@@ -980,20 +980,27 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Definition mem_state_memory_stack (ms : MemState) : memory_stack
     := ms.(ms_memory_stack).
 
+  Definition MemState_get_memory := mem_state_memory_stack.
+  Definition MemState_put_memory (mem' : memory_stack) (ms : MemState) : MemState :=
+    let '(mkMemState mem prov) := ms in
+    (mkMemState mem' prov).
+
   Definition mem_state_memory (ms : MemState) : memory
-    := fst ms.(ms_memory_stack).
+    := fst (MemState_get_memory ms).
 
   Definition mem_state_provenance (ms : MemState) : Provenance
     := ms.(ms_provenance).
 
+  Definition MemState_get_provenance := mem_state_provenance.
+
   Definition mem_state_frame_stack (ms : MemState) : FrameStack
     := snd ms.(ms_memory_stack).
 
-  Definition read_byte_MemPropT (ptr : addr) : MemPropT MemState SByte :=
+  Definition read_byte_MemPropT (ptr : addr) : MemPropT memory_stack SByte :=
     let addr := ptr_to_int ptr in
     let pr := address_provenance ptr in
-    ms <- get_mem_state;;
-    let mem := mem_state_memory ms in
+    mem_stack <- get_mem_state;;
+    let mem := fst mem_stack in
     match read_byte_raw mem addr with
     | None => raise_ub "Reading from unallocated memory."
     | Some byte =>
@@ -1005,9 +1012,9 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             ("Read from memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ show_prov pr ++ ", memory allocation id: " ++ Show.show (show_allocation_id aid) ++ " memory: " ++ Show.show (map (fun '(key, (_, aid)) => (key, show_allocation_id aid)) (IM.elements mem)))
     end.
 
-  Definition addr_allocated_prop (ptr : addr) (aid : AllocationId) : MemPropT MemState bool :=
-    ms <- get_mem_state;;
-    match read_byte_raw (mem_state_memory ms) (ptr_to_int ptr) with
+  Definition addr_allocated_prop (ptr : addr) (aid : AllocationId) : MemPropT memory_stack bool :=
+    mem <- get_mem_state;;
+    match read_byte_raw (fst mem) (ptr_to_int ptr) with
     | None => ret false
     | Some (byte, aid') =>
         ret (proj_sumbool (aid_eq_dec aid aid'))
@@ -1086,8 +1093,10 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     | Snoc s f => frame_stack_eqv s fs'
     end.
 
-  Definition mem_state_frame_stack_prop (ms : MemState) (fs : FrameStack) : Prop :=
-    frame_stack_eqv (mem_state_frame_stack ms) fs.
+  Definition memory_stack_frame_stack (mem : memory_stack) := snd mem.
+
+  Definition mem_state_frame_stack_prop (mem : memory_stack) (fs : FrameStack) : Prop :=
+    frame_stack_eqv (memory_stack_frame_stack mem) fs.
 
   (** Provenance / store ids *)
   Definition used_provenance_prop (ms : MemState) (pr : Provenance) : Prop :=
@@ -1126,12 +1135,14 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Lemma mem_state_fresh_provenance_fresh :
     forall (ms ms' : MemState) (pr : Provenance),
       mem_state_fresh_provenance ms = (pr, ms') ->
+      MemState_get_memory ms = MemState_get_memory ms' /\
       ~ used_provenance_prop ms pr /\ used_provenance_prop ms' pr.
   Proof.
     intros ms ms' pr MSFP.
     unfold mem_state_fresh_provenance in *.
     destruct ms; cbn in *; inv MSFP.
-    split.
+    split; [|split].
+    - reflexivity.
     - intros CONTRA;
       unfold used_provenance_prop in *.
       cbn in CONTRA.
@@ -1312,6 +1323,16 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     cbn in *; intros ptr; split; firstorder.
   Qed.
 
+  Lemma MemState_get_put_memory :
+    forall ms mem,
+      MemState_get_memory (MemState_put_memory mem ms) = mem.
+  Proof.
+    intros ms mem.
+    destruct ms.
+    cbn.
+    reflexivity.
+  Qed.
+
 End FiniteMemoryModelSpecPrimitives.
 
 Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) : MemoryModelExecPrimitives LP MP.
@@ -1341,7 +1362,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* Context `{MonadMemState MemState MemM}. *)
     (* Context `{RAISE_ERROR MemM} `{RAISE_UB MemM} `{RAISE_OOM MemM}. *)
     Context {ExtraState : Type}.
-    Context `{MemMonad MemState ExtraState Provenance MemM (itree Eff)}.
+    Context `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)}.
 
     (*** Data types *)
     Definition memory_empty : memory := IntMaps.empty.
@@ -1369,7 +1390,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     (*** Primitives on memory *)
     (** Reads *)
-    Definition read_byte `{MemMonad MemState ExtraState Provenance MemM (itree Eff)} (ptr : addr) : MemM SByte :=
+    Definition read_byte `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} (ptr : addr) : MemM SByte :=
       let addr := ptr_to_int ptr in
       let pr := address_provenance ptr in
       ms <- get_mem_state;;
@@ -1386,7 +1407,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       end.
 
     (** Writes *)
-    Definition write_byte `{MemMonad MemState ExtraState Provenance MemM (itree Eff)} (ptr : addr) (byte : SByte) : MemM unit :=
+    Definition write_byte `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} (ptr : addr) (byte : SByte) : MemM unit :=
       let addr := ptr_to_int ptr in
       let pr := address_provenance ptr in
       ms <- get_mem_state;;
@@ -1405,7 +1426,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       end.
 
     (** Allocations *)
-    Definition addr_allocated `{MemMonad MemState ExtraState Provenance MemM (itree Eff)} (ptr : addr) (aid : AllocationId) : MemM bool :=
+    Definition addr_allocated `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} (ptr : addr) (aid : AllocationId) : MemM bool :=
       ms <- get_mem_state;;
       match read_byte_raw (mem_state_memory ms) (ptr_to_int ptr) with
       | None => ret false
@@ -1457,7 +1478,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     #[global] Opaque add_all_to_frame.
     #[global] Opaque next_memory_key.
 
-    Definition allocate_bytes `{MemMonad MemState ExtraState Provenance MemM (itree Eff)} (dt : dtyp) (init_bytes : list SByte) : MemM addr :=
+    Definition allocate_bytes `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} (dt : dtyp) (init_bytes : list SByte) : MemM addr :=
       match dtyp_eq_dec dt DTYPE_Void with
       | left _ => raise_ub "Allocation of type void"
       | _ =>
@@ -1466,10 +1487,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           | right _ => raise_ub "Sizeof dtyp doesn't match number of bytes for initialization in allocation."
           | _ =>
               (* TODO: roll this into fresh provenance somehow? *)
-              ms <- get_mem_state;;
-              let '(pr, ms') := mem_state_fresh_provenance ms in
-              put_mem_state ms';;
-
+              pr <- fresh_provenance;;
               sid <- fresh_sid;;
               ms <- get_mem_state;;
               let mem_stack := ms_memory_stack ms in
@@ -1512,7 +1530,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       let pr := mem_state_provenance ms in
       mkMemState (mem, fs) pr.
 
-    Definition mempush `{MemMonad MemState ExtraState Provenance MemM (itree Eff)} : MemM unit :=
+    Definition mempush `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} : MemM unit :=
       ms <- get_mem_state;;
       let fs := mem_state_frame_stack ms in
       let fs' := push_frame_stack fs initial_frame in
@@ -1527,7 +1545,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Definition free_frame_memory (f : Frame) (m : memory) : memory :=
       fold_left (fun m key => free_byte key m) f m.
 
-    Definition mempop `{MemMonad MemState ExtraState Provenance MemM (itree Eff)} : MemM unit :=
+    Definition mempop `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} : MemM unit :=
       ms <- get_mem_state;;
       let (mem, fs) := ms_memory_stack ms in
       let f := peek_frame_stack fs in
@@ -1584,11 +1602,11 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* Admitted. *)
 
     Import Monad.
-    Definition exec_correct {MemM Eff ExtraState} `{MM: MemMonad MemState ExtraState Provenance MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT MemState X) : Prop :=
+    Definition exec_correct {MemM Eff ExtraState} `{MM: MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT MemState X) : Prop :=
       forall ms st,
-        (@MemMonad_valid_state MemState ExtraState Provenance MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ ms st) ->
+        (@MemMonad_valid_state MemState memory_stack ExtraState Provenance MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ms st) ->
         let t := MemMonad_run exec ms st in
-        let eqi := (@eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) in
+        let eqi := (@eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) in
         (* UB *)
         (exists msg_spec,
             spec ms (raise_ub msg_spec)) \/
@@ -1604,6 +1622,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           (forall st' ms' x,
               eqi _ t (ret (st', (ms', x))) ->
               spec ms (ret (ms', x))).
+
+    Definition exec_correct_memory {MemM Eff ExtraState} `{MM: MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT memory_stack X) : Prop :=
+      exec_correct exec (lift_memory_MemPropT spec).
 
     (* TODO: Move these tactics *)
     Ltac MemMonad_go :=
@@ -1704,15 +1725,37 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
            | tauto
         ]).
 
+    Ltac unfold_MemState_get_memory := 
+      unfold MemState_get_memory;
+      unfold mem_state_memory_stack;
+      unfold mem_state_memory.
+
     Ltac unfold_mem_state_memory :=
       unfold mem_state_memory;
       unfold fst;
       unfold ms_memory_stack.
 
+    Ltac unfold_MemState_get_memory_in := 
+      unfold MemState_get_memory in H;
+      unfold mem_state_memory_stack in H;
+      unfold mem_state_memory in H.
+
     Ltac unfold_mem_state_memory_in H :=
       unfold mem_state_memory in H;
       unfold fst in H;
       unfold ms_memory_stack in H.
+
+    Ltac solve_returns_provenance :=
+      let EQ := fresh "EQ" in
+      intros ? ? EQ; inv EQ; reflexivity.
+
+    Ltac break_byte_allocated_in ALLOC :=
+      destruct ALLOC as [?ms [?b [ALLOC [?EQ1 ?EQ2]]]]; subst;
+      destruct ALLOC as [ALLOC ?LIFT];
+      destruct ALLOC as [?ms' [?ms'' [[?EQ1 ?EQ2] ALLOC]]]; subst.
+
+    Ltac break_read_byte_prop_in READ :=
+      destruct READ as [?ms' [?ms'' [[?EQ1 ?EQ2] READ]]]; subst.
 
     (* TODO: move this *)
     Lemma byte_allocated_mem_stack :
@@ -1723,17 +1766,11 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Proof.
       intros [ms1 pr1] [ms2 pr2] addr aid ALLOC EQ.
       cbn in EQ; subst.
-      unfold byte_allocated, byte_allocated_MemPropT in *.
-      cbn in *.
-      destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
-      destruct ALLOC as [ms' [b [ALLOC [EQ1 EQ2]]]]; subst.
-      destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
-      repeat eexists.
+      break_byte_allocated_in ALLOC.
+      repeat eexists; [| solve_returns_provenance].
       unfold mem_state_memory in *; cbn in *.
-      break_match.
-      - break_match.
+      break_match; [break_match|];
         tauto.
-      - tauto.
     Qed.
 
     (* TODO: move this *)
@@ -1743,27 +1780,41 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         mem_state_memory_stack ms1 = mem_state_memory_stack ms2 ->
         read_byte_prop ms2 addr sbyte.
     Proof.
-      intros [ms1 pr1] [ms2 pr2] addr aid ALLOC EQ.
+      intros [ms1 pr1] [ms2 pr2] addr aid READ EQ.
       cbn in EQ; subst.
-      unfold read_byte_prop, read_byte_MemPropT in *.
-      cbn in *.
-      destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
+      break_read_byte_prop_in READ.
       repeat eexists.
       unfold mem_state_memory in *; cbn in *.
-      break_match.
-      - break_match; tauto.
-      - tauto.
+      break_match; [break_match|]; tauto.
     Qed.
+
+    Ltac rewrite_set_byte_eq :=
+      rewrite set_byte_raw_eq; [|solve [eauto]].
+
+    Ltac rewrite_set_byte_neq :=
+      first [
+          match goal with
+          | H: read_byte_raw (set_byte_raw _ _ _) _ = _ |- _
+            => rewrite set_byte_raw_neq in H; [| solve [eauto]]
+          end
+        | rewrite set_byte_raw_neq; [| solve [eauto]]
+        ].
 
     Ltac solve_byte_allocated :=
       solve [ eapply byte_allocated_mem_stack; eauto
-            | repeat eexists;
-              first [ cbn; (* This was unfold_mem_state_memory, but I think with read_byte_raw / write_byte raw opaque it's fine to cbn *)
-                      rewrite set_byte_raw_eq; [|solve [eauto]]
+            | repeat eexists; [| solve_returns_provenance];
+              unfold mem_state_memory in *;
+              first [ cbn;
+                      rewrite_set_byte_eq
+                    | cbn;
+                      rewrite_set_byte_neq
                     | subst_mempropt
                 ];
-              split; try reflexivity;
-              first [rewrite aid_access_allowed_refl | apply aid_eq_dec_refl]; auto
+              first
+                [ split; try reflexivity;
+                  first [rewrite aid_access_allowed_refl | apply aid_eq_dec_refl]; auto
+                | break_match; [break_match|]; split; repeat inv_option; eauto
+                ]
         ].
 
     Ltac solve_allocations_preserved :=
@@ -1793,6 +1844,11 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Ltac break_access_hyps :=
       break_read_byte_allowed_hyps;
       break_write_byte_allowed_hyps.
+
+    Ltac break_addr_allocated_prop_in ALLOCATED :=        
+      cbn in ALLOCATED;
+      destruct ALLOCATED as (?ms' & ?b & ALLOCATED);
+      destruct ALLOCATED as [[?C1 ?C2] ALLOCATED]; subst.
 
     Hint Rewrite int_to_ptr_provenance : PROVENANCE.
     Hint Resolve access_allowed_refl : ACCESS_ALLOWED.
@@ -1892,14 +1948,16 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         mem_state_memory m2 = set_byte_raw (mem_state_memory m1) (ptr_to_int ptr) (new, new_aid) ->
         byte_allocated m2 ptr new_aid.
     Proof.
-      intros ptr aid new new_aid m1 m2 [aid' [ms [GET ALLOCATED]]] MEM.
-      inversion GET; subst.
-      cbn in ALLOCATED.
-      destruct ALLOCATED as (ms' & b & ALLOCATED).
-      destruct ALLOCATED as [ALLOCATED [C1 C2]]; subst.
-      destruct ALLOCATED as [ms'' [ms''' [[C1 C2] ALLOCATED]]]; subst.
-
+      intros ptr aid new new_aid m1 m2 [aid' [ms [[ALLOCATED LIFT] GET]]] MEM.
       cbn in GET.
+      inversion GET; subst.
+      break_addr_allocated_prop_in ALLOCATED.
+
+      unfold mem_state_memory in *.
+      do 2 eexists.
+      split; [| cbn; tauto].
+      split; [| solve_returns_provenance].
+      cbn.
       repeat eexists.
       rewrite MEM.
       rewrite set_byte_raw_eq; auto.
@@ -1914,17 +1972,21 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         mem_state_memory m2 = set_byte_raw (mem_state_memory m1) (ptr_to_int new_ptr) (new, new_aid) ->
         byte_allocated m2 ptr aid.
     Proof.
-      intros ptr aid new_ptr new new_aid m1 m2 [aid' [ms [GET ALLOCATED]]] DISJOINT MEM.
+      intros ptr aid new_ptr new new_aid m1 m2 [aid' [ms [[ALLOCATED LIFT] GET]]] DISJOINT MEM.
       inversion GET; subst.
       cbn in ALLOCATED.
       destruct ALLOCATED as (ms' & b & ALLOCATED).
-      destruct ALLOCATED as [ALLOCATED [C1 C2]]; subst.
-      destruct ALLOCATED as [ms'' [ms''' [[C1 C2] ALLOCATED]]]; subst.
+      destruct ALLOCATED as [[C1 C2] ALLOCATED]; subst. 
+
+      do 2 eexists.
+      split; [| cbn; tauto].
+      split; [| solve_returns_provenance].
 
       repeat eexists.
+      unfold mem_state_memory in *.
       rewrite MEM.
       unfold mem_byte in *.
-      rewrite set_byte_raw_neq; auto.
+      rewrite set_byte_raw_neq; auto.        
       break_match.
       break_match.
       destruct ALLOCATED.
@@ -1958,7 +2020,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     (** Correctness of the main operations on memory *)
     Lemma read_byte_correct :
-      forall ptr, exec_correct (read_byte ptr) (read_byte_MemPropT ptr).
+      forall ptr, exec_correct_memory (read_byte ptr) (read_byte_MemPropT ptr).
     Proof.
       unfold exec_correct.
       intros ptr ms st VALID.
@@ -2016,7 +2078,13 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           rewrite MemMonad_run_ret in RUN; [| solve_MemMonad_valid_state].
 
           apply eq1_ret_ret in RUN; [inv RUN | typeclasses eauto].
+          split; [| solve_returns_provenance].
+          
           cbn; do 2 eexists.
+          unfold MemState_get_memory in *.
+          unfold mem_state_memory_stack in *.
+          unfold mem_state_memory in *.
+
           rewrite READ; cbn.
           rewrite ACCESS; cbn.
           eauto.
@@ -2025,13 +2093,20 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         Ltac solve_read_byte_MemPropT_contra READ ACCESS :=
           solve [repeat eexists; right;
                  repeat eexists; cbn;
+                 unfold MemState_get_memory in *;
+                 unfold mem_state_memory_stack in *;
+                 unfold mem_state_memory in *;
                  try rewrite READ in *; cbn in *;
                  try rewrite ACCESS in *; cbn in *;
                  tauto].
 
+        repeat eexists; [| solve_returns_provenance].
+        unfold mem_state_memory in *.
         solve_read_byte_MemPropT_contra READ ACCESS.
       - (* UB from accessing unallocated memory *)
         left.
+        repeat eexists; [| solve_returns_provenance].
+        unfold mem_state_memory in *.
         solve_read_byte_MemPropT_contra READ ACCESS.
 
         Unshelve.
@@ -2128,36 +2203,18 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 - (* TODO: solve_read_byte_allowed *)
                   apply read_byte_allowed_spec in READBYTE.
                   (* TODO: is there a way to avoid having to do these destructs before eexists? *)
-                  destruct READBYTE as [aid' [ALLOCATED ALLOWED]].
-                  unfold byte_allocated, byte_allocated_MemPropT in ALLOCATED.
-                  cbn in ALLOCATED.
-                  destruct ALLOCATED as [ms' [ms'' [[EQ1 EQ2] ALLOCATED]]]; subst.
-                  destruct ALLOCATED as [ms'' [a [ALLOCATED [EQ1 EQ2]]]]; subst.
-                  destruct ALLOCATED as [ms'' [ms''' [[EQ1 EQ2] ALLOCATED]]]; subst.
+                  break_access_hyps.
+                  break_byte_allocated_in ALLOC.
                   break_match_hyp.
                   break_match_hyp.
                   { (* Read of ptr' succeeds *)
-                    destruct ALLOCATED as [_ AIDEQ].
+                    destruct ALLOC as [_ AIDEQ].
 
-                    eexists; split.
-                    { (* TODO: solve_byte_allocated *)
-                      cbn.
-                      repeat eexists.
-                      cbn.
-                      rewrite set_byte_raw_neq; [| solve [eauto]].
-
-                      break_match.
-                      - break_match; split; inv Heqo; auto.
-                        apply AIDEQ.
-                      - inv Heqo.
-                    }
-                    { (* TODO: solve_access_allowed *)
-                      eapply ALLOWED.
-                    }
+                    eexists; split; [solve_byte_allocated | solve_access_allowed].
                   }
 
                   { (* Read fails *)
-                    destruct ALLOCATED as [_ EQ].
+                    destruct ALLOC as [_ EQ].
                     inv EQ.
                   }
                 - (* TODO: solve_read_byte_prop. *)
@@ -2169,70 +2226,39 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
                   repeat eexists.
                   cbn.
+                  unfold mem_state_memory in *.
                   rewrite set_byte_raw_neq; [| solve [eauto]].
-                  break_match; [break_match|].
-                  { destruct READBYTE; split; auto.
-                  }
-                  { firstorder.
-                  }
-                  { firstorder.
-                  }
+                  break_match; [break_match|]; firstorder.
               }
 
               { split.
                 - (* TODO: solve_read_byte_allowed *)
                   apply read_byte_allowed_spec in READBYTE.
                   (* TODO: is there a way to avoid having to do these destructs before eexists? *)
-                  destruct READBYTE as [aid' [ALLOCATED ALLOWED]].
-                  unfold byte_allocated, byte_allocated_MemPropT in ALLOCATED.
-                  cbn in ALLOCATED.
-                  destruct ALLOCATED as [ms' [ms'' [[EQ1 EQ2] ALLOCATED]]]; subst.
-                  destruct ALLOCATED as [ms'' [a [ALLOCATED [EQ1 EQ2]]]]; subst.
-                  destruct ALLOCATED as [ms'' [ms''' [[EQ1 EQ2] ALLOCATED]]]; subst.
+                  break_access_hyps.
+                  break_byte_allocated_in ALLOC.
+                  cbn in ALLOC; subst.
                   break_match_hyp.
                   break_match_hyp.
                   { (* Read of ptr' succeeds *)
-                    destruct ALLOCATED as [_ AIDEQ].
+                    destruct ALLOC as [_ AIDEQ].
 
-                    eexists; split.
-                    { (* TODO: solve_byte_allocated *)
-                      cbn.
-                      repeat eexists.
-                      cbn.
-                      cbn in Heqo.
-                      rewrite set_byte_raw_neq in Heqo; [| solve [eauto]].
-
-                      break_match.
-                      - break_match; split; inv Heqo; auto.
-                        apply AIDEQ.
-                      - inv Heqo.
-                    }
-                    { (* TODO: solve_access_allowed *)
-                      eapply ALLOWED.
-                    }
+                    eexists; split; [solve_byte_allocated | solve_access_allowed].
                   }
 
                   { (* Read fails *)
-                    destruct ALLOCATED as [_ EQ].
+                    destruct ALLOC as [_ EQ].
                     inv EQ.
                   }
                 - (* TODO: solve_read_byte_prop. *)
                   apply read_byte_value in READBYTE.
                   (* TODO: is there a way to avoid having to do these destructs before eexists? *)
-                  unfold read_byte_prop, read_byte_MemPropT in *.
-                  cbn in READBYTE. cbn.
-                  destruct READBYTE as [ms' [ms'' [[EQ1 EQ2] READBYTE]]]; subst.
-
+                  break_read_byte_prop_in READBYTE.
+                  cbn in *.
                   repeat eexists.
-                  cbn in READBYTE.
+                  unfold mem_state_memory in *.
                   rewrite set_byte_raw_neq in READBYTE; [| solve [eauto]].
-                  break_match; [break_match|].
-                  { destruct READBYTE; split; auto.
-                  }
-                  { firstorder.
-                  }
-                  { firstorder.
-                  }
+                  break_match; [break_match|]; firstorder.
               }
           * (* TODO: solve_write_byte_operation_invariants *)
             split.
@@ -2243,7 +2269,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               split.
               { (* TODO: solve_byte_allocated *)
                 intros ALLOC.
-                repeat eexists.
+
+                repeat eexists; [| solve_returns_provenance].
                 cbn.
                 match goal with
                 | |- context [ read_byte_raw (set_byte_raw _ ?p1 _) ?p2 ] =>
@@ -2252,36 +2279,24 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
                 - rewrite set_byte_raw_eq; [| solve [eauto]].
                   split; auto.
-                  destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
-                  rename ms' into ms.
-                  destruct ALLOC as [ms' [b [ALLOC [EQ1 EQ2]]]]; subst.
-                  destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
+
+                  break_byte_allocated_in ALLOC.
                   rewrite NDISJOINT in *.
+                  unfold mem_state_memory in *.
                   rewrite READ in *.
                   destruct ALLOC; auto.
                 - rewrite set_byte_raw_neq; [| solve [eauto]].
-                  destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
-                  rename ms' into ms.
-                  destruct ALLOC as [ms' [b [ALLOC [EQ1 EQ2]]]]; subst.
-                  destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
-
-                  break_match.
-                  + break_match.
-                    destruct ALLOC; auto.
-                  + destruct ALLOC as [_ CONTRA].
-                    inv CONTRA.
+                  break_byte_allocated_in ALLOC.
+                  unfold mem_state_memory in *.
+                  break_match; [break_match|]; firstorder.
               }
-{ (* TODO: solve_byte_allocated *)
+              { (* TODO: solve_byte_allocated *)
                 intros ALLOC.
 
-                repeat eexists.
-                cbn.
-                cbn in ALLOC.
-                destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
-                destruct ALLOC as [ms' [b [ALLOC [EQ1 EQ2]]]]; subst.
-                destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
-                cbn in ALLOC.
-
+                repeat eexists; [| solve_returns_provenance].
+                break_byte_allocated_in ALLOC.
+                unfold mem_state_memory in *.
+                cbn in *.
                 match goal with
                 | ALLOC : context [ read_byte_raw (set_byte_raw _ ?p1 _) ?p2 ] |- _ =>
                     pose proof Z.eq_dec p1 p2 as [NDISJOINT | DISJOINT]
@@ -2292,9 +2307,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   rewrite READ in *.
                   tauto.
                 - rewrite set_byte_raw_neq in ALLOC; [| solve [eauto]].
-                  break_match.
-                  + break_match. tauto.
-                  + tauto.
+                  break_match; [break_match|]; firstorder.
               }
             -- (* Frame stack preserved *)
               solve_frame_stack_preserved.
@@ -2302,7 +2315,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               unfold read_byte_allowed_all_preserved.
               intros addr.
               split; intros [aid' [ALLOC ALLOWED]]; exists aid'.
-              { split; repeat eexists; cbn.
+              { unfold mem_state_memory in *.
+                split; repeat eexists; [|solve_returns_provenance|]; cbn.
                 - match goal with
                   | |- context [ read_byte_raw (set_byte_raw _ ?p1 _) ?p2 ] =>
                       pose proof Z.eq_dec p1 p2 as [NDISJOINT | DISJOINT]
@@ -2310,37 +2324,28 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   + rewrite NDISJOINT in *.
                     rewrite set_byte_raw_eq; [| solve [eauto]].
                     split; auto.
-                    unfold byte_allocated, byte_allocated_MemPropT in ALLOC.
+                    break_byte_allocated_in ALLOC.
+                    break_match_hyp.
+                    break_match_hyp.
                     cbn in ALLOC.
-                    destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
-                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
-                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
-                    break_match_hyp.
-                    break_match_hyp.
-                    inversion READ; subst.
-                    tauto.
+                    cbn in ALLOWED.
+                    inversion READ; subst; tauto.
                     destruct ALLOC as [_ CONTRA].
                     inv CONTRA.
                   + rewrite set_byte_raw_neq; [| solve [eauto]].
-                    unfold byte_allocated, byte_allocated_MemPropT in ALLOC.
-                    cbn in ALLOC.
-                    destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
-                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
-                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    break_byte_allocated_in ALLOC.
                     break_match_hyp.
                     break_match_hyp.
                     inversion READ; subst.
-                    tauto.
+                    firstorder.
                     destruct ALLOC as [_ CONTRA].
                     inv CONTRA.
                 - auto.
               }
-              { split; repeat eexists; cbn.
-                - cbn in ALLOC.
-                  destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
-                  destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
-                  destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
-                  cbn in ALLOC.
+              { unfold mem_state_memory in *.
+                split; repeat eexists; [|solve_returns_provenance|]; cbn.
+                - break_byte_allocated_in ALLOC.
+                  cbn in *.
                   match goal with
                   | ALLOC : context [ read_byte_raw (set_byte_raw _ ?p1 _) ?p2 ] |- _ =>
                       pose proof Z.eq_dec p1 p2 as [NDISJOINT | DISJOINT]
@@ -2359,7 +2364,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             -- (* TODO: solve_write_byte_allowed_all_preserved *)
               intros addr.
               split; intros [aid' [ALLOC ALLOWED]]; exists aid'.
-              { split; repeat eexists; cbn.
+              { unfold mem_state_memory in *.
+                split; repeat eexists; [|solve_returns_provenance|]; cbn.
                 - match goal with
                   | |- context [ read_byte_raw (set_byte_raw _ ?p1 _) ?p2 ] =>
                       pose proof Z.eq_dec p1 p2 as [NDISJOINT | DISJOINT]
@@ -2367,37 +2373,27 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   + rewrite NDISJOINT in *.
                     rewrite set_byte_raw_eq; [| solve [eauto]].
                     split; auto.
-                    unfold byte_allocated, byte_allocated_MemPropT in ALLOC.
-                    cbn in ALLOC.
-                    destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
-                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
-                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    break_byte_allocated_in ALLOC.
                     break_match_hyp.
                     break_match_hyp.
                     inversion READ; subst.
-                    tauto.
+                    firstorder.
                     destruct ALLOC as [_ CONTRA].
                     inv CONTRA.
                   + rewrite set_byte_raw_neq; [| solve [eauto]].
-                    unfold byte_allocated, byte_allocated_MemPropT in ALLOC.
-                    cbn in ALLOC.
-                    destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
-                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
-                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    break_byte_allocated_in ALLOC.
                     break_match_hyp.
                     break_match_hyp.
                     inversion READ; subst.
-                    tauto.
+                    firstorder.
                     destruct ALLOC as [_ CONTRA].
                     inv CONTRA.
                 - auto.
               }
-              { split; repeat eexists; cbn.
-                - cbn in ALLOC.
-                  destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
-                  destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
-                  destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
-                  cbn in ALLOC.
+              { unfold mem_state_memory in *.
+                split; repeat eexists; [|solve_returns_provenance|]; cbn.
+                - break_byte_allocated_in ALLOC.
+                  cbn in *.
                   match goal with
                   | ALLOC : context [ read_byte_raw (set_byte_raw _ ?p1 _) ?p2 ] |- _ =>
                       pose proof Z.eq_dec p1 p2 as [NDISJOINT | DISJOINT]
@@ -2437,11 +2433,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         unfold addr_allocated_prop in *.
         destruct byte_write_succeeds0 as [aid' [ALLOC ALLOWED]].
 
-        cbn in ALLOC.
-        destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
-        rename ms'' into ms.
-        destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
-        destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+        unfold mem_state_memory in *.
+        break_byte_allocated_in ALLOC.
+        cbn in *.
         rewrite READ in *.
         destruct ALLOC as [EQ AID_ALLOWED].
 
@@ -2459,11 +2453,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         unfold addr_allocated_prop in *.
         destruct byte_write_succeeds0 as [aid' [ALLOC ALLOWED]].
 
-        cbn in ALLOC.
-        destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
-        rename ms'' into ms.
-        destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
-        destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+        unfold mem_state_memory in *.
+        break_byte_allocated_in ALLOC.
+        cbn in *.
         rewrite READ in *.
         destruct ALLOC as [EQ AID_ALLOWED].
         inv AID_ALLOWED.
@@ -2561,26 +2553,13 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
           { cbn in RUN.
             rewrite MemMonad_run_bind in RUN; auto.
-            rewrite MemMonad_get_mem_state in RUN.
+            pose proof MemMonad_run_fresh_provenance ms st VALID
+              as [ms' [pr' [FRESH_PR [VALID' [GET_PR [NUSED_PR USED_PR]]]]]].
+            rewrite FRESH_PR in RUN.
             rewrite bind_ret_l in RUN.
-            destruct mem_state_fresh_provenance as [pr' ms'] eqn:FRESH.
 
             rewrite MemMonad_run_bind in RUN; auto.
-            rewrite MemMonad_put_mem_state in RUN.
-            rewrite bind_ret_l in RUN.
-
-            assert (@MemMonad_valid_state MemState ExtraState Provenance MemM (itree Eff) MM MRun MPROV MSID MMS SIDFRESH PROVFRESH MERR MUB MOOM RunERR RunUB RunOOM H ms' st) as VALID'.
-            { (* TODO: ugh, probably need to change something to make sure I know this info *)
-              unfold mem_state_fresh_provenance in FRESH.
-              destruct ms.
-              inv FRESH.
-              admit.
-            }
-
-            unfold fresh_sid in RUN.
-            repeat red in RUN.
             pose proof MemMonad_run_fresh_sid ms' st VALID' as [st' [sid [RUN_FRESH_SID [VALID'' FRESH_SID]]]].
-            rewrite MemMonad_run_bind in RUN; [| tauto].
             rewrite RUN_FRESH_SID in RUN.
             rewrite bind_ret_l in RUN.
 
@@ -2591,9 +2570,11 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             destruct ms as [ms_stack ms_prov].
             destruct ms_stack as [mem frames].
 
+            destruct ms' as [[mem' fs'] pr''].
+            unfold ms_get_memory in GET_PR.
+            cbn in GET_PR.
+            inv GET_PR.
             cbn in RUN.
-
-            inversion FRESH; subst.
 
             (* TODO: need to know something about get_consecutive_ptrs *)
             unfold get_consecutive_ptrs in *; cbn in RUN.

@@ -378,14 +378,14 @@ Proof.
           (forall res, t ≈ ret res <-> m (ret res))).
 Defined.
 
-Definition MemPropT_lift_PropT_fresh {MemState Provenance X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (m : MemPropT MemState X) : 
-  stateT store_id (stateT Provenance (stateT MemState (PropT E))) X.
+Definition MemPropT_lift_PropT_fresh {MemState X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (m : MemPropT MemState X) : 
+  stateT store_id (stateT MemState (PropT E)) X.
 Proof.
   unfold PropT, MemPropT, stateT in *.
-  intros sid pr ms t.
+  intros sid ms t.
   specialize (m ms).
   refine (((exists msg, t ≈ raise_ub msg) <-> (forall res, ~ m res)) /\
           ((exists msg, t ≈ raise_error msg) <-> (exists msg, m (raise_error msg))) /\
           ((exists msg, t ≈ raise_oom msg) <-> (exists msg, m (raise_oom msg))) /\
-          (forall sid ms x, t ≈ ret (ms, (pr, (sid, x))) <-> m (ret (ms, x)))).
+          (forall sid ms x, t ≈ ret (ms, (sid, x)) <-> m (ret (ms, x)))).
 Defined.
