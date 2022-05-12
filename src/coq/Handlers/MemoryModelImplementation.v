@@ -1844,6 +1844,24 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Ltac destruct_read_byte_allowed_in READ :=
       destruct READ as [?aid [?ALLOC ?ALLOWED]].
 
+    Ltac break_read_byte_allowed_in READ :=
+      cbn in READ;
+      destruct READ as [?aid READ];
+      destruct READ as [READ ?ALLOWED];
+      destruct READ as [?ms' [?ms'' [READ [?EQ1 ?EQ2]]]]; subst;
+      destruct READ as [READ ?LIFT];
+      destruct READ as [?ms' [?ms'' [[?EQ1 ?EQ2] READ]]]; subst;
+      cbn in READ.
+
+    Ltac break_write_byte_allowed_in WRITE :=
+      destruct WRITE as [?aid WRITE];
+      destruct WRITE as [WRITE ?ALLOWED];
+      destruct WRITE as [?ms' [?b [WRITE [?EQ1 ?EQ2]]]]; subst;
+      destruct WRITE as [WRITE ?LIFT];
+      cbn in WRITE;
+      destruct WRITE as [?ms' [?ms'' [[?EQ1 ?EQ2] ?WRITE]]]; subst;
+      cbn in WRITE.
+
     Ltac destruct_write_byte_allowed_in WRITE :=
       destruct WRITE as [?aid [?ALLOC ?ALLOWED]].
 
@@ -4705,6 +4723,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         Proof.
           intros [[m fsm] pr] fs.
           red; cbn.
+          red.
           reflexivity.
         Qed.
 
@@ -4715,6 +4734,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         Proof.
           intros [[m fsm] pr] fs EQ; subst.
           red; cbn.
+          red.
           reflexivity.
         Qed.
 
@@ -4727,6 +4747,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           intros [[m fsm] pr] fs fs' fs'' EQV MEMPROP.
           red; cbn.
           red in MEMPROP; cbn in MEMPROP.
+          red. red in MEMPROP.
           rewrite <- EQV.
           auto.
         Qed.
@@ -4813,6 +4834,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         apply push_frame_stack_correct in PUSH_INIT.
 
         unfold mem_state_frame_stack_prop in POP.
+        red in POP.
         rewrite <- POP in PUSH.
         rewrite EQinit in PUSH.
 
@@ -4837,23 +4859,17 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   split; intros READ;
                   cbn in *.
 
-                - destruct READ as [aid READ].
-                  destruct READ as [READ ALLOWED].
-                  destruct READ as [ms' [ms'' [[EQ1 EQ2] READ]]]; subst.
-                  destruct READ as [ms' [b [[ms'' [ms''' [[EQ1' EQ2'] READ]]] [EQ1 EQ2]]]]; subst.
+                - break_read_byte_allowed_in READ.
 
                   exists aid.
-                  repeat eexists; auto.
+                  repeat eexists; [| solve_returns_provenance |]; auto.
 
                   cbn in *.
                   break_match; [break_match|]; tauto.
-                - destruct READ as [aid READ].
-                  destruct READ as [READ ALLOWED].
-                  destruct READ as [ms' [ms'' [[EQ1 EQ2] READ]]]; subst.
-                  destruct READ as [ms' [b [[ms'' [ms''' [[EQ1' EQ2'] READ]]] [EQ1 EQ2]]]]; subst.
+                - break_read_byte_allowed_in READ.
 
                   exists aid.
-                  repeat eexists; auto.
+                  repeat eexists; [| solve_returns_provenance |]; auto.
 
                   cbn in *.
                   break_match; [break_match|]; tauto.
@@ -4870,23 +4886,17 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   split; intros WRITE;
                   cbn in *.
 
-                - destruct WRITE as [aid WRITE].
-                  destruct WRITE as [WRITE ALLOWED].
-                  destruct WRITE as [ms' [ms'' [[EQ1 EQ2] WRITE]]]; subst.
-                  destruct WRITE as [ms' [b [[ms'' [ms''' [[EQ1' EQ2'] WRITE]]] [EQ1 EQ2]]]]; subst.
+                - break_write_byte_allowed_in WRITE.
 
                   exists aid.
-                  repeat eexists; auto.
+                  repeat eexists; [| solve_returns_provenance |]; auto.
 
                   cbn in *.
                   break_match; [break_match|]; tauto.
-                - destruct WRITE as [aid WRITE].
-                  destruct WRITE as [WRITE ALLOWED].
-                  destruct WRITE as [ms' [ms'' [[EQ1 EQ2] WRITE]]]; subst.
-                  destruct WRITE as [ms' [b [[ms'' [ms''' [[EQ1' EQ2'] WRITE]]] [EQ1 EQ2]]]]; subst.
+                - break_write_byte_allowed_in WRITE.
 
                   exists aid.
-                  repeat eexists; auto.
+                  repeat eexists; [| solve_returns_provenance |]; auto.
 
                   cbn in *.
                   break_match; [break_match|]; tauto.
@@ -4944,26 +4954,22 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
             - destruct ms as [[ms fs] pr].
               cbn in *.
-              destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
-              destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
-              destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+              break_byte_allocated_in ALLOC.
               cbn in ALLOC.
               unfold mem_state_memory in ALLOC.
               cbn in ALLOC.
 
-              repeat eexists.
+              repeat eexists; [| solve_returns_provenance].
               cbn.
               break_match; [break_match|]; tauto.
             - destruct ms as [[ms fs] pr].
               cbn in *.
-              destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
-              destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
-              destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+              break_byte_allocated_in ALLOC.
               cbn in ALLOC.
               unfold mem_state_memory in ALLOC.
               cbn in ALLOC.
 
-              repeat eexists.
+              repeat eexists; [| solve_returns_provenance].
               cbn.
               break_match; [break_match|]; tauto.
           Qed.
@@ -5121,16 +5127,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             Proof.
               intros ms ms' m m' ptr FREE MS MS'.
               intros aid CONTRA.
-              unfold byte_allocated in CONTRA.
+              break_byte_allocated_in CONTRA.
               cbn in CONTRA.
-              destruct CONTRA as [ms'' [ms''' [[EQ1 EQ2] CONTRA]]]; subst.
-              destruct CONTRA as [ms''' [b [CONTRA [EQ1 EQ2]]]]; subst.
-              destruct CONTRA as [ms''' [ms'''' [[EQ1 EQ2] CONTRA]]]; subst.
               break_match; [|inv CONTRA; inv H1].
               break_match. subst.
 
               symmetry in MS'.
               apply free_byte_read_byte_raw in MS'.
+              unfold mem_state_memory in *.
               rewrite MS' in Heqo.
               inv Heqo.
             Qed.
@@ -5145,16 +5149,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             Proof.
               intros ms ms' m m' f ptr FREE IN MS MS'.
               intros aid CONTRA.
-              unfold byte_allocated in CONTRA.
+              break_byte_allocated_in CONTRA.
               cbn in CONTRA.
-              destruct CONTRA as [ms'' [ms''' [[EQ1 EQ2] CONTRA]]]; subst.
-              destruct CONTRA as [ms''' [b [CONTRA [EQ1 EQ2]]]]; subst.
-              destruct CONTRA as [ms''' [ms'''' [[EQ1 EQ2] CONTRA]]]; subst.
               break_match; [|inv CONTRA; inv H1].
               break_match. subst.
 
               symmetry in MS'.
               eapply free_frame_memory_read_byte_raw in MS'; eauto.
+              unfold mem_state_memory in *.
               rewrite Heqo in MS'.
               inv MS'.
             Qed.
@@ -5242,32 +5244,30 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               intros ms ms' m m' ptr ptr' aid FREE MS MS' DISJOINT.
               split; intro ALLOC.
               - destruct ms as [[ms fs] pr].
-                cbn in *.
-                destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
-                destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
-                destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                break_byte_allocated_in ALLOC.
                 cbn in ALLOC.
                 unfold mem_state_memory in ALLOC.
                 cbn in ALLOC.
 
-                repeat eexists.
+                repeat eexists; [| solve_returns_provenance].
+                unfold mem_state_memory in *.
                 rewrite MS'.
                 erewrite free_byte_disjoint; eauto.
+                cbn in *.
                 break_match.
                 break_match.
                 tauto.
                 tauto.
               - destruct ms as [[ms fs] pr].
                 cbn in *.
-                destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
-                destruct ALLOC as [ms''' [a [ALLOC [EQ1 EQ2]]]]; subst.
-                destruct ALLOC as [ms''' [ms'''' [[EQ1 EQ2] ALLOC]]]; subst.
+                break_byte_allocated_in ALLOC.
                 cbn in ALLOC.
 
+                unfold mem_state_memory in *.
                 rewrite MS' in ALLOC.
                 erewrite free_byte_disjoint in ALLOC; eauto.
 
-                repeat eexists.
+                repeat eexists; [| solve_returns_provenance].
                 cbn.
                 break_match.
                 break_match.
@@ -5285,24 +5285,22 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               split; intros ALLOC.
               - destruct ms as [[ms fs] pr].
                 cbn in *.
-                destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
-                destruct ALLOC as [ms''' [a [ALLOC [EQ1 EQ2]]]]; subst.
-                destruct ALLOC as [ms''' [ms'''' [[EQ1 EQ2] ALLOC]]]; subst.
+                break_byte_allocated_in ALLOC.
                 cbn in ALLOC.
 
-                repeat eexists.
+                repeat eexists; [| solve_returns_provenance].
+                unfold mem_state_memory in *.
                 break_match.
                 break_match.
                 tauto.
                 tauto.
               - destruct ms as [[ms fs] pr].
                 cbn in *.
-                destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
-                destruct ALLOC as [ms''' [a [ALLOC [EQ1 EQ2]]]]; subst.
-                destruct ALLOC as [ms''' [ms'''' [[EQ1 EQ2] ALLOC]]]; subst.
+                break_byte_allocated_in ALLOC.
                 cbn in ALLOC.
 
-                repeat eexists.
+                repeat eexists; [| solve_returns_provenance].
+                unfold mem_state_memory in *.
                 cbn.
                 break_match.
                 break_match.
@@ -5368,6 +5366,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               apply NIN.
               intros fs' FS' f' PEEK'.
               unfold mem_state_frame_stack_prop in *.
+              unfold memory_stack_frame_stack_prop in *.
               rewrite FS in FS'.
               rewrite <- FS' in PEEK'.
               erewrite peek_frame_stack_prop_frame_eqv
