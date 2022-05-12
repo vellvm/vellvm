@@ -1136,13 +1136,20 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     forall (ms ms' : MemState) (pr : Provenance),
       mem_state_fresh_provenance ms = (pr, ms') ->
       MemState_get_memory ms = MemState_get_memory ms' /\
+        (forall pr, used_provenance_prop ms pr -> used_provenance_prop ms' pr) /\
       ~ used_provenance_prop ms pr /\ used_provenance_prop ms' pr.
   Proof.
     intros ms ms' pr MSFP.
     unfold mem_state_fresh_provenance in *.
     destruct ms; cbn in *; inv MSFP.
-    split; [|split].
+    split; [|split; [|split]].
     - reflexivity.
+    - intros pr H.
+      unfold used_provenance_prop in *.
+      cbn in *.
+      eapply provenance_lt_trans.
+      apply H.
+      apply provenance_lt_next_provenance.
     - intros CONTRA;
       unfold used_provenance_prop in *.
       cbn in CONTRA.
@@ -1332,6 +1339,12 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     cbn.
     reflexivity.
   Qed.
+
+  #[global] Instance MemState_memory_MemStateMem : MemStateMem MemState memory_stack :=
+    {| ms_get_memory := MemState_get_memory;
+      ms_put_memory := MemState_put_memory;
+      ms_get_put_memory := MemState_get_put_memory;
+    |}.
 
 End FiniteMemoryModelSpecPrimitives.
 
@@ -1604,9 +1617,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Import Monad.
     Definition exec_correct {MemM Eff ExtraState} `{MM: MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT MemState X) : Prop :=
       forall ms st,
-        (@MemMonad_valid_state MemState memory_stack ExtraState Provenance MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ms st) ->
+        (@MemMonad_valid_state MemState memory_stack ExtraState Provenance MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ ms st) ->
         let t := MemMonad_run exec ms st in
-        let eqi := (@eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) in
+        let eqi := (@eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) in
         (* UB *)
         (exists msg_spec,
             spec ms (raise_ub msg_spec)) \/
@@ -2554,7 +2567,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           { cbn in RUN.
             rewrite MemMonad_run_bind in RUN; auto.
             pose proof MemMonad_run_fresh_provenance ms st VALID
-              as [ms' [pr' [FRESH_PR [VALID' [GET_PR [NUSED_PR USED_PR]]]]]].
+              as [ms' [pr' [FRESH_PR [VALID' [GET_PR [EXTEND_PR [NUSED_PR USED_PR]]]]]]].
             rewrite FRESH_PR in RUN.
             rewrite bind_ret_l in RUN.
 
@@ -2575,6 +2588,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             cbn in GET_PR.
             inv GET_PR.
             cbn in RUN.
+            assert (mem' = mem) as MEMEQ by admit.
+            assert (fs' = frames) as FRAMESEQ by admit.
+            subst.
 
             (* TODO: need to know something about get_consecutive_ptrs *)
             unfold get_consecutive_ptrs in *; cbn in RUN.
@@ -2645,16 +2661,33 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   destruct (Util.map_monad IP.from_Z (Zseq 1 (Datatypes.length init_bytes))); inv HSEQ.
                   cbn in HMAPM.
                   rewrite handle_gep_addr_0 in HMAPM.
-                  break_match_hyp; inv HMAPM.
+                  match goal with
+                  | H:
+                    context [ map_monad ?f ?l ] |- _ =>
+                      destruct (map_monad f l)
+                  end; inv HMAPM.
                 }
                 subst.
                 cbn in *; inv HSEQ.
                 cbn in *.
 
                 (* Size is 0, nothing is allocated... *)
-                exists ({| ms_memory_stack := (mem, frames); ms_provenance := (next_provenance ms_prov) |}).
-                exists (next_provenance ms_prov).
+                exists ({| ms_memory_stack := (mem, frames); ms_provenance := pr'' |}).
+                exists pr'.
 
+                split.
+                { split; [|admit].
+
+                  unfold extend_provenance.
+                  split.
+                  - intros pr H0.
+                    eapply EXTEND_PR.
+                    (* apply USED_PR. *)
+                    admit.
+                  - split.
+                    (* Don't have anything for this... *)
+                  solve_extend_provenance.
+                }
                 split; [solve_fresh_provenance_invariants|].
 
                 eexists.

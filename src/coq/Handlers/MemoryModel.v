@@ -134,12 +134,19 @@ Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
     forall (ms ms' : MemState) (pr : Provenance),
       mem_state_fresh_provenance ms = (pr, ms') ->
       MemState_get_memory ms = MemState_get_memory ms' /\
+        (forall pr, used_provenance_prop ms pr -> used_provenance_prop ms' pr) /\
       ~ used_provenance_prop ms pr /\ used_provenance_prop ms' pr.
 
   (** Lemmas about MemState *)
   Parameter MemState_get_put_memory :
     forall ms mem,
       MemState_get_memory (MemState_put_memory mem ms) = mem.
+
+  #[global] Instance MemState_memory_MemStateMem : MemStateMem MemState memory_stack :=
+    {| ms_get_memory := MemState_get_memory;
+      ms_put_memory := MemState_put_memory;
+      ms_get_put_memory := MemState_get_put_memory;
+    |}.
 
 End MemoryModelSpecPrimitives.
 

@@ -206,7 +206,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         rewrite HFRESH.
         repeat setoid_rewrite bind_ret_l.
         cbn.
-        
+
         split; [|split].
         + reflexivity.
         + unfold MemStateFreshT_valid_state in *; auto.
@@ -399,12 +399,6 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
        - apply used_provenance_prop.
      Defined.
 
-    #[global] Instance MemState_memory_MemStateMem : MemStateMem MemState memory_stack :=
-      {| ms_get_memory := MemState_get_memory;
-        ms_put_memory := MemState_put_memory;
-        ms_get_put_memory := MemState_get_put_memory;
-      |}.
-
     #[global] Instance MemStateFreshT_MonadT {M} `{Monad M} : MonadT (MemStateFreshT M) M.
     Proof.
       unfold MemStateFreshT.
@@ -553,10 +547,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
     (* TODO: get rid of this silly hack. *)
     Definition my_handle_memory : MemoryE ~> MemStateFreshT (itree Effout) :=
-      @handle_memory (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
+      @handle_memory (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
     Definition my_handle_intrinsic : IntrinsicE ~> MemStateFreshT (itree Effout) :=
-      @handle_intrinsic (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
+      @handle_intrinsic (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
     Definition interp_memory_h : Effin ~> MemStateFreshT (itree Effout)
       := case_ E_trigger (case_ my_handle_intrinsic (case_ my_handle_memory F_trigger)).

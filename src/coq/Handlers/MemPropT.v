@@ -96,7 +96,7 @@ Import Monad.
 Import Morphisms.
 Class MemMonad (MemState : Type) (memory : Type) (ExtraState : Type) (Provenance : Type) (M : Type -> Type) (RunM : Type -> Type)
       `{MM : Monad M} `{MRun: Monad RunM}
-      `{MPROV : MonadProvenance Provenance M} `{MSID : MonadStoreId M} `{MMS: MonadMemState MemState M} `{MemSMem : MemStateMem MemState memory}
+      `{MPROV : MonadProvenance Provenance M} `{MSID : MonadStoreId M} `{MMS: MonadMemState MemState M}
       `{SIDFRESH : StoreIdFreshness MemState} `{PROVFRESH : ProvenanceFreshness Provenance MemState}
       `{MERR : RAISE_ERROR M} `{MUB : RAISE_UB M} `{MOOM :RAISE_OOM M}
       `{RunERR : RAISE_ERROR RunM} `{RunUB : RAISE_UB RunM} `{RunOOM :RAISE_OOM RunM}
@@ -109,6 +109,7 @@ Class MemMonad (MemState : Type) (memory : Type) (ExtraState : Type) (Provenance
     MemMonad_raisebindm_ub :> RaiseBindM RunM string (@raise_ub RunM RunUB);
     MemMonad_raisebindm_oom :> RaiseBindM RunM string (@raise_oom RunM RunOOM);
     MemMonad_raisebindm_err :> RaiseBindM RunM string (@raise_error RunM RunERR);
+    MemMonad_MemSMem :> MemStateMem MemState memory;
 
     MemMonad_eq1_runm_proper :>
         (forall A, Proper ((@eq1 _ MemMonad_eq1_runm) A ==> (@eq1 _ MemMonad_eq1_runm) A ==> iff) ((@eq1 _ MemMonad_eq1_runm) A));
@@ -154,6 +155,8 @@ Class MemMonad (MemState : Type) (memory : Type) (ExtraState : Type) (Provenance
       eq1 (MemMonad_run (fresh_provenance) ms st) (ret (st, (ms', pr'))) /\
         MemMonad_valid_state ms' st /\
         ms_get_memory ms = ms_get_memory ms' /\
+        (* Analogous to extend_provenance *)
+        (forall pr, used_provenance ms pr -> used_provenance ms' pr) /\
         ~ used_provenance ms pr' /\
         used_provenance ms' pr';
 
