@@ -1095,8 +1095,11 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
   Definition memory_stack_frame_stack (mem : memory_stack) := snd mem.
 
-  Definition mem_state_frame_stack_prop (mem : memory_stack) (fs : FrameStack) : Prop :=
+  Definition memory_stack_frame_stack_prop (mem : memory_stack) (fs : FrameStack) : Prop :=
     frame_stack_eqv (memory_stack_frame_stack mem) fs.
+
+  Definition mem_state_frame_stack_prop (ms : MemState) (fs : FrameStack) : Prop :=
+    memory_stack_frame_stack_prop (MemState_get_memory ms) fs.
 
   (** Provenance / store ids *)
   Definition used_provenance_prop (ms : MemState) (pr : Provenance) : Prop :=
@@ -1351,6 +1354,8 @@ End FiniteMemoryModelSpecPrimitives.
 Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) : MemoryModelExecPrimitives LP MP.
   Module MMSP := FiniteMemoryModelSpecPrimitives LP MP.
   Module MemSpec := MakeMemoryModelSpec LP MP MMSP.
+  Module MemExecM := MakeMemoryExecMonad LP MP MMSP MemSpec.
+  Import MemExecM.
 
   Import LP.
   Import LP.ADDR.
@@ -1375,7 +1380,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* Context `{MonadMemState MemState MemM}. *)
     (* Context `{RAISE_ERROR MemM} `{RAISE_UB MemM} `{RAISE_OOM MemM}. *)
     Context {ExtraState : Type}.
-    Context `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)}.
+    Context `{MemMonad ExtraState MemM (itree Eff)}.
 
     (*** Data types *)
     Definition memory_empty : memory := IntMaps.empty.
@@ -1403,7 +1408,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     (*** Primitives on memory *)
     (** Reads *)
-    Definition read_byte `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} (ptr : addr) : MemM SByte :=
+    Definition read_byte `{MemMonad ExtraState MemM (itree Eff)} (ptr : addr) : MemM SByte :=
       let addr := ptr_to_int ptr in
       let pr := address_provenance ptr in
       ms <- get_mem_state;;
@@ -1420,7 +1425,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       end.
 
     (** Writes *)
-    Definition write_byte `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} (ptr : addr) (byte : SByte) : MemM unit :=
+    Definition write_byte `{MemMonad ExtraState MemM (itree Eff)} (ptr : addr) (byte : SByte) : MemM unit :=
       let addr := ptr_to_int ptr in
       let pr := address_provenance ptr in
       ms <- get_mem_state;;
@@ -1439,7 +1444,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       end.
 
     (** Allocations *)
-    Definition addr_allocated `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} (ptr : addr) (aid : AllocationId) : MemM bool :=
+    Definition addr_allocated `{MemMonad ExtraState MemM (itree Eff)} (ptr : addr) (aid : AllocationId) : MemM bool :=
       ms <- get_mem_state;;
       match read_byte_raw (mem_state_memory ms) (ptr_to_int ptr) with
       | None => ret false
@@ -1491,7 +1496,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     #[global] Opaque add_all_to_frame.
     #[global] Opaque next_memory_key.
 
-    Definition allocate_bytes `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} (dt : dtyp) (init_bytes : list SByte) : MemM addr :=
+    Definition allocate_bytes `{MemMonad ExtraState MemM (itree Eff)} (dt : dtyp) (init_bytes : list SByte) : MemM addr :=
       match dtyp_eq_dec dt DTYPE_Void with
       | left _ => raise_ub "Allocation of type void"
       | _ =>
@@ -1511,7 +1516,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               ptrs <- get_consecutive_ptrs ptr (length init_bytes);;
               let mem' := add_all_index (map (fun b => (b, aid)) init_bytes) addr mem in
               let mem_stack' := add_all_to_frame (mem', fs) (map ptr_to_int ptrs) in
-              put_mem_state (mkMemState mem_stack' pr);;
+              ms' <- get_mem_state;;
+              let pr' := MemState_get_provenance ms' in
+              put_mem_state (mkMemState mem_stack' pr');;
               ret ptr
           end
       end.
@@ -1543,7 +1550,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       let pr := mem_state_provenance ms in
       mkMemState (mem, fs) pr.
 
-    Definition mempush `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} : MemM unit :=
+    Definition mempush `{MemMonad ExtraState MemM (itree Eff)} : MemM unit :=
       ms <- get_mem_state;;
       let fs := mem_state_frame_stack ms in
       let fs' := push_frame_stack fs initial_frame in
@@ -1558,7 +1565,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Definition free_frame_memory (f : Frame) (m : memory) : memory :=
       fold_left (fun m key => free_byte key m) f m.
 
-    Definition mempop `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} : MemM unit :=
+    Definition mempop `{MemMonad ExtraState MemM (itree Eff)} : MemM unit :=
       ms <- get_mem_state;;
       let (mem, fs) := ms_memory_stack ms in
       let f := peek_frame_stack fs in
@@ -1615,11 +1622,11 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* Admitted. *)
 
     Import Monad.
-    Definition exec_correct {MemM Eff ExtraState} `{MM: MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT MemState X) : Prop :=
+    Definition exec_correct {MemM Eff ExtraState} `{MM: MemMonad ExtraState MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT MemState X) : Prop :=
       forall ms st,
-        (@MemMonad_valid_state MemState memory_stack ExtraState Provenance MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ ms st) ->
+        (@MemMonad_valid_state ExtraState MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ ms st) ->
         let t := MemMonad_run exec ms st in
-        let eqi := (@eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) in
+        let eqi := (@eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) in
         (* UB *)
         (exists msg_spec,
             spec ms (raise_ub msg_spec)) \/
@@ -1636,7 +1643,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               eqi _ t (ret (st', (ms', x))) ->
               spec ms (ret (ms', x))).
 
-    Definition exec_correct_memory {MemM Eff ExtraState} `{MM: MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT memory_stack X) : Prop :=
+    Definition exec_correct_memory {MemM Eff ExtraState} `{MM: MemMonad ExtraState MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT memory_stack X) : Prop :=
       exec_correct exec (lift_memory_MemPropT spec).
 
     (* TODO: Move these tactics *)
@@ -1858,10 +1865,16 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       break_read_byte_allowed_hyps;
       break_write_byte_allowed_hyps.
 
-    Ltac break_addr_allocated_prop_in ALLOCATED :=        
+    Ltac break_addr_allocated_prop_in ALLOCATED :=
+       cbn in ALLOCATED;
+       destruct ALLOCATED as (?ms' & ?b & ALLOCATED);
+       destruct ALLOCATED as [[?C1 ?C2] ALLOCATED]; subst.
+
+    Ltac break_lifted_addr_allocated_prop_in ALLOCATED :=
       cbn in ALLOCATED;
-      destruct ALLOCATED as (?ms' & ?b & ALLOCATED);
-      destruct ALLOCATED as [[?C1 ?C2] ALLOCATED]; subst.
+      destruct ALLOCATED as [?ms [?b [ALLOCATED [?EQ1 ?EQ2]]]]; subst;
+      destruct ALLOCATED as [ALLOCATED ?LIFT];
+      destruct ALLOCATED as [?ms' [?ms'' [[?EQ1 ?EQ2] ALLOCATED]]]; subst.
 
     Hint Rewrite int_to_ptr_provenance : PROVENANCE.
     Hint Resolve access_allowed_refl : ACCESS_ALLOWED.
@@ -2624,6 +2637,10 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               rewrite bind_ret_l in RUN.
 
               rewrite MemMonad_run_bind in RUN; auto.
+              rewrite MemMonad_get_mem_state in RUN.
+              rewrite bind_ret_l in RUN.
+
+              rewrite MemMonad_run_bind in RUN; auto.
               rewrite MemMonad_put_mem_state in RUN.
               rewrite bind_ret_l in RUN.
               rewrite MemMonad_run_ret in RUN; auto.
@@ -2675,25 +2692,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 exists ({| ms_memory_stack := (mem, frames); ms_provenance := pr'' |}).
                 exists pr'.
 
-                split.
-                { split; [|admit].
-
-                  unfold extend_provenance.
-                  split.
-                  - intros pr H0.
-                    eapply EXTEND_PR.
-                    (* apply USED_PR. *)
-                    admit.
-                  - split.
-                    (* Don't have anything for this... *)
-                  solve_extend_provenance.
-                }
                 split; [solve_fresh_provenance_invariants|].
 
                 eexists.
                 set (alloc_addr :=
                        int_to_ptr (next_memory_key (mem, frames))
-                                  (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov)))).
+                                  (allocation_id_to_prov (provenance_to_allocation_id pr'))).
                 exists (alloc_addr, []).
 
                 split.
@@ -2748,9 +2752,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   - (* alloc_bytes_add_to_frame *)
                     intros fs1 fs2 POP ADD.
                     cbn in ADD; subst; auto.
-                    unfold mem_state_frame_stack_prop in *.
+                    unfold memory_stack_frame_stack_prop in *.
                     cbn in *.
-                    unfold mem_state_frame_stack.
+                    unfold memory_stack_frame_stack.
                     cbn.
                     rewrite add_all_to_frame_nil_preserves_frames.
                     cbn.
@@ -2766,8 +2770,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               (* Non-empty allocation *)
               cbn.
 
-              exists ({| ms_memory_stack := (mem, frames); ms_provenance := (next_provenance ms_prov) |}).
-              exists (next_provenance ms_prov).
+              exists ({| ms_memory_stack := (mem, frames); ms_provenance := pr'' |}).
+              exists pr'.
 
               split; [solve_fresh_provenance_invariants|].
 
@@ -2776,16 +2780,16 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     ms_memory_stack :=
               add_all_to_frame
                 (add_all_index
-                   (map (fun b : SByte => (b, provenance_to_allocation_id (next_provenance ms_prov)))
+                   (map (fun b : SByte => (b, provenance_to_allocation_id pr'))
                       init_bytes) (next_memory_key (mem, frames)) mem, frames)
                 (ptr_to_int alloc_addr :: map ptr_to_int ptrs);
-    ms_provenance := next_provenance ms_prov
+    ms_provenance := pr''
   |}).
               exists (alloc_addr, (alloc_addr :: ptrs)).
 
               Close Scope positive.
               assert (int_to_ptr
-                        (next_memory_key (mem, frames)) (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov))) = alloc_addr) as EQALLOC.
+                        (next_memory_key (mem, frames)) (allocation_id_to_prov (provenance_to_allocation_id pr')) = alloc_addr) as EQALLOC.
               {
                 destruct (Datatypes.length init_bytes) eqn:LENBYTES.
                 { cbn in HSEQ; inv HSEQ.
@@ -2801,8 +2805,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 unfold Util.map_monad in HMAPM.
                 inversion HMAPM.
                 inversion HMAPM.
-                break_match_hyp; inv H1.
+                (* Fragile proof... *)
                 break_match_hyp; inv H2.
+                break_match_hyp; inv H3.
 
                 rewrite handle_gep_addr_0 in Heqs.
                 inv Heqs.
@@ -2852,11 +2857,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   unfold byte_allocated.
                   unfold byte_allocated_MemPropT.
                   intros aid CONTRA.
-                  cbn in CONTRA.
-                  destruct CONTRA as [ms' [ms'' [[EQ1 EQ2] CONTRA]]]; subst.
-                  destruct CONTRA as [ms' [a CONTRA]].
-                  destruct CONTRA as [CONTRA [EQ1 EQ2]]; subst.
-                  destruct CONTRA as [ms' [ms'' [[EQ1 EQ2] CONTRA]]]; subst.
+                  break_lifted_addr_allocated_prop_in CONTRA.
                   cbn in CONTRA.
 
                   rewrite read_byte_raw_next_memory_key in CONTRA.
@@ -2887,7 +2888,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   pose proof map_monad_err_In _ _ _ _ HMAPM IN as MAPIN.
                   destruct MAPIN as [ip [GENPTR INip]].
 
-                  repeat eexists.
+                  repeat eexists; [| solve_returns_provenance].
                   cbn.
                   unfold mem_state_memory.
                   cbn.
@@ -2931,7 +2932,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                    *)
 
                   split; intros ALLOC.
-                  + repeat eexists; cbn; unfold mem_state_memory; cbn.
+                  + repeat eexists; [| solve_returns_provenance];
+                      cbn; unfold mem_state_memory; cbn.
                     rewrite add_all_to_frame_preserves_memory.
                     cbn.
 
@@ -2973,12 +2975,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       rewrite <- Zlength_correct.
                       lia.
 
-                      set (p := int_to_ptr (ptr_to_int ptr) (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov)))).
+                      set (p := int_to_ptr (ptr_to_int ptr) (allocation_id_to_prov (provenance_to_allocation_id pr'))).
 
                       (* I believe that p is necessarily in the result of HMAPM. *)
                       assert (In p (int_to_ptr (next_memory_key (mem, frames))
                                                (allocation_id_to_prov
-                                                  (provenance_to_allocation_id (next_provenance ms_prov))) :: ptrs)) as PIN.
+                                                  (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
                         eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
@@ -3014,17 +3016,11 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       reflexivity.
                     }
 
-                    cbn in ALLOC.
-                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
-                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
-                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    break_byte_allocated_in ALLOC.
                     cbn in ALLOC.
 
                     break_match; [break_match|]; split; tauto.
-                  + cbn in ALLOC.
-                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
-                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
-                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                  + break_byte_allocated_in ALLOC.
                     cbn in ALLOC.
 
                     unfold mem_state_memory in ALLOC; cbn in ALLOC.
@@ -3068,12 +3064,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       rewrite <- Zlength_correct.
                       lia.
 
-                      set (p := int_to_ptr (ptr_to_int ptr) (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov)))).
+                      set (p := int_to_ptr (ptr_to_int ptr) (allocation_id_to_prov (provenance_to_allocation_id pr'))).
 
                       (* I believe that p is necessarily in the result of HMAPM. *)
                       assert (In p (int_to_ptr (next_memory_key (mem, frames))
                                                (allocation_id_to_prov
-                                                  (provenance_to_allocation_id (next_provenance ms_prov))) :: ptrs)) as PIN.
+                                                  (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
                         eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
@@ -3109,7 +3105,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       reflexivity.
                     }
 
-                    repeat eexists.
+                    repeat eexists; [| solve_returns_provenance].
                     cbn.
 
                     break_match; [break_match|]; split; tauto.
@@ -3121,7 +3117,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     eexists.
                     split.
                     * (* TODO: solve_byte_allocated *)
-                      repeat eexists.
+                      repeat eexists; [| solve_returns_provenance].
                       cbn.
                       unfold mem_state_memory.
                       cbn.
@@ -3140,12 +3136,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                         (* I know this by cons cell result of HMAPM *)
                         assert (@MonadReturnsLaws.MReturns err _ _ _ (list addr)
                                                            (int_to_ptr (next_memory_key (mem, frames))
-                                                                       (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov))) :: ptrs)
+                                                                       (allocation_id_to_prov (provenance_to_allocation_id pr')) :: ptrs)
                                                            (Util.map_monad
             (fun ix : IP.intptr =>
              handle_gep_addr (DTYPE_I 8)
                (int_to_ptr (next_memory_key (mem, frames))
-                  (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov))))
+                  (allocation_id_to_prov (provenance_to_allocation_id pr')))
                [Events.DV.DVALUE_IPTR ix]) NOOM_seq)) as MAPRET.
                         { cbn. red.
                           auto.
@@ -3172,7 +3168,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       apply aid_eq_dec_refl.
                     * solve_access_allowed.
                   + (* TODO: solve_read_byte_allowed *)
-                    repeat eexists.
+                    repeat eexists; [| solve_returns_provenance |];
                     cbn.
                     unfold mem_state_memory.
                     cbn.
@@ -3188,7 +3184,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     forward READ.
                     { (* Bounds *)
                       assert (In p (int_to_ptr (next_memory_key (mem, frames))
-                                               (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov))) :: ptrs)) as IN'.
+                                               (allocation_id_to_prov (provenance_to_allocation_id pr')) :: ptrs)) as IN'.
                       { right; auto.
                       }
 
@@ -3235,14 +3231,11 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   + (* TODO: solve_read_byte_allowed. *)
                     break_access_hyps.
                     (* TODO: move this into break_access_hyps? *)
-                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
-                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
-                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
-                    cbn in ALLOC.
+                    break_byte_allocated_in ALLOC.
 
                     break_match; [break_match|]; destruct ALLOC as [EQM AID]; subst; [|inv AID].
 
-                    repeat eexists.
+                    repeat eexists; [| solve_returns_provenance |].
                     cbn.
                     unfold mem_state_memory.
                     cbn.
@@ -3255,20 +3248,20 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       rewrite next_memory_key_next_key.
                       eapply read_byte_raw_lt_next_memory_key; eauto.
                     }
+
+                    cbn in *.
                     rewrite Heqo; eauto.
 
                     solve_access_allowed.
                   + (* TODO: solve_read_byte_allowed. *)
                     break_access_hyps.
                     (* TODO: move this into break_access_hyps? *)
-                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
-                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
-                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    break_byte_allocated_in ALLOC.
                     cbn in ALLOC.
 
                     break_match; [break_match|]; destruct ALLOC as [EQM AID]; subst; [|inv AID].
 
-                    repeat eexists.
+                    repeat eexists; [| solve_returns_provenance |].
                     cbn.
                     unfold mem_state_memory in *.
                     cbn in *.
@@ -3326,12 +3319,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       rewrite <- Zlength_correct.
                       lia.
 
-                      set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov)))).
+                      set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
 
                       (* I believe that p is necessarily in the result of HMAPM. *)
                       assert (In p (int_to_ptr (next_memory_key (mem, frames))
                                                (allocation_id_to_prov
-                                                  (provenance_to_allocation_id (next_provenance ms_prov))) :: ptrs)) as PIN.
+                                                  (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
                         eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
@@ -3501,12 +3494,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       rewrite <- Zlength_correct.
                       lia.
 
-                      set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov)))).
+                      set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
 
                       (* I believe that p is necessarily in the result of HMAPM. *)
                       assert (In p (int_to_ptr (next_memory_key (mem, frames))
                                                (allocation_id_to_prov
-                                                  (provenance_to_allocation_id (next_provenance ms_prov))) :: ptrs)) as PIN.
+                                                  (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
                         eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
@@ -3596,12 +3589,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       rewrite <- Zlength_correct.
                       lia.
 
-                      set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov)))).
+                      set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
 
                       (* I believe that p is necessarily in the result of HMAPM. *)
                       assert (In p (int_to_ptr (next_memory_key (mem, frames))
                                                (allocation_id_to_prov
-                                                  (provenance_to_allocation_id (next_provenance ms_prov))) :: ptrs)) as PIN.
+                                                  (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
                         eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
@@ -3646,7 +3639,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   (* TODO: solve_write_byte_allowed. *)
                   break_access_hyps; eexists; split.
                   + (* TODO: solve_byte_allocated *)
-                    repeat eexists.
+                    repeat eexists; [| solve_returns_provenance].
                     unfold mem_state_memory.
                     cbn.
                     rewrite add_all_to_frame_preserves_memory.
@@ -3689,14 +3682,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     break_access_hyps.
 
                     (* TODO: move this into break_access_hyps? *)
-                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
-                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
-                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    break_byte_allocated_in ALLOC.
                     cbn in ALLOC.
 
                     break_match_hyp; [break_match_hyp|]; destruct ALLOC as [EQ1 EQ2]; inv EQ2.
 
-                    repeat eexists; eauto.
+                    repeat eexists; [| solve_returns_provenance |]; eauto.
                     cbn.
                     unfold mem_state_memory.
                     cbn.
@@ -3741,12 +3732,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       rewrite <- Zlength_correct.
                       lia.
 
-                      set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov)))).
+                      set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
 
                       (* I believe that p is necessarily in the result of HMAPM. *)
                       assert (In p (int_to_ptr (next_memory_key (mem, frames))
                                                (allocation_id_to_prov
-                                                  (provenance_to_allocation_id (next_provenance ms_prov))) :: ptrs)) as PIN.
+                                                  (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
                         eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
@@ -3787,10 +3778,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     break_access_hyps.
 
                     (* TODO: move this into break_access_hyps? *)
-                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
-                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
-                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    break_byte_allocated_in ALLOC.
                     cbn in ALLOC.
+
                     unfold mem_state_memory in ALLOC.
                     cbn in ALLOC.
                     rewrite add_all_to_frame_preserves_memory in ALLOC.
@@ -3834,12 +3824,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       rewrite <- Zlength_correct.
                       lia.
 
-                      set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov)))).
+                      set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
 
                       (* I believe that p is necessarily in the result of HMAPM. *)
                       assert (In p (int_to_ptr (next_memory_key (mem, frames))
                                                (allocation_id_to_prov
-                                                  (provenance_to_allocation_id (next_provenance ms_prov))) :: ptrs)) as PIN.
+                                                  (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
                         eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
@@ -3876,7 +3866,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     }
 
                     break_match; [break_match|].
-                    repeat eexists; eauto.
+                    repeat eexists; [| solve_returns_provenance |]; eauto.
                     cbn.
                     unfold mem_byte in *.
                     rewrite Heqo.
@@ -4608,7 +4598,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   Qed.
 
                   intros fs1 fs2 OLDFS ADD.
-                  unfold mem_state_frame_stack_prop in *.
+                  unfold memory_stack_frame_stack_prop in *.
                   cbn in OLDFS; subst.
                   cbn.
 

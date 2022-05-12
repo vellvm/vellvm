@@ -42,9 +42,10 @@ Import Error.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
-Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MM : MemoryModelSpec LP MP MMSP).
+Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MM : MemoryModelSpec LP MP MMSP) (MemExecM : MemoryExecMonad LP MP MMSP MM).
   Import MM.
   Import MMSP.
+  Import MemExecM.
   Import LP.Events.
   Import LP.PROV.
 
@@ -134,7 +135,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
          (forall sid', used_store_id ms sid' -> (sid' < sid)%N).
 
     #[global] Instance MemStateFreshT_MemMonad {Eff} `{FAIL: FailureE -< Eff} `{OOM: OOME -< Eff} `{UB: UBE -< Eff}
-      : MemMonad MemState memory_stack MemStateFreshT_State Provenance (MemStateFreshT (itree Eff)) (itree Eff).
+      : MemMonad MemStateFreshT_State (MemStateFreshT (itree Eff)) (itree Eff).
     Proof.
       esplit with
         (MemMonad_run := fun A => @MemStateFreshT_run A Eff FAIL OOM UB)
@@ -336,7 +337,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
   End Interpreters.
 End MemorySpecInterpreter.
 
-Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP) (MM : MemoryModelExec LP MP MMEP) (SPEC_INTERP : MemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec).
+Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP) (MM : MemoryModelExec LP MP MMEP) (SPEC_INTERP : MemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec MMEP.MemExecM).
   Import MM.
   Import MMEP.
   Import MMEP.MMSP.
@@ -349,6 +350,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
   Import MMSP.
   Import MMSP.MemByte.
   Import MemSpec.
+  Import MemExecM.
 
   Section Interpreters.
     Variable (E F : Type -> Type).
@@ -425,7 +427,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
          (forall sid', used_store_id ms sid' -> (sid' < sid)%N).
 
     #[global] Instance MemStateFreshT_MemMonad {Eff} `{FAIL: FailureE -< Eff} `{OOM: OOME -< Eff} `{UB: UBE -< Eff}
-      : MemMonad MemState memory_stack MemStateFreshT_State Provenance (MemStateFreshT (itree Eff)) (itree Eff).
+      : MemMonad MemStateFreshT_State (MemStateFreshT (itree Eff)) (itree Eff).
     Proof.
       esplit with
         (MemMonad_run := fun A => @MemStateFreshT_run A Eff FAIL OOM UB)
@@ -547,10 +549,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
     (* TODO: get rid of this silly hack. *)
     Definition my_handle_memory : MemoryE ~> MemStateFreshT (itree Effout) :=
-      @handle_memory (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
+      @handle_memory (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
     Definition my_handle_intrinsic : IntrinsicE ~> MemStateFreshT (itree Effout) :=
-      @handle_intrinsic (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
+      @handle_intrinsic (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
     Definition interp_memory_h : Effin ~> MemStateFreshT (itree Effout)
       := case_ E_trigger (case_ my_handle_intrinsic (case_ my_handle_memory F_trigger)).
@@ -578,10 +580,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 End MemoryExecInterpreter.
 
 
-Module MakeMemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MS : MemoryModelSpec LP MP MMSP) <: MemorySpecInterpreter LP MP MMSP MS.
-  Include MemorySpecInterpreter LP MP MMSP MS.
+Module MakeMemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MS : MemoryModelSpec LP MP MMSP) (MemExecM : MemoryExecMonad LP MP MMSP MS) <: MemorySpecInterpreter LP MP MMSP MS MemExecM.
+  Include MemorySpecInterpreter LP MP MMSP MS MemExecM.
 End MakeMemorySpecInterpreter.
 
-Module MakeMemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP) (ME : MemoryModelExec LP MP MMEP) (SPEC_INTERP : MemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec) <: MemoryExecInterpreter LP MP MMEP ME SPEC_INTERP.
+Module MakeMemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP) (ME : MemoryModelExec LP MP MMEP) (SPEC_INTERP : MemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec MMEP.MemExecM) <: MemoryExecInterpreter LP MP MMEP ME SPEC_INTERP.
   Include MemoryExecInterpreter LP MP MMEP ME SPEC_INTERP.
 End MakeMemoryExecInterpreter.

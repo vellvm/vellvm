@@ -105,7 +105,7 @@ Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
   Parameter peek_frame_stack_prop : FrameStack -> Frame -> Prop.
   Parameter pop_frame_stack_prop : FrameStack -> FrameStack -> Prop.
 
-  Parameter mem_state_frame_stack_prop : memory_stack -> FrameStack -> Prop.
+  Parameter memory_stack_frame_stack_prop : memory_stack -> FrameStack -> Prop.
 
   Definition frame_eqv (f f' : Frame) : Prop :=
     forall ptr, ptr_in_frame_prop f ptr <-> ptr_in_frame_prop f' ptr.
@@ -1051,7 +1051,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   (** Frame stack *)
   Definition frame_stack_preserved (m1 m2 : MemState) : Prop
     := forall fs,
-      mem_state_frame_stack_prop (MemState_get_memory m1) fs <-> mem_state_frame_stack_prop (MemState_get_memory m2) fs.
+      memory_stack_frame_stack_prop (MemState_get_memory m1) fs <-> memory_stack_frame_stack_prop (MemState_get_memory m2) fs.
 
   (*** Provenance operations *)
   #[global] Instance MemPropT_MonadProvenance : MonadProvenance Provenance (MemPropT MemState).
@@ -1147,7 +1147,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     }.
 
   Definition ptr_in_current_frame (ms : MemState) (ptr : addr) : Prop
-    := forall fs, mem_state_frame_stack_prop (MemState_get_memory ms) fs ->
+    := forall fs, memory_stack_frame_stack_prop (MemState_get_memory ms) fs ->
              forall f, peek_frame_stack_prop fs f ->
                   ptr_in_frame_prop f ptr.
 
@@ -1164,10 +1164,10 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     {
       fresh_frame :
       forall fs1 fs2 f,
-        mem_state_frame_stack_prop (MemState_get_memory m1) fs1 ->
+        memory_stack_frame_stack_prop (MemState_get_memory m1) fs1 ->
         empty_frame f ->
         push_frame_stack_spec fs1 f fs2 ->
-        mem_state_frame_stack_prop (MemState_get_memory m2) fs2;
+        memory_stack_frame_stack_prop (MemState_get_memory m2) fs2;
 
       mempush_invariants :
       mempush_operation_invariants m1 m2;
@@ -1215,9 +1215,9 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       (* Set new framestack *)
       pop_frame :
       forall fs1 fs2,
-        mem_state_frame_stack_prop (MemState_get_memory m1) fs1 ->
+        memory_stack_frame_stack_prop (MemState_get_memory m1) fs1 ->
         pop_frame_stack_prop fs1 fs2 ->
-        mem_state_frame_stack_prop (MemState_get_memory m2) fs2;
+        memory_stack_frame_stack_prop (MemState_get_memory m2) fs2;
 
       (* Invariants *)
       mempop_invariants : mempop_operation_invariants m1 m2;
@@ -1349,9 +1349,9 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       (* Add allocated bytes onto the stack frame *)
       allocate_bytes_add_to_frame :
       forall fs1 fs2,
-        mem_state_frame_stack_prop (MemState_get_memory m1) fs1 ->
+        memory_stack_frame_stack_prop (MemState_get_memory m1) fs1 ->
         add_ptrs_to_frame_stack fs1 ptrs fs2 ->
-        mem_state_frame_stack_prop (MemState_get_memory m2) fs2;
+        memory_stack_frame_stack_prop (MemState_get_memory m2) fs2;
 
       (* Type is valid *)
       allocate_bytes_typ :
@@ -1508,6 +1508,112 @@ Module MakeMemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Memo
   Include MemoryModelSpec LP MP MMSP.
 End MakeMemoryModelSpec.
 
+Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP).
+  (* TODO: move these imports *)
+  Import EitherMonad.
+  Import Monad.
+  Require Import Morphisms.
+  From Vellvm Require Import
+       MonadEq1Laws
+       Raise.
+
+  Import LP.
+  Import PROV.
+  Import MMSP.
+  Import MMS.
+
+  Class MemMonad (ExtraState : Type) (M : Type -> Type) (RunM : Type -> Type)
+        `{MM : Monad M} `{MRun: Monad RunM}
+        `{MPROV : MonadProvenance Provenance M} `{MSID : MonadStoreId M} `{MMS: MonadMemState MemState M}
+        `{MERR : RAISE_ERROR M} `{MUB : RAISE_UB M} `{MOOM :RAISE_OOM M}
+        `{RunERR : RAISE_ERROR RunM} `{RunUB : RAISE_UB RunM} `{RunOOM :RAISE_OOM RunM}
+    : Type
+    :=
+    { MemMonad_eq1_runm :> Eq1 RunM;
+      MemMonad_runm_monadlaws :> MonadLawsE RunM;
+      MemMonad_eq1_runm_equiv {A} :> Equivalence (@eq1 _ MemMonad_eq1_runm A);
+      MemMonad_eq1_runm_eq1laws :> Eq1_ret_inv RunM;
+      MemMonad_raisebindm_ub :> RaiseBindM RunM string (@raise_ub RunM RunUB);
+      MemMonad_raisebindm_oom :> RaiseBindM RunM string (@raise_oom RunM RunOOM);
+    MemMonad_raisebindm_err :> RaiseBindM RunM string (@raise_error RunM RunERR);
+    MemMonad_MemSMem :> MemStateMem MemState memory_stack;
+
+    MemMonad_eq1_runm_proper :>
+        (forall A, Proper ((@eq1 _ MemMonad_eq1_runm) A ==> (@eq1 _ MemMonad_eq1_runm) A ==> iff) ((@eq1 _ MemMonad_eq1_runm) A));
+
+    MemMonad_run {A} (ma : M A) (ms : MemState) (st : ExtraState)
+    : RunM (ExtraState * (MemState * A))%type;
+
+    (** Whether a piece of extra state is valid for a given execution *)
+    MemMonad_valid_state : MemState -> ExtraState -> Prop;
+
+    (** Run bind / ret laws *)
+    MemMonad_run_bind
+      {A B} (ma : M A) (k : A -> M B) (ms : MemState) (st : ExtraState) (VALID : MemMonad_valid_state ms st):
+    eq1 (MemMonad_run (x <- ma;; k x) ms st)
+        ('(st', (ms', x)) <- MemMonad_run ma ms st;; MemMonad_run (k x) ms' st');
+
+    MemMonad_run_ret
+      {A} (x : A) (ms : MemState) st (VALID : MemMonad_valid_state ms st):
+    eq1 (MemMonad_run (ret x) ms st) (ret (st, (ms, x)));
+
+    (** MonadMemState properties *)
+    MemMonad_get_mem_state
+      (ms : MemState) st :
+    eq1 (MemMonad_run (get_mem_state) ms st) (ret (st, (ms, ms)));
+
+    MemMonad_put_mem_state
+      (ms ms' : MemState) st :
+    eq1 (MemMonad_run (put_mem_state ms') ms st) (ret (st, (ms', tt)));
+
+    (** Fresh store id property *)
+    MemMonad_run_fresh_sid
+      (ms : MemState) st (VALID : MemMonad_valid_state ms st):
+    exists st' sid',
+      eq1 (MemMonad_run (fresh_sid) ms st) (ret (st', (ms, sid'))) /\
+        MemMonad_valid_state ms st' /\
+        ~ used_store_id_prop ms sid';
+
+    (** Fresh provenance property *)
+    (* TODO: unclear if this should exist, must change ms. *)
+    MemMonad_run_fresh_provenance
+      (ms : MemState) st (VALID : MemMonad_valid_state ms st):
+    exists ms' pr',
+      eq1 (MemMonad_run (fresh_provenance) ms st) (ret (st, (ms', pr'))) /\
+        MemMonad_valid_state ms' st /\
+        ms_get_memory ms = ms_get_memory ms' /\
+        (* Analogous to extend_provenance *)
+        (forall pr, used_provenance_prop ms pr -> used_provenance_prop ms' pr) /\
+        ~ used_provenance_prop ms pr' /\
+        used_provenance_prop ms' pr';
+
+    (** Exceptions *)
+    MemMonad_run_raise_oom :
+    forall {A} ms oom_msg st,
+      eq1 (MemMonad_run (@raise_oom _ _ A oom_msg) ms st) (raise_oom oom_msg);
+
+    MemMonad_eq1_raise_oom_inv :
+    forall {A} x oom_msg,
+      ~ ((@eq1 _ MemMonad_eq1_runm) A (ret x) (raise_oom oom_msg));
+
+    MemMonad_run_raise_ub :
+    forall {A} ms ub_msg st,
+      eq1 (MemMonad_run (@raise_ub _ _ A ub_msg) ms st) (raise_ub ub_msg);
+
+    MemMonad_run_raise_error :
+    forall {A} ms error_msg st,
+      eq1 (MemMonad_run (@raise_error _ _ A error_msg) ms st) (raise_error error_msg);
+
+    MemMonad_eq1_raise_error_inv :
+    forall {A} x error_msg,
+      ~ ((@eq1 _ MemMonad_eq1_runm) A (ret x) (raise_error error_msg));
+  }.
+End MemoryExecMonad.
+
+Module MakeMemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP) <: MemoryExecMonad LP MP MMSP MMS.
+  Include MemoryExecMonad LP MP MMSP MMS.
+End MakeMemoryExecMonad.
+
 Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
   Import LP.
   Import LP.ADDR.
@@ -1523,11 +1629,14 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
   Module MemSpec := MakeMemoryModelSpec LP MP MMSP.
   Import MemSpec.
 
+  Module MemExecM := MakeMemoryExecMonad LP MP MMSP MemSpec.
+  Import MemExecM.
+
   Section MemoryPrimatives.
     Context {MemM : Type -> Type}.
     Context {Eff : Type -> Type}.
     Context {ExtraState : Type}.
-    Context `{MM : MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)}.
+    Context `{MM : MemMonad ExtraState MemM (itree Eff)}.
 
     (*** Data types *)
     Parameter initial_memory_state : MemState.
@@ -1536,27 +1645,28 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
     (*** Primitives on memory *)
     (** Reads *)
     Parameter read_byte :
-      forall `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)}, addr -> MemM SByte.
+      forall `{MemMonad ExtraState MemM (itree Eff)}, addr -> MemM SByte.
 
     (** Writes *)
     Parameter write_byte :
-      forall `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)}, addr -> SByte -> MemM unit.
+      forall `{MemMonad ExtraState MemM (itree Eff)}, addr -> SByte -> MemM unit.
 
     (** Allocations *)
     Parameter allocate_bytes :
-      forall `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)}, dtyp -> list SByte -> MemM addr.
+      forall `{MemMonad ExtraState MemM (itree Eff)}, dtyp -> list SByte -> MemM addr.
 
     (** Frame stacks *)
-    Parameter mempush : forall `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)}, MemM unit.
-    Parameter mempop : forall `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)}, MemM unit.
+    Parameter mempush : forall `{MemMonad ExtraState MemM (itree Eff)}, MemM unit.
+    Parameter mempop : forall `{MemMonad ExtraState MemM (itree Eff)}, MemM unit.
 
     (*** Correctness *)
-    Parameter exec_correct : forall {MemM Eff ExtraState} `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT MemState X), Prop.
+    Parameter exec_correct : forall {MemM Eff ExtraState} `{MemMonad ExtraState MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT MemState X), Prop.
 
-    Parameter exec_correct_memory : forall {MemM Eff ExtraState} `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT memory_stack X), Prop.
+    Parameter exec_correct_memory : forall {MemM Eff ExtraState} `{MemMonad ExtraState MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT memory_stack X), Prop.
 
     Parameter exec_correct_lift_memory :
-      forall {X} exec (spec : MemPropT memory_stack X),
+      forall {MemM Eff ExtraState} `{MemMonad ExtraState MemM (itree Eff)}
+        {X} (exec : MemM X)  (spec : MemPropT memory_stack X),
         exec_correct_memory exec spec ->
         exec_correct exec (lift_memory_MemPropT spec).
 
@@ -1586,7 +1696,7 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
 
         initial_memory_frame_stack :
         forall fs,
-          mem_state_frame_stack_prop (MemState_get_memory initial_memory_state) fs ->
+          memory_stack_frame_stack_prop (MemState_get_memory initial_memory_state) fs ->
           empty_frame_stack fs;
 
         initial_memory_no_reads :
@@ -1613,6 +1723,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
   Import LP.Events.
   Import MP.
   Import MMEP.
+  Import MemExecM.
   Import MMSP.
   Import MMSP.MemByte.
   Import MMEP.MemSpec.
@@ -1628,22 +1739,22 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
     Context {MemM : Type -> Type}.
     Context {Eff : Type -> Type}.
     Context {ExtraState : Type}.
-    Context `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)}.
+    Context `{MM : MemMonad ExtraState MemM (itree Eff)}.
 
     (** Reading uvalues *)
-    Definition read_bytes `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} (ptr : addr) (len : nat) : MemM (list SByte) :=
+    Definition read_bytes `{MemMonad ExtraState MemM (itree Eff)} (ptr : addr) (len : nat) : MemM (list SByte) :=
       (* TODO: this should maybe be UB and not OOM??? *)
       ptrs <- get_consecutive_ptrs ptr len;;
 
       (* Actually perform reads *)
       Util.map_monad (fun ptr => read_byte ptr) ptrs.
 
-    Definition read_uvalue `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} (dt : dtyp) (ptr : addr) : MemM uvalue :=
+    Definition read_uvalue `{MemMonad ExtraState MemM (itree Eff)} (dt : dtyp) (ptr : addr) : MemM uvalue :=
       bytes <- read_bytes ptr (N.to_nat (sizeof_dtyp dt));;
       lift_err_RAISE_ERROR (deserialize_sbytes bytes dt).
 
     (** Writing uvalues *)
-    Definition write_bytes `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} (ptr : addr) (bytes : list SByte) : MemM unit :=
+    Definition write_bytes `{MemMonad ExtraState MemM (itree Eff)} (ptr : addr) (bytes : list SByte) : MemM unit :=
       (* TODO: Should this be UB instead of OOM? *)
       ptrs <- get_consecutive_ptrs ptr (length bytes);;
       let ptr_bytes := zip ptrs bytes in
@@ -1651,19 +1762,19 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       (* Actually perform writes *)
       Util.map_monad_ (fun '(ptr, byte) => write_byte ptr byte) ptr_bytes.
 
-    Definition write_uvalue `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} (dt : dtyp) (ptr : addr) (uv : uvalue) : MemM unit :=
+    Definition write_uvalue `{MemMonad ExtraState MemM (itree Eff)} (dt : dtyp) (ptr : addr) (uv : uvalue) : MemM unit :=
       bytes <- serialize_sbytes uv dt;;
       write_bytes ptr bytes.
 
     (** Allocating dtyps *)
     (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
-    Definition allocate_dtyp `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} (dt : dtyp) : MemM addr :=
+    Definition allocate_dtyp `{MemMonad ExtraState MemM (itree Eff)} (dt : dtyp) : MemM addr :=
       sid <- fresh_sid;;
       bytes <- lift_OOM (generate_undef_bytes dt sid);;
       allocate_bytes dt bytes.
 
     (** Handle memcpy *)
-    Definition memcpy `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} (src dst : addr) (len : Z) (align : N) (volatile : bool) : MemM unit :=
+    Definition memcpy `{MemMonad ExtraState MemM (itree Eff)} (src dst : addr) (len : Z) (align : N) (volatile : bool) : MemM unit :=
       if Z.ltb len 0
       then
         raise_ub "memcpy given negative length."
@@ -1682,7 +1793,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
         else
           raise_ub "memcpy with overlapping or non-equal src and dst memory locations.".
 
-    Definition handle_memory `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} : MemoryE ~> MemM
+    Definition handle_memory `{MemMonad ExtraState MemM (itree Eff)} : MemoryE ~> MemM
       := fun T m =>
            match m with
            (* Unimplemented *)
@@ -1709,7 +1820,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
                end
            end.
 
-    Definition handle_memcpy `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} (args : list dvalue) : MemM unit :=
+    Definition handle_memcpy `{MemMonad ExtraState MemM (itree Eff)} (args : list dvalue) : MemM unit :=
       match args with
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
@@ -1732,7 +1843,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
-    Definition handle_intrinsic `{MemMonad MemState memory_stack ExtraState Provenance MemM (itree Eff)} : IntrinsicE ~> MemM
+    Definition handle_intrinsic `{MemMonad ExtraState MemM (itree Eff)} : IntrinsicE ~> MemM
       := fun T e =>
            match e with
            | Intrinsic t name args =>

@@ -27,7 +27,7 @@ From Vellvm Require Import
 
     Declare Module MMEP : MemoryModelExecPrimitives LP MP.
     Module MEM_MODEL := MakeMemoryModelExec LP MP MMEP.
-    Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec.
+    Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec MMEP.MemExecM.
     Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL MEM_SPEC_INTERP.
 
     (* Serialization *)
