@@ -841,7 +841,6 @@ Definition gen_extractvalue : GenLLVM (typ * instr typ) :=
 
 
 (* ExtractElement*)
-Search int.
 Definition gen_extractelement : GenLLVM (typ * instr typ) :=
   ctx <- get_ctx;;
   let vector_in_context := filter_vec_typs ctx in
@@ -856,6 +855,33 @@ Definition gen_extractelement : GenLLVM (typ * instr typ) :=
   index_for_extractelement <- oneOf_LLVM (map ret index_list);;
   ret (t_in_vec, INSTR_Op (OP_ExtractElement (tvec, EXP_Ident id) (TYPE_I 32%N, EXP_Integer (Z.of_nat (N.to_nat index_for_extractelement))))).
 
+(* Assumes input is a primitive type*)
+
+(* Generate the element to be inserted into vector*)
+Definition gen_typ_eq_prim_typ (t: typ): GenLLVM (exp typ) :=
+  match t with 
+  | TYPE_I _ => i <- lift_GenLLVM (genNatInt);;
+  ret (EXP_Integer (DynamicValues.Int32.intval i))
+  | TYPE_Float => f <- lift_GenLLVM (fing32);;
+  ret (EXP_Float f)
+  | TYPE_Double => d <- lift_GenLLVM (fing64);;
+  ret (EXP_Double d)
+  | _ => ret (EXP_Null)
+  end.
+
+Definition gen_insertelement : GenLLVM (typ * instr typ) :=
+  ctx <- get_ctx;;
+  let vector_in_context := filter_vec_typs ctx in
+  '(id, tvec) <- (oneOf_LLVM (map ret vector_in_context));;
+  let get_size_ty (vType: typ) :=
+  match tvec with 
+  | TYPE_Vector sz ty => (sz, ty)
+  | _ => (0%N, TYPE_Void)
+  end in
+  let '(sz, t_in_vec) := get_size_ty tvec in
+  value <- gen_typ_eq_prim_typ t_in_vec;;
+  index <- lift_GenLLVM (choose (0,Z.of_N sz));;
+  ret (TYPE_Float, INSTR_Op (OP_InsertElement (tvec, EXP_Ident id) (t_in_vec, value) (TYPE_I 32, EXP_Integer index))).
 
 
 Definition genTypHelper (n: nat): G (typ) :=
