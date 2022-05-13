@@ -1622,40 +1622,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* Admitted. *)
 
     Import Monad.
-    Definition exec_correct {MemM Eff ExtraState} `{MM: MemMonad ExtraState MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT MemState X) : Prop :=
-      forall ms st,
-        (@MemMonad_valid_state ExtraState MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ ms st) ->
-        let t := MemMonad_run exec ms st in
-        let eqi := (@eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) in
-        (* UB *)
-        (exists msg_spec,
-            spec ms (raise_ub msg_spec)) \/
-          (* Error *)
-          ((exists msg msg_spec,
-               eqi _ t (raise_error msg) ->
-               spec ms (raise_error msg_spec))) /\
-          (* OOM *)
-          (exists msg msg_spec,
-              eqi _ t (raise_oom msg) ->
-              spec ms (raise_oom msg_spec)) /\
-          (* Success *)
-          (forall st' ms' x,
-              eqi _ t (ret (st', (ms', x))) ->
-              spec ms (ret (ms', x))).
-
-    Definition exec_correct_memory {MemM Eff ExtraState} `{MM: MemMonad ExtraState MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT memory_stack X) : Prop :=
-      exec_correct exec (lift_memory_MemPropT spec).
-
-    Lemma exec_correct_lift_memory :
-      forall {MemM Eff ExtraState} `{MemMonad ExtraState MemM (itree Eff)}
-        {X} (exec : MemM X)  (spec : MemPropT memory_stack X),
-        exec_correct_memory exec spec ->
-        exec_correct exec (lift_memory_MemPropT spec).
-    Proof.
-      intros * EXEC.
-      unfold exec_correct_memory in EXEC.
-      auto.
-    Qed.
 
     (* TODO: Move these tactics *)
     Ltac MemMonad_go :=
@@ -2074,7 +2040,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Qed.
 
     (** Correctness of the main operations on memory *)
-    Lemma read_byte_correct :
+    Lemma read_byte_correct_base :
       forall ptr, exec_correct_memory (read_byte ptr) (read_byte_MemPropT ptr).
     Proof.
       unfold exec_correct.
@@ -2163,6 +2129,121 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         repeat eexists; [| solve_returns_provenance].
         unfold mem_state_memory in *.
         solve_read_byte_MemPropT_contra READ ACCESS.
+
+        Unshelve.
+        all: exact (""%string).
+    Qed.
+
+    Lemma read_byte_correct :
+      forall ptr, exec_correct (read_byte ptr) (read_byte_spec_MemPropT ptr).
+    Proof.
+      intros ptr.
+      pose proof read_byte_correct_base ptr as BASE.
+      unfold exec_correct.
+      intros ms st VALID.
+
+      (* Need to destruct ahead of time so we know if UB happens *)
+      destruct (read_byte_raw (mem_state_memory ms) (ptr_to_int ptr)) as [[sbyte aid]|] eqn:READ.
+      destruct (access_allowed (address_provenance ptr) aid) eqn:ACCESS.
+        - (* Success *)
+        right.
+        split; [|split].
+        + (* Error *)
+          do 2 eexists; intros RUN.
+          exfalso.
+          unfold read_byte, read_byte_MemPropT in *.
+
+          rewrite MemMonad_run_bind in RUN.
+          rewrite MemMonad_get_mem_state in RUN.
+          rewrite bind_ret_l in RUN.
+
+          rewrite READ in RUN.
+          rewrite ACCESS in RUN.
+
+          rewrite MemMonad_run_ret in RUN.
+
+          apply MemMonad_eq1_raise_error_inv in RUN; auto.
+        + (* OOM *)
+          do 2 eexists; intros RUN.
+          exfalso.
+          unfold read_byte, read_byte_MemPropT in *.
+
+          rewrite MemMonad_run_bind in RUN.
+          rewrite MemMonad_get_mem_state in RUN.
+          rewrite bind_ret_l in RUN.
+
+          rewrite READ in RUN.
+          rewrite ACCESS in RUN.
+
+          rewrite MemMonad_run_ret in RUN.
+
+          apply MemMonad_eq1_raise_oom_inv in RUN; auto.
+        + (* Success *)
+          intros st' ms' x RUN.
+          unfold read_byte, read_byte_MemPropT in RUN.
+
+          rewrite MemMonad_run_bind in RUN.
+          rewrite MemMonad_get_mem_state in RUN.
+          rewrite bind_ret_l in RUN.
+
+          rewrite READ in RUN.
+          rewrite ACCESS in RUN.
+
+          rewrite MemMonad_run_ret in RUN.
+
+          apply eq1_ret_ret in RUN; [inv RUN | typeclasses eauto].
+          split; [|split]; auto.
+          solve_read_byte_allowed.
+          unfold read_byte_prop.
+          unfold exec_correct_memory in BASE.
+
+          cbn; do 2 eexists.
+          unfold MemState_get_memory in *.
+          unfold mem_state_memory_stack in *.
+          unfold mem_state_memory in *.
+
+          rewrite READ; cbn.
+          rewrite ACCESS; cbn.
+          eauto.
+      - (* UB from provenance mismatch *)
+        left.
+        repeat eexists.
+        cbn.
+        intros byte.
+        intros [ALLOWED VALUE].
+        unfold MemState_get_memory in *;
+          unfold mem_state_memory_stack in *;
+          unfold mem_state_memory in *;
+          
+          unfold mem_state_memory in *.
+
+        break_access_hyps.
+        break_byte_allocated_in ALLOC.
+        rewrite READ in ALLOC.
+        cbn in ALLOC.
+        inv ALLOC.
+
+        destruct (aid_eq_dec aid0 aid); inv H1.
+        rewrite ACCESS in ALLOWED.
+        inv ALLOWED.
+      - (* UB from accessing unallocated memory *)
+        left.
+        repeat eexists.
+        cbn.
+        intros byte.
+        intros [ALLOWED VALUE].
+        unfold MemState_get_memory in *;
+          unfold mem_state_memory_stack in *;
+          unfold mem_state_memory in *;
+          
+          unfold mem_state_memory in *.
+
+        break_access_hyps.
+        break_byte_allocated_in ALLOC.
+        rewrite READ in ALLOC.
+        cbn in ALLOC.
+        inv ALLOC.
+        inv H1.
 
         Unshelve.
         all: exact (""%string).

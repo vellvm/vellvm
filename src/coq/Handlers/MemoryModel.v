@@ -20,7 +20,10 @@ From Vellvm.Utils Require Import
      Util
      NMaps
      Tactics
-     MonadReturnsLaws.
+     Raise
+     MonadReturnsLaws
+     MonadEq1Laws
+     MonadExcLaws.
 
 From Vellvm.Numeric Require Import
      Integers.
@@ -1607,6 +1610,42 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     forall {A} x error_msg,
       ~ ((@eq1 _ MemMonad_eq1_runm) A (ret x) (raise_error error_msg));
   }.
+
+    (*** Correctness *)
+    Definition exec_correct {MemM Eff ExtraState} `{MM: MemMonad ExtraState MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT MemState X) : Prop :=
+      forall ms st,
+        (@MemMonad_valid_state ExtraState MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ ms st) ->
+        let t := MemMonad_run exec ms st in
+        let eqi := (@eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) in
+        (* UB *)
+        (exists msg_spec,
+            spec ms (raise_ub msg_spec)) \/
+          (* Error *)
+          ((exists msg msg_spec,
+               eqi _ t (raise_error msg) ->
+               spec ms (raise_error msg_spec))) /\
+          (* OOM *)
+          (exists msg msg_spec,
+              eqi _ t (raise_oom msg) ->
+              spec ms (raise_oom msg_spec)) /\
+          (* Success *)
+          (forall st' ms' x,
+              eqi _ t (ret (st', (ms', x))) ->
+              spec ms (ret (ms', x))).
+
+    Definition exec_correct_memory {MemM Eff ExtraState} `{MM: MemMonad ExtraState MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT memory_stack X) : Prop :=
+      exec_correct exec (lift_memory_MemPropT spec).
+
+    Lemma exec_correct_lift_memory :
+      forall {MemM Eff ExtraState} `{MemMonad ExtraState MemM (itree Eff)}
+        {X} (exec : MemM X)  (spec : MemPropT memory_stack X),
+        exec_correct_memory exec spec ->
+        exec_correct exec (lift_memory_MemPropT spec).
+    Proof.
+      intros * EXEC.
+      unfold exec_correct_memory in EXEC.
+      auto.
+    Qed.
 End MemoryExecMonad.
 
 Module MakeMemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP) <: MemoryExecMonad LP MP MMSP MMS.
@@ -1659,19 +1698,10 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
     Parameter mempop : forall `{MemMonad ExtraState MemM (itree Eff)}, MemM unit.
 
     (*** Correctness *)
-    Parameter exec_correct : forall {MemM Eff ExtraState} `{MemMonad ExtraState MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT MemState X), Prop.
-
-    Parameter exec_correct_memory : forall {MemM Eff ExtraState} `{MemMonad ExtraState MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT memory_stack X), Prop.
-
-    Parameter exec_correct_lift_memory :
-      forall {MemM Eff ExtraState} `{MemMonad ExtraState MemM (itree Eff)}
-        {X} (exec : MemM X)  (spec : MemPropT memory_stack X),
-        exec_correct_memory exec spec ->
-        exec_correct exec (lift_memory_MemPropT spec).
 
     (** Correctness of the main operations on memory *)
     Parameter read_byte_correct :
-      forall ptr, exec_correct_memory (read_byte ptr) (read_byte_MemPropT ptr).
+      forall ptr, exec_correct (read_byte ptr) (read_byte_spec_MemPropT ptr).
 
     Parameter write_byte_correct :
       forall ptr byte, exec_correct (write_byte ptr byte) (write_byte_spec_MemPropT ptr byte).
@@ -1863,3 +1893,517 @@ End MemoryModelExec.
 Module MakeMemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP) <: MemoryModelExec LP MP MMEP.
   Include MemoryModelExec LP MP MMEP.
 End MakeMemoryModelExec.
+
+Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP) (MME : MemoryModelExec LP MP MMEP).
+  Import MMEP.
+  Import MME.
+  Import MemSpec.
+  Import MMSP.
+  Import MemExecM.
+  Import MemHelpers.
+
+  Section Correctness.
+    Context {MemM : Type -> Type}.
+    Context {Eff : Type -> Type}.
+    Context {ExtraState : Type}.
+    Context `{MM : MemMonad ExtraState MemM (itree Eff)}.
+
+    Import Monad.
+
+    Lemma exec_correct_bind :
+      forall {A B}
+        (m_exec : MemM A) (k_exec : A -> MemM B)
+        (m_spec : MemPropT MemState A) (k_spec : A -> MemPropT MemState B),
+        exec_correct m_exec m_spec ->
+        (forall a, exec_correct (k_exec a) (k_spec a)) ->
+        exec_correct (a <- m_exec;; k_exec a) (a <- m_spec;; k_spec a).
+    Proof.
+      intros A B m_exec k_exec m_spec k_spec HM HK.
+      unfold exec_correct in *.
+      intros ms st VALID.
+
+      pose proof (HM ms st VALID) as [[ubm UBM] | NUBM].
+      { (* m raised UB *)
+        left.
+        repeat eexists; eauto.
+      }
+
+      (* m did not raise UB *)
+      destruct NUBM as [ERROR [OOM SUCC]].
+      right.
+
+      split; [|split].
+      { (* Error *)
+        do 2 eexists; intros RUN.
+
+        rewrite MemMonad_run_bind in RUN.
+        (* I think I need some kind of inversion lemma about this *)
+        admit.
+      }
+      admit.
+      admit.
+    Admitted.
+
+    Lemma exec_correct_map_monad :
+      forall {A B}
+        xs
+        (m_exec : A -> MemM B) (m_spec : A -> MemPropT MemState B),
+        (forall a, exec_correct (m_exec a) (m_spec a)) ->
+        exec_correct (map_monad m_exec xs) (map_monad m_spec xs).
+    Proof.
+      induction xs;
+        intros m_exec m_spec HM.
+
+      - cbn. red.
+        intros ms st VALID.
+        right.
+        split; [|split].
+    Admitted.
+
+    Lemma read_bytes_correct :
+      forall len ptr,
+        exec_correct (read_bytes ptr len) (read_bytes_spec ptr len).
+    Proof.
+      unfold read_bytes.
+      unfold read_bytes_spec.
+      intros len ptr.
+      eapply exec_correct_bind.
+      admit.
+
+      intros a.
+      eapply exec_correct_map_monad.
+      intros ptr'.
+      apply read_byte_correct.
+    Admitted.
+
+    (* Lemma read_bytes_correct : *)
+    (*   forall len ptr, *)
+    (*     exec_correct (read_bytes ptr len) (read_bytes_spec ptr len). *)
+    (* Proof. *)
+    (*   induction len; intros ptr. *)
+    (*   { (* Reading no bytes *) *)
+    (*     cbn. *)
+    (*     unfold read_bytes. *)
+    (*     unfold read_bytes_spec. *)
+    (*     unfold get_consecutive_ptrs in *. *)
+    (*     cbn. *)
+
+    (*     unfold exec_correct. *)
+    (*     intros ms st VALID. *)
+
+    (*     (* Reading 0 bytes should always succeed *) *)
+    (*     right. *)
+    (*     split; [|split]. *)
+    (*     { (* Error *) *)
+    (*       do 2 eexists. *)
+    (*       intros RUN. *)
+    (*       exfalso. *)
+
+    (*       repeat rewrite MemMonad_run_bind in RUN. *)
+    (*       repeat rewrite MemMonad_run_ret in RUN. *)
+    (*       repeat rewrite bind_ret_l in RUN. *)
+    (*       cbn in RUN. *)
+
+    (*       repeat rewrite MemMonad_run_ret in RUN. *)
+    (*       repeat rewrite bind_ret_l in RUN. *)
+    (*       cbn in RUN. *)
+
+    (*       repeat rewrite MemMonad_run_ret in RUN. *)
+    (*       repeat rewrite bind_ret_l in RUN. *)
+
+    (*       eapply MemMonad_eq1_raise_error_inv in RUN; contradiction. *)
+    (*     } *)
+
+    (*     { (* OOM *) *)
+    (*       do 2 eexists. *)
+    (*       intros RUN. *)
+    (*       exfalso. *)
+
+    (*       repeat rewrite MemMonad_run_bind in RUN. *)
+    (*       repeat rewrite MemMonad_run_ret in RUN. *)
+    (*       repeat rewrite bind_ret_l in RUN. *)
+    (*       cbn in RUN. *)
+
+    (*       repeat rewrite MemMonad_run_ret in RUN. *)
+    (*       repeat rewrite bind_ret_l in RUN. *)
+    (*       cbn in RUN. *)
+
+    (*       repeat rewrite MemMonad_run_ret in RUN. *)
+    (*       repeat rewrite bind_ret_l in RUN. *)
+
+    (*       eapply MemMonad_eq1_raise_oom_inv in RUN; contradiction. *)
+    (*     } *)
+
+    (*     { (* Success *) *)
+    (*       intros st' ms' x RUN. *)
+
+    (*       repeat rewrite MemMonad_run_bind in RUN. *)
+    (*       repeat rewrite MemMonad_run_ret in RUN. *)
+    (*       repeat rewrite bind_ret_l in RUN. *)
+    (*       cbn in RUN. *)
+
+    (*       repeat rewrite MemMonad_run_ret in RUN. *)
+    (*       repeat rewrite bind_ret_l in RUN. *)
+    (*       cbn in RUN. *)
+
+    (*       repeat rewrite MemMonad_run_ret in RUN. *)
+    (*       repeat rewrite bind_ret_l in RUN. *)
+    (*       eapply eq1_ret_ret in RUN; [| typeclasses eauto]. *)
+    (*       inv RUN. *)
+    (*       cbn. *)
+
+    (*       do 2 eexists. *)
+    (*       split. *)
+    (*       { do 2 eexists. *)
+    (*         split; eauto. *)
+    (*         cbn. *)
+    (*         split; eauto. *)
+    (*       } *)
+
+    (*       cbn. auto.           *)
+    (*     } *)
+    (*   } *)
+
+    (*   { (* Inductive case *) *)
+    (*     cbn. *)
+    (*     unfold read_bytes. *)
+    (*     unfold read_bytes_spec. *)
+    (*     unfold get_consecutive_ptrs in *. *)
+    (*     cbn. *)
+
+    (*     unfold exec_correct. *)
+    (*     intros ms st VALID. *)
+
+    (*     cbn. *)
+    (*     repeat rewrite LP.IP.from_Z_0. *)
+
+    (*     pose proof read_byte_correct ptr as READBYTE. *)
+    (*     unfold exec_correct_memory in READBYTE. unfold exec_correct in READBYTE. *)
+    (*     specialize (READBYTE ms st VALID). *)
+    (*     destruct READBYTE as [[ubmsg [UB LIFT]] | READBYTE]. *)
+    (*     { (* Reading the byte gave UB *) *)
+    (*       left. *)
+    (*       exists ubmsg. cbn. *)
+    (*       repeat eexists. *)
+    (*       left. *)
+    (*       repeat eexists. *)
+    (*       break_match. *)
+    (*       { cbn. right. *)
+    (*         repeat eexists. *)
+    (*         cbn. *)
+    (*         rewrite MP.GEP.handle_gep_addr_0. *)
+    (*         break_match; cbn; eauto. *)
+    (*         cbn in UB. *)
+
+    (*       } *)
+    (*     } *)
+
+    (*     cbn. *)
+
+
+    (*     destruct (map_monad LP.IP.from_Z (Zseq 1 len)) as [iptrs | OOM] eqn:HMAPM. *)
+
+    (*     2: { (* OOM *) *)
+    (*       right. *)
+    (*       split; [|split]. *)
+
+    (*       { (* Error *) *)
+    (*         do 2 exists ""%string. *)
+
+    (*         intros RUN. *)
+    (*         exfalso. *)
+
+    (*         repeat rewrite MemMonad_run_bind in RUN. *)
+    (*         cbn in RUN. *)
+    (*         repeat rewrite MemMonad_run_raise_oom in RUN. *)
+    (*         rewrite rbm_raise_bind in RUN; [| typeclasses eauto]. *)
+    (*         rewrite rbm_raise_bind in RUN; [| typeclasses eauto]. *)
+    (*         admit. (* OOM <> error *) *)
+    (*       } *)
+
+    (*       { (* OOM *) *)
+    (*         repeat eexists. *)
+    (*         exact ""%string. *)
+    (*         cbn. *)
+    (*         left. eauto. *)
+    (*       } *)
+
+    (*       { (* Success *) *)
+    (*         intros st' ms' x RUN. *)
+    (*         exfalso. *)
+
+    (*         cbn in RUN. *)
+    (*         repeat rewrite MemMonad_run_bind in RUN. *)
+    (*         cbn in RUN. *)
+    (*         repeat rewrite MemMonad_run_raise_oom in RUN. *)
+    (*         rewrite rbm_raise_bind in RUN; [| typeclasses eauto]. *)
+    (*         rewrite rbm_raise_bind in RUN; [| typeclasses eauto]. *)
+
+    (*         symmetry in RUN. *)
+    (*         eapply MemMonad_eq1_raise_oom_inv in RUN. *)
+    (*         contradiction. *)
+    (*       } *)
+    (*     } *)
+        
+    (*     { (* No OOM *) *)
+    (*       right. *)
+    (*       split; [|split]. *)
+
+    (*       { (* Error *) *)
+    (*         do 2 exists ""%string. *)
+
+    (*         intros RUN. *)
+
+    (*         repeat rewrite MemMonad_run_bind in RUN. *)
+    (*         repeat rewrite MemMonad_run_ret in RUN. *)
+    (*         repeat rewrite bind_ret_l in RUN. *)
+    (*         cbn in RUN. *)
+
+    (*         repeat rewrite MemMonad_run_ret in RUN. *)
+    (*         repeat rewrite bind_ret_l in RUN. *)
+    (*         cbn in RUN. *)
+
+    (*         rewrite MP.GEP.handle_gep_addr_0 in RUN. *)
+    (*         break_match_hyp. *)
+
+    (*         { (* Error when using gep to get pointers *) *)
+    (*           cbn in RUN. *)
+    (*           cbn. *)
+    (*           eexists. *)
+    (*           left. *)
+    (*           eexists. *)
+    (*           right. *)
+    (*           repeat eexists. *)
+    (*           cbn. *)
+    (*           break_match; cbn; auto. *)
+    (*           rewrite Heqs. *)
+    (*           cbn. auto. *)
+    (*         } *)
+
+    (*         cbn in RUN. *)
+    (*         repeat rewrite MemMonad_run_ret in RUN. *)
+    (*         repeat rewrite bind_ret_l in RUN. *)
+
+    (*         rewrite map_monad_unfold in RUN. *)
+    (*         repeat rewrite MemMonad_run_bind in RUN. *)
+
+    (*         (* TODO: RUN should be a contradiction if read_byte succeeds... *)
+
+    (*            Unfortunately, I don't know anything about MemMonad_run and read_byte... *)
+    (*          *) *)
+    (*         (* I *DO* know read_byte_correct, though... *) *)
+    (*         pose proof read_byte_correct ptr as READBYTE. *)
+    (*         unfold exec_correct_memory in READBYTE. unfold exec_correct in READBYTE. *)
+    (*         specialize (READBYTE ms st VALID). *)
+    (*         destruct READBYTE as [[ubmsg [UB LIFT]] | READBYTE]. *)
+    (*         { (* Reading the byte gave UB *) *)
+    (*           cbn in UB. *)
+    (*           Transparent read_byte_MemPropT. *)
+    (*           unfold read_byte_MemPropT in *. *)
+    (*         } *)
+    (*       } *)
+
+    (*       { (* OOM *) *)
+    (*         do 2 eexists. *)
+    (*         exact ""%string. *)
+    (*         intros RUN. *)
+
+    (*         cbn in RUN. *)
+    (*         repeat rewrite MemMonad_run_bind in RUN. *)
+    (*         repeat rewrite MemMonad_run_ret in RUN. *)
+    (*         repeat rewrite bind_ret_l in RUN. *)
+
+    (*         rewrite map_monad_unfold in RUN. *)
+    (*         repeat rewrite MemMonad_run_bind in RUN. *)
+
+            
+    (*       } *)
+
+    (*       (* ---------------------------------------------------------------------- *) *)
+    (*         (* Messing around... *) *)
+    (*         (* IHlen with read_bytes (ptr+1) len *) *)
+    (*         destruct len. *)
+    (*         { (* Just one byte read *) *)
+    (*           cbn in HMAPM. *)
+    (*           inv HMAPM. *)
+    (*           cbn in Heqs. *)
+    (*           inv Heqs. *)
+    (*           cbn in RUN. *)
+    (*           repeat rewrite MemMonad_run_ret in RUN. *)
+    (*           repeat rewrite bind_ret_l in RUN. *)
+
+    (*           repeat eexists. *)
+    (*           left. *)
+    (*           eexists. *)
+    (*           cbn. *)
+    (*           right. *)
+    (*           repeat eexists. *)
+
+    (*           cbn. *)
+    (*           rewrite MP.GEP.handle_gep_addr_0. *)
+    (*           cbn. *)
+    (*         } *)
+
+    (*         cbn in HMAPM. *)
+    (*         destruct (LP.IP.from_Z 1) eqn:HONE; inv HMAPM. *)
+
+    (*         set (fstptr:= MP.GEP.handle_gep_addr (DTYPE_I 8) ptr [LP.Events.DV.DVALUE_IPTR i]). *)
+    (*         destruct fstptr eqn:HFSTPTR. *)
+    (*         admit. (* Will be contradiction when I can use this *) *)
+    (*         pose proof (IHlen a) as REST. *)
+            
+    (*         repeat rewrite MemMonad_run_ret in RUN. *)
+    (*         repeat rewrite bind_ret_l in RUN. *)
+
+    (*         eapply MemMonad_eq1_raise_error_inv in RUN; contradiction. *)
+
+    (*       } *)
+    (*     } *)
+
+    (*     (* I need to know whether UB happens or not based on if the read is allowed *) *)
+    (*     right. *)
+    (*     split; [|split]. *)
+
+    (*     { (* Error *) *)
+    (*       do 2 exists ""%string. *)
+
+    (*       intros RUN. *)
+    (*       exfalso. *)
+    (*       rewrite LP.IP.from_Z_0 in RUN. *)
+
+    (*       repeat rewrite MemMonad_run_bind in RUN. *)
+    (*       repeat rewrite MemMonad_run_ret in RUN. *)
+    (*       repeat rewrite bind_ret_l in RUN. *)
+    (*       cbn in RUN. *)
+
+    (*       repeat rewrite MemMonad_run_ret in RUN. *)
+    (*       repeat rewrite bind_ret_l in RUN. *)
+    (*       cbn in RUN. *)
+
+    (*       repeat rewrite MemMonad_run_ret in RUN. *)
+    (*       repeat rewrite bind_ret_l in RUN. *)
+
+    (*       eapply MemMonad_eq1_raise_error_inv in RUN; contradiction. *)
+
+    (*     } *)
+    (*   } *)
+    (*   intros ptr len. *)
+    (*   unfold read_bytes. *)
+    (*   unfold read_bytes_spec. *)
+    (*   unfold get_consecutive_ptrs in *. *)
+
+
+    (* Lemma read_bytes_correct : *)
+    (*   forall ptr len, *)
+    (*     exec_correct (read_bytes ptr len) (read_bytes_spec ptr len). *)
+    (* Proof. *)
+    (*   intros ptr len. *)
+    (*   unfold read_bytes. *)
+    (*   unfold read_bytes_spec. *)
+    (*   unfold get_consecutive_ptrs in *. *)
+
+    (*   cbn. *)
+
+    (*   unfold exec_correct. *)
+    (*   intros ms st VALID. *)
+
+    (*   destruct (intptr_seq 0 len) eqn:HSEQ. *)
+    (*   2: { (* OOM *) *)
+    (*     cbn. *)
+    (*     right. *)
+    (*     split. *)
+    (*     { (* Error *) *)
+    (*       eexists. exists ""%string. *)
+    (*       intros RUN. *)
+
+    (*       repeat rewrite MemMonad_run_bind in RUN. *)
+    (*       rewrite Monad.bind_bind in RUN. *)
+    (*       rewrite MemMonad_run_raise_oom in RUN. *)
+    (*       rewrite rbm_raise_bind in RUN; [| typeclasses eauto]. *)
+    (*       exfalso. *)
+    (*       admit. (* TODO: Need something about raise_oom not being raise_error... *) *)
+    (*     } *)
+
+    (*     split. *)
+    (*     { (* OOM *) *)
+    (*       exists s. exists ""%string. *)
+    (*       intros RUN. *)
+
+    (*       repeat rewrite MemMonad_run_bind in RUN. *)
+    (*       rewrite Monad.bind_bind in RUN. *)
+    (*       rewrite MemMonad_run_raise_oom in RUN. *)
+    (*       rewrite rbm_raise_bind in RUN; [| typeclasses eauto]. *)
+
+    (*       repeat eexists. *)
+    (*       left. *)
+    (*       eauto. *)
+    (*     } *)
+
+    (*     { (* Success *) *)
+    (*       intros st' ms' x RUN. *)
+    (*       repeat rewrite MemMonad_run_bind in RUN. *)
+    (*       rewrite Monad.bind_bind in RUN. *)
+    (*       rewrite MemMonad_run_raise_oom in RUN. *)
+    (*       rewrite rbm_raise_bind in RUN; [| typeclasses eauto]. *)
+
+    (*       symmetry in RUN. *)
+    (*       eapply MemMonad_eq1_raise_oom_inv in RUN. *)
+    (*       contradiction. *)
+    (*     } *)
+    (*   } *)
+
+    (*   right. (* No UB *) *)
+
+    (*   split; cbn. *)
+    (*   { (* Error *) *)
+    (*     do 2 exists (""%string). *)
+
+    (*     intros RUN. *)
+    (*     repeat rewrite MemMonad_run_bind in RUN. *)
+    (*     repeat rewrite MemMonad_run_ret in RUN. *)
+    (*     rewrite bind_ret_l in RUN. *)
+
+    (*     match goal with *)
+    (*     | RUN : context [Util.map_monad ?f ?s] |- _ => *)
+    (*         destruct (Util.map_monad f s) as [ERR | ptrs] eqn:HMAPM *)
+    (*     end. *)
+
+    (*     { (* Error in map monad *) *)
+    (*       cbn in RUN. *)
+    (*       rewrite MemMonad_run_raise_error in RUN. *)
+    (*       rewrite rbm_raise_bind in RUN; [| typeclasses eauto]. *)
+    (*       repeat eexists. *)
+
+    (*       left. *)
+    (*       exists ""%string. *)
+    (*       right. *)
+
+    (*       repeat eexists. *)
+    (*       rewrite HMAPM. *)
+    (*       cbn. *)
+    (*       auto. *)
+    (*     } *)
+
+    (*     { (* Success in HMAPM *) *)
+    (*       cbn in RUN. *)
+    (*       rewrite MemMonad_run_ret in RUN. *)
+    (*       rewrite bind_ret_l in RUN. *)
+
+    (*       induction ptrs. *)
+    (*       - cbn in *. *)
+    (*         rewrite MemMonad_run_ret in RUN. *)
+    (*         eapply MemMonad_eq1_raise_error_inv in RUN. *)
+    (*         contradiction. *)
+    (*       - cbn in *. *)
+    (*         rewrite MemMonad_run_bind in RUN. *)
+
+    (*         (* read_byte_correct *) *)
+          
+          
+    (*       destruct (map_monad (fun ptr : LP.ADDR.addr => read_byte ptr) ptrs) as [ERR | bytes] eqn:HREADS. *)
+    (*     } *)
+    (*   } *)
+    (* Qed. *)
+
+    End Correctness.
+End MemoryModelTheory.
