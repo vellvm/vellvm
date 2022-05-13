@@ -140,8 +140,8 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
 
   Notation res_L1 := (global_env * dvalue)%type.
   Notation res_L2 := (local_env * lstack * res_L1)%type.
-  Notation res_L3 := (MemState * (Provenance * (store_id * res_L2)))%type.
-  Notation res_L4 := (MemState * (Provenance * (store_id * (local_env * lstack * (global_env * dvalue)))))%type.
+  Notation res_L3 := (MemState * (store_id * res_L2))%type.
+  Notation res_L4 := (MemState * (store_id * (local_env * lstack * (global_env * dvalue))))%type.
 
   (**
      Full denotation of a Vellvm program as an interaction tree:
@@ -194,7 +194,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : itree L4 res_L4 :=
     let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-    interp_mcfg4_exec t [] ([],[]) 0 initial_provenance initial_memory_state.
+    interp_mcfg4_exec t [] ([],[]) 0 initial_memory_state.
 
   (**
      Finally, the reference interpreter assumes no user-defined intrinsics and starts 
@@ -222,7 +222,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : PropT L4 res_L4 :=
     let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-    ℑs eq eq t [] ([],[]) 0 initial_provenance initial_memory_state. 
+    ℑs eq eq t [] ([],[]) 0 initial_memory_state. 
 
   (**
      Finally, the official model assumes no user-defined intrinsics.

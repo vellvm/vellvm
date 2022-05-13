@@ -328,9 +328,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
    *)
   Definition res_L4_convert_unsafe (res : LLVM1.res_L4) : OOM LLVM2.res_L4
     := match res with
-       | (ms, (pr, (sid, ((lenv, lstack), (genv, dv))))) =>
+       | (ms, (sid, ((lenv, lstack), (genv, dv)))) =>
            dv' <- dvalue_convert dv;;
-           ret (MMEP.initial_memory_state, (initial_provenance, (0, (([], []), ([], dv')))))
+           ret (MMEP.initial_memory_state, (0, (([], []), ([], dv'))))
        end.
  
   Definition refine_E1E2_L6 (srcs : PropT IS1.LP.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop
@@ -434,25 +434,25 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
 
         punfold REF; red in REF.
         genobs y yo.
-        setoid_rewrite <- Heqyo.
-        clear Heqyo.
-        clear y.
+        (* setoid_rewrite <- Heqyo. *)
+        (* clear Heqyo. *)
+        (* clear y. *)
 
-        revert x REF.
-        pcofix CIH; intros x REF.
+        (* revert x REF. *)
+        (* pcofix CIH; intros x REF. *)
 
-        Require Import Coq.Program.Equality.
-        dependent induction REF.
-        - cbn. pstep; red.
-          econstructor; eauto.
-          rewrite eq2.
-          rewrite interp_ret; reflexivity.
-        - pclearbot. punfold HS.
-          red in HS.
+        (* Require Import Coq.Program.Equality. *)
+        (* dependent induction REF. *)
+        (* - cbn. pstep; red. *)
+        (*   econstructor; eauto. *)
+        (*   rewrite eq2. *)
+        (*   rewrite interp_ret; reflexivity. *)
+        (* - pclearbot. punfold HS. *)
+        (*   red in HS. *)
 
-          pfold; red.
-          constructor.
-          left.
+        (*   pfold; red. *)
+        (*   constructor. *)
+        (*   left. *)
       Admitted.
 
       Import Morphisms.
@@ -492,14 +492,13 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
 
       intros r1 r2 H.
       unfold TLR_INF.R.refine_res3, TLR_INF.R.refine_res2, TLR_INF.R.refine_res1 in H.
-      destruct r1 as [r1a [r1pr [r1sid [[r1b1 r1b2] [r1c dv1]]]]].
-      destruct r2 as [r2a [r2pr [r2sid [[r2b1 r2b2] [r2c dv2]]]]].
+      destruct r1 as [r1a [r1sid [[r1b1 r1b2] [r1c dv1]]]].
+      destruct r2 as [r2a [r2sid [[r2b1 r2b2] [r2c dv2]]]].
       inversion H; subst.
       inversion H5; subst.
       inversion H7; subst.
-      inversion H7; subst.
       inversion H9; subst.
-      inversion H13; subst.
+      inversion H9; subst.
       cbn.
       reflexivity.
   Qed.

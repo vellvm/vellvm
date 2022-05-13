@@ -204,10 +204,19 @@ Definition from_Z := (fun (x : Z) => ret x : OOM Z).
     auto.
   Qed.
 
+  Lemma to_Z_inj :
+    forall x y,
+      to_Z x = to_Z y ->
+      x = y.
+  Proof.
+    intros x y.
+    unfold to_Z; auto.
+  Qed.
+
   Definition mequ_Z (x y : Z) : bool :=
     Z.eqb x y.
 
-  Definition mcmp_Z (c : comparison) (x y : Z) : bool := 
+  Definition mcmp_Z (c : comparison) (x y : Z) : bool :=
     match c with
     | Ceq => Z.eqb x y
     | Cne => Zneq_bool x y
@@ -217,7 +226,7 @@ Definition from_Z := (fun (x : Z) => ret x : OOM Z).
     | Cge => Z.geb x y
     end.
 
-  Definition mcmpu_Z (c : comparison) (x y : Z) : bool := 
+  Definition mcmpu_Z (c : comparison) (x y : Z) : bool :=
     match c with
     | Ceq => Z.eqb x y
     | Cne => Zneq_bool x y
@@ -341,6 +350,26 @@ Module IP64Bit : MemoryAddress.INTPTR.
     auto.
   Qed.
 
+  Require Import ProofIrrelevance.
+
+  Lemma to_Z_inj :
+    forall x y,
+      to_Z x = to_Z y ->
+      x = y.
+  Proof.
+    intros x y EQ.
+    unfold to_Z in *.
+    destruct x, y.
+    unfold Int64.signed, Int64.unsigned in *.
+    cbn in *.
+    break_match_hyp; break_match_hyp; subst.
+    - rewrite (proof_irrelevance _ intrange intrange0); auto.
+    - lia.
+    - lia.
+    - assert (intval = intval0) by lia; subst.
+      rewrite (proof_irrelevance _ intrange intrange0); auto.
+  Admitted. (* This is probably awful because of lia? *)
+
   Instance VMemInt_intptr : VMemInt intptr
     :=
     { (* Comparisons *)
@@ -442,12 +471,15 @@ Module IP64Bit : MemoryAddress.INTPTR.
 
 End IP64Bit.
 
-
-Module FinPTOI : PTOI(Addr).
+Module FinPTOI : PTOI(Addr)
+with Definition ptr_to_int := fun (ptr : Addr.addr) => fst ptr.
   Definition ptr_to_int (ptr : Addr.addr) := fst ptr.
 End FinPTOI.
 
-Module FinPROV : PROVENANCE(Addr) with Definition Prov := Prov.
+Module FinPROV : PROVENANCE(Addr)
+with Definition Prov := Prov
+with Definition address_provenance
+    := fun (a : Addr.addr) => snd a.
   Definition Provenance := Provenance.
   Definition AllocationId := AllocationId.
   Definition Prov := Prov.
@@ -491,6 +523,9 @@ Module FinPROV : PROVENANCE(Addr) with Definition Prov := Prov.
   Definition initial_provenance : Provenance
     := 0%N.
 
+  Definition provenance_lt (p1 p2 : Provenance) : Prop
+    := N.lt p1 p2.
+
   Lemma aid_access_allowed_refl :
     forall aid, aid_access_allowed aid aid = true.
   Proof.
@@ -501,16 +536,145 @@ Module FinPROV : PROVENANCE(Addr) with Definition Prov := Prov.
     auto.
   Qed.
 
+  Lemma access_allowed_refl :
+    forall aid,
+      access_allowed (allocation_id_to_prov aid) aid = true.
+  Proof.
+    intros aid.
+    unfold access_allowed.
+    cbn.
+    destruct aid; auto.
+    cbn.
+    rewrite N.eqb_refl.
+    cbn.
+    auto.
+  Qed.
+
+  Lemma provenance_eq_dec :
+    forall (pr pr' : Provenance),
+      {pr = pr'} + {pr <> pr'}.
+  Proof.
+    unfold Provenance.
+    unfold FiniteProvenance.Provenance.
+    intros pr pr'.
+    apply N.eq_dec.
+  Defined.
+
+  Lemma provenance_eq_dec_refl :
+    forall (pr : Provenance),
+      true = (@provenance_eq_dec pr pr).
+  Proof.
+    intros pr.
+    destruct provenance_eq_dec; cbn; auto.
+    exfalso; auto.
+  Qed.
+
+  Lemma aid_eq_dec :
+    forall (aid aid' : AllocationId),
+      {aid = aid'} + {aid <> aid'}.
+  Proof.
+    intros aid aid'.
+    destruct aid, aid'; auto.
+    pose proof @provenance_eq_dec p p0.
+    destruct H; subst; auto.
+    right.
+    intros CONTRA. inv CONTRA; contradiction.
+    right; intros CONTRA; inv CONTRA.
+    right; intros CONTRA; inv CONTRA.
+  Qed.
+
+  Lemma aid_eq_dec_refl :
+    forall (aid : AllocationId),
+      true = @aid_eq_dec aid aid.
+  Proof.
+    intros aid.
+    destruct (@aid_eq_dec aid aid); cbn; auto.
+    exfalso; auto.
+  Qed.
+
+  #[global] Instance provenance_lt_trans : Transitive provenance_lt.
+  Proof.
+    unfold Transitive.
+    intros x y z XY YZ.
+    unfold provenance_lt in *.
+    lia.
+  Defined.
+
+  Lemma provenance_lt_next_provenance :
+    forall pr,
+      provenance_lt pr (next_provenance pr).
+  Proof.
+    unfold provenance_lt, next_provenance.
+    lia.
+  Qed.
+
+  Lemma provenance_lt_nrefl :
+    forall pr,
+      ~ provenance_lt pr pr.
+  Proof.
+    intros pr.
+    unfold provenance_lt.
+    lia.
+  Qed.
+
+  #[global] Instance provenance_lt_antisym : Antisymmetric Provenance eq provenance_lt.
+  Proof.
+    unfold Antisymmetric.
+    intros x y XY YX.
+    unfold provenance_lt in *.
+    lia.
+  Defined.
+
+  Lemma next_provenance_neq :
+    forall pr,
+      pr <> next_provenance pr.
+  Proof.
+    intros pr.
+    unfold next_provenance.
+    lia.
+  Qed.
+
   (* Debug *)
   Definition show_prov (pr : Prov) := Show.show pr.
   Definition show_provenance (pr : Provenance) := Show.show pr.
   Definition show_allocation_id (aid : AllocationId) := Show.show aid.
-
 End FinPROV.
 
-Module FinITOP : ITOP(Addr)(FinPROV).
-  Definition int_to_ptr (i : Z) (pr : Prov) : Addr.addr
+Module FinITOP : ITOP(Addr)(FinPROV)(FinPTOI).
+  Import Addr.
+  Import FinPROV.
+  Import FinPTOI.
+
+  Definition int_to_ptr (i : Z) (pr : Prov) : addr
     := (i, pr).
+
+  Lemma int_to_ptr_provenance :
+    forall (x : Z) (p : Prov) ,
+      FinPROV.address_provenance (int_to_ptr x p) = p.
+  Proof.
+    intros x p.
+    reflexivity.
+  Qed.
+
+  Lemma int_to_ptr_ptr_to_int :
+    forall (a : addr) (p : Prov),
+      address_provenance a = p ->
+      int_to_ptr (ptr_to_int a) p = a.
+  Proof.
+    intros a p PROV.
+    unfold int_to_ptr.
+    unfold ptr_to_int.
+    destruct a; cbn.
+    inv PROV; cbn; auto.
+  Qed.
+
+  Lemma ptr_to_int_int_to_ptr :
+    forall (x : Z) (p : Prov),
+      ptr_to_int (int_to_ptr x p) = x.
+  Proof.
+    intros x p.
+    reflexivity.
+  Qed.
 End FinITOP.
 
 Module FinSizeof : Sizeof.
@@ -597,6 +761,12 @@ Module FinSizeof : Sizeof.
   Lemma sizeof_dtyp_vector :
     forall sz t,
       sizeof_dtyp (DTYPE_Vector sz t) = (sz * sizeof_dtyp t)%N.
+  Proof.
+    reflexivity.
+  Qed.
+
+  Lemma sizeof_dtyp_i8 :
+    sizeof_dtyp (DTYPE_I 8) = 1%N.
   Proof.
     reflexivity.
   Qed.

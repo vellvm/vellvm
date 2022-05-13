@@ -164,10 +164,10 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
     Qed.
 
-    Lemma refine_23 : forall t1 t2 sid pr m,
-        refine_L2 t1 t2 -> refine_L3 (interp_memory_prop refine_res2 t1 sid pr m) (interp_memory_prop refine_res2 t2 sid pr m).
+    Lemma refine_23 : forall t1 t2 sid m,
+        refine_L2 t1 t2 -> refine_L3 (interp_memory_prop refine_res2 t1 sid m) (interp_memory_prop refine_res2 t2 sid m).
     Proof.
-      intros t1 t2 sid pr ms REF t Ht.
+      intros t1 t2 sid ms REF t Ht.
       exists t; split.
       - unfold interp_memory_prop in *.
         unfold L3 in *.
@@ -247,15 +247,15 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     Definition model_to_L3 (prog: mcfg dtyp) :=
       let L0_trace := denote_vellvm_init prog in
-      ℑs3 (refine_res2) L0_trace [] ([],[]) 0 initial_provenance initial_memory_state.
+      ℑs3 (refine_res2) L0_trace [] ([],[]) 0 initial_memory_state.
 
     Definition model_to_L4 (prog: mcfg dtyp) :=
       let L0_trace := denote_vellvm_init prog in
-      ℑs4 (refine_res2) (refine_res3) L0_trace [] ([],[]) 0 initial_provenance initial_memory_state.
+      ℑs4 (refine_res2) (refine_res3) L0_trace [] ([],[]) 0 initial_memory_state.
 
     Definition model_to_L5 (prog: mcfg dtyp) :=
       let L0_trace := denote_vellvm_init prog in
-      ℑs5 (refine_res2) (refine_res3) L0_trace [] ([],[]) 0 initial_provenance initial_memory_state.
+      ℑs5 (refine_res2) (refine_res3) L0_trace [] ([],[]) 0 initial_memory_state.
 
     (**
    Which leads to five notion of equivalence of [mcfg]s.
@@ -504,17 +504,17 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     rewrite interp_intrinsics_ret, interp_global_ret, interp_local_stack_ret; reflexivity.
   Qed.
 
-  Definition interp_cfg {R: Type} (trace: itree instr_E R) g l sid pr m :=
+  Definition interp_cfg {R: Type} (trace: itree instr_E R) g l sid m :=
     let uvalue_trace   := interp_intrinsics trace in
     let L1_trace       := interp_global uvalue_trace g in
     let L2_trace       := interp_local L1_trace l in
-    let L3_trace       := interp_memory_prop eq L2_trace sid pr m in
+    let L3_trace       := interp_memory_prop eq L2_trace sid m in
     let L4_trace       := model_undef eq L3_trace in
     L4_trace.
 
   Definition model_to_L4_cfg (prog: cfg dtyp) :=
     let trace := denote_cfg prog in
-    interp_cfg trace [] [] 0 initial_provenance initial_memory_state.
+    interp_cfg trace [] [] 0 initial_memory_state.
 
   Definition refine_cfg_ret: relation (PropT L5 (MemState * (local_env * (global_env * uvalue)))) :=
     fun ts ts' => forall t, ts t -> exists t', ts' t' /\ eutt  (TT × (TT × (TT × refine_uvalue))) t t'.

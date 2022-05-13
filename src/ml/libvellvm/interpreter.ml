@@ -94,7 +94,7 @@ let debug (msg:string) =
     Calling `step` could either loop forever, return an error,
     or return the dvalue result returned from the itree.
  *)
-let rec step (m : ('a coq_L4, MMEP.MMSP.coq_MemState * (InterpretationStack.InterpreterStackBigIntptr.LP.PROV.coq_Provenance * (MemPropT.store_id * ((local_env * lstack) * (global_env * DV.dvalue))))) itree) : (DV.dvalue, string) result =
+let rec step (m : ('a coq_L4, MMEP.MMSP.coq_MemState * (MemPropT.store_id * ((local_env * lstack) * (global_env * DV.dvalue)))) itree) : (DV.dvalue, string) result =
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
@@ -102,7 +102,7 @@ let rec step (m : ('a coq_L4, MMEP.MMSP.coq_MemState * (InterpretationStack.Inte
 
   (* SAZ: Could inspect the memory or stack here too. *)
   (* We finished the computation *)
-  | RetF (_,(_,(_,(_,(_,v))))) -> Ok v
+  | RetF (_,(_,(_,(_,v)))) -> Ok v
 
   (* The ExternalCallE effect *)
   | VisF (Sum.Coq_inl1 (ExternalCall(_, _, _)), _) ->

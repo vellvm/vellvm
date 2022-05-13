@@ -410,24 +410,24 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     := eutt refine_res2.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics *)
-  Definition refine_res3 : relation (MemState * (Provenance * (store_id * (local_env * stack * (global_env * dvalue)))))
-    := TT × (TT × (TT × refine_res2)).
+  Definition refine_res3 : relation (MemState * (store_id * (local_env * stack * (global_env * dvalue))))
+    := TT × (TT × refine_res2).
 
-  Definition refine_L3 : relation (itree L3 (MemState * (Provenance * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)
+  Definition refine_L3 : relation (itree L3 (MemState * (store_id * (local_env * stack * (global_env * dvalue)))) -> Prop)
     := fun ts ts' => forall t', ts' t' -> exists t, ts t /\ eutt refine_res3 t t'.
 
   (* Refinement for after interpreting pick. *)
-  Definition refine_L4 : relation ((itree L4 (MemState * (Provenance * (store_id * (local_env * stack * (global_env * dvalue)))))) -> Prop)
+  Definition refine_L4 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)
     := fun ts ts' => forall t', ts' t' -> exists t, ts t /\ eutt refine_res3 t t'.
 
-  Definition refine_L5 : relation ((itree L4 (MemState * (Provenance * (store_id * (local_env * stack * (global_env * dvalue)))))) -> Prop)
+  Definition refine_L5 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)
     := fun ts ts' =>
          (* For any tree in the target set *)
          forall t', ts' t' ->
                (* There is a tree in the source set that is eutt our target tree *)
                exists t, ts t /\ eutt refine_res3 t t'.
 
-  Definition refine_L6 : relation ((itree L4 (MemState * (Provenance * (store_id * (local_env * stack * (global_env * dvalue)))))) -> Prop)
+  Definition refine_L6 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)
     := fun ts ts' =>
          forall t', ts' t' ->
                exists t, ts t /\ refine_OOM_h refine_res3 t t'.
