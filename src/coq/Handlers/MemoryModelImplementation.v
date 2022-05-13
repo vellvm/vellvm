@@ -2094,14 +2094,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           exfalso.
           unfold read_byte, read_byte_MemPropT in *.
 
-          rewrite MemMonad_run_bind in RUN; [| solve_MemMonad_valid_state].
+          rewrite MemMonad_run_bind in RUN.
           rewrite MemMonad_get_mem_state in RUN.
           rewrite bind_ret_l in RUN.
 
           rewrite READ in RUN.
           rewrite ACCESS in RUN.
 
-          rewrite MemMonad_run_ret in RUN; [| solve_MemMonad_valid_state].
+          rewrite MemMonad_run_ret in RUN.
 
           apply MemMonad_eq1_raise_error_inv in RUN; auto.
         + (* OOM *)
@@ -2109,28 +2109,28 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           exfalso.
           unfold read_byte, read_byte_MemPropT in *.
 
-          rewrite MemMonad_run_bind in RUN; [| solve_MemMonad_valid_state].
+          rewrite MemMonad_run_bind in RUN.
           rewrite MemMonad_get_mem_state in RUN.
           rewrite bind_ret_l in RUN.
 
           rewrite READ in RUN.
           rewrite ACCESS in RUN.
 
-          rewrite MemMonad_run_ret in RUN; [| solve_MemMonad_valid_state].
+          rewrite MemMonad_run_ret in RUN.
 
           apply MemMonad_eq1_raise_oom_inv in RUN; auto.
         + (* Success *)
           intros st' ms' x RUN.
           unfold read_byte, read_byte_MemPropT in *.
 
-          rewrite MemMonad_run_bind in RUN; [| solve_MemMonad_valid_state].
+          rewrite MemMonad_run_bind in RUN.
           rewrite MemMonad_get_mem_state in RUN.
           rewrite bind_ret_l in RUN.
 
           rewrite READ in RUN.
           rewrite ACCESS in RUN.
 
-          rewrite MemMonad_run_ret in RUN; [| solve_MemMonad_valid_state].
+          rewrite MemMonad_run_ret in RUN.
 
           apply eq1_ret_ret in RUN; [inv RUN | typeclasses eauto].
           split; [| solve_returns_provenance].
@@ -2205,7 +2205,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
           unfold write_byte in RUN.
 
-          rewrite MemMonad_run_bind in RUN; [| solve_MemMonad_valid_state].
+          rewrite MemMonad_run_bind in RUN.
           rewrite MemMonad_get_mem_state in RUN.
           rewrite bind_ret_l in RUN.
 
@@ -2220,7 +2220,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
           unfold write_byte in RUN.
 
-          rewrite MemMonad_run_bind in RUN; [| solve_MemMonad_valid_state].
+          rewrite MemMonad_run_bind in RUN.
           rewrite MemMonad_get_mem_state in RUN.
           rewrite bind_ret_l in RUN.
 
@@ -2234,7 +2234,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
           unfold write_byte in RUN.
 
-          rewrite MemMonad_run_bind in RUN; [| solve_MemMonad_valid_state].
+          rewrite MemMonad_run_bind in RUN.
           rewrite MemMonad_get_mem_state in RUN.
           rewrite bind_ret_l in RUN.
 
@@ -2618,7 +2618,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             rewrite RUN_FRESH_SID in RUN.
             rewrite bind_ret_l in RUN.
 
-            rewrite MemMonad_run_bind in RUN; [| tauto].
+            rewrite MemMonad_run_bind in RUN.
             rewrite MemMonad_get_mem_state in RUN.
             rewrite bind_ret_l in RUN.
 
@@ -2630,9 +2630,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             cbn in GET_PR.
             inv GET_PR.
             cbn in RUN.
-            assert (mem' = mem) as MEMEQ by admit.
-            assert (fs' = frames) as FRAMESEQ by admit.
-            subst.
+            rename mem' into mem.
+            rename fs' into frames.
 
             (* TODO: need to know something about get_consecutive_ptrs *)
             unfold get_consecutive_ptrs in *; cbn in RUN.
@@ -2673,22 +2672,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               rewrite MemMonad_put_mem_state in RUN.
               rewrite bind_ret_l in RUN.
               rewrite MemMonad_run_ret in RUN; auto.
-              2: { (* TODO: solve_MemMonad_valid_state *)
-                (* VALID'' / VALID' give me that previous states are valid...
-
-                   Need to know that adding init_bytes to memory
-                   results in a valid state at this point.
-
-                   Should be easy to show that the provenance is <=
-                   next_provenance for everything... Which is good.
-
-                   The other thing is showing that the store_ids in
-                   the init_bytes are less than the store id in
-                   `st'`... init_bytes is generic, though, so this can
-                   only be guaranteed with a precondition :(.
-                 *)
-                admit.
-              }
               cbn in RUN.
 
               apply eq1_ret_ret in RUN; [|typeclasses eauto].
@@ -4669,7 +4652,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
       Unshelve.
       all: try exact ""%string.
-    Admitted.
+    Qed.
 
     (** Correctness of frame stack operations *)
     Lemma mempush_correct :
@@ -5590,7 +5573,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             red. unfold used_provenance_prop.
             cbn. reflexivity.
         }
-      - auto.
     Qed.
 
     (*** Initial memory state *)

@@ -143,7 +143,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
 
       (* TODO: didn't need valid for ret / bind laws... *)
       - (* run bind *)
-        intros A B ma k ms sid VALID.
+        intros A B ma k ms sid.
         unfold MemStateFreshT_run.
         cbn.
         rewrite map_bind.
@@ -155,7 +155,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         cbn.
         reflexivity.
       - (* run ret *)
-        intros A x ms sid VALID.
+        intros A x ms sid.
         cbn.
         rewrite map_ret.
         reflexivity.
@@ -435,7 +435,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
       (* TODO: didn't need valid for ret / bind laws... *)
       - (* run bind *)
-        intros A B ma k ms sid VALID.
+        intros A B ma k ms sid.
         unfold MemStateFreshT_run.
         cbn.
         rewrite map_bind.
@@ -447,7 +447,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         cbn.
         reflexivity.
       - (* run ret *)
-        intros A x ms sid VALID.
+        intros A x ms sid.
         cbn.
         rewrite map_ret.
         reflexivity.

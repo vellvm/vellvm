@@ -1535,26 +1535,25 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       MemMonad_eq1_runm_eq1laws :> Eq1_ret_inv RunM;
       MemMonad_raisebindm_ub :> RaiseBindM RunM string (@raise_ub RunM RunUB);
       MemMonad_raisebindm_oom :> RaiseBindM RunM string (@raise_oom RunM RunOOM);
-    MemMonad_raisebindm_err :> RaiseBindM RunM string (@raise_error RunM RunERR);
-    MemMonad_MemSMem :> MemStateMem MemState memory_stack;
+      MemMonad_raisebindm_err :> RaiseBindM RunM string (@raise_error RunM RunERR);
 
-    MemMonad_eq1_runm_proper :>
-        (forall A, Proper ((@eq1 _ MemMonad_eq1_runm) A ==> (@eq1 _ MemMonad_eq1_runm) A ==> iff) ((@eq1 _ MemMonad_eq1_runm) A));
+      MemMonad_eq1_runm_proper :>
+                               (forall A, Proper ((@eq1 _ MemMonad_eq1_runm) A ==> (@eq1 _ MemMonad_eq1_runm) A ==> iff) ((@eq1 _ MemMonad_eq1_runm) A));
 
-    MemMonad_run {A} (ma : M A) (ms : MemState) (st : ExtraState)
-    : RunM (ExtraState * (MemState * A))%type;
+      MemMonad_run {A} (ma : M A) (ms : MemState) (st : ExtraState)
+      : RunM (ExtraState * (MemState * A))%type;
 
-    (** Whether a piece of extra state is valid for a given execution *)
-    MemMonad_valid_state : MemState -> ExtraState -> Prop;
+      (** Whether a piece of extra state is valid for a given execution *)
+      MemMonad_valid_state : MemState -> ExtraState -> Prop;
 
     (** Run bind / ret laws *)
     MemMonad_run_bind
-      {A B} (ma : M A) (k : A -> M B) (ms : MemState) (st : ExtraState) (VALID : MemMonad_valid_state ms st):
+      {A B} (ma : M A) (k : A -> M B) (ms : MemState) (st : ExtraState):
     eq1 (MemMonad_run (x <- ma;; k x) ms st)
         ('(st', (ms', x)) <- MemMonad_run ma ms st;; MemMonad_run (k x) ms' st');
 
     MemMonad_run_ret
-      {A} (x : A) (ms : MemState) st (VALID : MemMonad_valid_state ms st):
+      {A} (x : A) (ms : MemState) st:
     eq1 (MemMonad_run (ret x) ms st) (ret (st, (ms, x)));
 
     (** MonadMemState properties *)
