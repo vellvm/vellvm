@@ -1944,6 +1944,35 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       admit.
     Admitted.
 
+    Lemma exec_correct_ret :
+      forall {X} (x : X),
+        exec_correct (ret x) (ret x).
+    Proof.
+      intros X x.
+      cbn; red; cbn.
+      intros ms st VALID.
+      right.
+      setoid_rewrite MemMonad_run_ret.
+      split; [|split].
+      + (* Error *)
+        cbn. repeat eexists.
+        exact ""%string.
+        intros CONTRA.
+        apply MemMonad_eq1_raise_error_inv in CONTRA; auto.
+      + (* OOM *)
+        cbn. repeat eexists.
+        exact ""%string.
+        intros CONTRA.
+        apply MemMonad_eq1_raise_oom_inv in CONTRA; auto.
+      + (* Success *)
+        intros st' ms' x' RUN.
+        apply eq1_ret_ret in RUN; [|typeclasses eauto].
+        inv RUN; cbn; auto.
+
+        Unshelve.
+        all: exact ""%string.
+    Qed.
+        
     Lemma exec_correct_map_monad :
       forall {A B}
         xs
@@ -1954,11 +1983,19 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       induction xs;
         intros m_exec m_spec HM.
 
-      - cbn. red.
-        intros ms st VALID.
-        right.
-        split; [|split].
-    Admitted.
+      - unfold map_monad.
+        apply exec_correct_ret.
+      - rewrite map_monad_unfold.
+        rewrite map_monad_unfold.
+
+        eapply exec_correct_bind; eauto.
+        intros a0.
+
+        eapply exec_correct_bind; eauto.
+        intros a1.
+
+        apply exec_correct_ret.
+    Qed.
 
     Lemma read_bytes_correct :
       forall len ptr,
