@@ -1646,6 +1646,17 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Definition exec_correct_memory {MemM Eff ExtraState} `{MM: MemMonad ExtraState MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT memory_stack X) : Prop :=
       exec_correct exec (lift_memory_MemPropT spec).
 
+    Lemma exec_correct_lift_memory :
+      forall {MemM Eff ExtraState} `{MemMonad ExtraState MemM (itree Eff)}
+        {X} (exec : MemM X)  (spec : MemPropT memory_stack X),
+        exec_correct_memory exec spec ->
+        exec_correct exec (lift_memory_MemPropT spec).
+    Proof.
+      intros * EXEC.
+      unfold exec_correct_memory in EXEC.
+      auto.
+    Qed.
+
     (* TODO: Move these tactics *)
     Ltac MemMonad_go :=
       repeat match goal with
@@ -5372,14 +5383,10 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               erewrite peek_frame_stack_prop_frame_eqv
                 with (f:=f') (f':=f); eauto.
             Qed.
-                
-            unfold ptr_in_current_frame in NIN.
-            cbn in NIN.
 
-            eapply free_frame_memory_byte_disjoint_allocated; eauto.
-            eapply ptr_nin_current_frame; eauto.
-            unfold mem_state_frame_stack_prop. reflexivity.
-            cbn. reflexivity.
+            eapply free_frame_memory_byte_disjoint_allocated; cbn; eauto.
+            eapply ptr_nin_current_frame; cbn; eauto.
+            unfold mem_state_frame_stack_prop. red. reflexivity.
             cbn. reflexivity.
           - (* non_frame_bytes_read *)
             intros ptr byte NIN.
@@ -5464,6 +5471,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 destruct READ as [ms'' [ms''' [[EQ1 EQ2] READ]]]; subst.
                 repeat eexists.
                 cbn in *.
+                unfold mem_state_memory in *.
                 rewrite MS'.
                 erewrite free_byte_disjoint; eauto.
                 break_match.
@@ -5474,6 +5482,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 destruct READ as [ms'' [ms''' [[EQ1 EQ2] READ]]]; subst.
                 repeat eexists.
                 cbn in *.
+                unfold mem_state_memory in *.
                 rewrite MS' in READ.
                 erewrite free_byte_disjoint in READ; eauto.
                 break_match.
@@ -5496,6 +5505,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 destruct READ as [ms'' [ms''' [[EQ1 EQ2] READ]]]; subst.
                 repeat eexists.
                 cbn in *.
+                unfold mem_state_memory in *.
                 rewrite MS'.
                 erewrite free_frame_memory_disjoint; eauto.
                 break_match.
@@ -5506,6 +5516,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 destruct READ as [ms'' [ms''' [[EQ1 EQ2] READ]]]; subst.
                 repeat eexists.
                 cbn in *.
+                unfold mem_state_memory in *.
                 rewrite MS' in READ.
                 erewrite free_frame_memory_disjoint in READ; eauto.
                 break_match.
@@ -5517,10 +5528,10 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             + split.
               * (* read_byte_allowed *)
                 eapply free_frame_memory_byte_disjoint_read_byte_allowed
-                  with (ms := mkMemState (mem, Snoc fs f) pr);
+                  with (ms := mkMemState (mem, Snoc fs f) pr); cbn;
                   eauto.
                 eapply ptr_nin_current_frame; eauto.
-                all: unfold mem_state_frame_stack_prop; cbn; try reflexivity.
+                all: unfold mem_state_frame_stack_prop; cbn; red; try reflexivity.
                 cbn. reflexivity.
                 inv READ; solve_read_byte_allowed.
               * (* read_byte_prop *)
@@ -5528,8 +5539,10 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   with (ms := mkMemState (mem, Snoc fs f) pr);
                   eauto.
                 eapply ptr_nin_current_frame; eauto.
-                all: unfold mem_state_frame_stack_prop; cbn; try reflexivity.
-                cbn. reflexivity.
+                all: unfold mem_state_frame_stack_prop; try solve [cbn; reflexivity].
+                cbn. red; reflexivity.
+                cbn. red; reflexivity.
+
                 inv READ; solve_read_byte_prop.
             + (* read_byte_spec *)
               split.
@@ -5543,8 +5556,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                               |});
                   eauto.
                 eapply ptr_nin_current_frame; eauto.
-                all: unfold mem_state_frame_stack_prop; cbn; try reflexivity.
-                cbn. reflexivity.
+                all: unfold mem_state_frame_stack_prop; try solve [cbn; reflexivity].
+                cbn. red. reflexivity.
+                cbn. red. reflexivity.
                 inv READ; solve_read_byte_allowed.
               * (* read_byte_prop *)
                 eapply free_frame_memory_byte_disjoint_read_byte_prop
@@ -5556,7 +5570,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                               |});
                   eauto.
                 eapply ptr_nin_current_frame; eauto.
-                all: unfold mem_state_frame_stack_prop; cbn; try reflexivity.
+                all: unfold mem_state_frame_stack_prop; try solve [cbn; reflexivity].
+                cbn. red. reflexivity.
                 cbn. reflexivity.
                 inv READ; solve_read_byte_prop.
           - (* pop_frame *)
@@ -5628,7 +5643,7 @@ Module MakeFiniteMemory (LP : LLVMParams) : Memory LP.
 
   Module MMEP := FiniteMemoryModelExecPrimitives LP MP.
   Module MEM_MODEL := MakeMemoryModelExec LP MP MMEP.
-  Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec.
+  Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec MMEP.MemExecM.
   Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL MEM_SPEC_INTERP.
 
   (* Serialization *)
