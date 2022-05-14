@@ -221,6 +221,13 @@ Section ShowInstances.
       | OP_GetElementPtr t ptrval idxs =>
       let (tptr, exp) := ptrval in
       "getelementptr " ++ show t ++ ", " ++ show tptr ++ " " ++ show_exp exp ++ fold_left (fun str '(ty, ex) => ", " ++ show ty ++ " "++ show_exp ex ++ str) idxs ""
+      | OP_ExtractValue vec idxs =>
+      let (tptr, exp) := vec in
+      "extractvalue " ++ show tptr ++ " " ++ show_exp exp ++ fold_left (fun str i => ", " ++ show i ++ str) idxs ""
+      | OP_ExtractElement vec idx =>
+      let (tptr, exp) := vec in 
+      let (tidx, iexp) := idx in
+      "extractelement " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ show tidx ++ " " ++ show_exp iexp
       | OP_Select (tc, cnd) (t1, v1) (t2, v2) =>
         "select " ++ show tc ++ " " ++ show_exp cnd ++ ", " ++ show t1 ++ " " ++ show_exp v1  ++ ", " ++ show t2 ++ " " ++ show_exp v2
       | _ => "show_exp todo"
