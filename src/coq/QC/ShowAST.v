@@ -228,6 +228,11 @@ Section ShowInstances.
       let (tptr, exp) := vec in 
       let (tidx, iexp) := idx in
       "extractelement " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ show tidx ++ " " ++ show_exp iexp
+      | OP_InsertElement vec elt idx =>
+      let (tptr, exp) := vec in
+      let (telt, eexp) := elt in
+      let (tidx, iexp) := idx in
+      "insertelement " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ show telt ++ " " ++ show_exp eexp ++ ", " ++ show tidx ++ " " ++ show_exp iexp
       | OP_Select (tc, cnd) (t1, v1) (t2, v2) =>
         "select " ++ show tc ++ " " ++ show_exp cnd ++ ", " ++ show t1 ++ " " ++ show_exp v1  ++ ", " ++ show t2 ++ " " ++ show_exp v2
       | _ => "show_exp todo"
