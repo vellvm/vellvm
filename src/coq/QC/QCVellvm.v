@@ -95,3 +95,4 @@ QuickChick (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang).
 
 (*GenLLVM -> G*)
 Sample (run_GenLLVM (gen_exp_size 0 TYPE_Float)).
+Sample (run_GenLLVM gen_instr).

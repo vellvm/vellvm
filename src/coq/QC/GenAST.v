@@ -1107,7 +1107,7 @@ Section InstrGenerators.
       ; gen_store] (* TODO: Generate atomic operations and other instructions *)
       ++ (if negb (seq.nilp (filter_ptr_typs ctx)) then [] else [gen_gep])
       ++ (if negb (seq.nilp (filter_agg_typs ctx)) then [] else [gen_extractvalue])
-      ++ (if negb (seq.nilp (filter_vec_typs ctx)) then [] else [gen_extractelement])).
+      ++ (if negb (seq.nilp (filter_vec_typs ctx)) then [] else [gen_extractelement; gen_insertelement])).
 
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
@@ -1115,6 +1115,8 @@ Section InstrGenerators.
   (* TODO: want to generate phi nodes, which might be a bit
   complicated because we need to know that an id that occurs in a
   later block is in context *)
+
+
 
   Definition add_id_to_instr (t_instr : typ * instr typ) : GenLLVM (instr_id * instr typ)
     :=
