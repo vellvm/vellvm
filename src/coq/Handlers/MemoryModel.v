@@ -7,7 +7,8 @@ From Vellvm.Semantics Require Import
      MemoryParams
      Memory.Overlaps
      LLVMParams
-     LLVMEvents.
+     LLVMEvents
+     ItreeRaiseMReturns.
 
 Require Import MemBytes.
 
@@ -1938,6 +1939,25 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
 
         rewrite MemMonad_run_bind in RUN.
         (* I think I need some kind of inversion lemma about this *)
+        (* What about divergence? *)
+        (* Oh, it can't diverge because it's eutt error *)
+        epose proof MReturns_bind_inv.
+        assert (FailureE -< Eff) by admit.
+        epose proof (@MFails_bind_inv (itree Eff) _ _ ITreeErrorMonadReturns (ExtraState * (MemState * A)) (ExtraState * (MemState * B)) (MemMonad_run m_exec ms st) (fun x0 => (let (st', y) := x0 in let (ms', x) := y in MemMonad_run (k_exec x) ms' st'))) as FAILINV.
+
+        unfold MFails in FAILINV.
+        forward FAILINV.
+        admit.
+
+        destruct FAILINV.
+        + admit.
+        + 
+        replace MFails with ITreeErrorMFails.
+
+        unfold MFails.
+        apply RUN.
+
+        eapply MReturns_bind_inv in RUN.
         admit.
       }
       admit.

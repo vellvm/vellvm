@@ -790,29 +790,3 @@ Section StateT.
   (*      }. *)
 
 End StateT.
-
-
-Section ITree.
-  From ITree Require Import
-       ITree
-       Basics.Basics
-       Events.Exception
-       Eq.Eq
-       Events.StateFacts
-       Events.State.
-
-  (* Definition ITreeFails := fun {E A} (ma : itree E A) => False. *)
-
-  (* Lemma ITreeReturns_ret : *)
-    
-
-  (* Instance ITree_MonadReturns {E} : MonadReturns (itree E) *)
-  (*   := { MReturns := fun A => Returns; *)
-  (*        MFails := fun A => ITreeFails; *)
-  (*        MReturns_bind := Returns_bind E; *)
-  (*        MReturns_bind_inv := fun A B => Returns_bind_inversion; *)
-  (*        MReturns_ret := fun A => ReturnsRet; *)
-  (*        MReturns_ret_inv := Returns_ret_inv *)
-  (*      }. *)
-
-End ITree.

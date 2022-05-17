@@ -128,7 +128,7 @@ Set Contextual Implicit.
   #[global] Instance RAISE_ERR_ITREE_FAILUREE {E : Type -> Type} `{FailureE -< E} : RAISE_ERROR (itree E) :=
   { raise_error := fun A e => raise e
   }.
-    
+
   Definition lift_err {A B} {E} `{FailureE -< E} (f : A -> itree E B) (m:err A) : itree E B :=
     match m with
     | inl x => raise x
