@@ -451,8 +451,8 @@ Definition map_monad {m : Type -> Type} {H : Monad m} {A B} (f:A -> m B) : list 
       ret (b::bs)  
     end.
 
-Definition map_monad_ {A}
-  (f: A -> m unit) (l: list A): m unit :=
+Definition map_monad_ {A B}
+  (f: A -> m B) (l: list A): m unit :=
   map_monad f l;; ret tt.
 
 Fixpoint sequence {a} {M} `{Monad M} (ms : list (M a)) : M (list a)
@@ -463,7 +463,7 @@ Arguments monad_fold_right {_ _ _ _}.
 Arguments monad_app_fst {_ _ _ _ _}.
 Arguments monad_app_snd {_ _ _ _ _}.
 Arguments map_monad {_ _ _ _}.
-Arguments map_monad_ {_ _ _}.
+Arguments map_monad_ {_ _ _ _}.
 
 From ITree Require Import
      Basics.Monad. 
