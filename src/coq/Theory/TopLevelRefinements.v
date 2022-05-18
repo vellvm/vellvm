@@ -3,12 +3,13 @@ From ITree Require Import
      ITree
      ITreeFacts
      Basics.HeterogeneousRelations
-     Basics.MonadPropT
      Events.State
      Events.StateFacts
      InterpFacts
      KTreeFacts
-     Eq.Eqit.
+     Eq.Eqit
+     Extra.IForest.
+
 
 From Vellvm Require Import
      Utilities
@@ -167,8 +168,8 @@ Section REFINEMENT.
     exists t; split.
     - unfold model_undef in *.
       unfold L3 in *.
-      match goal with |- MonadPropT.interp_prop ?x _ _ _ _ => remember x as h end.
-      eapply interp_prop_Proper_eq in Ht.
+      match goal with |- interp_iforest ?x _ _ _ _ => remember x as h end.
+      eapply interp_iforest_Proper_eq in Ht.
       apply Ht.
       + apply prod_rel_refl; typeclasses eauto.
       + apply prod_rel_trans; typeclasses eauto.
@@ -304,10 +305,10 @@ Section REFINEMENT.
     cbn in *.
     unfold model_undef.
     unfold exec_undef.
-    apply interp_prop_correct_exec.
-    apply case_prop_handler_correct.
+    apply interp_iforest_correct_exec.
+    apply case_iforest_handler_correct.
     unfold handler_correct. intros. reflexivity.
-    apply case_prop_handler_correct.
+    apply case_iforest_handler_correct.
     apply Pick_handler_correct.
 
     unfold handler_correct. intros. reflexivity.
@@ -370,6 +371,6 @@ Definition model_to_L4_cfg (prog: cfg dtyp) :=
   let trace := denote_cfg prog in
   interp_cfg trace [] [] empty_memory_stack.
 
-Definition refine_cfg_ret: relation (PropT L5 (memory_stack * (local_env * (global_env * uvalue)))) :=
+Definition refine_cfg_ret: relation (iforest L5 (memory_stack * (local_env * (global_env * uvalue)))) :=
   fun ts ts' => forall t, ts t -> exists t', ts' t' /\ eutt  (TT × (TT × (TT × refine_uvalue))) t t'.
 

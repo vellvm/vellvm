@@ -13,7 +13,6 @@ From Vellvm Require Import
      TopLevelRefinements
      CFG
      DynamicTypes
-     PropT
      Transformations.Traversal.
 
 From Vellvm.Handlers Require Import
@@ -25,7 +24,8 @@ From ITree Require Import
      ITree
      Basics
      Eq.Eq
-     Events.State.
+     Events.State
+     Extra.IForest.
 
 From ExtLib Require Import
      Structures.Monads

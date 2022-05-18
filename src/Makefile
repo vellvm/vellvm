@@ -6,13 +6,12 @@ COQLIBDIR = ../lib
 MLDIR = ml
 EXTRACTDIR = ml/extracted
 
-OPAMPKGS=coq coq-ext-lib coq-paco coq-ceres coq-flocq coq-mathcomp-ssreflect coq-simple-io cppo dune menhir qcheck ocamlbuild
+OPAMPKGS=coq coq-ext-lib coq-paco coq-ceres coq-flocq coq-mathcomp-ssreflect coq-simple-io coq-itree cppo dune menhir qcheck ocamlbuild
 
 QUICKCHICKDIR=../lib/QuickChick
 FLOCQQUICKCHICKDIR=../lib/flocq-quickchick
-ITREEDIR=../lib/InteractionTrees/theories
 
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(QUICKCHICKDIR)/src/ QuickChick -I $(QUICKCHICKDIR)/src -R $(ITREEDIR) ITree
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(QUICKCHICKDIR)/src/ QuickChick -I $(QUICKCHICKDIR)/src
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source

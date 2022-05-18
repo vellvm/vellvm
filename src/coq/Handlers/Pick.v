@@ -12,7 +12,7 @@ From ExtLib Require Import
 From ITree Require Import
      ITree
      Eq.Eqit
-     Basics.MonadPropT.
+     Extra.IForest.
 
 From Vellvm Require Import
      Utils.Error
@@ -47,21 +47,21 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Section PickPropositional.
    
     (* The parameter [C] is currently not used *)
-    Inductive Pick_handler {E} `{FE:FailureE -< E} `{FO:UBE -< E}: PickE ~> PropT E :=
+    Inductive Pick_handler {E} `{FE:FailureE -< E} `{FO:UBE -< E}: PickE ~> iforest E :=
     | PickD: forall uv C res t,  concretize_u uv res -> t ≈ (lift_undef_or_err ret res) -> Pick_handler (pick uv C) t.
                                                                       
     Section PARAMS_MODEL.
       Variable (E F: Type -> Type).
 
-      Definition E_trigger_prop : E ~> PropT (E +' F) :=
+      Definition E_trigger_prop : E ~> iforest (E +' F) :=
         fun R e => fun t => t = r <- trigger e ;; ret r.
 
-      Definition F_trigger_prop : F ~> PropT (E +' F) :=
+      Definition F_trigger_prop : F ~> iforest (E +' F) :=
         fun R e => fun t => t = r <- trigger e ;; ret r.
 
       Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} :
-        forall (T:Type) (RR: T -> T -> Prop), itree (E +' PickE +' F) T -> PropT (E +' F) T :=
-        interp_prop (case_ E_trigger_prop (case_ Pick_handler F_trigger_prop)).
+        forall (T:Type) (RR: T -> T -> Prop), itree (E +' PickE +' F) T -> iforest (E +' F) T :=
+        interp_iforest (case_ E_trigger_prop (case_ Pick_handler F_trigger_prop)).
 
     End PARAMS_MODEL.
 

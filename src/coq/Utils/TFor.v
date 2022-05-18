@@ -10,7 +10,6 @@ From Vellvm Require Import
 From ITree Require Import
      ITree
      Eq.Eqit
-     Basics.MonadPropT
      Core.KTreeFacts.
 
 
