@@ -1902,6 +1902,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
   Import MMSP.
   Import MemExecM.
   Import MemHelpers.
+  Import LP.Events.
 
   Section Correctness.
     Context {MemM : Type -> Type}.
@@ -2087,8 +2088,8 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Admitted.
 
     Lemma exec_correct_raise_ub :
-      forall {A} (msg : string),
-        exec_correct (raise_ub msg) (raise_ub msg : MemPropT MemState A).
+      forall {A} (msg1 msg2 : string),
+        exec_correct (raise_ub msg1) (raise_ub msg2 : MemPropT MemState A).
     Proof.
       intros A msg.
       cbn.
@@ -2254,6 +2255,35 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       apply read_bytes_correct.
       intros a.
       apply write_bytes_correct.
+    Qed.
+
+    Lemma handle_memory_correct :
+      forall T (m : MemoryE T),
+        exec_correct (handle_memory T m) (handle_memory_prop T m).
+    Proof.
+      intros T m.
+      destruct m.
+      - (* MemPush *)
+        cbn.
+        apply mempush_correct.
+      - (* MemPop *)
+        cbn.
+        apply mempop_correct.
+      - (* Alloca *)
+        unfold handle_memory.
+        unfold handle_memory_prop.
+        apply exec_correct_bind.
+        apply allocate_dtyp_correct.
+        intros a.
+        apply exec_correct_ret.
+      - (* Load *)
+        unfold handle_memory, handle_memory_prop.
+        destruct a; try apply exec_correct_raise_ub.
+        apply read_uvalue_correct.
+      - (* Store *)
+        unfold handle_memory, handle_memory_prop.
+        destruct a; try apply exec_correct_raise_ub.
+        apply write_uvalue_correct.
     Qed.
 
     (* TODO: prove handle_memory etc correct. *)
