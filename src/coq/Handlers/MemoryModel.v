@@ -2286,73 +2286,29 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         apply write_uvalue_correct.
     Qed.
 
-    (* TODO: prove handle_memory etc correct. *)
-    (*
-    Definition handle_memory `{MemMonad ExtraState MemM (itree Eff)} : MemoryE ~> MemM
-      := fun T m =>
-           match m with
-           (* Unimplemented *)
-           | MemPush =>
-               mempush
-           | MemPop =>
-               mempop
-           | Alloca t =>
-               addr <- allocate_dtyp t;;
-               ret (DVALUE_Addr addr)
-           | Load t a =>
-               match a with
-               | DVALUE_Addr a =>
-                   read_uvalue t a
-               | _ =>
-                   raise_ub "Loading from something that is not an address."
-               end
-           | Store t a v =>
-               match a with
-               | DVALUE_Addr a =>
-                   write_uvalue t a v
-               | _ =>
-                   raise_ub "Store to somewhere that is not an address."
-               end
-           end.
+    Lemma handle_memcpy_correct:
+      forall args,
+        exec_correct (handle_memcpy args) (handle_memcpy_prop args).
+    Proof.
+      intros args.
+      unfold handle_memcpy, handle_memcpy_prop.
+      repeat (break_match; try apply exec_correct_raise_error).
+      all: apply memcpy_correct.
+    Qed.
 
-    Definition handle_memcpy `{MemMonad ExtraState MemM (itree Eff)} (args : list dvalue) : MemM unit :=
-      match args with
-      | DVALUE_Addr dst ::
-                    DVALUE_Addr src ::
-                    DVALUE_I32 len ::
-                    DVALUE_I32 align :: (* alignment ignored *)
-                    DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy src dst (unsigned len) (Z.to_N (unsigned align)) (equ volatile one)
-      | DVALUE_Addr dst ::
-                    DVALUE_Addr src ::
-                    DVALUE_I64 len ::
-                    DVALUE_I64 align :: (* alignment ignored *)
-                    DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy src dst (unsigned len) (Z.to_N (unsigned align)) (equ volatile one)
-      | DVALUE_Addr dst ::
-                    DVALUE_Addr src ::
-                    DVALUE_IPTR len ::
-                    DVALUE_IPTR align :: (* alignment ignored *)
-                    DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy src dst (IP.to_Z len) (Z.to_N (IP.to_Z align)) (equ volatile one)
-      | _ => raise_error "Unsupported arguments to memcpy."
-      end.
-
-    Definition handle_intrinsic `{MemMonad ExtraState MemM (itree Eff)} : IntrinsicE ~> MemM
-      := fun T e =>
-           match e with
-           | Intrinsic t name args =>
-               (* Pick all arguments, they should all be unique. *)
-               (* TODO: add more variants to memcpy *)
-               (* FIXME: use reldec typeclass? *)
-               if orb (Coqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i32"))
-                      (Coqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i64"))
-               then
-                 handle_memcpy args;;
-                 ret DVALUE_None
-               else
-                 raise_error ("Unknown intrinsic: " ++ name)
-           end.
-*)
-    End Correctness.
+    Lemma handle_intrinsic_correct:
+      forall T (e : IntrinsicE T),
+        exec_correct (handle_intrinsic T e) (handle_intrinsic_prop T e).
+    Proof.
+      intros T e.
+      unfold handle_intrinsic, handle_intrinsic_prop.
+      break_match.
+      break_match.
+      - apply exec_correct_bind.
+        apply handle_memcpy_correct.
+        intros a.
+        apply exec_correct_ret.
+      - apply exec_correct_raise_error.
+    Qed.
+  End Correctness.
 End MemoryModelTheory.
