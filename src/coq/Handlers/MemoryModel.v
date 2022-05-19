@@ -479,6 +479,64 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       lia.
     Defined.
 
+    Lemma re_sid_ubytes_helper_equation {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M}
+          (bytes : list (N * SByte)) (acc : NMap SByte) :
+      re_sid_ubytes_helper bytes acc =
+        match bytes with
+        | [] => ret acc
+        | ((n, x)::xs) =>
+            match sbyte_to_extractbyte x with
+            | UVALUE_ExtractByte uv dt idx sid =>
+                let '(ins, outs) := filter_sid_matches x xs in
+                nsid <- fresh_sid;;
+                let acc := @NM.add _ n (replace_sid nsid x) acc in
+                (* Assign new sid to entangled bytes *)
+                let acc := fold_left (fun acc '(n, ub) => @NM.add _ n (replace_sid nsid ub) acc) ins acc in
+                re_sid_ubytes_helper outs acc
+            | _ => raise_error "re_sid_ubytes_helper: sbyte_to_extractbyte did not yield UVALUE_ExtractByte"
+            end
+        end.
+    Proof.
+      unfold re_sid_ubytes_helper.
+      unfold re_sid_ubytes_helper_func at 1.
+      rewrite Wf.WfExtensionality.fix_sub_eq_ext.
+      destruct bytes.
+      reflexivity.
+      cbn.
+      break_match; break_match; try reflexivity.
+      break_match.
+      break_match; subst.
+      - assert
+          (forall nsid acc,
+              (fold_left
+                 (fun (acc0 : NM.t SByte) (pat : NM.key * SByte) =>
+                    (let '(n0, ub) as anonymous' := pat return (anonymous' = pat -> NM.t SByte) in fun _ : (n0, ub) = pat => NM.add n0 (replace_sid nsid ub) acc0)
+                      eq_refl) l acc) =
+                (fold_left (fun (acc0 : NM.t SByte) '(n0, ub) => NM.add n0 (replace_sid nsid ub) acc0) l acc)) as FOLD.
+        { clear Heqp1 acc.
+          induction l; intros nsid acc.
+          - reflexivity.
+          - cbn.
+            rewrite <- IHl.
+            destruct a.
+            reflexivity.
+        }
+
+        apply f_equal.
+        Require Import FunctionalExtensionality.
+        apply functional_extensionality.
+        intros nsid.
+        rewrite FOLD.
+        reflexivity.
+      - apply f_equal.
+        apply functional_extensionality.
+        intros nsid.
+        break_match.
+        break_match.
+        all: try reflexivity.
+        cbn.
+    Admitted.
+
     Definition re_sid_ubytes {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M}
                (bytes : list SByte) : M (list SByte)
       := let len := length bytes in
@@ -2027,6 +2085,28 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       apply exec_correct_ret.
     Qed.
 
+    Lemma exec_correct_map_monad_In :
+      forall {A B}
+        (xs : list A)
+        (m_exec : forall (x : A), In x xs -> MemM B) (m_spec : forall (x : A), In x xs -> MemPropT MemState B),
+      (forall a (IN : In a xs), exec_correct (m_exec a IN) (m_spec a IN)) ->
+      exec_correct (map_monad_In xs m_exec) (map_monad_In xs m_spec).
+    Proof.
+      induction xs; intros m_exec m_spec HM.
+      - unfold map_monad_In.
+        apply exec_correct_ret.
+      - rewrite map_monad_In_unfold.
+        rewrite map_monad_In_unfold.
+
+        eapply exec_correct_bind; eauto.
+        intros a0.
+
+        eapply exec_correct_bind; eauto.
+        intros a1.
+
+        apply exec_correct_ret.
+    Qed.
+
     Lemma exec_correct_raise_oom :
       forall {A} (msg : string),
         exec_correct (raise_oom msg) (raise_oom msg : MemPropT MemState A).
@@ -2058,24 +2138,25 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Admitted.
 
     Lemma exec_correct_raise_error :
-      forall {A} (msg : string),
-        exec_correct (raise_error msg) (raise_error msg : MemPropT MemState A).
+      forall {A} (msg1 msg2 : string),
+        exec_correct (raise_error msg1) (raise_error msg2 : MemPropT MemState A).
     Proof.
-      intros A msg.
+      intros A msg1 msg2.
       cbn.
       red.
       intros ms st VALID.
       cbn. right.
       split; [|split].
       { (* Error Case *)
-        exists msg.
-        exists msg.
+        exists msg1.
+        exists msg2.
         intros; auto.
       }
       { (* OOM case *)
         do 2 eexists.
         exact ""%string.
         intros RUN.
+        rewrite MemMonad_run_raise_error in RUN.
         admit. (* Need inversion property. *)
       }
       { (* Success *)
@@ -2115,6 +2196,15 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         exec_correct (lift_err_RAISE_ERROR m) (lift_err_RAISE_ERROR m).
     Proof.
       intros A [ERR | NOERR].
+      - apply exec_correct_raise_error.
+      - apply exec_correct_ret.
+    Qed.
+
+    Lemma exec_correct_lift_ERR_RAISE_ERROR :
+      forall {A} (m : ERR A),
+        exec_correct (lift_ERR_RAISE_ERROR m) (lift_ERR_RAISE_ERROR m).
+    Proof.
+      intros A [[ERR] | NOERR].
       - apply exec_correct_raise_error.
       - apply exec_correct_ret.
     Qed.
@@ -2167,11 +2257,95 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       all: exact ""%string.
     Qed.
 
+    Hint Resolve exec_correct_ret : EXEC_CORRECT.
+    Hint Resolve exec_correct_bind : EXEC_CORRECT.
+    Hint Resolve exec_correct_fresh_sid : EXEC_CORRECT.
+    Hint Resolve exec_correct_lift_err_RAISE_ERROR : EXEC_CORRECT.
+    Hint Resolve exec_correct_lift_ERR_RAISE_ERROR : EXEC_CORRECT.
+    Hint Resolve exec_correct_lift_OOM : EXEC_CORRECT.
+    Hint Resolve exec_correct_raise_error : EXEC_CORRECT.
+    Hint Resolve exec_correct_raise_oom : EXEC_CORRECT.
+    Hint Resolve exec_correct_raise_ub : EXEC_CORRECT.
+    Hint Resolve exec_correct_map_monad : EXEC_CORRECT.
+    Hint Resolve exec_correct_map_monad_ : EXEC_CORRECT.
+    Hint Resolve exec_correct_map_monad_In : EXEC_CORRECT.
+
+    (* TODO: move this *)
+    Lemma zip_cons :
+      forall {A B} (x : A) (y : B) xs ys,
+        zip (x :: xs) (y :: ys) = (x, y) :: zip xs ys.
+    Proof.
+      reflexivity.
+    Qed.
+        
+    Lemma exec_correct_re_sid_ubytes_helper :
+      forall bytes,
+        exec_correct
+          (re_sid_ubytes_helper bytes (NM.empty MP.BYTE_IMPL.SByte))
+          (re_sid_ubytes_helper bytes (NM.empty MP.BYTE_IMPL.SByte)).
+    Proof.
+      induction bytes.
+      - apply exec_correct_ret.
+      - repeat rewrite re_sid_ubytes_helper_equation.
+        break_match; auto with EXEC_CORRECT.
+        break_match; auto with EXEC_CORRECT.
+        break_match; auto with EXEC_CORRECT.
+        apply exec_correct_bind; auto with EXEC_CORRECT.
+        intros a0.
+        (* Fiddly reasoning because it's not structural... we update
+           all of the sids that match the current one at once, and
+           then recursively call the function on the unmatched
+           bytes...
+        *)
+    Admitted.
+
+    Hint Resolve exec_correct_re_sid_ubytes_helper : EXEC_CORRECT.
+
+    Lemma exec_correct_trywith_error :
+      forall {A} msg1 msg2 (ma : option A),
+        exec_correct
+          (trywith_error msg1 ma)
+          (trywith_error msg2 ma).
+    Proof.
+      intros A msg1 msg2 [a |];
+        unfold trywith_error;
+        auto with EXEC_CORRECT.
+    Qed.
+
+    Hint Resolve exec_correct_trywith_error : EXEC_CORRECT.
+
+    Lemma exec_correct_re_sid_ubytes :
+      forall bytes,
+        exec_correct (re_sid_ubytes bytes) (re_sid_ubytes bytes).
+    Proof.
+      intros bytes.
+      apply exec_correct_bind; auto with EXEC_CORRECT.
+    Qed.
+    
+    Hint Resolve exec_correct_re_sid_ubytes : EXEC_CORRECT.
+
     Lemma exec_correct_serialize_sbytes :
       forall uv dt,
         exec_correct (serialize_sbytes uv dt) (serialize_sbytes uv dt).
     Proof.
-      intros uv dt.
+      induction uv using uvalue_ind''; intros dt';
+        do 2 rewrite serialize_sbytes_equation;
+        auto with EXEC_CORRECT.
+
+      - (* Undef *)
+        admit.
+      - (* Poison *)
+        admit.
+      - (* Structs *)
+        break_match; auto with EXEC_CORRECT.
+        break_match; auto with EXEC_CORRECT.
+      - (* Packed structs *)
+        break_match; auto with EXEC_CORRECT.
+        break_match; auto with EXEC_CORRECT.
+      - (* Arrays *)
+        break_match; auto with EXEC_CORRECT.
+      - (* Vectors *)
+        break_match; auto with EXEC_CORRECT.
     Admitted.
 
     Lemma read_bytes_correct :
