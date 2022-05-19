@@ -611,8 +611,69 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_IPTR            : forall x, P (UVALUE_IPTR x).
     Hypothesis IH_Double         : forall x, P (UVALUE_Double x).
     Hypothesis IH_Float          : forall x, P (UVALUE_Float x).
-    Hypothesis IH_Undef          : forall t, P (UVALUE_Undef t).
-    Hypothesis IH_Poison         : forall t, P (UVALUE_Poison t).
+
+    (* Undef *)
+    Hypothesis IH_Undef_Array    :
+      forall sz t
+        (IH: P (UVALUE_Undef t)),
+        P (UVALUE_Undef (DTYPE_Array sz t)).
+
+    Hypothesis IH_Undef_Vector    :
+      forall sz t
+        (IH: P (UVALUE_Undef t)),
+        P (UVALUE_Undef (DTYPE_Vector sz t)).
+
+    Hypothesis IH_Undef_Struct_nil    :
+        P (UVALUE_Undef (DTYPE_Struct [])).
+
+    Hypothesis IH_Undef_Struct_cons    : forall dt dts,
+        P (UVALUE_Undef dt) ->
+        P (UVALUE_Undef (DTYPE_Struct dts)) ->
+        P (UVALUE_Undef (DTYPE_Struct (dt :: dts))).
+
+    Hypothesis IH_Undef_Packed_struct_nil    :
+        P (UVALUE_Undef (DTYPE_Packed_struct [])).
+
+    Hypothesis IH_Undef_Packed_struct_cons    : forall dt dts,
+        P (UVALUE_Undef dt) ->
+        P (UVALUE_Undef (DTYPE_Packed_struct dts)) ->
+        P (UVALUE_Undef (DTYPE_Packed_struct (dt :: dts))).
+
+    Hypothesis IH_Undef          : forall t,
+        ((forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) ->
+        P (UVALUE_Undef t).
+
+    (* Poison *)
+    Hypothesis IH_Poison_Array    :
+      forall sz t
+        (IH: P (UVALUE_Poison t)),
+        P (UVALUE_Poison (DTYPE_Array sz t)).
+
+    Hypothesis IH_Poison_Vector    :
+      forall sz t
+        (IH: P (UVALUE_Poison t)),
+        P (UVALUE_Poison (DTYPE_Vector sz t)).
+
+    Hypothesis IH_Poison_Struct_nil    :
+        P (UVALUE_Poison (DTYPE_Struct [])).
+
+    Hypothesis IH_Poison_Struct_cons    : forall dt dts,
+        P (UVALUE_Poison dt) ->
+        P (UVALUE_Poison (DTYPE_Struct dts)) ->
+        P (UVALUE_Poison (DTYPE_Struct (dt :: dts))).
+
+    Hypothesis IH_Poison_Packed_struct_nil    :
+        P (UVALUE_Poison (DTYPE_Packed_struct [])).
+
+    Hypothesis IH_Poison_Packed_struct_cons    : forall dt dts,
+        P (UVALUE_Poison dt) ->
+        P (UVALUE_Poison (DTYPE_Packed_struct dts)) ->
+        P (UVALUE_Poison (DTYPE_Packed_struct (dt :: dts))).
+
+    Hypothesis IH_Poison          : forall t,
+        ((forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) ->
+        P (UVALUE_Poison t).
+
     Hypothesis IH_None           : P UVALUE_None.
     Hypothesis IH_Struct_nil     : P (UVALUE_Struct []).
     Hypothesis IH_Struct_cons    : forall uv uvs, P uv -> P (UVALUE_Struct uvs) -> P (UVALUE_Struct (uv :: uvs)).
@@ -641,6 +702,78 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       fix IH 1.
       remember P as P0 in IH.
       destruct uv; auto; subst.
+      - generalize dependent t.
+        fix IHτ 1.
+        intros τ.
+        destruct τ eqn:Hτ; try contradiction;
+          try solve [eapply IH_Undef;
+                     repeat split; solve [intros * CONTRA; inversion CONTRA]].
+
+        (* Undef Arrays *)
+        { apply IH_Undef_Array.
+          apply IHτ.
+        }
+
+        (* Undef Structs *)
+        { clear Hτ.
+          generalize dependent fields.
+          induction fields.
+          - apply IH_Undef_Struct_nil.
+          - apply IH_Undef_Struct_cons.
+            apply IHτ.
+            apply IHfields.
+        }
+
+        (* Undef Packed structs *)
+        { clear Hτ.
+          generalize dependent fields.
+          induction fields.
+          - apply IH_Undef_Packed_struct_nil.
+          - apply IH_Undef_Packed_struct_cons.
+            apply IHτ.
+            apply IHfields.
+        }
+
+        (* Undef Vectors *)
+        { apply IH_Undef_Vector.
+          apply IHτ.
+        }
+      - generalize dependent t.
+        fix IHτ 1.
+        intros τ.
+        destruct τ eqn:Hτ; try contradiction;
+          try solve [eapply IH_Poison;
+                     repeat split; solve [intros * CONTRA; inversion CONTRA]].
+
+        (* Poison Arrays *)
+        { apply IH_Poison_Array.
+          apply IHτ.
+        }
+
+        (* Poison Structs *)
+        { clear Hτ.
+          generalize dependent fields.
+          induction fields.
+          - apply IH_Poison_Struct_nil.
+          - apply IH_Poison_Struct_cons.
+            apply IHτ.
+            apply IHfields.
+        }
+
+        (* Poison Packed structs *)
+        { clear Hτ.
+          generalize dependent fields.
+          induction fields.
+          - apply IH_Poison_Packed_struct_nil.
+          - apply IH_Poison_Packed_struct_cons.
+            apply IHτ.
+            apply IHfields.
+        }
+
+        (* Poison Vectors *)
+        { apply IH_Poison_Vector.
+          apply IHτ.
+        }
       - revert fields.
         fix IHfields 1. intros [|u' fields']. intros. apply IH_Struct_nil.
         apply IH_Struct_cons.

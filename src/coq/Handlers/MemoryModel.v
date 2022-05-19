@@ -2332,20 +2332,27 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         do 2 rewrite serialize_sbytes_equation;
         auto with EXEC_CORRECT.
 
-      - (* Undef *)
-        admit.
-      - (* Poison *)
-        admit.
-      - (* Structs *)
-        break_match; auto with EXEC_CORRECT.
-        break_match; auto with EXEC_CORRECT.
-      - (* Packed structs *)
-        break_match; auto with EXEC_CORRECT.
-        break_match; auto with EXEC_CORRECT.
-      - (* Arrays *)
-        break_match; auto with EXEC_CORRECT.
-      - (* Vectors *)
-        break_match; auto with EXEC_CORRECT.
+      (* - (* Undef *) *)
+      (*   break_match; auto with EXEC_CORRECT. *)
+      (*   { apply exec_correct_bind; auto with EXEC_CORRECT. *)
+      (*     apply exec_correct_map_monad_In. *)
+      (*     intros a IN. *)
+      (*     apply In_repeatN in IN; subst. *)
+      (*     admit. *)
+      (*   } *)
+      (*   admit. *)
+      (* - (* Poison *) *)
+      (*   admit. *)
+      (* - (* Structs *) *)
+      (*   break_match; auto with EXEC_CORRECT. *)
+      (*   break_match; auto with EXEC_CORRECT. *)
+      (* - (* Packed structs *) *)
+      (*   break_match; auto with EXEC_CORRECT. *)
+      (*   break_match; auto with EXEC_CORRECT. *)
+      (* - (* Arrays *) *)
+      (*   break_match; auto with EXEC_CORRECT. *)
+      (* - (* Vectors *) *)
+      (*   break_match; auto with EXEC_CORRECT. *)
     Admitted.
 
     Lemma read_bytes_correct :
