@@ -1356,6 +1356,9 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     end.
 
   (*** Heap operations *)
+  Definition empty_heap (h : Heap) : Prop :=
+    forall root ptr, ~ ptr_in_heap_prop h root ptr.
+
   Definition ptr_in_memstate_heap (ms : MemState) (root : addr) (ptr : addr) : Prop
     := forall h, memory_stack_heap_prop (MemState_get_memory ms) h ->
             ptr_in_heap_prop h root ptr.
@@ -1969,6 +1972,7 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
     (*** Data types *)
     Parameter initial_memory_state : MemState.
     Parameter initial_frame : Frame.
+    Parameter initial_heap : Heap.
 
     (*** Primitives on memory *)
     (** Reads *)
@@ -1979,13 +1983,20 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
     Parameter write_byte :
       forall `{MemMonad ExtraState MemM (itree Eff)}, addr -> SByte -> MemM unit.
 
-    (** Allocations *)
+    (** Stack allocations *)
     Parameter allocate_bytes :
       forall `{MemMonad ExtraState MemM (itree Eff)}, dtyp -> list SByte -> MemM addr.
 
     (** Frame stacks *)
     Parameter mempush : forall `{MemMonad ExtraState MemM (itree Eff)}, MemM unit.
     Parameter mempop : forall `{MemMonad ExtraState MemM (itree Eff)}, MemM unit.
+
+    (** Heap operations *)
+    Parameter malloc_bytes :
+      forall `{MemMonad ExtraState MemM (itree Eff)}, dtyp -> list SByte -> MemM addr.
+
+    Parameter free :
+      forall `{MemMonad ExtraState MemM (itree Eff)}, addr -> MemM unit.
 
     (*** Correctness *)
 
@@ -2006,6 +2017,14 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
     Parameter mempop_correct :
       exec_correct mempop mempop_spec_MemPropT.
 
+    Parameter malloc_correct :
+      forall dt init_bytes,
+        exec_correct (malloc_bytes dt init_bytes) (malloc_bytes_spec_MemPropT dt init_bytes).
+
+    Parameter free_correct :
+      forall ptr,
+        exec_correct (free ptr) (free_spec_MemPropT ptr).
+
     (*** Initial memory state *)
     Record initial_memory_state_prop : Prop :=
       {
@@ -2018,6 +2037,11 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
           memory_stack_frame_stack_prop (MemState_get_memory initial_memory_state) fs ->
           empty_frame_stack fs;
 
+        initial_memory_heap :
+        forall h,
+          memory_stack_heap_prop (MemState_get_memory initial_memory_state) h ->
+          empty_heap h;
+
         initial_memory_no_reads :
         forall ptr byte,
           ~ read_byte_prop initial_memory_state ptr byte
@@ -2028,8 +2052,14 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
         initial_frame_is_empty : empty_frame initial_frame;
       }.
 
+    Record initial_heap_prop : Prop :=
+      {
+        initial_heap_is_empty : empty_heap initial_heap;
+      }.
+
     Parameter initial_memory_state_correct : initial_memory_state_prop.
     Parameter initial_frame_correct : initial_frame_prop.
+    Parameter initial_heap_correct : initial_heap_prop.
   End MemoryPrimatives.
 End MemoryModelExecPrimitives.
 
@@ -2478,7 +2508,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         apply eq1_ret_ret in H; try typeclasses eauto.
         inv H.
         cbn.
-        split; [| split; [| split; [| split; [| split]]]];
+        split; [| split; [| split; [| split; [| split; [| split]]]]];
           try solve [red; reflexivity].
         - unfold fresh_store_id. auto.
         - unfold read_byte_preserved.
