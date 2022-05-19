@@ -880,6 +880,27 @@ Definition gen_insertelement : GenLLVM (typ * instr typ) :=
   value <- gen_typ_eq_prim_typ t_in_vec;;
   index <- lift_GenLLVM (choose (0,Z.of_N sz));;
   ret (TYPE_Float, INSTR_Op (OP_InsertElement (tvec, EXP_Ident id) (t_in_vec, value) (TYPE_I 32, EXP_Integer index))).
+Search list.
+Search N.
+Search map.
+Search seq.
+Search GenLLVM.
+Print vectorOf_LLVM.
+Fixpoint gen_typ_eq (t: typ): GenLLVM (exp typ) :=
+  match t with 
+  | TYPE_Array sz ty => 
+  arr <- vectorOf_LLVM (N.to_nat sz) (gen_typ_eq ty);;
+  let new_arr := map (fun ext => (ty, ext)) arr in
+  ret (EXP_Array new_arr)
+  | TYPE_Vector sz ty => 
+  arr <- vectorOf_LLVM (N.to_nat sz) (gen_typ_eq ty);;
+  let new_arr := map (fun ext => (ty, ext)) arr in 
+  ret (EXP_Array new_arr)
+  | _ => gen_typ_eq_prim_typ t
+  end.
+
+  (*let array := List.seq 0%nat (N.to_nat sz) in 
+  let new_array := map (fun _ => i <- gen_typ_eq ty;;(i)) array in*)
 
 Definition gen_insertvalue : GenLLVM (typ * instr typ) :=
   ctx <- get_ctx;;
@@ -887,7 +908,7 @@ Definition gen_insertvalue : GenLLVM (typ * instr typ) :=
   '(id, tagg) <- (oneOf_LLVM (map ret agg_in_context));;
   let paths_in_agg := get_index_paths_agg tagg in
   '(t, path_for_insertvalue) <- oneOf_LLVM (map ret paths_in_agg);;
-  
+  (* Generate all of the type*)
   ret (TYPE_Float, INSTR_Fence).
 
 Definition genTypHelper (n: nat): G (typ) :=
