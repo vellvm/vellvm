@@ -601,6 +601,92 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Qed.
   End UvalueInd'.
 
+  Section UvalueInd''.
+    Variable P : uvalue -> Prop.
+    Hypothesis IH_Addr           : forall a, P (UVALUE_Addr a).
+    Hypothesis IH_I1             : forall x, P (UVALUE_I1 x).
+    Hypothesis IH_I8             : forall x, P (UVALUE_I8 x).
+    Hypothesis IH_I32            : forall x, P (UVALUE_I32 x).
+    Hypothesis IH_I64            : forall x, P (UVALUE_I64 x).
+    Hypothesis IH_IPTR            : forall x, P (UVALUE_IPTR x).
+    Hypothesis IH_Double         : forall x, P (UVALUE_Double x).
+    Hypothesis IH_Float          : forall x, P (UVALUE_Float x).
+    Hypothesis IH_Undef          : forall t, P (UVALUE_Undef t).
+    Hypothesis IH_Poison         : forall t, P (UVALUE_Poison t).
+    Hypothesis IH_None           : P UVALUE_None.
+    Hypothesis IH_Struct_nil     : P (UVALUE_Struct []).
+    Hypothesis IH_Struct_cons    : forall uv uvs, P uv -> P (UVALUE_Struct uvs) -> P (UVALUE_Struct (uv :: uvs)).
+    Hypothesis IH_Packed_struct_nil     : P (UVALUE_Packed_struct []).
+    Hypothesis IH_Packed_struct_cons    : forall uv uvs, P uv -> P (UVALUE_Packed_struct uvs) -> P (UVALUE_Packed_struct (uv :: uvs)).
+    Hypothesis IH_Array          : forall (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Array elts).
+    Hypothesis IH_Vector         : forall (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Vector elts).
+    Hypothesis IH_IBinop         : forall (iop:ibinop) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_IBinop iop v1 v2).
+    Hypothesis IH_ICmp           : forall (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp cmp v1 v2).
+    Hypothesis IH_FBinop         : forall (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FBinop fop fm v1 v2).
+    Hypothesis IH_FCmp           : forall (cmp:fcmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FCmp cmp v1 v2).
+    Hypothesis IH_Conversion     : forall (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp), P v -> P (UVALUE_Conversion conv t_from v t_to).
+    Hypothesis IH_GetElementPtr  : forall (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)), P ptrval -> (forall idx, In idx idxs -> P idx) -> P (UVALUE_GetElementPtr t ptrval idxs).
+    Hypothesis IH_ExtractElement : forall (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement vec idx).
+    Hypothesis IH_InsertElement  : forall (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement vec elt idx).
+    Hypothesis IH_ShuffleVector  : forall (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector vec1 vec2 idxmask).
+    Hypothesis IH_ExtractValue   : forall (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue vec idxs).
+    Hypothesis IH_InsertValue    : forall (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue vec elt idxs).
+    Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
+    Hypothesis IH_ExtractByte : forall (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : N), P uv -> P idx -> P (UVALUE_ExtractByte uv dt idx sid).
+    Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue),
+        (forall u, In u uvs -> P u) ->
+        P (UVALUE_ConcatBytes uvs dt).
+
+    Lemma uvalue_ind'' : forall (uv:uvalue), P uv.
+      fix IH 1.
+      remember P as P0 in IH.
+      destruct uv; auto; subst.
+      - revert fields.
+        fix IHfields 1. intros [|u' fields']. intros. apply IH_Struct_nil.
+        apply IH_Struct_cons.
+        apply IH.
+        apply IHfields.
+      - revert fields.
+        fix IHfields 1. intros [|u' fields']. intros. apply IH_Packed_struct_nil.
+        apply IH_Packed_struct_cons.
+        apply IH.
+        apply IHfields.
+      - apply IH_Array.
+        { revert elts.
+          fix IHelts 1. intros [|u elts']. intros. inversion H.
+          intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
+        }
+      - apply IH_Vector.
+        { revert elts.
+          fix IHelts 1. intros [|u elts']. intros. inversion H.
+          intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
+        }
+      - apply IH_IBinop; auto.
+      - apply IH_ICmp; auto.
+      - apply IH_FBinop; auto.
+      - apply IH_FCmp; auto.
+      - apply IH_Conversion; auto.
+      - apply IH_GetElementPtr. apply IH.
+        { revert idxs.
+          fix IHidxs 1. intros [|u idxs']. intros. inversion H.
+          intros u' [<-|Hin]. apply IH. eapply IHidxs. apply Hin.
+        }
+      - apply IH_ExtractElement; auto.
+      - apply IH_InsertElement; auto.
+      - apply IH_ShuffleVector; auto.
+      - apply IH_ExtractValue; auto.
+      - apply IH_InsertValue; auto.
+      - apply IH_Select; auto.
+      - apply IH_ExtractByte; auto.
+      - apply IH_ConcatBytes.
+        { revert uvs.
+          fix IHuvs 1. intros [|u uvs']. intros. inversion H.
+          intros u' [<-|Hin]. apply IH. eapply IHuvs. apply Hin.
+        }
+    Qed.
+  End UvalueInd''.
+
+
   (* Injection of [dvalue] into [uvalue] *)
   Fixpoint dvalue_to_uvalue (dv : dvalue) : uvalue :=
     match dv with
