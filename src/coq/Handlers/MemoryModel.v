@@ -81,6 +81,9 @@ Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
   Parameter Frame : Type.
   Parameter FrameStack : Type.
 
+  (* Heaps *)
+  Parameter Heap : Type.
+
   (* TODO: Should DataLayout be here?
 
      It might make sense to move DataLayout to another module, some of
@@ -128,6 +131,34 @@ Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
 
   Parameter frame_stack_eqv : FrameStack -> FrameStack -> Prop.
   #[global] Parameter frame_stack_eqv_Equivalence : Equivalence frame_stack_eqv.
+
+  (** Heaps *)
+  (* 1) heap
+     2) root pointer
+     3) pointer
+
+     The root pointer is the reference to a block that will be freed.
+   *)
+  Parameter ptr_in_heap_prop : Heap -> addr -> addr -> Prop.
+
+  (* Memory stack's heap *)
+  Parameter memory_stack_heap_prop : memory_stack -> Heap -> Prop.
+
+  Definition heap_eqv (h h' : Heap) : Prop :=
+    forall root ptr, ptr_in_heap_prop h root ptr <-> ptr_in_heap_prop h' root ptr.
+
+  #[global] Instance heap_Equivalence : Equivalence heap_eqv.
+  Proof.
+    split.
+    - intros h root ptr.
+      reflexivity.
+    - intros h1 h2 EQV.
+      firstorder.
+    - intros x y z XY YZ root ptr.
+      split; intros BLOCK.
+      * apply YZ; firstorder.
+      * apply XY; firstorder.
+  Qed.
 
   (** Provenances *)
   Parameter used_provenance_prop : MemState -> Provenance -> Prop. (* Has a provenance *ever* been used. *)
@@ -1115,6 +1146,11 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     := forall fs,
       memory_stack_frame_stack_prop (MemState_get_memory m1) fs <-> memory_stack_frame_stack_prop (MemState_get_memory m2) fs.
 
+  (** Heap *)
+  Definition heap_preserved (m1 m2 : MemState) : Prop
+    := forall h,
+      memory_stack_heap_prop (MemState_get_memory m1) h <-> memory_stack_heap_prop (MemState_get_memory m2) h.
+
   (*** Provenance operations *)
   #[global] Instance MemPropT_MonadProvenance : MonadProvenance Provenance (MemPropT MemState).
   Proof.
@@ -1142,7 +1178,8 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
               read_byte_preserved ms ms' /\
               write_byte_allowed_all_preserved ms ms' /\
               allocations_preserved ms ms' /\
-              frame_stack_preserved ms ms'
+              frame_stack_preserved ms ms' /\
+              heap_preserved ms ms'
           ).
   Defined.
 
@@ -1162,7 +1199,8 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
               read_byte_preserved ms ms' /\
               write_byte_allowed_all_preserved ms ms' /\
               allocations_preserved ms ms' /\
-              frame_stack_preserved ms ms'
+              frame_stack_preserved ms ms' /\
+              heap_preserved ms ms'
           ).
   Defined.
 
@@ -1220,6 +1258,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       mempush_op_write_allowed : write_byte_allowed_all_preserved m1 m2;
       mempush_op_allocations : allocations_preserved m1 m2;
       mempush_op_allocation_ids : preserve_allocation_ids m1 m2;
+      mempush_heap_preserved : heap_preserved m1 m2;
     }.
 
   Record mempush_spec (m1 : MemState) (m2 : MemState) : Prop :=
@@ -1252,6 +1291,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   Record mempop_operation_invariants (m1 : MemState) (m2 : MemState) :=
     {
       mempop_op_allocation_ids : preserve_allocation_ids m1 m2;
+      mempop_heap_preserved : heap_preserved m1 m2;
     }.
 
   Record mempop_spec (m1 : MemState) (m2 : MemState) : Prop :=
@@ -1315,6 +1355,34 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
             add_ptr_to_frame_stack fs' ptr fs2
     end.
 
+  (*** Heap operations *)
+  Definition ptr_in_memstate_heap (ms : MemState) (root : addr) (ptr : addr) : Prop
+    := forall h, memory_stack_heap_prop (MemState_get_memory ms) h ->
+            ptr_in_heap_prop h root ptr.
+
+  Record add_ptr_to_heap (h1 : Heap) (root : addr) (ptr : addr) (h2 : Heap) : Prop :=
+    {
+      old_heap_lu : forall ptr', disjoint_ptr_byte ptr ptr' ->
+                            forall root, ptr_in_heap_prop h1 root ptr' <-> ptr_in_heap_prop h2 root ptr';
+      new_heap_lu : ptr_in_heap_prop h2 root ptr;
+    }.
+
+  Fixpoint add_ptrs_to_heap' (h1 : Heap) (root : addr) (ptrs : list addr) (h2 : Heap) : Prop :=
+    match ptrs with
+    | nil => heap_eqv h1 h2
+    | (ptr :: ptrs) =>
+        exists h',
+        add_ptrs_to_heap' h1 root ptrs h' /\
+          add_ptr_to_heap h' root ptr h2
+    end.
+
+  Definition add_ptrs_to_heap (h1 : Heap) (ptrs : list addr) (h2 : Heap) : Prop :=
+    match ptrs with
+    | nil => heap_eqv h1 h2
+    | (ptr :: _) =>
+        add_ptrs_to_heap' h1 ptr ptrs h2
+    end.
+
   (*** Writing to memory *)
   Record set_byte_memory (m1 : MemState) (ptr : addr) (byte : SByte) (m2 : MemState) : Prop :=
     {
@@ -1328,6 +1396,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     {
       write_byte_op_preserves_allocations : allocations_preserved m1 m2;
       write_byte_op_preserves_frame_stack : frame_stack_preserved m1 m2;
+      write_byte_op_preserves_heap : heap_preserved m1 m2;
       write_byte_op_read_allowed : read_byte_allowed_all_preserved m1 m2;
       write_byte_op_write_allowed : write_byte_allowed_all_preserved m1 m2;
       write_byte_op_allocation_ids : preserve_allocation_ids m1 m2;
@@ -1354,10 +1423,9 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
              write_byte_spec m1 ptr byte m2
          end.
 
-  (*** Allocating bytes in memory *)
+  (*** Allocating bytes on the stack *)
   Record allocate_bytes_succeeds_spec (m1 : MemState) (t : dtyp) (init_bytes : list SByte) (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
-    {
-      (* The allocated pointers are consecutive in memory. *)
+    { (* The allocated pointers are consecutive in memory. *)
       (* m1 doesn't really matter here. *)
       allocate_bytes_consecutive : get_consecutive_ptrs ptr (length init_bytes) m1 (ret (m1, ptrs));
 
@@ -1415,6 +1483,10 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         add_ptrs_to_frame_stack fs1 ptrs fs2 ->
         memory_stack_frame_stack_prop (MemState_get_memory m2) fs2;
 
+      (* Heap preserved *)
+      allocate_bytes_heap_preserved :
+      heap_preserved m1 m2;
+
       (* Type is valid *)
       allocate_bytes_typ :
       t <> DTYPE_Void;
@@ -1442,6 +1514,165 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     := prov <- fresh_provenance;;
        '(ptr, _) <- allocate_bytes_spec_MemPropT' t init_bytes prov;;
        ret ptr.
+
+  (*** Allocating bytes in the heap *)
+  Record malloc_bytes_succeeds_spec (m1 : MemState) (t : dtyp) (init_bytes : list SByte) (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
+    {
+      (* The allocated pointers are consecutive in memory. *)
+      (* m1 doesn't really matter here. *)
+      malloc_bytes_consecutive : get_consecutive_ptrs ptr (length init_bytes) m1 (ret (m1, ptrs));
+
+      (* Provenance *)
+      malloc_bytes_address_provenance : address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr); (* Need this case if `ptrs` is empty (allocating 0 bytes) *)
+      malloc_bytes_addresses_provenance : forall ptr, In ptr ptrs -> address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr);
+      malloc_bytes_provenances_preserved :
+      forall pr',
+        (used_provenance_prop m1 pr' <-> used_provenance_prop m2 pr');
+
+      (* byte_allocated *)
+      malloc_bytes_was_fresh_byte : forall ptr, In ptr ptrs -> byte_not_allocated m1 ptr;
+      malloc_bytes_now_byte_allocated : forall ptr, In ptr ptrs -> byte_allocated m2 ptr (provenance_to_allocation_id pr);
+      malloc_bytes_preserves_old_allocations :
+      forall ptr aid,
+        (forall p, In p ptrs -> disjoint_ptr_byte p ptr) ->
+        (byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid);
+
+      (* read permissions *)
+      malloc_bytes_new_reads_allowed :
+      forall p, In p ptrs ->
+           read_byte_allowed m2 p;
+
+      malloc_bytes_old_reads_allowed :
+      forall ptr',
+        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
+        read_byte_allowed m1 ptr' <-> read_byte_allowed m2 ptr';
+
+      (* reads *)
+      malloc_bytes_new_reads :
+      forall p ix byte,
+        Util.Nth ptrs ix p ->
+        Util.Nth init_bytes ix byte ->
+        read_byte_prop m2 p byte;
+
+      malloc_bytes_old_reads :
+      forall ptr' byte,
+        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
+        read_byte_prop m1 ptr' byte <-> read_byte_prop m2 ptr' byte;
+
+      (* write permissions *)
+      malloc_bytes_new_writes_allowed :
+      forall p, In p ptrs ->
+           write_byte_allowed m2 p;
+
+      malloc_bytes_old_writes_allowed :
+      forall ptr',
+        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
+        write_byte_allowed m1 ptr' <-> write_byte_allowed m2 ptr';
+
+      (* Framestack preserved *)
+      malloc_bytes_frame_stack_preserved : frame_stack_preserved m1 m2;
+
+      (* Heap extended *)
+      malloc_bytes_add_to_frame :
+      forall h1 h2,
+        memory_stack_heap_prop (MemState_get_memory m1) h1 ->
+        add_ptrs_to_heap h1 ptrs h2 ->
+        memory_stack_heap_prop (MemState_get_memory m2) h2;
+
+      (* Type is valid *)
+      malloc_bytes_typ :
+      t <> DTYPE_Void;
+
+      malloc_bytes_typ_size :
+      sizeof_dtyp t = N.of_nat (length init_bytes);
+    }.
+
+  Definition malloc_bytes_spec_MemPropT' (t : dtyp) (init_bytes : list SByte) (prov : Provenance)
+    : MemPropT MemState (addr * list addr)
+    := fun m1 res =>
+         match run_err_ub_oom res with
+         | inl (OOM_message x) =>
+             True
+         | inr (inl (UB_message x)) =>
+             forall m2 ptr ptrs, ~ malloc_bytes_succeeds_spec m1 t init_bytes prov m2 ptr ptrs
+         | inr (inr (inl (ERR_message x))) =>
+             True
+         | inr (inr (inr (m2, (ptr, ptrs)))) =>
+             malloc_bytes_succeeds_spec m1 t init_bytes prov m2 ptr ptrs
+         end.
+
+  Definition malloc_bytes_spec_MemPropT (t : dtyp) (init_bytes : list SByte)
+    : MemPropT MemState addr
+    := prov <- fresh_provenance;;
+       '(ptr, _) <- malloc_bytes_spec_MemPropT' t init_bytes prov;;
+       ret ptr.
+
+  (*** Freeing heap allocations *)
+  Record free_operation_invariants (m1 : MemState) (m2 : MemState) :=
+    {
+      free_op_allocation_ids : preserve_allocation_ids m1 m2;
+      free_frame_stack_preserved : frame_stack_preserved m1 m2;
+    }.
+
+  Record free_block_prop (h1 : Heap) (root : addr) (h2 : Heap) : Prop :=
+    { free_block_ptrs_freed :
+      forall ptr,
+        ptr_in_heap_prop h1 root ptr ->
+        (forall root, ~ ptr_in_heap_prop h2 root ptr);
+
+      (* TODO: make sure there's no weirdness about multiple roots *)
+      free_block_disjoint_preserved :
+      forall ptr root',
+        disjoint_ptr_byte root root' ->
+        ptr_in_heap_prop h1 root' ptr <-> ptr_in_heap_prop h2 root' ptr;
+    }.
+
+  Record free_spec (m1 : MemState) (root : addr) (m2 : MemState) : Prop :=
+    { (* ptr being freed was a root *)
+      free_was_root :
+      exists ptr, ptr_in_memstate_heap m1 root ptr;
+
+      (* all bytes in block are freed. *)
+      free_bytes_freed :
+      forall ptr,
+        ptr_in_memstate_heap m1 root ptr ->
+        byte_not_allocated m2 ptr;
+
+      (* Bytes not allocated in the block have the same allocation status as before *)
+      free_non_block_bytes_preserved :
+      forall ptr aid,
+        (~ ptr_in_memstate_heap m1 root ptr) ->
+        byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid;
+
+      (* Bytes not allocated in the freed block are the same when read *)
+      free_non_frame_bytes_read :
+      forall ptr byte,
+        (~ ptr_in_memstate_heap m1 root ptr) ->
+        read_byte_spec m1 ptr byte <-> read_byte_spec m2 ptr byte;
+
+      (* Set new heap *)
+      free_block :
+      forall h1 h2,
+        memory_stack_heap_prop (MemState_get_memory m1) h1 ->
+        free_block_prop h1 root h2 ->
+        memory_stack_heap_prop (MemState_get_memory m2) h2;
+
+      (* Invariants *)
+      free_invariants : free_operation_invariants m1 m2;
+    }.
+
+  Definition free_spec_MemPropT (root : addr) : MemPropT MemState unit :=
+    fun m1 res =>
+      match run_err_ub_oom res with
+      | inl (OOM_message x) =>
+          True
+      | inr (inl (UB_message x)) =>
+          forall m2, ~ free_spec m1 root m2
+      | inr (inr (inl (ERR_message x))) =>
+          True
+      | inr (inr (inr (m2, tt))) =>
+          free_spec m1 root m2
+      end.
 
   (*** Aggregate things *)
 
