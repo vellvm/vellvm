@@ -832,10 +832,21 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
        name. *)
     Definition FrameStack := FrameStack'.
 
+    (** Heaps *)
+    Definition Block := list Iptr.
+    Definition Heap := IntMap Block.
+
     (** ** Memory stack
       The full notion of state manipulated by the monad is a pair of a [memory] and a [mem_stack].
      *)
-    Definition memory_stack : Type := memory * FrameStack.
+    Record memory_stack' : Type :=
+      mkMemoryStack
+        { memory_stack_memory : memory;
+          memory_stack_frame_stack : FrameStack;
+          memory_stack_heap : Heap;
+        }.
+
+    Definition memory_stack := memory_stack'.
 
     (** Some operations on memory *)
     Definition set_byte_raw (mem : memory) (phys_addr : Z) (byte : mem_byte) : memory :=
@@ -986,7 +997,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (mkMemState mem' prov).
 
   Definition mem_state_memory (ms : MemState) : memory
-    := fst (MemState_get_memory ms).
+    := memory_stack_memory (MemState_get_memory ms).
 
   Definition mem_state_provenance (ms : MemState) : Provenance
     := ms.(ms_provenance).
@@ -994,13 +1005,16 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Definition MemState_get_provenance := mem_state_provenance.
 
   Definition mem_state_frame_stack (ms : MemState) : FrameStack
-    := snd ms.(ms_memory_stack).
+    := memory_stack_frame_stack ms.(ms_memory_stack).
+
+  Definition mem_state_heap (ms : MemState) : Heap
+    := memory_stack_heap ms.(ms_memory_stack).
 
   Definition read_byte_MemPropT (ptr : addr) : MemPropT memory_stack SByte :=
     let addr := ptr_to_int ptr in
     let pr := address_provenance ptr in
     mem_stack <- get_mem_state;;
-    let mem := fst mem_stack in
+    let mem := memory_stack_memory mem_stack in
     match read_byte_raw mem addr with
     | None => raise_ub "Reading from unallocated memory."
     | Some byte =>
@@ -1014,7 +1028,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
   Definition addr_allocated_prop (ptr : addr) (aid : AllocationId) : MemPropT memory_stack bool :=
     mem <- get_mem_state;;
-    match read_byte_raw (fst mem) (ptr_to_int ptr) with
+    match read_byte_raw (memory_stack_memory mem) (ptr_to_int ptr) with
     | None => ret false
     | Some (byte, aid') =>
         ret (proj_sumbool (aid_eq_dec aid aid'))
@@ -1093,13 +1107,38 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     | Snoc s f => frame_stack_eqv s fs'
     end.
 
-  Definition memory_stack_frame_stack (mem : memory_stack) := snd mem.
-
   Definition memory_stack_frame_stack_prop (mem : memory_stack) (fs : FrameStack) : Prop :=
     frame_stack_eqv (memory_stack_frame_stack mem) fs.
 
   Definition mem_state_frame_stack_prop (ms : MemState) (fs : FrameStack) : Prop :=
     memory_stack_frame_stack_prop (MemState_get_memory ms) fs.
+
+  (** Heap *)
+  Definition ptr_in_heap_prop (h : Heap) (root ptr : addr) : Prop
+    := match IM.find (ptr_to_int root) h with
+       | None => False
+       | Some ptrs => In (ptr_to_int ptr) ptrs
+       end.
+
+  Definition heap_eqv (h h' : Heap) : Prop :=
+    forall root ptr, ptr_in_heap_prop h root ptr <-> ptr_in_heap_prop h' root ptr.
+
+  #[global] Instance heap_Equivalence : Equivalence heap_eqv.
+  Proof.
+    split.
+    - intros h root ptr.
+      reflexivity.
+    - intros h1 h2 EQV.
+      firstorder.
+    - intros x y z XY YZ root ptr.
+      split; intros BLOCK.
+      * apply YZ; firstorder.
+      * apply XY; firstorder.
+  Qed.
+
+  (* Memory stack's heap *)
+  Definition memory_stack_heap_prop (ms : memory_stack) (h : Heap) : Prop
+    := heap_eqv (memory_stack_heap ms) h.
 
   (** Provenance / store ids *)
   Definition used_provenance_prop (ms : MemState) (pr : Provenance) : Prop :=
@@ -1385,7 +1424,10 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (*** Data types *)
     Definition memory_empty : memory := IntMaps.empty.
     Definition frame_empty : FrameStack := Singleton [].
-    Definition empty_memory_stack : memory_stack := (memory_empty, frame_empty).
+    Definition heap_empty : Heap := IntMaps.empty.
+
+    Definition empty_memory_stack : memory_stack :=
+      mkMemoryStack memory_empty frame_empty heap_empty.
 
     Definition initial_memory_state : MemState :=
       mkMemState empty_memory_stack initial_provenance.
@@ -1397,11 +1439,11 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     (* Get the next key in the memory *)
     Definition next_memory_key (m : memory_stack) : Z :=
-      next_key (fst m).
+      next_key (memory_stack_memory m).
 
     Lemma next_memory_key_next_key :
-      forall m f,
-        next_memory_key (m, f) = next_key m.
+      forall m f h,
+        next_memory_key (mkMemoryStack m f h) = next_key m.
     Proof.
       auto.
     Qed.
@@ -1438,7 +1480,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           then
             let mem' := set_byte_raw mem addr (byte, aid) in
             let fs := mem_state_frame_stack ms in
-            put_mem_state (mkMemState (mem', fs) prov)
+            let h := mem_state_heap ms in
+            put_mem_state (mkMemState (mkMemoryStack mem' fs h) prov)
           else raise_ub
                  ("Trying to write to memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ show_prov pr ++ ", memory allocation id: " ++ show_allocation_id aid ++ " Memory: " ++ Show.show (map (fun '(key, (_, aid)) => (key, show_allocation_id aid)) (IM.elements mem)))
       end.
@@ -1454,10 +1497,10 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     (* Register a concrete address in a frame *)
     Definition add_to_frame (m : memory_stack) (k : Z) : memory_stack :=
-      let '(m,s) := m in
+      let '(mkMemoryStack m s h) := m in
       match s with
-      | Singleton f => (m, Singleton (k :: f))
-      | Snoc s f => (m, Snoc s (k :: f))
+      | Singleton f => mkMemoryStack m (Singleton (k :: f)) h
+      | Snoc s f => mkMemoryStack m (Snoc s (k :: f)) h
       end.
 
     (* Register a list of concrete addresses in a frame *)
@@ -1466,7 +1509,15 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma add_to_frame_preserves_memory :
       forall ms k,
-        fst (add_to_frame ms k) = fst ms.
+        memory_stack_memory (add_to_frame ms k) = memory_stack_memory ms.
+    Proof.
+      intros [m fs] k.
+      destruct fs; auto.
+    Qed.
+
+    Lemma add_to_frame_preserves_heap :
+      forall ms k,
+        memory_stack_heap (add_to_frame ms k) = memory_stack_heap ms.
     Proof.
       intros [m fs] k.
       destruct fs; auto.
@@ -1474,7 +1525,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma add_all_to_frame_preserves_memory :
       forall ms ks,
-        fst (add_all_to_frame ms ks) = fst ms.
+        memory_stack_memory (add_all_to_frame ms ks) = memory_stack_memory ms.
     Proof.
       intros ms ks; revert ms;
       induction ks; intros ms; auto.
@@ -1484,9 +1535,21 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       auto.
     Qed.
 
+    Lemma add_all_to_frame_preserves_heap :
+      forall ms ks,
+        memory_stack_heap (add_all_to_frame ms ks) = memory_stack_heap ms.
+    Proof.
+      intros ms ks; revert ms;
+      induction ks; intros ms; auto.
+      cbn in *. unfold add_all_to_frame in IHks.
+      specialize (IHks (add_to_frame ms a)).
+      rewrite add_to_frame_preserves_heap in IHks.
+      auto.
+    Qed.
+
     Lemma add_all_to_frame_nil_preserves_frames :
       forall ms,
-        snd (add_all_to_frame ms []) = snd ms.
+        memory_stack_frame_stack (add_all_to_frame ms []) = memory_stack_frame_stack ms.
     Proof.
       intros [m fs].
       destruct fs; auto.
@@ -1510,12 +1573,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               ms <- get_mem_state;;
               let mem_stack := ms_memory_stack ms in
               let addr := next_memory_key mem_stack in
-              let '(mem, fs) := ms_memory_stack ms in
+              let '(mkMemoryStack mem fs h) := ms_memory_stack ms in
               let aid := provenance_to_allocation_id pr in
               let ptr := (int_to_ptr addr (allocation_id_to_prov aid)) in
               ptrs <- get_consecutive_ptrs ptr (length init_bytes);;
               let mem' := add_all_index (map (fun b => (b, aid)) init_bytes) addr mem in
-              let mem_stack' := add_all_to_frame (mem', fs) (map ptr_to_int ptrs) in
+              let mem_stack' := add_all_to_frame (mkMemoryStack mem' fs h) (map ptr_to_int ptrs) in
               ms' <- get_mem_state;;
               let pr' := MemState_get_provenance ms' in
               put_mem_state (mkMemState mem_stack' pr');;
@@ -1546,9 +1609,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       end.
 
     Definition mem_state_set_frame_stack (ms : MemState) (fs : FrameStack) : MemState :=
-      let (mem, _) := ms_memory_stack ms in
+      let '(mkMemoryStack mem _ h) := ms_memory_stack ms in
       let pr := mem_state_provenance ms in
-      mkMemState (mem, fs) pr.
+      mkMemState (mkMemoryStack mem fs h) pr.
+
+    Definition mem_state_set_heap (ms : MemState) (h : Heap) : MemState :=
+      let '(mkMemoryStack mem fs _) := ms_memory_stack ms in
+      let pr := mem_state_provenance ms in
+      mkMemState (mkMemoryStack mem fs h) pr.
 
     Definition mempush `{MemMonad ExtraState MemM (itree Eff)} : MemM unit :=
       ms <- get_mem_state;;
@@ -1567,12 +1635,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Definition mempop `{MemMonad ExtraState MemM (itree Eff)} : MemM unit :=
       ms <- get_mem_state;;
-      let (mem, fs) := ms_memory_stack ms in
+      let '(mkMemoryStack mem fs h) := ms_memory_stack ms in
       let f := peek_frame_stack fs in
       fs' <- lift_err_RAISE_ERROR (pop_frame_stack fs);;
       let mem' := free_frame_memory f mem in
       let pr := mem_state_provenance ms in
-      let ms' := mkMemState (mem', fs') pr in
+      let ms' := mkMemState (mkMemoryStack mem' fs' h) pr in
       put_mem_state ms'.
 
     (*** Correctness *)
@@ -1936,6 +2004,37 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           (* intros ?fs; split; intros PROP; inv PROP; reflexivity *)
         ].
 
+    (* TODO: move this? *)
+    (* Probably general enough to live in MemoryModel.v *)
+    Lemma heap_preserved_mem_state_heap_refl :
+      forall ms1 ms2,
+        heap_eqv (mem_state_heap ms1) (mem_state_heap ms2) ->
+        heap_preserved ms1 ms2.
+    Proof.
+      intros ms1 ms2 EQ.
+      destruct ms1, ms2.
+      unfold mem_state_heap in *.
+      cbn in *.
+      red.
+      intros h; cbn.
+      unfold memory_stack_heap_prop.
+      split; intros EQV.
+      rewrite <- EQ; auto.
+      rewrite EQ; auto.
+    Qed.
+
+    Ltac solve_heap_preserved :=
+      solve [
+          let PROP := fresh "PROP" in
+          intros ?fs; split; intros PROP; unfold mem_state_frame_stack_prop in *; auto
+        | eapply heap_preserved_mem_state_heap_refl;
+          unfold mem_state_heap;
+          cbn;
+          rewrite add_all_to_frame_preserves_heap;
+          cbn;
+          reflexivity
+        ].
+
     (* TODO: move this stuff? *)
     Hint Resolve
          provenance_lt_trans
@@ -1955,11 +2054,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Ltac solve_fresh_provenance_invariants :=
       split;
       [ solve_extend_provenance
-      | split; [| split; [| split]];
+      | split; [| split; [| split; [|split]]];
         [ solve_read_byte_preserved
         | solve_write_byte_allowed_all_preserved
         | solve_allocations_preserved
         | solve_frame_stack_preserved
+        | solve_heap_preserved
         ]
       ].
 
@@ -2447,6 +2547,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               }
             -- (* Frame stack preserved *)
               solve_frame_stack_preserved.
+            -- (* Heap preserved *)
+              solve_heap_preserved.
             -- (* TODO: solve_read_byte_allowed_all_preserved *)
               unfold read_byte_allowed_all_preserved.
               intros addr.
@@ -2623,7 +2725,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
           (* TODO: separate into lemmas? *)
           cbn.
-          split; [|split; [|split; [|split]]].
+          split; [|split; [|split; [|split; [|split]]]].
           - (* TODO: solve_extend_provenance *)
             unfold extend_provenance.
             split.
@@ -2654,6 +2756,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             split; intros PROP;
               solve_byte_allocated.
           - solve_frame_stack_preserved.
+          - solve_heap_preserved.
         }
         {
           repeat eexists.
@@ -2704,15 +2807,16 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             rewrite bind_ret_l in RUN.
 
             destruct ms as [ms_stack ms_prov].
-            destruct ms_stack as [mem frames].
+            destruct ms_stack as [mem frames heap].
 
-            destruct ms' as [[mem' fs'] pr''].
+            destruct ms' as [[mem' fs' h'] pr''].
             unfold ms_get_memory in GET_PR.
             cbn in GET_PR.
             inv GET_PR.
             cbn in RUN.
             rename mem' into mem.
             rename fs' into frames.
+            rename h' into heap.
 
             (* TODO: need to know something about get_consecutive_ptrs *)
             unfold get_consecutive_ptrs in *; cbn in RUN.
@@ -2782,14 +2886,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 cbn in *.
 
                 (* Size is 0, nothing is allocated... *)
-                exists ({| ms_memory_stack := (mem, frames); ms_provenance := pr'' |}).
+                exists ({| ms_memory_stack := mkMemoryStack mem frames heap; ms_provenance := pr'' |}).
                 exists pr'.
 
                 split; [solve_fresh_provenance_invariants|].
 
                 eexists.
                 set (alloc_addr :=
-                       int_to_ptr (next_memory_key (mem, frames))
+                       int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
                                   (allocation_id_to_prov (provenance_to_allocation_id pr'))).
                 exists (alloc_addr, []).
 
@@ -2849,10 +2953,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     cbn in *.
                     unfold memory_stack_frame_stack.
                     cbn.
-                    rewrite add_all_to_frame_nil_preserves_frames.
+                    setoid_rewrite add_all_to_frame_nil_preserves_frames.
                     cbn.
                     rewrite POP.
                     auto.
+                  - (* Heap preserved *)
+                    solve_heap_preserved.
                   - (* Non-void *)
                     auto.
                   - (* Length *)
@@ -2863,7 +2969,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               (* Non-empty allocation *)
               cbn.
 
-              exists ({| ms_memory_stack := (mem, frames); ms_provenance := pr'' |}).
+              exists ({| ms_memory_stack := (mkMemoryStack mem frames heap); ms_provenance := pr'' |}).
               exists pr'.
 
               split; [solve_fresh_provenance_invariants|].
@@ -2872,9 +2978,10 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               exists ({|
     ms_memory_stack :=
               add_all_to_frame
-                (add_all_index
+                (mkMemoryStack
+                   (add_all_index
                    (map (fun b : SByte => (b, provenance_to_allocation_id pr'))
-                      init_bytes) (next_memory_key (mem, frames)) mem, frames)
+                      init_bytes) (next_memory_key (mkMemoryStack mem frames heap)) mem) frames heap)
                 (ptr_to_int alloc_addr :: map ptr_to_int ptrs);
     ms_provenance := pr''
   |}).
@@ -2882,7 +2989,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
               Close Scope positive.
               assert (int_to_ptr
-                        (next_memory_key (mem, frames)) (allocation_id_to_prov (provenance_to_allocation_id pr')) = alloc_addr) as EQALLOC.
+                        (next_memory_key (mkMemoryStack mem frames heap)) (allocation_id_to_prov (provenance_to_allocation_id pr')) = alloc_addr) as EQALLOC.
               {
                 destruct (Datatypes.length init_bytes) eqn:LENBYTES.
                 { cbn in HSEQ; inv HSEQ.
@@ -3033,12 +3140,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     erewrite read_byte_raw_add_all_index_out.
                     2: {
                       rewrite Zlength_map.
-                      pose proof (Z_lt_ge_dec (ptr_to_int ptr) (next_memory_key (mem, frames))) as [LTNEXT | GENEXT]; auto.
-                      pose proof (Z_ge_lt_dec (ptr_to_int ptr) (next_memory_key (mem, frames) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
+                      pose proof (Z_lt_ge_dec (ptr_to_int ptr) (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
+                      pose proof (Z_ge_lt_dec (ptr_to_int ptr) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
 
                                             exfalso.
 
-                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mem, frames)) (next_memory_key (mem, frames) + Zlength init_bytes) (ptr_to_int ptr)) as BOUNDS.
+                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr)) as BOUNDS.
                       forward BOUNDS.
                       rewrite next_memory_key_next_key.
                       apply Z.ge_le.
@@ -3046,7 +3153,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       forward BOUNDS. lia.
                       destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
 
-                      replace (next_memory_key (mem, frames) + Zlength init_bytes - next_memory_key (mem, frames)) with (Zlength init_bytes) in BOUNDLT by lia.
+                      replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
 
                       (* Want to use bound in... *)
                       (* Need to get what ix is as an IP... *)
@@ -3071,7 +3178,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       set (p := int_to_ptr (ptr_to_int ptr) (allocation_id_to_prov (provenance_to_allocation_id pr'))).
 
                       (* I believe that p is necessarily in the result of HMAPM. *)
-                      assert (In p (int_to_ptr (next_memory_key (mem, frames))
+                      assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
                                                (allocation_id_to_prov
                                                   (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
@@ -3122,12 +3229,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     erewrite read_byte_raw_add_all_index_out in ALLOC.
                     2: {
                       rewrite Zlength_map.
-                      pose proof (Z_lt_ge_dec (ptr_to_int ptr) (next_memory_key (mem, frames))) as [LTNEXT | GENEXT]; auto.
-                      pose proof (Z_ge_lt_dec (ptr_to_int ptr) (next_memory_key (mem, frames) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
+                      pose proof (Z_lt_ge_dec (ptr_to_int ptr) (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
+                      pose proof (Z_ge_lt_dec (ptr_to_int ptr) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
 
                                             exfalso.
 
-                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mem, frames)) (next_memory_key (mem, frames) + Zlength init_bytes) (ptr_to_int ptr)) as BOUNDS.
+                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr)) as BOUNDS.
                       forward BOUNDS.
                       rewrite next_memory_key_next_key.
                       apply Z.ge_le.
@@ -3135,7 +3242,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       forward BOUNDS. lia.
                       destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
 
-                      replace (next_memory_key (mem, frames) + Zlength init_bytes - next_memory_key (mem, frames)) with (Zlength init_bytes) in BOUNDLT by lia.
+                      replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
 
                       (* Want to use bound in... *)
                       (* Need to get what ix is as an IP... *)
@@ -3160,7 +3267,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       set (p := int_to_ptr (ptr_to_int ptr) (allocation_id_to_prov (provenance_to_allocation_id pr'))).
 
                       (* I believe that p is necessarily in the result of HMAPM. *)
-                      assert (In p (int_to_ptr (next_memory_key (mem, frames))
+                      assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
                                                (allocation_id_to_prov
                                                   (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
@@ -3228,12 +3335,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                         (* Should be a non-empty allocation *)
                         (* I know this by cons cell result of HMAPM *)
                         assert (@MonadReturnsLaws.MReturns err _ _ _ (list addr)
-                                                           (int_to_ptr (next_memory_key (mem, frames))
+                                                           (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
                                                                        (allocation_id_to_prov (provenance_to_allocation_id pr')) :: ptrs)
                                                            (Util.map_monad
             (fun ix : IP.intptr =>
              handle_gep_addr (DTYPE_I 8)
-               (int_to_ptr (next_memory_key (mem, frames))
+               (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
                   (allocation_id_to_prov (provenance_to_allocation_id pr')))
                [Events.DV.DVALUE_IPTR ix]) NOOM_seq)) as MAPRET.
                         { cbn. red.
@@ -3276,7 +3383,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
                     forward READ.
                     { (* Bounds *)
-                      assert (In p (int_to_ptr (next_memory_key (mem, frames))
+                      assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
                                                (allocation_id_to_prov (provenance_to_allocation_id pr')) :: ptrs)) as IN'.
                       { right; auto.
                       }
@@ -3377,12 +3484,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                         therefore DISJOINT doesn't hold.
                        *)
                       rewrite Zlength_map.
-                      pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mem, frames))) as [LTNEXT | GENEXT]; auto.
-                      pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mem, frames) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
+                      pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
+                      pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
 
                       exfalso.
 
-                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mem, frames)) (next_memory_key (mem, frames) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
+                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
                       forward BOUNDS.
                       rewrite next_memory_key_next_key.
                       apply Z.ge_le.
@@ -3390,7 +3497,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       forward BOUNDS. lia.
                       destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
 
-                      replace (next_memory_key (mem, frames) + Zlength init_bytes - next_memory_key (mem, frames)) with (Zlength init_bytes) in BOUNDLT by lia.
+                      replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
 
                       (* Want to use bound in... *)
                       (* Need to get what ix is as an IP... *)
@@ -3415,7 +3522,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
 
                       (* I believe that p is necessarily in the result of HMAPM. *)
-                      assert (In p (int_to_ptr (next_memory_key (mem, frames))
+                      assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
                                                (allocation_id_to_prov
                                                   (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
@@ -3495,7 +3602,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
                     Should be `next_memory_key ms + ix` basically...
 
-                    So, `ptr_to_int p - next_memory_key (mem, frames) = ix`
+                    So, `ptr_to_int p - next_memory_key (mkMemoryStack mem frames heap) = ix`
 
                     With that BYTE and Heqo should give me byte = byte'
                    *)
@@ -3513,7 +3620,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     rewrite NTH_ix' in Heqo.
 
                     rewrite sizeof_dtyp_i8 in Heqo.
-                    replace (next_memory_key (mem, frames) + Z.of_N 1 * ( 0 + Z.of_nat ix) - next_memory_key (mem, frames)) with (Z.of_nat ix) in Heqo by lia.
+                    replace (next_memory_key (mkMemoryStack mem frames heap) + Z.of_N 1 * ( 0 + Z.of_nat ix) - next_memory_key (mkMemoryStack mem frames heap)) with (Z.of_nat ix) in Heqo by lia.
 
                     apply Util.Nth_list_nth_z in BYTE.
                     rewrite BYTE in Heqo.
@@ -3552,12 +3659,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     rewrite read_byte_raw_add_all_index_out.
                     2: {
                       rewrite Zlength_map.
-                      pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mem, frames))) as [LTNEXT | GENEXT]; auto.
-                      pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mem, frames) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
+                      pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
+                      pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
 
                       exfalso.
 
-                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mem, frames)) (next_memory_key (mem, frames) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
+                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
                       forward BOUNDS.
                       rewrite next_memory_key_next_key.
                       apply Z.ge_le.
@@ -3565,7 +3672,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       forward BOUNDS. lia.
                       destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
 
-                      replace (next_memory_key (mem, frames) + Zlength init_bytes - next_memory_key (mem, frames)) with (Zlength init_bytes) in BOUNDLT by lia.
+                      replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
 
                       (* Want to use bound in... *)
                       (* Need to get what ix is as an IP... *)
@@ -3590,7 +3697,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
 
                       (* I believe that p is necessarily in the result of HMAPM. *)
-                      assert (In p (int_to_ptr (next_memory_key (mem, frames))
+                      assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
                                                (allocation_id_to_prov
                                                   (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
@@ -3647,12 +3754,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     rewrite read_byte_raw_add_all_index_out in READ.
 2: {
                       rewrite Zlength_map.
-                      pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mem, frames))) as [LTNEXT | GENEXT]; auto.
-                      pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mem, frames) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
+                      pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
+                      pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
 
                       exfalso.
 
-                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mem, frames)) (next_memory_key (mem, frames) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
+                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
                       forward BOUNDS.
                       rewrite next_memory_key_next_key.
                       apply Z.ge_le.
@@ -3660,7 +3767,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       forward BOUNDS. lia.
                       destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
 
-                      replace (next_memory_key (mem, frames) + Zlength init_bytes - next_memory_key (mem, frames)) with (Zlength init_bytes) in BOUNDLT by lia.
+                      replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
 
                       (* Want to use bound in... *)
                       (* Need to get what ix is as an IP... *)
@@ -3685,7 +3792,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
 
                       (* I believe that p is necessarily in the result of HMAPM. *)
-                      assert (In p (int_to_ptr (next_memory_key (mem, frames))
+                      assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
                                                (allocation_id_to_prov
                                                   (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
@@ -3790,12 +3897,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     rewrite read_byte_raw_add_all_index_out.
                     2: {
                       rewrite Zlength_map.
-                      pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mem, frames))) as [LTNEXT | GENEXT]; auto.
-                      pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mem, frames) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
+                      pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
+                      pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
 
                       exfalso.
 
-                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mem, frames)) (next_memory_key (mem, frames) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
+                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
                       forward BOUNDS.
                       rewrite next_memory_key_next_key.
                       apply Z.ge_le.
@@ -3803,7 +3910,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       forward BOUNDS. lia.
                       destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
 
-                      replace (next_memory_key (mem, frames) + Zlength init_bytes - next_memory_key (mem, frames)) with (Zlength init_bytes) in BOUNDLT by lia.
+                      replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
 
                       (* Want to use bound in... *)
                       (* Need to get what ix is as an IP... *)
@@ -3828,7 +3935,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
 
                       (* I believe that p is necessarily in the result of HMAPM. *)
-                      assert (In p (int_to_ptr (next_memory_key (mem, frames))
+                      assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
                                                (allocation_id_to_prov
                                                   (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
@@ -3882,12 +3989,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     rewrite read_byte_raw_add_all_index_out in ALLOC.
                     2: {
                       rewrite Zlength_map.
-                      pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mem, frames))) as [LTNEXT | GENEXT]; auto.
-                      pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mem, frames) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
+                      pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
+                      pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
 
                       exfalso.
 
-                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mem, frames)) (next_memory_key (mem, frames) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
+                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
                       forward BOUNDS.
                       rewrite next_memory_key_next_key.
                       apply Z.ge_le.
@@ -3895,7 +4002,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       forward BOUNDS. lia.
                       destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
 
-                      replace (next_memory_key (mem, frames) + Zlength init_bytes - next_memory_key (mem, frames)) with (Zlength init_bytes) in BOUNDLT by lia.
+                      replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
 
                       (* Want to use bound in... *)
                       (* Need to get what ix is as an IP... *)
@@ -3920,7 +4027,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
 
                       (* I believe that p is necessarily in the result of HMAPM. *)
-                      assert (In p (int_to_ptr (next_memory_key (mem, frames))
+                      assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
                                                (allocation_id_to_prov
                                                   (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
@@ -4055,7 +4162,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       add_to_frame ms1' ptr2 = ms1'' ->
                       add_to_frame ms ptr2 = ms2' ->
                       add_to_frame ms2' ptr1 = ms2'' ->
-                      frame_stack_eqv (snd ms1'') (snd ms2'').
+                      frame_stack_eqv (memory_stack_frame_stack ms1'') (memory_stack_frame_stack ms2'').
                   Proof.
                     intros ptr1 ptr2 ms ms1' ms2' ms1'' ms2'' ADD1 ADD1' ADD2 ADD2'.
                     destruct ms, ms1', ms2', ms1'', ms2''.
@@ -4073,7 +4180,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       + unfold frame_eqv in *; cbn in *.
                         intros ptr; split; firstorder.
                     - unfold frame_stack_eqv.
-                      intros f n.
+                      intros f' n.
                       destruct n; cbn; [|tauto].
 
                       split; intros EQV.
@@ -4421,7 +4528,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   Qed.
 
                   #[global] Instance frame_stack_eqv_add_all_to_frame :
-                    Proper ((fun ms1 ms2 => frame_stack_eqv (snd ms1) (snd ms2)) ==> eq ==> (fun ms1 ms2 => frame_stack_eqv (snd ms1) (snd ms2))) add_all_to_frame.
+                    Proper ((fun ms1 ms2 => frame_stack_eqv (memory_stack_frame_stack ms1) (memory_stack_frame_stack ms2)) ==> eq ==> (fun ms1 ms2 => frame_stack_eqv (memory_stack_frame_stack ms1) (memory_stack_frame_stack ms2))) add_all_to_frame.
                   Proof.
                     unfold Proper, respectful.
                     intros ms1 ms2 EQV y x EQ; subst.
@@ -4490,7 +4597,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       add_all_to_frame ms ptrs = ms2' ->
                       add_to_frame ms2' ptr = ms2'' ->
 
-                      frame_stack_eqv (snd ms1'') (snd ms2'').
+                      frame_stack_eqv (memory_stack_frame_stack ms1'') (memory_stack_frame_stack ms2'').
                   Proof.
                     induction ptrs;
                       intros ptr ms ms1' ms1'' ms2' ms2'' ADD ADD_ALL ADD_ALL' ADD'.
@@ -4539,19 +4646,19 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                        *)
 
                       assert (frame_stack_eqv
-                                (snd (add_all_to_frame (add_to_frame (add_to_frame ms ptr) a) ptrs))
-                                (snd (add_to_frame (add_all_to_frame (add_to_frame ms ptr) ptrs) a))) as EQ1.
+                                (memory_stack_frame_stack (add_all_to_frame (add_to_frame (add_to_frame ms ptr) a) ptrs))
+                                (memory_stack_frame_stack (add_to_frame (add_all_to_frame (add_to_frame ms ptr) ptrs) a))) as EQ1.
                       { eauto.
                       }
 
                       rewrite EQ1.
 
                       assert (frame_stack_eqv
-                                (snd (add_to_frame (add_all_to_frame (add_to_frame ms a) ptrs) ptr))
-                                (snd (add_to_frame (add_all_to_frame (add_to_frame ms ptr) ptrs) a))) as EQ2.
+                                (memory_stack_frame_stack (add_to_frame (add_all_to_frame (add_to_frame ms a) ptrs) ptr))
+                                (memory_stack_frame_stack (add_to_frame (add_all_to_frame (add_to_frame ms ptr) ptrs) a))) as EQ2.
                       { assert (frame_stack_eqv
-                                  (snd (add_to_frame (add_all_to_frame (add_to_frame ms a) ptrs) ptr))
-                                  (snd (add_all_to_frame (add_to_frame (add_to_frame ms a) ptr) ptrs))) as EQ.
+                                  (memory_stack_frame_stack (add_to_frame (add_all_to_frame (add_to_frame ms a) ptrs) ptr))
+                                  (memory_stack_frame_stack (add_all_to_frame (add_to_frame (add_to_frame ms a) ptr) ptrs))) as EQ.
                         { symmetry; eauto.
                         }
 
@@ -4559,8 +4666,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                         clear EQ.
 
                         assert (frame_stack_eqv
-                                  (snd (add_to_frame (add_to_frame ms a) ptr))
-                                  (snd (add_to_frame (add_to_frame ms ptr) a))) as EQ.
+                                  (memory_stack_frame_stack (add_to_frame (add_to_frame ms a) ptr))
+                                  (memory_stack_frame_stack (add_to_frame (add_to_frame ms ptr) a))) as EQ.
                         {
                           eapply add_to_frame_swap; eauto.
                         }
@@ -4620,7 +4727,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   Lemma add_to_frame_correct :
                     forall ptr (ms ms' : memory_stack),
                       add_to_frame ms (ptr_to_int ptr) = ms' ->
-                      add_ptr_to_frame_stack (snd ms) ptr (snd ms').
+                      add_ptr_to_frame_stack (memory_stack_frame_stack ms) ptr (memory_stack_frame_stack ms').
                   Proof.
                     intros ptr ms ms' ADD.
                     unfold add_ptr_to_frame_stack.
@@ -4655,7 +4762,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   Lemma add_all_to_frame_correct :
                     forall ptrs (ms : memory_stack) (ms' : memory_stack),
                       add_all_to_frame ms (map ptr_to_int ptrs) = ms' ->
-                      add_ptrs_to_frame_stack (snd ms) ptrs (snd ms').
+                      add_ptrs_to_frame_stack (memory_stack_frame_stack ms) ptrs (memory_stack_frame_stack ms').
                   Proof.
                     induction ptrs;
                       intros ms ms' ADD_ALL.
@@ -4667,25 +4774,29 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       split.
                       + eapply IHptrs.
                         reflexivity.
-                      + destruct ms as [m fs].
-                        destruct ms' as [m' fs'].
+                      + destruct ms as [m fs h].
+                        destruct ms' as [m' fs' h'].
                         cbn.
 
                         apply add_all_to_frame_cons_inv in ADD_ALL.
                         destruct ADD_ALL as [ms' [ADD ADD_ALL]].
 
-                        destruct (add_all_to_frame (m, fs) (map ptr_to_int ptrs)) eqn:ADD_ALL'.
+                        destruct (add_all_to_frame (mkMemoryStack m fs h) (map ptr_to_int ptrs)) eqn:ADD_ALL'.
                         cbn.
 
-                        assert (add_to_frame (m0, f) (ptr_to_int a) = add_to_frame (m0, f) (ptr_to_int a)) as ADD' by reflexivity.
+                        rename memory_stack_memory0 into m0.
+                        rename memory_stack_frame_stack0 into f.
+                        rename memory_stack_heap0 into h0.
+
+                        assert (add_to_frame (mkMemoryStack m0 f h0) (ptr_to_int a) = add_to_frame (mkMemoryStack m0 f h0) (ptr_to_int a)) as ADD' by reflexivity.
                         pose proof (add_all_to_frame_cons_swap _ _ _ _ _ _ _ ADD ADD_ALL ADD_ALL' ADD') as EQV.
                         cbn in EQV.
                         rewrite EQV.
                         destruct f.
-                        * replace (Singleton f) with (snd (m0, Singleton f)) by reflexivity.
+                        * replace (Singleton f) with (memory_stack_frame_stack (mkMemoryStack m0 (Singleton f) h0)) by reflexivity.
                           eapply add_to_frame_correct.
                           reflexivity.
-                        * replace (Snoc f f0) with (snd (m0, Snoc f f0)) by reflexivity.
+                        * replace (Snoc f f0) with (memory_stack_frame_stack (mkMemoryStack m0 (Snoc f f0) h0))by reflexivity.
                           eapply add_to_frame_correct.
                           reflexivity.
                   Qed.
@@ -4707,6 +4818,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   eapply add_ptrs_to_frame_eqv; eauto.
                   rewrite <- OLDFS in ADD.
                   auto.
+                - (* Heap preserved *)
+                  solve_heap_preserved.
                 - (* non-void *)
                   auto.
                 - (* Length of init bytes matches up *)
@@ -5068,6 +5181,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
           (* TODO: solve_preserve_allocation_ids *)
           apply preserve_allocation_ids_set_frame_stack.
+        + unfold mem_state_set_frame_stack.
+          solve_heap_preserved.
     Qed.
 
     Lemma mempop_correct :
