@@ -778,7 +778,6 @@ Fixpoint get_index_paths_aux (t_from : typ) (pre_path : list Z) {struct t_from}:
   end.
   Definition get_index_paths_ptr (t_from: typ) : list (typ * list (Z)) :=
     map (fun '(t, path) => (t, [0%Z] ++ path)) (get_index_paths_aux t_from nil).
-Search filter.
   Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
     let edited_path := map (fun '(t, path) => match path with 
                             | hd::tl => (t, tl)
@@ -798,7 +797,6 @@ Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
                         | TYPE_Pointer _ => true
                         | _ => false
   end) ctx.
-Search bool.
 Definition filter_agg_typs (ctx: list (ident * typ)) : list (ident * typ) :=
   filter (fun '(_, t) => match t with 
   | TYPE_Array sz _ => N.ltb 0 sz
@@ -883,6 +881,14 @@ Definition gen_insertelement : GenLLVM (typ * instr typ) :=
   index <- lift_GenLLVM (choose (0,Z.of_N sz));;
   ret (TYPE_Float, INSTR_Op (OP_InsertElement (tvec, EXP_Ident id) (t_in_vec, value) (TYPE_I 32, EXP_Integer index))).
 
+Definition gen_insertvalue : GenLLVM (typ * instr typ) :=
+  ctx <- get_ctx;;
+  let agg_in_context := filter_agg_typs ctx in 
+  '(id, tagg) <- (oneOf_LLVM (map ret agg_in_context));;
+  let paths_in_agg := get_index_paths_agg tagg in
+  '(t, path_for_insertvalue) <- oneOf_LLVM (map ret paths_in_agg);;
+  
+  ret (TYPE_Float, INSTR_Fence).
 
 Definition genTypHelper (n: nat): G (typ) :=
   run_GenLLVM (gen_typ_non_void_size n).
