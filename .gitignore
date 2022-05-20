@@ -26,6 +26,7 @@ src/vellvm
 *.ml~
 examples.mli
 *.gz
+src/ml/extracted
 src/ml/extracted/*.ml
 src/ml/extracted/*.mli
 src/ml/extracted/STAMP
