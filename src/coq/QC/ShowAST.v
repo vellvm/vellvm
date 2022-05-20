@@ -233,6 +233,10 @@ Section ShowInstances.
       let (telt, eexp) := elt in
       let (tidx, iexp) := idx in
       "insertelement " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ show telt ++ " " ++ show_exp eexp ++ ", " ++ show tidx ++ " " ++ show_exp iexp
+      | OP_InsertValue vec elt idxs =>
+      let (tptr, exp) := vec in
+      let (telt, eexp) := elt in 
+      "insertvalue " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ show telt ++ " " ++ show_exp eexp ++ ", " ++ (fold_right (fun x y=> show x ++ ", " ++ y) "" idxs)
       | OP_Select (tc, cnd) (t1, v1) (t2, v2) =>
         "select " ++ show tc ++ " " ++ show_exp cnd ++ ", " ++ show t1 ++ " " ++ show_exp v1  ++ ", " ++ show t2 ++ " " ++ show_exp v2
       | _ => "show_exp todo"

@@ -118,7 +118,6 @@ Section Helpers.
       n <- (arbitrary : G nat);;
       ret (Z.of_nat n).
 End Helpers.
-Check show Decimal.int.
 Section GenerationState.
   Record GenState :=
     mkGenState
@@ -880,12 +879,7 @@ Definition gen_insertelement : GenLLVM (typ * instr typ) :=
   value <- gen_typ_eq_prim_typ t_in_vec;;
   index <- lift_GenLLVM (choose (0,Z.of_N sz));;
   ret (TYPE_Float, INSTR_Op (OP_InsertElement (tvec, EXP_Ident id) (t_in_vec, value) (TYPE_I 32, EXP_Integer index))).
-Search list.
-Search N.
-Search map.
-Search seq.
-Search GenLLVM.
-Print vectorOf_LLVM.
+
 Fixpoint gen_typ_eq (t: typ): GenLLVM (exp typ) :=
   match t with 
   | TYPE_Array sz ty => 
@@ -896,7 +890,17 @@ Fixpoint gen_typ_eq (t: typ): GenLLVM (exp typ) :=
   arr <- vectorOf_LLVM (N.to_nat sz) (gen_typ_eq ty);;
   let new_arr := map (fun ext => (ty, ext)) arr in 
   ret (EXP_Array new_arr)
+  | TYPE_Struct fields => gen_typ_eq_struct fields (ret nil)
+  | TYPE_Packed_struct fields => gen_typ_eq_struct fields (ret nil)
   | _ => gen_typ_eq_prim_typ t
+  end with 
+  gen_typ_eq_struct (fields: list typ) (gFields: GenLLVM (list (typ * exp typ))) {struct fields} : GenLLVM (exp typ):=
+  match fields with 
+  | nil => l <- gFields;;
+  ret (EXP_Array l)
+  | hd::tl => l <- gFields;;
+  ex <- gen_typ_eq hd;;
+  gen_typ_eq_struct tl (ret ((hd, ex)::l))
   end.
 
   (*let array := List.seq 0%nat (N.to_nat sz) in 
@@ -907,9 +911,10 @@ Definition gen_insertvalue : GenLLVM (typ * instr typ) :=
   let agg_in_context := filter_agg_typs ctx in 
   '(id, tagg) <- (oneOf_LLVM (map ret agg_in_context));;
   let paths_in_agg := get_index_paths_agg tagg in
-  '(t, path_for_insertvalue) <- oneOf_LLVM (map ret paths_in_agg);;
+  '(tsub, path_for_insertvalue) <- oneOf_LLVM (map ret paths_in_agg);;
+  ex <- gen_typ_eq tsub;;
   (* Generate all of the type*)
-  ret (TYPE_Float, INSTR_Fence).
+  ret (TYPE_Float, INSTR_Op (OP_InsertValue (tagg, EXP_Ident id) (tsub, ex) path_for_insertvalue)).
 
 Definition genTypHelper (n: nat): G (typ) :=
   run_GenLLVM (gen_typ_non_void_size n).
@@ -1119,7 +1124,6 @@ Section InstrGenerators.
      The type is sometimes void for instructions that don't really
      compute a value, like void function calls, stores, etc.
    *)
-  Search list.
   Definition gen_instr : GenLLVM (typ * instr typ) :=
     ctx <- get_ctx;;
     oneOf_LLVM
@@ -1133,7 +1137,7 @@ Section InstrGenerators.
       ; gen_load
       ; gen_store] (* TODO: Generate atomic operations and other instructions *)
       ++ (if negb (seq.nilp (filter_ptr_typs ctx)) then [] else [gen_gep])
-      ++ (if negb (seq.nilp (filter_agg_typs ctx)) then [] else [gen_extractvalue])
+      ++ (if negb (seq.nilp (filter_agg_typs ctx)) then [] else [gen_extractvalue; gen_insertvalue])
       ++ (if negb (seq.nilp (filter_vec_typs ctx)) then [] else [gen_extractelement; gen_insertelement])).
 
   (* TODO: Generate instructions with ids *)
