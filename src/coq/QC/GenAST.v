@@ -914,7 +914,7 @@ Definition gen_insertvalue : GenLLVM (typ * instr typ) :=
   '(tsub, path_for_insertvalue) <- oneOf_LLVM (map ret paths_in_agg);;
   ex <- gen_typ_eq tsub;;
   (* Generate all of the type*)
-  ret (TYPE_Float, INSTR_Op (OP_InsertValue (tagg, EXP_Ident id) (tsub, ex) path_for_insertvalue)).
+  ret (tagg, INSTR_Op (OP_InsertValue (tagg, EXP_Ident id) (tsub, ex) path_for_insertvalue)).
 
 Definition genTypHelper (n: nat): G (typ) :=
   run_GenLLVM (gen_typ_non_void_size n).
