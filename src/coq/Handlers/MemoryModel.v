@@ -1365,9 +1365,16 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   Record add_ptr_to_heap (h1 : Heap) (root : addr) (ptr : addr) (h2 : Heap) : Prop :=
     {
-      old_heap_lu : forall ptr', disjoint_ptr_byte ptr ptr' ->
-                            forall root, ptr_in_heap_prop h1 root ptr' <-> ptr_in_heap_prop h2 root ptr';
-      new_heap_lu : ptr_in_heap_prop h2 root ptr;
+      old_heap_lu : forall ptr', 
+        disjoint_ptr_byte ptr ptr' ->
+        forall root, ptr_in_heap_prop h1 root ptr' <-> ptr_in_heap_prop h2 root ptr';
+
+      old_heap_lu_different_root : forall root', 
+        disjoint_ptr_byte root root' ->
+        forall ptr', ptr_in_heap_prop h1 root' ptr' <-> ptr_in_heap_prop h2 root' ptr';
+
+      new_heap_lu :
+      ptr_in_heap_prop h2 root ptr;
     }.
 
   Fixpoint add_ptrs_to_heap' (h1 : Heap) (root : addr) (ptrs : list addr) (h2 : Heap) : Prop :=
