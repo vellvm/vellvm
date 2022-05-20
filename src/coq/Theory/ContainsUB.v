@@ -169,19 +169,24 @@ Section contains_UB.
         punfold H; red in H.
         dependent induction H.
         punfold EQ; red in EQ.
-        rewrite <- x in EQ.
-        dependent induction EQ.
-        + eapply FindUB.
+        genobs t2 ot2. genobs y oy. clear t2 Heqot2.
+        revert y Heqoy.
+
+        induction EQ; try solve [inv x]; intros.
+        + subst. inv x.
+          dependent destruction H1.
+          eapply FindUB.
           pfold; red.
-          rewrite <- x.
+          rewrite <- Heqoy.
           cbn.
           econstructor; intros [].
-        + eapply CrawlTau with (t1:=t0).
-          pfold; red; rewrite <- x; cbn.
+        + subst.
+          eapply CrawlTau with (t1:=t2).
+          pfold; red; rewrite <- Heqoy; cbn.
           constructor. left.
           apply Reflexive_eqit. typeclasses eauto.
 
-          eapply IHEQ; eauto.          
+          eapply IHEQ; eauto.
     }
 
     { revert x EQ.
@@ -302,19 +307,25 @@ Section contains_UB.
         punfold H; red in H.
         dependent induction H.
         punfold EQ; red in EQ.
-        rewrite <- x in EQ.
-        dependent induction EQ.
-        + eapply FindUB.
+
+        genobs t2 ot2. genobs y oy. clear t2 Heqot2.
+        revert y Heqoy.
+
+        induction EQ; try solve [inv x]; intros.
+        + subst. inv x.
+          dependent destruction H1.
+          eapply FindUB.
           pfold; red.
-          rewrite <- x.
+          rewrite <- Heqoy.
           cbn.
           econstructor; intros [].
-        + eapply CrawlTau with (t1:=t1).
-          pfold; red; rewrite <- x; cbn.
+        + subst.
+          eapply CrawlTau with (t1:=t1).
+          pfold; red; rewrite <- Heqoy; cbn.
           constructor. left.
           apply Reflexive_eqit. typeclasses eauto.
 
-          eapply IHEQ; eauto.          
+          eapply IHEQ; eauto.
     }
 
     Unshelve.
@@ -648,9 +659,12 @@ Section refine_OOM_h_lemmas.
         punfold H; red in H.
         dependent induction H.
         punfold EQ; red in EQ.
-        rewrite <- x in EQ.
-        dependent induction EQ.
+        genobs t2 ot2.
+        clear t2 Heqot2.
 
+        induction EQ; try inv x.
+
+        dependent destruction H1.
         cbn in KS.
         cbn in HTA; red in HTA.
         subst ta.
