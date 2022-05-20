@@ -50,6 +50,13 @@ Section Map_Operations.
   Definition lookup {a} k (m:IntMap a) := IM.find k m.
   Definition empty {a} := @IM.empty a.
 
+  Definition add_with {a b} k (v:a) (def : a -> b) (merge : a -> b -> b) (m:IntMap b) :=
+    match IM.find k m with
+    | None => add k (def v) m
+    | Some elt =>
+        add k (merge v elt) m
+    end.
+
   (* We use two notions of equivalence of maps depending on the type of objects stored.
        When we can get away with Leibniz's equality over the return type, we simply use
        [Equal] that implements extensional equality (and equality of domains).

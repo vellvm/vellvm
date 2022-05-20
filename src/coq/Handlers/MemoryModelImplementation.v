@@ -1435,6 +1435,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Definition initial_frame : Frame :=
       [].
 
+    Definition initial_heap : Heap := IntMaps.empty.
+
     (** ** Fresh key getters *)
 
     (* Get the next key in the memory *)
@@ -1507,6 +1509,23 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Definition add_all_to_frame (m : memory_stack) (ks : list Z) : memory_stack
       := fold_left (fun ms k => add_to_frame ms k) ks m.
 
+    (* Register a ptr with the heap *)
+    Definition add_to_heap (m : memory_stack) (root : Z) (ptr : Z) : memory_stack :=
+      let '(mkMemoryStack m s h) := m in
+      let h' := add_with root ptr ret cons h in
+      mkMemoryStack m s h'.
+
+    (* Register a list of concrete addresses in the heap *)
+    Definition add_all_to_heap' (m : memory_stack) (root : Z) (ks : list Z) : memory_stack
+      := fold_left (fun ms k => add_to_heap ms root k) ks m.
+
+    Definition add_all_to_heap (m : memory_stack) (ks : list Z) : memory_stack
+      := match ks with
+         | [] => m
+         | (root :: _) =>
+             add_all_to_heap' m root ks
+         end.
+
     Lemma add_to_frame_preserves_memory :
       forall ms k,
         memory_stack_memory (add_to_frame ms k) = memory_stack_memory ms.
@@ -1515,11 +1534,27 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       destruct fs; auto.
     Qed.
 
+    Lemma add_to_heap_preserves_memory :
+      forall ms root k,
+        memory_stack_memory (add_to_heap ms root k) = memory_stack_memory ms.
+    Proof.
+      intros [m fs] root k.
+      destruct fs; auto.
+    Qed.
+
     Lemma add_to_frame_preserves_heap :
       forall ms k,
         memory_stack_heap (add_to_frame ms k) = memory_stack_heap ms.
     Proof.
       intros [m fs] k.
+      destruct fs; auto.
+    Qed.
+
+    Lemma add_to_heap_preserves_frame_stack :
+      forall ms root k,
+        memory_stack_frame_stack (add_to_heap ms root k) = memory_stack_frame_stack ms.
+    Proof.
+      intros [m fs] root k.
       destruct fs; auto.
     Qed.
 
@@ -1535,6 +1570,27 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       auto.
     Qed.
 
+    Lemma add_all_to_heap'_preserves_memory :
+      forall ms root ks,
+        memory_stack_memory (add_all_to_heap' ms root ks) = memory_stack_memory ms.
+    Proof.
+      intros ms root ks; revert ms root;
+        induction ks; intros ms root; auto.
+      specialize (IHks (add_to_heap ms root a) root).
+      cbn in *.
+      unfold add_all_to_heap' in *.
+      rewrite add_to_heap_preserves_memory in IHks.
+      auto.
+    Qed.
+
+    Lemma add_all_to_heap_preserves_memory :
+      forall ms ks,
+        memory_stack_memory (add_all_to_heap ms ks) = memory_stack_memory ms.
+    Proof.
+      intros ms [|a ks]; auto.
+      apply add_all_to_heap'_preserves_memory.
+    Qed.
+
     Lemma add_all_to_frame_preserves_heap :
       forall ms ks,
         memory_stack_heap (add_all_to_frame ms ks) = memory_stack_heap ms.
@@ -1545,6 +1601,26 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       specialize (IHks (add_to_frame ms a)).
       rewrite add_to_frame_preserves_heap in IHks.
       auto.
+    Qed.
+
+    Lemma add_all_to_heap'_preserves_frame_stack :
+      forall ms root ks,
+        memory_stack_frame_stack (add_all_to_heap' ms root ks) = memory_stack_frame_stack ms.
+    Proof.
+      intros ms root ks; revert root ms;
+      induction ks; intros root ms; auto.
+      cbn in *. unfold add_all_to_heap' in IHks.
+      specialize (IHks root (add_to_heap ms root a)).
+      rewrite add_to_heap_preserves_frame_stack in IHks.
+      auto.
+    Qed.
+
+    Lemma add_all_to_heap_preserves_frame_stack :
+      forall ms ks,
+        memory_stack_frame_stack (add_all_to_heap ms ks) = memory_stack_frame_stack ms.
+    Proof.
+      intros ms [|a ks]; auto.
+      apply add_all_to_heap'_preserves_frame_stack.
     Qed.
 
     Lemma add_all_to_frame_nil_preserves_frames :
@@ -1586,6 +1662,33 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           end
       end.
 
+    (** Heap allocation *)
+    Definition malloc_bytes `{MemMonad ExtraState MemM (itree Eff)} (dt : dtyp) (init_bytes : list SByte) : MemM addr :=
+      match dtyp_eq_dec dt DTYPE_Void with
+      | left _ => raise_ub "Allocation of type void"
+      | _ =>
+          let len := length init_bytes in
+          match N.eq_dec (sizeof_dtyp dt) (N.of_nat len) with
+          | right _ => raise_ub "Sizeof dtyp doesn't match number of bytes for initialization in allocation."
+          | _ =>
+              (* TODO: roll this into fresh provenance somehow? *)
+              pr <- fresh_provenance;;
+              sid <- fresh_sid;;
+              ms <- get_mem_state;;
+              let mem_stack := ms_memory_stack ms in
+              let addr := next_memory_key mem_stack in
+              let '(mkMemoryStack mem fs h) := ms_memory_stack ms in
+              let aid := provenance_to_allocation_id pr in
+              let ptr := (int_to_ptr addr (allocation_id_to_prov aid)) in
+              ptrs <- get_consecutive_ptrs ptr (length init_bytes);;
+              let mem' := add_all_index (map (fun b => (b, aid)) init_bytes) addr mem in
+              let mem_stack' := add_all_to_heap (mkMemoryStack mem' fs h) (map ptr_to_int ptrs) in
+              ms' <- get_mem_state;;
+              let pr' := MemState_get_provenance ms' in
+              put_mem_state (mkMemState mem_stack' pr');;
+              ret ptr
+          end
+      end.
 
     (** Frame stacks *)
     (* Check if an address is allocated in a frame *)
@@ -1633,6 +1736,10 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Definition free_frame_memory (f : Frame) (m : memory) : memory :=
       fold_left (fun m key => free_byte key m) f m.
 
+    Definition free_block_memory (block : Block) (m : memory) : memory :=
+      fold_left (fun m key => free_byte key m) block m.
+
+    (** Stack free *)
     Definition mempop `{MemMonad ExtraState MemM (itree Eff)} : MemM unit :=
       ms <- get_mem_state;;
       let '(mkMemoryStack mem fs h) := ms_memory_stack ms in
@@ -1642,6 +1749,21 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       let pr := mem_state_provenance ms in
       let ms' := mkMemState (mkMemoryStack mem' fs' h) pr in
       put_mem_state ms'.
+
+    (** Free from heap *)
+    Definition free `{MemMonad ExtraState MemM (itree Eff)} (ptr : addr) : MemM unit :=
+      ms <- get_mem_state;;
+      let '(mkMemoryStack mem fs h) := ms_memory_stack ms in
+      let raw_addr := ptr_to_int ptr in
+      match lookup raw_addr h with
+      | None => raise_ub "Attempt to free non-heap allocated address."
+      | Some block =>
+          let mem' := free_block_memory block mem in
+          let h' := delete raw_addr h in
+          let pr := mem_state_provenance ms in
+          let ms' := mkMemState (mkMemoryStack mem' fs h') pr in
+          put_mem_state ms'
+      end.
 
     (*** Correctness *)
     (* Import ESID. *)
@@ -5182,7 +5304,16 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           (* TODO: solve_preserve_allocation_ids *)
           apply preserve_allocation_ids_set_frame_stack.
         + unfold mem_state_set_frame_stack.
-          solve_heap_preserved.
+          red.
+          unfold memory_stack_heap_prop. cbn.
+          unfold memory_stack_heap.
+          destruct ms.
+          cbn.
+          unfold MemState_get_memory.
+          unfold mem_state_memory_stack.
+          break_match.
+          cbn.
+          reflexivity.
     Qed.
 
     Lemma mempop_correct :
@@ -5201,7 +5332,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       rewrite MemMonad_run_bind in RUN; auto.
       rewrite MemMonad_get_mem_state in RUN.
       rewrite bind_ret_l in RUN.
-      destruct ms as [[mem fs] pr].
+      destruct ms as [[mem fs h] pr].
       cbn in RUN.
       rewrite MemMonad_run_bind in RUN.
       destruct fs as [f | fs f].
@@ -5366,7 +5497,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             cbn. reflexivity.
 
             eapply free_frame_memory_byte_not_allocated
-              with (ms := mkMemState (mem, Snoc fs f) pr); eauto.
+              with (ms := mkMemState (mkMemoryStack mem (Snoc fs f) h) pr); eauto.
           - (* non_frame_bytes_preserved *)
             intros ptr aid NIN.
 
@@ -5516,7 +5647,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
                 set (aptr := int_to_ptr a nil_prov).
                 erewrite free_byte_byte_disjoint_allocated
-                  with (ptr:=aptr) (ms':= mkMemState (m'', Singleton initial_frame) initial_provenance).
+                  with (ptr:=aptr) (ms':= mkMemState (mkMemoryStack m'' (Singleton initial_frame) initial_heap) initial_provenance).
                 2: {
                   subst aptr. rewrite ptr_to_int_int_to_ptr; eauto.
                 }
@@ -5707,7 +5838,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             + split.
               * (* read_byte_allowed *)
                 eapply free_frame_memory_byte_disjoint_read_byte_allowed
-                  with (ms := mkMemState (mem, Snoc fs f) pr); cbn;
+                  with (ms := mkMemState (mkMemoryStack mem (Snoc fs f) h) pr); cbn;
                   eauto.
                 eapply ptr_nin_current_frame; eauto.
                 all: unfold mem_state_frame_stack_prop; cbn; red; try reflexivity.
@@ -5715,7 +5846,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 inv READ; solve_read_byte_allowed.
               * (* read_byte_prop *)
                 eapply free_frame_memory_byte_disjoint_read_byte_prop
-                  with (ms := mkMemState (mem, Snoc fs f) pr);
+                  with (ms := mkMemState (mkMemoryStack mem (Snoc fs f) h) pr);
                   eauto.
                 eapply ptr_nin_current_frame; eauto.
                 all: unfold mem_state_frame_stack_prop; try solve [cbn; reflexivity].
@@ -5727,10 +5858,10 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               split.
               * (* read_byte_allowed *)
                 eapply free_frame_memory_byte_disjoint_read_byte_allowed
-                  with (ms := mkMemState (mem, Snoc fs f) pr)
+                  with (ms := mkMemState (mkMemoryStack mem (Snoc fs f) h) pr)
                        (ms' := {|
                                 ms_memory_stack :=
-                                (fold_left (fun (m : memory) (key : Iptr) => free_byte key m) f mem, fs);
+                                (mkMemoryStack (fold_left (fun (m : memory) (key : Iptr) => free_byte key m) f mem) fs h);
                                 ms_provenance := pr
                               |});
                   eauto.
@@ -5741,10 +5872,10 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 inv READ; solve_read_byte_allowed.
               * (* read_byte_prop *)
                 eapply free_frame_memory_byte_disjoint_read_byte_prop
-                  with (ms := mkMemState (mem, Snoc fs f) pr)
+                  with (ms := mkMemState (mkMemoryStack mem (Snoc fs f) h) pr)
                        (ms' := {|
                                 ms_memory_stack :=
-                                (fold_left (fun (m : memory) (key : Iptr) => free_byte key m) f mem, fs);
+                                (mkMemoryStack (fold_left (fun (m : memory) (key : Iptr) => free_byte key m) f mem) fs h);
                                 ms_provenance := pr
                               |});
                   eauto.
@@ -5765,9 +5896,11 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             reflexivity.
           - (* mempop_invariants *)
             split.
-            (* preserve_allocation_ids *)
-            red. unfold used_provenance_prop.
-            cbn. reflexivity.
+            + (* preserve_allocation_ids *)
+              red. unfold used_provenance_prop.
+              cbn. reflexivity.
+            + (* heap preserved *)
+              solve_heap_preserved.
         }
     Qed.
 
