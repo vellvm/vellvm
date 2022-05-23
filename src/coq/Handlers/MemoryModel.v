@@ -50,6 +50,8 @@ From Coq Require Import
      RelationClasses
      Wellfounded.
 
+Require Import Morphisms.
+
 Import ListNotations.
 Import ListUtil.
 Import Utils.Monads.
@@ -133,6 +135,9 @@ Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
   #[global] Parameter frame_stack_eqv_Equivalence : Equivalence frame_stack_eqv.
 
   (** Heaps *)
+
+  Parameter root_in_heap_prop : Heap -> addr -> Prop.
+
   (* 1) heap
      2) root pointer
      3) pointer
@@ -144,20 +149,46 @@ Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
   (* Memory stack's heap *)
   Parameter memory_stack_heap_prop : memory_stack -> Heap -> Prop.
 
-  Definition heap_eqv (h h' : Heap) : Prop :=
-    forall root ptr, ptr_in_heap_prop h root ptr <-> ptr_in_heap_prop h' root ptr.
+  Record heap_eqv (h h' : Heap) : Prop :=
+    {
+      heap_roots_eqv : forall root, root_in_heap_prop h root <-> root_in_heap_prop h' root;
+      heap_ptrs_eqv : forall root ptr, ptr_in_heap_prop h root ptr <-> ptr_in_heap_prop h' root ptr;
+    }.
+
+  #[global] Instance root_in_heap_prop_Proper :
+    Proper (heap_eqv ==> eq ==> iff) root_in_heap_prop.
+  Proof.
+    intros h h' HEAPEQ ptr ptr' PTREQ; subst.
+    inv HEAPEQ.
+    eauto.
+  Qed.
+
+  #[global] Instance ptr_in_heap_prop_Proper :
+    Proper (heap_eqv ==> eq ==> eq ==> iff) ptr_in_heap_prop.
+  Proof.
+    intros h h' HEAPEQ root root' ROOTEQ ptr ptr' PTREQ; subst.
+    inv HEAPEQ.
+    eauto.
+  Qed.
 
   #[global] Instance heap_Equivalence : Equivalence heap_eqv.
   Proof.
     split.
-    - intros h root ptr.
-      reflexivity.
+    - intros h; split.
+      + intros root.
+        reflexivity.
+      + intros root ptr.
+        reflexivity.
     - intros h1 h2 EQV.
       firstorder.
-    - intros x y z XY YZ root ptr.
-      split; intros BLOCK.
-      * apply YZ; firstorder.
-      * apply XY; firstorder.
+    - intros x y z XY YZ.
+      split.
+      + intros root.
+        rewrite XY, YZ.
+        reflexivity.
+      + intros root ptr.
+        rewrite XY, YZ.
+        reflexivity.
   Qed.
 
   (** Provenances *)
@@ -1356,8 +1387,18 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     end.
 
   (*** Heap operations *)
-  Definition empty_heap (h : Heap) : Prop :=
-    forall root ptr, ~ ptr_in_heap_prop h root ptr.
+  Record empty_heap (h : Heap) : Prop :=
+    {
+      empty_heap_no_roots : forall root,
+        ~ root_in_heap_prop h root;
+
+      empty_heap_no_ptrs : forall root ptr,
+        ~ ptr_in_heap_prop h root ptr;
+    }.
+
+  Definition root_in_memstate_heap (ms : MemState) (root : addr) : Prop
+    := forall h, memory_stack_heap_prop (MemState_get_memory ms) h ->
+            root_in_heap_prop h root.
 
   Definition ptr_in_memstate_heap (ms : MemState) (root : addr) (ptr : addr) : Prop
     := forall h, memory_stack_heap_prop (MemState_get_memory ms) h ->
@@ -1373,8 +1414,15 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         disjoint_ptr_byte root root' ->
         forall ptr', ptr_in_heap_prop h1 root' ptr' <-> ptr_in_heap_prop h2 root' ptr';
 
+      old_heap_roots : forall root',
+        disjoint_ptr_byte root root' ->
+        root_in_heap_prop h1 root' <-> root_in_heap_prop h2 root';
+
       new_heap_lu :
       ptr_in_heap_prop h2 root ptr;
+
+      new_heap_root :
+      root_in_heap_prop h2 root;
     }.
 
   Fixpoint add_ptrs_to_heap' (h1 : Heap) (root : addr) (ptrs : list addr) (h2 : Heap) : Prop :=
@@ -1628,19 +1676,27 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     { free_block_ptrs_freed :
       forall ptr,
         ptr_in_heap_prop h1 root ptr ->
-        (forall root, ~ ptr_in_heap_prop h2 root ptr);
+        ~ ptr_in_heap_prop h2 root ptr;
+
+      free_block_root_freed :
+      ~ root_in_heap_prop h2 root;
 
       (* TODO: make sure there's no weirdness about multiple roots *)
       free_block_disjoint_preserved :
       forall ptr root',
         disjoint_ptr_byte root root' ->
         ptr_in_heap_prop h1 root' ptr <-> ptr_in_heap_prop h2 root' ptr;
+
+      free_block_disjoint_roots :
+      forall root',
+        disjoint_ptr_byte root root' ->
+        root_in_heap_prop h1 root' <-> root_in_heap_prop h2 root';
     }.
 
   Record free_spec (m1 : MemState) (root : addr) (m2 : MemState) : Prop :=
     { (* ptr being freed was a root *)
       free_was_root :
-      exists ptr, ptr_in_memstate_heap m1 root ptr;
+      root_in_memstate_heap m1 root;
 
       (* all bytes in block are freed. *)
       free_bytes_freed :
@@ -1664,8 +1720,8 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       free_block :
       forall h1 h2,
         memory_stack_heap_prop (MemState_get_memory m1) h1 ->
-        free_block_prop h1 root h2 ->
-        memory_stack_heap_prop (MemState_get_memory m2) h2;
+        memory_stack_heap_prop (MemState_get_memory m2) h2 ->
+        free_block_prop h1 root h2;
 
       (* Invariants *)
       free_invariants : free_operation_invariants m1 m2;

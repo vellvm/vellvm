@@ -1120,20 +1120,49 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
        | Some ptrs => In (ptr_to_int ptr) ptrs
        end.
 
-  Definition heap_eqv (h h' : Heap) : Prop :=
-    forall root ptr, ptr_in_heap_prop h root ptr <-> ptr_in_heap_prop h' root ptr.
+  Definition root_in_heap_prop (h : Heap) (root : addr) : Prop
+    := member (ptr_to_int root) h.
+
+  Record heap_eqv (h h' : Heap) : Prop :=
+    {
+      heap_roots_eqv : forall root, root_in_heap_prop h root <-> root_in_heap_prop h' root;
+      heap_ptrs_eqv : forall root ptr, ptr_in_heap_prop h root ptr <-> ptr_in_heap_prop h' root ptr;
+    }.
+
+  #[global] Instance root_in_heap_prop_Proper :
+    Proper (heap_eqv ==> eq ==> iff) root_in_heap_prop.
+  Proof.
+    intros h h' HEAPEQ ptr ptr' PTREQ; subst.
+    inv HEAPEQ.
+    eauto.
+  Qed.
+
+  #[global] Instance ptr_in_heap_prop_Proper :
+    Proper (heap_eqv ==> eq ==> eq ==> iff) ptr_in_heap_prop.
+  Proof.
+    intros h h' HEAPEQ root root' ROOTEQ ptr ptr' PTREQ; subst.
+    inv HEAPEQ.
+    eauto.
+  Qed.
 
   #[global] Instance heap_Equivalence : Equivalence heap_eqv.
   Proof.
     split.
-    - intros h root ptr.
-      reflexivity.
+    - intros h; split.
+      + intros root.
+        reflexivity.
+      + intros root ptr.
+        reflexivity.
     - intros h1 h2 EQV.
       firstorder.
-    - intros x y z XY YZ root ptr.
-      split; intros BLOCK.
-      * apply YZ; firstorder.
-      * apply XY; firstorder.
+    - intros x y z XY YZ.
+      split.
+      + intros root.
+        rewrite XY, YZ.
+        reflexivity.
+      + intros root ptr.
+        rewrite XY, YZ.
+        reflexivity.
   Qed.
 
   (* Memory stack's heap *)
@@ -1778,7 +1807,52 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       repeat break_match_hyp; subst;
         inv ADD1; inv ADD1'; inv ADD2; inv ADD2'.
 
-      - unfold heap_eqv.
+      - split.
+        { intros root'.
+          unfold root_in_heap_prop.
+          split; intros ROOT.
+          - destruct (Z.eq_dec (ptr_to_int root') root) as [EQR | NEQR].
+            + subst.
+              unfold add_with in *.
+              break_inner_match.
+              { rewrite IP.F.add_eq_o in *; auto.
+                apply member_add_eq.
+              }
+              { rewrite IP.F.add_eq_o in *; auto.
+                apply member_add_eq.
+              }
+            + unfold add_with in *.
+              break_inner_match.
+              { rewrite IP.F.add_eq_o in *; auto.
+                do 2 apply member_add_preserved.
+                do 2 apply member_add_ineq in ROOT; auto.
+              }
+              { rewrite IP.F.add_eq_o in *; auto.
+                do 2 apply member_add_preserved.
+                do 2 apply member_add_ineq in ROOT; auto.
+              }
+          - destruct (Z.eq_dec (ptr_to_int root') root) as [EQR | NEQR].
+            + subst.
+              unfold add_with in *.
+              break_inner_match.
+              { rewrite IP.F.add_eq_o in *; auto.
+                apply member_add_eq.
+              }
+              { rewrite IP.F.add_eq_o in *; auto.
+                apply member_add_eq.
+              }
+            + unfold add_with in *.
+              break_inner_match.
+              { rewrite IP.F.add_eq_o in *; auto.
+                do 2 apply member_add_preserved.
+                do 2 apply member_add_ineq in ROOT; auto.
+              }
+              { rewrite IP.F.add_eq_o in *; auto.
+                do 2 apply member_add_preserved.
+                do 2 apply member_add_ineq in ROOT; auto.
+              }
+        }
+        
         intros root' a.
         unfold ptr_in_heap_prop in *.
         split; intros EQV.
@@ -1926,9 +2000,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Proof.
       unfold Proper, respectful.
       intros x y XY root root' EQR ptr ptr' EQPTR; subst.
-      unfold heap_eqv in XY.
-      unfold ptr_in_heap_prop in *.
-      auto.
+      rewrite XY.
+      reflexivity.
     Qed.
 
     #[global] Instance heap_eqv_add_ptr_to_heap_Proper :
@@ -1950,6 +2023,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           rewrite <- RS.
           rewrite <- XY.
           auto.
+        + intros ptr'0 DISJOINT.
+          rewrite <- RS.
+          rewrite <- XY.
+          auto.
+        + rewrite <- RS.
+          auto.
         + rewrite <- RS.
           auto.
       - destruct ADD as [OLD NEW].
@@ -1961,6 +2040,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         + intros ptr'0 DISJOINT root.
           rewrite RS.
           rewrite XY.
+          auto.
+        + intros root'0 DISJOINT.
+          rewrite XY.
+          rewrite RS.
+          auto.
+        + rewrite RS.
           auto.
         + rewrite RS.
           auto.
@@ -2298,7 +2383,29 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         heap_eqv h1 h2.
     Proof.
       intros ptr root h h1 h2 H1 H2.
-      unfold heap_eqv.
+      split.
+      { intros root0.
+        split; intros ROOT.
+        - inv H1; inv H2.
+          pose proof disjoint_ptr_byte_dec root root0 as [DISJOINT | NDISJOINT].
+          + eapply old_heap_roots1; eauto.
+            eapply old_heap_roots0; eauto.
+          + unfold disjoint_ptr_byte in NDISJOINT.
+            assert (ptr_to_int root = ptr_to_int root0) as EQR by lia.
+            unfold root_in_heap_prop in *.
+            rewrite EQR in *.
+            eapply new_heap_root1.
+        - inv H1; inv H2.
+          pose proof disjoint_ptr_byte_dec root root0 as [DISJOINT | NDISJOINT].
+          + eapply old_heap_roots0; eauto.
+            eapply old_heap_roots1; eauto.
+          + unfold disjoint_ptr_byte in NDISJOINT.
+            assert (ptr_to_int root = ptr_to_int root0) as EQR by lia.
+            unfold root_in_heap_prop in *.
+            rewrite EQR in *.
+            eapply new_heap_root0.
+      }
+
       intros root0 ptr0.
       split; intros IN.
       - eapply add_ptr_to_heap_inv with (f := h) (ptr := ptr) (root := root) in IN.
@@ -2438,7 +2545,35 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       unfold Proper, respectful.
       intros a b EQKEY p1 p2 EQPTR h1 h2 EQHEAP; subst.
       unfold add_with.
-      unfold heap_eqv in *.
+      split.
+      { intros root.
+        inv EQHEAP.
+        unfold root_in_heap_prop in *.
+        break_match;
+          break_match.
+        - destruct (Z.eq_dec (ptr_to_int root ) b) as [EQR | NEQR]; subst.
+          + split; intros ROOT; apply member_add_eq.
+          + split; intros ROOT;
+              apply member_add_ineq in ROOT; auto;
+              apply member_add_preserved; firstorder.
+        - destruct (Z.eq_dec (ptr_to_int root ) b) as [EQR | NEQR]; subst.
+          + split; intros ROOT; apply member_add_eq.
+          + split; intros ROOT;
+              apply member_add_ineq in ROOT; auto;
+              apply member_add_preserved; firstorder.
+        - destruct (Z.eq_dec (ptr_to_int root ) b) as [EQR | NEQR]; subst.
+          + split; intros ROOT; apply member_add_eq.
+          + split; intros ROOT;
+              apply member_add_ineq in ROOT; auto;
+              apply member_add_preserved; firstorder.
+        - destruct (Z.eq_dec (ptr_to_int root ) b) as [EQR | NEQR]; subst.
+          + split; intros ROOT; apply member_add_eq.
+          + split; intros ROOT;
+              apply member_add_ineq in ROOT; auto;
+              apply member_add_preserved; firstorder.
+      }
+
+      destruct EQHEAP as [_ EQHEAP].
       unfold ptr_in_heap_prop in *.
       cbn in *.
       intros root ptr.
@@ -2577,6 +2712,16 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         + rewrite RS.
           rewrite TU.
           auto.
+    Qed.
+
+    #[global] Instance member_ptr_to_int_heap_eqv_Proper :
+      Proper ((fun p1 p2 => ptr_to_int p1 = ptr_to_int p2) ==> heap_eqv ==> iff) (fun p => member (ptr_to_int p)).
+    Proof.
+      intros p1 p2 PTREQ h1 h2 HEAPEQ; subst.
+      inv HEAPEQ.
+      unfold root_in_heap_prop in *.
+      rewrite PTREQ.
+      auto.          
     Qed.
 
     Lemma add_all_to_frame_cons_swap :
@@ -2911,6 +3056,18 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         + unfold ptr_in_heap_prop.
           rewrite IP.F.add_neq_o; auto.
           reflexivity.
+      - intros root' DISJOINT.
+        inv ADD.
+        destruct ms as [mem fs h].
+        cbn.
+        unfold add_with.
+        break_match.
+        + unfold root_in_heap_prop.
+          rewrite member_add_ineq; auto.
+          reflexivity.
+        + unfold root_in_heap_prop.
+          rewrite member_add_ineq; auto.
+          reflexivity.
       - (* New *)
         destruct ms as [mem fs h].
         unfold add_to_heap in *.
@@ -2923,6 +3080,17 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         break_inner_match.
         -- rewrite IP.F.add_eq_o; firstorder.
         -- rewrite IP.F.add_eq_o; firstorder.
+      - destruct ms as [mem fs h].
+        unfold add_to_heap in *.
+        unfold root_in_heap_prop in *.
+        cbn in *.
+        inv ADD.
+        cbn.
+
+        unfold add_with.
+        break_inner_match.
+        -- rewrite member_add_eq; firstorder.
+        -- rewrite member_add_eq; firstorder.
     Qed.
 
     Lemma add_all_to_heap'_correct :
@@ -7366,6 +7534,23 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       cbn; split; auto.
     Qed.
 
+    Lemma free_block_memory_cons :
+      forall block m m' a,
+        free_block_memory (a :: block) m = m' ->
+        exists m'',
+          free_byte a m  = m'' /\
+            free_block_memory block m'' = m'.
+    Proof.
+      intros f m m' a FREE.
+      rewrite list_cons_app in FREE.
+      unfold free_block_memory in *.
+      rewrite fold_left_app in FREE.
+      set (m'' := fold_left (fun (m : memory) (key : Iptr) => free_byte key m) [a] m).
+      exists m''.
+      subst m''.
+      cbn; split; auto.
+    Qed.
+
     Lemma free_byte_no_add :
       forall m m' ptr ptr',
         read_byte_raw m ptr = None ->
@@ -7398,6 +7583,15 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         eauto.
     Qed.
 
+    Lemma free_block_memory_no_add :
+      forall block m m' ptr,
+        read_byte_raw m ptr = None ->
+        free_block_memory block m = m' ->
+        read_byte_raw m' ptr = None.
+    Proof.
+      apply free_frame_memory_no_add.
+    Qed.
+
     Lemma free_frame_memory_read_byte_raw :
       forall (f : Frame) (m m' : memory) ptr,
         free_frame_memory f m = m' ->
@@ -7416,6 +7610,26 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           eapply free_frame_memory_no_add; eauto.
           eapply free_byte_read_byte_raw; eauto.
         + eapply IHf; eauto.
+    Qed.
+
+    Lemma free_block_memory_read_byte_raw :
+      forall (block : Block) (m m' : memory) ptr,
+        free_block_memory block m = m' ->
+        In (ptr_to_int ptr) block ->
+        read_byte_raw m' (ptr_to_int ptr) = None.
+    Proof.
+      induction block;
+        intros m m' ptr FREE IN.
+
+      - inv IN.
+      - apply free_block_memory_cons in FREE.
+        destruct FREE as [m'' [FREEBYTE FREE]].
+
+        destruct IN as [IN | IN].
+        + subst a.
+          eapply free_block_memory_no_add; eauto.
+          eapply free_byte_read_byte_raw; eauto.
+        + eapply IHblock; eauto.
     Qed.
 
     Lemma free_byte_byte_not_allocated :
@@ -7448,6 +7662,28 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         byte_not_allocated ms' ptr.
     Proof.
       intros ms ms' m m' f ptr FREE IN MS MS'.
+      intros aid CONTRA.
+      break_byte_allocated_in CONTRA.
+      cbn in CONTRA.
+      break_match; [|inv CONTRA; inv H1].
+      break_match. subst.
+
+      symmetry in MS'.
+      eapply free_frame_memory_read_byte_raw in MS'; eauto.
+      unfold mem_state_memory in *.
+      rewrite Heqo in MS'.
+      inv MS'.
+    Qed.
+
+    Lemma free_block_memory_byte_not_allocated :
+      forall (ms ms' : MemState) (m m' : memory) block (ptr : addr),
+        free_block_memory block m = m' ->
+        In (ptr_to_int ptr) block ->
+        mem_state_memory ms = m ->
+        mem_state_memory ms' = m' ->
+        byte_not_allocated ms' ptr.
+    Proof.
+      intros ms ms' m m' block ptr FREE IN MS MS'.
       intros aid CONTRA.
       break_byte_allocated_in CONTRA.
       cbn in CONTRA.
@@ -7623,6 +7859,40 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         firstorder.
     Qed.
 
+    Lemma free_block_memory_byte_disjoint_allocated :
+      forall block (ms ms' : MemState) (m m' : memory) (ptr : addr) aid,
+        free_block_memory block m = m' ->
+        ~In (ptr_to_int ptr) block ->
+        mem_state_memory ms = m ->
+        mem_state_memory ms' = m' ->
+        byte_allocated ms ptr aid <-> byte_allocated ms' ptr aid.
+    Proof.
+      induction block;
+        intros ms ms' m m' ptr aid FREE NIN MS MS'.
+      - inv FREE.
+        cbn in H0.
+        eapply byte_allocated_mem_state_refl; eauto.
+      - apply free_block_memory_cons in FREE.
+        destruct FREE as [m'' [FREEBYTE FREE]].
+
+        set (aptr := int_to_ptr a nil_prov).
+        erewrite free_byte_byte_disjoint_allocated
+          with (ptr:=aptr) (ms':= mkMemState (mkMemoryStack m'' (Singleton initial_frame) initial_heap) initial_provenance).
+        2: {
+          subst aptr. rewrite ptr_to_int_int_to_ptr; eauto.
+        }
+        all: eauto.
+        2: {
+          subst aptr.
+          unfold disjoint_ptr_byte.
+          rewrite ptr_to_int_int_to_ptr.
+          firstorder.
+        }
+
+        eapply IHblock; eauto.
+        firstorder.
+    Qed.
+
     Lemma peek_frame_stack_prop_frame_eqv :
       forall fs f f',
         peek_frame_stack_prop fs f ->
@@ -7719,6 +7989,38 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         erewrite free_frame_memory_byte_disjoint_allocated; eauto.
     Qed.
 
+    Lemma free_block_memory_byte_disjoint_read_byte_allowed :
+      forall block (ms ms' : MemState) (m m' : memory) (ptr : addr),
+        free_block_memory block m = m' ->
+        ~In (ptr_to_int ptr) block ->
+        mem_state_memory ms = m ->
+        mem_state_memory ms' = m' ->
+        read_byte_allowed ms ptr <-> read_byte_allowed ms' ptr.
+    Proof.
+      intros block ms ms' m m' ptr FREE DISJOINT MS MS'.
+      split; intro READ.
+      - destruct ms as [[ms fs h] pr].
+        cbn in *.
+        unfold read_byte_allowed in *.
+        destruct READ as [aid READ].
+        destruct READ as [READ ALLOWED].
+        exists aid.
+        split; eauto.
+        subst ms.
+
+        erewrite <- free_block_memory_byte_disjoint_allocated; eauto.
+      - destruct ms as [[ms fs] pr].
+        cbn in *.
+        unfold read_byte_allowed in *.
+        destruct READ as [aid READ].
+        destruct READ as [READ ALLOWED].
+        exists aid.
+        split; eauto.
+        subst ms.
+
+        erewrite free_frame_memory_byte_disjoint_allocated; eauto.
+    Qed.
+
     Lemma free_byte_byte_disjoint_read_byte_prop :
       forall (ms ms' : MemState) (m m' : memory) (ptr ptr' : addr) byte,
         free_byte (ptr_to_int ptr) m = m' ->
@@ -7786,6 +8088,41 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         break_match.
         all: tauto.
     Qed.
+
+    Lemma free_block_memory_byte_disjoint_read_byte_prop :
+      forall block (ms ms' : MemState) (m m' : memory) (ptr : addr) byte,
+        free_block_memory block m = m' ->
+        ~In (ptr_to_int ptr) block ->
+        mem_state_memory ms = m ->
+        mem_state_memory ms' = m' ->
+        read_byte_prop ms ptr byte <-> read_byte_prop ms' ptr byte.
+    Proof.
+      intros block ms ms' m m' ptr byte FREE DISJOINT MS MS'.
+      split; intro READ.
+      - destruct ms as [[ms fs h] pr].
+        cbn in *.
+        destruct READ as [ms'' [ms''' [[EQ1 EQ2] READ]]]; subst.
+        repeat eexists.
+        cbn in *.
+        unfold mem_state_memory in *.
+        rewrite MS'.
+        erewrite free_frame_memory_disjoint; eauto.
+        break_match.
+        break_match.
+        all: tauto.
+      - destruct ms as [[ms fs] pr].
+        cbn in *.
+        destruct READ as [ms'' [ms''' [[EQ1 EQ2] READ]]]; subst.
+        repeat eexists.
+        cbn in *.
+        unfold mem_state_memory in *.
+        rewrite MS' in READ.
+        erewrite free_frame_memory_disjoint in READ; eauto.
+        break_match.
+        break_match.
+        all: tauto.
+    Qed.
+
 
     Lemma mempop_correct :
       exec_correct mempop mempop_spec_MemPropT.
@@ -7920,6 +8257,264 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         }
     Qed.
 
+    Lemma free_correct :
+      forall ptr,
+        exec_correct (free ptr) (free_spec_MemPropT ptr).
+    Proof.
+      unfold exec_correct.
+      intros ptr ms st VALID.
+
+      (* Need to determine if `ptr` is a root in the heap... If not,
+         UB has occurred.
+       *)
+
+      destruct ms as [[mem fs h] pr].
+      destruct (member (ptr_to_int ptr) h) eqn:ROOTIN.
+
+      2: { (* UB, ptr not a root of the heap *)
+        left.
+        eexists.
+        cbn.
+        intros m2 FREE.
+        inv FREE.
+        unfold root_in_memstate_heap in *.
+        specialize (free_was_root0 h).
+        forward free_was_root0.
+        cbn. red. cbn. reflexivity.
+        unfold root_in_heap_prop in free_was_root0.
+        rewrite ROOTIN in free_was_root0.
+        inv free_was_root0.
+      }
+      
+      pose proof (member_lookup _ _ ROOTIN) as (block & FINDPTR).
+      right.
+      cbn.
+      split; [do 2 exists ""%string; auto|].
+      split; [do 2 exists ""%string; auto|].
+
+      intros st' ms' [] RUN.
+      unfold free in RUN.
+      rewrite MemMonad_run_bind in RUN; auto.
+      rewrite MemMonad_get_mem_state in RUN.
+      rewrite bind_ret_l in RUN.
+      cbn in RUN.
+      rewrite FINDPTR in RUN.
+      rewrite MemMonad_put_mem_state in RUN.
+      eapply eq1_ret_ret in RUN; [| typeclasses eauto].
+      inv RUN.
+
+      (* Proof of free_spec *)
+      split.
+      - (* free_was_root *)
+        red.
+        intros h0 HEAP.
+        cbn in *.
+        red.
+        unfold memory_stack_heap_prop in HEAP.
+        cbn in HEAP.
+        eapply member_ptr_to_int_heap_eqv_Proper.
+        reflexivity.
+        symmetry; eauto.
+        eauto.
+      (* - (* free_removes_root *) *)
+      (*   intros CONTRA. *)
+      (*   red in CONTRA. *)
+      (*   cbn in CONTRA. *)
+      (*   specialize (CONTRA (delete (ptr_to_int ptr) h)). *)
+      (*   forward CONTRA. *)
+      (*   { unfold memory_stack_heap_prop; reflexivity. *)
+      (*   } *)
+
+      (*   unfold root_in_heap_prop in *. *)
+      (*   unfold member, delete in *. *)
+      (*   rewrite IP.F.remove_eq_b in CONTRA; auto; inv CONTRA. *)
+      - (* free_bytes_freed *)
+        (* TODO : solve_byte_not_allocated? *)
+        intros ptr0 HEAP.
+        red in HEAP.
+        cbn in HEAP.
+        specialize (HEAP h).
+        forward HEAP.
+        { unfold memory_stack_heap_prop; reflexivity.
+        }
+
+        unfold byte_not_allocated.
+        intros aid ALLOCATED.
+
+        unfold ptr_in_heap_prop in HEAP.
+        break_match_hyp; try inv HEAP.
+        unfold lookup in FINDPTR.
+        rewrite FINDPTR in Heqo; inv Heqo.
+
+        eapply free_block_memory_byte_not_allocated
+          with (ms := mkMemState (mkMemoryStack mem fs h) pr); eauto.
+
+        cbn.
+        reflexivity.
+
+      - (* free_non_block_bytes_preserved *)
+        intros ptr0 aid NIN.
+
+        eapply free_block_memory_byte_disjoint_allocated; cbn; eauto.
+        { unfold ptr_in_memstate_heap in *.
+          cbn in *.
+          intros IN.
+          apply NIN.
+          intros h0 H0.
+          red in H0.
+          cbn in H0.
+          rewrite <- H0.
+          red.
+          unfold lookup in FINDPTR.
+          rewrite FINDPTR; auto.
+        }        
+      - (* free_non_frame_bytes_read *)
+        intros ptr0 byte NIN.
+
+        split; intros READ.
+        + split.
+          * (* read_byte_allowed *)
+            eapply free_block_memory_byte_disjoint_read_byte_allowed
+              with (ms := mkMemState (mkMemoryStack mem fs h) pr); cbn;
+              eauto.
+            { unfold ptr_in_memstate_heap in *.
+              cbn in *.
+              intros IN.
+              apply NIN.
+              intros h0 H0.
+              red in H0.
+              cbn in H0.
+              rewrite <- H0.
+              red.
+              unfold lookup in FINDPTR.
+              rewrite FINDPTR; auto.
+            }
+            inv READ; solve_read_byte_allowed.
+          * (* read_byte_prop *)
+            eapply free_block_memory_byte_disjoint_read_byte_prop
+              with (ms := mkMemState (mkMemoryStack mem fs h) pr);
+              eauto.
+            { unfold ptr_in_memstate_heap in *.
+              cbn in *.
+              intros IN.
+              apply NIN.
+              intros h0 H0.
+              red in H0.
+              cbn in H0.
+              rewrite <- H0.
+              red.
+              unfold lookup in FINDPTR.
+              rewrite FINDPTR; eauto.
+            }
+            inv READ; solve_read_byte_prop.
+            inv READ; solve_read_byte_prop.
+        + (* read_byte_spec *)
+          split.
+          * (* read_byte_allowed *)
+            eapply free_block_memory_byte_disjoint_read_byte_allowed
+              with (ms := mkMemState (mkMemoryStack mem fs h) pr)
+                   (ms' := {|
+                            ms_memory_stack :=
+                            mkMemoryStack (free_block_memory block mem) fs (delete (ptr_to_int ptr) h);
+                            ms_provenance := pr
+                          |});
+              eauto.
+            { unfold ptr_in_memstate_heap in *.
+              cbn in *.
+              intros IN.
+              apply NIN.
+              intros h0 H0.
+              red in H0.
+              cbn in H0.
+              rewrite <- H0.
+              red.
+              unfold lookup in FINDPTR.
+              rewrite FINDPTR; eauto.
+            }
+            all: unfold mem_state_frame_stack_prop; try solve [cbn; reflexivity].
+            inv READ; solve_read_byte_allowed.
+          * (* read_byte_prop *)
+            eapply free_frame_memory_byte_disjoint_read_byte_prop
+              with (ms := mkMemState (mkMemoryStack mem fs h) pr)
+                   (ms' := {|
+                            ms_memory_stack :=
+                            mkMemoryStack (free_block_memory block mem) fs (delete (ptr_to_int ptr) h);
+                            ms_provenance := pr
+                          |});
+              eauto.
+            { unfold ptr_in_memstate_heap in *.
+              cbn in *.
+              intros IN.
+              apply NIN.
+              intros h0 H0.
+              red in H0.
+              cbn in H0.
+              rewrite <- H0.
+              red.
+              unfold lookup in FINDPTR.
+              rewrite FINDPTR; eauto.
+            }
+            all: unfold mem_state_frame_stack_prop; try solve [cbn; reflexivity].
+            inv READ; solve_read_byte_prop.
+      - (* free_block *)
+        intros h1 h2 HEAP1 HEAP2.
+        cbn in *.
+        unfold memory_stack_heap_prop in *.
+        cbn in *.
+        split.
+        + (* free_block_ptrs_freed *)
+          intros ptr0 IN CONTRA.
+          inv HEAP2.
+          apply heap_ptrs_eqv0 in CONTRA.
+          unfold ptr_in_heap_prop in *.
+          break_match_hyp; try inv CONTRA.
+          unfold delete in *.
+          rewrite IP.F.remove_eq_o in Heqo; auto; inv Heqo.
+        + (* free_block_root_freed *)
+          intros CONTRA.
+          inv HEAP2.
+          apply heap_roots_eqv0 in CONTRA.
+          unfold root_in_heap_prop in *.
+          unfold member, delete in *.
+          rewrite IP.F.remove_eq_b in CONTRA; auto; inv CONTRA.
+        + (* free_block_disjoint_preserved *)
+          intros ptr0 root' DISJOINT.
+          split; intros IN.
+          * apply HEAP2.
+            unfold ptr_in_heap_prop.
+            unfold delete.
+            rewrite IP.F.remove_neq_o; auto.
+            apply HEAP1; auto.
+          * apply HEAP2 in IN.
+            unfold ptr_in_heap_prop in IN.
+            unfold delete in IN.
+            rewrite IP.F.remove_neq_o in IN; auto.
+            apply HEAP1 in IN; auto.
+        + (* free_block_disjoint_roots *)
+          intros root' DISJOINT.
+          split; intros IN.
+          * apply HEAP2.
+            unfold root_in_heap_prop.
+            unfold delete.
+            rewrite IP.F.remove_neq_b; auto.
+            apply HEAP1; auto.
+          * apply HEAP2 in IN.
+            unfold root_in_heap_prop in IN.
+            unfold delete in IN.
+            rewrite IP.F.remove_neq_b in IN; auto.
+            apply HEAP1 in IN; auto.
+      - (* free_invariants *)
+        split.
+        + (* Allocation ids preserved *)
+          red. unfold used_provenance_prop.
+          cbn. reflexivity.
+        + (* Framestack preserved *)
+          solve_frame_stack_preserved.
+
+          Unshelve.
+          all: exact ""%string.
+    Qed.
+
     (*** Initial memory state *)
     Record initial_memory_state_prop : Prop :=
       {
@@ -7929,8 +8524,13 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
         initial_memory_frame_stack :
         forall fs,
-          mem_state_frame_stack_prop initial_memory_state fs ->
+          memory_stack_frame_stack_prop (MemState_get_memory initial_memory_state) fs ->
           empty_frame_stack fs;
+
+        initial_memory_heap :
+        forall h,
+          memory_stack_heap_prop (MemState_get_memory initial_memory_state) h ->
+          empty_heap h;
 
         initial_memory_no_reads :
         forall ptr byte,
@@ -7942,8 +8542,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         initial_frame_is_empty : empty_frame initial_frame;
       }.
 
+    Record initial_heap_prop : Prop :=
+      {
+        initial_heap_is_empty : empty_heap initial_heap;
+      }.
+
     Parameter initial_memory_state_correct : initial_memory_state_prop.
     Parameter initial_frame_correct : initial_frame_prop.
+    Parameter initial_heap_correct : initial_heap_prop.
   End MemoryPrimatives.
 
 End FiniteMemoryModelExecPrimitives.
