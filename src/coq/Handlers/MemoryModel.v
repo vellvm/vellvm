@@ -2024,7 +2024,7 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
     Parameter mempop_correct :
       exec_correct mempop mempop_spec_MemPropT.
 
-    Parameter malloc_correct :
+    Parameter malloc_bytes_correct :
       forall dt init_bytes,
         exec_correct (malloc_bytes dt init_bytes) (malloc_bytes_spec_MemPropT dt init_bytes).
 

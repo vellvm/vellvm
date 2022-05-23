@@ -2005,6 +2005,58 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           reflexivity.
     Qed.
 
+    #[global] Instance heap_eqv_add_ptrs_to_heap'_Proper :
+      Proper (heap_eqv ==> eq ==> eq ==> heap_eqv ==> iff) add_ptrs_to_heap'.
+    Proof.
+      unfold Proper, respectful.
+      intros x y XY root root' ROOTS ptrs ptrs' TU r s RS; subst.
+
+      split; intros ADD.
+      - revert x y XY r s RS ADD.
+        induction ptrs' as [|a ptrs];
+          intros x y XY r s RS ADD;
+          subst.
+        + cbn in *; subst.
+          rewrite <- XY.
+          rewrite <- RS.
+          auto.
+        + cbn in *.
+          destruct ADD as [h' [ADDPTRS ADD]].
+          eexists.
+          rewrite <- RS; split; eauto.
+
+          eapply IHptrs; eauto.
+          reflexivity.
+      - revert x y XY r s RS ADD.
+        induction ptrs' as [|a ptrs];
+          intros x y XY r s RS ADD;
+          subst.
+        + cbn in *; subst.
+          rewrite XY.
+          rewrite RS.
+          auto.
+        + cbn in *.
+          destruct ADD as [h' [ADDPTRS ADD]].
+          eexists.
+          rewrite RS; split; eauto.
+
+          eapply IHptrs; eauto.
+          reflexivity.
+    Qed.
+
+    #[global] Instance heap_eqv_add_ptrs_to_heap_Proper :
+      Proper (heap_eqv ==> eq ==> heap_eqv ==> iff) add_ptrs_to_heap.
+    Proof.
+      unfold Proper, respectful.
+      intros x y XY ptrs ptrs' TU r s RS; subst.
+      destruct ptrs'.
+      - cbn. rewrite XY, RS.
+        reflexivity.
+      - unfold add_ptrs_to_heap.
+        rewrite XY, RS.
+        reflexivity.
+    Qed.
+
     (* TODO: move this? *)
     Lemma disjoint_ptr_byte_dec :
       forall p1 p2,
@@ -2848,7 +2900,17 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             -- rewrite IP.F.add_neq_o in IN; firstorder.
       - (* Disjoint roots *)
         intros root' H0 ptr'.
-        
+        inv ADD.
+        destruct ms as [mem fs h].
+        cbn.
+        unfold add_with.
+        break_match.
+        + unfold ptr_in_heap_prop.
+          rewrite IP.F.add_neq_o; auto.
+          reflexivity.
+        + unfold ptr_in_heap_prop.
+          rewrite IP.F.add_neq_o; auto.
+          reflexivity.
       - (* New *)
         destruct ms as [mem fs h].
         unfold add_to_heap in *.
@@ -7158,16 +7220,15 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
                   match goal with
                   | H: _ |- context [ add_all_to_heap ?ms (map ptr_to_int ?ptrs) ] =>
-                      pose proof (add_all_to_frame_correct ptrs ms (add_all_to_frame ms (map ptr_to_int ptrs))) as ADDPTRS
+                      pose proof (add_all_to_heap_correct ptrs ms (add_all_to_heap ms (map ptr_to_int ptrs))) as ADDPTRS
                   end.
 
                   forward ADDPTRS; [reflexivity|].
 
                   eapply add_ptrs_to_heap_eqv; eauto.
-                  rewrite <- OLDFS in ADD.
+                  unfold memory_stack_heap_prop in OLDHEAP.
+                  rewrite <- OLDHEAP in ADD.
                   auto.
-                - (* Heap preserved *)
-                  solve_heap_preserved.
                 - (* non-void *)
                   auto.
                 - (* Length of init bytes matches up *)
