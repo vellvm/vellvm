@@ -2105,9 +2105,9 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
           memory_stack_heap_prop (MemState_get_memory initial_memory_state) h ->
           empty_heap h;
 
-        initial_memory_no_reads :
+        initial_memory_read_ub :
         forall ptr byte,
-          ~ read_byte_prop initial_memory_state ptr byte
+          read_byte_prop initial_memory_state ptr byte
       }.
 
     Record initial_frame_prop : Prop :=

@@ -7503,6 +7503,18 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Qed.
 
     (* TODO: move *)
+    Lemma read_byte_raw_memory_empty :
+      forall ptr,
+        read_byte_raw memory_empty ptr = None.
+    Proof.
+      intros ptr.
+      Transparent read_byte_raw.
+      unfold read_byte_raw.
+      Opaque read_byte_raw.
+      unfold memory_empty.
+      apply IP.F.empty_o.
+    Qed.
+
     Lemma free_byte_read_byte_raw :
       forall m m' ptr,
         free_byte ptr m = m' ->
@@ -8532,9 +8544,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           memory_stack_heap_prop (MemState_get_memory initial_memory_state) h ->
           empty_heap h;
 
-        initial_memory_no_reads :
+        initial_memory_read_ub :
         forall ptr byte,
-          ~ read_byte_prop initial_memory_state ptr byte
+          read_byte_prop initial_memory_state ptr byte
       }.
 
     Record initial_frame_prop : Prop :=
@@ -8547,9 +8559,136 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         initial_heap_is_empty : empty_heap initial_heap;
       }.
 
-    Parameter initial_memory_state_correct : initial_memory_state_prop.
-    Parameter initial_frame_correct : initial_frame_prop.
-    Parameter initial_heap_correct : initial_heap_prop.
+    Lemma initial_frame_correct : initial_frame_prop.
+    Proof.
+      split.
+      apply initial_frame_empty.
+    Qed.
+
+    Lemma initial_heap_correct : initial_heap_prop.
+    Proof.
+      split.
+      split.
+      - intros root.
+        unfold initial_heap.
+        unfold root_in_heap_prop.
+        intros CONTRA.
+        rewrite IP.F.empty_a in CONTRA.
+        inv CONTRA.
+      - intros ptr.
+        unfold initial_heap.
+        cbn.
+        auto.
+    Qed.
+
+    (* TODO: move this? *)
+    #[global] Instance empty_frame_stack_Proper :
+      Proper (frame_stack_eqv ==> iff) empty_frame_stack.
+    Proof.
+      intros fs' fs FS.
+      split; intros [NOPOP EMPTY].
+      - split.
+        + setoid_rewrite <- FS.
+          auto.
+        + setoid_rewrite <- FS.
+          auto.
+      - split.
+        + setoid_rewrite FS.
+          auto.
+        + setoid_rewrite FS.
+          auto.
+    Qed.
+
+    (* TODO: move this? *)
+    #[global] Instance empty_frame_Proper :
+      Proper (frame_eqv ==> iff) empty_frame.
+    Proof.
+      intros f' f F.
+      unfold empty_frame.
+      setoid_rewrite F.
+      reflexivity.
+    Qed.
+
+    (* TODO: move this? *)
+    Lemma empty_frame_nil :
+      empty_frame [].
+    Proof.
+      red.
+      cbn.
+      auto.
+    Qed.
+
+    (* TODO: move this? *)
+    Lemma empty_frame_stack_frame_empty :
+      empty_frame_stack frame_empty.
+    Proof.
+      unfold frame_empty.
+      split.
+      - intros f CONTRA.
+        cbn in *; auto.
+      - intros f CONTRA.
+        cbn in *.
+        rewrite CONTRA.
+        apply empty_frame_nil.
+    Qed.
+
+    (* TODO: move this? *)
+    #[global] Instance empty_heap_Proper :
+      Proper (heap_eqv ==> iff) empty_heap.
+    Proof.
+      intros f' f F.
+      split; intros [ROOTS PTRS].
+      - split; setoid_rewrite <- F; auto.
+      - split; setoid_rewrite F; auto.
+    Qed.
+
+    (* TODO: move this? *)
+    Lemma empty_heap_heap_empty :
+      empty_heap heap_empty.
+    Proof.
+      unfold heap_empty.
+      split.
+      - intros root CONTRA.
+        red in CONTRA.
+        unfold member in CONTRA.
+        rewrite IP.F.empty_a in CONTRA.
+        inv CONTRA.
+      - intros root ptr CONTRA.
+        red in CONTRA.
+        unfold member in CONTRA.
+        rewrite IP.F.empty_o in CONTRA.
+        inv CONTRA.
+    Qed.
+
+    Lemma initial_memory_state_correct : initial_memory_state_prop.
+    Proof.
+      split.
+      - intros ptr aid CONTRA.
+        unfold initial_memory_state in *.
+        break_byte_allocated_in CONTRA.
+        break_match_hyp; [break_match_hyp|].
+        + cbn in *.
+          rewrite read_byte_raw_memory_empty in Heqo.
+          inv Heqo.
+        + cbn in *.
+          destruct CONTRA as [_ CONTRA].
+          inv CONTRA.
+      - intros fs FS.
+        cbn in FS.
+        red in FS.
+        rewrite <- FS.
+        cbn.
+        apply empty_frame_stack_frame_empty.
+      - intros h HEAP.
+        cbn in HEAP.
+        red in HEAP.
+        rewrite <- HEAP.
+        cbn.
+        apply empty_heap_heap_empty.
+      - intros ptr byte.
+        solve_read_byte_prop.
+    Qed.
+
   End MemoryPrimatives.
 
 End FiniteMemoryModelExecPrimitives.
