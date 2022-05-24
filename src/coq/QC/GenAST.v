@@ -22,6 +22,7 @@ From ExtLib.Structures Require Export
      Functor Applicative Monads.
 
 Require Import ExtLib.Data.Monads.StateMonad.
+Require Import ExtLib.Structures.Monads.
 
 From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils.
 Require Import Integers Floats.
@@ -195,6 +196,13 @@ Section GenerationState.
        |}.
 
   Definition GenLLVM := stateT GenState G.
+
+  (* Need this because extlib doesn't declare this instance as global :|. *)
+  #[global] Instance monad_stateT {s m} `{Monad m} : Monad (stateT s m).
+  Proof.
+    apply Monad_stateT; 
+      typeclasses eauto.
+  Defined.
 
   Definition get_raw (gs : GenState) : nat
     := gs.(num_raw).
