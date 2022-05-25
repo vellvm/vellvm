@@ -807,8 +807,7 @@ Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
 Definition filter_agg_typs (ctx: list (ident * typ)) : list (ident * typ) :=
   filter (fun '(_, t) => match t with 
   | TYPE_Array sz _ => N.ltb 0 sz
-  | TYPE_Vector sz _ => N.ltb 0 sz
-  | TYPE_Struct l => negb (seq.nilp l)
+  | TYPE_Struct l
   | TYPE_Packed_struct l => negb (seq.nilp l)
   | _ => false 
   end ) ctx.
