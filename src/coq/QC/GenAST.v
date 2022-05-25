@@ -1144,9 +1144,9 @@ Section InstrGenerators.
       (* TODO: Generate calls *)
       ; gen_load
       ; gen_store] (* TODO: Generate atomic operations and other instructions *)
-      ++ (if negb (seq.nilp (filter_ptr_typs ctx)) then [] else [gen_gep])
-      ++ (if negb (seq.nilp (filter_agg_typs ctx)) then [] else [gen_extractvalue; gen_insertvalue])
-      ++ (if negb (seq.nilp (filter_vec_typs ctx)) then [] else [gen_extractelement; gen_insertelement])).
+      ++ (if seq.nilp (filter_ptr_typs ctx) then [] else [gen_gep])
+      ++ (if seq.nilp (filter_agg_typs ctx) then [] else [gen_extractvalue; gen_insertvalue])
+      ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])).
 
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
