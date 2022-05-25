@@ -4,10 +4,6 @@
     program should give you a string that can be read by clang.
 *)
 
-From QuickChick Require Import QuickChick.
-Import QcDefaultNotation. Open Scope qc_scope.
-Set Warnings "-extraction-opaque-accessed,-extraction".
-
 From ExtLib Require Import
      Structures.Monads
      Structures.Functor
@@ -23,6 +19,10 @@ Import MonadNotation.
 
 From Coq Require Import
      ZArith List String Lia Bool.Bool.
+
+From QuickChick Require Import QuickChick.
+Import QcDefaultNotation. Open Scope qc_scope.
+Set Warnings "-extraction-opaque-accessed,-extraction".
 
 Section ShowInstances.
   Definition show_raw_id (rid : raw_id) : string

@@ -12,10 +12,6 @@
     more details. *)
 Require Import Ceres.Ceres.
 
-From QuickChick Require Import QuickChick.
-Import QcDefaultNotation. Open Scope qc_scope.
-Set Warnings "-extraction-opaque-accessed,-extraction".
-
 From ExtLib.Structures Require Export
      Functor Applicative Monads.
 
@@ -37,6 +33,12 @@ Import ApplicativeNotation.
 From Coq Require Import
      ZArith List String Lia Bool.Bool.
 
+From QuickChick Require Import QuickChick.
+Import QcDefaultNotation. Open Scope qc_scope.
+Set Warnings "-extraction-opaque-accessed,-extraction".
+
+From ExtLib.Structures Require Export
+     Functor.
 Open Scope Z_scope.
 
 

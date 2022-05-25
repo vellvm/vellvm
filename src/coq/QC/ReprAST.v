@@ -7,11 +7,6 @@
     QuickChick. It may be worthwhile to serialize a counterexample
     into a format that it can be imported into Coq for debugging.
 *)
-
-From QuickChick Require Import QuickChick.
-Import QcDefaultNotation. Open Scope qc_scope.
-Set Warnings "-extraction-opaque-accessed,-extraction".
-
 From ExtLib Require Import
      Structures.Monads
      Structures.Functor
@@ -27,6 +22,10 @@ Import MonadNotation.
 
 From Coq Require Import
      ZArith List String Lia Bool.Bool.
+
+From QuickChick Require Import QuickChick.
+Import QcDefaultNotation. Open Scope qc_scope.
+Set Warnings "-extraction-opaque-accessed,-extraction".
 
 (* Class for the Coq representation of a structure. *)
 Class Repr A : Type :=
@@ -560,8 +559,8 @@ Section ReprInstances.
       match defn with
       | mk_definition _ df_prototype df_args df_instrs =>
         "(mk_definition _ " ++ repr df_prototype ++ " "
-                            ++ repr df_args ++ " "
-                            ++ repr df_instrs ++ ")"
+                          ++ repr df_args ++ " "
+                          ++ repr df_instrs ++ ")"
       end.
 
   Global Instance reprDefinition: Repr (definition typ (block typ * list (block typ))) :=
