@@ -356,7 +356,7 @@ Section TypGenerators.
                 (* ; TYPE_I 64 *)
                 (* TODO: Generate floats and stuff *)
                 ; TYPE_Float
-                ; TYPE_Double
+                (* ; TYPE_Double *)
                 (* TODO: Could generate TYPE_Identified if we filter for sized types *)
                 (* ; TYPE_Half *)
                 (* ; TYPE_X86_fp80 *)
@@ -407,7 +407,7 @@ Section TypGenerators.
                 ; TYPE_Void
                 (* TODO: Generate floats and stuff *)
                 ; TYPE_Float
-                ; TYPE_Double
+                (*; TYPE_Double*)
                 (* ; TYPE_Half *)
                 (* ; TYPE_X86_fp80 *)
                 (* ; TYPE_Fp128 *)
@@ -466,7 +466,7 @@ Section TypGenerators.
                 (* ; TYPE_I 64 *)
                 (* TODO: Generate floats and stuff *)
                 ; TYPE_Float
-                ; TYPE_Double
+                (* ; TYPE_Double *)
                 (* ; TYPE_Half *)
                 (* ; TYPE_X86_fp80 *)
                 (* ; TYPE_Fp128 *)
@@ -518,7 +518,7 @@ Section TypGenerators.
                 (* ; TYPE_I 64 *)
                 (* TODO: Generate floats and stuff *)
                 ; TYPE_Float
-                ; TYPE_Double
+                (* ; TYPE_Double *)
                 (* ; TYPE_Half *)
                 (* ; TYPE_X86_fp80 *)
                 (* ; TYPE_Fp128 *)
@@ -825,6 +825,7 @@ Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
                         | TYPE_Pointer _ => true
                         | _ => false
   end) ctx.
+
 Definition filter_agg_typs (ctx: list (ident * typ)) : list (ident * typ) :=
   filter (fun '(_, t) => match t with 
   | TYPE_Array sz _ => N.ltb 0 sz
@@ -1173,10 +1174,9 @@ Section InstrGenerators.
       (* TODO: Generate calls *)
       ; gen_load
       ; gen_store] (* TODO: Generate atomic operations and other instructions *)
-      ++ (if negb (seq.nilp (filter_ptr_typs ctx)) then [] else [gen_gep])
-      ++ (if negb (seq.nilp (filter_agg_typs ctx)) then [] else [gen_extractvalue; gen_insertvalue])
-      ++ (if negb (seq.nilp (filter_vec_typs ctx)) then [] else [gen_extractelement; gen_insertelement])).
-
+      ++ (if seq.nilp (filter_ptr_typs ctx) then [] else [gen_gep])
+      ++ (if seq.nilp (filter_agg_typs ctx) then [] else [gen_extractvalue; gen_insertvalue])
+      ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])).
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
 

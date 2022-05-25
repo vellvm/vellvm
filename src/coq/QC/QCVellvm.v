@@ -84,7 +84,9 @@ Definition vellvm_agrees_with_clang (prog : list (toplevel_entity typ (block typ
               whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) (equ x y)
             | _, _ => checker true
             end.
+
 Definition agrees := (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang).
+
 Extract Constant defNumTests    => "1000".
 QCInclude "../../ml/*".
 QCInclude "../../ml/libvellvm/*".
@@ -96,3 +98,5 @@ QCInclude "../../ml/libvellvm/*".
 Extract Inlined Constant Error.failwith => "(fun _ -> raise)".
 QuickChick (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang).
 (*! QuickChick agrees. *)
+
+
