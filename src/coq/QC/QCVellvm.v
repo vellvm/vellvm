@@ -52,14 +52,13 @@ Definition interpret (prog : list (toplevel_entity typ (block typ * list (block 
   := step (interpreter prog).
 
 Axiom to_caml_str : string -> string.
-Extract Constant to_caml_str =>
+Extract Constant to_caml_str => 
 "fun (s: char list) ->
   let r = Bytes.create (List.length s) in
   let rec fill pos = function
   | [] -> r
   | c :: s -> Bytes.set r pos c; fill (pos + 1) s
   in Bytes.to_string (fill 0 s)".
-
 
 (** Write our LLVM program to a file ("temporary_vellvm.ll"), and then
     use clang to compile this file to an executable, which we then run in
@@ -85,11 +84,12 @@ Definition vellvm_agrees_with_clang (prog : list (toplevel_entity typ (block typ
               whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) (equ x y)
             | _, _ => checker true
             end.
-
 Definition agrees := (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang).
 Extract Constant defNumTests    => "1000".
 QCInclude "../../ml/*".
 QCInclude "../../ml/libvellvm/*".
+
+
 (* QCInclude "../../ml/libvellvm/llvm_printer.ml". *)
 (* QCInclude "../../ml/libvellvm/Camlcoq.ml". *)
 (* QCInclude "../../ml/extracted/*ml". *)

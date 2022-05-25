@@ -9,7 +9,9 @@ From ExtLib Require Import
      Structures.Functor
      Eqv.
 
-From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG.
+From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG Semantics.TopLevel.
+From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils. (*Needs to be changed*)
+
 Require Import Integers Floats.
 
 Require Import List.
@@ -18,7 +20,7 @@ Import ListNotations.
 Import MonadNotation.
 
 From Coq Require Import
-     ZArith List String Lia Bool.Bool.
+     ZArith List String Lia Bool.Bool Hexadecimal Numbers.HexadecimalString Numbers.HexadecimalZ.
 
 From QuickChick Require Import QuickChick.
 Import QcDefaultNotation. Open Scope qc_scope.
@@ -74,6 +76,26 @@ Section ShowInstances.
     show := show_typ
     |}.
 
+  Definition show_dtyp (t : dtyp) : string
+    := match t with
+    | DTYPE_I sz                 => "Integer" ++ (show sz)
+    | DTYPE_Pointer              => "Pointer"
+    | DTYPE_Void                 => "Void"
+    | DTYPE_Half                 => "Half"
+    | DTYPE_Float                => "Float"
+    | DTYPE_Double               => "Double"
+    | DTYPE_X86_fp80             => "x86 fp80"
+    | DTYPE_Fp128                => "Fp128"
+    | DTYPE_Ppc_fp128            => "Ppc_fp128"
+    | DTYPE_Metadata             => "Metadata"
+    | DTYPE_X86_mmx              => "X86_mmx"
+    | DTYPE_Array sz t           => "Array"
+    | DTYPE_Struct fields        => "Struct"
+    | DTYPE_Packed_struct fields => "Packed struct"
+    | DTYPE_Opaque               => "Opaque"
+    | DTYPE_Vector sz t          => "Vector"
+    end.
+
   Definition show_ibinop (iop : ibinop) : string
     := match iop with
        (* TODO print flags *)
@@ -95,6 +117,18 @@ Section ShowInstances.
   Global Instance showIBinop : Show ibinop
     := {| show := show_ibinop |}.
 
+  Definition show_fbinop (fop : fbinop) : string
+    := match fop with
+       | FAdd => "fadd"
+       | FSub => "fsub"
+       | FMul => "fmul"
+       | FDiv => "fdiv"
+       | FRem => "frem"
+       end.
+
+  Global Instance showFBinop : Show fbinop
+    := {| show := show_fbinop |}.
+
   Definition show_icmp (cmp : icmp) : string
     := match cmp with
        | Eq  => "eq"
@@ -112,10 +146,64 @@ Section ShowInstances.
   Global Instance showICmp : Show icmp
     := {| show := show_icmp |}.
 
+  Definition show_fcmp (cmp: fcmp) : string
+    := match cmp with 
+      |FFalse => "ffalse"
+      |FOeq => "foeq"
+      |FOgt => "fogt"
+      |FOge => "foge"
+      |FOlt => "folt"
+      |FOle => "fole"
+      |FOne => "fone"
+      |FOrd => "ford"
+      |FUno => "funo"
+      |FUeq => "fueq"
+      |FUgt => "fugt"
+      |FUge => "fuge"
+      |FUlt => "fult"
+      |FUle => "fule"
+      |FUne => "fune"
+      |FTrue => "ftrue"
+    end.
+  Global Instance showFCmp : Show fcmp 
+  := {| show := show_fcmp|}.
+
+  Definition double_to_hex_string (f : float) : string
+    := "0x" ++ NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (Int64.unsigned (Float.to_bits f)))).
+
+  Definition float_to_hex_string (f : float32) : string
+    := double_to_hex_string (Float32.to_double f).
+
+  Global Instance showFloat : Show float
+    := {| show := double_to_hex_string |}.
+
+  Global Instance showFloat32 : Show float32
+    := {| show := float_to_hex_string |}.
+
+  Definition show_int (x : Integers.Int.int) : string
+    := show (Int.unsigned x).
+  
+  Global Instance Show_Int : Show Integers.Int.int
+  := {| show := show_int|}.
+
+  Definition show_fast_math (fm : fast_math) : string
+    := match fm with
+       | Nnan => "nnan"
+       | Ninf => "ninf"
+       | Nsz => "nsz"
+       | Arcp => "arcp"
+       | Fast => "fast"
+       end.
+
+  Global Instance showFastMatch : Show fast_math
+    := {| show := show_fast_math |}.
+
   Fixpoint show_exp (v : exp typ) :=
       match v with
       | EXP_Ident id => show id
       | EXP_Integer x => show x
+      | EXP_Float f => show f
+      | EXP_Double f => show f
       | EXP_Bool b => show b
       | EXP_Null => "null"
       | EXP_Zero_initializer => "zero initializer"
@@ -123,10 +211,34 @@ Section ShowInstances.
       | EXP_Undef => "undef"
       | OP_IBinop iop t v1 v2 =>
         show iop ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
+      | OP_FBinop fop fmath t v1 v2 =>
+        match fmath with
+        | nil => 
+          show fop ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
+        | _ =>
+          "show_exp: Need to implement fastmath show instances."
+        end
       | OP_ICmp cmp t v1 v2 =>
         "icmp " ++ show cmp ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
       | OP_GetElementPtr t ptrval idxs =>
-        "todo: getelementptr"
+      let (tptr, exp) := ptrval in
+      "getelementptr " ++ show t ++ ", " ++ show tptr ++ " " ++ show_exp exp ++ fold_left (fun str '(ty, ex) => ", " ++ show ty ++ " "++ show_exp ex ++ str) idxs ""
+      | OP_ExtractValue vec idxs =>
+      let (tptr, exp) := vec in
+      "extractvalue " ++ show tptr ++ " " ++ show_exp exp ++ fold_left (fun str i => ", " ++ show i ++ str) idxs ""
+      | OP_ExtractElement vec idx =>
+      let (tptr, exp) := vec in 
+      let (tidx, iexp) := idx in
+      "extractelement " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ show tidx ++ " " ++ show_exp iexp
+      | OP_InsertElement vec elt idx =>
+      let (tptr, exp) := vec in
+      let (telt, eexp) := elt in
+      let (tidx, iexp) := idx in
+      "insertelement " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ show telt ++ " " ++ show_exp eexp ++ ", " ++ show tidx ++ " " ++ show_exp iexp
+      | OP_InsertValue vec elt idxs =>
+      let (tptr, exp) := vec in
+      let (telt, eexp) := elt in 
+      "insertvalue " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ show telt ++ " " ++ show_exp eexp ++ ", " ++ (fold_right (fun x y=> show x ++ ", " ++ y) "" idxs)
       | OP_Select (tc, cnd) (t1, v1) (t2, v2) =>
         "select " ++ show tc ++ " " ++ show_exp cnd ++ ", " ++ show t1 ++ " " ++ show_exp v1  ++ ", " ++ show t2 ++ " " ++ show_exp v2
       | _ => "show_exp todo"
@@ -233,6 +345,15 @@ Section ShowInstances.
     show := show_block "    "
     |}.
 
+  Definition show_typ_instr (typ_instr: typ * instr typ) : string :=
+    let (t, i) := typ_instr in
+    "(" ++ (show t) ++ ", " ++ (show i) ++ ")".
+
+  Global Instance showTypInstr: Show (typ * instr typ) :=
+    {|
+    show := show_typ_instr
+    |}.
+  
   Definition show_arg (arg : local_id * typ) : string
     := let '(i, t) := arg in
        show t ++ " %" ++ show i.

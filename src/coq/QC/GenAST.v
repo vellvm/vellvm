@@ -16,6 +16,7 @@ From ExtLib.Structures Require Export
      Functor Applicative Monads.
 
 Require Import ExtLib.Data.Monads.StateMonad.
+Require Import ExtLib.Structures.Monads.
 
 Require Import List.
 
@@ -23,7 +24,6 @@ Import ListNotations.
 
 From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils.
 Require Import Integers Floats.
-
 Require Import List.
 
 Import ListNotations.
@@ -103,7 +103,6 @@ Section Helpers.
     | OP_Freeze v                        => true
     | _                                  => false
     end.
-
   (*
   Fixpoint well_formed_instr (ctx : list (ident * typ)) (i : instr typ) : bool :=
     match i with
@@ -133,7 +132,6 @@ Section Helpers.
       n <- (arbitrary : G nat);;
       ret (Z.of_nat n).
 End Helpers.
-
 Section GenerationState.
   Record GenState :=
     mkGenState
@@ -211,6 +209,13 @@ Section GenerationState.
        |}.
 
   Definition GenLLVM := stateT GenState G.
+
+  (* Need this because extlib doesn't declare this instance as global :|. *)
+  #[global] Instance monad_stateT {s m} `{Monad m} : Monad (stateT s m).
+  Proof.
+    apply Monad_stateT; 
+      typeclasses eauto.
+  Defined.
 
   Definition get_raw (gs : GenState) : nat
     := gs.(num_raw).
@@ -348,9 +353,10 @@ Section TypGenerators.
                 (* TODO: big ints *)
                 (* ; TYPE_I 64 *)
                 (* TODO: Generate floats and stuff *)
+                ; TYPE_Float
+                ; TYPE_Double
                 (* TODO: Could generate TYPE_Identified if we filter for sized types *)
                 (* ; TYPE_Half *)
-                (* ; TYPE_Double *)
                 (* ; TYPE_X86_fp80 *)
                 (* ; TYPE_Fp128 *)
                 (* ; TYPE_Ppc_fp128 *)
@@ -398,8 +404,9 @@ Section TypGenerators.
                (* ; TYPE_I 64 *)
                 ; TYPE_Void
                 (* TODO: Generate floats and stuff *)
+                ; TYPE_Float
+                ; TYPE_Double
                 (* ; TYPE_Half *)
-                (* ; TYPE_Double *)
                 (* ; TYPE_X86_fp80 *)
                 (* ; TYPE_Fp128 *)
                 (* ; TYPE_Ppc_fp128 *)
@@ -456,8 +463,9 @@ Section TypGenerators.
                 (* TODO: big ints *)
                 (* ; TYPE_I 64 *)
                 (* TODO: Generate floats and stuff *)
+                ; TYPE_Float
+                ; TYPE_Double
                 (* ; TYPE_Half *)
-                (* ; TYPE_Double *)
                 (* ; TYPE_X86_fp80 *)
                 (* ; TYPE_Fp128 *)
                 (* ; TYPE_Ppc_fp128 *)
@@ -482,6 +490,20 @@ Section TypGenerators.
                       ]
     end.
 
+  Program Fixpoint gen_typ_non_void_size_wo_fn (sz : nat) {measure sz} : GenLLVM typ :=
+  match sz with
+  | 0%nat => gen_typ_non_void_0
+  | (S sz') => oneOf_LLVM
+                    [ gen_typ_non_void_0
+                    (* Might want to restrict the size to something reasonable *)
+                    (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
+                    ; ret TYPE_Array <*> lift genN <*> gen_sized_typ_size sz'
+                    ; ret TYPE_Vector <*> lift genN <*> gen_sized_typ_size sz'
+                    ; ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
+                    ; ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
+                    ]
+  end.
+
   (* TODO: look up identifiers *)
   (* Types for operation expressions *)
   Definition gen_op_typ : GenLLVM typ :=
@@ -493,8 +515,9 @@ Section TypGenerators.
                 (* TODO: big ints *)
                 (* ; TYPE_I 64 *)
                 (* TODO: Generate floats and stuff *)
+                ; TYPE_Float
+                ; TYPE_Double
                 (* ; TYPE_Half *)
-                (* ; TYPE_Double *)
                 (* ; TYPE_X86_fp80 *)
                 (* ; TYPE_Fp128 *)
                 (* ; TYPE_Ppc_fp128 *)
@@ -536,10 +559,26 @@ Section ExpGenerators.
            ; ret Xor
            ].
 
+  (*Float operations*)
+  Definition gen_fbinop : G fbinop :=
+    oneOf_ failGen
+            [ ret LLVMAst.FAdd
+            ; ret FSub
+            ; ret FMul 
+            ; ret FDiv 
+            ; ret FRem
+            ].
+
   Definition gen_icmp : G icmp :=
     oneOf_ failGen
            (map ret
                 [ Eq; Ne; Ugt; Uge; Ult; Ule; Sgt; Sge; Slt; Sle]).
+
+  Definition gen_fcmp : G fcmp :=
+    oneOf_ failGen
+            (map ret 
+                  [FFalse; FOeq; FOgt; FOge; FOlt; FOle; FOne; FOrd; 
+                   FUno; FUeq; FUgt; FUge; FUlt; FUle; FUne; FTrue]).
 
   (* Generate an expression of a given type *)
   (* Context should probably not have duplicate ids *)
@@ -553,7 +592,7 @@ Section ExpGenerators.
     := match a, b with
        | DTYPE_I sz, DTYPE_I sz' =>
          if N.eq_dec sz sz' then true else false
-       | DTYPE_I sz, _ => false
+       | DTYPE_I _, _ => false
        | DTYPE_IPTR, DTYPE_IPTR => true
        | DTYPE_IPTR, _ => false
        | DTYPE_Pointer, DTYPE_Pointer => true
@@ -580,24 +619,24 @@ Section ExpGenerators.
            if N.eq_dec sz sz'
            then dtyp_eq t t'
            else false
-       | DTYPE_Array sz t, _ => false
+       | DTYPE_Array _ _, _ => false
        | DTYPE_Struct fields, DTYPE_Struct fields' =>
          if Nat.eqb (Datatypes.length fields) (Datatypes.length fields')
          then forallb id (map_In (zip fields fields') (fun '(a, b) HIn => dtyp_eq a b))
          else false
-       | DTYPE_Struct fields, _ => false
+       | DTYPE_Struct _, _ => false
        | DTYPE_Packed_struct fields, DTYPE_Packed_struct fields' =>
          if Nat.eqb (Datatypes.length fields) (Datatypes.length fields')
          then forallb id (map_In (zip fields fields') (fun '(a, b) HIn => dtyp_eq a b))
          else false
-       | DTYPE_Packed_struct fields, _ => false
+       | DTYPE_Packed_struct _, _ => false
        | DTYPE_Opaque, DTYPE_Opaque => false (* TODO: Unsure if this should compare equal *)
        | DTYPE_Opaque, _ => false
        | DTYPE_Vector sz t, DTYPE_Vector sz' t' =>
            if N.eq_dec sz sz'
            then dtyp_eq t t'
            else false
-       | DTYPE_Vector sz t, _ => false
+       | DTYPE_Vector _ _, _ => false
        end.
 
   (* TODO: Move this*)
@@ -730,8 +769,185 @@ Section ExpGenerators.
   Definition gen_non_zero_exp_size (sz : nat) (t : typ) : GenLLVM (exp typ)
     := match t with
        | TYPE_I n => ret EXP_Integer <*> lift gen_non_zero (* TODO: should integer be forced to be in bounds? *)
+       | TYPE_Float => ret EXP_Float <*> lift fing32 
+       | TYPE_Double => lift failGen(*ret EXP_Double <*> lift fing64*) (*TODO : Fix generator for double*)
        | _ => lift failGen
        end.
+
+(* Generator GEP part *)
+(* Get index paths from array or vector*)
+Fixpoint get_index_paths_from_AoV (sz: nat) (t: typ) (sub_paths: list (typ * list Z)) (pre_path: list Z): list (typ * list Z) :=
+  match sz with 
+  | 0%nat => []
+  | S z => map (fun '(t, p) => (t, pre_path ++ [Z.of_nat z] ++ p)) sub_paths ++ get_index_paths_from_AoV z t sub_paths pre_path
+  end.
+
+(* Can work after extracting the pointer inside*)
+Fixpoint get_index_paths_aux (t_from : typ) (pre_path : list Z) {struct t_from}: list (typ * list (Z)) :=
+  match t_from with
+  | TYPE_Array sz t => 
+  let sub_paths := get_index_paths_aux t [] in (* Get index path from the first element*)
+  [(t_from, pre_path)] (* The path to the array *)
+    ++ get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path (* Assemble them into 1*)
+  | TYPE_Vector sz t => let sub_paths := get_index_paths_aux t [] in
+  [(t_from, pre_path)] ++ get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path
+  | TYPE_Struct fields => [(t_from, pre_path)] ++ get_index_paths_from_struct fields pre_path 0
+  | TYPE_Packed_struct fields => [(t_from, pre_path)] ++ get_index_paths_from_struct fields pre_path 0
+  | t => [(t, pre_path)]
+  end with 
+  get_index_paths_from_struct (fields: list typ) (pre_path: list Z) (current_index : Z) {struct fields}: list (typ * list Z) := 
+  match fields with
+  | nil => nil
+  | h::t => let head_list := map (fun '(t, p) => (t, pre_path ++ [current_index] ++ p)) (get_index_paths_aux h []) in
+  let tail_list := get_index_paths_from_struct t pre_path (current_index + 1%Z) in
+  head_list ++ tail_list
+  end.
+  Definition get_index_paths_ptr (t_from: typ) : list (typ * list (Z)) :=
+    map (fun '(t, path) => (t, [0%Z] ++ path)) (get_index_paths_aux t_from nil).
+  Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
+    let edited_path := map (fun '(t, path) => match path with 
+                            | hd::tl => (t, tl)
+                            | _ => (t, path)
+    end) (get_index_paths_aux t_from nil) in 
+    filter (fun '(_,path) => match path with 
+                              | nil => false
+                              | _ => true
+    end) edited_path.
+
+(*Definition filter_typs_from_ctx (ctx: list (ident * typ)) (list_typ : list typ) : list (ident * typ) := *)
+
+
+(*filter all the (ident, typ) in ctx such that typ is a ptr*)
+Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_,t) => match t with
+                        | TYPE_Pointer _ => true
+                        | _ => false
+  end) ctx.
+Definition filter_agg_typs (ctx: list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_, t) => match t with 
+  | TYPE_Array sz _ => N.ltb 0 sz
+  | TYPE_Vector sz _ => N.ltb 0 sz
+  | TYPE_Struct l => negb (seq.nilp l)
+  | TYPE_Packed_struct l => negb (seq.nilp l)
+  | _ => false 
+  end ) ctx.
+
+Definition filter_vec_typs (ctx: list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_, t) => match t with 
+  | TYPE_Vector sz _ => N.ltb 0 sz
+  | _ => false end) ctx.
+
+Definition gen_gep : GenLLVM (typ * instr typ) :=
+  ctx <- get_ctx;;
+  let ptrs_in_context := filter_ptr_typs ctx in
+  '(id, tptr) <- (oneOf_LLVM (map ret ptrs_in_context));;
+  let get_typ_from_ptr (ptr: typ) : typ :=
+  match ptr with 
+  | TYPE_Pointer t => t 
+  | _ => ptr  (* Not gonna happened*)
+  end in
+  let t_in_ptr := get_typ_from_ptr tptr in (* Getting the inner type in the pointer*)
+  let paths_in_ptr := get_index_paths_ptr t_in_ptr in (* Inner paths: Paths after removing the outer pointer*)
+  '(t, path) <- oneOf_LLVM (map ret paths_in_ptr);; (* Select one path from the paths*)
+  let path_for_gep := map (fun x => (TYPE_I 32, EXP_Integer (x))) path in (* Turning the path to integer*)
+   (* Refer to function get_int_typ*)
+  ret (TYPE_Pointer t, INSTR_Op (OP_GetElementPtr t_in_ptr 
+                    (tptr, EXP_Ident id) path_for_gep)).
+
+Definition gen_extractvalue : GenLLVM (typ * instr typ) :=
+  ctx <- get_ctx;;
+  let agg_in_context := filter_agg_typs ctx in
+  '(id, tagg) <- (oneOf_LLVM (map ret agg_in_context));;
+  let paths_in_agg := get_index_paths_agg tagg in 
+  '(t, path_for_extractvalue) <- oneOf_LLVM (map ret paths_in_agg);;
+  ret (t, INSTR_Op (OP_ExtractValue (tagg, EXP_Ident id) path_for_extractvalue)).
+
+
+
+(* ExtractElement*)
+Definition gen_extractelement : GenLLVM (typ * instr typ) :=
+  ctx <- get_ctx;;
+  let vector_in_context := filter_vec_typs ctx in
+  '(id, tvec) <- (oneOf_LLVM (map ret vector_in_context));;
+  let get_size_ty (vType: typ) :=
+    match tvec with 
+    | TYPE_Vector sz ty => (sz, ty)
+    | _ => (0%N, TYPE_Void)
+    end in
+  let '(sz, t_in_vec) := get_size_ty tvec in
+  let index_list := map (fun x => N.of_nat x) (List.seq 0 (N.to_nat sz)) in
+  index_for_extractelement <- oneOf_LLVM (map ret index_list);;
+  ret (t_in_vec, INSTR_Op (OP_ExtractElement (tvec, EXP_Ident id) (TYPE_I 32%N, EXP_Integer (Z.of_nat (N.to_nat index_for_extractelement))))).
+
+(* Assumes input is a primitive type*)
+
+(* Generate the element to be inserted into vector*)
+Definition gen_typ_eq_prim_typ (t: typ): GenLLVM (exp typ) :=
+  match t with 
+  | TYPE_I _ => i <- lift_GenLLVM (genNatInt);;
+  ret (EXP_Integer (DynamicValues.Int32.intval i))
+  | TYPE_Float => f <- lift_GenLLVM (fing32);;
+  ret (EXP_Float f)
+  | TYPE_Double => d <- lift_GenLLVM (fing64);;
+  ret (EXP_Double d)
+  | _ => ret (EXP_Null)
+  end.
+
+Definition gen_insertelement : GenLLVM (typ * instr typ) :=
+  ctx <- get_ctx;;
+  let vector_in_context := filter_vec_typs ctx in
+  '(id, tvec) <- (oneOf_LLVM (map ret vector_in_context));;
+  let get_size_ty (vType: typ) :=
+  match tvec with 
+  | TYPE_Vector sz ty => (sz, ty)
+  | _ => (0%N, TYPE_Void)
+  end in
+  let '(sz, t_in_vec) := get_size_ty tvec in
+  value <- gen_typ_eq_prim_typ t_in_vec;;
+  index <- lift_GenLLVM (choose (0,Z.of_N sz));;
+  ret (TYPE_Float, INSTR_Op (OP_InsertElement (tvec, EXP_Ident id) (t_in_vec, value) (TYPE_I 32, EXP_Integer index))).
+
+Fixpoint gen_typ_eq (t: typ): GenLLVM (exp typ) :=
+  match t with 
+  | TYPE_Array sz ty => 
+  arr <- vectorOf_LLVM (N.to_nat sz) (gen_typ_eq ty);;
+  let new_arr := map (fun ext => (ty, ext)) arr in
+  ret (EXP_Array new_arr)
+  | TYPE_Vector sz ty => 
+  arr <- vectorOf_LLVM (N.to_nat sz) (gen_typ_eq ty);;
+  let new_arr := map (fun ext => (ty, ext)) arr in 
+  ret (EXP_Array new_arr)
+  | TYPE_Struct fields => gen_typ_eq_struct fields (ret nil)
+  | TYPE_Packed_struct fields => gen_typ_eq_struct fields (ret nil)
+  | _ => gen_typ_eq_prim_typ t
+  end with 
+  gen_typ_eq_struct (fields: list typ) (gFields: GenLLVM (list (typ * exp typ))) {struct fields} : GenLLVM (exp typ):=
+  match fields with 
+  | nil => l <- gFields;;
+  ret (EXP_Array l)
+  | hd::tl => l <- gFields;;
+  ex <- gen_typ_eq hd;;
+  gen_typ_eq_struct tl (ret ((hd, ex)::l))
+  end.
+
+  (*let array := List.seq 0%nat (N.to_nat sz) in 
+  let new_array := map (fun _ => i <- gen_typ_eq ty;;(i)) array in*)
+
+Definition gen_insertvalue : GenLLVM (typ * instr typ) :=
+  ctx <- get_ctx;;
+  let agg_in_context := filter_agg_typs ctx in 
+  '(id, tagg) <- (oneOf_LLVM (map ret agg_in_context));;
+  let paths_in_agg := get_index_paths_agg tagg in
+  '(tsub, path_for_insertvalue) <- oneOf_LLVM (map ret paths_in_agg);;
+  ex <- gen_typ_eq tsub;;
+  (* Generate all of the type*)
+  ret (tagg, INSTR_Op (OP_InsertValue (tagg, EXP_Ident id) (tsub, ex) path_for_insertvalue)).
+
+Definition genTypHelper (n: nat): G (typ) :=
+  run_GenLLVM (gen_typ_non_void_size n).
+
+Definition genType: G (typ) :=
+  sized genTypHelper.
 
   (* TODO: should make it much more likely to pick an identifier for
            better test cases *)
@@ -765,8 +981,8 @@ Section ExpGenerators.
             end
           (* Not generating these types for now *)
           | TYPE_Half                 => lift failGen
-          | TYPE_Float                => lift failGen
-          | TYPE_Double               => lift failGen
+          | TYPE_Float                => ret EXP_Float <*> lift fing32(* referred to genarators in flocq-quickchick*)
+          | TYPE_Double               => lift failGen (*ret EXP_Double <*> lift fing64*) (* TODO: Fix generator for double*)
           | TYPE_X86_fp80             => lift failGen
           | TYPE_Fp128                => lift failGen
           | TYPE_Ppc_fp128            => lift failGen
@@ -807,8 +1023,8 @@ Section ExpGenerators.
           | TYPE_Function ret args => [lift failGen] (* These shouldn't exist, I think *)
           | TYPE_Opaque            => [lift failGen] (* TODO: not sure what these should be... *)
           | TYPE_Half              => [lift failGen]
-          | TYPE_Float             => [lift failGen]
-          | TYPE_Double            => [lift failGen]
+          | TYPE_Float             => [gen_fbinop_exp TYPE_Float]
+          | TYPE_Double            => [(*gen_fbinop_exp TYPE_Double*)lift failGen]
           | TYPE_X86_fp80          => [lift failGen]
           | TYPE_Fp128             => [lift failGen]
           | TYPE_Ppc_fp128         => [lift failGen]
@@ -838,6 +1054,20 @@ Section ExpGenerators.
     :=
       let t := TYPE_I isz in
       gen_ibinop_exp_typ t.
+  with 
+  gen_fbinop_exp (ty: typ) : GenLLVM (exp typ)
+    :=
+      match ty with 
+       | TYPE_Float => fbinop <- lift gen_fbinop;;
+       if (Handlers.LLVMEvents.DV.fop_is_div fbinop)
+       then ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_non_zero_exp_size 0 ty 
+       else ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_exp_size 0 ty
+       | TYPE_Double => fbinop <- lift gen_fbinop;;
+       if (Handlers.LLVMEvents.DV.fop_is_div fbinop)
+       then ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_non_zero_exp_size 0 ty 
+       else ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_exp_size 0 ty
+       | _ => lift failGen
+      end.
 
   Definition gen_exp (t : typ) : GenLLVM (exp typ)
     := sized_LLVM (fun sz => gen_exp_size sz t).
@@ -851,7 +1081,6 @@ Section ExpGenerators.
     := t <- gen_sized_typ;;
        e <- gen_exp t;;
        ret (t, e).
-
   Definition gen_op (t : typ) : GenLLVM (exp typ)
     := sized_LLVM
          (fun sz =>
@@ -859,6 +1088,8 @@ Section ExpGenerators.
             | TYPE_I isz =>
               (* TODO: If I1 also allow ICmp and FCmp *)
               gen_ibinop_exp isz
+            | TYPE_Float => gen_fbinop_exp TYPE_Float
+            | TYPE_Double => gen_fbinop_exp TYPE_Double
             | _ => lift failGen
             end).
 
@@ -929,8 +1160,9 @@ Section InstrGenerators.
      compute a value, like void function calls, stores, etc.
    *)
   Definition gen_instr : GenLLVM (typ * instr typ) :=
+    ctx <- get_ctx;;
     oneOf_LLVM
-      [ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
+      ([ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
       ; t <- gen_op_typ;; (* gen_sized_typ;; *)
         (* TODO: generate multiple element allocas. Will involve changing initialization *)
         num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *)
@@ -938,9 +1170,10 @@ Section InstrGenerators.
         ret (TYPE_Pointer t, INSTR_Alloca t num_elems align)
       (* TODO: Generate calls *)
       ; gen_load
-      ; gen_store
-      (* TODO: Generate atomic operations and other instructions *)
-      ].
+      ; gen_store] (* TODO: Generate atomic operations and other instructions *)
+      ++ (if negb (seq.nilp (filter_ptr_typs ctx)) then [] else [gen_gep])
+      ++ (if negb (seq.nilp (filter_agg_typs ctx)) then [] else [gen_extractvalue; gen_insertvalue])
+      ++ (if negb (seq.nilp (filter_vec_typs ctx)) then [] else [gen_extractelement; gen_insertelement])).
 
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
@@ -948,6 +1181,8 @@ Section InstrGenerators.
   (* TODO: want to generate phi nodes, which might be a bit
   complicated because we need to know that an id that occurs in a
   later block is in context *)
+
+
 
   Definition add_id_to_instr (t_instr : typ * instr typ) : GenLLVM (instr_id * instr typ)
     :=

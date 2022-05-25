@@ -11,7 +11,7 @@ OPAMPKGS=coq coq-ext-lib coq-paco coq-ceres coq-flocq coq-mathcomp-ssreflect coq
 QUICKCHICKDIR=../lib/QuickChick
 FLOCQQUICKCHICKDIR=../lib/flocq-quickchick
 
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(QUICKCHICKDIR)/src/ QuickChick -I $(QUICKCHICKDIR)/src -I $(QUICKCHICKDIR)/plugin
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(QUICKCHICKDIR)/src/ QuickChick -I $(QUICKCHICKDIR)/src -I $(QUICKCHICKDIR)/plugin -R $(FLOCQQUICKCHICKDIR) FlocqQuickChick
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
@@ -89,7 +89,7 @@ interp: .depend
 
 .PHONY: coq
 coq: .depend
-	$(MAKE) $(VOFILES)
+	$(MAKE) quickchick flocq-quickchick $(VOFILES)
 
 .PHONY: qc-tests
 qc-tests: rm-qc-test-vo coq $(QCVOFILES)
@@ -110,12 +110,20 @@ quickchick:
 	$(MAKE) -C $(QUICKCHICKDIR) compat
 	$(MAKE) -C $(QUICKCHICKDIR)
 
+.PHONY: flocq-quickchick
+flocq-quickchick: quickchick
+	make -C $(FLOCQQUICKCHICKDIR)
+
 .PHONY: update-quickchick
 update-quickchick:
 	git submodule update -- $(QUICKCHICKDIR)
 
+.PHONY: update-flocq-quickchick
+update-flocq-quickchick:
+	git submodule update -- $(FLOCQQUICKCHICKDIR)
+
 .PHONY: update-submodules
-update-submodules: update-quickchick
+update-submodules: update-quickchick update-flocq-quickchick
 
 .PHONY: extracted
 extracted: .depend
