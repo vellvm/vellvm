@@ -37,6 +37,8 @@ From QuickChick Require Import QuickChick.
 Import QcDefaultNotation. Open Scope qc_scope.
 Set Warnings "-extraction-opaque-accessed,-extraction".
 
+From FlocqQuickChick Require Import Generators.
+
 From ExtLib.Structures Require Export
      Functor.
 Open Scope Z_scope.
@@ -1053,8 +1055,8 @@ Definition genType: G (typ) :=
   gen_ibinop_exp (isz : N) : GenLLVM (exp typ)
     :=
       let t := TYPE_I isz in
-      gen_ibinop_exp_typ t.
-  with 
+      gen_ibinop_exp_typ t
+  with
   gen_fbinop_exp (ty: typ) : GenLLVM (exp typ)
     :=
       match ty with 

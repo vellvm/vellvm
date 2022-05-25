@@ -79,6 +79,7 @@ Section ShowInstances.
   Definition show_dtyp (t : dtyp) : string
     := match t with
     | DTYPE_I sz                 => "Integer" ++ (show sz)
+    | DTYPE_IPTR                 => "iptr"
     | DTYPE_Pointer              => "Pointer"
     | DTYPE_Void                 => "Void"
     | DTYPE_Half                 => "Half"
