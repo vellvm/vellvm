@@ -923,7 +923,7 @@ Fixpoint gen_typ_eq (t: typ): GenLLVM (exp typ) :=
   | TYPE_Vector sz ty => 
   arr <- vectorOf_LLVM (N.to_nat sz) (gen_typ_eq ty);;
   let new_arr := map (fun ext => (ty, ext)) arr in 
-  ret (EXP_Array new_arr)
+  ret (EXP_Vector new_arr)
   | TYPE_Struct fields => gen_typ_eq_struct fields (ret nil)
   | TYPE_Packed_struct fields => gen_typ_eq_struct fields (ret nil)
   | _ => gen_typ_eq_prim_typ t
@@ -983,7 +983,7 @@ Definition genType: G (typ) :=
               ret (EXP_Array (map (fun e => (t, e)) es))
           | TYPE_Vector n t =>
               es <- vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t);;
-              ret (EXP_Array (map (fun e => (t, e)) es))
+              ret (EXP_Vector (map (fun e => (t, e)) es))
           | TYPE_Struct fields =>
               (* Should we divide size evenly amongst components of struct? *)
               tes <- map_monad (fun t => e <- gen_exp_size 0 t;; ret (t, e)) fields;;
