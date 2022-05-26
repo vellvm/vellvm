@@ -1534,6 +1534,55 @@ Class VInt I : Type :=
     | _ => failwith "invalid aggregate data"
     end.
   Arguments insert_into_str _ _ _ : simpl nomatch.
+  Definition t := let a: int32 := repr 1%Z in cmp Cge a (repr 1%Z).
+  Definition index_vec_into_str (v:uvalue) (idx:uvalue) : undef_or_err uvalue :=
+    let fix loop elts i :=
+        match elts with
+        | [] => failwith "index out of bounds"
+        | h :: tl =>
+          if (i =? 0)%Z then ret h else loop tl (i-1)%Z
+        end in
+    match v with
+    | UVALUE_Vector e =>
+        match idx with
+        | UVALUE_I32 i2
+        | UVALUE_I64 i2 =>
+            let iZ := signed i2 in
+            match iZ with
+            | Zpos _ => loop e iZ
+            | _ => failwith "invalid index data"
+            end
+        | _ => failwith "invalid index data"
+        end
+    | _ => failwith "invalid vector data"
+    end.
+  Arguments index_into_str _ _ : simpl nomatch.
+
+  Definition insert_vec_into_str (vec:dvalue) (v:dvalue) (idx:dvalue) : undef_or_err dvalue :=
+    let fix loop (acc elts:list dvalue) (i:LLVMAst.int) :=
+        match elts with
+        | [] => failwith "index out of bounds"
+        | h :: tl =>
+          (if i =? 0 then ret (acc ++ (v :: tl))
+          else loop (acc ++ [h]) tl (i-1))%Z
+        end%list in
+    match vec with
+    | DVALUE_Vector e =>
+        match idx with
+        | DVALUE_I32 i2
+        | DVALUE_I64 i2 =>
+            let iZ := signed i2 in
+            match iZ with
+            | Zpos _ =>
+                v <- (loop [] e iZ) ;;
+                ret (DVALUE_Array v)
+            | _ => failwith "invalid index data"
+            end
+        | _ => failwith "invalid index data"
+        end
+    | _ => failwith "invalid vector data"
+    end.
+  Arguments insert_into_str _ _ _ : simpl nomatch.
 
 (*  ------------------------------------------------------------------------- *)
 
