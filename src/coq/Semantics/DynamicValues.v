@@ -314,11 +314,11 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | UVALUE_FCmp             (cmp:fcmp)   (v1:uvalue) (v2:uvalue)
   | UVALUE_Conversion       (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp)
   | UVALUE_GetElementPtr    (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)) (* TODO: do we ever need this? GEP raises an event? *)
-  | UVALUE_ExtractElement   (vec: uvalue) (idx: uvalue)
-  | UVALUE_InsertElement    (vec: uvalue) (elt:uvalue) (idx:uvalue)
+  | UVALUE_ExtractElement   (vec_typ : dtyp) (vec: uvalue) (idx: uvalue)
+  | UVALUE_InsertElement    (vec_typ : dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue)
   | UVALUE_ShuffleVector    (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue)
-  | UVALUE_ExtractValue     (vec:uvalue) (idxs:list LLVMAst.int)
-  | UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int)
+  | UVALUE_ExtractValue     (vec_typ : dtyp) (vec:uvalue) (idxs:list LLVMAst.int)
+  | UVALUE_InsertValue      (vec_typ : dtyp) (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int)
   | UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue)
   (* Extract the `idx` byte from a uvalue `uv`, which was stored with
    type `dt`. `idx` 0 is the least significant byte. `sid` is the "store
@@ -354,15 +354,15 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         S (uvalue_measure v)
     | UVALUE_GetElementPtr t ptrval idxs =>
         S (uvalue_measure ptrval + list_sum (map uvalue_measure idxs))
-    | UVALUE_ExtractElement vec idx =>
+    | UVALUE_ExtractElement t vec idx =>
         S (uvalue_measure vec + uvalue_measure idx)
-    | UVALUE_InsertElement vec elt idx =>
+    | UVALUE_InsertElement t vec elt idx =>
         S (uvalue_measure vec + uvalue_measure elt + uvalue_measure idx)
     | UVALUE_ShuffleVector vec1 vec2 idxmask =>
         S (uvalue_measure vec1 + uvalue_measure vec2 + uvalue_measure idxmask)
-    | UVALUE_ExtractValue vec idxs =>
+    | UVALUE_ExtractValue t vec idxs =>
         S (uvalue_measure vec)
-    | UVALUE_InsertValue vec elt idxs =>
+    | UVALUE_InsertValue t vec elt idxs =>
         S (uvalue_measure vec + uvalue_measure elt)
     | UVALUE_Select cnd v1 v2 =>
         S (uvalue_measure cnd + uvalue_measure v1 + uvalue_measure v2)
@@ -454,11 +454,11 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_FCmp           : forall (cmp:fcmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FCmp cmp v1 v2).
     Hypothesis IH_Conversion     : forall (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp), P v -> P (UVALUE_Conversion conv t_from v t_to).
     Hypothesis IH_GetElementPtr  : forall (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)), P ptrval -> (forall idx, In idx idxs -> P idx) -> P (UVALUE_GetElementPtr t ptrval idxs).
-    Hypothesis IH_ExtractElement : forall (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement vec idx).
-    Hypothesis IH_InsertElement  : forall (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement vec elt idx).
+    Hypothesis IH_ExtractElement : forall (t:dtyp) (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement t vec idx).
+    Hypothesis IH_InsertElement  : forall (t:dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement t vec elt idx).
     Hypothesis IH_ShuffleVector  : forall (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector vec1 vec2 idxmask).
-    Hypothesis IH_ExtractValue   : forall (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue vec idxs).
-    Hypothesis IH_InsertValue    : forall (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue vec elt idxs).
+    Hypothesis IH_ExtractValue   : forall (t:dtyp) (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue t vec idxs).
+    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec elt idxs).
     Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
     Hypothesis IH_ExtractByte : forall (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : N), P uv -> P idx -> P (UVALUE_ExtractByte uv dt idx sid).
     Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue),
@@ -541,11 +541,11 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_FCmp           : forall (cmp:fcmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FCmp cmp v1 v2).
     Hypothesis IH_Conversion     : forall (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp), P v -> P (UVALUE_Conversion conv t_from v t_to).
     Hypothesis IH_GetElementPtr  : forall (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)), P ptrval -> (forall idx, In idx idxs -> P idx) -> P (UVALUE_GetElementPtr t ptrval idxs).
-    Hypothesis IH_ExtractElement : forall (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement vec idx).
-    Hypothesis IH_InsertElement  : forall (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement vec elt idx).
+    Hypothesis IH_ExtractElement : forall (t:dtyp) (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement t vec idx).
+    Hypothesis IH_InsertElement  : forall (t:dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement t vec elt idx).
     Hypothesis IH_ShuffleVector  : forall (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector vec1 vec2 idxmask).
-    Hypothesis IH_ExtractValue   : forall (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue vec idxs).
-    Hypothesis IH_InsertValue    : forall (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue vec elt idxs).
+    Hypothesis IH_ExtractValue   : forall (t:dtyp) (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue t vec idxs).
+    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec elt idxs).
     Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
     Hypothesis IH_ExtractByte : forall (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : N), P uv -> P idx -> P (UVALUE_ExtractByte uv dt idx sid).
     Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue),
@@ -687,11 +687,11 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_FCmp           : forall (cmp:fcmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FCmp cmp v1 v2).
     Hypothesis IH_Conversion     : forall (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp), P v -> P (UVALUE_Conversion conv t_from v t_to).
     Hypothesis IH_GetElementPtr  : forall (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)), P ptrval -> (forall idx, In idx idxs -> P idx) -> P (UVALUE_GetElementPtr t ptrval idxs).
-    Hypothesis IH_ExtractElement : forall (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement vec idx).
-    Hypothesis IH_InsertElement  : forall (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement vec elt idx).
+    Hypothesis IH_ExtractElement : forall (t:dtyp) (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement t vec idx).
+    Hypothesis IH_InsertElement  : forall (t:dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement t vec elt idx).
     Hypothesis IH_ShuffleVector  : forall (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector vec1 vec2 idxmask).
-    Hypothesis IH_ExtractValue   : forall (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue vec idxs).
-    Hypothesis IH_InsertValue    : forall (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue vec elt idxs).
+    Hypothesis IH_ExtractValue   : forall (t:dtyp) (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue t vec idxs).
+    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec elt idxs).
     Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
     Hypothesis IH_ExtractByte : forall (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : N), P uv -> P idx -> P (UVALUE_ExtractByte uv dt idx sid).
     Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue),
@@ -1208,12 +1208,12 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                 | UVALUE_FCmp op uv1 uv2, UVALUE_FCmp op' uv1' uv2' => _
                 | UVALUE_Conversion ct tf u t, UVALUE_Conversion ct' tf' u' t' => _
                 | UVALUE_GetElementPtr t u l, UVALUE_GetElementPtr t' u' l' => _
-                | UVALUE_ExtractElement u v, UVALUE_ExtractElement u' v' => _
-                | UVALUE_InsertElement u v t, UVALUE_InsertElement u' v' t' => _
-                | UVALUE_ShuffleVector u v t, UVALUE_ShuffleVector u' v' t' => _
-                | UVALUE_ExtractValue u l, UVALUE_ExtractValue u' l' => _
-                | UVALUE_InsertValue u v l, UVALUE_InsertValue u' v' l' => _
-                | UVALUE_Select u v t, UVALUE_Select u' v' t' => _
+                | UVALUE_ExtractElement t u v, UVALUE_ExtractElement t' u' v' => _
+                | UVALUE_InsertElement t u v x, UVALUE_InsertElement t' u' v' x' => _
+                | UVALUE_ShuffleVector u v x, UVALUE_ShuffleVector u' v' x' => _
+                | UVALUE_ExtractValue t u l, UVALUE_ExtractValue t' u' l' => _
+                | UVALUE_InsertValue t u v l, UVALUE_InsertValue t' u' v' l' => _
+                | UVALUE_Select u v w, UVALUE_Select u' v' w' => _
                 | UVALUE_ExtractByte uv dt idx sid, UVALUE_ExtractByte uv' dt' idx' sid' => _
                 | UVALUE_ConcatBytes uvs dt, UVALUE_ConcatBytes uvs' dt' => _
                 | _, _ => _
@@ -1252,22 +1252,26 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       - destruct (dtyp_eq_dec t t')...
         destruct (f u u')...
         destruct (lsteq_dec l l')...
+      - destruct (dtyp_eq_dec t t')...
+        destruct (f u u')...
+        destruct (f v v')...
+      - destruct (dtyp_eq_dec t t')...
+        destruct (f u u')...
+        destruct (f v v')...
+        destruct (f x x')...
       - destruct (f u u')...
         destruct (f v v')...
-      - destruct (f u u')...
+        destruct (f x x')...
+      - destruct (dtyp_eq_dec t t')...
+        destruct (f u u')...
+        destruct (list_eq_dec Z.eq_dec l l')...
+      - destruct (dtyp_eq_dec t t')...
+        destruct (f u u')...
         destruct (f v v')...
-        destruct (f t t')...
-      - destruct (f u u')...
-        destruct (f v v')...
-        destruct (f t t')...
-      - destruct (f u u')...
         destruct (list_eq_dec Z.eq_dec l l')...
       - destruct (f u u')...
         destruct (f v v')...
-        destruct (list_eq_dec Z.eq_dec l l')...
-      - destruct (f u u')...
-        destruct (f v v')...
-        destruct (f t t')...
+        destruct (f w w')...
       - destruct (f uv uv')...
         destruct (f idx idx')...
         destruct (N.eq_dec sid sid')...
@@ -1275,7 +1279,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       - destruct (lsteq_dec uvs uvs')...
         destruct (dtyp_eq_dec dt dt')...
     Qed.
-
 
     #[global] Instance eq_dec_uvalue : RelDec (@eq uvalue) := RelDec_from_dec (@eq uvalue) (@uvalue_eq_dec).
     #[global] Instance eqv_uvalue : Eqv (uvalue) := (@eq uvalue).
@@ -2878,25 +2881,25 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         IX_supported sz ->
         uvalue_has_dtyp idx (DTYPE_I sz) ->
         uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
-        uvalue_has_dtyp (UVALUE_ExtractElement vect idx) t
+        uvalue_has_dtyp (UVALUE_ExtractElement (DTYPE_Vector (N.of_nat n) t) vect idx) t
   | UVALUE_ExtractElement_ptr_typ :
       forall n vect idx t,
         uvalue_has_dtyp idx DTYPE_IPTR ->
         uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
-        uvalue_has_dtyp (UVALUE_ExtractElement vect idx) t
+        uvalue_has_dtyp (UVALUE_ExtractElement (DTYPE_Vector (N.of_nat n) t) vect idx) t
   | UVALUE_InsertElement_typ :
       forall n vect val idx t sz,
         IX_supported sz ->
         uvalue_has_dtyp idx (DTYPE_I sz) ->
         uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
         uvalue_has_dtyp val t ->
-        uvalue_has_dtyp (UVALUE_InsertElement vect val idx) (DTYPE_Vector (N.of_nat n) t)
+        uvalue_has_dtyp (UVALUE_InsertElement (DTYPE_Vector (N.of_nat n) t) vect val idx) (DTYPE_Vector (N.of_nat n) t)
   | UVALUE_InsertElement_ptr_typ :
       forall n vect val idx t,
         uvalue_has_dtyp idx DTYPE_IPTR ->
         uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
         uvalue_has_dtyp val t ->
-        uvalue_has_dtyp (UVALUE_InsertElement vect val idx) (DTYPE_Vector (N.of_nat n) t)
+        uvalue_has_dtyp (UVALUE_InsertElement (DTYPE_Vector (N.of_nat n) t) vect val idx) (DTYPE_Vector (N.of_nat n) t)
   | UVALUE_ShuffleVector_typ :
       forall n m v1 v2 idxs t,
         uvalue_has_dtyp idxs (DTYPE_Vector (N.of_nat m) (DTYPE_I 32)) ->
@@ -2908,50 +2911,50 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
         (0 <= idx)%Z ->
         Nth fts (Z.to_nat idx) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Struct fields) [idx]) dt
+        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Struct fts) (UVALUE_Struct fields) [idx]) dt
   | UVALUE_ExtractValue_Struct_cons_typ :
       forall fields fts fld ft dt idx idxs,
         uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
         (0 <= idx)%Z ->
-        Nth fts (Z.to_nat idx) dt ->
+        Nth fts (Z.to_nat idx) ft ->
         Nth fields (Z.to_nat idx) fld ->
         uvalue_has_dtyp fld ft ->
-        uvalue_has_dtyp (UVALUE_ExtractValue fld idxs) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Struct fields) (idx :: idxs)) dt
+        uvalue_has_dtyp (UVALUE_ExtractValue ft fld idxs) dt ->
+        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Struct fts) (UVALUE_Struct fields) (idx :: idxs)) dt
   | UVALUE_ExtractValue_Packed_struct_sing_typ :
       forall fields fts dt idx,
         uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct fts) ->
         (0 <= idx)%Z ->
         Nth fts (Z.to_nat idx) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Packed_struct fields) [idx]) dt
+        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Packed_struct fts) (UVALUE_Packed_struct fields) [idx]) dt
   | UVALUE_ExtractValue_Packed_struct_cons_typ :
       forall fields fts fld ft dt idx idxs,
         uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct fts) ->
         (0 <= idx)%Z ->
-        Nth fts (Z.to_nat idx) dt ->
+        Nth fts (Z.to_nat idx) ft ->
         Nth fields (Z.to_nat idx) fld ->
         uvalue_has_dtyp fld ft ->
-        uvalue_has_dtyp (UVALUE_ExtractValue fld idxs) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Packed_struct fields) (idx :: idxs)) dt
+        uvalue_has_dtyp (UVALUE_ExtractValue ft fld idxs) dt ->
+        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Packed_struct fts) (UVALUE_Packed_struct fields) (idx :: idxs)) dt
   | UVALUE_ExtractValue_Array_sing_typ :
       forall elements dt idx n,
         uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n dt) ->
         (0 <= idx <= Z.of_N n)%Z ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Array elements) [idx]) dt
+        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Array n dt) (UVALUE_Array elements) [idx]) dt
   | UVALUE_ExtractValue_Array_cons_typ :
       forall elements elem et dt n idx idxs,
-        uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n dt) ->
+        uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n et) ->
         (0 <= idx <= Z.of_N n)%Z ->
         Nth elements (Z.to_nat idx) elem ->
         uvalue_has_dtyp elem et ->
-        uvalue_has_dtyp (UVALUE_ExtractValue elem idxs) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Array elements) (idx :: idxs)) dt
+        uvalue_has_dtyp (UVALUE_ExtractValue et elem idxs) dt ->
+        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Array n et) (UVALUE_Array elements) (idx :: idxs)) dt
   | UVALUE_InsertValue_typ :
       forall struc idxs uv st dt,
-        uvalue_has_dtyp (UVALUE_ExtractValue struc idxs) dt ->
+        uvalue_has_dtyp (UVALUE_ExtractValue st struc idxs) dt ->
         uvalue_has_dtyp uv dt ->
         uvalue_has_dtyp struc st ->
-        uvalue_has_dtyp (UVALUE_InsertValue struc uv idxs) st
+        uvalue_has_dtyp (UVALUE_InsertValue st struc uv idxs) st
   | UVALUE_Select_i1 :
       forall cond x y t,
         uvalue_has_dtyp cond (DTYPE_I 1) ->
@@ -3342,14 +3345,14 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         P idx (DTYPE_I sz) ->
         uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
         P vect (DTYPE_Vector (N.of_nat n) t) ->
-        P (UVALUE_ExtractElement vect idx) t.
+        P (UVALUE_ExtractElement (DTYPE_Vector (N.of_nat n) t) vect idx) t.
 
     Hypothesis IH_ExtractElement_ptr : forall (n : nat) (vect idx : uvalue) (t : dtyp),
         uvalue_has_dtyp idx DTYPE_IPTR ->
         P idx DTYPE_IPTR ->
         uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
         P vect (DTYPE_Vector (N.of_nat n) t) ->
-        P (UVALUE_ExtractElement vect idx) t.
+        P (UVALUE_ExtractElement (DTYPE_Vector (N.of_nat n) t) vect idx) t.
 
     Hypothesis IH_InsertElement : forall (n : nat) (vect val idx : uvalue) (t : dtyp) (sz : N),
         IX_supported sz ->
@@ -3359,7 +3362,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         P vect (DTYPE_Vector (N.of_nat n) t) ->
         uvalue_has_dtyp val t ->
         P val t ->
-        P (UVALUE_InsertElement vect val idx)
+        P (UVALUE_InsertElement (DTYPE_Vector (N.of_nat n) t) vect val idx)
           (DTYPE_Vector (N.of_nat n) t).
 
     Hypothesis IH_InsertElement_ptr : forall (n : nat) (vect val idx : uvalue) (t : dtyp),
@@ -3369,7 +3372,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         P vect (DTYPE_Vector (N.of_nat n) t) ->
         uvalue_has_dtyp val t ->
         P val t ->
-        P (UVALUE_InsertElement vect val idx)
+        P (UVALUE_InsertElement (DTYPE_Vector (N.of_nat n) t) vect val idx)
           (DTYPE_Vector (N.of_nat n) t).
 
     Hypothesis IH_ShuffleVector : forall (n m : nat) (v1 v2 idxs : uvalue) (t : dtyp),
@@ -3389,7 +3392,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         (0 <= idx)%Z ->
         Nth fts (Z.to_nat idx) dt ->
         P
-          (UVALUE_ExtractValue (UVALUE_Struct fields) [idx]) dt.
+          (UVALUE_ExtractValue (DTYPE_Struct fts) (UVALUE_Struct fields) [idx]) dt.
 
     Hypothesis IH_ExtractValue_Struct_cons : forall (fields : list uvalue) (fts : list dtyp)
                                                (fld : uvalue) (ft dt : dtyp) (idx : Z)
@@ -3397,14 +3400,14 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
         P (UVALUE_Struct fields) (DTYPE_Struct fts) ->
         (0 <= idx)%Z ->
-        Nth fts (Z.to_nat idx) dt ->
+        Nth fts (Z.to_nat idx) ft ->
         Nth fields (Z.to_nat idx) fld ->
         uvalue_has_dtyp fld ft ->
         P fld ft ->
-        uvalue_has_dtyp (UVALUE_ExtractValue fld idxs) dt ->
-        P (UVALUE_ExtractValue fld idxs) dt ->
+        uvalue_has_dtyp (UVALUE_ExtractValue ft fld idxs) dt ->
+        P (UVALUE_ExtractValue ft fld idxs) dt ->
         P
-          (UVALUE_ExtractValue (UVALUE_Struct fields) (idx :: idxs))
+          (UVALUE_ExtractValue (DTYPE_Struct fts) (UVALUE_Struct fields) (idx :: idxs))
           dt.
 
     Hypothesis IH_ExtractValue_Packed_struct_sing : forall (fields : list uvalue)
@@ -3417,7 +3420,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         (0 <= idx)%Z ->
         Nth fts (Z.to_nat idx) dt ->
         P
-          (UVALUE_ExtractValue (UVALUE_Packed_struct fields)
+          (UVALUE_ExtractValue (DTYPE_Packed_struct fts) (UVALUE_Packed_struct fields)
                                [idx]) dt.
 
     Hypothesis IH_ExtractValue_Packed_struct_cons : forall (fields : list uvalue)
@@ -3429,14 +3432,14 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         P (UVALUE_Packed_struct fields)
                         (DTYPE_Packed_struct fts) ->
         (0 <= idx)%Z ->
-        Nth fts (Z.to_nat idx) dt ->
+        Nth fts (Z.to_nat idx) ft ->
         Nth fields (Z.to_nat idx) fld ->
         uvalue_has_dtyp fld ft ->
         P fld ft ->
-        uvalue_has_dtyp (UVALUE_ExtractValue fld idxs) dt ->
-        P (UVALUE_ExtractValue fld idxs) dt ->
+        uvalue_has_dtyp (UVALUE_ExtractValue ft fld idxs) dt ->
+        P (UVALUE_ExtractValue ft fld idxs) dt ->
         P
-          (UVALUE_ExtractValue (UVALUE_Packed_struct fields)
+          (UVALUE_ExtractValue (DTYPE_Packed_struct fts) (UVALUE_Packed_struct fields)
                                (idx :: idxs)) dt.
 
     Hypothesis IH_ExtractValue_Array_sing : forall (elements : list uvalue) (dt : dtyp) (idx : Z) (n : N),
@@ -3444,32 +3447,32 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         P (UVALUE_Array elements) (DTYPE_Array n dt) ->
         (0 <= idx <= Z.of_N n)%Z ->
         P
-          (UVALUE_ExtractValue (UVALUE_Array elements) [idx]) dt.
+          (UVALUE_ExtractValue (DTYPE_Array n dt) (UVALUE_Array elements) [idx]) dt.
 
     Hypothesis IH_ExtractValue_Array_cons : forall (elements : list uvalue) (elem : uvalue)
                                               (et dt : dtyp) (n : N) (idx : Z)
                                               (idxs : list LLVMAst.int),
-        uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n dt) ->
-        P (UVALUE_Array elements) (DTYPE_Array n dt) ->
+        uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n et) ->
+        P (UVALUE_Array elements) (DTYPE_Array n et) ->
         (0 <= idx <= Z.of_N n)%Z ->
         Nth elements (Z.to_nat idx) elem ->
         uvalue_has_dtyp elem et ->
         P elem et ->
-        uvalue_has_dtyp (UVALUE_ExtractValue elem idxs) dt ->
-        P (UVALUE_ExtractValue elem idxs) dt ->
+        uvalue_has_dtyp (UVALUE_ExtractValue et elem idxs) dt ->
+        P (UVALUE_ExtractValue et elem idxs) dt ->
         P
-          (UVALUE_ExtractValue (UVALUE_Array elements) (idx :: idxs))
+          (UVALUE_ExtractValue (DTYPE_Array n et) (UVALUE_Array elements) (idx :: idxs))
           dt.
 
     Hypothesis IH_InsertValue : forall (struc : uvalue) (idxs : list LLVMAst.int)
                                   (uv : uvalue) (st dt : dtyp),
-        uvalue_has_dtyp (UVALUE_ExtractValue struc idxs) dt ->
-        P (UVALUE_ExtractValue struc idxs) dt ->
+        uvalue_has_dtyp (UVALUE_ExtractValue st struc idxs) dt ->
+        P (UVALUE_ExtractValue st struc idxs) dt ->
         uvalue_has_dtyp uv dt ->
         P uv dt ->
         uvalue_has_dtyp struc st ->
         P struc st ->
-        P (UVALUE_InsertValue struc uv idxs) st.
+        P (UVALUE_InsertValue st struc uv idxs) st.
 
     Hypothesis IH_Select_i1 : forall (cond x y : uvalue) (t : dtyp),
         uvalue_has_dtyp cond (DTYPE_I 1) ->
@@ -4091,11 +4094,11 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
        | UVALUE_FCmp cmp v1 v2 => "UVALUE_FCmp"
        | UVALUE_Conversion conv t_from v t_to => "UVALUE_Conversion"
        | UVALUE_GetElementPtr t ptrval idxs => "UVALUE_GetElementPtr"
-       | UVALUE_ExtractElement vec idx => "UVALUE_ExtractElement"
-       | UVALUE_InsertElement vec elt idx => "UVALUE_InsertElement"
+       | UVALUE_ExtractElement t vec idx => "UVALUE_ExtractElement"
+       | UVALUE_InsertElement t vec elt idx => "UVALUE_InsertElement"
        | UVALUE_ShuffleVector vec1 vec2 idxmask => "UVALUE_ShuffleVector"
-       | UVALUE_ExtractValue vec idxs => "UVALUE_ExtractValue"
-       | UVALUE_InsertValue vec elt idxs => "UVALUE_InsertValue"
+       | UVALUE_ExtractValue t vec idxs => "UVALUE_ExtractValue"
+       | UVALUE_InsertValue t vec elt idxs => "UVALUE_InsertValue"
        | UVALUE_Select cnd v1 v2 => "UVALUE_Select"
        | UVALUE_ExtractByte uv dt idx sid => "UVALUE_ExtractByte"
        | UVALUE_ConcatBytes uvs dt => "UVALUE_ConcatBytes"

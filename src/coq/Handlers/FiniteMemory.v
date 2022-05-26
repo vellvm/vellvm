@@ -1106,11 +1106,11 @@ Module Type FinMemory (LP : LLVMParams) (MP : MemoryParams LP).
        | UVALUE_FCmp _ _ _
        | UVALUE_Conversion _ _ _ _
        | UVALUE_GetElementPtr _ _ _
-       | UVALUE_ExtractElement _ _
-       | UVALUE_InsertElement _ _ _
+       | UVALUE_ExtractElement _ _ _
+       | UVALUE_InsertElement _ _ _ _
        | UVALUE_ShuffleVector _ _ _
-       | UVALUE_ExtractValue _ _
-       | UVALUE_InsertValue _ _ _
+       | UVALUE_ExtractValue _ _ _
+       | UVALUE_InsertValue _ _ _ _
        | UVALUE_Select _ _ _ =>
          sid <- fresh_sid;;
          lift_OOM (to_ubytes uv dt sid)
@@ -1258,11 +1258,11 @@ Module Type FinMemory (LP : LLVMParams) (MP : MemoryParams LP).
        | UVALUE_FCmp _ _ _
        | UVALUE_Conversion _ _ _ _
        | UVALUE_GetElementPtr _ _ _
-       | UVALUE_ExtractElement _ _
-       | UVALUE_InsertElement _ _ _
+       | UVALUE_ExtractElement _ _ _
+       | UVALUE_InsertElement _ _ _ _
        | UVALUE_ShuffleVector _ _ _
-       | UVALUE_ExtractValue _ _
-       | UVALUE_InsertValue _ _ _
+       | UVALUE_ExtractValue _ _ _
+       | UVALUE_InsertValue _ _ _ _
        | UVALUE_Select _ _ _ =>
          sid <- fresh_sid;;
          lift_OOM (to_ubytes uv dt sid)
@@ -1986,11 +1986,11 @@ Module Type FinMemory (LP : LLVMParams) (MP : MemoryParams LP).
            | UVALUE_FCmp cmp v1 v2 => "UVALUE_FCmp"
            | UVALUE_Conversion conv t_from v t_to => "UVALUE_Conversion"
            | UVALUE_GetElementPtr t ptrval idxs => "UVALUE_GetElementPtr"
-           | UVALUE_ExtractElement vec idx => "UVALUE_ExtractElement"
-           | UVALUE_InsertElement vec elt idx => "UVALUE_InsertElement"
+           | UVALUE_ExtractElement t vec idx => "UVALUE_ExtractElement"
+           | UVALUE_InsertElement t vec elt idx => "UVALUE_InsertElement"
            | UVALUE_ShuffleVector vec1 vec2 idxmask => "UVALUE_ShuffleVector"
-           | UVALUE_ExtractValue vec idxs => "UVALUE_ExtractValue"
-           | UVALUE_InsertValue vec elt idxs => "UVALUE_InsertValue"
+           | UVALUE_ExtractValue t vec idxs => "UVALUE_ExtractValue"
+           | UVALUE_InsertValue t vec elt idxs => "UVALUE_InsertValue"
            | UVALUE_Select cnd v1 v2 => "UVALUE_Select"
            | UVALUE_ExtractByte uv dt idx sid => "UVALUE_ExtractByte " ++ uvalue_to_string uv ++ " typ " ++ uvalue_to_string idx ++ " " ++ Show.show sid
            | UVALUE_ConcatBytes uvs dt => "UVALUE_ConcatBytes " ++ Show.show (map uvalue_to_string uvs)
