@@ -355,6 +355,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
       dv <- pick_your_poison uv;;
       ret (dvalue_to_uvalue dv)
     end.
+
   Arguments denote_exp _ : simpl nomatch.
 
   Definition denote_op (o:exp dtyp) : itree exp_E uvalue :=

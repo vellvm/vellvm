@@ -2395,6 +2395,77 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     end.
   Arguments insert_into_str _ _ _ : simpl nomatch.
 
+  Definition index_into_vec_dv {M} `{Monad M} `{RAISE_ERROR M} (elt_typ : dtyp) (v:dvalue) (idx:dvalue) : M dvalue :=
+    let fix loop dt (elts : list dvalue) i :=
+        match elts with
+        | [] => ret (DVALUE_Poison dt) (* LangRef: if idx exceeds the length of val for a fixed-length vector, the result is a poison value *)
+        | h :: tl =>
+          if (i =? 0)%Z then ret h else loop dt tl (i-1)%Z
+        end in
+    match v with
+    | DVALUE_Array e
+    | DVALUE_Vector e =>
+        match idx with
+        | DVALUE_I32 i2
+        | DVALUE_I64 i2 =>
+            let iZ := signed i2 in
+            match iZ with
+            | Zpos _ => loop elt_typ e iZ
+            | _ => raise_error "invalid index data"
+            end
+        | _ => raise_error "invalid index data"
+        end
+    | _ => raise_error "invalid vector data"
+    end.
+  Arguments index_into_vec_dv _ _ : simpl nomatch.
+
+  Definition insert_into_vec_dv {M} `{Monad M} `{RAISE_ERROR M} (vec_typ : dtyp) (vec:dvalue) (v:dvalue) (idx:dvalue) : M dvalue :=
+    let fix loop (acc elts:list dvalue) (i:LLVMAst.int) :=
+        match elts with
+        | [] => None (* LangRef: if idx exceeds the length of val for a fixed-length vector, the result is a poison value *)
+        | h :: tl =>
+          (if i =? 0 then ret (acc ++ (v :: tl))
+          else loop (acc ++ [h]) tl (i-1))%Z
+        end%list in
+    match vec with
+    | DVALUE_Vector e =>
+        match idx with
+        | DVALUE_I32 i2
+        | DVALUE_I64 i2 =>
+            let iZ := signed i2 in
+            match iZ with
+            | Zpos _ =>
+                match loop [] e iZ with
+                | None =>
+                    ret (DVALUE_Poison vec_typ)
+                | Some elts =>
+                    ret (DVALUE_Vector elts)
+                end
+            | _ => raise_error "invalid index data"
+            end
+        | _ => raise_error "invalid index data"
+        end
+    | DVALUE_Array e =>
+        match idx with
+        | DVALUE_I32 i2
+        | DVALUE_I64 i2 =>
+            let iZ := signed i2 in
+            match iZ with
+            | Zpos _ =>
+                match loop [] e iZ with
+                | None =>
+                    ret (DVALUE_Poison vec_typ)
+                | Some elts =>
+                    ret (DVALUE_Array elts)
+                end
+            | _ => raise_error "invalid index data"
+            end
+        | _ => raise_error "invalid index data"
+        end
+    | _ => raise_error "invalid vector data"
+    end.
+  Arguments insert_into_vec_dv _ _ _ : simpl nomatch.
+
 (*  ------------------------------------------------------------------------- *)
 
   (* Interpretation of [uvalue] in terms of sets of [dvalue].
