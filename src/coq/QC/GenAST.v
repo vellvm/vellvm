@@ -133,7 +133,13 @@ Section Helpers.
     :=
       n <- (arbitrary : G nat);;
       ret (Z.of_nat n).
+
+  Definition genN : G N
+    :=
+      n <- (arbitrary : G nat);;
+      ret (N.of_nat n).
 End Helpers.
+
 Section GenerationState.
   Record GenState :=
     mkGenState
@@ -374,13 +380,14 @@ Section TypGenerators.
       oneOf_LLVM
         [ gen_sized_typ_0
         ; ret TYPE_Pointer <*> gen_sized_typ_size sz'
-        (* Might want to restrict the size to something reasonable *)
-        (* ; ret TYPE_Array <*> lift genPosZ <*> gen_sized_typ_size sz'
-        ; ret TYPE_Vector <*> lift genPosZ <*> gen_sized_typ_size sz'
-        ; let n := Nat.div sz 2 in
-          ret TYPE_Function <*> gen_sized_typ_size n <*> listOf_LLVM (gen_sized_typ_size n)
+        (* TODO: Might want to restrict the size to something reasonable *)
+        ; ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size sz'
+        ; ret TYPE_Vector <*> lift_GenLLVM genN <*> gen_sized_typ_size sz'
+        (* TODO: I don't think functions are sized types? *)
+        (* ; let n := Nat.div sz 2 in *)
+        (*   ret TYPE_Function <*> gen_sized_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) *)
         ; ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
-        ; ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz') *)
+        ; ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
         ]
     end.
 
@@ -416,9 +423,6 @@ Section TypGenerators.
                 (* ; TYPE_X86_mmx *)
                 (* ; TYPE_Opaque *)
                 ])).
-
-  Definition genN : G N
-    := n <- arbitrary;; ret (N.of_nat n).
 
   (* TODO: This should probably be mutually recursive with
      gen_sized_typ since pointers of any type are considered sized *)
@@ -972,10 +976,23 @@ Definition genType: G (typ) :=
           | TYPE_Void                 => lift failGen (* There should be no expressions of type void *)
           | TYPE_Function ret args    => lift failGen (* No expressions of function type *)
           | TYPE_Opaque               => lift failGen (* TODO: not sure what these should be... *)
-          | TYPE_Array n t            => lift failGen
-          | TYPE_Vector sz t          => lift failGen
-          | TYPE_Struct fields        => lift failGen
-          | TYPE_Packed_struct fields => lift failGen
+
+          (* Generate literals for aggregate structures *)
+          | TYPE_Array n t =>
+              es <- vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t);;
+              ret (EXP_Array (map (fun e => (t, e)) es))
+          | TYPE_Vector n t =>
+              es <- vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t);;
+              ret (EXP_Array (map (fun e => (t, e)) es))
+          | TYPE_Struct fields =>
+              (* Should we divide size evenly amongst components of struct? *)
+              tes <- map_monad (fun t => e <- gen_exp_size 0 t;; ret (t, e)) fields;;
+              ret (EXP_Struct tes)
+          | TYPE_Packed_struct fields =>
+              (* Should we divide size evenly amongst components of struct? *)
+              tes <- map_monad (fun t => e <- gen_exp_size 0 t;; ret (t, e)) fields;;
+              ret (EXP_Packed_struct tes)
+
           | TYPE_Identified id        =>
             ctx <- get_ctx;;
             match find_pred (fun '(i,t) => if Ident.eq_dec id i then true else false) ctx with
@@ -1007,21 +1024,14 @@ Definition genType: G (typ) :=
           | TYPE_IPTR =>
             (* TODO: If I1 also allow ICmp and FCmp *)
             [gen_ibinop_exp_typ TYPE_IPTR]
-          | TYPE_Array n t =>
-            [es <- vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t);;
-             ret (EXP_Array (map (fun e => (t, e)) es))]
-          | TYPE_Vector n t =>
-            [es <- vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t);;
-             ret (EXP_Array (map (fun e => (t, e)) es))]
-          | TYPE_Struct fields =>
-            (* Should we divide size evenly amongst components of struct? *)
-            [tes <- map_monad (fun t => e <- gen_exp_size 0 t;; ret (t, e)) fields;;
-             ret (EXP_Struct tes)]
-          | TYPE_Packed_struct fields =>
-            (* Should we divide size evenly amongst components of struct? *)
-            [tes <- map_monad (fun t => e <- gen_exp_size 0 t;; ret (t, e)) fields;;
-             ret (EXP_Packed_struct tes)]
           | TYPE_Pointer t         => [] (* GEP? *)
+
+          (* TODO: currently only generate literals for aggregate structures with size 0 exps *)
+          | TYPE_Array n t => []
+          | TYPE_Vector n t => []
+          | TYPE_Struct fields => []
+          | TYPE_Packed_struct fields => []
+
           | TYPE_Void              => [lift failGen] (* No void type expressions *)
           | TYPE_Function ret args => [lift failGen] (* These shouldn't exist, I think *)
           | TYPE_Opaque            => [lift failGen] (* TODO: not sure what these should be... *)
@@ -1084,6 +1094,7 @@ Definition genType: G (typ) :=
     := t <- gen_sized_typ;;
        e <- gen_exp t;;
        ret (t, e).
+
   Definition gen_op (t : typ) : GenLLVM (exp typ)
     := sized_LLVM
          (fun sz =>
@@ -1166,7 +1177,7 @@ Section InstrGenerators.
     ctx <- get_ctx;;
     oneOf_LLVM
       ([ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
-      ; t <- gen_op_typ;; (* gen_sized_typ;; *)
+      ; t <- gen_sized_typ;;
         (* TODO: generate multiple element allocas. Will involve changing initialization *)
         num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *)
         align <- ret None;;
