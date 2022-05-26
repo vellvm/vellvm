@@ -1535,7 +1535,7 @@ Class VInt I : Type :=
     end.
   Arguments insert_into_str _ _ _ : simpl nomatch.
   Definition t := let a: int32 := repr 1%Z in cmp Cge a (repr 1%Z).
-  Definition index_vec_into_str (v:uvalue) (idx:uvalue) : undef_or_err uvalue :=
+  Definition index_into_vec (v:uvalue) (idx:uvalue) : undef_or_err uvalue :=
     let fix loop elts i :=
         match elts with
         | [] => failwith "index out of bounds"
@@ -1558,7 +1558,7 @@ Class VInt I : Type :=
     end.
   Arguments index_into_str _ _ : simpl nomatch.
 
-  Definition insert_vec_into_str (vec:dvalue) (v:dvalue) (idx:dvalue) : undef_or_err dvalue :=
+  Definition insert_vec_into_vec (vec:dvalue) (v:dvalue) (idx:dvalue) : undef_or_err dvalue :=
     let fix loop (acc elts:list dvalue) (i:LLVMAst.int) :=
         match elts with
         | [] => failwith "index out of bounds"

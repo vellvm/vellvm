@@ -219,15 +219,15 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       - intros. subst. inversion H. clear H.
         induction sz.
         + cbn in H1.
-          destruct (default_dvalue_of_dtyp t) eqn: HT. inv H1. inv H1.
+          destruct (default_dvalue_of_dtyp t0) eqn: HT. inv H1. inv H1.
           pose proof DVALUE_Array_typ.
-          specialize (H nil (N.to_nat 0) t).
+          specialize (H nil (N.to_nat 0) t0).
           rewrite Nnat.N2Nat.id in H.
           apply H. auto. auto.
         + cbn in H1.
-          destruct (default_dvalue_of_dtyp t) eqn: HT. inv H1. inv H1.
+          destruct (default_dvalue_of_dtyp t0) eqn: HT. inv H1. inv H1.
           pose proof DVALUE_Array_typ as ARR.
-          specialize (ARR (repeat d (Pos.to_nat p)) (N.to_nat (N.pos p)) t).
+          specialize (ARR (repeat d (Pos.to_nat p)) (N.to_nat (N.pos p)) t0).
           rewrite Nnat.N2Nat.id in ARR.
           cbn in *.
           apply ARR.
@@ -283,13 +283,13 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
           symmetry. auto.
           apply IHfields. cbn. rewrite FIELDS. reflexivity.
       - intros. subst. inversion H. clear H.
-        revert H1. revert v. revert IHt. revert t.
+        revert H1. revert v. revert IHt. revert t0.
         induction sz.
         + intros. cbn in H1.
           pose proof DVALUE_Vector_typ.
           specialize (H nil (N.to_nat 0)).
           rewrite Nnat.N2Nat.id in H.
-          destruct t; inv H1;
+          destruct t0; inv H1;
               try
                 (apply H;
                  [constructor | constructor |
@@ -298,7 +298,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
           apply H. constructor. auto. unfold vector_dtyp. left.
           exists sz. reflexivity.
         + intros. cbn in H1.
-          destruct t; inv H1;
+          destruct t0; inv H1;
             try (
                 rewrite <- positive_nat_N;
                    constructor; [apply forall_repeat_true ; constructor |
@@ -318,7 +318,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       intros u.
       induction u; try do_it.
 
-      - cbn. destruct (default_dvalue_of_dtyp t) eqn: EQ.
+      - cbn. destruct (default_dvalue_of_dtyp t0) eqn: EQ.
         econstructor. Unshelve. 3 : { exact DVALUE_None. }
         intro. inv H.
         apply Concretize_Undef. apply dvalue_default. symmetry. auto.
