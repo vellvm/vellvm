@@ -356,7 +356,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
   Definition pickUnique {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue
     := concretize_or_pick uv (unique_prop uv).
-
+Print index_vec_into_str.
   (** ** Denotation of expressions
       [denote_exp top o] is the main entry point for evaluating itree expressions.
       top : the type at which the expression should be evaluated (if any)
@@ -371,7 +371,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
      Expressions are denoted as itrees that return a [uvalue].
  *)
-
+Search exp_E.
+Print undef_or_err.
   Fixpoint denote_exp
            (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E uvalue :=
         let eval_texp '(dt,ex) := denote_exp (Some dt) ex
@@ -590,7 +591,13 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             fmap dvalue_to_uvalue (trigger (GEP dt1 dvptr dvs))
           end
 
-        | OP_ExtractElement vecop idx =>
+        | OP_ExtractElement (dt, vec) (idt, idx) =>
+          vec <- denote_exp (Some dt) vec;;
+          idx <- denote_exp (Some idt) idx;;
+          (* verify that vec is indeed a vector and idx is an integer*)
+          (* verify that idx can find a vec in vector*)
+          dvec <- concretize_or_pick vec True;;
+          
           raise "extractelement not implemented" (* TODO: Extract Element *)
 
         | OP_InsertElement vecop eltop idx =>
