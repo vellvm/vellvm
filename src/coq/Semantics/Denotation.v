@@ -321,13 +321,13 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
     | OP_ExtractElement (dt_vec, vecop) (dt_idx, idx) =>
         vec <- denote_exp (Some dt_vec) vecop ;;
         idx <- denote_exp (Some dt_idx) idx ;;
-        ret (UVALUE_ExtractElement vec idx)
+        ret (UVALUE_ExtractElement dt_vec vec idx)
 
     | OP_InsertElement (dt_vec, vecop) (dt_elt, eltop) (dt_idx, idx) =>
         vec <- denote_exp (Some dt_vec) vecop ;;
         elt <- denote_exp (Some dt_elt) eltop ;;
         idx <- denote_exp (Some dt_idx) idx ;;
-        ret (UVALUE_InsertElement vec elt idx)
+        ret (UVALUE_InsertElement dt_vec vec elt idx)
 
     | OP_ShuffleVector (dt_vec1, vecop1) (dt_vec2, vecop2) (dt_mask, idxmask) =>
         vec1 <- denote_exp (Some dt_vec1) vecop1 ;;
@@ -337,24 +337,25 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
 
     | OP_ExtractValue (dt, str) idxs =>
         str <- denote_exp (Some dt) str ;;
-        ret (UVALUE_ExtractValue str idxs)
+        ret (UVALUE_ExtractValue dt str idxs)
 
     | OP_InsertValue (dt_str, strop) (dt_elt, eltop) idxs =>
         str <- denote_exp (Some dt_str) strop ;;
         elt <- denote_exp (Some dt_elt) eltop ;;
-        ret (UVALUE_InsertValue str elt idxs)
+        ret (UVALUE_InsertValue dt_str str elt idxs)
 
     | OP_Select (dt, cnd) (dt1, op1) (dt2, op2) =>
         cnd <- denote_exp (Some dt) cnd ;;
         v1   <- denote_exp (Some dt1) op1 ;;
         v2   <- denote_exp (Some dt2) op2 ;;
-        ret (UVALUE_Select cnd v1 v2)
+        ret (UVALUE_Select cnd v1 v2)    
 
     | OP_Freeze (dt, e) =>
       uv <- denote_exp (Some dt) e ;;
       dv <- pick_your_poison uv;;
       ret (dvalue_to_uvalue dv)
     end.
+
   Arguments denote_exp _ : simpl nomatch.
 
   Definition denote_op (o:exp dtyp) : itree exp_E uvalue :=

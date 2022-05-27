@@ -118,7 +118,7 @@ Module Type SerializationBase (LP : LLVMParams) (MP : MemoryParams LP).
             | inl err => lift_ue dvalue (raise_error err)
             | inr dv => ret dv
             end
-        | UVALUE_ExtractValue uv idxs =>
+        | UVALUE_ExtractValue t uv idxs =>
             str <- concretize_uvalueM M undef_handler ERR_M lift_ue uv;;
             (let
                 fix loop (str0 : dvalue) (idxs0 : list int) {struct idxs0} : ERR_M dvalue :=
@@ -849,7 +849,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
             | inl err => lift_ue (raise_error err)
             end
 
-        | UVALUE_ExtractValue uv idxs =>
+        | UVALUE_ExtractValue t uv idxs =>
             str <- concretize_uvalueM uv;;
             let fix loop str idxs : ERR_M dvalue :=
               match idxs with
@@ -1000,7 +1000,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
                 | inl err => lift_ue (raise_error err)
                 end
 
-            | UVALUE_ExtractValue uv idxs =>
+            | UVALUE_ExtractValue t uv idxs =>
                 str <- concretize_uvalueM uv;;
                 let fix loop str idxs : ERR_M dvalue :=
                   match idxs with
