@@ -22,14 +22,13 @@ let parse_pp_test path =
   let filename, _ = Platform.path_to_basename_ext path in
   let vll_file = Platform.gen_name !Platform.output_path filename ".v.ll" in
   let dot_s = Platform.gen_name !Platform.output_path filename ".s" in
-  let _ = Printf.fprintf stderr "Running llc on: %s\n%!" path in
+  let _ = Printf.fprintf stderr "Running clang on: %s\n%!" path in
   try
-    (* VV: Re-enabled llc *)
-    let _ = llc_parse path dot_s in
+    let _ = clang_parse path dot_s in
     let prog = parse_file path in
     let _ = output_file vll_file prog in
     try
-      let _ = llc_parse vll_file dot_s in
+      let _ = clang_parse vll_file dot_s in
       ()
     with
     PlatformError _ -> failwith (Printf.sprintf "vellvm output bad file: %s" vll_file)
@@ -38,7 +37,7 @@ let parse_pp_test path =
 
 
 
-let files_of_dir path : string list =
+let ll_files_of_dir path : string list =
   let tmp_file = gen_name "." ".ll_files" ".tmp" in
   let cmd = Printf.sprintf "find %s -name \"*.ll\" -print > %s" path tmp_file in
   let () = sh cmd raise_error in 
@@ -57,7 +56,7 @@ let files_of_dir path : string list =
 
 let pp_test_of_dir dir =
   Test ("Parsing files in: " ^ dir,
-        List.map (fun f -> (f, fun () -> parse_pp_test f)) (files_of_dir dir))
+        List.map (fun f -> (f, fun () -> parse_pp_test f)) (ll_files_of_dir dir))
 
 let run_dvalue_test (test:DV.dvalue -> bool) path =
   let (res, msg) =

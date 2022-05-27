@@ -19,8 +19,6 @@ define i64 @bar() {
   ret i64 %ans
 }
 
-
-
 ; ASSERT EQ: i64 17 = call i64 @foo()
 ; ASSERT EQ: i64 17 = call i64 @bar()
 

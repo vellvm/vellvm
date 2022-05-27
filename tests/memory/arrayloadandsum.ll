@@ -13,8 +13,8 @@ define i64 @main() #0 {
   br label %sum_loop_cond
 
 sum_loop_cond:
-  %iv = load i64, i64* %i, align 8
-  %cmp = icmp ult i64 %iv, 5
+  %xv = load i64, i64* %i, align 8
+  %cmp = icmp ult i64 %xv, 5
   br i1 %cmp, label %sum_loop_body, label %exit
 
 sum_loop_body:

@@ -147,8 +147,8 @@ The executable `vellvm` will be found in `src/`.
 Do `src/vellvm -help` from the command line to see all available options.
 In particular:
 - `src/vellvm -interpret tests/ll/factorial.ll` to run the interpreter on a given file.
-- `cd src && ./vellvm --test` to run the test suite against llc
-- `src/vellvm --test-file tests/ll/gep2.ll` to test a specific file using inlined assertions
+- `cd src && ./vellvm -test` to run the test suite against clang
+- `src/vellvm -test-file tests/ll/gep2.ll` to test a specific file using inlined assertions
 
 
 # Adding a new test case
@@ -212,10 +212,10 @@ attributes #0 = { noinline nounwind optnone ssp uwtable "correctly-rounded-divid
 ; ASSERT EQ: i32 5 = call i32 @foo(i32 2)
 ```
 
-5. Run vellvm with the `--test-file example.ll` flags to see the results of running the test cases:
+5. Run vellvm with the `-test-file example.ll` flags to see the results of running the test cases:
 
 ```
-~/vellvm/tests/c> ../../src/vellvm --test-file example.ll
+~/vellvm/tests/c> ../../src/vellvm -test-file example.ll
 (* -------- Vellvm Test Harness -------- *)
 
 example:
@@ -228,4 +228,4 @@ Passed: 2/3
 Failed: 1/3
 ```
 
-6. The command `vellvm --test-dir <dir>` will run the `ASSERT`s found in all the `.ll` files in directory `<dir>`.
+6. The command `vellvm -test-dir <dir>` will run the `ASSERT`s found in all the `.ll` files in directory `<dir>`.

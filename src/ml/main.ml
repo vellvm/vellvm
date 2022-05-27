@@ -85,7 +85,9 @@ let make_test ll_ast t : string * assertion  =
                                | _, Error er -> Error er
                end
              ) (Ok true))
+
 let test_pp_dir dir =
+  let _ = Printf.printf "===> RUNNING PRETTY PRINTING TESTS IN: %s\n" dir in  
   Platform.configure();
   let suite = [Test.pp_test_of_dir dir] in
   let outcome = run_suite suite in
@@ -127,7 +129,7 @@ let ast_pp_file path =
 
 let ast_pp_dir dir =
   Platform.configure();
-  let files = Test.files_of_dir dir in
+  let files = Test.ll_files_of_dir dir in
   List.iter ast_pp_file_inner files
 
 
@@ -146,40 +148,54 @@ let test_file path =
     | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
   end
 
-(* This is part of the standard library since 4.08.0 *)
-let rec filter_map (filter: 'a -> 'b option) (l: 'a list) : 'b list =
-match l with
-| [] -> []
-| hd :: tl -> (match filter hd with
-              | None -> filter_map filter tl
-              | Some b -> b :: filter_map filter tl)
-
 let test_dir dir =
+  let _ = Printf.printf "===> TESTING ASSERTIONS IN: %s\n" dir in
   Platform.configure();
-  let pathlist = Test.files_of_dir dir in
-  let files = filter_map (fun path ->
+  let pathlist = Test.ll_files_of_dir dir in
+  let files = List.filter_map (fun path ->
       let file, ext = Platform.path_to_basename_ext path in
+      try 
       begin match ext with
         | "ll" -> Some (file, parse_file path, parse_tests path)
         | _ -> None
-      end) pathlist
+      end
+      with
+        Failure s | ParseUtil.InvalidAnonymousId s ->
+          let _ = Printf.printf "FAILURE %s\n\t%s\n%!" path s in
+          None
+      | _ ->
+        let _ = Printf.printf "FAILURE %s\n" path in
+        None
+    ) pathlist
   in
-  let suite = List.map (fun (file, ast, tests) -> Test (file, List.map (make_test ast) tests)) files in
+  let suite = List.map (fun (file, ast, tests) ->
+      Test (file, List.map (make_test ast) tests)) files in
   let outcome = run_suite suite in
   Printf.printf "%s\n" (outcome_to_string outcome);
   raise (Ran_tests (successful outcome))
-  
 
-(* Use the --test option to run unit tests and the quit the program. *)
+let test_directory = ref "../tests"
+
+let test_all () =
+  let _ = Printf.printf "============== RUNNING TEST SUITE ==============\n" in
+  let b1 = try exec_tests () with Ran_tests b-> b in
+  let b2 = try test_pp_dir (!test_directory) with Ran_tests b -> b in
+  let b3 = try test_dir (!test_directory) with Ran_tests b -> b in
+  raise (Ran_tests (b1 && b2 && b3))
+
 let args =
-  [ ("--test", Unit exec_tests, "run the test suite, ignoring later inputs")
-  ; ("--test-file", String test_file, "run the assertions in a given file")
-  ; ("--test-dir", String test_dir, "run all .ll files in the given directory")
-  ; ("--test-pp-dir", String test_pp_dir, "run the parsing/pretty-printing tests on all .ll files in the given directory")
-  ; ("--print-ast", String ast_pp_file, "run the parsing on the given .ll file and write its internal ast and domination tree to a .v.ast file in the output directory (see -op)")
-  ; ("--print-ast-dir", String ast_pp_dir, "run the parsing on the given directory and write its internal ast and domination tree to a .v.ast file in the output directory (see -op)")
+  [
+    ("-set-test-dir", Set_string test_directory, "set the path to the tests directory [default='../tests']")
+  ; ("-test", Unit test_all, "run comprehensive test case:\n\tequivalent to running three times with\n\t -test-suite, then\n\t -test-pp-dir ../tests, then\n\t -test-dir ../tests")
+  ; ("-test-suite", Unit exec_tests, "run the test suite, ignoring later inputs")
+  ; ("-test-file", String test_file, "run the assertions in a given file")
+  ; ("-test-dir", String test_dir, "run all .ll files in the given directory")
+  ; ("-test-pp-dir", String test_pp_dir, "run the parsing/pretty-printing tests on all .ll files in the given directory")    
+  ; ("-print-ast", String ast_pp_file, "run the parsing on the given .ll file and write its internal ast and domination tree to a .v.ast file in the output directory (see -op)")
+  ; ("-print-ast-dir", String ast_pp_dir, "run the parsing on the given directory and write its internal ast and domination tree to a .v.ast file in the output directory (see -op)")
   ; ("-op", Set_string Platform.output_path, "set the path to the output files directory  [default='output']")
   ; ("-interpret", Set Driver.interpret, "interpret ll program starting from 'main'")
+  ; ("-i", Set Driver.interpret, "interpret ll program starting from 'main' (same as -interpret)")      
   ; ("-debug", Set Interpreter.debug_flag, "enable debugging trace output")
   ; ("-v", Set Platform.verbose, "enables more verbose compilation output")] 
 
