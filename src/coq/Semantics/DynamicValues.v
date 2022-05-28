@@ -2349,7 +2349,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         match elts with
         | [] => raise_error "index out of bounds"
         | h :: tl =>
-          if (idx =? 0)%Z then ret h else loop tl (i-1)%Z
+          if (i =? 0)%Z then ret h else loop tl (i-1)%Z
         end in
     match v with
     | UVALUE_Struct f => loop f idx
@@ -2366,7 +2366,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         match elts with
         | [] => raise_error "index out of bounds"
         | h :: tl =>
-          if (idx =? 0)%Z then ret h else loop tl (i-1)%Z
+          if (i =? 0)%Z then ret h else loop tl (i-1)%Z
         end in
     match v with
     | DVALUE_Struct f => loop f idx
@@ -2382,7 +2382,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         match elts with
         | [] => raise_error "index out of bounds"
         | h :: tl =>
-          (if idx =? 0 then ret (acc ++ (v :: tl))
+          (if i =? 0 then ret (acc ++ (v :: tl))
           else loop (acc ++ [h]) tl (i-1))%Z
         end%list in
     match str with
