@@ -2203,9 +2203,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | FAdd => ret (DVALUE_Double (b64_plus FT_Rounding v1 v2))
     | FSub => ret (DVALUE_Double (b64_minus FT_Rounding v1 v2))
     | FMul => ret (DVALUE_Double (b64_mult FT_Rounding v1 v2))
-    | FDiv => if (Float.eq_dec v2 Float.zero)
-              then raise_ub "Signed division by 0."
-              else ret (DVALUE_Double (b64_div FT_Rounding v1 v2))
+    | FDiv => ret (DVALUE_Double (b64_div FT_Rounding v1 v2))
     | FRem => raise_error "unimplemented double operation"
     end.
 
@@ -2214,9 +2212,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | FAdd => ret (DVALUE_Float (b32_plus FT_Rounding v1 v2))
     | FSub => ret (DVALUE_Float (b32_minus FT_Rounding v1 v2))
     | FMul => ret (DVALUE_Float (b32_mult FT_Rounding v1 v2))
-    | FDiv => if (Float32.eq_dec v2 Float32.zero)
-              then raise_ub "Signed division by 0."
-              else ret (DVALUE_Float (b32_div FT_Rounding v1 v2))
+    | FDiv => ret (DVALUE_Float (b32_div FT_Rounding v1 v2))
     | FRem => raise_error "unimplemented float operation"
     end.
 
@@ -2349,7 +2345,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         match elts with
         | [] => raise_error "index out of bounds"
         | h :: tl =>
-          if (idx =? 0)%Z then ret h else loop tl (i-1)%Z
+          if (i =? 0)%Z then ret h else loop tl (i-1)%Z
         end in
     match v with
     | UVALUE_Struct f => loop f idx
@@ -2366,7 +2362,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         match elts with
         | [] => raise_error "index out of bounds"
         | h :: tl =>
-          if (idx =? 0)%Z then ret h else loop tl (i-1)%Z
+          if (i =? 0)%Z then ret h else loop tl (i-1)%Z
         end in
     match v with
     | DVALUE_Struct f => loop f idx
@@ -2382,7 +2378,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         match elts with
         | [] => raise_error "index out of bounds"
         | h :: tl =>
-          (if idx =? 0 then ret (acc ++ (v :: tl))
+          (if i =? 0 then ret (acc ++ (v :: tl))
           else loop (acc ++ [h]) tl (i-1))%Z
         end%list in
     match str with
