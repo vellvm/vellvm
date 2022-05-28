@@ -23,32 +23,34 @@ let exec_tests () =
   raise (Ran_tests (successful outcome))
 
 let make_test ll_ast t : string * assertion  =
+  let open Format in 
   match t with
   | Assertion.EQTest (expected, dtyp, entry, args) ->
     let str =
       let expected_str =
-        Interpreter.pp_dvalue Format.str_formatter expected;
-        Format.flush_str_formatter ()
+        Interpreter.pp_dvalue str_formatter expected;
+        flush_str_formatter ()
       in
       let args_str: doc =
-        Format.pp_print_list ~pp_sep:(fun f () -> Format.pp_print_string f ", ") Interpreter.pp_uvalue Format.str_formatter args;
-        Format.flush_str_formatter()
+        pp_print_list ~pp_sep:(fun f () -> pp_print_string f ", ") Interpreter.pp_uvalue str_formatter args;
+        flush_str_formatter()
       in
       Printf.sprintf "%s = %s(%s)" expected_str entry args_str
     in
     let result () = Interpreter.step (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp (Camlcoq.coqstring_of_camlstring entry) args ll_ast)
     in
     str, (Assert.assert_eqf result (Ok expected))
+
   | Assertion.POISONTest (dtyp, entry, args) ->
      let expected = InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV.DVALUE_Poison dtyp in
      let str =
        let expected_str =
-         Interpreter.pp_dvalue Format.str_formatter expected;
-         Format.flush_str_formatter ()
+         Interpreter.pp_dvalue str_formatter expected;
+         flush_str_formatter ()
        in
       let args_str =
-        Format.pp_print_list ~pp_sep:(fun f () -> Format.pp_print_string f ", ") Interpreter.pp_uvalue Format.str_formatter args;
-        Format.flush_str_formatter()
+        pp_print_list ~pp_sep:(fun f () -> pp_print_string f ", ") Interpreter.pp_uvalue str_formatter args;
+        flush_str_formatter()
       in
       Printf.sprintf "%s = %s(%s)" expected_str entry args_str
      in
@@ -61,22 +63,12 @@ let make_test ll_ast t : string * assertion  =
      let (_t_args, v_args) = List.split generated_args in
      let res_src () = Interpreter.step(TopLevel.TopLevelBigIntptr.interpreter_gen expected_rett (Camlcoq.coqstring_of_camlstring "src") v_args ll_ast) in
      let res_tgt () = Interpreter.step(TopLevel.TopLevelBigIntptr.interpreter_gen expected_rett (Camlcoq.coqstring_of_camlstring "tgt") v_args ll_ast) in
-     let str =
-       let src_str =
-         match res_src () with
-         | Ok v -> Interpreter.pp_dvalue Format.str_formatter v; Format.flush_str_formatter ()
-         | Error e -> e
-       in
-       let tgt_str =
-         match res_tgt () with
-         | Ok v -> Interpreter.pp_dvalue Format.str_formatter v; Format.flush_str_formatter ()
-         | Error e -> e
-       in
+     let str = 
       let args_str: doc =
-        Format.pp_print_list ~pp_sep:(fun f () -> Format.pp_print_string f ", ") Interpreter.pp_uvalue Format.str_formatter v_args;
-        Format.flush_str_formatter()
+        pp_print_list ~pp_sep:(fun f () -> pp_print_string f ", ") Interpreter.pp_uvalue str_formatter v_args;
+        flush_str_formatter()
       in
-       Printf.sprintf "%s = %s on generated input (%s)" src_str tgt_str args_str
+       Printf.sprintf "src = tgt on generated input (%s)" args_str
      in
      str,  (Assert.assert_eqf (fun () ->
                let s,t = res_src (), res_tgt() in
@@ -136,12 +128,12 @@ let ast_pp_dir dir =
 let test_file path =
   Platform.configure ();
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
-  let file, ext = Platform.path_to_basename_ext path in
+  let _file, ext = Platform.path_to_basename_ext path in
   begin match ext with
     | "ll" -> 
       let tests = parse_tests path in
       let ll_ast = parse_file path in
-      let suite = Test (file, List.map (make_test ll_ast) tests) in
+      let suite = Test (path, List.map (make_test ll_ast) tests) in
       let outcome = run_suite [suite] in
       Printf.printf "%s\n" (outcome_to_string outcome);
       raise (Ran_tests (successful outcome))
@@ -153,10 +145,10 @@ let test_dir dir =
   Platform.configure();
   let pathlist = Test.ll_files_of_dir dir in
   let files = List.filter_map (fun path ->
-      let file, ext = Platform.path_to_basename_ext path in
+      let _file, ext = Platform.path_to_basename_ext path in
       try 
       begin match ext with
-        | "ll" -> Some (file, parse_file path, parse_tests path)
+        | "ll" -> Some (path, parse_file path, parse_tests path)
         | _ -> None
       end
       with

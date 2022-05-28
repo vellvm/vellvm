@@ -67,7 +67,7 @@ let run_dvalue_test (test:DV.dvalue -> bool) path =
   if not res then failwith (path ^ " test failed: " ^ msg); ()
 
 (* https://www.rosettacode.org/wiki/String_matching#OCaml *)
-let sting_begins_with s1 s2 =
+let string_begins_with s1 s2 =
   let len1 = String.length s1
   and len2 = String.length s2 in
   if len1 < len2 then false else
@@ -80,7 +80,7 @@ let run_parsefail_test path prefix =
       ignore (run_ll_file path);
       (false,"")
     with
-      Failure msg -> (sting_begins_with msg prefix, msg)
+      Failure msg -> (string_begins_with msg prefix, msg)
   in
   if not failed then failwith (path ^ " test failed to produce expected parsing error. Got ubstead: " ^ msg); ()
 
