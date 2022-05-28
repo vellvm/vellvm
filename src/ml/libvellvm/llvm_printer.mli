@@ -28,3 +28,5 @@ val declaration : Format.formatter -> LLVMAst.typ LLVMAst.declaration -> unit
 val definition : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.definition -> unit
 val block : Format.formatter -> (LLVMAst.typ LLVMAst.block) -> unit
 val modul : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block) list)) CFG.modul -> unit
+val string_of_typ : LLVMAst.typ -> string
+val string_of_exp : LLVMAst.typ LLVMAst.exp -> string  
