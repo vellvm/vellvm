@@ -158,7 +158,7 @@ vellvm: $(EXE)
 
 .PHONY: test
 test: vellvm
-	./vellvm --test
+	./vellvm -test
 
 .PHONY: print-includes
 print-includes:

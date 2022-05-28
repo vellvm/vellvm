@@ -808,8 +808,8 @@ Fixpoint get_index_paths_aux (t_from : typ) (pre_path : list Z) {struct t_from}:
   let tail_list := get_index_paths_from_struct t pre_path (current_index + 1%Z) in
   head_list ++ tail_list
   end.
-  Definition get_index_paths_ptr (t_from: typ) : list (typ * list (Z)) :=
-    map (fun '(t, path) => (t, [0%Z] ++ path)) (get_index_paths_aux t_from nil).
+Definition get_index_paths_ptr (t_from: typ) : list (typ * list (Z)) :=
+  map (fun '(t, path) => (t, path)) (get_index_paths_aux t_from [0%Z]).
   Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
     let edited_path := map (fun '(t, path) => match path with 
                             | hd::tl => (t, tl)

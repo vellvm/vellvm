@@ -226,7 +226,6 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
 
     (* FailureE *)
     inversion e0.
-    unfold FailureE in e0.
     apply (raise_error "").
   Defined.
 
@@ -260,7 +259,6 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
 
     (* FailureE *)
     inversion e0.
-    unfold FailureE in e0.
     apply (raise_error "").
   Defined.
 
@@ -294,7 +292,6 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
 
     (* FailureE *)
     inversion e0.
-    unfold FailureE in e0.
     apply (raise_error "").
   Defined.
 End EventConvert.

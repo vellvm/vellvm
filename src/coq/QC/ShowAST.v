@@ -129,7 +129,7 @@ Section ShowInstances.
 
   Global Instance showFBinop : Show fbinop
     := {| show := show_fbinop |}.
-
+  
   Definition show_icmp (cmp : icmp) : string
     := match cmp with
        | Eq  => "eq"
@@ -198,7 +198,23 @@ Section ShowInstances.
 
   Global Instance showFastMatch : Show fast_math
     := {| show := show_fast_math |}.
-
+  Definition show_conversion_type (ct : conversion_type) : string
+    := match ct with
+       | Trunc => "trunc"
+       | Zext => "zext"
+       | Sext => "sext"
+       | Fptrunc => "fptrunc"
+       | Fpext => "fpext"
+       | Uitofp => "uitofp"
+       | Sitofp => "sitofp"
+       | Fptoui => "fptoui"
+       | Fptosi => "fptosi"
+       | Inttoptr => "inttoptr"
+       | Ptrtoint => "ptrtoint"
+       | Bitcast => "bitcast"
+       end.
+  Global Instance ShowConversionType : Show conversion_type
+    := {| show := show_conversion_type |}.
   Fixpoint show_exp (v : exp typ) :=
       match v with
       | EXP_Ident id => show id
@@ -210,23 +226,29 @@ Section ShowInstances.
       | EXP_Zero_initializer => "zero initializer"
       | EXP_Cstring s => "unimplemented cstring" (* TODO, this is wrong *)
       | EXP_Undef => "undef"
+      | EXP_Struct fields => "{"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++ show_exp ex) fields) ++ "}"
+      | EXP_Packed_struct fields => "<{"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++ show_exp ex) fields) ++ "}>"
+      | EXP_Array elts => "["  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++ show_exp ex) elts) ++ "]"
+      | EXP_Vector elts => "<"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++ show_exp ex) elts) ++ ">"
       | OP_IBinop iop t v1 v2 =>
         show iop ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
       | OP_FBinop fop fmath t v1 v2 =>
-        match fmath with
-        | nil => 
-          show fop ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
-        | _ =>
-          "show_exp: Need to implement fastmath show instances."
-        end
-      | OP_ICmp cmp t v1 v2 =>
-        "icmp " ++ show cmp ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
+          let fmath_string :=
+            match fmath with
+            | nil => " "
+            | _ =>  " " ++ concat " " (map (fun x => show x) fmath) ++  " "
+            end in              
+         show fop ++ fmath_string ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
+      | OP_ICmp cmp t v1 v2
+      | OP_FCmp cmp t v1 v2 =>
+          "icmp " ++ show cmp ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
+      | OP_Conversion conv t_from v t_to => show conv ++ " " ++ show t_from ++ " " ++ show_exp v ++ " to " ++ show t_to
       | OP_GetElementPtr t ptrval idxs =>
       let (tptr, exp) := ptrval in
       "getelementptr " ++ show t ++ ", " ++ show tptr ++ " " ++ show_exp exp ++ fold_left (fun str '(ty, ex) => ", " ++ show ty ++ " "++ show_exp ex ++ str) idxs ""
       | OP_ExtractValue vec idxs =>
       let (tptr, exp) := vec in
-      "extractvalue " ++ show tptr ++ " " ++ show_exp exp ++ fold_left (fun str i => ", " ++ show i ++ str) idxs ""
+      "extractvalue " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ concat ", " (map (fun x => show x) idxs)
       | OP_ExtractElement vec idx =>
       let (tptr, exp) := vec in 
       let (tidx, iexp) := idx in
@@ -239,9 +261,10 @@ Section ShowInstances.
       | OP_InsertValue vec elt idxs =>
       let (tptr, exp) := vec in
       let (telt, eexp) := elt in 
-      "insertvalue " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ show telt ++ " " ++ show_exp eexp ++ ", " ++ (fold_right (fun x y=> show x ++ ", " ++ y) "" idxs)
+      "insertvalue " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ show telt ++ " " ++ show_exp eexp ++ ", " ++ concat ", " (map (fun x => show x) idxs)
       | OP_Select (tc, cnd) (t1, v1) (t2, v2) =>
-        "select " ++ show tc ++ " " ++ show_exp cnd ++ ", " ++ show t1 ++ " " ++ show_exp v1  ++ ", " ++ show t2 ++ " " ++ show_exp v2
+          "select " ++ show tc ++ " " ++ show_exp cnd ++ ", " ++ show t1 ++ " " ++ show_exp v1  ++ ", " ++ show t2 ++ " " ++ show_exp v2
+      | OP_Freeze (ty, ex) => "freeze " ++ show ty ++ " " ++ show_exp ex
       | _ => "show_exp todo"
       end.
 

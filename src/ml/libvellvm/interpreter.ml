@@ -135,7 +135,6 @@ let rec step (m : ('a coq_L4, MMEP.MMSP.coq_MemState * (MemPropT.store_id * ((lo
        *      (Camlcoq.camlstring_of_coqstring f));
        *   step (k (Obj.magic (DV.DVALUE_I64 DynamicValues.Int64.zero))) *)
 
-
 (** Interpret an LLVM program, returning a result that contains either the
     dvalue result returned by the LLVM program, or an error message.
 

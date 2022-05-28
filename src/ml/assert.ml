@@ -71,8 +71,8 @@ let result_test_to_string (name_pts:string) (r:result test): string =
   let string_of_case (name, res) =
     let (p, m) =
       begin match res with
-      | Pass     -> "passed", ""
-      | Fail msg -> "failed", ("\n\t   ERROR: " ^ msg)
+      | Pass     -> "PASSED", ""
+      | Fail msg -> "FAILED", ("\n\t   ERROR: " ^ msg)
       end
     in
     Printf.sprintf "  %s - %s%s%!" p name m
@@ -104,8 +104,10 @@ let outcome_to_string (o:outcome):string =
     (passed + p, failed + f, total + tot, 
     str ^ "\n" ^ (
       if f > 0 then (result_test_to_string name_pts t) else 
-      if tot > 0 then (name_pts ^ ":\n  OK") else
-        (name_pts ^ ":\n  Hidden") 
+      if tot > 0 then
+        (Printf.sprintf "%s: PASSED" name_pts)
+      else
+        (Printf.sprintf "%s: NO ASSERT" name_pts)
       )
     ) in
   let (p,f,tot,str) = List.fold_left helper (0,0,0,"") o in

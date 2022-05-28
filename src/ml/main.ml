@@ -23,32 +23,34 @@ let exec_tests () =
   raise (Ran_tests (successful outcome))
 
 let make_test ll_ast t : string * assertion  =
+  let open Format in 
   match t with
   | Assertion.EQTest (expected, dtyp, entry, args) ->
     let str =
       let expected_str =
-        Interpreter.pp_dvalue Format.str_formatter expected;
-        Format.flush_str_formatter ()
+        Interpreter.pp_dvalue str_formatter expected;
+        flush_str_formatter ()
       in
       let args_str: doc =
-        Format.pp_print_list ~pp_sep:(fun f () -> Format.pp_print_string f ", ") Interpreter.pp_uvalue Format.str_formatter args;
-        Format.flush_str_formatter()
+        pp_print_list ~pp_sep:(fun f () -> pp_print_string f ", ") Interpreter.pp_uvalue str_formatter args;
+        flush_str_formatter()
       in
       Printf.sprintf "%s = %s(%s)" expected_str entry args_str
     in
     let result () = Interpreter.step (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp (Camlcoq.coqstring_of_camlstring entry) args ll_ast)
     in
     str, (Assert.assert_eqf result (Ok expected))
+
   | Assertion.POISONTest (dtyp, entry, args) ->
      let expected = InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV.DVALUE_Poison dtyp in
      let str =
        let expected_str =
-         Interpreter.pp_dvalue Format.str_formatter expected;
-         Format.flush_str_formatter ()
+         Interpreter.pp_dvalue str_formatter expected;
+         flush_str_formatter ()
        in
       let args_str =
-        Format.pp_print_list ~pp_sep:(fun f () -> Format.pp_print_string f ", ") Interpreter.pp_uvalue Format.str_formatter args;
-        Format.flush_str_formatter()
+        pp_print_list ~pp_sep:(fun f () -> pp_print_string f ", ") Interpreter.pp_uvalue str_formatter args;
+        flush_str_formatter()
       in
       Printf.sprintf "%s = %s(%s)" expected_str entry args_str
      in
@@ -61,22 +63,12 @@ let make_test ll_ast t : string * assertion  =
      let (_t_args, v_args) = List.split generated_args in
      let res_src () = Interpreter.step(TopLevel.TopLevelBigIntptr.interpreter_gen expected_rett (Camlcoq.coqstring_of_camlstring "src") v_args ll_ast) in
      let res_tgt () = Interpreter.step(TopLevel.TopLevelBigIntptr.interpreter_gen expected_rett (Camlcoq.coqstring_of_camlstring "tgt") v_args ll_ast) in
-     let str =
-       let src_str =
-         match res_src () with
-         | Ok v -> Interpreter.pp_dvalue Format.str_formatter v; Format.flush_str_formatter ()
-         | Error e -> e
-       in
-       let tgt_str =
-         match res_tgt () with
-         | Ok v -> Interpreter.pp_dvalue Format.str_formatter v; Format.flush_str_formatter ()
-         | Error e -> e
-       in
+     let str = 
       let args_str: doc =
-        Format.pp_print_list ~pp_sep:(fun f () -> Format.pp_print_string f ", ") Interpreter.pp_uvalue Format.str_formatter v_args;
-        Format.flush_str_formatter()
+        pp_print_list ~pp_sep:(fun f () -> pp_print_string f ", ") Interpreter.pp_uvalue str_formatter v_args;
+        flush_str_formatter()
       in
-       Printf.sprintf "%s = %s on generated input (%s)" src_str tgt_str args_str
+       Printf.sprintf "src = tgt on generated input (%s)" args_str
      in
      str,  (Assert.assert_eqf (fun () ->
                let s,t = res_src (), res_tgt() in
@@ -85,7 +77,9 @@ let make_test ll_ast t : string * assertion  =
                                | _, Error er -> Error er
                end
              ) (Ok true))
+
 let test_pp_dir dir =
+  let _ = Printf.printf "===> RUNNING PRETTY PRINTING TESTS IN: %s\n" dir in  
   Platform.configure();
   let suite = [Test.pp_test_of_dir dir] in
   let outcome = run_suite suite in
@@ -127,59 +121,73 @@ let ast_pp_file path =
 
 let ast_pp_dir dir =
   Platform.configure();
-  let files = Test.files_of_dir dir in
+  let files = Test.ll_files_of_dir dir in
   List.iter ast_pp_file_inner files
 
 
 let test_file path =
   Platform.configure ();
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
-  let file, ext = Platform.path_to_basename_ext path in
+  let _file, ext = Platform.path_to_basename_ext path in
   begin match ext with
     | "ll" -> 
       let tests = parse_tests path in
       let ll_ast = parse_file path in
-      let suite = Test (file, List.map (make_test ll_ast) tests) in
+      let suite = Test (path, List.map (make_test ll_ast) tests) in
       let outcome = run_suite [suite] in
       Printf.printf "%s\n" (outcome_to_string outcome);
       raise (Ran_tests (successful outcome))
     | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
   end
 
-(* This is part of the standard library since 4.08.0 *)
-let rec filter_map (filter: 'a -> 'b option) (l: 'a list) : 'b list =
-match l with
-| [] -> []
-| hd :: tl -> (match filter hd with
-              | None -> filter_map filter tl
-              | Some b -> b :: filter_map filter tl)
-
 let test_dir dir =
+  let _ = Printf.printf "===> TESTING ASSERTIONS IN: %s\n" dir in
   Platform.configure();
-  let pathlist = Test.files_of_dir dir in
-  let files = filter_map (fun path ->
-      let file, ext = Platform.path_to_basename_ext path in
+  let pathlist = Test.ll_files_of_dir dir in
+  let files = List.filter_map (fun path ->
+      let _file, ext = Platform.path_to_basename_ext path in
+      try 
       begin match ext with
-        | "ll" -> Some (file, parse_file path, parse_tests path)
+        | "ll" -> Some (path, parse_file path, parse_tests path)
         | _ -> None
-      end) pathlist
+      end
+      with
+        Failure s | ParseUtil.InvalidAnonymousId s ->
+          let _ = Printf.printf "FAILURE %s\n\t%s\n%!" path s in
+          None
+      | _ ->
+        let _ = Printf.printf "FAILURE %s\n" path in
+        None
+    ) pathlist
   in
-  let suite = List.map (fun (file, ast, tests) -> Test (file, List.map (make_test ast) tests)) files in
+  let suite = List.map (fun (file, ast, tests) ->
+      Test (file, List.map (make_test ast) tests)) files in
   let outcome = run_suite suite in
   Printf.printf "%s\n" (outcome_to_string outcome);
   raise (Ran_tests (successful outcome))
-  
 
-(* Use the --test option to run unit tests and the quit the program. *)
+let test_directory = ref "../tests"
+
+let test_all () =
+  let _ = Printf.printf "============== RUNNING TEST SUITE ==============\n" in
+  let b1 = try exec_tests () with Ran_tests b-> b in
+  let b2 = try test_pp_dir (!test_directory) with Ran_tests b -> b in
+  let b3 = try test_dir (!test_directory) with Ran_tests b -> b in
+  raise (Ran_tests (b1 && b2 && b3))
+
 let args =
-  [ ("--test", Unit exec_tests, "run the test suite, ignoring later inputs")
-  ; ("--test-file", String test_file, "run the assertions in a given file")
-  ; ("--test-dir", String test_dir, "run all .ll files in the given directory")
-  ; ("--test-pp-dir", String test_pp_dir, "run the parsing/pretty-printing tests on all .ll files in the given directory")
-  ; ("--print-ast", String ast_pp_file, "run the parsing on the given .ll file and write its internal ast and domination tree to a .v.ast file in the output directory (see -op)")
-  ; ("--print-ast-dir", String ast_pp_dir, "run the parsing on the given directory and write its internal ast and domination tree to a .v.ast file in the output directory (see -op)")
+  [
+    ("-set-test-dir", Set_string test_directory, "set the path to the tests directory [default='../tests']")
+  ; ("-test", Unit test_all, "run comprehensive test case:\n\tequivalent to running three times with\n\t -test-suite, then\n\t -test-pp-dir ../tests, then\n\t -test-dir ../tests")
+  ; ("-test-suite", Unit exec_tests, "run the test suite, ignoring later inputs")
+  ; ("-test-file", String test_file, "run the assertions in a given file")
+  ; ("-test-dir", String test_dir, "run all .ll files in the given directory")
+  ; ("-test-pp-dir", String test_pp_dir, "run the parsing/pretty-printing tests on all .ll files in the given directory")    
+  ; ("-print-ast", String ast_pp_file, "run the parsing on the given .ll file and write its internal ast and domination tree to a .v.ast file in the output directory (see -op)")
+  ; ("-print-ast-dir", String ast_pp_dir, "run the parsing on the given directory and write its internal ast and domination tree to a .v.ast file in the output directory (see -op)")
   ; ("-op", Set_string Platform.output_path, "set the path to the output files directory  [default='output']")
   ; ("-interpret", Set Driver.interpret, "interpret ll program starting from 'main'")
+  ; ("-i", Set Driver.interpret, "interpret ll program starting from 'main' (same as -interpret)")      
   ; ("-debug", Set Interpreter.debug_flag, "enable debugging trace output")
   ; ("-v", Set Platform.verbose, "enables more verbose compilation output")] 
 
