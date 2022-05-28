@@ -112,18 +112,18 @@ let rec step (m : ('a coq_L4, MMEP.MMSP.coq_MemState * (MemPropT.store_id * ((lo
   | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 msg), k) ->
      Error ("Out of Memory: " ^ (Camlcoq.camlstring_of_coqstring msg))
 
-  (* The DebugE effect *)
+  (* UBE event *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 msg)), k) ->
+     Error ("Undefined Behaviour: " ^ (Camlcoq.camlstring_of_coqstring msg))
+
+  (* The DebugE effect *)
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 msg))), k) ->
      (debug (Camlcoq.camlstring_of_coqstring msg);
       step (k (Obj.magic DV.DVALUE_None)))
 
   (* The FailureE effect is a failure *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 _)), _) ->
-     Error "Failure effect"
-
-  (* The UndefinedBehaviourE effect is a failure *)
-  (* | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 f)), _) -> *)
-    (* Error (Camlcoq.camlstring_of_coqstring f) *)
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 msg))), _) ->
+     Error ("Failure effect: " ^ (Camlcoq.camlstring_of_coqstring msg))
 
   (* The only visible effects from LLVMIO that should propagate to the interpreter are:
      - Call to external functions
