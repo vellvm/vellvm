@@ -225,11 +225,13 @@ and parse_srctgt_assertion (filename: string) (line: string) : test list =
     []
   else
     let ast = read_and_parse filename in
-    let num_trials =
+    let num_trials = 1 in
+      (* SAZ: replaced this by 1 temporarily
       let str = Str.matched_group 1 line in
       try
         int_of_string str
       with _ -> 10 in
+      *)
     let (src_fxn, tgt_fxn) = (List.find_opt (find_fn "src") ast), (List.find_opt (find_fn "tgt") ast) in
     begin match src_fxn, tgt_fxn with
     | (Some src), (Some tgt) ->
