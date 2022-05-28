@@ -116,14 +116,16 @@ Set Contextual Implicit.
   Definition debug {E} `{DebugE -< E} (msg : string) : itree E unit :=
     trigger (Debug msg).
 
-  Definition FailureE := exceptE unit.
+  (* Failure. Carries a string for a message. *)
+  Variant FailureE : Type -> Type :=
+  | Throw : string -> FailureE void.
 
   (* This function can be replaced with print_string during extraction
      to print the error messages of Throw and (indirectly) ThrowUB. *)
   Definition print_msg (msg : string) : unit := tt.
 
   Definition raise {E} {A} `{FailureE -< E} (msg : string) : itree E A :=
-    v <- trigger (Throw (print_msg msg));; match v: void with end.
+    v <- trigger (Throw msg);; match v: void with end.
 
   #[global] Instance RAISE_ERR_ITREE_FAILUREE {E : Type -> Type} `{FailureE -< E} : RAISE_ERROR (itree E) :=
   { raise_error := fun A e => raise e
