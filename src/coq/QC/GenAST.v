@@ -378,19 +378,23 @@ Section TypGenerators.
     | O => gen_sized_typ_0
     | (S sz') =>
       oneOf_LLVM
-        [ gen_sized_typ_0
+        ([ gen_sized_typ_0
         ; ret TYPE_Pointer <*> gen_sized_typ_size sz'
         (* TODO: Might want to restrict the size to something reasonable *)
         ; ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size sz'
-        ; ret TYPE_Vector <*> lift_GenLLVM genN <*> gen_sized_typ_size sz'
+        ; ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_sized_typ_size 0
         (* TODO: I don't think functions are sized types? *)
         (* ; let n := Nat.div sz 2 in *)
         (*   ret TYPE_Function <*> gen_sized_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) *)
         ; ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
         ; ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
-        ]
+          ]
+        )
     end.
-
+  Next Obligation.
+  lia.
+  Defined.
+  
   Definition gen_sized_typ : GenLLVM typ
     := sized_LLVM (fun sz => gen_sized_typ_size sz).
 
@@ -434,7 +438,7 @@ Section TypGenerators.
                       (* Might want to restrict the size to something reasonable *)
                       (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
                       ; ret TYPE_Array <*> lift genN <*> gen_sized_typ_size sz'
-                      ; ret TYPE_Vector <*> lift genN <*> gen_sized_typ_size sz'
+                      ; ret TYPE_Vector <*> (n <- lift_GenLLVM genN;;ret (n + 1)%N) <*> gen_sized_typ_size 0
                       ; let n := Nat.div sz 2 in
                         ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n)
                       ; ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
@@ -488,7 +492,7 @@ Section TypGenerators.
                       (* Might want to restrict the size to something reasonable *)
                       (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
                       ; ret TYPE_Array <*> lift genN <*> gen_sized_typ_size sz'
-                      ; ret TYPE_Vector <*> lift genN <*> gen_sized_typ_size sz'
+                      ; ret TYPE_Vector <*> (n <- lift_GenLLVM genN;;ret (n + 1)%N) <*> gen_sized_typ_size 0
                       ; let n := Nat.div sz 2 in
                         ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n)
                       ; ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
@@ -504,7 +508,7 @@ Section TypGenerators.
                     (* Might want to restrict the size to something reasonable *)
                     (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
                     ; ret TYPE_Array <*> lift genN <*> gen_sized_typ_size sz'
-                    ; ret TYPE_Vector <*> lift genN <*> gen_sized_typ_size sz'
+                    ; ret TYPE_Vector <*> (n <- lift_GenLLVM genN;;ret (n + 1)%N) <*> gen_sized_typ_size 0
                     ; ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
                     ; ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
                     ]
@@ -957,6 +961,13 @@ Definition genType: G (typ) :=
 
   (* TODO: should make it much more likely to pick an identifier for
            better test cases *)
+
+  Fixpoint gen_exp_size_wo_ctx (sz: nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
+    match sz with
+    | 0%nat => ret (EXP_Null)
+    | S z => ret (EXP_Null)
+    end.
+
   Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
     match sz with
     | 0%nat =>
@@ -967,7 +978,7 @@ Definition genType: G (typ) :=
           | [] => []
           | _ => [(16%nat, fmap (fun '(i,_) => EXP_Ident i) (oneOf_LLVM (fmap ret ts)))]
           end in
-      let gen_size_0 :=
+      let fix gen_size_0 (t: typ) :=
           match t with
           | TYPE_I n                  => ret EXP_Integer <*> lift (arbitrary : G Z) (* lift (x <- (arbitrary : G nat);; ret (Z.of_nat x)) (* TODO: should the integer be forced to be in bounds? *) *)
           | TYPE_IPTR => ret EXP_Integer <*> lift (arbitrary : G Z)
@@ -978,18 +989,18 @@ Definition genType: G (typ) :=
 
           (* Generate literals for aggregate structures *)
           | TYPE_Array n t =>
-              es <- vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t);;
+              es <- vectorOf_LLVM (N.to_nat n) (gen_size_0 t);;
               ret (EXP_Array (map (fun e => (t, e)) es))
           | TYPE_Vector n t =>
-              es <- vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t);;
+              es <- vectorOf_LLVM (N.to_nat n) (gen_size_0 t);;
               ret (EXP_Vector (map (fun e => (t, e)) es))
           | TYPE_Struct fields =>
               (* Should we divide size evenly amongst components of struct? *)
-              tes <- map_monad (fun t => e <- gen_exp_size 0 t;; ret (t, e)) fields;;
+              tes <- map_monad (fun t => e <- gen_size_0 t;; ret (t, e)) fields;;
               ret (EXP_Struct tes)
           | TYPE_Packed_struct fields =>
               (* Should we divide size evenly amongst components of struct? *)
-              tes <- map_monad (fun t => e <- gen_exp_size 0 t;; ret (t, e)) fields;;
+              tes <- map_monad (fun t => e <- gen_size_0 t;; ret (t, e)) fields;;
               ret (EXP_Packed_struct tes)
 
           | TYPE_Identified id        =>
@@ -1012,7 +1023,7 @@ Definition genType: G (typ) :=
       match t with
       | TYPE_Pointer t => freq_LLVM gen_idents
       | _ => freq_LLVM
-               (gen_idents ++ [(1%nat, gen_size_0)])
+               (gen_idents ++ [(1%nat, gen_size_0 t)])
       end
     | (S sz') =>
       let gens :=
