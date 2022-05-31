@@ -779,6 +779,7 @@ Section ExpGenerators.
   Definition gen_non_zero_exp_size (sz : nat) (t : typ) : GenLLVM (exp typ)
     := match t with
        | TYPE_I n => ret EXP_Integer <*> lift gen_non_zero (* TODO: should integer be forced to be in bounds? *)
+       | TYPE_IPTR => ret EXP_Integer <*> lift gen_non_zero
        | TYPE_Float => ret EXP_Float <*> lift fing32 
        | TYPE_Double => lift failGen(*ret EXP_Double <*> lift fing64*) (*TODO : Fix generator for double*)
        | _ => lift failGen
@@ -1077,11 +1078,11 @@ Definition genType: G (typ) :=
       match ty with 
        | TYPE_Float => fbinop <- lift gen_fbinop;;
        if (Handlers.LLVMEvents.DV.fop_is_div fbinop)
-       then ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_non_zero_exp_size 0 ty 
+       then ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_exp_size 0 ty 
        else ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_exp_size 0 ty
        | TYPE_Double => fbinop <- lift gen_fbinop;;
        if (Handlers.LLVMEvents.DV.fop_is_div fbinop)
-       then ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_non_zero_exp_size 0 ty 
+       then ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_exp_size 0 ty 
        else ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_exp_size 0 ty
        | _ => lift failGen
       end.
@@ -1186,12 +1187,10 @@ Section InstrGenerators.
         num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *)
         align <- ret None;;
         ret (TYPE_Pointer t, INSTR_Alloca t num_elems align)
-      (* TODO: Generate calls *)
-      ; gen_load
-      ; gen_store] (* TODO: Generate atomic operations and other instructions *)
-      ++ (if seq.nilp (filter_ptr_typs ctx) then [] else [gen_gep])
-      ++ (if seq.nilp (filter_agg_typs ctx) then [] else [gen_extractvalue; gen_insertvalue])
-      ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])).
+      ] (* TODO: Generate atomic operations and other instructions *)
+         ++ (if seq.nilp (filter_ptr_typs ctx) then [] else [gen_gep; gen_load; gen_store])).
+         (* ++ (if seq.nilp (filter_agg_typs ctx) then [] else [gen_extractvalue (*; gen_insertvalue *)]) *)
+         (* ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])). *)
 
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
