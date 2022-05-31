@@ -28,6 +28,7 @@ COQFILESUTILS := Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Ut
 
 COQFILESSYNTAX := Syntax/DataLayout Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
 		Syntax/Traversal Syntax/DynamicTypes Syntax/TypToDtyp\
+		Syntax/TypeUtil\
 		Syntax/Scope Syntax/SurfaceSyntax\
 		Syntax
 
@@ -69,7 +70,7 @@ COQFILESOPT    := Transformations/Transform\
 
 COQFILESVIR      := $(COQFILESNUMERIC) $(COQFILESUTILS) $(COQFILESSYNTAX) $(COQFILESSEMANTICS)
 COQFILESCOMPILER := $(COQFILESVIR) $(COQFILESANALYSIS)
-COQFILESALL      := $(COQFILESCOMPILER) $(COQFILESTHEORY) $(COQFILESOPT)
+COQFILESALL      := $(COQFILESCOMPILER) $(COQFILESTHEORY) $(COQFILESOPT) $(COQFILESQC)
 
 VFILES  := $(COQFILESALL:%=coq/%.v)
 VOFILES := $(COQFILESALL:%=coq/%.vo)
@@ -173,7 +174,7 @@ clean:
 	find $(COQDIR) -name "*.vos" -delete
 	rm -f $(VOFILES)
 	rm -rf doc/html doc/*.glob
-	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
+	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.ml
 	dune clean
 	rm -rf output
 	rm -f vellvm
