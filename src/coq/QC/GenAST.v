@@ -962,12 +962,6 @@ Definition genType: G (typ) :=
   (* TODO: should make it much more likely to pick an identifier for
            better test cases *)
 
-  Fixpoint gen_exp_size_wo_ctx (sz: nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
-    match sz with
-    | 0%nat => ret (EXP_Null)
-    | S z => ret (EXP_Null)
-    end.
-
   Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
     match sz with
     | 0%nat =>
