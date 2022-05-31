@@ -245,7 +245,7 @@ Section ShowInstances.
       | OP_Conversion conv t_from v t_to => show conv ++ " " ++ show t_from ++ " " ++ show_exp v ++ " to " ++ show t_to
       | OP_GetElementPtr t ptrval idxs =>
       let (tptr, exp) := ptrval in
-      "getelementptr " ++ show t ++ ", " ++ show tptr ++ " " ++ show_exp exp ++ fold_left (fun str '(ty, ex) => ", " ++ show ty ++ " "++ show_exp ex ++ str) idxs ""
+      "getelementptr " ++ show t ++ ", " ++ show tptr ++ " " ++ show_exp exp ++ fold_left (fun str '(ty, ex) => str ++ ", " ++ show ty ++ " "++ show_exp ex) idxs ""
       | OP_ExtractValue vec idxs =>
       let (tptr, exp) := vec in
       "extractvalue " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ concat ", " (map (fun x => show x) idxs)
@@ -346,7 +346,7 @@ Section ShowInstances.
     "[ " ++ show e ++ ", " ++ "%" ++ show bid ++ " ]".
 
   Definition intersperse (sep : string) (l : list string) : string
-    := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else s ++ sep ++ acc) l "".
+    := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else acc ++ sep ++ s) l "".
 
   Global Instance showPhi : Show (phi typ)
     := {| show p :=
