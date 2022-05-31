@@ -812,8 +812,6 @@ Fixpoint get_index_paths_aux (t_from : typ) (pre_path : list Z) {struct t_from}:
   let tail_list := get_index_paths_from_struct t pre_path (current_index + 1%Z) in
   head_list ++ tail_list
   end.
-Definition get_index_paths_ptr (t_from: typ) : list (typ * list (Z)) :=
-  map (fun '(t, path) => (t, path)) (get_index_paths_aux t_from [0%Z]).
   Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
     let edited_path := map (fun '(t, path) => match path with 
                             | hd::tl => (t, tl)
@@ -847,6 +845,15 @@ Definition filter_vec_typs (ctx: list (ident * typ)) : list (ident * typ) :=
   | TYPE_Vector sz _ => N.ltb 0 sz
   | _ => false end) ctx.
 
+(*Example test : get_index_paths_aux (TYPE_Array 2 (TYPE_Array 3 (TYPE_Struct [TYPE_Array 1 (TYPE_I 8)]))) [0] = [].
+Proof. simpl.*)
+
+Example test : get_index_paths_aux (TYPE_Struct [TYPE_Struct [TYPE_Vector 3 (TYPE_I 32); TYPE_Vector 3 TYPE_Float; TYPE_I 8; TYPE_Vector 4 (TYPE_I 8)]]) [0] = [].
+Proof. simpl.                                                                                                
+
+
+
+       
 Definition gen_gep : GenLLVM (typ * instr typ) :=
   ctx <- get_ctx;;
   let ptrs_in_context := filter_ptr_typs ctx in
@@ -857,7 +864,7 @@ Definition gen_gep : GenLLVM (typ * instr typ) :=
   | _ => ptr  (* Not gonna happened*)
   end in
   let t_in_ptr := get_typ_from_ptr tptr in (* Getting the inner type in the pointer*)
-  let paths_in_ptr := get_index_paths_ptr t_in_ptr in (* Inner paths: Paths after removing the outer pointer*)
+  let paths_in_ptr := get_index_paths_aux t_in_ptr [0] in (* Inner paths: Paths after removing the outer pointer*)
   '(t, path) <- oneOf_LLVM (map ret paths_in_ptr);; (* Select one path from the paths*)
   let path_for_gep := map (fun x => (TYPE_I 32, EXP_Integer (x))) path in (* Turning the path to integer*)
    (* Refer to function get_int_typ*)
