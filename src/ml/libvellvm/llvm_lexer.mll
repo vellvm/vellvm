@@ -376,7 +376,6 @@ and lexed_id = parse
     | Llvm_parser.Error -> parsing_err lexbuf
     | Failure s -> 
       begin
-        (Printf.fprintf stderr "Failure: %s\n" s);
         parsing_err lexbuf
       end   
 
