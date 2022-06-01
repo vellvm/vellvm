@@ -951,6 +951,26 @@ Definition gen_insertvalue : GenLLVM (typ * instr typ) :=
   (* Generate all of the type*)
   ret (tagg, INSTR_Op (OP_InsertValue (tagg, EXP_Ident id) (tsub, ex) path_for_insertvalue)).
 
+Definition filter_ptr_vecptr_typ (ctx: list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_, t) => match t with
+                | TYPE_Pointer _ => true
+                | TYPE_Vector _ ty => match ty with
+                                     | TYPE_Pointer _ => true
+                                     | _ => false
+                                     end
+                | _ => false
+                end) ctx.
+
+Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
+  ctx <- get_ctx;;
+  let ptr_in_context := filter_ptr_typs ctx in
+  '(id, tptr) <- (oneOf_LLVM (map ret ptr_in_context));;
+  let 
+  ret (TYPE_Float, INSTR_Fence).
+                              
+
+
+
 Definition genTypHelper (n: nat): G (typ) :=
   run_GenLLVM (gen_typ_non_void_size n).
 
