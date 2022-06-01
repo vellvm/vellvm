@@ -728,17 +728,23 @@ Section ExpGenerators.
        | TYPE_Function ret args =>
          match b with
          | TYPE_Function ret' args' =>
-           normalized_typ_eq ret ret' && forallb id (zipWith (fun a b => normalized_typ_eq a b) args args')
+             Nat.eqb (Datatypes.length args) (Datatypes.length args') &&
+               normalized_typ_eq ret ret' &&
+               forallb id (zipWith (fun a b => normalized_typ_eq a b) args args')
          | _ => false
          end
        | TYPE_Struct fields =>
          match b with
-         | TYPE_Struct fields' => forallb id (zipWith (fun a b => normalized_typ_eq a b) fields fields')
+         | TYPE_Struct fields' =>
+             Nat.eqb (Datatypes.length fields) (Datatypes.length fields') &&
+             forallb id (zipWith (fun a b => normalized_typ_eq a b) fields fields')
          | _ => false
          end
        | TYPE_Packed_struct fields =>
          match b with
-         | TYPE_Packed_struct fields' => forallb id (zipWith (fun a b => normalized_typ_eq a b) fields fields')
+         | TYPE_Packed_struct fields' =>
+             Nat.eqb (Datatypes.length fields) (Datatypes.length fields') &&
+             forallb id (zipWith (fun a b => normalized_typ_eq a b) fields fields')
          | _ => false
          end
        | TYPE_Opaque =>
