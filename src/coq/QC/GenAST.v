@@ -844,15 +844,6 @@ Definition filter_vec_typs (ctx: list (ident * typ)) : list (ident * typ) :=
   filter (fun '(_, t) => match t with 
   | TYPE_Vector sz _ => N.ltb 0 sz
   | _ => false end) ctx.
-
-(*Example test : get_index_paths_aux (TYPE_Array 2 (TYPE_Array 3 (TYPE_Struct [TYPE_Array 1 (TYPE_I 8)]))) [0] = [].
-Proof. simpl.*)
-
-Example test : get_index_paths_aux (TYPE_Struct [TYPE_Struct [TYPE_Vector 3 (TYPE_I 32); TYPE_Vector 3 TYPE_Float; TYPE_I 8; TYPE_Vector 4 (TYPE_I 8)]]) [0] = [].
-Proof. simpl.                                                                                                
-
-
-
        
 Definition gen_gep : GenLLVM (typ * instr typ) :=
   ctx <- get_ctx;;
