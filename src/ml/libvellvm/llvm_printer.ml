@@ -848,3 +848,16 @@ and modul : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LL
 
   pp_print_list ~pp_sep:pp_force_newline definition ppf m.m_definitions;
   pp_force_newline ppf ()
+
+let string_of ppx x : string =
+  pp_open_hvbox str_formatter 0;
+  ppx str_formatter x;
+  pp_close_box str_formatter ();
+  flush_str_formatter ()
+
+
+let string_of_typ (t:LLVMAst.typ) : string =
+  string_of typ t
+
+let string_of_exp (e:LLVMAst.typ LLVMAst.exp) : string =
+  string_of exp e

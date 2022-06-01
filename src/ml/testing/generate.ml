@@ -6,11 +6,11 @@ module G = QCheck.Gen
 
 let small_gen =
   let open G in
-  G.int_range (-10000) 10000
+  G.int_range 0 10000
 
 let i8gen =
   let open G in
-  G.int_range (-128) 127
+  G.int_range 0 255
 
 let g_const : 'a. 'a -> 'a G.t = fun v _rs -> v
 
@@ -18,7 +18,7 @@ let g_i1 = G.map
              (fun v ->
                DV.UVALUE_I1 (if v then Z.one else Z.zero) ) G.bool
 let g_si8 = G.map
-                ( fun v -> DV.UVALUE_I8 (Z.of_sint v)) small_gen
+                ( fun v -> DV.UVALUE_I8 (Z.of_sint v)) i8gen
 
 let g_si32 = G.map
                  (fun v -> DV.UVALUE_I32 (Z.of_sint v)) small_gen
