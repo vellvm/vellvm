@@ -373,7 +373,7 @@ Section TypGenerators.
                 (* ; TYPE_Opaque *)
                 ])).
 
-  Program Fixpoint gen_sized_typ_size (sz : nat) {measure sz} : GenLLVM typ :=
+  Program Fixpoint gen_sized_typ_size (sz : nat){measure sz} : GenLLVM typ :=
     match sz with
     | O => gen_sized_typ_0
     | (S sz') =>
@@ -381,15 +381,14 @@ Section TypGenerators.
         ([ gen_sized_typ_0
         ; ret TYPE_Pointer <*> gen_sized_typ_size sz'
         (* TODO: Might want to restrict the size to something reasonable *)
-        ; ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size sz'
+        ;ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size sz'
         ; ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_sized_typ_size 0
         (* TODO: I don't think functions are sized types? *)
         (* ; let n := Nat.div sz 2 in *)
         (*   ret TYPE_Function <*> gen_sized_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) *)
         ; ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
         ; ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
-          ]
-        )
+          ])
     end.
   Next Obligation.
   lia.
@@ -1016,7 +1015,7 @@ Fixpoint clear_ctx (t: typ) :=
             ctx <- get_ctx;;
             match find_pred (fun '(i,t) => if Ident.eq_dec id i then true else false) ctx with
             | None => lift failGen
-            | Some (i,t) => clear_ctx t
+            | Some (i,t) => clear_ctx t (* What should we do with the identifier at this point*)
             end
           (* Not generating these types for now *)
           | TYPE_Half                 => lift failGen
@@ -1265,8 +1264,7 @@ Section InstrGenerators.
          ++ (if seq.nilp (filter_ptr_typs ctx) then [] else [gen_gep; gen_load; gen_store])
          ++ (if seq.nilp (filter_agg_typs ctx) then [] else [gen_extractvalue; gen_insertvalue])
          ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])).
-  (*Example test1 : get_index_paths_aux (TYPE_Packed_struct [TYPE_I 1; TYPE_I 1; TYPE_Struct [TYPE_Packed_struct [TYPE_I 32; TYPE_Packed_struct [TYPE_I 8; TYPE_Float; TYPE_Float]]]]) [] = [].
-  Proof. simpl.*)
+  
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
 
