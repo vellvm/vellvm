@@ -9,8 +9,7 @@ From ExtLib Require Import
      Structures.Functor
      Eqv.
 
-From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG Semantics.TopLevel.
-From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils. (*Needs to be changed*)
+From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG DynamicTypes.
 
 Require Import Integers Floats.
 
@@ -22,9 +21,22 @@ Import MonadNotation.
 From Coq Require Import
      ZArith List String Lia Bool.Bool Hexadecimal Numbers.HexadecimalString Numbers.HexadecimalZ.
 
-From QuickChick Require Import QuickChick.
-Import QcDefaultNotation. Open Scope qc_scope.
+From QuickChick Require Import Show.
+(* Import QcDefaultNotation. Open Scope qc_scope. *)
 Set Warnings "-extraction-opaque-accessed,-extraction".
+
+
+(*  ------------------------------------------------------------------------- *)
+(* SAZ: this function was gotten from QuickChick Test.v, but really doesn't belong there. 
+   TODO: Move somewhere saner
+*)
+Fixpoint concatStr (l : list string) : string :=
+  match l with
+    | nil => ""
+    | (h :: t) => h ++ concatStr t
+  end.
+(*  ------------------------------------------------------------------------- *)
+
 
 Section ShowInstances.
   Definition show_raw_id (rid : raw_id) : string
@@ -334,7 +346,7 @@ Section ShowInstances.
 
   Global Instance showTerminator : Show (terminator typ)
     := {| show := show_terminator |}.
-
+  
   Definition show_code (indent : string) (c : code typ) : string
     := concatStr (map (fun iid => indent ++ show_instr_id iid ++ newline) c).
 

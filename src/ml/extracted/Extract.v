@@ -23,7 +23,8 @@ Import ListNotations.
 From Vellvm Require
      Semantics.TopLevel
      Transformations.Transform
-     Utils.ParserHelper.
+     Utils.ParserHelper
+     QC.ShowAST.
 
 Require ExtrOcamlBasic.
 Require ExtrOcamlString.
@@ -81,3 +82,4 @@ Extraction Library ExtrOcamlIntConv.
 Recursive Extraction Library TopLevel.
 Extraction Library Transform.
 Extraction Library ParserHelper.
+Recursive Extraction Library ShowAST.
