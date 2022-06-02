@@ -166,7 +166,7 @@ print-includes:
 	@echo $(COQINCLUDES)
 
 .PHONY: clean
-clean:
+clean: extractedclean
 	rm -f .depend
 	find $(COQDIR) -name "*.vo" -delete
 	find $(COQDIR) -name "*.vio" -delete
@@ -174,11 +174,14 @@ clean:
 	find $(COQDIR) -name "*.vos" -delete
 	rm -f $(VOFILES)
 	rm -rf doc/html doc/*.glob
-	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.ml
 	dune clean
 	rm -rf output
 	rm -f vellvm
 	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o
+
+.PHONY: extractedclean
+extractedclean:
+	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.ml
 
 .PHONY: distclean
 distclean: clean
