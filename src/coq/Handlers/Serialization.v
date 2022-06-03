@@ -151,29 +151,19 @@ Module Type SerializationBase (LP : LLVMParams) (MP : MemoryParams LP).
                   v <- insert_into_str str elt i;;
                   ret v
               | i :: tl =>
-                  v <- index_into_str_dv str i;;
-                  loop v tl
+                      v <- index_into_str_dv str i;;
+                      v2 <- loop v tl;;
+                      v3 <- insert_into_str str v2 i;;
+                      ret v3
               end in
             lift_ue dvalue (loop str idxs)
         | UVALUE_ExtractElement vec_typ vec idx =>
             dvec <- concretize_uvalueM M undef_handler ERR_M lift_ue vec;;
             didx <- concretize_uvalueM M undef_handler ERR_M lift_ue idx;;
-            let elt_typ := match dvec with
-                           | DVALUE_Vector elts => match elts with
-                                                  | [] => DTYPE_Void
-                                                  | hd::tl => match hd with
-                                                            | DVALUE_I1 _ => DTYPE_I 1
-                                                            | DVALUE_I8 _ => DTYPE_I 8
-                                                            | DVALUE_I32 _ => DTYPE_I 32
-                                                            | DVALUE_I64 _ => DTYPE_I 64
-                                                            | DVALUE_IPTR _ => DTYPE_Pointer
-                                                            | DVALUE_Float _ => DTYPE_Float
-                                                            | DVALUE_Double _ => DTYPE_Double
-                                                            | _ => DTYPE_Void (* Won't reach here *)
-                                                            end
-                                                  end
-                           | _ => DTYPE_Void (* Won't reach here*)
-                           end in
+            let elt_typ := match vec_typ with
+                           | DTYPE_Vector _ t => t
+                           | _ => DTYPE_Void (* Won't reach here *)
+                           end in 
             lift_ue dvalue (index_into_vec_dv elt_typ dvec didx)
         | UVALUE_InsertElement vec_typ vec elt idx =>
             dvec <- concretize_uvalueM M undef_handler ERR_M lift_ue vec;;
@@ -924,29 +914,19 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
                   v <- insert_into_str str elt i;;
                   ret v
               | i :: tl =>
-                  v <- index_into_str_dv str i;;
-                  loop v tl
+                      v <- index_into_str_dv str i;;
+                      v2 <- loop v tl;;
+                      v3 <- insert_into_str str v2 i;;
+                      ret v3
               end in
             lift_ue (loop str idxs)
         | UVALUE_ExtractElement vec_typ vec idx =>
             dvec <- concretize_uvalueM vec;;
             didx <- concretize_uvalueM idx;;
-            let elt_typ := match dvec with
-                           | DVALUE_Vector elts => match elts with
-                                                  | [] => DTYPE_Void
-                                                  | hd::tl => match hd with
-                                                            | DVALUE_I1 _ => DTYPE_I 1
-                                                            | DVALUE_I8 _ => DTYPE_I 8
-                                                            | DVALUE_I32 _ => DTYPE_I 32
-                                                            | DVALUE_I64 _ => DTYPE_I 64
-                                                            | DVALUE_IPTR _ => DTYPE_Pointer
-                                                            | DVALUE_Float _ => DTYPE_Float
-                                                            | DVALUE_Double _ => DTYPE_Double
-                                                            | _ => DTYPE_Void (* Won't reach here *)
-                                                            end
-                                                  end
-                           | _ => DTYPE_Void (* Won't reach here*)
-                           end in
+            let elt_typ := match vec_typ with
+                           | DTYPE_Vector _ t => t
+                           | _ => DTYPE_Void (* Won't reach here *)
+                           end in 
             lift_ue (index_into_vec_dv elt_typ dvec didx)
         | UVALUE_InsertElement vec_typ vec elt idx =>
             dvec <- concretize_uvalueM vec;;
@@ -1104,44 +1084,34 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
                 (* TODO: maybe this is just an error? ExtractByte should be guarded by ConcatBytes? *)
                 lift_ue (raise_error "Attempting to concretize UVALUE_ExtractByte, should not happen.")
             | UVALUE_InsertValue t uv elt idxs =>
-            str <- concretize_uvalueM uv;;
-            elt <- concretize_uvalueM elt;;
-            let fix loop str idxs : ERR_M dvalue :=
-              match idxs with
-            | [] => ret str (* What to do? Do we print out some error *)
-            | i :: nil =>
-                  v <- insert_into_str str elt i;;
-                  ret v
-            | i :: tl =>
-                  v <- index_into_str_dv str i;;
-                  loop v tl
-              end in
-            lift_ue (loop str idxs)
-        | UVALUE_ExtractElement vec_typ vec idx =>
-            dvec <- concretize_uvalueM vec;;
-            didx <- concretize_uvalueM idx;;
-            let elt_typ := match dvec with
-                           | DVALUE_Vector elts => match elts with
-                                                  | [] => DTYPE_Void
-                                                  | hd::tl => match hd with
-                                                            | DVALUE_I1 _ => DTYPE_I 1
-                                                            | DVALUE_I8 _ => DTYPE_I 8
-                                                            | DVALUE_I32 _ => DTYPE_I 32
-                                                            | DVALUE_I64 _ => DTYPE_I 64
-                                                            | DVALUE_IPTR _ => DTYPE_Pointer
-                                                            | DVALUE_Float _ => DTYPE_Float
-                                                            | DVALUE_Double _ => DTYPE_Double
-                                                            | _ => DTYPE_Void (* Won't reach here *)
-                                                            end
-                                                  end
-                           | _ => DTYPE_Void (* Won't reach here*)
-                           end in
-            lift_ue (index_into_vec_dv elt_typ dvec didx)
-        | UVALUE_InsertElement vec_typ vec elt idx =>
-            dvec <- concretize_uvalueM vec;;
-            didx <- concretize_uvalueM idx;;
-            delt <- concretize_uvalueM elt;;
-            lift_ue (insert_into_vec_dv vec_typ dvec delt didx)
+                str <- concretize_uvalueM uv;;
+                elt <- concretize_uvalueM elt;;
+                let fix loop str idxs : ERR_M dvalue :=
+                  match idxs with
+                  | [] => ret str (* What to do? Do we print out some error *)
+                  | i :: nil =>
+                      v <- insert_into_str str elt i;;
+                      ret v
+                  | i :: tl =>
+                      v <- index_into_str_dv str i;;
+                      v2 <- loop v tl;;
+                      v3 <- insert_into_str str v2 i;;
+                      ret v3
+                  end in
+                lift_ue (loop str idxs)
+            | UVALUE_ExtractElement vec_typ vec idx =>
+                dvec <- concretize_uvalueM vec;;
+                didx <- concretize_uvalueM idx;;
+                let elt_typ := match vec_typ with
+                               | DTYPE_Vector _ t => t
+                               | _ => DTYPE_Void (* Won't reach here *)
+                               end in 
+                lift_ue (index_into_vec_dv elt_typ dvec didx)
+            | UVALUE_InsertElement vec_typ vec elt idx =>
+                dvec <- concretize_uvalueM vec;;
+                didx <- concretize_uvalueM idx;;
+                delt <- concretize_uvalueM elt;;
+                lift_ue (insert_into_vec_dv vec_typ dvec delt didx)
             | _ => lift_ue (raise_error ("concretize_uvalueM: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++ uvalue_constructor_string u))
 
             end.
