@@ -136,7 +136,7 @@ Variant param_attr : Set :=
 | PARAMATTR_Returned
 | PARAMATTR_Nonnull
 | PARAMATTR_Dereferenceable (a:int)
-| PARAMATTR_Dereferencable_or_null (a : int)
+| PARAMATTR_Dereferenceable_or_null (a : int)
 | PARAMATTR_Swiftself
 | PARAMATTR_Swiftasync
 | PARAMATTR_Swifterror 

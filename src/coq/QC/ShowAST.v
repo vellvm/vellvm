@@ -110,8 +110,8 @@ Local Open Scope string.
     | PARAMATTR_Nest => "nest"
     | PARAMATTR_Returned => "returned"
     | PARAMATTR_Nonnull => "nonnull"
-    | PARAMATTR_Dereferencable a => "dereferencable(" ++ show a ++ ")"
-    | PARAMATTR_Dereferencable_or_null a => "dereferencable_or_null(" ++ show a ++ ")"
+    | PARAMATTR_Dereferenceable a => "dereferencable(" ++ show a ++ ")"
+    | PARAMATTR_Dereferenceable_or_null a => "dereferencable_or_null(" ++ show a ++ ")"
     | PARAMATTR_Swiftself => "swiftself"
     | PARAMATTR_Swiftasync => "swiftasync"
     | PARAMATTR_Swifterror => "swifterror"
@@ -661,6 +661,8 @@ Local Open Scope string.
        | TLE_Definition defn => show_definition defn
        | _ => "todo: show_tle"
        end.
+
+  Check top_level_entity. 
 
   Global Instance showTLE: Show (toplevel_entity typ (block typ * list (block typ))) :=
     {| show := show_tle |}.
