@@ -9,31 +9,241 @@ From ExtLib Require Import
      Structures.Functor
      Eqv.
 
-From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG Semantics.TopLevel.
+From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG Semantics.TopLevel Floats.
 From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils. (*Needs to be changed*)
+
+Check Floats.Float.to_bits.
 
 Require Import Integers Floats.
 
-Require Import List.
+Require Import List. 
 
 Import ListNotations.
 Import MonadNotation.
 
 From Coq Require Import
-     ZArith List String Lia Bool.Bool Hexadecimal Numbers.HexadecimalString Numbers.HexadecimalZ.
+  ZArith List String Lia Bool.Bool Hexadecimal Numbers.HexadecimalString Numbers.HexadecimalZ.
 
 From QuickChick Require Import QuickChick.
 Import QcDefaultNotation. Open Scope qc_scope.
 Set Warnings "-extraction-opaque-accessed,-extraction".
 
 Section ShowInstances.
+Local Open Scope string.
+
+
+  Definition show_linkage (l : linkage) : string :=
+    match l with 
+    | LINKAGE_Private => "private"
+    | LINKAGE_Internal => "internal"
+    | LINKAGE_Available_externally => "available_externally"
+    | LINKAGE_Linkonce => "linkonce"
+    | LINKAGE_Weak => "weak"
+    | LINKAGE_Common => "common"
+    | LINKAGE_Appending => "appending"
+    | LINKAGE_Linkonce_odr => "linkonce_odr"
+    | LINKAGE_Weak_odr => "weak_odr"
+    | LINKAGE_External => "external"
+    | LINKAGE_Extern_weak => "extern_weak"                          
+    end.
+
+  Global Instance showLinkage (l : linkage) : Show linkage
+    := {| show := show_linkage |}. 
+    
+
+  Definition show_dll_storage (d : dll_storage) : string :=
+    match d with
+    | DLLSTORAGE_Dllimport => "dllimport"
+    | DLLSTORAGE_Dllexport => "dllexport"
+    end.
+
+  Global Instance showDllStorage (d : dll_storage) : Show dll_storage
+    := {| show := show_dll_storage |}.
+
+  Definition show_visibility (v : visibility) : string :=
+    match v with
+    | VISIBILITY_Default => "default"
+    | VISIBILITY_Hidden => "hidden"
+    | VISIBILITY_Protected => "protected"
+    end.
+
+  Global Instance showVisibility (v : visibility) : Show visibility
+    := {| show := show_visibility |}.
+    
+  
+  Definition show_cconv (c : cconv) : string :=
+    match c with
+    | CC_Ccc => "ccc"
+    | CC_Fastcc => "fastcc"
+    | CC_Coldcc => "coldcc"
+    | CC_Cc cc => "cc" ++ show cc 
+    | CC_Webkit_jscc => "webkit_jscc"
+    | CC_Anyregcc => "anyregcc"
+    | CC_Preserve_mostcc => "preserve_mostcc"
+    | CC_Preserve_allcc => "preserve_allcc"
+    | CC_Cxx_fast_tlscc => "cxx_fast_tlscc"
+    | CC_Tailcc => "tailcc"
+    | CC_Swiftcc => "swiftcc" 
+    | CC_Swifttailcc => "swifttailcc"
+    | CC_cfguard_checkcc => "cfguard_checkcc"
+    end.
+
+  Global Instance showCConv : Show cconv 
+    := {| show := show_cconv |}.
+  
+                   
+  Definition show_param_attr (p : param_attr) : string :=
+    match p with
+    | PARAMATTR_Zeroext => "zeroext"
+    | PARAMATTR_Signext => "signext"
+    | PARAMATTR_Inreg => "inreg"
+    | PARAMATTR_Byval t => "byval(" ++ show t ++ ")"
+    | PARAMATTR_Byref t => "byref(" ++ show t ++ ")"
+    | PARAMATTR_Preallocated t => "preallocated(" ++ show t ++ ")"                                
+    | PARAMATTR_Inalloca t => "inalloca(" ++ show t ++ ")"                               
+    | PARAMATTR_Sret t => "sret(" ++ show t ++ ")"
+    | PARAMATTR_Elementtype t => "elementtype(" ++ show t ++ ")"                                 
+    | PARAMATTR_Align a => "align(" ++ show a ++ ")"
+    | PARAMATTR_Noalias => "noalias" 
+    | PARAMATTR_Nocapture => "nocapture"
+    | PARAMATTR_Nofree => "nofree"                           
+    | PARAMATTR_Nest => "nest"
+    | PARAMATTR_Returned => "returned"
+    | PARAMATTR_Nonnull => "nonnull"
+    | PARAMATTR_Dereferencable a => "dereferencable(" ++ show a ++ ")"
+    | PARAMATTR_Dereferencable_or_null a => "dereferencable_or_null(" ++ show a ++ ")"
+    | PARAMATTR_Swiftself => "swiftself"
+    | PARAMATTR_Swiftasync => "swiftasync"
+    | PARAMATTR_Swifterror => "swifterror"
+    | PARAMATTR_Immarg => "immarg"
+    | PARAMATTR_Noundef => "noundef"
+    | PARAMATTR_Alignstack a => "alignstack(" ++ show a ++ ")"                          
+    | PARAMATTR_Allocalign => "allocalign"
+    | PARAMATTR_Allocptr => "allocptr" 
+    end.
+
+    Global Instance showParamAttr : Show param_attr
+    := { show := show_param_attr }.
+
+    (* unimplemented: frame-pointer patchable-function, key_value *) 
+  Definition show_fn_attr (f : fn_attr) : string :=
+    | FNATTR_Alignstack a => "alignstack(" ++ show a ++ ")"
+    | FNATTR_Alloc_family fam => """alloc-family""=" ++ """" ++ show fam ++ """"
+    | FNATTR_Allockind kind => "allockind(" ++ """" ++ show kind ++ """" ++ ")"
+    | FNATTR_Allocsize a1 a2 =>
+       match a2 with
+       | None => "allocsize(" ++ show a1 ++ ")"
+       | Some a => "allocsize(" ++ show a1 ++ "," ++ show a ++ ")"
+       end
+    | FNATTR_Alwaysinline => "alwaysinline"
+    | FNATTR_Builtin => "builtin"
+    | FNATTR_Cold => "cold"
+    | FNATTR_Convergent => "convergent"
+    | FNATTR_Disable_sanitizer_instrumentation => "disable_sanitizer_instrumentation"
+    | FNATTR_Dontcall_error => """dontcall-error"""
+    | FNATTR_Dontcall_warn => """dontcall-warn"""
+    | FNATTR_Frame_pointer => "unimplemented: frame-pointer"
+    | FNATTR_Hot => "hot"
+    | FNATTR_Inaccessiblememonly => "inaccessiblememonly"
+    | FNATTR_Inaccessiblemem_or_argmemonly => "inaccessiblemem_or_argmemonly"
+    | FNATTR_Inlinehint => "inlinehint"
+    | FNATTR_Jumptable => "jumptable"
+    | FNATTR_Minsize => "minsize"
+    | FNATTR_Naked => "naked"
+    | FNATTR_No_inline_line_tables => """no-inline-line-tables"""
+    | FNATTR_No_jump_tables => "no-jump-tables"
+    | FNATTR_Nobuiltin => "nobuiltin"
+    | FNATTR_Noduplicate => "noduplicate"
+    | FNATTR_Nofree => "nofree"
+    | FNATTR_Noimplicitfloat => "noimplicitfloat"
+    | FNATTR_Noinline => "noinline"
+    | FNATTR_Nomerge => "nomerge"
+    | FNATTR_Nonlazybind => "nonlazybind"
+    | FNATTR_Noprofile => "noprofile"
+    | FNATTR_Noredzone => "noredzone"
+    | FNATTR_Indirect_tls_seg_refs => "indirect-tls-seg-refs"
+    | FNATTR_Noreturn => "noreturn"
+    | FNATTR_Norecurse => "norecurse"
+    | FNATTR_Willreturn => "willreturn"
+    | FNATTR_Nosync => "nosync"
+    | FNATTR_Nounwind => "nounwind"
+    | FNATTR_Nosanitize_bounds => "nosanitize_bounds"
+    | FNATTR_Nosanitize_coverage => "nosanitize_coverage"
+    | FNATTR_Null_pointer_is_valid => "null_pointer_is_valid"
+    | FNATTR_Optforfuzzing => "optforfuzzing"
+    | FNATTR_Optnone => "optnone"
+    | FNATTR_Optsize => "optsize"
+    | FNATTR_Patchable_function => "unimplemented: patchable-function"
+    | FNATTR_Probe_stack => """probe-stack"""
+    | FNATTR_Readnone => "readnone"
+    | FNATTR_Readonly => "readonly"
+    | FNATTR_Stack_probe_size => """stack-probe-size"""
+    | FNATTR_No_stack_arg_probe => """no-stack-arg-probe"""
+    | FNATTR_Writeonly => "writeonly"
+    | FNATTR_Argmemonly => "argmemonly"
+    | FNATTR_Returns_twice => "returns_twice"                          
+    | FNATTR_Safestack => "safestack" 
+    | FNATTR_Sanitize_address => "sanitize_address" 
+    | FNATTR_Sanitize_memory => "sanitize_memory" 
+    | FNATTR_Sanitize_thread => "sanitize_thread" 
+    | FNATTR_Sanitize_hwaddress => "sanitize_hwaddress" 
+    | FNATTR_Sanitize_memtag => "sanitize_memtag" 
+    | FNATTR_Speculative_load_hardening => "speculative_load_hardening"    
+    | FNATTR_Speculatable => "speculatable" 
+    | FNATTR_Ssp => "ssp" 
+    | FNATTR_Sspstrong => "sspstrong" 
+    | FNATTR_Sspreq => "sspreq" 
+    | FNATTR_Strictfp => "strictfp"
+    | FNATTR_Denormal_fp_math (s1: string) (s2: option string) =>
+        match s2 with
+        | None => """" ++ show s1 ++  """"
+        | Some s => """" ++ show s1 ++ "," ++ show s2 ++ """"
+        end    
+    | FNATTR_Denormal_fp_math_32 (s1 : string) (s2 : option string) =>
+        match s2 with
+        | None => """" ++ show s1 ++  """"
+        | Some s => """" ++ show s1 ++ "," ++ show s2 ++ """"
+        end     
+    | FNATTR_Thunk => """thunk"""
+    | FNATTR_Tls-load-hoist => """tls-load-hoist"""                   
+    | FNATTR_Uwtable (sync : bool)  => if sync then "uwtable(sync)" else "uwtable" 
+    | FNATTR_Nocf_check => "nocf_check" 
+    | FNATTR_Shadowcallstack => "shadowcallstack" 
+    | FNATTR_Mustprogress => "mustprogeress"
+    | FNATTR_Warn_stack_size (th : int)  => """warn-stack-size""=" ++ """" ++ show th ++ """"
+    | FNATTR_vscale_range (min : int) (max : option int) =>
+        match max with
+        | None => "vscale_range(" ++ show min ++ ")"
+        | Some m => "vscale_range(" ++ show min ++ "," ++ show m ++ ")"
+        end                             
+    | FNATTR_Min_legal_vector_width (size : int) => """min-legal-vector-width""=" ++ """"
+                                                       ++ show size ++ """" 
+    | FNATTR_String (s:string) => """" ++ show s ++ """"  (* "no-see" *)
+    | FNATTR_Key_value (kv : string * string) => """" ++ fst kv ++ """=" ++ """" ++ snd kv ++ """" (* "unsafe-fp-math"="false" *)
+    | FNATTR_Attr_grp (g:int) => "attr_grip" ++ show g
+    end.
+  
+  Global Instance showFnAttr : Show fn_attr
+    := {| show := show_fn_attr |}.
+
+  Definition show_thread_local_storage (tls : thread_local_storage) : string :=
+    match tls with
+    | TLS_Localdynamic => "localdynamic"
+    | TLS_Initialexec => "initialexec"
+    | TLS_Localexec => "localexec" 
+    end.
+
+  Global Instance showTLS (tls : thread_local_storage) : Show thread_local_storage
+    := {| show := show_thread_local_storage |}. 
+    
+   
   Definition show_raw_id (rid : raw_id) : string
     := match rid with
        | Name s => s
        | Anon i => show i
        | Raw i  => show i
        end.
-
+  
   Global Instance showRawId : Show raw_id
     := {| show := show_raw_id |}.
 
@@ -45,8 +255,7 @@ Section ShowInstances.
 
   Global Instance showIdent : Show ident
     := {| show := show_ident |}.
-
-  Local Open Scope string.
+    
 
   Fixpoint show_typ (t : typ) : string :=
     match t with
@@ -97,6 +306,71 @@ Section ShowInstances.
     | DTYPE_Vector sz t          => "Vector"
     end.
 
+
+
+   Definition show_icmp (cmp : icmp) : string
+    := match cmp with
+       | Eq  => "eq"
+       | Ne  => "ne"
+       | Ugt => "ugt"
+       | Uge => "uge"
+       | Ult => "ult"
+       | Ule => "ule"
+       | Sgt => "sgt"
+       | Sge => "sge"
+       | Slt => "slt"
+       | Sle => "sle"
+       end.
+
+   Global Instance showICmp : Show icmp
+     := {| show := show_icmp |}.
+
+   (* Removed f's *) 
+   Definition show_fcmp (cmp: fcmp) : string
+    := match cmp with 
+      |FFalse => "false"
+      |FOeq => "oeq"
+      |FOgt => "ogt"
+      |FOge => "oge"
+      |FOlt => "olt"
+      |FOle => "ole"
+      |FOne => "one"
+      |FOrd => "ord"
+      |FUno => "uno"
+      |FUeq => "ueq"
+      |FUgt => "ugt"
+      |FUge => "uge"
+      |FUlt => "ult"
+      |FUle => "ule"
+      |FUne => "une"
+      |FTrue => "true"
+    end.
+
+     
+  Global Instance showFCmp : Show fcmp 
+  := {| show := show_fcmp|}.
+
+   Definition show_phi_block (p : block_id * exp typ) : string :=
+    let '(bid, e) := p in
+    "[ " ++ show e ++ ", " ++ "%" ++ show bid ++ " ]".
+
+  Definition intersperse (sep : string) (l : list string) : string
+    := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else s ++ sep ++ acc) l "".
+
+  Global Instance showPhi : Show (phi typ)
+    := {| show p :=
+            let '(Phi t phis) := p in
+            "phi " ++ show t ++ " " ++ intersperse ", " (map show_phi_block phis)
+       |}.
+
+  (*How to implement select, freeze, call, va_arg, landingpad, catchpad, cleanuppad*)
+
+
+
+
+  (*These are under binary operations*)
+  (*These are also under bitwsie binary operations*)
+  (*Should we implement shl, lshr, and ashr?*)
   Definition show_ibinop (iop : ibinop) : string
     := match iop with
        (* TODO print flags *)
@@ -115,9 +389,11 @@ Section ShowInstances.
        | Xor     => "xor"
        end.
 
+   
   Global Instance showIBinop : Show ibinop
     := {| show := show_ibinop |}.
 
+   (*These are under binary operations*)
   Definition show_fbinop (fop : fbinop) : string
     := match fop with
        | FAdd => "fadd"
@@ -129,45 +405,8 @@ Section ShowInstances.
 
   Global Instance showFBinop : Show fbinop
     := {| show := show_fbinop |}.
-  
-  Definition show_icmp (cmp : icmp) : string
-    := match cmp with
-       | Eq  => "eq"
-       | Ne  => "ne"
-       | Ugt => "ugt"
-       | Uge => "uge"
-       | Ult => "ult"
-       | Ule => "ule"
-       | Sgt => "sgt"
-       | Sge => "sge"
-       | Slt => "slt"
-       | Sle => "sle"
-       end.
 
-  Global Instance showICmp : Show icmp
-    := {| show := show_icmp |}.
 
-  Definition show_fcmp (cmp: fcmp) : string
-    := match cmp with 
-      |FFalse => "ffalse"
-      |FOeq => "foeq"
-      |FOgt => "fogt"
-      |FOge => "foge"
-      |FOlt => "folt"
-      |FOle => "fole"
-      |FOne => "fone"
-      |FOrd => "ford"
-      |FUno => "funo"
-      |FUeq => "fueq"
-      |FUgt => "fugt"
-      |FUge => "fuge"
-      |FUlt => "fult"
-      |FUle => "fule"
-      |FUne => "fune"
-      |FTrue => "ftrue"
-    end.
-  Global Instance showFCmp : Show fcmp 
-  := {| show := show_fcmp|}.
 
   Definition double_to_hex_string (f : float) : string
     := "0x" ++ NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (Int64.unsigned (Float.to_bits f)))).
@@ -198,6 +437,8 @@ Section ShowInstances.
 
   Global Instance showFastMatch : Show fast_math
     := {| show := show_fast_math |}.
+
+  (*These are Constant Expressions*)
   Definition show_conversion_type (ct : conversion_type) : string
     := match ct with
        | Trunc => "trunc"
@@ -212,19 +453,25 @@ Section ShowInstances.
        | Inttoptr => "inttoptr"
        | Ptrtoint => "ptrtoint"
        | Bitcast => "bitcast"
+       | Addrspacecast => "addrspacecast"
+                            (*Do the following ones take in arguments???*)
        end.
+  
   Global Instance ShowConversionType : Show conversion_type
     := {| show := show_conversion_type |}.
+  
   Fixpoint show_exp (v : exp typ) :=
       match v with
       | EXP_Ident id => show id
       | EXP_Integer x => show x
       | EXP_Float f => show f
       | EXP_Double f => show f
+      | EXP_Hex f => double_to_hex_string f
       | EXP_Bool b => show b
       | EXP_Null => "null"
       | EXP_Zero_initializer => "zero initializer"
-      | EXP_Cstring s => "unimplemented cstring" (* TODO, this is wrong *)
+      (* lowercase? *)                         
+      | EXP_Cstring s => "C""" ++ show s ++ """" 
       | EXP_Undef => "undef"
       | EXP_Struct fields => "{"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++ show_exp ex) fields) ++ "}"
       | EXP_Packed_struct fields => "<{"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++ show_exp ex) fields) ++ "}>"
@@ -258,6 +505,9 @@ Section ShowInstances.
       let (telt, eexp) := elt in
       let (tidx, iexp) := idx in
       "insertelement " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ show telt ++ " " ++ show_exp eexp ++ ", " ++ show tidx ++ " " ++ show_exp iexp
+      | OP_ShuffleVector vec1 vec2 idxmask => "shufflevector " ++ show vec1 ++ ", "
+                                                ++ show vec2 ++ ", "
+                                                ++ show idxmask
       | OP_InsertValue vec elt idxs =>
       let (tptr, exp) := vec in
       let (telt, eexp) := elt in 
@@ -268,6 +518,7 @@ Section ShowInstances.
       | _ => "show_exp todo"
       end.
 
+  
   Global Instance showExp : Show (exp typ)
     := {| show := show_exp |}.
 
@@ -340,19 +591,6 @@ Section ShowInstances.
 
   Global Instance showCode : Show (code typ)
     := {| show := show_code "    " |}.
-
-  Definition show_phi_block (p : block_id * exp typ) : string :=
-    let '(bid, e) := p in
-    "[ " ++ show e ++ ", " ++ "%" ++ show bid ++ " ]".
-
-  Definition intersperse (sep : string) (l : list string) : string
-    := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else s ++ sep ++ acc) l "".
-
-  Global Instance showPhi : Show (phi typ)
-    := {| show p :=
-            let '(Phi t phis) := p in
-            "phi " ++ show t ++ " " ++ intersperse ", " (map show_phi_block phis)
-       |}.
 
   Definition show_block (indent : string) (b : block typ) : string
     :=

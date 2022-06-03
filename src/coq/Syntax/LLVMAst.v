@@ -26,9 +26,56 @@ Open Scope list_scope.
 
  *)
 
+(* Changes we made:
+   - moved around raw_id, ident, typ
+   - moved other things around lol 
+   - added variants for linkage, dll_storage,
+     visibility, cconv, param_attr, frame_pointer_val,
+     fn_attr, thread_local_storage.
+   - added shuffle for exp *) 
+
 Definition int := Z.
 Definition float := Floats.float.  (* 64-bit floating point value *)
 Definition float32 := Floats.float32.
+
+
+Variant raw_id : Set :=
+| Name (s:string)     (* Named identifiers are strings: %argc, %val, %x, @foo, @bar etc. *)
+| Anon (n:int)        (* Anonymous identifiers must be sequentially numbered %0, %1, %2, etc. *)
+| Raw  (n:int)        (* Used for code generation -- serializes as %_RAW_0 %_RAW_1 etc. *)
+.
+
+Variant ident : Set :=
+| ID_Global (id:raw_id)   (* @id *)
+| ID_Local  (id:raw_id)   (* %id *)
+.
+
+
+Unset Elimination Schemes.
+Inductive typ : Set :=
+| TYPE_I (sz:N)
+| TYPE_IPTR
+| TYPE_Pointer (t:typ) (* Why pointer type when pointers themselves are here?
+  How do we know which types to include in dtyp *) 
+| TYPE_Void
+| TYPE_Half
+| TYPE_Float
+| TYPE_Double
+| TYPE_X86_fp80
+| TYPE_Fp128
+| TYPE_Ppc_fp128
+(* | TYPE_Label  label is not really a type *)
+(* | TYPE_Token -- used with exceptions *)
+| TYPE_Metadata
+| TYPE_X86_mmx
+| TYPE_Array (sz:N) (t:typ)
+| TYPE_Function (ret:typ) (args:list typ) (* add *) 
+| TYPE_Struct (fields:list typ)
+| TYPE_Packed_struct (fields:list typ)
+| TYPE_Opaque
+| TYPE_Vector (sz:N) (t:typ)     (* t must be integer, floating point, or pointer type *)
+| TYPE_Identified (id:ident) (* add *) 
+.
 
 Variant linkage : Set :=
 | LINKAGE_Private
@@ -60,35 +107,65 @@ Variant cconv : Set :=
 | CC_Fastcc
 | CC_Coldcc
 | CC_Cc (cc:int)
+| CC_Webkit_jscc
+| CC_Anyregcc
+| CC_Preserve_mostcc
+| CC_Preserve_allcc
+| CC_Cxx_fast_tlscc
+| CC_Tailcc
+| CC_Swiftcc
+| CC_Swifttailcc
+| CC_cfguard_checkcc 
 .
 
 Variant param_attr : Set :=
 | PARAMATTR_Zeroext
 | PARAMATTR_Signext
 | PARAMATTR_Inreg
-| PARAMATTR_Byval
-| PARAMATTR_Inalloca
-| PARAMATTR_Sret
+| PARAMATTR_Byval (t : typ)
+| PARAMATTR_Byref (t : typ)
+| PARAMATTR_Preallocated (t : typ)                    
+| PARAMATTR_Inalloca (t : typ) 
+| PARAMATTR_Sret (t : typ)  
+| PARAMATTR_Elementtype (t : typ)                            
 | PARAMATTR_Align (a:int)
 | PARAMATTR_Noalias
 | PARAMATTR_Nocapture
-| PARAMATTR_Readonly
+| PARAMATTR_Nofree      
 | PARAMATTR_Nest
 | PARAMATTR_Returned
 | PARAMATTR_Nonnull
 | PARAMATTR_Dereferenceable (a:int)
+| PARAMATTR_Dereferencable_or_null (a : int)
+| PARAMATTR_Swiftself
+| PARAMATTR_Swiftasync
+| PARAMATTR_Swifterror 
 | PARAMATTR_Immarg
 | PARAMATTR_Noundef
-| PARAMATTR_Nofree
+| PARAMATTR_Alignstack (a : int)
+| PARAMATTR_Allocalign
+| PARAMATTR_Allocptr
+.
+
+Variant frame_pointer_val : Set :=
+| FRAMEPTR_None
+| FRAMEPTR_Non_leaf
+| FRAMEPTR_All
 .
 
 Variant fn_attr : Set :=
 | FNATTR_Alignstack (a:int)
-| FNATTR_Allocsize  (l:list int)                    
+| FNATTR_Alloc_family (fam : string)
+| FNATTR_Allockind (kind : string)                         
+| FNATTR_Allocsize (a1 : int) (a2 : option int)                 
 | FNATTR_Alwaysinline
 | FNATTR_Builtin
 | FNATTR_Cold
 | FNATTR_Convergent
+| FNATTR_Disable_sanitizer_instrumentation
+| FNATTR_Dontcall_error
+| FNATTR_Dontcall_warn
+| FNATTR_Frame_pointer
 | FNATTR_Hot
 | FNATTR_Inaccessiblememonly
 | FNATTR_Inaccessiblemem_or_argmemonly
@@ -96,6 +173,7 @@ Variant fn_attr : Set :=
 | FNATTR_Jumptable
 | FNATTR_Minsize
 | FNATTR_Naked
+| FNATTR_No_inline_line_tables 
 | FNATTR_No_jump_tables
 | FNATTR_Nobuiltin
 | FNATTR_Noduplicate
@@ -104,6 +182,7 @@ Variant fn_attr : Set :=
 | FNATTR_Noinline
 | FNATTR_Nomerge    
 | FNATTR_Nonlazybind
+| FNATTR_Noprofile     
 | FNATTR_Noredzone
 | FNATTR_Indirect_tls_seg_refs
 | FNATTR_Noreturn
@@ -111,12 +190,18 @@ Variant fn_attr : Set :=
 | FNATTR_Willreturn
 | FNATTR_Nosync    
 | FNATTR_Nounwind
+| FNATTR_Nosanitize_bounds
+| FNATTR_Nosanitize_coverage
 | FNATTR_Null_pointer_is_valid
 | FNATTR_Optforfuzzing    
 | FNATTR_Optnone
 | FNATTR_Optsize
+| FNATTR_Patchable_function
+| FNATTR_Probe_stack
 | FNATTR_Readnone
 | FNATTR_Readonly
+| FNATTR_Stack_probe_size
+| FNATTR_No_stack_arg_probe 
 | FNATTR_Writeonly
 | FNATTR_Argmemonly    
 | FNATTR_Returns_twice
@@ -129,13 +214,19 @@ Variant fn_attr : Set :=
 | FNATTR_Speculative_load_hardening    
 | FNATTR_Speculatable
 | FNATTR_Ssp
-| FNATTR_Sspreq
 | FNATTR_Sspstrong
-| FNATTR_Strictfp    
-| FNATTR_Uwtable
+| FNATTR_Sspreq
+| FNATTR_Strictfp
+| FNATTR_Denormal_fp_math (s1 : string) (s2 : option string) 
+| FNATTR_Denormal_fp_math_32 (s1 : string) (s2 : option string) 
+| FNATTR_Thunk    
+| FNATTR_Uwtable (sync : bool) 
 | FNATTR_Nocf_check
 | FNATTR_Shadowcallstack
-| FNATTR_Mustprogress    
+| FNATTR_Mustprogress
+| FNATTR_Warn_stack_size (th : int) 
+| FNATTR_vscale_range (min : int) (max : option int) 
+| FNATTR_Min_legal_vector_width  
 | FNATTR_String (s:string) (* "no-see" *)
 | FNATTR_Key_value (kv : string * string) (* "unsafe-fp-math"="false" *)
 | FNATTR_Attr_grp (g:int)
@@ -145,17 +236,6 @@ Variant thread_local_storage : Set :=
 | TLS_Localdynamic
 | TLS_Initialexec
 | TLS_Localexec
-.
-
-Variant raw_id : Set :=
-| Name (s:string)     (* Named identifiers are strings: %argc, %val, %x, @foo, @bar etc. *)
-| Anon (n:int)        (* Anonymous identifiers must be sequentially numbered %0, %1, %2, etc. *)
-| Raw  (n:int)        (* Used for code generation -- serializes as %_RAW_0 %_RAW_1 etc. *)
-.
-
-Variant ident : Set :=
-| ID_Global (id:raw_id)   (* @id *)
-| ID_Local  (id:raw_id)   (* %id *)
 .
 
 (* auxiliary definitions for when we know which case we're in already *)
@@ -179,30 +259,6 @@ Definition function_id := global_id.
    ```
 *)
 
-Unset Elimination Schemes.
-Inductive typ : Set :=
-| TYPE_I (sz:N)
-| TYPE_IPTR
-| TYPE_Pointer (t:typ)
-| TYPE_Void
-| TYPE_Half
-| TYPE_Float
-| TYPE_Double
-| TYPE_X86_fp80
-| TYPE_Fp128
-| TYPE_Ppc_fp128
-(* | TYPE_Label  label is not really a type *)
-(* | TYPE_Token -- used with exceptions *)
-| TYPE_Metadata
-| TYPE_X86_mmx
-| TYPE_Array (sz:N) (t:typ)
-| TYPE_Function (ret:typ) (args:list typ)
-| TYPE_Struct (fields:list typ)
-| TYPE_Packed_struct (fields:list typ)
-| TYPE_Opaque
-| TYPE_Vector (sz:N) (t:typ)     (* t must be integer, floating point, or pointer type *)
-| TYPE_Identified (id:ident)
-.
 Set Elimination Schemes.
 
 Variant icmp : Set := Eq|Ne|Ugt|Uge|Ult|Ule|Sgt|Sge|Slt|Sle.
@@ -228,7 +284,7 @@ Variant fast_math : Set :=
 
 Variant conversion_type : Set :=
   Trunc | Zext | Sext | Fptrunc | Fpext | Uitofp | Sitofp | Fptoui |
-  Fptosi | Inttoptr | Ptrtoint | Bitcast.
+  Fptosi | Inttoptr | Ptrtoint | Bitcast | Addrspacecast.
 
 Section TypedSyntax.
 
