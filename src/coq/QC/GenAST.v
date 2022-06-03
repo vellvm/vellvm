@@ -286,7 +286,12 @@ Section GenerationState.
        let new_ctx := vars ++ ctx in
        modify (replace_ctx new_ctx);;
        ret tt.
-
+  Definition hide_ctx {A} (g: GenLLVM A) : GenLLVM A
+    := ctx <- get_ctx;;
+       modify (replace_ctx []);;
+       a <- g;;
+       append_to_ctx ctx;;
+       ret a.
   Definition append_to_typ_ctx (aliases : list (ident * typ)) : GenLLVM unit
     := ctx <- get_typ_ctx;;
        let new_ctx := aliases ++ ctx in
@@ -373,7 +378,7 @@ Section TypGenerators.
                 (* ; TYPE_Opaque *)
                 ])).
 
-  Program Fixpoint gen_sized_typ_size (sz : nat){measure sz} : GenLLVM typ :=
+  Program Fixpoint gen_sized_typ_size (sz : nat) {measure sz} : GenLLVM typ :=
     match sz with
     | O => gen_sized_typ_0
     | (S sz') =>
@@ -886,7 +891,9 @@ Definition get_ctx_agg_typ : GenLLVM (ident * typ) :=
   oneOf_LLVM (map ret aggs_in_context).
 
 Definition filter_vec_typs (ctx: list (ident * typ)) : list (ident * typ) :=
-
+  (* The function calls filter, which get all the vector type in the context
+   It does not utilize filter_type because we don't know the inner type of the vector
+   We simply wants to find all vectors (assume valid) in the context*)
   filter (fun '(_, t) =>
             match t with
             | TYPE_Vector _ _ => true
@@ -958,75 +965,11 @@ Definition gen_insertelement : GenLLVM (typ * instr typ) :=
   index <- lift_GenLLVM (choose (0,Z.of_N sz));;
   ret (tvec, INSTR_Op (OP_InsertElement (tvec, EXP_Ident id) (t_in_vec, value) (TYPE_I 32, EXP_Integer index))).
 
-(* TODO: code for ptrtoint incomplete
-Definition filter_ptr_vecptr_typ (ctx: list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_, t) => match t with
-                | TYPE_Pointer _ => true
-                | TYPE_Vector _ ty => match ty with
-                                     | TYPE_Pointer _ => true
-                                     | _ => false
-                                     end
-                | _ => false
-                end) ctx.
-
-Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
-  ctx <- get_ctx;;
-  let ptr_in_context := filter_ptr_typs ctx in
-  '(id, tptr) <- (oneOf_LLVM (map ret ptr_in_context));;
-  ret (TYPE_Float, INSTR_Fence).*)
-                              
-
-
-
 Definition genTypHelper (n: nat): G (typ) :=
   run_GenLLVM (gen_typ_non_void_size n).
 
 Definition genType: G (typ) :=
   sized genTypHelper.
-
-  (* TODO: should make it much more likely to pick an identifier for
-           better test cases *)
-Fixpoint clear_ctx (t: typ) :=
-  match t with
-          | TYPE_I n                  => ret EXP_Integer <*> lift (arbitrary : G Z) (* lift (x <- (arbitrary : G nat);; ret (Z.of_nat x)) (* TODO: should the integer be forced to be in bounds? *) *)
-          | TYPE_IPTR => ret EXP_Integer <*> lift (arbitrary : G Z)
-          | TYPE_Pointer t            => lift failGen (* Only pointer type expressions might be conversions? Maybe GEP? *)
-          | TYPE_Void                 => lift failGen (* There should be no expressions of type void *)
-          | TYPE_Function ret args    => lift failGen (* No expressions of function type *)
-          | TYPE_Opaque               => lift failGen (* TODO: not sure what these should be... *)
-
-          (* Generate literals for aggregate structures *)
-          | TYPE_Array n t =>
-              es <- vectorOf_LLVM (N.to_nat n) (clear_ctx t);;
-              ret (EXP_Array (map (fun e => (t, e)) es))
-          | TYPE_Vector n t =>
-              es <- vectorOf_LLVM (N.to_nat n) (clear_ctx t);;
-              ret (EXP_Vector (map (fun e => (t, e)) es))
-          | TYPE_Struct fields =>
-              (* Should we divide size evenly amongst components of struct? *)
-              tes <- map_monad (fun t => e <- clear_ctx t;; ret (t, e)) fields;;
-              ret (EXP_Struct tes)
-          | TYPE_Packed_struct fields =>
-              (* Should we divide size evenly amongst components of struct? *)
-              tes <- map_monad (fun t => e <- clear_ctx t;; ret (t, e)) fields;;
-              ret (EXP_Packed_struct tes)
-
-          | TYPE_Identified id        =>
-            ctx <- get_ctx;;
-            match find_pred (fun '(i,t) => if Ident.eq_dec id i then true else false) ctx with
-            | None => lift failGen
-            | Some (i,t) => clear_ctx t (* What should we do with the identifier at this point*)
-            end
-          (* Not generating these types for now *)
-          | TYPE_Half                 => lift failGen
-          | TYPE_Float                => ret EXP_Float <*> lift fing32(* referred to genarators in flocq-quickchick*)
-          | TYPE_Double               => lift failGen (*ret EXP_Double <*> lift fing64*) (* TODO: Fix generator for double*)
-          | TYPE_X86_fp80             => lift failGen
-          | TYPE_Fp128                => lift failGen
-          | TYPE_Ppc_fp128            => lift failGen
-          | TYPE_Metadata             => lift failGen
-          | TYPE_X86_mmx              => lift failGen
-          end.
   
   Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
     match sz with
@@ -1159,7 +1102,7 @@ Definition gen_insertvalue : GenLLVM (typ * instr typ) :=
   '(id, tagg) <- get_ctx_agg_typ;;
   let paths_in_agg := get_index_paths_agg tagg in
   '(tsub, path_for_insertvalue) <- oneOf_LLVM (map ret paths_in_agg);;
-  ex <- clear_ctx tsub;;
+  ex <- hide_ctx (gen_exp_size 0 tsub);;
   (* Generate all of the type*)
   ret (tagg, INSTR_Op (OP_InsertValue (tagg, EXP_Ident id) (tsub, ex) path_for_insertvalue)).
   
