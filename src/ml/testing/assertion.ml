@@ -4,7 +4,7 @@
 open LLVMAst
 open TopLevel
 open InterpretationStack.InterpreterStackBigIntptr.LP.Events
-
+open Llvm_printer
 
 type raw_assertion_string =
   | Eq of { lhs : string ; rhs : string}
@@ -70,7 +70,10 @@ let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV
     | 8 -> DVALUE_I8 x
     | 32 -> DVALUE_I32 x
     | 64 -> DVALUE_I64 x
-    | _ -> failwith "Assertion includes ill-typed or unsupported expression"
+    | _ -> failwith (Printf.sprintf "Assertion includes ill-typed or unsupported integer expression:\n\t %s %s"
+                       (string_of_typ typ)
+                       (string_of_exp exp)
+                    )
     end
   | TYPE_Float, EXP_Float f -> DVALUE_Float f
   | TYPE_Double, EXP_Double f -> DVALUE_Double f
@@ -78,7 +81,10 @@ let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV
   | TYPE_Struct _, EXP_Struct elts -> DVALUE_Struct (List.map texp_to_dvalue elts)
   | TYPE_Packed_struct _, EXP_Packed_struct elts -> DVALUE_Packed_struct (List.map texp_to_dvalue elts)
   | TYPE_Vector _, EXP_Vector elts -> DVALUE_Vector (List.map texp_to_dvalue elts)
-  | _,_ -> failwith "Assertion includes unsupported expression"
+  | _,_ -> failwith (Printf.sprintf "Assertion includes unsupported expression:\n\t%s %s"
+                       (string_of_typ typ)
+                       (string_of_exp exp)
+                    )
 
 let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV.uvalue =
   match typ, exp with
@@ -90,7 +96,10 @@ let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV
     | 8 -> UVALUE_I8 x
     | 32 -> UVALUE_I32 x
     | 64 -> UVALUE_I64 x
-    | _ -> failwith "Assertion includes ill-typed or unsupported expression"
+    | _ -> failwith (Printf.sprintf "Assertion includes ill-typed or unsupported integer expression:\n\t %s %s"
+                       (string_of_typ typ)
+                       (string_of_exp exp)
+                    )
     end
   | TYPE_Float, EXP_Float f -> UVALUE_Float f
   | TYPE_Double, EXP_Double f -> UVALUE_Double f
@@ -98,8 +107,10 @@ let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV
   | TYPE_Struct _, EXP_Struct elts -> UVALUE_Struct (List.map texp_to_uvalue elts)
   | TYPE_Packed_struct _, EXP_Packed_struct elts -> UVALUE_Packed_struct (List.map texp_to_uvalue elts)
   | TYPE_Vector _, EXP_Vector elts -> UVALUE_Vector (List.map texp_to_uvalue elts)
-  | _,_ -> failwith "Assertion includes unsupported expression"
-
+  | _,_ -> failwith (Printf.sprintf "Assertion includes unsupported expression:\n\t%s %s"
+                       (string_of_typ typ)
+                       (string_of_exp exp)
+                    )
 
 let rec typ_to_dtyp (typ : LLVMAst.typ) : DynamicTypes.dtyp =
   match typ with
@@ -111,7 +122,8 @@ let rec typ_to_dtyp (typ : LLVMAst.typ) : DynamicTypes.dtyp =
   | TYPE_Struct dtyps -> DTYPE_Struct (List.map typ_to_dtyp dtyps)
   | TYPE_Packed_struct dtyps -> DTYPE_Packed_struct (List.map typ_to_dtyp dtyps)
   | TYPE_Vector (sz,dtyp) -> DTYPE_Vector (sz, typ_to_dtyp dtyp)
-  | _ -> failwith "Assertion includes unsupported expression"
+  | _ -> failwith (Printf.sprintf "Assertion includes unsupported type:\n\t %s"
+                     (string_of_typ typ))
 
 
 let texp_to_function_name (_, exp) : string =

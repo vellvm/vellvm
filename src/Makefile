@@ -28,6 +28,7 @@ COQFILESUTILS := Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Ut
 
 COQFILESSYNTAX := Syntax/DataLayout Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
 		Syntax/Traversal Syntax/DynamicTypes Syntax/TypToDtyp\
+		Syntax/TypeUtil\
 		Syntax/Scope Syntax/SurfaceSyntax\
 		Syntax
 
@@ -69,7 +70,7 @@ COQFILESOPT    := Transformations/Transform\
 
 COQFILESVIR      := $(COQFILESNUMERIC) $(COQFILESUTILS) $(COQFILESSYNTAX) $(COQFILESSEMANTICS)
 COQFILESCOMPILER := $(COQFILESVIR) $(COQFILESANALYSIS)
-COQFILESALL      := $(COQFILESCOMPILER) $(COQFILESTHEORY) $(COQFILESOPT)
+COQFILESALL      := $(COQFILESCOMPILER) $(COQFILESTHEORY) $(COQFILESOPT) $(COQFILESQC)
 
 VFILES  := $(COQFILESALL:%=coq/%.v)
 VOFILES := $(COQFILESALL:%=coq/%.vo)
@@ -165,7 +166,7 @@ print-includes:
 	@echo $(COQINCLUDES)
 
 .PHONY: clean
-clean:
+clean: extractedclean
 	rm -f .depend
 	find $(COQDIR) -name "*.vo" -delete
 	find $(COQDIR) -name "*.vio" -delete
@@ -173,11 +174,14 @@ clean:
 	find $(COQDIR) -name "*.vos" -delete
 	rm -f $(VOFILES)
 	rm -rf doc/html doc/*.glob
-	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
 	dune clean
 	rm -rf output
 	rm -f vellvm
 	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o
+
+.PHONY: extractedclean
+extractedclean:
+	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.ml
 
 .PHONY: distclean
 distclean: clean

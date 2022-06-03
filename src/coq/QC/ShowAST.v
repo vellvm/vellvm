@@ -110,8 +110,8 @@ Local Open Scope string.
     | PARAMATTR_Nest => "nest"
     | PARAMATTR_Returned => "returned"
     | PARAMATTR_Nonnull => "nonnull"
-    | PARAMATTR_Dereferenceable a => "dereferencable(" ++ show a ++ ")"
-    | PARAMATTR_Dereferenceable_or_null a => "dereferencable_or_null(" ++ show a ++ ")"
+    | PARAMATTR_Dereferencable a => "dereferencable(" ++ show a ++ ")"
+    | PARAMATTR_Dereferencable_or_null a => "dereferencable_or_null(" ++ show a ++ ")"
     | PARAMATTR_Swiftself => "swiftself"
     | PARAMATTR_Swiftasync => "swiftasync"
     | PARAMATTR_Swifterror => "swifterror"
@@ -658,11 +658,18 @@ Local Open Scope string.
 
   Definition show_tle (tle : toplevel_entity typ (block typ * list (block typ))) : string
     := match tle with
+         (*Why is show_definition rather than show being used here*)
        | TLE_Definition defn => show_definition defn
+       | TLE_Comment msg => ";" ++ show msg (*What if the comment is multiple lines? Each line is supposed to have a semicolon. How do we handle that?*)
+       | TLE_Target tgt => show tgt
+       | TLE_Datalayout layout => show layout
+       | TLE_Source_filename s => "source_filename = " ++ show s
+         
+         
+         
+         
        | _ => "todo: show_tle"
        end.
-
-  Check top_level_entity. 
 
   Global Instance showTLE: Show (toplevel_entity typ (block typ * list (block typ))) :=
     {| show := show_tle |}.

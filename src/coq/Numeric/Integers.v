@@ -1634,6 +1634,7 @@ Proof.
   intros. unfold mone. rewrite testbit_repr; auto. apply Ztestbit_m1. lia.
 Qed.
 
+#[global]
 Hint Rewrite bits_zero bits_mone : ints.
 
 Ltac bit_solve :=
@@ -1710,6 +1711,7 @@ Proof.
   intros. unfold not. rewrite bits_xor; auto. rewrite bits_mone; auto.
 Qed.
 
+#[global]
 Hint Rewrite bits_and bits_or bits_xor bits_not: ints.
 
 Theorem and_commut: forall x y, and x y = and y x.
@@ -2118,6 +2120,7 @@ Proof.
   lia.
 Qed.
 
+#[global]
 Hint Rewrite bits_shl bits_shru bits_shr: ints.
 
 Theorem shl_zero: forall x, shl x zero = x.
@@ -2446,6 +2449,7 @@ Proof.
     lia. lia. lia. lia.
 Qed.
 
+#[global]
 Hint Rewrite bits_rol bits_ror: ints.
 
 Theorem shl_rolm:
@@ -3237,6 +3241,7 @@ Proof.
   lia. auto.
 Qed.
 
+#[global]
 Hint Rewrite bits_zero_ext bits_sign_ext: ints.
 
 Theorem zero_ext_above:

@@ -22,7 +22,6 @@ let parse_pp_test path =
   let filename, _ = Platform.path_to_basename_ext path in
   let vll_file = Platform.gen_name !Platform.output_path filename ".v.ll" in
   let dot_s = Platform.gen_name !Platform.output_path filename ".s" in
-  let _ = Printf.fprintf stderr "Running clang on: %s\n%!" path in
   try
     let _ = clang_parse path dot_s in
     let prog = parse_file path in

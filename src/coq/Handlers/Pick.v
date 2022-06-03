@@ -36,6 +36,11 @@ From Vellvm Require Import
      Semantics.SerializationParams
      Handlers.Serialization.
 
+From ExtLib Require Import
+     Data.Monads.EitherMonad
+     Data.Monads.IdentityMonad
+     Structures.Functor.
+
 Require Import List.
 Require Import Floats.
 
@@ -56,7 +61,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams L
   Import MP.
   Import LP.
   Import Events.
-
+  
   Section PickPropositional.
 
     Inductive Pick_handler {X Y Post} {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E} : @PickE X Y Post ~> PropT E :=
@@ -65,9 +70,6 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams L
     | PickRet : forall Pre x (res : Y) (t : itree E {y : Y | Post x y}),
         Post x res -> Pick_handler (pick Pre x) t.
 
-    Require Import ExtLib.Data.Monads.EitherMonad.
-    Require Import ExtLib.Data.Monads.IdentityMonad.
-    Require Import ExtLib.Structures.Functor.
 
     Program Definition lift_err_ub_oom_post {A B} {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} (m:err_ub_oom A) (Post : B -> Prop) (f : forall (a : A), m = ret a -> itree E {b : B | Post b}) : itree E {b : B | Post b} :=
       match m with
@@ -224,8 +226,6 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams L
     (*   - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'. *)
         (* Qed. *)
     Admitted.
-
-    Require Import ExtLib.Structures.Functor.
 
     Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} : PickUvalueE ~> itree E :=
       fun T p =>
