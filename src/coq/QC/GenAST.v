@@ -286,12 +286,14 @@ Section GenerationState.
        let new_ctx := vars ++ ctx in
        modify (replace_ctx new_ctx);;
        ret tt.
+  
   Definition hide_ctx {A} (g: GenLLVM A) : GenLLVM A
-    := ctx <- get_ctx;;
+    := saved_ctx <- get_ctx;;
        modify (replace_ctx []);;
        a <- g;;
-       append_to_ctx ctx;;
+       append_to_ctx saved_ctx;;
        ret a.
+  
   Definition append_to_typ_ctx (aliases : list (ident * typ)) : GenLLVM unit
     := ctx <- get_typ_ctx;;
        let new_ctx := aliases ++ ctx in
@@ -386,7 +388,7 @@ Section TypGenerators.
         ([ gen_sized_typ_0
         ; ret TYPE_Pointer <*> gen_sized_typ_size sz'
         (* TODO: Might want to restrict the size to something reasonable *)
-        ;ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size sz'
+        ; ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size sz'
         ; ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_sized_typ_size 0
         (* TODO: I don't think functions are sized types? *)
         (* ; let n := Nat.div sz 2 in *)
@@ -846,14 +848,14 @@ Fixpoint get_index_paths_aux_xinvec (t_from : typ) (pre_path : list Z) {struct t
   let tail_list := get_index_paths_from_struct_xinvec t pre_path (current_index + 1%Z) in
   head_list ++ tail_list
   end.
-(*Example test1 : get_index_paths_aux_xinvec (TYPE_Struct [TYPE_Struct [TYPE_Struct [TYPE_I 8; TYPE_I 8]; TYPE_Vector 2 (TYPE_I 32)]; TYPE_Vector 3 (TYPE_I 1)]) [] = [].
-Proof. simpl. *)
+
 Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
   let agg_paths := get_index_paths_aux_xinvec t_from nil in
-  filter (fun '(_,path) => match path with
-                        | nil => false
-                        | _ => true
-                        end) agg_paths.
+  (* The method is mainly used by extractvalue and insertvalue, 
+     which requires at least one index for getting inside the aggregate type.
+     There is a possibility for us to get nil path. The filter below will get rid of that possibility.
+     Given that the nilpath will definitely be at the beginning of a list of options, we can essentially get the tail.*)
+  tl agg_paths.
 
 (*filter all the (ident, typ) in ctx such that typ is a ptr*)
 Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
@@ -891,9 +893,6 @@ Definition get_ctx_agg_typ : GenLLVM (ident * typ) :=
   oneOf_LLVM (map ret aggs_in_context).
 
 Definition filter_vec_typs (ctx: list (ident * typ)) : list (ident * typ) :=
-  (* The function calls filter, which get all the vector type in the context
-   It does not utilize filter_type because we don't know the inner type of the vector
-   We simply wants to find all vectors (assume valid) in the context*)
   filter (fun '(_, t) =>
             match t with
             | TYPE_Vector _ _ => true
@@ -1206,8 +1205,7 @@ Section InstrGenerators.
         ] (* TODO: Generate atomic operations and other instructions *)
          ++ (if seq.nilp (filter_ptr_typs ctx) then [] else [gen_gep; gen_load; gen_store])
          ++ (if seq.nilp (filter_agg_typs ctx) then [] else [gen_extractvalue; gen_insertvalue])
-         ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])).
-  
+         ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])).  
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
 
