@@ -146,23 +146,22 @@ Module Type SerializationBase (LP : LLVMParams) (MP : MemoryParams LP).
             elt <- concretize_uvalueM M undef_handler ERR_M lift_ue elt;;
             let fix loop str idxs : ERR_M dvalue :=
               match idxs with
-              | [] => ret str (* What to do? Do we print out some error *)
+              | [] => raise_error "Index was not provided"
               | i :: nil =>
                   v <- insert_into_str str elt i;;
                   ret v
               | i :: tl =>
-                      v <- index_into_str_dv str i;;
-                      v2 <- loop v tl;;
-                      v3 <- insert_into_str str v2 i;;
-                      ret v3
+                  subfield <- index_into_str_dv str i;;
+                  modified_subfield <- loop subfield tl;;
+                  insert_into_str str modified_subfield i
               end in
             lift_ue dvalue (loop str idxs)
         | UVALUE_ExtractElement vec_typ vec idx =>
             dvec <- concretize_uvalueM M undef_handler ERR_M lift_ue vec;;
             didx <- concretize_uvalueM M undef_handler ERR_M lift_ue idx;;
             let elt_typ := match vec_typ with
-                           | DTYPE_Vector _ t => t
-                           | _ => DTYPE_Void (* Won't reach here *)
+                           | DTYPE_Vector _ t => ret t
+                           | _ => lift_ue (raise_error "Invalid vector type for ExtractElement")
                            end in 
             lift_ue dvalue (index_into_vec_dv elt_typ dvec didx)
         | UVALUE_InsertElement vec_typ vec elt idx =>
@@ -176,7 +175,6 @@ Module Type SerializationBase (LP : LLVMParams) (MP : MemoryParams LP).
                        ("concretize_uvalueM: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++
                                                                                                                                   uvalue_constructor_string u))
         end.
-  Check concretize_uvalueM.
 End SerializationBase.
 
 Module Type Serialization (LP : LLVMParams) (MP : MemoryParams LP) (SER : SerializationBase LP MP) <: SerializationBase LP MP.
@@ -909,24 +907,23 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
             elt <- concretize_uvalueM elt;;
             let fix loop str idxs : ERR_M dvalue :=
               match idxs with
-              | [] => ret str (* What to do? Do we print out some error *)
+              | [] => raise_error "Index was not provided"
               | i :: nil =>
                   v <- insert_into_str str elt i;;
                   ret v
               | i :: tl =>
-                      v <- index_into_str_dv str i;;
-                      v2 <- loop v tl;;
-                      v3 <- insert_into_str str v2 i;;
-                      ret v3
+                      subfield <- index_into_str_dv str i;;
+                      modified_subfield <- loop subfield tl;;
+                      insert_into_str str modified_subfield i
               end in
             lift_ue (loop str idxs)
         | UVALUE_ExtractElement vec_typ vec idx =>
             dvec <- concretize_uvalueM vec;;
             didx <- concretize_uvalueM idx;;
-            let elt_typ := match vec_typ with
-                           | DTYPE_Vector _ t => t
-                           | _ => DTYPE_Void (* Won't reach here *)
-                           end in 
+            elt_typ <- match vec_typ with
+                       | DTYPE_Vector _ t => ret t
+                       | _ => lift_ue (raise_error "Invalid vector type for ExtractElement")
+                       end;;
             lift_ue (index_into_vec_dv elt_typ dvec didx)
         | UVALUE_InsertElement vec_typ vec elt idx =>
             dvec <- concretize_uvalueM vec;;
@@ -1088,24 +1085,23 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
                 elt <- concretize_uvalueM elt;;
                 let fix loop str idxs : ERR_M dvalue :=
                   match idxs with
-                  | [] => ret str (* What to do? Do we print out some error *)
+                  | [] => raise_error "Index was not provided"
                   | i :: nil =>
                       v <- insert_into_str str elt i;;
                       ret v
                   | i :: tl =>
-                      v <- index_into_str_dv str i;;
-                      v2 <- loop v tl;;
-                      v3 <- insert_into_str str v2 i;;
-                      ret v3
+                      subfield <- index_into_str_dv str i;;
+                      modified_subfield <- loop subfield tl;;
+                      insert_into_str str modified_subfield i
                   end in
                 lift_ue (loop str idxs)
             | UVALUE_ExtractElement vec_typ vec idx =>
                 dvec <- concretize_uvalueM vec;;
                 didx <- concretize_uvalueM idx;;
-                let elt_typ := match vec_typ with
-                               | DTYPE_Vector _ t => t
-                               | _ => DTYPE_Void (* Won't reach here *)
-                               end in 
+                elt_typ <- match vec_typ with
+                           | DTYPE_Vector _ t => ret t
+                           | _ => lift_ue (raise_error "Invalid vector type for ExtractElement")
+                           end;;
                 lift_ue (index_into_vec_dv elt_typ dvec didx)
             | UVALUE_InsertElement vec_typ vec elt idx =>
                 dvec <- concretize_uvalueM vec;;
