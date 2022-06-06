@@ -31,27 +31,7 @@ Set Warnings "-extraction-opaque-accessed,-extraction".
 Section ShowInstances.
 Local Open Scope string.
 
- Definition show_raw_id (rid : raw_id) : string
-    := match rid with
-       | Name s => s
-       | Anon i => show i
-       | Raw i  => show i
-       end.
-  
-  Global Instance showRawId : Show raw_id
-    := {| show := show_raw_id |}.
-
-  Definition show_ident (i : ident) : string
-    := match i with
-       | ID_Global r => "@" ++ show_raw_id r
-       | ID_Local r  => "%" ++ show_raw_id r
-       end.
-
-  Global Instance showIdent : Show ident
-    := {| show := show_ident |}.
-
-   
-   Definition show_raw_id (rid : raw_id) : string
+  Definition show_raw_id (rid : raw_id) : string
     := match rid with
        | Name s => s
        | Anon i => show i
@@ -281,33 +261,33 @@ Fixpoint show_typ (t : typ) : string :=
     | FNATTR_Sspstrong => "sspstrong" 
     | FNATTR_Sspreq => "sspreq" 
     | FNATTR_Strictfp => "strictfp"
-    | FNATTR_Denormal_fp_math (s1: string) (s2: option string) =>
+    | FNATTR_Denormal_fp_math s1 s2 =>
         match s2 with
         | None => """" ++ show s1 ++  """"
         | Some s => """" ++ show s1 ++ "," ++ show s2 ++ """"
         end    
-    | FNATTR_Denormal_fp_math_32 (s1 : string) (s2 : option string) =>
+    | FNATTR_Denormal_fp_math_32 s1 s2 =>
         match s2 with
         | None => """" ++ show s1 ++  """"
         | Some s => """" ++ show s1 ++ "," ++ show s2 ++ """"
         end     
     | FNATTR_Thunk => """thunk"""
-    | FNATTR_Tls-load-hoist => """tls-load-hoist"""                   
-    | FNATTR_Uwtable (sync : bool)  => if sync then "uwtable(sync)" else "uwtable" 
+    | FNATTR_Tls_load_hoist => """tls-load-hoist"""                   
+    | FNATTR_Uwtable sync  => if sync then "uwtable(sync)" else "uwtable" 
     | FNATTR_Nocf_check => "nocf_check" 
     | FNATTR_Shadowcallstack => "shadowcallstack" 
     | FNATTR_Mustprogress => "mustprogeress"
-    | FNATTR_Warn_stack_size (th : int)  => """warn-stack-size""=" ++ """" ++ show th ++ """"
-    | FNATTR_vscale_range (min : int) (max : option int) =>
+    | FNATTR_Warn_stack_size th  => """warn-stack-size""=" ++ """" ++ show th ++ """"
+    | FNATTR_vscale_range min max  =>
         match max with
         | None => "vscale_range(" ++ show min ++ ")"
         | Some m => "vscale_range(" ++ show min ++ "," ++ show m ++ ")"
         end                             
-    | FNATTR_Min_legal_vector_width (size : int) => """min-legal-vector-width""=" ++ """"
+    | FNATTR_Min_legal_vector_width size => """min-legal-vector-width""=" ++ """"
                                                        ++ show size ++ """" 
-    | FNATTR_String (s:string) => """" ++ show s ++ """"  (* "no-see" *)
-    | FNATTR_Key_value (kv : string * string) => """" ++ fst kv ++ """=" ++ """" ++ snd kv ++ """" (* "unsafe-fp-math"="false" *)
-    | FNATTR_Attr_grp (g:int) => "attr_grip" ++ show g
+    | FNATTR_String s => """" ++ show s ++ """"  (* "no-see" *)
+    | FNATTR_Key_value kv => """" ++ fst kv ++ """=" ++ """" ++ snd kv ++ """" (* "unsafe-fp-math"="false" *)
+    | FNATTR_Attr_grp g => "attr_grip" ++ show g
     end.
   
   Global Instance showFnAttr : Show fn_attr
@@ -655,10 +635,10 @@ Fixpoint show_typ (t : typ) : string :=
       let name  := defn.(df_prototype).(dc_name) in
       let ftype := defn.(df_prototype).(dc_type) in
       match ftype with
-        (*Return type and arguments type*)
+        (*Return type and arguments type?*)
       | TYPE_Function ret_t args_t
         =>
-          (* It's being zipped with name of argument and type after bc of how show_arg is defined *)
+          (* What is df_args? -It is the names of the arguments *)
           let args := zip defn.(df_args) args_t in
           (* What is happening here? *)
                    (* Is newline literally just writing a new line? *)
@@ -704,16 +684,22 @@ Fixpoint show_typ (t : typ) : string :=
     {| show := show_declaration |}.
       
 
+  Definition show_metadata (md) : string :=
+    match md with
+      | METADATA_Const tv => 
+
+    
   Definition show_tle (tle : toplevel_entity typ (block typ * list (block typ))) : string
     := match tle with
          (*Why is show_definition rather than show being used here*)
        | TLE_Definition defn => show_definition defn
        | TLE_Comment msg => ";" ++ show msg (*What if the comment is multiple lines? Each line is supposed to have a semicolon. How do we handle that?*)
-       | TLE_Target tgt => "target triple =" ++ show tgt
-       | TLE_Datalayout layout => "target datalayout = " ++ show layout
+       | TLE_Target tgt => show tgt
+       | TLE_Datalayout layout => show layout
        | TLE_Source_filename s => "source_filename = " ++ show s
        | TLE_Declaration decl => show_declaration decl
-       | TLE_Global g => show_global g       
+       | TLE_Global g => show_global g
+       | TLE_Metadata id md =>                               
        | _ => "todo: show_tle"
        end.
 

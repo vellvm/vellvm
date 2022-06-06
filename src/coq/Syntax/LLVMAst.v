@@ -219,7 +219,8 @@ Variant fn_attr : Set :=
 | FNATTR_Strictfp
 | FNATTR_Denormal_fp_math (s1 : string) (s2 : option string) 
 | FNATTR_Denormal_fp_math_32 (s1 : string) (s2 : option string) 
-| FNATTR_Thunk    
+| FNATTR_Thunk
+| FNATTR_Tls_load_hoist      
 | FNATTR_Uwtable (sync : bool) 
 | FNATTR_Nocf_check
 | FNATTR_Shadowcallstack
