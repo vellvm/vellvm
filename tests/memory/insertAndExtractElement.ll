@@ -41,3 +41,7 @@ define i64 @insertAndRemove(i64 %location, i64 %val, i64 %removeLoc) {
 ; ASSERT EQ: i64 10 = call i64 @insertAndRemove(i64 3, i64 2, i64 1)
 ; ASSERT EQ: i64 15 = call i64 @insertAndRemove(i64 3, i64 2, i64 2)
 ; ASSERT EQ: i64 2 = call i64 @insertAndRemove(i64 3, i64 2, i64 3)
+
+
+
+
