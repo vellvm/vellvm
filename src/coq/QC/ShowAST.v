@@ -273,7 +273,7 @@ Fixpoint show_typ (t : typ) : string :=
           | Some s => """" ++ show s1 ++ "," ++ show s2 ++ """"
           end     
       | FNATTR_Thunk => """thunk"""
-      | FNATTR_Tls-load-hoist => """tls-load-hoist"""                   
+      | FNATTR_Tls_load_hoist => """tls-load-hoist"""                   
       | FNATTR_Uwtable (sync)  => if sync then "uwtable(sync)" else "uwtable" 
       | FNATTR_Nocf_check => "nocf_check" 
       | FNATTR_Shadowcallstack => "shadowcallstack" 
