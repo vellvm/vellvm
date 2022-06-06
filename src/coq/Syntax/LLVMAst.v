@@ -226,7 +226,7 @@ Variant fn_attr : Set :=
 | FNATTR_Mustprogress
 | FNATTR_Warn_stack_size (th : int) 
 | FNATTR_vscale_range (min : int) (max : option int) 
-| FNATTR_Min_legal_vector_width  
+| FNATTR_Min_legal_vector_width  (size : int)
 | FNATTR_String (s:string) (* "no-see" *)
 | FNATTR_Key_value (kv : string * string) (* "unsafe-fp-math"="false" *)
 | FNATTR_Attr_grp (g:int)
