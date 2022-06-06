@@ -13,25 +13,31 @@ define float @testExtractY() {
 }
 
 define i32 @testValuesChange() {
-  %agg1 = add [4 x i32] [i32 10, i32 20, i32 30, i32 40], zeroinitializer          
+  %ptr = alloca [4 x i32]
+  store [4 x i32] [i32 10, i32 20, i32 30, i32 40], [4 x i32]* %ptr
+  %agg1 = load [4 x i32], [4 x i32]* %ptr
   %agg2 = insertvalue [4 x i32] %agg1, i32 100, 1
   %val = extractvalue [4 x i32] %agg2, 1
   ret i32 %val
 }
 
 define i32 @testChangeDifferentLocation() {
-  %agg1 = add [4 x i32] [i32 10, i32 20, i32 30, i32 40], zeroinitializer          
+  %ptr = alloca [4 x i32]
+  store [4 x i32] [i32 10, i32 20, i32 30, i32 40], [4 x i32]* %ptr
+  %agg1 = load [4 x i32], [4 x i32]* %ptr        
   %agg2 = insertvalue [4 x i32] %agg1, i32 100, 1
   %val = extractvalue [4 x i32] %agg2, 3
   ret i32 %val
 }
 
 define i32 @testSingletonArray() {
-  %agg1 = add [1 x i32] [i32 4], zeroinitializer
+  %ptr = alloca [4 x i32]
+  store [4 x i32] [i32 10, i32 20, i32 30, i32 40], [4 x i32]* %ptr
+  %agg1 = load [4 x i32], [4 x i32]* %ptr
   %agg2 = insertvalue [1 x i32] %agg1, i32 60, 0
   %val = extractvalue [1 x i32] %agg2, 0
   ret i32 %val
-  }
+}
 
 ; ASSERT EQ: i32 1 = call i32 @testExtractX()
 
