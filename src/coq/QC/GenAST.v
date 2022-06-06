@@ -831,26 +831,26 @@ Definition get_index_paths_ptr (t_from: typ) : list (typ * list (Z)) :=
 
 
 (* Index path without getting into vector *)
-Fixpoint get_index_paths_aux_xinvec (t_from : typ) (pre_path : list Z) {struct t_from}: list (typ * list (Z)) :=
+Fixpoint get_index_paths_agg_aux (t_from : typ) (pre_path : list Z) {struct t_from}: list (typ * list (Z)) :=
   match t_from with
   | TYPE_Array sz t =>
-  let sub_paths := get_index_paths_aux_xinvec t [] in (* Get index path from the first element*)
+  let sub_paths := get_index_paths_agg_aux t [] in (* Get index path from the first element*)
   [(t_from, pre_path)] (* The path to the array *)
     ++ get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path (* Assemble them into 1*)
-  | TYPE_Struct fields => [(t_from, pre_path)] ++ get_index_paths_from_struct_xinvec fields pre_path 0
-  | TYPE_Packed_struct fields => [(t_from, pre_path)] ++ get_index_paths_from_struct_xinvec fields pre_path 0
+  | TYPE_Struct fields => [(t_from, pre_path)] ++ get_index_paths_agg_from_struct fields pre_path 0
+  | TYPE_Packed_struct fields => [(t_from, pre_path)] ++ get_index_paths_agg_from_struct fields pre_path 0
   | t => [(t, pre_path)]
   end with
-  get_index_paths_from_struct_xinvec (fields: list typ) (pre_path: list Z) (current_index : Z) {struct fields}: list (typ * list Z) :=
+  get_index_paths_agg_from_struct (fields: list typ) (pre_path: list Z) (current_index : Z) {struct fields}: list (typ * list Z) :=
   match fields with
   | nil => nil
-  | h::t => let head_list := map (fun '(t, p) => (t, pre_path ++ [current_index] ++ p)) (get_index_paths_aux_xinvec h []) in
-  let tail_list := get_index_paths_from_struct_xinvec t pre_path (current_index + 1%Z) in
+  | h::t => let head_list := map (fun '(t, p) => (t, pre_path ++ [current_index] ++ p)) (get_index_paths_agg_aux h []) in
+  let tail_list := get_index_paths_agg_from_struct t pre_path (current_index + 1%Z) in
   head_list ++ tail_list
   end.
 
 Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
-  let agg_paths := get_index_paths_aux_xinvec t_from nil in
+  let agg_paths := get_index_paths_agg_aux t_from nil in
   (* The method is mainly used by extractvalue and insertvalue, 
      which requires at least one index for getting inside the aggregate type.
      There is a possibility for us to get nil path. The filter below will get rid of that possibility.
