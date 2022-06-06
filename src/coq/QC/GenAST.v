@@ -151,6 +151,7 @@ Section GenerationState.
     ; gen_ctx : list (ident * typ)
     (* Type aliases *)
     ; gen_typ_ctx : list (ident * typ)
+    ; gen_ptrtoint_ctx : list (typ * ident * typ)
     }.
 
   Definition init_GenState : GenState
@@ -160,6 +161,7 @@ Section GenerationState.
         ; num_blocks := 0
         ; gen_ctx    := []
         ; gen_typ_ctx    := []
+        ; gen_ptrtoint_ctx := []
        |}.
 
   Definition increment_raw (gs : GenState) : GenState
@@ -169,6 +171,7 @@ Section GenerationState.
         ; num_blocks  := gs.(num_blocks)
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
+        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
        |}.
 
   Definition increment_global (gs : GenState) : GenState
@@ -178,6 +181,7 @@ Section GenerationState.
         ; num_blocks  := gs.(num_blocks)
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
+        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
        |}.
 
   Definition increment_void (gs : GenState) : GenState
@@ -187,6 +191,7 @@ Section GenerationState.
         ; num_blocks  := gs.(num_blocks)
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
+        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
        |}.
 
   Definition increment_blocks (gs : GenState) : GenState
@@ -196,6 +201,7 @@ Section GenerationState.
         ; num_blocks  := S gs.(num_blocks)
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
+        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
        |}.
 
   Definition replace_ctx (ctx : list (ident * typ)) (gs : GenState) : GenState
@@ -205,6 +211,7 @@ Section GenerationState.
         ; num_blocks  := gs.(num_blocks)
         ; gen_ctx     := ctx
         ; gen_typ_ctx := gs.(gen_typ_ctx)
+        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
        |}.
 
   Definition replace_typ_ctx (typ_ctx : list (ident * typ)) (gs : GenState) : GenState
@@ -214,8 +221,18 @@ Section GenerationState.
         ; num_blocks  := gs.(num_blocks)
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := typ_ctx
+        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
        |}.
 
+  Definition replace_ptrtoint_ctx (ptrtoint_ctx : list (typ * ident * typ)) (gs: GenState) : GenState
+    := {| num_void    := gs.(num_void)
+        ; num_raw     := gs.(num_raw)
+        ; num_global  := gs.(num_global)
+        ; num_blocks  := gs.(num_blocks)
+        ; gen_ctx     := gs.(gen_ctx)
+        ; gen_typ_ctx := gs.(gen_typ_ctx)
+        ; gen_ptrtoint_ctx := ptrtoint_ctx
+       |}.
   Definition GenLLVM := stateT GenState G.
 
   (* Need this because extlib doesn't declare this instance as global :|. *)
@@ -269,6 +286,9 @@ Section GenerationState.
   Definition get_typ_ctx : GenLLVM (list (ident * typ))
     := gets (fun gs => gs.(gen_typ_ctx)).
 
+  Definition get_ptrtoint_ctx : GenLLVM (list (ident * typ))
+    := gets (fun gs => gs.(gen_ptrtoint_ctx)).
+  
   Definition add_to_ctx (x : (ident * typ)) : GenLLVM  unit
     := ctx <- get_ctx;;
        let new_ctx := x :: ctx in
@@ -279,6 +299,12 @@ Section GenerationState.
     := ctx <- get_typ_ctx;;
        let new_ctx := x :: ctx in
        modify (replace_typ_ctx new_ctx);;
+       ret tt.
+
+  Definition add_to_ptrtoint_ctx (x : (ident * typ)) : GenLLVM unit
+    := ctx <- get_ptrtoint_ctx;;
+       let new_ctx := x :: ctx in
+       modify (replace_ptrtoint_ctx ctx);;
        ret tt.
 
   Definition append_to_ctx (vars : list (ident * typ)) : GenLLVM unit
@@ -939,7 +965,6 @@ Definition gen_extractelement : GenLLVM (typ * instr typ) :=
   ret (t_in_vec, INSTR_Op (OP_ExtractElement (tvec, EXP_Ident id) (TYPE_I 32%N, EXP_Integer (Z.of_nat (N.to_nat index_for_extractelement))))).
 
 (* Assumes input is a primitive type*)
-
 (* Generate the element to be inserted into vector*)
 Definition gen_typ_eq_prim_typ (t: typ): GenLLVM (exp typ) :=
   match t with
@@ -963,6 +988,32 @@ Definition gen_insertelement : GenLLVM (typ * instr typ) :=
   value <- gen_typ_eq_prim_typ t_in_vec;;
   index <- lift_GenLLVM (choose (0,Z.of_N sz));;
   ret (tvec, INSTR_Op (OP_InsertElement (tvec, EXP_Ident id) (t_in_vec, value) (TYPE_I 32, EXP_Integer index))).
+
+(*TODO: code for ptrtoint incomplete*)
+Definition filter_ptr_vecptr_typ (ctx: list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_, t) => match t with
+                | TYPE_Pointer _ => true
+                | TYPE_Vector _ ty => match ty with
+                                     | TYPE_Pointer _ => true
+                                     | _ => false
+                                     end
+                | _ => false
+                      end) ctx.
+
+
+Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
+  ctx <- get_ctx;;
+  let ptr_in_context := filter_ptr_typs ctx in
+  '(id, tptr) <- (oneOf_LLVM (map ret ptr_in_context));;
+  let gen_typ_in_ptr := match tptr with
+                    | TYPE_Pointer t => gen_int_typ
+                    | TYPE_Vector sz ty => x <- gen_int_typ;; ret (TYPE_Vector sz x)
+                    | _ => ret (TYPE_Void) (*Won't get into this case*)
+                    end in
+  typ_in_ptr <- gen_typ_in_ptr;;
+  ret (typ_in_ptr, INSTR_Op (OP_Conversion Ptrtoint tptr (EXP_Ident id) typ_in_ptr)).
+
+(*TODO: gen_inttoptr workspace here*)
 
 Definition genTypHelper (n: nat): G (typ) :=
   run_GenLLVM (gen_typ_non_void_size n).
