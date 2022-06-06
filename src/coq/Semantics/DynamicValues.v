@@ -2409,12 +2409,13 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         | DVALUE_I64 i2 =>
             let iZ := signed i2 in
             match iZ with
-            | Zpos _ => loop elt_typ e iZ
-            | _ => raise_error "invalid index data"
+            | Zneg _ =>
+                raise_error "index_into_vec_dv: negative index."
+            | _ => loop elt_typ e iZ
             end
-        | _ => raise_error "invalid index data"
+        | _ => raise_error "index_into_vec_dv: non-integer dvalue index."
         end
-    | _ => raise_error "invalid vector data"
+    | _ => raise_error "index_into_vec_dv: not a vector or array."
     end.
   Arguments index_into_vec_dv _ _ : simpl nomatch.
 
@@ -2433,16 +2434,18 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         | DVALUE_I64 i2 =>
             let iZ := signed i2 in
             match iZ with
-            | Zpos _ =>
+            | Zneg _ =>
+                raise_error "insert_into_vec_dv: negative index"
+            | _ =>
                 match loop [] e iZ with
                 | None =>
                     ret (DVALUE_Poison vec_typ)
                 | Some elts =>
                     ret (DVALUE_Vector elts)
                 end
-            | _ => raise_error "invalid index data"
             end
-        | _ => raise_error "invalid index data"
+        | _ =>
+            raise_error "insert_into_vec_dv: non-integer dvalue index."
         end
     | DVALUE_Array e =>
         match idx with
@@ -2450,18 +2453,20 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         | DVALUE_I64 i2 =>
             let iZ := signed i2 in
             match iZ with
-            | Zpos _ =>
+            | Zneg _ =>
+                raise_error "insert_into_vec_dv: negative index"
+            | _ =>
                 match loop [] e iZ with
                 | None =>
                     ret (DVALUE_Poison vec_typ)
                 | Some elts =>
                     ret (DVALUE_Array elts)
                 end
-            | _ => raise_error "invalid index data"
             end
-        | _ => raise_error "invalid index data"
+        | _ =>
+            raise_error "insert_into_vec_dv: non-integer dvalue index."
         end
-    | _ => raise_error "invalid vector data"
+    | _ => raise_error "insert_into_vec_dv: not a vector or array."
     end.
   Arguments insert_into_vec_dv _ _ _ : simpl nomatch.
 

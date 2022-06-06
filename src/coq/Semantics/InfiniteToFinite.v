@@ -21,7 +21,8 @@ From Vellvm Require Import
      Utils.Error
      Utils.Monads
      Utils.PropT
-     Utils.ListUtil.
+     Utils.ListUtil
+     Handlers.MemoryModelImplementation.
 
 From ExtLib Require Import
      Structures.Monads
@@ -42,8 +43,8 @@ Module Type AddrConvert (ADDR1 : ADDRESS) (ADDR2 : ADDRESS).
   Parameter addr_convert : ADDR1.addr -> OOM ADDR2.addr.
 End AddrConvert.
 
-Module FinAddrConvert : AddrConvert FiniteMemory.Addr FiniteMemory.Addr.
-  Definition addr_convert (a : FiniteMemory.Addr.addr) : OOM FiniteMemory.Addr.addr := ret a.
+Module FinAddrConvert : AddrConvert MemoryModelImplementation.Addr MemoryModelImplementation.Addr.
+  Definition addr_convert (a : MemoryModelImplementation.Addr.addr) : OOM MemoryModelImplementation.Addr.addr := ret a.
 End FinAddrConvert.
 
 Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF).
