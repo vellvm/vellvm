@@ -159,10 +159,10 @@ Module Type SerializationBase (LP : LLVMParams) (MP : MemoryParams LP).
         | UVALUE_ExtractElement vec_typ vec idx =>
             dvec <- concretize_uvalueM M undef_handler ERR_M lift_ue vec;;
             didx <- concretize_uvalueM M undef_handler ERR_M lift_ue idx;;
-            let elt_typ := match vec_typ with
-                           | DTYPE_Vector _ t => ret t
-                           | _ => lift_ue (raise_error "Invalid vector type for ExtractElement")
-                           end in 
+            elt_typ <- match vec_typ with
+                       | DTYPE_Vector _ t => ret t
+                       | _ => lift_ue _ (raise_error "Invalid vector type for ExtractElement")
+                       end;; 
             lift_ue dvalue (index_into_vec_dv elt_typ dvec didx)
         | UVALUE_InsertElement vec_typ vec elt idx =>
             dvec <- concretize_uvalueM M undef_handler ERR_M lift_ue vec;;
