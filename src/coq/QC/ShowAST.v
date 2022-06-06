@@ -262,7 +262,7 @@ Fixpoint show_typ (t : typ) : string :=
       | FNATTR_Sspstrong => "sspstrong" 
       | FNATTR_Sspreq => "sspreq" 
       | FNATTR_Strictfp => "strictfp"
-      | FNATTR_Denormal_fp_math (s1: string) (s2: option string) =>
+      | FNATTR_Denormal_fp_math (s1) (s2) =>
           match s2 with
           | None => """" ++ show s1 ++  """"
           | Some s => """" ++ show s1 ++ "," ++ show s2 ++ """"
