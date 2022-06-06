@@ -435,7 +435,6 @@ Record declaration : Set :=
     dc_gc          : option string;
   }.
 
-
 Definition code := list (instr_id * instr).
 
 Record block : Set :=

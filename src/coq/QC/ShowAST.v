@@ -32,6 +32,55 @@ Section ShowInstances.
 Local Open Scope string.
 
 
+Fixpoint show_typ (t : typ) : string :=
+    match t with
+    | TYPE_I sz                 => "i" ++ show sz
+    | TYPE_IPTR                 => "iptr"
+    | TYPE_Pointer t            => show_typ t ++ "*"
+    | TYPE_Void                 => "void"
+    | TYPE_Half                 => "half"
+    | TYPE_Float                => "float"
+    | TYPE_Double               => "double"
+    | TYPE_X86_fp80             => "x86_fp80"
+    | TYPE_Fp128                => "fp128"
+    | TYPE_Ppc_fp128            => "ppc_fp128"
+    | TYPE_Metadata             => "metadata"
+    | TYPE_X86_mmx              => "x86_mmx"
+    | TYPE_Array sz t           => "[" ++ show sz ++ " x " ++ show_typ t ++ "]"
+    | TYPE_Function ret args    => show_typ ret ++ " (" ++ concat ", " (map show_typ args) ++ ")"
+    | TYPE_Struct fields        => "{" ++ concat ", " (map show_typ fields) ++ "}"
+    | TYPE_Packed_struct fields => "<{" ++ concat ", " (map show_typ fields) ++ "}>"
+    | TYPE_Opaque               => "opaque"
+    | TYPE_Vector sz t          => "<" ++ show sz ++ " x " ++ show_typ t ++ ">"
+    | TYPE_Identified id        => show id
+    end.
+
+  Global Instance showTyp:  Show typ :=
+    {|
+    show := show_typ
+    |}.
+
+  Definition show_dtyp (t : dtyp) : string
+    := match t with
+    | DTYPE_I sz                 => "Integer" ++ (show sz)
+    | DTYPE_IPTR                 => "iptr"
+    | DTYPE_Pointer              => "Pointer"
+    | DTYPE_Void                 => "Void"
+    | DTYPE_Half                 => "Half"
+    | DTYPE_Float                => "Float"
+    | DTYPE_Double               => "Double"
+    | DTYPE_X86_fp80             => "x86 fp80"
+    | DTYPE_Fp128                => "Fp128"
+    | DTYPE_Ppc_fp128            => "Ppc_fp128"
+    | DTYPE_Metadata             => "Metadata"
+    | DTYPE_X86_mmx              => "X86_mmx"
+    | DTYPE_Array sz t           => "Array"
+    | DTYPE_Struct fields        => "Struct"
+    | DTYPE_Packed_struct fields => "Packed struct"
+    | DTYPE_Opaque               => "Opaque"
+    | DTYPE_Vector sz t          => "Vector"
+    end.
+
   Definition show_linkage (l : linkage) : string :=
     match l with 
     | LINKAGE_Private => "private"
@@ -110,8 +159,8 @@ Local Open Scope string.
     | PARAMATTR_Nest => "nest"
     | PARAMATTR_Returned => "returned"
     | PARAMATTR_Nonnull => "nonnull"
-    | PARAMATTR_Dereferencable a => "dereferencable(" ++ show a ++ ")"
-    | PARAMATTR_Dereferencable_or_null a => "dereferencable_or_null(" ++ show a ++ ")"
+    | PARAMATTR_Dereferenceable a => "dereferenceable(" ++ show a ++ ")"
+    | PARAMATTR_Dereferenceable_or_null a => "dereferenceable_or_null(" ++ show a ++ ")"
     | PARAMATTR_Swiftself => "swiftself"
     | PARAMATTR_Swiftasync => "swiftasync"
     | PARAMATTR_Swifterror => "swifterror"
@@ -256,58 +305,6 @@ Local Open Scope string.
   Global Instance showIdent : Show ident
     := {| show := show_ident |}.
     
-
-  Fixpoint show_typ (t : typ) : string :=
-    match t with
-    | TYPE_I sz                 => "i" ++ show sz
-    | TYPE_IPTR                 => "iptr"
-    | TYPE_Pointer t            => show_typ t ++ "*"
-    | TYPE_Void                 => "void"
-    | TYPE_Half                 => "half"
-    | TYPE_Float                => "float"
-    | TYPE_Double               => "double"
-    | TYPE_X86_fp80             => "x86_fp80"
-    | TYPE_Fp128                => "fp128"
-    | TYPE_Ppc_fp128            => "ppc_fp128"
-    | TYPE_Metadata             => "metadata"
-    | TYPE_X86_mmx              => "x86_mmx"
-    | TYPE_Array sz t           => "[" ++ show sz ++ " x " ++ show_typ t ++ "]"
-    | TYPE_Function ret args    => show_typ ret ++ " (" ++ concat ", " (map show_typ args) ++ ")"
-    | TYPE_Struct fields        => "{" ++ concat ", " (map show_typ fields) ++ "}"
-    | TYPE_Packed_struct fields => "<{" ++ concat ", " (map show_typ fields) ++ "}>"
-    | TYPE_Opaque               => "opaque"
-    | TYPE_Vector sz t          => "<" ++ show sz ++ " x " ++ show_typ t ++ ">"
-    | TYPE_Identified id        => show id
-    end.
-
-  Global Instance showTyp:  Show typ :=
-    {|
-    show := show_typ
-    |}.
-
-  Definition show_dtyp (t : dtyp) : string
-    := match t with
-    | DTYPE_I sz                 => "Integer" ++ (show sz)
-    | DTYPE_IPTR                 => "iptr"
-    | DTYPE_Pointer              => "Pointer"
-    | DTYPE_Void                 => "Void"
-    | DTYPE_Half                 => "Half"
-    | DTYPE_Float                => "Float"
-    | DTYPE_Double               => "Double"
-    | DTYPE_X86_fp80             => "x86 fp80"
-    | DTYPE_Fp128                => "Fp128"
-    | DTYPE_Ppc_fp128            => "Ppc_fp128"
-    | DTYPE_Metadata             => "Metadata"
-    | DTYPE_X86_mmx              => "X86_mmx"
-    | DTYPE_Array sz t           => "Array"
-    | DTYPE_Struct fields        => "Struct"
-    | DTYPE_Packed_struct fields => "Packed struct"
-    | DTYPE_Opaque               => "Opaque"
-    | DTYPE_Vector sz t          => "Vector"
-    end.
-
-
-
    Definition show_icmp (cmp : icmp) : string
     := match cmp with
        | Eq  => "eq"
@@ -638,13 +635,18 @@ Local Open Scope string.
       let name  := defn.(df_prototype).(dc_name) in
       let ftype := defn.(df_prototype).(dc_type) in
       match ftype with
+        (*Return type and arguments type?*)
       | TYPE_Function ret_t args_t
         =>
-        let args := zip defn.(df_args) args_t in
+          (* What is df_args? -It is the names of the arguments *)
+          let args := zip defn.(df_args) args_t in
+          (* What is happening here? *)
+                   (* Is newline literally just writing a new line? *)
         let blocks :=
             match df_instrs defn with
             | (b, bs) => concat newline (map (show_block "    ") (b::bs))
             end in
+        (* This is a function that takes in a list and makes it a string?*)
         concatStr
           [ "define "; show ret_t; " @"; show name; show_arg_list args; " {"; newline
           ; blocks
@@ -656,6 +658,32 @@ Local Open Scope string.
   Global Instance showDefinition: Show (definition typ (block typ * list (block typ))) :=
     {| show := show_definition |}.
 
+  (* Write the type of decl *)
+  Definition show_declaration (decl) : string :=
+    let name := decl.(dc_name) in
+    let ftype := decl.(dc_type) in
+    match ftype with
+    |TYPE_function ret_t args_t =>
+       let args := zip defn.(df_args) args_t in
+       (* declaration doesn't have df_instr like definition does *)
+        (* let blocks :=
+            match df_instrs defn with
+            | (b, bs) => concat newline (map (show_block "    ") (b::bs))
+            end in *)
+       concatStr
+         (*Should this even have curly braces? The one example I found, the one in the manual, doesn't*)
+          [ "declare "; show ret_t; " @"; show name; show_arg_list args; " {"; newline
+          ; blocks
+          ; "}"; newline
+          ]
+    | _ => "Invalid type on function: " ++ show name
+    end.
+
+  (* Is it ok if I just write decl as the parameter of Show? In showDefinition they don't write defn but rather the type of defn*)
+  Global Instance showDeclaration: Show (decl) :=
+    {| show := show_declaration |}.
+      
+
   Definition show_tle (tle : toplevel_entity typ (block typ * list (block typ))) : string
     := match tle with
          (*Why is show_definition rather than show being used here*)
@@ -664,10 +692,8 @@ Local Open Scope string.
        | TLE_Target tgt => show tgt
        | TLE_Datalayout layout => show layout
        | TLE_Source_filename s => "source_filename = " ++ show s
-         
-         
-         
-         
+       | TLE_Declaration decl => show_declaration decl
+       | TLE_Global g => show_global g       
        | _ => "todo: show_tle"
        end.
 
