@@ -635,10 +635,10 @@ Fixpoint show_typ (t : typ) : string :=
       let name  := defn.(df_prototype).(dc_name) in
       let ftype := defn.(df_prototype).(dc_type) in
       match ftype with
-        (*Return type and arguments type?*)
+        (*Return type and arguments type*)
       | TYPE_Function ret_t args_t
         =>
-          (* What is df_args? -It is the names of the arguments *)
+          (* It's being zipped with name of argument and type after bc of how show_arg is defined *)
           let args := zip defn.(df_args) args_t in
           (* What is happening here? *)
                    (* Is newline literally just writing a new line? *)
@@ -689,8 +689,8 @@ Fixpoint show_typ (t : typ) : string :=
          (*Why is show_definition rather than show being used here*)
        | TLE_Definition defn => show_definition defn
        | TLE_Comment msg => ";" ++ show msg (*What if the comment is multiple lines? Each line is supposed to have a semicolon. How do we handle that?*)
-       | TLE_Target tgt => show tgt
-       | TLE_Datalayout layout => show layout
+       | TLE_Target tgt => "target triple =" ++ show tgt
+       | TLE_Datalayout layout => "target datalayout = " ++ show layout
        | TLE_Source_filename s => "source_filename = " ++ show s
        | TLE_Declaration decl => show_declaration decl
        | TLE_Global g => show_global g       
