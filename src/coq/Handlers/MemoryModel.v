@@ -2026,7 +2026,7 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
   Module MemExecM := MakeMemoryExecMonad LP MP MMSP MemSpec.
   Import MemExecM.
 
-  Section MemoryPrimatives.
+  Section MemoryPrimitives.
     Context {MemM : Type -> Type}.
     Context {Eff : Type -> Type}.
     Context {ExtraState : Type}.
@@ -2123,7 +2123,7 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
     Parameter initial_memory_state_correct : initial_memory_state_prop.
     Parameter initial_frame_correct : initial_frame_prop.
     Parameter initial_heap_correct : initial_heap_prop.
-  End MemoryPrimatives.
+  End MemoryPrimitives.
 End MemoryModelExecPrimitives.
 
 Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP).
