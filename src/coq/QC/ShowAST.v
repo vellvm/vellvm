@@ -31,6 +31,24 @@ Set Warnings "-extraction-opaque-accessed,-extraction".
 Section ShowInstances.
 Local Open Scope string.
 
+ Definition show_raw_id (rid : raw_id) : string
+    := match rid with
+       | Name s => s
+       | Anon i => show i
+       | Raw i  => show i
+       end.
+  
+  Global Instance showRawId : Show raw_id
+    := {| show := show_raw_id |}.
+
+  Definition show_ident (i : ident) : string
+    := match i with
+       | ID_Global r => "@" ++ show_raw_id r
+       | ID_Local r  => "%" ++ show_raw_id r
+       end.
+
+  Global Instance showIdent : Show ident
+    := {| show := show_ident |}.
 
 Fixpoint show_typ (t : typ) : string :=
     match t with
@@ -286,24 +304,7 @@ Fixpoint show_typ (t : typ) : string :=
     := {| show := show_thread_local_storage |}. 
     
    
-  Definition show_raw_id (rid : raw_id) : string
-    := match rid with
-       | Name s => s
-       | Anon i => show i
-       | Raw i  => show i
-       end.
-  
-  Global Instance showRawId : Show raw_id
-    := {| show := show_raw_id |}.
-
-  Definition show_ident (i : ident) : string
-    := match i with
-       | ID_Global r => "@" ++ show_raw_id r
-       | ID_Local r  => "%" ++ show_raw_id r
-       end.
-
-  Global Instance showIdent : Show ident
-    := {| show := show_ident |}.
+ 
     
    Definition show_icmp (cmp : icmp) : string
     := match cmp with
