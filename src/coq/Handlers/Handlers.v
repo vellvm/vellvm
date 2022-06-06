@@ -23,25 +23,24 @@ From Vellvm.Handlers Require Export
      Local
      Stack
      Intrinsics
-     FiniteMemory
-     FiniteMemoryTheory
      Pick
      UndefinedBehaviour
+     MemoryModelImplementation
      OOM
      Serialization.
 
 From Vellvm.Semantics Require Import Memory.Sizeof Memory.MemBytes GepM.
 
 (* Handlers get instantiated over the domain of addresses provided by the memory model *)
-Module LLVMEvents64 := LLVMEvents.Make(FiniteMemory.Addr)(FiniteMemory.IP64Bit)(FiniteMemory.FinSizeof).
-Module Global64 := Global.Make FiniteMemory.Addr FiniteMemory.IP64Bit FiniteMemory.FinSizeof LLVMEvents64.
-Module Local64  := Local.Make  FiniteMemory.Addr FiniteMemory.IP64Bit FiniteMemory.FinSizeof LLVMEvents64.
-Module Stack64  := Stack.Make  FiniteMemory.Addr FiniteMemory.IP64Bit FiniteMemory.FinSizeof LLVMEvents64.
+Module LLVMEvents64 := LLVMEvents.Make(MemoryModelImplementation.Addr)(MemoryModelImplementation.IP64Bit)(MemoryModelImplementation.FinSizeof).
+Module Global64 := Global.Make MemoryModelImplementation.Addr MemoryModelImplementation.IP64Bit MemoryModelImplementation.FinSizeof LLVMEvents64.
+Module Local64  := Local.Make  MemoryModelImplementation.Addr MemoryModelImplementation.IP64Bit MemoryModelImplementation.FinSizeof LLVMEvents64.
+Module Stack64  := Stack.Make  MemoryModelImplementation.Addr MemoryModelImplementation.IP64Bit MemoryModelImplementation.FinSizeof LLVMEvents64.
 
-Module LLVMEvents := LLVMEvents.Make(FiniteMemory.Addr)(FiniteMemory.BigIP)(FiniteMemory.FinSizeof).
-Module Global := Global.Make FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof LLVMEvents.
-Module Local  := Local.Make  FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof LLVMEvents.
-Module Stack  := Stack.Make  FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof LLVMEvents.
+Module LLVMEvents := LLVMEvents.Make(MemoryModelImplementation.Addr)(MemoryModelImplementation.BigIP)(MemoryModelImplementation.FinSizeof).
+Module Global := Global.Make MemoryModelImplementation.Addr MemoryModelImplementation.BigIP MemoryModelImplementation.FinSizeof LLVMEvents.
+Module Local  := Local.Make  MemoryModelImplementation.Addr MemoryModelImplementation.BigIP MemoryModelImplementation.FinSizeof LLVMEvents.
+Module Stack  := Stack.Make  MemoryModelImplementation.Addr MemoryModelImplementation.BigIP MemoryModelImplementation.FinSizeof LLVMEvents.
 
 Require Import List ZArith String.
 Import ListNotations.
@@ -58,26 +57,26 @@ From ExtLib Require Import
 
 Import MonadNotation.
 
-(* Module GEP := GepM.Make FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof LLVMEvents FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP. *)
-(* Module GEP64 := GepM.Make FiniteMemory.Addr FiniteMemory.IP64Bit FiniteMemory.FinSizeof LLVMEvents64 FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP. *)
+(* Module GEP := GepM.Make MemoryModelImplementation.Addr MemoryModelImplementation.BigIP MemoryModelImplementation.FinSizeof LLVMEvents MemoryModelImplementation.FinPTOI MemoryModelImplementation.FinPROV MemoryModelImplementation.FinITOP. *)
+(* Module GEP64 := GepM.Make MemoryModelImplementation.Addr MemoryModelImplementation.IP64Bit MemoryModelImplementation.FinSizeof LLVMEvents64 MemoryModelImplementation.FinPTOI MemoryModelImplementation.FinPROV MemoryModelImplementation.FinITOP. *)
 
-(* Module Intrinsics64 := Intrinsics.Make FiniteMemory.Addr FiniteMemory.IP64Bit FiniteMemory.FinSizeof LLVMEvents64. *)
-(* Module Intrinsics := Intrinsics.Make FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof LLVMEvents. *)
+(* Module Intrinsics64 := Intrinsics.Make MemoryModelImplementation.Addr MemoryModelImplementation.IP64Bit MemoryModelImplementation.FinSizeof LLVMEvents64. *)
+(* Module Intrinsics := Intrinsics.Make MemoryModelImplementation.Addr MemoryModelImplementation.BigIP MemoryModelImplementation.FinSizeof LLVMEvents. *)
 
-(* Module Byte := FinByte FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof LLVMEvents. *)
-(* Module Byte64 := FinByte FiniteMemory.Addr FiniteMemory.IP64Bit FiniteMemory.FinSizeof LLVMEvents64. *)
+(* Module Byte := FinByte MemoryModelImplementation.Addr MemoryModelImplementation.BigIP MemoryModelImplementation.FinSizeof LLVMEvents. *)
+(* Module Byte64 := FinByte MemoryModelImplementation.Addr MemoryModelImplementation.IP64Bit MemoryModelImplementation.FinSizeof LLVMEvents64. *)
 
-(* Module SER := Serialization.Make(FiniteMemory.Addr)(FiniteMemory.BigIP)(FiniteMemory.FinSizeof)(LLVMEvents)(FiniteMemory.FinPTOI)(FiniteMemory.FinPROV)(FiniteMemory.FinITOP)(GEP)(Byte). *)
-(* Module SER64 := Serialization.Make(FiniteMemory.Addr)(FiniteMemory.IP64Bit)(FiniteMemory.FinSizeof)(LLVMEvents64)(FiniteMemory.FinPTOI)(FiniteMemory.FinPROV)(FiniteMemory.FinITOP)(GEP64)(Byte64). *)
+(* Module SER := Serialization.Make(MemoryModelImplementation.Addr)(MemoryModelImplementation.BigIP)(MemoryModelImplementation.FinSizeof)(LLVMEvents)(MemoryModelImplementation.FinPTOI)(MemoryModelImplementation.FinPROV)(MemoryModelImplementation.FinITOP)(GEP)(Byte). *)
+(* Module SER64 := Serialization.Make(MemoryModelImplementation.Addr)(MemoryModelImplementation.IP64Bit)(MemoryModelImplementation.FinSizeof)(LLVMEvents64)(MemoryModelImplementation.FinPTOI)(MemoryModelImplementation.FinPROV)(MemoryModelImplementation.FinITOP)(GEP64)(Byte64). *)
 
-(* Module MEM := FiniteMemory.Make(FiniteMemory.Addr)(FiniteMemory.BigIP)(FiniteMemory.FinSizeof)(LLVMEvents)(FiniteMemory.FinPTOI)(FiniteMemory.FinPROV)(FiniteMemory.FinITOP)(GEP)(Byte). *)
-(* Module MEM64 := FiniteMemory.Make(FiniteMemory.Addr)(FiniteMemory.IP64Bit)(FiniteMemory.FinSizeof)(LLVMEvents64)(FiniteMemory.FinPTOI)(FiniteMemory.FinPROV)(FiniteMemory.FinITOP)(GEP64)(Byte64). *)
+(* Module MEM := MemoryModelImplementation.Make(MemoryModelImplementation.Addr)(MemoryModelImplementation.BigIP)(MemoryModelImplementation.FinSizeof)(LLVMEvents)(MemoryModelImplementation.FinPTOI)(MemoryModelImplementation.FinPROV)(MemoryModelImplementation.FinITOP)(GEP)(Byte). *)
+(* Module MEM64 := MemoryModelImplementation.Make(MemoryModelImplementation.Addr)(MemoryModelImplementation.IP64Bit)(MemoryModelImplementation.FinSizeof)(LLVMEvents64)(MemoryModelImplementation.FinPTOI)(MemoryModelImplementation.FinPROV)(MemoryModelImplementation.FinITOP)(GEP64)(Byte64). *)
 
-(* Module MEMORY_THEORY := FiniteMemoryTheory.Make(FiniteMemory.Addr)(FiniteMemory.BigIP)(FiniteMemory.FinSizeof)(LLVMEvents)(FiniteMemory.FinPTOI)(FiniteMemory.FinPROV)(FiniteMemory.FinITOP)(GEP)(Byte). *)
-(* Module MEMORY_THEORY64 := FiniteMemoryTheory.Make(FiniteMemory.Addr)(FiniteMemory.IP64Bit)(FiniteMemory.FinSizeof)(LLVMEvents64)(FiniteMemory.FinPTOI)(FiniteMemory.FinPROV)(FiniteMemory.FinITOP)(GEP64)(Byte64). *)
+(* Module MEMORY_THEORY := MemoryModelImplementationTheory.Make(MemoryModelImplementation.Addr)(MemoryModelImplementation.BigIP)(MemoryModelImplementation.FinSizeof)(LLVMEvents)(MemoryModelImplementation.FinPTOI)(MemoryModelImplementation.FinPROV)(MemoryModelImplementation.FinITOP)(GEP)(Byte). *)
+(* Module MEMORY_THEORY64 := MemoryModelImplementationTheory.Make(MemoryModelImplementation.Addr)(MemoryModelImplementation.IP64Bit)(MemoryModelImplementation.FinSizeof)(LLVMEvents64)(MemoryModelImplementation.FinPTOI)(MemoryModelImplementation.FinPROV)(MemoryModelImplementation.FinITOP)(GEP64)(Byte64). *)
 
-(* Module Pick64 := Pick.Make FiniteMemory.Addr FiniteMemory.IP64Bit FinSizeof LLVMEvents64 FinPTOI FinPROV FinITOP GEP64 Byte64. *)
-(* Module Pick := Pick.Make FiniteMemory.Addr FiniteMemory.BigIP FinSizeof LLVMEvents FinPTOI FinPROV FinITOP GEP Byte. *)
+(* Module Pick64 := Pick.Make MemoryModelImplementation.Addr MemoryModelImplementation.IP64Bit FinSizeof LLVMEvents64 FinPTOI FinPROV FinITOP GEP64 Byte64. *)
+(* Module Pick := Pick.Make MemoryModelImplementation.Addr MemoryModelImplementation.BigIP FinSizeof LLVMEvents FinPTOI FinPROV FinITOP GEP Byte. *)
 
 (* Export LLVMEvents LLVMEvents.DV Global Local Stack Pick Intrinsics *)
 (*        MEM MEMORY_THEORY UndefinedBehaviour. *)
