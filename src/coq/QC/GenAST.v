@@ -286,7 +286,7 @@ Section GenerationState.
   Definition get_typ_ctx : GenLLVM (list (ident * typ))
     := gets (fun gs => gs.(gen_typ_ctx)).
 
-  Definition get_ptrtoint_ctx : GenLLVM (list (ident * typ))
+  Definition get_ptrtoint_ctx : GenLLVM (list (typ * ident * typ))
     := gets (fun gs => gs.(gen_ptrtoint_ctx)).
   
   Definition add_to_ctx (x : (ident * typ)) : GenLLVM  unit
@@ -301,7 +301,7 @@ Section GenerationState.
        modify (replace_typ_ctx new_ctx);;
        ret tt.
 
-  Definition add_to_ptrtoint_ctx (x : (ident * typ)) : GenLLVM unit
+  Definition add_to_ptrtoint_ctx (x : (typ * ident * typ)) : GenLLVM unit
     := ctx <- get_ptrtoint_ctx;;
        let new_ctx := x :: ctx in
        modify (replace_ptrtoint_ctx ctx);;
@@ -326,11 +326,21 @@ Section GenerationState.
        modify (replace_typ_ctx new_ctx);;
        ret tt.
 
+  (* TODO:Not sure when it will be used, if not just delete it *)
+  Definition append_to_ptrtoint_ctx (aliases : list (typ * ident * typ)) : GenLLVM unit
+    := ctx <- get_ptrtoint_ctx;;
+       let new_ctx := aliases ++ ctx in
+       modify (replace_ptrtoint_ctx new_ctx);;
+       ret tt.
+  
   Definition reset_ctx : GenLLVM unit
     := modify (replace_ctx []);; ret tt.
 
   Definition reset_typ_ctx : GenLLVM unit
     := modify (replace_typ_ctx []);; ret tt.
+
+  Definition reset_ptrtoint_ctx : GenLLVM unit
+    := modify (replace_ptrtoint_ctx []);; ret tt.
 
   Definition oneOf_LLVM {A} (gs : list (GenLLVM A)) : GenLLVM A
     := n <- lift (choose (0, List.length gs - 1)%nat);;
@@ -1010,10 +1020,17 @@ Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
                     | TYPE_Vector sz ty => x <- gen_int_typ;; ret (TYPE_Vector sz x)
                     | _ => ret (TYPE_Void) (*Won't get into this case*)
                     end in
-  typ_in_ptr <- gen_typ_in_ptr;;
-  ret (typ_in_ptr, INSTR_Op (OP_Conversion Ptrtoint tptr (EXP_Ident id) typ_in_ptr)).
+  typ_from_cast <- gen_typ_in_ptr;; (*Need to *)
+  new_id <- new_raw_id;; (* Add a new id so that it is identifiable in ptrtoint_ctx*)
+  add_to_ptrtoint_ctx (tptr, ID_Local new_id, typ_from_cast);;
+  ret (typ_from_cast, INSTR_Op (OP_Conversion Ptrtoint tptr (EXP_Ident id) typ_from_cast)).
 
 (*TODO: gen_inttoptr workspace here*)
+Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
+  ctx <- get_ptrtoint_ctx;;
+  '(tptr, id, typ_from_cast) <- oneOf_LLVM (map ret ctx);;
+  let tptr := tptr in (* TODO: Need to make it more complicate*)
+  ret (tptr, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) tptr)).
 
 Definition genTypHelper (n: nat): G (typ) :=
   run_GenLLVM (gen_typ_non_void_size n).
