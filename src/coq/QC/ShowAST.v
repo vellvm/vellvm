@@ -267,7 +267,7 @@ Fixpoint show_typ (t : typ) : string :=
           | None => """" ++ show s1 ++  """"
           | Some s => """" ++ show s1 ++ "," ++ show s2 ++ """"
           end    
-      | FNATTR_Denormal_fp_math_32 (s1 : string) (s2 : option string) =>
+      | FNATTR_Denormal_fp_math_32 (s1) (s2) =>
           match s2 with
           | None => """" ++ show s1 ++  """"
           | Some s => """" ++ show s1 ++ "," ++ show s2 ++ """"
