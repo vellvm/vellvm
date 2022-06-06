@@ -274,21 +274,21 @@ Fixpoint show_typ (t : typ) : string :=
           end     
       | FNATTR_Thunk => """thunk"""
       | FNATTR_Tls-load-hoist => """tls-load-hoist"""                   
-      | FNATTR_Uwtable (sync : bool)  => if sync then "uwtable(sync)" else "uwtable" 
+      | FNATTR_Uwtable (sync)  => if sync then "uwtable(sync)" else "uwtable" 
       | FNATTR_Nocf_check => "nocf_check" 
       | FNATTR_Shadowcallstack => "shadowcallstack" 
       | FNATTR_Mustprogress => "mustprogeress"
-      | FNATTR_Warn_stack_size (th : int)  => """warn-stack-size""=" ++ """" ++ show th ++ """"
-      | FNATTR_vscale_range (min : int) (max : option int) =>
+      | FNATTR_Warn_stack_size (th)  => """warn-stack-size""=" ++ """" ++ show th ++ """"
+      | FNATTR_vscale_range (min) (max) =>
           match max with
           | None => "vscale_range(" ++ show min ++ ")"
           | Some m => "vscale_range(" ++ show min ++ "," ++ show m ++ ")"
           end                             
-      | FNATTR_Min_legal_vector_width (size : int) => """min-legal-vector-width""=" ++ """"
+      | FNATTR_Min_legal_vector_width (size) => """min-legal-vector-width""=" ++ """"
                                                        ++ show size ++ """" 
-      | FNATTR_String (s:string) => """" ++ show s ++ """"  (* "no-see" *)
-      | FNATTR_Key_value (kv : string * string) => """" ++ fst kv ++ """=" ++ """" ++ snd kv ++ """" (* "unsafe-fp-math"="false" *)
-      | FNATTR_Attr_grp (g:int) => "attr_grip" ++ show g
+      | FNATTR_String (s) => """" ++ show s ++ """"  (* "no-see" *)
+      | FNATTR_Key_value (kv) => """" ++ fst kv ++ """=" ++ """" ++ snd kv ++ """" (* "unsafe-fp-math"="false" *)
+      | FNATTR_Attr_grp (g) => "attr_grip" ++ show g
       end.
     
   
