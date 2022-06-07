@@ -1060,6 +1060,16 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           inl "deserialize_sbytes: Attempt to deserialize void."%string
       end.
 
+    (* Serialize a uvalue into bytes and combine them into UVALUE_ConcatBytes. Useful for bitcasts.
+
+       dt should be the type of the thing you are casting to in the case of bitcasts.
+     *)
+    Definition uvalue_to_concatbytes
+               {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M} `{RAISE_OOM M}
+               (uv : uvalue) (dt : dtyp) : M uvalue :=
+      bytes <- serialize_sbytes uv dt;;
+      ret (UVALUE_ConcatBytes (map sbyte_to_extractbyte bytes) dt).
+
   (* (* TODO: *) *)
 
   (*  (*   What is the difference between a pointer and an integer...? *) *)
