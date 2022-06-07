@@ -492,7 +492,10 @@ Fixpoint show_typ (t : typ) : string :=
       let (tidx, iexp) := idx in
       "insertelement " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ show telt ++ " " ++ show_exp eexp ++ ", " ++ show tidx ++ " " ++ show_exp iexp
       | OP_ShuffleVector vec1 vec2 idxmask =>
-          "shufflevector " ++ show vec1 ++ ", " ++ show vec2 ++ ", " ++ show idxmask
+          let (type1, expression1) := vec1 in
+          let (type2, expression2) := vec2 in
+          let (type3, expression3) := idxmask in
+          "shufflevector " ++ show type1 ++ show_exp expression1  ++ ", " ++ show type2 ++ show_exp expression2 ++ ", " ++ show type3 ++ show_exp expression3
                            (* This one, extractValue *)
       | OP_ExtractValue vec idxs =>
       let (tptr, exp) := vec in
@@ -619,7 +622,7 @@ Fixpoint show_typ (t : typ) : string :=
   
   Definition show_arg (arg : local_id * typ * list param_attr) : string
     := let '(i, t, parameter_attributes) := arg in
-       show t ++ (map (fun x => show x ++ " ") (parameter_attributes)) ++ " %" ++ show i.
+       show t ++ concat " " (map (fun x => show x) (parameter_attributes)) ++ " %" ++ show i.
 
   Definition show_arg_list (args : list (local_id * typ * list param_attr)) : string
     :=
@@ -627,10 +630,11 @@ Fixpoint show_typ (t : typ) : string :=
       concatStr ["("; arg_str; ")"].
 
   (* TODO: REALLY?!? *)
-  Fixpoint zip {X Y Z} (xs : list X) (ys : list Y) (zs : list list Z) : list (X * Y * list Z)
+  Fixpoint zip {X Y Z} (xs : list X) (ys : list Y) (zs : list Z) : list (X * Y *  Z)
     := match xs, ys, zs with
-       | [], _ => []
-       | _, [] => []
+       | [], _, _ => []
+       | _, [], _ => []
+       | _, _, [] => []    
        | (x::xs), (y::ys), (z::zs) => (x, y, z) :: zip xs ys zs
        end.
 
@@ -638,7 +642,7 @@ Fixpoint show_typ (t : typ) : string :=
     :=
       let name  := defn.(df_prototype).(dc_name) in
       let ftype := defn.(df_prototype).(dc_type) in
-      let '(return_attributes, argument_attributes) = defn.(df_protoype).(dc_param_attrs) in
+      let '(return_attributes, argument_attributes):= defn.(df_prototype).(dc_param_attrs) in
       
       match ftype with
       (*Stand for return type and arguments type*)
@@ -669,6 +673,7 @@ Fixpoint show_typ (t : typ) : string :=
     {| show := show_definition |}.
 
   (* Write the type of decl *)
+  (*
   Definition show_declaration (decl) : string :=
     let name := decl.(dc_name) in
     let ftype := decl.(dc_type) in
@@ -688,10 +693,13 @@ Fixpoint show_typ (t : typ) : string :=
           ]
     | _ => "Invalid type on function: " ++ show name
     end.
+*)
 
   (* Is it ok if I just write decl as the parameter of Show? In showDefinition they don't write defn but rather the type of defn*)
+  (*
   Global Instance showDeclaration: Show (decl) :=
     {| show := show_declaration |}.
+*)
       
 
   Definition show_tle (tle : toplevel_entity typ (block typ * list (block typ))) : string
@@ -702,8 +710,13 @@ Fixpoint show_typ (t : typ) : string :=
        | TLE_Target tgt => "target triple =" ++ show tgt
        | TLE_Datalayout layout => "target datalayout = " ++ show layout
        | TLE_Source_filename s => "source_filename = " ++ show s
+                                                      (*
        | TLE_Declaration decl => show_declaration decl
-       | TLE_Global g => show_global g       
+                                                       *)
+
+                                                      (*
+       | TLE_Global g => show_global g  
+*)     
        | _ => "todo: show_tle"
        end.
 
