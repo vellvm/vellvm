@@ -304,7 +304,7 @@ Section GenerationState.
   Definition add_to_ptrtoint_ctx (x : (typ * ident * typ)) : GenLLVM unit
     := ctx <- get_ptrtoint_ctx;;
        let new_ctx := x :: ctx in
-       modify (replace_ptrtoint_ctx ctx);;
+       modify (replace_ptrtoint_ctx new_ctx);;
        ret tt.
 
   Definition append_to_ctx (vars : list (ident * typ)) : GenLLVM unit
