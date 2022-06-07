@@ -10,14 +10,11 @@ From ExtLib Require Import
      Eqv.
 
 From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG Semantics.TopLevel Floats.
-From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils. (*Needs to be changed*)
-
-Check Floats.Float.to_bits.
-
+From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils. (*Needs to be changed*)  
+ 
 Require Import Integers Floats.
 
 Require Import List. 
-
 Import ListNotations.
 Import MonadNotation.
 
@@ -31,7 +28,7 @@ Set Warnings "-extraction-opaque-accessed,-extraction".
 Section ShowInstances.
 Local Open Scope string.
 
- Definition show_raw_id (rid : raw_id) : string
+  Definition show_raw_id (rid : raw_id) : string
     := match rid with
        | Name s => s
        | Anon i => show i
@@ -193,105 +190,104 @@ Fixpoint show_typ (t : typ) : string :=
     := { show := show_param_attr }.
 
     (* unimplemented: frame-pointer patchable-function, key_value *) 
-    Definition show_fn_attr (f : fn_attr) : string :=
-      match f with 
-      | FNATTR_Alignstack a => "alignstack(" ++ show a ++ ")"
-      | FNATTR_Alloc_family fam => """alloc-family""=" ++ """" ++ show fam ++ """"
-      | FNATTR_Allockind kind => "allockind(" ++ """" ++ show kind ++ """" ++ ")"
-      | FNATTR_Allocsize a1 a2 =>
-          match a2 with
-          | None => "allocsize(" ++ show a1 ++ ")"
-          | Some a => "allocsize(" ++ show a1 ++ "," ++ show a ++ ")"
-          end
-      | FNATTR_Alwaysinline => "alwaysinline"
-      | FNATTR_Builtin => "builtin"
-      | FNATTR_Cold => "cold"
-      | FNATTR_Convergent => "convergent"
-      | FNATTR_Disable_sanitizer_instrumentation => "disable_sanitizer_instrumentation"
-      | FNATTR_Dontcall_error => """dontcall-error"""
-      | FNATTR_Dontcall_warn => """dontcall-warn"""
-      | FNATTR_Frame_pointer => "unimplemented: frame-pointer"
-      | FNATTR_Hot => "hot"
-      | FNATTR_Inaccessiblememonly => "inaccessiblememonly"
-      | FNATTR_Inaccessiblemem_or_argmemonly => "inaccessiblemem_or_argmemonly"
-      | FNATTR_Inlinehint => "inlinehint"
-      | FNATTR_Jumptable => "jumptable"
-      | FNATTR_Minsize => "minsize"
-      | FNATTR_Naked => "naked"
-      | FNATTR_No_inline_line_tables => """no-inline-line-tables"""
-      | FNATTR_No_jump_tables => "no-jump-tables"
-      | FNATTR_Nobuiltin => "nobuiltin"
-      | FNATTR_Noduplicate => "noduplicate"
-      | FNATTR_Nofree => "nofree"
-      | FNATTR_Noimplicitfloat => "noimplicitfloat"
-      | FNATTR_Noinline => "noinline"
-      | FNATTR_Nomerge => "nomerge"
-      | FNATTR_Nonlazybind => "nonlazybind"
-      | FNATTR_Noprofile => "noprofile"
-      | FNATTR_Noredzone => "noredzone"
-      | FNATTR_Indirect_tls_seg_refs => "indirect-tls-seg-refs"
-      | FNATTR_Noreturn => "noreturn"
-      | FNATTR_Norecurse => "norecurse"
-      | FNATTR_Willreturn => "willreturn"
-      | FNATTR_Nosync => "nosync"
-      | FNATTR_Nounwind => "nounwind"
-      | FNATTR_Nosanitize_bounds => "nosanitize_bounds"
-      | FNATTR_Nosanitize_coverage => "nosanitize_coverage"
-      | FNATTR_Null_pointer_is_valid => "null_pointer_is_valid"
-      | FNATTR_Optforfuzzing => "optforfuzzing"
-      | FNATTR_Optnone => "optnone"
-      | FNATTR_Optsize => "optsize"
-      | FNATTR_Patchable_function => "unimplemented: patchable-function"
-      | FNATTR_Probe_stack => """probe-stack"""
-      | FNATTR_Readnone => "readnone"
-      | FNATTR_Readonly => "readonly"
-      | FNATTR_Stack_probe_size => """stack-probe-size"""
-      | FNATTR_No_stack_arg_probe => """no-stack-arg-probe"""
-      | FNATTR_Writeonly => "writeonly"
-      | FNATTR_Argmemonly => "argmemonly"
-      | FNATTR_Returns_twice => "returns_twice"                          
-      | FNATTR_Safestack => "safestack" 
-      | FNATTR_Sanitize_address => "sanitize_address" 
-      | FNATTR_Sanitize_memory => "sanitize_memory" 
-      | FNATTR_Sanitize_thread => "sanitize_thread" 
-      | FNATTR_Sanitize_hwaddress => "sanitize_hwaddress" 
-      | FNATTR_Sanitize_memtag => "sanitize_memtag" 
-      | FNATTR_Speculative_load_hardening => "speculative_load_hardening"    
-      | FNATTR_Speculatable => "speculatable" 
-      | FNATTR_Ssp => "ssp" 
-      | FNATTR_Sspstrong => "sspstrong" 
-      | FNATTR_Sspreq => "sspreq" 
-      | FNATTR_Strictfp => "strictfp"
-      | FNATTR_Denormal_fp_math (s1) (s2) =>
-          match s2 with
-          | None => """" ++ show s1 ++  """"
-          | Some s => """" ++ show s1 ++ "," ++ show s2 ++ """"
-          end    
-      | FNATTR_Denormal_fp_math_32 (s1) (s2) =>
-          match s2 with
-          | None => """" ++ show s1 ++  """"
-          | Some s => """" ++ show s1 ++ "," ++ show s2 ++ """"
-          end     
-      | FNATTR_Thunk => """thunk"""
-      | FNATTR_Tls_load_hoist => """tls-load-hoist"""                   
-      | FNATTR_Uwtable (sync)  => if sync then "uwtable(sync)" else "uwtable" 
-      | FNATTR_Nocf_check => "nocf_check" 
-      | FNATTR_Shadowcallstack => "shadowcallstack" 
-      | FNATTR_Mustprogress => "mustprogeress"
-      | FNATTR_Warn_stack_size (th)  => """warn-stack-size""=" ++ """" ++ show th ++ """"
-      | FNATTR_vscale_range (min) (max) =>
-          match max with
-          | None => "vscale_range(" ++ show min ++ ")"
-          | Some m => "vscale_range(" ++ show min ++ "," ++ show m ++ ")"
-          end                             
-      | FNATTR_Min_legal_vector_width (size) => """min-legal-vector-width""=" ++ """"
+   Definition show_fn_attr (f : fn_attr) : string :=
+    match f with 
+    | FNATTR_Alignstack a => "alignstack(" ++ show a ++ ")"
+    | FNATTR_Alloc_family fam => """alloc-family""=" ++ """" ++ show fam ++ """"
+    | FNATTR_Allockind kind => "allockind(" ++ """" ++ show kind ++ """" ++ ")"
+    | FNATTR_Allocsize a1 a2 =>
+       match a2 with
+       | None => "allocsize(" ++ show a1 ++ ")"
+       | Some a => "allocsize(" ++ show a1 ++ "," ++ show a ++ ")"
+       end
+    | FNATTR_Alwaysinline => "alwaysinline"
+    | FNATTR_Builtin => "builtin"
+    | FNATTR_Cold => "cold"
+    | FNATTR_Convergent => "convergent"
+    | FNATTR_Disable_sanitizer_instrumentation => "disable_sanitizer_instrumentation"
+    | FNATTR_Dontcall_error => """dontcall-error"""
+    | FNATTR_Dontcall_warn => """dontcall-warn"""
+    | FNATTR_Frame_pointer => "unimplemented: frame-pointer"
+    | FNATTR_Hot => "hot"
+    | FNATTR_Inaccessiblememonly => "inaccessiblememonly"
+    | FNATTR_Inaccessiblemem_or_argmemonly => "inaccessiblemem_or_argmemonly"
+    | FNATTR_Inlinehint => "inlinehint"
+    | FNATTR_Jumptable => "jumptable"
+    | FNATTR_Minsize => "minsize"
+    | FNATTR_Naked => "naked"
+    | FNATTR_No_inline_line_tables => """no-inline-line-tables"""
+    | FNATTR_No_jump_tables => "no-jump-tables"
+    | FNATTR_Nobuiltin => "nobuiltin"
+    | FNATTR_Noduplicate => "noduplicate"
+    | FNATTR_Nofree => "nofree"
+    | FNATTR_Noimplicitfloat => "noimplicitfloat"
+    | FNATTR_Noinline => "noinline"
+    | FNATTR_Nomerge => "nomerge"
+    | FNATTR_Nonlazybind => "nonlazybind"
+    | FNATTR_Noprofile => "noprofile"
+    | FNATTR_Noredzone => "noredzone"
+    | FNATTR_Indirect_tls_seg_refs => "indirect-tls-seg-refs"
+    | FNATTR_Noreturn => "noreturn"
+    | FNATTR_Norecurse => "norecurse"
+    | FNATTR_Willreturn => "willreturn"
+    | FNATTR_Nosync => "nosync"
+    | FNATTR_Nounwind => "nounwind"
+    | FNATTR_Nosanitize_bounds => "nosanitize_bounds"
+    | FNATTR_Nosanitize_coverage => "nosanitize_coverage"
+    | FNATTR_Null_pointer_is_valid => "null_pointer_is_valid"
+    | FNATTR_Optforfuzzing => "optforfuzzing"
+    | FNATTR_Optnone => "optnone"
+    | FNATTR_Optsize => "optsize"
+    | FNATTR_Patchable_function => "unimplemented: patchable-function"
+    | FNATTR_Probe_stack => """probe-stack"""
+    | FNATTR_Readnone => "readnone"
+    | FNATTR_Readonly => "readonly"
+    | FNATTR_Stack_probe_size => """stack-probe-size"""
+    | FNATTR_No_stack_arg_probe => """no-stack-arg-probe"""
+    | FNATTR_Writeonly => "writeonly"
+    | FNATTR_Argmemonly => "argmemonly"
+    | FNATTR_Returns_twice => "returns_twice"                          
+    | FNATTR_Safestack => "safestack" 
+    | FNATTR_Sanitize_address => "sanitize_address" 
+    | FNATTR_Sanitize_memory => "sanitize_memory" 
+    | FNATTR_Sanitize_thread => "sanitize_thread" 
+    | FNATTR_Sanitize_hwaddress => "sanitize_hwaddress" 
+    | FNATTR_Sanitize_memtag => "sanitize_memtag" 
+    | FNATTR_Speculative_load_hardening => "speculative_load_hardening"    
+    | FNATTR_Speculatable => "speculatable" 
+    | FNATTR_Ssp => "ssp" 
+    | FNATTR_Sspstrong => "sspstrong" 
+    | FNATTR_Sspreq => "sspreq" 
+    | FNATTR_Strictfp => "strictfp"
+    | FNATTR_Denormal_fp_math s1 s2 =>
+        match s2 with
+        | None => """" ++ show s1 ++  """"
+        | Some s => """" ++ show s1 ++ "," ++ show s2 ++ """"
+        end    
+    | FNATTR_Denormal_fp_math_32 s1 s2 =>
+        match s2 with
+        | None => """" ++ show s1 ++  """"
+        | Some s => """" ++ show s1 ++ "," ++ show s2 ++ """"
+        end     
+    | FNATTR_Thunk => """thunk"""
+    | FNATTR_Tls_load_hoist => """tls-load-hoist"""                   
+    | FNATTR_Uwtable sync  => if sync then "uwtable(sync)" else "uwtable" 
+    | FNATTR_Nocf_check => "nocf_check" 
+    | FNATTR_Shadowcallstack => "shadowcallstack" 
+    | FNATTR_Mustprogress => "mustprogeress"
+    | FNATTR_Warn_stack_size th  => """warn-stack-size""=" ++ """" ++ show th ++ """"
+    | FNATTR_vscale_range min max  =>
+        match max with
+        | None => "vscale_range(" ++ show min ++ ")"
+        | Some m => "vscale_range(" ++ show min ++ "," ++ show m ++ ")"
+        end                             
+    | FNATTR_Min_legal_vector_width size => """min-legal-vector-width""=" ++ """"
                                                        ++ show size ++ """" 
-      | FNATTR_String (s) => """" ++ show s ++ """"  (* "no-see" *)
-      | FNATTR_Key_value (kv) => """" ++ fst kv ++ """=" ++ """" ++ snd kv ++ """" (* "unsafe-fp-math"="false" *)
-      | FNATTR_Attr_grp (g) => "attr_grip" ++ show g
-      end.
-    
-  
+    | FNATTR_String s => """" ++ show s ++ """"  (* "no-see" *)
+    | FNATTR_Key_value kv => """" ++ fst kv ++ """=" ++ """" ++ snd kv ++ """" (* "unsafe-fp-math"="false" *)
+    | FNATTR_Attr_grp g => "attr_grip" ++ show g
+    end.
+
   Global Instance showFnAttr : Show fn_attr
     := {| show := show_fn_attr |}.
 
@@ -349,10 +345,7 @@ Fixpoint show_typ (t : typ) : string :=
   Global Instance showFCmp : Show fcmp 
   := {| show := show_fcmp|}.
 
-
-
   (*How to implement select, freeze, call, va_arg, landingpad, catchpad, cleanuppad*)
-
 
 
 
@@ -520,6 +513,20 @@ Fixpoint show_typ (t : typ) : string :=
             end
        |}.
 
+  Definition show_phi_block (p : block_id * exp typ) : string :=
+    let '(bid, e) := p in
+    "[ " ++ show e ++ ", " ++ "%" ++ show bid ++ " ]".
+
+  Definition intersperse (sep : string) (l : list string) : string
+    := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else s ++ sep ++ acc) l "".
+
+  Global Instance showPhi : Show (phi typ)
+    := {| show p :=
+            let '(Phi t phis) := p in
+            "phi " ++ show t ++ " " ++ intersperse ", " (map show_phi_block phis)
+       |}.
+
+
   Definition show_opt_prefix {A} `{Show A} (prefix : string) (ma : option A) : string
     := match ma with
        | None   => ""
@@ -582,19 +589,6 @@ Fixpoint show_typ (t : typ) : string :=
 
   Global Instance showCode : Show (code typ)
      := {| show := show_code "    " |}.
-
-  Definition show_phi_block (p : block_id * exp typ) : string :=
-    let '(bid, e) := p in
-    "[ " ++ show e ++ ", " ++ "%" ++ show bid ++ " ]".
-
-  Definition intersperse (sep : string) (l : list string) : string
-    := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else s ++ sep ++ acc) l "".
-
-  Global Instance showPhi : Show (phi typ)
-    := {| show p :=
-            let '(Phi t phis) := p in
-            "phi " ++ show t ++ " " ++ intersperse ", " (map show_phi_block phis)
-       |}.
   
   Definition show_block (indent : string) (b : block typ) : string
     :=
@@ -654,7 +648,6 @@ Fixpoint show_typ (t : typ) : string :=
                    Is that why we do "df_instrs defn"? *)
                 (* Is df_instrs a list or a tuple? Or is bs a list and b some element?*)
                 (* Is newline literally just writing a new line? *)
-
         let blocks :=
           match df_instrs defn with
             (* We are doing concat with newline as the separator bc this represent code in the body, which obviously should be separated by lines.  *)
@@ -673,12 +666,12 @@ Fixpoint show_typ (t : typ) : string :=
     {| show := show_definition |}.
 
   (* Write the type of decl *)
-  (*
-  Definition show_declaration (decl) : string :=
-    let name := decl.(dc_name) in
+   Definition show_declaration (decl: declaration typ) : string :=
+    "". 
+    (* let name := decl.(dc_name) in
     let ftype := decl.(dc_type) in
     match ftype with
-    |TYPE_function ret_t args_t =>
+    |TYPE_Function ret_t args_t =>
        let args := zip defn.(df_args) args_t in
        (* declaration doesn't have df_instr like definition does *)
         (* let blocks :=
@@ -702,13 +695,31 @@ Fixpoint show_typ (t : typ) : string :=
 *)
       
 
+  Fixpoint show_metadata (md : metadata typ)  : string :=
+    match md with
+    | METADATA_Const tv => show tv
+    | METADATA_Null => "null"
+    | METADATA_Id i => "!" ++ show i
+    | METADATA_String s => "!" ++ show s   
+    | METADATA_Named strs => "!{" ++ show (intersperse " , " (List.map (fun x => "!" ++ x) strs)) ++ "}" 
+    | METADATA_Node mds => "!{" ++ show (intersperse " , " (List.map show_metadata mds)) ++ "}" 
+    end. 
+
+  Global Instance showMetadata (md : metadata typ) : Show (metadata typ) :=
+    {| show := show_metadata |}. 
+
+  Definition show_global (g : global typ) : string := "".
+
+  Global Instance showGlobal : Show (global typ) :=
+    {| show := show_global |}. 
+    
   Definition show_tle (tle : toplevel_entity typ (block typ * list (block typ))) : string
     := match tle with
          (*Why is show_definition rather than show being used here*)
-       | TLE_Definition defn => show_definition defn
+       | TLE_Definition defn => show defn
        | TLE_Comment msg => ";" ++ show msg (*What if the comment is multiple lines? Each line is supposed to have a semicolon. How do we handle that?*)
-       | TLE_Target tgt => "target triple =" ++ show tgt
-       | TLE_Datalayout layout => "target datalayout = " ++ show layout
+       | TLE_Target tgt => show tgt
+       | TLE_Datalayout layout => show layout
        | TLE_Source_filename s => "source_filename = " ++ show s
                                                       (*
        | TLE_Declaration decl => show_declaration decl
