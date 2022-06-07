@@ -349,18 +349,7 @@ Fixpoint show_typ (t : typ) : string :=
   Global Instance showFCmp : Show fcmp 
   := {| show := show_fcmp|}.
 
-   Definition show_phi_block (p : block_id * exp typ) : string :=
-    let '(bid, e) := p in
-    "[ " ++ show e ++ ", " ++ "%" ++ show bid ++ " ]".
 
-  Definition intersperse (sep : string) (l : list string) : string
-    := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else s ++ sep ++ acc) l "".
-
-  Global Instance showPhi : Show (phi typ)
-    := {| show p :=
-            let '(Phi t phis) := p in
-            "phi " ++ show t ++ " " ++ intersperse ", " (map show_phi_block phis)
-       |}.
 
   (*How to implement select, freeze, call, va_arg, landingpad, catchpad, cleanuppad*)
 
@@ -469,15 +458,17 @@ Fixpoint show_typ (t : typ) : string :=
       | EXP_Bool b => show b
       | EXP_Null => "null"
       | EXP_Zero_initializer => "zero initializer"
-      (* lowercase? *)                         
-      | EXP_Cstring s => "C""" ++ show s ++ """" 
+      (* see notes on cstring on LLVMAst.v *)                         
+      | EXP_Cstring elts => "unimplemented"      
       | EXP_Undef => "undef"
       | EXP_Struct fields => "{"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++ show_exp ex) fields) ++ "}"
       | EXP_Packed_struct fields => "<{"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++ show_exp ex) fields) ++ "}>"
       | EXP_Array elts => "["  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++ show_exp ex) elts) ++ "]"
       | EXP_Vector elts => "<"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++ show_exp ex) elts) ++ ">"
       | OP_IBinop iop t v1 v2 =>
-        show iop ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
+          show iop ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
+      | OP_ICmp cmp t v1 v2 =>
+          "icmp " ++ show cmp ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
       | OP_FBinop fop fmath t v1 v2 =>
           let fmath_string :=
             match fmath with
@@ -485,16 +476,12 @@ Fixpoint show_typ (t : typ) : string :=
             | _ =>  " " ++ concat " " (map (fun x => show x) fmath) ++  " "
             end in              
          show fop ++ fmath_string ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
-      | OP_ICmp cmp t v1 v2
       | OP_FCmp cmp t v1 v2 =>
-          "icmp " ++ show cmp ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
+          "fcmp " ++ show cmp ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
       | OP_Conversion conv t_from v t_to => show conv ++ " " ++ show t_from ++ " " ++ show_exp v ++ " to " ++ show t_to
       | OP_GetElementPtr t ptrval idxs =>
       let (tptr, exp) := ptrval in
       "getelementptr " ++ show t ++ ", " ++ show tptr ++ " " ++ show_exp exp ++ fold_left (fun str '(ty, ex) => ", " ++ show ty ++ " "++ show_exp ex ++ str) idxs ""
-      | OP_ExtractValue vec idxs =>
-      let (tptr, exp) := vec in
-      "extractvalue " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ concat ", " (map (fun x => show x) idxs)
       | OP_ExtractElement vec idx =>
       let (tptr, exp) := vec in 
       let (tidx, iexp) := idx in
@@ -504,9 +491,12 @@ Fixpoint show_typ (t : typ) : string :=
       let (telt, eexp) := elt in
       let (tidx, iexp) := idx in
       "insertelement " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ show telt ++ " " ++ show_exp eexp ++ ", " ++ show tidx ++ " " ++ show_exp iexp
-      | OP_ShuffleVector vec1 vec2 idxmask => "shufflevector " ++ show vec1 ++ ", "
-                                                ++ show vec2 ++ ", "
-                                                ++ show idxmask
+      | OP_ShuffleVector vec1 vec2 idxmask =>
+          "shufflevector " ++ show vec1 ++ ", " ++ show vec2 ++ ", " ++ show idxmask
+                           (* This one, extractValue *)
+      | OP_ExtractValue vec idxs =>
+      let (tptr, exp) := vec in
+      "extractvalue " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ concat ", " (map (fun x => show x) idxs)
       | OP_InsertValue vec elt idxs =>
       let (tptr, exp) := vec in
       let (telt, eexp) := elt in 
@@ -514,7 +504,6 @@ Fixpoint show_typ (t : typ) : string :=
       | OP_Select (tc, cnd) (t1, v1) (t2, v2) =>
           "select " ++ show tc ++ " " ++ show_exp cnd ++ ", " ++ show t1 ++ " " ++ show_exp v1  ++ ", " ++ show t2 ++ " " ++ show_exp v2
       | OP_Freeze (ty, ex) => "freeze " ++ show ty ++ " " ++ show_exp ex
-      | _ => "show_exp todo"
       end.
 
   
@@ -589,8 +578,21 @@ Fixpoint show_typ (t : typ) : string :=
     := concatStr (map (fun iid => indent ++ show_instr_id iid ++ newline) c).
 
   Global Instance showCode : Show (code typ)
-    := {| show := show_code "    " |}.
+     := {| show := show_code "    " |}.
 
+  Definition show_phi_block (p : block_id * exp typ) : string :=
+    let '(bid, e) := p in
+    "[ " ++ show e ++ ", " ++ "%" ++ show bid ++ " ]".
+
+  Definition intersperse (sep : string) (l : list string) : string
+    := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else s ++ sep ++ acc) l "".
+
+  Global Instance showPhi : Show (phi typ)
+    := {| show p :=
+            let '(Phi t phis) := p in
+            "phi " ++ show t ++ " " ++ intersperse ", " (map show_phi_block phis)
+       |}.
+  
   Definition show_block (indent : string) (b : block typ) : string
     :=
       let phis   := concatStr (map (fun '(l, p) => indent ++ "%" ++ show l ++ " = " ++ show p ++ newline) (blk_phis b)) in
@@ -615,37 +617,43 @@ Fixpoint show_typ (t : typ) : string :=
     show := show_typ_instr
     |}.
   
-  Definition show_arg (arg : local_id * typ) : string
-    := let '(i, t) := arg in
-       show t ++ " %" ++ show i.
+  Definition show_arg (arg : local_id * typ * list param_attr) : string
+    := let '(i, t, parameter_attributes) := arg in
+       show t ++ (map (fun x => show x ++ " ") (parameter_attributes)) ++ " %" ++ show i.
 
-  Definition show_arg_list (args : list (local_id * typ)) : string
+  Definition show_arg_list (args : list (local_id * typ * list param_attr)) : string
     :=
       let arg_str := concat ", " (map show_arg args) in
       concatStr ["("; arg_str; ")"].
 
   (* TODO: REALLY?!? *)
-  Fixpoint zip {X Y} (xs : list X) (ys : list Y) : list (X * Y)
-    := match xs, ys with
+  Fixpoint zip {X Y Z} (xs : list X) (ys : list Y) (zs : list list Z) : list (X * Y * list Z)
+    := match xs, ys, zs with
        | [], _ => []
        | _, [] => []
-       | (x::xs), (y::ys) => (x, y) :: zip xs ys
+       | (x::xs), (y::ys), (z::zs) => (x, y, z) :: zip xs ys zs
        end.
 
   Definition show_definition (defn : definition typ (block typ * list (block typ))) : string
     :=
       let name  := defn.(df_prototype).(dc_name) in
       let ftype := defn.(df_prototype).(dc_type) in
+      let '(return_attributes, argument_attributes) = defn.(df_protoype).(dc_param_attrs) in
+      
       match ftype with
-        (*Return type and arguments type*)
-      | TYPE_Function ret_t args_t
-        =>
-          (* It's being zipped with name of argument and type after bc of how show_arg is defined *)
-          let args := zip defn.(df_args) args_t in
+      (*Stand for return type and arguments type*)
+      | TYPE_Function ret_t args_t =>
+      (* It's being zipped with name of arg and then type bc of how show_arg is defined *)
+          let args := zip defn.(df_args) args_t argument_attributes in
           (* What is happening here? *)
-                   (* Is newline literally just writing a new line? *)
+                (* Are we matching the instructions field of definition?
+                   Is that why we do "df_instrs defn"? *)
+                (* Is df_instrs a list or a tuple? Or is bs a list and b some element?*)
+                (* Is newline literally just writing a new line? *)
+
         let blocks :=
-            match df_instrs defn with
+          match df_instrs defn with
+            (* We are doing concat with newline as the separator bc this represent code in the body, which obviously should be separated by lines.  *)
             | (b, bs) => concat newline (map (show_block "    ") (b::bs))
             end in
         (* This is a function that takes in a list and makes it a string?*)
