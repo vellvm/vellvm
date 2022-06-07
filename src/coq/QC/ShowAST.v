@@ -10,14 +10,11 @@ From ExtLib Require Import
      Eqv.
 
 From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG Semantics.TopLevel Floats.
-From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils. (*Needs to be changed*)
-
-Check Floats.Float.to_bits.
-
+From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils. (*Needs to be changed*)  
+ 
 Require Import Integers Floats.
 
 Require Import List. 
-
 Import ListNotations.
 Import MonadNotation.
 
@@ -193,7 +190,8 @@ Fixpoint show_typ (t : typ) : string :=
     := { show := show_param_attr }.
 
     (* unimplemented: frame-pointer patchable-function, key_value *) 
-  Definition show_fn_attr (f : fn_attr) : string :=
+   Definition show_fn_attr (f : fn_attr) : string :=
+    match f with 
     | FNATTR_Alignstack a => "alignstack(" ++ show a ++ ")"
     | FNATTR_Alloc_family fam => """alloc-family""=" ++ """" ++ show fam ++ """"
     | FNATTR_Allockind kind => "allockind(" ++ """" ++ show kind ++ """" ++ ")"
@@ -347,21 +345,8 @@ Fixpoint show_typ (t : typ) : string :=
   Global Instance showFCmp : Show fcmp 
   := {| show := show_fcmp|}.
 
-   Definition show_phi_block (p : block_id * exp typ) : string :=
-    let '(bid, e) := p in
-    "[ " ++ show e ++ ", " ++ "%" ++ show bid ++ " ]".
-
-  Definition intersperse (sep : string) (l : list string) : string
-    := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else s ++ sep ++ acc) l "".
-
-  Global Instance showPhi : Show (phi typ)
-    := {| show p :=
-            let '(Phi t phis) := p in
-            "phi " ++ show t ++ " " ++ intersperse ", " (map show_phi_block phis)
-       |}.
 
   (*How to implement select, freeze, call, va_arg, landingpad, catchpad, cleanuppad*)
-
 
 
 
@@ -466,9 +451,8 @@ Fixpoint show_typ (t : typ) : string :=
       | EXP_Hex f => double_to_hex_string f
       | EXP_Bool b => show b
       | EXP_Null => "null"
-      | EXP_Zero_initializer => "zero initializer"
-      (* lowercase? *)                         
-      | EXP_Cstring s => "C""" ++ show s ++ """" 
+      | EXP_Zero_initializer => "zeroinitializer"                       
+      | EXP_Cstring s => (* "c""" ++ show s ++ """" *) ""
       | EXP_Undef => "undef"
       | EXP_Struct fields => "{"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++ show_exp ex) fields) ++ "}"
       | EXP_Packed_struct fields => "<{"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++ show_exp ex) fields) ++ "}>"
@@ -502,9 +486,9 @@ Fixpoint show_typ (t : typ) : string :=
       let (telt, eexp) := elt in
       let (tidx, iexp) := idx in
       "insertelement " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ show telt ++ " " ++ show_exp eexp ++ ", " ++ show tidx ++ " " ++ show_exp iexp
-      | OP_ShuffleVector vec1 vec2 idxmask => "shufflevector " ++ show vec1 ++ ", "
+      | OP_ShuffleVector vec1 vec2 idxmask => (* "shufflevector " ++ show vec1 ++ ", "
                                                 ++ show vec2 ++ ", "
-                                                ++ show idxmask
+                                                ++ show idxmask *) ""
       | OP_InsertValue vec elt idxs =>
       let (tptr, exp) := vec in
       let (telt, eexp) := elt in 
@@ -512,7 +496,6 @@ Fixpoint show_typ (t : typ) : string :=
       | OP_Select (tc, cnd) (t1, v1) (t2, v2) =>
           "select " ++ show tc ++ " " ++ show_exp cnd ++ ", " ++ show t1 ++ " " ++ show_exp v1  ++ ", " ++ show t2 ++ " " ++ show_exp v2
       | OP_Freeze (ty, ex) => "freeze " ++ show ty ++ " " ++ show_exp ex
-      | _ => "show_exp todo"
       end.
 
   
@@ -525,6 +508,20 @@ Fixpoint show_typ (t : typ) : string :=
             | (t, e) => show t ++ " " ++ show e
             end
        |}.
+
+  Definition show_phi_block (p : block_id * exp typ) : string :=
+    let '(bid, e) := p in
+    "[ " ++ show e ++ ", " ++ "%" ++ show bid ++ " ]".
+
+  Definition intersperse (sep : string) (l : list string) : string
+    := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else s ++ sep ++ acc) l "".
+
+  Global Instance showPhi : Show (phi typ)
+    := {| show p :=
+            let '(Phi t phis) := p in
+            "phi " ++ show t ++ " " ++ intersperse ", " (map show_phi_block phis)
+       |}.
+
 
   Definition show_opt_prefix {A} `{Show A} (prefix : string) (ma : option A) : string
     := match ma with
@@ -659,11 +656,12 @@ Fixpoint show_typ (t : typ) : string :=
     {| show := show_definition |}.
 
   (* Write the type of decl *)
-  Definition show_declaration (decl) : string :=
-    let name := decl.(dc_name) in
+   Definition show_declaration (decl: declaration typ) : string :=
+    "". 
+    (* let name := decl.(dc_name) in
     let ftype := decl.(dc_type) in
     match ftype with
-    |TYPE_function ret_t args_t =>
+    |TYPE_Function ret_t args_t =>
        let args := zip defn.(df_args) args_t in
        (* declaration doesn't have df_instr like definition does *)
         (* let blocks :=
@@ -677,29 +675,42 @@ Fixpoint show_typ (t : typ) : string :=
           ; "}"; newline
           ]
     | _ => "Invalid type on function: " ++ show name
-    end.
+    end. *) 
 
   (* Is it ok if I just write decl as the parameter of Show? In showDefinition they don't write defn but rather the type of defn*)
-  Global Instance showDeclaration: Show (decl) :=
+  Global Instance showDeclaration: Show (declaration typ) :=
     {| show := show_declaration |}.
       
 
-  Definition show_metadata (md) : string :=
+  Fixpoint show_metadata (md : metadata typ)  : string :=
     match md with
-      | METADATA_Const tv => 
+    | METADATA_Const tv => show tv
+    | METADATA_Null => "null"
+    | METADATA_Id i => "!" ++ show i
+    | METADATA_String s => "!" ++ show s   
+    | METADATA_Named strs => "!{" ++ show (intersperse " , " (List.map (fun x => "!" ++ x) strs)) ++ "}" 
+    | METADATA_Node mds => "!{" ++ show (intersperse " , " (List.map show_metadata mds)) ++ "}" 
+    end. 
 
+  Global Instance showMetadata (md : metadata typ) : Show (metadata typ) :=
+    {| show := show_metadata |}. 
+
+  Definition show_global (g : global typ) : string := "".
+
+  Global Instance showGlobal : Show (global typ) :=
+    {| show := show_global |}. 
     
   Definition show_tle (tle : toplevel_entity typ (block typ * list (block typ))) : string
     := match tle with
          (*Why is show_definition rather than show being used here*)
-       | TLE_Definition defn => show_definition defn
+       | TLE_Definition defn => show defn
        | TLE_Comment msg => ";" ++ show msg (*What if the comment is multiple lines? Each line is supposed to have a semicolon. How do we handle that?*)
        | TLE_Target tgt => show tgt
        | TLE_Datalayout layout => show layout
        | TLE_Source_filename s => "source_filename = " ++ show s
-       | TLE_Declaration decl => show_declaration decl
-       | TLE_Global g => show_global g
-       | TLE_Metadata id md =>                               
+       | TLE_Declaration decl => show decl
+       | TLE_Global g => show g
+       | TLE_Metadata id md => "!" ++ show id (* ++ show md *)                          
        | _ => "todo: show_tle"
        end.
 
