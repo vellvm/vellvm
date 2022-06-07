@@ -1034,18 +1034,18 @@ Fixpoint get_size_from_typ (t: typ) : nat :=
   | TYPE_Pointer _ => 64
   | _ => 1
   end.
-Search GenLLVM.
 
 Fixpoint gen_typ_le_size (max_byte_sz : nat) : GenLLVM typ :=
+  ctx <- get_ctx;;
   oneOf_LLVM ((if (max_byte_sz =? 0)%nat then [] else
                (if (max_byte_sz <=? 8)%nat then [ret (TYPE_I 1)] else []
-                ++ (if (max_byte_sz <=? 32)%nat then [ret (TYPE_I 8)] else [])
+                ++ (if (max_byte_sz <=? 32)%nat then [ret (TYPE_I 8); x <- gen_typ_le_size max_byte_sz;;ret (TYPE_Pointer x)] else [])
                 ++ (if (max_byte_sz <=? 64)%nat then [ret (TYPE_I 32); ret TYPE_Float] else [])
                 ++ (if (64 <=? max_byte_sz)%nat then [ret (TYPE_I 64); ret TYPE_Double] else []))
-                 ++ [sz' <- lift_GenLLVM (choose (1, BinIntDef.Z.of_nat max_byte_sz));;
+                 ++ [(*sz' <- lift_GenLLVM (choose (1, BinIntDef.Z.of_nat max_byte_sz));;
                      let sz' := BinIntDef.Z.to_nat sz' in
                      t <- gen_typ_le_size (max_byte_sz / sz');;
-                     ret (TYPE_Vector (BinNatDef.N.of_nat sz') t);
+                     ret (TYPE_Vector (BinNatDef.N.of_nat sz') t);*)
                      sz' <- lift_GenLLVM (choose (1, BinIntDef.Z.of_nat max_byte_sz));;
                      let sz' := BinIntDef.Z.to_nat sz' in
                      t <- gen_typ_le_size (max_byte_sz / sz');;
@@ -1065,9 +1065,21 @@ gen_typ_from_size_struct (max_byte_sz : nat) : GenLLVM (list typ) :=
 (* How to get ptrtoint_ctx out of context*)
 Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
   ctx <- get_ptrtoint_ctx;;
-  '(tptr, id, typ_from_cast) <- oneOf_LLVM (map ret ctx);;
-  let tptr := tptr in (* TODO: Need to make it more complicate*)
-  ret (tptr, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) tptr)).
+  '(old_tptr, id, typ_from_cast) <- oneOf_LLVM (map ret ctx);;
+  let genllvm_new_tptr :=
+    match old_tptr with
+    | TYPE_Pointer old_typ => new_typ <- gen_typ_le_size (get_size_from_typ old_typ);;
+                                           ret (TYPE_Pointer new_typ)
+    | TYPE_Vector sz old_tptr => match old_tptr with
+                                | TYPE_Pointer old_typ =>
+                                    new_typ <-gen_typ_le_size (get_size_from_typ old_typ);;
+                                    ret (TYPE_Pointer new_typ)
+                                | _ => ret (TYPE_Void) (*Won't reach here... Hopefully*)
+                                end
+    | _ => ret (TYPE_Void) (*Won't reach here... Hopefully*)
+    end in
+  new_tptr <- genllvm_new_tptr;;
+  ret (new_tptr, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr)).
 
 Definition genTypHelper (n: nat): G (typ) :=
   run_GenLLVM (gen_typ_non_void_size n).
