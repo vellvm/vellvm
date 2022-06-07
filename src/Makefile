@@ -52,7 +52,8 @@ COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/Memory/Sizeof Semantics/G
 
 COQFILESANALYSIS := Analysis/Iteration Analysis/Kildall Analysis/Dom Analysis/DomKildall Analysis/ssa Analysis/DomId 
 
-COQFILESQC := Syntax/TypeUtil QC/Utils QC/GenAST QC/ShowAST QC/ReprAST QC/QCVellvm
+COQFILESQC := Syntax/TypeUtil QC/Utils QC/GenAST QC/ShowAST QC/ReprAST
+COQFILESQCTEST := QC/QCVellvm
 
 COQFILESTHEORY := Syntax/ScopeTheory\
 		Theory/StatePredicates\
@@ -74,6 +75,7 @@ COQFILESALL      := $(COQFILESCOMPILER) $(COQFILESTHEORY) $(COQFILESOPT) $(COQFI
 VFILES  := $(COQFILESALL:%=coq/%.v)
 VOFILES := $(COQFILESALL:%=coq/%.vo)
 QCVOFILES := $(COQFILESQC:%=coq/%.vo)
+QCVOFILESTEST := $(COQFILESQCTEST:%=coq/%.vo)
 
 .PHONY: all
 all: .depend
@@ -92,7 +94,7 @@ coq: .depend
 	$(MAKE) quickchick flocq-quickchick $(VOFILES)
 
 .PHONY: qc-tests
-qc-tests: rm-qc-test-vo coq $(QCVOFILES)
+qc-tests: rm-qc-test-vo coq $(QCVOFILES) $(QCVOFILESTEST) 
 
 .PHONY: rm-qc-test-vo
 rm-qc-test-vo:
