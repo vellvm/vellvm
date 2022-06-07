@@ -1920,7 +1920,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
       | Inttoptr =>
         match t1, t2 with
-        | DTYPE_I 64, DTYPE_Pointer => Conv_ItoP x
+        | DTYPE_I _, DTYPE_Pointer => Conv_ItoP x
         | _, _ => Conv_Illegal "ERROR: Inttoptr got illegal arguments"
         end
       | Ptrtoint =>
