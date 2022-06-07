@@ -1269,7 +1269,6 @@ Section InstrGenerators.
      The type is sometimes void for instructions that don't really
      compute a value, like void function calls, stores, etc.
    *)
-
   Definition gen_instr : GenLLVM (typ * instr typ) :=
     ctx <- get_ctx;;
     ptrtoint_ctx <- get_ptrtoint_ctx;;
@@ -1284,16 +1283,14 @@ Section InstrGenerators.
          ++ (if seq.nilp (filter_ptr_typs ctx) then [] else [gen_gep; gen_load; gen_store; gen_ptrtoint])
          ++ (if seq.nilp ptrtoint_ctx then [] else [gen_inttoptr])
          ++ (if seq.nilp (filter_agg_typs ctx) then [] else [gen_extractvalue; gen_insertvalue])
-         ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])).  
+         ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])).
+  
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
 
   (* TODO: want to generate phi nodes, which might be a bit
   complicated because we need to know that an id that occurs in a
   later block is in context *)
-
-
-
   Definition add_id_to_instr (t_instr : typ * instr typ) : GenLLVM (instr_id * instr typ)
     :=
       match t_instr with
