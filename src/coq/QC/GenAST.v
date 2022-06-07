@@ -1010,7 +1010,6 @@ Definition filter_ptr_vecptr_typ (ctx: list (ident * typ)) : list (ident * typ) 
                 | _ => false
                       end) ctx.
 
-
 Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
   ctx <- get_ctx;;
   let ptr_in_context := filter_ptr_typs ctx in
@@ -1021,11 +1020,20 @@ Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
                     | _ => ret (TYPE_Void) (*Won't get into this case*)
                     end in
   typ_from_cast <- gen_typ_in_ptr;; (*Need to *)
-  new_id <- new_raw_id;; (* Add a new id so that it is identifiable in ptrtoint_ctx*)
-  add_to_ptrtoint_ctx (tptr, ID_Local new_id, typ_from_cast);;
   ret (typ_from_cast, INSTR_Op (OP_Conversion Ptrtoint tptr (EXP_Ident id) typ_from_cast)).
 
-(*TODO: gen_inttoptr workspace here*)
+(*TODO: gen_inttoptr incomplete*)
+Fixpoint get_size_from_typ (t: typ) : nat :=
+  match t with
+  | TYPE_I sz => N.to_nat sz
+  | TYPE_Float => 32
+  | TYPE_Double => 64
+  | TYPE_Array sz t
+  | TYPE_Vector sz t => (N.to_nat sz) * (get_size_from_typ t)
+  | _ => 0
+  end.
+
+(* How to get ptrtoint_ctx out of context*)
 Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
   ctx <- get_ptrtoint_ctx;;
   '(tptr, id, typ_from_cast) <- oneOf_LLVM (map ret ctx);;
@@ -1261,8 +1269,10 @@ Section InstrGenerators.
      The type is sometimes void for instructions that don't really
      compute a value, like void function calls, stores, etc.
    *)
+
   Definition gen_instr : GenLLVM (typ * instr typ) :=
     ctx <- get_ctx;;
+    ptrtoint_ctx <- get_ptrtoint_ctx;;
     oneOf_LLVM
       ([ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
          ; t <- gen_sized_typ;;
@@ -1271,7 +1281,8 @@ Section InstrGenerators.
            align <- ret None;;
            ret (TYPE_Pointer t, INSTR_Alloca t num_elems align)
         ] (* TODO: Generate atomic operations and other instructions *)
-         ++ (if seq.nilp (filter_ptr_typs ctx) then [] else [gen_gep; gen_load; gen_store])
+         ++ (if seq.nilp (filter_ptr_typs ctx) then [] else [gen_gep; gen_load; gen_store; gen_ptrtoint])
+         ++ (if seq.nilp ptrtoint_ctx then [] else [gen_inttoptr])
          ++ (if seq.nilp (filter_agg_typs ctx) then [] else [gen_extractvalue; gen_insertvalue])
          ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])).  
   (* TODO: Generate instructions with ids *)
@@ -1290,9 +1301,15 @@ Section InstrGenerators.
         vid <- new_void_id;;
         ret (vid, instr)
       | (t, instr) =>
-        i <- new_raw_id;;
-        add_to_ctx (ID_Local i, t);;
-        ret (IId i, instr)
+          i <- new_raw_id;;
+          match instr with
+          | INSTR_Op (OP_Conversion Ptrtoint t_from v t_to) =>
+              add_to_ptrtoint_ctx (t_from, ID_Local i, t_to);; (* Register the local variable to ptrtoint_ctx*)
+              ret (IId i, instr)
+          | _ =>
+              add_to_ctx (ID_Local i, t);;
+              ret (IId i, instr)
+          end
       end.
 
   (* Generate a block of code, spitting out a new context. *)
