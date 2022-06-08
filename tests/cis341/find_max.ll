@@ -39,3 +39,5 @@ define i64 @main(i64 %argc, i8** %argv) {
     %1 = call i64 @find_max()
     ret i64 %1
 }
+
+; ASSERT EQ: i64 80 = call i64 @main(i64 0, i8** null)

@@ -30,3 +30,5 @@ define i64 @main(i64 %argc, i8** %arcv) {
   %out = call i64 @kadane([0 x i64]* @gbl, i64 0, i64 0, i64 9, i64 0)
   ret i64 %out
 }
+
+; ASSERT EQ: i64 6 = call i64 @main(i64 0, i8** null)

@@ -19,3 +19,5 @@ define i64 @main(i64 %argc, i8** %argv) {
   call void @printf(i8* %1, i8* %3, i8* %4, i64 %5, i64 4, i64 5, i64 6, i64 7, i64 8)
   ret i64 0
 }
+
+; ASSERT EQ: i64 20 = call i64 @main(i64 0, i8** null)

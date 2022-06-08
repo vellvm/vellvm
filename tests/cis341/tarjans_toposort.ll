@@ -129,3 +129,5 @@ define i1 @main(i64 %argc, i8** %argv) {
   %1 = call i1 @sortsEqual([12 x i64]* @topoSortAnswer, [12 x i64]* @topoSortComputed)
   ret i1 %1
 }
+
+; ASSERT EQ: i64 1 = call i64 @main(i64 0, i8** null)

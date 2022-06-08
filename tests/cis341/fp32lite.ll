@@ -102,3 +102,5 @@ define i64 @main(i64 %argc, i8** %argv) {
   %int = call i64 @fp32_to_int(i64 1132389990)  ; 0x437EE666: 254.9
   ret i64 %int
 }
+
+; ASSERT EQ: i64 254 = call i64 @main(i64 0, i8** null)

@@ -30,8 +30,8 @@ define i64 @lcs(i64 %m, i64 %n) {
   not_eq_recurse:
   %ans1 = call i64 @lcs(i64 %m1, i64 %n)
   %ans2 = call i64 @lcs(i64 %m, i64 %n1)
-  %10 = icmp sge i64 %ans1, %ans2                                                                        %10 = icmp sge i64 %ans1, %ans2
-  br i1 %10, label %ret1, label %ret2
+  %8 = icmp sge i64 %ans1, %ans2
+  br i1 %8, label %ret1, label %ret2
 
   ret1:
   ret i64 %ans1
@@ -48,3 +48,5 @@ define i64 @main(i64 %argc, i8** %arcv) {
   %1 = call i64 @lcs(i64 7, i64 6)
   ret i64 %1
 }
+
+; ASSERT EQ: i64 4 = call i64 @main(i64 0, i8** null)

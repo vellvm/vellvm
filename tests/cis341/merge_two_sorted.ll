@@ -97,3 +97,5 @@ define i64 @main(i64 %argc, i8** %arcv) {
     %is_sorted = call i1 @isSorted(%vecresult* @g_vecresult)
     ret i1 %is_sorted
 }
+
+; ASSERT EQ: i64 1 = call i64 @main(i64 0, i8** null)

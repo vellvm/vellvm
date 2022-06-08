@@ -46,3 +46,5 @@ define i64 @main() {
   %ans = call i64 @lcm(i64 10, i64 25)
   ret i64 %ans
 }
+
+; ASSERT EQ: i64 50 = call i64 @main(i64 0, i8** null)

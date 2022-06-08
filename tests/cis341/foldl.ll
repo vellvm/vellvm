@@ -24,3 +24,5 @@ define i64 @main(i64 %argc, i8** %arcv) {
   %2 = call i64 @foldl(i64(i64, i64)* @add, i64 0, i64* %1, i64 5)
   ret i64 %2
 }
+
+; ASSERT EQ: i64 20 = call i64 @main(i64 0, i8** null)

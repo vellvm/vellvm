@@ -68,3 +68,5 @@ succ:
   %big = load i64, i64* %p
   ret i64 %big
 }
+
+; ASSERT EQ: i64 155 = call i64 @main(i64 0, i8** null)

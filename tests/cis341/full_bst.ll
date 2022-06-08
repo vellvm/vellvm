@@ -15,8 +15,8 @@
 @root2 = global %Node { %Node* @n5_2, %Node* @n6, i64 1 }
 
 define i1 @bst_full(%Node* %n) {
-  %1 = icmp eq %Node* %n, null
-  br i1 %1, label %full, label %check_leaf
+  %two = icmp eq %Node* %n, null
+  br i1 %two, label %full, label %check_leaf
 
 check_leaf:
 
@@ -50,6 +50,8 @@ not_full:
 }
 
 define i64 @main(i64 %argc, i8** %argv) {
-  %2 = call i1 @bst_full(%Node* @root1)
-  ret i1 %2
+  %one = call i1 @bst_full(%Node* @root1)
+  ret i1 %one
 }
+
+; ASSERT EQ: i64 1 = call i64 @main(i64 0, i8** null)

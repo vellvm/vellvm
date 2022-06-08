@@ -60,3 +60,5 @@ define i64 @main(i64 %argc, i8** %arcv) {
   %1 = call i64 @selectsort(i64 0, i64 0, i64 5)
   ret i64 %1
 }
+
+; ASSERT EQ: i64 25 = call i64 @main(i64 0, i8** null)

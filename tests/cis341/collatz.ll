@@ -2,26 +2,28 @@ define i64 @collatz(i64 %n) {
   %cmp = icmp sgt i64 %n, 1
   br i1 %cmp, label %then, label %ret0
 then:
-  %4 = shl i64 %n, 63
-  %5 = ashr i64 %4, 63
-  %6 = icmp eq i64 %5, 0
-  br i1 %6, label %even, label %odd
+  %four = shl i64 %n, 63
+  %five = ashr i64 %four, 63
+  %six = icmp eq i64 %five, 0
+  br i1 %six, label %even, label %odd
 ret0:
   ret i64 0
 even:
-  %7 = ashr i64 %n, 1
-  %8 = call i64 @collatz(i64 %7)
-  %9 = add i64 %8, 1
-  ret i64 %9
+  %seven = ashr i64 %n, 1
+  %eight = call i64 @collatz(i64 %seven)
+  %nine = add i64 %eight, 1
+  ret i64 %nine
 odd:
-  %7 = mul i64 3, %n
-  %8 = add i64 1, %7 
-  %9 = call i64 @collatz(i64 %8)
-  %10 = add i64 1, %9
-  ret i64 %10
+  %seven = mul i64 3, %n
+  %eight = add i64 1, %seven 
+  %nine = call i64 @collatz(i64 %eight)
+  %one0 = add i64 1, %nine
+  ret i64 %one0
 }
 
 define i64 @main(i64 %argc, i8** %arcv) {
-  %1 = call i64 @collatz(i64 7426)
-  ret i64 %1
+  %one = call i64 @collatz(i64 7426)
+  ret i64 %one
 }
+
+; ASSERT EQ: i64 70 = call i64 @main(i64 0, i8** null)

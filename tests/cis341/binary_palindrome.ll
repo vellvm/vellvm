@@ -47,3 +47,5 @@ define i64 @main(i64 %argc, i8** %argv) {
   %res = call i64 @is_binary_palindrome(i64 819)
   ret i64 %res
 }
+
+; ASSERT EQ: i64 1 = call i64 @main(i64 0, i8** null)
