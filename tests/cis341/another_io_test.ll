@@ -16,8 +16,8 @@ define i64 @main(i64 %argc, i8** %argv) {
   %4 = getelementptr [5 x i8], [5 x i8]* @text, i32 0, i32 0
   call void @changetext() 
   %5 = load i64, i64* @integer
-  call void @printf(i8* %1, i8* %3, i8* %4, i64 %5, i64 4, i64 5, i64 6, i64 7, i64 8)
+  ;; call void @printf(i8* %1, i8* %3, i8* %4, i64 %5, i64 4, i64 5, i64 6, i64 7, i64 8)
   ret i64 0
 }
 
-; ASSERT EQ: i64 20 = call i64 @main(i64 0, i8** null)
+; ASSERT EQ: i64 0 = call i64 @main(i64 0, i8** null)

@@ -49,9 +49,9 @@ not_full:
 
 }
 
-define i64 @main(i64 %argc, i8** %argv) {
+define i1 @main(i64 %argc, i8** %argv) {
   %one = call i1 @bst_full(%Node* @root1)
   ret i1 %one
 }
 
-; ASSERT EQ: i64 1 = call i64 @main(i64 0, i8** null)
+; ASSERT EQ: i1 1 = call i1 @main(i64 0, i8** null)

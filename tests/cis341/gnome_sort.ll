@@ -23,8 +23,8 @@ bumpc:
 swap:
   store i64 %v1, i64* %p2
   store i64 %v2, i64* %p1
-  %cmp2 = icmp sgt i64 %count, 0
-  br i1 %cmp2, label %decc, label %loop
+  %cmp3 = icmp sgt i64 %count, 0
+  br i1 %cmp3, label %decc, label %loop
 decc:
   store i64 %v1, i64* %p2
   store i64 %v2, i64* %p1
