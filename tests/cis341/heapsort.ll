@@ -172,8 +172,6 @@ define i64 @main(i64 %argc, i8** %argv) {
 
   %35 = getelementptr [162 x i8], [162 x i8]* @str, i32 0, i32 0
 
-  call void @printf(i8* %35, i64 %5, i64 %10, i64 %23, i64 %24, i64 %25, i64 %26, i64 %27, i64 %28, i64 %29, i64 %30, i64 %31, i64 %32, i64 %33, i64 %34)
-
   ret i64 0
 }
 

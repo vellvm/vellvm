@@ -166,11 +166,11 @@ define i64 @main(i64 %argc, i8** %arcv) {
 
 	%s = getelementptr [170 x i8], [170 x i8]* @output_str, i32 0, i32 0
 
-	call void @printf(i8* %s, i64 %a0, i64 %a1, i64 %a2, i64 %a3, i64 %a4, i64 %a5, i64 %a6, i64 %a7, i64 %a8, i64 %a9, i64 %a10, i64 %a11, i64 %a12, i64 %a13, i64 %b0, i64 %b1, i64 %b2, i64 %b3, i64 %b4, i64 %b5, i64 %b6, i64 %b7, i64 %b8, i64 %b9, i64 %b10, i64 %b11, i64 %b12, i64 %b13)
+	;; call void @printf(i8* %s, i64 %a0, i64 %a1, i64 %a2, i64 %a3, i64 %a4, i64 %a5, i64 %a6, i64 %a7, i64 %a8, i64 %a9, i64 %a10, i64 %a11, i64 %a12, i64 %a13, i64 %b0, i64 %b1, i64 %b2, i64 %b3, i64 %b4, i64 %b5, i64 %b6, i64 %b7, i64 %b8, i64 %b9, i64 %b10, i64 %b11, i64 %b12, i64 %b13)
 
 	ret i64 1
 
 
 }
 
-; ASSERT EQ: i64 20 = call i64 @main(i64 0, i8** null)
+; ASSERT EQ: i64 1 = call i64 @main(i64 0, i8** null)

@@ -38,4 +38,4 @@
    "fp32lite", 254L
    "heapsort", 0L
    "another_io_test", 0L
-   "quicksort", 
+   "quicksort", 1L
