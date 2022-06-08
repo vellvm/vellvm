@@ -1038,8 +1038,8 @@ Fixpoint get_size_from_typ (t: typ) : N :=
 Definition get_prim_typ_le_size (max_byte_sz: N) : list (GenLLVM typ) :=
   [ret (TYPE_I 1)]
     ++ (if (1 <=? max_byte_sz)%N then [ret (TYPE_I 8)] else [])
-    ++ (if (2 <=? max_byte_sz)%N then [ret (TYPE_I 32); ret TYPE_Float] else [])
-    ++ (if (3 <=? max_byte_sz)%N then [ret (TYPE_I 64); ret TYPE_Double] else []).
+    ++ (if (4 <=? max_byte_sz)%N then [ret (TYPE_I 32); ret TYPE_Float] else [])
+    ++ (if (8 <=? max_byte_sz)%N then [ret (TYPE_I 64); ret TYPE_Double] else []).
 
 (*Main method, it will generate based on the max_byte_sz
   Currently we support, int (1,8,32,64), float, double
