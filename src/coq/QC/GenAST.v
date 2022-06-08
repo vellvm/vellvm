@@ -233,6 +233,7 @@ Section GenerationState.
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := ptrtoint_ctx
        |}.
+  
   Definition GenLLVM := stateT GenState G.
 
   (* Need this because extlib doesn't declare this instance as global :|. *)
@@ -1003,12 +1004,10 @@ Definition gen_insertelement : GenLLVM (typ * instr typ) :=
 Definition filter_ptr_vecptr_typ (ctx: list (ident * typ)) : list (ident * typ) :=
   filter (fun '(_, t) => match t with
                 | TYPE_Pointer _ => true
-                | TYPE_Vector _ ty => match ty with
-                                     | TYPE_Pointer _ => true
-                                     | _ => false
-                                     end
+                | TYPE_Vector _ (TYPE_Pointer _ ) =>true
                 | _ => false
                       end) ctx.
+
 Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
   ctx <- get_ctx;;
   let ptr_in_context := filter_ptr_typs ctx in
@@ -1022,79 +1021,55 @@ Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
   ret (typ_from_cast, INSTR_Op (OP_Conversion Ptrtoint tptr (EXP_Ident id) typ_from_cast)).
 
 (*TODO: gen_inttoptr incomplete*)
-Fixpoint get_size_from_typ (t: typ) : nat :=
+Fixpoint get_size_from_typ (t: typ) : N :=
   match t with
-  | TYPE_I sz => N.to_nat sz
-  | TYPE_Float => 32
-  | TYPE_Double => 64
+  | TYPE_I sz => N.max 1 (sz / 8)%N
+  | TYPE_Float => 4
+  | TYPE_Double => 8
   | TYPE_Array sz t
-  | TYPE_Vector sz t => (N.to_nat sz) * (get_size_from_typ t)
+  | TYPE_Vector sz t => (sz) * (get_size_from_typ t)
   | TYPE_Struct fields
-  | TYPE_Packed_struct fields => fold_right (fun x acc => ((get_size_from_typ x) + acc)%nat) 0%nat fields
-  | TYPE_Pointer _ => 64
-  | _ => 1
+  | TYPE_Packed_struct fields => fold_right (fun x acc => ((get_size_from_typ x) + acc)%N) 0%N fields
+  | TYPE_Pointer _ => 8
+  | _ => 0
   end.
 
 (*Assuming max_byte_sz for this function is greater than 0*)
-
-Definition get_prim_typ_le_size (max_byte_sz: nat) : list (GenLLVM typ) :=
+Definition get_prim_typ_le_size (max_byte_sz: N) : list (GenLLVM typ) :=
   [ret (TYPE_I 1)]
-    ++ (if (8 <=? max_byte_sz)%nat then [ret (TYPE_I 8)] else [])
-    ++ (if (32 <=? max_byte_sz)%nat then [ret (TYPE_I 32); ret TYPE_Float] else [])
-    ++ (if (64 <=? max_byte_sz)%nat then [ret (TYPE_I 64); ret TYPE_Double] else []).
+    ++ (if (1 <=? max_byte_sz)%N then [ret (TYPE_I 8)] else [])
+    ++ (if (2 <=? max_byte_sz)%N then [ret (TYPE_I 32); ret TYPE_Float] else [])
+    ++ (if (3 <=? max_byte_sz)%N then [ret (TYPE_I 64); ret TYPE_Double] else []).
 
-Fixpoint gen_typ_le_size (max_byte_sz : nat) : GenLLVM typ :=
+(*Main method, it will generate based on the max_byte_sz
+  Currently we support, int (1,8,32,64), float, double
+  pointer, vector, array, struct, packed struct
+  Aggregate structures used the types above.*)
+Fixpoint gen_typ_le_size (max_byte_sz : N) : GenLLVM typ :=
   ctx <- get_ctx;;
-  oneOf_LLVM ((if (max_byte_sz =? 0)%nat then [] else
-                 (if (8 <=? max_byte_sz)%nat then [ x <- gen_typ_le_size max_byte_sz;;ret (TYPE_Pointer x)] else [])
-                 ++ get_prim_typ_le_size max_byte_sz
-                 ++ [sz' <- lift_GenLLVM (choose (1, BinIntDef.Z.of_nat (Nat.max (max_byte_sz - 1) 1)));;
-                     let sz' := BinIntDef.Z.to_nat sz' in
+  oneOf_LLVM ((if (max_byte_sz =? 0)%N then [] else (* Base case, max_byte_sz is zero then terminate*)
+                 (if (8 <=? max_byte_sz)%N then [x <- gen_typ_le_size max_byte_sz;;ret (TYPE_Pointer x)] else []) (* Pointer type*)
+                   ++ get_prim_typ_le_size max_byte_sz (* Primitive type*)
+                   (*Vector and Array*)
+                 ++ [sz' <- lift_GenLLVM (choose (1, BinIntDef.Z.of_N max_byte_sz ));;
+                     let sz' := BinIntDef.Z.to_N sz' in
                      t <- oneOf_LLVM (get_prim_typ_le_size (max_byte_sz / sz'));;
-                     ret (TYPE_Vector (BinNatDef.N.of_nat sz') t);
-                     sz' <- lift_GenLLVM (choose (1, BinIntDef.Z.of_nat (Nat.max (max_byte_sz - 1) 1)));;
-                     let sz' := BinIntDef.Z.to_nat sz' in
+                     ret (TYPE_Vector (sz') t);
+                     sz' <- lift_GenLLVM (choose (1, BinIntDef.Z.of_N max_byte_sz));;
+                     let sz' := BinIntDef.Z.to_N sz' in
                      t <- gen_typ_le_size (max_byte_sz / sz');;
-                     ret (TYPE_Array (BinNatDef.N.of_nat sz') t)]
-                 ++ [fields <- gen_typ_from_size_struct max_byte_sz;;
+                     ret (TYPE_Array (sz') t)]
+                 ++ [fields <- gen_typ_from_size_struct max_byte_sz;; (* Struct and Packed Struct*)
                      ret (TYPE_Struct fields);
                      fields <- gen_typ_from_size_struct max_byte_sz;;
                      ret (TYPE_Packed_struct fields)])
     ) with
-gen_typ_from_size_struct (max_byte_sz : nat) : GenLLVM (list typ) :=
+gen_typ_from_size_struct (max_byte_sz : N) : GenLLVM (list typ) :=
   subtyp <- gen_typ_le_size max_byte_sz;;
-  let sz' := (max_byte_sz - (get_size_from_typ subtyp))%nat in
+  let sz' := (max_byte_sz - (get_size_from_typ subtyp))%N in
   tl <- gen_typ_from_size_struct sz';;
   (*Get the size*)
   ret ([subtyp] ++ tl).
-
-(* Function that can work
-Fixpoint gen_typ_le_size (max_byte_sz : nat) : GenLLVM typ :=
-  ctx <- get_ctx;;
-  oneOf_LLVM ((if (max_byte_sz =? 0)%nat then [] else
-               [ret (TYPE_I 1)]
-                ++ (if (8 <=? max_byte_sz)%nat then [ret (TYPE_I 8); x <- gen_typ_le_size max_byte_sz;;ret (TYPE_Pointer x)] else [])
-                ++ (if (32 <=? max_byte_sz)%nat then [ret (TYPE_I 32); ret TYPE_Float] else [])
-                ++ (if (64 <=? max_byte_sz)%nat then [ret (TYPE_I 64); ret TYPE_Double] else [])
-                 ++ [(*sz' <- lift_GenLLVM (choose (1, BinIntDef.Z.of_nat max_byte_sz));;
-                     let sz' := BinIntDef.Z.to_nat sz' in
-                     t <- gen_typ_le_size (max_byte_sz / sz');;
-                     ret (TYPE_Vector (BinNatDef.N.of_nat sz') t);*)
-                     sz' <- lift_GenLLVM (choose (1, BinIntDef.Z.of_nat (Nat.max (max_byte_sz - 1) 1)));;
-                     let sz' := BinIntDef.Z.to_nat sz' in
-                     t <- gen_typ_le_size (max_byte_sz / sz');;
-                     ret (TYPE_Array (BinNatDef.N.of_nat sz') t)]
-                 ++ [fields <- gen_typ_from_size_struct max_byte_sz;;
-                     ret (TYPE_Struct fields);
-                     fields <- gen_typ_from_size_struct max_byte_sz;;
-                     ret (TYPE_Packed_struct fields)])
-    ) with
-gen_typ_from_size_struct (max_byte_sz : nat) : GenLLVM (list typ) :=
-  subtyp <- gen_typ_le_size max_byte_sz;;
-  let sz' := (max_byte_sz - (get_size_from_typ subtyp))%nat in
-  tl <- gen_typ_from_size_struct sz';;
-  (*Get the size*)
-  ret ([subtyp] ++ tl).*)
 
 (* How to get ptrtoint_ctx out of context*)
 Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
@@ -1104,12 +1079,9 @@ Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
     match old_tptr with
     | TYPE_Pointer old_typ => new_typ <- gen_typ_le_size (get_size_from_typ old_typ);;
                                            ret (TYPE_Pointer new_typ)
-    | TYPE_Vector sz old_tptr => match old_tptr with
-                                | TYPE_Pointer old_typ =>
-                                    new_typ <-gen_typ_le_size (get_size_from_typ old_typ);;
-                                    ret (TYPE_Pointer new_typ)
-                                | _ => ret (TYPE_Void) (*Won't reach here... Hopefully*)
-                                end
+    | TYPE_Vector sz (TYPE_Pointer old_typ) => 
+        new_typ <-gen_typ_le_size (get_size_from_typ old_typ);;
+        ret (TYPE_Pointer new_typ)
     | _ => ret (TYPE_Void) (*Won't reach here... Hopefully*)
     end in
   new_tptr <- genllvm_new_tptr;;
