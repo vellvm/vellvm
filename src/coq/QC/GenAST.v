@@ -1092,11 +1092,20 @@ Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
   let genllvm_new_tptr :=
     match old_tptr with
     | TYPE_Pointer old_typ =>
-        new_typ <- gen_typ_le_size (get_size_from_typ old_typ);;
-        ret (TYPE_Pointer new_typ)
-    | TYPE_Vector sz (TYPE_Pointer old_typ) => 
+        match old_typ with
+        | TYPE_Pointer _ =>
+            ret old_tptr
+        | _ =>
+            new_typ <- gen_typ_le_size (get_size_from_typ old_typ);;
+            ret (TYPE_Pointer new_typ)
+        end
+    | TYPE_Vector sz (TYPE_Pointer old_typ) =>
+        match old_typ with
+        | TYPE_Pointer _ => ret old_tptr
+        | _ =>
         new_typ <-gen_typ_le_size (get_size_from_typ old_typ);;
         ret (TYPE_Pointer new_typ)
+        end
     | _ => ret (TYPE_Void) (* Won't reach here... Hopefully *)
     end in
   new_tptr <- genllvm_new_tptr;;
