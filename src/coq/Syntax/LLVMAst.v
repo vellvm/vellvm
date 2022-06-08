@@ -422,6 +422,18 @@ Record global : Set :=
 }.
 
 Record declaration : Set :=
+  (* We are missing:
+     -A runtime preemption specifier     PreemptionSpecifier,
+     -An optional unnamed_addr attribute [(unnamed_addr|local_unnamed_addr)]
+     -An optional address space          [AddrSpace]
+     -Optional function attributes       [fn Attrs]
+     -Optional partition                 [partition "name"]
+     -Optional comdat                    [comdat [($name)]]
+     -Optional prefix                    [prefix Constant]
+     -Optional prologue                  [prologue Constant]
+     -Optional personality               [personality Constant]
+     -Optional list of attached metadata? (!name !N)* ?
+        *)
   mk_declaration
   {
     dc_name        : function_id;

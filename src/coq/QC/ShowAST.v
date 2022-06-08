@@ -2,7 +2,7 @@
     Show instances for Vellvm. These serialize Vellvm ASTs into the
     standard format for .ll files. The result of show on a Vellvm
     program should give you a string that can be read by clang.
-*)
+ *)
 
 From ExtLib Require Import
      Structures.Monads
@@ -642,7 +642,7 @@ Fixpoint show_typ (t : typ) : string :=
       (*Stand for return type and arguments type*)
       | TYPE_Function ret_t args_t =>
       (* It's being zipped with name of arg and then type bc of how show_arg is defined *)
-          let args := zip defn.(df_args) args_t argument_attributes in
+        let args := zip defn.(df_args) args_t argument_attributes in
           (* What is happening here? *)
                 (* Are we matching the instructions field of definition?
                    Is that why we do "df_instrs defn"? *)
@@ -653,12 +653,49 @@ Fixpoint show_typ (t : typ) : string :=
             (* We are doing concat with newline as the separator bc this represent code in the body, which obviously should be separated by lines.  *)
             | (b, bs) => concat newline (map (show_block "    ") (b::bs))
             end in
-        (* This is a function that takes in a list and makes it a string?*)
-        concatStr
-          [ "define "; show ret_t; " @"; show name; show_arg_list args; " {"; newline
-          ; blocks
-          ; "}"; newline
-          ]
+       
+        let ret_attributes :=  concat " " (map (fun x => show x) (return_attributes)) in
+        let the_linkage := defn.(df_prototype).(dc_linkage) in 
+        let printable_linkage := match the_linkage with
+                                 |None => ""
+                                 |Some l => show_linkage l
+                                 end in
+        let the_visibility := defn.(df_prototype).(dc_visibility) in 
+        let printable_visibility := match the_visibility with
+                                 |None => ""
+                                 |Some v => show_visibility v
+                                    end in
+        let the_dll_storage := defn.(df_prototype).(dc_dll_storage) in 
+        let printable_dll_storage := match the_dll_storage with
+                                 |None => ""
+                                 |Some d => show_dll_storage d
+                                     end in
+        let the_cconv := defn.(df_prototype).(dc_cconv) in 
+        let printable_cconv := match the_cconv with
+                                 |None => ""
+                                 |Some c => show_cconv c
+                               end in
+        let the_section := defn.(df_prototype).(dc_section) in 
+        let printable_section := match the_section with
+                                 |None => ""
+                                 |Some c => show c
+                                 end in
+        let the_align := defn.(df_prototype).(dc_align) in 
+        let printable_align := match the_align with
+                                 |None => ""
+                                 |Some c => show c
+                               end in
+        let the_gc := defn.(df_prototype).(dc_gc) in 
+        let printable_gc := match the_gc with
+                                 |None => ""
+                                 |Some c => show c
+                                 end in
+        
+        concatStr ["define "; printable_linkage; printable_visibility ; printable_dll_storage ;
+                   printable_cconv ; ret_attributes; show ret_t; " @"; show name; show_arg_list                   args; printable_section ; printable_align ; printable_gc ; " {"; newline ;
+                   blocks;
+                   "}";
+                   newline]
       | _ => "Invalid type on function: " ++ show name
       end.
 
