@@ -1093,7 +1093,7 @@ Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
     match old_tptr with
     | TYPE_Pointer old_typ =>
         match old_typ with
-        | TYPE_Pointer _ =>
+        | TYPE_Pointer _ => (* Double pointer issue *)
             ret old_tptr
         | _ =>
             new_typ <- gen_typ_le_size (get_size_from_typ old_typ);;
@@ -1101,10 +1101,11 @@ Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
         end
     | TYPE_Vector sz (TYPE_Pointer old_typ) =>
         match old_typ with
-        | TYPE_Pointer _ => ret old_tptr
+        | TYPE_Pointer _ =>
+            ret old_tptr
         | _ =>
-        new_typ <-gen_typ_le_size (get_size_from_typ old_typ);;
-        ret (TYPE_Pointer new_typ)
+            new_typ <-gen_typ_le_size (get_size_from_typ old_typ);;
+            ret (TYPE_Pointer new_typ)
         end
     | _ => ret (TYPE_Void) (* Won't reach here... Hopefully *)
     end in
