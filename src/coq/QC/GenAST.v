@@ -1038,15 +1038,15 @@ Fixpoint get_size_from_typ (t: typ) : nat :=
 Fixpoint gen_typ_le_size (max_byte_sz : nat) : GenLLVM typ :=
   ctx <- get_ctx;;
   oneOf_LLVM ((if (max_byte_sz =? 0)%nat then [] else
-               (if (max_byte_sz <=? 8)%nat then [ret (TYPE_I 1)] else []
-                ++ (if (max_byte_sz <=? 32)%nat then [ret (TYPE_I 8); x <- gen_typ_le_size max_byte_sz;;ret (TYPE_Pointer x)] else [])
-                ++ (if (max_byte_sz <=? 64)%nat then [ret (TYPE_I 32); ret TYPE_Float] else [])
-                ++ (if (64 <=? max_byte_sz)%nat then [ret (TYPE_I 64); ret TYPE_Double] else []))
+               [ret (TYPE_I 1)]
+                ++ (if (8 <=? max_byte_sz)%nat then [ret (TYPE_I 8); x <- gen_typ_le_size max_byte_sz;;ret (TYPE_Pointer x)] else [])
+                ++ (if (32 <=? max_byte_sz)%nat then [ret (TYPE_I 32); ret TYPE_Float] else [])
+                ++ (if (64 <=? max_byte_sz)%nat then [ret (TYPE_I 64); ret TYPE_Double] else [])
                  ++ [(*sz' <- lift_GenLLVM (choose (1, BinIntDef.Z.of_nat max_byte_sz));;
                      let sz' := BinIntDef.Z.to_nat sz' in
                      t <- gen_typ_le_size (max_byte_sz / sz');;
                      ret (TYPE_Vector (BinNatDef.N.of_nat sz') t);*)
-                     sz' <- lift_GenLLVM (choose (1, BinIntDef.Z.of_nat max_byte_sz));;
+                     sz' <- lift_GenLLVM (choose (1, BinIntDef.Z.of_nat (Nat.max (max_byte_sz - 1) 1)));;
                      let sz' := BinIntDef.Z.to_nat sz' in
                      t <- gen_typ_le_size (max_byte_sz / sz');;
                      ret (TYPE_Array (BinNatDef.N.of_nat sz') t)]
