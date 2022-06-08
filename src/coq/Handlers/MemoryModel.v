@@ -1060,6 +1060,16 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           inl "deserialize_sbytes: Attempt to deserialize void."%string
       end.
 
+    (* Serialize a uvalue into bytes and combine them into UVALUE_ConcatBytes. Useful for bitcasts.
+
+       dt should be the type of the thing you are casting to in the case of bitcasts.
+     *)
+    Definition uvalue_to_concatbytes
+               {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M} `{RAISE_OOM M}
+               (uv : uvalue) (dt : dtyp) : M uvalue :=
+      bytes <- serialize_sbytes uv dt;;
+      ret (UVALUE_ConcatBytes (map sbyte_to_extractbyte bytes) dt).
+
   (* (* TODO: *) *)
 
   (*  (*   What is the difference between a pointer and an integer...? *) *)
@@ -2026,7 +2036,7 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
   Module MemExecM := MakeMemoryExecMonad LP MP MMSP MemSpec.
   Import MemExecM.
 
-  Section MemoryPrimatives.
+  Section MemoryPrimitives.
     Context {MemM : Type -> Type}.
     Context {Eff : Type -> Type}.
     Context {ExtraState : Type}.
@@ -2123,7 +2133,7 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
     Parameter initial_memory_state_correct : initial_memory_state_prop.
     Parameter initial_frame_correct : initial_frame_prop.
     Parameter initial_heap_correct : initial_heap_prop.
-  End MemoryPrimatives.
+  End MemoryPrimitives.
 End MemoryModelExecPrimitives.
 
 Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP).

@@ -286,7 +286,14 @@ Section GenerationState.
        let new_ctx := vars ++ ctx in
        modify (replace_ctx new_ctx);;
        ret tt.
-
+  
+  Definition hide_ctx {A} (g: GenLLVM A) : GenLLVM A
+    := saved_ctx <- get_ctx;;
+       modify (replace_ctx []);;
+       a <- g;;
+       append_to_ctx saved_ctx;;
+       ret a.
+  
   Definition append_to_typ_ctx (aliases : list (ident * typ)) : GenLLVM unit
     := ctx <- get_typ_ctx;;
        let new_ctx := aliases ++ ctx in
@@ -388,8 +395,7 @@ Section TypGenerators.
         (*   ret TYPE_Function <*> gen_sized_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) *)
         ; ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
         ; ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
-          ]
-        )
+          ])
     end.
   Next Obligation.
   lia.
@@ -823,15 +829,33 @@ Fixpoint get_index_paths_aux (t_from : typ) (pre_path : list Z) {struct t_from}:
 Definition get_index_paths_ptr (t_from: typ) : list (typ * list (Z)) :=
   map (fun '(t, path) => (t, path)) (get_index_paths_aux t_from [0%Z]).
 
+
+(* Index path without getting into vector *)
+Fixpoint get_index_paths_agg_aux (t_from : typ) (pre_path : list Z) {struct t_from}: list (typ * list (Z)) :=
+  match t_from with
+  | TYPE_Array sz t =>
+  let sub_paths := get_index_paths_agg_aux t [] in (* Get index path from the first element*)
+  [(t_from, pre_path)] (* The path to the array *)
+    ++ get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path (* Assemble them into 1*)
+  | TYPE_Struct fields => [(t_from, pre_path)] ++ get_index_paths_agg_from_struct fields pre_path 0
+  | TYPE_Packed_struct fields => [(t_from, pre_path)] ++ get_index_paths_agg_from_struct fields pre_path 0
+  | t => [(t, pre_path)]
+  end with
+  get_index_paths_agg_from_struct (fields: list typ) (pre_path: list Z) (current_index : Z) {struct fields}: list (typ * list Z) :=
+  match fields with
+  | nil => nil
+  | h::t => let head_list := map (fun '(t, p) => (t, pre_path ++ [current_index] ++ p)) (get_index_paths_agg_aux h []) in
+  let tail_list := get_index_paths_agg_from_struct t pre_path (current_index + 1%Z) in
+  head_list ++ tail_list
+  end.
+
 Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
-  let edited_path := map (fun '(t, path) => match path with
-                                         | hd::tl => (t, tl)
-                                         | _ => (t, path)
-                                         end) (get_index_paths_aux t_from nil) in
-  filter (fun '(_,path) => match path with
-                        | nil => false
-                        | _ => true
-                        end) edited_path.
+  let agg_paths := get_index_paths_agg_aux t_from nil in
+  (* The method is mainly used by extractvalue and insertvalue, 
+     which requires at least one index for getting inside the aggregate type.
+     There is a possibility for us to get nil path. The filter below will get rid of that possibility.
+     Given that the nilpath will definitely be at the beginning of a list of options, we can essentially get the tail.*)
+  tl agg_paths.
 
 (*filter all the (ident, typ) in ctx such that typ is a ptr*)
 Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
@@ -871,7 +895,7 @@ Definition get_ctx_agg_typ : GenLLVM (ident * typ) :=
 Definition filter_vec_typs (ctx: list (ident * typ)) : list (ident * typ) :=
   filter (fun '(_, t) =>
             match t with
-            | TYPE_Vector sz _ => N.ltb 0 sz
+            | TYPE_Vector _ _ => true
             | _ => false
             end) ctx.
 
@@ -940,49 +964,12 @@ Definition gen_insertelement : GenLLVM (typ * instr typ) :=
   index <- lift_GenLLVM (choose (0,Z.of_N sz));;
   ret (tvec, INSTR_Op (OP_InsertElement (tvec, EXP_Ident id) (t_in_vec, value) (TYPE_I 32, EXP_Integer index))).
 
-Fixpoint gen_typ_eq (t: typ): GenLLVM (exp typ) :=
-  match t with
-  | TYPE_Array sz ty =>
-  arr <- vectorOf_LLVM (N.to_nat sz) (gen_typ_eq ty);;
-  let new_arr := map (fun ext => (ty, ext)) arr in
-  ret (EXP_Array new_arr)
-  | TYPE_Vector sz ty =>
-  arr <- vectorOf_LLVM (N.to_nat sz) (gen_typ_eq ty);;
-  let new_arr := map (fun ext => (ty, ext)) arr in
-  ret (EXP_Vector new_arr)
-  | TYPE_Struct fields => gen_typ_eq_struct fields (ret nil)
-  | TYPE_Packed_struct fields => gen_typ_eq_struct fields (ret nil)
-  | _ => gen_typ_eq_prim_typ t
-  end with
-  gen_typ_eq_struct (fields: list typ) (gFields: GenLLVM (list (typ * exp typ))) {struct fields} : GenLLVM (exp typ):=
-  match fields with
-  | nil => l <- gFields;;
-  ret (EXP_Array l)
-  | hd::tl => l <- gFields;;
-  ex <- gen_typ_eq hd;;
-  gen_typ_eq_struct tl (ret ((hd, ex)::l))
-  end.
-
-  (*let array := List.seq 0%nat (N.to_nat sz) in
-  let new_array := map (fun _ => i <- gen_typ_eq ty;;(i)) array in*)
-
-Definition gen_insertvalue : GenLLVM (typ * instr typ) :=
-  '(id, tagg) <- get_ctx_agg_typ;;
-  let paths_in_agg := get_index_paths_agg tagg in
-  '(tsub, path_for_insertvalue) <- oneOf_LLVM (map ret paths_in_agg);;
-  ex <- gen_typ_eq tsub;;
-  (* Generate all of the type*)
-  ret (tagg, INSTR_Op (OP_InsertValue (tagg, EXP_Ident id) (tsub, ex) path_for_insertvalue)).
-
 Definition genTypHelper (n: nat): G (typ) :=
   run_GenLLVM (gen_typ_non_void_size n).
 
 Definition genType: G (typ) :=
   sized genTypHelper.
-
-  (* TODO: should make it much more likely to pick an identifier for
-           better test cases *)
-
+  
   Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
     match sz with
     | 0%nat =>
@@ -1110,6 +1097,14 @@ Definition genType: G (typ) :=
   Definition gen_exp (t : typ) : GenLLVM (exp typ)
     := sized_LLVM (fun sz => gen_exp_size sz t).
 
+Definition gen_insertvalue : GenLLVM (typ * instr typ) :=
+  '(id, tagg) <- get_ctx_agg_typ;;
+  let paths_in_agg := get_index_paths_agg tagg in
+  '(tsub, path_for_insertvalue) <- oneOf_LLVM (map ret paths_in_agg);;
+  ex <- hide_ctx (gen_exp_size 0 tsub);;
+  (* Generate all of the type*)
+  ret (tagg, INSTR_Op (OP_InsertValue (tagg, EXP_Ident id) (tsub, ex) path_for_insertvalue)).
+  
   Definition gen_texp : GenLLVM (texp typ)
     := t <- gen_typ;;
        e <- gen_exp t;;
@@ -1209,9 +1204,8 @@ Section InstrGenerators.
            ret (TYPE_Pointer t, INSTR_Alloca t num_elems align)
         ] (* TODO: Generate atomic operations and other instructions *)
          ++ (if seq.nilp (filter_ptr_typs ctx) then [] else [gen_gep; gen_load; gen_store])
-         ++ (if seq.nilp (filter_agg_typs ctx) then [] else [gen_extractvalue; gen_insertvalue])).
-         (* ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])). *)
-
+         ++ (if seq.nilp (filter_agg_typs ctx) then [] else [gen_extractvalue; gen_insertvalue])
+         ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])).  
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
 

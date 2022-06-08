@@ -141,6 +141,34 @@ Module Type SerializationBase (LP : LLVMParams) (MP : MemoryParams LP).
               | None => extractbytes_to_dvalue M undef_handler ERR_M lift_ue bytes dt
               end
             else extractbytes_to_dvalue M undef_handler ERR_M lift_ue bytes dt
+        | UVALUE_InsertValue t uv elt idxs =>
+            str <- concretize_uvalueM M undef_handler ERR_M lift_ue uv;;
+            elt <- concretize_uvalueM M undef_handler ERR_M lift_ue elt;;
+            let fix loop str idxs : ERR_M dvalue :=
+              match idxs with
+              | [] => raise_error "Index was not provided"
+              | i :: nil =>
+                  v <- insert_into_str str elt i;;
+                  ret v
+              | i :: tl =>
+                  subfield <- index_into_str_dv str i;;
+                  modified_subfield <- loop subfield tl;;
+                  insert_into_str str modified_subfield i
+              end in
+            lift_ue dvalue (loop str idxs)
+        | UVALUE_ExtractElement vec_typ vec idx =>
+            dvec <- concretize_uvalueM M undef_handler ERR_M lift_ue vec;;
+            didx <- concretize_uvalueM M undef_handler ERR_M lift_ue idx;;
+            elt_typ <- match vec_typ with
+                       | DTYPE_Vector _ t => ret t
+                       | _ => lift_ue _ (raise_error "Invalid vector type for ExtractElement")
+                       end;; 
+            lift_ue dvalue (index_into_vec_dv elt_typ dvec didx)
+        | UVALUE_InsertElement vec_typ vec elt idx =>
+            dvec <- concretize_uvalueM M undef_handler ERR_M lift_ue vec;;
+            didx <- concretize_uvalueM M undef_handler ERR_M lift_ue idx;;
+            delt <- concretize_uvalueM M undef_handler ERR_M lift_ue elt;;
+            lift_ue dvalue (insert_into_vec_dv vec_typ dvec delt didx)
         | _ =>
             lift_ue dvalue
                     (raise_error
@@ -874,7 +902,34 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
         | UVALUE_ExtractByte byte dt idx sid =>
             (* TODO: maybe this is just an error? ExtractByte should be guarded by ConcatBytes? *)
             lift_ue (raise_error "Attempting to concretize UVALUE_ExtractByte, should not happen.")
-
+        | UVALUE_InsertValue t uv elt idxs =>
+            str <- concretize_uvalueM uv;;
+            elt <- concretize_uvalueM elt;;
+            let fix loop str idxs : ERR_M dvalue :=
+              match idxs with
+              | [] => raise_error "Index was not provided"
+              | i :: nil =>
+                  v <- insert_into_str str elt i;;
+                  ret v
+              | i :: tl =>
+                      subfield <- index_into_str_dv str i;;
+                      modified_subfield <- loop subfield tl;;
+                      insert_into_str str modified_subfield i
+              end in
+            lift_ue (loop str idxs)
+        | UVALUE_ExtractElement vec_typ vec idx =>
+            dvec <- concretize_uvalueM vec;;
+            didx <- concretize_uvalueM idx;;
+            elt_typ <- match vec_typ with
+                       | DTYPE_Vector _ t => ret t
+                       | _ => lift_ue (raise_error "Invalid vector type for ExtractElement")
+                       end;;
+            lift_ue (index_into_vec_dv elt_typ dvec didx)
+        | UVALUE_InsertElement vec_typ vec elt idx =>
+            dvec <- concretize_uvalueM vec;;
+            didx <- concretize_uvalueM idx;;
+            delt <- concretize_uvalueM elt;;
+            lift_ue (insert_into_vec_dv vec_typ dvec delt didx)
         | _ => lift_ue (raise_error ("concretize_uvalueM: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++ uvalue_constructor_string u))
 
         end
@@ -1025,7 +1080,34 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
             | UVALUE_ExtractByte byte dt idx sid =>
                 (* TODO: maybe this is just an error? ExtractByte should be guarded by ConcatBytes? *)
                 lift_ue (raise_error "Attempting to concretize UVALUE_ExtractByte, should not happen.")
-
+            | UVALUE_InsertValue t uv elt idxs =>
+                str <- concretize_uvalueM uv;;
+                elt <- concretize_uvalueM elt;;
+                let fix loop str idxs : ERR_M dvalue :=
+                  match idxs with
+                  | [] => raise_error "Index was not provided"
+                  | i :: nil =>
+                      v <- insert_into_str str elt i;;
+                      ret v
+                  | i :: tl =>
+                      subfield <- index_into_str_dv str i;;
+                      modified_subfield <- loop subfield tl;;
+                      insert_into_str str modified_subfield i
+                  end in
+                lift_ue (loop str idxs)
+            | UVALUE_ExtractElement vec_typ vec idx =>
+                dvec <- concretize_uvalueM vec;;
+                didx <- concretize_uvalueM idx;;
+                elt_typ <- match vec_typ with
+                           | DTYPE_Vector _ t => ret t
+                           | _ => lift_ue (raise_error "Invalid vector type for ExtractElement")
+                           end;;
+                lift_ue (index_into_vec_dv elt_typ dvec didx)
+            | UVALUE_InsertElement vec_typ vec elt idx =>
+                dvec <- concretize_uvalueM vec;;
+                didx <- concretize_uvalueM idx;;
+                delt <- concretize_uvalueM elt;;
+                lift_ue (insert_into_vec_dv vec_typ dvec delt didx)
             | _ => lift_ue (raise_error ("concretize_uvalueM: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++ uvalue_constructor_string u))
 
             end.

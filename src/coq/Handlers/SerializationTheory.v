@@ -10,7 +10,7 @@ From Vellvm Require Import
      Utils.ListUtil
      Utils.Error
      Utils.RefineProp
-     Handlers.FiniteMemory
+     Handlers.MemoryModelImplementation
      Handlers.Serialization
      Semantics.LLVMEvents
      Semantics.LLVMParams
@@ -257,9 +257,8 @@ Module SerializationTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : Serial
   Import BYTE.
   Import SIZEOF.
 
-  Module Mem := FiniteMemory.Make LP MP.
+  Module Mem := MakeFiniteMemory LP.
   Import Mem.
-  Import Mem.ESID.
 
   Import DynamicTypes.
 
@@ -293,16 +292,16 @@ Module SerializationTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : Serial
     end.
 
 
-  Ltac eval_serialize_sbytes_hyp :=
-    match goal with
-    (* Try easy case first for speedup *)
-    | H: ErrSID_evals_to
-           (serialize_sbytes ?x ?dt)
-           ?sbytes ?sid ?prov |- _ =>
-      tactic_on_non_aggregate_uvalues x ltac:(cbn in H; inv H)
-    | H: context[serialize_sbytes ?x ?dt] |- _ =>
-      tactic_on_non_aggregate_uvalues x ltac:(cbn in H; inv H)
-    end.
+  (* Ltac eval_serialize_sbytes_hyp := *)
+  (*   match goal with *)
+  (*   (* Try easy case first for speedup *) *)
+  (*   | H: ErrSID_evals_to *)
+  (*          (serialize_sbytes ?x ?dt) *)
+  (*          ?sbytes ?sid ?prov |- _ => *)
+  (*     tactic_on_non_aggregate_uvalues x ltac:(cbn in H; inv H) *)
+  (*   | H: context[serialize_sbytes ?x ?dt] |- _ => *)
+  (*     tactic_on_non_aggregate_uvalues x ltac:(cbn in H; inv H) *)
+  (*   end. *)
 
   Lemma eval_icmp_err_ub_oom_to_M :
     forall {M} `{HM : Monad M} `{HME : RAISE_ERROR M} op a b res,
@@ -1272,346 +1271,346 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
   Admitted.
 
 
-  Lemma serialize_sbytes_deserialize_sbytes :
-    forall uv dt sid prov sbytes ,
-      uvalue_has_dtyp uv dt ->
-      is_supported dt ->
-      sizeof_dtyp dt > 0 ->
-      ErrSID_evals_to (serialize_sbytes uv dt) sid prov sbytes ->
-      deserialize_sbytes sbytes dt = inr uv.
-  Proof.
-    intros uv dt sid prov sbytes TYP SUP SIZE SER.
-    induction TYP.
+(*   Lemma serialize_sbytes_deserialize_sbytes : *)
+(*     forall uv dt sid prov sbytes , *)
+(*       uvalue_has_dtyp uv dt -> *)
+(*       is_supported dt -> *)
+(*       sizeof_dtyp dt > 0 -> *)
+(*       ErrSID_evals_to (serialize_sbytes uv dt) sid prov sbytes -> *)
+(*       deserialize_sbytes sbytes dt = inr uv. *)
+(*   Proof. *)
+(*     intros uv dt sid prov sbytes TYP SUP SIZE SER. *)
+(*     induction TYP. *)
 
-    Ltac solve_deserialize_local :=
-      match goal with
-      | SER : ErrSID_evals_to _ _ _ _ |- _
-        => rewrite serialize_sbytes_equation in SER;
-          cbn in SER; inv SER; cbn;
-          erewrite from_ubytes_to_ubytes; eauto;
-          cbn in *;
-          match goal with
-          | H: context [BYTE.to_ubytes ?uv ?dt ?sid] |- _
-            => destruct (BYTE.to_ubytes uv dt sid) eqn:?;
-                       inversion H; subst; eauto  
-          end
-      end.
-
-    1-6: match goal with
-          (* Try easy case first for speedup *)
-          | |- _ = inr ?x =>
-              tactic_on_non_aggregate_uvalues x ltac:(try solve_deserialize_local)
-          end.
-
-    (* Poison arrays *)
-    { admit.
-    }
-
-    (* Poison vectors *)
-    { admit.
-    }
-
-    (* Poison structs *)
-    { admit.
-    }
-
-    { admit.
-    }
-
-    (* Poison packed structs *)
-    { admit.
-    }
-
-    { admit.
-    }
-
-    (* Poison *)
-    { destruct H as (NV & NSTRUCT & NPACKED & NARRAY & NVECTOR).
-      destruct t;
-      match goal with
-      (* Try easy case first for speedup *)
-      | |- _ = inr (UVALUE_Poison DynamicTypes.DTYPE_Void) =>
-        cbn in NV; contradiction
-      | |- _ = inr (UVALUE_Poison ?x) =>
-        tactic_on_non_aggregate_dtyps x ltac:(try solve_deserialize_local)
-      end.
-
-      all: exfalso;
-        match goal with
-        | H: _ |- _ =>
-          solve [eapply H; eauto]
-        end.
-    }
-
-    (* Undef arrays *)
-    { admit.
-    }
-
-    (* Undef vectors *)
-    { admit.
-    }
-
-    (* Undef structs *)
-    { admit.
-    }
-
-    { admit.
-    }
-
-    (* Undef packed structs *)
-    { admit.
-    }
-
-    { admit.
-    }
-
-
-    (* Undef *)
-    { destruct H as (NV & NSTRUCT & NPACKED & NARRAY & NVECTOR).
-      destruct t;
-      match goal with
-      (* Try easy case first for speedup *)
-      | |- _ = inr (UVALUE_Undef DynamicTypes.DTYPE_Void) =>
-        cbn in NV; contradiction
-      | |- _ = inr (UVALUE_Undef ?x) =>
-        tactic_on_non_aggregate_dtyps x ltac:(try solve_deserialize_local)
-      end.
-
-      all: exfalso;
-        match goal with
-        | H: _ |- _ =>
-          solve [eapply H; eauto]
-        end.
-    }
-
-    match goal with
-    (* Try easy case first for speedup *)
-    | |- _ = inr ?x =>
-      tactic_on_non_aggregate_uvalues x ltac:(try solve_deserialize_local)
-    end.    
-
-(*     { destruct t. *)
-(*       1-12: match goal with *)
-(*           (* Try easy case first for speedup *) *)
-(*           | |- _ = inr ?x => *)
-(*             tactic_on_non_aggregate_uvalues x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto)) *)
-(*           end. *)
-
-(*       (* No void undefs *) *)
-(*       contradiction. *)
-
-(*       (* Aggregates *) *)
-(*       (* Arrays *) *)
-(*       - rewrite serialize_sbytes_equation in SER. *)
-
-(*         (* Errr...  *)
-
-(*            Right hand side is:  *)
-
-(*            inr (UVALUE_Undef (DynamicTypes.DTYPE_Array sz t)) *)
-
-(*            Because this lemma is saying that if I serialize *)
-(*            UVALUE_Undef (DynamicTypes.DTYPE_Array sz t), then when I *)
-(*            deserialize the result I should get *)
-(*            UVALUE_Undef (DynamicTypes.DTYPE_Array sz t) back. *)
-
-(*            I've added special cases for aggregate types in *)
-(*            serialize_sbytes for undef so they get serialized with *)
-(*            undef for each element / field... *)
-
-(*            The problem is that when these are deserialized I should *)
-(*            get, for instance... *)
-
-(*            UVALUE_Array [UVALUE_Undef t; ... ; UVALUE_Undef t ] *)
-
-(*            Instead of just *)
-
-(*            UVALUE_Undef (DynamicTypes.DTYPE_Array sz t) *)
-
-(*            These values should be equivalent, but they have different *)
-(*            representations... *)
-(*          *) *)
-(*         (* unfold deserialize_sbytes,deserialize_sbytes_func. *) *)
-(*         (* cbn. *) *)
-(*         (* TODO: probably need an equation for rewriting *) *)
-      
+(*     Ltac solve_deserialize_local := *)
 (*       match goal with *)
+(*       | SER : ErrSID_evals_to _ _ _ _ |- _ *)
+(*         => rewrite serialize_sbytes_equation in SER; *)
+(*           cbn in SER; inv SER; cbn; *)
+(*           erewrite from_ubytes_to_ubytes; eauto; *)
+(*           cbn in *; *)
+(*           match goal with *)
+(*           | H: context [BYTE.to_ubytes ?uv ?dt ?sid] |- _ *)
+(*             => destruct (BYTE.to_ubytes uv dt sid) eqn:?; *)
+(*                        inversion H; subst; eauto   *)
+(*           end *)
+(*       end. *)
+
+(*     1-6: match goal with *)
 (*           (* Try easy case first for speedup *) *)
 (*           | |- _ = inr ?x => *)
-(*             tactic_on_non_aggregate_uvalues x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto)) *)
+(*               tactic_on_non_aggregate_uvalues x ltac:(try solve_deserialize_local) *)
 (*           end. *)
 
-(* (*       cbn. *) *)
-(* (*       match goal with *) *)
-(* (*       (* Try easy case first for speedup *) *) *)
-(* (*       | |- _ = inr ?x => *) *)
-(* (*         tactic_on_non_aggregate_uvalues x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto)) *) *)
-(* (*       end. *) *)
+(*     (* Poison arrays *) *)
+(*     { admit. *)
+(*     } *)
+
+(*     (* Poison vectors *) *)
+(*     { admit. *)
+(*     } *)
+
+(*     (* Poison structs *) *)
+(*     { admit. *)
+(*     } *)
+
+(*     { admit. *)
+(*     } *)
+
+(*     (* Poison packed structs *) *)
+(*     { admit. *)
+(*     } *)
+
+(*     { admit. *)
+(*     } *)
+
+(*     (* Poison *) *)
+(*     { destruct H as (NV & NSTRUCT & NPACKED & NARRAY & NVECTOR). *)
+(*       destruct t; *)
+(*       match goal with *)
+(*       (* Try easy case first for speedup *) *)
+(*       | |- _ = inr (UVALUE_Poison DynamicTypes.DTYPE_Void) => *)
+(*         cbn in NV; contradiction *)
+(*       | |- _ = inr (UVALUE_Poison ?x) => *)
+(*         tactic_on_non_aggregate_dtyps x ltac:(try solve_deserialize_local) *)
+(*       end. *)
+
+(*       all: exfalso; *)
+(*         match goal with *)
+(*         | H: _ |- _ => *)
+(*           solve [eapply H; eauto] *)
+(*         end. *)
+(*     } *)
+
+(*     (* Undef arrays *) *)
+(*     { admit. *)
+(*     } *)
+
+(*     (* Undef vectors *) *)
+(*     { admit. *)
+(*     } *)
+
+(*     (* Undef structs *) *)
+(*     { admit. *)
+(*     } *)
+
+(*     { admit. *)
+(*     } *)
+
+(*     (* Undef packed structs *) *)
+(*     { admit. *)
+(*     } *)
+
+(*     { admit. *)
+(*     } *)
 
 
-(* (*     } *) *)
-    
-(* (*     1-12: match goal with *) *)
+(*     (* Undef *) *)
+(*     { destruct H as (NV & NSTRUCT & NPACKED & NARRAY & NVECTOR). *)
+(*       destruct t; *)
+(*       match goal with *)
+(*       (* Try easy case first for speedup *) *)
+(*       | |- _ = inr (UVALUE_Undef DynamicTypes.DTYPE_Void) => *)
+(*         cbn in NV; contradiction *)
+(*       | |- _ = inr (UVALUE_Undef ?x) => *)
+(*         tactic_on_non_aggregate_dtyps x ltac:(try solve_deserialize_local) *)
+(*       end. *)
+
+(*       all: exfalso; *)
+(*         match goal with *)
+(*         | H: _ |- _ => *)
+(*           solve [eapply H; eauto] *)
+(*         end. *)
+(*     } *)
+
+(*     match goal with *)
+(*     (* Try easy case first for speedup *) *)
+(*     | |- _ = inr ?x => *)
+(*       tactic_on_non_aggregate_uvalues x ltac:(try solve_deserialize_local) *)
+(*     end.     *)
+
+(* (*     { destruct t. *) *)
+(* (*       1-12: match goal with *) *)
 (* (*           (* Try easy case first for speedup *) *) *)
 (* (*           | |- _ = inr ?x => *) *)
 (* (*             tactic_on_non_aggregate_uvalues x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto)) *) *)
 (* (*           end. *) *)
 
-(* (*     { cbn in SER. *) *)
-(* (*       inv SER. *) *)
-(* (*       inv SUP. *) *)
-(* (*       - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto]. *) *)
-(* (*       - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto]. *) *)
-(* (*       - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto]. *) *)
-(* (*       - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto]. *) *)
-(* (*       - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto]. *) *)
-(* (*       - (* Void... Shouldn't have void undef *) *) *)
-(* (*         rewrite sizeof_dtyp_void in SIZE. lia. *) *)
-(* (*       - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto]. *) *)
-(* (*       - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto]. *) *)
-(* (*       - (* Arrays... Aggregate types *) *) *)
-(* (*         cbn. *) *)
-(* (*         cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto]. *) *)
+(* (*       (* No void undefs *) *) *)
+(* (*       contradiction. *) *)
 
-(* (*       cbn. *) *)
-(* (*       rewrite from_ubytes_to_ubytes. *) *)
-(* (*       reflexivity. *) *)
-(* (*       unfold deserialize_sbytes, deserialize_sbytes_func. *) *)
+(* (*       (* Aggregates *) *) *)
+(* (*       (* Arrays *) *) *)
+(* (*       - rewrite serialize_sbytes_equation in SER. *) *)
 
+(* (*         (* Errr...  *) *)
 
-(* (*       match goal with          (* Try easy case first for speedup *) *) *)
-(* (*           | |- _ = inr ?x => *) *)
-(* (*             tactic_on_non_aggregate_uvalues x ltac:(try (cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto)) *) *)
-(* (*     end. *) *)
+(* (*            Right hand side is:  *) *)
 
-(* (*     cbn. *) *)
-(* (*     cbn. *) *)
+(* (*            inr (UVALUE_Undef (DynamicTypes.DTYPE_Array sz t)) *) *)
 
+(* (*            Because this lemma is saying that if I serialize *) *)
+(* (*            UVALUE_Undef (DynamicTypes.DTYPE_Array sz t), then when I *) *)
+(* (*            deserialize the result I should get *) *)
+(* (*            UVALUE_Undef (DynamicTypes.DTYPE_Array sz t) back. *) *)
 
-(* (*     cbn. *) *)
-(* (*     cbn in SER. *) *)
-(* (*     inv SER. *) *)
-(* (*     cbn. *) *)
-(* (*     rewrite from_ubytes_to_ubytes. *) *)
-(* (*     eauto. *) *)
-(* (* (*     match goal with *) *) *)
-(* (* (*           (* Try easy case first for speedup *) *) *) *)
-(* (* (*           | |- _ = inr ?x => *) *) *)
-(* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *)
-(* (* (*           end; *) *) *)
-(* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *)
-(* (* (*     match goal with *) *) *)
-(* (* (*           (* Try easy case first for speedup *) *) *) *)
-(* (* (*           | |- _ = inr ?x => *) *) *)
-(* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *)
-(* (* (*           end; *) *) *)
-(* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *)
-(* (* (*     match goal with *) *) *)
-(* (* (*           (* Try easy case first for speedup *) *) *) *)
-(* (* (*           | |- _ = inr ?x => *) *) *)
-(* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *)
-(* (* (*           end; *) *) *)
-(* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *)
-(* (* (*     match goal with *) *) *)
-(* (* (*           (* Try easy case first for speedup *) *) *) *)
-(* (* (*           | |- _ = inr ?x => *) *) *)
-(* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *)
-(* (* (*           end; *) *) *)
-(* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *)
-(* (* (*     match goal with *) *) *)
-(* (* (*           (* Try easy case first for speedup *) *) *) *)
-(* (* (*           | |- _ = inr ?x => *) *) *)
-(* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *)
-(* (* (*           end; *) *) *)
-(* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *)
-(* (* (*     match goal with *) *) *)
-(* (* (*           (* Try easy case first for speedup *) *) *) *)
-(* (* (*           | |- _ = inr ?x => *) *) *)
-(* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *)
-(* (* (*           end; *) *) *)
-(* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *)
+(* (*            I've added special cases for aggregate types in *) *)
+(* (*            serialize_sbytes for undef so they get serialized with *) *)
+(* (*            undef for each element / field... *) *)
 
-(* (* (*     - unfold deserialize_sbytes. *) *) *)
-(* (* (*       cbn. *) *) *)
-(* (* (* cbn in *; *) *) *)
-(* (* (*         destruct t. *) *) *)
-(* (* (*       cbn *) *) *)
-(* (* (*       reflexivity. *) *) *)
-(* (* (*       destruct t. *) *) *)
+(* (*            The problem is that when these are deserialized I should *) *)
+(* (*            get, for instance... *) *)
 
-(* (* (*       cbn; inv SER. *) *) *)
-(* (* (*           rewrite from_ubytes_to_ubytes; eauto. *) *) *)
+(* (*            UVALUE_Array [UVALUE_Undef t; ... ; UVALUE_Undef t ] *) *)
 
+(* (*            Instead of just *) *)
 
+(* (*            UVALUE_Undef (DynamicTypes.DTYPE_Array sz t) *) *)
 
-(* (* (*     solve [match goal with *) *) *)
-(* (* (*           (* Try easy case first for speedup *) *) *) *)
-(* (* (*           | |- _ = inr ?x => *) *) *)
-(* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *)
-(* (* (*           end; *) *) *)
-(* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto]. *) *) *)
-(* (* (*     match goal with *) *) *)
-(* (* (*           (* Try easy case first for speedup *) *) *) *)
-(* (* (*           | |- _ = inr ?x => *) *) *)
-(* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *)
-(* (* (*           end; *) *) *)
-(* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *)
-(* (* (*     match goal with *) *) *)
-(* (* (*           (* Try easy case first for speedup *) *) *) *)
-(* (* (*           | |- _ = inr ?x => *) *) *)
-(* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *)
-(* (* (*           end; *) *) *)
-(* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *)
-(* (* (*     match goal with *) *) *)
-(* (* (*           (* Try easy case first for speedup *) *) *) *)
-(* (* (*           | |- _ = inr ?x => *) *) *)
-(* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *)
-(* (* (*           end; *) *) *)
-(* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *)
-(* (* (*     match goal with *) *) *)
-(* (* (*           (* Try easy case first for speedup *) *) *) *)
-(* (* (*           | |- _ = inr ?x => *) *) *)
-(* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *)
-(* (* (*           end; *) *) *)
-(* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *)
-(* (* (*     match goal with *) *) *)
-(* (* (*           (* Try easy case first for speedup *) *) *) *)
-(* (* (*           | |- _ = inr ?x => *) *) *)
-(* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *)
-(* (* (*           end; *) *) *)
-(* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *)
-
-
-(* (* (*     49: { eval_serialize_sbytes_hyp. *) *) *)
-(* (* (*     56: { cbn in SER. destruct bytes. cbn in *. } *) *) *)
-(* (* (*     all:eval_serialize_sbytes_hyp. *) *) *)
-(* (* (*     1-30:eval_serialize_sbytes_hyp. *) *) *)
-(* (* (*     12: { *) *) *)
-(* (* (*       eval_serialize_sbytes_hyp. *) *) *)
+(* (*            These values should be equivalent, but they have different *) *)
+(* (*            representations... *) *)
+(* (*          *) *) *)
+(* (*         (* unfold deserialize_sbytes,deserialize_sbytes_func. *) *) *)
+(* (*         (* cbn. *) *) *)
+(* (*         (* TODO: probably need an equation for rewriting *) *) *)
       
-(* (* (*       rewrite serialize_sbytes_equation in SER. *) *) *)
+(* (*       match goal with *) *)
+(* (*           (* Try easy case first for speedup *) *) *)
+(* (*           | |- _ = inr ?x => *) *)
+(* (*             tactic_on_non_aggregate_uvalues x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto)) *) *)
+(* (*           end. *) *)
+
+(* (* (*       cbn. *) *) *)
+(* (* (*       match goal with *) *) *)
+(* (* (*       (* Try easy case first for speedup *) *) *) *)
+(* (* (*       | |- _ = inr ?x => *) *) *)
+(* (* (*         tactic_on_non_aggregate_uvalues x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto)) *) *) *)
+(* (* (*       end. *) *) *)
+
+
 (* (* (*     } *) *) *)
-(* (* (*     rewrite serialize_sbytes_equation in SER. *) *) *)
-(* (* (*       try solve [cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto]. *) *) *)
+    
+(* (* (*     1-12: match goal with *) *) *)
+(* (* (*           (* Try easy case first for speedup *) *) *) *)
+(* (* (*           | |- _ = inr ?x => *) *) *)
+(* (* (*             tactic_on_non_aggregate_uvalues x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto)) *) *) *)
+(* (* (*           end. *) *) *)
+
+(* (* (*     { cbn in SER. *) *) *)
+(* (* (*       inv SER. *) *) *)
+(* (* (*       inv SUP. *) *) *)
+(* (* (*       - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto]. *) *) *)
+(* (* (*       - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto]. *) *) *)
+(* (* (*       - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto]. *) *) *)
+(* (* (*       - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto]. *) *) *)
+(* (* (*       - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto]. *) *) *)
+(* (* (*       - (* Void... Shouldn't have void undef *) *) *) *)
+(* (* (*         rewrite sizeof_dtyp_void in SIZE. lia. *) *) *)
+(* (* (*       - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto]. *) *) *)
+(* (* (*       - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto]. *) *) *)
+(* (* (*       - (* Arrays... Aggregate types *) *) *) *)
+(* (* (*         cbn. *) *) *)
+(* (* (*         cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto]. *) *) *)
+
+(* (* (*       cbn. *) *) *)
+(* (* (*       rewrite from_ubytes_to_ubytes. *) *) *)
+(* (* (*       reflexivity. *) *) *)
+(* (* (*       unfold deserialize_sbytes, deserialize_sbytes_func. *) *) *)
+
+
+(* (* (*       match goal with          (* Try easy case first for speedup *) *) *) *)
+(* (* (*           | |- _ = inr ?x => *) *) *)
+(* (* (*             tactic_on_non_aggregate_uvalues x ltac:(try (cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto)) *) *) *)
+(* (* (*     end. *) *) *)
+
+(* (* (*     cbn. *) *) *)
+(* (* (*     cbn. *) *) *)
+
+
+(* (* (*     cbn. *) *) *)
+(* (* (*     cbn in SER. *) *) *)
+(* (* (*     inv SER. *) *) *)
+(* (* (*     cbn. *) *) *)
+(* (* (*     rewrite from_ubytes_to_ubytes. *) *) *)
+(* (* (*     eauto. *) *) *)
+(* (* (* (*     match goal with *) *) *) *)
+(* (* (* (*           (* Try easy case first for speedup *) *) *) *) *)
+(* (* (* (*           | |- _ = inr ?x => *) *) *) *)
+(* (* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *) *)
+(* (* (* (*           end; *) *) *) *)
+(* (* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *) *)
+(* (* (* (*     match goal with *) *) *) *)
+(* (* (* (*           (* Try easy case first for speedup *) *) *) *) *)
+(* (* (* (*           | |- _ = inr ?x => *) *) *) *)
+(* (* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *) *)
+(* (* (* (*           end; *) *) *) *)
+(* (* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *) *)
+(* (* (* (*     match goal with *) *) *) *)
+(* (* (* (*           (* Try easy case first for speedup *) *) *) *) *)
+(* (* (* (*           | |- _ = inr ?x => *) *) *) *)
+(* (* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *) *)
+(* (* (* (*           end; *) *) *) *)
+(* (* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *) *)
+(* (* (* (*     match goal with *) *) *) *)
+(* (* (* (*           (* Try easy case first for speedup *) *) *) *) *)
+(* (* (* (*           | |- _ = inr ?x => *) *) *) *)
+(* (* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *) *)
+(* (* (* (*           end; *) *) *) *)
+(* (* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *) *)
+(* (* (* (*     match goal with *) *) *) *)
+(* (* (* (*           (* Try easy case first for speedup *) *) *) *) *)
+(* (* (* (*           | |- _ = inr ?x => *) *) *) *)
+(* (* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *) *)
+(* (* (* (*           end; *) *) *) *)
+(* (* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *) *)
+(* (* (* (*     match goal with *) *) *) *)
+(* (* (* (*           (* Try easy case first for speedup *) *) *) *) *)
+(* (* (* (*           | |- _ = inr ?x => *) *) *) *)
+(* (* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *) *)
+(* (* (* (*           end; *) *) *) *)
+(* (* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *) *)
+
+(* (* (* (*     - unfold deserialize_sbytes. *) *) *) *)
+(* (* (* (*       cbn. *) *) *) *)
+(* (* (* (* cbn in *; *) *) *) *)
+(* (* (* (*         destruct t. *) *) *) *)
+(* (* (* (*       cbn *) *) *) *)
+(* (* (* (*       reflexivity. *) *) *) *)
+(* (* (* (*       destruct t. *) *) *) *)
+
+(* (* (* (*       cbn; inv SER. *) *) *) *)
+(* (* (* (*           rewrite from_ubytes_to_ubytes; eauto. *) *) *) *)
+
+
+
+(* (* (* (*     solve [match goal with *) *) *) *)
+(* (* (* (*           (* Try easy case first for speedup *) *) *) *) *)
+(* (* (* (*           | |- _ = inr ?x => *) *) *) *)
+(* (* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *) *)
+(* (* (* (*           end; *) *) *) *)
+(* (* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto]. *) *) *) *)
+(* (* (* (*     match goal with *) *) *) *)
+(* (* (* (*           (* Try easy case first for speedup *) *) *) *) *)
+(* (* (* (*           | |- _ = inr ?x => *) *) *) *)
+(* (* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *) *)
+(* (* (* (*           end; *) *) *) *)
+(* (* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *) *)
+(* (* (* (*     match goal with *) *) *) *)
+(* (* (* (*           (* Try easy case first for speedup *) *) *) *) *)
+(* (* (* (*           | |- _ = inr ?x => *) *) *) *)
+(* (* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *) *)
+(* (* (* (*           end; *) *) *) *)
+(* (* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *) *)
+(* (* (* (*     match goal with *) *) *) *)
+(* (* (* (*           (* Try easy case first for speedup *) *) *) *) *)
+(* (* (* (*           | |- _ = inr ?x => *) *) *) *)
+(* (* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *) *)
+(* (* (* (*           end; *) *) *) *)
+(* (* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *) *)
+(* (* (* (*     match goal with *) *) *) *)
+(* (* (* (*           (* Try easy case first for speedup *) *) *) *) *)
+(* (* (* (*           | |- _ = inr ?x => *) *) *) *)
+(* (* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *) *)
+(* (* (* (*           end; *) *) *) *)
+(* (* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *) *)
+(* (* (* (*     match goal with *) *) *) *)
+(* (* (* (*           (* Try easy case first for speedup *) *) *) *) *)
+(* (* (* (*           | |- _ = inr ?x => *) *) *) *)
+(* (* (* (*             tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER) *) *) *) *)
+(* (* (* (*           end; *) *) *) *)
+(* (* (* (*       cbn; rewrite from_ubytes_to_ubytes; eauto. *) *) *) *)
+
+
+(* (* (* (*     49: { eval_serialize_sbytes_hyp. *) *) *) *)
+(* (* (* (*     56: { cbn in SER. destruct bytes. cbn in *. } *) *) *) *)
+(* (* (* (*     all:eval_serialize_sbytes_hyp. *) *) *) *)
+(* (* (* (*     1-30:eval_serialize_sbytes_hyp. *) *) *) *)
+(* (* (* (*     12: { *) *) *) *)
+(* (* (* (*       eval_serialize_sbytes_hyp. *) *) *) *)
+      
+(* (* (* (*       rewrite serialize_sbytes_equation in SER. *) *) *) *)
+(* (* (* (*     } *) *) *) *)
+(* (* (* (*     rewrite serialize_sbytes_equation in SER. *) *) *) *)
+(* (* (* (*       try solve [cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto]. *) *) *) *)
 
     
-(* (* (*     induction TYP; *) *) *)
-(* (* (*       try solve [unfold serialize_sbytes in SER; *) *) *)
-(* (* (*                  inv SER; *) *) *)
-(* (* (*                  unfold deserialize_sbytes; *) *) *)
-(* (* (*                  rewrite from_ubytes_to_ubytes; eauto *) *) *)
-(* (* (*                 | cbn in *; *) *) *)
-(* (* (*                   match goal with *) *) *)
-(* (* (*                   | |- deserialize_sbytes _ ?t = _ => *) *) *)
-(* (* (*                     cbn in *; *) *) *)
-(* (* (*                     destruct t; cbn; inv SER; *) *) *)
-(* (* (*                     rewrite from_ubytes_to_ubytes; eauto *) *) *)
-(* (* (*                   end *) *) *)
-(* (* (*                 ]. *) *) *)
-(* (* (*     - inv SUP; exfalso; apply H; constructor. *) *) *)
-(* (* (*     - rewrite sizeof_dtyp_void in SIZE. inv SIZE. *) *) *)
-(* (* (*   Qed. *) *) *)
-  Admitted.
+(* (* (* (*     induction TYP; *) *) *) *)
+(* (* (* (*       try solve [unfold serialize_sbytes in SER; *) *) *) *)
+(* (* (* (*                  inv SER; *) *) *) *)
+(* (* (* (*                  unfold deserialize_sbytes; *) *) *) *)
+(* (* (* (*                  rewrite from_ubytes_to_ubytes; eauto *) *) *) *)
+(* (* (* (*                 | cbn in *; *) *) *) *)
+(* (* (* (*                   match goal with *) *) *) *)
+(* (* (* (*                   | |- deserialize_sbytes _ ?t = _ => *) *) *) *)
+(* (* (* (*                     cbn in *; *) *) *) *)
+(* (* (* (*                     destruct t; cbn; inv SER; *) *) *) *)
+(* (* (* (*                     rewrite from_ubytes_to_ubytes; eauto *) *) *) *)
+(* (* (* (*                   end *) *) *) *)
+(* (* (* (*                 ]. *) *) *) *)
+(* (* (* (*     - inv SUP; exfalso; apply H; constructor. *) *) *) *)
+(* (* (* (*     - rewrite sizeof_dtyp_void in SIZE. inv SIZE. *) *) *) *)
+(* (* (* (*   Qed. *) *) *) *)
+(*   Admitted. *)
 
     (** ** Deserialize - Serialize
         Starting from a dvalue [val] whose [dtyp] is [t], if:
@@ -1623,16 +1622,16 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
 
         The proof should go by induction over [TYP] I think, and rely on [lookup_all_index_add] notably.
      *)
-    Lemma deserialize_serialize : forall val dt sid prov bytes,
-        uvalue_has_dtyp val dt ->
-        ErrSID_evals_to (serialize_sbytes val dt) sid prov bytes ->
-        deserialize_sbytes bytes dt = inr val.
-    Proof.
-      intros val dt sid prov bytes TYP SER.
-      induction TYP.
-      - cbn in SER; inv SER.
-        cbn.
-    Admitted.
+    (* Lemma deserialize_serialize : forall val dt sid prov bytes, *)
+    (*     uvalue_has_dtyp val dt -> *)
+    (*     ErrSID_evals_to (serialize_sbytes val dt) sid prov bytes -> *)
+    (*     deserialize_sbytes bytes dt = inr val. *)
+    (* Proof. *)
+    (*   intros val dt sid prov bytes TYP SER. *)
+    (*   induction TYP. *)
+    (*   - cbn in SER; inv SER. *)
+    (*     cbn. *)
+    (* Admitted. *)
 
     (* Lemma deserialize_serialize : forall val t (TYP : dvalue_has_dtyp val t), *)
     (*     forall off (bytes : mem_block) (SUP : is_supported t), *)

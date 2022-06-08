@@ -21,7 +21,8 @@ From Vellvm Require Import
      Utils.Error
      Utils.Monads
      Utils.PropT
-     Utils.ListUtil.
+     Utils.ListUtil
+     Handlers.MemoryModelImplementation.
 
 From ExtLib Require Import
      Structures.Monads
@@ -42,8 +43,8 @@ Module Type AddrConvert (ADDR1 : ADDRESS) (ADDR2 : ADDRESS).
   Parameter addr_convert : ADDR1.addr -> OOM ADDR2.addr.
 End AddrConvert.
 
-Module FinAddrConvert : AddrConvert FiniteMemory.Addr FiniteMemory.Addr.
-  Definition addr_convert (a : FiniteMemory.Addr.addr) : OOM FiniteMemory.Addr.addr := ret a.
+Module FinAddrConvert : AddrConvert MemoryModelImplementation.Addr MemoryModelImplementation.Addr.
+  Definition addr_convert (a : MemoryModelImplementation.Addr.addr) : OOM MemoryModelImplementation.Addr.addr := ret a.
 End FinAddrConvert.
 
 Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF).
@@ -360,12 +361,54 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
 
   Hint Resolve interp_PropT__mono : paco.
 
-  (*
-    If
+  (* TODO: Move these refine_OOM_h lemmas? *)
+  Require Import Paco.paco.
+  Import Morphisms.
 
-    - ti2 is a refinement of ti1
-    - tf2 refines ti2
-    - tf1 refines tf2 at finite level
+  Lemma refine_OOM_h_L4_convert_tree :
+    forall T x_inf y_inf RR,
+      refine_OOM_h RR x_inf y_inf ->
+      refine_OOM_h RR (@L4_convert_tree T x_inf) (@L4_convert_tree T y_inf).
+  Proof.
+    intros T x y RR REF.
+    unfold L4_convert_tree in *.
+    unfold refine_OOM_h in *.
+  Admitted.
+
+  Lemma refine_OOM_h_bind :
+    forall {T R E F} (x y : itree (E +' OOME +' F) T) (RR1 : relation T) (RR2 : relation R) k,
+      (forall r1 r2, RR1 r1 r2 -> refine_OOM_h RR2 (k r1) (k r2)) ->
+      refine_OOM_h RR1 x y ->
+      refine_OOM_h RR2 (a <- x;; k a) (a <- y;; k a).
+  Proof.
+    intros T R E F x y RR1 RR2 k RK H.
+    pinversion H; subst.
+    - cbn.
+      unfold refine_OOM_h.
+      eapply interp_prop_Proper3.
+      + unfold Proper, respectful, flip, impl.
+        intros T0 R0 RR b a x0 y0 H0 x1 y1 H2 x2 y2 H3 x3 y3 H4 x4 y4 H5; subst.
+        split; intros KSEPC;
+          destruct y0 as [e | [e | e]]; cbn in *; auto.
+      + rewrite unfold_bind.
+        rewrite <- H1.
+        reflexivity.
+      + reflexivity.
+      + eapply interp_prop_Proper2.
+        * unfold Proper, respectful, flip, impl.
+          intros A R0 e ta k1 k2 x0 y0 EQ KSPEC; subst.
+          destruct e as [e | [e | e]]; cbn in *; try rewrite EQ; auto.
+        * setoid_rewrite eq2.
+          rewrite bind_ret_l.
+          reflexivity.
+        * apply RK.
+          auto.
+  Admitted.
+
+  (* If
+
+    - ti2 is a refinement of ti1 tf2 refines ti2 tf1 refines tf2 at
+    - finite level
 
     Not sure that this is true.
 
@@ -380,7 +423,8 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     In theory I can refine ti1 to ti2, and to tf1 through
     tf2... BUT... Does this mean I can refine ti1 directly to tf1?
 
-    In theory ti2 has fewer behaviours than ti1, and so if I can refine it to tf2, then I can also refine ti1 to tf2.
+    In theory ti2 has fewer behaviours than ti1, and so if I can
+    refine it to tf2, then I can also refine ti1 to tf2.
    *)
   Lemma refine_E1E2_L6_compose_inf_to_fin :
     forall tx ty tz,
@@ -415,74 +459,6 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
 
       (* There's probably a more general lemma hiding here *)
       unfold L4_convert_tree.
-      Require Import Paco.paco.
-
-      Set Nested Proofs Allowed.
-
-      Lemma refine_OOM_h_L4_convert_tree :
-        forall T x_inf y_inf RR,
-          refine_OOM_h RR x_inf y_inf ->
-          refine_OOM_h RR (@L4_convert_tree T x_inf) (@L4_convert_tree T y_inf).
-      Proof.
-        intros T x y RR REF.
-        unfold L4_convert_tree in *.
-        unfold refine_OOM_h in *.
-        rewrite unfold_interp.
-
-        punfold REF; red in REF.
-        genobs y yo.
-        (* setoid_rewrite <- Heqyo. *)
-        (* clear Heqyo. *)
-        (* clear y. *)
-
-        (* revert x REF. *)
-        (* pcofix CIH; intros x REF. *)
-
-        (* Require Import Coq.Program.Equality. *)
-        (* dependent induction REF. *)
-        (* - cbn. pstep; red. *)
-        (*   econstructor; eauto. *)
-        (*   rewrite eq2. *)
-        (*   rewrite interp_ret; reflexivity. *)
-        (* - pclearbot. punfold HS. *)
-        (*   red in HS. *)
-
-        (*   pfold; red. *)
-        (*   constructor. *)
-        (*   left. *)
-      Admitted.
-
-      Import Morphisms.
-
-      Lemma refine_OOM_h_bind :
-        forall {T R E F} (x y : itree (E +' OOME +' F) T) (RR1 : relation T) (RR2 : relation R) k,
-          (forall r1 r2, RR1 r1 r2 -> refine_OOM_h RR2 (k r1) (k r2)) ->
-          refine_OOM_h RR1 x y ->
-          refine_OOM_h RR2 (a <- x;; k a) (a <- y;; k a).
-      Proof.
-        intros T R E F x y RR1 RR2 k RK H.
-        pinversion H; subst.
-        - cbn.
-          unfold refine_OOM_h.
-          eapply interp_prop_Proper3.
-          + unfold Proper, respectful, flip, impl.
-            intros T0 R0 RR b a x0 y0 H0 x1 y1 H2 x2 y2 H3 x3 y3 H4 x4 y4 H5; subst.
-            split; intros KSEPC;
-            destruct y0 as [e | [e | e]]; cbn in *; auto.
-          + rewrite unfold_bind.
-            rewrite <- H1.
-            reflexivity.
-          + reflexivity.
-          + eapply interp_prop_Proper2.
-            * unfold Proper, respectful, flip, impl.
-              intros A R0 e ta k1 k2 x0 y0 EQ KSPEC; subst.
-              destruct e as [e | [e | e]]; cbn in *; try rewrite EQ; auto.
-            * setoid_rewrite eq2.
-              rewrite bind_ret_l.
-              reflexivity.
-            * apply RK.
-              auto.
-      Admitted.
 
       apply refine_OOM_h_L4_convert_tree.
       eapply refine_OOM_h_bind; eauto.
@@ -506,32 +482,36 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
       TLR_FIN.R.refine_L6 ty tz ->
       refine_E1E2_L6 tx tz.
   Proof.
-    intros tx ty tz XY_INF YZ_FIN.
+    intros tx ty tz XY_INF_TO_FIN YZ_FIN.
 
     unfold refine_E1E2_L6 in *.
     unfold TLR_INF.R.refine_L6 in *.
     unfold TLR_FIN.R.refine_L6 in *.
-  Abort.
+
+    intros rz TZ.
+    specialize (YZ_FIN rz TZ).
+    destruct YZ_FIN as (ry_fin & TY_FIN & YZ).
+
+    specialize (XY_INF_TO_FIN ry_fin TY_FIN).
+    destruct XY_INF_TO_FIN as (rx_fin & TX_FIN & refine_inf_fin_x).
+
+    exists rx_fin.
+    split; auto.
+    rewrite refine_inf_fin_x; auto.
+  Qed.
 
   Lemma refine_E1E2_L6_transitive :
-    forall ti1 ti2 tf2 tf1,
+    forall ti1 ti2 tf1 tf2,
       TLR_INF.R.refine_L6 ti1 ti2 ->
-      refine_E1E2_L6 ti2 tf2 ->
-      TLR_FIN.R.refine_L6 tf2 tf1 ->
-      refine_E1E2_L6 ti1 tf1.
+      refine_E1E2_L6 ti2 tf1 ->
+      TLR_FIN.R.refine_L6 tf1 tf2 ->
+      refine_E1E2_L6 ti1 tf2.
   Proof.
-    intros ti1 ti2 tf2 tf1 RINF RITOF RFIN.
+    intros ti1 ti2 tf1 tf2 RINF RITOF RFIN.
 
-    unfold refine_E1E2_L6 in *.
-    Require Import Coq.Classes.RelationClasses.
-    unfold TLR_FIN.R.refine_L6 in *.
-    unfold TLR_INF.R.refine_L6 in *.
-
-    intros t' H.
-    eexists.
-    split.
-
-  Admitted.
+    eapply refine_E1E2_L6_compose_fin_to_inf; eauto.
+    eapply refine_E1E2_L6_compose_inf_to_fin; eauto.
+  Qed.
 
   (* TODO: move this *)
   Lemma model_E1E2_L6_sound :

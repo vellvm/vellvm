@@ -131,7 +131,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
   Arguments eval_conv_pure _ _ _ _ : simpl nomatch.
 
   Definition dv_zero_initializer (t:dtyp) : err dvalue :=
-    failwith "dv_zero_initializer unimplemented".
+    default_dvalue_of_dtyp t.
 
   (** ** Ident lookups
       Look-ups depend on the nature of the [ident], that may be local or global.
