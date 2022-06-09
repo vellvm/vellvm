@@ -839,19 +839,19 @@ Section ExpGenerators.
 Fixpoint get_index_paths_from_AoV (sz: nat) (t: typ) (sub_paths: list (typ * list Z)) (pre_path: list Z): list (typ * list Z) :=
   match sz with
   | 0%nat => []
-  | S z => map (fun '(t, p) => (t, pre_path ++ [Z.of_nat z] ++ p)) sub_paths ++ get_index_paths_from_AoV z t sub_paths pre_path
+  | S z =>
+      map (fun '(t, p) => (t, pre_path ++ [Z.of_nat z] ++ p)) sub_paths ++ get_index_paths_from_AoV z t sub_paths pre_path
   end.
 
 (* Can work after extracting the pointer inside*)
 Fixpoint get_index_paths_aux (t_from : typ) (pre_path : list Z) {struct t_from}: list (typ * list (Z)) :=
   match t_from with
-  | TYPE_Array sz t =>
-  let sub_paths := get_index_paths_aux t [] in (* Get index path from the first element*)
-  [(t_from, pre_path)] (* The path to the array *)
-    ++ get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path (* Assemble them into 1*)
-  | TYPE_Vector sz t => let sub_paths := get_index_paths_aux t [] in
-  [(t_from, pre_path)] ++ get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path
-  | TYPE_Struct fields => [(t_from, pre_path)] ++ get_index_paths_from_struct fields pre_path 0
+  | TYPE_Array sz t
+  | TYPE_Vector sz t =>
+      let sub_paths := get_index_paths_aux t [] in (* Get index path from the first element*)
+      [(t_from, pre_path)] ++ (* The path to the array *)
+      get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path (* Assemble them into 1*)
+  | TYPE_Struct fields
   | TYPE_Packed_struct fields => [(t_from, pre_path)] ++ get_index_paths_from_struct fields pre_path 0
   | t => [(t, pre_path)]
   end with
@@ -871,30 +871,33 @@ Definition get_index_paths_ptr (t_from: typ) : list (typ * list (Z)) :=
 Fixpoint get_index_paths_agg_aux (t_from : typ) (pre_path : list Z) {struct t_from}: list (typ * list (Z)) :=
   match t_from with
   | TYPE_Array sz t =>
-  let sub_paths := get_index_paths_agg_aux t [] in (* Get index path from the first element*)
-  [(t_from, pre_path)] (* The path to the array *)
-    ++ get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path (* Assemble them into 1*)
-  | TYPE_Struct fields => [(t_from, pre_path)] ++ get_index_paths_agg_from_struct fields pre_path 0
-  | TYPE_Packed_struct fields => [(t_from, pre_path)] ++ get_index_paths_agg_from_struct fields pre_path 0
+      let sub_paths := get_index_paths_agg_aux t [] in (* Get index path from the first element*)
+      [(t_from, pre_path)] ++ (* The path to the array *)
+      get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path (* Assemble them into 1*)
+  | TYPE_Struct fields
+  | TYPE_Packed_struct fields =>
+      [(t_from, pre_path)] ++ get_index_paths_agg_from_struct fields pre_path 0
   | t => [(t, pre_path)]
   end with
   get_index_paths_agg_from_struct (fields: list typ) (pre_path: list Z) (current_index : Z) {struct fields}: list (typ * list Z) :=
   match fields with
   | nil => nil
-  | h::t => let head_list := map (fun '(t, p) => (t, pre_path ++ [current_index] ++ p)) (get_index_paths_agg_aux h []) in
-  let tail_list := get_index_paths_agg_from_struct t pre_path (current_index + 1%Z) in
-  head_list ++ tail_list
+  | h::t =>
+      let head_list :=
+        map (fun '(t, p) => (t, pre_path ++ [current_index] ++ p)) (get_index_paths_agg_aux h []) in
+      let tail_list := get_index_paths_agg_from_struct t pre_path (current_index + 1%Z) in
+      head_list ++ tail_list
   end.
 
+(* The method is mainly used by extractvalue and insertvalue, 
+   which requires at least one index for getting inside the aggregate type.
+   There is a possibility for us to get nil path. The filter below will get rid of that possibility.
+   Given that the nilpath will definitely be at the beginning of a list of options, we can essentially get the tail. *)
 Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
   let agg_paths := get_index_paths_agg_aux t_from nil in
-  (* The method is mainly used by extractvalue and insertvalue, 
-     which requires at least one index for getting inside the aggregate type.
-     There is a possibility for us to get nil path. The filter below will get rid of that possibility.
-     Given that the nilpath will definitely be at the beginning of a list of options, we can essentially get the tail.*)
   tl agg_paths.
 
-(*filter all the (ident, typ) in ctx such that typ is a ptr*)
+(* filter all the (ident, typ) in ctx such that typ is a ptr *)
 Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
   filter (fun '(_,t) => match t with
                         | TYPE_Pointer _ => true
@@ -946,10 +949,10 @@ Definition get_ctx_vec_typ : GenLLVM (ident * typ) :=
 
 Definition gen_gep : GenLLVM (typ * instr typ) :=
   '(id, t_in_ptr) <- get_ctx_ptr;;
-  let paths_in_ptr := get_index_paths_ptr t_in_ptr in (* Inner paths: Paths after removing the outer pointer*)
-  '(t, path) <- oneOf_LLVM (map ret paths_in_ptr);; (* Select one path from the paths*)
-  let path_for_gep := map (fun x => (TYPE_I 32, EXP_Integer (x))) path in (* Turning the path to integer*)
-   (* Refer to function get_int_typ*)
+  let paths_in_ptr := get_index_paths_ptr t_in_ptr in (* Inner paths: Paths after removing the outer pointer *)
+  '(t, path) <- oneOf_LLVM (map ret paths_in_ptr);; (* Select one path from the paths *)
+  let path_for_gep := map (fun x => (TYPE_I 32, EXP_Integer (x))) path in (* Turning the path to integer *)
+   (* Refer to function get_int_typ *)
   ret (TYPE_Pointer t, INSTR_Op (OP_GetElementPtr t_in_ptr
                     (TYPE_Pointer t_in_ptr, EXP_Ident id) path_for_gep)).
 
@@ -960,7 +963,7 @@ Definition gen_extractvalue : GenLLVM (typ * instr typ) :=
   ret (t, INSTR_Op (OP_ExtractValue (tagg, EXP_Ident id) path_for_extractvalue)).
 
 
-(* ExtractElement*)
+(* ExtractElement *)
 Definition gen_extractelement : GenLLVM (typ * instr typ) :=
   ctx <- get_ctx;;
   let vector_in_context := filter_vec_typs ctx in
@@ -975,8 +978,8 @@ Definition gen_extractelement : GenLLVM (typ * instr typ) :=
   index_for_extractelement <- oneOf_LLVM (map ret index_list);;
   ret (t_in_vec, INSTR_Op (OP_ExtractElement (tvec, EXP_Ident id) (TYPE_I 32%N, EXP_Integer (Z.of_nat (N.to_nat index_for_extractelement))))).
 
-(* Assumes input is a primitive type*)
-(* Generate the element to be inserted into vector*)
+(* Assumes input is a primitive type *)
+(* Generate the element to be inserted into vector *)
 Definition gen_typ_eq_prim_typ (t: typ): GenLLVM (exp typ) :=
   match t with
   | TYPE_I _ => i <- lift_GenLLVM (genNatInt);;
@@ -1088,40 +1091,46 @@ Fixpoint gen_typ_le_size (max_byte_sz : N) : GenLLVM typ :=
 with gen_typ_from_size_struct (max_byte_sz : N) : GenLLVM (list typ) :=
        subtyp <- gen_typ_le_size max_byte_sz;;
        let sz' := (max_byte_sz - (get_size_from_typ subtyp))%N in
-       if (sz' =? 0)%N (* If the remaining size available is 0, then it will shrink the test case to not have other subtyp appending at the end*)
+       if (sz' =? 0)%N (* If the remaining size available is 0, then it will shrink the test case to not have other subtyp appending at the end *)
        then
          ret [subtyp]
        else
          tl <- gen_typ_from_size_struct sz';;
          ret ([subtyp] ++ tl).
 
+(* A Helper function that will detect if  the type has pointer *)
 Fixpoint typ_contains_pointer (old_ptr: typ) : bool :=
   match old_ptr with
   | TYPE_Pointer _ => false
   | TYPE_Array _ t
-  | TYPE_Vector _ t => typ_contains_pointer t
-  | TYPE_Struct fields => fold_left (fun acc x => andb acc (typ_contains_pointer x)) fields true
+  | TYPE_Vector _ t =>
+      typ_contains_pointer t
+  | TYPE_Struct fields =>
+      fold_left (fun acc x => andb acc (typ_contains_pointer x)) fields true
   | _ => true
   end.
 
 Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
   ctx <- get_ptrtoint_ctx;;
   '(old_tptr, id, typ_from_cast) <- oneOf_LLVM (map ret ctx);;
-  (* In the following case, we will check whether there are double pointers in the old pointer type, we will not cast if the data structure has double pointer
-TODO: Better identify the pointer inside and cast without changing their location
-     *)
+  (* In the following case, we will check whether there are double pointers in the old pointer type, we will not cast if the data structure has double pointer *)
+  (* TODO: Better identify the pointer inside and cast without changing their location *)
   new_tptr <-
     match old_tptr with
     | TYPE_Pointer old_typ =>
         if typ_contains_pointer old_typ
-        then x <- gen_typ_le_size (get_size_from_typ old_typ);;
-             ret (TYPE_Pointer x)
-        else ret old_tptr
+        then
+          x <- gen_typ_le_size (get_size_from_typ old_typ);;
+          ret (TYPE_Pointer x)
+        else
+          ret old_tptr
     | TYPE_Vector sz (TYPE_Pointer old_typ) =>
         if typ_contains_pointer old_typ
-        then x <- gen_typ_le_size (get_size_from_typ old_typ);;
-             ret (TYPE_Pointer x)
-        else ret old_tptr
+        then
+          x <- gen_typ_le_size (get_size_from_typ old_typ);;
+          ret (TYPE_Pointer x)
+        else
+          ret old_tptr
     | _ => ret (TYPE_Void) (* Won't reach here... Hopefully *)
     end;;
   ret (new_tptr, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr)).
