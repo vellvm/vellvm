@@ -9,21 +9,33 @@ From ExtLib Require Import
      Structures.Functor
      Eqv.
 
-From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG Semantics.TopLevel Floats.
-From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils. (*Needs to be changed*)  
- 
+From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG DynamicTypes.
+
 Require Import Integers Floats.
 
-Require Import List. 
+Require Import List.
+
 Import ListNotations.
 Import MonadNotation.
 
 From Coq Require Import
-  ZArith List String Lia Bool.Bool Hexadecimal Numbers.HexadecimalString Numbers.HexadecimalZ.
+     ZArith List String Lia Bool.Bool Hexadecimal Numbers.HexadecimalString Numbers.HexadecimalZ.
 
-From QuickChick Require Import QuickChick.
-Import QcDefaultNotation. Open Scope qc_scope.
+From QuickChick Require Import Show.
+(* Import QcDefaultNotation. Open Scope qc_scope. *)
 Set Warnings "-extraction-opaque-accessed,-extraction".
+
+(*  ------------------------------------------------------------------------- *)
+(* SAZ: this function was gotten from QuickChick Test.v, but really doesn't belong there. 
+   TODO: Move somewhere saner
+*)
+Fixpoint concatStr (l : list string) : string :=
+  match l with
+    | nil => ""
+    | (h :: t) => h ++ concatStr t
+  end.
+(*  ------------------------------------------------------------------------- *)
+
 
 Section ShowInstances.
 Local Open Scope string.
@@ -731,7 +743,6 @@ Fixpoint show_typ (t : typ) : string :=
     {| show := show_declaration |}.
 *)
       
-
   Fixpoint show_metadata (md : metadata typ)  : string :=
     match md with
     | METADATA_Const tv => show tv
