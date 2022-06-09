@@ -28,8 +28,8 @@ swap:
 decc:
   store i64 %v1, i64* %p2
   store i64 %v2, i64* %p1
-  %a = sub i64 %count, 1
-  store i64 %a, i64* %i
+  %b = sub i64 %count, 1
+  store i64 %b, i64* %i
   br label %loop
 done:
   %max_ptr = getelementptr [10 x i64], [10 x i64]* %list, i32 0, i64 9
@@ -49,7 +49,7 @@ define i64 @main(i64 %argc, i8** %arcv) {
   %index9 = getelementptr [10 x i64], [10 x i64]* @glist, i32 0, i64 8
   %index10 = getelementptr [10 x i64], [10 x i64]* @glist, i32 0, i64 9
 
-  %r = call void @sort([10 x i64]* @glist)
+  call void @sort([10 x i64]* @glist)
 
   %i1 = load i64, i64* %index1
   %i2 = load i64, i64* %index2
