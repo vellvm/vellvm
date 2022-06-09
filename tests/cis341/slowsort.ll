@@ -45,9 +45,9 @@ loop:
   %valj = load i64, i64* %ptrj
   store i64 %j, i64* %iptr
   %inorder = icmp sle i64 %vali, %valj
-  br i1 %inorder, label %checkloop, label %succ
+  br i1 %inorder, label %checkloop, label %fail
 checkloop:
-  %isdone = icmp eq i64 %i, %len1
+  %isdone = icmp eq i64 %j, %len1
   br i1 %isdone, label %succ, label %loop
 fail:
   ret i1 0
