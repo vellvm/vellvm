@@ -429,13 +429,13 @@ Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
 
         ; ctx <- get_ctx;;
           let ptrs_in_ctx := filter_ptr_typs ctx in
-          if seq.nilp ptrs_in_ctx then '(_,typ) <- oneOf_LLVM (map ret ctx);; ret typ else '(_,typ) <- oneOf_LLVM (map ret ptrs_in_ctx);; ret typ
+          if seq.nilp ptrs_in_ctx then '(_,typ) <- oneOf_LLVM (map ret ctx);; ret typ else gen_sized_typ_size_ptrinctx sz' (* If not simply wait till the next size. This will prevent any failGen *)
         ])
     end.
   Next Obligation.
   lia.
   Defined.
-
+    
   Definition gen_sized_typ_ptrinctx : GenLLVM typ
     := sized_LLVM (fun sz => gen_sized_typ_size_ptrinctx sz).
   
