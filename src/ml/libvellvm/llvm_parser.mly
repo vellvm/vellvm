@@ -762,9 +762,9 @@ param_attr:
   | KW_ZEROEXT                   { PARAMATTR_Zeroext           }
   | KW_SIGNEXT                   { PARAMATTR_Signext           }
   | KW_INREG                     { PARAMATTR_Inreg             }
-  | KW_BYVAL                     { PARAMATTR_Byval             }
-  | KW_INALLOCA                  { PARAMATTR_Inalloca          }
-  | KW_SRET                      { PARAMATTR_Sret              }
+  | KW_BYVAL t=typ                     { PARAMATTR_Byval t             }
+  | KW_INALLOCA t=typ                 { PARAMATTR_Inalloca t          }
+  | KW_SRET t=typ                { PARAMATTR_Sret t            }
   | KW_ALIGN n=INTEGER           { PARAMATTR_Align n           }
   | KW_NOALIAS                   { PARAMATTR_Noalias           }
   | KW_NOCAPTURE                 { PARAMATTR_Nocapture         }
@@ -791,7 +791,13 @@ call_arg: t=typ i=exp             { (t, i t)      }
 fn_attr:
   | KW_ALIGNSTACK LPAREN p=INTEGER RPAREN { FNATTR_Alignstack p     }
   | KW_ALLOCSIZE LPAREN l=separated_nonempty_list(csep, INTEGER) RPAREN
-                                          { FNATTR_Allocsize l      }
+                                          { match l with
+					    | [] -> failwith "illegal"
+					    | x :: [] -> FNATTR_Allocsize (x, None)
+					    | x :: y :: [] -> FNATTR_Allocsize (x, Some y)
+					    | _ -> failwith "illegal too long"
+
+                                          }
   | KW_ALWAYSINLINE                       { FNATTR_Alwaysinline     }
   | KW_BUILTIN                            { FNATTR_Nobuiltin        }
   | KW_COLD                               { FNATTR_Cold             }
@@ -839,7 +845,7 @@ fn_attr:
   | KW_SSPREQ                             { FNATTR_Sspreq           }
   | KW_SSPSTRONG                          { FNATTR_Sspstrong        }
   | KW_STRICTFP                           { FNATTR_Strictfp         }
-  | KW_UWTABLE                            { FNATTR_Uwtable          }
+  | KW_UWTABLE                             { FNATTR_Uwtable true          }
   | KW_NOCF_CHECK                         { FNATTR_Nocf_check       }
   | KW_SHADOWCALLSTACK                    { FNATTR_Shadowcallstack  }
   | KW_MUSTPROGRESS                       { FNATTR_Mustprogress     }

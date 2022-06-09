@@ -589,9 +589,9 @@ and param_attr : Format.formatter -> LLVMAst.param_attr -> unit =
   | PARAMATTR_Zeroext -> pp_print_string ppf "PARAMATTR_Zeroext"
   | PARAMATTR_Signext  -> pp_print_string ppf "PARAMATTR_Signext"
   | PARAMATTR_Inreg -> pp_print_string ppf "PARAMATTR_Inreg"
-  | PARAMATTR_Byval -> pp_print_string ppf "PARAMATTR_Byval"
-  | PARAMATTR_Inalloca -> pp_print_string ppf "PARAMATTR_Inalloca"
-  | PARAMATTR_Sret -> pp_print_string ppf "PARAMATTR_Sret"
+  | PARAMATTR_Byval _ -> pp_print_string ppf "PARAMATTR_Byval"
+  | PARAMATTR_Inalloca _ -> pp_print_string ppf "PARAMATTR_Inalloca"
+  | PARAMATTR_Sret _ -> pp_print_string ppf "PARAMATTR_Sret"
   | PARAMATTR_Align n -> fprintf ppf "PARAMATTR_Align %d%%Z" (to_int n)
   | PARAMATTR_Noalias -> pp_print_string ppf "PARAMATTR_Noalias"
   | PARAMATTR_Nocapture -> pp_print_string ppf "PARAMATTR_Nocapture"
@@ -715,8 +715,8 @@ and fn_attr : Format.formatter -> LLVMAst.fn_attr -> unit =
   fun ppf ->
   function
   | FNATTR_Alignstack n -> fprintf ppf "FNATTR_Alignstack %a" llvm_int n
-  | FNATTR_Allocsize l ->
-     fprintf ppf "FNATTR_Allocsize (%a)" (pp_print_list ~pp_sep:pp_sc_space llvm_int) l
+  | FNATTR_Allocsize (l, _) ->
+     fprintf ppf "FNATTR_Allocsize" (* NOT QUITE RIGHT *)
   | FNATTR_Alwaysinline -> pp_print_string ppf "FNATTR_Alwaysinline"
   | FNATTR_Builtin -> pp_print_string ppf "FNATTR_Builtin"
   | FNATTR_Cold -> pp_print_string ppf "FNATTR_Cold"
@@ -764,7 +764,7 @@ and fn_attr : Format.formatter -> LLVMAst.fn_attr -> unit =
   | FNATTR_Sspreq -> pp_print_string ppf "FNATTR_Sspreq"
   | FNATTR_Sspstrong -> pp_print_string ppf "FNATTR_Sspstrong"
   | FNATTR_Strictfp -> pp_print_string ppf "FNATTR_Strictfp"
-  | FNATTR_Uwtable -> pp_print_string ppf "FNATTR_Uwtable"
+  | FNATTR_Uwtable _ -> pp_print_string ppf "FNATTR_Uwtable"
   | FNATTR_Nocf_check -> pp_print_string ppf "FNATTR_Nocf_check"
   | FNATTR_Shadowcallstack -> pp_print_string ppf "FNATTR_Shadowcallstack"
   | FNATTR_Mustprogress -> pp_print_string ppf "FNATTR_Mustprogress"
