@@ -348,6 +348,14 @@ Section GenerationState.
 End GenerationState.
 
 Section TypGenerators.
+
+  (*filter all the (ident, typ) in ctx such that typ is a ptr*)
+Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_,t) => match t with
+                        | TYPE_Pointer _ => true
+                        | _ => false
+                     end) ctx. 
+  
   (* TODO: These currently don't generate pointer types either. *)
 
   (* Not sized in the QuickChick sense, sized in the LLVM sense. *)
@@ -404,6 +412,33 @@ Section TypGenerators.
   Definition gen_sized_typ : GenLLVM typ
     := sized_LLVM (fun sz => gen_sized_typ_size sz).
 
+ Program Fixpoint gen_sized_typ_size_ptrinctx (sz : nat) {measure sz} : GenLLVM typ :=
+    match sz with
+    | 0%nat => gen_sized_typ_0
+    | (S sz') =>
+      oneOf_LLVM
+        ([ gen_sized_typ_0
+        (* TODO: Might want to restrict the size to something reasonable *)
+        ; ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size_ptrinctx sz'
+        ; ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_sized_typ_size_ptrinctx 0
+        (* TODO: I don't think functions are sized types? *)
+        (* ; let n := Nat.div sz 2 in *)
+        (*   ret TYPE_Function <*> gen_sized_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) *)
+        ; ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size_ptrinctx sz')
+        ; ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size_ptrinctx sz')
+
+        ; ctx <- get_ctx;;
+          let ptrs_in_ctx := filter_ptr_typs ctx in
+          if seq.nilp ptrs_in_ctx then '(_,typ) <- oneOf_LLVM (map ret ctx);; ret typ else '(_,typ) <- oneOf_LLVM (map ret ptrs_in_ctx);; ret typ
+        ])
+    end.
+  Next Obligation.
+  lia.
+  Defined.
+
+  Definition gen_sized_typ_ptrinctx : GenLLVM typ
+    := sized_LLVM (fun sz => gen_sized_typ_size_ptrinctx sz).
+  
   (* Generate a type of size 0 *)
   Definition gen_typ_0 : GenLLVM typ :=
     aliases <- get_typ_ctx;;
@@ -857,13 +892,6 @@ Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
      Given that the nilpath will definitely be at the beginning of a list of options, we can essentially get the tail.*)
   tl agg_paths.
 
-(*filter all the (ident, typ) in ctx such that typ is a ptr*)
-Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_,t) => match t with
-                        | TYPE_Pointer _ => true
-                        | _ => false
-                     end) ctx.
-
 Definition get_ctx_ptrs  : GenLLVM (list (ident * typ)) :=
   ctx <- get_ctx;;
   ret (filter_ptr_typs ctx).
@@ -1197,7 +1225,7 @@ Section InstrGenerators.
     ctx <- get_ctx;;
     oneOf_LLVM
       ([ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
-         ; t <- gen_sized_typ;;
+         ; t <- gen_sized_typ_ptrinctx;;
            (* TODO: generate multiple element allocas. Will involve changing initialization *)
            num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *)
            align <- ret None;;
@@ -1212,8 +1240,6 @@ Section InstrGenerators.
   (* TODO: want to generate phi nodes, which might be a bit
   complicated because we need to know that an id that occurs in a
   later block is in context *)
-
-
 
   Definition add_id_to_instr (t_instr : typ * instr typ) : GenLLVM (instr_id * instr typ)
     :=
