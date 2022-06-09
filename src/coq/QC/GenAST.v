@@ -1026,7 +1026,7 @@ Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
   typ_from_cast <- gen_typ_in_ptr;;
   ret (typ_from_cast, INSTR_Op (OP_Conversion Ptrtoint tptr (EXP_Ident id) typ_from_cast)).
 
-(*TODO: gen_inttoptr incomplete*)
+(* TODO: gen_inttoptr incomplete *)
 Fixpoint get_size_from_typ (t: typ) : N :=
   match t with
   | TYPE_I sz => N.max 1 (sz / 8)%N
@@ -1037,37 +1037,43 @@ Fixpoint get_size_from_typ (t: typ) : N :=
   | TYPE_Struct fields
   | TYPE_Packed_struct fields => fold_right (fun x acc => ((get_size_from_typ x) + acc)%N) 0%N fields
   | TYPE_Pointer _ => 8
-  | _ => 0
+  | _ => 1
   end.
 
-(*Assuming max_byte_sz for this function is greater than 0*)
+(* Assuming max_byte_sz for this function is greater than 0 *)
 Definition get_prim_typ_le_size (max_byte_sz: N) : list (GenLLVM typ) :=
   (if (1 <=? max_byte_sz)%N then [ret (TYPE_I 1); ret (TYPE_I 8)] else []) ++
   (if (4 <=? max_byte_sz)%N then [ret (TYPE_I 32); ret TYPE_Float] else []) ++
   (if (8 <=? max_byte_sz)%N then [ret (TYPE_I 64); ret TYPE_Double] else []).
 
-(*Main method, it will generate based on the max_byte_sz
+(* Main method, it will generate based on the max_byte_sz
   Currently we support, int (1,8,32,64), float, double
   pointer, vector, array, struct, packed struct
-  Aggregate structures used the types above.*)
+  Aggregate structures used the types above. *)
 Fixpoint gen_typ_le_size (max_byte_sz : N) : GenLLVM typ :=
   ctx <- get_ctx;;
   oneOf_LLVM
     ( (* Primitive types *)
       get_prim_typ_le_size max_byte_sz ++
       
-      (* Vector types *)
+        (* Vector types *)
+      (if (max_byte_sz =? 0)%N then [] else
       [ sz' <- lift_GenLLVM (choose (1, BinIntDef.Z.of_N max_byte_sz ));;
         let sz' := BinIntDef.Z.to_N sz' in
         t <- oneOf_LLVM (get_prim_typ_le_size (max_byte_sz / sz'));;
         ret (TYPE_Vector (sz') t)
-      ] ++
+      ]) ++
 
       (* Array types *)
-      [ sz' <- lift_GenLLVM (choose (1, BinIntDef.Z.of_N max_byte_sz));;
+      [ sz' <- lift_GenLLVM (choose (0, BinIntDef.Z.of_N max_byte_sz));;
         let sz' := BinIntDef.Z.to_N sz' in
-        t <- gen_typ_le_size (max_byte_sz / sz');;
-        ret (TYPE_Array (sz') t)
+        if (sz' =? 0)%N (* Catch 0 array*)
+        then
+          t <- oneOf_LLVM (get_prim_typ_le_size 64);; (* Only primitive type to enhance performance *)
+          ret (TYPE_Array (sz') t)
+        else
+          t <- gen_typ_le_size (max_byte_sz / sz');;
+          ret (TYPE_Array (sz') t)
       ] ++
 
       (* Structs *)
@@ -1082,34 +1088,42 @@ Fixpoint gen_typ_le_size (max_byte_sz : N) : GenLLVM typ :=
 with gen_typ_from_size_struct (max_byte_sz : N) : GenLLVM (list typ) :=
        subtyp <- gen_typ_le_size max_byte_sz;;
        let sz' := (max_byte_sz - (get_size_from_typ subtyp))%N in
-       tl <- gen_typ_from_size_struct sz';;
-       (* Get the size *)
-       ret ([subtyp] ++ tl).
+       if (sz' =? 0)%N (* If the remaining size available is 0, then it will shrink the test case to not have other subtyp appending at the end*)
+       then
+         ret [subtyp]
+       else
+         tl <- gen_typ_from_size_struct sz';;
+         ret ([subtyp] ++ tl).
+
+Fixpoint typ_contains_pointer (old_ptr: typ) : bool :=
+  match old_ptr with
+  | TYPE_Pointer _ => false
+  | TYPE_Array _ t
+  | TYPE_Vector _ t => typ_contains_pointer t
+  | TYPE_Struct fields => fold_left (fun acc x => andb acc (typ_contains_pointer x)) fields true
+  | _ => true
+  end.
 
 Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
   ctx <- get_ptrtoint_ctx;;
   '(old_tptr, id, typ_from_cast) <- oneOf_LLVM (map ret ctx);;
-  let genllvm_new_tptr :=
+  (* In the following case, we will check whether there are double pointers in the old pointer type, we will not cast if the data structure has double pointer
+TODO: Better identify the pointer inside and cast without changing their location
+     *)
+  new_tptr <-
     match old_tptr with
     | TYPE_Pointer old_typ =>
-        match old_typ with
-        | TYPE_Pointer _ => (* Double pointer issue *)
-            ret old_tptr
-        | _ =>
-            new_typ <- gen_typ_le_size (get_size_from_typ old_typ);;
-            ret (TYPE_Pointer new_typ)
-        end
+        if typ_contains_pointer old_typ
+        then x <- gen_typ_le_size (get_size_from_typ old_typ);;
+             ret (TYPE_Pointer x)
+        else ret old_tptr
     | TYPE_Vector sz (TYPE_Pointer old_typ) =>
-        match old_typ with
-        | TYPE_Pointer _ =>
-            ret old_tptr
-        | _ =>
-            new_typ <-gen_typ_le_size (get_size_from_typ old_typ);;
-            ret (TYPE_Pointer new_typ)
-        end
+        if typ_contains_pointer old_typ
+        then x <- gen_typ_le_size (get_size_from_typ old_typ);;
+             ret (TYPE_Pointer x)
+        else ret old_tptr
     | _ => ret (TYPE_Void) (* Won't reach here... Hopefully *)
-    end in
-  new_tptr <- genllvm_new_tptr;;
+    end;;
   ret (new_tptr, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr)).
 
 Definition genTypHelper (n: nat): G (typ) :=
