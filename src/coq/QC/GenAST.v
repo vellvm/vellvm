@@ -1059,7 +1059,7 @@ Fixpoint gen_typ_le_size (max_byte_sz : N) : GenLLVM typ :=
     ( (* Primitive types *)
       get_prim_typ_le_size max_byte_sz ++
       
-        (* Vector types *)
+      (* Vector type *)
       (if (max_byte_sz =? 0)%N then [] else
       [ sz' <- lift_GenLLVM (choose (1, BinIntDef.Z.of_N max_byte_sz ));;
         let sz' := BinIntDef.Z.to_N sz' in
@@ -1067,7 +1067,7 @@ Fixpoint gen_typ_le_size (max_byte_sz : N) : GenLLVM typ :=
         ret (TYPE_Vector (sz') t)
       ]) ++
 
-      (* Array types *)
+      (* Array type *)
       [ sz' <- lift_GenLLVM (choose (0, BinIntDef.Z.of_N max_byte_sz));;
         let sz' := BinIntDef.Z.to_N sz' in
         if (sz' =? 0)%N (* Catch 0 array*)
@@ -1079,12 +1079,12 @@ Fixpoint gen_typ_le_size (max_byte_sz : N) : GenLLVM typ :=
           ret (TYPE_Array (sz') t)
       ] ++
 
-      (* Structs *)
+      (* Struct type *)
       [fields <- gen_typ_from_size_struct max_byte_sz;;
        ret (TYPE_Struct fields)
       ] ++
 
-      (* Packed structs *)
+      (* Packed struct type *)
       [fields <- gen_typ_from_size_struct max_byte_sz;;
        ret (TYPE_Packed_struct fields)
       ])
@@ -1101,13 +1101,14 @@ with gen_typ_from_size_struct (max_byte_sz : N) : GenLLVM (list typ) :=
 (* A Helper function that will detect if  the type has pointer *)
 Fixpoint typ_contains_pointer (old_ptr: typ) : bool :=
   match old_ptr with
-  | TYPE_Pointer _ => false
+  | TYPE_Pointer _ => true
   | TYPE_Array _ t
   | TYPE_Vector _ t =>
       typ_contains_pointer t
-  | TYPE_Struct fields =>
-      fold_left (fun acc x => andb acc (typ_contains_pointer x)) fields true
-  | _ => true
+  | TYPE_Struct fields
+  | TYPE_Packed_struct fields =>
+      fold_left (fun acc x => orb acc (typ_contains_pointer x)) fields false
+  | _ => false
   end.
 
 Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
@@ -1120,17 +1121,17 @@ Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
     | TYPE_Pointer old_typ =>
         if typ_contains_pointer old_typ
         then
+          ret old_tptr
+        else
           x <- gen_typ_le_size (get_size_from_typ old_typ);;
           ret (TYPE_Pointer x)
-        else
-          ret old_tptr
     | TYPE_Vector sz (TYPE_Pointer old_typ) =>
         if typ_contains_pointer old_typ
         then
+          ret old_tptr
+        else
           x <- gen_typ_le_size (get_size_from_typ old_typ);;
           ret (TYPE_Pointer x)
-        else
-          ret old_tptr
     | _ => ret (TYPE_Void) (* Won't reach here... Hopefully *)
     end;;
   ret (new_tptr, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr)).
