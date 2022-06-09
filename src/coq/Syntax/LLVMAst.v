@@ -131,6 +131,7 @@ Variant param_attr : Set :=
 | PARAMATTR_Align (a:int)
 | PARAMATTR_Noalias
 | PARAMATTR_Nocapture
+| PARAMATTR_Readonly      
 | PARAMATTR_Nofree      
 | PARAMATTR_Nest
 | PARAMATTR_Returned
@@ -405,6 +406,13 @@ Variant terminator : Set :=
 
 
 Record global : Set :=
+  (* We are missing:
+     -An optional runtime preemption specifier     PreemptionSpecifier,
+     -An optional initializer constant [<InitializerConstant>]
+     -An optional partition            [, partition "name"]
+     -An optional comdat               [, comdat [($name)]]
+     -Optional list of attached metadata? (, !name !N)* ?
+        *)
   mk_global {
       g_ident        : global_id;
       g_typ          : T;
@@ -415,15 +423,14 @@ Record global : Set :=
       g_dll_storage  : option dll_storage;
       g_thread_local : option thread_local_storage;
       g_unnamed_addr : bool;
-      g_addrspace    : option int;
-      g_externally_initialized: bool;
+      g_addrspace    : option int;      g_externally_initialized: bool;
       g_section      : option string;
       g_align        : option int;
 }.
 
 Record declaration : Set :=
   (* We are missing:
-     -A runtime preemption specifier     PreemptionSpecifier,
+     -An optional runtime preemption specifier     PreemptionSpecifier,
      -An optional unnamed_addr attribute [(unnamed_addr|local_unnamed_addr)]
      -An optional address space          [AddrSpace]
      -Optional function attributes       [fn Attrs]

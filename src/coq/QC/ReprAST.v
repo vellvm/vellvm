@@ -437,7 +437,7 @@ Section ReprInstances.
     | PARAMATTR_Align a => "(PARAMATTR_Align " ++ repr a ++ ")"
     | PARAMATTR_Noalias => "PARAMATTR_Noalias"
     | PARAMATTR_Nocapture => "PARAMATTR_Nocapture"
-   (* | PARAMATTR_Readonly => "PARAMATTR_Readonly" *)
+    | PARAMATTR_Readonly => "PARAMATTR_Readonly" 
     | PARAMATTR_Nest => "PARAMATTR_Nest"
     | PARAMATTR_Returned => "PARAMATTR_Returned"
     | PARAMATTR_Nonnull => "PARAMATTR_Nonnull"
