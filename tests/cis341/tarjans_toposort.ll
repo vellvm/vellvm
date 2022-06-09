@@ -130,4 +130,4 @@ define i1 @main(i64 %argc, i8** %argv) {
   ret i1 %1
 }
 
-; ASSERT EQ: i64 1 = call i64 @main(i64 0, i8** null)
+; ASSERT EQ: i1 1 = call i1 @main(i64 0, i8** null)
