@@ -40,6 +40,10 @@ Fixpoint concatStr (l : list string) : string :=
 Section ShowInstances.
 Local Open Scope string.
 
+
+  Context {T : Set}.
+  Context `{Show T}.
+  
   Definition show_raw_id (rid : raw_id) : string
     := match rid with
        | Name s => s
@@ -454,7 +458,7 @@ Fixpoint show_typ (t : typ) : string :=
   Global Instance ShowConversionType : Show conversion_type
     := {| show := show_conversion_type |}.
   
-  Fixpoint show_exp (v : exp typ) :=
+  Fixpoint show_exp (v : exp T) :=
       match v with
       | EXP_Ident id => show id
       | EXP_Integer x => show x
@@ -516,24 +520,24 @@ Fixpoint show_typ (t : typ) : string :=
       end.
 
   
-  Global Instance showExp : Show (exp typ)
+  Global Instance showExp : Show (exp T)
     := {| show := show_exp |}.
 
-  Global Instance showTExp : Show (texp typ)
+  Global Instance showTExp : Show (texp T)
     := {| show te :=
             match te with
             | (t, e) => show t ++ " " ++ show e
             end
        |}.
 
-  Definition show_phi_block (p : block_id * exp typ) : string :=
+  Definition show_phi_block (p : block_id * exp T) : string :=
     let '(bid, e) := p in
     "[ " ++ show e ++ ", " ++ "%" ++ show bid ++ " ]".
 
   Definition intersperse (sep : string) (l : list string) : string
     := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else s ++ sep ++ acc) l "".
 
-  Global Instance showPhi : Show (phi typ)
+  Global Instance showPhi : Show (phi T)
     := {| show p :=
             let '(Phi t phis) := p in
             "phi " ++ show t ++ " " ++ intersperse ", " (map show_phi_block phis)
@@ -546,7 +550,7 @@ Fixpoint show_typ (t : typ) : string :=
        | Some a => prefix ++ show a
        end.
 
-  Definition show_instr (i : instr typ) : string
+  Definition show_instr (i : instr T) : string
     := match i with
        | INSTR_Comment s => "; " ++ s
        | INSTR_Op e => show e
@@ -559,7 +563,7 @@ Fixpoint show_typ (t : typ) : string :=
        | _ => "show_instr todo"
        end.
 
-  Global Instance showInstr : Show (instr typ)
+  Global Instance showInstr : Show (instr T)
     := {| show := show_instr |}.
 
   Global Instance showInstrId : Show instr_id
@@ -570,7 +574,7 @@ Fixpoint show_typ (t : typ) : string :=
             end
        |}.
 
-  Definition show_instr_id (inst : instr_id * instr typ) : string
+  Definition show_instr_id (inst : instr_id * instr T) : string
     :=
       let '(iid, i) := inst in
       match iid with
@@ -580,30 +584,50 @@ Fixpoint show_typ (t : typ) : string :=
           show i
       end.
 
-  Global Instance showInstrWithId : Show (instr_id * instr typ)
+  Global Instance showInstrWithId : Show (instr_id * instr T)
     := {| show := show_instr_id |}.
 
-  Definition show_terminator (t : terminator typ) : string
+  
+  Definition show_tint_literal (t : tint_literal) : string :=
+    match t with
+    (* typo? *) 
+    | TInt_Literal sz x => show sz ++ show x ++ "What is a tint_literal anyway?"
+    end.
+
+  Global Instance showTintLiteral : Show tint_literal :=
+    {| show := show_tint_literal |}. 
+
+  (* To-do: add new terminators *) 
+  Definition show_terminator (t : terminator T) : string
     := match t with
        | TERM_Ret v => "ret " ++ show v
        | TERM_Ret_void => "ret"
        | TERM_Br te b1 b2 =>
          "br " ++ show te ++ ", label %" ++ show b1 ++ ", label %" ++ show b2
-       | TERM_Br_1 b =>
-         "br label %" ++ show b
-       | _ => "show_terminator todo"
+       | TERM_Br_1 b => "br label %" ++ show b
+       | TERM_Switch v def_dest brs =>
+           "switch " ++ show v ++ ", label " ++ show def_dest
+             ++ show (map (fun '(x, y) => show x ++ ", label " ++ show y) brs)
+       | TERM_IndirectBr v brs => "indirectbr " ++ (fun '(x, y) => show x ++ "*" ++ show y) v
+                                                ++ show (map (fun x => "label " ++ show x) brs) 
+       | TERM_Resume v => "resume " ++ show v 
+       | TERM_Invoke fnptrval args to_label unwind_label => "invoke " ++ show fnptrval
+                                                              ++ "(" ++ show args ++ ")"
+                                                              ++ "to label " ++ show to_label
+                                                              ++ "unwind label " ++ show unwind_label
+       | TERM_Unreachable => "unreachable" 
        end.
 
-  Global Instance showTerminator : Show (terminator typ)
+  Global Instance showTerminator : Show (terminator T)
     := {| show := show_terminator |}.
 
-  Definition show_code (indent : string) (c : code typ) : string
+  Definition show_code (indent : string) (c : code T) : string
     := concatStr (map (fun iid => indent ++ show_instr_id iid ++ newline) c).
 
-  Global Instance showCode : Show (code typ)
+  Global Instance showCode : Show (code T)
      := {| show := show_code "    " |}.
   
-  Definition show_block (indent : string) (b : block typ) : string
+  Definition show_block (indent : string) (b : block T) : string
     :=
       let phis   := concatStr (map (fun '(l, p) => indent ++ "%" ++ show l ++ " = " ++ show p ++ newline) (blk_phis b)) in
       let code   := show_code indent (blk_code b) in
@@ -613,25 +637,25 @@ Fixpoint show_typ (t : typ) : string :=
            ++ code
            ++ term.
 
-  Global Instance showBlock: Show (block typ) :=
+  Global Instance showBlock: Show (block T) :=
     {|
     show := show_block "    "
     |}.
 
-  Definition show_typ_instr (typ_instr: typ * instr typ) : string :=
+  Definition show_typ_instr (typ_instr: typ * instr T) : string :=
     let (t, i) := typ_instr in
     "(" ++ (show t) ++ ", " ++ (show i) ++ ")".
 
-  Global Instance showTypInstr: Show (typ * instr typ) :=
+  Global Instance showTypInstr: Show (typ * instr T) :=
     {|
     show := show_typ_instr
     |}.
   
-  Definition show_arg (arg : local_id * typ * list param_attr) : string
+  Definition show_arg (arg : local_id * T * list param_attr) : string
     := let '(i, t, parameter_attributes) := arg in
        show t ++ concat " " (map (fun x => show x) (parameter_attributes)) ++ " %" ++ show i.
 
-  Definition show_arg_list (args : list (local_id * typ * list param_attr)) : string
+  Definition show_arg_list (args : list (local_id * T * list param_attr)) : string
     :=
       let arg_str := concat ", " (map show_arg args) in
       concatStr ["("; arg_str; ")"].
@@ -644,6 +668,21 @@ Fixpoint show_typ (t : typ) : string :=
        | _, _, [] => []    
        | (x::xs), (y::ys), (z::zs) => (x, y, z) :: zip xs ys zs
        end.
+
+   Fixpoint show_metadata (md : metadata T)  : string :=
+    match md with
+    | METADATA_Const tv => show tv
+    | METADATA_Null => "null"
+    | METADATA_Id i => "!" ++ show i
+    | METADATA_String s => "!" ++ show s   
+    | METADATA_Named strs => "!{" ++ show (intersperse " , " (List.map (fun x => "!" ++ x) strs)) ++ "}" 
+    | METADATA_Node mds => "!{" ++ show (intersperse " , " (List.map show_metadata mds)) ++ "}" 
+    end. 
+
+  Global Instance showMetadata (md : metadata T) : Show (metadata T) :=
+    {| show := show_metadata |}. 
+
+  End ShowInstances. 
 
   Definition show_definition (defn : definition typ (block typ * list (block typ))) : string
     :=
@@ -753,7 +792,7 @@ Fixpoint show_typ (t : typ) : string :=
     let printable_g_or_c := if global_or_constant then "constant" else "global" in
     let printable_section := match g.(g_section) with
                             | None => ""
-                            | Some s =>  ", section " ++ show s
+                            | Some s =>  concatStr[", section ";  show s]
                             end in
     let printable_align :=  match g.(g_align) with
                                 | None => ""
@@ -766,65 +805,67 @@ Fixpoint show_typ (t : typ) : string :=
   Global Instance showGlobal : Show (global typ) :=
       {| show := show_global |}.
   
-  (* Write the type of decl *)
+
   Definition show_declaration (decl: declaration typ) : string :=
-    "". 
-    (* let name := decl.(dc_name) in
-    let ftype := decl.(dc_type) in
-    match ftype with
-    |TYPE_Function ret_t args_t =>
-       let args := zip defn.(df_args) args_t in
-       (* declaration doesn't have df_instr like definition does *)
-        (* let blocks :=
-            match df_instrs defn with
-            | (b, bs) => concat newline (map (show_block "    ") (b::bs))
-            end in *)
-       concatStr
-         (*Should this even have curly braces? The one example I found, the one in the manual, doesn't*)
-          [ "declare "; show ret_t; " @"; show name; show_arg_list args; " {"; newline
-          ; blocks
-          ; "}"; newline
-          ]
-    | _ => "Invalid type on function: " ++ show name
-    end.
-*)
+   let name := decl.(dc_name) in
+   let (ret_attrs, args_attrs) := decl.(dc_param_attrs) in
+   match decl.(dc_type) with
+    | TYPE_Function ret_t args_t =>
+   let link := match decl.(dc_linkage) with
+               | None => ""
+               | Some l => show_linkage l
+               end in
+   let vis := match decl.(dc_visibility) with
+              | None => ""
+              | Some w => show_visibility w
+              end in
+   let dll := match decl.(dc_dll_storage) with
+              | None => ""
+              | Some d => show_dll_storage d
+              end in
+   let cc := match decl.(dc_cconv) with
+             | None => ""
+             | Some c => show_cconv c
+             end in                  
+   let sec := match decl.(dc_section) with
+              | None => ""
+              | Some s => concatStr["section \"; s; "\"]
+              end in
+   let all := match decl.(dc_align) with
+              | None => ""
+              | Some a => concatStr["align "; show a]
+              end in
+   let gc := match decl.(dc_gc) with
+             | None => ""
+             | Some g => concatStr["gc \"; g; "\"]
+             end in                      
+   concatStr ["declare "; link; " "; vis; " "; dll; " "; cc; " ";
+              show (intersperse " " (List.map show ret_attrs)); 
+              show ret_t; " @"; show name; 
+              "("; show (intersperse ", " (List.map show (List.combine args_t args_attrs)));
+              sec; all; gc] 
+   | _ => "Invalid type on function: " ++ show name
+   end.                                     
 
-  (* Is it ok if I just write decl as the parameter of Show? In showDefinition they don't write defn but rather the type of defn*)
-  (*
-  Global Instance showDeclaration: Show (decl) :=
+  Global Instance showDeclaration: Show (declaration typ) :=
     {| show := show_declaration |}.
-   *)
 
-  Fixpoint show_metadata (md : metadata typ)  : string :=
-    match md with
-    | METADATA_Const tv => show tv
-    | METADATA_Null => "null"
-    | METADATA_Id i => "!" ++ show i
-    | METADATA_String s => "!" ++ show s   
-    | METADATA_Named strs => "!{" ++ show (intersperse " , " (List.map (fun x => "!" ++ x) strs)) ++ "}" 
-    | METADATA_Node mds => "!{" ++ show (intersperse " , " (List.map show_metadata mds)) ++ "}" 
-    end. 
 
-  Global Instance showMetadata (md : metadata typ) : Show (metadata typ) :=
-    {| show := show_metadata |}. 
+ 
     
   Definition show_tle (tle : toplevel_entity typ (block typ * list (block typ))) : string
     := match tle with
          (*Why is show_definition rather than show being used here*)
        | TLE_Definition defn => show defn
-       | TLE_Comment msg => ";" ++ show msg (*What if the comment is multiple lines? Each line is supposed to have a semicolon. How do we handle that?*)
+       | TLE_Comment msg => ";" ++ show msg
        | TLE_Target tgt => show tgt
        | TLE_Datalayout layout => show layout
-       | TLE_Source_filename s => "source_filename = " ++ show s
-                                                      (*
-       | TLE_Declaration decl => show_declaration decl
-                                                       *)
-
-                                                      
-       | TLE_Global g => show_global g
+       | TLE_Source_filename s => "source_filename = " ++ show s                                      
+       | TLE_Declaration decl => show decl                                                        
+       | TLE_Global g => show g
+       | TLE_Metadata id md => "!" ++ show id ++ show_metadata md                        
        | TLE_Type_decl id t => concatStr ["% " ; show_ident id ;  "= type " ; show t ]
        | TLE_Attribute_group i attrs => concatStr ["attributes #" ; show i ; " = { " ; concat " " (map (fun x => show x) (attrs)) ; " }"  ]              
-       | _ => "todo: show_tle"
        end.
 
   Global Instance showTLE: Show (toplevel_entity typ (block typ * list (block typ))) :=
@@ -833,4 +874,3 @@ Fixpoint show_typ (t : typ) : string :=
   Global Instance showProg : Show (list (toplevel_entity typ (block typ * list (block typ)))) :=
     {| show tles := concat (newline ++ newline) (map show_tle tles) |}.
 
-End ShowInstances.
