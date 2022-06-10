@@ -365,14 +365,44 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
   Require Import Paco.paco.
   Import Morphisms.
 
+  #[local] Notation E1 := (E1.ExternalCallE +' OOME +' UBE +' DebugE +' FailureE).
+  #[local] Notation E2 := (E2.ExternalCallE +' OOME +' UBE +' DebugE +' FailureE).
+  #[local] Notation OOM_h := (refine_OOM_handler (F:=_)).
+  #[local] Notation OOM_spec := (@oom_k_spec _ _).
+
+  Instance refine_OOM_h_eq_itree {E F T RR} : Proper (eq_itree eq ==> eq_itree eq ==> iff) (@refine_OOM_h E F T RR).
+  Admitted.
+
   Lemma refine_OOM_h_L4_convert_tree :
     forall T x_inf y_inf RR,
       refine_OOM_h RR x_inf y_inf ->
       refine_OOM_h RR (@L4_convert_tree T x_inf) (@L4_convert_tree T y_inf).
   Proof.
-    intros T x y RR REF.
+    (*
+    intros T x y RR.
+    unfold L4_convert_tree.
+    unfold InterpreterStackBigIntptr.LP.Events.L4 in *.
+    rewrite (unfold_interp y).
+    revert x y.
+    pcofix R.
+    intros t u REF.
+    punfold REF.
+    pfold.
+    red.
+    red in REF.
+    induction REF.
+    - cbn.
+      apply Interp_PropT_Ret with r2.
+      auto.
+      rewrite eq2, interp_ret.
+      reflexivity.
+    - cbn.
+
+
     unfold L4_convert_tree in *.
+
     unfold refine_OOM_h in *.
+     *)
   Admitted.
 
   Lemma refine_OOM_h_bind :
