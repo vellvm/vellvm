@@ -41,10 +41,11 @@ Section ShowInstances.
 Local Open Scope string.
 
 
-  Context {T : Set}.
+  Context {T:Set}.
   Context `{Show T}.
-  
-  Definition show_raw_id (rid : raw_id) : string
+
+
+ Definition show_raw_id (rid : raw_id) : string
     := match rid with
        | Name s => s
        | Anon i => show i
@@ -187,7 +188,7 @@ Fixpoint show_typ (t : typ) : string :=
     | PARAMATTR_Noalias => "noalias" 
     | PARAMATTR_Nocapture => "nocapture"
     | PARAMATTR_Readonly => "readonly"                          
-    | PARAMATTR_Nofree => "nofree"                           
+    | PARAMATTR_Nofree => "nofree"                        
     | PARAMATTR_Nest => "nest"
     | PARAMATTR_Returned => "returned"
     | PARAMATTR_Nonnull => "nonnull"
@@ -206,7 +207,6 @@ Fixpoint show_typ (t : typ) : string :=
     Global Instance showParamAttr : Show param_attr
     := { show := show_param_attr }.
 
-    (* unimplemented: frame-pointer patchable-function, key_value *) 
    Definition show_fn_attr (f : fn_attr) : string :=
     match f with 
     | FNATTR_Alignstack a => "alignstack(" ++ show a ++ ")"
@@ -587,7 +587,6 @@ Fixpoint show_typ (t : typ) : string :=
   Global Instance showInstrWithId : Show (instr_id * instr T)
     := {| show := show_instr_id |}.
 
-  
   Definition show_tint_literal (t : tint_literal) : string :=
     match t with
     (* typo? *) 
@@ -642,20 +641,20 @@ Fixpoint show_typ (t : typ) : string :=
     show := show_block "    "
     |}.
 
-  Definition show_typ_instr (typ_instr: typ * instr T) : string :=
+  Definition show_typ_instr (typ_instr: T * instr T) : string :=
     let (t, i) := typ_instr in
     "(" ++ (show t) ++ ", " ++ (show i) ++ ")".
 
-  Global Instance showTypInstr: Show (typ * instr T) :=
+  Global Instance showTypInstr: Show (T * instr T) :=
     {|
     show := show_typ_instr
     |}.
   
-  Definition show_arg (arg : local_id * T * list param_attr) : string
+  Definition show_arg (arg : local_id * typ * list param_attr) : string
     := let '(i, t, parameter_attributes) := arg in
        show t ++ concat " " (map (fun x => show x) (parameter_attributes)) ++ " %" ++ show i.
 
-  Definition show_arg_list (args : list (local_id * T * list param_attr)) : string
+  Definition show_arg_list (args : list (local_id * typ * list param_attr)) : string
     :=
       let arg_str := concat ", " (map show_arg args) in
       concatStr ["("; arg_str; ")"].
@@ -669,7 +668,7 @@ Fixpoint show_typ (t : typ) : string :=
        | (x::xs), (y::ys), (z::zs) => (x, y, z) :: zip xs ys zs
        end.
 
-   Fixpoint show_metadata (md : metadata T)  : string :=
+  Fixpoint show_metadata (md : metadata T)  : string :=
     match md with
     | METADATA_Const tv => show tv
     | METADATA_Null => "null"
@@ -682,7 +681,7 @@ Fixpoint show_typ (t : typ) : string :=
   Global Instance showMetadata (md : metadata T) : Show (metadata T) :=
     {| show := show_metadata |}. 
 
-  End ShowInstances. 
+End ShowInstances.
 
   Definition show_definition (defn : definition typ (block typ * list (block typ))) : string
     :=
@@ -744,7 +743,8 @@ Fixpoint show_typ (t : typ) : string :=
                                  end in
         
         concatStr ["define "; printable_linkage; printable_visibility ; printable_dll_storage ;
-                   printable_cconv ; ret_attributes; show ret_t; " @"; show name; show_arg_list                   args; printable_section ; printable_align ; printable_gc ; " {"; newline ;
+                   printable_cconv ; ret_attributes; show ret_t; " @"; show name; show_arg_list args;
+                   printable_section ; printable_align ; printable_gc ; " {"; newline ;
                    blocks;
                    "}";
                    newline]
@@ -754,58 +754,7 @@ Fixpoint show_typ (t : typ) : string :=
   Global Instance showDefinition: Show (definition typ (block typ * list (block typ))) :=
     {| show := show_definition |}.
 
-  Definition show_global (g : global typ) : string :=
-    let name  := g.(g_ident) in
-    let gtype := g.(g_typ) in
-    let the_linkage := g.(g_linkage) in   
-    let printable_linkage := match the_linkage with                               
-                             |None => ""                                       
-                             |Some l => show_linkage l                                          
-                             end in
-    let the_visibility := g.(g_visibility) in   
-    let printable_visibility := match the_visibility with                               
-                             |None => ""                                       
-                             |Some l => show_visibility l                                       
-                                end in
-    let the_dll_storage := g.(g_dll_storage) in    
-    let printable_dll_storage := match the_dll_storage with                               
-                             |None => ""                                       
-                             |Some l => show_dll_storage l                                      
-                                 end in
-    let the_thread_local := g.(g_thread_local) in
-    let printable_thread_local := match the_thread_local with                               
-                             |None => ""                                       
-                             |Some l => show_thread_local_storage l                             
-                                  end in
-    
-    let the_unnamed_addr := g.(g_unnamed_addr) in
-    let printable_unnamed_addr := if the_unnamed_addr then "unnamed_addr" else "local_unnamed_addr" in
-    let the_addrspace := g.(g_addrspace) in
-    let printable_addrspace := match the_addrspace with                               
-                             |None => ""                                       
-                             |Some x => show x                              
-                                 end in
-    let the_externally_initialized := g.(g_externally_initialized) in
-    (* Based on example in Global Variables section *)
-    let printable_externally_initialized := if the_externally_initialized then "external" else "" in
-    let global_or_constant := g.(g_constant) in
-    let printable_g_or_c := if global_or_constant then "constant" else "global" in
-    let printable_section := match g.(g_section) with
-                            | None => ""
-                            | Some s =>  concatStr[", section ";  show s]
-                            end in
-    let printable_align :=  match g.(g_align) with
-                                | None => ""
-                                | Some s => show s
-                                end in                                                                      
-    concatStr ["@ "; show name ; "=" ; printable_linkage ; printable_visibility ; printable_dll_storage ; printable_thread_local ; printable_unnamed_addr ; printable_addrspace ; printable_externally_initialized ; printable_g_or_c ; show gtype ;  printable_section ; printable_align ].
-               
-      
-
-  Global Instance showGlobal : Show (global typ) :=
-      {| show := show_global |}.
-  
-
+  (* Why can I not make show functions implicit?  *) 
   Definition show_declaration (decl: declaration typ) : string :=
    let name := decl.(dc_name) in
    let (ret_attrs, args_attrs) := decl.(dc_param_attrs) in
@@ -850,27 +799,78 @@ Fixpoint show_typ (t : typ) : string :=
   Global Instance showDeclaration: Show (declaration typ) :=
     {| show := show_declaration |}.
 
-
- 
+  Definition show_global (g : global typ) : string :=
+    let name  := g.(g_ident) in
+    let gtype := g.(g_typ) in
+    let the_linkage := g.(g_linkage) in   
+    let printable_linkage := match the_linkage with                               
+                             |None => ""                                       
+                             |Some l => show_linkage l                                          
+                             end in
+    let the_visibility := g.(g_visibility) in   
+    let printable_visibility := match the_visibility with                               
+                             |None => ""                                       
+                             |Some l => show_visibility l                                       
+                                end in
+    let the_dll_storage := g.(g_dll_storage) in    
+    let printable_dll_storage := match the_dll_storage with                               
+                             |None => ""                                       
+                             |Some l => show_dll_storage l                                      
+                                 end in
+    let the_thread_local := g.(g_thread_local) in
+    let printable_thread_local := match the_thread_local with                               
+                             |None => ""                                       
+                             |Some l => show_thread_local_storage l                             
+                                  end in
     
+    let the_unnamed_addr := g.(g_unnamed_addr) in
+    let printable_unnamed_addr := if the_unnamed_addr then "unnamed_addr" else "local_unnamed_addr" in
+    let the_addrspace := g.(g_addrspace) in
+    let printable_addrspace := match the_addrspace with                               
+                             |None => ""                                       
+                             |Some x => show x                              
+                                 end in
+    let the_externally_initialized := g.(g_externally_initialized) in
+    (* Based on example in Global Variables section *)
+    let printable_externally_initialized := if the_externally_initialized then "external" else "" in
+    let global_or_constant := g.(g_constant) in
+    let printable_g_or_c := if global_or_constant then "constant" else "global" in
+    let printable_section := match g.(g_section) with
+                            | None => ""
+                            | Some s => concatStr[", section "; show s]
+                            end in
+    let printable_align :=  match g.(g_align) with
+                                | None => ""
+                                | Some s => show s
+                                end in                                                                      
+    concatStr ["@ "; show name ; "=" ; printable_linkage ; printable_visibility ; printable_dll_storage ; printable_thread_local ; printable_unnamed_addr ;
+               printable_addrspace ; printable_externally_initialized ; printable_g_or_c ; show gtype ;  printable_section ; printable_align ].
+               
+      
+
+  Global Instance showGlobal : Show (global typ) :=
+    {| show := show_global |}.
+
+  
   Definition show_tle (tle : toplevel_entity typ (block typ * list (block typ))) : string
     := match tle with
          (*Why is show_definition rather than show being used here*)
        | TLE_Definition defn => show defn
-       | TLE_Comment msg => ";" ++ show msg
+       | TLE_Comment msg => ";" ++ show msg (*What if the comment is multiple lines? *)
        | TLE_Target tgt => show tgt
        | TLE_Datalayout layout => show layout
-       | TLE_Source_filename s => "source_filename = " ++ show s                                      
-       | TLE_Declaration decl => show decl                                                        
+       | TLE_Source_filename s => "source_filename = " ++ show s
+       | TLE_Declaration decl => show decl
        | TLE_Global g => show g
-       | TLE_Metadata id md => "!" ++ show id ++ show_metadata md                        
+       | TLE_Metadata id md => "!" ++ show id ++ show_metadata md (* Can't use implicit *)                                                           
        | TLE_Type_decl id t => concatStr ["% " ; show_ident id ;  "= type " ; show t ]
        | TLE_Attribute_group i attrs => concatStr ["attributes #" ; show i ; " = { " ; concat " " (map (fun x => show x) (attrs)) ; " }"  ]              
        end.
 
-  Global Instance showTLE: Show (toplevel_entity typ (block typ * list (block typ))) :=
+  Global Instance showTLE: Show (toplevel_entity typ (block typ  * list (block typ))) :=
     {| show := show_tle |}.
 
   Global Instance showProg : Show (list (toplevel_entity typ (block typ * list (block typ)))) :=
-    {| show tles := concat (newline ++ newline) (map show_tle tles) |}.
+    {| show tles := concat (newline ++ newline) (map show_tle tles) |}. 
 
+  
