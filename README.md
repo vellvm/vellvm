@@ -106,9 +106,9 @@ Our current test-suite of LLVM programs for which we compare our semantics again
 # Installing / Compiling Vellvm
 
 ### Assumes: 
-  - Coq: version 8.15 (installed via *opam*, see below)
+  - Coq: version 8.15.0 (installed via *opam*, see below)
   - OCaml: version 4.12.0 (installed via *opam*, see below)
-  - opam: version 2.0.8.
+  - opam: version 2.0.8+.
     It is available via [homebrew](https://brew.sh/) on Mac, and most system's package managers on Linux, e.g. `sudo apt-get install opam`.
     If this is the first time you are using opam you need to initialize it: 
     + On Linux: `opam init`
@@ -119,19 +119,19 @@ Our current test-suite of LLVM programs for which we compare our semantics again
     `opam switch create vellvm ocaml-base-compiler.4.12.0`.
   - Clang 7.0.1+ (available for Mac OSX in XCode 4.2+, or installed via, e.g. `sudo apt-get install clang`)
   - External Coq libraries: 
-    * ext-lib    (installed via, e.g. `opam install coq-ext-lib`)
-    * paco       (installed via, e.g. `opam install coq-paco`)
-    * itrees     (installed via, e.g. `opam install coq-itree`)
-    * flocq      (installed via, e.g. `opam install coq-flocq`) 
-    * ceres      (installed via, e.g. `opam install coq-ceres`)
-    * mathcomp   (installed via, e.g. `opam install coq-mathcomp-ssreflect`)
-    * simple-io  (installed via, e.g. `opam install coq-simple-io`)
+    * ext-lib         (installed via, e.g. `opam install coq-ext-lib`)
+    * paco            (installed via, e.g. `opam install coq-paco`)
+    * itrees          (installed via, e.g. `opam install coq-itree`)
+    * flocq == 4.0.0  (installed via, e.g. `opam pin add coq-flocq 4.0.0` then selecting `y`)
+    * ceres           (installed via, e.g. `opam install coq-ceres`)
+    * mathcomp        (installed via, e.g. `opam install coq-mathcomp-ssreflect`)
+    * simple-io       (installed via, e.g. `opam install coq-simple-io`)
 
   - Additional opam packages: 
-    * ocamlbuild (installed via, e.g. `opam install ocamlbuild`)
-    * dune       (installed via, e.g. `opam install dune`)
-    * menhir     (installed via, e.g. `opam install menhir`)
-    * qcheck     (installed via, e.g. `opam install qcheck`)
+    * ocamlbuild     (installed via, e.g. `opam install ocamlbuild`)
+    * dune == 3.0.3  (installed via, e.g. `opam pin add dune 3.0.3` then selecting `y`) 
+    * menhir         (installed via, e.g. `opam install menhir`)
+    * qcheck         (installed via, e.g. `opam install qcheck`)
 
 Compilation:
 

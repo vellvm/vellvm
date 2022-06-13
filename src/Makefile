@@ -86,6 +86,9 @@ rm-qc-test-vo:
 
 .PHONY: opam
 opam:
+	opam pin add dune 3.0.3
+	opam pin add coq 8.15.0
+	opam pin add coq-flocq 4.0.0
 	opam install $(OPAMPKGS)
 
 .PHONY: coqinterp
