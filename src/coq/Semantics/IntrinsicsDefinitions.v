@@ -102,6 +102,38 @@ Definition memcpy_8_decl: declaration typ :=
     dc_gc          := None
   |}.
 
+Definition malloc_decl: declaration typ :=
+  let pt := TYPE_Pointer (TYPE_I 8%N) in
+  let i64 := TYPE_I 64%N in
+  {|
+    dc_name        := Name "malloc";
+    dc_type        := TYPE_Function pt [i64] ;
+    dc_param_attrs := ([], [[];[];[];[];[]]);
+    dc_linkage     := None ;
+    dc_visibility  := None ;
+    dc_dll_storage := None ;
+    dc_cconv       := None ;
+    dc_attrs       := [] ;
+    dc_section     := None ;
+    dc_align       := None ;
+    dc_gc          := None
+  |}.
+
+Definition free_decl: declaration typ :=
+  let pt := TYPE_Pointer (TYPE_I 8%N) in
+  {|
+    dc_name        := Name "free";
+    dc_type        := TYPE_Function TYPE_Void [pt] ;
+    dc_param_attrs := ([], [[];[];[];[];[]]);
+    dc_linkage     := None ;
+    dc_visibility  := None ;
+    dc_dll_storage := None ;
+    dc_cconv       := None ;
+    dc_attrs       := [] ;
+    dc_section     := None ;
+    dc_align       := None ;
+    dc_gc          := None
+  |}.  
 
 Definition maxnum_64_decl: declaration typ :=
   {|
@@ -168,7 +200,7 @@ Definition minimum_32_decl: declaration typ :=
    2. It includes declarations for built-in memory-dependent intrinisics such as `memcpy`.
  *)
 Definition defined_intrinsics_decls :=
-  [ fabs_32_decl; fabs_64_decl; maxnum_32_decl ; maxnum_64_decl; minimum_32_decl; minimum_64_decl; memcpy_8_decl ].
+  [ fabs_32_decl; fabs_64_decl; maxnum_32_decl ; maxnum_64_decl; minimum_32_decl; minimum_64_decl; memcpy_8_decl; malloc_decl; free_decl ].
 
 (* This functor module provides a way to (extensibly) add the semantic behavior
    for intrinsics defined outside of the core Vellvm operational semantics.
