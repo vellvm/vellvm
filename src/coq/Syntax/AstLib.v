@@ -771,7 +771,10 @@ Ltac unfold_eqv :=
 Definition intrinsic_ident (id:ident) : option string :=
   match id with
   | ID_Global (Name s) =>
-    if String.prefix "llvm." s then Some s else None
+      if orb (orb (String.prefix "llvm." s)
+                  (Coqlib.proj_sumbool (string_dec "malloc" s)))
+             (Coqlib.proj_sumbool (string_dec "free" s))
+      then Some s else None
   | _ => None
   end.
 
