@@ -385,6 +385,47 @@ Section GenerationState.
 End GenerationState.
 
 Section TypGenerators.
+
+  (*filter all the (ident, typ) in ctx such that typ is a ptr*)
+Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_, t) => match t with
+                        | TYPE_Pointer _ => true
+                        | _ => false
+                     end) ctx. 
+
+Definition filter_sized_typs (typ_ctx: list (ident * typ)) (ctx : list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_, t) => is_sized_type typ_ctx t) ctx.
+
+Definition filter_non_void_typs (ctx : list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_, t) => match t with
+                      | TYPE_Void => false
+                      | _ => true
+                      end) ctx.
+
+Definition filter_agg_typs (ctx: list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_, t) =>
+            match t with
+            | TYPE_Array sz _ => N.ltb 0 sz
+            | TYPE_Struct l
+            | TYPE_Packed_struct l => negb (seq.nilp l)
+            | _ => false
+            end ) ctx.
+
+Definition filter_vec_typs (ctx: list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_, t) =>
+            match t with
+            | TYPE_Vector _ _ => true
+            | _ => false
+            end) ctx.
+
+Definition filter_ptr_vecptr_typ (ctx: list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_, t) =>
+            match t with
+            | TYPE_Pointer _ => true
+            | TYPE_Vector _ (TYPE_Pointer _) => true
+            | _ => false
+            end) ctx.
+
   (* TODO: These currently don't generate pointer types either. *)
 
   (* Not sized in the QuickChick sense, sized in the LLVM sense. *)
@@ -415,23 +456,27 @@ Section TypGenerators.
                 (* ; TYPE_Metadata *)
                 (* ; TYPE_X86_mmx *)
                 (* ; TYPE_Opaque *)
-                ])).
-
+           ])).
+  
   Program Fixpoint gen_sized_typ_size (sz : nat) {measure sz} : GenLLVM typ :=
     match sz with
     | O => gen_sized_typ_0
     | (S sz') =>
-      oneOf_LLVM
-        ([ gen_sized_typ_0
-        ; ret TYPE_Pointer <*> gen_sized_typ_size sz'
+        ctx <- get_ctx;;
+        aliases <- get_typ_ctx;;
+        let typs_in_ctx := map (fun '(_, typ) => ret typ) (filter_sized_typs aliases ctx) in
+        freq_LLVM
+        ([(min (List.length typs_in_ctx) 10, oneOf_LLVM typs_in_ctx)] ++
+         [(1%nat, gen_sized_typ_0)
+        ; (1%nat, ret TYPE_Pointer <*> gen_sized_typ_size sz')
         (* TODO: Might want to restrict the size to something reasonable *)
-        ; ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size sz'
-        ; ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_sized_typ_size 0
+        ; (1%nat, ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size sz')
+        ; (1%nat, ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_sized_typ_size 0)
         (* TODO: I don't think functions are sized types? *)
         (* ; let n := Nat.div sz 2 in *)
         (*   ret TYPE_Function <*> gen_sized_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) *)
-        ; ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
-        ; ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
+        ; (1%nat, ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz'))
+        ; (1%nat, ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz'))
           ])
     end.
   Next Obligation.
@@ -441,6 +486,32 @@ Section TypGenerators.
   Definition gen_sized_typ : GenLLVM typ
     := sized_LLVM (fun sz => gen_sized_typ_size sz).
 
+ Program Fixpoint gen_sized_typ_size_ptrinctx (sz : nat) {measure sz} : GenLLVM typ :=
+    match sz with
+    | 0%nat => gen_sized_typ_0
+    | (S sz') =>
+        ctx <- get_ctx;;
+        aliases <- get_typ_ctx;;
+        let typs_in_ctx := map (fun '(_, typ) => ret typ) (filter_sized_typs aliases ctx) in
+        freq_LLVM
+        ([(min (List.length typs_in_ctx) 10, oneOf_LLVM typs_in_ctx)] ++
+        [(1%nat, gen_sized_typ_0)
+        (* TODO: Might want to restrict the size to something reasonable *)
+        ; (1%nat, ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size_ptrinctx sz')
+        ; (1%nat, ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_sized_typ_size_ptrinctx 0)
+        (* TODO: I don't think functions are sized types? *)
+        (* ; let n := Nat.div sz 2 in *)
+        (*   ret TYPE_Function <*> gen_sized_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) *)
+        ; (1%nat, ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size_ptrinctx sz'))
+        ; (1%nat, ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size_ptrinctx sz'))])
+    end.
+  Next Obligation.
+  lia.
+  Defined.
+    
+  Definition gen_sized_typ_ptrinctx : GenLLVM typ
+    := sized_LLVM (fun sz => gen_sized_typ_size_ptrinctx sz).
+  
   (* Generate a type of size 0 *)
   Definition gen_typ_0 : GenLLVM typ :=
     aliases <- get_typ_ctx;;
@@ -476,17 +547,22 @@ Section TypGenerators.
   Program Fixpoint gen_typ_size (sz : nat) {measure sz} : GenLLVM typ :=
     match sz with
     | 0%nat => gen_typ_0
-    | (S sz') => oneOf_LLVM
-                      [ gen_typ_0
-                      (* Might want to restrict the size to something reasonable *)
-                      (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
-                      ; ret TYPE_Array <*> lift genN <*> gen_sized_typ_size sz'
-                      ; ret TYPE_Vector <*> (n <- lift_GenLLVM genN;;ret (n + 1)%N) <*> gen_sized_typ_size 0
-                      ; let n := Nat.div sz 2 in
-                        ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n)
-                      ; ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
-                      ; ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
-                      ]
+    | (S sz') =>
+        ctx <- get_ctx;;
+        (* not filter sized types for this one *)
+        let typs_in_ctx := map (fun '(_, typ) =>ret typ) ctx in
+        freq_LLVM
+        ([(min (List.length typs_in_ctx) 10, oneOf_LLVM typs_in_ctx)] ++
+        [ (1%nat, gen_typ_0) (* TODO: Not sure if I need to add it here *)
+        (* Might want to restrict the size to something reasonable *)
+        (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
+        ; (1%nat, ret TYPE_Array <*> lift genN <*> gen_sized_typ_size sz')
+        ; (1%nat, ret TYPE_Vector <*> (n <- lift_GenLLVM genN;;ret (n + 1)%N) <*> gen_sized_typ_size 0)
+        ; let n := Nat.div sz 2 in
+        (1%nat, ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n))
+        ; (1%nat, ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz'))
+        ; (1%nat, ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz'))
+        ])
     end.
   Next Obligation.
     cbn.
@@ -530,31 +606,40 @@ Section TypGenerators.
   Program Fixpoint gen_typ_non_void_size (sz : nat) {measure sz} : GenLLVM typ :=
     match sz with
     | 0%nat => gen_typ_non_void_0
-    | (S sz') => oneOf_LLVM
-                      [ gen_typ_non_void_0
-                      (* Might want to restrict the size to something reasonable *)
-                      (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
-                      ; ret TYPE_Array <*> lift genN <*> gen_sized_typ_size sz'
-                      ; ret TYPE_Vector <*> (n <- lift_GenLLVM genN;;ret (n + 1)%N) <*> gen_sized_typ_size 0
-                      ; let n := Nat.div sz 2 in
-                        ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n)
-                      ; ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
-                      ; ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
-                      ]
+    | (S sz') =>
+        ctx <- get_ctx;;
+        let typs_in_ctx := map (fun '(_, typ) => ret typ) (filter_non_void_typs ctx) in
+        freq_LLVM
+        ([(min (List.length typs_in_ctx) 10, oneOf_LLVM typs_in_ctx)] ++
+        [ (1%nat, gen_typ_non_void_0)
+        (* Might want to restrict the size to something reasonable *)
+        (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
+        ; (1%nat, ret TYPE_Array <*> lift genN <*> gen_sized_typ_size sz')
+        ; (1%nat, ret TYPE_Vector <*> (n <- lift_GenLLVM genN;;ret (n + 1)%N) <*> gen_sized_typ_size 0)
+        ; let n := Nat.div sz 2 in
+        (1%nat, ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n))
+        ; (1%nat, ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz'))
+        ; (1%nat, ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz'))
+          ])
     end.
 
   Program Fixpoint gen_typ_non_void_size_wo_fn (sz : nat) {measure sz} : GenLLVM typ :=
   match sz with
   | 0%nat => gen_typ_non_void_0
-  | (S sz') => oneOf_LLVM
-                    [ gen_typ_non_void_0
-                    (* Might want to restrict the size to something reasonable *)
-                    (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
-                    ; ret TYPE_Array <*> lift genN <*> gen_sized_typ_size sz'
-                    ; ret TYPE_Vector <*> (n <- lift_GenLLVM genN;;ret (n + 1)%N) <*> gen_sized_typ_size 0
-                    ; ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
-                    ; ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
-                    ]
+  | (S sz') =>
+      ctx <- get_ctx;;
+      aliases <- get_typ_ctx;;
+      let typs_in_ctx := map (fun '(_, typ) => ret typ) (filter_sized_typs aliases ctx) in
+      freq_LLVM
+      ([(min (List.length typs_in_ctx) 10, oneOf_LLVM typs_in_ctx)] ++
+      [ (1%nat, gen_typ_non_void_0)
+      (* Might want to restrict the size to something reasonable *)
+      (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
+      ; (1%nat, ret TYPE_Array <*> lift genN <*> gen_sized_typ_size sz')
+      ; (1%nat, ret TYPE_Vector <*> (n <- lift_GenLLVM genN;;ret (n + 1)%N) <*> gen_sized_typ_size 0)
+      ; (1%nat, ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz'))
+      ; (1%nat, ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz'))
+      ])
   end.
 
   (* TODO: look up identifiers *)
@@ -901,13 +986,6 @@ Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
   let agg_paths := get_index_paths_agg_aux t_from nil in
   tl agg_paths.
 
-(* filter all the (ident, typ) in ctx such that typ is a ptr *)
-Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_,t) => match t with
-                        | TYPE_Pointer _ => true
-                        | _ => false
-                     end) ctx.
-
 Definition get_ctx_ptrs  : GenLLVM (list (ident * typ)) :=
   ctx <- get_ctx;;
   ret (filter_ptr_typs ctx).
@@ -920,14 +998,6 @@ Definition get_ctx_ptr : GenLLVM (ident * typ) :=
   | _ => lift failGen (* Should not happen *)
   end.
 
-Definition filter_agg_typs (ctx: list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_, t) => match t with
-  | TYPE_Array sz _ => N.ltb 0 sz
-  | TYPE_Struct l
-  | TYPE_Packed_struct l => negb (seq.nilp l)
-  | _ => false
-  end ) ctx.
-
 Definition get_ctx_agg_typs : GenLLVM (list (ident * typ)) :=
   ctx <- get_ctx;;
   ret (filter_agg_typs ctx).
@@ -935,13 +1005,6 @@ Definition get_ctx_agg_typs : GenLLVM (list (ident * typ)) :=
 Definition get_ctx_agg_typ : GenLLVM (ident * typ) :=
   aggs_in_context <- get_ctx_agg_typs;;
   oneOf_LLVM (map ret aggs_in_context).
-
-Definition filter_vec_typs (ctx: list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_, t) =>
-            match t with
-            | TYPE_Vector _ _ => true
-            | _ => false
-            end) ctx.
 
 Definition get_ctx_vec_typs : GenLLVM (list (ident * typ)) :=
   ctx <- get_ctx;;
@@ -1006,15 +1069,6 @@ Definition gen_insertelement : GenLLVM (typ * instr typ) :=
   value <- gen_typ_eq_prim_typ t_in_vec;;
   index <- lift_GenLLVM (choose (0,Z.of_N sz));;
   ret (tvec, INSTR_Op (OP_InsertElement (tvec, EXP_Ident id) (t_in_vec, value) (TYPE_I 32, EXP_Integer index))).
-
-(* TODO: code for ptrtoint incomplete *)
-Definition filter_ptr_vecptr_typ (ctx: list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_, t) =>
-            match t with
-            | TYPE_Pointer _ => true
-            | TYPE_Vector _ (TYPE_Pointer _) => true
-            | _ => false
-            end) ctx.
 
 Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
   ctx <- get_ctx;;
@@ -1374,7 +1428,7 @@ Section InstrGenerators.
     ptrtoint_ctx <- get_ptrtoint_ctx;;
     oneOf_LLVM
       ([ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
-         ; t <- gen_sized_typ;;
+         ; t <- gen_sized_typ_ptrinctx;;
            (* TODO: generate multiple element allocas. Will involve changing initialization *)
            num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *)
            align <- ret None;;
