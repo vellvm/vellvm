@@ -388,13 +388,43 @@ Section TypGenerators.
 
   (*filter all the (ident, typ) in ctx such that typ is a ptr*)
 Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_,t) => match t with
+  filter (fun '(_, t) => match t with
                         | TYPE_Pointer _ => true
                         | _ => false
                      end) ctx. 
 
 Definition filter_sized_typs (typ_ctx: list (ident * typ)) (ctx : list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_,t) => is_sized_type typ_ctx t) ctx.
+  filter (fun '(_, t) => is_sized_type typ_ctx t) ctx.
+
+Definition filter_non_void_typs (ctx : list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_, t) => match t with
+                      | TYPE_Void => false
+                      | _ => true
+                      end) ctx.
+
+Definition filter_agg_typs (ctx: list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_, t) =>
+            match t with
+            | TYPE_Array sz _ => N.ltb 0 sz
+            | TYPE_Struct l
+            | TYPE_Packed_struct l => negb (seq.nilp l)
+            | _ => false
+            end ) ctx.
+
+Definition filter_vec_typs (ctx: list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_, t) =>
+            match t with
+            | TYPE_Vector _ _ => true
+            | _ => false
+            end) ctx.
+
+Definition filter_ptr_vecptr_typ (ctx: list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_, t) =>
+            match t with
+            | TYPE_Pointer _ => true
+            | TYPE_Vector _ (TYPE_Pointer _) => true
+            | _ => false
+            end) ctx.
 
   (* TODO: These currently don't generate pointer types either. *)
 
@@ -426,8 +456,8 @@ Definition filter_sized_typs (typ_ctx: list (ident * typ)) (ctx : list (ident * 
                 (* ; TYPE_Metadata *)
                 (* ; TYPE_X86_mmx *)
                 (* ; TYPE_Opaque *)
-                ])).
-
+           ])).
+  
   Program Fixpoint gen_sized_typ_size (sz : nat) {measure sz} : GenLLVM typ :=
     match sz with
     | O => gen_sized_typ_0
@@ -575,8 +605,7 @@ Definition filter_sized_typs (typ_ctx: list (ident * typ)) (ctx : list (ident * 
     | 0%nat => gen_typ_non_void_0
     | (S sz') =>
         ctx <- get_ctx;;
-        aliases <- get_typ_ctx;;
-        let typs_in_ctx := map (fun '(_, typ) => (1%nat, ret typ)) (filter_sized_typs aliases ctx) in
+        let typs_in_ctx := map (fun '(_, typ) => (1%nat, ret typ)) (filter_non_void_typs ctx) in
         freq_LLVM        
           (typs_in_ctx ++[ (1%nat, gen_typ_non_void_0)
               (* Might want to restrict the size to something reasonable *)
@@ -964,14 +993,6 @@ Definition get_ctx_ptr : GenLLVM (ident * typ) :=
   | _ => lift failGen (* Should not happen *)
   end.
 
-Definition filter_agg_typs (ctx: list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_, t) => match t with
-  | TYPE_Array sz _ => N.ltb 0 sz
-  | TYPE_Struct l
-  | TYPE_Packed_struct l => negb (seq.nilp l)
-  | _ => false
-  end ) ctx.
-
 Definition get_ctx_agg_typs : GenLLVM (list (ident * typ)) :=
   ctx <- get_ctx;;
   ret (filter_agg_typs ctx).
@@ -979,13 +1000,6 @@ Definition get_ctx_agg_typs : GenLLVM (list (ident * typ)) :=
 Definition get_ctx_agg_typ : GenLLVM (ident * typ) :=
   aggs_in_context <- get_ctx_agg_typs;;
   oneOf_LLVM (map ret aggs_in_context).
-
-Definition filter_vec_typs (ctx: list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_, t) =>
-            match t with
-            | TYPE_Vector _ _ => true
-            | _ => false
-            end) ctx.
 
 Definition get_ctx_vec_typs : GenLLVM (list (ident * typ)) :=
   ctx <- get_ctx;;
@@ -1050,15 +1064,6 @@ Definition gen_insertelement : GenLLVM (typ * instr typ) :=
   value <- gen_typ_eq_prim_typ t_in_vec;;
   index <- lift_GenLLVM (choose (0,Z.of_N sz));;
   ret (tvec, INSTR_Op (OP_InsertElement (tvec, EXP_Ident id) (t_in_vec, value) (TYPE_I 32, EXP_Integer index))).
-
-(* TODO: code for ptrtoint incomplete *)
-Definition filter_ptr_vecptr_typ (ctx: list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_, t) =>
-            match t with
-            | TYPE_Pointer _ => true
-            | TYPE_Vector _ (TYPE_Pointer _) => true
-            | _ => false
-            end) ctx.
 
 Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
   ctx <- get_ctx;;
