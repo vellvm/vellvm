@@ -589,9 +589,10 @@ Section TypGenerators.
                 (* TODO: big ints *)
                 (* ; TYPE_I 64 *)
            ]).
-  
-  Definition gen_int_typ_for_ptr_cast : GenLLVM typ :=
-    ret TYPE_IPTR.
+
+  (* TODO: IPTR not implemented *)
+  (* Definition gen_int_typ_for_ptr_cast : GenLLVM typ :=
+    ret TYPE_IPTR.*)
 End TypGenerators.
 
 Section ExpGenerators.
