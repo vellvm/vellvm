@@ -8648,3 +8648,46 @@ Module LLVMParams64BitIntptr := LLVMParams.Make Addr IP64Bit FinSizeof FinPTOI F
 
 Module MemoryBigIntptr := MakeFiniteMemory LLVMParamsBigIntptr.
 Module Memory64BitIntptr := MakeFiniteMemory LLVMParams64BitIntptr.
+
+(* TODO: Move this to its own file? *)
+Module MemoryBigIntTheory.
+  Import MemoryBigIntptr.
+  Import MMEP.
+  Import MMSP.
+  Import MemSpec.
+
+  (* allocate_bytes succeeds lemma... *)
+  Lemma allocate_bytes_succeeds :
+    forall dt bytes ms,
+    exists ms' addr,
+      (allocate_bytes_spec_MemPropT dt bytes) ms (ret (ms', addr)).
+  Proof.
+    intros dt bytes ms.
+
+    (* Can extract memory_stack... *)
+    set (mem := MemState_get_memory ms).
+
+    (* memory_stack is still abstract, however... *)
+    (* Need to be able to allocate new address... *)
+    (* !!! Should be able to make MemState and memory_stack
+    transparent by specifying them in the module *)
+
+  (*   next_memory_key *)
+    
+  (*   set (ms' := MemState_put_memory mem ms). *)
+    
+  (*   do 2 eexists. *)
+  (*   unfold allocate_bytes_spec_MemPropT. *)
+  (*   cbn. *)
+  (*   do 2 eexists. *)
+  (*   split. *)
+  (*   admit. *)
+
+  (*   do 2 eexists. *)
+  (*   split. *)
+  (*   break_match. *)
+
+
+    (* Qed. *)
+  Admitted.
+End MemoryBigIntTheory.

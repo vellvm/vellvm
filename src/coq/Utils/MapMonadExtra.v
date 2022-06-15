@@ -137,3 +137,32 @@ Proof.
         epose proof (IHres _ _ NTH ls Heqs0) as [y [HF INy]].
         exists y; split; cbn; eauto.
 Qed.
+
+(* TODO: can I generalize this? *)
+Lemma map_monad_err_succeeds :
+  forall {A B} (f : A -> err B) l,
+    (forall a, In a l -> exists b, f a = ret b) ->
+    exists res, Util.map_monad f l = ret res.
+Proof.
+  intros A B f l IN.
+  generalize dependent l.
+  induction l; intros IN.
+  - exists [].
+    reflexivity.
+  - cbn.
+    forward IHl.
+    { intros a0 IN'.
+      eapply IN.
+      right; auto.
+    }
+
+    specialize (IN a).
+    forward IN; cbn; auto.
+    destruct IN as (b & IN).
+    destruct IHl as (res & IHl).
+
+    exists (b :: res).
+    rewrite IHl, IN.
+    cbn.
+    reflexivity.
+Qed.

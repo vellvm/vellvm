@@ -17,7 +17,8 @@ From Vellvm Require Import Error.
 From Vellvm.Utils Require Import
      MonadEq1Laws
      PropT
-     Raise.
+     Raise
+     Tactics.
 
 From Vellvm.Semantics Require Import
      MemoryAddress
@@ -154,18 +155,15 @@ Proof.
               match r with
               | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent r)))) =>
                   match r with
-                  | inl (OOM_message x) =>
-                      exists msg',
+                  | inl (OOM_message msg') =>
                       (ma sa (raise_oom msg') \/
                          (exists sab a, ma sa (ret (sab, a)) /\
                                      (amb a sab (raise_oom msg'))))
-                  | inr (inl (UB_message x)) =>
-                      exists msg',
+                  | inr (inl (UB_message msg')) =>
                       (ma sa (raise_ub msg') \/
                          (exists sab a, ma sa (ret (sab, a)) /\
                                      (amb a sab (raise_ub msg'))))
-                  | inr (inr (inl (ERR_message x))) =>
-                      exists msg',
+                  | inr (inr (inl (ERR_message msg'))) =>
                       (ma sa (raise_error msg') \/
                          (exists sab a, ma sa (ret (sab, a)) /\
                                      (amb a sab (raise_error msg'))))
@@ -176,6 +174,47 @@ Proof.
                   end
               end).
 Defined.
+
+#[global] Instance MemPropT_Eq1 {MemState} : Eq1 (MemPropT MemState).
+Proof.
+  unfold Eq1.
+  intros A m1 m2.
+  unfold MemPropT in *.
+  exact (forall (ms : MemState) (x : err_ub_oom (MemState * A)),
+            m1 ms x <-> m2 ms x).
+Defined.
+
+#[global] Instance MemPropT_Eq1Equivalance {MemState} : Eq1Equivalence (MemPropT MemState).
+Proof.
+  split.
+  - firstorder.
+  - firstorder.
+  - unfold Transitive.
+    intros x y z XY YZ.
+    unfold eq1, MemPropT_Eq1 in *.
+    intros ms x0.
+    rewrite XY.
+    auto.
+Defined.
+
+#[global] Instance MemPropT_MonadLawsE {MemState} : MonadLawsE (MemPropT MemState).
+Proof.
+  split.
+  - intros A B f x.
+    cbn.
+    unfold eq1, MemPropT_Eq1 in *.
+    split;
+      intros M.
+    +
+      (* TODO: Move to Error.v *)
+      Ltac destruct_err_ub_oom x :=
+        destruct x as [[[[[[[?oom_x] | [[?ub_x] | [[?err_x] | ?x]]]]]]]] eqn:?Hx.
+
+      destruct_err_ub_oom x0; firstorder; subst; firstorder.
+      repeat break_match_hyp.
+      destruct M as (sab & a & (EQ1 & EQ2) & F); subst.
+      auto.
+Admitted.
 
 Instance MemPropT_MonadMemState {MemState : Type} : MonadMemState MemState (MemPropT MemState).
 Proof.

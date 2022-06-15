@@ -6,8 +6,7 @@ From Vellvm Require Import
      Utils.PropT
      Utils.Tactics
      Theory.DenotationTheory
-     Theory.InterpreterMCFG
-     Handlers.InfiniteMemoryTheory.
+     Theory.InterpreterMCFG.
 
 From ITree Require Import
      ITree
@@ -31,7 +30,6 @@ Module Infinite.
   Import TopLevelRefinementsBigIntptr.
   Import DenotationTheoryBigIntptr.
   Import MCFGTheoryBigIntptr.
-  Import BigIntptrInfiniteMemoryTheory.
   Import D.
 
   Import Global.
@@ -41,20 +39,19 @@ Module Infinite.
   Import MCFGTactics.
 
   Import Global.
-  Import ESID.
 
-  Definition t_alloc : itree L0 uvalue
-    := trigger (Alloca (DTYPE_I 64%N));; ret UVALUE_None.
+  Definition t_alloc : itree L0 dvalue
+    := trigger (Alloca (DTYPE_I 64%N));; ret DVALUE_None.
 
-  Definition t_ret : itree L0 uvalue
-    := ret UVALUE_None.
+  Definition t_ret : itree L0 dvalue
+    := ret DVALUE_None.
 
   (* Remove allocation in infinite language *)
   Lemma remove_alloc:
-    forall g l s m,
-      refine_L6 (interp_mcfg4 TT t_alloc g (l, s) m) (interp_mcfg4 TT t_ret g (l, s) m).
+    forall genv lenv stack sid m,
+      refine_L6 (interp_mcfg4 TT TT t_alloc genv (lenv, stack) sid m) (interp_mcfg4 TT TT t_ret genv (lenv, stack) sid m).
   Proof.
-    intros g l s m.
+    intros genv lenv stack sid m.
     unfold refine_L6.
     intros t' INTERP.
     exists t'.

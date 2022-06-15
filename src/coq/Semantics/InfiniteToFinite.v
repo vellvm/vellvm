@@ -569,23 +569,28 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
          with the events converted, and the resulting uvalue converted.
        *)
       induction p.
-      + unfold TopLevelBigIntptr.model, TopLevelBigIntptr.model_gen.
-        From Vellvm Require Import Tactics.
-        exists (LLVMEvents.raise
-             ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") "")).
-        set (raise := (LLVMEvents.raise
-                  ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") ""))).
+      unfold model, model_gen in *.
+      (* cbn in m_fin. *)
+      (* red in m_fin. *)
+      (* rewrite bind_bind in m_fin. *)
+      (* setoid_rewrite bind_ret_l in m_fin. *)
+      (* + unfold TopLevelBigIntptr.model, TopLevelBigIntptr.model_gen. *)
+      (*   From Vellvm Require Import Tactics. *)
+      (*   exists (LLVMEvents.raise *)
+      (*        ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") "")). *)
+      (*   set (raise := (LLVMEvents.raise *)
+      (*             ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") ""))). *)
 
-        From ITree Require Import
-             ITree
-             Basics.Monad
-             Events.StateFacts
-             Eq.Eq.
+      (*   From ITree Require Import *)
+      (*        ITree *)
+      (*        Basics.Monad *)
+      (*        Events.StateFacts *)
+      (*        Eq.Eq. *)
 
-        unfold model in m_fin.
-        unfold model_gen in m_fin.
-        cbn in m_fin.
-        unfold interp_mcfg5 in m_fin.
+      (*   unfold model in m_fin. *)
+      (*   unfold model_gen in m_fin. *)
+      (*   cbn in m_fin. *)
+      (*   unfold interp_mcfg5 in m_fin. *)
     (*     repeat rewrite bind_ret_l in m_fin. *)
     (*     Import TranslateFacts. *)
     (*     rewrite translate_ret in m_fin. *)
