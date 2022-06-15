@@ -373,7 +373,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
          (fun ix => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
          ixs).
 
-  Definition generate_undef_bytes (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
+  Definition generate_num_undef_bytes (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
     N.recursion
       (fun (x : N) => ret [])
       (fun n mf x =>
@@ -381,7 +381,10 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
          x' <- IP.from_Z (Z.of_N x);;
          let byte := uvalue_sbyte (UVALUE_Undef dt) dt (UVALUE_IPTR x') sid in
          ret (byte :: rest_bytes))
-      (sizeof_dtyp dt) 0%N.
+      num 0%N.
+
+  Definition generate_undef_bytes (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
+    generate_num_undef_bytes (sizeof_dtyp dt) dt sid.
 
   Section Serialization.
     (** ** Serialization *)
@@ -1584,7 +1587,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
        ret ptr.
 
   (*** Allocating bytes in the heap *)
-  Record malloc_bytes_succeeds_spec (m1 : MemState) (t : dtyp) (init_bytes : list SByte) (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
+  Record malloc_bytes_succeeds_spec (m1 : MemState) (init_bytes : list SByte) (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
     {
       (* The allocated pointers are consecutive in memory. *)
       (* m1 doesn't really matter here. *)
@@ -1646,33 +1649,26 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         memory_stack_heap_prop (MemState_get_memory m1) h1 ->
         add_ptrs_to_heap h1 ptrs h2 ->
         memory_stack_heap_prop (MemState_get_memory m2) h2;
-
-      (* Type is valid *)
-      malloc_bytes_typ :
-      t <> DTYPE_Void;
-
-      malloc_bytes_typ_size :
-      sizeof_dtyp t = N.of_nat (length init_bytes);
     }.
 
-  Definition malloc_bytes_spec_MemPropT' (t : dtyp) (init_bytes : list SByte) (prov : Provenance)
+  Definition malloc_bytes_spec_MemPropT' (init_bytes : list SByte) (prov : Provenance)
     : MemPropT MemState (addr * list addr)
     := fun m1 res =>
          match run_err_ub_oom res with
          | inl (OOM_message x) =>
              True
          | inr (inl (UB_message x)) =>
-             forall m2 ptr ptrs, ~ malloc_bytes_succeeds_spec m1 t init_bytes prov m2 ptr ptrs
+             forall m2 ptr ptrs, ~ malloc_bytes_succeeds_spec m1 init_bytes prov m2 ptr ptrs
          | inr (inr (inl (ERR_message x))) =>
              True
          | inr (inr (inr (m2, (ptr, ptrs)))) =>
-             malloc_bytes_succeeds_spec m1 t init_bytes prov m2 ptr ptrs
+             malloc_bytes_succeeds_spec m1 init_bytes prov m2 ptr ptrs
          end.
 
-  Definition malloc_bytes_spec_MemPropT (t : dtyp) (init_bytes : list SByte)
+  Definition malloc_bytes_spec_MemPropT (init_bytes : list SByte)
     : MemPropT MemState addr
     := prov <- fresh_provenance;;
-       '(ptr, _) <- malloc_bytes_spec_MemPropT' t init_bytes prov;;
+       '(ptr, _) <- malloc_bytes_spec_MemPropT' init_bytes prov;;
        ret ptr.
 
   (*** Freeing heap allocations *)
@@ -1854,6 +1850,29 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
+    Definition handle_malloc_prop (args : list dvalue) : MemPropT MemState addr :=
+      match args with
+      | [DVALUE_I1 sz]
+      | [DVALUE_I8 sz]
+      | [DVALUE_I32 sz]
+      | [DVALUE_I64 sz] =>
+          sid <- fresh_sid;;
+          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8) sid);;
+          malloc_bytes_spec_MemPropT bytes
+      | [DVALUE_IPTR sz] =>
+          sid <- fresh_sid;;
+          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (IP.to_unsigned sz)) (DTYPE_I 8) sid);;
+          malloc_bytes_spec_MemPropT bytes
+      | _ => raise_error "Malloc: invalid arguments."
+      end.
+
+    Definition handle_free_prop (args : list dvalue) : MemPropT MemState unit :=
+      match args with
+      | [DVALUE_Addr ptr] =>
+          free_spec_MemPropT ptr
+      | _ => raise_error "Free: invalid arguments."
+      end.
+
     Definition handle_intrinsic_prop : IntrinsicE ~> MemPropT MemState
       := fun T e =>
            match e with
@@ -1867,7 +1886,17 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
                  handle_memcpy_prop args;;
                  ret DVALUE_None
                else
-                 raise_error ("Unknown intrinsic: " ++ name)
+                 if (Coqlib.proj_sumbool (string_dec name "malloc"))
+                 then
+                   addr <- handle_malloc_prop args;;
+                   ret (DVALUE_Addr addr)
+                 else
+                   if (Coqlib.proj_sumbool (string_dec name "free"))
+                   then
+                        handle_free_prop args;;
+                        ret DVALUE_None
+                   else
+                     raise_error ("Unknown intrinsic: " ++ name)
            end.
 
   End Handlers.
@@ -2066,7 +2095,7 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
 
     (** Heap operations *)
     Parameter malloc_bytes :
-      forall `{MemMonad ExtraState MemM (itree Eff)}, dtyp -> list SByte -> MemM addr.
+      forall `{MemMonad ExtraState MemM (itree Eff)}, list SByte -> MemM addr.
 
     Parameter free :
       forall `{MemMonad ExtraState MemM (itree Eff)}, addr -> MemM unit.
@@ -2091,8 +2120,8 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
       exec_correct mempop mempop_spec_MemPropT.
 
     Parameter malloc_bytes_correct :
-      forall dt init_bytes,
-        exec_correct (malloc_bytes dt init_bytes) (malloc_bytes_spec_MemPropT dt init_bytes).
+      forall init_bytes,
+        exec_correct (malloc_bytes init_bytes) (malloc_bytes_spec_MemPropT init_bytes).
 
     Parameter free_correct :
       forall ptr,
@@ -2265,6 +2294,29 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
+    Definition handle_malloc `{MemMonad ExtraState MemM (itree Eff)} (args : list dvalue) : MemM addr :=
+      match args with
+      | [DVALUE_I1 sz]
+      | [DVALUE_I8 sz]
+      | [DVALUE_I32 sz]
+      | [DVALUE_I64 sz] =>
+          sid <- fresh_sid;;
+          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8) sid);;
+          malloc_bytes bytes
+      | [DVALUE_IPTR sz] =>
+          sid <- fresh_sid;;
+          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (IP.to_unsigned sz)) (DTYPE_I 8) sid);;
+          malloc_bytes bytes
+      | _ => raise_error "Malloc: invalid arguments."
+      end.
+
+    Definition handle_free `{MemMonad ExtraState MemM (itree Eff)} (args : list dvalue) : MemM unit :=
+      match args with
+      | [DVALUE_Addr ptr] =>
+          free ptr
+      | _ => raise_error "Free: invalid arguments."
+      end.
+
     Definition handle_intrinsic `{MemMonad ExtraState MemM (itree Eff)} : IntrinsicE ~> MemM
       := fun T e =>
            match e with
@@ -2278,8 +2330,19 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
                  handle_memcpy args;;
                  ret DVALUE_None
                else
-                 raise_error ("Unknown intrinsic: " ++ name)
+                 if (Coqlib.proj_sumbool (string_dec name "malloc"))
+                 then
+                   addr <- handle_malloc args;;
+                   ret (DVALUE_Addr addr)
+                 else
+                   if (Coqlib.proj_sumbool (string_dec name "free"))
+                   then
+                     handle_free args;;
+                     ret DVALUE_None
+                   else
+                     raise_error ("Unknown intrinsic: " ++ name)
            end.
+
   End Handlers.
 End MemoryModelExec.
 
@@ -2603,6 +2666,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Hint Resolve exec_correct_map_monad : EXEC_CORRECT.
     Hint Resolve exec_correct_map_monad_ : EXEC_CORRECT.
     Hint Resolve exec_correct_map_monad_In : EXEC_CORRECT.
+    Hint Resolve malloc_bytes_correct : EXEC_CORRECT.
 
     (* TODO: move this *)
     Lemma zip_cons :
@@ -2811,6 +2875,26 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       all: apply memcpy_correct.
     Qed.
 
+    Lemma handle_malloc_correct:
+      forall args,
+        exec_correct (handle_malloc args) (handle_malloc_prop args).
+    Proof.
+      intros args.
+      unfold handle_malloc, handle_malloc_prop.
+      repeat (break_match; try apply exec_correct_raise_error).
+      all: eauto with EXEC_CORRECT.
+    Qed.
+
+    Lemma handle_free_correct:
+      forall args,
+        exec_correct (handle_free args) (handle_free_prop args).
+    Proof.
+      intros args.
+      unfold handle_free, handle_free_prop.
+      repeat (break_match; try apply exec_correct_raise_error).
+      all: apply free_correct.
+    Qed.
+
     Lemma handle_intrinsic_correct:
       forall T (e : IntrinsicE T),
         exec_correct (handle_intrinsic T e) (handle_intrinsic_prop T e).
@@ -2819,11 +2903,28 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       unfold handle_intrinsic, handle_intrinsic_prop.
       break_match.
       break_match.
-      - apply exec_correct_bind.
+      { (* Memcpy *)
+        apply exec_correct_bind.
         apply handle_memcpy_correct.
         intros a.
         apply exec_correct_ret.
-      - apply exec_correct_raise_error.
+      }
+
+      break_match.
+      { (* Malloc *)
+        apply exec_correct_bind.
+        apply handle_malloc_correct.
+        eauto with EXEC_CORRECT.
+      }
+
+      break_match.
+      { (* Free *)
+        apply exec_correct_bind.
+        apply handle_free_correct.
+        eauto with EXEC_CORRECT.
+      }
+
+      apply exec_correct_raise_error.
     Qed.
   End Correctness.
 End MemoryModelTheory.
