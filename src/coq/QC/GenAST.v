@@ -1563,6 +1563,42 @@ Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
     end;;
   ret (new_tptr, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr)).
 
+Definition filter_first_class_typs (ctx : list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_, t) =>
+            match t with
+            | TYPE_Struct _
+            | TYPE_Packed_struct _ => false
+            | TYPE_Array _ _ => false
+            | _ => true
+            end) ctx.
+
+Fixpoint gen_bitcast_typ (t_from : typ) : GenLLVM typ :=
+  let gen_typ_list :=
+    match t_from with
+    | TYPE_I 1 => ret [TYPE_I 1]
+    | TYPE_I 8 => ret [TYPE_I 8]
+    | TYPE_I 32
+    | TYPE_Float => ret [TYPE_I 32; TYPE_Float]
+    | TYPE_I 64
+    | TYPE_Double => ret [TYPE_I 64; TYPE_Double]
+    | TYPE_Pointer subtyp =>
+        new_subtyp <- gen_bitcast_typ subtyp;;
+        ret [TYPE_Pointer new_subtyp]
+    | TYPE_Vector sz subtyp =>
+        new_subtyp <- gen_bitcast_typ subtyp;;
+        ret [TYPE_Vector sz subtyp]
+    | _ => ret [t_from] (* TODO: Add more types *) (* This currently is to prevent types like pointer of struct from failing *)
+    end in
+  typ_list <- gen_typ_list;;
+  oneOf_LLVM (map ret typ_list).
+
+Definition gen_bitcast : GenLLVM (typ * instr typ) :=
+  ctx <- get_ctx;;
+  let first_class_typs := filter_first_class_typs ctx in
+  '(id, tfc) <- oneOf_LLVM (map ret first_class_typs);;
+  new_typ <- gen_bitcast_typ tfc;;
+  ret (new_typ, INSTR_Op (OP_Conversion Bitcast tfc (EXP_Ident id) new_typ)).
+
 Definition genTypHelper (n: nat): G (typ) :=
   run_GenLLVM (gen_typ_non_void_size n).
 
@@ -1848,6 +1884,7 @@ Section InstrGenerators.
            align <- ret None;;
            ret (TYPE_Pointer t, INSTR_Alloca t num_elems align)
         ] (* TODO: Generate atomic operations and other instructions *)
+         ++ (if seq.nilp (filter_first_class_typs ctx) then [] else [gen_bitcast])
          ++ (if seq.nilp sized_ptr_typs_in_ctx then [] else [gen_gep; gen_load; gen_store])
          ++ (if seq.nilp ptr_typs_in_ctx then [] else [gen_ptrtoint])
          ++ (if seq.nilp ptrtoint_ctx then [] else [gen_inttoptr])
@@ -1856,7 +1893,6 @@ Section InstrGenerators.
                                                                gen_insertvalue x])
          ++ (if seq.nilp vec_typs_in_ctx then [] else [gen_extractelement; gen_insertelement])
          ++ (if seq.nilp fun_ptrs_in_ctx then [] else [gen_call fun_ptrs_in_ctx])).
-
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
 
