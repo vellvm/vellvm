@@ -174,11 +174,11 @@ Section Endo.
           INSTR_Load volatile (endo t) (endo ptr) align
         | INSTR_Store volatile val ptr align =>
           INSTR_Store volatile (endo val) (endo ptr) align
-        | INSTR_Comment _
-        | INSTR_Fence
-        | INSTR_AtomicCmpXchg
-        | INSTR_AtomicRMW
-        | INSTR_VAArg
+        | INSTR_Comment msg => INSTR_Comment msg
+        | INSTR_Fence syncscope o => ins
+        | INSTR_AtomicCmpXchg c => ins
+        | INSTR_AtomicRMW a => ins
+        | INSTR_VAArg va t => ins
         | INSTR_LandingPad => ins
         end.
 
@@ -484,6 +484,48 @@ Section TFunctor.
       : TFunctor texp | 50 :=
       fun _ _ f '(t,e) => (f t, tfmap f e).
 
+ #[global] Instance TFunctor_cmpxchg
+           `{Endo bool}
+           `{Endo icmp}
+           `{Endo int}
+           `{Endo string}         
+           `{Endo ordering}
+           `{TFunctor texp}
+           (* `{TFunctor typ} *)
+      : TFunctor cmpxchg | 50 :=
+      fun U V f c =>
+        mk_cmpxchg
+          (endo (c_weak c))
+          (endo (c_volatile c))
+          (tfmap f (c_ptr c))
+          (endo (c_cmp c))
+          (f (c_cmp_type c))
+          (tfmap f (c_new c))
+          (endo (c_syncscope c))
+          (endo (c_success_ordering c))
+          (endo (c_failure_ordering c))
+          (endo (c_align c)).
+
+  #[global] Instance TFunctor_atomicrmw
+           `{Endo bool}
+           `{Endo atomic_rmw_operation}          
+           `{Endo string}         
+           `{Endo ordering}
+           `{Endo int}
+           `{TFunctor texp}
+           (* `{TFunctor typ} *)
+      : TFunctor atomicrmw | 50 :=
+      fun U V f a =>
+        mk_atomicrmw
+          (endo (a_volatile a))
+          (endo (a_operation a))
+          (tfmap f (a_ptr a))
+          (tfmap f (a_val a))
+          (endo (a_syncscope a))
+          (endo (a_ordering a))
+          (endo (a_align a))
+          (f (a_type a)).
+  
     #[global] Instance TFunctor_instr
            `{TFunctor exp}
       : TFunctor instr | 50 :=
@@ -495,10 +537,10 @@ Section TFunctor.
         | INSTR_Alloca t nb align => INSTR_Alloca (f t) (tfmap f nb) align
         | INSTR_Load volatile t ptr align => INSTR_Load volatile (f t) (tfmap f ptr) align
         | INSTR_Store volatile val ptr align => INSTR_Store volatile (tfmap f val) (tfmap f ptr) align
-        | INSTR_Fence => INSTR_Fence
-        | INSTR_AtomicCmpXchg => INSTR_AtomicCmpXchg
-        | INSTR_AtomicRMW => INSTR_AtomicRMW
-        | INSTR_VAArg => INSTR_VAArg
+        | INSTR_Fence syncscope o => INSTR_Fence syncscope o 
+        | INSTR_AtomicCmpXchg c => INSTR_AtomicCmpXchg (tfmap f c)
+        | INSTR_AtomicRMW a => INSTR_AtomicRMW (tfmap f a)
+        | INSTR_VAArg va t => INSTR_VAArg (tfmap f va) t
         | INSTR_LandingPad => INSTR_LandingPad 
         end.
 

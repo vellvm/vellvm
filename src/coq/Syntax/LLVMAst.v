@@ -376,6 +376,57 @@ Variant phi : Set :=
 | Phi  (t:T) (args:list (block_id * exp))
 .
 
+Variant ordering : Set :=
+  |Unordered
+  |Monotonic
+  |Acquire
+  |Release
+  |Acq_rel
+  |Seq_cst
+     .
+
+Record cmpxchg : Set :=
+  mk_cmpxchg {
+      c_weak              : option bool; 
+      c_volatile          : option bool;
+      c_ptr               : texp;
+      c_cmp               : icmp;
+      c_cmp_type          : T;
+      c_new               : texp;                                
+      c_syncscope            : option string;
+      c_success_ordering     : ordering;
+      c_failure_ordering     : ordering;
+      c_align                : option int;     
+    }.
+
+Variant atomic_rmw_operation : Set := 
+  |Axchg  
+  |Aadd  
+  |Asub     
+  |Aand     
+  |Anand     
+  |Aor     
+  |Axor     
+  |Amax     
+  |Amin     
+  |Aumax     
+  |Aumin     
+  |Afadd     
+  |Afsub
+     .
+     
+Record atomicrmw : Set :=
+  mk_atomicrmw { 
+      a_volatile             : option bool;
+      a_operation            : atomic_rmw_operation;
+      a_ptr                  : texp;
+      a_val                  : texp;                                 
+      a_syncscope            : option string;
+      a_ordering             : ordering;
+      a_align                : option int;
+      a_type                 : T;
+    }.
+     
 Variant instr : Set :=
 | INSTR_Comment (msg:string)
 | INSTR_Op   (op:exp)                        (* INVARIANT: op must be of the form (OP_ ...) *)
@@ -383,10 +434,10 @@ Variant instr : Set :=
 | INSTR_Alloca (t:T) (nb: option texp) (align:option int)
 | INSTR_Load  (volatile:bool) (t:T) (ptr:texp) (align:option int)
 | INSTR_Store (volatile:bool) (val:texp) (ptr:texp) (align:option int)
-| INSTR_Fence
-| INSTR_AtomicCmpXchg
-| INSTR_AtomicRMW
-| INSTR_VAArg
+| INSTR_Fence (syncscope:option string) (o:ordering)
+| INSTR_AtomicCmpXchg (c : cmpxchg)
+| INSTR_AtomicRMW (a :atomicrmw )
+| INSTR_VAArg (va_list_and_arg_list : texp) (t: typ) (* arg_list isn't actually a list, this is just the name of the argument  *)
 | INSTR_LandingPad
 .
 
@@ -501,8 +552,12 @@ Variant toplevel_entity {FnBody:Set} : Set :=
 Definition toplevel_entities (FnBody:Set) : Set := list (@toplevel_entity FnBody).
 
 End TypedSyntax.
-
+Check exp.
 Arguments exp: clear implicits.
+Arguments cmpxchg : clear implicits.
+Check cmpxchg.
+Arguments atomicrmw : clear implicits.
+Check atomicrmw.
 Arguments block: clear implicits.
 Arguments texp: clear implicits.
 Arguments phi: clear implicits.

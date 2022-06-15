@@ -475,11 +475,11 @@ and instr : Format.formatter -> (LLVMAst.typ LLVMAst.instr) -> unit =
       texp ptr
       (pp_print_option pp_print_int) a
 
-  | INSTR_VAArg -> pp_print_string ppf "INSTR_VAarg"
+  | INSTR_VAArg ( _, _) -> pp_print_string ppf "INSTR_VAarg"
   | INSTR_LandingPad
-  | INSTR_AtomicCmpXchg
-  | INSTR_AtomicRMW
-  | INSTR_Fence -> assert false
+  | INSTR_AtomicCmpXchg _
+  | INSTR_AtomicRMW _
+  | INSTR_Fence (_, _) -> assert false
 
 and branch_label : Format.formatter -> LLVMAst.raw_id -> unit =
   fun ppf id ->

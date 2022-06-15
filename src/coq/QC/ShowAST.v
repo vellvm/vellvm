@@ -546,6 +546,84 @@ Fixpoint show_typ (t : typ) : string :=
        | Some a => prefix ++ show a
        end.
 
+  Definition show_ordering (o : ordering) : string :=
+    match o with
+    |Unordered => "unordered"
+    |Monotonic => "monotonic"                   
+    |Acquire => "acquire"
+    |Release => "release"
+    |Acq_rel => "acq_rel"
+    |Seq_cst => "seq_cst"
+    end.
+
+  Global Instance showOrdering : Show (ordering)
+    := {| show := show_ordering |}.
+
+  Definition show_cmpxchg (c : cmpxchg typ) : string :=
+    let p_weak := match c.(c_weak) with
+                 |None => ""
+                 |Some x => show x
+                 end in
+    let p_volatile := match c.(c_volatile) with
+                     |None => ""
+                     |Some x => show x
+                     end in
+    let p_syncscope := match c.(c_syncscope) with
+                      |None => ""
+                      |Some x => "[syncscope(""" ++ show x ++ """)]"
+                      end in
+    let p_align := match c.(c_align) with
+                  |None => ""
+                  |Some x => ", align " ++ show x
+                  end in
+       
+    concatStr ["cmpxchg "; p_weak; p_volatile; show c.(c_ptr); ", ";  show c.(c_cmp_type); show c.(c_cmp); ", " ; show c.(c_new) ; p_syncscope ; show c.(c_success_ordering); show c.(c_failure_ordering) ; p_align ;  "yields  { "; show c.(c_cmp_type) ; ", i1 } "].
+
+   Global Instance showCmpxchg : Show (cmpxchg typ)
+     := {| show := show_cmpxchg |}.
+
+  Definition show_a_rmw_operation (a :  atomic_rmw_operation) : string :=
+    match a with
+    |Axchg => "xchg"       
+    |Aadd  => "add"
+    |Asub => "sub"     
+    |Aand => "and"     
+    |Anand => "nand"   
+    |Aor  => "or"   
+    |Axor => "xor"   
+    |Amax => "max"  
+    |Amin => "min"    
+    |Aumax => "umax"     
+    |Aumin => "umin"     
+    |Afadd => "fadd"    
+    |Afsub => "fsub"
+    end.
+
+   Global Instance showARmwOperation : Show (atomic_rmw_operation)
+    := {| show := show_a_rmw_operation |}.
+   
+  Definition show_atomic_rmw (a : atomicrmw typ) : string :=
+    let p_volatile := match a.(a_volatile) with
+                     |None => ""
+                     |Some x => show x
+                     end in                       
+    let p_syncscope := match a.(a_syncscope) with
+                      |None => ""
+                      |Some x => "[syncscope(""" ++ show x ++ """)]"
+                      end in
+    
+    let p_align := match a.(a_align) with
+                  |None => ""
+                  |Some x => ", align " ++ show x
+                  end in
+    
+     concatStr ["atomicrmw" ;  p_volatile ; show a.(a_operation) ; show a.(a_ptr) ; ", " ;
+               show a.(a_val) ; p_syncscope ; show a.(a_ordering) ; p_align ; "yields " ;
+               show a.(a_type)].
+
+   Global Instance showAtomicrmw : Show (atomicrmw typ) 
+     := {| show := show_atomic_rmw |}.
+  
   Definition show_instr (i : instr typ) : string
     := match i with
        | INSTR_Comment s => "; " ++ s
@@ -557,8 +635,15 @@ Fixpoint show_typ (t : typ) : string :=
        | INSTR_Load vol t ptr align =>
          "load " ++ show t ++ ", " ++ show ptr ++ show_opt_prefix ", align " align
        | INSTR_Store vol tval ptr align =>
-         "store " ++ (if vol then "volatile " else "") ++ show tval ++ ", " ++ show ptr ++ show_opt_prefix ", align " align                    
-       | _ => "show_instr todo"
+           "store " ++ (if vol then "volatile " else "") ++ show tval ++ ", " ++ show ptr ++ show_opt_prefix ", align " align
+       | INSTR_Fence syncscope ordering => let printable_sync := match syncscope with
+                                                               | None => ""
+                                                               | Some x => "[syncscope(""" ++ show x ++ """)]"
+                                                                end in                                                                                                       "fence " ++ printable_sync ++ show ordering  ++" ; yields void"
+       | INSTR_AtomicCmpXchg c => show_cmpxchg c
+       | INSTR_AtomicRMW a => show_atomic_rmw a                                             
+       | INSTR_VAArg (va_list_and_arg_list) (t)  => "va_arg " ++ show va_list_and_arg_list ++ ", " ++ show t           
+       | INSTR_LandingPad => "skipping implementation at the moment"  
        end.
 
   Global Instance showInstr : Show (instr typ)
@@ -700,7 +785,7 @@ Fixpoint show_typ (t : typ) : string :=
                                  |None => ""
                                  |Some c => show c
                                end in
-        let the_gc := defn.(df_prototype).(dc_gc) in 
+       let the_gc := defn.(df_prototype).(dc_gc) in 
         let printable_gc := match the_gc with
                                  |None => ""
                                  |Some c => show c

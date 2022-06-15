@@ -276,10 +276,10 @@ Section REGISTER_OPERATIONS.
                             => use_sites e
                           | INSTR_Store _ e1 e2 _
                             => use_sites e1 +++ use_sites e2
-                          | INSTR_Fence
-                          | INSTR_AtomicCmpXchg
-                          | INSTR_AtomicRMW
-                          | INSTR_VAArg
+                          | INSTR_Fence _ _
+                          | INSTR_AtomicCmpXchg _ 
+                          | INSTR_AtomicRMW _
+                          | INSTR_VAArg _ _
                           | INSTR_LandingPad
                           | INSTR_Comment _
                             => []
