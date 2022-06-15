@@ -591,8 +591,8 @@ Section TypGenerators.
            ]).
 
   (* TODO: IPTR not implemented *)
-  (* Definition gen_int_typ_for_ptr_cast : GenLLVM typ :=
-    ret TYPE_IPTR.*)
+  Definition gen_int_typ_for_ptr_cast : GenLLVM typ :=
+    ret (TYPE_I 64).
 End TypGenerators.
 
 Section ExpGenerators.
@@ -1023,9 +1023,9 @@ Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
   let gen_typ_in_ptr :=
     match tptr with
     | TYPE_Pointer t =>
-        ret (TYPE_I 64) (* TODO: Wait till IPTR is implemented *)
+        gen_int_typ_for_ptr_cast (* TODO: Wait till IPTR is implemented *)
     | TYPE_Vector sz ty =>
-        let x := TYPE_I 64 in
+        x <- gen_int_typ_for_ptr_cast;;
         ret (TYPE_Vector sz x)
     | _ =>
         ret (TYPE_Void) (* Won't get into this case *)
