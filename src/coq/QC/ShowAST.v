@@ -635,7 +635,7 @@ Fixpoint show_typ (t : typ) : string :=
     := match i with
        | INSTR_Comment s => "; " ++ s
        | INSTR_Op e => show e
-                           (* Based on the old printer  *)
+       (* Based on the old printer  *)
        | INSTR_Call fn args => "call " ++ show fn ++ "(" ++ (concat ", " (map (fun x => show x) (args))) ++ ")"        
        | INSTR_Alloca t nb align => 
            "alloca " ++ show t ++ show_opt_prefix ", " nb ++ show_opt_prefix ", align " align                    
@@ -646,7 +646,8 @@ Fixpoint show_typ (t : typ) : string :=
        | INSTR_Fence syncscope ordering => let printable_sync := match syncscope with
                                                                | None => ""
                                                                | Some x => "[syncscope(""" ++ show x ++ """)]"
-                                                                end in                                                                                                       "fence " ++ printable_sync ++ show ordering  ++" ; yields void"
+                                                                 end in
+                                           "fence " ++ printable_sync ++ show ordering  ++" ; yields void"
        | INSTR_AtomicCmpXchg c => show_cmpxchg c
        | INSTR_AtomicRMW a => show_atomic_rmw a                                             
        | INSTR_VAArg (va_list_and_arg_list) (t)  => "va_arg " ++ show va_list_and_arg_list ++ ", " ++ show t           
@@ -880,11 +881,11 @@ End ShowInstances.
    concatStr ["declare "; link; vis; dll; cc;
               concatStr[intersperse " " (map show ret_attrs)]; 
               show ret_t; " @"; show name;  "(";
-              concatStr[(intersperse ", " (map (fun '(x, y) => concatStr[show x; " "; match y with
-                                                                                 | [] => ""
-                                                                                 | z :: tl => show z
-                                                                                 end ])
-                                             (List.combine args_t args_attrs)))];
+              concat ", " (map (fun '(x, y) => concatStr[show x; " "; match y with
+                                                                      | [] => ""
+                                                                      | z :: tl => show z
+                                                                      end ])
+                                             (List.combine args_t args_attrs));
               ")"; sec; all; gc] 
    | _ => "Invalid type on function: " ++ show name
    end.                                     
