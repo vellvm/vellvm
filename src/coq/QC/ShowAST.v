@@ -405,7 +405,6 @@ Fixpoint show_typ (t : typ) : string :=
     := {| show := show_fbinop |}.
 
 
-
   Definition double_to_hex_string (f : float) : string
     := "0x" ++ NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (Int64.unsigned (Float.to_bits f)))).
 
