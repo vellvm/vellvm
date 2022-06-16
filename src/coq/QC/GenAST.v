@@ -13,7 +13,7 @@
 Require Import Ceres.Ceres.
 
 From ExtLib.Structures Require Export
-     Functor Applicative Monads.
+     Functor Applicative Monads Monoid.
 
 Require Import ExtLib.Data.Monads.StateMonad.
 Require Import ExtLib.Structures.Monads.
@@ -50,6 +50,40 @@ Open Scope Z_scope.
     not used in proofs) it's not terribly important to prove that they
     actually terminate.  *)
 Unset Guard Checking.
+
+(* TODO: Move this? *)
+(** Difference lists *)
+Section DList.
+  Definition DList (A : Type) := list A -> list A.
+
+  Definition DList_to_list {A} (dl : DList A) : list A
+    := dl [].
+
+  Definition DList_append {A} (dl1 dl2 : DList A) : DList A
+    := fun xs => dl1 (dl2 xs).
+
+  Definition DList_singleton {A} (a : A) : DList A
+    := cons a.
+
+  Definition DList_cons {A} (a : A) (dl : DList A) : DList A
+    := DList_append (DList_singleton a) dl.
+
+  Definition DList_empty {A} : DList A
+    := fun xs => xs.
+
+  Definition DList_from_list {A} (l : list A) : DList A
+    := fold_right DList_cons DList_empty l.
+
+  Definition DList_map {A B} (f : A -> B) (dl : DList A) : DList B
+    := fold_right (fun a => DList_cons (f a)) (@DList_empty B) (DList_to_list dl).
+
+  #[global] Instance DList_Functor : Functor DList.
+  Proof.
+    split.
+    intros A B X X0.
+    eapply DList_map; eauto.
+  Defined.
+End DList.
 
 Section Helpers.
   Fixpoint is_sized_type_h (t : dtyp) : bool
@@ -977,56 +1011,64 @@ Section ExpGenerators.
 
   (* Generator GEP part *)
   (* Get index paths from array or vector*)
-  
-  Definition get_index_paths_from_AoV (sz: N) (t: typ) (pre_path: list Z) (sub_paths: list (typ * list Z)) : list (typ * list Z) :=
-    N.recursion []
+
+  Definition get_index_paths_from_AoV (sz: N) (t: typ) (pre_path: DList Z) (sub_paths: DList (typ * DList Z)) : DList (typ * DList Z) :=
+    N.recursion DList_empty
                 (fun ix acc =>
-                   map (fun '(t, sub_path) => (t, Z.of_N ix :: sub_path)) sub_paths)
+                   DList_map (fun '(t, sub_path) => (t, DList_append pre_path (DList_cons (Z.of_N ix) sub_path))) sub_paths)
                 sz.
 
   (* Can work after extracting the pointer inside*)
-  Fixpoint get_index_paths_aux (t_from : typ) (pre_path : list Z) {struct t_from}: list (typ * list (Z)) :=
+  Fixpoint get_index_paths_aux (t_from : typ) (pre_path : DList Z) {struct t_from}: DList (typ * DList (Z)) :=
     match t_from with
     | TYPE_Array sz t
     | TYPE_Vector sz t =>
-        let sub_paths := get_index_paths_aux t [] in (* Get index path from the first element*)
-        [(t_from, pre_path)] ++ (* The path to the array *)
-        get_index_paths_from_AoV sz t pre_path sub_paths (* Assemble them into 1*)
+        let sub_paths := get_index_paths_aux t DList_empty in (* Get index path from the first element*)
+        DList_cons (t_from, pre_path) (get_index_paths_from_AoV sz t pre_path sub_paths)
     | TYPE_Struct fields
-    | TYPE_Packed_struct fields => [(t_from, pre_path)] ++ get_index_paths_from_struct pre_path fields
-    | _ => [(t_from, pre_path)]
+    | TYPE_Packed_struct fields =>
+        DList_cons (t_from, pre_path) (get_index_paths_from_struct pre_path fields)
+    | _ => DList_singleton (t_from, pre_path)
     end with
-  get_index_paths_from_struct (pre_path: list Z) (fields: list typ) {struct fields}: list (typ * list Z) :=
+  get_index_paths_from_struct (pre_path: DList Z) (fields: list typ) {struct fields}: DList (typ * DList Z) :=
     snd (fold_left
-           (fun '(ix, paths) (fld_typ : typ) => (ix + 1, (get_index_paths_aux fld_typ (pre_path ++ [ix]) ++ paths)))
-           fields (0%Z, [] : list (typ * list Z))).
+           (fun '(ix, paths) (fld_typ : typ) =>
+              (ix + 1,
+                (DList_append (get_index_paths_aux fld_typ (DList_append pre_path (DList_singleton ix)))
+                              paths)))
+           fields (0%Z, DList_empty : DList (typ * DList Z))).
+
+  Definition DList_paths_to_list_paths (paths : DList (typ * DList (Z))) : list (typ * list (Z))
+    := map (fun '(x, paths) => (x, DList_to_list paths)) (DList_to_list paths).
 
   Definition get_index_paths_ptr (t_from: typ) : list (typ * list (Z)) :=
-    get_index_paths_aux t_from [0%Z].
+    DList_paths_to_list_paths (get_index_paths_aux t_from (DList_singleton 0%Z)).
 
   (* Index path without getting into vector *)
-  Fixpoint get_index_paths_agg_aux (t_from : typ) (pre_path : list Z) {struct t_from}: list (typ * list (Z)) :=
+  Fixpoint get_index_paths_agg_aux (t_from : typ) (pre_path : DList Z) {struct t_from}: DList (typ * DList (Z)) :=
     match t_from with
     | TYPE_Array sz t =>
-        let sub_paths := get_index_paths_aux t [] in (* Get index path from the first element*)
-        [(t_from, pre_path)] ++ (* The path to the array *)
-        get_index_paths_from_AoV sz t pre_path sub_paths (* Assemble them into 1*)
+        let sub_paths := get_index_paths_agg_aux t DList_empty in (* Get index path from the first element*)
+        DList_cons (t_from, pre_path) (get_index_paths_from_AoV sz t pre_path sub_paths)
     | TYPE_Struct fields
-    | TYPE_Packed_struct fields => [(t_from, pre_path)] ++ get_index_paths_agg_from_struct pre_path fields
-    | _ => [(t_from, pre_path)]
+    | TYPE_Packed_struct fields =>
+        DList_cons (t_from, pre_path) (get_index_paths_agg_from_struct pre_path fields)
+    | _ => DList_singleton (t_from, pre_path)
     end with
-  get_index_paths_agg_from_struct (pre_path: list Z) (fields: list typ) {struct fields}: list (typ * list Z) :=
+  get_index_paths_agg_from_struct (pre_path: DList Z) (fields: list typ) {struct fields}: DList (typ * DList Z) :=
     snd (fold_left
-           (fun '(ix, paths) (fld_typ : typ) => (ix + 1, (get_index_paths_agg_aux fld_typ (pre_path ++ [ix]) ++ paths)))
-           fields (0%Z, [] : list (typ * list Z))).
+           (fun '(ix, paths) (fld_typ : typ) =>
+              (ix + 1,
+                (DList_append (get_index_paths_agg_aux fld_typ (DList_append pre_path (DList_singleton ix)))
+                              paths)))
+           fields (0%Z, DList_empty : DList (typ * DList Z))).
 
 (* The method is mainly used by extractvalue and insertvalue,
    which requires at least one index for getting inside the aggregate type.
    There is a possibility for us to get nil path. The filter below will get rid of that possibility.
    Given that the nilpath will definitely be at the beginning of a list of options, we can essentially get the tail. *)
 Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
-  let agg_paths := get_index_paths_agg_aux t_from nil in
-  tl agg_paths.
+  tl (DList_paths_to_list_paths (get_index_paths_agg_aux t_from DList_empty)).
 
 Definition get_ctx_ptrs  : GenLLVM (list (ident * typ)) :=
   ctx <- get_ctx;;
@@ -1061,9 +1103,9 @@ Definition gen_gep : GenLLVM (typ * instr typ) :=
   let paths_in_ptr := get_index_paths_ptr t_in_ptr in (* Inner paths: Paths after removing the outer pointer *)
   '(t, path) <- oneOf_LLVM (map ret paths_in_ptr);; (* Select one path from the paths *)
   let path_for_gep := map (fun x => (TYPE_I 32, EXP_Integer (x))) path in (* Turning the path to integer *)
-   (* Refer to function get_int_typ *)
+  (* Refer to function get_int_typ *)
   ret (TYPE_Pointer t, INSTR_Op (OP_GetElementPtr t_in_ptr
-                    (TYPE_Pointer t_in_ptr, EXP_Ident id) path_for_gep)).
+                                                  (TYPE_Pointer t_in_ptr, EXP_Ident id) path_for_gep)).
 
 Definition gen_extractvalue : GenLLVM (typ * instr typ) :=
   '(id, tagg) <- get_ctx_agg_typ;;
