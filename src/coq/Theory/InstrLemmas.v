@@ -9,7 +9,7 @@ Require Import ZArith.
 From ITree Require Import
      ITree
      Basics.Monad
-     Eq.Eq
+     Eq.Eqit
      TranslateFacts.
 
 From Vellvm Require Import

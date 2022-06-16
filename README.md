@@ -106,18 +106,20 @@ Our current test-suite of LLVM programs for which we compare our semantics again
 # Installing / Compiling Vellvm
 
 ### Assumes: 
-  - Coq: version 8.15 (installed via *opam*, see below)
-  - OCaml: version 4.12.0 (installed via *opam*, see below)
-  - opam: version 2.0.8.
+  - Coq: version > 8.15 (installed via *opam*, see below)
+	  * tested with 8.15.2
+  - OCaml: version > 4.12.0 (installed via *opam*, see below)
+	  * tested with 4.13.1
+  - opam: version > 2.0.8.
+      * tested with 2.1.2
     It is available via [homebrew](https://brew.sh/) on Mac, and most system's package managers on Linux, e.g. `sudo apt-get install opam`.
     If this is the first time you are using opam you need to initialize it: 
     + On Linux: `opam init`
     + On Mac:  `opam init --disable-sandboxing` (sandboxing needs to be disabled due to a known [issue](https://github.com/ocaml/opam-repository/issues/12973)).
-- Add the Coq package repository:
+  - Add the Coq package repository:
     `opam repo add coq-released https://coq.inria.fr/opam/released`.
-- Finally, create an opam *switch* with:
-    `opam switch create vellvm ocaml-base-compiler.4.12.0`.
-  - Clang 7.0.1+ (available for Mac OSX in XCode 4.2+, or installed via, e.g. `sudo apt-get install clang`)
+  - Finally, create an opam *switch* with:
+    `opam switch create vellvm ocaml-base-compiler.4.13.1`.
   - External Coq libraries: 
     * ext-lib    (installed via, e.g. `opam install coq-ext-lib`)
     * paco       (installed via, e.g. `opam install coq-paco`)
@@ -132,6 +134,8 @@ Our current test-suite of LLVM programs for which we compare our semantics again
     * dune       (installed via, e.g. `opam install dune`)
     * menhir     (installed via, e.g. `opam install menhir`)
     * qcheck     (installed via, e.g. `opam install qcheck`)
+
+  - Clang 7.0.1+ (available for Mac OSX in XCode 4.2+, or installed via, e.g. `sudo apt-get install clang`)
 
 Compilation:
 

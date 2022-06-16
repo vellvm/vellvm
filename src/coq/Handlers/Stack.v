@@ -10,7 +10,7 @@ From ExtLib Require Import
 From ITree Require Import
      ITree
      Events.StateFacts
-     Eq.Eq
+     Eq.Eqit
      Events.State.
 
 From Vellvm Require Import

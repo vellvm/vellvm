@@ -12,7 +12,7 @@ From ITree Require Import
      Events.StateFacts
      InterpFacts
      KTreeFacts
-     Eq.Eq.
+     Eq.Eqit.
 
 From Vellvm Require Import
      Utilities

@@ -1,6 +1,6 @@
 (* begin hide *)
 From ITree Require Import
-     Eq.Eq
+     Eq.Eqit
      ITree
      FailFacts
      Events.Exception.
