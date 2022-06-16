@@ -457,8 +457,6 @@ Fixpoint show_typ (t : typ) : string :=
   
   Global Instance ShowConversionType : Show conversion_type
     := {| show := show_conversion_type |}.
-
-  Print fold_left. 
    
   Fixpoint show_exp (v : exp T) :=
       match v with
@@ -469,7 +467,7 @@ Fixpoint show_typ (t : typ) : string :=
       | EXP_Hex f => double_to_hex_string f
       | EXP_Bool b => show b
       | EXP_Null => "null"
-      | EXP_Zero_initializer => "zero initializer"
+      | EXP_Zero_initializer => "zeroinitializer"
       (* see notes on cstring on LLVMAst.v *)                         
       | EXP_Cstring elts => "unimplemented"      
       | EXP_Undef => "undef"
@@ -680,8 +678,8 @@ Fixpoint show_typ (t : typ) : string :=
 
   Definition show_tint_literal (t : tint_literal) : string :=
     match t with
-    (* typo? *) 
-    | TInt_Literal sz x => show sz ++ show x ++ "What is a tint_literal anyway?"
+    (* What is going on here? *) 
+    | TInt_Literal sz x => "i" ++ show sz ++ " " ++ show x
     end.
 
   Global Instance showTintLiteral : Show tint_literal :=
@@ -690,10 +688,14 @@ Fixpoint show_typ (t : typ) : string :=
   Definition show_terminator (t : terminator T) : string
     := match t with
        | TERM_Ret v => "ret " ++ show v
-       | TERM_Ret_void => "ret"
+       | TERM_Ret_void => "ret void"
        | TERM_Br te b1 b2 => "br " ++ show te ++ ", label %" ++ show b1 ++ ", label %" ++ show b2
        | TERM_Br_1 b => "br label %" ++ show b
-       | TERM_Switch v def_dest brs => "" 
+       | TERM_Switch v def_dest brs => concatStr["switch "; show v; ", label %"; show def_dest;
+                                                 " ["; fold_left (fun str '(x, y) =>
+                                                                    str ++ show x ++ ", label %" ++ show y ++ " ") brs "";
+                                                 "]"] 
+                                        
        | TERM_IndirectBr v brs => concatStr["indirectbr "; show v; show brs]
        | TERM_Resume v => "remove " ++ show v
        | TERM_Invoke fnptrval args to_label unwind_label => concatStr["invoke "; show fnptrval;
@@ -962,7 +964,7 @@ End ShowInstances.
        | TLE_Declaration decl => show decl
        | TLE_Global g => show g
        | TLE_Metadata id md => "!" ++ show id ++ show_metadata md (* Can't use implicit *)                                                           
-       | TLE_Type_decl id t => concatStr [(* "% "; *) show_ident id ;  " = type " ; show t ]
+       | TLE_Type_decl id t => concatStr [show_ident id ;  " = type " ; show t ]
        | TLE_Attribute_group i attrs => concatStr ["attributes #" ; show i ; " = { " ;
                                                    concat ", " (map (fun x => show x) (attrs)) ; " }"  ]             
        end.
