@@ -975,60 +975,50 @@ Section ExpGenerators.
        | _ => lift failGen
        end.
 
-(* Generator GEP part *)
-(* Get index paths from array or vector*)
-Fixpoint get_index_paths_from_AoV (sz: nat) (t: typ) (sub_paths: list (typ * list Z)) (pre_path: list Z): list (typ * list Z) :=
-  match sz with
-  | 0%nat => []
-  | S z =>
-      map (fun '(t, p) => (t, pre_path ++ [Z.of_nat z] ++ p)) sub_paths ++ get_index_paths_from_AoV z t sub_paths pre_path
-  end.
+  (* Generator GEP part *)
+  (* Get index paths from array or vector*)
+  
+  Definition get_index_paths_from_AoV (sz: N) (t: typ) (pre_path: list Z) (sub_paths: list (typ * list Z)) : list (typ * list Z) :=
+    N.recursion []
+                (fun ix acc =>
+                   map (fun '(t, sub_path) => (t, Z.of_N ix :: sub_path)) sub_paths)
+                sz.
 
-(* Can work after extracting the pointer inside*)
-Fixpoint get_index_paths_aux (t_from : typ) (pre_path : list Z) {struct t_from}: list (typ * list (Z)) :=
-  match t_from with
-  | TYPE_Array sz t
-  | TYPE_Vector sz t =>
-      let sub_paths := get_index_paths_aux t [] in (* Get index path from the first element*)
-      [(t_from, pre_path)] ++ (* The path to the array *)
-      get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path (* Assemble them into 1*)
-  | TYPE_Struct fields
-  | TYPE_Packed_struct fields => [(t_from, pre_path)] ++ get_index_paths_from_struct fields pre_path 0
-  | t => [(t, pre_path)]
-  end with
-  get_index_paths_from_struct (fields: list typ) (pre_path: list Z) (current_index : Z) {struct fields}: list (typ * list Z) :=
-  match fields with
-  | nil => nil
-  | h::t => let head_list := map (fun '(t, p) => (t, pre_path ++ [current_index] ++ p)) (get_index_paths_aux h []) in
-  let tail_list := get_index_paths_from_struct t pre_path (current_index + 1%Z) in
-  head_list ++ tail_list
-  end.
+  (* Can work after extracting the pointer inside*)
+  Fixpoint get_index_paths_aux (t_from : typ) (pre_path : list Z) {struct t_from}: list (typ * list (Z)) :=
+    match t_from with
+    | TYPE_Array sz t
+    | TYPE_Vector sz t =>
+        let sub_paths := get_index_paths_aux t [] in (* Get index path from the first element*)
+        [(t_from, pre_path)] ++ (* The path to the array *)
+        get_index_paths_from_AoV sz t pre_path sub_paths (* Assemble them into 1*)
+    | TYPE_Struct fields
+    | TYPE_Packed_struct fields => [(t_from, pre_path)] ++ get_index_paths_from_struct pre_path fields
+    | _ => [(t_from, pre_path)]
+    end with
+  get_index_paths_from_struct (pre_path: list Z) (fields: list typ) {struct fields}: list (typ * list Z) :=
+    snd (fold_left
+           (fun '(ix, paths) (fld_typ : typ) => (ix + 1, (get_index_paths_aux fld_typ (pre_path ++ [ix]) ++ paths)))
+           fields (0%Z, [] : list (typ * list Z))).
 
-Definition get_index_paths_ptr (t_from: typ) : list (typ * list (Z)) :=
-  map (fun '(t, path) => (t, path)) (get_index_paths_aux t_from [0%Z]).
+  Definition get_index_paths_ptr (t_from: typ) : list (typ * list (Z)) :=
+    get_index_paths_aux t_from [0%Z].
 
-
-(* Index path without getting into vector *)
-Fixpoint get_index_paths_agg_aux (t_from : typ) (pre_path : list Z) {struct t_from}: list (typ * list (Z)) :=
-  match t_from with
-  | TYPE_Array sz t =>
-      let sub_paths := get_index_paths_agg_aux t [] in (* Get index path from the first element*)
-      [(t_from, pre_path)] ++ (* The path to the array *)
-      get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path (* Assemble them into 1*)
-  | TYPE_Struct fields
-  | TYPE_Packed_struct fields =>
-      [(t_from, pre_path)] ++ get_index_paths_agg_from_struct fields pre_path 0
-  | t => [(t, pre_path)]
-  end with
-  get_index_paths_agg_from_struct (fields: list typ) (pre_path: list Z) (current_index : Z) {struct fields}: list (typ * list Z) :=
-  match fields with
-  | nil => nil
-  | h::t =>
-      let head_list :=
-        map (fun '(t, p) => (t, pre_path ++ [current_index] ++ p)) (get_index_paths_agg_aux h []) in
-      let tail_list := get_index_paths_agg_from_struct t pre_path (current_index + 1%Z) in
-      head_list ++ tail_list
-  end.
+  (* Index path without getting into vector *)
+  Fixpoint get_index_paths_agg_aux (t_from : typ) (pre_path : list Z) {struct t_from}: list (typ * list (Z)) :=
+    match t_from with
+    | TYPE_Array sz t =>
+        let sub_paths := get_index_paths_aux t [] in (* Get index path from the first element*)
+        [(t_from, pre_path)] ++ (* The path to the array *)
+        get_index_paths_from_AoV sz t pre_path sub_paths (* Assemble them into 1*)
+    | TYPE_Struct fields
+    | TYPE_Packed_struct fields => [(t_from, pre_path)] ++ get_index_paths_agg_from_struct pre_path fields
+    | _ => [(t_from, pre_path)]
+    end with
+  get_index_paths_agg_from_struct (pre_path: list Z) (fields: list typ) {struct fields}: list (typ * list Z) :=
+    snd (fold_left
+           (fun '(ix, paths) (fld_typ : typ) => (ix + 1, (get_index_paths_agg_aux fld_typ (pre_path ++ [ix]) ++ paths)))
+           fields (0%Z, [] : list (typ * list Z))).
 
 (* The method is mainly used by extractvalue and insertvalue,
    which requires at least one index for getting inside the aggregate type.
