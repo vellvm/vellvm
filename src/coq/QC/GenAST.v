@@ -1662,6 +1662,7 @@ Section InstrGenerators.
   Definition gen_definition (name : global_id) (ret_t : typ) (args : list (local_id * typ)) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
       ctx <- get_ctx;;
+      ptr_int_ctx <- get_ptrtoint_ctx;;
       (* Add arguments to context *)
       let args_ctx := map (fun '(i, t) => (ID_Local i, t)) args in
       append_to_ctx args_ctx;;
@@ -1679,6 +1680,7 @@ Section InstrGenerators.
       in
       (* Reset context *)
       modify (replace_ctx ((ID_Global name, f_type) :: ctx));;
+      modify (replace_ptrtoint_ctx ptr_int_ctx);;
       ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs).
 
   Definition gen_new_definition (ret_t : typ) (args : list (local_id * typ)) : GenLLVM (definition typ (block typ * list (block typ)))
