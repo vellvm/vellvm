@@ -591,8 +591,8 @@ Proof.
 Qed.
 
 Lemma interp_intrinsics_iter :
-  forall {E F R I} `{FailureE -< F } (t: I -> itree (E +' IntrinsicE +' F) (I + R)) x,
-             interp_intrinsics (iter t x) ≈
+  forall {E F R I} `{FailureE -< F} (t: I -> itree (E +' IntrinsicE +' F) (I + R)) x,
+             (interp_intrinsics (iter (C:=ktree _) t x)) ≈
              ITree.iter (fun x => interp_intrinsics (t x)) x.
 Proof.
   intros.

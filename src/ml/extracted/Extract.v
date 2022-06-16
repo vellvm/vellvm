@@ -8,7 +8,7 @@ Require Import ZArith.
 From ITree Require Import
      ITree
      Basics.Monad
-     Eq.Eq.
+     Eq.Eqit.
 
 From Vellvm Require Import
      Utilities
@@ -71,9 +71,9 @@ Extract Inlined Constant Binary.B2R => "fun _ -> assert false".
 Extract Inlined Constant BinarySingleNaN.round_mode => "fun _ -> assert false".
 Extract Inlined Constant BinarySingleNaN.SF2R => "fun _ -> assert false".
 Extract Inlined Constant BinarySingleNaN.B2R => "fun _ -> assert false".
-Extract Inlined Constant Binary.BSN.round_mode => "fun _ -> assert false".
-Extract Inlined Constant Binary.BSN.SF2R => "fun _ -> assert false".
-Extract Inlined Constant Binary.BSN.B2R => "fun _ -> assert false".
+(* Extract Inlined Constant Binary.BSN.round_mode => "fun _ -> assert false". *)
+(* Extract Inlined Constant Binary.BSN.SF2R => "fun _ -> assert false". *)
+(* Extract Inlined Constant Binary.BSN.B2R => "fun _ -> assert false". *)
 Extract Inlined Constant Bracket.inbetween_loc => "fun _ -> assert false".
 Extract Inlined Constant Generic_fmt.round => "fun _ -> assert false".
 

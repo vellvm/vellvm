@@ -121,13 +121,13 @@ Our current test-suite of LLVM programs for which we compare our semantics again
   - Finally, create an opam *switch* with:
     `opam switch create vellvm ocaml-base-compiler.4.13.1`.
   - External Coq libraries: 
-    * ext-lib    (installed via, e.g. `opam install coq-ext-lib`)
-    * paco       (installed via, e.g. `opam install coq-paco`)
-    * itrees     (installed via, e.g. `opam install coq-itree`)
-    * flocq      (installed via, e.g. `opam install coq-flocq`) 
-    * ceres      (installed via, e.g. `opam install coq-ceres`)
-    * mathcomp   (installed via, e.g. `opam install coq-mathcomp-ssreflect`)
-    * simple-io  (installed via, e.g. `opam install coq-simple-io`)
+    * ext-lib version   (installed via, e.g. `opam install coq-ext-lib`)
+    * paco    version   (installed via, e.g. `opam install coq-paco`)
+    * itrees  version 5.0   (installed via, e.g. `opam install coq-itree`)
+    * flocq   version 3.4.3 (installed via, e.g. `opam pin coq-flocq 3.4.3`) 
+    * ceres   version   (installed via, e.g. `opam install coq-ceres`)
+    * mathcomp version  (installed via, e.g. `opam install coq-mathcomp-ssreflect`)
+    * simple-io version (installed via, e.g. `opam install coq-simple-io`)
 
   - Additional opam packages: 
     * ocamlbuild (installed via, e.g. `opam install ocamlbuild`)

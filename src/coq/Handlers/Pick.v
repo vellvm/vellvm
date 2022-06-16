@@ -219,13 +219,13 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       - intros. subst. inversion H. clear H.
         induction sz.
         + cbn in H1.
-          destruct (default_dvalue_of_dtyp t) eqn: HT. inv H1. inv H1.
+          destruct (default_dvalue_of_dtyp t) eqn: HT. inversion H1. inversion H1.
           pose proof DVALUE_Array_typ.
           specialize (H nil (N.to_nat 0) t).
           rewrite Nnat.N2Nat.id in H.
           apply H. auto. auto.
         + cbn in H1.
-          destruct (default_dvalue_of_dtyp t) eqn: HT. inv H1. inv H1.
+          destruct (default_dvalue_of_dtyp t) eqn: HT. inversion H1. inversion H1.
           pose proof DVALUE_Array_typ as ARR.
           specialize (ARR (repeat d (Pos.to_nat p)) (N.to_nat (N.pos p)) t).
           rewrite Nnat.N2Nat.id in ARR.
@@ -235,7 +235,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
             apply IHt. reflexivity.
           * apply repeat_length.
       - revert H. induction fields.
-        + intros. inv H0. constructor.
+        + intros. inversion H0. constructor.
         + intros.
           assert (forall u : dtyp,
               In u fields ->
@@ -252,14 +252,14 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
           unfold map_monad at 1 in H0.
           Opaque map_monad. cbn in H0.
           destruct (default_dvalue_of_dtyp a) eqn: A_DEFAULT.
-          inv H0.
+          inversion H0.
           destruct (map_monad default_dvalue_of_dtyp fields) eqn: FIELDS.
-          inv H0.
-          inv H0. constructor. apply H. apply in_eq.
+          inversion H0.
+          inversion H0. constructor. apply H. apply in_eq.
           symmetry. auto.
           apply IHfields. cbn. rewrite FIELDS. reflexivity.
       - revert H. induction fields.
-        + intros. inv H0. constructor.
+        + intros. inversion H0. constructor.
         + intros.
           assert (forall u : dtyp,
               In u fields ->
@@ -276,10 +276,10 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
           unfold map_monad at 1 in H0.
           Opaque map_monad. cbn in H0.
           destruct (default_dvalue_of_dtyp a) eqn: A_DEFAULT.
-          inv H0.
+          inversion H0.
           destruct (map_monad default_dvalue_of_dtyp fields) eqn: FIELDS.
-          inv H0.
-          inv H0. constructor. apply H. apply in_eq.
+          inversion H0.
+          inversion H0. constructor. apply H. apply in_eq.
           symmetry. auto.
           apply IHfields. cbn. rewrite FIELDS. reflexivity.
       - intros. subst. inversion H. clear H.
@@ -289,22 +289,22 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
           pose proof DVALUE_Vector_typ.
           specialize (H nil (N.to_nat 0)).
           rewrite Nnat.N2Nat.id in H.
-          destruct t; inv H1;
+          destruct t; inversion H1;
               try
                 (apply H;
                  [constructor | constructor |
                   unfold vector_dtyp; intuition]).
-          destruct (default_dvalue_of_dtyp_i sz) eqn: HI; inv H2.
+          destruct (default_dvalue_of_dtyp_i sz) eqn: HI; inversion H2.
           apply H. constructor. auto. unfold vector_dtyp. left.
           exists sz. reflexivity.
         + intros. cbn in H1.
-          destruct t; inv H1;
+          destruct t; inversion H1;
             try (
                 rewrite <- positive_nat_N;
                    constructor; [apply forall_repeat_true ; constructor |
                           apply repeat_length |
                           unfold vector_dtyp ; intuition ]).
-          destruct (default_dvalue_of_dtyp_i sz) eqn: SZ; inv H0.
+          destruct (default_dvalue_of_dtyp_i sz) eqn: SZ; inversion H0.
             pose proof DVALUE_Vector_typ.
             rewrite <- positive_nat_N. apply H.
             apply forall_repeat_true. apply IHt. symmetry. auto.
@@ -320,7 +320,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
       - cbn. destruct (default_dvalue_of_dtyp t) eqn: EQ.
         econstructor. Unshelve. 3 : { exact DVALUE_None. }
-        intro. inv H.
+        intro. inversion H.
         apply Concretize_Undef. apply dvalue_default. symmetry. auto.
       - cbn. induction fields.
         + cbn. constructor. auto.
@@ -374,14 +374,14 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
             -- destruct s; auto.
                destruct (unEitherT (map_monad concretize_uvalue elts)); auto.
                destruct s; auto.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
+      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inversion H'.
+      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inversion H'.
+      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inversion H'.
+      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inversion H'.
+      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inversion H'.
+      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inversion H'.
+      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inversion H'.
+      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inversion H'.
     Qed.
 
     Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} : PickE ~> itree E :=

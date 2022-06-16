@@ -289,7 +289,7 @@ Lemma interp_cfg3_alloca :
 Proof.
   intros * NV.
   unfold ℑ3.
-  eapply interp_memory_alloca_exists in NV as (m' & a' & ALLOC & INTERP).
+  eapply (@interp_memory_alloca_exists _ L3)in NV as (m' & a' & ALLOC & INTERP).
   exists m', a'. 
   split; eauto.
   go.

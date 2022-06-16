@@ -146,8 +146,9 @@ Section Correctness.
       (digits m < prec /\ e = 3 - emax - prec)
       (digits m = prec /\ 3 - emax - prec <= e <= emax - prec).
   Proof.
-    unfold FLX.Prec_gt_0, bounded, canonical_mantissa, fexp, emin in *.
+    unfold FLX.Prec_gt_0, bounded, canonical_mantissa, FLX.Prec_gt_0 in *.
     rewrite Bool.andb_true_iff, Z.leb_le, <-Zeq_is_eq_bool, digits2_pos_digits.
+    unfold FLT.FLT_exp.
     remember (3 - emax - prec) as emin.
     split; intro.
     all: destruct (Z_lt_le_dec (digits m + e - prec) emin).

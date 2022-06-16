@@ -194,7 +194,7 @@ Proof.
   eapply eutt_equiv; eauto.
   split.
   - intros ? ? (? & ? & ?); do 2 econstructor; eauto. 
-  - intros ? ? ?. inv H. inv REL1.
+  - intros ? ? ?. inversion H. inversion REL1.
     destruct REL2 as [-> ?], REL0 as [<- ?]; eauto.
 Qed.
 
