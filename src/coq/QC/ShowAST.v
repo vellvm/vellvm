@@ -676,8 +676,7 @@ Fixpoint show_typ (t : typ) : string :=
     := {| show := show_instr_id |}.
 
   Definition show_tint_literal (t : tint_literal) : string :=
-    match t with
-    (* What is going on here? *) 
+    match t with  
     | TInt_Literal sz x => "i" ++ show sz ++ " " ++ show x
     end.
 
