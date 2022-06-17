@@ -1074,7 +1074,7 @@ Definition get_ctx_ptrs  : GenLLVM (list (ident * typ)) :=
   ret (filter_ptr_typs ctx).
 
 (* Index path without getting into vector *)
-  Fixpoint get_index_paths_insertvalue_aux (t_from : typ) (pre_path : DList Z) (ctx: list (ident * typ)) {struct t_from}: bool * DList (typ * DList (Z)) :=
+  Fixpoint get_index_paths_insertvalue_aux (t_from : typ) (pre_path : DList Z) (ctx : list (ident * typ)) {struct t_from}: bool * DList (typ * DList (Z)) :=
     match t_from with
     | TYPE_Array sz t =>
         let '(has_subpaths, sub_paths) := get_index_paths_insertvalue_aux t DList_empty ctx in (* Get index path from the first element*)
@@ -1088,6 +1088,9 @@ Definition get_ctx_ptrs  : GenLLVM (list (ident * typ)) :=
         then (true, DList_cons (t_from, pre_path) reaches)
         else (false, DList_empty)
     | TYPE_Pointer t => if seq.nilp (filter_type t_from ctx) then (false, DList_empty) else (true, DList_singleton (t_from, pre_path))
+    | TYPE_Vector _ t =>
+        let '(has_subpaths, sub_paths) := get_index_paths_insertvalue_aux t DList_empty ctx in (* Get index path from the first element*)
+        if has_subpaths then (true, DList_singleton (t_from, pre_path)) else (false, DList_empty)           
     | _ => (true, DList_singleton (t_from, pre_path))
     end with
   get_index_paths_insertvalue_from_struct (pre_path: DList Z) (fields: list typ) (ctx: list (ident * typ)) {struct fields}: bool * DList (typ * DList Z) :=
@@ -1098,7 +1101,7 @@ Definition get_ctx_ptrs  : GenLLVM (list (ident * typ)) :=
                  (orb has_reach b, DList_append reach paths))))
            fields (0%Z, (false, DList_empty : DList (typ * DList Z)))).
 
-Definition get_index_paths_insertvalue (t_from: typ) (ctx: list (ident * typ)): list (typ * list (Z)) :=
+Definition get_index_paths_insertvalue (t_from : typ) (ctx : list (ident * typ)): list (typ * list (Z)) :=
   tl (DList_paths_to_list_paths (snd (get_index_paths_insertvalue_aux t_from DList_empty ctx))).
 
 Definition get_ctx_ptr : GenLLVM (ident * typ) :=
@@ -1530,7 +1533,7 @@ Section InstrGenerators.
        let pt := TYPE_Pointer ptr_typ in
        let pexp := EXP_Ident ptr_ident in
        gen_store_to (pt, pexp).
-
+  
   (* Generate an instruction, as well as its type...
 
      The type is sometimes void for instructions that don't really
