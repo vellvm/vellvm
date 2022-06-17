@@ -1559,6 +1559,10 @@ Section InstrGenerators.
   Definition gen_instr : GenLLVM (typ * instr typ) :=
     ctx <- get_ctx;;
     ptrtoint_ctx <- get_ptrtoint_ctx;;
+    let agg_typs_in_ctx := filter_agg_typs ctx in
+    let ptr_typs_in_ctx := filter_ptr_typs ctx in
+    let vec_typs_in_ctx := filter_vec_typs ctx in
+    let insertvalue_typs_in_ctx := filter_insertvalue_typs agg_typs_in_ctx ctx in
     oneOf_LLVM
       ([ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
          ; t <- gen_sized_typ_ptrinctx;;
@@ -1567,9 +1571,11 @@ Section InstrGenerators.
            align <- ret None;;
            ret (TYPE_Pointer t, INSTR_Alloca t num_elems align)
         ] (* TODO: Generate atomic operations and other instructions *)
-         ++ (if seq.nilp (filter_ptr_typs ctx) then [] else [gen_gep; gen_load; gen_store; gen_ptrtoint])
+         ++ (if seq.nilp ptr_typs_in_ctx then [] else [gen_gep; gen_load; gen_store; gen_ptrtoint])
          ++ (if seq.nilp ptrtoint_ctx then [] else [gen_inttoptr])
-         ++ (let agg_typs_in_ctx := filter_agg_typs ctx in if seq.nilp (agg_typs_in_ctx) then [] else [gen_extractvalue]                                                                                     ++ (let insertvalue_typs_in_ctx := filter_insertvalue_typs agg_typs_in_ctx ctx in if seq.nilp (insertvalue_typs_in_ctx) then [] else [x <- elems_LLVM insertvalue_typs_in_ctx;; gen_insertvalue x]))
+         ++ (if seq.nilp agg_typs_in_ctx then [] else [gen_extractvalue])
+         ++ (if seq.nilp insertvalue_typs_in_ctx then [] else [x <- elems_LLVM insertvalue_typs_in_ctx;;
+                                                               gen_insertvalue x])
          ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])).
 
   (* TODO: Generate instructions with ids *)
