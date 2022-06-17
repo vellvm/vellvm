@@ -24,7 +24,6 @@ Import ListNotations.
 
 From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils.
 Require Import Integers Floats.
-Require Import List.
 
 Import ListNotations.
 Import MonadNotation.
@@ -510,7 +509,7 @@ Definition filter_ptr_vecptr_typ (ctx: list (ident * typ)) : list (ident * typ) 
             | TYPE_Pointer _ => true
             | TYPE_Vector _ (TYPE_Pointer _) => true
             | _ => false
-            end) ctx.
+            end) ctx.           
 
   (* TODO: These currently don't generate pointer types either. *)
 
@@ -979,8 +978,8 @@ Section ExpGenerators.
          | _ => false
          end
        | TYPE_Identified id => false
-       end.
-
+       end.   
+  
   (* TODO: Move this *)
   Fixpoint replicateM {M : Type -> Type} {A} `{Monad M} (n : nat) (ma : M A) : M (list A)
     := match n with
@@ -1073,6 +1072,34 @@ Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
 Definition get_ctx_ptrs  : GenLLVM (list (ident * typ)) :=
   ctx <- get_ctx;;
   ret (filter_ptr_typs ctx).
+
+(* Index path without getting into vector *)
+  Fixpoint get_index_paths_insertvalue_aux (t_from : typ) (pre_path : DList Z) (ctx: list (ident * typ)) {struct t_from}: bool * DList (typ * DList (Z)) :=
+    match t_from with
+    | TYPE_Array sz t =>
+        let '(has_subpaths, sub_paths) := get_index_paths_insertvalue_aux t DList_empty ctx in (* Get index path from the first element*)
+        if has_subpaths 
+        then (true, DList_cons (t_from, pre_path) (get_index_paths_from_AoV sz t pre_path sub_paths))
+        else (false, DList_empty)
+    | TYPE_Struct fields
+    | TYPE_Packed_struct fields =>
+        let '(has_reach, reaches) := (get_index_paths_insertvalue_from_struct pre_path fields ctx) in
+        if has_reach
+        then (true, DList_cons (t_from, pre_path) reaches)
+        else (false, DList_empty)
+    | TYPE_Pointer t => if seq.nilp (filter_type t_from ctx) then (false, DList_empty) else (true, DList_singleton (t_from, pre_path))
+    | _ => (true, DList_singleton (t_from, pre_path))
+    end with
+  get_index_paths_insertvalue_from_struct (pre_path: DList Z) (fields: list typ) (ctx: list (ident * typ)) {struct fields}: bool * DList (typ * DList Z) :=
+    snd (fold_left
+           (fun '(ix, (b, paths)) (fld_typ : typ) =>
+              (ix + 1,
+                (let '(has_reach, reach) := get_index_paths_insertvalue_aux fld_typ (DList_append pre_path (DList_singleton ix)) ctx in
+                 (orb has_reach b, DList_append reach paths))))
+           fields (0%Z, (false, DList_empty : DList (typ * DList Z)))).
+
+Definition get_index_paths_insertvalue (t_from: typ) (ctx: list (ident * typ)): list (typ * list (Z)) :=
+  tl (DList_paths_to_list_paths (snd (get_index_paths_insertvalue_aux t_from DList_empty ctx))).
 
 Definition get_ctx_ptr : GenLLVM (ident * typ) :=
   ptrs_in_context <- get_ctx_ptrs;;
@@ -1298,7 +1325,8 @@ Definition genType: G (typ) :=
           match t with
           | TYPE_I n                  => ret EXP_Integer <*> lift (arbitrary : G Z) (* lift (x <- (arbitrary : G nat);; ret (Z.of_nat x)) (* TODO: should the integer be forced to be in bounds? *) *)
           | TYPE_IPTR => ret EXP_Integer <*> lift (arbitrary : G Z)
-          | TYPE_Pointer t            => lift failGen (* Only pointer type expressions might be conversions? Maybe GEP? *)
+          | TYPE_Pointer subtyp       => lift failGen
+          (* Only pointer type expressions might be conversions? Maybe GEP? *)
           | TYPE_Void                 => lift failGen (* There should be no expressions of type void *)
           | TYPE_Function ret args    => lift failGen (* No expressions of function type *)
           | TYPE_Opaque               => lift failGen (* TODO: not sure what these should be... *)
@@ -1413,7 +1441,8 @@ Definition genType: G (typ) :=
 
 Definition gen_insertvalue : GenLLVM (typ * instr typ) :=
   '(id, tagg) <- get_ctx_agg_typ;;
-  let paths_in_agg := get_index_paths_agg tagg in
+  ctx <- get_ctx;;
+  let paths_in_agg := get_index_paths_insertvalue tagg ctx in
   '(tsub, path_for_insertvalue) <- oneOf_LLVM (map ret paths_in_agg);;
   ex <- hide_ctx (gen_exp_size 0 tsub);;
   (* Generate all of the type*)
