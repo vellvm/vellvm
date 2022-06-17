@@ -23,11 +23,11 @@ let exec_tests () =
   Printf.printf "%s\n" (outcome_to_string outcome);
   raise (Ran_tests (successful outcome))
 
-let dvalue_eq_assertion (dt1 : unit -> DV.dvalue) (dt2 : unit -> DV.dvalue) () =
-  let dv1 = dt1 () in
-  let dv2 = dt2 () in
+let dvalue_eq_assertion (got : unit -> DV.dvalue) (expected : unit -> DV.dvalue) () =
+  let dv1 = got () in
+  let dv2 = expected () in
   if DV.dvalue_eqb dv1 dv2 then () else
-    failwith (Printf.sprintf "dvalue: %s <> %s"
+    failwith (Printf.sprintf "dvalues different\ngot:\n\t%s\nexpected:\n\t%s"
                 (Llvm_printer.string_of_dvalue dv1)
                 (Llvm_printer.string_of_dvalue dv2))
 
