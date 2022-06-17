@@ -25,11 +25,11 @@
                        meta.broken = false;
                      });
 
-              flocq = super.flocq.overrideAttrs
-                (s : { version = "4.0.0";
+              ITree = super.ITree.overrideAttrs
+                (s : { version = "5.0.0";
                        src = fetchTarball {
-                         url = "https://gitlab.inria.fr/flocq/flocq/-/archive/flocq-4.0.0/flocq-flocq-4.0.0.zip";
-                         sha256 = "07bj7fha14iifnh0s17q0kxq9s1g5rq18l1swbydz29c3bmz3i41";
+                         url = "https://github.com/DeepSpec/InteractionTrees/archive/refs/tags/5.0.0.zip";
+                         sha256 = "1cnq5qb9n6908xw117z9d5c3is9m42aa0xabw7nna22szycc4apz";
                        };
                 });
             });
