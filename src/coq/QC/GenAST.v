@@ -435,7 +435,7 @@ Section GenerationState.
   Definition freq_LLVM {A} (gs : list (nat * GenLLVM A)) : GenLLVM A
     := mkStateT
          (fun st => freq_ failGen (fmap (fun '(n, g) => (n, runStateT g st)) gs)).
-  
+
   Definition elems_LLVM {A : Type} (l: list A) : GenLLVM A (* TODO: Need a more efficient way*)
     := n <- lift (choose (0, List.length l - 1)%nat);;
        nth n (map ret l) (lift failGen).
@@ -513,7 +513,7 @@ Definition filter_ptr_vecptr_typ (ctx: list (ident * typ)) : list (ident * typ) 
             | TYPE_Pointer _ => true
             | TYPE_Vector _ (TYPE_Pointer _) => true
             | _ => false
-            end) ctx.           
+            end) ctx.
 
   (* TODO: These currently don't generate pointer types either. *)
 
@@ -982,8 +982,8 @@ Section ExpGenerators.
          | _ => false
          end
        | TYPE_Identified id => false
-       end.   
-  
+       end.
+
   (* TODO: Move this *)
   Fixpoint replicateM {M : Type -> Type} {A} `{Monad M} (n : nat) (ma : M A) : M (list A)
     := match n with
@@ -1082,7 +1082,7 @@ Definition get_ctx_ptrs  : GenLLVM (list (ident * typ)) :=
     match t_from with
     | TYPE_Array sz t =>
         let '(has_subpaths, sub_paths) := get_index_paths_insertvalue_aux t DList_empty ctx in (* Get index path from the first element*)
-        if has_subpaths 
+        if has_subpaths
         then (true, DList_cons (t_from, pre_path) (get_index_paths_from_AoV sz t pre_path sub_paths))
         else (false, DList_empty)
     | TYPE_Struct fields
@@ -1094,7 +1094,7 @@ Definition get_ctx_ptrs  : GenLLVM (list (ident * typ)) :=
     | TYPE_Pointer t => if seq.nilp (filter_type t_from ctx) then (false, DList_empty) else (true, DList_singleton (t_from, pre_path))
     | TYPE_Vector _ t =>
         let '(has_subpaths, sub_paths) := get_index_paths_insertvalue_aux t DList_empty ctx in (* Get index path from the first element*)
-        if has_subpaths then (true, DList_singleton (t_from, pre_path)) else (false, DList_empty)           
+        if has_subpaths then (true, DList_singleton (t_from, pre_path)) else (false, DList_empty)
     | _ => (true, DList_singleton (t_from, pre_path))
     end with
   get_index_paths_insertvalue_from_struct (pre_path: DList Z) (fields: list typ) (ctx: list (ident * typ)) {struct fields}: bool * DList (typ * DList Z) :=
@@ -1550,7 +1550,7 @@ Section InstrGenerators.
        let pt := TYPE_Pointer ptr_typ in
        let pexp := EXP_Ident ptr_ident in
        gen_store_to (pt, pexp).
-  
+
   (* Generate an instruction, as well as its type...
 
      The type is sometimes void for instructions that don't really
