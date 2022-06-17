@@ -787,8 +787,8 @@ Fixpoint show_typ (t : typ) : string :=
     | METADATA_Null => "null"
     | METADATA_Id i => "!" ++ show i
     | METADATA_String s => "!" ++ show s   
-    | METADATA_Named strs => "!{" ++ show (intersperse " , " (List.map (fun x => "!" ++ x) strs)) ++ "}" 
-    | METADATA_Node mds => "!{" ++ show (intersperse " , " (List.map show_metadata mds)) ++ "}" 
+    | METADATA_Named strs => "!{" ++ intersperse " , " (List.map (fun x => "!" ++ x) strs) ++ "}" 
+    | METADATA_Node mds => "!{" ++ intersperse " , " (List.map show_metadata mds) ++ "}" 
     end. 
 
   Global Instance showMetadata (md : metadata T) : Show (metadata T) :=
@@ -982,21 +982,19 @@ End ShowInstances.
          (*Why is show_definition rather than show being used here*)
        | TLE_Definition defn => show defn
        | TLE_Comment msg => ";" ++ show msg (*What if the comment is multiple lines? *)
-       | TLE_Target tgt => show tgt
-       | TLE_Datalayout layout => show layout
+       | TLE_Target tgt => "target triple = " ++  show tgt
+       | TLE_Datalayout layout => "target datalayout = "  show layout
        | TLE_Source_filename s => "source_filename = " ++ show s
        | TLE_Declaration decl => show decl
        | TLE_Global g => show g
        | TLE_Metadata id md => "!" ++ show id ++ show_metadata md (* Can't use implicit *)                                                           
        | TLE_Type_decl id t => concatStr [show_ident id ;  " = type " ; show t ]
        | TLE_Attribute_group i attrs => concatStr ["attributes #" ; show i ; " = { " ;
-                                                   concat ", " (map (fun x => show x) (attrs)) ; " }"  ]             
+                                                   concat " " (map (fun x => show x) (attrs)) ; " }"  ]             
        end.
 
   Global Instance showTLE: Show (toplevel_entity typ (block typ  * list (block typ))) :=
     {| show := show_tle |}.
 
   Global Instance showProg : Show (list (toplevel_entity typ (block typ * list (block typ)))) :=
-    {| show tles := concat (newline ++ newline) (map show_tle tles) |}.
-
-  
+    {| show tles := concat (newline ++ newline) (map show_tle tles) |}.  
