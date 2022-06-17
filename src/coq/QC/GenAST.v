@@ -1104,6 +1104,19 @@ Definition get_ctx_ptrs  : GenLLVM (list (ident * typ)) :=
 Definition get_index_paths_insertvalue (t_from : typ) (ctx : list (ident * typ)): list (typ * list (Z)) :=
   tl (DList_paths_to_list_paths (snd (get_index_paths_insertvalue_aux t_from DList_empty ctx))).
 
+Fixpoint has_paths_insertvalue_aux (t_from : typ) (ctx : list (ident * typ)) {struct t_from}: bool :=
+  match t_from with
+  | TYPE_Array _ t
+  | TYPE_Vector _ t => has_paths_insertvalue_aux t ctx
+  | TYPE_Struct fields
+  | TYPE_Packed_struct fields => fold_left (fun acc x => orb acc (has_paths_insertvalue_aux x ctx)) fields false
+  | TYPE_Pointer _ => seq.nilp (filter (fun '(_, x) => normalized_typ_eq x t_from) ctx)
+  | _ => true
+  end.
+
+Definition no_path_insertvalue (agg_typs : list (ident * typ)) (ctx : list (ident * typ)) : bool :=
+  seq.nilp (filter (fun '(_, x) => has_paths_insertvalue_aux x ctx) agg_typs).
+
 Definition get_ctx_ptr : GenLLVM (ident * typ) :=
   ptrs_in_context <- get_ctx_ptrs;;
   '(ptr_ident, ptr_typ) <- (oneOf_LLVM (map ret (ptrs_in_context)));;
@@ -1552,7 +1565,7 @@ Section InstrGenerators.
         ] (* TODO: Generate atomic operations and other instructions *)
          ++ (if seq.nilp (filter_ptr_typs ctx) then [] else [gen_gep; gen_load; gen_store; gen_ptrtoint])
          ++ (if seq.nilp ptrtoint_ctx then [] else [gen_inttoptr])
-         ++ (if seq.nilp (filter_agg_typs ctx) then [] else [gen_extractvalue; gen_insertvalue])
+         ++ (let agg_typs_in_ctx := filter_agg_typs ctx in if seq.nilp (agg_typs_in_ctx) then [] else [gen_extractvalue]                                                                                     ++ (if no_path_insertvalue agg_typs_in_ctx ctx then [] else [gen_insertvalue]))
          ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])).
 
   (* TODO: Generate instructions with ids *)
