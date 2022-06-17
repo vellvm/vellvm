@@ -1014,11 +1014,11 @@ Section ExpGenerators.
 
   (* Generator GEP part *)
   (* Get index paths from array or vector*)
-
   Definition get_index_paths_from_AoV (sz: N) (t: typ) (pre_path: DList Z) (sub_paths: DList (typ * DList Z)) : DList (typ * DList Z) :=
     N.recursion DList_empty
                 (fun ix acc =>
-                   DList_map (fun '(t, sub_path) => (t, DList_append pre_path (DList_cons (Z.of_N ix) sub_path))) sub_paths)
+                   let ix_sub_paths := DList_map (fun '(t, sub_path) => (t, DList_append pre_path (DList_cons (Z.of_N ix) sub_path))) sub_paths in
+                   DList_append acc ix_sub_paths)
                 sz.
 
   (* Can work after extracting the pointer inside*)
