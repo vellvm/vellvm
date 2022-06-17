@@ -4,7 +4,7 @@
 
 open Format
 open LLVMAst
-
+open InterpretationStack.InterpreterStackBigIntptr.LP.Events
 
 let toplevel_entities (fmt : Format.formatter) (tles: (LLVMAst.typ , (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entities) : unit =
   Format.pp_print_string fmt (Camlcoq.camlstring_of_coqstring (ShowAST.showProg tles))
@@ -12,4 +12,4 @@ let toplevel_entities (fmt : Format.formatter) (tles: (LLVMAst.typ , (LLVMAst.ty
 
 let string_of_typ (t:LLVMAst.typ) = Camlcoq.camlstring_of_coqstring (ShowAST.show_typ t)
 let string_of_exp (e:LLVMAst.typ LLVMAst.exp) = Camlcoq.camlstring_of_coqstring (ShowAST.show_exp e)
-
+let string_of_dvalue (d:DV.dvalue) = Camlcoq.camlstring_of_coqstring (DV.show_dvalue d)

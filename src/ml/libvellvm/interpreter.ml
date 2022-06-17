@@ -36,7 +36,7 @@ let rec pp_uvalue : Format.formatter -> DV.uvalue -> unit =
   let pp_comma_space ppf () = pp_print_string ppf ", " in
   fun ppf ->
   function
-  | UVALUE_Addr   x -> fprintf ppf "UVALUE_Addr"
+  | UVALUE_Addr   _x -> fprintf ppf "UVALUE_Addr"
   | UVALUE_I1     x -> fprintf ppf "UVALUE_I1(%d)"  (Camlcoq.Z.to_int (DynamicValues.Int1.unsigned x))
   | UVALUE_I8     x -> fprintf ppf "UVALUE_I8(%d)"  (Camlcoq.Z.to_int (DynamicValues.Int8.unsigned x))
   | UVALUE_I32    x -> fprintf ppf "UVALUE_I32(%d)" (Camlcoq.Z.to_int (DynamicValues.Int32.unsigned x))
@@ -52,27 +52,6 @@ let rec pp_uvalue : Format.formatter -> DV.uvalue -> unit =
   | UVALUE_Array         l -> fprintf ppf "UVALUE_Array(%a)"         (pp_print_list ~pp_sep:pp_comma_space pp_uvalue) l
   | UVALUE_Vector        l -> fprintf ppf "UVALUE_Vector(%a)"        (pp_print_list ~pp_sep:pp_comma_space pp_uvalue) l
   | _ -> fprintf ppf "pp_uvalue: todo"
-
-let rec pp_dvalue : Format.formatter -> DV.dvalue -> unit =
-  let open Camlcoq in
-  let pp_comma_space ppf () = pp_print_string ppf ", " in
-  fun ppf ->
-  function
-  | DVALUE_Addr   x -> fprintf ppf "DVALUE_Addr"
-  | DVALUE_I1     x -> fprintf ppf "DVALUE_I1(%d)"  (Camlcoq.Z.to_int (DynamicValues.Int1.unsigned x))
-  | DVALUE_I8     x -> fprintf ppf "DVALUE_I8(%d)"  (Camlcoq.Z.to_int (DynamicValues.Int8.unsigned x))
-  | DVALUE_I32    x -> fprintf ppf "DVALUE_I32(%d)" (Camlcoq.Z.to_int (DynamicValues.Int32.unsigned x))
-  | DVALUE_I64    x -> fprintf ppf "DVALUE_I64(%s)" (Int64.to_string (Z.to_int64 (DynamicValues.Int64.unsigned x)))
-  | DVALUE_IPTR   x -> fprintf ppf "DVALUE_IPTR(%d)" (Camlcoq.Z.to_int (InterpretationStack.InterpreterStackBigIntptr.LP.IP.to_Z x))
-  | DVALUE_Double x -> fprintf ppf "DVALUE_Double(%s)" (string_of_float_full (camlfloat_of_coqfloat x))
-  | DVALUE_Float  x -> fprintf ppf "DVALUE_Float(%s)"  (string_of_float_full (camlfloat_of_coqfloat32 x))
-  | DVALUE_Poison _ -> fprintf ppf "DVALUE_Poison"
-  | DVALUE_None     -> fprintf ppf "DVALUE_None"
-  | DVALUE_Struct        l -> fprintf ppf "DVALUE_Struct(%a)"        (pp_print_list ~pp_sep:pp_comma_space pp_dvalue) l
-  | DVALUE_Packed_struct l -> fprintf ppf "DVALUE_Packet_struct(%a)" (pp_print_list ~pp_sep:pp_comma_space pp_dvalue) l
-  | DVALUE_Array         l -> fprintf ppf "DVALUE_Array(%a)"         (pp_print_list ~pp_sep:pp_comma_space pp_dvalue) l
-  | DVALUE_Vector        l -> fprintf ppf "DVALUE_Vector(%a)"        (pp_print_list ~pp_sep:pp_comma_space pp_dvalue) l
-  | _ -> fprintf ppf "pp_dvalue: todo"
 
 let debug_flag = ref false
 
@@ -109,11 +88,11 @@ let rec step (m : ('a coq_L4, MMEP.MMSP.coq_MemState * (MemPropT.store_id * ((lo
      Error "Uninterpreted Call"
 
   (* The OOME effect *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 msg), k) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 msg), _k) ->
      Error ("Out of Memory: " ^ (Camlcoq.camlstring_of_coqstring msg))
 
   (* UBE event *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 msg)), k) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 msg)), _k) ->
      Error ("Undefined Behaviour: " ^ (Camlcoq.camlstring_of_coqstring msg))
 
   (* The DebugE effect *)
