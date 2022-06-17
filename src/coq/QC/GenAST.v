@@ -435,6 +435,10 @@ Section GenerationState.
   Definition freq_LLVM {A} (gs : list (nat * GenLLVM A)) : GenLLVM A
     := mkStateT
          (fun st => freq_ failGen (fmap (fun '(n, g) => (n, runStateT g st)) gs)).
+  
+  Definition elems_LLVM {A : Type} (l: list A) : GenLLVM A (* TODO: Need a more efficient way*)
+    := n <- lift (choose (0, List.length l - 1)%nat);;
+       nth n (map ret l) (lift failGen).
 
   Definition vectorOf_LLVM {A : Type} (k : nat) (g : GenLLVM A)
     : GenLLVM (list A) :=
@@ -1114,8 +1118,8 @@ Fixpoint has_paths_insertvalue_aux (t_from : typ) (ctx : list (ident * typ)) {st
   | _ => true
   end.
 
-Definition no_path_insertvalue (agg_typs : list (ident * typ)) (ctx : list (ident * typ)) : bool :=
-  seq.nilp (filter (fun '(_, x) => has_paths_insertvalue_aux x ctx) agg_typs).
+Definition filter_insertvalue_typs (agg_typs : list (ident * typ)) (ctx : list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_, x) => has_paths_insertvalue_aux x ctx) agg_typs.
 
 Definition get_ctx_ptr : GenLLVM (ident * typ) :=
   ptrs_in_context <- get_ctx_ptrs;;
@@ -1455,8 +1459,8 @@ Definition genType: G (typ) :=
   Definition gen_exp (t : typ) : GenLLVM (exp typ)
     := sized_LLVM (fun sz => gen_exp_size sz t).
 
-Definition gen_insertvalue : GenLLVM (typ * instr typ) :=
-  '(id, tagg) <- get_ctx_agg_typ;;
+Definition gen_insertvalue (typ_in_ctx: ident * typ): GenLLVM (typ * instr typ) :=
+  let '(id, tagg) := typ_in_ctx in
   ctx <- get_ctx;;
   let paths_in_agg := get_index_paths_insertvalue tagg ctx in
   '(tsub, path_for_insertvalue) <- oneOf_LLVM (map ret paths_in_agg);;
@@ -1565,7 +1569,7 @@ Section InstrGenerators.
         ] (* TODO: Generate atomic operations and other instructions *)
          ++ (if seq.nilp (filter_ptr_typs ctx) then [] else [gen_gep; gen_load; gen_store; gen_ptrtoint])
          ++ (if seq.nilp ptrtoint_ctx then [] else [gen_inttoptr])
-         ++ (let agg_typs_in_ctx := filter_agg_typs ctx in if seq.nilp (agg_typs_in_ctx) then [] else [gen_extractvalue]                                                                                     ++ (if no_path_insertvalue agg_typs_in_ctx ctx then [] else [gen_insertvalue]))
+         ++ (let agg_typs_in_ctx := filter_agg_typs ctx in if seq.nilp (agg_typs_in_ctx) then [] else [gen_extractvalue]                                                                                     ++ (let insertvalue_typs_in_ctx := filter_insertvalue_typs agg_typs_in_ctx ctx in if seq.nilp (insertvalue_typs_in_ctx) then [] else [x <- elems_LLVM insertvalue_typs_in_ctx;; gen_insertvalue x]))
          ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])).
 
   (* TODO: Generate instructions with ids *)
