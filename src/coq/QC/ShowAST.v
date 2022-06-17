@@ -19,7 +19,8 @@ Import ListNotations.
 Import MonadNotation.
 
 From Coq Require Import
-     ZArith List String Lia Bool.Bool Hexadecimal Numbers.HexadecimalString Numbers.HexadecimalZ.
+  ZArith List String Lia Bool.Bool Hexadecimal Numbers.HexadecimalString Numbers.HexadecimalZ
+  Strings.Ascii. 
 
 From QuickChick Require Import Show.
 (* Import QcDefaultNotation. Open Scope qc_scope. *)
@@ -456,6 +457,29 @@ Fixpoint show_typ (t : typ) : string :=
   
   Global Instance ShowConversionType : Show conversion_type
     := {| show := show_conversion_type |}.
+
+  
+  Eval compute in (show (ascii_of_nat 32)).
+
+  Definition ex_to_nat (ex : exp T) : nat :=
+    match ex with
+    |EXP_Integer x => (Z.to_nat x)
+    | _ => 0 (* This is arbitrary, it's never going to hit this case anyway *)
+    end.
+
+
+  Definition ex_to_int (ex : exp T) : Z :=
+    match ex with
+    |EXP_Integer x => x
+    | _ => 0%Z (* This is arbitrary, it's never going to hit this case anyway *)
+    end.
+
+  Definition show_c_string (ex : exp T) : string :=
+    let n : nat := ex_to_nat ex in
+    let x : Z := ex_to_int ex in
+    if ((n <? 32) || (126 <? n))%nat then NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N  x))
+    else (string_of_list_ascii ((ascii_of_nat n) :: [])).
+      
    
   Fixpoint show_exp (v : exp T) :=
       match v with
@@ -468,7 +492,9 @@ Fixpoint show_typ (t : typ) : string :=
       | EXP_Null => "null"
       | EXP_Zero_initializer => "zeroinitializer"
       (* see notes on cstring on LLVMAst.v *)                         
-      | EXP_Cstring elts => "unimplemented"      
+      (* I'm using string_of_list_ascii bc I couldn't find any other function that converted asciis to strings  *)
+       | EXP_Cstring elts => "c" ++ """" ++
+          concat "" (map (fun '(ty,ex) => show_c_string ex) elts)  ++ """" 
       | EXP_Undef => "undef"
       | EXP_Struct fields => "{"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++ show_exp ex) fields) ++ "}"
       | EXP_Packed_struct fields => "<{"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++ show_exp ex) fields) ++ "}>"
