@@ -1405,7 +1405,12 @@ Definition genType: G (typ) :=
           end in
       let fix gen_size_0 (t: typ) :=
           match t with
-          | TYPE_I n                  => ret EXP_Integer <*> lift (arbitrary : G Z) (* lift (x <- (arbitrary : G nat);; ret (Z.of_nat x)) (* TODO: should the integer be forced to be in bounds? *) *)
+          | TYPE_I n                  =>
+              let size := BinIntDef.Z.of_N (N.min (2 ^ n) (2 ^ 30 - 1)) in
+              z <- lift (choose (0, size - 1));;
+              ret (EXP_Integer (z))
+          (* lift (x <- (arbitrary : G nat);; ret (Z.of_nat x))
+           (* TODO: should the integer be forced to be in bounds? *) *)
           | TYPE_IPTR => ret EXP_Integer <*> lift (arbitrary : G Z)
           | TYPE_Pointer subtyp       => lift failGen
           (* Only pointer type expressions might be conversions? Maybe GEP? *)
