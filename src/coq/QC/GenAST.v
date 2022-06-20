@@ -1622,7 +1622,7 @@ Section InstrGenerators.
                    ret (TERM_Br (TYPE_I 1, c) (blk_id b1) (blk_id b2), (bh1::bs1) ++ (bh2::bs2)))
             (* Sometimes generate a loop *)
             ; (min sz' 6%nat,
-               '(t, (b, bs)) <- gen_loop_sz sz t back_blocks 10;;
+               '(t, (b, bs)) <- gen_loop_sz sz' t back_blocks 10;; (* TODO: Should I replace sz with sz' here*)
                ret (t, (b :: bs)))
            ]
               ++
