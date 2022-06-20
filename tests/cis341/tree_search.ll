@@ -1,5 +1,4 @@
 %node = type { %node*, %node*, i64 }
-
 @root = global %node { %node* @node1, %node* @node2, i64 5 }
 @node1 = global %node { %node* @node3, %node* @node4, i64 2 }
 @node2 = global %node { %node* @node5, %node* null, i64 8 }
@@ -34,3 +33,5 @@ define i64 @main(i64 %argc, i8** %arcv) {
   %answer = call i64 @tree_search(%node* @root, i64 7)
   ret i64 %answer
 }
+
+; ASSERT EQ: i64 1 = call i64 @main(i64 0, i8** null)

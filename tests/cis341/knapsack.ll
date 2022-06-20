@@ -57,3 +57,5 @@ define i64 @main(i64 %argc, i8** %arcv) {
    %out = call i64 @knapsack([9 x i64]* @gbl_values, [9 x i64]* @gbl_weights, i64 8, i64 30)
   ret i64 %out
 }
+
+; ASSERT EQ: i64 80 = call i64 @main(i64 0, i8** null)

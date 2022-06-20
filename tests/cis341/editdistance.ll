@@ -6,8 +6,7 @@
 @arr2len = global i64 11
 
 
-@dp = global %mat [
-    [12 x i64] [i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0],
+@dp = global %mat [[12 x i64] [i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0],
     [12 x i64] [i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0],
     [12 x i64] [i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0],
     [12 x i64] [i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0,i64 0],
@@ -131,3 +130,5 @@ define i64 @main(i64 %argc, i8** %arcv) {
     %1 = call i64 @levenshtein()
     ret i64 %1
 }
+
+; ASSERT EQ: i64 7 = call i64 @main(i64 0, i8** null)

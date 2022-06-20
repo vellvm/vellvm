@@ -18,6 +18,9 @@ loop_body_i:
 loop_body_j:
   %left_indx = load i64, i64* %j
   %right_indx = add i64 %left_indx, 1
+  %cmpExit = icmp eq i64 6, %right_indx
+  br i1 %cmpExit, label %exit_j, label %loop_body_j_cont
+loop_body_j_cont:
   %left = getelementptr [6 x i64], [6 x i64]* %list, i64 0, i64 %left_indx
   %right = getelementptr [6 x i64], [6 x i64]* %list, i64 0, i64 %right_indx
   %left_el = load i64, i64* %left
@@ -46,3 +49,5 @@ define i64 @main(i64 %argc, i8** %arcv) {
   %1 = load i64, i64* %r
   ret i64 %1
 }
+
+; ASSERT EQ: i64 0 = call i64 @main(i64 0, i8** null)

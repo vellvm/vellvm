@@ -47,7 +47,8 @@ define void @heapify(%Node* %0) {
   %12 = load %Node*, %Node** %2 
   store %Node* %12, %Node** %5 
   %13 = load %Node*, %Node** %3 
-  %14 = icmp ne %Node* %13, null 
+  %14 = icmp ne %Node* %13, null
+  %15 = alloca %Node*
   br i1 %14, label %l15, label %l25 
 l15:                                                
   %16 = load %Node*, %Node** %3 
@@ -56,15 +57,18 @@ l15:
   %19 = load %Node*, %Node** %2 
   %20 = getelementptr %Node, %Node* %19, i32 0, i32 2 
   %21 = load i64, i64* %20 
-  %22 = icmp sgt i64 %18, %21 
+  %22 = icmp sgt i64 %18, %21
+  %23 = alloca %Node*
   br i1 %22, label %l23, label %l25 
 l23:                                              
-  %24 = load %Node*, %Node** %3 
+  %24 = load %Node*, %Node** %3
+  %25 = alloca %Node*
   store %Node* %24, %Node** %5 
   br label %l25 
 l25:                                               
   %26 = load %Node*, %Node** %4 
-  %27 = icmp ne %Node* %26, null 
+  %27 = icmp ne %Node* %26, null
+  %28 = alloca %Node*
   br i1 %27, label %l28, label %l38 
 l28:                                                
   %29 = load %Node*, %Node** %4 
@@ -73,16 +77,19 @@ l28:
   %32 = load %Node*, %Node** %2 
   %33 = getelementptr %Node, %Node* %32, i32 0, i32 2 
   %34 = load i64, i64* %33 
-  %35 = icmp sgt i64 %31, %34 
+  %35 = icmp sgt i64 %31, %34
+  %36 = alloca %Node*
   br i1 %35, label %l36, label %l38 
 l36:                                                
-  %37 = load %Node*, %Node** %4 
+  %37 = load %Node*, %Node** %4
+  %38 = alloca %Node*
   store %Node* %37, %Node** %5 
   br label %l38 
 l38:                                               
   %39 = load %Node*, %Node** %5 
   %40 = load %Node*, %Node** %2 
-  %41 = icmp ne %Node* %39, %40 
+  %41 = icmp ne %Node* %39, %40
+  %42 = alloca %Node*
   br i1 %41, label %l42, label %l46 
 l42:                                               
   %43 = load %Node*, %Node** %2 
@@ -101,13 +108,16 @@ define void @heapify_total(%Node* %0) {
   %3 = load %Node*, %Node** %2 
   %4 = getelementptr %Node, %Node* %3, i32 0, i32 0 
   %5 = load %Node*, %Node** %4 
-  %6 = icmp eq %Node* %5, null 
+  %6 = icmp eq %Node* %5, null
+  %7 = alloca %Node*
   br i1 %6, label %l7, label %l13 
 l7:                                                 
   %8 = load %Node*, %Node** %2 
   %9 = getelementptr %Node, %Node* %8, i32 0, i32 1 
   %10 = load %Node*, %Node** %9 
-  %11 = icmp eq %Node* %10, null 
+  %11 = icmp eq %Node* %10, null
+  %12 = alloca %Node*
+  %13 = alloca %Node*
   br i1 %11, label %l12, label %l13 
 l12:                                                
   br label %l51 
@@ -115,13 +125,15 @@ l13:
   %14 = load %Node*, %Node** %2 
   %15 = getelementptr %Node, %Node* %14, i32 0, i32 0 
   %16 = load %Node*, %Node** %15 
-  %17 = icmp ne %Node* %16, null 
+  %17 = icmp ne %Node* %16, null
+  %18 = alloca %Node*
   br i1 %17, label %l18, label %l31 
 l18:                                               
   %19 = load %Node*, %Node** %2 
   %20 = getelementptr %Node, %Node* %19, i32 0, i32 1 
   %21 = load %Node*, %Node** %20 
-  %22 = icmp ne %Node* %21, null 
+  %22 = icmp ne %Node* %21, null
+  %23 = alloca %Node*
   br i1 %22, label %l23, label %l31 
 l23:                                                
   %24 = load %Node*, %Node** %2 
@@ -132,28 +144,32 @@ l23:
   %28 = getelementptr %Node, %Node* %27, i32 0, i32 1 
   %29 = load %Node*, %Node** %28 
   call void @heapify_total(%Node* %29) 
-  %30 = load %Node*, %Node** %2 
+  %30 = load %Node*, %Node** %2
+  %31 = alloca %Node*
   call void @heapify(%Node* %30) 
   br label %l51 
 l31:                                                
   %32 = load %Node*, %Node** %2 
   %33 = getelementptr %Node, %Node* %32, i32 0, i32 0 
   %34 = load %Node*, %Node** %33 
-  %35 = icmp eq %Node* %34, null 
+  %35 = icmp eq %Node* %34, null
+  %36 = alloca %Node*
   br i1 %35, label %l36, label %l41 
 l36:                                                
   %37 = load %Node*, %Node** %2 
   %38 = getelementptr %Node, %Node* %37, i32 0, i32 1 
   %39 = load %Node*, %Node** %38 
   call void @heapify_total(%Node* %39) 
-  %40 = load %Node*, %Node** %2 
+  %40 = load %Node*, %Node** %2
+  %41 = alloca %Node*
   call void @heapify(%Node* %40) 
   br label %l51 
 l41:                                                
   %42 = load %Node*, %Node** %2 
   %43 = getelementptr %Node, %Node* %42, i32 0, i32 1 
   %44 = load %Node*, %Node** %43 
-  %45 = icmp eq %Node* %44, null 
+  %45 = icmp eq %Node* %44, null
+  %46 = alloca %Node*
   br i1 %45, label %l46, label %l51 
 l46:                                                
   %47 = load %Node*, %Node** %2 
@@ -173,3 +189,5 @@ define i64 @main() {
   %max_val = load i64, i64* %max_val_ptr 
   ret i64 %max_val 
 }
+
+; ASSERT EQ: i64 67 = call i64 @main(i64 0, i8** null)

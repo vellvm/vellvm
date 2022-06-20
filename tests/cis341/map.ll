@@ -52,3 +52,5 @@ call void @map(i64(i64)* @cube, i64* %9, i64 3)
 %17 = add i64 %8, %16
 ret i64 %17
 }
+
+; ASSERT EQ: i64 50 = call i64 @main(i64 0, i8** null)

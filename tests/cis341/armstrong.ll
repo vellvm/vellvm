@@ -46,3 +46,5 @@ ret_true:
 ret_false:
     ret i64 0
 }
+
+; ASSERT EQ: i64 1 = call i64 @main(i64 0, i8** null)
