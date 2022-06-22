@@ -21,7 +21,6 @@ Import MonadNotation.
 From Coq Require Import
   ZArith List String Lia Bool.Bool Hexadecimal Numbers.HexadecimalString Numbers.HexadecimalZ
   Strings.Ascii. 
-
 From QuickChick Require Import Show.
 (* Import QcDefaultNotation. Open Scope qc_scope. *)
 Set Warnings "-extraction-opaque-accessed,-extraction".
@@ -116,17 +115,17 @@ Fixpoint show_typ (t : typ) : string :=
 
   Definition show_linkage (l : linkage) : string :=
     match l with 
-    | LINKAGE_Private => "private"
-    | LINKAGE_Internal => "internal"
-    | LINKAGE_Available_externally => "available_externally"
-    | LINKAGE_Linkonce => "linkonce"
-    | LINKAGE_Weak => "weak"
-    | LINKAGE_Common => "common"
-    | LINKAGE_Appending => "appending"
-    | LINKAGE_Linkonce_odr => "linkonce_odr"
-    | LINKAGE_Weak_odr => "weak_odr"
-    | LINKAGE_External => "external"
-    | LINKAGE_Extern_weak => "extern_weak"                          
+    | LINKAGE_Private => "private "
+    | LINKAGE_Internal => "internal "
+    | LINKAGE_Available_externally => "available_externally "
+    | LINKAGE_Linkonce => "linkonce "
+    | LINKAGE_Weak => "weak "
+    | LINKAGE_Common => "common "
+    | LINKAGE_Appending => "appending "
+    | LINKAGE_Linkonce_odr => "linkonce_odr "
+    | LINKAGE_Weak_odr => "weak_odr "
+    | LINKAGE_External => "external "
+    | LINKAGE_Extern_weak => "extern_weak "                          
     end.
 
   Global Instance showLinkage (l : linkage) : Show linkage
@@ -185,7 +184,7 @@ Fixpoint show_typ (t : typ) : string :=
     | PARAMATTR_Inalloca t => "inalloca(" ++ show t ++ ")"                               
     | PARAMATTR_Sret t => "sret(" ++ show t ++ ")"
     | PARAMATTR_Elementtype t => "elementtype(" ++ show t ++ ")"                               
-    | PARAMATTR_Align a => "align(" ++ show a ++ ")"
+    | PARAMATTR_Align a => "align " ++ show a
     | PARAMATTR_Noalias => "noalias" 
     | PARAMATTR_Nocapture => "nocapture"
     | PARAMATTR_Readonly => "readonly"                          
@@ -479,9 +478,30 @@ Fixpoint show_typ (t : typ) : string :=
     let x : Z := ex_to_int ex in
     if ((n <? 32) || (126 <? n))%nat then NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N  x))
     else (string_of_list_ascii ((ascii_of_nat n) :: [])).
-      
-   
+
+  Definition is_op (e : exp T) : bool :=
+    match e with
+    | EXP_Integer x => false                         
+    | EXP_Float f =>  false                        
+    | EXP_Double f =>   false                        
+    | EXP_Hex f =>   false                                  
+    | EXP_Bool b =>     false                
+    | EXP_Null =>      false              
+    | EXP_Zero_initializer =>    false                            
+      (* see notes on cstring on LLVMAst.v *)                         
+      (* I'm using string_of_list_ascii bc I couldn't find any other function that converted asciis to strings  *)
+    | EXP_Cstring elts =>     false                           
+    | EXP_Undef =>         false        
+    | EXP_Struct fields =>    false                            
+    | EXP_Packed_struct fields =>     false                                   
+    | EXP_Array elts =>               false             
+    | EXP_Vector elts =>        false
+    | _ => true            
+    end.
+  
+    
   Fixpoint show_exp (v : exp T) :=
+        
       match v with
       | EXP_Ident id => show id
       | EXP_Integer x => show x
@@ -496,52 +516,52 @@ Fixpoint show_typ (t : typ) : string :=
        | EXP_Cstring elts => "c" ++ """" ++
           concat "" (map (fun '(ty,ex) => show_c_string ex) elts)  ++ """" 
       | EXP_Undef => "undef"
-      | EXP_Struct fields => "{"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++ show_exp ex) fields) ++ "}"
-      | EXP_Packed_struct fields => "<{"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++ show_exp ex) fields) ++ "}>"
-      | EXP_Array elts => "["  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++ show_exp ex) elts) ++ "]"
-      | EXP_Vector elts => "<"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++ show_exp ex) elts) ++ ">"
+      | EXP_Struct fields => "{"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++  show_exp ex) fields) ++ "}"
+      | EXP_Packed_struct fields => "<{"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++  show_exp ex) fields) ++ "}>"
+      | EXP_Array elts => "["  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++  show_exp ex) elts) ++ "]"
+      | EXP_Vector elts => "<"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++  show_exp ex) elts) ++ ">"
       | OP_IBinop iop t v1 v2 =>
-          show iop ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
+          show iop ++ " " ++ show t ++ " " ++  show_exp v1 ++ ", " ++  show_exp v2
       | OP_ICmp cmp t v1 v2 =>
-          "icmp " ++ show cmp ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
+          "icmp " ++ show cmp ++ " " ++ show t ++ " " ++  show_exp v1 ++ ", " ++  show_exp v2
       | OP_FBinop fop fmath t v1 v2 =>
           let fmath_string :=
             match fmath with
             | nil => " "
             | _ =>  " " ++ concat " " (map (fun x => show x) fmath) ++  " "
             end in              
-         show fop ++ fmath_string ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
+         show fop ++ fmath_string ++ show t ++ " " ++  show_exp v1 ++ ", " ++  show_exp v2
       | OP_FCmp cmp t v1 v2 =>
-          "fcmp " ++ show cmp ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
-      | OP_Conversion conv t_from v t_to => show conv ++ " " ++ show t_from ++ " " ++ show_exp v ++ " to " ++ show t_to
+          "fcmp " ++ show cmp ++ " " ++ show t ++ " " ++  show_exp v1 ++ ", " ++  show_exp v2
+      | OP_Conversion conv t_from v t_to => show conv ++ " " ++ show t_from ++ " " ++  show_exp v ++ " to " ++ show t_to
       | OP_GetElementPtr t ptrval idxs =>
       let (tptr, exp) := ptrval in
-      "getelementptr " ++ show t ++ ", " ++ show tptr ++ " " ++ show_exp exp ++  fold_left (fun str '(ty, ex) => str ++ ", " ++ show ty ++ " "++ show_exp ex) idxs ""
+      "getelementptr " ++ show t ++ ", " ++ show tptr ++ " " ++  show_exp exp ++  fold_left (fun str '(ty, ex) => str ++ ", " ++ show ty ++ " "++  show_exp ex) idxs ""
                         
       | OP_ExtractElement vec idx =>
       let (tptr, exp) := vec in 
       let (tidx, iexp) := idx in
-      "extractelement " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ show tidx ++ " " ++ show_exp iexp
+      "extractelement " ++ show tptr ++ " " ++  show_exp exp ++ ", " ++ show tidx ++ " " ++  show_exp iexp
       | OP_InsertElement vec elt idx =>
       let (tptr, exp) := vec in
       let (telt, eexp) := elt in
       let (tidx, iexp) := idx in
-      "insertelement " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ show telt ++ " " ++ show_exp eexp ++ ", " ++ show tidx ++ " " ++ show_exp iexp
+      "insertelement " ++ show tptr ++ " " ++  show_exp exp ++ ", " ++ show telt ++ " " ++  show_exp eexp ++ ", " ++ show tidx ++ " " ++ show_exp iexp
       | OP_ShuffleVector vec1 vec2 idxmask =>
           let (type1, expression1) := vec1 in
           let (type2, expression2) := vec2 in
           let (type3, expression3) := idxmask in
-          "shufflevector " ++ show type1 ++ show_exp expression1  ++ ", " ++ show type2 ++ show_exp expression2 ++ ", " ++ show type3 ++ show_exp expression3
+          "shufflevector " ++ show type1 ++  show_exp expression1  ++ ", " ++ show type2 ++  show_exp expression2 ++ ", " ++ show type3 ++  show_exp expression3
                            (* This one, extractValue *)
       | OP_ExtractValue vec idxs =>
       let (tptr, exp) := vec in
-      "extractvalue " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ concat ", " (map (fun x => show x) idxs)
+      "extractvalue " ++ show tptr ++ " " ++  show_exp exp ++ ", " ++ concat ", " (map (fun x => show x) idxs)
       | OP_InsertValue vec elt idxs =>
       let (tptr, exp) := vec in
       let (telt, eexp) := elt in 
-      "insertvalue " ++ show tptr ++ " " ++ show_exp exp ++ ", " ++ show telt ++ " " ++ show_exp eexp ++ ", " ++ concat ", " (map (fun x => show x) idxs)
+      "insertvalue " ++ show tptr ++ " " ++  show_exp exp ++ ", " ++ show telt ++ " " ++  show_exp eexp ++ ", " ++ concat ", " (map (fun x => show x) idxs)
       | OP_Select (tc, cnd) (t1, v1) (t2, v2) =>
-          "select " ++ show tc ++ " " ++ show_exp cnd ++ ", " ++ show t1 ++ " " ++ show_exp v1  ++ ", " ++ show t2 ++ " " ++ show_exp v2
+          "select " ++ show tc ++ " " ++  show_exp cnd ++ ", " ++ show t1 ++ " " ++  show_exp v1  ++ ", " ++ show t2 ++ " " ++  show_exp v2
       | OP_Freeze (ty, ex) => "freeze " ++ show ty ++ " " ++ show_exp ex
       end.
 
@@ -748,7 +768,6 @@ Fixpoint show_typ (t : typ) : string :=
            ++ phis
            ++ code
            ++ term.
-
   Global Instance showBlock: Show (block T) :=
     {|
     show := show_block "    "
@@ -819,6 +838,7 @@ End ShowInstances.
             end in
        
         let ret_attributes :=  concat " " (map (fun x => show x) (return_attributes)) in
+        let printable_ret_attrs := if ret_attributes then concatStr [" " ;ret_attributes] else "" in
         let the_linkage := defn.(df_prototype).(dc_linkage) in 
         let printable_linkage := match the_linkage with
                                  |None => ""
@@ -827,7 +847,7 @@ End ShowInstances.
         let the_visibility := defn.(df_prototype).(dc_visibility) in 
         let printable_visibility := match the_visibility with
                                  |None => ""
-                                 |Some v => show_visibility v
+                                 |Some v => show_visibility v 
                                     end in
         let the_dll_storage := defn.(df_prototype).(dc_dll_storage) in 
         let printable_dll_storage := match the_dll_storage with
@@ -856,7 +876,7 @@ End ShowInstances.
                                  end in
         
         concatStr ["define "; printable_linkage; printable_visibility ; printable_dll_storage ;
-                   printable_cconv ; ret_attributes; show ret_t; " @"; show name; show_arg_list args;
+                   printable_cconv ; printable_ret_attrs ; show ret_t; " @"; show name; show_arg_list args;
                    printable_section ; printable_align ; printable_gc ; " {"; newline ;
                    blocks;
                    "}";
@@ -878,11 +898,11 @@ End ShowInstances.
     | TYPE_Function ret_t args_t =>
    let link := match decl.(dc_linkage) with
                | None => ""
-               | Some l => show_linkage l
+               | Some l => show_linkage l 
                end in
    let vis := match decl.(dc_visibility) with
               | None => ""
-              | Some w => show_visibility w
+              | Some w => show_visibility w 
               end in
    let dll := match decl.(dc_dll_storage) with
               | None => ""
@@ -905,7 +925,7 @@ End ShowInstances.
              | Some g => concatStr["gc \"; g; "\"; " "]
              end in                      
    concatStr ["declare "; link; vis; dll; cc;
-              concatStr[intersperse " " (map show ret_attrs)]; 
+              concatStr[intersperse " " (map show ret_attrs)]; " " ;
               show ret_t; " @"; show name;  "(";
               concat ", " (map (fun '(x, y) => concatStr[show x; " "; match y with
                                                                       | [] => ""
@@ -983,7 +1003,7 @@ End ShowInstances.
        | TLE_Definition defn => show defn
        | TLE_Comment msg => ";" ++ show msg (*What if the comment is multiple lines? *)
        | TLE_Target tgt => "target triple = " ++  show tgt
-       | TLE_Datalayout layout => "target datalayout = "  show layout
+       | TLE_Datalayout layout => "target datalayout = " ++ show layout
        | TLE_Source_filename s => "source_filename = " ++ show s
        | TLE_Declaration decl => show decl
        | TLE_Global g => show g
