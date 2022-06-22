@@ -371,15 +371,18 @@ Fixpoint show_typ (t : typ) : string :=
   (*Should we implement shl, lshr, and ashr?*)
   Definition show_ibinop (iop : ibinop) : string
     := match iop with
-       (* TODO print flags *)
-       | LLVMAst.Add _ _ => "add"
-       | Sub _ _ => "sub"
-       | Mul _ _ => "mul"
-       | Shl _ _ => "shl"
-       | UDiv _  => "udiv"
-       | SDiv _  => "sdiv"
-       | LShr _  => "lshr"
-       | AShr _  => "ashr"
+       | LLVMAst.Add nuw nsw  => concatStr["add"; if nuw then " nuw" else "";
+                                           if nsw then " nsw" else ""]
+       | Sub nuw nsw => concatStr["sub"; if nuw then " nuw" else "";
+                                  if nsw then " nsw" else ""]
+       | Mul nuw nsw => concatStr["mul"; if nuw then " nuw" else "";
+                                  if nsw then " nsw" else ""]
+       | Shl nuw nsw => concatStr["shl"; if nuw then " nuw" else "";
+                                  if nsw then " nsw" else ""] 
+       | UDiv exact  => "udiv" ++ if exact then " exact" else ""
+       | SDiv exact  => "sdiv" ++ if exact then " exact" else ""
+       | LShr exact  => "lshr" ++ if exact then " exact" else ""
+       | AShr exact  => "ashr" ++ if exact then " exact" else ""
        | URem    => "urem"
        | SRem    => "srem"
        | And     => "and"
@@ -457,9 +460,6 @@ Fixpoint show_typ (t : typ) : string :=
   Global Instance ShowConversionType : Show conversion_type
     := {| show := show_conversion_type |}.
 
-  
-  Eval compute in (show (ascii_of_nat 32)).
-
   Definition ex_to_nat (ex : exp T) : nat :=
     match ex with
     |EXP_Integer x => (Z.to_nat x)
@@ -536,7 +536,8 @@ Fixpoint show_typ (t : typ) : string :=
       | OP_Conversion conv t_from v t_to => show conv ++ " " ++ show t_from ++ " " ++  show_exp v ++ " to " ++ show t_to
       | OP_GetElementPtr t ptrval idxs =>
       let (tptr, exp) := ptrval in
-      "getelementptr " ++ show t ++ ", " ++ show tptr ++ " " ++  show_exp exp ++  fold_left (fun str '(ty, ex) => str ++ ", " ++ show ty ++ " "++  show_exp ex) idxs ""
+
+      "getelementptr " ++ show t ++ ", " ++ show tptr ++ " " ++ show_exp exp ++  fold_left (fun str '(ty, ex) => str ++ ", " ++ show ty ++ " " ++ show_exp ex) idxs ""
                         
       | OP_ExtractElement vec idx =>
       let (tptr, exp) := vec in 
@@ -837,8 +838,10 @@ End ShowInstances.
             | (b, bs) => concat newline (map (show_block "    ") (b::bs))
             end in
        
+
         let ret_attributes :=  concat " " (map (fun x => show x) (return_attributes)) in
         let printable_ret_attrs := if ret_attributes then concatStr [" " ;ret_attributes] else "" in
+
         let the_linkage := defn.(df_prototype).(dc_linkage) in 
         let printable_linkage := match the_linkage with
                                  |None => ""
@@ -926,6 +929,7 @@ End ShowInstances.
              end in                      
    concatStr ["declare "; link; vis; dll; cc;
               concatStr[intersperse " " (map show ret_attrs)]; " " ;
+
               show ret_t; " @"; show name;  "(";
               concat ", " (map (fun '(x, y) => concatStr[show x; " "; match y with
                                                                       | [] => ""
@@ -1017,4 +1021,4 @@ End ShowInstances.
     {| show := show_tle |}.
 
   Global Instance showProg : Show (list (toplevel_entity typ (block typ * list (block typ)))) :=
-    {| show tles := concat (newline ++ newline) (map show_tle tles) |}.  
+    {| show tles := concat (newline ++ newline) (map show_tle tles) |}.
