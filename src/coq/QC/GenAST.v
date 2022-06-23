@@ -480,7 +480,7 @@ Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
 
   Definition filter_sized_typs (typ_ctx: list (ident * typ)) (ctx : list (ident * typ)) : list (ident * typ) :=
     filter (fun '(_, t) => is_sized_type typ_ctx t) ctx.
-  
+
 Definition filter_non_void_typs (ctx : list (ident * typ)) : list (ident * typ) :=
   filter (fun '(_, t) => match t with
                       | TYPE_Void => false
@@ -510,7 +510,7 @@ Definition filter_ptr_vecptr_typs (ctx: list (ident * typ)) : list (ident * typ)
             | TYPE_Vector _ (TYPE_Pointer _) => true
             | _ => false
             end) ctx.
-  
+
   (* TODO: These currently don't generate pointer types either. *)
 
   (* Not sized in the QuickChick sense, sized in the LLVM sense. *)
@@ -984,6 +984,8 @@ Section ExpGenerators.
   | soft
   | hard.
 
+  (* This is a part of the easy fix for Issue 260. It can also potentially help other generators in filtering
+     If there exists a subtyp of certain tribute *)
   Fixpoint contains_typ (t_from : typ) (t : typ) (flag : contains_flag): bool :=
     match t_from with
     | TYPE_I _ =>
@@ -1013,7 +1015,7 @@ Section ExpGenerators.
             end
         | _ => contains_typ subtyp t flag
         end
-    | TYPE_Array sz subtyp => 
+    | TYPE_Array sz subtyp =>
         match t with
         | TYPE_Array sz' subtyp' =>
             match flag with
@@ -1036,7 +1038,7 @@ Section ExpGenerators.
         | TYPE_Struct fields' =>
             match flag with
             | soft => true
-            | hard => normalized_typ_eq t_from t || fold_left (fun acc x => acc || x) (map (fun y => contains_typ y t flag) fields) false 
+            | hard => normalized_typ_eq t_from t || fold_left (fun acc x => acc || x) (map (fun y => contains_typ y t flag) fields) false
             end
         | _ => fold_left (fun acc x => acc || contains_typ x t flag) fields false
         end
@@ -1045,15 +1047,13 @@ Section ExpGenerators.
         | TYPE_Struct fields' =>
             match flag with
             | soft => true
-            | hard =>  normalized_typ_eq t_from t || fold_left (fun acc x => acc || x) (map (fun y => contains_typ y t flag) fields) false 
+            | hard =>  normalized_typ_eq t_from t || fold_left (fun acc x => acc || x) (map (fun y => contains_typ y t flag) fields) false
             end
         | _ => fold_left (fun acc x => acc || contains_typ x t flag) fields false
         end
-    | _ => false 
+    | _ => false
     end.
-  
-Compute (contains_typ (TYPE_Pointer (TYPE_Struct [TYPE_Float; TYPE_Double])) (TYPE_Struct []) soft).
-  
+
   (* TODO: Move this *)
   Fixpoint replicateM {M : Type -> Type} {A} `{Monad M} (n : nat) (ma : M A) : M (list A)
     := match n with
