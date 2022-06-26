@@ -50,8 +50,6 @@ Open Scope Z_scope.
     not used in proofs) it's not terribly important to prove that they
     actually terminate.  *)
 Unset Guard Checking.
-
-(* TODO: Move this? *)
 (** Difference lists *)
 Section DList.
   Definition DList (A : Type) := list A -> list A.
@@ -688,7 +686,6 @@ Definition filter_ptr_vecptr_typ (ctx: list (ident * typ)) : list (ident * typ) 
                 (* ; TYPE_X86_mmx *)
                 (* ; TYPE_Opaque *)
                 ])).
-
   Program Fixpoint gen_typ_non_void_size (sz : nat) {measure sz} : GenLLVM typ :=
     match sz with
     | 0%nat => gen_typ_non_void_0
@@ -767,8 +764,25 @@ Definition filter_ptr_vecptr_typ (ctx: list (ident * typ)) : list (ident * typ) 
 End TypGenerators.
 
 Section ExpGenerators.
-  (* nuw / nsw make poison values likely *)
+
   Definition gen_ibinop : G ibinop :=
+     oneOf_ failGen
+           [ ret LLVMAst.Add <*> ret false <*> ret false
+           ; ret Sub <*> ret false <*> ret false
+           ; ret Mul <*> ret false <*> ret false
+           ; ret Shl <*> ret false <*> ret false
+           ; ret UDiv <*> ret false
+           ; ret SDiv <*> ret false
+           ; ret LShr <*> ret false
+           ; ret AShr <*> ret false
+           ; ret URem
+           ; ret SRem
+           ; ret And
+           ; ret Or
+           ; ret Xor
+           ].
+  (*
+  Definition gen_ibinop (t: typ) (ex1 ex2: exp typ) : G ibinop :=
     (* Note: some of these binops are currently commented out due to a
        bug with extraction and QC. *)
     oneOf_ failGen
@@ -785,7 +799,13 @@ Section ExpGenerators.
            ; ret And
            ; ret Or
            ; ret Xor
-           ].
+           ] ++
+           (if (z2 =? 0) then [] else [ret UDiv <*> ret false; ret SDiv <*> ret false]) ++
+           (let max_left_shift := size - get_bitwidth z1 in
+            if (z2 <? 0) || (z2 >? max_left_shift) then [] else [ret Shl <*> ret false <*> ret false]) ++
+           (let max_right_shift := z2 - 1 in
+           if (z2 <? 0) || (z2 >? max_right_shift) then [] else [ret LShr <*> ret false; ret AShr <*> ret false])
+           ).*)
 
   (*Float operations*)
   Definition gen_fbinop : G fbinop :=
@@ -1283,7 +1303,7 @@ Definition genTypHelper (n: nat): G (typ) :=
 
 Definition genType: G (typ) :=
   sized genTypHelper.
-
+Search ibinop.
   Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
     match sz with
     | 0%nat =>
@@ -1383,11 +1403,27 @@ Definition genType: G (typ) :=
   with
   (* TODO: Make sure we don't divide by 0 *)
   gen_ibinop_exp_typ (t : typ) : GenLLVM (exp typ)
-    :=
-      ibinop <- lift gen_ibinop;;
-      if Handlers.LLVMEvents.DV.iop_is_div ibinop
-      then ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t
-      else ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_exp_size 0 t
+  :=
+    (*
+    exp_value <- gen_exp_size 0 t;;
+    exp_value2 <- gen_exp_size 0 t;;
+    ibinop <- lift (gen_ibinop t exp_value exp_value2);;
+    ret (OP_IBinop ibinop t exp_value exp_value2) *)
+    ibinop <- lift gen_ibinop;;
+    if Handlers.LLVMEvents.DV.iop_is_div ibinop
+    then ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t
+    else
+    exp_value <- gen_exp_size 0 t;;
+    exp_value2 <- gen_exp_size 0 t;;
+    if Handlers.LLVMEvents.DV.iop_is_shift ibinop
+    then
+      let size2 := match exp_value2 with
+                   | EXP_Integer v => v
+                   | _ => 0
+                   end in
+      ret (OP_IBinop ibinop t exp_value exp_value2)
+           
+    else ret (OP_IBinop ibinop t exp_value exp_value2)
   with
   gen_ibinop_exp (isz : N) : GenLLVM (exp typ)
     :=
