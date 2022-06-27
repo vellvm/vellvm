@@ -65,9 +65,8 @@ Section PARAMS_MODEL.
              (t2 : itree Effout R) : Prop
     :=
     match e with
-    | inl1 e => t2 ≈ bind ta k2
     | inr1 (inl1 oom) => True
-    | inr1 (inr1 f) => t2 ≈ bind ta k2
+    | _ => t2 ≈ bind ta k2
     end.
 
   Global Instance oom_k_spec_proper {T R : Type} {RR : R -> R -> Prop} {b a : bool} :
