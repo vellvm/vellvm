@@ -1303,7 +1303,7 @@ Definition genTypHelper (n: nat): G (typ) :=
 
 Definition genType: G (typ) :=
   sized genTypHelper.
-Search ibinop.
+Search Z.
   Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
     match sz with
     | 0%nat =>
@@ -1417,12 +1417,17 @@ Search ibinop.
     exp_value2 <- gen_exp_size 0 t;;
     if Handlers.LLVMEvents.DV.iop_is_shift ibinop
     then
-      let size2 := match exp_value2 with
-                   | EXP_Integer v => v
-                   | _ => 0
-                   end in
-      ret (OP_IBinop ibinop t exp_value exp_value2)
-           
+      let max_shift_size :=
+        match t with
+        | TYPE_I i => BinIntDef.Z.of_N i
+        | _ => 0
+        end in
+      let new_exp_value2 : exp typ :=
+        match exp_value2 with
+        | EXP_Integer v => EXP_Integer (BinIntDef.Z.max 0 (BinIntDef.Z.min max_shift_size v))
+        | _ => EXP_Integer 0
+        end in
+      ret (OP_IBinop ibinop t exp_value new_exp_value2)
     else ret (OP_IBinop ibinop t exp_value exp_value2)
   with
   gen_ibinop_exp (isz : N) : GenLLVM (exp typ)
