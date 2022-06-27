@@ -1303,7 +1303,7 @@ Definition genTypHelper (n: nat): G (typ) :=
 
 Definition genType: G (typ) :=
   sized genTypHelper.
-Search Z.
+Search size.
   Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
     match sz with
     | 0%nat =>
@@ -1419,7 +1419,7 @@ Search Z.
     then
       let max_shift_size :=
         match t with
-        | TYPE_I i => BinIntDef.Z.of_N i
+        | TYPE_I i => BinIntDef.Z.of_N (i - 1)
         | _ => 0
         end in
       let new_exp_value2 : exp typ :=
