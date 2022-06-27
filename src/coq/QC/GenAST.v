@@ -781,31 +781,6 @@ Section ExpGenerators.
            ; ret Or
            ; ret Xor
            ].
-  (*
-  Definition gen_ibinop (t: typ) (ex1 ex2: exp typ) : G ibinop :=
-    (* Note: some of these binops are currently commented out due to a
-       bug with extraction and QC. *)
-    oneOf_ failGen
-           [ ret LLVMAst.Add <*> ret false <*> ret false
-           ; ret Sub <*> ret false <*> ret false
-           ; ret Mul <*> ret false <*> ret false
-           ; ret Shl <*> ret false <*> ret false
-           ; ret UDiv <*> ret false
-           ; ret SDiv <*> ret false
-           ; ret LShr <*> ret false
-           ; ret AShr <*> ret false
-           ; ret URem
-           ; ret SRem
-           ; ret And
-           ; ret Or
-           ; ret Xor
-           ] ++
-           (if (z2 =? 0) then [] else [ret UDiv <*> ret false; ret SDiv <*> ret false]) ++
-           (let max_left_shift := size - get_bitwidth z1 in
-            if (z2 <? 0) || (z2 >? max_left_shift) then [] else [ret Shl <*> ret false <*> ret false]) ++
-           (let max_right_shift := z2 - 1 in
-           if (z2 <? 0) || (z2 >? max_right_shift) then [] else [ret LShr <*> ret false; ret AShr <*> ret false])
-           ).*)
 
   (*Float operations*)
   Definition gen_fbinop : G fbinop :=
@@ -1303,7 +1278,7 @@ Definition genTypHelper (n: nat): G (typ) :=
 
 Definition genType: G (typ) :=
   sized genTypHelper.
-Search size.
+
   Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
     match sz with
     | 0%nat =>
