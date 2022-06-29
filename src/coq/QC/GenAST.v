@@ -1379,17 +1379,11 @@ Definition genType: G (typ) :=
   (* TODO: Make sure we don't divide by 0 *)
   gen_ibinop_exp_typ (t : typ) : GenLLVM (exp typ)
   :=
-    (*
-    exp_value <- gen_exp_size 0 t;;
-    exp_value2 <- gen_exp_size 0 t;;
-    ibinop <- lift (gen_ibinop t exp_value exp_value2);;
-    ret (OP_IBinop ibinop t exp_value exp_value2) *)
     ibinop <- lift gen_ibinop;;
     if Handlers.LLVMEvents.DV.iop_is_div ibinop
     then ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t
     else
     exp_value <- gen_exp_size 0 t;;
-    exp_value2 <- gen_exp_size 0 t;;
     if Handlers.LLVMEvents.DV.iop_is_shift ibinop
     then
       let max_shift_size :=
@@ -1397,13 +1391,10 @@ Definition genType: G (typ) :=
         | TYPE_I i => BinIntDef.Z.of_N (i - 1)
         | _ => 0
         end in
-      let new_exp_value2 : exp typ :=
-        match exp_value2 with
-        | EXP_Integer v => EXP_Integer (BinIntDef.Z.max 0 (BinIntDef.Z.min max_shift_size v))
-        | _ => EXP_Integer 0
-        end in
-      ret (OP_IBinop ibinop t exp_value new_exp_value2)
-    else ret (OP_IBinop ibinop t exp_value exp_value2)
+      x <- lift (choose (0, max_shift_size));;
+      let exp_value2 : exp typ := EXP_Integer x in
+      ret (OP_IBinop ibinop t exp_value exp_value2)
+    else ret (OP_IBinop ibinop t exp_value) <*> gen_exp_size 0 t
   with
   gen_ibinop_exp (isz : N) : GenLLVM (exp typ)
     :=
