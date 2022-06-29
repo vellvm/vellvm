@@ -6,7 +6,8 @@ From Vellvm Require Import
      Utils.PropT
      Utils.Tactics
      Theory.DenotationTheory
-     Theory.InterpreterMCFG.
+     Theory.InterpreterMCFG
+     Handlers.MemoryModelImplementation.
 
 From ITree Require Import
      ITree
@@ -30,6 +31,7 @@ Module Infinite.
   Import TopLevelRefinementsBigIntptr.
   Import DenotationTheoryBigIntptr.
   Import MCFGTheoryBigIntptr.
+  Import MemoryBigIntptrInfiniteSpec.
   Import D.
 
   Import Global.
@@ -39,6 +41,10 @@ Module Infinite.
   Import MCFGTactics.
 
   Import Global.
+  Import InterpretationStack.
+  Import InterpreterStackBigIntptr.
+  Import MEM.
+  Import MEM_SPEC_INTERP.
 
   Definition t_alloc : itree L0 dvalue
     := trigger (Alloca (DTYPE_I 64%N));; ret DVALUE_None.
@@ -57,9 +63,24 @@ Module Infinite.
     exists t'.
     split.
     - cbn.
+      pose proof allocate_can_always_succeed m (DTYPE_I 64%N) as ALLOC_SUCCESS.
+
+
       unfold interp_mcfg4.
       unfold model_undef.
+
+      eexists; cbn; split.
+      + setoid_rewrite bind_trigger.
+
+        
+      + reflexivity.
+
+      
+      cbn.
+
+      
       epose proof interp_prop_Proper_eq.
+      
       unfold Proper, respectful in *.
       unfold Basics.flip, Basics.impl in *.
       eapply H.

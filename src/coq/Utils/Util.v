@@ -1687,11 +1687,10 @@ Definition guard_opt (x : bool) : option unit
 
 Lemma exists_in_bounds_le_lt :
   forall (lower upper x : Z),
-    0 <= lower ->
     lower <= x < upper ->
     exists ix, 0 <= ix < (upper - lower) /\ x = lower + ix.
 Proof.
-  intros lower upper x POS [LE LT].
+  intros lower upper x [LE LT].
   exists (x - lower).
   split; lia.
 Qed.

@@ -331,7 +331,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       intptr_seq start len = NoOom seq ->
       (forall x,
           (start <= x < start + Z.of_nat len)%Z ->
-          exists ipx, IP.from_Z x = NoOom ipx).
+          exists ipx, IP.from_Z x = NoOom ipx /\ In ipx seq).
   Proof.
     intros start len; revert start;
       induction len;
@@ -342,11 +342,13 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       cbn in SEQ.
       break_match_hyp.
       + destruct (Z.eq_dec x start); subst.
-        exists i; auto.
-
-        break_match_hyp; inv SEQ.
-        eapply IHlen with (x := x) in Heqo0; auto.
-        lia.
+        * exists i.
+          split; auto.
+          break_match_hyp; inv SEQ; cbn; auto.
+        * break_match_hyp; inv SEQ.
+          eapply IHlen with (x := x) in Heqo0 as (ipx & FROMZ & IN).
+          exists ipx; split; cbn; auto.
+          lia.
       + inv SEQ.
   Qed.
 
@@ -372,6 +374,44 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       (Util.map_monad
          (fun ix => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
          ixs).
+
+  Import Monad.
+  Lemma get_consecutive_ptrs_length : 
+    forall {M} `{HM : Monad M} `{EQM : Monad.Eq1 M}
+      `{EQV : @Eq1Equivalence M HM EQM}
+      `{EQRET : @Eq1_ret_inv M EQM HM}
+      `{MLAWS : @MonadLawsE M EQM HM}
+      `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
+      `{RAISE : @RaiseBindM M HM EQM string (fun T msg => raise_oom msg)}
+      (ptr : addr) (len : nat) (ptrs : list addr),
+      (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad ->
+      len = length ptrs.
+  Proof.
+    intros M HM EQM EQV EQRET MLAWS OOM ERR RAISE ptr len ptrs CONSEC.
+    unfold get_consecutive_ptrs in CONSEC.
+    cbn in *.
+    destruct (intptr_seq 0 len) eqn:SEQ.
+    - (* No OOM *)
+      cbn in *.
+      rewrite bind_ret_l in CONSEC.
+      destruct (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix]) l) eqn:HMAPM.
+      + (* Error: should be a contradiction *)
+        (* TODO: need inversion lemma. *)
+        cbn in CONSEC.
+        admit.
+      + cbn in CONSEC.
+        apply eq1_ret_ret in CONSEC; auto.
+        assert (MReturns l0 (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix]) l)) as RETS.
+        { auto. }
+
+        epose proof MapMonadExtra.map_monad_length l _ _ RETS as LEN.
+        apply intptr_seq_len in SEQ.
+        subst.
+        auto.
+    - (* OOM: CONSEC equivalent to ret is a contradiction. *)
+      (* TODO: need inversion lemma *)
+      admit.
+  Admitted.
 
   Definition generate_num_undef_bytes (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
     N.recursion
@@ -1906,7 +1946,7 @@ Module MakeMemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Memo
   Include MemoryModelSpec LP MP MMSP.
 End MakeMemoryModelSpec.
 
-Module Type MemStateInfinite (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP).
+Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP).
   (* Intptrs are "big" *)
   Import LP.Events.
   Import LP.ITOP.
@@ -1915,6 +1955,7 @@ Module Type MemStateInfinite (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP :
   Import LP.IP.
   Import LP.ADDR.
   Import LP.PROV.
+  Import LP.SIZEOF.
 
   Import MMSP.
   Import MMS.
@@ -1925,62 +1966,8 @@ Module Type MemStateInfinite (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP :
   Import MP.GEP.
   Import MP.BYTE_IMPL.
 
-  Parameter next_addr : MemState -> (addr * Provenance)%type.
-
-  Parameter next_addr_fresh :
-    forall ms1 ms2 ptr pr,
-      next_addr ms1 = (ptr, pr) ->
-      (* Address is fresh *)
-      (* All previously allocated addresses are smaller *)
-      (forall p aid,
-          addr_allocated_prop p aid (MemState_get_memory ms1) (ret (MemState_get_memory ms1, true)) ->
-          (ptr_to_int ptr > ptr_to_int p)%Z) /\
-        (* Fresh provenance *)
-        address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr) /\
-        (* Provenance not previously used *)
-        ~ used_provenance_prop ms1 pr /\
-        (* Provenance now used *)
-        used_provenance_prop ms2 pr /\
-        (* All provenances preserved... *)
-        (forall pr, used_provenance_prop ms1 pr -> used_provenance_prop ms2 pr).
-        
-  Parameter initialize_memory : MemState -> addr -> Provenance -> list SByte -> MemState.
-
-  Parameter initialize_memory_properties :
-    forall ms1 ptr pr bytes ms2,
-      initialize_memory ms1 ptr pr bytes = ms2 ->
-      (* Provenance is used *)
-      used_provenance_prop ms2 pr.
-
-End MemStateInfinite.
-
-(** Memory models which have unlimited memory *)
-Module MemoryModelInfiniteSpec (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP) (MSINF : MemStateInfinite LP MP MMSP MMS).
-  (* Intptrs are "big" *)
-  Import LP.Events.
-  Import LP.ITOP.
-  Import LP.PTOI.
-  Import LP.IP_BIG.
-  Import LP.IP.
-
-  Import MMSP.
-  Import MMS.
-  Import MemHelpers.
-
-  Import MP.GEP.
-
-  Import MSINF.
   Import Util.
 
-  Import MapMonadExtra.
-  Import Monad.
-
-  Import LP.SIZEOF.
-  Import LP.
-  Import PROV.
-  Import MP.BYTE_IMPL.
-
-  Import DV.
   (*
     Things that must succeed:
 
@@ -2069,7 +2056,7 @@ Module MemoryModelInfiniteSpec (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
       `{LAWS: @MonadLawsE M EQM HM}
       ptr len p ptrs,
       (get_consecutive_ptrs ptr len ≈ ret (p :: ptrs))%monad ->
-      p = ptr /\ (exists ptr' len', get_consecutive_ptrs ptr' len' ≈ ret ptrs)%monad.
+      p = ptr /\ (exists ptr' len', len = S len' /\ (get_consecutive_ptrs ptr' len' ≈ ret ptrs)%monad).
   Proof.
     intros M HM EQM EQRET EQV OOM ERR LAWS ptr len p ptrs CONSEC.
 
@@ -2144,7 +2131,7 @@ Module MemoryModelInfiniteSpec (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
         subst.
         lia.
       + pose proof CONSEC as CONSEC'.
-        apply get_consecutive_ptrs_cons in CONSEC as (START & ptr' & len' & CONSEC).
+        apply get_consecutive_ptrs_cons in CONSEC as (START & ptr' & len' & LENEQ & CONSEC).
         subst.
         pose proof IHptrs as IHptrs'.
         specialize (IHptrs' _ _ CONSEC _ IN).
@@ -2168,11 +2155,97 @@ Module MemoryModelInfiniteSpec (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
 
         (* Need to show that ptr'0 = ptr' *)
         pose proof CONSEC as CONSEC''.
-        apply get_consecutive_ptrs_cons in CONSEC as (ptreq & ptr'' & len'' & CONSEC).
+        apply get_consecutive_ptrs_cons in CONSEC as (ptreq & ptr'' & len'' & LENEQ & CONSEC).
         subst.
 
         assert (ptr_to_int ptr < ptr_to_int ptr')%Z by admit.
         lia.
+  Admitted.
+
+  (* TODO: can probably move out of infinite stuff *)
+  Lemma get_consecutive_ptrs_range :
+    forall {M : Type -> Type}
+      `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
+      `{EQRET : @Eq1_ret_inv M EQM HM}
+      `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
+      `{LAWS: @MonadLawsE M EQM HM}
+      ptr len ptrs,
+      (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad ->
+      (forall p,
+          In p ptrs ->
+          (ptr_to_int ptr <= ptr_to_int p < ptr_to_int ptr + (Z.of_nat len))%Z).
+  Proof.
+    intros M HM EQM EQV EQRET OOM ERR LAWS ptr len ptrs.
+    revert ptr len.
+    induction ptrs; intros ptr len CONSEC p IN.
+    - inv IN.
+    - induction IN as [IN | IN].
+      + subst.
+        apply get_consecutive_ptrs_cons in CONSEC as (START & ptr' & len' & LENEQ & CONSEC).
+        subst.
+        lia.
+      + pose proof CONSEC as CONSEC'.
+        apply get_consecutive_ptrs_cons in CONSEC as (START & ptr' & len' & LENEQ & CONSEC).
+        subst.
+        pose proof IHptrs as IHptrs'.
+        specialize (IHptrs' _ _ CONSEC _ IN).
+
+        (* `ptr'` is in `ptrs`, and everything in `ptrs >= ptr'`
+
+           So, I know `ptr' <= p`
+
+           I should know that `ptr < ptr'`...
+         *)
+
+        (* Could take get_consecutive_ptrs in CONSEC and CONSEC' and compare...
+
+           What if ptrs = [ ]?
+
+           I.e., len = 1... Then ptrs is nil and IN is a contradiction.
+        *)
+
+        destruct ptrs as [| ptr'0 ptrs].
+        inv IN.
+
+        (* Need to show that ptr'0 = ptr' *)
+        pose proof CONSEC as CONSEC''.
+        apply get_consecutive_ptrs_cons in CONSEC as (ptreq & ptr'' & len'' & LENEQ & CONSEC).
+        subst.
+
+        assert (Z.succ (ptr_to_int ptr) = ptr_to_int ptr')%Z.
+        { unfold get_consecutive_ptrs in CONSEC'.
+          cbn in CONSEC'.
+          break_match_hyp.
+          2: { cbn in CONSEC'. rewrite rbm_raise_bind in CONSEC'.
+               (* TODO: inversion lemma *)
+               admit.
+               admit.
+          }
+
+          break_match_hyp.
+          2: { cbn in CONSEC'. rewrite rbm_raise_bind in CONSEC'.
+               (* TODO: inversion lemma *)
+               admit.
+               admit.
+          }
+
+          cbn in CONSEC'.
+          rewrite bind_ret_l in CONSEC'.
+          destruct (map_monad (fun ix : intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
+                              (i :: l)) eqn:HMAPM.
+          { cbn in CONSEC'.
+            (* TODO: inversion lemma *)
+            admit.
+          }
+
+          cbn in CONSEC'.
+          apply eq1_ret_ret in CONSEC'; eauto.
+          inv CONSEC'.
+          apply map_monad_err_In with (x := ptr') in HMAPM; [| intuition].
+
+          admit.
+        }
+        lia.        
   Admitted.
 
   Lemma get_consecutive_ptrs_nth :
@@ -2259,170 +2332,34 @@ Module MemoryModelInfiniteSpec (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
     auto.
   Qed.
 
-  Lemma can_find_fresh_block :
-    forall {M : Type -> Type}
-      `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
-      `{EQRET : @Eq1_ret_inv M EQM HM}
-      `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
-      `{LAWS: @MonadLawsE M EQM HM}
-      (m1 : MemState) (m2 : MemState) len,
-    exists pr ptr ptrs,
-      (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad /\
-        (forall p, In p ptrs -> byte_not_allocated m1 p) /\
-        (address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr)) /\
-        (forall p, In p ptrs -> address_provenance p = allocation_id_to_prov (provenance_to_allocation_id pr)) /\
-        ~ used_provenance_prop m1 pr /\
-        used_provenance_prop m2 pr /\
-        (forall pr, used_provenance_prop m1 pr -> used_provenance_prop m2 pr) /\
-        
-  .
-  Proof.
-    intros M HM EQM EQV EQRET OOM ERR LAWS m1 len.
-    set (ptr_w_prov := next_addr m1).
-    set (ptr := fst ptr_w_prov).
-    set (pr := snd ptr_w_prov).
+End MemStateInfiniteHelpers.
 
-    exists pr.
-    exists ptr.
-    pose proof get_consecutive_ptrs_succeeds ptr len as (ptrs & CONSEC).
+Module Type MemoryModelInfiniteSpec (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP).
+  (* Intptrs are "big" *)
+  Import LP.Events.
+  Import LP.ITOP.
+  Import LP.PTOI.
+  Import LP.IP_BIG.
+  Import LP.IP.
+  Import LP.ADDR.
+  Import LP.PROV.
+  Import LP.SIZEOF.
 
-    exists ptrs.
+  Import MMSP.
+  Import MMS.
+  Import MemHelpers.
 
-    pose proof next_addr_fresh m1 ptr pr as FRESH.
-    forward FRESH.
-    { destruct ptr_w_prov eqn:PTR.
-      auto.
-    }
+  Import Monad.
+  Import MapMonadExtra.
+  Import MP.GEP.
+  Import MP.BYTE_IMPL.
 
-    destruct FRESH as (FRESH_ADDR & PTR_PROV & FRESH_PROV).
-
-    split; auto.
-    split; auto.
-    { intros p IN.
-
-      unfold byte_not_allocated.
-      intros aid.
-      intros ALLOC.
-      unfold byte_allocated in ALLOC.
-      red in ALLOC.
-
-      specialize (FRESH_ADDR p aid).
-      forward FRESH_ADDR.
-      { cbn in ALLOC.
-        destruct ALLOC as (sab & a & ALLOC & EQ1 & EQ2); subst.
-        unfold lift_memory_MemPropT in ALLOC.
-        destruct ALLOC as (ALLOC & SUCC).
-        cbn in ALLOC.
-        cbn.
-        auto.
-      }
-
-      epose proof (get_consecutive_ptrs_ge _ _ _ CONSEC _ IN).
-      lia.
-    }
-
-    split; auto.
-    split; auto.
-
-    { intros p IN.
-      rewrite <- PTR_PROV.
-      eapply get_consecutive_ptrs_prov; eauto.      
-    }
-  Qed.
-
-  (* Actually, the easy way to do this is to show that the executable version always succeeds...
-
-     Because the executable version is a subset of the allowed behaviours...
-
-     Eh.
-   *)
-  Lemma allocate_can_always_succeed :
+  Parameter allocate_can_always_succeed :
     forall (m1 : MemState) (t : dtyp) (init_bytes : list SByte)
       (BYTES_SIZE : sizeof_dtyp t = N.of_nat (length init_bytes))
       (NON_VOID : t <> DTYPE_Void),
     exists m2 pr ptr ptrs,
       allocate_bytes_succeeds_spec m1 t init_bytes pr m2 ptr ptrs.
-  Proof.
-    intros m1 t init_bytes BYTES_SIZE NON_VOID.
-
-    epose proof (@can_find_fresh_block (MemPropT MemState) (@MemPropT_Monad MemState) (@MemPropT_Eq1 MemState) _ _ _ _ _ m1 (length init_bytes)) as (pr & ptr & ptrs & CONSEC_PTRS & CONSEC_FRESH & PTR_PR & PTRS_PR & UNUSED_PR).
-    pose proof (big_intptr_seq_succeeds 0 (length init_bytes)) as (ixs & SEQ_ixs).
-
-    (* m1 + init_bytes starting at ptr *)
-    pose proof mem_state_fresh_provenance m1 as (pr' & FRESH_PROV).
-    set (m
-    prov <- fresh_provenance;;
-    set (m2 := initialize_memory m1 ptr pr init_bytes).
-    exists m2.
-    exists pr.
-
-    exists ptr. exists ptrs.
-
-    split.
-    - (* allocate_bytes_consecutive *)
-      apply CONSEC_PTRS.
-      cbn; auto.
-    - (* allocate_bytes_address_provenance *)
-      auto.
-    - (* allocate_bytes_addresses_provenance *)
-      auto.
-    - (* allocate_bytes_provenances_preserved *)
-      intros pr'0.
-      admit.
-    - (* allocate_bytes_was_fresh_byte *)
-      auto.
-    - (* allocate_bytes_now_byte_allocated *)
-      admit.
-    - (* allocate_bytes_preserves_old_allocations *)
-      admit.
-    - (* alloc_bytes_new_reads_allowed *)
-      admit.
-    - (* alloc_bytes_old_reads_allowed *)
-      admit.
-      (* intros ptr' DISJOINT.
-      split; auto. *)
-    - (* alloc_bytes_new_reads *)
-      intros p ix byte NTH1 NTH2.
-      (* apply Util.not_Nth_nil in NTH1. *)
-      (* contradiction. *)
-      admit.
-    - (* alloc_bytes_old_reads *)
-      intros ptr' byte DISJOINT.
-      split; auto.
-      admit.
-      admit.
-    - (* alloc_bytes_new_writes_allowed *)
-      intros p IN.
-      admit.
-      (* inv IN. *)
-    - (* alloc_bytes_old_writes_allowed *)
-      intros ptr' DISJOINT.
-      split; auto.
-      admit.
-      admit.
-    - (* alloc_bytes_add_to_frame *)
-      (*
-      intros fs1 fs2 POP ADD.
-      cbn in ADD; subst; auto.
-      unfold memory_stack_frame_stack_prop in *.
-      cbn in *.
-      unfold memory_stack_frame_stack.
-      cbn.
-      setoid_rewrite add_all_to_frame_nil_preserves_frames.
-      cbn.
-      rewrite POP.
-      auto. *)
-      admit.
-    - (* Heap preserved *)
-      admit.
-      solve_heap_preserved.
-    - (* Non-void *)
-      auto.
-    - (* Length *)
-      cbn; auto.
-*)
-  Admitted.
-
 End MemoryModelInfiniteSpec.
 
 Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP).
