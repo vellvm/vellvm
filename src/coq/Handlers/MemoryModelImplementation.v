@@ -9028,79 +9028,6 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
       (* Done extracting extra info *)
 
       rename ptrs' into ptrs_alloced.
-      destruct ptrs_alloced as [ _ | alloc_addr ptrs] eqn:HALLOC_PTRS.
-      { (* Empty ptr list... Not a contradiction, can allocate 0 bytes... MAY not be unique. *)
-        assert (init_bytes = []) as INIT_NIL.
-        { admit.
-        }
-        assert (ptrs_alloced = []) as PTRS_NIL.
-        { admit.
-        }
-        subst.
-        cbn in *.
-
-        split.
-        - (* allocate_bytes_consecutive *)
-          cbn.
-          repeat eexists.
-        - (* allocate_bytes_address_provenance *)
-          rewrite int_to_ptr_provenance.
-          auto.
-        - (* allocate_bytes_addresses_provenance *)
-          intros ptr IN.
-          inv IN.
-        - (* allocate_bytes_provenances_preserved *)
-          intros pr'0.
-          unfold used_provenance_prop.
-          cbn.
-          reflexivity.
-        - (* allocate_bytes_was_fresh_byte *)
-          intros ptr IN.
-          inv IN.
-        - (* allocate_bytes_now_byte_allocated *)
-          intros ptr IN.
-          inv IN.
-        - (* alloc_bytes_preserves_old_allocations *)
-          intros ptr aid NIN.
-          reflexivity.
-        - (* alloc_bytes_new_reads_allowed *)
-          intros ptr IN.
-          inv IN.
-        - (* alloc_bytes_old_reads_allowed *)
-          intros ptr' DISJOINT.
-          split; auto.
-        - (* alloc_bytes_new_reads *)
-          intros p ix byte NTH1 NTH2.
-          apply Util.not_Nth_nil in NTH1.
-          contradiction.
-        - (* alloc_bytes_old_reads *)
-          intros ptr' byte DISJOINT.
-          split; auto.
-        - (* alloc_bytes_new_writes_allowed *)
-          intros p IN.
-          inv IN.
-        - (* alloc_bytes_old_writes_allowed *)
-          intros ptr' DISJOINT.
-          split; auto.
-        - (* alloc_bytes_add_to_frame *)
-          intros fs1 fs2 POP ADD.
-          cbn in ADD; subst; auto.
-          unfold memory_stack_frame_stack_prop in *.
-          cbn in *.
-          unfold memory_stack_frame_stack.
-          cbn.
-          setoid_rewrite add_all_to_frame_nil_preserves_frames.
-          cbn.
-          rewrite POP.
-          auto.
-        - (* Heap preserved *)
-          solve_heap_preserved.
-        - (* Non-void *)
-          auto.
-        - (* Length *)
-          cbn; auto.
-      }
-
       (* Non-empty allocation *)
       (* TODO: solve_alloc_bytes_succeeds_spec *)
       split.
@@ -9451,7 +9378,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
                     (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
                        (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id
                           (LLVMParamsBigIntptr.PROV.next_provenance ms_prov))))).
-          epose proof (get_consecutive_ptrs_range next_ptr (Datatypes.length init_bytes) (alloc_addr :: ptrs) CONSEC p IN) as INRANGE.
+          epose proof (get_consecutive_ptrs_range next_ptr (Datatypes.length init_bytes) (ptrs_alloced) CONSEC p IN) as INRANGE.
           subst next_ptr.
           rewrite ptr_to_int_int_to_ptr in INRANGE.
           auto.
@@ -9709,7 +9636,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
                     (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
                        (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id
                           (LLVMParamsBigIntptr.PROV.next_provenance ms_prov))))).
-          epose proof (get_consecutive_ptrs_range next_ptr (Datatypes.length init_bytes) (alloc_addr :: ptrs) CONSEC p IN) as INRANGE.
+          epose proof (get_consecutive_ptrs_range next_ptr (Datatypes.length init_bytes) (ptrs_alloced) CONSEC p IN) as INRANGE.
           subst next_ptr.
           rewrite ptr_to_int_int_to_ptr in INRANGE.
           auto.
@@ -9769,8 +9696,6 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
         cbn in OLDFS; subst.
         cbn.
 
-        rewrite <- map_cons.
-
         match goal with
         | H: _ |- context [ add_all_to_frame ?ms (map ptr_to_int ?ptrs) ] =>
             pose proof (add_all_to_frame_correct ptrs ms (add_all_to_frame ms (map ptr_to_int ptrs))) as ADDPTRS
@@ -9803,6 +9728,23 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     (* May need a specific initial extra state... *)
     assert store_id as init_store_id.
     admit.
+
+
+
+  Lemma allocate_bytes_succeeds_spec_correct :
+    forall (ms_init ms_fresh_pr ms_final : MemState) (st sid st' st_final : store_id) dt init_bytes (pr : Provenance) (ptr : addr) (ptrs : list addr)
+      (VALID : @MemMonad_valid_state store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ ms_init st)
+      (VALID' : @MemMonad_valid_state store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ ms_fresh_pr st)
+      (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length init_bytes))
+      (NON_VOID : dt <> DTYPE_Void)
+      (RUN_FRESH : (@MemMonad_run store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ fresh_provenance ms_init st ≈ ret (st, (ms_fresh_pr, pr)))%monad)
+      (MEMORY_FRESH : ms_get_memory ms_init = ms_get_memory ms_fresh_pr)
+      (RUN_FRESH_SID : (@MemMonad_run store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ fresh_sid ms_fresh_pr st ≈ ret (st', (ms_fresh_pr, sid)))%monad)
+      (ALLOC : (@MemMonad_run store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ (@allocate_bytes (MemStateFreshT (itree Eff)) Eff _ _ _ _ _ _ _ _ _ _ _ _ _ dt init_bytes) ms_init st ≈ ret (st', (ms_final, ptr)))%monad)
+      (CONSEC : (@get_consecutive_ptrs (MemStateFreshT (itree Eff)) _ _ _ ptr (length init_bytes) ≈ ret ptrs)%monad)
+      (PR : address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr)),
+      allocate_bytes_succeeds_spec ms_fresh_pr dt init_bytes pr ms_final ptr ptrs.
+  Proof.
 
     remember m1 as m.
     destruct m.
