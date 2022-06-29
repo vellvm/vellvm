@@ -87,7 +87,7 @@ Definition vellvm_agrees_with_clang (prog : list (toplevel_entity typ (block typ
 
 Definition agrees := (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang).
 
-Extract Constant defNumTests    => "1000".
+Extract Constant defNumTests    => "2000".
 QCInclude "../../ml/*".
 QCInclude "../../ml/libvellvm/*".
 
