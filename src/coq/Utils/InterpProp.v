@@ -265,11 +265,11 @@ Section interp_prop.
   Qed.
 
   Instance interp_prop_eutt_Proper_impl_ :
-    forall R (x : _ R), Proper (eutt eq ==> impl) (interp_prop eq x).
+    forall R RR (x : _ R), Proper (eutt eq ==> impl) (interp_prop RR x).
   Proof.
     repeat intro. red in H0.
     punfold H; punfold H0; red in H; red in H0; cbn in *.
-    revert_until R.
+    revert_until RR.
     pcofix CIH.
     intros x y y' EQ H.
     remember (observe x); remember (observe y).
@@ -309,7 +309,7 @@ Section interp_prop.
         * remember (VisF e k1) as ot.
           hinduction HS before CIH; intros; try discriminate; eauto.
           pose proof @Interp_PropT_Vis.
-          specialize (H _ eq (upaco2 (interp_PropT_ R eq) r) A e k1 ta (VisF e0 k3)).
+          specialize (H _ RR (upaco2 (interp_PropT_ R RR) r) A e k1 ta (VisF e0 k3)).
           eapply H; eauto.
           intros.
           left. specialize (HK _ H0). pclearbot.
@@ -320,7 +320,7 @@ Section interp_prop.
           rewrite Heqot. eapply eqit_Vis; reflexivity.
           auto.
         * eapply IHREL; eauto. pstep_reverse.
-          assert (interp_prop eq t0 (Tau t1)) by (pstep; auto).
+          assert (interp_prop RR t0 (Tau t1)) by (pstep; auto).
           apply interp_prop_inv_tau_r in H. punfold H.
     - rewrite <- Heqi. constructor.
       specialize (IHinterp_PropTF _ eq_refl _ Heqi0 EQ). auto.
@@ -344,12 +344,12 @@ Section interp_prop.
   Qed.
 
   Instance interp_prop_eutt_Proper_impl :
-    forall R, Proper (eutt eq ==> eutt eq ==> impl) (interp_prop (R := R) eq).
+    forall R RR, Proper (eutt eq ==> eutt eq ==> impl) (interp_prop (R := R) RR).
   Proof.
-    intros ? y y' EQ x x' EQ' H.
+    intros ? ? y y' EQ x x' EQ' H.
     rewrite <- EQ'. clear x' EQ'.
     punfold H; punfold EQ; red in H; red in EQ; cbn in *.
-    revert_until R.
+    revert_until RR.
     pcofix CIH.
     intros x x' EQ y H.
     remember (observe x); remember (observe y).
@@ -359,7 +359,7 @@ Section interp_prop.
     rename i into xo, i0 into yo.
     induction H; subst; pclearbot; intros.
     - rewrite <- Heqi0.
-      remember (RetF (E:= E) r2).
+      remember (RetF (E:= E) r1).
       induction EQ; inv Heqi1; intros.
       + constructor; auto.
       + constructor. eapply IHEQ; eauto.
@@ -390,14 +390,14 @@ Section interp_prop.
           hinduction HS before CIH; intros; try discriminate; eauto.
           pose proof @Interp_PropT_Vis.
           inversion Heqot. dependent destruction H3.
-          specialize (H _ eq (upaco2 (interp_PropT_ R eq) r)).
+          specialize (H _ RR (upaco2 (interp_PropT_ R RR) r)).
           eapply H; eauto.
           intros. right. eapply CIH; eauto.
           specialize (REL a). pclearbot. punfold REL.
           specialize (HK _ H0). pclearbot.
           punfold HK.
         * eapply IHREL; eauto. pstep_reverse.
-          assert (interp_prop eq (Tau t0) t2) by (pstep; auto).
+          assert (interp_prop RR (Tau t0) t2) by (pstep; auto).
           apply interp_prop_inv_tau_l in H. punfold H.
     - specialize (IHinterp_PropTF _ eq_refl _ Heqi0).
       assert (t1 ≈ go ox').
@@ -418,7 +418,7 @@ Section interp_prop.
   Qed.
 
   Instance interp_prop_eutt_Proper :
-    forall R, Proper (eutt eq ==> eutt eq ==> iff) (interp_prop (R := R) eq).
+    forall R RR, Proper (eutt eq ==> eutt eq ==> iff) (interp_prop (R := R) RR).
   Proof.
     split; intros; [rewrite <- H, <- H0 | rewrite H, H0]; auto.
   Qed.
@@ -583,44 +583,42 @@ Section interp_prop.
       forall R RR `{Reflexive _ RR} (t : _ R) t', t ≈ t' -> interp_prop RR t (interp h t').
   Proof.
     intros h HC KC R RR H t t' H1.
-    revert t t' H1.
+    setoid_rewrite unfold_interp.
+    remember (_interp h (observe t')).
+    assert (i ≅ _interp h (observe t')). {
+      rewrite Heqi. reflexivity.
+    } clear Heqi.
+    revert t t' i H1 H0.
     pcofix CIH.
-    intros t t' eq.
+    intros t t' i eq ?.
     pstep.
     red.
-    unfold interp, Basics.iter, MonadIter_itree.
+    (* unfold _interp, interp, Basics.iter, MonadIter_itree in H2. *)
     punfold eq. red in eq.
-    (* rewrite (itree_eta t) in eq. *)
-    destruct (observe t).
-    (* - rewrite <- eq. econstructor. reflexivity. rewrite <- eq. rewrite unfold_iter. cbn. rewrite Eq.bind_ret_l. cbn.  reflexivity. *)
-    (* - econstructor. right. *)
-    (*   eapply CIH. rewrite tau_eutt in eq. rewrite eq. reflexivity. *)
-    (* - econstructor. *)
-    (*   apply HC. *)
-    (*   intros a. cbn. *)
-    (*   right. *)
-    (*   unfold interp, Basics.iter, MonadIter_itree in CIH. unfold fmap, Functor_itree, ITree.map in CIH. *)
-    (*   specialize (CIH (k a) (k a)). *)
-    (*   apply CIH. *)
-    (*   reflexivity. *)
-
-    (*   unfold k_spec_correct in KC. *)
-
-    (*   eapply KC. *)
-    (*   rewrite <- eq. *)
-    (*   rewrite unfold_iter. *)
-    (*   cbn. *)
-
-    (*   rewrite bind_map. *)
-    (*   eapply eutt_clo_bind. *)
-    (*   reflexivity. *)
-    (*   intros u1 u2 H0; subst. *)
-
-    (*   rewrite tau_eutt. *)
-    (*   reflexivity. *)
-  Admitted.
-
-  From Coq Require Import Logic.Classical_Prop.
+    genobs t ot; genobs t' ot'.
+    revert i H2 t t' Heqot Heqot'.
+    induction eq; intros; subst; pclearbot; auto.
+    - punfold H2; inv H2; try inv CHECK.
+      constructor; auto.
+    - punfold H2; inv H2; try inv CHECK.
+      constructor; auto.
+      right; eauto. eapply CIH; pclearbot; eauto.
+      rewrite <- unfold_interp; auto.
+    - econstructor.
+      apply HC; reflexivity.
+      intros; right; eapply CIH; eauto.
+      Unshelve.
+      3 : exact (fun x => _interp h (observe (k2 x))).
+      reflexivity.
+      eapply KC; split; [ reflexivity | rewrite H2; rewrite <- itree_eta].
+      eapply eutt_clo_bind; [ reflexivity | intros; subst; rewrite tau_eutt, unfold_interp; reflexivity].
+    - constructor; eapply IHeq; eauto.
+    - cbn in H2.
+      apply eqitree_inv_Tau_r in H2.
+      destruct H2 as (?&?&?). rewrite unfold_interp in H1.
+      specialize (IHeq _ H1 _ _ eq_refl eq_refl).
+      rewrite H0. constructor; auto.
+  Qed.
 
   (* Figure 7: interp Trigger law *)
   (* morally, we should only work with "proper" triggers everywhere *)
