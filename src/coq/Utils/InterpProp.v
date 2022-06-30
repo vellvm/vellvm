@@ -44,7 +44,7 @@ Section interp_prop.
 
   (* Definition 5.3: Handler Correctness *)
   Definition handler_correct {E F} (h_spec: E ~> PropT F) (h: E ~> itree F) :=
-    (forall T e, h_spec T e (h T e)).
+    (forall T e ta, ta ≈ h T e <-> h_spec T e ta).
 
   Lemma case_prop_handler_correct:
     forall {E1 E2 F}
@@ -66,7 +66,7 @@ Section interp_prop.
              {E F}
              (h: E ~> itree F)
              (k_spec : forall T R, E T -> itree F T -> (T -> itree F R) -> itree F R -> Prop) : Prop
-    := forall T R e k2 t2, t2 ≈ bind (h T e) k2 -> k_spec T R e (h T e) k2 t2.
+    := forall T R e k2 t2 ta, (ta ≈ h _ e /\ t2 ≈ bind ta k2) <-> k_spec T R e ta k2 t2.
 
   Context {E F : Type -> Type}.
   Context (h_spec : E ~> PropT F).
@@ -542,28 +542,6 @@ Section interp_prop.
         rewrite H, H0. eapply k_spec_bind; eauto.
   Qed.
 
-  Inductive may_converge {A : Type} (a : A) : itree E A -> Prop :=
-  | conv_ret (t : itree E A) : t ≈ Ret a -> may_converge a t
-  | conv_vis (t : itree E A ) {B : Type} (e : E B) (k : B -> itree E A):
-      t ≈ Vis e k -> (forall b, may_converge a (k b)) -> may_converge a t.
-  Hint Constructors may_converge : itree.
-
-  #[global]
-  Instance eutt_proper_con_converge {A} {a : A} : Proper (eutt eq ==> iff) (@may_converge _ a).
-  Proof.
-    intros t1 t2 Ht. split; intros.
-    - induction H.
-      + apply conv_ret; auto. rewrite <- Ht. auto.
-      + eapply conv_vis; eauto. rewrite <- H.
-        symmetry. auto.
-    - induction H.
-      + apply conv_ret; auto. rewrite Ht. auto.
-      + eapply conv_vis; eauto. rewrite Ht.
-        eauto.
-  Qed.
-
-  From Coq Require Import Logic.Classical_Prop.
-
   Lemma interp_prop_ret_pure :
     forall {T E F} (RR : relation T) `{REF: Reflexive _ RR} (x : T)
       (h : E ~> PropT F)
@@ -642,10 +620,14 @@ Section interp_prop.
     (*   reflexivity. *)
   Admitted.
 
+  From Coq Require Import Logic.Classical_Prop.
+
   (* Figure 7: interp Trigger law *)
   (* morally, we should only work with "proper" triggers everywhere *)
   Lemma interp_prop_trigger :
-    forall R (e : E R) (HProper: Proper (eutt eq ==> iff) (h_spec _ e)),
+    forall R (e : E R) (HProper: Proper (eutt eq ==> iff) (h_spec _ e)) h
+      (HC : handler_correct h_spec h)
+      (KC : k_spec_correct h k_spec),
       (interp_prop eq (trigger e) ≈ h_spec _ e)%monad.
   Proof.
     intros; red.
@@ -657,29 +639,40 @@ Section interp_prop.
     intros; split; intros;
       [rewrite <- H | rewrite <- H in H0]; clear H y.
     - unfold trigger in H0. red in H0.
-      pinversion H0; subst.
-      + admit.
-
-      (* * red in H0. rewrite <- H3 in H0. inversion HS. *)
-
-  (*     apply inj_pair2 in H3. apply inj_pair2 in H4. *)
-  (*     subst. *)
-  (*     unfold subevent, resum, ReSum_id, Id_IFun, id_ in HTA. *)
-  (*     rewrite eq2 in H. *)
-  (*     assert (x <- ta ;; k2 x ≈ ta). *)
-  (*     { rewrite <- (Eq.bind_ret_r ta). *)
-  (*       apply eutt_clo_bind with (UU := fun u1 u2 => u1 = u2 /\ Returns u1 ta). *)
-  (*       rewrite Eq.bind_ret_r. apply eutt_Returns. *)
-  (*       intros. destruct H1. subst. specialize (HK u2 H2). pclearbot. pinversion HK. subst. assumption. *)
-  (*     } *)
-  (*     rewrite H1 in H. *)
-  (*     specialize (HP R e e eq_refl).  unfold Eq1_PropT in HP. destruct HP as (P & _ & _). *)
-  (*     rewrite P. apply HTA. symmetry. assumption. *)
-  (*   + unfold trigger, subevent, resum, ReSum_id, Id_IFun, id_. *)
-  (*     red. pstep. eapply Interp_PropT_Vis with (k2 := (fun x : R => Ret x)). *)
-  (*     * apply H0. *)
-  (*     * unfold bind, Monad_itree. rewrite Eq.bind_ret_r. assumption. *)
-  (*     * intros a. left. pstep. red. econstructor. reflexivity.  reflexivity. *)
-Admitted.
+      punfold H0. red in H0. cbn in H0.
+      unfold subevent, resum, ReSum_id, Id_IFun, id_ in H0.
+      remember (VisF e (fun x => Ret x)).
+      rewrite itree_eta.
+      remember (observe x).
+      revert Heqi x Heqi0.
+      induction H0; intros; inv Heqi.
+      + rewrite tau_eutt; rewrite (itree_eta). eapply IHinterp_PropTF; eauto.
+      + dependent destruction H1.
+        assert (x <- ta ;; k2 x ≈ ta).
+        { rewrite <- (Eq.bind_ret_r ta).
+          apply eutt_clo_bind with (UU := fun u1 u2 => u1 = u2 /\ Returns u1 ta).
+          rewrite Eq.bind_ret_r. apply eutt_Returns.
+          intros. destruct H; eauto. subst. specialize (HK _ H0).
+          pclearbot.
+          punfold HK; red in HK; cbn in HK.
+          symmetry.
+          pstep. red. cbn.
+          remember (RetF u2); remember (observe (k2 u2)).
+          assert (go i0 ≈ k2 u2).
+          { rewrite Heqi0, <- itree_eta; reflexivity. }
+          clear Heqi0.
+          revert x u2 k2 Heqi H KS H0.
+          induction HK; intros; inv Heqi.
+          - constructor; auto.
+          - constructor; eauto; eapply IHHK; eauto.
+            rewrite tau_eutt in H. rewrite <- itree_eta; auto. }
+        rewrite <- H in HTA. red in HC, KC. symmetry in H.
+        rewrite <- KC in KS. destruct KS as (?&KS); rewrite KS; auto.
+      - unfold trigger, subevent, resum, ReSum_id, Id_IFun, id_.
+        red. pstep. eapply Interp_PropT_Vis with (k2 := (fun x : R => Ret x)); eauto.
+        + intros; left; pstep; constructor; auto.
+        + red in KC. eapply KC. eapply HC in H0.
+          split; eauto. rewrite bind_ret_r, <- itree_eta; reflexivity.
+  Qed.
 
 End interp_prop.
