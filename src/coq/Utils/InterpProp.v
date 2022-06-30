@@ -593,7 +593,6 @@ Section interp_prop.
     intros t t' i eq ?.
     pstep.
     red.
-    (* unfold _interp, interp, Basics.iter, MonadIter_itree in H2. *)
     punfold eq. red in eq.
     genobs t ot; genobs t' ot'.
     revert i H2 t t' Heqot Heqot'.
