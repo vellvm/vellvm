@@ -5,6 +5,7 @@ From Vellvm Require Import
      Utils.Monads
      Utils.PropT
      Utils.Tactics
+     Utils.MonadEq1Laws
      Theory.DenotationTheory
      Theory.InterpreterMCFG
      Handlers.MemoryModelImplementation.
@@ -158,15 +159,65 @@ Module Infinite.
         Lemma interp_prop_vis :
           forall {E F X} (h_spec : E ~> PropT F) k_spec R RR
             (e : E X) kk t,
-            interp_prop h_spec k_spec R RR (Vis e kk) t ->
+            interp_prop h_spec k_spec R RR (Vis e kk) t <->
             (x <- h_spec X e;;
             interp_prop h_spec k_spec R RR (kk x)) t. (* Do I need to use k_spec anywhere...? *)
         Proof.
-          intros E F X h_spec k_spec R RR e kk t SPEC.
         Admitted.
             
         epose proof allocate_dtyp_spec_can_always_succeed m _ _ (DTYPE_I 64) _ _ _ _ _ as (ms_final & addr & ALLOC).
 
+        eapply interp_prop_vis.
+        cbn.
+        unfold bind_PropT.
+
+        exists (ITree.map (fun '(_, (_, x)) => x) (Ret r2)).
+        eexists.
+        split.
+        * exists sid. exists ms_final.
+          unfold my_handle_memory_prop.
+          unfold MemPropT_lift_PropT_fresh.
+          right.
+          split; [|split].
+          -- exists String.EmptyString.
+             exists String.EmptyString.
+             intros ERR.
+             rewrite map_ret in ERR.
+             rewrite map_ret in ERR.
+             cbn in ERR.
+             (* TODO: inv *)
+             admit.
+          -- exists String.EmptyString.
+             exists String.EmptyString.
+             intros OOM.
+             rewrite map_ret in OOM.
+             rewrite map_ret in OOM.
+             cbn in OOM.
+             (* TODO: inv *)
+             admit.
+          -- intros st' ms' addr_dv SUCC.
+             rewrite map_ret in SUCC.
+             rewrite map_ret in SUCC.
+             cbn in SUCC.
+             destruct r2 as (lenv' & lstack & dv).
+             assert ((ms_final, (sid, dv)) = (ms', (st', addr_dv))) as EQRES.
+             { eapply (@eq1_ret_ret
+                       (itree
+                          (sum1 ExternalCallE
+                                (sum1 PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))))
+                    )); eauto.
+
+               typeclasses eauto.
+             }
+
+             inversion EQRES.
+             subst ms' st' dv.
+
+             cbn.
+             exists ms_final, addr.
+             split; [|split]; auto.
+             
+        
         pfold. red.
         cbn.
         (* t2 = (ITree.map (fun '(_, (_, x)) => x) (Ret2 s' m' r2)) *)

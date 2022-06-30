@@ -321,26 +321,50 @@ Definition MemPropT_assert_post {MemState X} (Post : X -> Prop) : MemPropT MemSt
            end
        end.
 
-Definition MemPropT_lift_PropT {MemState X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (m : MemPropT MemState X) : 
+Definition MemPropT_lift_PropT {MemState X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (spec : MemPropT MemState X) : 
   stateT MemState (PropT E) X.
 Proof.
   unfold PropT, MemPropT, stateT in *.
-  intros ms t.
-  specialize (m ms).
-  refine (((exists msg, t ≈ raise_ub msg) <-> (forall res, ~ m res)) /\
-          ((exists msg, t ≈ raise_error msg) <-> (exists msg, m (raise_error msg))) /\
-          ((exists msg, t ≈ raise_oom msg) <-> (exists msg, m (raise_oom msg))) /\
-          (forall res, t ≈ ret res <-> m (ret res))).
+  refine
+    (fun ms t =>
+       (* UB *)
+       (exists msg_spec,
+           spec ms (raise_ub msg_spec)) \/
+         (* Error *)
+         ((exists msg msg_spec,
+              t ≈ (raise_error msg) ->
+              spec ms (raise_error msg_spec))) /\
+           (* OOM *)
+           (exists msg msg_spec,
+               t ≈ (raise_oom msg) ->
+               spec ms (raise_oom msg_spec)) /\
+           (* Success *)
+           (forall ms' x,
+               t ≈ (ret (ms', x)) ->
+               spec ms (ret (ms', x)))).
 Defined.
 
-Definition MemPropT_lift_PropT_fresh {MemState X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (m : MemPropT MemState X) : 
+(* Should line up with exec_correct *)
+Definition MemPropT_lift_PropT_fresh {MemState X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (spec : MemPropT MemState X) : 
   stateT store_id (stateT MemState (PropT E)) X.
 Proof.
   unfold PropT, MemPropT, stateT in *.
-  intros sid ms t.
-  specialize (m ms).
-  refine (((exists msg, t ≈ raise_ub msg) <-> (forall res, ~ m res)) /\
-          ((exists msg, t ≈ raise_error msg) <-> (exists msg, m (raise_error msg))) /\
-          ((exists msg, t ≈ raise_oom msg) <-> (exists msg, m (raise_oom msg))) /\
-          (forall sid ms x, t ≈ ret (ms, (sid, x)) <-> m (ret (ms, x)))).
+
+  refine
+    (fun st ms t =>
+       (* UB *)
+       (exists msg_spec,
+           spec ms (raise_ub msg_spec)) \/
+         (* Error *)
+         ((exists msg msg_spec,
+              t ≈ (raise_error msg) ->
+              spec ms (raise_error msg_spec))) /\
+           (* OOM *)
+           (exists msg msg_spec,
+               t ≈ (raise_oom msg) ->
+               spec ms (raise_oom msg_spec)) /\
+           (* Success *)
+           (forall st' ms' x,
+               t ≈ (ret (ms', (st', x))) ->
+               spec ms (ret (ms', x)))).
 Defined.
