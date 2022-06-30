@@ -32,6 +32,7 @@ Module Infinite.
   Import DenotationTheoryBigIntptr.
   Import MCFGTheoryBigIntptr.
   Import MemoryBigIntptrInfiniteSpec.
+  Import MemoryBigIntptrInfiniteSpecHelpers.
   Import D.
 
   Import Global.
@@ -45,6 +46,10 @@ Module Infinite.
   Import InterpreterStackBigIntptr.
   Import MEM.
   Import MEM_SPEC_INTERP.
+
+  Import SemNotations.
+  Import InterpFacts.
+  Import LLVMEvents.
 
   Definition t_alloc : itree L0 dvalue
     := trigger (Alloca (DTYPE_I 64%N));; ret DVALUE_None.
@@ -62,7 +67,196 @@ Module Infinite.
     intros t' INTERP.
     exists t'.
     split.
-    - cbn.
+    - cbn in *.
+
+      (* TODO: Should make lemmas about ret, etc for interp_mcfg4 *)
+      unfold interp_mcfg4 in *.
+      unfold model_undef in *.
+
+      destruct INTERP as [t_pre [INTERP UNDEF]].
+
+      (* TODO: Need something about interp_memory_prop being proper with respect to eutt? *)
+      (* Not sure if this is exactly what it should be *)
+      Set Nested Proofs Allowed.
+      #[global] Instance interp_mem_prop_Proper3 :
+        forall {E F} `{FAIL : FailureE -< F} `{UB : UBE -< F} `{OOM : OOME -< F}
+          {R} (RR : R -> R -> Prop) a b,
+          Proper (eqit eq a b ==> eq ==> eq ==> eq ==> iff) (@interp_memory_prop E F FAIL UB OOM R RR).
+      Proof.
+        intros E F FAIL UB OOM R RR a b.
+        unfold interp_memory_prop.
+        unfold Proper, respectful.
+        intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2.
+        subst.
+        rewrite H.
+        reflexivity.
+      Qed.
+
+      setoid_rewrite interp_intrinsics_ret in INTERP.
+      setoid_rewrite interp_global_ret in INTERP.
+      setoid_rewrite interp_local_stack_ret in INTERP.
+
+      (* TODO: Turn this into an interp_memory_prop lemma *)
+      unfold interp_memory_prop in INTERP.
+      cbn in INTERP.
+
+      apply interp_prop_ret_inv in INTERP.
+      destruct INTERP as [r2 [INTERP_TT EQ]].
+
+      assert (ITree.map (fun '(_, (_, x)) => x) t_pre ≈ Ret ((fun '(_, (_, x)) => x) (m, (sid, r2)))).
+      auto.
+      clear EQ.
+      rename H into EQ.
+
+      Lemma ret_map_itree :
+        forall Eff A B (f : A -> B) (t : itree Eff A) (a : A),
+          ITree.map f t ≈ ret (f a) ->
+          exists a', t ≈ ret a' /\ f a' = f a.
+      Proof.
+      Admitted.
+
+      apply ret_map_itree in EQ as ((m', (s', a')) & EQ & FEQ).
+
+      rewrite EQ in UNDEF.
+      cbn in UNDEF.
+
+      cbn in EQ.
+      subst.
+      exists (Ret2 s' m' r2). (* Not sure if should be s' or sid, and m' or m *)
+
+      split.
+      + rewrite bind_trigger.
+        rewrite interp_intrinsics_vis.
+        cbn.
+        rewrite bind_trigger.
+        rewrite interp_global_vis.
+        cbn.
+        rewrite bind_bind.
+        setoid_rewrite bind_ret_l.
+        cbn.
+        setoid_rewrite interp_intrinsics_ret.
+        setoid_rewrite interp_global_ret.
+        cbn.
+
+        rewrite bind_trigger.
+        rewrite interp_local_stack_vis.
+        cbn.
+
+        rewrite bind_bind.
+        rewrite bind_trigger.
+
+        setoid_rewrite bind_ret_l.
+        cbn.
+
+
+        (* LEMMA *)
+        unfold interp_memory_prop.
+        cbn.
+
+        Opaque MMEP.MemSpec.allocate_dtyp_spec.
+
+        Lemma interp_prop_vis :
+          forall {E F X} (h_spec : E ~> PropT F) k_spec R RR
+            (e : E X) kk t,
+            interp_prop h_spec k_spec R RR (Vis e kk) t ->
+            (x <- h_spec X e;;
+            interp_prop h_spec k_spec R RR (kk x)) t. (* Do I need to use k_spec anywhere...? *)
+        Proof.
+          intros E F X h_spec k_spec R RR e kk t SPEC.
+        Admitted.
+            
+        epose proof allocate_dtyp_spec_can_always_succeed m _ _ (DTYPE_I 64) _ _ _ _ _ as (ms_final & addr & ALLOC).
+
+        pfold. red.
+        cbn.
+        (* t2 = (ITree.map (fun '(_, (_, x)) => x) (Ret2 s' m' r2)) *)
+        (* t2 ≈ bind ta k2 *)
+        (* *)\
+        eapply Interp_PropT_Vis. (* with (ta := (ITree.map (fun '(_, (_, x)) => x) (Ret r2))). *)
+        * cbn.
+          exists sid. exists ms_final.
+          unfold my_handle_memory_prop.
+          unfold MemPropT_lift_PropT_fresh.
+          split; [|split; [|split]].
+          admit.
+          -- (* UB *)
+            split; intros UB.
+            ++ destruct UB as [ubm UB].
+               rewrite map_ret in UB.
+               rewrite map_ret in UB.
+               (* TODO: inv *)
+               admit.
+            ++ unfold MMEP.MemSpec.handle_memory_prop in UB.
+               exfalso.
+               apply UB with (res := ret (ms_final, DVALUE_Addr addr)).
+               cbn.
+               clear UB.
+
+               exists ms_final. exists addr.
+               tauto.
+          -- (* Error *)
+            split; intros ERR.
+            ++ (* TODO: inv *)
+              admit.
+            ++ destruct ERR as [errm ERR].
+               (* I don't actually know that allocate_dtyp_spec *can't* error *)
+               exists errm.
+               unfold MMEP.MemSpec.handle_memory_prop in ERR.
+               cbn in ERR.
+               destruct ERR as [ERR | ERR].
+               rewrite ALLOC in ERR.
+               exfalso.
+               apply ERR with (res := ret (ms_final, DVALUE_Addr addr)).
+               cbn.
+               clear UB.
+
+               exists ms_final. exists addr.
+               tauto.
+
+              setoid_rewrite ALLOC in ERR.
+          --
+        setoid_rewrite map_ret.
+        
+        Set Nested Proofs Allowed.
+        Lemma interp_memory_prop_vis :
+          interp_memor
+          
+        (* TODO: lemma *)
+        unfold interp_memory_prop.
+        cbn.
+      + auto. (* s' and m' may be unimportant *)
+
+      rewrite EQ.
+      
+      setoid_rewrite R2 in EQ.
+      (* TODO: I feel like I need a map lemma involving eutt ret * )
+      assert (@ret (itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE))
+                   (@Monad_itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE))
+                   (local_env * @Stack.stack local_env * res_L1) r2 = (ret ((fun '(_, (_, x)) => x) (m, (sid, r2))))) as R2 by reflexivity.
+      Unset Printing Notations.
+      setoid_rewrite R2 in EQ.
+      eassert (Ret r2 = ).
+      reflexivity.
+      rewrite H in EQ.
+
+(MMEP.MMSP.MemState * (store_id * (local_env * @Stack.stack local_env * res_L1)))
+      erewrite <- map_ret in EQ.
+      
+      setoid_rewrite interp_memory_prop_ret2 in INTERP.
+
+
+    Definition interp_memory_prop {R} (RR : R -> R -> Prop) :
+      itree Effin R -> MemStateFreshT (PropT Effout) R :=
+      fun (t : itree Effin R) (sid : store_id) (ms : MemState) (t' : itree Effout (MemState * (store_id * R))) =>
+        interp_prop (fun T (e : Effin T) (t : itree Effout T) => exists (sid' : store_id) (ms' : MemState),
+                         @interp_memory_prop_h T e sid ms (fmap (fun (x : T) => (ms', (sid', x))) t)) (@memory_k_spec) R RR t ((fmap (fun '(_, (_, x)) => x) t') : itree Effout R).
+
+      unfold interp_memory_prop in INTERP.
+      
+      setoid_rewrite interp_intrinsics_ret in INTERP.
+      Show Proof.
+      rewrite interp_ret in INTERP.
+      
       pose proof allocate_can_always_succeed m (DTYPE_I 64%N) as ALLOC_SUCCESS.
 
 

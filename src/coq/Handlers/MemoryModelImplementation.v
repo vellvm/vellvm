@@ -8894,7 +8894,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Admitted.
 
   Lemma allocate_bytes_succeeds_spec_correct :
-    forall (ms_init ms_fresh_pr ms_final : MemState) (st sid st' st_final : store_id) dt init_bytes (pr : Provenance) (ptr : addr) (ptrs : list addr)
+    forall (ms_init ms_fresh_pr ms_final : MemState) (st sid st' : store_id) dt init_bytes (pr : Provenance) (ptr : addr) (ptrs : list addr)
       (VALID : @MemMonad_valid_state store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ ms_init st)
       (VALID' : @MemMonad_valid_state store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ ms_fresh_pr st)
       (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length init_bytes))
@@ -8907,7 +8907,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
       (PR : address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr)),
       allocate_bytes_succeeds_spec ms_fresh_pr dt init_bytes pr ms_final ptr ptrs.
   Proof.
-    intros ms_init ms_fresh_pr ms_final st sid st' st_final dt init_bytes pr ptr ptrs VALID VALID' BYTES_SIZE NON_VOID RUN_FRESH MEMORY_FRESH RUN_FRESH_SID ALLOC CONSEC PR.
+    intros ms_init ms_fresh_pr ms_final st sid st' dt init_bytes pr ptr ptrs VALID VALID' BYTES_SIZE NON_VOID RUN_FRESH MEMORY_FRESH RUN_FRESH_SID ALLOC CONSEC PR.
 
     Opaque get_consecutive_ptrs.
     unfold allocate_bytes in ALLOC.
@@ -9715,42 +9715,59 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Admitted.
 
   Lemma allocate_can_always_succeed :
-    forall (m1 : MemState) (t : dtyp) (init_bytes : list SByte)
+    forall (ms_init ms_fresh_pr : MemState) (t : dtyp) (init_bytes : list SByte) (pr : Provenance)
+      (FRESH_PR : (fresh_provenance ms_init (ret (ms_fresh_pr, pr))))
       (BYTES_SIZE : sizeof_dtyp t = N.of_nat (length init_bytes))
       (NON_VOID : t <> DTYPE_Void),
-    exists m2 pr ptr ptrs,
-      allocate_bytes_succeeds_spec m1 t init_bytes pr m2 ptr ptrs.
+    exists ms_final ptr ptrs,
+      allocate_bytes_succeeds_spec ms_fresh_pr t init_bytes pr ms_final ptr ptrs.
   Proof.
-    intros m1 t init_bytes BYTES_SIZE NON_VOID.
+    intros ms_init ms_fresh_pr t init_bytes pr FRESH_PR BYTES_SIZE NON_VOID.
 
     remember (@allocate_bytes (MemStateFreshT (itree Eff)) Eff _ _ _ _ _ _ _ _ _ _ _ _ _ t init_bytes) as alloc.
+    assert (forall ms, exists st, @MemMonad_valid_state store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ ms st) as ALWAYS_VALID by admit.
+    specialize (ALWAYS_VALID ms_init) as (st & VALID).
+
+    epose proof @exec_correct_fresh_provenance (MemStateFreshT (itree Eff)) Eff store_id
+          _ _ _ _ _ _ _ _ _ _ _ _ as FRESH_PR_CORRECT.
+    unfold exec_correct in FRESH_PR_CORRECT.
+    specialize (FRESH_PR_CORRECT ms_init st VALID).
+    destruct FRESH_PR_CORRECT as [UB | FRESH_PR_CORRECT].
+    { destruct UB as [ubm UB].
+      unfold fresh_provenance in UB.
+      cbn in UB.
+      inv UB.
+    }
+
+    destruct FRESH_PR_CORRECT as [FRESH_PR_ERR [FRESH_PR_OOM FRESH_PR_RET]].
+    unfold fresh_provenance in *.
+    cbn in *.
+    destruct FRESH_PR as [EXTPR BLAH].
+    pose proof EXTPR.
+    unfold extend_provenance in H.
+    (* used_provenance_prop can't conclude that any new provenance
+    allocated must be identical to the next provenance allocated by
+    the executable... *)
+
+    (* I need a relationship between
+       fresh_provenance in MemPropT and MemStateFreshT...
+
+       Can it just be exec_correct?
+     *)
+
+    (*
+    remember (@MemMonad_run store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ alloc ms_init st) as ALLOC.
+    subst alloc.
+    destruct MemM
+    epose proof allocate_bytes_succeeds_spec_correct ms_init ms_fresh_pr.
 
     (* May need a specific initial extra state... *)
     assert store_id as init_store_id.
     admit.
+*)
 
-
-
-  Lemma allocate_bytes_succeeds_spec_correct :
-    forall (ms_init ms_fresh_pr ms_final : MemState) (st sid st' st_final : store_id) dt init_bytes (pr : Provenance) (ptr : addr) (ptrs : list addr)
-      (VALID : @MemMonad_valid_state store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ ms_init st)
-      (VALID' : @MemMonad_valid_state store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ ms_fresh_pr st)
-      (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length init_bytes))
-      (NON_VOID : dt <> DTYPE_Void)
-      (RUN_FRESH : (@MemMonad_run store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ fresh_provenance ms_init st ≈ ret (st, (ms_fresh_pr, pr)))%monad)
-      (MEMORY_FRESH : ms_get_memory ms_init = ms_get_memory ms_fresh_pr)
-      (RUN_FRESH_SID : (@MemMonad_run store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ fresh_sid ms_fresh_pr st ≈ ret (st', (ms_fresh_pr, sid)))%monad)
-      (ALLOC : (@MemMonad_run store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ (@allocate_bytes (MemStateFreshT (itree Eff)) Eff _ _ _ _ _ _ _ _ _ _ _ _ _ dt init_bytes) ms_init st ≈ ret (st', (ms_final, ptr)))%monad)
-      (CONSEC : (@get_consecutive_ptrs (MemStateFreshT (itree Eff)) _ _ _ ptr (length init_bytes) ≈ ret ptrs)%monad)
-      (PR : address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr)),
-      allocate_bytes_succeeds_spec ms_fresh_pr dt init_bytes pr ms_final ptr ptrs.
-  Proof.
-
-    remember m1 as m.
-    destruct m.
+    destruct ms_init eqn:HINIT.
     destruct ms_memory_stack0.
-    destruct (MMSP.mem_state_fresh_provenance m1) as [p m1'] eqn:FRESH.
-    apply mem_state_fresh_provenance_fresh in FRESH as [MEMEQ [PRESERVED_PR FRESH]].    
 
     set (next_ptr :=
            (LLVMParamsBigIntptr.ITOP.int_to_ptr
@@ -9822,320 +9839,54 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
           LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0
       |}).
 
-    exists (LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0). exists next_ptr. exists ptrs.
+    exists next_ptr. exists ptrs.
 
-    apply allocate_bytes_succeeds_spec_correct with (st := init_store_id) (st' := BinNatDef.N.succ init_store_id).
-    { cbn.
-      unfold allocate_bytes.
+    (*** This stuff isn't provable because of fresh_provenance
+       differences in MemPropT and MemStateFreshT.
+
+       I'm going to go sort out if I can even use something
+       resembling this, and then worry about the details of
+       the admits here...
+
+       I might be able to deal with the admits here by breaking
+       up allocate_bytes into two parts, one that grabs a fresh
+       provenance, and one that, given the provenance, allocates
+       memory.
+
+       The issue is that when these things are combined as they are
+       in the executable allocate_bytes, the structure is slightly
+       different than the specification... Which makes it harder to
+       formulate these lemmas (allocate_bytes does more stuff that
+       allocate_bytes_succeeds_spec, as the latter just takes in a
+       provenance, and does not allocate one itself).
+     *)
+    apply allocate_bytes_succeeds_spec_correct with (st := st) (st' := BinNatDef.N.succ st) (sid := BinNatDef.N.succ st) (ms_init := ms_init); auto.
+    - subst; auto.
+    - admit.
+    - cbn.
+      repeat setoid_rewrite bind_ret_l.
+      repeat rewrite map_bind.
+      setoid_rewrite map_ret.
       cbn.
-
-      destruct (dtyp_eq_dec t DTYPE_Void) as [EQ_VOID | ];
-        [contradiction |].
-
-      destruct (N.eq_dec (LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp t)
-                         (N.of_nat (Datatypes.length init_bytes))) as [EQ_SIZE | NEQ_SIZE];
-        [| contradiction].
-
-      setoid_rewrite map_bind.
+      break_match.
       repeat rewrite bind_ret_l.
       cbn.
-      repeat rewrite bind_ret_l.
-      cbn.
-      (* break_match. *)
-      (* setoid_rewrite map_bind. *)
-      (* cbn. *)
-
-      (* set (next_ptr := *)
-      (*        (LLVMParamsBigIntptr.ITOP.int_to_ptr *)
-      (*           (next_memory_key *)
-      (*              {| *)
-      (*                memory_stack_memory := memory_stack_memory0; *)
-      (*                memory_stack_frame_stack := memory_stack_frame_stack0; *)
-      (*                memory_stack_heap := memory_stack_heap0 *)
-      (*              |}) *)
-      (*           (LLVMParamsBigIntptr.PROV.allocation_id_to_prov *)
-      (*              (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id p)))). *)
-
-      rewrite map_bind.
-
-      unfold eq1 in CONSEC.
-      unfold MonadState.Eq1_stateTM in *.
-      unfold pointwise_relation in CONSEC.
-      specialize (CONSEC (BinNatDef.N.succ init_store_id)).
-      unfold eq1 in CONSEC.
-      specialize (CONSEC {|
-          MemoryBigIntptrInfiniteSpec.MMSP.ms_memory_stack :=
-            {|
-              MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := memory_stack_memory0;
-              MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := memory_stack_frame_stack0;
-              MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := memory_stack_heap0
-            |};
-          MemoryBigIntptrInfiniteSpec.MMSP.ms_provenance :=
-            LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0
-        |}).
-      unfold ITreeMonad.Eq1_ITree in CONSEC.
-      subst next_ptr.
-      setoid_rewrite CONSEC.
-
+      admit. (* TODO: Provenance concrete vs spec issue *)
+    - admit.
+    - cbn.
       repeat setoid_rewrite bind_ret_l.
       cbn.
       reflexivity.
-    }
-
-    { auto.
-    }
-
-    { subst next_ptr.
-      rewrite int_to_ptr_provenance.
-      reflexivity.
-    }
-
-    split.
-    - apply CONSEC.
-      cbn.
-      auto.
+    - cbn.
+      admit.
     - subst next_ptr.
       rewrite int_to_ptr_provenance.
-      reflexivity.
-    - intros ptr IN.
+      (* TODO: Provenance mismatch issue *)
       admit.
-    - intros pr'.
-      cbn.
-      split; intros USED.
-      + subst; eauto.
-      + subst; eauto.
-        cbn in *.
-        admit.
-    - intros ptr IN.
-      unfold byte_not_allocated.
-      intros aid CONTRA.
-      (* ptr is larger than anything in original memory *)
-      admit.
-    - intros ptr IN.
-      (* Freshly allocated *)
-      admit.
-    - intros ptr aid DISJOINT.
-      admit.
-    - intros p0 IN.
-      admit.
-    - 
-
-
-
-
-    pose proof allocate_bytes_correct t init_bytes as ALLOC_CORRECT.
-    assert (exists sid' ms' alloc_addr, MemStateFreshT_run alloc m1 init_store_id ≈ ret (sid', (ms', alloc_addr))).
-    { subst alloc.
-      do 3 eexists.
-      cbn.
-      unfold allocate_bytes.
-      cbn.
-
-      destruct (dtyp_eq_dec t DTYPE_Void) as [EQ_VOID | ];
-        [contradiction |].
-
-      destruct (N.eq_dec (LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp t)
-                         (N.of_nat (Datatypes.length init_bytes))) as [EQ_SIZE | NEQ_SIZE];
-        [| contradiction].
-
-      setoid_rewrite map_bind.
-      rewrite bind_ret_l.
-      cbn.
-      break_match.
-      repeat rewrite bind_ret_l.
-      cbn.
-      break_match.
-      setoid_rewrite map_bind.
-      cbn.
-
-      set (next_ptr :=
-           (LLVMParamsBigIntptr.ITOP.int_to_ptr
-              (next_memory_key
-                 {|
-                   memory_stack_memory := memory_stack_memory0;
-                   memory_stack_frame_stack := memory_stack_frame_stack0;
-                   memory_stack_heap := memory_stack_heap0
-                 |})
-           (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
-              (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id p)))).
-
-      assert (MonadLawsE (MemStateFreshT (itree Eff))) as LAWS by admit.
-      assert (Eq1_ret_inv (MemStateFreshT (itree Eff))) as RETINV by admit.
-      pose proof @get_consecutive_ptrs_succeeds (MemStateFreshT (itree Eff)) _ _ _ RETINV _ _ LAWS next_ptr (Datatypes.length init_bytes) as (ptrs & CONSEC).
-
-      unfold eq1 in CONSEC.
-      unfold MonadState.Eq1_stateTM in *.
-      unfold pointwise_relation in CONSEC.
-      specialize (CONSEC (BinNatDef.N.succ init_store_id)).
-      unfold eq1 in CONSEC.
-      specialize (CONSEC m).
-      setoid_rewrite CONSEC.
-
-      repeat setoid_rewrite bind_ret_l.
-      cbn.
-      reflexivity.
-    }
-
-
-  (Ret
-     (BinNatDef.N.succ init_store_id,
-     ({|
-        ms_memory_stack :=
-          add_all_to_frame
-            {|
-              memory_stack_memory :=
-                add_all_index
-                  (map (fun b : SByte => (b, LLVMParamsBigIntptr.PROV.provenance_to_allocation_id p))
-                     init_bytes)
-                  (next_memory_key
-                     {|
-                       memory_stack_memory := memory_stack_memory0;
-                       memory_stack_frame_stack := memory_stack_frame_stack0;
-                       memory_stack_heap := memory_stack_heap0
-                     |}) memory_stack_memory0;
-              memory_stack_frame_stack := memory_stack_frame_stack0;
-              memory_stack_heap := memory_stack_heap0
-            |} (map LLVMParamsBigIntptr.PTOI.ptr_to_int ptrs);
-        ms_provenance := MMSP.MemState_get_provenance m
-      |}, next_ptr)) ≈ Ret (?sid', (?ms', ?alloc_addr)))%monad
-
-
-    
-    remember (MemStateFreshT_run alloc m1 init_store_id) as run_alloc.
-    subst alloc.
-
-    unfold allocate_bytes in *.
-    destruct (dtyp_eq_dec t DTYPE_Void) as [EQ_VOID | ];
-      [contradiction|].
-
-    destruct (N.eq_dec (LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp t)
-                       (N.of_nat (Datatypes.length init_bytes))) as [EQ_SIZE | NEQ_SIZE];
-      [| contradiction].
-
-    cbn in *.
-
-    setoid_rewrite bind_ret_l in Heqrun_alloc.
-
-    specialize (alloc init_store_id).
-
-
-    setoid_rewrite BYTES_SIZE in alloc.
-    
-    Check alloc.
-    MemStateT.
-
-      (* Should run allocate_bytes, which should succeed *)
-      (* Ideally we run this in a specialized version of MemM... *)
-
-      (* Going down the allocate_bytes_correct route is just suffering for no reason...
-
-         I end up having to prove allocate_bytes_succeeds_spec anawyay
-
-       *)
-      pose proof allocate_bytes_correct t init_bytes as ALLOC_CORRECT.
-      unfold exec_correct in *.
-      specialize (ALLOC_CORRECT m1 st VALID).
-      destruct ALLOC_CORRECT as [UB | ALLOC_CORRECT].
-      - (* UB in spec *)
-        destruct UB as [ubmsg UB].
-        unfold MemSpec.allocate_bytes_spec_MemPropT in *.
-
-        (* Fresh provenance bind in MemPropT *)
-        cbn in *.
-        destruct UB as [[] | UB].
-        destruct UB as [ms_fresh_pr [pr [FRESH_PROV_INVARIANTS UB]]].
-        destruct UB as [ALLOC_FAILS_UB | UB].
-        + (* Allocation fails, should be bogus because we prove it succeeds... *)
-        + 
-        
-        rewrite MemMonad_run_fresh_provenance in UB.
-        unfold MemSpec.allocate_bytes_spec_MemPropT' in .
-
-        cbn in UB.
-        
-        destruct UB as [sab [pr ].
-      destruct UB as [sab [a [BLAH REST]]].
-      
-      cbn in *.
-      (* Allocate bytes will always succeed, just need the right MemM monad to run it... *)
-      pose proof @allocate_bytes MemM Eff ExtraState _ _ _ _ _ _ _ _ _ _ _ _ t init_bytes as ALLOC_BYTES.
-
-  (*   epose proof MemoryBigIntptr.MMEP.allocate_bytes. *)
-  (*   epose proof (@can_find_fresh_block (MemPropT MemState) (@MemPropT_Monad MemState) (@MemPropT_Eq1 MemState) _ _ _ _ _ m1 (length init_bytes)) as (pr & ptr & ptrs & CONSEC_PTRS & CONSEC_FRESH & PTR_PR & PTRS_PR & UNUSED_PR). *)
-  (*   pose proof (big_intptr_seq_succeeds 0 (length init_bytes)) as (ixs & SEQ_ixs). *)
-
-  (*   (* m1 + init_bytes starting at ptr *) *)
-  (*   pose proof mem_state_fresh_provenance m1 as (pr' & FRESH_PROV). *)
-  (*   set (m *)
-  (*   prov <- fresh_provenance;; *)
-  (*   set (m2 := initialize_memory m1 ptr pr init_bytes). *)
-  (*   exists m2. *)
-  (*   exists pr. *)
-
-  (*   exists ptr. exists ptrs. *)
-
-  (*   split. *)
-  (*   - (* allocate_bytes_consecutive *) *)
-  (*     apply CONSEC_PTRS. *)
-  (*     cbn; auto. *)
-  (*   - (* allocate_bytes_address_provenance *) *)
-  (*     auto. *)
-  (*   - (* allocate_bytes_addresses_provenance *) *)
-  (*     auto. *)
-  (*   - (* allocate_bytes_provenances_preserved *) *)
-  (*     intros pr'0. *)
-  (*     admit. *)
-  (*   - (* allocate_bytes_was_fresh_byte *) *)
-  (*     auto. *)
-  (*   - (* allocate_bytes_now_byte_allocated *) *)
-  (*     admit. *)
-  (*   - (* allocate_bytes_preserves_old_allocations *) *)
-  (*     admit. *)
-  (*   - (* alloc_bytes_new_reads_allowed *) *)
-  (*     admit. *)
-  (*   - (* alloc_bytes_old_reads_allowed *) *)
-  (*     admit. *)
-  (*     (* intros ptr' DISJOINT. *)
-  (*     split; auto. *) *)
-  (*   - (* alloc_bytes_new_reads *) *)
-  (*     intros p ix byte NTH1 NTH2. *)
-  (*     (* apply Util.not_Nth_nil in NTH1. *) *)
-  (*     (* contradiction. *) *)
-  (*     admit. *)
-  (*   - (* alloc_bytes_old_reads *) *)
-  (*     intros ptr' byte DISJOINT. *)
-  (*     split; auto. *)
-  (*     admit. *)
-  (*     admit. *)
-  (*   - (* alloc_bytes_new_writes_allowed *) *)
-  (*     intros p IN. *)
-  (*     admit. *)
-  (*     (* inv IN. *) *)
-  (*   - (* alloc_bytes_old_writes_allowed *) *)
-  (*     intros ptr' DISJOINT. *)
-  (*     split; auto. *)
-  (*     admit. *)
-  (*     admit. *)
-  (*   - (* alloc_bytes_add_to_frame *) *)
-  (*     (* *)
-  (*     intros fs1 fs2 POP ADD. *)
-  (*     cbn in ADD; subst; auto. *)
-  (*     unfold memory_stack_frame_stack_prop in *. *)
-  (*     cbn in *. *)
-  (*     unfold memory_stack_frame_stack. *)
-  (*     cbn. *)
-  (*     setoid_rewrite add_all_to_frame_nil_preserves_frames. *)
-  (*     cbn. *)
-  (*     rewrite POP. *)
-  (*     auto. *) *)
-  (*     admit. *)
-  (*   - (* Heap preserved *) *)
-  (*     admit. *)
-  (*     solve_heap_preserved. *)
-  (*   - (* Non-void *) *)
-  (*     auto. *)
-  (*   - (* Length *) *)
-  (*     cbn; auto. *)
-    (* Qed. *)
   Admitted.
+
 End MemoryBigIntptrInfiniteSpec.
+
+
+Module MemoryBigIntptrInfiniteSpecHelpers :=
+  MemoryModelInfiniteSpecHelpers  LLVMParamsBigIntptr MemoryBigIntptr.MP MemoryBigIntptr.MMEP.MMSP MemoryBigIntptr.MMEP.MemSpec MemoryBigIntptrInfiniteSpec.
