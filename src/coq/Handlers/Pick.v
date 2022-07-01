@@ -21,6 +21,7 @@ From Vellvm Require Import
      Utils.Error
      Utils.Util
      Utils.PropT
+     Utils.InterpProp
      Syntax.LLVMAst
      Syntax.AstLib
      Syntax.DynamicTypes
@@ -120,26 +121,24 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams L
                  {T R : Type}
                  (e : (E +' PickUvalueE +' F) T)
                  (ta : itree (E +' F) T)
-                 (k1 : T -> itree (E +' PickUvalueE +' F) R)
                  (k2 : T -> itree (E +' F) R)
                  (t2 : itree (E +' F) R) : Prop
         := t2 ≈ bind ta k2.
 
-      Global Instance pick_uvalue_k_spec_proper {T R : Type} {RR : R -> R -> Prop} {b a : bool} :
-        Proper
-          (eq ==>
-              eq ==>
-              (fun k1 k2 : T -> itree (E +' PickUvalueE +' F) R =>
-                 forall x : T, eqit RR b a (k1 x) (k2 x)) ==> eq ==> eq ==> iff)
-          pick_uvalue_k_spec.
-      Proof.
-        unfold Proper, respectful.
-        intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2 x3 y3 H3; subst.
-        split; cbn; auto.
-      Qed.
+      (* Global Instance pick_uvalue_k_spec_proper {T R : Type} {RR : R -> R -> Prop} {b a : bool} : *)
+      (*   Proper *)
+      (*     (eq ==> *)
+      (*         eq ==> *)
+      (*         (fun k1 k2 : T -> itree (E +' PickUvalueE +' F) R => *)
+      (*            forall x : T, eqit RR b a (k1 x) (k2 x)) ==> eq ==> eq ==> iff) *)
+      (*     pick_uvalue_k_spec. *)
+      (* Proof. *)
+      (*   unfold Proper, respectful. *)
+      (*   intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2 x3 y3 H3; subst. *)
+      (*   split; cbn; auto. *)
+      (* Qed. *)
 
-      Definition model_undef_h `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :
-        forall (T:Type) (RR: T -> T -> Prop), itree (E +' PickUvalueE +' F) T -> PropT (E +' F) T :=
+      Definition model_undef_h `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :=
         interp_prop (case_ E_trigger_prop (case_ PickUvalue_handler F_trigger_prop)) (@pick_uvalue_k_spec).
 
       Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F}
@@ -254,9 +253,8 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams L
         k_spec_correct (@pick_exec_h _ _ _) (@pick_uvalue_k_spec _ _).
       Proof.
         unfold k_spec_correct.
-        intros T R e k1 k2 t2 H2.
-        unfold pick_uvalue_k_spec.
-        auto.
+        intros.
+        unfold pick_uvalue_k_spec. eauto.
       Qed.
 
       Definition exec_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :

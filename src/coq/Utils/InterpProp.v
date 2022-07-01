@@ -66,7 +66,7 @@ Section interp_prop.
              {E F}
              (h: E ~> itree F)
              (k_spec : forall T R, E T -> itree F T -> (T -> itree F R) -> itree F R -> Prop) : Prop
-    := forall T R e k2 t2 ta, (ta ≈ h _ e /\ t2 ≈ bind ta k2) <-> k_spec T R e ta k2 t2.
+    := forall T R e k2 t2 ta, ta ≈ h _ e -> t2 ≈ bind ta k2 -> k_spec T R e ta k2 t2.
 
   Context {E F : Type -> Type}.
   Context (h_spec : E ~> PropT F).
@@ -80,7 +80,12 @@ Section interp_prop.
         k_spec A R e ta k2 t2 ->
         k_spec A R e ta (fun x => bind (k2 x) k') (bind t2 k');
       k_spec_Proper : forall {A R} ta k e,
-        Proper (eutt eq ==> iff) (k_spec A R e ta k)
+        Proper (eutt eq ==> iff) (k_spec A R e ta k);
+      k_spec_respects_h_spec : forall {A} (ta : itree F _) (k : _ -> itree F _) e x,
+           ta ≈ x <- ta ;; k x ->
+           k_spec A _ e ta k x ->
+           h_spec _ e ta ->
+           h_spec _ e x
     }.
 
   Context (k_spec_wellformed : k_spec_WF).
@@ -422,6 +427,12 @@ Section interp_prop.
   Proof.
     split; intros; [rewrite <- H, <- H0 | rewrite H, H0]; auto.
   Qed.
+  
+  Instance interp_prop_Proper_eq :
+    forall R (RR : relation R) (HR: Reflexive RR) (HT : Transitive RR),
+      Proper (@eutt _ _ _ RR ==> eq ==> flip Basics.impl) (interp_prop RR).
+  Proof.
+  Admitted.
 
   (* Figure 7: Interpreter law for Ret *)
   Lemma interp_prop_ret :
@@ -557,7 +568,7 @@ Section interp_prop.
     econstructor.
     reflexivity.
   Qed.
-
+ 
   Lemma interp_prop_ret_refine :
     forall {T E F} (RR : relation T) (x y : T)
       (h : E ~> PropT F)
@@ -609,7 +620,7 @@ Section interp_prop.
       Unshelve.
       3 : exact (fun x => _interp h (observe (k2 x))).
       reflexivity.
-      eapply KC; split; [ reflexivity | rewrite H2; rewrite <- itree_eta].
+      eapply KC; [ reflexivity | rewrite H2; rewrite <- itree_eta].
       eapply eutt_clo_bind; [ reflexivity | intros; subst; rewrite tau_eutt, unfold_interp; reflexivity].
     - constructor; eapply IHeq; eauto.
     - cbn in H2.
@@ -664,12 +675,40 @@ Section interp_prop.
           - constructor; eauto; eapply IHHK; eauto.
             rewrite tau_eutt in H. rewrite <- itree_eta; auto. }
         rewrite <- H in HTA. red in HC, KC. symmetry in H.
-        rewrite <- KC in KS. destruct KS as (?&KS); rewrite KS; auto.
+        rewrite <- H in HTA.
+        eapply k_spec_respects_h_spec; eauto.
       - unfold trigger, subevent, resum, ReSum_id, Id_IFun, id_.
         red. pstep. eapply Interp_PropT_Vis with (k2 := (fun x : R => Ret x)); eauto.
         + intros; left; pstep; constructor; auto.
-        + red in KC. eapply KC. eapply HC in H0.
-          split; eauto. rewrite bind_ret_r, <- itree_eta; reflexivity.
+        + red in KC. eapply KC. eapply HC in H0. eauto.
+          rewrite bind_ret_r, <- itree_eta; reflexivity.
+  Qed.
+End interp_prop.
+
+Section interp_refl.
+
+  Lemma interp_prop_refl_h :
+    forall {T E} (RR : relation T) `{REF: Reflexive _ RR} (t1 t2 : itree E T)
+      (h : E ~> PropT E)
+      (k_spec : forall T R, E T -> itree E T -> (T -> itree E R) -> itree E R -> Prop),
+      (forall {X : Type} (e : E X), h X e (trigger e)) ->
+      (k_spec_correct (fun T e => trigger e) k_spec) ->
+      t1 ≈ t2 ->
+      interp_prop h k_spec _ RR t1 t2.
+  Proof.
+  Admitted.
+
+  Lemma interp_prop_refl :
+    forall {T E} (RR : relation T) `{REF: Reflexive _ RR} (t : itree E T)
+      (h : forall X : Type, E X -> PropT E X)
+      (k_spec : forall T R, E T -> itree E T -> (T -> itree E R) -> itree E R -> Prop),
+      (forall {X : Type} (e : E X), h X e (trigger e)) ->
+      (k_spec_correct (fun T e => trigger e) k_spec) ->
+      interp_prop h k_spec _ RR t t.
+  Proof.
+    intros T E0 RR REF t h k_spec H_SPEC K_SPEC.
+    apply interp_prop_refl_h; eauto.
+    reflexivity.
   Qed.
 
-End interp_prop.
+End interp_refl.

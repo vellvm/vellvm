@@ -14,14 +14,14 @@ From Vellvm.Handlers Require Import
      MemPropT.
 
 From Vellvm.Utils Require Import
+     InterpProp
      StateMonads.
 
 From ITree Require Import
      ITree
      Basics.Basics
      Eq.Eq
-     Events.StateFacts
-     Events.State.
+     Events.StateFacts.
 
 From ExtLib Require Import
      Structures.Functor
@@ -304,22 +304,23 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
                {T R : Type}
                (e : Effin T)
                (ta : itree Effout T)
-               (k1 : T -> itree Effin R)
                (k2 : T -> itree Effout R)
                (t2 : itree Effout R) : Prop
       := t2 ≈ (bind ta k2).
 
-    #[global] Instance memory_k_spec_proper {T R : Type} {RR : R -> R -> Prop} {b a : bool} :
+    #[global] Instance memory_k_spec_proper {T R : Type} {RR : R -> R -> Prop} :
       Proper
         (eq ==>
             eq ==>
-            (fun k1 k2 : T -> itree Effin R =>
-               forall x : T, eqit RR b a (k1 x) (k2 x)) ==> eq ==> eq ==> iff)
+            (fun k1 k2 : T -> itree Effout R =>
+               forall x : T, eqit eq true true (k1 x) (k2 x)) ==> eq ==> iff)
         (memory_k_spec).
     Proof.
       unfold Proper, respectful.
-      intros x y ? x0 y0 ? x1 y1 ? x2 y2 ? x3 y3 ?; subst.
-      split; cbn; auto.
+      intros x y ? x0 y0 ? x1 y1 ? x3 y3 ?; subst.
+      split; intros; red.
+      red in H2; rewrite H2; eapply eutt_clo_bind; [ reflexivity | intros; subst]; eauto.
+      red in H2; rewrite H2; eapply eutt_clo_bind; [ reflexivity | intros; subst]; symmetry; eauto.
     Qed.
 
     Definition interp_memory_prop' {R} (RR : R -> R -> Prop) :
@@ -560,7 +561,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     (* TODO: I find the lack of interp_prop here disturbing... *)
     Definition interp_memory :
       itree Effin ~> MemStateFreshT (itree Effout) :=
-      interp_state interp_memory_h.
+    State.interp_state interp_memory_h.
 
     (* fmap throws away extra sid / provenance from state
        handler. This is fine because interp_memory_prop should include
@@ -574,7 +575,8 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       intros T t ms sid.
       unfold interp_memory_prop.
       unfold interp_memory.
-      unfold interp_state.
+      unfold State.interp_state.
+
     Admitted.
   End Interpreters.
 End MemoryExecInterpreter.
