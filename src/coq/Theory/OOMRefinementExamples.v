@@ -67,7 +67,7 @@ Module Infinite.
     unfold refine_L6.
     intros t' INTERP.
     exists t'.
-    split.
+    split; [| reflexivity].
     - cbn in *.
 
       (* TODO: Should make lemmas about ret, etc for interp_mcfg4 *)
@@ -123,7 +123,10 @@ Module Infinite.
 
       cbn in EQ.
       subst.
-      exists (Ret2 s' m' r2). (* Not sure if should be s' or sid, and m' or m *)
+
+      epose proof allocate_dtyp_spec_can_always_succeed m _ _ (DTYPE_I 64) _ _ _ _ _ as (ms_final & addr & ALLOC).
+
+      exists (Ret2 s' m' (lenv, stack, (genv, DVALUE_Addr addr))). (* Not sure if should be s' or sid, and m' or m *) (* Used to be r2 *)
 
       split.
       + rewrite bind_trigger.
@@ -164,16 +167,15 @@ Module Infinite.
             interp_prop h_spec k_spec R RR (kk x)) t. (* Do I need to use k_spec anywhere...? *)
         Proof.
         Admitted.
-            
-        epose proof allocate_dtyp_spec_can_always_succeed m _ _ (DTYPE_I 64) _ _ _ _ _ as (ms_final & addr & ALLOC).
 
         eapply interp_prop_vis.
         cbn.
         unfold bind_PropT.
 
-        exists (ITree.map (fun '(_, (_, x)) => x) (Ret r2)).
-        eexists.
-        split.
+        (* was just ret r2... *)
+        exists (ITree.map (fun '(_, (_, x)) => x) (Ret (lenv, (stack, DVALUE_Addr addr)))).
+        exists (fun dv => ret (lenv, stack, (genv, dv))).
+        split; [|split].
         * exists sid. exists ms_final.
           unfold my_handle_memory_prop.
           unfold MemPropT_lift_PropT_fresh.
@@ -199,8 +201,7 @@ Module Infinite.
              rewrite map_ret in SUCC.
              rewrite map_ret in SUCC.
              cbn in SUCC.
-             destruct r2 as (lenv' & lstack & dv).
-             assert ((ms_final, (sid, dv)) = (ms', (st', addr_dv))) as EQRES.
+             assert ((ms_final, (sid, DVALUE_Addr addr)) = (ms', (st', addr_dv))) as EQRES.
              { eapply (@eq1_ret_ret
                        (itree
                           (sum1 ExternalCallE
@@ -211,151 +212,37 @@ Module Infinite.
              }
 
              inversion EQRES.
-             subst ms' st' dv.
+             subst ms' st' addr_dv.
 
              cbn.
              exists ms_final, addr.
-             split; [|split]; auto.
-             
-        
-        pfold. red.
+             tauto.
+        * rewrite map_ret.
+          setoid_rewrite map_bind.
+          rewrite bind_ret_l.
+          rewrite map_ret.
+          reflexivity.
+        * intros a RET.
+          rewrite map_ret in RET.
+          apply Returns_Ret in RET.
+          subst.
+          cbn.
+          rewrite interp_local_stack_ret.
+          eapply interp_prop_ret_refine; eauto.
+      + apply interp_prop_ret_inv in UNDEF as (r3 & R3 & T').
+        unfold model_undef_h.
+        (* Supposedly I can do this rewrite with T' with the new interp_prop... *)
+        assert (interp_prop
+                  (case_ (E_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))
+                         (case_ PickUvalue_handler (F_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))))
+                  (@pick_uvalue_k_spec ExternalCallE (OOME +' UBE +' DebugE +' FailureE))
+                  (MMEP.MMSP.MemState * (store_id * (local_env * Stack.stack * res_L1))) TT
+                  (Ret5 genv (lenv, stack) s' m' (DVALUE_Addr addr)) (ret r3)).
+        2: admit. (* Pretending I rewrote *)
+
         cbn.
-        (* t2 = (ITree.map (fun '(_, (_, x)) => x) (Ret2 s' m' r2)) *)
-        (* t2 ≈ bind ta k2 *)
-        (* *)\
-        eapply Interp_PropT_Vis. (* with (ta := (ITree.map (fun '(_, (_, x)) => x) (Ret r2))). *)
-        * cbn.
-          exists sid. exists ms_final.
-          unfold my_handle_memory_prop.
-          unfold MemPropT_lift_PropT_fresh.
-          split; [|split; [|split]].
-          admit.
-          -- (* UB *)
-            split; intros UB.
-            ++ destruct UB as [ubm UB].
-               rewrite map_ret in UB.
-               rewrite map_ret in UB.
-               (* TODO: inv *)
-               admit.
-            ++ unfold MMEP.MemSpec.handle_memory_prop in UB.
-               exfalso.
-               apply UB with (res := ret (ms_final, DVALUE_Addr addr)).
-               cbn.
-               clear UB.
-
-               exists ms_final. exists addr.
-               tauto.
-          -- (* Error *)
-            split; intros ERR.
-            ++ (* TODO: inv *)
-              admit.
-            ++ destruct ERR as [errm ERR].
-               (* I don't actually know that allocate_dtyp_spec *can't* error *)
-               exists errm.
-               unfold MMEP.MemSpec.handle_memory_prop in ERR.
-               cbn in ERR.
-               destruct ERR as [ERR | ERR].
-               rewrite ALLOC in ERR.
-               exfalso.
-               apply ERR with (res := ret (ms_final, DVALUE_Addr addr)).
-               cbn.
-               clear UB.
-
-               exists ms_final. exists addr.
-               tauto.
-
-              setoid_rewrite ALLOC in ERR.
-          --
-        setoid_rewrite map_ret.
-        
-        Set Nested Proofs Allowed.
-        Lemma interp_memory_prop_vis :
-          interp_memor
-          
-        (* TODO: lemma *)
-        unfold interp_memory_prop.
-        cbn.
-      + auto. (* s' and m' may be unimportant *)
-
-      rewrite EQ.
-      
-      setoid_rewrite R2 in EQ.
-      (* TODO: I feel like I need a map lemma involving eutt ret * )
-      assert (@ret (itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE))
-                   (@Monad_itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE))
-                   (local_env * @Stack.stack local_env * res_L1) r2 = (ret ((fun '(_, (_, x)) => x) (m, (sid, r2))))) as R2 by reflexivity.
-      Unset Printing Notations.
-      setoid_rewrite R2 in EQ.
-      eassert (Ret r2 = ).
-      reflexivity.
-      rewrite H in EQ.
-
-(MMEP.MMSP.MemState * (store_id * (local_env * @Stack.stack local_env * res_L1)))
-      erewrite <- map_ret in EQ.
-      
-      setoid_rewrite interp_memory_prop_ret2 in INTERP.
-
-
-    Definition interp_memory_prop {R} (RR : R -> R -> Prop) :
-      itree Effin R -> MemStateFreshT (PropT Effout) R :=
-      fun (t : itree Effin R) (sid : store_id) (ms : MemState) (t' : itree Effout (MemState * (store_id * R))) =>
-        interp_prop (fun T (e : Effin T) (t : itree Effout T) => exists (sid' : store_id) (ms' : MemState),
-                         @interp_memory_prop_h T e sid ms (fmap (fun (x : T) => (ms', (sid', x))) t)) (@memory_k_spec) R RR t ((fmap (fun '(_, (_, x)) => x) t') : itree Effout R).
-
-      unfold interp_memory_prop in INTERP.
-      
-      setoid_rewrite interp_intrinsics_ret in INTERP.
-      Show Proof.
-      rewrite interp_ret in INTERP.
-      
-      pose proof allocate_can_always_succeed m (DTYPE_I 64%N) as ALLOC_SUCCESS.
-
-
-      unfold interp_mcfg4.
-      unfold model_undef.
-
-      eexists; cbn; split.
-      + setoid_rewrite bind_trigger.
-
-        
-      + reflexivity.
-
-      
-      cbn.
-
-      
-      epose proof interp_prop_Proper_eq.
-      
-      unfold Proper, respectful in *.
-      unfold Basics.flip, Basics.impl in *.
-      eapply H.
-      all: eauto; try typeclasses eauto.
-      cbn.
-      go.
-
-      rewrite interp_memory_trigger.
-      cbn.
-      go.
-      cbn.
-
-      pose proof (allocate_succeeds (ms_memory_stack m) (DTYPE_I 64)) as ALLOC_SUC.
-      forward ALLOC_SUC. intros CONTRA; inversion CONTRA.
-
-      destruct m as [ms sid pr].
-      eapply ErrSID_succeeds_ErrSID_runs_to in ALLOC_SUC as ((ms' & a) & sid' & pr' & REST).
-      rewrite REST.
-
-      go.
-      cbn.
-      go.
-      cbn.
-
-      apply eutt_Ret.
-      reflexivity.
-    - right.
-      apply OOM.eutt_refine_oom_h; try typeclasses eauto.
-      reflexivity.
-  Qed.
+        eapply interp_prop_ret_refine; eauto.
+  Admitted.
 
   (* Add allocation in infinite language *)
   Lemma add_alloc :
