@@ -1572,9 +1572,6 @@ Definition filter_first_class_typs (ctx : var_context) : var_context :=
             | _ => true
             end) ctx.
 
-(* 1. get size
-   2. divide (how to determine the accurate size for dividing)*)
-
 Fixpoint gen_bitcast_typ (t_from : typ) : GenLLVM typ :=
   let gen_typ_list :=
     match t_from with
