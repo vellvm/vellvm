@@ -1594,7 +1594,11 @@ Fixpoint gen_bitcast_typ (t_from : typ) : GenLLVM typ :=
             new_subtyp <- gen_bitcast_typ subtyp;;
             ret [TYPE_Vector sz subtyp]
         | subtyp =>
-            let trivial_typs := [(1, TYPE_I 1); (8, TYPE_I 8); (32, TYPE_I 32); (32, TYPE_Float); (64, TYPE_I 64); (64, TYPE_Double)] in ret []
+            let trivial_typs := [(1%N, TYPE_I 1); (8%N, TYPE_I 8); (32%N, TYPE_I 32); (32%N, TYPE_Float); (64%N, TYPE_I 64); (64%N, TYPE_Double)] in
+            let size_of_vec := get_bit_size_from_typ t_from in
+            let choices := fold_left (fun acc '(s,t) => let sz' := (size_of_vec / s)%N in
+                                                 if (sz' =? 0)%N then acc else acc ++ [TYPE_Vector sz' t]) trivial_typs [] in
+            ret choices
         end
     | TYPE_Pointer subtyp => 
         new_subtyp <- gen_bitcast_typ subtyp;;
