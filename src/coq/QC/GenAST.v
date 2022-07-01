@@ -1589,8 +1589,13 @@ Fixpoint gen_bitcast_typ (t_from : typ) : GenLLVM typ :=
     | TYPE_Double =>
         ret [TYPE_I 64; TYPE_Double; TYPE_Vector 2 (TYPE_I 32); TYPE_Vector 2 (TYPE_Float); TYPE_Vector 8 (TYPE_I 8); TYPE_Vector 64 (TYPE_I 1)]
     | TYPE_Vector sz subtyp =>
-        new_subtyp <- gen_bitcast_typ subtyp;;
-        ret [TYPE_Vector sz subtyp]
+        match subtyp with
+        | TYPE_Pointer _ => 
+            new_subtyp <- gen_bitcast_typ subtyp;;
+            ret [TYPE_Vector sz subtyp]
+        | subtyp =>
+            let trivial_typs := [(1, TYPE_I 1); (8, TYPE_I 8); (32, TYPE_I 32); (32, TYPE_Float); (64, TYPE_I 64); (64, TYPE_Double)] in ret []
+        end
     | TYPE_Pointer subtyp => 
         new_subtyp <- gen_bitcast_typ subtyp;;
         ret [TYPE_Pointer new_subtyp]
