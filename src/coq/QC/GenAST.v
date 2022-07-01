@@ -1563,7 +1563,7 @@ Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
     end;;
   ret (new_tptr, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr)).
 
-Definition filter_first_class_typs (ctx : list (ident * typ)) : list (ident * typ) :=
+Definition filter_first_class_typs (ctx : var_context) : var_context :=
   filter (fun '(_, t) =>
             match t with
             | TYPE_Struct _
@@ -1572,21 +1572,28 @@ Definition filter_first_class_typs (ctx : list (ident * typ)) : list (ident * ty
             | _ => true
             end) ctx.
 
+(* 1. get size
+   2. divide (how to determine the accurate size for dividing)*)
+
 Fixpoint gen_bitcast_typ (t_from : typ) : GenLLVM typ :=
   let gen_typ_list :=
     match t_from with
-    | TYPE_I 1 => ret [TYPE_I 1]
-    | TYPE_I 8 => ret [TYPE_I 8]
+    | TYPE_I 1 =>
+        ret [TYPE_I 1]
+    | TYPE_I 8 =>
+        ret [TYPE_I 8; TYPE_Vector 8 (TYPE_I 1)]
     | TYPE_I 32
-    | TYPE_Float => ret [TYPE_I 32; TYPE_Float]
+    | TYPE_Float =>
+        ret [TYPE_I 32; TYPE_Float; TYPE_Vector 4 (TYPE_I 8); TYPE_Vector 32 (TYPE_I 1)]
     | TYPE_I 64
-    | TYPE_Double => ret [TYPE_I 64; TYPE_Double]
-    | TYPE_Pointer subtyp =>
-        new_subtyp <- gen_bitcast_typ subtyp;;
-        ret [TYPE_Pointer new_subtyp]
+    | TYPE_Double =>
+        ret [TYPE_I 64; TYPE_Double; TYPE_Vector 2 (TYPE_I 32); TYPE_Vector 2 (TYPE_Float); TYPE_Vector 8 (TYPE_I 8); TYPE_Vector 64 (TYPE_I 1)]
     | TYPE_Vector sz subtyp =>
         new_subtyp <- gen_bitcast_typ subtyp;;
         ret [TYPE_Vector sz subtyp]
+    | TYPE_Pointer subtyp => 
+        new_subtyp <- gen_bitcast_typ subtyp;;
+        ret [TYPE_Pointer new_subtyp]
     | _ => ret [t_from] (* TODO: Add more types *) (* This currently is to prevent types like pointer of struct from failing *)
     end in
   typ_list <- gen_typ_list;;
