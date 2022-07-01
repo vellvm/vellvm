@@ -1590,8 +1590,9 @@ Fixpoint gen_bitcast_typ (t_from : typ) : GenLLVM typ :=
         ret [TYPE_I 64; TYPE_Double; TYPE_Vector 2 (TYPE_I 32); TYPE_Vector 2 (TYPE_Float); TYPE_Vector 8 (TYPE_I 8); TYPE_Vector 64 (TYPE_I 1)]
     | TYPE_Vector sz subtyp =>
         match subtyp with
-        | TYPE_Pointer _ => 
-            new_subtyp <- gen_bitcast_typ subtyp;;
+        | TYPE_Pointer _ =>
+            (* TODO: Clean up. Figure out what can subtyp of pointer be *)
+            (* new_subtyp <- gen_bitcast_typ subtyp;; *)
             ret [TYPE_Vector sz subtyp]
         | subtyp =>
             let trivial_typs := [(1%N, TYPE_I 1); (8%N, TYPE_I 8); (32%N, TYPE_I 32); (32%N, TYPE_Float); (64%N, TYPE_I 64); (64%N, TYPE_Double)] in
@@ -1600,8 +1601,10 @@ Fixpoint gen_bitcast_typ (t_from : typ) : GenLLVM typ :=
                                                  if (sz' =? 0)%N then acc else acc ++ [TYPE_Vector sz' t]) trivial_typs [] in
             ret choices
         end
-    | TYPE_Pointer subtyp => 
-        new_subtyp <- gen_bitcast_typ subtyp;;
+    | TYPE_Pointer subtyp =>
+        (* TODO: Clean up. Figure out what can subtyp of pointer be *)
+        (* new_subtyp <- gen_bitcast_typ subtyp;; *)
+        new_subtyp <- gen_sized_typ;;
         ret [TYPE_Pointer new_subtyp]
     | _ => ret [t_from] (* TODO: Add more types *) (* This currently is to prevent types like pointer of struct from failing *)
     end in
