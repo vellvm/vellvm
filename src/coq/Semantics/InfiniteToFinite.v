@@ -21,6 +21,7 @@ From Vellvm Require Import
      Utils.Error
      Utils.Monads
      Utils.PropT
+     Utils.InterpProp
      Utils.ListUtil
      Handlers.MemoryModelImplementation.
 
