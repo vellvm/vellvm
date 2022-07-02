@@ -373,16 +373,16 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
 
   From ITree Require Import Eq.EqAxiom.
 
-  Lemma interp_prop_bind :
-    forall R E F
-      (h_spec : E ~> PropT F)
-      (k_spec : forall T R, E T -> itree F T -> (T -> itree E R) -> (T -> itree F R) -> itree F R -> Prop)
-      R' (t : itree E R') (k : R' -> itree E R)
-    , Eq1_PropT _ (interp_prop h_spec k_spec R eq (bind t k))
-                (bind (interp_prop h_spec (fun _ _ _ _ _ _ _ => True) R' eq t)
-                      (fun x => interp_prop h_spec k_spec R eq (k x))).
-  Proof.
-  Admitted.
+  (* Lemma interp_prop_bind : *)
+  (*   forall R E F *)
+  (*     (h_spec : E ~> PropT F) *)
+  (*     (k_spec : forall T R, E T -> itree F T -> (T -> itree E R) -> (T -> itree F R) -> itree F R -> Prop) *)
+  (*     R' (t : itree E R') (k : R' -> itree E R) *)
+  (*   , Eq1_PropT _ (interp_prop h_spec k_spec R eq (bind t k)) *)
+  (*               (bind (interp_prop h_spec (fun _ _ _ _ _ _ _ => True) R' eq t) *)
+  (*                     (fun x => interp_prop h_spec k_spec R eq (k x))). *)
+  (* Proof. *)
+  (* Admitted. *)
 
   (* Lemma interp_propTF_bind : *)
   (*   forall E F (h_spec : forall T : Type, E T -> PropT F T) k_spec R (RR : relation R) sim *)
@@ -426,44 +426,6 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     assert (Heq: i ≅ _interp EC.L4_convert (observe y)). {
       subst; reflexivity. }
     clear Heqi.
-    revert x y i Heq.
-    pcofix R.
-    intros t u i Heq REF.
-    punfold REF.
-    pfold.
-    red.
-    red in REF.
-    induction REF;
-      apply bisimulation_is_eq in Heq; rewrite Heq; clear Heq; cbn.
-    - apply Interp_PropT_Ret with r2.
-      auto.
-      rewrite eq2, interp_ret.
-      reflexivity.
-    - destruct HS; [ | inv H].
-      constructor. right.
-      eapply R; eauto.
-      rewrite unfold_interp. reflexivity.
-    - repeat red in KS, HTA; repeat red in HTA.
-      Opaque EC.L4_convert. destruct e.
-      + eapply interp_PropTF_Proper.
-        intros.
-        admit. admit.
-        rewrite KS.
-        red in HTA. rewrite HTA. unfold trigger.
-        cbn. rewrite interp_bind. rewrite interp_vis, bind_bind.
-        setoid_rewrite interp_ret; setoid_rewrite bind_tau;
-          setoid_rewrite bind_ret_l.
-        reflexivity.
-        unfold subevent, resum, ReSum_inl, cat, resum,
-          Cat_IFun, ReSum_id, inl_, Inl_sum1, id_, Id_IFun.
-        assert (forall (E : Type -> Type) (h_spec : forall T : Type, E T -> PropT E T)
-                  (k_spec : forall T R : Type, E T -> itree E T -> (T -> itree E R) -> (T -> itree E R) -> itree E R -> Prop)
-                  (R : Type) (RR : relation R) (sim : itree E R -> itree E R -> Prop)
-                  X (t : itree E X) k1 k2,
-                   (forall a, Returns a t ->  sim (k1 a) (k2 a)) ->
-                   interp_PropTF h_spec k_spec RR sim (observe (ITree.bind t k1)) (ITree.bind t k2)). admit.
-        eapply H; intros. red in HTA. rewrite HTA in HK.
-        left. pstep. constructor.
   Admitted.
 
   Lemma refine_OOM_h_bind :
@@ -476,24 +438,6 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     pinversion H; subst.
     - cbn.
       unfold refine_OOM_h.
-      eapply interp_prop_Proper3.
-      + unfold Proper, respectful, flip, impl.
-        intros T0 R0 RR b a x0 y0 H0 x1 y1 H2 x2 y2 H3 x3 y3 H4 x4 y4 H5; subst.
-        split; intros KSEPC;
-          destruct y0 as [e | [e | e]]; cbn in *; auto.
-      + rewrite unfold_bind.
-        rewrite <- H1.
-        reflexivity.
-      + reflexivity.
-      + eapply interp_prop_Proper2.
-        * unfold Proper, respectful, flip, impl.
-          intros A R0 e ta k1 k2 x0 y0 EQ KSPEC; subst.
-          destruct e as [e | [e | e]]; cbn in *; try rewrite EQ; auto.
-        * setoid_rewrite eq2.
-          rewrite bind_ret_l.
-          reflexivity.
-        * apply RK.
-          auto.
   Admitted.
 
   (* If
