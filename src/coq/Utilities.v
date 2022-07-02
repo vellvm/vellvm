@@ -12,4 +12,6 @@ From Vellvm Require Export
      Utils.AListFacts
      Utils.ListUtil
      Utils.Error
-     Utils.PropT.
+     Utils.PropT
+     Utils.InterpProp.
+

@@ -269,6 +269,15 @@ Section interp_prop.
       punfold IHinterp_PropTF.
   Qed.
 
+  Lemma interp_prop_inv_tau {R} RR (t0 : _ R) t1:
+    interp_prop RR (Tau t0) (Tau t1) ->
+    interp_prop RR t0 t1.
+  Proof.
+    intros H.
+    apply interp_prop_inv_tau_l in H.
+    apply interp_prop_inv_tau_r in H; auto.
+  Qed.
+
   Instance interp_prop_eutt_Proper_impl_ :
     forall R RR (x : _ R), Proper (eutt eq ==> impl) (interp_prop RR x).
   Proof.

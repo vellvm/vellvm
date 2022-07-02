@@ -150,6 +150,9 @@ Section PARAMS_INTERP.
 
 End PARAMS_INTERP.
 
+Instance OOM_k_spec_WF E F : k_spec_WF (refine_OOM_handler (F:=F)) (@oom_k_spec E F).
+Admitted.
+
 Lemma eutt_refine_oom_h :
   forall {T} {E F} (RR : relation T) `{REF: Reflexive _ RR} `{TRANS : Transitive _ RR}
     (t1 t2 : itree (E +' OOME +' F) T),
@@ -160,20 +163,18 @@ Proof.
   (* apply eutt_flip in H. *)
   unfold refine_OOM_h.
 
-  pose proof interp_prop_Proper_eq.
+  pose proof @interp_prop_Proper_eq.
   unfold Proper, respectful in H0.
 
   eapply H0; eauto.
 
+  typeclasses eauto.
   { apply eutt_flip. eauto. }
 
   apply interp_prop_refl; eauto.
   - intros X [e | [e | e]]; cbn; reflexivity.
   - apply oom_k_spec_correct_trigger.
 Qed.
-
-Instance OOM_k_spec_WF E F : k_spec_WF (refine_OOM_handler (F:=F)) (@oom_k_spec E F).
-Admitted.
 
 Lemma refine_oom_h_raise_oom :
   forall {T} {E F} (RR : relation T)
