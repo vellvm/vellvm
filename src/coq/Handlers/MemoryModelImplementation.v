@@ -8204,6 +8204,27 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         rewrite ROOTIN in free_was_root0.
         inv free_was_root0.
       }
+
+      (* Need to determine if the ptr is allocated, if not UB occurs. *)
+      destruct (read_byte_raw mem (ptr_to_int ptr)) as [[root_byte root_aid] |] eqn:READ_ROOT.
+      2: { (* Unallocated root, UB *)
+        left.
+        eexists.
+        cbn.
+        intros m2 FREE.
+        inv FREE.
+        destruct free_was_allocated0 as (aid & ALLOC).
+        unfold byte_allocated, byte_allocated_MemPropT, addr_allocated_prop in ALLOC.
+        pose proof ALLOC as ALLOC'.
+        unfold lift_memory_MemPropT in ALLOC'.
+        cbn in ALLOC'.
+        destruct ALLOC' as [ms [a [ALLOC' [EQ1 EQ2]]]]; subst.
+        destruct ALLOC' as [[ms [ms' [[EQ1 EQ2] ALLOC']]] PR]; subst.
+        cbn in ALLOC'.
+        rewrite READ_ROOT in ALLOC'.
+        inv ALLOC'.
+        inv H1.
+      }
       
       pose proof (member_lookup _ _ ROOTIN) as (block & FINDPTR).
       right.
@@ -8247,6 +8268,18 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       (*   unfold root_in_heap_prop in *. *)
       (*   unfold member, delete in *. *)
       (*   rewrite IP.F.remove_eq_b in CONTRA; auto; inv CONTRA. *)
+      - exists root_aid.
+        do 2 red.
+        unfold addr_allocated_prop.
+        repeat eexists.
+        + cbn.
+          rewrite READ_ROOT.
+          split; auto.
+          apply aid_eq_dec_refl.
+        + intros ms' x H0.
+          cbn in H0.
+          inv H0.
+          reflexivity.
       - (* free_bytes_freed *)
         (* TODO : solve_byte_not_allocated? *)
         intros ptr0 HEAP.

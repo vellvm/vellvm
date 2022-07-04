@@ -1744,6 +1744,10 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       free_was_root :
       root_in_memstate_heap m1 root;
 
+      (* ptr being freed was allocated *)
+      free_was_allocated :
+      exists aid, byte_allocated m1 root aid;
+
       (* all bytes in block are freed. *)
       free_bytes_freed :
       forall ptr,
