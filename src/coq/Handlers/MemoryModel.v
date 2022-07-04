@@ -376,7 +376,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
          ixs).
 
   Import Monad.
-  Lemma get_consecutive_ptrs_length : 
+  Lemma get_consecutive_ptrs_length :
     forall {M} `{HM : Monad M} `{EQM : Monad.Eq1 M}
       `{EQV : @Eq1Equivalence M HM EQM}
       `{EQRET : @Eq1_ret_inv M EQM HM}
@@ -1459,11 +1459,11 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   Record add_ptr_to_heap (h1 : Heap) (root : addr) (ptr : addr) (h2 : Heap) : Prop :=
     {
-      old_heap_lu : forall ptr', 
+      old_heap_lu : forall ptr',
         disjoint_ptr_byte ptr ptr' ->
         forall root, ptr_in_heap_prop h1 root ptr' <-> ptr_in_heap_prop h2 root ptr';
 
-      old_heap_lu_different_root : forall root', 
+      old_heap_lu_different_root : forall root',
         disjoint_ptr_byte root root' ->
         forall ptr', ptr_in_heap_prop h1 root' ptr' <-> ptr_in_heap_prop h2 root' ptr';
 
@@ -1744,9 +1744,15 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       free_was_root :
       root_in_memstate_heap m1 root;
 
-      (* ptr being freed was allocated *)
+      (* root being freed was allocated *)
       free_was_allocated :
       exists aid, byte_allocated m1 root aid;
+
+      (* ptrs in block were allocated *)
+      free_block_allocated :
+      forall ptr,
+        ptr_in_memstate_heap m1 root ptr ->
+        exists aid, byte_allocated m1 ptr aid;
 
       (* all bytes in block are freed. *)
       free_bytes_freed :
@@ -2452,7 +2458,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
 
         destruct FAILINV.
         + admit.
-        + 
+        +
 
         admit.
       }
@@ -2488,7 +2494,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         Unshelve.
         all: exact ""%string.
     Qed.
-        
+
     Lemma exec_correct_map_monad :
       forall {A B}
         xs
@@ -2623,7 +2629,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       exists ""%string.
       auto.
     Qed.
-      
+
     Lemma exec_correct_lift_OOM :
       forall {A} (m : OOM A),
         exec_correct (lift_OOM m) (lift_OOM m).
@@ -2870,7 +2876,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Proof.
       reflexivity.
     Qed.
-        
+
     Lemma exec_correct_re_sid_ubytes_helper :
       forall bytes,
         exec_correct
@@ -2914,7 +2920,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       intros bytes.
       apply exec_correct_bind; auto with EXEC_CORRECT.
     Qed.
-    
+
     Hint Resolve exec_correct_re_sid_ubytes : EXEC_CORRECT.
 
     Lemma exec_correct_serialize_sbytes :
@@ -3423,7 +3429,7 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
 
           admit.
         }
-        lia.        
+        lia.
   Admitted.
 
   Lemma get_consecutive_ptrs_nth :
@@ -3562,7 +3568,7 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
   Import MP.BYTE_IMPL.
 
   Import MMIS.
-  
+
   Lemma allocate_bytes_spec_MemPropT_can_always_succeed :
     forall (ms_init ms_fresh_pr : MemState)
       dt bytes

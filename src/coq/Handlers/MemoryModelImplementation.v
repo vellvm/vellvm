@@ -1881,7 +1881,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 do 2 apply member_add_ineq in ROOT; auto.
               }
         }
-        
+
         intros root' a.
         unfold ptr_in_heap_prop in *.
         split; intros EQV.
@@ -2454,7 +2454,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   unfold ptr_in_heap_prop in *.
                   rewrite EQ in *.
                   rewrite EQR in *.
-                  auto.                  
+                  auto.
           * unfold ptr_in_heap_prop in *.
             rewrite IN1 in *.
             rewrite IN2 in *.
@@ -2477,7 +2477,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   unfold ptr_in_heap_prop in *.
                   rewrite EQ in *.
                   rewrite EQR in *.
-                  auto.                  
+                  auto.
           * unfold ptr_in_heap_prop in *.
             rewrite IN1 in *.
             rewrite IN2 in *.
@@ -2750,7 +2750,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       inv HEAPEQ.
       unfold root_in_heap_prop in *.
       rewrite PTREQ.
-      auto.          
+      auto.
     Qed.
 
     Lemma add_all_to_frame_cons_swap :
@@ -8176,6 +8176,236 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         }
     Qed.
 
+    Lemma byte_not_allocated_dec :
+      forall ms ptr,
+        {byte_not_allocated ms ptr} + {~ byte_not_allocated ms ptr}.
+    Proof.
+      intros ([m fs h] & pr) ptr.
+
+      unfold byte_not_allocated.
+      unfold byte_allocated, byte_allocated_MemPropT.
+      unfold addr_allocated_prop.
+
+      destruct (read_byte_raw m (ptr_to_int ptr)) as [[byte aid] |] eqn:READ.
+      - (* Allocated *)
+        right.
+        cbn.
+        intros CONTRA.
+        specialize (CONTRA aid).
+        apply CONTRA.
+        clear CONTRA.
+        repeat eexists.
+        cbn.
+        rewrite READ.
+        split; auto.
+        apply aid_eq_dec_refl.
+
+        intros ms' x H0.
+        cbn in H0.
+        inv H0.
+        reflexivity.
+      - (* Not allocated *)
+        left.
+        intros aid CONTRA.
+
+        cbn in CONTRA.
+        destruct CONTRA as [ms [a [CONTRA [EQ1 EQ2]]]]; subst.
+        destruct CONTRA as [[ms [ms' [[EQ1 EQ2] CONTRA]]] PR]; subst.
+        cbn in CONTRA.
+        rewrite READ in CONTRA.
+        cbn in *.
+        destruct CONTRA as [_ CONTRA].
+        inv CONTRA.
+    Qed.
+
+    Lemma byte_allocated_dec :
+      forall ms ptr,
+        {exists aid, byte_allocated ms ptr aid} + {~ exists aid, byte_allocated ms ptr aid}.
+    Proof.
+      intros ([m fs h] & pr) ptr.
+
+      unfold byte_not_allocated.
+      unfold byte_allocated, byte_allocated_MemPropT.
+      unfold addr_allocated_prop.
+
+      destruct (read_byte_raw m (ptr_to_int ptr)) as [[byte aid] |] eqn:READ.
+      - (* Allocated *)
+        left.
+        exists aid.
+        repeat eexists.
+        cbn.
+        rewrite READ.
+        split; auto.
+        apply aid_eq_dec_refl.
+
+        intros ms' x H0.
+        cbn in H0.
+        inv H0.
+        reflexivity.
+      - (* Not allocated *)
+        right.
+        intros (aid & CONTRA).
+
+        cbn in CONTRA.
+        destruct CONTRA as [ms [a [CONTRA [EQ1 EQ2]]]]; subst.
+        destruct CONTRA as [[ms [ms' [[EQ1 EQ2] CONTRA]]] PR]; subst.
+        cbn in CONTRA.
+        rewrite READ in CONTRA.
+        cbn in *.
+        destruct CONTRA as [_ CONTRA].
+        inv CONTRA.
+    Qed.
+
+    Lemma block_ptr_allocated_dec :
+      forall m1 root ptr,
+        ptr_in_memstate_heap m1 root ptr ->
+        {exists aid, byte_allocated m1 ptr aid} + {byte_not_allocated m1 ptr}.
+    Proof.
+      intros ([m fs h] & pr) root ptr INBLOCK.
+
+      red in INBLOCK.
+      unfold memory_stack_heap_prop in INBLOCK.
+      cbn in INBLOCK.
+      specialize (INBLOCK h).
+      forward INBLOCK; [reflexivity|].
+      unfold ptr_in_heap_prop in INBLOCK.
+      break_match_hyp; try inv INBLOCK.
+
+      unfold byte_not_allocated.
+      unfold byte_allocated, byte_allocated_MemPropT.
+      unfold addr_allocated_prop.
+
+      destruct (read_byte_raw m (ptr_to_int ptr)) as [[byte aid] |] eqn:READ.
+
+      - (* Allocated *)
+        left.
+        repeat eexists.
+        cbn.
+        rewrite READ.
+        split; auto.
+        apply aid_eq_dec_refl.
+
+        intros ms' x H0.
+        cbn in *.
+        inv H0.
+        cbn.
+        reflexivity.
+      - (* Not allocated *)
+        right.
+        intros aid CONTRA.
+        cbn in CONTRA.
+        destruct CONTRA as [ms [a [CONTRA [EQ1 EQ2]]]]; subst.
+        destruct CONTRA as [[ms [ms' [[EQ1 EQ2] CONTRA]]] PR]; subst.
+        cbn in CONTRA.
+        rewrite READ in CONTRA.
+        destruct CONTRA as [_ CONTRA].
+        inv CONTRA.
+    Qed.
+
+    Lemma byte_allocated_ignores_provenance :
+      forall ms ptr1 ptr2 aid,
+        byte_allocated ms ptr1 aid ->
+        ptr_to_int ptr1 = ptr_to_int ptr2 ->
+        byte_allocated ms ptr2 aid.
+    Proof.
+      intros ms ptr1 ptr2 aid ALLOC INTEQ.
+      do 2 red.
+      do 2 red in ALLOC.
+      unfold addr_allocated_prop in *.
+      rewrite INTEQ in ALLOC.
+      auto.
+    Qed.
+
+    Lemma block_allocated_dec :
+      forall m1 root,
+      (forall ptr,
+          ptr_in_memstate_heap m1 root ptr ->
+          exists aid, byte_allocated m1 ptr aid) \/
+        ~(forall ptr,
+        ptr_in_memstate_heap m1 root ptr ->
+        exists aid, byte_allocated m1 ptr aid).
+    Proof.
+      intros ms root.
+      destruct ms as ([m fs h] & pr) eqn:MS.
+
+      (* Is there a block? *)
+      destruct (IM.find (elt:=Block) (ptr_to_int root) h) eqn:BLOCK.
+      2: {
+        (* No block, vacuously true. *)
+        left.
+        intros ptr CONTRA.
+        unfold ptr_in_memstate_heap in CONTRA.
+        specialize (CONTRA h).
+        forward CONTRA; [cbn; red; cbn; reflexivity|].
+
+        unfold ptr_in_heap_prop in CONTRA.
+        rewrite BLOCK in CONTRA.
+        inv CONTRA.
+      }
+
+      (* Block exists *)
+      pose proof byte_allocated_dec ms as BADEC.
+      pose proof Forall_dec _ BADEC as ALLOC.
+      set (aid := provenance_to_allocation_id initial_provenance).
+      set (prov := allocation_id_to_prov aid).
+      set (block := map (fun ip => int_to_ptr ip prov) b).
+      specialize (ALLOC block).
+      destruct ALLOC as [ALL_ALLOCATED | NOT_ALL_ALLOCATED].
+      - setoid_rewrite -> Forall_forall in ALL_ALLOCATED.
+        left.
+        intros ptr INHEAP.
+        red in INHEAP.
+        cbn in INHEAP.
+        specialize (INHEAP h).
+        forward INHEAP; [repeat red; reflexivity|].
+        unfold ptr_in_heap_prop in INHEAP.
+        rewrite BLOCK in INHEAP.
+        assert (In (int_to_ptr (ptr_to_int ptr) prov) block) as INBLOCK.
+        { subst block.
+          pose proof in_map.
+          specialize (H0 _ _ (fun ip : Z => int_to_ptr ip prov) b (ptr_to_int ptr) INHEAP).
+          auto.
+        }
+
+        specialize (ALL_ALLOCATED _ INBLOCK).
+        subst ms.
+        destruct ALL_ALLOCATED as (aid' & ALL_ALLOCATED).
+        exists aid'.
+        eapply byte_allocated_ignores_provenance.
+        apply ALL_ALLOCATED.
+        rewrite ptr_to_int_int_to_ptr. reflexivity.
+      - setoid_rewrite -> Forall_forall in NOT_ALL_ALLOCATED.
+        right.
+        intros CONTRA.
+        apply NOT_ALL_ALLOCATED.
+        intros ptr INBLOCK.
+        specialize (CONTRA ptr).
+        forward CONTRA.
+        { red.
+          intros h' HEAP.
+          red in HEAP.
+          cbn in HEAP.
+          rewrite <- HEAP.
+          red.
+          rewrite BLOCK.
+          subst block.
+          eapply in_map with (f:=ptr_to_int) in INBLOCK.
+          rewrite map_map in INBLOCK.
+          apply in_map_iff in INBLOCK.
+          destruct INBLOCK as (x & CAST & INBLOCK).
+          rewrite ptr_to_int_int_to_ptr in CAST.
+          subst.
+          auto.
+        }
+
+        destruct CONTRA as (aid' & CONTRA).
+        exists aid'.
+        subst ms.
+        eapply byte_allocated_ignores_provenance.
+        apply CONTRA.
+        reflexivity.
+    Qed.
+
     Lemma free_correct :
       forall ptr,
         exec_correct (free ptr) (free_spec_MemPropT ptr).
@@ -8187,7 +8417,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
          UB has occurred.
        *)
 
-      destruct ms as [[mem fs h] pr].
+      destruct ms as [[mem fs h] pr] eqn:HMS.
       destruct (member (ptr_to_int ptr) h) eqn:ROOTIN.
 
       2: { (* UB, ptr not a root of the heap *)
@@ -8225,7 +8455,19 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         inv ALLOC'.
         inv H1.
       }
-      
+
+      (* Need to determine if block is allocated *)
+      pose proof (block_allocated_dec ms ptr) as [BLOCK_ALLOCATED | BLOCK_NOTALLOCATED].
+      2: {
+        (* Block unallocated, UB *)
+        left.
+        eexists.
+        cbn.
+        intros m2 FREE.
+        inv FREE.
+        contradiction.
+      }
+
       pose proof (member_lookup _ _ ROOTIN) as (block & FINDPTR).
       right.
       cbn.
@@ -8280,6 +8522,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           cbn in H0.
           inv H0.
           reflexivity.
+      - auto.
       - (* free_bytes_freed *)
         (* TODO : solve_byte_not_allocated? *)
         intros ptr0 HEAP.
@@ -8319,7 +8562,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           red.
           unfold lookup in FINDPTR.
           rewrite FINDPTR; auto.
-        }        
+        }
       - (* free_non_frame_bytes_read *)
         intros ptr0 byte NIN.
 
@@ -8796,18 +9039,18 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
 (*         destruct UB as [ms_fresh_pr [pr [FRESH_PROV_INVARIANTS UB]]]. *)
 (*         destruct UB as [ALLOC_FAILS_UB | UB]. *)
 (*         + (* Allocation fails, should be bogus because we prove it succeeds... *) *)
-          
+
 (*         +  *)
-        
+
 (*         rewrite MemMonad_run_fresh_provenance in UB. *)
 (*         unfold MemSpec.allocate_bytes_spec_MemPropT' in . *)
 
 (*         cbn in UB. *)
-        
+
 (*         destruct UB as [sab [pr ]. *)
 (*       destruct UB as [sab [a [BLAH REST]]]. *)
 
-    
+
 
 (*   Qed. *)
 
@@ -8920,7 +9163,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
         do 2 red.
         intros ms x.
         setoid_rewrite bind_bind in CONSEC.
-        
+
         specialize (CONSEC 0%N ms).
         (* need inversion lemma for consec *)
         admit.
@@ -8962,7 +9205,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     rename ALLOC into RUN.
     rename ms_fresh_pr into ms'.
     rename MEMORY_FRESH into GET_PR.
-    
+
     { rewrite MemMonad_run_bind in RUN; auto.
       rewrite RUN_FRESH_SID in RUN.
       setoid_rewrite bind_ret_l in RUN.
@@ -8985,7 +9228,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
       pose proof (@eq1_ret_ret (itree Eff) (@ITreeMonad.Eq1_ITree Eff) _ _ (prod store_id (prod MemState _)) _ _ RUN_FRESH) as EQ_RET_FRESH.
       inv EQ_RET_FRESH.
 
-      
+
       unfold ms_get_memory in GET_PR.
       cbn in GET_PR.
       inv GET_PR.
@@ -9020,7 +9263,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
       unfold pointwise_relation in CONSEC'.
       specialize (CONSEC' st').
       unfold eq1 in CONSEC'.
-      specialize (CONSEC' 
+      specialize (CONSEC'
               {|
                 MemoryBigIntptrInfiniteSpec.MMSP.ms_memory_stack :=
                   {|
@@ -9453,7 +9696,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
               eauto.
         Qed.
 
-        eapply read_byte_allowed_preserved_get_consecutive_ptrs. 
+        eapply read_byte_allowed_preserved_get_consecutive_ptrs.
         + reflexivity.
         + cbn.
           unfold mem_state_memory.
@@ -9711,7 +9954,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
               eauto.
         Qed.
 
-        eapply write_byte_allowed_preserved_get_consecutive_ptrs. 
+        eapply write_byte_allowed_preserved_get_consecutive_ptrs.
         + reflexivity.
         + cbn.
           unfold mem_state_memory.
