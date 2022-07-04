@@ -1205,6 +1205,14 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     forall ptr,
       write_byte_allowed m1 ptr <-> write_byte_allowed m2 ptr.
 
+  (** Frees *)
+  Definition free_allowed (ms : MemState) (ptr : addr) : Prop :=
+    exists aid, byte_allocated ms ptr aid /\ access_allowed (address_provenance ptr) aid = true.
+
+  Definition free_allowed_all_preserved (m1 m2 : MemState) : Prop :=
+    forall ptr,
+      write_byte_allowed m1 ptr <-> write_byte_allowed m2 ptr.
+
   (** Allocations *)
   Definition allocations_preserved (m1 m2 : MemState) : Prop :=
     forall ptr aid, byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid.
@@ -1261,6 +1269,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
           ( extend_provenance ms new_pr ms' /\
               read_byte_preserved ms ms' /\
               write_byte_allowed_all_preserved ms ms' /\
+              free_allowed_all_preserved ms ms' /\
               allocations_preserved ms ms' /\
               frame_stack_preserved ms ms' /\
               heap_preserved ms ms'
@@ -1282,6 +1291,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
               preserve_allocation_ids ms ms' /\
               read_byte_preserved ms ms' /\
               write_byte_allowed_all_preserved ms ms' /\
+              free_allowed_all_preserved ms ms' /\
               allocations_preserved ms ms' /\
               frame_stack_preserved ms ms' /\
               heap_preserved ms ms'
@@ -1340,6 +1350,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     {
       mempush_op_reads : read_byte_preserved m1 m2;
       mempush_op_write_allowed : write_byte_allowed_all_preserved m1 m2;
+      mempush_op_free_allowed : free_allowed_all_preserved m1 m2;
       mempush_op_allocations : allocations_preserved m1 m2;
       mempush_op_allocation_ids : preserve_allocation_ids m1 m2;
       mempush_heap_preserved : heap_preserved m1 m2;
@@ -1510,6 +1521,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       write_byte_op_preserves_heap : heap_preserved m1 m2;
       write_byte_op_read_allowed : read_byte_allowed_all_preserved m1 m2;
       write_byte_op_write_allowed : write_byte_allowed_all_preserved m1 m2;
+      write_byte_op_free_allowed : free_allowed_all_preserved m1 m2;
       write_byte_op_allocation_ids : preserve_allocation_ids m1 m2;
     }.
 
@@ -1586,6 +1598,16 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       forall ptr',
         (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
         write_byte_allowed m1 ptr' <-> write_byte_allowed m2 ptr';
+
+      (* free permissions *)
+      alloc_bytes_new_frees_allowed :
+      forall p, In p ptrs ->
+           free_allowed m2 p;
+
+      alloc_bytes_old_frees_allowed :
+      forall ptr',
+        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
+        free_allowed m1 ptr' <-> free_allowed m2 ptr';
 
       (* Add allocated bytes onto the stack frame *)
       allocate_bytes_add_to_frame :
@@ -1680,6 +1702,16 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
         write_byte_allowed m1 ptr' <-> write_byte_allowed m2 ptr';
 
+      (* free permissions *)
+      malloc_bytes_new_frees_allowed :
+      forall p, In p ptrs ->
+           free_allowed m2 p;
+
+      malloc_bytes_old_frees_allowed :
+      forall ptr',
+        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
+        free_allowed m1 ptr' <-> free_allowed m2 ptr';
+
       (* Framestack preserved *)
       malloc_bytes_frame_stack_preserved : frame_stack_preserved m1 m2;
 
@@ -1743,6 +1775,10 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     { (* ptr being freed was a root *)
       free_was_root :
       root_in_memstate_heap m1 root;
+
+      (* Free is allowed *)
+      free_is_allowed : free_allowed m1 root;
+      free_no_longer_allowed : ~ free_allowed m2 root;
 
       (* root being freed was allocated *)
       free_was_allocated :
@@ -2695,7 +2731,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         apply eq1_ret_ret in H; try typeclasses eauto.
         inv H.
         cbn.
-        split; [| split; [| split; [| split; [| split; [| split]]]]];
+        split; [| split; [| split; [| split; [| split; [| split; [| split]]]]]];
           try solve [red; reflexivity].
         - unfold fresh_store_id. auto.
         - unfold read_byte_preserved.
@@ -2753,6 +2789,19 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       eapply byte_allocated_mem_eq; eauto.
     Qed.
 
+    Lemma free_allowed_mem_eq :
+      forall ms ms' ptr,
+        free_allowed ms ptr ->
+        MemState_get_memory ms = MemState_get_memory ms' ->
+        free_allowed ms' ptr.
+    Proof.
+      intros ms ms' ptr FREE EQ.
+      unfold free_allowed in *.
+      destruct FREE as [aid [ALLOC ACCESS]].
+      exists aid; split; auto.
+      eapply byte_allocated_mem_eq; eauto.
+    Qed.
+
     (* TODO: move this? *)
     Lemma read_byte_prop_mem_eq :
       forall ms ms' ptr byte,
@@ -2791,6 +2840,20 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         intros WRITE_ALLOWED;
         eapply write_byte_allowed_mem_eq; eauto.
     Qed.
+
+    Lemma free_allowed_all_preserved_mem_eq :
+      forall ms ms',
+        MemState_get_memory ms = MemState_get_memory ms' ->
+        free_allowed_all_preserved ms ms'.
+    Proof.
+      intros ms ms' EQ.
+      unfold free_allowed_all_preserved.
+      intros ptr.
+      split; red;
+        intros FREE_ALLOWED;
+        eapply free_allowed_mem_eq; eauto.
+    Qed.
+
 
     Lemma allocations_preserved_mem_eq :
       forall ms ms',
@@ -2839,11 +2902,12 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         apply eq1_ret_ret in H; try typeclasses eauto.
         inv H.
         cbn.
-        split; [| split; [| split; [| split; [| split; [| split]]]]];
+        split; [| split; [| split; [| split; [| split; [| split; [| split]]]]]];
           try solve [red; reflexivity].
         - unfold extend_provenance. tauto.
         - eapply read_byte_preserved_mem_eq; eauto.
         - eapply write_byte_allowed_all_preserved_mem_eq; eauto.
+        - eapply free_allowed_all_preserved_mem_eq; eauto.
         - eapply allocations_preserved_mem_eq; eauto.
         - eapply frame_stack_preserved_mem_eq; eauto.
         - unfold ms_get_memory in MEM; cbn in MEM. rewrite MEM.
