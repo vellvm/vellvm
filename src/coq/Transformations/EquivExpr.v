@@ -437,6 +437,18 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
   (* This is the analog of the "norm" tactic from the Softare Foundations RIP tutorial. *)
   Ltac norm := autorewrite with opt.
 
+  (* Induction on u *)
+  Lemma uvalue_poison_cases : forall u, exists dt, 
+      (concretize u (DVALUE_Poison dt)) \/ (~ concretize u (DVALUE_Poison dt)).
+    Proof. Admitted.
+
+    (* Induction on d  *)
+  Lemma uvalue_dvalue_to_uvalue : forall (d : dvalue) d',
+      concretize (dvalue_to_uvalue d) d' -> d = d'.
+  Proof. intros. induction d.
+         - 
+
+  Admitted.
   
   Lemma add_zero : forall b1 b2 (e:exp dtyp),
     (OP_IBinop (Add b1 b2) (DTYPE_I 32) (EXP_Integer (0)%Z) e) ≐ [DTYPE_I 32] e.
@@ -455,6 +467,8 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
     apply eutt_Ret.       (* <- this lets relate the returned values *)
     intuition.
     unfold uvalue_eq.
+    split.
+    - 
     (* TODO: Need some facts about [refine_uvalue]. *)
   Abort.
 
