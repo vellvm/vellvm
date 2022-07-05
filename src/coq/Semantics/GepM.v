@@ -79,6 +79,15 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
     match vs with
     | v :: vs' =>
       match v with
+      | DVALUE_I8 i =>
+        let k := unsigned i in
+        let n := BinIntDef.Z.to_nat k in
+        match t with
+        | DTYPE_Vector _ ta
+        | DTYPE_Array _ ta =>
+          handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
+        | _ => failwith ("non-i8-indexable type")
+        end
       | DVALUE_I32 i =>
         let k := unsigned i in
         let n := BinIntDef.Z.to_nat k in
@@ -97,15 +106,6 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
           end
         | _ => failwith ("non-i32-indexable type")
         end
-      | DVALUE_I8 i =>
-        let k := unsigned i in
-        let n := BinIntDef.Z.to_nat k in
-        match t with
-        | DTYPE_Vector _ ta
-        | DTYPE_Array _ ta =>
-          handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
-        | _ => failwith ("non-i8-indexable type")
-        end
       | DVALUE_I64 i =>
         let k := unsigned i in
         let n := BinIntDef.Z.to_nat k in
@@ -115,7 +115,16 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
           handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
         | _ => failwith ("non-i64-indexable type")
         end
-      | _ => failwith "non-I32 index"
+      | DVALUE_IPTR i =>
+        let k := IP.to_Z i in
+        let n := BinIntDef.Z.to_nat k in
+        match t with
+        | DTYPE_Vector _ ta
+        | DTYPE_Array _ ta =>
+          handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
+        | _ => failwith ("non-iptr-indexable type")
+        end
+      | _ => failwith "handle_gep_h: unsupported index type"
       end
     | [] => ret off
     end.
@@ -127,7 +136,10 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
     let ptr := ptr_to_int a in
     let prov := address_provenance a in
     match vs with
-    | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 / i64 indices *)
+    | DVALUE_I8 i :: vs' =>
+      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (unsigned i)) vs' ;;
+      ret (int_to_ptr ptr' prov)
+    | DVALUE_I32 i :: vs' =>
       ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (unsigned i)) vs' ;;
       ret (int_to_ptr ptr' prov)
     | DVALUE_I64 i :: vs' =>
@@ -136,7 +148,7 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
     | DVALUE_IPTR i :: vs' =>
       ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (IP.to_Z i)) vs' ;;
       ret (int_to_ptr ptr' prov)
-    | _ => failwith "non-I32 index"
+    | _ => failwith "handle_gep_addr: unsupported index type"
     end.
 
   Lemma handle_gep_addr_0 :
@@ -185,6 +197,9 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
 
     cbn in GEP.
     destruct a; inversion GEP.
+    - break_match_hyp; inv GEP.
+      rewrite int_to_ptr_provenance.
+      reflexivity.
     - break_match_hyp; inv GEP.
       rewrite int_to_ptr_provenance.
       reflexivity.
