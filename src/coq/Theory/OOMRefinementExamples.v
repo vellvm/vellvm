@@ -485,6 +485,169 @@ Module Infinite.
         eapply interp_prop_ret_refine; eauto.
   Admitted.
 
+  Lemma remove_alloc_ptoi_block :
+    forall genv lenv stack sid m,
+      refine_L6 (interp_mcfg4 TT TT (interp_instr_E_to_L0 _ ptoi_tree) genv (lenv, stack) sid m) (interp_mcfg4 TT TT (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m).
+  Proof.
+    intros genv lenv stack sid m.
+    unfold refine_L6.
+    intros t' INTERP.
+    exists t'.
+    split; [| reflexivity].
+    - cbn in *.
+
+      (* TODO: Should make lemmas about ret, etc for interp_mcfg4 *)
+      unfold interp_mcfg4 in *.
+      unfold model_undef in *.
+
+      destruct INTERP as [t_pre [INTERP UNDEF]].
+
+      go_in INTERP.
+      repeat setoid_rewrite bind_ret_l in INTERP.
+      rewrite TranslateFacts.translate_ret in INTERP.
+      repeat setoid_rewrite bind_ret_l in INTERP.
+      cbn in INTERP.
+      setoid_rewrite interp_ret in INTERP.
+      setoid_rewrite interp_intrinsics_ret in INTERP.
+      setoid_rewrite interp_global_ret in INTERP.
+      setoid_rewrite interp_local_stack_ret in INTERP.
+
+      (* TODO: Turn this into an interp_memory_prop lemma *)
+      unfold interp_memory_prop in INTERP.
+      cbn in INTERP.
+
+      apply interp_prop_ret_inv in INTERP.
+      destruct INTERP as [r2 [INTERP_TT EQ]].
+
+      assert (ITree.map (fun '(_, (_, x)) => x) t_pre ≈ Ret ((fun '(_, (_, x)) => x) (m, (sid, r2)))).
+      auto.
+      clear EQ.
+      rename H into EQ.
+
+      apply ret_map_itree in EQ as ((m', (s', a')) & EQ & FEQ).
+
+      rewrite EQ in UNDEF.
+      cbn in UNDEF.
+
+      cbn in EQ.
+      subst.
+
+      epose proof allocate_dtyp_spec_can_always_succeed m _ _ (DTYPE_I 64) _ _ _ _ _ as (ms_final & addr & ALLOC).
+
+      exists (Ret2 s' m' (lenv, stack, (genv, DVALUE_Addr addr))). (* Not sure if should be s' or sid, and m' or m *) (* Used to be r2 *)
+
+      split.
+      + 
+        Ltac go_setoid :=
+          repeat match goal with
+                 | |- context [interp_intrinsics (ITree.bind _ _)] => setoid_rewrite interp_intrinsics_bind
+                 | |- context [interp_global (ITree.bind _ _)] => setoid_rewrite interp_global_bind
+                 | |- context [interp_local_stack (ITree.bind _ _)] => setoid_rewrite interp_local_stack_bind
+                 (* | |- context [interp_memory (ITree.bind _ _)] => setoid_rewrite interp_memory_bind *)
+                 | |- context [interp_intrinsics (trigger _)] => setoid_rewrite interp_intrinsics_trigger; cbn; rewrite ?subevent_subevent
+                 | |- context [interp_intrinsics (ITree.trigger _)] => setoid_rewrite interp_intrinsics_trigger; cbn; rewrite ?subevent_subevent
+                 | |- context [interp_global (trigger _)] => setoid_rewrite interp_global_trigger; cbn; rewrite ?subevent_subevent
+                 | |- context [interp_global (ITree.trigger _)] => setoid_rewrite interp_global_trigger; cbn; rewrite ?subevent_subevent
+                 | |- context [interp_local_stack (trigger _)] => setoid_rewrite interp_local_stack_trigger; cbn; rewrite ?subevent_subevent
+                 | |- context [interp_local_stack (ITree.trigger _)] => setoid_rewrite interp_local_stack_trigger; cbn; rewrite ?subevent_subevent
+                 | |- context [ITree.bind (ITree.bind _ _) _] => setoid_rewrite bind_bind
+                 | |- context [interp_intrinsics (Ret _)] => setoid_rewrite interp_intrinsics_ret
+                 | |- context [interp_global (Ret _)] => setoid_rewrite interp_global_ret
+                 | |- context [interp_local_stack (Ret _)] => setoid_rewrite interp_local_stack_ret
+                 (* | |- context [interp_memory (Ret _)] => setoid_rewrite interp_memory_ret *)
+                 | |- context [ITree.bind (Ret _) _] => setoid_rewrite bind_ret_l
+                 | |- context [translate _ (Ret _)] => setoid_rewrite translate_ret
+                 | |- context [interp _ (trigger _)] => setoid_rewrite interp_trigger
+                 | |- context [interp _ (ITree.bind _ _)] => setoid_rewrite interp_bind
+                 | |- context [interp _ (Ret _)] => setoid_rewrite interp_ret
+                 | |- context [map _ (ret _)] => setoid_rewrite map_ret
+                 | |- context [ITree.map _ (Ret _)] => setoid_rewrite map_ret
+                 | |- context [translate _ (trigger _)] => setoid_rewrite translate_trigger; cbn; rewrite ?subevent_subevent
+                 | |- context [translate _ (ITree.trigger _)] => setoid_rewrite translate_trigger; cbn; rewrite ?subevent_subevent
+                 | |- context [translate _ (ITree.bind _ _)] => setoid_rewrite translate_bind
+                 end.
+
+        unfold interp_instr_E_to_L0; cbn.
+        repeat (go_setoid; cbn).
+
+        setoid_rewrite bind_trigger.
+
+        (* LEMMA *)
+        unfold interp_memory_prop.
+        cbn.
+
+        eapply interp_prop_vis.
+        cbn.
+        unfold bind_PropT.
+
+        (* was just ret r2... *)
+        exists (ITree.map (fun '(_, (_, x)) => x) (Ret (lenv, (stack, DVALUE_Addr addr)))).
+        exists (fun dv => ret (lenv, stack, (genv, dv))).
+        split; [|split].
+        * exists sid. exists ms_final.
+          unfold my_handle_memory_prop.
+          unfold MemPropT_lift_PropT_fresh.
+          right.
+          split; [|split].
+          -- intros msg ERR.
+             rewrite map_ret in ERR.
+             rewrite map_ret in ERR.
+             cbn in ERR.
+             (* TODO: inv *)
+             admit.
+          -- intros msg OOM.
+             rewrite map_ret in OOM.
+             rewrite map_ret in OOM.
+             cbn in OOM.
+             (* TODO: inv *)
+             admit.
+          -- intros st' ms' addr_dv SUCC.
+             rewrite map_ret in SUCC.
+             rewrite map_ret in SUCC.
+             cbn in SUCC.
+             assert ((ms_final, (sid, DVALUE_Addr addr)) = (ms', (st', addr_dv))) as EQRES.
+             { eapply (@eq1_ret_ret
+                       (itree
+                          (sum1 ExternalCallE
+                                (sum1 PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))))
+                    )); eauto.
+
+               typeclasses eauto.
+             }
+
+             inversion EQRES.
+             subst ms' st' addr_dv.
+
+             cbn.
+             exists ms_final, addr.
+             tauto.
+        * rewrite map_ret.
+          setoid_rewrite map_bind.
+          rewrite bind_ret_l.
+          rewrite map_ret.
+          reflexivity.
+        * intros a RET.
+          rewrite map_ret in RET.
+          apply Returns_Ret in RET.
+          subst.
+          cbn.
+
+          eapply interp_prop_ret_refine; eauto.
+      + apply interp_prop_ret_inv in UNDEF as (r3 & R3 & T').
+        unfold model_undef_h.
+        (* Supposedly I can do this rewrite with T' with the new interp_prop... *)
+        assert (interp_prop
+                  (case_ (E_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))
+                         (case_ PickUvalue_handler (F_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))))
+                  (@pick_uvalue_k_spec ExternalCallE (OOME +' UBE +' DebugE +' FailureE))
+                  (MMEP.MMSP.MemState * (store_id * (local_env * Stack.stack * res_L1))) TT
+                  (Ret5 genv (lenv, stack) s' m' (DVALUE_Addr addr)) (ret r3)).
+        2: admit. (* Pretending I rewrote *)
+
+        cbn.
+        eapply interp_prop_ret_refine; eauto.
+  Admitted.
+
   (* Add allocation in infinite language *)
   Lemma add_alloc :
     forall {RR_mem RR_pick} `{REF_mem : @Reflexive _ RR_mem} `{REF_pick : @Reflexive _ RR_pick} genv lenv stack sid m,
