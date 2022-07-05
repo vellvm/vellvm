@@ -204,6 +204,27 @@ Proof.
     reflexivity.
 Qed.
 
+(* TODO: can I generalize this? *)
+Lemma map_monad_err_fail :
+  forall {A B} (f : A -> err B) l b,
+    map_monad f l = inl b ->
+    exists a, In a l /\ f a = inl b.
+Proof.
+  intros A B f l b MAP.
+  generalize dependent b.
+  generalize dependent l.
+  induction l; intros b MAP.
+  - cbn in MAP.
+    inv MAP.
+  - cbn.
+    cbn in MAP.
+    destruct (f a) eqn:Hfa; inv MAP.
+    + exists a. split; auto.
+    + rename H0 into MAP.
+      destruct (map_monad f l) eqn:HMAP; inv MAP.
+      specialize (IHl b eq_refl) as [a' [IN FA]].
+      exists a'. tauto.
+Qed.
 
 Lemma map_monad_map :
   forall A B C 
@@ -617,5 +638,3 @@ Arguments map_monad_cons_ret {_ _ _ _ _ _ _}.
 Arguments map_monad_cons_ret {_ _ _ _ _ _ _}.          
 Arguments map_monad_map {_ _ _ _ _ _ _ _}.
 Arguments map_monad_g {_ _ _ _ _ _ _ _}.
-
-

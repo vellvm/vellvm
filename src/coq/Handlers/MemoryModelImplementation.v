@@ -4291,8 +4291,18 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
         + (* Error *)
           intros msg RUN.
-          exists ""%string.
-          auto.
+          unfold write_byte in RUN.
+
+          rewrite MemMonad_run_bind in RUN.
+          rewrite MemMonad_get_mem_state in RUN.
+          rewrite bind_ret_l in RUN.
+
+          rewrite READ in RUN.
+          rewrite ACCESS in RUN.
+
+          rewrite MemMonad_put_mem_state in RUN.
+          apply MemMonad_eq1_raise_error_inv in RUN.
+          inv RUN.
         + (* OOM *)
           intros msg RUN.
           exists ""%string.
@@ -4658,9 +4668,93 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         right.
         split; [|split].
         - (* Error *)
-          (* Always allowed to error *)
-          repeat eexists. left.
-          cbn. auto.
+          intros msg RUN.
+          exfalso.
+          unfold allocate_bytes in RUN.
+          destruct (dtyp_eq_dec dt DTYPE_Void); try contradiction.
+          destruct (N.eq_dec (sizeof_dtyp dt) (N.of_nat (Datatypes.length init_bytes))) eqn:Hlen.
+          2 : {
+            rewrite MemMonad_run_raise_ub in RUN.
+            apply MemMonad_eq1_raise_ub_raise_error_inv in RUN; auto.
+          }
+
+          { cbn in RUN.
+            rewrite MemMonad_run_bind in RUN; auto.
+            pose proof MemMonad_run_fresh_provenance ms st VALID
+              as [ms' [pr' [FRESH_PR [VALID' [GET_PR [EXTEND_PR [NUSED_PR USED_PR]]]]]]].
+            rewrite FRESH_PR in RUN.
+            rewrite bind_ret_l in RUN.
+
+            rewrite MemMonad_run_bind in RUN; auto.
+            pose proof MemMonad_run_fresh_sid ms' st VALID' as [st' [sid [RUN_FRESH_SID [VALID'' FRESH_SID]]]].
+            rewrite RUN_FRESH_SID in RUN.
+            rewrite bind_ret_l in RUN.
+
+            rewrite MemMonad_run_bind in RUN.
+            rewrite MemMonad_get_mem_state in RUN.
+            rewrite bind_ret_l in RUN.
+
+            destruct ms as [ms_stack ms_prov].
+            destruct ms_stack as [mem frames heap].
+
+            destruct ms' as [[mem' fs' h'] pr''].
+            unfold ms_get_memory in GET_PR.
+            cbn in GET_PR.
+            inv GET_PR.
+            cbn in RUN.
+            rename mem' into mem.
+            rename fs' into frames.
+            rename h' into heap.
+
+            (* TODO: need to know something about get_consecutive_ptrs *)
+            unfold get_consecutive_ptrs in *; cbn in RUN.
+            do 2 rewrite MemMonad_run_bind in RUN; auto.
+            rewrite bind_bind in RUN.
+            destruct (intptr_seq 0 (Datatypes.length init_bytes)) as [NOOM_seq | OOM_seq] eqn:HSEQ.
+            { (* no oom *)
+              cbn in RUN.
+              rewrite MemMonad_run_ret in RUN; auto.
+              rewrite bind_ret_l in RUN.
+
+              match goal with
+              | RUN : context [map_monad ?f ?s] |- _ =>
+                  pose proof map_monad_err_succeeds f s as HMAPM
+              end.
+              forward HMAPM.
+              { intros a IN.
+                eexists.
+                eapply handle_gep_addr_ix'; eauto.
+              }
+              destruct HMAPM as [ptrs HMAPM].
+
+              (* SUCCESS *)
+              rewrite HMAPM in RUN.
+              cbn in RUN.
+              rewrite MemMonad_run_ret in RUN; auto.
+              rewrite bind_ret_l in RUN.
+
+              rewrite MemMonad_run_bind in RUN; auto.
+              rewrite MemMonad_get_mem_state in RUN.
+              rewrite bind_ret_l in RUN.
+
+              rewrite MemMonad_run_bind in RUN; auto.
+              rewrite MemMonad_put_mem_state in RUN.
+              rewrite bind_ret_l in RUN.
+              rewrite MemMonad_run_ret in RUN; auto.
+              cbn in RUN.
+
+              apply MemMonad_eq1_raise_error_inv in RUN; auto.
+            }
+
+            { (* OOM *)
+              cbn in RUN.
+              rewrite MemMonad_run_raise_oom in RUN.
+              rewrite rbm_raise_bind in RUN.
+              exfalso.
+              eapply MemMonad_eq1_raise_oom_raise_error_inv in RUN; auto.
+              typeclasses eauto.
+            }
+          }            
         - (* OOM *)
           (* Always allowed to oom *)
           repeat eexists. left.
@@ -5986,9 +6080,87 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       { right.
         split; [|split].
         - (* Error *)
-          (* Always allowed to error *)
-          repeat eexists. left.
-          cbn. auto.
+          intros msg RUN.
+          exfalso.
+          unfold malloc_bytes in RUN.
+
+          { cbn in RUN.
+            rewrite MemMonad_run_bind in RUN; auto.
+            pose proof MemMonad_run_fresh_provenance ms st VALID
+              as [ms' [pr'' [FRESH_PR [VALID' [GET_PR [EXTEND_PR [NUSED_PR USED_PR]]]]]]].
+            rewrite FRESH_PR in RUN.
+            rewrite bind_ret_l in RUN.
+
+            rewrite MemMonad_run_bind in RUN; auto.
+            pose proof MemMonad_run_fresh_sid ms' st VALID' as [st' [sid [RUN_FRESH_SID [VALID'' FRESH_SID]]]].
+            rewrite RUN_FRESH_SID in RUN.
+            rewrite bind_ret_l in RUN.
+
+            rewrite MemMonad_run_bind in RUN.
+            rewrite MemMonad_get_mem_state in RUN.
+            rewrite bind_ret_l in RUN.
+
+            destruct ms as [ms_stack ms_prov].
+            destruct ms_stack as [mem frames heap].
+
+            destruct ms' as [[mem' fs' h'] pr'''].
+            unfold ms_get_memory in GET_PR.
+            cbn in GET_PR.
+            inv GET_PR.
+            cbn in RUN.
+            rename mem' into mem.
+            rename fs' into frames.
+            rename h' into heap.
+
+            (* TODO: need to know something about get_consecutive_ptrs *)
+            unfold get_consecutive_ptrs in *; cbn in RUN.
+            do 2 rewrite MemMonad_run_bind in RUN; auto.
+            rewrite bind_bind in RUN.
+            destruct (intptr_seq 0 (Datatypes.length init_bytes)) as [NOOM_seq | OOM_seq] eqn:HSEQ.
+            { (* no oom *)
+              cbn in RUN.
+              rewrite MemMonad_run_ret in RUN; auto.
+              rewrite bind_ret_l in RUN.
+
+              match goal with
+              | RUN : context [map_monad ?f ?s] |- _ =>
+                  pose proof map_monad_err_succeeds f s as HMAPM
+              end.
+              forward HMAPM.
+              { intros a IN.
+                eexists.
+                eapply handle_gep_addr_ix'; eauto.
+              }
+              destruct HMAPM as [ptrs HMAPM].
+
+              (* SUCCESS *)
+              rewrite HMAPM in RUN.
+              cbn in RUN.
+              rewrite MemMonad_run_ret in RUN; auto.
+              rewrite bind_ret_l in RUN.
+
+              rewrite MemMonad_run_bind in RUN; auto.
+              rewrite MemMonad_get_mem_state in RUN.
+              rewrite bind_ret_l in RUN.
+
+              rewrite MemMonad_run_bind in RUN; auto.
+              rewrite MemMonad_put_mem_state in RUN.
+              rewrite bind_ret_l in RUN.
+              rewrite MemMonad_run_ret in RUN; auto.
+              cbn in RUN.
+
+              apply MemMonad_eq1_raise_error_inv in RUN; auto.
+            }
+
+            { (* OOM *)
+              cbn in RUN.
+              rewrite MemMonad_run_raise_oom in RUN.
+              rewrite rbm_raise_bind in RUN.
+              exfalso.
+              eapply MemMonad_eq1_raise_oom_raise_error_inv in RUN; auto.
+              typeclasses eauto.
+            }
+          }
         - (* OOM *)
           (* Always allowed to oom *)
           repeat eexists. left.
@@ -7318,7 +7490,15 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
       right.
       cbn.
-      split; [intros msg RUN; exists ""%string; auto|].
+      split.
+      { intros msg RUN; exists ""%string; auto.
+        unfold mempush in RUN.
+        rewrite MemMonad_run_bind in RUN.
+        rewrite MemMonad_get_mem_state in RUN.
+        rewrite bind_ret_l in RUN.
+        rewrite MemMonad_put_mem_state in RUN.
+        apply MemMonad_eq1_raise_error_inv in RUN; auto.        
+      }
       split; [intros msg RUN; exists ""%string; auto|].
 
       intros st' ms' [] RUN.
@@ -8028,7 +8208,35 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
       right.
       cbn.
-      split; [intros msg RUN; exists ""%string; auto|].
+      split.
+      { intros msg RUN; exists ""%string; auto.
+        unfold mempop in RUN.
+        rewrite MemMonad_run_bind in RUN.
+        rewrite MemMonad_get_mem_state in RUN.
+        rewrite bind_ret_l in RUN.
+        destruct ms.
+        cbn in RUN.
+        destruct ms_memory_stack0.
+        unfold pop_frame_stack in RUN.
+        destruct memory_stack_frame_stack0.
+        - cbn in RUN.
+          rewrite MemMonad_run_bind in RUN.
+          rewrite MemMonad_run_raise_error in RUN.
+          rewrite rbm_raise_bind in RUN; [| typeclasses eauto].
+          unfold cannot_pop.
+          intros fs1 fs2 MSFSP.
+          unfold memory_stack_frame_stack_prop in MSFSP.
+          cbn in MSFSP.
+          rewrite <- MSFSP.
+          cbn. auto.
+        - cbn in RUN.
+          rewrite MemMonad_run_bind in RUN.
+          rewrite MemMonad_run_ret in RUN.
+          rewrite bind_ret_l in RUN.
+          rewrite MemMonad_put_mem_state in RUN.
+          exfalso.
+          apply MemMonad_eq1_raise_error_inv in RUN; auto.
+      }
       split; [intros msg RUN; exists ""%string; auto|].
 
       intros st' ms' [] RUN.
@@ -8448,7 +8656,17 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       pose proof (member_lookup _ _ ROOTIN) as (block & FINDPTR).
       right.
       cbn.
-      split; [intros msg RUN; exists ""%string; auto|].
+      split.
+      { intros msg RUN; exists ""%string; auto.
+        unfold free in RUN.
+        rewrite MemMonad_run_bind in RUN.
+        rewrite MemMonad_get_mem_state in RUN.
+        rewrite bind_ret_l in RUN.
+        cbn in RUN.
+        rewrite FINDPTR in RUN.
+        rewrite MemMonad_put_mem_state in RUN.
+        apply MemMonad_eq1_raise_error_inv in RUN; auto.
+      }
       split; [intros msg RUN; exists ""%string; auto|].
 
       intros st' ms' [] RUN.
@@ -9147,7 +9365,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Admitted.
 
   Lemma allocate_bytes_succeeds_spec_correct :
-    forall (ms_init ms_fresh_pr ms_final : MemState) (st sid st' : store_id) dt init_bytes (pr : Provenance) (ptr : addr) (ptrs : list addr)
+    forall (ms_init ms_fresh_pr ms_final : MemState) (st sid st' : store_id) (dt : dtyp) (init_bytes : list SByte) (pr : Provenance) (ptr : addr) (ptrs : list addr)
       (VALID : @MemMonad_valid_state store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ ms_init st)
       (VALID' : @MemMonad_valid_state store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ ms_fresh_pr st)
       (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length init_bytes))

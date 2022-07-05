@@ -134,6 +134,24 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       := let sid := st in
          (forall sid', used_store_id ms sid' -> (sid' < sid)%N).
 
+    Lemma oom_error_inv :
+      forall {A Eff} `{FailureE -< Eff} `{OOME -< Eff} oom_msg error_msg,
+        ~ (raise_oom oom_msg : itree Eff A) ≈ (raise_error error_msg).
+    Proof.
+    Admitted.
+
+    Lemma ub_error_inv :
+      forall {A Eff} `{FailureE -< Eff} `{UBE -< Eff} ub_msg error_msg,
+        ~ (raise_ub ub_msg : itree Eff A) ≈ (raise_error error_msg).
+    Proof.
+    Admitted.
+
+    Lemma oom_ub_inv :
+      forall {A Eff} `{UBE -< Eff} `{OOME -< Eff} oom_msg ub_msg,
+        ~ (raise_oom oom_msg : itree Eff A) ≈ (raise_ub ub_msg).
+    Proof.
+    Admitted.
+
     #[global] Instance MemStateFreshT_MemMonad {Eff} `{FAIL: FailureE -< Eff} `{OOM: OOME -< Eff} `{UB: UBE -< Eff}
       : MemMonad MemStateFreshT_State (MemStateFreshT (itree Eff)) (itree Eff).
     Proof.
@@ -246,6 +264,24 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         intros A x error_msg.
         intros EQ.
         pinversion EQ.
+      - (* raise_oom_raise_error_inv *)
+        intros A oom_msg error_msg.
+        apply oom_error_inv.        
+      - (* raise_error_raise_oom_inv *)
+        intros A oom_msg error_msg.
+        intros EQ.
+        symmetry in EQ.
+        apply oom_error_inv in EQ; auto.
+      - intros A ub_msg error_msg.
+        apply ub_error_inv.
+      - intros A ub_msg error_msg EQ.
+        symmetry in EQ.
+        apply ub_error_inv in EQ; auto.
+      - intros A oom_msg ub_msg.
+        apply oom_ub_inv.
+      - intros A oom_msg ub_msg EQ.
+        symmetry in EQ.
+        apply oom_ub_inv in EQ; auto.
     Defined.
 
     Definition E_trigger' : forall R, E R -> (MemStateT (PropT Effout) R) :=
@@ -538,6 +574,24 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         intros A x error_msg.
         intros EQ.
         pinversion EQ.
+      - (* raise_oom_raise_error_inv *)
+        intros A oom_msg error_msg.
+        eapply oom_error_inv; eauto.
+      - (* raise_error_raise_oom_inv *)
+        intros A oom_msg error_msg.
+        intros EQ.
+        symmetry in EQ.
+        eapply oom_error_inv in EQ; eauto.
+      - intros A ub_msg error_msg.
+        eapply ub_error_inv; eauto.
+      - intros A ub_msg error_msg EQ.
+        symmetry in EQ.
+        eapply ub_error_inv in EQ; eauto.
+      - intros A oom_msg ub_msg.
+        eapply oom_ub_inv; eauto.
+      - intros A oom_msg ub_msg EQ.
+        symmetry in EQ.
+        eapply oom_ub_inv in EQ; eauto.
     Defined.
 
     (** Handlers *)

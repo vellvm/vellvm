@@ -1180,6 +1180,22 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   Definition disjoint_ptr_byte (a b : addr) :=
     ptr_to_int a <> ptr_to_int b.
 
+  (** Utilities *)
+  Definition lift_spec_to_MemPropT {A}
+             (succeeds_spec : MemState -> A -> MemState -> Prop) (ub_spec : MemState -> Prop) :
+    MemPropT MemState A :=
+    fun m1 res =>
+      match run_err_ub_oom res with
+      | inl (OOM_message x) =>
+          True
+      | inr (inl (UB_message x)) =>
+          ub_spec m1
+      | inr (inr (inl (ERR_message x))) =>
+          False
+      | inr (inr (inr (m2, res))) =>
+          succeeds_spec m1 res m2
+      end.
+
   (*** Predicates *)
 
   (** Reads *)
@@ -1256,7 +1272,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       intros ms [[[[[[[oom_res] | [[ub_res] | [[err_res] | [ms' new_pr]]]]]]]]].
       + exact True.
       + exact False.
-      + exact True.
+      + exact False.
       + exact
           ( extend_provenance ms new_pr ms' /\
               read_byte_preserved ms ms' /\
@@ -1276,7 +1292,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       intros ms [[[[[[[oom_res] | [[ub_res] | [[err_res] | [ms' new_sid]]]]]]]]].
       + exact True.
       + exact False.
-      + exact True.
+      + exact False.
       + exact
           ( fresh_store_id ms' new_sid /\
               preserve_allocation_ids ms ms' /\
@@ -1295,17 +1311,11 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     }.
 
   Definition read_byte_spec_MemPropT (ptr : addr) : MemPropT MemState SByte :=
-    fun m1 res =>
-      match run_err_ub_oom res with
-      | inl (OOM_message x) =>
-          True
-      | inr (inl (UB_message x)) =>
-          forall byte, ~ read_byte_spec m1 ptr byte
-      | inr (inr (inl (ERR_message x))) =>
-          True
-      | inr (inr (inr (m2, byte))) =>
-          m1 = m2 /\ read_byte_spec m1 ptr byte
-      end.
+    lift_spec_to_MemPropT
+      (fun m1 byte m2 =>
+         m1 = m2 /\ read_byte_spec m1 ptr byte)
+      (fun m1 =>
+         forall byte, ~ read_byte_spec m1 ptr byte).
 
   (*** Framestack operations *)
   Definition empty_frame (f : Frame) : Prop :=
@@ -1359,17 +1369,11 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     }.
 
   Definition mempush_spec_MemPropT : MemPropT MemState unit :=
-    fun m1 res =>
-      match run_err_ub_oom res with
-      | inl (OOM_message x) =>
-          True
-      | inr (inl (UB_message x)) =>
-          forall m2, ~ mempush_spec m1 m2
-      | inr (inr (inl (ERR_message x))) =>
-          True
-      | inr (inr (inr (m2, tt))) =>
-          mempush_spec m1 m2
-      end.
+    lift_spec_to_MemPropT
+      (fun m1 _ m2 =>
+         mempush_spec m1 m2)
+      (fun m1 =>
+         forall m2, ~ mempush_spec m1 m2).
 
   (** mempop *)
   Record mempop_operation_invariants (m1 : MemState) (m2 : MemState) :=
@@ -1409,16 +1413,22 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       mempop_invariants : mempop_operation_invariants m1 m2;
     }.
 
+  Definition cannot_pop (ms : MemState) :=
+    forall fs1 fs2,
+      memory_stack_frame_stack_prop (MemState_get_memory ms) fs1 ->
+      ~ pop_frame_stack_prop fs1 fs2.
+
   Definition mempop_spec_MemPropT : MemPropT MemState unit :=
     fun m1 res =>
       match run_err_ub_oom res with
       | inl (OOM_message x) =>
           True
       | inr (inl (UB_message x)) =>
-          forall m2, ~ mempop_spec m1 m2
+          ~ cannot_pop m1 /\ forall m2, ~ mempop_spec m1 m2
       | inr (inr (inl (ERR_message x))) =>
-          True
-      | inr (inr (inr (m2, tt))) =>
+          (* Not being able to pop is an error, shouldn't happen *)
+          cannot_pop m1
+      | inr (inr (inr (m2, res))) =>
           mempop_spec m1 m2
       end.
 
@@ -1522,17 +1532,12 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     }.
 
   Definition write_byte_spec_MemPropT (ptr : addr) (byte : SByte) : MemPropT MemState unit
-    := fun m1 res =>
-         match run_err_ub_oom res with
-         | inl (OOM_message x) =>
-             True
-         | inr (inl (UB_message x)) =>
-             forall m2, ~ write_byte_spec m1 ptr byte m2
-         | inr (inr (inl (ERR_message x))) =>
-             True
-         | inr (inr (inr (m2, tt))) =>
-             write_byte_spec m1 ptr byte m2
-         end.
+    :=
+    lift_spec_to_MemPropT
+      (fun m1 _ m2 =>
+         write_byte_spec m1 ptr byte m2)
+      (fun m1 =>
+         forall m2, ~ write_byte_spec m1 ptr byte m2).
 
   (*** Allocating bytes on the stack *)
   Record allocate_bytes_succeeds_spec (m1 : MemState) (t : dtyp) (init_bytes : list SByte) (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
@@ -1608,17 +1613,12 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   Definition allocate_bytes_spec_MemPropT' (t : dtyp) (init_bytes : list SByte) (prov : Provenance)
     : MemPropT MemState (addr * list addr)
-    := fun m1 res =>
-         match run_err_ub_oom res with
-         | inl (OOM_message x) =>
-             True
-         | inr (inl (UB_message x)) =>
-             forall m2 ptr ptrs, ~ allocate_bytes_succeeds_spec m1 t init_bytes prov m2 ptr ptrs
-         | inr (inr (inl (ERR_message x))) =>
-             True
-         | inr (inr (inr (m2, (ptr, ptrs)))) =>
-             allocate_bytes_succeeds_spec m1 t init_bytes prov m2 ptr ptrs
-         end.
+    :=
+    lift_spec_to_MemPropT
+      (fun m1 '(ptr, ptrs) m2 =>
+         allocate_bytes_succeeds_spec m1 t init_bytes prov m2 ptr ptrs)
+      (fun m1 =>
+         forall m2 ptr ptrs, ~ allocate_bytes_succeeds_spec m1 t init_bytes prov m2 ptr ptrs).
 
   Definition allocate_bytes_spec_MemPropT (t : dtyp) (init_bytes : list SByte)
     : MemPropT MemState addr
@@ -1693,17 +1693,12 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   Definition malloc_bytes_spec_MemPropT' (init_bytes : list SByte) (prov : Provenance)
     : MemPropT MemState (addr * list addr)
-    := fun m1 res =>
-         match run_err_ub_oom res with
-         | inl (OOM_message x) =>
-             True
-         | inr (inl (UB_message x)) =>
-             forall m2 ptr ptrs, ~ malloc_bytes_succeeds_spec m1 init_bytes prov m2 ptr ptrs
-         | inr (inr (inl (ERR_message x))) =>
-             True
-         | inr (inr (inr (m2, (ptr, ptrs)))) =>
-             malloc_bytes_succeeds_spec m1 init_bytes prov m2 ptr ptrs
-         end.
+    :=
+    lift_spec_to_MemPropT
+      (fun m1 '(ptr, ptrs) m2 =>
+         malloc_bytes_succeeds_spec m1 init_bytes prov m2 ptr ptrs)
+      (fun m1 =>
+         forall m2 ptr ptrs, ~ malloc_bytes_succeeds_spec m1 init_bytes prov m2 ptr ptrs).
 
   Definition malloc_bytes_spec_MemPropT (init_bytes : list SByte)
     : MemPropT MemState addr
@@ -1784,17 +1779,11 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     }.
 
   Definition free_spec_MemPropT (root : addr) : MemPropT MemState unit :=
-    fun m1 res =>
-      match run_err_ub_oom res with
-      | inl (OOM_message x) =>
-          True
-      | inr (inl (UB_message x)) =>
-          forall m2, ~ free_spec m1 root m2
-      | inr (inr (inl (ERR_message x))) =>
-          True
-      | inr (inr (inr (m2, tt))) =>
-          free_spec m1 root m2
-      end.
+    lift_spec_to_MemPropT
+      (fun m1 _ m2 =>
+         free_spec m1 root m2)
+      (fun m1 =>
+         forall m2, ~ free_spec m1 root m2).
 
   (*** Aggregate things *)
 
@@ -2054,6 +2043,30 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     MemMonad_eq1_raise_error_inv :
     forall {A} x error_msg,
       ~ ((@eq1 _ MemMonad_eq1_runm) A (ret x) (raise_error error_msg));
+
+    MemMonad_eq1_raise_oom_raise_error_inv :
+    forall {A} oom_msg error_msg,
+      ~ ((@eq1 _ MemMonad_eq1_runm) A (raise_oom oom_msg) (raise_error error_msg));
+
+    MemMonad_eq1_raise_error_raise_oom_inv :
+    forall {A} error_msg oom_msg,
+      ~ ((@eq1 _ MemMonad_eq1_runm) A (raise_error error_msg) (raise_oom oom_msg));
+
+    MemMonad_eq1_raise_ub_raise_error_inv :
+    forall {A} ub_msg error_msg,
+      ~ ((@eq1 _ MemMonad_eq1_runm) A (raise_ub ub_msg) (raise_error error_msg));
+
+    MemMonad_eq1_raise_error_raise_ub_inv :
+    forall {A} error_msg ub_msg,
+      ~ ((@eq1 _ MemMonad_eq1_runm) A (raise_error error_msg) (raise_ub ub_msg));
+
+    MemMonad_eq1_raise_oom_raise_ub_inv :
+    forall {A} oom_msg ub_msg,
+      ~ ((@eq1 _ MemMonad_eq1_runm) A (raise_oom oom_msg) (raise_ub ub_msg));
+
+    MemMonad_eq1_raise_ub_raise_oom_inv :
+    forall {A} ub_msg oom_msg,
+      ~ ((@eq1 _ MemMonad_eq1_runm) A (raise_ub ub_msg) (raise_oom oom_msg));
   }.
 
     (*** Correctness *)
@@ -2567,7 +2580,8 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       { (* Error Case *)
         intros msg_oom ERROR.
         exists ""%string.
-        admit. (* Need inversion property. *)
+        rewrite MemMonad_run_raise_oom in ERROR.
+        eapply MemMonad_eq1_raise_oom_raise_error_inv in ERROR; auto.
       }
       { (* OOM case *)
         intros msg_oom OOM.
@@ -2581,7 +2595,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         apply MemMonad_eq1_raise_oom_inv in H.
         auto.
       }
-    Admitted.
+    Qed.
 
     Lemma exec_correct_raise_error :
       forall {A} (msg1 msg2 : string),
@@ -2601,7 +2615,8 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       { (* OOM case *)
         intros msg OOM.
         exists ""%string.
-        admit. (* Need inversion property. *)
+        rewrite MemMonad_run_raise_error in OOM.
+        eapply MemMonad_eq1_raise_error_raise_oom_inv in OOM; auto.
       }
       { (* Success *)
         intros st' ms' x H.
@@ -2610,7 +2625,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         apply MemMonad_eq1_raise_error_inv in H.
         auto.
       }
-    Admitted.
+    Qed.
 
     Lemma exec_correct_raise_ub :
       forall {A} (msg1 msg2 : string),
