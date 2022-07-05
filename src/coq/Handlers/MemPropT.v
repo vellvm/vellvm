@@ -331,13 +331,13 @@ Proof.
        (exists msg_spec,
            spec ms (raise_ub msg_spec)) \/
          (* Error *)
-         ((exists msg msg_spec,
+         ((forall msg,
               t ≈ (raise_error msg) ->
-              spec ms (raise_error msg_spec))) /\
+              exists msg_spec, spec ms (raise_error msg_spec))) /\
            (* OOM *)
-           (exists msg msg_spec,
+           (forall msg,
                t ≈ (raise_oom msg) ->
-               spec ms (raise_oom msg_spec)) /\
+               exists msg_spec, spec ms (raise_oom msg_spec)) /\
            (* Success *)
            (forall ms' x,
                t ≈ (ret (ms', x)) ->
@@ -356,13 +356,13 @@ Proof.
        (exists msg_spec,
            spec ms (raise_ub msg_spec)) \/
          (* Error *)
-         ((exists msg msg_spec,
+         ((forall msg,
               t ≈ (raise_error msg) ->
-              spec ms (raise_error msg_spec))) /\
+              exists msg_spec, spec ms (raise_error msg_spec))) /\
            (* OOM *)
-           (exists msg msg_spec,
+           (forall msg,
                t ≈ (raise_oom msg) ->
-               spec ms (raise_oom msg_spec)) /\
+               exists msg_spec, spec ms (raise_oom msg_spec)) /\
            (* Success *)
            (forall st' ms' x,
                t ≈ (ret (ms', (st', x))) ->

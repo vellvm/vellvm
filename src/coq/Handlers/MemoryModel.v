@@ -2066,13 +2066,13 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         (exists msg_spec,
             spec ms (raise_ub msg_spec)) \/
           (* Error *)
-          ((exists msg msg_spec,
+          ((forall msg,
                eqi _ t (raise_error msg) ->
-               spec ms (raise_error msg_spec))) /\
+               exists msg_spec, spec ms (raise_error msg_spec))) /\
           (* OOM *)
-          (exists msg msg_spec,
+          (forall msg,
               eqi _ t (raise_oom msg) ->
-              spec ms (raise_oom msg_spec)) /\
+              exists msg_spec, spec ms (raise_oom msg_spec)) /\
           (* Success *)
           (forall st' ms' x,
               eqi _ t (ret (st', (ms', x))) ->
@@ -2442,7 +2442,8 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
 
       split; [|split].
       { (* Error *)
-        do 2 eexists; intros RUN.
+        intros msg RUN.
+        eexists.
 
         rewrite MemMonad_run_bind in RUN.
         (* I think I need some kind of inversion lemma about this *)
@@ -2477,14 +2478,12 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       setoid_rewrite MemMonad_run_ret.
       split; [|split].
       + (* Error *)
-        cbn. repeat eexists.
-        exact ""%string.
-        intros CONTRA.
+        intros msg CONTRA.
+        exists ""%string.
         apply MemMonad_eq1_raise_error_inv in CONTRA; auto.
       + (* OOM *)
-        cbn. repeat eexists.
-        exact ""%string.
-        intros CONTRA.
+        intros msg CONTRA.
+        exists ""%string.
         apply MemMonad_eq1_raise_oom_inv in CONTRA; auto.
       + (* Success *)
         intros st' ms' x' RUN.
@@ -2566,15 +2565,14 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       cbn. right.
       split; [|split].
       { (* Error Case *)
-        do 2 eexists.
-        exact ""%string.
-        intros RUN.
+        intros msg_oom ERROR.
+        exists ""%string.
         admit. (* Need inversion property. *)
       }
       { (* OOM case *)
-        exists msg.
-        exists msg.
-        intros; auto.
+        intros msg_oom OOM.
+        exists ""%string.
+        auto.
       }
       { (* Success *)
         intros st' ms' x H.
@@ -2596,15 +2594,13 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       cbn. right.
       split; [|split].
       { (* Error Case *)
-        exists msg1.
-        exists msg2.
-        intros; auto.
+        intros msg ERR.
+        exists ""%string.
+        auto.
       }
       { (* OOM case *)
-        do 2 eexists.
-        exact ""%string.
-        intros RUN.
-        rewrite MemMonad_run_raise_error in RUN.
+        intros msg OOM.
+        exists ""%string.
         admit. (* Need inversion property. *)
       }
       { (* Success *)
@@ -2678,14 +2674,12 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       right.
       eapply MemMonad_run_fresh_sid in H as [st' [sid [EUTT [VALID FRESH]]]].
       split; [| split].
-      { do 2 eexists.
-        intros ERR.
+      { intros msg ERR.
         exfalso.
         rewrite EUTT in ERR.
         apply MemMonad_eq1_raise_error_inv in ERR; auto.
       }
-      { do 2 eexists.
-        intros OOM.
+      { intros msg OOM.
         exfalso.
         rewrite EUTT in OOM.
         apply MemMonad_eq1_raise_oom_inv in OOM; auto.
@@ -2822,14 +2816,12 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       right.
       eapply MemMonad_run_fresh_provenance in H as [st' [sid [EUTT [VALID [MEM FRESH]]]]].
       split; [| split].
-      { do 2 eexists.
-        intros ERR.
+      { intros msg ERR.
         exfalso.
         rewrite EUTT in ERR.
         apply MemMonad_eq1_raise_error_inv in ERR; auto.
       }
-      { do 2 eexists.
-        intros OOM.
+      { intros msg OOM.
         exfalso.
         rewrite EUTT in OOM.
         apply MemMonad_eq1_raise_oom_inv in OOM; auto.

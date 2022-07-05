@@ -4079,7 +4079,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         right.
         split; [|split].
         + (* Error *)
-          do 2 eexists; intros RUN.
+          intros msg RUN.
           exfalso.
           unfold read_byte, read_byte_MemPropT in *.
 
@@ -4094,7 +4094,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
           apply MemMonad_eq1_raise_error_inv in RUN; auto.
         + (* OOM *)
-          do 2 eexists; intros RUN.
+          intros msg RUN.
           exfalso.
           unfold read_byte, read_byte_MemPropT in *.
 
@@ -4172,7 +4172,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         right.
         split; [|split].
         + (* Error *)
-          do 2 eexists; intros RUN.
+          intros msg RUN.
           exfalso.
           unfold read_byte, read_byte_MemPropT in *.
 
@@ -4187,7 +4187,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
           apply MemMonad_eq1_raise_error_inv in RUN; auto.
         + (* OOM *)
-          do 2 eexists; intros RUN.
+          intros msg RUN.
           exfalso.
           unfold read_byte, read_byte_MemPropT in *.
 
@@ -4289,35 +4289,13 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         split; [| split].
 
         + (* Error *)
-          eexists. exists ""%string.
-          intros RUN.
-
-          unfold write_byte in RUN.
-
-          rewrite MemMonad_run_bind in RUN.
-          rewrite MemMonad_get_mem_state in RUN.
-          rewrite bind_ret_l in RUN.
-
-          rewrite READ in RUN.
-          rewrite ACCESS in RUN.
-
-          rewrite MemMonad_put_mem_state in RUN.
-          apply MemMonad_eq1_raise_error_inv in RUN; auto.
+          intros msg RUN.
+          exists ""%string.
+          auto.
         + (* OOM *)
-          eexists. exists ""%string.
-          intros RUN.
-
-          unfold write_byte in RUN.
-
-          rewrite MemMonad_run_bind in RUN.
-          rewrite MemMonad_get_mem_state in RUN.
-          rewrite bind_ret_l in RUN.
-
-          rewrite READ in RUN.
-          rewrite ACCESS in RUN.
-
-          rewrite MemMonad_put_mem_state in RUN.
-          apply MemMonad_eq1_raise_oom_inv in RUN; auto.
+          intros msg RUN.
+          exists ""%string.
+          auto.
         + (* Success *)
           intros st' ms' x RUN.
 
@@ -7341,8 +7319,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
       right.
       cbn.
-      split; [do 2 exists ""%string; auto|].
-      split; [do 2 exists ""%string; auto|].
+      split; [intros msg RUN; exists ""%string; auto|].
+      split; [intros msg RUN; exists ""%string; auto|].
 
       intros st' ms' [] RUN.
       unfold mempush in RUN.
@@ -8051,8 +8029,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
       right.
       cbn.
-      split; [do 2 exists ""%string; auto|].
-      split; [do 2 exists ""%string; auto|].
+      split; [intros msg RUN; exists ""%string; auto|].
+      split; [intros msg RUN; exists ""%string; auto|].
 
       intros st' ms' [] RUN.
       unfold mempop in RUN.
@@ -8471,8 +8449,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       pose proof (member_lookup _ _ ROOTIN) as (block & FINDPTR).
       right.
       cbn.
-      split; [do 2 exists ""%string; auto|].
-      split; [do 2 exists ""%string; auto|].
+      split; [intros msg RUN; exists ""%string; auto|].
+      split; [intros msg RUN; exists ""%string; auto|].
 
       intros st' ms' [] RUN.
       unfold free in RUN.

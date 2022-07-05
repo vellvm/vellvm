@@ -51,12 +51,81 @@ Module Infinite.
   Import SemNotations.
   Import InterpFacts.
   Import LLVMEvents.
+  Import LLVMAst.
+  Import CFG.
+
+  Import List.
+  Import ListNotations.
+  Require Import Coq.Strings.String.
+
+  Definition alloc_code : code dtyp :=
+    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) None None)
+    ].
+
+  Definition ptoi_code : code dtyp :=
+    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) None None);
+      (IId (Name "i"), INSTR_Op (OP_Conversion Ptrtoint DTYPE_Pointer (EXP_Ident (ID_Local (Name "ptr"))) (DTYPE_IPTR)))
+    ].
+
+  Definition ret_code : code dtyp :=
+    [].
+
+  Definition alloc_block : block dtyp :=
+    {|
+      blk_id := Name "";
+      blk_phis := [];
+      blk_code := alloc_code;
+      blk_term := TERM_Ret (DTYPE_I 1%N, EXP_Bool true);
+      blk_comments := None;
+    |}.
+
+  Definition ptoi_block : block dtyp :=
+    {|
+      blk_id := Name "";
+      blk_phis := [];
+      blk_code := ptoi_code;
+      blk_term := TERM_Ret (DTYPE_I 1%N, EXP_Bool true);
+      blk_comments := None;
+    |}.
+
+  Definition ret_block : block dtyp :=
+    {|
+      blk_id := Name "";
+      blk_phis := [];
+      blk_code := ret_code;
+      blk_term := TERM_Ret (DTYPE_I 1%N, EXP_Bool true);
+      blk_comments := None;
+    |}.
+
+  Definition block_to_dvalue {E} `{FailureE -< E}
+             (t : itree E (block_id + uvalue)) : itree E dvalue :=
+    b_or_v <- t;;
+    match b_or_v with
+    | inl _ => raise "id"
+    | inr uv =>
+        match uvalue_to_dvalue uv with
+        | inl msg => raise msg
+        | inr dv => ret dv
+        end
+    end.
+
+  Definition denote_program prog :=
+    block_to_dvalue (denote_block prog (Name "blk")).
+
+  Definition alloc_tree : itree instr_E dvalue :=
+    denote_program alloc_block.
+
+  Definition ptoi_tree : itree instr_E dvalue :=
+    denote_program ptoi_block.
+
+  Definition ret_tree : itree instr_E dvalue :=
+    denote_program ret_block.
 
   Definition t_alloc : itree L0 dvalue
-    := trigger (Alloca (DTYPE_I 64%N));; ret DVALUE_None.
+    := trigger (Alloca (DTYPE_I 64%N));; ret (DVALUE_I1 one).
 
   Definition t_ret : itree L0 dvalue
-    := ret DVALUE_None.
+    := ret (DVALUE_I1 one).
 
   (* Remove allocation in infinite language *)
   Lemma remove_alloc:
@@ -129,29 +198,11 @@ Module Infinite.
       exists (Ret2 s' m' (lenv, stack, (genv, DVALUE_Addr addr))). (* Not sure if should be s' or sid, and m' or m *) (* Used to be r2 *)
 
       split.
-      + rewrite bind_trigger.
-        rewrite interp_intrinsics_vis.
-        cbn.
+      + go.
         rewrite bind_trigger.
-        rewrite interp_global_vis.
-        cbn.
-        rewrite bind_bind.
-        setoid_rewrite bind_ret_l.
-        cbn.
-        setoid_rewrite interp_intrinsics_ret.
-        setoid_rewrite interp_global_ret.
-        cbn.
-
-        rewrite bind_trigger.
-        rewrite interp_local_stack_vis.
-        cbn.
-
-        rewrite bind_bind.
-        rewrite bind_trigger.
-
-        setoid_rewrite bind_ret_l.
-        cbn.
-
+        repeat setoid_rewrite bind_ret_l.
+        setoid_rewrite interp_local_stack_ret.
+        repeat setoid_rewrite bind_ret_l.
 
         (* LEMMA *)
         unfold interp_memory_prop.
@@ -181,17 +232,13 @@ Module Infinite.
           unfold MemPropT_lift_PropT_fresh.
           right.
           split; [|split].
-          -- exists String.EmptyString.
-             exists String.EmptyString.
-             intros ERR.
+          -- intros msg ERR.
              rewrite map_ret in ERR.
              rewrite map_ret in ERR.
              cbn in ERR.
              (* TODO: inv *)
              admit.
-          -- exists String.EmptyString.
-             exists String.EmptyString.
-             intros OOM.
+          -- intros msg OOM.
              rewrite map_ret in OOM.
              rewrite map_ret in OOM.
              cbn in OOM.
@@ -227,7 +274,201 @@ Module Infinite.
           apply Returns_Ret in RET.
           subst.
           cbn.
-          rewrite interp_local_stack_ret.
+          go.
+          eapply interp_prop_ret_refine; eauto.
+      + apply interp_prop_ret_inv in UNDEF as (r3 & R3 & T').
+        unfold model_undef_h.
+        (* Supposedly I can do this rewrite with T' with the new interp_prop... *)
+        assert (interp_prop
+                  (case_ (E_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))
+                         (case_ PickUvalue_handler (F_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))))
+                  (@pick_uvalue_k_spec ExternalCallE (OOME +' UBE +' DebugE +' FailureE))
+                  (MMEP.MMSP.MemState * (store_id * (local_env * Stack.stack * res_L1))) TT
+                  (Ret5 genv (lenv, stack) s' m' (DVALUE_Addr addr)) (ret r3)).
+        2: admit. (* Pretending I rewrote *)
+
+        cbn.
+        eapply interp_prop_ret_refine; eauto.
+  Admitted.
+
+  Definition instr_E_to_L0 {T : Type} : instr_E T -> itree L0 T :=
+    fun (e : instr_E T) =>
+      match e with
+      | inl1 call =>
+          match call with
+          | Call dt fv args =>
+              raise "call"
+          end
+      | inr1 e0 =>
+          trigger (inr1 e0)
+      end.
+
+  Definition interp_instr_E_to_L0 :=
+    interp (@instr_E_to_L0).
+
+  Import TranslateFacts.
+  Import StateFacts.
+
+  Lemma remove_alloc_block :
+    forall genv lenv stack sid m,
+      refine_L6 (interp_mcfg4 TT TT (interp_instr_E_to_L0 _ alloc_tree) genv (lenv, stack) sid m) (interp_mcfg4 TT TT (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m).
+  Proof.
+    intros genv lenv stack sid m.
+    unfold refine_L6.
+    intros t' INTERP.
+    exists t'.
+    split; [| reflexivity].
+    - cbn in *.
+
+      (* TODO: Should make lemmas about ret, etc for interp_mcfg4 *)
+      unfold interp_mcfg4 in *.
+      unfold model_undef in *.
+
+      destruct INTERP as [t_pre [INTERP UNDEF]].
+
+      go_in INTERP.
+      repeat setoid_rewrite bind_ret_l in INTERP.
+      rewrite TranslateFacts.translate_ret in INTERP.
+      repeat setoid_rewrite bind_ret_l in INTERP.
+      cbn in INTERP.
+      setoid_rewrite interp_ret in INTERP.
+      setoid_rewrite interp_intrinsics_ret in INTERP.
+      setoid_rewrite interp_global_ret in INTERP.
+      setoid_rewrite interp_local_stack_ret in INTERP.
+
+      (* TODO: Turn this into an interp_memory_prop lemma *)
+      unfold interp_memory_prop in INTERP.
+      cbn in INTERP.
+
+      apply interp_prop_ret_inv in INTERP.
+      destruct INTERP as [r2 [INTERP_TT EQ]].
+
+      assert (ITree.map (fun '(_, (_, x)) => x) t_pre ≈ Ret ((fun '(_, (_, x)) => x) (m, (sid, r2)))).
+      auto.
+      clear EQ.
+      rename H into EQ.
+
+      apply ret_map_itree in EQ as ((m', (s', a')) & EQ & FEQ).
+
+      rewrite EQ in UNDEF.
+      cbn in UNDEF.
+
+      cbn in EQ.
+      subst.
+
+      epose proof allocate_dtyp_spec_can_always_succeed m _ _ (DTYPE_I 64) _ _ _ _ _ as (ms_final & addr & ALLOC).
+
+      exists (Ret2 s' m' (lenv, stack, (genv, DVALUE_Addr addr))). (* Not sure if should be s' or sid, and m' or m *) (* Used to be r2 *)
+
+      split.
+      + go.
+        cbn.
+        repeat setoid_rewrite bind_ret_l.
+        repeat setoid_rewrite bind_bind.
+        repeat rewrite bind_trigger.
+        repeat setoid_rewrite bind_ret_l.
+        setoid_rewrite TranslateFacts.translate_ret.
+        repeat setoid_rewrite bind_ret_l.
+
+        setoid_rewrite interp_vis.
+        cbn.
+        rewrite bind_trigger.
+        rewrite interp_intrinsics_vis.
+        go.
+        cbn.
+        go.
+        setoid_rewrite bind_ret_l.
+        setoid_rewrite interp_local_stack_ret.
+        setoid_rewrite bind_ret_l.
+
+        repeat setoid_rewrite bind_trigger.
+        setoid_rewrite interp_vis.
+        cbn.
+        setoid_rewrite bind_trigger.
+        setoid_rewrite interp_intrinsics_Tau.
+        setoid_rewrite interp_global_Tau.
+
+        setoid_rewrite interp_intrinsics_vis.
+        setoid_rewrite interp_global_bind.
+        cbn.
+        setoid_rewrite interp_global_trigger.
+        cbn.
+        setoid_rewrite bind_bind.
+        setoid_rewrite bind_ret_l.
+        setoid_rewrite StateFacts.interp_state_tau.
+        setoid_rewrite tau_eutt.
+        setoid_rewrite interp_state_bind.
+        setoid_rewrite interp_state_trigger.
+        cbn.
+        setoid_rewrite map_ret.
+        setoid_rewrite bind_ret_l.
+        cbn.
+        setoid_rewrite tau_eutt.
+        setoid_rewrite interp_ret.
+        setoid_rewrite interp_intrinsics_ret.
+        setoid_rewrite interp_global_ret.
+        setoid_rewrite interp_state_ret.
+
+        (* LEMMA *)
+        unfold interp_memory_prop.
+        cbn.
+
+        eapply interp_prop_vis.
+        cbn.
+        unfold bind_PropT.
+
+        (* was just ret r2... *)
+        exists (ITree.map (fun '(_, (_, x)) => x) (Ret (lenv, (stack, DVALUE_Addr addr)))).
+        exists (fun dv => ret (lenv, stack, (genv, dv))).
+        split; [|split].
+        * exists sid. exists ms_final.
+          unfold my_handle_memory_prop.
+          unfold MemPropT_lift_PropT_fresh.
+          right.
+          split; [|split].
+          -- intros msg ERR.
+             rewrite map_ret in ERR.
+             rewrite map_ret in ERR.
+             cbn in ERR.
+             (* TODO: inv *)
+             admit.
+          -- intros msg OOM.
+             rewrite map_ret in OOM.
+             rewrite map_ret in OOM.
+             cbn in OOM.
+             (* TODO: inv *)
+             admit.
+          -- intros st' ms' addr_dv SUCC.
+             rewrite map_ret in SUCC.
+             rewrite map_ret in SUCC.
+             cbn in SUCC.
+             assert ((ms_final, (sid, DVALUE_Addr addr)) = (ms', (st', addr_dv))) as EQRES.
+             { eapply (@eq1_ret_ret
+                       (itree
+                          (sum1 ExternalCallE
+                                (sum1 PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))))
+                    )); eauto.
+
+               typeclasses eauto.
+             }
+
+             inversion EQRES.
+             subst ms' st' addr_dv.
+
+             cbn.
+             exists ms_final, addr.
+             tauto.
+        * rewrite map_ret.
+          setoid_rewrite map_bind.
+          rewrite bind_ret_l.
+          rewrite map_ret.
+          reflexivity.
+        * intros a RET.
+          rewrite map_ret in RET.
+          apply Returns_Ret in RET.
+          subst.
+          cbn.
+
           eapply interp_prop_ret_refine; eauto.
       + apply interp_prop_ret_inv in UNDEF as (r3 & R3 & T').
         unfold model_undef_h.
@@ -246,45 +487,126 @@ Module Infinite.
 
   (* Add allocation in infinite language *)
   Lemma add_alloc :
-    forall g l s m,
-      refine_L6 (interp_mcfg4 TT t_ret g (l, s) m) (interp_mcfg4 TT t_alloc g (l, s) m).
+    forall {RR_mem RR_pick} `{REF_mem : @Reflexive _ RR_mem} `{REF_pick : @Reflexive _ RR_pick} genv lenv stack sid m,
+      refine_L6 (interp_mcfg4 RR_mem RR_pick t_ret genv (lenv, stack) sid m) (interp_mcfg4 RR_mem RR_pick t_alloc genv (lenv, stack) sid m).
   Proof.
-    intros g l s m.
+    intros RR_mem RR_pick REF_mem REF_pick genv lenv stack sid m.
     unfold refine_L6.
     intros t' INTERP.
-    exists t'.
+
+    (* either t' succeeds and we're eqv some ret like t_ret...
+       or t' runs out of memory because it's an allocation.
+     *)
+
+    unfold interp_mcfg4 in *.
+    unfold model_undef in *.
+
+    destruct INTERP as [t_pre [INTERP UNDEF]].
+    unfold interp_memory_prop in INTERP.
+    unfold t_alloc in INTERP.
+    cbn in INTERP.
+    go_in INTERP.
+    rewrite bind_trigger in INTERP.
+    repeat setoid_rewrite bind_ret_l in INTERP.
+    setoid_rewrite interp_local_stack_ret in INTERP.
+    repeat setoid_rewrite bind_ret_l in INTERP.
+    
+    setoid_rewrite interp_intrinsics_ret in INTERP.
+    setoid_rewrite interp_global_ret in INTERP.
+    setoid_rewrite interp_local_stack_ret in INTERP.
+
+    unfold interp_memory_prop in INTERP.
+    apply interp_prop_vis_inv in INTERP.
+
+    (* I seem to know very little about k_alloc *)
+    destruct INTERP as (ta & k_alloc & HANDLER & KSPEC).
+    unfold memory_k_spec in KSPEC.
+
+    destruct HANDLER as (sid' & ms_alloc & HANDLER).
+
+    cbn in HANDLER.
+    unfold my_handle_memory_prop in HANDLER.
+    unfold MemPropT_lift_PropT_fresh in HANDLER.
+
+    destruct HANDLER as [[ubmsg UB] | [ALLOC_ERROR [ALLOC_OOM ALLOC]]].
+    - (* t_alloc raises UB *)
+      admit.
+    - (* t_alloc doesn't have UB *)
+      (* In reality it's going to either OOM or succeed... *)
+      (* Need some kind of lemma about that... *)
+      
+      (* TODO: PLACEHOLDER *)
+      destruct ALLOC_OOM as (oom1 & oom2 & ALLOC_OOM).
+      forward ALLOC_OOM.
+      admit.
+      cbn in ALLOC_OOM.
+
+      unfold t_alloc in KSPEC.
+      
+      cbn in *.
+    
+    
+
+    exists (Ret2 sid m (lenv, stack, (genv, DVALUE_None))).
+    (* exists (ITree.map (fun '(_, (_, x)) => x) (Ret2 sid m (lenv, stack, (genv, DVALUE_None)))). *)
     split.
     - cbn.
-      unfold interp_mcfg4.
-      unfold model_undef.
-      epose proof interp_prop_Proper_eq.
-      unfold Proper, respectful in *.
-      unfold Basics.flip, Basics.impl in *.
-      eapply H.
-      all: eauto.
+      unfold interp_mcfg4 in *.
+      unfold model_undef in *.
+      unfold interp_memory_prop.
       cbn.
-      go.
-
-      rewrite interp_memory_trigger.
+      unfold interp_memory_prop_h.
       cbn.
-      go.
-      cbn.
+      exists (Ret5 genv (lenv, stack) sid m DVALUE_None).
 
-      pose proof (allocate_succeeds (ms_memory_stack m) (DTYPE_I 64)) as ALLOC_SUC.
-      forward ALLOC_SUC. intros CONTRA; inversion CONTRA.
+      split.
+      + go.
+        (* TODO: reflexivity *)
+        unfold interp_memory_prop.
+        cbn.
 
-      destruct m as [ms sid pr].
-      eapply ErrSID_succeeds_ErrSID_runs_to in ALLOC_SUC as ((ms' & a) & sid' & pr' & REST).
-      rewrite REST.
+        (* Supposedly rewriteable *)
+        assert (interp_prop
+          (fun (T : Type)
+             (e : (ExternalCallE +'
+                                    LLVMParamsBigIntptr.Events.IntrinsicE +'
+                                                                             LLVMParamsBigIntptr.Events.MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T)
+             (t : itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T) =>
+             exists (sid' : store_id) (ms' : MMEP.MMSP.MemState),
+               interp_memory_prop_h e sid m (ITree.map (fun x : T => (ms', (sid', x))) t))
+          (@memory_k_spec ExternalCallE (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE))
+          (local_env * Stack.stack * res_L1) RR_mem (Ret2 genv (lenv, stack) DVALUE_None)
+          (Ret2 genv (lenv, stack) DVALUE_None)).
+        2: admit.
 
-      go.
-      cbn.
-      go.
-      cbn.
+        eapply interp_prop_ret_refine; eauto.
+      + unfold model_undef_h.
+        eapply interp_prop_ret_refine; eauto.
+    - destruct INTERP as [t_pre [INTERP UNDEF]].
+      unfold refine_OOM_h.
+      unfold t_alloc in INTERP.
+      cbn in INTERP.
+      go_in INTERP.
+      rewrite bind_trigger in INTERP.
+      repeat setoid_rewrite bind_ret_l in INTERP.
+      setoid_rewrite interp_local_stack_ret in INTERP.
+      repeat setoid_rewrite bind_ret_l in INTERP.
+      
+      setoid_rewrite interp_intrinsics_ret in INTERP.
+      setoid_rewrite interp_global_ret in INTERP.
+      setoid_rewrite interp_local_stack_ret in INTERP.
 
-      apply eutt_Ret.
-      reflexivity.
-    - right.
+      unfold interp_memory_prop in INTERP.
+      apply interp_prop_vis_inv in INTERP.
+
+      destruct INTERP as (m' & k & BLAH).
+      destruct BLAH as (HANDLER & KSPEC).
+      cbn in *.
+      unfold memory_k_spec in KSPEC.
+      
+      apply interp_prop_vis in INTERP.
+
+
       apply OOM.eutt_refine_oom_h; try typeclasses eauto.
       reflexivity.
   Qed.
