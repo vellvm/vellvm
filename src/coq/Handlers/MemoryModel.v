@@ -1539,65 +1539,107 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       (fun m1 =>
          forall m2, ~ write_byte_spec m1 ptr byte m2).
 
-  (*** Allocating bytes on the stack *)
-  Record allocate_bytes_succeeds_spec (m1 : MemState) (t : dtyp) (init_bytes : list SByte) (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
-    { (* The allocated pointers are consecutive in memory. *)
-      (* m1 doesn't really matter here. *)
-      allocate_bytes_consecutive : get_consecutive_ptrs ptr (length init_bytes) m1 (ret (m1, ptrs));
+  (*** Allocation utilities *)
+  Record block_is_free (m1 : MemState) (len : nat) (pr : Provenance) (ptr : addr) (ptrs : list addr) : Prop :=
+    { block_is_free_consecutive : get_consecutive_ptrs ptr len m1 (ret (m1, ptrs));
+      block_is_free_ptr_provenance : address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr); (* Need this case if `ptrs` is empty (allocating 0 bytes) *)
+      block_is_free_ptrs_provenance : forall ptr, In ptr ptrs -> address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr);
 
-      (* Provenance *)
-      allocate_bytes_address_provenance : address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr); (* Need this case if `ptrs` is empty (allocating 0 bytes) *)
-      allocate_bytes_addresses_provenance : forall ptr, In ptr ptrs -> address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr);
-      allocate_bytes_provenances_preserved :
+      (* Actual free condition *)
+      block_is_free_bytes_are_free : forall ptr, In ptr ptrs -> byte_not_allocated m1 ptr;
+    }.
+  
+  Definition find_free_block (len : nat) (pr : Provenance) : MemPropT MemState (addr * list addr)%type
+    := fun m1 res =>
+         match run_err_ub_oom res with
+         | inl (OOM_message x) =>
+             True
+         | inr (inl (UB_message x)) =>
+             False
+         | inr (inr (inl (ERR_message x))) =>
+             False
+         | inr (inr (inr (m2, (ptr, ptrs)))) =>
+             m1 = m2 /\ block_is_free m1 len pr ptr ptrs
+         end.
+
+  Record extend_read_byte_allowed (m1 : MemState) (ptrs : list addr) (m2 : MemState) : Prop :=
+    { extend_read_byte_allowed_new_reads :
+      forall p, In p ptrs ->
+           read_byte_allowed m2 p;
+
+      extend_read_byte_allowed_old_reads :
+      forall ptr',
+        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
+        read_byte_allowed m1 ptr' <-> read_byte_allowed m2 ptr';
+    }.
+
+  Record extend_reads (m1 : MemState) (ptrs : list addr) (bytes : list SByte) (m2 : MemState) : Prop :=
+    { extend_reads_new_reads :
+      forall p ix byte,
+        Util.Nth ptrs ix p ->
+        Util.Nth bytes ix byte ->
+        read_byte_prop m2 p byte;
+
+      extend_reads_old_reads :
+      forall ptr' byte,
+        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
+        read_byte_prop m1 ptr' byte <-> read_byte_prop m2 ptr' byte;
+    }.
+
+  Record extend_write_byte_allowed (m1 : MemState) (ptrs : list addr) (m2 : MemState) : Prop :=
+    { extend_write_byte_allowed_new_writes :
+      forall p, In p ptrs ->
+           write_byte_allowed m2 p;
+
+      extend_write_byte_allowed_old_writes :
+      forall ptr',
+        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
+        write_byte_allowed m1 ptr' <-> write_byte_allowed m2 ptr';
+    }.
+
+  Definition extend_stack_frame (m1 : MemState) (ptrs : list addr) (m2 : MemState) : Prop :=
+    forall fs1 fs2,
+      memory_stack_frame_stack_prop (MemState_get_memory m1) fs1 ->
+      add_ptrs_to_frame_stack fs1 ptrs fs2 ->
+      memory_stack_frame_stack_prop (MemState_get_memory m2) fs2.
+
+  Definition extend_heap (m1 : MemState) (ptrs : list addr) (m2 : MemState) : Prop :=
+    forall h1 h2,
+      memory_stack_heap_prop (MemState_get_memory m1) h1 ->
+      add_ptrs_to_heap h1 ptrs h2 ->
+      memory_stack_heap_prop (MemState_get_memory m2) h2.
+
+  Record extend_allocations (m1 : MemState) (ptrs : list addr) (pr : Provenance) (m2 : MemState) : Prop :=
+    { extend_allocations_bytes_now_allocated :
+      forall ptr, In ptr ptrs -> byte_allocated m2 ptr (provenance_to_allocation_id pr);
+
+      extend_allocations_old_allocations_preserved :
+      forall ptr aid,
+        (forall p, In p ptrs -> disjoint_ptr_byte p ptr) ->
+        (byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid);
+    }.
+
+  (*** Allocating bytes on the stack *)
+  (* Post conditions for actually reserving bytes in memory and allocating them in the current stack frame *)
+  Record allocate_bytes_post_conditions (m1 : MemState) (t : dtyp) (init_bytes : list SByte) (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
+    { allocate_bytes_provenances_preserved :
       forall pr',
         (used_provenance_prop m1 pr' <-> used_provenance_prop m2 pr');
 
       (* byte_allocated *)
-      allocate_bytes_was_fresh_byte : forall ptr, In ptr ptrs -> byte_not_allocated m1 ptr;
-      allocate_bytes_now_byte_allocated : forall ptr, In ptr ptrs -> byte_allocated m2 ptr (provenance_to_allocation_id pr);
-      allocate_bytes_preserves_old_allocations :
-      forall ptr aid,
-        (forall p, In p ptrs -> disjoint_ptr_byte p ptr) ->
-        (byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid);
+      allocate_bytes_extended_allocations : extend_allocations m1 ptrs pr m2;
 
       (* read permissions *)
-      alloc_bytes_new_reads_allowed :
-      forall p, In p ptrs ->
-           read_byte_allowed m2 p;
-
-      alloc_bytes_old_reads_allowed :
-      forall ptr',
-        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
-        read_byte_allowed m1 ptr' <-> read_byte_allowed m2 ptr';
+      alloc_bytes_extended_reads_allowed : extend_read_byte_allowed m1 ptrs m2;
 
       (* reads *)
-      alloc_bytes_new_reads :
-      forall p ix byte,
-        Util.Nth ptrs ix p ->
-        Util.Nth init_bytes ix byte ->
-        read_byte_prop m2 p byte;
-
-      alloc_bytes_old_reads :
-      forall ptr' byte,
-        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
-        read_byte_prop m1 ptr' byte <-> read_byte_prop m2 ptr' byte;
+      alloc_bytes_extended_reads : extend_reads m1 ptrs init_bytes m2;
 
       (* write permissions *)
-      alloc_bytes_new_writes_allowed :
-      forall p, In p ptrs ->
-           write_byte_allowed m2 p;
-
-      alloc_bytes_old_writes_allowed :
-      forall ptr',
-        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
-        write_byte_allowed m1 ptr' <-> write_byte_allowed m2 ptr';
+      alloc_bytes_extended_writes_allowed : extend_write_byte_allowed m1 ptrs m2;
 
       (* Add allocated bytes onto the stack frame *)
-      allocate_bytes_add_to_frame :
-      forall fs1 fs2,
-        memory_stack_frame_stack_prop (MemState_get_memory m1) fs1 ->
-        add_ptrs_to_frame_stack fs1 ptrs fs2 ->
-        memory_stack_frame_stack_prop (MemState_get_memory m2) fs2;
+      allocate_bytes_add_to_frame : extend_stack_frame m1 ptrs m2;
 
       (* Heap preserved *)
       allocate_bytes_heap_preserved :
@@ -1611,99 +1653,70 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       sizeof_dtyp t = N.of_nat (length init_bytes);
     }.
 
-  Definition allocate_bytes_spec_MemPropT' (t : dtyp) (init_bytes : list SByte) (prov : Provenance)
-    : MemPropT MemState (addr * list addr)
-    :=
-    lift_spec_to_MemPropT
-      (fun m1 '(ptr, ptrs) m2 =>
-         allocate_bytes_succeeds_spec m1 t init_bytes prov m2 ptr ptrs)
-      (fun m1 =>
-         forall m2 ptr ptrs, ~ allocate_bytes_succeeds_spec m1 t init_bytes prov m2 ptr ptrs).
+  Definition allocate_bytes_post_conditions_MemPropT (t : dtyp) (init_bytes : list SByte) (prov : Provenance) (ptr : addr) (ptrs : list addr) : MemPropT MemState (addr * list addr)
+    := fun m1 res =>
+         match run_err_ub_oom res with
+         | inl (OOM_message x) =>
+             False
+         | inr (inl (UB_message x)) =>
+             t = DTYPE_Void
+         | inr (inr (inl (ERR_message x))) =>
+             False
+         | inr (inr (inr (m2, (ptr', ptrs')))) =>
+             allocate_bytes_post_conditions m1 t init_bytes prov m2 ptr ptrs /\ ptr = ptr' /\ ptrs = ptrs'
+         end.
 
   Definition allocate_bytes_spec_MemPropT (t : dtyp) (init_bytes : list SByte)
     : MemPropT MemState addr
     := prov <- fresh_provenance;;
-       '(ptr, _) <- allocate_bytes_spec_MemPropT' t init_bytes prov;;
+       '(ptr, ptrs) <- find_free_block (length init_bytes) prov;;
+       allocate_bytes_post_conditions_MemPropT t init_bytes prov ptr ptrs;;
        ret ptr.
 
   (*** Allocating bytes in the heap *)
-  Record malloc_bytes_succeeds_spec (m1 : MemState) (init_bytes : list SByte) (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
-    {
-      (* The allocated pointers are consecutive in memory. *)
-      (* m1 doesn't really matter here. *)
-      malloc_bytes_consecutive : get_consecutive_ptrs ptr (length init_bytes) m1 (ret (m1, ptrs));
-
-      (* Provenance *)
-      malloc_bytes_address_provenance : address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr); (* Need this case if `ptrs` is empty (allocating 0 bytes) *)
-      malloc_bytes_addresses_provenance : forall ptr, In ptr ptrs -> address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr);
+  Record malloc_bytes_post_conditions (m1 : MemState) (init_bytes : list SByte) (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
+    { (* Provenance *)
       malloc_bytes_provenances_preserved :
       forall pr',
         (used_provenance_prop m1 pr' <-> used_provenance_prop m2 pr');
 
       (* byte_allocated *)
-      malloc_bytes_was_fresh_byte : forall ptr, In ptr ptrs -> byte_not_allocated m1 ptr;
-      malloc_bytes_now_byte_allocated : forall ptr, In ptr ptrs -> byte_allocated m2 ptr (provenance_to_allocation_id pr);
-      malloc_bytes_preserves_old_allocations :
-      forall ptr aid,
-        (forall p, In p ptrs -> disjoint_ptr_byte p ptr) ->
-        (byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid);
+      malloc_bytes_extended_allocations : extend_allocations m1 ptrs pr m2;
 
       (* read permissions *)
-      malloc_bytes_new_reads_allowed :
-      forall p, In p ptrs ->
-           read_byte_allowed m2 p;
-
-      malloc_bytes_old_reads_allowed :
-      forall ptr',
-        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
-        read_byte_allowed m1 ptr' <-> read_byte_allowed m2 ptr';
+      malloc_bytes_extended_reads_allowed : extend_read_byte_allowed m1 ptrs m2;
 
       (* reads *)
-      malloc_bytes_new_reads :
-      forall p ix byte,
-        Util.Nth ptrs ix p ->
-        Util.Nth init_bytes ix byte ->
-        read_byte_prop m2 p byte;
-
-      malloc_bytes_old_reads :
-      forall ptr' byte,
-        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
-        read_byte_prop m1 ptr' byte <-> read_byte_prop m2 ptr' byte;
+      malloc_bytes_extended_reads : extend_reads m1 ptrs init_bytes m2;
 
       (* write permissions *)
-      malloc_bytes_new_writes_allowed :
-      forall p, In p ptrs ->
-           write_byte_allowed m2 p;
-
-      malloc_bytes_old_writes_allowed :
-      forall ptr',
-        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
-        write_byte_allowed m1 ptr' <-> write_byte_allowed m2 ptr';
+      malloc_bytes_extended_writes_allowed : extend_write_byte_allowed m1 ptrs m2;
 
       (* Framestack preserved *)
       malloc_bytes_frame_stack_preserved : frame_stack_preserved m1 m2;
 
       (* Heap extended *)
-      malloc_bytes_add_to_frame :
-      forall h1 h2,
-        memory_stack_heap_prop (MemState_get_memory m1) h1 ->
-        add_ptrs_to_heap h1 ptrs h2 ->
-        memory_stack_heap_prop (MemState_get_memory m2) h2;
+      malloc_bytes_add_to_frame : extend_heap m1 ptrs m2;
     }.
 
-  Definition malloc_bytes_spec_MemPropT' (init_bytes : list SByte) (prov : Provenance)
-    : MemPropT MemState (addr * list addr)
-    :=
-    lift_spec_to_MemPropT
-      (fun m1 '(ptr, ptrs) m2 =>
-         malloc_bytes_succeeds_spec m1 init_bytes prov m2 ptr ptrs)
-      (fun m1 =>
-         forall m2 ptr ptrs, ~ malloc_bytes_succeeds_spec m1 init_bytes prov m2 ptr ptrs).
+  Definition malloc_bytes_post_conditions_MemPropT (init_bytes : list SByte) (prov : Provenance) (ptr : addr) (ptrs : list addr) : MemPropT MemState (addr * list addr)
+    := fun m1 res =>
+         match run_err_ub_oom res with
+         | inl (OOM_message x) =>
+             False
+         | inr (inl (UB_message x)) =>
+             False
+         | inr (inr (inl (ERR_message x))) =>
+             False
+         | inr (inr (inr (m2, (ptr', ptrs')))) =>
+             malloc_bytes_post_conditions m1 init_bytes prov m2 ptr ptrs /\ ptr = ptr' /\ ptrs = ptrs'
+         end.
 
   Definition malloc_bytes_spec_MemPropT (init_bytes : list SByte)
     : MemPropT MemState addr
     := prov <- fresh_provenance;;
-       '(ptr, _) <- malloc_bytes_spec_MemPropT' init_bytes prov;;
+       '(ptr, ptrs) <- find_free_block (length init_bytes) prov;;
+       malloc_bytes_post_conditions_MemPropT init_bytes prov ptr ptrs;;
        ret ptr.
 
   (*** Freeing heap allocations *)
@@ -2094,16 +2107,302 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     Definition exec_correct_memory {MemM Eff ExtraState} `{MM: MemMonad ExtraState MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT memory_stack X) : Prop :=
       exec_correct exec (lift_memory_MemPropT spec).
 
-    Lemma exec_correct_lift_memory :
+    Lemma exec_correct_bind :
       forall {MemM Eff ExtraState} `{MemMonad ExtraState MemM (itree Eff)}
-        {X} (exec : MemM X)  (spec : MemPropT memory_stack X),
-        exec_correct_memory exec spec ->
-        exec_correct exec (lift_memory_MemPropT spec).
+        {A B}
+        (m_exec : MemM A) (k_exec : A -> MemM B)
+        (m_spec : MemPropT MemState A) (k_spec : A -> MemPropT MemState B),
+        exec_correct m_exec m_spec ->
+        (forall a, exec_correct (k_exec a) (k_spec a)) ->
+        exec_correct (a <- m_exec;; k_exec a) (a <- m_spec;; k_spec a).
     Proof.
-      intros * EXEC.
-      unfold exec_correct_memory in EXEC.
+      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM MemMonad
+             A B m_exec k_exec m_spec
+             k_spec HM HK.
+
+      unfold exec_correct in *.
+      intros ms st VALID.
+
+      pose proof (HM ms st VALID) as [[ubm UBM] | NUBM].
+      { (* m raised UB *)
+        left.
+        exists ubm.
+        repeat eexists; cbn; eauto.
+      }
+
+      (* m did not raise UB *)
+      destruct NUBM as [ERROR [OOM SUCC]].
+      right.
+
+      split; [|split].
+      { (* Error *)
+        intros msg RUN.
+        eexists.
+
+        rewrite MemMonad_run_bind in RUN.
+
+        (* I think I need some kind of inversion lemma about this *)
+        (* What about divergence? *)
+        (* Oh, it can't diverge because it's eutt error *)
+        Unset Printing Notations.
+        Set Printing Implicit.
+
+        epose proof (@MFails_bind_inv (itree Eff) _ _ ITreeErrorMonadReturns (ExtraState * (MemState * A)) (ExtraState * (MemState * B)) (MemMonad_run m_exec ms st) (fun x0 => (let (st', y) := x0 in let (ms', x) := y in MemMonad_run (k_exec x) ms' st'))) as FAILINV.
+
+        forward FAILINV.
+        { unfold MFails.
+          cbn.
+          red.
+          eexists.
+          do 2 red in RUN.
+          cbn in RUN. 
+        }
+        admit.
+
+        destruct FAILINV.
+        + admit.
+        +
+
+        admit.
+      }
+      admit.
+      admit.
+    Admitted.
+
+    Lemma exec_correct_ret :
+      forall {X} (x : X),
+        exec_correct (ret x) (ret x).
+    Proof.
+      intros X x.
+      cbn; red; cbn.
+      intros ms st VALID.
+      right.
+      setoid_rewrite MemMonad_run_ret.
+      split; [|split].
+      + (* Error *)
+        intros msg CONTRA.
+        exists ""%string.
+        apply MemMonad_eq1_raise_error_inv in CONTRA; auto.
+      + (* OOM *)
+        intros msg CONTRA.
+        exists ""%string.
+        apply MemMonad_eq1_raise_oom_inv in CONTRA; auto.
+      + (* Success *)
+        intros st' ms' x' RUN.
+        apply eq1_ret_ret in RUN; [|typeclasses eauto].
+        inv RUN; cbn; auto.
+
+        Unshelve.
+        all: exact ""%string.
+    Qed.
+
+    Lemma exec_correct_map_monad :
+      forall {A B}
+        xs
+        (m_exec : A -> MemM B) (m_spec : A -> MemPropT MemState B),
+        (forall a, exec_correct (m_exec a) (m_spec a)) ->
+        exec_correct (map_monad m_exec xs) (map_monad m_spec xs).
+    Proof.
+      induction xs;
+        intros m_exec m_spec HM.
+
+      - unfold map_monad.
+        apply exec_correct_ret.
+      - rewrite map_monad_unfold.
+        rewrite map_monad_unfold.
+
+        eapply exec_correct_bind; eauto.
+        intros a0.
+
+        eapply exec_correct_bind; eauto.
+        intros a1.
+
+        apply exec_correct_ret.
+    Qed.
+
+    Lemma exec_correct_map_monad_ :
+      forall {A B}
+        (xs : list A)
+        (m_exec : A -> MemM B) (m_spec : A -> MemPropT MemState B),
+        (forall a, exec_correct (m_exec a) (m_spec a)) ->
+        exec_correct (map_monad_ m_exec xs) (map_monad_ m_spec xs).
+    Proof.
+      intros A B xs m_exec m_spec H.
+      apply exec_correct_bind.
+      eapply exec_correct_map_monad; auto.
+      intros a.
+      apply exec_correct_ret.
+    Qed.
+
+    Lemma exec_correct_map_monad_In :
+      forall {A B}
+        (xs : list A)
+        (m_exec : forall (x : A), In x xs -> MemM B) (m_spec : forall (x : A), In x xs -> MemPropT MemState B),
+      (forall a (IN : In a xs), exec_correct (m_exec a IN) (m_spec a IN)) ->
+      exec_correct (map_monad_In xs m_exec) (map_monad_In xs m_spec).
+    Proof.
+      induction xs; intros m_exec m_spec HM.
+      - unfold map_monad_In.
+        apply exec_correct_ret.
+      - rewrite map_monad_In_unfold.
+        rewrite map_monad_In_unfold.
+
+        eapply exec_correct_bind; eauto.
+        intros a0.
+
+        eapply exec_correct_bind; eauto.
+        intros a1.
+
+        apply exec_correct_ret.
+    Qed.
+
+    Lemma exec_correct_raise_oom :
+      forall {A} (msg : string),
+        exec_correct (raise_oom msg) (raise_oom msg : MemPropT MemState A).
+    Proof.
+      intros A msg.
+      cbn.
+      red.
+      intros ms st VALID.
+      cbn. right.
+      split; [|split].
+      { (* Error Case *)
+        intros msg_oom ERROR.
+        exists ""%string.
+        rewrite MemMonad_run_raise_oom in ERROR.
+        eapply MemMonad_eq1_raise_oom_raise_error_inv in ERROR; auto.
+      }
+      { (* OOM case *)
+        intros msg_oom OOM.
+        exists ""%string.
+        auto.
+      }
+      { (* Success *)
+        intros st' ms' x H.
+        symmetry in H.
+        rewrite MemMonad_run_raise_oom in H.
+        apply MemMonad_eq1_raise_oom_inv in H.
+        auto.
+      }
+    Qed.
+
+    Lemma exec_correct_raise_error :
+      forall {A} (msg1 msg2 : string),
+        exec_correct (raise_error msg1) (raise_error msg2 : MemPropT MemState A).
+    Proof.
+      intros A msg1 msg2.
+      cbn.
+      red.
+      intros ms st VALID.
+      cbn. right.
+      split; [|split].
+      { (* Error Case *)
+        intros msg ERR.
+        exists ""%string.
+        auto.
+      }
+      { (* OOM case *)
+        intros msg OOM.
+        exists ""%string.
+        rewrite MemMonad_run_raise_error in OOM.
+        eapply MemMonad_eq1_raise_error_raise_oom_inv in OOM; auto.
+      }
+      { (* Success *)
+        intros st' ms' x H.
+        symmetry in H.
+        rewrite MemMonad_run_raise_error in H.
+        apply MemMonad_eq1_raise_error_inv in H.
+        auto.
+      }
+    Qed.
+
+    Lemma exec_correct_raise_ub :
+      forall {A} (msg1 msg2 : string),
+        exec_correct (raise_ub msg1) (raise_ub msg2 : MemPropT MemState A).
+    Proof.
+      intros A msg.
+      cbn.
+      red.
+      intros ms st VALID.
+      cbn.
+      left.
+      exists ""%string.
       auto.
     Qed.
+
+    Lemma exec_correct_lift_OOM :
+      forall {A} (m : OOM A),
+        exec_correct (lift_OOM m) (lift_OOM m).
+    Proof.
+      intros A [NOOM | OOM].
+      - apply exec_correct_ret.
+      - apply exec_correct_raise_oom.
+    Qed.
+
+    Lemma exec_correct_lift_err_RAISE_ERROR :
+      forall {A} (m : err A),
+        exec_correct (lift_err_RAISE_ERROR m) (lift_err_RAISE_ERROR m).
+    Proof.
+      intros A [ERR | NOERR].
+      - apply exec_correct_raise_error.
+      - apply exec_correct_ret.
+    Qed.
+
+    Lemma exec_correct_lift_ERR_RAISE_ERROR :
+      forall {A} (m : ERR A),
+        exec_correct (lift_ERR_RAISE_ERROR m) (lift_ERR_RAISE_ERROR m).
+    Proof.
+      intros A [[ERR] | NOERR].
+      - apply exec_correct_raise_error.
+      - apply exec_correct_ret.
+    Qed.
+
+    Lemma exec_correct_get_consecutive_pointers :
+      forall len ptr,
+        exec_correct (get_consecutive_ptrs ptr len) (get_consecutive_ptrs ptr len).
+    Proof.
+      intros len ptr.
+      unfold get_consecutive_ptrs.
+      eapply exec_correct_bind.
+      apply exec_correct_lift_OOM.
+
+      intros a.
+      apply exec_correct_lift_err_RAISE_ERROR.
+    Qed.
+
+    Lemma exec_correct_fresh_sid :
+      exec_correct fresh_sid fresh_sid.
+    Proof.
+      red.
+      intros ms st H.
+      right.
+      eapply MemMonad_run_fresh_sid in H as [st' [sid [EUTT [VALID FRESH]]]].
+      split; [| split].
+      { intros msg ERR.
+        exfalso.
+        rewrite EUTT in ERR.
+        apply MemMonad_eq1_raise_error_inv in ERR; auto.
+      }
+      { intros msg OOM.
+        exfalso.
+        rewrite EUTT in OOM.
+        apply MemMonad_eq1_raise_oom_inv in OOM; auto.
+      }
+      { intros st'0 ms' x H.
+        rewrite EUTT in H.
+        apply eq1_ret_ret in H; try typeclasses eauto.
+        inv H.
+        cbn.
+        split; [| split; [| split; [| split; [| split; [| split]]]]];
+          try solve [red; reflexivity].
+        - unfold fresh_store_id. auto.
+        - unfold read_byte_preserved.
+          split; red; reflexivity.
+      }
+      Unshelve.
+      all: exact ""%string.
+    Qed.
+
 End MemoryExecMonad.
 
 Module MakeMemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP) <: MemoryExecMonad LP MP MMSP MMS.
@@ -3545,13 +3844,19 @@ Module Type MemoryModelInfiniteSpec (LP : LLVMParamsBig) (MP : MemoryParams LP) 
   Import MP.GEP.
   Import MP.BYTE_IMPL.
 
-  Parameter allocate_can_always_succeed :
-    forall (ms_init ms_fresh_pr : MemState) (t : dtyp) (init_bytes : list SByte) (pr : Provenance)
+  Parameter find_free_block_can_always_succeed :
+    forall (ms : MemState) (len : nat) (pr : Provenance),
+    exists ptr ptrs,
+      find_free_block len pr ms (ret (ms, (ptr, ptrs))).
+
+  Parameter allocate_bytes_post_conditions_can_always_be_satisfied :
+    forall (ms_init ms_fresh_pr : MemState) dt bytes pr ptr ptrs
       (FRESH_PR : (fresh_provenance ms_init (ret (ms_fresh_pr, pr))))
-      (BYTES_SIZE : sizeof_dtyp t = N.of_nat (length init_bytes))
-      (NON_VOID : t <> DTYPE_Void),
-    exists ms_final ptr ptrs,
-      allocate_bytes_succeeds_spec ms_fresh_pr t init_bytes pr ms_final ptr ptrs.
+      (FIND_FREE : find_free_block (length bytes) pr ms_fresh_pr (ret (ms_fresh_pr, (ptr, ptrs))))
+      (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length bytes))
+      (NON_VOID : dt <> DTYPE_Void),
+    exists ms_final,
+      allocate_bytes_post_conditions ms_fresh_pr dt bytes pr ms_final ptr ptrs.
 
 End MemoryModelInfiniteSpec.
 
@@ -3587,21 +3892,26 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
       allocate_bytes_spec_MemPropT dt bytes ms_init (ret (ms_final, ptr)).
   Proof.
     intros ms_init ms_fresh_pr dt bytes pr FRESH_PR BYTES_SIZE NON_VOID.
-    unfold allocate_bytes_spec_MemPropT, allocate_bytes_spec_MemPropT'.
+    unfold allocate_bytes_spec_MemPropT.
 
-    pose proof allocate_can_always_succeed
-         ms_init ms_fresh_pr dt bytes pr FRESH_PR BYTES_SIZE NON_VOID
-      as (ms_final & ptr & ptrs & ALLOC_SUCCESS).
+    pose proof find_free_block_can_always_succeed
+         ms_fresh_pr (length bytes) pr as (ptr & ptrs & FIND_FREE_SUCCESS).
 
-    exists ms_final, ptr.
+    pose proof allocate_bytes_post_conditions_can_always_be_satisfied ms_init ms_fresh_pr dt bytes pr ptr ptrs FRESH_PR FIND_FREE_SUCCESS BYTES_SIZE NON_VOID as (ms_final & ALLOC).
+
+    exists ms_final. exists ptr.
 
     (* Fresh provenance *)
-    cbn.
     exists ms_fresh_pr. exists pr.
     split; auto.
 
-    exists ms_final, (ptr, ptrs).
-    tauto.
+    (* Find free block *)
+    eexists. exists (ptr, ptrs).
+    split; eauto.
+
+    (* Post conditions *)
+    exists ms_final. exists (ptr, ptrs).
+    split; split; auto.
   Qed.
 
   (* TODO: should this be here? *)

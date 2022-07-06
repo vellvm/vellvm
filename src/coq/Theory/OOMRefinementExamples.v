@@ -223,7 +223,7 @@ Module Infinite.
         cbn.
         unfold bind_PropT.
 
-        (* was just ret r2... *)
+                               (* was just ret r2... *)
         exists (ITree.map (fun '(_, (_, x)) => x) (Ret (lenv, (stack, DVALUE_Addr addr)))).
         exists (fun dv => ret (lenv, stack, (genv, dv))).
         split; [|split].
@@ -567,8 +567,37 @@ Module Infinite.
                  | |- context [translate _ (ITree.bind _ _)] => setoid_rewrite translate_bind
                  end.
 
+        Ltac go_prime :=
+          repeat match goal with
+                 | |- context [interp_intrinsics (ITree.bind _ _)] => rewrite interp_intrinsics_bind
+                 | |- context [interp_global (ITree.bind _ _)] => rewrite interp_global_bind
+                 | |- context [interp_local_stack (ITree.bind _ _)] => rewrite interp_local_stack_bind
+                 (* | |- context [interp_memory (ITree.bind _ _)] => rewrite interp_memory_bind *)
+                 | |- context [interp_intrinsics (trigger _)] => rewrite interp_intrinsics_trigger; cbn; rewrite ?subevent_subevent
+                 | |- context [interp_intrinsics (ITree.trigger _)] => rewrite interp_intrinsics_trigger; cbn; rewrite ?subevent_subevent
+                 | |- context [interp_global (trigger _)] => rewrite interp_global_trigger; cbn; rewrite ?subevent_subevent
+                 | |- context [interp_global (ITree.trigger _)] => rewrite interp_global_trigger; cbn; rewrite ?subevent_subevent
+                 | |- context [interp_local_stack (trigger _)] => rewrite interp_local_stack_trigger; cbn; rewrite ?subevent_subevent
+                 | |- context [interp_local_stack (ITree.trigger _)] => rewrite interp_local_stack_trigger; cbn; rewrite ?subevent_subevent
+                 | |- context [ITree.bind (ITree.bind _ _) _] => rewrite bind_bind
+                 | |- context [interp_intrinsics (Ret _)] => rewrite interp_intrinsics_ret
+                 | |- context [interp_global (Ret _)] => rewrite interp_global_ret
+                 | |- context [interp_local_stack (Ret _)] => rewrite interp_local_stack_ret
+                 (* | |- context [interp_memory (Ret _)] => rewrite interp_memory_ret *)
+                 | |- context [ITree.bind (Ret _) _] => rewrite bind_ret_l
+                 | |- context [translate _ (Ret _)] => rewrite translate_ret
+                 | |- context [interp _ (trigger _)] => rewrite interp_trigger
+                 | |- context [interp _ (ITree.bind _ _)] => rewrite interp_bind
+                 | |- context [interp _ (Ret _)] => rewrite interp_ret
+                 | |- context [map _ (ret _)] => rewrite map_ret
+                 | |- context [ITree.map _ (Ret _)] => rewrite map_ret
+                 | |- context [translate _ (trigger _)] => rewrite translate_trigger; cbn; rewrite ?subevent_subevent
+                 | |- context [translate _ (ITree.trigger _)] => rewrite translate_trigger; cbn; rewrite ?subevent_subevent
+                 | |- context [translate _ (ITree.bind _ _)] => rewrite translate_bind
+                 end.
+
         unfold interp_instr_E_to_L0; cbn.
-        repeat (go_setoid; cbn).
+        repeat (go_setoid; cbn). (* This is sloooow *)
 
         setoid_rewrite bind_trigger.
 
@@ -678,26 +707,153 @@ Module Infinite.
     setoid_rewrite interp_global_ret in INTERP.
     setoid_rewrite interp_local_stack_ret in INTERP.
 
-    unfold interp_memory_prop in INTERP.
+    exists (Ret (m, (sid, (lenv, stack, (genv, DVALUE_I1 one))))).
+    split.
+    { exists (Ret (m, (sid, (lenv, stack, (genv, DVALUE_I1 one))))).
+      split.
+      unfold t_ret.
+      cbn.
+      go.
+      unfold interp_memory_prop.
+      admit.
+      unfold model_undef_h.
+      eapply interp_prop_ret_refine; eauto.
+    }
+    {
+      (* t' is the result of t_alloc *)
+      (* t' could in general be:
+
+         - OOM: OOM is a refinement of everything, so this is fine.
+         - Ret: Needs to return one, but it will if alloca succeeds
+         - UB:
+           + May not be possible
+         - ERR:
+           + Shouldn't actually be possible.
+       *)
+
+      (* Ruling out UB and ERR are the real problems now. *)
+      apply interp_prop_vis_inv in INTERP.
+      destruct INTERP as (ta & k_alloc & HANDLER & KSPEC).
+      destruct HANDLER as (sid' & ms_alloc & HANDLER).
+
+      cbn in HANDLER.
+      unfold my_handle_memory_prop in HANDLER.
+      unfold MemPropT_lift_PropT_fresh in HANDLER.
+
+      unfold memory_k_spec in *.
+      Transparent MMEP.MemSpec.allocate_dtyp_spec.
+
+      Ltac break_fresh_sid_in H :=
+        destruct H as [?ms [?fresh_sid [?FRESHSID H]]].
+
+      Ltac break_fresh_provenance_in H :=
+        destruct H as [?ms [?fresh_pr [?FRESHPR H]]].
+
+      destruct HANDLER as [[ubmsg UB] | [ALLOC_ERROR [ALLOC_OOM ALLOC]]].
+      - cbn in UB.
+        exfalso.
+        destruct UB as [[UB | UB] | UB]; auto.
+        + break_fresh_sid_in UB.
+          cbn in *.
+          destruct (MMEP.MemSpec.MemHelpers.generate_undef_bytes (DTYPE_I 64) fresh_sid).
+          * cbn in UB; destruct UB as [UB | UB]; auto; subst.
+            destruct UB as [ms' [bytes [[EQ1 EQ2] UB]]]; subst.
+            destruct UB as [UB | UB]; auto.
+
+            break_fresh_provenance_in UB.
+            destruct UB as [UB_NO_SUCCESS | UB_RAISE_UB].
+            -- eapply UB_NO_SUCCESS.
+               
+               unfold MMEP.MemSpec.allocate_bytes_succeeds_spec.
+               repeat eexists.
+            destruct UB as [sab 
+            
+        destruct UB as [[ubmsg' | UB] | UB].
+        contradiction.
+        admit.
+    }
+    split; auto.
+
+    unfold interp_memory_prop.
+    cbn.
+    go.
+
+    pose proof INTERP as INTERP_BACKUP.
     apply interp_prop_vis_inv in INTERP.
-
-    (* I seem to know very little about k_alloc *)
     destruct INTERP as (ta & k_alloc & HANDLER & KSPEC).
-    unfold memory_k_spec in KSPEC.
-
     destruct HANDLER as (sid' & ms_alloc & HANDLER).
 
     cbn in HANDLER.
     unfold my_handle_memory_prop in HANDLER.
     unfold MemPropT_lift_PropT_fresh in HANDLER.
 
+    unfold memory_k_spec in *.
+    destruct HANDLER as [[ubmsg UB] | [ALLOC_ERROR [ALLOC_OOM ALLOC]]].
+    - destruct UB as [UB | UB].
+      + unfold MMEP.MemSpec.allocate_dtyp_spec in *. admit.
+    destruct HANDLER as [[ubmsg UB] | [ALLOC_ERROR [ALLOC_OOM ALLOC]]].
+
+    (* If alloc is UB, then the ret is allowed... *)
+    (* If alloc is OOM, then t_pre should be OOM *)
+
+    (* &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& *)
+    
+    (* LEMMA *)
+    (* (* apply interp_prop_vis_inv in INTERP. *) *)
+
+    (* (* I seem to know very little about k_alloc *) *)
+    (* destruct INTERP as (ta & k_alloc & HANDLER & KSPEC). *)
+    (* unfold memory_k_spec in KSPEC. *)
+
+    (* destruct HANDLER as (sid' & ms_alloc & HANDLER). *)
+
+    (* cbn in HANDLER. *)
+    (* unfold my_handle_memory_prop in HANDLER. *)
+    (* unfold MemPropT_lift_PropT_fresh in HANDLER. *)
+
     destruct HANDLER as [[ubmsg UB] | [ALLOC_ERROR [ALLOC_OOM ALLOC]]].
     - (* t_alloc raises UB *)
-      admit.
+      admit. (* alloca shouldn't raise UB *)
+      (* ... Although, it can in the spec...? *)
     - (* t_alloc doesn't have UB *)
       (* In reality it's going to either OOM or succeed... *)
       (* Need some kind of lemma about that... *)
-      
+
+      exists t'. (* (ret (m, (sid, (lenv, stack, (genv, DVALUE_I1 one))))). *)
+      split.
+      + exists t_pre. (* (ret (m, (sid, (lenv, stack, (genv, DVALUE_I1 one))))). *)
+        split; auto.
+        cbn.
+        go.
+        unfold interp_memory_prop.
+        cbn.
+        red in UNDEF.
+
+        unfold UNDEF.
+        (* Pretending I can do rewrite... *)
+        assert (interp_prop
+                  (fun (T : Type)
+                     (e : (ExternalCallE +'
+                                            LLVMParamsBigIntptr.Events.IntrinsicE +'
+                                                                                     LLVMParamsBigIntptr.Events.MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T)
+                     (t : itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T) =>
+                     exists (sid'0 : store_id) (ms' : MMEP.MMSP.MemState),
+                       interp_memory_prop_h e sid m (ITree.map (fun x : T => (ms', (sid'0, x))) t))
+                  (@memory_k_spec ExternalCallE (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE))
+                  (local_env * Stack.stack * res_L1) RR_mem
+                  (Ret2 genv (lenv, stack) (DVALUE_I1 DynamicValues.Int1.one))
+                  (Ret2 genv (lenv, stack) (DVALUE_I1 DynamicValues.Int1.one))).
+        2: admit.
+
+        eapply interp_prop_ret_refine; eauto.
+        eauto.
+        cbn.
+        unfold model_undef_h.
+        eapply interp_prop_ret_refine; eauto.
+      + cbn.
+        red.
+        red in UNDEF.
+
       (* TODO: PLACEHOLDER *)
       destruct ALLOC_OOM as (oom1 & oom2 & ALLOC_OOM).
       forward ALLOC_OOM.

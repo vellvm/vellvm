@@ -3219,25 +3219,31 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     #[global] Opaque add_all_to_heap.
     #[global] Opaque next_memory_key.
 
+    Definition get_free_block `{MemMonad ExtraState MemM (itree Eff)} (len : nat) (pr : Provenance) : MemM (addr * list addr)%type :=
+      ms <- get_mem_state;;
+      let mem_stack := ms_memory_stack ms in
+      let addr := next_memory_key mem_stack in
+      let '(mkMemoryStack mem fs h) := ms_memory_stack ms in
+      let aid := provenance_to_allocation_id pr in
+      let ptr := (int_to_ptr addr (allocation_id_to_prov aid)) in
+      ptrs <- get_consecutive_ptrs ptr len;;
+      ret (ptr, ptrs).
+
     Definition allocate_bytes `{MemMonad ExtraState MemM (itree Eff)} (dt : dtyp) (init_bytes : list SByte) : MemM addr :=
+      pr <- fresh_provenance;;
+      let len := length init_bytes in
+      '(ptr, ptrs) <- get_free_block len pr;;
       match dtyp_eq_dec dt DTYPE_Void with
       | left _ => raise_ub "Allocation of type void"
       | _ =>
-          let len := length init_bytes in
           match N.eq_dec (sizeof_dtyp dt) (N.of_nat len) with
           | right _ => raise_ub "Sizeof dtyp doesn't match number of bytes for initialization in allocation."
           | _ =>
-              (* TODO: roll this into fresh provenance somehow? *)
-              pr <- fresh_provenance;;
-              sid <- fresh_sid;;
               ms <- get_mem_state;;
-              let mem_stack := ms_memory_stack ms in
-              let addr := next_memory_key mem_stack in
-              let '(mkMemoryStack mem fs h) := ms_memory_stack ms in
               let aid := provenance_to_allocation_id pr in
-              let ptr := (int_to_ptr addr (allocation_id_to_prov aid)) in
-              ptrs <- get_consecutive_ptrs ptr (length init_bytes);;
-              let mem' := add_all_index (map (fun b => (b, aid)) init_bytes) addr mem in
+              let mem_stack := ms_memory_stack ms in
+              let '(mkMemoryStack mem fs h) := ms_memory_stack ms in
+              let mem' := add_all_index (map (fun b => (b, aid)) init_bytes) (ptr_to_int ptr) mem in
               let mem_stack' := add_all_to_frame (mkMemoryStack mem' fs h) (map ptr_to_int ptrs) in
               ms' <- get_mem_state;;
               let pr' := MemState_get_provenance ms' in
@@ -3248,18 +3254,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     (** Heap allocation *)
     Definition malloc_bytes `{MemMonad ExtraState MemM (itree Eff)} (init_bytes : list SByte) : MemM addr :=
-      let len := length init_bytes in
-      (* TODO: roll this into fresh provenance somehow? *)
       pr <- fresh_provenance;;
-      sid <- fresh_sid;;
+      let len := length init_bytes in
+      '(ptr, ptrs) <- get_free_block len pr;;
       ms <- get_mem_state;;
-      let mem_stack := ms_memory_stack ms in
-      let addr := next_memory_key mem_stack in
-      let '(mkMemoryStack mem fs h) := ms_memory_stack ms in
       let aid := provenance_to_allocation_id pr in
-      let ptr := (int_to_ptr addr (allocation_id_to_prov aid)) in
-      ptrs <- get_consecutive_ptrs ptr (length init_bytes);;
-      let mem' := add_all_index (map (fun b => (b, aid)) init_bytes) addr mem in
+      let mem_stack := ms_memory_stack ms in
+      let '(mkMemoryStack mem fs h) := ms_memory_stack ms in
+      let mem' := add_all_index (map (fun b => (b, aid)) init_bytes) (ptr_to_int ptr) mem in
       let mem_stack' := add_all_to_heap (mkMemoryStack mem' fs h) (map ptr_to_int ptrs) in
       ms' <- get_mem_state;;
       let pr' := MemState_get_provenance ms' in
@@ -4599,6 +4601,163 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         all: exact ""%string.
     Qed.
 
+    (* TODO: move this? *)
+    Lemma get_consecutive_ptrs_inv :
+      forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M}
+        `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM} `{LAWS: @MonadLawsE M EQM HM}
+        `{RAISE : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+        (ptr : addr) (len : nat),
+        (exists msg, @get_consecutive_ptrs M HM OOM ERR ptr len ≈ raise_oom msg) \/
+          (exists ptrs, @get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs).
+    Proof.
+      intros M HM OOM ERR EQM EQV LAWS RAISE ptr len.
+      unfold get_consecutive_ptrs.
+      destruct (intptr_seq 0 len) eqn:HSEQ.
+      - right.
+
+        pose proof (map_monad_err_succeeds
+                      (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) as HMAPM.
+        forward HMAPM.
+        { intros a IN.
+          eexists; eapply handle_gep_addr_ix'.
+          reflexivity.
+        }
+
+        destruct HMAPM as (ptrs & HMAPM).
+        exists ptrs.
+        cbn.
+        rewrite bind_ret_l.
+        rewrite HMAPM.
+        reflexivity.
+      - left.
+        exists s.
+        cbn.
+        rewrite rbm_raise_bind; [reflexivity|eauto].
+    Qed.
+
+    (* TODO: move this? *)
+    Lemma MemMonad_run_get_consecutive_ptrs:
+      forall {ExtraState : Type} {M RunM : Type -> Type} {MM : Monad M} {MRun : Monad RunM}
+        {MPROV : MonadProvenance Provenance M} {MSID : MonadStoreId M} {MMS : MonadMemState MemState M}
+        {MERR : RAISE_ERROR M} {MUB : RAISE_UB M} {MOOM : RAISE_OOM M} {RunERR : RAISE_ERROR RunM}
+        {RunUB : RAISE_UB RunM} {RunOOM : RAISE_OOM RunM} {MemMonad : MemMonad ExtraState M RunM}
+        `{EQV : @Eq1Equivalence RunM MRun (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM MemMonad)}
+        `{LAWS: @MonadLawsE RunM (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM MemMonad) MRun}
+        `{RAISEOOM : @RaiseBindM RunM MRun (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM MemMonad) string (@raise_oom RunM RunOOM)}
+        `{RAISEERR : @RaiseBindM RunM MRun (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM MemMonad) string (@raise_error RunM RunERR)}
+        {A : Type} (ms : MemState) ptr len (st : ExtraState),
+        (@eq1 RunM
+              (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM MemMonad)
+              (prod ExtraState (prod MemState (list addr)))
+              (@MemMonad_run
+           ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM MemMonad (list addr)
+           (@get_consecutive_ptrs M MM MOOM MERR ptr len) ms st)
+              (fmap (fun ptrs => (st, (ms, ptrs))) (@get_consecutive_ptrs RunM MRun RunOOM RunERR ptr len)))%monad.
+    Proof.
+      intros ExtraState0 M RunM MM0 MRun0 MPROV0 MSID0 MMS0 MERR0 MUB0 MOOM0 RunERR0 RunUB0 RunOOM0 MemMonad0 EQV
+             LAWS RAISE RAISEERR A ms ptr len st.
+
+      unfold get_consecutive_ptrs.
+      destruct (intptr_seq 0 len) as [NOOM_seq | OOM_seq] eqn:HSEQ.
+      - cbn.
+        rewrite MemMonad_run_bind.
+        rewrite MemMonad_run_ret.
+        unfold liftM.
+        repeat rewrite bind_ret_l.
+
+        destruct
+          (map_monad
+             (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix])
+             NOOM_seq) eqn:HMAPM.
+        + cbn.
+          rewrite MemMonad_run_raise_error.
+          rewrite rbm_raise_bind; eauto.
+          reflexivity.
+        + cbn.
+          rewrite MemMonad_run_ret.
+          rewrite bind_ret_l.
+          reflexivity.
+      - cbn.
+        rewrite MemMonad_run_bind.
+        unfold liftM.
+        rewrite MemMonad_run_raise_oom.
+        rewrite bind_bind.
+        rewrite rbm_raise_bind; eauto.
+        rewrite rbm_raise_bind; eauto.
+        reflexivity.
+    Qed.
+  
+    Lemma find_free_block_correct :
+      forall len pr,
+        exec_correct (get_free_block len pr) (find_free_block len pr).
+    Proof.
+      unfold exec_correct.
+      intros len pr ms st VALID.
+      cbn.
+      right.
+
+      (* remember (@MemMonad_run ExtraState MemM (itree Eff) MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB *)
+      (*                         RunOOM H (addr * list addr) *)
+      (*                         (@get_free_block MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM *)
+      (*                                          H len pr) ms st) as run eqn:EQRUN. *)
+
+      (* unfold get_free_block in *. *)
+      (* assert (run ≈ run) as RUN by reflexivity. *)
+      (* rewrite EQRUN in RUN at 2. *)
+      (* setoid_rewrite MemMonad_run_bind in RUN. *)
+      (* rewrite MemMonad_get_mem_state in RUN. *)
+      (* rewrite MemMonad_get_mem_state. in *. *)
+
+      split; [| split].
+      - (* Error *)
+        intros msg RUN.
+        unfold get_free_block in *.
+        rewrite MemMonad_run_bind in RUN.
+        rewrite MemMonad_get_mem_state in RUN.
+        rewrite bind_ret_l in RUN.
+        destruct ms.
+        cbn in RUN.
+        destruct ms_memory_stack0.
+        cbn in *.
+        rewrite MemMonad_run_bind in RUN.
+
+        match goal with
+        | RUN : context [@get_consecutive_ptrs ?MemM ?MM ?OOM ?ERR ?ptr ?len] |- _ =>
+            epose proof (@get_consecutive_ptrs_inv (itree Eff) MRun RunOOM RunERR (@MemMonad_eq1_runm ExtraState MemM (itree Eff) MM MRun MPROV MSID MMS MERR MUB MOOM RunERR
+             RunUB RunOOM H) _ _ _ ptr len)
+                  as [[oom_msg CONSEC_OOM] | [ptrs CONSEC_RET]]
+        end.
+
+        + (* setoid_rewrite MemMonad_run_get_consecutive_ptrs in RUN. *)
+          admit. (* inversion with RUN *)
+        + (* Ret inv... *)
+          admit.
+      - (* OOM *)
+        eexists; auto.
+      - (* Success *)
+        intros st' ms' x RUN.
+        unfold get_free_block in *.
+        rewrite MemMonad_run_bind in RUN.
+        rewrite MemMonad_get_mem_state in RUN.
+        rewrite bind_ret_l in RUN.
+        destruct ms.
+        cbn in RUN.
+        destruct ms_memory_stack0.
+        cbn in *.
+        rewrite MemMonad_run_bind in RUN.
+
+        match goal with
+        | RUN : context [@get_consecutive_ptrs ?MemM ?MM ?OOM ?ERR ?ptr ?len] |- _ =>
+            epose proof (@get_consecutive_ptrs_inv (itree Eff) MRun RunOOM RunERR (@MemMonad_eq1_runm ExtraState MemM (itree Eff) MM MRun MPROV MSID MMS MERR MUB MOOM RunERR
+             RunUB RunOOM H) _ _ _ ptr len)
+                  as [[oom_msg CONSEC_OOM] | [ptrs CONSEC_RET]]
+        end.
+
+        + (* OOM inversion in RUN *)
+          admit.
+        + admit.
+    Admitted.
+
     Lemma allocate_bytes_correct :
       forall dt init_bytes, exec_correct (allocate_bytes dt init_bytes) (allocate_bytes_spec_MemPropT dt init_bytes).
     Proof.
@@ -4655,8 +4814,19 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           - solve_frame_stack_preserved.
           - solve_heap_preserved.
         }
-        {
+        { pose proof find_free_block_correct (length init_bytes) pr'.
+          unfold exec_correct in H0.
+          specialize (H0 _ _ VALID).
+
+          right.
           repeat eexists.
+          admit.
+          cbn.
+          break_match.
+          right.
+          repeat eexists.
+          admit.
+          break_match.
           left. intros m2 ptr ptrs.
           intros SUCC.
           inversion SUCC.
