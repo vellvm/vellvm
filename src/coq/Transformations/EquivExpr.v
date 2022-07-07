@@ -443,11 +443,51 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
     Proof. Admitted.
 
     (* Induction on d  *)
+
+    Lemma uvalue_dvalue_to_uvalue_M : forall d M (MM:Monad M) D ERR_M err M_ERR_M RAISE_ERR r_ub r_oom,
+        @concretize_uvalueM M MM D ERR_M M_ERR_M RAISE_ERR r_ub r_oom err
+                            (dvalue_to_uvalue d) = ret d.
+    Proof.
+      intros.
+      induction d; simpl; rewrite concretize_uvalueM_equation; try reflexivity.
+      - 
+
+
+
+
+        destruct fields.
+        * simpl.
+          rewrite <- H.
+          +  simpl. rewrite concretize_uvalueM_equation. simpl. reflexivity.
+          + 
+          
   Lemma uvalue_dvalue_to_uvalue : forall (d : dvalue) d',
       concretize (dvalue_to_uvalue d) d' -> d = d'.
-  Proof. intros. induction d.
-         - 
+  Proof.
+    (* intros. induction d as [| | | | | | | | | | dlist IH | dlist IH | dlist IH | dlist Ih];  *)
+    (*        unfold concretize in H; unfold concretize_u in H; *)
+    (*        rewrite concretize_uvalueM_equation in H; *)
+    (*   simpl in H; inversion H; try reflexivity. *)
+    
 
+    intros. induction d as [| | | | | | | | | | dlist IH | dlist IH | dlist IH | dlist Ih]; unfold concretize in H; unfold concretize_u in H; rewrite concretize_uvalueM_equation in H; simpl in H; inversion H; try reflexivity.
+    - apply IH. unfold I
+    - 
+      assert (K : dvalue_to_uvalue (DVALUE_Addr a) = UVALUE_Addr a). {
+             reflexivity. }
+           rewrite K in H.
+           apply RefineProp.RefineProp_bind_ret_r in H. simpl in H.
+           destruct success_unERR_UB_OOM.           
+           
+           Check concretize_u.
+           unfold concretize_u in H.
+           
+
+           subst dvalue_to_uvalue (DVALUE_Addr a) with UVALUE_Addr a.
+
+           simpl in H. destruct success_unERR_UB_OOM.
+           Print success_unERR_UB_OOM.
+ Print concretize_u.
   Admitted.
   
   Lemma add_zero : forall b1 b2 (e:exp dtyp),
