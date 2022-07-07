@@ -468,17 +468,23 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
          eq1 (map_monad f (map g xs))
              (map_monad (fun x => f ( g x) ) xs).
       Proof.
-      Admitted.
+        intros. induction xs.
+        - simpl. reflexivity.
+        - simpl. destruct Laws_M.
+          setoid_rewrite IHxs.
+          reflexivity. Qed.
 
-      (* UNNEEDED? *)
+
       Lemma bind_f_assoc :
         forall A B C (a: A) (f : A -> M B) (g : B -> C),
         eq1 (bind (f a) (fun y => ret (g y)))
             (bind (bind (f a) ret) (fun y => ret (g y))).
       Proof.
-      Admitted.
-        
-      
+        intros. destruct Laws_M. rewrite bind_bind. setoid_rewrite bind_ret_l.
+        reflexivity.
+        Qed.
+
+             
       Lemma map_monad_cons :
         forall A B (f : A -> M B) (a:A) (xs:list A) (z : B) (zs : list B)
           (EQ2 : eq1 (bind (map_monad f xs) (fun ys => ret ys))
@@ -494,7 +500,27 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
           apply MonadEq1Laws.eq1_ret_ret in EQ2.
           subst. reflexivity.
           admit.
-       - 
+        - simpl. rewrite bind_bind. setoid_rewrite bind_bind.
+          setoid_rewrite bind_ret_l.
+
+          simpl in EQ2.
+          repeat setoid_rewrite bind_bind in EQ2.
+          setoid_rewrite bind_ret_l in EQ2. 
+          
+          
+
+          (* rewrite IHxs. *)
+
+            
+          (* Simpl. repeat setoid_rewrite bind_bind. apply IHxs.  *)
+
+
+          (* rewrite Monads.map_monad_unfold. *)
+
+          (* simpl. rewrite bind_bind. setoid_rewrite bind_bind. *)
+          (* simpl in EQ2. rewrite bind_bind in EQ2. setoid_rewrite bind_bind in EQ2. *)
+          
+          
        Admitted.
 
         
@@ -559,9 +585,9 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
          assert
          (eq1 (bind
               (map_monad (concretize_uvalueM M D ERR_M err)
-                 (map dvalue_to_uvalue fields)) ret)
-            (ret fields)).
-         { induction fields.
+                 (map dvalue_to_uvalue elts)) ret)
+            (ret elts)).
+         { induction elts.
            - simpl. rewrite bind_ret_l. reflexivity.
            - simpl. rewrite H.
              rewrite bind_ret_l.
@@ -569,14 +595,34 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
              setoid_rewrite bind_ret_l.
              apply map_monad_cons.
              exact (dvalue_to_uvalue a).
-             apply IHfields.
+             apply IHelts.
              intros. apply H. apply in_cons. assumption.
              apply in_eq.
          }
          rewrite H0.
          rewrite bind_ret_l. reflexivity.
-      
-
+       - destruct Laws_M.
+         rewrite bind_f_assoc.
+         assert
+         (eq1 (bind
+              (map_monad (concretize_uvalueM M D ERR_M err)
+                 (map dvalue_to_uvalue elts)) ret)
+            (ret elts)).
+         { induction elts.
+           - simpl. rewrite bind_ret_l. reflexivity.
+           - simpl. rewrite H.
+             rewrite bind_ret_l.
+             rewrite bind_bind.
+             setoid_rewrite bind_ret_l.
+             apply map_monad_cons.
+             exact (dvalue_to_uvalue a).
+             apply IHelts.
+             intros. apply H. apply in_cons. assumption.
+             apply in_eq.
+         }
+         rewrite H0.
+         rewrite bind_ret_l. reflexivity.
+Qed.
 
           
   Lemma uvalue_dvalue_to_uvalue : forall (d : dvalue) d',
@@ -589,23 +635,11 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
     
 
     intros. induction d as [| | | | | | | | | | dlist IH | dlist IH | dlist IH | dlist Ih]; unfold concretize in H; unfold concretize_u in H; rewrite concretize_uvalueM_equation in H; simpl in H; inversion H; try reflexivity.
-    - apply IH. unfold I
-    - 
-      assert (K : dvalue_to_uvalue (DVALUE_Addr a) = UVALUE_Addr a). {
-             reflexivity. }
-           rewrite K in H.
-           apply RefineProp.RefineProp_bind_ret_r in H. simpl in H.
-           destruct success_unERR_UB_OOM.           
-           
-           Check concretize_u.
-           unfold concretize_u in H.
-           
+    - apply IH.
+      
 
-           subst dvalue_to_uvalue (DVALUE_Addr a) with UVALUE_Addr a.
 
-           simpl in H. destruct success_unERR_UB_OOM.
-           Print success_unERR_UB_OOM.
- Print concretize_u.
+      
   Admitted.
   
   Lemma add_zero : forall b1 b2 (e:exp dtyp),
