@@ -36,6 +36,7 @@ From Vellvm Require Import
      Semantics.Memory.Sizeof
      Semantics.VellvmIntegers
      Utils.Monads
+     Utils.MapMonadExtra
      Utils.MonadEq1Laws
      Utils.MonadReturnsLaws
      QC.ShowAST.
@@ -895,6 +896,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | _ => failwith "Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen"
     end.
 
+  Lemma foo : (map_monad uvalue_to_dvalue ([] ++ [])) = ret [].
+  rewrite map_monad_app.
+  
   Lemma uvalue_to_dvalue_of_dvalue_to_uvalue :
     forall (d : dvalue),
       uvalue_to_dvalue (dvalue_to_uvalue d : uvalue) = inr d.
@@ -907,7 +911,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                  uvalue_to_dvalue (dvalue_to_uvalue u : uvalue) = inr u).
       intros. apply H. apply in_cons; auto. specialize (IHfields H0).
       clear H0. rewrite map_cons. rewrite list_cons_app.
-      rewrite map_monad_app. cbn.
+      rewrite (map_monad_app). cbn.
       destruct (map_monad uvalue_to_dvalue (map dvalue_to_uvalue fields)) eqn: EQ.
       + discriminate IHfields.
       + rewrite H. cbn. inversion IHfields. reflexivity.

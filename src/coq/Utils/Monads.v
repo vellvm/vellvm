@@ -80,61 +80,6 @@ Arguments sequence {_ _ _}.
 Arguments foldM {_ _ _ _}.
 
 
-Lemma map_monad_app
-      {m : Type -> Type}
-      {Mm : Monad m}
-      {EqMm : Eq1 m}
-      {HEQP: Eq1Equivalence m}
-      {ML: MonadLawsE m}
-      {A B} (f:A -> m B) (l0 l1:list A):
-  map_monad f (l0++l1) ≈
-  bs1 <- map_monad f l0;;
-  bs2 <- map_monad f l1;;
-  ret (bs1 ++ bs2).
-Proof.
-  induction l0 as [| a l0 IH]; simpl; intros.
-  - cbn; rewrite bind_ret_l, bind_ret_r.
-    reflexivity.
-  - cbn.
-    setoid_rewrite IH.
-    repeat setoid_rewrite bind_bind.
-    setoid_rewrite bind_ret_l.
-    reflexivity.
-Qed.
-
-
-Lemma map_monad_unfold :
-  forall {A B : Type} {M : Type -> Type} {H : Monad M} (x : A) (xs : list A)
-    (f : A -> M B),
-    map_monad f (x :: xs) =
-    b <- f x;;
-    bs <- map_monad (fun (x0 : A) => f x0) xs;;
-    ret (b :: bs).
-Proof.
-  intros A B M H x xs f.
-  induction xs; cbn; auto.
-Qed.
-
-Lemma map_monad_In {m : Type -> Type} {H : Monad m} {A B} (l : list A) (f: forall (x : A), In x l -> m B) : m (list B).
-Proof.
-  induction l.
-  - exact (ret []).
-  - refine (b <- f a _;; bs <- IHl _;; ret (b::bs)).
-    + cbn; auto.
-    + intros x Hin.
-      apply (f x).
-      cbn; auto.
-Defined.
-
-Lemma map_monad_In_unfold :
-  forall {A B M} `{Monad M} (x : A) (xs : list A) (f : forall (elt:A), In elt (x::xs) -> M B),
-    map_monad_In (x::xs) f = b <- f x (or_introl eq_refl);;
-                            bs <- map_monad_In xs (fun x HIn => f x (or_intror HIn));;
-                            ret (b :: bs).
-Proof.
-  intros A B M H x xs f.
-  induction xs; cbn; auto.
-Qed.
 
 #[global]
 Instance EqM_sum {E} : Monad.Eq1 (sum E) :=
