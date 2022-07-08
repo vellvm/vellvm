@@ -19,6 +19,7 @@ From ITree Require Import
 
 From Vellvm Require Import
      Utilities
+     Utils.MapMonadExtra
      Syntax
      Semantics
      Theory
@@ -423,6 +424,11 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
 
   (*  *)
 
+  Import Monads.
+  Import Monad.
+  Import MonadNotation.
+  Open Scope monad_scope.
+  Open Scope monad.
 
   (* Define an appropriate notion of equivalence of expressions after interpretation at level 2 *)
   Definition eq_l2 (t:dtyp) (exp1 : exp dtyp)  (exp2 : exp dtyp) : Prop :=
@@ -440,24 +446,26 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
   (* Induction on u *)
   Lemma uvalue_poison_cases : forall u, exists dt, 
       (concretize u (DVALUE_Poison dt)) \/ (~ concretize u (DVALUE_Poison dt)).
-    Proof. Admitted.
+  Proof. Admitted.
+    
+  Section MonadContext.
 
-    Section MonadContext.
+    Context (M: Type -> Type).
+    Context {MM: Monad M}.
+    Context {EQM : Monad.Eq1 M}.
+    Context {EE : Eq1Equivalence M}.
+    Context {Laws_M : MonadLawsE M}.
+    Context {EQM_Laws_M  : MonadEq1Laws.Eq1_ret_inv M}.
+    Context (D : dtyp -> M dvalue).
+    Context (ERR_M : Type -> Type).
+    Context (err : forall A : Type, ERR_M A -> M A).
+    Context {M_ERR_M : Monad ERR_M}.
+    Context {RAISE_ERR : RAISE_ERROR ERR_M}.
+    Context (r_ub : RAISE_UB ERR_M).
+    Context (r_oom : RAISE_OOM ERR_M).
 
-      Context (M: Type -> Type).
-      Context {MM: Monad M}.
-      Context {EQM : Eq1 M}.
-      Context {EE : forall A, Equivalence (@eq1 M EQM A)}.
-      Context {Laws_M : MonadLawsE M}.
-       Context {EQM_Laws_M  : MonadEq1Laws.Eq1_ret_inv M}.
-      Context (D : dtyp -> M dvalue).
-      Context (ERR_M : Type -> Type).
-      Context (err : forall A : Type, ERR_M A -> M A).
-      Context {M_ERR_M : Monad ERR_M}.
-      Context {RAISE_ERR : RAISE_ERROR ERR_M}.
-      Context (r_ub : RAISE_UB ERR_M).
-      Context (r_oom : RAISE_OOM ERR_M).
-
+    Existing Instance EQM.
+    Existing Instance EQM_Laws_M.
       
       (* Induction on d  *)
 
@@ -470,25 +478,23 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
     Proof.
       intros.
       induction d; simpl; rewrite concretize_uvalueM_equation; try reflexivity.
-      - rewrite map_monad_map;
+      - rewrite map_monad_map.
         apply map_monad_g;
-        destruct Laws_M;
-        induction fields; simpl. 
+        induction fields; simpl; auto.
        + rewrite bind_ret_l. 
          reflexivity.
        + rewrite H. 
           rewrite bind_ret_l. 
           rewrite bind_bind. 
-          setoid_rewrite bind_ret_l. 
-          apply map_monad_cons. 
+          setoid_rewrite bind_ret_l.
+          apply map_monad_cons_ret.
           exact a. 
           apply IHfields. 
           intros. apply H. apply in_cons. assumption.
           apply in_eq. 
 
        (* TODO: automate this *) 
-      - destruct Laws_M.
-        rewrite map_monad_map;
+      -  rewrite map_monad_map;
           apply map_monad_g;
           induction fields; simpl.
         + rewrite bind_ret_l.
@@ -497,7 +503,7 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
           rewrite bind_ret_l. 
           rewrite bind_bind. 
           setoid_rewrite bind_ret_l. 
-          apply map_monad_cons. 
+          apply map_monad_cons_ret. 
           exact a. 
           apply IHfields. 
           intros. apply H. apply in_cons. assumption.
@@ -514,7 +520,7 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
           rewrite bind_ret_l. 
           rewrite bind_bind. 
           setoid_rewrite bind_ret_l. 
-          apply map_monad_cons. 
+          apply map_monad_cons_ret. 
           exact a. 
           apply IHelts. 
           intros. apply H. apply in_cons. assumption.
@@ -531,7 +537,7 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
           rewrite bind_ret_l. 
           rewrite bind_bind. 
           setoid_rewrite bind_ret_l. 
-          apply map_monad_cons. 
+          apply map_monad_cons_ret. 
           exact a. 
           apply IHelts. 
           intros. apply H. apply in_cons. assumption.
@@ -567,8 +573,10 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
   Proof.
     unfold eq_l2.
     intros.
-    cbn.
+    cbn. (* SAZ: Something about the new monad stuff broke the automation. *)
+(*
     norm.
+    cbn. 
     bind_ret_r2.          (* <- note how this adds a "ret" on the right *)
     eapply eutt_clo_bind.  (* <- this is the key lemma!! *)
     reflexivity.
@@ -581,7 +589,7 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
     unfold uvalue_eq.
     split.
     - 
-    (* TODO: Need some facts about [refine_uvalue]. *)
+    (* TODO: Need some facts about [refine_uvalue]. *) *)
   Abort.
 
   

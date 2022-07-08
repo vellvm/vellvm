@@ -20,6 +20,7 @@ From Vellvm Require Import
      Theory.ContainsUB
      Utils.Error
      Utils.Monads
+     Utils.MapMonadExtra
      Utils.PropT
      Utils.ListUtil
      Handlers.MemoryModelImplementation.

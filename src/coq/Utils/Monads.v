@@ -81,18 +81,18 @@ Arguments foldM {_ _ _ _}.
 
 
 
-#[global]
-Instance EqM_sum {E} : Monad.Eq1 (sum E) :=
+
+Global Instance EqM_sum {E} : Monad.Eq1 (sum E) :=
   fun (a : Type) (x y : sum E a) => x = y.
 
-#[global]
-Instance EqMProps_sum {E} : Monad.Eq1Equivalence (sum E).
+
+Global Instance EqMProps_sum {E} : Monad.Eq1Equivalence (sum E).
 constructor; intuition.
 repeat intro. etransitivity; eauto.
 Defined.
 
-#[global]
-Instance MonadLaws_sum {T} : Monad.MonadLawsE (sum T).
+
+Global Instance MonadLaws_sum {T} : Monad.MonadLawsE (sum T).
   constructor.
   - intros. repeat red. cbn. auto.
   - intros. repeat red. cbn. destruct x eqn: Hx; auto.
@@ -102,12 +102,12 @@ Instance MonadLaws_sum {T} : Monad.MonadLawsE (sum T).
     repeat red in H0. destruct y; auto.
 Qed.
 
-#[global]
-Instance EqM_eitherT {E} {M} `{Monad.Eq1 M} : Monad.Eq1 (eitherT E M)
+
+Global Instance EqM_eitherT {E} {M} `{Monad.Eq1 M} : Monad.Eq1 (eitherT E M)
   := fun (a : Type) x y => Monad.eq1 (unEitherT x) (unEitherT y).
 
-#[global]
-Instance Eq1Equivalence_eitherT :
+
+Global Instance Eq1Equivalence_eitherT :
   forall {M : Type -> Type} {H : Monad M} {H0 : Monad.Eq1 M} E,
     Monad.Eq1Equivalence M -> Monad.Eq1Equivalence (eitherT E M).
 Proof.
@@ -123,12 +123,12 @@ Proof.
 Qed.
 
 (* TODO: move this *)
-#[global]
-Instance Eq1_ident : Monad.Eq1 IdentityMonad.ident
+
+Global Instance Eq1_ident : Monad.Eq1 IdentityMonad.ident
   := {eq1 := fun A => Logic.eq}.
 
-#[global]
-Instance Eq1Equivalence_ident : Monad.Eq1Equivalence IdentityMonad.ident.
+
+Global Instance Eq1Equivalence_ident : Monad.Eq1Equivalence IdentityMonad.ident.
 Proof.
   split; red.
   - intros x.
@@ -141,8 +141,8 @@ Proof.
     reflexivity.
 Defined.
 
-#[global]
-Instance MonadLawsE_ident : Monad.MonadLawsE IdentityMonad.ident.
+
+Global Instance MonadLawsE_ident : Monad.MonadLawsE IdentityMonad.ident.
 Proof.
   split; intros *.
   - reflexivity.
@@ -167,8 +167,8 @@ Proof.
   destruct ma; reflexivity.
 Qed.
 
-#[global]
-Instance MonadLaws_eitherT {E} {M} `{HM : Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM} `{@Monad.MonadLawsE M EQM _} : Monad.MonadLawsE (eitherT E M).
+
+Global Instance MonadLaws_eitherT {E} {M} `{HM : Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM} `{@Monad.MonadLawsE M EQM _} : Monad.MonadLawsE (eitherT E M).
 Proof.
   split; intros *.
   - cbn.
@@ -237,8 +237,8 @@ Proof.
     reflexivity.
 Defined.
 
-#[global]
-Existing Instance MonadState.MonadLawsE_stateTM.
+
+Global Existing Instance MonadState.MonadLawsE_stateTM.
 
 
 

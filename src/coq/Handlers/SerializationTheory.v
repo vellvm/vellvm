@@ -11,6 +11,7 @@ From Vellvm Require Import
      Utils.Error
      Utils.RefineProp
      Utils.Monads
+     Utils.MapMonadExtra
      Handlers.MemoryModelImplementation
      Handlers.Serialization
      Semantics.LLVMEvents

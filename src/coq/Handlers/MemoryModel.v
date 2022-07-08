@@ -23,6 +23,7 @@ From Vellvm.Utils Require Import
      Tactics
      Raise
      Monads
+     MapMonadExtra
      MonadReturnsLaws
      MonadEq1Laws
      MonadExcLaws.

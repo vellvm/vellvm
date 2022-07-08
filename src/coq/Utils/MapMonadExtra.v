@@ -327,10 +327,6 @@ Proof.
   
 Admitted.  
 
-
-Check @map_monad.
-
-
 Lemma map_monad_cons
       {A B} (f:A -> M B) (x:A) (l:list A) :
   (map_monad f (x::l)) ≈
@@ -389,6 +385,15 @@ Lemma map_monad_In_inv :
 Proof.
 Admitted.
 
-
-
 End MonadContext.
+Arguments map_monad_In {_ _ _ _}.
+Arguments map_monad_In_unfold {_ _ _ _}.
+Arguments map_monad_length {_ _ _ _ _ _ _ _}.
+Arguments map_monad_app {_ _ _ _ _ _ _}.
+Arguments map_monad_err_In' {_ _ _ _ _ _ _ _ _}.
+Arguments map_monad_cons_ret {_ _ _ _ _ _ _}.
+Arguments map_monad_cons_ret {_ _ _ _ _ _ _}.          
+Arguments map_monad_map {_ _ _ _ _ _ _ _}.
+Arguments map_monad_g {_ _ _ _ _ _ _ _}.
+
+
