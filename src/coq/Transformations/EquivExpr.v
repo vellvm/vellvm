@@ -444,13 +444,13 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
 
     Section MonadContext.
 
-      
+      Search eq1.
       Context (M: Type -> Type).
       Context {MM: Monad M}.
       Context {EQM : Eq1 M}.
       Context {EE : forall A, Equivalence (@eq1 M EQM A)}.
       Context {Laws_M : MonadLawsE M}.
-(*       Context {EQM_Laws_M  : MonadEq1Laws M EQM} *)
+       Context {EQM_Laws_M  : MonadEq1Laws.Eq1_ret_inv M}.
       Context (D : dtyp -> M dvalue).
       Context (ERR_M : Type -> Type).
       Context (err : forall A : Type, ERR_M A -> M A).
@@ -468,7 +468,13 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
          eq1 (map_monad f (map g xs))
              (map_monad (fun x => f ( g x) ) xs).
       Proof.
-      Admitted.
+        intros. induction xs.
+        - simpl. reflexivity.
+        - simpl. destruct Laws_M.
+          setoid_rewrite IHxs.
+          reflexivity. Qed.
+
+
 
       Lemma bind_helper :
         forall A B (m : M A) (f : A -> M B), 
@@ -495,6 +501,17 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
         reflexivity.
       Qed.
           
+
+      Lemma bind_f_assoc :
+        forall A B C (a: A) (f : A -> M B) (g : B -> C),
+        eq1 (bind (f a) (fun y => ret (g y)))
+            (bind (bind (f a) ret) (fun y => ret (g y))).
+      Proof.
+        intros. destruct Laws_M. rewrite bind_bind. setoid_rewrite bind_ret_l.
+        reflexivity.
+        Qed.
+             
+
       Lemma map_monad_cons :
         forall A B (f : A -> M B) (a:A) (xs:list A) (z : B) (zs : list B)
           (EQ2 : eq1 (bind (map_monad f xs) (fun ys => ret ys))
@@ -510,6 +527,37 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
         reflexivity.
       Qed.
 
+        destruct Laws_M.
+        induction xs.
+        - simpl.  rewrite bind_ret_l.
+          simpl in EQ2. rewrite bind_ret_l in EQ2.
+          apply MonadEq1Laws.eq1_ret_ret in EQ2.
+          subst. reflexivity.
+          apply EQM_Laws_M.
+        - simpl. rewrite bind_bind. setoid_rewrite bind_bind.
+          setoid_rewrite bind_ret_l.
+          simpl in EQ2.
+          repeat setoid_rewrite bind_bind in EQ2.
+          setoid_rewrite bind_ret_l in EQ2.
+          admit.
+          
+          
+
+          (* rewrite IHxs. *)
+
+            
+          (* Simpl. repeat setoid_rewrite bind_bind. apply IHxs.  *)
+
+
+          (* rewrite Monads.map_monad_unfold. *)
+
+          (* simpl. rewrite bind_bind. setoid_rewrite bind_bind. *)
+          (* simpl in EQ2. rewrite bind_bind in EQ2. setoid_rewrite bind_bind in EQ2. *)
+          
+          
+       Admitted.
+
+        
       (* more general form of the two above; do we need those two? *) 
       Lemma map_monad_g :
         forall A B C (f : A -> M B) (g : list B -> C) (xs:list A) (zs : list B)
@@ -647,7 +695,32 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
          }
          rewrite H0.
          rewrite bind_ret_l. reflexivity.
+
       Admitted.  *) 
+
+
+       - destruct Laws_M.
+         rewrite bind_f_assoc.
+         assert
+         (eq1 (bind
+              (map_monad (concretize_uvalueM M D ERR_M err)
+                 (map dvalue_to_uvalue elts)) ret)
+            (ret elts)).
+         { induction elts.
+           - simpl. rewrite bind_ret_l. reflexivity.
+           - simpl. rewrite H.
+             rewrite bind_ret_l.
+             rewrite bind_bind.
+             setoid_rewrite bind_ret_l.
+             apply map_monad_cons.
+             exact (dvalue_to_uvalue a).
+             apply IHelts.
+             intros. apply H. apply in_cons. assumption.
+             apply in_eq.
+         }
+         rewrite H0.
+         rewrite bind_ret_l. reflexivity.
+Qed.
 
 
           
@@ -655,6 +728,7 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
       concretize (dvalue_to_uvalue d) d' -> d = d'.
   Proof.
 
+<<<<<<< HEAD
     (* clean attempt *) 
     intros. induction d.
     - admit.
