@@ -338,19 +338,20 @@ Lemma map_monad_cons
   bs2 <- map_monad f l;;
   ret (b :: bs2).
 Proof.
-  (* TODO - easy? *)
-  intros. simpl. reflexivity. Qed.
+  intros. reflexivity. Qed. 
 
 Lemma map_monad_nil 
       {A B} (f:A -> M B) :
   (map_monad f []) ≈ ret [].
 Proof.
   intros. reflexivity. Qed.
-  (* TODO - very easy *)
 
 Lemma sequence : forall {A} (l : list A),
       sequence (map ret l) ≈ ret l.
-Proof.
+Proof. intros. induction l.
+       - simpl. reflexivity. 
+       - rewrite map_cons. 
+
 Admitted.  
 
 Lemma map_monad_ret_l : forall {A} (l : list A),
