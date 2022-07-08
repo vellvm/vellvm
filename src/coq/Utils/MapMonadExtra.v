@@ -324,7 +324,7 @@ Lemma map_monad_commutative_maps :
     map_monad (fun x => y <- (g x) ;; f y) xs.
 Proof.
   (* Is this true? *)
-  
+  intros. destruct LAWS.
 Admitted.  
 
 Lemma map_monad_cons
@@ -334,32 +334,37 @@ Lemma map_monad_cons
   bs2 <- map_monad f l;;
   ret (b :: bs2).
 Proof.
-  (* TODO - easy? *)
-Admitted.
+  intros. reflexivity. Qed. 
 
 Lemma map_monad_nil 
       {A B} (f:A -> M B) :
   (map_monad f []) ≈ ret [].
 Proof.
-  (* TODO - very easy *)
-Admitted.  
+  intros. reflexivity. Qed.
 
 Lemma sequence : forall {A} (l : list A),
       sequence (map ret l) ≈ ret l.
-Proof.
+Proof. intros. induction l.
+       - simpl. reflexivity. 
+       - rewrite map_cons. 
+
 Admitted.  
 
 Lemma map_monad_ret_l : forall {A} (l : list A),
     map_monad ret l ≈ ret l.
 Proof.
-Admitted.  
+  intros. destruct LAWS.
+  induction l.
+  - apply map_monad_nil.
+  - rewrite map_monad_cons.
+    rewrite bind_ret_l. rewrite IHl. rewrite bind_ret_l. reflexivity. Qed.
 
 Lemma map_monad_ret_nil_inv :
   forall {A B} (f : A -> M B) (l : list A)
   (HRet : MReturns [] (map_monad f l)),
   l = [].
 Proof.
-Admitted.  
+  Admitted.
 
 Lemma map_monad_ret_nil_inv_pure :
   forall {A B} (f : A -> M B) (l : list A)
