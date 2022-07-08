@@ -444,7 +444,6 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
 
     Section MonadContext.
 
-      Search eq1.
       Context (M: Type -> Type).
       Context {MM: Monad M}.
       Context {EQM : Eq1 M}.
@@ -458,7 +457,6 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
       Context {RAISE_ERR : RAISE_ERROR ERR_M}.
       Context (r_ub : RAISE_UB ERR_M).
       Context (r_oom : RAISE_OOM ERR_M).
-
 
       Lemma map_monad_map :
         forall A B C 
@@ -475,6 +473,33 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
           reflexivity.
       Qed.
 
+
+      Lemma bind_helper :
+        forall A B (m : M A) (f : A -> M B), 
+          eq1 (bind m f)  ((bind (bind m ret) f)).
+      Proof.
+        intros.
+        destruct Laws_M.
+        rewrite bind_ret_r.
+        reflexivity.
+      Qed.
+          
+      Lemma map_monad_append :
+        forall A B (f : A -> M B) (xs:list A) (ws : list B) (zs : list B)
+          (EQ2 : eq1 (bind (map_monad f xs) (fun ys => ret ys))
+                   (ret (zs))),
+          eq1 (bind (map_monad f xs) (fun ys => ret (ws ++ ys)%list))
+            (ret ((ws ++ zs)%list)).
+      Proof.
+        destruct Laws_M.        
+        intros.
+        rewrite bind_helper.
+        rewrite EQ2.
+        rewrite bind_ret_l.
+        reflexivity.
+      Qed.
+          
+
       Lemma bind_f_assoc :
         forall A B C (a: A) (f : A -> M B) (g : B -> C),
         eq1 (bind (f a) (fun y => ret (g y)))
@@ -484,6 +509,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
         reflexivity.
       Qed.
              
+
       Lemma map_monad_cons :
         forall A B (f : A -> M B) (a:A) (xs:list A) (z : B) (zs : list B)
           (EQ2 : eq1 (bind (map_monad f xs) (fun ys => ret ys))
@@ -491,41 +517,30 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
           eq1 (bind (map_monad f xs) (fun ys => ret (z::ys)))
             (ret ((z::zs))).
       Proof.
+        destruct Laws_M.        
         intros.
-        destruct Laws_M.
-        induction xs.
-        - simpl.  rewrite bind_ret_l.
-          simpl in EQ2. rewrite bind_ret_l in EQ2.
-          apply MonadEq1Laws.eq1_ret_ret in EQ2.
-          subst. reflexivity.
-          apply EQM_Laws_M.
-        - simpl. rewrite bind_bind. setoid_rewrite bind_bind.
-          setoid_rewrite bind_ret_l.
-          simpl in EQ2.
-          repeat setoid_rewrite bind_bind in EQ2.
-          setoid_rewrite bind_ret_l in EQ2.
-          admit.
-          
-          
+        rewrite bind_helper.
+        rewrite EQ2.
+        rewrite bind_ret_l.
+        reflexivity.
+      Qed.
 
-          (* rewrite IHxs. *)
-
-            
-          (* Simpl. repeat setoid_rewrite bind_bind. apply IHxs.  *)
-
-
-          (* rewrite Monads.map_monad_unfold. *)
-
-          (* simpl. rewrite bind_bind. setoid_rewrite bind_bind. *)
-          (* simpl in EQ2. rewrite bind_bind in EQ2. setoid_rewrite bind_bind in EQ2. *)
-          
-          
-       Admitted.
-
-        
-
+      (* more general form of the two above; do we need those two? *) 
+      Lemma map_monad_g :
+        forall A B C (f : A -> M B) (g : list B -> C) (xs:list A) (zs : list B)
+          (EQ2 : eq1 (bind (map_monad f xs) (fun ys => ret ys))
+                   (ret (zs))),
+          eq1 (bind (map_monad f xs) (fun ys => ret (g ys)))
+            (ret (g zs)).
+      Proof.
+        destruct Laws_M.        
+        intros.
+        rewrite bind_helper.
+        rewrite EQ2.
+        rewrite bind_ret_l.
+        reflexivity.
+      Qed.
       
-
       (* Induction on d  *)
 
 (* Lemma 
@@ -537,107 +552,97 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
     Proof.
       intros.
       induction d; simpl; rewrite concretize_uvalueM_equation; try reflexivity.
-      -  destruct Laws_M.
-         rewrite bind_f_assoc.
-         assert
-         (eq1 (bind
-              (map_monad (concretize_uvalueM M D ERR_M err)
-                 (map dvalue_to_uvalue fields)) ret)
-            (ret fields)).
-         { induction fields.
-           - simpl. rewrite bind_ret_l. reflexivity.
-           - simpl. rewrite H.
-             rewrite bind_ret_l.
-             rewrite bind_bind.
-             setoid_rewrite bind_ret_l.
-             apply map_monad_cons.
-             exact (dvalue_to_uvalue a).
-             apply IHfields.
-             intros. apply H. apply in_cons. assumption.
-             apply in_eq.
-         }
-         rewrite H0.
-         rewrite bind_ret_l. reflexivity.
+      - rewrite map_monad_map;
+        apply map_monad_g;
+        destruct Laws_M;
+        induction fields; simpl. 
+       + rewrite bind_ret_l. 
+         reflexivity.
+       + rewrite H. 
+          rewrite bind_ret_l. 
+          rewrite bind_bind. 
+          setoid_rewrite bind_ret_l. 
+          apply map_monad_cons. 
+          exact a. 
+          apply IHfields. 
+          intros. apply H. apply in_cons. assumption.
+          apply in_eq. 
+
+       (* TODO: automate this *) 
       - destruct Laws_M.
-         rewrite bind_f_assoc.
-         assert
-         (eq1 (bind
-              (map_monad (concretize_uvalueM M D ERR_M err)
-                 (map dvalue_to_uvalue fields)) ret)
-            (ret fields)).
-         { induction fields.
-           - simpl. rewrite bind_ret_l. reflexivity.
-           - simpl. rewrite H.
-             rewrite bind_ret_l.
-             rewrite bind_bind.
-             setoid_rewrite bind_ret_l.
-             apply map_monad_cons.
-             exact (dvalue_to_uvalue a).
-             apply IHfields.
-             intros. apply H. apply in_cons. assumption.
-             apply in_eq.
-         }
-         rewrite H0.
-         rewrite bind_ret_l. reflexivity.
-       - destruct Laws_M.
-         rewrite bind_f_assoc.
-         assert
-         (eq1 (bind
-              (map_monad (concretize_uvalueM M D ERR_M err)
-                 (map dvalue_to_uvalue elts)) ret)
-            (ret elts)).
-         { induction elts.
-           - simpl. rewrite bind_ret_l. reflexivity.
-           - simpl. rewrite H.
-             rewrite bind_ret_l.
-             rewrite bind_bind.
-             setoid_rewrite bind_ret_l.
-             apply map_monad_cons.
-             exact (dvalue_to_uvalue a).
-             apply IHelts.
-             intros. apply H. apply in_cons. assumption.
-             apply in_eq.
-         }
-         rewrite H0.
-         rewrite bind_ret_l. reflexivity.
-       - destruct Laws_M.
-         rewrite bind_f_assoc.
-         assert
-         (eq1 (bind
-              (map_monad (concretize_uvalueM M D ERR_M err)
-                 (map dvalue_to_uvalue elts)) ret)
-            (ret elts)).
-         { induction elts.
-           - simpl. rewrite bind_ret_l. reflexivity.
-           - simpl. rewrite H.
-             rewrite bind_ret_l.
-             rewrite bind_bind.
-             setoid_rewrite bind_ret_l.
-             apply map_monad_cons.
-             exact (dvalue_to_uvalue a).
-             apply IHelts.
-             intros. apply H. apply in_cons. assumption.
-             apply in_eq.
-         }
-         rewrite H0.
-         rewrite bind_ret_l. reflexivity.
-Qed.
+        rewrite map_monad_map;
+          apply map_monad_g;
+          induction fields; simpl.
+        + rewrite bind_ret_l.
+          reflexivity.
+        + rewrite H. 
+          rewrite bind_ret_l. 
+          rewrite bind_bind. 
+          setoid_rewrite bind_ret_l. 
+          apply map_monad_cons. 
+          exact a. 
+          apply IHfields. 
+          intros. apply H. apply in_cons. assumption.
+          apply in_eq.
+
+          
+      - destruct Laws_M.
+        rewrite map_monad_map;
+          apply map_monad_g;
+          induction elts; simpl.
+        + rewrite bind_ret_l.
+          reflexivity.
+        + rewrite H. 
+          rewrite bind_ret_l. 
+          rewrite bind_bind. 
+          setoid_rewrite bind_ret_l. 
+          apply map_monad_cons. 
+          exact a. 
+          apply IHelts. 
+          intros. apply H. apply in_cons. assumption.
+          apply in_eq.
+
+          
+      - destruct Laws_M.
+        rewrite map_monad_map;
+          apply map_monad_g;
+          induction elts; simpl.
+        + rewrite bind_ret_l.
+          reflexivity.
+        + rewrite H. 
+          rewrite bind_ret_l. 
+          rewrite bind_bind. 
+          setoid_rewrite bind_ret_l. 
+          apply map_monad_cons. 
+          exact a. 
+          apply IHelts. 
+          intros. apply H. apply in_cons. assumption.
+          apply in_eq.
+     Qed. 
 
     End MonadContext.
     
   Lemma uvalue_dvalue_to_uvalue : forall (d : dvalue) d',
       concretize (dvalue_to_uvalue d) d' -> d = d'.
   Proof.
-    (* intros. induction d as [| | | | | | | | | | dlist IH | dlist IH | dlist IH | dlist Ih];  *)
-    (*        unfold concretize in H; unfold concretize_u in H; *)
-    (*        rewrite concretize_uvalueM_equation in H; *)
-    (*   simpl in H; inversion H; try reflexivity. *)
-    
+    (* clean attempt *) 
+    intros. induction d.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - unfold concretize in H.
+      unfold concretize_u in H.
+      rewrite concretize_uvalueM_equation in H. 
+      simpl in H. unfold eq1 in H.
+      Admitted. 
 
-    intros. induction d as [| | | | | | | | | | dlist IH | dlist IH | dlist IH | dlist Ih]; unfold concretize in H; unfold concretize_u in H; rewrite concretize_uvalueM_equation in H; simpl in H; inversion H; try reflexivity.
-    - apply IH.
-      
-  Admitted.
   
   Lemma add_zero : forall b1 b2 (e:exp dtyp),
     (OP_IBinop (Add b1 b2) (DTYPE_I 32) (EXP_Integer (0)%Z) e) ≐ [DTYPE_I 32] e.
