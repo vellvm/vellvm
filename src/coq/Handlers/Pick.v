@@ -18,9 +18,7 @@ From ITree Require Import
      Events.State.
 
 From Vellvm Require Import
-     Utils.Error
-     Utils.Util
-     Utils.PropT
+     Utilities
      Syntax.LLVMAst
      Syntax.AstLib
      Syntax.DynamicTypes

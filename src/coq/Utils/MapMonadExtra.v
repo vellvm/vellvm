@@ -55,7 +55,7 @@ Qed.
 (* TODO: can I generalize this? *)
 Lemma map_monad_err_In :
   forall {A B} (f : A -> err B) l res x,
-    Util.map_monad f l = ret res ->
+    map_monad f l = ret res ->
     In x res ->
     exists y, f y = ret x /\ In y l.
 Proof.
@@ -83,7 +83,7 @@ Qed.
 Lemma map_monad_err_In' :
   forall {A B : Type} (f : A -> err B) (l : list A) (res : list B) (y : A),
     In y l ->
-    Util.map_monad f l = ret res -> exists x, ret x = f y /\ In x res.
+    map_monad f l = ret res -> exists x, ret x = f y /\ In x res.
 Proof.
   intros A B f l.
   induction l; intros res y IN MAP.
@@ -106,7 +106,7 @@ Qed.
 (* TODO: can I generalize this? *)
 Lemma map_monad_err_Nth :
   forall {A B} (f : A -> err B) l res x n,
-    Util.map_monad f l = ret res ->
+    map_monad f l = ret res ->
     Util.Nth res n x ->
     exists y, f y = ret x /\ Util.Nth l n y.
 Proof.
@@ -142,7 +142,7 @@ Qed.
 Lemma map_monad_err_succeeds :
   forall {A B} (f : A -> err B) l,
     (forall a, In a l -> exists b, f a = ret b) ->
-    exists res, Util.map_monad f l = ret res.
+    exists res, map_monad f l = ret res.
 Proof.
   intros A B f l IN.
   generalize dependent l.

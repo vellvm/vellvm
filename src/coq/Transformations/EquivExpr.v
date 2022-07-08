@@ -472,8 +472,8 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
         - simpl. reflexivity.
         - simpl. destruct Laws_M.
           setoid_rewrite IHxs.
-          reflexivity. Qed.
-
+          reflexivity.
+      Qed.
 
       Lemma bind_f_assoc :
         forall A B C (a: A) (f : A -> M B) (g : B -> C),
@@ -482,7 +482,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
       Proof.
         intros. destruct Laws_M. rewrite bind_bind. setoid_rewrite bind_ret_l.
         reflexivity.
-        Qed.
+      Qed.
              
       Lemma map_monad_cons :
         forall A B (f : A -> M B) (a:A) (xs:list A) (z : B) (zs : list B)
@@ -623,7 +623,8 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
          rewrite bind_ret_l. reflexivity.
 Qed.
 
-          
+    End MonadContext.
+    
   Lemma uvalue_dvalue_to_uvalue : forall (d : dvalue) d',
       concretize (dvalue_to_uvalue d) d' -> d = d'.
   Proof.
@@ -635,9 +636,6 @@ Qed.
 
     intros. induction d as [| | | | | | | | | | dlist IH | dlist IH | dlist IH | dlist Ih]; unfold concretize in H; unfold concretize_u in H; rewrite concretize_uvalueM_equation in H; simpl in H; inversion H; try reflexivity.
     - apply IH.
-      
-
-
       
   Admitted.
   

@@ -29,6 +29,7 @@ From Vellvm.Utils Require Import
      PropT
      Tactics
      IntMaps
+     Monads
      MonadEq1Laws
      MonadExcLaws
      MapMonadExtra
@@ -3731,7 +3732,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       Ltac solve_access_allowed :=
         solve [match goal with
                | HMAPM :
-                 Util.map_monad _ _ = inr ?xs,
+                 map_monad _ _ = inr ?xs,
                    IN :
                    In _ ?xs |- _ =>
                    let GENPTR := fresh "GENPTR" in
@@ -4715,8 +4716,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               rewrite bind_ret_l in RUN.
 
               match goal with
-              | RUN : context [Util.map_monad ?f ?s] |- _ =>
-                  destruct (Util.map_monad f s) as [ERR | ptrs] eqn:HMAPM
+              | RUN : context [map_monad ?f ?s] |- _ =>
+                  destruct (map_monad f s) as [ERR | ptrs] eqn:HMAPM
               end.
 
               { (* Error *)
@@ -4758,7 +4759,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 { destruct init_bytes; auto.
                   cbn in *.
                   rewrite IP.from_Z_0 in HSEQ.
-                  destruct (Util.map_monad IP.from_Z (Zseq 1 (Datatypes.length init_bytes))); inv HSEQ.
+                  destruct (map_monad IP.from_Z (Zseq 1 (Datatypes.length init_bytes))); inv HSEQ.
                   cbn in HMAPM.
                   rewrite handle_gep_addr_0 in HMAPM.
                   match goal with
@@ -4888,7 +4889,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 rewrite IP.from_Z_0 in HSEQ.
                 destruct (intptr_seq 1 n0); inv HSEQ.
 
-                unfold Util.map_monad in HMAPM.
+                unfold map_monad in HMAPM.
                 inversion HMAPM.
                 inversion HMAPM.
                 (* Fragile proof... *)
@@ -5213,7 +5214,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                         assert (@MonadReturnsLaws.MReturns err _ _ _ (list addr)
                                                            (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
                                                                        (allocation_id_to_prov (provenance_to_allocation_id pr')) :: ptrs)
-                                                           (Util.map_monad
+                                                           (map_monad
             (fun ix : IP.intptr =>
              handle_gep_addr (DTYPE_I 8)
                (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
@@ -6038,8 +6039,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               rewrite bind_ret_l in RUN.
 
               match goal with
-              | RUN : context [Util.map_monad ?f ?s] |- _ =>
-                  destruct (Util.map_monad f s) as [ERR | ptrs] eqn:HMAPM
+              | RUN : context [map_monad ?f ?s] |- _ =>
+                  destruct (map_monad f s) as [ERR | ptrs] eqn:HMAPM
               end.
 
               { (* Error *)
@@ -6081,7 +6082,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 { destruct init_bytes; auto.
                   cbn in *.
                   rewrite IP.from_Z_0 in HSEQ.
-                  destruct (Util.map_monad IP.from_Z (Zseq 1 (Datatypes.length init_bytes))); inv HSEQ.
+                  destruct (map_monad IP.from_Z (Zseq 1 (Datatypes.length init_bytes))); inv HSEQ.
                   cbn in HMAPM.
                   rewrite handle_gep_addr_0 in HMAPM.
                   match goal with
@@ -6215,7 +6216,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 rewrite IP.from_Z_0 in HSEQ.
                 destruct (intptr_seq 1 n); inv HSEQ.
 
-                unfold Util.map_monad in HMAPM.
+                unfold map_monad in HMAPM.
                 inversion HMAPM.
                 inversion HMAPM.
                 (* Fragile proof... *)
@@ -6540,7 +6541,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                         assert (@MonadReturnsLaws.MReturns err _ _ _ (list addr)
                                                            (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
                                                                        (allocation_id_to_prov (provenance_to_allocation_id pr'')) :: ptrs)
-                                                           (Util.map_monad
+                                                           (map_monad
             (fun ix : IP.intptr =>
              handle_gep_addr (DTYPE_I 8)
                (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))

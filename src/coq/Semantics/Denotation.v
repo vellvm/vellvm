@@ -512,10 +512,10 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
     end.
 
   Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp)): itree instr_E unit :=
-    dvs <- Util.map_monad
+    dvs <- map_monad
              (fun x => translate exp_to_instr (denote_phi bid_from x))
              phis;;
-    Util.map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
+    map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
     ret tt.
 
   (* A block ends with a terminator, it either jumps to another block,

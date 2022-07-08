@@ -110,7 +110,7 @@ Inductive IX_supported : N -> Prop :=
 .
 
 (* TODO: This probably should live somewhere else... *)
-#[refine] Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
+#[refine]#[local] Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
     Decidable_witness := N.eqb x y
   }.
 apply N.eqb_eq.
@@ -1762,25 +1762,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
            end
          | _ => PtrConv_Neither
          end.
-
-    (* TODO: move / replace with show instance *)
-    Definition dvalue_to_string (x : dvalue) : string
-      := match x with
-       | DVALUE_Addr a => "DVALUE_Addr"
-       | DVALUE_I1 x => "DVALUE_I1"
-       | DVALUE_I8 x => "DVALUE_I8"
-       | DVALUE_I32 x => "DVALUE_I32"
-       | DVALUE_I64 x => "DVALUE_I64"
-       | DVALUE_IPTR x => "DVALUE_IPTR"
-       | DVALUE_Double x => "DVALUE_Double"
-       | DVALUE_Float x => "DVALUE_Float"
-       | DVALUE_Poison t => "DVALUE_Poison"
-       | DVALUE_None => "DVALUE_None"
-       | DVALUE_Struct fields => "DVALUE_Struct"
-       | DVALUE_Packed_struct fields => "DVALUE_Packed_struct"
-       | DVALUE_Array elts => "DVALUE_Array"
-       | DVALUE_Vector elts => "DVALUE_Vector"
-       end.
 
     Definition get_conv_case conv (t1:dtyp) (x:dvalue) (t2:dtyp) : conv_case :=
       match conv with

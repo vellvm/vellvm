@@ -22,6 +22,7 @@ From Vellvm.Utils Require Import
      NMaps
      Tactics
      Raise
+     Monads
      MonadReturnsLaws
      MonadEq1Laws
      MonadExcLaws.
@@ -228,7 +229,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
 
   (* TODO: Move this? *)
   Definition intptr_seq (start : Z) (len : nat) : OOM (list IP.intptr)
-    := Util.map_monad (IP.from_Z) (Zseq start len).
+    := map_monad (IP.from_Z) (Zseq start len).
 
   (* TODO: Move this? *)
   Lemma intptr_seq_succ :
@@ -371,7 +372,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   Definition get_consecutive_ptrs {M} `{Monad M} `{RAISE_OOM M} `{RAISE_ERROR M} (ptr : addr) (len : nat) : M (list addr) :=
     ixs <- lift_OOM (intptr_seq 0 len);;
     lift_err_RAISE_ERROR
-      (Util.map_monad
+      (map_monad
          (fun ix => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
          ixs).
 
@@ -1804,7 +1805,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     ptrs <- get_consecutive_ptrs ptr len;;
 
     (* Actually perform reads *)
-    Util.map_monad (fun ptr => read_byte_spec_MemPropT ptr) ptrs.
+    map_monad (fun ptr => read_byte_spec_MemPropT ptr) ptrs.
 
   Definition read_uvalue_spec (dt : dtyp) (ptr : addr) : MemPropT MemState uvalue :=
     bytes <- read_bytes_spec ptr (N.to_nat (sizeof_dtyp dt));;
@@ -1817,7 +1818,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
     (* TODO: double check that this is correct... Should we check if all writes are allowed first? *)
     (* Actually perform writes *)
-    Util.map_monad_ (fun '(ptr, byte) => write_byte_spec_MemPropT ptr byte) ptr_bytes.
+    map_monad_ (fun '(ptr, byte) => write_byte_spec_MemPropT ptr byte) ptr_bytes.
 
   Definition write_uvalue_spec (dt : dtyp) (ptr : addr) (uv : uvalue) : MemPropT MemState unit :=
     bytes <- serialize_sbytes uv dt;;
@@ -2248,7 +2249,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       ptrs <- get_consecutive_ptrs ptr len;;
 
       (* Actually perform reads *)
-      Util.map_monad (fun ptr => read_byte ptr) ptrs.
+      map_monad (fun ptr => read_byte ptr) ptrs.
 
     Definition read_uvalue `{MemMonad ExtraState MemM (itree Eff)} (dt : dtyp) (ptr : addr) : MemM uvalue :=
       bytes <- read_bytes ptr (N.to_nat (sizeof_dtyp dt));;
@@ -2261,7 +2262,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       let ptr_bytes := zip ptrs bytes in
 
       (* Actually perform writes *)
-      Util.map_monad_ (fun '(ptr, byte) => write_byte ptr byte) ptr_bytes.
+      map_monad_ (fun '(ptr, byte) => write_byte ptr byte) ptr_bytes.
 
     Definition write_uvalue `{MemMonad ExtraState MemM (itree Eff)} (dt : dtyp) (ptr : addr) (uv : uvalue) : MemM unit :=
       bytes <- serialize_sbytes uv dt;;
