@@ -444,13 +444,13 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
 
     Section MonadContext.
 
-      
+      Search eq1.
       Context (M: Type -> Type).
       Context {MM: Monad M}.
       Context {EQM : Eq1 M}.
       Context {EE : forall A, Equivalence (@eq1 M EQM A)}.
       Context {Laws_M : MonadLawsE M}.
-(*       Context {EQM_Laws_M  : MonadEq1Laws M EQM} *)
+       Context {EQM_Laws_M  : MonadEq1Laws.Eq1_ret_inv M}.
       Context (D : dtyp -> M dvalue).
       Context (ERR_M : Type -> Type).
       Context (err : forall A : Type, ERR_M A -> M A).
@@ -499,7 +499,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
           simpl in EQ2. rewrite bind_ret_l in EQ2.
           apply MonadEq1Laws.eq1_ret_ret in EQ2.
           subst. reflexivity.
-          admit.
+          apply EQM_Laws_M.
         - simpl. rewrite bind_bind. setoid_rewrite bind_bind.
           setoid_rewrite bind_ret_l.
 
