@@ -502,10 +502,12 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
           apply EQM_Laws_M.
         - simpl. rewrite bind_bind. setoid_rewrite bind_bind.
           setoid_rewrite bind_ret_l.
-
+          setoid_rewrite bind_ret_r in IHxs.
+          rewrite <- IHxs.
           simpl in EQ2.
           repeat setoid_rewrite bind_bind in EQ2.
-          setoid_rewrite bind_ret_l in EQ2. 
+          setoid_rewrite bind_ret_l in EQ2.
+          admit.
           
           
 
