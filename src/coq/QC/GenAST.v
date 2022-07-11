@@ -24,7 +24,6 @@ Import ListNotations.
 
 From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils.
 Require Import Integers Floats.
-Require Import List.
 
 Import ListNotations.
 Import MonadNotation.
@@ -434,6 +433,10 @@ Section GenerationState.
   Definition freq_LLVM {A} (gs : list (nat * GenLLVM A)) : GenLLVM A
     := mkStateT
          (fun st => freq_ failGen (fmap (fun '(n, g) => (n, runStateT g st)) gs)).
+
+  Definition elems_LLVM {A : Type} (l: list A) : GenLLVM A (* TODO: Need a more efficient way*)
+    := n <- lift (choose (0, List.length l - 1)%nat);;
+       nth n (map ret l) (lift failGen).
 
   Definition vectorOf_LLVM {A : Type} (k : nat) (g : GenLLVM A)
     : GenLLVM (list A) :=
@@ -1069,6 +1072,50 @@ Definition get_ctx_ptrs  : GenLLVM (list (ident * typ)) :=
   ctx <- get_ctx;;
   ret (filter_ptr_typs ctx).
 
+(* Index path without getting into vector *)
+  Fixpoint get_index_paths_insertvalue_aux (t_from : typ) (pre_path : DList Z) (ctx : list (ident * typ)) {struct t_from}: bool * DList (typ * DList (Z)) :=
+    match t_from with
+    | TYPE_Array sz t =>
+        let '(has_subpaths, sub_paths) := get_index_paths_insertvalue_aux t DList_empty ctx in (* Get index path from the first element*)
+        if has_subpaths
+        then (true, DList_cons (t_from, pre_path) (get_index_paths_from_AoV sz t pre_path sub_paths))
+        else (false, DList_empty)
+    | TYPE_Struct fields
+    | TYPE_Packed_struct fields =>
+        let '(has_reach, reaches) := (get_index_paths_insertvalue_from_struct pre_path fields ctx) in
+        if has_reach
+        then (true, DList_cons (t_from, pre_path) reaches)
+        else (false, DList_empty)
+    | TYPE_Pointer t => if seq.nilp (filter_type t_from ctx) then (false, DList_empty) else (true, DList_singleton (t_from, pre_path))
+    | TYPE_Vector _ t =>
+        let '(has_subpaths, sub_paths) := get_index_paths_insertvalue_aux t DList_empty ctx in (* Get index path from the first element*)
+        if has_subpaths then (true, DList_singleton (t_from, pre_path)) else (false, DList_empty)
+    | _ => (true, DList_singleton (t_from, pre_path))
+    end with
+  get_index_paths_insertvalue_from_struct (pre_path: DList Z) (fields: list typ) (ctx: list (ident * typ)) {struct fields}: bool * DList (typ * DList Z) :=
+    snd (fold_left
+           (fun '(ix, (b, paths)) (fld_typ : typ) =>
+              (ix + 1,
+                (let '(has_reach, reach) := get_index_paths_insertvalue_aux fld_typ (DList_append pre_path (DList_singleton ix)) ctx in
+                 (orb has_reach b, DList_append reach paths))))
+           fields (0%Z, (false, DList_empty : DList (typ * DList Z)))).
+
+Definition get_index_paths_insertvalue (t_from : typ) (ctx : list (ident * typ)): list (typ * list (Z)) :=
+  tl (DList_paths_to_list_paths (snd (get_index_paths_insertvalue_aux t_from DList_empty ctx))).
+
+Fixpoint has_paths_insertvalue_aux (t_from : typ) (ctx : list (ident * typ)) {struct t_from}: bool :=
+  match t_from with
+  | TYPE_Array _ t
+  | TYPE_Vector _ t => has_paths_insertvalue_aux t ctx
+  | TYPE_Struct fields
+  | TYPE_Packed_struct fields => fold_left (fun acc x => orb acc (has_paths_insertvalue_aux x ctx)) fields false
+  | TYPE_Pointer _ => seq.nilp (filter (fun '(_, x) => normalized_typ_eq x t_from) ctx)
+  | _ => true
+  end.
+
+Definition filter_insertvalue_typs (agg_typs : list (ident * typ)) (ctx : list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_, x) => has_paths_insertvalue_aux x ctx) agg_typs.
+
 Definition get_ctx_ptr : GenLLVM (ident * typ) :=
   ptrs_in_context <- get_ctx_ptrs;;
   '(ptr_ident, ptr_typ) <- (oneOf_LLVM (map ret (ptrs_in_context)));;
@@ -1293,7 +1340,8 @@ Definition genType: G (typ) :=
           match t with
           | TYPE_I n                  => ret EXP_Integer <*> lift (arbitrary : G Z) (* lift (x <- (arbitrary : G nat);; ret (Z.of_nat x)) (* TODO: should the integer be forced to be in bounds? *) *)
           | TYPE_IPTR => ret EXP_Integer <*> lift (arbitrary : G Z)
-          | TYPE_Pointer t            => lift failGen (* Only pointer type expressions might be conversions? Maybe GEP? *)
+          | TYPE_Pointer subtyp       => lift failGen
+          (* Only pointer type expressions might be conversions? Maybe GEP? *)
           | TYPE_Void                 => lift failGen (* There should be no expressions of type void *)
           | TYPE_Function ret args    => lift failGen (* No expressions of function type *)
           | TYPE_Opaque               => lift failGen (* TODO: not sure what these should be... *)
@@ -1418,9 +1466,10 @@ Definition genType: G (typ) :=
   Definition gen_exp (t : typ) : GenLLVM (exp typ)
     := sized_LLVM (fun sz => gen_exp_size sz t).
 
-Definition gen_insertvalue : GenLLVM (typ * instr typ) :=
-  '(id, tagg) <- get_ctx_agg_typ;;
-  let paths_in_agg := get_index_paths_agg tagg in
+Definition gen_insertvalue (typ_in_ctx: ident * typ): GenLLVM (typ * instr typ) :=
+  let '(id, tagg) := typ_in_ctx in
+  ctx <- get_ctx;;
+  let paths_in_agg := get_index_paths_insertvalue tagg ctx in
   '(tsub, path_for_insertvalue) <- oneOf_LLVM (map ret paths_in_agg);;
   ex <- hide_ctx (gen_exp_size 0 tsub);;
   (* Generate all of the type*)
@@ -1517,6 +1566,10 @@ Section InstrGenerators.
   Definition gen_instr : GenLLVM (typ * instr typ) :=
     ctx <- get_ctx;;
     ptrtoint_ctx <- get_ptrtoint_ctx;;
+    let agg_typs_in_ctx := filter_agg_typs ctx in
+    let ptr_typs_in_ctx := filter_ptr_typs ctx in
+    let vec_typs_in_ctx := filter_vec_typs ctx in
+    let insertvalue_typs_in_ctx := filter_insertvalue_typs agg_typs_in_ctx ctx in
     oneOf_LLVM
       ([ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
          ; t <- gen_sized_typ_ptrinctx;;
@@ -1525,9 +1578,11 @@ Section InstrGenerators.
            align <- ret None;;
            ret (TYPE_Pointer t, INSTR_Alloca t num_elems align)
         ] (* TODO: Generate atomic operations and other instructions *)
-         ++ (if seq.nilp (filter_ptr_typs ctx) then [] else [gen_gep; gen_load; gen_store; gen_ptrtoint])
+         ++ (if seq.nilp ptr_typs_in_ctx then [] else [gen_gep; gen_load; gen_store; gen_ptrtoint])
          ++ (if seq.nilp ptrtoint_ctx then [] else [gen_inttoptr])
-         ++ (if seq.nilp (filter_agg_typs ctx) then [] else [gen_extractvalue; gen_insertvalue])
+         ++ (if seq.nilp agg_typs_in_ctx then [] else [gen_extractvalue])
+         ++ (if seq.nilp insertvalue_typs_in_ctx then [] else [x <- elems_LLVM insertvalue_typs_in_ctx;;
+                                                               gen_insertvalue x])
          ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])).
 
   (* TODO: Generate instructions with ids *)
