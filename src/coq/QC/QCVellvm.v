@@ -79,15 +79,15 @@ Definition run_llc (prog : list (toplevel_entity typ (block typ * list (block ty
 Definition vellvm_agrees_with_clang (prog : list (toplevel_entity typ (block typ * list (block typ)))) : Checker
   := 
     (* collect (show prog) *)
-            match interpret prog, run_llc prog with
-            | MlOk _ _ (DVALUE_I8 x), DVALUE_I8 y =>
+            match run_llc prog, interpret prog with
+            | DVALUE_I8 y, MlOk _ _ (DVALUE_I8 x) =>
               whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) (equ x y)
             | _, _ => checker true
             end.
 
 Definition agrees := (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang).
 
-Extract Constant defNumTests    => "1000".
+Extract Constant defNumTests    => "2000".
 QCInclude "../../ml/*".
 QCInclude "../../ml/libvellvm/*".
 

@@ -50,8 +50,6 @@ Open Scope Z_scope.
     not used in proofs) it's not terribly important to prove that they
     actually terminate.  *)
 Unset Guard Checking.
-
-(* TODO: Move this? *)
 (** Difference lists *)
 Section DList.
   Definition DList (A : Type) := list A -> list A.
@@ -688,7 +686,6 @@ Definition filter_ptr_vecptr_typ (ctx: list (ident * typ)) : list (ident * typ) 
                 (* ; TYPE_X86_mmx *)
                 (* ; TYPE_Opaque *)
                 ])).
-
   Program Fixpoint gen_typ_non_void_size (sz : nat) {measure sz} : GenLLVM typ :=
     match sz with
     | 0%nat => gen_typ_non_void_0
@@ -767,11 +764,9 @@ Definition filter_ptr_vecptr_typ (ctx: list (ident * typ)) : list (ident * typ) 
 End TypGenerators.
 
 Section ExpGenerators.
-  (* nuw / nsw make poison values likely *)
+
   Definition gen_ibinop : G ibinop :=
-    (* Note: some of these binops are currently commented out due to a
-       bug with extraction and QC. *)
-    oneOf_ failGen
+     oneOf_ failGen
            [ ret LLVMAst.Add <*> ret false <*> ret false
            ; ret Sub <*> ret false <*> ret false
            ; ret Mul <*> ret false <*> ret false
@@ -1383,11 +1378,23 @@ Definition genType: G (typ) :=
   with
   (* TODO: Make sure we don't divide by 0 *)
   gen_ibinop_exp_typ (t : typ) : GenLLVM (exp typ)
-    :=
-      ibinop <- lift gen_ibinop;;
-      if Handlers.LLVMEvents.DV.iop_is_div ibinop
-      then ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t
-      else ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_exp_size 0 t
+  :=
+    ibinop <- lift gen_ibinop;;
+    if Handlers.LLVMEvents.DV.iop_is_div ibinop
+    then ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t
+    else
+    exp_value <- gen_exp_size 0 t;;
+    if Handlers.LLVMEvents.DV.iop_is_shift ibinop
+    then
+      let max_shift_size :=
+        match t with
+        | TYPE_I i => BinIntDef.Z.of_N (i - 1)
+        | _ => 0
+        end in
+      x <- lift (choose (0, max_shift_size));;
+      let exp_value2 : exp typ := EXP_Integer x in
+      ret (OP_IBinop ibinop t exp_value exp_value2)
+    else ret (OP_IBinop ibinop t exp_value) <*> gen_exp_size 0 t
   with
   gen_ibinop_exp (isz : N) : GenLLVM (exp typ)
     :=

@@ -1699,6 +1699,14 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | _      => false
     end.
 
+  Definition iop_is_shift (iop : ibinop) : bool :=
+    match iop with
+    | Shl _ _ => true
+    | LShr _ => true
+    | AShr _ => true
+    | _ => false
+    end.
+
   (* Check if this is an instruction which can trigger UB with division by 0. *)
   Definition fop_is_div (fop : fbinop) : bool :=
     match fop with
