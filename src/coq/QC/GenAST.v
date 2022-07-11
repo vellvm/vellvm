@@ -1751,9 +1751,9 @@ Section InstrGenerators.
                    (* We backtrack contexts so blocks in second branch
                       don't refer to variables from the first
                       branch. *)
-                   '(b1, (bh1, bs1)) <- backtrack_variable_ctxs (gen_blocks_sz sz' t back_blocks);;
+                   '(b1, (bh1, bs1)) <- backtrack_variable_ctxs (gen_blocks_sz (sz / 2) t back_blocks);;
 
-                   '(b2, (bh2, bs2)) <- gen_blocks_sz sz' t back_blocks;;
+                   '(b2, (bh2, bs2)) <- gen_blocks_sz (sz / 2) t back_blocks;;
 
                    ret (TERM_Br (TYPE_I 1, c) (blk_id b1) (blk_id b2), (bh1::bs1) ++ (bh2::bs2)))
             (* Sometimes generate a loop *)
