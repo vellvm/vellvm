@@ -472,16 +472,15 @@ Section GenerationState.
 End GenerationState.
 
 Section TypGenerators.
-
-  (*filter all the (ident, typ) in ctx such that typ is a ptr*)
+    (*filter all the (ident, typ) in ctx such that typ is a ptr*)
 Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
   filter (fun '(_, t) => match t with
                         | TYPE_Pointer _ => true
                         | _ => false
                      end) ctx.
 
-Definition filter_sized_typs (typ_ctx: list (ident * typ)) (ctx : list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_, t) => is_sized_type typ_ctx t) ctx.
+  Definition filter_sized_typs (typ_ctx: list (ident * typ)) (ctx : list (ident * typ)) : list (ident * typ) :=
+    filter (fun '(_, t) => is_sized_type typ_ctx t) ctx.
 
 Definition filter_non_void_typs (ctx : list (ident * typ)) : list (ident * typ) :=
   filter (fun '(_, t) => match t with
@@ -505,7 +504,7 @@ Definition filter_vec_typs (ctx: list (ident * typ)) : list (ident * typ) :=
             | _ => false
             end) ctx.
 
-Definition filter_ptr_vecptr_typ (ctx: list (ident * typ)) : list (ident * typ) :=
+Definition filter_ptr_vecptr_typs (ctx: list (ident * typ)) : list (ident * typ) :=
   filter (fun '(_, t) =>
             match t with
             | TYPE_Pointer _ => true
@@ -979,6 +978,80 @@ Section ExpGenerators.
        | TYPE_Identified id => false
        end.
 
+  Variant contains_flag :=
+  | soft
+  | hard.
+
+  (* This is a part of the easy fix for Issue 260. It can also potentially help other generators in filtering
+     If there exists a subtyp of certain tribute *)
+  Fixpoint contains_typ (t_from : typ) (t : typ) (flag : contains_flag): bool :=
+    match t_from with
+    | TYPE_I _ =>
+        match t with
+        | TYPE_I _ =>
+            match flag with
+            | soft => true
+            | hard => normalized_typ_eq t_from t
+            end
+        | _ => false
+        end
+    | TYPE_IPTR
+    | TYPE_Half
+    | TYPE_Float
+    | TYPE_Double
+    | TYPE_X86_fp80
+    | TYPE_Fp128
+    | TYPE_Ppc_fp128
+    | TYPE_Metadata
+    | TYPE_X86_mmx => normalized_typ_eq t_from t
+    | TYPE_Pointer subtyp =>
+        match t with
+        | TYPE_Pointer subtyp' =>
+            match flag with
+            | soft => true
+            | hard => normalized_typ_eq subtyp subtyp' || contains_typ subtyp t flag
+            end
+        | _ => contains_typ subtyp t flag
+        end
+    | TYPE_Array sz subtyp =>
+        match t with
+        | TYPE_Array sz' subtyp' =>
+            match flag with
+            | soft => true
+            | hard =>  (sz =? sz')%N && ((normalized_typ_eq subtyp subtyp') || (contains_typ subtyp t flag))
+            end
+        | _ => contains_typ subtyp t flag
+        end
+    | TYPE_Vector sz subtyp =>
+        match t with
+        | TYPE_Array sz' subtyp' =>
+            match flag with
+            | soft => true
+            | hard =>  (sz =? sz')%N && ((normalized_typ_eq subtyp subtyp') || (contains_typ subtyp t flag))
+            end
+        | _ => contains_typ subtyp t flag
+        end
+    | TYPE_Struct fields =>
+        match t with
+        | TYPE_Struct fields' =>
+            match flag with
+            | soft => true
+            | hard => normalized_typ_eq t_from t || fold_left (fun acc x => acc || x) (map (fun y => contains_typ y t flag) fields) false
+            end
+        | _ => fold_left (fun acc x => acc || contains_typ x t flag) fields false
+        end
+    | TYPE_Packed_struct fields =>
+        match t with
+        | TYPE_Struct fields' =>
+            match flag with
+            | soft => true
+            | hard =>  normalized_typ_eq t_from t || fold_left (fun acc x => acc || x) (map (fun y => contains_typ y t flag) fields) false
+            end
+        | _ => fold_left (fun acc x => acc || contains_typ x t flag) fields false
+        end
+    | _ => false
+    end.
+
   (* TODO: Move this *)
   Fixpoint replicateM {M : Type -> Type} {A} `{Monad M} (n : nat) (ma : M A) : M (list A)
     := match n with
@@ -1198,8 +1271,9 @@ Definition gen_insertelement : GenLLVM (typ * instr typ) :=
 
 Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
   ctx <- get_ctx;;
-  let ptr_in_context := filter_ptr_typs ctx in
-  '(id, tptr) <- (oneOf_LLVM (map ret ptr_in_context));;
+  let ptr_vecptr_in_ctx := filter_ptr_vecptr_typs ctx in
+  let valid_ptr_vecptr_in_ctx := filter (fun '(_, x) => negb (contains_typ x (TYPE_Struct []) soft)) ptr_vecptr_in_ctx in
+  '(id, tptr) <- (oneOf_LLVM (map ret valid_ptr_vecptr_in_ctx));;
   let gen_typ_in_ptr :=
     match tptr with
     | TYPE_Pointer t =>
@@ -1264,9 +1338,9 @@ Fixpoint gen_typ_le_size (max_byte_sz : N) : GenLLVM typ :=
       ] ++
 
       (* Struct type *)
-      [fields <- gen_typ_from_size_struct max_byte_sz;;
+      (* [fields <- gen_typ_from_size_struct max_byte_sz;;
        ret (TYPE_Struct fields)
-      ] ++
+      ] ++ *) (* Issue #260 *)
 
       (* Packed struct type *)
       [fields <- gen_typ_from_size_struct max_byte_sz;;
@@ -1684,7 +1758,7 @@ Section InstrGenerators.
                    ret (TERM_Br (TYPE_I 1, c) (blk_id b1) (blk_id b2), (bh1::bs1) ++ (bh2::bs2)))
             (* Sometimes generate a loop *)
             ; (min sz' 6%nat,
-               '(t, (b, bs)) <- gen_loop_sz sz t back_blocks 10;;
+               '(t, (b, bs)) <- gen_loop_sz sz' t back_blocks 10;; (* TODO: Should I replace sz with sz' here*)
                ret (t, (b :: bs)))
            ]
               ++
