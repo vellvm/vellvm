@@ -342,14 +342,6 @@ Lemma map_monad_nil
 Proof.
   intros. reflexivity. Qed.
 
-Lemma sequence : forall {A} (l : list A),
-      sequence (map ret l) ≈ ret l.
-Proof. intros. induction l.
-       - simpl. reflexivity. 
-       - rewrite map_cons. 
-
-Admitted.  
-
 Lemma map_monad_ret_l : forall {A} (l : list A),
     map_monad ret l ≈ ret l.
 Proof.
@@ -358,6 +350,18 @@ Proof.
   - apply map_monad_nil.
   - rewrite map_monad_cons.
     rewrite bind_ret_l. rewrite IHl. rewrite bind_ret_l. reflexivity. Qed.
+
+Lemma id_ret : forall A B (g: A -> B) (x: A),
+    id (g x) = g x.
+Proof.
+  intros. unfold id. reflexivity. Qed.
+  
+Lemma sequence : forall {A} (l : list A),
+      sequence (map ret l) ≈ ret l.
+Proof. intros. induction l.
+       - simpl. reflexivity. 
+       - rewrite map_cons. simpl. setoid_rewrite map_monad_map. assert (forall A B (g: A -> B) (x : A), id (g x) = g x). apply id_ret.
+         rewrite H. rewrite <- map_monad_cons. rewrite map_monad_ret_l. reflexivity. Qed.
 
 Lemma map_monad_ret_nil_inv :
   forall {A B} (f : A -> M B) (l : list A)
