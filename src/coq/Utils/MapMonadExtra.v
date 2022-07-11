@@ -14,6 +14,7 @@ From Vellvm Require Import
      Utils.Util
      Utils.Error
      Utils.MonadReturnsLaws
+     
      Utils.MonadEq1Laws
      Utils.Tactics.
 
@@ -36,10 +37,14 @@ Section MonadContext.
   Context {MRET : @MonadReturns M HM EQM}.
   Context {MRETSTR : @MonadReturnsStrongBindInv M HM EQM MRET}.
   Context {EQRET : @Eq1_ret_inv M EQM HM}.
+  Context {MRETPROPER : @MonadReturnsProper M HM EQM MRET}.
+  Context {MRETPROPERFLIP : @MonadReturns_ProperFlip M HM EQM MRET}.
 
   Existing Instance EQM.
   Existing Instance LAWS.
-
+  Existing Instance MRETPROPER.
+  Existing Instance MRETPROPERFLIP.
+  
 
 Lemma map_monad_unfold :
   forall {A B : Type} (x : A) (xs : list A)
@@ -324,7 +329,7 @@ Lemma map_monad_commutative_maps :
     map_monad (fun x => y <- (g x) ;; f y) xs.
 Proof.
   (* Is this true? *)
-  intros. destruct LAWS.
+  intros. destruct LAWS. 
 Admitted.  
 
 Lemma map_monad_cons
@@ -360,24 +365,46 @@ Lemma sequence : forall {A} (l : list A),
       sequence (map ret l) ≈ ret l.
 Proof. intros. induction l.
        - simpl. reflexivity. 
-       - rewrite map_cons. simpl. setoid_rewrite map_monad_map. assert (forall A B (g: A -> B) (x : A), id (g x) = g x). apply id_ret.
-         rewrite H. rewrite <- map_monad_cons. rewrite map_monad_ret_l. reflexivity. Qed.
+       - rewrite map_cons. simpl. setoid_rewrite map_monad_map. rewrite id_ret.
+         rewrite <- map_monad_cons. rewrite map_monad_ret_l. reflexivity. Qed.
 
+
+Lemma map_monad_ret_nil_inv_reverse {A B} (f : A -> M B) (l : list A) :  
+    (l = []) -> 
+    MReturns [] (map_monad f l).
+Proof.
+  intros. induction l. unfold map_monad.
+  - destruct MRET. apply MReturns_ret. reflexivity.
+  - rewrite H. inversion H. 
+Qed. 
+     
+  
 Lemma map_monad_ret_nil_inv :
   forall {A B} (f : A -> M B) (l : list A)
   (HRet : MReturns [] (map_monad f l)),
   l = [].
 Proof.
-  Admitted.
+  intros. 
+  apply map_monad_length in HRet.
+  simpl in HRet. 
+  assert (H: length l = 0 -> l = []). { intros. induction l. reflexivity. inversion HRet.}
+  apply H in HRet. assumption.
+Qed.
 
 Lemma map_monad_ret_nil_inv_pure :
   forall {A B} (f : A -> M B) (l : list A)
   (HEq : map_monad f l ≈ ret []),
   l = [].
 Proof.
-  (* Provable using MReturns_ret_inv and [map_monad_ret_nil_inv] *)
-Admitted.  
-
+  intros.
+  apply (map_monad_ret_nil_inv f).
+  (* SHOULD BE ABLE TO DO: rewrite HEq at this point -- typeclasses are not set up correctly. *)
+  destruct MRETPROPER.
+  eapply MReturns_Proper.
+  apply HEq.
+  apply MReturns_ret. reflexivity.
+Qed.
+  
 Lemma map_monad_In_inv_pure :
   forall {A B} (f : A -> M B) (x : A) (y : B) (l1 : list A) (l2 : list B)
     (HIn: In y l2)
