@@ -39,6 +39,9 @@ Section MonadContext.
   Context {EQRET : @Eq1_ret_inv M EQM HM}.
   Context {MRETPROPER : @MonadReturnsProper M HM EQM MRET}.
   Context {MRETPROPERFLIP : @MonadReturns_ProperFlip M HM EQM MRET}.
+  Context {BINDRETINV : forall {A B} (m : M A) (k : A -> M B) (v : B)
+                          (HRET : EQM _ (a <- m ;; k a) (ret v)),
+    exists b, EQM _ (m) (ret b) /\ EQM _ (k b) (ret v)}.
 
   Existing Instance EQM.
   Existing Instance LAWS.
@@ -329,7 +332,15 @@ Lemma map_monad_commutative_maps :
     map_monad (fun x => y <- (g x) ;; f y) xs.
 Proof.
   (* Is this true? *)
-  intros. destruct LAWS. 
+  intros. destruct LAWS.
+  unfold commutative_maps in HC.
+  rewrite <- map_monad_map. 
+
+
+  (* unfold map_monad. repeat unfold map. *)
+  (* rewrite bind_bind. setoid_rewrite bind_ret_l. *)
+
+
 Admitted.  
 
 Lemma map_monad_cons
@@ -404,22 +415,102 @@ Proof.
   apply HEq.
   apply MReturns_ret. reflexivity.
 Qed.
-  
+
+
+Lemma map_monad_ret_cons :
+  forall {A B} (a : A) (b : B) (f : A -> M B) (l1 : list A) (l2 : list B)
+    (H : map_monad f (a :: l1) ≈ ret (b :: l2)),
+    map_monad f l1≈ ret l2.
+Proof.
+  intros. simpl in H. apply BINDRETINV in H. repeat destruct H.
+  apply BINDRETINV in H0. repeat destruct H0. apply EQRET in H1.
+  inversion H1.
+  subst. apply H0.
+  Qed. 
+
+Lemma map_monad_head :
+  forall {A B} (a : A) (b : B) (f : A -> M B) (l1 : list A) (l2 : list B)
+    (H : map_monad f (a :: l1) ≈ ret (b :: l2)),
+    f a ≈ ret b.
+Proof.
+  intros. simpl in H. apply BINDRETINV in H. repeat destruct H.
+  apply BINDRETINV in H0. repeat destruct H0. apply EQRET in H1.
+  inversion H1.
+  subst. apply H.
+Qed.
+
+Lemma map_monad_MReturns_cons :
+  forall {A B} (a1 a2 : A) (b : B) (f : A -> M B) (l2 : list A) (l1 : list B)
+    (H : MReturns (b :: l1) (map_monad f (a2 :: l2))),
+    MReturns l1 (map_monad f l2).
+Proof.
+  intros. 
+  destruct MRETSTR. simpl in H. apply MReturns_strong_bind_inv in H.
+  repeat destruct H. apply MReturns_strong_bind_inv in H0. repeat destruct H0.
+  apply MReturns_ret_inv in H1. inversion H1. subst.
+  apply H0.
+  Qed. 
+
+
+Lemma map_monad_MReturns_head :
+  forall {A B} (a : A) (b : B) (f : A -> M B) (l1 : list A) (l2 : list B)
+    (H : MReturns (b :: l2) (map_monad f (a :: l1))),
+    MReturns b (f a).
+Proof.
+  intros. 
+  destruct MRETSTR. simpl in H. apply MReturns_strong_bind_inv in H.
+  repeat destruct H. apply MReturns_strong_bind_inv in H0. repeat destruct H0.
+  apply MReturns_ret_inv in H1. inversion H1. subst.
+  apply H.
+  Qed. 
+ 
+    
 Lemma map_monad_In_inv_pure :
   forall {A B} (f : A -> M B) (x : A) (y : B) (l1 : list A) (l2 : list B)
     (HIn: In y l2)
     (HEq: map_monad f l1 ≈ ret l2),
     exists x, In x l1 /\ f x ≈ ret y.
 Proof.
-Admitted.
-
+  intros. generalize dependent l1.
+  destruct MRETSTR.
+  induction l2.
+  - inversion HIn.
+  - intros.
+    inversion HIn.
+    * subst.
+      destruct l1.
+    + cbn in HIn. apply eq1_ret_ret in HEq. inversion HEq. auto.
+    + apply map_monad_head in HEq. exists a. split. apply in_eq. apply HEq.
+    * specialize (IHl2 H). destruct l1. 
+    + apply eq1_ret_ret in HEq. inversion HEq. auto.
+    + specialize (IHl2 l1). apply map_monad_ret_cons in HEq.
+      apply IHl2 in HEq. repeat destruct HEq. exists x0. split.
+      apply in_cons. apply H0. apply H0.
+Qed.      
+  
 Lemma map_monad_In_inv :
   forall {A B} (f : A -> M B) (x : A) (y : B) (l1 : list A) (l2 : list B)
     (HIn: In y l2)
     (HEq: MReturns l2 (map_monad f l1)),
     exists x, In x l1 /\ (MReturns y (f x)).
 Proof.
-Admitted.
+  intros. generalize dependent l1.
+  destruct MRETSTR.
+  induction l2.
+  - inversion HIn.
+  - intros.
+    inversion HIn.
+    * destruct l1.
+    + apply MReturns_ret_inv in HEq. inversion HEq.
+    + assert (HEq' := HEq). apply map_monad_MReturns_cons in HEq. 
+      apply map_monad_MReturns_head in HEq'. subst. exists a0.
+      split. apply in_eq. assumption. assumption.
+      * destruct l1.
+    + apply MReturns_ret_inv in HEq. inversion HEq.
+    + specialize (IHl2 H l1). apply map_monad_MReturns_cons in HEq.
+      specialize (IHl2 HEq). repeat destruct IHl2. exists x0.
+      split. apply in_cons. apply H0. apply H0. auto.
+Qed. 
 
 End MonadContext.
 Arguments map_monad_In {_ _ _ _}.
