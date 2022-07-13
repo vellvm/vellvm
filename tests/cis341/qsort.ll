@@ -111,3 +111,5 @@ define i64 @main() {
     %1 = call i64 @is_sorted([0 x i64]* %a, i64 0, i64 -5, i64 10)
     ret i64 %1
 }
+
+; ASSERT EQ: i64 1 = call i64 @main(i64 0, i8** null)

@@ -27,3 +27,5 @@ define i64 @main(i64 %argc, i8** %arcv) {
     %ans = call i64 @search(i64 0, i64 6, i64 54, [7 x i64]* @unsorted)
     ret i64 %ans
 }
+
+; ASSERT EQ: i64 0 = call i64 @main(i64 0, i8** null)

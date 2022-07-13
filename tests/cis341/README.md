@@ -36,3 +36,6 @@
    "countsort", 6L
    "find_max", 80L
    "fp32lite", 254L
+   "heapsort", 0L
+   "another_io_test", 0L
+   "quicksort", 1L

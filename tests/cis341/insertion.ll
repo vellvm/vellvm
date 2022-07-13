@@ -23,6 +23,8 @@ while_cond_2:
   ; while j > 0 and A[j-1] > A[j]
   %4 = load i64, i64* %j ; j
   %5 = icmp sgt i64 %4, 0 ; j>0
+  br i1 %5, label %continue, label %while_end_2
+continue:
   %6 = sub i64 %4, 1 ; j-1
   %a_j0_ptr = getelementptr [10 x i64], [10 x i64]* @input, i32 0, i64 %6
   %a_j0 = load i64, i64* %a_j0_ptr; A[j-1]
@@ -60,3 +62,5 @@ define i64 @main(i64 %argc, i8** %arcv) {
   %2 = load i64, i64* %1
   ret i64 %2
 }
+
+; ASSERT EQ: i64 11 = call i64 @main(i64 0, i8** null)

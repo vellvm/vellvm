@@ -91,3 +91,5 @@ define i64 @main(i64 %argc, i8** %argv) {
   %ans = call i64 @is_square(%point* @pt1, %point* @pt2, %point* @pt3, %point* @pt4)
   ret i64 %ans
 }
+
+; ASSERT EQ: i64 1 = call i64 @main(i64 0, i8** null)

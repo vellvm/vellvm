@@ -64,7 +64,14 @@ Extract Constant to_caml_str =>
     use clang to compile this file to an executable, which we then run in
     order to get the return code. *)
 Axiom llc_command : string -> int.
-Extract Constant llc_command => "fun prog -> let f = open_out ""temporary_vellvm.ll"" in Printf.fprintf f ""%s"" prog; close_out f; Big_int_Z.big_int_of_int (Sys.command ""clang -Wno-everything temporary_vellvm.ll -o vellvmqc && ./vellvmqc"")".
+Extract Constant llc_command =>
+          "fun prog ->
+              let llvm_file_name = Filename.(concat (get_temp_dir_name ()) ""temporary_vellvm.ll"") in
+              let test_binary = Filename.(concat (get_temp_dir_name ()) ""vellvmqc"") in
+              let f = open_out llvm_file_name in
+                Printf.fprintf f ""%s"" prog;
+                close_out f;
+                Big_int_Z.big_int_of_int (Sys.command (""clang -lm -Wno-everything "" ^ llvm_file_name ^ "" -o "" ^ test_binary ^ "" && "" ^ test_binary))".
 
 Axiom vellvm_print_ll : list (toplevel_entity typ (block typ * list (block typ))) -> string.
 Extract Constant vellvm_print_ll => "fun prog -> Llvm_printer.toplevel_entities Format.str_formatter prog; Format.flush_str_formatter".
@@ -79,15 +86,15 @@ Definition run_llc (prog : list (toplevel_entity typ (block typ * list (block ty
 Definition vellvm_agrees_with_clang (prog : list (toplevel_entity typ (block typ * list (block typ)))) : Checker
   := 
     (* collect (show prog) *)
-            match interpret prog, run_llc prog with
-            | MlOk _ _ (DVALUE_I8 x), DVALUE_I8 y =>
+            match run_llc prog, interpret prog with
+            | DVALUE_I8 y, MlOk _ _ (DVALUE_I8 x) =>
               whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) (equ x y)
             | _, _ => checker true
             end.
 
 Definition agrees := (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang).
 
-Extract Constant defNumTests    => "1000".
+Extract Constant defNumTests    => "10000".
 QCInclude "../../ml/*".
 QCInclude "../../ml/libvellvm/*".
 

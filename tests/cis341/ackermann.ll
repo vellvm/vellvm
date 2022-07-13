@@ -30,3 +30,5 @@ define i64 @main(i64 %argc, i8** %argv) {
   %ans = call i64 @ack(i64 2, i64 2)
   ret i64 %ans
 }
+
+; ASSERT EQ: i64 7 = call i64 @main(i64 0, i8** null)

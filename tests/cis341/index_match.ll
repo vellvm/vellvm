@@ -36,3 +36,5 @@ define i64 @main(i64 %argc, i8** %arcv) {
   %ans = call i64 @indexmatch(i64 0, i64 6, [7 x i64]* @glist)
   ret i64 %ans
 }
+
+; ASSERT EQ: i64 1 = call i64 @main(i64 0, i8** null)
