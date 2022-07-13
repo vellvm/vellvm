@@ -472,45 +472,45 @@ Section GenerationState.
 End GenerationState.
 
 Section TypGenerators.
-    (*filter all the (ident, typ) in ctx such that typ is a ptr*)
-Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_, t) => match t with
+  (*filter all the (ident, typ) in ctx such that typ is a ptr*)
+  Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
+    filter (fun '(_, t) => match t with
                         | TYPE_Pointer _ => true
                         | _ => false
-                     end) ctx.
+                        end) ctx.
 
   Definition filter_sized_typs (typ_ctx: list (ident * typ)) (ctx : list (ident * typ)) : list (ident * typ) :=
     filter (fun '(_, t) => is_sized_type typ_ctx t) ctx.
 
-Definition filter_non_void_typs (ctx : list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_, t) => match t with
-                      | TYPE_Void => false
-                      | _ => true
-                      end) ctx.
+  Definition filter_non_void_typs (ctx : list (ident * typ)) : list (ident * typ) :=
+    filter (fun '(_, t) => match t with
+                        | TYPE_Void => false
+                        | _ => true
+                        end) ctx.
 
-Definition filter_agg_typs (ctx: list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_, t) =>
-            match t with
-            | TYPE_Array sz _ => N.ltb 0 sz
-            | TYPE_Struct l
-            | TYPE_Packed_struct l => negb (seq.nilp l)
-            | _ => false
-            end ) ctx.
+  Definition filter_agg_typs (ctx: list (ident * typ)) : list (ident * typ) :=
+    filter (fun '(_, t) =>
+              match t with
+              | TYPE_Array sz _ => N.ltb 0 sz
+              | TYPE_Struct l
+              | TYPE_Packed_struct l => negb (seq.nilp l)
+              | _ => false
+              end ) ctx.
 
-Definition filter_vec_typs (ctx: list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_, t) =>
-            match t with
-            | TYPE_Vector _ _ => true
-            | _ => false
-            end) ctx.
+  Definition filter_vec_typs (ctx: list (ident * typ)) : list (ident * typ) :=
+    filter (fun '(_, t) =>
+              match t with
+              | TYPE_Vector _ _ => true
+              | _ => false
+              end) ctx.
 
-Definition filter_ptr_vecptr_typs (ctx: list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_, t) =>
-            match t with
-            | TYPE_Pointer _ => true
-            | TYPE_Vector _ (TYPE_Pointer _) => true
-            | _ => false
-            end) ctx.
+  Definition filter_ptr_vecptr_typs (ctx: list (ident * typ)) : list (ident * typ) :=
+    filter (fun '(_, t) =>
+              match t with
+              | TYPE_Pointer _ => true
+              | TYPE_Vector _ (TYPE_Pointer _) => true
+              | _ => false
+              end) ctx.
 
   (* TODO: These currently don't generate pointer types either. *)
 
@@ -1127,16 +1127,16 @@ Section ExpGenerators.
                               paths)))
            fields (0%Z, DList_empty : DList (typ * DList Z))).
 
-(* The method is mainly used by extractvalue and insertvalue,
+  (* The method is mainly used by extractvalue and insertvalue,
    which requires at least one index for getting inside the aggregate type.
    There is a possibility for us to get nil path. The filter below will get rid of that possibility.
    Given that the nilpath will definitely be at the beginning of a list of options, we can essentially get the tail. *)
-Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
-  tl (DList_paths_to_list_paths (get_index_paths_agg_aux t_from DList_empty)).
+  Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
+    tl (DList_paths_to_list_paths (get_index_paths_agg_aux t_from DList_empty)).
 
-Definition get_ctx_ptrs  : GenLLVM (list (ident * typ)) :=
-  ctx <- get_ctx;;
-  ret (filter_ptr_typs ctx).
+  Definition get_ctx_ptrs  : GenLLVM (list (ident * typ)) :=
+    ctx <- get_ctx;;
+    ret (filter_ptr_typs ctx).
 
 (* Index path without getting into vector *)
   Fixpoint get_index_paths_insertvalue_aux (t_from : typ) (pre_path : DList Z) (ctx : list (ident * typ)) {struct t_from}: bool * DList (typ * DList (Z)) :=
