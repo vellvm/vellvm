@@ -1052,13 +1052,6 @@ Section ExpGenerators.
     | _ => false
     end.
 
-  (* TODO: Move this *)
-  Fixpoint replicateM {M : Type -> Type} {A} `{Monad M} (n : nat) (ma : M A) : M (list A)
-    := match n with
-       | O    => a <- ma;; ret [a]
-       | S n' => a <- ma;; rest <- replicateM n' ma;; ret (a :: rest)
-       end.
-
   (* This needs to use normalized_typ_eq, instead of dtyp_eq because of pointer types...
      dtyps only tell you that a type is a pointer, the other type
      information about the pointers is erased.
@@ -1609,7 +1602,7 @@ Section InstrGenerators.
        vol <- lift (arbitrary : G bool);;
        let pt := TYPE_Pointer ptr_typ in
        let ptr := EXP_Ident ptr_ident in
-       align <- ret None;;
+       align <- ret (Some 1);;
        ret (ptr_typ, INSTR_Load vol ptr_typ (pt, ptr) align).
 
   Definition gen_store_to (ptr : texp typ) : GenLLVM (typ * instr typ)
@@ -1617,7 +1610,7 @@ Section InstrGenerators.
       match ptr with
       | (TYPE_Pointer t, pexp) =>
         vol   <- lift arbitrary;;
-        align <- ret None;;
+        align <- ret (Some 1);;
 
         e <- resize_LLVM 0 (gen_exp t);;
         let val := (t, e) in
