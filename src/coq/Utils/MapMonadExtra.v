@@ -321,28 +321,6 @@ Proof.
   induction xs; cbn; auto.
 Qed.
 
-Definition commutative_maps {A} (g : A -> M A) (f : A -> M A) :=
-    forall x, (y <- g x ;; f y)  ≈ (y <- f x ;; g y).
-  
-Lemma map_monad_commutative_maps :
-  forall A (xs : list A) (g : A -> M A) (f : A -> M A)
-    (HC : commutative_maps g f),
-    (ys <- map_monad g xs ;; map_monad f ys)
-      ≈
-    map_monad (fun x => y <- (g x) ;; f y) xs.
-Proof.
-  (* Is this true? *)
-  intros. destruct LAWS.
-  unfold commutative_maps in HC.
-  rewrite <- map_monad_map. 
-
-
-  (* unfold map_monad. repeat unfold map. *)
-  (* rewrite bind_bind. setoid_rewrite bind_ret_l. *)
-
-
-Admitted.  
-
 Lemma map_monad_cons
       {A B} (f:A -> M B) (x:A) (l:list A) :
   (map_monad f (x::l)) ≈
@@ -420,7 +398,7 @@ Qed.
 Lemma map_monad_ret_cons :
   forall {A B} (a : A) (b : B) (f : A -> M B) (l1 : list A) (l2 : list B)
     (H : map_monad f (a :: l1) ≈ ret (b :: l2)),
-    map_monad f l1≈ ret l2.
+    map_monad f l1 ≈ ret l2.
 Proof.
   intros. simpl in H. apply BINDRETINV in H. repeat destruct H.
   apply BINDRETINV in H0. repeat destruct H0. apply EQRET in H1.
@@ -510,7 +488,54 @@ Proof.
     + specialize (IHl2 H l1). apply map_monad_MReturns_cons in HEq.
       specialize (IHl2 HEq). repeat destruct IHl2. exists x0.
       split. apply in_cons. apply H0. apply H0. auto.
-Qed. 
+Qed.
+
+Definition commutative_maps {A} (g : A -> M A) (f : A -> M A) :=
+    forall x, (y <- g x ;; f y) ≈ (y <- f x ;; g y).
+
+(* by induction on xs *) 
+Lemma map_comm_lemma : forall {A B} (b : A) (xs : list A) (g : A -> M A) (f : A -> M A) (k : A -> list A -> M B) (* (HC : commutative_maps f g) *), 
+    (bs <- map_monad g xs ;; x <- f b ;; k x bs) ≈
+      (x <- f b ;;  bs <- map_monad g xs ;; k x bs).
+Proof.
+  intros. destruct LAWS. induction xs.
+  + simpl. rewrite bind_ret_l.
+    setoid_rewrite bind_ret_l. reflexivity.
+  + rewrite map_monad_cons.
+    rewrite bind_bind.
+    setoid_rewrite map_monad_cons.
+    repeat setoid_rewrite bind_bind.
+    
+
+
+    setoid_rewrite map_monad_cons.
+    rewrite bind_bind. setoid_rewrite bind_bind.
+    setoid_rewrite bind_bind. setoid_rewrite bind_ret_l.
+    
+    
+Admitted. 
+
+    (* use unfold, monad laws, induction, reassociate binds, etc. *) 
+
+  
+Lemma map_monad_commutative_maps :
+  forall A (xs : list A) (g : A -> M A) (f : A -> M A)
+    (HC : commutative_maps g f),
+    (ys <- map_monad g xs ;; map_monad f ys)
+      ≈
+    map_monad (fun x => y <- (g x) ;; f y) xs.
+Proof.
+  (* Is this true? *)
+  intros. destruct LAWS.
+  unfold commutative_maps in HC.
+  rewrite <- map_monad_map. 
+
+
+  (* unfold map_monad. repeat unfold map. *)
+  (* rewrite bind_bind. setoid_rewrite bind_ret_l. *)
+
+
+Admitted.  
 
 End MonadContext.
 Arguments map_monad_In {_ _ _ _}.
