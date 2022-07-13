@@ -1059,16 +1059,72 @@ Section ExpGenerators.
   Definition filter_type (ty : typ) (ctx : list (ident * typ)) : list (ident * typ)
     := filter (fun '(i, t) => normalized_typ_eq (normalize_type ctx ty) (normalize_type ctx t)) ctx.
 
-  (* TODO: Also generate negative numbers *)
-  Definition gen_non_zero : G Z
-    := n <- (arbitrary : G nat);;
-       ret (Z.of_nat (S n)).
+  (* Can't use choose for these functions because it gets extracted to
+     ocaml's Random.State.int function which has small bounds. *)
+
+  Definition gen_unsigned_bitwidth (bitwidth : N) : G Z :=
+    z <- (arbitrary : G Z);;
+    ret (Z.modulo z (2^(Z.of_N bitwidth))).
+
+  Definition gen_signed_bitwidth (bitwidth : N) : G Z :=
+    let zbitwidth := Z.of_N bitwidth in
+    let zhalf := zbitwidth - 1 in
+
+    z <- (arbitrary : G Z);;
+    negative <- (arbitrary : G bool);;
+    if negative : bool
+    then
+      ret (-((Z.modulo z (2^zhalf)) + 1))
+    else
+      ret (Z.modulo z (2^zhalf)).
+
+  Definition gen_gt_zero (bitwidth : option N) : G Z
+    := match bitwidth with
+       | None =>
+           (* Unbounded *)
+           n <- (arbitrary : G N);;
+           ret (Z.of_N (N.succ n))
+       | Some bitwidth =>
+           n <- (arbitrary : G N);;
+           ret (1 + Z.modulo (Z.of_N n) (2^(Z.of_N bitwidth) - 1))
+       end.
+
+  Definition gen_non_zero (bitwidth : option N) : G Z
+    := match bitwidth with
+       | None =>
+           (* Unbounded *)
+           x <- gen_gt_zero None;;
+           elems_ x [x; -x]
+       | Some bitwidth =>
+           let zbitwidth := Z.of_N bitwidth in
+           let zhalf := zbitwidth - 1 in
+           if Z.eqb zhalf 0
+           then ret (-1)
+           else
+             negative <- (arbitrary : G bool);;
+             if (negative : bool)
+             then
+               n <- (arbitrary : G N);;
+               ret (-(1 + Z.modulo (Z.of_N n) (2^zhalf)))
+             else
+               n <- (arbitrary : G N);;
+               ret (1 + Z.modulo (Z.of_N n) (2^zhalf - 1))
+       end.
 
   Definition gen_non_zero_exp_size (sz : nat) (t : typ) : GenLLVM (exp typ)
     := match t with
-       | TYPE_I n => ret EXP_Integer <*> lift gen_non_zero (* TODO: should integer be forced to be in bounds? *)
-       | TYPE_IPTR => ret EXP_Integer <*> lift gen_non_zero
-       | TYPE_Float => ret EXP_Float <*> lift fing32
+       | TYPE_I n => ret EXP_Integer <*> lift (gen_non_zero (Some n))
+       | TYPE_IPTR => ret EXP_Integer <*> lift (gen_non_zero None)
+       | TYPE_Float => ret EXP_Float <*> lift fing32 (* TODO: is this actually non-zero...? *)
+       | TYPE_Double => lift failGen(*ret EXP_Double <*> lift fing64*) (*TODO : Fix generator for double*)
+       | _ => lift failGen
+       end.
+
+  Definition gen_gt_zero_exp_size (sz : nat) (t : typ) : GenLLVM (exp typ)
+    := match t with
+       | TYPE_I n => ret EXP_Integer <*> lift (gen_gt_zero (Some n))
+       | TYPE_IPTR => ret EXP_Integer <*> lift (gen_gt_zero None)
+       | TYPE_Float => lift failGen
        | TYPE_Double => lift failGen(*ret EXP_Double <*> lift fing64*) (*TODO : Fix generator for double*)
        | _ => lift failGen
        end.
@@ -1406,9 +1462,8 @@ Definition genType: G (typ) :=
       let fix gen_size_0 (t: typ) :=
           match t with
           | TYPE_I n                  =>
-              let size := BinIntDef.Z.of_N (N.min (2 ^ n) (2 ^ 30 - 1)) in
-              z <- lift (choose (0, size - 1));;
-              ret (EXP_Integer (z))
+              z <- lift (gen_unsigned_bitwidth n);;
+              ret (EXP_Integer z)
           (* lift (x <- (arbitrary : G nat);; ret (Z.of_nat x))
            (* TODO: should the integer be forced to be in bounds? *) *)
           | TYPE_IPTR => ret EXP_Integer <*> lift (arbitrary : G Z)
@@ -1500,21 +1555,26 @@ Definition genType: G (typ) :=
   gen_ibinop_exp_typ (t : typ) : GenLLVM (exp typ)
   :=
     ibinop <- lift gen_ibinop;;
-    if Handlers.LLVMEvents.DV.iop_is_div ibinop
-    then ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t
-    else
-    exp_value <- gen_exp_size 0 t;;
-    if Handlers.LLVMEvents.DV.iop_is_shift ibinop
+    if Handlers.LLVMEvents.DV.iop_is_div ibinop && Handlers.LLVMEvents.DV.iop_is_signed ibinop
     then
-      let max_shift_size :=
-        match t with
-        | TYPE_I i => BinIntDef.Z.of_N (i - 1)
-        | _ => 0
-        end in
-      x <- lift (choose (0, max_shift_size));;
-      let exp_value2 : exp typ := EXP_Integer x in
-      ret (OP_IBinop ibinop t exp_value exp_value2)
-    else ret (OP_IBinop ibinop t exp_value) <*> gen_exp_size 0 t
+      ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t
+    else
+      if Handlers.LLVMEvents.DV.iop_is_div ibinop
+      then
+        ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_gt_zero_exp_size 0 t
+      else
+        exp_value <- gen_exp_size 0 t;;
+        if Handlers.LLVMEvents.DV.iop_is_shift ibinop
+        then
+          let max_shift_size :=
+            match t with
+            | TYPE_I i => BinIntDef.Z.of_N (i - 1)
+            | _ => 0
+            end in
+          x <- lift (choose (0, max_shift_size));;
+          let exp_value2 : exp typ := EXP_Integer x in
+          ret (OP_IBinop ibinop t exp_value exp_value2)
+        else ret (OP_IBinop ibinop t exp_value) <*> gen_exp_size 0 t
   with
   gen_ibinop_exp (isz : N) : GenLLVM (exp typ)
     :=
