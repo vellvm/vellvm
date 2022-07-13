@@ -472,45 +472,45 @@ Section GenerationState.
 End GenerationState.
 
 Section TypGenerators.
-    (*filter all the (ident, typ) in ctx such that typ is a ptr*)
-Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_, t) => match t with
+  (*filter all the (ident, typ) in ctx such that typ is a ptr*)
+  Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
+    filter (fun '(_, t) => match t with
                         | TYPE_Pointer _ => true
                         | _ => false
-                     end) ctx.
+                        end) ctx.
 
   Definition filter_sized_typs (typ_ctx: list (ident * typ)) (ctx : list (ident * typ)) : list (ident * typ) :=
     filter (fun '(_, t) => is_sized_type typ_ctx t) ctx.
 
-Definition filter_non_void_typs (ctx : list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_, t) => match t with
-                      | TYPE_Void => false
-                      | _ => true
-                      end) ctx.
+  Definition filter_non_void_typs (ctx : list (ident * typ)) : list (ident * typ) :=
+    filter (fun '(_, t) => match t with
+                        | TYPE_Void => false
+                        | _ => true
+                        end) ctx.
 
-Definition filter_agg_typs (ctx: list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_, t) =>
-            match t with
-            | TYPE_Array sz _ => N.ltb 0 sz
-            | TYPE_Struct l
-            | TYPE_Packed_struct l => negb (seq.nilp l)
-            | _ => false
-            end ) ctx.
+  Definition filter_agg_typs (ctx: list (ident * typ)) : list (ident * typ) :=
+    filter (fun '(_, t) =>
+              match t with
+              | TYPE_Array sz _ => N.ltb 0 sz
+              | TYPE_Struct l
+              | TYPE_Packed_struct l => negb (seq.nilp l)
+              | _ => false
+              end ) ctx.
 
-Definition filter_vec_typs (ctx: list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_, t) =>
-            match t with
-            | TYPE_Vector _ _ => true
-            | _ => false
-            end) ctx.
+  Definition filter_vec_typs (ctx: list (ident * typ)) : list (ident * typ) :=
+    filter (fun '(_, t) =>
+              match t with
+              | TYPE_Vector _ _ => true
+              | _ => false
+              end) ctx.
 
-Definition filter_ptr_vecptr_typs (ctx: list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_, t) =>
-            match t with
-            | TYPE_Pointer _ => true
-            | TYPE_Vector _ (TYPE_Pointer _) => true
-            | _ => false
-            end) ctx.
+  Definition filter_ptr_vecptr_typs (ctx: list (ident * typ)) : list (ident * typ) :=
+    filter (fun '(_, t) =>
+              match t with
+              | TYPE_Pointer _ => true
+              | TYPE_Vector _ (TYPE_Pointer _) => true
+              | _ => false
+              end) ctx.
 
   (* TODO: These currently don't generate pointer types either. *)
 
@@ -1059,16 +1059,72 @@ Section ExpGenerators.
   Definition filter_type (ty : typ) (ctx : list (ident * typ)) : list (ident * typ)
     := filter (fun '(i, t) => normalized_typ_eq (normalize_type ctx ty) (normalize_type ctx t)) ctx.
 
-  (* TODO: Also generate negative numbers *)
-  Definition gen_non_zero : G Z
-    := n <- (arbitrary : G nat);;
-       ret (Z.of_nat (S n)).
+  (* Can't use choose for these functions because it gets extracted to
+     ocaml's Random.State.int function which has small bounds. *)
+
+  Definition gen_unsigned_bitwidth (bitwidth : N) : G Z :=
+    z <- (arbitrary : G Z);;
+    ret (Z.modulo z (2^(Z.of_N bitwidth))).
+
+  Definition gen_signed_bitwidth (bitwidth : N) : G Z :=
+    let zbitwidth := Z.of_N bitwidth in
+    let zhalf := zbitwidth - 1 in
+
+    z <- (arbitrary : G Z);;
+    negative <- (arbitrary : G bool);;
+    if negative : bool
+    then
+      ret (-((Z.modulo z (2^zhalf)) + 1))
+    else
+      ret (Z.modulo z (2^zhalf)).
+
+  Definition gen_gt_zero (bitwidth : option N) : G Z
+    := match bitwidth with
+       | None =>
+           (* Unbounded *)
+           n <- (arbitrary : G N);;
+           ret (Z.of_N (N.succ n))
+       | Some bitwidth =>
+           n <- (arbitrary : G N);;
+           ret (1 + Z.modulo (Z.of_N n) (2^(Z.of_N bitwidth) - 1))
+       end.
+
+  Definition gen_non_zero (bitwidth : option N) : G Z
+    := match bitwidth with
+       | None =>
+           (* Unbounded *)
+           x <- gen_gt_zero None;;
+           elems_ x [x; -x]
+       | Some bitwidth =>
+           let zbitwidth := Z.of_N bitwidth in
+           let zhalf := zbitwidth - 1 in
+           if Z.eqb zhalf 0
+           then ret (-1)
+           else
+             negative <- (arbitrary : G bool);;
+             if (negative : bool)
+             then
+               n <- (arbitrary : G N);;
+               ret (-(1 + Z.modulo (Z.of_N n) (2^zhalf)))
+             else
+               n <- (arbitrary : G N);;
+               ret (1 + Z.modulo (Z.of_N n) (2^zhalf - 1))
+       end.
 
   Definition gen_non_zero_exp_size (sz : nat) (t : typ) : GenLLVM (exp typ)
     := match t with
-       | TYPE_I n => ret EXP_Integer <*> lift gen_non_zero (* TODO: should integer be forced to be in bounds? *)
-       | TYPE_IPTR => ret EXP_Integer <*> lift gen_non_zero
-       | TYPE_Float => ret EXP_Float <*> lift fing32
+       | TYPE_I n => ret EXP_Integer <*> lift (gen_non_zero (Some n))
+       | TYPE_IPTR => ret EXP_Integer <*> lift (gen_non_zero None)
+       | TYPE_Float => ret EXP_Float <*> lift fing32 (* TODO: is this actually non-zero...? *)
+       | TYPE_Double => lift failGen(*ret EXP_Double <*> lift fing64*) (*TODO : Fix generator for double*)
+       | _ => lift failGen
+       end.
+
+  Definition gen_gt_zero_exp_size (sz : nat) (t : typ) : GenLLVM (exp typ)
+    := match t with
+       | TYPE_I n => ret EXP_Integer <*> lift (gen_gt_zero (Some n))
+       | TYPE_IPTR => ret EXP_Integer <*> lift (gen_gt_zero None)
+       | TYPE_Float => lift failGen
        | TYPE_Double => lift failGen(*ret EXP_Double <*> lift fing64*) (*TODO : Fix generator for double*)
        | _ => lift failGen
        end.
@@ -1127,16 +1183,16 @@ Section ExpGenerators.
                               paths)))
            fields (0%Z, DList_empty : DList (typ * DList Z))).
 
-(* The method is mainly used by extractvalue and insertvalue,
+  (* The method is mainly used by extractvalue and insertvalue,
    which requires at least one index for getting inside the aggregate type.
    There is a possibility for us to get nil path. The filter below will get rid of that possibility.
    Given that the nilpath will definitely be at the beginning of a list of options, we can essentially get the tail. *)
-Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
-  tl (DList_paths_to_list_paths (get_index_paths_agg_aux t_from DList_empty)).
+  Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
+    tl (DList_paths_to_list_paths (get_index_paths_agg_aux t_from DList_empty)).
 
-Definition get_ctx_ptrs  : GenLLVM (list (ident * typ)) :=
-  ctx <- get_ctx;;
-  ret (filter_ptr_typs ctx).
+  Definition get_ctx_ptrs  : GenLLVM (list (ident * typ)) :=
+    ctx <- get_ctx;;
+    ret (filter_ptr_typs ctx).
 
 (* Index path without getting into vector *)
   Fixpoint get_index_paths_insertvalue_aux (t_from : typ) (pre_path : DList Z) (ctx : list (ident * typ)) {struct t_from}: bool * DList (typ * DList (Z)) :=
@@ -1405,7 +1461,11 @@ Definition genType: G (typ) :=
           end in
       let fix gen_size_0 (t: typ) :=
           match t with
-          | TYPE_I n                  => ret EXP_Integer <*> lift (arbitrary : G Z) (* lift (x <- (arbitrary : G nat);; ret (Z.of_nat x)) (* TODO: should the integer be forced to be in bounds? *) *)
+          | TYPE_I n                  =>
+              z <- lift (gen_unsigned_bitwidth n);;
+              ret (EXP_Integer z)
+          (* lift (x <- (arbitrary : G nat);; ret (Z.of_nat x))
+           (* TODO: should the integer be forced to be in bounds? *) *)
           | TYPE_IPTR => ret EXP_Integer <*> lift (arbitrary : G Z)
           | TYPE_Pointer subtyp       => lift failGen
           (* Only pointer type expressions might be conversions? Maybe GEP? *)
@@ -1495,21 +1555,26 @@ Definition genType: G (typ) :=
   gen_ibinop_exp_typ (t : typ) : GenLLVM (exp typ)
   :=
     ibinop <- lift gen_ibinop;;
-    if Handlers.LLVMEvents.DV.iop_is_div ibinop
-    then ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t
-    else
-    exp_value <- gen_exp_size 0 t;;
-    if Handlers.LLVMEvents.DV.iop_is_shift ibinop
+    if Handlers.LLVMEvents.DV.iop_is_div ibinop && Handlers.LLVMEvents.DV.iop_is_signed ibinop
     then
-      let max_shift_size :=
-        match t with
-        | TYPE_I i => BinIntDef.Z.of_N (i - 1)
-        | _ => 0
-        end in
-      x <- lift (choose (0, max_shift_size));;
-      let exp_value2 : exp typ := EXP_Integer x in
-      ret (OP_IBinop ibinop t exp_value exp_value2)
-    else ret (OP_IBinop ibinop t exp_value) <*> gen_exp_size 0 t
+      ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t
+    else
+      if Handlers.LLVMEvents.DV.iop_is_div ibinop
+      then
+        ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_gt_zero_exp_size 0 t
+      else
+        exp_value <- gen_exp_size 0 t;;
+        if Handlers.LLVMEvents.DV.iop_is_shift ibinop
+        then
+          let max_shift_size :=
+            match t with
+            | TYPE_I i => BinIntDef.Z.of_N (i - 1)
+            | _ => 0
+            end in
+          x <- lift (choose (0, max_shift_size));;
+          let exp_value2 : exp typ := EXP_Integer x in
+          ret (OP_IBinop ibinop t exp_value exp_value2)
+        else ret (OP_IBinop ibinop t exp_value) <*> gen_exp_size 0 t
   with
   gen_ibinop_exp (isz : N) : GenLLVM (exp typ)
     :=
