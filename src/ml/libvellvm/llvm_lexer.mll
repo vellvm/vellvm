@@ -33,6 +33,7 @@
 
   exception Lex_error_unterminated_string of Lexing.position
 
+  (* TODO: Replace this function with a hash table, which should be a lot more efficient. *)
   let kw = function
   | "target"                       -> KW_TARGET
   | "datalayout"                   -> KW_DATALAYOUT
@@ -56,10 +57,20 @@
   | "default"                      -> KW_DEFAULT
   | "hidden"                       -> KW_HIDDEN
   | "protected"                    -> KW_PROTECTED
+
   | "ccc"                          -> KW_CCC
   | "fastcc"                       -> KW_FASTCC
   | "coldcc"                       -> KW_COLDCC
   | "cc"                           -> KW_CC
+  | "webkit_jscc"                  -> KW_WEBKIT_JSCC
+  | "anyregcc"                     -> KW_ANYREGCC
+  | "preserve_mostcc"              -> KW_PRESERVE_MOSTCC
+  | "preserve_allcc"               -> KW_PRESERVE_ALLCC
+  | "cxx_fast_tlscc"               -> KW_CXX_FAST_TLSCC
+  | "tailcc"                       -> KW_TAILCC
+  | "swiftcc"                      -> KW_SWIFTCC
+  | "swifttailcc"                  -> KW_SWIFTTAILCC
+  | "cfguard_checkcc"              -> KW_CFGUARD_CHECKCC
   | "unnamed_addr"                 -> KW_UNNAMED_ADDR
   | "type"                         -> KW_TYPE
   | "opaque"                       -> KW_OPAQUE

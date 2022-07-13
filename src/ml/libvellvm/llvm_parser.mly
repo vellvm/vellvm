@@ -139,9 +139,10 @@ let is_externally_initialized l =
 %token KW_DATALAYOUT 
 %token KW_TRIPLE 
 %token KW_SOURCE_FILENAME
+
+(* Linkage *)
 %token KW_PRIVATE 
 %token KW_INTERNAL 
-
 %token KW_AVAILABLE_EXTERNALLY 
 %token KW_LINKONCE 
 %token KW_WEAK 
@@ -151,16 +152,31 @@ let is_externally_initialized l =
 %token KW_LINKONCE_ODR 
 %token KW_WEAK_ODR 
 %token KW_EXTERNAL 
-%token KW_DLLIMPORT 
-%token KW_DLLEXPORT
+
+(* Visibility *)
 %token KW_DEFAULT 
 %token KW_HIDDEN 
 %token KW_PROTECTED
 
+(* dll storage *)
+%token KW_DLLIMPORT 
+%token KW_DLLEXPORT
+
+(* Calling Conventions: cconv *)
 %token KW_CCC 
 %token KW_FASTCC 
 %token KW_COLDCC 
 %token KW_CC
+%token KW_WEBKIT_JSCC
+%token KW_ANYREGCC
+%token KW_PRESERVE_MOSTCC
+%token KW_PRESERVE_ALLCC
+%token KW_CXX_FAST_TLSCC
+%token KW_TAILCC
+%token KW_SWIFTCC
+%token KW_SWIFTTAILCC
+%token KW_CFGUARD_CHECKCC
+
 %token KW_UNNAMED_ADDR
 %token KW_TYPE 
 %token KW_X 
@@ -735,7 +751,18 @@ visibility:
   | KW_PROTECTED { VISIBILITY_Protected }
 
 cconv:
-  |KW_CCC{CC_Ccc}|KW_FASTCC{CC_Fastcc}|KW_COLDCC{CC_Coldcc}
+  | KW_CCC        {CC_Ccc}
+  | KW_FASTCC     {CC_Fastcc}
+  | KW_COLDCC     {CC_Coldcc}
+  | KW_WEBKIT_JSCC        {CC_Webkit_jscc}
+  | KW_ANYREGCC		  {CC_Anyregcc}
+  | KW_PRESERVE_MOSTCC	  {CC_Preserve_mostcc}
+  | KW_PRESERVE_ALLCC	  {CC_Preserve_allcc}
+  | KW_CXX_FAST_TLSCC	  {CC_Cxx_fast_tlscc}
+  | KW_TAILCC		  {CC_Tailcc}
+  | KW_SWIFTCC		  {CC_Swiftcc}
+  | KW_SWIFTTAILCC	  {CC_Swifttailcc}
+  | KW_CFGUARD_CHECKCC	  {CC_cfguard_checkcc}
   |KW_CC n=INTEGER{CC_Cc n}
 
 typ:
@@ -762,8 +789,8 @@ param_attr:
   | KW_ZEROEXT                   { PARAMATTR_Zeroext           }
   | KW_SIGNEXT                   { PARAMATTR_Signext           }
   | KW_INREG                     { PARAMATTR_Inreg             }
-  | KW_BYVAL t=typ                     { PARAMATTR_Byval t             }
-  | KW_INALLOCA t=typ                 { PARAMATTR_Inalloca t          }
+  | KW_BYVAL t=typ               { PARAMATTR_Byval t           }
+  | KW_INALLOCA t=typ            { PARAMATTR_Inalloca t        }
   | KW_SRET t=typ                { PARAMATTR_Sret t            }
   | KW_ALIGN n=INTEGER           { PARAMATTR_Align n           }
   | KW_NOALIAS                   { PARAMATTR_Noalias           }
