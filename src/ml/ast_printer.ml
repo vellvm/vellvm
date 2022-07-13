@@ -195,7 +195,8 @@ and conversion_type : Format.formatter -> LLVMAst.conversion_type -> unit =
                | Fptosi   -> "Fptosi"
                | Inttoptr -> "Inttoptr"
                | Ptrtoint -> "Ptrtoint"
-               | Bitcast  -> "Bitcast")
+               | Bitcast  -> "Bitcast"
+               | Addrspacecast -> "Addrspacecast")
 
 and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
   fun (ppf:Format.formatter) vv ->
@@ -475,11 +476,11 @@ and instr : Format.formatter -> (LLVMAst.typ LLVMAst.instr) -> unit =
       texp ptr
       (pp_print_option pp_print_int) a
 
-  | INSTR_VAArg -> pp_print_string ppf "INSTR_VAarg"
+  | INSTR_VAArg ( _, _) -> pp_print_string ppf "INSTR_VAarg"
   | INSTR_LandingPad
-  | INSTR_AtomicCmpXchg
-  | INSTR_AtomicRMW
-  | INSTR_Fence -> assert false
+  | INSTR_AtomicCmpXchg _
+  | INSTR_AtomicRMW _
+  | INSTR_Fence (_, _) -> assert false
 
 and branch_label : Format.formatter -> LLVMAst.raw_id -> unit =
   fun ppf id ->
@@ -589,20 +590,30 @@ and param_attr : Format.formatter -> LLVMAst.param_attr -> unit =
   | PARAMATTR_Zeroext -> pp_print_string ppf "PARAMATTR_Zeroext"
   | PARAMATTR_Signext  -> pp_print_string ppf "PARAMATTR_Signext"
   | PARAMATTR_Inreg -> pp_print_string ppf "PARAMATTR_Inreg"
-  | PARAMATTR_Byval -> pp_print_string ppf "PARAMATTR_Byval"
-  | PARAMATTR_Inalloca -> pp_print_string ppf "PARAMATTR_Inalloca"
-  | PARAMATTR_Sret -> pp_print_string ppf "PARAMATTR_Sret"
+  | PARAMATTR_Byval t -> (pp_print_string ppf "PARAMATTR_Byval "; typ ppf t)
+  | PARAMATTR_Byref t -> (pp_print_string ppf "PARAMATTR_Byref "; typ ppf t)
+  | PARAMATTR_Preallocated t -> (pp_print_string ppf "PARAMATTR_Preallocated "; typ ppf t)                         
+  | PARAMATTR_Inalloca t -> (pp_print_string ppf "PARAMATTR_Inalloca "; typ ppf t)
+  | PARAMATTR_Sret t -> (pp_print_string ppf "PARAMATTR_Sret "; typ ppf t)
+  | PARAMATTR_Elementtype t -> (pp_print_string ppf "PARAMATTR_Elementtype "; typ ppf t)
   | PARAMATTR_Align n -> fprintf ppf "PARAMATTR_Align %d%%Z" (to_int n)
   | PARAMATTR_Noalias -> pp_print_string ppf "PARAMATTR_Noalias"
   | PARAMATTR_Nocapture -> pp_print_string ppf "PARAMATTR_Nocapture"
   | PARAMATTR_Readonly -> pp_print_string ppf "PARAMATTR_Readonly"
+  | PARAMATTR_Nofree -> fprintf ppf "PARAMATTR_Nofree"
   | PARAMATTR_Nest -> pp_print_string ppf "PARAMATTR_Nest"
   | PARAMATTR_Returned  -> pp_print_string ppf "PARAMATTR_Returned"
   | PARAMATTR_Nonnull -> pp_print_string ppf "PARAMATTR_Nonnull"
   | PARAMATTR_Dereferenceable n -> fprintf ppf "PARAMATTR_Dereferenceable %d%%Z" (to_int n)
+  | PARAMATTR_Dereferenceable_or_null n -> fprintf ppf "PARAMATTR_Dereferenceable_or_null %d%%Z" (to_int n)
+  | PARAMATTR_Swiftself -> pp_print_string ppf "PARAMATTR_Swiftself"
+  | PARAMATTR_Swiftasync -> pp_print_string ppf "PARAMATTR_Swiftasync"
+  | PARAMATTR_Swifterror -> pp_print_string ppf "PARAMATTR_Swiftaerror"
   | PARAMATTR_Immarg -> fprintf ppf "PARAMATTR_Immarg"
   | PARAMATTR_Noundef -> fprintf ppf "PARAMATTR_Noundef"
-  | PARAMATTR_Nofree -> fprintf ppf "PARAMATTR_Nofree"
+  | PARAMATTR_Alignstack n -> fprintf ppf "PARAMATTR_Alignstack %d%%Z" (to_int n)
+  | PARAMATTR_Allocalign -> pp_print_string ppf "PARAMATTR_Allocalign"
+  | PARAMATTR_Allocptr -> pp_print_string ppf "PARAMATTR_Allocptr"
 
 and thread_local_storage : Format.formatter -> LLVMAst.thread_local_storage -> unit =
   fun ppf ->
@@ -707,6 +718,16 @@ and cconv : Format.formatter -> LLVMAst.cconv -> unit =
   | CC_Fastcc -> pp_print_string ppf "CC_Fastcc"
   | CC_Coldcc -> pp_print_string ppf "CC_Coldcc"
   | CC_Cc n -> fprintf ppf "CC_Cc %d%%Z" (to_int n)
+  | CC_Webkit_jscc -> pp_print_string ppf "CC_Webkit_jscc"
+  | CC_Anyregcc -> pp_print_string ppf "CC_Anyregcc"
+  | CC_Preserve_mostcc -> pp_print_string ppf "CC_Preserve_mostcc"
+  | CC_Preserve_allcc -> pp_print_string ppf "CC_Preserve_allcc"
+  | CC_Cxx_fast_tlscc -> pp_print_string ppf "CC_Cxx_fast_tlscc"
+  | CC_Tailcc -> pp_print_string ppf "CC_Tailcc"
+  | CC_Swiftcc -> pp_print_string ppf "CC_Swiftcc"
+  | CC_Swifttailcc -> pp_print_string ppf "CC_Swifttailcc"
+  | CC_cfguard_checkcc  -> pp_print_string ppf "CC_cfguard_checkcc "
+
 
 and llvm_int : Format.formatter -> LLVMAst.int -> unit =
   fun ppf i -> fprintf ppf "%d%%Z" (to_int i)
@@ -715,19 +736,26 @@ and fn_attr : Format.formatter -> LLVMAst.fn_attr -> unit =
   fun ppf ->
   function
   | FNATTR_Alignstack n -> fprintf ppf "FNATTR_Alignstack %a" llvm_int n
-  | FNATTR_Allocsize l ->
-     fprintf ppf "FNATTR_Allocsize (%a)" (pp_print_list ~pp_sep:pp_sc_space llvm_int) l
+  | FNATTR_Alloc_family fam -> fprintf ppf "FNATTR_Alloc_family fam %s" (of_str fam)
+  | FNATTR_Allockind kind -> fprintf ppf "FNATTR_Alloc_kind kind %s" (of_str kind)
+  | FNATTR_Allocsize (a, no) ->
+     fprintf ppf "FNATTR_Allocsize %a %a" llvm_int a (pp_print_option llvm_int) no
   | FNATTR_Alwaysinline -> pp_print_string ppf "FNATTR_Alwaysinline"
   | FNATTR_Builtin -> pp_print_string ppf "FNATTR_Builtin"
   | FNATTR_Cold -> pp_print_string ppf "FNATTR_Cold"
   | FNATTR_Convergent -> pp_print_string ppf "FNATTR_Convergent"
-  | FNATTR_Hot -> pp_print_string ppf "FNATTR_Hot"
+  | FNATTR_Disable_sanitizer_instrumentation -> fprintf ppf "FNATTR_Disable_sanitizer_instrumentation"
+  | FNATTR_Dontcall_error -> fprintf ppf "FNATTR_Dontcall_error"
+  | FNATTR_Dontcall_warn -> fprintf ppf "FNATTR_Dontcall_warn"
+  | FNATTR_Frame_pointer -> fprintf ppf "FNATTR_Frame_pointer"
+  | FNATTR_Hot -> fprintf ppf "FNATTR_Hot"
   | FNATTR_Inaccessiblememonly -> pp_print_string ppf "FNATTR_Inaccessiblememonly"
   | FNATTR_Inaccessiblemem_or_argmemonly-> pp_print_string ppf "FNATTR_Inaccessible_or_argmemonly"
   | FNATTR_Inlinehint -> pp_print_string ppf "FNATTR_Inlinehint"
   | FNATTR_Jumptable -> pp_print_string ppf "FNATTR_Jumptable"
   | FNATTR_Minsize -> pp_print_string ppf "FNATTR_Minsize"
   | FNATTR_Naked -> pp_print_string ppf "FNATTR_Naked"
+  | FNATTR_No_inline_line_tables -> fprintf ppf "FNATTR_No_inline_line_tables "
   | FNATTR_No_jump_tables -> pp_print_string ppf "FNATTR_No_jump_tables"
   | FNATTR_Nobuiltin -> pp_print_string ppf "FNATTR_Nobuiltin"
   | FNATTR_Noduplicate -> pp_print_string ppf "FNATTR_Noduplicate"
@@ -736,6 +764,7 @@ and fn_attr : Format.formatter -> LLVMAst.fn_attr -> unit =
   | FNATTR_Noinline -> pp_print_string ppf "FNATTR_Noinline"
   | FNATTR_Nomerge -> pp_print_string ppf "FNATTR_Nomerge"
   | FNATTR_Nonlazybind -> pp_print_string ppf "FNATTR_Nonlazybind"
+  | FNATTR_Noprofile -> fprintf ppf "FNATTR_Noprofile"
   | FNATTR_Noredzone -> pp_print_string ppf "FNATTR_Noredzone"
   | FNATTR_Indirect_tls_seg_refs -> pp_print_string ppf "FNATTR_Indirect_tls_seg_refs"
   | FNATTR_Noreturn -> pp_print_string ppf "FNATTR_Noreturn"
@@ -743,12 +772,18 @@ and fn_attr : Format.formatter -> LLVMAst.fn_attr -> unit =
   | FNATTR_Willreturn -> pp_print_string ppf "FNATTR_Willreturn"
   | FNATTR_Nosync -> pp_print_string ppf "FNATTR_Nosync"
   | FNATTR_Nounwind -> pp_print_string ppf "FNATTR_Nounwind"
+  | FNATTR_Nosanitize_bounds -> fprintf ppf "FNATTR_Nosanitize_bounds"
+  | FNATTR_Nosanitize_coverage -> fprintf ppf "FNATTR_Nosanitize_coverage"
   | FNATTR_Null_pointer_is_valid -> pp_print_string ppf "FNATTR_Null_pointer_is_valid"
   | FNATTR_Optforfuzzing -> pp_print_string ppf "FNATTR_Optforfuzzing"
   | FNATTR_Optnone -> pp_print_string ppf "FNATTR_Optnone"
   | FNATTR_Optsize -> pp_print_string ppf "FNATTR_Optsize"
+  | FNATTR_Patchable_function -> fprintf ppf "FNATTR_Patchable_function"
+  | FNATTR_Probe_stack -> fprintf ppf "FNATTR_Probe_stack"
   | FNATTR_Readnone -> pp_print_string ppf "FNATTR_Readnone"
   | FNATTR_Readonly -> pp_print_string ppf "FNATTR_Readonly"
+  | FNATTR_Stack_probe_size -> fprintf ppf "FNATTR_Stack_probe_size"
+  | FNATTR_No_stack_arg_probe -> fprintf ppf "FNATTR_No_stack_arg_probe"
   | FNATTR_Writeonly -> pp_print_string ppf "FNATTR_Writeonly"
   | FNATTR_Argmemonly -> pp_print_string ppf "FNATTR_Argmemonly"
   | FNATTR_Returns_twice -> pp_print_string ppf "FNATTR_Returns_twice"
@@ -761,13 +796,26 @@ and fn_attr : Format.formatter -> LLVMAst.fn_attr -> unit =
   | FNATTR_Speculative_load_hardening -> pp_print_string ppf "FNATTR_Speculative_load_hardening"
   | FNATTR_Speculatable -> pp_print_string ppf "FNATTR_Speculatable"
   | FNATTR_Ssp -> pp_print_string ppf "FNATTR_Ssp"
-  | FNATTR_Sspreq -> pp_print_string ppf "FNATTR_Sspreq"
   | FNATTR_Sspstrong -> pp_print_string ppf "FNATTR_Sspstrong"
+  | FNATTR_Sspreq -> pp_print_string ppf "FNATTR_Sspreq"
   | FNATTR_Strictfp -> pp_print_string ppf "FNATTR_Strictfp"
-  | FNATTR_Uwtable -> pp_print_string ppf "FNATTR_Uwtable"
+  | FNATTR_Denormal_fp_math(s1, s2)  ->
+    fprintf ppf "FNATTR_Denormal_fp_math %s %a" (of_str s1)
+      (pp_print_option (fun ppf x -> pp_print_string ppf (of_str x))) s2
+  | FNATTR_Denormal_fp_math_32 (s1, s2) ->
+    fprintf ppf "FNATTR_Denormal_fp_math_32 %s %a" (of_str s1)
+      (pp_print_option (fun ppf x -> pp_print_string ppf (of_str x))) s2
+  | FNATTR_Thunk -> fprintf ppf "FNATTR_Thunk"
+  | FNATTR_Tls_load_hoist -> fprintf ppf "FNATTR_Tls_load_hoist"
+  | FNATTR_Uwtable b -> fprintf ppf "FNATTR_Uwtable %s" (if b then "true" else "false")
   | FNATTR_Nocf_check -> pp_print_string ppf "FNATTR_Nocf_check"
   | FNATTR_Shadowcallstack -> pp_print_string ppf "FNATTR_Shadowcallstack"
   | FNATTR_Mustprogress -> pp_print_string ppf "FNATTR_Mustprogress"
+  | FNATTR_Warn_stack_size th -> fprintf ppf "FNATTR_Warn_stack_size %a" llvm_int th
+  | FNATTR_vscale_range (min, max) ->
+    fprintf ppf "FNATTR_vscale_range %a %a)"
+      llvm_int min (pp_print_option llvm_int) max
+  | FNATTR_Min_legal_vector_width size -> fprintf ppf "FNATTR_Min_legal_vector_width %a" llvm_int size
   | FNATTR_String s -> fprintf ppf "FNATTR_String %s" (of_str s)
   | FNATTR_Key_value (s,s') -> fprintf ppf "FNATTR_Key_value (%s,%s)" (of_str s) (of_str s')
   | FNATTR_Attr_grp n  -> fprintf ppf "FNATTR_Attr_grp %d%%Z" (to_int n)

@@ -399,24 +399,58 @@ Section ReprInstances.
     repr := repr_block
     |}.
 
+(*
+  
   Definition repr_param_attr (pa : param_attr) : string :=
     match pa with
     | PARAMATTR_Zeroext => "PARAMATTR_Zeroext"
     | PARAMATTR_Signext => "PARAMATTR_Signext"
     | PARAMATTR_Inreg => "PARAMATTR_Inreg"
-    | PARAMATTR_Byval => "PARAMATTR_Byval"
-    | PARAMATTR_Inalloca => "PARAMATTR_Inalloca"
-    | PARAMATTR_Sret => "PARAMATTR_Sret"
+    | PARAMATTR_Byval t => "PARAMATTR_Byval" ++ repr t 
+    | PARAMATTR_Inalloca t => "PARAMATTR_Inalloca" ++ repr t
+    | PARAMATTR_Sret t => "PARAMATTR_Sret" ++ repr t
     | PARAMATTR_Align a => "(PARAMATTR_Align " ++ repr a ++ ")"
     | PARAMATTR_Noalias => "PARAMATTR_Noalias"
     | PARAMATTR_Nocapture => "PARAMATTR_Nocapture"
-    | PARAMATTR_Readonly => "PARAMATTR_Readonly"
+   (* | PARAMATTR_Readonly => "PARAMATTR_Readonly" *)
     | PARAMATTR_Nest => "PARAMATTR_Nest"
     | PARAMATTR_Returned => "PARAMATTR_Returned"
     | PARAMATTR_Nonnull => "PARAMATTR_Nonnull"
     | PARAMATTR_Dereferenceable a => "(PARAMATTR_Dereferenceable " ++ repr a ++ ")"
     | PARAMATTR_Immarg => "PARAMATTR_Immarg"
     | PARAMATTR_Noundef => "PARAMATTR_Noundef"
+    | PARAMATTR_Nofree => "PARAMATTR_Nofree"
+    end.
+ *)
+
+   Definition repr_param_attr (pa : param_attr) : string :=
+    match pa with
+    | PARAMATTR_Zeroext => "PARAMATTR_Zeroext"
+    | PARAMATTR_Signext => "PARAMATTR_Signext"
+    | PARAMATTR_Inreg => "PARAMATTR_Inreg"
+    | PARAMATTR_Byval t => "PARAMATTR_Byval" ++ repr t
+    | PARAMATTR_Byref (t) => "PARAMATTR_Byref" ++ repr t
+    | PARAMATTR_Preallocated (t) => "PARAMATTR_Preallocated" ++ repr t                        
+    | PARAMATTR_Inalloca t => "PARAMATTR_Inalloca" ++ repr t
+    | PARAMATTR_Sret t => "PARAMATTR_Sret" ++ repr t
+    | PARAMATTR_Elementtype (t) => "PARAMATTR_Elementtype" ++ repr t                      
+    | PARAMATTR_Align a => "(PARAMATTR_Align " ++ repr a ++ ")"
+    | PARAMATTR_Noalias => "PARAMATTR_Noalias"
+    | PARAMATTR_Nocapture => "PARAMATTR_Nocapture"
+    | PARAMATTR_Readonly => "PARAMATTR_Readonly" 
+    | PARAMATTR_Nest => "PARAMATTR_Nest"
+    | PARAMATTR_Returned => "PARAMATTR_Returned"
+    | PARAMATTR_Nonnull => "PARAMATTR_Nonnull"
+    | PARAMATTR_Dereferenceable a => "(PARAMATTR_Dereferenceable " ++ repr a ++ ")"
+    | PARAMATTR_Dereferenceable_or_null (a) =>  "(PARAMATTR_Dereferenceable_or_null " ++ repr a ++ ")"
+    | PARAMATTR_Swiftself =>  "PARAMATTR_Swiftself"
+    | PARAMATTR_Swiftasync => "PARAMATTR_Swiftasync"
+    | PARAMATTR_Swifterror => "PARAMATTR_Swifterror"                                   
+    | PARAMATTR_Immarg => "PARAMATTR_Immarg"
+    | PARAMATTR_Noundef => "PARAMATTR_Noundef"
+    | PARAMATTR_Alignstack (a) => "PARAMATTR_Alignstack" ++ repr a
+    | PARAMATTR_Allocalign =>  "PARAMATTR_Allocalign"
+    | PARAMATTR_Allocptr => "PARAMATTR_Allocptr"
     | PARAMATTR_Nofree => "PARAMATTR_Nofree"
     end.
 
@@ -466,6 +500,15 @@ Section ReprInstances.
     | CC_Fastcc => "CC_Fastcc"
     | CC_Coldcc => "CC_Coldcc"
     | CC_Cc cc => "CC_Cc cc"
+    | CC_Webkit_jscc => "CC_Webkit_jscc"     
+    | CC_Anyregcc  => "CC_Anyregcc"
+    | CC_Preserve_allcc => "CC_Preserve_allcc"
+    | CC_Cxx_fast_tlscc =>  "CC_Cxx_fast_tlscc"
+    | CC_Tailcc =>  "CC_Tailcc"
+    | CC_Swiftcc => "CC_Swiftcc"
+    | CC_Swifttailcc => "CC_Swifttailcc"
+    | CC_cfguard_checkcc => "CC_cfguard_checkcc"
+    | CC_Preserve_mostc => "CC_Preserve_mostc"                  
     end.
 
   Global Instance reprCconv : Repr cconv :=
@@ -474,11 +517,22 @@ Section ReprInstances.
   Definition repr_fn_attr (fa : fn_attr) : string :=
     match fa with
     | FNATTR_Alignstack a => "(FNATTR_Alignstack " ++ repr a ++ ")"
-    | FNATTR_Allocsize l => "(FNATTR_Allocsize " ++ repr l ++ ")"
+    | FNATTR_Alloc_family (fam) => "(FNATTR_Alloc_family" ++ repr fam ++ ")"
+    | FNATTR_Allockind (kind) => "(FNATTR_Allockind" ++ repr kind ++ ")"                                            
+    | FNATTR_Allocsize l l2 => let printable_l2 := match l2 with
+                                                 |None => ""
+                                                 |Some s => repr s
+                                                 end in
+                                  
+        "(FNATTR_Allocsize " ++ repr l ++ printable_l2 ++ ")"
     | FNATTR_Alwaysinline => "FNATTR_Alwaysinline"
     | FNATTR_Builtin => "FNATTR_Builtin"
     | FNATTR_Cold => "FNATTR_Cold"
     | FNATTR_Convergent => "FNATTR_Convergent"
+    | FNATTR_Disable_sanitizer_instrumentation => "FNATTR__Disable_sanitizer_instrumentation"
+    | FNATTR_Dontcall_error => " FNATTR_Dontcall_error"                            
+    | FNATTR_Dontcall_warn => "FNATTR_Dontcall_warn"                          
+    | FNATTR_Frame_pointer => "FNATTR_Frame_pointer"                            
     | FNATTR_Hot => "FNATTR_Hot"
     | FNATTR_Inaccessiblememonly => "FNATTR_Inaccessiblememonly"
     | FNATTR_Inaccessiblemem_or_argmemonly => "FNATTR_Inaccessiblemem_or_argmemonly"
@@ -486,6 +540,7 @@ Section ReprInstances.
     | FNATTR_Jumptable => "FNATTR_Jumptable"
     | FNATTR_Minsize => "FNATTR_Minsize"
     | FNATTR_Naked => "FNATTR_Naked"
+    | FNATTR_No_inline_line_tables  => "FNATTR_No_inline_line_tables"                                   
     | FNATTR_No_jump_tables => "FNATTR_No_jump_tables"
     | FNATTR_Nobuiltin => "FNATTR_Nobuiltin"
     | FNATTR_Noduplicate => "FNATTR_Noduplicate"
@@ -494,6 +549,7 @@ Section ReprInstances.
     | FNATTR_Noinline => "FNATTR_Noinline"
     | FNATTR_Nomerge => "FNATTR_Nomerge"
     | FNATTR_Nonlazybind => "FNATTR_Nonlazybind"
+    | FNATTR_Noprofile => "FNATTR_Noprofile"                        
     | FNATTR_Noredzone => "FNATTR_Noredzone"
     | FNATTR_Indirect_tls_seg_refs => "FNATTR_Indirect_tls_seg_refs"
     | FNATTR_Noreturn => "FNATTR_Noreturn"
@@ -501,12 +557,18 @@ Section ReprInstances.
     | FNATTR_Willreturn => "FNATTR_Willreturn"
     | FNATTR_Nosync => "FNATTR_Nosync"
     | FNATTR_Nounwind => "FNATTR_Nounwind"
+    | FNATTR_Nosanitize_bounds => "FNATTR_Nosanitize_bounds"
+    | FNATTR_Nosanitize_coverage => "FNATTR_Nosanitize_coverage"                                
     | FNATTR_Null_pointer_is_valid => "FNATTR_Null_pointer_is_valid"
     | FNATTR_Optforfuzzing => "FNATTR_Optforfuzzing"
     | FNATTR_Optnone => "FNATTR_Optnone"
     | FNATTR_Optsize => "FNATTR_Optsize"
+    | FNATTR_Patchable_function => "FNATTR_Patchable_function"
+    | FNATTR_Probe_stack => "FNATTR_Probe_stack"   
     | FNATTR_Readnone => "FNATTR_Readnone"
     | FNATTR_Readonly => "FNATTR_Readonly"
+    | FNATTR_Stack_probe_size => "FNATTR_Stack_probe_size"                             
+    | FNATTR_No_stack_arg_probe => "FNATTR_No_stack_arg_probe"                             
     | FNATTR_Writeonly => "FNATTR_Writeonly"
     | FNATTR_Argmemonly => "FNATTR_Argmemonly"
     | FNATTR_Returns_twice => "FNATTR_Returns_twice"
@@ -522,10 +584,32 @@ Section ReprInstances.
     | FNATTR_Sspreq => "FNATTR_Sspreq"
     | FNATTR_Sspstrong => "FNATTR_Sspstrong"
     | FNATTR_Strictfp => "FNATTR_Strictfp"
-    | FNATTR_Uwtable => "FNATTR_Uwtable"
+    | FNATTR_Denormal_fp_math (s1) (s2) =>
+        let printable_sw := match s2 with
+                            |None => ""        
+                            |Some s => repr s            
+                            end in                      
+        "(FNATTR_Denormal_fp_math " ++ repr s1 ++ printable_sw ++ ")"
+    | FNATTR_Denormal_fp_math_32 (s1) (s2) =>
+         let printable_sw := match s2 with
+                            |None => ""        
+                            |Some s => repr s            
+                            end in                      
+         "(FNATTR_Denormal_fp_math32" ++ repr s1 ++ printable_sw ++ ")"
+    | FNATTR_Thunk => "FNATTR_Thunk"
+    | FNATTR_Tls_load_hoist => "FNATTR_Tls_load_hoist"
+    | FNATTR_Uwtable sync => "FNATTR_Uwtable" ++ repr sync
     | FNATTR_Nocf_check => "FNATTR_Nocf_check"
     | FNATTR_Shadowcallstack => "FNATTR_Shadowcallstack"
     | FNATTR_Mustprogress => "FNATTR_Mustprogress"
+    | FNATTR_Warn_stack_size (th) => "FNATTR_Warn_stack_size" ++ repr th  
+    | FNATTR_vscale_range (min) (max) =>
+         let printable_max := match max with
+                            |None => ""        
+                            |Some s => repr s            
+                            end in                      
+         "(FNATTR_Denormal_fp_math32" ++ repr min ++ printable_max ++ ")"
+    | FNATTR_Min_legal_vector_width  (size) => "FNATTR_Min_legal_vector_width" ++ repr size                               
     | FNATTR_String s => "(FNATTR_String " ++ repr s ++ ")"
     | FNATTR_Key_value kv => "(FNATTR_Key_value " ++ repr kv ++ ")"
     | FNATTR_Attr_grp g => "(FNATTR_Attr_grp " ++ repr g ++ ")"

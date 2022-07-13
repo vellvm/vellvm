@@ -1963,6 +1963,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       | Fptosi
       | Fptrunc
       | Fpext
+      | Addrspacecast    
         => Conv_Illegal "TODO: unimplemented numeric conversion"
       end.
     Arguments get_conv_case _ _ _ _ : simpl nomatch.
