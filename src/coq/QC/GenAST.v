@@ -1555,6 +1555,7 @@ Definition genType: G (typ) :=
   gen_ibinop_exp_typ (t : typ) : GenLLVM (exp typ)
   :=
     ibinop <- lift gen_ibinop;;
+
     if Handlers.LLVMEvents.DV.iop_is_div ibinop && Handlers.LLVMEvents.DV.iop_is_signed ibinop
     then
       ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t
@@ -1961,6 +1962,15 @@ Section InstrGenerators.
       name <- new_global_id;;
       gen_definition name ret_t args.
 
+  Definition gen_helper_function: GenLLVM (definition typ (block typ * list (block typ)))
+    := gen_new_definition (TYPE_I 8) [].
+
+  Definition gen_helper_function_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
+    := ret TLE_Definition <*> gen_helper_function.
+
+  Definition gen_global : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
+    := fmap ret gen_helper_function_tle.
+  
   Definition gen_main : GenLLVM (definition typ (block typ * list (block typ)))
     := gen_definition (Name "main") (TYPE_I 8) [].
 
@@ -1968,6 +1978,9 @@ Section InstrGenerators.
     := ret TLE_Definition <*> gen_main.
 
   Definition gen_llvm :GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
-    := fmap ret gen_main_tle.
+    :=
+    globals <- gen_global;;
+    main <- gen_main_tle;;
+    ret (globals ++ [main]).
 
 End InstrGenerators.
