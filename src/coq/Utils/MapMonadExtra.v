@@ -490,32 +490,25 @@ Proof.
       split. apply in_cons. apply H0. apply H0. auto.
 Qed.
 
-Definition commutative_maps {A} (g : A -> M A) (f : A -> M A) :=
-    forall x, (y <- g x ;; f y) ≈ (y <- f x ;; g y).
+Definition commutative_maps {A} (g f : A -> M A) :=
+  forall {B} a b (k : A -> A -> M B),
+    (y <- g a ;; z <- f b ;; k y z) ≈ (z <- f b ;; y <- g a ;; k y z).
 
-(* by induction on xs *) 
-Lemma map_comm_lemma : forall {A B} (b : A) (xs : list A) (g : A -> M A) (f : A -> M A) (k : A -> list A -> M B) (* (HC : commutative_maps f g) *), 
+Lemma map_comm_lemma : forall {A B} (b : A) (xs : list A) (g : A -> M A) (f : A -> M A) (k : A -> list A -> M B) (HC : commutative_maps g f), 
     (bs <- map_monad g xs ;; x <- f b ;; k x bs) ≈
       (x <- f b ;;  bs <- map_monad g xs ;; k x bs).
 Proof.
-  intros. destruct LAWS. induction xs.
-  + simpl. rewrite bind_ret_l.
+  destruct LAWS. 
+  induction xs.
+  + intros. simpl. rewrite bind_ret_l.
     setoid_rewrite bind_ret_l. reflexivity.
-  + rewrite map_monad_cons.
-    rewrite bind_bind.
-    setoid_rewrite map_monad_cons.
-    repeat setoid_rewrite bind_bind.
-    
-
-
-    setoid_rewrite map_monad_cons.
+  + intros. setoid_rewrite map_monad_cons.
     rewrite bind_bind. setoid_rewrite bind_bind.
     setoid_rewrite bind_bind. setoid_rewrite bind_ret_l.
-    
-    
-Admitted. 
-
-    (* use unfold, monad laws, induction, reassociate binds, etc. *) 
+    unfold commutative_maps in HC. rewrite <- HC.
+    setoid_rewrite IHxs. reflexivity.
+    assumption.
+Qed.      
 
   
 Lemma map_monad_commutative_maps :
@@ -525,17 +518,21 @@ Lemma map_monad_commutative_maps :
       ≈
     map_monad (fun x => y <- (g x) ;; f y) xs.
 Proof.
-  (* Is this true? *)
-  intros. destruct LAWS.
-  unfold commutative_maps in HC.
-  rewrite <- map_monad_map. 
-
-
-  (* unfold map_monad. repeat unfold map. *)
-  (* rewrite bind_bind. setoid_rewrite bind_ret_l. *)
-
-
-Admitted.  
+  intros A xs. induction xs.
+  + intros. simpl. rewrite bind_ret_l.
+    apply map_monad_nil.
+  + intros. rewrite map_monad_cons. rewrite bind_bind.
+    setoid_rewrite map_monad_cons.
+    rewrite bind_bind.
+    setoid_rewrite bind_bind.
+    setoid_rewrite bind_ret_l.
+    setoid_rewrite map_monad_cons.
+    unfold commutative_maps in HC.
+    setoid_rewrite map_comm_lemma.
+    setoid_rewrite <- IHxs.
+    setoid_rewrite bind_bind.
+    reflexivity. auto. auto.
+Qed. 
 
 End MonadContext.
 Arguments map_monad_In {_ _ _ _}.
