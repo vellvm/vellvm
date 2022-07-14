@@ -598,6 +598,7 @@ Section TypGenerators.
     | 0%nat => gen_sized_typ_0
     | (S sz') =>
         ctx <- get_ctx;;
+        let ctx := filter_non_fun_typs ctx in (* Don't need function in this generator *)
         aliases <- get_typ_ctx;;
         let typs_in_ctx := map (fun '(_, typ) => ret typ) (filter_sized_typs aliases ctx) in
         freq_LLVM
@@ -1000,6 +1001,13 @@ Section ExpGenerators.
        | TYPE_Identified id => false
        end.
 
+  (* This needs to use normalized_typ_eq, instead of dtyp_eq because of pointer types...
+     dtyps only tell you that a type is a pointer, the other type
+     information about the pointers is erased.
+   *)
+  Definition filter_type (ty : typ) (ctx : list (ident * typ)) : list (ident * typ)
+    := filter (fun '(i, t) => normalized_typ_eq (normalize_type ctx ty) (normalize_type ctx t)) ctx.
+  
   Variant contains_flag :=
   | soft
   | hard.
@@ -1071,15 +1079,17 @@ Section ExpGenerators.
             end
         | _ => fold_left (fun acc x => acc || contains_typ x t flag) fields false
         end
-    | _ => false
+    | TYPE_Function ret_t args =>
+        match t with
+        | TYPE_Function ret_t args =>
+            match flag with
+            | soft => true
+            | hard => normalized_typ_eq t_from t
+            end
+        | _ => false
+        end
+    | _ => false 
     end.
-
-  (* This needs to use normalized_typ_eq, instead of dtyp_eq because of pointer types...
-     dtyps only tell you that a type is a pointer, the other type
-     information about the pointers is erased.
-   *)
-  Definition filter_type (ty : typ) (ctx : list (ident * typ)) : list (ident * typ)
-    := filter (fun '(i, t) => normalized_typ_eq (normalize_type ctx ty) (normalize_type ctx t)) ctx.
 
   (* Can't use choose for these functions because it gets extracted to
      ocaml's Random.State.int function which has small bounds. *)
@@ -1465,6 +1475,12 @@ Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
     end;;
   ret (new_tptr, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr)).
 
+Definition get_ret_params_from_tfun (tfun: typ) :=
+  match tfun with
+  | TYPE_Function ret_t args => (ret_t, args)
+  | _ => (TYPE_Void, []) (* Won't reach here... Hopefully *)
+  end.
+
 Definition genTypHelper (n: nat): G (typ) :=
   run_GenLLVM (gen_typ_non_void_size n).
 
@@ -1618,7 +1634,7 @@ Definition genType: G (typ) :=
        | _ => lift failGen
       end.
 
-  Definition gen_exp (t : typ) : GenLLVM (exp typ)
+ Definition gen_exp (t : typ) : GenLLVM (exp typ)
     := sized_LLVM (fun sz => gen_exp_size sz t).
 
 Definition gen_insertvalue (typ_in_ctx: ident * typ): GenLLVM (typ * instr typ) :=
@@ -1629,6 +1645,18 @@ Definition gen_insertvalue (typ_in_ctx: ident * typ): GenLLVM (typ * instr typ) 
   ex <- hide_ctx (gen_exp_size 0 tsub);;
   (* Generate all of the type*)
   ret (tagg, INSTR_Op (OP_InsertValue (tagg, EXP_Ident id) (tsub, ex) path_for_insertvalue)).
+
+Definition gen_call : GenLLVM (typ * instr typ) :=
+  ctx <- get_ctx;;
+  let fun_in_ctx := filter (fun '(_, t) => contains_typ t (TYPE_Function TYPE_Void []) soft) ctx in
+  '(id, tfun) <- oneOf_LLVM (map ret fun_in_ctx);;
+  let '(ret_t, args) := get_ret_params_from_tfun tfun in
+  args_exp <- map_monad
+               (fun (arg_typ:typ) =>
+                  arg_exp <- gen_exp_size 0 arg_typ;;
+                  ret (arg_typ, arg_exp))
+               args;;
+  ret (ret_t, INSTR_Call (tfun, EXP_Ident id) []).
 
   Definition gen_texp : GenLLVM (texp typ)
     := t <- gen_typ;;
