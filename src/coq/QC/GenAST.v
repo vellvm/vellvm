@@ -532,7 +532,7 @@ Section TypGenerators.
               | TYPE_Function _ _ => false
               | _ => true
               end) ctx.
-  
+
   (* TODO: These currently don't generate pointer types either. *)
 
   (* Not sized in the QuickChick sense, sized in the LLVM sense. *)
@@ -710,7 +710,7 @@ Section TypGenerators.
                 (* ; TYPE_X86_mmx *)
                 (* ; TYPE_Opaque *)
           ])).
-  
+
   Program Fixpoint gen_typ_non_void_size (sz : nat) {measure sz} : GenLLVM typ :=
     match sz with
     | 0%nat => gen_typ_non_void_0
@@ -1007,7 +1007,7 @@ Section ExpGenerators.
    *)
   Definition filter_type (ty : typ) (ctx : list (ident * typ)) : list (ident * typ)
     := filter (fun '(i, t) => normalized_typ_eq (normalize_type ctx ty) (normalize_type ctx t)) ctx.
-  
+
   Variant contains_flag :=
   | soft
   | hard.
@@ -1088,7 +1088,7 @@ Section ExpGenerators.
             end
         | _ => false
         end
-    | _ => false 
+    | _ => false
     end.
 
   Definition filter_fun_typs (ctx: var_context) : var_context :=
@@ -1654,12 +1654,12 @@ Definition gen_call : GenLLVM (typ * instr typ) :=
   let fun_in_ctx := filter (fun '(_, t) => contains_typ t (TYPE_Function TYPE_Void []) soft) ctx in
   '(id, tfun) <- oneOf_LLVM (map ret fun_in_ctx);;
   let '(ret_t, args) := get_ret_params_from_tfun tfun in
-  args_exp <- map_monad
+  args_texp <- map_monad
                (fun (arg_typ:typ) =>
                   arg_exp <- gen_exp_size 0 arg_typ;;
                   ret (arg_typ, arg_exp))
                args;;
-  ret (ret_t, INSTR_Call (tfun, EXP_Ident id) []).
+  ret (ret_t, INSTR_Call (tfun, EXP_Ident id) args_texp).
 
   Definition gen_texp : GenLLVM (texp typ)
     := t <- gen_typ;;
@@ -1991,7 +1991,7 @@ Section InstrGenerators.
 
   Definition is_main (name : global_id)
     := match name with
-       | Name sname => String.string_dec sname "main"%string 
+       | Name sname => String.string_dec sname "main"%string
        | Anon _
        | Raw _ => false
        end.
@@ -2039,7 +2039,7 @@ Section InstrGenerators.
 
   Definition gen_global : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     := fmap ret gen_helper_function_tle.
-  
+
   Definition gen_main : GenLLVM (definition typ (block typ * list (block typ)))
     := gen_definition (Name "main") (TYPE_I 8) [].
 
