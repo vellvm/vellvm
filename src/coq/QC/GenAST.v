@@ -346,6 +346,19 @@ Section GenerationState.
            set_ptrtoint_ctx ptoi_ctx
        end.
 
+  Definition filter_global_from_variable_ctxs (ctxs : all_var_contexts) : all_var_contexts
+    := let is_global_id (id: ident) :=
+         match id with
+         | ID_Global _ => true
+         | ID_Local _ => false
+         end in
+       match ctxs with
+       | (ctx, ptoi_ctx) =>
+           let globals_in_ctx := filter (fun '(id, _) => is_global_id id) ctx in
+           let globals_in_ptoi_ctx := filter (fun '(_, id, _) => is_global_id id) ptoi_ctx in
+           (globals_in_ctx, globals_in_ptoi_ctx)
+       end.
+
   Definition add_to_ctx (x : (ident * typ)) : GenLLVM unit
     := ctx <- get_ctx;;
        let new_ctx := x :: ctx in
@@ -1933,7 +1946,7 @@ Section InstrGenerators.
 
   Definition gen_blocks (t : typ) : GenLLVM (block typ * list (block typ))
     := sized_LLVM (fun n => fmap snd (gen_blocks_sz n t [])).
-
+  
   (* Don't want to generate CFGs, actually. Want to generated TLEs *)
   Definition gen_definition (name : global_id) (ret_t : typ) (args : list (local_id * typ)) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
