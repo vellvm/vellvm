@@ -41,6 +41,8 @@
   | "triple"                       -> KW_TRIPLE
   | "define"                       -> KW_DEFINE
   | "declare"                      -> KW_DECLARE
+
+  (* Linkage *)
   | "private"                      -> KW_PRIVATE
   | "internal"                     -> KW_INTERNAL
   | "available_externally"         -> KW_AVAILABLE_EXTERNALLY
@@ -52,12 +54,17 @@
   | "linkonce_odr"                 -> KW_LINKONCE_ODR
   | "weak_odr"                     -> KW_WEAK_ODR
   | "external"                     -> KW_EXTERNAL
+
+  (* DLL storage *)
   | "dllimport"                    -> KW_DLLIMPORT
   | "dllexport"                    -> KW_DLLEXPORT
+
+  (* Visibility *)
   | "default"                      -> KW_DEFAULT
   | "hidden"                       -> KW_HIDDEN
   | "protected"                    -> KW_PROTECTED
 
+  (* Calling Conventions cconv *)
   | "ccc"                          -> KW_CCC
   | "fastcc"                       -> KW_FASTCC
   | "coldcc"                       -> KW_COLDCC
@@ -71,6 +78,8 @@
   | "swiftcc"                      -> KW_SWIFTCC
   | "swifttailcc"                  -> KW_SWIFTTAILCC
   | "cfguard_checkcc"              -> KW_CFGUARD_CHECKCC
+
+
   | "unnamed_addr"                 -> KW_UNNAMED_ADDR
   | "type"                         -> KW_TYPE
   | "opaque"                       -> KW_OPAQUE
@@ -83,25 +92,45 @@
   | "localdynamic"                 -> KW_LOCALDYNAMIC
   | "initialexec"                  -> KW_INITIALEXEC
   | "localexec"                    -> KW_LOCALEXEC
+
+  (* Parameter Attributes param_attr *)
   | "zeroext"                      -> KW_ZEROEXT
   | "signext"                      -> KW_SIGNEXT
   | "inreg"                        -> KW_INREG
   | "byval"                        -> KW_BYVAL
+  | "byref"                        -> KW_BYREF  
+  | "preallocated"                 -> KW_PREALLOCATED
+  | "inalloca"                     -> KW_INALLOCA
   | "sret"                         -> KW_SRET
+  | "elementtype"                  -> KW_ELEMENTTYPE
+(* | "align"                        -> KW_ALIGN   (* align is used multiple ways *) *)
   | "noalias"                      -> KW_NOALIAS
   | "nocapture"                    -> KW_NOCAPTURE
+  | "readonly"                     -> KW_READONLY
+  | "nofree"                       -> KW_NOFREE
   | "nest"                         -> KW_NEST
-  | "dereferenceable"              -> KW_DEREFERENCEABLE
-  | "inalloca"                     -> KW_INALLOCA
   | "returned"                     -> KW_RETURNED
   | "nonnull"                      -> KW_NONNULL
-  
+  | "dereferenceable"              -> KW_DEREFERENCEABLE
+  | "dereferenceable_or_null"      -> KW_DEREFERENCEABLE_OR_NULL
+  | "swiftself"                    -> KW_SWIFTSELF
+  | "swiftasync"                   -> KW_SWIFTASYNC
+  | "swifterror"                   -> KW_SWIFTERROR
+  | "immarg"                       -> KW_IMMARG  
+  | "noundef"                      -> KW_NOUNDEF
   | "alignstack"                   -> KW_ALIGNSTACK
+  | "allocalign"                   -> KW_ALLOCALIGN
+  | "allocptr"                     -> KW_ALLOCPTR
+
+(* Function Attributes *)
+  | "allockind"                    -> KW_ALLOCKIND
   | "allocsize"                    -> KW_ALLOCSIZE
   | "alwaysinline"                 -> KW_ALWAYSINLINE
   | "builtin"                      -> KW_BUILTIN
   | "cold"                         -> KW_COLD
   | "convergent"                   -> KW_CONVERGENT
+  | "disable_sanitizer_instrumentation" -> KW_DISABLE_SANITIZER_INSTRUMENTATION
+  | "fn_ret_thunk_extern"          -> KW_FN_RET_THUNK_EXTERN
   | "hot"                          -> KW_HOT
   | "inaccessiblememonly"          -> KW_INACCESSIBLEMEMONLY
   | "inaccessiblemem_or_argmemeonly" -> KW_INACCESSIBLEMEM_OR_ARGMEMONLY
@@ -112,7 +141,6 @@
   | "no_jump_tables"               -> KW_NO_JUMP_TABLES
   | "nobuiltin"                    -> KW_NOBUILTIN
   | "noduplicate"                  -> KW_NODUPLICATE
-  | "nofree"                       -> KW_NOFREE
   | "noimplicitfloat"              -> KW_NOIMPLICITFLOAT
   | "noinline"                     -> KW_NOINLINE
   | "nomerge"                      -> KW_NOMERGE
@@ -124,12 +152,13 @@
   | "willreturn"                   -> KW_WILLRETURN
   | "nosync"                       -> KW_NOSYNC
   | "nounwind"                     -> KW_NOUNWIND
+  | "nosantitize_bounds"           -> KW_NOSANITIZE_BOUNDS
+  | "nosantitize_coverage"         -> KW_NOSANITIZE_COVERAGE
   | "null_pointer_is_valid"        -> KW_NULL_POINTER_IS_VALID
   | "optforfuzzing"                -> KW_OPTFORFUZZING
   | "optnone"                      -> KW_OPTNONE
   | "optsize"                      -> KW_OPTSIZE
   | "readnone"                     -> KW_READNONE
-  | "readonly"                     -> KW_READONLY
   | "writeonly"                    -> KW_WRITEONLY
   | "argmemonly"                   -> KW_ARGMEMONLY
   | "returns_twice"                -> KW_RETURNS_TWICE
@@ -146,9 +175,12 @@
   | "sspstrong"                    -> KW_SSPSTRONG
   | "strictfp"                     -> KW_STRICTFP
   | "uwtable"                      -> KW_UWTABLE
+  | "sync"                         -> KW_SYNC
+  | "async"                        -> KW_ASYNC
   | "nocf_check"                   -> KW_NOCF_CHECK
   | "shadowcallstack"              -> KW_SHADOWCALLSTACK
   | "mustprogress"                 -> KW_MUSTPROGRESS
+  | "vscale_range"                 -> KW_VSCALE_RANGE
 
   | "align"                        -> KW_ALIGN
   | "gc"                           -> KW_GC
@@ -156,8 +188,6 @@
   | "unwind"                       -> KW_UNWIND
   | "tail"                         -> KW_TAIL
   | "volatile"                     -> KW_VOLATILE
-  | "immarg"                       -> KW_IMMARG  
-  | "noundef"                      -> KW_NOUNDEF
 
   (* instrs *)
   | "add"            -> KW_ADD
@@ -371,31 +401,32 @@ and lexed_id = parse
 
 {
 
-  let parsing_err lexbuf =
+  let parsing_err lexbuf msg =
     let pos = Lexing.lexeme_start_p lexbuf in
     let msg =
-        Printf.sprintf "Parsing error: line %d, column %d, token '%s'\n%s"
+        Printf.sprintf "Parsing error: line %d, column %d, token '%s': %s\n%s"
                        pos.Lexing.pos_lnum
                        (pos.Lexing.pos_cnum - pos.Lexing.pos_bol)
                        (Lexing.lexeme lexbuf)
+		       msg
 		       (Printexc.get_backtrace ())
       in failwith msg
 
   let parse lexbuf =
     try Llvm_parser.toplevel_entities token lexbuf
     with 
-    | Llvm_parser.Error -> parsing_err lexbuf
+    | Llvm_parser.Error -> parsing_err lexbuf "Error token encountered"
     | Failure s -> 
       begin
-        parsing_err lexbuf
+        parsing_err lexbuf s
       end   
 
   let parse_test_call lexbuf = 
     try Llvm_parser.test_call token lexbuf
-    with Llvm_parser.Error -> parsing_err lexbuf
+    with Llvm_parser.Error -> parsing_err lexbuf "Error token encountered"
 
   let parse_texp lexbuf =
     try Llvm_parser.texp token lexbuf
-    with Llvm_parser.Error -> parsing_err lexbuf
+    with Llvm_parser.Error -> parsing_err lexbuf "Error token encountered"
     
 }

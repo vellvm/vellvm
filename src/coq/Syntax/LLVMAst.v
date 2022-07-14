@@ -156,7 +156,7 @@ Variant frame_pointer_val : Set :=
 
 Variant fn_attr : Set :=
 | FNATTR_Alignstack (a:int)
-| FNATTR_Alloc_family (fam : string)
+(* | FNATTR_Alloc_family (fam : string) - FNATTR_KeyValue *)
 | FNATTR_Allockind (kind : string)                         
 | FNATTR_Allocsize (a1 : int) (a2 : option int)                 
 | FNATTR_Alwaysinline
@@ -164,9 +164,10 @@ Variant fn_attr : Set :=
 | FNATTR_Cold
 | FNATTR_Convergent
 | FNATTR_Disable_sanitizer_instrumentation
-| FNATTR_Dontcall_error
-| FNATTR_Dontcall_warn
-| FNATTR_Frame_pointer
+(* | FNATTR_Dontcall_error - FNATTR_String *)
+(* | FNATTR_Dontcall_warn - FNATTR_String *)
+| FNATTR_Fn_ret_thunk_extern      
+(* | FNATTR_Frame_pointer - FNATTR_KeyValue *)
 | FNATTR_Hot
 | FNATTR_Inaccessiblememonly
 | FNATTR_Inaccessiblemem_or_argmemonly
@@ -174,7 +175,7 @@ Variant fn_attr : Set :=
 | FNATTR_Jumptable
 | FNATTR_Minsize
 | FNATTR_Naked
-| FNATTR_No_inline_line_tables 
+(* | FNATTR_No_inline_line_tables - FNATTR_String *)
 | FNATTR_No_jump_tables
 | FNATTR_Nobuiltin
 | FNATTR_Noduplicate
@@ -197,12 +198,12 @@ Variant fn_attr : Set :=
 | FNATTR_Optforfuzzing    
 | FNATTR_Optnone
 | FNATTR_Optsize
-| FNATTR_Patchable_function
-| FNATTR_Probe_stack
+(* | FNATTR_Patchable_function - FNATTR_KeyValue *)
+(* | FNATTR_Probe_stack - FNATTR_String *)
 | FNATTR_Readnone
 | FNATTR_Readonly
-| FNATTR_Stack_probe_size
-| FNATTR_No_stack_arg_probe 
+(* | FNATTR_Stack_probe_size - FNATTR_KeyValue *)
+(* | FNATTR_No_stack_arg_probe  - FNATTR_String *)
 | FNATTR_Writeonly
 | FNATTR_Argmemonly    
 | FNATTR_Returns_twice
@@ -218,19 +219,19 @@ Variant fn_attr : Set :=
 | FNATTR_Sspstrong
 | FNATTR_Sspreq
 | FNATTR_Strictfp
-| FNATTR_Denormal_fp_math (s1 : string) (s2 : option string) 
-| FNATTR_Denormal_fp_math_32 (s1 : string) (s2 : option string)
-| FNATTR_Thunk
+(* | FNATTR_Denormal_fp_math (s1 : string) (s2 : option string)  - FNATTR_KeyValue *)
+(* | FNATTR_Denormal_fp_math_f32 (s1 : string) (s2 : option string) - FNATTR_KeyValue *)
+(* | FNATTR_Thunk - FNATTR_String *)
 | FNATTR_Tls_load_hoist
-| FNATTR_Uwtable (sync : bool) 
+| FNATTR_Uwtable (sync : option bool)   (* None ~ Some False ~ async, Some true = sync *)
 | FNATTR_Nocf_check
 | FNATTR_Shadowcallstack
 | FNATTR_Mustprogress
-| FNATTR_Warn_stack_size (th : int) 
+(* | FNATTR_Warn_stack_size (th : int) - FNATTR_KeyValue *)
 | FNATTR_vscale_range (min : int) (max : option int) 
-| FNATTR_Min_legal_vector_width  (size : int)
-| FNATTR_String (s:string) (* "no-see" *)
-| FNATTR_Key_value (kv : string * string) (* "unsafe-fp-math"="false" *)
+(* | FNATTR_Min_legal_vector_width  (size : int) - FNATTR_KeyValue *)
+| FNATTR_String (s:string)   (* See the comments above for cases covered by FNATTR_String *)
+| FNATTR_Key_value (kv : string * string) (* See the comments above for cases covered by FNATTR_KeyValue *)
 | FNATTR_Attr_grp (g:int)
 .
 
@@ -552,12 +553,10 @@ Variant toplevel_entity {FnBody:Set} : Set :=
 Definition toplevel_entities (FnBody:Set) : Set := list (@toplevel_entity FnBody).
 
 End TypedSyntax.
-Check exp.
+
 Arguments exp: clear implicits.
 Arguments cmpxchg : clear implicits.
-Check cmpxchg.
 Arguments atomicrmw : clear implicits.
-Check atomicrmw.
 Arguments block: clear implicits.
 Arguments texp: clear implicits.
 Arguments phi: clear implicits.

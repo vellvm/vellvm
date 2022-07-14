@@ -210,7 +210,7 @@ Fixpoint show_typ (t : typ) : string :=
    Definition show_fn_attr (f : fn_attr) : string :=
     match f with 
     | FNATTR_Alignstack a => "alignstack(" ++ show a ++ ")"
-    | FNATTR_Alloc_family fam => """alloc-family""=" ++ """" ++ show fam ++ """"
+    (* | FNATTR_Alloc_family (fam : string) - FNATTR_KeyValue *)
     | FNATTR_Allockind kind => "allockind(" ++ """" ++ show kind ++ """" ++ ")"
     | FNATTR_Allocsize a1 a2 =>
        match a2 with
@@ -222,9 +222,10 @@ Fixpoint show_typ (t : typ) : string :=
     | FNATTR_Cold => "cold"
     | FNATTR_Convergent => "convergent"
     | FNATTR_Disable_sanitizer_instrumentation => "disable_sanitizer_instrumentation"
-    | FNATTR_Dontcall_error => """dontcall-error"""
-    | FNATTR_Dontcall_warn => """dontcall-warn"""
-    | FNATTR_Frame_pointer => "unimplemented: frame-pointer"
+    (* | FNATTR_Dontcall_error - FNATTR_String *)
+    (* | FNATTR_Dontcall_warn - FNATTR_String *)
+    | FNATTR_Fn_ret_thunk_extern => "fun_ret_thunk_extern"
+    (* | FNATTR_Frame_pointer - FNATTR_KeyValue *)
     | FNATTR_Hot => "hot"
     | FNATTR_Inaccessiblememonly => "inaccessiblememonly"
     | FNATTR_Inaccessiblemem_or_argmemonly => "inaccessiblemem_or_argmemonly"
@@ -232,7 +233,7 @@ Fixpoint show_typ (t : typ) : string :=
     | FNATTR_Jumptable => "jumptable"
     | FNATTR_Minsize => "minsize"
     | FNATTR_Naked => "naked"
-    | FNATTR_No_inline_line_tables => """no-inline-line-tables"""
+    (* | FNATTR_No_inline_line_tables - FNATTR_String *)
     | FNATTR_No_jump_tables => "no-jump-tables"
     | FNATTR_Nobuiltin => "nobuiltin"
     | FNATTR_Noduplicate => "noduplicate"
@@ -255,12 +256,12 @@ Fixpoint show_typ (t : typ) : string :=
     | FNATTR_Optforfuzzing => "optforfuzzing"
     | FNATTR_Optnone => "optnone"
     | FNATTR_Optsize => "optsize"
-    | FNATTR_Patchable_function => "unimplemented: patchable-function"
-    | FNATTR_Probe_stack => """probe-stack"""
+    (* | FNATTR_Patchable_function - FNATTR_KeyValue *)
+    (* | FNATTR_Probe_stack - FNATTR_String *)
     | FNATTR_Readnone => "readnone"
     | FNATTR_Readonly => "readonly"
-    | FNATTR_Stack_probe_size => """stack-probe-size"""
-    | FNATTR_No_stack_arg_probe => """no-stack-arg-probe"""
+    (* | FNATTR_Stack_probe_size => - FNATTR_KeyValue *)
+    (* | FNATTR_No_stack_arg_probe => -  FNATTR_String *)
     | FNATTR_Writeonly => "writeonly"
     | FNATTR_Argmemonly => "argmemonly"
     | FNATTR_Returns_twice => "returns_twice"                          
@@ -276,33 +277,28 @@ Fixpoint show_typ (t : typ) : string :=
     | FNATTR_Sspstrong => "sspstrong" 
     | FNATTR_Sspreq => "sspreq" 
     | FNATTR_Strictfp => "strictfp"
-    | FNATTR_Denormal_fp_math s1 s2 =>
-        match s2 with
-        | None => """" ++ show s1 ++  """"
-        | Some s => """" ++ show s1 ++ "," ++ show s2 ++ """"
-        end    
-    | FNATTR_Denormal_fp_math_32 s1 s2 =>
-        match s2 with
-        | None => """" ++ show s1 ++  """"
-        | Some s => """" ++ show s1 ++ "," ++ show s2 ++ """"
-        end     
-    | FNATTR_Thunk => """thunk"""
+    (* | FNATTR_Denormal_fp_math s1 s2 - FNATTR_KeyValue *)
+    (* | FNATTR_Denormal_fp_math_32 s1 s2 - FNATTR_KeyValue *)
+    (* | FNATTR_Thunk => - FNATTR_String *)
     | FNATTR_Tls_load_hoist => """tls-load-hoist"""                   
-    | FNATTR_Uwtable sync  => if sync then "uwtable(sync)" else "uwtable" 
+    | FNATTR_Uwtable so  =>
+        match so with
+        | None => "uwtable"
+        | Some sync => if sync then "uwtable(sync)" else "uwtable(async)"
+        end
     | FNATTR_Nocf_check => "nocf_check" 
     | FNATTR_Shadowcallstack => "shadowcallstack" 
     | FNATTR_Mustprogress => "mustprogeress"
-    | FNATTR_Warn_stack_size th  => """warn-stack-size""=" ++ """" ++ show th ++ """"
+    (* | FNATTR_Warn_stack_size th  => - FNATTR_KeyValue *)
     | FNATTR_vscale_range min max  =>
         match max with
         | None => "vscale_range(" ++ show min ++ ")"
         | Some m => "vscale_range(" ++ show min ++ "," ++ show m ++ ")"
         end                             
-    | FNATTR_Min_legal_vector_width size => """min-legal-vector-width""=" ++ """"
-                                                       ++ show size ++ """" 
+    (* | FNATTR_Min_legal_vector_width size => - FNATTR_KeyValue *)
     | FNATTR_String s => """" ++ show s ++ """"  (* "no-see" *)
     | FNATTR_Key_value kv => """" ++ fst kv ++ """=" ++ """" ++ snd kv ++ """" (* "unsafe-fp-math"="false" *)
-    | FNATTR_Attr_grp g => "attr_grip" ++ show g
+    | FNATTR_Attr_grp g => "#" ++ show g
     end.
 
   Global Instance showFnAttr : Show fn_attr

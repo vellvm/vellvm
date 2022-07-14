@@ -736,7 +736,6 @@ and fn_attr : Format.formatter -> LLVMAst.fn_attr -> unit =
   fun ppf ->
   function
   | FNATTR_Alignstack n -> fprintf ppf "FNATTR_Alignstack %a" llvm_int n
-  | FNATTR_Alloc_family fam -> fprintf ppf "FNATTR_Alloc_family fam %s" (of_str fam)
   | FNATTR_Allockind kind -> fprintf ppf "FNATTR_Alloc_kind kind %s" (of_str kind)
   | FNATTR_Allocsize (a, no) ->
      fprintf ppf "FNATTR_Allocsize %a %a" llvm_int a (pp_print_option llvm_int) no
@@ -745,9 +744,7 @@ and fn_attr : Format.formatter -> LLVMAst.fn_attr -> unit =
   | FNATTR_Cold -> pp_print_string ppf "FNATTR_Cold"
   | FNATTR_Convergent -> pp_print_string ppf "FNATTR_Convergent"
   | FNATTR_Disable_sanitizer_instrumentation -> fprintf ppf "FNATTR_Disable_sanitizer_instrumentation"
-  | FNATTR_Dontcall_error -> fprintf ppf "FNATTR_Dontcall_error"
-  | FNATTR_Dontcall_warn -> fprintf ppf "FNATTR_Dontcall_warn"
-  | FNATTR_Frame_pointer -> fprintf ppf "FNATTR_Frame_pointer"
+  | FNATTR_Fn_ret_thunk_extern -> pp_print_string ppf "FNATTR_Fn_ret_thunk_extern"
   | FNATTR_Hot -> fprintf ppf "FNATTR_Hot"
   | FNATTR_Inaccessiblememonly -> pp_print_string ppf "FNATTR_Inaccessiblememonly"
   | FNATTR_Inaccessiblemem_or_argmemonly-> pp_print_string ppf "FNATTR_Inaccessible_or_argmemonly"
@@ -755,7 +752,6 @@ and fn_attr : Format.formatter -> LLVMAst.fn_attr -> unit =
   | FNATTR_Jumptable -> pp_print_string ppf "FNATTR_Jumptable"
   | FNATTR_Minsize -> pp_print_string ppf "FNATTR_Minsize"
   | FNATTR_Naked -> pp_print_string ppf "FNATTR_Naked"
-  | FNATTR_No_inline_line_tables -> fprintf ppf "FNATTR_No_inline_line_tables "
   | FNATTR_No_jump_tables -> pp_print_string ppf "FNATTR_No_jump_tables"
   | FNATTR_Nobuiltin -> pp_print_string ppf "FNATTR_Nobuiltin"
   | FNATTR_Noduplicate -> pp_print_string ppf "FNATTR_Noduplicate"
@@ -778,12 +774,8 @@ and fn_attr : Format.formatter -> LLVMAst.fn_attr -> unit =
   | FNATTR_Optforfuzzing -> pp_print_string ppf "FNATTR_Optforfuzzing"
   | FNATTR_Optnone -> pp_print_string ppf "FNATTR_Optnone"
   | FNATTR_Optsize -> pp_print_string ppf "FNATTR_Optsize"
-  | FNATTR_Patchable_function -> fprintf ppf "FNATTR_Patchable_function"
-  | FNATTR_Probe_stack -> fprintf ppf "FNATTR_Probe_stack"
   | FNATTR_Readnone -> pp_print_string ppf "FNATTR_Readnone"
   | FNATTR_Readonly -> pp_print_string ppf "FNATTR_Readonly"
-  | FNATTR_Stack_probe_size -> fprintf ppf "FNATTR_Stack_probe_size"
-  | FNATTR_No_stack_arg_probe -> fprintf ppf "FNATTR_No_stack_arg_probe"
   | FNATTR_Writeonly -> pp_print_string ppf "FNATTR_Writeonly"
   | FNATTR_Argmemonly -> pp_print_string ppf "FNATTR_Argmemonly"
   | FNATTR_Returns_twice -> pp_print_string ppf "FNATTR_Returns_twice"
@@ -799,23 +791,17 @@ and fn_attr : Format.formatter -> LLVMAst.fn_attr -> unit =
   | FNATTR_Sspstrong -> pp_print_string ppf "FNATTR_Sspstrong"
   | FNATTR_Sspreq -> pp_print_string ppf "FNATTR_Sspreq"
   | FNATTR_Strictfp -> pp_print_string ppf "FNATTR_Strictfp"
-  | FNATTR_Denormal_fp_math(s1, s2)  ->
-    fprintf ppf "FNATTR_Denormal_fp_math %s %a" (of_str s1)
-      (pp_print_option (fun ppf x -> pp_print_string ppf (of_str x))) s2
-  | FNATTR_Denormal_fp_math_32 (s1, s2) ->
-    fprintf ppf "FNATTR_Denormal_fp_math_32 %s %a" (of_str s1)
-      (pp_print_option (fun ppf x -> pp_print_string ppf (of_str x))) s2
-  | FNATTR_Thunk -> fprintf ppf "FNATTR_Thunk"
   | FNATTR_Tls_load_hoist -> fprintf ppf "FNATTR_Tls_load_hoist"
-  | FNATTR_Uwtable b -> fprintf ppf "FNATTR_Uwtable %s" (if b then "true" else "false")
+  | FNATTR_Uwtable b -> fprintf ppf "FNATTR_Uwtable %s"
+                          (match b with
+                           | None -> "None"
+                           | Some b -> (if b then "(Some true)" else "(Some false)"))
   | FNATTR_Nocf_check -> pp_print_string ppf "FNATTR_Nocf_check"
   | FNATTR_Shadowcallstack -> pp_print_string ppf "FNATTR_Shadowcallstack"
   | FNATTR_Mustprogress -> pp_print_string ppf "FNATTR_Mustprogress"
-  | FNATTR_Warn_stack_size th -> fprintf ppf "FNATTR_Warn_stack_size %a" llvm_int th
   | FNATTR_vscale_range (min, max) ->
     fprintf ppf "FNATTR_vscale_range %a %a)"
       llvm_int min (pp_print_option llvm_int) max
-  | FNATTR_Min_legal_vector_width size -> fprintf ppf "FNATTR_Min_legal_vector_width %a" llvm_int size
   | FNATTR_String s -> fprintf ppf "FNATTR_String %s" (of_str s)
   | FNATTR_Key_value (s,s') -> fprintf ppf "FNATTR_Key_value (%s,%s)" (of_str s) (of_str s')
   | FNATTR_Attr_grp n  -> fprintf ppf "FNATTR_Attr_grp %d%%Z" (to_int n)

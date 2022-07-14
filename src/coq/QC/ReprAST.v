@@ -517,7 +517,7 @@ Section ReprInstances.
   Definition repr_fn_attr (fa : fn_attr) : string :=
     match fa with
     | FNATTR_Alignstack a => "(FNATTR_Alignstack " ++ repr a ++ ")"
-    | FNATTR_Alloc_family (fam) => "(FNATTR_Alloc_family" ++ repr fam ++ ")"
+    (* | FNATTR_Alloc_family (fam) => "(FNATTR_Alloc_family" ++ repr fam ++ ")" *)
     | FNATTR_Allockind (kind) => "(FNATTR_Allockind" ++ repr kind ++ ")"                                            
     | FNATTR_Allocsize l l2 => let printable_l2 := match l2 with
                                                  |None => ""
@@ -530,9 +530,10 @@ Section ReprInstances.
     | FNATTR_Cold => "FNATTR_Cold"
     | FNATTR_Convergent => "FNATTR_Convergent"
     | FNATTR_Disable_sanitizer_instrumentation => "FNATTR__Disable_sanitizer_instrumentation"
-    | FNATTR_Dontcall_error => " FNATTR_Dontcall_error"                            
-    | FNATTR_Dontcall_warn => "FNATTR_Dontcall_warn"                          
-    | FNATTR_Frame_pointer => "FNATTR_Frame_pointer"                            
+    (* | FNATTR_Dontcall_error => "FNATTR_Dontcall_error"                             *)
+    (* | FNATTR_Dontcall_warn => "FNATTR_Dontcall_warn"                           *)
+    | FNATTR_Fn_ret_thunk_extern => "FNATTR_Fn_ret_thunk_extern"
+    (* | FNATTR_Frame_pointer => "FNATTR_Frame_pointer"                             *)
     | FNATTR_Hot => "FNATTR_Hot"
     | FNATTR_Inaccessiblememonly => "FNATTR_Inaccessiblememonly"
     | FNATTR_Inaccessiblemem_or_argmemonly => "FNATTR_Inaccessiblemem_or_argmemonly"
@@ -540,7 +541,7 @@ Section ReprInstances.
     | FNATTR_Jumptable => "FNATTR_Jumptable"
     | FNATTR_Minsize => "FNATTR_Minsize"
     | FNATTR_Naked => "FNATTR_Naked"
-    | FNATTR_No_inline_line_tables  => "FNATTR_No_inline_line_tables"                                   
+    (* | FNATTR_No_inline_line_tables  => "FNATTR_No_inline_line_tables" *)
     | FNATTR_No_jump_tables => "FNATTR_No_jump_tables"
     | FNATTR_Nobuiltin => "FNATTR_Nobuiltin"
     | FNATTR_Noduplicate => "FNATTR_Noduplicate"
@@ -563,12 +564,12 @@ Section ReprInstances.
     | FNATTR_Optforfuzzing => "FNATTR_Optforfuzzing"
     | FNATTR_Optnone => "FNATTR_Optnone"
     | FNATTR_Optsize => "FNATTR_Optsize"
-    | FNATTR_Patchable_function => "FNATTR_Patchable_function"
-    | FNATTR_Probe_stack => "FNATTR_Probe_stack"   
+    (* | FNATTR_Patchable_function => "FNATTR_Patchable_function" *)
+    (* | FNATTR_Probe_stack => "FNATTR_Probe_stack"    *)
     | FNATTR_Readnone => "FNATTR_Readnone"
     | FNATTR_Readonly => "FNATTR_Readonly"
-    | FNATTR_Stack_probe_size => "FNATTR_Stack_probe_size"                             
-    | FNATTR_No_stack_arg_probe => "FNATTR_No_stack_arg_probe"                             
+    (* | FNATTR_Stack_probe_size => "FNATTR_Stack_probe_size"                              *)
+    (* | FNATTR_No_stack_arg_probe => FNATTR_String *)
     | FNATTR_Writeonly => "FNATTR_Writeonly"
     | FNATTR_Argmemonly => "FNATTR_Argmemonly"
     | FNATTR_Returns_twice => "FNATTR_Returns_twice"
@@ -584,32 +585,32 @@ Section ReprInstances.
     | FNATTR_Sspreq => "FNATTR_Sspreq"
     | FNATTR_Sspstrong => "FNATTR_Sspstrong"
     | FNATTR_Strictfp => "FNATTR_Strictfp"
-    | FNATTR_Denormal_fp_math (s1) (s2) =>
-        let printable_sw := match s2 with
-                            |None => ""        
-                            |Some s => repr s            
-                            end in                      
-        "(FNATTR_Denormal_fp_math " ++ repr s1 ++ printable_sw ++ ")"
-    | FNATTR_Denormal_fp_math_32 (s1) (s2) =>
-         let printable_sw := match s2 with
-                            |None => ""        
-                            |Some s => repr s            
-                            end in                      
-         "(FNATTR_Denormal_fp_math32" ++ repr s1 ++ printable_sw ++ ")"
-    | FNATTR_Thunk => "FNATTR_Thunk"
+    (* | FNATTR_Denormal_fp_math (s1) (s2) => *)
+    (*     let printable_sw := match s2 with *)
+    (*                         |None => ""         *)
+    (*                         |Some s => repr s             *)
+    (*                         end in                       *)
+    (*     "(FNATTR_Denormal_fp_math " ++ repr s1 ++ printable_sw ++ ")" *)
+    (* | FNATTR_Denormal_fp_math_32 (s1) (s2) => *)
+    (*      let printable_sw := match s2 with *)
+    (*                         |None => ""         *)
+    (*                         |Some s => repr s             *)
+    (*                         end in                       *)
+    (*      "(FNATTR_Denormal_fp_math32" ++ repr s1 ++ printable_sw ++ ")" *)
+    (* | FNATTR_Thunk => "FNATTR_Thunk" *)
     | FNATTR_Tls_load_hoist => "FNATTR_Tls_load_hoist"
     | FNATTR_Uwtable sync => "FNATTR_Uwtable" ++ repr sync
     | FNATTR_Nocf_check => "FNATTR_Nocf_check"
     | FNATTR_Shadowcallstack => "FNATTR_Shadowcallstack"
     | FNATTR_Mustprogress => "FNATTR_Mustprogress"
-    | FNATTR_Warn_stack_size (th) => "FNATTR_Warn_stack_size" ++ repr th  
+    (* | FNATTR_Warn_stack_size (th) => "FNATTR_Warn_stack_size" ++ repr th   *)
     | FNATTR_vscale_range (min) (max) =>
          let printable_max := match max with
                             |None => ""        
                             |Some s => repr s            
                             end in                      
          "(FNATTR_Denormal_fp_math32" ++ repr min ++ printable_max ++ ")"
-    | FNATTR_Min_legal_vector_width  (size) => "FNATTR_Min_legal_vector_width" ++ repr size                               
+    (* | FNATTR_Min_legal_vector_width  (size) => "FNATTR_Min_legal_vector_width" ++ repr size  *)              
     | FNATTR_String s => "(FNATTR_String " ++ repr s ++ ")"
     | FNATTR_Key_value kv => "(FNATTR_Key_value " ++ repr kv ++ ")"
     | FNATTR_Attr_grp g => "(FNATTR_Attr_grp " ++ repr g ++ ")"

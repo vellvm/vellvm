@@ -52,7 +52,7 @@ let normalize_float_literal (t:typ) (d:string) =
            failwith ("Illegal 32-bit floating point literal: " ^ dbg)
   | _ -> failwith "normalize_float_literal called with non-float type"
 
-(* att type is a workaround to simplify parsing of optionnal keywords in
+(* att type is a workaround to simplify parsing of optional keywords in
  * global / function declaration / definition.
  * It is far from what would be ideal since it will allow to parse silly
  * LLVM IR (keywords at the bad place, or function attributes in global
@@ -190,32 +190,61 @@ let is_externally_initialized l =
 %token KW_INITIALEXEC 
 %token KW_LOCALEXEC 
 %token KW_EXTERNALLY_INITIALIZED
+
+(* Parameter Attributes param_attr *)
 %token KW_ZEROEXT 
 %token KW_SIGNEXT 
 %token KW_INREG 
 %token KW_BYVAL 
+%token KW_BYREF
+%token KW_PREALLOCATED
+%token KW_INALLOCA
 %token KW_SRET 
+%token KW_ELEMENTTYPE
+%token KW_ALIGN
 %token KW_NOALIAS 
 %token KW_NOCAPTURE 
+%token KW_READONLY
+%token KW_NOFREE
 %token KW_NEST
-
+%token KW_RETURNED
+%token KW_NONNULL
+%token KW_DEREFERENCEABLE 
+%token KW_DEREFERENCEABLE_OR_NULL
+%token KW_SWIFTSELF
+%token KW_SWIFTASYNC
+%token KW_SWIFTERROR
+%token KW_IMMARG 
+%token KW_NOUNDEF 
 %token KW_ALIGNSTACK
+%token KW_ALLOCALIGN
+%token KW_ALLOCPTR
+
+(* Function Attributes *)
+(* %token KW_ALIGNSTACK *)
+(* %token KW_ALLOC_FAMILY  (* quoted "alloc-family" *) *)
+%token KW_ALLOCKIND
 %token KW_ALLOCSIZE 
 %token KW_ALWAYSINLINE 
 %token KW_BUILTIN 
 %token KW_COLD
 %token KW_CONVERGENT
+%token KW_DISABLE_SANITIZER_INSTRUMENTATION
+(* %token KW_DONTCALL_ERROR *)
+(* %token KW_DONTCALL_WARN *)
+%token KW_FN_RET_THUNK_EXTERN
 %token KW_HOT
 %token KW_INACCESSIBLEMEMONLY
 %token KW_INACCESSIBLEMEM_OR_ARGMEMONLY
 %token KW_INLINEHINT 
 %token KW_JUMPTABLE 
 %token KW_MINSIZE 
-%token KW_NAKED 
+%token KW_NAKED
+(* %token KW_NO_INLINE_LINE_TABLES  (* quoted "no-inline-line-tables" *) *)
 %token KW_NO_JUMP_TABLES
 %token KW_NOBUILTIN 
 %token KW_NODUPLICATE
-%token KW_NOFREE
+(* KW_NOFREE - used in multiple ways *)
 %token KW_NOIMPLICITFLOAT 
 %token KW_NOINLINE 
 %token KW_NOMERGE
@@ -226,13 +255,19 @@ let is_externally_initialized l =
 %token KW_NORECURSE
 %token KW_WILLRETURN
 %token KW_NOSYNC
-%token KW_NOUNWIND 
+%token KW_NOUNWIND
+%token KW_NOSANITIZE_BOUNDS
+%token KW_NOSANITIZE_COVERAGE
 %token KW_NULL_POINTER_IS_VALID
 %token KW_OPTFORFUZZING
 %token KW_OPTNONE 
-%token KW_OPTSIZE 
+%token KW_OPTSIZE
+(* %token KW_PATCHABLE_FUNCTION quoted "patchable-function" *) 
+(* %token KW_PROBE_STACK quoted "probe-stack"  *)
 %token KW_READNONE 
-%token KW_READONLY 
+(* %token KW_READONLY *) 
+(* %token KW_STACK_PROBE_SIZE (* quoted "stack-probe-size" *) *)
+(* %token KW_NO_STACK_ARG_PROBE (* quoted "no-stack-arg-probe " *) *)
 %token KW_WRITEONLY
 %token KW_ARGMEMONLY
 %token KW_RETURNS_TWICE
@@ -245,21 +280,24 @@ let is_externally_initialized l =
 %token KW_SPECULATIVE_LOAD_HARDENING
 %token KW_SPECULATABLE
 %token KW_SSP 
-%token KW_SSPREQ 
 %token KW_SSPSTRONG
+%token KW_SSPREQ 
 %token KW_STRICTFP
+(* %token KW_DENORMAL_FP_MATH (* quoted "denormal-fp-math" *) *)
+(* %token KW_DENORMAL_FP_MATH_F32 (* quoted "denormal-fp-math-f32" *) *)
+(* %token KW_THUNK (* quoted "thunk" *) *)
+(* %token KW_TLS_LOAD_HOIST (* quoted "tls-load-hoist" *) *)
 %token KW_UWTABLE
+%token KW_SYNC  (* goes with uwtable *)
+%token KW_ASYNC (* goes with uwtable *)
 %token KW_NOCF_CHECK
 %token KW_SHADOWCALLSTACK
 %token KW_MUSTPROGRESS
-
-%token KW_DEREFERENCEABLE 
-%token KW_INALLOCA
-%token KW_RETURNED 
-%token KW_NONNULL
+(* %token KW_WARN_STACK_SIZE (* quoted "warn-stack-size" *) *)
+%token KW_VSCALE_RANGE
+(* %token KW_MIN_LEGAL_VECTOR_WIDTH (* quoted "min-legal-vector-width" *) *)
 
 
-%token KW_ALIGN
 %token KW_GC
 
 %token KW_ADD 
@@ -365,8 +403,7 @@ let is_externally_initialized l =
 %token KW_UNE
 %token KW_TAIL
 %token KW_VOLATILE
-%token KW_NOUNDEF 
-%token KW_IMMARG 
+
 
 
 %token<LLVMAst.raw_id> METADATA_ID
@@ -618,14 +655,6 @@ definition:
       }
     }
 
-(*
-      begin match blks with
-      | [] -> failwith "illegal LLVM function definition: must have non-empty entry block"
-      | entry::rest -> (entry, rest)
-      end
-    }
-*)
-
 
 (* An instruction lhs might have a declared identifier, which can be either
 "anonymous" (i.e. of the form %N where N is a number is sequence order or %x,
@@ -817,6 +846,8 @@ call_arg: t=typ i=exp             { (t, i t)      }
 
 fn_attr:
   | KW_ALIGNSTACK LPAREN p=INTEGER RPAREN { FNATTR_Alignstack p     }
+  (*  KW_ALLOC_FAMILY - quoted KeyValue *)
+  | KW_ALLOCKIND LPAREN s=STRING RPAREN   { FNATTR_Allockind (str s) }
   | KW_ALLOCSIZE LPAREN l=separated_nonempty_list(csep, INTEGER) RPAREN
                                           { match l with
 					    | [] -> failwith "illegal"
@@ -829,6 +860,11 @@ fn_attr:
   | KW_BUILTIN                            { FNATTR_Nobuiltin        }
   | KW_COLD                               { FNATTR_Cold             }
   | KW_CONVERGENT                         { FNATTR_Convergent       }
+  | KW_DISABLE_SANITIZER_INSTRUMENTATION  { FNATTR_Disable_sanitizer_instrumentation }
+(* KW_DONTCALL_ERROR - quoted *)
+(* KW_DONTCALL_WARN - quoted *) 
+  | KW_FN_RET_THUNK_EXTERN                { FNATTR_Fn_ret_thunk_extern }
+(* KW_FRAME_POINTER - quoted KeyValue *) 
   | KW_HOT                                { FNATTR_Hot              }
   | KW_INACCESSIBLEMEMONLY                { FNATTR_Inaccessiblememonly }
   | KW_INACCESSIBLEMEM_OR_ARGMEMONLY      { FNATTR_Inaccessiblemem_or_argmemonly }
@@ -836,6 +872,7 @@ fn_attr:
   | KW_JUMPTABLE                          { FNATTR_Jumptable        }
   | KW_MINSIZE                            { FNATTR_Minsize          }
   | KW_NAKED                              { FNATTR_Naked            }
+(* KW_NO_INLINE_LINE_TABLES - quoted *)
   | KW_NO_JUMP_TABLES                     { FNATTR_No_jump_tables   }
   | KW_NOBUILTIN                          { FNATTR_Nobuiltin        }
   | KW_NODUPLICATE                        { FNATTR_Noduplicate      }
@@ -851,12 +888,18 @@ fn_attr:
   | KW_WILLRETURN                         { FNATTR_Willreturn       }
   | KW_NOSYNC                             { FNATTR_Nosync           }
   | KW_NOUNWIND                           { FNATTR_Nounwind         }
+  | KW_NOSANITIZE_BOUNDS                  { FNATTR_Nosanitize_bounds }
+  | KW_NOSANITIZE_COVERAGE                { FNATTR_Nosanitize_coverage }  
   | KW_NULL_POINTER_IS_VALID              { FNATTR_Null_pointer_is_valid }
   | KW_OPTFORFUZZING                      { FNATTR_Optforfuzzing    }
   | KW_OPTNONE                            { FNATTR_Optnone          }
   | KW_OPTSIZE                            { FNATTR_Optsize          }
+(* KW_PATCHABLE_FUNCTION - quoted KeyValue *)
+(* KW_PROBE_STACK - quoted *)
   | KW_READNONE                           { FNATTR_Readnone         }
   | KW_READONLY                           { FNATTR_Readonly         }
+(* KW_STACK_PROBE_SIZE - quoted KeyValue *)
+(* KW_NO_STACK_ARG_PROBE - quoted *)
   | KW_WRITEONLY                          { FNATTR_Writeonly        }
   | KW_ARGMEMONLY                         { FNATTR_Argmemonly       }
   | KW_RETURNS_TWICE                      { FNATTR_Returns_twice    }
@@ -869,10 +912,15 @@ fn_attr:
   | KW_SPECULATIVE_LOAD_HARDENING         { FNATTR_Speculative_load_hardening }
   | KW_SPECULATABLE                       { FNATTR_Speculatable     }
   | KW_SSP                                { FNATTR_Ssp              }
-  | KW_SSPREQ                             { FNATTR_Sspreq           }
   | KW_SSPSTRONG                          { FNATTR_Sspstrong        }
+  | KW_SSPREQ                             { FNATTR_Sspreq           }
   | KW_STRICTFP                           { FNATTR_Strictfp         }
-  | KW_UWTABLE                             { FNATTR_Uwtable true          }
+(* KW_DENORMAL_FP_MATH - quoted KeyValue *)
+(* KW_DENORMAL_FP_MATH_F32 - quoted KeyValue *)
+(* KW_THUNK - quoted *)
+  | KW_UWTABLE                            { FNATTR_Uwtable None     }
+  | KW_UWTABLE LPAREN KW_SYNC RPAREN      { FNATTR_Uwtable (Some true) }
+  | KW_UWTABLE LPAREN KW_ASYNC RPAREN     { FNATTR_Uwtable (Some false) }  
   | KW_NOCF_CHECK                         { FNATTR_Nocf_check       }
   | KW_SHADOWCALLSTACK                    { FNATTR_Shadowcallstack  }
   | KW_MUSTPROGRESS                       { FNATTR_Mustprogress     }
