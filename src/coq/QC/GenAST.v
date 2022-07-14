@@ -526,6 +526,13 @@ Section TypGenerators.
               | _ => false
               end) ctx.
 
+  Definition filter_non_fun_typs (ctx : list (ident * typ)) : list (ident * typ) :=
+    filter (fun '(_, t) =>
+              match t with
+              | TYPE_Function _ _ => false
+              | _ => true
+              end) ctx.
+  
   (* TODO: These currently don't generate pointer types either. *)
 
   (* Not sized in the QuickChick sense, sized in the LLVM sense. *)
@@ -701,7 +708,8 @@ Section TypGenerators.
                 (* ; TYPE_Metadata *)
                 (* ; TYPE_X86_mmx *)
                 (* ; TYPE_Opaque *)
-                ])).
+          ])).
+  
   Program Fixpoint gen_typ_non_void_size (sz : nat) {measure sz} : GenLLVM typ :=
     match sz with
     | 0%nat => gen_typ_non_void_0
