@@ -346,6 +346,7 @@ Section GenerationState.
            set_ptrtoint_ctx ptoi_ctx
        end.
 
+  (* TODO: Do we need this? *)
   Definition filter_global_from_variable_ctxs (ctxs : all_var_contexts) : all_var_contexts
     := let is_global_id (id: ident) :=
          match id with
@@ -1946,7 +1947,13 @@ Section InstrGenerators.
 
   Definition gen_blocks (t : typ) : GenLLVM (block typ * list (block typ))
     := sized_LLVM (fun n => fmap snd (gen_blocks_sz n t [])).
-  
+
+  Definition is_main (name : global_id)
+    := match name with
+       | Name sname => String.string_dec sname "main"%string 
+       | Anon _
+       | Raw _ => false
+       end.
   (* Don't want to generate CFGs, actually. Want to generated TLEs *)
   Definition gen_definition (name : global_id) (ret_t : typ) (args : list (local_id * typ)) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
@@ -1968,8 +1975,15 @@ Section InstrGenerators.
                          None None None
       in
       (* Reset context *)
-      restore_variable_ctxs ctxs;;
-      ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs).
+      (* TODO: Check if reset context is only applied in main function*)
+      if is_main name
+      then
+        restore_variable_ctxs ([], []);;
+        ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs)
+      else
+        let '(ctx, ptoi_ctx) := ctxs in
+        restore_variable_ctxs ((ID_Global name, f_type)::ctx, ptoi_ctx);;
+        ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs).
 
   Definition gen_new_definition (ret_t : typ) (args : list (local_id * typ)) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
