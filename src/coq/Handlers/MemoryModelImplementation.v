@@ -5063,9 +5063,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                                (allocation_id_to_prov
                                                   (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
-
-                        eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
-
+                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
                         destruct HMAPM as [x [GENPTR IN]].
                         symmetry in GENPTR.
                         pose proof GENPTR as GENPTR'.
@@ -5149,7 +5147,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                                   (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
-                        eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
+                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
 
                         destruct HMAPM as [x [GENPTR IN]].
                         symmetry in GENPTR.
@@ -5400,7 +5398,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                                   (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
-                        eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
+                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
 
                         destruct HMAPM as [x [GENPTR IN]].
                         symmetry in GENPTR.
@@ -5571,7 +5569,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                                   (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
-                        eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
+                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
 
                         destruct HMAPM as [x [GENPTR IN]].
                         symmetry in GENPTR.
@@ -5662,8 +5660,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                                   (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
-                        eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
-
+                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
+                        
                         destruct HMAPM as [x [GENPTR IN]].
                         symmetry in GENPTR.
                         pose proof GENPTR as GENPTR'.
@@ -5801,7 +5799,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                                   (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
-                        eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
+                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
 
                         destruct HMAPM as [x [GENPTR IN]].
                         symmetry in GENPTR.
@@ -5889,8 +5887,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                                   (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
-                        eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
-
+                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
+                        
                         destruct HMAPM as [x [GENPTR IN]].
                         symmetry in GENPTR.
                         pose proof GENPTR as GENPTR'.
@@ -6391,8 +6389,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                                   (provenance_to_allocation_id pr'')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
-                        eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
-
+                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
+                        
                         destruct HMAPM as [x [GENPTR IN]].
                         symmetry in GENPTR.
                         pose proof GENPTR as GENPTR'.
@@ -6476,7 +6474,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                                   (provenance_to_allocation_id pr'')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
-                        eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
+                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
 
                         destruct HMAPM as [x [GENPTR IN]].
                         symmetry in GENPTR.
@@ -6727,7 +6725,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                                   (provenance_to_allocation_id pr'')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
-                        eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
+                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
 
                         destruct HMAPM as [x [GENPTR IN]].
                         symmetry in GENPTR.
@@ -6898,7 +6896,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                                   (provenance_to_allocation_id pr'')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
-                        eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
+                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
 
                         destruct HMAPM as [x [GENPTR IN]].
                         symmetry in GENPTR.
@@ -6989,7 +6987,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                                   (provenance_to_allocation_id pr'')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
-                        eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
+                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
 
                         destruct HMAPM as [x [GENPTR IN]].
                         symmetry in GENPTR.
@@ -7128,8 +7126,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                                   (provenance_to_allocation_id pr'')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
-                        eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
-
+                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
+                        
                         destruct HMAPM as [x [GENPTR IN]].
                         symmetry in GENPTR.
                         pose proof GENPTR as GENPTR'.
@@ -7216,7 +7214,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                                   (provenance_to_allocation_id pr'')) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
-                        eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
+                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
 
                         destruct HMAPM as [x [GENPTR IN]].
                         symmetry in GENPTR.
@@ -9516,7 +9514,8 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
                     forward FROMZ; [lia|].
                     destruct FROMZ as (ip_offset & FROMZ & INSEQ).
 
-                    eapply map_monad_err_In' with (y := ip_offset) in HMAPM; auto.
+                    eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=ip_offset) in HMAPM; auto; try typeclasses eauto.
+
                     destruct HMAPM as (p' & GEP & IN).
                     symmetry in GEP.
                     cbn in GEP.

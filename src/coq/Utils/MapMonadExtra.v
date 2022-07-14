@@ -376,7 +376,7 @@ Proof.
   intros. 
   apply map_monad_length in HRet.
   simpl in HRet. 
-  assert (H: length l = 0 -> l = []). { intros. induction l. reflexivity. inversion HRet.}
+  assert (H: length l = 0 -> l = []). { intros. induction l. reflexivity. inversion HRet. }
   apply H in HRet. assumption.
 Qed.
 
