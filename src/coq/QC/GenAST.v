@@ -1047,7 +1047,7 @@ Section ExpGenerators.
         end
     | TYPE_Vector sz subtyp =>
         match t with
-        | TYPE_Array sz' subtyp' =>
+        | TYPE_Vector sz' subtyp' =>
             match flag with
             | soft => true
             | hard =>  (sz =? sz')%N && ((normalized_typ_eq subtyp subtyp') || (contains_typ subtyp t flag))
@@ -1065,7 +1065,7 @@ Section ExpGenerators.
         end
     | TYPE_Packed_struct fields =>
         match t with
-        | TYPE_Struct fields' =>
+        | TYPE_Packed_struct fields' =>
             match flag with
             | soft => true
             | hard =>  normalized_typ_eq t_from t || fold_left (fun acc x => acc || x) (map (fun y => contains_typ y t flag) fields) false
