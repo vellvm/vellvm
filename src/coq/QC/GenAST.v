@@ -1092,6 +1092,9 @@ Section ExpGenerators.
     | _ => false 
     end.
 
+  Definition filter_fun_typs (ctx: var_context) : var_context :=
+    filter (fun '(_, t) => contains_typ t (TYPE_Function TYPE_Void []) soft) ctx.
+
   (* Can't use choose for these functions because it gets extracted to
      ocaml's Random.State.int function which has small bounds. *)
 
@@ -1752,6 +1755,7 @@ Section InstrGenerators.
     let agg_typs_in_ctx := filter_agg_typs ctx in
     let ptr_typs_in_ctx := filter_ptr_typs ctx in
     let vec_typs_in_ctx := filter_vec_typs ctx in
+    let fun_typs_in_ctx := filter_fun_typs ctx in
     let insertvalue_typs_in_ctx := filter_insertvalue_typs agg_typs_in_ctx ctx in
     oneOf_LLVM
       ([ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
@@ -1766,7 +1770,8 @@ Section InstrGenerators.
          ++ (if seq.nilp agg_typs_in_ctx then [] else [gen_extractvalue])
          ++ (if seq.nilp insertvalue_typs_in_ctx then [] else [x <- elems_LLVM insertvalue_typs_in_ctx;;
                                                                gen_insertvalue x])
-         ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])).
+         ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])
+         ++ (if seq.nilp (fun_typs_in_ctx) then [] else [gen_call])).
 
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
