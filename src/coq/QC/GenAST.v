@@ -1996,7 +1996,7 @@ Section InstrGenerators.
        | Raw _ => false
        end.
   (* Don't want to generate CFGs, actually. Want to generated TLEs *)
-
+Print show_args_list.
   Definition gen_definition (name : global_id) (ret_t : typ) (args : list (typ)) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
       ctxs <- get_variable_ctxs;;
@@ -2048,8 +2048,7 @@ Section InstrGenerators.
   Fixpoint gen_helper_function_tle_size (sz: nat) : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     := match sz with
        | 0%nat =>
-           helper <- gen_helper_function_tle;;
-           ret [helper]
+           ret nil
        | S z =>
            helper <- gen_helper_function_tle;;
            helpers <- gen_helper_function_tle_size z;;
