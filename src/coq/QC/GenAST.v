@@ -2031,7 +2031,10 @@ Section InstrGenerators.
       gen_definition name ret_t args.
 
   Definition gen_helper_function: GenLLVM (definition typ (block typ * list (block typ)))
-    := gen_new_definition (TYPE_I 8) [].
+    :=
+    ret_t <- hide_ctx (gen_sized_typ);;
+    args <-  listOf_LLVM (hide_ctx gen_sized_typ);;
+    gen_new_definition ret_t [].
 
   Definition gen_helper_function_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
     := ret TLE_Definition <*> gen_helper_function.
@@ -2050,7 +2053,7 @@ Section InstrGenerators.
   Definition gen_helper_function_tle_multiple : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     :=
     (* sz <- lift (arbitrary : G N)*)
-    sz <- lift_GenLLVM (choose (0,2)%nat);;
+    sz <- lift_GenLLVM (choose (0,2)%nat);; (* TODO: Use the above line instead. Use this for testing purposes *)
     gen_helper_function_tle_size sz.
   
   Definition gen_global : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
