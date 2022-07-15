@@ -1996,11 +1996,15 @@ Section InstrGenerators.
        | Raw _ => false
        end.
   (* Don't want to generate CFGs, actually. Want to generated TLEs *)
-  Definition gen_definition (name : global_id) (ret_t : typ) (args : list (local_id * typ)) : GenLLVM (definition typ (block typ * list (block typ)))
+
+  Definition gen_definition (name : global_id) (ret_t : typ) (args : list (typ)) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
       ctxs <- get_variable_ctxs;;
 
       (* Add arguments to context *)
+      args <- map_monad (fun t =>
+                        i <- new_raw_id;;
+                        ret (i, t)) args;;
       let args_ctx := map (fun '(i, t) => (ID_Local i, t)) args in
       append_to_ctx args_ctx;;
 
@@ -2025,7 +2029,7 @@ Section InstrGenerators.
         restore_variable_ctxs ((ID_Global name, f_type)::ctx, ptoi_ctx);;
         ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs).
 
-  Definition gen_new_definition (ret_t : typ) (args : list (local_id * typ)) : GenLLVM (definition typ (block typ * list (block typ)))
+  Definition gen_new_definition (ret_t : typ) (args : list (typ)) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
       name <- new_global_id;;
       gen_definition name ret_t args.
@@ -2034,7 +2038,7 @@ Section InstrGenerators.
     :=
     ret_t <- hide_ctx (gen_sized_typ);;
     args <-  listOf_LLVM (hide_ctx gen_sized_typ);;
-    gen_new_definition ret_t [].
+    gen_new_definition ret_t args.
 
   Definition gen_helper_function_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
     := ret TLE_Definition <*> gen_helper_function.
