@@ -1996,7 +1996,7 @@ Section InstrGenerators.
        | Raw _ => false
        end.
   (* Don't want to generate CFGs, actually. Want to generated TLEs *)
-  
+
   Definition gen_definition (name : global_id) (ret_t : typ) (args : list (typ)) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
       ctxs <- get_variable_ctxs;;
