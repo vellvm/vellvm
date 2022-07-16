@@ -1996,7 +1996,7 @@ Section InstrGenerators.
        | Raw _ => false
        end.
   (* Don't want to generate CFGs, actually. Want to generated TLEs *)
-Print show_args_list.
+  
   Definition gen_definition (name : global_id) (ret_t : typ) (args : list (typ)) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
       ctxs <- get_variable_ctxs;;
@@ -2014,9 +2014,10 @@ Print show_args_list.
 
       let args_t := map snd args in
       let f_type := TYPE_Function ret_t args_t in
+      let param_attr_slots := map (fun t => []) args in
       let prototype :=
           mk_declaration name f_type
-                         ([], [])
+                         ([], param_attr_slots)
                          None None None None
                          []
                          None None None
