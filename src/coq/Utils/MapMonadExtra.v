@@ -241,7 +241,7 @@ Qed.
 
 
 
-(* more general form of the two above; do we need those two? *) 
+
 Lemma map_monad_g :
   forall A B C (f : A -> M B) (g : list B -> C) (xs:list A) (zs : list B)
     (EQ2 : (bind (map_monad f xs) (fun ys => ret ys)) ≈ (ret (zs))),
@@ -394,7 +394,8 @@ Proof.
   apply MReturns_ret. reflexivity.
 Qed.
 
-
+(* what is the difference between this and
+map_monad_cons_ret? *) 
 Lemma map_monad_ret_cons :
   forall {A B} (a : A) (b : B) (f : A -> M B) (l1 : list A) (l2 : list B)
     (H : map_monad f (a :: l1) ≈ ret (b :: l2)),
@@ -532,7 +533,70 @@ Proof.
     setoid_rewrite <- IHxs.
     setoid_rewrite bind_bind.
     reflexivity. auto. auto.
+Qed.
+
+(* Fixpoint foldM {a b} {M} `{Monad M} (f : b -> a -> M b ) (acc : b) (l : list a) : M b :=
+      match l with 
+      | [] => ret acc 
+      | (x :: xs) => b <- f acc x;; foldM f b xs 
+       end.
+ *) 
+
+Lemma foldM_cons :
+  forall {A B} (a : A) (b : B) (f : B -> A -> M B) (al : list A),
+    foldM f b (a :: al) ≈ b' <- f b a;; foldM f b' al.
+Proof.
+  intros.
+  induction al.
+  destruct LAWS.
+  - simpl. rewrite bind_ret_r. reflexivity.
+  - simpl. reflexivity. 
 Qed. 
+
+Lemma foldM_app :
+  forall {A B} (l1 l2 : list A) (b : B) (f : B -> A -> M B), 
+    foldM f b (l1 ++ l2) ≈ a1 <- foldM f b l1 ;; foldM f a1 l2. 
+Proof.
+  intros. generalize dependent b. 
+  induction l1.
+  + intros. simpl. rewrite bind_ret_l. reflexivity.
+  + intros. simpl. rewrite bind_bind.
+    setoid_rewrite IHl1. reflexivity.
+Qed.
+
+(* is this helpful? *) 
+Lemma foldM_nil :
+  forall {A B} (l1 : list A) (b : B) (f : B -> A -> M B),
+    foldM f b [] ≈ ret b. 
+Proof.
+  intros. reflexivity.
+Qed.
+
+
+(* An inversion principle-ish idea, I hope? 
+  This is not stated properly; it is false, but it could be an idea. *) 
+Lemma foldM_ret_exists :
+  forall {A B} (tl : list A) (b r : B) (a : A) (f : B -> A -> M B)
+         (HC : foldM f b (a :: tl) ≈ ret r),
+    exists x y, f x y = ret r. 
+Proof.
+  intros. induction tl.
+  + simpl in HC. exists b. exists a. rewrite bind_ret_r in HC.
+    Admitted. 
+
+(* foldM : (?b -> ?a -> M ?b) -> ?b -> list ?a -> M ?b *) 
+(* map_monad : (?A -> M ?B) -> list ?A -> M (list ?B) *)
+
+
+Lemma foldM_map :
+  forall {A B} (l : list B) (b : B) (f : B -> A -> M B) (g : B -> A),
+    foldM f b (map g l) ≈ foldM (fun x y => f x (g y)) b l.
+Proof.
+  intros. generalize dependent b. induction l.
+  + simpl. reflexivity.
+  + simpl. intros. setoid_rewrite IHl. reflexivity.
+Qed.
+
 
 End MonadContext.
 Arguments map_monad_In {_ _ _ _}.
