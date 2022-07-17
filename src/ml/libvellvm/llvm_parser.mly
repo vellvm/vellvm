@@ -780,9 +780,9 @@ visibility:
   | KW_PROTECTED { VISIBILITY_Protected }
 
 cconv:
-  | KW_CCC        {CC_Ccc}
-  | KW_FASTCC     {CC_Fastcc}
-  | KW_COLDCC     {CC_Coldcc}
+  | KW_CCC                {CC_Ccc}
+  | KW_FASTCC             {CC_Fastcc}
+  | KW_COLDCC             {CC_Coldcc}
   | KW_WEBKIT_JSCC        {CC_Webkit_jscc}
   | KW_ANYREGCC		  {CC_Anyregcc}
   | KW_PRESERVE_MOSTCC	  {CC_Preserve_mostcc}
@@ -792,7 +792,7 @@ cconv:
   | KW_SWIFTCC		  {CC_Swiftcc}
   | KW_SWIFTTAILCC	  {CC_Swifttailcc}
   | KW_CFGUARD_CHECKCC	  {CC_cfguard_checkcc}
-  |KW_CC n=INTEGER{CC_Cc n}
+  |KW_CC n=INTEGER        {CC_Cc n}
 
 typ:
   | n=I                                               { TYPE_I n              }
@@ -815,24 +815,38 @@ typ:
   | l=lident                                          { TYPE_Identified (ID_Local l)  }
 
 param_attr:
-  | KW_ZEROEXT                   { PARAMATTR_Zeroext           }
-  | KW_SIGNEXT                   { PARAMATTR_Signext           }
-  | KW_INREG                     { PARAMATTR_Inreg             }
-  | KW_BYVAL t=typ               { PARAMATTR_Byval t           }
-  | KW_INALLOCA t=typ            { PARAMATTR_Inalloca t        }
-  | KW_SRET t=typ                { PARAMATTR_Sret t            }
-  | KW_ALIGN n=INTEGER           { PARAMATTR_Align n           }
-  | KW_NOALIAS                   { PARAMATTR_Noalias           }
-  | KW_NOCAPTURE                 { PARAMATTR_Nocapture         }
-  | KW_READONLY                  { PARAMATTR_Readonly          }
-  | KW_NEST                      { PARAMATTR_Nest              }
-  | KW_RETURNED                  { PARAMATTR_Returned          }
-  | KW_NONNULL                   { PARAMATTR_Nonnull           }
+  | KW_ZEROEXT                           { PARAMATTR_Zeroext                   }
+  | KW_SIGNEXT                           { PARAMATTR_Signext                   }
+  | KW_INREG                             { PARAMATTR_Inreg                     }
+  | KW_BYVAL LPAREN t=typ RPAREN         { PARAMATTR_Byval t                   }
+  | KW_BYREF LPAREN t=typ RPAREN         { PARAMATTR_Byref t                   }
+  | KW_PREALLOCATED LPAREN t=typ RPAREN  { PARAMATTR_Preallocated t            }
+  | KW_INALLOCA LPAREN t=typ RPAREN      { PARAMATTR_Inalloca t                }
+  | KW_SRET LPAREN t=typ RPAREN          { PARAMATTR_Sret t                    }
+  | KW_ELEMENTTYPE LPAREN t=typ RPAREN   { PARAMATTR_Elementtype t             }
+  | KW_ALIGN n=INTEGER                   { PARAMATTR_Align n                   }
+  | KW_ALIGN LPAREN n=INTEGER RPAREN     { PARAMATTR_Align n                   }
+  | KW_NOALIAS                           { PARAMATTR_Noalias                   }
+  | KW_NOCAPTURE                         { PARAMATTR_Nocapture                 }
+  | KW_NOFREE                            { PARAMATTR_Nofree                    }
+  | KW_NEST                              { PARAMATTR_Nest                      }
+  | KW_READONLY                          { PARAMATTR_Readonly                  }
+  | KW_RETURNED                          { PARAMATTR_Returned                  }
+  | KW_NONNULL                           { PARAMATTR_Nonnull                   }
   | KW_DEREFERENCEABLE LPAREN n=INTEGER RPAREN
-                                 { PARAMATTR_Dereferenceable n }
-  | KW_IMMARG                    { PARAMATTR_Immarg            }
-  | KW_NOUNDEF                   { PARAMATTR_Noundef           }
-  | KW_NOFREE                    { PARAMATTR_Nofree            }
+                                         { PARAMATTR_Dereferenceable n         }
+  | KW_DEREFERENCEABLE_OR_NULL LPAREN n=INTEGER RPAREN
+                                         { PARAMATTR_Dereferenceable_or_null n }
+  | KW_SWIFTSELF                         { PARAMATTR_Swiftself                 }
+  | KW_SWIFTASYNC                        { PARAMATTR_Swiftasync                }
+  | KW_SWIFTERROR                        { PARAMATTR_Swifterror                }
+  | KW_IMMARG                            { PARAMATTR_Immarg                    }
+  | KW_NOUNDEF                           { PARAMATTR_Noundef                   }
+  | KW_ALIGNSTACK LPAREN n=INTEGER RPAREN
+                                         { PARAMATTR_Alignstack n              }
+  | KW_ALLOCALIGN                        { PARAMATTR_Allocalign                }
+  | KW_ALLOCPTR                          { PARAMATTR_Allocptr                  }
+
 
 dc_arg:
   | t=typ p=param_attr*         { (t, p) }
@@ -850,10 +864,10 @@ fn_attr:
   | KW_ALLOCKIND LPAREN s=STRING RPAREN   { FNATTR_Allockind (str s) }
   | KW_ALLOCSIZE LPAREN l=separated_nonempty_list(csep, INTEGER) RPAREN
                                           { match l with
-					    | [] -> failwith "illegal"
+					    | [] -> failwith "impossible"
 					    | x :: [] -> FNATTR_Allocsize (x, None)
 					    | x :: y :: [] -> FNATTR_Allocsize (x, Some y)
-					    | _ -> failwith "illegal too long"
+					    | _ -> failwith "allocsize illegal - too long"
 
                                           }
   | KW_ALWAYSINLINE                       { FNATTR_Alwaysinline     }
@@ -924,6 +938,13 @@ fn_attr:
   | KW_NOCF_CHECK                         { FNATTR_Nocf_check       }
   | KW_SHADOWCALLSTACK                    { FNATTR_Shadowcallstack  }
   | KW_MUSTPROGRESS                       { FNATTR_Mustprogress     }
+  | KW_VSCALE_RANGE LPAREN l=separated_nonempty_list(csep, INTEGER) RPAREN
+                                          { match l with
+					    | [] -> failwith "impossible"
+					    | x :: [] -> FNATTR_Vscale_range (x, None)
+					    | x :: y :: [] -> FNATTR_Vscale_range (x, Some y)
+					    | _ -> failwith "allocsize illegal - too long"
+					  }
   | s=STRING                              { FNATTR_String (str s)   }
   | k=STRING EQ v=STRING                  { FNATTR_Key_value (str k, str v) }
   | i=ATTR_GRP_ID                         { FNATTR_Attr_grp i       }

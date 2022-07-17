@@ -251,17 +251,12 @@ Section SurfaceSyntaxTest.
   
   Definition add_twice := mcfg_of_tle [TLE_Definition {|
                                df_prototype := {|dc_name := (Name "main");
-                                                 dc_type := (TYPE_Function (TYPE_I 32%N) [(TYPE_I 32%N); (TYPE_Pointer (TYPE_Pointer (TYPE_I 8%N)))]);
+                                                 dc_type := (TYPE_Function (TYPE_I 32%N) [(TYPE_I 32%N); (TYPE_Pointer (TYPE_Pointer (TYPE_I 8%N)))] false);
                                                  dc_param_attrs := ([], [
                                                                    ]);
-                                                 dc_linkage := None;
-                                                 dc_visibility := None;
-                                                 dc_dll_storage := None;
-                                                 dc_cconv := None;
                                                  dc_attrs := [];
-                                                 dc_section := None;
-                                                 dc_align := None;
-                                                 dc_gc := None|};
+                                                 dc_annotations := []
+                                               |};
                                df_args := [(Name "argc"); (Name "arcv")];
                                df_instrs := (
                                              {|
@@ -298,119 +293,66 @@ Section SurfaceSyntaxTest.
                 g_typ := (TYPE_Identified (ID_Local (Name "struct.Node")));
                 g_constant := false;
                 g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node2")))); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node3")))); ((TYPE_I 64%N),(EXP_Integer (50)%Z))]));
-                g_linkage := None;
-                g_visibility := None;
-                g_dll_storage := None;
-                g_thread_local := None;
-                g_unnamed_addr := false;
-                g_addrspace := None;
                 g_externally_initialized := false;
-                g_section := None;
-                g_align := None|};
+                g_annotations := []
+              |};
    TLE_Global {|g_ident := (Name "node2");
                 g_typ := (TYPE_Identified (ID_Local (Name "struct.Node")));
                 g_constant := false;
                 g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node4")))); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node5")))); ((TYPE_I 64%N),(EXP_Integer (25)%Z))]));
-                g_linkage := None;
-                g_visibility := None;
-                g_dll_storage := None;
-                g_thread_local := None;
-                g_unnamed_addr := false;
-                g_addrspace := None;
                 g_externally_initialized := false;
-                g_section := None;
-                g_align := None|};
+                g_annotations := []
+              |};
    TLE_Global {|g_ident := (Name "node3");
                 g_typ := (TYPE_Identified (ID_Local (Name "struct.Node")));
                 g_constant := false;
                 g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node6")))); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node7")))); ((TYPE_I 64%N),(EXP_Integer (75)%Z))]));
-                g_linkage := None;
-                g_visibility := None;
-                g_dll_storage := None;
-                g_thread_local := None;
-                g_unnamed_addr := false;
-                g_addrspace := None;
                 g_externally_initialized := false;
-                g_section := None;
-                g_align := None|};
+                g_annotations := []
+              |};
    TLE_Global {|g_ident := (Name "node4");
                 g_typ := (TYPE_Identified (ID_Local (Name "struct.Node")));
                 g_constant := false;
                 g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node8")))); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_I 64%N),(EXP_Integer (10)%Z))]));
-                g_linkage := None;
-                g_visibility := None;
-                g_dll_storage := None;
-                g_thread_local := None;
-                g_unnamed_addr := false;
-                g_addrspace := None;
                 g_externally_initialized := false;
-                g_section := None;
-                g_align := None|};
+                g_annotations := []
+              |};
    TLE_Global {|g_ident := (Name "node5");
                 g_typ := (TYPE_Identified (ID_Local (Name "struct.Node")));
                 g_constant := false;
                 g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_I 64%N),(EXP_Integer (30)%Z))]));
-                g_linkage := None;
-                g_visibility := None;
-                g_dll_storage := None;
-                g_thread_local := None;
-                g_unnamed_addr := false;
-                g_addrspace := None;
                 g_externally_initialized := false;
-                g_section := None;
-                g_align := None|};
+                g_annotations := []
+              |};
    TLE_Global {|g_ident := (Name "node6");
                 g_typ := (TYPE_Identified (ID_Local (Name "struct.Node")));
                 g_constant := false;
                 g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_I 64%N),(EXP_Integer (60)%Z))]));
-                g_linkage := None;
-                g_visibility := None;
-                g_dll_storage := None;
-                g_thread_local := None;
-                g_unnamed_addr := false;
-                g_addrspace := None;
                 g_externally_initialized := false;
-                g_section := None;
-                g_align := None|};
+                g_annotations := []
+              |};
    TLE_Global {|g_ident := (Name "node7");
                 g_typ := (TYPE_Identified (ID_Local (Name "struct.Node")));
                 g_constant := false;
                 g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_I 64%N),(EXP_Integer (80)%Z))]));
-                g_linkage := None;
-                g_visibility := None;
-                g_dll_storage := None;
-                g_thread_local := None;
-                g_unnamed_addr := false;
-                g_addrspace := None;
                 g_externally_initialized := false;
-                g_section := None;
-                g_align := None|};
+                g_annotations := []
+              |};
    TLE_Global {|g_ident := (Name "node8");
                 g_typ := (TYPE_Identified (ID_Local (Name "struct.Node")));
                 g_constant := false;
                 g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_I 64%N),(EXP_Integer (1)%Z))]));
-                g_linkage := None;
-                g_visibility := None;
-                g_dll_storage := None;
-                g_thread_local := None;
-                g_unnamed_addr := false;
-                g_addrspace := None;
                 g_externally_initialized := false;
-                g_section := None;
-                g_align := None|};
+                g_annotations := []
+              |};
    TLE_Definition {|
        df_prototype := {|dc_name := (Name "contains");
-                         dc_type := (TYPE_Function (TYPE_I 64%N) [(TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))); (TYPE_I 64%N)]);
+                         dc_type := (TYPE_Function (TYPE_I 64%N) [(TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))); (TYPE_I 64%N)] false);
                          dc_param_attrs := ([], [
                                            ]);
-                         dc_linkage := None;
-                         dc_visibility := None;
-                         dc_dll_storage := None;
-                         dc_cconv := None;
                          dc_attrs := [];
-                         dc_section := None;
-                         dc_align := None;
-                         dc_gc := None|};
+                         dc_annotations := []
+                       |};
        df_args := [(Name "root"); (Name "value")];
        df_instrs := (
                      {|
@@ -478,17 +420,12 @@ Section SurfaceSyntaxTest.
      |};
    TLE_Definition {|
        df_prototype := {|dc_name := (Name "main");
-                         dc_type := (TYPE_Function (TYPE_I 64%N) [(TYPE_I 64%N); (TYPE_Pointer (TYPE_Pointer (TYPE_I 8%N)))]);
+                         dc_type := (TYPE_Function (TYPE_I 64%N) [(TYPE_I 64%N); (TYPE_Pointer (TYPE_Pointer (TYPE_I 8%N)))] false);
                          dc_param_attrs := ([], [
                                            ]);
-                         dc_linkage := None;
-                         dc_visibility := None;
-                         dc_dll_storage := None;
-                         dc_cconv := None;
                          dc_attrs := [];
-                         dc_section := None;
-                         dc_align := None;
-                         dc_gc := None|};
+                         dc_annotations := []
+                       |};
        df_args := [(Name "argc"); (Name "argv")];
        df_instrs := (
                      {|

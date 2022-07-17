@@ -645,7 +645,7 @@ Definition filter_ptr_vecptr_typs (ctx: list (ident * typ)) : list (ident * typ)
         ; (1%nat, ret TYPE_Array <*> lift genN <*> gen_sized_typ_size sz')
         ; (1%nat, ret TYPE_Vector <*> (n <- lift_GenLLVM genN;;ret (n + 1)%N) <*> gen_sized_typ_size 0)
         ; let n := Nat.div sz 2 in
-        (1%nat, ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n))
+        (1%nat, ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) <*> ret false)
         ; (1%nat, ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz'))
         ; (1%nat, ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz'))
         ])
@@ -702,7 +702,7 @@ Definition filter_ptr_vecptr_typs (ctx: list (ident * typ)) : list (ident * typ)
         ; (1%nat, ret TYPE_Array <*> lift genN <*> gen_sized_typ_size sz')
         ; (1%nat, ret TYPE_Vector <*> (n <- lift_GenLLVM genN;;ret (n + 1)%N) <*> gen_sized_typ_size 0)
         ; let n := Nat.div sz 2 in
-        (1%nat, ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n))
+        (1%nat, ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) <*> ret false)
         ; (1%nat, ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz'))
         ; (1%nat, ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz'))
           ])
@@ -940,12 +940,13 @@ Section ExpGenerators.
            else false
          | _ => false
          end
-       | TYPE_Function ret args =>
+       | TYPE_Function ret args varargs=>
          match b with
-         | TYPE_Function ret' args' =>
+         | TYPE_Function ret' args' varargs' =>
              Nat.eqb (Datatypes.length args) (Datatypes.length args') &&
                normalized_typ_eq ret ret' &&
                forallb id (zipWith (fun a b => normalized_typ_eq a b) args args')
+             && Bool.eqb varargs varargs'
          | _ => false
          end
        | TYPE_Struct fields =>
@@ -1417,7 +1418,7 @@ Definition genType: G (typ) :=
           | TYPE_Pointer subtyp       => lift failGen
           (* Only pointer type expressions might be conversions? Maybe GEP? *)
           | TYPE_Void                 => lift failGen (* There should be no expressions of type void *)
-          | TYPE_Function ret args    => lift failGen (* No expressions of function type *)
+          | TYPE_Function ret args _   => lift failGen (* No expressions of function type *)
           | TYPE_Opaque               => lift failGen (* TODO: not sure what these should be... *)
 
           (* Generate literals for aggregate structures *)
@@ -1476,7 +1477,7 @@ Definition genType: G (typ) :=
           | TYPE_Packed_struct fields => []
 
           | TYPE_Void              => [lift failGen] (* No void type expressions *)
-          | TYPE_Function ret args => [lift failGen] (* These shouldn't exist, I think *)
+          | TYPE_Function ret args _ => [lift failGen] (* These shouldn't exist, I think *)
           | TYPE_Opaque            => [lift failGen] (* TODO: not sure what these should be... *)
           | TYPE_Half              => [lift failGen]
           | TYPE_Float             => [gen_fbinop_exp TYPE_Float]
@@ -1887,13 +1888,12 @@ Section InstrGenerators.
       bs <- gen_blocks ret_t;;
 
       let args_t := map snd args in
-      let f_type := TYPE_Function ret_t args_t in
+      let f_type := TYPE_Function ret_t args_t false in
       let prototype :=
           mk_declaration name f_type
                          ([], [])
-                         None None None None
                          []
-                         None None None
+                         []
       in
       (* Reset context *)
       restore_variable_ctxs ctxs;;

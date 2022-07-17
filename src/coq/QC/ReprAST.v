@@ -107,7 +107,7 @@ Section ReprInstances.
     | TYPE_Metadata => 0
     | TYPE_X86_mmx => 0
     | TYPE_Array sz t => S (typ_measure t)
-    | TYPE_Function ret args => S (typ_measure ret + list_sum (map typ_measure args))
+    | TYPE_Function ret args _ => S (typ_measure ret + list_sum (map typ_measure args))
     | TYPE_Struct fields => S (list_sum (map typ_measure fields))
     | TYPE_Packed_struct fields => S (list_sum (map typ_measure fields))
     | TYPE_Opaque => 0
@@ -165,7 +165,7 @@ Section ReprInstances.
     | TYPE_Metadata             => "TYPE_Metadata"
     | TYPE_X86_mmx              => "TYPE_X86_mmx"
     | TYPE_Array sz t           => "(TYPE_Array (" ++ repr sz ++ ") (" ++ repr_typ t ++ "))"
-    | TYPE_Function ret args    => "(TYPE_Function (" ++ repr_typ ret ++ ") [" ++ contents_In args (fun arg HIn => repr_typ arg) ++ "])"
+    | TYPE_Function ret args varargs    => "(TYPE_Function (" ++ repr_typ ret ++ ") [" ++ contents_In args (fun arg HIn => repr_typ arg) ++ "]" ++ if varargs then "true" else "false" ++ ")"
     | TYPE_Struct fields        => "(TYPE_Struct [" ++ contents_In fields (fun fld HIn => repr_typ fld) ++ "])"
     | TYPE_Packed_struct fields => "(TYPE_Packed_struct [" ++ contents_In fields (fun fld HIn => repr_typ fld) ++ "])"
     | TYPE_Opaque               => "TYPE_Opaque"
@@ -399,30 +399,6 @@ Section ReprInstances.
     repr := repr_block
     |}.
 
-(*
-  
-  Definition repr_param_attr (pa : param_attr) : string :=
-    match pa with
-    | PARAMATTR_Zeroext => "PARAMATTR_Zeroext"
-    | PARAMATTR_Signext => "PARAMATTR_Signext"
-    | PARAMATTR_Inreg => "PARAMATTR_Inreg"
-    | PARAMATTR_Byval t => "PARAMATTR_Byval" ++ repr t 
-    | PARAMATTR_Inalloca t => "PARAMATTR_Inalloca" ++ repr t
-    | PARAMATTR_Sret t => "PARAMATTR_Sret" ++ repr t
-    | PARAMATTR_Align a => "(PARAMATTR_Align " ++ repr a ++ ")"
-    | PARAMATTR_Noalias => "PARAMATTR_Noalias"
-    | PARAMATTR_Nocapture => "PARAMATTR_Nocapture"
-   (* | PARAMATTR_Readonly => "PARAMATTR_Readonly" *)
-    | PARAMATTR_Nest => "PARAMATTR_Nest"
-    | PARAMATTR_Returned => "PARAMATTR_Returned"
-    | PARAMATTR_Nonnull => "PARAMATTR_Nonnull"
-    | PARAMATTR_Dereferenceable a => "(PARAMATTR_Dereferenceable " ++ repr a ++ ")"
-    | PARAMATTR_Immarg => "PARAMATTR_Immarg"
-    | PARAMATTR_Noundef => "PARAMATTR_Noundef"
-    | PARAMATTR_Nofree => "PARAMATTR_Nofree"
-    end.
- *)
-
    Definition repr_param_attr (pa : param_attr) : string :=
     match pa with
     | PARAMATTR_Zeroext => "PARAMATTR_Zeroext"
@@ -437,7 +413,7 @@ Section ReprInstances.
     | PARAMATTR_Align a => "(PARAMATTR_Align " ++ repr a ++ ")"
     | PARAMATTR_Noalias => "PARAMATTR_Noalias"
     | PARAMATTR_Nocapture => "PARAMATTR_Nocapture"
-    | PARAMATTR_Readonly => "PARAMATTR_Readonly" 
+    | PARAMATTR_Readonly => "PARAMATTR_Readonly"                             
     | PARAMATTR_Nest => "PARAMATTR_Nest"
     | PARAMATTR_Returned => "PARAMATTR_Returned"
     | PARAMATTR_Nonnull => "PARAMATTR_Nonnull"
@@ -604,7 +580,7 @@ Section ReprInstances.
     | FNATTR_Shadowcallstack => "FNATTR_Shadowcallstack"
     | FNATTR_Mustprogress => "FNATTR_Mustprogress"
     (* | FNATTR_Warn_stack_size (th) => "FNATTR_Warn_stack_size" ++ repr th   *)
-    | FNATTR_vscale_range (min) (max) =>
+    | FNATTR_Vscale_range (min) (max) =>
          let printable_max := match max with
                             |None => ""        
                             |Some s => repr s            
@@ -619,71 +595,16 @@ Section ReprInstances.
   Global Instance reprFn_Attr : Repr fn_attr :=
     {| repr := repr_fn_attr |}.
 
-  Definition repr_declaration (dec : declaration typ) : string
-    := match dec with
-       | mk_declaration dc_name dc_type dc_param_attrs dc_linkage dc_visibility dc_dll_storage dc_cconv
-                        dc_attrs dc_section dc_align dc_gc =>
-         "(mk_declaration " ++ repr dc_name ++ " "
-                            ++ repr dc_type ++ " "
-                            ++ repr dc_param_attrs ++ " "
-                            ++ repr dc_linkage ++ " "
-                            ++ repr dc_visibility ++ " "
-                            ++ repr dc_dll_storage ++ " "
-                            ++ repr dc_cconv ++ " "
-                            ++ repr dc_attrs ++ " "
-                            ++ repr dc_section ++ " "
-                            ++ repr dc_align ++ " "
-                            ++ repr dc_gc ++ ")"
-       end.
   
-  Global Instance reprDeclaration : Repr (declaration typ) :=
-    {| repr := repr_declaration |}.
-
-  Definition repr_definition (defn : definition typ (block typ * list (block typ))) : string
-    :=
-      match defn with
-      | mk_definition _ df_prototype df_args df_instrs =>
-        "(mk_definition _ " ++ repr df_prototype ++ " "
-                          ++ repr df_args ++ " "
-                          ++ repr df_instrs ++ ")"
-      end.
-
-  Global Instance reprDefinition: Repr (definition typ (block typ * list (block typ))) :=
-    {| repr := repr_definition |}.
-
   Definition repr_thread_local_storage (tls : thread_local_storage) : string :=
     match tls with
     | TLS_Localdynamic => "TLS_Localdynamic"
     | TLS_Initialexec => "TLS_Initialexec"
     | TLS_Localexec => "TLS_Localexec"
     end.
-
+  
   Global Instance reprThread_Local_Storage : Repr thread_local_storage :=
     {| repr := repr_thread_local_storage |}.
-
-
-  Definition repr_global (g : global typ) : string :=
-    match g with
-    | mk_global g_ident g_typ g_constant g_exp g_linkage g_visibility g_dll_storage g_thread_local
-                g_unnamed_addr g_addrspace g_externally_initialized g_section g_align =>
-      "(mk_global " ++ repr g_ident ++ " "
-                    ++ repr g_typ ++ " "
-                    ++ repr g_constant ++ " "
-                    ++ repr g_exp ++ " "
-                    ++ repr g_linkage ++ " "
-                    ++ repr g_visibility ++ " "
-                    ++ repr g_dll_storage ++ " "
-                    ++ repr g_thread_local ++ " "
-                    ++ repr g_unnamed_addr ++ " "
-                    ++ repr g_addrspace ++ " "
-                    ++ repr g_externally_initialized ++ " "
-                    ++ repr g_section ++ " "
-                    ++ repr g_align ++ " "
-                    ++ ")"
-    end.
-
-  Global Instance reprGlobal : Repr (global typ) :=
-    {| repr := repr_global |}.
 
   Fixpoint metadata_measure (m : metadata typ) : nat
     := match m with
@@ -707,6 +628,98 @@ Section ReprInstances.
 
   Global Instance reprMetadata : Repr (metadata typ) :=
     {| repr := repr_metadata |}.
+
+
+  Definition repr_preemption_specifier (p:preemption_specifier) : string :=
+    match p with
+    | PREEMPTION_Dso_premptable => "PREEMPTION_Dso_premptable"
+    | PREEMPTION_Dso_local => "PREEMPTION_Dso_local"
+    end
+  .
+
+  Global Instance reprPremptionSpecifier : Repr (preemption_specifier) :=
+    {| repr := repr_preemption_specifier |}.
+
+
+  Definition repr_unnamed_addr (u:unnamed_addr) : string :=
+    match u with
+    | Unnamed_addr => "Unnamed_addr"
+    | Local_Unnamed_addr => "Local_Unnamed_addr"
+    end.
+
+  Global Instance reprUnnamedAddr : Repr (unnamed_addr) :=
+    {| repr := repr_unnamed_addr |}.
+  
+  
+  Definition repr_annotation (a : annotation typ) : string :=
+    match a with
+    | ANN_linkage l => "ANN_linkage " ++ (repr l)
+    | ANN_preemption_specifier p => "ANN_preemption_specifier " ++ (repr p)
+    | ANN_visibility v => "ANN_visibility " ++ (repr v)
+    | ANN_dll_storage d => "ANN_dll_storage " ++ (repr d)
+    | ANN_thread_local_storage t => "ANN_thread_local_storage " ++ (repr t)
+    | ANN_unnamed_addr u => "ANN_unnamed_addr " ++ (repr u)
+    | ANN_addrspace n => "ANN_addrspace " ++ (repr n)
+    | ANN_section s => "ANN_section " ++ (repr s)
+    | ANN_partition s => "ANN_partition " ++ (repr s)
+    | ANN_comdat l => "ANN_comdat " ++ (repr l)
+    | ANN_align n => "ANN_align " ++ (repr n)
+    | ANN_no_sanitize => "ANN_no_sanitize"
+    | ANN_no_sanitize_address => "ANN_no_sanitize_address"
+    | ANN_no_sanitize_hwaddress => "ANN_no_sanitize_hwaddress"
+    | ANN_sanitize_address_dyninit => "ANN_sanitize_address_dyninit"
+    | ANN_metadata l => "ANN_metadata " ++ (repr l)
+    | ANN_cconv c => "ANN_cconv " ++ (repr c)
+    | ANN_gc s => "ANN_gc " ++ (repr s)
+    | ANN_prefix t => "ANN_prefix " ++ (repr t)
+    | ANN_prologue t => "ANN_prologue " ++ (repr t)
+    | ANN_personality t => "ANN_personality " ++ (repr t)
+  end.
+  
+  Global Instance reprAnnotation : Repr (annotation typ) :=
+    {| repr := repr_annotation |}.
+  
+  Definition repr_declaration (dec : declaration typ) : string
+    := match dec with
+       | mk_declaration dc_name dc_type dc_param_attrs dc_attrs dc_annotations =>
+         "(mk_declaration " ++ repr dc_name ++ " "
+                            ++ repr dc_type ++ " "
+                            ++ repr dc_param_attrs ++ " "
+                            ++ repr dc_attrs ++ " "
+                            ++ repr dc_annotations
+
+       end.
+  
+  Global Instance reprDeclaration : Repr (declaration typ) :=
+    {| repr := repr_declaration |}.
+
+  Definition repr_definition (defn : definition typ (block typ * list (block typ))) : string
+    :=
+      match defn with
+      | mk_definition _ df_prototype df_args df_instrs =>
+        "(mk_definition _ " ++ repr df_prototype ++ " "
+                          ++ repr df_args ++ " "
+                          ++ repr df_instrs ++ ")"
+      end.
+
+  Global Instance reprDefinition: Repr (definition typ (block typ * list (block typ))) :=
+    {| repr := repr_definition |}.
+
+  Definition repr_global (g : global typ) : string :=
+    match g with
+    | mk_global g_ident g_typ g_constant g_exp g_externally_initialized g_annotations =>
+      "(mk_global " ++ repr g_ident ++ " "
+                    ++ repr g_typ ++ " "
+                    ++ repr g_constant ++ " "
+                    ++ repr g_exp ++ " "
+                    ++ repr g_externally_initialized ++ " "
+                    ++ repr g_annotations
+                    ++ ")"
+    end.
+
+  Global Instance reprGlobal : Repr (global typ) :=
+    {| repr := repr_global |}.
+
 
   Definition repr_tle (tle : toplevel_entity typ (block typ * list (block typ))) : string
     := match tle with

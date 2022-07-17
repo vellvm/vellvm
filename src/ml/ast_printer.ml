@@ -599,7 +599,7 @@ and param_attr : Format.formatter -> LLVMAst.param_attr -> unit =
   | PARAMATTR_Align n -> fprintf ppf "PARAMATTR_Align %d%%Z" (to_int n)
   | PARAMATTR_Noalias -> pp_print_string ppf "PARAMATTR_Noalias"
   | PARAMATTR_Nocapture -> pp_print_string ppf "PARAMATTR_Nocapture"
-  | PARAMATTR_Readonly -> pp_print_string ppf "PARAMATTR_Readonly"
+  | PARAMATTR_Readonly -> pp_print_string ppf "PARAMATTR_Readonly"                             
   | PARAMATTR_Nofree -> fprintf ppf "PARAMATTR_Nofree"
   | PARAMATTR_Nest -> pp_print_string ppf "PARAMATTR_Nest"
   | PARAMATTR_Returned  -> pp_print_string ppf "PARAMATTR_Returned"

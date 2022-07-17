@@ -79,7 +79,8 @@ Fixpoint show_typ (t : typ) : string :=
     | TYPE_Metadata             => "metadata"
     | TYPE_X86_mmx              => "x86_mmx"
     | TYPE_Array sz t           => "[" ++ show sz ++ " x " ++ show_typ t ++ "]"
-    | TYPE_Function ret args    => show_typ ret ++ " (" ++ concat ", " (map show_typ args) ++ ")"
+    | TYPE_Function ret args varargs
+        => show_typ ret ++ " (" ++ concat ", " (map show_typ args) ++ if varargs then ", ..." else "" ++ ")"
     | TYPE_Struct fields        => "{" ++ concat ", " (map show_typ fields) ++ "}"
     | TYPE_Packed_struct fields => "<{" ++ concat ", " (map show_typ fields) ++ "}>"
     | TYPE_Opaque               => "opaque"
@@ -290,7 +291,7 @@ Fixpoint show_typ (t : typ) : string :=
     | FNATTR_Shadowcallstack => "shadowcallstack" 
     | FNATTR_Mustprogress => "mustprogeress"
     (* | FNATTR_Warn_stack_size th  => - FNATTR_KeyValue *)
-    | FNATTR_vscale_range min max  =>
+    | FNATTR_Vscale_range min max  =>
         match max with
         | None => "vscale_range(" ++ show min ++ ")"
         | Some m => "vscale_range(" ++ show min ++ "," ++ show m ++ ")"
@@ -783,10 +784,10 @@ Fixpoint show_typ (t : typ) : string :=
     := let '(i, t, parameter_attributes) := arg in
        show t ++ concat " " (map (fun x => show x) (parameter_attributes)) ++ " %" ++ show i.
 
-  Definition show_arg_list (args : list (local_id * T * list param_attr)) : string
+  Definition show_arg_list (args : list (local_id * T * list param_attr)) (varargs:bool) : string
     :=
       let arg_str := concat ", " (map show_arg args) in
-      concatStr ["("; arg_str; ")"].
+      concatStr ["("; arg_str; if varargs then ", ..." else ""; ")"].
 
   (* TODO: REALLY?!? *)
   Fixpoint zip {X Y Z} (xs : list X) (ys : list Y) (zs : list Z) : list (X * Y *  Z)
@@ -820,7 +821,7 @@ End ShowInstances.
       
       match ftype with
       (*Stand for return type and arguments type*)
-      | TYPE_Function ret_t args_t =>
+      | TYPE_Function ret_t args_t varargs =>
       (* It's being zipped with name of arg and then type bc of how show_arg is defined *)
         let args := zip defn.(df_args) args_t argument_attributes in
           (* What is happening here? *)
@@ -838,44 +839,45 @@ End ShowInstances.
         let ret_attributes :=  concat " " (map (fun x => show x) (return_attributes)) in
         let printable_ret_attrs := if ret_attributes then concatStr [" " ;ret_attributes] else "" in
 
-        let the_linkage := defn.(df_prototype).(dc_linkage) in 
+        let the_linkage := dc_linkage defn.(df_prototype) in 
         let printable_linkage := match the_linkage with
                                  |None => ""
                                  |Some l => show_linkage l
                                  end in
-        let the_visibility := defn.(df_prototype).(dc_visibility) in 
+        let the_visibility := dc_visibility defn.(df_prototype) in 
         let printable_visibility := match the_visibility with
                                  |None => ""
                                  |Some v => show_visibility v 
                                     end in
-        let the_dll_storage := defn.(df_prototype).(dc_dll_storage) in 
+        let the_dll_storage := dc_dll_storage defn.(df_prototype) in 
         let printable_dll_storage := match the_dll_storage with
                                  |None => ""
                                  |Some d => show_dll_storage d
                                      end in
-        let the_cconv := defn.(df_prototype).(dc_cconv) in 
+        let the_cconv := dc_cconv defn.(df_prototype) in 
         let printable_cconv := match the_cconv with
                                  |None => ""
                                  |Some c => show_cconv c
                                end in
-        let the_section := defn.(df_prototype).(dc_section) in 
+        let the_section := dc_section defn.(df_prototype) in 
         let printable_section := match the_section with
                                  |None => ""
                                  |Some c => show c
                                  end in
-        let the_align := defn.(df_prototype).(dc_align) in 
+        let the_align := dc_align defn.(df_prototype) in 
         let printable_align := match the_align with
                                  |None => ""
                                  |Some c => show c
                                end in
-       let the_gc := defn.(df_prototype).(dc_gc) in 
+       let the_gc := dc_gc defn.(df_prototype) in 
         let printable_gc := match the_gc with
                                  |None => ""
                                  |Some c => show c
                                  end in
         
         concatStr ["define "; printable_linkage; printable_visibility ; printable_dll_storage ;
-                   printable_cconv ; printable_ret_attrs ; show ret_t; " @"; show name; show_arg_list args;
+                   printable_cconv ; printable_ret_attrs ; show ret_t; " @";
+                   show name; show_arg_list args varargs;
                    printable_section ; printable_align ; printable_gc ; " {"; newline ;
                    blocks;
                    "}";
@@ -894,32 +896,32 @@ End ShowInstances.
    let name := decl.(dc_name) in
    let (ret_attrs, args_attrs) := decl.(dc_param_attrs) in
    match decl.(dc_type) with
-    | TYPE_Function ret_t args_t =>
-   let link := match decl.(dc_linkage) with
+    | TYPE_Function ret_t args_t varargs =>
+   let link := match dc_linkage decl with
                | None => ""
                | Some l => show_linkage l 
                end in
-   let vis := match decl.(dc_visibility) with
+   let vis := match dc_visibility decl with
               | None => ""
               | Some w => show_visibility w 
               end in
-   let dll := match decl.(dc_dll_storage) with
+   let dll := match dc_dll_storage decl with
               | None => ""
               | Some d => show_dll_storage d
               end in
-   let cc := match decl.(dc_cconv) with
+   let cc := match dc_cconv decl with
              | None => ""
              | Some c => show_cconv c
              end in                  
-   let sec := match decl.(dc_section) with
+   let sec := match dc_section decl with
               | None => ""
               | Some s => concatStr["section \"; s; "\"; " "]
               end in
-   let all := match decl.(dc_align) with
+   let all := match dc_align decl with
               | None => ""
               | Some a => concatStr["align "; show a; " "]
               end in
-   let gc := match decl.(dc_gc) with
+   let gc := match dc_gc decl with
              | None => ""
              | Some g => concatStr["gc \"; g; "\"; " "]
              end in                      
@@ -931,7 +933,8 @@ End ShowInstances.
                                                                       | [] => ""
                                                                       | z :: tl => show z
                                                                       end ])
-                                             (List.combine args_t args_attrs));
+                               (List.combine args_t args_attrs));
+              if varargs then ", ..." else "";
               ")"; sec; all; gc] 
    | _ => "Invalid type on function: " ++ show name
    end.                                     
@@ -942,33 +945,33 @@ End ShowInstances.
   Definition show_global (g : global typ) : string :=
     let name  := g.(g_ident) in
     let gtype := g.(g_typ) in
-    let the_linkage := g.(g_linkage) in   
+    let the_linkage := g_linkage g in   
     let printable_linkage := match the_linkage with                               
                              |None => ""                                       
                              |Some l => show_linkage l                                          
                              end in
-    let the_visibility := g.(g_visibility) in   
+    let the_visibility := g_visibility g in   
     let printable_visibility := match the_visibility with                               
                              |None => ""                                       
                              |Some l => show_visibility l                                       
                                 end in
-    let the_dll_storage := g.(g_dll_storage) in    
+    let the_dll_storage := g_dll_storage g in    
     let printable_dll_storage := match the_dll_storage with                               
                              |None => ""                                       
                              |Some l => show_dll_storage l                                      
                                  end in
-    let the_thread_local := g.(g_thread_local) in
+    let the_thread_local := g_thread_local_storage g in
     let printable_thread_local := match the_thread_local with                               
                              |None => ""                                       
                              |Some l => show_thread_local_storage l                             
                                   end in
-    let g_exp := match g.(g_exp) with
+    let g_exp := match g_exp g with
                  | None => ""
                  | Some e => show e
                  end in 
-    let the_unnamed_addr := g.(g_unnamed_addr) in
+    let the_unnamed_addr := g_unnamed_addr g in
     let printable_unnamed_addr := if the_unnamed_addr then "unnamed_addr " else "local_unnamed_addr " in
-    let the_addrspace := g.(g_addrspace) in
+    let the_addrspace := g_addrspace g in
     let printable_addrspace := match the_addrspace with                               
                              |None => ""                                       
                              |Some x => show x                              
@@ -978,11 +981,11 @@ End ShowInstances.
     let printable_externally_initialized := if the_externally_initialized then "external " else "" in
     let global_or_constant := g.(g_constant) in
     let printable_g_or_c := if global_or_constant then "constant " else "global " in
-    let printable_section := match g.(g_section) with
+    let printable_section := match g_section g with
                             | None => ""
                             | Some s => concatStr[", section "; show s]
                             end in
-    let printable_align :=  match g.(g_align) with
+    let printable_align :=  match g_align g with
                                 | None => ""
                                 | Some s => concatStr[", align "; show s]
                                 end in                                                                      
