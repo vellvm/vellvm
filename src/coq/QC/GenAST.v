@@ -1893,11 +1893,10 @@ Section InstrGenerators.
           mk_declaration name f_type
                          ([], [])
                          []
-                         []
       in
       (* Reset context *)
       restore_variable_ctxs ctxs;;
-      ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs).
+      ret (mk_definition (block typ * list (block typ)) prototype (map fst args) [] bs).
 
   Definition gen_new_definition (ret_t : typ) (args : list (local_id * typ)) : GenLLVM (definition typ (block typ * list (block typ)))
     :=

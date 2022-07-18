@@ -250,25 +250,25 @@ End VIR_Notations.
 Section SurfaceSyntaxTest.
   
   Definition add_twice := mcfg_of_tle [TLE_Definition {|
-                               df_prototype := {|dc_name := (Name "main");
-                                                 dc_type := (TYPE_Function (TYPE_I 32%N) [(TYPE_I 32%N); (TYPE_Pointer (TYPE_Pointer (TYPE_I 8%N)))] false);
-                                                 dc_param_attrs := ([], [
-                                                                   ]);
-                                                 dc_attrs := [];
-                                                 dc_annotations := []
-                                               |};
-                               df_args := [(Name "argc"); (Name "arcv")];
-                               df_instrs := (
-                                             {|
-                                               blk_id := (Anon 0%Z);
-                                               blk_phis := [];
-                                               blk_code := [(IId (Anon 1%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%N) (EXP_Integer (5)%Z) (EXP_Integer (9)%Z))));
-                                                           (IId (Anon 2%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%N) (EXP_Ident (ID_Local (Anon 1%Z))) (EXP_Integer (15)%Z))))];
-                                               blk_term := TERM_Ret ((TYPE_I 32%N), (EXP_Ident (ID_Local (Anon 2%Z))));
-                                               blk_comments := None
-                                             |}
-                                           ,[])
-                             |}].
+                                           df_prototype := {|dc_name := (Name "main");
+                                                             dc_type := (TYPE_Function (TYPE_I 32%N) [(TYPE_I 32%N); (TYPE_Pointer (TYPE_Pointer (TYPE_I 8%N)))] false);
+                                                             dc_param_attrs := ([], [
+                                                                               ]);
+                                                             dc_annotations := []
+                                                           |};
+                                           df_args := [(Name "argc"); (Name "arcv")];
+                                           df_attrs := [];
+                                           df_instrs := (
+                                                         {|
+                                                           blk_id := (Anon 0%Z);
+                                                           blk_phis := [];
+                                                           blk_code := [(IId (Anon 1%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%N) (EXP_Integer (5)%Z) (EXP_Integer (9)%Z))));
+                                                                        (IId (Anon 2%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%N) (EXP_Ident (ID_Local (Anon 1%Z))) (EXP_Integer (15)%Z))))];
+                                                           blk_term := TERM_Ret ((TYPE_I 32%N), (EXP_Ident (ID_Local (Anon 2%Z))));
+                                                           blk_comments := None
+                                                         |}
+                                                         ,[])
+                                         |}].
   
  Import VIR_Notations .
 
@@ -350,10 +350,10 @@ Section SurfaceSyntaxTest.
                          dc_type := (TYPE_Function (TYPE_I 64%N) [(TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))); (TYPE_I 64%N)] false);
                          dc_param_attrs := ([], [
                                            ]);
-                         dc_attrs := [];
                          dc_annotations := []
                        |};
        df_args := [(Name "root"); (Name "value")];
+       df_attrs := [];
        df_instrs := (
                      {|
                        blk_id := (Anon 0%Z);
@@ -423,10 +423,10 @@ Section SurfaceSyntaxTest.
                          dc_type := (TYPE_Function (TYPE_I 64%N) [(TYPE_I 64%N); (TYPE_Pointer (TYPE_Pointer (TYPE_I 8%N)))] false);
                          dc_param_attrs := ([], [
                                            ]);
-                         dc_attrs := [];
                          dc_annotations := []
-                       |};
+                       |};       
        df_args := [(Name "argc"); (Name "argv")];
+       df_attrs := [];
        df_instrs := (
                      {|
                        blk_id := (Anon 0%Z);

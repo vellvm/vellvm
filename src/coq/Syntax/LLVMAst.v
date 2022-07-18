@@ -21,8 +21,13 @@ Open Scope list_scope.
     file defines the structure that a front end for a higher level language
     should target: [@toplevel_entities typ (block typ * list (block typ))]
 
-    All changes to this file must naturally be mirrored in the parser.
-    "/src/ml/libvellvm/llvm_parser.mly"
+    All changes to this file must naturally be mirrored in:
+    - the parser:
+       "/src/ml/libvellvm/llvm_parser.mly"
+    - the Coq Representation 
+       "/src/coq/QC/ReprAST.v"
+    - the prettyprinter 
+       "/src/coq/QC/ShowAST.v"
 
  *)
 
@@ -85,7 +90,7 @@ Variant linkage : Set :=
 .
 
 Variant preemption_specifier : Set :=
-  | PREEMPTION_Dso_premptable
+  | PREEMPTION_Dso_preemptable
   | PREEMPTION_Dso_local
 .      
 
@@ -494,7 +499,7 @@ Variant annotation : Set :=
   | ANN_no_sanitize_address
   | ANN_no_sanitize_hwaddress
   | ANN_sanitize_address_dyninit
-  | ANN_metadata (l:list metadata)
+  | ANN_metadata (l:list (raw_id * metadata))
   | ANN_cconv (c:cconv) (* declaration / definitions only *)
   | ANN_gc (s:string) (* declaration / definitions only *)
   | ANN_prefix (t:texp) (* declaration / definitions only *)
@@ -592,7 +597,7 @@ Definition ann_sanitize_address_dynint (a:annotation) : option unit :=
   | _ => None
   end.
 
-Definition ann_metadata (a:annotation) : option (list metadata) :=
+Definition ann_metadata (a:annotation) : option (list (raw_id * metadata)) :=
   match a with
   | ANN_metadata m => Some m
   | _ => None
@@ -680,7 +685,7 @@ Definition g_no_sanitize_hwaddress (g:global) : option unit :=
 Definition g_sanitize_address_dyninit (g:global) : option unit :=
   find_option ann_sanitize_address_dynint (g_annotations g).
 
-Definition g_metadata (g:global) : option (list metadata) :=
+Definition g_metadata (g:global) : option (list (raw_id * metadata)) :=
   find_option ann_metadata (g_annotations g).
 
 
@@ -690,7 +695,6 @@ Record declaration : Set :=
     dc_name         : function_id;
     dc_type         : T;    (* INVARIANT: should be TYPE_Function (ret_t * args_t * vararg) *)
     dc_param_attrs  : list param_attr * list (list param_attr); (* ret_attrs * args_attrs *)
-    dc_attrs        : list fn_attr;
     dc_annotations  : list annotation
   }.
 
@@ -739,7 +743,7 @@ Definition dc_prologue (d:declaration) : option texp :=
 Definition dc_personality (d:declaration) : option texp :=
   find_option ann_personality (dc_annotations d).
 
-Definition dc_metadata (d:declaration) : option (list metadata) :=
+Definition dc_metadata (d:declaration) : option (list (raw_id * metadata)) :=
   find_option ann_metadata (dc_annotations d).
 
 
@@ -760,6 +764,7 @@ Record definition {FnBody:Set} :=
   {
     df_prototype   : declaration;
     df_args        : list local_id;
+    df_attrs       : list fn_attr;
     df_instrs      : FnBody;
   }.
 

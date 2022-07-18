@@ -47,6 +47,7 @@ Definition mangle_definition (d:definition T (block T * list (block T))) : defin
   mk_definition _
   (df_prototype d)
   (df_args d)
+  (df_attrs d)
   (mangle_blocks (df_instrs d))
 .
 

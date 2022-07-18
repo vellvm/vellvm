@@ -58,7 +58,6 @@ Definition fabs_32_decl: declaration typ :=
     dc_name        := Name "llvm.fabs.f32";
     dc_type        := TYPE_Function TYPE_Float [TYPE_Float] false;
     dc_param_attrs := ([], [[]]);
-    dc_attrs       := [] ;
     dc_annotations  := []
   |}.
 
@@ -68,7 +67,6 @@ Definition fabs_64_decl: declaration typ :=
     dc_name        := Name "llvm.fabs.f64";
     dc_type        := TYPE_Function TYPE_Double [TYPE_Double] false;
     dc_param_attrs := ([], [[]]);
-    dc_attrs       := [] ;
     dc_annotations  := []
   |}.
 
@@ -80,7 +78,6 @@ Definition memcpy_8_decl: declaration typ :=
     dc_name        := Name "llvm.memcpy.p0i8.p0i8.i32";
     dc_type        := TYPE_Function TYPE_Void [pt; pt; i32; i32; i1] false;
     dc_param_attrs := ([], [[];[];[];[];[]]);
-    dc_attrs       := [] ;
     dc_annotations  := []    
   |}.
 
@@ -91,7 +88,6 @@ Definition malloc_decl: declaration typ :=
     dc_name        := Name "malloc";
     dc_type        := TYPE_Function pt [i64] false;
     dc_param_attrs := ([], [[];[];[];[];[]]);
-    dc_attrs       := [] ;
     dc_annotations  := []
   |}.
 
@@ -101,7 +97,6 @@ Definition free_decl: declaration typ :=
     dc_name        := Name "free";
     dc_type        := TYPE_Function TYPE_Void [pt] false;
     dc_param_attrs := ([], [[];[];[];[];[]]);
-    dc_attrs       := [] ;
     dc_annotations  := []
   |}.  
 
@@ -110,7 +105,6 @@ Definition maxnum_64_decl: declaration typ :=
     dc_name        := Name "llvm.maxnum.f64";
     dc_type        := TYPE_Function TYPE_Double [TYPE_Double;TYPE_Double] false;
     dc_param_attrs := ([], [[];[]]);
-    dc_attrs       := [] ;
     dc_annotations  := []
   |}.
 
@@ -119,7 +113,6 @@ Definition minimum_64_decl: declaration typ :=
     dc_name        := Name "llvm.minimum.f64";
     dc_type        := TYPE_Function TYPE_Double [TYPE_Double;TYPE_Double] false;
     dc_param_attrs := ([], [[];[]]);
-    dc_attrs       := [] ;
     dc_annotations  := []
   |}.
 
@@ -128,7 +121,6 @@ Definition maxnum_32_decl: declaration typ :=
     dc_name        := Name "llvm.maxnum.f32";
     dc_type        := TYPE_Function TYPE_Float [TYPE_Float;TYPE_Float] false;
     dc_param_attrs := ([], [[];[]]);
-    dc_attrs       := [] ;
     dc_annotations  := []
   |}.
 
@@ -137,7 +129,6 @@ Definition minimum_32_decl: declaration typ :=
     dc_name        := Name "minimum.f32";
     dc_type        := TYPE_Function TYPE_Float [TYPE_Float;TYPE_Float] false;
     dc_param_attrs := ([], [[];[]]);
-    dc_attrs       := [] ;
     dc_annotations  := []
   |}.
 

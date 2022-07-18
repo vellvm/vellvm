@@ -81,6 +81,8 @@
 
 
   | "unnamed_addr"                 -> KW_UNNAMED_ADDR
+  | "local_unnamed_addr"           -> KW_LOCAL_UNNAMED_ADDR
+
   | "type"                         -> KW_TYPE
   | "opaque"                       -> KW_OPAQUE
   | "global"                       -> KW_GLOBAL
@@ -88,6 +90,8 @@
   | "externally_initialized"       -> KW_EXTERNALLY_INITIALIZED
   | "constant"                     -> KW_CONSTANT
   | "section"                      -> KW_SECTION
+  | "comdat"                       -> KW_COMDAT
+  | "partition"                    -> KW_PARTITION
   | "thread_local"                 -> KW_THREAD_LOCAL
   | "localdynamic"                 -> KW_LOCALDYNAMIC
   | "initialexec"                  -> KW_INITIALEXEC
@@ -164,6 +168,10 @@
   | "returns_twice"                -> KW_RETURNS_TWICE
   | "safestack"                    -> KW_SAFESTACK
   | "sanitize_address"             -> KW_SANITIZE_ADDRESS
+  | "no_sanitize"                  -> KW_NO_SANITIZE
+  | "no_sanitize_address"          -> KW_NO_SANITIZE_ADDRESS
+  | "no_sanitize_hwaddress"        -> KW_NO_SANITIZE_HWADDRESS  
+  | "sanitize_address_dyninit"     -> KW_SANITIZE_ADDRESS_DYNINIT
   | "sanitize_memory"              -> KW_SANITIZE_MEMORY
   | "sanitize_thread"              -> KW_SANITIZE_THREAD
   | "sanitize_hwaddress"           -> KW_SANITIZE_HWADDRESS
@@ -183,6 +191,10 @@
   | "vscale_range"                 -> KW_VSCALE_RANGE
 
   | "align"                        -> KW_ALIGN
+
+  | "prefix"                       -> KW_PREFIX
+  | "prologue"                     -> KW_PROLOGUE
+  | "personality"                  -> KW_PERSONALITY
   | "gc"                           -> KW_GC
   | "to"                           -> KW_TO
   | "unwind"                       -> KW_UNWIND
@@ -248,6 +260,9 @@
   | "extractvalue"   -> KW_EXTRACTVALUE
   | "insertvalue"    -> KW_INSERTVALUE
   | "landingpad"     -> KW_LANDINGPAD
+
+  | "dso_preemptable" -> KW_DSO_PREEMPTABLE
+  | "dso_local"       -> KW_DSO_LOCAL
 
   (* icmp *)
   | "nuw"            -> KW_NUW

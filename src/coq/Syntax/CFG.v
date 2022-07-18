@@ -211,6 +211,7 @@ Section CFG.
     let defns := map (fun d => {|
                           df_prototype := df_prototype d;
                           df_args := df_args d;
+                          df_attrs := df_attrs d;    
                           df_instrs := cfg_of_definition d
                         |}) (m_definitions m)
     in
@@ -239,6 +240,7 @@ Section CFG.
                                        {|
                                          df_prototype := df_prototype d;
                                          df_args := df_args d;
+                                         df_attrs := df_attrs d;
                                          df_instrs := (x, xs)
                                        |}
                                          ::l)
@@ -294,6 +296,7 @@ Section TLE_To_Modul.
       modul_defns_of_mcfg_defns (map (fun d => {|
                                           df_prototype := df_prototype d;
                                           df_args := df_args d;
+                                          df_attrs := df_attrs d;
                                           df_instrs := cfg_of_definition T d
                                         |}) l) = Some l.
   Proof.

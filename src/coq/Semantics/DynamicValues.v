@@ -110,9 +110,10 @@ Inductive IX_supported : N -> Prop :=
 .
 
 (* TODO: This probably should live somewhere else... *)
-#[refine] Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
+#[global] Program Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
     Decidable_witness := N.eqb x y
   }.
+Next Obligation.
 apply N.eqb_eq.
 Qed.
 
@@ -2689,9 +2690,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     apply Forall_HIn_cons_inv; auto.
   Qed.
 
-  Hint Rewrite NO_VOID_equation : NO_VOID.
-  Hint Resolve NO_VOID_Struct_cons_inv : NO_VOID.
-  Hint Resolve NO_VOID_Packed_struct_cons_inv : NO_VOID.
+  #[global] Hint Rewrite NO_VOID_equation : NO_VOID.
+  #[global] Hint Resolve NO_VOID_Struct_cons_inv : NO_VOID.
+  #[global] Hint Resolve NO_VOID_Packed_struct_cons_inv : NO_VOID.
   Ltac solve_no_void :=
     solve
       [ auto with NO_VOID

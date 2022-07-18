@@ -221,12 +221,14 @@ and parse_srctgt_assertion (filename: string) (line: string) : test list =
       end
     | _ -> false
   in
-  (* Find the function type for a given top level entity *)
+  (* Find the function type for a given top level entity 
+     NOTE: does not work with vararg functions
+  *)
   let find_ty toplevel_entity : (LLVMAst.typ list * LLVMAst.typ) =
     match toplevel_entity with
     | TLE_Definition df ->
        begin match LLVMAst.dc_type df.df_prototype with
-       | LLVMAst.TYPE_Function (rt, args) -> args, rt
+       | LLVMAst.TYPE_Function (rt, args,_) -> args, rt
        | _ -> failwith "given entity not a function definition"
        end
     | _ -> failwith "not a function definition"

@@ -128,7 +128,7 @@ update-flocq-quickchick:
 update-submodules: update-quickchick update-flocq-quickchick
 
 .PHONY: extracted
-extracted: .depend
+extracted: .depend 
 	$(MAKE) quickchick $(EXTRACTDIR)/STAMP $(VOFILES)
 
 $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v

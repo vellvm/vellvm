@@ -4,10 +4,6 @@
     program should give you a string that can be read by clang.
  *)
 
-From ExtLib Require Import
-     Structures.Monads
-     Structures.Functor
-     Eqv.
 
 From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG DynamicTypes.
 
@@ -16,7 +12,6 @@ Require Import Integers Floats.
 Require Import List.
 
 Import ListNotations.
-Import MonadNotation.
 
 From Coq Require Import
   ZArith List String Lia Bool.Bool Hexadecimal Numbers.HexadecimalString Numbers.HexadecimalZ
