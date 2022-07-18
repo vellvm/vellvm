@@ -1781,8 +1781,10 @@ Section InstrGenerators.
     := Build_Gen int genInt.
 
   (* TODO: move this. Also give a less confusing name because genOption is a thing? *)
-  Definition gen_option {A} (g : G A) : G (option A)
-    := freq_ failGen [(1%nat, ret None); (7%nat, liftM Some g)].
+  Definition gen_option {A} (g : G A) (freqs : nat * nat) : G (option A)
+    :=
+    let '(none_freq, some_freq) := freqs in
+    freq_ failGen [(none_freq, ret None); (some_freq, liftM Some g)].
 
   (* TODO: move these *)
   Definition opt_add_state {A} {ST} (st : ST) (o : option (A * ST)) : (option A * ST)
@@ -1791,10 +1793,10 @@ Section InstrGenerators.
        | (Some (a, st')) => (Some a, st')
        end.
 
-  Definition gen_opt_LLVM {A} (g : GenLLVM A) : GenLLVM (option A)
+  Definition gen_opt_LLVM {A} (g : GenLLVM A) (freqs : nat * nat) : GenLLVM (option A)
     := mkStateT
          (fun st =>
-            opt <- gen_option (runStateT g st);;
+            opt <- gen_option (runStateT g st) freqs;;
             ret (opt_add_state st opt)).
 
   Definition gen_load : GenLLVM (typ * instr typ)
@@ -2130,19 +2132,43 @@ Section InstrGenerators.
   Definition gen_helper_function_tle_multiple : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     := listOf_LLVM gen_helper_function_tle.
 
-  Definition gen_global : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
-    := fmap ret gen_helper_function_tle.
-
   Definition gen_main : GenLLVM (definition typ (block typ * list (block typ)))
     := gen_definition (Name "main") (TYPE_I 8) [].
 
   Definition gen_main_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
     := ret TLE_Definition <*> gen_main.
 
-  Definition gen_llvm :GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
+  Definition gen_global_var : GenLLVM (global typ)
     :=
-    globals <- gen_helper_function_tle_multiple;;
+      name <- new_global_id;;
+      t <- gen_sized_typ;;
+      opt_exp <- gen_opt_LLVM (hide_ctx (gen_exp_size 0 t)) (1,7)%nat;;
+      add_to_ctx (ID_Global name, t);;
+      ret (mk_global name t false opt_exp None None None None false None false None None).
+
+  Definition gen_global_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
+    := ret TLE_Global <*> gen_global_var.
+
+  Fixpoint gen_global_tle_size (sz : nat) : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
+    := match sz with
+       | 0%nat =>
+           ret nil
+       | S z =>
+           g_var <- gen_global_tle;;
+           g_vars <- gen_global_tle_size z;;
+           ret (g_var::g_vars)
+       end.
+
+  Definition gen_global_tle_multiple : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
+    := (* sz <- lift (arbitrary : G N) *)
+      sz <- lift_GenLLVM (choose (0,2)%nat);;
+      gen_global_tle_size sz.
+
+  Definition gen_llvm : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
+    :=
+    globals <- gen_global_tle_multiple;;
+    functions <- gen_helper_function_tle_multiple;;
     main <- gen_main_tle;;
-    ret (globals ++ [main]).
+    ret (globals ++ functions ++ [main]).
 
 End InstrGenerators.
