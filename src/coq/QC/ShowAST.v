@@ -74,8 +74,14 @@ Section ShowInstances.
     | TYPE_Metadata             => "metadata"
     | TYPE_X86_mmx              => "x86_mmx"
     | TYPE_Array sz t           => "[" ++ show sz ++ " x " ++ show_typ t ++ "]"
-    | TYPE_Function ret args varargs
-        => show_typ ret ++ " (" ++ concat ", " (map show_typ args) ++ if varargs then ", ..." else "" ++ ")"
+    | TYPE_Function ret args varargs =>
+        let varargs_str :=
+          if Nat.eqb (List.length args) 0 then
+            (if varargs then "..." else "")
+          else
+            (if varargs then ", ..." else "")
+        in
+        show_typ ret ++ " (" ++ concat ", " (map show_typ args) ++ varargs_str ++ ")"
     | TYPE_Struct fields        => "{" ++ concat ", " (map show_typ fields) ++ "}"
     | TYPE_Packed_struct fields => "<{" ++ concat ", " (map show_typ fields) ++ "}>"
     | TYPE_Opaque               => "opaque"
@@ -785,8 +791,15 @@ Section ShowInstances.
 
   Definition show_arg_list (args : list (local_id * T * list param_attr)) (varargs:bool) : string
     :=
-      let arg_str := concat ", " (map show_arg args) in
-      concatStr ["("; arg_str; if varargs then ", ..." else ""; ")"].
+    let vararg_str :=
+      if Nat.eqb (List.length args) 0 then
+        (if varargs then "..." else "")
+      else
+        (if varargs then ", ..." else "")
+    in
+    let arg_str := concat ", " (map show_arg args)
+    in
+      concatStr ["("; arg_str; vararg_str ; ")"].
 
 
   (* TODO: REALLY?!? *)
@@ -821,10 +834,11 @@ Section ShowInstances.
 End ShowInstances.
 
 (** Return empty string when None *)
+(** Adds a space -- is this the right place to do that? *)
 Definition maybe_to_string {X} (to_string : X -> string) (ox : option X) :=
   match ox with
   | None => ""
-  | Some x => to_string x
+  | Some x => ((to_string x) ++ " ")%string
   end.
 
 (** Return empty stringwhen None *)
@@ -911,6 +925,12 @@ Definition show_declaration (decl: declaration typ) : string :=
 
       let gc := maybe_show (dc_gc decl) in
 
+      let vararg_str :=
+        if Nat.eqb (List.length args_t) 0 then
+          (if vararg then "..." else "")
+        else
+          (if vararg then ", ..." else "")
+      in
       concatStr ["declare "; link; vis; dll; cc;
                  concatStr[intersperse " " (map show ret_attrs)]; " " ;
 
@@ -920,7 +940,7 @@ Definition show_declaration (decl: declaration typ) : string :=
                                                                       | z :: tl => show z
                                                                       end ])
                                   (List.combine args_t args_attrs));
-                 if vararg then ", ..." else "";
+                 vararg_str ;
                  ")"; section; align; gc]
   | _ => "Invalid type on function: " ++ show name
   end.

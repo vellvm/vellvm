@@ -28,8 +28,8 @@ let dvalue_eq_assertion (got : unit -> DV.dvalue) (expected : unit -> DV.dvalue)
   let dv2 = expected () in
   if DV.dvalue_eqb dv1 dv2 then () else
     failwith (Printf.sprintf "dvalues different\ngot:\n\t%s\nexpected:\n\t%s"
-                (Llvm_printer.string_of_dvalue dv1)
-                (Llvm_printer.string_of_dvalue dv2))
+                (string_of_dvalue dv1)
+                (string_of_dvalue dv2))
 
 
 let make_test ll_ast t : string * assertion  =
@@ -47,7 +47,7 @@ let make_test ll_ast t : string * assertion  =
   match t with
   | Assertion.EQTest (expected, dtyp, entry, args) ->
     let str =
-      let expected_str = Llvm_printer.string_of_dvalue expected  in
+      let expected_str = string_of_dvalue expected  in
       let args_str: doc =
         pp_print_list ~pp_sep:(fun f () -> pp_print_string f ", ") Interpreter.pp_uvalue str_formatter args;
         flush_str_formatter()
@@ -60,7 +60,7 @@ let make_test ll_ast t : string * assertion  =
   | Assertion.POISONTest (dtyp, entry, args) ->
      let expected = InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV.DVALUE_Poison dtyp in
      let str =
-       let expected_str = Llvm_printer.string_of_dvalue expected in
+       let expected_str = string_of_dvalue expected in
        let args_str =
          pp_print_list ~pp_sep:(fun f () -> pp_print_string f ", ") Interpreter.pp_uvalue str_formatter args;
          flush_str_formatter()

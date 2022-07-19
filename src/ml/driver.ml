@@ -9,8 +9,10 @@
  ---------------------------------------------------------------------------- *)
 
 open Printf
-
+open InterpretationStack.InterpreterStackBigIntptr.LP.Events
+       
 let of_str = Camlcoq.camlstring_of_coqstring
+let string_of_dvalue (d:DV.dvalue) = of_str (DV.show_dvalue d)
 
 let interpret = ref false
 
@@ -88,8 +90,7 @@ let process_ll_file path file =
   let _ = if !interpret then begin
       match Interpreter.interpret ll_ast with
       | Ok dv ->
-        Printf.printf "Program terminated with: %s\n" 
-        (Llvm_printer.string_of_dvalue dv)
+        Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv)
 
       | Error msg -> failwith msg
     end
