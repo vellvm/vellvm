@@ -1142,8 +1142,11 @@ conversion:
   | KW_BITCAST  { Bitcast  }
 
 ibinop:
-  | op=ibinop_nuw_nsw_opt nuw=KW_NUW? nsw=KW_NSW?
-    { op (nuw <> None) (nsw <> None) }
+  | op=ibinop_nuw_nsw_opt   { op false false }
+  | op=ibinop_nuw_nsw_opt KW_NSW { op false true }
+  | op=ibinop_nuw_nsw_opt KW_NUW { op true false }
+  | op=ibinop_nuw_nsw_opt KW_NUW KW_NSW { op true true }
+  | op=ibinop_nuw_nsw_opt KW_NSW KW_NUW { op true true }  
   | op=ibinop_exact_opt exact=KW_EXACT? { op (exact <> None) }
   | op=ibinop_no_opt { op }
 
