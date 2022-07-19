@@ -695,6 +695,7 @@ Record declaration : Set :=
     dc_name         : function_id;
     dc_type         : T;    (* INVARIANT: should be TYPE_Function (ret_t * args_t * vararg) *)
     dc_param_attrs  : list param_attr * list (list param_attr); (* ret_attrs * args_attrs *)
+    dc_attrs        : list fn_attr;
     dc_annotations  : list annotation
   }.
 
@@ -764,7 +765,6 @@ Record definition {FnBody:Set} :=
   {
     df_prototype   : declaration;
     df_args        : list local_id;
-    df_attrs       : list fn_attr;
     df_instrs      : FnBody;
   }.
 

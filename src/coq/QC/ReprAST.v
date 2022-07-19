@@ -676,10 +676,11 @@ Section ReprInstances.
   
   Definition repr_declaration (dec : declaration typ) : string
     := match dec with
-       | mk_declaration dc_name dc_type dc_param_attrs dc_annotations =>
+       | mk_declaration dc_name dc_type dc_param_attrs dc_attrs dc_annotations =>
          "(mk_declaration " ++ repr dc_name ++ " "
                             ++ repr dc_type ++ " "
                             ++ repr dc_param_attrs ++ " "
+                            ++ repr dc_attrs ++ " "
                             ++ repr dc_annotations
 
        end.
@@ -691,10 +692,9 @@ Section ReprInstances.
   Definition repr_definition (defn : definition typ (block typ * list (block typ))) : string
     :=
       match defn with
-      | mk_definition df_prototype df_args df_attrs df_instrs =>
+      | mk_definition df_prototype df_args df_instrs =>
         "(mk_definition _ " ++ repr df_prototype ++ " "
                             ++ repr df_args ++ " "
-                            ++ repr df_attrs ++ " "
                             ++ repr df_instrs ++ ")"
       end.
 

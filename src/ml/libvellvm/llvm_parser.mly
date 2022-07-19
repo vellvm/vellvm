@@ -681,6 +681,7 @@ declaration:
     LPAREN args = dc_args RPAREN
 
     u = unnamed_addr?
+    dc_attrs = fn_attr*
     a = align_ann?
     g = gc?
     pre = prefix?
@@ -691,6 +692,7 @@ declaration:
 	 dc_name        = lexed_id_to_raw_id name ;
 	 dc_type        = TYPE_Function(df_ret_typ, List.map fst dc_args, vararg);
          dc_param_attrs = (df_ret_attrs, List.map snd dc_args);
+	 dc_attrs;
 	 dc_annotations =
 	   ( (opt_list (ann_linkage_opt l))
 	     @ (opt_list p)
@@ -735,7 +737,7 @@ definition:
 
     u = unnamed_addr?
     ad = addrspace?
-    df_attrs = fn_attr*
+    dc_attrs = fn_attr*
 
     sec = section?
     part = partition?
@@ -790,7 +792,8 @@ definition:
           dc_type = TYPE_Function (df_ret_typ, 
                                    List.map (fun x -> fst (fst x)) args, vararg) ;
           dc_param_attrs = (df_ret_attrs,
-                           List.map (fun x -> snd (fst x)) args) ;
+                            List.map (fun x -> snd (fst x)) args) ;
+	  dc_attrs;
 	  dc_annotations =
 	    ( (opt_list (ann_linkage_opt l))
 	      @ (opt_list p)
@@ -811,7 +814,6 @@ definition:
 	    )
 	} ;
         df_args;
-	df_attrs;
         df_instrs;
       }
     }

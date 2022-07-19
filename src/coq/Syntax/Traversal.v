@@ -285,6 +285,7 @@ Section Endo.
            `{Endo string}
            `{Endo int}
            `{Endo param_attr}
+           `{Endo fn_attr}
            `{Endo (annotation T)}
            `{Endo (exp T)}
       : Endo (declaration T) | 50 :=
@@ -292,6 +293,7 @@ Section Endo.
               (endo (dc_name d))
               (endo (dc_type d))
               (endo (dc_param_attrs d))
+              (endo (dc_attrs d))
               (endo (dc_annotations d))
     .
 
@@ -299,14 +301,12 @@ Section Endo.
            {FnBody:Set}
            `{Endo (declaration T)}
            `{Endo raw_id}
-           `{Endo fn_attr}
            `{Endo FnBody}
       : Endo (definition T FnBody) | 50 :=
       fun d =>
         mk_definition _
                       (endo (df_prototype d))
                       (endo (df_args d))
-                      (endo (df_attrs d))
                       (endo (df_instrs d)).
 
     #[global] Instance Endo_toplevel_entity
@@ -670,6 +670,7 @@ Section TFunctor.
            `{Endo visibility}
            `{Endo dll_storage}
            `{Endo cconv}
+           `{Endo fn_attr}
            `{TFunctor exp}
            `{TFunctor metadata}
       : TFunctor declaration | 50 :=
@@ -677,6 +678,7 @@ Section TFunctor.
                        (endo (dc_name d))
                        (f (dc_type d))
                        (endo (dc_param_attrs d))
+                       (endo (dc_attrs d))
                        (tfmap f (dc_annotations d))
           .
 
@@ -685,14 +687,12 @@ Section TFunctor.
            {FnBody:Set -> Set}
            `{TFunctor declaration}
            `{Endo raw_id}
-           `{Endo fn_attr}
            `{TFunctor FnBody}
       : TFunctor (fun T => definition T (FnBody T)) | 50 :=
       fun U V f d =>
         mk_definition _
                       (tfmap f (df_prototype d))
                       (endo (df_args d))
-                      (endo (df_attrs d))
                       (tfmap f (df_instrs d)).
 
     #[global] Instance TFunctor_toplevel_entity
@@ -832,7 +832,7 @@ Section Examples.
     Instance subst_cfg_endo_cfg: Endo (definition T (cfg T)) :=
       fun f =>
         if (dc_name (df_prototype f)) ~=? fid
-        then {| df_prototype := df_prototype f; df_args := df_args f ; df_attrs := df_attrs f ; df_instrs := new_f |}
+        then {| df_prototype := df_prototype f; df_args := df_args f ; df_instrs := new_f |}
         else f.
 
     Definition subst_cfg: Endo (mcfg T) := endo.

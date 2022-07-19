@@ -254,10 +254,10 @@ Section SurfaceSyntaxTest.
                                                              dc_type := (TYPE_Function (TYPE_I 32%N) [(TYPE_I 32%N); (TYPE_Pointer (TYPE_Pointer (TYPE_I 8%N)))] false);
                                                              dc_param_attrs := ([], [
                                                                                ]);
+                                                             dc_attrs := [];
                                                              dc_annotations := []
                                                            |};
                                            df_args := [(Name "argc"); (Name "arcv")];
-                                           df_attrs := [];
                                            df_instrs := (
                                                          {|
                                                            blk_id := (Anon 0%Z);
@@ -350,10 +350,10 @@ Section SurfaceSyntaxTest.
                          dc_type := (TYPE_Function (TYPE_I 64%N) [(TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))); (TYPE_I 64%N)] false);
                          dc_param_attrs := ([], [
                                            ]);
+                         dc_attrs := [];
                          dc_annotations := []
                        |};
        df_args := [(Name "root"); (Name "value")];
-       df_attrs := [];
        df_instrs := (
                      {|
                        blk_id := (Anon 0%Z);
@@ -423,10 +423,10 @@ Section SurfaceSyntaxTest.
                          dc_type := (TYPE_Function (TYPE_I 64%N) [(TYPE_I 64%N); (TYPE_Pointer (TYPE_Pointer (TYPE_I 8%N)))] false);
                          dc_param_attrs := ([], [
                                            ]);
+                         dc_attrs := [];
                          dc_annotations := []
                        |};       
        df_args := [(Name "argc"); (Name "argv")];
-       df_attrs := [];
        df_instrs := (
                      {|
                        blk_id := (Anon 0%Z);
