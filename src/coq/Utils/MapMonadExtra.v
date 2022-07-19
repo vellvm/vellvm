@@ -209,7 +209,7 @@ Lemma map_monad_map :
     (f : B -> M C)
     (g : A -> B)
     (xs : list A),
-    (map_monad f (map g xs)) ≈ (map_monad (fun x => f ( g x) ) xs).
+    (map_monad f (map g xs)) ≈ (map_monad (fun x => f (g x)) xs).
 Proof.
   intros. induction xs.
   - simpl. reflexivity.
@@ -535,12 +535,12 @@ Proof.
     reflexivity. auto. auto.
 Qed.
 
-(* Fixpoint foldM {a b} {M} `{Monad M} (f : b -> a -> M b ) (acc : b) (l : list a) : M b :=
+(* Fixpoint foldM {a b} {M} `{Monad M} (f : b -> a -> M b) (acc : b) (l : list a) : M b :=
       match l with 
       | [] => ret acc 
       | (x :: xs) => b <- f acc x;; foldM f b xs 
        end.
- *) 
+ *)
 
 Lemma foldM_cons :
   forall {A B} (a : A) (b : B) (f : B -> A -> M B) (al : list A),
@@ -564,7 +564,6 @@ Proof.
     setoid_rewrite IHl1. reflexivity.
 Qed.
 
-(* is this helpful? *) 
 Lemma foldM_nil :
   forall {A B} (l1 : list A) (b : B) (f : B -> A -> M B),
     foldM f b [] ≈ ret b. 
@@ -573,15 +572,15 @@ Proof.
 Qed.
 
 
-(* An inversion principle-ish idea, I hope? 
-  This is not stated properly; it is false, but it could be an idea. *) 
+(* An inversion principle-ish idea, I hope? *) 
 Lemma foldM_ret_exists :
   forall {A B} (tl : list A) (b r : B) (a : A) (f : B -> A -> M B)
-         (HC : foldM f b (a :: tl) ≈ ret r),
-    exists x y, f x y = ret r. 
+         (HC : foldM f b (a :: tl)  ≈ ret r),
+    exists x y, f x y ≈ ret r. 
 Proof.
-  intros. induction tl.
-  + simpl in HC. exists b. exists a. rewrite bind_ret_r in HC.
+  intros. generalize dependent b. generalize dependent a. induction tl.
+  + intros. simpl in HC. exists b. exists a. rewrite bind_ret_r in HC. apply HC.
+  + intros. rewrite foldM_cons in HC. apply IHtl in 
     Admitted. 
 
 (* foldM : (?b -> ?a -> M ?b) -> ?b -> list ?a -> M ?b *) 
