@@ -2142,9 +2142,17 @@ Section InstrGenerators.
     :=
       name <- new_global_id;;
       t <- gen_sized_typ;;
-      opt_exp <- gen_opt_LLVM (hide_ctx (gen_exp_size 0 t)) (1,7)%nat;;
-      add_to_ctx (ID_Global name, t);;
-      ret (mk_global name t false opt_exp None None None None false None false None None).
+      (* opt_exp <- gen_opt_LLVM (hide_ctx (gen_exp_size 0 t)) (1,7)%nat;; *)
+      ex <- hide_ctx (gen_exp_size 0 t);;
+      let opt_exp := Some ex in
+      add_to_ctx (ID_Global name, TYPE_Pointer t);;
+      (* let flag_external : bool :=
+        match opt_exp with
+        | None => true
+        | Some _ => false
+        end
+        in *)
+        ret (mk_global name t false opt_exp None None None None false None false None None).
 
   Definition gen_global_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
     := ret TLE_Global <*> gen_global_var.
