@@ -2149,20 +2149,8 @@ Section InstrGenerators.
   Definition gen_global_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
     := ret TLE_Global <*> gen_global_var.
 
-  Fixpoint gen_global_tle_size (sz : nat) : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
-    := match sz with
-       | 0%nat =>
-           ret nil
-       | S z =>
-           g_var <- gen_global_tle;;
-           g_vars <- gen_global_tle_size z;;
-           ret (g_var::g_vars)
-       end.
-
   Definition gen_global_tle_multiple : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
-    := (* sz <- lift (arbitrary : G N) *)
-      sz <- lift_GenLLVM (choose (0,2)%nat);;
-      gen_global_tle_size sz.
+    := listOf_LLVM  gen_global_tle.
 
   Definition gen_llvm : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     :=
