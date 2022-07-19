@@ -1700,6 +1700,13 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | _      => false
     end.
 
+  Definition iop_is_signed (iop : ibinop) : bool :=
+    match iop with
+    | SDiv _ => true
+    | SRem   => true
+    | _      => false
+    end.
+
   Definition iop_is_shift (iop : ibinop) : bool :=
     match iop with
     | Shl _ _ => true
