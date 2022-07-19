@@ -15,6 +15,7 @@
 **/_build
 src/main.native
 src/vellvm
+src/frontend
 **/.merlin
 *~
 *.v~
