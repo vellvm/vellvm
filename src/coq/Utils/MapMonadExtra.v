@@ -612,11 +612,13 @@ Admitted.
 Print foldM. 
 Lemma foldM_implements_lemma : 
   forall {A B} (l : list A) (k : list B) (f : A -> M B),
-    l' <- map_monad f l ;; ret (l' ++ k) ≈ foldM (fun x y => t <- f y ;; ret (t :: x)) k l.
+    l' <- map_monad f l ;; ret (k ++ l') ≈ foldM (fun x y => t <- f y ;; ret (x ++ [t])) k l.
 Proof. intros. generalize dependent k. induction l.
        + simpl. intros. rewrite bind_ret_l. reflexivity.
        + simpl. intros. repeat setoid_rewrite bind_bind.
          setoid_rewrite bind_ret_l. setoid_rewrite <- IHl.
+         simpl.
+         Admitted.
          
          
 (* not done, need to show lemmas above *)                                                                                                  
