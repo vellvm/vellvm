@@ -9,6 +9,7 @@
  ---------------------------------------------------------------------------- *)
 
 open Printf
+open Base
 open InterpretationStack.InterpreterStackBigIntptr.LP.Events
        
 let of_str = Camlcoq.camlstring_of_coqstring
@@ -24,25 +25,6 @@ let print_banner s =
   let rec dashes n = if n = 0 then "" else "-"^(dashes (n-1)) in
   printf "%s %s\n%!" (dashes (79 - (String.length s))) s
 
-let read_file (file:string) : string =
-  let lines = ref [] in
-  let channel = open_in file in
-  try while true; do
-      lines := input_line channel :: !lines
-  done; ""
-  with End_of_file ->
-    close_in channel;
-    String.concat "\n" (List.rev !lines)
-
-let write_file (file:string) (out:string) =
-  let channel = open_out file in
-  fprintf channel "%s" out;
-  close_out channel
-
-let parse_file filename =
-  read_file filename
-  |> Lexing.from_string
-  |> Llvm_lexer.parse
 
 
 (* Todo add line count information *)
@@ -58,15 +40,6 @@ let parse_tests filename =
     close_in channel;
     List.rev !assertions
 
-let output_file filename ast =
-  let open Llvm_printer in
-  let channel = open_out filename in
-  toplevel_entities (Format.formatter_of_out_channel channel) ast;
-  close_out channel
-
-let output_ast ast channel =
-  let open Ast_printer in
-  toplevel_entities channel ast
 
 let string_of_file (f:in_channel) : string =
   let rec _string_of_file (stream:string list) (f:in_channel) : string list=
@@ -86,7 +59,7 @@ let add_link_file path =
 
 let process_ll_file path file =
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
-  let ll_ast = parse_file path in
+  let ll_ast = IO.parse_file path in
   let _ = if !interpret then begin
       match Interpreter.interpret ll_ast with
       | Ok dv ->
@@ -97,7 +70,7 @@ let process_ll_file path file =
   in
   let ll_ast' = transform ll_ast in
   let vll_file = Platform.gen_name !Platform.output_path file ".v.ll" in
-  let _ = output_file vll_file ll_ast' in
+  let _ = IO.output_file vll_file ll_ast' in
   ()
 
 
@@ -116,5 +89,5 @@ let process_files files =
 (* Parses and runs the ll file at the given path, returning the dvalue produced. *)
 let run_ll_file path =
   let _ = Platform.verb @@ Printf.sprintf "* running file: %s\n" path in
-  let ll_ast = parse_file path in
+  let ll_ast = IO.parse_file path in
   Interpreter.interpret ll_ast

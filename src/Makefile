@@ -129,7 +129,7 @@ update-submodules: update-quickchick update-flocq-quickchick
 
 .PHONY: extracted
 extracted: .depend 
-	$(MAKE) quickchick $(EXTRACTDIR)/STAMP $(VOFILES)
+	$(MAKE) $(EXTRACTDIR)/STAMP $(VOFILES)
 
 $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
 	@echo "Extracting"
@@ -182,7 +182,7 @@ clean: extractedclean
 
 .PHONY: extractedclean
 extractedclean:
-	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.ml
+	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/FRONTEND_STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.ml
 
 .PHONY: distclean
 distclean: clean
@@ -201,5 +201,40 @@ documentation: doc/coq2html $(VFILES)
 	doc/coq2html -d doc/html doc/*.glob \
           $(filter-out doc/coq2html cparser/Parser.v, $^)
 	cp ../lib/coq2html/coq2html.css ../lib/coq2html/coq2html.js doc/html/
+
+############
+### Facilities for building only the frontend - parser and pretty printer
+
+COQFILES_FRONTEND := QC/ShowAST QC/ReprAST Utils/ParserHelper
+
+FRONTEND_VOFILES := $(COQFILES_FRONTEND:%=coq/%.vo)
+
+
+$(EXTRACTDIR)/FRONTEND_STAMP: $(FRONTEND_VOFILES) $(EXTRACTDIR)/ExtractFrontend.v
+	@echo "Extracting Frontend"
+	rm -f $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
+	$(COQEXEC) $(EXTRACTDIR)/ExtractFrontend.v
+	patch -p0 < CRelationClasses.mli.patch
+	touch $(EXTRACTDIR)/FRONTEND_STAMP
+
+FRONTEND_EXE=_build/default/ml/frontend.exe
+
+$(FRONTEND_EXE): $(EXTRACTDIR)/FRONTEND_STAMP ml/dune ml/extracted/dune ml/testing/dune
+	@echo "Compiling Vellvm (Frontend Only)"
+	dune build ml/frontend.exe
+
+frontend: .depend
+	$(MAKE) $(FRONTEND_VOFILES)
+	$(MAKE) frontend_exe
+
+.PHONY: frontend_exe
+frontend_exe: $(FRONTEND_EXE)
+	cp $(FRONTEND_EXE) frontend
+	chmod u+w frontend
+
+
+############
+
+
 
 include .depend
