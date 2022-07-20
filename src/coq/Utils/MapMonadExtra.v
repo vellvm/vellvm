@@ -596,16 +596,8 @@ Lemma cons_app :
     a :: l = [a] ++ l.
 Proof. intros. reflexivity. Qed.
 
-(* this lemma is trash as is - might need some lemma for foldM_map_ret *) 
- Lemma foldM_map_ret_aaaa :
-  forall {A B} (l : list A) (k : list B) (y b : B) (a : A) (f : A -> M B),
-   foldM (fun (x : list B) (y0 : A) => t <- f y0;; ret (t :: x)) k l 
-     ≈ bs <- (foldM (fun (x : list B) (y0 : A) => t <- f y0;; ret (t :: x)) [] l) ;; ret (k ++ bs).
- Proof.
-   intros. Admitted. 
-
 (* UGHHHH *) 
-Lemma foldM_map_ret :
+Lemma foldM_implements_map_monad_helper :
   forall {A B} (l : list A) (a : A) (f : A -> M B),
     (b <- f a ;; bs <- foldM (fun x y => t <- f y ;; ret (t :: x)) [] l ;; ret (b :: bs))
       ≈ b <- f a ;; foldM (fun x y => t <- f y ;; ret (t :: x)) [b] l.
@@ -614,12 +606,21 @@ Proof.
   + simpl. setoid_rewrite bind_ret_l. reflexivity.
   + setoid_rewrite foldM_cons.
     do 2 setoid_rewrite bind_bind.
-    setoid_rewrite bind_ret_l. 
-    setoid_rewrite foldM_map_ret_aaaa.
-    Admitted. 
-    
+    setoid_rewrite bind_ret_l.
+     
+Admitted.
+Print foldM. 
+Lemma foldM_implements_lemma : 
+  forall {A B} (l : list A) (k : list B) (f : A -> M B),
+    l' <- map_monad f l ;; ret (l' ++ k) ≈ foldM (fun x y => t <- f y ;; ret (t :: x)) k l.
+Proof. intros. generalize dependent k. induction l.
+       + simpl. intros. rewrite bind_ret_l. reflexivity.
+       + simpl. intros. repeat setoid_rewrite bind_bind.
+         setoid_rewrite bind_ret_l. setoid_rewrite <- IHl.
+         
+         
 (* not done, need to show lemmas above *)                                                                                                  
-Lemma foldM_mapppp :
+Lemma foldM_implements_map_monad :
   forall {A B} (l : list A) (f : A -> M B), 
      map_monad f l ≈ foldM (fun x y => t <- f y ;; ret (t :: x)) [] l.  
 Proof.
@@ -627,10 +628,14 @@ Proof.
   + reflexivity.
   + simpl. setoid_rewrite IHl.
     setoid_rewrite bind_bind. setoid_rewrite bind_ret_l.
-    apply foldM_map_ret.
-Qed. 
+    
+    Admitted. 
+
+
 
 (* Lemma map_monad_fold would be a good idea to implemement. *)
+
+
 Lemma foldM_map :
   forall {A B} (l : list B) (b : B) (f : B -> A -> M B) (g : B -> A),
     foldM f b (map g l) ≈ foldM (fun x y => f x (g y)) b l.
@@ -639,8 +644,6 @@ Proof.
   + simpl. reflexivity.
   + simpl. intros. setoid_rewrite IHl. reflexivity.
 Qed.
-
-
 
 End MonadContext.
 Arguments map_monad_In {_ _ _ _}.
