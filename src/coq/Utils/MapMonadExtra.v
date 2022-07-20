@@ -581,13 +581,11 @@ Lemma cons_app :
 Proof. intros. reflexivity. Qed.
 
 Lemma cons_app_assoc :
-  forall {A} (k y0 : list A) (y : A),
+  forall A (k y0 : list A) (y : A),
     k ++ y :: y0 = (k ++ [y]) ++ y0.
 Proof. intros. rewrite <- Lists.List.app_assoc. reflexivity. Qed.
 
-(* From ITree Require Import *)
-(*      Eq.Eq. *)
-
+Ltac rewrite_under_bind H := repeat (apply Proper_bind; [reflexivity |]; repeat intro); rewrite H.
 Lemma foldM_implements_lemma : 
   forall {A B} (l : list A) (k : list B) (f : A -> M B),
     l' <- map_monad f l ;; ret (k ++ l') ≈ foldM (fun x y => t <- f y ;; ret (x ++ [t])) k l.
@@ -597,8 +595,8 @@ Proof. intros. generalize dependent k. induction l.
          setoid_rewrite bind_ret_l. setoid_rewrite <- IHl.
          pose proof @cons_app_assoc as Hassoc.
          destruct LAWS. destruct EQRET.
-         repeat (apply Proper_bind; [reflexivity |]; repeat intro).
-         rewrite cons_app_assoc. reflexivity.
+         rewrite_under_bind cons_app_assoc.
+         reflexivity.
          Qed.
 
 Lemma foldM_implements_map_monad :
@@ -607,14 +605,6 @@ Lemma foldM_implements_map_monad :
 Proof.
   intros. rewrite <- foldM_implements_lemma. simpl. rewrite bind_ret_r. reflexivity.
 Qed.
-
-
-(* Lemma map_monad_fold would be a good idea to implemement. *)
-Lemma map_monad_to_fold :
-  forall {A B} (l : list B) (b : B) (f : B -> A -> M B) (g: B -> A),
-    .
-Proof.
-  Admitted.
 
 Lemma foldM_map :
   forall {A B} (l : list B) (b : B) (f : B -> A -> M B) (g : B -> A),
