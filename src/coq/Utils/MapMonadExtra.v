@@ -596,29 +596,33 @@ Lemma cons_app :
     a :: l = [a] ++ l.
 Proof. intros. reflexivity. Qed.
 
-(* UGHHHH *) 
-Lemma foldM_implements_map_monad_helper :
-  forall {A B} (l : list A) (a : A) (f : A -> M B),
-    (b <- f a ;; bs <- foldM (fun x y => t <- f y ;; ret (t :: x)) [] l ;; ret (b :: bs))
-      ≈ b <- f a ;; foldM (fun x y => t <- f y ;; ret (t :: x)) [b] l.
-Proof.
-  intros. induction l.
-  + simpl. setoid_rewrite bind_ret_l. reflexivity.
-  + setoid_rewrite foldM_cons.
-    do 2 setoid_rewrite bind_bind.
-    setoid_rewrite bind_ret_l.
-     
-Admitted.
-Print foldM. 
+Lemma cons_app_assoc :
+  forall {A} (k y0 : list A) (y : A),
+    k ++ y :: y0 = (k ++ [y]) ++ y0.
+Proof. intros. rewrite <- Lists.List.app_assoc. reflexivity. Qed.
+
 Lemma foldM_implements_lemma : 
   forall {A B} (l : list A) (k : list B) (f : A -> M B),
     l' <- map_monad f l ;; ret (k ++ l') ≈ foldM (fun x y => t <- f y ;; ret (x ++ [t])) k l.
 Proof. intros. generalize dependent k. induction l.
-       + simpl. intros. rewrite bind_ret_l. reflexivity.
+       + simpl. intros. rewrite bind_ret_l. rewrite Lists.List.app_nil_r. reflexivity.
        + simpl. intros. repeat setoid_rewrite bind_bind.
          setoid_rewrite bind_ret_l. setoid_rewrite <- IHl.
-         simpl.
-         Admitted.
+         setoid_rewrite <- cons_app_assoc. reflexivity.
+Qed.
+ 
+(* Lemma foldM_implements_map_monad_helper : *)
+(*   forall {A B} (l : list A) (a : A) (f : A -> M B), *)
+(*     (b <- f a ;; bs <- foldM (fun x y => t <- f y ;; ret (t :: x)) [] l ;; ret (b :: bs)) *)
+(*       ≈ b <- f a ;; foldM (fun x y => t <- f y ;; ret (t :: x)) [b] l. *)
+(* Proof. *)
+(*   intros. induction l. *)
+(*   + simpl. setoid_rewrite bind_ret_l. reflexivity. *)
+(*   + setoid_rewrite foldM_cons. *)
+(*     do 2 setoid_rewrite bind_bind. *)
+(*     setoid_rewrite bind_ret_l. *)
+     
+(* Admitted. *)
          
          
 (* not done, need to show lemmas above *)                                                                                                  
@@ -630,6 +634,7 @@ Proof.
   + reflexivity.
   + simpl. setoid_rewrite IHl.
     setoid_rewrite bind_bind. setoid_rewrite bind_ret_l.
+    
     
     Admitted. 
 
