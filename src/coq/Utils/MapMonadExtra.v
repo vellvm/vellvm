@@ -8,7 +8,7 @@ From ExtLib Require Import
      Data.Monads.IdentityMonad.
 
 From ITree Require Import
-     Basics.Monad.
+  Basics.Monad.
 
 From Vellvm Require Import
      Utils.Util
@@ -203,6 +203,7 @@ Proof.
     cbn.
     reflexivity.
 Qed.
+
 
 Lemma map_monad_map :
   forall A B C 
@@ -584,6 +585,9 @@ Lemma cons_app_assoc :
     k ++ y :: y0 = (k ++ [y]) ++ y0.
 Proof. intros. rewrite <- Lists.List.app_assoc. reflexivity. Qed.
 
+(* From ITree Require Import *)
+(*      Eq.Eq. *)
+
 Lemma foldM_implements_lemma : 
   forall {A B} (l : list A) (k : list B) (f : A -> M B),
     l' <- map_monad f l ;; ret (k ++ l') ≈ foldM (fun x y => t <- f y ;; ret (x ++ [t])) k l.
@@ -591,11 +595,12 @@ Proof. intros. generalize dependent k. induction l.
        + simpl. intros. rewrite bind_ret_l. rewrite Lists.List.app_nil_r. reflexivity.
        + simpl. intros. repeat setoid_rewrite bind_bind.
          setoid_rewrite bind_ret_l. setoid_rewrite <- IHl.
-       Admitted.
-(*          setoid_rewrite <- Lists.List.app_assoc. reflexivity. *)
-(* Qed. *)
-                  
-(* not done, need to show lemmas above *)                                                                                                  
+         pose proof @cons_app_assoc as Hassoc.
+         destruct LAWS. destruct EQRET.
+         repeat (apply Proper_bind; [reflexivity |]; repeat intro).
+         rewrite cons_app_assoc. reflexivity.
+         Qed.
+
 Lemma foldM_implements_map_monad :
   forall {A B} (l : list A) (f : A -> M B), 
      map_monad f l ≈ foldM (fun x y => t <- f y ;; ret (x ++ [t])) [] l.  
@@ -604,9 +609,12 @@ Proof.
 Qed.
 
 
-
 (* Lemma map_monad_fold would be a good idea to implemement. *)
-
+Lemma map_monad_to_fold :
+  forall {A B} (l : list B) (b : B) (f : B -> A -> M B) (g: B -> A),
+    .
+Proof.
+  Admitted.
 
 Lemma foldM_map :
   forall {A B} (l : list B) (b : B) (f : B -> A -> M B) (g : B -> A),
