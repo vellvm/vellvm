@@ -571,23 +571,6 @@ Proof.
   intros. reflexivity.
 Qed.
 
-
-(* An inversion principle-ish idea, I hope? *) 
-Lemma foldM_ret_exists :
-  forall {A B} (tl : list A) (b r : B) (m : M B) (a : A) (f : B -> A -> M B)
-         (HC : foldM f b (a :: tl) ≈ m),
-    exists x y, f x y ≈ m. 
-Proof.
-  intros. simpl in HC. 
-  generalize dependent b. generalize dependent a. induction tl.
-  + intros. simpl in HC. exists b. exists a. rewrite bind_ret_r in HC. apply HC.
-  + intros. 
-Admitted.
-
-(* M (list B) = map_monad,
-   list (M B) -> A -> M (list M B) *) 
-
-
 (* foldM : (?b -> ?a -> M ?b) -> ?b -> list ?a -> M ?b *)
 (* map_monad : (?A -> M ?B) -> list ?A -> M (list ?B) *)
 
@@ -608,35 +591,17 @@ Proof. intros. generalize dependent k. induction l.
        + simpl. intros. rewrite bind_ret_l. rewrite Lists.List.app_nil_r. reflexivity.
        + simpl. intros. repeat setoid_rewrite bind_bind.
          setoid_rewrite bind_ret_l. setoid_rewrite <- IHl.
-         setoid_rewrite <- cons_app_assoc. reflexivity.
-Qed.
- 
-(* Lemma foldM_implements_map_monad_helper : *)
-(*   forall {A B} (l : list A) (a : A) (f : A -> M B), *)
-(*     (b <- f a ;; bs <- foldM (fun x y => t <- f y ;; ret (t :: x)) [] l ;; ret (b :: bs)) *)
-(*       ≈ b <- f a ;; foldM (fun x y => t <- f y ;; ret (t :: x)) [b] l. *)
-(* Proof. *)
-(*   intros. induction l. *)
-(*   + simpl. setoid_rewrite bind_ret_l. reflexivity. *)
-(*   + setoid_rewrite foldM_cons. *)
-(*     do 2 setoid_rewrite bind_bind. *)
-(*     setoid_rewrite bind_ret_l. *)
-     
-(* Admitted. *)
-         
-         
+       Admitted.
+(*          setoid_rewrite <- Lists.List.app_assoc. reflexivity. *)
+(* Qed. *)
+                  
 (* not done, need to show lemmas above *)                                                                                                  
 Lemma foldM_implements_map_monad :
   forall {A B} (l : list A) (f : A -> M B), 
-     map_monad f l ≈ foldM (fun x y => t <- f y ;; ret (t :: x)) [] l.  
+     map_monad f l ≈ foldM (fun x y => t <- f y ;; ret (x ++ [t])) [] l.  
 Proof.
-  intros. induction l.
-  + reflexivity.
-  + simpl. setoid_rewrite IHl.
-    setoid_rewrite bind_bind. setoid_rewrite bind_ret_l.
-    
-    
-    Admitted. 
+  intros. rewrite <- foldM_implements_lemma. simpl. rewrite bind_ret_r. reflexivity.
+Qed.
 
 
 
