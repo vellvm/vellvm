@@ -4,10 +4,6 @@
     program should give you a string that can be read by clang.
  *)
 
-From ExtLib Require Import
-     Structures.Monads
-     Structures.Functor
-     Eqv.
 
 From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG DynamicTypes.
 
@@ -16,7 +12,6 @@ Require Import Integers Floats.
 Require Import List.
 
 Import ListNotations.
-Import MonadNotation.
 
 From Coq Require Import
      ZArith List String Lia Bool.Bool Hexadecimal Numbers.HexadecimalString Numbers.HexadecimalZ
@@ -79,7 +74,14 @@ Section ShowInstances.
     | TYPE_Metadata             => "metadata"
     | TYPE_X86_mmx              => "x86_mmx"
     | TYPE_Array sz t           => "[" ++ show sz ++ " x " ++ show_typ t ++ "]"
-    | TYPE_Function ret args    => show_typ ret ++ " (" ++ concat ", " (map show_typ args) ++ ")"
+    | TYPE_Function ret args varargs =>
+        let varargs_str :=
+          if Nat.eqb (List.length args) 0 then
+            (if varargs then "..." else "")
+          else
+            (if varargs then ", ..." else "")
+        in
+        show_typ ret ++ " (" ++ concat ", " (map show_typ args) ++ varargs_str ++ ")"
     | TYPE_Struct fields        => "{" ++ concat ", " (map show_typ fields) ++ "}"
     | TYPE_Packed_struct fields => "<{" ++ concat ", " (map show_typ fields) ++ "}>"
     | TYPE_Opaque               => "opaque"
@@ -208,7 +210,7 @@ Section ShowInstances.
   Definition show_fn_attr (f : fn_attr) : string :=
     match f with
     | FNATTR_Alignstack a => "alignstack(" ++ show a ++ ")"
-    | FNATTR_Alloc_family fam => """alloc-family""=" ++ """" ++ show fam ++ """"
+    (* | FNATTR_Alloc_family (fam : string) - FNATTR_KeyValue *)
     | FNATTR_Allockind kind => "allockind(" ++ """" ++ show kind ++ """" ++ ")"
     | FNATTR_Allocsize a1 a2 =>
         match a2 with
@@ -220,9 +222,10 @@ Section ShowInstances.
     | FNATTR_Cold => "cold"
     | FNATTR_Convergent => "convergent"
     | FNATTR_Disable_sanitizer_instrumentation => "disable_sanitizer_instrumentation"
-    | FNATTR_Dontcall_error => """dontcall-error"""
-    | FNATTR_Dontcall_warn => """dontcall-warn"""
-    | FNATTR_Frame_pointer => "unimplemented: frame-pointer"
+    (* | FNATTR_Dontcall_error - FNATTR_String *)
+    (* | FNATTR_Dontcall_warn - FNATTR_String *)
+    | FNATTR_Fn_ret_thunk_extern => "fun_ret_thunk_extern"
+    (* | FNATTR_Frame_pointer - FNATTR_KeyValue *)
     | FNATTR_Hot => "hot"
     | FNATTR_Inaccessiblememonly => "inaccessiblememonly"
     | FNATTR_Inaccessiblemem_or_argmemonly => "inaccessiblemem_or_argmemonly"
@@ -230,7 +233,7 @@ Section ShowInstances.
     | FNATTR_Jumptable => "jumptable"
     | FNATTR_Minsize => "minsize"
     | FNATTR_Naked => "naked"
-    | FNATTR_No_inline_line_tables => """no-inline-line-tables"""
+    (* | FNATTR_No_inline_line_tables - FNATTR_String *)
     | FNATTR_No_jump_tables => "no-jump-tables"
     | FNATTR_Nobuiltin => "nobuiltin"
     | FNATTR_Noduplicate => "noduplicate"
@@ -253,12 +256,12 @@ Section ShowInstances.
     | FNATTR_Optforfuzzing => "optforfuzzing"
     | FNATTR_Optnone => "optnone"
     | FNATTR_Optsize => "optsize"
-    | FNATTR_Patchable_function => "unimplemented: patchable-function"
-    | FNATTR_Probe_stack => """probe-stack"""
+    (* | FNATTR_Patchable_function - FNATTR_KeyValue *)
+    (* | FNATTR_Probe_stack - FNATTR_String *)
     | FNATTR_Readnone => "readnone"
     | FNATTR_Readonly => "readonly"
-    | FNATTR_Stack_probe_size => """stack-probe-size"""
-    | FNATTR_No_stack_arg_probe => """no-stack-arg-probe"""
+    (* | FNATTR_Stack_probe_size => - FNATTR_KeyValue *)
+    (* | FNATTR_No_stack_arg_probe => -  FNATTR_String *)
     | FNATTR_Writeonly => "writeonly"
     | FNATTR_Argmemonly => "argmemonly"
     | FNATTR_Returns_twice => "returns_twice"
@@ -274,33 +277,27 @@ Section ShowInstances.
     | FNATTR_Sspstrong => "sspstrong"
     | FNATTR_Sspreq => "sspreq"
     | FNATTR_Strictfp => "strictfp"
-    | FNATTR_Denormal_fp_math s1 s2 =>
-        match s2 with
-        | None => """" ++ show s1 ++  """"
-        | Some s => """" ++ show s1 ++ "," ++ show s2 ++ """"
+    (* | FNATTR_Denormal_fp_math s1 s2 - FNATTR_KeyValue *)
+    (* | FNATTR_Denormal_fp_math_32 s1 s2 - FNATTR_KeyValue *)
+    (* | FNATTR_Thunk => - FNATTR_String *)
+    | FNATTR_Tls_load_hoist => """tls-load-hoist"""                   
+    | FNATTR_Uwtable so  =>
+        match so with
+        | None => "uwtable"
+        | Some sync => if sync then "uwtable(sync)" else "uwtable(async)"
         end
-    | FNATTR_Denormal_fp_math_32 s1 s2 =>
-        match s2 with
-        | None => """" ++ show s1 ++  """"
-        | Some s => """" ++ show s1 ++ "," ++ show s2 ++ """"
-        end
-    | FNATTR_Thunk => """thunk"""
-    | FNATTR_Tls_load_hoist => """tls-load-hoist"""
-    | FNATTR_Uwtable sync  => if sync then "uwtable(sync)" else "uwtable"
-    | FNATTR_Nocf_check => "nocf_check"
-    | FNATTR_Shadowcallstack => "shadowcallstack"
+    | FNATTR_Nocf_check => "nocf_check" 
+    | FNATTR_Shadowcallstack => "shadowcallstack" 
     | FNATTR_Mustprogress => "mustprogeress"
-    | FNATTR_Warn_stack_size th  => """warn-stack-size""=" ++ """" ++ show th ++ """"
-    | FNATTR_vscale_range min max  =>
+    (* | FNATTR_Warn_stack_size th  => - FNATTR_KeyValue *)
+    | FNATTR_Vscale_range min max  =>
         match max with
         | None => "vscale_range(" ++ show min ++ ")"
         | Some m => "vscale_range(" ++ show min ++ "," ++ show m ++ ")"
-        end
-    | FNATTR_Min_legal_vector_width size => """min-legal-vector-width""=" ++ """"
-                                             ++ show size ++ """"
+        end                             
     | FNATTR_String s => """" ++ show s ++ """"  (* "no-see" *)
     | FNATTR_Key_value kv => """" ++ fst kv ++ """=" ++ """" ++ snd kv ++ """" (* "unsafe-fp-math"="false" *)
-    | FNATTR_Attr_grp g => "attr_grip" ++ show g
+    | FNATTR_Attr_grp g => "#" ++ show g
     end.
 
   #[global] Instance showFnAttr : Show fn_attr
@@ -792,10 +789,18 @@ Section ShowInstances.
     := let '(i, t, parameter_attributes) := arg in
        show t ++ concat " " (map (fun x => show x) (parameter_attributes)) ++ " %" ++ show i.
 
-  Definition show_arg_list (args : list (local_id * T * list param_attr)) : string
+  Definition show_arg_list (args : list (local_id * T * list param_attr)) (varargs:bool) : string
     :=
-    let arg_str := concat ", " (map show_arg args) in
-    concatStr ["("; arg_str; ")"].
+    let vararg_str :=
+      if Nat.eqb (List.length args) 0 then
+        (if varargs then "..." else "")
+      else
+        (if varargs then ", ..." else "")
+    in
+    let arg_str := concat ", " (map show_arg args)
+    in
+      concatStr ["("; arg_str; vararg_str ; ")"].
+
 
   (* TODO: REALLY?!? *)
   Fixpoint zip {X Y} (xs : list X) (ys : list Y) : list (X * Y)
@@ -829,10 +834,11 @@ Section ShowInstances.
 End ShowInstances.
 
 (** Return empty string when None *)
+(** Adds a space -- is this the right place to do that? *)
 Definition maybe_to_string {X} (to_string : X -> string) (ox : option X) :=
   match ox with
   | None => ""
-  | Some x => to_string x
+  | Some x => ((to_string x) ++ " ")%string
   end.
 
 (** Return empty stringwhen None *)
@@ -846,7 +852,7 @@ Definition show_definition (defn : definition typ (block typ * list (block typ))
   let '(return_attributes, argument_attributes):= defn.(df_prototype).(dc_param_attrs) in
 
   match ftype with
-  | TYPE_Function ret_t args_t =>
+  | TYPE_Function ret_t args_t vararg =>
       let arg_names := defn.(df_args) in
 
       (* Note: if these lists are not equal in length arguments will
@@ -866,25 +872,25 @@ Definition show_definition (defn : definition typ (block typ * list (block typ))
         let ret_attributes := concat " " (map (fun x => show x) (return_attributes)) in
         let printable_ret_attrs := if ret_attributes then concatStr [" "; ret_attributes] else "" in
 
-        let linkage := maybe_show defn.(df_prototype).(dc_linkage) in
-        let visibility := maybe_show defn.(df_prototype).(dc_visibility) in
-        let dll_storage := maybe_show defn.(df_prototype).(dc_dll_storage) in
-        let cconv := maybe_show defn.(df_prototype).(dc_cconv) in
+        let linkage := maybe_show (dc_linkage defn.(df_prototype)) in
+        let visibility := maybe_show (dc_visibility defn.(df_prototype)) in
+        let dll_storage := maybe_show (dc_dll_storage defn.(df_prototype)) in
+        let cconv := maybe_show (dc_cconv defn.(df_prototype)) in
 
         let section :=
           maybe_to_string
             (fun s => concatStr ["section \"; s; "\"; " "])
-            defn.(df_prototype).(dc_section) in
+            (dc_section defn.(df_prototype)) in
 
         let align :=
           maybe_to_string
             (fun a => concatStr ["align "; show a; " "])
-            defn.(df_prototype).(dc_align) in
+            (dc_align defn.(df_prototype)) in
 
-        let gc := maybe_show defn.(df_prototype).(dc_gc) in
+        let gc := maybe_show (dc_gc defn.(df_prototype)) in
 
         concatStr ["define "; linkage; visibility ; dll_storage ;
-                   cconv ; printable_ret_attrs ; show ret_t; " @"; show name; show_arg_list args;
+                   cconv ; printable_ret_attrs ; show ret_t; " @"; show name; show_arg_list args vararg;
                    section ; align ; gc ; " {"; newline ;
                    blocks;
                    "}";
@@ -901,24 +907,30 @@ Definition show_declaration (decl: declaration typ) : string :=
   let name := decl.(dc_name) in
   let (ret_attrs, args_attrs) := decl.(dc_param_attrs) in
   match decl.(dc_type) with
-  | TYPE_Function ret_t args_t =>
-      let link := maybe_show decl.(dc_linkage) in
-      let vis := maybe_show decl.(dc_visibility) in
-      let dll := maybe_show decl.(dc_dll_storage) in
-      let cc := maybe_show decl.(dc_cconv)in
+  | TYPE_Function ret_t args_t vararg =>
+      let link := maybe_show (dc_linkage decl) in
+      let vis := maybe_show (dc_visibility decl) in
+      let dll := maybe_show (dc_dll_storage decl) in
+      let cc := maybe_show (dc_cconv decl)in
 
       let section :=
         maybe_to_string
           (fun s => concatStr ["section \"; s; "\"; " "])
-          decl.(dc_section) in
+          (dc_section decl) in
 
       let align :=
         maybe_to_string
           (fun a => concatStr ["align "; show a; " "])
-          decl.(dc_align) in
+          (dc_align decl) in
 
-      let gc := maybe_show decl.(dc_gc) in
+      let gc := maybe_show (dc_gc decl) in
 
+      let vararg_str :=
+        if Nat.eqb (List.length args_t) 0 then
+          (if vararg then "..." else "")
+        else
+          (if vararg then ", ..." else "")
+      in
       concatStr ["declare "; link; vis; dll; cc;
                  concatStr[intersperse " " (map show ret_attrs)]; " " ;
 
@@ -928,6 +940,7 @@ Definition show_declaration (decl: declaration typ) : string :=
                                                                       | z :: tl => show z
                                                                       end ])
                                   (List.combine args_t args_attrs));
+                 vararg_str ;
                  ")"; section; align; gc]
   | _ => "Invalid type on function: " ++ show name
   end.
@@ -935,28 +948,37 @@ Definition show_declaration (decl: declaration typ) : string :=
 Global Instance showDeclaration: Show (declaration typ) :=
   {| show := show_declaration |}.
 
+Definition show_unnamed_addr (u:unnamed_addr) : string :=
+  match u with
+  | Unnamed_addr => "unnamed_addr"
+  | Local_Unnamed_addr => "local_unnamed_addr"
+  end.
+          
+#[global] Instance showUnnamedAddr : Show unnamed_addr :=
+  {| show := show_unnamed_addr |}.
+
 Definition show_global (g : global typ) : string :=
   let name  := g.(g_ident) in
   let gtype := g.(g_typ) in
-  let linkage := maybe_show g.(g_linkage) in
-  let visibility := maybe_show g.(g_visibility) in
-  let dll_storage := maybe_show g.(g_dll_storage) in
-  let thread_local := maybe_show g.(g_thread_local) in
+  let linkage := maybe_show (g_linkage g) in
+  let visibility := maybe_show (g_visibility g) in
+  let dll_storage := maybe_show (g_dll_storage g) in
+  let thread_local := maybe_show (g_thread_local_storage g) in
   let g_exp := maybe_show g.(g_exp) in
-  let unnamed_addr := if g.(g_unnamed_addr) then "unnamed_addr " else "local_unnamed_addr " in
-  let addrspace := maybe_show g.(g_addrspace) in
+  let unnamed_addr := maybe_show (g_unnamed_addr g) in
+  let addrspace := maybe_show (g_addrspace g) in
   let externally_initialized := if g.(g_externally_initialized) then "external " else "" in
   let g_or_c := if g.(g_constant) then "constant " else "global " in
 
   let section :=
     maybe_to_string
       (fun s => concatStr ["section \"; s; "\"; " "])
-      g.(g_section) in
+      (g_section g) in
 
   let align :=
     maybe_to_string
       (fun a => concatStr ["align "; show a; " "])
-      g.(g_align) in
+      (g_align g) in
 
   concatStr ["@"; show name ; " = " ; linkage ; visibility;
              dll_storage ; thread_local;

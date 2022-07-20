@@ -155,10 +155,10 @@ Inductive guarded_typ : ident -> list (ident * typ) -> typ -> Prop :=
       guarded_typ id env TYPE_X86_mmx
 
 | guarded_typ_Function :
-    forall (id : ident) (env : list (ident * typ)) (ret : typ) (args : list typ),
+    forall (id : ident) (env : list (ident * typ)) (ret : typ) (args : list typ) (varargs:bool),
       guarded_typ id env ret ->
       (forall a, In a args -> guarded_typ id env a) ->
-      guarded_typ id env (TYPE_Function ret args)
+      guarded_typ id env (TYPE_Function ret args varargs)
 
 | guarded_typ_Array :
     forall (id : ident) (env : list (ident * typ)) (sz : N) (t : typ),
@@ -285,12 +285,12 @@ Inductive wf_typ : list (ident * typ) -> typ -> Prop :=
       wf_typ defs TYPE_X86_mmx
 
 | wf_typ_Function :
-    forall (defs : list (ident * typ)) (ret : typ) (args : list typ),
+    forall (defs : list (ident * typ)) (ret : typ) (args : list typ) (varargs : bool),
       function_ret_typ ret ->
       wf_typ defs ret ->
       (forall (a : typ), In a args -> sized_typ defs a) ->
       (forall (a : typ), In a args -> wf_typ defs a) ->
-      wf_typ defs (TYPE_Function ret args)
+      wf_typ defs (TYPE_Function ret args varargs)
 
 (* Arrays are only well formed if the size is >= 0, and the element type is sized. *)
 | wf_typ_Array :
@@ -332,7 +332,8 @@ Inductive wf_typ : list (ident * typ) -> typ -> Prop :=
 .
 
 
-Hint Constructors wf_typ.
+#[global]
+Hint Constructors wf_typ : core.
 
 
 Definition wf_env (env : list (ident * typ)) : Prop :=
@@ -385,12 +386,12 @@ Inductive guarded_wf_typ : list (ident * typ) -> typ -> Prop :=
       guarded_wf_typ defs TYPE_X86_mmx
 
 | guarded_wf_typ_Function :
-    forall (defs : list (ident * typ)) (ret : typ) (args : list typ),
+    forall (defs : list (ident * typ)) (ret : typ) (args : list typ) (varargs:bool),
       function_ret_typ ret ->
       guarded_wf_typ defs ret ->
       (forall (a : typ), In a args -> sized_typ defs a) ->
       (forall (a : typ), In a args -> guarded_wf_typ defs a) ->
-      guarded_wf_typ defs (TYPE_Function ret args)
+      guarded_wf_typ defs (TYPE_Function ret args varargs)
 
 (* Arrays are only well formed if the size is >= 0, and the element type is sized. *)
 | guarded_wf_typ_Array :
@@ -431,7 +432,8 @@ Inductive guarded_wf_typ : list (ident * typ) -> typ -> Prop :=
       guarded_wf_typ defs TYPE_Opaque
 .
 
-Hint Constructors guarded_wf_typ.
+#[global]
+Hint Constructors guarded_wf_typ : core.
 
 
 Theorem wf_typ_is_guarded_wf_typ :
@@ -491,10 +493,10 @@ Inductive unrolled_typ : typ -> Prop :=
       unrolled_typ (TYPE_Array sz t)
 
 | unrolled_typ_Function :
-    forall (ret : typ) (args : list typ),
+    forall (ret : typ) (args : list typ) (varargs:bool),
       unrolled_typ ret ->
       Forall unrolled_typ args ->
-      unrolled_typ (TYPE_Function ret args)
+      unrolled_typ (TYPE_Function ret args varargs)
 
 | unrolled_typ_Struct :
     forall (fields : list typ),
@@ -522,14 +524,15 @@ Inductive typ_order : typ -> typ -> Prop :=
     forall f, In f fields -> typ_order f (TYPE_Struct fields)
 | typ_order_Packed_struct : forall (fields : list typ),
     forall f, In f fields -> typ_order f (TYPE_Packed_struct fields)
-| typ_order_Function_args : forall (ret : typ) (args : list typ),
-    forall a, In a args -> typ_order a (TYPE_Function ret args)
-| typ_order_Function_ret : forall (ret : typ) (args : list typ),
-    typ_order ret (TYPE_Function ret args)
+| typ_order_Function_args : forall (ret : typ) (args : list typ) (varargs:bool),
+    forall a, In a args -> typ_order a (TYPE_Function ret args varargs)
+| typ_order_Function_ret : forall (ret : typ) (args : list typ) (varargs:bool),
+    typ_order ret (TYPE_Function ret args varargs)
 .
 
 
-Hint Constructors typ_order.
+#[global]
+Hint Constructors typ_order : core.
 
 
 Theorem wf_typ_order :
@@ -547,8 +550,10 @@ Proof.
   apply lt_wf. apply wf_typ_order.
 Qed.
 
-Hint Resolve wf_lt_typ_order.
-Hint Constructors lex_ord.
+#[global]
+Hint Resolve wf_lt_typ_order : core.
+#[global]
+Hint Constructors lex_ord : core.
 
 
 Definition length_order {A : Type} (l1 l2 : list A) :=
@@ -707,10 +712,10 @@ Program Fixpoint normalize_type (env : list (ident * typ)) (t : typ) {measure (L
     let nt := normalize_type env t in
     TYPE_Array sz nt
 
-  | TYPE_Function ret args =>
+  | TYPE_Function ret args varargs =>
     let nret := (normalize_type env ret) in
     let nargs := map_In args (fun t _ => normalize_type env t) in
-    TYPE_Function nret nargs
+    TYPE_Function nret nargs varargs
 
   | TYPE_Struct fields =>
     let nfields := map_In fields (fun t _ => normalize_type env t) in
@@ -760,10 +765,10 @@ Lemma normalize_type_equation : forall env t,
     let nt := normalize_type env t in
     TYPE_Array sz nt
 
-  | TYPE_Function ret args =>
+  | TYPE_Function ret args varargs =>
     let nret := (normalize_type env ret) in
     let nargs := map_In args (fun t _ => normalize_type env t) in
-    TYPE_Function nret nargs
+    TYPE_Function nret nargs varargs
 
   | TYPE_Struct fields =>
     let nfields := map_In fields (fun t _ => normalize_type env t) in
@@ -809,8 +814,8 @@ Proof.
   reflexivity.
 Defined.    
 
-
-Hint Constructors unrolled_typ.
+#[global]
+Hint Constructors unrolled_typ : core.
 
 
 Lemma find_in_wf_env :
@@ -916,8 +921,10 @@ Proof.
         assumption.
 Qed.
 
-Hint Constructors sized_typ.
-Hint Constructors guarded_typ.
+#[global]
+Hint Constructors sized_typ : core.
+#[global]
+Hint Constructors guarded_typ : core.
 
 
 (* Types with no identifiers *)
@@ -935,10 +942,10 @@ Inductive simple_typ : typ -> Prop :=
 | simple_typ_X86_mmx : simple_typ (TYPE_X86_mmx)
 | simple_typ_Array : forall sz t, simple_typ t -> simple_typ (TYPE_Array sz t)
 | simple_typ_Function :
-    forall ret args,
+    forall ret args varargs,
       simple_typ ret ->
       (forall a, In a args -> simple_typ a) ->
-      simple_typ (TYPE_Function ret args)
+      simple_typ (TYPE_Function ret args varargs)
 | simple_typ_Struct :
     forall fields,
       (forall f, In f fields -> simple_typ f) ->
@@ -952,7 +959,8 @@ Inductive simple_typ : typ -> Prop :=
 .
 
 
-Hint Constructors simple_typ.
+#[global]
+Hint Constructors simple_typ : core.
 
 
 Theorem map_in_id :

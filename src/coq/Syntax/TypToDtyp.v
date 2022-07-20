@@ -38,10 +38,10 @@ Inductive typ_order : typ -> typ -> Prop :=
     forall f, In f fields -> typ_order f (TYPE_Struct fields)
 | typ_order_Packed_struct : forall (fields : list typ),
     forall f, In f fields -> typ_order f (TYPE_Packed_struct fields)
-| typ_order_Function_args : forall (ret : typ) (args : list typ),
-    forall a, In a args -> typ_order a (TYPE_Function ret args)
-| typ_order_Function_ret : forall (ret : typ) (args : list typ),
-    typ_order ret (TYPE_Function ret args)
+| typ_order_Function_args : forall (ret : typ) (args : list typ) (varargs:bool),
+    forall a, In a args -> typ_order a (TYPE_Function ret args varargs)
+| typ_order_Function_ret : forall (ret : typ) (args : list typ) (varargs:bool),
+    typ_order ret (TYPE_Function ret args varargs)
 .
 #[export] Hint Constructors typ_order : core.
 
@@ -107,7 +107,7 @@ Program Fixpoint typ_to_dtyp (env : list (ident * typ)) (t : typ) {measure (List
     let nt := typ_to_dtyp env t in
     DTYPE_Array sz nt
 
-  | TYPE_Function ret args =>
+  | TYPE_Function ret args varargs =>
     DTYPE_Pointer 
 
   | TYPE_Struct fields =>
@@ -158,7 +158,7 @@ Lemma typ_to_dtyp_equation  : forall env t,
       let nt := typ_to_dtyp env t in
       DTYPE_Array sz nt
 
-    | TYPE_Function ret args =>
+    | TYPE_Function ret args varargs =>
       DTYPE_Pointer (* Function nret nargs *)
 
     | TYPE_Struct fields =>

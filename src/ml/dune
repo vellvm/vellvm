@@ -2,10 +2,23 @@
   (dev
     (flags (:standard -warn-error -A -w -34))))
 
+(library
+  (name base)
+  (modules assert platform IO)
+  (libraries libvellvm unix str)
+  )
+
+(executables
+  (names frontend)
+  (modules frontend frontend_test)
+  (libraries base extracted libvellvm unix str)
+  )
+
 
 (executables
  (names main)
-  (libraries extracted libvellvm testing unix str)
+  (modules main driver interpreter test)
+  (libraries base extracted libvellvm testing unix str)
   )
 
 

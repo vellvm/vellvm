@@ -28,7 +28,6 @@ let pp_addr : Format.formatter -> MemoryModelImplementation.Addr.addr -> unit
 let string_of_float_full f =
   (* Due to the limited number of bits in the representation of doubles, the maximal precision is 324. See Wikipedia. *)
   let s = sprintf "%.350f" f in
-  let open Str in
   Str.global_replace (Str.regexp "0+$") "" s
 
 let rec pp_uvalue : Format.formatter -> DV.uvalue -> unit =
