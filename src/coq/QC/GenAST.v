@@ -2047,21 +2047,11 @@ Section InstrGenerators.
   Definition gen_helper_function_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
     := ret TLE_Definition <*> gen_helper_function.
 
-  Fixpoint gen_helper_function_tle_size (sz: nat) : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
-    := match sz with
-       | 0%nat =>
-           ret nil
-       | S z =>
-           helper <- gen_helper_function_tle;;
-           helpers <- gen_helper_function_tle_size z;;
-           ret (helper::helpers)
-       end.
-
   Definition gen_helper_function_tle_multiple : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     :=
-    (* sz <- lift (arbitrary : G N)*)
-    sz <- lift_GenLLVM (choose (0,2)%nat);; (* TODO: Use the above line instead. Use this for testing purposes *)
-    gen_helper_function_tle_size sz.
+    sz <- lift (arbitrary : G nat);;
+    (* sz <- lift_GenLLVM (choose (0,2)%nat);; *) (* TODO: Use the above line instead. Use this for testing purposes *)
+    vectorOf_LLVM sz gen_helper_function_tle.
 
   Definition gen_global : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     := fmap ret gen_helper_function_tle.
