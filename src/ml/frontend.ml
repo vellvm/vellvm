@@ -36,6 +36,8 @@ let ast_pp_file_inner path =
 
       (* Prints the original llvm program *)
       let _ = IO.output_file vast_file ll_ast in
+      let _ = Printf.printf "pretty-printed version of %s:\n\n" path in
+      let _ = IO.print_ast ll_ast in
 
       let perm = [Open_append; Open_creat] in
       let channel = open_out_gen perm 0o640 vast_file in

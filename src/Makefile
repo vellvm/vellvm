@@ -219,7 +219,7 @@ $(EXTRACTDIR)/FRONTEND_STAMP: $(FRONTEND_VOFILES) $(EXTRACTDIR)/ExtractFrontend.
 
 FRONTEND_EXE=_build/default/ml/frontend.exe
 
-$(FRONTEND_EXE): $(EXTRACTDIR)/FRONTEND_STAMP ml/dune ml/extracted/dune ml/testing/dune
+$(FRONTEND_EXE): $(EXTRACTDIR)/FRONTEND_STAMP ml/dune ml/extracted/dune ml/testing/dune ml/frontend.ml ml/IO.ml
 	@echo "Compiling Vellvm (Frontend Only)"
 	dune build ml/frontend.exe
 
@@ -228,7 +228,8 @@ frontend: .depend
 	$(MAKE) frontend_exe
 
 .PHONY: frontend_exe
-frontend_exe: $(FRONTEND_EXE)
+frontend_exe:
+	make $(FRONTEND_EXE)
 	cp $(FRONTEND_EXE) frontend
 	chmod u+w frontend
 

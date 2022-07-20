@@ -21,6 +21,9 @@ let output_file filename ast =
   toplevel_entities (Format.formatter_of_out_channel channel) ast;
   close_out channel
 
+let print_ast ast =
+  Llvm_printer.toplevel_entities Format.std_formatter ast
+
 let output_ast ast channel =
   let open Ast_printer in
   toplevel_entities channel ast

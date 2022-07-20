@@ -640,7 +640,7 @@ Record global : Set :=
       g_constant     : bool;              (* true = constant, false = global *)
       g_exp          : option exp;     (* InitializerConstant *)
       g_externally_initialized: bool;
-      g_annotations : list annotation
+      g_annotations : list annotation  (* Invariant: the list list of annotations is in the same order as is valid for the LLVM IR grammar *)
 }.
 
 Definition g_linkage (g:global) : option linkage :=
