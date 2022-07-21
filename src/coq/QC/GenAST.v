@@ -183,6 +183,7 @@ Section GenerationState.
     (* Type aliases *)
     ; gen_typ_ctx : list (ident * typ)
     ; gen_ptrtoint_ctx : list (typ * ident * typ)
+    ; gen_current_fun : option (ident * typ) (* TODO: Force this to only accept function *)
     }.
 
   Definition init_GenState : GenState
@@ -193,6 +194,7 @@ Section GenerationState.
         ; gen_ctx    := []
         ; gen_typ_ctx    := []
         ; gen_ptrtoint_ctx := []
+        ; gen_current_fun := None
        |}.
 
   Definition increment_raw (gs : GenState) : GenState
@@ -203,6 +205,7 @@ Section GenerationState.
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; gen_current_fun := gs.(gen_current_fun)
        |}.
 
   Definition increment_global (gs : GenState) : GenState
@@ -213,6 +216,7 @@ Section GenerationState.
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; gen_current_fun := gs.(gen_current_fun)
        |}.
 
   Definition increment_void (gs : GenState) : GenState
@@ -223,6 +227,7 @@ Section GenerationState.
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; gen_current_fun := gs.(gen_current_fun)
        |}.
 
   Definition increment_blocks (gs : GenState) : GenState
@@ -233,6 +238,7 @@ Section GenerationState.
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; gen_current_fun := gs.(gen_current_fun)
        |}.
 
   Definition replace_ctx (ctx : list (ident * typ)) (gs : GenState) : GenState
@@ -243,6 +249,7 @@ Section GenerationState.
         ; gen_ctx     := ctx
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; gen_current_fun := gs.(gen_current_fun)
        |}.
 
   Definition replace_typ_ctx (typ_ctx : list (ident * typ)) (gs : GenState) : GenState
@@ -253,6 +260,7 @@ Section GenerationState.
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := typ_ctx
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; gen_current_fun := gs.(gen_current_fun)
        |}.
 
   Definition replace_ptrtoint_ctx (ptrtoint_ctx : list (typ * ident * typ)) (gs: GenState) : GenState
@@ -263,6 +271,18 @@ Section GenerationState.
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := ptrtoint_ctx
+        ; gen_current_fun := gs.(gen_current_fun)
+       |}.
+
+  Definition replace_current_fun (current_fun : option (ident * typ)) (gs: GenState): GenState
+    := {| num_void    := gs.(num_void)
+        ; num_raw     := gs.(num_raw)
+        ; num_global  := gs.(num_global)
+        ; num_blocks  := gs.(num_blocks)
+        ; gen_ctx     := gs.(gen_ctx)
+        ; gen_typ_ctx := gs.(gen_typ_ctx)
+        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; gen_current_fun := current_fun
        |}.
 
   Definition GenLLVM := stateT GenState G.
@@ -331,12 +351,19 @@ Section GenerationState.
        ptoi_ctx <- get_ptrtoint_ctx;;
        ret (ctx, ptoi_ctx).
 
+  Definition get_current_fun : GenLLVM (option (ident * typ))
+    := gets (fun gs => gs.(gen_current_fun)).
+
   Definition set_ctx (ctx : var_context) : GenLLVM unit
     := modify (replace_ctx ctx);;
        ret tt.
 
   Definition set_ptrtoint_ctx (ptoi_ctx : ptr_to_int_context) : GenLLVM unit
     := modify (replace_ptrtoint_ctx ptoi_ctx);;
+       ret tt.
+
+  Definition set_current_fun (current_fun : ident * typ) : GenLLVM unit
+    := modify (replace_current_fun (Some current_fun));;
        ret tt.
 
   Definition restore_variable_ctxs (ctxs : all_var_contexts) : GenLLVM unit
@@ -405,6 +432,12 @@ Section GenerationState.
   Definition reset_ptrtoint_ctx : GenLLVM unit
     := modify (replace_ptrtoint_ctx []);; ret tt.
 
+  Definition reset_variable_ctxs : GenLLVM unit
+    := restore_variable_ctxs ([], []).
+  
+  Definition reset_current_fun : GenLLVM unit
+    := modify (replace_current_fun None);; ret tt.
+  
   Definition hide_ctx {A} (g: GenLLVM A) : GenLLVM A
     := saved_ctx <- get_ctx;;
        reset_ctx;;
@@ -529,7 +562,7 @@ Section TypGenerators.
   Definition filter_non_fun_typs (ctx : list (ident * typ)) : list (ident * typ) :=
     filter (fun '(_, t) =>
               match t with
-              | TYPE_Function _ _ => false
+              | TYPE_Function _ _  => false
               | _ => true
               end) ctx.
 
@@ -1000,7 +1033,8 @@ Section ExpGenerators.
          end
        | TYPE_Identified id => false
        end.
-
+  Notation "A =? B" := (normalized_typ_eq A B).
+  
   (* This needs to use normalized_typ_eq, instead of dtyp_eq because of pointer types...
      dtyps only tell you that a type is a pointer, the other type
      information about the pointers is erased.
@@ -1008,6 +1042,30 @@ Section ExpGenerators.
   Definition filter_type (ty : typ) (ctx : list (ident * typ)) : list (ident * typ)
     := filter (fun '(i, t) => normalized_typ_eq (normalize_type ctx ty) (normalize_type ctx t)) ctx.
 
+  (* TODO: Move equation property to somewhere else*)
+  Definition normalized_raw_id_eq (na : raw_id) (nb : raw_id) : bool
+    := match na, nb with
+       | Name sa, Name sb => (sa =? sb)%string 
+       | Anon ia, Anon ib
+       | Raw ia, Raw ib => (ia =? ib)%Z
+       | _, _ => false
+       end.
+  Notation "A =? B" := (normalized_raw_id_eq A B).
+  
+  Definition normalized_ident_eq (ia : ident) (ib : ident) : bool 
+    := match ia, ib with
+       | ID_Global na, ID_Global nb 
+       | ID_Local na, ID_Local nb => normalized_raw_id_eq na nb
+       | _, _ => false
+       end.
+  Notation "A =? B" := (normalized_ident_eq A B).
+  
+  Definition normalized_var_eq (a : ident * typ) (b : ident * typ) : bool :=
+    let '(ia, ta) := a in
+    let '(ib, tb) := b in
+    normalized_typ_eq ta tb && (ia =? ib).
+  Notation "A =? B" := (normalized_var_eq A B).
+  
   Variant contains_flag :=
   | soft
   | hard.
@@ -1091,6 +1149,9 @@ Section ExpGenerators.
     | _ => false
     end.
 
+  Definition filter_nc_fun_typs (ctx : var_context) (curr_fun : (ident * typ)): var_context :=
+    filter (fun '(i, t) => contains_typ t (TYPE_Function TYPE_Void []) soft && !normalized_typ_eq t (i,t))
+  
   Definition filter_fun_typs (ctx: var_context) : var_context :=
     filter (fun '(_, t) => contains_typ t (TYPE_Function TYPE_Void []) soft) ctx.
 
@@ -1755,7 +1816,7 @@ Section InstrGenerators.
     let agg_typs_in_ctx := filter_agg_typs ctx in
     let ptr_typs_in_ctx := filter_ptr_typs ctx in
     let vec_typs_in_ctx := filter_vec_typs ctx in
-    let fun_typs_in_ctx := filter_fun_typs ctx in
+    let fun_typs_in_ctx := filter_nc_fun_type ctx in
     let insertvalue_typs_in_ctx := filter_insertvalue_typs agg_typs_in_ctx ctx in
     oneOf_LLVM
       ([ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
@@ -1771,7 +1832,7 @@ Section InstrGenerators.
          ++ (if seq.nilp insertvalue_typs_in_ctx then [] else [x <- elems_LLVM insertvalue_typs_in_ctx;;
                                                                gen_insertvalue x])
          ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])
-         ++ (if seq.nilp (fun_typs_in_ctx) then [] else [gen_call])).
+         ++ (if seq.nilp (fun_typs_in_ctx)  then [] else [gen_call])).
 
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
@@ -1999,6 +2060,9 @@ Section InstrGenerators.
 
   Definition gen_definition (name : global_id) (ret_t : typ) (args : list (typ)) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
+      let args_t := args in
+      let f_type := TYPE_Function ret_t args_t in
+      add_to_ctx (ID_Global name, f_type) (* Issue 211: Add to ctx to create reurse function *)
       ctxs <- get_variable_ctxs;;
 
       (* Add arguments to context *)
@@ -2012,8 +2076,6 @@ Section InstrGenerators.
 
       bs <- gen_blocks ret_t;;
 
-      let args_t := map snd args in
-      let f_type := TYPE_Function ret_t args_t in
       let param_attr_slots := map (fun t => []) args in
       let prototype :=
           mk_declaration name f_type
