@@ -302,6 +302,18 @@ Section Sum.
          MReturns_ret_inv := fun A => SumReturns_ret_inv
     }.
 
+  Global Program Instance MonadReturns_Sum_ReturnsProper : MonadReturnsProper (sum E)
+    := {
+      MReturns_Proper := _
+    }.
+  Next Obligation.
+    unfold eq1, EqM_sum. repeat red. intros. unfold SumReturns in H0. subst. reflexivity.
+  Qed.
+
+  Global Program Instance MonadReturns_Sum_ProperFlip : MonadReturns_ProperFlip (sum E)
+    := { MReturns_ProperFlip := _ }.
+    
+  
   Global Instance MonadReturns_Sum_Fails : MonadReturnsFails (sum E)
     := { MReturns_MFails := fun A => SumReturns_SumFails;
          MFails_MReturns := fun A => SumFails_SumReturns

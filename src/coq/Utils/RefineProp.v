@@ -9,7 +9,10 @@ From Vellvm Require Import
 From ExtLib Require Import
      Structures.Monads.
 
+From ITree Require Import Basics.Monad.
+
 Import MonadNotation.
+Open Scope monad_scope.
 
 Definition RefineProp (X : Type) : Type := err_ub_oom X -> Prop.
 
@@ -25,7 +28,6 @@ Definition bind_RefineProp {A B : Type} (pa : RefineProp A) (k : A -> RefineProp
     bind := @bind_RefineProp
   |}.
 
-From ITree Require Import Basics.Monad.
 Import IdentityMonad.
 #[global] Instance EQM_RefineProp : Eq1 RefineProp.
 Proof.

@@ -412,84 +412,6 @@ Import ListNotations.
 Set Implicit Arguments.
 
 
-(* Monads ------------------------------------------------------------------- *)
-(* TODO: Add to ExtLib *)
-
-Require Import ExtLib.Structures.Monads.
-Import MonadNotation.
-Open Scope monad_scope.
-
-Section monad.
-  Variable m : Type -> Type.
-  Variable M : Monad m.
-  
-  Fixpoint monad_fold_right {A B} (f : B -> A -> m B) (l:list A) (b : B) : m B :=
-    match l with
-    | [] => ret b
-    | x::xs => 
-      r <- monad_fold_right f xs b ;;
-      f r x
-    end.
-
-Definition monad_app_fst {A B C} (f : A -> m C) (p:A * B) : m (C * B)%type :=
-  let '(x,y) := p in
-  z <- f x ;;
-  ret (z,y).
-
-Definition monad_app_snd {A B C} (f : B -> m C) (p:A * B) : m (A * C)%type :=
-  let '(x,y) := p in
-  z <- f y ;;
-  ret (x,z).
-
-Definition map_monad {m : Type -> Type} {H : Monad m} {A B} (f:A -> m B) : list A -> m (list B) :=
-  fix loop l :=
-    match l with
-    | [] => ret []
-    | a::l' =>
-      b <- f a ;;
-      bs <- loop l' ;;
-      ret (b::bs)  
-    end.
-
-Definition map_monad_ {A B}
-  (f: A -> m B) (l: list A): m unit :=
-  map_monad f l;; ret tt.
-
-Fixpoint sequence {a} {M} `{Monad M} (ms : list (M a)) : M (list a)
-  := map_monad id ms.
-
-End monad.
-Arguments monad_fold_right {_ _ _ _}.
-Arguments monad_app_fst {_ _ _ _ _}.
-Arguments monad_app_snd {_ _ _ _ _}.
-Arguments map_monad {_ _ _ _}.
-Arguments map_monad_ {_ _ _ _}.
-
-From ITree Require Import
-     Basics.Monad. 
-
-Lemma map_monad_app
-      {m : Type -> Type}
-      {Mm : Monad m}
-      {EqMm : Eq1 m}
-      {HEQP: Eq1Equivalence m}
-      {ML: MonadLawsE m}
-      {A B} (f:A -> m B) (l0 l1:list A):
-  map_monad f (l0++l1) ≈
-  bs1 <- map_monad f l0;;
-  bs2 <- map_monad f l1;;
-  ret (bs1 ++ bs2).
-Proof.
-  induction l0 as [| a l0 IH]; simpl; intros.
-  - cbn; rewrite bind_ret_l, bind_ret_r.
-    reflexivity.
-  - cbn.
-    setoid_rewrite IH.
-    repeat setoid_rewrite bind_bind.
-    setoid_rewrite bind_ret_l.
-    reflexivity.
-Qed.
-
 (* Arithmetic --------------------------------------------------------------- *)
 
 
@@ -1687,11 +1609,10 @@ Definition guard_opt (x : bool) : option unit
 
 Lemma exists_in_bounds_le_lt :
   forall (lower upper x : Z),
-    0 <= lower ->
     lower <= x < upper ->
     exists ix, 0 <= ix < (upper - lower) /\ x = lower + ix.
 Proof.
-  intros lower upper x POS [LE LT].
+  intros lower upper x [LE LT].
   exists (x - lower).
   split; lia.
 Qed.
