@@ -501,8 +501,10 @@ Section ShowInstances.
     | _ => true
     end.
 
+  Definition add_parens (b : bool) (s : string) : string :=
+    if b then "(" ++ s ++ ")" else s.
 
-  Fixpoint show_exp (v : exp T) :=
+  Fixpoint show_exp (b: bool) (v : exp T) :=
 
     match v with
     | EXP_Ident id => show id
@@ -518,59 +520,62 @@ Section ShowInstances.
     | EXP_Cstring elts => "c" ++ """" ++
                              concat "" (map (fun '(ty,ex) => show_c_string ex) elts)  ++ """"
     | EXP_Undef => "undef"
-    | EXP_Struct fields => "{"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++  show_exp ex) fields) ++ "}"
-    | EXP_Packed_struct fields => "<{"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++  show_exp ex) fields) ++ "}>"
-    | EXP_Array elts => "["  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++  show_exp ex) elts) ++ "]"
-    | EXP_Vector elts => "<"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++  show_exp ex) elts) ++ ">"
+    | EXP_Struct fields => "{"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++  show_exp false ex) fields) ++ "}"
+    | EXP_Packed_struct fields => "<{"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++  show_exp false ex) fields) ++ "}>"
+    | EXP_Array elts => "["  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++  show_exp false ex) elts) ++ "]"
+    | EXP_Vector elts => "<"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++  show_exp false ex) elts) ++ ">"
     | OP_IBinop iop t v1 v2 =>
-        show iop ++ " " ++ show t ++ " " ++  show_exp v1 ++ ", " ++  show_exp v2
+       show iop ++ " " ++ add_parens b (show t ++ " " ++  show_exp true v1 ++ ", " ++  show_exp true v2)
     | OP_ICmp cmp t v1 v2 =>
-        "icmp " ++ show cmp ++ " " ++ show t ++ " " ++  show_exp v1 ++ ", " ++  show_exp v2
+        let second_expression :=  if b then  show t ++ " " ++ show_exp true v2 else show_exp true v2 in
+    
+        "icmp " ++  show cmp ++ " " ++  add_parens b (show t ++ " " ++  show_exp true v1 ++ ", " ++ second_expression) 
+                 (* "icmp " ++  show cmp ++ " " ++  add_parens b (show t ++ " " ++  show_exp true v1 ++ ", " ++ show_exp true v2) *)
     | OP_FBinop fop fmath t v1 v2 =>
         let fmath_string :=
           match fmath with
           | nil => " "
           | _ =>  " " ++ concat " " (map (fun x => show x) fmath) ++  " "
           end in
-        show fop ++ fmath_string ++ show t ++ " " ++  show_exp v1 ++ ", " ++  show_exp v2
+        show fop ++ " " ++ add_parens b (fmath_string ++ show t ++ " " ++  show_exp true v1 ++ ", " ++  show_exp true v2)
     | OP_FCmp cmp t v1 v2 =>
-        "fcmp " ++ show cmp ++ " " ++ show t ++ " " ++  show_exp v1 ++ ", " ++  show_exp v2
-    | OP_Conversion conv t_from v t_to => show conv ++ " " ++ show t_from ++ " " ++  show_exp v ++ " to " ++ show t_to
-    | OP_GetElementPtr t ptrval idxs =>
+        "fcmp " ++  add_parens b (show cmp ++ " " ++ show t ++ " " ++  show_exp true v1 ++ ", " ++  show_exp true v2)
+    | OP_Conversion conv t_from v t_to => show conv ++ " " ++ add_parens b (show t_from ++ " " ++  show_exp true v ++ " to " ++ show t_to)
+   | OP_GetElementPtr t ptrval idxs =>
         let (tptr, exp) := ptrval in
 
-        "getelementptr " ++ show t ++ ", " ++ show tptr ++ " " ++ show_exp exp ++  fold_left (fun str '(ty, ex) => str ++ ", " ++ show ty ++ " " ++ show_exp ex) idxs ""
+       "getelementptr " ++  add_parens b (show t ++ ", " ++ show tptr ++ " " ++ show_exp true exp ++  fold_left (fun str '(ty, ex) => str ++ ", " ++ show ty ++ " " ++ show_exp true ex) idxs "")
 
     | OP_ExtractElement vec idx =>
         let (tptr, exp) := vec in
         let (tidx, iexp) := idx in
-        "extractelement " ++ show tptr ++ " " ++  show_exp exp ++ ", " ++ show tidx ++ " " ++  show_exp iexp
+        "extractelement " ++  add_parens b ( show tptr ++ " " ++  show_exp true exp ++ ", " ++ show tidx ++ " " ++  show_exp true iexp)
     | OP_InsertElement vec elt idx =>
         let (tptr, exp) := vec in
         let (telt, eexp) := elt in
         let (tidx, iexp) := idx in
-        "insertelement " ++ show tptr ++ " " ++  show_exp exp ++ ", " ++ show telt ++ " " ++  show_exp eexp ++ ", " ++ show tidx ++ " " ++ show_exp iexp
+         "insertelement " ++ add_parens b (show tptr ++ " " ++  show_exp true exp ++ ", " ++ show telt ++ " " ++  show_exp true eexp ++ ", " ++ show tidx ++ " " ++ show_exp true iexp)
     | OP_ShuffleVector vec1 vec2 idxmask =>
         let (type1, expression1) := vec1 in
         let (type2, expression2) := vec2 in
         let (type3, expression3) := idxmask in
-        "shufflevector " ++ show type1 ++  show_exp expression1  ++ ", " ++ show type2 ++  show_exp expression2 ++ ", " ++ show type3 ++  show_exp expression3
+        "shufflevector " ++  add_parens b (show type1 ++  show_exp true expression1  ++ ", " ++ show type2 ++  show_exp true expression2 ++ ", " ++ show type3 ++  show_exp true expression3)
     (* This one, extractValue *)
     | OP_ExtractValue vec idxs =>
         let (tptr, exp) := vec in
-        "extractvalue " ++ show tptr ++ " " ++  show_exp exp ++ ", " ++ concat ", " (map (fun x => show x) idxs)
+       "extractvalue " ++  add_parens b ( show tptr ++ " " ++  show_exp true exp ++ ", " ++ concat ", " (map (fun x => show x) idxs))
     | OP_InsertValue vec elt idxs =>
         let (tptr, exp) := vec in
         let (telt, eexp) := elt in
-        "insertvalue " ++ show tptr ++ " " ++  show_exp exp ++ ", " ++ show telt ++ " " ++  show_exp eexp ++ ", " ++ concat ", " (map (fun x => show x) idxs)
+        "insertvalue " ++  add_parens b (show tptr ++ " " ++  show_exp false exp ++ ", " ++ show telt ++ " " ++  show_exp false eexp ++ ", " ++ concat ", " (map (fun x => show x) idxs))
     | OP_Select (tc, cnd) (t1, v1) (t2, v2) =>
-        "select " ++ show tc ++ " " ++  show_exp cnd ++ ", " ++ show t1 ++ " " ++  show_exp v1  ++ ", " ++ show t2 ++ " " ++  show_exp v2
-    | OP_Freeze (ty, ex) => "freeze " ++ show ty ++ " " ++ show_exp ex
+        "select "  ++  add_parens b (show tc ++ " " ++  show_exp true cnd ++ ", " ++ show t1 ++ " " ++  show_exp true v1  ++ ", " ++ show t2 ++ " " ++  show_exp true v2)
+    | OP_Freeze (ty, ex) => "freeze " ++ add_parens b (show ty ++ " " ++ show_exp true ex)
     end.
 
 
   #[global] Instance showExp : Show (exp T)
-    := {| show := show_exp |}.
+    := {| show := show_exp false |}.
 
   #[global] Instance showTExp : Show (texp T)
     := {| show te :=
@@ -677,18 +682,23 @@ Section ShowInstances.
   #[global] Instance showAtomicrmw : Show (atomicrmw T)
     := {| show := show_atomic_rmw |}.
 
+  Definition show_texp (x : texp T) : string :=
+    match x with
+    | (t, exp) => show t ++ " " ++ show_exp true exp
+      end.
+
   Definition show_instr (i : instr T) : string
     := match i with
        | INSTR_Comment s => "; " ++ s
        | INSTR_Op e => show e
        (* Based on the old printer  *)
-       | INSTR_Call fn args => "call " ++ show fn ++ "(" ++ (concat ", " (map (fun x => show x) (args))) ++ ")"
+       | INSTR_Call fn args => "call " ++ show fn ++ "(" ++ (concat ", " (map show_texp args)) ++ ")"
        | INSTR_Alloca t nb align =>
            "alloca " ++ show t ++ show_opt_prefix ", " nb ++ show_opt_prefix ", align " align
        | INSTR_Load vol t ptr align =>
-           "load " ++ show t ++ ", " ++ show ptr ++ show_opt_prefix ", align " align
+           "load " ++ show t ++ ", " ++ show_texp ptr ++ show_opt_prefix ", align " align
        | INSTR_Store vol tval ptr align =>
-           "store " ++ (if vol then "volatile " else "") ++ show tval ++ ", " ++ show ptr ++ show_opt_prefix ", align " align
+           "store " ++ (if vol then "volatile " else "") ++ show_texp tval ++ ", " ++ show ptr ++ show_opt_prefix ", align " align
        | INSTR_Fence syncscope ordering => let printable_sync := match syncscope with
                                                                  | None => ""
                                                                  | Some x => "[syncscope(""" ++ show x ++ """)]"
@@ -734,17 +744,17 @@ Section ShowInstances.
 
   Definition show_terminator (t : terminator T) : string
     := match t with
-       | TERM_Ret v => "ret " ++ show v
+       | TERM_Ret v => "ret " ++ show_texp v
        | TERM_Ret_void => "ret void"
-       | TERM_Br te b1 b2 => "br " ++ show te ++ ", label %" ++ show b1 ++ ", label %" ++ show b2
+       | TERM_Br te b1 b2 => "br " ++ show_texp te ++ ", label %" ++ show b1 ++ ", label %" ++ show b2
        | TERM_Br_1 b => "br label %" ++ show b
-       | TERM_Switch v def_dest brs => concatStr["switch "; show v; ", label %"; show def_dest;
+       | TERM_Switch v def_dest brs => concatStr["switch "; show_texp v; ", label %"; show def_dest;
                                                  " ["; fold_left (fun str '(x, y) =>
                                                                     str ++ show x ++ ", label %" ++ show y ++ " ") brs "";
                                                  "]"]
 
-       | TERM_IndirectBr v brs => concatStr["indirectbr "; show v; show brs]
-       | TERM_Resume v => "remove " ++ show v
+       | TERM_IndirectBr v brs => concatStr["indirectbr "; show_texp v; show brs]
+       | TERM_Resume v => "remove " ++ show_texp v
        | TERM_Invoke fnptrval args to_label unwind_label => concatStr["invoke "; show fnptrval;
                                                                       "( "; show args; "to label ";
                                                                       show to_label; "unwind label ";

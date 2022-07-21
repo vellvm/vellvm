@@ -10,5 +10,5 @@ let toplevel_entities (fmt : Format.formatter) (tles: (LLVMAst.typ , (LLVMAst.ty
 
 
 let string_of_typ (t:LLVMAst.typ) = Camlcoq.camlstring_of_coqstring (ShowAST.show_typ t)
-let string_of_exp (e:LLVMAst.typ LLVMAst.exp) = Camlcoq.camlstring_of_coqstring (ShowAST.show_exp ShowAST.show_typ e)
+let string_of_exp (e:LLVMAst.typ LLVMAst.exp) = Camlcoq.camlstring_of_coqstring (ShowAST.show_exp ShowAST.show_typ false e)
 
