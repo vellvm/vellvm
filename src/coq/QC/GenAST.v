@@ -274,7 +274,7 @@ Section GenerationState.
         ; gen_current_fun := gs.(gen_current_fun)
        |}.
 
-  Definition replace_current_fun (current_fun : option (ident * typ)) (gs: GenState): GenState
+  Definition replace_current_fun (curr_fun : option (ident * typ)) (gs: GenState): GenState
     := {| num_void    := gs.(num_void)
         ; num_raw     := gs.(num_raw)
         ; num_global  := gs.(num_global)
@@ -282,7 +282,7 @@ Section GenerationState.
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
-        ; gen_current_fun := current_fun
+        ; gen_current_fun := curr_fun
        |}.
 
   Definition GenLLVM := stateT GenState G.
@@ -362,8 +362,8 @@ Section GenerationState.
     := modify (replace_ptrtoint_ctx ptoi_ctx);;
        ret tt.
 
-  Definition set_current_fun (current_fun : ident * typ) : GenLLVM unit
-    := modify (replace_current_fun (Some current_fun));;
+  Definition set_current_fun (curr_fun : ident * typ) : GenLLVM unit
+    := modify (replace_current_fun (Some curr_fun));;
        ret tt.
 
   Definition restore_variable_ctxs (ctxs : all_var_contexts) : GenLLVM unit
@@ -2070,7 +2070,9 @@ Section InstrGenerators.
     :=
       let args_t := args in
       let f_type := TYPE_Function ret_t args_t in
-      add_to_ctx (ID_Global name, f_type);; (* Issue 211: Add to ctx to create reurse function *)
+      let f_var := (ID_Global name, f_type) in
+      add_to_ctx f_var;; (* Issue 211: Add to ctx to create reurse function *)
+      set_current_fun f_var;;
       ctxs <- get_variable_ctxs;;
 
       (* Add arguments to context *)
@@ -2097,10 +2099,12 @@ Section InstrGenerators.
       if is_main name
       then
         restore_variable_ctxs ([], []);;
+        reset_current_fun;;
         ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs)
       else
         let '(ctx, ptoi_ctx) := ctxs in
-        restore_variable_ctxs ((ID_Global name, f_type)::ctx, ptoi_ctx);;
+        restore_variable_ctxs (f_var::ctx, ptoi_ctx);;
+        (* restore_variable_ctxs ((ID_Global name, f_type)::ctx, ptoi_ctx);; *)
         ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs).
 
   Definition gen_new_definition (ret_t : typ) (args : list (typ)) : GenLLVM (definition typ (block typ * list (block typ)))
