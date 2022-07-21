@@ -527,7 +527,10 @@ Section ShowInstances.
     | OP_IBinop iop t v1 v2 =>
        show iop ++ " " ++ add_parens b (show t ++ " " ++  show_exp true v1 ++ ", " ++  show_exp true v2)
     | OP_ICmp cmp t v1 v2 =>
-       "icmp " ++  show cmp ++ " " ++  add_parens b (show t ++ " " ++  show_exp true v1 ++ ", " ++  show_exp true v2)
+        let second_expression :=  if b then  show t ++ " " ++ show_exp true v2 else show_exp true v2 in
+    
+        "icmp " ++  show cmp ++ " " ++  add_parens b (show t ++ " " ++  show_exp true v1 ++ ", " ++ second_expression) 
+                 (* "icmp " ++  show cmp ++ " " ++  add_parens b (show t ++ " " ++  show_exp true v1 ++ ", " ++ show_exp true v2) *)
     | OP_FBinop fop fmath t v1 v2 =>
         let fmath_string :=
           match fmath with
@@ -679,18 +682,23 @@ Section ShowInstances.
   #[global] Instance showAtomicrmw : Show (atomicrmw T)
     := {| show := show_atomic_rmw |}.
 
+  Definition show_texp (x : texp T) : string :=
+    match x with
+    | (t, exp) => show t ++ " " ++ show_exp true exp
+      end.
+
   Definition show_instr (i : instr T) : string
     := match i with
        | INSTR_Comment s => "; " ++ s
        | INSTR_Op e => show e
        (* Based on the old printer  *)
-       | INSTR_Call fn args => "call " ++ show fn ++ "(" ++ (concat ", " (map (fun x => show x) (args))) ++ ")"
+       | INSTR_Call fn args => "call " ++ show fn ++ "(" ++ (concat ", " (map show_texp args)) ++ ")"
        | INSTR_Alloca t nb align =>
            "alloca " ++ show t ++ show_opt_prefix ", " nb ++ show_opt_prefix ", align " align
        | INSTR_Load vol t ptr align =>
-           "load " ++ show t ++ ", " ++ show ptr ++ show_opt_prefix ", align " align
+           "load " ++ show t ++ ", " ++ show_texp ptr ++ show_opt_prefix ", align " align
        | INSTR_Store vol tval ptr align =>
-           "store " ++ (if vol then "volatile " else "") ++ show tval ++ ", " ++ show ptr ++ show_opt_prefix ", align " align
+           "store " ++ (if vol then "volatile " else "") ++ show_texp tval ++ ", " ++ show ptr ++ show_opt_prefix ", align " align
        | INSTR_Fence syncscope ordering => let printable_sync := match syncscope with
                                                                  | None => ""
                                                                  | Some x => "[syncscope(""" ++ show x ++ """)]"
@@ -736,17 +744,17 @@ Section ShowInstances.
 
   Definition show_terminator (t : terminator T) : string
     := match t with
-       | TERM_Ret v => "ret " ++ show v
+       | TERM_Ret v => "ret " ++ show_texp v
        | TERM_Ret_void => "ret void"
-       | TERM_Br te b1 b2 => "br " ++ show te ++ ", label %" ++ show b1 ++ ", label %" ++ show b2
+       | TERM_Br te b1 b2 => "br " ++ show_texp te ++ ", label %" ++ show b1 ++ ", label %" ++ show b2
        | TERM_Br_1 b => "br label %" ++ show b
-       | TERM_Switch v def_dest brs => concatStr["switch "; show v; ", label %"; show def_dest;
+       | TERM_Switch v def_dest brs => concatStr["switch "; show_texp v; ", label %"; show def_dest;
                                                  " ["; fold_left (fun str '(x, y) =>
                                                                     str ++ show x ++ ", label %" ++ show y ++ " ") brs "";
                                                  "]"]
 
-       | TERM_IndirectBr v brs => concatStr["indirectbr "; show v; show brs]
-       | TERM_Resume v => "remove " ++ show v
+       | TERM_IndirectBr v brs => concatStr["indirectbr "; show_texp v; show brs]
+       | TERM_Resume v => "remove " ++ show_texp v
        | TERM_Invoke fnptrval args to_label unwind_label => concatStr["invoke "; show fnptrval;
                                                                       "( "; show args; "to label ";
                                                                       show to_label; "unwind label ";
