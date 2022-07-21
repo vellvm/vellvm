@@ -16,12 +16,14 @@ From Vellvm Require Import
 Import ListNotations.
 Import MonadNotation.
 
-Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (IP:INTPTR) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)).
+Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITOP : ITOP Addr PROV PTOI) (IP:INTPTR) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)).
   Import LLVMEvents.
   Import DV.
   Import PROV.
   Import Addr.
   Import PTOI.
+  Import ITOP.
+  Import IP.
   Import SIZEOF.
 
   (* TODO: should this be here? *)
@@ -38,6 +40,11 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (IP:
       handle_gep_addr dt p [DVALUE_IPTR ix] = inr p' ->
       ptr_to_int p' = (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z.
 
+  Parameter handle_gep_addr_ix' :
+    forall (dt : dtyp) (p p' : addr) ix,
+      p' = int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z (address_provenance p) ->
+      handle_gep_addr dt p [DVALUE_IPTR ix] = inr p'.
+
   Parameter handle_gep_addr_preserves_provenance :
     forall (dt : dtyp) ixs (p p' : addr),
       handle_gep_addr dt p ixs = inr p' ->
@@ -50,7 +57,7 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (IP:
     end.
 End GEPM.
 
-Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERACTIONS(ADDR)(IP)(SIZE)) (PTOI : PTOI ADDR) (PROV : PROVENANCE ADDR) (ITOP : ITOP ADDR PROV PTOI) <: GEPM(ADDR)(PTOI)(PROV)(IP)(SIZE)(Events).
+Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERACTIONS(ADDR)(IP)(SIZE)) (PTOI : PTOI ADDR) (PROV : PROVENANCE ADDR) (ITOP : ITOP ADDR PROV PTOI) <: GEPM(ADDR)(PTOI)(PROV)(ITOP)(IP)(SIZE)(Events).
   Import ADDR.
   Import Events.
   Import DV.
@@ -72,6 +79,15 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
     match vs with
     | v :: vs' =>
       match v with
+      | DVALUE_I8 i =>
+        let k := unsigned i in
+        let n := BinIntDef.Z.to_nat k in
+        match t with
+        | DTYPE_Vector _ ta
+        | DTYPE_Array _ ta =>
+          handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
+        | _ => failwith ("non-i8-indexable type")
+        end
       | DVALUE_I32 i =>
         let k := unsigned i in
         let n := BinIntDef.Z.to_nat k in
@@ -90,15 +106,6 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
           end
         | _ => failwith ("non-i32-indexable type")
         end
-      | DVALUE_I8 i =>
-        let k := unsigned i in
-        let n := BinIntDef.Z.to_nat k in
-        match t with
-        | DTYPE_Vector _ ta
-        | DTYPE_Array _ ta =>
-          handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
-        | _ => failwith ("non-i8-indexable type")
-        end
       | DVALUE_I64 i =>
         let k := unsigned i in
         let n := BinIntDef.Z.to_nat k in
@@ -108,7 +115,16 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
           handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
         | _ => failwith ("non-i64-indexable type")
         end
-      | _ => failwith "non-I32 index"
+      | DVALUE_IPTR i =>
+        let k := IP.to_Z i in
+        let n := BinIntDef.Z.to_nat k in
+        match t with
+        | DTYPE_Vector _ ta
+        | DTYPE_Array _ ta =>
+          handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
+        | _ => failwith ("non-iptr-indexable type")
+        end
+      | _ => failwith "handle_gep_h: unsupported index type"
       end
     | [] => ret off
     end.
@@ -120,7 +136,10 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
     let ptr := ptr_to_int a in
     let prov := address_provenance a in
     match vs with
-    | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 / i64 indices *)
+    | DVALUE_I8 i :: vs' =>
+      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (unsigned i)) vs' ;;
+      ret (int_to_ptr ptr' prov)
+    | DVALUE_I32 i :: vs' =>
       ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (unsigned i)) vs' ;;
       ret (int_to_ptr ptr' prov)
     | DVALUE_I64 i :: vs' =>
@@ -129,7 +148,7 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
     | DVALUE_IPTR i :: vs' =>
       ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (IP.to_Z i)) vs' ;;
       ret (int_to_ptr ptr' prov)
-    | _ => failwith "non-I32 index"
+    | _ => failwith "handle_gep_addr: unsupported index type"
     end.
 
   Lemma handle_gep_addr_0 :
@@ -155,6 +174,17 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
     reflexivity.
   Qed.
 
+  Lemma handle_gep_addr_ix' :
+    forall (dt : dtyp) (p p' : addr) ix,
+      p' = int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z (address_provenance p) ->
+      handle_gep_addr dt p [DVALUE_IPTR ix] = inr p'.
+  Proof.
+    intros dt p p' ix IX.
+    cbn.
+    subst.
+    reflexivity.
+  Qed.
+
   Lemma handle_gep_addr_preserves_provenance :
     forall (dt : dtyp) ixs (p p' : addr),
       handle_gep_addr dt p ixs = inr p' ->
@@ -167,6 +197,9 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
 
     cbn in GEP.
     destruct a; inversion GEP.
+    - break_match_hyp; inv GEP.
+      rewrite int_to_ptr_provenance.
+      reflexivity.
     - break_match_hyp; inv GEP.
       rewrite int_to_ptr_provenance.
       reflexivity.

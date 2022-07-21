@@ -14,6 +14,7 @@ From ITree Require Import
 
 From Vellvm Require Import
      Utilities
+     Utils.MapMonadExtra
      Syntax
      Semantics
      Theory.Refinement
