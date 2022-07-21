@@ -37,7 +37,11 @@ From Vellvm Require Import
      Semantics.VellvmIntegers
      Utils.Monads
      Utils.MonadEq1Laws
-     Utils.MonadReturnsLaws.
+     Utils.MonadReturnsLaws
+     QC.ShowAST.
+
+(* TODO: when/if we cut ties to QC, change this import *)
+From QuickChick Require Import Show.
 
 Import EqvNotation.
 Import MonadNotation.
@@ -106,9 +110,10 @@ Inductive IX_supported : N -> Prop :=
 .
 
 (* TODO: This probably should live somewhere else... *)
-#[refine] Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
+#[global] Program Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
     Decidable_witness := N.eqb x y
   }.
+Next Obligation.
 apply N.eqb_eq.
 Qed.
 
@@ -209,6 +214,24 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   .
   Set Elimination Schemes.
 
+  Fixpoint show_dvalue (dv : dvalue) : string :=
+    match dv with
+    | DVALUE_Addr a => "<addr>"
+    | DVALUE_I1 x => show (Int1.unsigned x)
+    | DVALUE_I8 x => show (Int8.unsigned x)
+    | DVALUE_I32 x => show (Int32.unsigned x)
+    | DVALUE_I64 x => show (Int64.unsigned x)
+    | DVALUE_IPTR x => "<intptr>"
+    | DVALUE_Double x => show x
+    | DVALUE_Float x => show x
+    | DVALUE_Poison t => "poison[" ++ show_dtyp t ++ "]"
+    | DVALUE_None => "none"
+    | DVALUE_Struct fields => "{" ++ String.concat ", " (map show_dvalue fields) ++ "}"
+    | DVALUE_Packed_struct fields => "{<" ++ String.concat ", " (map show_dvalue fields) ++ ">}"
+    | DVALUE_Array elts => "["  ++ String.concat ", " (map show_dvalue elts) ++ "]"
+    | DVALUE_Vector elts => "<"  ++ String.concat ", " (map show_dvalue elts) ++ ">"
+    end.
+  
   Fixpoint dvalue_measure (dv : dvalue) : nat :=
     match dv with
     | DVALUE_Addr a => 1
@@ -1677,6 +1700,21 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | _      => false
     end.
 
+  Definition iop_is_signed (iop : ibinop) : bool :=
+    match iop with
+    | SDiv _ => true
+    | SRem   => true
+    | _      => false
+    end.
+
+  Definition iop_is_shift (iop : ibinop) : bool :=
+    match iop with
+    | Shl _ _ => true
+    | LShr _ => true
+    | AShr _ => true
+    | _ => false
+    end.
+
   (* Check if this is an instruction which can trigger UB with division by 0. *)
   Definition fop_is_div (fop : fbinop) : bool :=
     match fop with
@@ -1933,6 +1971,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       | Fptosi
       | Fptrunc
       | Fpext
+      | Addrspacecast    
         => Conv_Illegal "TODO: unimplemented numeric conversion"
       end.
     Arguments get_conv_case _ _ _ _ : simpl nomatch.
@@ -2658,9 +2697,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     apply Forall_HIn_cons_inv; auto.
   Qed.
 
-  Hint Rewrite NO_VOID_equation : NO_VOID.
-  Hint Resolve NO_VOID_Struct_cons_inv : NO_VOID.
-  Hint Resolve NO_VOID_Packed_struct_cons_inv : NO_VOID.
+  #[global] Hint Rewrite NO_VOID_equation : NO_VOID.
+  #[global] Hint Resolve NO_VOID_Struct_cons_inv : NO_VOID.
+  #[global] Hint Resolve NO_VOID_Packed_struct_cons_inv : NO_VOID.
   Ltac solve_no_void :=
     solve
       [ auto with NO_VOID

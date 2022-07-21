@@ -20,6 +20,12 @@ Import ListNotations.
 
 Open Scope monad.
 
+Fixpoint replicateM {M : Type -> Type} {A} `{Monad M} (n : nat) (ma : M A) : M (list A)
+  := match n with
+     | O    => a <- ma;; ret [a]
+     | S n' => a <- ma;; rest <- replicateM n' ma;; ret (a :: rest)
+     end.
+
 Fixpoint foldM {a b} {M} `{Monad M} (f : b -> a -> M b ) (acc : b) (l : list a) : M b
   := match l with
      | [] => ret acc

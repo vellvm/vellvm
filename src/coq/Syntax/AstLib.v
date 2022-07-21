@@ -307,7 +307,7 @@ Hypothesis IH_Ppc_fp128  : P(TYPE_Ppc_fp128).
 Hypothesis IH_Metadata   : P(TYPE_Metadata).
 Hypothesis IH_X86_mmx    : P(TYPE_X86_mmx).
 Hypothesis IH_Array      : forall sz t, P t -> P(TYPE_Array sz t).
-Hypothesis IH_Function   : forall ret args, P ret -> (forall u, In u args -> P u) -> P(TYPE_Function ret args).
+Hypothesis IH_Function   : forall ret args varargs, P ret -> (forall u, In u args -> P u) -> P(TYPE_Function ret args varargs).
 Hypothesis IH_Struct     : forall fields, (forall u, In u fields -> P u) -> P(TYPE_Struct fields).
 Hypothesis IH_Packed_struct : forall fields, (forall u, In u fields -> P u) -> P(TYPE_Packed_struct fields).
 Hypothesis IH_Opaque     : P(TYPE_Opaque).
@@ -368,7 +368,7 @@ Hypothesis IH_Ppc_fp128  : P(TYPE_Ppc_fp128).
 Hypothesis IH_Metadata   : P(TYPE_Metadata).
 Hypothesis IH_X86_mmx    : P(TYPE_X86_mmx).
 Hypothesis IH_Array      : forall sz t, P t -> P(TYPE_Array sz t).
-Hypothesis IH_Function   : forall ret args, P ret -> (forall u : typ, (P u -> typ -> P u) -> list typ -> P u -> P u) -> P(TYPE_Function ret args).
+Hypothesis IH_Function   : forall ret args varargs, P ret -> (forall u : typ, (P u -> typ -> P u) -> list typ -> P u -> P u) -> P(TYPE_Function ret args varargs).
 Hypothesis IH_Struct     : forall fields, (forall u : typ, (P u -> typ -> P u) -> list typ -> P u -> P u) -> P(TYPE_Struct fields).
 Hypothesis IH_Packed_struct : forall fields, (forall u : typ, (P u -> typ -> P u) -> list typ -> P u -> P u) -> P(TYPE_Packed_struct fields).
 Hypothesis IH_Opaque     : P(TYPE_Opaque).
@@ -615,7 +615,7 @@ Section hiding_notation.
     | TYPE_Metadata => Atom "metadata"
     | TYPE_X86_mmx => Atom "x86_mmx"
     | TYPE_Array sz t => [Atom "["; Atom (show_N sz); Atom "x"; serialize_typ' t; Atom "]"]
-    | TYPE_Function ret args => [serialize_typ' ret; Atom "("; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexp (serialize_typ' x)) args)); Atom ")"]
+    | TYPE_Function ret args varargs => [serialize_typ' ret; Atom "("; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexp (serialize_typ' x)) args)); Atom ")"]
     | TYPE_Struct fields => [Atom "{"; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexp (serialize_typ' x)) fields)); Atom "}"]
     | TYPE_Packed_struct fields => [Atom "<{"; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexp (serialize_typ' x)) fields)); Atom "}>"]
     | TYPE_Opaque => Atom "opaque"
@@ -714,11 +714,12 @@ Section hiding_notation.
         to_sexp (blk_code block); to_sexp (blk_term block)].
   End WithSerializeT.
 
+  (* TODO: What is this SerializeTyp stuff about? Why use ceres? *)
   Section SerializeTyp.
     #[global] Instance serialize_definition_list_block : Serialize (definition typ (list (block typ))) :=
       fun defn =>
         match defn.(df_prototype).(dc_type) with
-        | TYPE_Function ret_t args_t
+        | TYPE_Function ret_t args_t varargs
           => let name  := defn.(df_prototype).(dc_name) in
              [Atom "define"; to_sexp ret_t; to_sexp name;
              Atom " {\n";
@@ -750,7 +751,7 @@ End hiding_notation.
 Definition is_void_typ (t:typ) : bool :=
   match t with
   | TYPE_Void => true
-  | TYPE_Function TYPE_Void _ => true
+  | TYPE_Function TYPE_Void _ _ => true
   | _ => false
   end.
 

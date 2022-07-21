@@ -10,9 +10,11 @@
 
 (* A main harness for Coq-extracted LLVM Transformations *)
 open Arg
+open Base    
 open Assert
 open Driver
-
+open InterpretationStack.InterpreterStackBigIntptr.LP.Events
+       
 (* test harness ------------------------------------------------------------- *)
 exception Ran_tests of bool
 let suite = ref Test.suite
@@ -22,47 +24,58 @@ let exec_tests () =
   Printf.printf "%s\n" (outcome_to_string outcome);
   raise (Ran_tests (successful outcome))
 
+let dvalue_eq_assertion (got : unit -> DV.dvalue) (expected : unit -> DV.dvalue) () =
+  let dv1 = got () in
+  let dv2 = expected () in
+  if DV.dvalue_eqb dv1 dv2 then () else
+    failwith (Printf.sprintf "dvalues different\ngot:\n\t%s\nexpected:\n\t%s"
+                (string_of_dvalue dv1)
+                (string_of_dvalue dv2))
+
+
 let make_test ll_ast t : string * assertion  =
-  let open Format in 
+  let open Format in
+
+  let run dtyp entry args ll_ast () =
+      match 
+        Interpreter.step
+          (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp (Camlcoq.coqstring_of_camlstring entry) args ll_ast)
+      with
+      | Ok dv -> dv
+      | Error e -> failwith e
+  in
+  
   match t with
   | Assertion.EQTest (expected, dtyp, entry, args) ->
     let str =
-      let expected_str =
-        Interpreter.pp_dvalue str_formatter expected;
-        flush_str_formatter ()
-      in
+      let expected_str = string_of_dvalue expected  in
       let args_str: doc =
         pp_print_list ~pp_sep:(fun f () -> pp_print_string f ", ") Interpreter.pp_uvalue str_formatter args;
         flush_str_formatter()
       in
       Printf.sprintf "%s = %s(%s)" expected_str entry args_str
     in
-    let result () = Interpreter.step (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp (Camlcoq.coqstring_of_camlstring entry) args ll_ast)
-    in
-    str, (Assert.assert_eqf result (Ok expected))
+    let result = run dtyp entry args ll_ast in
+    str, (dvalue_eq_assertion result (fun () -> expected))
 
   | Assertion.POISONTest (dtyp, entry, args) ->
      let expected = InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV.DVALUE_Poison dtyp in
      let str =
-       let expected_str =
-         Interpreter.pp_dvalue str_formatter expected;
-         flush_str_formatter ()
+       let expected_str = string_of_dvalue expected in
+       let args_str =
+         pp_print_list ~pp_sep:(fun f () -> pp_print_string f ", ") Interpreter.pp_uvalue str_formatter args;
+         flush_str_formatter()
        in
-      let args_str =
-        pp_print_list ~pp_sep:(fun f () -> pp_print_string f ", ") Interpreter.pp_uvalue str_formatter args;
-        flush_str_formatter()
-      in
-      Printf.sprintf "%s = %s(%s)" expected_str entry args_str
+       Printf.sprintf "%s = %s(%s)" expected_str entry args_str
      in
 
-     let result () = Interpreter.step(TopLevel.TopLevelBigIntptr.interpreter_gen dtyp (Camlcoq.coqstring_of_camlstring entry) args ll_ast)
-     in 
-     str, (Assert.assert_eqf result (Ok expected))
+     let result  = run dtyp entry args ll_ast in 
+     str, (dvalue_eq_assertion result (fun () -> expected))
          
   | Assertion.SRCTGTTest (expected_rett, generated_args) ->
      let (_t_args, v_args) = List.split generated_args in
-     let res_src () = Interpreter.step(TopLevel.TopLevelBigIntptr.interpreter_gen expected_rett (Camlcoq.coqstring_of_camlstring "src") v_args ll_ast) in
-     let res_tgt () = Interpreter.step(TopLevel.TopLevelBigIntptr.interpreter_gen expected_rett (Camlcoq.coqstring_of_camlstring "tgt") v_args ll_ast) in
+     let res_src = run expected_rett "src" v_args ll_ast in
+     let res_tgt = run expected_rett "tgt" v_args ll_ast in 
      let str = 
       let args_str: doc =
         pp_print_list ~pp_sep:(fun f () -> pp_print_string f ", ") Interpreter.pp_uvalue str_formatter v_args;
@@ -70,13 +83,7 @@ let make_test ll_ast t : string * assertion  =
       in
        Printf.sprintf "src = tgt on generated input (%s)" args_str
      in
-     str,  (Assert.assert_eqf (fun () ->
-               let s,t = res_src (), res_tgt() in
-               begin match s, t with | Ok sv, Ok tv -> Ok (Assertion.eq_dvalue sv tv)
-                               | Error el, _ -> Error el
-                               | _, Error er -> Error er
-               end
-             ) (Ok true))
+     str,  (dvalue_eq_assertion res_src res_tgt) 
 
 let test_pp_dir dir =
   let _ = Printf.printf "===> RUNNING PRETTY PRINTING TESTS IN: %s\n" dir in  
@@ -92,12 +99,12 @@ let ast_pp_file_inner path =
   let file, ext = Platform.path_to_basename_ext path in
   begin match ext with
     | "ll" ->
-      let ll_ast = parse_file path in
+      let ll_ast = IO.parse_file path in
       let ll_ast' = transform ll_ast in
       let vast_file = Platform.gen_name !Platform.output_path file ".v.ast" in
 
       (* Prints the original llvm program *)
-      let _ = output_file vast_file ll_ast' in
+      let _ = IO.output_file vast_file ll_ast' in
 
       let perm = [Open_append; Open_creat] in
       let channel = open_out_gen perm 0o640 vast_file in
@@ -109,7 +116,7 @@ let ast_pp_file_inner path =
       Format.pp_print_string oc "Internal Coq representation of the ast:";
       Format.pp_force_newline oc ();
       Format.pp_force_newline oc ();
-      let _ = output_ast ll_ast' oc in
+      let _ = IO.output_ast ll_ast' oc in
 
       close_out channel
     | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
@@ -132,7 +139,7 @@ let test_file path =
   begin match ext with
     | "ll" -> 
       let tests = parse_tests path in
-      let ll_ast = parse_file path in
+      let ll_ast = IO.parse_file path in
       let suite = Test (path, List.map (make_test ll_ast) tests) in
       let outcome = run_suite [suite] in
       Printf.printf "%s\n" (outcome_to_string outcome);
@@ -148,7 +155,7 @@ let test_dir dir =
       let _file, ext = Platform.path_to_basename_ext path in
       try 
       begin match ext with
-        | "ll" -> Some (path, parse_file path, parse_tests path)
+        | "ll" -> Some (path, IO.parse_file path, parse_tests path)
         | _ -> None
       end
       with
