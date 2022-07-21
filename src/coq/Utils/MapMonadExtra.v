@@ -536,6 +536,13 @@ Proof.
     reflexivity. auto. auto.
 Qed.
 
+(* Fixpoint foldM {a b} {M} `{Monad M} (f : b -> a -> M b) (acc : b) (l : list a) : M b :=
+      match l with 
+      | [] => ret acc 
+      | (x :: xs) => b <- f acc x;; foldM f b xs 
+       end.
+ *)
+
 Lemma foldM_cons :
   forall {A B} (a : A) (b : B) (f : B -> A -> M B) (al : list A),
     foldM f b (a :: al) ≈ b' <- f b a;; foldM f b' al.
@@ -565,6 +572,9 @@ Proof.
   intros. reflexivity.
 Qed.
 
+(* foldM : (?b -> ?a -> M ?b) -> ?b -> list ?a -> M ?b *)
+(* map_monad : (?A -> M ?B) -> list ?A -> M (list ?B) *)
+
 Lemma cons_app :
   forall {A} (l : list A) (a : A),
     a :: l = [a] ++ l.
@@ -575,9 +585,7 @@ Lemma cons_app_assoc :
     k ++ y :: y0 = (k ++ [y]) ++ y0.
 Proof. intros. rewrite <- Lists.List.app_assoc. reflexivity. Qed.
 
-Ltac rewrite_under_bind H :=
-  repeat (apply Proper_bind; [reflexivity |]; repeat intro); rewrite H.
-
+Ltac rewrite_under_bind H := repeat (apply Proper_bind; [reflexivity |]; repeat intro); rewrite H.
 Lemma foldM_implements_lemma : 
   forall {A B} (l : list A) (k : list B) (f : A -> M B),
     l' <- map_monad f l ;; ret (k ++ l') ≈ foldM (fun x y => t <- f y ;; ret (x ++ [t])) k l.
@@ -617,5 +625,7 @@ Arguments map_monad_cons_ret {_ _ _ _ _ _ _}.
 Arguments map_monad_cons_ret {_ _ _ _ _ _ _}.          
 Arguments map_monad_map {_ _ _ _ _ _ _ _}.
 Arguments map_monad_g {_ _ _ _ _ _ _ _}.
+
+
 
 

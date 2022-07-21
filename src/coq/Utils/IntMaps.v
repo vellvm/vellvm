@@ -429,6 +429,7 @@ Section Map_Operations.
   Lemma lookup_all_index_add_out {a} : forall k (n : N) (m : IntMap a) key x def,
       (key < k \/ key >= k + Z.of_N n) ->
       lookup_all_index k n (add key x m) def =
+
       lookup_all_index k n m def.
   Proof.
     intros; eapply lookup_all_index_add_out_aux; eauto.
