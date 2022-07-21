@@ -1149,8 +1149,15 @@ Section ExpGenerators.
     | _ => false
     end.
 
-  Definition filter_nc_fun_typs (ctx : var_context) (curr_fun : (ident * typ)): var_context :=
-    filter (fun '(i, t) => contains_typ t (TYPE_Function TYPE_Void []) soft && !normalized_typ_eq t (i,t))
+  (* nc stands for "Not current" *)
+  (* TODO: Need a better name*)
+  Definition filter_nc_fun_typs (ctx : var_context) (curr_fun : option (ident * typ)): var_context :=
+    match curr_fun with
+    | None =>
+        filter (fun '(i, t) => contains_typ t (TYPE_Function TYPE_Void []) soft) ctx
+    | Some f =>
+        filter (fun '(i, t) => contains_typ t (TYPE_Function TYPE_Void []) soft && negb (f =? (i,t))) ctx
+    end.
   
   Definition filter_fun_typs (ctx: var_context) : var_context :=
     filter (fun '(_, t) => contains_typ t (TYPE_Function TYPE_Void []) soft) ctx.
@@ -1710,10 +1717,9 @@ Definition gen_insertvalue (typ_in_ctx: ident * typ): GenLLVM (typ * instr typ) 
   (* Generate all of the type*)
   ret (tagg, INSTR_Op (OP_InsertValue (tagg, EXP_Ident id) (tsub, ex) path_for_insertvalue)).
 
-Definition gen_call : GenLLVM (typ * instr typ) :=
+Definition gen_call (fun_in_ctx: ident * typ): GenLLVM (typ * instr typ) :=
   ctx <- get_ctx;;
-  let fun_in_ctx := filter (fun '(_, t) => contains_typ t (TYPE_Function TYPE_Void []) soft) ctx in
-  '(id, tfun) <- oneOf_LLVM (map ret fun_in_ctx);;
+  let '(id, tfun) := fun_in_ctx in
   let '(ret_t, args) := get_ret_params_from_tfun tfun in
   args_texp <- map_monad
                (fun (arg_typ:typ) =>
@@ -1813,10 +1819,11 @@ Section InstrGenerators.
   Definition gen_instr : GenLLVM (typ * instr typ) :=
     ctx <- get_ctx;;
     ptrtoint_ctx <- get_ptrtoint_ctx;;
+    curr_fun <- get_current_fun;;
     let agg_typs_in_ctx := filter_agg_typs ctx in
     let ptr_typs_in_ctx := filter_ptr_typs ctx in
     let vec_typs_in_ctx := filter_vec_typs ctx in
-    let fun_typs_in_ctx := filter_nc_fun_type ctx in
+    let fun_typs_in_ctx := filter_nc_fun_typs ctx curr_fun in
     let insertvalue_typs_in_ctx := filter_insertvalue_typs agg_typs_in_ctx ctx in
     oneOf_LLVM
       ([ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
@@ -1832,7 +1839,8 @@ Section InstrGenerators.
          ++ (if seq.nilp insertvalue_typs_in_ctx then [] else [x <- elems_LLVM insertvalue_typs_in_ctx;;
                                                                gen_insertvalue x])
          ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])
-         ++ (if seq.nilp (fun_typs_in_ctx)  then [] else [gen_call])).
+         ++ (if seq.nilp (fun_typs_in_ctx) then [] else [x <- elems_LLVM fun_typs_in_ctx;;
+                 gen_call x])).
 
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
@@ -2062,7 +2070,7 @@ Section InstrGenerators.
     :=
       let args_t := args in
       let f_type := TYPE_Function ret_t args_t in
-      add_to_ctx (ID_Global name, f_type) (* Issue 211: Add to ctx to create reurse function *)
+      add_to_ctx (ID_Global name, f_type);; (* Issue 211: Add to ctx to create reurse function *)
       ctxs <- get_variable_ctxs;;
 
       (* Add arguments to context *)
