@@ -419,10 +419,10 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
     | (IVoid _, INSTR_Comment _) => ret tt
 
     (* Currently unhandled itree instructions *)
-    | (_, INSTR_Fence)
-    | (_, INSTR_AtomicCmpXchg)
-    | (_, INSTR_AtomicRMW)
-    | (_, INSTR_VAArg)
+    | (_, INSTR_Fence _ _) 
+    | (_, INSTR_AtomicCmpXchg _)
+    | (_, INSTR_AtomicRMW _)
+    | (_, INSTR_VAArg _ _)
     | (_, INSTR_LandingPad) => raise "Unsupported VIR instruction"
 
     (* Error states *)

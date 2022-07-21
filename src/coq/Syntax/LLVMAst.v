@@ -21,14 +21,59 @@ Open Scope list_scope.
     file defines the structure that a front end for a higher level language
     should target: [@toplevel_entities typ (block typ * list (block typ))]
 
-    All changes to this file must naturally be mirrored in the parser.
-    "/src/ml/libvellvm/llvm_parser.mly"
+    All changes to this file must naturally be mirrored in:
+    - the parser:
+       "/src/ml/libvellvm/llvm_parser.mly"
+    - the Coq Representation 
+       "/src/coq/QC/ReprAST.v"
+    - the prettyprinter 
+       "/src/coq/QC/ShowAST.v"
 
  *)
 
 Definition int := Z.
 Definition float := Floats.float.  (* 64-bit floating point value *)
 Definition float32 := Floats.float32.
+
+
+Variant raw_id : Set :=
+| Name (s:string)     (* Named identifiers are strings: %argc, %val, %x, @foo, @bar etc. *)
+| Anon (n:int)        (* Anonymous identifiers must be sequentially numbered %0, %1, %2, etc. *)
+| Raw  (n:int)        (* Used for code generation -- serializes as %_RAW_0 %_RAW_1 etc. *)
+.
+
+Variant ident : Set :=
+| ID_Global (id:raw_id)   (* @id *)
+| ID_Local  (id:raw_id)   (* %id *)
+.
+
+
+Unset Elimination Schemes.
+Inductive typ : Set :=
+| TYPE_I (sz:N)
+| TYPE_IPTR
+| TYPE_Pointer (t:typ)  
+| TYPE_Void
+| TYPE_Half
+| TYPE_Float
+| TYPE_Double
+| TYPE_X86_fp80
+| TYPE_Fp128
+| TYPE_Ppc_fp128
+(* | TYPE_Label  label is not really a type *)
+(* | TYPE_Token -- used with exceptions *)
+| TYPE_Metadata
+| TYPE_X86_mmx
+| TYPE_Array (sz:N) (t:typ)
+| TYPE_Function (ret:typ) (args:list typ) (vararg:bool)
+                (* Langref doesn't specify that "..." appears only at the end of the arguments, 
+                   but I believe it is implied *)
+| TYPE_Struct (fields:list typ)
+| TYPE_Packed_struct (fields:list typ)
+| TYPE_Opaque
+| TYPE_Vector (sz:N) (t:typ)     (* t must be integer, floating point, or pointer type *)
+| TYPE_Identified (id:ident) (* add *) 
+.
 
 Variant linkage : Set :=
 | LINKAGE_Private
@@ -43,6 +88,12 @@ Variant linkage : Set :=
 | LINKAGE_Weak_odr
 | LINKAGE_External
 .
+
+Variant preemption_specifier : Set :=
+  | PREEMPTION_Dso_preemptable
+  | PREEMPTION_Dso_local
+.      
+
 
 Variant dll_storage : Set :=
 | DLLSTORAGE_Dllimport
@@ -60,35 +111,68 @@ Variant cconv : Set :=
 | CC_Fastcc
 | CC_Coldcc
 | CC_Cc (cc:int)
+| CC_Webkit_jscc
+| CC_Anyregcc
+| CC_Preserve_mostcc
+| CC_Preserve_allcc
+| CC_Cxx_fast_tlscc
+| CC_Tailcc
+| CC_Swiftcc
+| CC_Swifttailcc
+| CC_cfguard_checkcc 
 .
 
 Variant param_attr : Set :=
 | PARAMATTR_Zeroext
 | PARAMATTR_Signext
 | PARAMATTR_Inreg
-| PARAMATTR_Byval
-| PARAMATTR_Inalloca
-| PARAMATTR_Sret
+| PARAMATTR_Byval (t : typ)
+| PARAMATTR_Byref (t : typ)
+| PARAMATTR_Preallocated (t : typ)                    
+| PARAMATTR_Inalloca (t : typ) 
+| PARAMATTR_Sret (t : typ)  
+| PARAMATTR_Elementtype (t : typ)                            
 | PARAMATTR_Align (a:int)
 | PARAMATTR_Noalias
 | PARAMATTR_Nocapture
-| PARAMATTR_Readonly
+| PARAMATTR_Readonly   (* NOTE: The status of this one is ambiguous - it was definitely
+                          supported in some version of LLVM IR, but isn't listed in LangRef *)
+| PARAMATTR_Nofree      
 | PARAMATTR_Nest
 | PARAMATTR_Returned
 | PARAMATTR_Nonnull
 | PARAMATTR_Dereferenceable (a:int)
+| PARAMATTR_Dereferenceable_or_null (a : int)
+| PARAMATTR_Swiftself
+| PARAMATTR_Swiftasync
+| PARAMATTR_Swifterror 
 | PARAMATTR_Immarg
 | PARAMATTR_Noundef
-| PARAMATTR_Nofree
+| PARAMATTR_Alignstack (a : int)
+| PARAMATTR_Allocalign
+| PARAMATTR_Allocptr
+.
+
+Variant frame_pointer_val : Set :=
+| FRAMEPTR_None
+| FRAMEPTR_Non_leaf
+| FRAMEPTR_All
 .
 
 Variant fn_attr : Set :=
 | FNATTR_Alignstack (a:int)
-| FNATTR_Allocsize  (l:list int)                    
+(* | FNATTR_Alloc_family (fam : string) - FNATTR_KeyValue *)
+| FNATTR_Allockind (kind : string)                         
+| FNATTR_Allocsize (a1 : int) (a2 : option int)                 
 | FNATTR_Alwaysinline
 | FNATTR_Builtin
 | FNATTR_Cold
 | FNATTR_Convergent
+| FNATTR_Disable_sanitizer_instrumentation
+(* | FNATTR_Dontcall_error - FNATTR_String *)
+(* | FNATTR_Dontcall_warn - FNATTR_String *)
+| FNATTR_Fn_ret_thunk_extern      
+(* | FNATTR_Frame_pointer - FNATTR_KeyValue *)
 | FNATTR_Hot
 | FNATTR_Inaccessiblememonly
 | FNATTR_Inaccessiblemem_or_argmemonly
@@ -96,6 +180,7 @@ Variant fn_attr : Set :=
 | FNATTR_Jumptable
 | FNATTR_Minsize
 | FNATTR_Naked
+(* | FNATTR_No_inline_line_tables - FNATTR_String *)
 | FNATTR_No_jump_tables
 | FNATTR_Nobuiltin
 | FNATTR_Noduplicate
@@ -104,6 +189,7 @@ Variant fn_attr : Set :=
 | FNATTR_Noinline
 | FNATTR_Nomerge    
 | FNATTR_Nonlazybind
+| FNATTR_Noprofile     
 | FNATTR_Noredzone
 | FNATTR_Indirect_tls_seg_refs
 | FNATTR_Noreturn
@@ -111,12 +197,18 @@ Variant fn_attr : Set :=
 | FNATTR_Willreturn
 | FNATTR_Nosync    
 | FNATTR_Nounwind
+| FNATTR_Nosanitize_bounds
+| FNATTR_Nosanitize_coverage
 | FNATTR_Null_pointer_is_valid
 | FNATTR_Optforfuzzing    
 | FNATTR_Optnone
 | FNATTR_Optsize
+(* | FNATTR_Patchable_function - FNATTR_KeyValue *)
+(* | FNATTR_Probe_stack - FNATTR_String *)
 | FNATTR_Readnone
 | FNATTR_Readonly
+(* | FNATTR_Stack_probe_size - FNATTR_KeyValue *)
+(* | FNATTR_No_stack_arg_probe  - FNATTR_String *)
 | FNATTR_Writeonly
 | FNATTR_Argmemonly    
 | FNATTR_Returns_twice
@@ -129,15 +221,22 @@ Variant fn_attr : Set :=
 | FNATTR_Speculative_load_hardening    
 | FNATTR_Speculatable
 | FNATTR_Ssp
-| FNATTR_Sspreq
 | FNATTR_Sspstrong
-| FNATTR_Strictfp    
-| FNATTR_Uwtable
+| FNATTR_Sspreq
+| FNATTR_Strictfp
+(* | FNATTR_Denormal_fp_math (s1 : string) (s2 : option string)  - FNATTR_KeyValue *)
+(* | FNATTR_Denormal_fp_math_f32 (s1 : string) (s2 : option string) - FNATTR_KeyValue *)
+(* | FNATTR_Thunk - FNATTR_String *)
+| FNATTR_Tls_load_hoist
+| FNATTR_Uwtable (sync : option bool)   (* None ~ Some False ~ async, Some true = sync *)
 | FNATTR_Nocf_check
 | FNATTR_Shadowcallstack
-| FNATTR_Mustprogress    
-| FNATTR_String (s:string) (* "no-see" *)
-| FNATTR_Key_value (kv : string * string) (* "unsafe-fp-math"="false" *)
+| FNATTR_Mustprogress
+(* | FNATTR_Warn_stack_size (th : int) - FNATTR_KeyValue *)
+| FNATTR_Vscale_range (min : int) (max : option int) 
+(* | FNATTR_Min_legal_vector_width  (size : int) - FNATTR_KeyValue *)
+| FNATTR_String (s:string)   (* See the comments above for cases covered by FNATTR_String *)
+| FNATTR_Key_value (kv : string * string) (* See the comments above for cases covered by FNATTR_KeyValue *)
 | FNATTR_Attr_grp (g:int)
 .
 
@@ -147,22 +246,12 @@ Variant thread_local_storage : Set :=
 | TLS_Localexec
 .
 
-Variant raw_id : Set :=
-| Name (s:string)     (* Named identifiers are strings: %argc, %val, %x, @foo, @bar etc. *)
-| Anon (n:int)        (* Anonymous identifiers must be sequentially numbered %0, %1, %2, etc. *)
-| Raw  (n:int)        (* Used for code generation -- serializes as %_RAW_0 %_RAW_1 etc. *)
-.
-
-Variant ident : Set :=
-| ID_Global (id:raw_id)   (* @id *)
-| ID_Local  (id:raw_id)   (* %id *)
-.
-
 (* auxiliary definitions for when we know which case we're in already *)
 Definition local_id  := raw_id.
 Definition global_id := raw_id.
 Definition block_id := raw_id.
 Definition function_id := global_id.
+
 
 (* NOTE:
    We could separate return types from types, but that needs mutually recursive types.
@@ -179,30 +268,6 @@ Definition function_id := global_id.
    ```
 *)
 
-Unset Elimination Schemes.
-Inductive typ : Set :=
-| TYPE_I (sz:N)
-| TYPE_IPTR
-| TYPE_Pointer (t:typ)
-| TYPE_Void
-| TYPE_Half
-| TYPE_Float
-| TYPE_Double
-| TYPE_X86_fp80
-| TYPE_Fp128
-| TYPE_Ppc_fp128
-(* | TYPE_Label  label is not really a type *)
-(* | TYPE_Token -- used with exceptions *)
-| TYPE_Metadata
-| TYPE_X86_mmx
-| TYPE_Array (sz:N) (t:typ)
-| TYPE_Function (ret:typ) (args:list typ)
-| TYPE_Struct (fields:list typ)
-| TYPE_Packed_struct (fields:list typ)
-| TYPE_Opaque
-| TYPE_Vector (sz:N) (t:typ)     (* t must be integer, floating point, or pointer type *)
-| TYPE_Identified (id:ident)
-.
 Set Elimination Schemes.
 
 Variant icmp : Set := Eq|Ne|Ugt|Uge|Ult|Ule|Sgt|Sge|Slt|Sle.
@@ -228,7 +293,7 @@ Variant fast_math : Set :=
 
 Variant conversion_type : Set :=
   Trunc | Zext | Sext | Fptrunc | Fpext | Uitofp | Sitofp | Fptoui |
-  Fptosi | Inttoptr | Ptrtoint | Bitcast.
+  Fptosi | Inttoptr | Ptrtoint | Bitcast | Addrspacecast.
 
 Section TypedSyntax.
 
@@ -272,6 +337,7 @@ Inductive exp : Set :=
 | EXP_Bool    (b:bool)
 | EXP_Null
 | EXP_Zero_initializer
+    (* change type of Cstring to string *)
 | EXP_Cstring         (elts: list (T * exp))
                       (* parsing guarantees that the elts of a Cstring will be of the form
                          ((TYPE_I 8), Exp_Integer <byte>)
@@ -301,9 +367,17 @@ Set Elimination Schemes.
 
 Definition texp : Set := T * exp.
 
-(* Used in switch branches which insist on integer literals
-   
-*)
+Inductive metadata : Set :=
+  | METADATA_Const  (tv:texp)
+  | METADATA_Null
+  | METADATA_Id     (id:raw_id)  (* local or global? *)
+  | METADATA_String (str:string)
+  | METADATA_Named  (strs:list string)
+  | METADATA_Node   (mds:list metadata)
+.
+
+
+(* Used in switch branches which insist on integer literals *)
 Variant tint_literal : Set :=
   | TInt_Literal (sz:N) (x:int).
 
@@ -317,6 +391,57 @@ Variant phi : Set :=
 | Phi  (t:T) (args:list (block_id * exp))
 .
 
+Variant ordering : Set :=
+  |Unordered
+  |Monotonic
+  |Acquire
+  |Release
+  |Acq_rel
+  |Seq_cst
+     .
+
+Record cmpxchg : Set :=
+  mk_cmpxchg {
+      c_weak              : option bool; 
+      c_volatile          : option bool;
+      c_ptr               : texp;
+      c_cmp               : icmp;
+      c_cmp_type          : T;
+      c_new               : texp;                                
+      c_syncscope            : option string;
+      c_success_ordering     : ordering;
+      c_failure_ordering     : ordering;
+      c_align                : option int;     
+    }.
+
+Variant atomic_rmw_operation : Set := 
+  |Axchg  
+  |Aadd  
+  |Asub     
+  |Aand     
+  |Anand     
+  |Aor     
+  |Axor     
+  |Amax     
+  |Amin     
+  |Aumax     
+  |Aumin     
+  |Afadd     
+  |Afsub
+     .
+     
+Record atomicrmw : Set :=
+  mk_atomicrmw { 
+      a_volatile             : option bool;
+      a_operation            : atomic_rmw_operation;
+      a_ptr                  : texp;
+      a_val                  : texp;                                 
+      a_syncscope            : option string;
+      a_ordering             : ordering;
+      a_align                : option int;
+      a_type                 : T;
+    }.
+     
 Variant instr : Set :=
 | INSTR_Comment (msg:string)
 | INSTR_Op   (op:exp)                        (* INVARIANT: op must be of the form (OP_ ...) *)
@@ -324,10 +449,10 @@ Variant instr : Set :=
 | INSTR_Alloca (t:T) (nb: option texp) (align:option int)
 | INSTR_Load  (volatile:bool) (t:T) (ptr:texp) (align:option int)
 | INSTR_Store (volatile:bool) (val:texp) (ptr:texp) (align:option int)
-| INSTR_Fence
-| INSTR_AtomicCmpXchg
-| INSTR_AtomicRMW
-| INSTR_VAArg
+| INSTR_Fence (syncscope:option string) (o:ordering)
+| INSTR_AtomicCmpXchg (c : cmpxchg)
+| INSTR_AtomicRMW (a :atomicrmw )
+| INSTR_VAArg (va_list_and_arg_list : texp) (t: typ) (* arg_list isn't actually a list, this is just the name of the argument  *)
 | INSTR_LandingPad
 .
 
@@ -346,38 +471,281 @@ Variant terminator : Set :=
 .
 
 
+Variant unnamed_addr : Set :=
+  | Unnamed_addr
+  | Local_Unnamed_addr
+.
+
+(* LLVM has many optional attributes and annotations for global values,
+   declarations, and definitions.  This type collects together these options so
+   that they can be represented as a single list of features.  We call these
+   "annotations".  Some annotations (such as prefix) are applicable only to
+   function declarations or definitions, but we collect them all here
+   for a more uniform treatment.  
+*)
+Variant annotation : Set :=
+  | ANN_linkage (l:linkage)
+  | ANN_preemption_specifier (p:preemption_specifier)
+  | ANN_visibility (v:visibility)
+  | ANN_dll_storage (d:dll_storage)
+  | ANN_thread_local_storage (t:thread_local_storage)
+  | ANN_unnamed_addr (u:unnamed_addr)
+  | ANN_addrspace (n:int)
+  | ANN_section (s:string)
+  | ANN_partition (s:string)
+  | ANN_comdat (l:local_id)
+  | ANN_align (n:int)
+  | ANN_no_sanitize
+  | ANN_no_sanitize_address
+  | ANN_no_sanitize_hwaddress
+  | ANN_sanitize_address_dyninit
+  | ANN_metadata (l:list (raw_id * metadata))
+  | ANN_cconv (c:cconv) (* declaration / definitions only *)
+  | ANN_gc (s:string) (* declaration / definitions only *)
+  | ANN_prefix (t:texp) (* declaration / definitions only *)
+  | ANN_prologue (t:texp) (* declaration / definitions only *)
+  | ANN_personality (t:texp) (* declaration / definitions only *)
+.
+
+Definition ann_linkage (a:annotation) : option linkage :=
+  match a with
+  | ANN_linkage l => Some l
+  | _ => None
+  end.
+
+Definition ann_preemption_specifier (a:annotation) : option preemption_specifier :=
+  match a with
+  | ANN_preemption_specifier p => Some p
+  | _ => None
+  end.
+
+Definition ann_visibility (a:annotation) : option visibility :=
+  match a with
+  | ANN_visibility v => Some v
+  | _ => None
+  end.
+
+Definition ann_dll_storage (a:annotation) : option dll_storage :=
+  match a with
+  | ANN_dll_storage d => Some d
+  | _ => None
+  end.
+
+Definition ann_thread_local_storage (a:annotation) : option thread_local_storage :=
+  match a with
+  | ANN_thread_local_storage t => Some t
+  | _ => None
+  end.
+
+Definition ann_unnamed_addr (a:annotation) : option unnamed_addr :=
+  match a with
+  | ANN_unnamed_addr a => Some a
+  | _ => None
+  end.
+
+Definition ann_addrspace (a:annotation) : option int :=
+  match a with
+  | ANN_addrspace a => Some a
+  | _ => None
+  end.
+
+Definition ann_section (a:annotation) : option string :=
+  match a with
+  | ANN_section s => Some s
+  | _ => None
+  end.
+
+Definition ann_partition (a:annotation) : option string :=
+  match a with
+  | ANN_partition p => Some p
+  | _ => None
+  end.
+
+Definition ann_comdat (a:annotation) : option local_id :=
+  match a with
+  | ANN_comdat s => Some s
+  | _ => None
+  end.
+
+Definition ann_align (a:annotation) : option int :=
+  match a with
+  | ANN_align n => Some n
+  | _ => None
+  end.
+
+Definition ann_no_sanitize (a:annotation) : option unit :=
+  match a with
+  | ANN_no_sanitize => Some tt
+  | _ => None
+  end.
+
+Definition ann_no_sanitize_address (a:annotation) : option unit :=
+  match a with
+  | ANN_no_sanitize_address => Some tt
+  | _ => None
+  end.
+
+Definition ann_no_sanitize_hwaddress (a:annotation) : option unit :=
+  match a with
+  | ANN_no_sanitize_hwaddress => Some tt
+  | _ => None
+  end.
+
+Definition ann_sanitize_address_dynint (a:annotation) : option unit :=
+  match a with
+  | ANN_sanitize_address_dyninit => Some tt
+  | _ => None
+  end.
+
+Definition ann_metadata (a:annotation) : option (list (raw_id * metadata)) :=
+  match a with
+  | ANN_metadata m => Some m
+  | _ => None
+  end.
+
+Definition ann_cconv (a:annotation) : option cconv :=
+  match a with
+  | ANN_cconv c => Some c
+  | _ => None
+  end.
+
+Definition ann_gc (a:annotation) : option string :=
+  match a with
+  | ANN_gc s => Some s
+  | _ => None
+  end.
+
+Definition ann_prefix (a:annotation) : option texp :=
+  match a with
+  | ANN_prefix t => Some t
+  | _ => None
+  end.
+
+Definition ann_prologue (a:annotation) : option texp :=
+  match a with
+  | ANN_prologue t => Some t
+  | _ => None
+  end.
+
+Definition ann_personality (a:annotation) : option texp :=
+  match a with
+  | ANN_personality t => Some t
+  | _ => None
+  end.
+
 Record global : Set :=
   mk_global {
       g_ident        : global_id;
       g_typ          : T;
-      g_constant     : bool;
-      g_exp          : option exp;
-      g_linkage      : option linkage;
-      g_visibility   : option visibility;
-      g_dll_storage  : option dll_storage;
-      g_thread_local : option thread_local_storage;
-      g_unnamed_addr : bool;
-      g_addrspace    : option int;
+      g_constant     : bool;              (* true = constant, false = global *)
+      g_exp          : option exp;     (* InitializerConstant *)
       g_externally_initialized: bool;
-      g_section      : option string;
-      g_align        : option int;
+      g_annotations : list annotation  (* Invariant: the list list of annotations is in the same order as is valid for the LLVM IR grammar *)
 }.
+
+Definition g_linkage (g:global) : option linkage :=
+  find_option ann_linkage (g_annotations g).
+
+Definition g_visibility (g:global) : option visibility :=
+  find_option ann_visibility (g_annotations g).
+
+Definition g_dll_storage (g:global) : option dll_storage :=
+  find_option ann_dll_storage (g_annotations g).
+
+Definition g_thread_local_storage (g:global) : option thread_local_storage :=
+  find_option ann_thread_local_storage (g_annotations g).
+
+Definition g_unnamed_addr (g:global) : option unnamed_addr :=
+  find_option ann_unnamed_addr (g_annotations g).
+
+Definition g_addrspace (g:global) : option int :=
+  find_option ann_addrspace (g_annotations g).
+
+Definition g_section (g:global) : option string :=
+  find_option ann_section (g_annotations g).
+
+Definition g_partition (g:global) : option string :=
+  find_option ann_partition (g_annotations g).
+
+Definition g_comdat (g:global) : option local_id :=
+  find_option ann_comdat (g_annotations g).
+
+Definition g_align (g:global) : option int :=
+  find_option ann_align (g_annotations g).
+
+Definition g_no_sanitize (g:global) : option unit :=
+  find_option ann_no_sanitize (g_annotations g).
+
+Definition g_no_sanitize_address (g:global) : option unit :=
+  find_option ann_no_sanitize_address (g_annotations g).
+
+Definition g_no_sanitize_hwaddress (g:global) : option unit :=
+  find_option ann_no_sanitize_hwaddress (g_annotations g).
+
+Definition g_sanitize_address_dyninit (g:global) : option unit :=
+  find_option ann_sanitize_address_dynint (g_annotations g).
+
+Definition g_metadata (g:global) : option (list (raw_id * metadata)) :=
+  find_option ann_metadata (g_annotations g).
+
 
 Record declaration : Set :=
   mk_declaration
   {
-    dc_name        : function_id;
-    dc_type        : T;    (* INVARIANT: should be TYPE_Function (ret_t * args_t) *)
-    dc_param_attrs : list param_attr * list (list param_attr); (* ret_attrs * args_attrs *)
-    dc_linkage     : option linkage;
-    dc_visibility  : option visibility;
-    dc_dll_storage : option dll_storage;
-    dc_cconv       : option cconv;
-    dc_attrs       : list fn_attr;
-    dc_section     : option string;
-    dc_align       : option int;
-    dc_gc          : option string;
+    dc_name         : function_id;
+    dc_type         : T;    (* INVARIANT: should be TYPE_Function (ret_t * args_t * vararg) *)
+    dc_param_attrs  : list param_attr * list (list param_attr); (* ret_attrs * args_attrs *)
+    dc_attrs        : list fn_attr;
+    dc_annotations  : list annotation
   }.
+
+Definition dc_linkage (d:declaration) : option linkage :=
+  find_option ann_linkage (dc_annotations d).
+
+Definition dc_visibility (d:declaration) : option visibility :=
+  find_option ann_visibility (dc_annotations d).
+
+Definition dc_dll_storage (d:declaration) : option dll_storage :=
+  find_option ann_dll_storage (dc_annotations d).
+
+Definition dc_thread_local_storage (d:declaration) : option thread_local_storage :=
+  find_option ann_thread_local_storage (dc_annotations d).
+
+Definition dc_unnamed_addr (d:declaration) : option unnamed_addr :=
+  find_option ann_unnamed_addr (dc_annotations d).
+
+Definition dc_addrspace (d:declaration) : option int :=
+  find_option ann_addrspace (dc_annotations d).
+
+Definition dc_section (d:declaration) : option string :=
+  find_option ann_section (dc_annotations d).
+
+Definition dc_partition (d:declaration) : option string :=
+  find_option ann_partition (dc_annotations d).
+
+Definition dc_comdat (d:declaration) : option local_id :=
+  find_option ann_comdat (dc_annotations d).
+
+Definition dc_align (d:declaration) : option int :=
+  find_option ann_align (dc_annotations d).
+
+Definition dc_cconv (d:declaration) : option cconv :=
+  find_option ann_cconv (dc_annotations d).
+
+Definition dc_gc (d:declaration) : option string :=
+  find_option ann_gc (dc_annotations d).
+
+Definition dc_prefix (d:declaration) : option texp :=
+  find_option ann_prefix (dc_annotations d).
+
+Definition dc_prologue (d:declaration) : option texp :=
+  find_option ann_prologue (dc_annotations d).
+
+Definition dc_personality (d:declaration) : option texp :=
+  find_option ann_personality (dc_annotations d).
+
+Definition dc_metadata (d:declaration) : option (list (raw_id * metadata)) :=
+  find_option ann_metadata (dc_annotations d).
 
 
 Definition code := list (instr_id * instr).
@@ -400,14 +768,6 @@ Record definition {FnBody:Set} :=
     df_instrs      : FnBody;
   }.
 
-Inductive metadata : Set :=
-  | METADATA_Const  (tv:texp)
-  | METADATA_Null
-  | METADATA_Id     (id:raw_id)  (* local or global? *)
-  | METADATA_String (str:string)
-  | METADATA_Named  (strs:list string)
-  | METADATA_Node   (mds:list metadata)
-.
 
 Variant toplevel_entity {FnBody:Set} : Set :=
 | TLE_Comment         (msg:string)
@@ -427,16 +787,18 @@ Definition toplevel_entities (FnBody:Set) : Set := list (@toplevel_entity FnBody
 End TypedSyntax.
 
 Arguments exp: clear implicits.
+Arguments cmpxchg : clear implicits.
+Arguments atomicrmw : clear implicits.
 Arguments block: clear implicits.
 Arguments texp: clear implicits.
 Arguments phi: clear implicits.
 Arguments instr: clear implicits.
 Arguments terminator: clear implicits.
 Arguments code: clear implicits.
+Arguments annotation: clear implicits.
 Arguments global: clear implicits.
 Arguments declaration: clear implicits.
 Arguments definition: clear implicits.
 Arguments metadata: clear implicits.
 Arguments toplevel_entity: clear implicits.
 Arguments toplevel_entities: clear implicits.
-

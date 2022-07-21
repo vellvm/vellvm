@@ -4,6 +4,22 @@ From Vellvm.Utils Require Import Error.
 
 Import ListNotations.
 
+Section FINDOPTION.
+  Context {A B:Type}.
+
+  Fixpoint find_option (f: A -> option B) (l:list A) : option B :=
+    match l with
+    | [] => None
+    | x::xs => match f x with
+             | None => find_option f xs
+             | Some b => Some b
+             end
+    end.
+
+End FINDOPTION.
+
+
+
 (* TODO: Move. Also, do I really have to define this? *)
 Fixpoint zipWith {A B C} (f : A -> B -> C) (xs : list A) (ys : list B) : list C
   := match xs, ys with
