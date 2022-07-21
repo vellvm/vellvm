@@ -10,6 +10,7 @@
 
 (* A main harness for Coq-extracted LLVM Transformations *)
 open Arg
+open Base    
 open Assert
 open Driver
 open InterpretationStack.InterpreterStackBigIntptr.LP.Events
@@ -28,8 +29,8 @@ let dvalue_eq_assertion (got : unit -> DV.dvalue) (expected : unit -> DV.dvalue)
   let dv2 = expected () in
   if DV.dvalue_eqb dv1 dv2 then () else
     failwith (Printf.sprintf "dvalues different\ngot:\n\t%s\nexpected:\n\t%s"
-                (Llvm_printer.string_of_dvalue dv1)
-                (Llvm_printer.string_of_dvalue dv2))
+                (string_of_dvalue dv1)
+                (string_of_dvalue dv2))
 
 
 let make_test ll_ast t : string * assertion  =
@@ -47,7 +48,7 @@ let make_test ll_ast t : string * assertion  =
   match t with
   | Assertion.EQTest (expected, dtyp, entry, args) ->
     let str =
-      let expected_str = Llvm_printer.string_of_dvalue expected  in
+      let expected_str = string_of_dvalue expected  in
       let args_str: doc =
         pp_print_list ~pp_sep:(fun f () -> pp_print_string f ", ") Interpreter.pp_uvalue str_formatter args;
         flush_str_formatter()
@@ -60,7 +61,7 @@ let make_test ll_ast t : string * assertion  =
   | Assertion.POISONTest (dtyp, entry, args) ->
      let expected = InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV.DVALUE_Poison dtyp in
      let str =
-       let expected_str = Llvm_printer.string_of_dvalue expected in
+       let expected_str = string_of_dvalue expected in
        let args_str =
          pp_print_list ~pp_sep:(fun f () -> pp_print_string f ", ") Interpreter.pp_uvalue str_formatter args;
          flush_str_formatter()
@@ -98,12 +99,12 @@ let ast_pp_file_inner path =
   let file, ext = Platform.path_to_basename_ext path in
   begin match ext with
     | "ll" ->
-      let ll_ast = parse_file path in
+      let ll_ast = IO.parse_file path in
       let ll_ast' = transform ll_ast in
       let vast_file = Platform.gen_name !Platform.output_path file ".v.ast" in
 
       (* Prints the original llvm program *)
-      let _ = output_file vast_file ll_ast' in
+      let _ = IO.output_file vast_file ll_ast' in
 
       let perm = [Open_append; Open_creat] in
       let channel = open_out_gen perm 0o640 vast_file in
@@ -115,7 +116,7 @@ let ast_pp_file_inner path =
       Format.pp_print_string oc "Internal Coq representation of the ast:";
       Format.pp_force_newline oc ();
       Format.pp_force_newline oc ();
-      let _ = output_ast ll_ast' oc in
+      let _ = IO.output_ast ll_ast' oc in
 
       close_out channel
     | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
@@ -138,7 +139,7 @@ let test_file path =
   begin match ext with
     | "ll" -> 
       let tests = parse_tests path in
-      let ll_ast = parse_file path in
+      let ll_ast = IO.parse_file path in
       let suite = Test (path, List.map (make_test ll_ast) tests) in
       let outcome = run_suite [suite] in
       Printf.printf "%s\n" (outcome_to_string outcome);
@@ -154,7 +155,7 @@ let test_dir dir =
       let _file, ext = Platform.path_to_basename_ext path in
       try 
       begin match ext with
-        | "ll" -> Some (path, parse_file path, parse_tests path)
+        | "ll" -> Some (path, IO.parse_file path, parse_tests path)
         | _ -> None
       end
       with

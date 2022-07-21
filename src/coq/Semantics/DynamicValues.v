@@ -114,6 +114,7 @@ Inductive IX_supported : N -> Prop :=
 #[refine]#[local] Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
     Decidable_witness := N.eqb x y
   }.
+Next Obligation.
 apply N.eqb_eq.
 Qed.
 
@@ -1700,6 +1701,21 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | _      => false
     end.
 
+  Definition iop_is_signed (iop : ibinop) : bool :=
+    match iop with
+    | SDiv _ => true
+    | SRem   => true
+    | _      => false
+    end.
+
+  Definition iop_is_shift (iop : ibinop) : bool :=
+    match iop with
+    | Shl _ _ => true
+    | LShr _ => true
+    | AShr _ => true
+    | _ => false
+    end.
+
   (* Check if this is an instruction which can trigger UB with division by 0. *)
   Definition fop_is_div (fop : fbinop) : bool :=
     match fop with
@@ -1937,6 +1953,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       | Fptosi
       | Fptrunc
       | Fpext
+      | Addrspacecast    
         => Conv_Illegal "TODO: unimplemented numeric conversion"
       end.
     Arguments get_conv_case _ _ _ _ : simpl nomatch.
@@ -2662,9 +2679,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     apply Forall_HIn_cons_inv; auto.
   Qed.
 
-  Hint Rewrite NO_VOID_equation : NO_VOID.
-  Hint Resolve NO_VOID_Struct_cons_inv : NO_VOID.
-  Hint Resolve NO_VOID_Packed_struct_cons_inv : NO_VOID.
+  #[global] Hint Rewrite NO_VOID_equation : NO_VOID.
+  #[global] Hint Resolve NO_VOID_Struct_cons_inv : NO_VOID.
+  #[global] Hint Resolve NO_VOID_Packed_struct_cons_inv : NO_VOID.
   Ltac solve_no_void :=
     solve
       [ auto with NO_VOID

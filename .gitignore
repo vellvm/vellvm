@@ -1,3 +1,5 @@
+**/#*#
+**/a.out
 **.s
 **.vo
 **.vos
@@ -13,6 +15,7 @@
 **/_build
 src/main.native
 src/vellvm
+src/frontend
 **/.merlin
 *~
 *.v~
@@ -38,3 +41,5 @@ src/ml/libvellvm/.merlin
 src/.ll_files.tmp
 src/coq/.lia.cache
 *.cache
+*.DS_Store
+*a.out

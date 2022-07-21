@@ -75,7 +75,7 @@ Section Endo.
         match t with
         | TYPE_Pointer t' => TYPE_Pointer (endo_typ t')
         | TYPE_Array sz t' => TYPE_Array sz (endo_typ t')
-        | TYPE_Function ret args => TYPE_Function (endo_typ ret) (List.map endo_typ args)
+        | TYPE_Function ret args varargs => TYPE_Function (endo_typ ret) (List.map endo_typ args) varargs
         | TYPE_Struct fields => TYPE_Struct (List.map endo_typ fields)
         | TYPE_Packed_struct fields => TYPE_Packed_struct (List.map endo_typ fields)
         | TYPE_Vector sz t' => TYPE_Vector sz (endo_typ t')
@@ -157,6 +157,23 @@ Section Endo.
       : Endo (texp T) | 50 :=
       fun te => let '(t,e) := te in (endo t, endo e).
 
+
+    #[global] Instance Endo_metadata
+           `{Endo T}
+           `{Endo (exp T)}
+           `{Endo raw_id}
+           `{Endo string}
+      : Endo (metadata T) | 50 :=
+      fix endo_metadata m :=
+        match m with
+        | METADATA_Const  tv => METADATA_Const (endo tv)
+        | METADATA_Null => METADATA_Null
+        | METADATA_Id id => METADATA_Id (endo id)
+        | METADATA_String str => METADATA_String (endo str)
+        | METADATA_Named strs => METADATA_Named (endo strs)
+        | METADATA_Node mds => METADATA_Node (List.map endo_metadata mds)
+        end.
+
     #[global] Instance Endo_tint_literal
       : Endo tint_literal | 50 := id.
     
@@ -174,11 +191,11 @@ Section Endo.
           INSTR_Load volatile (endo t) (endo ptr) align
         | INSTR_Store volatile val ptr align =>
           INSTR_Store volatile (endo val) (endo ptr) align
-        | INSTR_Comment _
-        | INSTR_Fence
-        | INSTR_AtomicCmpXchg
-        | INSTR_AtomicRMW
-        | INSTR_VAArg
+        | INSTR_Comment msg => INSTR_Comment msg
+        | INSTR_Fence syncscope o => ins
+        | INSTR_AtomicCmpXchg c => ins
+        | INSTR_AtomicRMW a => ins
+        | INSTR_VAArg va t => ins
         | INSTR_LandingPad => ins
         end.
 
@@ -225,6 +242,25 @@ Section Endo.
                  (endo (blk_term b))
                  (blk_comments b).
 
+    (* SAZ: I didn't make this instance as parameterized as it could be because
+       there are so many cases with annotations that probably can't be modified much *)
+    #[global] Instance Endo_annotation
+     `{Endo T}
+     `{Endo raw_id}
+     `{Endo (exp T)}
+     `{Endo (metadata T)}
+      : Endo (annotation T) | 50 :=
+      fun a =>
+        match a with
+        | ANN_metadata l => ANN_metadata (endo l)
+        | ANN_prefix t => ANN_prefix (endo t)
+        | ANN_prologue t => ANN_prologue (endo t)
+        | ANN_personality t => ANN_personality (endo t)
+        | _ => a
+        end
+        .
+
+    
     #[global] Instance Endo_global
            `{Endo raw_id}
            `{Endo T}
@@ -232,10 +268,6 @@ Section Endo.
            `{Endo int}
            `{Endo string}
            `{Endo (exp T)}
-           `{Endo linkage}
-           `{Endo visibility}
-           `{Endo dll_storage}
-           `{Endo thread_local_storage}
       : Endo (global T) | 50 :=
       fun g =>
         mk_global
@@ -243,15 +275,9 @@ Section Endo.
           (endo (g_typ g))
           (endo (g_constant g))
           (endo (g_exp g))
-          (endo (g_linkage g))
-          (endo (g_visibility g))
-          (endo (g_dll_storage g))
-          (endo (g_thread_local g))
-          (endo (g_unnamed_addr g))
-          (endo (g_addrspace g))
           (endo (g_externally_initialized g))
-          (endo (g_section g))
-          (endo (g_align g)).
+          (endo (g_annotations g))
+    .
 
     #[global] Instance Endo_declaration
            `{Endo function_id}
@@ -259,40 +285,17 @@ Section Endo.
            `{Endo string}
            `{Endo int}
            `{Endo param_attr}
-           `{Endo linkage}
-           `{Endo visibility}
-           `{Endo dll_storage}
-           `{Endo cconv}
            `{Endo fn_attr}
+           `{Endo (annotation T)}
+           `{Endo (exp T)}
       : Endo (declaration T) | 50 :=
       fun d => mk_declaration
               (endo (dc_name d))
               (endo (dc_type d))
               (endo (dc_param_attrs d))
-              (endo (dc_linkage d))
-              (endo (dc_visibility d))
-              (endo (dc_dll_storage d))
-              (endo (dc_cconv d))
               (endo (dc_attrs d))
-              (endo (dc_section d))
-              (endo (dc_align d))
-              (endo (dc_gc d)).
-
-    #[global] Instance Endo_metadata
-           `{Endo T}
-           `{Endo (exp T)}
-           `{Endo raw_id}
-           `{Endo string}
-      : Endo (metadata T) | 50 :=
-      fix endo_metadata m :=
-        match m with
-        | METADATA_Const  tv => METADATA_Const (endo tv)
-        | METADATA_Null => METADATA_Null
-        | METADATA_Id id => METADATA_Id (endo id)
-        | METADATA_String str => METADATA_String (endo str)
-        | METADATA_Named strs => METADATA_Named (endo strs)
-        | METADATA_Node mds => METADATA_Node (List.map endo_metadata mds)
-        end.
+              (endo (dc_annotations d))
+    .
 
     #[global] Instance Endo_definition
            {FnBody:Set}
@@ -340,6 +343,7 @@ Section Endo.
            `{Endo T}
            `{Endo (global T)}
            `{Endo (declaration T)}
+           `{Endo fn_attr}
            `{Endo raw_id}
       : Endo (modul FnBody) | 50 :=
       fun m =>
@@ -484,6 +488,48 @@ Section TFunctor.
       : TFunctor texp | 50 :=
       fun _ _ f '(t,e) => (f t, tfmap f e).
 
+ #[global] Instance TFunctor_cmpxchg
+           `{Endo bool}
+           `{Endo icmp}
+           `{Endo int}
+           `{Endo string}         
+           `{Endo ordering}
+           `{TFunctor texp}
+           (* `{TFunctor typ} *)
+      : TFunctor cmpxchg | 50 :=
+      fun U V f c =>
+        mk_cmpxchg
+          (endo (c_weak c))
+          (endo (c_volatile c))
+          (tfmap f (c_ptr c))
+          (endo (c_cmp c))
+          (f (c_cmp_type c))
+          (tfmap f (c_new c))
+          (endo (c_syncscope c))
+          (endo (c_success_ordering c))
+          (endo (c_failure_ordering c))
+          (endo (c_align c)).
+
+  #[global] Instance TFunctor_atomicrmw
+           `{Endo bool}
+           `{Endo atomic_rmw_operation}          
+           `{Endo string}         
+           `{Endo ordering}
+           `{Endo int}
+           `{TFunctor texp}
+           (* `{TFunctor typ} *)
+      : TFunctor atomicrmw | 50 :=
+      fun U V f a =>
+        mk_atomicrmw
+          (endo (a_volatile a))
+          (endo (a_operation a))
+          (tfmap f (a_ptr a))
+          (tfmap f (a_val a))
+          (endo (a_syncscope a))
+          (endo (a_ordering a))
+          (endo (a_align a))
+          (f (a_type a)).
+  
     #[global] Instance TFunctor_instr
            `{TFunctor exp}
       : TFunctor instr | 50 :=
@@ -495,10 +541,10 @@ Section TFunctor.
         | INSTR_Alloca t nb align => INSTR_Alloca (f t) (tfmap f nb) align
         | INSTR_Load volatile t ptr align => INSTR_Load volatile (f t) (tfmap f ptr) align
         | INSTR_Store volatile val ptr align => INSTR_Store volatile (tfmap f val) (tfmap f ptr) align
-        | INSTR_Fence => INSTR_Fence
-        | INSTR_AtomicCmpXchg => INSTR_AtomicCmpXchg
-        | INSTR_AtomicRMW => INSTR_AtomicRMW
-        | INSTR_VAArg => INSTR_VAArg
+        | INSTR_Fence syncscope o => INSTR_Fence syncscope o 
+        | INSTR_AtomicCmpXchg c => INSTR_AtomicCmpXchg (tfmap f c)
+        | INSTR_AtomicRMW a => INSTR_AtomicRMW (tfmap f a)
+        | INSTR_VAArg va t => INSTR_VAArg (tfmap f va) t
         | INSTR_LandingPad => INSTR_LandingPad 
         end.
 
@@ -549,57 +595,6 @@ Section TFunctor.
                  (tfmap f (blk_code b))
                  (tfmap f (blk_term b)) 
                  (blk_comments b).
-    
-    #[global] Instance TFunctor_global
-           `{Endo raw_id}
-           `{Endo bool}
-           `{Endo int}
-           `{Endo string}
-           `{TFunctor exp}
-           `{Endo linkage}
-           `{Endo visibility}
-           `{Endo dll_storage}
-           `{Endo thread_local_storage}
-      : TFunctor global | 50 :=
-      fun U V f g =>
-        mk_global
-          (endo (g_ident g))
-          (f (g_typ g))
-          (endo (g_constant g))
-          (tfmap f (g_exp g))
-          (endo (g_linkage g))
-          (endo (g_visibility g))
-          (endo (g_dll_storage g))
-          (endo (g_thread_local g))
-          (endo (g_unnamed_addr g))
-          (endo (g_addrspace g))
-          (endo (g_externally_initialized g))
-          (endo (g_section g))
-          (endo (g_align g)).
-
-    #[global] Instance TFunctor_declaration
-           `{Endo function_id}
-           `{Endo string}
-           `{Endo int}
-           `{Endo param_attr}
-           `{Endo linkage}
-           `{Endo visibility}
-           `{Endo dll_storage}
-           `{Endo cconv}
-           `{Endo fn_attr}
-      : TFunctor declaration | 50 :=
-      fun U V f d => mk_declaration
-                       (endo (dc_name d))
-                       (f (dc_type d))
-                       (endo (dc_param_attrs d))
-                       (endo (dc_linkage d))
-                       (endo (dc_visibility d))
-                       (endo (dc_dll_storage d))
-                       (endo (dc_cconv d))
-                       (endo (dc_attrs d))
-                       (endo (dc_section d))
-                       (endo (dc_align d))
-                       (endo (dc_gc d)).
 
     #[global] Instance TFunctor_metadata
            `{TFunctor exp}
@@ -615,6 +610,78 @@ Section TFunctor.
         | METADATA_Named strs => METADATA_Named (endo strs)
         | METADATA_Node mds => METADATA_Node (tfmap endo_metadata mds)
         end.
+
+    
+    (* SAZ: Not as parameterized as it could be - how often do we want to change annnotations? *)
+    #[global] Instance TFunctor_annotation
+     `{TFunctor exp}
+     `{Endo raw_id}
+     `{TFunctor metadata}
+      : TFunctor annotation | 50 :=
+      fun U V f a =>
+        match a with
+        | ANN_linkage l => ANN_linkage l
+        | ANN_preemption_specifier p => ANN_preemption_specifier p
+        | ANN_visibility v => ANN_visibility v
+        | ANN_dll_storage d => ANN_dll_storage d
+        | ANN_thread_local_storage t => ANN_thread_local_storage t
+        | ANN_unnamed_addr u => ANN_unnamed_addr u
+        | ANN_addrspace n => ANN_addrspace n
+        | ANN_section s => ANN_section s
+        | ANN_partition s => ANN_partition s
+        | ANN_comdat l => ANN_comdat l
+        | ANN_align n => ANN_align n
+        | ANN_no_sanitize => ANN_no_sanitize
+        | ANN_no_sanitize_address => ANN_no_sanitize_address
+        | ANN_no_sanitize_hwaddress => ANN_no_sanitize_hwaddress
+        | ANN_sanitize_address_dyninit => ANN_sanitize_address_dyninit
+        | ANN_metadata l => ANN_metadata (tfmap (fun '(x,y) => (endo x, tfmap f y)) l)
+        | ANN_cconv c => ANN_cconv c
+        | ANN_gc s => ANN_gc s
+        | ANN_prefix t => ANN_prefix (tfmap f t)
+        | ANN_prologue t => ANN_prologue (tfmap f t)
+        | ANN_personality t => ANN_personality (tfmap f t)
+        end
+        .
+    
+    #[global] Instance TFunctor_global
+           `{Endo raw_id}
+           `{Endo bool}
+           `{Endo int}
+           `{TFunctor exp}
+           `{TFunctor metadata}
+      : TFunctor global | 50 :=
+      fun U V f g =>
+        mk_global
+          (endo (g_ident g))
+          (f (g_typ g))
+          (endo (g_constant g))
+          (tfmap f (g_exp g))
+          (endo (g_externally_initialized g))
+          (tfmap f (g_annotations g))
+        .
+
+    #[global] Instance TFunctor_declaration
+           `{Endo function_id}
+           `{Endo string}
+           `{Endo int}
+           `{Endo param_attr}
+           `{Endo linkage}
+           `{Endo visibility}
+           `{Endo dll_storage}
+           `{Endo cconv}
+           `{Endo fn_attr}
+           `{TFunctor exp}
+           `{TFunctor metadata}
+      : TFunctor declaration | 50 :=
+      fun U V f d => mk_declaration
+                       (endo (dc_name d))
+                       (f (dc_type d))
+                       (endo (dc_param_attrs d))
+                       (endo (dc_attrs d))
+                       (tfmap f (dc_annotations d))
+          .
+
 
     #[global] Instance TFunctor_definition
            {FnBody:Set -> Set}

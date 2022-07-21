@@ -8,7 +8,7 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-;; open Platform
+;; open Base
 ;; open Driver
 ;; open Assert
 ;; open DynamicValues
@@ -18,14 +18,15 @@
 
 
 let parse_pp_test path =
-  let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
-  let filename, _ = Platform.path_to_basename_ext path in
-  let vll_file = Platform.gen_name !Platform.output_path filename ".v.ll" in
-  let dot_s = Platform.gen_name !Platform.output_path filename ".s" in
+  let open Platform in
+  let _ = verb @@ Printf.sprintf "* processing file: %s\n" path in
+  let filename, _ = path_to_basename_ext path in
+  let vll_file = gen_name !output_path filename ".v.ll" in
+  let dot_s = gen_name !output_path filename ".s" in
   try
     let _ = clang_parse path dot_s in
-    let prog = parse_file path in
-    let _ = output_file vll_file prog in
+    let prog = IO.parse_file path in
+    let _ = IO.output_file vll_file prog in
     try
       let _ = clang_parse vll_file dot_s in
       ()
@@ -37,6 +38,7 @@ let parse_pp_test path =
 
 
 let ll_files_of_dir path : string list =
+  let open Platform in
   let tmp_file = gen_name "." ".ll_files" ".tmp" in
   let cmd = Printf.sprintf "find %s -name \"*.ll\" -print > %s" path tmp_file in
   let () = sh cmd raise_error in 
