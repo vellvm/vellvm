@@ -1151,11 +1151,12 @@ Section ExpGenerators.
 
   (* nc stands for "Not current" *)
   (* TODO: Need a better name*)
-  Definition filter_nc_fun_typs (ctx : var_context) (curr_fun : option (ident * typ)): var_context :=
+  Definition filter_nc_fun_typs (ctx : var_context) (curr_fun : option (ident * typ * list (ident * typ))): var_context :=
     match curr_fun with
     | None =>
         filter (fun '(i, t) => contains_typ t (TYPE_Function TYPE_Void []) soft) ctx
-    | Some f =>
+    | Some (i, t, l) =>
+        let f := (i, t) in
         filter (fun '(i, t) => contains_typ t (TYPE_Function TYPE_Void []) soft && negb (f =? (i,t))) ctx
     end.
   
@@ -1944,9 +1945,6 @@ Section InstrGenerators.
             ; (min sz' 6%nat,
                '(t, (b, bs)) <- gen_loop_sz sz' t back_blocks 10;; (* TODO: Should I replace sz with sz' here*)
                ret (t, (b :: bs)))
-              ; (min 0%nat 0%nat, (* Will change this later *)
-                  '(t, (b, bs)) <- gen_recurs_sz sz' t back_blocks;;
-                ret (t, (b::bs)))
            ]
               ++
               (* Loop back sometimes *)
@@ -1958,17 +1956,25 @@ Section InstrGenerators.
               | nil => []
               end
               
-             (* ++
+              ++
              (* Recurse sometimes *)
-              match curr_fun with
-              | TYPE_Function ret_t args =>
-                  let int_args
-                  if (filter
-                        (fun t =>
-                           match t with
-                           | TYPE_I _ => true
-                           | _ => false) args)
-*)
+              (match curr_fun with
+               | None => []
+               | Some (i, t, l) =>
+                   let indices := filter
+                                    (fun '(_, ty) =>
+                                       match ty with
+                                       | TYPE_I _ => true
+                                       | _ => false
+                                       end) l in
+                   if seq.nilp indices
+                   then []
+                   else
+                     [(min 0%nat 0%nat, (* Will change this later *)
+                        index <- elems_LLVM indices;;
+                        '(t, (b, bs)) <- gen_recurs_sz sz' t back_blocks index;;
+                        ret (t, (b::bs)))]
+              end)
 
            )
        end
@@ -2076,6 +2082,7 @@ Section InstrGenerators.
          (sz : nat)
          (t : typ) (* Return type *)
          (back_blocks : list block_id) (* Blocks that I'm allowed to jump back to *)
+         (indicator : ident * typ)
          {struct t} : GenLLVM (terminator typ * (block typ * list (block typ)))
        :=
 
