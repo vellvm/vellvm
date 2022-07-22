@@ -451,7 +451,7 @@ Section GenerationState.
        a <- g;;
        append_to_ptrtoint_ctx saved_ctx;;
        ret a.
-
+  
   Definition hide_variable_ctxs {A} (g: GenLLVM A) : GenLLVM A
     := hide_ctx (hide_ptrtoint_ctx g).
 
@@ -1065,6 +1065,13 @@ Section ExpGenerators.
     let '(ib, tb) := b in
     normalized_typ_eq ta tb && (ia =? ib).
   Notation "A =? B" := (normalized_var_eq A B).
+
+  Definition hide_ctx_var {A} (g: GenLLVM A) (v : ident * typ): GenLLVM A
+    := saved_ctx <- get_ctx;;
+       let new_ctx := filter (fun x => negb (x =? v)) saved_ctx in
+       a <- g;;
+       modify (replace_ctx saved_ctx);;
+       ret a.
   
   Variant contains_flag :=
   | soft
@@ -2085,10 +2092,16 @@ Section InstrGenerators.
          (indicator : ident * typ)
          {struct t} : GenLLVM (terminator typ * (block typ * list (block typ)))
        :=
+         (* Base case *)
+         bid_base <- new_block_id;;
+         
+         (* Inductions*)
 
 
+         (* Finish*)
 
 
+         
          (* Compiled part *)
            '(_, (b1, b2)) <- gen_blocks_sz 0 t back_blocks;;
            ret (TERM_Unreachable, (b1, b2))
