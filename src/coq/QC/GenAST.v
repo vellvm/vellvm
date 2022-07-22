@@ -183,7 +183,7 @@ Section GenerationState.
     (* Type aliases *)
     ; gen_typ_ctx : list (ident * typ)
     ; gen_ptrtoint_ctx : list (typ * ident * typ)
-    ; gen_current_fun : option (ident * typ) (* TODO: Force this to only accept function *)
+    ; gen_current_fun : option (ident * typ * list (ident * typ)) (* TODO: Force this to only accept function *) (* Need the current fun in order to track the local ident*)
     }.
 
   Definition init_GenState : GenState
@@ -274,7 +274,7 @@ Section GenerationState.
         ; gen_current_fun := gs.(gen_current_fun)
        |}.
 
-  Definition replace_current_fun (curr_fun : option (ident * typ)) (gs: GenState): GenState
+  Definition replace_current_fun (curr_fun : option (ident * typ * list (ident * typ))) (gs: GenState): GenState
     := {| num_void    := gs.(num_void)
         ; num_raw     := gs.(num_raw)
         ; num_global  := gs.(num_global)
@@ -351,7 +351,7 @@ Section GenerationState.
        ptoi_ctx <- get_ptrtoint_ctx;;
        ret (ctx, ptoi_ctx).
 
-  Definition get_current_fun : GenLLVM (option (ident * typ))
+  Definition get_current_fun : GenLLVM (option (ident * typ * list (ident * typ)))
     := gets (fun gs => gs.(gen_current_fun)).
 
   Definition set_ctx (ctx : var_context) : GenLLVM unit
@@ -362,7 +362,7 @@ Section GenerationState.
     := modify (replace_ptrtoint_ctx ptoi_ctx);;
        ret tt.
 
-  Definition set_current_fun (curr_fun : ident * typ) : GenLLVM unit
+  Definition set_current_fun (curr_fun : ident * typ * list (ident * typ)) : GenLLVM unit
     := modify (replace_current_fun (Some curr_fun));;
        ret tt.
 
@@ -1840,7 +1840,7 @@ Section InstrGenerators.
                                                                gen_insertvalue x])
          ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement; gen_insertelement])
          ++ (if seq.nilp (fun_typs_in_ctx) then [] else [x <- elems_LLVM fun_typs_in_ctx;;
-                 gen_call x])).
+                 gen_call x])). (* This call does not involve recursion. *)
 
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
@@ -1911,6 +1911,7 @@ Section InstrGenerators.
            {struct t} : GenLLVM (terminator typ * list (block typ))
     :=
       ctx <- get_ctx;;
+      curr_fun <- get_current_fun;;
       match sz with
        | 0%nat =>
          (* Only returns allowed *)
@@ -1943,6 +1944,9 @@ Section InstrGenerators.
             ; (min sz' 6%nat,
                '(t, (b, bs)) <- gen_loop_sz sz' t back_blocks 10;; (* TODO: Should I replace sz with sz' here*)
                ret (t, (b :: bs)))
+              ; (min 0%nat 0%nat, (* Will change this later *)
+                  '(t, (b, bs)) <- gen_recurs_sz sz' t back_blocks;;
+                ret (t, (b::bs)))
            ]
               ++
               (* Loop back sometimes *)
@@ -1952,7 +1956,21 @@ Section InstrGenerators.
                 bid <- lift_GenLLVM (elems_ b back_blocks);;
                 ret (TERM_Br_1 bid, []))]
               | nil => []
-              end)
+              end
+              
+             (* ++
+             (* Recurse sometimes *)
+              match curr_fun with
+              | TYPE_Function ret_t args =>
+                  let int_args
+                  if (filter
+                        (fun t =>
+                           match t with
+                           | TYPE_I _ => true
+                           | _ => false) args)
+*)
+
+           )
        end
   with gen_blocks_sz
          (sz : nat)
@@ -2053,7 +2071,22 @@ Section InstrGenerators.
                      ; blk_term := term
                      ; blk_comments := None
                     |} in
-           ret (b, bs).
+           ret (b, bs)
+  with gen_recurs_sz
+         (sz : nat)
+         (t : typ) (* Return type *)
+         (back_blocks : list block_id) (* Blocks that I'm allowed to jump back to *)
+         {struct t} : GenLLVM (terminator typ * (block typ * list (block typ)))
+       :=
+
+
+
+
+         (* Compiled part *)
+           '(_, (b1, b2)) <- gen_blocks_sz 0 t back_blocks;;
+           ret (TERM_Unreachable, (b1, b2))
+         
+  .
 
   Definition gen_blocks (t : typ) : GenLLVM (block typ * list (block typ))
     := sized_LLVM (fun n => fmap snd (gen_blocks_sz n t [])).
@@ -2072,7 +2105,6 @@ Section InstrGenerators.
       let f_type := TYPE_Function ret_t args_t in
       let f_var := (ID_Global name, f_type) in
       add_to_ctx f_var;; (* Issue 211: Add to ctx to create reurse function *)
-      set_current_fun f_var;;
       ctxs <- get_variable_ctxs;;
 
       (* Add arguments to context *)
@@ -2083,6 +2115,7 @@ Section InstrGenerators.
                args;;
       let args_ctx := map (fun '(i, t) => (ID_Local i, t)) args in
       append_to_ctx args_ctx;;
+      set_current_fun (f_var, args_ctx);;
 
       bs <- gen_blocks ret_t;;
 
