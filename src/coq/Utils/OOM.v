@@ -19,7 +19,6 @@ From ITree Require Import
 From Vellvm.Utils Require Import
      MonadReturnsLaws
      MonadRefactoredTheory
-     Error
      Tactics
      MonadRefactored.
 
@@ -462,7 +461,8 @@ Notation success_unERR_UB_OOM v :=
    |}).
 
 Import MonadNotation.
-Import Utils.Monads.
+Import Utils.MonadRefactored
+     Utils.MonadRefactoredTheory.
 
 Section err_ub_oom_monad.
   Variable (M : Type -> Type).

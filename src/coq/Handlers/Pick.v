@@ -19,6 +19,7 @@ From ITree Require Import
 
 From Vellvm Require Import
      Utilities
+     Utils.OOM
      Syntax.LLVMAst
      Syntax.AstLib
      Syntax.DynamicTypes

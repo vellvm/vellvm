@@ -8,14 +8,17 @@ From Vellvm Require Import
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
      Semantics.LLVMEvents
-     Utils.Monads
+     (* Utils.Monads *)
+     Utils.MonadRefactored
+     Utils.MonadRefactoredTheory
+     Utils.OOM
      Utils.NMaps
      Utils.OptionUtil
      Utils.ListUtil
-     Utils.Error
+     (* Utils.Error *)
      Utils.Util
-     Utils.MonadReturnsLaws
-     Utils.MapMonadExtra.
+     Utils.MonadReturnsLaws.
+     (* Utils.MapMonadExtra. *)
 
 Import Basics.Basics.Monads.
 

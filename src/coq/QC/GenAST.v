@@ -22,7 +22,7 @@ Require Import List.
 
 Import ListNotations.
 
-From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils.
+From Vellvm Require Import LLVMAst AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils Utils.OOM Utils.MonadRefactored Utils.MonadRefactoredTheory Utils.MonadReturnsLaws.
 Require Import Integers Floats.
 
 Import ListNotations.

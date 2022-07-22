@@ -9,7 +9,8 @@ From Coq Require Import
 
 From Vellvm Require Import
      Utils.Tactics
-     Utils.Monads
+     Utils.MonadRefactored
+     Utils.MonadRefactoredTheory
      Numeric.Coqlib
      ListUtil.
 

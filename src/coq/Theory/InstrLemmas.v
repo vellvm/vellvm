@@ -14,7 +14,8 @@ From ITree Require Import
 
 From Vellvm Require Import
      Utilities
-     Utils.MapMonadExtra
+     Utils.MonadRefactored
+     Utils.MonadRefactoredTheory
      Syntax
      Semantics
      Theory.Refinement

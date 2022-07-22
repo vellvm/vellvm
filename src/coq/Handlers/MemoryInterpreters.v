@@ -13,8 +13,9 @@ From Vellvm.Handlers Require Import
      MemoryModel
      MemPropT.
 
-From Vellvm.Utils Require Import
-     StateMonads.
+From Vellvm Require Import
+     Utils.MonadRefactored
+     Utils.MonadRefactoredTheory.
 
 From ITree Require Import
      ITree
@@ -37,7 +38,8 @@ Import Basics.Basics.Monads.
 Import MonadNotation.
 
 Import MemoryAddress.
-Import Error.
+Import MonadRefactored.
+Import MonadRefactoredTheory.
 
 Set Implicit Arguments.
 Set Contextual Implicit.

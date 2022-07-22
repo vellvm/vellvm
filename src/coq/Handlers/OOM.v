@@ -9,8 +9,8 @@ From ExtLib Require Import
      Structures.Monads.
 
 From Vellvm Require Import
-     Utils.RefineProp
-     Utils.Error
+     Utils.MonadRefactored
+     Utils.MonadRefactoredTheory
      Semantics.LLVMEvents.
 
 From ITree Require Import

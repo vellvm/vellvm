@@ -8,7 +8,9 @@ From ExtLib Require Import
      Data.Monads.IdentityMonad
      Structures.Monads.
 
-From Vellvm.Utils Require Import MonadExcLaws PropT Monads.
+From Vellvm.Utils Require Import
+     PropT
+     MonadRefactored.
 
 Local Open Scope monad_scope.
 
@@ -711,7 +713,7 @@ Section StateT.
 
   Import Monads.
 
-  From Vellvm Require Import Utils.StateMonads.
+  From Vellvm Require Import Utils.MonadRefactored.
 
   Context {S : Type}.
   Context {SINHAB : Inhabited S}.

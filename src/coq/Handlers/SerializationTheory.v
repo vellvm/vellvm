@@ -6,12 +6,11 @@ From ExtLib Require Import
 
 From Vellvm Require Import
      Utils.Util
+     Utils.MonadRefactored
+     Utils.MonadRefactoredTheory
      Utils.Tactics
      Utils.ListUtil
-     Utils.Error
-     Utils.RefineProp
-     Utils.Monads
-     Utils.MapMonadExtra
+     Utils.OOM
      Handlers.MemoryModelImplementation
      Handlers.Serialization
      Semantics.LLVMEvents
@@ -144,7 +143,7 @@ Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : Serializati
             reflexivity.
           }
 
-          apply MapMonadExtra.map_monad_length in RETS.
+          apply map_monad_length in RETS.
           rewrite Nseq_length in RETS.
           auto.
         }
@@ -183,7 +182,7 @@ Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : Serializati
     { rewrite TOUBYTES; reflexivity.
     }
 
-    apply MapMonadExtra.map_monad_length in RETS.
+    apply map_monad_length in RETS.
     rewrite Nseq_length in RETS.
     lia.
   Qed.
@@ -320,8 +319,8 @@ Module SerializationTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : Serial
         ].
   Qed.
 
-  Require Import Monads.
-  From Vellvm.Utils Require Import Monads MonadExcLaws MonadEq1Laws.
+  From Vellvm Require Import Utils.MonadRefactored
+     Utils.MonadRefactoredTheory.
   From ITree Require Import
        Basics.Monad.
 
@@ -1177,14 +1176,14 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
 
     Ltac ret_inv :=
       match goal with
-      | |- MonadEq1Laws.Eq1_ret_inv _ =>
+      | |- Eq1_ret_inv _ =>
             let H := fresh "H" in
             constructor; intros * H; subst; inv H; auto
       end.
 
     Ltac euo_crush :=
       match goal with
-      | |- MonadEq1Laws.Eq1_ret_inv _ => ret_inv
+      | |- Eq1_ret_inv _ => ret_inv
       | |- NoFailsRet err_ub_oom => constructor; intros;
                                     eapply MReturns_MFails; apply MReturns_ret; eauto
       | |- MFails_ERROR err_ub_oom => constructor; intros; constructor

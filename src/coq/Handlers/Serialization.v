@@ -3,15 +3,15 @@ From Vellvm Require Import
      Numeric.Integers
      Numeric.Floats
      Utils.Tactics
+     Utils.MonadRefactored
+     Utils.MonadRefactoredTheory
      Utils.Util
      Utils.OptionUtil
-     Utils.Error
      Utils.ListUtil
      Utils.NonEmpty
      Utils.NMaps
-     Utils.Monads
      Utils.MonadReturnsLaws
-     Utils.RefineProp
+     Utils.OOM
      Syntax.LLVMAst
      Syntax.DynamicTypes
      Syntax.DataLayout

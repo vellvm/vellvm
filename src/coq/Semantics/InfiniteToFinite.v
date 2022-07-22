@@ -18,10 +18,10 @@ From Vellvm Require Import
      Semantics.LLVMParams
      Theory.TopLevelRefinements
      Theory.ContainsUB
-     Utils.Error
-     Utils.Monads
-     Utils.MapMonadExtra
+     Utils.MonadRefactored
+     Utils.MonadRefactoredTheory
      Utils.PropT
+     Utils.OOM
      Utils.ListUtil
      Handlers.MemoryModelImplementation.
 

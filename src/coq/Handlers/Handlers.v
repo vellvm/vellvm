@@ -46,7 +46,8 @@ Require Import List ZArith String.
 Import ListNotations.
 
 From Vellvm Require Import
-     Utils.Error
+     Utils.MonadRefactored
+     Utils.MonadRefactoredTheory
      Semantics.MemoryAddress
      Semantics.LLVMEvents
      DynamicTypes.

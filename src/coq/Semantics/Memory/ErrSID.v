@@ -9,17 +9,15 @@ From ExtLib Require Import
      Data.Monads.IdentityMonad.
 
 From Vellvm Require Import
-     Utils.Error
-     Utils.UBAndErrors
+     Utils.MonadRefactored
+     Utils.MonadRefactoredTheory
      Semantics.MemoryAddress
      Semantics.DynamicValues
      Semantics.LLVMEvents
      Semantics.Memory.FiniteProvenance
      Semantics.Memory.Sizeof
-     Utils.StateMonads
-     Utils.Monads
-     Utils.MonadExcLaws
      Utils.MonadReturnsLaws
+     Utils.OOM
      Utils.Raise.
 
 From ITree Require Import
@@ -79,7 +77,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
 
   #[global] Instance MonadLawsE_ErrSID
     : Monad.MonadLawsE ErrSID.
-  Proof.
+  Proof. 
     split.
     - (* bind_ret_l *)
       intros A B f x.
@@ -102,9 +100,10 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
       intros pr.
       unfold Eq1_ident.
 
-      destruct (e s pr) as [[pr' [s' e']]]; cbn.
+      cbn.
+      destruct (e s pr) as [[pr' [s' e']]];  cbn.
       destruct e' as [e_OOM | [e_UB | [[e_ERR] | a]]]; auto.
-    - (* bind_bind *)
+    - (* Bind_bind *)
       intros A B C x f g.
       
       cbn.
@@ -121,6 +120,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
       intros pr.
       unfold Eq1_ident.
 
+      cbn.
       destruct (e s pr) as [[pr' [s' e']]]; cbn.
       destruct e' as [e_OOM | [e_UB | [[e_ERR] | a]]]; cbn; auto.
 
@@ -151,6 +151,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
       cbn in XY.
 
       unfold unIdent.
+      cbn.
       destruct (x s pr) as [[prx [sx x']]] eqn:Hx; cbn.
       destruct (y s pr) as [[pry [sy y']]] eqn:Hy; cbn.
       destruct x' as [x_OOM | [x_UB | [[x_ERR] | x']]]; cbn; auto;
@@ -160,6 +161,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
         inversion XY'; auto.
 
       unfold Monad.eq1, Monad_EQ1_ErrSID_T in POINTWISE.
+      cbn.
       specialize (POINTWISE y').
       destruct (x0 y') as [[x0y']].
       destruct (y0 y') as [[y0y']].

@@ -9,8 +9,8 @@ From Vellvm Require Import
      LLVMEvents
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
-     Utils.Error
-     Utils.Monads
+     Utils.MonadRefactored
+     Utils.MonadRefactoredTheory
      Utils.Tactics.
 
 Import ListNotations.

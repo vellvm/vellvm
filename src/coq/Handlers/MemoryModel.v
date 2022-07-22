@@ -16,17 +16,15 @@ From Vellvm.Handlers Require Import
      MemPropT.
 
 From Vellvm.Utils Require Import
-     Error
+     MonadRefactored
+     MonadRefactoredTheory
      PropT
      Util
      NMaps
      Tactics
      Raise
-     Monads
-     MapMonadExtra
-     MonadReturnsLaws
-     MonadEq1Laws
-     MonadExcLaws.
+     OOM
+     MonadReturnsLaws.
 
 From Vellvm.Numeric Require Import
      Integers.
@@ -56,7 +54,8 @@ Require Import Morphisms.
 
 Import ListNotations.
 Import ListUtil.
-Import Utils.Monads.
+Import Utils.MonadRefactored.
+Import Utils.MonadRefactoredTheory.
 
 Import Basics.Basics.Monads.
 Import MonadNotation.
@@ -406,7 +405,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         assert (MReturns l0 (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix]) l)) as RETS.
         { auto. }
 
-        epose proof MapMonadExtra.map_monad_length l _ _ RETS as LEN.
+        epose proof map_monad_length l _ _ RETS as LEN.
         apply intptr_seq_len in SEQ.
         subst.
         auto.
@@ -1966,7 +1965,8 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   Import Monad.
   Require Import Morphisms.
   From Vellvm Require Import
-       MonadEq1Laws
+       Utils.MonadRefactored
+       Utils.MonadRefactoredTheory
        Raise.
 
   Import LP.
@@ -3141,13 +3141,14 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
   Import MMS.
   Import MemHelpers.
 
-  Import Monad.
-  Import MapMonadExtra.
+  Import MonadRefactored.
+  Import MonadRefactoredTheory.
   Import MP.GEP.
   Import MP.BYTE_IMPL.
-
   Import Util.
 
+  Import ITree.Basics.Monad.
+  
   (*
     Things that must succeed:
 
@@ -3530,7 +3531,7 @@ Module Type MemoryModelInfiniteSpec (LP : LLVMParamsBig) (MP : MemoryParams LP) 
   Import MemHelpers.
 
   Import Monad.
-  Import MapMonadExtra.
+  Import MonadRefactoredTheory.
   Import MP.GEP.
   Import MP.BYTE_IMPL.
 
@@ -3559,7 +3560,7 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
   Import MemHelpers.
 
   Import Monad.
-  Import MapMonadExtra.
+  Import MonadRefactoredTheory.
   Import MP.GEP.
   Import MP.BYTE_IMPL.
 

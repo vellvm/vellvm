@@ -4,7 +4,9 @@ From Coq Require Import
 From Vellvm Require Import
      Numeric.Integers
      Syntax.DynamicTypes
-     Utils.Error.
+     Utils.MonadRefactored
+     Utils.MonadRefactoredTheory
+     Utils.OOM.
 
 (* Integers that can run out of memory... Necessary for handling
      finite memory compilation. *)

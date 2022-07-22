@@ -294,32 +294,3 @@ Definition failwith {A:Type} {F} `{Monad F} `{MonadExc string F} (s:string) : F 
 #[export] Hint Unfold failwith: core.
 Arguments failwith _ _ _ _: simpl nomatch.
 
-(* A computation that can run out of memory. *)
-Variant OOM (A:Type) : Type :=
-  | NoOom : A -> OOM A
-  | Oom : string -> OOM A.
-Arguments NoOom {_} _.
-Arguments Oom {_}.
-
-Global Instance MonadOOM : Monad OOM.
-Proof.
-  split.
-  - refine (fun _ x => NoOom x).
-  - refine (fun A B ma k =>
-              match ma with
-              | NoOom a => k a
-              | Oom s => Oom s
-              end
-           ).
-Defined.
-
-Global Instance FunctorOOM : Functor OOM.
-Proof.
-  split.
-  - refine (fun A B f ma =>
-              match ma with
-              | NoOom a => NoOom (f a)
-              | Oom s => Oom s
-              end).
-Defined.
-

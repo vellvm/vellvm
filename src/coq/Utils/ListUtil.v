@@ -1,6 +1,7 @@
 From Coq Require Import String List Lia ZArith Program.Wf.
 
-From Vellvm.Utils Require Import Error.
+From Vellvm Require Import Utils.MonadRefactored
+     Utils.MonadRefactoredTheory.
 
 Import ListNotations.
 

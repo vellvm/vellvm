@@ -8,16 +8,18 @@ From ExtLib Require Import
 From ITree Require Import
      ITree
      Basics.Basics
+     Basics.Monad
      Eq.Eq
      Events.StateFacts
      Events.State.
 
-From Vellvm Require Import Error.
+From Vellvm Require Import Utils.MonadRefactored
+     Utils.MonadRefactoredTheory.
 
 From Vellvm.Utils Require Import
-     MonadEq1Laws
      PropT
      Raise
+     OOM
      Tactics.
 
 From Vellvm.Semantics Require Import
@@ -93,7 +95,8 @@ Definition modify_mem_state {M MemState} `{Monad M} `{MonadMemState MemState M} 
 
 (* TODO: Add RAISE_PICK or something... May need to be in a module *)
 Import EitherMonad.
-Import Monad.
+Import MonadRefactored.
+Import MonadRefactoredTheory.
 Import Morphisms.
 
     (** StateT *)

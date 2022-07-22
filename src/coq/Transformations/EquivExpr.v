@@ -19,7 +19,9 @@ From ITree Require Import
 
 From Vellvm Require Import
      Utilities
-     Utils.MapMonadExtra
+     Utils.MonadRefactored
+     Utils.MonadRefactoredTheory
+     Utils.OOM
      Syntax
      Semantics
      Theory
@@ -455,7 +457,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
     Context {EQM : Monad.Eq1 M}.
     Context {EE : Eq1Equivalence M}.
     Context {Laws_M : MonadLawsE M}.
-    Context {EQM_Laws_M  : MonadEq1Laws.Eq1_ret_inv M}.
+    Context {EQM_Laws_M  : Eq1_ret_inv M}.
     Context (D : dtyp -> M dvalue).
     Context (ERR_M : Type -> Type).
     Context (err : forall A : Type, ERR_M A -> M A).

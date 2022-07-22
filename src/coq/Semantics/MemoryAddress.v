@@ -17,7 +17,9 @@ Require Import Coqlib.
 From Vellvm Require Import
      Syntax.DynamicTypes
      Semantics.VellvmIntegers
-     Utils.Error.
+     Utils.MonadRefactored
+     Utils.MonadRefactoredTheory
+     Utils.OOM.
 
 From ExtLib Require Import
      Structures.Monads.

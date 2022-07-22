@@ -16,7 +16,8 @@ From ITree Require Import
 
 From Vellvm Require Import
      Utils.Util
-     Utils.Error
+     Utils.MonadRefactored
+     Utils.MonadRefactoredTheory
      Semantics.LLVMEvents
      Semantics.Memory.Sizeof.
 

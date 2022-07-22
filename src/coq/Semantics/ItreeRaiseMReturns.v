@@ -11,11 +11,11 @@ From ITree Require Import
      Events.Exception.
 
 From Vellvm Require Import
-     Utils.Error
      Utils.Raise
      Utils.MonadReturnsLaws
-     Utils.MonadEq1Laws
-     Utils.MonadExcLaws
+     Utils.MonadRefactored
+     Utils.MonadRefactoredTheory
+     Utils.OOM
      Utils.PropT
      Semantics.LLVMEvents.
   

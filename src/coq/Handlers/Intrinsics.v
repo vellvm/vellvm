@@ -19,7 +19,8 @@ From ExtLib Require Import
 
 From Vellvm Require Import
      Utils.Util
-     Utils.Error
+     Utils.MonadRefactored
+     Utils.MonadRefactoredTheory
      Syntax.LLVMAst
      Semantics.LLVMEvents
      Semantics.Memory.Sizeof

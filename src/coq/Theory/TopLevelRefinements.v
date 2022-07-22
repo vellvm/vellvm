@@ -13,6 +13,7 @@ From Vellvm Require Import
      Utilities
      Syntax
      Semantics
+     Utils.OOM
      Theory.Refinement
      Theory.InterpreterMCFG
      Theory.InterpreterCFG.

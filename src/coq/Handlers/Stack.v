@@ -15,7 +15,8 @@ From ITree Require Import
 
 From Vellvm Require Import
      Utils.Util
-     Utils.Error
+     Utils.MonadRefactored
+     Utils.MonadRefactoredTheory
      Syntax.LLVMAst
      Syntax.AstLib
      Semantics.MemoryAddress

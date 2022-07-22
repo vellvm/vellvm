@@ -8,7 +8,8 @@ From Coq Require Import
      Lia.
 
 From Vellvm Require Import
-     Utils.Monads
+     Utils.MonadRefactored
+     Utils.MonadRefactoredTheory
      ListUtil.
 
 From ExtLib Require Import

@@ -20,10 +20,10 @@ CP=cp
 
 COQFILESNUMERIC := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats
 
-COQFILESUTILS := Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/Error Utils/ListUtil Utils/IntMaps Utils/NMaps\
-		Utils/MonadRefactoredTheory Utils/Monads Utils/StateMonads Utils/MonadEq1Laws Utils/MonadExcLaws\
-		Utils/MonadReturnsLaws Utils/PropT Utils/RefineProp\
-		Utils/PostConditions Utils/TFor Utils/NoFailure Utils/NonEmpty Utils/Default Utils/OptionUtil Utils/MapMonadExtra\
+COQFILESUTILS := Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/ListUtil Utils/IntMaps Utils/NMaps\
+		Utils/MonadRefactoredTheory Utils/MonadRefactored\
+		Utils/MonadReturnsLaws Utils/OOM Utils/PropT\
+		Utils/PostConditions Utils/TFor Utils/NoFailure Utils/NonEmpty Utils/Default Utils/OptionUtil\
 		Utilities
 
 COQFILESSYNTAX := Syntax/DataLayout Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
