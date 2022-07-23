@@ -434,10 +434,10 @@ Section GenerationState.
 
   Definition reset_variable_ctxs : GenLLVM unit
     := restore_variable_ctxs ([], []).
-  
+
   Definition reset_current_fun : GenLLVM unit
     := modify (replace_current_fun None);; ret tt.
-  
+
   Definition hide_ctx {A} (g: GenLLVM A) : GenLLVM A
     := saved_ctx <- get_ctx;;
        reset_ctx;;
@@ -451,7 +451,7 @@ Section GenerationState.
        a <- g;;
        append_to_ptrtoint_ctx saved_ctx;;
        ret a.
-  
+
   Definition hide_variable_ctxs {A} (g: GenLLVM A) : GenLLVM A
     := hide_ctx (hide_ptrtoint_ctx g).
 
@@ -1034,7 +1034,7 @@ Section ExpGenerators.
        | TYPE_Identified id => false
        end.
   Notation "A =? B" := (normalized_typ_eq A B).
-  
+
   (* This needs to use normalized_typ_eq, instead of dtyp_eq because of pointer types...
      dtyps only tell you that a type is a pointer, the other type
      information about the pointers is erased.
@@ -1045,21 +1045,21 @@ Section ExpGenerators.
   (* TODO: Move equation property to somewhere else*)
   Definition normalized_raw_id_eq (na : raw_id) (nb : raw_id) : bool
     := match na, nb with
-       | Name sa, Name sb => (sa =? sb)%string 
+       | Name sa, Name sb => (sa =? sb)%string
        | Anon ia, Anon ib
        | Raw ia, Raw ib => (ia =? ib)%Z
        | _, _ => false
        end.
   Notation "A =? B" := (normalized_raw_id_eq A B).
-  
-  Definition normalized_ident_eq (ia : ident) (ib : ident) : bool 
+
+  Definition normalized_ident_eq (ia : ident) (ib : ident) : bool
     := match ia, ib with
-       | ID_Global na, ID_Global nb 
+       | ID_Global na, ID_Global nb
        | ID_Local na, ID_Local nb => normalized_raw_id_eq na nb
        | _, _ => false
        end.
   Notation "A =? B" := (normalized_ident_eq A B).
-  
+
   Definition normalized_var_eq (a : ident * typ) (b : ident * typ) : bool :=
     let '(ia, ta) := a in
     let '(ib, tb) := b in
@@ -1072,7 +1072,7 @@ Section ExpGenerators.
        a <- g;;
        modify (replace_ctx saved_ctx);;
        ret a.
-  
+
   Variant contains_flag :=
   | soft
   | hard.
@@ -1166,7 +1166,7 @@ Section ExpGenerators.
         let f := (i, t) in
         filter (fun '(i, t) => contains_typ t (TYPE_Function TYPE_Void []) soft && negb (f =? (i,t))) ctx
     end.
-  
+
   Definition filter_fun_typs (ctx: var_context) : var_context :=
     filter (fun '(_, t) => contains_typ t (TYPE_Function TYPE_Void []) soft) ctx.
 
@@ -1962,7 +1962,7 @@ Section InstrGenerators.
                 ret (TERM_Br_1 bid, []))]
               | nil => []
               end
-              
+
               ++
              (* Recurse sometimes *)
               (match curr_fun with
@@ -2094,18 +2094,18 @@ Section InstrGenerators.
        :=
          (* Base case *)
          bid_base <- new_block_id;;
-         
+
          (* Inductions*)
 
 
          (* Finish*)
 
 
-         
+
          (* Compiled part *)
            '(_, (b1, b2)) <- gen_blocks_sz 0 t back_blocks;;
            ret (TERM_Unreachable, (b1, b2))
-         
+
   .
 
   Definition gen_blocks (t : typ) : GenLLVM (block typ * list (block typ))
