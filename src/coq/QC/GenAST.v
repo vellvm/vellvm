@@ -1909,6 +1909,7 @@ Section InstrGenerators.
     | IVoid n => Name ("fail (instr_id_to_raw_id): " ++ fail_msg)
     end.
 
+  (* A helper function in generating recursive function below *)
   Definition gen_call_var (fun_to_call : ident * typ * list (ident * typ)) (var: ident * (ident * typ)) :=
     let '(fun_i, fun_t, args) := fun_to_call in
     let '(ret_t, _) := get_ret_params_from_tfun fun_t in
@@ -1983,6 +1984,7 @@ Section InstrGenerators.
               (match curr_fun with
                | None => []
                | Some (fun_i, fun_t, args_l) =>
+                   (* Won't reach main function because require an argument*)
                    let indices := filter
                                     (fun '(_, ty) =>
                                        match ty with
@@ -1994,7 +1996,8 @@ Section InstrGenerators.
                    else
                      [(min sz' 6%nat, (* Will change this later *)
                         indicator <- elems_LLVM indices;;
-                        '(t, (b, bs)) <- hide_ctx_var (gen_recurs_sz sz' t back_blocks (fun_i, fun_t, args_l) indicator) indicator;; (* Prevent indicator from being accidenly increase in the function *)
+                        (* Prevent indicator from being accidenly increase in the function *)
+                        '(t, (b, bs)) <- hide_ctx_var (gen_recurs_sz sz' t back_blocks (fun_i, fun_t, args_l) indicator) indicator;;
                         ret (t, (b::bs)))]
               end)
 
@@ -2132,14 +2135,14 @@ Section InstrGenerators.
          fun_call <- gen_call_var curr_fun (ID_Local next_instr_raw_id, indicator);;
          '(recur_call_id, recur_call) <- add_id_to_instr fun_call;;
          let induction_code : list (instr_id * instr typ) := code ++ [(next_instr_id, next_instr); (recur_call_id, recur_call)] in
-         '(term, induction_bs) <- gen_terminator_sz (sz / 2) t (back_blocks);;
+         '(term, induction_bs) <- gen_terminator_sz (sz / 2) t (back_blocks);; (* TODO: Is this the best way for representing the induction step? *)
          let induction_block := {| blk_id := induction_bid
                                  ; blk_phis := []
                                  ; blk_code := induction_code
                                  ; blk_term := term
                                  ; blk_comments := None
                                 |} in
-         (* Last Part *)
+         (* Declare entry block *)
          let induction_blocks := induction_block::induction_bs in
          let entry_block := {| blk_id := entry_bid
                              ; blk_phis := []
@@ -2147,7 +2150,7 @@ Section InstrGenerators.
                              ; blk_term := TERM_Br (TYPE_I 1, (EXP_Ident (ID_Local (instr_id_to_raw_id "recursion_cond_id" recur_cond_id)))) induction_bid base_bid
                              ; blk_comments := None
                             |} in
-         (* Compiled part *)
+         (* Return entry block *)
          ret (TERM_Br_1 entry_bid, (entry_block, base_blocks ++ induction_blocks))
   .
 
@@ -2200,7 +2203,6 @@ Section InstrGenerators.
       else
         let '(ctx, ptoi_ctx) := ctxs in
         restore_variable_ctxs (f_var::ctx, ptoi_ctx);;
-        (* restore_variable_ctxs ((ID_Global name, f_type)::ctx, ptoi_ctx);; *)
         ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs).
 
   Definition gen_new_definition (ret_t : typ) (args : list (typ)) : GenLLVM (definition typ (block typ * list (block typ)))
