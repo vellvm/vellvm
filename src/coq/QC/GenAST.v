@@ -1909,6 +1909,21 @@ Section InstrGenerators.
     | IVoid n => Name ("fail (instr_id_to_raw_id): " ++ fail_msg)
     end.
 
+  Definition gen_call_var (fun_to_call : ident * typ * list (ident * typ)) (var: ident * (ident * typ)) :=
+    let '(fun_i, fun_t, args) := fun_to_call in
+    let '(ret_t, _) := get_ret_params_from_tfun fun_t in
+    let '(var_new_i, (var_old_i, var_t)) := var in
+    args_texp <- map_monad
+                  (fun '(arg_i, arg_t) =>
+                     if (normalized_var_eq (var_old_i, var_t) (arg_i, arg_t))
+                     then
+                       ret (var_t, EXP_Ident var_new_i)
+                     else
+                       arg_exp <- gen_exp_size 0 arg_t;;
+                       ret (arg_t, arg_exp))
+                  args;;
+    ret (ret_t, INSTR_Call (fun_t, EXP_Ident fun_i) args_texp).
+  
   (* Returns a terminator and a list of new blocks that it reaches *)
   (* Need to make returns more likely than branches so we don't get an
      endless tree of blocks *)
@@ -1967,19 +1982,19 @@ Section InstrGenerators.
              (* Recurse sometimes *)
               (match curr_fun with
                | None => []
-               | Some (i, t, l) =>
+               | Some (fun_i, fun_t, args_l) =>
                    let indices := filter
                                     (fun '(_, ty) =>
                                        match ty with
                                        | TYPE_I _ => true
                                        | _ => false
-                                       end) l in
+                                       end) args_l in
                    if seq.nilp indices
                    then []
                    else
-                     [(min 0%nat 0%nat, (* Will change this later *)
-                        index <- elems_LLVM indices;;
-                        '(t, (b, bs)) <- gen_recurs_sz sz' t back_blocks index;;
+                     [(min sz' 6%nat, (* Will change this later *)
+                        indicator <- elems_LLVM indices;;
+                        '(t, (b, bs)) <- hide_ctx_var (gen_recurs_sz sz' t back_blocks (fun_i, fun_t, args_l) indicator) indicator;; (* Prevent indicator from being accidenly increase in the function *)
                         ret (t, (b::bs)))]
               end)
 
@@ -2089,22 +2104,53 @@ Section InstrGenerators.
          (sz : nat)
          (t : typ) (* Return type *)
          (back_blocks : list block_id) (* Blocks that I'm allowed to jump back to *)
+         (curr_fun : ident * typ * list (ident * typ))
          (indicator : ident * typ)
          {struct t} : GenLLVM (terminator typ * (block typ * list (block typ)))
        :=
+         let '(indicator_id, indicator_typ) := indicator in
+         (* Block: Entry *)
+         entry_bid <- new_block_id;;
+         (* Command: Find an ending value *)
+         recur_init <- ret INSTR_Op <*> gen_op (indicator_typ);;
+         '(recur_init_instr_id, recur_init_instr) <- add_id_to_instr (indicator_typ, recur_init);;
+         let recur_init_instr_raw_id := instr_id_to_raw_id "recursion init id" recur_init_instr_id in 
+         (* Command: icmp for greater than *)
+         '(recur_cond_id, recur_cond) <- add_id_to_instr (TYPE_I 1, INSTR_Op (OP_ICmp Ugt indicator_typ (EXP_Ident indicator_id) (EXP_Ident (ID_Local recur_init_instr_raw_id))));;
+         let entry_code : list (instr_id * instr typ) := [(recur_init_instr_id, recur_init_instr); (recur_cond_id, recur_cond)] in
          (* Base case *)
-         bid_base <- new_block_id;;
-
+         '(_, (base_b, base_bs)) <- gen_blocks_sz (sz / 2) t back_blocks;;
+         let base_blocks := base_b :: base_bs in
+         let base_bid := blk_id base_b in
          (* Inductions*)
-
-
-         (* Finish*)
-
-
-
+         induction_bid <- new_block_id;;
+         code <- gen_code;; (* Some other instructions *)
+         let next_exp := OP_IBinop (UDiv false) indicator_typ (EXP_Ident indicator_id) (EXP_Integer 2) in (* TODO: Should have more variety in decreasing indicator *)
+         '(next_instr_id, next_instr) <- add_id_to_instr (indicator_typ, INSTR_Op next_exp);;
+         let next_instr_raw_id := instr_id_to_raw_id "next_exp" next_instr_id in
+         (* Generate a call: How to let it put the parameter in the right position? *)
+         fun_call <- gen_call_var curr_fun (ID_Local next_instr_raw_id, indicator);;
+         '(recur_call_id, recur_call) <- add_id_to_instr fun_call;;
+         let induction_code : list (instr_id * instr typ) := code ++ [(next_instr_id, next_instr); (recur_call_id, recur_call)] in
+         '(term, induction_bs) <- gen_terminator_sz (sz / 2) t (back_blocks);;
+         let induction_block := {| blk_id := induction_bid
+                                 ; blk_phis := []
+                                 ; blk_code := induction_code
+                                 ; blk_term := term
+                                 ; blk_comments := None
+                                |} in
+         (* Last Part *)
+         let induction_blocks := induction_block::induction_bs in
+         let entry_block := {| blk_id := entry_bid
+                             ; blk_phis := []
+                             ; blk_code := entry_code
+                             ; blk_term := TERM_Br (TYPE_I 1, (EXP_Ident (ID_Local (instr_id_to_raw_id "recursion_cond_id" recur_cond_id)))) induction_bid base_bid
+                             ; blk_comments := None
+                            |} in 
          (* Compiled part *)
-           '(_, (b1, b2)) <- gen_blocks_sz 0 t back_blocks;;
-           ret (TERM_Unreachable, (b1, b2))
+         ret (TERM_Br_1 entry_bid, (entry_block, base_blocks ++ induction_blocks))
+           (* '(_, (b1, b2)) <- gen_blocks_sz 0 t back_blocks;;
+           ret (TERM_Unreachable, (b1, b2)) *)
 
   .
 
