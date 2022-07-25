@@ -217,13 +217,13 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Fixpoint show_dvalue (dv : dvalue) : string :=
     match dv with
     | DVALUE_Addr a => "<addr>"
-    | DVALUE_I1 x => show (Int1.unsigned x)
-    | DVALUE_I8 x => show (Int8.unsigned x)
-    | DVALUE_I32 x => show (Int32.unsigned x)
-    | DVALUE_I64 x => show (Int64.unsigned x)
+    | DVALUE_I1 x => "i1 " ++ show (Int1.unsigned x)
+    | DVALUE_I8 x => "i8 " ++ show (Int8.unsigned x)
+    | DVALUE_I32 x => "i32 " ++ show (Int32.unsigned x)
+    | DVALUE_I64 x => "i64 " ++ show (Int64.unsigned x)
     | DVALUE_IPTR x => "<intptr>"
-    | DVALUE_Double x => show x
-    | DVALUE_Float x => show x
+    | DVALUE_Double x => "double " ++ show x
+    | DVALUE_Float x => "float " ++ show x
     | DVALUE_Poison t => "poison[" ++ show_dtyp t ++ "]"
     | DVALUE_None => "none"
     | DVALUE_Struct fields => "{" ++ String.concat ", " (map show_dvalue fields) ++ "}"
