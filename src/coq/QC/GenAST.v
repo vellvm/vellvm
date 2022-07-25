@@ -1923,7 +1923,7 @@ Section InstrGenerators.
                        ret (arg_t, arg_exp))
                   args;;
     ret (ret_t, INSTR_Call (fun_t, EXP_Ident fun_i) args_texp).
-  
+
   (* Returns a terminator and a list of new blocks that it reaches *)
   (* Need to make returns more likely than branches so we don't get an
      endless tree of blocks *)
@@ -2114,7 +2114,7 @@ Section InstrGenerators.
          (* Command: Find an ending value *)
          recur_init <- ret INSTR_Op <*> gen_op (indicator_typ);;
          '(recur_init_instr_id, recur_init_instr) <- add_id_to_instr (indicator_typ, recur_init);;
-         let recur_init_instr_raw_id := instr_id_to_raw_id "recursion init id" recur_init_instr_id in 
+         let recur_init_instr_raw_id := instr_id_to_raw_id "recursion init id" recur_init_instr_id in
          (* Command: icmp for greater than *)
          '(recur_cond_id, recur_cond) <- add_id_to_instr (TYPE_I 1, INSTR_Op (OP_ICmp Ugt indicator_typ (EXP_Ident indicator_id) (EXP_Ident (ID_Local recur_init_instr_raw_id))));;
          let entry_code : list (instr_id * instr typ) := [(recur_init_instr_id, recur_init_instr); (recur_cond_id, recur_cond)] in
@@ -2146,12 +2146,9 @@ Section InstrGenerators.
                              ; blk_code := entry_code
                              ; blk_term := TERM_Br (TYPE_I 1, (EXP_Ident (ID_Local (instr_id_to_raw_id "recursion_cond_id" recur_cond_id)))) induction_bid base_bid
                              ; blk_comments := None
-                            |} in 
+                            |} in
          (* Compiled part *)
          ret (TERM_Br_1 entry_bid, (entry_block, base_blocks ++ induction_blocks))
-           (* '(_, (b1, b2)) <- gen_blocks_sz 0 t back_blocks;;
-           ret (TERM_Unreachable, (b1, b2)) *)
-
   .
 
   Definition gen_blocks (t : typ) : GenLLVM (block typ * list (block typ))
