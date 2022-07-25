@@ -1039,16 +1039,12 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       (* Array and vector types *)
       | DTYPE_Array sz t =>
           let elt_size := sizeof_dtyp t in
-          let array_size := sizeof_dtyp (DTYPE_Array sz t) in
-          let array_size_nat := N.to_nat array_size in
-          fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*elt_size) ((idx+1) * elt_size) bytes) t;; ret (uv::acc)) (Nseq 0 array_size_nat) [];;
+          fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*elt_size) ((idx+1) * elt_size) bytes) t;; ret (uv::acc)) (Nseq 0 (N.to_nat sz)) [];;
           ret (UVALUE_Array fields)
 
       | DTYPE_Vector sz t =>
           let elt_size := sizeof_dtyp t in
-          let vec_size := sizeof_dtyp (DTYPE_Vector sz t) in
-          let vec_size_nat := N.to_nat vec_size in
-          fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*elt_size) ((idx+1) * elt_size) bytes) t;; ret (uv::acc)) (Nseq 0 vec_size_nat) [];;
+          fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*elt_size) ((idx+1) * elt_size) bytes) t;; ret (uv::acc)) (Nseq 0 (N.to_nat sz)) [];;
           ret (UVALUE_Vector fields)
 
       (* Padded aggregate types *)
