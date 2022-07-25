@@ -114,7 +114,6 @@ Inductive IX_supported : N -> Prop :=
 #[refine]#[local] Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
     Decidable_witness := N.eqb x y
   }.
-Next Obligation.
 apply N.eqb_eq.
 Qed.
 
