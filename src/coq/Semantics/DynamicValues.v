@@ -2406,6 +2406,10 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       v <- (loop [] f idx) ;;
       ret (DVALUE_Struct v)
 
+    | DVALUE_Packed_struct f =>
+      v <- (loop [] f idx) ;;
+      ret (DVALUE_Packed_struct v)
+
     | DVALUE_Array e =>
       v <- (loop [] e idx) ;;
       ret (DVALUE_Array v)
