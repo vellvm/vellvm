@@ -2363,7 +2363,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Definition index_into_str {M} `{Monad M} `{RAISE_ERROR M} (v:uvalue) (idx:LLVMAst.int) : M uvalue :=
     let fix loop elts i :=
         match elts with
-        | [] => raise_error "index out of bounds"
+        | [] => raise_error "index_into_str: index out of bounds"
         | h :: tl =>
           if (i =? 0)%Z then ret h else loop tl (i-1)%Z
         end in
@@ -2371,7 +2371,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | UVALUE_Struct f => loop f idx
     | UVALUE_Packed_struct f => loop f idx
     | UVALUE_Array e => loop e idx
-    | _ => raise_error "invalid aggregate data"
+    | _ => raise_error "index_into_str: invalid aggregate data"
     end.
   Arguments index_into_str _ _ : simpl nomatch.
 
@@ -2380,7 +2380,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Definition index_into_str_dv {M} `{Monad M} `{RAISE_ERROR M} (v:dvalue) (idx:LLVMAst.int) : M dvalue :=
     let fix loop elts i :=
         match elts with
-        | [] => raise_error "index out of bounds"
+        | [] => raise_error "index_into_str_dv: index out of bounds"
         | h :: tl =>
           if (i =? 0)%Z then ret h else loop tl (i-1)%Z
         end in
@@ -2388,7 +2388,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_Struct f => loop f idx
     | DVALUE_Packed_struct f => loop f idx
     | DVALUE_Array e => loop e idx
-    | _ => raise_error "invalid aggregate data"
+    | _ => raise_error "index_into_str_dv: invalid aggregate data"
     end.
   Arguments index_into_str_dv _ _ : simpl nomatch.
 
@@ -2396,7 +2396,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Definition insert_into_str {M} `{Monad M} `{RAISE_ERROR M} (str:dvalue) (v:dvalue) (idx:LLVMAst.int) : M dvalue :=
     let fix loop (acc elts:list dvalue) (i:LLVMAst.int) :=
         match elts with
-        | [] => raise_error "index out of bounds"
+        | [] => raise_error "insert_into_str: index out of bounds"
         | h :: tl =>
           (if i =? 0 then ret (acc ++ (v :: tl))
           else loop (acc ++ [h]) tl (i-1))%Z
@@ -2410,7 +2410,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       v <- (loop [] e idx) ;;
       ret (DVALUE_Array v)
 
-    | _ => raise_error "invalid aggregate data"
+    | _ => raise_error "insert_into_str: invalid aggregate data"
     end.
   Arguments insert_into_str _ _ _ : simpl nomatch.
 
