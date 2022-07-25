@@ -1316,7 +1316,7 @@ Definition gen_insertelement : GenLLVM (typ * instr typ) :=
     end in
   let '(sz, t_in_vec) := get_size_ty tvec in
   value <- gen_typ_eq_prim_typ t_in_vec;;
-  index <- lift_GenLLVM (choose (0,Z.of_N sz));;
+  index <- lift_GenLLVM (choose (0, Z.of_N (sz - 1)));;
   ret (tvec, INSTR_Op (OP_InsertElement (tvec, EXP_Ident id) (t_in_vec, value) (TYPE_I 32, EXP_Integer index))).
 
 Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
