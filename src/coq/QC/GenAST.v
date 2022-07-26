@@ -529,7 +529,7 @@ Section TypGenerators.
   Definition filter_non_fun_typs (ctx : list (ident * typ)) : list (ident * typ) :=
     filter (fun '(_, t) =>
               match t with
-              | TYPE_Function _ _ => false
+              | TYPE_Function _ _ _ => false
               | _ => true
               end) ctx.
 
@@ -1080,9 +1080,9 @@ Section ExpGenerators.
             end
         | _ => fold_left (fun acc x => acc || contains_typ x t flag) fields false
         end
-    | TYPE_Function ret_t args =>
+    | TYPE_Function ret_t args vararg =>
         match t with
-        | TYPE_Function ret_t args =>
+        | TYPE_Function ret_t args vararg =>
             match flag with
             | soft => true
             | hard => normalized_typ_eq t_from t
@@ -1093,7 +1093,7 @@ Section ExpGenerators.
     end.
 
   Definition filter_fun_typs (ctx: var_context) : var_context :=
-    filter (fun '(_, t) => contains_typ t (TYPE_Function TYPE_Void []) soft) ctx.
+    filter (fun '(_, t) => contains_typ t (TYPE_Function TYPE_Void [] false) soft) ctx.
 
   (* Can't use choose for these functions because it gets extracted to
      ocaml's Random.State.int function which has small bounds. *)
@@ -1478,12 +1478,6 @@ Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
     end;;
   ret (new_tptr, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr)).
 
-Definition get_ret_params_from_tfun (tfun: typ) :=
-  match tfun with
-  | TYPE_Function ret_t args => (ret_t, args)
-  | _ => (TYPE_Void, []) (* Won't reach here... Hopefully *)
-  end.
-
 Definition genTypHelper (n: nat): G (typ) :=
   run_GenLLVM (gen_typ_non_void_size n).
 
@@ -1651,15 +1645,18 @@ Definition gen_insertvalue (typ_in_ctx: ident * typ): GenLLVM (typ * instr typ) 
 
 Definition gen_call : GenLLVM (typ * instr typ) :=
   ctx <- get_ctx;;
-  let fun_in_ctx := filter (fun '(_, t) => contains_typ t (TYPE_Function TYPE_Void []) soft) ctx in
+  let fun_in_ctx := filter_fun_typs ctx in
   '(id, tfun) <- oneOf_LLVM (map ret fun_in_ctx);;
-  let '(ret_t, args) := get_ret_params_from_tfun tfun in
-  args_texp <- map_monad
-               (fun (arg_typ:typ) =>
-                  arg_exp <- gen_exp_size 0 arg_typ;;
-                  ret (arg_typ, arg_exp))
-               args;;
-  ret (ret_t, INSTR_Call (tfun, EXP_Ident id) args_texp).
+  match tfun with
+  | TYPE_Function ret_t args varargs =>
+      args_texp <- map_monad
+                    (fun (arg_typ:typ) =>
+                       arg_exp <- gen_exp_size 0 arg_typ;;
+                       ret (arg_typ, arg_exp))
+                    args;;
+      ret (ret_t, INSTR_Call (tfun, EXP_Ident id) args_texp)
+  | _ => lift failGen
+  end.
 
   Definition gen_texp : GenLLVM (texp typ)
     := t <- gen_typ;;
@@ -1997,7 +1994,7 @@ Section InstrGenerators.
        end.
   (* Don't want to generate CFGs, actually. Want to generated TLEs *)
 
-  Definition gen_definition (name : global_id) (ret_t : typ) (args : list (typ)) : GenLLVM (definition typ (block typ * list (block typ)))
+  Definition gen_definition (name : global_id) (ret_t : typ) (args : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
       ctxs <- get_variable_ctxs;;
 
@@ -2013,27 +2010,20 @@ Section InstrGenerators.
       bs <- gen_blocks ret_t;;
 
       let args_t := map snd args in
-      let f_type := TYPE_Function ret_t args_t in
+      let f_type := TYPE_Function ret_t args_t false in
       let param_attr_slots := map (fun t => []) args in
       let prototype :=
           mk_declaration name f_type
                          ([], param_attr_slots)
-                         None None None None
                          []
                          []
       in
       (* Reset context *)
-      (* TODO: Check if reset context is only applied in main function*)
-      if is_main name
-      then
-        restore_variable_ctxs ([], []);;
-        ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs)
-      else
-        let '(ctx, ptoi_ctx) := ctxs in
-        restore_variable_ctxs ((ID_Global name, f_type)::ctx, ptoi_ctx);;
-        ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs).
+      let '(ctx, ptoi_ctx) := ctxs in
+      restore_variable_ctxs ((ID_Global name, f_type)::ctx, ptoi_ctx);;
+      ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs).
 
-  Definition gen_new_definition (ret_t : typ) (args : list (typ)) : GenLLVM (definition typ (block typ * list (block typ)))
+  Definition gen_new_definition (ret_t : typ) (args : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
       name <- new_global_id;;
       gen_definition name ret_t args.
@@ -2048,10 +2038,9 @@ Section InstrGenerators.
     := ret TLE_Definition <*> gen_helper_function.
 
   Definition gen_helper_function_tle_multiple : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
-    :=
-    sz <- lift (arbitrary : G nat);;
-    (* sz <- lift_GenLLVM (choose (0,2)%nat);; *) (* TODO: Use the above line instead. Use this for testing purposes *)
-    vectorOf_LLVM sz gen_helper_function_tle.
+    := sized_LLVM
+         (fun sz =>
+            vectorOf_LLVM sz gen_helper_function_tle).
 
   Definition gen_global : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     := fmap ret gen_helper_function_tle.
@@ -2064,8 +2053,8 @@ Section InstrGenerators.
 
   Definition gen_llvm :GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     :=
-    globals <- gen_helper_function_tle_multiple;;
+    (* globals <- gen_helper_function_tle_multiple;; *)
     main <- gen_main_tle;;
-    ret (globals ++ [main]).
+    ret [main]. (* (globals ++ [main]). *)
 
 End InstrGenerators.
