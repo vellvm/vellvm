@@ -1142,8 +1142,7 @@ Section ExpGenerators.
   (* Can work after extracting the pointer inside*)
   Fixpoint get_index_paths_aux (t_from : typ) (pre_path : DList Z) {struct t_from}: DList (typ * DList (Z)) :=
     match t_from with
-    | TYPE_Array sz t
-    | TYPE_Vector sz t =>
+    | TYPE_Array sz t =>
         let sub_paths := get_index_paths_aux t DList_empty in (* Get index path from the first element*)
         DList_cons (t_from, pre_path) (get_index_paths_from_AoV sz t pre_path sub_paths)
     | TYPE_Struct fields
