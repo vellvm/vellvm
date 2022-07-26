@@ -4,6 +4,7 @@ From Coq Require Import
 Require Import List.
 Import ListNotations.
 Require Import ZArith.
+Import ZArith.BinInt.
 
 From ITree Require Import
      ITree
@@ -24,7 +25,8 @@ From Vellvm Require
      Semantics.TopLevel
      Transformations.Transform
      Utils.ParserHelper
-     QC.ShowAST.
+     QC.ShowAST
+     QC.ReprAST.
 
 Require ExtrOcamlBasic.
 Require ExtrOcamlString.
@@ -83,3 +85,4 @@ Recursive Extraction Library TopLevel.
 Extraction Library Transform.
 Extraction Library ParserHelper.
 Recursive Extraction Library ShowAST.
+Recursive Extraction Library ReprAST. 

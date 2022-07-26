@@ -20,13 +20,49 @@ Import ListNotations.
 
 Open Scope monad.
 
-Fixpoint replicateM {M : Type -> Type} {A} `{Monad M} (n : nat) (ma : M A) : M (list A)
-  := match n with
-     | O    => a <- ma;; ret [a]
-     | S n' => a <- ma;; rest <- replicateM n' ma;; ret (a :: rest)
-     end.
+(* Monads ------------------------------------------------------------------- *)
+(* TODO: Add to ExtLib *)
 
-Fixpoint foldM {a b} {M} `{Monad M} (f : b -> a -> M b ) (acc : b) (l : list a) : M b
+Section monad.
+  Variable m : Type -> Type.
+  Variable M : Monad m.
+  
+  Fixpoint monad_fold_right {A B} (f : B -> A -> m B) (l:list A) (b : B) : m B :=
+    match l with
+    | [] => ret b
+    | x::xs => 
+      r <- monad_fold_right f xs b ;;
+      f r x
+    end.
+
+Definition monad_app_fst {A B C} (f : A -> m C) (p:A * B) : m (C * B)%type :=
+  let '(x,y) := p in
+  z <- f x ;;
+  ret (z,y).
+
+Definition monad_app_snd {A B C} (f : B -> m C) (p:A * B) : m (A * C)%type :=
+  let '(x,y) := p in
+  z <- f y ;;
+  ret (x,z).
+
+Definition map_monad {m : Type -> Type} {H : Monad m} {A B} (f:A -> m B) : list A -> m (list B) :=
+  fix loop l :=
+    match l with
+    | [] => ret []
+    | a::l' =>
+      b <- f a ;;
+      bs <- loop l' ;;
+      ret (b::bs)  
+    end.
+
+Definition map_monad_ {A B}
+  (f: A -> m B) (l: list A): m unit :=
+  map_monad f l;; ret tt.
+
+Fixpoint sequence {a} (ms : list (m a)) : m (list a)
+  := map_monad id ms.
+
+Fixpoint foldM {a b} (f : b -> a -> m b ) (acc : b) (l : list a) : m b
   := match l with
      | [] => ret acc
      | (x :: xs) =>
@@ -34,47 +70,27 @@ Fixpoint foldM {a b} {M} `{Monad M} (f : b -> a -> M b ) (acc : b) (l : list a) 
        foldM f b xs
      end.
 
-Lemma map_monad_unfold :
-  forall {A B : Type} {M : Type -> Type} {H : Monad M} (x : A) (xs : list A)
-    (f : A -> M B),
-    map_monad f (x :: xs) =
-    b <- f x;;
-    bs <- map_monad (fun (x0 : A) => f x0) xs;;
-    ret (b :: bs).
-Proof.
-  intros A B M H x xs f.
-  induction xs; cbn; auto.
-Qed.
+End monad.
+Arguments monad_fold_right {_ _ _ _}.
+Arguments monad_app_fst {_ _ _ _ _}.
+Arguments monad_app_snd {_ _ _ _ _}.
+Arguments map_monad {_ _ _ _}.
+Arguments map_monad_ {_ _ _ _}.
+Arguments sequence {_ _ _}.
+Arguments foldM {_ _ _ _}.
 
-Lemma map_monad_In {m : Type -> Type} {H : Monad m} {A B} (l : list A) (f: forall (x : A), In x l -> m B) : m (list B).
-Proof.
-  induction l.
-  - exact (ret []).
-  - refine (b <- f a _;; bs <- IHl _;; ret (b::bs)).
-    + cbn; auto.
-    + intros x Hin.
-      apply (f x).
-      cbn; auto.
-Defined.
 
-Lemma map_monad_In_unfold :
-  forall {A B M} `{Monad M} (x : A) (xs : list A) (f : forall (elt:A), In elt (x::xs) -> M B),
-    map_monad_In (x::xs) f = b <- f x (or_introl eq_refl);;
-                            bs <- map_monad_In xs (fun x HIn => f x (or_intror HIn));;
-                            ret (b :: bs).
-Proof.
-  intros A B M H x xs f.
-  induction xs; cbn; auto.
-Qed.
 
 
 Global Instance EqM_sum {E} : Monad.Eq1 (sum E) :=
   fun (a : Type) (x y : sum E a) => x = y.
 
+
 Global Instance EqMProps_sum {E} : Monad.Eq1Equivalence (sum E).
 constructor; intuition.
 repeat intro. etransitivity; eauto.
 Defined.
+
 
 Global Instance MonadLaws_sum {T} : Monad.MonadLawsE (sum T).
   constructor.
@@ -86,8 +102,10 @@ Global Instance MonadLaws_sum {T} : Monad.MonadLawsE (sum T).
     repeat red in H0. destruct y; auto.
 Qed.
 
+
 Global Instance EqM_eitherT {E} {M} `{Monad.Eq1 M} : Monad.Eq1 (eitherT E M)
   := fun (a : Type) x y => Monad.eq1 (unEitherT x) (unEitherT y).
+
 
 Global Instance Eq1Equivalence_eitherT :
   forall {M : Type -> Type} {H : Monad M} {H0 : Monad.Eq1 M} E,
@@ -105,8 +123,10 @@ Proof.
 Qed.
 
 (* TODO: move this *)
+
 Global Instance Eq1_ident : Monad.Eq1 IdentityMonad.ident
   := {eq1 := fun A => Logic.eq}.
+
 
 Global Instance Eq1Equivalence_ident : Monad.Eq1Equivalence IdentityMonad.ident.
 Proof.
@@ -120,6 +140,7 @@ Proof.
     rewrite H. rewrite H0.
     reflexivity.
 Defined.
+
 
 Global Instance MonadLawsE_ident : Monad.MonadLawsE IdentityMonad.ident.
 Proof.
@@ -145,6 +166,7 @@ Proof.
   intros X Y M HM EQM EQV ma.
   destruct ma; reflexivity.
 Qed.
+
 
 Global Instance MonadLaws_eitherT {E} {M} `{HM : Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM} `{@Monad.MonadLawsE M EQM _} : Monad.MonadLawsE (eitherT E M).
 Proof.
@@ -215,4 +237,8 @@ Proof.
     reflexivity.
 Defined.
 
-Existing Instance MonadState.MonadLawsE_stateTM.
+
+Global Existing Instance MonadState.MonadLawsE_stateTM.
+
+
+

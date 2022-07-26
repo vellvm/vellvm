@@ -1,3 +1,5 @@
+**/#*#
+**/a.out
 **.s
 **.vo
 **.vos
@@ -13,6 +15,7 @@
 **/_build
 src/main.native
 src/vellvm
+src/frontend
 **/.merlin
 *~
 *.v~

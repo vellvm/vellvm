@@ -562,7 +562,7 @@ Section TypGenerators.
   Definition filter_non_fun_typs (ctx : list (ident * typ)) : list (ident * typ) :=
     filter (fun '(_, t) =>
               match t with
-              | TYPE_Function _ _  => false
+              | TYPE_Function _ _ _  => false
               | _ => true
               end) ctx.
 
@@ -700,7 +700,7 @@ Section TypGenerators.
         ; (1%nat, ret TYPE_Array <*> lift genN <*> gen_sized_typ_size sz')
         ; (1%nat, ret TYPE_Vector <*> (n <- lift_GenLLVM genN;;ret (n + 1)%N) <*> gen_sized_typ_size 0)
         ; let n := Nat.div sz 2 in
-        (1%nat, ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n))
+        (1%nat, ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) <*> ret false)
         ; (1%nat, ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz'))
         ; (1%nat, ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz'))
         ])
@@ -758,7 +758,7 @@ Section TypGenerators.
         ; (1%nat, ret TYPE_Array <*> lift genN <*> gen_sized_typ_size sz')
         ; (1%nat, ret TYPE_Vector <*> (n <- lift_GenLLVM genN;;ret (n + 1)%N) <*> gen_sized_typ_size 0)
         ; let n := Nat.div sz 2 in
-        (1%nat, ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n))
+        (1%nat, ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) <*> ret false)
         ; (1%nat, ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz'))
         ; (1%nat, ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz'))
           ])
@@ -996,12 +996,13 @@ Section ExpGenerators.
            else false
          | _ => false
          end
-       | TYPE_Function ret args =>
+       | TYPE_Function ret args varargs=>
          match b with
-         | TYPE_Function ret' args' =>
+         | TYPE_Function ret' args' varargs' =>
              Nat.eqb (Datatypes.length args) (Datatypes.length args') &&
                normalized_typ_eq ret ret' &&
                forallb id (zipWith (fun a b => normalized_typ_eq a b) args args')
+             && Bool.eqb varargs varargs'
          | _ => false
          end
        | TYPE_Struct fields =>
@@ -1144,9 +1145,9 @@ Section ExpGenerators.
             end
         | _ => fold_left (fun acc x => acc || contains_typ x t flag) fields false
         end
-    | TYPE_Function ret_t args =>
+    | TYPE_Function _ _ _ =>
         match t with
-        | TYPE_Function ret_t args =>
+        | TYPE_Function _ _ _ =>
             match flag with
             | soft => true
             | hard => normalized_typ_eq t_from t
@@ -1161,14 +1162,14 @@ Section ExpGenerators.
   Definition filter_nc_fun_typs (ctx : var_context) (curr_fun : option (ident * typ * list (ident * typ))): var_context :=
     match curr_fun with
     | None =>
-        filter (fun '(i, t) => contains_typ t (TYPE_Function TYPE_Void []) soft) ctx
+        filter (fun '(i, t) => contains_typ t (TYPE_Function TYPE_Void [] false) soft) ctx
     | Some (i, t, l) =>
         let f := (i, t) in
-        filter (fun '(i, t) => contains_typ t (TYPE_Function TYPE_Void []) soft && negb (f =? (i,t))) ctx
+        filter (fun '(i, t) => contains_typ t (TYPE_Function TYPE_Void [] false) soft && negb (f =? (i,t))) ctx
     end.
 
   Definition filter_fun_typs (ctx: var_context) : var_context :=
-    filter (fun '(_, t) => contains_typ t (TYPE_Function TYPE_Void []) soft) ctx.
+    filter (fun '(_, t) => contains_typ t (TYPE_Function TYPE_Void [] false) soft) ctx.
 
   (* Can't use choose for these functions because it gets extracted to
      ocaml's Random.State.int function which has small bounds. *)
@@ -1252,8 +1253,7 @@ Section ExpGenerators.
   (* Can work after extracting the pointer inside*)
   Fixpoint get_index_paths_aux (t_from : typ) (pre_path : DList Z) {struct t_from}: DList (typ * DList (Z)) :=
     match t_from with
-    | TYPE_Array sz t
-    | TYPE_Vector sz t =>
+    | TYPE_Array sz t =>
         let sub_paths := get_index_paths_aux t DList_empty in (* Get index path from the first element*)
         DList_cons (t_from, pre_path) (get_index_paths_from_AoV sz t pre_path sub_paths)
     | TYPE_Struct fields
@@ -1426,7 +1426,7 @@ Definition gen_insertelement : GenLLVM (typ * instr typ) :=
     end in
   let '(sz, t_in_vec) := get_size_ty tvec in
   value <- gen_typ_eq_prim_typ t_in_vec;;
-  index <- lift_GenLLVM (choose (0,Z.of_N sz));;
+  index <- lift_GenLLVM (choose (0, Z.of_N (sz - 1)));;
   ret (tvec, INSTR_Op (OP_InsertElement (tvec, EXP_Ident id) (t_in_vec, value) (TYPE_I 32, EXP_Integer index))).
 
 Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
@@ -1554,9 +1554,9 @@ Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
     end;;
   ret (new_tptr, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr)).
 
-Definition get_ret_params_from_tfun (tfun: typ) :=
+Definition get_ret_params_from_tfun (tfun: typ) : typ * list typ :=
   match tfun with
-  | TYPE_Function ret_t args => (ret_t, args)
+  | TYPE_Function ret_t args vararg => (ret_t, args)
   | _ => (TYPE_Void, []) (* Won't reach here... Hopefully *)
   end.
 
@@ -1587,7 +1587,7 @@ Definition genType: G (typ) :=
           | TYPE_Pointer subtyp       => lift failGen
           (* Only pointer type expressions might be conversions? Maybe GEP? *)
           | TYPE_Void                 => lift failGen (* There should be no expressions of type void *)
-          | TYPE_Function ret args    => lift failGen (* No expressions of function type *)
+          | TYPE_Function ret args _   => lift failGen (* No expressions of function type *)
           | TYPE_Opaque               => lift failGen (* TODO: not sure what these should be... *)
 
           (* Generate literals for aggregate structures *)
@@ -1646,7 +1646,7 @@ Definition genType: G (typ) :=
           | TYPE_Packed_struct fields => []
 
           | TYPE_Void              => [lift failGen] (* No void type expressions *)
-          | TYPE_Function ret args => [lift failGen] (* These shouldn't exist, I think *)
+          | TYPE_Function ret args _ => [lift failGen] (* These shouldn't exist, I think *)
           | TYPE_Opaque            => [lift failGen] (* TODO: not sure what these should be... *)
           | TYPE_Half              => [lift failGen]
           | TYPE_Float             => [gen_fbinop_exp TYPE_Float]
@@ -2165,10 +2165,10 @@ Section InstrGenerators.
        end.
   (* Don't want to generate CFGs, actually. Want to generated TLEs *)
 
-  Definition gen_definition (name : global_id) (ret_t : typ) (args : list (typ)) : GenLLVM (definition typ (block typ * list (block typ)))
+  Definition gen_definition (name : global_id) (ret_t : typ) (args : list (typ)) (vararg : bool) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
       let args_t := args in
-      let f_type := TYPE_Function ret_t args_t in
+      let f_type := TYPE_Function ret_t args_t vararg in
       let f_var := (ID_Global name, f_type) in
       add_to_ctx f_var;; (* Issue 211: Add to ctx to create reurse function *)
       ctxs <- get_variable_ctxs;;
@@ -2186,12 +2186,13 @@ Section InstrGenerators.
       bs <- gen_blocks ret_t;;
 
       let param_attr_slots := map (fun t => []) args in
+      let args_t := map snd args in
+      let f_type := TYPE_Function ret_t args_t false in
       let prototype :=
           mk_declaration name f_type
                          ([], param_attr_slots)
-                         None None None None
                          []
-                         None None None
+                         []
       in
       (* Reset context *)
       (* TODO: Check if reset context is only applied in main function*)
@@ -2208,7 +2209,7 @@ Section InstrGenerators.
   Definition gen_new_definition (ret_t : typ) (args : list (typ)) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
       name <- new_global_id;;
-      gen_definition name ret_t args.
+      gen_definition name ret_t args false.
 
   Definition gen_helper_function: GenLLVM (definition typ (block typ * list (block typ)))
     :=
@@ -2229,7 +2230,7 @@ Section InstrGenerators.
     := fmap ret gen_helper_function_tle.
 
   Definition gen_main : GenLLVM (definition typ (block typ * list (block typ)))
-    := gen_definition (Name "main") (TYPE_I 8) [].
+    := gen_definition (Name "main") (TYPE_I 8) [] false.
 
   Definition gen_main_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
     := ret TLE_Definition <*> gen_main.

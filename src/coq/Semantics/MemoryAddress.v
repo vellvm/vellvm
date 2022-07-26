@@ -152,6 +152,15 @@ Module Type PROVENANCE(Addr:MemoryAddress.ADDRESS).
     forall aid,
       access_allowed (allocation_id_to_prov aid) aid = true.
 
+  Parameter allocation_id_to_prov_inv:
+    forall aid aid',
+      allocation_id_to_prov aid = allocation_id_to_prov aid' ->
+      aid = aid'.
+  Parameter provenance_to_allocation_id_inv :
+    forall pr pr',
+      provenance_to_allocation_id pr = provenance_to_allocation_id pr' ->
+      pr = pr'.
+
   Parameter provenance_eq_dec :
     forall (pr pr' : Provenance),
       {pr = pr'} + {pr <> pr'}.
@@ -200,6 +209,17 @@ Module PROV_FUNCS(Addr:MemoryAddress.ADDRESS)(PROV:PROVENANCE(Addr)).
 
   Definition all_aid_accesses_allowed (pr : AllocationId) (aids : list AllocationId) : bool
     := forallb (aid_access_allowed pr) aids.
+
+  Lemma allocation_id_to_prov_provenance_to_allocation_id_inv :
+    forall pr pr',
+      allocation_id_to_prov (provenance_to_allocation_id pr) = allocation_id_to_prov (provenance_to_allocation_id pr') ->
+      pr = pr'.
+  Proof.
+    intros pr pr' H.
+    apply provenance_to_allocation_id_inv.
+    apply allocation_id_to_prov_inv.
+    auto.
+  Qed.
 End PROV_FUNCS.
 
 (* TODO: move this? *)

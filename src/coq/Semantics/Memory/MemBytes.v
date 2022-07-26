@@ -72,12 +72,13 @@ Module Type ByteModule(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_I
          end
        end.
 
-  Definition all_bytes_from_uvalue (bytes : list SByte) : option uvalue
+  Definition all_bytes_from_uvalue (t : dtyp) (bytes : list SByte) : option uvalue
     := match bytes with
        | nil => None
        | cons sbyte xs =>
          match sbyte_to_extractbyte sbyte with
          | UVALUE_ExtractByte uv dt idx sid =>
+           guard_opt (dtyp_eqb t dt);;
            all_bytes_from_uvalue_helper 0 sid uv bytes
          | _ => None
          end
@@ -103,17 +104,18 @@ Module Type ByteModule(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_I
 
   (* Check that store ids, uvalues, and types match up, as well as
        that the extract byte indices are in the right order *)
-  Definition all_extract_bytes_from_uvalue (bytes : list uvalue) : option uvalue
+  Definition all_extract_bytes_from_uvalue (t : dtyp) (bytes : list uvalue) : option uvalue
     := match bytes with
        | nil => None
        | (UVALUE_ExtractByte uv dt idx sid)::xs =>
-         all_extract_bytes_from_uvalue_helper 0 sid dt uv bytes
+           guard_opt (dtyp_eqb t dt);;
+           all_extract_bytes_from_uvalue_helper 0 sid dt uv bytes
        | _ => None
        end.
 
   Definition from_ubytes (bytes : list SByte) (dt : dtyp) : uvalue
     :=
-      match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_bytes_from_uvalue bytes with
+      match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_bytes_from_uvalue dt bytes with
       | true, Some uv => uv
       | _, _ => UVALUE_ConcatBytes (map sbyte_to_extractbyte bytes) dt
       end.

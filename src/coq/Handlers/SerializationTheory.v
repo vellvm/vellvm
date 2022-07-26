@@ -10,6 +10,8 @@ From Vellvm Require Import
      Utils.ListUtil
      Utils.Error
      Utils.RefineProp
+     Utils.Monads
+     Utils.MapMonadExtra
      Handlers.MemoryModelImplementation
      Handlers.Serialization
      Semantics.LLVMEvents
@@ -241,6 +243,9 @@ Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : Serializati
       subst.
       rewrite sbyte_to_extractbyte_of_uvalue_sbyte.
       erewrite to_ubytes_all_bytes_from_uvalue_helper; eauto.
+
+      rewrite DynamicTypes.dtyp_eqb_refl.
+      cbn; eauto.
   Qed.
 End MemBytesTheory.
 

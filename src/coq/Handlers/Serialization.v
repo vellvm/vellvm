@@ -9,6 +9,7 @@ From Vellvm Require Import
      Utils.ListUtil
      Utils.NonEmpty
      Utils.NMaps
+     Utils.Monads
      Utils.MonadReturnsLaws
      Utils.RefineProp
      Syntax.LLVMAst
@@ -56,7 +57,7 @@ Module Type SerializationBase (LP : LLVMParams) (MP : MemoryParams LP).
     forall (M : Type -> Type) `{Monad M} (handler : dtyp -> M dvalue) (ERR_M : Type -> Type) `{Monad ERR_M} `{RAISE_ERROR ERR_M} `{RAISE_UB ERR_M} `{RAISE_OOM ERR_M},
       (forall A : Type, ERR_M A -> M A) -> list uvalue -> dtyp -> M dvalue.
 
-  Parameter all_extract_bytes_from_uvalue : list uvalue -> option uvalue.
+  Parameter all_extract_bytes_from_uvalue : dtyp -> list uvalue -> option uvalue.
 
   (* Equations *)
   Parameter concretize_uvalueM_equation :
@@ -136,7 +137,7 @@ Module Type SerializationBase (LP : LLVMParams) (MP : MemoryParams LP).
         | UVALUE_ConcatBytes bytes dt =>
             if N.of_nat (Datatypes.length bytes) =? sizeof_dtyp dt
             then
-              match all_extract_bytes_from_uvalue bytes with
+              match all_extract_bytes_from_uvalue dt bytes with
               | Some uv => concretize_uvalueM M undef_handler ERR_M lift_ue uv
               | None => extractbytes_to_dvalue M undef_handler ERR_M lift_ue bytes dt
               end
@@ -382,10 +383,11 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
 
   (* Check that store ids, uvalues, and types match up, as well as
        that the extract byte indices are in the right order *)
-  Definition all_extract_bytes_from_uvalue (bytes : list uvalue) : option uvalue
+  Definition all_extract_bytes_from_uvalue (t : dtyp) (bytes : list uvalue) : option uvalue
     := match bytes with
        | nil => None
        | (UVALUE_ExtractByte uv dt idx sid)::xs =>
+           guard_opt (dtyp_eqb t dt);;
            all_extract_bytes_from_uvalue_helper 0 sid dt uv bytes
        | _ => None
        end.
@@ -894,7 +896,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
             concretize_uvalueM uv
 
         | UVALUE_ConcatBytes bytes dt =>
-            match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_extract_bytes_from_uvalue bytes with
+            match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_extract_bytes_from_uvalue dt bytes with
             | true, Some uv => concretize_uvalueM uv
             | _, _ => extractbytes_to_dvalue bytes dt
             end
@@ -1072,7 +1074,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
                 concretize_uvalueM uv
 
             | UVALUE_ConcatBytes bytes dt =>
-                match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_extract_bytes_from_uvalue bytes with
+                match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_extract_bytes_from_uvalue dt bytes with
                 | true, Some uv => concretize_uvalueM uv
                 | _, _ => extractbytes_to_dvalue bytes dt
                 end

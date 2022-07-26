@@ -52,68 +52,17 @@ let normalize_float_literal (t:typ) (d:string) =
            failwith ("Illegal 32-bit floating point literal: " ^ dbg)
   | _ -> failwith "normalize_float_literal called with non-float type"
 
-(* att type is a workaround to simplify parsing of optionnal keywords in
- * global / function declaration / definition.
- * It is far from what would be ideal since it will allow to parse silly
- * LLVM IR (keywords at the bad place, or function attributes in global
- * variable declaration, ...).
- * It will work as expected with valid LLVM IR. *)
 
-type att =
-  | OPT_fn_attr of fn_attr list
-  | OPT_align of Camlcoq.Z.t
-  | OPT_section of string
-  | OPT_linkage of linkage
-  | OPT_visibility of visibility
-  | OPT_thread_local of thread_local_storage
-  | OPT_addrspace of Camlcoq.Z.t
-  | OPT_unnamed_addr
-  | OPT_cconv of cconv
-  | OPT_dll_storage of dll_storage
-  | OPT_externally_initialized
-  | OPT_gc of string
+let opt_list (m:'a option) : 'a list =
+  match m with
+  | None -> []
+  | Some x -> [x]
 
-let rec get_opt f  = function
-  | []       -> None
-  | hd :: tl -> match f hd with None -> get_opt f tl | x -> x
+let ann_linkage_opt (m : linkage option) : (typ annotation) option =
+  match m with
+  | None -> None
+  | Some l -> Some (ANN_linkage l)
 
-let get_fn_attrs l =
-  match get_opt (function OPT_fn_attr a -> Some a | _ -> None) l with
-  | None  -> []
-  | Some l -> l
-
-let get_section =
-  get_opt (function OPT_section s -> Some (str s) | _ -> None)
-
-let get_align =
-  get_opt (function OPT_align a -> Some a | _ -> None)
-
-let get_linkage =
-  get_opt (function OPT_linkage l -> Some l | _ -> None)
-
-let get_visibility =
-  get_opt (function OPT_visibility v -> Some v | _ -> None)
-
-let get_addrspace =
-  get_opt (function OPT_addrspace i -> Some i | _ -> None)
-
-let get_dll_storage =
-  get_opt (function OPT_dll_storage i -> Some i | _ -> None)
-
-let get_cconv =
-  get_opt (function OPT_cconv i -> Some i | _ -> None)
-
-let get_thread_local =
-  get_opt (function OPT_thread_local x -> Some x | _ -> None)
-
-let get_gc =
-  get_opt (function OPT_gc x -> Some (str x) | _ -> None)
-
-let is_unnamed_addr l =
-  None <> get_opt (function OPT_unnamed_addr -> Some () | _ -> None) l
-
-let is_externally_initialized l =
-  None <> get_opt (function OPT_externally_initialized -> Some () | _ -> None) l
 
 %}
 
@@ -139,9 +88,10 @@ let is_externally_initialized l =
 %token KW_DATALAYOUT 
 %token KW_TRIPLE 
 %token KW_SOURCE_FILENAME
+
+(* Linkage *)
 %token KW_PRIVATE 
 %token KW_INTERNAL 
-
 %token KW_AVAILABLE_EXTERNALLY 
 %token KW_LINKONCE 
 %token KW_WEAK 
@@ -151,55 +101,103 @@ let is_externally_initialized l =
 %token KW_LINKONCE_ODR 
 %token KW_WEAK_ODR 
 %token KW_EXTERNAL 
-%token KW_DLLIMPORT 
-%token KW_DLLEXPORT
+
+(* Visibility *)
 %token KW_DEFAULT 
 %token KW_HIDDEN 
 %token KW_PROTECTED
 
+(* dll storage *)
+%token KW_DLLIMPORT 
+%token KW_DLLEXPORT
+
+(* Calling Conventions: cconv *)
 %token KW_CCC 
 %token KW_FASTCC 
 %token KW_COLDCC 
 %token KW_CC
+%token KW_WEBKIT_JSCC
+%token KW_ANYREGCC
+%token KW_PRESERVE_MOSTCC
+%token KW_PRESERVE_ALLCC
+%token KW_CXX_FAST_TLSCC
+%token KW_TAILCC
+%token KW_SWIFTCC
+%token KW_SWIFTTAILCC
+%token KW_CFGUARD_CHECKCC
+
 %token KW_UNNAMED_ADDR
+%token KW_LOCAL_UNNAMED_ADDR
+
 %token KW_TYPE 
 %token KW_X 
 %token KW_OPAQUE
 %token KW_GLOBAL 
 %token KW_ADDRSPACE 
 %token KW_CONSTANT 
-%token KW_SECTION 
+%token KW_SECTION
+%token KW_COMDAT
+%token KW_PARTITION
 %token KW_THREAD_LOCAL 
 %token KW_LOCALDYNAMIC 
 %token KW_INITIALEXEC 
 %token KW_LOCALEXEC 
 %token KW_EXTERNALLY_INITIALIZED
+
+(* Parameter Attributes param_attr *)
 %token KW_ZEROEXT 
 %token KW_SIGNEXT 
 %token KW_INREG 
 %token KW_BYVAL 
+%token KW_BYREF
+%token KW_PREALLOCATED
+%token KW_INALLOCA
 %token KW_SRET 
+%token KW_ELEMENTTYPE
+%token KW_ALIGN
 %token KW_NOALIAS 
 %token KW_NOCAPTURE 
+%token KW_READONLY
+%token KW_NOFREE
 %token KW_NEST
-
+%token KW_RETURNED
+%token KW_NONNULL
+%token KW_DEREFERENCEABLE 
+%token KW_DEREFERENCEABLE_OR_NULL
+%token KW_SWIFTSELF
+%token KW_SWIFTASYNC
+%token KW_SWIFTERROR
+%token KW_IMMARG 
+%token KW_NOUNDEF 
 %token KW_ALIGNSTACK
+%token KW_ALLOCALIGN
+%token KW_ALLOCPTR
+
+(* Function Attributes *)
+(* %token KW_ALIGNSTACK *)
+(* %token KW_ALLOC_FAMILY  (* quoted "alloc-family" *) *)
+%token KW_ALLOCKIND
 %token KW_ALLOCSIZE 
 %token KW_ALWAYSINLINE 
 %token KW_BUILTIN 
 %token KW_COLD
 %token KW_CONVERGENT
+%token KW_DISABLE_SANITIZER_INSTRUMENTATION
+(* %token KW_DONTCALL_ERROR *)
+(* %token KW_DONTCALL_WARN *)
+%token KW_FN_RET_THUNK_EXTERN
 %token KW_HOT
 %token KW_INACCESSIBLEMEMONLY
 %token KW_INACCESSIBLEMEM_OR_ARGMEMONLY
 %token KW_INLINEHINT 
 %token KW_JUMPTABLE 
 %token KW_MINSIZE 
-%token KW_NAKED 
+%token KW_NAKED
+(* %token KW_NO_INLINE_LINE_TABLES  (* quoted "no-inline-line-tables" *) *)
 %token KW_NO_JUMP_TABLES
 %token KW_NOBUILTIN 
 %token KW_NODUPLICATE
-%token KW_NOFREE
+(* KW_NOFREE - used in multiple ways *)
 %token KW_NOIMPLICITFLOAT 
 %token KW_NOINLINE 
 %token KW_NOMERGE
@@ -210,18 +208,28 @@ let is_externally_initialized l =
 %token KW_NORECURSE
 %token KW_WILLRETURN
 %token KW_NOSYNC
-%token KW_NOUNWIND 
+%token KW_NOUNWIND
+%token KW_NOSANITIZE_BOUNDS
+%token KW_NOSANITIZE_COVERAGE
 %token KW_NULL_POINTER_IS_VALID
 %token KW_OPTFORFUZZING
 %token KW_OPTNONE 
-%token KW_OPTSIZE 
+%token KW_OPTSIZE
+(* %token KW_PATCHABLE_FUNCTION quoted "patchable-function" *) 
+(* %token KW_PROBE_STACK quoted "probe-stack"  *)
 %token KW_READNONE 
-%token KW_READONLY 
+(* %token KW_READONLY *) 
+(* %token KW_STACK_PROBE_SIZE (* quoted "stack-probe-size" *) *)
+(* %token KW_NO_STACK_ARG_PROBE (* quoted "no-stack-arg-probe " *) *)
 %token KW_WRITEONLY
 %token KW_ARGMEMONLY
 %token KW_RETURNS_TWICE
 %token KW_SAFESTACK
-%token KW_SANITIZE_ADDRESS 
+%token KW_NO_SANITIZE
+%token KW_SANITIZE_ADDRESS
+%token KW_SANITIZE_ADDRESS_DYNINIT
+%token KW_NO_SANITIZE_ADDRESS
+%token KW_NO_SANITIZE_HWADDRESS
 %token KW_SANITIZE_MEMORY 
 %token KW_SANITIZE_THREAD 
 %token KW_SANITIZE_HWADDRESS
@@ -229,22 +237,31 @@ let is_externally_initialized l =
 %token KW_SPECULATIVE_LOAD_HARDENING
 %token KW_SPECULATABLE
 %token KW_SSP 
-%token KW_SSPREQ 
 %token KW_SSPSTRONG
+%token KW_SSPREQ 
 %token KW_STRICTFP
+(* %token KW_DENORMAL_FP_MATH (* quoted "denormal-fp-math" *) *)
+(* %token KW_DENORMAL_FP_MATH_F32 (* quoted "denormal-fp-math-f32" *) *)
+(* %token KW_THUNK (* quoted "thunk" *) *)
+(* %token KW_TLS_LOAD_HOIST (* quoted "tls-load-hoist" *) *)
 %token KW_UWTABLE
+%token KW_SYNC  (* goes with uwtable *)
+%token KW_ASYNC (* goes with uwtable *)
 %token KW_NOCF_CHECK
 %token KW_SHADOWCALLSTACK
 %token KW_MUSTPROGRESS
+(* %token KW_WARN_STACK_SIZE (* quoted "warn-stack-size" *) *)
+%token KW_VSCALE_RANGE
+(* %token KW_MIN_LEGAL_VECTOR_WIDTH (* quoted "min-legal-vector-width" *) *)
 
-%token KW_DEREFERENCEABLE 
-%token KW_INALLOCA
-%token KW_RETURNED 
-%token KW_NONNULL
+%token KW_DSO_PREEMPTABLE
+%token KW_DSO_LOCAL
 
-
-%token KW_ALIGN
 %token KW_GC
+
+%token KW_PREFIX
+%token KW_PROLOGUE
+%token KW_PERSONALITY
 
 %token KW_ADD 
 %token KW_FADD 
@@ -349,8 +366,7 @@ let is_externally_initialized l =
 %token KW_UNE
 %token KW_TAIL
 %token KW_VOLATILE
-%token KW_NOUNDEF 
-%token KW_IMMARG 
+
 
 
 %token<LLVMAst.raw_id> METADATA_ID
@@ -362,6 +378,8 @@ let is_externally_initialized l =
 %start<(LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entities> toplevel_entities
 %start<LLVMAst.typ LLVMAst.instr> test_call
 %start<(LLVMAst.typ * LLVMAst.typ LLVMAst.exp)> texp
+
+
 
 %%
 
@@ -403,150 +421,337 @@ metadata_value:
   | mid=METADATA_ID             { METADATA_Id mid     }
   | mn=metadata_node            { mn                  }
 
+(* For externally defined global variables *)
+%inline
+external_linkage:
+  | KW_EXTERN_WEAK                  { LINKAGE_Extern_weak                  }
+  | KW_EXTERNAL                     { LINKAGE_External                     }
 
-global_decl:
-  | g_ident=gident EQ
-    el=external_linkage
-    attrs=global_attr*
-    g_constant=global_is_constant
-    g_typ=typ
-    opt=preceded(COMMA, separated_list(csep, global_attr))?
-      { let opt = match opt with Some o -> o | None -> [] in
-        { g_ident;
-          g_typ;
-          g_constant;
+(* For internally defined global variabls *)
+%inline
+nonexternal_linkage:
+  | KW_PRIVATE                      { LINKAGE_Private                      }
+  | KW_INTERNAL                     { LINKAGE_Internal                     }
+  | KW_AVAILABLE_EXTERNALLY         { LINKAGE_Available_externally         }
+  | KW_LINKONCE                     { LINKAGE_Linkonce                     }
+  | KW_WEAK                         { LINKAGE_Weak                         }
+  | KW_COMMON                       { LINKAGE_Common                       }
+  | KW_APPENDING                    { LINKAGE_Appending                    }
+  | KW_LINKONCE_ODR                 { LINKAGE_Linkonce_odr                 }
+  | KW_WEAK_ODR                     { LINKAGE_Weak_odr                     }
 
-	  g_exp = None;
-          g_linkage = Some el;
-          g_visibility = get_visibility attrs;
-          g_dll_storage = get_dll_storage attrs;
-          g_thread_local = get_thread_local attrs;
-          g_unnamed_addr = is_unnamed_addr attrs;
-          g_addrspace = get_addrspace attrs;
-          g_externally_initialized = is_externally_initialized attrs;
-          g_section = get_section opt;
-          g_align = get_align opt; } }
-  
-  | g_ident=gident EQ
-    g_linkage=nonexternal_linkage?
-    attrs=global_attr*
-    g_constant=global_is_constant
-    g_typ=typ
-    gv=exp
-    opt=preceded(COMMA, separated_list(csep, global_attr))?
-      { let opt = match opt with Some o -> o | None -> [] in
-        { g_ident;
-          g_typ;
-          g_constant;
-          g_exp = Some (gv g_typ);
+(* For function declarations and definitions *)
+%inline
+linkage:
+  | KW_PRIVATE                      { LINKAGE_Private                      }
+  | KW_INTERNAL                     { LINKAGE_Internal                     }
+  | KW_AVAILABLE_EXTERNALLY         { LINKAGE_Available_externally         }
+  | KW_LINKONCE                     { LINKAGE_Linkonce                     }
+  | KW_WEAK                         { LINKAGE_Weak                         }
+  | KW_COMMON                       { LINKAGE_Common                       }
+  | KW_APPENDING                    { LINKAGE_Appending                    }
+  | KW_EXTERN_WEAK                  { LINKAGE_Extern_weak                  }
+  | KW_LINKONCE_ODR                 { LINKAGE_Linkonce_odr                 }
+  | KW_WEAK_ODR                     { LINKAGE_Weak_odr                     }
+  | KW_EXTERNAL                     { LINKAGE_External                     }
 
-          g_linkage;
-          g_visibility = get_visibility attrs;
-          g_dll_storage = get_dll_storage attrs;
-          g_thread_local = get_thread_local attrs;
-          g_unnamed_addr = is_unnamed_addr attrs;
-          g_addrspace = get_addrspace attrs;
-          g_externally_initialized = is_externally_initialized attrs;
-          g_section = get_section opt;
-          g_align = get_align opt; } }
+%inline
+preemption_specifier:
+  | KW_DSO_PREEMPTABLE { ANN_preemption_specifier PREEMPTION_Dso_preemptable }
+  | KW_DSO_LOCAL { ANN_preemption_specifier PREEMPTION_Dso_local }
 
-global_is_constant:
-  | KW_GLOBAL { false }
-  | KW_CONSTANT { true }
 
-global_attr:
-  | a=visibility                         { OPT_visibility a           }
-  | a=dll_storage                        { OPT_dll_storage a          }
-  | KW_THREAD_LOCAL LPAREN t=tls RPAREN  { OPT_thread_local t         }
-  | KW_UNNAMED_ADDR                      { OPT_unnamed_addr           }
-  | KW_EXTERNALLY_INITIALIZED            { OPT_externally_initialized }
-  | KW_ALIGN n=INTEGER           	 { OPT_align n                }
-  | KW_ADDRSPACE LPAREN n=INTEGER RPAREN { OPT_addrspace n            }
+%inline
+visibility:
+  | KW_DEFAULT   { ANN_visibility VISIBILITY_Default   }
+  | KW_HIDDEN    { ANN_visibility VISIBILITY_Hidden    }
+  | KW_PROTECTED { ANN_visibility VISIBILITY_Protected }
 
-dll_storage:
-  | KW_DLLIMPORT { DLLSTORAGE_Dllimport }
-  | KW_DLLEXPORT { DLLSTORAGE_Dllexport }
+%inline
+dll_storage_class:
+  | KW_DLLIMPORT { ANN_dll_storage DLLSTORAGE_Dllimport }
+  | KW_DLLEXPORT { ANN_dll_storage DLLSTORAGE_Dllexport }
 
+%inline
+thread_local_storage:
+  | KW_THREAD_LOCAL LPAREN t=tls RPAREN  { ANN_thread_local_storage t }
+
+%inline
 tls:
   | KW_LOCALDYNAMIC { TLS_Localdynamic }
   | KW_INITIALEXEC  { TLS_Initialexec  }
   | KW_LOCALEXEC    { TLS_Localexec    }
 
+%inline
+unnamed_addr:
+  | KW_UNNAMED_ADDR       { ANN_unnamed_addr Unnamed_addr }
+  | KW_LOCAL_UNNAMED_ADDR { ANN_unnamed_addr Local_Unnamed_addr }
+
+%inline
+addrspace:
+  | KW_ADDRSPACE LPAREN n=INTEGER RPAREN { ANN_addrspace n }
+
+global_pre_annotations:
+|   p=preemption_specifier?
+    v=visibility?
+    d=dll_storage_class?
+    t=thread_local_storage?
+    u=unnamed_addr? 
+    a=addrspace?
+    { (opt_list p)
+      @ (opt_list v)
+      @ (opt_list d)
+      @ (opt_list t)
+      @ (opt_list u)
+      @ (opt_list a) }
+
+(* For some reason, LLVM IR expects there to be a COMMA before the 
+   annotations for global expressions, but _not_ for declarations or
+   definitions.
+*)
+
+c_section:
+  | csep KW_SECTION s=STRING l=c_partition { (ANN_section (str s)) :: l }
+  |  l=c_partition { l }
+
+c_partition:
+  | csep KW_PARTITION s=STRING l=c_comdat { (ANN_partition (str s)) :: l }
+  | l=c_comdat { l }
+
+c_comdat:
+  | csep KW_COMDAT LPAREN lid=lident RPAREN l=c_align { (ANN_comdat lid) :: l }
+  | l=c_align { l }
+
+c_align:
+  | csep KW_ALIGN n=INTEGER l=c_no_sanitize { (ANN_align n) :: l }
+  | l=c_no_sanitize { l }
+
+c_no_sanitize:
+  | csep KW_NO_SANITIZE l=c_no_sanitize_address { ANN_no_sanitize :: l }
+  | l=c_no_sanitize_address { l }
+
+c_no_sanitize_address:
+  | csep KW_NO_SANITIZE_ADDRESS l=c_no_sanitize_hwaddress { ANN_no_sanitize_address :: l }
+  | l=c_no_sanitize_hwaddress { l }
+
+c_no_sanitize_hwaddress:
+  | csep KW_NO_SANITIZE_HWADDRESS l=c_sanitize_address_dyninit { ANN_no_sanitize_hwaddress :: l }
+  | l=c_sanitize_address_dyninit { l }
+
+c_sanitize_address_dyninit:
+  | csep KW_SANITIZE_ADDRESS_DYNINIT l=c_global_metadata { ANN_sanitize_address_dyninit :: l }
+  | l=c_global_metadata { l }
+
+c_global_metadata:
+ |  m = preceded(csep, separated_nonempty_list(csep, metadata)) { [ANN_metadata m] }
+ | (* empty *) { [] }
+
+metadata:
+  | m1=METADATA_ID m2=metadata_value { (m1, m2) }
+
+
+global_post_annotations:
+    | l=c_section { l }
+
+%inline
+externally_initialized:
+  | KW_EXTERNALLY_INITIALIZED { true }
+  | (* empty *) { false } 
+
+%inline
+global_is_constant:
+  | KW_GLOBAL { false }
+  | KW_CONSTANT { true }
+
+
+global_decl:
+(* Internal declarations - may have initializers *)
+  |  g_ident = gident EQ
+     l = nonexternal_linkage?
+     g_pre = global_pre_annotations
+     g_externally_initialized = externally_initialized
+     g_constant = global_is_constant
+     g_typ=typ
+     gv = exp
+     g_post = global_post_annotations
+    { { g_ident ;
+        g_typ ;
+        g_constant ;
+        g_exp = Some (gv g_typ) ; 
+        g_externally_initialized ;
+        g_annotations = ((opt_list (ann_linkage_opt l)) @ g_pre @ g_post)
+      }
+    }
+      
+(* External declarations - cannot have initializers *)
+  |  g_ident = gident EQ
+     l = external_linkage
+     g_pre = global_pre_annotations
+     g_externally_initialized = externally_initialized
+     g_constant = global_is_constant
+     g_typ=typ
+     g_post = global_post_annotations
+    { { g_ident ;
+	g_typ ;
+	g_constant ;
+	g_exp = None ; (* No initializer *)
+	g_externally_initialized ;
+	g_annotations = ([ANN_linkage l] @ g_pre @ g_post)
+      }
+    }
+
+
+%inline
+section:
+  | KW_SECTION s=STRING { ANN_section (str s) }
+
+%inline
+partition:
+  | KW_PARTITION s=STRING { ANN_partition (str s) }
+
+%inline
+comdat:
+  | KW_COMDAT LPAREN l=lident RPAREN { ANN_comdat l }
+
+%inline
+align_ann:
+  | KW_ALIGN n=INTEGER { ANN_align n }
+
+
+global_metadata:
+  m = nonempty_list(metadata) { ANN_metadata m }
+
+%inline
+cconv:
+  | KW_CCC                {ANN_cconv CC_Ccc}
+  | KW_FASTCC             {ANN_cconv CC_Fastcc}
+  | KW_COLDCC             {ANN_cconv CC_Coldcc}
+  | KW_WEBKIT_JSCC        {ANN_cconv CC_Webkit_jscc}
+  | KW_ANYREGCC		  {ANN_cconv CC_Anyregcc}
+  | KW_PRESERVE_MOSTCC	  {ANN_cconv CC_Preserve_mostcc}
+  | KW_PRESERVE_ALLCC	  {ANN_cconv CC_Preserve_allcc}
+  | KW_CXX_FAST_TLSCC	  {ANN_cconv CC_Cxx_fast_tlscc}
+  | KW_TAILCC		  {ANN_cconv CC_Tailcc}
+  | KW_SWIFTCC		  {ANN_cconv CC_Swiftcc}
+  | KW_SWIFTTAILCC	  {ANN_cconv CC_Swifttailcc}
+  | KW_CFGUARD_CHECKCC	  {ANN_cconv CC_cfguard_checkcc}
+  | KW_CC n=INTEGER       {ANN_cconv (CC_Cc n)}
+
+%inline
+prefix:
+  | KW_PREFIX t = texp { ANN_prefix t }
+
+%inline
+prologue:
+  | KW_PROLOGUE t = texp { ANN_prologue t }
+
+%inline
+personality:
+  | KW_PERSONALITY t = texp { ANN_personality t }
+
+%inline
+gc:
+  | KW_GC s = STRING { ANN_gc (str s) }
+
+
+dc_arg:
+  | t=typ p=param_attr*         { (t, p) }
+  | t=typ p=param_attr* lident  { (t, p) }  (* Throw away declaration names? *)
+
+dc_args:
+  | (* empty *)  { ([], false) }
+  | DOTDOTDOT    { ([], true) }
+  | arg=dc_arg   { ([arg], false) }
+  | arg=dc_arg csep r=dc_args  { (arg::(fst r), snd r) }
+
+%inline
 declaration:
   | KW_DECLARE
-    pre_attrs=df_pre_attr*
+    l = linkage?
+    p = preemption_specifier?
+    v = visibility?
+    d = dll_storage_class?
+    c = cconv?
     df_ret_attrs=param_attr*
     df_ret_typ=typ
     name=GLOBAL
 
     midrule( { void_ctr.reset () } )   (* reset the void counter to 0 *)
 
-    LPAREN dc_args=separated_list(csep, dc_arg) RPAREN
-    post_attrs=df_post_attr*
+    LPAREN args = dc_args RPAREN
 
-    { 
+    u = unnamed_addr?
+    dc_attrs = fn_attr*
+    a = align_ann?
+    g = gc?
+    pre = prefix?
+    pro = prologue?
+
+    { let (dc_args, vararg) = args in
       {
-	 dc_type        = TYPE_Function(df_ret_typ, List.map fst dc_args);
+	 dc_name        = lexed_id_to_raw_id name ;
+	 dc_type        = TYPE_Function(df_ret_typ, List.map fst dc_args, vararg);
          dc_param_attrs = (df_ret_attrs, List.map snd dc_args);
-         dc_name        = lexed_id_to_raw_id name ;
-         dc_linkage     = get_linkage pre_attrs;
-         dc_visibility  = get_visibility pre_attrs;
-         dc_dll_storage = get_dll_storage pre_attrs;
-         dc_cconv       = get_cconv pre_attrs;
-         dc_attrs       = get_fn_attrs post_attrs;
-         dc_section     = get_section post_attrs;
-         dc_align       = get_align post_attrs;
-         dc_gc          = get_gc post_attrs;
+	 dc_attrs;
+	 dc_annotations =
+	   ( (opt_list (ann_linkage_opt l))
+	     @ (opt_list p)
+	     @ (opt_list v)
+	     @ (opt_list d)
+	     @ (opt_list c)
+	     @ (opt_list u)
+	     @ (opt_list a)
+	     @ (opt_list g)
+	     @ (opt_list pre)
+	     @ (opt_list pro)
+	   )
       }
     }
 
+df_args:
+  | (* empty *)  { ([], false) }
+  | DOTDOTDOT    { ([], true) }
+  | arg=df_arg   { ([arg], false) }
+  | arg=df_arg csep r=df_args  { (arg::(fst r), snd r) }
 
-(* Dealing with anonymous identifiers 
 
-   Each function definition in LLVM IR can have so-called "anonymous" local identifiers
-   some of which can be omitted from the concrete syntax of the program.
+df_arg:
+ | t=typ p=param_attr*                { ((t, p), None)   }  (* Later generate anonymous label *)
+ | t=typ p=param_attr* l=bound_lident { ((t, p), Some l) }  (* Later validate anonymous or use name *)
 
-   These identifiers are either 
-       - temporaries (a.k.a. registers) of the name %NNN, found as function arguments or 
-         on the left-hand-sides of instruction definitions, or
-       - block labels (without the '%') that are numbered
-
-   All "anonymous" identifiers, whether omitted or not, must be bound consecutively (in
-   program order).  This means that a parser for an LLVM IR function 
-   Block labels, function arguments, and local temporaries all share the same counter.
-
-   So-called "void" instructions, that _don't_ have a binding occurrence (i.e. to the left of an =)
-   but we still generate a unique identifier for them for use in the semantics.   
-*)
-
-(* Correctly parsing a CFG definition while generating / checking anonymous
-   instruction identifiers is annoying because what to do for a `call`
-   instruction depends on the type of the call.  If the function's return type
-   is "void" then no identifier is bound (and it is a syntax error to try to
-   bind an identifier).  If the function's return-type is non-void, then
-   an anonymous identifier might need to be generated / checked.
-
-   Also, since some anonymous identifiers can be omitted, we have to process
-   the whole function body and then post-process to either check of generate
-   the appropriate anonymous ids.
-*)
-
+%inline
 definition:
   | KW_DEFINE
-    pre_attrs     = df_pre_attr*
+    l = linkage?
+    p = preemption_specifier?
+    v = visibility?
+    d = dll_storage_class?
+    c = cconv?
     df_ret_attrs  = param_attr*
     df_ret_typ    = typ
     name          = GLOBAL
 
     midrule( { void_ctr.reset () } )   (* reset the void counter to 0 *)
 
-    LPAREN args=separated_list(csep, df_arg) RPAREN
+    LPAREN df_args = df_args RPAREN
 
-    post_attrs   = df_post_attr* EOL*
+    u = unnamed_addr?
+    ad = addrspace?
+    dc_attrs = fn_attr*
+
+    sec = section?
+    part = partition?
+    com = comdat?
+    al = align_ann?
+    g = gc?
+    pre = prefix?
+    pro = prologue?
+    per = personality?
+    meta = global_metadata?
     LCURLY EOL*
     blks=df_blocks
     RCURLY
-    {
+    { let (args, vararg) = df_args in
       (* prepare to validate / generate the sequential identifiers *)
       let _ = anon_ctr.reset ()
       in
@@ -583,31 +788,65 @@ definition:
 	| entry::body -> (entry, body)
       in
       { df_prototype = {
+	  dc_name        = lexed_id_to_raw_id name;
           dc_type = TYPE_Function (df_ret_typ, 
-                                   List.map (fun x -> fst (fst x)) args) ;
+                                   List.map (fun x -> fst (fst x)) args, vararg) ;
           dc_param_attrs = (df_ret_attrs,
-                           List.map (fun x -> snd (fst x)) args) ;
-          dc_name        = lexed_id_to_raw_id name;
-	  dc_linkage     = get_linkage pre_attrs;
-          dc_visibility  = get_visibility pre_attrs;
-          dc_dll_storage = get_dll_storage pre_attrs;
-          dc_cconv       = get_cconv pre_attrs;
-          dc_attrs       = get_fn_attrs post_attrs;
-          dc_section     = get_section post_attrs;
-          dc_align       = get_align post_attrs;
-          dc_gc          = get_gc post_attrs;
-	  } ;
+                            List.map (fun x -> snd (fst x)) args) ;
+	  dc_attrs;
+	  dc_annotations =
+	    ( (opt_list (ann_linkage_opt l))
+	      @ (opt_list p)
+	      @ (opt_list v)
+	      @ (opt_list d)
+	      @ (opt_list c)
+	      @ (opt_list u)
+	      @ (opt_list ad)
+	      @ (opt_list sec)
+	      @ (opt_list part)
+	      @ (opt_list com)
+	      @ (opt_list al)
+	      @ (opt_list g)
+	      @ (opt_list pre)
+	      @ (opt_list pro)
+	      @ (opt_list per)
+	      @ (opt_list meta)
+	    )
+	} ;
         df_args;
         df_instrs;
       }
     }
 
-(*
-      begin match blks with
-      | [] -> failwith "illegal LLVM function definition: must have non-empty entry block"
-      | entry::rest -> (entry, rest)
-      end
-    }
+
+(* Dealing with anonymous identifiers 
+
+   Each function definition in LLVM IR can have so-called "anonymous" local identifiers
+   some of which can be omitted from the concrete syntax of the program.
+
+   These identifiers are either 
+       - temporaries (a.k.a. registers) of the name %NNN, found as function arguments or 
+         on the left-hand-sides of instruction definitions, or
+       - block labels (without the '%') that are numbered
+
+   All "anonymous" identifiers, whether omitted or not, must be bound consecutively (in
+   program order).  This means that a parser for an LLVM IR function 
+   Block labels, function arguments, and local temporaries all share the same counter.
+
+   So-called "void" instructions, that _don't_ have a binding occurrence (i.e. to the left of an =)
+   but we still generate a unique identifier for them for use in the semantics.   
+*)
+
+(* Correctly parsing a CFG definition while generating / checking anonymous
+   instruction identifiers is annoying because what to do for a `call`
+   instruction depends on the type of the call.  If the function's return type
+   is "void" then no identifier is bound (and it is a syntax error to try to
+   bind an identifier).  If the function's return-type is non-void, then
+   an anonymous identifier might need to be generated / checked.
+
+   Also, since some anonymous identifiers can be omitted, we have to process
+   the whole function body and then post-process to either check of generate
+   the appropriate anonymous ids.
 *)
 
 
@@ -681,62 +920,11 @@ df_blocks:
   | blks=block+
     { blks }
 
-df_pre_attr:
-  | a=linkage                            { OPT_linkage a     }
-  | a=visibility                         { OPT_visibility a  }
-  | a=dll_storage                        { OPT_dll_storage a }
-  | a=cconv                              { OPT_cconv a       }
-
-df_post_attr:
-  | KW_ADDRSPACE LPAREN n=INTEGER RPAREN { OPT_addrspace n   }
-  | KW_UNNAMED_ADDR                      { OPT_unnamed_addr  }
-  | a=fn_attr+                           { OPT_fn_attr a     }
-  (* parser conflict with fn_attr+ looking for a df_post_attr list,
-   * because if function attribute a2 follows function attribute a1,
-   * it can be seen as [...;[a1];[a2];...] or [...;[a1;a2];...].
-   * Shifting to [a1;a2] is the good solution and it is how menhir
-   * will handle this conflict. *)
-  | s=section                            { OPT_section s     }
-                                         (* TODO: comdat *)
-  | a=align                              { OPT_align a       }
-  | KW_GC a=STRING                       { OPT_gc a          }
-                                         (* TODO: prefix *)
-external_linkage:
-  | KW_EXTERN_WEAK                  { LINKAGE_Extern_weak                  }
-  | KW_EXTERNAL                     { LINKAGE_External                     }
-
-nonexternal_linkage:
-  | KW_PRIVATE                      { LINKAGE_Private                      }
-  | KW_INTERNAL                     { LINKAGE_Internal                     }
-  | KW_AVAILABLE_EXTERNALLY         { LINKAGE_Available_externally         }
-  | KW_LINKONCE                     { LINKAGE_Linkonce                     }
-  | KW_WEAK                         { LINKAGE_Weak                         }
-  | KW_COMMON                       { LINKAGE_Common                       }
-  | KW_APPENDING                    { LINKAGE_Appending                    }
-  | KW_LINKONCE_ODR                 { LINKAGE_Linkonce_odr                 }
-  | KW_WEAK_ODR                     { LINKAGE_Weak_odr                     }
-
-linkage:
-  | KW_PRIVATE                      { LINKAGE_Private                      }
-  | KW_INTERNAL                     { LINKAGE_Internal                     }
-  | KW_AVAILABLE_EXTERNALLY         { LINKAGE_Available_externally         }
-  | KW_LINKONCE                     { LINKAGE_Linkonce                     }
-  | KW_WEAK                         { LINKAGE_Weak                         }
-  | KW_COMMON                       { LINKAGE_Common                       }
-  | KW_APPENDING                    { LINKAGE_Appending                    }
-  | KW_EXTERN_WEAK                  { LINKAGE_Extern_weak                  }
-  | KW_LINKONCE_ODR                 { LINKAGE_Linkonce_odr                 }
-  | KW_WEAK_ODR                     { LINKAGE_Weak_odr                     }
-  | KW_EXTERNAL                     { LINKAGE_External                     }
-
-visibility:
-  | KW_DEFAULT   { VISIBILITY_Default   }
-  | KW_HIDDEN    { VISIBILITY_Hidden    }
-  | KW_PROTECTED { VISIBILITY_Protected }
-
-cconv:
-  |KW_CCC{CC_Ccc}|KW_FASTCC{CC_Fastcc}|KW_COLDCC{CC_Coldcc}
-  |KW_CC n=INTEGER{CC_Cc n}
+typ_args:
+  | (* empty *)  { ([], false) }
+  | DOTDOTDOT    { ([], true) }
+  | arg=typ   { ([arg], false) }
+  | arg=typ csep r=typ_args  { (arg::(fst r), snd r) }
 
 typ:
   | n=I                                               { TYPE_I n              }
@@ -751,7 +939,7 @@ typ:
   | KW_X86_MMX                                        { TYPE_X86_mmx          }
   | t=typ STAR                                        { TYPE_Pointer t        }
   | LSQUARE n=INTEGER KW_X t=typ RSQUARE              { TYPE_Array (n_of_z n, t)  }
-  | t=typ LPAREN ts=separated_list(csep, typ) RPAREN  { TYPE_Function (t, ts) }
+  | t=typ LPAREN args=typ_args RPAREN                    { let (ts,v) = args in TYPE_Function (t, ts, v) }
   | LCURLY ts=separated_list(csep, typ) RCURLY        { TYPE_Struct ts        }
   | LTLCURLY ts=separated_list(csep, typ) RCURLYGT    { TYPE_Packed_struct ts }
   | KW_OPAQUE                                         { TYPE_Opaque           }
@@ -759,49 +947,63 @@ typ:
   | l=lident                                          { TYPE_Identified (ID_Local l)  }
 
 param_attr:
-  | KW_ZEROEXT                   { PARAMATTR_Zeroext           }
-  | KW_SIGNEXT                   { PARAMATTR_Signext           }
-  | KW_INREG                     { PARAMATTR_Inreg             }
-  | KW_BYVAL t=typ                     { PARAMATTR_Byval t             }
-  | KW_INALLOCA t=typ                 { PARAMATTR_Inalloca t          }
-  | KW_SRET t=typ                { PARAMATTR_Sret t            }
-  | KW_ALIGN n=INTEGER           { PARAMATTR_Align n           }
-  | KW_NOALIAS                   { PARAMATTR_Noalias           }
-  | KW_NOCAPTURE                 { PARAMATTR_Nocapture         }
-  | KW_READONLY                  { PARAMATTR_Readonly          }
-  | KW_NEST                      { PARAMATTR_Nest              }
-  | KW_RETURNED                  { PARAMATTR_Returned          }
-  | KW_NONNULL                   { PARAMATTR_Nonnull           }
+  | KW_ZEROEXT                           { PARAMATTR_Zeroext                   }
+  | KW_SIGNEXT                           { PARAMATTR_Signext                   }
+  | KW_INREG                             { PARAMATTR_Inreg                     }
+  | KW_BYVAL LPAREN t=typ RPAREN         { PARAMATTR_Byval t                   }
+  | KW_BYREF LPAREN t=typ RPAREN         { PARAMATTR_Byref t                   }
+  | KW_PREALLOCATED LPAREN t=typ RPAREN  { PARAMATTR_Preallocated t            }
+  | KW_INALLOCA LPAREN t=typ RPAREN      { PARAMATTR_Inalloca t                }
+  | KW_SRET LPAREN t=typ RPAREN          { PARAMATTR_Sret t                    }
+  | KW_ELEMENTTYPE LPAREN t=typ RPAREN   { PARAMATTR_Elementtype t             }
+  | KW_ALIGN n=INTEGER                   { PARAMATTR_Align n                   }
+  | KW_ALIGN LPAREN n=INTEGER RPAREN     { PARAMATTR_Align n                   }
+  | KW_NOALIAS                           { PARAMATTR_Noalias                   }
+  | KW_NOCAPTURE                         { PARAMATTR_Nocapture                 }
+  | KW_NOFREE                            { PARAMATTR_Nofree                    }
+  | KW_NEST                              { PARAMATTR_Nest                      }
+  | KW_READONLY                          { PARAMATTR_Readonly                  }
+  | KW_RETURNED                          { PARAMATTR_Returned                  }
+  | KW_NONNULL                           { PARAMATTR_Nonnull                   }
   | KW_DEREFERENCEABLE LPAREN n=INTEGER RPAREN
-                                 { PARAMATTR_Dereferenceable n }
-  | KW_IMMARG                    { PARAMATTR_Immarg            }
-  | KW_NOUNDEF                   { PARAMATTR_Noundef           }
-  | KW_NOFREE                    { PARAMATTR_Nofree            }
+                                         { PARAMATTR_Dereferenceable n         }
+  | KW_DEREFERENCEABLE_OR_NULL LPAREN n=INTEGER RPAREN
+                                         { PARAMATTR_Dereferenceable_or_null n }
+  | KW_SWIFTSELF                         { PARAMATTR_Swiftself                 }
+  | KW_SWIFTASYNC                        { PARAMATTR_Swiftasync                }
+  | KW_SWIFTERROR                        { PARAMATTR_Swifterror                }
+  | KW_IMMARG                            { PARAMATTR_Immarg                    }
+  | KW_NOUNDEF                           { PARAMATTR_Noundef                   }
+  | KW_ALIGNSTACK LPAREN n=INTEGER RPAREN
+                                         { PARAMATTR_Alignstack n              }
+  | KW_ALLOCALIGN                        { PARAMATTR_Allocalign                }
+  | KW_ALLOCPTR                          { PARAMATTR_Allocptr                  }
 
-dc_arg:
-  | t=typ p=param_attr*         { (t, p) }
-  | t=typ p=param_attr* lident  { (t, p) }  (* Throw away declaration names? *)
 
-df_arg:
- | t=typ p=param_attr*                { ((t, p), None)   }  (* Later generate anonymous label *)
- | t=typ p=param_attr* l=bound_lident { ((t, p), Some l) }  (* Later validate anonymous or use name *)
 
 call_arg: t=typ i=exp             { (t, i t)      }
 
 fn_attr:
   | KW_ALIGNSTACK LPAREN p=INTEGER RPAREN { FNATTR_Alignstack p     }
+  (*  KW_ALLOC_FAMILY - quoted KeyValue *)
+  | KW_ALLOCKIND LPAREN s=STRING RPAREN   { FNATTR_Allockind (str s) }
   | KW_ALLOCSIZE LPAREN l=separated_nonempty_list(csep, INTEGER) RPAREN
                                           { match l with
-					    | [] -> failwith "illegal"
+					    | [] -> failwith "impossible"
 					    | x :: [] -> FNATTR_Allocsize (x, None)
 					    | x :: y :: [] -> FNATTR_Allocsize (x, Some y)
-					    | _ -> failwith "illegal too long"
+					    | _ -> failwith "allocsize illegal - too long"
 
                                           }
   | KW_ALWAYSINLINE                       { FNATTR_Alwaysinline     }
   | KW_BUILTIN                            { FNATTR_Nobuiltin        }
   | KW_COLD                               { FNATTR_Cold             }
   | KW_CONVERGENT                         { FNATTR_Convergent       }
+  | KW_DISABLE_SANITIZER_INSTRUMENTATION  { FNATTR_Disable_sanitizer_instrumentation }
+(* KW_DONTCALL_ERROR - quoted *)
+(* KW_DONTCALL_WARN - quoted *) 
+  | KW_FN_RET_THUNK_EXTERN                { FNATTR_Fn_ret_thunk_extern }
+(* KW_FRAME_POINTER - quoted KeyValue *) 
   | KW_HOT                                { FNATTR_Hot              }
   | KW_INACCESSIBLEMEMONLY                { FNATTR_Inaccessiblememonly }
   | KW_INACCESSIBLEMEM_OR_ARGMEMONLY      { FNATTR_Inaccessiblemem_or_argmemonly }
@@ -809,6 +1011,7 @@ fn_attr:
   | KW_JUMPTABLE                          { FNATTR_Jumptable        }
   | KW_MINSIZE                            { FNATTR_Minsize          }
   | KW_NAKED                              { FNATTR_Naked            }
+(* KW_NO_INLINE_LINE_TABLES - quoted *)
   | KW_NO_JUMP_TABLES                     { FNATTR_No_jump_tables   }
   | KW_NOBUILTIN                          { FNATTR_Nobuiltin        }
   | KW_NODUPLICATE                        { FNATTR_Noduplicate      }
@@ -824,12 +1027,18 @@ fn_attr:
   | KW_WILLRETURN                         { FNATTR_Willreturn       }
   | KW_NOSYNC                             { FNATTR_Nosync           }
   | KW_NOUNWIND                           { FNATTR_Nounwind         }
+  | KW_NOSANITIZE_BOUNDS                  { FNATTR_Nosanitize_bounds }
+  | KW_NOSANITIZE_COVERAGE                { FNATTR_Nosanitize_coverage }  
   | KW_NULL_POINTER_IS_VALID              { FNATTR_Null_pointer_is_valid }
   | KW_OPTFORFUZZING                      { FNATTR_Optforfuzzing    }
   | KW_OPTNONE                            { FNATTR_Optnone          }
   | KW_OPTSIZE                            { FNATTR_Optsize          }
+(* KW_PATCHABLE_FUNCTION - quoted KeyValue *)
+(* KW_PROBE_STACK - quoted *)
   | KW_READNONE                           { FNATTR_Readnone         }
   | KW_READONLY                           { FNATTR_Readonly         }
+(* KW_STACK_PROBE_SIZE - quoted KeyValue *)
+(* KW_NO_STACK_ARG_PROBE - quoted *)
   | KW_WRITEONLY                          { FNATTR_Writeonly        }
   | KW_ARGMEMONLY                         { FNATTR_Argmemonly       }
   | KW_RETURNS_TWICE                      { FNATTR_Returns_twice    }
@@ -842,20 +1051,29 @@ fn_attr:
   | KW_SPECULATIVE_LOAD_HARDENING         { FNATTR_Speculative_load_hardening }
   | KW_SPECULATABLE                       { FNATTR_Speculatable     }
   | KW_SSP                                { FNATTR_Ssp              }
-  | KW_SSPREQ                             { FNATTR_Sspreq           }
   | KW_SSPSTRONG                          { FNATTR_Sspstrong        }
+  | KW_SSPREQ                             { FNATTR_Sspreq           }
   | KW_STRICTFP                           { FNATTR_Strictfp         }
-  | KW_UWTABLE                             { FNATTR_Uwtable true          }
+(* KW_DENORMAL_FP_MATH - quoted KeyValue *)
+(* KW_DENORMAL_FP_MATH_F32 - quoted KeyValue *)
+(* KW_THUNK - quoted *)
+  | KW_UWTABLE                            { FNATTR_Uwtable None     }
+  | KW_UWTABLE LPAREN KW_SYNC RPAREN      { FNATTR_Uwtable (Some true) }
+  | KW_UWTABLE LPAREN KW_ASYNC RPAREN     { FNATTR_Uwtable (Some false) }  
   | KW_NOCF_CHECK                         { FNATTR_Nocf_check       }
   | KW_SHADOWCALLSTACK                    { FNATTR_Shadowcallstack  }
   | KW_MUSTPROGRESS                       { FNATTR_Mustprogress     }
+  | KW_VSCALE_RANGE LPAREN l=separated_nonempty_list(csep, INTEGER) RPAREN
+                                          { match l with
+					    | [] -> failwith "impossible"
+					    | x :: [] -> FNATTR_Vscale_range (x, None)
+					    | x :: y :: [] -> FNATTR_Vscale_range (x, Some y)
+					    | _ -> failwith "allocsize illegal - too long"
+					  }
   | s=STRING                              { FNATTR_String (str s)   }
   | k=STRING EQ v=STRING                  { FNATTR_Key_value (str k, str v) }
   | i=ATTR_GRP_ID                         { FNATTR_Attr_grp i       }
 
-align: KW_ALIGN p=INTEGER { p }
-
-section: KW_SECTION s=STRING { s }
 
 %inline
 ibinop_nuw_nsw_opt: (* may appear with `nuw`/`nsw` keywords *)
@@ -924,11 +1142,11 @@ conversion:
   | KW_BITCAST  { Bitcast  }
 
 ibinop:
-  | op=ibinop_nuw_nsw_opt nuw=KW_NUW? nsw=KW_NSW?
-    { op (nuw <> None) (nsw <> None) }
-  (* allow `nsw` to be first *)
-  | op=ibinop_nuw_nsw_opt KW_NSW nuw=KW_NUW?
-    { op (nuw <> None) true }
+  | op=ibinop_nuw_nsw_opt   { op false false }
+  | op=ibinop_nuw_nsw_opt KW_NSW { op false true }
+  | op=ibinop_nuw_nsw_opt KW_NUW { op true false }
+  | op=ibinop_nuw_nsw_opt KW_NUW KW_NSW { op true true }
+  | op=ibinop_nuw_nsw_opt KW_NSW KW_NUW { op true true }  
   | op=ibinop_exact_opt exact=KW_EXACT? { op (exact <> None) }
   | op=ibinop_no_opt { op }
 
@@ -1114,17 +1332,19 @@ terminator:
   | KW_UNREACHABLE
     { TERM_Unreachable }
 
+align:
+  | KW_ALIGN n=INTEGER { n }
 
 alloca_opt:
-  | a=align                           { (None, Some a) }
+  | a=align                  { (None, Some a) }
   | nb=texp a=preceded(COMMA, align)? { (Some nb, a) }
 
 
 switch_table_entry:
   | sz=I x=INTEGER COMMA i=branch_label EOL? { (TInt_Literal(sz, x), i) }
 
-csep:
-  COMMA EOL* { () }
+%inline csep:
+  COMMA EOL* { }
 
 
 lident:
