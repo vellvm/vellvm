@@ -2105,7 +2105,7 @@ Section InstrGenerators.
   Definition gen_helper_function: GenLLVM (definition typ (block typ * list (block typ)))
     :=
     ret_t <- hide_ctx gen_sized_typ_ptrinctx;;
-    args <-  listOf_LLVM (hide_ctx gen_sized_typ_ptrinctx);;
+    args  <- listOf_LLVM (hide_ctx gen_sized_typ_ptrinctx);;
     gen_new_definition ret_t args.
 
   Definition gen_helper_function_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
