@@ -150,11 +150,23 @@ Extract Constant vellvm_print_ll => "fun prog -> Llvm_printer.toplevel_entities 
 Definition run_llc (prog : list (toplevel_entity typ (block typ * list (block typ)))) : dvalue
   := DVALUE_I8 (repr (llc_command (to_caml_str (show prog)))).
 
+(* Hide show instance... *)
+Inductive PROG :=
+| Prog : list (toplevel_entity typ (block typ * list (block typ))) -> PROG
+.
+
+#[global] Instance Show_PROG : Show PROG :=
+  { show p := "" (* PROG: avoiding inefficient printing in QC, see #253 *) }.
+
+Definition gen_PROG : GenLLVM PROG
+  := fmap Prog gen_llvm.
+
 (** Basic property to make sure that Vellvm and Clang agree when they
     both produce values *)
-Definition vellvm_agrees_with_clang_parallel (prog : list (toplevel_entity typ (block typ * list (block typ)))) : Checker
+Definition vellvm_agrees_with_clang_parallel (p : PROG) : Checker
   :=
   (* collect (show prog) *)
+  let '(Prog prog) := p in
   let pid := fork tt in
   if oeq pid ozero
   then (* Child *)
@@ -165,7 +177,9 @@ Definition vellvm_agrees_with_clang_parallel (prog : list (toplevel_entity typ (
     match vellvm_res, clang_res with
     | MlOk _ _ (DVALUE_I8 x), (WEXITED ocaml_y) =>
         let y := repr (oint_to_Z ocaml_y) in
-        whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) (equ x y)
+        if equ x y
+        then checker true
+        else whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false
     | _, (WSIGNALED ocaml_y) =>
         whenFail ("clang process signaled") false
     | _, (WSTOPPED ocaml_y) =>
@@ -174,24 +188,26 @@ Definition vellvm_agrees_with_clang_parallel (prog : list (toplevel_entity typ (
         whenFail ("Something else went wrong... Vellvm: " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
     end.
 
-
 (** Basic property to make sure that Vellvm and Clang agree when they
     both produce values *)
-Definition vellvm_agrees_with_clang (prog : list (toplevel_entity typ (block typ * list (block typ)))) : Checker
+Definition vellvm_agrees_with_clang (p : PROG) : Checker
   :=
   (* collect (show prog) *)
+  let '(Prog prog) := p in
   let clang_res := run_llc prog in
   let vellvm_res := interpret prog in
   match clang_res, vellvm_res with
   | DVALUE_I8 y, MlOk _ _ (DVALUE_I8 x) =>
-      whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) (equ x y)
+      if equ x y
+      then checker true
+      else whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false
   | _, _ =>
       whenFail ("Something else went wrong... Vellvm: " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
   end.
 
-Definition agrees := (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang).
+(* Definition agrees := (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang). *)
 
-Extract Constant defNumTests    => "10000".
+Extract Constant defNumTests    => "5000".
 QCInclude "../../ml/*".
 QCInclude "../../ml/libvellvm/*".
 
@@ -200,5 +216,5 @@ QCInclude "../../ml/libvellvm/*".
 (* QCInclude "../../ml/libvellvm/Camlcoq.ml". *)
 (* QCInclude "../../ml/extracted/*ml". *)
 Extract Inlined Constant Error.failwith => "(fun _ -> raise)".
-QuickChick (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang).
+QuickChick (forAll (run_GenLLVM gen_PROG) vellvm_agrees_with_clang).
 (*! QuickChick agrees. *)
