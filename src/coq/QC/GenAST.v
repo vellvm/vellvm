@@ -192,17 +192,23 @@ Section Helpers.
 End Helpers.
 
 Section GenerationState.
+
+  Definition type_context := list (ident * typ).
+  Definition var_context := list (ident * typ).
+  Definition ptr_to_int_context := list (typ * ident * typ).
+  Definition all_var_contexts := (var_context * ptr_to_int_context)%type.
+
   Record GenState :=
     mkGenState
-    { num_void : nat
-    ; num_raw  : nat
-    ; num_global : nat
-    ; num_blocks : nat
+    { num_void : N
+    ; num_raw  : N
+    ; num_global : N
+    ; num_blocks : N
     (* Types of values *)
-    ; gen_ctx : list (ident * typ)
+    ; gen_ctx : var_context
     (* Type aliases *)
-    ; gen_typ_ctx : list (ident * typ)
-    ; gen_ptrtoint_ctx : list (typ * ident * typ)
+    ; gen_typ_ctx : type_context
+    ; gen_ptrtoint_ctx : ptr_to_int_context
     }.
 
   Definition init_GenState : GenState
@@ -217,7 +223,7 @@ Section GenerationState.
 
   Definition increment_raw (gs : GenState) : GenState
     := {| num_void    := gs.(num_void)
-        ; num_raw     := S gs.(num_raw)
+        ; num_raw     := N.succ gs.(num_raw)
         ; num_global  := gs.(num_global)
         ; num_blocks  := gs.(num_blocks)
         ; gen_ctx     := gs.(gen_ctx)
@@ -228,7 +234,7 @@ Section GenerationState.
   Definition increment_global (gs : GenState) : GenState
     := {| num_void    := gs.(num_void)
         ; num_raw     := gs.(num_raw)
-        ; num_global  := S gs.(num_global)
+        ; num_global  := N.succ gs.(num_global)
         ; num_blocks  := gs.(num_blocks)
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
@@ -236,7 +242,7 @@ Section GenerationState.
        |}.
 
   Definition increment_void (gs : GenState) : GenState
-    := {| num_void    := S gs.(num_void)
+    := {| num_void    := N.succ gs.(num_void)
         ; num_raw     := gs.(num_raw)
         ; num_global  := gs.(num_global)
         ; num_blocks  := gs.(num_blocks)
@@ -249,7 +255,7 @@ Section GenerationState.
     := {| num_void    := gs.(num_void)
         ; num_raw     := gs.(num_raw)
         ; num_global  := gs.(num_global)
-        ; num_blocks  := S gs.(num_blocks)
+        ; num_blocks  := N.succ gs.(num_blocks)
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
@@ -294,16 +300,16 @@ Section GenerationState.
       typeclasses eauto.
   Defined.
 
-  Definition get_raw (gs : GenState) : nat
+  Definition get_raw (gs : GenState) : N
     := gs.(num_raw).
 
-  Definition get_global (gs : GenState) : nat
+  Definition get_global (gs : GenState) : N
     := gs.(num_global).
 
-  Definition get_void (gs : GenState) : nat
+  Definition get_void (gs : GenState) : N
     := gs.(num_void).
 
-  Definition get_blocks (gs : GenState) : nat
+  Definition get_blocks (gs : GenState) : N
     := gs.(num_blocks).
 
   #[global] Instance MGEN : Monad GenLLVM.
@@ -325,17 +331,12 @@ Section GenerationState.
   Definition new_void_id : GenLLVM instr_id
     := n <- gets get_void;;
        modify increment_void;;
-       ret (IVoid (Z.of_nat n)).
+       ret (IVoid (Z.of_N n)).
 
   Definition new_block_id : GenLLVM block_id
     := n <- gets get_blocks;;
        modify increment_blocks;;
        ret (Name ("b" ++ show n)).
-
-  Definition type_context := list (ident * typ).
-  Definition var_context := list (ident * typ).
-  Definition ptr_to_int_context := list (typ * ident * typ).
-  Definition all_var_contexts := (var_context * ptr_to_int_context)%type.
 
   Definition get_ctx : GenLLVM var_context
     := gets (fun gs => gs.(gen_ctx)).
