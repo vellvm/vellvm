@@ -4758,756 +4758,1357 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         + admit.
     Admitted.
 
+    Hint Resolve find_free_block_correct : EXEC_CORRECT.
+
+    Lemma mem_state_fresh_provenance_correct :
+      forall ms_init ms_fresh_pr (pr : Provenance),
+        mem_state_fresh_provenance ms_init = (pr, ms_fresh_pr) ->
+        @fresh_provenance Provenance (MemPropT MemState) _ ms_init (ret (ms_fresh_pr, pr)).
+    Proof.
+      intros ms_init ms_fresh_pr pr FRESH.
+      cbn.
+      unfold mem_state_fresh_provenance in FRESH.
+      destruct ms_init as (ms & pr_init).
+      inv FRESH.
+
+      solve_fresh_provenance_invariants.
+    Qed.
+
+    Require Import Error.
+    Require Import MonadReturnsLaws.
+    Require Import ItreeRaiseMReturns.
+
+    (* TODO: move this *)
+    Lemma exec_correct_bind' :
+      forall {MemM Eff ExtraState} `{MEMM : MemMonad ExtraState MemM (itree Eff)}
+        {A B}
+        (m_exec : MemM A) (k_exec : A -> MemM B)
+        (m_spec : MemPropT MemState A) (k_spec : A -> MemPropT MemState B),
+        exec_correct m_exec m_spec ->
+        (* This isn't true:
+
+           (forall a ms ms', m_spec ms (ret (ms', a)) -> exec_correct (k_exec a) (k_spec a)) -> ...
+
+           E.g., if 1 is a valid return value in m_spec, but m_exec can only return 0, then
+
+           k_spec may ≈ ret 2
+
+           But k_exec may ≈ \a => if a == 0 then ret 2 else raise_ub "blah"
+
+           I.e., k_exec may be set up to only be valid when results are returned by m_exec.
+         *)
+        (forall a ms ms' st st',
+            m_spec ms (ret (ms', a)) /\ (MemMonad_run m_exec ms st ≈ ret (st', (ms', a)))%monad->
+            exec_correct (k_exec a) (k_spec a)) ->
+        exec_correct (a <- m_exec;; k_exec a) (a <- m_spec;; k_spec a).
+    Proof.
+      intros MemM0 Eff0 ExtraState0 MM0 MRun0 MPROV0 MSID0 MMS0 MERR0 MUB0 MOOM0 RunERR0 RunUB0 RunOOM0 MEMM A B
+             m_exec k_exec m_spec k_spec M_CORRECT K_CORRECT.
+
+      unfold exec_correct in *.
+      intros ms st VALID.
+      specialize (M_CORRECT ms st VALID).
+      destruct M_CORRECT as [[msg M_UB] | [M_ERR [M_OOM M_SUCCESS]]].
+      - (* UB *)
+        left.
+        exists msg.
+        left; auto.
+      - (* No UB in 'm' *)
+        right.
+        split; [|split].
+        + (* Error *)
+          intros msg RUN.
+          rewrite MemMonad_run_bind in RUN.
+
+        (* I think I need some kind of inversion lemma about this *)
+        (* What about divergence? *)
+        (* Oh, it can't diverge because it's eutt error *)
+        epose proof (@MFails_bind_inv (itree Eff) _ _ ITreeErrorMonadReturns (ExtraState * (MemState * A)) (ExtraState * (MemState * B)) (MemMonad_run m_exec ms st) (fun x0 => (let (st', y) := x0 in let (ms', x) := y in MemMonad_run (k_exec x) ms' st'))) as FAILINV.
+    Qed.
+
     Lemma allocate_bytes_correct :
       forall dt init_bytes, exec_correct (allocate_bytes dt init_bytes) (allocate_bytes_spec_MemPropT dt init_bytes).
     Proof.
-      unfold exec_correct.
-      intros dt init_bytes ms st VALID.
+      Opaque exec_correct.
+      intros dt init_bytes.
+
+      unfold allocate_bytes, allocate_bytes_spec_MemPropT.
+      apply exec_correct_bind'; eauto with EXEC_CORRECT.
+      intros pr ms ms_fresh_pr FRESH_PR.
+
+      apply exec_correct_bind'; eauto with EXEC_CORRECT.
+      intros (ptr & ptrs) ms' ms_find_free FIND_FREE.
 
       (* Need to destruct ahead of time so we know if UB happens *)
       pose proof (dtyp_eq_dec dt DTYPE_Void) as [VOID | NVOID].
 
-      destruct (mem_state_fresh_provenance ms) as [pr' ms_fresh_pr] eqn:FRESH.
+      { (* UB because dt is void *)
+        break_match; try contradiction.
 
-      { (* Can't allocate VOID *)
+        unfold allocate_bytes_post_conditions_MemPropT.
+        Transparent exec_correct.
         left.
-        repeat eexists; right.
-        exists ms_fresh_pr. exists pr'.
-        split.
-        { (* fresh_provenance *)
-          unfold fresh_provenance.
-          cbn.
-          destruct ms; inversion FRESH; cbn in *; subst.
-
-          (* TODO: separate into lemmas? *)
-          cbn.
-          split; [|split; [|split; [|split; [|split]]]].
-          - (* TODO: solve_extend_provenance *)
-            unfold extend_provenance.
-            split.
-            intros pr USED.
-            { eapply provenance_lt_trans; eauto.
-              eapply provenance_lt_next_provenance.
-            }
-
-            eapply mem_state_fresh_provenance_fresh; eauto.
-          - (* TODO: solve_read_byte_preserved *)
-            unfold read_byte_preserved.
-            split.
-            cbn.
-            + (* TODO: solve_read_byte_allowed_all_preserved *)
-              unfold read_byte_allowed_all_preserved; intros ptr.
-              split; intros [aid [ALLOC ALLOWED]];
-                solve_read_byte_allowed.
-            + (* TODO: solve_read_byte_prop_all_preserved *)
-              unfold read_byte_prop_all_preserved.
-              intros ptr byte.
-              split; intros PROP; solve_read_byte_prop.
-          - (* TODO: solve_write_byte_allowed_all_preserved *)
-            unfold write_byte_allowed_all_preserved; intros ptr.
-            split; intros [aid [ALLOC ALLOWED]];
-              solve_write_byte_allowed.
-          - (* TODO: solve_allocations_preserved *)
-            unfold allocations_preserved; intros ptr aid.
-            split; intros PROP;
-              solve_byte_allocated.
-          - solve_frame_stack_preserved.
-          - solve_heap_preserved.
-        }
-        { pose proof find_free_block_correct (length init_bytes) pr'.
-          unfold exec_correct in H0.
-          specialize (H0 _ _ VALID).
-
-          right.
-          repeat eexists.
-          admit.
-          cbn.
-          break_match.
-          right.
-          repeat eexists.
-          admit.
-          break_match.
-          left. intros m2 ptr ptrs.
-          intros SUCC.
-          inversion SUCC.
-          contradiction.
-        }
+        cbn.
+        exists ""%string. auto.
       }
 
-      { (* dt is non-void, allocation may succeed *)
-        right.
-        split; [|split].
-        - (* Error *)
-          intros msg RUN.
-          exfalso.
-          unfold allocate_bytes in RUN.
-          destruct (dtyp_eq_dec dt DTYPE_Void); try contradiction.
-          destruct (N.eq_dec (sizeof_dtyp dt) (N.of_nat (Datatypes.length init_bytes))) eqn:Hlen.
-          2 : {
-            rewrite MemMonad_run_raise_ub in RUN.
-            apply MemMonad_eq1_raise_ub_raise_error_inv in RUN; auto.
-          }
+      (* dt is non-void, allocation may succeed *)
+      Opaque exec_correct.
+      break_match; try contradiction.
 
-          { cbn in RUN.
-            rewrite MemMonad_run_bind in RUN; auto.
-            pose proof MemMonad_run_fresh_provenance ms st VALID
-              as [ms' [pr' [FRESH_PR [VALID' [GET_PR [EXTEND_PR [NUSED_PR USED_PR]]]]]]].
-            rewrite FRESH_PR in RUN.
-            rewrite bind_ret_l in RUN.
+      (* UB if size of dtyp and number of bytes being initialized differs *)
+      break_match.
+      2: { (* Size of bytes mismatch *)
+        unfold allocate_bytes_post_conditions_MemPropT.
+        Transparent exec_correct.
+        left.
+        cbn.
+        exists ""%string. auto.
+      }
 
-            rewrite MemMonad_run_bind in RUN; auto.
-            pose proof MemMonad_run_fresh_sid ms' st VALID' as [st' [sid [RUN_FRESH_SID [VALID'' FRESH_SID]]]].
-            rewrite RUN_FRESH_SID in RUN.
-            rewrite bind_ret_l in RUN.
+      (* Postconditions *)
+      unfold exec_correct.
+      intros ms st VALID.
+      destruct ms as [[mem fs] pr'] eqn:HMS.
 
-            rewrite MemMonad_run_bind in RUN.
-            rewrite MemMonad_get_mem_state in RUN.
-            rewrite bind_ret_l in RUN.
+      (* Simplify *)
+      cbn.
+      right.
+      setoid_rewrite MemMonad_run_bind.
+      setoid_rewrite MemMonad_get_mem_state.
+      setoid_rewrite bind_ret_l.
+      setoid_rewrite MemMonad_run_bind.
+      setoid_rewrite MemMonad_get_mem_state.
+      setoid_rewrite bind_ret_l.
+      setoid_rewrite MemMonad_run_bind.
+      setoid_rewrite MemMonad_put_mem_state.
+      setoid_rewrite bind_ret_l.
+      setoid_rewrite MemMonad_run_ret.
+      cbn.
 
-            destruct ms as [ms_stack ms_prov].
-            destruct ms_stack as [mem frames heap].
+      split; [| split].
+      - (* Error *)
+        intros msg RUN.
+        exfalso.
+        eapply MemMonad_eq1_raise_error_inv in RUN; auto.
+      - (* OOM *)
+        intros msg RUN.
+        exfalso.
+        eapply MemMonad_eq1_raise_oom_inv in RUN; auto.
+      - (* Success *)
+        intros st' ms' x RUN.
+        eapply eq1_ret_ret in RUN; [| typeclasses eauto].
+        inv RUN.
 
-            destruct ms' as [[mem' fs' h'] pr''].
-            unfold ms_get_memory in GET_PR.
-            cbn in GET_PR.
-            inv GET_PR.
-            cbn in RUN.
-            rename mem' into mem.
-            rename fs' into frames.
-            rename h' into heap.
+        eexists. exists (x, ptrs).
+        split; auto.
+        split; auto.
 
-            (* TODO: need to know something about get_consecutive_ptrs *)
-            unfold get_consecutive_ptrs in *; cbn in RUN.
-            do 2 rewrite MemMonad_run_bind in RUN; auto.
-            rewrite bind_bind in RUN.
-            destruct (intptr_seq 0 (Datatypes.length init_bytes)) as [NOOM_seq | OOM_seq] eqn:HSEQ.
-            { (* no oom *)
-              cbn in RUN.
-              rewrite MemMonad_run_ret in RUN; auto.
-              rewrite bind_ret_l in RUN.
+        split.
+        + (* provenances_preserved *)
+          intros pr'0.
+          split; eauto.
+        + (* extend_allocations *)
+          split.
+          * (* alloc_bytes_now_byte_allocated *)
+            (* TODO: solve_byte_allocated *)
+            intros ptr IN.
 
-              match goal with
-              | RUN : context [map_monad ?f ?s] |- _ =>
-                  pose proof map_monad_err_succeeds f s as HMAPM
-              end.
-              forward HMAPM.
-              { intros a IN.
-                eexists.
-                eapply handle_gep_addr_ix'; eauto.
-              }
-              destruct HMAPM as [ptrs HMAPM].
+            Set Nested Proofs Allowed.
+            Lemma byte_allocated_add_all_index :
+              forall (ms : MemState) (mem : memory) (bytes : list mem_byte) (ix : Z) (aid : AllocationId),
+                mem_state_memory ms = add_all_index bytes ix mem ->
+                (forall mb, In mb bytes -> snd mb = aid) ->
+                (forall p, ix <= ptr_to_int p < ix + (Z.of_nat (length bytes)) -> byte_allocated ms p aid).
+            Proof.
+            Admitted.
 
-              (* SUCCESS *)
-              rewrite HMAPM in RUN.
-              cbn in RUN.
-              rewrite MemMonad_run_ret in RUN; auto.
-              rewrite bind_ret_l in RUN.
+            Lemma byte_allocated_get_consecutive_ptrs :
+              forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
+                `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
+                `{LAWS : @MonadLawsE M EQM HM}
 
-              rewrite MemMonad_run_bind in RUN; auto.
-              rewrite MemMonad_get_mem_state in RUN.
-              rewrite bind_ret_l in RUN.
+                (mem : memory) (ms : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
+                (bytes : list mem_byte) (aid : AllocationId),
+                mem_state_memory ms = add_all_index bytes (ptr_to_int ptr) mem ->
+                length bytes = len ->
+                (forall mb, In mb bytes -> snd mb = aid) ->
+                (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
+                forall p, In p ptrs -> byte_allocated ms p aid.
+            Proof.
+              intros M HM OOM ERR EQM EQV EQRET LAWS mem ms ptr len ptrs
+                     bytes aid MEM LEN AIDS CONSEC p IN.
 
-              rewrite MemMonad_run_bind in RUN; auto.
-              rewrite MemMonad_put_mem_state in RUN.
-              rewrite bind_ret_l in RUN.
-              rewrite MemMonad_run_ret in RUN; auto.
-              cbn in RUN.
+              eapply byte_allocated_add_all_index; eauto.
+              (* eapply get_consecutive_ptrs_range in CONSEC; eauto. *)
+              (* lia. *)
+            Admitted.
 
-              apply MemMonad_eq1_raise_error_inv in RUN; auto.
+            eapply byte_allocated_get_consecutive_ptrs.
+
+        + unfold mem_state_memory.
+          cbn.
+          rewrite add_all_to_frame_preserves_memory.
+          cbn.
+          rewrite ptr_to_int_int_to_ptr.
+          reflexivity.
+        + rewrite map_length. reflexivity.
+        + intros mb INMB.
+          apply in_map_iff in INMB as (sb & MBEQ & INSB).
+          inv MBEQ.
+          cbn. reflexivity.
+        + eapply get_consecutive_MemPropT_MemStateFreshT; eauto.
+        + auto.
+
+
+          
+          * intros ptr IN.
+
+            (* Bundle this into a byte_not_allocated lemma *)
+            Set Nested Proofs Allowed.
+            (* TODO: Move these and incorporate into solve_byte_not_allocated *)
+            Lemma byte_not_allocated_ge_next_memory_key :
+              forall (mem : memory_stack) (ms : MemState) (ptr : addr),
+                MemState_get_memory ms = mem ->
+                next_memory_key mem <= ptr_to_int ptr ->
+                byte_not_allocated ms ptr.
+            Proof.
+              intros mem ms ptr MEM NEXT.
+              unfold byte_not_allocated.
+              unfold byte_allocated.
+              unfold byte_allocated_MemPropT.
+              intros aid CONTRA.
+              cbn in CONTRA.
+              destruct CONTRA as [ms' [a [CONTRA [EQ1 EQ2]]]]. subst ms' a.
+              unfold lift_memory_MemPropT in CONTRA.
+              destruct CONTRA as [CONTRA PROV].
+              cbn in CONTRA.
+              destruct CONTRA as [ms' [mem' [[EQ1 EQ2] CONTRA]]].
+              subst.
+              rewrite read_byte_raw_next_memory_key in CONTRA.
+              - destruct CONTRA as [_ CONTRA]; inv CONTRA.
+              - rewrite next_memory_key_next_key_memory_stack_memory in NEXT.
+                lia.
+            Qed.
+
+            Lemma byte_not_allocated_get_consecutive_ptrs :
+              forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
+                `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM} `{LAWS : @MonadLawsE M EQM HM}
+                (mem : memory_stack) (ms : MemState) (ptr : addr) (len : nat) (ptrs : list addr),
+                MemState_get_memory ms = mem ->
+                next_memory_key mem <= ptr_to_int ptr ->
+                (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
+                forall p, In p ptrs -> byte_not_allocated ms p.
+            Proof.
+              intros M HM OOM ERR EQM EQV EQRET LAWS mem ms ptr len ptrs MEM NEXT CONSEC p IN.
+              eapply get_consecutive_ptrs_ge with (p := p) in CONSEC; eauto.
+              eapply byte_not_allocated_ge_next_memory_key; eauto.
+              lia.
+            Qed.
+
+            eapply byte_not_allocated_get_consecutive_ptrs with
+              (ptr :=
+                 (LLVMParamsBigIntptr.ITOP.int_to_ptr
+                    (next_memory_key
+                       {|
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := frames;
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := heap
+                       |})
+                    (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
+                       (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id
+                          (LLVMParamsBigIntptr.PROV.next_provenance ms_prov))))).
+
+            reflexivity.
+            cbn. rewrite ptr_to_int_int_to_ptr. reflexivity.
+            eapply get_consecutive_MemPropT_MemStateFreshT; eauto.
+            auto.
+      - (* alloc_bytes_preserves_old_allocations *)
+        intros ptr aid DISJOINT.
+        (* TODO: not enough for ptr to not be in ptrs list. Must be disjoint.
+
+                     E.g., problem if provenances are different.
+         *)
+
+        (* TODO: Move and reuse *)
+        Lemma byte_allocated_preserved_get_consecutive_ptrs :
+          forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
+                 `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
+                 `{LAWS : @MonadLawsE M EQM HM}
+
+                 (mem : memory) (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
+                 (bytes : list mem_byte) (p : addr) (aid : AllocationId),
+            mem_state_memory ms = mem ->
+            mem_state_memory ms' = add_all_index bytes (ptr_to_int ptr) mem ->
+            (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
+            (length bytes = len) ->
+            (forall new_p, In new_p ptrs -> disjoint_ptr_byte new_p p) ->
+            byte_allocated ms p aid <->
+              byte_allocated ms' p aid.
+        Proof.
+          intros M HM OOM ERR EQM EQV EQRET LAWS mem ms ms' ptr len ptrs
+                 bytes p aid MEM1 MEM2 CONSEC BYTELEN DISJOINT.
+          unfold mem_state_memory in *.
+          split; intros ALLOC.
+          - repeat eexists; [| solve_returns_provenance];
+              cbn; unfold mem_state_memory; cbn; rewrite MEM2.
+
+            erewrite read_byte_raw_add_all_index_out.
+            2: {
+              unfold disjoint_ptr_byte in *.
+              (* I should know from get_consecutive_ptrs and DISJOINT
+               that p can't be in this range.
+
+               I should know that:
+
+               forall ix, ptoi ptr <= ix < ptoi ptr + len, exists new_p, In new_p ptrs.
+
+               *)
+              Lemma get_consecutive_ptrs_covers_range :
+                forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
+                       `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
+                       `{LAWS : @MonadLawsE M EQM HM}
+                       ptr len ptrs,
+                  (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
+                  forall ix, ptr_to_int ptr <= ix < ptr_to_int ptr + (Z.of_nat len) ->
+                             exists p', ptr_to_int p' = ix /\ In p' ptrs.
+              Proof.
+                (* TODO: This is kind of related to get_consecutive_ptrs_nth *)
+                intros M HM OOM ERR EQM EQV EQRET LAWS ptr len ptrs CONSEC ix RANGE.
+                Transparent get_consecutive_ptrs.
+                unfold get_consecutive_ptrs in CONSEC.
+                Opaque get_consecutive_ptrs.
+
+                (* Technically this can be more general with inversion lemma for raise_oom *)
+                destruct (intptr_seq 0 len) eqn:HSEQ.
+                - cbn in *.
+                  setoid_rewrite Monad.bind_ret_l in CONSEC.
+
+                  destruct (map_monad
+                              (fun ix : LLVMParamsBigIntptr.IP.intptr =>
+                                 GEP.handle_gep_addr (DTYPE_I 8) ptr [LLVMParamsBigIntptr.Events.DV.DVALUE_IPTR ix])
+                              l) eqn:HMAPM.
+                  + cbn in CONSEC.
+                    (* TODO: need inversion lemma *)
+                    admit.
+                  + cbn in CONSEC.
+                    apply eq1_ret_ret in CONSEC; eauto.
+                    inv CONSEC.
+
+                    pose proof (@exists_in_bounds_le_lt
+                                  (ptr_to_int ptr)
+                                  (ptr_to_int ptr + Z.of_nat len)
+                                  ix) as BOUNDS.
+
+                    forward BOUNDS. lia.
+                    destruct BOUNDS as [offset [[BOUNDLE BOUNDLT] EQ]].
+
+                    (* How does ix connect to HSEQ?
+
+                       EQ: ix = ptr_to_int ptr + offset
+                       BOUNDLE : 0 <= offset
+                       BOUNDLT : offset < Z.of_nat len
+
+                       Then with:
+
+                       HSEQ: intptr_seq 0 len = NoOom l
+
+                       I should know that:
+
+                       exists ip_offset, In ip_offset l /\ from_Z ip_offset = offset
+
+                       (or maybe to_Z ip_offset = NoOom offset)
+                     *)
+                    pose proof intptr_seq_from_Z 0 len l HSEQ offset as FROMZ.
+                    forward FROMZ; [lia|].
+                    destruct FROMZ as (ip_offset & FROMZ & INSEQ).
+
+                    eapply map_monad_err_In' with (y := ip_offset) in HMAPM; auto.
+                    destruct HMAPM as (p' & GEP & IN).
+                    symmetry in GEP.
+                    cbn in GEP.
+                    apply GEP.handle_gep_addr_ix in GEP.
+                    exists p'. split; auto.
+                    subst.
+
+                    rewrite sizeof_dtyp_i8 in GEP.
+                    erewrite from_Z_to_Z in GEP; [|apply FROMZ].
+                    lia.
+              Admitted.
+
+              pose proof (get_consecutive_ptrs_covers_range ptr len ptrs CONSEC) as INRANGE.
+              subst.
+              rewrite <- Zlength_correct in INRANGE.
+
+              pose proof (Z_lt_ge_dec (ptr_to_int p) (ptr_to_int ptr)) as [LTNEXT | GENEXT]; auto.
+              pose proof (Z_ge_lt_dec (ptr_to_int p) (ptr_to_int ptr + Zlength bytes)) as [LTNEXT' | GENEXT']; auto.
+
+              specialize (INRANGE (ptr_to_int p)).
+              forward INRANGE; [lia|].
+              destruct INRANGE as (p' & EQ & INRANGE).
+              specialize (DISJOINT p' INRANGE).
+              lia.
             }
 
-            { (* OOM *)
+            break_byte_allocated_in ALLOC.
+            cbn in ALLOC.
+
+            break_match; [break_match|]; split; tauto.
+          - break_byte_allocated_in ALLOC.
+            cbn in ALLOC.
+
+            unfold mem_state_memory in ALLOC; cbn in ALLOC.
+            rewrite MEM2 in ALLOC.
+
+            erewrite read_byte_raw_add_all_index_out in ALLOC.
+            2: {
+              unfold disjoint_ptr_byte in *.
+
+              pose proof (get_consecutive_ptrs_covers_range ptr (Datatypes.length bytes) ptrs CONSEC) as INRANGE.
+              subst.
+              rewrite <- Zlength_correct in INRANGE.
+
+              pose proof (Z_lt_ge_dec (ptr_to_int p) (ptr_to_int ptr)) as [LTNEXT | GENEXT]; auto.
+              pose proof (Z_ge_lt_dec (ptr_to_int p) (ptr_to_int ptr + Zlength bytes)) as [LTNEXT' | GENEXT']; auto.
+
+              specialize (INRANGE (ptr_to_int p)).
+              forward INRANGE; [lia|].
+              destruct INRANGE as (p' & EQ & INRANGE).
+              specialize (DISJOINT p' INRANGE).
+              lia.
+            }
+
+            repeat eexists; [| solve_returns_provenance].
+            cbn.
+
+            break_match; [break_match|]; split; tauto.
+        Qed.
+
+        eapply byte_allocated_preserved_get_consecutive_ptrs.
+        + reflexivity.
+        + cbn.
+          unfold mem_state_memory.
+          cbn.
+          rewrite add_all_to_frame_preserves_memory.
+          cbn.
+          rewrite ptr_to_int_int_to_ptr.
+          reflexivity.
+        + eapply get_consecutive_MemPropT_MemStateFreshT; eauto.
+        + rewrite map_length. reflexivity.
+        + intros new_p IN. auto.
+      - (* alloc_bytes_new_reads_allowed *)
+        intros p IN.
+
+        (* TODO: move and add to solve_read_byte_allowed *)
+        Lemma read_byte_allowed_add_all_index :
+          forall (ms : MemState) (mem : memory) (bytes : list mem_byte) (ix : Z) (aid : AllocationId),
+            mem_state_memory ms = add_all_index bytes ix mem ->
+            (forall mb, In mb bytes -> snd mb = aid) ->
+            (forall p,
+                ix <= ptr_to_int p < ix + (Z.of_nat (length bytes)) ->
+                access_allowed (address_provenance p) aid ->
+                read_byte_allowed ms p).
+        Proof.
+          intros ms mem bytes ix aid MEM AID p IN_BOUNDS ACCESS_ALLOWED.
+          unfold read_byte_allowed.
+          exists aid. split; auto.
+          eapply byte_allocated_add_all_index; eauto.
+        Qed.
+
+        eapply read_byte_allowed_add_all_index.
+        + unfold mem_state_memory.
+          cbn.
+          rewrite add_all_to_frame_preserves_memory.
+          cbn.
+          reflexivity.
+        + intros mb INMB.
+          apply in_map_iff in INMB as (sb & MB & INSB).
+          inv MB.
+          cbn.
+          reflexivity.
+        + rewrite map_length.
+          (* True because of CONSEC *)
+          assert (Z.of_nat (length init_bytes) > 0) by admit.
+          set (next_ptr :=
+                 (LLVMParamsBigIntptr.ITOP.int_to_ptr
+                    (next_memory_key
+                       {|
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := frames;
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := heap
+                       |})
+                    (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
+                       (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id
+                          (LLVMParamsBigIntptr.PROV.next_provenance ms_prov))))).
+          epose proof (get_consecutive_ptrs_range next_ptr (Datatypes.length init_bytes) (ptrs_alloced) CONSEC p IN) as INRANGE.
+          subst next_ptr.
+          rewrite ptr_to_int_int_to_ptr in INRANGE.
+          auto.
+        + pose proof CONSEC as PROV.
+          eapply get_consecutive_ptrs_prov in PROV.
+          2: eauto.
+          rewrite int_to_ptr_provenance in PROV.
+          rewrite PROV.
+          apply access_allowed_refl.
+      - (* alloc_bytes_old_reads_allowed *)
+        intros ptr' DISJOINT.
+
+        (* TODO: Move and reuse *)
+        Lemma read_byte_allowed_preserved_get_consecutive_ptrs :
+          forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
+                 `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
+                 `{LAWS : @MonadLawsE M EQM HM}
+
+                 (mem : memory) (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
+                 (bytes : list mem_byte) (p : addr),
+            mem_state_memory ms = mem ->
+            mem_state_memory ms' = add_all_index bytes (ptr_to_int ptr) mem ->
+            (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
+            (length bytes = len) ->
+            (forall new_p, In new_p ptrs -> disjoint_ptr_byte new_p p) ->
+            read_byte_allowed ms p <->
+              read_byte_allowed ms' p.
+        Proof.
+          intros M HM OOM ERR EQM EQV EQRET LAWS mem ms ms' ptr len ptrs
+                 bytes p MEM1 MEM2 CONSEC BYTELEN DISJOINT.
+          split; intros ALLOC.
+          - break_read_byte_allowed_hyps.
+            eexists; split; eauto.
+            eapply byte_allocated_preserved_get_consecutive_ptrs with (ms := ms) (ms' := ms');
+              eauto.
+          - break_read_byte_allowed_hyps.
+            eexists; split; eauto.
+            eapply byte_allocated_preserved_get_consecutive_ptrs with (ms := ms) (ms' := ms');
+              eauto.
+        Qed.
+
+        eapply read_byte_allowed_preserved_get_consecutive_ptrs.
+        + reflexivity.
+        + cbn.
+          unfold mem_state_memory.
+          cbn.
+          rewrite add_all_to_frame_preserves_memory.
+          cbn.
+          rewrite ptr_to_int_int_to_ptr.
+          reflexivity.
+        + eapply get_consecutive_MemPropT_MemStateFreshT; eauto.
+        + rewrite map_length. reflexivity.
+        + intros new_p IN. auto.
+      - (* alloc_bytes_new_reads *)
+        intros p ix byte ADDR BYTE.
+
+        (* TODO: move and add to solve_read_byte_allowed *)
+        Lemma read_byte_add_all_index :
+          forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
+                 `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
+                 `{LAWS : @MonadLawsE M EQM HM}
+
+                 (ms : MemState) (mem : memory) (bytes : list mem_byte)
+                 (byte : SByte) (offset : nat) (aid : AllocationId) p ptr ptrs,
+
+            mem_state_memory ms = add_all_index bytes (ptr_to_int ptr) mem ->
+            Util.Nth bytes offset (byte, aid) ->
+            (@get_consecutive_ptrs M HM OOM ERR ptr (length bytes) ≈ ret ptrs)%monad ->
+            Util.Nth ptrs offset p ->
+            access_allowed (address_provenance p) aid ->
+            read_byte_prop ms p byte.
+        Proof.
+          intros M HM OOM ERR EQM EQV EQRET LAWS
+                 ms mem bytes byte offset aid p ptr ptrs
+                 MEM BYTE CONSEC PTR ACCESS_ALLOWED.
+
+          unfold read_byte_prop, read_byte_MemPropT.
+          cbn.
+          do 2 eexists; split; auto.
+
+          unfold mem_state_memory in *.
+          rewrite MEM.
+          erewrite read_byte_raw_add_all_index_in with (v := (byte, aid)).
+
+          { cbn.
+            rewrite ACCESS_ALLOWED.
+            auto.
+          }
+
+          { eapply get_consecutive_ptrs_range with (p:=p) in CONSEC.
+            rewrite Zlength_correct.
+            lia.
+            eapply Nth_In; eauto.
+          }
+
+          { eapply get_consecutive_ptrs_nth in CONSEC; eauto.
+            destruct CONSEC as (ip_offset & FROMZ & GEP).
+            eapply GEP.handle_gep_addr_ix in GEP.
+            rewrite sizeof_dtyp_i8 in GEP.
+            assert (ptr_to_int p - ptr_to_int ptr = to_Z ip_offset) as EQOFF by lia.
+            symmetry in FROMZ; apply from_Z_to_Z in FROMZ.
+            rewrite FROMZ in EQOFF.
+            rewrite EQOFF.
+            eapply Nth_list_nth_z; eauto.
+          }
+        Qed.
+
+        eapply read_byte_add_all_index.
+        + unfold mem_state_memory.
+          cbn.
+          rewrite add_all_to_frame_preserves_memory.
+          cbn.
+          rewrite ptr_to_int_int_to_ptr.
+          reflexivity.
+        + eapply Nth_map; eauto.
+        + rewrite map_length.
+          eapply get_consecutive_MemPropT_MemStateFreshT; eauto.
+        + eauto.
+        + pose proof CONSEC as PROV.
+          eapply get_consecutive_ptrs_prov in PROV.
+          2: eapply Nth_In; eauto.
+          rewrite int_to_ptr_provenance in PROV.
+          rewrite PROV.
+          apply access_allowed_refl.
+      - (* alloc_bytes_old_reads *)
+        intros ptr' byte DISJOINT.
+
+        (* TODO: Move and reuse *)
+        Lemma read_byte_preserved_get_consecutive_ptrs :
+          forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
+                 `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
+                 `{LAWS : @MonadLawsE M EQM HM}
+
+                 (mem : memory) (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
+                 (bytes : list mem_byte) (p : addr) byte,
+            mem_state_memory ms = mem ->
+            mem_state_memory ms' = add_all_index bytes (ptr_to_int ptr) mem ->
+            (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
+            (length bytes = len) ->
+            (forall new_p, In new_p ptrs -> disjoint_ptr_byte new_p p) ->
+            read_byte_prop ms p byte <->
+              read_byte_prop ms' p byte.
+        Proof.
+          intros M HM OOM ERR EQM EQV EQRET LAWS mem ms ms' ptr len ptrs
+                 bytes p byte MEM1 MEM2 CONSEC BYTELEN DISJOINT.
+
+          unfold mem_state_memory in *.
+
+          split; intros READ.
+          - destruct READ as [?ms' [?ms'' [[?EQ1 ?EQ2] READ]]].
+            subst ms'0 ms''.
+            repeat eexists.
+            rewrite MEM2.
+            rewrite MEM1 in READ.
+            cbn in *.
+            erewrite read_byte_raw_add_all_index_out.
+            2: {
+              pose proof (get_consecutive_ptrs_covers_range ptr len ptrs CONSEC) as INRANGE.
+              subst.
+              rewrite <- Zlength_correct in INRANGE.
+
+              pose proof (Z_lt_ge_dec (ptr_to_int p) (ptr_to_int ptr)) as [LTNEXT | GENEXT]; auto.
+              pose proof (Z_ge_lt_dec (ptr_to_int p) (ptr_to_int ptr + Zlength bytes)) as [LTNEXT' | GENEXT']; auto.
+
+              specialize (INRANGE (ptr_to_int p)).
+              forward INRANGE; [lia|].
+              destruct INRANGE as (p' & EQ & INRANGE).
+              specialize (DISJOINT p' INRANGE).
+              unfold disjoint_ptr_byte in DISJOINT.
+              lia.
+            }
+
+            cbn.
+            break_match; [break_match|]; split; tauto.
+          - destruct READ as [?ms' [?ms'' [[?EQ1 ?EQ2] READ]]].
+            subst ms'0 ms''.
+            repeat eexists.
+            rewrite MEM2 in READ.
+            rewrite MEM1.
+            cbn in *.
+            erewrite read_byte_raw_add_all_index_out in READ.
+            2: {
+              pose proof (get_consecutive_ptrs_covers_range ptr len ptrs CONSEC) as INRANGE.
+              subst.
+              rewrite <- Zlength_correct in INRANGE.
+
+              pose proof (Z_lt_ge_dec (ptr_to_int p) (ptr_to_int ptr)) as [LTNEXT | GENEXT]; auto.
+              pose proof (Z_ge_lt_dec (ptr_to_int p) (ptr_to_int ptr + Zlength bytes)) as [LTNEXT' | GENEXT']; auto.
+
+              specialize (INRANGE (ptr_to_int p)).
+              forward INRANGE; [lia|].
+              destruct INRANGE as (p' & EQ & INRANGE).
+              specialize (DISJOINT p' INRANGE).
+              unfold disjoint_ptr_byte in DISJOINT.
+              lia.
+            }
+
+            cbn.
+            break_match; [break_match|]; split; tauto.
+        Qed.
+
+        eapply read_byte_preserved_get_consecutive_ptrs.
+        + reflexivity.
+        + cbn.
+          unfold mem_state_memory.
+          cbn.
+          rewrite add_all_to_frame_preserves_memory.
+          cbn.
+          rewrite ptr_to_int_int_to_ptr.
+          reflexivity.
+        + eapply get_consecutive_MemPropT_MemStateFreshT; eauto.
+        + rewrite map_length. reflexivity.
+        + intros new_p IN. auto.
+      - (* alloc_bytes_new_writes_allowed *)
+        intros p IN.
+
+        (* TODO: move and add to solve_read_byte_allowed *)
+        Lemma write_byte_allowed_add_all_index :
+          forall (ms : MemState) (mem : memory) (bytes : list mem_byte) (ix : Z) (aid : AllocationId),
+            mem_state_memory ms = add_all_index bytes ix mem ->
+            (forall mb, In mb bytes -> snd mb = aid) ->
+            (forall p,
+                ix <= ptr_to_int p < ix + (Z.of_nat (length bytes)) ->
+                access_allowed (address_provenance p) aid ->
+                write_byte_allowed ms p).
+        Proof.
+          intros ms mem bytes ix aid MEM AID p IN_BOUNDS ACCESS_ALLOWED.
+          unfold read_byte_allowed.
+          exists aid. split; auto.
+          eapply byte_allocated_add_all_index; eauto.
+        Qed.
+
+        eapply write_byte_allowed_add_all_index.
+        + unfold mem_state_memory.
+          cbn.
+          rewrite add_all_to_frame_preserves_memory.
+          cbn.
+          reflexivity.
+        + intros mb INMB.
+          apply in_map_iff in INMB as (sb & MB & INSB).
+          inv MB.
+          cbn.
+          reflexivity.
+        + rewrite map_length.
+          (* True because of CONSEC *)
+          assert (Z.of_nat (length init_bytes) > 0) by admit.
+          set (next_ptr :=
+                 (LLVMParamsBigIntptr.ITOP.int_to_ptr
+                    (next_memory_key
+                       {|
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := frames;
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := heap
+                       |})
+                    (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
+                       (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id
+                          (LLVMParamsBigIntptr.PROV.next_provenance ms_prov))))).
+          epose proof (get_consecutive_ptrs_range next_ptr (Datatypes.length init_bytes) (ptrs_alloced) CONSEC p IN) as INRANGE.
+          subst next_ptr.
+          rewrite ptr_to_int_int_to_ptr in INRANGE.
+          auto.
+        + pose proof CONSEC as PROV.
+          eapply get_consecutive_ptrs_prov in PROV.
+          2: eauto.
+          rewrite int_to_ptr_provenance in PROV.
+          rewrite PROV.
+          apply access_allowed_refl.
+      - (* alloc_bytes_old_writes_allowed *)
+        intros ptr' DISJOINT.
+
+        (* TODO: Move and reuse *)
+        Lemma write_byte_allowed_preserved_get_consecutive_ptrs :
+          forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
+                 `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
+                 `{LAWS : @MonadLawsE M EQM HM}
+
+                 (mem : memory) (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
+                 (bytes : list mem_byte) (p : addr),
+            mem_state_memory ms = mem ->
+            mem_state_memory ms' = add_all_index bytes (ptr_to_int ptr) mem ->
+            (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
+            (length bytes = len) ->
+            (forall new_p, In new_p ptrs -> disjoint_ptr_byte new_p p) ->
+            write_byte_allowed ms p <->
+              write_byte_allowed ms' p.
+        Proof.
+          intros M HM OOM ERR EQM EQV EQRET LAWS mem ms ms' ptr len ptrs
+                 bytes p MEM1 MEM2 CONSEC BYTELEN DISJOINT.
+          split; intros ALLOC.
+          - break_write_byte_allowed_hyps.
+            eexists; split; eauto.
+            eapply byte_allocated_preserved_get_consecutive_ptrs with (ms := ms) (ms' := ms');
+              eauto.
+          - break_write_byte_allowed_hyps.
+            eexists; split; eauto.
+            eapply byte_allocated_preserved_get_consecutive_ptrs with (ms := ms) (ms' := ms');
+              eauto.
+        Qed.
+
+        eapply write_byte_allowed_preserved_get_consecutive_ptrs.
+        + reflexivity.
+        + cbn.
+          unfold mem_state_memory.
+          cbn.
+          rewrite add_all_to_frame_preserves_memory.
+          cbn.
+          rewrite ptr_to_int_int_to_ptr.
+          reflexivity.
+        + eapply get_consecutive_MemPropT_MemStateFreshT; eauto.
+        + rewrite map_length. reflexivity.
+        + intros new_p IN. auto.
+      - (* Adding to framestack *)
+        intros fs1 fs2 OLDFS ADD.
+        unfold memory_stack_frame_stack_prop in *.
+        cbn in OLDFS; subst.
+        cbn.
+
+        match goal with
+        | H: _ |- context [ add_all_to_frame ?ms (map ptr_to_int ?ptrs) ] =>
+            pose proof (add_all_to_frame_correct ptrs ms (add_all_to_frame ms (map ptr_to_int ptrs))) as ADDPTRS
+        end.
+
+        forward ADDPTRS; [reflexivity|].
+
+        eapply add_ptrs_to_frame_eqv; eauto.
+        rewrite <- OLDFS in ADD.
+        auto.
+      - (* Heap preserved *)
+        solve_heap_preserved.
+      - (* non-void *)
+        auto.
+      - (* Length of init bytes matches up *)
+        cbn; auto.
+
+
+        unfold allocate_bytes_post_conditions.
+        repeat eexists.
+        
+
+        unfold allocate_bytes_spec_MemPropT.
+        intros st_final ms_final alloc_addr RUN.
+        unfold allocate_bytes in *.
+        destruct (dtyp_eq_dec dt DTYPE_Void); try contradiction.
+        destruct (N.eq_dec (sizeof_dtyp dt) (N.of_nat (Datatypes.length init_bytes))) eqn:Hlen.
+        2 : {
+          rewrite MemMonad_run_raise_ub in RUN.
+          apply rbm_raise_ret_inv in RUN; try tauto.
+          typeclasses eauto.
+        }
+
+        { cbn in RUN.
+          rewrite MemMonad_run_bind in RUN; auto.
+          pose proof MemMonad_run_fresh_provenance ms st VALID
+            as [ms' [pr' [FRESH_PR [VALID' [GET_PR [EXTEND_PR [NUSED_PR USED_PR]]]]]]].
+          rewrite FRESH_PR in RUN.
+          rewrite bind_ret_l in RUN.
+
+          rewrite MemMonad_run_bind in RUN; auto.
+          pose proof MemMonad_run_fresh_sid ms' st VALID' as [st' [sid [RUN_FRESH_SID [VALID'' FRESH_SID]]]].
+          rewrite RUN_FRESH_SID in RUN.
+          rewrite bind_ret_l in RUN.
+
+          rewrite MemMonad_run_bind in RUN.
+          rewrite MemMonad_get_mem_state in RUN.
+          rewrite bind_ret_l in RUN.
+
+          destruct ms as [ms_stack ms_prov].
+          destruct ms_stack as [mem frames heap].
+
+          destruct ms' as [[mem' fs' h'] pr''].
+          unfold ms_get_memory in GET_PR.
+          cbn in GET_PR.
+          inv GET_PR.
+          cbn in RUN.
+          rename mem' into mem.
+          rename fs' into frames.
+          rename h' into heap.
+
+          (* TODO: need to know something about get_consecutive_ptrs *)
+          unfold get_consecutive_ptrs in *; cbn in RUN.
+          do 2 rewrite MemMonad_run_bind in RUN; auto.
+          rewrite bind_bind in RUN.
+          destruct (intptr_seq 0 (Datatypes.length init_bytes)) as [NOOM_seq | OOM_seq] eqn:HSEQ.
+          { (* no oom *)
+            cbn in RUN.
+            rewrite MemMonad_run_ret in RUN; auto.
+            rewrite bind_ret_l in RUN.
+
+            match goal with
+            | RUN : context [Util.map_monad ?f ?s] |- _ =>
+                destruct (Util.map_monad f s) as [ERR | ptrs] eqn:HMAPM
+            end.
+
+            { (* Error *)
               cbn in RUN.
-              rewrite MemMonad_run_raise_oom in RUN.
+              rewrite MemMonad_run_raise_error in RUN.
               rewrite rbm_raise_bind in RUN.
               exfalso.
-              eapply MemMonad_eq1_raise_oom_raise_error_inv in RUN; auto.
+              symmetry in RUN.
+              eapply MemMonad_eq1_raise_error_inv in RUN.
+              auto.
               typeclasses eauto.
             }
-          }            
-        - (* OOM *)
-          (* Always allowed to oom *)
-          repeat eexists. left.
-          cbn. auto.
-        - (* Success *)
-          unfold allocate_bytes_spec_MemPropT.
-          intros st_final ms_final alloc_addr RUN.
-          unfold allocate_bytes in *.
-          destruct (dtyp_eq_dec dt DTYPE_Void); try contradiction.
-          destruct (N.eq_dec (sizeof_dtyp dt) (N.of_nat (Datatypes.length init_bytes))) eqn:Hlen.
-          2 : {
-            rewrite MemMonad_run_raise_ub in RUN.
-            apply rbm_raise_ret_inv in RUN; try tauto.
-            typeclasses eauto.
-          }
 
-          { cbn in RUN.
-            rewrite MemMonad_run_bind in RUN; auto.
-            pose proof MemMonad_run_fresh_provenance ms st VALID
-              as [ms' [pr' [FRESH_PR [VALID' [GET_PR [EXTEND_PR [NUSED_PR USED_PR]]]]]]].
-            rewrite FRESH_PR in RUN.
+            (* SUCCESS *)
+            cbn in RUN.
+            rewrite MemMonad_run_ret in RUN; auto.
             rewrite bind_ret_l in RUN.
 
             rewrite MemMonad_run_bind in RUN; auto.
-            pose proof MemMonad_run_fresh_sid ms' st VALID' as [st' [sid [RUN_FRESH_SID [VALID'' FRESH_SID]]]].
-            rewrite RUN_FRESH_SID in RUN.
-            rewrite bind_ret_l in RUN.
-
-            rewrite MemMonad_run_bind in RUN.
             rewrite MemMonad_get_mem_state in RUN.
             rewrite bind_ret_l in RUN.
 
-            destruct ms as [ms_stack ms_prov].
-            destruct ms_stack as [mem frames heap].
-
-            destruct ms' as [[mem' fs' h'] pr''].
-            unfold ms_get_memory in GET_PR.
-            cbn in GET_PR.
-            inv GET_PR.
+            rewrite MemMonad_run_bind in RUN; auto.
+            rewrite MemMonad_put_mem_state in RUN.
+            rewrite bind_ret_l in RUN.
+            rewrite MemMonad_run_ret in RUN; auto.
             cbn in RUN.
-            rename mem' into mem.
-            rename fs' into frames.
-            rename h' into heap.
 
-            (* TODO: need to know something about get_consecutive_ptrs *)
-            unfold get_consecutive_ptrs in *; cbn in RUN.
-            do 2 rewrite MemMonad_run_bind in RUN; auto.
-            rewrite bind_bind in RUN.
-            destruct (intptr_seq 0 (Datatypes.length init_bytes)) as [NOOM_seq | OOM_seq] eqn:HSEQ.
-            { (* no oom *)
-              cbn in RUN.
-              rewrite MemMonad_run_ret in RUN; auto.
-              rewrite bind_ret_l in RUN.
+            apply eq1_ret_ret in RUN; [|typeclasses eauto].
+            inv RUN.
+            (* Done extracting information from RUN. *)
 
-              match goal with
-              | RUN : context [map_monad ?f ?s] |- _ =>
-                  destruct (map_monad f s) as [ERR | ptrs] eqn:HMAPM
-              end.
-
-              { (* Error *)
-                cbn in RUN.
-                rewrite MemMonad_run_raise_error in RUN.
-                rewrite rbm_raise_bind in RUN.
-                exfalso.
-                symmetry in RUN.
-                eapply MemMonad_eq1_raise_error_inv in RUN.
-                auto.
-                typeclasses eauto.
-              }
-
-              (* SUCCESS *)
-              cbn in RUN.
-              rewrite MemMonad_run_ret in RUN; auto.
-              rewrite bind_ret_l in RUN.
-
-              rewrite MemMonad_run_bind in RUN; auto.
-              rewrite MemMonad_get_mem_state in RUN.
-              rewrite bind_ret_l in RUN.
-
-              rewrite MemMonad_run_bind in RUN; auto.
-              rewrite MemMonad_put_mem_state in RUN.
-              rewrite bind_ret_l in RUN.
-              rewrite MemMonad_run_ret in RUN; auto.
-              cbn in RUN.
-
-              apply eq1_ret_ret in RUN; [|typeclasses eauto].
-              inv RUN.
-              (* Done extracting information from RUN. *)
-
-              rename ptrs into ptrs_alloced.
-              destruct ptrs_alloced as [ _ | alloc_addr ptrs] eqn:HALLOC_PTRS.
-              { (* Empty ptr list... Not a contradiction, can allocate 0 bytes... MAY not be unique. *)
-                cbn in HMAPM.
-                cbn.
-                assert (init_bytes = []) as INIT_NIL.
-                { destruct init_bytes; auto.
-                  cbn in *.
-                  rewrite IP.from_Z_0 in HSEQ.
-                  destruct (map_monad IP.from_Z (Zseq 1 (Datatypes.length init_bytes))); inv HSEQ.
-                  cbn in HMAPM.
-                  rewrite handle_gep_addr_0 in HMAPM.
-                  match goal with
-                  | H:
-                    context [ map_monad ?f ?l ] |- _ =>
-                      destruct (map_monad f l)
-                  end; inv HMAPM.
-                }
-                subst.
-                cbn in *; inv HSEQ.
-                cbn in *.
-
-                (* Size is 0, nothing is allocated... *)
-                exists ({| ms_memory_stack := mkMemoryStack mem frames heap; ms_provenance := pr'' |}).
-                exists pr'.
-
-                split; [solve_fresh_provenance_invariants|].
-
-                eexists.
-                set (alloc_addr :=
-                       int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
-                                  (allocation_id_to_prov (provenance_to_allocation_id pr'))).
-                exists (alloc_addr, []).
-
-                split.
-                2: {
-                  split; eauto.
-                }
-
-                { (* TODO: solve_allocate_bytes_succeeds_spec *)
-                  split.
-                  - (* allocate_bytes_consecutive *)
-                    cbn.
-                    repeat eexists.
-                  - (* allocate_bytes_address_provenance *)
-                    subst alloc_addr.
-                    apply int_to_ptr_provenance.
-                  - (* allocate_bytes_addresses_provenance *)
-                    intros ptr IN.
-                    inv IN.
-                  - (* allocate_bytes_provenances_preserved *)
-                    intros pr'0.
-                    unfold used_provenance_prop.
-                    cbn.
-                    reflexivity.
-                  - (* allocate_bytes_was_fresh_byte *)
-                    intros ptr IN.
-                    inv IN.
-                  - (* allocate_bytes_now_byte_allocated *)
-                    intros ptr IN.
-                    inv IN.
-                  - (* allocate_bytes_preserves_old_allocations *)
-                    intros ptr aid NIN.
-                    reflexivity.
-                  - (* alloc_bytes_new_reads_allowed *)
-                    intros ptr IN.
-                    inv IN.
-                  - (* alloc_bytes_old_reads_allowed *)
-                    intros ptr' DISJOINT.
-                    split; auto.
-                  - (* alloc_bytes_new_reads *)
-                    intros p ix byte NTH1 NTH2.
-                    apply Util.not_Nth_nil in NTH1.
-                    contradiction.
-                  - (* alloc_bytes_old_reads *)
-                    intros ptr' byte DISJOINT.
-                    split; auto.
-                  - (* alloc_bytes_new_writes_allowed *)
-                    intros p IN.
-                    inv IN.
-                  - (* alloc_bytes_old_writes_allowed *)
-                    intros ptr' DISJOINT.
-                    split; auto.
-                  - (* alloc_bytes_add_to_frame *)
-                    intros fs1 fs2 POP ADD.
-                    cbn in ADD; subst; auto.
-                    unfold memory_stack_frame_stack_prop in *.
-                    cbn in *.
-                    unfold memory_stack_frame_stack.
-                    cbn.
-                    setoid_rewrite add_all_to_frame_nil_preserves_frames.
-                    cbn.
-                    rewrite POP.
-                    auto.
-                  - (* Heap preserved *)
-                    solve_heap_preserved.
-                  - (* Non-void *)
-                    auto.
-                  - (* Length *)
-                    cbn; auto.
-                }
-              }
-
-              (* Non-empty allocation *)
+            rename ptrs into ptrs_alloced.
+            destruct ptrs_alloced as [ _ | alloc_addr ptrs] eqn:HALLOC_PTRS.
+            { (* Empty ptr list... Not a contradiction, can allocate 0 bytes... MAY not be unique. *)
+              cbn in HMAPM.
               cbn.
+              assert (init_bytes = []) as INIT_NIL.
+              { destruct init_bytes; auto.
+                cbn in *.
+                rewrite IP.from_Z_0 in HSEQ.
+                destruct (Util.map_monad IP.from_Z (Zseq 1 (Datatypes.length init_bytes))); inv HSEQ.
+                cbn in HMAPM.
+                rewrite handle_gep_addr_0 in HMAPM.
+                match goal with
+                | H:
+                  context [ map_monad ?f ?l ] |- _ =>
+                    destruct (map_monad f l)
+                end; inv HMAPM.
+              }
+              subst.
+              cbn in *; inv HSEQ.
+              cbn in *.
 
-              exists ({| ms_memory_stack := (mkMemoryStack mem frames heap); ms_provenance := pr'' |}).
+              (* Size is 0, nothing is allocated... *)
+              exists ({| ms_memory_stack := mkMemoryStack mem frames heap; ms_provenance := pr'' |}).
               exists pr'.
 
               split; [solve_fresh_provenance_invariants|].
 
-              Open Scope positive.
-              exists ({|
-    ms_memory_stack :=
-              add_all_to_frame
-                (mkMemoryStack
-                   (add_all_index
-                   (map (fun b : SByte => (b, provenance_to_allocation_id pr'))
-                      init_bytes) (next_memory_key (mkMemoryStack mem frames heap)) mem) frames heap)
-                (ptr_to_int alloc_addr :: map ptr_to_int ptrs);
-    ms_provenance := pr''
-  |}).
-              exists (alloc_addr, (alloc_addr :: ptrs)).
-
-              Close Scope positive.
-              assert (int_to_ptr
-                        (next_memory_key (mkMemoryStack mem frames heap)) (allocation_id_to_prov (provenance_to_allocation_id pr')) = alloc_addr) as EQALLOC.
-              {
-                destruct (Datatypes.length init_bytes) eqn:LENBYTES.
-                { cbn in HSEQ; inv HSEQ.
-                  cbn in *.
-                  inv HMAPM.
-                }
-
-                rewrite intptr_seq_succ in HSEQ.
-                cbn in HSEQ.
-                rewrite IP.from_Z_0 in HSEQ.
-                destruct (intptr_seq 1 n0); inv HSEQ.
-
-                unfold map_monad in HMAPM.
-                inversion HMAPM.
-                inversion HMAPM.
-                (* Fragile proof... *)
-                break_match_hyp; inv H2.
-                break_match_hyp; inv H3.
-
-                rewrite handle_gep_addr_0 in Heqs.
-                inv Heqs.
-                reflexivity.
-              }
+              eexists.
+              set (alloc_addr :=
+                     int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
+                                (allocation_id_to_prov (provenance_to_allocation_id pr'))).
+              exists (alloc_addr, []).
 
               split.
+              2: {
+                split; eauto.
+              }
+
               { (* TODO: solve_allocate_bytes_succeeds_spec *)
                 split.
                 - (* allocate_bytes_consecutive *)
-                  do 2 eexists.
-                  split.
-                  + cbn.
-                    rewrite HSEQ.
-                    cbn.
-                    split; reflexivity.
-                  + rewrite EQALLOC in HMAPM.
-                    rewrite HMAPM.
-                    cbn.
-                    split; reflexivity.
+                  cbn.
+                  repeat eexists.
                 - (* allocate_bytes_address_provenance *)
-                    subst alloc_addr.
-                    apply int_to_ptr_provenance.
-                - (* allocate_bytes_addressses_provenance *)
-                  (* TODO: Need map_monad lemmas *)
-                  assert (@inr string (list addr) = ret) as INR.
-                  reflexivity.
-                  rewrite INR in HMAPM.
-                  clear INR.
-
+                  subst alloc_addr.
+                  apply int_to_ptr_provenance.
+                - (* allocate_bytes_addresses_provenance *)
                   intros ptr IN.
-                  pose proof map_monad_err_In _ _ _ _ HMAPM IN as MAPIN.
-                  destruct MAPIN as [ip [GENPTR INip]].
-
-                  apply handle_gep_addr_preserves_provenance in GENPTR.
-                  rewrite int_to_ptr_provenance in GENPTR.
-                  auto.
+                  inv IN.
                 - (* allocate_bytes_provenances_preserved *)
                   intros pr'0.
-                  split; eauto.
+                  unfold used_provenance_prop.
+                  cbn.
+                  reflexivity.
                 - (* allocate_bytes_was_fresh_byte *)
                   intros ptr IN.
-
-                  unfold byte_not_allocated.
-                  unfold byte_allocated.
-                  unfold byte_allocated_MemPropT.
-                  intros aid CONTRA.
-                  break_lifted_addr_allocated_prop_in CONTRA.
-                  cbn in CONTRA.
-
-                  rewrite read_byte_raw_next_memory_key in CONTRA.
-                  2: {
-                    pose proof map_monad_err_In _ _ _ _ HMAPM IN as MAPIN.
-                    destruct MAPIN as [ip [GENPTR INip]].
-
-                    apply handle_gep_addr_ix in GENPTR.
-                    rewrite ptr_to_int_int_to_ptr in GENPTR.
-                    rewrite GENPTR.
-
-                    assert (IP.to_Z ip >= 0).
-                    { eapply intptr_seq_ge; eauto.
-                    }
-
-                    rewrite sizeof_dtyp_i8.
-                    rewrite next_memory_key_next_key.
-                    lia.
-                  }
-
-                  destruct CONTRA as [_ CONTRA].
-                  inversion CONTRA.
+                  inv IN.
                 - (* allocate_bytes_now_byte_allocated *)
-                  (* TODO: solve_byte_allocated *)
                   intros ptr IN.
+                  inv IN.
+                - (* allocate_bytes_preserves_old_allocations *)
+                  intros ptr aid NIN.
+                  reflexivity.
+                - (* alloc_bytes_new_reads_allowed *)
+                  intros ptr IN.
+                  inv IN.
+                - (* alloc_bytes_old_reads_allowed *)
+                  intros ptr' DISJOINT.
+                  split; auto.
+                - (* alloc_bytes_new_reads *)
+                  intros p ix byte NTH1 NTH2.
+                  apply Util.not_Nth_nil in NTH1.
+                  contradiction.
+                - (* alloc_bytes_old_reads *)
+                  intros ptr' byte DISJOINT.
+                  split; auto.
+                - (* alloc_bytes_new_writes_allowed *)
+                  intros p IN.
+                  inv IN.
+                - (* alloc_bytes_old_writes_allowed *)
+                  intros ptr' DISJOINT.
+                  split; auto.
+                - (* alloc_bytes_add_to_frame *)
+                  intros fs1 fs2 POP ADD.
+                  cbn in ADD; subst; auto.
+                  unfold memory_stack_frame_stack_prop in *.
+                  cbn in *.
+                  unfold memory_stack_frame_stack.
+                  cbn.
+                  setoid_rewrite add_all_to_frame_nil_preserves_frames.
+                  cbn.
+                  rewrite POP.
+                  auto.
+                - (* Heap preserved *)
+                  solve_heap_preserved.
+                - (* Non-void *)
+                  auto.
+                - (* Length *)
+                  cbn; auto.
+              }
+            }
 
-                  (* New bytes are allocated because the exist in the add_all_index block *)
+            (* Non-empty allocation *)
+            cbn.
+
+            exists ({| ms_memory_stack := (mkMemoryStack mem frames heap); ms_provenance := pr'' |}).
+            exists pr'.
+
+            split; [solve_fresh_provenance_invariants|].
+
+            Open Scope positive.
+            exists ({|
+                       ms_memory_stack :=
+                       add_all_to_frame
+                         (mkMemoryStack
+                            (add_all_index
+                               (map (fun b : SByte => (b, provenance_to_allocation_id pr'))
+                                    init_bytes) (next_memory_key (mkMemoryStack mem frames heap)) mem) frames heap)
+                         (ptr_to_int alloc_addr :: map ptr_to_int ptrs);
+                       ms_provenance := pr''
+                     |}).
+            exists (alloc_addr, (alloc_addr :: ptrs)).
+
+            Close Scope positive.
+            assert (int_to_ptr
+                      (next_memory_key (mkMemoryStack mem frames heap)) (allocation_id_to_prov (provenance_to_allocation_id pr')) = alloc_addr) as EQALLOC.
+            {
+              destruct (Datatypes.length init_bytes) eqn:LENBYTES.
+              { cbn in HSEQ; inv HSEQ.
+                cbn in *.
+                inv HMAPM.
+              }
+
+              rewrite intptr_seq_succ in HSEQ.
+              cbn in HSEQ.
+              rewrite IP.from_Z_0 in HSEQ.
+              destruct (intptr_seq 1 n0); inv HSEQ.
+
+              unfold Util.map_monad in HMAPM.
+              inversion HMAPM.
+              inversion HMAPM.
+              (* Fragile proof... *)
+              break_match_hyp; inv H2.
+              break_match_hyp; inv H3.
+
+              rewrite handle_gep_addr_0 in Heqs.
+              inv Heqs.
+              reflexivity.
+            }
+
+            split.
+            { (* TODO: solve_allocate_bytes_succeeds_spec *)
+              split.
+              - (* allocate_bytes_consecutive *)
+                do 2 eexists.
+                split.
+                + cbn.
+                  rewrite HSEQ.
+                  cbn.
+                  split; reflexivity.
+                + rewrite EQALLOC in HMAPM.
+                  rewrite HMAPM.
+                  cbn.
+                  split; reflexivity.
+              - (* allocate_bytes_address_provenance *)
+                subst alloc_addr.
+                apply int_to_ptr_provenance.
+              - (* allocate_bytes_addressses_provenance *)
+                (* TODO: Need map_monad lemmas *)
+                assert (@inr string (list addr) = ret) as INR.
+                reflexivity.
+                rewrite INR in HMAPM.
+                clear INR.
+
+                intros ptr IN.
+                pose proof map_monad_err_In _ _ _ _ HMAPM IN as MAPIN.
+                destruct MAPIN as [ip [GENPTR INip]].
+
+                apply handle_gep_addr_preserves_provenance in GENPTR.
+                rewrite int_to_ptr_provenance in GENPTR.
+                auto.
+              - (* allocate_bytes_provenances_preserved *)
+                intros pr'0.
+                split; eauto.
+              - (* allocate_bytes_was_fresh_byte *)
+                intros ptr IN.
+
+                unfold byte_not_allocated.
+                unfold byte_allocated.
+                unfold byte_allocated_MemPropT.
+                intros aid CONTRA.
+                break_lifted_addr_allocated_prop_in CONTRA.
+                cbn in CONTRA.
+
+                rewrite read_byte_raw_next_memory_key in CONTRA.
+                2: {
                   pose proof map_monad_err_In _ _ _ _ HMAPM IN as MAPIN.
                   destruct MAPIN as [ip [GENPTR INip]].
 
-                  repeat eexists; [| solve_returns_provenance].
-                  cbn.
-                  unfold mem_state_memory.
-                  cbn.
+                  apply handle_gep_addr_ix in GENPTR.
+                  rewrite ptr_to_int_int_to_ptr in GENPTR.
+                  rewrite GENPTR.
+
+                  assert (IP.to_Z ip >= 0).
+                  { eapply intptr_seq_ge; eauto.
+                  }
+
+                  rewrite sizeof_dtyp_i8.
+                  rewrite next_memory_key_next_key.
+                  lia.
+                }
+
+                destruct CONTRA as [_ CONTRA].
+                inversion CONTRA.
+              - (* allocate_bytes_now_byte_allocated *)
+                (* TODO: solve_byte_allocated *)
+                intros ptr IN.
+
+                (* New bytes are allocated because the exist in the add_all_index block *)
+                pose proof map_monad_err_In _ _ _ _ HMAPM IN as MAPIN.
+                destruct MAPIN as [ip [GENPTR INip]].
+
+                repeat eexists; [| solve_returns_provenance].
+                cbn.
+                unfold mem_state_memory.
+                cbn.
+                rewrite add_all_to_frame_preserves_memory.
+                cbn.
+
+                match goal with
+                | H: _ |- context [ read_byte_raw (add_all_index ?l ?z ?mem) ?p ] =>
+                    pose proof read_byte_raw_add_all_index_in_exists mem l z p as ?READ
+                end.
+
+                forward READ.
+                { (* Bounds *)
+                  pose proof (map_monad_err_In _ _ _ _ HMAPM IN) as [ix' [GENp IN_ix']].
+                  apply handle_gep_addr_ix in GENp.
+                  rewrite sizeof_dtyp_i8 in GENp.
+                  replace (Z.of_N 1 * IP.to_Z ix') with (IP.to_Z ix') in GENp by lia.
+                  rewrite ptr_to_int_int_to_ptr in GENp.
+                  apply (in_intptr_seq _ _ _ _ HSEQ) in IN_ix'.
+
+                  rewrite Zlength_map.
+                  rewrite <- Zlength_correct in IN_ix'.
+                  lia.
+                }
+
+                destruct READ as [(byte', aid_byte) [NTH READ]].
+                rewrite list_nth_z_map in NTH.
+                unfold option_map in NTH.
+                break_match_hyp; inv NTH.
+
+                (* Need this unfold for rewrite >_< *)
+                unfold mem_byte in *.
+                rewrite READ.
+                split; try tauto.
+                apply aid_eq_dec_refl.
+              - (* allocate_bytes_preserves_old_allocations *)
+                intros ptr aid DISJOINT.
+                (* TODO: not enough for ptr to not be in ptrs list. Must be disjoint.
+
+                     E.g., problem if provenances are different.
+                 *)
+
+                split; intros ALLOC.
+                + repeat eexists; [| solve_returns_provenance];
+                    cbn; unfold mem_state_memory; cbn.
                   rewrite add_all_to_frame_preserves_memory.
                   cbn.
 
-                  match goal with
-                  | H: _ |- context [ read_byte_raw (add_all_index ?l ?z ?mem) ?p ] =>
-                      pose proof read_byte_raw_add_all_index_in_exists mem l z p as ?READ
-                  end.
-
-                  forward READ.
-                  { (* Bounds *)
-                    pose proof (map_monad_err_In _ _ _ _ HMAPM IN) as [ix' [GENp IN_ix']].
-                    apply handle_gep_addr_ix in GENp.
-                    rewrite sizeof_dtyp_i8 in GENp.
-                    replace (Z.of_N 1 * IP.to_Z ix') with (IP.to_Z ix') in GENp by lia.
-                    rewrite ptr_to_int_int_to_ptr in GENp.
-                    apply (in_intptr_seq _ _ _ _ HSEQ) in IN_ix'.
-
+                  erewrite read_byte_raw_add_all_index_out.
+                  2: {
                     rewrite Zlength_map.
-                    rewrite <- Zlength_correct in IN_ix'.
+                    pose proof (Z_lt_ge_dec (ptr_to_int ptr) (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
+                    pose proof (Z_ge_lt_dec (ptr_to_int ptr) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
+
+                    exfalso.
+
+                    pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr)) as BOUNDS.
+                    forward BOUNDS. lia.
+                    destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
+
+                    replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
+
+                    (* Want to use bound in... *)
+                    (* Need to get what ix is as an IP... *)
+                    destruct (IP.from_Z ix) eqn:IX.
+                    2: {
+                      (* HSEQ succeeding should make this a contradiction *)
+                      apply intptr_seq_from_Z with (x := ix) in HSEQ.
+                      destruct HSEQ as [ipx [EQ' INSEQ]].
+                      rewrite EQ' in IX.
+                      inv IX.
+
+                      rewrite <- Zlength_correct.
+                      lia.
+                    }
+
+                    pose proof (in_intptr_seq _ _ i _ HSEQ) as [IN BOUNDIN].
+                    apply IP.from_Z_to_Z in IX; subst.
+                    forward BOUNDIN.
+                    rewrite <- Zlength_correct.
                     lia.
+
+                    set (p := int_to_ptr (ptr_to_int ptr) (allocation_id_to_prov (provenance_to_allocation_id pr'))).
+
+                    (* I believe that p is necessarily in the result of HMAPM. *)
+                    assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
+                                             (allocation_id_to_prov
+                                                (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
+                    { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
+
+                      eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
+
+                      destruct HMAPM as [x [GENPTR IN]].
+                      symmetry in GENPTR.
+                      pose proof GENPTR as GENPTR'.
+                      apply handle_gep_addr_ix in GENPTR.
+                      rewrite sizeof_dtyp_i8 in GENPTR.
+                      replace (Z.of_N 1 * IP.to_Z i) with (IP.to_Z i) in GENPTR by lia.
+                      rewrite ptr_to_int_int_to_ptr in GENPTR.
+                      rewrite <- GENPTR in EQ.
+
+                      subst p.
+                      rewrite EQ.
+                      rewrite int_to_ptr_ptr_to_int; auto.
+
+                      apply handle_gep_addr_preserves_provenance in GENPTR'.
+                      rewrite int_to_ptr_provenance in GENPTR'.
+                      symmetry; auto.
+                    }
+
+                    eapply map_monad_err_In with (x:=p) in HMAPM; auto.
+
+                    (* DISJOINT should be a contradition now *)
+                    exfalso.
+                    (* ?p doesn't have to be ptr', but ptr_to_int ?p = ptr_to_int ptr' *)
+                    eapply DISJOINT with (p:=p).
+                    apply PIN.
+
+                    subst p.
+                    rewrite ptr_to_int_int_to_ptr.
+                    reflexivity.
                   }
 
-                  destruct READ as [(byte', aid_byte) [NTH READ]].
-                  rewrite list_nth_z_map in NTH.
-                  unfold option_map in NTH.
-                  break_match_hyp; inv NTH.
+                  break_byte_allocated_in ALLOC.
+                  cbn in ALLOC.
 
-                  (* Need this unfold for rewrite >_< *)
-                  unfold mem_byte in *.
-                  rewrite READ.
-                  split; try tauto.
-                  apply aid_eq_dec_refl.
-                - (* allocate_bytes_preserves_old_allocations *)
-                  intros ptr aid DISJOINT.
-                  (* TODO: not enough for ptr to not be in ptrs list. Must be disjoint.
+                  break_match; [break_match|]; split; tauto.
+                + break_byte_allocated_in ALLOC.
+                  cbn in ALLOC.
 
-                     E.g., problem if provenances are different.
-                   *)
+                  unfold mem_state_memory in ALLOC; cbn in ALLOC.
+                  rewrite add_all_to_frame_preserves_memory in ALLOC; cbn in ALLOC.
 
-                  split; intros ALLOC.
-                  + repeat eexists; [| solve_returns_provenance];
-                      cbn; unfold mem_state_memory; cbn.
-                    rewrite add_all_to_frame_preserves_memory.
-                    cbn.
+                  erewrite read_byte_raw_add_all_index_out in ALLOC.
+                  2: {
+                    rewrite Zlength_map.
+                    pose proof (Z_lt_ge_dec (ptr_to_int ptr) (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
+                    pose proof (Z_ge_lt_dec (ptr_to_int ptr) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
 
-                    erewrite read_byte_raw_add_all_index_out.
+                    exfalso.
+
+                    pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr)) as BOUNDS.
+                    forward BOUNDS. lia.
+                    destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
+
+                    replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
+
+                    (* Want to use bound in... *)
+                    (* Need to get what ix is as an IP... *)
+                    destruct (IP.from_Z ix) eqn:IX.
                     2: {
-                      rewrite Zlength_map.
-                      pose proof (Z_lt_ge_dec (ptr_to_int ptr) (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
-                      pose proof (Z_ge_lt_dec (ptr_to_int ptr) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
+                      (* HSEQ succeeding should make this a contradiction *)
+                      apply intptr_seq_from_Z with (x := ix) in HSEQ.
+                      destruct HSEQ as [ipx [EQ' INSEQ]].
+                      rewrite EQ' in IX.
+                      inv IX.
 
-                                            exfalso.
-
-                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr)) as BOUNDS.
-                      forward BOUNDS. lia.
-                      destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
-
-                      replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
-
-                      (* Want to use bound in... *)
-                      (* Need to get what ix is as an IP... *)
-                      destruct (IP.from_Z ix) eqn:IX.
-                      2: {
-                         (* HSEQ succeeding should make this a contradiction *)
-                        apply intptr_seq_from_Z with (x := ix) in HSEQ.
-                        destruct HSEQ as [ipx [EQ' INSEQ]].
-                        rewrite EQ' in IX.
-                        inv IX.
-
-                        rewrite <- Zlength_correct.
-                        lia.
-                      }
-
-                      pose proof (in_intptr_seq _ _ i _ HSEQ) as [IN BOUNDIN].
-                      apply IP.from_Z_to_Z in IX; subst.
-                      forward BOUNDIN.
                       rewrite <- Zlength_correct.
                       lia.
-
-                      set (p := int_to_ptr (ptr_to_int ptr) (allocation_id_to_prov (provenance_to_allocation_id pr'))).
-
-                      (* I believe that p is necessarily in the result of HMAPM. *)
-                      assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
-                                               (allocation_id_to_prov
-                                                  (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
-                      { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
-                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
-                        destruct HMAPM as [x [GENPTR IN]].
-                        symmetry in GENPTR.
-                        pose proof GENPTR as GENPTR'.
-                        apply handle_gep_addr_ix in GENPTR.
-                        rewrite sizeof_dtyp_i8 in GENPTR.
-                        replace (Z.of_N 1 * IP.to_Z i) with (IP.to_Z i) in GENPTR by lia.
-                        rewrite ptr_to_int_int_to_ptr in GENPTR.
-                        rewrite <- GENPTR in EQ.
-
-                        subst p.
-                        rewrite EQ.
-                        rewrite int_to_ptr_ptr_to_int; auto.
-
-                        apply handle_gep_addr_preserves_provenance in GENPTR'.
-                        rewrite int_to_ptr_provenance in GENPTR'.
-                        symmetry; auto.
-                      }
-
-                      eapply map_monad_err_In with (x:=p) in HMAPM; auto.
-
-                      (* DISJOINT should be a contradition now *)
-                      exfalso.
-                      (* ?p doesn't have to be ptr', but ptr_to_int ?p = ptr_to_int ptr' *)
-                      eapply DISJOINT with (p:=p).
-                      apply PIN.
-
-                      subst p.
-                      rewrite ptr_to_int_int_to_ptr.
-                      reflexivity.
                     }
 
-                    break_byte_allocated_in ALLOC.
-                    cbn in ALLOC.
+                    pose proof (in_intptr_seq _ _ i _ HSEQ) as [IN BOUNDIN].
+                    apply IP.from_Z_to_Z in IX; subst.
+                    forward BOUNDIN.
+                    rewrite <- Zlength_correct.
+                    lia.
 
-                    break_match; [break_match|]; split; tauto.
-                  + break_byte_allocated_in ALLOC.
-                    cbn in ALLOC.
+                    set (p := int_to_ptr (ptr_to_int ptr) (allocation_id_to_prov (provenance_to_allocation_id pr'))).
 
-                    unfold mem_state_memory in ALLOC; cbn in ALLOC.
-                    rewrite add_all_to_frame_preserves_memory in ALLOC; cbn in ALLOC.
+                    (* I believe that p is necessarily in the result of HMAPM. *)
+                    assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
+                                             (allocation_id_to_prov
+                                                (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
+                    { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
 
-                    erewrite read_byte_raw_add_all_index_out in ALLOC.
-                    2: {
-                      rewrite Zlength_map.
-                      pose proof (Z_lt_ge_dec (ptr_to_int ptr) (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
-                      pose proof (Z_ge_lt_dec (ptr_to_int ptr) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
+                      eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
 
-                                            exfalso.
-
-                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr)) as BOUNDS.
-                      forward BOUNDS. lia.
-                      destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
-
-                      replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
-
-                      (* Want to use bound in... *)
-                      (* Need to get what ix is as an IP... *)
-                      destruct (IP.from_Z ix) eqn:IX.
-                      2: {
-                         (* HSEQ succeeding should make this a contradiction *)
-                        apply intptr_seq_from_Z with (x := ix) in HSEQ.
-                        destruct HSEQ as [ipx [EQ' INSEQ]].
-                        rewrite EQ' in IX.
-                        inv IX.
-
-                        rewrite <- Zlength_correct.
-                        lia.
-                      }
-
-                      pose proof (in_intptr_seq _ _ i _ HSEQ) as [IN BOUNDIN].
-                      apply IP.from_Z_to_Z in IX; subst.
-                      forward BOUNDIN.
-                      rewrite <- Zlength_correct.
-                      lia.
-
-                      set (p := int_to_ptr (ptr_to_int ptr) (allocation_id_to_prov (provenance_to_allocation_id pr'))).
-
-                      (* I believe that p is necessarily in the result of HMAPM. *)
-                      assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
-                                               (allocation_id_to_prov
-                                                  (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
-                      { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
-
-                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
-
-                        destruct HMAPM as [x [GENPTR IN]].
-                        symmetry in GENPTR.
-                        pose proof GENPTR as GENPTR'.
-                        apply handle_gep_addr_ix in GENPTR.
-                        rewrite sizeof_dtyp_i8 in GENPTR.
-                        replace (Z.of_N 1 * IP.to_Z i) with (IP.to_Z i) in GENPTR by lia.
-                        rewrite ptr_to_int_int_to_ptr in GENPTR.
-                        rewrite <- GENPTR in EQ.
-
-                        subst p.
-                        rewrite EQ.
-                        rewrite int_to_ptr_ptr_to_int; auto.
-
-                        apply handle_gep_addr_preserves_provenance in GENPTR'.
-                        rewrite int_to_ptr_provenance in GENPTR'.
-                        symmetry; auto.
-                      }
-
-                      eapply map_monad_err_In with (x:=p) in HMAPM; auto.
-
-                      (* DISJOINT should be a contradition now *)
-                      exfalso.
-                      (* ?p doesn't have to be ptr', but ptr_to_int ?p = ptr_to_int ptr' *)
-                      eapply DISJOINT with (p:=p).
-                      apply PIN.
+                      destruct HMAPM as [x [GENPTR IN]].
+                      symmetry in GENPTR.
+                      pose proof GENPTR as GENPTR'.
+                      apply handle_gep_addr_ix in GENPTR.
+                      rewrite sizeof_dtyp_i8 in GENPTR.
+                      replace (Z.of_N 1 * IP.to_Z i) with (IP.to_Z i) in GENPTR by lia.
+                      rewrite ptr_to_int_int_to_ptr in GENPTR.
+                      rewrite <- GENPTR in EQ.
 
                       subst p.
-                      rewrite ptr_to_int_int_to_ptr.
-                      reflexivity.
+                      rewrite EQ.
+                      rewrite int_to_ptr_ptr_to_int; auto.
+
+                      apply handle_gep_addr_preserves_provenance in GENPTR'.
+                      rewrite int_to_ptr_provenance in GENPTR'.
+                      symmetry; auto.
                     }
 
+                    eapply map_monad_err_In with (x:=p) in HMAPM; auto.
+
+                    (* DISJOINT should be a contradition now *)
+                    exfalso.
+                    (* ?p doesn't have to be ptr', but ptr_to_int ?p = ptr_to_int ptr' *)
+                    eapply DISJOINT with (p:=p).
+                    apply PIN.
+
+                    subst p.
+                    rewrite ptr_to_int_int_to_ptr.
+                    reflexivity.
+                  }
+
+                  repeat eexists; [| solve_returns_provenance].
+                  cbn.
+
+                  break_match; [break_match|]; split; tauto.
+              - (* alloc_bytes_new_reads_allowed *)
+                intros p IN.
+                (* TODO: solve_read_byte_allowed *)
+                induction IN as [IN | IN]; subst.
+                + (* TODO: solve_read_byte_allowed *)
+                  eexists.
+                  split.
+                  * (* TODO: solve_byte_allocated *)
                     repeat eexists; [| solve_returns_provenance].
-                    cbn.
-
-                    break_match; [break_match|]; split; tauto.
-                - (* alloc_bytes_new_reads_allowed *)
-                  intros p IN.
-                  (* TODO: solve_read_byte_allowed *)
-                  induction IN as [IN | IN]; subst.
-                  + (* TODO: solve_read_byte_allowed *)
-                    eexists.
-                    split.
-                    * (* TODO: solve_byte_allocated *)
-                      repeat eexists; [| solve_returns_provenance].
-                      cbn.
-                      unfold mem_state_memory.
-                      cbn.
-                      rewrite add_all_to_frame_preserves_memory.
-                      cbn in *.
-                      rewrite ptr_to_int_int_to_ptr.
-
-                      match goal with
-                      | H: _ |- context [ read_byte_raw (add_all_index ?l ?z ?mem) ?p ] =>
-                          pose proof read_byte_raw_add_all_index_in_exists mem l z p as ?READ
-                      end.
-
-                      forward READ.
-                      { (* bounds *)
-                        (* Should be a non-empty allocation *)
-                        (* I know this by cons cell result of HMAPM *)
-                        assert (@MonadReturnsLaws.MReturns err _ _ _ (list addr)
-                                                           (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
-                                                                       (allocation_id_to_prov (provenance_to_allocation_id pr')) :: ptrs)
-                                                           (map_monad
-            (fun ix : IP.intptr =>
-             handle_gep_addr (DTYPE_I 8)
-               (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
-                  (allocation_id_to_prov (provenance_to_allocation_id pr')))
-               [Events.DV.DVALUE_IPTR ix]) NOOM_seq)) as MAPRET.
-                        { cbn. red.
-                          auto.
-                        }
-
-                        eapply map_monad_length in MAPRET.
-                        cbn in MAPRET.
-                        rewrite Zlength_map.
-                        rewrite Zlength_correct.
-                        apply intptr_seq_len in HSEQ.
-                        lia.
-                      }
-
-                      destruct READ as [(byte, aid_byte) [NTH READ]].
-                      rewrite list_nth_z_map in NTH.
-                      unfold option_map in NTH.
-                      break_match_hyp; inv NTH.
-
-                      (* Need this unfold for rewrite >_< *)
-                      unfold mem_byte in *.
-                      rewrite READ.
-
-                      split; auto.
-                      apply aid_eq_dec_refl.
-                    * solve_access_allowed.
-                  + (* TODO: solve_read_byte_allowed *)
-                    repeat eexists; [| solve_returns_provenance |];
                     cbn.
                     unfold mem_state_memory.
                     cbn.
@@ -5521,21 +6122,27 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     end.
 
                     forward READ.
-                    { (* Bounds *)
-                      assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
-                                               (allocation_id_to_prov (provenance_to_allocation_id pr')) :: ptrs)) as IN'.
-                      { right; auto.
+                    { (* bounds *)
+                      (* Should be a non-empty allocation *)
+                      (* I know this by cons cell result of HMAPM *)
+                      assert (@MonadReturnsLaws.MReturns err _ _ _ (list addr)
+                                                         (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
+                                                                     (allocation_id_to_prov (provenance_to_allocation_id pr')) :: ptrs)
+                                                         (Util.map_monad
+                                                            (fun ix : IP.intptr =>
+                                                               handle_gep_addr (DTYPE_I 8)
+                                                                               (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
+                                                                                           (allocation_id_to_prov (provenance_to_allocation_id pr')))
+                                                                               [Events.DV.DVALUE_IPTR ix]) NOOM_seq)) as MAPRET.
+                      { cbn. red.
+                        auto.
                       }
 
-                      pose proof (map_monad_err_In _ _ _ _ HMAPM IN') as [ix' [GENp IN_ix']].
-                      apply handle_gep_addr_ix in GENp.
-                      rewrite sizeof_dtyp_i8 in GENp.
-                      replace (Z.of_N 1 * IP.to_Z ix') with (IP.to_Z ix') in GENp by lia.
-                      rewrite ptr_to_int_int_to_ptr in GENp.
-                      apply (in_intptr_seq _ _ _ _ HSEQ) in IN_ix'.
-
+                      eapply map_monad_length in MAPRET.
+                      cbn in MAPRET.
                       rewrite Zlength_map.
-                      rewrite <- Zlength_correct in IN_ix'.
+                      rewrite Zlength_correct.
+                      apply intptr_seq_len in HSEQ.
                       lia.
                     }
 
@@ -5550,162 +6157,15 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
                     split; auto.
                     apply aid_eq_dec_refl.
-
-                    (* Need to look up provenance via IN *)
-                    (* TODO: solve_access_allowed *)
-                    eapply map_monad_err_In in HMAPM.
-                    2: {
-                      cbn; right; eauto.
-                    }
-
-                    destruct HMAPM as [ip [GENPTR INip]].
-                    apply handle_gep_addr_preserves_provenance in GENPTR.
-                    rewrite int_to_ptr_provenance in GENPTR.
-                    rewrite <- GENPTR.
-
-                    solve_access_allowed.
-                - (* alloc_bytes_old_reads_allowed *)
-                  intros ptr' DISJOINT.
-                  split; intros ALLOWED.
-                  + (* TODO: solve_read_byte_allowed. *)
-                    break_access_hyps.
-                    (* TODO: move this into break_access_hyps? *)
-                    break_byte_allocated_in ALLOC.
-
-                    break_match; [break_match|]; destruct ALLOC as [EQM AID]; subst; [|inv AID].
-
-                    repeat eexists; [| solve_returns_provenance |].
+                  * solve_access_allowed.
+                + (* TODO: solve_read_byte_allowed *)
+                  repeat eexists; [| solve_returns_provenance |];
                     cbn.
-                    unfold mem_state_memory.
-                    cbn.
-                    rewrite add_all_to_frame_preserves_memory.
-
-                    cbn.
-                    rewrite read_byte_raw_add_all_index_out.
-                    2: {
-                      left.
-                      rewrite next_memory_key_next_key.
-                      eapply read_byte_raw_lt_next_memory_key; eauto.
-                    }
-
-                    cbn in *.
-                    rewrite Heqo; eauto.
-
-                    solve_access_allowed.
-                  + (* TODO: solve_read_byte_allowed. *)
-                    break_access_hyps.
-                    (* TODO: move this into break_access_hyps? *)
-                    break_byte_allocated_in ALLOC.
-                    cbn in ALLOC.
-
-                    break_match; [break_match|]; destruct ALLOC as [EQM AID]; subst; [|inv AID].
-
-                    repeat eexists; [| solve_returns_provenance |].
-                    cbn.
-                    unfold mem_state_memory in *.
-                    cbn in *.
-                    rewrite add_all_to_frame_preserves_memory in Heqo.
-                    cbn in *.
-
-                    rewrite read_byte_raw_add_all_index_out in Heqo.
-                    2: {
-                      (* If read is in the bounds of add_all_index then that means it's not disjoint...
-
-                       *)
-
-                      (*
-                        If ptr' is such that...
-
-                        ptr' >= next_mem_key and
-                        ptr' < next_mem_key + length
-
-                        then ptr' is in the allocated pointers, and
-                        therefore DISJOINT doesn't hold.
-                       *)
-                      rewrite Zlength_map.
-                      pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
-                      pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
-
-                      exfalso.
-
-                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
-                      forward BOUNDS. lia.
-                      destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
-
-                      replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
-
-                      (* Want to use bound in... *)
-                      (* Need to get what ix is as an IP... *)
-                      destruct (IP.from_Z ix) eqn:IX.
-                      2: {
-                         (* HSEQ succeeding should make this a contradiction *)
-                        apply intptr_seq_from_Z with (x := ix) in HSEQ.
-                        destruct HSEQ as [ipx [EQ' INSEQ]].
-                        rewrite EQ' in IX.
-                        inv IX.
-
-                        rewrite <- Zlength_correct.
-                        lia.
-                      }
-
-                      pose proof (in_intptr_seq _ _ i _ HSEQ) as [IN BOUNDIN].
-                      apply IP.from_Z_to_Z in IX; subst.
-                      forward BOUNDIN.
-                      rewrite <- Zlength_correct.
-                      lia.
-
-                      set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
-
-                      (* I believe that p is necessarily in the result of HMAPM. *)
-                      assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
-                                               (allocation_id_to_prov
-                                                  (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
-                      { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
-
-                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
-
-                        destruct HMAPM as [x [GENPTR IN]].
-                        symmetry in GENPTR.
-                        pose proof GENPTR as GENPTR'.
-                        apply handle_gep_addr_ix in GENPTR.
-                        rewrite sizeof_dtyp_i8 in GENPTR.
-                        replace (Z.of_N 1 * IP.to_Z i) with (IP.to_Z i) in GENPTR by lia.
-                        rewrite ptr_to_int_int_to_ptr in GENPTR.
-                        rewrite <- GENPTR in EQ.
-
-                        subst p.
-                        rewrite EQ.
-                        rewrite int_to_ptr_ptr_to_int; auto.
-
-                        apply handle_gep_addr_preserves_provenance in GENPTR'.
-                        rewrite int_to_ptr_provenance in GENPTR'.
-                        symmetry; auto.
-                      }
-
-                      eapply map_monad_err_In with (x:=p) in HMAPM; auto.
-
-                      (* DISJOINT should be a contradition now *)
-                      exfalso.
-                      (* ?p doesn't have to be ptr', but ptr_to_int ?p = ptr_to_int ptr' *)
-                      eapply DISJOINT with (p:=p).
-                      apply PIN.
-
-                      subst p.
-                      rewrite ptr_to_int_int_to_ptr.
-                      reflexivity.
-                    }
-
-                    rewrite Heqo; eauto.
-
-                    solve_access_allowed.
-                - (* alloc_bytes_new_reads *)
-                  intros p ix byte ADDR BYTE.
-                  cbn.
-                  repeat eexists.
                   unfold mem_state_memory.
                   cbn.
                   rewrite add_all_to_frame_preserves_memory.
-                  cbn.
+                  cbn in *.
+                  rewrite ptr_to_int_int_to_ptr.
 
                   match goal with
                   | H: _ |- context [ read_byte_raw (add_all_index ?l ?z ?mem) ?p ] =>
@@ -5714,8 +6174,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
                   forward READ.
                   { (* Bounds *)
-                    pose proof (Nth_In ADDR) as IN.
-                    pose proof (map_monad_err_In _ _ _ _ HMAPM IN) as [ix' [GENp IN_ix']].
+                    assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
+                                             (allocation_id_to_prov (provenance_to_allocation_id pr')) :: ptrs)) as IN'.
+                    { right; auto.
+                    }
+
+                    pose proof (map_monad_err_In _ _ _ _ HMAPM IN') as [ix' [GENp IN_ix']].
                     apply handle_gep_addr_ix in GENp.
                     rewrite sizeof_dtyp_i8 in GENp.
                     replace (Z.of_N 1 * IP.to_Z ix') with (IP.to_Z ix') in GENp by lia.
@@ -5727,12 +6191,200 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     lia.
                   }
 
-                  destruct READ as [(byte', aid_byte) [NTH READ]].
+                  destruct READ as [(byte, aid_byte) [NTH READ]].
                   rewrite list_nth_z_map in NTH.
                   unfold option_map in NTH.
                   break_match_hyp; inv NTH.
 
-                  (*
+                  (* Need this unfold for rewrite >_< *)
+                  unfold mem_byte in *.
+                  rewrite READ.
+
+                  split; auto.
+                  apply aid_eq_dec_refl.
+
+                  (* Need to look up provenance via IN *)
+                  (* TODO: solve_access_allowed *)
+                  eapply map_monad_err_In in HMAPM.
+                  2: {
+                    cbn; right; eauto.
+                  }
+
+                  destruct HMAPM as [ip [GENPTR INip]].
+                  apply handle_gep_addr_preserves_provenance in GENPTR.
+                  rewrite int_to_ptr_provenance in GENPTR.
+                  rewrite <- GENPTR.
+
+                  solve_access_allowed.
+              - (* alloc_bytes_old_reads_allowed *)
+                intros ptr' DISJOINT.
+                split; intros ALLOWED.
+                + (* TODO: solve_read_byte_allowed. *)
+                  break_access_hyps.
+                  (* TODO: move this into break_access_hyps? *)
+                  break_byte_allocated_in ALLOC.
+
+                  break_match; [break_match|]; destruct ALLOC as [EQM AID]; subst; [|inv AID].
+
+                  repeat eexists; [| solve_returns_provenance |].
+                  cbn.
+                  unfold mem_state_memory.
+                  cbn.
+                  rewrite add_all_to_frame_preserves_memory.
+
+                  cbn.
+                  rewrite read_byte_raw_add_all_index_out.
+                  2: {
+                    left.
+                    rewrite next_memory_key_next_key.
+                    eapply read_byte_raw_lt_next_memory_key; eauto.
+                  }
+
+                  cbn in *.
+                  rewrite Heqo; eauto.
+
+                  solve_access_allowed.
+                + (* TODO: solve_read_byte_allowed. *)
+                  break_access_hyps.
+                  (* TODO: move this into break_access_hyps? *)
+                  break_byte_allocated_in ALLOC.
+                  cbn in ALLOC.
+
+                  break_match; [break_match|]; destruct ALLOC as [EQM AID]; subst; [|inv AID].
+
+                  repeat eexists; [| solve_returns_provenance |].
+                  cbn.
+                  unfold mem_state_memory in *.
+                  cbn in *.
+                  rewrite add_all_to_frame_preserves_memory in Heqo.
+                  cbn in *.
+
+                  rewrite read_byte_raw_add_all_index_out in Heqo.
+                  2: {
+                    (* If read is in the bounds of add_all_index then that means it's not disjoint...
+
+                     *)
+
+                    (*
+                        If ptr' is such that...
+
+                        ptr' >= next_mem_key and
+                        ptr' < next_mem_key + length
+
+                        then ptr' is in the allocated pointers, and
+                        therefore DISJOINT doesn't hold.
+                     *)
+                    rewrite Zlength_map.
+                    pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
+                    pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
+
+                    exfalso.
+
+                    pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
+                    forward BOUNDS. lia.
+                    destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
+
+                    replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
+
+                    (* Want to use bound in... *)
+                    (* Need to get what ix is as an IP... *)
+                    destruct (IP.from_Z ix) eqn:IX.
+                    2: {
+                      (* HSEQ succeeding should make this a contradiction *)
+                      apply intptr_seq_from_Z with (x := ix) in HSEQ.
+                      destruct HSEQ as [ipx [EQ' INSEQ]].
+                      rewrite EQ' in IX.
+                      inv IX.
+
+                      rewrite <- Zlength_correct.
+                      lia.
+                    }
+
+                    pose proof (in_intptr_seq _ _ i _ HSEQ) as [IN BOUNDIN].
+                    apply IP.from_Z_to_Z in IX; subst.
+                    forward BOUNDIN.
+                    rewrite <- Zlength_correct.
+                    lia.
+
+                    set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
+
+                    (* I believe that p is necessarily in the result of HMAPM. *)
+                    assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
+                                             (allocation_id_to_prov
+                                                (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
+                    { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
+
+                      eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
+
+                      destruct HMAPM as [x [GENPTR IN]].
+                      symmetry in GENPTR.
+                      pose proof GENPTR as GENPTR'.
+                      apply handle_gep_addr_ix in GENPTR.
+                      rewrite sizeof_dtyp_i8 in GENPTR.
+                      replace (Z.of_N 1 * IP.to_Z i) with (IP.to_Z i) in GENPTR by lia.
+                      rewrite ptr_to_int_int_to_ptr in GENPTR.
+                      rewrite <- GENPTR in EQ.
+
+                      subst p.
+                      rewrite EQ.
+                      rewrite int_to_ptr_ptr_to_int; auto.
+
+                      apply handle_gep_addr_preserves_provenance in GENPTR'.
+                      rewrite int_to_ptr_provenance in GENPTR'.
+                      symmetry; auto.
+                    }
+
+                    eapply map_monad_err_In with (x:=p) in HMAPM; auto.
+
+                    (* DISJOINT should be a contradition now *)
+                    exfalso.
+                    (* ?p doesn't have to be ptr', but ptr_to_int ?p = ptr_to_int ptr' *)
+                    eapply DISJOINT with (p:=p).
+                    apply PIN.
+
+                    subst p.
+                    rewrite ptr_to_int_int_to_ptr.
+                    reflexivity.
+                  }
+
+                  rewrite Heqo; eauto.
+
+                  solve_access_allowed.
+              - (* alloc_bytes_new_reads *)
+                intros p ix byte ADDR BYTE.
+                cbn.
+                repeat eexists.
+                unfold mem_state_memory.
+                cbn.
+                rewrite add_all_to_frame_preserves_memory.
+                cbn.
+
+                match goal with
+                | H: _ |- context [ read_byte_raw (add_all_index ?l ?z ?mem) ?p ] =>
+                    pose proof read_byte_raw_add_all_index_in_exists mem l z p as ?READ
+                end.
+
+                forward READ.
+                { (* Bounds *)
+                  pose proof (Nth_In ADDR) as IN.
+                  pose proof (map_monad_err_In _ _ _ _ HMAPM IN) as [ix' [GENp IN_ix']].
+                  apply handle_gep_addr_ix in GENp.
+                  rewrite sizeof_dtyp_i8 in GENp.
+                  replace (Z.of_N 1 * IP.to_Z ix') with (IP.to_Z ix') in GENp by lia.
+                  rewrite ptr_to_int_int_to_ptr in GENp.
+                  apply (in_intptr_seq _ _ _ _ HSEQ) in IN_ix'.
+
+                  rewrite Zlength_map.
+                  rewrite <- Zlength_correct in IN_ix'.
+                  lia.
+                }
+
+                destruct READ as [(byte', aid_byte) [NTH READ]].
+                rewrite list_nth_z_map in NTH.
+                unfold option_map in NTH.
+                break_match_hyp; inv NTH.
+
+                (*
                     ADDR tells me that p is in my pointers list at index `ix`...
 
                     Should be `next_memory_key ms + ix` basically...
@@ -5740,237 +6392,238 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     So, `ptr_to_int p - next_memory_key (mkMemoryStack mem frames heap) = ix`
 
                     With that BYTE and Heqo should give me byte = byte'
-                   *)
-                  assert (byte = byte').
-                  { pose proof (map_monad_err_Nth _ _ _ _ _ HMAPM ADDR) as [ix' [GENp NTH_ix']].
-                    apply handle_gep_addr_ix in GENp.
-                    rewrite ptr_to_int_int_to_ptr in GENp.
-                    rewrite GENp in Heqo.
+                 *)
+                assert (byte = byte').
+                { pose proof (map_monad_err_Nth _ _ _ _ _ HMAPM ADDR) as [ix' [GENp NTH_ix']].
+                  apply handle_gep_addr_ix in GENp.
+                  rewrite ptr_to_int_int_to_ptr in GENp.
+                  rewrite GENp in Heqo.
 
-                    (* NTH_ix' -> ix = ix' *)
-                    (* Heqo + BYTE *)
+                  (* NTH_ix' -> ix = ix' *)
+                  (* Heqo + BYTE *)
 
-                    eapply intptr_seq_nth in NTH_ix'; eauto.
-                    apply IP.from_Z_to_Z in NTH_ix'.
-                    rewrite NTH_ix' in Heqo.
+                  eapply intptr_seq_nth in NTH_ix'; eauto.
+                  apply IP.from_Z_to_Z in NTH_ix'.
+                  rewrite NTH_ix' in Heqo.
 
-                    rewrite sizeof_dtyp_i8 in Heqo.
-                    replace (next_memory_key (mkMemoryStack mem frames heap) + Z.of_N 1 * ( 0 + Z.of_nat ix) - next_memory_key (mkMemoryStack mem frames heap)) with (Z.of_nat ix) in Heqo by lia.
+                  rewrite sizeof_dtyp_i8 in Heqo.
+                  replace (next_memory_key (mkMemoryStack mem frames heap) + Z.of_N 1 * ( 0 + Z.of_nat ix) - next_memory_key (mkMemoryStack mem frames heap)) with (Z.of_nat ix) in Heqo by lia.
 
-                    apply Util.Nth_list_nth_z in BYTE.
-                    rewrite BYTE in Heqo.
-                    inv Heqo; auto.
+                  apply Util.Nth_list_nth_z in BYTE.
+                  rewrite BYTE in Heqo.
+                  inv Heqo; auto.
+                }
+
+                subst.
+
+                (* Need this unfold for rewrite >_< *)
+                unfold mem_byte in *.
+                rewrite READ.
+
+                cbn.
+                break_match.
+                split; auto.
+
+                apply Util.Nth_In in ADDR.
+                pose proof (map_monad_err_In _ _ _ _ HMAPM ADDR) as [ix' [GENp IN_ix']].
+
+                apply handle_gep_addr_preserves_provenance in GENp.
+                rewrite <- GENp in Heqb.
+                rewrite int_to_ptr_provenance in Heqb.
+                rewrite access_allowed_refl in Heqb.
+                inv Heqb.
+              - (* alloc_bytes_old_reads *)
+                intros ptr' byte DISJOINT.
+                split; intros READ.
+                + (* TODO: solve_read_byte_prop *)
+                  cbn.
+                  repeat eexists.
+                  unfold mem_state_memory.
+                  cbn.
+                  rewrite add_all_to_frame_preserves_memory.
+                  cbn.
+
+                  rewrite read_byte_raw_add_all_index_out.
+                  2: {
+                    rewrite Zlength_map.
+                    pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
+                    pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
+
+                    exfalso.
+
+                    pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
+                    forward BOUNDS. lia.
+                    destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
+
+                    replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
+
+                    (* Want to use bound in... *)
+                    (* Need to get what ix is as an IP... *)
+                    destruct (IP.from_Z ix) eqn:IX.
+                    2: {
+                      (* HSEQ succeeding should make this a contradiction *)
+                      apply intptr_seq_from_Z with (x := ix) in HSEQ.
+                      destruct HSEQ as [ipx [EQ' INSEQ]].
+                      rewrite EQ' in IX.
+                      inv IX.
+
+                      rewrite <- Zlength_correct.
+                      lia.
+                    }
+
+                    pose proof (in_intptr_seq _ _ i _ HSEQ) as [IN BOUNDIN].
+                    apply IP.from_Z_to_Z in IX; subst.
+                    forward BOUNDIN.
+                    rewrite <- Zlength_correct.
+                    lia.
+
+                    set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
+
+                    eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
+                    (* I believe that p is necessarily in the result of HMAPM. *)
+                    assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
+                                             (allocation_id_to_prov
+                                                (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
+                    { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
+
+                      eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
+
+                      destruct HMAPM as [x [GENPTR IN]].
+                      symmetry in GENPTR.
+                      pose proof GENPTR as GENPTR'.
+                      apply handle_gep_addr_ix in GENPTR.
+                      rewrite sizeof_dtyp_i8 in GENPTR.
+                      replace (Z.of_N 1 * IP.to_Z i) with (IP.to_Z i) in GENPTR by lia.
+                      rewrite ptr_to_int_int_to_ptr in GENPTR.
+                      rewrite <- GENPTR in EQ.
+
+                      subst p.
+                      rewrite EQ.
+                      rewrite int_to_ptr_ptr_to_int; auto.
+
+                      apply handle_gep_addr_preserves_provenance in GENPTR'.
+                      rewrite int_to_ptr_provenance in GENPTR'.
+                      symmetry; auto.
+                    }
+
+                    eapply map_monad_err_In with (x:=p) in HMAPM; auto.
+
+                    (* DISJOINT should be a contradition now *)
+                    exfalso.
+                    (* ?p doesn't have to be ptr', but ptr_to_int ?p = ptr_to_int ptr' *)
+                    eapply DISJOINT with (p:=p).
+                    apply PIN.
+
+                    subst p.
+                    rewrite ptr_to_int_int_to_ptr.
+                    reflexivity.
                   }
 
-                  subst.
+                  (* TODO: ltac to break this up *)
+                  destruct READ as [ms' [ms'' [[EQ1 EQ2] READ]]]; subst.
+                  cbn in READ.
 
-                  (* Need this unfold for rewrite >_< *)
-                  unfold mem_byte in *.
-                  rewrite READ.
+                  break_match; [break_match|]; auto.
+                  tauto.
+                + (* TODO: solve_read_byte_prop *)
+
+                  (* TODO: ltac to break this up *)
+                  destruct READ as [ms' [ms'' [[EQ1 EQ2] READ]]]; subst.
+                  cbn in READ.
+                  unfold mem_state_memory in READ.
+                  cbn in READ.
+                  rewrite add_all_to_frame_preserves_memory in READ.
+                  cbn in READ.
+
+                  rewrite read_byte_raw_add_all_index_out in READ.
+                  2: {
+                    rewrite Zlength_map.
+                    pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
+                    pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
+
+                    exfalso.
+
+                    pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
+                    forward BOUNDS. lia.
+                    destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
+
+                    replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
+
+                    (* Want to use bound in... *)
+                    (* Need to get what ix is as an IP... *)
+                    destruct (IP.from_Z ix) eqn:IX.
+                    2: {
+                      (* HSEQ succeeding should make this a contradiction *)
+                      apply intptr_seq_from_Z with (x := ix) in HSEQ.
+                      destruct HSEQ as [ipx [EQ' INSEQ]].
+                      rewrite EQ' in IX.
+                      inv IX.
+
+                      rewrite <- Zlength_correct.
+                      lia.
+                    }
+
+                    pose proof (in_intptr_seq _ _ i _ HSEQ) as [IN BOUNDIN].
+                    apply IP.from_Z_to_Z in IX; subst.
+                    forward BOUNDIN.
+                    rewrite <- Zlength_correct.
+                    lia.
+
+                    set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
+
+                    (* I believe that p is necessarily in the result of HMAPM. *)
+                    assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
+                                             (allocation_id_to_prov
+                                                (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
+                    { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
+
+                      eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
+
+                      destruct HMAPM as [x [GENPTR IN]].
+                      symmetry in GENPTR.
+                      pose proof GENPTR as GENPTR'.
+                      apply handle_gep_addr_ix in GENPTR.
+                      rewrite sizeof_dtyp_i8 in GENPTR.
+                      replace (Z.of_N 1 * IP.to_Z i) with (IP.to_Z i) in GENPTR by lia.
+                      rewrite ptr_to_int_int_to_ptr in GENPTR.
+                      rewrite <- GENPTR in EQ.
+
+                      subst p.
+                      rewrite EQ.
+                      rewrite int_to_ptr_ptr_to_int; auto.
+
+                      apply handle_gep_addr_preserves_provenance in GENPTR'.
+                      rewrite int_to_ptr_provenance in GENPTR'.
+                      symmetry; auto.
+                    }
+
+                    eapply map_monad_err_In with (x:=p) in HMAPM; auto.
+
+                    (* DISJOINT should be a contradition now *)
+                    exfalso.
+                    (* ?p doesn't have to be ptr', but ptr_to_int ?p = ptr_to_int ptr' *)
+                    eapply DISJOINT with (p:=p).
+                    apply PIN.
+
+                    subst p.
+                    rewrite ptr_to_int_int_to_ptr.
+                    reflexivity.
+                  }
 
                   cbn.
-                  break_match.
-                  split; auto.
-
-                  apply Util.Nth_In in ADDR.
-                  pose proof (map_monad_err_In _ _ _ _ HMAPM ADDR) as [ix' [GENp IN_ix']].
-
-                  apply handle_gep_addr_preserves_provenance in GENp.
-                  rewrite <- GENp in Heqb.
-                  rewrite int_to_ptr_provenance in Heqb.
-                  rewrite access_allowed_refl in Heqb.
-                  inv Heqb.
-                - (* alloc_bytes_old_reads *)
-                  intros ptr' byte DISJOINT.
-                  split; intros READ.
-                  + (* TODO: solve_read_byte_prop *)
-                    cbn.
-                    repeat eexists.
-                    unfold mem_state_memory.
-                    cbn.
-                    rewrite add_all_to_frame_preserves_memory.
-                    cbn.
-
-                    rewrite read_byte_raw_add_all_index_out.
-                    2: {
-                      rewrite Zlength_map.
-                      pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
-                      pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
-
-                      exfalso.
-
-                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
-                      forward BOUNDS. lia.
-                      destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
-
-                      replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
-
-                      (* Want to use bound in... *)
-                      (* Need to get what ix is as an IP... *)
-                      destruct (IP.from_Z ix) eqn:IX.
-                      2: {
-                         (* HSEQ succeeding should make this a contradiction *)
-                        apply intptr_seq_from_Z with (x := ix) in HSEQ.
-                        destruct HSEQ as [ipx [EQ' INSEQ]].
-                        rewrite EQ' in IX.
-                        inv IX.
-
-                        rewrite <- Zlength_correct.
-                        lia.
-                      }
-
-                      pose proof (in_intptr_seq _ _ i _ HSEQ) as [IN BOUNDIN].
-                      apply IP.from_Z_to_Z in IX; subst.
-                      forward BOUNDIN.
-                      rewrite <- Zlength_correct.
-                      lia.
-
-                      set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
-
-                      (* I believe that p is necessarily in the result of HMAPM. *)
-                      assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
-                                               (allocation_id_to_prov
-                                                  (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
-                      { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
-
-                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
-
-                        destruct HMAPM as [x [GENPTR IN]].
-                        symmetry in GENPTR.
-                        pose proof GENPTR as GENPTR'.
-                        apply handle_gep_addr_ix in GENPTR.
-                        rewrite sizeof_dtyp_i8 in GENPTR.
-                        replace (Z.of_N 1 * IP.to_Z i) with (IP.to_Z i) in GENPTR by lia.
-                        rewrite ptr_to_int_int_to_ptr in GENPTR.
-                        rewrite <- GENPTR in EQ.
-
-                        subst p.
-                        rewrite EQ.
-                        rewrite int_to_ptr_ptr_to_int; auto.
-
-                        apply handle_gep_addr_preserves_provenance in GENPTR'.
-                        rewrite int_to_ptr_provenance in GENPTR'.
-                        symmetry; auto.
-                      }
-
-                      eapply map_monad_err_In with (x:=p) in HMAPM; auto.
-
-                      (* DISJOINT should be a contradition now *)
-                      exfalso.
-                      (* ?p doesn't have to be ptr', but ptr_to_int ?p = ptr_to_int ptr' *)
-                      eapply DISJOINT with (p:=p).
-                      apply PIN.
-
-                      subst p.
-                      rewrite ptr_to_int_int_to_ptr.
-                      reflexivity.
-                    }
-
-                    (* TODO: ltac to break this up *)
-                    destruct READ as [ms' [ms'' [[EQ1 EQ2] READ]]]; subst.
-                    cbn in READ.
-
-                    break_match; [break_match|]; auto.
-                    tauto.
-                  + (* TODO: solve_read_byte_prop *)
-
-                    (* TODO: ltac to break this up *)
-                    destruct READ as [ms' [ms'' [[EQ1 EQ2] READ]]]; subst.
-                    cbn in READ.
-                    unfold mem_state_memory in READ.
-                    cbn in READ.
-                    rewrite add_all_to_frame_preserves_memory in READ.
-                    cbn in READ.
-
-                    rewrite read_byte_raw_add_all_index_out in READ.
-2: {
-                      rewrite Zlength_map.
-                      pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
-                      pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
-
-                      exfalso.
-
-                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
-                      forward BOUNDS. lia.
-                      destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
-
-                      replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
-
-                      (* Want to use bound in... *)
-                      (* Need to get what ix is as an IP... *)
-                      destruct (IP.from_Z ix) eqn:IX.
-                      2: {
-                         (* HSEQ succeeding should make this a contradiction *)
-                        apply intptr_seq_from_Z with (x := ix) in HSEQ.
-                        destruct HSEQ as [ipx [EQ' INSEQ]].
-                        rewrite EQ' in IX.
-                        inv IX.
-
-                        rewrite <- Zlength_correct.
-                        lia.
-                      }
-
-                      pose proof (in_intptr_seq _ _ i _ HSEQ) as [IN BOUNDIN].
-                      apply IP.from_Z_to_Z in IX; subst.
-                      forward BOUNDIN.
-                      rewrite <- Zlength_correct.
-                      lia.
-
-                      set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
-
-                      (* I believe that p is necessarily in the result of HMAPM. *)
-                      assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
-                                               (allocation_id_to_prov
-                                                  (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
-                      { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
-
-                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
-                        
-                        destruct HMAPM as [x [GENPTR IN]].
-                        symmetry in GENPTR.
-                        pose proof GENPTR as GENPTR'.
-                        apply handle_gep_addr_ix in GENPTR.
-                        rewrite sizeof_dtyp_i8 in GENPTR.
-                        replace (Z.of_N 1 * IP.to_Z i) with (IP.to_Z i) in GENPTR by lia.
-                        rewrite ptr_to_int_int_to_ptr in GENPTR.
-                        rewrite <- GENPTR in EQ.
-
-                        subst p.
-                        rewrite EQ.
-                        rewrite int_to_ptr_ptr_to_int; auto.
-
-                        apply handle_gep_addr_preserves_provenance in GENPTR'.
-                        rewrite int_to_ptr_provenance in GENPTR'.
-                        symmetry; auto.
-                      }
-
-                      eapply map_monad_err_In with (x:=p) in HMAPM; auto.
-
-                      (* DISJOINT should be a contradition now *)
-                      exfalso.
-                      (* ?p doesn't have to be ptr', but ptr_to_int ?p = ptr_to_int ptr' *)
-                      eapply DISJOINT with (p:=p).
-                      apply PIN.
-
-                      subst p.
-                      rewrite ptr_to_int_int_to_ptr.
-                      reflexivity.
-                    }
-
-                    cbn.
-                    repeat eexists.
-                    cbn.
-                    break_match; [break_match|]; tauto.
-                - (* alloc_bytes_new_writes_allowed *)
-                  intros p IN.
-                  (* TODO: solve_write_byte_allowed. *)
-                  break_access_hyps; eexists; split.
-                  + (* TODO: solve_byte_allocated *)
-                    repeat eexists; [| solve_returns_provenance].
-                    unfold mem_state_memory.
-                    cbn.
-                    rewrite add_all_to_frame_preserves_memory.
-                    cbn.
+                  repeat eexists.
+                  cbn.
+                  break_match; [break_match|]; tauto.
+              - (* alloc_bytes_new_writes_allowed *)
+                intros p IN.
+                (* TODO: solve_write_byte_allowed. *)
+                break_access_hyps; eexists; split.
+                + (* TODO: solve_byte_allocated *)
+                  repeat eexists; [| solve_returns_provenance].
+                  unfold mem_state_memory.
+                  cbn.
+                  rewrite add_all_to_frame_preserves_memory.
+                  cbn.
 
                   match goal with
                   | H: _ |- context [ read_byte_raw (add_all_index ?l ?z ?mem) ?p ] =>
@@ -6001,238 +6654,237 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
                   split; auto.
                   apply aid_eq_dec_refl.
-                  + solve_access_allowed.
-                - (* alloc_bytes_old_writes_allowed *)
-                  intros ptr' DISJOINT.
-                  split; intros WRITE.
-                  + (* TODO: solve_write_byte_allowed. *)
-                    break_access_hyps.
+                + solve_access_allowed.
+              - (* alloc_bytes_old_writes_allowed *)
+                intros ptr' DISJOINT.
+                split; intros WRITE.
+                + (* TODO: solve_write_byte_allowed. *)
+                  break_access_hyps.
 
-                    (* TODO: move this into break_access_hyps? *)
-                    break_byte_allocated_in ALLOC.
-                    cbn in ALLOC.
+                  (* TODO: move this into break_access_hyps? *)
+                  break_byte_allocated_in ALLOC.
+                  cbn in ALLOC.
 
-                    break_match_hyp; [break_match_hyp|]; destruct ALLOC as [EQ1 EQ2]; inv EQ2.
+                  break_match_hyp; [break_match_hyp|]; destruct ALLOC as [EQ1 EQ2]; inv EQ2.
 
-                    repeat eexists; [| solve_returns_provenance |]; eauto.
-                    cbn.
-                    unfold mem_state_memory.
-                    cbn.
-                    rewrite add_all_to_frame_preserves_memory.
-                    cbn.
-
-                    rewrite read_byte_raw_add_all_index_out.
-                    2: {
-                      rewrite Zlength_map.
-                      pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
-                      pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
-
-                      exfalso.
-
-                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
-                      forward BOUNDS. lia.
-                      destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
-
-                      replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
-
-                      (* Want to use bound in... *)
-                      (* Need to get what ix is as an IP... *)
-                      destruct (IP.from_Z ix) eqn:IX.
-                      2: {
-                         (* HSEQ succeeding should make this a contradiction *)
-                        apply intptr_seq_from_Z with (x := ix) in HSEQ.
-                        destruct HSEQ as [ipx [EQ' INSEQ]].
-                        rewrite EQ' in IX.
-                        inv IX.
-
-                        rewrite <- Zlength_correct.
-                        lia.
-                      }
-
-                      pose proof (in_intptr_seq _ _ i _ HSEQ) as [IN BOUNDIN].
-                      apply IP.from_Z_to_Z in IX; subst.
-                      forward BOUNDIN.
-                      rewrite <- Zlength_correct.
-                      lia.
-
-                      set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
-
-                      (* I believe that p is necessarily in the result of HMAPM. *)
-                      assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
-                                               (allocation_id_to_prov
-                                                  (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
-                      { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
-
-                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
-
-                        destruct HMAPM as [x [GENPTR IN]].
-                        symmetry in GENPTR.
-                        pose proof GENPTR as GENPTR'.
-                        apply handle_gep_addr_ix in GENPTR.
-                        rewrite sizeof_dtyp_i8 in GENPTR.
-                        replace (Z.of_N 1 * IP.to_Z i) with (IP.to_Z i) in GENPTR by lia.
-                        rewrite ptr_to_int_int_to_ptr in GENPTR.
-                        rewrite <- GENPTR in EQ.
-
-                        subst p.
-                        rewrite EQ.
-                        rewrite int_to_ptr_ptr_to_int; auto.
-
-                        apply handle_gep_addr_preserves_provenance in GENPTR'.
-                        rewrite int_to_ptr_provenance in GENPTR'.
-                        symmetry; auto.
-                      }
-
-                      eapply map_monad_err_In with (x:=p) in HMAPM; auto.
-
-                      (* DISJOINT should be a contradition now *)
-                      exfalso.
-                      (* ?p doesn't have to be ptr', but ptr_to_int ?p = ptr_to_int ptr' *)
-                      eapply DISJOINT with (p:=p).
-                      apply PIN.
-
-                      subst p.
-                      rewrite ptr_to_int_int_to_ptr.
-                      reflexivity.
-                    }
-
-                    rewrite Heqo; cbn; split; eauto.
-                  + (* TODO: solve_write_byte_allowed *)
-                    break_access_hyps.
-
-                    (* TODO: move this into break_access_hyps? *)
-                    break_byte_allocated_in ALLOC.
-                    cbn in ALLOC.
-
-                    unfold mem_state_memory in ALLOC.
-                    cbn in ALLOC.
-                    rewrite add_all_to_frame_preserves_memory in ALLOC.
-                    cbn in ALLOC.
-
-                    rewrite read_byte_raw_add_all_index_out in ALLOC.
-                    2: {
-                      rewrite Zlength_map.
-                      pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
-                      pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
-
-                      exfalso.
-
-                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
-                      forward BOUNDS. lia.
-                      destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
-
-                      replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
-
-                      (* Want to use bound in... *)
-                      (* Need to get what ix is as an IP... *)
-                      destruct (IP.from_Z ix) eqn:IX.
-                      2: {
-                         (* HSEQ succeeding should make this a contradiction *)
-                        apply intptr_seq_from_Z with (x := ix) in HSEQ.
-                        destruct HSEQ as [ipx [EQ' INSEQ]].
-                        rewrite EQ' in IX.
-                        inv IX.
-
-                        rewrite <- Zlength_correct.
-                        lia.
-                      }
-
-                      pose proof (in_intptr_seq _ _ i _ HSEQ) as [IN BOUNDIN].
-                      apply IP.from_Z_to_Z in IX; subst.
-                      forward BOUNDIN.
-                      rewrite <- Zlength_correct.
-                      lia.
-
-                      set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
-
-                      (* I believe that p is necessarily in the result of HMAPM. *)
-                      assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
-                                               (allocation_id_to_prov
-                                                  (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
-                      { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
-
-                        eapply (@map_monad_err_In' err _ _ Monads.MonadLaws_sum) with (y:=i) in HMAPM; auto; try typeclasses eauto.
-                        
-                        destruct HMAPM as [x [GENPTR IN]].
-                        symmetry in GENPTR.
-                        pose proof GENPTR as GENPTR'.
-                        apply handle_gep_addr_ix in GENPTR.
-                        rewrite sizeof_dtyp_i8 in GENPTR.
-                        replace (Z.of_N 1 * IP.to_Z i) with (IP.to_Z i) in GENPTR by lia.
-                        rewrite ptr_to_int_int_to_ptr in GENPTR.
-                        rewrite <- GENPTR in EQ.
-
-                        subst p.
-                        rewrite EQ.
-                        rewrite int_to_ptr_ptr_to_int; auto.
-
-                        apply handle_gep_addr_preserves_provenance in GENPTR'.
-                        rewrite int_to_ptr_provenance in GENPTR'.
-                        symmetry; auto.
-                      }
-
-                      eapply map_monad_err_In with (x:=p) in HMAPM; auto.
-
-                      (* DISJOINT should be a contradition now *)
-                      exfalso.
-                      (* ?p doesn't have to be ptr', but ptr_to_int ?p = ptr_to_int ptr' *)
-                      eapply DISJOINT with (p:=p).
-                      apply PIN.
-
-                      subst p.
-                      rewrite ptr_to_int_int_to_ptr.
-                      reflexivity.
-                    }
-
-                    break_match; [break_match|].
-                    repeat eexists; [| solve_returns_provenance |]; eauto.
-                    cbn.
-                    unfold mem_byte in *.
-                    rewrite Heqo.
-                    tauto.
-                    destruct ALLOC as [_ CONTRA]; inv CONTRA.
-                - (* alloc_bytes_add_to_frame *)
-                  intros fs1 fs2 OLDFS ADD.
-                  unfold memory_stack_frame_stack_prop in *.
-                  cbn in OLDFS; subst.
+                  repeat eexists; [| solve_returns_provenance |]; eauto.
+                  cbn.
+                  unfold mem_state_memory.
+                  cbn.
+                  rewrite add_all_to_frame_preserves_memory.
                   cbn.
 
-                  rewrite <- map_cons.
+                  rewrite read_byte_raw_add_all_index_out.
+                  2: {
+                    rewrite Zlength_map.
+                    pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
+                    pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
 
-                  match goal with
-                  | H: _ |- context [ add_all_to_frame ?ms (map ptr_to_int ?ptrs) ] =>
-                      pose proof (add_all_to_frame_correct ptrs ms (add_all_to_frame ms (map ptr_to_int ptrs))) as ADDPTRS
-                  end.
+                    exfalso.
 
-                  forward ADDPTRS; [reflexivity|].
+                    pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
+                    forward BOUNDS. lia.
+                    destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
 
-                  eapply add_ptrs_to_frame_eqv; eauto.
-                  rewrite <- OLDFS in ADD.
-                  auto.
-                - (* Heap preserved *)
-                  solve_heap_preserved.
-                - (* non-void *)
-                  auto.
-                - (* Length of init bytes matches up *)
-                  cbn; auto.
-              }
-              { split.
-                reflexivity.
+                    replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
+
+                    (* Want to use bound in... *)
+                    (* Need to get what ix is as an IP... *)
+                    destruct (IP.from_Z ix) eqn:IX.
+                    2: {
+                      (* HSEQ succeeding should make this a contradiction *)
+                      apply intptr_seq_from_Z with (x := ix) in HSEQ.
+                      destruct HSEQ as [ipx [EQ' INSEQ]].
+                      rewrite EQ' in IX.
+                      inv IX.
+
+                      rewrite <- Zlength_correct.
+                      lia.
+                    }
+
+                    pose proof (in_intptr_seq _ _ i _ HSEQ) as [IN BOUNDIN].
+                    apply IP.from_Z_to_Z in IX; subst.
+                    forward BOUNDIN.
+                    rewrite <- Zlength_correct.
+                    lia.
+
+                    set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
+
+                    (* I believe that p is necessarily in the result of HMAPM. *)
+                    assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
+                                             (allocation_id_to_prov
+                                                (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
+                    { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
+
+                      eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
+
+                      destruct HMAPM as [x [GENPTR IN]].
+                      symmetry in GENPTR.
+                      pose proof GENPTR as GENPTR'.
+                      apply handle_gep_addr_ix in GENPTR.
+                      rewrite sizeof_dtyp_i8 in GENPTR.
+                      replace (Z.of_N 1 * IP.to_Z i) with (IP.to_Z i) in GENPTR by lia.
+                      rewrite ptr_to_int_int_to_ptr in GENPTR.
+                      rewrite <- GENPTR in EQ.
+
+                      subst p.
+                      rewrite EQ.
+                      rewrite int_to_ptr_ptr_to_int; auto.
+
+                      apply handle_gep_addr_preserves_provenance in GENPTR'.
+                      rewrite int_to_ptr_provenance in GENPTR'.
+                      symmetry; auto.
+                    }
+
+                    eapply map_monad_err_In with (x:=p) in HMAPM; auto.
+
+                    (* DISJOINT should be a contradition now *)
+                    exfalso.
+                    (* ?p doesn't have to be ptr', but ptr_to_int ?p = ptr_to_int ptr' *)
+                    eapply DISJOINT with (p:=p).
+                    apply PIN.
+
+                    subst p.
+                    rewrite ptr_to_int_int_to_ptr.
+                    reflexivity.
+                  }
+
+                  rewrite Heqo; cbn; split; eauto.
+                + (* TODO: solve_write_byte_allowed *)
+                  break_access_hyps.
+
+                  (* TODO: move this into break_access_hyps? *)
+                  break_byte_allocated_in ALLOC.
+                  cbn in ALLOC.
+
+                  unfold mem_state_memory in ALLOC.
+                  cbn in ALLOC.
+                  rewrite add_all_to_frame_preserves_memory in ALLOC.
+                  cbn in ALLOC.
+
+                  rewrite read_byte_raw_add_all_index_out in ALLOC.
+                  2: {
+                    rewrite Zlength_map.
+                    pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
+                    pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
+
+                    exfalso.
+
+                    pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
+                    forward BOUNDS. lia.
+                    destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
+
+                    replace (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes - next_memory_key (mkMemoryStack mem frames heap)) with (Zlength init_bytes) in BOUNDLT by lia.
+
+                    (* Want to use bound in... *)
+                    (* Need to get what ix is as an IP... *)
+                    destruct (IP.from_Z ix) eqn:IX.
+                    2: {
+                      (* HSEQ succeeding should make this a contradiction *)
+                      apply intptr_seq_from_Z with (x := ix) in HSEQ.
+                      destruct HSEQ as [ipx [EQ' INSEQ]].
+                      rewrite EQ' in IX.
+                      inv IX.
+
+                      rewrite <- Zlength_correct.
+                      lia.
+                    }
+
+                    pose proof (in_intptr_seq _ _ i _ HSEQ) as [IN BOUNDIN].
+                    apply IP.from_Z_to_Z in IX; subst.
+                    forward BOUNDIN.
+                    rewrite <- Zlength_correct.
+                    lia.
+
+                    set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id pr'))).
+
+                    (* I believe that p is necessarily in the result of HMAPM. *)
+                    assert (In p (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
+                                             (allocation_id_to_prov
+                                                (provenance_to_allocation_id pr')) :: ptrs)) as PIN.
+                    { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
+
+                      eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
+                      destruct HMAPM as [x [GENPTR IN]].
+                      symmetry in GENPTR.
+                      pose proof GENPTR as GENPTR'.
+                      apply handle_gep_addr_ix in GENPTR.
+                      rewrite sizeof_dtyp_i8 in GENPTR.
+                      replace (Z.of_N 1 * IP.to_Z i) with (IP.to_Z i) in GENPTR by lia.
+                      rewrite ptr_to_int_int_to_ptr in GENPTR.
+                      rewrite <- GENPTR in EQ.
+
+                      subst p.
+                      rewrite EQ.
+                      rewrite int_to_ptr_ptr_to_int; auto.
+
+                      apply handle_gep_addr_preserves_provenance in GENPTR'.
+                      rewrite int_to_ptr_provenance in GENPTR'.
+                      symmetry; auto.
+                    }
+
+                    eapply map_monad_err_In with (x:=p) in HMAPM; auto.
+
+                    (* DISJOINT should be a contradition now *)
+                    exfalso.
+                    (* ?p doesn't have to be ptr', but ptr_to_int ?p = ptr_to_int ptr' *)
+                    eapply DISJOINT with (p:=p).
+                    apply PIN.
+
+                    subst p.
+                    rewrite ptr_to_int_int_to_ptr.
+                    reflexivity.
+                  }
+
+                  break_match; [break_match|].
+                  repeat eexists; [| solve_returns_provenance |]; eauto.
+                  cbn.
+                  unfold mem_byte in *.
+                  rewrite Heqo.
+                  tauto.
+                  destruct ALLOC as [_ CONTRA]; inv CONTRA.
+              - (* alloc_bytes_add_to_frame *)
+                intros fs1 fs2 OLDFS ADD.
+                unfold memory_stack_frame_stack_prop in *.
+                cbn in OLDFS; subst.
+                cbn.
+
+                rewrite <- map_cons.
+
+                match goal with
+                | H: _ |- context [ add_all_to_frame ?ms (map ptr_to_int ?ptrs) ] =>
+                    pose proof (add_all_to_frame_correct ptrs ms (add_all_to_frame ms (map ptr_to_int ptrs))) as ADDPTRS
+                end.
+
+                forward ADDPTRS; [reflexivity|].
+
+                eapply add_ptrs_to_frame_eqv; eauto.
+                rewrite <- OLDFS in ADD.
                 auto.
-              }
+              - (* Heap preserved *)
+                solve_heap_preserved.
+              - (* non-void *)
+                auto.
+              - (* Length of init bytes matches up *)
+                cbn; auto.
             }
-
-            { (* OOM *)
-              cbn in RUN.
-              rewrite MemMonad_run_raise_oom in RUN.
-              rewrite rbm_raise_bind in RUN.
-              exfalso.
-              symmetry in RUN.
-              eapply MemMonad_eq1_raise_oom_inv in RUN.
+            { split.
+              reflexivity.
               auto.
-              typeclasses eauto.
             }
           }
+
+          { (* OOM *)
+            cbn in RUN.
+            rewrite MemMonad_run_raise_oom in RUN.
+            rewrite rbm_raise_bind in RUN.
+            exfalso.
+            symmetry in RUN.
+            eapply MemMonad_eq1_raise_oom_inv in RUN.
+            auto.
+            typeclasses eauto.
+          }
+        }
       }
 
       Unshelve.
@@ -6521,24 +7173,24 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
               Open Scope positive.
               exists ({|
-                    ms_memory_stack :=
-                    add_all_to_heap
-                      {|
-                        memory_stack_memory :=
-                        add_all_index
-                          (map (fun b : SByte => (b, provenance_to_allocation_id pr'')) init_bytes)
-                          (next_memory_key
-                             {|
-                               memory_stack_memory := mem;
-                               memory_stack_frame_stack := frames;
-                               memory_stack_heap := heap
-                             |}) mem;
-                        memory_stack_frame_stack := frames;
-                        memory_stack_heap := heap
-                      |} (map ptr_to_int (alloc_addr :: ptrs));
+                         ms_memory_stack :=
+                         add_all_to_heap
+                           {|
+                             memory_stack_memory :=
+                             add_all_index
+                               (map (fun b : SByte => (b, provenance_to_allocation_id pr'')) init_bytes)
+                               (next_memory_key
+                                  {|
+                                    memory_stack_memory := mem;
+                                    memory_stack_frame_stack := frames;
+                                    memory_stack_heap := heap
+                                  |}) mem;
+                             memory_stack_frame_stack := frames;
+                             memory_stack_heap := heap
+                           |} (map ptr_to_int (alloc_addr :: ptrs));
 
-                    ms_provenance := pr'''
-                  |}).
+                         ms_provenance := pr'''
+                       |}).
               exists (alloc_addr, (alloc_addr :: ptrs)).
 
               Close Scope positive.
@@ -6583,8 +7235,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     cbn.
                     split; reflexivity.
                 - (* malloc_bytes_address_provenance *)
-                    subst alloc_addr.
-                    apply int_to_ptr_provenance.
+                  subst alloc_addr.
+                  apply int_to_ptr_provenance.
                 - (* malloc_bytes_addressses_provenance *)
                   (* TODO: Need map_monad lemmas *)
                   assert (@inr string (list addr) = ret) as INR.
@@ -6695,7 +7347,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       pose proof (Z_lt_ge_dec (ptr_to_int ptr) (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
                       pose proof (Z_ge_lt_dec (ptr_to_int ptr) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
 
-                                            exfalso.
+                      exfalso.
 
                       pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr)) as BOUNDS.
                       forward BOUNDS. lia.
@@ -6707,7 +7359,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       (* Need to get what ix is as an IP... *)
                       destruct (IP.from_Z ix) eqn:IX.
                       2: {
-                         (* HSEQ succeeding should make this a contradiction *)
+                        (* HSEQ succeeding should make this a contradiction *)
                         apply intptr_seq_from_Z with (x := ix) in HSEQ.
                         destruct HSEQ as [ipx [EQ' INSEQ]].
                         rewrite EQ' in IX.
@@ -6780,7 +7432,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       pose proof (Z_lt_ge_dec (ptr_to_int ptr) (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
                       pose proof (Z_ge_lt_dec (ptr_to_int ptr) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
 
-                                            exfalso.
+                      exfalso.
 
                       pose proof (@exists_in_bounds_le_lt (next_memory_key (mkMemoryStack mem frames heap)) (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes) (ptr_to_int ptr)) as BOUNDS.
                       forward BOUNDS. lia.
@@ -6792,7 +7444,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       (* Need to get what ix is as an IP... *)
                       destruct (IP.from_Z ix) eqn:IX.
                       2: {
-                         (* HSEQ succeeding should make this a contradiction *)
+                        (* HSEQ succeeding should make this a contradiction *)
                         apply intptr_seq_from_Z with (x := ix) in HSEQ.
                         destruct HSEQ as [ipx [EQ' INSEQ]].
                         rewrite EQ' in IX.
@@ -6881,12 +7533,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                         assert (@MonadReturnsLaws.MReturns err _ _ _ (list addr)
                                                            (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
                                                                        (allocation_id_to_prov (provenance_to_allocation_id pr'')) :: ptrs)
-                                                           (map_monad
-            (fun ix : IP.intptr =>
-             handle_gep_addr (DTYPE_I 8)
-               (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
-                  (allocation_id_to_prov (provenance_to_allocation_id pr'')))
-               [Events.DV.DVALUE_IPTR ix]) NOOM_seq)) as MAPRET.
+                                                           (Util.map_monad
+                                                              (fun ix : IP.intptr =>
+                                                                 handle_gep_addr (DTYPE_I 8)
+                                                                                 (int_to_ptr (next_memory_key (mkMemoryStack mem frames heap))
+                                                                                             (allocation_id_to_prov (provenance_to_allocation_id pr'')))
+                                                                                 [Events.DV.DVALUE_IPTR ix]) NOOM_seq)) as MAPRET.
                         { cbn. red.
                           auto.
                         }
@@ -6913,7 +7565,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     * solve_access_allowed.
                   + (* TODO: solve_read_byte_allowed *)
                     repeat eexists; [| solve_returns_provenance |];
-                    cbn.
+                      cbn.
                     unfold mem_state_memory.
                     cbn.
                     rewrite add_all_to_heap_preserves_memory.
@@ -7043,7 +7695,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       (* Need to get what ix is as an IP... *)
                       destruct (IP.from_Z ix) eqn:IX.
                       2: {
-                         (* HSEQ succeeding should make this a contradiction *)
+                        (* HSEQ succeeding should make this a contradiction *)
                         apply intptr_seq_from_Z with (x := ix) in HSEQ.
                         destruct HSEQ as [ipx [EQ' INSEQ]].
                         rewrite EQ' in IX.
@@ -7214,7 +7866,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       (* Need to get what ix is as an IP... *)
                       destruct (IP.from_Z ix) eqn:IX.
                       2: {
-                         (* HSEQ succeeding should make this a contradiction *)
+                        (* HSEQ succeeding should make this a contradiction *)
                         apply intptr_seq_from_Z with (x := ix) in HSEQ.
                         destruct HSEQ as [ipx [EQ' INSEQ]].
                         rewrite EQ' in IX.
@@ -7288,7 +7940,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     cbn in READ.
 
                     rewrite read_byte_raw_add_all_index_out in READ.
-2: {
+                    2: {
                       rewrite Zlength_map.
                       pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap))) as [LTNEXT | GENEXT]; auto.
                       pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mkMemoryStack mem frames heap) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
@@ -7305,7 +7957,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       (* Need to get what ix is as an IP... *)
                       destruct (IP.from_Z ix) eqn:IX.
                       2: {
-                         (* HSEQ succeeding should make this a contradiction *)
+                        (* HSEQ succeeding should make this a contradiction *)
                         apply intptr_seq_from_Z with (x := ix) in HSEQ.
                         destruct HSEQ as [ipx [EQ' INSEQ]].
                         rewrite EQ' in IX.
@@ -7377,35 +8029,35 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     rewrite add_all_to_heap_preserves_memory.
                     cbn.
 
-                  match goal with
-                  | H: _ |- context [ read_byte_raw (add_all_index ?l ?z ?mem) ?p ] =>
-                      pose proof read_byte_raw_add_all_index_in_exists mem l z p as ?READ
-                  end.
+                    match goal with
+                    | H: _ |- context [ read_byte_raw (add_all_index ?l ?z ?mem) ?p ] =>
+                        pose proof read_byte_raw_add_all_index_in_exists mem l z p as ?READ
+                    end.
 
-                  forward READ.
-                  { (* Bounds *)
-                    pose proof (map_monad_err_In _ _ _ _ HMAPM IN) as [ix' [GENp IN_ix']].
-                    apply handle_gep_addr_ix in GENp.
-                    rewrite sizeof_dtyp_i8 in GENp.
-                    replace (Z.of_N 1 * IP.to_Z ix') with (IP.to_Z ix') in GENp by lia.
-                    rewrite ptr_to_int_int_to_ptr in GENp.
-                    apply (in_intptr_seq _ _ _ _ HSEQ) in IN_ix'.
+                    forward READ.
+                    { (* Bounds *)
+                      pose proof (map_monad_err_In _ _ _ _ HMAPM IN) as [ix' [GENp IN_ix']].
+                      apply handle_gep_addr_ix in GENp.
+                      rewrite sizeof_dtyp_i8 in GENp.
+                      replace (Z.of_N 1 * IP.to_Z ix') with (IP.to_Z ix') in GENp by lia.
+                      rewrite ptr_to_int_int_to_ptr in GENp.
+                      apply (in_intptr_seq _ _ _ _ HSEQ) in IN_ix'.
 
-                    rewrite Zlength_map.
-                    rewrite <- Zlength_correct in IN_ix'.
-                    lia.
-                  }
+                      rewrite Zlength_map.
+                      rewrite <- Zlength_correct in IN_ix'.
+                      lia.
+                    }
 
-                  destruct READ as [(byte', aid_byte) [NTH READ]].
-                  rewrite list_nth_z_map in NTH.
-                  unfold option_map in NTH.
-                  break_match_hyp; inv NTH.
+                    destruct READ as [(byte', aid_byte) [NTH READ]].
+                    rewrite list_nth_z_map in NTH.
+                    unfold option_map in NTH.
+                    break_match_hyp; inv NTH.
 
-                  unfold mem_byte in *.
-                  rewrite READ.
+                    unfold mem_byte in *.
+                    rewrite READ.
 
-                  split; auto.
-                  apply aid_eq_dec_refl.
+                    split; auto.
+                    apply aid_eq_dec_refl.
                   + solve_access_allowed.
                 - (* alloc_bytes_old_writes_allowed *)
                   intros ptr' DISJOINT.
@@ -7444,7 +8096,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       (* Need to get what ix is as an IP... *)
                       destruct (IP.from_Z ix) eqn:IX.
                       2: {
-                         (* HSEQ succeeding should make this a contradiction *)
+                        (* HSEQ succeeding should make this a contradiction *)
                         apply intptr_seq_from_Z with (x := ix) in HSEQ.
                         destruct HSEQ as [ipx [EQ' INSEQ]].
                         rewrite EQ' in IX.
@@ -7532,7 +8184,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       (* Need to get what ix is as an IP... *)
                       destruct (IP.from_Z ix) eqn:IX.
                       2: {
-                         (* HSEQ succeeding should make this a contradiction *)
+                        (* HSEQ succeeding should make this a contradiction *)
                         apply intptr_seq_from_Z with (x := ix) in HSEQ.
                         destruct HSEQ as [ipx [EQ' INSEQ]].
                         rewrite EQ' in IX.
@@ -7716,9 +8368,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           * (* solve_read_byte_prop_all_preserved. *)
             apply read_byte_prop_set_frame_stack.
         + (* write_byte_allowed_all_preserved *)
-            apply write_byte_allowed_all_preserved_set_frame_stack.
+          apply write_byte_allowed_all_preserved_set_frame_stack.
         + (* allocations_preserved *)
-        (* TODO: move to solve_allocations_preserved *)
+          (* TODO: move to solve_allocations_preserved *)
           apply allocations_preserved_set_frame_stack.
         + (* preserve_allocation_ids *)
           (* TODO: solve_preserve_allocation_ids *)
@@ -8673,12 +9325,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma block_allocated_dec :
       forall m1 root,
-      (forall ptr,
-          ptr_in_memstate_heap m1 root ptr ->
-          exists aid, byte_allocated m1 ptr aid) \/
-        ~(forall ptr,
-        ptr_in_memstate_heap m1 root ptr ->
-        exists aid, byte_allocated m1 ptr aid).
+        (forall ptr,
+            ptr_in_memstate_heap m1 root ptr ->
+            exists aid, byte_allocated m1 ptr aid) \/
+          ~(forall ptr,
+               ptr_in_memstate_heap m1 root ptr ->
+               exists aid, byte_allocated m1 ptr aid).
     Proof.
       intros ms root.
       destruct ms as ([m fs h] & pr) eqn:MS.
@@ -9237,7 +9889,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         solve_read_byte_prop.
     Qed.
 
-  End MemoryPrimatives.
+    End MemoryPrimatives.
 
 End FiniteMemoryModelExecPrimitives.
 
@@ -9326,98 +9978,98 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Import Eq.
   Import MMSP.
 
-(*   Lemma allocate_bytes_always_succeeds : *)
-(*     forall dt init_bytes ms_init, *)
-(*     exists (alloc_addr : addr) ms_final, *)
-(*       allocate_bytes_spec_MemPropT dt init_bytes ms_init (ret (ms_final, alloc_addr)). *)
-(*   Proof. *)
-(*     intros dt init_bytes ms_init. *)
+  (*   Lemma allocate_bytes_always_succeeds : *)
+  (*     forall dt init_bytes ms_init, *)
+  (*     exists (alloc_addr : addr) ms_final, *)
+  (*       allocate_bytes_spec_MemPropT dt init_bytes ms_init (ret (ms_final, alloc_addr)). *)
+  (*   Proof. *)
+  (*     intros dt init_bytes ms_init. *)
 
-(*     remember ms_init as m. *)
-(*     destruct m. *)
-(*     destruct ms_memory_stack0. *)
-(*     destruct (MMSP.mem_state_fresh_provenance ms_init) as [p ms_fresh_prov] eqn:FRESH. *)
-(*     apply mem_state_fresh_provenance_fresh in FRESH as [MEMEQ [PRESERVED_PR FRESH]].     *)
+  (*     remember ms_init as m. *)
+  (*     destruct m. *)
+  (*     destruct ms_memory_stack0. *)
+  (*     destruct (MMSP.mem_state_fresh_provenance ms_init) as [p ms_fresh_prov] eqn:FRESH. *)
+  (*     apply mem_state_fresh_provenance_fresh in FRESH as [MEMEQ [PRESERVED_PR FRESH]].     *)
 
-(*     set (next_ptr := *)
-(*            (LLVMParamsBigIntptr.ITOP.int_to_ptr *)
-(*               (next_memory_key *)
-(*                  {| *)
-(*                    memory_stack_memory := memory_stack_memory0; *)
-(*                    memory_stack_frame_stack := memory_stack_frame_stack0; *)
-(*                    memory_stack_heap := memory_stack_heap0 *)
-(*                  |}) *)
-(* (LLVMParamsBigIntptr.PROV.allocation_id_to_prov *)
-(*               (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id *)
-(*                  (LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0))))). *)
+  (*     set (next_ptr := *)
+  (*            (LLVMParamsBigIntptr.ITOP.int_to_ptr *)
+  (*               (next_memory_key *)
+  (*                  {| *)
+  (*                    memory_stack_memory := memory_stack_memory0; *)
+  (*                    memory_stack_frame_stack := memory_stack_frame_stack0; *)
+  (*                    memory_stack_heap := memory_stack_heap0 *)
+  (*                  |}) *)
+  (* (LLVMParamsBigIntptr.PROV.allocation_id_to_prov *)
+  (*               (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id *)
+  (*                  (LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0))))). *)
 
-(*     assert (MonadLawsE (MemStateFreshT (itree Eff))) as LAWS by admit. *)
-(*     assert (Eq1_ret_inv (MemStateFreshT (itree Eff))) as RETINV by admit. *)
-(*     (* pose proof @get_consecutive_ptrs_succeeds (MemStateFreshT (itree Eff)) _ _ _ RETINV _ _ LAWS next_ptr (Datatypes.length init_bytes) as (ptrs & CONSEC). *) *)
-(*     assert (MonadLawsE (MemPropT MMSP.MemState)) as LAWS' by admit. *)
-(*     assert (Eq1_ret_inv (MemPropT MMSP.MemState)) as RETINV' by admit. *)
-(*     (* pose proof @get_consecutive_ptrs_succeeds (MemPropT MMSP.MemState) _ _ _ RETINV' _ _ LAWS' next_ptr (Datatypes.length init_bytes) as (ptrs & CONSEC). *) *)
-(*     pose proof @get_consecutive_ptrs_succeeds (MemStateFreshT (itree Eff)) _ _ _ RETINV _ _ LAWS next_ptr (Datatypes.length init_bytes) as (ptrs & CONSEC). *)
+  (*     assert (MonadLawsE (MemStateFreshT (itree Eff))) as LAWS by admit. *)
+  (*     assert (Eq1_ret_inv (MemStateFreshT (itree Eff))) as RETINV by admit. *)
+  (*     (* pose proof @get_consecutive_ptrs_succeeds (MemStateFreshT (itree Eff)) _ _ _ RETINV _ _ LAWS next_ptr (Datatypes.length init_bytes) as (ptrs & CONSEC). *) *)
+  (*     assert (MonadLawsE (MemPropT MMSP.MemState)) as LAWS' by admit. *)
+  (*     assert (Eq1_ret_inv (MemPropT MMSP.MemState)) as RETINV' by admit. *)
+  (*     (* pose proof @get_consecutive_ptrs_succeeds (MemPropT MMSP.MemState) _ _ _ RETINV' _ _ LAWS' next_ptr (Datatypes.length init_bytes) as (ptrs & CONSEC). *) *)
+  (*     pose proof @get_consecutive_ptrs_succeeds (MemStateFreshT (itree Eff)) _ _ _ RETINV _ _ LAWS next_ptr (Datatypes.length init_bytes) as (ptrs & CONSEC). *)
 
-(*     exists next_ptr. *)
-(*     exists ({| *)
-(*         MemoryBigIntptrInfiniteSpec.MMSP.ms_memory_stack := *)
-(*           add_all_to_frame *)
-(*             {| *)
-(*               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := *)
-(*                 add_all_index *)
-(*                   (map *)
-(*                      (fun b : SByte => *)
-(*                       (b, *)
-(*                       LLVMParamsBigIntptr.PROV.provenance_to_allocation_id *)
-(*                         (LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0))) init_bytes) *)
-(*                   (next_memory_key *)
-(*                      {| *)
-(*                        MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := memory_stack_memory0; *)
-(*                        MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := *)
-(*                          memory_stack_frame_stack0; *)
-(*                        MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := memory_stack_heap0 *)
-(*                      |}) memory_stack_memory0; *)
-(*               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := memory_stack_frame_stack0; *)
-(*               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := memory_stack_heap0 *)
-(*             |} (map LLVMParamsBigIntptr.PTOI.ptr_to_int ptrs); *)
-(*         MemoryBigIntptrInfiniteSpec.MMSP.ms_provenance := *)
-(*           LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0 *)
-(*         |}). *)
+  (*     exists next_ptr. *)
+  (*     exists ({| *)
+  (*         MemoryBigIntptrInfiniteSpec.MMSP.ms_memory_stack := *)
+  (*           add_all_to_frame *)
+  (*             {| *)
+  (*               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := *)
+  (*                 add_all_index *)
+  (*                   (map *)
+  (*                      (fun b : SByte => *)
+  (*                       (b, *)
+  (*                       LLVMParamsBigIntptr.PROV.provenance_to_allocation_id *)
+  (*                         (LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0))) init_bytes) *)
+  (*                   (next_memory_key *)
+  (*                      {| *)
+  (*                        MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := memory_stack_memory0; *)
+  (*                        MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := *)
+  (*                          memory_stack_frame_stack0; *)
+  (*                        MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := memory_stack_heap0 *)
+  (*                      |}) memory_stack_memory0; *)
+  (*               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := memory_stack_frame_stack0; *)
+  (*               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := memory_stack_heap0 *)
+  (*             |} (map LLVMParamsBigIntptr.PTOI.ptr_to_int ptrs); *)
+  (*         MemoryBigIntptrInfiniteSpec.MMSP.ms_provenance := *)
+  (*           LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0 *)
+  (*         |}). *)
 
-(*     assert store_id as init_store_id. *)
-(*     admit. *)
+  (*     assert store_id as init_store_id. *)
+  (*     admit. *)
 
-(*     pose proof @allocate_bytes_correct (MemStateFreshT (itree Eff)) Eff as CORRECT. *)
-(*     unfold exec_correct in CORRECT. *)
-(*     specialize (CORRECT store_id _ _ _ _ _ _ _ _ _ _ _ _ dt init_bytes ms_init init_store_id). *)
-(*     forward CORRECT. *)
-(*     admit. *)
-(*     destruct CORRECT as [UB | CORRECT]. *)
-(*       - (* UB in spec *) *)
-(*         destruct UB as [ubmsg UB]. *)
-(*         unfold MemSpec.allocate_bytes_spec_MemPropT in *. *)
+  (*     pose proof @allocate_bytes_correct (MemStateFreshT (itree Eff)) Eff as CORRECT. *)
+  (*     unfold exec_correct in CORRECT. *)
+  (*     specialize (CORRECT store_id _ _ _ _ _ _ _ _ _ _ _ _ dt init_bytes ms_init init_store_id). *)
+  (*     forward CORRECT. *)
+  (*     admit. *)
+  (*     destruct CORRECT as [UB | CORRECT]. *)
+  (*       - (* UB in spec *) *)
+  (*         destruct UB as [ubmsg UB]. *)
+  (*         unfold MemSpec.allocate_bytes_spec_MemPropT in *. *)
 
-(*         (* Fresh provenance bind in MemPropT *) *)
-(*         cbn in UB. *)
-(*         destruct UB as [[] | UB]. *)
-(*         destruct UB as [ms_fresh_pr [pr [FRESH_PROV_INVARIANTS UB]]]. *)
-(*         destruct UB as [ALLOC_FAILS_UB | UB]. *)
-(*         + (* Allocation fails, should be bogus because we prove it succeeds... *) *)
+  (*         (* Fresh provenance bind in MemPropT *) *)
+  (*         cbn in UB. *)
+  (*         destruct UB as [[] | UB]. *)
+  (*         destruct UB as [ms_fresh_pr [pr [FRESH_PROV_INVARIANTS UB]]]. *)
+  (*         destruct UB as [ALLOC_FAILS_UB | UB]. *)
+  (*         + (* Allocation fails, should be bogus because we prove it succeeds... *) *)
 
-(*         +  *)
+  (*         +  *)
 
-(*         rewrite MemMonad_run_fresh_provenance in UB. *)
-(*         unfold MemSpec.allocate_bytes_spec_MemPropT' in . *)
+  (*         rewrite MemMonad_run_fresh_provenance in UB. *)
+  (*         unfold MemSpec.allocate_bytes_spec_MemPropT' in . *)
 
-(*         cbn in UB. *)
+  (*         cbn in UB. *)
 
-(*         destruct UB as [sab [pr ]. *)
-(*       destruct UB as [sab [a [BLAH REST]]]. *)
+  (*         destruct UB as [sab [pr ]. *)
+  (*       destruct UB as [sab [a [BLAH REST]]]. *)
 
 
 
-(*   Qed. *)
+  (*   Qed. *)
 
   (* TODO: Move this thing? *)
   Lemma get_consecutive_MemPropT_MemStateFreshT :
@@ -9449,8 +10101,8 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
         destruct CONSEC as [ms' [a [[EQ1 EQ2] CONSEC]]].
         subst.
         destruct (map_monad
-        (fun ix : LLVMParamsBigIntptr.IP.intptr =>
-           GEP.handle_gep_addr (DTYPE_I 8) ptr [LLVMParamsBigIntptr.Events.DV.DVALUE_IPTR ix]) l);
+                    (fun ix : LLVMParamsBigIntptr.IP.intptr =>
+                       GEP.handle_gep_addr (DTYPE_I 8) ptr [LLVMParamsBigIntptr.Events.DV.DVALUE_IPTR ix]) l);
           inv CONSEC.
 
         cbn.
@@ -9536,16 +10188,16 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
 
   Lemma allocate_bytes_succeeds_spec_correct :
     forall (ms_init ms_fresh_pr ms_final : MemState) (st sid st' : store_id) (dt : dtyp) (init_bytes : list SByte) (pr : Provenance) (ptr : addr) (ptrs : list addr)
-      (VALID : @MemMonad_valid_state store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ ms_init st)
-      (VALID' : @MemMonad_valid_state store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ ms_fresh_pr st)
-      (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length init_bytes))
-      (NON_VOID : dt <> DTYPE_Void)
-      (RUN_FRESH : (@MemMonad_run store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ fresh_provenance ms_init st ≈ ret (st, (ms_fresh_pr, pr)))%monad)
-      (MEMORY_FRESH : ms_get_memory ms_init = ms_get_memory ms_fresh_pr)
-      (RUN_FRESH_SID : (@MemMonad_run store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ fresh_sid ms_fresh_pr st ≈ ret (st', (ms_fresh_pr, sid)))%monad)
-      (ALLOC : (@MemMonad_run store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ (@allocate_bytes (MemStateFreshT (itree Eff)) Eff _ _ _ _ _ _ _ _ _ _ _ _ _ dt init_bytes) ms_init st ≈ ret (st', (ms_final, ptr)))%monad)
-      (CONSEC : (@get_consecutive_ptrs (MemStateFreshT (itree Eff)) _ _ _ ptr (length init_bytes) ≈ ret ptrs)%monad)
-      (PR : address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr)),
+           (VALID : @MemMonad_valid_state store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ ms_init st)
+           (VALID' : @MemMonad_valid_state store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ ms_fresh_pr st)
+           (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length init_bytes))
+           (NON_VOID : dt <> DTYPE_Void)
+           (RUN_FRESH : (@MemMonad_run store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ fresh_provenance ms_init st ≈ ret (st, (ms_fresh_pr, pr)))%monad)
+           (MEMORY_FRESH : ms_get_memory ms_init = ms_get_memory ms_fresh_pr)
+           (RUN_FRESH_SID : (@MemMonad_run store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ fresh_sid ms_fresh_pr st ≈ ret (st', (ms_fresh_pr, sid)))%monad)
+           (ALLOC : (@MemMonad_run store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ (@allocate_bytes (MemStateFreshT (itree Eff)) Eff _ _ _ _ _ _ _ _ _ _ _ _ _ dt init_bytes) ms_init st ≈ ret (st', (ms_final, ptr)))%monad)
+           (CONSEC : (@get_consecutive_ptrs (MemStateFreshT (itree Eff)) _ _ _ ptr (length init_bytes) ≈ ret ptrs)%monad)
+           (PR : address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr)),
       allocate_bytes_succeeds_spec ms_fresh_pr dt init_bytes pr ms_final ptr ptrs.
   Proof.
     intros ms_init ms_fresh_pr ms_final st sid st' dt init_bytes pr ptr ptrs VALID VALID' BYTES_SIZE NON_VOID RUN_FRESH MEMORY_FRESH RUN_FRESH_SID ALLOC CONSEC PR.
@@ -9607,15 +10259,15 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
       rewrite map_bind in RUN.
 
       set (next_ptr :=
-           (LLVMParamsBigIntptr.ITOP.int_to_ptr
-              (next_memory_key
-                 {|
-                   memory_stack_memory := mem;
-                   memory_stack_frame_stack := frames;
-                   memory_stack_heap := heap
-                 |})
-           (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
-              (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id (LLVMParamsBigIntptr.PROV.next_provenance ms_prov))))).
+             (LLVMParamsBigIntptr.ITOP.int_to_ptr
+                (next_memory_key
+                   {|
+                     memory_stack_memory := mem;
+                     memory_stack_frame_stack := frames;
+                     memory_stack_heap := heap
+                   |})
+                (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
+                   (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id (LLVMParamsBigIntptr.PROV.next_provenance ms_prov))))).
 
       assert (MonadLawsE (MemStateFreshT (itree Eff))) as LAWS by admit.
       assert (Eq1_ret_inv (MemStateFreshT (itree Eff))) as RETINV by admit.
@@ -9629,15 +10281,15 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
       specialize (CONSEC' st').
       unfold eq1 in CONSEC'.
       specialize (CONSEC'
-              {|
-                MemoryBigIntptrInfiniteSpec.MMSP.ms_memory_stack :=
-                  {|
-                    MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
-                    MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := frames;
-                    MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := heap
-                  |};
-                MemoryBigIntptrInfiniteSpec.MMSP.ms_provenance := LLVMParamsBigIntptr.PROV.next_provenance ms_prov
-              |}).
+                    {|
+                      MemoryBigIntptrInfiniteSpec.MMSP.ms_memory_stack :=
+                      {|
+                        MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
+                        MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := frames;
+                        MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := heap
+                      |};
+                      MemoryBigIntptrInfiniteSpec.MMSP.ms_provenance := LLVMParamsBigIntptr.PROV.next_provenance ms_prov
+                    |}).
       unfold ITreeMonad.Eq1_ITree in CONSEC'.
 
       subst next_ptr.
@@ -9724,8 +10376,8 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
 
         Lemma byte_not_allocated_get_consecutive_ptrs :
           forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
-            `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM} `{LAWS : @MonadLawsE M EQM HM}
-            (mem : memory_stack) (ms : MemState) (ptr : addr) (len : nat) (ptrs : list addr),
+                 `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM} `{LAWS : @MonadLawsE M EQM HM}
+                 (mem : memory_stack) (ms : MemState) (ptr : addr) (len : nat) (ptrs : list addr),
             MemState_get_memory ms = mem ->
             next_memory_key mem <= ptr_to_int ptr ->
             (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
@@ -9744,11 +10396,11 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
                    {|
                      MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
                      MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := frames;
-                      MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := heap
-                    |})
-                 (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
-                    (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id
-                       (LLVMParamsBigIntptr.PROV.next_provenance ms_prov))))).
+                     MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := heap
+                   |})
+                (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
+                   (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id
+                      (LLVMParamsBigIntptr.PROV.next_provenance ms_prov))))).
 
         reflexivity.
         cbn. rewrite ptr_to_int_int_to_ptr. reflexivity.
@@ -9769,11 +10421,11 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
 
         Lemma byte_allocated_get_consecutive_ptrs :
           forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
-            `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
-            `{LAWS : @MonadLawsE M EQM HM}
+                 `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
+                 `{LAWS : @MonadLawsE M EQM HM}
 
-            (mem : memory) (ms : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
-            (bytes : list mem_byte) (aid : AllocationId),
+                 (mem : memory) (ms : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
+                 (bytes : list mem_byte) (aid : AllocationId),
             mem_state_memory ms = add_all_index bytes (ptr_to_int ptr) mem ->
             length bytes = len ->
             (forall mb, In mb bytes -> snd mb = aid) ->
@@ -9812,18 +10464,18 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
         (* TODO: Move and reuse *)
         Lemma byte_allocated_preserved_get_consecutive_ptrs :
           forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
-            `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
-            `{LAWS : @MonadLawsE M EQM HM}
+                 `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
+                 `{LAWS : @MonadLawsE M EQM HM}
 
-            (mem : memory) (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
-            (bytes : list mem_byte) (p : addr) (aid : AllocationId),
+                 (mem : memory) (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
+                 (bytes : list mem_byte) (p : addr) (aid : AllocationId),
             mem_state_memory ms = mem ->
             mem_state_memory ms' = add_all_index bytes (ptr_to_int ptr) mem ->
             (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
             (length bytes = len) ->
             (forall new_p, In new_p ptrs -> disjoint_ptr_byte new_p p) ->
             byte_allocated ms p aid <->
-            byte_allocated ms' p aid.
+              byte_allocated ms' p aid.
         Proof.
           intros M HM OOM ERR EQM EQV EQRET LAWS mem ms ms' ptr len ptrs
                  bytes p aid MEM1 MEM2 CONSEC BYTELEN DISJOINT.
@@ -9835,22 +10487,22 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
             erewrite read_byte_raw_add_all_index_out.
             2: {
               unfold disjoint_ptr_byte in *.
-            (* I should know from get_consecutive_ptrs and DISJOINT
+              (* I should know from get_consecutive_ptrs and DISJOINT
                that p can't be in this range.
 
                I should know that:
 
                forall ix, ptoi ptr <= ix < ptoi ptr + len, exists new_p, In new_p ptrs.
 
-             *)
+               *)
               Lemma get_consecutive_ptrs_covers_range :
                 forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
-                  `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
-                  `{LAWS : @MonadLawsE M EQM HM}
-                  ptr len ptrs,
+                       `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
+                       `{LAWS : @MonadLawsE M EQM HM}
+                       ptr len ptrs,
                   (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
                   forall ix, ptr_to_int ptr <= ix < ptr_to_int ptr + (Z.of_nat len) ->
-                  exists p', ptr_to_int p' = ix /\ In p' ptrs.
+                             exists p', ptr_to_int p' = ix /\ In p' ptrs.
               Proof.
                 (* TODO: This is kind of related to get_consecutive_ptrs_nth *)
                 intros M HM OOM ERR EQM EQV EQRET LAWS ptr len ptrs CONSEC ix RANGE.
@@ -10036,11 +10688,11 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
         (* TODO: Move and reuse *)
         Lemma read_byte_allowed_preserved_get_consecutive_ptrs :
           forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
-            `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
-            `{LAWS : @MonadLawsE M EQM HM}
+                 `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
+                 `{LAWS : @MonadLawsE M EQM HM}
 
-            (mem : memory) (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
-            (bytes : list mem_byte) (p : addr),
+                 (mem : memory) (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
+                 (bytes : list mem_byte) (p : addr),
             mem_state_memory ms = mem ->
             mem_state_memory ms' = add_all_index bytes (ptr_to_int ptr) mem ->
             (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
@@ -10080,11 +10732,11 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
         (* TODO: move and add to solve_read_byte_allowed *)
         Lemma read_byte_add_all_index :
           forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
-            `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
-            `{LAWS : @MonadLawsE M EQM HM}
+                 `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
+                 `{LAWS : @MonadLawsE M EQM HM}
 
-            (ms : MemState) (mem : memory) (bytes : list mem_byte)
-            (byte : SByte) (offset : nat) (aid : AllocationId) p ptr ptrs,
+                 (ms : MemState) (mem : memory) (bytes : list mem_byte)
+                 (byte : SByte) (offset : nat) (aid : AllocationId) p ptr ptrs,
 
             mem_state_memory ms = add_all_index bytes (ptr_to_int ptr) mem ->
             Util.Nth bytes offset (byte, aid) ->
@@ -10151,11 +10803,11 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
         (* TODO: Move and reuse *)
         Lemma read_byte_preserved_get_consecutive_ptrs :
           forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
-            `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
-            `{LAWS : @MonadLawsE M EQM HM}
+                 `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
+                 `{LAWS : @MonadLawsE M EQM HM}
 
-            (mem : memory) (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
-            (bytes : list mem_byte) (p : addr) byte,
+                 (mem : memory) (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
+                 (bytes : list mem_byte) (p : addr) byte,
             mem_state_memory ms = mem ->
             mem_state_memory ms' = add_all_index bytes (ptr_to_int ptr) mem ->
             (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
@@ -10294,11 +10946,11 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
         (* TODO: Move and reuse *)
         Lemma write_byte_allowed_preserved_get_consecutive_ptrs :
           forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
-            `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
-            `{LAWS : @MonadLawsE M EQM HM}
+                 `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
+                 `{LAWS : @MonadLawsE M EQM HM}
 
-            (mem : memory) (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
-            (bytes : list mem_byte) (p : addr),
+                 (mem : memory) (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
+                 (bytes : list mem_byte) (p : addr),
             mem_state_memory ms = mem ->
             mem_state_memory ms' = add_all_index bytes (ptr_to_int ptr) mem ->
             (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
@@ -10358,9 +11010,9 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
 
   Lemma allocate_can_always_succeed :
     forall (ms_init ms_fresh_pr : MemState) (t : dtyp) (init_bytes : list SByte) (pr : Provenance)
-      (FRESH_PR : (fresh_provenance ms_init (ret (ms_fresh_pr, pr))))
-      (BYTES_SIZE : sizeof_dtyp t = N.of_nat (length init_bytes))
-      (NON_VOID : t <> DTYPE_Void),
+           (FRESH_PR : (fresh_provenance ms_init (ret (ms_fresh_pr, pr))))
+           (BYTES_SIZE : sizeof_dtyp t = N.of_nat (length init_bytes))
+           (NON_VOID : t <> DTYPE_Void),
     exists ms_final ptr ptrs,
       allocate_bytes_succeeds_spec ms_fresh_pr t init_bytes pr ms_final ptr ptrs.
   Proof.
@@ -10406,7 +11058,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     (* May need a specific initial extra state... *)
     assert store_id as init_store_id.
     admit.
-*)
+     *)
 
     destruct ms_init eqn:HINIT.
     destruct ms_memory_stack0.
@@ -10419,9 +11071,9 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
                    memory_stack_frame_stack := memory_stack_frame_stack0;
                    memory_stack_heap := memory_stack_heap0
                  |})
-(LLVMParamsBigIntptr.PROV.allocation_id_to_prov
-              (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id
-                 (LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0))))).
+              (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
+                 (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id
+                    (LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0))))).
 
     (* (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
                  (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id p)))). *)
@@ -10457,29 +11109,29 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     (*     |}). *)
 
     exists ({|
-        MemoryBigIntptrInfiniteSpec.MMSP.ms_memory_stack :=
-          add_all_to_frame
-            {|
-              MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory :=
-                add_all_index
-                  (map
-                     (fun b : SByte =>
-                      (b,
-                      LLVMParamsBigIntptr.PROV.provenance_to_allocation_id
-                        (LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0))) init_bytes)
-                  (next_memory_key
-                     {|
-                       MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := memory_stack_memory0;
-                       MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack :=
-                         memory_stack_frame_stack0;
-                       MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := memory_stack_heap0
-                     |}) memory_stack_memory0;
-              MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := memory_stack_frame_stack0;
-              MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := memory_stack_heap0
-            |} (map LLVMParamsBigIntptr.PTOI.ptr_to_int ptrs);
-        MemoryBigIntptrInfiniteSpec.MMSP.ms_provenance :=
-          LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0
-      |}).
+               MemoryBigIntptrInfiniteSpec.MMSP.ms_memory_stack :=
+               add_all_to_frame
+                 {|
+                   MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory :=
+                   add_all_index
+                     (map
+                        (fun b : SByte =>
+                           (b,
+                             LLVMParamsBigIntptr.PROV.provenance_to_allocation_id
+                               (LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0))) init_bytes)
+                     (next_memory_key
+                        {|
+                          MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := memory_stack_memory0;
+                          MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack :=
+                          memory_stack_frame_stack0;
+                          MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := memory_stack_heap0
+                        |}) memory_stack_memory0;
+                   MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := memory_stack_frame_stack0;
+                   MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := memory_stack_heap0
+                 |} (map LLVMParamsBigIntptr.PTOI.ptr_to_int ptrs);
+               MemoryBigIntptrInfiniteSpec.MMSP.ms_provenance :=
+               LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0
+             |}).
 
     exists next_ptr. exists ptrs.
 
