@@ -2130,19 +2130,37 @@ Section InstrGenerators.
   Definition gen_helper_function_tle_multiple : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     := listOf_LLVM gen_helper_function_tle.
 
-  Definition gen_global : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
-    := fmap ret gen_helper_function_tle.
-
   Definition gen_main : GenLLVM (definition typ (block typ * list (block typ)))
     := gen_definition (Name "main") (TYPE_I 8) [].
 
   Definition gen_main_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
     := ret TLE_Definition <*> gen_main.
 
-  Definition gen_llvm :GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
+  Definition gen_global_var : GenLLVM (global typ)
     :=
-    globals <- gen_helper_function_tle_multiple;;
+      name <- new_global_id;;
+      t <- hide_ctx gen_sized_typ_ptrinctx;;
+      opt_exp <- fmap Some (hide_ctx (gen_exp_size 0 t));;
+      add_to_ctx (ID_Global name, TYPE_Pointer t);;
+      let ann_linkage : list (annotation typ) :=
+        match opt_exp with
+        | None => [ANN_linkage (LINKAGE_External)]
+        | Some _ => []
+        end in
+      let annotations := ann_linkage in (* TODO: Add more flags *)
+      ret (mk_global name t false opt_exp false annotations).
+
+  Definition gen_global_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
+    := ret TLE_Global <*> gen_global_var.
+
+  Definition gen_global_tle_multiple : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
+    := listOf_LLVM  gen_global_tle.
+
+  Definition gen_llvm : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
+    :=
+    globals <- gen_global_tle_multiple;;
+    functions <- gen_helper_function_tle_multiple;;
     main <- gen_main_tle;;
-    ret (globals ++ [main]).
+    ret (globals ++ functions ++ [main]).
 
 End InstrGenerators.
