@@ -2122,10 +2122,12 @@ Section InstrGenerators.
          '(recur_cond_id, recur_cond) <- add_id_to_instr (TYPE_I 1, INSTR_Op (OP_ICmp Ugt indicator_typ (EXP_Ident indicator_id) (EXP_Ident (ID_Local recur_init_instr_raw_id))));;
          let entry_code : list (instr_id * instr typ) := [(recur_init_instr_id, recur_init_instr); (recur_cond_id, recur_cond)] in
          (* Base case *)
+         ctxs <- get_variable_ctxs;;
          '(_, (base_b, base_bs)) <- gen_blocks_sz (sz / 2) t back_blocks;;
          let base_blocks := base_b :: base_bs in
          let base_bid := blk_id base_b in
          (* Inductions*)
+         restore_variable_ctxs ctxs;;
          induction_bid <- new_block_id;;
          code <- gen_code;; (* Some other instructions *)
          let next_exp := OP_IBinop (UDiv false) indicator_typ (EXP_Ident indicator_id) (EXP_Integer 2) in (* TODO: Should have more variety in decreasing indicator *)
