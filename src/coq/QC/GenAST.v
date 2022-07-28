@@ -1781,10 +1781,8 @@ Section InstrGenerators.
     := Build_Gen int genInt.
 
   (* TODO: move this. Also give a less confusing name because genOption is a thing? *)
-  Definition gen_option {A} (g : G A) (freqs : nat * nat) : G (option A)
-    :=
-    let '(none_freq, some_freq) := freqs in
-    freq_ failGen [(none_freq, ret None); (some_freq, liftM Some g)].
+  Definition gen_option {A} (g : G A) : G (option A)
+    := freq_ failGen [(1%nat, ret None); (7%nat, liftM Some g)].
 
   (* TODO: move these *)
   Definition opt_add_state {A} {ST} (st : ST) (o : option (A * ST)) : (option A * ST)
@@ -1793,10 +1791,10 @@ Section InstrGenerators.
        | (Some (a, st')) => (Some a, st')
        end.
 
-  Definition gen_opt_LLVM {A} (g : GenLLVM A) (freqs : nat * nat) : GenLLVM (option A)
+  Definition gen_opt_LLVM {A} (g : GenLLVM A) : GenLLVM (option A)
     := mkStateT
          (fun st =>
-            opt <- gen_option (runStateT g st) freqs;;
+            opt <- gen_option (runStateT g st);;
             ret (opt_add_state st opt)).
 
   Definition gen_load : GenLLVM (typ * instr typ)
@@ -2141,8 +2139,8 @@ Section InstrGenerators.
   Definition gen_global_var : GenLLVM (global typ)
     :=
       name <- new_global_id;;
-      t <- gen_sized_typ;;
-      opt_exp <- gen_opt_LLVM (hide_ctx (gen_exp_size 0 t)) (0,7)%nat;;
+      t <- hide_ctx gen_sized_typ_ptrinctx;;
+      opt_exp <- fmap Some (hide_ctx (gen_exp_size 0 t));;
       add_to_ctx (ID_Global name, TYPE_Pointer t);;
       let ann_linkage : list (annotation typ) :=
         match opt_exp with
