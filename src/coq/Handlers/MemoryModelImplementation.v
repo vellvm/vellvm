@@ -3751,11 +3751,17 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Ltac solve_read_byte_allowed :=
       solve_write_byte_allowed.
 
+    Ltac solve_free_byte_allowed :=
+      solve_write_byte_allowed.
+
     Ltac solve_read_byte_allowed_all_preserved :=
       intros ?ptr; split; intros ?READ; solve_read_byte_allowed.
 
     Ltac solve_write_byte_allowed_all_preserved :=
       intros ?ptr; split; intros ?WRITE; solve_write_byte_allowed.
+
+    Ltac solve_free_byte_allowed_all_preserved :=
+      intros ?ptr; split; intros ?WRITE; solve_free_byte_allowed.
 
     Ltac solve_read_byte_prop :=
       solve [ eapply read_byte_prop_mem_stack; eauto
@@ -3840,9 +3846,10 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Ltac solve_fresh_provenance_invariants :=
       split;
       [ solve_extend_provenance
-      | split; [| split; [| split; [|split]]];
+      | split; [| split; [| split; [| split; [| split]]]];
         [ solve_read_byte_preserved
         | solve_write_byte_allowed_all_preserved
+        | solve_free_byte_allowed_all_preserved
         | solve_allocations_preserved
         | solve_frame_stack_preserved
         | solve_heap_preserved
@@ -4499,6 +4506,54 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 - auto.
               }
             -- (* TODO: solve_write_byte_allowed_all_preserved *)
+              intros addr.
+              split; intros [aid' [ALLOC ALLOWED]]; exists aid'.
+              { unfold mem_state_memory in *.
+                split; repeat eexists; [|solve_returns_provenance|]; cbn.
+                - match goal with
+                  | |- context [ read_byte_raw (set_byte_raw _ ?p1 _) ?p2 ] =>
+                      pose proof Z.eq_dec p1 p2 as [NDISJOINT | DISJOINT]
+                  end.
+                  + rewrite NDISJOINT in *.
+                    rewrite set_byte_raw_eq; [| solve [eauto]].
+                    split; auto.
+                    break_byte_allocated_in ALLOC.
+                    break_match_hyp.
+                    break_match_hyp.
+                    inversion READ; subst.
+                    firstorder.
+                    destruct ALLOC as [_ CONTRA].
+                    inv CONTRA.
+                  + rewrite set_byte_raw_neq; [| solve [eauto]].
+                    break_byte_allocated_in ALLOC.
+                    break_match_hyp.
+                    break_match_hyp.
+                    inversion READ; subst.
+                    firstorder.
+                    destruct ALLOC as [_ CONTRA].
+                    inv CONTRA.
+                - auto.
+              }
+              { unfold mem_state_memory in *.
+                split; repeat eexists; [|solve_returns_provenance|]; cbn.
+                - break_byte_allocated_in ALLOC.
+                  cbn in *.
+                  match goal with
+                  | ALLOC : context [ read_byte_raw (set_byte_raw _ ?p1 _) ?p2 ] |- _ =>
+                      pose proof Z.eq_dec p1 p2 as [NDISJOINT | DISJOINT]
+                  end.
+                  + rewrite NDISJOINT in *.
+                    rewrite set_byte_raw_eq in ALLOC; [| solve [eauto]].
+                    rewrite READ in *.
+                    tauto.
+                  + rewrite set_byte_raw_neq in ALLOC; [| solve [eauto]].
+                    break_match_hyp.
+                    break_match_hyp.
+                    tauto.
+                    tauto.
+                - auto.
+              }
+            -- (* TODO: solve_free_byte_allowed_all_preserved *)
               intros addr.
               split; intros [aid' [ALLOC ALLOWED]]; exists aid'.
               { unfold mem_state_memory in *.
