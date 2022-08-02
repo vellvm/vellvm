@@ -1261,9 +1261,9 @@ Section ExpGenerators.
            fields (0%Z, DList_empty : DList (typ * DList Z))).
 
   (* The method is mainly used by extractvalue and insertvalue,
-   which requires at least one index for getting inside the aggregate type.
-   There is a possibility for us to get nil path. The filter below will get rid of that possibility.
-   Given that the nilpath will definitely be at the beginning of a list of options, we can essentially get the tail. *)
+     which requires at least one index for getting inside the aggregate type.
+     There is a possibility for us to get nil path. The filter below will get rid of that possibility.
+     Given that the nilpath will definitely be at the beginning of a list of options, we can essentially get the tail. *)
   Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
     tl (DList_paths_to_list_paths (get_index_paths_agg_aux t_from DList_empty)).
 
@@ -1755,28 +1755,28 @@ Definition genType: G (typ) :=
  Definition gen_exp (t : typ) : GenLLVM (exp typ)
     := sized_LLVM (fun sz => gen_exp_size sz t).
 
-Definition gen_insertvalue (typ_in_ctx: ident * typ): GenLLVM (typ * instr typ) :=
-  let '(id, tagg) := typ_in_ctx in
-  ctx <- get_ctx;;
-  let paths_in_agg := get_index_paths_insertvalue tagg ctx in
-  '(tsub, path_for_insertvalue) <- oneOf_LLVM (map ret paths_in_agg);;
-  ex <- hide_ctx (gen_exp_size 0 tsub);;
-  (* Generate all of the type*)
-  ret (tagg, INSTR_Op (OP_InsertValue (tagg, EXP_Ident id) (tsub, ex) path_for_insertvalue)).
+ Definition gen_insertvalue (typ_in_ctx: ident * typ): GenLLVM (typ * instr typ) :=
+   let '(id, tagg) := typ_in_ctx in
+   ctx <- get_ctx;;
+   let paths_in_agg := get_index_paths_insertvalue tagg ctx in
+   '(tsub, path_for_insertvalue) <- oneOf_LLVM (map ret paths_in_agg);;
+   ex <- hide_ctx (gen_exp_size 0 tsub);;
+   (* Generate all of the type*)
+   ret (tagg, INSTR_Op (OP_InsertValue (tagg, EXP_Ident id) (tsub, ex) path_for_insertvalue)).
 
-Definition gen_call (fun_ptrs : var_context) : GenLLVM (typ * instr typ) :=
-  ctx <- get_ctx;;
-  '(id, tfun) <- oneOf_LLVM (map ret fun_ptrs);;
-  match tfun with
-  | TYPE_Pointer (TYPE_Function ret_t args varargs) =>
-      args_texp <- map_monad
-                    (fun (arg_typ:typ) =>
-                       arg_exp <- gen_exp_size 0 arg_typ;;
-                       ret (arg_typ, arg_exp))
-                    args;;
-      ret (ret_t, INSTR_Call (TYPE_Function ret_t args varargs, EXP_Ident id) args_texp)
-  | _ => lift failGen
-  end.
+ Definition gen_call (fun_ptrs : var_context) : GenLLVM (typ * instr typ) :=
+   ctx <- get_ctx;;
+   '(id, tfun) <- oneOf_LLVM (map ret fun_ptrs);;
+   match tfun with
+   | TYPE_Pointer (TYPE_Function ret_t args varargs) =>
+       args_texp <- map_monad
+                     (fun (arg_typ:typ) =>
+                        arg_exp <- gen_exp_size 0 arg_typ;;
+                        ret (arg_typ, arg_exp))
+                     args;;
+       ret (ret_t, INSTR_Call (TYPE_Function ret_t args varargs, EXP_Ident id) args_texp)
+   | _ => lift failGen
+   end.
 
   Definition gen_texp : GenLLVM (texp typ)
     := t <- gen_typ;;
@@ -1893,6 +1893,7 @@ Section InstrGenerators.
                                                                gen_insertvalue x])
          ++ (if seq.nilp vec_typs_in_ctx then [] else [gen_extractelement; gen_insertelement])
          ++ (if seq.nilp fun_ptrs_in_ctx then [] else [gen_call fun_ptrs_in_ctx])).
+
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
 
