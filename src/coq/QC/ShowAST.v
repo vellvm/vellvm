@@ -295,7 +295,7 @@ Section ShowInstances.
         | None => "vscale_range(" ++ show min ++ ")"
         | Some m => "vscale_range(" ++ show min ++ "," ++ show m ++ ")"
         end                             
-    | FNATTR_String s => """" ++ show s ++ """"  (* "no-see" *)
+    | FNATTR_String s => """" ++ s ++ """"  (* "no-see" *)
     | FNATTR_Key_value kv => """" ++ fst kv ++ """=" ++ """" ++ snd kv ++ """" (* "unsafe-fp-math"="false" *)
     | FNATTR_Attr_grp g => "#" ++ show g
     end.
@@ -474,12 +474,21 @@ Section ShowInstances.
     |EXP_Integer x => x
     | _ => 0%Z (* This is arbitrary, it's never going to hit this case anyway *)
     end.
-
+  
   Definition show_c_string (ex : exp T) : string :=
     let n : nat := ex_to_nat ex in
     let x : Z := ex_to_int ex in
-    if ((n <? 32) || (126 <? n))%nat then NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N  x))
+    if ((n <? 32) || (126 <? n))%nat then (
+        let conversion :=  NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N  x)) in
+        if ((length (conversion)) =? (Z.to_nat 1))%nat then  "\0" ++ conversion
+        else "\" ++ conversion          
+      )
+    (*Special case for decimal 34/hex 22*)                                       
+    else if (n =? 34)%nat then "\22"
+    (*Special case for decimal 92/hex 5C*)                                       
+    else if (n =? 92)%nat then "\\"
     else (string_of_list_ascii ((ascii_of_nat n) :: [])).
+                         
 
   Definition is_op (e : exp T) : bool :=
     match e with
@@ -490,7 +499,8 @@ Section ShowInstances.
     | EXP_Bool b =>     false
     | EXP_Null =>      false
     | EXP_Zero_initializer =>    false
-    (* see notes on cstring on LLVMAst.v *)
+    (* see no
+tes on cstring on LLVMAst.v *)
     (* I'm using string_of_list_ascii bc I couldn't find any other function that converted asciis to strings  *)
     | EXP_Cstring elts =>     false
     | EXP_Undef =>         false
@@ -525,12 +535,11 @@ Section ShowInstances.
     | EXP_Array elts => "["  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++  show_exp false ex) elts) ++ "]"
     | EXP_Vector elts => "<"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++  show_exp false ex) elts) ++ ">"
     | OP_IBinop iop t v1 v2 =>
-       show iop ++ " " ++ add_parens b (show t ++ " " ++  show_exp true v1 ++ ", " ++  show_exp true v2)
+       let second_expression :=  if b then  show t ++ " " ++ show_exp true v2 else show_exp true v2 in
+       show iop ++ " " ++ add_parens b (show t ++ " " ++  show_exp true v1 ++ ", " ++ second_expression)
     | OP_ICmp cmp t v1 v2 =>
-        let second_expression :=  if b then  show t ++ " " ++ show_exp true v2 else show_exp true v2 in
-    
+        let second_expression :=  if b then  show t ++ " " ++ show_exp true v2 else show_exp true v2 in    
         "icmp " ++  show cmp ++ " " ++  add_parens b (show t ++ " " ++  show_exp true v1 ++ ", " ++ second_expression) 
-                 (* "icmp " ++  show cmp ++ " " ++  add_parens b (show t ++ " " ++  show_exp true v1 ++ ", " ++ show_exp true v2) *)
     | OP_FBinop fop fmath t v1 v2 =>
         let fmath_string :=
           match fmath with
@@ -586,10 +595,10 @@ Section ShowInstances.
 
   Definition show_phi_block (p : block_id * exp T) : string :=
     let '(bid, e) := p in
-    "[ " ++ show e ++ ", " ++ "%" ++ show bid ++ " ]".
+    "[ " ++ show_exp true e ++ ", " ++ "%" ++ show bid ++ " ]".
 
   Definition intersperse (sep : string) (l : list string) : string
-    := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else s ++ sep ++ acc) l "".
+    := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else acc ++ sep ++ s) l "".
 
   #[global] Instance showPhi : Show (phi T)
     := {| show p :=
@@ -698,7 +707,7 @@ Section ShowInstances.
        | INSTR_Load vol t ptr align =>
            "load " ++ show t ++ ", " ++ show_texp ptr ++ show_opt_prefix ", align " align
        | INSTR_Store vol tval ptr align =>
-           "store " ++ (if vol then "volatile " else "") ++ show_texp tval ++ ", " ++ show ptr ++ show_opt_prefix ", align " align
+           "store " ++ (if vol then "volatile " else "") ++ show_texp tval ++ ", " ++ show_texp ptr ++ show_opt_prefix ", align " align
        | INSTR_Fence syncscope ordering => let printable_sync := match syncscope with
                                                                  | None => ""
                                                                  | Some x => "[syncscope(""" ++ show x ++ """)]"
@@ -1009,7 +1018,7 @@ Definition show_tle (tle : toplevel_entity typ (block typ * list (block typ))) :
      | TLE_Source_filename s => "source_filename = " ++ show s
      | TLE_Declaration decl => show decl
      | TLE_Global g => show g
-     | TLE_Metadata id md => "!" ++ show id ++ show_metadata md (* Can't use implicit *)
+     | TLE_Metadata id md => "!" ++ show id ++ " = " ++ show_metadata md (* Can't use implicit *)
      | TLE_Type_decl id t => concatStr [show_ident id ;  " = type " ; show t ]
      | TLE_Attribute_group i attrs => concatStr ["attributes #" ; show i ; " = { " ;
                                                 concat " " (map (fun x => show x) (attrs)) ; " }"  ]

@@ -378,7 +378,7 @@ rule token = parse
            begin match rid with 
            | ParseUtil.Named id ->
 	   (if id.[0] = '"' && id.[String.length id - 1] = '"'
-               then METADATA_STRING id
+               then METADATA_STRING (String.sub id 1 (String.length id - 2))
                else METADATA_ID (Name (str id)))
 	   | ParseUtil.Anonymous n -> METADATA_ID (Anon (coq_of_int n))
 	   end
