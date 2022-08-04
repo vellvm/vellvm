@@ -114,7 +114,6 @@ Inductive IX_supported : N -> Prop :=
 #[refine]#[local] Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
     Decidable_witness := N.eqb x y
   }.
-Next Obligation.
 apply N.eqb_eq.
 Qed.
 
@@ -218,13 +217,13 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Fixpoint show_dvalue (dv : dvalue) : string :=
     match dv with
     | DVALUE_Addr a => "<addr>"
-    | DVALUE_I1 x => show (Int1.unsigned x)
-    | DVALUE_I8 x => show (Int8.unsigned x)
-    | DVALUE_I32 x => show (Int32.unsigned x)
-    | DVALUE_I64 x => show (Int64.unsigned x)
+    | DVALUE_I1 x => "i1 " ++ show (Int1.unsigned x)
+    | DVALUE_I8 x => "i8 " ++ show (Int8.unsigned x)
+    | DVALUE_I32 x => "i32 " ++ show (Int32.unsigned x)
+    | DVALUE_I64 x => "i64 " ++ show (Int64.unsigned x)
     | DVALUE_IPTR x => "<intptr>"
-    | DVALUE_Double x => show x
-    | DVALUE_Float x => show x
+    | DVALUE_Double x => "double " ++ show x
+    | DVALUE_Float x => "float " ++ show x
     | DVALUE_Poison t => "poison[" ++ show_dtyp t ++ "]"
     | DVALUE_None => "none"
     | DVALUE_Struct fields => "{" ++ String.concat ", " (map show_dvalue fields) ++ "}"
@@ -2364,7 +2363,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Definition index_into_str {M} `{Monad M} `{RAISE_ERROR M} (v:uvalue) (idx:LLVMAst.int) : M uvalue :=
     let fix loop elts i :=
         match elts with
-        | [] => raise_error "index out of bounds"
+        | [] => raise_error "index_into_str: index out of bounds"
         | h :: tl =>
           if (i =? 0)%Z then ret h else loop tl (i-1)%Z
         end in
@@ -2372,7 +2371,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | UVALUE_Struct f => loop f idx
     | UVALUE_Packed_struct f => loop f idx
     | UVALUE_Array e => loop e idx
-    | _ => raise_error "invalid aggregate data"
+    | _ => raise_error "index_into_str: invalid aggregate data"
     end.
   Arguments index_into_str _ _ : simpl nomatch.
 
@@ -2381,7 +2380,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Definition index_into_str_dv {M} `{Monad M} `{RAISE_ERROR M} (v:dvalue) (idx:LLVMAst.int) : M dvalue :=
     let fix loop elts i :=
         match elts with
-        | [] => raise_error "index out of bounds"
+        | [] => raise_error "index_into_str_dv: index out of bounds"
         | h :: tl =>
           if (i =? 0)%Z then ret h else loop tl (i-1)%Z
         end in
@@ -2389,7 +2388,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_Struct f => loop f idx
     | DVALUE_Packed_struct f => loop f idx
     | DVALUE_Array e => loop e idx
-    | _ => raise_error "invalid aggregate data"
+    | _ => raise_error "index_into_str_dv: invalid aggregate data"
     end.
   Arguments index_into_str_dv _ _ : simpl nomatch.
 
@@ -2397,7 +2396,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Definition insert_into_str {M} `{Monad M} `{RAISE_ERROR M} (str:dvalue) (v:dvalue) (idx:LLVMAst.int) : M dvalue :=
     let fix loop (acc elts:list dvalue) (i:LLVMAst.int) :=
         match elts with
-        | [] => raise_error "index out of bounds"
+        | [] => raise_error "insert_into_str: index out of bounds"
         | h :: tl =>
           (if i =? 0 then ret (acc ++ (v :: tl))
           else loop (acc ++ [h]) tl (i-1))%Z
@@ -2407,11 +2406,15 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       v <- (loop [] f idx) ;;
       ret (DVALUE_Struct v)
 
+    | DVALUE_Packed_struct f =>
+      v <- (loop [] f idx) ;;
+      ret (DVALUE_Packed_struct v)
+
     | DVALUE_Array e =>
       v <- (loop [] e idx) ;;
       ret (DVALUE_Array v)
 
-    | _ => raise_error "invalid aggregate data"
+    | _ => raise_error "insert_into_str: invalid aggregate data"
     end.
   Arguments insert_into_str _ _ _ : simpl nomatch.
 

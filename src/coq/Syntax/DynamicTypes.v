@@ -104,14 +104,28 @@ Lemma dtyp_eq_dec : forall (t1 t2:dtyp), {t1 = t2} + {t1 <> t2}.
     + left; subst; reflexivity.
     + right; intros H; inversion H. contradiction.
       * right; intros H; inversion H. contradiction.
-Qed.
+Defined.
 Arguments dtyp_eq_dec: clear implicits.
+
+Lemma dtyp_eq_dec_refl :
+  forall dt, dtyp_eq_dec dt dt = left eq_refl.
+Proof.
+Admitted.
 
 Definition dtyp_eqb (dt1 dt2 : dtyp) : bool
   := match @dtyp_eq_dec dt1 dt2 with
      | left x => true
      | right x => false
      end.
+
+Lemma dtyp_eqb_refl :
+  forall dt, dtyp_eqb dt dt = true.
+Proof.
+  intros dt.
+  unfold dtyp_eqb.
+  rewrite dtyp_eq_dec_refl.
+  reflexivity.
+Qed.
 
 Definition vector_dtyp dt :=
   (exists n, dt = DTYPE_I n) \/ dt = DTYPE_Pointer \/ dt = DTYPE_Half \/ dt = DTYPE_Float \/
