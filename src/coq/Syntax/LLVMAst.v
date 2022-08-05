@@ -288,7 +288,7 @@ Variant fbinop : Set :=
   FAdd | FSub | FMul | FDiv | FRem.
 
 Variant fast_math : Set :=
-  Nnan | Ninf | Nsz | Arcp | Fast.
+  Nnan | Ninf | Nsz | Arcp | Contract | Afn | Reassoc | Fast.
 
 Variant conversion_type : Set :=
   Trunc | Zext | Sext | Fptrunc | Fpext | Uitofp | Sitofp | Fptoui |
@@ -456,6 +456,12 @@ Variant unnamed_addr : Set :=
   | Local_Unnamed_addr
 .
 
+Variant tailcall : Set :=
+  | Tail
+  | Musttail
+  | Notail
+.
+
 (* LLVM has many optional attributes and annotations for global values,
    declarations, and definitions.  This type collects together these options so
    that they can be represented as a single list of features.  We call these
@@ -488,6 +494,10 @@ Variant annotation : Set :=
   | ANN_inalloca  (* alloca instruction only *)
   | ANN_num_elements (t:texp) (* alloca instruction only *)
   | ANN_volatile (* load / store *)
+  | ANN_tail (t:tailcall)
+  | ANN_fast_math_flag (f:fast_math)
+  | ANN_ret_attribute (p:param_attr)
+  | ANN_fun_attribute (f:fn_attr)
 .
 
 Definition ann_linkage (a:annotation) : option linkage :=
@@ -634,11 +644,34 @@ Definition ann_volatile (a:annotation) : option unit :=
   | _ => None
   end.
 
+Definition ann_tail (a:annotation) : option tailcall :=
+  match a with
+  | ANN_tail t => Some t
+  | _ => None
+  end.
+
+Definition ann_fast_math_flag (a:annotation) : option fast_math :=
+  match a with
+  | ANN_fast_math_flag f => Some f
+  | _ => None
+  end.
+
+Definition ann_ret_attribute (a:annotation) : option param_attr :=
+  match a with
+  | ANN_ret_attribute p => Some p
+  | _ => None
+  end.
+
+Definition ann_fun_attribute (a:annotation) : option fn_attr :=
+  match a with
+  | ANN_fun_attribute f => Some f
+  | _ => None
+  end.
 
 Variant instr : Set :=
 | INSTR_Comment (msg:string)
 | INSTR_Op   (op:exp)                                             (* INVARIANT: op must be of the form (OP_ ...) *)
-| INSTR_Call (fn:texp) (args:list texp) (anns:list annotation)    (* CORNER CASE: return type is void treated specially *)
+| INSTR_Call (fn:texp) (args:list (texp * (list param_attr))) (anns:list annotation)    (* CORNER CASE: return type is void treated specially *)
 | INSTR_Alloca (t:T) (anns: list annotation)
 | INSTR_Load  (t:T) (ptr:texp) (anns: list annotation)
 | INSTR_Store (val:texp) (ptr:texp) (anns: list annotation)
@@ -659,7 +692,7 @@ Variant terminator : Set :=
 | TERM_Switch     (v:texp) (default_dest:block_id) (brs: list (tint_literal * block_id))
 | TERM_IndirectBr (v:texp) (brs:list block_id) (* address * possible addresses (labels) *)
 | TERM_Resume     (v:texp)
-| TERM_Invoke     (fnptrval:tident) (args:list texp) (to_label:block_id) (unwind_label:block_id)
+| TERM_Invoke     (fnptrval:tident) (args:list (texp * (list param_attr))) (to_label:block_id) (unwind_label:block_id)
 | TERM_Unreachable
 .
 

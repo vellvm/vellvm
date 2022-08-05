@@ -434,6 +434,9 @@ Section ShowInstances.
        | Ninf => "ninf"
        | Nsz => "nsz"
        | Arcp => "arcp"
+       | Contract => "contract"
+       | Afn => "afn"
+       | Reassoc => "reassoc"
        | Fast => "fast"
        end.
 
@@ -613,6 +616,13 @@ tes on cstring on LLVMAst.v *)
        | Some a => prefix ++ show a
        end.
 
+  Definition show_opt_list {A} `{Show A} (ma : option A) : list string
+    := match ma with
+       | None   => []
+       | Some a => [show a]
+       end.
+
+
   Definition show_ordering (o : ordering) : string :=
     match o with
     |Unordered => "unordered"
@@ -713,12 +723,48 @@ tes on cstring on LLVMAst.v *)
   #[global] Instance showMetadata (md : metadata T) : Show (metadata T) :=
     {| show := show_metadata |}.
 
+  Definition show_unnamed_addr (u:unnamed_addr) : string :=
+    match u with
+    | Unnamed_addr => "unnamed_addr"
+    | Local_Unnamed_addr => "local_unnamed_addr"
+    end.
 
+  #[global] Instance showUnnamedAddr : Show unnamed_addr :=
+    {| show := show_unnamed_addr |}.
+
+
+  Definition show_tailcall (t:tailcall) : string :=
+    match t with
+    | Tail => "tail"
+    | Musttail => "musttail"
+    | Notail => "notail"
+    end.
+
+  #[global]
+    Instance showTailcall : Show tailcall :=
+    {| show := show_tailcall |}.
 
   Definition show_texp (x : texp T) : string :=
     match x with
     | (t, exp) => show t ++ " " ++ show_exp true exp
       end.
+
+  Definition show_opt_space {A} (x:option A) : string :=
+    match x with
+    | Some _ => " "
+    | None => ""
+    end.
+
+  Definition concat_with_space (c:string) (l:list string) :=
+    match l with
+    | [] => ""
+    | _::_ => (concat c l) ++ " "
+    end.
+
+  Definition show_call_arg '(te, atts) :=
+    let '(t, e) := (te:texp T) in
+    let attrs := concat_with_space " " (List.map show (atts:list param_attr)) in
+    (show (t:T)) ++ " " ++ attrs ++ (show (e:exp T)).
 
   Definition show_instr (i : instr T) : string
     := match i with
@@ -726,7 +772,28 @@ tes on cstring on LLVMAst.v *)
 
        | INSTR_Op e => show e
 
-       | INSTR_Call fn args => "call " ++ show fn ++ "(" ++ (concat ", " (map show_texp args)) ++ ")"
+       | INSTR_Call fn args anns =>
+           let tail := find_option ann_tail anns in
+           let fast_math_flags := filter_option ann_fast_math_flag anns in
+           let cconv := find_option ann_cconv anns in
+           let ret_attrs := filter_option ann_ret_attribute anns in
+           let addrspace := find_option ann_addrspace anns in
+           let fn_attrs := filter_option ann_fun_attribute anns in
+           (show_opt_prefix "" tail) ++ (show_opt_space tail)
+             ++
+             "call " ++
+             (concat_with_space " "
+                     ((map show_fast_math fast_math_flags)
+                        ++
+                        (show_opt_list cconv)
+                        ++
+                        (map show_param_attr ret_attrs)
+                        ++
+                        (show_opt_list addrspace)
+                     )
+             ) ++
+             show fn ++ "(" ++ (concat ", " (map show_call_arg args)) ++ ") " ++
+             (concat " " (map show_fn_attr fn_attrs))
 
        | INSTR_Alloca t anns =>
            let inalloca := match find_option ann_inalloca anns with
@@ -1019,14 +1086,7 @@ Definition show_declaration (decl: declaration typ) : string :=
 Global Instance showDeclaration: Show (declaration typ) :=
   {| show := show_declaration |}.
 
-Definition show_unnamed_addr (u:unnamed_addr) : string :=
-  match u with
-  | Unnamed_addr => "unnamed_addr"
-  | Local_Unnamed_addr => "local_unnamed_addr"
-  end.
 
-#[global] Instance showUnnamedAddr : Show unnamed_addr :=
-  {| show := show_unnamed_addr |}.
 
 Definition show_global (g : global typ) : string :=
   let name  := g.(g_ident) in

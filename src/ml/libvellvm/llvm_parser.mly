@@ -326,6 +326,9 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token KW_NINF
 %token KW_NSZ
 %token KW_ARCP
+%token KW_CONTRACT
+%token KW_AFN
+%token KW_REASSOC
 %token KW_FAST
 %token<Camlcoq.N.t> I
 %token KW_IPTR
@@ -366,6 +369,8 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token KW_UEQ
 %token KW_UNE
 %token KW_TAIL
+%token KW_MUSTTAIL
+%token KW_NOTAIL
 %token KW_VOLATILE
 
 
@@ -1012,7 +1017,8 @@ param_attr:
 
 
 
-call_arg: t=typ i=exp             { (t, i t)      }
+call_arg: t=typ ra=list(param_attr) i=exp
+    { ((t, i t), ra) }
 
 fn_attr:
   | KW_ALIGNSTACK LPAREN p=INTEGER RPAREN { FNATTR_Alignstack p     }
@@ -1193,6 +1199,9 @@ fast_math:
   | KW_NINF { Ninf }
   | KW_NSZ  { Nsz  }
   | KW_ARCP { Arcp }
+  | KW_CONTRACT { Contract }
+  | KW_AFN  { Afn }
+  | KW_REASSOC { Reassoc }
   | KW_FAST { Fast }
 
 instr_op:
@@ -1373,6 +1382,11 @@ store_anns:
   | anns=s_nontemporal { anns }
 
 
+tailcall:
+  | KW_TAIL { ANN_tail Tail }
+  | KW_MUSTTAIL { ANN_tail Musttail }
+  | KW_NOTAIL { ANN_tail Notail }
+
 exp:
   | eo=expr_op { fun _ -> eo }
   | ev=expr_val { ev }
@@ -1380,10 +1394,18 @@ exp:
 %inline instr:
   | eo=instr_op { INSTR_Op eo }
 
-  | KW_TAIL? KW_CALL cconv? list(param_attr) f=texp
-    a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
-    list(fn_attr)
-    { INSTR_Call (f, a) }
+  | t=tailcall? KW_CALL fm=list(fast_math) cc=cconv? ra=list(param_attr) addr=addrspace?
+    f=texp  a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
+    fa=list(fn_attr)  (* TODO: operand bundles? *)
+    { let atts =
+	(opt_list t)
+	@ (List.map (fun f -> ANN_fast_math_flag f) fm)
+	@ (opt_list cc)
+        @ (List.map (fun r -> ANN_ret_attribute r) ra)
+        @ (opt_list addr)
+        @ (List.map (fun f -> ANN_fun_attribute f) fa)
+      in
+      INSTR_Call (f, a, atts) }
 
   | KW_ALLOCA ia=KW_INALLOCA? t=typ anns=alloca_anns
     { let a = match ia with Some _ -> [ANN_inalloca] | None -> [] in
@@ -1476,7 +1498,15 @@ test_instr:
    instr EOF { ... }
 *)
 test_call:
-  | KW_TAIL? KW_CALL cconv? list(param_attr) f=texp
-    a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
-    list(fn_attr) EOF
-    { INSTR_Call (f, a) }
+  | t=tailcall? KW_CALL fm=list(fast_math) cc=cconv? ra=list(param_attr) addr=addrspace?
+    f=texp  a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
+    fa=list(fn_attr)  (* TODO: operand bundles? *)
+    { let atts =
+	(opt_list t)
+	@ (List.map (fun f -> ANN_fast_math_flag f) fm)
+	@ (opt_list cc)
+        @ (List.map (fun r -> ANN_ret_attribute r) ra)
+        @ (opt_list addr)
+        @ (List.map (fun f -> ANN_fun_attribute f) fa)
+      in
+      INSTR_Call (f, a, atts) }

@@ -226,6 +226,9 @@ Section ReprInstances.
     | Ninf => "Ninf"
     | Nsz => "Nsz"
     | Arcp => "Arcp"
+    | Contract => "Contract"
+    | Afn => "Afn"
+    | Reassoc => "Reassoc"
     | Fast => "Fast"
     end.
 
@@ -590,6 +593,16 @@ Section ReprInstances.
    Instance reprUnnamedAddr : Repr (unnamed_addr) :=
     {| repr := repr_unnamed_addr |}.
 
+  Definition repr_tailcall (t:tailcall) : string :=
+    match t with
+    | Tail => "Tail"
+    | Musttail => "Musttail"
+    | Notail => "Notail"
+    end.
+
+  #[global]
+   Instance reprTailcall : Repr tailcall :=
+    {| repr := show_tailcall |}.
 
   Definition repr_annotation (a : annotation typ) : string :=
     match a with
@@ -617,6 +630,10 @@ Section ReprInstances.
     | ANN_inalloca => "ANN_inalloca"
     | ANN_num_elements t => "ANN_num_elements " ++ (repr t)
     | ANN_volatile => "ANN_volatile"
+    | ANN_tail t => "ANN_tail " ++ (repr t)
+    | ANN_fast_math_flag f => "ANN_fast_math_flag " ++ (repr f)
+    | ANN_ret_attribute r => "ANN_ret_attribute " ++ (repr r)
+    | ANN_fun_attribute f => "ANN_fun_attribute " ++ (repr f)
     end.
 
   #[global]

@@ -199,6 +199,8 @@
   | "to"                           -> KW_TO
   | "unwind"                       -> KW_UNWIND
   | "tail"                         -> KW_TAIL
+  | "musttail"                     -> KW_MUSTTAIL
+  | "notail"                       -> KW_NOTAIL
   | "volatile"                     -> KW_VOLATILE
 
   (* instrs *)
@@ -297,6 +299,9 @@
   | "ninf"           -> KW_NINF
   | "nsz"            -> KW_NSZ
   | "arcp"           -> KW_ARCP
+  | "contract"       -> KW_CONTRACT
+  | "afn"            -> KW_AFN
+  | "reassoc"        -> KW_REASSOC
   | "fast"           -> KW_FAST
 
   (* synchronization *)
