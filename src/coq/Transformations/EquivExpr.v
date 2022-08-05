@@ -104,7 +104,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
               induction args as [| a args IH]; intros; [reflexivity |].
               cbn.
               rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
-              destruct a; cbn; rewrite opt_correct; reflexivity.
+              destruct a; destruct t; cbn; rewrite opt_correct; reflexivity.
               intro2.
               rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq); [apply IH |].
               intro2.
@@ -125,7 +125,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
               induction args as [| a args IH]; intros; [reflexivity |].
               cbn.
               rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
-              destruct a; cbn; rewrite opt_correct; reflexivity.
+              destruct a; destruct t; cbn; rewrite opt_correct; reflexivity.
               intro2.
               rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq); [apply IH |].
               intro2.

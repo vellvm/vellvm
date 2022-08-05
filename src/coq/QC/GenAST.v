@@ -1789,9 +1789,9 @@ Definition genType: G (typ) :=
        args_texp <- map_monad
                      (fun (arg_typ:typ) =>
                         arg_exp <- gen_exp_size 0 arg_typ;;
-                        ret (arg_typ, arg_exp))
+                        ret ((arg_typ, arg_exp), []))
                      args;;
-       ret (ret_t, INSTR_Call (TYPE_Function ret_t args varargs, EXP_Ident id) args_texp)
+       ret (ret_t, INSTR_Call (TYPE_Function ret_t args varargs, EXP_Ident id) args_texp [])
    | _ => lift failGen
    end.
 
@@ -1856,7 +1856,8 @@ Section InstrGenerators.
        let pt := TYPE_Pointer ptr_typ in
        let ptr := EXP_Ident ptr_ident in
        align <- ret (Some 1);;
-       ret (ptr_typ, INSTR_Load vol ptr_typ (pt, ptr) align).
+       (* TODO: Fix parameters / generate more of them *)
+       ret (ptr_typ, INSTR_Load ptr_typ (pt, ptr) []).
 
   Definition gen_store_to (ptr : texp typ) : GenLLVM (typ * instr typ)
     :=
@@ -1867,8 +1868,8 @@ Section InstrGenerators.
 
         e <- resize_LLVM 0 (gen_exp t);;
         let val := (t, e) in
-
-        ret (TYPE_Void, INSTR_Store vol val ptr align)
+        (* TODO: Fix parameters / generate more of them *)
+        ret (TYPE_Void, INSTR_Store val ptr [])
       | _ => lift failGen
       end.
 
@@ -1897,9 +1898,9 @@ Section InstrGenerators.
       ([ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
          ; t <- gen_sized_typ_ptrinctx;;
            (* TODO: generate multiple element allocas. Will involve changing initialization *)
-           num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *)
-           align <- ret None;;
-           ret (TYPE_Pointer t, INSTR_Alloca t num_elems align)
+           (* num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *) *)
+           (* align <- ret None;; *)
+           ret (TYPE_Pointer t, INSTR_Alloca t [])
         ] (* TODO: Generate atomic operations and other instructions *)
          ++ (if seq.nilp (filter_first_class_typs ctx) then [] else [gen_bitcast])
          ++ (if seq.nilp sized_ptr_typs_in_ctx then [] else [gen_gep; gen_load; gen_store])
@@ -1941,7 +1942,7 @@ Section InstrGenerators.
 
   Definition fix_alloca (iid : instr_id * instr typ) : GenLLVM (list (instr_id * instr typ))
     := match iid with
-       | (IId i, INSTR_Alloca t num_elems align) =>
+       | (IId i, INSTR_Alloca t _) =>
          t_instr <- gen_store_to (TYPE_Pointer t, EXP_Ident (ID_Local i));;
          instr <- add_id_to_instr t_instr;;
          ret [instr]
@@ -2218,5 +2219,3 @@ Section InstrGenerators.
     ret (globals ++ functions ++ [main]).
 
 End InstrGenerators.
-
-

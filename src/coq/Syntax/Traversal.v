@@ -168,6 +168,14 @@ Section Endo.
         match m with
         | METADATA_Const  tv => METADATA_Const (endo tv)
         | METADATA_Null => METADATA_Null
+        | METADATA_Nontemporal => METADATA_Nontemporal
+        | METADATA_Invariant_load => METADATA_Invariant_load
+        | METADATA_Invariant_group => METADATA_Invariant_group
+        | METADATA_Nonnull => METADATA_Nonnull
+        | METADATA_Dereferenceable => METADATA_Dereferenceable
+        | METADATA_Dereferenceable_or_null => METADATA_Dereferenceable_or_null
+        | METADATA_Align => METADATA_Align
+        | METADATA_Noundef => METADATA_Noundef
         | METADATA_Id id => METADATA_Id (endo id)
         | METADATA_String str => METADATA_String (endo str)
         | METADATA_Named strs => METADATA_Named (endo strs)
@@ -180,17 +188,19 @@ Section Endo.
     #[global] Instance Endo_instr
            `{Endo T}
            `{Endo (exp T)}
+           `{Endo param_attr}
+           `{Endo (annotation T)}
       : Endo (instr T) | 50 :=
       fun ins =>
         match ins with
         | INSTR_Op op => INSTR_Op (endo op)
-        | INSTR_Call fn args => INSTR_Call (endo fn) (endo args)
-        | INSTR_Alloca t nb align =>
-          INSTR_Alloca (endo t) (endo nb) align
-        | INSTR_Load volatile t ptr align =>
-          INSTR_Load volatile (endo t) (endo ptr) align
-        | INSTR_Store volatile val ptr align =>
-          INSTR_Store volatile (endo val) (endo ptr) align
+        | INSTR_Call fn args atts => INSTR_Call (endo fn) (endo args) (endo atts)
+        | INSTR_Alloca t atts =>
+          INSTR_Alloca (endo t) (endo atts)
+        | INSTR_Load t ptr atts =>
+          INSTR_Load (endo t) (endo ptr) (endo atts)
+        | INSTR_Store val ptr atts =>
+          INSTR_Store (endo val) (endo ptr) (endo atts)
         | INSTR_Comment msg => INSTR_Comment msg
         | INSTR_Fence syncscope o => ins
         | INSTR_AtomicCmpXchg c => ins
@@ -203,6 +213,7 @@ Section Endo.
            `{Endo T}
            `{Endo raw_id}
            `{Endo (exp T)}
+           `{Endo param_attr}
       : Endo (terminator T) | 50 :=
       fun trm =>
         match trm with
@@ -252,7 +263,7 @@ Section Endo.
       : Endo (annotation T) | 50 :=
       fun a =>
         match a with
-        | ANN_metadata l => ANN_metadata (endo l)
+        | ANN_metadata m l => ANN_metadata (endo m) (endo l)
         | ANN_prefix t => ANN_prefix (endo t)
         | ANN_prologue t => ANN_prologue (endo t)
         | ANN_personality t => ANN_personality (endo t)
@@ -531,16 +542,19 @@ Section TFunctor.
           (f (a_type a)).
 
     #[global] Instance TFunctor_instr
-           `{TFunctor exp}
+     `{TFunctor exp}
+     `{TFunctor annotation}
       : TFunctor instr | 50 :=
       fun U V f ins =>
         match ins with
         | INSTR_Comment s => INSTR_Comment s
         | INSTR_Op op => INSTR_Op (tfmap f op)
-        | INSTR_Call fn args => INSTR_Call  (tfmap f fn) (tfmap f args)
-        | INSTR_Alloca t nb align => INSTR_Alloca (f t) (tfmap f nb) align
-        | INSTR_Load volatile t ptr align => INSTR_Load volatile (f t) (tfmap f ptr) align
-        | INSTR_Store volatile val ptr align => INSTR_Store volatile (tfmap f val) (tfmap f ptr) align
+        | INSTR_Call fn args atts => INSTR_Call  (tfmap f fn)
+                                                (List.map (fun '(te, a) => (tfmap f te, a))  args)
+                                                (tfmap f atts)
+        | INSTR_Alloca t atts => INSTR_Alloca (f t) (tfmap f atts)
+        | INSTR_Load  t ptr atts => INSTR_Load  (f t) (tfmap f ptr) (tfmap f atts)
+        | INSTR_Store val ptr atts => INSTR_Store (tfmap f val) (tfmap f ptr) (tfmap f atts)
         | INSTR_Fence syncscope o => INSTR_Fence syncscope o
         | INSTR_AtomicCmpXchg c => INSTR_AtomicCmpXchg (tfmap f c)
         | INSTR_AtomicRMW a => INSTR_AtomicRMW (tfmap f a)
@@ -566,7 +580,10 @@ Section TFunctor.
         | TERM_Switch v default_dest brs => TERM_Switch (tfmap f v) (endo default_dest) (endo brs)
         | TERM_IndirectBr v brs => TERM_IndirectBr (tfmap f v) (endo brs)
         | TERM_Resume v => TERM_Resume (tfmap f v)
-        | TERM_Invoke fnptrval args to_label unwind_label => TERM_Invoke (tfmap f fnptrval) (tfmap f args) (endo to_label) (endo unwind_label)
+        | TERM_Invoke fnptrval args to_label unwind_label =>
+            TERM_Invoke (tfmap f fnptrval)
+                        (List.map (fun '(te, a) => (tfmap f te, a))  args)
+                        (endo to_label) (endo unwind_label)
         | TERM_Unreachable => TERM_Unreachable
         end.
 
@@ -605,6 +622,14 @@ Section TFunctor.
         match m with
         | METADATA_Const tv => METADATA_Const (tfmap f tv)
         | METADATA_Null => METADATA_Null
+        | METADATA_Nontemporal => METADATA_Nontemporal
+        | METADATA_Invariant_load => METADATA_Invariant_load
+        | METADATA_Invariant_group => METADATA_Invariant_group
+        | METADATA_Nonnull => METADATA_Nonnull
+        | METADATA_Dereferenceable => METADATA_Dereferenceable
+        | METADATA_Dereferenceable_or_null => METADATA_Dereferenceable_or_null
+        | METADATA_Align => METADATA_Align
+        | METADATA_Noundef => METADATA_Noundef
         | METADATA_Id id => METADATA_Id (endo id)
         | METADATA_String str => METADATA_String (endo str)
         | METADATA_Named strs => METADATA_Named (endo strs)
@@ -617,6 +642,7 @@ Section TFunctor.
      `{TFunctor exp}
      `{Endo raw_id}
      `{TFunctor metadata}
+     `{Endo param_attr}
       : TFunctor annotation | 50 :=
       fun U V f a =>
         match a with
@@ -635,12 +661,19 @@ Section TFunctor.
         | ANN_no_sanitize_address => ANN_no_sanitize_address
         | ANN_no_sanitize_hwaddress => ANN_no_sanitize_hwaddress
         | ANN_sanitize_address_dyninit => ANN_sanitize_address_dyninit
-        | ANN_metadata l => ANN_metadata (tfmap (fun '(x,y) => (endo x, tfmap f y)) l)
+        | ANN_metadata m l => ANN_metadata (tfmap f m) (tfmap f l)
         | ANN_cconv c => ANN_cconv c
         | ANN_gc s => ANN_gc s
         | ANN_prefix t => ANN_prefix (tfmap f t)
         | ANN_prologue t => ANN_prologue (tfmap f t)
         | ANN_personality t => ANN_personality (tfmap f t)
+        | ANN_inalloca  => ANN_inalloca
+        | ANN_num_elements t => ANN_num_elements (tfmap f t)
+        | ANN_volatile => ANN_volatile
+        | ANN_tail t => ANN_tail t
+        | ANN_fast_math_flag f => ANN_fast_math_flag f
+        | ANN_ret_attribute p => ANN_ret_attribute (endo p)
+        | ANN_fun_attribute a => ANN_fun_attribute (endo a)
         end
         .
 
