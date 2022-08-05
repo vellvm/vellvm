@@ -330,69 +330,6 @@ Section ReprInstances.
    Instance reprOption (A : Type) `{Repr A} : Repr (option A) :=
     {| repr := repr_opt |}.
 
-  Definition repr_instr (i : instr typ) : string
-    := match i with
-       | INSTR_Comment s => "(INSTR_Comment " ++ s ++ ")"
-       | INSTR_Op e => "(INSTR_Op " ++ repr e ++ ")"
-       | INSTR_Load vol t ptr align =>
-         "(INSTR_Load " ++ repr vol ++ " " ++ repr t ++ " " ++ repr ptr ++ " " ++ repr align ++ ")"
-       | INSTR_Store vol tval ptr align =>
-         "(INSTR_Store " ++ repr vol ++ " " ++ repr tval ++ " " ++ repr ptr ++ " " ++ repr align ++ ")"
-       | INSTR_Alloca t nb align =>
-         "(INSTR_Alloca " ++ repr t ++ " " ++ repr nb ++ " " ++ repr align ++ ")"
-       | _ => "repr_instr todo"
-       end.
-
-  #[global]
-   Instance reprInstr : Repr (instr typ)
-    := {| repr := repr_instr |}.
-
-  #[global]
-   Instance reprInstrId : Repr instr_id
-    := {| repr i :=
-            match i with
-            | IId raw => ("(IId " ++ repr raw ++ ")")%string
-            | IVoid n => ("(IVoid " ++ repr n ++ ")")%string
-            end
-       |}.
-
-  Definition repr_terminator (t : terminator typ) : string
-    := match t with
-       | TERM_Ret v => "(TERM_Ret " ++ repr v ++ ")"
-       | TERM_Ret_void => "TERM_Ret_void"
-       | TERM_Br te b1 b2 =>
-         "(TERM_Br " ++ repr te ++ " " ++ repr b1 ++ " " ++ repr b2 ++ ")"
-       | TERM_Br_1 b => "(TERM_Br_1 " ++ repr b ++ ")"
-       | _ => "repr_terminator todo"
-       end.
-
-  #[global]
-   Instance reprTerminator : Repr (terminator typ)
-    := {| repr := repr_terminator |}.
-
-  Definition repr_phi (p : phi typ) : string
-    := match p with
-       | Phi t args =>
-         "(Phi " ++ repr t ++ repr args ++ ")"
-       end.
-
-  #[global]
-   Instance reprPhi : Repr (phi typ)
-    := {| repr := repr_phi
-       |}.
-
-  Definition repr_block (b : block typ) : string
-    :=
-      match b with
-      | mk_block blk_id blk_phis blk_code blk_term blk_comments =>
-        "(mk_block " ++ repr blk_id ++ " " ++ repr blk_phis ++ " " ++ repr blk_code ++ " " ++ repr blk_term ++ " " ++ repr blk_comments ++ ")"
-      end.
-
-  #[global]
-   Instance reprBlock: Repr (block typ) :=
-    {|
-    repr := repr_block
-    |}.
 
    Definition repr_param_attr (pa : param_attr) : string :=
     match pa with
@@ -612,6 +549,14 @@ Section ReprInstances.
     match m with
     | METADATA_Const tv => "(METADATA_Const " ++ repr tv ++ ")"
     | METADATA_Null => "METADATA_Null"
+    | METADATA_Nontemporal => "METADATA_Nontemporal"
+    | METADATA_Invariant_load => "METADATA_Invariant_load"
+    | METADATA_Invariant_group => "METADATA_Invariant_group"
+    | METADATA_Nonnull => "METADATA_Nonnull"
+    | METADATA_Dereferenceable => "METADATA_Dereferenceable"
+    | METADATA_Dereferenceable_or_null => "METADATA_Dereferenceable_or_null"
+    | METADATA_Align => "METADATA_Align"
+    | METADATA_Noundef => "METADATA_Noundef"
     | METADATA_Id id => "(METADATA_Id " ++ repr id ++ ")"
     | METADATA_String str => "(METADATA_String " ++ repr str ++ ")"
     | METADATA_Named strs => "(METADATA_Named " ++ repr strs ++ ")"
@@ -663,17 +608,85 @@ Section ReprInstances.
     | ANN_no_sanitize_address => "ANN_no_sanitize_address"
     | ANN_no_sanitize_hwaddress => "ANN_no_sanitize_hwaddress"
     | ANN_sanitize_address_dyninit => "ANN_sanitize_address_dyninit"
-    | ANN_metadata l => "ANN_metadata " ++ (repr l)
+    | ANN_metadata m n => "ANN_metadata " ++ (repr m) ++ " " ++ (repr n)
     | ANN_cconv c => "ANN_cconv " ++ (repr c)
     | ANN_gc s => "ANN_gc " ++ (repr s)
     | ANN_prefix t => "ANN_prefix " ++ (repr t)
     | ANN_prologue t => "ANN_prologue " ++ (repr t)
     | ANN_personality t => "ANN_personality " ++ (repr t)
-  end.
+    | ANN_inalloca => "ANN_inalloca"
+    | ANN_num_elements t => "ANN_num_elements " ++ (repr t)
+    | ANN_volatile => "ANN_volatile"
+    end.
 
   #[global]
    Instance reprAnnotation : Repr (annotation typ) :=
     {| repr := repr_annotation |}.
+
+  Definition repr_instr (i : instr typ) : string
+    := match i with
+       | INSTR_Comment s => "(INSTR_Comment " ++ s ++ ")"
+       | INSTR_Op e => "(INSTR_Op " ++ repr e ++ ")"
+       | INSTR_Load t ptr anns =>
+         "(INSTR_Load " ++ repr t ++ " " ++ repr ptr ++ " " ++ repr anns ++ ")"
+       | INSTR_Store tval ptr anns =>
+         "(INSTR_Store " ++ repr tval ++ " " ++ repr ptr ++ " " ++ repr anns ++ ")"
+       | INSTR_Alloca t anns =>
+         "(INSTR_Alloca " ++ repr t ++ " " ++ repr anns ++ ")"
+       | _ => "repr_instr todo"
+       end.
+
+  #[global]
+   Instance reprInstr : Repr (instr typ)
+    := {| repr := repr_instr |}.
+
+  #[global]
+   Instance reprInstrId : Repr instr_id
+    := {| repr i :=
+            match i with
+            | IId raw => ("(IId " ++ repr raw ++ ")")%string
+            | IVoid n => ("(IVoid " ++ repr n ++ ")")%string
+            end
+       |}.
+
+  Definition repr_terminator (t : terminator typ) : string
+    := match t with
+       | TERM_Ret v => "(TERM_Ret " ++ repr v ++ ")"
+       | TERM_Ret_void => "TERM_Ret_void"
+       | TERM_Br te b1 b2 =>
+         "(TERM_Br " ++ repr te ++ " " ++ repr b1 ++ " " ++ repr b2 ++ ")"
+       | TERM_Br_1 b => "(TERM_Br_1 " ++ repr b ++ ")"
+       | _ => "repr_terminator todo"
+       end.
+
+  #[global]
+   Instance reprTerminator : Repr (terminator typ)
+    := {| repr := repr_terminator |}.
+
+  Definition repr_phi (p : phi typ) : string
+    := match p with
+       | Phi t args =>
+         "(Phi " ++ repr t ++ repr args ++ ")"
+       end.
+
+  #[global]
+   Instance reprPhi : Repr (phi typ)
+    := {| repr := repr_phi
+       |}.
+
+  Definition repr_block (b : block typ) : string
+    :=
+      match b with
+      | mk_block blk_id blk_phis blk_code blk_term blk_comments =>
+        "(mk_block " ++ repr blk_id ++ " " ++ repr blk_phis ++ " " ++ repr blk_code ++ " " ++ repr blk_term ++ " " ++ repr blk_comments ++ ")"
+      end.
+
+  #[global]
+   Instance reprBlock: Repr (block typ) :=
+    {|
+    repr := repr_block
+    |}.
+
 
   Definition repr_declaration (dec : declaration typ) : string
     := match dec with

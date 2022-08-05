@@ -29,11 +29,11 @@ open LLVMAst
 open ParserHelper
 open ParseUtil
 
-(* normalize_float_size : 
+(* normalize_float_size :
    - LLVM floating point literals need different interpretations depending
      on their types.
 
-   - This function converts a string into either a 
+   - This function converts a string into either a
      EXP_Double 64-bit literal, or
      EXP_Float 32-bit literal depending on the type annotation t
  *)
@@ -42,7 +42,7 @@ let normalize_float_literal (t:typ) (d:string) =
   | TYPE_Double -> EXP_Double (coqfloat_of_string d)
   | TYPE_Float  ->
        let v = coqfloat_of_string d in
-         if can_convert_float_to_float32 v 
+         if can_convert_float_to_float32 v
            then EXP_Float (coqfloat32_of_string d)
          else
            let dbg = (match v with
@@ -73,48 +73,48 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token<Camlcoq.Z.t> INTEGER
 %token<string> FLOAT
 %token<Floats.float> HEXCONSTANT
-%token KW_NULL 
-%token KW_UNDEF 
-%token KW_TRUE 
-%token KW_FALSE 
-%token KW_ZEROINITIALIZER 
+%token KW_NULL
+%token KW_UNDEF
+%token KW_TRUE
+%token KW_FALSE
+%token KW_ZEROINITIALIZER
 %token KW_C
 
 %token<string> LABEL
 
-%token KW_DEFINE 
-%token KW_DECLARE 
-%token KW_TARGET 
-%token KW_DATALAYOUT 
-%token KW_TRIPLE 
+%token KW_DEFINE
+%token KW_DECLARE
+%token KW_TARGET
+%token KW_DATALAYOUT
+%token KW_TRIPLE
 %token KW_SOURCE_FILENAME
 
 (* Linkage *)
-%token KW_PRIVATE 
-%token KW_INTERNAL 
-%token KW_AVAILABLE_EXTERNALLY 
-%token KW_LINKONCE 
-%token KW_WEAK 
-%token KW_COMMON 
-%token KW_APPENDING 
-%token KW_EXTERN_WEAK 
-%token KW_LINKONCE_ODR 
-%token KW_WEAK_ODR 
-%token KW_EXTERNAL 
+%token KW_PRIVATE
+%token KW_INTERNAL
+%token KW_AVAILABLE_EXTERNALLY
+%token KW_LINKONCE
+%token KW_WEAK
+%token KW_COMMON
+%token KW_APPENDING
+%token KW_EXTERN_WEAK
+%token KW_LINKONCE_ODR
+%token KW_WEAK_ODR
+%token KW_EXTERNAL
 
 (* Visibility *)
-%token KW_DEFAULT 
-%token KW_HIDDEN 
+%token KW_DEFAULT
+%token KW_HIDDEN
 %token KW_PROTECTED
 
 (* dll storage *)
-%token KW_DLLIMPORT 
+%token KW_DLLIMPORT
 %token KW_DLLEXPORT
 
 (* Calling Conventions: cconv *)
-%token KW_CCC 
-%token KW_FASTCC 
-%token KW_COLDCC 
+%token KW_CCC
+%token KW_FASTCC
+%token KW_COLDCC
 %token KW_CC
 %token KW_WEBKIT_JSCC
 %token KW_ANYREGCC
@@ -129,46 +129,46 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token KW_UNNAMED_ADDR
 %token KW_LOCAL_UNNAMED_ADDR
 
-%token KW_TYPE 
-%token KW_X 
+%token KW_TYPE
+%token KW_X
 %token KW_OPAQUE
-%token KW_GLOBAL 
-%token KW_ADDRSPACE 
-%token KW_CONSTANT 
+%token KW_GLOBAL
+%token KW_ADDRSPACE
+%token KW_CONSTANT
 %token KW_SECTION
 %token KW_COMDAT
 %token KW_PARTITION
-%token KW_THREAD_LOCAL 
-%token KW_LOCALDYNAMIC 
-%token KW_INITIALEXEC 
-%token KW_LOCALEXEC 
+%token KW_THREAD_LOCAL
+%token KW_LOCALDYNAMIC
+%token KW_INITIALEXEC
+%token KW_LOCALEXEC
 %token KW_EXTERNALLY_INITIALIZED
 
 (* Parameter Attributes param_attr *)
-%token KW_ZEROEXT 
-%token KW_SIGNEXT 
-%token KW_INREG 
-%token KW_BYVAL 
+%token KW_ZEROEXT
+%token KW_SIGNEXT
+%token KW_INREG
+%token KW_BYVAL
 %token KW_BYREF
 %token KW_PREALLOCATED
 %token KW_INALLOCA
-%token KW_SRET 
+%token KW_SRET
 %token KW_ELEMENTTYPE
 %token KW_ALIGN
-%token KW_NOALIAS 
-%token KW_NOCAPTURE 
+%token KW_NOALIAS
+%token KW_NOCAPTURE
 %token KW_READONLY
 %token KW_NOFREE
 %token KW_NEST
 %token KW_RETURNED
 %token KW_NONNULL
-%token KW_DEREFERENCEABLE 
+%token KW_DEREFERENCEABLE
 %token KW_DEREFERENCEABLE_OR_NULL
 %token KW_SWIFTSELF
 %token KW_SWIFTASYNC
 %token KW_SWIFTERROR
-%token KW_IMMARG 
-%token KW_NOUNDEF 
+%token KW_IMMARG
+%token KW_NOUNDEF
 %token KW_ALIGNSTACK
 %token KW_ALLOCALIGN
 %token KW_ALLOCPTR
@@ -177,9 +177,9 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 (* %token KW_ALIGNSTACK *)
 (* %token KW_ALLOC_FAMILY  (* quoted "alloc-family" *) *)
 %token KW_ALLOCKIND
-%token KW_ALLOCSIZE 
-%token KW_ALWAYSINLINE 
-%token KW_BUILTIN 
+%token KW_ALLOCSIZE
+%token KW_ALWAYSINLINE
+%token KW_BUILTIN
 %token KW_COLD
 %token KW_CONVERGENT
 %token KW_DISABLE_SANITIZER_INSTRUMENTATION
@@ -189,20 +189,20 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token KW_HOT
 %token KW_INACCESSIBLEMEMONLY
 %token KW_INACCESSIBLEMEM_OR_ARGMEMONLY
-%token KW_INLINEHINT 
-%token KW_JUMPTABLE 
-%token KW_MINSIZE 
+%token KW_INLINEHINT
+%token KW_JUMPTABLE
+%token KW_MINSIZE
 %token KW_NAKED
 (* %token KW_NO_INLINE_LINE_TABLES  (* quoted "no-inline-line-tables" *) *)
 %token KW_NO_JUMP_TABLES
-%token KW_NOBUILTIN 
+%token KW_NOBUILTIN
 %token KW_NODUPLICATE
 (* KW_NOFREE - used in multiple ways *)
-%token KW_NOIMPLICITFLOAT 
-%token KW_NOINLINE 
+%token KW_NOIMPLICITFLOAT
+%token KW_NOINLINE
 %token KW_NOMERGE
-%token KW_NONLAZYBIND 
-%token KW_NOREDZONE 
+%token KW_NONLAZYBIND
+%token KW_NOREDZONE
 %token KW_INDIRECT_TLS_SEG_REFS
 %token KW_NORETURN
 %token KW_NORECURSE
@@ -213,12 +213,12 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token KW_NOSANITIZE_COVERAGE
 %token KW_NULL_POINTER_IS_VALID
 %token KW_OPTFORFUZZING
-%token KW_OPTNONE 
+%token KW_OPTNONE
 %token KW_OPTSIZE
-(* %token KW_PATCHABLE_FUNCTION quoted "patchable-function" *) 
+(* %token KW_PATCHABLE_FUNCTION quoted "patchable-function" *)
 (* %token KW_PROBE_STACK quoted "probe-stack"  *)
-%token KW_READNONE 
-(* %token KW_READONLY *) 
+%token KW_READNONE
+(* %token KW_READONLY *)
 (* %token KW_STACK_PROBE_SIZE (* quoted "stack-probe-size" *) *)
 (* %token KW_NO_STACK_ARG_PROBE (* quoted "no-stack-arg-probe " *) *)
 %token KW_WRITEONLY
@@ -230,15 +230,15 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token KW_SANITIZE_ADDRESS_DYNINIT
 %token KW_NO_SANITIZE_ADDRESS
 %token KW_NO_SANITIZE_HWADDRESS
-%token KW_SANITIZE_MEMORY 
-%token KW_SANITIZE_THREAD 
+%token KW_SANITIZE_MEMORY
+%token KW_SANITIZE_THREAD
 %token KW_SANITIZE_HWADDRESS
 %token KW_SANITIZE_MEMTAG
 %token KW_SPECULATIVE_LOAD_HARDENING
 %token KW_SPECULATABLE
-%token KW_SSP 
+%token KW_SSP
 %token KW_SSPSTRONG
-%token KW_SSPREQ 
+%token KW_SSPREQ
 %token KW_STRICTFP
 (* %token KW_DENORMAL_FP_MATH (* quoted "denormal-fp-math" *) *)
 (* %token KW_DENORMAL_FP_MATH_F32 (* quoted "denormal-fp-math-f32" *) *)
@@ -263,116 +263,136 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token KW_PROLOGUE
 %token KW_PERSONALITY
 
-%token KW_ADD 
-%token KW_FADD 
-%token KW_SUB 
-%token KW_FSUB 
-%token KW_MUL 
-%token KW_FMUL 
-%token KW_UDIV 
-%token KW_SDIV 
-%token KW_FDIV 
-%token KW_UREM 
-%token KW_SREM 
-%token KW_FREM 
-%token KW_SHL 
-%token KW_LSHR 
-%token KW_ASHR 
-%token KW_AND 
-%token KW_OR 
-%token KW_XOR 
-%token KW_ICMP 
-%token KW_FCMP 
-%token KW_PHI 
-%token KW_CALL 
-%token KW_TRUNC 
-%token KW_ZEXT 
-%token KW_SEXT 
-%token KW_FPTRUNC 
-%token KW_FPEXT 
-%token KW_UITOFP 
-%token KW_SITOFP 
-%token KW_FPTOUI 
-%token KW_FPTOSI 
-%token KW_INTTOPTR 
-%token KW_PTRTOINT 
-%token KW_BITCAST 
-%token KW_SELECT 
-%token KW_FREEZE 
-%token KW_VAARG 
-%token KW_RET 
-%token KW_BR 
-%token KW_SWITCH 
-%token KW_INDIRECTBR 
-%token KW_INVOKE 
-%token KW_RESUME 
-%token KW_UNREACHABLE 
-%token KW_ALLOCA 
-%token KW_LOAD 
-%token KW_STORE 
-%token KW_ATOMICCMPXCHG 
-%token KW_ATOMICRMW 
-%token KW_FENCE 
-%token KW_GETELEMENTPTR 
-%token KW_INBOUNDS 
-%token KW_EXTRACTELEMENT 
-%token KW_INSERTELEMENT 
-%token KW_SHUFFLEVECTOR 
-%token KW_EXTRACTVALUE 
-%token KW_INSERTVALUE 
+%token KW_ADD
+%token KW_FADD
+%token KW_SUB
+%token KW_FSUB
+%token KW_MUL
+%token KW_FMUL
+%token KW_UDIV
+%token KW_SDIV
+%token KW_FDIV
+%token KW_UREM
+%token KW_SREM
+%token KW_FREM
+%token KW_SHL
+%token KW_LSHR
+%token KW_ASHR
+%token KW_AND
+%token KW_OR
+%token KW_XOR
+%token KW_ICMP
+%token KW_FCMP
+%token KW_PHI
+%token KW_CALL
+%token KW_TRUNC
+%token KW_ZEXT
+%token KW_SEXT
+%token KW_FPTRUNC
+%token KW_FPEXT
+%token KW_UITOFP
+%token KW_SITOFP
+%token KW_FPTOUI
+%token KW_FPTOSI
+%token KW_INTTOPTR
+%token KW_PTRTOINT
+%token KW_BITCAST
+%token KW_SELECT
+%token KW_FREEZE
+%token KW_VAARG
+%token KW_RET
+%token KW_BR
+%token KW_SWITCH
+%token KW_INDIRECTBR
+%token KW_INVOKE
+%token KW_RESUME
+%token KW_UNREACHABLE
+%token KW_ALLOCA
+%token KW_LOAD
+%token KW_STORE
+%token KW_ATOMICCMPXCHG
+%token KW_ATOMICRMW
+%token KW_FENCE
+%token KW_GETELEMENTPTR
+%token KW_INBOUNDS
+%token KW_EXTRACTELEMENT
+%token KW_INSERTELEMENT
+%token KW_SHUFFLEVECTOR
+%token KW_EXTRACTVALUE
+%token KW_INSERTVALUE
 %token KW_LANDINGPAD
 
-%token KW_NNAN 
-%token KW_NINF 
-%token KW_NSZ 
-%token KW_ARCP 
+%token KW_NNAN
+%token KW_NINF
+%token KW_NSZ
+%token KW_ARCP
 %token KW_FAST
 %token<Camlcoq.N.t> I
 %token KW_IPTR
-%token KW_VOID 
-%token KW_HALF 
-%token KW_FLOAT 
-%token KW_DOUBLE 
-%token KW_X86_FP80 
-%token KW_FP128 
-%token KW_PPC_FP128 
-%token KW_LABEL 
-%token KW_METADATA 
+%token KW_VOID
+%token KW_HALF
+%token KW_FLOAT
+%token KW_DOUBLE
+%token KW_X86_FP80
+%token KW_FP128
+%token KW_PPC_FP128
+%token KW_LABEL
+%token KW_METADATA
 %token KW_X86_MMX
 
-%token KW_UNWIND 
+%token KW_UNWIND
 %token KW_TO
-%token KW_NUW 
+%token KW_NUW
 %token KW_NSW
 %token KW_EXACT
-%token KW_EQ 
-%token KW_NE 
-%token KW_SGT 
-%token KW_SGE 
-%token KW_SLT 
+%token KW_EQ
+%token KW_NE
+%token KW_SGT
+%token KW_SGE
+%token KW_SLT
 %token KW_SLE
-%token KW_UGT 
-%token KW_UGE 
-%token KW_ULT 
+%token KW_UGT
+%token KW_UGE
+%token KW_ULT
 %token KW_ULE
-%token KW_OEQ 
-%token KW_OGT 
-%token KW_OGE 
-%token KW_OLT 
-%token KW_OLE 
-%token KW_ONE 
-%token KW_ORD 
-%token KW_UNO 
-%token KW_UEQ 
+%token KW_OEQ
+%token KW_OGT
+%token KW_OGE
+%token KW_OLT
+%token KW_OLE
+%token KW_ONE
+%token KW_ORD
+%token KW_UNO
+%token KW_UEQ
 %token KW_UNE
 %token KW_TAIL
 %token KW_VOLATILE
 
 
+%token KW_SYNCSCOPE
+%token KW_UNORDERED
+%token KW_MONOTONIC
+%token KW_ACQUIRE
+%token KW_RELEASE
+%token KW_ACQ_REL
+%token KW_SEQ_CST
+
+(* METADATA constants *)
+
+(* for load instructions *)
+%token META_NONTEMPORAL
+%token META_INVARIANT_LOAD
+%token META_INVARIANT_GROUP
+%token META_NONNULL
+%token META_DEREFERENCEABLE
+%token META_DEREFERENCEABLE_OR_NULL
+%token META_ALIGN
+%token META_NOUNDEF
 
 %token<LLVMAst.raw_id> METADATA_ID
 %token<string> METADATA_STRING
 %token BANGLCURLY
+
 %token KW_ATTRIBUTES
 %token<Camlcoq.Z.t> ATTR_GRP_ID
 
@@ -394,10 +414,10 @@ toplevel_entity:
   | KW_TARGET KW_TRIPLE EQ s=STRING     { TLE_Target (str s)             }
   | KW_SOURCE_FILENAME EQ s=STRING      { TLE_Source_filename (str s)    }
 
-  (* SAZ: It's not clear what the rules for named identifiers are.  It 
+  (* SAZ: It's not clear what the rules for named identifiers are.  It
      seems that they don't follow the "anonymous" rules of sequentiality
      and they also seem to live in another name space.
-   *) 
+   *)
   | i=lident EQ KW_TYPE t=typ           { TLE_Type_decl (ID_Local i, t)  }
   | g=global_decl                       { TLE_Global g                   }
   | i=METADATA_ID EQ m=tle_metadata     { TLE_Metadata (i, m)            }
@@ -410,6 +430,18 @@ tle_metadata:
    { METADATA_Node m }
   | KW_METADATA m=metadata_node
     { m }
+
+metadata_id:
+  | META_NONTEMPORAL             { METADATA_Nontemporal }
+  | META_INVARIANT_LOAD          { METADATA_Invariant_load }
+  | META_INVARIANT_GROUP         { METADATA_Invariant_group }
+  | META_NONNULL                 { METADATA_Nonnull }
+  | META_DEREFERENCEABLE         { METADATA_Dereferenceable }
+  | META_DEREFERENCEABLE_OR_NULL { METADATA_Dereferenceable_or_null }
+  | META_ALIGN                   { METADATA_Align }
+  | META_NOUNDEF                 { METADATA_Noundef }
+  | ms=METADATA_STRING           { METADATA_String (str ms) }
+  | mid=METADATA_ID              { METADATA_Id mid }
 
 metadata_node:
   | BANGLCURLY m=separated_list(csep, metadata_value) RCURLY
@@ -497,7 +529,7 @@ global_pre_annotations:
     v=visibility?
     d=dll_storage_class?
     t=thread_local_storage?
-    u=unnamed_addr? 
+    u=unnamed_addr?
     a=addrspace?
     { (opt_list p)
       @ (opt_list v)
@@ -506,7 +538,7 @@ global_pre_annotations:
       @ (opt_list u)
       @ (opt_list a) }
 
-(* For some reason, LLVM IR expects there to be a COMMA before the 
+(* For some reason, LLVM IR expects there to be a COMMA before the
    annotations for global expressions, but _not_ for declarations or
    definitions.
 *)
@@ -544,12 +576,8 @@ c_sanitize_address_dyninit:
   | l=c_global_metadata { l }
 
 c_global_metadata:
- |  m = preceded(csep, separated_nonempty_list(csep, metadata)) { [ANN_metadata m] }
+ |  csep m1=metadata_id m2=metadata_value l=c_global_metadata { (ANN_metadata(m1, m2)) :: l }
  | (* empty *) { [] }
-
-metadata:
-  | m1=METADATA_ID m2=metadata_value { (m1, m2) }
-
 
 global_post_annotations:
     | l=c_section { l }
@@ -557,7 +585,7 @@ global_post_annotations:
 %inline
 externally_initialized:
   | KW_EXTERNALLY_INITIALIZED { true }
-  | (* empty *) { false } 
+  | (* empty *) { false }
 
 %inline
 global_is_constant:
@@ -578,12 +606,12 @@ global_decl:
     { { g_ident ;
         g_typ ;
         g_constant ;
-        g_exp = Some (gv g_typ) ; 
+        g_exp = Some (gv g_typ) ;
         g_externally_initialized ;
         g_annotations = ((opt_list (ann_linkage_opt l)) @ g_pre @ g_post)
       }
     }
-      
+
 (* External declarations - cannot have initializers *)
   |  g_ident = gident EQ
      l = external_linkage
@@ -620,7 +648,8 @@ align_ann:
 
 
 global_metadata:
-  m = nonempty_list(metadata) { ANN_metadata m }
+ |  m1=metadata_id m2=metadata_value l=c_global_metadata { (ANN_metadata(m1, m2)) :: l }
+ | (* empty *) { [] }
 
 %inline
 cconv:
@@ -748,7 +777,7 @@ definition:
     pre = prefix?
     pro = prologue?
     per = personality?
-    meta = global_metadata?
+    meta = global_metadata
     LCURLY EOL*
     blks=df_blocks
     RCURLY
@@ -772,8 +801,8 @@ definition:
 	  | Some _ -> failwith "void function has defined left-hand-side"
 	else
 	  (IId (check_or_generate_id lopt), i)
-      in	
-	
+      in
+
       let process_block (lopt, (phis, instrs), blk_term) =
 	  let blk_id   = check_or_generate_label lopt in
 	  let blk_phis = List.map process_lhs_phi phis in
@@ -790,7 +819,7 @@ definition:
       in
       { df_prototype = {
 	  dc_name        = lexed_id_to_raw_id name;
-          dc_type = TYPE_Function (df_ret_typ, 
+          dc_type = TYPE_Function (df_ret_typ,
                                    List.map (fun x -> fst (fst x)) args, vararg) ;
           dc_param_attrs = (df_ret_attrs,
                             List.map (fun x -> snd (fst x)) args) ;
@@ -811,7 +840,7 @@ definition:
 	      @ (opt_list pre)
 	      @ (opt_list pro)
 	      @ (opt_list per)
-	      @ (opt_list meta)
+	      @ meta
 	    )
 	} ;
         df_args;
@@ -820,22 +849,22 @@ definition:
     }
 
 
-(* Dealing with anonymous identifiers 
+(* Dealing with anonymous identifiers
 
    Each function definition in LLVM IR can have so-called "anonymous" local identifiers
    some of which can be omitted from the concrete syntax of the program.
 
-   These identifiers are either 
-       - temporaries (a.k.a. registers) of the name %NNN, found as function arguments or 
+   These identifiers are either
+       - temporaries (a.k.a. registers) of the name %NNN, found as function arguments or
          on the left-hand-sides of instruction definitions, or
        - block labels (without the '%') that are numbered
 
    All "anonymous" identifiers, whether omitted or not, must be bound consecutively (in
-   program order).  This means that a parser for an LLVM IR function 
+   program order).  This means that a parser for an LLVM IR function
    Block labels, function arguments, and local temporaries all share the same counter.
 
    So-called "void" instructions, that _don't_ have a binding occurrence (i.e. to the left of an =)
-   but we still generate a unique identifier for them for use in the semantics.   
+   but we still generate a unique identifier for them for use in the semantics.
 *)
 
 (* Correctly parsing a CFG definition while generating / checking anonymous
@@ -861,16 +890,16 @@ The post-processing takes place after the whole cfg has been parsed as part of
 the declatation parser production.
 
 SAZ: I would prefer the terminology "sequential, possibly implicit identifiers"
-to "anonymous". 
+to "anonymous".
 *)
 
 %inline
 instr_lhs:
   | /* empty */
-    { None   }   
+    { None   }
 
   | l=bound_lident EQ
-    { Some l }   
+    { Some l }
 
 (* A block label behaves like the lhs of an instruction (except, strangely, it
   isn't written with a leading % except when used as a label value in a
@@ -909,7 +938,7 @@ phi_table_entry:
   | LSQUARE v=exp COMMA l=lident RSQUARE { (l, v) }
 
 block:
-  blk_id   = block_label 
+  blk_id   = block_label
   body     = block_phis_and_instrs
   blk_term = terminated(terminator, EOL+)
     {
@@ -917,7 +946,7 @@ block:
     }
 
 
-df_blocks: 
+df_blocks:
   | blks=block+
     { blks }
 
@@ -1003,9 +1032,9 @@ fn_attr:
   | KW_CONVERGENT                         { FNATTR_Convergent       }
   | KW_DISABLE_SANITIZER_INSTRUMENTATION  { FNATTR_Disable_sanitizer_instrumentation }
 (* KW_DONTCALL_ERROR - quoted *)
-(* KW_DONTCALL_WARN - quoted *) 
+(* KW_DONTCALL_WARN - quoted *)
   | KW_FN_RET_THUNK_EXTERN                { FNATTR_Fn_ret_thunk_extern }
-(* KW_FRAME_POINTER - quoted KeyValue *) 
+(* KW_FRAME_POINTER - quoted KeyValue *)
   | KW_HOT                                { FNATTR_Hot              }
   | KW_INACCESSIBLEMEMONLY                { FNATTR_Inaccessiblememonly }
   | KW_INACCESSIBLEMEM_OR_ARGMEMONLY      { FNATTR_Inaccessiblemem_or_argmemonly }
@@ -1030,7 +1059,7 @@ fn_attr:
   | KW_NOSYNC                             { FNATTR_Nosync           }
   | KW_NOUNWIND                           { FNATTR_Nounwind         }
   | KW_NOSANITIZE_BOUNDS                  { FNATTR_Nosanitize_bounds }
-  | KW_NOSANITIZE_COVERAGE                { FNATTR_Nosanitize_coverage }  
+  | KW_NOSANITIZE_COVERAGE                { FNATTR_Nosanitize_coverage }
   | KW_NULL_POINTER_IS_VALID              { FNATTR_Null_pointer_is_valid }
   | KW_OPTFORFUZZING                      { FNATTR_Optforfuzzing    }
   | KW_OPTNONE                            { FNATTR_Optnone          }
@@ -1061,7 +1090,7 @@ fn_attr:
 (* KW_THUNK - quoted *)
   | KW_UWTABLE                            { FNATTR_Uwtable None     }
   | KW_UWTABLE LPAREN KW_SYNC RPAREN      { FNATTR_Uwtable (Some true) }
-  | KW_UWTABLE LPAREN KW_ASYNC RPAREN     { FNATTR_Uwtable (Some false) }  
+  | KW_UWTABLE LPAREN KW_ASYNC RPAREN     { FNATTR_Uwtable (Some false) }
   | KW_NOCF_CHECK                         { FNATTR_Nocf_check       }
   | KW_SHADOWCALLSTACK                    { FNATTR_Shadowcallstack  }
   | KW_MUSTPROGRESS                       { FNATTR_Mustprogress     }
@@ -1148,7 +1177,7 @@ ibinop:
   | op=ibinop_nuw_nsw_opt KW_NSW { op false true }
   | op=ibinop_nuw_nsw_opt KW_NUW { op true false }
   | op=ibinop_nuw_nsw_opt KW_NUW KW_NSW { op true true }
-  | op=ibinop_nuw_nsw_opt KW_NSW KW_NUW { op true true }  
+  | op=ibinop_nuw_nsw_opt KW_NSW KW_NUW { op true true }
   | op=ibinop_exact_opt exact=KW_EXACT? { op (exact <> None) }
   | op=ibinop_no_opt { op }
 
@@ -1268,10 +1297,86 @@ expr_val:
 								     cstring_bytes_to_LLVM_i8_array
 								     (unescape (str cstr))) }
 
+a_num_elts:
+  | csep t=texp l=a_align { (ANN_num_elements t)::l }
+  | l=a_align { l }
+
+a_align:
+  | csep KW_ALIGN n=INTEGER l=a_addrspace { (ANN_align n) :: l }
+  | l=a_addrspace { l }
+
+a_addrspace:
+  | csep a=addrspace { [a] }
+  | (* empty *) { [] }
+
+alloca_anns:
+  anns=a_num_elts { anns }
+
+
+l_nontemporal:
+  | csep META_NONTEMPORAL m=metadata_value l=l_invariant_load
+     { (ANN_metadata (METADATA_Nontemporal, m)) :: l }
+  | l=l_invariant_load { l }
+
+l_invariant_load:
+  | csep META_INVARIANT_LOAD m=metadata_value l=l_invariant_group
+    { (ANN_metadata (METADATA_Invariant_load, m)) :: l }
+  | l=l_invariant_group { l }
+
+l_invariant_group:
+  | csep META_INVARIANT_GROUP m=metadata_value l=l_nonnull
+    { (ANN_metadata (METADATA_Invariant_group, m)) :: l }
+  | l=l_nonnull { l }
+
+l_nonnull:
+  | csep META_NONNULL m=metadata_value l=l_dereferenceable
+    { (ANN_metadata (METADATA_Nonnull, m)) :: l }
+  | l=l_dereferenceable { l }
+
+l_dereferenceable:
+  | csep META_DEREFERENCEABLE m=metadata_value l=l_dereferenceable_or_null
+    { (ANN_metadata (METADATA_Dereferenceable, m)) :: l }
+  | l=l_dereferenceable_or_null { l }
+
+l_dereferenceable_or_null:
+  | csep META_DEREFERENCEABLE_OR_NULL m=metadata_value l=l_align
+    { (ANN_metadata (METADATA_Dereferenceable_or_null, m)) :: l }
+  | l=l_align { l }
+
+l_align:
+  | csep META_ALIGN m=metadata_value l=l_noundef
+    { (ANN_metadata (METADATA_Align, m)) :: l }
+  | l=l_noundef { l }
+
+l_noundef:
+  | csep META_NOUNDEF m=metadata_value
+    { (ANN_metadata (METADATA_Noundef, m)) :: [] }
+  | (* empty *) { [] }
+
+load_anns:
+  | csep a=align l=l_nontemporal {  a::l }
+  | anns=l_nontemporal { anns }
+
+
+s_nontemporal:
+  | csep META_NONTEMPORAL m=metadata_value l=s_invariant_group
+     { (ANN_metadata (METADATA_Nontemporal, m)) :: l }
+  | l=s_invariant_group { l }
+
+s_invariant_group:
+  | csep META_INVARIANT_GROUP m=metadata_value
+    { (ANN_metadata (METADATA_Invariant_group, m)) :: [] }
+  | (* empty *) { [] }
+
+store_anns:
+  | csep a=align l=s_nontemporal {  a::l }
+  | anns=s_nontemporal { anns }
+
+
 exp:
   | eo=expr_op { fun _ -> eo }
   | ev=expr_val { ev }
-  
+
 %inline instr:
   | eo=instr_op { INSTR_Op eo }
 
@@ -1280,19 +1385,21 @@ exp:
     list(fn_attr)
     { INSTR_Call (f, a) }
 
-  | KW_ALLOCA t=typ opt=preceded(COMMA, alloca_opt)?
-    { let (n, a) = match opt with Some x -> x | None -> (None, None) in
-      INSTR_Alloca (t, n, a) }
+  | KW_ALLOCA ia=KW_INALLOCA? t=typ anns=alloca_anns
+    { let a = match ia with Some _ -> [ANN_inalloca] | None -> [] in
+      INSTR_Alloca (t, a@anns) }
 
-  | KW_LOAD vol=KW_VOLATILE? t=typ COMMA tv=texp a=preceded(COMMA, align)?
-    { INSTR_Load (vol<>None, t, tv, a) }
+  | KW_LOAD vol=KW_VOLATILE? t=typ COMMA tv=texp anns=load_anns
+    { let v = match vol with Some _ -> [ANN_volatile] | None -> [] in
+      INSTR_Load (t, tv, v@anns) }
 
 
   | KW_VAARG  { failwith"INSTR_VAArg"  }
   | KW_LANDINGPAD    { failwith"INSTR_LandingPad"    }
 
-  | KW_STORE vol=KW_VOLATILE? all=texp COMMA ptr=texp a=preceded(COMMA, align)?
-    { INSTR_Store (vol<>None, all, ptr, a) }
+  | KW_STORE vol=KW_VOLATILE? all=texp COMMA ptr=texp anns=store_anns
+    { let v = match vol with Some _ -> [ANN_volatile] | None -> [] in
+      INSTR_Store (all, ptr, v@anns) }
 
   | KW_ATOMICCMPXCHG { failwith"INSTR_AtomicCmpXchg" }
   | KW_ATOMICRMW     { failwith"INSTR_AtomicRMW"     }
@@ -1301,8 +1408,8 @@ exp:
 
 branch_label:
   KW_LABEL o=LOCAL  { lexed_id_to_raw_id o }
-  
-terminator:  
+
+terminator:
   | KW_RET tv=texp
     { TERM_Ret tv }
 
@@ -1335,11 +1442,7 @@ terminator:
     { TERM_Unreachable }
 
 align:
-  | KW_ALIGN n=INTEGER { n }
-
-alloca_opt:
-  | a=align                  { (None, Some a) }
-  | nb=texp a=preceded(COMMA, align)? { (Some nb, a) }
+  | KW_ALIGN n=INTEGER { ANN_align n }
 
 
 switch_table_entry:

@@ -666,19 +666,20 @@ Section hiding_notation.
     #[global] Instance serialize_instr : Serialize (instr T) :=
       fun instr =>
         match instr with
+          (* SAZ: OUT OF DATE *)
+        (*
         | INSTR_Op op => to_sexp op
 
-        | INSTR_Load vol t ptr align =>
-          [Atom "load" ; to_sexp t ; to_sexp ptr
-           ; @serialize_opt _ serialize_int ", align" align]
+        | INSTR_Load t ptr anns =>
+          [Atom "load" ; to_sexp t ; to_sexp ptr ]
 
-        | INSTR_Store vol tval ptr align =>
+        | INSTR_Store tval ptr anns =>
           [Atom "store" ; to_sexp tval; to_sexp ptr
            ; @serialize_opt _ serialize_int ", align" align]
 
-        | INSTR_Alloca t nb align =>
-          [Atom "alloca" ; to_sexp t ; @serialize_opt _ serialize_int ", align" align]
-        (*
+        | INSTR_Alloca t anns (* TODO: add anns *)=>
+          [Atom "alloca" ; to_sexp t]
+
            | INSTR_Call
            | INSTR_Phi
            | INSTR_Alloca
@@ -758,7 +759,7 @@ Definition is_void_instr (i:instr typ) : bool :=
   match i with
   | INSTR_Comment _ => true
   | INSTR_Call (t,_) _ => is_void_typ t
-  | INSTR_Store _ _ _ _ => true
+  | INSTR_Store _ _ _ => true
   | _ => false
   end.
 

@@ -5,7 +5,7 @@
  *)
 
 
-From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG DynamicTypes.
+From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG DynamicTypes.
 
 Require Import Integers Floats.
 
@@ -691,6 +691,30 @@ tes on cstring on LLVMAst.v *)
   #[global] Instance showAtomicrmw : Show (atomicrmw T)
     := {| show := show_atomic_rmw |}.
 
+
+  Fixpoint show_metadata (md : metadata T)  : string :=
+    match md with
+    | METADATA_Const tv => show tv
+    | METADATA_Null => "null"
+    | METADATA_Nontemporal => "!nontemporal"
+    | METADATA_Invariant_load => "!invariant.load"
+    | METADATA_Invariant_group => "!invariant.group"
+    | METADATA_Nonnull => "!nonnull"
+    | METADATA_Dereferenceable => "!dereferenceable"
+    | METADATA_Dereferenceable_or_null => "!dereferenceable_or_null"
+    | METADATA_Align => "!align"
+    | METADATA_Noundef => "!noundef"
+    | METADATA_Id i => "!" ++ show i
+    | METADATA_String s => "!" ++ show s
+    | METADATA_Named strs => "!{" ++ intersperse " , " (List.map (fun x => "!" ++ x) strs) ++ "}"
+    | METADATA_Node mds => "!{" ++ intersperse " , " (List.map show_metadata mds) ++ "}"
+    end.
+
+  #[global] Instance showMetadata (md : metadata T) : Show (metadata T) :=
+    {| show := show_metadata |}.
+
+
+
   Definition show_texp (x : texp T) : string :=
     match x with
     | (t, exp) => show t ++ " " ++ show_exp true exp
@@ -699,23 +723,63 @@ tes on cstring on LLVMAst.v *)
   Definition show_instr (i : instr T) : string
     := match i with
        | INSTR_Comment s => "; " ++ s
+
        | INSTR_Op e => show e
-       (* Based on the old printer  *)
+
        | INSTR_Call fn args => "call " ++ show fn ++ "(" ++ (concat ", " (map show_texp args)) ++ ")"
-       | INSTR_Alloca t nb align =>
-           "alloca " ++ show t ++ show_opt_prefix ", " nb ++ show_opt_prefix ", align " align
-       | INSTR_Load vol t ptr align =>
-           "load " ++ show t ++ ", " ++ show_texp ptr ++ show_opt_prefix ", align " align
-       | INSTR_Store vol tval ptr align =>
-           "store " ++ (if vol then "volatile " else "") ++ show_texp tval ++ ", " ++ show_texp ptr ++ show_opt_prefix ", align " align
+
+       | INSTR_Alloca t anns =>
+           let inalloca := match find_option ann_inalloca anns with
+                           | Some _ => "inalloca"
+                           | None => ""
+                           end
+           in
+           let nb := find_option ann_num_elements anns in
+           let align := find_option ann_align anns in
+           "alloca " ++ inalloca ++ show t ++ show_opt_prefix ", " nb ++ show_opt_prefix ", align " align
+
+       | INSTR_Load t ptr anns =>
+           let volatile := match find_option ann_volatile anns with
+                           | Some _ => "volatile"
+                           | None => ""
+                           end
+           in
+           let align := find_option ann_align anns in
+           let meta := filter_option ann_metadata anns in
+           let meta_str := concatStr (List.map (fun '(m1, m2) =>
+                                                  ", "
+                                                    ++ (show_metadata (m1:metadata T)) ++ " " ++
+                                                    (show_metadata (m2:metadata T))) meta)
+           in
+           "load " ++ volatile ++ show t ++ ", " ++ show_texp ptr ++ (show_opt_prefix ", align " align) ++ meta_str
+
+       | INSTR_Store tval ptr anns =>
+           let volatile := match find_option ann_volatile anns with
+                           | Some _ => "volatile"
+                           | None => ""
+                           end
+           in
+           let align := find_option ann_align anns in
+           let meta := filter_option ann_metadata anns in
+           let meta_str := concatStr (List.map (fun '(m1, m2) =>
+                                                  ", "
+                                                    ++ (show_metadata (m1:metadata T)) ++ " " ++
+                                                    (show_metadata (m2:metadata T))) meta)
+           in
+           "store " ++ volatile ++ show_texp tval ++ ", " ++ show_texp ptr ++ show_opt_prefix ", align " align ++ meta_str
+
        | INSTR_Fence syncscope ordering => let printable_sync := match syncscope with
                                                                  | None => ""
                                                                  | Some x => "[syncscope(""" ++ show x ++ """)]"
                                                                  end in
                                            "fence " ++ printable_sync ++ show ordering  ++" ; yields void"
+
        | INSTR_AtomicCmpXchg c => show_cmpxchg c
+
        | INSTR_AtomicRMW a => show_atomic_rmw a
+
        | INSTR_VAArg (va_list_and_arg_list) (t)  => "va_arg " ++ show va_list_and_arg_list ++ ", " ++ show t
+
        | INSTR_LandingPad => "skipping implementation at the moment"
        end.
 
@@ -837,18 +901,6 @@ tes on cstring on LLVMAst.v *)
        | (x::xs), (y::ys), (z::zs) => (x, y, z) :: zip3 xs ys zs
        end.
 
-  Fixpoint show_metadata (md : metadata T)  : string :=
-    match md with
-    | METADATA_Const tv => show tv
-    | METADATA_Null => "null"
-    | METADATA_Id i => "!" ++ show i
-    | METADATA_String s => "!" ++ show s
-    | METADATA_Named strs => "!{" ++ intersperse " , " (List.map (fun x => "!" ++ x) strs) ++ "}"
-    | METADATA_Node mds => "!{" ++ intersperse " , " (List.map show_metadata mds) ++ "}"
-    end.
-
-  #[global] Instance showMetadata (md : metadata T) : Show (metadata T) :=
-    {| show := show_metadata |}.
 
 End ShowInstances.
 
