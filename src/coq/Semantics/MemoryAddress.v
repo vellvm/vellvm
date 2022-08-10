@@ -177,6 +177,9 @@ Module Type PROVENANCE(Addr:MemoryAddress.ADDRESS).
     forall (aid : AllocationId),
       true = (aid_eq_dec aid aid).
 
+  Parameter access_allowed_Proper :
+    Proper (eq ==> (fun aid aid' => true = (aid_eq_dec aid aid')) ==> eq) access_allowed.
+
   Parameter provenance_lt_trans : Transitive provenance_lt.
 
   Parameter provenance_lt_next_provenance :
