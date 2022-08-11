@@ -3913,6 +3913,53 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         }
     Qed.
 
+    Lemma byte_allocated_set_byte_raw'' :
+      forall m1 m2 ptr_new ptr new_byte rbyte aid aid',
+        read_byte_raw (mem_state_memory m1) (ptr_to_int ptr) = Some (rbyte, aid) ->
+        access_allowed (address_provenance ptr) aid ->
+        mem_state_memory m2 = set_byte_raw (mem_state_memory m1) (ptr_to_int ptr_new) (new_byte, aid) ->
+        byte_allocated m1 ptr aid' <->
+          byte_allocated m2 ptr aid'.
+    Proof.
+      intros m1 m2 ptr_new ptr new_byte rbyte aid aid' READ ALLOWED MEMEQ.
+      split; intros ALLOC.
+      - pose proof disjoint_ptr_byte_dec ptr ptr_new as [DISJOINT | NDISJOINT].
+        { eapply byte_allocated_set_byte_raw_neq; [eauto | | cbn; eauto]; eauto.
+        }
+        { eapply byte_allocated_set_byte_raw_eq; eauto.
+          cbn.
+
+          unfold mem_state_memory in *.
+          break_byte_allocated_in ALLOC.
+          prove_ptr_to_int_eq_subst ptr ptr_new.
+          rewrite READ in ALLOC.
+          cbn in ALLOC.
+          destruct ALLOC as [_ AID_EQ].
+          destruct aid_eq_dec; inv AID_EQ.
+          eauto.
+        }
+      - pose proof disjoint_ptr_byte_dec ptr ptr_new as [DISJOINT | NDISJOINT].
+        {  eapply byte_allocated_set_byte_raw_neq' in ALLOC; [eauto | | cbn; eauto]; eauto.
+        }
+        { prove_ptr_to_int_eq_subst ptr_new ptr.
+
+          repeat eexists.
+          - unfold mem_state_memory in *.
+            rewrite READ.
+            cbn.
+            split; auto.
+            break_byte_allocated_in ALLOC.
+            cbn in ALLOC.
+            rewrite MEMEQ in ALLOC.
+            rewrite set_byte_raw_eq in ALLOC; auto.
+            destruct ALLOC as [_ AIDEQ].
+            auto.
+          - intros ms' x RET.
+            inv RET.
+            auto.
+        }
+    Qed.
+
     Ltac solve_byte_allocated :=
       match goal with
       | H: byte_allocated ?ms1 ?ptr ?aid1 |-
@@ -4257,11 +4304,41 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       | solve_read_byte_prop_all_preserved
       ].
 
-    (* Ltac solve_set_byte_memory := *)
-    (*   split; [solve_read_byte_allowed | solve_read_byte_prop | solve_disjoint_read_bytes]. *)
+    Lemma read_byte_spec_disjoint_set_byte_raw:
+      forall (ms1 ms2 : MemState) (ptr ptr' : addr) (byte : SByte) (byte' : mem_byte),
+        disjoint_ptr_byte ptr ptr' ->
+        mem_state_memory ms2 = set_byte_raw (mem_state_memory ms1) (ptr_to_int ptr') byte' ->
+        read_byte_spec ms1 ptr byte <-> read_byte_spec ms2 ptr byte.
+    Proof.
+      intros ms1 ms2 ptr ptr' byte [byte' aid_byte'] DISJOINT MEMEQ.
+      split; intros [[aid' [READ_ALLOC READ_ALLOWED]] READ_PROP].
+      { split.
+        + eexists; split; eauto.
+          eapply byte_allocated_set_byte_raw_neq; eauto.                    
+        + solve_read_byte_prop.
+      }
+      { split.
+        + eexists; split; eauto.
+          eapply byte_allocated_set_byte_raw_neq'; eauto.
+        + solve_read_byte_prop.
+      }
+    Qed.
+
+    Ltac solve_disjoint_ptr_byte :=
+      solve [eauto | symmetry; eauto].
+
+    Ltac solve_disjoint_read_byte_spec :=
+      let ptr := fresh "ptr" in
+      let byte := fresh "byte" in
+      let DISJOINT := fresh "DISJOINT" in
+      intros ptr byte DISJOINT;
+      eapply read_byte_spec_disjoint_set_byte_raw; [solve_disjoint_ptr_byte |]; cbn; eauto.
 
     Ltac solve_read_byte_spec :=
       split; [solve_read_byte_allowed | solve_read_byte_prop].
+
+    Ltac solve_set_byte_memory :=
+      split; [solve_read_byte_spec | solve_disjoint_read_byte_spec].
 
     Ltac solve_frame_stack_preserved :=
       solve [
@@ -4343,6 +4420,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       | solve_free_byte_allowed_all_preserved
       | solve_preserve_allocation_ids
       ].
+
+    Ltac solve_write_byte_spec :=
+      split; [solve_write_byte_allowed | solve_set_byte_memory | solve_write_byte_operation_invariants].
 
     Section MemoryPrimatives.
       Context {MemM : Type -> Type}.
@@ -4666,55 +4746,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         { unfold read_byte_spec_MemPropT.
           unfold lift_spec_to_MemPropT.
           cbn.
-          split; auto.
-          - solve_write_byte_allowed.
-          - (* TODO: solve_set_byte_memory *)
-            split.
-            + solve_read_byte_spec.
-            + intros ptr' byte' H0.
-              split; intros [[aid' [READ_ALLOC READ_ALLOWED]] READ_PROP].
-              { split.
-                + eexists; split; eauto.
-                  solve_byte_allocated.
-                + solve_read_byte_prop.
-              }
-              { split.
-                + eexists; split; eauto.
-                  eapply byte_allocated_set_byte_raw_neq'; eauto.
-                  symmetry. eauto.
-
-                  cbn.
-                  eauto.
-                + solve_read_byte_prop.
-              }
-
-              Set Nested Proofs Allowed.
-              Lemma read_byte_spec_disjoint_set_byte_raw :
-                forall ms ptr1 ptr2 byte rbyte aid fs heap,
-                  read_byte_raw (mem_state_memory ms) (ptr_to_int ptr2) = Some (rbyte, aid) ->
-                  access_allowed (address_provenance ptr2) aid ->
-                  read_byte_spec ms ptr2 byte <->
-                    read_byte_spec {| ms_memory_stack := {| memory_stack_memory := set_byte_raw (mem_state_memory ms) (ptr_to_int ptr1) (byte, aid); memory_stack_frame_stack := fs; memory_stack_heap := heap |}; ms_provenance := mem_state_provenance ms |} ptr2 byte.
-              Proof.
-                intros ms ptr1 ptr2 byte rbyte aid fs heap READ ALLOWED.
-                split; intros [[aid' [READ_ALLOC READ_ALLOWED]] READ_PROP].
-                - split.
-                  + eexists; split; eauto.
-                    eapply byte_allocated_set_byte_raw' with (ms:=ms); eauto.
-                    solve_byte_allocated.
-                - solve_read_byte_spec.
-              Qed.
-
-
-              split; intros READSPEC;
-                solve_read_byte_spec.
-              admit.
-              admit.
-          - solve_write_byte_operation_invariants.
+          solve_write_byte_spec.
         }
 
-        unfold MemMonad_valid_state.
-       cbn.
+        (* TODO: Need something about valid_state being preserved with set_byte_raw...
+
+           This is going to be a problem. I don't know what MemMonad_valid_state is. Because 
+         *)
+        admit.
       - unfold mem_state_memory in *.
         solve_read_byte_prop.
         }
