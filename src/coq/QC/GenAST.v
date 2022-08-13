@@ -194,7 +194,15 @@ End Helpers.
 
 Section GenerationState.
 
+  Variant var_flag :=
+    | ptrtoint_pointer (prev_typ : typ)
+    | malloc_pointer (sz : N)
+    | malloc_pointer_child (parents : list (ident * typ))
+  .
+
   Definition type_context := list (ident * typ).
+  Definition backend_var := (ident * typ * list var_flag)%type.
+  Definition backend_context := list (backend_var).
   Definition var_context := list (ident * typ).
   Definition ptr_to_int_context := list (typ * ident * typ).
   Definition all_var_contexts := (var_context * ptr_to_int_context)%type.
@@ -206,10 +214,10 @@ Section GenerationState.
     ; num_global : N
     ; num_blocks : N
     (* Types of values *)
-    ; gen_ctx : var_context
+    ; gen_ctx : backend_context
     (* Type aliases *)
     ; gen_typ_ctx : type_context
-    ; gen_ptrtoint_ctx : ptr_to_int_context
+    ; curr_var_flags : list var_flag
     }.
 
   Definition init_GenState : GenState
@@ -219,7 +227,7 @@ Section GenerationState.
         ; num_blocks := 0
         ; gen_ctx    := []
         ; gen_typ_ctx    := []
-        ; gen_ptrtoint_ctx := []
+        ; curr_var_flags := []
        |}.
 
   Definition increment_raw (gs : GenState) : GenState
@@ -229,7 +237,7 @@ Section GenerationState.
         ; num_blocks  := gs.(num_blocks)
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
-        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; curr_var_flags := gs.(curr_var_flags)
        |}.
 
   Definition increment_global (gs : GenState) : GenState
@@ -239,7 +247,7 @@ Section GenerationState.
         ; num_blocks  := gs.(num_blocks)
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
-        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; curr_var_flags := gs.(curr_var_flags)
        |}.
 
   Definition increment_void (gs : GenState) : GenState
@@ -249,7 +257,7 @@ Section GenerationState.
         ; num_blocks  := gs.(num_blocks)
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
-        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; curr_var_flags := gs.(curr_var_flags)
        |}.
 
   Definition increment_blocks (gs : GenState) : GenState
@@ -259,37 +267,37 @@ Section GenerationState.
         ; num_blocks  := N.succ gs.(num_blocks)
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
-        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; curr_var_flags := gs.(curr_var_flags)
        |}.
 
-  Definition replace_ctx (ctx : list (ident * typ)) (gs : GenState) : GenState
+  Definition replace_ctx (ctx : backend_context) (gs : GenState) : GenState
     := {| num_void    := gs.(num_void)
         ; num_raw     := gs.(num_raw)
         ; num_global  := gs.(num_global)
         ; num_blocks  := gs.(num_blocks)
         ; gen_ctx     := ctx
         ; gen_typ_ctx := gs.(gen_typ_ctx)
-        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; curr_var_flags := gs.(curr_var_flags)
        |}.
 
-  Definition replace_typ_ctx (typ_ctx : list (ident * typ)) (gs : GenState) : GenState
+  Definition replace_typ_ctx (typ_ctx : type_context) (gs : GenState) : GenState
     := {| num_void    := gs.(num_void)
         ; num_raw     := gs.(num_raw)
         ; num_global  := gs.(num_global)
         ; num_blocks  := gs.(num_blocks)
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := typ_ctx
-        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; curr_var_flags := gs.(curr_var_flags)
        |}.
 
-  Definition replace_ptrtoint_ctx (ptrtoint_ctx : list (typ * ident * typ)) (gs: GenState) : GenState
+  Definition replace_curr_var_flags (curr_var_flags : list var_flag) (gs : GenState) : GenState
     := {| num_void    := gs.(num_void)
         ; num_raw     := gs.(num_raw)
         ; num_global  := gs.(num_global)
         ; num_blocks  := gs.(num_blocks)
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
-        ; gen_ptrtoint_ctx := ptrtoint_ctx
+        ; curr_var_flags := curr_var_flags
        |}.
 
   Definition GenLLVM := stateT GenState G.
@@ -339,35 +347,63 @@ Section GenerationState.
        modify increment_blocks;;
        ret (Name ("b" ++ show n)).
 
-  Definition get_ctx : GenLLVM var_context
+  Definition is_ptrtoint_var (l_var_flag : list var_flag) : bool :=
+    List.anyb (fun varflag => match varflag with
+                      | ptrtoint_pointer _ => true
+                      | _ => false
+                      end) l_var_flag.
+
+  Fixpoint get_ptrtoint_prev_typ (l_var_flag : list var_flag) : option typ :=
+    match l_var_flag with
+    | hd:: tl =>
+        match hd with
+        | ptrtoint_pointer t => Some t
+        | _ => get_ptrtoint_prev_typ tl
+        end
+    | nil => None
+    end.
+
+  Definition is_malloc0_var (l_var_flag : list var_flag) : bool :=
+    List.anyb (fun varflag => match varflag with
+                           | malloc_pointer 0 => true
+                           | _ => false
+                           end) l_var_flag.
+
+  Definition is_normal_var (l_var_flag : list var_flag) : bool :=
+    negb (is_ptrtoint_var l_var_flag) && negb (is_malloc0_var l_var_flag).
+
+  Definition get_ctx : GenLLVM backend_context
     := gets (fun gs => gs.(gen_ctx)).
+
+  Definition get_normal_ctx : GenLLVM var_context
+    := ctx <- get_ctx;;
+       ret (fold_left (fun acc '(i, t, l_var_flag) => if is_normal_var l_var_flag then acc ++ [(i, t)] else acc) ctx []).
+
+  Definition get_ptrtoint_ctx : GenLLVM ptr_to_int_context
+    := ctx <- get_ctx;;
+       ret
+         (fold_left
+            (fun acc '(i, t, l_var_flag) =>
+               match get_ptrtoint_prev_typ l_var_flag with
+               | None => acc
+               | Some prev => acc ++ [(prev, i, t)]
+             end) ctx []).
 
   Definition get_typ_ctx : GenLLVM type_context
     := gets (fun gs => gs.(gen_typ_ctx)).
 
-  Definition get_ptrtoint_ctx : GenLLVM ptr_to_int_context
-    := gets (fun gs => gs.(gen_ptrtoint_ctx)).
-
   (* Get all variable contexts that might need to be saved *)
   Definition get_variable_ctxs : GenLLVM all_var_contexts
-    := ctx <- get_ctx;;
+    := ctx <- get_normal_ctx;;
        ptoi_ctx <- get_ptrtoint_ctx;;
        ret (ctx, ptoi_ctx).
 
-  Definition set_ctx (ctx : var_context) : GenLLVM unit
+  Definition set_ctx (ctx : backend_context) : GenLLVM unit
     := modify (replace_ctx ctx);;
        ret tt.
 
-  Definition set_ptrtoint_ctx (ptoi_ctx : ptr_to_int_context) : GenLLVM unit
-    := modify (replace_ptrtoint_ctx ptoi_ctx);;
-       ret tt.
-
-  Definition restore_variable_ctxs (ctxs : all_var_contexts) : GenLLVM unit
-    := match ctxs with
-       | (ctx, ptoi_ctx) =>
-           set_ctx ctx;;
-           set_ptrtoint_ctx ptoi_ctx
-       end.
+  Definition restore_backend_ctx (ctx : backend_context) : GenLLVM unit
+    := set_ctx ctx.
 
   (* TODO: Do we need this? *)
   Definition filter_global_from_variable_ctxs (ctxs : all_var_contexts) : all_var_contexts
@@ -383,7 +419,7 @@ Section GenerationState.
            (globals_in_ctx, globals_in_ptoi_ctx)
        end.
 
-  Definition add_to_ctx (x : (ident * typ)) : GenLLVM unit
+  Definition add_to_ctx (x : (ident * typ * list var_flag)) : GenLLVM unit
     := ctx <- get_ctx;;
        let new_ctx := x :: ctx in
        modify (replace_ctx new_ctx);;
@@ -395,28 +431,16 @@ Section GenerationState.
        modify (replace_typ_ctx new_ctx);;
        ret tt.
 
-  Definition add_to_ptrtoint_ctx (x : (typ * ident * typ)) : GenLLVM unit
-    := ctx <- get_ptrtoint_ctx;;
-       let new_ctx := x :: ctx in
-       modify (replace_ptrtoint_ctx new_ctx);;
-       ret tt.
-
-  Definition append_to_ctx (vars : list (ident * typ)) : GenLLVM unit
+  Definition append_to_ctx (vars : backend_context) : GenLLVM unit
     := ctx <- get_ctx;;
        let new_ctx := vars ++ ctx in
        modify (replace_ctx new_ctx);;
        ret tt.
 
-  Definition append_to_typ_ctx (aliases : list (ident * typ)) : GenLLVM unit
+  Definition append_to_typ_ctx (aliases : type_context) : GenLLVM unit
     := ctx <- get_typ_ctx;;
        let new_ctx := aliases ++ ctx in
        modify (replace_typ_ctx new_ctx);;
-       ret tt.
-
-  Definition append_to_ptrtoint_ctx (aliases : list (typ * ident * typ)) : GenLLVM unit
-    := ctx <- get_ptrtoint_ctx;;
-       let new_ctx := aliases ++ ctx in
-       modify (replace_ptrtoint_ctx new_ctx);;
        ret tt.
 
   Definition reset_ctx : GenLLVM unit
@@ -425,25 +449,12 @@ Section GenerationState.
   Definition reset_typ_ctx : GenLLVM unit
     := modify (replace_typ_ctx []);; ret tt.
 
-  Definition reset_ptrtoint_ctx : GenLLVM unit
-    := modify (replace_ptrtoint_ctx []);; ret tt.
-
   Definition hide_ctx {A} (g: GenLLVM A) : GenLLVM A
     := saved_ctx <- get_ctx;;
        reset_ctx;;
        a <- g;;
        append_to_ctx saved_ctx;;
        ret a.
-
-  Definition hide_ptrtoint_ctx {A} (g: GenLLVM A) : GenLLVM A
-    := saved_ctx <- get_ptrtoint_ctx;;
-       reset_ptrtoint_ctx;;
-       a <- g;;
-       append_to_ptrtoint_ctx saved_ctx;;
-       ret a.
-
-  Definition hide_variable_ctxs {A} (g: GenLLVM A) : GenLLVM A
-    := hide_ctx (hide_ptrtoint_ctx g).
 
   (** Restore context after running a generator. *)
   Definition backtrack_ctx {A} (g: GenLLVM A) : GenLLVM A
@@ -452,17 +463,18 @@ Section GenerationState.
        set_ctx saved_ctx;;
        ret a.
 
-  (** Restore ptrtoint context after running a generator. *)
-  Definition backtrack_ptrtoint_ctx {A} (g: GenLLVM A) : GenLLVM A
-    := saved_ctx <- get_ptrtoint_ctx;;
-       a <- g;;
-       set_ptrtoint_ctx saved_ctx;;
-       ret a.
+  (*! Section for modifying the current variable !*)
+  (* Helper for malloc/free*)
+  Definition reset_curr_varflag : GenLLVM unit
+    := modify (replace_curr_var_flags []);; ret tt.
 
-  (** Restore all variable contexts after running a generator. *)
-  Definition backtrack_variable_ctxs {A} (g: GenLLVM A) : GenLLVM A
-    := backtrack_ctx (backtrack_ptrtoint_ctx g).
+  Definition get_curr_varflags : GenLLVM (list var_flag)
+    := gets (fun gs => gs.(curr_var_flags)).
 
+  Definition set_curr_varflag (l_var_flag : list var_flag) : GenLLVM unit
+    := modify (replace_curr_var_flags l_var_flag);; ret tt.
+
+  (*! GenLLVM generator functions!*)
   Definition oneOf_LLVM {A} (gs : list (GenLLVM A)) : GenLLVM A
     := n <- lift (choose (0, List.length gs - 1)%nat);;
        nth n gs (lift failGen).
@@ -523,20 +535,40 @@ End GenerationState.
 
 Section TypGenerators.
   (*filter all the (ident, typ) in ctx such that typ is a ptr*)
+
+  Fixpoint is_malloc_ptr (l : list var_flag) : bool :=
+    match l with
+    | (malloc_pointer _)::tl => true
+    | nil => false
+    | _::tl => is_malloc_ptr tl
+    end.
+
+  Definition filter_malloc_ptr_typs (typ_ctx : type_context) (ctx : backend_context) : var_context :=
+    map (fun '(i, t, _) => (i, t)) (filter
+      (fun '(_, t, l) =>
+         match normalize_type typ_ctx t with
+         | TYPE_Pointer _ => is_malloc_ptr l
+         | _ => false
+         end) ctx).
+
   Definition filter_ptr_typs (typ_ctx : type_context) (ctx : var_context) : var_context :=
-    filter (fun '(_, t) => match normalize_type typ_ctx t with
-                        | TYPE_Pointer _ => true
-                        | _ => false
-                        end) ctx.
+    filter
+      (fun '(_, t) =>
+         match normalize_type typ_ctx t with
+         | TYPE_Pointer _ => true
+         | _ => false
+         end) ctx.
 
   Definition filter_sized_ptr_typs (typ_ctx : type_context) (ctx : var_context) : var_context :=
-    filter (fun '(_, t) => match normalize_type typ_ctx t with
-                        | TYPE_Pointer t => is_sized_type typ_ctx t
-                        | _ => false
-                        end) ctx.
+    filter
+      (fun '(_, t) =>
+         match normalize_type typ_ctx t with
+         | TYPE_Pointer t => is_sized_type typ_ctx t
+         | _ => false
+         end) ctx.
 
   Definition filter_sized_typs (typ_ctx: type_context) (ctx : var_context) : var_context :=
-    filter (fun '(_, t) => is_sized_type typ_ctx t) ctx.
+    filter (fun '(_, t) =>  is_sized_type typ_ctx t) ctx.
 
   Definition filter_non_void_typs (typ_ctx : type_context) (ctx : var_context) : var_context :=
     filter (fun '(_, t) => match normalize_type typ_ctx t with
@@ -549,12 +581,12 @@ Section TypGenerators.
               match normalize_type typ_ctx t with
               | TYPE_Array sz _ => N.ltb 0 sz
               | TYPE_Struct l
-              | TYPE_Packed_struct l => negb (seq.nilp l)
+              | TYPE_Packed_struct l =>  negb (seq.nilp l)
               | _ => false
               end ) ctx.
 
   Definition filter_vec_typs (typ_ctx : type_context) (ctx: var_context) : var_context :=
-    filter (fun '(_, t) =>
+    filter (fun  '(_, t) =>
               match normalize_type typ_ctx t with
               | TYPE_Vector _ _ => true
               | _ => false
@@ -612,9 +644,10 @@ Section TypGenerators.
     match sz with
     | O => gen_sized_typ_0
     | (S sz') =>
-        ctx <- get_ctx;;
+        ctx <- get_normal_ctx;;
         aliases <- get_typ_ctx;;
-        let typs_in_ctx := map (fun '(_, typ) => ret typ) (filter_sized_typs aliases ctx) in
+        let typs_in_ctx := map (fun '(_, typ) => ret typ) (filter_sized_typs aliases ctx)
+        in
         freq_LLVM_thunked
         ([(min (List.length typs_in_ctx) 10, (fun _ => oneOf_LLVM typs_in_ctx))] ++
          [(1%nat, (fun _ => gen_sized_typ_0))
@@ -640,9 +673,10 @@ Section TypGenerators.
     match sz with
     | 0%nat => gen_sized_typ_0
     | (S sz') =>
-        ctx <- get_ctx;;
+        ctx <- get_normal_ctx;;
         aliases <- get_typ_ctx;;
-        let typs_in_ctx := map (fun '(_, typ) => ret typ) (filter_sized_typs aliases ctx) in
+        let typs_in_ctx := map (fun '(_, typ) => ret typ) (filter_sized_typs aliases ctx)
+        in
         freq_LLVM_thunked
         ([(min (List.length typs_in_ctx) 10, (fun _ => oneOf_LLVM typs_in_ctx))] ++
         [(1%nat, (fun _ => gen_sized_typ_0))
@@ -698,9 +732,10 @@ Section TypGenerators.
     match sz with
     | 0%nat => gen_typ_0
     | (S sz') =>
-        ctx <- get_ctx;;
+        ctx <- get_normal_ctx;;
         (* not filter sized types for this one *)
-        let typs_in_ctx := map (fun '(_, typ) =>ret typ) ctx in
+        let typs_in_ctx := map (fun '(_, typ) => ret typ) ctx
+        in
         freq_LLVM_thunked
         ([(min (List.length typs_in_ctx) 10, (fun _ => oneOf_LLVM typs_in_ctx))] ++
         [ (1%nat, (fun _ => gen_typ_0)) (* TODO: Not sure if I need to add it here *)
@@ -758,8 +793,9 @@ Section TypGenerators.
     | 0%nat => gen_typ_non_void_0
     | (S sz') =>
         typ_ctx <- get_typ_ctx;;
-        ctx <- get_ctx;;
-        let typs_in_ctx := map (fun '(_, typ) => ret typ) (filter_non_void_typs typ_ctx ctx) in
+        ctx <- get_normal_ctx;;
+        let typs_in_ctx := map (fun '(_, typ) => ret typ) (filter_non_void_typs typ_ctx ctx)
+        in
         freq_LLVM_thunked
         ([(min (List.length typs_in_ctx) 10, fun _ => oneOf_LLVM typs_in_ctx)] ++
         [ (1%nat, fun _ => gen_typ_non_void_0)
@@ -778,9 +814,10 @@ Section TypGenerators.
   match sz with
   | 0%nat => gen_typ_non_void_0
   | (S sz') =>
-      ctx <- get_ctx;;
+      ctx <- get_normal_ctx;;
       aliases <- get_typ_ctx;;
-      let typs_in_ctx := map (fun '(_, typ) => ret typ) (filter_sized_typs aliases ctx) in
+      let typs_in_ctx := map (fun '(_, typ) => ret typ) (filter_sized_typs aliases ctx)
+      in
       freq_LLVM_thunked
       ([(min (List.length typs_in_ctx) 10, fun _ => oneOf_LLVM typs_in_ctx)] ++
       [ (1%nat, fun _ => gen_typ_non_void_0)
@@ -1045,6 +1082,57 @@ Section ExpGenerators.
        | TYPE_Identified id => false
        end.
 
+Definition normalized_raw_id_eq (na : raw_id) (nb : raw_id) : bool
+    := match na, nb with
+       | Name sa, Name sb => (sa =? sb)%string
+       | Anon ia, Anon ib
+       | Raw ia, Raw ib => (ia =? ib)%Z
+       | _, _ => false
+       end.
+  Notation "A =? B" := (normalized_raw_id_eq A B).
+
+  Definition normalized_ident_eq (ia : ident) (ib : ident) : bool
+    := match ia, ib with
+       | ID_Global na, ID_Global nb
+       | ID_Local na, ID_Local nb => normalized_raw_id_eq na nb
+       | _, _ => false
+       end.
+  Notation "A =? B" := (normalized_ident_eq A B).
+
+  Definition normalized_var_eq (a : ident * typ) (b : ident * typ) : bool :=
+    let '(ia, ta) := a in
+    let '(ib, tb) := b in
+    normalized_typ_eq ta tb && (ia =? ib).
+  Notation "A =? B" := (normalized_var_eq A B).
+
+  (* Helper function for update_curr_varflags_h. Add var as adding in set*)
+  Fixpoint set_l_var_add (v : ident * typ) (prev next : var_context) :=
+    match next with
+    | nil => prev ++ [v]
+    | hd::tl =>
+        if normalized_var_eq hd v
+        then prev ++ next
+        else set_l_var_add v (prev ++ [hd]) tl
+    end.
+
+  Fixpoint update_curr_varflags_h (varflag : var_flag) (prev next : list var_flag) : list var_flag :=
+    match next with
+    | nil => prev ++ [varflag]
+    | hd::tl =>
+        match hd, varflag with
+        | ptrtoint_pointer t1, ptrtoint_pointer t2 => prev ++ [varflag] ++ tl
+        | malloc_pointer sz, malloc_pointer sz' => prev ++ [varflag] ++ tl
+        | malloc_pointer_child parents1, malloc_pointer_child parents2 =>
+            let l_updated_var := fold_left (fun acc v => set_l_var_add v [] acc) (parents1 ++ parents2) [] in
+            prev ++ [malloc_pointer_child l_updated_var] ++ tl
+        | _, _ => update_curr_varflags_h varflag (prev ++ [hd]) tl
+        end
+    end.
+
+  Definition update_curr_varflags (varflag : var_flag) : GenLLVM unit :=
+    varflags <- get_curr_varflags;;
+    set_curr_varflag (update_curr_varflags_h varflag [] varflags).
+
   (* This needs to use normalized_typ_eq, instead of dtyp_eq because of pointer types...
      dtyps only tell you that a type is a pointer, the other type
      information about the pointers is erased.
@@ -1214,10 +1302,31 @@ Definition genTypHelper (n: nat): G (typ) :=
 Definition genType: G (typ) :=
   sized genTypHelper.
 
+(* A function use to add var_flag malloc_poitner_child if needed *)
+Definition update_malloc (e : exp typ) (t : typ) : GenLLVM unit :=
+  match e with
+  | EXP_Ident i =>
+      backend_ctx <- get_ctx;;
+      let filtered_i := filter (fun '(i1, t1, _) => normalized_var_eq (i,t) (i1, t1)) backend_ctx in
+      match filtered_i with
+      | (_, _, l)::tl =>
+          let fix update_malloc_h (l : list var_flag): GenLLVM unit :=
+            match l with
+            | nil => ret tt
+            | (malloc_pointer _)::tl => update_curr_varflags (malloc_pointer_child [(i, t)])
+            | (malloc_pointer_child ps)::tl => update_curr_varflags (malloc_pointer_child ((i, t)::ps))
+            | hd::tl => update_malloc_h tl
+            end
+          in update_malloc_h l
+      | nil => ret tt
+      end
+  | _ => ret tt
+  end.
+
   Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
     match sz with
     | 0%nat =>
-      ctx <- get_ctx;;
+      ctx <- get_normal_ctx;;
       let ts := filter_type t ctx in
       let gen_idents :=
           match ts with
@@ -1255,7 +1364,6 @@ Definition genType: G (typ) :=
               ret (EXP_Packed_struct tes)
 
           | TYPE_Identified id        =>
-            ctx <- get_ctx;;
             match find_pred (fun '(i,t) => if Ident.eq_dec id i then true else false) ctx with
             | None => lift failGen
             | Some (i,t) => gen_exp_size 0 t
@@ -1305,7 +1413,7 @@ Definition genType: G (typ) :=
           | TYPE_Metadata          => [lift failGen]
           | TYPE_X86_mmx           => [lift failGen]
           | TYPE_Identified id     =>
-            [ctx <- get_ctx;;
+            [ctx <- get_normal_ctx;;
              match find_pred (fun '(i,t) => if Ident.eq_dec id i then true else false) ctx with
              | None => lift failGen
              | Some (i,t) => gen_exp_size sz t
@@ -1313,7 +1421,9 @@ Definition genType: G (typ) :=
           end
       in
       (* short-circuit to size 0 *)
-      oneOf_LLVM (gen_exp_size 0 t :: gens)
+      expression <- oneOf_LLVM (gen_exp_size 0 t :: gens);;
+      update_malloc expression t;;
+      ret expression
     end
   with
   (* TODO: Make sure we don't divide by 0 *)
@@ -1457,12 +1567,12 @@ Section InstrGenerators.
 
   Definition get_ctx_ptrs  : GenLLVM (list (ident * typ)) :=
     typ_ctx <- get_typ_ctx;;
-    ctx <- get_ctx;;
+    ctx <- get_normal_ctx;;
     ret (filter_ptr_typs typ_ctx ctx).
 
   Definition get_ctx_sized_ptrs  : GenLLVM (list (ident * typ)) :=
     typ_ctx <- get_typ_ctx;;
-    ctx <- get_ctx;;
+    ctx <- get_normal_ctx;;
     ret (filter_sized_ptr_typs typ_ctx ctx).
 
   (* Index path without getting into vector *)
@@ -1527,7 +1637,7 @@ Section InstrGenerators.
 
   Definition get_ctx_agg_typs : GenLLVM (list (ident * typ)) :=
     typ_ctx <- get_typ_ctx;;
-    ctx <- get_ctx;;
+    ctx <- get_normal_ctx;;
     ret (filter_agg_typs typ_ctx ctx).
 
   Definition get_ctx_agg_typ : GenLLVM (ident * typ) :=
@@ -1536,7 +1646,7 @@ Section InstrGenerators.
 
   Definition get_ctx_vec_typs : GenLLVM (list (ident * typ)) :=
     typ_ctx <- get_typ_ctx;;
-    ctx <- get_ctx;;
+    ctx <- get_normal_ctx;;
     ret (filter_vec_typs typ_ctx ctx).
 
   Definition get_ctx_vec_typ : GenLLVM (ident * typ) :=
@@ -1564,7 +1674,7 @@ Section InstrGenerators.
 
   Definition gen_insertvalue (tagg: typ): GenLLVM (typ * instr typ) :=
     eagg <- gen_exp_size 0 tagg;;
-    ctx <- get_ctx;;
+    ctx <- get_normal_ctx;;
     let paths_in_agg := get_index_paths_insertvalue tagg ctx in
     '(tsub, path_for_insertvalue) <- oneOf_LLVM (map ret paths_in_agg);;
     esub <- hide_ctx (gen_exp_size 0 tsub);;
@@ -1609,6 +1719,7 @@ Section InstrGenerators.
           ret (TYPE_Void) (* Won't get into this case *)
       end in
     typ_from_cast <- gen_typ_in_ptr tptr;;
+    update_curr_varflags (ptrtoint_pointer tptr);;
     ret (typ_from_cast, INSTR_Op (OP_Conversion Ptrtoint tptr eptr typ_from_cast)).
 
   Definition round_up_to_eight (n : N) : N :=
@@ -1775,14 +1886,20 @@ Section InstrGenerators.
           | subtyp =>
               let trivial_typs := [(1%N, TYPE_I 1); (8%N, TYPE_I 8); (32%N, TYPE_I 32); (32%N, TYPE_Float); (64%N, TYPE_I 64); (64%N, TYPE_Double)] in
               let size_of_vec := get_bit_size_from_typ t_from in
-              let choices := fold_left (fun acc '(s,t) => let sz' := (size_of_vec / s)%N in
-                                                       if (sz' =? 0)%N then acc else acc ++ [TYPE_Vector sz' t]) trivial_typs [] in
+              let choices :=
+                fold_left
+                  (fun acc '(s,t) =>
+                     let '(sz', m) := N.div_eucl size_of_vec s in
+                     if orb (sz' =? 0)%N (negb (m =? 0)%N)
+                     then acc
+                     else acc ++ [TYPE_Vector sz' t]) trivial_typs [] in
               ret choices
           end
       | TYPE_Pointer subtyp =>
           (* TODO: Clean up. Figure out what can subtyp of pointer be *)
           (* new_subtyp <- gen_bitcast_typ subtyp;; *)
-          new_subtyp <- gen_sized_typ;;
+          (* new_subtyp <- gen_sized_typ;; *)
+          new_subtyp <- gen_typ_le_size (get_size_from_typ subtyp);;
           ret [TYPE_Pointer new_subtyp]
       | _ => ret [t_from] (* TODO: Add more types *) (* This currently is to prevent types like pointer of struct from failing *)
       end in
@@ -1802,7 +1919,7 @@ Section InstrGenerators.
     end.
 
   Definition gen_bitcast : GenLLVM (typ * instr typ) :=
-    ctx <- get_ctx;;
+    ctx <- get_normal_ctx;;
     let first_class_typs_in_ctx := filter_first_class_typs ctx in
     trivial_typ <- oneOf_LLVM [ret (TYPE_I 1); ret (TYPE_I 8); ret (TYPE_I 32); ret (TYPE_I 64); ret (TYPE_Float); ret (TYPE_Double); ret TYPE_Vector <*> lift_GenLLVM genN <*> gen_typ_non_void_0];;
     let gen_first_class_typs := (ret trivial_typ)::(map (fun '(_, t) => ret t) first_class_typs_in_ctx) in
@@ -1824,6 +1941,34 @@ Section InstrGenerators.
         ret (ret_t, INSTR_Call (TYPE_Function ret_t args varargs, efun) args_with_params [])
     | _ => lift failGen
     end.
+
+  Definition gen_malloc : GenLLVM (typ * instr typ) :=
+    let ret_t := TYPE_Pointer (TYPE_I 8) in
+    let malloc_function := (ID_Global (Name "malloc"), TYPE_Function ret_t [TYPE_I 8] false) in
+    x <- lift_GenLLVM (choose (0, 2^8 - 1));;
+    update_curr_varflags (malloc_pointer (Z.to_N x));;
+    ret (ret_t, INSTR_Call (snd malloc_function, EXP_Ident (fst malloc_function)) [((TYPE_I 8, EXP_Integer x), [])] []).
+
+  (* Free Generator *)
+  Fixpoint has_malloc_parent (var : ident * typ) (l_var_flag : list var_flag) : bool :=
+    match l_var_flag with
+    | (malloc_pointer_child l)::tl => seq.nilp (filter (fun parent => normalized_var_eq parent var) l)
+    | nil => false
+    | _::tl => has_malloc_parent var tl
+    end.
+
+  Definition free_malloc_pointers (var : ident * typ) : GenLLVM unit :=
+    backend_ctx <- get_ctx;;
+    let updated_ctx := fold_left (fun acc '(i, t, l) => if orb (has_malloc_parent var l) (normalized_var_eq (i, t) var) then acc else acc ++ [(i, t, l)]) backend_ctx [] in
+    set_ctx updated_ctx.
+
+  Definition gen_free (malloc_ptrs : var_context) : GenLLVM (typ * instr typ) :=
+    '(id, tptr) <- oneOf_LLVM (map ret malloc_ptrs);;
+    let ret_t := TYPE_Void in
+    let free_function := (ID_Global (Name "free"), TYPE_Function (ret_t) [(TYPE_Pointer (TYPE_I 8))] false) in
+    (* Remove all related pointer from malloc *)
+    free_malloc_pointers (id, tptr);;
+    ret (ret_t, INSTR_Call (snd free_function, EXP_Ident (fst free_function)) [((tptr, EXP_Ident id), [])] []).
 
   (* TODO: move this *)
   Definition genInt : G int
@@ -1861,7 +2006,7 @@ Section InstrGenerators.
        ptr_typ <- get_typ_in_ptr tptr;;
        align <- ret (Some 1);;
        (* TODO: Fix parameters / generate more of them *)
-       ret (ptr_typ, INSTR_Load ptr_typ (tptr, eptr) []).
+       ret (ptr_typ, INSTR_Load ptr_typ (tptr, eptr) [ANN_align 1]).
 
   Definition gen_store_to (ptr : texp typ) : GenLLVM (typ * instr typ)
     :=
@@ -1885,9 +2030,11 @@ Section InstrGenerators.
      The type is sometimes void for instructions that don't really
      compute a value, like void function calls, stores, etc.
    *)
+
   Definition gen_instr : GenLLVM (typ * instr typ) :=
     typ_ctx <- get_typ_ctx;;
-    ctx <- get_ctx;;
+    ctx <- get_normal_ctx;;
+    backend_ctx <- get_ctx;;
     ptrtoint_ctx <- get_ptrtoint_ctx;;
     let agg_typs_in_ctx := filter_agg_typs typ_ctx ctx in
     let ptr_vecptr_in_ctx := filter_sized_ptr_vecptr_typs typ_ctx ctx in
@@ -1899,6 +2046,7 @@ Section InstrGenerators.
     let get_typ_l (ctx : var_context) : GenLLVM typ :=
       var <- elems_LLVM ctx;;
       ret (snd var) in
+    let malloc_ptrs_in_ctx := filter_malloc_ptr_typs typ_ctx backend_ctx in
     oneOf_LLVM
       ([ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
          ; t <- gen_sized_typ_ptrinctx;;
@@ -1922,7 +2070,8 @@ Section InstrGenerators.
                  bind (get_typ_l vec_typs_in_ctx) gen_extractelement
                  ; bind (get_typ_l vec_typs_in_ctx) gen_insertelement])
          ++ (if seq.nilp fun_ptrs_in_ctx then [] else [
-                 bind (get_typ_l fun_ptrs_in_ctx) gen_call])).
+                 bind (get_typ_l fun_ptrs_in_ctx) gen_call])
+         ++ (if seq.nilp malloc_ptrs_in_ctx then [] else [gen_free malloc_ptrs_in_ctx])). (* Always going to work since we have malloc and free*)
 
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
@@ -1930,6 +2079,19 @@ Section InstrGenerators.
   (* TODO: want to generate phi nodes, which might be a bit
   complicated because we need to know that an id that occurs in a
   later block is in context *)
+  Fixpoint can_add_to_ctx (l_varflag : list var_flag) :=
+    match l_varflag with
+    | nil => true
+    | (malloc_pointer sz)::tl => negb (sz =? 0)%N
+    | _::tl => can_add_to_ctx tl
+    end.
+
+  Definition add_to_ctx_vf (var : ident * typ * list (var_flag)) :=
+    let '(_, _, l_varflag) := var in
+    if (can_add_to_ctx l_varflag)
+    then add_to_ctx var
+    else ret tt.
+
   Definition add_id_to_instr (t_instr : typ * instr typ) : GenLLVM (instr_id * instr typ)
     :=
     match t_instr with
@@ -1940,17 +2102,30 @@ Section InstrGenerators.
         i <- new_raw_id;;
         match instr with
         | INSTR_Op (OP_Conversion Ptrtoint t_from v t_to) =>
-            add_to_ptrtoint_ctx (t_from, ID_Local i, t_to);; (* Register the local variable to ptrtoint_ctx*)
+            update_curr_varflags (ptrtoint_pointer t_from);;
+            l_var_flag <- get_curr_varflags;;
+            add_to_ctx (ID_Local i, t_to, l_var_flag);;
+            (* add_to_ptrtoint_ctx (t_from, ID_Local i, t_to);; (* Register the local variable to ptrtoint_ctx*) *)
             ret (IId i, instr)
+
+        | INSTR_Call (TYPE_Function _ _ _, EXP_Ident id) _ _ => (* TODO: Detect malloc function and add it in *)
+            l_var_flag <- get_curr_varflags;;
+            add_to_ctx_vf (ID_Local i, t, l_var_flag);;
+            ret (IId i, instr)
+
         | _ =>
-            add_to_ctx (ID_Local i, t);;
+            l_var_flag <- get_curr_varflags;;
+            add_to_ctx (ID_Local i, t, l_var_flag);;
             ret (IId i, instr)
         end
     end.
 
   (* Generate a block of code, spitting out a new context. *)
   Definition gen_instr_id : GenLLVM (instr_id * instr typ)
-    := t_instr <- gen_instr;; add_id_to_instr t_instr.
+    := t_instr <- gen_instr;;
+       it <- add_id_to_instr t_instr;;
+       reset_curr_varflag;;
+       ret it.
 
   Definition fix_alloca (iid : instr_id * instr typ) : GenLLVM (list (instr_id * instr typ))
     := match iid with
@@ -1992,7 +2167,7 @@ Section InstrGenerators.
            (back_blocks : list block_id) (* Blocks that I'm allowed to jump back to *)
            {struct t} : GenLLVM (terminator typ * list (block typ))
     :=
-      ctx <- get_ctx;;
+      ctx <- get_normal_ctx;;
       match sz with
        | 0%nat =>
          (* Only returns allowed *)
@@ -2017,7 +2192,7 @@ Section InstrGenerators.
                  (* We backtrack contexts so blocks in second branch
                       don't refer to variables from the first
                       branch. *)
-                 '(b1, (bh1, bs1)) <- backtrack_variable_ctxs (gen_blocks_sz (sz / 2) t back_blocks);;
+                 '(b1, (bh1, bs1)) <- backtrack_ctx (gen_blocks_sz (sz / 2) t back_blocks);;
 
                  '(b2, (bh2, bs2)) <- gen_blocks_sz (sz / 2) t back_blocks;;
 
@@ -2081,7 +2256,7 @@ Section InstrGenerators.
       let entry_code : list (instr_id * instr typ) := [(loop_init_instr_id, loop_init_instr); (loop_cmp_id, loop_cmp); (select_id, select_instr); (loop_cond_id, loop_cond)] in
 
       (* Generate end blocks *)
-      ctxs <- get_variable_ctxs;;
+      backend_ctx <- get_ctx;;
       '(_, (end_b, end_bs)) <- gen_blocks_sz (sz / 2) t back_blocks;;
       let end_blocks := end_b :: end_bs in
       let end_bid := blk_id end_b in
@@ -2107,7 +2282,7 @@ Section InstrGenerators.
                          |} in
 
       (* Generate loop blocks *)
-      restore_variable_ctxs ctxs;;
+      restore_backend_ctx backend_ctx;;
       '(loop_b, loop_bs) <- gen_loop_entry_sz (sz / 2) t loop_bid phi_id bid_entry bid_next (EXP_Ident (ID_Local loop_final_init_id_raw)) (EXP_Ident (ID_Local next_instr_raw_id)) back_blocks;;
       let loop_blocks := loop_b :: loop_bs in
       let loop_bid := blk_id loop_b in
@@ -2153,7 +2328,7 @@ Section InstrGenerators.
 
   Definition gen_definition (name : global_id) (ret_t : typ) (args : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
-      ctxs <- get_variable_ctxs;;
+      ctx <- get_ctx;;
 
       (* Add arguments to context *)
       args <- map_monad
@@ -2161,7 +2336,7 @@ Section InstrGenerators.
                   i <- new_raw_id;;
                   ret (i, t))
                args;;
-      let args_ctx := map (fun '(i, t) => (ID_Local i, t)) args in
+      let args_ctx := map (fun '(i, t) => (ID_Local i, t, [])) args in
       append_to_ctx args_ctx;;
 
       bs <- gen_blocks ret_t;;
@@ -2176,8 +2351,8 @@ Section InstrGenerators.
                          []
       in
       (* Reset context *)
-      let '(ctx, ptoi_ctx) := ctxs in
-      restore_variable_ctxs ((ID_Global name, TYPE_Pointer f_type)::ctx, ptoi_ctx);;
+      (* let '(ctx, ptoi_ctx) := ctxs in *)
+      restore_backend_ctx ((ID_Global name, TYPE_Pointer f_type, [])::ctx);;
       ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs).
 
   Definition gen_new_definition (ret_t : typ) (args : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
@@ -2208,7 +2383,7 @@ Section InstrGenerators.
       name <- new_global_id;;
       t <- hide_ctx gen_sized_typ_ptrinctx;;
       opt_exp <- fmap Some (hide_ctx (gen_exp_size 0 t));;
-      add_to_ctx (ID_Global name, TYPE_Pointer t);;
+      add_to_ctx (ID_Global name, TYPE_Pointer t, []);;
       let ann_linkage : list (annotation typ) :=
         match opt_exp with
         | None => [ANN_linkage (LINKAGE_External)]
@@ -2223,11 +2398,39 @@ Section InstrGenerators.
   Definition gen_global_tle_multiple : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     := listOf_LLVM  gen_global_tle.
 
+  Definition gen_malloc_dec : GenLLVM (declaration typ)
+    :=
+    let malloc_id := Name "malloc" in
+    let malloc_typ := TYPE_Function (TYPE_Pointer (TYPE_I 8)) [TYPE_I 8] false in
+    (* add_to_ctx (ID_Global malloc_id, TYPE_Pointer malloc_typ, [malloc_function]);; *)
+    ret (mk_declaration malloc_id malloc_typ ([], [[]]) [] []).
+
+  Definition gen_malloc_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
+    :=
+    (*n <- lift (choose (0, 1)%nat);;
+    if (n =? 0)
+    then []
+    else [ret TLE_Declaration <*> gen_malloc_dec]. *)
+    ret TLE_Declaration <*> gen_malloc_dec.
+
+  Definition gen_free_dec : GenLLVM (declaration typ)
+    :=
+    let free_id := Name "free" in
+    let free_typ := TYPE_Function (TYPE_Void) [(TYPE_Pointer (TYPE_I 8))] false in
+    (* add_to_ctx (ID_Global free_id, TYPE_Pointer free_typ, [free_function]);; *) (* Dynamically add this in filter_function_pointer *)
+    ret (mk_declaration free_id free_typ ([], [[]]) [] []).
+
+  Definition gen_free_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
+    :=
+    ret TLE_Declaration <*> gen_free_dec.
+
   Definition gen_llvm : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     :=
+    malloc <- gen_malloc_tle;;
+    free <- gen_free_tle;;
     globals <- gen_global_tle_multiple;;
     functions <- gen_helper_function_tle_multiple;;
     main <- gen_main_tle;;
-    ret (globals ++ functions ++ [main]).
+    ret ([malloc; free] ++ globals ++ functions ++ [main]).
 
 End InstrGenerators.
