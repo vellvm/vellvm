@@ -1811,7 +1811,7 @@ Section InstrGenerators.
         ret (ret_t, INSTR_Call (TYPE_Function ret_t args varargs, EXP_Ident id) args_texp)
     | _ => lift failGen
     end.
-  
+
   (* TODO: move this *)
   Definition genInt : G int
     := fmap Int.repr (arbitrary : G Z).
