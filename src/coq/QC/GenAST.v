@@ -1208,414 +1208,6 @@ Section ExpGenerators.
        | _ => lift failGen
        end.
 
-  (* Generator GEP part *)
-  (* Get index paths from array or vector*)
-  Definition get_index_paths_from_AoV (sz: N) (t: typ) (pre_path: DList Z) (sub_paths: DList (typ * DList Z)) : DList (typ * DList Z) :=
-    N.recursion DList_empty
-                (fun ix acc =>
-                   let ix_sub_paths := DList_map (fun '(t, sub_path) => (t, DList_append pre_path (DList_cons (Z.of_N ix) sub_path))) sub_paths in
-                   DList_append acc ix_sub_paths)
-                sz.
-
-  (* Can work after extracting the pointer inside*)
-  Fixpoint get_index_paths_aux (t_from : typ) (pre_path : DList Z) {struct t_from}: DList (typ * DList (Z)) :=
-    match t_from with
-    | TYPE_Array sz t =>
-        let sub_paths := get_index_paths_aux t DList_empty in (* Get index path from the first element*)
-        DList_cons (t_from, pre_path) (get_index_paths_from_AoV sz t pre_path sub_paths)
-    | TYPE_Struct fields
-    | TYPE_Packed_struct fields =>
-        DList_cons (t_from, pre_path) (get_index_paths_from_struct pre_path fields)
-    | _ => DList_singleton (t_from, pre_path)
-    end with
-  get_index_paths_from_struct (pre_path: DList Z) (fields: list typ) {struct fields}: DList (typ * DList Z) :=
-    snd (fold_left
-           (fun '(ix, paths) (fld_typ : typ) =>
-              (ix + 1,
-                (DList_append (get_index_paths_aux fld_typ (DList_append pre_path (DList_singleton ix)))
-                              paths)))
-           fields (0%Z, DList_empty : DList (typ * DList Z))).
-
-  Definition DList_paths_to_list_paths (paths : DList (typ * DList (Z))) : list (typ * list (Z))
-    := map (fun '(x, paths) => (x, DList_to_list paths)) (DList_to_list paths).
-
-  Definition get_index_paths_ptr (t_from: typ) : list (typ * list (Z)) :=
-    DList_paths_to_list_paths (get_index_paths_aux t_from (DList_singleton 0%Z)).
-
-  (* Index path without getting into vector *)
-  Fixpoint get_index_paths_agg_aux (t_from : typ) (pre_path : DList Z) {struct t_from}: DList (typ * DList (Z)) :=
-    match t_from with
-    | TYPE_Array sz t =>
-        let sub_paths := get_index_paths_agg_aux t DList_empty in (* Get index path from the first element*)
-        DList_cons (t_from, pre_path) (get_index_paths_from_AoV sz t pre_path sub_paths)
-    | TYPE_Struct fields
-    | TYPE_Packed_struct fields =>
-        DList_cons (t_from, pre_path) (get_index_paths_agg_from_struct pre_path fields)
-    | _ => DList_singleton (t_from, pre_path)
-    end with
-  get_index_paths_agg_from_struct (pre_path: DList Z) (fields: list typ) {struct fields}: DList (typ * DList Z) :=
-    snd (fold_left
-           (fun '(ix, paths) (fld_typ : typ) =>
-              (ix + 1,
-                (DList_append (get_index_paths_agg_aux fld_typ (DList_append pre_path (DList_singleton ix)))
-                              paths)))
-           fields (0%Z, DList_empty : DList (typ * DList Z))).
-
-  (* The method is mainly used by extractvalue and insertvalue,
-     which requires at least one index for getting inside the aggregate type.
-     There is a possibility for us to get nil path. The filter below will get rid of that possibility.
-     Given that the nilpath will definitely be at the beginning of a list of options, we can essentially get the tail. *)
-  Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
-    tl (DList_paths_to_list_paths (get_index_paths_agg_aux t_from DList_empty)).
-
-  Definition get_ctx_ptrs  : GenLLVM (list (ident * typ)) :=
-    typ_ctx <- get_typ_ctx;;
-    ctx <- get_ctx;;
-    ret (filter_ptr_typs typ_ctx ctx).
-
-  Definition get_ctx_sized_ptrs  : GenLLVM (list (ident * typ)) :=
-    typ_ctx <- get_typ_ctx;;
-    ctx <- get_ctx;;
-    ret (filter_sized_ptr_typs typ_ctx ctx).
-
-(* Index path without getting into vector *)
-  Fixpoint get_index_paths_insertvalue_aux (t_from : typ) (pre_path : DList Z) (ctx : list (ident * typ)) {struct t_from}: bool * DList (typ * DList (Z)) :=
-    match t_from with
-    | TYPE_Array sz t =>
-        let '(has_subpaths, sub_paths) := get_index_paths_insertvalue_aux t DList_empty ctx in (* Get index path from the first element*)
-        if has_subpaths
-        then (true, DList_cons (t_from, pre_path) (get_index_paths_from_AoV sz t pre_path sub_paths))
-        else (false, DList_empty)
-    | TYPE_Struct fields
-    | TYPE_Packed_struct fields =>
-        let '(has_reach, reaches) := (get_index_paths_insertvalue_from_struct pre_path fields ctx) in
-        if has_reach
-        then (true, DList_cons (t_from, pre_path) reaches)
-        else (false, DList_empty)
-    | TYPE_Pointer t => if seq.nilp (filter_type t_from ctx) then (false, DList_empty) else (true, DList_singleton (t_from, pre_path))
-    | TYPE_Vector _ t =>
-        let '(has_subpaths, sub_paths) := get_index_paths_insertvalue_aux t DList_empty ctx in (* Get index path from the first element*)
-        if has_subpaths then (true, DList_singleton (t_from, pre_path)) else (false, DList_empty)
-    | _ => (true, DList_singleton (t_from, pre_path))
-    end with
-  get_index_paths_insertvalue_from_struct (pre_path: DList Z) (fields: list typ) (ctx: list (ident * typ)) {struct fields}: bool * DList (typ * DList Z) :=
-    snd (fold_left
-           (fun '(ix, (b, paths)) (fld_typ : typ) =>
-              (ix + 1,
-                (let '(has_reach, reach) := get_index_paths_insertvalue_aux fld_typ (DList_append pre_path (DList_singleton ix)) ctx in
-                 (orb has_reach b, DList_append reach paths))))
-           fields (0%Z, (false, DList_empty : DList (typ * DList Z)))).
-
-Definition get_index_paths_insertvalue (t_from : typ) (ctx : list (ident * typ)): list (typ * list (Z)) :=
-  tl (DList_paths_to_list_paths (snd (get_index_paths_insertvalue_aux t_from DList_empty ctx))).
-
-Fixpoint has_paths_insertvalue_aux (t_from : typ) (ctx : list (ident * typ)) {struct t_from}: bool :=
-  match t_from with
-  | TYPE_Array _ t
-  | TYPE_Vector _ t => has_paths_insertvalue_aux t ctx
-  | TYPE_Struct fields
-  | TYPE_Packed_struct fields => fold_left (fun acc x => orb acc (has_paths_insertvalue_aux x ctx)) fields false
-  | TYPE_Pointer _ => seq.nilp (filter (fun '(_, x) => normalized_typ_eq x t_from) ctx)
-  | _ => true
-  end.
-
-Definition filter_insertvalue_typs (agg_typs : list (ident * typ)) (ctx : list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(_, x) => has_paths_insertvalue_aux x ctx) agg_typs.
-
-Definition get_ctx_ptr : GenLLVM (ident * typ) :=
-  ptrs_in_context <- get_ctx_ptrs;;
-  '(ptr_ident, ptr_typ) <- (oneOf_LLVM (map ret (ptrs_in_context)));;
-  match ptr_typ with
-  | TYPE_Pointer t => ret (ptr_ident, t)
-  | _ => lift failGen (* Should not happen *)
-  end.
-
-Definition get_ctx_sized_ptr : GenLLVM (ident * typ) :=
-  ptrs_in_context <- get_ctx_sized_ptrs;;
-  '(ptr_ident, ptr_typ) <- (oneOf_LLVM (map ret (ptrs_in_context)));;
-  match ptr_typ with
-  | TYPE_Pointer t => ret (ptr_ident, t)
-  | _ => lift failGen (* Should not happen *)
-  end.
-
-Definition get_ctx_agg_typs : GenLLVM (list (ident * typ)) :=
-  typ_ctx <- get_typ_ctx;;
-  ctx <- get_ctx;;
-  ret (filter_agg_typs typ_ctx ctx).
-
-Definition get_ctx_agg_typ : GenLLVM (ident * typ) :=
-  aggs_in_context <- get_ctx_agg_typs;;
-  oneOf_LLVM (map ret aggs_in_context).
-
-Definition get_ctx_vec_typs : GenLLVM (list (ident * typ)) :=
-  typ_ctx <- get_typ_ctx;;
-  ctx <- get_ctx;;
-  ret (filter_vec_typs typ_ctx ctx).
-
-Definition get_ctx_vec_typ : GenLLVM (ident * typ) :=
-  vecs_in_context <- get_ctx_vec_typs;;
-  oneOf_LLVM (map ret vecs_in_context).
-
-Definition gen_gep : GenLLVM (typ * instr typ) :=
-  '(id, t_in_ptr) <- get_ctx_sized_ptr;;
-  let paths_in_ptr := get_index_paths_ptr t_in_ptr in (* Inner paths: Paths after removing the outer pointer *)
-  '(t, path) <- oneOf_LLVM (map ret paths_in_ptr);; (* Select one path from the paths *)
-  let path_for_gep := map (fun x => (TYPE_I 32, EXP_Integer (x))) path in (* Turning the path to integer *)
-  (* Refer to function get_int_typ *)
-  ret (TYPE_Pointer t, INSTR_Op (OP_GetElementPtr t_in_ptr
-                                                  (TYPE_Pointer t_in_ptr, EXP_Ident id) path_for_gep)).
-
-Definition gen_extractvalue : GenLLVM (typ * instr typ) :=
-  '(id, tagg) <- get_ctx_agg_typ;;
-  let paths_in_agg := get_index_paths_agg tagg in
-  '(t, path_for_extractvalue) <- oneOf_LLVM (map ret paths_in_agg);;
-  ret (t, INSTR_Op (OP_ExtractValue (tagg, EXP_Ident id) path_for_extractvalue)).
-
-
-(* ExtractElement *)
-Definition gen_extractelement : GenLLVM (typ * instr typ) :=
-  typ_ctx <- get_typ_ctx;;
-  ctx <- get_ctx;;
-  let vector_in_context := filter_vec_typs typ_ctx ctx in
-  '(id, tvec) <- (oneOf_LLVM (map ret vector_in_context));;
-  let get_size_ty (vType: typ) :=
-    match tvec with
-    | TYPE_Vector sz ty => (sz, ty)
-    | _ => (0%N, TYPE_Void)
-    end in
-  let '(sz, t_in_vec) := get_size_ty tvec in
-  let index_list := map (fun x => N.of_nat x) (List.seq 0 (N.to_nat sz)) in
-  index_for_extractelement <- oneOf_LLVM (map ret index_list);;
-  ret (t_in_vec, INSTR_Op (OP_ExtractElement (tvec, EXP_Ident id) (TYPE_I 32%N, EXP_Integer (Z.of_nat (N.to_nat index_for_extractelement))))).
-
-(* Assumes input is a primitive type *)
-(* Generate the element to be inserted into vector *)
-Definition gen_typ_eq_prim_typ (t: typ): GenLLVM (exp typ) :=
-  match t with
-  | TYPE_I _ => i <- lift_GenLLVM (genNatInt);;
-  ret (EXP_Integer (DynamicValues.Int32.intval i))
-  | TYPE_Float => f <- lift_GenLLVM (fing32);;
-  ret (EXP_Float f)
-  | TYPE_Double => d <- lift_GenLLVM (fing64);;
-  ret (EXP_Double d)
-  | _ => ret (EXP_Null)
-  end.
-
-Definition gen_insertelement : GenLLVM (typ * instr typ) :=
-  '(id, tvec) <- get_ctx_vec_typ;;
-  let get_size_ty (vType: typ) :=
-    match tvec with
-    | TYPE_Vector sz ty => (sz, ty)
-    | _ => (0%N, TYPE_Void)
-    end in
-  let '(sz, t_in_vec) := get_size_ty tvec in
-  value <- gen_typ_eq_prim_typ t_in_vec;;
-  index <- lift_GenLLVM (choose (0, Z.of_N (sz - 1)));;
-  ret (tvec, INSTR_Op (OP_InsertElement (tvec, EXP_Ident id) (t_in_vec, value) (TYPE_I 32, EXP_Integer index))).
-
-Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
-  typ_ctx <- get_typ_ctx;;
-  ctx <- get_ctx;;
-  let ptr_vecptr_in_ctx := filter_sized_ptr_vecptr_typs typ_ctx ctx in
-  let valid_ptr_vecptr_in_ctx := filter (fun '(_, x) => negb (contains_typ x (TYPE_Struct []) soft)) ptr_vecptr_in_ctx in
-  '(id, tptr) <- (oneOf_LLVM (map ret valid_ptr_vecptr_in_ctx));;
-  let gen_typ_in_ptr :=
-    match tptr with
-    | TYPE_Pointer t =>
-        gen_int_typ_for_ptr_cast (* TODO: Wait till IPTR is implemented *)
-    | TYPE_Vector sz ty =>
-        x <- gen_int_typ_for_ptr_cast;;
-        ret (TYPE_Vector sz x)
-    | _ =>
-        ret (TYPE_Void) (* Won't get into this case *)
-    end in
-  typ_from_cast <- gen_typ_in_ptr;;
-  ret (typ_from_cast, INSTR_Op (OP_Conversion Ptrtoint tptr (EXP_Ident id) typ_from_cast)).
-
-Definition round_up_to_eight (n : N) : N :=
-  if N.eqb 0 n
-  then 0
-  else (((n - 1) / 8) + 1) * 8.
-
-Fixpoint get_bit_size_from_typ (t : typ) : N :=
-  match t with
-  | TYPE_I sz => N.max 1 sz
-  | TYPE_IPTR => 64 (* TODO: probably kind of a lie... *)
-  | TYPE_Pointer t => 64
-  | TYPE_Void => 0
-  | TYPE_Half => 16
-  | TYPE_Float => 32
-  | TYPE_Double => 64
-  | TYPE_X86_fp80 => 80
-  | TYPE_Fp128 => 128
-  | TYPE_Ppc_fp128 => 128
-  | TYPE_Metadata => 0
-  | TYPE_X86_mmx => 64
-  | TYPE_Array sz t => sz * (round_up_to_eight (get_bit_size_from_typ t))
-  | TYPE_Function ret args vararg => 0
-  | TYPE_Struct fields
-  | TYPE_Packed_struct fields =>
-      fold_right (fun x acc => (round_up_to_eight (get_bit_size_from_typ x) + acc)%N) 0%N fields
-  | TYPE_Opaque => 0
-  | TYPE_Vector sz t => sz * get_bit_size_from_typ t
-  | TYPE_Identified id => 0
-  end.
-
-Fixpoint get_size_from_typ (t: typ) : N :=
-  round_up_to_eight (get_bit_size_from_typ t) / 8.
-
-(* Assuming max_byte_sz for this function is greater than 0 *)
-Definition get_prim_typ_le_size (max_byte_sz: N) : list (GenLLVM typ) :=
-  (if (1 <=? max_byte_sz)%N then [ret (TYPE_I 1); ret (TYPE_I 8)] else []) ++
-  (if (4 <=? max_byte_sz)%N then [ret (TYPE_I 32); ret TYPE_Float] else []) ++
-  (if (8 <=? max_byte_sz)%N then [ret (TYPE_I 64); ret TYPE_Double] else []).
-
-(* Version without problematic i1 type *)
-Definition get_prim_vector_typ_le_size (max_byte_sz: N) : list (GenLLVM typ) :=
-  (if (1 <=? max_byte_sz)%N then [ret (TYPE_I 8)] else []) ++
-  (if (4 <=? max_byte_sz)%N then [ret (TYPE_I 32); ret TYPE_Float] else []) ++
-  (if (8 <=? max_byte_sz)%N then [ret (TYPE_I 64); ret TYPE_Double] else []).
-
-(* Main method, it will generate based on the max_byte_sz
-  Currently we support, int (1,8,32,64), float, double
-  pointer, vector, array, struct, packed struct
-  Aggregate structures used the types above. *)
-Fixpoint gen_typ_le_size (max_byte_sz : N) : GenLLVM typ :=
-  ctx <- get_ctx;;
-  oneOf_LLVM
-    ( (* Primitive types *)
-      get_prim_typ_le_size max_byte_sz ++
-
-      (* Vector type *)
-      (if (max_byte_sz =? 0)%N then [] else
-      [ sz' <- lift_GenLLVM (choose (1, BinIntDef.Z.of_N max_byte_sz ));;
-        let sz' := BinIntDef.Z.to_N sz' in
-        t <- oneOf_LLVM (get_prim_vector_typ_le_size (max_byte_sz / sz'));;
-        ret (TYPE_Vector (sz') t)
-      ]) ++
-
-      (* Array type *)
-      [ sz' <- lift_GenLLVM (choose (0, BinIntDef.Z.of_N max_byte_sz));;
-        let sz' := BinIntDef.Z.to_N sz' in
-        if (sz' =? 0)%N (* Catch 0 array*)
-        then
-          t <- oneOf_LLVM (get_prim_typ_le_size 64);; (* Only primitive type to enhance performance *)
-          ret (TYPE_Array (sz') t)
-        else
-          t <- gen_typ_le_size (max_byte_sz / sz');;
-          ret (TYPE_Array (sz') t)
-      ] ++
-
-      (* Struct type *)
-      (* [fields <- gen_typ_from_size_struct max_byte_sz;;
-       ret (TYPE_Struct fields)
-      ] ++ *) (* Issue #260 *)
-
-      (* Packed struct type *)
-      [fields <- gen_typ_from_size_struct max_byte_sz;;
-       ret (TYPE_Packed_struct fields)
-      ])
-with gen_typ_from_size_struct (max_byte_sz : N) : GenLLVM (list typ) :=
-       subtyp <- gen_typ_le_size max_byte_sz;;
-       let sz' := (max_byte_sz - (get_size_from_typ subtyp))%N in
-       if (sz' =? 0)%N (* If the remaining size available is 0, then it will shrink the test case to not have other subtyp appending at the end *)
-       then
-         ret [subtyp]
-       else
-         tl <- gen_typ_from_size_struct sz';;
-         ret ([subtyp] ++ tl).
-
-(* A Helper function that will detect if  the type has pointer *)
-Fixpoint typ_contains_pointer (old_ptr: typ) : bool :=
-  match old_ptr with
-  | TYPE_Pointer _ => true
-  | TYPE_Array _ t
-  | TYPE_Vector _ t =>
-      typ_contains_pointer t
-  | TYPE_Struct fields
-  | TYPE_Packed_struct fields =>
-      fold_left (fun acc x => orb acc (typ_contains_pointer x)) fields false
-  | _ => false
-  end.
-
-Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
-  ctx <- get_ptrtoint_ctx;;
-  typ_ctx <- get_typ_ctx;;
-  '(old_tptr, id, typ_from_cast) <- oneOf_LLVM (map ret ctx);;
-  (* In the following case, we will check whether there are double pointers in the old pointer type, we will not cast if the data structure has double pointer *)
-  (* TODO: Better identify the pointer inside and cast without changing their location *)
-  new_tptr <-
-    match old_tptr with
-    | TYPE_Pointer old_typ =>
-        if typ_contains_pointer old_typ || is_function_type typ_ctx old_typ
-        then
-          ret old_tptr
-        else
-          x <- gen_typ_le_size (get_size_from_typ old_typ);;
-          ret (TYPE_Pointer x)
-    | TYPE_Vector sz (TYPE_Pointer old_typ) =>
-        if typ_contains_pointer old_typ || is_function_type typ_ctx old_typ
-        then
-          ret old_tptr
-        else
-          x <- gen_typ_le_size (get_size_from_typ old_typ);;
-          ret (TYPE_Pointer x)
-    | _ => ret (TYPE_Void) (* Won't reach here... Hopefully *)
-    end;;
-  ret (new_tptr, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr)).
-
-Definition filter_first_class_typs (ctx : var_context) : var_context :=
-  filter (fun '(_, t) =>
-            match t with
-            | TYPE_Struct _
-            | TYPE_Packed_struct _ => false
-            | TYPE_Array _ _ => false
-            | _ => true
-            end) ctx.
-
-Fixpoint gen_bitcast_typ (t_from : typ) : GenLLVM typ :=
-  let gen_typ_list :=
-    match t_from with
-    | TYPE_I 1 =>
-        ret [TYPE_I 1]
-    | TYPE_I 8 =>
-        ret [TYPE_I 8; TYPE_Vector 8 (TYPE_I 1)]
-    | TYPE_I 32
-    | TYPE_Float =>
-        ret [TYPE_I 32; TYPE_Float; TYPE_Vector 4 (TYPE_I 8); TYPE_Vector 32 (TYPE_I 1)]
-    | TYPE_I 64
-    | TYPE_Double =>
-        ret [TYPE_I 64; TYPE_Double; TYPE_Vector 2 (TYPE_I 32); TYPE_Vector 2 (TYPE_Float); TYPE_Vector 8 (TYPE_I 8); TYPE_Vector 64 (TYPE_I 1)]
-    | TYPE_Vector sz subtyp =>
-        match subtyp with
-        | TYPE_Pointer _ =>
-            (* TODO: Clean up. Figure out what can subtyp of pointer be *)
-            (* new_subtyp <- gen_bitcast_typ subtyp;; *)
-            ret [TYPE_Vector sz subtyp]
-        | subtyp =>
-            let trivial_typs := [(1%N, TYPE_I 1); (8%N, TYPE_I 8); (32%N, TYPE_I 32); (32%N, TYPE_Float); (64%N, TYPE_I 64); (64%N, TYPE_Double)] in
-            let size_of_vec := get_bit_size_from_typ t_from in
-            let choices := fold_left (fun acc '(s,t) => let sz' := (size_of_vec / s)%N in
-                                                 if (sz' =? 0)%N then acc else acc ++ [TYPE_Vector sz' t]) trivial_typs [] in
-            ret choices
-        end
-    | TYPE_Pointer subtyp =>
-        (* TODO: Clean up. Figure out what can subtyp of pointer be *)
-        (* new_subtyp <- gen_bitcast_typ subtyp;; *)
-        new_subtyp <- gen_sized_typ;;
-        ret [TYPE_Pointer new_subtyp]
-    | _ => ret [t_from] (* TODO: Add more types *) (* This currently is to prevent types like pointer of struct from failing *)
-    end in
-  typ_list <- gen_typ_list;;
-  oneOf_LLVM (map ret typ_list).
-
-Definition gen_bitcast : GenLLVM (typ * instr typ) :=
-  ctx <- get_ctx;;
-  let first_class_typs := filter_first_class_typs ctx in
-  '(id, tfc) <- oneOf_LLVM (map ret first_class_typs);;
-  new_typ <- gen_bitcast_typ tfc;;
-  ret (new_typ, INSTR_Op (OP_Conversion Bitcast tfc (EXP_Ident id) new_typ)).
-
 Definition genTypHelper (n: nat): G (typ) :=
   run_GenLLVM (gen_typ_non_void_size n).
 
@@ -1751,8 +1343,8 @@ Definition genType: G (typ) :=
         else ret (OP_IBinop ibinop t exp_value) <*> gen_exp_size 0 t
   with
   gen_ibinop_exp (isz : N) : GenLLVM (exp typ)
-    :=
-      let t := TYPE_I isz in
+  :=
+    let t := TYPE_I isz in
       gen_ibinop_exp_typ t
   with
   gen_fbinop_exp (ty: typ) : GenLLVM (exp typ)
@@ -1771,29 +1363,6 @@ Definition genType: G (typ) :=
 
  Definition gen_exp (t : typ) : GenLLVM (exp typ)
     := sized_LLVM (fun sz => gen_exp_size sz t).
-
- Definition gen_insertvalue (typ_in_ctx: ident * typ): GenLLVM (typ * instr typ) :=
-   let '(id, tagg) := typ_in_ctx in
-   ctx <- get_ctx;;
-   let paths_in_agg := get_index_paths_insertvalue tagg ctx in
-   '(tsub, path_for_insertvalue) <- oneOf_LLVM (map ret paths_in_agg);;
-   ex <- hide_ctx (gen_exp_size 0 tsub);;
-   (* Generate all of the type*)
-   ret (tagg, INSTR_Op (OP_InsertValue (tagg, EXP_Ident id) (tsub, ex) path_for_insertvalue)).
-
- Definition gen_call (fun_ptrs : var_context) : GenLLVM (typ * instr typ) :=
-   ctx <- get_ctx;;
-   '(id, tfun) <- oneOf_LLVM (map ret fun_ptrs);;
-   match tfun with
-   | TYPE_Pointer (TYPE_Function ret_t args varargs) =>
-       args_texp <- map_monad
-                     (fun (arg_typ:typ) =>
-                        arg_exp <- gen_exp_size 0 arg_typ;;
-                        ret ((arg_typ, arg_exp), []))
-                     args;;
-       ret (ret_t, INSTR_Call (TYPE_Function ret_t args varargs, EXP_Ident id) args_texp [])
-   | _ => lift failGen
-   end.
 
   Definition gen_texp : GenLLVM (texp typ)
     := t <- gen_typ;;
@@ -1825,6 +1394,425 @@ Definition genType: G (typ) :=
 End ExpGenerators.
 
 Section InstrGenerators.
+
+  (* Generator GEP part *)
+  (* Get index paths from array or vector*)
+  Definition get_index_paths_from_AoV (sz: N) (t: typ) (pre_path: DList Z) (sub_paths: DList (typ * DList Z)) : DList (typ * DList Z) :=
+    N.recursion DList_empty
+                (fun ix acc =>
+                   let ix_sub_paths := DList_map (fun '(t, sub_path) => (t, DList_append pre_path (DList_cons (Z.of_N ix) sub_path))) sub_paths in
+                   DList_append acc ix_sub_paths)
+                sz.
+
+  (* Can work after extracting the pointer inside*)
+  Fixpoint get_index_paths_aux (t_from : typ) (pre_path : DList Z) {struct t_from}: DList (typ * DList (Z)) :=
+    match t_from with
+    | TYPE_Array sz t =>
+        let sub_paths := get_index_paths_aux t DList_empty in (* Get index path from the first element*)
+        DList_cons (t_from, pre_path) (get_index_paths_from_AoV sz t pre_path sub_paths)
+    | TYPE_Struct fields
+    | TYPE_Packed_struct fields =>
+        DList_cons (t_from, pre_path) (get_index_paths_from_struct pre_path fields)
+    | _ => DList_singleton (t_from, pre_path)
+    end with
+  get_index_paths_from_struct (pre_path: DList Z) (fields: list typ) {struct fields}: DList (typ * DList Z) :=
+    snd (fold_left
+           (fun '(ix, paths) (fld_typ : typ) =>
+              (ix + 1,
+                (DList_append (get_index_paths_aux fld_typ (DList_append pre_path (DList_singleton ix)))
+                              paths)))
+           fields (0%Z, DList_empty : DList (typ * DList Z))).
+
+  Definition DList_paths_to_list_paths (paths : DList (typ * DList (Z))) : list (typ * list (Z))
+    := map (fun '(x, paths) => (x, DList_to_list paths)) (DList_to_list paths).
+
+  Definition get_index_paths_ptr (t_from: typ) : list (typ * list (Z)) :=
+    DList_paths_to_list_paths (get_index_paths_aux t_from (DList_singleton 0%Z)).
+
+  (* Index path without getting into vector *)
+  Fixpoint get_index_paths_agg_aux (t_from : typ) (pre_path : DList Z) {struct t_from}: DList (typ * DList (Z)) :=
+    match t_from with
+    | TYPE_Array sz t =>
+        let sub_paths := get_index_paths_agg_aux t DList_empty in (* Get index path from the first element*)
+        DList_cons (t_from, pre_path) (get_index_paths_from_AoV sz t pre_path sub_paths)
+    | TYPE_Struct fields
+    | TYPE_Packed_struct fields =>
+        DList_cons (t_from, pre_path) (get_index_paths_agg_from_struct pre_path fields)
+    | _ => DList_singleton (t_from, pre_path)
+    end with
+  get_index_paths_agg_from_struct (pre_path: DList Z) (fields: list typ) {struct fields}: DList (typ * DList Z) :=
+    snd (fold_left
+           (fun '(ix, paths) (fld_typ : typ) =>
+              (ix + 1,
+                (DList_append (get_index_paths_agg_aux fld_typ (DList_append pre_path (DList_singleton ix)))
+                              paths)))
+           fields (0%Z, DList_empty : DList (typ * DList Z))).
+
+  (* The method is mainly used by extractvalue and insertvalue,
+     which requires at least one index for getting inside the aggregate type.
+     There is a possibility for us to get nil path. The filter below will get rid of that possibility.
+     Given that the nilpath will definitely be at the beginning of a list of options, we can essentially get the tail. *)
+  Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
+    tl (DList_paths_to_list_paths (get_index_paths_agg_aux t_from DList_empty)).
+
+  Definition get_ctx_ptrs  : GenLLVM (list (ident * typ)) :=
+    typ_ctx <- get_typ_ctx;;
+    ctx <- get_ctx;;
+    ret (filter_ptr_typs typ_ctx ctx).
+
+  Definition get_ctx_sized_ptrs  : GenLLVM (list (ident * typ)) :=
+    typ_ctx <- get_typ_ctx;;
+    ctx <- get_ctx;;
+    ret (filter_sized_ptr_typs typ_ctx ctx).
+
+(* Index path without getting into vector *)
+  Fixpoint get_index_paths_insertvalue_aux (t_from : typ) (pre_path : DList Z) (ctx : list (ident * typ)) {struct t_from}: bool * DList (typ * DList (Z)) :=
+    match t_from with
+    | TYPE_Array sz t =>
+        let '(has_subpaths, sub_paths) := get_index_paths_insertvalue_aux t DList_empty ctx in (* Get index path from the first element*)
+        if has_subpaths
+        then (true, DList_cons (t_from, pre_path) (get_index_paths_from_AoV sz t pre_path sub_paths))
+        else (false, DList_empty)
+    | TYPE_Struct fields
+    | TYPE_Packed_struct fields =>
+        let '(has_reach, reaches) := (get_index_paths_insertvalue_from_struct pre_path fields ctx) in
+        if has_reach
+        then (true, DList_cons (t_from, pre_path) reaches)
+        else (false, DList_empty)
+    | TYPE_Pointer t => if seq.nilp (filter_type t_from ctx) then (false, DList_empty) else (true, DList_singleton (t_from, pre_path))
+    | TYPE_Vector _ t =>
+        let '(has_subpaths, sub_paths) := get_index_paths_insertvalue_aux t DList_empty ctx in (* Get index path from the first element*)
+        if has_subpaths then (true, DList_singleton (t_from, pre_path)) else (false, DList_empty)
+    | _ => (true, DList_singleton (t_from, pre_path))
+    end with
+  get_index_paths_insertvalue_from_struct (pre_path: DList Z) (fields: list typ) (ctx: list (ident * typ)) {struct fields}: bool * DList (typ * DList Z) :=
+    snd (fold_left
+           (fun '(ix, (b, paths)) (fld_typ : typ) =>
+              (ix + 1,
+                (let '(has_reach, reach) := get_index_paths_insertvalue_aux fld_typ (DList_append pre_path (DList_singleton ix)) ctx in
+                 (orb has_reach b, DList_append reach paths))))
+           fields (0%Z, (false, DList_empty : DList (typ * DList Z)))).
+
+  Definition get_index_paths_insertvalue (t_from : typ) (ctx : list (ident * typ)): list (typ * list (Z)) :=
+    tl (DList_paths_to_list_paths (snd (get_index_paths_insertvalue_aux t_from DList_empty ctx))).
+
+  Fixpoint has_paths_insertvalue_aux (t_from : typ) (ctx : list (ident * typ)) {struct t_from}: bool :=
+    match t_from with
+    | TYPE_Array _ t
+    | TYPE_Vector _ t => has_paths_insertvalue_aux t ctx
+    | TYPE_Struct fields
+    | TYPE_Packed_struct fields => fold_left (fun acc x => orb acc (has_paths_insertvalue_aux x ctx)) fields false
+    | TYPE_Pointer _ => seq.nilp (filter (fun '(_, x) => normalized_typ_eq x t_from) ctx)
+    | _ => true
+    end.
+
+  Definition filter_insertvalue_typs (agg_typs : list (ident * typ)) (ctx : list (ident * typ)) : list (ident * typ) :=
+    filter (fun '(_, x) => has_paths_insertvalue_aux x ctx) agg_typs.
+
+  Definition get_ctx_ptr : GenLLVM (ident * typ) :=
+    ptrs_in_context <- get_ctx_ptrs;;
+    '(ptr_ident, ptr_typ) <- (oneOf_LLVM (map ret (ptrs_in_context)));;
+    match ptr_typ with
+    | TYPE_Pointer t => ret (ptr_ident, t)
+    | _ => lift failGen (* Should not happen *)
+    end.
+
+  Definition get_ctx_sized_ptr : GenLLVM (ident * typ) :=
+    ptrs_in_context <- get_ctx_sized_ptrs;;
+    '(ptr_ident, ptr_typ) <- (oneOf_LLVM (map ret (ptrs_in_context)));;
+    match ptr_typ with
+    | TYPE_Pointer t => ret (ptr_ident, t)
+    | _ => lift failGen (* Should not happen *)
+    end.
+
+  Definition get_ctx_agg_typs : GenLLVM (list (ident * typ)) :=
+    typ_ctx <- get_typ_ctx;;
+    ctx <- get_ctx;;
+    ret (filter_agg_typs typ_ctx ctx).
+
+  Definition get_ctx_agg_typ : GenLLVM (ident * typ) :=
+    aggs_in_context <- get_ctx_agg_typs;;
+    oneOf_LLVM (map ret aggs_in_context).
+
+  Definition get_ctx_vec_typs : GenLLVM (list (ident * typ)) :=
+    typ_ctx <- get_typ_ctx;;
+    ctx <- get_ctx;;
+    ret (filter_vec_typs typ_ctx ctx).
+
+  Definition get_ctx_vec_typ : GenLLVM (ident * typ) :=
+    vecs_in_context <- get_ctx_vec_typs;;
+    oneOf_LLVM (map ret vecs_in_context).
+
+  Definition gen_gep : GenLLVM (typ * instr typ) :=
+    '(id, t_in_ptr) <- get_ctx_sized_ptr;;
+    let paths_in_ptr := get_index_paths_ptr t_in_ptr in (* Inner paths: Paths after removing the outer pointer *)
+    '(t, path) <- oneOf_LLVM (map ret paths_in_ptr);; (* Select one path from the paths *)
+    let path_for_gep := map (fun x => (TYPE_I 32, EXP_Integer (x))) path in (* Turning the path to integer *)
+    (* Refer to function get_int_typ *)
+    ret (TYPE_Pointer t, INSTR_Op (OP_GetElementPtr t_in_ptr
+                                     (TYPE_Pointer t_in_ptr, EXP_Ident id) path_for_gep)).
+
+  Definition gen_extractvalue : GenLLVM (typ * instr typ) :=
+    '(id, tagg) <- get_ctx_agg_typ;;
+    let paths_in_agg := get_index_paths_agg tagg in
+    '(t, path_for_extractvalue) <- oneOf_LLVM (map ret paths_in_agg);;
+    ret (t, INSTR_Op (OP_ExtractValue (tagg, EXP_Ident id) path_for_extractvalue)).
+
+
+  (* ExtractElement *)
+  Definition gen_extractelement : GenLLVM (typ * instr typ) :=
+    typ_ctx <- get_typ_ctx;;
+    ctx <- get_ctx;;
+    let vector_in_context := filter_vec_typs typ_ctx ctx in
+    '(id, tvec) <- (oneOf_LLVM (map ret vector_in_context));;
+    let get_size_ty (vType: typ) :=
+      match tvec with
+      | TYPE_Vector sz ty => (sz, ty)
+      | _ => (0%N, TYPE_Void)
+      end in
+    let '(sz, t_in_vec) := get_size_ty tvec in
+    let index_list := map (fun x => N.of_nat x) (List.seq 0 (N.to_nat sz)) in
+    index_for_extractelement <- oneOf_LLVM (map ret index_list);;
+    ret (t_in_vec, INSTR_Op (OP_ExtractElement (tvec, EXP_Ident id) (TYPE_I 32%N, EXP_Integer (Z.of_nat (N.to_nat index_for_extractelement))))).
+
+  Definition gen_insertelement : GenLLVM (typ * instr typ) :=
+    '(id, tvec) <- get_ctx_vec_typ;;
+    let get_size_ty (vType: typ) :=
+      match tvec with
+      | TYPE_Vector sz ty => (sz, ty)
+      | _ => (0%N, TYPE_Void)
+      end in
+    let '(sz, t_in_vec) := get_size_ty tvec in
+    value <- gen_exp_size 0 t_in_vec;;
+    index <- lift_GenLLVM (choose (0, Z.of_N (sz - 1)));;
+    ret (tvec, INSTR_Op (OP_InsertElement (tvec, EXP_Ident id) (t_in_vec, value) (TYPE_I 32, EXP_Integer index))).
+
+  Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
+    typ_ctx <- get_typ_ctx;;
+    ctx <- get_ctx;;
+    let ptr_vecptr_in_ctx := filter_sized_ptr_vecptr_typs typ_ctx ctx in
+    let valid_ptr_vecptr_in_ctx := filter (fun '(_, x) => negb (contains_typ x (TYPE_Struct []) soft)) ptr_vecptr_in_ctx in
+    '(id, tptr) <- (oneOf_LLVM (map ret valid_ptr_vecptr_in_ctx));;
+    let gen_typ_in_ptr :=
+      match tptr with
+      | TYPE_Pointer t =>
+          gen_int_typ_for_ptr_cast (* TODO: Wait till IPTR is implemented *)
+      | TYPE_Vector sz ty =>
+          x <- gen_int_typ_for_ptr_cast;;
+          ret (TYPE_Vector sz x)
+      | _ =>
+          ret (TYPE_Void) (* Won't get into this case *)
+      end in
+    typ_from_cast <- gen_typ_in_ptr;;
+    ret (typ_from_cast, INSTR_Op (OP_Conversion Ptrtoint tptr (EXP_Ident id) typ_from_cast)).
+
+  Definition round_up_to_eight (n : N) : N :=
+    if N.eqb 0 n
+    then 0
+    else (((n - 1) / 8) + 1) * 8.
+
+  Fixpoint get_bit_size_from_typ (t : typ) : N :=
+    match t with
+    | TYPE_I sz => N.max 1 sz
+    | TYPE_IPTR => 64 (* TODO: probably kind of a lie... *)
+    | TYPE_Pointer t => 64
+    | TYPE_Void => 0
+    | TYPE_Half => 16
+    | TYPE_Float => 32
+    | TYPE_Double => 64
+    | TYPE_X86_fp80 => 80
+    | TYPE_Fp128 => 128
+    | TYPE_Ppc_fp128 => 128
+    | TYPE_Metadata => 0
+    | TYPE_X86_mmx => 64
+    | TYPE_Array sz t => sz * (round_up_to_eight (get_bit_size_from_typ t))
+    | TYPE_Function ret args vararg => 0
+    | TYPE_Struct fields
+    | TYPE_Packed_struct fields =>
+        fold_right (fun x acc => (round_up_to_eight (get_bit_size_from_typ x) + acc)%N) 0%N fields
+    | TYPE_Opaque => 0
+    | TYPE_Vector sz t => sz * get_bit_size_from_typ t
+    | TYPE_Identified id => 0
+    end.
+
+  Fixpoint get_size_from_typ (t: typ) : N :=
+    round_up_to_eight (get_bit_size_from_typ t) / 8.
+
+  (* Assuming max_byte_sz for this function is greater than 0 *)
+  Definition get_prim_typ_le_size (max_byte_sz: N) : list (GenLLVM typ) :=
+    (if (1 <=? max_byte_sz)%N then [ret (TYPE_I 1); ret (TYPE_I 8)] else []) ++
+      (if (4 <=? max_byte_sz)%N then [ret (TYPE_I 32); ret TYPE_Float] else []) ++
+      (if (8 <=? max_byte_sz)%N then [ret (TYPE_I 64); ret TYPE_Double] else []).
+
+  (* Version without problematic i1 type *)
+  Definition get_prim_vector_typ_le_size (max_byte_sz: N) : list (GenLLVM typ) :=
+    (if (1 <=? max_byte_sz)%N then [ret (TYPE_I 8)] else []) ++
+      (if (4 <=? max_byte_sz)%N then [ret (TYPE_I 32); ret TYPE_Float] else []) ++
+      (if (8 <=? max_byte_sz)%N then [ret (TYPE_I 64); ret TYPE_Double] else []).
+
+  (* Main method, it will generate based on the max_byte_sz
+  Currently we support, int (1,8,32,64), float, double
+  pointer, vector, array, struct, packed struct
+  Aggregate structures used the types above. *)
+  Fixpoint gen_typ_le_size (max_byte_sz : N) : GenLLVM typ :=
+    ctx <- get_ctx;;
+    oneOf_LLVM
+      ( (* Primitive types *)
+        get_prim_typ_le_size max_byte_sz ++
+
+          (* Vector type *)
+          (if (max_byte_sz =? 0)%N then [] else
+             [ sz' <- lift_GenLLVM (choose (1, BinIntDef.Z.of_N max_byte_sz ));;
+               let sz' := BinIntDef.Z.to_N sz' in
+               t <- oneOf_LLVM (get_prim_vector_typ_le_size (max_byte_sz / sz'));;
+               ret (TYPE_Vector (sz') t)
+          ]) ++
+
+          (* Array type *)
+          [ sz' <- lift_GenLLVM (choose (0, BinIntDef.Z.of_N max_byte_sz));;
+            let sz' := BinIntDef.Z.to_N sz' in
+            if (sz' =? 0)%N (* Catch 0 array*)
+            then
+              t <- oneOf_LLVM (get_prim_typ_le_size 64);; (* Only primitive type to enhance performance *)
+              ret (TYPE_Array (sz') t)
+            else
+              t <- gen_typ_le_size (max_byte_sz / sz');;
+              ret (TYPE_Array (sz') t)
+          ] ++
+
+          (* Struct type *)
+          (* [fields <- gen_typ_from_size_struct max_byte_sz;;
+       ret (TYPE_Struct fields)
+      ] ++ *) (* Issue #260 *)
+
+          (* Packed struct type *)
+          [fields <- gen_typ_from_size_struct max_byte_sz;;
+           ret (TYPE_Packed_struct fields)
+      ])
+  with gen_typ_from_size_struct (max_byte_sz : N) : GenLLVM (list typ) :=
+         subtyp <- gen_typ_le_size max_byte_sz;;
+         let sz' := (max_byte_sz - (get_size_from_typ subtyp))%N in
+         if (sz' =? 0)%N (* If the remaining size available is 0, then it will shrink the test case to not have other subtyp appending at the end *)
+         then
+           ret [subtyp]
+         else
+           tl <- gen_typ_from_size_struct sz';;
+           ret ([subtyp] ++ tl).
+
+  (* A Helper function that will detect if  the type has pointer *)
+  Fixpoint typ_contains_pointer (old_ptr: typ) : bool :=
+    match old_ptr with
+    | TYPE_Pointer _ => true
+    | TYPE_Array _ t
+    | TYPE_Vector _ t =>
+        typ_contains_pointer t
+    | TYPE_Struct fields
+    | TYPE_Packed_struct fields =>
+        fold_left (fun acc x => orb acc (typ_contains_pointer x)) fields false
+    | _ => false
+    end.
+
+  Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
+    ctx <- get_ptrtoint_ctx;;
+    typ_ctx <- get_typ_ctx;;
+    '(old_tptr, id, typ_from_cast) <- oneOf_LLVM (map ret ctx);;
+    (* In the following case, we will check whether there are double pointers in the old pointer type, we will not cast if the data structure has double pointer *)
+    (* TODO: Better identify the pointer inside and cast without changing their location *)
+    new_tptr <-
+      match old_tptr with
+      | TYPE_Pointer old_typ =>
+          if typ_contains_pointer old_typ || is_function_type typ_ctx old_typ
+          then
+            ret old_tptr
+          else
+            x <- gen_typ_le_size (get_size_from_typ old_typ);;
+            ret (TYPE_Pointer x)
+      | TYPE_Vector sz (TYPE_Pointer old_typ) =>
+          if typ_contains_pointer old_typ || is_function_type typ_ctx old_typ
+          then
+            ret old_tptr
+          else
+            x <- gen_typ_le_size (get_size_from_typ old_typ);;
+            ret (TYPE_Pointer x)
+      | _ => ret (TYPE_Void) (* Won't reach here... Hopefully *)
+      end;;
+    ret (new_tptr, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr)).
+
+  Definition filter_first_class_typs (ctx : var_context) : var_context :=
+    filter (fun '(_, t) =>
+              match t with
+              | TYPE_Struct _
+              | TYPE_Packed_struct _ => false
+              | TYPE_Array _ _ => false
+              | _ => true
+              end) ctx.
+
+  Fixpoint gen_bitcast_typ (t_from : typ) : GenLLVM typ :=
+    let gen_typ_list :=
+      match t_from with
+      | TYPE_I 1 =>
+          ret [TYPE_I 1]
+      | TYPE_I 8 =>
+          ret [TYPE_I 8; TYPE_Vector 8 (TYPE_I 1)]
+      | TYPE_I 32
+      | TYPE_Float =>
+          ret [TYPE_I 32; TYPE_Float; TYPE_Vector 4 (TYPE_I 8); TYPE_Vector 32 (TYPE_I 1)]
+      | TYPE_I 64
+      | TYPE_Double =>
+          ret [TYPE_I 64; TYPE_Double; TYPE_Vector 2 (TYPE_I 32); TYPE_Vector 2 (TYPE_Float); TYPE_Vector 8 (TYPE_I 8); TYPE_Vector 64 (TYPE_I 1)]
+      | TYPE_Vector sz subtyp =>
+          match subtyp with
+          | TYPE_Pointer _ =>
+              (* TODO: Clean up. Figure out what can subtyp of pointer be *)
+              (* new_subtyp <- gen_bitcast_typ subtyp;; *)
+              ret [TYPE_Vector sz subtyp]
+          | subtyp =>
+              let trivial_typs := [(1%N, TYPE_I 1); (8%N, TYPE_I 8); (32%N, TYPE_I 32); (32%N, TYPE_Float); (64%N, TYPE_I 64); (64%N, TYPE_Double)] in
+              let size_of_vec := get_bit_size_from_typ t_from in
+              let choices := fold_left (fun acc '(s,t) => let sz' := (size_of_vec / s)%N in
+                                                       if (sz' =? 0)%N then acc else acc ++ [TYPE_Vector sz' t]) trivial_typs [] in
+              ret choices
+          end
+      | TYPE_Pointer subtyp =>
+          (* TODO: Clean up. Figure out what can subtyp of pointer be *)
+          (* new_subtyp <- gen_bitcast_typ subtyp;; *)
+          new_subtyp <- gen_sized_typ;;
+          ret [TYPE_Pointer new_subtyp]
+      | _ => ret [t_from] (* TODO: Add more types *) (* This currently is to prevent types like pointer of struct from failing *)
+      end in
+    typ_list <- gen_typ_list;;
+    oneOf_LLVM (map ret typ_list).
+
+  Definition gen_bitcast : GenLLVM (typ * instr typ) :=
+    ctx <- get_ctx;;
+    let first_class_typs := filter_first_class_typs ctx in
+    '(id, tfc) <- oneOf_LLVM (map ret first_class_typs);;
+    new_typ <- gen_bitcast_typ tfc;;
+    ret (new_typ, INSTR_Op (OP_Conversion Bitcast tfc (EXP_Ident id) new_typ)).
+
+  Definition gen_insertvalue (typ_in_ctx: ident * typ): GenLLVM (typ * instr typ) :=
+    let '(id, tagg) := typ_in_ctx in
+    ctx <- get_ctx;;
+    let paths_in_agg := get_index_paths_insertvalue tagg ctx in
+    '(tsub, path_for_insertvalue) <- oneOf_LLVM (map ret paths_in_agg);;
+    ex <- hide_ctx (gen_exp_size 0 tsub);;
+    (* Generate all of the type*)
+    ret (tagg, INSTR_Op (OP_InsertValue (tagg, EXP_Ident id) (tsub, ex) path_for_insertvalue)).
+
+  Definition gen_call (fun_ptrs : var_context) : GenLLVM (typ * instr typ) :=
+    ctx <- get_ctx;;
+    '(id, tfun) <- oneOf_LLVM (map ret fun_ptrs);;
+    match tfun with
+    | TYPE_Pointer (TYPE_Function ret_t args varargs) =>
+        args_texp <- map_monad
+                      (fun (arg_typ:typ) =>
+                         arg_exp <- gen_exp_size 0 arg_typ;;
+                         ret (arg_typ, arg_exp))
+                      args;;
+        let args_with_params := map (fun arg => (arg, [])) args_texp in
+        ret (ret_t, INSTR_Call (TYPE_Function ret_t args varargs, EXP_Ident id) args_with_params [])
+    | _ => lift failGen
+    end.
 
   (* TODO: move this *)
   Definition genInt : G int
@@ -1861,17 +1849,14 @@ Section InstrGenerators.
 
   Definition gen_store_to (ptr : texp typ) : GenLLVM (typ * instr typ)
     :=
-      match ptr with
-      | (TYPE_Pointer t, pexp) =>
-        vol   <- lift arbitrary;;
-        align <- ret (Some 1);;
-
+    match ptr with
+    | (TYPE_Pointer t, pexp) =>
         e <- resize_LLVM 0 (gen_exp t);;
         let val := (t, e) in
-        (* TODO: Fix parameters / generate more of them *)
-        ret (TYPE_Void, INSTR_Store val ptr [])
-      | _ => lift failGen
-      end.
+
+        ret (TYPE_Void, INSTR_Store val ptr [ANN_align 1])
+    | _ => lift failGen
+    end.
 
   Definition gen_store : GenLLVM (typ * instr typ)
     := '(ptr_ident, ptr_typ) <- get_ctx_sized_ptr;;
@@ -1902,7 +1887,7 @@ Section InstrGenerators.
            (* align <- ret None;; *)
            ret (TYPE_Pointer t, INSTR_Alloca t [])
         ] (* TODO: Generate atomic operations and other instructions *)
-         ++ (if seq.nilp (filter_first_class_typs ctx) then [] else [gen_bitcast])
+         (* ++ (if seq.nilp (filter_first_class_typs ctx) then [] else [gen_bitcast]) *)
          ++ (if seq.nilp sized_ptr_typs_in_ctx then [] else [gen_gep; gen_load; gen_store])
          ++ (if seq.nilp ptr_typs_in_ctx then [] else [gen_ptrtoint])
          ++ (if seq.nilp ptrtoint_ctx then [] else [gen_inttoptr])
@@ -1920,21 +1905,21 @@ Section InstrGenerators.
   later block is in context *)
   Definition add_id_to_instr (t_instr : typ * instr typ) : GenLLVM (instr_id * instr typ)
     :=
-      match t_instr with
-      | (TYPE_Void, instr) =>
+    match t_instr with
+    | (TYPE_Void, instr) =>
         vid <- new_void_id;;
         ret (vid, instr)
-      | (t, instr) =>
-          i <- new_raw_id;;
-          match instr with
-          | INSTR_Op (OP_Conversion Ptrtoint t_from v t_to) =>
-              add_to_ptrtoint_ctx (t_from, ID_Local i, t_to);; (* Register the local variable to ptrtoint_ctx*)
-              ret (IId i, instr)
-          | _ =>
-              add_to_ctx (ID_Local i, t);;
-              ret (IId i, instr)
-          end
-      end.
+    | (t, instr) =>
+        i <- new_raw_id;;
+        match instr with
+        | INSTR_Op (OP_Conversion Ptrtoint t_from v t_to) =>
+            add_to_ptrtoint_ctx (t_from, ID_Local i, t_to);; (* Register the local variable to ptrtoint_ctx*)
+            ret (IId i, instr)
+        | _ =>
+            add_to_ctx (ID_Local i, t);;
+            ret (IId i, instr)
+        end
+    end.
 
   (* Generate a block of code, spitting out a new context. *)
   Definition gen_instr_id : GenLLVM (instr_id * instr typ)
