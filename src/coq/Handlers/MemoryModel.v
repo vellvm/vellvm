@@ -2018,7 +2018,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     :=
     { MemMonad_eq1_runm :> Eq1 RunM;
       MemMonad_runm_monadlaws :> MonadLawsE RunM;
-      MemMonad_eq1_runm_equiv {A} :> Equivalence (@eq1 _ MemMonad_eq1_runm A);
+      MemMonad_eq1_runm_equiv :> Eq1Equivalence RunM;
       MemMonad_eq1_runm_eq1laws :> Eq1_ret_inv RunM;
       MemMonad_raisebindm_ub :> RaiseBindM RunM string (@raise_ub RunM RunUB);
       MemMonad_raisebindm_oom :> RaiseBindM RunM string (@raise_oom RunM RunOOM);
