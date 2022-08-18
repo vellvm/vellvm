@@ -4991,7 +4991,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         inv Heqo0.
         cbn in Heqs.
         inv Heqs.
-        repeat eexists.
+        exists p. exists 0%nat.
+        split; auto.
         cbn.
         rewrite bind_ret_l.
         cbn.
@@ -5062,7 +5063,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           eapply Zseq_nil_len; eauto.
         Qed.
 
-        Lemma intptr_seq_last :
+        Lemma intptr_seq_succ_last :
           forall l off len x,
             intptr_seq off (S len) = NoOom (l ++ [x]) ->
             intptr_seq off len = NoOom l.
@@ -5103,14 +5104,113 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             reflexivity.
         Qed.
 
+        Lemma Nth_last :
+          forall {A} (l : list A) x,
+            Util.Nth (l ++ [x]) (length l) x.
+        Proof.
+          intros A l x.
+          induction l; cbn; auto.
+        Qed.
+
+        (* TODO: move / generalize these *)
+        Lemma map_monad_err_forall2 :
+          forall {A B} (f : A -> err B) l res,
+            map_monad f l = inr res ->
+            Forall2 (fun a b => f a = inr b) l res.
+        Proof.
+          intros A B f.
+          induction l; intros res MAP.
+          - cbn in *.
+            inv MAP.
+            auto.
+          - rewrite map_monad_unfold in MAP.
+            cbn in *.
+            break_match_hyp; inv MAP.
+            break_match_hyp; inv H1.
+
+            pose proof (IHl l0 eq_refl) as FORALL.
+
+            constructor; auto.            
+        Qed.
+
+        (* TODO: move / generalize these *)
+        Lemma map_monad_oom_forall2 :
+          forall {A B} (f : A -> OOM B) l res,
+            map_monad f l = NoOom res <->
+            Forall2 (fun a b => f a = NoOom b) l res.
+        Proof.
+          intros A B f.
+          induction l; intros res.
+          - split; intros MAP.
+            + cbn in *.
+              inv MAP.
+              auto.
+            + inv MAP.
+              reflexivity.
+          - split; intros MAP.
+            + rewrite map_monad_unfold in MAP.
+              cbn in *.
+              break_match_hyp; inv MAP.
+              break_match_hyp; inv H1.
+
+              pose proof (IHl l0) as FORALL.
+              constructor; auto.
+              eapply FORALL. reflexivity.
+            + inv MAP.
+              eapply IHl in H4.
+              cbn.
+              rewrite H2, H4.
+              reflexivity.
+        Qed.
+
+        Lemma intptr_seq_succ_last' :
+          forall l off len x,
+            intptr_seq off len = NoOom l ->
+            IP.from_Z (off + Z.of_nat len) = NoOom x ->
+            intptr_seq off (S len) = NoOom (l ++ [x]).
+        Proof.
+          induction l as [ | i l']; intros off len x SEQ EQ.
+          - rewrite intptr_seq_succ.
+            apply intptr_seq_nil_len in SEQ.
+            subst.
+            cbn in *.
+            replace (off + 0) with off in EQ by lia.
+            rewrite EQ.
+            reflexivity.
+          - pose proof SEQ as LEN.
+            apply intptr_seq_len in LEN.
+            cbn in LEN; inv LEN.
+
+            rewrite intptr_seq_succ in SEQ.
+            cbn in SEQ.
+            break_match_hyp; [| solve [inv SEQ]].
+            break_match_hyp; [| solve [inv SEQ]].
+            inv SEQ.
+            rename Heqo0 into SEQ.
+
+            pose proof (IHl' (Z.succ off) (length l') x SEQ) as SEQ'.
+            forward SEQ'.
+            { cbn in EQ.
+              rewrite Zpos_P_of_succ_nat in EQ.
+              rewrite Z.add_succ_comm.
+              auto.
+            }
+
+            rewrite <- app_comm_cons.
+            rewrite intptr_seq_succ.
+            rewrite Heqo.
+            rewrite SEQ'.
+            cbn.
+            reflexivity.
+        Qed.
+
         Lemma intptr_seq_shifted :
           forall len l,
             intptr_seq 1 len = NoOom l ->
             exists l', intptr_seq 0 len = NoOom l' /\
                     NoOom l = map_monad (fun ip => IP.from_Z (IP.to_Z ip + 1)) l'.
         Proof.
-          intros len l shiftZ EQ SEQ.
-          subst shiftZ.
+          intros len l SEQ.
           revert SEQ. revert len.
           induction l using rev_ind; intros len SEQ.
           - exists nil; split; auto.
@@ -5129,13 +5229,21 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
             (* Also follows from SEQ and LENEQ *)
             assert (intptr_seq 1 len' = NoOom l) as SEQ_CUT.
-            { eapply intptr_seq_last; subst len; eauto.
+            { eapply intptr_seq_succ_last; subst len; eauto.
             }
 
             subst len.
 
-            pose proof (IHl len' 1 SEQ_CUT) as [l_shifted [SEQ_SHIFTED MAP_SHIFTED]].
-            assert (exists y, IP.from_Z (IP.to_Z x - shiftZ) = NoOom y) as [y YEQ].
+            pose proof (IHl len' SEQ_CUT) as [l_shifted [SEQ_SHIFTED MAP_SHIFTED]].
+
+            pose proof MAP_SHIFTED as ALL_SHIFTED.
+            symmetry in ALL_SHIFTED.
+            eapply map_monad_oom_forall2 in ALL_SHIFTED.
+
+            pose proof ALL_SHIFTED as NTH_SHIFTED.
+            eapply Forall2_forall in NTH_SHIFTED as [LEN_SHIFTED NTH_SHIFTED].
+
+            assert (exists y, IP.from_Z (IP.to_Z x - 1) = NoOom y) as [y YEQ].
             { (* I know this because...??? *)
               (* shiftZ is the start, x is the final element in the sequence.
 
@@ -5147,20 +5255,66 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                  technically.
 
                  If shiftZ is just 1 this is knowable.
-              *)
+               *)
+              
+              pose proof (Nth_last l x) as NTH.
+              pose proof (intptr_seq_nth _ _ _ _ _ SEQ NTH) as SEQNTH.
+              apply IP.from_Z_to_Z in SEQNTH.
+              rewrite SEQNTH.
+
+              (* When len' is 0, y is just 0 *)
+              destruct l using rev_ind.
+              - exists IP.zero.
+                cbn in SEQ_CUT.
+                inv SEQ_CUT.
+                cbn.
+                apply IP.from_Z_0.
+              - clear IHl0.
+                exists x0.
+
+                pose proof (Nth_last l x0) as NTH'.
+                pose proof (intptr_seq_nth _ _ _ _ _ SEQ_CUT NTH') as SEQNTH'.
+                apply IP.from_Z_to_Z in SEQNTH'.
+                rewrite app_length.
+                rewrite Nat2Z.inj_add.
+                replace ((1 + (Z.of_nat (Datatypes.length l) + Z.of_nat (Datatypes.length [x0])) - 1)) with ((Z.of_nat (Datatypes.length l) + Z.of_nat (Datatypes.length [x0]))) by lia.
+                cbn.
+                replace (Z.of_nat (length l) + 1) with (1 + Z.of_nat (length l)) by lia.
+                rewrite <- SEQNTH'.
+                apply IP.to_Z_from_Z.
             }
 
             exists (l_shifted ++ [y]).
             split.
-            + admit.
-            + assert (eq1 (NoOom (l ++ [x])) (map_monad (fun ip : IP.intptr => IP.from_Z (IP.to_Z ip + shiftZ)) (l_shifted ++ [y]))) as EQ.
+            + apply intptr_seq_succ_last'; eauto.
+              cbn.
+
+              destruct len'.
+              -- cbn in *.
+                 inv SEQ_CUT.
+                 break_match_hyp; inv SEQ.
+                 erewrite IP.from_Z_to_Z in YEQ; eauto.
+                 cbn in YEQ.
+                 auto.
+              -- (* I know that x = S S len' *)
+                pose proof intptr_seq_nth 1 (S (S len')) (l ++ [x]) (S len') x SEQ as LAST_SEQ.
+                forward LAST_SEQ.
+                { eapply intptr_seq_len in SEQ_CUT.
+                  rewrite <- SEQ_CUT.
+                  eapply Nth_last.
+                }
+
+                erewrite IP.from_Z_to_Z in YEQ; eauto.
+                replace (1 + Z.of_nat (S len') - 1) with (Z.of_nat (S len')) in YEQ by lia.
+                auto.
+            + assert (eq1 (NoOom (l ++ [x])) (map_monad (fun ip : IP.intptr => IP.from_Z (IP.to_Z ip + 1)) (l_shifted ++ [y]))) as EQ.
               { rewrite map_monad_app.
                 cbn.
                 rewrite <- MAP_SHIFTED.
                 (* Must be some way to prove that this match gives NoOom x... *)
-                assert (IP.from_Z (IP.to_Z y + shiftZ) = NoOom x) as EQ.
+                assert (IP.from_Z (IP.to_Z y + 1) = NoOom x) as EQ.
                 { erewrite IP.from_Z_to_Z; eauto.
-                  assert (IP.to_Z x - shiftZ + shiftZ = IP.to_Z x) as EQ by lia.
+                  assert (IP.to_Z x - 1 + 1 = IP.to_Z x) as EQ by lia.
                   rewrite EQ.
                   apply IP.to_Z_from_Z.
                 }
@@ -5172,69 +5326,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               cbn in EQ.
               break_match_hyp; inv EQ.
               reflexivity.
-        Qed.
-
-        Lemma intptr_seq_shifted :
-          forall len l,
-            intptr_seq 1 len = NoOom l ->
-            exists l', intptr_seq 0 len = NoOom l' /\
-                    NoOom l = map_monad (fun ip => IP.from_Z (IP.to_Z ip + 1)) l'.
-        Proof.
-          intros len l SEQ.
-          revert SEQ. revert len.
-          induction l using rev_ind.
-          - exists nil; split; auto.
-            apply intptr_seq_nil_len in SEQ.
-            subst; cbn; auto.
-          - intros len SEQ.
-            (* I know exists len' s.t., len = S len' from SEQ.
-
-               That means I should be able to have...
-
-               intptr_seq 1 len' = NoOom l
-
-               Which could be plugged into IHl.
-             *)
-
-            assert (exists len', len = S len') as [len' LENEQ] by admit.
-            assert (intptr_seq 1 len' = NoOom l) as SEQ_CUT by admit.
-
-            subst len.
-            pose proof (IHl len' SEQ_CUT) as [l' [SEQl' MAPl']].
-
-            (* l' is `cut (0 :: l)` *)
-
-            (* I need... exists (intptr_seq 0 len) where len = S len'
-
-               I have intptr_seq 1 len', so I know:
-
-               - If len' = 0: then l = [], and x = IP.one
-               - If len' = S x: then l = l'' ++ [y], and
-                 intptr_seq 0 len = NoOom (l' ++ [y])
-
-               Which would mean we'd have to show...
-
-               NoOom (l ++ [x]) = map_monad (+1) (l' ++ [y])
-
-               I also know... x = y + 1 and l = map (+1) l'... So this should be provable.
-             *)
-            
-            exists (IP.zero :: l).
-            split.
-            + subst len.
-              rewrite intptr_seq_succ.
-              cbn.
-              rewrite IP.from_Z_0.
-              rewrite SEQ_CUT.
-              reflexivity.
-            + 
-
-            rewrite intptr_seq_succ in SEQ.
-            cbn in SEQ.
-            break_match_hyp; [| solve [inv SEQ]].
-            break_match_hyp; [| solve [inv SEQ]].
-            rename i into x. rename l0 into l'.
-            eexists.
         Qed.
 
         Lemma map_monad_eqv :
@@ -5313,100 +5404,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
         rewrite Heqs'.
         cbn; reflexivity.
-
-        (* DONE! *)
-
-
-        assert (handle_gep_addr (DTYPE_I 8) p' [Events.DV.DVALUE_IPTR b] = inr (int_to_ptr (ptr_to_int p' + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * IP.to_Z b) (address_provenance p'))).
-        {
-          eapply handle_gep_addr_ix'.
-          reflexivity.
-        }
-        rewrite H0.
-        clear H0.
-
-handle_gep_addr_ix' :
-forall (dt : dtyp) (p p' : addr) (ix : IP.intptr),
-p' = int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix) (address_provenance p) ->
-handle_gep_addr dt p [Events.DV.DVALUE_IPTR ix] = inr p'
-
-      }
-
-      { (* Show contradiction with SHIFT and Heqs' *)
-        apply handle_gep_addr_ix in Heqs0.
-        rewrite sizeof_dtyp_i8 in Heqs0.
-        cbn in Heqs0.
-        apply IP.from_Z_to_Z in Heqo.
-        rewrite Heqo in Heqs0.
-
-        apply map_monad_err_fail in Heqs'.
-
-        destruct Heqs' as [ip [INIP GEP]].
-        pose proof (map_monad_err_In _ _ _ (int_to_ptr (IP.to_Z ip) (address_provenance p)) Heqs).
-        map_monad_err_In:
-          forall {A B : Type} (f : A -> err B) (l : list A) (res : list B) (x : B),
-            map_monad f l = ret res -> In x res -> exists y : A, f y = ret x /\ In y l
-
-        rewrite <- Heqs0 in Heqs'.
-        rewrite <- SHIFT in Heqs'.
-
-      }
-
-      destruct len.
-      + (* len is 0 *)
-        cbn in *.
-        inv Heqo0.
-        cbn in *.
-        inv Heqs.
-        rewrite bind_ret_l; cbn.
-        reflexivity.
-      + rewrite intptr_seq_succ.
-        cbn.
-        rewrite IP.from_Z_0.
-        (* Heqo0 should equal intptr_seq 1 len, but with one more element.
-
-           At least, when len is greater than 1?
-
-           Ah! It's not a range, len is literally the length...
-         *)
-      
-      induction len.
-      cbn in *.
-      + inv Heqo0.
-        cbn in *.
-        inv Heqs.
-        rewrite bind_ret_l.
-        cbn.
-        reflexivity.
-      + clear IHlen0.
-
-      
-      destruct l'.
-      cbn in *; inv Heqs.
-      (* TODO: Need some kind of inversion lemma for raise_error and ret *)
-      cbn in *.
-      admit.
-
-      cbn in *.
-      eapply eq1_ret_ret in CONSEC; [|typeclasses eauto].
-      inv CONSEC.
-
-      split; auto.
-      destruct (from_Z 1) as [ix_one | ix_one] eqn:ONE.
-      2: {
-        pose proof from_Z_safe 1 as CONTRA.
-        rewrite ONE in CONTRA.
-        contradiction.
-      }
-
-      destruct (handle_gep_addr (DTYPE_I 8) p [LP.Events.DV.DVALUE_IPTR ix_one]) as [ptr_one | ptr_one] eqn:PTRONE.
-      { erewrite handle_gep_addr_ix' in PTRONE.
-        inv PTRONE.
-        reflexivity.
-      }
-
-      induction len.
-  Admitted.
+  Qed.
 
   (* TODO: this can probably more somewhere else *)
   Lemma get_consecutive_ptrs_ge :
