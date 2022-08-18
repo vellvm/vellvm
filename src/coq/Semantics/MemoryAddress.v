@@ -61,6 +61,10 @@ Module Type INTPTR.
       from_Z z = NoOom i ->
       to_Z i = z.
 
+  Parameter to_Z_from_Z :
+    forall (i : intptr),
+      from_Z (to_Z i) = NoOom i.
+
   Parameter from_Z_0 :
     from_Z 0 = NoOom zero.
 
