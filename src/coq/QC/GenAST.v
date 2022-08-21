@@ -87,7 +87,7 @@ Section Helpers.
     := match t with
        | TYPE_I sz => true
        | TYPE_IPTR => true
-       | TYPE_Pointer t => true
+       | TYPE_Pointer t => is_sized_type_h t
        | TYPE_Void => false
        | TYPE_Half => true
        | TYPE_Float => true
@@ -1569,6 +1569,7 @@ Definition filter_first_class_typs (ctx : var_context) : var_context :=
             | TYPE_Struct _
             | TYPE_Packed_struct _ => false
             | TYPE_Array _ _ => false
+            | TYPE_Pointer (TYPE_Function _ _ _) => false
             | _ => true
             end) ctx.
 
