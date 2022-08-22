@@ -1606,7 +1606,8 @@ Fixpoint gen_bitcast_typ (t_from : typ) : GenLLVM typ :=
     | TYPE_Pointer subtyp =>
         (* TODO: Clean up. Figure out what can subtyp of pointer be *)
         (* new_subtyp <- gen_bitcast_typ subtyp;; *)
-        new_subtyp <- gen_sized_typ;;
+        (* new_subtyp <- gen_sized_typ;; *)
+        new_subtyp <- gen_typ_le_size (get_size_from_typ subtyp);;
         ret [TYPE_Pointer new_subtyp]
     | _ => ret [t_from] (* TODO: Add more types *) (* This currently is to prevent types like pointer of struct from failing *)
     end in
