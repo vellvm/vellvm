@@ -1465,7 +1465,7 @@ Section InstrGenerators.
     ctx <- get_ctx;;
     ret (filter_sized_ptr_typs typ_ctx ctx).
 
-(* Index path without getting into vector *)
+  (* Index path without getting into vector *)
   Fixpoint get_index_paths_insertvalue_aux (t_from : typ) (pre_path : DList Z) (ctx : list (ident * typ)) {struct t_from}: bool * DList (typ * DList (Z)) :=
     match t_from with
     | TYPE_Array sz t =>
@@ -1543,20 +1543,30 @@ Section InstrGenerators.
     vecs_in_context <- get_ctx_vec_typs;;
     oneOf_LLVM (map ret vecs_in_context).
 
-  Definition gen_gep : GenLLVM (typ * instr typ) :=
-    '(id, t_in_ptr) <- get_ctx_sized_ptr;;
+  Definition gen_gep (tptr : typ) : GenLLVM (typ * instr typ) :=
+    let get_typ_in_ptr (tptr : typ) :=
+      match tptr with
+      | TYPE_Pointer t => ret t
+      | _ => lift failGen
+      end in
+    t_in_ptr <- get_typ_in_ptr tptr;;
+    eptr <- gen_exp_size 0 tptr;;
     let paths_in_ptr := get_index_paths_ptr t_in_ptr in (* Inner paths: Paths after removing the outer pointer *)
-    '(t, path) <- oneOf_LLVM (map ret paths_in_ptr);; (* Select one path from the paths *)
+    '(ret_t, path) <- oneOf_LLVM (map ret paths_in_ptr);; (* Select one path from the paths *)
     let path_for_gep := map (fun x => (TYPE_I 32, EXP_Integer (x))) path in (* Turning the path to integer *)
-    (* Refer to function get_int_typ *)
-    ret (TYPE_Pointer t, INSTR_Op (OP_GetElementPtr t_in_ptr
-                                     (TYPE_Pointer t_in_ptr, EXP_Ident id) path_for_gep)).
+    ret (TYPE_Pointer ret_t, INSTR_Op (OP_GetElementPtr t_in_ptr (TYPE_Pointer t_in_ptr, eptr) path_for_gep)).
 
-  Definition gen_extractvalue : GenLLVM (typ * instr typ) :=
-    '(id, tagg) <- get_ctx_agg_typ;;
+  Definition gen_extractvalue (tagg : typ): GenLLVM (typ * instr typ) :=
+    eagg <- gen_exp_size 0 tagg;;
     let paths_in_agg := get_index_paths_agg tagg in
     '(t, path_for_extractvalue) <- oneOf_LLVM (map ret paths_in_agg);;
-    ret (t, INSTR_Op (OP_ExtractValue (tagg, EXP_Ident id) path_for_extractvalue)).
+    ret (t, INSTR_Op (OP_ExtractValue (tagg, eagg) path_for_extractvalue)).
+
+  (* Definition gen_extractvalue : GenLLVM (typ * instr typ) := *)
+  (*   '(id, tagg) <- get_ctx_agg_typ;; *)
+  (*   let paths_in_agg := get_index_paths_agg tagg in *)
+  (*   '(t, path_for_extractvalue) <- oneOf_LLVM (map ret paths_in_agg);; *)
+  (*   ret (t, INSTR_Op (OP_ExtractValue (tagg, EXP_Ident id) path_for_extractvalue)). *)
 
 
   (* ExtractElement *)
@@ -1880,6 +1890,10 @@ Section InstrGenerators.
        let pexp := EXP_Ident ptr_ident in
        gen_store_to (pt, pexp).
 
+  Definition get_typ_l (ctx : var_context) : GenLLVM typ :=
+    var <- oneOf_LLVM (map ret ctx);;
+    ret (snd var).
+
   (* Generate an instruction, as well as its type...
 
      The type is sometimes void for instructions that don't really
@@ -1904,10 +1918,14 @@ Section InstrGenerators.
            ret (TYPE_Pointer t, INSTR_Alloca t [])
         ] (* TODO: Generate atomic operations and other instructions *)
          (* ++ (if seq.nilp (filter_first_class_typs ctx) then [] else [gen_bitcast]) *)
-         ++ (if seq.nilp sized_ptr_typs_in_ctx then [] else [gen_gep; gen_load; gen_store])
+         ++ (if seq.nilp sized_ptr_typs_in_ctx then [] else [
+                 (bind (get_typ_l sized_ptr_typs_in_ctx) gen_gep )
+                 ; gen_load
+                 ; gen_store])
          ++ (if seq.nilp ptr_typs_in_ctx then [] else [gen_ptrtoint])
          ++ (if seq.nilp ptrtoint_ctx then [] else [gen_inttoptr])
-         ++ (if seq.nilp agg_typs_in_ctx then [] else [gen_extractvalue])
+         ++ (if seq.nilp agg_typs_in_ctx then [] else [
+                 bind (get_typ_l agg_typs_in_ctx) gen_extractvalue])
          ++ (if seq.nilp insertvalue_typs_in_ctx then [] else [x <- elems_LLVM insertvalue_typs_in_ctx;;
                                                                gen_insertvalue x])
          ++ (if seq.nilp vec_typs_in_ctx then [] else [gen_extractelement; gen_insertelement])
