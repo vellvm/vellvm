@@ -1596,26 +1596,7 @@ Section InstrGenerators.
     value <- gen_exp_size 0 t_in_vec;;
     index <- lift_GenLLVM (choose (0, Z.of_N (sz - 1)));;
     ret (tvec, INSTR_Op (OP_InsertElement (tvec, evec) (t_in_vec, value) (TYPE_I 32, EXP_Integer index))).
-
-  Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
-    typ_ctx <- get_typ_ctx;;
-    ctx <- get_ctx;;
-    let ptr_vecptr_in_ctx := filter_sized_ptr_vecptr_typs typ_ctx ctx in
-    let valid_ptr_vecptr_in_ctx := filter (fun '(_, x) => negb (contains_typ x (TYPE_Struct []) soft)) ptr_vecptr_in_ctx in
-    '(id, tptr) <- (oneOf_LLVM (map ret valid_ptr_vecptr_in_ctx));;
-    let gen_typ_in_ptr :=
-      match tptr with
-      | TYPE_Pointer t =>
-          gen_int_typ_for_ptr_cast (* TODO: Wait till IPTR is implemented *)
-      | TYPE_Vector sz ty =>
-          x <- gen_int_typ_for_ptr_cast;;
-          ret (TYPE_Vector sz x)
-      | _ =>
-          ret (TYPE_Void) (* Won't get into this case *)
-      end in
-    typ_from_cast <- gen_typ_in_ptr;;
-    ret (typ_from_cast, INSTR_Op (OP_Conversion Ptrtoint tptr (EXP_Ident id) typ_from_cast)).
-
+  
   Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
     typ_ctx <- get_typ_ctx;;
     ctx <- get_ctx;;
@@ -1835,9 +1816,8 @@ Section InstrGenerators.
     new_typ <- gen_bitcast_typ tfc;;
     ret (new_typ, INSTR_Op (OP_Conversion Bitcast tfc efc new_typ)).
 
-  Definition gen_call (fun_ptrs : var_context) : GenLLVM (typ * instr typ) :=
-    ctx <- get_ctx;;
-    '(id, tfun) <- oneOf_LLVM (map ret fun_ptrs);;
+  Definition gen_call (tfun : typ) : GenLLVM (typ * instr typ) :=
+    efun <- gen_exp_size 0 tfun;;
     match tfun with
     | TYPE_Pointer (TYPE_Function ret_t args varargs) =>
         args_texp <- map_monad
@@ -1846,7 +1826,7 @@ Section InstrGenerators.
                          ret (arg_typ, arg_exp))
                       args;;
         let args_with_params := map (fun arg => (arg, [])) args_texp in
-        ret (ret_t, INSTR_Call (TYPE_Function ret_t args varargs, EXP_Ident id) args_with_params [])
+        ret (ret_t, INSTR_Call (TYPE_Function ret_t args varargs, efun) args_with_params [])
     | _ => lift failGen
     end.
 
@@ -1940,7 +1920,9 @@ Section InstrGenerators.
          ++ (if seq.nilp vec_typs_in_ctx then [] else [
                  bind (get_typ_l vec_typs_in_ctx) gen_extractelement
                  ; bind (get_typ_l vec_typs_in_ctx) gen_insertelement])
-         ++ (if seq.nilp fun_ptrs_in_ctx then [] else [gen_call fun_ptrs_in_ctx])).
+         ++ (if seq.nilp fun_ptrs_in_ctx then [] else [
+                 bind (get_typ_l fun_ptrs_in_ctx) gen_call
+                 (* gen_call fun_ptrs_in_ctx *)])).
 
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
