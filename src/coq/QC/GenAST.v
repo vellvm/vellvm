@@ -88,7 +88,7 @@ Section Helpers.
     := match t with
        | TYPE_I sz => true
        | TYPE_IPTR => true
-       | TYPE_Pointer t => true
+       | TYPE_Pointer t => is_sized_type_h t
        | TYPE_Void => false
        | TYPE_Half => true
        | TYPE_Float => true
@@ -1744,6 +1744,7 @@ Section InstrGenerators.
               | TYPE_Struct _
               | TYPE_Packed_struct _ => false
               | TYPE_Array _ _ => false
+              | TYPE_Pointer (TYPE_Function _ _ _) => false
               | _ => true
               end) ctx.
 
@@ -1783,12 +1784,27 @@ Section InstrGenerators.
     typ_list <- gen_typ_list;;
     oneOf_LLVM (map ret typ_list).
 
+  (* TODO: Another approach to form all first class types for bitcast
+   If use this will get O(n^2) runtime where n is the length of the context
+   but may make generating trivial types less likely to happen *)
+  Fixpoint set_add_h {A} (dec : A -> A -> bool) (t : A) (prev next : list A) :=
+    match next with
+    | nil => prev ++ [t]
+    | hd::tl =>
+        if dec hd t
+        then prev ++ next
+        else set_add_h dec t (prev ++ [hd]) tl
+    end.
+
   Definition gen_bitcast : GenLLVM (typ * instr typ) :=
     ctx <- get_ctx;;
-    let first_class_typs := filter_first_class_typs ctx in
-    '(id, tfc) <- oneOf_LLVM (map ret first_class_typs);;
+    let first_class_typs_in_ctx := filter_first_class_typs ctx in
+    trivial_typ <- oneOf_LLVM [ret (TYPE_I 1); ret (TYPE_I 8); ret (TYPE_I 32); ret (TYPE_I 64); ret (TYPE_Float); ret (TYPE_Double); ret TYPE_Vector <*> lift_GenLLVM genN <*> gen_typ_non_void_0];;
+    let gen_first_class_typs := (ret trivial_typ)::(map (fun '(_, t) => ret t) first_class_typs_in_ctx) in
+    tfc <- oneOf_LLVM gen_first_class_typs;;
+    efc <- gen_exp_size 0 tfc;;
     new_typ <- gen_bitcast_typ tfc;;
-    ret (new_typ, INSTR_Op (OP_Conversion Bitcast tfc (EXP_Ident id) new_typ)).
+    ret (new_typ, INSTR_Op (OP_Conversion Bitcast tfc efc new_typ)).
 
   Definition gen_insertvalue (typ_in_ctx: ident * typ): GenLLVM (typ * instr typ) :=
     let '(id, tagg) := typ_in_ctx in
