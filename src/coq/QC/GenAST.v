@@ -1596,7 +1596,7 @@ Section InstrGenerators.
     value <- gen_exp_size 0 t_in_vec;;
     index <- lift_GenLLVM (choose (0, Z.of_N (sz - 1)));;
     ret (tvec, INSTR_Op (OP_InsertElement (tvec, evec) (t_in_vec, value) (TYPE_I 32, EXP_Integer index))).
-  
+
   Definition gen_ptrtoint : GenLLVM (typ * instr typ) :=
     typ_ctx <- get_typ_ctx;;
     ctx <- get_ctx;;
@@ -1854,14 +1854,19 @@ Section InstrGenerators.
             opt <- gen_option (runStateT g st);;
             ret (opt_add_state st opt)).
 
-  Definition gen_load : GenLLVM (typ * instr typ)
-    := '(ptr_ident, ptr_typ) <- get_ctx_sized_ptr;;
+  Definition get_typ_in_ptr (pt : typ) : GenLLVM typ :=
+    match pt with
+    | TYPE_Pointer t => ret t
+    | _ => lift failGen
+    end.
+
+  Definition gen_load (tptr : typ) : GenLLVM (typ * instr typ)
+    := eptr <- gen_exp_size 0 tptr;;
        vol <- lift (arbitrary : G bool);;
-       let pt := TYPE_Pointer ptr_typ in
-       let ptr := EXP_Ident ptr_ident in
+       ptr_typ <- get_typ_in_ptr tptr;;
        align <- ret (Some 1);;
        (* TODO: Fix parameters / generate more of them *)
-       ret (ptr_typ, INSTR_Load ptr_typ (pt, ptr) []).
+       ret (ptr_typ, INSTR_Load ptr_typ (tptr, eptr) []).
 
   Definition gen_store_to (ptr : texp typ) : GenLLVM (typ * instr typ)
     :=
@@ -1874,11 +1879,17 @@ Section InstrGenerators.
     | _ => lift failGen
     end.
 
-  Definition gen_store : GenLLVM (typ * instr typ)
-    := '(ptr_ident, ptr_typ) <- get_ctx_sized_ptr;;
-       let pt := TYPE_Pointer ptr_typ in
-       let pexp := EXP_Ident ptr_ident in
-       gen_store_to (pt, pexp).
+  Definition gen_store (tptr : typ) : GenLLVM (typ * instr typ)
+    :=
+    eptr <- gen_exp_size 0 tptr;;
+    ptr_typ <- get_typ_in_ptr tptr;;
+    gen_store_to(tptr, eptr).
+
+  (* Definition gen_store : GenLLVM (typ * instr typ) *)
+  (*   := '(ptr_ident, ptr_typ) <- get_ctx_sized_ptr;; *)
+  (*      let pt := TYPE_Pointer ptr_typ in *)
+  (*      let pexp := EXP_Ident ptr_ident in *)
+  (*      gen_store_to (pt, pexp). *)
 
   (* Generate an instruction, as well as its type...
 
@@ -1909,8 +1920,8 @@ Section InstrGenerators.
          (* ++ (if seq.nilp (filter_first_class_typs ctx) then [] else [gen_bitcast]) *)
          ++ (if seq.nilp sized_ptr_typs_in_ctx then [] else [
                  (bind (get_typ_l sized_ptr_typs_in_ctx) gen_gep )
-                 ; gen_load
-                 ; gen_store])
+                 ; bind (get_typ_l sized_ptr_typs_in_ctx) gen_load
+                 ; bind (get_typ_l sized_ptr_typs_in_ctx) gen_store])
          ++ (if seq.nilp ptr_typs_in_ctx then [] else [gen_ptrtoint])
          ++ (if seq.nilp ptrtoint_ctx then [] else [gen_inttoptr])
          ++ (if seq.nilp agg_typs_in_ctx then [] else [
