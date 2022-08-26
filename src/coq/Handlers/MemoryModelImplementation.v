@@ -4540,6 +4540,33 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         break_match; [break_match|]; tauto.
     Qed.
 
+    (* TODO: add to write_byte_allowed *)
+    Lemma free_byte_allowed_set_frame_stack :
+      forall ms f ptr,
+        free_byte_allowed ms ptr <-> free_byte_allowed (mem_state_set_frame_stack ms f) ptr.
+    Proof.
+      intros [[ms prov] fs] f ptr.
+      cbn.
+      unfold free_byte_allowed;
+        split; intros FREE;
+        cbn in *.
+
+      - break_free_byte_allowed_in FREE.
+
+        exists aid.
+        repeat eexists; [| solve_returns_provenance |]; auto.
+
+        cbn in *.
+        break_match; [break_match|]; tauto.
+      - break_free_byte_allowed_in FREE.
+
+        exists aid.
+        repeat eexists; [| solve_returns_provenance |]; auto.
+
+        cbn in *.
+        break_match; [break_match|]; tauto.
+    Qed.
+
     (* TODO: add to solve_read_byte_prop_all_preserved. *)
     Lemma read_byte_prop_set_frame_stack :
       forall ms f,
@@ -4570,6 +4597,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Proof.
       intros ms f ptr.
       eapply write_byte_allowed_set_frame_stack.
+    Qed.
+
+    Lemma free_byte_allowed_all_preserved_set_frame_stack :
+      forall ms f,
+        free_byte_allowed_all_preserved ms (mem_state_set_frame_stack ms f).
+    Proof.
+      intros ms f ptr.
+      eapply free_byte_allowed_set_frame_stack.
     Qed.
 
     Lemma allocations_preserved_set_frame_stack :
@@ -7027,7 +7062,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma malloc_bytes_correct :
       forall init_bytes pre, exec_correct pre (malloc_bytes init_bytes) (malloc_bytes_spec_MemPropT init_bytes).
     Proof.
-      Opaque exec_correct.
       intros init_bytes pre.
 
       unfold malloc_bytes.
@@ -7049,83 +7083,79 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       unfold exec_correct.
       intros pre ms st VALID PRE.
 
-      right.
+      right; right; right.
       cbn.
+
+      do 3 eexists.
       split.
-      { intros msg RUN; exists ""%string; auto.
-        unfold mempush in RUN.
-        rewrite MemMonad_run_bind in RUN.
-        rewrite MemMonad_get_mem_state in RUN.
-        rewrite bind_ret_l in RUN.
-        rewrite MemMonad_put_mem_state in RUN.
-        apply MemMonad_eq1_raise_error_inv in RUN; auto.
-      }
-      split; [intros msg RUN; exists ""%string; auto|].
+      - unfold mempush.
+        rewrite MemMonad_run_bind.
+        rewrite MemMonad_get_mem_state.
+        rewrite bind_ret_l.
+        rewrite MemMonad_put_mem_state.
+        reflexivity.
+      - split.
+        + split.
+          -- (* fresh_frame *)
+            intros fs1 fs2 f POP EMPTY PUSH.
+            pose proof empty_frame_eqv _ _ EMPTY initial_frame_empty as EQinit.
 
-      intros st' ms' [] RUN.
-      unfold mempush in RUN.
-      rewrite MemMonad_run_bind in RUN; auto.
-      rewrite MemMonad_get_mem_state in RUN.
-      rewrite bind_ret_l in RUN.
-      rewrite MemMonad_put_mem_state in RUN.
-      apply eq1_ret_ret in RUN; [inv RUN | typeclasses eauto].
+            (* This:
 
-      split.
-      - (* fresh_frame *)
-        intros fs1 fs2 f POP EMPTY PUSH.
-        pose proof empty_frame_eqv _ _ EMPTY initial_frame_empty as EQinit.
+               (mem_state_set_frame_stack ms (push_frame_stack (mem_state_frame_stack ms) initial_frame))
 
-        (* This:
+               Should be equivalent to (f :: fs1).
+             *)
+            eapply mem_state_frame_stack_prop_set_trans; [|apply mem_state_frame_stack_prop_set_refl].
 
-          (mem_state_set_frame_stack ms (push_frame_stack (mem_state_frame_stack ms) initial_frame))
+            pose proof (eq_refl (push_frame_stack (mem_state_frame_stack ms) initial_frame)) as PUSH_INIT.
+            apply push_frame_stack_correct in PUSH_INIT.
 
-          Should be equivalent to (f :: fs1).
-         *)
-        eapply mem_state_frame_stack_prop_set_trans; [|apply mem_state_frame_stack_prop_set_refl].
+            unfold mem_state_frame_stack_prop in POP.
+            red in POP.
+            rewrite <- POP in PUSH.
+            rewrite EQinit in PUSH.
 
-        pose proof (eq_refl (push_frame_stack (mem_state_frame_stack ms) initial_frame)) as PUSH_INIT.
-        apply push_frame_stack_correct in PUSH_INIT.
-
-        unfold mem_state_frame_stack_prop in POP.
-        red in POP.
-        rewrite <- POP in PUSH.
-        rewrite EQinit in PUSH.
-
-        eapply push_frame_stack_inj; eauto.
-      - (* mempush_invariants *)
-        split.
-        + (* read_byte_preserved *)
-          (* TODO: solve_read_byte_preserved. *)
-          split.
-          * (* solve_read_byte_allowed_all_preserved. *)
-            intros ?ptr; split; intros ?READ.
-            -- (* read_byte_allowed *)
-              apply read_byte_allowed_set_frame_stack; eauto.
-            -- (* read_byte_allowed *)
-              (* TODO: solve_read_byte_allowed *)
-              eapply read_byte_allowed_set_frame_stack; eauto.
-          * (* solve_read_byte_prop_all_preserved. *)
-            apply read_byte_prop_set_frame_stack.
-        + (* write_byte_allowed_all_preserved *)
-          apply write_byte_allowed_all_preserved_set_frame_stack.
-        + (* allocations_preserved *)
-          (* TODO: move to solve_allocations_preserved *)
-          apply allocations_preserved_set_frame_stack.
-        + (* preserve_allocation_ids *)
-          (* TODO: solve_preserve_allocation_ids *)
-          apply preserve_allocation_ids_set_frame_stack.
-        + unfold mem_state_set_frame_stack.
-          red.
-          unfold memory_stack_heap_prop. cbn.
-          unfold memory_stack_heap.
-          destruct ms.
-          cbn.
-          unfold MemState_get_memory.
-          unfold mem_state_memory_stack.
-          break_match.
-          cbn.
-          reflexivity.
-    Qed.
+            eapply push_frame_stack_inj; eauto.
+          -- (* mempush_invariants *)
+            split.
+            ++ (* read_byte_preserved *)
+              (* TODO: solve_read_byte_preserved. *)
+              split.
+              ** (* solve_read_byte_allowed_all_preserved. *)
+                intros ?ptr; split; intros ?READ.
+                --- (* read_byte_allowed *)
+                  apply read_byte_allowed_set_frame_stack; eauto.
+                --- (* read_byte_allowed *)
+                  (* TODO: solve_read_byte_allowed *)
+                  eapply read_byte_allowed_set_frame_stack; eauto.
+              ** (* solve_read_byte_prop_all_preserved. *)
+                apply read_byte_prop_set_frame_stack.
+            ++ (* write_byte_allowed_all_preserved *)
+              apply write_byte_allowed_all_preserved_set_frame_stack.
+            ++ (* free_byte_allowed_all_preserved *)
+              apply free_byte_allowed_all_preserved_set_frame_stack.
+            ++ (* allocations_preserved *)
+              (* TODO: move to solve_allocations_preserved *)
+              apply allocations_preserved_set_frame_stack.
+            ++ (* preserve_allocation_ids *)
+              (* TODO: solve_preserve_allocation_ids *)
+              apply preserve_allocation_ids_set_frame_stack.
+            ++ (* TODO: solve_heap_preserved. *)
+              unfold mem_state_set_frame_stack.
+              red.
+              unfold memory_stack_heap_prop. cbn.
+              unfold memory_stack_heap.
+              destruct ms.
+              cbn.
+              unfold MemState_get_memory.
+              unfold mem_state_memory_stack.
+              break_match.
+              cbn.
+              reflexivity.
+        + (* MemMonad_valid_state *)
+          admit.
+    Admitted.
 
     (* TODO: move *)
     Lemma read_byte_raw_memory_empty :
@@ -7760,167 +7790,166 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         all: tauto.
     Qed.
 
+    (* TODO: Move this so it can be reused *)
+    Lemma cannot_pop_singleton :
+      forall ms f,
+        mem_state_frame_stack_prop ms (Singleton f) ->
+        cannot_pop ms.
+    Proof.
+      intros ms f FSP.
+      unfold cannot_pop.
+      intros fs1 fs2 FSP2.
+      unfold mem_state_frame_stack_prop in FSP.
+      red in FSP.
+      red in FSP2.
+      rewrite FSP2 in FSP.
+      rewrite FSP.
+      intros POP.
+      unfold pop_frame_stack_prop in POP.
+      auto.
+    Qed.
 
     Lemma mempop_correct :
-      exec_correct mempop mempop_spec_MemPropT.
+      forall pre, exec_correct pre mempop mempop_spec_MemPropT.
     Proof.
       unfold exec_correct.
-      intros ms st VALID.
+      intros pre ms st VALID PRE.
 
-      right.
-      cbn.
-      split.
-      { intros msg RUN; exists ""%string; auto.
-        unfold mempop in RUN.
-        rewrite MemMonad_run_bind in RUN.
-        rewrite MemMonad_get_mem_state in RUN.
-        rewrite bind_ret_l in RUN.
-        destruct ms.
-        cbn in RUN.
-        destruct ms_memory_stack0.
-        unfold pop_frame_stack in RUN.
-        destruct memory_stack_frame_stack0.
-        - cbn in RUN.
-          rewrite MemMonad_run_bind in RUN.
-          rewrite MemMonad_run_raise_error in RUN.
-          rewrite rbm_raise_bind in RUN; [| typeclasses eauto].
-          unfold cannot_pop.
-          intros fs1 fs2 MSFSP.
-          unfold memory_stack_frame_stack_prop in MSFSP.
-          cbn in MSFSP.
-          rewrite <- MSFSP.
-          cbn. auto.
-        - cbn in RUN.
-          rewrite MemMonad_run_bind in RUN.
-          rewrite MemMonad_run_ret in RUN.
-          rewrite bind_ret_l in RUN.
-          rewrite MemMonad_put_mem_state in RUN.
-          exfalso.
-          apply MemMonad_eq1_raise_error_inv in RUN; auto.
-      }
-      split; [intros msg RUN; exists ""%string; auto|].
-
-      intros st' ms' [] RUN.
-      unfold mempop in RUN.
-      rewrite MemMonad_run_bind in RUN; auto.
-      rewrite MemMonad_get_mem_state in RUN.
-      rewrite bind_ret_l in RUN.
       destruct ms as [[mem fs h] pr].
-      cbn in RUN.
-      rewrite MemMonad_run_bind in RUN.
       destruct fs as [f | fs f].
       - (* Pop singleton, error *)
-        cbn in RUN.
-        rewrite MemMonad_run_raise_error in RUN.
-        rewrite rbm_raise_bind in RUN; [|solve [typeclasses eauto]].
-        symmetry in RUN.
-        apply MemMonad_eq1_raise_error_inv in RUN.
-        contradiction.
+        right; left.
+        cbn.
+        exists "Last frame, cannot pop."%string.
+        split.
+        + unfold mempop.
+          rewrite MemMonad_run_bind.
+          rewrite MemMonad_get_mem_state.
+          rewrite bind_ret_l.
+          cbn.
+          rewrite MemMonad_run_bind.
+          rewrite MemMonad_run_raise_error.
+          rewrite rbm_raise_bind; [|solve [typeclasses eauto]].
+          reflexivity.
+        + exists ""%string.
+          eapply cannot_pop_singleton.
+          do 2 red.
+          cbn; reflexivity. 
       - (* Pop succeeds *)
-        cbn in RUN.
-        rewrite MemMonad_run_ret in RUN; auto.
-        rewrite bind_ret_l in RUN.
-        rewrite MemMonad_put_mem_state in RUN.
-
-        apply eq1_ret_ret in RUN; [inv RUN | typeclasses eauto].
-
-        (* mempop_spec *)
-        { split.
-          - (* bytes_freed *)
-            (* TODO : solve_byte_not_allocated? *)
-            intros ptr IN.
-
-            unfold ptr_in_current_frame in IN.
-            specialize (IN (Snoc fs f)).
-            forward IN.
-            { apply mem_state_frame_stack_prop_refl.
-              cbn. reflexivity.
-            }
-            specialize (IN f).
-            forward IN.
-            cbn. reflexivity.
-
-            eapply free_frame_memory_byte_not_allocated
-              with (ms := mkMemState (mkMemoryStack mem (Snoc fs f) h) pr); eauto.
-          - (* non_frame_bytes_preserved *)
-            intros ptr aid NIN.
-
-            eapply free_frame_memory_byte_disjoint_allocated; cbn; eauto.
-            eapply ptr_nin_current_frame; cbn; eauto.
-            unfold mem_state_frame_stack_prop. red. reflexivity.
-            cbn. reflexivity.
-          - (* non_frame_bytes_read *)
-            intros ptr byte NIN.
-
-            split; intros READ.
-            + split.
-              * (* read_byte_allowed *)
-                eapply free_frame_memory_byte_disjoint_read_byte_allowed
-                  with (ms := mkMemState (mkMemoryStack mem (Snoc fs f) h) pr); cbn;
-                  eauto.
-                eapply ptr_nin_current_frame; eauto.
-                all: unfold mem_state_frame_stack_prop; cbn; red; try reflexivity.
-                cbn. reflexivity.
-                inv READ; solve_read_byte_allowed.
-              * (* read_byte_prop *)
-                eapply free_frame_memory_byte_disjoint_read_byte_prop
-                  with (ms := mkMemState (mkMemoryStack mem (Snoc fs f) h) pr);
-                  eauto.
-                eapply ptr_nin_current_frame; eauto.
-                all: unfold mem_state_frame_stack_prop; try solve [cbn; reflexivity].
-                cbn. red; reflexivity.
-                cbn. red; reflexivity.
-
-                inv READ; solve_read_byte_prop.
-            + (* read_byte_spec *)
-              split.
-              * (* read_byte_allowed *)
-                eapply free_frame_memory_byte_disjoint_read_byte_allowed
-                  with (ms := mkMemState (mkMemoryStack mem (Snoc fs f) h) pr)
-                       (ms' := {|
-                                ms_memory_stack :=
-                                (mkMemoryStack (fold_left (fun (m : memory) (key : Iptr) => free_byte key m) f mem) fs h);
-                                ms_provenance := pr
-                              |});
-                  eauto.
-                eapply ptr_nin_current_frame; eauto.
-                all: unfold mem_state_frame_stack_prop; try solve [cbn; reflexivity].
-                cbn. red. reflexivity.
-                cbn. red. reflexivity.
-                inv READ; solve_read_byte_allowed.
-              * (* read_byte_prop *)
-                eapply free_frame_memory_byte_disjoint_read_byte_prop
-                  with (ms := mkMemState (mkMemoryStack mem (Snoc fs f) h) pr)
-                       (ms' := {|
-                                ms_memory_stack :=
-                                (mkMemoryStack (fold_left (fun (m : memory) (key : Iptr) => free_byte key m) f mem) fs h);
-                                ms_provenance := pr
-                              |});
-                  eauto.
-                eapply ptr_nin_current_frame; eauto.
-                all: unfold mem_state_frame_stack_prop; try solve [cbn; reflexivity].
-                cbn. red. reflexivity.
-                cbn. reflexivity.
-                inv READ; solve_read_byte_prop.
-          - (* pop_frame *)
-            intros fs1 fs2 FS POP.
-            unfold pop_frame_stack_prop in POP.
-            destruct fs1; [contradiction|].
-            red; cbn.
-            red in FS; cbn in FS.
-            apply frame_stack_snoc_inv_fs in FS.
-            rewrite FS.
-            rewrite POP.
-            reflexivity.
-          - (* mempop_invariants *)
+        right; right; right.
+        cbn.
+        do 2 eexists.
+        exists tt.
+        split.
+        + unfold mempop.
+          rewrite MemMonad_run_bind.
+          rewrite MemMonad_get_mem_state.
+          rewrite bind_ret_l.
+          cbn.
+          rewrite MemMonad_run_bind.
+          rewrite MemMonad_run_ret.
+          rewrite bind_ret_l.
+          rewrite MemMonad_put_mem_state.
+          reflexivity.
+        + split.
+          -- (* mempop_spec *)
             split.
-            + (* preserve_allocation_ids *)
-              red. unfold used_provenance_prop.
+            ++ (* bytes_freed *)
+              (* TODO : solve_byte_not_allocated? *)
+              intros ptr IN.
+              unfold ptr_in_current_frame in IN.
+              specialize (IN (Snoc fs f)).
+              forward IN.
+              { apply mem_state_frame_stack_prop_refl.
+                cbn. reflexivity.
+              }
+              specialize (IN f).
+              forward IN.
               cbn. reflexivity.
-            + (* heap preserved *)
-              solve_heap_preserved.
-        }
-    Qed.
+
+              eapply free_frame_memory_byte_not_allocated
+                with (ms := mkMemState (mkMemoryStack mem (Snoc fs f) h) pr); eauto.
+            ++ (* non_frame_bytes_preserved *)
+              intros ptr aid NIN.
+
+              eapply free_frame_memory_byte_disjoint_allocated; cbn; eauto.
+              eapply ptr_nin_current_frame; cbn; eauto.
+              unfold mem_state_frame_stack_prop. red. reflexivity.
+              cbn. reflexivity.
+            ++ (* non_frame_bytes_read *)
+              { intros ptr byte NIN.
+
+                split; intros READ.
+                + split.
+                  * (* read_byte_allowed *)
+                    eapply free_frame_memory_byte_disjoint_read_byte_allowed
+                      with (ms := mkMemState (mkMemoryStack mem (Snoc fs f) h) pr); cbn;
+                      eauto.
+                    eapply ptr_nin_current_frame; eauto.
+                    all: unfold mem_state_frame_stack_prop; cbn; red; try reflexivity.
+                    cbn. reflexivity.
+                    inv READ; solve_read_byte_allowed.
+                  * (* read_byte_prop *)
+                    eapply free_frame_memory_byte_disjoint_read_byte_prop
+                      with (ms := mkMemState (mkMemoryStack mem (Snoc fs f) h) pr);
+                      eauto.
+                    eapply ptr_nin_current_frame; eauto.
+                    all: unfold mem_state_frame_stack_prop; try solve [cbn; reflexivity].
+                    cbn. red; reflexivity.
+                    cbn. red; reflexivity.
+
+                    inv READ; solve_read_byte_prop.
+                + (* read_byte_spec *)
+                  split.
+                  * (* read_byte_allowed *)
+                    eapply free_frame_memory_byte_disjoint_read_byte_allowed
+                      with (ms := mkMemState (mkMemoryStack mem (Snoc fs f) h) pr)
+                           (ms' := {|
+                                    ms_memory_stack :=
+                                    (mkMemoryStack (fold_left (fun (m : memory) (key : Iptr) => free_byte key m) f mem) fs h);
+                                    ms_provenance := pr
+                                  |});
+                      eauto.
+                    eapply ptr_nin_current_frame; eauto.
+                    all: unfold mem_state_frame_stack_prop; try solve [cbn; reflexivity].
+                    cbn. red. reflexivity.
+                    cbn. red. reflexivity.
+                    inv READ; solve_read_byte_allowed.
+                  * (* read_byte_prop *)
+                    eapply free_frame_memory_byte_disjoint_read_byte_prop
+                      with (ms := mkMemState (mkMemoryStack mem (Snoc fs f) h) pr)
+                           (ms' := {|
+                                    ms_memory_stack :=
+                                    (mkMemoryStack (fold_left (fun (m : memory) (key : Iptr) => free_byte key m) f mem) fs h);
+                                    ms_provenance := pr
+                                  |});
+                      eauto.
+                    eapply ptr_nin_current_frame; eauto.
+                    all: unfold mem_state_frame_stack_prop; try solve [cbn; reflexivity].
+                    cbn. red. reflexivity.
+                    cbn. reflexivity.
+                    inv READ; solve_read_byte_prop.
+              }
+            ++ (* pop_frame *)
+              intros fs1 fs2 FS POP.
+              unfold pop_frame_stack_prop in POP.
+              destruct fs1; [contradiction|].
+              red; cbn.
+              red in FS; cbn in FS.
+              apply frame_stack_snoc_inv_fs in FS.
+              rewrite FS.
+              rewrite POP.
+              reflexivity.
+            ++ (* mempop_invariants *)
+              split.
+              --- (* preserve_allocation_ids *)
+                red. unfold used_provenance_prop.
+                cbn. reflexivity.
+              --- (* heap preserved *)
+                solve_heap_preserved.
+          -- (* MemMonad_valid_state *)
+            admit.
+    Admitted.
 
     Lemma byte_not_allocated_dec :
       forall ms ptr,
