@@ -17,6 +17,7 @@ From Vellvm Require Import
      Utils.Util
      Utils.Error
      Utils.Tactics
+     Utils.FMapAList
      Syntax.LLVMAst
      Syntax.AstLib
      Semantics.MemoryAddress
@@ -131,8 +132,6 @@ Section StackMap.
 
 End StackMap.
 
-From ExtLib Require Import
-     Data.Map.FMapAList.
 From Vellvm Require Import
      LLVMAst
      MemoryAddress.

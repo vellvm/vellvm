@@ -21,7 +21,7 @@ CP=cp
 COQFILESNUMERIC := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats
 
 COQFILESUTILS := Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/ListUtil Utils/Error\
-		Utils/PostConditions Utils/TFor Utils/NoFailure\
+		Utils/FMapAList Utils/PostConditions Utils/TFor Utils/NoFailure\
 		Utilities
 
 COQFILESSYNTAX := Syntax/LLVMAst Syntax/AstLib Syntax/CFG\

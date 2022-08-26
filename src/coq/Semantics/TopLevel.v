@@ -11,12 +11,12 @@ From ITree Require Import
      Events.State.
 
 From ExtLib Require Import
-     Structures.Monads
-     Data.Map.FMapAList.
+     Structures.Monads.
 
 From Vellvm Require Import
      Utilities
      Syntax
+     Utils.FMapAList
      Semantics.LLVMEvents
      Semantics.Denotation
      Semantics.IntrinsicsDefinitions

@@ -158,11 +158,10 @@ Section Locals.
 
 End Locals.
 
-From ExtLib Require Import
-     Data.Map.FMapAList.
 From Vellvm Require Import
      LLVMAst
-     MemoryAddress.
+     MemoryAddress
+     Utils.FMapAList.
 
 (* YZ TODO : Undecided about the status of this over-generalization of these events over domains of keys and values.
    The interface needs to be specialized anyway in [LLVMEvents].
@@ -171,6 +170,6 @@ From Vellvm Require Import
    So exposing the specialization here, but it is awkward.
  *)
 Module Make (A : ADDRESS) (LLVMEvents : LLVM_INTERACTIONS(A)).
-  Definition local_env := FMapAList.alist raw_id LLVMEvents.DV.uvalue.
+  Definition local_env := alist raw_id LLVMEvents.DV.uvalue.
 End Make.
 

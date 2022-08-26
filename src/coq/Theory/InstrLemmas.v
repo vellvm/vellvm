@@ -16,6 +16,7 @@ From Vellvm Require Import
      Utilities
      Syntax
      Semantics
+     Utils.FMapAList
      Theory.Refinement
      Theory.InterpreterCFG
      Theory.ExpLemmas.
@@ -435,7 +436,7 @@ Lemma denote_instr_intrinsic :
     ->
     ⟦ (IId i, INSTR_Call (τ, EXP_Ident (ID_Global (Name fn))) args) ⟧i3 g l m
     ≈
-    Ret3 g (FMapAList.alist_add i (dvalue_to_uvalue res) l) m tt.
+    Ret3 g (alist_add i (dvalue_to_uvalue res) l) m tt.
 Proof.
   intros * INTRINSIC ASSOC MAP CONCARGS RES.
 

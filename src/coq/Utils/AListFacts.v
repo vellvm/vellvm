@@ -1,12 +1,12 @@
 (* begin hide *)
 From ExtLib Require Import
      Core.RelDec
-     Data.Map.FMapAList
      Structures.Maps.
 
 From Vellvm Require Import
      Utils.Tactics
-     Utils.Util.
+     Utils.Util
+     Utils.FMapAList.
 
 From Coq Require Import
      RelationClasses

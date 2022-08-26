@@ -15,6 +15,7 @@ From Vellvm Require Import
      Semantics
      Utils.NoFailure
      Utils.PostConditions
+     Utils.FMapAList
      Theory.StatePredicates
      Theory.InterpreterCFG
      Theory.ExpLemmas
@@ -24,7 +25,6 @@ From Vellvm Require Import
 
 From ExtLib Require Import
      Core.RelDec
-     Data.Map.FMapAList
      Structures.Maps.
 
 Import ListNotations.
