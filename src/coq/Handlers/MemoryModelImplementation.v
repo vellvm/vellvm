@@ -8182,11 +8182,11 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Qed.
 
     Lemma free_correct :
-      forall ptr,
-        exec_correct (free ptr) (free_spec_MemPropT ptr).
+      forall pre ptr,
+        exec_correct pre (free ptr) (free_spec_MemPropT ptr).
     Proof.
       unfold exec_correct.
-      intros ptr ms st VALID.
+      intros pre ptr ms st VALID PRE.
 
       (* Need to determine if `ptr` is a root in the heap... If not,
          UB has occurred.
@@ -8244,256 +8244,243 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       }
 
       pose proof (member_lookup _ _ ROOTIN) as (block & FINDPTR).
-      right.
+      right; right; right.
       cbn.
+      do 2 eexists.
+      exists tt.
+
       split.
-      { intros msg RUN; exists ""%string; auto.
-        unfold free in RUN.
-        rewrite MemMonad_run_bind in RUN.
-        rewrite MemMonad_get_mem_state in RUN.
-        rewrite bind_ret_l in RUN.
-        cbn in RUN.
-        rewrite FINDPTR in RUN.
-        rewrite MemMonad_put_mem_state in RUN.
-        apply MemMonad_eq1_raise_error_inv in RUN; auto.
-      }
-      split; [intros msg RUN; exists ""%string; auto|].
-
-      intros st' ms' [] RUN.
-      unfold free in RUN.
-      rewrite MemMonad_run_bind in RUN; auto.
-      rewrite MemMonad_get_mem_state in RUN.
-      rewrite bind_ret_l in RUN.
-      cbn in RUN.
-      rewrite FINDPTR in RUN.
-      rewrite MemMonad_put_mem_state in RUN.
-      eapply eq1_ret_ret in RUN; [| typeclasses eauto].
-      inv RUN.
-
-      (* Proof of free_spec *)
-      split.
-      - (* free_was_root *)
-        red.
-        intros h0 HEAP.
-        cbn in *.
-        red.
-        unfold memory_stack_heap_prop in HEAP.
-        cbn in HEAP.
-        eapply member_ptr_to_int_heap_eqv_Proper.
-        reflexivity.
-        symmetry; eauto.
-        eauto.
-      (* - (* free_removes_root *) *)
-      (*   intros CONTRA. *)
-      (*   red in CONTRA. *)
-      (*   cbn in CONTRA. *)
-      (*   specialize (CONTRA (delete (ptr_to_int ptr) h)). *)
-      (*   forward CONTRA. *)
-      (*   { unfold memory_stack_heap_prop; reflexivity. *)
-      (*   } *)
-
-      (*   unfold root_in_heap_prop in *. *)
-      (*   unfold member, delete in *. *)
-      (*   rewrite IP.F.remove_eq_b in CONTRA; auto; inv CONTRA. *)
-      - exists root_aid.
-        do 2 red.
-        unfold addr_allocated_prop.
-        repeat eexists.
-        + cbn.
-          rewrite READ_ROOT.
-          split; auto.
-          apply aid_eq_dec_refl.
-        + intros ms' x H0.
-          cbn in H0.
-          inv H0.
-          reflexivity.
-      - auto.
-      - (* free_bytes_freed *)
-        (* TODO : solve_byte_not_allocated? *)
-        intros ptr0 HEAP.
-        red in HEAP.
-        cbn in HEAP.
-        specialize (HEAP h).
-        forward HEAP.
-        { unfold memory_stack_heap_prop; reflexivity.
-        }
-
-        unfold byte_not_allocated.
-        intros aid ALLOCATED.
-
-        unfold ptr_in_heap_prop in HEAP.
-        break_match_hyp; try inv HEAP.
-        unfold lookup in FINDPTR.
-        rewrite FINDPTR in Heqo; inv Heqo.
-
-        eapply free_block_memory_byte_not_allocated
-          with (ms := mkMemState (mkMemoryStack mem fs h) pr); eauto.
-
+      { unfold free.
+        rewrite MemMonad_run_bind.
+        rewrite MemMonad_get_mem_state.
+        rewrite bind_ret_l.
         cbn.
+        rewrite FINDPTR.
+        rewrite MemMonad_put_mem_state.
         reflexivity.
+      }
 
-      - (* free_non_block_bytes_preserved *)
-        intros ptr0 aid NIN.
-
-        eapply free_block_memory_byte_disjoint_allocated; cbn; eauto.
-        { unfold ptr_in_memstate_heap in *.
-          cbn in *.
-          intros IN.
-          apply NIN.
-          intros h0 H0.
-          red in H0.
-          cbn in H0.
-          rewrite <- H0.
+      split.
+      { (* Proof of free_spec *)
+        split.
+        - (* free_was_root *)
           red.
+          intros h0 HEAP.
+          cbn in *.
+          red.
+          unfold memory_stack_heap_prop in HEAP.
+          cbn in HEAP.
+          eapply member_ptr_to_int_heap_eqv_Proper.
+          reflexivity.
+          symmetry; eauto.
+          eauto.
+        - (* free_was_allocated *)
+          exists root_aid.
+          do 2 red.
+          unfold addr_allocated_prop.
+          repeat eexists.
+          + cbn.
+            rewrite READ_ROOT.
+            split; auto.
+            apply aid_eq_dec_refl.
+          + intros ms' x H0.
+            cbn in H0.
+            inv H0.
+            reflexivity.
+        - (* free_block_allocated *)
+          intros heap_ptr IN.
+          subst.
+          specialize (BLOCK_ALLOCATED heap_ptr IN).
+          eauto.
+        - (* free_bytes_freed *)
+          (* TODO : solve_byte_not_allocated? *)
+          intros ptr0 HEAP.
+          red in HEAP.
+          cbn in HEAP.
+          specialize (HEAP h).
+          forward HEAP.
+          { unfold memory_stack_heap_prop; reflexivity.
+          }
+
+          unfold byte_not_allocated.
+          intros aid ALLOCATED.
+
+          unfold ptr_in_heap_prop in HEAP.
+          break_match_hyp; try inv HEAP.
           unfold lookup in FINDPTR.
-          rewrite FINDPTR; auto.
-        }
-      - (* free_non_frame_bytes_read *)
-        intros ptr0 byte NIN.
+          rewrite FINDPTR in Heqo; inv Heqo.
 
-        split; intros READ.
-        + split.
-          * (* read_byte_allowed *)
-            eapply free_block_memory_byte_disjoint_read_byte_allowed
-              with (ms := mkMemState (mkMemoryStack mem fs h) pr); cbn;
-              eauto.
-            { unfold ptr_in_memstate_heap in *.
-              cbn in *.
-              intros IN.
-              apply NIN.
-              intros h0 H0.
-              red in H0.
-              cbn in H0.
-              rewrite <- H0.
-              red.
-              unfold lookup in FINDPTR.
-              rewrite FINDPTR; auto.
-            }
-            inv READ; solve_read_byte_allowed.
-          * (* read_byte_prop *)
-            eapply free_block_memory_byte_disjoint_read_byte_prop
-              with (ms := mkMemState (mkMemoryStack mem fs h) pr);
-              eauto.
-            { unfold ptr_in_memstate_heap in *.
-              cbn in *.
-              intros IN.
-              apply NIN.
-              intros h0 H0.
-              red in H0.
-              cbn in H0.
-              rewrite <- H0.
-              red.
-              unfold lookup in FINDPTR.
-              rewrite FINDPTR; eauto.
-            }
-            inv READ; solve_read_byte_prop.
-            inv READ; solve_read_byte_prop.
-        + (* read_byte_spec *)
+          eapply free_block_memory_byte_not_allocated
+            with (ms := mkMemState (mkMemoryStack mem fs h) pr); eauto.
+
+          cbn.
+          reflexivity.
+        - (* free_non_block_bytes_preserved *)
+          intros ptr0 aid NIN.
+
+          eapply free_block_memory_byte_disjoint_allocated; cbn; eauto.
+          { unfold ptr_in_memstate_heap in *.
+            cbn in *.
+            intros IN.
+            apply NIN.
+            intros h0 H0.
+            red in H0.
+            cbn in H0.
+            rewrite <- H0.
+            red.
+            unfold lookup in FINDPTR.
+            rewrite FINDPTR; auto.
+          }
+        - (* free_non_frame_bytes_read *)
+          intros ptr0 byte NIN.
+
+          split; intros READ.
+          + split.
+            * (* read_byte_allowed *)
+              eapply free_block_memory_byte_disjoint_read_byte_allowed
+                with (ms := mkMemState (mkMemoryStack mem fs h) pr); cbn;
+                eauto.
+              { unfold ptr_in_memstate_heap in *.
+                cbn in *.
+                intros IN.
+                apply NIN.
+                intros h0 H0.
+                red in H0.
+                cbn in H0.
+                rewrite <- H0.
+                red.
+                unfold lookup in FINDPTR.
+                rewrite FINDPTR; auto.
+              }
+              inv READ; solve_read_byte_allowed.
+            * (* read_byte_prop *)
+              eapply free_block_memory_byte_disjoint_read_byte_prop
+                with (ms := mkMemState (mkMemoryStack mem fs h) pr);
+                eauto.
+              { unfold ptr_in_memstate_heap in *.
+                cbn in *.
+                intros IN.
+                apply NIN.
+                intros h0 H0.
+                red in H0.
+                cbn in H0.
+                rewrite <- H0.
+                red.
+                unfold lookup in FINDPTR.
+                rewrite FINDPTR; eauto.
+              }
+              inv READ; solve_read_byte_prop.
+              inv READ; solve_read_byte_prop.
+          + (* read_byte_spec *)
+            split.
+            * (* read_byte_allowed *)
+              eapply free_block_memory_byte_disjoint_read_byte_allowed
+                with (ms := mkMemState (mkMemoryStack mem fs h) pr)
+                     (ms' := {|
+                              ms_memory_stack :=
+                              mkMemoryStack (free_block_memory block mem) fs (delete (ptr_to_int ptr) h);
+                              ms_provenance := pr
+                            |});
+                eauto.
+              { unfold ptr_in_memstate_heap in *.
+                cbn in *.
+                intros IN.
+                apply NIN.
+                intros h0 H0.
+                red in H0.
+                cbn in H0.
+                rewrite <- H0.
+                red.
+                unfold lookup in FINDPTR.
+                rewrite FINDPTR; eauto.
+              }
+              all: unfold mem_state_frame_stack_prop; try solve [cbn; reflexivity].
+              inv READ; solve_read_byte_allowed.
+            * (* read_byte_prop *)
+              eapply free_frame_memory_byte_disjoint_read_byte_prop
+                with (ms := mkMemState (mkMemoryStack mem fs h) pr)
+                     (ms' := {|
+                              ms_memory_stack :=
+                              mkMemoryStack (free_block_memory block mem) fs (delete (ptr_to_int ptr) h);
+                              ms_provenance := pr
+                            |});
+                eauto.
+              { unfold ptr_in_memstate_heap in *.
+                cbn in *.
+                intros IN.
+                apply NIN.
+                intros h0 H0.
+                red in H0.
+                cbn in H0.
+                rewrite <- H0.
+                red.
+                unfold lookup in FINDPTR.
+                rewrite FINDPTR; eauto.
+              }
+              all: unfold mem_state_frame_stack_prop; try solve [cbn; reflexivity].
+              inv READ; solve_read_byte_prop.
+        - (* free_block *)
+          intros h1 h2 HEAP1 HEAP2.
+          cbn in *.
+          unfold memory_stack_heap_prop in *.
+          cbn in *.
           split.
-          * (* read_byte_allowed *)
-            eapply free_block_memory_byte_disjoint_read_byte_allowed
-              with (ms := mkMemState (mkMemoryStack mem fs h) pr)
-                   (ms' := {|
-                            ms_memory_stack :=
-                            mkMemoryStack (free_block_memory block mem) fs (delete (ptr_to_int ptr) h);
-                            ms_provenance := pr
-                          |});
-              eauto.
-            { unfold ptr_in_memstate_heap in *.
-              cbn in *.
-              intros IN.
-              apply NIN.
-              intros h0 H0.
-              red in H0.
-              cbn in H0.
-              rewrite <- H0.
-              red.
-              unfold lookup in FINDPTR.
-              rewrite FINDPTR; eauto.
-            }
-            all: unfold mem_state_frame_stack_prop; try solve [cbn; reflexivity].
-            inv READ; solve_read_byte_allowed.
-          * (* read_byte_prop *)
-            eapply free_frame_memory_byte_disjoint_read_byte_prop
-              with (ms := mkMemState (mkMemoryStack mem fs h) pr)
-                   (ms' := {|
-                            ms_memory_stack :=
-                            mkMemoryStack (free_block_memory block mem) fs (delete (ptr_to_int ptr) h);
-                            ms_provenance := pr
-                          |});
-              eauto.
-            { unfold ptr_in_memstate_heap in *.
-              cbn in *.
-              intros IN.
-              apply NIN.
-              intros h0 H0.
-              red in H0.
-              cbn in H0.
-              rewrite <- H0.
-              red.
-              unfold lookup in FINDPTR.
-              rewrite FINDPTR; eauto.
-            }
-            all: unfold mem_state_frame_stack_prop; try solve [cbn; reflexivity].
-            inv READ; solve_read_byte_prop.
-      - (* free_block *)
-        intros h1 h2 HEAP1 HEAP2.
-        cbn in *.
-        unfold memory_stack_heap_prop in *.
-        cbn in *.
-        split.
-        + (* free_block_ptrs_freed *)
-          intros ptr0 IN CONTRA.
-          inv HEAP2.
-          apply heap_ptrs_eqv0 in CONTRA.
-          unfold ptr_in_heap_prop in *.
-          break_match_hyp; try inv CONTRA.
-          unfold delete in *.
-          rewrite IP.F.remove_eq_o in Heqo; auto; inv Heqo.
-        + (* free_block_root_freed *)
-          intros CONTRA.
-          inv HEAP2.
-          apply heap_roots_eqv0 in CONTRA.
-          unfold root_in_heap_prop in *.
-          unfold member, delete in *.
-          rewrite IP.F.remove_eq_b in CONTRA; auto; inv CONTRA.
-        + (* free_block_disjoint_preserved *)
-          intros ptr0 root' DISJOINT.
-          split; intros IN.
-          * apply HEAP2.
-            unfold ptr_in_heap_prop.
-            unfold delete.
-            rewrite IP.F.remove_neq_o; auto.
-            apply HEAP1; auto.
-          * apply HEAP2 in IN.
-            unfold ptr_in_heap_prop in IN.
-            unfold delete in IN.
-            rewrite IP.F.remove_neq_o in IN; auto.
-            apply HEAP1 in IN; auto.
-        + (* free_block_disjoint_roots *)
-          intros root' DISJOINT.
-          split; intros IN.
-          * apply HEAP2.
-            unfold root_in_heap_prop.
-            unfold delete.
-            rewrite IP.F.remove_neq_b; auto.
-            apply HEAP1; auto.
-          * apply HEAP2 in IN.
-            unfold root_in_heap_prop in IN.
-            unfold delete in IN.
-            rewrite IP.F.remove_neq_b in IN; auto.
-            apply HEAP1 in IN; auto.
-      - (* free_invariants *)
-        split.
-        + (* Allocation ids preserved *)
-          red. unfold used_provenance_prop.
-          cbn. reflexivity.
-        + (* Framestack preserved *)
-          solve_frame_stack_preserved.
+          + (* free_block_ptrs_freed *)
+            intros ptr0 IN CONTRA.
+            inv HEAP2.
+            apply heap_ptrs_eqv0 in CONTRA.
+            unfold ptr_in_heap_prop in *.
+            break_match_hyp; try inv CONTRA.
+            unfold delete in *.
+            rewrite IP.F.remove_eq_o in Heqo; auto; inv Heqo.
+          + (* free_block_root_freed *)
+            intros CONTRA.
+            inv HEAP2.
+            apply heap_roots_eqv0 in CONTRA.
+            unfold root_in_heap_prop in *.
+            unfold member, delete in *.
+            rewrite IP.F.remove_eq_b in CONTRA; auto; inv CONTRA.
+          + (* free_block_disjoint_preserved *)
+            intros ptr0 root' DISJOINT.
+            split; intros IN.
+            * apply HEAP2.
+              unfold ptr_in_heap_prop.
+              unfold delete.
+              rewrite IP.F.remove_neq_o; auto.
+              apply HEAP1; auto.
+            * apply HEAP2 in IN.
+              unfold ptr_in_heap_prop in IN.
+              unfold delete in IN.
+              rewrite IP.F.remove_neq_o in IN; auto.
+              apply HEAP1 in IN; auto.
+          + (* free_block_disjoint_roots *)
+            intros root' DISJOINT.
+            split; intros IN.
+            * apply HEAP2.
+              unfold root_in_heap_prop.
+              unfold delete.
+              rewrite IP.F.remove_neq_b; auto.
+              apply HEAP1; auto.
+            * apply HEAP2 in IN.
+              unfold root_in_heap_prop in IN.
+              unfold delete in IN.
+              rewrite IP.F.remove_neq_b in IN; auto.
+              apply HEAP1 in IN; auto.
+        - (* free_invariants *)
+          split.
+          + (* Allocation ids preserved *)
+            red. unfold used_provenance_prop.
+            cbn. reflexivity.
+          + (* Framestack preserved *)
+            solve_frame_stack_preserved.
 
-          Unshelve.
-          all: exact ""%string.
-    Qed.
+            Unshelve.
+            all: exact ""%string.
+      }
+
+      (* MemMonad_valid_state *)
+      admit.
+    Admitted.
 
     (*** Initial memory state *)
     Record initial_memory_state_prop : Prop :=
