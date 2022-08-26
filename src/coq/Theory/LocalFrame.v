@@ -16,6 +16,7 @@ From Vellvm Require Import
      Utils.NoFailure
      Utils.PostConditions
      Utils.FMapAList
+     Utils.AListFacts
      Theory.StatePredicates
      Theory.InterpreterCFG
      Theory.ExpLemmas

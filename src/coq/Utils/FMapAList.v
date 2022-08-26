@@ -1,19 +1,13 @@
+From stdpp Require Import base.
+
 Require Import Coq.Classes.RelationClasses.
 Require Import Coq.Lists.List.
 Require Import ExtLib.Core.RelDec.
 Require Import ExtLib.Tactics.Consider.
 Require Import ExtLib.Structures.Maps.
-Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.Reducible.
 Require Import ExtLib.Structures.Functor.
-From Coq Require Import
-     Basics.
-From ExtLib Require Import
-     Extras
-     OptionMonad.
-Import
-  FunNotation
-  FunctorNotation.
+From ExtLib Require Import OptionMonad.
 Open Scope program_scope.
 
 Set Implicit Arguments.
