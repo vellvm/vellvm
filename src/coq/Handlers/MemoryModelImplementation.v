@@ -4792,10 +4792,10 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Qed.
 
     Lemma write_byte_correct :
-      forall ptr pre byte, exec_correct pre (write_byte ptr byte) (write_byte_spec_MemPropT ptr byte).
+      forall ptr byte pre, exec_correct pre (write_byte ptr byte) (write_byte_spec_MemPropT ptr byte).
     Proof.
       unfold exec_correct.
-      intros ptr pre byte ms st VALID.
+      intros ptr byte pre ms st VALID.
 
       (* Need to destruct ahead of time so we know if UB happens *)
       destruct (read_byte_raw (mem_state_memory ms) (ptr_to_int ptr)) as [[sbyte aid]|] eqn:READ.
@@ -8182,11 +8182,11 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Qed.
 
     Lemma free_correct :
-      forall pre ptr,
+      forall ptr pre,
         exec_correct pre (free ptr) (free_spec_MemPropT ptr).
     Proof.
       unfold exec_correct.
-      intros pre ptr ms st VALID PRE.
+      intros ptr pre ms st VALID PRE.
 
       (* Need to determine if `ptr` is a root in the heap... If not,
          UB has occurred.
