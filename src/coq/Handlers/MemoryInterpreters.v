@@ -152,6 +152,27 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Proof.
     Admitted.
 
+    Import MonadEq1Laws.
+
+    #[global] Instance MemStateFreshT_Eq1_ret_inv {Eff} `{FAIL: FailureE -< Eff} `{OOM: OOME -< Eff} `{UB: UBE -< Eff}
+      : Eq1_ret_inv (MemStateFreshT (itree Eff)).
+    Proof.
+      split.
+      intros A x y EQ.
+      cbn in EQ.
+      unfold Monad.eq1 in *.
+      unfold MonadState.Eq1_stateTM in *.
+      unfold pointwise_relation in *.
+      specialize (EQ 0%N).
+      specialize (EQ initial_memory_state).
+      unfold Monad.eq1 in *.
+      unfold ITreeMonad.Eq1_ITree in *.
+      cbn in EQ.
+      apply eqit_inv_Ret in EQ.
+      inv EQ.
+      reflexivity.
+    Qed.
+
     #[global] Instance MemStateFreshT_MemMonad {Eff} `{FAIL: FailureE -< Eff} `{OOM: OOME -< Eff} `{UB: UBE -< Eff}
       : MemMonad MemStateFreshT_State (MemStateFreshT (itree Eff)) (itree Eff).
     Proof.
@@ -603,10 +624,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
     (* TODO: get rid of this silly hack. *)
     Definition my_handle_memory : MemoryE ~> MemStateFreshT (itree Effout) :=
-      @handle_memory (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
+      @handle_memory (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
     Definition my_handle_intrinsic : IntrinsicE ~> MemStateFreshT (itree Effout) :=
-      @handle_intrinsic (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
+      @handle_intrinsic (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
     Definition interp_memory_h : Effin ~> MemStateFreshT (itree Effout)
       := case_ E_trigger (case_ my_handle_intrinsic (case_ my_handle_memory F_trigger)).

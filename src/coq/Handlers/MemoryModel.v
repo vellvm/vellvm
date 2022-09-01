@@ -77,6 +77,7 @@ Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
   (*** Internal state of memory *)
   Parameter MemState : Type.
   Parameter memory_stack : Type.
+  Parameter initial_memory_state : MemState.
   Parameter MemState_get_memory : MemState -> memory_stack.
   Parameter MemState_get_provenance : MemState -> Provenance.
   Parameter MemState_put_memory : memory_stack -> MemState -> MemState.
@@ -2014,7 +2015,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         `{MPROV : MonadProvenance Provenance M} `{MSID : MonadStoreId M} `{MMS: MonadMemState MemState M}
         `{MERR : RAISE_ERROR M} `{MUB : RAISE_UB M} `{MOOM :RAISE_OOM M}
         `{RunERR : RAISE_ERROR RunM} `{RunUB : RAISE_UB RunM} `{RunOOM :RAISE_OOM RunM}
-        `{EQM : Eq1 M} `{MLAWS : @MonadLawsE M EQM MM}
+        `{EQM : Eq1 M} `{EQRI : @Eq1_ret_inv M EQM MM} `{MLAWS : @MonadLawsE M EQM MM}
     : Type
     :=
     { MemMonad_eq1_runm :> Eq1 RunM;
@@ -2123,10 +2124,10 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     (*** Correctness *)
     Definition exec_correct {MemM Eff ExtraState} `{MM: MemMonad ExtraState MemM (itree Eff)} {X} (pre : MemState -> ExtraState -> Prop) (exec : MemM X) (spec : MemPropT MemState X) : Prop :=
       forall ms st,
-        (@MemMonad_valid_state ExtraState MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ ms st) ->
+        (@MemMonad_valid_state ExtraState MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ms st) ->
         pre ms st ->
         let t := MemMonad_run exec ms st in
-        let eqi := (@eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) in
+        let eqi := (@eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) in
         (* UB *)
         (exists msg_spec,
             spec ms (raise_ub msg_spec)) \/
@@ -2142,7 +2143,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
           (exists st' ms' x,
               eqi _ t (ret (st', (ms', x))) /\
                 spec ms (ret (ms', x)) /\
-                (@MemMonad_valid_state ExtraState MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ ms' st')).
+                (@MemMonad_valid_state ExtraState MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ms' st')).
 
     Definition exec_correct_memory {MemM Eff ExtraState} `{MM: MemMonad ExtraState MemM (itree Eff)} {X} (pre : MemState -> ExtraState -> Prop) (exec : MemM X) (spec : MemPropT memory_stack X) : Prop :=
       exec_correct pre exec (lift_memory_MemPropT spec).
@@ -2165,7 +2166,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         exec_correct pre exec spec.
     Proof.
       intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM
-             RunERR RunUB RunOOM EQM MLAWS MEMM A pre
+             RunERR RunUB RunOOM EQM EQRI MLAWS MEMM A pre
              weak_pre exec spec WEAK EXEC.
       unfold exec_correct in *.
       intros ms st VALID PRE.
@@ -2208,7 +2209,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
             exec_correct (fun ms_k st_k => pre ms_init st_init /\ m_spec ms_init (ret (ms_k, a))) (k_exec a) (k_spec a)) ->
         exec_correct pre (a <- m_exec;; k_exec a) (a <- m_spec;; k_spec a).
     Proof.
-      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM MLAWS MEMM A B pre m_exec k_exec m_spec k_spec M_CORRECT K_CORRECT.
+      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MEMM A B pre m_exec k_exec m_spec k_spec M_CORRECT K_CORRECT.
 
       unfold exec_correct in *.
       intros ms st VALID PRE.
@@ -2401,7 +2402,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         {X} pre (x : X),
         exec_correct pre (ret x) (ret x).
     Proof.
-      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM MLAWS H X pre x.
+      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS H X pre x.
       cbn; red; cbn.
       intros ms st VALID PRE.
       right; right; right.
@@ -2444,7 +2445,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         (forall a pre, exec_correct pre (m_exec a) (m_spec a)) ->
         forall pre, exec_correct pre (map_monad_ m_exec xs) (map_monad_ m_spec xs).
     Proof.
-      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM MLAWS H A B xs m_exec m_spec H0 pre.
+      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS H A B xs m_exec m_spec H0 pre.
       apply exec_correct_bind.
       eapply exec_correct_map_monad; auto.
       intros * RUN.
@@ -2479,7 +2480,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         {A} (msg : string),
         forall pre, exec_correct pre (raise_oom msg) (raise_oom msg : MemPropT MemState A).
     Proof.
-      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM MLAWS MemMonad A msg.
+      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MemMonad A msg.
       cbn.
       red.
       intros ms st VALID.
@@ -2496,7 +2497,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         {A} (msg1 msg2 : string),
         forall pre, exec_correct pre (raise_error msg1) (raise_error msg2 : MemPropT MemState A).
     Proof.
-      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM MLAWS MemMonad A msg.
+      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MemMonad A msg.
       cbn.
       red.
       intros ms st VALID.
@@ -2528,7 +2529,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         {A} (m : OOM A),
         forall pre, exec_correct pre (lift_OOM m) (lift_OOM m).
     Proof.
-      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM MLAWS MemMonad
+      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MemMonad
              A [NOOM | OOM] pre.
       - apply exec_correct_ret.
       - apply exec_correct_raise_oom.
@@ -2539,7 +2540,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         {A} (m : err A),
         forall pre, exec_correct pre (lift_err_RAISE_ERROR m) (lift_err_RAISE_ERROR m).
     Proof.
-      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM MLAWS MemMonad
+      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MemMonad
              A [ERR | NOERR] pre.
       - apply exec_correct_raise_error.
       - apply exec_correct_ret.
@@ -2550,7 +2551,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         {A} (m : ERR A),
         forall pre, exec_correct pre (lift_ERR_RAISE_ERROR m) (lift_ERR_RAISE_ERROR m).
     Proof.
-      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM MLAWS MemMonad
+      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MemMonad
              A [[ERR] | NOERR] pre.
       - apply exec_correct_raise_error.
       - apply exec_correct_ret.
@@ -2561,7 +2562,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         len ptr,
         forall pre, exec_correct pre (get_consecutive_ptrs ptr len) (get_consecutive_ptrs ptr len).
     Proof.
-      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM MLAWS MemMonad
+      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MemMonad
              len ptr pre.
       unfold get_consecutive_ptrs.
       eapply exec_correct_bind.
@@ -2576,7 +2577,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         exec_correct pre fresh_sid fresh_sid.
     Proof.
       red.
-      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM MLAWS MemMonad pre
+      intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MemMonad pre
              ms st H PRE.
       right.
       eapply MemMonad_run_fresh_sid in H as [st' [sid [EUTT [VALID FRESH]]]].
@@ -2822,7 +2823,6 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
     Context `{MM : MemMonad ExtraState MemM (itree Eff)}.
 
     (*** Data types *)
-    Parameter initial_memory_state : MemState.
     Parameter initial_frame : Frame.
     Parameter initial_heap : Heap.
 

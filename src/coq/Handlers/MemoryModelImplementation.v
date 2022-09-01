@@ -1047,6 +1047,16 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   *)
   Definition MemState := MemState'.
 
+  Definition memory_empty : memory := IntMaps.empty.
+  Definition frame_empty : FrameStack := Singleton [].
+  Definition heap_empty : Heap := IntMaps.empty.
+
+  Definition empty_memory_stack : memory_stack :=
+    mkMemoryStack memory_empty frame_empty heap_empty.
+
+  Definition initial_memory_state : MemState :=
+    mkMemState empty_memory_stack initial_provenance.
+
   Definition mem_state_memory_stack (ms : MemState) : memory_stack
     := ms.(ms_memory_stack).
 
@@ -1513,15 +1523,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Context `{MemMonad ExtraState MemM (itree Eff)}.
 
     (*** Data types *)
-    Definition memory_empty : memory := IntMaps.empty.
-    Definition frame_empty : FrameStack := Singleton [].
-    Definition heap_empty : Heap := IntMaps.empty.
-
-    Definition empty_memory_stack : memory_stack :=
-      mkMemoryStack memory_empty frame_empty heap_empty.
-
-    Definition initial_memory_state : MemState :=
-      mkMemState empty_memory_stack initial_provenance.
 
     Definition initial_frame : Frame :=
       [].
@@ -4919,22 +4920,22 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         {MPROV : MonadProvenance Provenance M} {MSID : MonadStoreId M} {MMS : MonadMemState MemState M}
         {MERR : RAISE_ERROR M} {MUB : RAISE_UB M} {MOOM : RAISE_OOM M} {RunERR : RAISE_ERROR RunM}
         {RunUB : RAISE_UB RunM} {RunOOM : RAISE_OOM RunM}
-        `{EQM : Eq1 M} `{MLAWS : @MonadLawsE M EQM MM}
+        `{EQM : Eq1 M} `{EQRI : @Eq1_ret_inv M EQM MM} `{MLAWS : @MonadLawsE M EQM MM}
         {MemMonad : MemMonad ExtraState M RunM}
-        `{EQV : @Eq1Equivalence RunM MRun (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ MemMonad)}
-        `{LAWS: @MonadLawsE RunM (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ MemMonad) MRun}
-        `{RAISEOOM : @RaiseBindM RunM MRun (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ MemMonad) string (@raise_oom RunM RunOOM)}
-        `{RAISEERR : @RaiseBindM RunM MRun (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ MemMonad) string (@raise_error RunM RunERR)}
+        `{EQV : @Eq1Equivalence RunM MRun (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad)}
+        `{LAWS: @MonadLawsE RunM (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad) MRun}
+        `{RAISEOOM : @RaiseBindM RunM MRun (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad) string (@raise_oom RunM RunOOM)}
+        `{RAISEERR : @RaiseBindM RunM MRun (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad) string (@raise_error RunM RunERR)}
         (ms : MemState) ptr len (st : ExtraState),
         (@eq1 RunM
-              (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ MemMonad)
+              (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad)
               (prod ExtraState (prod MemState (list addr)))
               (@MemMonad_run
-           ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ MemMonad (list addr)
+           ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad (list addr)
            (@get_consecutive_ptrs M MM MOOM MERR ptr len) ms st)
               (fmap (fun ptrs => (st, (ms, ptrs))) (@get_consecutive_ptrs RunM MRun RunOOM RunERR ptr len)))%monad.
     Proof.
-      intros ExtraState0 M RunM MM0 MRun0 MPROV0 MSID0 MMS0 MERR0 MUB0 MOOM0 RunERR0 RunUB0 RunOOM0 MemMonad0 EQM' MLAWS' EQV
+      intros ExtraState0 M RunM MM0 MRun0 MPROV0 MSID0 MMS0 MERR0 MUB0 MOOM0 RunERR0 RunUB0 RunOOM0 MemMonad0 EQM' EQRI' MLAWS' EQV
              LAWS RAISE RAISEERR ms ptr len st.
 
       unfold get_consecutive_ptrs.
@@ -5687,7 +5688,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       match goal with
       | _ : _ |- context [@get_consecutive_ptrs ?MemM ?MM ?OOM ?ERR ?ptr ?len] =>
           epose proof (@get_consecutive_ptrs_inv (itree Eff) MRun RunOOM RunERR (@MemMonad_eq1_runm ExtraState MemM (itree Eff) MM MRun MPROV MSID MMS MERR MUB MOOM RunERR
-                                                                                                    RunUB RunOOM _ _ H) _ _ _ ptr len)
+                                                                                                    RunUB RunOOM _ _ _ H) _ _ _ ptr len)
           as [[oom_msg CONSEC_OOM] | [ptrs CONSEC_RET]]
       end.
 
@@ -8733,98 +8734,398 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Import Eq.
   Import MMSP.
 
-  (*   Lemma allocate_bytes_always_succeeds : *)
-  (*     forall dt init_bytes ms_init, *)
-  (*     exists (alloc_addr : addr) ms_final, *)
-  (*       allocate_bytes_spec_MemPropT dt init_bytes ms_init (ret (ms_final, alloc_addr)). *)
-  (*   Proof. *)
-  (*     intros dt init_bytes ms_init. *)
+  Section MemoryPrimatives.
+    Context {MemM : Type -> Type}.
+    Context {Eff : Type -> Type}.
+    (* Context `{Monad MemM}. *)
+    (* Context `{MonadProvenance Provenance MemM}. *)
+    (* Context `{MonadStoreID MemM}. *)
+    (* Context `{MonadMemState MemState MemM}. *)
+    (* Context `{RAISE_ERROR MemM} `{RAISE_UB MemM} `{RAISE_OOM MemM}. *)
+    Context {ExtraState : Type}.
+    Context `{MemMonad ExtraState MemM (itree Eff)}.
 
-  (*     remember ms_init as m. *)
-  (*     destruct m. *)
-  (*     destruct ms_memory_stack0. *)
-  (*     destruct (MMSP.mem_state_fresh_provenance ms_init) as [p ms_fresh_prov] eqn:FRESH. *)
-  (*     apply mem_state_fresh_provenance_fresh in FRESH as [MEMEQ [PRESERVED_PR FRESH]].     *)
+    (* TODO: Move out of infinite stuff *)
+    Lemma find_free_block_never_ub :
+      forall sz prov ms msg,
+        ~ find_free_block sz prov ms (raise_ub msg).
+    Proof.
+      intros sz prov ms msg FREE.
+      cbn in FREE.
+      auto.
+    Qed.
 
-  (*     set (next_ptr := *)
-  (*            (LLVMParamsBigIntptr.ITOP.int_to_ptr *)
-  (*               (next_memory_key *)
-  (*                  {| *)
-  (*                    memory_stack_memory := memory_stack_memory0; *)
-  (*                    memory_stack_frame_stack := memory_stack_frame_stack0; *)
-  (*                    memory_stack_heap := memory_stack_heap0 *)
-  (*                  |}) *)
-  (* (LLVMParamsBigIntptr.PROV.allocation_id_to_prov *)
-  (*               (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id *)
-  (*                  (LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0))))). *)
+    Lemma find_free_block_never_err :
+      forall sz prov ms msg,
+        ~ find_free_block sz prov ms (raise_error msg).
+    Proof.
+      intros sz prov ms msg FREE.
+      cbn in FREE.
+      auto.
+    Qed.
 
-  (*     assert (MonadLawsE (MemStateFreshT (itree Eff))) as LAWS by admit. *)
-  (*     assert (Eq1_ret_inv (MemStateFreshT (itree Eff))) as RETINV by admit. *)
-  (*     (* pose proof @get_consecutive_ptrs_succeeds (MemStateFreshT (itree Eff)) _ _ _ RETINV _ _ LAWS next_ptr (Datatypes.length init_bytes) as (ptrs & CONSEC). *) *)
-  (*     assert (MonadLawsE (MemPropT MMSP.MemState)) as LAWS' by admit. *)
-  (*     assert (Eq1_ret_inv (MemPropT MMSP.MemState)) as RETINV' by admit. *)
-  (*     (* pose proof @get_consecutive_ptrs_succeeds (MemPropT MMSP.MemState) _ _ _ RETINV' _ _ LAWS' next_ptr (Datatypes.length init_bytes) as (ptrs & CONSEC). *) *)
-  (*     pose proof @get_consecutive_ptrs_succeeds (MemStateFreshT (itree Eff)) _ _ _ RETINV _ _ LAWS next_ptr (Datatypes.length init_bytes) as (ptrs & CONSEC). *)
+    Lemma find_free_block_always_succeeds :
+      forall sz prov ms,
+      exists ptr ptrs,
+        find_free_block sz prov ms (ret (ms, (ptr, ptrs))).
+    Proof.
+      intros sz prov ms.
+      assert (exists ptr ptrs, get_free_block sz prov ≈ ret (ptr, ptrs)) as [ptr [ptrs GET_FREE]].
+      admit.
 
-  (*     exists next_ptr. *)
-  (*     exists ({| *)
-  (*         MemoryBigIntptrInfiniteSpec.MMSP.ms_memory_stack := *)
-  (*           add_all_to_frame *)
-  (*             {| *)
-  (*               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := *)
-  (*                 add_all_index *)
-  (*                   (map *)
-  (*                      (fun b : SByte => *)
-  (*                       (b, *)
-  (*                       LLVMParamsBigIntptr.PROV.provenance_to_allocation_id *)
-  (*                         (LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0))) init_bytes) *)
-  (*                   (next_memory_key *)
-  (*                      {| *)
-  (*                        MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := memory_stack_memory0; *)
-  (*                        MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := *)
-  (*                          memory_stack_frame_stack0; *)
-  (*                        MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := memory_stack_heap0 *)
-  (*                      |}) memory_stack_memory0; *)
-  (*               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := memory_stack_frame_stack0; *)
-  (*               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := memory_stack_heap0 *)
-  (*             |} (map LLVMParamsBigIntptr.PTOI.ptr_to_int ptrs); *)
-  (*         MemoryBigIntptrInfiniteSpec.MMSP.ms_provenance := *)
-  (*           LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0 *)
-  (*         |}). *)
+      exists ptr. exists ptrs.
 
-  (*     assert store_id as init_store_id. *)
-  (*     admit. *)
+      pose proof (find_free_block_correct sz prov (fun _ _ => True)) as FREE.
 
-  (*     pose proof @allocate_bytes_correct (MemStateFreshT (itree Eff)) Eff as CORRECT. *)
-  (*     unfold exec_correct in CORRECT. *)
-  (*     specialize (CORRECT store_id _ _ _ _ _ _ _ _ _ _ _ _ dt init_bytes ms_init init_store_id). *)
-  (*     forward CORRECT. *)
-  (*     admit. *)
-  (*     destruct CORRECT as [UB | CORRECT]. *)
-  (*       - (* UB in spec *) *)
-  (*         destruct UB as [ubmsg UB]. *)
-  (*         unfold MemSpec.allocate_bytes_spec_MemPropT in *. *)
+      unfold exec_correct in GET_FREE.
+      specialize (FREE ms st).
+      forward FREE. admit.
+      forward FREE; auto.
 
-  (*         (* Fresh provenance bind in MemPropT *) *)
-  (*         cbn in UB. *)
-  (*         destruct UB as [[] | UB]. *)
-  (*         destruct UB as [ms_fresh_pr [pr [FRESH_PROV_INVARIANTS UB]]]. *)
-  (*         destruct UB as [ALLOC_FAILS_UB | UB]. *)
-  (*         + (* Allocation fails, should be bogus because we prove it succeeds... *) *)
+      destruct FREE as [[ub_msg UB] | FREE].
+      apply find_free_block_never_ub in UB; inv UB.
 
-  (*         +  *)
+      destruct FREE as [ERR | [OOM | RET]].
+      - destruct ERR as [err_msg [RUN [err_msg_spec ERR]]].
+        eapply find_free_block_never_err in ERR; inv ERR.
+      - cbn in *.
+        split; auto.
+        destruct OOM as [oom_msg [RUN _]].
+        unfold get_free_block in RUN.
+        rewrite MemMonad_run_bind in RUN.
+        rewrite MemMonad_get_mem_state in RUN.
+        rewrite Monad.bind_ret_l in RUN.
+        destruct ms as [[mem fs h] pr] eqn:HMS.
+        cbn in *.
 
-  (*         rewrite MemMonad_run_fresh_provenance in UB. *)
-  (*         unfold MemSpec.allocate_bytes_spec_MemPropT' in . *)
+        epose proof (@get_consecutive_ptrs_succeeds
+                      MemM
+                      MM EQM _ _ _ _ MLAWS
+                      (LLVMParamsBigIntptr.ITOP.int_to_ptr
+                         (next_memory_key
+                            {|
+                              MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
+                              MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs;
+                              MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
+                            |})
+                         (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
+                            (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id prov)))
+                      sz) as (ptrs' & GEP).
 
-  (*         cbn in UB. *)
+        Set Nested Proofs Allowed.
+        #[global] Instance MemMonad_eq1_runm_proper :
+          forall A,
+            Proper (@eq1 _ EQM A ==> eq ==> eq ==>
+                         @eq1 (itree Eff)
+                         (@MemMonad_eq1_runm ExtraState MemM (itree Eff) MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB
+                                             RunOOM EQM EQRI MLAWS H)
+                         _) MemMonad_run.
+        Proof.
 
-  (*         destruct UB as [sab [pr ]. *)
-  (*       destruct UB as [sab [a [BLAH REST]]]. *)
+          unfold Proper, respectful.
+          intros A x y H0 x0 y0 H1 x1 y1 H2; subst.
+        Admitted.
+
+        epose proof MemMonad_eq1_runm_proper.
+        specialize (H0 (prod LLVMParamsBigIntptr.ADDR.addr (list LLVMParamsBigIntptr.ADDR.addr))).
+        unfold Proper, respectful in H0.
+
+        specialize (H0
+                      (ptrs <- (@MemSpec.MemHelpers.get_consecutive_ptrs
+                         MemM MM MOOM MERR
+                         (LLVMParamsBigIntptr.ITOP.int_to_ptr
+                            (next_memory_key
+                               {|
+                                 MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
+                                 MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs;
+                                 MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
+                               |})
+                            (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
+                               (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id prov))) sz);;
+                       ret
+                         (LLVMParamsBigIntptr.ITOP.int_to_ptr
+                            (next_memory_key
+                               {|
+                                 MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
+                                 MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs;
+                                 MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
+                               |})
+                            (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
+                               (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id prov)), ptrs))
+
+                      (ret
+                         (LLVMParamsBigIntptr.ITOP.int_to_ptr
+                            (next_memory_key
+                               {|
+                                 MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
+                                 MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs;
+                                 MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
+                               |})
+                            (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
+                               (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id prov)), ptrs'))
+                   ).
+        forward H0.
+        { admit.
+        }
+
+        specialize (H0 {|
+               MemoryBigIntptrInfiniteSpec.MMSP.ms_memory_stack :=
+                 {|
+                   MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
+                   MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs;
+                   MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
+                 |};
+               MemoryBigIntptrInfiniteSpec.MMSP.ms_provenance := pr
+                      |}
+                       {|
+               MemoryBigIntptrInfiniteSpec.MMSP.ms_memory_stack :=
+                 {|
+                   MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
+                   MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs;
+                   MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
+                 |};
+               MemoryBigIntptrInfiniteSpec.MMSP.ms_provenance := pr
+                       |}
+                       eq_refl).
+        specialize (H0 st st eq_refl).
+
+        rewrite H0 in RUN.
+        clear H0.
+        rewrite MemMonad_run_ret in RUN.
+
+        cbn in RUN.
+        apply MemMonad_eq1_raise_oom_inv in RUN.
+        contradiction.
+      - destruct RET as [st' [ms' [[ptr' ptrs'] [RUN [FREE VALID]]]]].
+        cbn in *.
+        destruct FREE as [MEMEQ FREE].
+        subst.
+        split; [tauto|].
+
+        unfold get_free_block in *.
+        rewrite MemMonad_run_bind in RUN.
+        rewrite MemMonad_get_mem_state in RUN.
+        rewrite Monad.bind_ret_l in RUN.
+
+        destruct ms' as [[mem fs h] pr] eqn:HMS.
+
+        epose proof (@get_consecutive_ptrs_succeeds
+                      MemM
+                      MM EQM _ _ _ _ MLAWS
+                      (LLVMParamsBigIntptr.ITOP.int_to_ptr
+                         (next_memory_key
+                            {|
+                              MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
+                              MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs;
+                              MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
+                            |})
+                         (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
+                            (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id prov)))
+                      sz) as (ptrs_gep & GEP).
+    Admitted.
+
+    (* Lemma find_free_block_always_succeeds : *)
+    (*   forall sz prov ms (st : ExtraState), *)
+    (*   exists ptr ptrs, *)
+    (*     find_free_block sz prov ms (ret (ptr, ptrs)). *)
+    (* Proof. *)
+    (*   intros sz prov ms st. *)
+    (*   pose proof (find_free_block_correct sz prov (fun _ _ => True)) as GET_FREE. *)
+    (*   unfold exec_correct in GET_FREE. *)
+    (*   specialize (GET_FREE ms st). *)
+    (*   forward GET_FREE. admit. *)
+    (*   forward GET_FREE; auto. *)
+
+    (*   destruct GET_FREE as [[ub_msg UB] | GET_FREE]. *)
+    (*   apply find_free_block_never_ub in UB; inv UB. *)
+
+    (*   destruct GET_FREE as [ERR | [OOM | RET]]. *)
+    (*   - destruct ERR as [err_msg [RUN [err_msg_spec ERR]]]. *)
+    (*     eapply find_free_block_never_err in ERR; inv ERR. *)
+    (*   - cbn in *. *)
+    (*     destruct OOM as [oom_msg [RUN _]]. *)
+    (*     unfold get_free_block in RUN. *)
+    (* Qed. *)
+
+    Lemma allocate_bytes_post_conditions_can_always_be_satisfied :
+      forall (ms_init ms_fresh_pr : MemState) dt bytes pr ptr ptrs
+        (FRESH_PR : (@fresh_provenance Provenance (MemPropT MemState) _ ms_init (ret (ms_fresh_pr, pr))))
+        (FIND_FREE : find_free_block (length bytes) pr ms_fresh_pr (ret (ms_fresh_pr, (ptr, ptrs))))
+        (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length bytes))
+        (NON_VOID : dt <> DTYPE_Void),
+      exists ms_final,
+        allocate_bytes_post_conditions ms_fresh_pr dt bytes pr ms_final ptr ptrs.
+    Proof.
+      intros ms_init ms_fresh_pr dt bytes pr ptr ptrs FRESH_PR FIND_FREE BYTES_SIZE NON_VOID.
+
+      destruct ms_fresh_pr as [[mem fs h] pr'] eqn:HMS.      
+
+      set (new_ptr := LLVMParamsBigIntptr.ITOP.int_to_ptr
+         (next_memory_key
+            {|
+              MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
+              MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs;
+              MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
+            |})
+         (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
+            (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id pr))).
+
+      pose proof (allocate_bytes_correct dt bytes (fun _ _ => True) ms_init) as CORRECT.
+      unfold exec_correct in CORRECT.
+      assert (ExtraState) as st by admit.
+      specialize (CORRECT st).
+      forward CORRECT. admit.
+      forward CORRECT; auto.
+
+      destruct CORRECT as [[ubmsg UB] | CORRECT].
+      { cbn in UB.
+        destruct UB as [UB | UB]; [inv UB|].
+        destruct UB as [ms [pr' [FRESH UB]]].
+        destruct UB as [UB | UB]; [inv UB|].
+        destruct UB as [ms' [[ptr' ptrs'] [[EQ FREE] UB]]].
+        subst.
+        destruct UB as [[UB | UB] | UB]; try contradiction.
+        destruct UB as [ms'' [[ptr'' ptrs''] [[EQ FREE'] UB]]].
+        contradiction.
+      }
+
+      destruct CORRECT as [[errmsg [ERR [errspecmsg ERRSPEC]]] | CORRECT].
+      { cbn in ERRSPEC.
+        destruct ERRSPEC as [UB | UB]; [inv UB|].
+        destruct UB as [ms [pr' [FRESH UB]]].
+        destruct UB as [UB | UB]; [inv UB|].
+        destruct UB as [ms' [[ptr' ptrs'] [[EQ FREE] UB]]].
+        subst.
+        destruct UB as [UB | UB]; try contradiction.
+        destruct UB as [ms'' [[ptr'' ptrs''] [[EQ FREE'] UB]]].
+        contradiction.
+      }
+
+      destruct CORRECT as [[oommsg [OOM [oomspecmsg OOMSPEC]]] | CORRECT].
+      { cbn in *.
+      }
+
+      destruct ms_fresh_pr as [[mem fs h] pr'] eqn:HMS.
+      exists {|
+        MemoryBigIntptrInfiniteSpec.MMSP.ms_memory_stack :=
+        {|
+          MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
+          MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs;
+          MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
+        |};
+        MemoryBigIntptrInfiniteSpec.MMSP.ms_provenance := pr'
+      |}.
+      eexists.
+      split.
+
+
+      
+
+
+      assert 
+      pose proof (@MemMonad_run
+                    ExtraState MemM _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ H _
+                    (allocate_bytes dt bytes)
+                    ms_fresh_pr
+                    initial_state (* Probably wrong, not guaranteed to be valid. May need existence lemma *)
+                 ).
+      (allocate_bytes dt bytes)).
+
+      unfold exec_correct in CORRECT.
+       destruct CORRECT.
+    Qed.
+    Lemma allocate_bytes_always_succeeds :
+      forall dt init_bytes ms_init,
+      exists (alloc_addr : addr) ms_final,
+        allocate_bytes_spec_MemPropT dt init_bytes ms_init (ret (ms_final, alloc_addr)).
+    Proof.
+      intros dt init_bytes ms_init.
+
+      remember ms_init as m.
+      destruct m.
+      destruct ms_memory_stack0.
+      destruct (MMSP.mem_state_fresh_provenance ms_init) as [p ms_fresh_prov] eqn:FRESH.
+      apply mem_state_fresh_provenance_fresh in FRESH as [MEMEQ [PRESERVED_PR FRESH]].
+
+      set (next_ptr :=
+             (LLVMParamsBigIntptr.ITOP.int_to_ptr
+                (next_memory_key
+                   {|
+                     memory_stack_memory := memory_stack_memory0;
+                     memory_stack_frame_stack := memory_stack_frame_stack0;
+                     memory_stack_heap := memory_stack_heap0
+                   |})
+  (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
+                (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id
+                   (LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0))))).
+
+      assert (MonadLawsE (MemStateFreshT (itree Eff))) as LAWS by admit.
+      assert (Eq1_ret_inv (MemStateFreshT (itree Eff))) as RETINV by admit.
+      (* pose proof @get_consecutive_ptrs_succeeds (MemStateFreshT (itree Eff)) _ _ _ RETINV _ _ LAWS next_ptr (Datatypes.length init_bytes) as (ptrs & CONSEC). *)
+      assert (MonadLawsE (MemPropT MMSP.MemState)) as LAWS' by admit.
+      assert (Eq1_ret_inv (MemPropT MMSP.MemState)) as RETINV' by admit.
+      (* pose proof @get_consecutive_ptrs_succeeds (MemPropT MMSP.MemState) _ _ _ RETINV' _ _ LAWS' next_ptr (Datatypes.length init_bytes) as (ptrs & CONSEC). *)
+      pose proof @get_consecutive_ptrs_succeeds (MemStateFreshT (itree Eff)) _ _ _ RETINV _ _ LAWS next_ptr (Datatypes.length init_bytes) as (ptrs & CONSEC).
+
+      exists next_ptr.
+      exists ({|
+          MemoryBigIntptrInfiniteSpec.MMSP.ms_memory_stack :=
+            add_all_to_frame
+              {|
+                MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory :=
+                  add_all_index
+                    (map
+                       (fun b : SByte =>
+                        (b,
+                        LLVMParamsBigIntptr.PROV.provenance_to_allocation_id
+                          (LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0))) init_bytes)
+                    (next_memory_key
+                       {|
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := memory_stack_memory0;
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack :=
+                           memory_stack_frame_stack0;
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := memory_stack_heap0
+                       |}) memory_stack_memory0;
+                MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := memory_stack_frame_stack0;
+                MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := memory_stack_heap0
+              |} (map LLVMParamsBigIntptr.PTOI.ptr_to_int ptrs);
+          MemoryBigIntptrInfiniteSpec.MMSP.ms_provenance :=
+            LLVMParamsBigIntptr.PROV.next_provenance ms_provenance0
+          |}).
+
+      assert store_id as init_store_id.
+      admit.
+
+      pose proof @allocate_bytes_correct (MemStateFreshT (itree Eff)) Eff as CORRECT.
+      unfold exec_correct in CORRECT.
+      specialize (CORRECT store_id _ _ _ _ _ _ _ _ _ _ _ _ dt init_bytes ms_init init_store_id).
+      forward CORRECT.
+      admit.
+      destruct CORRECT as [UB | CORRECT].
+        - (* UB in spec *)
+          destruct UB as [ubmsg UB].
+          unfold MemSpec.allocate_bytes_spec_MemPropT in *.
+
+          (* Fresh provenance bind in MemPropT *)
+          cbn in UB.
+          destruct UB as [[] | UB].
+          destruct UB as [ms_fresh_pr [pr [FRESH_PROV_INVARIANTS UB]]].
+          destruct UB as [ALLOC_FAILS_UB | UB].
+          + (* Allocation fails, should be bogus because we prove it succeeds... *)
+
+          +
+
+          rewrite MemMonad_run_fresh_provenance in UB.
+          unfold MemSpec.allocate_bytes_spec_MemPropT' in .
+
+          cbn in UB.
+
+          destruct UB as [sab [pr ].
+        destruct UB as [sab [a [BLAH REST]]].
 
 
 
-  (*   Qed. *)
+    Qed.
 
   Lemma allocate_bytes_succeeds_spec_correct :
     forall (ms_init ms_fresh_pr ms_final : MemState) (st sid st' : store_id) (dt : dtyp) (init_bytes : list SByte) (pr : Provenance) (ptr : addr) (ptrs : list addr)
@@ -8838,6 +9139,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
            (ALLOC : (@MemMonad_run store_id (MemStateFreshT (itree Eff)) (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ (@allocate_bytes (MemStateFreshT (itree Eff)) Eff _ _ _ _ _ _ _ _ _ _ _ _ _ dt init_bytes) ms_init st ≈ ret (st', (ms_final, ptr)))%monad)
            (CONSEC : (@get_consecutive_ptrs (MemStateFreshT (itree Eff)) _ _ _ ptr (length init_bytes) ≈ ret ptrs)%monad)
            (PR : address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr)),
+      allocate_bytes_spec_MemPropT dt init_bytes
       allocate_bytes_succeeds_spec ms_fresh_pr dt init_bytes pr ms_final ptr ptrs.
   Proof.
     intros ms_init ms_fresh_pr ms_final st sid st' dt init_bytes pr ptr ptrs VALID VALID' BYTES_SIZE NON_VOID RUN_FRESH MEMORY_FRESH RUN_FRESH_SID ALLOC CONSEC PR.
