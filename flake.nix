@@ -27,8 +27,23 @@
             });
 
         version = "vellvm:master";
-      in {
-        defaultPackage =
-          (pkgs.callPackage ./release.nix (ocamlPkgs // coqPkgs // { inherit coq version; })).vellvm;
+      in rec {
+        packages = {
+          default = (pkgs.callPackage ./release.nix (ocamlPkgs // coqPkgs // { inherit coq version; })).vellvm;
+        };
+
+        defaultPackage = packages.default;
+
+        app.default = flake-utils.lib.mkApp { drv = packages.default; };
+
+        devShells = {
+          # Include a fixed version of clang in the development environment for testing.
+          default = pkgs.mkShell {
+            inputsFrom = [ packages.default ];
+            buildInputs = [ pkgs.clang_13 ];
+          };
+        };
+
+        devShell = devShells.default;
       });
 }
