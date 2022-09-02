@@ -236,14 +236,16 @@ Module Infinite.
              rewrite map_ret in ERR.
              rewrite map_ret in ERR.
              cbn in ERR.
-             (* TODO: inv *)
-             admit.
+             symmetry in ERR.
+             apply Raise.raise_ret_inv_itree in ERR.
+             contradiction.
           -- intros msg OOM.
              rewrite map_ret in OOM.
              rewrite map_ret in OOM.
              cbn in OOM.
-             (* TODO: inv *)
-             admit.
+             symmetry in OOM.
+             apply Raise.raiseOOM_ret_inv_itree in OOM.
+             contradiction.
           -- intros st' ms' addr_dv SUCC.
              rewrite map_ret in SUCC.
              rewrite map_ret in SUCC.
@@ -430,14 +432,16 @@ Module Infinite.
              rewrite map_ret in ERR.
              rewrite map_ret in ERR.
              cbn in ERR.
-             (* TODO: inv *)
-             admit.
+             symmetry in ERR.
+             apply Raise.raise_ret_inv_itree in ERR.
+             contradiction.
           -- intros msg OOM.
              rewrite map_ret in OOM.
              rewrite map_ret in OOM.
              cbn in OOM.
-             (* TODO: inv *)
-             admit.
+             symmetry in OOM.
+             apply Raise.raiseOOM_ret_inv_itree in OOM.
+             contradiction.
           -- intros st' ms' addr_dv SUCC.
              rewrite map_ret in SUCC.
              rewrite map_ret in SUCC.
@@ -622,14 +626,16 @@ Module Infinite.
              rewrite map_ret in ERR.
              rewrite map_ret in ERR.
              cbn in ERR.
-             (* TODO: inv *)
-             admit.
+             symmetry in ERR.
+             apply Raise.raise_ret_inv_itree in ERR.
+             contradiction.
           -- intros msg OOM.
              rewrite map_ret in OOM.
              rewrite map_ret in OOM.
              cbn in OOM.
-             (* TODO: inv *)
-             admit.
+             symmetry in OOM.
+             apply Raise.raiseOOM_ret_inv_itree in OOM.
+             contradiction.
           -- intros st' ms' addr_dv SUCC.
              rewrite map_ret in SUCC.
              rewrite map_ret in SUCC.
