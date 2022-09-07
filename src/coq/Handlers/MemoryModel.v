@@ -429,6 +429,13 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   Definition generate_undef_bytes (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
     generate_num_undef_bytes (sizeof_dtyp dt) dt sid.
 
+  Lemma generate_undef_bytes_length :
+    forall dt sid bytes,
+      generate_undef_bytes dt sid = ret bytes ->
+      sizeof_dtyp dt = N.of_nat (length bytes).
+  Proof.
+  Admitted.
+
   Section Serialization.
     (** ** Serialization *)
   (*      Conversion back and forth between values and their byte representation *)
@@ -2035,6 +2042,21 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       (** Whether a piece of extra state is valid for a given execution *)
       MemMonad_valid_state : MemState -> ExtraState -> Prop;
 
+      (** Some lemmas about valid states *)
+      (* This may not be true for infinite memory. Valid state is
+         mostly used to ensure that we can find a store id that hasn't
+         been used in memory yet...
+
+         Unfortunately, if memory is infinite it's possible to
+         construct a MemState that has a byte allocated for every
+         store id... Even though store ids are unbounded integers,
+         they have the same cardinality as the memory :|.
+       *)
+      (*
+      MemMonad_has_valid_state :
+      forall (ms : MemState), exists (st : ExtraState),
+        MemMonad_valid_state ms st;
+       *)
     (** Run bind / ret laws *)
     MemMonad_run_bind
       {A B} (ma : M A) (k : A -> M B) (ms : MemState) (st : ExtraState):
@@ -3377,6 +3399,163 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       apply exec_correct_raise_error.
     Qed.
   End Correctness.
+
+    Import LP.PROV.
+    Import LP.SIZEOF.
+    Import LP.ADDR.
+
+    Lemma find_free_block_inv :
+      forall len pr ms_init
+        (res : err_ub_oom (MemState * (addr * list addr)))
+        (FIND : find_free_block len pr ms_init res),
+        (* Success *)
+        (exists ptr ptrs,
+            res = ret (ms_init, (ptr, ptrs))) \/
+          (* OOM *)
+          (exists oom_msg,
+              res = raise_oom oom_msg).
+    Proof.
+      intros len pr ms_init res FIND.
+      unfold find_free_block in FIND.
+      cbn in *.
+      destruct res as [[[[[[[oom_res] | [[ub_res] | [[err_res] | res']]]]]]]] eqn:Hres;
+        cbn in *; try contradiction.
+
+      - (* OOM *)
+        right.
+        exists oom_res.
+        reflexivity.
+      - (* Success *)
+        destruct res' as [ms' [ptr ptrs]].
+        destruct FIND as [MEQ BLOCKFREE].
+        subst.
+        left.
+        do 2 eexists.
+        reflexivity.
+    Qed.
+
+    Lemma allocate_bytes_spec_MemPropT_no_ub :
+      forall (ms_init : MemState)
+        dt bytes
+        (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length bytes))
+        (NON_VOID : dt <> DTYPE_Void)
+        (ub_msg : string),
+        ~ allocate_bytes_spec_MemPropT dt bytes ms_init (raise_ub ub_msg).
+    Proof.
+      intros ms_init dt bytes BYTES_SIZE NON_VOID ub_msg CONTRA.
+
+      unfold allocate_bytes_spec_MemPropT in CONTRA.
+      cbn in CONTRA.
+      destruct CONTRA as [[] | [ms' [pr' [FRESH [[] | CONTRA]]]]].
+      destruct CONTRA as [ms'' [[ptr ptrs] [[EQ BLOCKFREE] CONTRA]]]; subst.
+      destruct CONTRA as [[CONTRA | CONTRA] | CONTRA]; try contradiction.
+      destruct CONTRA as [ms''' [[ptr' ptrs'] [POST CONTRA]]]; contradiction.
+    Qed.
+
+    Lemma allocate_bytes_spec_MemPropT_no_err :
+      forall (ms_init : MemState)
+        dt bytes
+        (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length bytes))
+        (NON_VOID : dt <> DTYPE_Void)
+        (err_msg : string),
+        ~ allocate_bytes_spec_MemPropT dt bytes ms_init (raise_error err_msg).
+    Proof.
+      intros ms_init dt bytes BYTES_SIZE NON_VOID err_msg CONTRA.
+
+      unfold allocate_bytes_spec_MemPropT in CONTRA.
+      cbn in CONTRA.
+      destruct CONTRA as [[] | [ms' [pr' [FRESH [[] | CONTRA]]]]].
+      destruct CONTRA as [ms'' [[ptr ptrs] [[EQ BLOCKFREE] CONTRA]]]; subst.
+      destruct CONTRA as [[] | [ms''' [[ptr' ptrs'] [POST []]]]].
+    Qed.
+
+    Lemma allocate_bytes_spec_MemPropT_inv :
+      forall (ms_init : MemState)
+        dt bytes
+        (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length bytes))
+        (NON_VOID : dt <> DTYPE_Void)
+        (res : err_ub_oom (MemState * LP.ADDR.addr))
+        (ALLOC : allocate_bytes_spec_MemPropT dt bytes ms_init res),
+        (exists ms_final ptr,
+            res = ret (ms_final, ptr)) \/
+          (exists oom_msg,
+              res = raise_oom oom_msg).
+    Proof.
+      intros ms_init dt bytes BYTES_SIZE NON_VOID res ALLOC.
+      unfold allocate_bytes_spec_MemPropT in ALLOC.
+      destruct res as [[[[[[[oom_res] | [[ub_res] | [[err_res] | res']]]]]]]] eqn:Hres;
+        cbn in *; try contradiction.
+      - (* OOM *)
+        right. eexists; reflexivity.
+      - (* UB *)
+        destruct ALLOC as [[] | [ms' [pr' [FRESH [[] | ALLOC]]]]].
+        destruct ALLOC as [ms'' [[ptr ptrs] [[MEQ BLOCKFREE] [[UB | UB] | ALLOC]]]];
+          try contradiction; subst.
+
+        destruct ALLOC as [ms''' [[ptr' ptrs'] ALLOC]].
+        tauto.
+      - (* Error *)
+        destruct ALLOC as [[] | [ms' [pr' [FRESH [[] | ALLOC]]]]].
+        destruct ALLOC as [ms'' [[ptr ptrs] [[MEQ BLOCKFREE] [[] | ALLOC]]]].
+        destruct ALLOC as [ms''' [[ptr' ptrs'] ALLOC]].
+        tauto.
+      - (* Success *)
+        destruct res' as [ms a].
+        subst.
+        left.
+
+        destruct ALLOC as [ms' [pr' [FRESH ALLOC]]].
+        destruct ALLOC as [ms'' [[ptr ptrs] [[MEQ BLOCKFREE] ALLOC]]]; subst.
+        destruct ALLOC as [ms''' [[ptr' ptrs'] ALLOC]].
+        destruct ALLOC as [[POST [PTREQ PTRSEQ]] [MEQ PTREQ']].
+        subst.
+        repeat eexists.
+    Qed.
+
+    Lemma allocate_dtyp_spec_inv :
+      forall (ms_init : MemState) dt
+        (NON_VOID : dt <> DTYPE_Void)
+        (res : err_ub_oom (MemState * LP.ADDR.addr))
+        (ALLOC : allocate_dtyp_spec dt ms_init res),
+        (exists ms_final ptr,
+            res = ret (ms_final, ptr)) \/
+          (exists oom_msg,
+              res = raise_oom oom_msg).
+    Proof.
+      intros ms_init dt NON_VOID res ALLOC.
+      unfold allocate_dtyp_spec in *.
+      Opaque allocate_bytes_spec_MemPropT.
+      cbn in ALLOC.
+      destruct res as [[[[[[[oom_res] | [[ub_res] | [[err_res] | res']]]]]]]] eqn:Hres;
+        cbn in *; try contradiction.
+      - (* OOM *)
+        right. eexists; reflexivity.
+      - (* UB *)
+        destruct ALLOC as [[] | [ms' [sid [FRESH [GEN | ALLOC]]]]].
+        { destruct (generate_undef_bytes dt sid); cbn in *; contradiction. }
+
+        destruct ALLOC as [ms'' [bytes [GEN ALLOC]]].
+        eapply allocate_bytes_spec_MemPropT_inv in ALLOC; eauto.
+
+        destruct (generate_undef_bytes dt sid) eqn:HGEN; cbn in *; inv GEN.
+        eapply generate_undef_bytes_length; eauto.
+      - (* Error *)
+        destruct ALLOC as [[] | [ms' [sid [FRESH [GEN | ALLOC]]]]].
+        { destruct (generate_undef_bytes dt sid); cbn in *; contradiction. }
+
+        destruct ALLOC as [ms'' [bytes [GEN ALLOC]]].
+        eapply allocate_bytes_spec_MemPropT_inv in ALLOC; eauto.
+
+        destruct (generate_undef_bytes dt sid) eqn:HGEN; cbn in *; inv GEN.
+        eapply generate_undef_bytes_length; eauto.
+      - (* Success *)
+        destruct res' as [ms a].
+        subst.
+        left.
+        repeat eexists.
+      Transparent allocate_bytes_spec_MemPropT.
+    Qed.
+
 End MemoryModelTheory.
 
 Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP).
@@ -3899,14 +4078,6 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
     unfold generate_undef_bytes.
     apply generate_num_undef_bytes_succeeds.
   Qed.
-
-  (* TODO: Move this *)
-  Lemma generate_undef_bytes_length :
-    forall dt sid bytes,
-      generate_undef_bytes dt sid = ret bytes ->
-      sizeof_dtyp dt = N.of_nat (length bytes).
-  Proof.
-  Admitted.
 
   Lemma allocate_dtyp_spec_can_always_succeed :
     forall (ms_init ms_fresh_sid ms_fresh_pr : MemState) dt pr sid

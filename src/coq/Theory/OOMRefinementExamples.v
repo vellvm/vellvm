@@ -230,41 +230,13 @@ Module Infinite.
         * exists sid. exists ms_final.
           unfold my_handle_memory_prop.
           unfold MemPropT_lift_PropT_fresh.
-          right.
-          split; [|split].
-          -- intros msg ERR.
-             rewrite map_ret in ERR.
-             rewrite map_ret in ERR.
-             cbn in ERR.
-             symmetry in ERR.
-             apply Raise.raise_ret_inv_itree in ERR.
-             contradiction.
-          -- intros msg OOM.
-             rewrite map_ret in OOM.
-             rewrite map_ret in OOM.
-             cbn in OOM.
-             symmetry in OOM.
-             apply Raise.raiseOOM_ret_inv_itree in OOM.
-             contradiction.
-          -- intros st' ms' addr_dv SUCC.
-             rewrite map_ret in SUCC.
-             rewrite map_ret in SUCC.
-             cbn in SUCC.
-             assert ((ms_final, (sid, DVALUE_Addr addr)) = (ms', (st', addr_dv))) as EQRES.
-             { eapply (@eq1_ret_ret
-                       (itree
-                          (sum1 ExternalCallE
-                                (sum1 PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))))
-                    )); eauto.
-
-               typeclasses eauto.
-             }
-
-             inversion EQRES.
-             subst ms' st' addr_dv.
-
-             cbn.
-             exists ms_final, addr.
+          right; right; right.
+          do 3 eexists.
+          split.
+          -- do 2 rewrite map_ret; cbn.
+             reflexivity.
+          -- cbn.
+             exists ms_final. exists addr.
              tauto.
         * rewrite map_ret.
           setoid_rewrite map_bind.
@@ -426,41 +398,13 @@ Module Infinite.
         * exists sid. exists ms_final.
           unfold my_handle_memory_prop.
           unfold MemPropT_lift_PropT_fresh.
-          right.
-          split; [|split].
-          -- intros msg ERR.
-             rewrite map_ret in ERR.
-             rewrite map_ret in ERR.
-             cbn in ERR.
-             symmetry in ERR.
-             apply Raise.raise_ret_inv_itree in ERR.
-             contradiction.
-          -- intros msg OOM.
-             rewrite map_ret in OOM.
-             rewrite map_ret in OOM.
-             cbn in OOM.
-             symmetry in OOM.
-             apply Raise.raiseOOM_ret_inv_itree in OOM.
-             contradiction.
-          -- intros st' ms' addr_dv SUCC.
-             rewrite map_ret in SUCC.
-             rewrite map_ret in SUCC.
-             cbn in SUCC.
-             assert ((ms_final, (sid, DVALUE_Addr addr)) = (ms', (st', addr_dv))) as EQRES.
-             { eapply (@eq1_ret_ret
-                       (itree
-                          (sum1 ExternalCallE
-                                (sum1 PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))))
-                    )); eauto.
-
-               typeclasses eauto.
-             }
-
-             inversion EQRES.
-             subst ms' st' addr_dv.
-
-             cbn.
-             exists ms_final, addr.
+          right; right; right.
+          do 3 eexists.
+          split.
+          -- do 2 rewrite map_ret; cbn.
+             reflexivity.
+          -- cbn.
+             exists ms_final. exists addr.
              tauto.
         * rewrite map_ret.
           setoid_rewrite map_bind.
@@ -620,41 +564,13 @@ Module Infinite.
         * exists sid. exists ms_final.
           unfold my_handle_memory_prop.
           unfold MemPropT_lift_PropT_fresh.
-          right.
-          split; [|split].
-          -- intros msg ERR.
-             rewrite map_ret in ERR.
-             rewrite map_ret in ERR.
-             cbn in ERR.
-             symmetry in ERR.
-             apply Raise.raise_ret_inv_itree in ERR.
-             contradiction.
-          -- intros msg OOM.
-             rewrite map_ret in OOM.
-             rewrite map_ret in OOM.
-             cbn in OOM.
-             symmetry in OOM.
-             apply Raise.raiseOOM_ret_inv_itree in OOM.
-             contradiction.
-          -- intros st' ms' addr_dv SUCC.
-             rewrite map_ret in SUCC.
-             rewrite map_ret in SUCC.
-             cbn in SUCC.
-             assert ((ms_final, (sid, DVALUE_Addr addr)) = (ms', (st', addr_dv))) as EQRES.
-             { eapply (@eq1_ret_ret
-                       (itree
-                          (sum1 ExternalCallE
-                                (sum1 PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))))
-                    )); eauto.
-
-               typeclasses eauto.
-             }
-
-             inversion EQRES.
-             subst ms' st' addr_dv.
-
-             cbn.
-             exists ms_final, addr.
+          right; right; right.
+          do 3 eexists.
+          split.
+          -- do 2 rewrite map_ret; cbn.
+             reflexivity.
+          -- cbn.
+             exists ms_final. exists addr.
              tauto.
         * rewrite map_ret.
           setoid_rewrite map_bind.
@@ -713,28 +629,138 @@ Module Infinite.
     setoid_rewrite interp_global_ret in INTERP.
     setoid_rewrite interp_local_stack_ret in INTERP.
 
-    exists (Ret (m, (sid, (lenv, stack, (genv, DVALUE_I1 one))))).
-    split.
-    { exists (Ret (m, (sid, (lenv, stack, (genv, DVALUE_I1 one))))).
+    rewrite interp_prop_vis in INTERP.
+
+    (* Maybe write a lemma to unfold this... *)
+    cbn in INTERP.
+    Import MMEP.MemSpec.
+    unfold my_handle_memory_prop in INTERP.
+    Opaque bind ret.
+    Opaque MMEP.MemSpec.allocate_dtyp_spec.
+    cbn in INTERP.
+    unfold bind_PropT in INTERP.
+    destruct INTERP as [ta [k [ALLOC [K INTERP]]]].
+    destruct ALLOC as [sid' [ms' ALLOC]].
+
+    Import MemTheory.
+    pose proof allocate_dtyp_spec_inv m (DTYPE_I 64) as ALLOCINV.
+    forward ALLOCINV. intros CONTRA; inv CONTRA.
+
+    Transparent bind ret.
+    Transparent MMEP.MemSpec.allocate_dtyp_spec.
+
+    (* TODO: move this *)
+    Arguments MMEP.MemSpec.allocate_dtyp_spec dt : simpl never.
+
+    cbn in ALLOC.
+    unfold MemPropT_lift_PropT_fresh in ALLOC.
+    cbn in ALLOC.
+
+    Transparent bind ret.
+    Transparent MMEP.MemSpec.allocate_dtyp_spec.
+
+    destruct ALLOC as [ALLOC_UB | [ALLOC_ERR | [ALLOC_OOM | ALLOC_SUC]]].
+    - (* UB *)
+      destruct ALLOC_UB as [ub_msg [ALLOC_UB | [sab [a [ALLOC_UB []]]]]].
+      apply ALLOCINV in ALLOC_UB.
+      destruct ALLOC_UB as [[ms_final [ptr ALLOC_UB]] | [oom_msg ALLOC_UB]];
+        inv ALLOC_UB.
+    - (* ERR *)
+      destruct ALLOC_ERR as [err_msg [MAP [spec_msg [ALLOC_ERR | [sab [a [ALLOC_ERR []]]]]]]].
+      apply ALLOCINV in ALLOC_ERR.
+      destruct ALLOC_ERR as [[ms_final [ptr ALLOC_ERR]] | [oom_msg ALLOC_ERR]];
+        inv ALLOC_ERR.
+    - (* OOM *)
+      destruct ALLOC_OOM as [err_msg [MAP [spec_msg [ALLOC_OOM | [sab [a [ALLOC_OOM []]]]]]]].
+      apply ALLOCINV in ALLOC_OOM.
+      destruct ALLOC_OOM as [[ms_final [ptr ALLOC_OOM]] | [oom_msg ALLOC_OOM]];
+        inv ALLOC_OOM.
+
+      Import Raise.
+      apply raiseOOM_map_itree_inv in MAP.
+      rewrite MAP in K.
+      rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_OOM _)) in K.
+      apply raiseOOM_map_itree_inv in K.
+      rewrite K in UNDEF.
+
+      (* TODO: should be clear that t' is raiseOOM as well *)
+      (* Should be able to have a lemma for that *)
+      assert (t' ≈ raiseOOM err_msg) as T' by admit.
+
+      exists (raiseOOM err_msg).
       split.
-      unfold t_ret.
-      cbn.
-      go.
-      unfold interp_memory_prop.
-      admit.
-      unfold model_undef_h.
-      eapply interp_prop_ret_refine; eauto.
-    }
-    {
-      (* t' is the result of t_alloc *)
+      + exists (raiseOOM err_msg).
+        split.
+        * cbn.
+          go_prime.
+          (* TODO: interp_memory_prop_ret *)
+          unfold interp_memory_prop.
+          cbn.
+
+        (* Supposedly I can do this rewrite with the new interp_prop... *)
+          assert
+            (interp_prop
+            (fun (T : Type)
+               (e : (ExternalCallE +'
+                                      LLVMParamsBigIntptr.Events.IntrinsicE +'
+                                                                               LLVMParamsBigIntptr.Events.MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T)
+               (t : itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T) =>
+               exists (sid'0 : store_id) (ms'0 : MMEP.MMSP.MemState),
+                 interp_memory_prop_h e sid m (ITree.map (fun x : T => (ms'0, (sid'0, x))) t))
+            (@memory_k_spec ExternalCallE (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE))
+            (local_env * Stack.stack * res_L1) RR_mem
+            (Ret2 genv (lenv, stack) (DVALUE_I1 DynamicValues.Int1.one))
+            (Ret2 genv (lenv, stack) (DVALUE_I1 DynamicValues.Int1.one))).
+          2: admit. (* Pretending I rewrote *)
+
+          apply interp_prop_ret_pure; auto.
+        * cbn.
+          (* TODO: model_undef_h reflexive / OOM... *)
+          admit.
+      + unfold refine_OOM_h.
+        cbn.
+        rewrite T'.
+        (* TODO: Need raiseOOM reflexivity *)
+        admit.
+    - (* Success *)    
+      exists (Ret (m, (sid, (lenv, stack, (genv, DVALUE_I1 one))))).
+      split.
+      { exists (Ret (m, (sid, (lenv, stack, (genv, DVALUE_I1 one))))).
+        split.
+        unfold t_ret.
+        cbn.
+        go.
+        unfold interp_memory_prop.
+        admit.
+        unfold model_undef_h.
+        eapply interp_prop_ret_pure; eauto.
+      }
+      { (* t' is the successful result of t_alloc *)
+        destruct ALLOC_SUC as [sid'' [ ms'' [x [MAP ALLOC_SUC]]]].        
+        destruct ALLOC_SUC as [ms''' [a [ALLOC [MEQ XEQ]]]].
+        subst.
+
+        Lemma itree_map_ret_inv :
+          forall {E X Y} f (t : itree E X) (y : Y),
+            ITree.map f t ≈ ret y ->
+            exists (x : X), t ≈ ret x /\ f x = y.
+        Proof.
+        Admitted.
+
+        apply itree_map_ret_inv in MAP as [x [TA EQ]].
+        inv EQ.
+        rewrite TA in K.
+        cbn in K.
+        apply itree_map_ret_inv in K as [x [TPRE EQ]].
+        
       (* t' could in general be:
 
          - OOM: OOM is a refinement of everything, so this is fine.
          - Ret: Needs to return one, but it will if alloca succeeds
          - UB:
-           + May not be possible
+           + Not possible.
          - ERR:
-           + Shouldn't actually be possible.
+           + Not possible.
        *)
 
       (* Ruling out UB and ERR are the real problems now. *)
@@ -750,11 +776,58 @@ Module Infinite.
       Transparent MMEP.MemSpec.allocate_dtyp_spec.
 
       Ltac break_fresh_sid_in H :=
-        destruct H as [?ms [?fresh_sid [?FRESHSID H]]].
+        destruct H as [?ms [?new_sid [?FRESHSID H]]].
 
       Ltac break_fresh_provenance_in H :=
-        destruct H as [?ms [?fresh_pr [?FRESHPR H]]].
+        destruct H as [?ms [?new_pr [?FRESHPR H]]].
 
+      Import MMS.
+      Import MMEP.MMSP.
+      Opaque allocate_dtyp_spec.
+      unfold MMEP.MemSpec.handle_memory_prop in *.
+      cbn in *.
+      pose proof allocate_dtyp_spec_can_always_succeed as SUCCEEDS.
+      cbn in *.
+
+      destruct HANDLER as [[ubmsg UB] | HANDLER].
+      { cbn in UB.
+        destruct UB as [UB | [sab [a [UB []]]]].
+        destruct UB as [UB | UB]; try contradiction.
+        { (* OOM when generating undef bytes...
+
+             Probably means that we OOM.
+           *)
+          break_fresh_sid_in H.
+          destruct H as [ms' [a [BLAH FOO]]].
+          destruct FOO.
+          - pose proof generate_undef_bytes_succeeds (DTYPE_I 64) a as (bytes & GENBYTES).
+            rewrite GENBYTES in H.
+            cbn in H.
+            inv H.
+          - destruct H as [ms'' [a' [BLAH' FOO]]].
+            pose proof generate_undef_bytes_succeeds (DTYPE_I 64) a as (bytes & GENBYTES).
+            rewrite GENBYTES in BLAH'.
+            cbn in BLAH'.
+            inv BLAH'.
+            destruct FOO as [[] | FOO].
+            destruct FOO as [ms'' [a' [BLAH' FOO]]].
+            destruct FOO as [[] | FOO].
+            destruct FOO as [ms''' [a'' [BLAH'' FOO]]].
+            destruct a''.
+            inv BLAH''.
+            destruct FOO as [[TYPE_UB | SIZEUB] | FOO].
+            + inv TYPE_UB.
+            + apply generate_undef_bytes_length in GENBYTES.
+              contradiction.
+            + destruct FOO as [_ [_ [_ []]]].
+        }
+
+        destruct H as [ms' [a [_ CONTRA]]]; contradiction.
+      }
+
+      destruct HANDLER as [[errmsg ERR] | HANDLER].
+
+      cbn in *.
       destruct HANDLER as [[ubmsg UB] | [ALLOC_ERROR [ALLOC_OOM ALLOC]]].
       - cbn in UB.
         exfalso.

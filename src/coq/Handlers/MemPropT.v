@@ -331,16 +331,16 @@ Proof.
        (exists msg_spec,
            spec ms (raise_ub msg_spec)) \/
          (* Error *)
-         ((forall msg,
-              t ≈ (raise_error msg) ->
-              exists msg_spec, spec ms (raise_error msg_spec))) /\
+         ((exists msg,
+              t ≈ (raise_error msg) /\
+              exists msg_spec, spec ms (raise_error msg_spec))) \/
            (* OOM *)
-           (forall msg,
-               t ≈ (raise_oom msg) ->
-               exists msg_spec, spec ms (raise_oom msg_spec)) /\
+           (exists msg,
+               t ≈ (raise_oom msg) /\
+               exists msg_spec, spec ms (raise_oom msg_spec)) \/
            (* Success *)
-           (forall ms' x,
-               t ≈ (ret (ms', x)) ->
+           (exists ms' x,
+               t ≈ (ret (ms', x)) /\
                spec ms (ret (ms', x)))).
 Defined.
 
@@ -356,15 +356,15 @@ Proof.
        (exists msg_spec,
            spec ms (raise_ub msg_spec)) \/
          (* Error *)
-         ((forall msg,
-              t ≈ (raise_error msg) ->
-              exists msg_spec, spec ms (raise_error msg_spec))) /\
+         ((exists msg,
+              t ≈ (raise_error msg) /\
+              exists msg_spec, spec ms (raise_error msg_spec))) \/
            (* OOM *)
-           (forall msg,
-               t ≈ (raise_oom msg) ->
-               exists msg_spec, spec ms (raise_oom msg_spec)) /\
+           (exists msg,
+               t ≈ (raise_oom msg) /\
+               exists msg_spec, spec ms (raise_oom msg_spec)) \/
            (* Success *)
-           (forall st' ms' x,
-               t ≈ (ret (ms', (st', x))) ->
+           (exists st' ms' x,
+               t ≈ (ret (ms', (st', x))) /\
                spec ms (ret (ms', x)))).
 Defined.

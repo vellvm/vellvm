@@ -110,6 +110,13 @@ Section OOM.
     intros [].
   Qed.
 
+  Lemma raiseOOM_map_itree_inv :
+    forall A B (f : A -> B) t x,
+      ITree.map f t ≈ raiseOOM x ->
+      t ≈ raiseOOM x.
+  Proof.
+  Admitted.
+
   Lemma raiseOOM_ret_inv_itree :
       forall A x (y : A),
         ~ (raiseOOM x) ≈ (ret y).
