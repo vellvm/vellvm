@@ -22,6 +22,7 @@ From Vellvm Require Import
      Utils.Monads
      Utils.MapMonadExtra
      Utils.PropT
+     Utils.InterpProp
      Utils.ListUtil
      Handlers.MemoryModelImplementation.
 
@@ -193,7 +194,6 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
   Require Import String.
 
   Definition L4_convert : Handler E1.L4 E2.L4.
-  Proof.
     refine (fun A e => _).
 
     refine (match e with
@@ -232,7 +232,6 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
   Defined.
 
   Definition L5_convert : Handler E1.L5 E2.L5.
-  Proof.
     refine (fun A e => _).
 
     refine (match e with
@@ -265,7 +264,6 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
   Defined.
 
   Definition L6_convert : Handler E1.L6 E2.L6.
-  Proof.
     refine (fun A e => _).
 
     refine (match e with
@@ -329,7 +327,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     := match res with
        | (ms, (sid, ((lenv, lstack), (genv, dv)))) =>
            dv' <- dvalue_convert dv;;
-           ret (MMEP.initial_memory_state, (0, (([], []), ([], dv'))))
+           ret (MMEP.MMSP.initial_memory_state, (0, (([], []), ([], dv'))))
        end.
  
   Definition refine_E1E2_L6 (srcs : PropT IS1.LP.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop
@@ -374,36 +372,61 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
   Instance refine_OOM_h_eq_itree {E F T RR} : Proper (eq_itree eq ==> eq_itree eq ==> iff) (@refine_OOM_h E F T RR).
   Admitted.
 
+  From ITree Require Import Eq.EqAxiom.
+
+  (* Lemma interp_prop_bind : *)
+  (*   forall R E F *)
+  (*     (h_spec : E ~> PropT F) *)
+  (*     (k_spec : forall T R, E T -> itree F T -> (T -> itree E R) -> (T -> itree F R) -> itree F R -> Prop) *)
+  (*     R' (t : itree E R') (k : R' -> itree E R) *)
+  (*   , Eq1_PropT _ (interp_prop h_spec k_spec R eq (bind t k)) *)
+  (*               (bind (interp_prop h_spec (fun _ _ _ _ _ _ _ => True) R' eq t) *)
+  (*                     (fun x => interp_prop h_spec k_spec R eq (k x))). *)
+  (* Proof. *)
+  (* Admitted. *)
+
+  (* Lemma interp_propTF_bind : *)
+  (*   forall E F (h_spec : forall T : Type, E T -> PropT F T) k_spec R (RR : relation R) sim *)
+  (*     X (t : itree E X) (k : X -> itree E R) t2, *)
+  (*     interp_PropTF h_spec k_spec RR sim t t-> *)
+  (*     interp_PropTF h_spec k_spec RR sim -> *)
+  (*     interp_PropTF h_spec k_spec RR sim (observe (ITree.bind t k)) t2. *)
+    
+  (* OOM_h (@OOM_spec) (flip RR) (upaco2 (interp_PropT_ E2 E2 OOM_h (@OOM_spec) T (flip RR)) r) *)
+  (*   (observe (ITree.bind (EC.L4_convert A e) (fun x : A => Tau (interp EC.L4_convert (k1 x))))) *)
+  (*   (interp EC.L4_convert t2) *)
+
+  Lemma bind_tau_k:
+    forall {E : Type -> Type} {R : Type} (U : Type) (t : itree E U) (k : U -> itree E R),
+      ITree.bind t (fun x => Tau (k x)) ≅ Tau (ITree.bind t k).
+  Proof.
+    intros.
+    rewrite (itree_eta t).
+    genobs t ot. clear t Heqot. revert ot k.
+    ginit. gcofix CIH; intros.
+    induction ot.
+    - setoid_rewrite bind_ret_l. gstep.
+      reflexivity.
+    - rewrite bind_tau. gstep. constructor.
+      rewrite bind_tau. rewrite (itree_eta t).
+      gfinal. left. eapply CIH.
+    - rewrite 2 bind_vis. gstep.
+  Admitted.
+
   Lemma refine_OOM_h_L4_convert_tree :
     forall T x_inf y_inf RR,
       refine_OOM_h RR x_inf y_inf ->
       refine_OOM_h RR (@L4_convert_tree T x_inf) (@L4_convert_tree T y_inf).
   Proof.
-    (*
     intros T x y RR.
-    unfold L4_convert_tree.
-    unfold InterpreterStackBigIntptr.LP.Events.L4 in *.
+    unfold L4_convert_tree; cbn.
     rewrite (unfold_interp y).
-    revert x y.
-    pcofix R.
-    intros t u REF.
-    punfold REF.
-    pfold.
-    red.
-    red in REF.
-    induction REF.
-    - cbn.
-      apply Interp_PropT_Ret with r2.
-      auto.
-      rewrite eq2, interp_ret.
-      reflexivity.
-    - cbn.
-
-
-    unfold L4_convert_tree in *.
-
-    unfold refine_OOM_h in *.
-     *)
+    match goal with
+    | |- context [refine_OOM_h RR (interp EC.L4_convert x) ?r] => remember r
+    end.
+    assert (Heq: i ≅ _interp EC.L4_convert (observe y)). {
+      subst; reflexivity. }
+    clear Heqi.
   Admitted.
 
   Lemma refine_OOM_h_bind :
@@ -416,24 +439,6 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     pinversion H; subst.
     - cbn.
       unfold refine_OOM_h.
-      eapply interp_prop_Proper3.
-      + unfold Proper, respectful, flip, impl.
-        intros T0 R0 RR b a x0 y0 H0 x1 y1 H2 x2 y2 H3 x3 y3 H4 x4 y4 H5; subst.
-        split; intros KSEPC;
-          destruct y0 as [e | [e | e]]; cbn in *; auto.
-      + rewrite unfold_bind.
-        rewrite <- H1.
-        reflexivity.
-      + reflexivity.
-      + eapply interp_prop_Proper2.
-        * unfold Proper, respectful, flip, impl.
-          intros A R0 e ta k1 k2 x0 y0 EQ KSPEC; subst.
-          destruct e as [e | [e | e]]; cbn in *; try rewrite EQ; auto.
-        * setoid_rewrite eq2.
-          rewrite bind_ret_l.
-          reflexivity.
-        * apply RK.
-          auto.
   Admitted.
 
   (* If

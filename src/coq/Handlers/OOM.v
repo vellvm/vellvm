@@ -10,6 +10,7 @@ From ExtLib Require Import
 
 From Vellvm Require Import
      Utils.RefineProp
+     Utils.InterpProp
      Utils.Error
      Semantics.LLVMEvents.
 
@@ -60,28 +61,29 @@ Section PARAMS_MODEL.
              {T R : Type}
              (e : Effin T)
              (ta : itree Effout T)
-             (k1 : T -> itree Effin R)
              (k2 : T -> itree Effout R)
              (t2 : itree Effout R) : Prop
     :=
     match e with
-    | inl1 e => t2 ≈ bind ta k2
     | inr1 (inl1 oom) => True
-    | inr1 (inr1 f) => t2 ≈ bind ta k2
+    | _ => t2 ≈ bind ta k2
     end.
 
-  Global Instance oom_k_spec_proper {T R : Type} {RR : R -> R -> Prop} {b a : bool} :
+  From Paco Require Import paco.
+  Global Instance oom_k_spec_proper {T R : Type} {RR : R -> R -> Prop} :
     Proper
       (eq ==>
           eq ==>
           (fun k1 k2 : T -> itree Effout R =>
-             forall x : T, eqit RR b a (k1 x) (k2 x)) ==> eq ==> eq ==> iff)
+             forall x : T, eqit eq true true (k1 x) (k2 x)) ==> eq ==> iff)
       oom_k_spec.
   Proof.
     unfold Proper, respectful.
-    intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2 x3 y3 H3; subst.
-    split; cbn; auto.
-  Qed.
+    intros x y H x0 y0 H0 x2 y2 H2 x3 y3 H3; subst.
+    split; cbn; auto; intros EQ; destruct y; red; cbn in EQ; try rewrite EQ.
+    2, 4 : destruct s; auto; rewrite EQ.
+    all : eapply eutt_clo_bind; [ reflexivity | intros; subst; eauto ; symmetry; eauto ].
+  Qed .
 
   Definition oom_k_spec_correct_trigger :
     k_spec_correct (fun (T : Type) (e : Effout T) => trigger e) (@oom_k_spec).
@@ -98,6 +100,7 @@ Section PARAMS_MODEL.
 
   Definition refine_OOM {T} (RR : relation T) (sources : PropT Effout T) (target : itree Effout T) : Prop
     := exists source, sources source /\ refine_OOM_h RR source target.
+
 
   Global Instance refine_OOM_h_reflexive {R} {RR : relation R} `{Reflexive _ RR} : Reflexive (refine_OOM_h RR).
   Proof.
@@ -120,6 +123,7 @@ Section PARAMS_MODEL.
 
     (* Might be able to have something more general with interp_prop... *)
   Admitted.
+
 End PARAMS_MODEL.
 
 Section PARAMS_INTERP.
@@ -146,6 +150,9 @@ Section PARAMS_INTERP.
 
 End PARAMS_INTERP.
 
+Instance OOM_k_spec_WF E F : k_spec_WF (refine_OOM_handler (F:=F)) (@oom_k_spec E F).
+Admitted.
+
 Lemma eutt_refine_oom_h :
   forall {T} {E F} (RR : relation T) `{REF: Reflexive _ RR} `{TRANS : Transitive _ RR}
     (t1 t2 : itree (E +' OOME +' F) T),
@@ -153,17 +160,16 @@ Lemma eutt_refine_oom_h :
     refine_OOM_h RR t1 t2.
 Proof.
   intros T E F RR REF TRANS t1 t2 H.
-  apply eutt_flip in H.
+  (* apply eutt_flip in H. *)
   unfold refine_OOM_h.
 
-  pose proof interp_prop_Proper_eq.
+  pose proof @interp_prop_Proper_eq.
   unfold Proper, respectful in H0.
 
   eapply H0; eauto.
 
-  { intros T0 R RR0 b a x y H1 x0 y0 H2 x1 y1 H3 x2 y2 H4 x3 y3 H5; subst.
-    split; auto.
-  }
+  typeclasses eauto.
+  { apply eutt_flip. eauto. }
 
   apply interp_prop_refl; eauto.
   - intros X [e | [e | e]]; cbn; reflexivity.
@@ -182,9 +188,9 @@ Proof.
   unfold refine_OOM_h.
 
   unfold raiseOOM.
-  rewrite bind_trigger.
+  eapply interp_prop_eutt_Proper. 1: typeclasses eauto.
+  rewrite bind_trigger. reflexivity. reflexivity.
 
-  Require Import Paco.paco.
   red.
   pstep.
   econstructor.
