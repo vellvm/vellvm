@@ -751,8 +751,68 @@ Module Infinite.
         inv EQ.
         rewrite TA in K.
         cbn in K.
+
+        specialize (INTERP (LLVMParamsBigIntptr.Events.DV.DVALUE_Addr a)).
+        forward INTERP.
+        { rewrite TA.
+          cbn.
+          constructor.
+          reflexivity.
+        }
+
+        (*
+          Not sure if this is true with the new definition... But
+          either way K (... a) should be ret or OOM.
+
+interp_prop_ret_inv:
+  forall (E F : Type -> Type) (h_spec : forall T : Type, E T -> PropT F T)
+    (k_spec : forall T R : Type,
+              E T -> itree F T -> (T -> itree E R) -> (T -> itree F R) -> itree F R -> Prop) 
+    (R : Type) (RR : Relation_Definitions.relation R) (r1 : R) (t : itree F R),
+  interp_prop h_spec k_spec R RR (ret r1) t -> exists r2 : R, RR r1 r2 /\ t ≈ ret r2
+         *)
+
+        apply interp_prop_ret_inv in INTERP.
+        destruct INTERP as [[lenv' [stack' res']] [R2 K']].
+
+        rewrite bind_ret_l in K.
+        rewrite K' in K.
         apply itree_map_ret_inv in K as [x [TPRE EQ]].
+        destruct x as [ms'''' [sid'''' y]].
+        inv EQ.
+
+        (* TODO: may need some kind of inversion lemma about RR_mem and RR_pick *)
+
+        rewrite TPRE in UNDEF.
+        cbn in UNDEF.
+        unfold model_undef_h in UNDEF.
+
+        apply interp_prop_ret_inv in UNDEF.
+        destruct UNDEF as [r2 [RPICK T']].
+
+        destruct r2 as [ms''''' [sid''''' z]].
+
+        #[global] Instance refine_OOM_h_eutt_Proper :
+          forall {E F T RR},
+            Proper (eq ==> eutt eq ==> iff) (@refine_OOM_h E F T RR).
+        Proof.
+          intros E F T RR.
+          unfold Proper, respectful.
+          intros x y XY z w ZW.
+          split; intros REF; subst.
+          - unfold refine_OOM_h in *.
+            rewrite <- ZW.
+            auto.
+          - unfold refine_OOM_h in *.
+            rewrite ZW.
+            auto.
+        Qed.
         
+        rewrite T'.
+
+        cbn.
+
+        apply itree_map_ret_inv in UNDEF as [x [T' EQ']].
       (* t' could in general be:
 
          - OOM: OOM is a refinement of everything, so this is fine.
