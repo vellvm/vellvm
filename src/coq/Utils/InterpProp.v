@@ -692,7 +692,47 @@ Section interp_prop.
         + red in KC. eapply KC. eapply HC in H0. eauto.
           rewrite bind_ret_r, <- itree_eta; reflexivity.
   Qed.
+
 End interp_prop.
+
+Lemma interp_prop_ret_inv:
+  forall (E F : Type -> Type) (h_spec : forall T : Type, E T -> PropT F T)
+    (k_spec : forall T R : Type,
+        E T -> itree F T -> (T -> itree F R) -> itree F R -> Prop) 
+    (R : Type) (RR : Relation_Definitions.relation R) (r1 : R) (t : itree F R),
+    interp_prop h_spec k_spec R RR (ret r1) t -> exists r2 : R, RR r1 r2 /\ t ≈ ret r2.
+Proof.
+  intros E F h_spec k_spec R RR r1 t INTERP.
+  punfold INTERP; [|apply interp_PropT__mono].
+  red in INTERP.
+  setoid_rewrite itree_eta with (t:=t).
+  remember (observe (ret r1)); remember (observe t).
+  clear Heqi0.
+  induction INTERP; subst; pclearbot; intros.
+  - exists r2.
+    cbn in Heqi.
+    inv Heqi.
+    split; auto.
+    cbn.
+    reflexivity.
+  - inv Heqi.
+  - inv Heqi.
+  - cbn in INTERP.
+    inv INTERP.
+    + apply simpobs in H.
+      exists r2; split; auto.
+      rewrite H.
+      rewrite tau_eutt.
+      reflexivity.
+    + specialize (IHINTERP eq_refl).
+      destruct IHINTERP as [r2 [RRr1r2 EQ]].
+      exists r2; split; auto.
+      rewrite <- itree_eta in EQ.
+      rewrite EQ.
+      rewrite tau_eutt.
+      reflexivity.
+  - inv Heqi.
+Qed.
 
 Section interp_refl.
 
