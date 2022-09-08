@@ -6,6 +6,7 @@ From Vellvm Require Import
      Utils.PropT
      Utils.Tactics
      Utils.MonadEq1Laws
+     Utils.InterpProp
      Theory.DenotationTheory
      Theory.InterpreterMCFG
      Handlers.MemoryModelImplementation.
@@ -147,20 +148,30 @@ Module Infinite.
 
       (* TODO: Need something about interp_memory_prop being proper with respect to eutt? *)
       (* Not sure if this is exactly what it should be *)
+
       Set Nested Proofs Allowed.
       #[global] Instance interp_mem_prop_Proper3 :
         forall {E F} `{FAIL : FailureE -< F} `{UB : UBE -< F} `{OOM : OOME -< F}
-          {R} (RR : R -> R -> Prop) a b,
-          Proper (eqit eq a b ==> eq ==> eq ==> eq ==> iff) (@interp_memory_prop E F FAIL UB OOM R RR).
+          {R} (RR : R -> R -> Prop),
+          Proper (eutt eq ==> eq ==> eq ==> eq ==> iff) (@interp_memory_prop E F FAIL UB OOM R RR).
       Proof.
-        intros E F FAIL UB OOM R RR a b.
+        intros E F FAIL UB OOM R RR.
         unfold interp_memory_prop.
         unfold Proper, respectful.
         intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2.
         subst.
-        rewrite H.
-        reflexivity.
-      Qed.
+        split; intros INTERP.
+        - eapply interp_prop_eutt_Proper_impl.
+          + admit.
+          + eauto.
+          + reflexivity.
+          + auto.
+        - eapply interp_prop_eutt_Proper_impl.
+          + admit.
+          + symmetry. apply H.
+          + reflexivity.
+          + auto.
+      Admitted.
 
       setoid_rewrite interp_intrinsics_ret in INTERP.
       setoid_rewrite interp_global_ret in INTERP.
@@ -185,9 +196,33 @@ Module Infinite.
       Proof.
       Admitted.
 
+      Class KSPEC_WF {E F} (h_spec : forall T : Type, E T -> PropT F T)
+            (k_spec : forall T R : Type, E T -> itree F T -> (T -> itree F R) -> itree F R -> Prop) : Type
+        := k_spec_WF_class : k_spec_WF h_spec k_spec.
+
+      #[global] Instance interp_prop_eutt_Proper2:
+        forall {E F : Type -> Type} {h_spec : forall T : Type, E T -> PropT F T}
+          {k_spec : forall T R : Type, E T -> itree F T -> (T -> itree F R) -> itree F R -> Prop}
+          `{WF : @KSPEC_WF _ _ h_spec k_spec},
+          forall (R : Type) (RR : Relation_Definitions.relation R),
+            Proper (eutt eq ==> eutt eq ==> impl) (interp_prop h_spec k_spec R RR).
+      Proof.
+        intros E F h_spec k_spec H R RR.
+        unfold Proper, respectful.
+        intros x y H0 x0 y0 H1 H2.
+        eapply interp_prop_eutt_Proper; eauto.
+        symmetry; auto.
+        symmetry; auto.
+      Qed.
+
       apply ret_map_itree in EQ as ((m', (s', a')) & EQ & FEQ).
 
-      rewrite EQ in UNDEF.
+
+      unfold model_undef_h in *.
+
+      Typeclasses eauto := debug.
+      setoid_rewrite EQ in UNDEF.
+      
       cbn in UNDEF.
 
       cbn in EQ.
