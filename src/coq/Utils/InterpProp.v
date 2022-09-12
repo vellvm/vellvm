@@ -563,10 +563,8 @@ Section interp_prop.
   Qed.
 
   Lemma interp_prop_ret_pure :
-    forall {T E F} (RR : relation T) `{REF: Reflexive _ RR} (x : T)
-      (h : E ~> PropT F)
-      (k_spec : forall T R, E T -> itree F T -> (T -> itree E R) -> (T -> itree F R) -> itree F R -> Prop),
-    interp_prop RR (ret x) (ret x).
+    forall {T} (RR : relation T) `{REF: Reflexive _ RR} (x : T),
+      interp_prop RR (ret x) (ret x).
   Proof.
     intros.
     generalize dependent x.
@@ -579,9 +577,7 @@ Section interp_prop.
   Qed.
  
   Lemma interp_prop_ret_refine :
-    forall {T E F} (RR : relation T) (x y : T)
-      (h : E ~> PropT F)
-      (k_spec : forall T R, E T -> itree F T -> (T -> itree E R) -> (T -> itree F R) -> itree F R -> Prop),
+    forall {T} (RR : relation T) (x y : T),
       RR x y ->
       interp_prop RR (ret x) (ret y).
   Proof.
