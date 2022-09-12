@@ -15,6 +15,7 @@ COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R 
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
+COQMAKEFILE="$(COQBIN)coq_makefile"
 MENHIR=menhir
 CP=cp
 
@@ -77,21 +78,27 @@ VOFILES := $(COQFILESALL:%=coq/%.vo)
 QCVOFILES := $(COQFILESQC:%=coq/%.vo)
 QCVOFILESTEST := $(COQFILESQCTEST:%=coq/%.vo)
 
-.PHONY: all
-all: .depend
-	$(MAKE) coq
-	$(MAKE) extracted
-	$(MAKE) vellvm
+KNOWNTARGETS := CoqMakefile extracted $(EXTRACTDIR)/STAMP interp coq qc-tests opam frontend frontend_exe distclean update-quickchick update-flocq-quickchick rm-qc-test-vo vellvm
+KNOWNFILES := Makefile _CoqProject
+.DEFAULT_GOAL := all
+
+CoqMakefile: Makefile _CoqProject
+	$(COQMAKEFILE) -f _CoqProject -o CoqMakefile
+
+invoke-coqmakefile: CoqMakefile
+	$(MAKE) -j --no-print-directory -f CoqMakefile $(filter-out $(KNOWNTARGETS),$(MAKECMDGOALS))
+
+clean-coqmakefile: CoqMakefile
+	$(MAKE) -j --no-print-directory -f CoqMakefile $(filter-out $(KNOWNTARGETS),$(MAKECMDGOALS)) clean
+
+.PHONY: all invoke-coqmakefile clean-coqmakefile $(KNOWNFILES) vok
+all: quickchick flocq-quickchick vok extracted vellvm
 
 .PHONY: interp
-interp: .depend
-	$(MAKE) coqinterp
-	$(MAKE) extracted
-	$(MAKE) vellvm
+interp: coqinterp extracted vellvm
 
 .PHONY: coq
-coq: .depend
-	$(MAKE) quickchick flocq-quickchick $(VOFILES)
+coq: quickchick flocq-quickchick $(VOFILES)
 
 .PHONY: qc-tests
 qc-tests: rm-qc-test-vo coq $(QCVOFILES) $(QCVOFILESTEST) 
@@ -128,13 +135,12 @@ update-flocq-quickchick:
 update-submodules: update-quickchick update-flocq-quickchick
 
 .PHONY: extracted
-extracted: .depend 
-	$(MAKE) $(EXTRACTDIR)/STAMP $(VOFILES)
+extracted: vok $(EXTRACTDIR)/STAMP
 
-$(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
+$(EXTRACTDIR)/STAMP: vok $(EXTRACTDIR)/Extract.v
 	@echo "Extracting"
-	rm -f $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
 	$(COQEXEC) $(EXTRACTDIR)/Extract.v
+	@echo "Patching extraction"
 	patch -p0 < CRelationClasses.mli.patch
 	./fix-extraction.sh
 	touch $(EXTRACTDIR)/STAMP
@@ -167,7 +173,7 @@ print-includes:
 	@echo $(COQINCLUDES)
 
 .PHONY: clean
-clean: extractedclean
+clean: extractedclean clean-coqmakefile
 	rm -f .depend
 	find $(COQDIR) -name "*.vo" -delete
 	find $(COQDIR) -name "*.vio" -delete
@@ -233,9 +239,5 @@ frontend_exe:
 	cp $(FRONTEND_EXE) frontend
 	chmod u+w frontend
 
-
-############
-
-
-
-include .depend
+%: invoke-coqmakefile
+	@true
