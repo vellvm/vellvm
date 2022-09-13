@@ -6798,39 +6798,101 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         split; auto.
 
         (* TODO: solve_allocate_bytes_post_conditions *)
-        (* TODO: I think this can be a lemma...
+        (* TODO: move, generalize *)
+        Lemma find_free_allocate_bytes_post_conditions :
+          forall (ms_init ms_found_free ms_final : MemState) dt init_bytes pr ptr ptrs
+            memory_stack_memory0 memory_stack_frame_stack0 memory_stack_heap0 ms_provenance0
+            (SIZE : sizeof_dtyp dt = N.of_nat (length init_bytes))
+            (NVOID : dt <> DTYPE_Void)
+            (EQ : ms_found_free = {| ms_memory_stack :=
+                                    {|
+                                      memory_stack_memory := memory_stack_memory0;
+                                      memory_stack_frame_stack := memory_stack_frame_stack0;
+                                      memory_stack_heap := memory_stack_heap0
+                                    |};
+                                    ms_provenance := ms_provenance0
+                                  |})
+            (EQF : ms_final = 
+                     {|
+                       ms_memory_stack :=
+                       add_all_to_frame
+                         {|
+                           memory_stack_memory :=
+                           add_all_index (map (fun b : SByte => (b, provenance_to_allocation_id pr)) init_bytes)
+                                         (ptr_to_int ptr) memory_stack_memory0;
+                           memory_stack_frame_stack := memory_stack_frame_stack0;
+                           memory_stack_heap := memory_stack_heap0
+                         |} (map ptr_to_int ptrs);
+                       ms_provenance := ms_provenance0
+                     |})
+            (FIND_FREE : find_free_block (length init_bytes) pr ms_init (ret (ms_found_free, (ptr, ptrs)))),
+          allocate_bytes_post_conditions ms_found_free dt init_bytes pr ms_final ptr ptrs.
+        Proof.
+          intros ms_init ms_found_free ms_final dt init_bytes pr ptr ptrs memory_stack_memory0
+                 memory_stack_frame_stack0 memory_stack_heap0 ms_provenance0 SIZE EQ EQF FIND_FREE.
+          subst.
+          split.
+          + solve_used_provenance_prop.
+            solve_provenances_preserved.
+          + (* extend_allocations *)
+            pose proof FIND_FREE as FIND_FREE'.
+            eapply find_free_block_ms_eq in FIND_FREE'; subst.
+            eapply find_free_block_extend_allocations; [solve [eauto] | solve_mem_state_memory].
+          + (* extend_read_byte_allowed *)
+            pose proof FIND_FREE as PRE.
+            eapply find_free_block_ms_eq in PRE; subst.
+            eapply find_free_block_extend_read_byte_allowed; [solve [eauto] | solve_mem_state_memory].
+          + pose proof FIND_FREE as PRE.
+            eapply find_free_block_ms_eq in PRE; subst.
+            eapply find_free_block_extend_reads; [solve [eauto] | solve_mem_state_memory].
+          + (* extend_write_byte_allowed *)
+            pose proof FIND_FREE as PRE.
+            eapply find_free_block_ms_eq in PRE; subst.
+            eapply find_free_block_extend_write_byte_allowed; [solve [eauto] | solve_mem_state_memory].
+          + (* extend_free_byte_allowed *)
+            pose proof FIND_FREE as PRE.
+            eapply find_free_block_ms_eq in PRE; subst.
+            eapply find_free_block_extend_free_byte_allowed; [solve [eauto] | solve_mem_state_memory].
+          + (* extend_stack_frame *)
+            (* TODO: Tactic or lemma? *)
+            unfold extend_stack_frame.
+            intros fs1 fs2 MFSP PTRS_ADDED.
+            unfold memory_stack_frame_stack_prop in *.
+            cbn in *.
+            setoid_rewrite <- MFSP in PTRS_ADDED.
+            apply add_ptrs_to_frame_eqv with (fs:=memory_stack_frame_stack0) (ptrs:=ptrs); auto.
 
-             find_free_block -> allocate_bytes_post_conditions
-         *)
-        split.
-        + solve_used_provenance_prop.
-          solve_provenances_preserved.
-        + (* extend_allocations *)
-          pose proof PRE as FREE.
-          eapply find_free_block_ms_eq in PRE; subst.
-          eapply find_free_block_extend_allocations; [solve [eauto] | solve_mem_state_memory].
-        + (* extend_read_byte_allowed *)
-          pose proof PRE as FREE.
-          eapply find_free_block_ms_eq in PRE; subst.
-          eapply find_free_block_extend_read_byte_allowed; [solve [eauto] | solve_mem_state_memory].
+            assert (memory_stack_frame_stack0 = memory_stack_frame_stack {|
+                    memory_stack_memory := 
+                     add_all_index (map (fun b : SByte => (b, provenance_to_allocation_id pr)) init_bytes)
+                     (ptr_to_int ptr) memory_stack_memory0;
+                    memory_stack_frame_stack := memory_stack_frame_stack0;
+                    memory_stack_heap := memory_stack_heap0
+                                                  |}) as EQFS by reflexivity.
+            rewrite EQFS at 1.
+            eapply add_all_to_frame_correct; auto.
+          + solve_heap_preserved.
+          + auto.
+          + auto.
+        Qed.
 
-        + pose proof PRE as FREE.
-          eapply find_free_block_ms_eq in PRE; subst.
-          eapply find_free_block_extend_reads; [solve [eauto] | solve_mem_state_memory].
-        + (* extend_write_byte_allowed *)
-          pose proof PRE as FREE.
-          eapply find_free_block_ms_eq in PRE; subst.
-          eapply find_free_block_extend_write_byte_allowed; [solve [eauto] | solve_mem_state_memory].
-        + (* extend_free_byte_allowed *)
-          pose proof PRE as FREE.
-          eapply find_free_block_ms_eq in PRE; subst.
-          eapply find_free_block_extend_free_byte_allowed; [solve [eauto] | solve_mem_state_memory].
-        + (* extend_stack_frame *)
-          (* TODO *)
-          admit.
-        + solve_heap_preserved.
-        + auto.
-        + auto.
+        (* TODO: move *)
+        Lemma find_free_allocate_bytes_post_conditions_exists :
+          forall (ms_init ms_found_free : MemState) dt init_bytes pr ptr ptrs
+            (SIZE : sizeof_dtyp dt = N.of_nat (length init_bytes))
+            (NVOID : dt <> DTYPE_Void)
+            (FIND_FREE : find_free_block (length init_bytes) pr ms_init (ret (ms_found_free, (ptr, ptrs)))),
+        exists ms_final,
+          allocate_bytes_post_conditions ms_found_free dt init_bytes pr ms_final ptr ptrs.
+        Proof.
+          intros ms_init ms_found_free dt init_bytes pr ptr ptrs SIZE FIND_FREE.
+          destruct ms_found_free.
+          destruct ms_memory_stack0.
+          eexists.
+          eapply find_free_allocate_bytes_post_conditions; eauto.
+        Qed.
+
+        eapply find_free_allocate_bytes_post_conditions; eauto.
       - admit. (* MemMonad_valid_state *)
     Admitted.
 
@@ -8915,15 +8977,19 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Admitted.
 
   Lemma allocate_bytes_post_conditions_can_always_be_satisfied :
-    forall (ms_init ms_fresh_pr : MemState) dt bytes pr ptr ptrs
-      (FRESH_PR : (fresh_provenance ms_init (ret (ms_fresh_pr, pr))))
-      (FIND_FREE : find_free_block (length bytes) pr ms_fresh_pr (ret (ms_fresh_pr, (ptr, ptrs))))
+    forall (ms_init : MemState) dt bytes pr ptr ptrs
+      (* (FRESH_PR : (fresh_provenance ms_init (ret (ms_fresh_pr, pr)))) *)
+      (FIND_FREE : find_free_block (length bytes) pr ms_init (ret (ms_init, (ptr, ptrs))))
       (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length bytes))
       (NON_VOID : dt <> DTYPE_Void),
     exists ms_final,
-      allocate_bytes_post_conditions ms_fresh_pr dt bytes pr ms_final ptr ptrs.
+      allocate_bytes_post_conditions ms_init dt bytes pr ms_final ptr ptrs.
   Proof.
-  Admitted.
+    intros ms_init dt bytes pr ptr ptrs FIND_FREE BYTES_SIZE NON_VOID.
+    eexists.
+    split.
+    
+  Qed.
 
   Section MemoryPrimitives.
     Context {MemM : Type -> Type}.
