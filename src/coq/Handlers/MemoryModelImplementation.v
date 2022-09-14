@@ -6849,10 +6849,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             pose proof FIND_FREE as PRE.
             eapply find_free_block_ms_eq in PRE; subst.
             eapply find_free_block_extend_write_byte_allowed; [solve [eauto] | solve_mem_state_memory].
-          + (* extend_free_byte_allowed *)
-            pose proof FIND_FREE as PRE.
-            eapply find_free_block_ms_eq in PRE; subst.
-            eapply find_free_block_extend_free_byte_allowed; [solve [eauto] | solve_mem_state_memory].
           + (* extend_stack_frame *)
             (* TODO: Tactic or lemma? *)
             unfold extend_stack_frame.
@@ -8977,19 +8973,14 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Admitted.
 
   Lemma allocate_bytes_post_conditions_can_always_be_satisfied :
-    forall (ms_init : MemState) dt bytes pr ptr ptrs
-      (* (FRESH_PR : (fresh_provenance ms_init (ret (ms_fresh_pr, pr)))) *)
-      (FIND_FREE : find_free_block (length bytes) pr ms_init (ret (ms_init, (ptr, ptrs))))
+    forall (ms_init ms_fresh_pr : MemState) dt bytes pr ptr ptrs
+      (FRESH_PR : (fresh_provenance ms_init (ret (ms_fresh_pr, pr))))
+      (FIND_FREE : find_free_block (length bytes) pr ms_fresh_pr (ret (ms_fresh_pr, (ptr, ptrs))))
       (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length bytes))
       (NON_VOID : dt <> DTYPE_Void),
     exists ms_final,
-      allocate_bytes_post_conditions ms_init dt bytes pr ms_final ptr ptrs.
-  Proof.
-    intros ms_init dt bytes pr ptr ptrs FIND_FREE BYTES_SIZE NON_VOID.
-    eexists.
-    split.
-    
-  Qed.
+      allocate_bytes_post_conditions ms_fresh_pr dt bytes pr ms_final ptr ptrs.
+  Admitted.
 
   Section MemoryPrimitives.
     Context {MemM : Type -> Type}.

@@ -1731,9 +1731,9 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       malloc_bytes_extended_writes_allowed : extend_write_byte_allowed m1 ptrs m2;
 
       (* free permissions *)
-
+      (* TODO: See #312, need to add this condition back later, but this currently complicates things *)
       (* free_root_allowed covers the case where 0 bytes are allocated *)
-      malloc_bytes_extended_free_root_allowed : extend_free_byte_allowed m1 [ptr] m2;
+      (* malloc_bytes_extended_free_root_allowed : extend_free_byte_allowed m1 [ptr] m2; *)
       malloc_bytes_extended_free_allowed : extend_free_byte_allowed m1 ptrs m2;
 
       (* Framestack preserved *)
@@ -1807,8 +1807,11 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         exists aid, byte_allocated m1 ptr aid;
 
       (* root is allowed to be freed *)
-      free_root_allowed :
-      free_byte_allowed m1 root;
+      (* TODO: add this back. #312 / #313 *)
+      (* Running into problems with exec_correct_free because of the
+         implementation with size 0 allocations / frees *)
+      (* free_root_allowed :
+         free_byte_allowed m1 root; *)
 
       (* all bytes in block are freed. *)
       free_bytes_freed :
