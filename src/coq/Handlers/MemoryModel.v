@@ -1242,7 +1242,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   Definition free_byte_allowed_all_preserved (m1 m2 : MemState) : Prop :=
     forall ptr,
-      write_byte_allowed m1 ptr <-> write_byte_allowed m2 ptr.
+      free_byte_allowed m1 ptr <-> free_byte_allowed m2 ptr.
 
   (** Allocations *)
   Definition allocations_preserved (m1 m2 : MemState) : Prop :=
@@ -1676,9 +1676,6 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       (* write permissions *)
       alloc_bytes_extended_writes_allowed : extend_write_byte_allowed m1 ptrs m2;
 
-      (* free permissions *)
-      alloc_bytes_extended_free_allowed : extend_free_byte_allowed m1 ptrs m2;
-
       (* Add allocated bytes onto the stack frame *)
       allocate_bytes_add_to_frame : extend_stack_frame m1 ptrs m2;
 
@@ -1734,6 +1731,9 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       malloc_bytes_extended_writes_allowed : extend_write_byte_allowed m1 ptrs m2;
 
       (* free permissions *)
+
+      (* free_root_allowed covers the case where 0 bytes are allocated *)
+      malloc_bytes_extended_free_root_allowed : extend_free_byte_allowed m1 [ptr] m2;
       malloc_bytes_extended_free_allowed : extend_free_byte_allowed m1 ptrs m2;
 
       (* Framestack preserved *)
@@ -1805,6 +1805,10 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       forall ptr,
         ptr_in_memstate_heap m1 root ptr ->
         exists aid, byte_allocated m1 ptr aid;
+
+      (* root is allowed to be freed *)
+      free_root_allowed :
+      free_byte_allowed m1 root;
 
       (* all bytes in block are freed. *)
       free_bytes_freed :
