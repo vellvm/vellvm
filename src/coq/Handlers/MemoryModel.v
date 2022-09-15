@@ -3979,13 +3979,12 @@ Module Type MemoryModelInfiniteSpec (LP : LLVMParamsBig) (MP : MemoryParams LP) 
       find_free_block len pr ms (ret (ms, (ptr, ptrs))).
 
   Parameter allocate_bytes_post_conditions_can_always_be_satisfied :
-    forall (ms_init ms_fresh_pr : MemState) dt bytes pr ptr ptrs
-      (FRESH_PR : (fresh_provenance ms_init (ret (ms_fresh_pr, pr))))
-      (FIND_FREE : find_free_block (length bytes) pr ms_fresh_pr (ret (ms_fresh_pr, (ptr, ptrs))))
+    forall (ms_init : MemState) dt bytes pr ptr ptrs
+      (FIND_FREE : find_free_block (length bytes) pr ms_init (ret (ms_init, (ptr, ptrs))))
       (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length bytes))
       (NON_VOID : dt <> DTYPE_Void),
     exists ms_final,
-      allocate_bytes_post_conditions ms_fresh_pr dt bytes pr ms_final ptr ptrs.
+      allocate_bytes_post_conditions ms_init dt bytes pr ms_final ptr ptrs.
 
 End MemoryModelInfiniteSpec.
 
@@ -4026,7 +4025,7 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
     pose proof find_free_block_can_always_succeed
          ms_fresh_pr (length bytes) pr as (ptr & ptrs & FIND_FREE_SUCCESS).
 
-    pose proof allocate_bytes_post_conditions_can_always_be_satisfied ms_init ms_fresh_pr dt bytes pr ptr ptrs FRESH_PR FIND_FREE_SUCCESS BYTES_SIZE NON_VOID as (ms_final & ALLOC).
+    pose proof allocate_bytes_post_conditions_can_always_be_satisfied ms_fresh_pr dt bytes pr ptr ptrs FIND_FREE_SUCCESS BYTES_SIZE NON_VOID as (ms_final & ALLOC).
 
     exists ms_final. exists ptr.
 
@@ -4035,7 +4034,7 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
     split; auto.
 
     (* Find free block *)
-    eexists. exists (ptr, ptrs).
+    exists ms_fresh_pr. exists (ptr, ptrs).
     split; eauto.
 
     (* Post conditions *)
