@@ -205,30 +205,59 @@ Module Infinite.
           {k_spec : forall T R : Type, E T -> itree F T -> (T -> itree F R) -> itree F R -> Prop}
           `{WF : @KSPEC_WF _ _ h_spec k_spec},
           forall (R : Type) (RR : Relation_Definitions.relation R),
-            Proper (eutt eq ==> eutt eq ==> impl) (interp_prop h_spec k_spec R RR).
+            Proper (eutt eq ==> eutt eq ==> iff) (interp_prop h_spec k_spec R RR).
       Proof.
         intros E F h_spec k_spec H R RR.
         unfold Proper, respectful.
-        intros x y H0 x0 y0 H1 H2.
-        eapply interp_prop_eutt_Proper; eauto.
-        symmetry; auto.
-        symmetry; auto.
+        intros x y H0 x0 y0 H1.
+        split; intros H2.
+        - eapply interp_prop_eutt_Proper; eauto.
+          symmetry; auto.
+          symmetry; auto.
+        - eapply interp_prop_eutt_Proper; eauto.
       Qed.
 
+      #[global] Instance KSPEC_poison :
+        k_spec_WF
+          (case_ (E_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))
+                 (case_ PickUvalue_handler (F_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))))
+          (@pick_uvalue_k_spec ExternalCallE (OOME +' UBE +' DebugE +' FailureE)).
+      Proof.
+        apply k_spec_WF_pick_uvalue_k_spec.
+      Defined.
+
+      #[global] Instance KSPEC_memory {sid m} :
+        KSPEC_WF
+          (fun (T : Type)
+             (e : (ExternalCallE +'
+                                    LLVMParamsBigIntptr.Events.IntrinsicE +'
+                                                                             LLVMParamsBigIntptr.Events.MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T)
+             (t : itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T) =>
+             exists (sid' : store_id) (ms' : MMEP.MMSP.MemState),
+               interp_memory_prop_h e sid m (ITree.map (fun x : T => (ms', (sid', x))) t))
+          (@memory_k_spec ExternalCallE (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)).
+      Proof.
+        apply k_spec_WF_memory_k_spec.
+      Defined.
+
       apply ret_map_itree in EQ as ((m', (s', a')) & EQ & FEQ).
-
-
       unfold model_undef_h in *.
 
-      Typeclasses eauto := debug.
-      setoid_rewrite EQ in UNDEF.
+      (* TODO: Why can't I just do this rewrite??? *)
+      (* setoid_rewrite EQ in UNDEF. *)
+      eapply interp_prop_eutt_Proper in UNDEF.
+      3: symmetry; eauto.
+      3: reflexivity.
+      2: apply k_spec_WF_pick_uvalue_k_spec.
       
       cbn in UNDEF.
 
       cbn in EQ.
       subst.
 
-      epose proof allocate_dtyp_spec_can_always_succeed m _ _ (DTYPE_I 64) _ _ _ _ _ as (ms_final & addr & ALLOC).
+      Import MMEP.MMSP.
+      Import MemoryBigIntptr.MMEP.MMSP.
+      epose proof allocate_dtyp_spec_can_always_succeed m m (mkMemState (ms_memory_stack m) (next_provenance (ms_provenance m))) (DTYPE_I 64) _ _ _ _ _ as (ms_final & addr & ALLOC).
 
       exists (Ret2 s' m' (lenv, stack, (genv, DVALUE_Addr addr))). (* Not sure if should be s' or sid, and m' or m *) (* Used to be r2 *)
 
@@ -258,7 +287,7 @@ Module Infinite.
         cbn.
         unfold bind_PropT.
 
-                               (* was just ret r2... *)
+        (* was just ret r2... *)
         exists (ITree.map (fun '(_, (_, x)) => x) (Ret (lenv, (stack, DVALUE_Addr addr)))).
         exists (fun dv => ret (lenv, stack, (genv, dv))).
         split; [|split].
@@ -287,17 +316,17 @@ Module Infinite.
           eapply interp_prop_ret_refine; eauto.
       + apply interp_prop_ret_inv in UNDEF as (r3 & R3 & T').
         unfold model_undef_h.
-        (* Supposedly I can do this rewrite with T' with the new interp_prop... *)
-        assert (interp_prop
-                  (case_ (E_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))
-                         (case_ PickUvalue_handler (F_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))))
-                  (@pick_uvalue_k_spec ExternalCallE (OOME +' UBE +' DebugE +' FailureE))
-                  (MMEP.MMSP.MemState * (store_id * (local_env * Stack.stack * res_L1))) TT
-                  (Ret5 genv (lenv, stack) s' m' (DVALUE_Addr addr)) (ret r3)).
-        2: admit. (* Pretending I rewrote *)
-
+        eapply interp_prop_eutt_Proper2.
+        reflexivity.
+        eauto.
         cbn.
         eapply interp_prop_ret_refine; eauto.
+
+        Unshelve.
+        exact initial_provenance.
+        exact 0%N.
+        cbn.
+        all: admit.
   Admitted.
 
   Definition instr_E_to_L0 {T : Type} : instr_E T -> itree L0 T :=
@@ -345,6 +374,10 @@ Module Infinite.
       setoid_rewrite interp_global_ret in INTERP.
       setoid_rewrite interp_local_stack_ret in INTERP.
 
+      repeat setoid_rewrite bind_ret_l.
+      repeat setoid_rewrite bind_bind.
+      repeat setoid_rewrite bind_ret_l.
+
       (* TODO: Turn this into an interp_memory_prop lemma *)
       unfold interp_memory_prop in INTERP.
       cbn in INTERP.
@@ -359,69 +392,41 @@ Module Infinite.
 
       apply ret_map_itree in EQ as ((m', (s', a')) & EQ & FEQ).
 
-      rewrite EQ in UNDEF.
+      (* TODO: Why can't I just do this rewrite??? *)
+      (* setoid_rewrite EQ in UNDEF. *)
+      eapply interp_prop_eutt_Proper in UNDEF.
+      3: symmetry; eauto.
+      3: reflexivity.
+      2: apply k_spec_WF_pick_uvalue_k_spec.
+
       cbn in UNDEF.
 
       cbn in EQ.
       subst.
 
-      epose proof allocate_dtyp_spec_can_always_succeed m _ _ (DTYPE_I 64) _ _ _ _ _ as (ms_final & addr & ALLOC).
+      Import MMEP.MMSP.
+      Import MemoryBigIntptr.MMEP.MMSP.
+      Import MapMonadExtra.
+      epose proof allocate_dtyp_spec_can_always_succeed m m (mkMemState (ms_memory_stack m) (next_provenance (ms_provenance m))) (DTYPE_I 64) _ _ _ _ _ as (ms_final & addr & ALLOC).
 
       exists (Ret2 s' m' (lenv, stack, (genv, DVALUE_Addr addr))). (* Not sure if should be s' or sid, and m' or m *) (* Used to be r2 *)
 
       split.
-      + go.
-        cbn.
-        repeat setoid_rewrite bind_ret_l.
-        repeat setoid_rewrite bind_bind.
-        repeat rewrite bind_trigger.
-        repeat setoid_rewrite bind_ret_l.
-        setoid_rewrite TranslateFacts.translate_ret.
-        repeat setoid_rewrite bind_ret_l.
-
-        setoid_rewrite interp_vis.
-        cbn.
-        rewrite bind_trigger.
-        rewrite interp_intrinsics_vis.
+      + rewrite interp_bind with (f:=@instr_E_to_L0);
+          rewrite interp_trigger; cbn; rewrite subevent_subevent.
         go.
-        cbn.
-        go.
-        setoid_rewrite bind_ret_l.
+        repeat setoid_rewrite bind_ret_l.
         setoid_rewrite interp_local_stack_ret.
-        setoid_rewrite bind_ret_l.
-
-        repeat setoid_rewrite bind_trigger.
-        setoid_rewrite interp_vis.
-        cbn.
-        setoid_rewrite bind_trigger.
-        setoid_rewrite interp_intrinsics_Tau.
-        setoid_rewrite interp_global_Tau.
-
-        setoid_rewrite interp_intrinsics_vis.
-        setoid_rewrite interp_global_bind.
-        cbn.
-        setoid_rewrite interp_global_trigger.
-        cbn.
-        setoid_rewrite bind_bind.
-        setoid_rewrite bind_ret_l.
-        setoid_rewrite StateFacts.interp_state_tau.
-        setoid_rewrite tau_eutt.
-        setoid_rewrite interp_state_bind.
-        setoid_rewrite interp_state_trigger.
-        cbn.
-        setoid_rewrite map_ret.
-        setoid_rewrite bind_ret_l.
-        cbn.
-        setoid_rewrite tau_eutt.
-        setoid_rewrite interp_ret.
-        setoid_rewrite interp_intrinsics_ret.
-        setoid_rewrite interp_global_ret.
-        setoid_rewrite interp_state_ret.
+        repeat setoid_rewrite bind_ret_l.
 
         (* LEMMA *)
         unfold interp_memory_prop.
         cbn.
 
+
+        Opaque MMEP.MemSpec.allocate_dtyp_spec.
+
+        rewrite bind_trigger.
         eapply interp_prop_vis.
         cbn.
         unfold bind_PropT.
@@ -451,21 +456,29 @@ Module Infinite.
           apply Returns_Ret in RET.
           subst.
           cbn.
-
+          go.
+          rewrite interp_bind with (f:=@instr_E_to_L0);
+            rewrite interp_trigger; cbn; rewrite subevent_subevent.
+          go.
+          rewrite map_ret.
+          go.
+          cbn.
+          rewrite interp_ret.
+          go.
           eapply interp_prop_ret_refine; eauto.
       + apply interp_prop_ret_inv in UNDEF as (r3 & R3 & T').
         unfold model_undef_h.
-        (* Supposedly I can do this rewrite with T' with the new interp_prop... *)
-        assert (interp_prop
-                  (case_ (E_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))
-                         (case_ PickUvalue_handler (F_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))))
-                  (@pick_uvalue_k_spec ExternalCallE (OOME +' UBE +' DebugE +' FailureE))
-                  (MMEP.MMSP.MemState * (store_id * (local_env * Stack.stack * res_L1))) TT
-                  (Ret5 genv (lenv, stack) s' m' (DVALUE_Addr addr)) (ret r3)).
-        2: admit. (* Pretending I rewrote *)
-
+        eapply interp_prop_eutt_Proper2.
+        reflexivity.
+        eauto.
         cbn.
         eapply interp_prop_ret_refine; eauto.
+
+        Unshelve.
+        exact initial_provenance.
+        exact 0%N.
+        cbn.
+        all: admit.
   Admitted.
 
   Lemma remove_alloc_ptoi_block :

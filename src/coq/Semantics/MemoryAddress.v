@@ -204,6 +204,12 @@ Module Type PROVENANCE(Addr:MemoryAddress.ADDRESS).
   Parameter show_prov : Prov -> string.
   Parameter show_provenance : Provenance -> string.
   Parameter show_allocation_id : AllocationId -> string.
+
+  (* Hints *)
+  Hint Resolve
+       provenance_lt_trans
+       provenance_lt_next_provenance
+       provenance_lt_nrefl : PROVENANCE_LT.
 End PROVENANCE.
 
 
