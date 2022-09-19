@@ -70,7 +70,7 @@ Section PARAMS_MODEL.
     end.
 
   From Paco Require Import paco.
-  Global Instance oom_k_spec_proper {T R : Type} {RR : R -> R -> Prop} :
+  #[global] Instance oom_k_spec_proper {T R : Type} {RR : R -> R -> Prop} :
     Proper
       (eq ==>
           eq ==>
@@ -102,7 +102,7 @@ Section PARAMS_MODEL.
     := exists source, sources source /\ refine_OOM_h RR source target.
 
 
-  Global Instance refine_OOM_h_reflexive {R} {RR : relation R} `{Reflexive _ RR} : Reflexive (refine_OOM_h RR).
+  #[global] Instance refine_OOM_h_reflexive {R} {RR : relation R} `{Reflexive _ RR} : Reflexive (refine_OOM_h RR).
   Proof.
     unfold Reflexive.
 
@@ -112,7 +112,7 @@ Section PARAMS_MODEL.
     - apply oom_k_spec_correct_trigger.
   Qed.
 
-  Global Instance refine_OOM_h_transitive {R} {RR : relation R} `{Transitive _ RR} : Transitive (refine_OOM_h RR).
+  #[global] Instance refine_OOM_h_transitive {R} {RR : relation R} `{Transitive _ RR} : Transitive (refine_OOM_h RR).
   Proof.
     (* y is eutt x, except it might run out of memory earlier *)
     (* z is eutt y, except it might run out of memory earlier *)

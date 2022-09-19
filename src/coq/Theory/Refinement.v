@@ -56,13 +56,13 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Definition uvalue_eq (uv1 uv2 : uvalue) : Prop
     := refine_uvalue uv1 uv2 /\ refine_uvalue uv2 uv1.
 
-  Global Instance refine_uvalue_Reflexive : Reflexive refine_uvalue.
+  #[global] Instance refine_uvalue_Reflexive : Reflexive refine_uvalue.
   Proof.
     repeat intro.
     destruct x; (apply RefineConcrete; solve [auto]).
   Qed.
 
-  Global Instance uvalue_eq_Reflexive : Reflexive uvalue_eq.
+  #[global] Instance uvalue_eq_Reflexive : Reflexive uvalue_eq.
   Proof.
     repeat intro.
     split; reflexivity.
@@ -79,7 +79,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     - inversion REF; subst.
   Admitted.
 
-  Global Instance refine_uvalue_Transitive : Transitive refine_uvalue.
+  #[global] Instance refine_uvalue_Transitive : Transitive refine_uvalue.
   Proof.
     repeat intro.
     inversion H; subst.
@@ -99,19 +99,19 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         auto.
   Qed.
 
-  Global Instance uvalue_eq_Transitive : Transitive uvalue_eq.
+  #[global] Instance uvalue_eq_Transitive : Transitive uvalue_eq.
   Proof.
     intros x y z [Rxy Ryx] [Ryz Rzy].
     split; etransitivity; eauto.
   Qed.
 
-  Global Instance uvalue_eq_Symmetric : Symmetric uvalue_eq.
+  #[global] Instance uvalue_eq_Symmetric : Symmetric uvalue_eq.
   Proof.
     intros x y [Rxy Ryx].
     split; auto.
   Qed.
 
-  Global Instance uvalue_eq_Equivalence : Equivalence uvalue_eq.
+  #[global] Instance uvalue_eq_Equivalence : Equivalence uvalue_eq.
   Proof.
     split.
     - apply uvalue_eq_Reflexive.
@@ -367,25 +367,25 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
 
   Definition TT {A} : relation A := fun _ _ => True.
 
-  Global Instance TT_Reflexive {A} : Reflexive (@TT A).
+  #[global] Instance TT_Reflexive {A} : Reflexive (@TT A).
   Proof.
     intro.
     reflexivity.
   Qed.
 
-  Global Instance TT_Transitive {A} : Transitive (@TT A).
+  #[global] Instance TT_Transitive {A} : Transitive (@TT A).
   Proof.
     intro.
     auto.
   Qed.
 
-  Global Instance TT_Symmetric {A} : Symmetric (@TT A).
+  #[global] Instance TT_Symmetric {A} : Symmetric (@TT A).
   Proof.
     intro.
     auto.
   Qed.
 
-  Global Instance TT_Equivalence {A} : Equivalence (@TT A).
+  #[global] Instance TT_Equivalence {A} : Equivalence (@TT A).
   Proof.
     split; typeclasses eauto.
   Qed.
