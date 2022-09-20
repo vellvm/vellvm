@@ -161,6 +161,15 @@ Module Infinite.
     intros x1 x2 X y1 y2 Y.
     split; intros REFINE.
   Admitted.
+
+  Lemma model_undef_h_oom :
+    forall {R} {E F}
+      `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} `{OOME -< E +' PickUvalueE +' F}
+      oom_msg (t' : itree (E +' F) R),
+      model_undef_h eq (raiseOOM oom_msg) t' ->
+      t' ≈ raiseOOM oom_msg.
+  Proof.
+  Admitted.
   
   Definition alloc_code : code dtyp :=
     [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) None None)
@@ -729,12 +738,9 @@ Module Infinite.
       rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_OOM _)) in K.
       apply raiseOOM_map_itree_inv in K.
 
-      (* TODO: why can't I just do this rewrite? *)
       rewrite K in UNDEF.
 
-      (* TODO: should be clear that t' is raiseOOM as well *)
-      (* Should be able to have a lemma for that *)
-      assert (t' ≈ raiseOOM err_msg) as T' by admit.
+      assert (t' ≈ raiseOOM err_msg) as T' by (eapply model_undef_h_oom; eauto).
 
       exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
       split.
@@ -811,7 +817,7 @@ Module Infinite.
         do 2 red.
         unfold refine_res2, refine_res1.
         repeat constructor; auto.
-  Admitted.
+  Qed.
 End Infinite.
 
 Module Finite.
@@ -902,6 +908,15 @@ Module Finite.
     unfold Proper, respectful.
     intros x1 x2 X y1 y2 Y.
     split; intros REFINE.
+  Admitted.
+
+  Lemma model_undef_h_oom :
+    forall {R} {E F}
+      `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} `{OOME -< E +' PickUvalueE +' F}
+      oom_msg (t' : itree (E +' F) R),
+      model_undef_h eq (raiseOOM oom_msg) t' ->
+      t' ≈ raiseOOM oom_msg.
+  Proof.
   Admitted.
 
   (* TODO: Move this, there are duplicates of this elsewhere too. *)
@@ -1087,12 +1102,9 @@ Module Finite.
       rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_OOM _)) in K.
       apply raiseOOM_map_itree_inv in K.
 
-      (* TODO: why can't I just do this rewrite? *)
       rewrite K in UNDEF.
 
-      (* TODO: should be clear that t' is raiseOOM as well *)
-      (* Should be able to have a lemma for that *)
-      assert (t' ≈ raiseOOM err_msg) as T' by admit.
+      assert (t' ≈ raiseOOM err_msg) as T' by (eapply model_undef_h_oom; eauto).
 
       exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
       split.
@@ -1151,7 +1163,6 @@ Module Finite.
 
         unfold model_undef_h in UNDEF.
 
-        (* TODO: why can't I just do this rewrite? *)
         rewrite TPRE in UNDEF.
 
         eapply interp_prop_ret_inv in UNDEF.
@@ -1169,5 +1180,5 @@ Module Finite.
         do 2 red.
         unfold refine_res2, refine_res1.
         repeat constructor; auto.
-  Admitted.
+  Qed.
 End Finite.
