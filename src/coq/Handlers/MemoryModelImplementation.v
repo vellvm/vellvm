@@ -5604,6 +5604,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       `{EQRET : @Eq1_ret_inv M EQM HM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
+      `{RAISE_OOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+      `{RAISE_ERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
       ptr len ptrs,
       (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad ->
       (forall p ix_nat,
@@ -5612,15 +5614,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             NoOom ix = IP.from_Z (Z.of_nat ix_nat) /\
               handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix] = inr p).
   Proof.
-    intros M HM EQM' EQV EQRET OOM ERR LAWS ptr len ptrs CONSEC p ix_nat NTH.
+    intros M HM EQM' EQV EQRET OOM ERR LAWS RAISE_OOM RAISE_ERR ptr len ptrs CONSEC p ix_nat NTH.
     pose proof CONSEC as CONSEC'.
     unfold get_consecutive_ptrs in CONSEC.
     destruct (intptr_seq 0 len) eqn:SEQ.
     2: {
       cbn in CONSEC.
-      rewrite rbm_raise_bind in CONSEC.
-      admit.
-      admit.
+      rewrite rbm_raise_bind in CONSEC; auto.
+      apply rbm_raise_ret_inv in CONSEC; try contradiction; auto.
     }
 
     cbn in CONSEC.
@@ -5628,7 +5629,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     destruct (map_monad
                 (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) eqn:MAP.
     { cbn in CONSEC.
-      admit.
+      apply rbm_raise_ret_inv in CONSEC; try contradiction; auto.
     }
 
     cbn in CONSEC.
@@ -5644,7 +5645,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     exists ix; split; eauto.
 
     eapply intptr_seq_nth in SEQ; eauto.
-  Admitted.
+  Qed.
 
   Lemma get_consecutive_ptrs_prov :
     forall {M : Type -> Type}
@@ -5652,19 +5653,21 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       `{EQRET : @Eq1_ret_inv M EQM HM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
+      `{RAISE_OOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+      `{RAISE_ERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
       ptr len ptrs,
       (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad ->
       forall p, In p ptrs -> address_provenance p = address_provenance ptr.
   Proof.
-    intros M HM EQM' EQV EQRET OOM ERR LAWS ptr len ptrs CONSEC p IN.
+    intros M HM EQM' EQV EQRET OOM ERR LAWS RAISE_OOM RAISE_ERR ptr len ptrs CONSEC p IN.
 
     apply In_nth_error in IN as (ix_nat & NTH).
     pose proof CONSEC as GEP.
-    eapply get_consecutive_ptrs_nth in GEP; eauto.
+    eapply get_consecutive_ptrs_nth in GEP; cbn; eauto.
     destruct GEP as (ix & IX & GEP).
 
     apply handle_gep_addr_preserves_provenance in GEP.
-    auto.
+    eauto.
   Qed.      
 
     Lemma find_free_block_correct :

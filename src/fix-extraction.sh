@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 EXTRACT_DIR=ml/extracted
 
 #Files in which to rewrite

@@ -3673,11 +3673,12 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
       `{EQRET : @Eq1_ret_inv M EQM HM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
+      `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
       ptr len p ptrs,
       (get_consecutive_ptrs ptr len ≈ ret (p :: ptrs))%monad ->
       p = ptr /\ (exists ptr' len', len = S len' /\ (get_consecutive_ptrs ptr' len' ≈ ret ptrs)%monad).
   Proof.
-    intros M HM EQM EQRET EQV OOM ERR LAWS ptr len p ptrs CONSEC.
+    intros M HM EQM EQRET EQV OOM ERR LAWS RBMERR ptr len p ptrs CONSEC.
 
     unfold get_consecutive_ptrs in *.
     pose proof big_intptr_seq_succeeds 0 len as (ips & SEQ).
@@ -3704,7 +3705,7 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
       break_match_hyp.
       (* TODO: Need some kind of inversion lemma for raise_error and ret *)
       cbn in *.
-      admit.
+      eapply rbm_raise_ret_inv in CONSEC; try contradiction; auto.
 
       cbn in *.
       eapply eq1_ret_ret in CONSEC; [|typeclasses eauto].
@@ -3734,13 +3735,14 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
       `{EQRET : @Eq1_ret_inv M EQM HM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
+      `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
       ptr len ptrs,
       (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad ->
       (forall p,
           In p ptrs ->
           (ptr_to_int ptr <= ptr_to_int p)%Z).
   Proof.
-    intros M HM EQM EQV EQRET OOM ERR LAWS ptr len ptrs.
+    intros M HM EQM EQV EQRET OOM ERR LAWS RBMERR ptr len ptrs.
     revert ptr len.
     induction ptrs; intros ptr len CONSEC p IN.
     - inv IN.
@@ -3788,13 +3790,14 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
       `{EQRET : @Eq1_ret_inv M EQM HM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
+      `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
       ptr len ptrs,
       (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad ->
       (forall p,
           In p ptrs ->
           (ptr_to_int ptr <= ptr_to_int p < ptr_to_int ptr + (Z.of_nat len))%Z).
   Proof.
-    intros M HM EQM EQV EQRET OOM ERR LAWS ptr len ptrs.
+    intros M HM EQM EQV EQRET OOM ERR LAWS RBMERR ptr len ptrs.
     revert ptr len.
     induction ptrs; intros ptr len CONSEC p IN.
     - inv IN.
