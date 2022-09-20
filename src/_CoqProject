@@ -9,8 +9,6 @@
 ./coq/Handlers/Local.v
 ./coq/Handlers/UndefinedBehaviour.v
 ./coq/Handlers/SplitLCMemory.v
-./coq/Handlers/MemoryTypeSupport.v
-./coq/Handlers/MemoryModelFinite.v
 ./coq/Handlers/Handlers.v
 ./coq/Handlers/MemPropT.v
 ./coq/Handlers/MemoryModel.v
@@ -80,7 +78,6 @@
 ./coq/Utils/PostConditions.v
 ./coq/Utils/TFor.v
 ./coq/Utils/Tactics.v
-./coq/Utils/IntMapsRaw.v
 ./coq/Utils/Commutation.v
 ./coq/Utils/Default.v
 ./coq/Utils/ErrorMonads.v
