@@ -7,7 +7,7 @@ From ExtLib Require Import
 
 From ITree Require Import
      ITree
-     Eq.Eq
+     Eq.Eqit
      Interp.Interp
      Interp.InterpFacts
      Interp.TranslateFacts

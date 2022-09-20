@@ -12,7 +12,8 @@ From ITree Require Import
      ITree.
 
 From Vellvm Require Import 
-     Semantics.LLVMEvents.
+  Semantics.LLVMEvents
+  Utils.Tactics.
 
 Require Import Coq.Program.Equality.
 
@@ -55,7 +56,7 @@ Section Failure.
 
   Lemma raise_map_itree :
     forall A B (f : A -> B) x,
-      ITree.map f (raise x) ≈ raise x.
+      ITree.map f (@raise _ _ FAIL x) ≈ raise x.
   Proof.
     intros A B f x.
     unfold raise.
@@ -67,7 +68,7 @@ Section Failure.
 
   Lemma raise_map_itree_inv :
     forall A B (f : A -> B) t x,
-      ITree.map f t ≈ raise x ->
+      ITree.map f t ≈ @raise _ _ FAIL x ->
       t ≈ raise x.
   Proof.
     unfold ITree.map. intros A B.
@@ -100,12 +101,12 @@ Section Failure.
       destruct (observe t); eapply eqit_inv in H; inv H.
       destruct H0 as (?&?). destruct H.
       constructor. intros. inv v.
-    - intros.
-      destruct (observe t); eapply eqit_inv in H; try solve [inv H].
+    - intros t TAU.
+      destruct (observe t); eapply eqit_inv in TAU; try solve [inv TAU].
       cbn in *. assert (t1 ≈ raise x). { pstep; eauto. }
       clear H0.
-      assert (t1 ≅ ITree.map f t0). { punfold H; pstep; unfold ITree.map; eauto. }
-      clear H.
+      assert (t1 ≅ ITree.map f t0). { punfold TAU; pstep; unfold ITree.map; eauto. }
+      clear TAU.
       rewrite H0 in H1.
       specialize (IHeqitF eq_refl).
       setoid_rewrite <- unfold_bind in IHeqitF.
@@ -114,7 +115,7 @@ Section Failure.
 
   Lemma raise_ret_inv_itree :
       forall A x (y : A),
-        ~ (raise x) ≈ (ret y).
+        ~ (@raise _ _ FAIL x) ≈ (ret y).
   Proof.
     intros A x y.
     intros CONTRA.
@@ -148,7 +149,7 @@ Section OOM.
 
   Lemma raiseOOM_map_itree :
     forall A B (f : A -> B) x,
-      ITree.map f (raiseOOM x) ≈ raiseOOM x.
+      ITree.map f (raiseOOM (E:=E) x) ≈ raiseOOM x.
   Proof.
     intros A B f x.
     unfold raiseOOM, raise.
@@ -160,7 +161,7 @@ Section OOM.
 
   Lemma raiseOOM_map_itree_inv :
     forall A B (f : A -> B) t x,
-      ITree.map f t ≈ raiseOOM x ->
+      ITree.map f t ≈ raiseOOM (E:=E) x ->
       t ≈ raiseOOM x.
   Proof.
     unfold ITree.map. intros A B.
@@ -193,12 +194,12 @@ Section OOM.
       destruct (observe t); eapply eqit_inv in H; inv H.
       destruct H0 as (?&?). destruct H.
       constructor. intros. inv v.
-    - intros.
-      destruct (observe t); eapply eqit_inv in H; try solve [inv H].
+    - intros t TAU.
+      destruct (observe t); eapply eqit_inv in TAU; try solve [inv TAU].
       cbn in *. assert (t1 ≈ raiseOOM x). { pstep; eauto. }
       clear H0.
-      assert (t1 ≅ ITree.map f t0). { punfold H; pstep; unfold ITree.map; eauto. }
-      clear H.
+      assert (t1 ≅ ITree.map f t0). { punfold TAU; pstep; unfold ITree.map; eauto. }
+      clear TAU.
       rewrite H0 in H1.
       specialize (IHeqitF eq_refl).
       setoid_rewrite <- unfold_bind in IHeqitF.
@@ -207,7 +208,7 @@ Section OOM.
 
   Lemma raiseOOM_ret_inv_itree :
       forall A x (y : A),
-        ~ (raiseOOM x) ≈ (ret y).
+        ~ (raiseOOM (E:=E) x) ≈ (ret y).
   Proof.
     intros A x y.
     intros CONTRA.
@@ -241,7 +242,7 @@ Section UB.
 
   Lemma raiseUB_map_itree :
     forall A B (f : A -> B) x,
-      ITree.map f (raiseUB x) ≈ raiseUB x.
+      ITree.map f (raiseUB (E:=E) x) ≈ raiseUB x.
   Proof.
     intros A B f x.
     unfold raiseUB, raise.
@@ -253,7 +254,7 @@ Section UB.
 
   Lemma raiseUB_map_itree_inv :
     forall A B (f : A -> B) t x,
-      ITree.map f t ≈ raiseUB x ->
+      ITree.map f t ≈ raiseUB (E:=E) x ->
       t ≈ raiseUB x.
   Proof.
     unfold ITree.map. intros A B.
@@ -286,12 +287,12 @@ Section UB.
       destruct (observe t); eapply eqit_inv in H; inv H.
       destruct H0 as (?&?). destruct H.
       constructor. intros. inv v.
-    - intros.
-      destruct (observe t); eapply eqit_inv in H; try solve [inv H].
+    - intros t TAU.
+      destruct (observe t); eapply eqit_inv in TAU; try solve [inv TAU].
       cbn in *. assert (t1 ≈ raiseUB x). { pstep; eauto. }
       clear H0.
-      assert (t1 ≅ ITree.map f t0). { punfold H; pstep; unfold ITree.map; eauto. }
-      clear H.
+      assert (t1 ≅ ITree.map f t0). { punfold TAU; pstep; unfold ITree.map; eauto. }
+      clear TAU.
       rewrite H0 in H1.
       specialize (IHeqitF eq_refl).
       setoid_rewrite <- unfold_bind in IHeqitF.
@@ -301,7 +302,7 @@ Section UB.
 
   Lemma raiseUB_ret_inv_itree :
       forall A x (y : A),
-        ~ (raiseUB x) ≈ (ret y).
+        ~ (raiseUB (E:=E) x) ≈ (ret y).
   Proof.
     intros A x y.
     intros CONTRA.

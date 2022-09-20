@@ -22,8 +22,6 @@ From Vellvm Require Import
      Utils.MonadReturnsLaws
      Utils.Raise.
 
-
-
 Import Morphisms.
 
 Import Basics.Basics.Monads.

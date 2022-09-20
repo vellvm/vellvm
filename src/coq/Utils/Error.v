@@ -14,7 +14,8 @@ From ITree Require Import
 
 From Vellvm.Utils Require Import
      MonadReturnsLaws
-     MonadEq1Laws.
+     MonadEq1Laws
+     Tactics.
 
 Import Monad.
 

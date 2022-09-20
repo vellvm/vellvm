@@ -22,8 +22,7 @@ From Vellvm.Utils Require Import
 
 From ITree Require Import
      ITree
-     Eq.Eq
-     Interp.InterpFacts
+     Eq.Eqit
      Eq.EqAxiom
      Events.StateFacts.
 

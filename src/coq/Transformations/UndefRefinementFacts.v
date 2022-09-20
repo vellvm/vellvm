@@ -37,7 +37,7 @@ From Vellvm.Handlers Require Import
 From ITree Require Import
      ITree
      Basics
-     Eq.Eq
+     Eq.Eqit
      Events.State.
 
 From ExtLib Require Import

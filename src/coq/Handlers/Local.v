@@ -8,13 +8,14 @@ From ExtLib Require Import
 
 From ITree Require Import
      ITree
-     Eq.Eq
+     Eq.Eqit
      Events.State
      Events.StateFacts.
 
 From Vellvm Require Import
      Utils.Util
      Utils.Error
+     Utils.Tactics
      Semantics.LLVMEvents
      Semantics.Memory.Sizeof.
 

@@ -41,7 +41,7 @@ From ITree Require Import
      ITree
      Basics.Basics
      Events.Exception
-     Eq.Eq
+     Eq.Eqit
      Events.StateFacts
      Events.State.
 
@@ -967,7 +967,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       { eapply within_ret_ret in CONSEC; eauto.
         inv CONSEC.
         inv SEQUENCE.
-        break_match_hyp; inv H0.
+        break_match_hyp; inv H1.
         split; auto.
 
         destruct len.
@@ -1169,7 +1169,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
             { rewrite map_monad_unfold in MAPM.
               cbn in MAPM.
               break_match_hyp; inv MAPM.
-              break_match_hyp; inv H0.
+              break_match_hyp; inv H1.
               symmetry; eapply handle_gep_addr_preserves_provenance; eauto.
             }
 
@@ -1453,7 +1453,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           apply within_ret_ret in CONSEC'; eauto.
           inv CONSEC'.
           break_match_hyp; inv Heqo0.
-          break_match_hyp; inv H0.
+          break_match_hyp; inv H1.
           cbn in HMAPM.
           break_match_hyp; [inv HMAPM|].
           break_match_hyp; [inv HMAPM|].
@@ -3679,7 +3679,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     {Eff}
     `{FAIL : FailureE -< Eff} `{UB : UBE -< Eff} `{OOM : OOME -< Eff}
     {A} :
-    Proper (eq1 ==> eq ==> eq ==> eq ==> iff) (within_err_ub_oom_itree (Pre:=Pre) (Post:=Post) (A:=A)).
+    Proper (eq1 ==> eq ==> eq ==> eq ==> iff) (within_err_ub_oom_itree (Eff:=Eff) (Pre:=Pre) (Post:=Post) (A:=A)).
   Proof.
     unfold Proper, respectful.
     intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2.

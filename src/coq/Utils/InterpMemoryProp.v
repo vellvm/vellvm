@@ -10,7 +10,7 @@ From ITree Require Import
      Core.ITreeMonad
      CategoryKleisli
      CategoryKleisliFacts
-     Eq.Eq.
+     Eq.Eqit.
 
 From ExtLib Require Import
      Structures.Functor.
@@ -73,8 +73,8 @@ Section interp_memory_prop.
                          t2 s1 s2
                          (k1 : A -> itree E R1)
                          (k2 : stateful A -> itree F (stateful R2))
-                         (HK : forall a b, Returns a (trigger e) ->
-                                           Returns b ta ->
+                         (HK : forall a b, @Returns E A a (trigger e) ->
+                                           @Returns F (stateful A) b ta ->
                                            a = snd (snd b) ->
                                     sim (k1 a) (k2 b)),
         h_spec _ e s1 s2 ta ->
@@ -236,7 +236,8 @@ Section interp_memory_prop.
           eapply paco2_mon; eauto. intros; inv PR.
           rewrite itree_eta in H0; rewrite Heqot in H0.
           rewrite <- H0; apply eqit_Vis.
-          symmetry. pclearbot. eauto.
+          symmetry. pclearbot.
+          apply REL.
         * eapply IHREL; eauto. pstep_reverse.
           assert (interp_memory_prop t0 (Tau t1)) by (pstep; auto).
           apply interp_memory_prop_inv_tau_r in H. punfold H.
@@ -250,6 +251,8 @@ Section interp_memory_prop.
       constructor; eauto.
       assert (Tau t0 ≈ t2). { pstep; auto. }
       apply eqit_inv_Tau_l in H1; punfold H1.
+      eapply IHinterp_memory_PropTF; eauto.
+      constructor; eauto.
     - rewrite <- Heqi.
       rewrite Heqi0 in EQ.
       rewrite itree_eta in H0.
@@ -378,12 +381,12 @@ Section interp_memory_prop.
   Qed.
 
   Lemma interp_memory_prop_vis :
-    forall {X} (e : _ X) k t ta k' s1 s2,
+    forall {X} (e : E X) k t ta k' s1 s2,
       t ≈ x <- ta;; k' x ->
       h_spec X e s1 s2 ta ->
       (forall (a : X) (b : stateful X),
-      Returns a (trigger e) ->
-      Returns b ta -> a = snd (snd b) -> interp_memory_prop (k a) (k' b)) ->
+          @Returns E X a (trigger e) ->
+          Returns b ta -> a = snd (snd b) -> interp_memory_prop (k a) (k' b)) ->
       interp_memory_prop (Vis e k) t.
   Proof.
     intros.

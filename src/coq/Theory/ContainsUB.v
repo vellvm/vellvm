@@ -2,7 +2,7 @@ From ITree Require Import
      ITree
      Basics
      Basics.HeterogeneousRelations
-     Eq.Eq.
+     Eq.Eqit.
 
 From Vellvm Require Import
      Utilities
@@ -42,7 +42,7 @@ Section contains_UB.
   | CrawlTau  : forall t1 t2, t2 ≅ Tau t1 -> contains_UB t1 -> contains_UB t2
   | CrawlVis1 : forall Y (e : (E +' F) Y) x k t2, t2 ≅ (vis e k) -> contains_UB (k x) -> contains_UB t2
   | CrawlVis2 : forall Y (e : G Y) x k t2, t2 ≅ (vis e k) -> contains_UB (k x) -> contains_UB t2
-  | FindUB    : forall s k t2, t2 ≅ (vis (subevent _ (ThrowUB s)) k) -> contains_UB t2.
+  | FindUB    : forall s k t2, t2 ≅ (vis (subevent (F:=Eff) _ (ThrowUB s)) k) -> contains_UB t2.
 
   #[global] Instance proper_eutt_contains_UB {R} {RR : relation R} : Proper (@eqit Eff _ _ RR true true ==> iff) contains_UB.
   Proof.
@@ -90,7 +90,7 @@ Section contains_UB.
             apply IHUB.
             pclearbot.
             rewrite <- REL0.
-            eauto.
+            apply REL.
           - punfold H; red in H.
             rewrite <- Heqt2o in H.
             cbn in H.
@@ -144,7 +144,7 @@ Section contains_UB.
             apply IHUB.
             pclearbot.
             rewrite <- REL0.
-            eauto.
+            apply REL.
           - punfold H; red in H.
             rewrite <- Heqt2o in H.
             cbn in H.
@@ -228,7 +228,7 @@ Section contains_UB.
             apply IHUB.
             pclearbot.
             rewrite <- REL0.
-            eauto.
+            apply REL.
           - punfold H; red in H.
             cbn in H.
             dependent induction H.
@@ -282,7 +282,7 @@ Section contains_UB.
             apply IHUB.
             pclearbot.
             rewrite <- REL0.
-            eauto.
+            apply REL.
           - punfold H; red in H.
             cbn in H.
             dependent induction H.

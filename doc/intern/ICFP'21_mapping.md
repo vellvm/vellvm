@@ -23,7 +23,7 @@ Although we have made significant contributions to the itree library for the sak
 is orthogonal to the material described in this paper, and can be treated entirely as an external library to understand this project.
 
 The content of Section 5.1 that gives a taste of how the underlying equational theory works can be found in more details in
-the files [Eq.v](https://github.com/DeepSpec/InteractionTrees/blob/master/theories/Eq/Eq.v) and [UpToTaus.v](https://github.com/DeepSpec/InteractionTrees/blob/master/theories/Eq/UpToTaus.v) in the [Interaction Trees github repo](https://github.com/DeepSpec/InteractionTrees)
+the files [Eq.v](https://github.com/DeepSpec/InteractionTrees/blob/master/theories/Eq.Eqit.v) and [UpToTaus.v](https://github.com/DeepSpec/InteractionTrees/blob/master/theories/Eq/UpToTaus.v) in the [Interaction Trees github repo](https://github.com/DeepSpec/InteractionTrees)
 
 
 ### Unit Tests

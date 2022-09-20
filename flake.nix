@@ -17,14 +17,37 @@
         coqPkgs = pkgs.coqPackages_8_15.overrideScope'
           (self: super:
             { simple-io = super.simple-io.overrideAttrs
-                (s : { version = "1.7.0";
-                       src = fetchTarball {
-                         url = "https://github.com/Lysxia/coq-simple-io/archive/refs/tags/1.7.0.zip";
-                         sha256 = "1a1q9x2abx71hqvjdai3n12jxzd49mhf3nqqh3ya2ssl2lj609ci";
-                       };
-                       propagatedBuildInputs = s.propagatedBuildInputs ++ [ ocamlPkgs.cppo ocamlPkgs.zarith ocamlPkgs.findlib ];
-                       meta.broken = false;
-                     });
+              (s : rec
+                { version = "1.7.0";
+                  name = "coq8.15-simple-io-${version}";
+                  src = fetchTarball {
+                    url = "https://github.com/Lysxia/coq-simple-io/archive/refs/tags/1.7.0.zip";
+                    sha256 = "1a1q9x2abx71hqvjdai3n12jxzd49mhf3nqqh3ya2ssl2lj609ci";
+                  };
+                  meta.broken = false;
+                });
+
+              ITree = super.ITree.overrideAttrs
+                (s : rec
+                  { version = "5.0.0";
+                    name = "coq8.15-InteractionTrees-${version}";
+                    src = fetchTarball {
+                      url = "https://github.com/DeepSpec/InteractionTrees/archive/refs/tags/5.0.0.zip";
+                      sha256 = "1cnq5qb9n6908xw117z9d5c3is9m42aa0xabw7nna22szycc4apz";
+                    };
+                    meta.broken = false;
+                  });
+
+              flocq = super.flocq.overrideAttrs
+                (s : rec
+                  { version = "3.4.3";
+                    name = "coq8.15-flocq-${version}";
+                    src = fetchTarball {
+                      url = "https://gitlab.inria.fr/flocq/flocq/-/archive/flocq-3.4.3/flocq-flocq-3.4.3.tar.gz";
+                      sha256 = "sha256:1489kbqa2z5dpcw9d900g9ssmcc2iqsfwy293sf309l596a5cdv1";
+                    };
+                    meta.broken = false;
+                  });
             });
 
         version = "vellvm:master";

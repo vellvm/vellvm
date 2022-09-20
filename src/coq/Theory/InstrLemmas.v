@@ -8,7 +8,7 @@ Import ListNotations.
 From ITree Require Import
      ITree
      Basics.Monad
-     Eq.Eq
+     Eq.Eqit
      TranslateFacts.
 
 From Vellvm Require Import

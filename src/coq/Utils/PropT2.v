@@ -10,7 +10,7 @@ From ITree Require Import
      Core.ITreeMonad
      CategoryKleisli
      CategoryKleisliFacts
-     Eq.Eq.
+     Eq.Eqit.
 
 From ExtLib Require Import
      Structures.Functor.

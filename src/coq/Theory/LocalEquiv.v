@@ -5,7 +5,7 @@ From Coq Require Import
 From ITree Require Import
      ITree
      Basics.Monad
-     Eq.Eq
+     Eq.Eqit
      TranslateFacts
      Events.State.
 

@@ -9,7 +9,7 @@ Import ZArith.BinInt.
 From ITree Require Import
      ITree
      Basics.Monad
-     Eq.Eq.
+     Eq.Eqit.
 
 From Vellvm Require Import
      Utilities

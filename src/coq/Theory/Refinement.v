@@ -5,7 +5,7 @@ From ITree Require Import
      ITree
      Basics
      Basics.HeterogeneousRelations
-     Eq.Eq.
+     Eq.Eqit.
 
 From Vellvm Require Import
      Utilities

@@ -10,7 +10,7 @@ From ITree Require Import
      Core.ITreeMonad
      CategoryKleisli
      CategoryKleisliFacts
-     Eq.Eq.
+     Eq.Eqit.
 
 From ExtLib Require Import
      Structures.Functor.
@@ -249,6 +249,7 @@ Section interp_prop.
           rewrite itree_eta in H0; rewrite Heqot in H0.
           rewrite <- H0; apply eqit_Vis.
           symmetry. pclearbot. eauto.
+          apply REL.
         * eapply IHREL; eauto. pstep_reverse.
           assert (interp_prop t0 (Tau t1)) by (pstep; auto).
           apply interp_prop_inv_tau_r in H. punfold H.
@@ -262,6 +263,8 @@ Section interp_prop.
       constructor; eauto.
       assert (Tau t0 ≈ t2). { pstep; auto. }
       apply eqit_inv_Tau_l in H1; punfold H1.
+      eapply IHinterp_PropTF; eauto.
+      constructor; eauto.
     - rewrite <- Heqi.
       econstructor; eauto.
     - rewrite <- Heqi.
@@ -451,7 +454,7 @@ Proof.
             specialize (HK _ H1). pclearbot.
             punfold HK.
       * eapply IHREL; eauto. pstep_reverse.
-        assert (interp_prop h_spec RR (Tau t2) t0) by (pstep; auto).
+        assert (interp_prop h_spec RR (Tau t2) t0 (OOME:=CONSTRAINT)) by (pstep; auto).
         apply interp_prop_inv_tau_l in H. punfold H.
   - specialize (IHinterp_PropTF _ Heqi _ Heqi0).
     assert (eutt RR (go xo) t1).
@@ -537,20 +540,22 @@ Section interp_prop_extra.
       Unshelve.
       2 : exact (fun a => bind (k0 a) k1).
       intros. cbn.
-      eapply eq_itree_clo_bind; pclearbot; eauto. intros; subst; reflexivity.
+      eapply eq_itree_clo_bind; pclearbot; eauto.
+      apply REL.
+      intros; subst; reflexivity.
     - eapply Interp_PropT_Vis; eauto.
       intros; eauto. right. eapply CIH; eauto.
       specialize (HK _ H1). pclearbot. eapply HK; eauto.
       rewrite <- unfold_bind.
-      setoid_rewrite <- Eq.bind_bind.
+      setoid_rewrite <- Eqit.bind_bind.
       eapply eutt_clo_bind; eauto. intros; eauto. subst; reflexivity.
   Qed.
 
   Lemma interp_prop_mono:
     forall (R : Type) RR RR' t1 t2,
       (RR <2= RR') ->
-      interp_prop h RR t1 t2 ->
-      interp_prop h (F := F) (R1 := R1) (R2 := R2) RR' t1 t2.
+      interp_prop h RR t1 t2 (OOME:=OOME) ->
+      interp_prop h (F := F) (R1 := R1) (R2 := R2) RR' t1 t2 (OOME:=OOME).
   Proof.
     intros ? ? ?.
     pcofix self. pstep. intros u v ? euv. punfold euv.
@@ -563,7 +568,7 @@ Section interp_prop_extra.
   (* Figure 7: Interpreter law for Ret *)
   Lemma interp_prop_ret :
     forall R (r : R),
-      (interp_prop (F := F) h eq (ret r) ≈ ret r)%monad.
+      (interp_prop (F := F) (OOME:=OOME) h eq (ret r) ≈ ret r)%monad.
   Proof.
     intros.
     repeat red.
@@ -593,8 +598,8 @@ Section interp_prop_extra.
 
   Lemma interp_prop_bind_refine:
       forall (t : itree E R1) (k : R1 -> itree E R2) (y : itree F R2),
-        (x0 <- interp_prop h eq t;; interp_prop h eq (k x0)) y ->
-        interp_prop h eq (x <- t;; k x) y.
+        (x0 <- interp_prop (OOME:=OOME) h eq t;; interp_prop (OOME:=OOME) h eq (k x0)) y ->
+        interp_prop (OOME:=OOME) h eq (x <- t;; k x) y.
   Proof.
     intros t k y H0.
     destruct H0 as (x0&x1&?&?&?).
@@ -643,7 +648,7 @@ Section interp_prop_extra.
 
       specialize (IHinterp_PropTF _ _ k k' Heqi1 eq_refl).
 
-      assert (forall a , Returns a t2 -> interp_prop h eq (k a) (k' a)).
+      assert (forall a , Returns a t2 -> interp_prop (OOME:=OOME) h eq (k a) (k' a)).
       { intros; eapply H1. rewrite (itree_eta t'); rewrite <- Heqi2.
         rewrite tau_eutt; auto. rewrite <- itree_eta; auto. }
 
@@ -695,12 +700,12 @@ Section interp_prop_extra.
       rewrite H0. eapply Returns_bind; eauto.
       apply bisimulation_is_eq; rewrite <- unfold_bind; reflexivity.
       apply bisimulation_is_eq; setoid_rewrite <- unfold_bind; reflexivity.
-      setoid_rewrite <- unfold_bind. rewrite H0. setoid_rewrite Eq.bind_bind; reflexivity.
+      setoid_rewrite <- unfold_bind. rewrite H0. setoid_rewrite Eqit.bind_bind; reflexivity.
   Qed.
 
   Lemma interp_prop_ret_pure :
     forall {T} (RR : relation T) `{REF: Reflexive _ RR} (x : T),
-      interp_prop (F := F) h RR (ret x) (ret x).
+      interp_prop (F := F) (OOME:=OOME) h RR (ret x) (ret x).
   Proof.
     intros.
     generalize dependent x.
@@ -715,7 +720,7 @@ Section interp_prop_extra.
   Lemma interp_prop_ret_refine :
     forall {T} (RR : relation T) (x y : T),
       RR x y ->
-      interp_prop (F := F) h RR (ret x) (ret y).
+      interp_prop (F := F) (OOME:=OOME) h RR (ret x) (ret y).
   Proof.
     intros.
     generalize dependent y.
@@ -732,7 +737,7 @@ Section interp_prop_extra.
     forall {R} RR `{Reflexive _ RR} (t : _ R) t' (f : (forall T : Type, E T -> itree F T))
       (HC : handler_correct h f),
       t ≈ t' ->
-      interp_prop h RR t (interp f t').
+      interp_prop (OOME:=OOME) h RR t (interp f t').
   Proof.
     intros R RR0 H t t' f HC H1.
     setoid_rewrite unfold_interp.
@@ -762,6 +767,7 @@ Section interp_prop_extra.
       intros; subst; setoid_rewrite tau_eutt at 1.
       Unshelve. 3 : exact (fun x => interp f (k2 x)). reflexivity.
       intros. right; eapply CIH; eauto.
+      apply REL.
       rewrite <- unfold_interp; reflexivity.
     - constructor; auto; eapply IHeq; eauto.
     - cbn in H2.
@@ -796,9 +802,9 @@ Section interp_prop_extra.
       (* + rewrite tau_eutt; rewrite (itree_eta). eapply IHinterp_PropTF; eauto. *)
       (* + dependent destruction H1. *)
       (*   assert (x <- ta ;; k2 x ≈ ta). *)
-      (*   { rewrite <- (Eq.bind_ret_r ta). *)
+      (*   { rewrite <- (Eqit.bind_ret_r ta). *)
       (*     apply eutt_clo_bind with (UU := fun u1 u2 => u1 = u2 /\ Returns u1 ta). *)
-      (*     rewrite Eq.bind_ret_r. apply eutt_Returns. *)
+      (*     rewrite Eqit.bind_ret_r. apply eutt_Returns. *)
       (*     intros. destruct H; eauto. subst. specialize (HK _ H0). *)
       (*     pclearbot. *)
       (*     punfold HK; red in HK; cbn in HK. *)
@@ -826,7 +832,7 @@ Section interp_prop_extra.
 
   Lemma interp_prop_ret_inv:
     forall  r1 (t : itree F _),
-      interp_prop (F := F) h RR (ret r1) t -> exists r2 , RR r1 r2 /\ t ≈ ret r2.
+      interp_prop (F := F) (OOME:=OOME) h RR (ret r1) t -> exists r2 , RR r1 r2 /\ t ≈ ret r2.
   Proof.
     intros r1 t INTERP.
     punfold INTERP.

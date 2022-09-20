@@ -150,11 +150,12 @@ Module Infinite.
     unfold raiseOOM in *.
     force_rewrite: @bind_trigger in Hmodel.
     force_rewrite @bind_trigger.
+
     remember (observe
-                (vis (ThrowOOM oom_msg) (fun x : void => match x return (itree _ R) with
+                (vis (ThrowOOM oom_msg) (fun x : void => match x return (itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) R) with
                                                          end))).
 
-    hinduction Hmodel before CIH; cbn; intros; inv Heqi; eauto; [ inv e | ].
+    hinduction Hmodel before CIH; cbn; intros; inv Heqi; eauto; [cbn in *; eapply EqTauL; auto | inv e | ].
     dependent destruction H3.
     do 20 red in H.
     setoid_rewrite bind_trigger in H.
@@ -316,7 +317,7 @@ Module Infinite.
               raise "call"
           end
       | inr1 e0 =>
-          trigger (inr1 e0)
+          trigger e0
       end.
 
   Definition interp_instr_E_to_L0 :=
@@ -384,7 +385,7 @@ Module Infinite.
   Remark L3_trace_MemoryE:
     forall R X g l sid m (e : MemoryE X) (k : X -> itree L0 R) t,
       interp_memory_prop eq
-            (vis (subevent _ e) (fun x : X => interp_local_stack (interp_global (interp_intrinsics (k x)) g) l)) sid m t <->
+        (vis e (fun x : X => interp_local_stack (interp_global (interp_intrinsics (k x)) g) l)) sid m t <->
       interp_memory_prop eq (interp_local_stack (interp_global (interp_intrinsics (vis e k)) g) l) sid m t.
   Proof.
     intros.
@@ -611,13 +612,13 @@ Module Infinite.
 
   Lemma interp_memory_prop_vis_inv:
     forall E R X (e : _ X) k sid m x,
-      interp_memory_prop (R2 := R) eq (Vis e k) sid m x ->
-    (exists ta k2 s1 s2 ,
+      interp_memory_prop (E:=E) (R2 := R) eq (Vis e k) sid m x ->
+      (exists ta k2 s1 s2 ,
         x ≈ x <- ta;; k2 x /\
           interp_memory_prop_h e s1 s2 ta /\
           (forall (a : X) (b : MMEP.MMSP.MemState * (store_id * X)),
-            Returns a (trigger e) ->
-            Returns b ta ->
+            @Returns (E +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X a (trigger e) ->
+            @Returns (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) (MMEP.MMSP.MemState * (store_id * X)) b ta ->
             a = snd (snd b) ->
             interp_memory_prop (E := E) eq (k a) sid m (k2 b))).
   Proof.
@@ -630,7 +631,7 @@ Module Infinite.
     - specialize (IHinterp_memory_PropTF m eq_refl).
       destruct IHinterp_memory_PropTF as (?&?&?&?&?&?&?).
       eexists _,_,_,_; split; eauto. rewrite tau_eutt.
-      rewrite <- itree_eta in H0. eauto.
+      rewrite <- itree_eta in H1. eauto.
     - dependent destruction H3.
       eexists _,_,_,_; split; eauto.
       + rewrite <- itree_eta; eauto.
@@ -763,7 +764,7 @@ Module Infinite.
                         LLVMParamsBigIntptr.Events.MemoryE +'
                         LLVMParamsBigIntptr.Events.PickUvalueE +'
                         OOME +' UBE +' DebugE +' FailureE)
-                                   x (trigger (subevent _ (Alloca (DTYPE_I 64) 1 None)))).
+                                   x (trigger (Alloca (DTYPE_I 64) 1 None))).
     { intros. unfold trigger.
       eapply ReturnsVis; [ reflexivity | ].
       Unshelve. eapply ReturnsRet. reflexivity. }
@@ -898,7 +899,7 @@ Module Finite.
               raise "call"
           end
       | inr1 e0 =>
-          trigger (inr1 e0)
+          trigger e0
       end.
 
   Definition interp_instr_E_to_L0 :=
@@ -1002,7 +1003,7 @@ Module Finite.
   Remark L3_trace_MemoryE:
     forall R X g l sid m (e : MemoryE X) (k : X -> itree L0 R) t,
       interp_memory_prop eq
-            (vis (subevent _ e) (fun x : X => interp_local_stack (interp_global (interp_intrinsics (k x)) g) l)) sid m t <->
+            (vis e (fun x : X => interp_local_stack (interp_global (interp_intrinsics (k x)) g) l)) sid m t <->
       interp_memory_prop eq (interp_local_stack (interp_global (interp_intrinsics (vis e k)) g) l) sid m t.
   Proof.
     intros.
@@ -1082,13 +1083,13 @@ Module Finite.
 
   Lemma interp_memory_prop_vis_inv:
     forall E R X (e : _ X) k sid m x,
-      interp_memory_prop (R2 := R) eq (Vis e k) sid m x ->
-    (exists ta k2 s1 s2 ,
+      interp_memory_prop (E:=E) (R2 := R) eq (Vis e k) sid m x ->
+      (exists ta k2 s1 s2 ,
         x ≈ x <- ta;; k2 x /\
           interp_memory_prop_h e s1 s2 ta /\
           (forall (a : X) (b : MMEP.MMSP.MemState * (store_id * X)),
-            Returns a (trigger e) ->
-            Returns b ta ->
+            @Returns (E +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X a (trigger e) ->
+            @Returns (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) (MMEP.MMSP.MemState * (store_id * X)) b ta ->
             a = snd (snd b) ->
             interp_memory_prop (E := E) eq (k a) sid m (k2 b))).
   Proof.
@@ -1101,7 +1102,7 @@ Module Finite.
     - specialize (IHinterp_memory_PropTF m eq_refl).
       destruct IHinterp_memory_PropTF as (?&?&?&?&?&?&?).
       eexists _,_,_,_; split; eauto. rewrite tau_eutt.
-      rewrite <- itree_eta in H0. eauto.
+      rewrite <- itree_eta in H1. eauto.
     - dependent destruction H3.
       eexists _,_,_,_; split; eauto.
       + rewrite <- itree_eta; eauto.
@@ -1248,7 +1249,7 @@ Module Finite.
                           LLVMParams64BitIntptr.Events.IntrinsicE +'
                           LLVMParams64BitIntptr.Events.MemoryE +'
                           LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
-                    x (trigger (subevent _ (Alloca (DTYPE_I 64) 1 None)))).
+                    x (trigger (Alloca (DTYPE_I 64) 1 None))).
     { intros. unfold trigger.
       eapply ReturnsVis; [ reflexivity | ].
       Unshelve. eapply ReturnsRet. reflexivity. }

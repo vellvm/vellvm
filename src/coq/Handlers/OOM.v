@@ -13,13 +13,14 @@ From Vellvm Require Import
      Utils.RefineProp
      Utils.InterpProp
      Utils.Error
+     Utils.Tactics
      Semantics.LLVMEvents.
 
 From ITree Require Import
      ITree
-     Eq.Eq.
+     Eq.Eqit
+     Eq.EqAxiom.
 
-From ITree Require Import Eq.EqAxiom.
 From Paco Require Import paco.
 
 Set Implicit Arguments.
@@ -218,7 +219,7 @@ Section PARAMS_MODEL.
     punfold H0; red in H0; intros.
     pstep; red.
     hinduction H0 before t; try solve [constructor; auto]; try inv CHECK; intros.
-    cbn.
+    constructor; reflexivity.
 
     change (VisF e k2) with (observe (Vis e k2)).
     eapply Interp_PropT_Vis; eauto. red; reflexivity.
@@ -270,7 +271,9 @@ Proof.
   pose proof @interp_prop_Proper_eq.
   unfold Proper, respectful in H0.
 
-  eapply H0; eauto. apply eutt_flip; eauto.
+  eapply H0; eauto.
+  typeclasses eauto.
+  apply eutt_flip; eauto.
   apply refine_OOM_h_reflexive; auto.
 Qed.
 

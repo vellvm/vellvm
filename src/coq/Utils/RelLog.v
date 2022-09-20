@@ -2,7 +2,7 @@
 From ITree Require Import
      ITree
      Basics
-     Eq.Eq.
+     Eq.Eqit.
 
 Import ITreeNotations.
 (* end hide *)

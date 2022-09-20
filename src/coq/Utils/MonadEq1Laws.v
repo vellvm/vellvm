@@ -91,7 +91,7 @@ Section ITree.
     forall {A} (x y : A), (ret x : itree E A) ≈ ret y -> x = y.
   Proof.
     intros A x y EQ.
-    eapply Eq.eutt_inv_Ret.
+    eapply Eqit.eutt_inv_Ret.
     cbn in EQ.
     eapply EQ.
   Qed.
@@ -99,4 +99,3 @@ Section ITree.
   Global Instance Eq1_ret_inv_itree : Eq1_ret_inv (itree E) :=
     { eq1_ret_ret := fun a => eq1_ret_ret_itree }.
 End ITree.
-

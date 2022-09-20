@@ -37,7 +37,7 @@ From Vellvm.Utils Require Import
 
 From ITree Require Import
      ITree
-     Eq.Eq.
+     Eq.Eqit.
 
 From ExtLib Require Import
      Structures.Monads

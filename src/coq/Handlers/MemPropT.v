@@ -8,7 +8,7 @@ From ExtLib Require Import
 From ITree Require Import
      ITree
      Basics.Basics
-     Eq.Eq
+     Eq.Eqit
      Events.StateFacts
      Events.State.
 

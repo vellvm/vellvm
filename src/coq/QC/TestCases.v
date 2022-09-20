@@ -179,7 +179,7 @@ QuickChick (vellvm_agrees_with_clang shrunk_program).
 
 From ITree Require Import
      ITree
-     Eq.Eq
+     Eq.Eqit
      TranslateFacts.
 
 From Vellvm Require Import

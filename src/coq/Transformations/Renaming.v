@@ -14,7 +14,7 @@ From Coq Require Import
 From ITree Require Import
      ITree
      Basics.HeterogeneousRelations
-     Eq.Eq
+     Eq.Eqit
      Interp.Interp
      Interp.InterpFacts
      Interp.TranslateFacts

@@ -24,6 +24,7 @@ From Vellvm Require Import
      Utils.PropT
      Utils.InterpProp
      Utils.ListUtil
+     Utils.Tactics
      Handlers.MemoryModules.FiniteAddresses
      Handlers.MemoryModules.InfiniteAddresses
      Handlers.MemoryModelImplementation.
@@ -36,7 +37,8 @@ From ITree Require Import
      ITree
      Basics
      Basics.HeterogeneousRelations
-     Eq.Eq Eq.EqAxiom.
+     Eq.Eqit
+     Eq.EqAxiom.
 
 Require Import Coq.Program.Equality.
 
@@ -984,7 +986,7 @@ Module InfiniteToFinite.
     forall a d f u l t args,
       EC.DVCrev.dvalue_convert a = NoOom d ->
       EC.DVC.uvalue_convert f = NoOom u ->
-      @Returns E2 E2.DV.dvalue a (trigger (resum IFun E2.DV.dvalue (E2.ExternalCall t u l))) ->
+      @Returns E2 E2.DV.dvalue a (trigger (E2.ExternalCall t u l)) ->
       @Returns E1 E1.DV.dvalue d (trigger (E1.ExternalCall t f args)).
   Proof.
   Admitted.
@@ -1341,13 +1343,16 @@ Module InfiniteToFinite.
       eapply eqit_Vis.
       Unshelve.
       intros. cbn.
-      eapply eq_itree_clo_bind; pclearbot; eauto. intros; subst; reflexivity.
+      eapply eq_itree_clo_bind; pclearbot; eauto.
+      apply REL.
+      intros; subst; reflexivity.
     - eapply Interp_PropT_Vis; eauto.
       intros; eauto. right. eapply CIH; eauto.
       specialize (HK0 _ H1). pclearbot. eapply HK0; eauto.
       rewrite <- unfold_bind.
-      setoid_rewrite <- Eq.bind_bind.
-      eapply eutt_clo_bind; eauto. intros; eauto. subst; reflexivity.
+      setoid_rewrite <- Eqit.bind_bind.
+      eapply eutt_clo_bind; eauto. intros; eauto.
+      subst; reflexivity.
   Qed.
 
   (* If
@@ -1413,13 +1418,13 @@ Module InfiniteToFinite.
         unfold TLR_INF.R.refine_res3, TLR_INF.R.refine_res2, TLR_INF.R.refine_res1 in H.
         destruct r1 as [r1a [r1sid [[r1b1 r1b2] [r1c dv1]]]].
         destruct r2 as [r2a [r2sid [[r2b1 r2b2] [r2c dv2]]]].
-        inversion H; subst.
-        inversion H5; subst.
-        inversion H7; subst.
-        inversion H9; subst.
-        inversion H9; subst.
         cbn.
-        reflexivity.
+
+        inversion H; subst.
+        inversion snd_rel; subst.
+        inversion snd_rel0; subst.
+        inversion snd_rel1; subst.
+        cbn in *; subst; reflexivity.
       }
       { apply refine_OOM_h_L6_convert_tree; auto.
       }
@@ -1468,7 +1473,7 @@ Module InfiniteToFinite.
         ITree
         Basics.Monad
         Events.StateFacts
-        Eq.Eq.
+        Eq.Eqit.
 
   Import TranslateFacts.
   Import TopLevelBigIntptr.

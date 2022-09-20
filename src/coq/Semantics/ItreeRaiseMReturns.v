@@ -3,7 +3,12 @@ From ExtLib Require Import
 
 From ITree Require Import
      ITree
-     Eq.Eq.
+     Basics.Basics
+     Events.Exception
+     Eq.Eqit
+     Events.StateFacts
+     Events.State
+     Events.Exception.
 
 From Vellvm Require Import
      Utils.Error

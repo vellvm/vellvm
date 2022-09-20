@@ -27,7 +27,7 @@ From Vellvm Require Import
 From ITree Require Import
      ITree
      InterpFacts
-     Eq.Eq.
+     Eq.Eqit.
 
 Import MonadNotation.
 Import EqvNotation.

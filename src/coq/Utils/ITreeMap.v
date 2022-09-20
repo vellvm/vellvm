@@ -19,15 +19,16 @@ Proof.
   dependent induction HM.
   - setoid_rewrite (itree_eta t).
     unfold ITree.map,observe in x; cbn in x.
-    destruct (observe t) eqn:EQ'; try now inv x.
-    cbn in *; exists r; inv x; split; reflexivity.
+    destruct (observe t) eqn:EQ'; try now inversion x.
+    cbn in *; exists r; inversion x; split; reflexivity.
   - unfold ITree.map,observe in x; cbn in x.
     setoid_rewrite (itree_eta t).
-    destruct (observe t) eqn:EQ'; try now inv x.
+    destruct (observe t) eqn:EQ'; try now inversion x.
     cbn in x.
-    inv x.
+    inversion x.
+    subst.
     edestruct IHHM as (? & ? & ?).
     all: try reflexivity.
-    exists x; split; auto.
+    exists x0; split; auto.
     rewrite H, tau_eutt; reflexivity.
 Qed.

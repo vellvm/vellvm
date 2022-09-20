@@ -10,7 +10,7 @@ From ITree Require Import
      Core.ITreeMonad
      CategoryKleisli
      CategoryKleisliFacts
-     Eq.Eq.
+     Eq.Eqit.
 
 From ExtLib Require Import
      Structures.Functor.
@@ -228,7 +228,7 @@ Section PropMonad.
     intros E A a b t eq H.
     revert b eq.
     induction H; intros; subst.
-    - rewrite H in eq. apply Eq.eqit_Ret in eq. auto.
+    - rewrite H in eq. apply Eqit.eqit_Ret in eq. auto.
     - eapply IHReturns. rewrite tau_eutt in H. rewrite <- H. assumption.
     - rewrite H in eq. symmetry in eq. apply eqit_inv in eq; inv eq.
   Qed.
@@ -278,12 +278,12 @@ Section PropMonad.
     revert R S RS k1 k2 EQIT.
     induction HRET; intros.
     - rewrite H in EQIT.
-      do 2 rewrite Eq.bind_ret_l in EQIT.
+      do 2 rewrite Eqit.bind_ret_l in EQIT.
       assumption.
     - rewrite tau_eutt in H. rewrite H in EQIT.
       eapply IHHRET; eauto.
     - rewrite H in EQIT.
-      do 2 rewrite Eq.bind_vis in EQIT.
+      do 2 rewrite Eqit.bind_vis in EQIT.
       repeat red in EQIT. punfold EQIT.
       inversion EQIT.
       apply inj_pair2 in H2.
@@ -389,6 +389,7 @@ Section PropMonad.
         gbase.
         apply CIH.
         constructor; auto.
+        apply REL.
         intros ? HR; apply REL0.
         rewrite itree_eta, <- Heqot1.
         econstructor 3; eauto; reflexivity.
@@ -458,9 +459,9 @@ Section PropMonad.
     intros.
     revert B b k HK.
     induction HM; intros.
-    - rewrite H. cbn. rewrite Eq.bind_ret_l. assumption.
-    - rewrite H. cbn. rewrite Eq.bind_tau. rewrite tau_eutt. apply IHHM. assumption.
-    - rewrite H. cbn. rewrite Eq.bind_vis. econstructor 3. reflexivity. apply IHHM. assumption.
+    - rewrite H. cbn. rewrite Eqit.bind_ret_l. assumption.
+    - rewrite H. cbn. rewrite Eqit.bind_tau. rewrite tau_eutt. apply IHHM. assumption.
+    - rewrite H. cbn. rewrite Eqit.bind_vis. econstructor 3. reflexivity. apply IHHM. assumption.
   Qed.
 
   Lemma Returns_bind_inversion_ : forall {E A B} (u : itree E B) (t : itree E A) (k : A -> itree E B) b,
@@ -651,10 +652,10 @@ Section IterLaws.
       eapply iterative_proper_iter.
       subst.
       do 3 red. intros.
-      destruct a0. rewrite Eq.bind_bind.
+      destruct a0. rewrite Eqit.bind_bind.
       eapply eutt_clo_bind. reflexivity.
       intros. rewrite H. destruct u2;
-      rewrite Eq.bind_ret_l; cbn; reflexivity.
+      rewrite Eqit.bind_ret_l; cbn; reflexivity.
     }
     do 3 red in H.
     apply H.
@@ -696,12 +697,12 @@ Section MonadLaws.
       * cbn in *.
         repeat red in eqtt'.
         destruct eqtt' as (ta & k & EQ1 & EQ2 & KA).
-      + unfold bind, Monad_itree in EQ2. rewrite EQ1, Eq.bind_ret_l, eq in EQ2.
+      + unfold bind, Monad_itree in EQ2. rewrite EQ1, Eqit.bind_ret_l, eq in EQ2.
         eapply H; [apply EQ2 | apply KA].
         constructor 1; eauto.
      * cbn.
        exists (Ret x), (fun _ => t); split; [reflexivity|]; split.
-        + unfold bind, Monad_itree. rewrite Eq.bind_ret_l; reflexivity.
+        + unfold bind, Monad_itree. rewrite Eqit.bind_ret_l; reflexivity.
         + intros.
           apply Returns_Ret in H0. subst. red in H. rewrite eq.
           assumption.
@@ -709,29 +710,29 @@ Section MonadLaws.
     - intros t t' EQ; cbn; split; intros HX.
       * destruct HX as (ta & k & EQ1 & EQ2 & KA).
         exists (Ret x), (fun _ => t); split; [reflexivity |]; split.
-        --  unfold bind, Monad_itree. rewrite Eq.bind_ret_l. symmetry. assumption.
+        --  unfold bind, Monad_itree. rewrite Eqit.bind_ret_l. symmetry. assumption.
         --
           intros ? RET; inv RET.
           2: { rewrite tau_eutt in H0. rewrite <- H0 in H1. apply Returns_Ret in H1. subst.
                red in H. rewrite EQ2. rewrite EQ1.
                unfold bind, Monad_itree.
-               rewrite Eq.bind_ret_l. apply KA. rewrite EQ1. constructor. reflexivity. }
+               rewrite Eqit.bind_ret_l. apply KA. rewrite EQ1. constructor. reflexivity. }
           2: exfalso; eapply eutt_ret_vis_abs; eauto.
           apply eqit_inv_Ret in H0; subst.
           eapply H. rewrite EQ1 in EQ2.
           unfold bind, Monad_itree in EQ2.
-             rewrite Eq.bind_ret_l in EQ2. apply EQ2.
+             rewrite Eqit.bind_ret_l in EQ2. apply EQ2.
              apply KA; rewrite EQ1; constructor; reflexivity.
 
       * destruct HX as (ta & k & EQ1 & EQ2 & KA).
         exists (Ret x), (fun _ => t); split; [reflexivity |]; split.
-        --  unfold bind, Monad_itree. rewrite Eq.bind_ret_l. reflexivity.
+        --  unfold bind, Monad_itree. rewrite Eqit.bind_ret_l. reflexivity.
         --
           intros ? RET; inv RET.
           2: { rewrite tau_eutt in H0. rewrite <- H0 in H1. apply Returns_Ret in H1. subst.
                red in H. rewrite EQ. rewrite EQ2. rewrite EQ1.
                unfold bind, Monad_itree.
-               rewrite Eq.bind_ret_l. apply KA; rewrite EQ1; constructor 1; reflexivity.
+               rewrite Eqit.bind_ret_l. apply KA; rewrite EQ1; constructor 1; reflexivity.
           }
           2: exfalso; eapply eutt_ret_vis_abs; eauto.
 
@@ -739,7 +740,7 @@ Section MonadLaws.
           red in H.
           rewrite EQ, EQ2, EQ1.
           unfold bind, Monad_itree.
-          rewrite Eq.bind_ret_l.
+          rewrite Eqit.bind_ret_l.
           apply KA; rewrite EQ1; constructor; reflexivity.
     - assumption.
   Qed.
@@ -799,8 +800,8 @@ Section MonadLaws.
       + intros. cbn in H0. unfold agrees_itree in H0.
         unfold ITree.map in H0.
         rewrite H in H0.
-        do 2 rewrite Eq.bind_ret_l in H0.
-        apply Eq.eqit_Ret in H0. assumption.
+        do 2 rewrite Eqit.bind_ret_l in H0.
+        apply Eqit.eqit_Ret in H0. assumption.
       + intros.
         rewrite tau_eutt in H.
         unfold agrees_itree in H1.
@@ -826,7 +827,7 @@ Section MonadLaws.
         apply eqit_Returns_bind''.
         * reflexivity.
         * intros. subst.
-          apply Eq.eqit_Ret.
+          apply Eqit.eqit_Ret.
           specialize (REL x).
           red in REL.
           pclearbot.
@@ -847,11 +848,11 @@ Section MonadLaws.
     apply NEQ. clear NEQ.
     revert k1 k2 HI.
     induction HRET; intros.
-    - rewrite H in HI. cbn in HI. rewrite Eq.bind_ret_l in HI. rewrite Eq.bind_ret_l in HI.
+    - rewrite H in HI. cbn in HI. rewrite Eqit.bind_ret_l in HI. rewrite Eqit.bind_ret_l in HI.
       assumption.
     - apply IHHRET. unfold bind, Monad_itree in HI.
       rewrite H in HI.
-      do 2 rewrite Eq.bind_tau in HI.
+      do 2 rewrite Eqit.bind_tau in HI.
       do 2 rewrite tau_eutt in HI. apply HI.
     - apply IHHRET. rewrite H in HI.
       do 2 rewrite bind_vis in HI.
@@ -867,7 +868,7 @@ Section MonadLaws.
     induction HRet; intros (tb & HK).
     - setoid_rewrite H in HK.
       unfold bind, Monad_itree in HK.
-      setoid_rewrite Eq.bind_ret_l in HK.
+      setoid_rewrite Eqit.bind_ret_l in HK.
       pose (HK (fun _ => ret X)) as t2. cbn in t2.
       pose (HK (fun _ => ITree.spin)) as t3. cbn in t3.
       assert (Ret X ≈ (ITree.spin : itree E B)).
@@ -915,7 +916,7 @@ Section MonadLaws.
 
       * cbn.
         exists t', (fun x => Ret x); split; [auto|]; split.
-        unfold bind, Monad_itree. rewrite Eq.bind_ret_r; auto.
+        unfold bind, Monad_itree. rewrite Eqit.bind_ret_r; auto.
         intros; reflexivity.
 
     + intros x y EQ; split; intros eqtt'.
@@ -1042,7 +1043,7 @@ Lemma bind_bind_Prop: forall {E}
         * setoid_rewrite EQc; clear EQc.
           setoid_rewrite EQb. setoid_rewrite EQb in HRkbc; clear EQb tb.
           unfold bind, Monad_itree.
-          rewrite Eq.bind_bind. reflexivity.
+          rewrite Eqit.bind_bind. reflexivity.
         * intros a HRet.
           exists (kab a), kbc.
           split; [auto|];split.
@@ -1112,19 +1113,19 @@ Module BIND_BIND_COUNTEREXAMPLE.
     rewrite HEQ' in HEQ.
     unfold t in HEQ.
     unfold bind, Monad_itree in HEQ.
-    rewrite Eq.bind_bind in HEQ.
-    assert (forall r, Returns r (trigger Pick) -> eutt eq ((fun b : bool =>
+    rewrite Eqit.bind_bind in HEQ.
+    assert (forall r, @Returns ND bool r (trigger Pick) -> eutt eq ((fun b : bool =>
            if b
            then ITree.bind (trigger Pick) (fun x : bool => if x then ret true else ITree.spin)
            else ITree.bind (trigger Pick) (fun x : bool => if x then ret false else ITree.spin)) r) ((fun r : bool => ITree.bind (kb r) k) r)).
     apply eqit_bind_Returns_inv. apply HEQ.
-    assert (Returns true (trigger Pick)).
+    assert (@Returns ND bool true (trigger Pick)).
     { unfold trigger. econstructor 3. reflexivity. constructor 1. reflexivity. }
-    assert (Returns false (trigger Pick)).
+    assert (@Returns ND bool false (trigger Pick)).
     { unfold trigger. econstructor 3. reflexivity. constructor 1. reflexivity. }
-    assert (Returns true (trigger Pick)).
+    assert (@Returns ND bool true (trigger Pick)).
     { unfold trigger. econstructor 3. reflexivity. constructor 1. reflexivity. }
-    assert (Returns false (trigger Pick)).
+    assert (@Returns ND bool false (trigger Pick)).
     { unfold trigger. econstructor 3. reflexivity. constructor 1. reflexivity. }
     apply H in H0.
     apply H in H1.
