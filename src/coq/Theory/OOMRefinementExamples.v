@@ -28,21 +28,33 @@ Import DynamicTypes.
 Require Import Morphisms.
 Require Import Paco.paco.
 
+Require Import Coq.Program.Equality.
 
 (* TODO: Move all of this stuff *)
-Lemma ret_map_itree :
-  forall Eff A B (f : A -> B) (t : itree Eff A) (a : A),
-    ITree.map f t ≈ ret (f a) ->
-    exists a', t ≈ ret a' /\ f a' = f a.
-Proof.
-Admitted.
-
 Lemma itree_map_ret_inv :
-  forall {E X Y} f (t : itree E X) (y : Y),
-    ITree.map f t ≈ ret y ->
-    exists (x : X), t ≈ ret x /\ f x = y.
+  forall Eff A B (f : A -> B) (t : itree Eff A) b,
+    ITree.map f t ≈ ret b ->
+    exists a, t ≈ ret a /\ f a = b.
 Proof.
-Admitted.
+  intros * HM.
+  punfold HM.
+  cbn in *.
+  red in HM.
+  dependent induction HM.
+  - setoid_rewrite (itree_eta t).
+    unfold ITree.map,observe in x; cbn in x.
+    destruct (observe t) eqn:EQ'; try now inv x.
+    cbn in *; exists r; inv x; split; reflexivity.
+  - unfold ITree.map,observe in x; cbn in x.
+    setoid_rewrite (itree_eta t).
+    destruct (observe t) eqn:EQ'; try now inv x.
+    cbn in x.
+    inv x.
+    edestruct IHHM as (? & ? & ?).
+    all: try reflexivity.
+    exists x; split; auto.
+    rewrite H, tau_eutt; reflexivity.
+Qed.
 
 Class KSPEC_WF {E F} (h_spec : forall T : Type, E T -> PropT F T)
       (k_spec : forall T R : Type, E T -> itree F T -> (T -> itree F R) -> itree F R -> Prop) : Type
@@ -170,7 +182,7 @@ Module Infinite.
       t' ≈ raiseOOM oom_msg.
   Proof.
   Admitted.
-  
+
   Definition alloc_code : code dtyp :=
     [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) None None)
     ].
@@ -274,7 +286,7 @@ Module Infinite.
       clear EQ.
       rename H into EQ.
 
-      apply ret_map_itree in EQ as ((m', (s', a')) & EQ & FEQ).
+      apply itree_map_ret_inv in EQ as ((m', (s', a')) & EQ & FEQ).
 
       rewrite EQ in UNDEF.
       cbn in UNDEF.
@@ -408,7 +420,7 @@ Module Infinite.
       clear EQ.
       rename H into EQ.
 
-      apply ret_map_itree in EQ as ((m', (s', a')) & EQ & FEQ).
+      apply itree_map_ret_inv in EQ as ((m', (s', a')) & EQ & FEQ).
 
       rewrite EQ in UNDEF.
       cbn in UNDEF.
@@ -532,7 +544,7 @@ Module Infinite.
       clear EQ.
       rename H into EQ.
 
-      apply ret_map_itree in EQ as ((m', (s', a')) & EQ & FEQ).
+      apply itree_map_ret_inv in EQ as ((m', (s', a')) & EQ & FEQ).
 
       rewrite EQ in UNDEF.
       cbn in UNDEF.
@@ -545,7 +557,7 @@ Module Infinite.
       exists (Ret2 s' m' (lenv, stack, (genv, DVALUE_Addr addr))). (* Not sure if should be s' or sid, and m' or m *) (* Used to be r2 *)
 
       split.
-      + 
+      +
         Ltac go_setoid :=
           repeat match goal with
                  | |- context [interp_intrinsics (ITree.bind _ _)] => setoid_rewrite interp_intrinsics_bind
@@ -680,7 +692,7 @@ Module Infinite.
     repeat setoid_rewrite bind_ret_l in INTERP.
     setoid_rewrite interp_local_stack_ret in INTERP.
     repeat setoid_rewrite bind_ret_l in INTERP.
-    
+
     setoid_rewrite interp_intrinsics_ret in INTERP.
     setoid_rewrite interp_global_ret in INTERP.
     setoid_rewrite interp_local_stack_ret in INTERP.
@@ -776,7 +788,7 @@ Module Infinite.
          * red.
            eapply interp_prop_ret_pure; eauto.
       + (* t' is the successful result of t_alloc *)
-        destruct ALLOC_SUC as [sid'' [ ms'' [x [MAP ALLOC_SUC]]]].        
+        destruct ALLOC_SUC as [sid'' [ ms'' [x [MAP ALLOC_SUC]]]].
         destruct ALLOC_SUC as [ms''' [a [ALLOC [MEQ XEQ]]]].
         subst.
 
@@ -1045,7 +1057,7 @@ Module Finite.
     repeat setoid_rewrite bind_ret_l in INTERP.
     setoid_rewrite interp_local_stack_ret in INTERP.
     repeat setoid_rewrite bind_ret_l in INTERP.
-    
+
     setoid_rewrite interp_intrinsics_ret in INTERP.
     setoid_rewrite interp_global_ret in INTERP.
     setoid_rewrite interp_local_stack_ret in INTERP.
@@ -1140,7 +1152,7 @@ Module Finite.
          * red.
            eapply interp_prop_ret_pure; eauto.
       + (* t' is the successful result of t_alloc *)
-        destruct ALLOC_SUC as [sid'' [ ms'' [x [MAP ALLOC_SUC]]]].        
+        destruct ALLOC_SUC as [sid'' [ ms'' [x [MAP ALLOC_SUC]]]].
         destruct ALLOC_SUC as [ms''' [a [ALLOC [MEQ XEQ]]]].
         subst.
 
