@@ -1,5 +1,5 @@
 # Vellvm
-[![Build Status](https://travis-ci.com/vellvm/vellvm.svg?branch=master)](https://travis-ci.com/vellvm/vellvm)
+[![Build vellvm](https://github.com/vellvm/vellvm/actions/workflows/test.yml/badge.svg?branch=finite-memory)](https://github.com/vellvm/vellvm/actions/workflows/test.yml)
 
 Vellvm is an ongoing project aiming at the formal verification in the Coq proof
 assistant of a compilation infrastructure inspired by the LLVM compiler.
