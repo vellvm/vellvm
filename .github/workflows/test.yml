@@ -14,6 +14,6 @@ jobs:
       with:
         name: vellvm
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-    - run: nix build ".#?submodules=1"
+    - run: nix build ".?submodules=1"
     - run: nix flake check
     
