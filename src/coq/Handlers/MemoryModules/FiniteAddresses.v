@@ -1,0 +1,305 @@
+From Coq Require Import
+     ZArith
+     List
+     Lia
+     Morphisms.
+
+From Vellvm Require Import
+     Numeric.Coqlib.
+
+From Vellvm.Semantics Require Import
+     MemoryAddress
+     Memory.FiniteProvenance.
+
+From QuickChick Require Import Show.
+
+From ExtLib Require Import
+     Structures.Functor.
+
+Import ListNotations.
+
+(** ** Type of pointers
+    Implementation of the notion of pointer used: an address and an offset.
+ *)
+Definition Iptr := Z. (* Integer pointer type (physical addresses) *)
+
+(* TODO: Should probably make this an NSet, but it gives universe inconsistency with Module addr *)
+Definition Prov := option (list Provenance). (* Provenance *)
+
+Definition wildcard_prov : Prov := None.
+Definition nil_prov : Prov := Some [].
+
+(* TODO: If Prov is an NSet, I get a universe inconsistency here... *)
+Module Addr : MemoryAddress.ADDRESS with Definition addr := (Iptr * Prov) % type.
+  Definition addr := (Iptr * Prov) % type.
+  Definition null : addr := (0, nil_prov)%Z.
+
+  (* TODO: is this what we should be using for equality on pointers? Probably *NOT* because of provenance. *)
+  Lemma eq_dec : forall (a b : addr), {a = b} + {a <> b}.
+  Proof.
+    intros [a1 a2] [b1 b2].
+
+    destruct (Z.eq_dec a1 b1);
+      destruct (option_eq (fun x y => list_eq_dec N.eq_dec x y) a2 b2); subst.
+    - left; reflexivity.
+    - right. intros H. inversion H; subst. apply n. reflexivity.
+    - right. intros H. inversion H; subst. apply n. reflexivity.
+    - right. intros H. inversion H; subst. apply n. reflexivity.
+  Qed.
+
+  Lemma different_addrs :
+    forall (a : addr), exists (b : addr), a <> b.
+  Proof.
+    intros a.
+    destruct a.
+    destruct i.
+    - exists (Z.pos 1, p).
+      intros CONTRA; inversion CONTRA.
+    - exists (0, p).
+      intros CONTRA; inversion CONTRA.
+    - exists (Z.pos 1, p).
+      intros CONTRA; inversion CONTRA.
+  Qed.
+
+  Definition show_addr (a : addr) := Show.show a.
+End Addr.
+
+Module FinPTOI : PTOI(Addr)
+with Definition ptr_to_int := fun (ptr : Addr.addr) => fst ptr.
+  Definition ptr_to_int (ptr : Addr.addr) := fst ptr.
+End FinPTOI.
+
+Module FinPROV : PROVENANCE(Addr)
+with Definition Prov := Prov
+with Definition address_provenance
+    := fun (a : Addr.addr) => snd a.
+  Definition Provenance := Provenance.
+  Definition AllocationId := AllocationId.
+  Definition Prov := Prov.
+  Definition wildcard_prov : Prov := wildcard_prov.
+  Definition nil_prov : Prov := nil_prov.
+  Definition address_provenance (a : Addr.addr) : Prov
+    := snd a.
+
+  (* Does the provenance set pr allow for access to aid? *)
+  Definition access_allowed (pr : Prov) (aid : AllocationId) : bool
+    := match pr with
+       | None => true (* Wildcard can access anything. *)
+       | Some prset =>
+         match aid with
+         | None => true (* Wildcard, can be accessed by anything. *)
+         | Some aid =>
+           existsb (N.eqb aid) prset
+         end
+       end.
+
+  Definition aid_access_allowed (pr : AllocationId) (aid : AllocationId) : bool
+    := match pr with
+       | None => true
+       | Some pr =>
+         match aid with
+         | None => true
+         | Some aid =>
+           N.eqb pr aid
+         end
+       end.
+
+  Definition allocation_id_to_prov (aid : AllocationId) : Prov
+    := fmap (fun x => [x]) aid.
+
+  Definition provenance_to_allocation_id (pr : Provenance) : AllocationId
+    := Some pr.
+
+  Definition next_provenance (pr : Provenance) : Provenance
+    := N.succ pr.
+
+  Definition initial_provenance : Provenance
+    := 0%N.
+
+  Definition provenance_lt (p1 p2 : Provenance) : Prop
+    := N.lt p1 p2.
+
+  Lemma aid_access_allowed_refl :
+    forall aid, aid_access_allowed aid aid = true.
+  Proof.
+    intros aid.
+    unfold aid_access_allowed.
+    destruct aid; auto.
+    rewrite N.eqb_refl.
+    auto.
+  Qed.
+
+  Lemma access_allowed_refl :
+    forall aid,
+      access_allowed (allocation_id_to_prov aid) aid = true.
+  Proof.
+    intros aid.
+    unfold access_allowed.
+    cbn.
+    destruct aid; auto.
+    cbn.
+    rewrite N.eqb_refl.
+    cbn.
+    auto.
+  Qed.
+
+  Lemma allocation_id_to_prov_inv:
+    forall aid aid',
+      allocation_id_to_prov aid = allocation_id_to_prov aid' ->
+      aid = aid'.
+  Proof.
+    intros aid aid' H.
+    unfold allocation_id_to_prov in *.
+    cbn in *.
+    destruct aid, aid'; inv H; auto.
+  Qed.
+
+  Lemma provenance_to_allocation_id_inv :
+    forall pr pr',
+      provenance_to_allocation_id pr = provenance_to_allocation_id pr' ->
+      pr = pr'.
+  Proof.
+    intros pr pr' H.
+    unfold provenance_to_allocation_id in *.
+    inv H; auto.
+  Qed.
+
+  Lemma provenance_eq_dec :
+    forall (pr pr' : Provenance),
+      {pr = pr'} + {pr <> pr'}.
+  Proof.
+    unfold Provenance.
+    unfold FiniteProvenance.Provenance.
+    intros pr pr'.
+    apply N.eq_dec.
+  Defined.
+
+  Lemma provenance_eq_dec_refl :
+    forall (pr : Provenance),
+      true = provenance_eq_dec pr pr.
+  Proof.
+    intros pr.
+    destruct provenance_eq_dec; cbn; auto.
+    exfalso; auto.
+  Qed.
+
+  Lemma aid_eq_dec :
+    forall (aid aid' : AllocationId),
+      {aid = aid'} + {aid <> aid'}.
+  Proof.
+    intros aid aid'.
+    destruct aid, aid'; auto.
+    pose proof provenance_eq_dec p p0.
+    destruct H; subst; auto.
+    right.
+    intros CONTRA. inv CONTRA; contradiction.
+    right; intros CONTRA; inv CONTRA.
+    right; intros CONTRA; inv CONTRA.
+  Qed.
+
+  Lemma aid_eq_dec_refl :
+    forall (aid : AllocationId),
+      true = aid_eq_dec aid aid.
+  Proof.
+    intros aid.
+    destruct (aid_eq_dec aid aid); cbn; auto.
+    exfalso; auto.
+  Qed.
+
+  #[global] Instance access_allowed_Proper :
+    Proper (eq ==> (fun aid aid' => true = (aid_eq_dec aid aid')) ==> eq) access_allowed.
+  Proof.
+    unfold Proper, respectful.
+    intros x y H x0 y0 H0.
+    subst.
+    unfold access_allowed.
+    symmetry in H0.
+    eapply proj_sumbool_true in H0.
+    subst.
+    reflexivity.
+  Defined.
+
+  #[global] Instance provenance_lt_trans : Transitive provenance_lt.
+  Proof.
+    unfold Transitive.
+    intros x y z XY YZ.
+    unfold provenance_lt in *.
+    lia.
+  Defined.
+
+  Lemma provenance_lt_next_provenance :
+    forall pr,
+      provenance_lt pr (next_provenance pr).
+  Proof.
+    unfold provenance_lt, next_provenance.
+    lia.
+  Qed.
+
+  Lemma provenance_lt_nrefl :
+    forall pr,
+      ~ provenance_lt pr pr.
+  Proof.
+    intros pr.
+    unfold provenance_lt.
+    lia.
+  Qed.
+
+  #[global] Instance provenance_lt_antisym : Antisymmetric Provenance eq provenance_lt.
+  Proof.
+    unfold Antisymmetric.
+    intros x y XY YX.
+    unfold provenance_lt in *.
+    lia.
+  Defined.
+
+  Lemma next_provenance_neq :
+    forall pr,
+      pr <> next_provenance pr.
+  Proof.
+    intros pr.
+    unfold next_provenance.
+    lia.
+  Qed.
+
+  (* Debug *)
+  Definition show_prov (pr : Prov) := Show.show pr.
+  Definition show_provenance (pr : Provenance) := Show.show pr.
+  Definition show_allocation_id (aid : AllocationId) := Show.show aid.
+End FinPROV.
+
+Module FinITOP : ITOP(Addr)(FinPROV)(FinPTOI).
+  Import Addr.
+  Import FinPROV.
+  Import FinPTOI.
+
+  Definition int_to_ptr (i : Z) (pr : Prov) : addr
+    := (i, pr).
+
+  Lemma int_to_ptr_provenance :
+    forall (x : Z) (p : Prov) ,
+      FinPROV.address_provenance (int_to_ptr x p) = p.
+  Proof.
+    intros x p.
+    reflexivity.
+  Qed.
+
+  Lemma int_to_ptr_ptr_to_int :
+    forall (a : addr) (p : Prov),
+      address_provenance a = p ->
+      int_to_ptr (ptr_to_int a) p = a.
+  Proof.
+    intros a p PROV.
+    unfold int_to_ptr.
+    unfold ptr_to_int.
+    destruct a; cbn.
+    inv PROV; cbn; auto.
+  Qed.
+
+  Lemma ptr_to_int_int_to_ptr :
+    forall (x : Z) (p : Prov),
+      ptr_to_int (int_to_ptr x p) = x.
+  Proof.
+    intros x p.
+    reflexivity.
+  Qed.
+End FinITOP.

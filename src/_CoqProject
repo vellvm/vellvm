@@ -15,6 +15,11 @@
 ./coq/Handlers/Serialization.v
 ./coq/Handlers/SerializationTheory.v
 ./coq/Handlers/Stack.v
+./coq/Handlers/MemoryModules/FiniteAddresses.v
+./coq/Handlers/MemoryModules/FiniteIntptr.v
+./coq/Handlers/MemoryModules/FiniteSizeof.v
+./coq/Handlers/MemoryModules/FiniteSpecPrimitives.v
+./coq/Handlers/MemoryModules/FiniteExecPrimitives.v
 ./coq/Handlers/MemoryModelImplementation.v
 ./coq/Handlers/MemoryInterpreters.v
 ./coq/Handlers/OOM.v
