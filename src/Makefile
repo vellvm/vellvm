@@ -78,7 +78,7 @@ VOFILES := $(COQFILESALL:%=coq/%.vo)
 QCVOFILES := $(COQFILESQC:%=coq/%.vo)
 QCVOFILESTEST := $(COQFILESQCTEST:%=coq/%.vo)
 
-KNOWNTARGETS := CoqMakefile extracted $(EXTRACTDIR)/STAMP interp coq qc-tests opam frontend frontend_exe distclean update-quickchick update-flocq-quickchick rm-qc-test-vo vellvm
+KNOWNTARGETS := CoqMakefile extracted $(EXTRACTDIR)/STAMP interp coq qc-tests opam frontend frontend_exe distclean update-quickchick update-flocq-quickchick rm-qc-test-vo vellvm test check
 KNOWNFILES := Makefile _CoqProject
 .DEFAULT_GOAL := all
 
@@ -167,6 +167,9 @@ vellvm: $(EXE)
 .PHONY: test
 test: vellvm
 	./vellvm -test
+
+.PHONY: check
+check: test
 
 .PHONY: print-includes
 print-includes:
