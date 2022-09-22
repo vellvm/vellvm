@@ -119,6 +119,45 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     - apply uvalue_eq_Transitive.
   Qed.
 
+  (* Refinement relation for dvalues *)
+  Variant refine_dvalue: dvalue -> dvalue -> Prop :=
+    | RefineDVPoison : forall dt dv, dvalue_has_dtyp dv dt -> refine_dvalue (DVALUE_Poison dt) dv
+    | RefineDVRefl : forall dv, refine_dvalue dv dv.
+
+  #[export] Hint Constructors refine_dvalue : core.
+
+  #[global] Instance refine_dvalue_Reflexive : Reflexive refine_dvalue.
+  Proof.
+    repeat intro.
+    apply RefineDVRefl.
+  Qed.
+
+  Lemma refine_dvalue_dtyp :
+    forall dv1 dv2 dt,
+      dvalue_has_dtyp dv1 dt ->
+      refine_dvalue dv1 dv2 ->
+      dvalue_has_dtyp dv2 dt.
+  Proof.
+    intros dv1 dv2 dt DTYP REF.
+    induction REF.
+    - inversion DTYP; subst; auto.
+    - auto.
+  Qed.
+
+  #[global] Instance refine_dvalue_Transitive : Transitive refine_dvalue.
+  Proof.
+    repeat intro.
+    inversion H; subst.
+    - (* x concretizes to poison *)
+      eapply RefineDVPoison.
+      eapply refine_dvalue_dtyp; eauto.
+    - (* x may not be poison  *)
+      inversion H0; subst.
+      + (* y is poison *)
+        eapply RefineDVPoison; eauto.
+      + eauto.
+  Qed.
+
   (* TODO: move this? *)
   Ltac red_concretize :=
     unfold concretize, concretize_u; rewrite concretize_uvalueM_equation.
@@ -393,11 +432,11 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   (* Lemma 5.7 - uses this definition of refinement 
    note that refine_uvalue is the basic Uvalue refinement given by Definition 5.6 *)
   (* Refinement of uninterpreted mcfg *)
-  Definition refine_L0: relation (itree L0 dvalue) := eutt eq.
+  Definition refine_L0: relation (itree L0 dvalue) := eutt refine_dvalue.
 
   (* Refinement of mcfg after globals *)
   Definition refine_res1 : relation (global_env * dvalue)
-    := TT × eq.
+    := TT × refine_dvalue.
 
   Definition refine_L1 : relation (itree L1 (global_env * dvalue))
     := eutt refine_res1.
