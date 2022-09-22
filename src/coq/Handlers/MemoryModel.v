@@ -418,7 +418,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       eapply rbm_raise_ret_inv in CONSEC; [contradiction | auto].
   Qed.
 
-  Definition generate_num_undef_bytes (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
+  Definition generate_num_undef_bytes_h (start_ix : N) (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
     N.recursion
       (fun (x : N) => ret [])
       (fun n mf x =>
@@ -426,17 +426,79 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
          x' <- IP.from_Z (Z.of_N x);;
          let byte := uvalue_sbyte (UVALUE_Undef dt) dt (UVALUE_IPTR x') sid in
          ret (byte :: rest_bytes))
-      num 0%N.
+      num start_ix.
+
+  Definition generate_num_undef_bytes (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
+    generate_num_undef_bytes_h 0 num dt sid.
 
   Definition generate_undef_bytes (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
     generate_num_undef_bytes (sizeof_dtyp dt) dt sid.
+
+  Lemma generate_num_undef_bytes_h_length :
+    forall num start_ix dt sid bytes,
+      generate_num_undef_bytes_h start_ix num dt sid = NoOom bytes ->
+      num = N.of_nat (length bytes).
+  Proof.
+    intros num.
+    induction num using N.peano_rect; intros start_ix dt sid bytes GEN.
+    - cbn in *.
+      inv GEN.
+      reflexivity.
+    - unfold generate_num_undef_bytes_h in GEN.
+      pose proof @N.recursion_succ (N -> OOM (list SByte)) eq (fun _ : N => ret [])
+           (fun (_ : N) (mf : N -> OOM (list SByte)) (x : N) =>
+           rest_bytes <- mf (N.succ x);;
+           x' <- IP.from_Z (Z.of_N x);;
+           ret (uvalue_sbyte (UVALUE_Undef dt) dt (UVALUE_IPTR x') sid :: rest_bytes))
+           eq_refl.
+      forward H.
+      { unfold Proper, respectful.
+        intros x y H0 x0 y0 H1; subst.
+        reflexivity.
+      }
+      specialize (H num).
+      rewrite H in GEN.
+      clear H.
+
+      destruct
+        (N.recursion (fun _ : N => ret [])
+                     (fun (_ : N) (mf : N -> OOM (list SByte)) (x : N) =>
+                        rest_bytes <- mf (N.succ x);;
+                        x' <- IP.from_Z (Z.of_N x);;
+                        ret (uvalue_sbyte (UVALUE_Undef dt) dt (UVALUE_IPTR x') sid :: rest_bytes)) num
+                     (N.succ start_ix)) eqn:HREC.
+      + (* No OOM *)
+        cbn in GEN.
+        break_match_hyp; inv GEN.
+        cbn.
+
+        unfold generate_num_undef_bytes_h in IHnum.
+        pose proof (IHnum (N.succ start_ix) dt sid l HREC) as IH.
+        lia.
+      + (* OOM *)
+        cbn in GEN.
+        inv GEN.
+  Qed.
+
+  Lemma generate_num_undef_bytes_length :
+    forall num dt sid bytes,
+      generate_num_undef_bytes num dt sid = NoOom bytes ->
+      num = N.of_nat (length bytes).
+  Proof.
+    intros num dt sid bytes GEN.
+    unfold generate_num_undef_bytes in *.
+    eapply generate_num_undef_bytes_h_length; eauto.
+  Qed.
 
   Lemma generate_undef_bytes_length :
     forall dt sid bytes,
       generate_undef_bytes dt sid = ret bytes ->
       sizeof_dtyp dt = N.of_nat (length bytes).
   Proof.
-  Admitted.
+    intros dt sid bytes GEN_UNDEF.
+    unfold generate_undef_bytes in *.
+    apply generate_num_undef_bytes_length in GEN_UNDEF; auto.
+  Qed.
 
   Section Serialization.
     (** ** Serialization *)
@@ -4058,7 +4120,7 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
     induction (sizeof_dtyp dt) using N.peano_ind.
     - cbn.
       admit.
-    - unfold generate_num_undef_bytes in *.
+    - unfold generate_num_undef_bytes, generate_num_undef_bytes_h in *.
       match goal with
       | H: _ |- N.recursion ?a ?f  _ _ = ret _ =>
           pose proof
