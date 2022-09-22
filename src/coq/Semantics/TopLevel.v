@@ -166,7 +166,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
     'addr <- trigger (GlobalRead (Name entry)) ;;
     'rv <- denote_mcfg defns ret_typ (dvalue_to_uvalue addr) args ;;
-    dv_pred <- trigger (pick_uvalue True rv);;
+    dv_pred <- trigger (pick_uvalue (forall dt, ~concretize rv (DVALUE_Poison dt)) rv);;
     ret (proj1_sig dv_pred).
 
   (* main_args and denote_vellvm_main may not be needed anymore, but I'm keeping them 
