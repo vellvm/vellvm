@@ -385,12 +385,13 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       `{EQRET : @Eq1_ret_inv M EQM HM}
       `{MLAWS : @MonadLawsE M EQM HM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
-      `{RAISE : @RaiseBindM M HM EQM string (fun T msg => raise_oom msg)}
+      `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+      `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
       (ptr : addr) (len : nat) (ptrs : list addr),
       (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad ->
       len = length ptrs.
   Proof.
-    intros M HM EQM EQV EQRET MLAWS OOM ERR RAISE ptr len ptrs CONSEC.
+    intros M HM EQM EQV EQRET MLAWS OOM ERR RBMOOM RBMERR ptr len ptrs CONSEC.
     unfold get_consecutive_ptrs in CONSEC.
     cbn in *.
     destruct (intptr_seq 0 len) eqn:SEQ.
@@ -401,7 +402,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       + (* Error: should be a contradiction *)
         (* TODO: need inversion lemma. *)
         cbn in CONSEC.
-        admit.
+        eapply rbm_raise_ret_inv in CONSEC; [contradiction | auto].
       + cbn in CONSEC.
         apply eq1_ret_ret in CONSEC; auto.
         assert (MReturns l0 (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix]) l)) as RETS.
@@ -412,9 +413,10 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         subst.
         auto.
     - (* OOM: CONSEC equivalent to ret is a contradiction. *)
-      (* TODO: need inversion lemma *)
-      admit.
-  Admitted.
+      cbn in CONSEC.
+      rewrite rbm_raise_bind in CONSEC; auto.
+      eapply rbm_raise_ret_inv in CONSEC; [contradiction | auto].
+  Qed.
 
   Definition generate_num_undef_bytes (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
     N.recursion
