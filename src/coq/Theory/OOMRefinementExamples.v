@@ -255,7 +255,7 @@ Module Infinite.
       `{FAIL : FailureE -< F}
       `{UB : UBE -< F}
       `{OOM : OOME -< F}
-      {X} (x : X) sid m (t : itree (E +' F) (MemState * (store_id * X))%type),
+      {X} (x : X) sid m (t : itree (E +' F) (MMEP.MMSP.MemState * (store_id * X))%type),
       interp_memory_prop eq (Ret x) sid m t ->
       Functor.fmap (fun '(_, (_, x)) => x) t ≈ Ret x.
   Proof.

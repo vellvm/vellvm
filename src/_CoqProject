@@ -78,6 +78,7 @@
 ./coq/Theory/InstrLemmas.v
 ./coq/Theory/ContainsUB.v
 ./coq/Theory/TopLevelRefinements.v
+./coq/Theory/OOMRefinementExamples.v
 ./coq/Utils/AListFacts.v
 ./coq/Utils/NoFailure.v
 ./coq/Utils/PostConditions.v
