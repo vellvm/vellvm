@@ -1,0 +1,186 @@
+Okay, so to further clarify the whole ~interp_prop~ ~RR~
+parameterization makes perfect sense to me, and I think it would be
+wrong to specialize it (unless we would wish to do so for ~eutt~ as
+well). The intuition is that ~interp~, ~interp_prop~, and ~eutt~ are
+all completely related things.
+
+The ~itrees~ are the traces for our program's execution.
+~eutt RR t1 t2~ is a relation between two traces ~t1~ and ~t2~, which holds
+whenever ~t1~ and ~t2~ (which have the same event signature) observe
+the exact same sequence of events ignoring any ~Tau~ steps, and if a
+trace terminates with a ~Ret~, the other must as well, and the return
+values must be related by ~RR~.
+
+#+begin_src coq
+  Inductive eqitF (b1 b2: bool) vclo (sim : itree E R1 -> itree E R2 -> Prop) :
+    itree' E R1 -> itree' E R2 -> Prop :=
+  | EqRet r1 r2
+       (REL: RR r1 r2):
+     eqitF b1 b2 vclo sim (RetF r1) (RetF r2)
+  | EqTau m1 m2
+        (REL: sim m1 m2):
+      eqitF b1 b2 vclo sim (TauF m1) (TauF m2)
+  | EqVis {u} (e : E u) k1 k2
+        (REL: forall v, vclo sim (k1 v) (k2 v) : Prop):
+      eqitF b1 b2 vclo sim (VisF e k1) (VisF e k2)
+  | EqTauL t1 ot2
+        (CHECK: b1)
+        (REL: eqitF b1 b2 vclo sim (observe t1) ot2):
+      eqitF b1 b2 vclo sim (TauF t1) ot2
+  | EqTauR ot1 t2
+        (CHECK: b2)
+        (REL: eqitF b1 b2 vclo sim ot1 (observe t2)):
+      eqitF b1 b2 vclo sim ot1 (TauF t2)
+  .
+#+end_src
+
+I think it's easier to see the relationship between ~eutt~ and
+~interp_prop~, but let's start with ~interp~. We use ~interp~ to
+handle events that appear in our ~itrees~ that represent the traces of
+execution of our LLVM programs. Consider ~interp h t1 = t2~, in this
+case ~t1~ is an ~itree~ trace with abstract events like ~LocalRead~,
+and ~t2~ is the trace you get after giving ~LocalRead~ and other
+events an implementation using the handler ~h~.
+
+#+begin_src coq
+Definition interp {E M : Type -> Type}
+           {FM : Functor M} {MM : Monad M} {IM : MonadIter M}
+           (h : E ~> M) :
+  itree E ~> M := fun R =>
+  iter (fun t =>
+    match observe t with
+    | RetF r => ret (inr r)
+    | TauF t => ret (inl t)
+    | VisF e k => fmap (fun x => inl (k x)) (h _ e)
+    end).
+#+end_src
+
+While this is not the same thing as the ~eutt~ relation, ~interp~
+follows a similar structure. It ignores ~Tau~ nodes, and if ~t1~
+returns, then ~t2~ will return the same value.
+
+Morally all we are doing is giving events a specific implementation
+with ~h~. When applied to an event, ~h _ e~ will give us an ~itree~
+trace that represents the behaviour of an implementation of the
+otherwise abstract event ~e~. The resulting ~itree~, ~t2~, will have
+the same structure as ~t1~, but the event ~e~ is replaced with an
+~itree~ trace that implements it.
+
+With how we use ~interp~, the ~t1~ and ~t2~ from ~interp h t1 = t2~
+are essentially related via "~eutt~", but it's not just "equivalent up
+to tau", but "equivalent up to tau and the implementation of the
+events."
+
+I think it's actually easier to see in terms of our ~interp_prop~...
+
+#+begin_src coq
+  Inductive interp_PropTF
+            {R : Type} (RR : relation R) (sim : itree E R -> itree F R -> Prop)
+            : itree' E R -> itree' F R -> Prop :=
+  | Interp_PropT_Ret : forall r1 r2 (REL: RR r1 r2),
+      interp_PropTF RR sim (RetF r1) (RetF r2)
+
+  | Interp_PropT_Tau : forall t1 t2 (HS: sim t1 t2),
+      interp_PropTF RR sim (TauF t1) (TauF t2)
+
+  | Interp_PropT_TauL : forall t1 t2 (HS: interp_PropTF RR sim (observe t1) t2),
+      interp_PropTF RR sim (TauF t1) t2
+
+  | Interp_PropT_TauR : forall t1 t2 (HS: interp_PropTF RR sim t1 (observe t2)),
+      interp_PropTF RR sim t1 (TauF t2)
+
+  | Interp_PropT_Vis : forall A (e : E A) (k1 : A -> itree E R) ta
+                         (t2 : itree' F R)
+
+                         (k2 : A -> itree F R)
+
+                         (HTA: h_spec A e ta)
+                         (HK : forall (a : A), Returns a ta -> sim (k1 a) (k2 a))
+
+                         (KS : k_spec A R e ta k2 (go t2)),
+      interp_PropTF RR sim (VisF e k1) t2.
+#+end_src
+
+In fact, ~interp_PropTF~ is essentially identical to ~eutt~'s definition:
+
+#+begin_src coq
+  Inductive eqitF (b1 b2: bool) vclo (sim : itree E R1 -> itree E R2 -> Prop) :
+    itree' E R1 -> itree' E R2 -> Prop :=
+  | EqRet r1 r2
+       (REL: RR r1 r2):
+     eqitF b1 b2 vclo sim (RetF r1) (RetF r2)
+  | EqTau m1 m2
+        (REL: sim m1 m2):
+      eqitF b1 b2 vclo sim (TauF m1) (TauF m2)
+  | EqVis {u} (e : E u) k1 k2
+        (REL: forall v, vclo sim (k1 v) (k2 v) : Prop):
+      eqitF b1 b2 vclo sim (VisF e k1) (VisF e k2)
+  | EqTauL t1 ot2
+        (CHECK: b1)
+        (REL: eqitF b1 b2 vclo sim (observe t1) ot2):
+      eqitF b1 b2 vclo sim (TauF t1) ot2
+  | EqTauR ot1 t2
+        (CHECK: b2)
+        (REL: eqitF b1 b2 vclo sim ot1 (observe t2)):
+      eqitF b1 b2 vclo sim ot1 (TauF t2)
+  .
+#+end_src
+
+The ~Ret~, ~Tau~, ~TauL~, and ~TauR~ cases are essentially identical
+between these relations. The only real difference is in handling
+~Vis~.
+
+The definition of ~eutt~ only relates ~vis~ nodes with identical
+events, and only as long as the continuations ~k1~ and ~k2~ produce
+traces that are ~eutt~ on any input.
+
+The definition of ~interp_prop~ is less picky with respect to ~vis~
+nodes. If ~t1 = VisF e k1~, then ~t2~ is related only when it's a tree
+that results from an "implementation" of the event ~e~.
+
+~interp~ has an actual handler that turns an event into an ~itree~, but
+~interp_prop~ has a specification for a handler ~h_spec A e ta~ which
+is a predicate that says when a trace ~ta~ is a valid way of handling
+an event ~e~.
+
+~interp_prop~ is fundamentally very similar to ~eutt~, except of
+course for the fact that instead of being an "equivalence up to tau"
+of two traces with the same effect signatures, ~interp_prop~ gives you
+a relationship between trees with different effect signatures, that's
+essentially "~eutt~, but relating a tree with abstract events, to a
+tree where the abstract events have been implemented according to a
+specification."
+
+There is of course the additional complication of the ~k_spec~, which
+has arisen largely because in our particular case we sometimes want
+~t2~ to not always be a bind. In particular, when we have a tree with
+~OOM~ events, we want to say it's related to a tree without ~OOM~
+events, as long as the prefix of the tree is identical before the
+~OOM~. But, I think ~k_spec~ is mostly a bit of a distraction here.
+
+#+begin_src coq
+  Definition oom_k_spec
+             {T R : Type}
+             (e : Effin T)
+             (ta : itree Effout T)
+             (k2 : T -> itree Effout R)
+             (t2 : itree Effout R) : Prop
+    :=
+    match e with
+    | inr1 (inl1 oom) => True
+    | _ => t2 ≈ bind ta k2
+    end.
+#+end_src
+
+Anyway, this is my intuition for ~interp_prop~. I think that
+~interp_prop~ and ~eutt~ are at their core doing very similar
+things. Because they are essentially doing the same thing, it makes
+perfect sense to me that they would both be parameterized by a
+relation ~RR~. If anything ~interp_prop~ is actually too specialized
+right now, as both trees have the same return type ~R~. I think it
+would make perfect sense for ~interp_prop~ to have ~R1~ and ~R2~ just
+like the ~eutt~ definitions, and it would also make sense to have the
+~b1~ and ~b2~ parameters for controlling which ~Tau~ nodes you're
+allowed to skip. That's probably not important for our purposes, but
+it would absolutely matter if you wanted to have stronger claims about
+programs -- like relating them with ~eqit~ instead of ~eutt~.
