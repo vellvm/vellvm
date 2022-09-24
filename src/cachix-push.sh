@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 nix build -L ".?submodules=1" -o vellvm-build
 cachix push vellvm vellvm-build
