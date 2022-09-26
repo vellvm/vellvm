@@ -2297,7 +2297,9 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
              + Should be covered by `exec_correct m_exec m_spec` assumption.
          *)
         (forall a ms_init ms_after_m st_init st_after_m,
-            (MemMonad_run m_exec ms_init st_init ≈ ret (st_after_m, (ms_after_m, a)))%monad ->
+            ((@eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MEMM)) _
+              (MemMonad_run m_exec ms_init st_init)
+              (ret (st_after_m, (ms_after_m, a))))%monad ->
             (* ms_k is a MemState after evaluating m *)
             exec_correct (fun ms_k st_k => pre ms_init st_init /\ m_spec ms_init (ret (ms_k, a))) (k_exec a) (k_spec a)) ->
         exec_correct pre (a <- m_exec;; k_exec a) (a <- m_spec;; k_spec a).
@@ -2340,14 +2342,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         destruct M_SUCCESS as [st' [ms' [a [M_EXEC [M_SPEC M_VALID]]]]].
 
         specialize (K_CORRECT a ms ms' st st').
-        forward K_CORRECT.
-        { split; auto.
-          (* Don't know that M_EXEC is the same because of eq1
-             instance... Don't know that RunM_eq1 is the same as the
-             itree one, bleh. *)
-          (* apply M_EXEC. *)
-          admit.
-        }
+        forward K_CORRECT; auto.
 
         specialize (K_CORRECT _ _ M_VALID (conj PRE M_SPEC)).
         destruct K_CORRECT as [[msg K_UB] | [[msg [K_ERR [msg_spec K_ERR_SPEC]]] | [[msg [K_OOM [msg_spec K_OOM_SPEC]]] | K_SUCCESS]]].
@@ -2392,103 +2387,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
           * cbn.
             exists ms', a.
             split; auto.
-    Admitted.
-
-    (* Lemma exec_correct_bind : *)
-    (*   forall {MemM Eff ExtraState} `{MemMonad ExtraState MemM (itree Eff)} *)
-    (*     {A B} *)
-    (*     (pre : MemState -> ExtraState -> Prop) *)
-    (*     (m_exec : MemM A) (k_exec : A -> MemM B) *)
-    (*     (m_spec : MemPropT MemState A) (k_spec : A -> MemPropT MemState B), *)
-    (*     exec_correct pre m_exec m_spec -> *)
-    (*     (forall a pre, exec_correct pre (k_exec a) (k_spec a)) -> *)
-    (*     exec_correct pre (a <- m_exec;; k_exec a) (a <- m_spec;; k_spec a). *)
-    (* Proof. *)
-    (*   intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM MLAWS MEMM A B pre m_exec k_exec m_spec k_spec M_CORRECT K_CORRECT. *)
-
-    (*   unfold exec_correct in *. *)
-    (*   intros ms st VALID PRE. *)
-    (*   specialize (M_CORRECT ms st VALID PRE). *)
-    (*   destruct M_CORRECT as [[msg M_UB] | [M_ERR | [M_OOM | M_SUCCESS]]]. *)
-    (*   - (* UB *) *)
-    (*     left. *)
-    (*     exists msg. *)
-    (*     left; auto. *)
-    (*   - (* Error *) *)
-    (*     right; left. *)
-    (*     destruct M_ERR as [msg [M_ERR [msg_spec M_SPEC_ERR]]]. *)
-    (*     exists msg. *)
-    (*     split. *)
-    (*     + rewrite MemMonad_run_bind. *)
-    (*       rewrite M_ERR. *)
-    (*       rewrite rbm_raise_bind; [| typeclasses eauto]. *)
-    (*       reflexivity. *)
-    (*     + exists msg_spec. *)
-    (*       cbn. *)
-    (*       left; auto. *)
-    (*   - (* OOM *) *)
-    (*     right; right; left. *)
-    (*     destruct M_OOM as [msg [M_OOM [msg_spec M_SPEC_OOM]]]. *)
-    (*     exists msg. *)
-    (*     split. *)
-    (*     + rewrite MemMonad_run_bind. *)
-    (*       rewrite M_OOM. *)
-    (*       rewrite rbm_raise_bind; [| typeclasses eauto]. *)
-    (*       reflexivity. *)
-    (*     + exists msg_spec. *)
-    (*       cbn. *)
-    (*       left; auto. *)
-    (*   - (* Success *) *)
-    (*     destruct M_SUCCESS as [st' [ms' [a [M_EXEC [M_SPEC M_VALID]]]]]. *)
-
-    (*     specialize (K_CORRECT a pre ms' st' M_VALID). *)
-    (*     forward K_CORRECT. *)
-    (*     { auto. *)
-    (*     } *)
-
-    (*     destruct K_CORRECT as [[msg K_UB] | [[msg [K_ERR [msg_spec K_ERR_SPEC]]] | [[msg [K_OOM [msg_spec K_OOM_SPEC]]] | K_SUCCESS]]]. *)
-    (*     + left. *)
-    (*       exists msg. *)
-    (*       cbn. *)
-    (*       right. *)
-    (*       exists ms', a. *)
-    (*       split; auto. *)
-    (*     + right; left. *)
-    (*       exists msg. *)
-    (*       split. *)
-    (*       * rewrite MemMonad_run_bind. *)
-    (*         rewrite M_EXEC. *)
-    (*         rewrite bind_ret_l. *)
-    (*         auto. *)
-    (*       * exists msg_spec. *)
-    (*         cbn. *)
-    (*         right. *)
-    (*         exists ms', a. *)
-    (*         split; auto. *)
-    (*     + right; right; left. *)
-    (*       exists msg. *)
-    (*       split. *)
-    (*       * rewrite MemMonad_run_bind. *)
-    (*         rewrite M_EXEC. *)
-    (*         rewrite bind_ret_l. *)
-    (*         auto. *)
-    (*       * exists msg_spec. *)
-    (*         cbn. *)
-    (*         right. *)
-    (*         exists ms', a. *)
-    (*         split; auto. *)
-    (*     + right; right; right. *)
-    (*       destruct K_SUCCESS as [st'' [ms'' [b [K_RUN [K_SPEC K_VALID]]]]]. *)
-    (*       exists st'', ms'', b. *)
-    (*       split; [| split]; auto. *)
-    (*       * rewrite MemMonad_run_bind. *)
-    (*         rewrite M_EXEC. *)
-    (*         rewrite bind_ret_l. *)
-    (*         auto. *)
-    (*       * cbn. *)
-    (*         exists ms', a. *)
-    (*         split; auto. *)
-    (* Qed. *)
+    Qed.
 
     Lemma exec_correct_ret :
       forall {MemM Eff ExtraState} `{MemMonad ExtraState MemM (itree Eff)}
