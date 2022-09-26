@@ -3948,6 +3948,7 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
       `{EQRET : @Eq1_ret_inv M EQM HM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
+      `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
       ptr len ptrs,
       (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad ->
       (forall p ix_nat,
@@ -3956,7 +3957,7 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
             NoOom ix = from_Z (Z.of_nat ix_nat) /\
             handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix] = inr p).
   Proof.
-    intros M HM EQM EQV EQRET OOM ERR LAWS ptr len ptrs CONSEC p ix_nat NTH.
+    intros M HM EQM EQV EQRET OOM ERR LAWS RBMERR ptr len ptrs CONSEC p ix_nat NTH.
     pose proof from_Z_safe (Z.of_nat ix_nat) as IX.
     break_match_hyp; inv IX.
     rename i into ix.
@@ -3983,9 +3984,7 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
     forward MAPNTH.
     { destruct (map_monad (fun ix : intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix]) ixs).
       cbn in CONSEC.
-      (* TODO: Need raise_error inversion lemma *)
-      admit.
-      cbn in CONSEC.
+      eapply rbm_raise_ret_inv in CONSEC; [contradiction | typeclasses eauto].
       eapply eq1_ret_ret in CONSEC; try typeclasses eauto.
       subst; auto.
     }
@@ -4003,7 +4002,7 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
     }
 
     subst; auto.
-  Admitted.
+  Qed.
 
   Lemma get_consecutive_ptrs_prov :
     forall {M : Type -> Type}
@@ -4011,19 +4010,20 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
       `{EQRET : @Eq1_ret_inv M EQM HM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
+      `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
       ptr len ptrs,
       (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad ->
       forall p, In p ptrs -> address_provenance p = address_provenance ptr.
   Proof.
-    intros M HM EQM EQV EQRET OOM ERR LAWS ptr len ptrs CONSEC p IN.
+    intros M HM EQM EQV EQRET OOM ERR LAWS RBMERR ptr len ptrs CONSEC p IN.
 
     apply In_nth_error in IN as (ix_nat & NTH).
     pose proof CONSEC as GEP.
     eapply get_consecutive_ptrs_nth in GEP; eauto.
     destruct GEP as (ix & IX & GEP).
 
-    apply handle_gep_addr_preserves_provenance in GEP.
-    auto.
+    apply handle_gep_addr_preserves_provenance in GEP;
+      auto.
   Qed.
 
 End MemStateInfiniteHelpers.
