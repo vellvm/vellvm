@@ -18,7 +18,8 @@ From ITree Require Import
 
 From Coq Require Import
      ZArith
-     Relations.
+     Relations
+     Relation_Definitions.
 
 From ExtLib Require Import
      Monads.
@@ -118,16 +119,6 @@ Module Infinite.
       + symmetry. apply H.
       + reflexivity.
       + auto.
-  Admitted.
-
-  (* TODO: Move this *)
-  Import Relation_Definitions.
-  #[global] Instance refine_OOM_h_eutt_Proper {T : Type} {RR : relation T} {E F}:
-    Proper (eutt eq ==> eutt eq ==> iff) (@refine_OOM_h E F T RR).
-  Proof.
-    unfold Proper, respectful.
-    intros x1 x2 X y1 y2 Y.
-    split; intros REFINE.
   Admitted.
 
   #[global] Instance refine_OOM_h_eutt_RR_Proper {T : Type} {RR : relation T} {E F}:
@@ -940,16 +931,6 @@ Module Finite.
       + symmetry. apply H.
       + reflexivity.
       + auto.
-  Admitted.
-
-  (* TODO: Move this *)
-  Import Relation_Definitions.
-  #[global] Instance refine_OOM_h_eutt_Proper {T : Type} {RR : relation T} {E F}:
-    Proper (eutt eq ==> eutt eq ==> iff) (@refine_OOM_h E F T RR).
-  Proof.
-    unfold Proper, respectful.
-    intros x1 x2 X y1 y2 Y.
-    split; intros REFINE.
   Admitted.
 
   Lemma model_undef_h_oom :

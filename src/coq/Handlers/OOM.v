@@ -206,7 +206,23 @@ Proof.
     intros [].
   - cbn; auto.
 Qed.
-  
+
+#[global] Instance refine_OOM_h_eutt_Proper {T : Type} {RR : relation T} {E F}:
+  Proper (eutt eq ==> eutt eq ==> iff) (@refine_OOM_h E F T RR).
+Proof.
+  unfold Proper, respectful.
+  intros x y XY z w ZW.
+  split; intros REF; subst.
+  - unfold refine_OOM_h in *.
+    rewrite ZW in REF.
+    rewrite XY in REF.
+    auto.
+  - unfold refine_OOM_h in *.
+    rewrite <- ZW in REF.
+    rewrite <- XY in REF.
+    auto.
+Qed.
+
 
 (* Instance Transitive_refine_OOM_h {E F T} {RR} : Transitive (@refine_OOM_h E F T RR). *)
 (* Proof. *)
