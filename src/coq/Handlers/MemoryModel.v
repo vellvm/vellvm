@@ -3854,6 +3854,7 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
       `{EQRET : @Eq1_ret_inv M EQM HM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
+      `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
       `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
       ptr len ptrs,
       (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad ->
@@ -3861,7 +3862,7 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
           In p ptrs ->
           (ptr_to_int ptr <= ptr_to_int p < ptr_to_int ptr + (Z.of_nat len))%Z).
   Proof.
-    intros M HM EQM EQV EQRET OOM ERR LAWS RBMERR ptr len ptrs.
+    intros M HM EQM EQV EQRET OOM ERR LAWS RBMOOM RBMERR ptr len ptrs.
     revert ptr len.
     induction ptrs; intros ptr len CONSEC p IN.
     - inv IN.
@@ -3902,17 +3903,15 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
         { unfold get_consecutive_ptrs in CONSEC'.
           cbn in CONSEC'.
           break_match_hyp.
-          2: { cbn in CONSEC'. rewrite rbm_raise_bind in CONSEC'.
-               (* TODO: inversion lemma *)
-               admit.
-               admit.
+          2: { cbn in CONSEC'.
+               rewrite rbm_raise_bind in CONSEC'; [|typeclasses eauto].
+               eapply rbm_raise_ret_inv in CONSEC'; [contradiction | typeclasses eauto].
           }
 
           break_match_hyp.
-          2: { cbn in CONSEC'. rewrite rbm_raise_bind in CONSEC'.
-               (* TODO: inversion lemma *)
-               admit.
-               admit.
+          2: { cbn in CONSEC'.
+               rewrite rbm_raise_bind in CONSEC'; [|typeclasses eauto].
+               eapply rbm_raise_ret_inv in CONSEC'; [contradiction | typeclasses eauto].
           }
 
           cbn in CONSEC'.
@@ -3920,19 +3919,28 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
           destruct (map_monad (fun ix : intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
                               (i :: l)) eqn:HMAPM.
           { cbn in CONSEC'.
-            (* TODO: inversion lemma *)
-            admit.
+            eapply rbm_raise_ret_inv in CONSEC'; [contradiction | typeclasses eauto].
           }
 
           cbn in CONSEC'.
           apply eq1_ret_ret in CONSEC'; eauto.
           inv CONSEC'.
-          apply map_monad_err_In with (x := ptr') in HMAPM; [| intuition].
+          break_match_hyp; inv Heqo0.
+          break_match_hyp; inv H0.
+          cbn in HMAPM.
+          break_match_hyp; [inv HMAPM|].
+          break_match_hyp; [inv HMAPM|].
+          break_match_hyp; [inv Heqs0|].
+          break_match_hyp; inv Heqs0.
+          inv HMAPM.
 
-          admit.
+          apply handle_gep_addr_ix in Heqs1.
+          rewrite sizeof_dtyp_i8 in Heqs1.
+          rewrite (from_Z_to_Z _ _ Heqo1) in Heqs1.
+          lia.
         }
         lia.
-  Admitted.
+  Qed.
 
   Lemma get_consecutive_ptrs_nth :
     forall {M : Type -> Type}
