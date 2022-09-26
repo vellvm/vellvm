@@ -164,7 +164,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
     Qed.
 
-    Instance k_spec_WF_memory_k_spec sid ms :
+    #[global] Instance k_spec_WF_memory_k_spec sid ms :
       k_spec_WF
         (fun (T : Type)
           (e : (ExternalCallE +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T)
@@ -181,14 +181,13 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       intros t1 t2 sid ms REF t Ht.
       exists t; split.
       - unfold L3 in *.
-        eapply interp_prop_Proper_eq in Ht; try typeclasses eauto.
-        + apply  Ht.
-        + assumption.
-        + reflexivity.
+        unfold refine_L2 in *.
+        eapply interp_prop_Proper_eq in Ht; try typeclasses eauto; eauto.
+        Unshelve. 
       - reflexivity.
     Qed.
 
-    Instance k_spec_WF_pick_uvalue_k_spec :
+    #[global] Instance k_spec_WF_pick_uvalue_k_spec :
       k_spec_WF
         (case_ (E_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))
           (case_ PickUvalue_handler (F_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))))

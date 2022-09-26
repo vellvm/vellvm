@@ -96,7 +96,7 @@ Section PARAMS_MODEL.
     := case_ E_trigger_model_prop (case_ OOM_handler F_trigger_model_prop).
 
   Definition refine_OOM_h {T} (RR : relation T) (source target : itree Effout T) : Prop
-    := interp_prop refine_OOM_handler (@oom_k_spec) T (Basics.flip RR) target source.
+    := interp_prop (Basics.flip RR) refine_OOM_handler (@oom_k_spec) target source.
 
   Definition refine_OOM {T} (RR : relation T) (sources : PropT Effout T) (target : itree Effout T) : Prop
     := exists source, sources source /\ refine_OOM_h RR source target.
@@ -167,8 +167,6 @@ Proof.
   unfold Proper, respectful in H0.
 
   eapply H0; eauto.
-
-  typeclasses eauto.
   { apply eutt_flip. eauto. }
 
   apply interp_prop_refl; eauto.

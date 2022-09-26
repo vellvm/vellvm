@@ -191,7 +191,7 @@ clean: extractedclean clean-coqmakefile
 
 .PHONY: extractedclean
 extractedclean:
-	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/FRONTEND_STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.ml
+	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/FRONTEND_STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
 
 .PHONY: distclean
 distclean: clean

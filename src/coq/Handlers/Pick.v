@@ -135,8 +135,8 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams L
       (*   split; cbn; auto. *)
       (* Qed. *)
 
-      Definition model_undef_h `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :=
-        interp_prop (case_ E_trigger_prop (case_ PickUvalue_handler F_trigger_prop)) (@pick_uvalue_k_spec).
+      Definition model_undef_h `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} {R1 R2} (RR : R1 -> R2 -> Prop) :=
+        interp_prop RR (case_ E_trigger_prop (case_ PickUvalue_handler F_trigger_prop)) (@pick_uvalue_k_spec).
 
       Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F}
                  {T} (RR : T -> T -> Prop) (ts : PropT (E +' PickUvalueE +' F) T) : PropT (E +' F) T:=

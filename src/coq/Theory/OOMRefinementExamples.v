@@ -17,7 +17,8 @@ From ITree Require Import
      Basics.
 
 From Coq Require Import
-     ZArith.
+     ZArith
+     Relations.
 
 From ExtLib Require Import
      Monads.
@@ -56,33 +57,12 @@ Proof.
     rewrite H, tau_eutt; reflexivity.
 Qed.
 
-Class KSPEC_WF {E F} (h_spec : forall T : Type, E T -> PropT F T)
-      (k_spec : forall T R : Type, E T -> itree F T -> (T -> itree F R) -> itree F R -> Prop) : Type
-  := k_spec_WF_class : k_spec_WF h_spec k_spec.
-
-#[global] Instance interp_prop_eutt_Proper2:
-  forall {E F : Type -> Type} {h_spec : forall T : Type, E T -> PropT F T}
-    {k_spec : forall T R : Type, E T -> itree F T -> (T -> itree F R) -> itree F R -> Prop}
-    `{WF : @KSPEC_WF _ _ h_spec k_spec},
-  forall (R : Type) (RR : Relation_Definitions.relation R),
-    Proper (eutt eq ==> eutt eq ==> iff) (interp_prop h_spec k_spec R RR).
-Proof.
-  intros E F h_spec k_spec H R RR.
-  unfold Proper, respectful.
-  intros x y H0 x0 y0 H1.
-  split; intros H2.
-  - eapply interp_prop_eutt_Proper; eauto.
-    symmetry; auto.
-    symmetry; auto.
-  - eapply interp_prop_eutt_Proper; eauto.
-Qed.
-
 Lemma interp_prop_vis :
-  forall {E F X} (h_spec : E ~> PropT F) k_spec R RR
+  forall {E F X} (h_spec : E ~> PropT F) k_spec {R} (RR : relation R)
     (e : E X) kk t,
-    interp_prop h_spec k_spec R RR (Vis e kk) t <->
+    interp_prop RR h_spec k_spec (Vis e kk) t <->
       (x <- h_spec X e;;
-       interp_prop h_spec k_spec R RR (kk x)) t. (* Do I need to use k_spec anywhere...? *)
+       interp_prop RR h_spec k_spec (kk x)) t. (* Do I need to use k_spec anywhere...? *)
 Proof.
 Admitted.
 
@@ -116,30 +96,6 @@ Module Infinite.
   Import List.
   Import ListNotations.
   Require Import Coq.Strings.String.
-
-  (* TODO: Move these *)
-  #[global] Instance KSPEC_poison :
-    KSPEC_WF
-      (case_ (E_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))
-             (case_ PickUvalue_handler (F_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))))
-      (@pick_uvalue_k_spec ExternalCallE (OOME +' UBE +' DebugE +' FailureE)).
-  Proof.
-    apply k_spec_WF_pick_uvalue_k_spec.
-  Defined.
-
-  #[global] Instance KSPEC_memory {sid m} :
-    KSPEC_WF
-      (fun (T : Type)
-         (e : (ExternalCallE +'
-                                LLVMParamsBigIntptr.Events.IntrinsicE +'
-                                                                         LLVMParamsBigIntptr.Events.MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T)
-         (t : itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T) =>
-         exists (sid' : store_id) (ms' : MMEP.MMSP.MemState),
-           interp_memory_prop_h e sid m (ITree.map (fun x : T => (ms', (sid', x))) t))
-      (@memory_k_spec ExternalCallE (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)).
-  Proof.
-    apply k_spec_WF_memory_k_spec.
-  Defined.
 
   #[global] Instance interp_mem_prop_Proper3 :
     forall {E F} `{FAIL : FailureE -< F} `{UB : UBE -< F} `{OOM : OOME -< F}
@@ -400,7 +356,13 @@ Module Infinite.
           apply Returns_Ret in RET.
           subst.
           cbn.
-          go.
+
+          (* TODO: should just be `go` *)
+          eapply interp_prop_eq_itree_Proper.
+          2: go; reflexivity.
+          2: go; reflexivity.
+          typeclasses eauto.
+                           
           apply interp_prop_ret_pure; auto.
       + apply model_undef_h_ret_pure; auto.
     - rewrite INTERP.
@@ -498,8 +460,11 @@ Module Infinite.
       rewrite interp_bind with (f:=@instr_E_to_L0);
         rewrite interp_trigger; cbn; rewrite subevent_subevent.
       go.
-
       rewrite bind_trigger.
+      setoid_rewrite bind_ret_l.
+      setoid_rewrite interp_local_stack_ret.
+      setoid_rewrite bind_ret_l.
+
       eapply interp_prop_vis.
       cbn.
       unfold bind_PropT.
@@ -531,9 +496,8 @@ Module Infinite.
         go.
 
         rewrite interp_bind with (f:=@instr_E_to_L0);
-          rewrite interp_trigger; cbn; rewrite subevent_subevent.
+        rewrite interp_trigger; cbn; rewrite subevent_subevent.
         go.
-
         rewrite map_ret.
         go.
         rewrite interp_ret.
@@ -959,30 +923,6 @@ Module Finite.
 
   Module MemTheory  := MemoryModelTheory LP MP MMEP MEM_MODEL.
   Import MemTheory.
-
-  (* TODO: Move these *)
-  #[global] Instance KSPEC_poison :
-    KSPEC_WF
-      (case_ (E_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))
-             (case_ PickUvalue_handler (F_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))))
-      (@pick_uvalue_k_spec ExternalCallE (OOME +' UBE +' DebugE +' FailureE)).
-  Proof.
-    apply k_spec_WF_pick_uvalue_k_spec.
-  Defined.
-
-  #[global] Instance KSPEC_memory {sid m} :
-    KSPEC_WF
-      (fun (T : Type)
-         (e : (ExternalCallE +'
-                                LLVMParams64BitIntptr.Events.IntrinsicE +'
-                                                                         LLVMParams64BitIntptr.Events.MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T)
-         (t : itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T) =>
-         exists (sid' : store_id) (ms' : MMEP.MMSP.MemState),
-           interp_memory_prop_h e sid m (ITree.map (fun x : T => (ms', (sid', x))) t))
-      (@memory_k_spec ExternalCallE (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)).
-  Proof.
-    apply k_spec_WF_memory_k_spec.
-  Defined.
 
   #[global] Instance interp_mem_prop_Proper3 :
     forall {E F} `{FAIL : FailureE -< F} `{UB : UBE -< F} `{OOM : OOME -< F}
