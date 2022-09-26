@@ -357,12 +357,7 @@ Module Infinite.
           subst.
           cbn.
 
-          (* TODO: should just be `go` *)
-          eapply interp_prop_eq_itree_Proper.
-          2: go; reflexivity.
-          2: go; reflexivity.
-          typeclasses eauto.
-                           
+          go.
           apply interp_prop_ret_pure; auto.
       + apply model_undef_h_ret_pure; auto.
     - rewrite INTERP.
