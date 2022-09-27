@@ -1,0 +1,122 @@
+* Introduction
+
+Vellvm can be installed with the nix package manager, and it can also be used to set up a development environment.
+
+* Nix installation
+
+Follow instructions here: https://nixos.org/download.html
+
+Vellvm relies upon nix flakes, an experimental feature that allows
+dependencies to be pinned declaratively. This feature must be enabled:
+
+#+begin_src sh
+nix-env -iA nixpkgs.nixFlakes
+#+end_src
+
+And then edit either ~$HOME/.config/nix/nix.conf~ or ~/etc/nix/nix.conf~ to add:
+
+#+begin_example
+experimental-features = nix-command flakes
+#+end_example
+
+After that you may need to restart the nix daemon, which manages building packages.
+
+On a mac:
+
+#+begin_src sh
+launchctl remove org.nixos.nix-daemon && launchctl load /Library/LaunchDaemons/org.nixos.nix-daemon.plist
+#+end_src
+
+On Linux with systemd:
+
+#+begin_src sh
+systemctl restart nix-daemon
+#+end_src
+
+After that you should be good to go :).
+
+* Building Vellvm
+
+** Building locally
+
+This should be sufficient to get you a development environment and build vellvm locally:
+
+#+begin_src sh
+git clone --recursive git@github.com:vellvm/vellvm.git vellvm
+cd vellvm
+nix develop .
+cd src
+make
+#+end_src
+
+*Note:* It is important to use ~git clone --recursive~, otherwise you
+will be missing the custom QuickChick submodules.
+
+*Note:* The command ~nix develop .~ will put you in a new shell that has
+all of the necessary dependencies. You will need to do this any time
+you want to build vellvm. It will be easiest to start a proof
+assistant like proof general from this shell, as it should have all of
+the right versions of dependencies in the path then.
+
+*** direnv
+
+I would recommend setting up [[https://direnv.net/][direnv]] for local development with
+[[https://github.com/nix-community/nix-direnv][nix-direnv]]. This will automatically give you a development shell when
+you enter the vellvm directory, after using ~direnv allow~ in the
+vellvm directory to enable it.
+
+If you use proof general install [[https://github.com/wbolster/emacs-direnv][emacs-direnv]]. This will allow emacs
+to automatically use the right development environment when you open a
+file in the vellvm project.
+
+** Nix
+
+*** Locally
+
+This can be useful to check if the current directory builds from
+scratch with everything that is checked into git. This should mimic
+what CI does.
+
+In the vellvm directory type:
+
+#+begin_src sh
+nix build -L ".?submodules=1"
+#+end_src
+
+Or you can build and run the executable with:
+
+#+begin_src sh
+nix run ".?submodules=1" -- --help
+#+end_src
+
+*Note:* It is important to use the ~?submodules=1~ option, otherwise
+nix flakes ignore the git submodules that we currently use for some
+custom QuickChick libraries.
+
+*** Building and running without cloning using nix flakes
+
+You can build vellvm with:
+
+#+begin_src sh
+nix build "git+https://github.com/vellvm/vellvm?submodules=1" 
+#+end_src
+
+Or just run it with:
+
+#+begin_src sh
+nix run "git+https://github.com/vellvm/vellvm?submodules=1" -- --help
+#+end_src
+
+*Note:* It is important to use the ~?submodules=1~ option, otherwise
+nix flakes ignore the git submodules that we currently use for some
+custom QuickChick libraries.
+
+** Cachix
+
+Vellvm has a [[https://www.cachix.org/][cachix]] binary cache. You can use it after installing cachix:
+
+#+begin_src sh
+cachix use vellvm
+#+end_src
+
+This will let you fetch prebuilt dependencies and binaries for vellvm in nix.

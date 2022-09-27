@@ -105,6 +105,10 @@ Our current test-suite of LLVM programs for which we compare our semantics again
 
 # Installing / Compiling Vellvm
 
+### Using nix:
+
+If you are a nix user the easiest way to install / compile vellvm is with nix. Instructions can be found [here](nix.org).
+
 ### Assumes: 
   - Coq: version 8.15 (installed via *opam*, see below)
   - OCaml: version 4.12.0 (installed via *opam*, see below)
