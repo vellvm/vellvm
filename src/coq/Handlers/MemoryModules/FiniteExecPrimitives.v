@@ -4174,6 +4174,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     lia.
   Qed.
 
+  (* TODO: move and reconcile with duplicates in MemStateInfiniteHelpers *)
   Lemma get_consecutive_ptrs_nth :
     forall {M : Type -> Type}
       `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
@@ -4246,6 +4247,29 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     eauto.
   Qed.      
 
+  (* TODO: Move this *)
+  Lemma get_consecutive_ptrs_MemPropT_no_ub:
+    forall msg ptr len ms,
+      ~ (@get_consecutive_ptrs
+           (MemPropT MemState) (@MemPropT_Monad MemState)
+           (@MemPropT_RAISE_OOM MemState) (@MemPropT_RAISE_ERROR MemState)
+           ptr len ms (raise_ub msg))%monad.
+  Proof.
+    intros msg ptr len ms CONTRA.
+    cbn in CONTRA.
+    destruct CONTRA as [UB | CONTRA].
+    - destruct (intptr_seq 0 len) eqn:HSEQ;
+        cbn in *; auto.
+    - destruct CONTRA as [sab [addrs [SEQ CONTRA]]].
+      destruct (intptr_seq 0 len) eqn:HSEQ;
+        cbn in *; auto.
+      inv SEQ.
+
+      red in CONTRA.
+      break_match_hyp;
+        cbn in *; auto.
+  Qed.
+
     Lemma find_free_block_correct :
       forall len pr pre,
         exec_correct pre (get_free_block len pr) (find_free_block len pr).
@@ -4276,21 +4300,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         exists oom_msg; split; [| exists ""%string; auto].
         rewrite MemMonad_run_bind.
         rewrite MemMonad_run_get_consecutive_ptrs.
-
-        (* TODO: Move this *)
-        Set Nested Proofs Allowed.
-        #[global] Instance fmap_Monad_Proper :
-          forall A B M `{MM : Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M MM EQM} `{LAWS: @MonadLawsE M EQM MM}, Proper (eq ==> eq1 ==> eq1) (@fmap M (@Functor_Monad M MM) A B).
-        Proof.
-          intros A B M MM0 EQM' EQV LAWS.
-          unfold Proper, respectful.
-          intros f1 f2 FEQ ma1 ma2 MEQ.
-          subst.
-          cbn.
-          unfold liftM.
-          rewrite MEQ.
-          reflexivity.
-        Qed.
 
         setoid_rewrite CONSEC_OOM.
         cbn.
@@ -4354,9 +4363,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                         |} st VALID H0).
           destruct H1.
           { (* UB case, should be dischargeable *)
-            (* Could use get_consecutive_ptrs_inv if RaiseBindM on it... *)
-            (* TODO: Prove this *)
-            admit.
+            destruct H1 as [ubmsg CONTRA].
+            exfalso.
+            apply get_consecutive_ptrs_MemPropT_no_ub in CONTRA; auto.
           }
 
           destruct H1 as [ERR | BLAH].
@@ -4420,7 +4429,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           (* Silly inversion lemmas *)
           intros * CONTRA_OOM. symmetry in CONTRA_OOM; eapply MemMonad_eq1_raise_oom_inv in CONTRA_OOM; auto.
           intros * CONTRA_ERR. symmetry in CONTRA_ERR ; eapply MemMonad_eq1_raise_error_inv in CONTRA_ERR; auto.
-    Admitted.
+    Qed.
 
     Hint Resolve find_free_block_correct : EXEC_CORRECT.
 

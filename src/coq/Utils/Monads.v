@@ -3,6 +3,7 @@ From Coq Require Import
      Morphisms.
 
 From ExtLib Require Import
+     Structures.Functor
      Structures.Monads
      Data.Monads.EitherMonad
      Data.Monads.IdentityMonad.
@@ -237,8 +238,17 @@ Proof.
     reflexivity.
 Defined.
 
+#[global] Instance fmap_Monad_Proper :
+  forall A B M `{MM : Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M MM EQM} `{LAWS: @MonadLawsE M EQM MM}, Proper (eq ==> eq1 ==> eq1) (@fmap M (@Functor_Monad M MM) A B).
+Proof.
+  intros A B M MM0 EQM' EQV LAWS.
+  unfold Proper, respectful.
+  intros f1 f2 FEQ ma1 ma2 MEQ.
+  subst.
+  cbn.
+  unfold liftM.
+  rewrite MEQ.
+  reflexivity.
+Qed.
 
-Global Existing Instance MonadState.MonadLawsE_stateTM.
-
-
-
+#[global] Existing Instance MonadState.MonadLawsE_stateTM.
