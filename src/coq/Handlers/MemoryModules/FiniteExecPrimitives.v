@@ -3414,7 +3414,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
         (* TODO: Need something about valid_state being preserved with set_byte_raw...
 
-           This is going to be a problem. I don't know what MemMonad_valid_state is. Because
+           This is going to be a problem. I don't know what MemMonad_valid_state is.
          *)
         admit.
       - (* UB from provenance mismatch *)
@@ -4158,21 +4158,21 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Lemma byte_not_allocated_get_consecutive_ptrs :
     forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
       `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM} `{LAWS : @MonadLawsE M EQM HM}
+      `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+      `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
       (mem : memory_stack) (ms : MemState) (ptr : addr) (len : nat) (ptrs : list addr),
       MemState_get_memory ms = mem ->
       next_memory_key mem <= ptr_to_int ptr ->
       (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
       forall p, In p ptrs -> byte_not_allocated ms p.
   Proof.
-    intros M HM OOM ERR EQM' EQV EQRET LAWS mem ms ptr len ptrs MEM NEXT CONSEC p IN.
-    eapply get_consecutive_ptrs_ge with (p := p) in CONSEC; eauto.
+    intros M HM OOM ERR EQM' EQV EQRET LAWS RBMOOM RBMERR mem ms ptr len ptrs MEM NEXT CONSEC p IN.
+    eapply get_consecutive_ptrs_ge with (p := p) in CONSEC; eauto;
+      try (intros * CONTRA;
+           eapply rbm_raise_ret_inv in CONTRA; eauto).
     eapply byte_not_allocated_ge_next_memory_key; eauto.
     lia.
-
-    (* TODO: Silly OOM / ERR inversion lemmas *)
-    admit.
-    admit.
-  Admitted.
+  Qed.
 
   Lemma get_consecutive_ptrs_nth :
     forall {M : Type -> Type}
