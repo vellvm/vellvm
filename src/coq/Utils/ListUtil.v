@@ -527,3 +527,11 @@ Definition nextOrMaximum {A} (leq : A -> A -> bool) (n : A) (def : A) (l : list 
 Definition nextOrMaximumOpt {A} (leq : A -> A -> bool) (n : A) (l : list A) : option A :=
   let max := maximumByOpt leq l
   in fold_left (fun a b => if leq n b then option_pick_small leq a (Some b) else a) l max.
+
+Lemma Nth_last :
+  forall {A} (l : list A) x,
+    Util.Nth (l ++ [x]) (length l) x.
+Proof.
+  intros A l x.
+  induction l; cbn; auto.
+Qed.

@@ -638,3 +638,63 @@ Arguments map_monad_cons_ret {_ _ _ _ _ _ _}.
 Arguments map_monad_cons_ret {_ _ _ _ _ _ _}.          
 Arguments map_monad_map {_ _ _ _ _ _ _ _}.
 Arguments map_monad_g {_ _ _ _ _ _ _ _}.
+
+(* TODO: move / generalize these *)
+Lemma map_monad_err_forall2 :
+  forall {A B} (f : A -> err B) l res,
+    map_monad f l = inr res <->
+      Forall2 (fun a b => f a = inr b) l res.
+Proof.
+  intros A B f.
+  induction l; intros res.
+  - split; intros MAP.
+    + cbn in *.
+      inv MAP.
+      auto.
+    + inv MAP.
+      reflexivity.
+  - split; intros MAP.
+    + rewrite map_monad_unfold in MAP.
+      cbn in *.
+      break_match_hyp; inv MAP.
+      break_match_hyp; inv H0.
+
+      pose proof (IHl l0) as FORALL.
+      constructor; auto.
+      eapply FORALL. reflexivity.
+    + inv MAP.
+      eapply IHl in H3.
+      cbn.
+      rewrite H1, H3.
+      reflexivity.
+Qed.
+
+(* TODO: move / generalize these *)
+Lemma map_monad_oom_forall2 :
+  forall {A B} (f : A -> OOM B) l res,
+    map_monad f l = NoOom res <->
+      Forall2 (fun a b => f a = NoOom b) l res.
+Proof.
+  intros A B f.
+  induction l; intros res.
+  - split; intros MAP.
+    + cbn in *.
+      inv MAP.
+      auto.
+    + inv MAP.
+      reflexivity.
+  - split; intros MAP.
+    + rewrite map_monad_unfold in MAP.
+      cbn in *.
+      break_match_hyp; inv MAP.
+      break_match_hyp; inv H0.
+
+      pose proof (IHl l0) as FORALL.
+      constructor; auto.
+      eapply FORALL. reflexivity.
+    + inv MAP.
+      eapply IHl in H3.
+      cbn.
+      rewrite H1, H3.
+      reflexivity.
+Qed.
