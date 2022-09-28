@@ -375,6 +375,231 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       reflexivity.
   Qed.
 
+  Require Import MonadReturnsLaws.
+  Import Monad.
+
+  Lemma intptr_seq_nil_len :
+    forall start len,
+      intptr_seq start len = NoOom [] ->
+      len = 0%nat.
+  Proof.
+    intros start len SEQ.
+    unfold intptr_seq in SEQ.
+    assert (MReturns [] (map_monad IP.from_Z (Zseq start len))) as RET.
+    { cbn. unfold OOMReturns.
+      rewrite SEQ.
+      reflexivity.
+    }
+    pose proof (@map_monad_ret_nil_inv OOM _ _ _ _ _ _ _ IP.from_Z _ RET) as SEQLEN.
+    eapply Zseq_nil_len; eauto.
+  Qed.
+
+  Lemma intptr_seq_succ_last :
+    forall l off len x,
+      intptr_seq off (S len) = NoOom (l ++ [x]) ->
+      intptr_seq off len = NoOom l.
+  Proof.
+    induction l;
+      intros off len x SEQ.
+    - cbn in *.
+      break_match_hyp; [| solve [inv SEQ]].
+      break_match_hyp; [| solve [inv SEQ]].
+      inv SEQ.
+
+      assert (MReturns [] (map_monad IP.from_Z (Zseq (Z.succ off) len))) as RET.
+      { cbn. unfold OOMReturns.
+        rewrite Heqo0.
+        reflexivity.
+      }
+
+      pose proof (@map_monad_ret_nil_inv OOM _ _ _ _ _ _ _ IP.from_Z _ RET) as SEQLEN.
+      apply Zseq_nil_len in SEQLEN.
+      subst.
+      cbn.
+      reflexivity.
+    - rewrite intptr_seq_succ in SEQ.
+      cbn in SEQ.
+      break_match_hyp; [| solve [inv SEQ]].
+      break_match_hyp; [| solve [inv SEQ]].
+      inv SEQ.
+
+      pose proof (intptr_seq_len _ _ _ Heqo0) as LEN.
+      rewrite last_length in LEN.
+      subst len.
+      pose proof (IHl (Z.succ off) _ _ Heqo0) as GENL.
+
+      rewrite intptr_seq_succ.
+      rewrite Heqo.
+      rewrite GENL.
+      cbn.
+      reflexivity.
+  Qed.
+
+  Lemma intptr_seq_succ_last' :
+    forall l off len x,
+      intptr_seq off len = NoOom l ->
+      IP.from_Z (off + Z.of_nat len) = NoOom x ->
+      intptr_seq off (S len) = NoOom (l ++ [x]).
+  Proof.
+    induction l as [ | i l']; intros off len x SEQ EQ.
+    - rewrite intptr_seq_succ.
+      apply intptr_seq_nil_len in SEQ.
+      subst.
+      cbn in *.
+      replace (off + 0)%Z with off in EQ by lia.
+      rewrite EQ.
+      reflexivity.
+    - pose proof SEQ as LEN.
+      apply intptr_seq_len in LEN.
+      cbn in LEN; inv LEN.
+
+      rewrite intptr_seq_succ in SEQ.
+      cbn in SEQ.
+      break_match_hyp; [| solve [inv SEQ]].
+      break_match_hyp; [| solve [inv SEQ]].
+      inv SEQ.
+      rename Heqo0 into SEQ.
+
+      pose proof (IHl' (Z.succ off) (length l') x SEQ) as SEQ'.
+      forward SEQ'.
+      { cbn in EQ.
+        rewrite Zpos_P_of_succ_nat in EQ.
+        rewrite Z.add_succ_comm.
+        auto.
+      }
+
+      rewrite <- app_comm_cons.
+      rewrite intptr_seq_succ.
+      rewrite Heqo.
+      rewrite SEQ'.
+      cbn.
+      reflexivity.
+  Qed.
+
+  Lemma intptr_seq_shifted :
+    forall len l,
+      intptr_seq 1 len = NoOom l ->
+      exists l', intptr_seq 0 len = NoOom l' /\
+              NoOom l = map_monad (fun ip => IP.from_Z (IP.to_Z ip + 1)) l'.
+  Proof.
+    intros len l SEQ.
+    revert SEQ. revert len.
+    induction l using rev_ind; intros len SEQ.
+    - exists nil; split; auto.
+      apply intptr_seq_nil_len in SEQ.
+      subst; cbn; auto.
+    - (* Follows from SEQ *)
+      assert (exists len', len = S len') as [len' LENEQ].
+      { destruct len; cbn in SEQ.
+        - cbn in SEQ; inv SEQ.
+          assert (length (l ++ [x]) = 0%nat) as LEN.
+          rewrite <- H0; reflexivity.
+          rewrite last_length in LEN.
+          inv LEN.
+        - exists len. reflexivity.
+      }
+
+      (* Also follows from SEQ and LENEQ *)
+      assert (intptr_seq 1 len' = NoOom l) as SEQ_CUT.
+      { eapply intptr_seq_succ_last; subst len; eauto.
+      }
+
+      subst len.
+
+      pose proof (IHl len' SEQ_CUT) as [l_shifted [SEQ_SHIFTED MAP_SHIFTED]].
+
+      pose proof MAP_SHIFTED as ALL_SHIFTED.
+      symmetry in ALL_SHIFTED.
+      eapply map_monad_oom_forall2 in ALL_SHIFTED.
+
+      pose proof ALL_SHIFTED as NTH_SHIFTED.
+      eapply Forall2_forall in NTH_SHIFTED as [LEN_SHIFTED NTH_SHIFTED].
+
+      assert (exists y, IP.from_Z (IP.to_Z x - 1) = NoOom y) as [y YEQ].
+      { (* I know this because...??? *)
+        (* shiftZ is the start, x is the final element in the sequence.
+
+                 This actually computes (S len'), the length of the initial sequence...
+                 But it's not clear if this length can actually be represented as an iptr.
+
+                 We know 0 can be, and we know the range between
+                 shiftZ and x can be, but we don't know anything else,
+                 technically.
+
+                 If shiftZ is just 1 this is knowable.
+         *)
+
+        pose proof (Nth_last l x) as NTH.
+        pose proof (intptr_seq_nth _ _ _ _ _ SEQ NTH) as SEQNTH.
+        apply IP.from_Z_to_Z in SEQNTH.
+        rewrite SEQNTH.
+
+        (* When len' is 0, y is just 0 *)
+        destruct l using rev_ind.
+        - exists IP.zero.
+          cbn in SEQ_CUT.
+          inv SEQ_CUT.
+          cbn.
+          apply IP.from_Z_0.
+        - clear IHl0.
+          exists x0.
+
+          pose proof (Nth_last l x0) as NTH'.
+          pose proof (intptr_seq_nth _ _ _ _ _ SEQ_CUT NTH') as SEQNTH'.
+          apply IP.from_Z_to_Z in SEQNTH'.
+          rewrite app_length.
+          rewrite Nat2Z.inj_add.
+          replace ((1 + (Z.of_nat (Datatypes.length l) + Z.of_nat (Datatypes.length [x0])) - 1))%Z with ((Z.of_nat (Datatypes.length l) + Z.of_nat (Datatypes.length [x0])))%Z by lia.
+          cbn.
+          replace (Z.of_nat (length l) + 1)%Z with (1 + Z.of_nat (length l))%Z by lia.
+          rewrite <- SEQNTH'.
+          apply IP.to_Z_from_Z.
+      }
+
+      exists (l_shifted ++ [y]).
+      split.
+      + apply intptr_seq_succ_last'; eauto.
+        cbn.
+
+        destruct len'.
+        -- cbn in *.
+           inv SEQ_CUT.
+           break_match_hyp; inv SEQ.
+           erewrite IP.from_Z_to_Z in YEQ; eauto.
+           cbn in YEQ.
+           auto.
+        -- (* I know that x = S S len' *)
+          pose proof intptr_seq_nth 1 (S (S len')) (l ++ [x]) (S len') x SEQ as LAST_SEQ.
+          forward LAST_SEQ.
+          { eapply intptr_seq_len in SEQ_CUT.
+            rewrite <- SEQ_CUT.
+            eapply Nth_last.
+          }
+
+          erewrite IP.from_Z_to_Z in YEQ; eauto.
+          replace (1 + Z.of_nat (S len') - 1)%Z with (Z.of_nat (S len'))%Z in YEQ by lia.
+          auto.
+      + assert (eq1 (NoOom (l ++ [x])) (map_monad (fun ip : IP.intptr => IP.from_Z (IP.to_Z ip + 1)) (l_shifted ++ [y]))) as EQ.
+        { rewrite map_monad_app.
+          cbn.
+          rewrite <- MAP_SHIFTED.
+          (* Must be some way to prove that this match gives NoOom x... *)
+          assert (IP.from_Z (IP.to_Z y + 1) = NoOom x) as EQ.
+          { erewrite IP.from_Z_to_Z; eauto.
+            assert (IP.to_Z x - 1 + 1 = IP.to_Z x)%Z as EQ by lia.
+            rewrite EQ.
+            apply IP.to_Z_from_Z.
+          }
+
+          rewrite EQ.
+          reflexivity.
+        }
+
+        cbn in EQ.
+        break_match_hyp; inv EQ.
+        reflexivity.
+  Qed.
+
   Definition get_consecutive_ptrs {M} `{Monad M} `{RAISE_OOM M} `{RAISE_ERROR M} (ptr : addr) (len : nat) : M (list addr) :=
     ixs <- lift_OOM (intptr_seq 0 len);;
     lift_err_RAISE_ERROR
@@ -382,7 +607,6 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
          (fun ix => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
          ixs).
 
-  Import Monad.
   Lemma get_consecutive_ptrs_length :
     forall {M} `{HM : Monad M} `{EQM : Monad.Eq1 M}
       `{EQV : @Eq1Equivalence M HM EQM}
@@ -608,254 +832,6 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
              map (fun ip => handle_gep_addr (DTYPE_I 8) ip [Events.DV.DVALUE_IPTR 1])
                  (intptr_seq 0 len)`
        *)
-        Set Nested Proofs Allowed.
-        Require Import MonadReturnsLaws.
-        Lemma Zseq_nil_len :
-          forall start len,
-            Zseq start len = [] ->
-            len = 0%nat.
-        Proof.
-          intros start len SEQ.
-          destruct len; cbn in *; auto.
-          inv SEQ.
-        Qed.
-
-        Lemma intptr_seq_nil_len :
-          forall start len,
-            intptr_seq start len = NoOom [] ->
-            len = 0%nat.
-        Proof.
-          intros start len SEQ.
-          unfold intptr_seq in SEQ.
-          assert (MReturns [] (map_monad IP.from_Z (Zseq start len))) as RET.
-          { cbn. unfold OOMReturns.
-            rewrite SEQ.
-            reflexivity.
-          }
-          pose proof (@map_monad_ret_nil_inv OOM _ _ _ _ _ _ _ IP.from_Z _ RET) as SEQLEN.
-          eapply Zseq_nil_len; eauto.
-        Qed.
-
-        Lemma intptr_seq_succ_last :
-          forall l off len x,
-            intptr_seq off (S len) = NoOom (l ++ [x]) ->
-            intptr_seq off len = NoOom l.
-        Proof.
-          induction l;
-            intros off len x SEQ.
-          - cbn in *.
-            break_match_hyp; [| solve [inv SEQ]].
-            break_match_hyp; [| solve [inv SEQ]].
-            inv SEQ.
-
-            assert (MReturns [] (map_monad IP.from_Z (Zseq (Z.succ off) len))) as RET.
-            { cbn. unfold OOMReturns.
-              rewrite Heqo0.
-              reflexivity.
-            }
-
-            pose proof (@map_monad_ret_nil_inv OOM _ _ _ _ _ _ _ IP.from_Z _ RET) as SEQLEN.
-            apply Zseq_nil_len in SEQLEN.
-            subst.
-            cbn.
-            reflexivity.
-          - rewrite intptr_seq_succ in SEQ.
-            cbn in SEQ.
-            break_match_hyp; [| solve [inv SEQ]].
-            break_match_hyp; [| solve [inv SEQ]].
-            inv SEQ.
-
-            pose proof (intptr_seq_len _ _ _ Heqo0) as LEN.
-            rewrite last_length in LEN.
-            subst len.
-            pose proof (IHl (Z.succ off) _ _ Heqo0) as GENL.
-
-            rewrite intptr_seq_succ.
-            rewrite Heqo.
-            rewrite GENL.
-            cbn.
-            reflexivity.
-        Qed.
-
-        Lemma intptr_seq_succ_last' :
-          forall l off len x,
-            intptr_seq off len = NoOom l ->
-            IP.from_Z (off + Z.of_nat len) = NoOom x ->
-            intptr_seq off (S len) = NoOom (l ++ [x]).
-        Proof.
-          induction l as [ | i l']; intros off len x SEQ EQ.
-          - rewrite intptr_seq_succ.
-            apply intptr_seq_nil_len in SEQ.
-            subst.
-            cbn in *.
-            replace (off + 0)%Z with off in EQ by lia.
-            rewrite EQ.
-            reflexivity.
-          - pose proof SEQ as LEN.
-            apply intptr_seq_len in LEN.
-            cbn in LEN; inv LEN.
-
-            rewrite intptr_seq_succ in SEQ.
-            cbn in SEQ.
-            break_match_hyp; [| solve [inv SEQ]].
-            break_match_hyp; [| solve [inv SEQ]].
-            inv SEQ.
-            rename Heqo0 into SEQ.
-
-            pose proof (IHl' (Z.succ off) (length l') x SEQ) as SEQ'.
-            forward SEQ'.
-            { cbn in EQ.
-              rewrite Zpos_P_of_succ_nat in EQ.
-              rewrite Z.add_succ_comm.
-              auto.
-            }
-
-            rewrite <- app_comm_cons.
-            rewrite intptr_seq_succ.
-            rewrite Heqo.
-            rewrite SEQ'.
-            cbn.
-            reflexivity.
-        Qed.
-
-        Lemma intptr_seq_shifted :
-          forall len l,
-            intptr_seq 1 len = NoOom l ->
-            exists l', intptr_seq 0 len = NoOom l' /\
-                    NoOom l = map_monad (fun ip => IP.from_Z (IP.to_Z ip + 1)) l'.
-        Proof.
-          intros len l SEQ.
-          revert SEQ. revert len.
-          induction l using rev_ind; intros len SEQ.
-          - exists nil; split; auto.
-            apply intptr_seq_nil_len in SEQ.
-            subst; cbn; auto.
-          - (* Follows from SEQ *)
-            assert (exists len', len = S len') as [len' LENEQ].
-            { destruct len; cbn in SEQ.
-              - cbn in SEQ; inv SEQ.
-                assert (length (l ++ [x]) = 0%nat) as LEN.
-                rewrite <- H0; reflexivity.
-                rewrite last_length in LEN.
-                inv LEN.
-              - exists len. reflexivity.
-            }
-
-            (* Also follows from SEQ and LENEQ *)
-            assert (intptr_seq 1 len' = NoOom l) as SEQ_CUT.
-            { eapply intptr_seq_succ_last; subst len; eauto.
-            }
-
-            subst len.
-
-            pose proof (IHl len' SEQ_CUT) as [l_shifted [SEQ_SHIFTED MAP_SHIFTED]].
-
-            pose proof MAP_SHIFTED as ALL_SHIFTED.
-            symmetry in ALL_SHIFTED.
-            eapply map_monad_oom_forall2 in ALL_SHIFTED.
-
-            pose proof ALL_SHIFTED as NTH_SHIFTED.
-            eapply Forall2_forall in NTH_SHIFTED as [LEN_SHIFTED NTH_SHIFTED].
-
-            assert (exists y, IP.from_Z (IP.to_Z x - 1) = NoOom y) as [y YEQ].
-            { (* I know this because...??? *)
-              (* shiftZ is the start, x is the final element in the sequence.
-
-                 This actually computes (S len'), the length of the initial sequence...
-                 But it's not clear if this length can actually be represented as an iptr.
-
-                 We know 0 can be, and we know the range between
-                 shiftZ and x can be, but we don't know anything else,
-                 technically.
-
-                 If shiftZ is just 1 this is knowable.
-               *)
-
-              pose proof (Nth_last l x) as NTH.
-              pose proof (intptr_seq_nth _ _ _ _ _ SEQ NTH) as SEQNTH.
-              apply IP.from_Z_to_Z in SEQNTH.
-              rewrite SEQNTH.
-
-              (* When len' is 0, y is just 0 *)
-              destruct l using rev_ind.
-              - exists IP.zero.
-                cbn in SEQ_CUT.
-                inv SEQ_CUT.
-                cbn.
-                apply IP.from_Z_0.
-              - clear IHl0.
-                exists x0.
-
-                pose proof (Nth_last l x0) as NTH'.
-                pose proof (intptr_seq_nth _ _ _ _ _ SEQ_CUT NTH') as SEQNTH'.
-                apply IP.from_Z_to_Z in SEQNTH'.
-                rewrite app_length.
-                rewrite Nat2Z.inj_add.
-                replace ((1 + (Z.of_nat (Datatypes.length l) + Z.of_nat (Datatypes.length [x0])) - 1))%Z with ((Z.of_nat (Datatypes.length l) + Z.of_nat (Datatypes.length [x0])))%Z by lia.
-                cbn.
-                replace (Z.of_nat (length l) + 1)%Z with (1 + Z.of_nat (length l))%Z by lia.
-                rewrite <- SEQNTH'.
-                apply IP.to_Z_from_Z.
-            }
-
-            exists (l_shifted ++ [y]).
-            split.
-            + apply intptr_seq_succ_last'; eauto.
-              cbn.
-
-              destruct len'.
-              -- cbn in *.
-                 inv SEQ_CUT.
-                 break_match_hyp; inv SEQ.
-                 erewrite IP.from_Z_to_Z in YEQ; eauto.
-                 cbn in YEQ.
-                 auto.
-              -- (* I know that x = S S len' *)
-                pose proof intptr_seq_nth 1 (S (S len')) (l ++ [x]) (S len') x SEQ as LAST_SEQ.
-                forward LAST_SEQ.
-                { eapply intptr_seq_len in SEQ_CUT.
-                  rewrite <- SEQ_CUT.
-                  eapply Nth_last.
-                }
-
-                erewrite IP.from_Z_to_Z in YEQ; eauto.
-                replace (1 + Z.of_nat (S len') - 1)%Z with (Z.of_nat (S len'))%Z in YEQ by lia.
-                auto.
-            + assert (eq1 (NoOom (l ++ [x])) (map_monad (fun ip : IP.intptr => IP.from_Z (IP.to_Z ip + 1)) (l_shifted ++ [y]))) as EQ.
-              { rewrite map_monad_app.
-                cbn.
-                rewrite <- MAP_SHIFTED.
-                (* Must be some way to prove that this match gives NoOom x... *)
-                assert (IP.from_Z (IP.to_Z y + 1) = NoOom x) as EQ.
-                { erewrite IP.from_Z_to_Z; eauto.
-                  assert (IP.to_Z x - 1 + 1 = IP.to_Z x)%Z as EQ by lia.
-                  rewrite EQ.
-                  apply IP.to_Z_from_Z.
-                }
-
-                rewrite EQ.
-                reflexivity.
-              }
-
-              cbn in EQ.
-              break_match_hyp; inv EQ.
-              reflexivity.
-        Qed.
-
-        Lemma map_monad_eqv :
-          forall {M} `{MM: Monad M} {A B C} (f1 : A -> M C) (f2 : B -> M C) l1 l2 res,
-            map_monad f1 l1 = res ->
-            Forall2 (fun a b => f1 a = f2 b) l1 l2 ->
-            map_monad f2 l2 = res.
-        Proof.
-          intros M MM0 A B C f1 f2 l1 l2 res MAP1 ZIP.
-          revert MAP1. revert res.
-          induction ZIP; intros res MAP1.
-          - cbn in *; auto.
-          - cbn in *.
-            rewrite <- H.
-            erewrite IHZIP; eauto.
-        Qed.
 
         rename l into ixs.
         pose proof Heqo0 as SEQ.

@@ -170,6 +170,16 @@ Proof.
       auto.
 Qed.
 
+Lemma Zseq_nil_len :
+  forall start len,
+    Zseq start len = [] ->
+    len = 0%nat.
+Proof.
+  intros start len SEQ.
+  destruct len; cbn in *; auto.
+  inversion SEQ.
+Qed.
+
 Lemma Zlength_map :
   forall {X Y} (l : list X) (f : X -> Y),
     Zlength (map f l) = Zlength l.

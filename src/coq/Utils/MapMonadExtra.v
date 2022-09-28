@@ -698,3 +698,18 @@ Proof.
       rewrite H1, H3.
       reflexivity.
 Qed.
+
+Lemma map_monad_eqv :
+  forall {M} `{MM: Monad M} {A B C} (f1 : A -> M C) (f2 : B -> M C) l1 l2 res,
+    map_monad f1 l1 = res ->
+    Forall2 (fun a b => f1 a = f2 b) l1 l2 ->
+    map_monad f2 l2 = res.
+Proof.
+  intros M MM0 A B C f1 f2 l1 l2 res MAP1 ZIP.
+  revert MAP1. revert res.
+  induction ZIP; intros res MAP1.
+  - cbn in *; auto.
+  - cbn in *.
+    rewrite <- H.
+    erewrite IHZIP; eauto.
+Qed.

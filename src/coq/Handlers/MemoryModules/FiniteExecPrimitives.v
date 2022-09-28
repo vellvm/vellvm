@@ -4078,7 +4078,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
         `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
         `{LAWS : @MonadLawsE M EQM HM}
-
+        `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+        `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
         (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
         (bytes : list mem_byte) (p : addr) byte,
         mem_state_memory ms' = add_all_index bytes (ptr_to_int ptr) (mem_state_memory ms)->
@@ -4088,7 +4089,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         read_byte_prop ms p byte <->
           read_byte_prop ms' p byte.
     Proof.
-      intros M HM OOM ERR EQM' EQV EQRET LAWS ms ms' ptr len ptrs
+      intros M HM OOM ERR EQM' EQV EQRET LAWS RBMOOM RBMERR ms ms' ptr len ptrs
              bytes p byte MEM2 CONSEC BYTELEN DISJOINT.
 
       unfold mem_state_memory in *.
@@ -4156,37 +4157,35 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       inv MS; inv FREE.
       split.
       - intros p ix byte NTHptr NTHbyte.
-        eapply @read_byte_get_consecutive_ptrs with (HM:=@Monad_itree Eff); try typeclasses eauto.
-        unfold mem_state_memory in *.
-        cbn; eauto.
+        eapply @read_byte_get_consecutive_ptrs with (HM:=@Monad_itree Eff);
+          eauto; try typeclasses eauto.
 
         intros mb INMB.
         apply in_map_iff in INMB as (sb & MBEQ & INSB).
         inv MBEQ.
         cbn. reflexivity.
 
-        reflexivity.
-
         eapply get_consecutive_MemPropT_itree;
           eapply get_consecutive_ptrs_MemPropT_eq1; eauto.
 
-        rewrite map_length; reflexivity.
-        eauto.
-        eauto.
+        rewrite map_length; eauto.
 
         setoid_rewrite block_is_free_ptrs_provenance0; eauto.
         apply access_allowed_refl.
         eapply Nth_In; eauto.
-      - intros ptr' DISJOINT.
-        eapply @read_byte_preserved_get_consecutive_ptrs with (HM:=@Monad_itree Eff); try typeclasses eauto.
-        unfold mem_state_memory in *.
-        cbn; eauto.
+      - intros ptr' byte DISJOINT.
+        eapply @read_byte_preserved_get_consecutive_ptrs with (HM:=@Monad_itree Eff);
+          eauto; try typeclasses eauto.
+
+        (* TODO: figure out RaiseBindM situation here *)
+        admit.
+        admit.
 
         eapply get_consecutive_MemPropT_itree;
           eapply get_consecutive_ptrs_MemPropT_eq1; eauto.
 
-        rewrite map_length; reflexivity.
-    Qed.
+        rewrite map_length; eauto.
+    Admitted.
 
     (* TODO: Move and reuse *)
     Lemma read_byte_allowed_get_consecutive_ptrs :
