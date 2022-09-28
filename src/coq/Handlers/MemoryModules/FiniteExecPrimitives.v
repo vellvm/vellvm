@@ -4863,15 +4863,15 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             Opaque get_consecutive_ptrs.
             cbn in CONSEC'.
             break_match_hyp.
-            2: { cbn in CONSEC'. rewrite rbm_raise_bind in CONSEC'; [| typeclasses eauto].
-                 (* TODO: inversion lemma for CONSEC' *)
-                 admit.
+            2: { cbn in CONSEC'.
+                 rewrite rbm_raise_bind in CONSEC'; [| typeclasses eauto].
+                 eapply rbm_raise_ret_inv in CONSEC'; [contradiction | typeclasses eauto].
             }
 
             break_match_hyp.
-            2: { cbn in CONSEC'. rewrite rbm_raise_bind in CONSEC'; [| typeclasses eauto].
-                 (* TODO: inversion lemma for CONSEC' *)
-                 admit.
+            2: { cbn in CONSEC'.
+                 rewrite rbm_raise_bind in CONSEC'; [| typeclasses eauto].
+                 eapply rbm_raise_ret_inv in CONSEC'; [contradiction | typeclasses eauto].
             }
 
             cbn in CONSEC'.
@@ -4879,8 +4879,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             destruct (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix])
                                 (i :: l)) eqn:HMAPM.
             { cbn in CONSEC'.
-              (* TODO: inversion lemma for CONSEC' *)
-              admit.
+              eapply rbm_raise_ret_inv in CONSEC'; [contradiction | typeclasses eauto].
             }
 
             cbn in CONSEC'.
