@@ -4,9 +4,10 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/master";
     flake-utils.url = "github:numtide/flake-utils";
+    nix-filter.url = "github:numtide/nix-filter";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, nix-filter }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
@@ -29,7 +30,7 @@
         version = "vellvm:master";
       in rec {
         packages = {
-          default = (pkgs.callPackage ./release.nix (ocamlPkgs // coqPkgs // { inherit coq version; })).vellvm;
+          default = (pkgs.callPackage ./release.nix (ocamlPkgs // coqPkgs // { nix-filter = nix-filter.lib; inherit coq version; })).vellvm;
         };
 
         defaultPackage = packages.default;

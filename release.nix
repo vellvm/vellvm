@@ -1,4 +1,5 @@
 { lib,
+  nix-filter,
   mkCoqDerivation,
   version ? null,
   coq,
@@ -46,7 +47,34 @@
           cppo
         ];
 
-      src = ./.;
+      src =
+        # Some filtering to ignore files that are unimportant for the build.
+        # Helps with caching and preventing rebuilds when, e.g., only
+        # a README changed.
+        nix-filter {
+          root = ./.;
+          include = [
+            ./lib
+            ./src
+            ./src/Makefile
+            (nix-filter.matchExt "v")
+            (nix-filter.matchExt "ml")
+            (nix-filter.matchExt "patch")
+            (nix-filter.matchName "dune")
+            (nix-filter.matchName "dune-project")
+          ];
+
+          exclude = [
+            ./src/doc
+            ./src/cachix-push.sh
+            (nix-filter.matchExt "org")
+            (nix-filter.matchExt "md")
+            (nix-filter.matchExt "txt")
+            (nix-filter.matchExt "yml")
+            (nix-filter.matchName "README")
+            ./.gitignore
+          ];
+        };
 
       buildPhase = ''
   make -C src/
