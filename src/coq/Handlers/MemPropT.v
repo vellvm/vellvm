@@ -20,6 +20,9 @@ From Vellvm.Utils Require Import
      Raise
      Tactics.
 
+From Vellvm.Handlers.MemoryModules Require Import
+     Within.
+
 From Vellvm.Semantics Require Import
      MemoryAddress
      LLVMEvents.
@@ -216,7 +219,7 @@ Proof.
       auto.
 Admitted.
 
-Instance MemPropT_MonadMemState {MemState : Type} : MonadMemState MemState (MemPropT MemState).
+#[global] Instance MemPropT_MonadMemState {MemState : Type} : MonadMemState MemState (MemPropT MemState).
 Proof.
   (* Operations must actually succeed *)
   split.
@@ -245,7 +248,7 @@ Proof.
     + exact (ms_to_put = ms').
 Defined.
 
-Instance MemPropT_RAISE_OOM {MemState : Type} : RAISE_OOM (MemPropT MemState).
+#[global] Instance MemPropT_RAISE_OOM {MemState : Type} : RAISE_OOM (MemPropT MemState).
 Proof.
   split.
   - intros A msg.
@@ -262,7 +265,7 @@ Proof.
       exact False. (* Must run out of memory *)
 Defined.
 
-Instance MemPropT_RAISE_ERROR {MemState : Type} : RAISE_ERROR (MemPropT MemState).
+#[global] Instance MemPropT_RAISE_ERROR {MemState : Type} : RAISE_ERROR (MemPropT MemState).
 Proof.
   split.
   - intros A msg.
@@ -279,7 +282,7 @@ Proof.
       exact False. (* Must error. *)
 Defined.
 
-Instance MemPropT_RAISE_UB {MemState : Type} : RAISE_UB (MemPropT MemState).
+#[global] Instance MemPropT_RAISE_UB {MemState : Type} : RAISE_UB (MemPropT MemState).
 Proof.
   split.
   intros A ub_msg.
@@ -288,6 +291,55 @@ Proof.
     (* Allow everything because UB *)
     all: exact True.
 Defined.
+
+Definition within_MemPropT{MemState} {A} (m : MemPropT MemState A) (pre : unit) (res : A) (post : unit) : Prop :=
+  forall pre_ms post_ms,
+    m pre_ms (ret (post_ms, res)).
+
+Lemma within_MemPropT_eq1Proper {MemState} {A} :
+  Proper (eq1 ==> eq ==> eq ==> eq ==> iff) (@within_MemPropT MemState A).
+Proof.
+  unfold Proper, respectful.
+  intros m1 m2 M x y X b1 b2 B z w Z.
+  subst.
+
+  unfold within_MemPropT.
+
+  split; intros WITHIN pre_ms post_ms;
+    specialize (WITHIN pre_ms post_ms);
+    apply M in WITHIN; auto.
+Qed.
+
+(** Generic within instance. Useful for operations where the memstate doesn't matter (e.g., get_consecutive_ptrs) *)
+#[global] Instance Within_MemPropT {MemState} : @Within (MemPropT MemState) _ (fun X => X) unit unit :=
+  {
+    within := @within_MemPropT MemState;
+    within_eq1_Proper := @within_MemPropT_eq1Proper MemState;
+  }.
+
+
+Definition within_MemPropT_MemState {MemState} {A} (m : MemPropT MemState A) (pre_ms : MemState) (res : A) (post_ms : MemState) : Prop :=
+  m pre_ms (ret (post_ms, res)).
+
+Lemma within_MemPropT_MemState_eq1Proper {MemState} {A} :
+  Proper (eq1 ==> eq ==> eq ==> eq ==> iff) (@within_MemPropT_MemState MemState A).
+Proof.
+  unfold Proper, respectful.
+  intros m1 m2 M x y X b1 b2 B z w Z.
+  subst.
+
+  unfold within_MemPropT.
+
+  split; intros WITHIN;
+    apply M in WITHIN; auto.
+Qed.
+
+(** Within instance that specifies pre and post memstates *)
+#[global] Instance Within_MemPropT_MemState {MemState} : @Within (MemPropT MemState) _ (fun X => X) MemState MemState :=
+  {
+    within := @within_MemPropT_MemState MemState;
+    within_eq1_Proper := @within_MemPropT_MemState_eq1Proper MemState;
+  }.
 
 Definition MemPropT_assert {MemState X} (assertion : Prop) : MemPropT MemState X
   := fun ms ms'x =>
@@ -321,7 +373,7 @@ Definition MemPropT_assert_post {MemState X} (Post : X -> Prop) : MemPropT MemSt
            end
        end.
 
-Definition MemPropT_lift_PropT {MemState X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (spec : MemPropT MemState X) : 
+Definition MemPropT_lift_PropT {MemState X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (spec : MemPropT MemState X) :
   stateT MemState (PropT E) X.
 Proof.
   unfold PropT, MemPropT, stateT in *.
@@ -345,7 +397,7 @@ Proof.
 Defined.
 
 (* Should line up with exec_correct *)
-Definition MemPropT_lift_PropT_fresh {MemState X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (spec : MemPropT MemState X) : 
+Definition MemPropT_lift_PropT_fresh {MemState X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (spec : MemPropT MemState X) :
   stateT store_id (stateT MemState (PropT E)) X.
 Proof.
   unfold PropT, MemPropT, stateT in *.

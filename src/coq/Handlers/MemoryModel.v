@@ -607,32 +607,92 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
          (fun ix => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
          ixs).
 
-  Lemma get_consecutive_ptrs_length :
+
+  Require Import Vellvm.Handlers.MemoryModules.Within.
+
+  Ltac convert_to_ret :=
+    match goal with
+    | _:_ |- context [ success_unERR_UB_OOM ?x ] =>
+        replace (success_unERR_UB_OOM x) with (@ret err_ub_oom _ _ x) by auto
+    end.
+
+  Ltac convert_to_ret_hyp :=
+    repeat
+      match goal with
+      | H : context [ success_unERR_UB_OOM ?x ] |- _ =>
+          replace (success_unERR_UB_OOM x) with (@ret err_ub_oom _ _ x) in H by auto
+      end.
+
+  Ltac convert_to_raise :=
+    match goal with
+    | _:_ |-
+        context [
+            ({| unERR_UB_OOM :=
+               {|
+                 EitherMonad.unEitherT :=
+                 {|
+                   EitherMonad.unEitherT :=
+                   {|
+                     EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (@inl _ (sum ERR_MESSAGE ?t) (UB_message ?ub_msg)) |}
+                   |}
+                 |}
+               |}
+             |}) ] =>
+        replace (UB_unERR_UB_OOM ub_msg) with (@raise_ub err_ub_oom _ t ub_msg) by auto
+    end.
+
+  Ltac convert_to_raise_hyp :=
+    repeat
+      match goal with
+      | H : context [
+                ({| unERR_UB_OOM :=
+                   {|
+                     EitherMonad.unEitherT :=
+                     {|
+                       EitherMonad.unEitherT :=
+                       {|
+                         EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (@inl _ (sum ERR_MESSAGE ?t) (UB_message ?ub_msg)) |}
+                       |}
+                     |}
+                   |}
+                 |}) ] |- _ =>
+          replace (UB_unERR_UB_OOM ub_msg) with (@raise_ub err_ub_oom _ t ub_msg) in H by eauto
+      end.
+
+   Lemma get_consecutive_ptrs_length :
     forall {M} `{HM : Monad M} `{EQM : Monad.Eq1 M}
+      {Pre Post : Type}
+      `{WM : @Within M EQM err_ub_oom Pre Post}
       `{EQV : @Eq1Equivalence M HM EQM}
-      `{EQRET : @Eq1_ret_inv M EQM HM}
+      `{WRET : @Within_ret_inv M err_ub_oom Pre Post HM _ EQM WM}
       `{MLAWS : @MonadLawsE M EQM HM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
-      `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
+      `{RBMERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+      `{RWOOM : @RaiseWithin M err_ub_oom Pre Post _ EQM WM string (@raise_oom M OOM)}
+      `{RWERR : @RaiseWithin M err_ub_oom Pre Post _ EQM WM string (@raise_error M ERR)}
       (ptr : addr) (len : nat) (ptrs : list addr),
-      (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad ->
+      (@ret err_ub_oom _ _ ptrs ∈ @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
       len = length ptrs.
   Proof.
-    intros M HM EQM EQV EQRET MLAWS OOM ERR RBMOOM RBMERR ptr len ptrs CONSEC.
+    intros M HM EQM Pre Post WM EQV WRET MLAWS OOM ERR RBMOOM RBMERR RWOOM RWERR ptr len ptrs CONSEC.
     unfold get_consecutive_ptrs in CONSEC.
     cbn in *.
     destruct (intptr_seq 0 len) eqn:SEQ.
     - (* No OOM *)
       cbn in *.
-      rewrite bind_ret_l in CONSEC.
+      setoid_rewrite bind_ret_l in CONSEC.
+
+      (* rewrite bind_ret_l in CONSEC. *)
       destruct (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix]) l) eqn:HMAPM.
       + (* Error: should be a contradiction *)
         (* TODO: need inversion lemma. *)
         cbn in CONSEC.
-        eapply rbm_raise_ret_inv in CONSEC; [contradiction | auto].
+        convert_to_ret_hyp;
+          eapply rw_ret_nin_raise in CONSEC; [contradiction | auto].
       + cbn in CONSEC.
-        apply eq1_ret_ret in CONSEC; auto.
+        convert_to_ret_hyp.
+        apply within_ret_ret in CONSEC; auto.
         assert (MReturns l0 (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix]) l)) as RETS.
         { auto. }
 
@@ -642,23 +702,30 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         auto.
     - (* OOM: CONSEC equivalent to ret is a contradiction. *)
       cbn in CONSEC.
-      rewrite rbm_raise_bind in CONSEC; auto.
-      eapply rbm_raise_ret_inv in CONSEC; [contradiction | auto].
+      setoid_rewrite rbm_raise_bind in CONSEC; auto.
+      convert_to_ret_hyp;
+        eapply rw_ret_nin_raise in CONSEC; [contradiction | auto].
   Qed.
 
   Lemma get_consecutive_ptrs_covers_range :
     forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
-      `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
+      {Pre Post : Type}
+      `{WM : @Within M EQM err_ub_oom Pre Post}
+      `{EQV : @Eq1Equivalence M HM EQM}
+      `{EQRET : @Eq1_ret_inv M EQM HM}
+      `{WRET : @Within_ret_inv M err_ub_oom Pre Post HM _ EQM WM}
       `{LAWS : @MonadLawsE M EQM HM}
       `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
       `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
+      `{RWOOM : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_oom M OOM)}
+      `{RWERR : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_error M ERR)}
       ptr len ptrs,
-      (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
+      (ret ptrs ∈ @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
       forall ix, (ptr_to_int ptr <= ix < ptr_to_int ptr + (Z.of_nat len))%Z ->
             exists p', ptr_to_int p' = ix /\ In p' ptrs.
   Proof.
     (* TODO: This is kind of related to get_consecutive_ptrs_nth *)
-    intros M HM OOM ERR EQM' EQV EQRET LAWS RBMOOM RBMERR ptr len ptrs CONSEC ix RANGE.
+    intros M HM OOM ERR EQM' Pre Post WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR ptr len ptrs CONSEC ix RANGE.
     Transparent get_consecutive_ptrs.
     unfold get_consecutive_ptrs in CONSEC.
     Opaque get_consecutive_ptrs.
@@ -673,9 +740,11 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
                      MP.GEP.handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix])
                   l) eqn:HMAPM.
       + cbn in CONSEC.
-        apply rbm_raise_ret_inv in CONSEC; [contradiction | try typeclasses eauto].
+        convert_to_ret_hyp;
+          eapply rw_ret_nin_raise in CONSEC; [contradiction | try typeclasses eauto].
       + cbn in CONSEC.
-        apply eq1_ret_ret in CONSEC; eauto.
+        convert_to_ret_hyp.
+        apply within_ret_ret in CONSEC; eauto.
         inv CONSEC.
 
         pose proof (@exists_in_bounds_le_lt
@@ -719,43 +788,50 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         erewrite IP.from_Z_to_Z in GEP; [|apply FROMZ].
         lia.
     - cbn in CONSEC.
-      rewrite rbm_raise_bind in CONSEC; [|typeclasses eauto].
-      apply rbm_raise_ret_inv in CONSEC; [contradiction | typeclasses eauto].
+      setoid_rewrite rbm_raise_bind in CONSEC; [|typeclasses eauto].
+      convert_to_ret_hyp;
+        eapply rw_ret_nin_raise in CONSEC; [contradiction | typeclasses eauto].
   Qed.
 
   Lemma get_consecutive_ptrs_cons :
     forall {M : Type -> Type}
       `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
+      {Pre Post : Type}
+      `{WM : @Within M EQM err_ub_oom Pre Post}
       `{EQRET : @Eq1_ret_inv M EQM HM}
+      `{WRET : @Within_ret_inv M err_ub_oom Pre Post HM _ EQM WM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
       `{RAISE_OOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
       `{RAISE_ERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+      `{RWOOM : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_oom M OOM)}
+      `{RWERR : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_error M ERR)}
       ptr len p ptrs,
-      (get_consecutive_ptrs ptr len ≈ ret (p :: ptrs))%monad ->
-      p = ptr /\ (exists ptr' len', len = S len' /\ (get_consecutive_ptrs ptr' len' ≈ ret ptrs)%monad).
+      (ret (p :: ptrs) ∈ get_consecutive_ptrs ptr len)%monad ->
+      p = ptr /\ (exists ptr' len', len = S len' /\ (ret ptrs ∈ get_consecutive_ptrs ptr' len')%monad).
   Proof.
-    intros M HM EQM' EQRET EQV OOM ERR LAWS RAISE_OOM RAISE_ERR ptr len p ptrs CONSEC.
+    intros M HM EQM' Pre Post WM EQRET WRET EQV OOM ERR LAWS RAISE_OOM RAISE_ERR RWOOM RWERR ptr len p ptrs CONSEC.
 
     Transparent get_consecutive_ptrs.
     unfold get_consecutive_ptrs in *.
     destruct (intptr_seq 0 len) eqn:SEQ.
     2: {
       cbn in CONSEC.
-      rewrite rbm_raise_bind in CONSEC; eauto.
-      apply rbm_raise_ret_inv in CONSEC; eauto.
-      contradiction.
+      setoid_rewrite rbm_raise_bind in CONSEC; eauto.
+      convert_to_ret_hyp;
+        eapply rw_ret_nin_raise in CONSEC; eauto; contradiction.
     }
 
     cbn in *.
-    rewrite bind_ret_l in CONSEC.
+    setoid_rewrite bind_ret_l in CONSEC.
 
     generalize dependent len.
     destruct len; intros SEQ.
     - cbn in SEQ.
       inv SEQ.
       cbn in CONSEC.
-      eapply eq1_ret_ret in CONSEC; [|typeclasses eauto].
+      convert_to_ret_hyp.
+      eapply within_ret_ret in CONSEC; [|typeclasses eauto].
       inv CONSEC.
     - rewrite intptr_seq_succ in SEQ.
       cbn in *.
@@ -773,13 +849,15 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       break_match_hyp.
       { (* map_monad fails *)
         cbn in CONSEC.
-        apply rbm_raise_ret_inv in CONSEC; eauto.
+        convert_to_ret_hyp.
+        apply rw_ret_nin_raise in CONSEC; eauto.
         contradiction.
       }
 
       (* map_monad succeeds *)
       cbn in CONSEC.
-      eapply eq1_ret_ret in CONSEC; eauto.
+      convert_to_ret_hyp.
+      eapply within_ret_ret in CONSEC; eauto.
       inv CONSEC.
       split; auto.
 
@@ -788,12 +866,13 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         inv Heqo0.
         cbn in Heqs.
         inv Heqs.
-        exists p. exists 0%nat.
+        exists ptr. exists 0%nat.
         split; auto.
         cbn.
-        rewrite bind_ret_l.
+        setoid_rewrite bind_ret_l.
         cbn.
-        reflexivity.
+        convert_to_ret.
+        eapply within_ret_refl; eauto.
       + pose proof Heqo0 as SEQ.
         rewrite intptr_seq_succ in SEQ.
         cbn in SEQ.
@@ -809,7 +888,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         break_match_hyp; [ solve [inv MAPM] |].
         break_match_hyp; [ solve [inv MAPM] |].
         rename a into p'.
-        rename l0 into ptrs'.
+        rename l1 into ptrs'.
         inv MAPM.
 
         exists p'.
@@ -833,14 +912,14 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
                  (intptr_seq 0 len)`
        *)
 
-        rename l into ixs.
+        rename l0 into ixs.
         pose proof Heqo0 as SEQ.
         apply intptr_seq_shifted in Heqo0.
         destruct Heqo0 as [l'' [SEQ_SHIFT SHIFT]].
         rewrite SEQ_SHIFT.
         cbn.
 
-        rewrite bind_ret_l.
+        setoid_rewrite bind_ret_l.
         match goal with
         | _ : _ |- context [map_monad ?f ?l] =>
             assert (map_monad f l = inr (p' :: ptrs')) as Heqs'
@@ -864,7 +943,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           reflexivity.
           reflexivity.
 
-          assert (address_provenance p' = address_provenance p) as PROV.
+          assert (address_provenance p' = address_provenance ptr) as PROV.
           { rewrite map_monad_unfold in Heqs.
             cbn in Heqs.
             break_match_hyp; inv Heqs.
@@ -877,9 +956,9 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           rewrite Heqs0.
           rewrite IP.from_Z_to_Z with (z:=1%Z) (i:=one); auto.
 
-          assert ((ptr_to_int p + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * 1 +
+          assert ((ptr_to_int ptr + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * 1 +
                      Z.of_N (sizeof_dtyp (DTYPE_I 8)) * IP.to_Z b) =
-                    (ptr_to_int p + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * IP.to_Z a))%Z as EQ.
+                    (ptr_to_int ptr + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * IP.to_Z a))%Z as EQ.
           { rewrite sizeof_dtyp_i8.
             unfold Z.of_N.
 
@@ -893,33 +972,38 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         }
 
         rewrite Heqs'.
-        cbn; reflexivity.
+        cbn.
+
+        convert_to_ret.
+        eapply within_ret_refl; eauto.
   Qed.
 
   Lemma get_consecutive_ptrs_ge :
     forall {M : Type -> Type}
       `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
+      {Pre Post : Type}
+      `{WM : @Within M EQM err_ub_oom Pre Post}
       `{EQRET : @Eq1_ret_inv M EQM HM}
+      `{WRET : @Within_ret_inv M err_ub_oom Pre Post HM _ EQM WM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
       `{RAISE_OOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
       `{RAISE_ERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+      `{RWOOM : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_oom M OOM)}
+      `{RWERR : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_error M ERR)}
       ptr len ptrs,
-      (forall {A} msg (x : A), ~ (@eq1 M EQM _ (raise_oom msg) (ret x))) ->
-      (forall {A} msg (x : A), ~ (@eq1 M EQM _ (raise_error msg) (ret x))) ->
-      (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad ->
+      (ret ptrs ∈ get_consecutive_ptrs ptr len)%monad ->
       (forall p,
           In p ptrs ->
           (ptr_to_int ptr <= ptr_to_int p)%Z).
   Proof.
-    intros M HM EQM' EQV EQRET OOM ERR LAWS RAISE_OOM RAISE_ERR ptr len ptrs RAISE_INV RAISE_ERROR_INV.
+    intros M HM EQM' EQV Pre Post WM EQRET WRET OOM ERR LAWS RAISE_OOM RAISE_ERR RWOOM RWERR ptr len ptrs.
     revert ptr len.
     induction ptrs; intros ptr len CONSEC p IN.
     - inv IN.
     - destruct IN as [IN | IN].
       + subst.
         eapply get_consecutive_ptrs_cons in CONSEC as (START & CONSEC).
-        Unshelve. all: try typeclasses eauto.
         subst.
         lia.
       + pose proof CONSEC as CONSEC'.
@@ -958,14 +1042,13 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           break_match_hyp.
           2: {
             cbn in CONSEC'.
-            rewrite rbm_raise_bind in CONSEC'.
-            apply RAISE_INV in CONSEC'.
-            contradiction.
-            typeclasses eauto.
+            setoid_rewrite rbm_raise_bind in CONSEC'; eauto.
+            convert_to_ret_hyp;
+              eapply rw_ret_nin_raise in CONSEC'; eauto; contradiction.
           }
 
           cbn in CONSEC'.
-          rewrite bind_ret_l in CONSEC'.
+          setoid_rewrite bind_ret_l in CONSEC'.
 
           break_match_hyp.
           2: {
@@ -974,16 +1057,19 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           break_match_hyp; inv Heqo.
           cbn in CONSEC'.
           break_match_hyp; cbn in CONSEC'.
-          apply RAISE_ERROR_INV in CONSEC'; contradiction.
+          convert_to_ret_hyp;
+            eapply rw_ret_nin_raise in CONSEC'; eauto; contradiction.
           break_match_hyp; cbn in CONSEC'.
-          apply RAISE_ERROR_INV in CONSEC'; contradiction.
+          convert_to_ret_hyp;
+            eapply rw_ret_nin_raise in CONSEC'; eauto; contradiction.
           break_match_hyp; cbn in CONSEC'.
           inv Heqs0.
           break_match_hyp; inv Heqs0.
 
           apply handle_gep_addr_ix in Heqs.
           apply handle_gep_addr_ix in Heqs1.
-          apply eq1_ret_ret in CONSEC'; eauto.
+          convert_to_ret_hyp.
+          apply within_ret_ret in CONSEC'; eauto.
           inv CONSEC'.
 
           rewrite sizeof_dtyp_i8 in *.
@@ -996,18 +1082,23 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   Lemma get_consecutive_ptrs_range :
     forall {M : Type -> Type}
       `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
+      {Pre Post : Type}
+      `{WM : @Within M EQM err_ub_oom Pre Post}
       `{EQRET : @Eq1_ret_inv M EQM HM}
+      `{WRET : @Within_ret_inv M err_ub_oom Pre Post HM _ EQM WM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
       `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
       `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
+      `{RWOOM : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_oom M OOM)}
+      `{RWERR : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_error M ERR)}
       ptr len ptrs,
-      (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad ->
+      (ret ptrs ∈ get_consecutive_ptrs ptr len)%monad ->
       (forall p,
           In p ptrs ->
           (ptr_to_int ptr <= ptr_to_int p < ptr_to_int ptr + (Z.of_nat len))%Z).
   Proof.
-    intros M HM EQM EQV EQRET OOM ERR LAWS RBMOOM RBMERR ptr len ptrs.
+    intros M HM EQM EQV Pre Post WM EQRET WRET OOM ERR LAWS RBMOOM RBMERR RWOOM RWERR ptr len ptrs.
     revert ptr len.
     induction ptrs; intros ptr len CONSEC p IN.
     - inv IN.
@@ -1049,26 +1140,30 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           cbn in CONSEC'.
           break_match_hyp.
           2: { cbn in CONSEC'.
-               rewrite rbm_raise_bind in CONSEC'; [|typeclasses eauto].
-               eapply rbm_raise_ret_inv in CONSEC'; [contradiction | typeclasses eauto].
+               setoid_rewrite rbm_raise_bind in CONSEC'; [|typeclasses eauto].
+               convert_to_ret_hyp.
+               eapply rw_ret_nin_raise in CONSEC'; [contradiction | typeclasses eauto].
           }
 
           break_match_hyp.
           2: { cbn in CONSEC'.
-               rewrite rbm_raise_bind in CONSEC'; [|typeclasses eauto].
-               eapply rbm_raise_ret_inv in CONSEC'; [contradiction | typeclasses eauto].
+               setoid_rewrite rbm_raise_bind in CONSEC'; [|typeclasses eauto].
+               convert_to_ret_hyp.
+               eapply rw_ret_nin_raise in CONSEC'; [contradiction | typeclasses eauto].
           }
 
           cbn in CONSEC'.
-          rewrite bind_ret_l in CONSEC'.
+          setoid_rewrite bind_ret_l in CONSEC'.
           destruct (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
                               (i :: l)) eqn:HMAPM.
           { cbn in CONSEC'.
-            eapply rbm_raise_ret_inv in CONSEC'; [contradiction | typeclasses eauto].
+            convert_to_ret_hyp.
+            eapply rw_ret_nin_raise in CONSEC'; [contradiction | typeclasses eauto].
           }
 
           cbn in CONSEC'.
-          apply eq1_ret_ret in CONSEC'; eauto.
+          convert_to_ret_hyp.
+          apply within_ret_ret in CONSEC'; eauto.
           inv CONSEC'.
           break_match_hyp; inv Heqo0.
           break_match_hyp; inv H0.
@@ -1090,39 +1185,46 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   Lemma get_consecutive_ptrs_nth :
     forall {M : Type -> Type}
       `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
-      `{EQRET : @Eq1_ret_inv M EQM HM}
+      {Pre Post : Type}
+      `{WM : @Within M EQM err_ub_oom Pre Post}
+      `{WRET : @Within_ret_inv M err_ub_oom Pre Post HM _ EQM WM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
       `{RAISE_OOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
       `{RAISE_ERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+      `{RWOOM : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_oom M OOM)}
+      `{RWERR : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_error M ERR)}
       ptr len ptrs,
-      (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad ->
+      (ret ptrs ∈ get_consecutive_ptrs ptr len)%monad ->
       (forall p ix_nat,
           Util.Nth ptrs ix_nat p ->
           exists ix,
             NoOom ix = IP.from_Z (Z.of_nat ix_nat) /\
               handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix] = inr p).
   Proof.
-    intros M HM EQM' EQV EQRET OOM ERR LAWS RAISE_OOM RAISE_ERR ptr len ptrs CONSEC p ix_nat NTH.
+    intros M HM EQM' EQV Pre Post WM WRET OOM ERR LAWS RAISE_OOM RAISE_ERR RWOOM RWERR ptr len ptrs CONSEC p ix_nat NTH.
     pose proof CONSEC as CONSEC'.
     unfold get_consecutive_ptrs in CONSEC.
     destruct (intptr_seq 0 len) eqn:SEQ.
     2: {
       cbn in CONSEC.
-      rewrite rbm_raise_bind in CONSEC; auto.
-      apply rbm_raise_ret_inv in CONSEC; try contradiction; auto.
+      setoid_rewrite rbm_raise_bind in CONSEC; auto.
+      convert_to_ret_hyp.
+      apply rw_ret_nin_raise in CONSEC; try contradiction; auto.
     }
 
     cbn in CONSEC.
-    rewrite bind_ret_l in CONSEC.
+    setoid_rewrite bind_ret_l in CONSEC.
     destruct (map_monad
                 (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) eqn:MAP.
     { cbn in CONSEC.
-      apply rbm_raise_ret_inv in CONSEC; try contradiction; auto.
+      convert_to_ret_hyp.
+      apply rw_ret_nin_raise in CONSEC; try contradiction; auto.
     }
 
     cbn in CONSEC.
-    apply eq1_ret_ret in CONSEC; auto.
+    convert_to_ret_hyp.
+    apply within_ret_ret in CONSEC; auto.
     inv CONSEC.
 
     pose proof MAP as PTRS.
@@ -1139,17 +1241,20 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   Lemma get_consecutive_ptrs_prov :
     forall {M : Type -> Type}
       `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
-      `{EQRET : @Eq1_ret_inv M EQM HM}
+      {Pre Post : Type}
+      `{WM : @Within M EQM err_ub_oom Pre Post}
+      `{WRET : @Within_ret_inv M err_ub_oom Pre Post HM _ EQM WM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
-      `{RAISE_OOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
-      `{RAISE_ERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+      `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+      `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
+      `{RWOOM : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_oom M OOM)}
+      `{RWERR : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_error M ERR)}
       ptr len ptrs,
-      (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad ->
+      (ret ptrs ∈ get_consecutive_ptrs ptr len)%monad ->
       forall p, In p ptrs -> address_provenance p = address_provenance ptr.
   Proof.
-    intros M HM EQM' EQV EQRET OOM ERR LAWS RAISE_OOM RAISE_ERR ptr len ptrs CONSEC p IN.
-
+    intros M HM EQM' EQV Pre Post WM WRET OOM ERR LAWS RAISE_OOM RAISE_ERR RWOOM RWERR ptr len ptrs CONSEC p IN.
     apply In_nth_error in IN as (ix_nat & NTH).
     pose proof CONSEC as GEP.
     eapply get_consecutive_ptrs_nth in GEP; cbn; eauto.
@@ -1190,6 +1295,55 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       exists s.
       cbn.
       rewrite rbm_raise_bind; [reflexivity|eauto].
+  Qed.
+
+  Lemma get_consecutive_ptrs_no_ub:
+    forall {M : Type -> Type}
+      `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
+      {Pre Post : Type}
+      `{WM : @Within M EQM err_ub_oom Pre Post}
+      `{WRET : @Within_ret_inv M err_ub_oom Pre Post HM _ EQM WM}
+      `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
+      `{LAWS: @MonadLawsE M EQM HM}
+      `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+      `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
+      `{RWOOM : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_oom M OOM)}
+      `{RWERR : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_error M ERR)}
+      `{RWUB : @RetWithin M err_ub_oom _ _ _ EQM WM string (@raise_ub err_ub_oom _)}
+      `{DRUBOOM :  @DisjointRaiseWithin M err_ub_oom _ _ EQM WM string (@raise_ub err_ub_oom _) (@raise_oom M OOM)}
+      msg ptr len,
+      (raise_ub msg ∉ get_consecutive_ptrs ptr len)%monad.
+  Proof.
+    intros M HM EQM EQV Pre Post WM WRET OOM ERR LAWS RBMOOM RBMERR RWOOM RWERR RWUB DRUBOOM msg ptr len.
+    intros CONTRA.
+    unfold get_consecutive_ptrs in *.
+    destruct (intptr_seq 0 len) eqn:HSEQ.
+
+    2: {
+      cbn in CONTRA.
+      setoid_rewrite rbm_raise_bind in CONTRA; auto.
+
+      convert_to_raise_hyp.
+      eapply disjoint_raise_within in CONTRA; try contradiction; auto.
+    }
+
+    cbn in CONTRA.
+    setoid_rewrite bind_ret_l in CONTRA.
+    
+    pose proof (map_monad_err_succeeds
+                  (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) as HMAPM.
+      forward HMAPM.
+      { intros a IN.
+        eexists; eapply handle_gep_addr_ix'.
+        reflexivity.
+      }
+
+      destruct HMAPM as (ptrs & HMAPM).
+      rewrite HMAPM in CONTRA.
+      cbn in CONTRA.
+
+      convert_to_raise_hyp.
+      eapply rw_raise_nin_ret in CONTRA; eauto.
   Qed.
 
   Definition generate_num_undef_bytes_h (start_ix : N) (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
