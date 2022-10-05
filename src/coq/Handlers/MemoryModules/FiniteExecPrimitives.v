@@ -3658,8 +3658,16 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           destruct H1.
           { (* UB case, should be dischargeable *)
             destruct H1 as [ubmsg CONTRA].
+
+            (* Would be ideal if I could use the...
+
+            get_consecutive_ptrs_no_ub
+
+            lemma to prove this case.
+             *)
+            
             exfalso.
-                      Set Printing Implicit.
+            Set Printing Implicit.
 
             assert (~ (@within (MemPropT MemState) _ err_ub_oom _ _
                          (@get_consecutive_ptrs

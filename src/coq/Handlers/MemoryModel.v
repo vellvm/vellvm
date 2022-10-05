@@ -688,7 +688,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       + (* Error: should be a contradiction *)
         (* TODO: need inversion lemma. *)
         cbn in CONSEC.
-        convert_to_ret_hyp;
+        convert_to_ret_hyp.
           eapply rw_ret_nin_raise in CONSEC; [contradiction | auto].
       + cbn in CONSEC.
         convert_to_ret_hyp.
@@ -1316,6 +1316,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   Proof.
     intros M HM EQM EQV Pre Post WM WRET OOM ERR LAWS RBMOOM RBMERR RWOOM RWERR RWUB DRUBOOM msg ptr len.
     intros CONTRA.
+
     unfold get_consecutive_ptrs in *.
     destruct (intptr_seq 0 len) eqn:HSEQ.
 
