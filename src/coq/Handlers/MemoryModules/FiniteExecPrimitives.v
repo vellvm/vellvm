@@ -3538,25 +3538,27 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Lemma byte_not_allocated_get_consecutive_ptrs :
     forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
       `{EQV : @Eq1Equivalence M HM EQM}
-      {Pre Post : Type}
-      `{WM : @Within M EQM err_ub_oom Pre Post}
+      `{WM : @Within M EQM err_ub_oom MemState MemState}
       `{EQRET : @Eq1_ret_inv M EQM HM}
-      `{WRET : @Within_ret_inv M err_ub_oom Pre Post HM _ EQM WM}
+      `{WRET : @Within_ret_inv M err_ub_oom MemState MemState HM _ EQM WM}
       `{LAWS : @MonadLawsE M EQM HM}
       `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
       `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
       `{RWOOM : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_oom M OOM)}
       `{RWERR : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_error M ERR)}
-      (mem : memory_stack) (ms : MemState) (ptr : addr) (len : nat) (ptrs : list addr),
+      (mem : memory_stack) (ms : MemState) (ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr),
       MemState_get_memory ms = mem ->
       next_memory_key mem <= ptr_to_int ptr ->
-      (ret ptrs ∈ @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
+      (ret ptrs {{ms}} ∈ {{ms'}} @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
       forall p, In p ptrs -> byte_not_allocated ms p.
   Proof.
-    intros M HM OOM ERR EQM' EQV Pre Post WM EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR mem ms ptr len ptrs MEM NEXT CONSEC p IN.
-    eapply get_consecutive_ptrs_ge with (p := p) in CONSEC; eauto;
-      try (intros * CONTRA;
-           eapply rbm_raise_ret_inv in CONTRA; eauto).
+    intros M HM OOM ERR EQM' EQV WM EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR mem ms ms' ptr len ptrs MEM NEXT CONSEC p IN.
+    pose proof get_consecutive_ptrs_ge ptr len ptrs as GE.
+    forward GE.
+    { exists ms. exists ms'.
+      auto.
+    }
+    specialize (GE _ IN).
     eapply byte_not_allocated_ge_next_memory_key; eauto.
     lia.
   Qed.
@@ -3669,7 +3671,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             exfalso.
             Set Printing Implicit.
 
-            assert (~ (@within (MemPropT MemState) _ err_ub_oom _ _
+            assert (~ (@within (MemPropT MemState) _ err_ub_Odom _ _
                          (@get_consecutive_ptrs
                              (MemPropT MemState) _ _ _
                              (int_to_ptr
