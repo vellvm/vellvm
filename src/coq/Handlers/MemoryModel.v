@@ -3181,16 +3181,55 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     eapply within_eq1_Proper_RunM_MemMonad; eauto.
   Defined.
 
+  Definition within_err_ub_oom_itree
+    {Pre Post : Type}
+    {Eff}
+    `{FAIL : FailureE -< Eff} `{UB : UBE -< Eff} `{OOM : OOME -< Eff}
+    {A} (t : itree Eff A) (pre : Pre) (e : err_ub_oom A) (post : Post) : Prop :=
+    t ≈ lift_err_ub_oom ret e.
+
+  Lemma within_Proper_err_ub_oom_itree
+    {Pre Post : Type}
+    {Eff}
+    `{FAIL : FailureE -< Eff} `{UB : UBE -< Eff} `{OOM : OOME -< Eff}
+    {A} :
+    Proper (eq1 ==> eq ==> eq ==> eq ==> iff) (within_err_ub_oom_itree (Pre:=Pre) (Post:=Post) (A:=A)).
+  Proof.
+    unfold Proper, respectful.
+    intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2.
+    subst.
+    unfold within_err_ub_oom_itree in *.
+    split; intros WITHIN.
+    - rewrite H in WITHIN.
+      auto.
+    - rewrite H.
+      auto.
+  Qed.
+
+  #[global] Instance Within_err_ub_oom_itree
+    {Pre Post : Type}
+    {Eff}
+    `{FAIL : FailureE -< Eff} `{UB : UBE -< Eff} `{OOM : OOME -< Eff}
+    : @Within (itree Eff) _ err_ub_oom Pre Post.
+  Proof.
+    esplit.
+    intros A.
+    unfold Proper, respectful.
+    intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2.
+    eapply within_Proper_err_ub_oom_itree; eauto.
+  Defined.
+
   (*** Correctness *)
   Definition exec_correct {MemM Eff ExtraState} `{MM: MemMonad ExtraState MemM (itree Eff)} {X} (pre : MemState -> ExtraState -> Prop) (exec : MemM X) (spec : MemPropT MemState X) : Prop :=
     forall ms st,
       (@MemMonad_valid_state ExtraState MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ms st) ->
       pre ms st ->
-      let t := MemMonad_run exec ms st in
-      let eqi := (@eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) in
-      (* UB *)
-      (exists msg_spec,
-          @raise_ub err_ub_oom _ X msg_spec {{ ms }} ∈ {{ ms }} spec) \/
+      exists ms',
+        (* UB *)
+        (exists msg_spec,
+            @raise_ub err_ub_oom _ X msg_spec {{ ms }} ∈ {{ ms' }} spec) \/
+          (t {{ ms }} ∈ {{ ms' }} exec)
+        t {{ ms }} ∈ {{ ms' }}
         (* Error *)
         ((exists msg,
              eqi _ t (raise_error msg) /\

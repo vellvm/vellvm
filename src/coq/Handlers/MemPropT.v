@@ -292,53 +292,26 @@ Proof.
     all: exact True.
 Defined.
 
-Definition within_MemPropT{MemState} {A} (m : MemPropT MemState A) (pre : unit) (res : A) (post : unit) : Prop :=
-  forall pre_ms post_ms,
-    m pre_ms (ret (post_ms, res)).
+Definition within_err_ub_oom_MemPropT {MemState} {A} (m : MemPropT MemState A) (pre : MemState) (e : err_ub_oom A) (post : MemState) : Prop :=
+    m pre (a <- e;; ret (post, a)).
 
-Lemma within_MemPropT_eq1Proper {MemState} {A} :
-  Proper (eq1 ==> eq ==> eq ==> eq ==> iff) (@within_MemPropT MemState A).
+Lemma within_err_ub_oom_MemPropT_eq1Proper {MemState} {A} :
+  Proper (eq1 ==> eq ==> eq ==> eq ==> iff) (@within_err_ub_oom_MemPropT MemState A).
 Proof.
   unfold Proper, respectful.
   intros m1 m2 M x y X b1 b2 B z w Z.
   subst.
 
-  unfold within_MemPropT.
-
-  split; intros WITHIN pre_ms post_ms;
-    specialize (WITHIN pre_ms post_ms);
-    apply M in WITHIN; auto.
-Qed.
-
-(** Generic within instance. Useful for operations where the memstate doesn't matter (e.g., get_consecutive_ptrs) *)
-#[global] Instance Within_MemPropT {MemState} : @Within (MemPropT MemState) _ (fun X => X) unit unit :=
-  {
-    within := @within_MemPropT MemState;
-    within_eq1_Proper := @within_MemPropT_eq1Proper MemState;
-  }.
-
-
-Definition within_MemPropT_MemState {MemState} {A} (m : MemPropT MemState A) (pre_ms : MemState) (res : A) (post_ms : MemState) : Prop :=
-  m pre_ms (ret (post_ms, res)).
-
-Lemma within_MemPropT_MemState_eq1Proper {MemState} {A} :
-  Proper (eq1 ==> eq ==> eq ==> eq ==> iff) (@within_MemPropT_MemState MemState A).
-Proof.
-  unfold Proper, respectful.
-  intros m1 m2 M x y X b1 b2 B z w Z.
-  subst.
-
-  unfold within_MemPropT.
+  unfold within_err_ub_oom_MemPropT.
 
   split; intros WITHIN;
     apply M in WITHIN; auto.
 Qed.
 
-(** Within instance that specifies pre and post memstates *)
-#[global] Instance Within_MemPropT_MemState {MemState} : @Within (MemPropT MemState) _ (fun X => X) MemState MemState :=
+#[global] Instance Within_err_ub_oom_MemPropT {MemState} : @Within (MemPropT MemState) _ err_ub_oom MemState MemState :=
   {
-    within := @within_MemPropT_MemState MemState;
-    within_eq1_Proper := @within_MemPropT_MemState_eq1Proper MemState;
+    within := @within_err_ub_oom_MemPropT MemState;
+    within_eq1_Proper := @within_err_ub_oom_MemPropT_eq1Proper MemState;
   }.
 
 Definition MemPropT_assert {MemState X} (assertion : Prop) : MemPropT MemState X
