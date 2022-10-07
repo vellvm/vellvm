@@ -3188,6 +3188,28 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     {A} (t : itree Eff A) (pre : Pre) (e : err_ub_oom A) (post : Post) : Prop :=
     t ≈ lift_err_ub_oom ret e.
 
+  (* Version that uses RAISE_OOM etc explicitly *)
+  Import IdentityMonad.
+  Definition within_err_ub_oom_itree'
+    {Pre Post : Type}
+    {Eff}
+    `{FAIL : RAISE_ERROR (itree Eff)} `{UB : RAISE_UB (itree Eff)} `{OOM : RAISE_OOM (itree Eff)}
+    {A} (t : itree Eff A) (pre : Pre) (e : err_ub_oom A) (post : Post) : Prop :=
+    match e with
+    | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>
+        match m with
+        | inl (OOM_message x) =>
+            exists oom_msg, t ≈ raise_oom oom_msg
+        | inr (inl (UB_message x)) =>
+            (* Should this be more permissive? *)
+            exists ub_msg, t ≈ raise_ub ub_msg
+        | inr (inr (inl (ERR_message x))) =>
+            exists err_msg, t ≈ raise_error err_msg
+        | inr (inr (inr x)) =>
+            t ≈ ret x
+        end
+    end.
+
   Lemma within_Proper_err_ub_oom_itree
     {Pre Post : Type}
     {Eff}
@@ -3206,6 +3228,26 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       auto.
   Qed.
 
+  Lemma within_Proper_err_ub_oom_itree'
+    {Pre Post : Type}
+    {Eff}
+    `{FAIL : RAISE_ERROR (itree Eff)} `{UB : RAISE_UB (itree Eff)} `{OOM : RAISE_OOM (itree Eff)}
+    {A} :
+    Proper (eq1 ==> eq ==> eq ==> eq ==> iff) (within_err_ub_oom_itree' (Pre:=Pre) (Post:=Post) (A:=A)).
+  Proof.
+    unfold Proper, respectful.
+    intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2.
+    subst.
+    unfold within_err_ub_oom_itree' in *.
+    split; intros WITHIN.
+    - destruct y1 as [[[[[[[oom_y1] | [[ub_y1] | [[err_y1] | y1']]]]]]]] eqn:Hy1;
+        setoid_rewrite H in WITHIN;
+        auto.
+    - destruct y1 as [[[[[[[oom_y1] | [[ub_y1] | [[err_y1] | y1']]]]]]]] eqn:Hy1;
+        setoid_rewrite H;
+        auto.
+  Qed.
+
   #[global] Instance Within_err_ub_oom_itree
     {Pre Post : Type}
     {Eff}
@@ -3219,30 +3261,48 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     eapply within_Proper_err_ub_oom_itree; eauto.
   Defined.
 
+  #[global] Instance Within_err_ub_oom_itree'
+    {Pre Post : Type}
+    {Eff}
+    `{FAIL : RAISE_ERROR (itree Eff)} `{UB : RAISE_UB (itree Eff)} `{OOM : RAISE_OOM (itree Eff)}
+    : @Within (itree Eff) _ err_ub_oom Pre Post.
+  Proof.
+    esplit.
+    intros A.
+    unfold Proper, respectful.
+    intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2.
+    eapply within_Proper_err_ub_oom_itree'; eauto.
+  Defined.
+
+  (* Should probably be derivable with typeclasses eauto... *)
+  #[global] Instance Within_err_ub_oom {MemM Eff ExtraState}
+    `{FAIL : RAISE_ERROR (itree Eff)} `{UB : RAISE_UB (itree Eff)} `{OOM : RAISE_OOM (itree Eff)}
+    `{MM: MemMonad ExtraState MemM (itree Eff)} : @Within MemM _ err_ub_oom (ExtraState * MemState)%type (ExtraState * MemState)%type.
+  Proof.
+    eapply @Transitive_Within with (M1:=err_ub_oom) (M2:=itree Eff) (M3:=MemM).
+    - eapply Within_err_ub_oom_itree'.
+    - eapply Within_RunM_MemMonad.
+  Defined.
+
   (*** Correctness *)
   Definition exec_correct {MemM Eff ExtraState} `{MM: MemMonad ExtraState MemM (itree Eff)} {X} (pre : MemState -> ExtraState -> Prop) (exec : MemM X) (spec : MemPropT MemState X) : Prop :=
     forall ms st,
       (@MemMonad_valid_state ExtraState MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ms st) ->
       pre ms st ->
       exists ms',
-        (* UB *)
+        (* UB catchall *)
         (exists msg_spec,
             @raise_ub err_ub_oom _ X msg_spec {{ ms }} ∈ {{ ms' }} spec) \/
-          (t {{ ms }} ∈ {{ ms' }} exec)
-        t {{ ms }} ∈ {{ ms' }}
-        (* Error *)
-        ((exists msg,
-             eqi _ t (raise_error msg) /\
-               exists msg_spec, spec ms (raise_error msg_spec))) \/
-        (* OOM *)
-        (exists msg,
-            eqi _ t (raise_oom msg) /\
-              exists msg_spec, spec ms (raise_oom msg_spec)) \/
-        (* Success *)
-        (exists st' ms' x,
-            eqi _ t (ret (st', (ms', x))) /\
-              spec ms (ret (ms', x)) /\
-              (@MemMonad_valid_state ExtraState MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ms' st')).
+          (forall (e : err_ub_oom X) (st' : ExtraState) (ms' : MemState),
+              (* Had to manually supply typeclasses, but this within expression is: (e {{(st, ms)}} ∈ {{(st', ms')}} exec))
+
+                 I.e., The executable is correct if forall behaviours
+                 in the executable those behaviours are in the spec as
+                 well, and if the executable returns successfully it
+                 gives a valid ExtraState / MemState pair.
+               *)
+              (@within MemM _ err_ub_oom (ExtraState * MemState)%type (ExtraState * MemState)%type Within_err_ub_oom X exec (st, ms) e (st', ms')) ->
+              (e {{ms}} ∈ {{ms'}} spec) /\ (exists x, (e ≈ ret x)%monad -> (@MemMonad_valid_state ExtraState MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ms' st'))).
 
   Definition exec_correct_memory {MemM Eff ExtraState} `{MM: MemMonad ExtraState MemM (itree Eff)} {X} (pre : MemState -> ExtraState -> Prop) (exec : MemM X) (spec : MemPropT memory_stack X) : Prop :=
     exec_correct pre exec (lift_memory_MemPropT spec).

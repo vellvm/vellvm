@@ -14,7 +14,7 @@ Import MonadNotation.
 Open Scope monad_scope.
 
 (* Whether a monadic computation M contains something in B *)
-Class Within {M : Type -> Type} `{EQM : Eq1 M} (B : Type -> Type) (PreState PostState : Type) : Type :=
+Class Within (M : Type -> Type) `{EQM : Eq1 M} (B : Type -> Type) (PreState PostState : Type) : Type :=
   { within {A} (m : M A) (pre : PreState) (b : B A) (post : PostState) : Prop;
     within_eq1_Proper {A} :>
       Proper (@eq1 M EQM A ==> eq ==> eq ==> eq ==> iff) within;
