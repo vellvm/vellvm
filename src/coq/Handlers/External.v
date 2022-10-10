@@ -95,3 +95,42 @@ Definition handle_memory':
       exact (ITree.bind foo (fun '(x, r) => Ret (to_memory_ext x, r))).
     + exact (pure_state _).
 Defined.
+
+Definition interp_mcfg3_external' {R} (t : itree L0 R) g l :=
+  let uvalue_trace   := interp_intrinsics t in
+  let L1_trace       := interp_global uvalue_trace g in
+  let L2_trace       := interp_local_stack L1_trace l in
+  let L3_trace_ext   := interp_state handle_memory' L2_trace in
+  L3_trace_ext.
+
+(* TODO: Specification for memory injections: translate whiteboard notes from [2B] *)
+(* Definition Reachable *)
+
+(* Tying open knot for external calls *)
+Definition mrec_ext' {I E D}
+           (rhI : I ~> itree (E +' I +' D))
+           (rhE : E ~> itree (E +' I +' D)) : E ~> itree D.
+  intros t e.
+  unshelve eapply (@ITree.iter _ _ (itree (E +' I +' D) t) _ (rhE _ e)).
+  refine
+    (fun e => match observe e with
+    | RetF r => Ret (inr r)
+    | TauF t => Ret (inl t)
+    | VisF (inl1 e) k => Ret (inl (ITree.bind (rhE _ e) k))
+    | VisF (inr1 (inl1 e)) k => Ret (inl (ITree.bind (rhI _ e) k))
+    | VisF (inr1 (inr1 e)) k => ITree.bind (trigger e) (fun x => Ret (inl (k x)))
+           end).
+Defined.
+
+Definition mrec_ext {I E D}
+           (rhI : I ~> itree (I +' D))
+           (rhE : E ~> itree (E +' I +' D)) : E ~> itree D :=
+  fun t e =>
+    ITree.iter
+      (fun e => match observe e with
+      | RetF r => Ret (inr r)
+      | TauF t => Ret (inl t)
+      | VisF (inl1 e) k => Ret (inl (ITree.bind (rhE _ e) k))
+      | VisF (inr1 (inl1 e)) k => Ret (inl (ITree.bind (translate inr1 (rhI _ e)) k))
+      | VisF (inr1 (inr1 e)) k => ITree.bind (trigger e) (fun x => Ret (inl (k x)))
+      end) (rhE _ e).
