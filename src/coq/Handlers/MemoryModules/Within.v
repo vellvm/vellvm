@@ -123,6 +123,15 @@ Defined.
 #[global] Instance Transitive_Within {Pre Post} {M1 M2 M3} `{EQM2 : Eq1 M2} `{EQM3 : Eq1 M3} `{WM1M2 : @Within M2 EQM2 M1 Pre Post} `{WM2M3 : @Within M3 EQM3 M2 Pre Post} : @Within M3 EQM3 M1 Pre Post.
 Proof.
   esplit.
+  Unshelve.
+    2: {
+      intros A m pre b post.
+      eapply @transitive_within with (M1 := M1) (M2 := M2) (M3 := M3).
+      4: apply pre.
+      5: apply post.
+      all: eauto.
+    }
+
   intros A.
   unfold Proper, respectful.
   intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2.
