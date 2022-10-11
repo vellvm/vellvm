@@ -3300,17 +3300,27 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       (* UB catchall *)
       (exists ms' msg_spec,
           @raise_ub err_ub_oom _ X msg_spec {{ ms }} ∈ {{ ms' }} spec) \/
-        (forall (e : err_ub_oom X) (st' : ExtraState) (ms' : MemState),
-            (* Had to manually supply typeclasses, but this within expression is: (e {{(st, ms)}} ∈ {{(st', ms')}} exec))
+        ( (* exists a behaviour in exec that lines up with spec.
+
+               Technically this should be something along the lines of...
+
+               "There is at least one behaviour in exec, and for every
+               behaviour in exec it is within the spec"
+
+               For our purposes exec is deterministic, so "exists"
+               should be fine here for simplicity.
+             *)
+           exists (e : err_ub_oom X) (st' : ExtraState) (ms' : MemState),
+             (* Had to manually supply typeclasses, but this within expression is: (e {{(st, ms)}} ∈ {{(st', ms')}} exec))
 
                  I.e., The executable is correct if forall behaviours
                  in the executable those behaviours are in the spec as
                  well, and if the executable returns successfully it
                  gives a valid ExtraState / MemState pair.
-             *)
-            let WEM := (Within_err_ub_oom_MemM (EQI:=(@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) (EQV:=(@MemMonad_eq1_runm_equiv _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM))) in
-            (@within MemM _ err_ub_oom (ExtraState * MemState)%type (ExtraState * MemState)%type WEM X exec (st, ms) e (st', ms')) ->
-            (e {{ms}} ∈ {{ms'}} spec) /\ ((exists x, (e ≈ ret x)%monad) -> (@MemMonad_valid_state ExtraState MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ms' st'))).
+              *)
+             let WEM := (Within_err_ub_oom_MemM (EQI:=(@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) (EQV:=(@MemMonad_eq1_runm_equiv _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM))) in
+             (@within MemM _ err_ub_oom (ExtraState * MemState)%type (ExtraState * MemState)%type WEM X exec (st, ms) e (st', ms')) /\
+               (e {{ms}} ∈ {{ms'}} spec) /\ ((exists x, e = ret x) -> (@MemMonad_valid_state ExtraState MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ms' st'))).
 
   Definition exec_correct_memory {MemM Eff ExtraState} `{MM: MemMonad ExtraState MemM (itree Eff)} {X} (pre : MemState -> ExtraState -> Prop) (exec : MemM X) (spec : MemPropT memory_stack X) : Prop :=
     exec_correct pre exec (lift_memory_MemPropT spec).
@@ -3390,197 +3400,160 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       left; auto.
     }
 
-    (* Need to know if there's UB in k... *)
-
-    (* No UB in m_spec *)
-    intros e st' ms' EXEC.
+    destruct M_CORRECT as [e [st' [ms' [M_EXEC_CORRECT [M_SPEC_CORRECT M_POST]]]]].
     destruct e as [[[[[[[oom_e] | [[ub_e] | [[err_e] | e']]]]]]]] eqn:He.
 
     - (* OOM *)
+      right.
+      exists (raise_oom oom_e).
+      exists st'.
+      exists ms'.
+
       split.
-      2: {
-        intros [x CONTRA].
-        inv CONTRA.
+      { (* Exec *)
+        cbn in M_EXEC_CORRECT.
+        red in M_EXEC_CORRECT.
+        cbn. red.
+        destruct M_EXEC_CORRECT as [m2 [[oom_msg OOM] EXEC]].
+        exists (raise_oom oom_msg).
+        split.
+        cbn.
+        eexists; reflexivity.
+        cbn.
+        cbn in EXEC.
+        rewrite MemMonad_run_bind.
+        rewrite EXEC.
+        rewrite OOM.
+        repeat (rewrite rbm_raise_bind; [| typeclasses eauto]).
+        reflexivity.
       }
 
-      (* Need to know whether OOM occurs in m_exec or k_exec *)
-      cbn in EXEC.
-      destruct EXEC as [t [[oom_msg IN_TREE] IN_MEMM]].
-      cbn in IN_MEMM.
-      rewrite MemMonad_run_bind in IN_MEMM.
-      red in IN_TREE.
-      rewrite IN_TREE in IN_MEMM.
-      rewrite rbm_raise_bind in IN_MEMM; [| typeclasses eauto].
-
-      (* Ideally I would have a lemma about raise_oom that would let me break up this bind...
-         Swear I had that before...
-
-         MFails_bind_inv
-       *)
-
-      (* Should be runm eq1 *)
-      set (eqi := @eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MEMM)).
-      assert (eqi _ (MemMonad_run m_exec ms st) (raise_oom oom_msg) \/
-                (exists (a : ExtraState * (MemState * A)),
-                    (eqi _ (MemMonad_run m_exec ms st) (@ret _ MRun _ a)) /\
-                      ((let (st', y) := a in
-                        let (ms', x) := y in
-                        eqi _ (MemMonad_run (k_exec x) ms' st') (raise_oom oom_msg)))))%monad by admit.
-      subst eqi.
-      clear IN_MEMM.
-      rename H into IN_MEMM.
-
-      destruct IN_MEMM as [IN_MEMM | IN_MEMM].
-      + (* OOM in m_exec *)
-        specialize (M_CORRECT (raise_oom oom_e) st' ms').
-        forward M_CORRECT.
-        red.
-        cbn.
-        red.
-        exists (raise_oom oom_msg).
-        { split.
-          cbn.
-          eexists; reflexivity.
-          cbn.
-          rewrite IN_MEMM.
-          eapply rbm_raise_bind.
-          admit.
-        }
-
-        destruct M_CORRECT as [OOM_SPEC M_VALID].
-        cbn in OOM_SPEC.
-        red in OOM_SPEC.
-
-        red.
+      split.
+      { (* In spec *)
         cbn.
         left.
-        cbn in OOM_SPEC.
-        auto.
-      + (* OOM in continuation *)
-        destruct IN_MEMM as [[st'' [ms'' res]] [EXEC K]].
+        apply M_SPEC_CORRECT.
+      }
 
-        specialize (M_CORRECT (ret res) st'' ms'').
-        forward M_CORRECT.
-        red.
-        cbn.
-        red.
-        exists (ret res).
-        cbn.
-        split; [reflexivity|].
-        rewrite bind_ret_l; eauto.
+      intros [x CONTRA].
+      inv CONTRA.
+    - (* UB *)
+      left.
+      exists ms'. exists ub_e.
+      cbn.
+      left.
+      apply M_SPEC_CORRECT.
+    - (* Err *)
+      right.
+      exists (raise_error err_e).
+      exists st'.
+      exists ms'.
 
-        destruct M_CORRECT as [M_SPEC M_VALID].
-        cbn.
-        right.
-        eexists. eexists.
+      split.
+      { (* Exec *)
+        cbn in M_EXEC_CORRECT.
+        red in M_EXEC_CORRECT.
+        cbn. red.
+        destruct M_EXEC_CORRECT as [m2 [[err_msg ERR] EXEC]].
+        exists (raise_error err_msg).
         split.
-        * cbn in M_SPEC.
-          red in M_SPEC.
-          cbn in M_SPEC.
-          apply M_SPEC.
-        * forward M_VALID.
-          eexists; reflexivity.
-
-          specialize (K_CORRECT res ms ms'' st st'' EXEC _ _ M_VALID).
-          forward K_CORRECT.
-          split; auto.
-
-          destruct K_CORRECT as [[ms_ub [msg_ub K_UB]] | K_CORRECT].
-          -- cbn in K_UB.
-             red in K_UB.
-             cbn in K_UB.
-
-        apply EXEC.
-
-        specialize (K_CORRECT res ms' ms'' st' st'' EXEC).
-        forward K_CORRECT; eauto.
-        
-        unfold Returns in EXEC.
-        
-
-      epose proof (MFails_bind_inv (itree Eff)
-                     (MemMonad_run m_exec ms' st')
-                     (fun (x0 : (ExtraState * (MemState * A))) => (let (st', y) := x0 in let (ms', x) := y in MemMonad_run (k_exec x) ms' st'))).
-      Set Printing Implicit.
-      unfold MFails in H.
-      unfold MFails in H.
-
-      
-        Set Printing Implicit.
-        Unset Printing Notations.
-
-      red in IN_TREE.
-      specialize (M_CORRECT e st' ms').
-      split.
-      + rewrite MemMonad_run_bind.
-        rewrite M_OOM.
-        rewrite rbm_raise_bind; [| typeclasses eauto].
-        reflexivity.
-      + exists msg_spec.
         cbn.
-        left; auto.
-    - (* Error *)
-      right; left.
-      destruct M_ERR as [msg [M_ERR [msg_spec M_SPEC_ERR]]].
-      exists msg.
-      split.
-      + rewrite MemMonad_run_bind.
-        rewrite M_ERR.
-        rewrite rbm_raise_bind; [| typeclasses eauto].
-        reflexivity.
-      + exists msg_spec.
+        eexists; reflexivity.
         cbn.
-        left; auto.
+        cbn in EXEC.
+        rewrite MemMonad_run_bind.
+        rewrite EXEC.
+        rewrite ERR.
+        repeat (rewrite rbm_raise_bind; [| typeclasses eauto]).
+        reflexivity.
+      }
 
+      split.
+      { (* In spec *)
+        cbn.
+        left.
+        apply M_SPEC_CORRECT.
+      }
+
+      intros [x CONTRA].
+      cbn in CONTRA.
+      inv CONTRA.
     - (* Success *)
-      destruct M_SUCCESS as [st' [ms' [a [M_EXEC [M_SPEC M_VALID]]]]].
-
+      (* Need to know if there's UB in K... *)
+      rename e' into a.
       specialize (K_CORRECT a ms ms' st st').
-      forward K_CORRECT; auto.
+      forward K_CORRECT.
+      { cbn in M_EXEC_CORRECT.
+        red in M_EXEC_CORRECT.
+        destruct M_EXEC_CORRECT as [m2 [SUCC EXEC]].
+        cbn in *.
+        rewrite EXEC, SUCC.
+        rewrite bind_ret_l.
+        reflexivity.
+      }
 
-      specialize (K_CORRECT _ _ M_VALID (conj PRE M_SPEC)).
-      destruct K_CORRECT as [[msg K_UB] | [[msg [K_ERR [msg_spec K_ERR_SPEC]]] | [[msg [K_OOM [msg_spec K_OOM_SPEC]]] | K_SUCCESS]]].
-      + left.
-        exists msg.
-        cbn.
+      forward M_POST.
+      { exists a. reflexivity. }
+
+      specialize (K_CORRECT _ _ M_POST).
+      forward K_CORRECT.
+      { split; auto. }
+
+      destruct K_CORRECT as [[ub_ms [ub_msg K_UB]] | K_CORRECT].
+      { (* UB in K *)
+        left.
+        exists ub_ms. exists ub_msg.
         right.
-        exists ms', a.
+        exists ms'. exists a.
         split; auto.
-      + right; left.
-        exists msg.
-        split.
-        * rewrite MemMonad_run_bind.
-          rewrite M_EXEC.
-          rewrite bind_ret_l.
-          auto.
-        * exists msg_spec.
-          cbn.
-          right.
-          exists ms', a.
-          split; auto.
-      + right; right; left.
-        exists msg.
-        split.
-        * rewrite MemMonad_run_bind.
-          rewrite M_EXEC.
-          rewrite bind_ret_l.
-          auto.
-        * exists msg_spec.
-          cbn.
-          right.
-          exists ms', a.
-          split; auto.
-      + right; right; right.
-        destruct K_SUCCESS as [st'' [ms'' [b [K_RUN [K_SPEC K_VALID]]]]].
-        exists st'', ms'', b.
-        split; [| split]; auto.
-        * rewrite MemMonad_run_bind.
-          rewrite M_EXEC.
-          rewrite bind_ret_l.
-          auto.
-        * cbn.
-          exists ms', a.
-          split; auto.
+      }
+
+      (* UB not necessarily in K *)
+      right.
+      destruct K_CORRECT as [eb [st'' [ms'' [K_EXEC [K_SPEC K_POST]]]]].
+
+      cbn in M_EXEC_CORRECT.
+      red in M_EXEC_CORRECT.
+
+      cbn in K_EXEC.
+      red in K_EXEC.
+
+      destruct M_EXEC_CORRECT as [tm [M_SUCC M_EXEC]].
+      destruct K_EXEC as [tk [K_SUCC K_EXEC]].
+
+      cbn in M_SUCC, M_EXEC.
+      rewrite M_SUCC in M_EXEC.
+      rewrite bind_ret_l in M_EXEC.
+
+      exists eb. exists st''. exists ms''.
+      split; [| split].
+
+      { (* Exec *)
+        exists tk.
+        split; auto.
+
+        cbn.
+        rewrite MemMonad_run_bind.
+
+        rewrite M_EXEC.
+        rewrite bind_ret_l.
+        rewrite K_EXEC.
+        reflexivity.
+      }
+
+      { (* Spec *)
+        (* TODO: Probably a good bind lemma for this *)
+        destruct eb as [[[[[[[oom_eb] | [[ub_eb] | [[err_eb] | eb']]]]]]]] eqn:Heb;
+          try right; cbn; exists ms'; exists a; split; auto.
+      }
+
+      { (* Post *)
+        intros [x RET].
+        subst.
+
+        eapply K_POST.
+        eexists; reflexivity.
+      }
   Qed.
 
   Lemma exec_correct_ret :
@@ -3589,13 +3562,23 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       exec_correct pre (ret x) (ret x).
   Proof.
     intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS H X pre x.
-    cbn; red; cbn.
     intros ms st VALID PRE.
-    right; right; right.
-    exists st, ms, x.
-    setoid_rewrite MemMonad_run_ret.
-    split; [|split]; auto.
-    reflexivity.
+    right.
+    exists (ret x), st, ms.
+    split.
+    { (* TODO: cleaner lemma *)
+      cbn.
+      red.
+      exists (ret x).
+      split.
+      - cbn. reflexivity.
+      - cbn.
+        rewrite MemMonad_run_ret.
+        rewrite bind_ret_l.
+        reflexivity.
+    }
+
+    split; cbn; auto.
   Qed.
 
   Lemma exec_correct_map_monad :
@@ -3666,16 +3649,25 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       {A} (msg : string),
     forall pre, exec_correct pre (raise_oom msg) (raise_oom msg : MemPropT MemState A).
   Proof.
-    intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MemMonad A msg.
-    cbn.
+    intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MemMonad A msg pre.
     red.
-    intros ms st VALID.
-    cbn. right; right; left.
-    exists msg.
+    intros ms st VALID PRE.
+    right.
+    exists (raise_oom msg).
+    exists st. exists ms.
     split.
-    - rewrite MemMonad_run_raise_oom.
-      reflexivity.
-    - exists ""%string; auto.
+    { (* TODO: cleaner lemma? *)
+      cbn.
+      red.
+      exists (raise_oom msg).
+      split; cbn.
+      - eexists; reflexivity.
+      - rewrite MemMonad_run_raise_oom.
+        rewrite rbm_raise_bind; [| typeclasses eauto].
+        reflexivity.
+    }
+
+    split; cbn; auto.
   Qed.
 
   Lemma exec_correct_raise_error :
@@ -3683,16 +3675,25 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       {A} (msg1 msg2 : string),
     forall pre, exec_correct pre (raise_error msg1) (raise_error msg2 : MemPropT MemState A).
   Proof.
-    intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MemMonad A msg.
-    cbn.
+    intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MemMonad A msg1 msg2 pre.
     red.
-    intros ms st VALID.
-    cbn. right; left.
-    exists msg.
+    intros ms st VALID PRE.
+    right.
+    exists (raise_error msg2).
+    exists st. exists ms.
     split.
-    - rewrite MemMonad_run_raise_error.
-      reflexivity.
-    - exists ""%string; auto.
+    { (* TODO: cleaner lemma? *)
+      cbn.
+      red.
+      exists (raise_error msg1).
+      split; cbn.
+      - eexists; reflexivity.
+      - rewrite MemMonad_run_raise_error.
+        rewrite rbm_raise_bind; [| typeclasses eauto].
+        reflexivity.
+    }
+
+    split; cbn; auto.
   Qed.
 
   Lemma exec_correct_raise_ub :
@@ -3700,14 +3701,14 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       {A} (msg1 msg2 : string),
     forall pre, exec_correct pre (raise_ub msg1) (raise_ub msg2 : MemPropT MemState A).
   Proof.
-    intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM MemMonad A msg1 msg2.
-    cbn.
+    intros MemM Eff ExtraState MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS H A msg1 msg2 pre.
+
     red.
-    intros ms st VALID.
-    cbn.
+    intros ms st VALID PRE.
+
     left.
-    exists ""%string.
-    auto.
+    exists ms. exists msg2.
+    cbn; auto.
   Qed.
 
   Lemma exec_correct_lift_OOM :
@@ -3767,10 +3768,17 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
            ms st H PRE.
     right.
     eapply MemMonad_run_fresh_sid in H as [st' [sid [EUTT [VALID FRESH]]]].
-    right; right.
-    exists st', ms, sid.
+    exists (ret sid), st', ms.
     split; [| split]; auto.
-    unfold fresh_sid.
+    { cbn.
+      red.
+      exists (ret sid).
+      split; cbn.
+      - reflexivity.
+      - rewrite EUTT, bind_ret_l.
+        reflexivity.
+    }
+
     cbn.
     split; [| split; [| split; [| split; [| split; [| split; [| split]]]]]];
       try solve [red; reflexivity].
@@ -3947,9 +3955,17 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       intros pre ms st H PRE.
       right.
       eapply MemMonad_run_fresh_provenance in H as [ms' [pr [EUTT [VALID [MEM FRESH]]]]].
-      right; right.
-      exists st, ms', pr.
+      exists (ret pr), st, ms'.
       split; [| split]; auto.
+      { cbn.
+        red.
+        exists (ret pr).
+        split; cbn.
+        - reflexivity.
+        - rewrite EUTT, bind_ret_l.
+          reflexivity.
+      }
+
       cbn.
       split; [| split; [| split; [| split; [| split; [| split]]]]];
         try solve [red; reflexivity].
