@@ -11,7 +11,8 @@ From Vellvm.Semantics Require Import
 
 From Vellvm.Handlers Require Import
      MemoryModel
-     MemPropT.
+     MemPropT
+     MemoryModules.Within.
 
 From Vellvm.Utils Require Import
      InterpProp
@@ -120,7 +121,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Defined.
 
     (* M may be PropT or itree... *)
-    Definition MemStateFreshT_run {A} {Eff} `{FailureE -< Eff} `{OOME -< Eff} `{UBE -< Eff} (ma : MemStateFreshT (itree Eff) A) (ms : MemState) (st : MemStateFreshT_State) : itree Eff (MemStateFreshT_State * (MemState * A)).
+    Definition MemStateFreshT_run {A} {Eff} (ma : MemStateFreshT (itree Eff) A) (ms : MemState) (st : MemStateFreshT_State) : itree Eff (MemStateFreshT_State * (MemState * A)).
     Proof.
       unfold MemStateFreshT in *.
       specialize (ma st ms).
@@ -133,6 +134,55 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Definition MemStateFreshT_valid_state (ms : MemState) (st : MemStateFreshT_State) : Prop
       := let sid := st in
          (forall sid', used_store_id ms sid' -> (sid' < sid)%N).
+
+  Definition within_MemStateFreshT_itree
+    {Eff}
+    {A} (msf : MemStateFreshT (itree Eff) A) (pre : MemStateFreshT_State * MemState) (t : itree Eff A) (post : MemStateFreshT_State * MemState) : Prop :=
+    let '(sid, ms) := pre in
+    let '(sid', ms') := post in
+    MemStateFreshT_run msf ms sid ≈ fmap (fun x => (sid', (ms', x))) t.
+
+  Lemma within_eq1_Proper_MemStateFreshT_itree
+    {Eff} :
+    forall A : Type,
+      Proper (Monad.eq1 ==> eq ==> eq ==> eq ==> iff)
+        (@within_MemStateFreshT_itree Eff A).
+  Proof.
+    intros A.
+    unfold Proper, respectful.
+    intros x y H2 x0 y0 H3 x1 y1 H4 x2 y2 H5.
+    subst.
+    unfold within_MemStateFreshT_itree.
+    cbn.
+    destruct y0, y2.
+    split; intros WITHIN.
+    - rewrite H2 in WITHIN.
+      auto.
+    - rewrite H2.
+      auto.
+  Qed.
+
+  #[global] Instance MemStateFreshT_Within {Eff} :
+    Within (MemStateFreshT (itree Eff)) (itree Eff) (MemStateFreshT_State * MemState) (MemStateFreshT_State * MemState).
+  Proof.
+    esplit.
+    Unshelve.
+    2: {
+      intros A m pre b post.
+      eapply within_MemStateFreshT_itree.
+      2: apply pre.
+      3: apply post.
+      eauto.
+      eauto.
+    }
+
+    intros A.
+    unfold Proper, respectful.
+    intros x y H2 x0 y0 H3 x1 y1 H4 x2 y2 H5.
+    subst.
+
+    eapply within_eq1_Proper_MemStateFreshT_itree; eauto.
+  Defined.
 
     Lemma oom_error_inv :
       forall {A Eff} `{FailureE -< Eff} `{OOME -< Eff} oom_msg error_msg,
@@ -173,11 +223,22 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       reflexivity.
     Qed.
 
+    #[global] Instance MemStateFreshT_run_Proper {A Eff} :
+      Proper (Monad.eq1 ==> eq ==> eq ==> Monad.eq1) (@MemStateFreshT_run A Eff).
+    Proof.
+      unfold Proper, respectful.
+      intros x y H2 x0 y0 H3 x1 y1 H4; subst.
+      cbn. do 2 red.
+      do 8 red in H2.
+      rewrite H2.
+      reflexivity.
+    Qed.
+
     #[global] Instance MemStateFreshT_MemMonad {Eff} `{FAIL: FailureE -< Eff} `{OOM: OOME -< Eff} `{UB: UBE -< Eff}
       : MemMonad MemStateFreshT_State (MemStateFreshT (itree Eff)) (itree Eff).
     Proof.
       esplit with
-        (MemMonad_run := fun A => @MemStateFreshT_run A Eff FAIL OOM UB)
+        (MemMonad_run := fun A => @MemStateFreshT_run A Eff)
         (MemMonad_valid_state := MemStateFreshT_valid_state); try solve [typeclasses eauto].
 
       (* TODO: didn't need valid for ret / bind laws... *)
@@ -275,6 +336,10 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         rewrite map_bind.
         setoid_rewrite Raise.raiseUB_bind_itree.
         reflexivity.
+      - (* raise_ub_inv *)
+        intros A x ub_msg.
+        intros EQ.
+        pinversion EQ.
       - (* raise_error *)
         intros A ms oom_msg sid.
         cbn.
@@ -586,6 +651,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         rewrite map_bind.
         setoid_rewrite Raise.raiseUB_bind_itree.
         reflexivity.
+      - (* raise_ub_inv *)
+        intros A x ub_msg.
+        intros EQ.
+        pinversion EQ.
       - (* raise_error *)
         intros A ms oom_msg sid.
         cbn.

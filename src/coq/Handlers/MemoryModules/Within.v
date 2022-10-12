@@ -159,8 +159,82 @@ Defined.
 #[global] Instance Reflexive_Within {Pre Post} {M} `{MM : Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M MM EQM} : @Within M EQM M Pre Post.
 Proof.
   esplit.
+  Unshelve.
+  2: {
+    intros A m pre b post.
+    eapply reflexive_within.
+    2: apply pre.
+    3: apply post.
+    apply m.
+    apply b.
+  }
   intros A.
   unfold Proper, respectful.
   intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2.
   eapply reflexive_within_eq1_Proper; eauto.
+Defined.
+
+Require Import MonadEq1Laws.
+Import Coq.Init.Logic.
+Import String.
+
+#[global] Instance Reflexive_Within_ret_inv
+  {Pre Post} {M} `{MM : Monad M}
+  `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M MM EQM}
+  `{EQR : @Eq1_ret_inv M EQM MM} `{IPRE : inhabited Pre} `{IPOST : inhabited Post}:
+  @Within_ret_inv M M Pre Post MM MM EQM (@Reflexive_Within Pre Post M MM EQM EQV).
+Proof.
+  split.
+  - intros A x y RET.
+    cbn in RET.
+    destruct RET.
+    destruct H.
+    cbn in H.
+    red in H.
+    eapply eq1_ret_ret in H; eauto.
+  - intros A x.
+    inversion IPRE.
+    inversion IPOST.
+    cbn.
+    exists X.
+    exists X0.
+    red.
+    reflexivity.
+Defined.
+
+Require Import Vellvm.Utils.Error.
+Require Import Vellvm.Utils.Raise.
+
+#[global] Instance Reflexive_OOM_RaiseWithin
+  {Pre Post} {M} `{MM : Monad M}
+  `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M MM EQM}
+  `{EQR : @Eq1_ret_inv M EQM MM}
+  `{OOM : RAISE_OOM M}
+  `{RBMOOM : @RaiseBindM M MM EQM string (@raise_oom M OOM)} :
+  @RaiseWithin M M Pre Post MM EQM (@Reflexive_Within Pre Post M MM EQM EQV) string (@raise_oom M OOM).
+Proof.
+  split.
+  intros X msg x.
+  red.
+  intros [pre [post CONTRA]].
+  cbn in CONTRA.
+  red in CONTRA.
+  eapply rbm_raise_ret_inv; eauto.
+Defined.
+
+#[global] Instance Reflexive_ERROR_RaiseWithin
+  {Pre Post} {M} `{MM : Monad M}
+  `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M MM EQM}
+  `{EQR : @Eq1_ret_inv M EQM MM}
+  `{ERR : RAISE_ERROR M}
+  `{RBMOOM : @RaiseBindM M MM EQM string (@raise_error M ERR)} :
+  @RaiseWithin M M Pre Post MM EQM (@Reflexive_Within Pre Post M MM EQM EQV) string (@raise_error M ERR).
+Proof.
+  split.
+  intros X msg x.
+  red.
+  intros [pre [post CONTRA]].
+  cbn in CONTRA.
+  red in CONTRA.
+  eapply rbm_raise_ret_inv; eauto.
 Defined.

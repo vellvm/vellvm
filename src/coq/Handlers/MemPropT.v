@@ -314,6 +314,98 @@ Qed.
     within_eq1_Proper := @within_err_ub_oom_MemPropT_eq1Proper MemState;
   }.
 
+#[global] Instance Within_ret_inv_MemPropT {MemState} {IMS : inhabited MemState} :
+  Within_ret_inv (MemPropT MemState) err_ub_oom MemState MemState.
+Proof.
+  split.
+  - intros A x y H.
+    cbn in *.
+    firstorder.
+  - intros A x.
+    cbn.
+    inv IMS.
+    exists X. exists X.
+    auto.
+Defined.
+
+#[global] Instance RaiseBindM_OOM_MemPropT {MemState} {IMS : inhabited MemState} :
+  RaiseBindM (MemPropT MemState) string (@raise_oom (MemPropT MemState) MemPropT_RAISE_OOM).
+Proof.
+  split.
+  - intros A B f x.
+    cbn.
+    intros ms e.
+    destruct e as [[[[[[[oom_e] | [[ub_e] | [[err_e] | [ms' b]]]]]]]]] eqn:He;
+      firstorder.
+  - intros A x y CONTRA.
+    inv IMS.
+    rename X into ms.
+    specialize (CONTRA ms (raise_oom x)).
+    cbn in *.
+    tauto.
+Defined.
+
+#[global] Instance RaiseBindM_ERROR_MemPropT {MemState} {IMS : inhabited MemState} :
+  RaiseBindM (MemPropT MemState) string (@raise_error (MemPropT MemState) MemPropT_RAISE_ERROR).
+Proof.
+  split.
+  - intros A B f x.
+    cbn.
+    intros ms e.
+    destruct e as [[[[[[[oom_e] | [[ub_e] | [[err_e] | [ms' b]]]]]]]]] eqn:He;
+      firstorder.
+  - intros A x y CONTRA.
+    inv IMS.
+    rename X into ms.
+    specialize (CONTRA ms (raise_error x)).
+    cbn in *.
+    tauto.
+Defined.
+
+#[global] Instance RaiseWithin_OOM_MemPropT {MemState} :
+  RaiseWithin (MemPropT MemState) err_ub_oom MemState MemState string
+    (@raise_oom (MemPropT MemState) MemPropT_RAISE_OOM).
+Proof.
+  split.
+  intros X msg x.
+  cbn.
+  intros [ms [ms' CONTRA]].
+  auto.
+Defined.
+
+#[global] Instance RaiseWithin_ERROR_MemPropT {MemState} :
+  RaiseWithin (MemPropT MemState) err_ub_oom MemState MemState string
+    (@raise_error (MemPropT MemState) MemPropT_RAISE_ERROR).
+Proof.
+  split.
+  intros X msg x.
+  cbn.
+  intros [ms [ms' CONTRA]].
+  auto.
+Defined.
+
+#[global] Instance RetWithin_UB_MemPropT {MemState} :
+  RetWithin (MemPropT MemState) err_ub_oom MemState MemState string
+    (@raise_ub err_ub_oom RAISE_UB_err_ub_oom_T).
+Proof.
+  split.
+  intros X msg x.
+  cbn.
+  intros [ms [ms' CONTRA]].
+  auto.
+Defined.
+
+#[global] Instance DisjointRaiseWithin_UB_MemPropT {MemState} :
+  DisjointRaiseWithin (MemPropT MemState) err_ub_oom MemState MemState string
+    (@raise_ub err_ub_oom RAISE_UB_err_ub_oom_T) (@raise_oom (MemPropT MemState) MemPropT_RAISE_OOM).
+Proof.
+  split.
+  intros X msg1 msg2.
+  cbn.
+  intros [ms [ms' CONTRA]].
+  auto.
+Defined.
+
 Definition MemPropT_assert {MemState X} (assertion : Prop) : MemPropT MemState X
   := fun ms ms'x =>
        match ms'x with

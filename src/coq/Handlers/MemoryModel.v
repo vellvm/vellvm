@@ -662,20 +662,21 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
    Lemma get_consecutive_ptrs_length :
     forall {M} `{HM : Monad M} `{EQM : Monad.Eq1 M}
       {Pre Post : Type}
-      `{WM : @Within M EQM err_ub_oom Pre Post}
+      {B} `{MB : Monad B}
+      `{WM : @Within M EQM B Pre Post}
       `{EQV : @Eq1Equivalence M HM EQM}
-      `{WRET : @Within_ret_inv M err_ub_oom Pre Post HM _ EQM WM}
+      `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
       `{MLAWS : @MonadLawsE M EQM HM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
       `{RBMERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
-      `{RWOOM : @RaiseWithin M err_ub_oom Pre Post _ EQM WM string (@raise_oom M OOM)}
-      `{RWERR : @RaiseWithin M err_ub_oom Pre Post _ EQM WM string (@raise_error M ERR)}
+      `{RWOOM : @RaiseWithin M B Pre Post _ EQM WM string (@raise_oom M OOM)}
+      `{RWERR : @RaiseWithin M B Pre Post _ EQM WM string (@raise_error M ERR)}
       (ptr : addr) (len : nat) (ptrs : list addr),
-      (@ret err_ub_oom _ _ ptrs ∈ @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
+      (@ret B _ _ ptrs ∈ @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
       len = length ptrs.
   Proof.
-    intros M HM EQM Pre Post WM EQV WRET MLAWS OOM ERR RBMOOM RBMERR RWOOM RWERR ptr len ptrs CONSEC.
+    intros M HM EQM Pre Post B MB WM EQV WRET MLAWS OOM ERR RBMOOM RBMERR RWOOM RWERR ptr len ptrs CONSEC.
     unfold get_consecutive_ptrs in CONSEC.
     cbn in *.
     destruct (intptr_seq 0 len) eqn:SEQ.
@@ -710,22 +711,23 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   Lemma get_consecutive_ptrs_covers_range :
     forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
       {Pre Post : Type}
-      `{WM : @Within M EQM err_ub_oom Pre Post}
+      {B} `{MB : Monad B}
+      `{WM : @Within M EQM B Pre Post}
       `{EQV : @Eq1Equivalence M HM EQM}
       `{EQRET : @Eq1_ret_inv M EQM HM}
-      `{WRET : @Within_ret_inv M err_ub_oom Pre Post HM _ EQM WM}
+      `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
       `{LAWS : @MonadLawsE M EQM HM}
       `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
       `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
-      `{RWOOM : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_oom M OOM)}
-      `{RWERR : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_error M ERR)}
+      `{RWOOM : @RaiseWithin M B _ _ _ EQM WM string (@raise_oom M OOM)}
+      `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
       ptr len ptrs,
       (ret ptrs ∈ @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
       forall ix, (ptr_to_int ptr <= ix < ptr_to_int ptr + (Z.of_nat len))%Z ->
             exists p', ptr_to_int p' = ix /\ In p' ptrs.
   Proof.
     (* TODO: This is kind of related to get_consecutive_ptrs_nth *)
-    intros M HM OOM ERR EQM' Pre Post WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR ptr len ptrs CONSEC ix RANGE.
+    intros M HM OOM ERR EQM' Pre Post B MB WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR ptr len ptrs CONSEC ix RANGE.
     Transparent get_consecutive_ptrs.
     unfold get_consecutive_ptrs in CONSEC.
     Opaque get_consecutive_ptrs.
@@ -793,24 +795,57 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         eapply rw_ret_nin_raise in CONSEC; [contradiction | typeclasses eauto].
   Qed.
 
+  Lemma get_consecutive_ptrs_covers_range_eq1 :
+    forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
+      {B} `{MB : Monad B}
+      `{EQV : @Eq1Equivalence M HM EQM}
+      `{EQRET : @Eq1_ret_inv M EQM HM}
+      `{LAWS : @MonadLawsE M EQM HM}
+      `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+      `{RBMERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+      ptr len ptrs,
+      (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
+      forall ix, (ptr_to_int ptr <= ix < ptr_to_int ptr + (Z.of_nat len))%Z ->
+            exists p', ptr_to_int p' = ix /\ In p' ptrs.
+  Proof.
+    intros M HM OOM ERR EQM B MB EQV EQRET LAWS RBMOOM RBMERR ptr len ptrs CONSEC ix IN.
+
+    assert (@within M EQM M unit unit (Reflexive_Within) _
+              (@get_consecutive_ptrs M HM OOM ERR ptr len)
+              tt
+              (@ret M HM (list addr) ptrs)
+              tt
+           ) as WITHIN.
+    { cbn. red.
+      auto.
+    }
+
+    eapply @get_consecutive_ptrs_covers_range with (B:=M); eauto.
+    eapply Reflexive_Within_ret_inv.
+    Unshelve.
+    3-4: constructor; exact tt.
+    all: typeclasses eauto.
+  Qed.
+
   Lemma get_consecutive_ptrs_cons :
     forall {M : Type -> Type}
       `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
       {Pre Post : Type}
-      `{WM : @Within M EQM err_ub_oom Pre Post}
+      {B} `{MB : Monad B}
+      `{WM : @Within M EQM B Pre Post}
       `{EQRET : @Eq1_ret_inv M EQM HM}
-      `{WRET : @Within_ret_inv M err_ub_oom Pre Post HM _ EQM WM}
+      `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
       `{RAISE_OOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
       `{RAISE_ERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
-      `{RWOOM : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_oom M OOM)}
-      `{RWERR : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_error M ERR)}
+      `{RWOOM : @RaiseWithin M B _ _ _ EQM WM string (@raise_oom M OOM)}
+      `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
       ptr len p ptrs,
       (ret (p :: ptrs) ∈ get_consecutive_ptrs ptr len)%monad ->
       p = ptr /\ (exists ptr' len', len = S len' /\ (ret ptrs ∈ get_consecutive_ptrs ptr' len')%monad).
   Proof.
-    intros M HM EQM' Pre Post WM EQRET WRET EQV OOM ERR LAWS RAISE_OOM RAISE_ERR RWOOM RWERR ptr len p ptrs CONSEC.
+    intros M HM EQM' Pre Post B MB WM EQRET WRET EQV OOM ERR LAWS RAISE_OOM RAISE_ERR RWOOM RWERR ptr len p ptrs CONSEC.
 
     Transparent get_consecutive_ptrs.
     unfold get_consecutive_ptrs in *.
@@ -871,7 +906,6 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         cbn.
         setoid_rewrite bind_ret_l.
         cbn.
-        convert_to_ret.
         eapply within_ret_refl; eauto.
       + pose proof Heqo0 as SEQ.
         rewrite intptr_seq_succ in SEQ.
@@ -974,7 +1008,6 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         rewrite Heqs'.
         cbn.
 
-        convert_to_ret.
         eapply within_ret_refl; eauto.
   Qed.
 
@@ -982,22 +1015,23 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     forall {M : Type -> Type}
       `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
       {Pre Post : Type}
-      `{WM : @Within M EQM err_ub_oom Pre Post}
+      {B} `{MB : Monad B}
+      `{WM : @Within M EQM B Pre Post}
       `{EQRET : @Eq1_ret_inv M EQM HM}
-      `{WRET : @Within_ret_inv M err_ub_oom Pre Post HM _ EQM WM}
+      `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
       `{RAISE_OOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
       `{RAISE_ERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
-      `{RWOOM : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_oom M OOM)}
-      `{RWERR : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_error M ERR)}
+      `{RWOOM : @RaiseWithin M B _ _ _ EQM WM string (@raise_oom M OOM)}
+      `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
       ptr len ptrs,
       (ret ptrs ∈ get_consecutive_ptrs ptr len)%monad ->
       (forall p,
           In p ptrs ->
           (ptr_to_int ptr <= ptr_to_int p)%Z).
   Proof.
-    intros M HM EQM' EQV Pre Post WM EQRET WRET OOM ERR LAWS RAISE_OOM RAISE_ERR RWOOM RWERR ptr len ptrs.
+    intros M HM EQM' EQV Pre Post B MB WM EQRET WRET OOM ERR LAWS RAISE_OOM RAISE_ERR RWOOM RWERR ptr len ptrs.
     revert ptr len.
     induction ptrs; intros ptr len CONSEC p IN.
     - inv IN.
@@ -1079,26 +1113,62 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         lia.
   Qed.
 
+  Lemma get_consecutive_ptrs_ge_eq1 :
+    forall {M : Type -> Type}
+      `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
+      {B} `{MB : Monad B}
+      `{EQRET : @Eq1_ret_inv M EQM HM}
+      `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
+      `{LAWS: @MonadLawsE M EQM HM}
+      `{RAISE_OOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+      `{RAISE_ERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+      ptr len ptrs,
+      (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad ->
+      (forall p,
+          In p ptrs ->
+          (ptr_to_int ptr <= ptr_to_int p)%Z).
+  Proof.
+    intros M HM EQM0 EQV B MB EQRET OOM ERR LAWS RAISE_OOM RAISE_ERR
+      ptr len ptrs CONSEC p IN.
+
+    assert (@within M EQM0 M unit unit (Reflexive_Within) _
+              (@get_consecutive_ptrs M HM OOM ERR ptr len)
+              tt
+              (@ret M HM (list addr) ptrs)
+              tt
+           ) as WITHIN.
+    { cbn. red.
+      auto.
+    }
+
+    eapply @get_consecutive_ptrs_ge with (B:=M); eauto.
+    eapply Reflexive_Within_ret_inv.
+    Unshelve.
+    3-4: constructor; exact tt.
+    all: typeclasses eauto.
+  Qed.
+
   Lemma get_consecutive_ptrs_range :
     forall {M : Type -> Type}
       `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
       {Pre Post : Type}
-      `{WM : @Within M EQM err_ub_oom Pre Post}
+      {B} `{MB : Monad B}
+      `{WM : @Within M EQM B Pre Post}
       `{EQRET : @Eq1_ret_inv M EQM HM}
-      `{WRET : @Within_ret_inv M err_ub_oom Pre Post HM _ EQM WM}
+      `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
       `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
       `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
-      `{RWOOM : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_oom M OOM)}
-      `{RWERR : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_error M ERR)}
+      `{RWOOM : @RaiseWithin M B _ _ _ EQM WM string (@raise_oom M OOM)}
+      `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
       ptr len ptrs,
       (ret ptrs ∈ get_consecutive_ptrs ptr len)%monad ->
       (forall p,
           In p ptrs ->
           (ptr_to_int ptr <= ptr_to_int p < ptr_to_int ptr + (Z.of_nat len))%Z).
   Proof.
-    intros M HM EQM EQV Pre Post WM EQRET WRET OOM ERR LAWS RBMOOM RBMERR RWOOM RWERR ptr len ptrs.
+    intros M HM EQM EQV Pre Post B MB WM EQRET WRET OOM ERR LAWS RBMOOM RBMERR RWOOM RWERR ptr len ptrs.
     revert ptr len.
     induction ptrs; intros ptr len CONSEC p IN.
     - inv IN.
@@ -1182,18 +1252,54 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         lia.
   Qed.
 
+  Lemma get_consecutive_ptrs_range_eq1 :
+    forall {M : Type -> Type}
+      `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
+      {B} `{MB : Monad B}
+      `{EQRET : @Eq1_ret_inv M EQM HM}
+      `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
+      `{LAWS: @MonadLawsE M EQM HM}
+      `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+      `{RBMERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+      ptr len ptrs,
+      (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad ->
+      (forall p,
+          In p ptrs ->
+          (ptr_to_int ptr <= ptr_to_int p < ptr_to_int ptr + (Z.of_nat len))%Z).
+  Proof.
+    intros M HM EQM EQV B MB EQRET OOM ERR LAWS RBMOOM RBMERR
+      ptr len ptrs CONSEC p IN.
+
+    assert (@within M EQM M unit unit (Reflexive_Within) _
+              (@get_consecutive_ptrs M HM OOM ERR ptr len)
+              tt
+              (@ret M HM (list addr) ptrs)
+              tt
+           ) as WITHIN.
+    { cbn. red.
+      auto.
+    }
+
+    eapply @get_consecutive_ptrs_range with (B:=M); eauto.
+    eapply Reflexive_Within_ret_inv.
+    Unshelve.
+    3-4: constructor; exact tt.
+    all: typeclasses eauto.
+  Qed.
+
   Lemma get_consecutive_ptrs_nth :
     forall {M : Type -> Type}
       `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
       {Pre Post : Type}
-      `{WM : @Within M EQM err_ub_oom Pre Post}
-      `{WRET : @Within_ret_inv M err_ub_oom Pre Post HM _ EQM WM}
+      {B} `{MB : Monad B}
+      `{WM : @Within M EQM B Pre Post}
+      `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
       `{RAISE_OOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
       `{RAISE_ERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
-      `{RWOOM : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_oom M OOM)}
-      `{RWERR : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_error M ERR)}
+      `{RWOOM : @RaiseWithin M B _ _ _ EQM WM string (@raise_oom M OOM)}
+      `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
       ptr len ptrs,
       (ret ptrs ∈ get_consecutive_ptrs ptr len)%monad ->
       (forall p ix_nat,
@@ -1202,7 +1308,9 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
             NoOom ix = IP.from_Z (Z.of_nat ix_nat) /\
               handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix] = inr p).
   Proof.
-    intros M HM EQM' EQV Pre Post WM WRET OOM ERR LAWS RAISE_OOM RAISE_ERR RWOOM RWERR ptr len ptrs CONSEC p ix_nat NTH.
+    intros M HM EQM EQV Pre Post B MB WM WRET OOM ERR LAWS RAISE_OOM RAISE_ERR RWOOM RWERR
+      ptr len ptrs CONSEC p ix_nat NTH.
+
     pose proof CONSEC as CONSEC'.
     unfold get_consecutive_ptrs in CONSEC.
     destruct (intptr_seq 0 len) eqn:SEQ.
@@ -1238,23 +1346,61 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     eapply intptr_seq_nth in SEQ; eauto.
   Qed.
 
+  Lemma get_consecutive_ptrs_nth_eq1 :
+    forall {M : Type -> Type}
+      `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
+      `{EQRET : @Eq1_ret_inv M EQM HM}
+      {B} `{MB : Monad B}
+      `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
+      `{LAWS: @MonadLawsE M EQM HM}
+      `{RAISE_OOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+      `{RAISE_ERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+      ptr len ptrs,
+      (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad ->
+      (forall p ix_nat,
+          Util.Nth ptrs ix_nat p ->
+          exists ix,
+            NoOom ix = IP.from_Z (Z.of_nat ix_nat) /\
+              handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix] = inr p).
+  Proof.
+    intros M HM EQM EQV EQRET B MB OOM ERR LAWS RAISE_OOM RAISE_ERR
+      ptr len ptrs CONSEC p ix_nat NTH.
+
+    assert (@within M EQM M unit unit (Reflexive_Within) _
+              (@get_consecutive_ptrs M HM OOM ERR ptr len)
+              tt
+              (@ret M HM (list addr) ptrs)
+              tt
+           ) as WITHIN.
+    { cbn. red.
+      auto.
+    }
+
+    eapply @get_consecutive_ptrs_nth with (B:=M); eauto.
+    eapply Reflexive_Within_ret_inv.
+    Unshelve.
+    3-4: constructor; exact tt.
+    all: typeclasses eauto.
+  Qed.
+
   Lemma get_consecutive_ptrs_prov :
     forall {M : Type -> Type}
       `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
       {Pre Post : Type}
-      `{WM : @Within M EQM err_ub_oom Pre Post}
-      `{WRET : @Within_ret_inv M err_ub_oom Pre Post HM _ EQM WM}
+      {B} `{MB : Monad B}
+      `{WM : @Within M EQM B Pre Post}
+      `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
       `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
-      `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
-      `{RWOOM : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_oom M OOM)}
-      `{RWERR : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_error M ERR)}
+      `{RBMERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+      `{RWOOM : @RaiseWithin M B _ _ _ EQM WM string (@raise_oom M OOM)}
+      `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
       ptr len ptrs,
       (ret ptrs ∈ get_consecutive_ptrs ptr len)%monad ->
       forall p, In p ptrs -> address_provenance p = address_provenance ptr.
   Proof.
-    intros M HM EQM' EQV Pre Post WM WRET OOM ERR LAWS RAISE_OOM RAISE_ERR RWOOM RWERR ptr len ptrs CONSEC p IN.
+    intros M HM EQM' EQV Pre Post B MB WM WRET OOM ERR LAWS RAISE_OOM RAISE_ERR RWOOM RWERR ptr len ptrs CONSEC p IN.
     apply In_nth_error in IN as (ix_nat & NTH).
     pose proof CONSEC as GEP.
     eapply get_consecutive_ptrs_nth in GEP; cbn; eauto.
@@ -1263,6 +1409,37 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     apply handle_gep_addr_preserves_provenance in GEP.
     eauto.
   Qed.
+
+  Lemma get_consecutive_ptrs_prov_eq1 :
+    forall {M : Type -> Type}
+      `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
+      `{EQR : @Eq1_ret_inv M EQM HM}
+      `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
+      `{LAWS: @MonadLawsE M EQM HM}
+      `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+      `{RBMERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+      ptr len ptrs,
+      (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad ->
+      forall p, In p ptrs -> address_provenance p = address_provenance ptr.
+  Proof.
+    intros M HM EQM0 EQV EQR OOM ERR LAWS RBMOOM RBMERR ptr len ptrs CONSEC p IN.
+    assert (@within M EQM0 M unit unit (Reflexive_Within) _
+              (@get_consecutive_ptrs M HM OOM ERR ptr len)
+              tt
+              (@ret M HM (list addr) ptrs)
+              tt
+           ) as WITHIN.
+    { cbn. red.
+      auto.
+    }
+
+    eapply @get_consecutive_ptrs_prov with (B:=M); eauto.
+    eapply Reflexive_Within_ret_inv.
+    Unshelve.
+    3-4: constructor; exact tt.
+    all: typeclasses eauto.
+  Qed.
+
 
   Lemma get_consecutive_ptrs_inv :
     forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M}
@@ -1301,20 +1478,22 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     forall {M : Type -> Type}
       `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
       {Pre Post : Type}
-      `{WM : @Within M EQM err_ub_oom Pre Post}
-      `{WRET : @Within_ret_inv M err_ub_oom Pre Post HM _ EQM WM}
+      {B} `{MB : Monad B}
+      `{WM : @Within M EQM B Pre Post}
+      `{WRET : @Within_ret_inv M B Pre Post HM MB EQM WM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
+      `{UBB: RAISE_UB B}
       `{LAWS: @MonadLawsE M EQM HM}
       `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
-      `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
-      `{RWOOM : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_oom M OOM)}
-      `{RWERR : @RaiseWithin M err_ub_oom _ _ _ EQM WM string (@raise_error M ERR)}
-      `{RWUB : @RetWithin M err_ub_oom _ _ _ EQM WM string (@raise_ub err_ub_oom _)}
-      `{DRUBOOM :  @DisjointRaiseWithin M err_ub_oom _ _ EQM WM string (@raise_ub err_ub_oom _) (@raise_oom M OOM)}
+      `{RBMERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+      `{RWOOM : @RaiseWithin M B _ _ MB EQM WM string (@raise_oom M OOM)}
+      `{RWERR : @RaiseWithin M B _ _ MB EQM WM string (@raise_error M ERR)}
+      `{RWUB : @RetWithin M B _ _ HM EQM WM string (@raise_ub B _)}
+      `{DRUBOOM :  @DisjointRaiseWithin M B _ _ EQM WM string (@raise_ub B _) (@raise_oom M OOM)}
       msg ptr len,
       (raise_ub msg ∉ get_consecutive_ptrs ptr len)%monad.
   Proof.
-    intros M HM EQM EQV Pre Post WM WRET OOM ERR LAWS RBMOOM RBMERR RWOOM RWERR RWUB DRUBOOM msg ptr len.
+    intros M HM EQM EQV Pre Post B MB WM WRET OOM ERR UBB LAWS RBMOOM RBMERR RWOOM RWERR RWUB DRUBOOM msg ptr len.
     intros CONTRA.
 
     unfold get_consecutive_ptrs in *.
@@ -3115,6 +3294,10 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     MemMonad_run_raise_ub :
     forall {A} ms ub_msg st,
       eq1 (MemMonad_run (@raise_ub _ _ A ub_msg) ms st) (raise_ub ub_msg);
+
+    MemMonad_eq1_raise_ub_inv :
+    forall {A} x ub_msg,
+      ~ ((@eq1 _ MemMonad_eq1_runm) A (ret x) (raise_ub ub_msg));
 
     MemMonad_run_raise_error :
     forall {A} ms error_msg st,
