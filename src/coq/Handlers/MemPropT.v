@@ -18,7 +18,8 @@ From Vellvm.Utils Require Import
      MonadEq1Laws
      PropT
      Raise
-     Tactics.
+     Tactics
+     Inhabited.
 
 From Vellvm.Handlers.MemoryModules Require Import
      Within.
@@ -314,7 +315,7 @@ Qed.
     within_eq1_Proper := @within_err_ub_oom_MemPropT_eq1Proper MemState;
   }.
 
-#[global] Instance Within_ret_inv_MemPropT {MemState} {IMS : inhabited MemState} :
+#[global] Instance Within_ret_inv_MemPropT {MemState} {IMS : Inhabited MemState} :
   Within_ret_inv (MemPropT MemState) err_ub_oom MemState MemState.
 Proof.
   split.
@@ -324,11 +325,11 @@ Proof.
   - intros A x.
     cbn.
     inv IMS.
-    exists X. exists X.
+    exists inhabitant. exists inhabitant.
     auto.
 Defined.
 
-#[global] Instance RaiseBindM_OOM_MemPropT {MemState} {IMS : inhabited MemState} :
+#[global] Instance RaiseBindM_OOM_MemPropT {MemState} {IMS : Inhabited MemState} :
   RaiseBindM (MemPropT MemState) string (@raise_oom (MemPropT MemState) MemPropT_RAISE_OOM).
 Proof.
   split.
@@ -339,13 +340,13 @@ Proof.
       firstorder.
   - intros A x y CONTRA.
     inv IMS.
-    rename X into ms.
+    rename inhabitant into ms.
     specialize (CONTRA ms (raise_oom x)).
     cbn in *.
     tauto.
 Defined.
 
-#[global] Instance RaiseBindM_ERROR_MemPropT {MemState} {IMS : inhabited MemState} :
+#[global] Instance RaiseBindM_ERROR_MemPropT {MemState} {IMS : Inhabited MemState} :
   RaiseBindM (MemPropT MemState) string (@raise_error (MemPropT MemState) MemPropT_RAISE_ERROR).
 Proof.
   split.
@@ -356,7 +357,7 @@ Proof.
       firstorder.
   - intros A x y CONTRA.
     inv IMS.
-    rename X into ms.
+    rename inhabitant into ms.
     specialize (CONTRA ms (raise_error x)).
     cbn in *.
     tauto.
@@ -404,6 +405,20 @@ Proof.
   cbn.
   intros [ms [ms' CONTRA]].
   auto.
+Defined.
+
+#[global] Instance MemPropT_Eq1_ret_inv {MemState} `{IMS : Inhabited MemState} : Eq1_ret_inv (MemPropT MemState).
+Proof.
+  split.
+  intros A x y EQ.
+  cbn in EQ.
+  red in EQ.
+  red in EQ.
+  inversion IMS.
+  rename inhabitant into initial_memory_state.
+  specialize (EQ initial_memory_state (ret (initial_memory_state, x))).
+  cbn in *.
+  tauto.
 Defined.
 
 Definition MemPropT_assert {MemState X} (assertion : Prop) : MemPropT MemState X

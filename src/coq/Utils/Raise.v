@@ -13,7 +13,8 @@ From ITree Require Import
 
 From Vellvm Require Import 
      Semantics.LLVMEvents
-     Utils.MonadExcLaws.
+     Utils.MonadExcLaws
+     Utils.Error.
 
 Require Import Paco.paco.
 

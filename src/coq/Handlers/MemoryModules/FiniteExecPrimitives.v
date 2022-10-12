@@ -3709,16 +3709,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             }
 
             eapply get_consecutive_ptrs_no_ub in CONTRA'; eauto.
-            Unshelve.
-            all: try typeclasses eauto.
-            eapply Within_ret_inv_MemPropT.
-            Unshelve. 3: constructor; exact initial_memory_state.
-
-            eapply RaiseBindM_OOM_MemPropT.
-            Unshelve. 2: constructor; exact initial_memory_state.
-
-            eapply RaiseBindM_ERROR_MemPropT.
-            Unshelve. constructor; exact initial_memory_state.
           }
 
           destruct H1 as [e_gep [st_gep [ms_gep [GEP_EXEC [GEP_SPEC GEP_POST]]]]].
@@ -3824,24 +3814,34 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma byte_allocated_get_consecutive_ptrs :
       forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
+        {Pre Post : Type}
+        {B} `{MB : Monad B}
+        `{WM : @Within M EQM B Pre Post}
         `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
-        `{LAWS : @MonadLawsE M EQM HM}
+        `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
+        `{LAWS: @MonadLawsE M EQM HM}
+        `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+        `{RBMERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+        `{RWOOM : @RaiseWithin M B _ _ _ EQM WM string (@raise_oom M OOM)}
+        `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
 
         (mem : memory) (ms : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
         (bytes : list mem_byte) (aid : AllocationId),
         mem_state_memory ms = add_all_index bytes (ptr_to_int ptr) mem ->
         length bytes = len ->
         (forall mb, In mb bytes -> snd mb = aid) ->
-        (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
+        (ret ptrs ∈ @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
         forall p, In p ptrs -> byte_allocated ms p aid.
     Proof.
-      intros M HM OOM ERR EQM' EQV EQRET LAWS mem ms ptr len ptrs
-             bytes aid MEM LEN AIDS CONSEC p IN.
+      intros M HM OOM ERR EQM' Pre Post B MB WM EQV EQRET WRET LAWS
+        RBMOOM RBMERR RWOOM RWERR
+        mem ms ptr len ptrs
+        bytes aid MEM LEN AIDS CONSEC p IN.
 
       eapply byte_allocated_add_all_index; eauto.
-      (* eapply get_consecutive_ptrs_range in CONSEC; eauto. *)
-      (* lia. *)
-    Admitted.
+      eapply get_consecutive_ptrs_range in CONSEC; eauto.
+      lia.
+    Qed.
 
     (* (* TODO: Move this thing? *) *)
     Lemma get_consecutive_MemPropT_itree :
@@ -4030,18 +4030,27 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma byte_allocated_preserved_get_consecutive_ptrs :
       forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
+        {Pre Post : Type}
+        {B} `{MB : Monad B}
+        `{WM : @Within M EQM B Pre Post}
         `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
-        `{LAWS : @MonadLawsE M EQM HM}
+        `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
+        `{LAWS: @MonadLawsE M EQM HM}
+        `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+        `{RBMERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+        `{RWOOM : @RaiseWithin M B _ _ _ EQM WM string (@raise_oom M OOM)}
+        `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
 
         (ms ms': MemState) (ptr_old ptr : addr) (len : nat) (ptrs : list addr)
         (bytes : list mem_byte) (aid : AllocationId),
         mem_state_memory ms' = add_all_index bytes (ptr_to_int ptr) (mem_state_memory ms) ->
         length bytes = len ->
         (forall p : addr, In p ptrs -> disjoint_ptr_byte p ptr_old) ->
-        (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
+        (ret ptrs ∈ @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
         byte_allocated ms ptr_old aid <-> byte_allocated ms' ptr_old aid.
     Proof.
-      intros M HM OOM ERR EQM0 EQV EQRET LAWS ms ms' ptr_old ptr len ptrs bytes aid MEM LEN DISJOINT CONSEC.
+      intros M HM OOM ERR EQM0 Pre Post B MB WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR ms ms' ptr_old ptr
+        len ptrs bytes aid MEM LEN DISJOINT CONSEC.
     Admitted.
 
     Lemma find_free_block_extend_allocations :
@@ -4053,7 +4062,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       intros ms_init ms_found_free ms_extended pr ptr ptrs init_bytes [MS FREE] MEM.
       inv MS; inv FREE.
       split.
-      - eapply @byte_allocated_get_consecutive_ptrs with (HM:=@Monad_itree Eff); try typeclasses eauto.
+      - eapply @byte_allocated_get_consecutive_ptrs
+          with (HM:=@MemPropT_Monad MemState) (B:= err_ub_oom); try typeclasses eauto.
+
         unfold mem_state_memory in *.
         cbn; eauto.
         rewrite map_length; reflexivity.
@@ -4063,17 +4074,21 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         inv MBEQ.
         cbn. reflexivity.
 
-        eapply get_consecutive_MemPropT_itree;
-          eapply get_consecutive_ptrs_MemPropT_eq1; eauto.
+        exists ms_found_free.
+        exists ms_found_free.
+        auto.
       - intros ptr' aid IN.
-        eapply @byte_allocated_preserved_get_consecutive_ptrs with (HM:=@Monad_itree Eff); try typeclasses eauto.
+        eapply @byte_allocated_preserved_get_consecutive_ptrs
+          with (HM:=@MemPropT_Monad MemState) (B:= err_ub_oom); try typeclasses eauto.
+
         unfold mem_state_memory in *.
         cbn; eauto.
         rewrite map_length; reflexivity.
         eauto.
 
-        eapply get_consecutive_MemPropT_itree;
-          eapply get_consecutive_ptrs_MemPropT_eq1; eauto.
+        exists ms_found_free.
+        exists ms_found_free.
+        auto.
     Qed.
 
     Lemma find_free_block_ms_eq :
@@ -4133,21 +4148,29 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* TODO: Move and reuse *)
     Lemma read_byte_preserved_get_consecutive_ptrs :
       forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
+        {Pre Post : Type}
+        {B} `{MB : Monad B}
+        `{WM : @Within M EQM B Pre Post}
         `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
-        `{LAWS : @MonadLawsE M EQM HM}
+        `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
+        `{LAWS: @MonadLawsE M EQM HM}
         `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
-        `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
+        `{RBMERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+        `{RWOOM : @RaiseWithin M B _ _ _ EQM WM string (@raise_oom M OOM)}
+        `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
+
         (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
         (bytes : list mem_byte) (p : addr) byte,
         mem_state_memory ms' = add_all_index bytes (ptr_to_int ptr) (mem_state_memory ms)->
-        (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
+        (ret ptrs ∈ @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
         (length bytes = len) ->
         (forall new_p, In new_p ptrs -> disjoint_ptr_byte new_p p) ->
         read_byte_prop ms p byte <->
           read_byte_prop ms' p byte.
     Proof.
-      intros M HM OOM ERR EQM' EQV EQRET LAWS RBMOOM RBMERR ms ms' ptr len ptrs
-             bytes p byte MEM2 CONSEC BYTELEN DISJOINT.
+      intros M HM OOM ERR EQM0 Pre Post B MB WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR
+        ms ms' ptr len ptrs
+        bytes p byte MEM2 CONSEC BYTELEN DISJOINT.
 
       unfold mem_state_memory in *.
 
@@ -4160,7 +4183,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         cbn in *.
         erewrite read_byte_raw_add_all_index_out.
         2: {
-          pose proof (get_consecutive_ptrs_covers_range_eq1 ptr len ptrs CONSEC) as INRANGE.
+          pose proof (get_consecutive_ptrs_covers_range ptr len ptrs CONSEC) as INRANGE.
           subst.
           rewrite <- Zlength_correct in INRANGE.
 
@@ -4185,7 +4208,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         cbn in *.
         erewrite read_byte_raw_add_all_index_out in READ.
         2: {
-          pose proof (get_consecutive_ptrs_covers_range_eq1 ptr len ptrs CONSEC) as INRANGE.
+          pose proof (get_consecutive_ptrs_covers_range ptr len ptrs CONSEC) as INRANGE.
           subst.
           rewrite <- Zlength_correct in INRANGE.
 
@@ -4216,56 +4239,56 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       - intros p ix byte NTHptr NTHbyte.
         eapply @read_byte_get_consecutive_ptrs with (HM:=@MemPropT_Monad MemState);
           eauto; try typeclasses eauto.
-        2: {
-          exists ms_found_free.
-          exists ms_found_free.
-          cbn in *.
-          rewrite map_length.
-          eauto.
+
+        { intros mb INMB.
+          apply in_map_iff in INMB as (sb & MBEQ & INSB).
+          inv MBEQ.
+          cbn. reflexivity.
         }
-        2: {
-          setoid_rewrite block_is_free_ptrs_provenance0; eauto.
+
+        { rewrite map_length; auto.
+        }
+
+        { setoid_rewrite block_is_free_ptrs_provenance0; eauto.
           apply access_allowed_refl.
           eapply Nth_In; eauto.
         }
 
-        intros mb INMB.
-        apply in_map_iff in INMB as (sb & MBEQ & INSB).
-        inv MBEQ.
-        cbn. reflexivity.
-
       - intros ptr' byte DISJOINT.
-        eapply @read_byte_preserved_get_consecutive_ptrs with (HM:=@Monad_itree Eff);
+        eapply @read_byte_preserved_get_consecutive_ptrs
+          with (HM:=@MemPropT_Monad MemState) (B:=err_ub_oom);
           eauto; try typeclasses eauto.
 
-        (* TODO: figure out RaiseBindM situation here *)
-        admit.
-        admit.
-
-        eapply get_consecutive_MemPropT_itree;
-          eapply get_consecutive_ptrs_MemPropT_eq1; eauto.
-
         rewrite map_length; eauto.
-    Admitted.
+    Qed.
 
     (* TODO: Move and reuse *)
     Lemma read_byte_allowed_get_consecutive_ptrs :
       forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
+        {Pre Post : Type}
+        {B} `{MB : Monad B}
+        `{WM : @Within M EQM B Pre Post}
         `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
-        `{LAWS : @MonadLawsE M EQM HM}
+        `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
+        `{LAWS: @MonadLawsE M EQM HM}
+        `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+        `{RBMERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+        `{RWOOM : @RaiseWithin M B _ _ _ EQM WM string (@raise_oom M OOM)}
+        `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
 
         (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
         (bytes : list mem_byte) (aid : AllocationId),
         mem_state_memory ms' = add_all_index bytes (ptr_to_int ptr) (mem_state_memory ms) ->
         (forall mb : mem_byte, In mb bytes -> snd mb = aid) ->
-        (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
+        (ret ptrs ∈ @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
         (length bytes = len) ->
         forall p, In p ptrs ->
              access_allowed (address_provenance p) aid ->
              read_byte_allowed ms' p.
     Proof.
-      intros M HM OOM ERR EQM' EQV EQRET LAWS ms ms' ptr len ptrs
-             bytes aid MEM2 INMB CONSEC BYTELEN p IN ACCESS.
+      intros M HM OOM ERR EQM0 Pre Post B MB WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR
+        ms ms' ptr len ptrs
+        bytes aid MEM2 INMB CONSEC BYTELEN p IN ACCESS.
       unfold read_byte_allowed.
       eexists.
       split; eauto.
@@ -4276,20 +4299,28 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* TODO: Move and reuse *)
     Lemma read_byte_allowed_preserved_get_consecutive_ptrs :
       forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
+        {Pre Post : Type}
+        {B} `{MB : Monad B}
+        `{WM : @Within M EQM B Pre Post}
         `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
-        `{LAWS : @MonadLawsE M EQM HM}
+        `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
+        `{LAWS: @MonadLawsE M EQM HM}
+        `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+        `{RBMERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+        `{RWOOM : @RaiseWithin M B _ _ _ EQM WM string (@raise_oom M OOM)}
+        `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
 
         (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
         (bytes : list mem_byte) (p : addr),
         mem_state_memory ms' = add_all_index bytes (ptr_to_int ptr) (mem_state_memory ms) ->
-        (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
+        (ret ptrs ∈ @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
         (length bytes = len) ->
         (forall new_p, In new_p ptrs -> disjoint_ptr_byte new_p p) ->
         read_byte_allowed ms p <->
           read_byte_allowed ms' p.
     Proof.
-      intros M HM OOM ERR EQM' EQV EQRET LAWS ms ms' ptr len ptrs
-             bytes p MEM2 CONSEC BYTELEN DISJOINT.
+      intros M HM OOM ERR EQM0 Pre Post B MB WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR ms ms' ptr len ptrs
+        bytes p MEM2 CONSEC BYTELEN DISJOINT.
       split; intros ALLOC.
       - break_read_byte_allowed_hyps.
         eexists; split; eauto.
@@ -4311,7 +4342,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       inv MS; inv FREE.
       split.
       - intros p IN.
-        eapply @read_byte_allowed_get_consecutive_ptrs with (HM:=@Monad_itree Eff); try typeclasses eauto.
+        eapply @read_byte_allowed_get_consecutive_ptrs
+          with (HM:=@MemPropT_Monad MemState) (B:=err_ub_oom); try typeclasses eauto.
         unfold mem_state_memory in *.
         cbn; eauto.
 
@@ -4320,8 +4352,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         inv MBEQ.
         cbn. reflexivity.
 
-        eapply get_consecutive_MemPropT_itree;
-          eapply get_consecutive_ptrs_MemPropT_eq1; eauto.
+        exists ms_found_free.
+        exists ms_found_free.
+        eauto.
 
         rewrite map_length; reflexivity.
         eauto.
@@ -4329,12 +4362,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         setoid_rewrite block_is_free_ptrs_provenance0; eauto.
         apply access_allowed_refl.
       - intros ptr' DISJOINT.
-        eapply @read_byte_allowed_preserved_get_consecutive_ptrs with (HM:=@Monad_itree Eff); try typeclasses eauto.
+        eapply @read_byte_allowed_preserved_get_consecutive_ptrs
+          with (HM:=@MemPropT_Monad MemState) (B:=err_ub_oom); try typeclasses eauto.
         unfold mem_state_memory in *.
         cbn; eauto.
 
-        eapply get_consecutive_MemPropT_itree;
-          eapply get_consecutive_ptrs_MemPropT_eq1; eauto.
+        eauto.
 
         rewrite map_length; reflexivity.
         eauto.
@@ -4343,21 +4376,29 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* TODO: Move and reuse *)
     Lemma write_byte_allowed_get_consecutive_ptrs :
       forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
+        {Pre Post : Type}
+        {B} `{MB : Monad B}
+        `{WM : @Within M EQM B Pre Post}
         `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
-        `{LAWS : @MonadLawsE M EQM HM}
+        `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
+        `{LAWS: @MonadLawsE M EQM HM}
+        `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+        `{RBMERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+        `{RWOOM : @RaiseWithin M B _ _ _ EQM WM string (@raise_oom M OOM)}
+        `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
 
         (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
         (bytes : list mem_byte) (aid : AllocationId),
         mem_state_memory ms' = add_all_index bytes (ptr_to_int ptr) (mem_state_memory ms) ->
         (forall mb : mem_byte, In mb bytes -> snd mb = aid) ->
-        (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
+        (ret ptrs ∈ @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
         (length bytes = len) ->
         forall p, In p ptrs ->
              access_allowed (address_provenance p) aid ->
              write_byte_allowed ms' p.
     Proof.
-      intros M HM OOM ERR EQM' EQV EQRET LAWS ms ms' ptr len ptrs
-             bytes aid MEM2 INMB CONSEC BYTELEN p IN ACCESS.
+      intros M HM OOM ERR EQM0 Pre Post B MB WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR ms ms' ptr len ptrs
+        bytes aid MEM2 INMB CONSEC BYTELEN p IN ACCESS.
       unfold write_byte_allowed.
       eexists.
       split; eauto.
@@ -4368,20 +4409,28 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* TODO: Move and reuse *)
     Lemma write_byte_allowed_preserved_get_consecutive_ptrs :
       forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
+        {Pre Post : Type}
+        {B} `{MB : Monad B}
+        `{WM : @Within M EQM B Pre Post}
         `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
-        `{LAWS : @MonadLawsE M EQM HM}
+        `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
+        `{LAWS: @MonadLawsE M EQM HM}
+        `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+        `{RBMERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+        `{RWOOM : @RaiseWithin M B _ _ _ EQM WM string (@raise_oom M OOM)}
+        `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
 
         (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
         (bytes : list mem_byte) (p : addr),
         mem_state_memory ms' = add_all_index bytes (ptr_to_int ptr) (mem_state_memory ms) ->
-        (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
+        (ret ptrs ∈ @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
         (length bytes = len) ->
         (forall new_p, In new_p ptrs -> disjoint_ptr_byte new_p p) ->
         write_byte_allowed ms p <->
           write_byte_allowed ms' p.
     Proof.
-      intros M HM OOM ERR EQM' EQV EQRET LAWS ms ms' ptr len ptrs
-             bytes p MEM2 CONSEC BYTELEN DISJOINT.
+      intros M HM OOM ERR EQM0 Pre Post B MB WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR ms ms' ptr len ptrs
+        bytes p MEM2 CONSEC BYTELEN DISJOINT.
       split; intros ALLOC.
       - break_write_byte_allowed_hyps.
         eexists; split; eauto.
@@ -4403,7 +4452,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       inv MS; inv FREE.
       split.
       - intros p IN.
-        eapply @write_byte_allowed_get_consecutive_ptrs with (HM:=@Monad_itree Eff); try typeclasses eauto.
+        eapply @write_byte_allowed_get_consecutive_ptrs
+          with (HM:=@MemPropT_Monad MemState) (B:=err_ub_oom); try typeclasses eauto.
         unfold mem_state_memory in *.
         cbn; eauto.
 
@@ -4412,8 +4462,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         inv MBEQ.
         cbn. reflexivity.
 
-        eapply get_consecutive_MemPropT_itree;
-          eapply get_consecutive_ptrs_MemPropT_eq1; eauto.
+        eauto.
 
         rewrite map_length; reflexivity.
         eauto.
@@ -4421,12 +4470,13 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         setoid_rewrite block_is_free_ptrs_provenance0; eauto.
         apply access_allowed_refl.
       - intros ptr' DISJOINT.
-        eapply @read_byte_allowed_preserved_get_consecutive_ptrs with (HM:=@Monad_itree Eff); try typeclasses eauto.
+        eapply @write_byte_allowed_preserved_get_consecutive_ptrs
+          with (HM:=@MemPropT_Monad MemState) (B:=err_ub_oom); try typeclasses eauto.
+
         unfold mem_state_memory in *.
         cbn; eauto.
 
-        eapply get_consecutive_MemPropT_itree;
-          eapply get_consecutive_ptrs_MemPropT_eq1; eauto.
+        eauto.
 
         rewrite map_length; reflexivity.
         eauto.
@@ -4435,21 +4485,29 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* TODO: Move and reuse *)
     Lemma free_byte_allowed_get_consecutive_ptrs :
       forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
+        {Pre Post : Type}
+        {B} `{MB : Monad B}
+        `{WM : @Within M EQM B Pre Post}
         `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
-        `{LAWS : @MonadLawsE M EQM HM}
+        `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
+        `{LAWS: @MonadLawsE M EQM HM}
+        `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+        `{RBMERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+        `{RWOOM : @RaiseWithin M B _ _ _ EQM WM string (@raise_oom M OOM)}
+        `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
 
         (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
         (bytes : list mem_byte) (aid : AllocationId),
         mem_state_memory ms' = add_all_index bytes (ptr_to_int ptr) (mem_state_memory ms) ->
         (forall mb : mem_byte, In mb bytes -> snd mb = aid) ->
-        (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
+        (ret ptrs ∈ @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
         (length bytes = len) ->
         forall p, In p ptrs ->
              access_allowed (address_provenance p) aid ->
              free_byte_allowed ms' p.
     Proof.
-      intros M HM OOM ERR EQM' EQV EQRET LAWS ms ms' ptr len ptrs
-             bytes aid MEM2 INMB CONSEC BYTELEN p IN ACCESS.
+      intros M HM OOM ERR EQM0 Pre Post B MB WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR ms ms' ptr len ptrs
+        bytes aid MEM2 INMB CONSEC BYTELEN p IN ACCESS.
       unfold free_byte_allowed.
       eexists.
       split; eauto.
@@ -4460,20 +4518,28 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* TODO: Move and reuse *)
     Lemma free_byte_allowed_preserved_get_consecutive_ptrs :
       forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
+        {Pre Post : Type}
+        {B} `{MB : Monad B}
+        `{WM : @Within M EQM B Pre Post}
         `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
-        `{LAWS : @MonadLawsE M EQM HM}
+        `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
+        `{LAWS: @MonadLawsE M EQM HM}
+        `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+        `{RBMERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+        `{RWOOM : @RaiseWithin M B _ _ _ EQM WM string (@raise_oom M OOM)}
+        `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
 
         (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
         (bytes : list mem_byte) (p : addr),
         mem_state_memory ms' = add_all_index bytes (ptr_to_int ptr) (mem_state_memory ms) ->
-        (@get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad ->
+        (ret ptrs ∈ @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
         (length bytes = len) ->
         (forall new_p, In new_p ptrs -> disjoint_ptr_byte new_p p) ->
         read_byte_allowed ms p <->
           read_byte_allowed ms' p.
     Proof.
-      intros M HM OOM ERR EQM' EQV EQRET LAWS ms ms' ptr len ptrs
-             bytes p MEM2 CONSEC BYTELEN DISJOINT.
+      intros M HM OOM ERR EQM0 Pre Post B MB WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR ms ms' ptr len ptrs
+        bytes p MEM2 CONSEC BYTELEN DISJOINT.
       split; intros ALLOC.
       - break_read_byte_allowed_hyps.
         eexists; split; eauto.
@@ -4495,7 +4561,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       inv MS; inv FREE.
       split.
       - intros p IN.
-        eapply @free_byte_allowed_get_consecutive_ptrs with (HM:=@Monad_itree Eff); try typeclasses eauto.
+        eapply @free_byte_allowed_get_consecutive_ptrs
+          with (HM:=@MemPropT_Monad MemState) (B:=err_ub_oom); try typeclasses eauto.
         unfold mem_state_memory in *.
         cbn; eauto.
 
@@ -4504,8 +4571,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         inv MBEQ.
         cbn. reflexivity.
 
-        eapply get_consecutive_MemPropT_itree;
-          eapply get_consecutive_ptrs_MemPropT_eq1; eauto.
+        eauto.
 
         rewrite map_length; reflexivity.
         eauto.
@@ -4513,12 +4579,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         setoid_rewrite block_is_free_ptrs_provenance0; eauto.
         apply access_allowed_refl.
       - intros ptr' DISJOINT.
-        eapply @free_byte_allowed_preserved_get_consecutive_ptrs with (HM:=@Monad_itree Eff); try typeclasses eauto.
+        eapply @free_byte_allowed_preserved_get_consecutive_ptrs
+          with (HM:=@MemPropT_Monad MemState) (B:=err_ub_oom); try typeclasses eauto.
         unfold mem_state_memory in *.
         cbn; eauto.
 
-        eapply get_consecutive_MemPropT_itree;
-          eapply get_consecutive_ptrs_MemPropT_eq1; eauto.
+        eauto.
 
         rewrite map_length; reflexivity.
         eauto.
@@ -4816,6 +4882,10 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             intros h1 h2 MSHP PTRS_ADDED.
             unfold memory_stack_frame_stack_prop in *.
             cbn in *.
+
+            destruct FIND_FREE as [FIND_FREE BLOCK_IS_FREE].
+            inv BLOCK_IS_FREE.
+
             setoid_rewrite <- MSHP in PTRS_ADDED.
             apply add_ptrs_to_heap_eqv with (root:=ptr) (h:=memory_stack_heap0) (ptrs:=ptrs); auto.
 
@@ -4831,8 +4901,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             { cbn in PTRS_ADDED.
               unfold MemSpec.add_ptrs_to_heap in PTRS_ADDED.
               destruct ptrs; auto.
-              destruct FIND_FREE as [FIND_FREE BLOCK_IS_FREE].
-              inv BLOCK_IS_FREE.
               cbn.
               admit.
             }

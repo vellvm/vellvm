@@ -27,7 +27,8 @@ From Vellvm.Semantics Require Import
 From Vellvm.Utils Require Import
      Error
      IntMaps
-     Tactics.
+     Tactics
+     Inhabited.
 
 From Vellvm.Handlers Require Import
      MemPropT
@@ -689,5 +690,9 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       ms_put_memory := MemState_put_memory;
       ms_get_put_memory := MemState_get_put_memory;
     |}.
+
+  #[global] Instance Inhabited_MemState : Inhabited MemState :=
+    { inhabitant := initial_memory_state
+    }.
 
 End FiniteMemoryModelSpecPrimitives.

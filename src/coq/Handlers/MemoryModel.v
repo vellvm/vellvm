@@ -13,7 +13,8 @@ From Vellvm.Semantics Require Import
 Require Import MemBytes.
 
 From Vellvm.Handlers Require Import
-     MemPropT.
+  MemPropT
+  MemoryModules.Within.
 
 From Vellvm.Utils Require Import
      Error
@@ -26,7 +27,8 @@ From Vellvm.Utils Require Import
      MapMonadExtra
      MonadReturnsLaws
      MonadEq1Laws
-     MonadExcLaws.
+     MonadExcLaws
+     Inhabited.
 
 From Vellvm.Numeric Require Import
      Integers.
@@ -216,6 +218,10 @@ Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
       ms_put_memory := MemState_put_memory;
       ms_get_put_memory := MemState_get_put_memory;
     |}.
+
+  #[global] Instance Inhabited_MemState : Inhabited MemState :=
+    { inhabitant := initial_memory_state
+    }.
 
 End MemoryModelSpecPrimitives.
 
@@ -607,9 +613,6 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
          (fun ix => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
          ixs).
 
-
-  Require Import Vellvm.Handlers.MemoryModules.Within.
-
   Ltac convert_to_ret :=
     match goal with
     | _:_ |- context [ success_unERR_UB_OOM ?x ] =>
@@ -820,11 +823,8 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       auto.
     }
 
-    eapply @get_consecutive_ptrs_covers_range with (B:=M); eauto.
-    eapply Reflexive_Within_ret_inv.
-    Unshelve.
-    3-4: constructor; exact tt.
-    all: typeclasses eauto.
+    eapply @get_consecutive_ptrs_covers_range with (B:=M);
+      eauto; typeclasses eauto.
   Qed.
 
   Lemma get_consecutive_ptrs_cons :
@@ -1141,11 +1141,8 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       auto.
     }
 
-    eapply @get_consecutive_ptrs_ge with (B:=M); eauto.
-    eapply Reflexive_Within_ret_inv.
-    Unshelve.
-    3-4: constructor; exact tt.
-    all: typeclasses eauto.
+    eapply @get_consecutive_ptrs_ge with (B:=M);
+      eauto; typeclasses eauto.
   Qed.
 
   Lemma get_consecutive_ptrs_range :
@@ -1280,11 +1277,8 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       auto.
     }
 
-    eapply @get_consecutive_ptrs_range with (B:=M); eauto.
-    eapply Reflexive_Within_ret_inv.
-    Unshelve.
-    3-4: constructor; exact tt.
-    all: typeclasses eauto.
+    eapply @get_consecutive_ptrs_range with (B:=M);
+      eauto; typeclasses eauto.
   Qed.
 
   Lemma get_consecutive_ptrs_nth :
@@ -1376,11 +1370,8 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       auto.
     }
 
-    eapply @get_consecutive_ptrs_nth with (B:=M); eauto.
-    eapply Reflexive_Within_ret_inv.
-    Unshelve.
-    3-4: constructor; exact tt.
-    all: typeclasses eauto.
+    eapply @get_consecutive_ptrs_nth with (B:=M);
+      eauto; typeclasses eauto.
   Qed.
 
   Lemma get_consecutive_ptrs_prov :
@@ -1433,13 +1424,9 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       auto.
     }
 
-    eapply @get_consecutive_ptrs_prov with (B:=M); eauto.
-    eapply Reflexive_Within_ret_inv.
-    Unshelve.
-    3-4: constructor; exact tt.
-    all: typeclasses eauto.
+    eapply @get_consecutive_ptrs_prov with (B:=M);
+      eauto; typeclasses eauto.
   Qed.
-
 
   Lemma get_consecutive_ptrs_inv :
     forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M}
@@ -2740,7 +2727,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   (*** Allocation utilities *)
   Record block_is_free (m1 : MemState) (len : nat) (pr : Provenance) (ptr : addr) (ptrs : list addr) : Prop :=
-    { block_is_free_consecutive : get_consecutive_ptrs ptr len m1 (ret (m1, ptrs));
+    { block_is_free_consecutive : ret ptrs {{m1}} ∈ {{m1}} get_consecutive_ptrs ptr len;
       block_is_free_ptr_provenance : address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr); (* Need this case if `ptrs` is empty (allocating 0 bytes) *)
       block_is_free_ptrs_provenance : forall ptr, In ptr ptrs -> address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr);
 

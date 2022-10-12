@@ -1,5 +1,8 @@
 From Vellvm.Utils Require Import
-     Monads.
+  Error
+  Raise
+  Monads
+  Inhabited.
 
 From ExtLib Require Import
      Structures.Monads.
@@ -8,6 +11,9 @@ From Coq Require Import
      Relations
      RelationClasses
      Morphisms.
+
+Require Import MonadEq1Laws.
+Import String.
 
 Import Monad.
 Import MonadNotation.
@@ -174,14 +180,10 @@ Proof.
   eapply reflexive_within_eq1_Proper; eauto.
 Defined.
 
-Require Import MonadEq1Laws.
-Import Coq.Init.Logic.
-Import String.
-
 #[global] Instance Reflexive_Within_ret_inv
   {Pre Post} {M} `{MM : Monad M}
   `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M MM EQM}
-  `{EQR : @Eq1_ret_inv M EQM MM} `{IPRE : inhabited Pre} `{IPOST : inhabited Post}:
+  `{EQR : @Eq1_ret_inv M EQM MM} `{IPRE : Inhabited Pre} `{IPOST : Inhabited Post}:
   @Within_ret_inv M M Pre Post MM MM EQM (@Reflexive_Within Pre Post M MM EQM EQV).
 Proof.
   split.
@@ -196,14 +198,11 @@ Proof.
     inversion IPRE.
     inversion IPOST.
     cbn.
-    exists X.
-    exists X0.
+    exists inhabitant.
+    exists inhabitant0.
     red.
     reflexivity.
 Defined.
-
-Require Import Vellvm.Utils.Error.
-Require Import Vellvm.Utils.Raise.
 
 #[global] Instance Reflexive_OOM_RaiseWithin
   {Pre Post} {M} `{MM : Monad M}

@@ -8,7 +8,7 @@ From ExtLib Require Import
      Data.Monads.IdentityMonad
      Structures.Monads.
 
-From Vellvm.Utils Require Import MonadExcLaws PropT Monads.
+From Vellvm.Utils Require Import MonadExcLaws PropT Monads Inhabited.
 
 Local Open Scope monad_scope.
 
@@ -689,18 +689,6 @@ Section EitherT.
   Qed.
 
 End EitherT.
-
-(* TODO: Move this *)
-Section Inhabited.
-  Variable A: Type.
-  Class Inhabited :=
-    { has_value : A }.
-End Inhabited.
-
-(* TODO: Move this *)
-Require Import ZArith.
-Global Instance Inhabited_N : Inhabited N
-  := { has_value := 0%N }.
 
 Section StateT.
   From ITree Require Import
