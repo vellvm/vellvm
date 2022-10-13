@@ -3810,7 +3810,38 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         (forall mb, In mb bytes -> snd mb = aid) ->
         (forall p, ix <= ptr_to_int p < ix + (Z.of_nat (length bytes)) -> byte_allocated ms p aid).
     Proof.
-    Admitted.
+      intros ms mem bytes ix aid MEM IN p RANGE.
+      exists ms. exists true.
+      split.
+      - red.
+        split.
+        + cbn.
+          destruct ms.
+          exists ms_memory_stack0.
+          exists ms_memory_stack0.
+          split; cbn; auto.
+
+          unfold mem_state_memory in MEM.
+          cbn in MEM.
+          rewrite MEM.
+
+          pose proof read_byte_raw_add_all_index_in_exists mem bytes ix (ptr_to_int p) as READ.
+          forward READ.
+          { rewrite Zlength_correct.
+            lia.
+          }
+
+          destruct READ as [[b aid'] [NTH READ]].
+          rewrite READ.
+          split; auto.
+          apply list_nth_z_in in NTH.
+          apply IN in NTH.
+          inv NTH.
+          cbn.
+          apply aid_eq_dec_refl.
+        + intros ms' x EQ; inv EQ; auto.
+      - cbn. auto.
+    Qed.
 
     Lemma byte_allocated_get_consecutive_ptrs :
       forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
