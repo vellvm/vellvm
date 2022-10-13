@@ -3741,7 +3741,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             rewrite GEP_EXEC in T_GEP_EXEC.
             rewrite rbm_raise_bind in T_GEP_EXEC; [| typeclasses eauto].
             apply MemMonad_eq1_raise_ub_inv in T_GEP_EXEC.
-            contradiction.            
+            contradiction.
           }
 
           { (* Error *)
@@ -3749,7 +3749,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             rewrite GEP_EXEC in T_GEP_EXEC.
             rewrite rbm_raise_bind in T_GEP_EXEC; [| typeclasses eauto].
             apply MemMonad_eq1_raise_error_inv in T_GEP_EXEC.
-            contradiction.            
+            contradiction.
           }
 
           { (* Success *)
@@ -4888,31 +4888,40 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
             setoid_rewrite <- MSHP in PTRS_ADDED.
             apply add_ptrs_to_heap_eqv with (root:=ptr) (h:=memory_stack_heap0) (ptrs:=ptrs); auto.
+            {
+              assert (memory_stack_heap0 = memory_stack_heap {|
+                                               memory_stack_memory :=
+                                                 add_all_index (map (fun b : SByte => (b, provenance_to_allocation_id pr)) init_bytes)
+                                                   (ptr_to_int ptr) memory_stack_memory0;
+                                               memory_stack_frame_stack := memory_stack_frame_stack0;
+                                               memory_stack_heap := memory_stack_heap0
+                                             |}) as EQFS by reflexivity.
+              rewrite EQFS at 1.
 
-            assert (memory_stack_heap0 = memory_stack_heap {|
-                    memory_stack_memory :=
-                     add_all_index (map (fun b : SByte => (b, provenance_to_allocation_id pr)) init_bytes)
-                     (ptr_to_int ptr) memory_stack_memory0;
-                    memory_stack_frame_stack := memory_stack_frame_stack0;
-                    memory_stack_heap := memory_stack_heap0
-                                                  |}) as EQFS by reflexivity.
-            rewrite EQFS at 1.
-            eapply add_all_to_heap'_correct.
-            { cbn in PTRS_ADDED.
-              unfold MemSpec.add_ptrs_to_heap in PTRS_ADDED.
-              destruct ptrs; auto.
-              cbn.
-              admit.
+              destruct ptrs as [|p ptrs].
+              { (* Length of get_consecutive_ptrs was 0 *)
+                eapply add_all_to_heap'_correct; eauto.
+              }
+
+              { (* Actually got consecutive pointers *)
+                assert (p = ptr).
+                { eapply @get_consecutive_ptrs_cons with (M:=MemPropT MemState) (B:=err_ub_oom);
+                    eauto; typeclasses eauto.
+                }
+
+                subst.
+                eapply add_all_to_heap'_correct; eauto.
+              }
             }
 
             unfold MemSpec.add_ptrs_to_heap in PTRS_ADDED.
-            destruct ptrs; auto.
-            assert (a = ptr) by admit.
-            subst.
-            cbn in *.
-            auto.            
-        Admitted.
-
+            destruct ptrs as [|p ptrs]; auto.
+            assert (p = ptr).
+            { eapply @get_consecutive_ptrs_cons with (M:=MemPropT MemState) (B:=err_ub_oom);
+                eauto; typeclasses eauto.
+            }
+            subst; cbn in *; auto.
+        Qed.
         eapply find_free_malloc_bytes_post_conditions; eauto.
         cbn. tauto.
       - admit. (* MemMonad_valid_state *)
