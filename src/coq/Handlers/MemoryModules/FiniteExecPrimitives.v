@@ -3978,9 +3978,69 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         (ret ptrs ∈ @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
         byte_allocated ms ptr_old aid <-> byte_allocated ms' ptr_old aid.
     Proof.
-      intros M HM OOM ERR EQM0 Pre Post B MB WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR ms ms' ptr_old ptr
+      intros M HM OOM ERR EQM0 Pre Post B MB WM
+        EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR ms ms' ptr_old ptr
         len ptrs bytes aid MEM LEN DISJOINT CONSEC.
-    Admitted.
+
+      unfold mem_state_memory in *.
+
+      split; intros ALLOC.
+      - destruct ALLOC as [?ms' [?ms'' [[?EQ1 ?EQ2] ALLOC]]].
+        inv ALLOC.
+        repeat eexists.
+        rewrite MEM.
+
+        cbn in *.
+        erewrite read_byte_raw_add_all_index_out.
+        2: {
+          pose proof (get_consecutive_ptrs_covers_range ptr (Datatypes.length bytes) ptrs CONSEC) as INRANGE.
+          subst.
+          rewrite <- Zlength_correct in INRANGE.
+
+          pose proof (Z_lt_ge_dec (ptr_to_int ptr_old) (ptr_to_int ptr)) as [LTNEXT | GENEXT]; auto.
+          pose proof (Z_ge_lt_dec (ptr_to_int ptr_old) (ptr_to_int ptr + Zlength bytes)) as [LTNEXT' | GENEXT']; auto.
+
+          specialize (INRANGE (ptr_to_int ptr_old)).
+          forward INRANGE; [lia|].
+          destruct INRANGE as (p' & EQ & INRANGE).
+          specialize (DISJOINT p' INRANGE).
+          unfold disjoint_ptr_byte in DISJOINT.
+          lia.
+        }
+
+        destruct EQ1 as [sab [a [[?EQ1 ?EQ2] READ]]]; subst.
+        break_match; [break_match|]; split; tauto.
+        intros ms'0 x EQ; inv EQ; auto.
+      - destruct ALLOC as [?ms' [?ms'' [[?EQ1 ?EQ2] ALLOC]]].
+        repeat eexists.
+        cbn in ALLOC; inv ALLOC.
+
+        cbn in *.
+        destruct EQ1 as [sab [a [[?EQ1 ?EQ2] READ]]]; subst.
+
+        rewrite MEM in READ.
+        erewrite read_byte_raw_add_all_index_out in READ.
+        2: {
+          pose proof (get_consecutive_ptrs_covers_range ptr (Datatypes.length bytes) ptrs CONSEC) as INRANGE.
+          subst.
+          rewrite <- Zlength_correct in INRANGE.
+
+          pose proof (Z_lt_ge_dec (ptr_to_int ptr_old) (ptr_to_int ptr)) as [LTNEXT | GENEXT]; auto.
+          pose proof (Z_ge_lt_dec (ptr_to_int ptr_old) (ptr_to_int ptr + Zlength bytes)) as [LTNEXT' | GENEXT']; auto.
+
+          specialize (INRANGE (ptr_to_int ptr_old)).
+          forward INRANGE; [lia|].
+          destruct INRANGE as (p' & EQ & INRANGE).
+          specialize (DISJOINT p' INRANGE).
+          unfold disjoint_ptr_byte in DISJOINT.
+          lia.
+        }
+
+        cbn.
+        break_match; [break_match|]; split; tauto.
+
+        intros ms'1 x EQ; inv EQ; auto.
+    Qed.
 
     Lemma find_free_block_extend_allocations :
       forall ms_init ms_found_free ms_extended pr ptr ptrs init_bytes,
