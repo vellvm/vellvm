@@ -545,3 +545,31 @@ Proof.
   intros A l x.
   induction l; cbn; auto.
 Qed.
+
+Lemma Nth_ix_lt_length :
+  forall {X} ix (xs : list X) x,
+    Util.Nth xs ix x ->
+    (ix < length xs)%nat.
+Proof.
+  intros X.
+  induction ix; intros xs x NTH.
+  - cbn in *.
+    destruct xs; inversion NTH.
+    cbn; lia.
+  - destruct xs.
+    cbn in *; inversion NTH.
+    cbn in *.
+    eapply IHix in NTH.
+    lia.
+Qed.
+
+Lemma Nth_ix_lt_Zlength :
+  forall {X} ix (xs : list X) x,
+    Util.Nth xs ix x ->
+    (Z.of_nat ix < Zlength xs)%Z.
+Proof.
+  intros X ix xs x NTH.
+  eapply Nth_ix_lt_length in NTH; eauto.
+  rewrite Zlength_correct.
+  lia.
+Qed.

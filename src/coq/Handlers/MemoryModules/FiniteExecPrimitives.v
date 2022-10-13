@@ -3843,108 +3843,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       lia.
     Qed.
 
-    (* (* TODO: Move this thing? *) *)
-    Lemma get_consecutive_MemPropT_itree :
-      forall ptr len ptrs,
-        (@get_consecutive_ptrs (MemPropT MemState) (@MemPropT_Monad MemState) (@MemPropT_RAISE_OOM MemState)
-                               (@MemPropT_RAISE_ERROR MemState) ptr len
-                               ≈ @ret (MemPropT MemState) (@MemPropT_Monad MemState) (list addr) ptrs)%monad <->
-          (@get_consecutive_ptrs (itree Eff) (@Monad_itree Eff)
-                                 _ _
-                                 ptr len
-                                 ≈ Ret ptrs)%monad.
-    Proof.
-      intros ptr len ptrs.
-      split; intros CONSEC.
-      - unfold get_consecutive_ptrs in *.
-        destruct (intptr_seq 0 len) eqn:HSEQ.
-        + cbn in *.
-          unfold eq1 in CONSEC.
-          red in CONSEC.
-          rewrite Eq.bind_ret_l.
-          cbn.
-
-          specialize (CONSEC initial_memory_state (ret (initial_memory_state, ptrs))).
-          cbn in CONSEC.
-          destruct CONSEC as [blah CONSEC].
-          forward CONSEC; auto.
-          destruct CONSEC as [ms' [a [[EQ1 EQ2] CONSEC]]].
-          subst.
-          destruct (map_monad
-                      (fun ix : IP.intptr =>
-                         GEP.handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l);
-            inv CONSEC.
-
-          cbn.
-          reflexivity.
-        + cbn in *.
-          unfold eq1 in CONSEC.
-          specialize (CONSEC initial_memory_state (ret (initial_memory_state, ptrs))).
-          cbn in CONSEC.
-          destruct CONSEC as [blah CONSEC].
-          forward CONSEC; auto.
-          destruct CONSEC as [ms' [a [[]CONSEC]]].
-      - unfold get_consecutive_ptrs in *.
-        destruct (intptr_seq 0 len) eqn:HSEQ.
-        + cbn in *.
-          unfold eq1 in CONSEC.
-          intros ms x.
-          cbn.
-          setoid_rewrite Eq.bind_ret_l in CONSEC.
-          cbn in CONSEC.
-
-          destruct (map_monad
-                      (fun ix : IP.intptr =>
-                         GEP.handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) eqn:HMAPM.
-          { (* Error raised *)
-            cbn in CONSEC.
-            (* Contradition, need inversion lemma *)
-            admit.
-          }
-
-          cbn in CONSEC.
-          assert (l0 = ptrs) by admit; subst.
-          rename H into MemMM.
-          destruct_err_ub_oom x.
-          * split; intros H.
-            -- destruct H; auto.
-               destruct H0 as [ms' [a' [[EQ1 EQ2] H']]]; subst.
-               rewrite HMAPM in H'.
-               cbn in H'.
-               auto.
-            -- inv H.
-          * split; intros H.
-            -- destruct H; auto.
-               destruct H0 as [ms' [a' [[EQ1 EQ2] H']]]; subst.
-               rewrite HMAPM in H'.
-               cbn in H'.
-               auto.
-            -- inv H.
-          * split; intros H.
-            -- destruct H; auto.
-               destruct H0 as [ms' [a' [[EQ1 EQ2] H']]]; subst.
-               rewrite HMAPM in H'.
-               cbn in H'.
-               auto.
-            -- inv H.
-          * destruct x0.
-            split; intros H.
-            -- destruct H as [ms' [a' [[EQ1 EQ2] H']]]; subst.
-               rewrite HMAPM in H'.
-               cbn in H'.
-               auto.
-            -- exists ms. exists l.
-               split; auto.
-               rewrite HMAPM.
-               cbn.
-               auto.
-        + cbn in *.
-          unfold eq1 in CONSEC.
-          intros ms x.
-          (* need inversion lemma for consec *)
-          admit.
-    Admitted.
-
     Lemma get_consecutive_ptrs_MemPropT_MemState :
       forall ptr len ptrs ms1 ms2 ,
         (@get_consecutive_ptrs (MemPropT MemState) (@MemPropT_Monad MemState) (@MemPropT_RAISE_OOM MemState)
@@ -4112,8 +4010,17 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma read_byte_get_consecutive_ptrs :
       forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
-        `{EQV : @Eq1Equivalence M HM EQM}
-        `{WM : @Within M EQM err_ub_oom MemState MemState}
+        {Pre Post : Type}
+        {B} `{MB : Monad B}
+        `{WM : @Within M EQM B Pre Post}
+        `{EQV : @Eq1Equivalence M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM}
+        `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
+        `{LAWS: @MonadLawsE M EQM HM}
+        `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+        `{RBMERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+        `{RWOOM : @RaiseWithin M B _ _ _ EQM WM string (@raise_oom M OOM)}
+        `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
+
         (ms ms' : MemState) (ptr : addr) (len : nat) (ptrs : list addr)
         (init_bytes : list SByte) (bytes : list mem_byte) pr (aid : AllocationId),
         mem_state_memory ms' = add_all_index bytes (ptr_to_int ptr) (mem_state_memory ms) ->
@@ -4127,23 +4034,48 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           access_allowed (address_provenance p) aid ->
           read_byte_prop ms' p byte.
     Proof.
-      intros M HM OOM ERR EQM0 EQV WM
-        ms ms' ptr len ptrs init_bytes bytes pr aid MEM2 INMB BYTES CONSEC BYTELEN p ix
+      intros M HM OOM ERR EQM0 Pre Post B MB WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR ms ms' ptr len ptrs
+        init_bytes bytes pr aid MEM2 INMB BYTES CONSEC BYTELEN p ix
         byte PTRNTH BYTENTH ACCESS.
 
       unfold read_byte_prop, read_byte_MemPropT.
       repeat eexists.
       unfold mem_state_memory in *.
       rewrite MEM2.
+
+      eapply get_consecutive_ptrs_nth with (ix_nat := ix) (p:=p) in CONSEC; eauto.
+      destruct CONSEC as [ix_ip [IXIP_IX GEP]].
+      eapply handle_gep_addr_ix in GEP.
+      rewrite sizeof_dtyp_i8 in GEP.
+      erewrite IP.from_Z_to_Z in GEP; eauto.
+
       rewrite read_byte_raw_add_all_index_in with (v:=(byte, aid)).
       unfold snd.
       rewrite ACCESS.
       cbn.
       tauto.
 
-      - admit.
-      - admit.
-    Admitted.
+      - assert (Z.of_nat ix < Zlength bytes).
+        {
+          subst bytes.
+          rewrite Zlength_map.
+          eapply Nth_ix_lt_Zlength; eauto.
+        }
+
+        lia.
+      - assert ((ptr_to_int p - ptr_to_int ptr) = Z.of_nat ix) as IX by lia.
+        rewrite IX.
+        subst bytes.
+        eapply Nth_list_nth_z.
+        eapply Nth_map; eauto.
+        specialize (INMB (byte, provenance_to_allocation_id pr)).
+        forward INMB.
+        { eapply Nth_In in BYTENTH.
+          eapply in_map with (f:= (fun b : SByte => (b, provenance_to_allocation_id pr))).
+          eauto.
+        }
+        inv INMB; auto.
+    Qed.
 
     (* TODO: Move and reuse *)
     Lemma read_byte_preserved_get_consecutive_ptrs :
@@ -4237,7 +4169,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       inv MS; inv FREE.
       split.
       - intros p ix byte NTHptr NTHbyte.
-        eapply @read_byte_get_consecutive_ptrs with (HM:=@MemPropT_Monad MemState);
+        eapply @read_byte_get_consecutive_ptrs with (HM:=@MemPropT_Monad MemState) (B:=err_ub_oom);
           eauto; try typeclasses eauto.
 
         { intros mb INMB.
