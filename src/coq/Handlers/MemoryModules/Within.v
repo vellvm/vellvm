@@ -8,8 +8,6 @@ From ExtLib Require Import
      Structures.Monads.
 
 From Coq Require Import
-     Relations
-     RelationClasses
      Morphisms.
 
 Require Import MonadEq1Laws.
@@ -31,7 +29,7 @@ Notation "b ∉ m" := (~ (exists pre post, within m pre b post)) (at level 99).
 Notation "b ⦉ pre ⦊ ∈ ⦉ post ⦊ m" := (within m pre b post) (at level 99).
 Notation "b ⦉ pre ⦊ ∉ ⦉ post ⦊ m" := (~ (within m pre b post)) (at level 99).
 Notation "b {{ pre }} ∈ {{ post }} m" := (within m pre b post) (at level 99).
-Notation "b {{ pre }} ∉ {{ post }} m" := (~ (within m pre b post)) (at level 99).    
+Notation "b {{ pre }} ∉ {{ post }} m" := (~ (within m pre b post)) (at level 99).
 
 Section Laws.
   Variable M : Type -> Type.

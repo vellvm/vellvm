@@ -13,7 +13,6 @@ From ITree Require Import
      ITree
      Basics.Monad
      Eq.Eq
-     InterpFacts
      TranslateFacts.
 
 From Vellvm Require Import
@@ -82,7 +81,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
 
     Lemma remove_block_find_block_ineq : forall {T} b b' (G : ocfg T),
         b <> b' ->
-        find_block (G ∖ b) b' = find_block G b'. 
+        find_block (G ∖ b) b' = find_block G b'.
     Proof.
       induction G as [| bk G IH].
       reflexivity.
@@ -103,7 +102,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
       induction G as [| bk G IH]; intros * IN; [inv IN |].
       cbn in IN.
       break_match_hyp.
-      - right; auto. 
+      - right; auto.
       - destruct IN as [EQ | IN].
         subst; left; reflexivity.
         right; eapply IH; eauto.
@@ -190,7 +189,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
         blk_code       := bk.(blk_code);
         blk_term       := bk.(blk_term);
         blk_comments   := None (* TODO: proper propagation of comments *)
-      |}.   
+      |}.
 
     Definition update_provenance_ocfg {T} (old new : block_id) (bks : ocfg T) : ocfg T :=
       map (update_provenance_block old new) bks.
@@ -223,7 +222,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
                - remove the two block [bk_s] and [bk_t] getting fused
                - add their fusion
                - update the phi-nodes so that anyone expecting a jump from [bk_t]
-               now expects one from [bk_s] 
+               now expects one from [bk_s]
                      *)
                     (update_provenance_ocfg
                        b_t bk_s.(blk_id) ((block_fusions bk_s bk_t) :: ((G ∖ bk_s.(blk_id)) ∖ b_t)),
@@ -310,11 +309,11 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
           assert (EQ1: predecessors f2 [bk1] = [bk1.(blk_id)]).
           {
             cbn.
-            unfold is_predecessor, successors. 
+            unfold is_predecessor, successors.
             rewrite Heqt; cbn.
             break_match_goal; intuition.
             break_match_hyp; intuition.
-          }          
+          }
           rewrite !app_length, EQ1 in SINGLEPRED.
           cbn in SINGLEPRED.
           assert (EQ2: predecessors f2 bks = []).
@@ -353,7 +352,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
           }
 
           rewrite map_remove_block; auto.
-          apply remove_block_find_block_eq.          
+          apply remove_block_find_block_eq.
           apply wf_ocfg_map; auto.
           apply wf_ocfg_bid_remove_block; auto.
 
@@ -412,7 +411,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
     Lemma block_fusion_none_id_rec :
       forall G G' bks pre,
         G = pre ++ bks ->
-        block_fusion_rec G bks = (G',None) ->	
+        block_fusion_rec G bks = (G',None) ->
         G' = G.
     Proof.
       induction bks as [| bk bks IH]; intros * -> FUSE.
@@ -426,10 +425,10 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
 
     Lemma block_fusion_none_id :
       forall G G',
-        block_fusion G = (G', None) ->	
+        block_fusion G = (G', None) ->
         G' = G.
     Proof.
-      intros; eapply block_fusion_none_id_rec with (pre := []); eauto; reflexivity. 
+      intros; eapply block_fusion_none_id_rec with (pre := []); eauto; reflexivity.
     Qed.
 
     Lemma update_provenance_find_block :
@@ -472,7 +471,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
       break_match_goal; auto.
       unfold Eqv.eqv_dec,RelDec.rel_dec in Heqb; cbn in *; break_match_hyp; intuition.
     Qed.
-    
+
     Lemma assoc_update_provenance :
       forall old new (args : list (block_id * exp dtyp)) x,
         ~ In new (map fst args) ->
@@ -532,7 +531,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
       forall φ, In φ φs -> ~ In b (phi_sources (snd φ)).
 
     Definition block_phis_block_id_not_in {T} b (bk : block T) :=
-      phis_block_id_not_in b bk.(blk_phis).   
+      phis_block_id_not_in b bk.(blk_phis).
 
     Lemma update_provenance_phis_eq_itree :
       forall phis old new f,
@@ -663,7 +662,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
         do 2 red in e; subst b2.
         pose proof find_block_has_id _ _ LU2; subst.
         apply PRED in EXIT; auto.
-        
+
       - (* For any other block, we simply match the denotation of the blocks one against another *)
         rewrite 2 denote_ocfg_unfold_eq_itree.
 
@@ -674,8 +673,8 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
         {
           intros.
           destruct (find_block G f0) eqn:EQ.
-          - apply H in EQ; auto. 
-          - apply H' in EQ; auto. 
+          - apply H in EQ; auto.
+          - apply H' in EQ; auto.
         }
         clear H H'.
         rewrite H0; auto.
@@ -707,7 +706,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
     Qed.
 
     Lemma block_fusion_correct_none :
-      forall G G' f to, 
+      forall G G' f to,
         block_fusion G = (G',None) ->
         ⟦ G ⟧bs (f,to) ≈ ⟦ G' ⟧bs (f,to).
     Proof.
@@ -729,7 +728,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
       apply block_fusion_some in FUSE; auto.
       destruct FUSE as (INEQ & bk1 & bk2 & LU1 & TERM & LU2 & PRED & NOPHI & LU3 & LU4 & LU5).
       intros ABS.
-      eapply predecessor_successor in ABS; eauto. 
+      eapply predecessor_successor in ABS; eauto.
       unfold successors in ABS; rewrite TERM in ABS; destruct ABS as [EQ | []].
       subst tgt.
       rewrite wf_ocfg_bid_In_is_found in LU2; auto; inv LU2.
@@ -749,7 +748,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
       unfold denote_cfg.
       simpl bind.
       unfold block_fusion_cfg.
-      destruct (block_fusion G.(blks)) as [bks' [[src tgt] |]] eqn:EQ. 
+      destruct (block_fusion G.(blks)) as [bks' [[src tgt] |]] eqn:EQ.
       - break_match_goal; [reflexivity |].
         simpl.
         apply Bool.orb_false_elim in Heqb as [INEQ1 INEQ2].
@@ -757,7 +756,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
         rewrite <- RelDec.neg_rel_dec_correct in INEQ1.
         rewrite <- RelDec.neg_rel_dec_correct in INEQ2.
         eapply block_fusion_correct_some with (f := G.(init)) (to := G.(init)) in EQ; auto.
-        rewrite update_provenance_ineq in EQ; auto. 
+        rewrite update_provenance_ineq in EQ; auto.
         eapply eutt_clo_bind; [apply EQ |].
         intros [[]|?] [[]|?] INV; try now inv INV.
         subst; reflexivity.

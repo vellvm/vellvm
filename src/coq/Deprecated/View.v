@@ -1,4 +1,4 @@
-From ITree Require Import 
+From ITree Require Import
      ITree
      Events.State.
 
@@ -52,16 +52,16 @@ Definition Subevent A B := forall x, View A x B.
   over {V} swap (subevent {V} x) = subevent {V} (swap {V} x)
   -----------------
   translate swap (trigger (subevent {f} x)) ~ trigger (subevent {f} (swap x))
-  
+
   forall V, translate (over {z:=V} (swap a b)) X
 
   translate (over f) (Vis e k) = Vis (over f e) (fun x => translate (over f) k)
-  translate (over f) (translate (over g) X) = 
+  translate (over f) (translate (over g) X) =
 *)
 
 (* Things are also interested with respect to simplifying the construction of interpreters.
  Consider the case from GlobalE for example *)
-From ITree Require Import 
+From ITree Require Import
      Events.State.
 From Vellvm Require Import
      LLVMEvents.
@@ -75,7 +75,7 @@ Section Globals.
   Context {map : Type}.
   Context {M: Map k v map}.
   Context {SK : Show k}.
- 
+
   Import ITree.Basics.Basics.Monads.
 
   (* Lift an interpreter g handling only GlobalE to one over a generic overset of effects.
@@ -294,7 +294,7 @@ Admitted.
     Arguments Prism' : clear implicits.
     Arguments pleft {_ _ _ _} _.
     Arguments pright {_ _ _ _} _.
-    
+
 
     Definition pover {A B C D} (p : Prism' A B C D) : (C ~> D) -> (A ~> B).
       intros.
@@ -302,14 +302,14 @@ Admitted.
       destruct X0.
       { eapply X in c.
         eapply (p.(pright).(p_put) _ c). }
-      { 
+      {
 
     view   : A -> a + o
     insert : a + o -> A
 
     Record Prism' {A B C D : Type -> Type} : Type :=
     { get : forall t, A t -> option (C t)
-    ; put : 
+    ; put :
 
 
   End with_mapping.

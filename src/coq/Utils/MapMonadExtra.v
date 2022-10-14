@@ -2,10 +2,7 @@ From Coq Require Import
      List
      Morphisms.
 
-From ExtLib Require Import
-     Structures.Monads
-     Data.Monads.EitherMonad
-     Data.Monads.IdentityMonad.
+
 
 From ITree Require Import
   Basics.Monad.
@@ -713,3 +710,4 @@ Proof.
     rewrite <- H.
     erewrite IHZIP; eauto.
 Qed.
+

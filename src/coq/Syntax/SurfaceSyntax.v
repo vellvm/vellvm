@@ -44,12 +44,12 @@ Module VIR_Notations.
   Notation "d" := (EXP_Double d)   (at level 10,only printing).
   Notation "h" := (EXP_Hex h)   (at level 10,only printing).
   Notation "b" := (EXP_Bool b)   (at level 10,only printing).
-  Notation "'null'" := (EXP_Null)   (at level 10,only printing). 
-  Notation "'zeroinitializer'" := (EXP_Zero_initializer)   (at level 10,only printing). 
+  Notation "'null'" := (EXP_Null)   (at level 10,only printing).
+  Notation "'zeroinitializer'" := (EXP_Zero_initializer)   (at level 10,only printing).
   (* Coercion EXP_Cstring : string >-> exp. *)
   Notation "s" := (EXP_Cstring s)   (at level 10,only printing).
-  Notation "'undef'" := (EXP_Undef)   (at level 10,only printing). 
-  
+  Notation "'undef'" := (EXP_Undef)   (at level 10,only printing).
+
   (* ibinop *)
 
   (* We only display the wrapping flags that are either true, or parametric.
@@ -235,7 +235,7 @@ Module VIR_Notations.
     (mk_definition _ (mk_declaration (Name f) _ _ _ _ _ _ _ _ _ _)
                    args x) (at level 10, only printing,
                             format "'func'  f  args  ':=' '//' x").
- 
+
   (** * cfg  *)
   Notation "bks" := (mkCFG _ bks _) (at level 10, only printing).
 
@@ -248,7 +248,7 @@ Module VIR_Notations.
 End VIR_Notations.
 
 Section SurfaceSyntaxTest.
-  
+
   Definition add_twice := mcfg_of_tle [TLE_Definition {|
                                            df_prototype := {|dc_name := (Name "main");
                                                              dc_type := (TYPE_Function (TYPE_I 32%N) [(TYPE_I 32%N); (TYPE_Pointer (TYPE_Pointer (TYPE_I 8%N)))] false);
@@ -269,7 +269,7 @@ Section SurfaceSyntaxTest.
                                                          |}
                                                          ,[])
                                          |}].
-  
+
  Import VIR_Notations .
 
  Variable P: mcfg typ -> Prop.
@@ -425,7 +425,7 @@ Section SurfaceSyntaxTest.
                                            ]);
                          dc_attrs := [];
                          dc_annotations := []
-                       |};       
+                       |};
        df_args := [(Name "argc"); (Name "argv")];
        df_instrs := (
                      {|
@@ -477,4 +477,3 @@ Section SurfaceSyntaxTest.
  Abort.
 
 End SurfaceSyntaxTest.
-

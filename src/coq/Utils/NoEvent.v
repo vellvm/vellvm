@@ -1066,7 +1066,7 @@ From Vellvm Require Import
      Theory.DenotationTheory
      Theory.InstrLemmas.
 
-From Coq Require Import Relation_Definitions.
+
 
 Import MonadNotation.
 Open Scope monad_scope.
@@ -1146,3 +1146,4 @@ Module PICK_REMOVE (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM
   Variable remove_pick_ub : itree (ExternalCallE +' PickUvalueE +' UBE +' DebugE +' FailureE) ~> itree (ExternalCallE +' DebugE +' FailureE).
   Variable deterministic_vellvm : forall R, itree L0 R -> Prop.
 End PICK_REMOVE.
+

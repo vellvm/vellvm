@@ -26,8 +26,7 @@ From Vellvm Require Import
      Numeric.Integers
      Numeric.Floats.
 
-From ITree Require Import
-     ITree.
+
 
 From Flocq.IEEE754 Require Import
      Binary
@@ -81,7 +80,7 @@ Definition memcpy_8_decl: declaration typ :=
     dc_type        := TYPE_Function TYPE_Void [pt; pt; i32; i32; i1] false;
     dc_param_attrs := ([], [[];[];[];[];[]]);
     dc_attrs       := [];
-    dc_annotations  := []    
+    dc_annotations  := []
   |}.
 
 Definition malloc_decl: declaration typ :=
@@ -103,7 +102,7 @@ Definition free_decl: declaration typ :=
     dc_param_attrs := ([], [[];[];[];[];[]]);
     dc_attrs       := [];
     dc_annotations  := []
-  |}.  
+  |}.
 
 Definition maxnum_64_decl: declaration typ :=
   {|

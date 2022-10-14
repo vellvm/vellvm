@@ -59,14 +59,14 @@ Lemma iter_prop:
   forall n b a, P a -> iter n a = Some b -> Q b.
 Proof.
   intros n b. pattern n. apply (well_founded_ind N.lt_wf_0).
-  intros until 2. rewrite (Fix_eq N.lt_wf_0 _ iter_step). 
-  unfold iter_step at 1. destruct (N.eq_dec _ _). 
+  intros until 2. rewrite (Fix_eq N.lt_wf_0 _ iter_step).
+  unfold iter_step at 1. destruct (N.eq_dec _ _).
   discriminate 1. specialize (step_prop H0).
   destruct (step a).
     inversion 1; subst b0; exact step_prop.
     apply H; auto. apply N.lt_pred_l; auto.
-  intros. f_equal. 
-  apply functional_extensionality_dep. intro. 
+  intros. f_equal.
+  apply functional_extensionality_dep. intro.
   apply functional_extensionality_dep. auto.
 Qed.
 
@@ -79,4 +79,3 @@ Qed.
 End ITERATION.
 
 End Iter.
-

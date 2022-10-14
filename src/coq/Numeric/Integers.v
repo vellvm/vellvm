@@ -803,8 +803,8 @@ Qed.
 
 Theorem signed_one: zwordsize > 1 -> signed one = 1.
 Proof.
-  intros. unfold signed. rewrite unsigned_one. apply zlt_true. 
-  change 1 with (two_p 0). rewrite half_modulus_power. apply two_p_monotone_strict. lia. 
+  intros. unfold signed. rewrite unsigned_one. apply zlt_true.
+  change 1 with (two_p 0). rewrite half_modulus_power. apply two_p_monotone_strict. lia.
 Qed.
 
 Theorem signed_mone: signed mone = -1.
@@ -1866,11 +1866,11 @@ Qed.
 Theorem xor_is_zero: forall x y, eq (xor x y) zero = eq x y.
 Proof.
   intros. predSpec eq eq_spec (xor x y) zero.
-- apply xor_zero_equal in H. subst y. rewrite eq_true; auto. 
+- apply xor_zero_equal in H. subst y. rewrite eq_true; auto.
 - predSpec eq eq_spec x y.
-+ elim H; subst y; apply xor_idem. 
++ elim H; subst y; apply xor_idem.
 + auto.
-Qed. 
+Qed.
 
 Theorem and_xor_distrib:
   forall x y z,
@@ -2978,7 +2978,7 @@ Theorem shrx_zero:
 Proof.
   intros. unfold shrx. rewrite shl_zero. unfold divs. rewrite signed_one by auto.
   rewrite Z.quot_1_r. apply repr_signed.
-Qed. 
+Qed.
 
 Theorem shrx_shr:
   forall x y,
@@ -4168,11 +4168,11 @@ Proof.
   { apply unsigned_repr. assert (63 < max_unsigned) by reflexivity. lia. }
   transitivity (shrx x y1).
 - unfold shrx', shrx, shl', shl. rewrite U; auto.
-- rewrite shrx_carry. 
-+ f_equal. 
+- rewrite shrx_carry.
++ f_equal.
   unfold shr, shr'. rewrite U; auto.
   unfold shr_carry, shr_carry', shl, shl'. rewrite U; auto.
-+ unfold ltu. apply zlt_true. rewrite U; tauto. 
++ unfold ltu. apply zlt_true. rewrite U; tauto.
 Qed.
 
 Theorem shrx'_shr_2:
@@ -5263,5 +5263,3 @@ Global Hint Resolve Ptrofs.modulus_pos Ptrofs.eqm_refl Ptrofs.eqm_refl2 Ptrofs.e
   Ptrofs.eqm_unsigned_repr Ptrofs.eqm_unsigned_repr_l Ptrofs.eqm_unsigned_repr_r
   Ptrofs.unsigned_range Ptrofs.unsigned_range_2
   Ptrofs.repr_unsigned Ptrofs.repr_signed Ptrofs.unsigned_repr : ints.
-
-

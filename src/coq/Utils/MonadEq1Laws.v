@@ -7,8 +7,6 @@ From ITree Require Import
      ITree.
 
 From ExtLib Require Import
-     Structures.Monads
-     Data.Monads.EitherMonad
      Data.Monads.IdentityMonad.
 
 From Vellvm.Utils Require Import Monads MonadExcLaws.
@@ -101,3 +99,4 @@ Section ITree.
   Global Instance Eq1_ret_inv_itree : Eq1_ret_inv (itree E) :=
     { eq1_ret_ret := fun a => eq1_ret_ret_itree }.
 End ITree.
+

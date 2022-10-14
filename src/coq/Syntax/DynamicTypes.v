@@ -7,9 +7,7 @@ From Coq Require Import
      Morphisms
      Classes.RelationClasses.
 
-From ExtLib Require Import
-     Core.RelDec
-     Programming.Eqv.
+
 
 From Vellvm Require Import
      Utilities
@@ -289,7 +287,7 @@ Qed.
 
 Section hiding_notation.
   #[local] Open Scope sexp_scope.
-  
+
   Fixpoint serialize_dtyp' (dt:dtyp): sexp :=
     match dt with
     | DTYPE_I sz     => Atom ("i" ++ to_string sz)%string

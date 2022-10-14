@@ -1,4 +1,4 @@
-(** 
+(**
     These "Repr" instances for Vellvm should serialize Vellvm ASTs
     into a Coq string which represents the AST, allowing ASTs to be
     serialized and read back into Coq later.
@@ -17,7 +17,7 @@ Require Import List.
 Import ListNotations.
 
 From Coq Require Import
-     ZArith List String Bool.Bool.
+     ZArith String.
 
 From QuickChick Require Import Show.
 Set Warnings "-extraction-opaque-accessed,-extraction".
@@ -115,7 +115,7 @@ Section ReprInstances.
     | TYPE_X86_mmx              => "TYPE_X86_mmx"
     | TYPE_Array sz t           => "(TYPE_Array (" ++ repr sz ++ ") (" ++ repr_typ t ++ "))"
     | TYPE_Function ret args varargs
-      => "(TYPE_Function (" ++ repr_typ ret ++ ") 
+      => "(TYPE_Function (" ++ repr_typ ret ++ ")
         [" ++ (contents id (List.map repr_typ args)) ++ "]"
         ++ if varargs then "true" else "false" ++ ")"
     | TYPE_Struct fields        => "(TYPE_Struct [" ++ (contents id (List.map repr_typ fields)) ++ "])"
@@ -187,7 +187,7 @@ Section ReprInstances.
     end.
 
   Definition repr_conversion_type (c:conversion_type) : string :=
-    match c with 
+    match c with
     | Trunc => "Trunc"
     | Zext => "Zext"
     | Sext => "Sext"
@@ -219,7 +219,7 @@ Section ReprInstances.
   #[global]
    Instance reprFBinop : Repr fbinop :=
     {| repr := repr_fbinop |}.
-  
+
   Definition repr_fast_math (fm:fast_math) : string :=
     match fm with
     | Nnan => "Nnan"
@@ -256,7 +256,7 @@ Section ReprInstances.
   #[global]
    Instance reprFCmp : Repr fcmp :=
     {| repr := repr_fcmp |}.
-  
+
   Fixpoint repr_exp (v : exp typ) : string :=
     let texp (te : (typ * exp typ)) : string :=
       let '(t, e) := te in "(" ++ repr_typ t ++ ", " ++ repr_exp e ++ ")"
@@ -306,7 +306,7 @@ Section ReprInstances.
     | OP_Freeze v =>
         "(OP_Freez " ++ texp v ++")"
     end.
-                                          
+
 
   #[global]
    Instance reprExp : Repr (exp typ)
@@ -401,14 +401,14 @@ Section ReprInstances.
     | PARAMATTR_Inreg => "PARAMATTR_Inreg"
     | PARAMATTR_Byval t => "PARAMATTR_Byval" ++ repr t
     | PARAMATTR_Byref (t) => "PARAMATTR_Byref" ++ repr t
-    | PARAMATTR_Preallocated (t) => "PARAMATTR_Preallocated" ++ repr t                        
+    | PARAMATTR_Preallocated (t) => "PARAMATTR_Preallocated" ++ repr t
     | PARAMATTR_Inalloca t => "PARAMATTR_Inalloca" ++ repr t
     | PARAMATTR_Sret t => "PARAMATTR_Sret" ++ repr t
-    | PARAMATTR_Elementtype (t) => "PARAMATTR_Elementtype" ++ repr t                      
+    | PARAMATTR_Elementtype (t) => "PARAMATTR_Elementtype" ++ repr t
     | PARAMATTR_Align a => "(PARAMATTR_Align " ++ repr a ++ ")"
     | PARAMATTR_Noalias => "PARAMATTR_Noalias"
     | PARAMATTR_Nocapture => "PARAMATTR_Nocapture"
-    | PARAMATTR_Readonly => "PARAMATTR_Readonly"                             
+    | PARAMATTR_Readonly => "PARAMATTR_Readonly"
     | PARAMATTR_Nest => "PARAMATTR_Nest"
     | PARAMATTR_Returned => "PARAMATTR_Returned"
     | PARAMATTR_Nonnull => "PARAMATTR_Nonnull"
@@ -416,7 +416,7 @@ Section ReprInstances.
     | PARAMATTR_Dereferenceable_or_null (a) =>  "(PARAMATTR_Dereferenceable_or_null " ++ repr a ++ ")"
     | PARAMATTR_Swiftself =>  "PARAMATTR_Swiftself"
     | PARAMATTR_Swiftasync => "PARAMATTR_Swiftasync"
-    | PARAMATTR_Swifterror => "PARAMATTR_Swifterror"                                   
+    | PARAMATTR_Swifterror => "PARAMATTR_Swifterror"
     | PARAMATTR_Immarg => "PARAMATTR_Immarg"
     | PARAMATTR_Noundef => "PARAMATTR_Noundef"
     | PARAMATTR_Alignstack (a) => "PARAMATTR_Alignstack" ++ repr a
@@ -475,7 +475,7 @@ Section ReprInstances.
     | CC_Fastcc => "CC_Fastcc"
     | CC_Coldcc => "CC_Coldcc"
     | CC_Cc cc => "CC_Cc cc"
-    | CC_Webkit_jscc => "CC_Webkit_jscc"     
+    | CC_Webkit_jscc => "CC_Webkit_jscc"
     | CC_Anyregcc  => "CC_Anyregcc"
     | CC_Preserve_allcc => "CC_Preserve_allcc"
     | CC_Cxx_fast_tlscc =>  "CC_Cxx_fast_tlscc"
@@ -483,7 +483,7 @@ Section ReprInstances.
     | CC_Swiftcc => "CC_Swiftcc"
     | CC_Swifttailcc => "CC_Swifttailcc"
     | CC_cfguard_checkcc => "CC_cfguard_checkcc"
-    | CC_Preserve_mostc => "CC_Preserve_mostc"                  
+    | CC_Preserve_mostc => "CC_Preserve_mostc"
     end.
 
   #[global]
@@ -494,12 +494,12 @@ Section ReprInstances.
     match fa with
     | FNATTR_Alignstack a => "(FNATTR_Alignstack " ++ repr a ++ ")"
     (* | FNATTR_Alloc_family (fam) => "(FNATTR_Alloc_family" ++ repr fam ++ ")" *)
-    | FNATTR_Allockind (kind) => "(FNATTR_Allockind" ++ repr kind ++ ")"                                            
+    | FNATTR_Allockind (kind) => "(FNATTR_Allockind" ++ repr kind ++ ")"
     | FNATTR_Allocsize l l2 => let printable_l2 := match l2 with
                                                  |None => ""
                                                  |Some s => repr s
                                                  end in
-                                  
+
         "(FNATTR_Allocsize " ++ repr l ++ printable_l2 ++ ")"
     | FNATTR_Alwaysinline => "FNATTR_Alwaysinline"
     | FNATTR_Builtin => "FNATTR_Builtin"
@@ -526,7 +526,7 @@ Section ReprInstances.
     | FNATTR_Noinline => "FNATTR_Noinline"
     | FNATTR_Nomerge => "FNATTR_Nomerge"
     | FNATTR_Nonlazybind => "FNATTR_Nonlazybind"
-    | FNATTR_Noprofile => "FNATTR_Noprofile"                        
+    | FNATTR_Noprofile => "FNATTR_Noprofile"
     | FNATTR_Noredzone => "FNATTR_Noredzone"
     | FNATTR_Indirect_tls_seg_refs => "FNATTR_Indirect_tls_seg_refs"
     | FNATTR_Noreturn => "FNATTR_Noreturn"
@@ -535,7 +535,7 @@ Section ReprInstances.
     | FNATTR_Nosync => "FNATTR_Nosync"
     | FNATTR_Nounwind => "FNATTR_Nounwind"
     | FNATTR_Nosanitize_bounds => "FNATTR_Nosanitize_bounds"
-    | FNATTR_Nosanitize_coverage => "FNATTR_Nosanitize_coverage"                                
+    | FNATTR_Nosanitize_coverage => "FNATTR_Nosanitize_coverage"
     | FNATTR_Null_pointer_is_valid => "FNATTR_Null_pointer_is_valid"
     | FNATTR_Optforfuzzing => "FNATTR_Optforfuzzing"
     | FNATTR_Optnone => "FNATTR_Optnone"
@@ -582,11 +582,11 @@ Section ReprInstances.
     (* | FNATTR_Warn_stack_size (th) => "FNATTR_Warn_stack_size" ++ repr th   *)
     | FNATTR_Vscale_range (min) (max) =>
          let printable_max := match max with
-                            |None => ""        
-                            |Some s => repr s            
-                            end in                      
+                            |None => ""
+                            |Some s => repr s
+                            end in
          "(FNATTR_Denormal_fp_math32" ++ repr min ++ printable_max ++ ")"
-    (* | FNATTR_Min_legal_vector_width  (size) => "FNATTR_Min_legal_vector_width" ++ repr size  *)              
+    (* | FNATTR_Min_legal_vector_width  (size) => "FNATTR_Min_legal_vector_width" ++ repr size  *)
     | FNATTR_String s => "(FNATTR_String " ++ repr s ++ ")"
     | FNATTR_Key_value kv => "(FNATTR_Key_value " ++ repr kv ++ ")"
     | FNATTR_Attr_grp g => "(FNATTR_Attr_grp " ++ repr g ++ ")"
@@ -596,14 +596,14 @@ Section ReprInstances.
    Instance reprFn_Attr : Repr fn_attr :=
     {| repr := repr_fn_attr |}.
 
-  
+
   Definition repr_thread_local_storage (tls : thread_local_storage) : string :=
     match tls with
     | TLS_Localdynamic => "TLS_Localdynamic"
     | TLS_Initialexec => "TLS_Initialexec"
     | TLS_Localexec => "TLS_Localexec"
     end.
-  
+
   #[global]
    Instance reprThread_Local_Storage : Repr thread_local_storage :=
     {| repr := repr_thread_local_storage |}.
@@ -644,8 +644,8 @@ Section ReprInstances.
   #[global]
    Instance reprUnnamedAddr : Repr (unnamed_addr) :=
     {| repr := repr_unnamed_addr |}.
-  
-  
+
+
   Definition repr_annotation (a : annotation typ) : string :=
     match a with
     | ANN_linkage l => "ANN_linkage " ++ (repr l)
@@ -670,11 +670,11 @@ Section ReprInstances.
     | ANN_prologue t => "ANN_prologue " ++ (repr t)
     | ANN_personality t => "ANN_personality " ++ (repr t)
   end.
-  
+
   #[global]
    Instance reprAnnotation : Repr (annotation typ) :=
     {| repr := repr_annotation |}.
-  
+
   Definition repr_declaration (dec : declaration typ) : string
     := match dec with
        | mk_declaration dc_name dc_type dc_param_attrs dc_attrs dc_annotations =>
@@ -685,7 +685,7 @@ Section ReprInstances.
                             ++ repr dc_annotations
 
        end.
-  
+
   #[global]
    Instance reprDeclaration : Repr (declaration typ) :=
     {| repr := repr_declaration |}.
@@ -739,4 +739,3 @@ Section ReprInstances.
     {| repr := repr_tle |}.
 
 End ReprInstances.
-

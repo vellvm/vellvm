@@ -14,7 +14,7 @@ From ExtLib Require Import
      Structures.Monads
      Structures.Functor.
 
-From Coq Require Import Relations RelationClasses.
+From Coq Require Import Relations.
 
 Require Import Morphisms.
 Require Import Paco.paco.
@@ -361,7 +361,7 @@ Section contains_UB.
       - rewrite XX in XY.
 
     }
-    
+
   Qed.
 *)
 
@@ -438,7 +438,7 @@ Section bind_lemmas.
         rewrite bind_vis.
         eapply CrawlVis2 with (e := g) (k := (fun x0 : X => ITree.bind (k0 x0) k)).
         reflexivity.
-        eauto.      
+        eauto.
   Qed.
 
   Lemma bind_contains_UB' :
@@ -470,7 +470,7 @@ Section interp_lemmas.
 
       Definition handler_keeps_UB := forall {R} (e : UBE R),
         contains_UB (handler _ ((inr1 (inr1 (inl1 e))) : Eff1 R)).
-    
+
     Unfortunately, this isn't good enough to ensure:
 
       contains_UB (interp handler t).
@@ -485,7 +485,7 @@ Section interp_lemmas.
 
     Depending on how `e` is handled the resulting tree may or may not
     have UB. If we look at the relevant constructor for `contains_UB`:
-    
+
       | CrawlVis1 : forall Y (e : (E +' F) Y) x k t2, t2 ≅ (vis e k)
         -> contains_UB (k x) -> contains_UB t2
 

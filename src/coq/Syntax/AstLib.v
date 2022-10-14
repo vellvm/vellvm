@@ -1,7 +1,6 @@
 (* begin hide *)
 From Coq Require Import
-     Decimal
-     ZArith.ZArith List
+     ZArith.ZArith
      String.
 
 From Vellvm Require Import

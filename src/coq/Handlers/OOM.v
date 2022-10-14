@@ -16,8 +16,7 @@ From Vellvm Require Import
 
 From ITree Require Import
      ITree
-     Eq.Eq
-     Basics.
+     Eq.Eq.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -243,8 +242,8 @@ Qed.
 (*   eapply H. *)
 (*   3: eapply XY. *)
 (*   all:eauto. *)
-  
-  
+
+
 (*   destruct (observe z) eqn:Hz. *)
 (*   - pstep. red. *)
 
@@ -269,7 +268,7 @@ Qed.
 
 
 (*        to *)
-      
+
 (*       unfold interp_prop in *. *)
 (*   epose proof interp_prop_Proper. *)
 (*   unfold Proper, respectful in H. *)
@@ -318,7 +317,7 @@ Qed.
 
 
 (*        to *)
-      
+
 (*       unfold interp_prop in *. *)
 (*   epose proof interp_prop_Proper. *)
 (*   unfold Proper, respectful in H. *)

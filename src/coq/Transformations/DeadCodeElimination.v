@@ -11,10 +11,7 @@ Import ListNotations.
 
 From ITree Require Import
      ITree
-     Basics.Monad
-     Eq.Eq
-     InterpFacts
-     TranslateFacts.
+     Basics.Monad.
 
 From Vellvm Require Import
      Utilities
@@ -54,7 +51,7 @@ Module DeadCodeElimination (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT :
       pose proof denote_bk_exits_in_outputs b f.
       apply has_post_post_strong in H.
       apply H.
-    - intros ? ? [<- SUCC]. 
+    - intros ? ? [<- SUCC].
       destruct u1; [| reflexivity].
       estep; ebase; right.
       apply CIHL.
@@ -74,7 +71,7 @@ Module DeadCodeElimination (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT :
    The execution of the block above hence contains all behaviors starting with an
    external call, it does not contain the one consisting in refining it by eliminating it.
 
-  See: https://llvm.org/docs/LangRef.html#unreachable-instruction 
+  See: https://llvm.org/docs/LangRef.html#unreachable-instruction
 
    *)
 End DeadCodeElimination.

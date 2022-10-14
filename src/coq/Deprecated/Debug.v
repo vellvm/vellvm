@@ -18,4 +18,3 @@ Definition into_debug {E F} (h : E ~> LLVM F) : CallE +' Locals +' CallE +' IO +
 
 Definition ignore_debug {E} : LLVM (E +' debugE) ~> LLVM E :=
   interp (into_debug debug_hom).
-

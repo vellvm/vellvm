@@ -363,7 +363,7 @@ Theorem mul2_add:
 Proof.
   intros. apply Bmult2_Bplus.
   intros x y Hx Hy. unfold binop_nan.
-  destruct x; try discriminate. simpl. rewrite Archi.choose_nan_64_idem. 
+  destruct x; try discriminate. simpl. rewrite Archi.choose_nan_64_idem.
   destruct y; reflexivity || discriminate.
 Qed.
 
@@ -494,7 +494,7 @@ Proof.
     apply integer_representable_n; auto; smart_lia. }
   unfold sub, of_int. rewrite BofZ_minus by auto. unfold of_intu. f_equal.
   assert (E: Int.add hi lo = x).
-  { unfold hi, lo. rewrite Int.add_is_or. 
+  { unfold hi, lo. rewrite Int.add_is_or.
   - rewrite <- Int.and_or_distrib. apply Int.and_mone.
   - rewrite Int.and_assoc. rewrite (Int.and_commut ox8000_0000). rewrite Int.and_assoc.
     change (Int.and ox7FFF_FFFF ox8000_0000) with Int.zero. rewrite ! Int.and_zero; auto.
@@ -504,7 +504,7 @@ Proof.
     apply Int.zero_ext_range. compute_this Int.zwordsize. lia. }
   assert (B: forall i, 0 <= i < Int.zwordsize -> Int.testbit ox8000_0000 i = if zeq i 31 then true else false).
   { intros; unfold Int.testbit. change (Int.unsigned ox8000_0000) with (2^31).
-    destruct (zeq i 31). subst i; auto. apply Z.pow2_bits_false; auto. } 
+    destruct (zeq i 31). subst i; auto. apply Z.pow2_bits_false; auto. }
   assert (EITHER: hi = Int.zero \/ hi = ox8000_0000).
   { unfold hi; destruct (Int.testbit x 31) eqn:B31; [right|left];
     Int.bit_solve; rewrite B by auto.
@@ -513,7 +513,7 @@ Proof.
   }
   assert (SU: - Int.signed hi = Int.unsigned hi).
   { destruct EITHER as [EQ|EQ]; rewrite EQ; reflexivity. }
-  unfold Z.sub; rewrite SU, <- E. 
+  unfold Z.sub; rewrite SU, <- E.
   unfold Int.add; rewrite Int.unsigned_repr, Int.signed_eq_unsigned. lia.
   - assert (Int.max_signed = two_p 31 - 1) by reflexivity. lia.
   - assert (Int.unsigned hi = 0 \/ Int.unsigned hi = two_p 31)
@@ -1101,7 +1101,7 @@ Definition of_bits (b: int): float32 := b32_of_bits (Int.unsigned b).
 Theorem add_commut:
   forall x y, is_nan _ _ x = false \/ is_nan _ _ y = false -> add x y = add y x.
 Proof.
-  intros. apply Bplus_commut. 
+  intros. apply Bplus_commut.
   destruct x, y; try reflexivity; now destruct H.
 Qed.
 
@@ -1119,7 +1119,7 @@ Theorem mul2_add:
 Proof.
   intros. apply Bmult2_Bplus.
   intros x y Hx Hy. unfold binop_nan.
-  destruct x; try discriminate. simpl. rewrite Archi.choose_nan_32_idem. 
+  destruct x; try discriminate. simpl. rewrite Archi.choose_nan_32_idem.
   destruct y; reflexivity || discriminate.
 Qed.
 
@@ -1454,4 +1454,3 @@ Global Opaque
   Float32.to_int Float32.to_intu Float32.to_long Float32.to_longu
   Float32.add Float32.sub Float32.mul Float32.div Float32.cmp Float32.ordered
   Float32.to_bits Float32.of_bits.
-

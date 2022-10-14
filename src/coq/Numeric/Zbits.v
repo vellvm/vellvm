@@ -499,10 +499,10 @@ Corollary Ztestbit_neg_two_p:
   forall n i, 0 <= n -> 0 <= i ->
   Z.testbit (- (two_p n)) i = if zlt i n then false else true.
 Proof.
-  intros. 
-  replace (- two_p n) with (- (two_p n - 1) - 1) by lia. 
+  intros.
+  replace (- two_p n) with (- (two_p n - 1) - 1) by lia.
   rewrite Z_one_complement by auto.
-  rewrite Ztestbit_two_p_m1 by auto. 
+  rewrite Ztestbit_two_p_m1 by auto.
   destruct (zlt i n); auto.
 Qed.
 
@@ -668,9 +668,9 @@ Proof.
   intros. apply equal_same_bits; intros.
   rewrite Zsign_ext_spec by auto.
   destruct (Z.testbit x (n - 1)) eqn:SIGNBIT.
-- set (n' := - two_p n). 
+- set (n' := - two_p n).
   replace (Zzero_ext n x - two_p n) with (Zzero_ext n x + n') by (unfold n'; lia).
-  rewrite Z_add_is_or; auto. 
+  rewrite Z_add_is_or; auto.
   rewrite Zzero_ext_spec by auto. unfold n'; rewrite Ztestbit_neg_two_p by lia.
   destruct (zlt i n). rewrite orb_false_r; auto. auto.
   intros. rewrite Zzero_ext_spec by lia. unfold n'; rewrite Ztestbit_neg_two_p by lia.
@@ -691,10 +691,10 @@ Proof.
   assert (B: Z.testbit (Zzero_ext n x) (n - 1) =
              if zlt (Zzero_ext n x) (two_p (n - 1)) then false else true).
   { set (N := Z.to_nat (n - 1)).
-    generalize (Zsign_bit N (Zzero_ext n x)). 
+    generalize (Zsign_bit N (Zzero_ext n x)).
     rewrite ! two_power_nat_two_p.
     rewrite inj_S.  unfold N; rewrite Z2Nat.id by lia.
-    intros X; apply X.  replace (Z.succ (n - 1)) with n by lia. exact A. 
+    intros X; apply X.  replace (Z.succ (n - 1)) with n by lia. exact A.
   }
   assert (C: two_p n = 2 * two_p (n - 1)).
   { rewrite <- two_p_S by lia. f_equal; lia. }
@@ -707,9 +707,9 @@ Lemma eqmod_Zsign_ext:
   forall n x, 0 < n ->
   eqmod (two_p n) (Zsign_ext n x) x.
 Proof.
-  intros. rewrite Zsign_ext_zero_ext by auto. 
-  apply eqmod_trans with (x - 0). 
-  apply eqmod_sub. 
+  intros. rewrite Zsign_ext_zero_ext by auto.
+  apply eqmod_trans with (x - 0).
+  apply eqmod_sub.
   apply eqmod_Zzero_ext; lia.
   exists (if Z.testbit x (n - 1) then 1 else 0). destruct (Z.testbit x (n - 1)); ring.
   apply eqmod_refl2; lia.
@@ -823,7 +823,7 @@ Proof.
   apply Z.log2_nonneg.
 - reflexivity.
 Qed.
- 
+
 Lemma Z_is_power2_sound:
   forall x i, Z_is_power2 x = Some i -> x = two_p i /\ i = Z.log2 x.
 Proof.
@@ -1027,4 +1027,3 @@ Proof.
   exploit (Zsize_interval_1 y). lia.
   lia.
 Qed.
-

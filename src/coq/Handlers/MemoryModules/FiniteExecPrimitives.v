@@ -3801,7 +3801,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Qed.
 
     Require Import Error.
-    Require Import MonadReturnsLaws.
+
 
 
     Lemma byte_allocated_add_all_index :
@@ -6701,4 +6701,3 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     End MemoryPrimatives.
 
 End FiniteMemoryModelExecPrimitives.
-

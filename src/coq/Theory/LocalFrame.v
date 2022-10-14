@@ -22,10 +22,7 @@ From Vellvm Require Import
      Theory.InterpreterCFG
      Theory.SymbolicInterpreter.
 
-From ExtLib Require Import
-     Core.RelDec
-     Data.Map.FMapAList
-     Structures.Maps.
+
 
 Import ListNotations.
 Import AlistNotations.
@@ -788,3 +785,4 @@ Module LocalFrame (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (*     auto. *)
   (* Qed. *)
 End LocalFrame.
+

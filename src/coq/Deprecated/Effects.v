@@ -21,16 +21,16 @@ Set Contextual Implicit.
 
 
 (* TODO: Add other memory effects, such as synchronization operations *)
-(* Notes: 
+(* Notes:
    - To allow the memory model to correctly model stack alloca deallocation,
-     we would also have to expose the "Ret" instruction. 
+     we would also have to expose the "Ret" instruction.
 
-  DESIGN QUESTIONS: 
+  DESIGN QUESTIONS:
     - should Load, Store, GEP take addr as the pointer or should
       they take values?  Who's job is it to do the case analysis?
     - similarly, should Store take a value and Load return a value?
 
-    Call: should the name be a value, a global id, or a string? 
+    Call: should the name be a value, a global id, or a string?
     external calls are identified by strings, for now
 *)
 
@@ -50,7 +50,7 @@ Definition tau {X} (d:Trace X) : Prop :=
   end.
 
 
-  
+
 
 (* Define a predicate that holds only of infinite Tau traceervations a.k.a. silent divergence *)
 Inductive diverges_step {X} (div : Trace X -> Prop) : Trace X -> Prop :=
@@ -75,23 +75,23 @@ Section RELATED_EFFECTS.
   Variable X : Type.
   Variable R : X -> X -> Prop.
 
-  
+
   (*
-  This relation doesn't allow any variation in the relations for the memory model.  
+  This relation doesn't allow any variation in the relations for the memory model.
   A more parametric version would:
-    - Replace the use of '=' in the definition of trace_equiv_effect_step with 
+    - Replace the use of '=' in the definition of trace_equiv_effect_step with
       a state relation on states: RA : A -> A -> Prop
-    - have an address relation   RAddr : addr -> addr -> Prop  
+    - have an address relation   RAddr : addr -> addr -> Prop
     - have a value relation     RValue : value -> value -> Prop
   It builds in the "total" relation for error string traceervations:
-     Err s1 ~~ Err s2   for any s1, s2     
+     Err s1 ~~ Err s2   for any s1, s2
      ( Could pass in E : string -> string -> Prop )
 
   In order for the theory to make sense, we probly would also want to have:
     RA a1 a2 <-> R (Ret a1) (Ret a2)
     RAddr a1 a2 <->  RValue (inj_addr a1) (inj_addr a2)
   *)
-  
+
   Inductive related_effect_step  : effects X -> effects X -> Prop :=
   | related_effect_Alloca :
       forall t k1 k2
@@ -120,7 +120,7 @@ Section RELATED_EFFECTS.
         related_effect_step (Call v1 vs1 k1) (Call v2 vs2 k2)
   .
   Hint Constructors related_effect_step.
-  
+
   Lemma related_effect_refl : (reflexive _ R) -> reflexive _ related_effect_step.
   Proof.
     unfold reflexive.
@@ -129,7 +129,7 @@ Section RELATED_EFFECTS.
     - econstructor. intros a1 a2 H. subst. eauto.
     - econstructor; eauto. intros v1 v2 H. subst. eauto.
     - econstructor; intros; subst; eauto.
-  Qed.      
+  Qed.
 
   Lemma related_effect_symm : (symmetric _ R) -> symmetric _ related_effect_step.
   Proof.
@@ -143,14 +143,14 @@ Section RELATED_EFFECTS.
     unfold transitive.
     intros HR x y z H1 H2.
     dependent destruction H1; dependent destruction H2; eauto.
-  Qed.    
-End RELATED_EFFECTS.    
+  Qed.
+End RELATED_EFFECTS.
 
 Section RELATED_EVENTS.
 
   Variable X : Type.
   Variable R : X -> X -> Prop.
-  
+
   Inductive related_event_step : Event X -> Event X -> Prop :=
   | related_event_fin :
       forall v1 v2
@@ -167,14 +167,14 @@ Section RELATED_EVENTS.
         related_event_step (Eff e1) (Eff e2)
   .
   Hint Constructors related_event_step.
-  
+
   Lemma related_event_refl : (reflexive _ R) -> reflexive _ related_event_step.
   Proof.
     unfold reflexive.
     intros HR x.
-    destruct x; eauto. 
+    destruct x; eauto.
     - constructor. apply related_effect_refl; auto.
-  Qed.      
+  Qed.
 
   Lemma related_event_symm : (symmetric _ R) -> symmetric _ related_event_step.
   Proof.
@@ -190,14 +190,14 @@ Section RELATED_EVENTS.
     intros HR x y z H1 H2.
     dependent destruction H1; dependent destruction H2; constructor; eauto.
     - eapply related_effect_trans; eauto.
-  Qed.    
-  
+  Qed.
+
 End RELATED_EVENTS.
 
-Section OBSERVATIONAL_EQUIVALENCE. 
+Section OBSERVATIONAL_EQUIVALENCE.
   Variable X : Type.
   Variable R : Trace X -> Trace X -> Prop.
-  
+
   Inductive trace_equiv_step : Trace X -> Trace X -> Prop :=
   | trace_equiv_step_vis :
       forall e1 e2
@@ -220,7 +220,7 @@ Section OBSERVATIONAL_EQUIVALENCE.
         trace_equiv_step k1 (Tau x2 k2)
   .
   Hint Constructors trace_equiv_step.
-  
+
 End OBSERVATIONAL_EQUIVALENCE.
 
 Hint Constructors related_effect_step related_event_step trace_equiv_step.
@@ -232,7 +232,7 @@ Lemma related_effect_step_monotone : forall X (R1 R2: X -> X -> Prop)
 Proof.
   intros X R1 R2 HR e1 e2 HM.
   dependent destruction HM; constructor; eauto.
-Qed.  
+Qed.
 Hint Resolve related_effect_step_monotone : paco.
 
 Lemma related_event_step_monotone : forall X (R1 R2:X -> X -> Prop)
@@ -242,8 +242,8 @@ Lemma related_event_step_monotone : forall X (R1 R2:X -> X -> Prop)
 Proof.
   intros X R1 R2 HR m1 m2 HM.
   dependent destruction HM; constructor; eauto using related_effect_step_monotone.
-Qed.  
-Hint Resolve related_event_step_monotone : paco.  
+Qed.
+Hint Resolve related_event_step_monotone : paco.
 
 Lemma trace_equiv_step_monotone : forall {X}, monotone2 (@trace_equiv_step X).
 Proof.
@@ -273,7 +273,7 @@ Lemma trace_equiv_symm : symmetric Trace trace_equiv.
 Proof.
   pcofix CIH.
   intros d1 d2 H.
-  punfold H. 
+  punfold H.
   induction H; pfold; econstructor; eauto.
   - dependent destruction HRe; subst; eauto.
     constructor. inversion HRe; constructor; eauto.
@@ -284,12 +284,12 @@ Proof.
   - pclearbot. right. eauto.
   - punfold IHtrace_equiv_step.
   - punfold IHtrace_equiv_step.
-Qed.    
-      
+Qed.
+
 Inductive tau_star (P:Trace -> Prop) : Trace  -> Prop :=
 | tau_star_zero : forall (d:Trace), P d -> tau_star P d
 | tau_star_tau  : forall (d:Trace), tau_star P d -> tau_star P (Tau d)
-.                                                       
+.
 Hint Constructors tau_star.
 
 Lemma tau_star_monotone : monotone1 tau_star.
@@ -297,13 +297,13 @@ Proof.
   unfold monotone1.
   intros x0 r r' IN LE.
   induction IN; auto.
-Qed.  
+Qed.
 Hint Resolve tau_star_monotone : paco.
 
 (* This predicate relates two traces that agree on a non-tau step *)
 Inductive trace_event (R: Trace -> Trace -> Prop) : Trace -> Trace -> Prop :=
 | trace_event_vis : forall e1 e2, related_event_step R e1 e2 -> trace_event R (Vis e1) (Vis e2)
-.                                                                  
+.
 Hint Constructors trace_event.
 
 Lemma trace_event_monotone : monotone2 trace_event.
@@ -319,7 +319,7 @@ Inductive trace_equiv_big_step (R:Trace -> Trace -> Prop) : Trace -> Trace -> Pr
                      (TS1:tau_star (fun t => t = t1) s1)
                      (TS2:tau_star (fun t => t = t2) s2)
                      (HO: trace_event R t1 t2) : trace_equiv_big_step R s1 s2
-.                                                                 
+.
 Hint Constructors trace_equiv_big_step.
 
 Lemma trace_equiv_big_step_monotone : monotone2 trace_equiv_big_step.
@@ -329,7 +329,7 @@ Proof.
   induction IN; auto.
   eapply trace_equiv_big_taus. apply TS1. apply TS2.
   eapply trace_event_monotone. apply HO. exact LE.
-Qed.  
+Qed.
 Hint Resolve trace_equiv_big_step_monotone : paco.
 
 Definition trace_equiv_big (d1 d2:Trace) := paco2 trace_equiv_big_step bot2 d1 d2.
@@ -340,30 +340,30 @@ Proof.
   intros.
   pfold. apply trace_equiv_step_lft.
   punfold H.
-Qed.  
+Qed.
 
 Lemma trace_equiv_tau_rgt : forall (d1 d2:Trace), trace_equiv d1 d2 -> trace_equiv d1 (Tau d2).
 Proof.
   intros.
   pfold. apply trace_equiv_step_rgt.
   punfold H.
-Qed.  
+Qed.
 
 Lemma trace_equiv_lft_inversion : forall(d1 d2:Trace), trace_equiv (Tau d1) d2 -> trace_equiv d1 d2.
 Proof.
   intros d1 d2 H.
-  punfold H. remember (Tau d1) as d. 
+  punfold H. remember (Tau d1) as d.
   induction H; try (solve [inversion Heqd; subst; clear Heqd]).
   - inversion Heqd. subst. apply trace_equiv_tau_rgt. pclearbot. punfold HRk.
   - inversion Heqd. subst. pfold. exact H.
   - subst. apply trace_equiv_tau_rgt. apply IHtrace_equiv_step. reflexivity.
-Qed.    
+Qed.
 
 Lemma trace_equiv_rgt_inversion : forall (d1 d2:Trace), trace_equiv d1 (Tau d2) -> trace_equiv d1 d2.
 Proof.
   intros.
   apply trace_equiv_symm. apply trace_equiv_symm in H. apply trace_equiv_lft_inversion. exact H.
-Qed.  
+Qed.
 
 Lemma event_not_diverges : forall (d:Trace), tau_star non_tau d -> diverges d -> False.
 Proof.
@@ -371,7 +371,7 @@ Proof.
   induction HS.
   - intros HD; dependent destruction d; punfold HD; inversion HD.
   - intros HD. apply IHHS. punfold HD. dependent destruction HD. pclearbot. apply H.
-Qed.    
+Qed.
 
 (* CLASSICAL! *)
 Lemma event_or_diverges : forall (d:Trace), tau_star non_tau d \/ diverges d.
@@ -394,7 +394,7 @@ Proof.
     pfold. constructor. right. eauto.
   - punfold HD. inversion HD. subst. pclearbot. apply IHEQ. apply H0.
   - pfold. constructor. left. auto.
-Qed.    
+Qed.
 
 Lemma trace_equiv_event : forall (d1 d2:Trace) (EQ:trace_equiv d1 d2) (HS:tau_star non_tau d1), tau_star non_tau d2.
 Proof.
@@ -407,7 +407,7 @@ Proof.
     + apply tau_star_tau. apply IHHS. pclearbot. eauto.
     + apply IHHS. pfold. exact EQ.
     + apply tau_star_tau. eauto.
-Qed.      
+Qed.
 
 Lemma trace_equiv_diverges_or_event : forall (d1 d2:Trace) (EQ:trace_equiv d1 d2),
     (diverges d1 /\ diverges d2) \/ (tau_star non_tau d1 /\ tau_star non_tau d2).
@@ -416,7 +416,7 @@ Proof.
   destruct (@event_or_diverges d1) as [HS | HD].
   - right. eauto using trace_equiv_event.
   - left. eauto using trace_equiv_diverges.
-Qed.    
+Qed.
 
 Lemma trace_equiv_big_step_tau_left :  forall R (d1 d2:Trace)
                                        (HR: paco2 trace_equiv_big_step R d1 d2), paco2 trace_equiv_big_step R (Tau d1) d2.
@@ -456,7 +456,7 @@ Proof.
     + eauto using trace_equiv_big_step_tau_right, trace_equiv_rgt_inversion.
   - eauto using trace_equiv_big_step_tau_left, trace_equiv_lft_inversion.
 Qed.
-      
+
 Lemma trace_equiv_big_implies_trace_equiv : forall (d1 d2:Trace) (EQB:trace_equiv_big d1 d2), trace_equiv d1 d2.
 Proof.
   pcofix CIH.
@@ -474,7 +474,7 @@ Proof.
         exact H.
       * pfold.  apply IHTS2 in HO. punfold HO.
     + pfold. constructor. apply IHTS1 in TS2; eauto. punfold TS2.
-Qed.      
+Qed.
 
 Lemma trace_event_non_tau_left : forall R (d1 d2:Trace), trace_event R d1 d2 -> non_tau d1.
 Proof.
@@ -502,7 +502,7 @@ Proof.
     + simpl in ND1. inversion ND1.
   - dependent destruction TS2; eauto.
     simpl in ND2. inversion ND2.
-Qed.    
+Qed.
 
 (*
 Lemma trace_equiv_mem_step_trans:
@@ -524,7 +524,7 @@ Proof.
   inversion H12; subst; inversion H23; subst; constructor; intros; eauto.
   - rewrite H. rewrite H3. reflexivity.
   - rewrite H. rewrite H3. reflexivity.
-  - rewrite H. rewrite H4. reflexivity.    
+  - rewrite H. rewrite H4. reflexivity.
 Qed.
 *)
 
@@ -557,8 +557,8 @@ Proof.
     + intros rv1 rv2 Heq.
       specialize (HRk rv1 rv2 Heq). specialize (HRk0 rv1 rv2 Heq). subst. pclearbot.
       right. eapply CIH; eauto.
-Qed.    
-    
+Qed.
+
 
 Lemma trace_equiv_trans : forall (d1 d2 d3:Trace), trace_equiv d1 d2 -> trace_equiv d2 d3 -> trace_equiv d1 d3.
 Proof.
@@ -570,14 +570,14 @@ Qed.
 
 (* This statement is false if d1 and d2 are inifinite Tau streams
     would have to weaken the conclusion to:
-      (d1 = d2 /\ d1 = all_taus) \/ ... 
+      (d1 = d2 /\ d1 = all_taus) \/ ...
     this would probably require classical logic to prove.
 
 Lemma trace_equiv_inversion : forall {A} (d1 d2:Trace A),
     trace_equiv d1 d2 ->  exists d1', exists d2', exists n, exists m,
             d1 = taus n d1' /\ d2 = taus m d2' /\ non_tau_head d1' /\ non_tau_head d2' /\ trace_equiv d1' d2'.
 Proof.
-Abort.  
+Abort.
 *)
 
 
@@ -645,7 +645,7 @@ Lemma predicate_effect_step_monotone : forall X (R1 R2: X -> Prop)
 Proof.
   intros X R1 R2 HR e HM.
   dependent destruction HM; constructor; eauto.
-Qed.  
+Qed.
 Hint Resolve predicate_effect_step_monotone : paco.
 
 
@@ -669,13 +669,13 @@ Proof.
   intros X R1 R2 HR e HM.
   dependent destruction HM; constructor; eauto.
   eapply predicate_effect_step_monotone; eauto.
-Qed.  
+Qed.
 Hint Resolve error_free_event_step_monotone : paco.
 
 Inductive error_free_trace_step (R : Trace -> Prop) : Trace -> Prop :=
 | error_free_vis : forall e, error_free_event_step R e -> error_free_trace_step R (Vis e)
 | error_free_tau : forall k, R k -> error_free_trace_step R (Tau k)
-.                                                  
+.
 Hint Constructors error_free_trace_step.
 
 Lemma error_free_trace_step_monotone : monotone1 error_free_trace_step.

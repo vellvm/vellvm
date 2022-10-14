@@ -1,13 +1,10 @@
 (* begin hide *)
 From Vellvm Require Import
-     Utils.Util
      Syntax.CFG
      Syntax.DynamicTypes
      Syntax.LLVMAst
-     Syntax.AstLib
      Syntax.Scope
-     Analysis.Dom
-     Analysis.DomKildall.
+     Analysis.Dom.
 (* end hide *)
 
   Lemma instr_id_eq_dec : forall (x y : instr_id), {x = y} + {x <> y}.
@@ -31,7 +28,7 @@ From Vellvm Require Import
   Definition succ_instr (c : cfg dtyp) (v v' : pc) : Prop :=
     let '(bid,mx) := v in
     match find_block c.(blks) bid with
-    | Some bk => 
+    | Some bk =>
       match List.nth_error
               (def_sites_phis bk.(blk_phis) ++ List.map fst bk.(blk_code)) (opt_succ mx) with
       | None => exists bid', List.In bid' (successors bk) /\ v' = (bid',None)
@@ -43,10 +40,10 @@ From Vellvm Require Import
   Definition mem_instr (c : cfg dtyp) (p : pc) : Prop :=
     let '(bid,mx) := p in
     match find_block c.(blks) bid with
-    | Some bk => 
+    | Some bk =>
       match mx with
       | None => True
-      | Some (offset,x) => 
+      | Some (offset,x) =>
         match List.nth_error
                 (def_sites_phis bk.(blk_phis) ++ List.map fst bk.(blk_code)) offset with
         | None => False
@@ -56,7 +53,7 @@ From Vellvm Require Import
     | None => False
     end.
 
-(**  ------------------------------------------------------------------------- *)  
+(**  ------------------------------------------------------------------------- *)
 (** * GRAPH instance for dominance calculation *)
 
 (** Graph of program points *)
@@ -74,4 +71,3 @@ End idGraph.
 (** Instantiate the dominance spec for this graph *)
 
 Module Export Dom := Dom.Spec idGraph.
-

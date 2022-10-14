@@ -24,8 +24,7 @@ From Coq Require Import
      List
      Program.Tactics Program.Equality.
 From ITree Require Import
-     Basics.Monad
-     Basics.MonadState.
+     Basics.Monad.
 
 From Vellvm Require Import
      Utils.PropT.
@@ -799,3 +798,4 @@ Section interp_refl.
   Qed.
 
 End interp_refl.
+

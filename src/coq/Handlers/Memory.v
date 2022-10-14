@@ -136,10 +136,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
    *)
   Section Map_Operations.
 
-  
+
     (* Polymorphic type of maps indexed by [Z] *)
     Definition IntMap := IM.t.
-    
+
     Definition add {a} k (v:a) := IM.add k v.
     Definition delete {a} k (m:IntMap a) := IM.remove k m.
     Definition member {a} k (m:IntMap a) := IM.mem k m.
@@ -375,7 +375,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | DVALUE_Vector fields =>
         (* note the _right_ fold is necessary for byte ordering. *)
         fold_right (fun 'dv acc => ((serialize_dvalue dv) ++ acc) % list) [] fields
-      | _ => [] 
+      | _ => []
       end.
 
     (** ** Well defined block

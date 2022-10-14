@@ -106,7 +106,7 @@ Section EitherT.
 
   Open Scope monad_scope.
 
-  From Coq Require Import Setoid.
+
 
   (* Instance proper_eq1_mkEitherT : forall {A}, Proper (@eq1 M EQM (E + A) ==> @eq1 (eitherT E M) _ A) mkEitherT. *)
   (* Proof. *)
@@ -160,3 +160,4 @@ Section EitherT.
     { raise_catch := raise_catch_eitherT }.
 
 End EitherT.
+

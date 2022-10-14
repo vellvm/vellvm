@@ -692,10 +692,7 @@ End EitherT.
 
 Section StateT.
   From ITree Require Import
-       ITree
-       Basics.Basics
-       Events.StateFacts
-       Events.State.
+       ITree.
 
   Import Monads.
 
@@ -790,3 +787,4 @@ Section StateT.
   (*      }. *)
 
 End StateT.
+

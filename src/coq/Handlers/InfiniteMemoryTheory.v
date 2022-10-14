@@ -75,7 +75,7 @@ Module BigIntptrInfiniteMemoryTheory : InfiniteMemoryTheory InterpreterStackBigI
           => pose proof from_Z_safe x as SAFE
         end.
         break_match_hyp; [|contradiction].
-        unfold ErrSID_succeeds; cbn; auto.        
+        unfold ErrSID_succeeds; cbn; auto.
       }
 
       intros sid1 pr1 a1 EVALS'.

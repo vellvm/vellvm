@@ -25,8 +25,7 @@ From Coq Require Import
      Program.Tactics.
 
 From ITree Require Import
-     Basics.Monad
-     Basics.MonadState.
+     Basics.Monad.
 
 Require Import Paco.paco.
 
@@ -1150,3 +1149,4 @@ Proof.
 Qed.
 
 End BIND_BIND_COUNTEREXAMPLE.
+

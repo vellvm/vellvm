@@ -1,10 +1,5 @@
 From Coq Require Import
      List
-     String
-     Ascii
-     FSets.FMapAVL
-     FSets.FSetAVL
-     Structures.OrderedTypeEx
      ZArith.
 
 From Vellvm Require Import

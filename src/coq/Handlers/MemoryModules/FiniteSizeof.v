@@ -11,7 +11,6 @@ From Vellvm.Syntax Require Import
 
 From Vellvm.Semantics Require Import
      DynamicValues
-     MemoryAddress
      LLVMEvents
      Memory.MemBytes
      Memory.Sizeof.

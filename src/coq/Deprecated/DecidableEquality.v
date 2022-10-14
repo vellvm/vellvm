@@ -1,6 +1,6 @@
 
 (* TODO: This file needs to be ported for use with ExtLib.
-     - replace eq_dec with RelDec and Eqv instances 
+     - replace eq_dec with RelDec and Eqv instances
 *)
 
 
@@ -14,7 +14,7 @@ Require Import Vellvm.Util.
 Require Import Vellvm.LLVMAst Vellvm.AstLib Vellvm.CFG.
 Require Import Vellvm.DynamicValues Vellvm.StepSemantics Vellvm.Memory.
 Require Import List.
-(** ** Decidable Equality *) 
+(** ** Decidable Equality *)
 
 Instance eq_dec_int : eq_dec (BinNums.Z) := Z.eq_dec.
 
@@ -185,7 +185,7 @@ Proof.
              | [] => IHTYPE_FunctionBase ret (prove_t ret)
              | (t' :: ts) =>
                IHTYPE_FunctionInd ret t' ts
-                   (prove_t ret)     
+                   (prove_t ret)
                    (prove_t t')
                    (prove_l ts)
              end
@@ -201,7 +201,7 @@ Proof.
              end
          in
          prove_l IHTYPE_StructBase IHTYPE_StructInd fields
-       | TYPE_Packed_struct fields => 
+       | TYPE_Packed_struct fields =>
          let fix prove_l base ind (l : list LLVMAst.typ) :=
              match l with
              | [] => base
@@ -242,7 +242,7 @@ Proof.
               end).
       { inversion args_eq_ys; subst; auto. }
       { intros H. inversion H. subst; auto. }
-    } 
+    }
     { intros H; inversion H; subst; auto. }
   - destruct fields; auto.
   - refine (match fields0 with
@@ -318,7 +318,7 @@ Definition exp_ind': forall (P : LLVMAst.exp  -> Set),
     (forall id : ident, P (EXP_Ident id)) ->
     (forall x : int, P (EXP_Integer x)) ->
     (forall f : float, P (EXP_Float f)) ->
-    (forall h : float, P (EXP_Hex h)) ->    
+    (forall h : float, P (EXP_Hex h)) ->
     (forall b : bool, P (EXP_Bool b)) ->
     (P EXP_Null) ->
     (P EXP_Zero_initializer) ->
@@ -403,7 +403,7 @@ Proof.
          | EXP_Ident id => _
          | EXP_Integer n => _
          | EXP_Float f => _
-         | EXP_Hex h => _                             
+         | EXP_Hex h => _
          | EXP_Bool b => _
          | EXP_Null => _
          | EXP_Zero_initializer => _
@@ -417,7 +417,7 @@ Proof.
              | (t, v) :: rest =>
                IH_Struct_Ind t v rest (prove_v v) (prove_l rest)
              end
-           in prove_l l 
+           in prove_l l
          | EXP_Packed_struct l =>
            let
              fix prove_l (l : list (LLVMAst.typ * LLVMAst.exp)) :=
@@ -426,7 +426,7 @@ Proof.
              | (t, v) :: rest =>
                IH_Packed_struct_Ind t v rest (prove_v v) (prove_l rest)
              end
-           in prove_l l 
+           in prove_l l
          | EXP_Array l =>
            let
              fix prove_l (l : list (LLVMAst.typ * LLVMAst.exp)) :=
@@ -435,7 +435,7 @@ Proof.
              | (t, v) :: rest =>
                IH_Array_Ind t v rest (prove_v v) (prove_l rest)
              end
-           in prove_l l 
+           in prove_l l
 
          | EXP_Vector l =>
            let
@@ -445,19 +445,19 @@ Proof.
              | (t, v) :: rest =>
                IH_Vector_Ind t v rest (prove_v v) (prove_l rest)
              end
-           in prove_l l            
+           in prove_l l
 
          | OP_IBinop op t v1 v2 =>
-           IH_IBinop op t v1 v2 (prove_v v1) (prove_v v2) 
-         | OP_ICmp op t v1 v2 => 
-           IH_ICmp op t v1 v2 (prove_v v1) (prove_v v2) 
+           IH_IBinop op t v1 v2 (prove_v v1) (prove_v v2)
+         | OP_ICmp op t v1 v2 =>
+           IH_ICmp op t v1 v2 (prove_v v1) (prove_v v2)
          | OP_FBinop op fm t v1 v2 =>
-           IH_FBinop op fm t v1 v2 (prove_v v1) (prove_v v2) 
+           IH_FBinop op fm t v1 v2 (prove_v v1) (prove_v v2)
          | OP_FCmp op t v1 v2 =>
-           IH_FCmp op t v1 v2 (prove_v v1) (prove_v v2) 
+           IH_FCmp op t v1 v2 (prove_v v1) (prove_v v2)
          | OP_Conversion conv t_from v t_to =>
            IH_Conversion conv t_from v t_to (prove_v v)
-           
+
          | OP_GetElementPtr t (ptr_t, ptr_v) l =>
            let fix prove_l (l : list (LLVMAst.typ * LLVMAst.exp)) :=
                match l with
@@ -469,18 +469,18 @@ Proof.
                                       (prove_l rest)
                end
            in prove_l l
-           
+
          | OP_ExtractElement (vec_t, vec_v) (idx_t, idx_v) =>
            IH_ExtractElement vec_t vec_v idx_t idx_v
                              (prove_v vec_v) (prove_v idx_v)
          | OP_InsertElement (vec_t, vec_v) (elt_t, elt_v) (idx_t, idx_v) =>
            IH_InsertElement vec_t vec_v elt_t elt_v idx_t idx_v
                             (prove_v vec_v) (prove_v elt_v) (prove_v idx_v)
-         | OP_ShuffleVector (vec1_t, vec1_v) (vec2_t, vec2_v) (idxmask_t, idxmask_v) => 
+         | OP_ShuffleVector (vec1_t, vec1_v) (vec2_t, vec2_v) (idxmask_t, idxmask_v) =>
            IH_ShuffleVector vec1_t vec1_v vec2_t vec2_v idxmask_t idxmask_v
                             (prove_v vec1_v) (prove_v vec2_v) (prove_v idxmask_v)
          | OP_ExtractValue (vec_t, vec_v) idxs =>
-           IH_ExtractValue vec_t vec_v idxs (prove_v vec_v) 
+           IH_ExtractValue vec_t vec_v idxs (prove_v vec_v)
          | OP_InsertValue (vec_t, vec_v) (elt_t, elt_v) idxs =>
            IH_InsertValue vec_t vec_v elt_t elt_v idxs
                           (prove_v vec_v) (prove_v elt_v)
@@ -504,7 +504,7 @@ Proof.
   - destruct (Float.eq_dec h f).
     left; subst; reflexivity.
     right. injection. tauto.
-   
+
   (* Case Exp_Struct *)
   - destruct fields; auto.
   - refine
@@ -613,7 +613,7 @@ Proof.
          end
        | right t_neq => right _
        end).
-    { subst; reflexivity. } 
+    { subst; reflexivity. }
     { intros H; inversion H; apply ptr_exp_neq; subst; auto. }
     { intros H; inversion H; apply t_neq; subst; auto. }
   - destruct ptrval as (ptr_t', ptr_v');
@@ -679,7 +679,7 @@ Proof.
 
     (* DV (OP_InsertElement ...), arity 3 *)
   - destruct vec as (vec_t', vec_v');
-      destruct elt as (elt_t', elt_v');      
+      destruct elt as (elt_t', elt_v');
       destruct idx as (idx_t', idx_v');
       try (right; intros H; inversion H; tauto).
     refine (match decide (vec_t = vec_t') with
@@ -689,7 +689,7 @@ Proof.
                 match decide (elt_t = elt_t') with
                 | left elt_t_eq =>
                   match decide (x2 = elt_v') with
-                  | left elt_v_eq => 
+                  | left elt_v_eq =>
                     match decide (idx_t = idx_t') with
                     | left idx_t_eq =>
                       match decide (x3 = idx_v') with
@@ -701,7 +701,7 @@ Proof.
                   | right elt_v_neq => right _
                   end
                 | right elt_t_neq => right _
-                end                  
+                end
               | right vec_v_neq => right _
               end
             | right vec_t_neq => right _
@@ -715,7 +715,7 @@ Proof.
 
     (* (OP_ShuffleVector ...) ; Same as (OP_InsertElement ...), with arity 3 *)
   - destruct vec1 as (vec1_t', vec1_v');
-      destruct vec2 as (vec2_t', vec2_v');      
+      destruct vec2 as (vec2_t', vec2_v');
       destruct idxmask as (idxmask_t', idxmask_v');
       try (right; intros H; inversion H; tauto).
     refine (match decide (vec1_t = vec1_t') with
@@ -725,7 +725,7 @@ Proof.
                 match decide (vec2_t = vec2_t') with
                 | left vec2_t_eq =>
                   match decide (x2 = vec2_v') with
-                  | left vec2_v_eq => 
+                  | left vec2_v_eq =>
                     match decide (idxmask_t = idxmask_t') with
                     | left idxmask_t_eq =>
                       match decide (x3 = idxmask_v') with
@@ -737,7 +737,7 @@ Proof.
                   | right vec2_v_neq => right _
                   end
                 | right vec2_t_neq => right _
-                end                  
+                end
               | right vec1_v_neq => right _
               end
             | right vec1_t_neq => right _
@@ -801,7 +801,7 @@ Proof.
                 match decide (v1_t = v1_t') with
                 | left v1_t_eq =>
                   match decide (x2 = v1_v') with
-                  | left v1_v_eq => 
+                  | left v1_v_eq =>
                     match decide (v2_t = v2_t') with
                     | left v2_t_eq =>
                       match decide (x3 = v2_v') with
@@ -813,7 +813,7 @@ Proof.
                   | right v1_v_neq => right _
                   end
                 | right v1_t_neq => right _
-                end                  
+                end
               | right cnd_v_neq => right _
               end
             | right cnd_t_neq => right _
@@ -835,10 +835,10 @@ Definition dvalue_ind':=
     (f4 : forall x : ll_double, P (DVALUE_Double x))
     (f5 : forall x : ll_float, P (DVALUE_Float x))
     (f6 : forall (t : LLVMAst.typ) (v : option exp), P (DVALUE_Undef t v))
-    (f7 : P DVALUE_Poison) 
+    (f7 : P DVALUE_Poison)
     (f8 : P DVALUE_None)
     (IH_Struct_Base: P(DVALUE_Struct []))
-    (IH_Struct_Ind : forall t v fields, 
+    (IH_Struct_Ind : forall t v fields,
           P v ->
           P (DVALUE_Struct fields) ->
           P (DVALUE_Struct ((t,v)::fields)))
@@ -848,12 +848,12 @@ Definition dvalue_ind':=
           P (DVALUE_Packed_struct fields) ->
           P (DVALUE_Packed_struct ((t,v) :: fields)))
     (IH_Array_Base: P(DVALUE_Array []))
-    (IH_Array_Ind : forall t v elts , 
+    (IH_Array_Ind : forall t v elts ,
           P v ->
           P (DVALUE_Array elts) ->
           P (DVALUE_Array ((t, v) :: elts)))
     (IH_Vector_Base: P(DVALUE_Vector []))
-    (IH_Vector_Ind : forall t v elts, 
+    (IH_Vector_Ind : forall t v elts,
           P v ->
           P (DVALUE_Vector elts) ->
           P (DVALUE_Vector ((t,v) :: elts)))
@@ -876,21 +876,21 @@ Definition dvalue_ind':=
              | (t, v) :: rest =>
                IH_Struct_Ind t v rest (prove_dv v) (prove_l rest)
              end) x
-      | DVALUE_Packed_struct x =>         
+      | DVALUE_Packed_struct x =>
         (fix prove_l (l : list (LLVMAst.typ * dvalue)) :=
              match l with
              | [] => IH_Packed_Struct_Base
              | (t, v) :: rest =>
                IH_Packed_Struct_Ind t v rest (prove_dv v) (prove_l rest)
              end) x
-      | DVALUE_Array x =>          
+      | DVALUE_Array x =>
         (fix prove_l (l : list (LLVMAst.typ * dvalue)) :=
              match l with
              | [] => IH_Array_Base
              | (t, v) :: rest =>
                IH_Array_Ind t v rest (prove_dv v) (prove_l rest)
              end) x
-      | DVALUE_Vector x =>          
+      | DVALUE_Vector x =>
         (fix prove_l (l : list (LLVMAst.typ * dvalue)) :=
              match l with
              | [] => IH_Vector_Base
@@ -904,7 +904,7 @@ Instance eq_dec_llfloat : eq_dec ll_float := Floats.Float32.eq_dec.
 
 Instance eq_dvalue : eq_dec dvalue.
 Proof.
-  induction x using dvalue_ind'; destruct y; 
+  induction x using dvalue_ind'; destruct y;
     try (right; intro H; inversion H; tauto);
     try (lift_decide_eq);
     try destruct e; unfold Decidable;
@@ -1016,7 +1016,7 @@ Instance eq_dec_terminator : eq_dec terminator.
 Proof.
   lift_decide_eq; left; auto.
 Defined.
-  
+
 Instance eq_dec_phi : eq_dec LLVMAst.phi.
 Proof. lift_decide_eq. Defined.
 
@@ -1041,13 +1041,13 @@ Proof. lift_decide_eq. Defined.
  *)
 
 (*
-The following are not true. 
+The following are not true.
 Instance eq_dec_effects `{eq_dec D} : eq_dec (effects D).
 Instance eq_dec_transition `{eq_dec X} : eq_dec (transition X).
 *)
 
 
-(** ** Basic Propositions *) 
+(** ** Basic Propositions *)
 
 Inductive prefix_of {A : Type}: list A -> list A -> Prop :=
 | prefix_nil : forall l : list A, prefix_of [] l

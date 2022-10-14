@@ -20,7 +20,7 @@ From Vellvm.Semantics Require Import
      DynamicValues
      VellvmIntegers.
 
-From QuickChick Require Import Show.
+
 
 From ExtLib Require Import
      Structures.Monads.

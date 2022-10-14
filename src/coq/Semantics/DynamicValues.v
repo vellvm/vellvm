@@ -31,11 +31,9 @@ From ExtLib Require Import
 From Vellvm Require Import
      Utilities
      Syntax
-     Syntax.DataLayout
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
      Semantics.VellvmIntegers
-     Utils.Monads
      Utils.MapMonadExtra
      Utils.MonadEq1Laws
      Utils.MonadReturnsLaws
@@ -231,7 +229,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_Array elts => "["  ++ String.concat ", " (map show_dvalue elts) ++ "]"
     | DVALUE_Vector elts => "<"  ++ String.concat ", " (map show_dvalue elts) ++ ">"
     end.
-  
+
   Fixpoint dvalue_measure (dv : dvalue) : nat :=
     match dv with
     | DVALUE_Addr a => 1
@@ -1952,7 +1950,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       | Fptosi
       | Fptrunc
       | Fpext
-      | Addrspacecast    
+      | Addrspacecast
         => Conv_Illegal "TODO: unimplemented numeric conversion"
       end.
     Arguments get_conv_case _ _ _ _ : simpl nomatch.
@@ -2628,7 +2626,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       {NO_VOID dt} + {~NO_VOID dt}.
   Proof.
     intros dt.
-    induction dt.  
+    induction dt.
     all:
       try match goal with
           | NV : {NO_VOID _} + {~ NO_VOID _} |- _ =>

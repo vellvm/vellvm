@@ -1,6 +1,4 @@
 From Coq Require Import
-     ZArith
-     List
      Lia
      Morphisms.
 

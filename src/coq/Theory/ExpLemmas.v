@@ -23,9 +23,7 @@ From Vellvm Require Import
      Syntax
      Semantics
      Theory.StatePredicates
-     Theory.Refinement
-     Theory.InterpreterCFG
-     Utils.PostConditions.
+     Theory.InterpreterCFG.
 
 Open Scope itree_scope.
 Import ITreeNotations.
@@ -239,7 +237,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Import ExpTactics.
 
   Section ExpLemmas.
-    
+
     Lemma denote_exp_GR :forall g l id v τ,
         Maps.lookup id g = Some v ->
         ⟦ EXP_Ident (ID_Global id) at τ ⟧e2 g l
@@ -373,7 +371,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       rewrite AV, BV.
       cbn.
       rewrite EVAL.
-      cbn. 
+      cbn.
       go.
       reflexivity.
     Qed.
@@ -711,12 +709,12 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (*                                         apply failure_is_pure *)
   (*                 end | *)
 
-                  
+
   (*                 match goal with *)
   (*                   |- context [raiseUB] => rewrite ?FUB_to_exp_raiseUB, ?exp_to_instr_raiseUB;  *)
   (*                                           apply UB_is_pure *)
   (*                 end | *)
-                  
+
   (*                 match goal with *)
   (*                   |- context [pick_uvalue] => rewrite ?exp_to_instr_pick; *)
   (*                                        apply pick_is_pure *)
@@ -743,14 +741,14 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (*   (*       destruct (Maps.lookup id g) eqn:EQ. *) *)
   (*   (*       * step. *) *)
   (*   (*         go... *) *)
-    
+
   (*   (*       * step... *) *)
-    
+
   (*   (*     + go.  *) *)
   (*   (*       destruct (Maps.lookup id l) eqn:EQ. *) *)
   (*   (*       * step...  *) *)
   (*   (*       * step... *) *)
-    
+
   (*   (*   - destruct o; cbn... *) *)
   (*   (*     destruct d; simpl... *) *)
   (*   (*     unfold denote_exp, lift_undef_or_err. *) *)
@@ -1114,7 +1112,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (*   (*       break_match_goal... *) *)
   (*   (*       break_match_goal... *) *)
   (*   (*       go... *) *)
-    
+
   (*   (*   - auto... *) *)
 
   (*   (*   - destruct cnd,v1,v2; cbn. *) *)
@@ -1134,7 +1132,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (*   (*     break_match_goal... *) *)
   (*   (*     break_match_goal... *) *)
   (*   (*     go... *) *)
-    
+
   (*   (*   - destruct v; cbn. *) *)
   (*   (*     go. *) *)
   (*   (*     eapply has_post_bind_strong. *) *)
@@ -1153,7 +1151,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (*   (*     } *) *)
   (*   (*     intros (? & ? & ? & ?) (-> & -> & ->). *) *)
   (*   (*     go... *) *)
-    
+
   (*   (* Admitted. *) *)
 
   (* End ExpPure. *)

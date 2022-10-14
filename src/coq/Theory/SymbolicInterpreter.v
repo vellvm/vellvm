@@ -10,15 +10,7 @@ From ITree Require Import
      Eq.Eq
      TranslateFacts.
 
-From Vellvm Require Import
-     Utilities
-     Syntax
-     Semantics
-     Syntax.ScopeTheory
-     Theory.DenotationTheory
-     Theory.ExpLemmas
-     Theory.InstrLemmas
-     Theory.InterpreterCFG.
+
 
 (* end hide *)
 
@@ -310,4 +302,5 @@ From Vellvm Require Import
 (* Tactic Notation "eutt_hide_rel" := *)
 (*   let H := fresh "ER" in *)
 (*   eutt_hide_rel_named H. *)
+
 

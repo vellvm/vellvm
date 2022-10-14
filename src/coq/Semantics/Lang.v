@@ -1,16 +1,10 @@
 From Vellvm Require Import
-     Semantics.MemoryAddress
-     Semantics.Memory.Sizeof
      Semantics.Memory.MemBytes
      Semantics.LLVMParams
      Semantics.GepM
-     Semantics.LLVMEvents
      Semantics.Denotation
-     Semantics.MemoryParams
-     Semantics.SerializationParams
 
      Handlers.Global
-     Handlers.Local
      Handlers.Stack
      Handlers.Intrinsics
      Handlers.Pick
@@ -35,7 +29,7 @@ From Vellvm Require Import
 
     Export GEP Byte MP MEM_MODEL SP.
   End Memory.
-  
+
   Module Type Lang (LP: LLVMParams).
     Export LP.
 

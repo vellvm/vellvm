@@ -4,23 +4,22 @@ From Coq Require Import Morphisms.
 From ITree Require Import
      ITree
      Eq.Eq
-     Basics.HeterogeneousRelations
      Interp.TranslateFacts.
 Set Implicit Arguments.
 Set Strict Implicit.
 (* end hide *)
 
 (** * Unary interpretation for [eutt]: a traditional program logic.
- 
-  The weak bisimulation supported by [itree]s and the notions of 
+
+  The weak bisimulation supported by [itree]s and the notions of
   refinements we build upon it in the various monads we interpret into
   give us reasoning principles to establish the equivalence or refinement
   of computations.
   In particular, it can be seen as a relational program logic.
 
   We develop here some theory for a unary program logic over itree-based computations.
-  It is defined in terms of [eutt], simply taking its diagonal. 
-  We prove that it respects the expected elemntary proof rules w.r.t. to logical 
+  It is defined in terms of [eutt], simply taking its diagonal.
+  We prove that it respects the expected elemntary proof rules w.r.t. to logical
   connectors.
   Most importantly, we derive a proof rule to leverage such unary facts during a
   relational refinement proof: see [eutt_post_bind] and [eutt_post_bind_gen].
@@ -78,7 +77,7 @@ Proof.
   intros * HP HQ.
   pose proof eutt_conj _ _ HP HQ.
   auto.
-Qed.     
+Qed.
 
 Lemma has_post_disj_l : forall {E X} (t : itree E X) P Q,
     t ⤳ P ->
@@ -87,7 +86,7 @@ Proof.
   intros * HP.
   epose proof eutt_disj_l _ _ HP as H.
   apply H.
-Qed.     
+Qed.
 
 Lemma has_post_disj_r : forall {E X} (t : itree E X) P Q,
     t ⤳ Q ->
@@ -96,7 +95,7 @@ Proof.
   intros * HQ.
   epose proof eutt_disj_r _ _ HQ as H.
   apply H.
-Qed.     
+Qed.
 
 Lemma has_post_weaken : forall {E X} (t : itree E X) P Q,
     t ⤳ P ->
@@ -106,7 +105,7 @@ Proof.
   intros * HP INCL.
   eapply eqit_mon; eauto.
   intros; apply INCL; auto.
-Qed.     
+Qed.
 
 Lemma has_post_True : forall {E X} (t : itree E X),
     t ⤳ fun _ => True.
@@ -114,7 +113,7 @@ Proof.
   intros *.
   eapply eqit_mon; eauto.
   reflexivity.
-Qed.     
+Qed.
 
 (** [has_post] structural constructs *)
 
@@ -148,7 +147,7 @@ Proof.
   specialize (IND i); apply has_post_post_strong in IND; auto.
   unfold has_post_strong in IND.
   eapply eqit_mon; try apply IND; auto.
-  intros [] ? [<- ?]; eauto. 
+  intros [] ? [<- ?]; eauto.
 Qed.
 
 Lemma has_post_translate : forall {E F X} (t : itree E X) Q (h : E ~> F),
@@ -165,7 +164,7 @@ Qed.
  *)
 Lemma eutt_post_bind : forall E R1 R2 RR U Q (t: itree E U) (k1: U -> itree E R1) (k2: U -> itree E R2),
     t ⤳ Q ->
-    (forall u, Q u -> eutt RR (k1 u) (k2 u)) -> 
+    (forall u, Q u -> eutt RR (k1 u) (k2 u)) ->
     eutt RR (ITree.bind t k1) (ITree.bind t k2).
 Proof.
   intros * POST ?.
@@ -193,7 +192,7 @@ Proof.
   clear -EQ2.
   eapply eutt_equiv; eauto.
   split.
-  - intros ? ? (? & ? & ?); do 2 econstructor; eauto. 
+  - intros ? ? (? & ? & ?); do 2 econstructor; eauto.
   - intros ? ? ?. inv H. inv REL1.
     destruct REL2 as [-> ?], REL0 as [<- ?]; eauto.
 Qed.

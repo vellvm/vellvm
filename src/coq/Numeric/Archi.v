@@ -18,7 +18,7 @@
 (** Architecture-dependent parameters for PowerPC *)
 
 Require Import ZArith List.
-From Flocq Require Import Binary Bits.
+
 
 Definition ptr64 := false.
 

@@ -1,4 +1,4 @@
-Require Import ZArith Lia Basics RelationClasses Program.
+Require Import ZArith Lia Basics RelationClasses.
 Require Import Flocq.IEEE754.Binary Flocq.Core.Defs Flocq.Core.Zaux.
 Require Import Floats.
 
@@ -101,7 +101,7 @@ Section Correctness.
    *
    * [break_match] looks for a [match] construct in the goal or some hypothesis,
    * and destructs the discriminee, while retaining the information about
-   * the discriminee's value leading to the branch being taken. 
+   * the discriminee's value leading to the branch being taken.
    *)
   Ltac break_match :=
     match goal with
@@ -159,7 +159,7 @@ Section Correctness.
     | Z.pos m => bounded prec emax m (Fexp f)
     | Z.neg m => bounded prec emax m (Fexp f)
     end.
-  
+
   (** ** equality on floats with no jumps to Real *)
   Definition float_eq (f1 : bfloat) (f2 : bfloat) : Prop :=
     let '(m1, e1) := (Fnum f1, Fexp f1) in

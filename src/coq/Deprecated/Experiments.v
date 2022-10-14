@@ -35,7 +35,7 @@ Hint Constructors s_equiv_step.
 
 Lemma s_equiv_step_mono : monotone2 s_equiv_step.
 Proof.
-  unfold monotone2. intros x0 x1 r r' IN LE. 
+  unfold monotone2. intros x0 x1 r r' IN LE.
   induction IN; eauto.
 Qed.
 Hint Resolve s_equiv_step_mono : paco.
@@ -64,12 +64,12 @@ Proof.
     eapply s_equiv_step_mono. eapply Hs.
     intros. pclearbot. right. eapply CIH. apply PR. apply s_equiv_refl.
   - remember (scons n s1) as s0.
-    punfold Hs. rewrite <- HeqR in Hs. 
+    punfold Hs. rewrite <- HeqR in Hs.
     induction Hs; try inversion Heqs0; subst.
     + pfold. apply s_equiv_cons. pclearbot. right. eapply CIH.
       exact R1. exact R0.
     + pfold. apply s_equiv_cons_z_l.
-      pclearbot. 
+      pclearbot.
       assert (paco2 s_equiv_step r s0 (scons n s2)).
       eapply IHHs; auto.
       punfold H0.
@@ -80,10 +80,10 @@ Proof.
       specialize IHs_equiv_step with (s:=s0). apply IHs_equiv_step in R0. punfold R0.
     + pfold. apply s_equiv_cons_z_l.
       apply IHHs in H. punfold H.
-Qed.      
+Qed.
 
 
-(* A more relaxed notion of equivalence where the 0's can be inserted finitely often in either 
+(* A more relaxed notion of equivalence where the 0's can be inserted finitely often in either
    stream. *)
 Inductive seq_step (seq : stream nat -> stream nat -> Prop) : stream nat -> stream nat -> Prop :=
 | seq_nil  : seq_step seq snil snil
@@ -95,7 +95,7 @@ Hint Constructors seq_step.
 
 Lemma seq_step_mono : monotone2 seq_step.
 Proof.
-  unfold monotone2. intros x0 x1 r r' IN LE. 
+  unfold monotone2. intros x0 x1 r r' IN LE.
   induction IN; eauto.
 Qed.
 Hint Resolve seq_step_mono : paco.
@@ -117,7 +117,7 @@ Proof.
   intros s.
   pfold.
   destruct s; auto.
-Qed.  
+Qed.
 
 
 (* HELP! *)
@@ -130,7 +130,7 @@ Qed.
     - give an equivalent presentation of seq that "large-steps" over
       the finite stutters to arrive back at an equivalent event
       as defined by gseq using gseq_step
-*) 
+*)
 
 
 Require Import Program Classical.
@@ -203,7 +203,7 @@ Proof.
   intros. revert INF. induction ZST.
   - intro INF. punfold INF. dependent destruction INF.
     dependent destruction BASE. contradiction.
-  - intro INF. apply IHZST. 
+  - intro INF. apply IHZST.
     punfold INF. dependent destruction INF. pclearbot. eauto.
 Qed.
 
@@ -233,15 +233,15 @@ Lemma seq_zeros_star_imply: forall s t
   (R: seq s t) (IZ: zeros_star nonzero s), zeros_star nonzero t.
 Proof.
   intros. revert t R. induction IZ; intros.
-  - punfold R. induction R; pclearbot; eauto. 
+  - punfold R. induction R; pclearbot; eauto.
     + inversion BASE. eauto.
     + inversion BASE. contradiction.
-  - punfold R.  dependent induction R; intros; pclearbot; try dependent destruction Heqs; eauto. 
+  - punfold R.  dependent induction R; intros; pclearbot; try dependent destruction Heqs; eauto.
 Qed.
 
 Lemma seq_infzeros_or_finzeros: forall s t
     (R: seq s t),
-  (infzeros s /\ infzeros t) \/ 
+  (infzeros s /\ infzeros t) \/
   (zeros_star nonzero s /\ zeros_star nonzero t).
 Proof.
   intros. destruct (@infzeros_or_finzeros s).
@@ -249,7 +249,7 @@ Proof.
   - eauto using seq_zeros_star_imply.
 Qed.
 
-Lemma seq_zero_l: forall s t 
+Lemma seq_zero_l: forall s t
     (EQ : seq (scons 0 s) t),
   seq s t.
 Proof.
@@ -258,10 +258,10 @@ Proof.
   punfold R.
 Qed.
 
-Lemma seq_zero_r: forall s t 
+Lemma seq_zero_r: forall s t
     (EQ : seq s (scons 0 t)),
   seq s t.
-Proof. 
+Proof.
   intros. punfold EQ. pfold.
   dependent induction EQ; intros; try dependent destruction Heqs0; pclearbot; eauto.
   punfold R.
@@ -303,7 +303,7 @@ Lemma gseq_implies_seq: forall s t
 Proof.
   pcofix CIH; intros.
   punfold R. destruct R.
-  - punfold IZ1. punfold IZ2. 
+  - punfold IZ1. punfold IZ2.
     dependent destruction IZ1. dependent destruction IZ2. pclearbot.
     pfold. econstructor. right. eauto.
   - induction ZS1; subst.
@@ -330,7 +330,7 @@ Lemma zeros_star_nonzero_uniq: forall s1 s2 t
     (NZ2: nonzero s2),
   s1 = s2.
 Proof.
-  intros s1 s2 t ZS1. revert s2. 
+  intros s1 s2 t ZS1. revert s2.
   induction ZS1; subst; intros.
   - induction ZS2; subst; eauto.
     inversion NZ1. contradiction.
@@ -338,7 +338,7 @@ Proof.
     inversion NZ2. contradiction.
 Qed.
 
-Lemma gseq_trans : forall d1 d2 d3 
+Lemma gseq_trans : forall d1 d2 d3
   (EQL: gseq d1 d2) (EQR: gseq d2 d3), gseq d1 d3.
 Proof.
   pcofix CIH; intros.
@@ -349,7 +349,7 @@ Proof.
   - exfalso. eapply nonzero_not_infzeros, IZ1.
     eapply zeros_star_mono; eauto.
     simpl. intros. subst. destruct R; eauto.
-  - eapply zeros_star_nonzero_uniq in ZS2; 
+  - eapply zeros_star_nonzero_uniq in ZS2;
     eauto using gseq_cons_or_nil_nonzero_l, gseq_cons_or_nil_nonzero_r.
     subst. pfold. econstructor 2; eauto.
     destruct R; dependent destruction R0; pclearbot; eauto.
@@ -393,11 +393,11 @@ Proof.
   right. simpl. auto.
   destruct n. left. simpl. auto.
   right. simpl. auto.
-Qed.  
+Qed.
 
 Inductive zeros_step (zs : stream nat -> Prop) : stream nat -> Prop :=
 | zeros_z : forall s, zs s -> zeros_step zs (scons 0 s)
-.                                   
+.
 Hint Constructors zeros_step.
 
 Lemma zeros_step_mono : monotone1 zeros_step.
@@ -412,7 +412,7 @@ Inductive not_zeros : stream nat -> Prop :=
 | not_zeros_nil : not_zeros snil
 | not_zeros_b : forall n s, not_zeros (scons (S n) s)
 | not_zeros_z : forall s, not_zeros s -> not_zeros (scons 0 s)
-.                                             
+.
 Hint Constructors not_zeros.
 
 CoInductive coFalse := .
@@ -445,8 +445,8 @@ Proof.
   constructor. exact H.
   assert False.
   apply H0. constructor. inversion H.
-Qed.  
-  
+Qed.
+
 
 
 Inductive teq_step (teq : stream nat -> stream nat -> Prop) : stream nat -> stream nat -> Prop :=
@@ -456,12 +456,12 @@ Inductive teq_step (teq : stream nat -> stream nat -> Prop) : stream nat -> stre
 | teq_z_b : forall s1 s2, teq_step teq s1 s2 -> teq_step teq (scons 0 s1) (scons 0 s2)
 | teq_z_l : forall s1 s2, not_zero_hd s2 -> teq_step teq s1 s2 -> teq_step teq (scons O s1) s2
 | teq_z_r : forall s1 s2, not_zero_hd s1 -> teq_step teq s1 s2 -> teq_step teq s1 (scons O s2)
-.                                                                
+.
 Hint Constructors teq_step.
 
 Lemma teq_step_mono : monotone2 teq_step.
 Proof.
-  unfold monotone2. intros x0 x1 r r' IN LE. 
+  unfold monotone2. intros x0 x1 r r' IN LE.
   induction IN; eauto.
 Qed.
 Hint Resolve teq_step_mono : paco.
@@ -486,7 +486,7 @@ Proof.
     induction H23; inversion Heqs; subst; auto.
     + pfold. apply teq_div; auto. right. eapply CIH. apply H. pclearbot. apply H2.
     + pfold.
-      
+
       assert (paco2 teq_step r zeros s2). apply IHteq_step.
       rewrite (@id_stream_eq _ zeros) at 1. simpl. reflexivity.
       punfold H0.
@@ -503,7 +503,7 @@ Proof.
     induction H23; inversion Heqs; subst; auto.
     + pcofix CIH'.
       rewrite (@id_stream_eq _ zeros) in Heqs. simpl in Heqs. inversion Heqs.
-      
+
 *)
 
 
@@ -532,7 +532,7 @@ Proof.
   - destruct n.
     pcofix CIH'.
     pclearbot. pfold. constructor.
-    
+
 
 
 
@@ -546,7 +546,7 @@ Proof.
   punfold H.
   induction H; try constructor; auto.
   - pclearbot. right. apply CIH. punfold R.
-Qed.    
+Qed.
 
 (* HELP! *)
 Lemma seq_trans : forall d1 d2 d3, seq d1 d2 -> seq d2 d3 -> seq d1 d2.
@@ -564,7 +564,7 @@ Abort.
 Lemma seq_step_trans' : forall (R:stream nat -> stream nat -> Prop) d1 d2 d3,
     (forall d1 d2 d3, R d1 d2 -> R d2 d3 -> R d1 d3) ->
     (forall d1 d2 d3, R d1 d2 -> seq_step R d2 d3 -> seq_step R d1 d3) ->
-    (forall d1 d2 d3, seq_step R d1 d2 -> R d2 d3 -> seq_step R d1 d3) ->    
+    (forall d1 d2 d3, seq_step R d1 d2 -> R d2 d3 -> seq_step R d1 d3) ->
     seq_step R d1 d2 ->
     seq_step R d2 d3 ->
     seq_step R d1 d3.
@@ -584,14 +584,14 @@ Proof.
     + apply seq_cons_z_r. eapply RR. apply H12. exact R0.
     + apply IHseq_step. exact H21.
     + apply seq_cons_z_r. apply IHseq_step0; auto.
-Qed.      
-      
+Qed.
+
 
 Lemma seq_trans' : forall (R:stream nat -> stream nat -> Prop) (s t u : stream nat),
     (forall d, paco2 seq_step R d d) ->
     (forall d1 d2 d3, seq_step R d1 d2 -> seq_step R d2 d3 -> seq_step R d1 d3) ->
     (forall d1 d2 d3, R d1 d2 -> seq_step R d2 d3 -> seq_step R d1 d3) ->
-    (forall d1 d2 d3, seq_step R d1 d2 -> R d2 d3 -> seq_step R d1 d3) ->    
+    (forall d1 d2 d3, seq_step R d1 d2 -> R d2 d3 -> seq_step R d1 d3) ->
     paco2 seq_step R s t -> paco2 seq_step R t u -> paco2 seq_step R s u.
 Proof.
 (*
@@ -609,33 +609,33 @@ Proof.
   - remember (scons n s1) as s0. generalize dependent s2.
     punfold Hs.
     induction Hs; try inversion Heqs0; intros s2' HR; subst.
-    + pfold. apply seq_cons. right. 
+    + pfold. apply seq_cons. right.
       destruct R0. destruct HR.
       eapply CIH. apply Hrefl. apply HS. apply H. apply H0.
       eapply CIH. apply Hrefl. apply HS. apply Hrefl.
       pfold.
 
-    
+
   - remember (scons n s1) as s0. generalize dependent s2.
-    punfold Hs. rewrite <- HeqR in Hs. 
+    punfold Hs. rewrite <- HeqR in Hs.
     induction Hs; try inversion Heqs0; intros s2' HR; subst.
     + pfold. apply seq_cons. pclearbot. right. eapply CIH.
       exact R0. exact HR.
     + pfold. apply seq_cons_z_l.
-      pclearbot. 
+      pclearbot.
       assert (paco2 seq_step r s0 (scons n s2')).
-      eapply IHHs; auto.  
+      eapply IHHs; auto.
       punfold H0.
     + pfold. apply seq_cons_z_r.
       destruct HR. punfold H.
-      
+
       pclearbot. punfold HR.
       eapply seq_step_trans; eauto.
       intros. destruct H. destruct H0.
       right. eapply CIH. punfold H. punfold H0. pfold. eapply seq_step_mono. apply H.
       intros. left. destruct PR.
-      right. eapply CIH. 
-      
+      right. eapply CIH.
+
   - remember (scons 0 s1) as s0.
     punfold Hs. rewrite <- HeqR in Hs.
     induction Hs; try inversion Heqs0; subst.
@@ -643,7 +643,7 @@ Proof.
       specialize IHseq_step with (s:=s0). apply IHseq_step in R0. punfold R0.
     + pfold. apply seq_cons_z_l.
       apply IHHs in H. punfold H.
-Qed.      
+Qed.
 *)
 Admitted.
 
@@ -674,7 +674,7 @@ Section S_EQUIV_COIND.
   Hypothesis Hrpq : R p q.
   Hypothesis H : forall d1 d2,
     R d1 d2 -> s_equiv_step R d1 d2.
-  
+
   Theorem s_equiv_coind :
     s_equiv p q.
   Proof.
@@ -683,7 +683,7 @@ Section S_EQUIV_COIND.
     intros ? ? Hr.
     apply H in Hr. induction Hr; intros; subst; try solve [clear CIH; auto].
     - pfold. constructor. right. auto.
-    - pfold. constructor. 
+    - pfold. constructor.
       punfold IHHr.
   Qed.
 
@@ -703,7 +703,7 @@ Lemma s_equiv_step'_mono : monotone2 s_equiv_step'.
 Proof.
   unfold monotone2. intros x0 x1 r r' IN LE.
   destruct IN; eauto.
-Qed.  
+Qed.
 Hint Resolve s_equiv_step'_mono : paco.
 
 Definition s_equiv' (s t : stream nat) := paco2 s_equiv_step' bot2 s t.
@@ -728,7 +728,7 @@ Proof.
   pfold.
   rewrite (@id_stream_eq _ zeros). simpl.
   apply s_equiv_cons_z_l'. right. apply CIH.
-Qed.  
+Qed.
 
 Lemma not_zeros_equiv : exists s, ~ s_equiv zeros s.
 Proof.
@@ -740,17 +740,11 @@ Proof.
   remember (scons 1 snil) as t.
   induction H.
   - inversion Heqt.
-  - inversion Heqt. subst. 
+  - inversion Heqt. subst.
     rewrite (@id_stream_eq _ zeros) in Heqs.
     simpl in Heqs. inversion Heqs.
   - apply IHs_equiv_step.
     rewrite (@id_stream_eq _ zeros) in Heqs.
     simpl in Heqs. inversion Heqs. reflexivity.
     exact Heqt.
-Qed.    
-  
-
-
-
-
-
+Qed.

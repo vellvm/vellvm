@@ -21,8 +21,7 @@ Import ListNotations.
 Import MonadNotation.
 Import ApplicativeNotation.
 
-From Coq Require Import
-     ZArith List String Lia Bool.Bool.
+From Coq Require Import Lia.
 
 Open Scope Z_scope.
 
@@ -67,4 +66,3 @@ Proof.
     unfold list_sum in IHxs.
     lia.
 Qed.
-

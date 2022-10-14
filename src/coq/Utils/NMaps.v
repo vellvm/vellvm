@@ -12,8 +12,7 @@ From Vellvm Require Import
      ListUtil.
 
 From ExtLib Require Import
-     Structures.Monads
-     Data.Monads.OptionMonad.
+     Structures.Monads.
 
 Import ListNotations.
 Import MonadNotation.
@@ -46,3 +45,4 @@ Fixpoint NM_find_many {A} (xs : list N) (nm : NMap A) : option (list A)
        elts <- NM_find_many xs nm;;
        ret (elt :: elts)
      end.
+

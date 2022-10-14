@@ -15,10 +15,7 @@ From Vellvm Require Import
 
 From ExtLib Require Import
      Structures.Monads
-     Structures.Functor
-     Core.RelDec
-     Programming.Eqv
-     Data.String.
+     Programming.Eqv.
 
 Import EqvNotation.
 Import ListNotations.
@@ -579,3 +576,4 @@ Section Map_Operations.
        end.
 
 End Map_Operations.
+

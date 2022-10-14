@@ -3,12 +3,7 @@ From ExtLib Require Import
 
 From ITree Require Import
      ITree
-     Basics.Basics
-     Events.Exception
-     Eq.Eq
-     Events.StateFacts
-     Events.State
-     Events.Exception.
+     Eq.Eq.
 
 From Vellvm Require Import
      Utils.Error
@@ -18,7 +13,7 @@ From Vellvm Require Import
      Utils.MonadExcLaws
      Utils.PropT
      Semantics.LLVMEvents.
-  
+
 Require Import Paco.paco.
 Require Import String.
 

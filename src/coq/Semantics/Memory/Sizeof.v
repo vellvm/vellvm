@@ -29,7 +29,7 @@ Module Type Sizeof.
   Parameter sizeof_dtyp_struct_cons :
     forall dt dts,
     sizeof_dtyp (DTYPE_Struct (dt :: dts)) = (sizeof_dtyp dt + sizeof_dtyp (DTYPE_Struct dts))%N.
-  
+
   Parameter sizeof_dtyp_array :
     forall sz t,
       sizeof_dtyp (DTYPE_Array sz t) = (sz * sizeof_dtyp t)%N.

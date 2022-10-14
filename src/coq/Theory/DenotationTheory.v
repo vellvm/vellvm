@@ -7,12 +7,7 @@ From Coq Require Import
 From ITree Require Import
      ITree
      ITreeFacts
-     Basics.HeterogeneousRelations
-     Events.State
-     Events.StateFacts
-     InterpFacts
-     KTreeFacts
-     Eq.Eq.
+     Basics.HeterogeneousRelations.
 
 From Vellvm Require Import
      Utilities
@@ -193,7 +188,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       ⟦ mk_block id phis c t s ⟧b origin ≈
                                 ⟦ phis ⟧Φs origin;;
       ⟦ c ⟧c;;
-      translate exp_to_instr ⟦ t ⟧t. 
+      translate exp_to_instr ⟦ t ⟧t.
   Proof.
     intros; cbn; reflexivity.
   Qed.
@@ -229,7 +224,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     rewrite tau_eutt; reflexivity.
   Qed.
 
-  Lemma denote_ocfg_unfold_not_in: forall bks bid_from bid_src, 
+  Lemma denote_ocfg_unfold_not_in: forall bks bid_from bid_src,
       find_block bks bid_src = None ->
       ⟦ bks ⟧bs (bid_from, bid_src) ≈ Ret (inl (bid_from,bid_src)).
   Proof.
@@ -310,7 +305,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
 
   Section Outputs.
-    
+
     (** * outputs soundness *)
 
     Lemma raise_has_all_posts : forall {E X} `{FailureE -< E} s Q,
@@ -326,7 +321,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       unfold raise; intros.
       apply has_post_bind; intros [].
     Qed.
-    
+
     Lemma unEither_eta : forall {T m A} (x : eitherT T m A), {|unEitherT := unEitherT x|} = x.
     Proof.
       intros.
@@ -362,7 +357,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         ⟦ term ⟧t ⤳ sum_pred (fun id => In id (terminator_outputs term)) TT.
     Proof.
       intros term; destruct term eqn:Hterm; cbn; try (apply raise_has_all_posts || apply eutt_Ret; cbn; eauto).
-      - destruct v.  
+      - destruct v.
         apply has_post_bind; intros ?.
         apply eutt_Ret; cbn; eauto.
       - destruct v; cbn.
@@ -390,7 +385,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
             apply Forall_nil.
           * break_match_goal; subst.
             break_match_goal; subst.
-          
+
             repeat break_match_goal;
               try (cbn; go; setoid_rewrite raise_bind_itree; apply raise_has_all_posts).
 
@@ -403,7 +398,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
               cbn in H.
               apply Forall_cons; eauto.
               apply Forall_impl with (P := fun id => In id (List.map snd brs)); eauto.
-            -- 
+            --
               go.
               eapply eutt_clo_bind; eauto.
               intros u1 u2 H.
@@ -466,7 +461,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         (IND : forall fto (b : block dtyp),
             Qb fto ->
             find_block bks (snd fto) = Some b ->
-            ⟦ b ⟧b (fst fto) ⤳ sum_pred (fun to => Qb (snd fto, to)) Qv), 
+            ⟦ b ⟧b (fst fto) ⤳ sum_pred (fun to => Qb (snd fto, to)) Qv),
         ⟦ bks ⟧bs fto ⤳ sum_pred Qb Qv.
     Proof.
       intros * INIT IND.
@@ -486,7 +481,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
      *)
     Lemma denote_ocfg_has_post :
       forall (bks : ocfg _) fto (Qb : block_id -> Prop) (Qv : uvalue -> Prop)
-        (ENTER : In (snd fto) (inputs bks)) 
+        (ENTER : In (snd fto) (inputs bks))
         (IND : forall fto (b : block dtyp),
             find_block bks (snd fto) = Some b ->
             ⟦ b ⟧b (fst fto) ⤳ sum_pred Qb Qv),
@@ -649,7 +644,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     clear CIHH.
     intros * WF.
     destruct (find_block bks' to) as [bk |] eqn:EQ.
-    - unfold denote_ocfg at 1 3. 
+    - unfold denote_ocfg at 1 3.
       setoid_rewrite KTreeFacts.unfold_iter_ktree.
       cbn; rewrite !bind_bind.
       assert (find_block (prefix ++ bks' ++ postfix) to = Some bk).

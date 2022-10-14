@@ -12,8 +12,7 @@ From ITree Require Import
      ITree.
 
 From Vellvm Require Import 
-     Semantics.LLVMEvents
-     Utils.MonadExcLaws.
+     Semantics.LLVMEvents.
 
 Section Laws.
   Variable E : Type -> Type.
@@ -98,3 +97,4 @@ Section UB.
       rbi_raise_bind := raiseUB_bind_itree
     }.
 End UB.
+

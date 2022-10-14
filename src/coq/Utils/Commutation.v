@@ -9,8 +9,7 @@ From Paco Require Import paco.
 
 From ITree Require Import
      ITree
-     ITreeFacts
-     Eq.Eq.
+     ITreeFacts.
 
 Set Implicit Arguments.
 Set Strict Implicit.
@@ -22,13 +21,13 @@ Open Scope monad_scope.
 
 (** * Commutation of computations described as [itree]s
   This file develops some theory to justify when two computations described as
-  interaction trees can be commuted, i.e. looks for sufficient condition under 
+  interaction trees can be commuted, i.e. looks for sufficient condition under
   which we have: [t1 ;; t2 ≈ t2 ;; t1].
 
-  We prove the obvious result that it always hold for computations that have no 
+  We prove the obvious result that it always hold for computations that have no
   effects (E == void1) and computes no meaningful value (R == unit): [trivial_commut].
   While it is not surprising, it is not a completely trivial fact as it must
-  account for divergence of either of the computation. 
+  account for divergence of either of the computation.
 
   We also establish more interesting results for computations involving a state.
   These lemmas are currently used in Helix in order to justify that the order of
@@ -67,7 +66,7 @@ Proof.
     destruct (observe (t3 tt)) eqn:EQ'.
     + destruct r.
       rewrite bind_ret_l.
-      rewrite <- (bind_ret_r (t4 tt)). 
+      rewrite <- (bind_ret_r (t4 tt)).
       ebind; econstructor.
       rewrite <- EQ1.
       rewrite (itree_eta (t1 tt)), EQ; reflexivity.

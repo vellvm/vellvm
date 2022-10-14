@@ -25,7 +25,6 @@ From Vellvm.Handlers.MemoryModules Require Import
      Within.
 
 From Vellvm.Semantics Require Import
-     MemoryAddress
      LLVMEvents.
 
 Import Basics.Basics.Monads.

@@ -9,11 +9,9 @@ From Coq Require Import
      String
      Logic.FunctionalExtensionality.
 
-From Vellvm Require Import 
-     Utils.Util
+From Vellvm Require Import
      Syntax.LLVMAst
-     Syntax.AstLib
-     Syntax.DynamicTypes.
+     Syntax.AstLib.
 
 Require Import Coqlib.
 
@@ -106,7 +104,7 @@ Inductive element_typ : typ -> Prop :=
 | element_typ_Fp128 : element_typ TYPE_Fp128
 | element_typ_Ppc_fp128 : element_typ TYPE_Ppc_fp128
 .
-  
+
 
 (* Predicate to ensure that an ident is guarded by a pointer everywhere in a type in an environment *)
 Inductive guarded_typ : ident -> list (ident * typ) -> typ -> Prop :=
@@ -682,7 +680,7 @@ Lemma remove_key_commutes :
     remove_key eq_dec k1 (remove_key eq_dec k2 l) = remove_key eq_dec k2 (remove_key eq_dec k1 l).
 Proof.
   induction l; solve_eq_dec.
-Qed.  
+Qed.
 
 
 Lemma remove_key_keys :
@@ -805,14 +803,14 @@ Lemma normalize_type_equation : forall env t,
   end.
 Proof.
   intros env t.
-  unfold normalize_type. 
+  unfold normalize_type.
   unfold normalize_type_func at 1.
   rewrite Wf.WfExtensionality.fix_sub_eq_ext.
   destruct t; try reflexivity. simpl.
   destruct (find (fun a : ident * typ => Ident.eq_dec id (fst a)) env).
   destruct p; simpl; eauto.
   reflexivity.
-Defined.    
+Defined.
 
 #[global]
 Hint Constructors unrolled_typ : core.
@@ -1012,7 +1010,7 @@ Proof.
   - simpl in *. destruct H.
     + exists a. split; auto.
     + apply IHl in H as [t [Hin Hftx]].
-      exists t. intuition.      
+      exists t. intuition.
 Qed.
 
 
@@ -1218,7 +1216,7 @@ Proof.
   eauto using wf_typ_is_guarded_wf_typ, guarded_normalize_same.
 Qed.
 
-  
+
 Theorem double_normalize_type :
   forall env t,
     wf_env env ->

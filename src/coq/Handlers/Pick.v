@@ -39,7 +39,7 @@ From ExtLib Require Import
      Data.Monads.IdentityMonad
      Structures.Functor.
 
-Require Import List.
+
 
 
 Set Implicit Arguments.
@@ -59,7 +59,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams L
   Import MP.
   Import LP.
   Import Events.
-  
+
   Section PickPropositional.
 
     Inductive Pick_handler {X Y Post} {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E} : @PickE X Y Post ~> PropT E :=
@@ -263,4 +263,3 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams L
   End PickImplementation.
 
 End Make.
-

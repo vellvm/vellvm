@@ -10,8 +10,7 @@ From ExtLib Require Import
      Data.Monads.EitherMonad.
 
 From ITree Require Import
-     ITree
-     Events.Exception.
+     ITree.
 
 From Vellvm.Utils Require Import
      MonadReturnsLaws
@@ -21,9 +20,9 @@ Import Monad.
 
 (* end hide *)
 
-(** * Error and exception monads 
+(** * Error and exception monads
   The arithmetic performed by vir programs being essentially pure, we have chosen
-  not to wrap it in the [itree] monad. It gets instead injected into it when 
+  not to wrap it in the [itree] monad. It gets instead injected into it when
   representing syntactic constructs relying on it.
 
   It is however not completely pure: it is partial, and may raise undefined behavior.
@@ -232,7 +231,7 @@ Section OOMLaws.
     destruct x, y; cbn in *; subst; auto.
     contradiction.
   Qed.
-                                                         
+
   Global Instance MonadReturnsOOM : @MonadReturns OOM MonadOOM MonadEq1OOM
     := { MReturns := fun A => OOMReturns;
          MFails := fun A => OOMFails;
@@ -491,7 +490,7 @@ Section err_ub_oom_monad.
     (* refine (fun T mt1 mt2 => _). *)
     (* destruct mt1, mt2. *)
     (* apply (Monad.eq1 unERR_UB_OOM0 unERR_UB_OOM1). *)
-    
+
     refine (fun T mt1 mt2 => _).
 
     (* mt2 should be a refinement of mt1 *)
@@ -529,8 +528,8 @@ Section err_ub_oom_monad.
     destruct x as [[[[[[[oom_x] | [[ub_x] | [[err_x] | x']]]]]]]] eqn:Hx;
       destruct y as [[[[[[[oom_y] | [[ub_y] | [[err_y] | y']]]]]]]] eqn:Hy;
       destruct z as [[[[[[[oom_z] | [[ub_z] | [[err_z] | z']]]]]]]] eqn:Hz;
-      cbn in *; subst; auto; try contradiction.    
-  Defined.  
+      cbn in *; subst; auto; try contradiction.
+  Defined.
 
   #[global] Instance Monad_err_ub_oom : Monad (err_ub_oom_T M).
   Proof.
@@ -575,7 +574,7 @@ Section err_ub_oom_extra.
 
       destruct (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (x0 x)))));
       destruct unIdent; auto; destruct s; auto; destruct s; auto.
-      
+
       subst.
 
       destruct (x0 y) as [[[[[[oom_x0y | [ub_x0y | [err_x0y | x0y]]]]]]]] eqn:Hx0y; cbn; auto;

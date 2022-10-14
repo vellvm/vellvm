@@ -329,7 +329,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
            dv' <- dvalue_convert dv;;
            ret (MMEP.MMSP.initial_memory_state, (0, (([], []), ([], dv'))))
        end.
- 
+
   Definition refine_E1E2_L6 (srcs : PropT IS1.LP.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop
     :=
     (* res_L4_convert_unsafe should be fine here because refine_L6
@@ -372,7 +372,7 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
   Instance refine_OOM_h_eq_itree {E F T RR} : Proper (eq_itree eq ==> eq_itree eq ==> iff) (@refine_OOM_h E F T RR).
   Admitted.
 
-  From ITree Require Import Eq.EqAxiom.
+
 
   (* Lemma interp_prop_bind : *)
   (*   forall R E F *)
@@ -391,7 +391,7 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
   (*     interp_PropTF h_spec k_spec RR sim t t-> *)
   (*     interp_PropTF h_spec k_spec RR sim -> *)
   (*     interp_PropTF h_spec k_spec RR sim (observe (ITree.bind t k)) t2. *)
-    
+
   (* OOM_h (@OOM_spec) (flip RR) (upaco2 (interp_PropT_ E2 E2 OOM_h (@OOM_spec) T (flip RR)) r) *)
   (*   (observe (ITree.bind (EC.L4_convert A e) (fun x : A => Tau (interp EC.L4_convert (k1 x))))) *)
   (*   (interp EC.L4_convert t2) *)
@@ -602,7 +602,7 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     (*     rewrite translate_ret in m_fin. *)
     (*     repeat rewrite bind_ret_l in m_fin. *)
 
-        
+
     (*     split. *)
     (*     left. *)
     (*     cbn. *)

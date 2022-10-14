@@ -14,7 +14,7 @@ Require Import List.
 Import ListNotations.
 
 From Coq Require Import
-     ZArith List String Lia Bool.Bool Hexadecimal Numbers.HexadecimalString Numbers.HexadecimalZ
+     ZArith String Bool.Bool Numbers.HexadecimalString
      Strings.Ascii.
 From QuickChick Require Import Show.
 (* Import QcDefaultNotation. Open Scope qc_scope. *)
@@ -280,21 +280,21 @@ Section ShowInstances.
     (* | FNATTR_Denormal_fp_math s1 s2 - FNATTR_KeyValue *)
     (* | FNATTR_Denormal_fp_math_32 s1 s2 - FNATTR_KeyValue *)
     (* | FNATTR_Thunk => - FNATTR_String *)
-    | FNATTR_Tls_load_hoist => """tls-load-hoist"""                   
+    | FNATTR_Tls_load_hoist => """tls-load-hoist"""
     | FNATTR_Uwtable so  =>
         match so with
         | None => "uwtable"
         | Some sync => if sync then "uwtable(sync)" else "uwtable(async)"
         end
-    | FNATTR_Nocf_check => "nocf_check" 
-    | FNATTR_Shadowcallstack => "shadowcallstack" 
+    | FNATTR_Nocf_check => "nocf_check"
+    | FNATTR_Shadowcallstack => "shadowcallstack"
     | FNATTR_Mustprogress => "mustprogeress"
     (* | FNATTR_Warn_stack_size th  => - FNATTR_KeyValue *)
     | FNATTR_Vscale_range min max  =>
         match max with
         | None => "vscale_range(" ++ show min ++ ")"
         | Some m => "vscale_range(" ++ show min ++ "," ++ show m ++ ")"
-        end                             
+        end
     | FNATTR_String s => """" ++ show s ++ """"  (* "no-see" *)
     | FNATTR_Key_value kv => """" ++ fst kv ++ """=" ++ """" ++ snd kv ++ """" (* "unsafe-fp-math"="false" *)
     | FNATTR_Attr_grp g => "#" ++ show g
@@ -528,8 +528,8 @@ Section ShowInstances.
        show iop ++ " " ++ add_parens b (show t ++ " " ++  show_exp true v1 ++ ", " ++  show_exp true v2)
     | OP_ICmp cmp t v1 v2 =>
         let second_expression :=  if b then  show t ++ " " ++ show_exp true v2 else show_exp true v2 in
-    
-        "icmp " ++  show cmp ++ " " ++  add_parens b (show t ++ " " ++  show_exp true v1 ++ ", " ++ second_expression) 
+
+        "icmp " ++  show cmp ++ " " ++  add_parens b (show t ++ " " ++  show_exp true v1 ++ ", " ++ second_expression)
                  (* "icmp " ++  show cmp ++ " " ++  add_parens b (show t ++ " " ++  show_exp true v1 ++ ", " ++ show_exp true v2) *)
     | OP_FBinop fop fmath t v1 v2 =>
         let fmath_string :=
@@ -963,7 +963,7 @@ Definition show_unnamed_addr (u:unnamed_addr) : string :=
   | Unnamed_addr => "unnamed_addr"
   | Local_Unnamed_addr => "local_unnamed_addr"
   end.
-          
+
 #[global] Instance showUnnamedAddr : Show unnamed_addr :=
   {| show := show_unnamed_addr |}.
 

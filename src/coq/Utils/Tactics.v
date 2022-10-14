@@ -160,9 +160,7 @@ Ltac forward H :=
   | ?P -> _ => assert P as H'; [| specialize (H H'); clear H']
   end.
 
-From ITree Require Import
-     ITree
-     Eq.Eq.
+
 (* Simple specialization of [eqit_Ret] to [eutt] so that users of the library do not need to know about [eqit] *)
 Ltac ret_bind_l_left v :=
   match goal with
@@ -314,4 +312,5 @@ Ltac subst_cont :=
   | h: visible_cont _ |- _ =>
     destruct h; subst
   end.
+
 

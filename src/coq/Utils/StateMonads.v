@@ -3,12 +3,7 @@ From ExtLib Require Import
      Structures.Functor.
 
 From ITree Require Import
-     ITree
-     Basics.Basics
-     Events.Exception
-     Eq.Eq
-     Events.StateFacts
-     Events.State.
+     ITree.
 
 Import Basics.Basics.Monads.
 
@@ -31,3 +26,4 @@ Global Instance MonadState_stateT_itree {S : Type} {M : Type -> Type} `{Monad M}
   := {| MonadState.get := fun s => ret (s, s);
         MonadState.put := fun x s => ret (x, tt);
      |}.
+

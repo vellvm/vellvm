@@ -53,7 +53,6 @@ From Vellvm Require Import
      DynamicTypes.
 
 From ExtLib Require Import
-     Structures.Functor
      Structures.Monad.
 
 Import MonadNotation.
@@ -81,4 +80,3 @@ Import MonadNotation.
 
 (* Export LLVMEvents LLVMEvents.DV Global Local Stack Pick Intrinsics *)
 (*        MEM MEMORY_THEORY UndefinedBehaviour. *)
-

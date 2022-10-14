@@ -1,10 +1,9 @@
 From Coq Require Import
      ZArith.
 
-From Vellvm Require Import
-     Numeric.Integers
-     Syntax.DynamicTypes
-     Utils.Error.
+From Vellvm Require Import Syntax.DynamicTypes Utils.Error.
+
+
 
 (* Integers that can run out of memory... Necessary for handling
      finite memory compilation. *)
@@ -12,8 +11,8 @@ Class VMemInt I : Type :=
   {
     (* Comparisons *)
     mequ : I -> I -> bool;
-    mcmp : comparison -> I -> I -> bool;
-    mcmpu : comparison -> I -> I -> bool;
+    mcmp : Numeric.Integers.comparison -> I -> I -> bool;
+    mcmpu : Numeric.Integers.comparison -> I -> I -> bool;
 
     (* Constants *)
     mbitwidth : option nat;

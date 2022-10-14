@@ -14,11 +14,8 @@ From ITree Require Import
 From Vellvm Require Import
      Utilities
      Utils.MapMonadExtra
-     Syntax
      Semantics
-     Theory.Refinement
-     Theory.InterpreterCFG
-     Theory.ExpLemmas.
+     Theory.InterpreterCFG.
 
 Open Scope list_scope.
 Open Scope itree_scope.
@@ -106,7 +103,7 @@ Module InstrLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Proof.
     intros uv CONC.
     induction uv;
-      inversion CONC; try (eexists; reflexivity). 
+      inversion CONC; try (eexists; reflexivity).
     - cbn.
       pose proof uvalue_to_dvalue_list _ H H1 as (dv & MAP).
       exists (DVALUE_Struct dv). rewrite MAP.

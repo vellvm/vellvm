@@ -3,7 +3,6 @@ Require Import Floats.
 From Coq Require Import
      List
      String
-     Ascii
      ZArith.
 From Vellvm Require Import
      Utilities.
@@ -24,9 +23,9 @@ Open Scope list_scope.
     All changes to this file must naturally be mirrored in:
     - the parser:
        "/src/ml/libvellvm/llvm_parser.mly"
-    - the Coq Representation 
+    - the Coq Representation
        "/src/coq/QC/ReprAST.v"
-    - the prettyprinter 
+    - the prettyprinter
        "/src/coq/QC/ShowAST.v"
 
  *)
@@ -52,7 +51,7 @@ Unset Elimination Schemes.
 Inductive typ : Set :=
 | TYPE_I (sz:N)
 | TYPE_IPTR
-| TYPE_Pointer (t:typ)  
+| TYPE_Pointer (t:typ)
 | TYPE_Void
 | TYPE_Half
 | TYPE_Float
@@ -66,13 +65,13 @@ Inductive typ : Set :=
 | TYPE_X86_mmx
 | TYPE_Array (sz:N) (t:typ)
 | TYPE_Function (ret:typ) (args:list typ) (vararg:bool)
-                (* Langref doesn't specify that "..." appears only at the end of the arguments, 
+                (* Langref doesn't specify that "..." appears only at the end of the arguments,
                    but I believe it is implied *)
 | TYPE_Struct (fields:list typ)
 | TYPE_Packed_struct (fields:list typ)
 | TYPE_Opaque
 | TYPE_Vector (sz:N) (t:typ)     (* t must be integer, floating point, or pointer type *)
-| TYPE_Identified (id:ident) (* add *) 
+| TYPE_Identified (id:ident) (* add *)
 .
 
 Variant linkage : Set :=
@@ -92,7 +91,7 @@ Variant linkage : Set :=
 Variant preemption_specifier : Set :=
   | PREEMPTION_Dso_preemptable
   | PREEMPTION_Dso_local
-.      
+.
 
 
 Variant dll_storage : Set :=
@@ -119,7 +118,7 @@ Variant cconv : Set :=
 | CC_Tailcc
 | CC_Swiftcc
 | CC_Swifttailcc
-| CC_cfguard_checkcc 
+| CC_cfguard_checkcc
 .
 
 Variant param_attr : Set :=
@@ -128,16 +127,16 @@ Variant param_attr : Set :=
 | PARAMATTR_Inreg
 | PARAMATTR_Byval (t : typ)
 | PARAMATTR_Byref (t : typ)
-| PARAMATTR_Preallocated (t : typ)                    
-| PARAMATTR_Inalloca (t : typ) 
-| PARAMATTR_Sret (t : typ)  
-| PARAMATTR_Elementtype (t : typ)                            
+| PARAMATTR_Preallocated (t : typ)
+| PARAMATTR_Inalloca (t : typ)
+| PARAMATTR_Sret (t : typ)
+| PARAMATTR_Elementtype (t : typ)
 | PARAMATTR_Align (a:int)
 | PARAMATTR_Noalias
 | PARAMATTR_Nocapture
 | PARAMATTR_Readonly   (* NOTE: The status of this one is ambiguous - it was definitely
                           supported in some version of LLVM IR, but isn't listed in LangRef *)
-| PARAMATTR_Nofree      
+| PARAMATTR_Nofree
 | PARAMATTR_Nest
 | PARAMATTR_Returned
 | PARAMATTR_Nonnull
@@ -145,7 +144,7 @@ Variant param_attr : Set :=
 | PARAMATTR_Dereferenceable_or_null (a : int)
 | PARAMATTR_Swiftself
 | PARAMATTR_Swiftasync
-| PARAMATTR_Swifterror 
+| PARAMATTR_Swifterror
 | PARAMATTR_Immarg
 | PARAMATTR_Noundef
 | PARAMATTR_Alignstack (a : int)
@@ -162,8 +161,8 @@ Variant frame_pointer_val : Set :=
 Variant fn_attr : Set :=
 | FNATTR_Alignstack (a:int)
 (* | FNATTR_Alloc_family (fam : string) - FNATTR_KeyValue *)
-| FNATTR_Allockind (kind : string)                         
-| FNATTR_Allocsize (a1 : int) (a2 : option int)                 
+| FNATTR_Allockind (kind : string)
+| FNATTR_Allocsize (a1 : int) (a2 : option int)
 | FNATTR_Alwaysinline
 | FNATTR_Builtin
 | FNATTR_Cold
@@ -171,7 +170,7 @@ Variant fn_attr : Set :=
 | FNATTR_Disable_sanitizer_instrumentation
 (* | FNATTR_Dontcall_error - FNATTR_String *)
 (* | FNATTR_Dontcall_warn - FNATTR_String *)
-| FNATTR_Fn_ret_thunk_extern      
+| FNATTR_Fn_ret_thunk_extern
 (* | FNATTR_Frame_pointer - FNATTR_KeyValue *)
 | FNATTR_Hot
 | FNATTR_Inaccessiblememonly
@@ -184,23 +183,23 @@ Variant fn_attr : Set :=
 | FNATTR_No_jump_tables
 | FNATTR_Nobuiltin
 | FNATTR_Noduplicate
-| FNATTR_Nofree    
+| FNATTR_Nofree
 | FNATTR_Noimplicitfloat
 | FNATTR_Noinline
-| FNATTR_Nomerge    
+| FNATTR_Nomerge
 | FNATTR_Nonlazybind
-| FNATTR_Noprofile     
+| FNATTR_Noprofile
 | FNATTR_Noredzone
 | FNATTR_Indirect_tls_seg_refs
 | FNATTR_Noreturn
 | FNATTR_Norecurse
 | FNATTR_Willreturn
-| FNATTR_Nosync    
+| FNATTR_Nosync
 | FNATTR_Nounwind
 | FNATTR_Nosanitize_bounds
 | FNATTR_Nosanitize_coverage
 | FNATTR_Null_pointer_is_valid
-| FNATTR_Optforfuzzing    
+| FNATTR_Optforfuzzing
 | FNATTR_Optnone
 | FNATTR_Optsize
 (* | FNATTR_Patchable_function - FNATTR_KeyValue *)
@@ -210,15 +209,15 @@ Variant fn_attr : Set :=
 (* | FNATTR_Stack_probe_size - FNATTR_KeyValue *)
 (* | FNATTR_No_stack_arg_probe  - FNATTR_String *)
 | FNATTR_Writeonly
-| FNATTR_Argmemonly    
+| FNATTR_Argmemonly
 | FNATTR_Returns_twice
-| FNATTR_Safestack    
+| FNATTR_Safestack
 | FNATTR_Sanitize_address
 | FNATTR_Sanitize_memory
 | FNATTR_Sanitize_thread
 | FNATTR_Sanitize_hwaddress
 | FNATTR_Sanitize_memtag
-| FNATTR_Speculative_load_hardening    
+| FNATTR_Speculative_load_hardening
 | FNATTR_Speculatable
 | FNATTR_Ssp
 | FNATTR_Sspstrong
@@ -233,7 +232,7 @@ Variant fn_attr : Set :=
 | FNATTR_Shadowcallstack
 | FNATTR_Mustprogress
 (* | FNATTR_Warn_stack_size (th : int) - FNATTR_KeyValue *)
-| FNATTR_Vscale_range (min : int) (max : option int) 
+| FNATTR_Vscale_range (min : int) (max : option int)
 (* | FNATTR_Min_legal_vector_width  (size : int) - FNATTR_KeyValue *)
 | FNATTR_String (s:string)   (* See the comments above for cases covered by FNATTR_String *)
 | FNATTR_Key_value (kv : string * string) (* See the comments above for cases covered by FNATTR_KeyValue *)
@@ -259,11 +258,11 @@ Definition function_id := global_id.
    eliminate some corner cases.
 
    ```
-    Inductive type : Set := 
+    Inductive type : Set :=
       ...
     with
     rtyp : Set :=
-    | RTYPE_Void 
+    | RTYPE_Void
     | RTYPE_Typ (t:typ)
    ```
 *)
@@ -402,46 +401,46 @@ Variant ordering : Set :=
 
 Record cmpxchg : Set :=
   mk_cmpxchg {
-      c_weak              : option bool; 
+      c_weak              : option bool;
       c_volatile          : option bool;
       c_ptr               : texp;
       c_cmp               : icmp;
       c_cmp_type          : T;
-      c_new               : texp;                                
+      c_new               : texp;
       c_syncscope            : option string;
       c_success_ordering     : ordering;
       c_failure_ordering     : ordering;
-      c_align                : option int;     
+      c_align                : option int;
     }.
 
-Variant atomic_rmw_operation : Set := 
-  |Axchg  
-  |Aadd  
-  |Asub     
-  |Aand     
-  |Anand     
-  |Aor     
-  |Axor     
-  |Amax     
-  |Amin     
-  |Aumax     
-  |Aumin     
-  |Afadd     
+Variant atomic_rmw_operation : Set :=
+  |Axchg
+  |Aadd
+  |Asub
+  |Aand
+  |Anand
+  |Aor
+  |Axor
+  |Amax
+  |Amin
+  |Aumax
+  |Aumin
+  |Afadd
   |Afsub
      .
-     
+
 Record atomicrmw : Set :=
-  mk_atomicrmw { 
+  mk_atomicrmw {
       a_volatile             : option bool;
       a_operation            : atomic_rmw_operation;
       a_ptr                  : texp;
-      a_val                  : texp;                                 
+      a_val                  : texp;
       a_syncscope            : option string;
       a_ordering             : ordering;
       a_align                : option int;
       a_type                 : T;
     }.
-     
+
 Variant instr : Set :=
 | INSTR_Comment (msg:string)
 | INSTR_Op   (op:exp)                        (* INVARIANT: op must be of the form (OP_ ...) *)
@@ -481,7 +480,7 @@ Variant unnamed_addr : Set :=
    that they can be represented as a single list of features.  We call these
    "annotations".  Some annotations (such as prefix) are applicable only to
    function declarations or definitions, but we collect them all here
-   for a more uniform treatment.  
+   for a more uniform treatment.
 *)
 Variant annotation : Set :=
   | ANN_linkage (l:linkage)

@@ -18,8 +18,7 @@ From ITree Require Import
 
 From Coq Require Import
      ZArith
-     Relations
-     Relation_Definitions.
+     Relations.
 
 From ExtLib Require Import
      Monads.
@@ -1205,3 +1204,4 @@ Module Finite.
         repeat constructor; auto.
   Qed.
 End Finite.
+

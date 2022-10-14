@@ -41,7 +41,7 @@ Definition mangle_block (blk:block T) : block T :=
   blk.
 
 Definition mangle_blocks (blks: block T * list (block T)) : block T * list (block T) :=
-  let '(entry, body) := blks in 
+  let '(entry, body) := blks in
   (mangle_block entry, List.map mangle_block body).
 
 Definition mangle_definition (d:definition T (block T * list (block T))) : definition T (block T * list (block T)) :=

@@ -21,7 +21,7 @@
 Require Import Psatz.
 Require Import Bool.
 Require Import Eqdep_dec.
-From Flocq Require Import Core Digits Operations Round Bracket Sterbenz Binary Round_odd.
+From Flocq Require Import Core Digits Sterbenz Binary Round_odd.
 
 
 Local Open Scope Z_scope.
@@ -1514,4 +1514,3 @@ Proof.
 Qed.
 
 End Compose_Conversions.
-

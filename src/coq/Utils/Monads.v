@@ -11,8 +11,7 @@ From ExtLib Require Import
 From ITree Require Import
      Basics.Monad Basics.MonadState.
 
-From Vellvm Require Import
-     Utils.Util.
+
 
 Import Monads.
 
@@ -252,3 +251,4 @@ Proof.
 Qed.
 
 #[global] Existing Instance MonadState.MonadLawsE_stateTM.
+

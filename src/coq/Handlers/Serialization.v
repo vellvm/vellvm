@@ -26,7 +26,6 @@ From Vellvm Require Import
      Handlers.MemoryHelpers.
 
 From ExtLib Require Import
-     Core.RelDec
      Structures.Monads
      Data.Monads.EitherMonad.
 
@@ -61,7 +60,7 @@ Module Type SerializationBase (LP : LLVMParams) (MP : MemoryParams LP).
 
   (* Equations *)
   Parameter concretize_uvalueM_equation :
-    forall (M : Type -> Type) {HM : Monad M} (undef_handler : dtyp -> M dvalue) 
+    forall (M : Type -> Type) {HM : Monad M} (undef_handler : dtyp -> M dvalue)
       (ERR_M : Type -> Type) {HM_ERR : Monad ERR_M} {ERR : RAISE_ERROR ERR_M} {UB : RAISE_UB ERR_M}
       {OOM : RAISE_OOM ERR_M} (lift_ue : forall A : Type, ERR_M A -> M A) (u : uvalue),
       concretize_uvalueM M undef_handler ERR_M lift_ue u =
@@ -163,7 +162,7 @@ Module Type SerializationBase (LP : LLVMParams) (MP : MemoryParams LP).
             elt_typ <- match vec_typ with
                        | DTYPE_Vector _ t => ret t
                        | _ => lift_ue _ (raise_error "Invalid vector type for ExtractElement")
-                       end;; 
+                       end;;
             lift_ue dvalue (index_into_vec_dv elt_typ dvec didx)
         | UVALUE_InsertElement vec_typ vec elt idx =>
             dvec <- concretize_uvalueM M undef_handler ERR_M lift_ue vec;;

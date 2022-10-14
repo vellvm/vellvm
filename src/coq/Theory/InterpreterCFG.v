@@ -12,17 +12,14 @@ From ITree Require Import
      Eq.Eq.
 
 From Vellvm Require Import
-     Utilities
-     Syntax
-     Semantics
-     Theory.Refinement.
+     Semantics.
 
 Import ITreeNotations.
 
 (* end hide *)
 
 (** * General facts on the CFG-level interpretation
-  A collection of elementary facts about the interpretation when considering an intra-function piece of syntax 
+  A collection of elementary facts about the interpretation when considering an intra-function piece of syntax
 *)
 Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Export TOP.
@@ -65,7 +62,7 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Import CFGTactics.
 
   Lemma interp_cfg1_bind :
-    forall {R S} (t: itree instr_E R) (k: R -> itree instr_E S) g, 
+    forall {R S} (t: itree instr_E R) (k: R -> itree instr_E S) g,
       ℑ1 (t >>= k) g ≈ '(g',x) <- ℑ1 t g ;; ℑ1 (k x) g'.
   Proof.
     intros.

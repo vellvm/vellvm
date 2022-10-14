@@ -1496,7 +1496,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
 
     cbn in CONTRA.
     setoid_rewrite bind_ret_l in CONTRA.
-    
+
     pose proof (map_monad_err_succeeds
                   (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) as HMAPM.
       forward HMAPM.
@@ -3353,7 +3353,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       4: apply post.
       all: eauto.
     }
-    
+
     intros A.
     unfold Proper, respectful.
     intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2.
@@ -3497,7 +3497,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   Require Import Error.
   Require Import MonadReturnsLaws.
-  Require Import ItreeRaiseMReturns.
+
 
 
   (* TODO: Move this *)

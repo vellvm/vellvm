@@ -9,10 +9,7 @@ From ITree Require Import
      Eq.Eq.
 
 From Vellvm Require Import
-     Utilities
-     Syntax
-     Semantics
-     Semantics.InterpretationStack.
+     Semantics.
 
 Import ITreeNotations.
 
@@ -237,3 +234,4 @@ End Make.
 
 Module MCFGTheoryBigIntptr := Make InterpreterStackBigIntptr TopLevelBigIntptr.
 Module MCFGTheory64BitIntptr := Make InterpreterStack64BitIntptr TopLevel64BitIntptr.
+

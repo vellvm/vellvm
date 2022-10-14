@@ -1,8 +1,5 @@
 (* begin hide *)
 From Vellvm Require Import
-     Utilities
-     Syntax
-     Semantics
      Semantics.LLVMParams
      Semantics.Lang.
 (* end hide *)
@@ -49,3 +46,4 @@ Module CFG_LEVEL (LP : LLVMParams) (LLVM : Lang LP).
   
   Notation "↑" :=  lift_state_cfgP.
 End CFG_LEVEL.
+

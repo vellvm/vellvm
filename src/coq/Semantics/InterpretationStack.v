@@ -7,11 +7,7 @@ From ITree Require Import
 
 From Vellvm Require Import
      Utilities
-     Syntax
      Semantics.LLVMEvents
-     Semantics.Denotation
-     Semantics.MemoryAddress
-     Semantics.Memory.Sizeof
      Semantics.Lang
      Semantics.LLVMParams.
 

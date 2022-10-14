@@ -20,9 +20,7 @@ From Vellvm.Utils Require Import
 
 From ITree Require Import
      ITree
-     Basics.Basics
-     Eq.Eq
-     Events.StateFacts.
+     Eq.Eq.
 
 From ExtLib Require Import
      Structures.Functor
@@ -352,7 +350,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         pinversion EQ.
       - (* raise_oom_raise_error_inv *)
         intros A oom_msg error_msg.
-        apply oom_error_inv.        
+        apply oom_error_inv.
       - (* raise_error_raise_oom_inv *)
         intros A oom_msg error_msg.
         intros EQ.
@@ -622,7 +620,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         rewrite HFRESH.
         repeat setoid_rewrite bind_ret_l.
         cbn.
-        
+
         split; [|split].
         + reflexivity.
         + unfold MemStateFreshT_valid_state in *; auto.

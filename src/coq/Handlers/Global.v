@@ -158,10 +158,10 @@ Section Globals.
       Qed.
 
       #[global] Instance eutt_interp_global {R} :
-        Proper (eutt eq ==> eq ==> eutt eq) (@interp_global R). 
+        Proper (eutt eq ==> eq ==> eutt eq) (@interp_global R).
       Proof.
         repeat intro.
-        unfold interp_global. 
+        unfold interp_global.
         subst; rewrite H1.
         reflexivity.
       Qed.
@@ -172,8 +172,7 @@ Section Globals.
 
 End Globals.
 
-From ExtLib Require Import
-     Data.Map.FMapAList.
+
 From Vellvm Require Import
      LLVMAst
      MemoryAddress.

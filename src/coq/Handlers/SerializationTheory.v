@@ -13,16 +13,9 @@ From Vellvm Require Import
      Utils.Monads
      Utils.MapMonadExtra
      Handlers.MemoryModelImplementation
-     Handlers.Serialization
-     Semantics.LLVMEvents
      Semantics.LLVMParams
      Semantics.Denotation
-     Semantics.MemoryAddress
-     Semantics.GepM
-     Semantics.Memory.Sizeof
      Semantics.Memory.MemBytes
-     Semantics.Memory.ErrSID
-     Semantics.LLVMParams
      Semantics.MemoryParams
      Semantics.SerializationParams.
 
@@ -91,7 +84,7 @@ Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : Serializati
       replace (Z.of_N (start + N.pos (Pos.of_succ_nat (Datatypes.length sbytes)))) with (Z.of_N (N.succ start + N.of_nat (Datatypes.length sbytes))) in REST by lia.
 
       rewrite <- N2Z.inj_succ in *.
-      
+
       apply IHsbytes; auto.
   Qed.
 
@@ -162,11 +155,11 @@ Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : Serializati
       is_supported dt ->
       to_ubytes uv dt sid = NoOom sbytes ->
       all_bytes_from_uvalue_helper 0 sid uv sbytes = Some uv.
-  Proof.  
+  Proof.
     intros uv dt sid sbytes SUP TO.
 
     change 0%Z with (Z.of_N 0).
-    eapply to_ubytes_all_bytes_from_uvalue_helper'; eauto.    
+    eapply to_ubytes_all_bytes_from_uvalue_helper'; eauto.
   Qed.
 
   Lemma to_ubytes_sizeof_dtyp :
@@ -408,7 +401,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
         setoid_rewrite Heqb in H1.
         inversion H1.
         reflexivity.
-      + solve_bind_res. 
+      + solve_bind_res.
       + solve_bind_res.
       + repeat break_match_goal;
           solve [ destruct (VellvmIntegers.mmul x x0); cbn in *; inversion EVAL;
@@ -806,7 +799,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
       eexists.
       exists (fun _ => raise_ub "").
 
-      
+
       split; [apply pama|].
       split; cbn; auto.
 
@@ -834,7 +827,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
       eexists.
       exists (fun _ => raise_ub "").
 
-      
+
       split; [apply pama|].
       split; cbn; auto.
 
@@ -855,7 +848,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
       eexists.
       exists (fun _ => raise_ub "").
 
-      
+
       split; [apply pama|].
       split; cbn; auto.
 
@@ -1080,7 +1073,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
         rewrite concretize_uvalueM_equation; cbn.
         reflexivity.
       }
-      
+
       inversion IHDTYP; subst.
       inversion IHDTYP0; subst.
 
@@ -1439,7 +1432,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
 (* (*         (* unfold deserialize_sbytes,deserialize_sbytes_func. *) *) *)
 (* (*         (* cbn. *) *) *)
 (* (*         (* TODO: probably need an equation for rewriting *) *) *)
-      
+
 (* (*       match goal with *) *)
 (* (*           (* Try easy case first for speedup *) *) *)
 (* (*           | |- _ = inr ?x => *) *)
@@ -1455,7 +1448,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
 
 
 (* (* (*     } *) *) *)
-    
+
 (* (* (*     1-12: match goal with *) *) *)
 (* (* (*           (* Try easy case first for speedup *) *) *) *)
 (* (* (*           | |- _ = inr ?x => *) *) *)
@@ -1593,13 +1586,13 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
 (* (* (* (*     1-30:eval_serialize_sbytes_hyp. *) *) *) *)
 (* (* (* (*     12: { *) *) *) *)
 (* (* (* (*       eval_serialize_sbytes_hyp. *) *) *) *)
-      
+
 (* (* (* (*       rewrite serialize_sbytes_equation in SER. *) *) *) *)
 (* (* (* (*     } *) *) *) *)
 (* (* (* (*     rewrite serialize_sbytes_equation in SER. *) *) *) *)
 (* (* (* (*       try solve [cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto]. *) *) *) *)
 
-    
+
 (* (* (* (*     induction TYP; *) *) *) *)
 (* (* (* (*       try solve [unfold serialize_sbytes in SER; *) *) *) *)
 (* (* (* (*                  inv SER; *) *) *) *)
@@ -2006,4 +1999,3 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
     (* Qed. *)
 
 End SerializationTheory.
-

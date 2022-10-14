@@ -31,7 +31,6 @@ From ITree Require Import
 From Vellvm Require Import
      Utilities
      Syntax
-     Semantics.MemoryAddress
      Semantics.Memory.Sizeof
      Semantics.DynamicValues.
 
@@ -86,7 +85,7 @@ Set Contextual Implicit.
     with any return type. *)
   Definition raiseUB {E : Type -> Type} `{UBE -< E} {X}
              (e : string)
-    : itree E X 
+    : itree E X
     := v <- trigger (ThrowUB e);; match v: void with end.
 
   #[global] Instance RAISE_UB_ITREE_UB {E : Type -> Type} `{UBE -< E} : RAISE_UB (itree E) :=
@@ -101,7 +100,7 @@ Set Contextual Implicit.
     with any return type. *)
   Definition raiseOOM {E : Type -> Type} `{OOME -< E} {X}
              (e : string)
-    : itree E X 
+    : itree E X
     := v <- trigger (ThrowOOM e);; match v: void with end.
 
   #[global] Instance RAISE_OOM_ITREE_OOME {E : Type -> Type} `{OOME -< E} : RAISE_OOM (itree E) :=
@@ -193,7 +192,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
     | pick (Pre : Prop) (x : X) : PickE ({y : Y | Post x y}).
 
   Definition PickUvalueE := @PickE uvalue dvalue (fun _ _ => True).
-  
+
   (* MOVE THIS *)
   Class RAISE_PICK {X Y Post} (M : Type -> Type) : Type :=
     { raise_pick : @PickE X Y Post ~> M }.

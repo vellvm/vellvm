@@ -36,9 +36,7 @@ From Vellvm.Handlers Require Import
      MemoryInterpreters.
 
 From Vellvm.Handlers.MemoryModules Require Import
-     FiniteAddresses
-     FiniteIntptr
-     FiniteSizeof.
+     FiniteAddresses.
 
 From ExtLib Require Import
      Structures.Monads.

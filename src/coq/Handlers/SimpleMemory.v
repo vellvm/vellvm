@@ -9,12 +9,12 @@ Set Contextual Implicit.
 Inductive Addr :=
 | Null
 | Ptr (n:nat)
-.      
+.
 
 Module A : Vellvm.LLVMIO.ADDR with Definition addr := Addr.
   Definition addr := Addr.
-  Definition null := Null.   
-End A.  
+  Definition null := Null.
+End A.
 
 Module SS := StepSemantics.StepSemantics(A).
 Export SS.
@@ -23,7 +23,7 @@ Export SS.DV.
 Definition memory := list dvalue.
 
 Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (list dvalue * X) :=
-  match e in IO Y return (IO Y) + (list dvalue * Y) with 
+  match e in IO Y return (IO Y) + (list dvalue * Y) with
   | Alloca t =>
     inr  ((m ++ [undef t])%list,
           DVALUE_Addr (Ptr (List.length m)))
@@ -34,7 +34,7 @@ Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (list dvalue * X) :=
          | DVALUE_Addr (Ptr n) => nth_default (undef t) m n
          | _ => undef t
          end)
-        
+
   | Store a v =>
     inr (
         match a with
@@ -47,11 +47,11 @@ Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (list dvalue * X) :=
 
   | ItoP t i => inl (ItoP t i) (* TODO: ItoP semantics *)
 
-  | PtoI t a => inl (PtoI t a) (* TODO: ItoP semantics *)                     
-                       
+  | PtoI t a => inl (PtoI t a) (* TODO: ItoP semantics *)
+
   | Call t f args  => inl (Call t f args)
 
-                         
+
   | DeclareFun f =>
     (* TODO: should check for re-declarations and maintain that state in the memory *)
     inr (m,
@@ -81,7 +81,7 @@ Definition run_with_memory prog : option (Trace dvalue) :=
   | None => None
   | Some mcfg =>
     mret
-      (memD [] 
+      (memD []
       ('s <- SS.init_state mcfg "main";
          SS.step_sem mcfg (SS.Step s)))
   end.
@@ -107,7 +107,7 @@ Fixpoint MemDFin (m:memory) (d:Trace ()) (steps:nat) : option memory :=
 *)
 
 (*
-Previous bug: 
+Previous bug:
 Fixpoint MemDFin {A} (memory:mtype) (d:Obs A) (steps:nat) : option mtype :=
   match steps with
   | O => None

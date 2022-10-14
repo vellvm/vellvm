@@ -7,7 +7,7 @@ From Vellvm Require Import
      Numeric.Coqlib
      Utilities
      Syntax.
-     
+
 From ExtLib Require Import List.
 
 Set Implicit Arguments.
@@ -30,7 +30,7 @@ Section LABELS_THEORY.
   Proof.
     intros.
     unfold inputs at 1.
-    rewrite map_app; auto. 
+    rewrite map_app; auto.
   Qed.
 
   Lemma inputs_cons: forall b (l : ocfg T),
@@ -69,7 +69,7 @@ Section LABELS_THEORY.
   Qed.
 
   Lemma wf_ocfg_bid_nil:
-    wf_ocfg_bid (T := T) []. 
+    wf_ocfg_bid (T := T) [].
   Proof.
     intros; apply list_norepet_nil.
   Qed.
@@ -91,7 +91,7 @@ Section LABELS_THEORY.
   Qed.
 
   Lemma wf_ocfg_bid_app_r :
-    forall (bs1 bs2 : ocfg T), 
+    forall (bs1 bs2 : ocfg T),
       wf_ocfg_bid (bs1 ++ bs2) ->
       wf_ocfg_bid bs2.
   Proof.
@@ -103,7 +103,7 @@ Section LABELS_THEORY.
   Qed.
 
   Lemma wf_ocfg_bid_app_l :
-    forall (bs1 bs2 : ocfg T), 
+    forall (bs1 bs2 : ocfg T),
       wf_ocfg_bid (bs1 ++ bs2) ->
       wf_ocfg_bid bs1.
   Proof.
@@ -219,7 +219,7 @@ Section LABELS_THEORY.
   Lemma In_bk_outputs: forall bid br (b: block T) (l : ocfg T),
       In br (successors b) ->
       find_block l bid = Some b ->
-      In br (outputs l). 
+      In br (outputs l).
   Proof.
     induction l as [| ? l IH].
     - cbn; intros ? abs; inv abs.
@@ -229,7 +229,7 @@ Section LABELS_THEORY.
       + flatten_hyp Heq; inv Heq.
         rewrite outputs_cons.
         apply in_or_app; left; auto.
-      + flatten_hyp Heq; inv Heq. 
+      + flatten_hyp Heq; inv Heq.
         rewrite outputs_cons.
         apply in_or_app; right.
         auto.
@@ -355,7 +355,7 @@ Section LABELS_THEORY.
       (free_in_cfg bks1 b /\ free_in_cfg bks2 b).
   Proof.
     intros; split; unfold free_in_cfg; intro FREE.
-    - split; intros abs; eapply FREE; rewrite inputs_app; eauto using in_or_app. 
+    - split; intros abs; eapply FREE; rewrite inputs_app; eauto using in_or_app.
     - rewrite inputs_app; intros abs; apply in_app_or in abs; destruct FREE as [FREEL FREER]; destruct abs; [eapply FREEL | eapply FREER]; eauto.
   Qed.
 
@@ -382,7 +382,7 @@ Section LABELS_THEORY.
     - intros.
       unfold predecessors.
       rewrite app_assoc.
-      rewrite 2 (fold_left_app _ _ [bk]). 
+      rewrite 2 (fold_left_app _ _ [bk]).
       simpl.
       break_match_goal.
       + cbn; f_equal.
@@ -417,7 +417,7 @@ Section LABELS_THEORY.
   Proof.
     intros * IN FIND.
     apply find_block_In in FIND; revert FIND.
-    induction G as [| bki G IH]; intros * FIND. 
+    induction G as [| bki G IH]; intros * FIND.
     - inv FIND.
     - destruct FIND as [EQ | FIND].
       + subst.
@@ -439,7 +439,7 @@ Section LABELS_THEORY.
     fold_left (fun acc bk => if is_predecessor b bk then bk.(blk_id) :: acc else acc) G acc.
 
   Lemma In_predecessors_is_predecessor_aux :
-    forall (G : ocfg T) acc (src tgt : block_id), 
+    forall (G : ocfg T) acc (src tgt : block_id),
       In src (predecessors_aux tgt G acc) ->
       (In src acc \/ exists bk, In bk G /\ src = bk.(blk_id) /\ is_predecessor tgt bk = true).
   Proof.
@@ -456,7 +456,7 @@ Section LABELS_THEORY.
   Qed.
 
   Lemma In_predecessors_is_predecessor :
-    forall (G : ocfg T) (src tgt : block_id), 
+    forall (G : ocfg T) (src tgt : block_id),
       In src (predecessors tgt G) ->
       exists bk, In bk G /\ src = bk.(blk_id) /\ is_predecessor tgt bk = true.
   Proof.
@@ -484,10 +484,10 @@ Section LABELS_THEORY.
     contradiction n; reflexivity.
   Qed.
 
-  Lemma find_block_ineq: 
+  Lemma find_block_ineq:
     forall x (b : block T) (bs : ocfg T),
       blk_id b <> x ->
-      find_block (b::bs) x = find_block bs x. 
+      find_block (b::bs) x = find_block bs x.
   Proof.
     intros; cbn.
     destruct (Eqv.eqv_dec_p (blk_id b)) as [EQ | INEQ].
@@ -496,7 +496,7 @@ Section LABELS_THEORY.
   Qed.
 
   Lemma wf_ocfg_bid_In_is_found :
-    forall (bks : ocfg T) bk, 
+    forall (bks : ocfg T) bk,
       wf_ocfg_bid bks ->
       In bk bks ->
       find_block bks bk.(blk_id) = Some bk.
@@ -512,7 +512,7 @@ Section LABELS_THEORY.
     - rewrite find_block_ineq; [| auto].
       apply IH.
       eapply wf_ocfg_bid_cons; eauto.
-      destruct IN; auto. 
+      destruct IN; auto.
       exfalso; subst; eapply n; reflexivity.
   Qed.
 
@@ -540,11 +540,11 @@ Section LABELS_THEORY.
     intros x b; induction bs1 as [| hd bs1 IH]; intros * NOREP FIND.
     - rewrite app_nil_l; auto.
     - cbn; break_inner_match_goal.
-      + cbn in NOREP; apply wf_ocfg_bid_cons_not_in in NOREP. 
+      + cbn in NOREP; apply wf_ocfg_bid_cons_not_in in NOREP.
         exfalso; apply NOREP.
         rewrite e.
         apply find_some in FIND as [FIND EQ].
-        clear - FIND EQ. 
+        clear - FIND EQ.
         rewrite inputs_app; eapply in_or_app; right.
         break_match; [| intuition].
         rewrite <- e.
@@ -617,7 +617,7 @@ Section LABELS_THEORY.
       destruct (Eqv.eqv_dec_p (blk_id hd) b).
       cbn; rewrite e; auto.
       right; eapply IH.
-      erewrite <- find_block_ineq; eauto. 
+      erewrite <- find_block_ineq; eauto.
   Qed.
 
   Lemma wf_ocfg_bid_find_None_app_l :
@@ -632,13 +632,13 @@ Section LABELS_THEORY.
     - exfalso.
       cbn in WF; eapply wf_ocfg_bid_cons_not_in in WF.
       apply WF.
-      rewrite inputs_app. 
+      rewrite inputs_app.
       apply in_or_app; right.
       rewrite e.
       apply find_block_Some_In_inputs in FIND; auto.
     - rewrite find_block_ineq; auto.
       eapply IH; eauto using wf_ocfg_bid_cons.
-  Qed.    
+  Qed.
 
   Lemma find_block_has_id : forall (G : ocfg T) b bk,
       find_block G b = Some bk ->
@@ -662,7 +662,7 @@ Section LABELS_THEORY.
   Proof.
     intros * ID; induction G as [| hd G IH]; intros FIND ; [inv FIND |].
     cbn in *.
-    rewrite ID. 
+    rewrite ID.
     break_match_goal; break_match_hyp; intuition.
     inv FIND; auto.
   Qed.
@@ -675,7 +675,7 @@ Section LABELS_THEORY.
   Proof.
     intros * ID; induction G as [| hd G IH]; intros FIND; [reflexivity |].
     cbn in *.
-    rewrite ID. 
+    rewrite ID.
     break_match_goal; break_match_hyp; intuition.
     inv FIND; auto.
   Qed.
@@ -693,7 +693,7 @@ Section LABELS_THEORY.
     inv FIND1; inv FIND2; auto.
     break_match_hyp; intuition.
     eapply IH; eauto.
-    eapply wf_ocfg_bid_cons; eauto. 
+    eapply wf_ocfg_bid_cons; eauto.
   Qed.
 
   Lemma find_block_In' : forall G b (bk : block T),
@@ -731,10 +731,10 @@ Section LABELS_THEORY.
   Proof.
     induction bks as [| x bks IH]; intros * IN; [inv IN | ].
     destruct (Eqv.eqv_dec_p x.(blk_id) bk.(blk_id)).
-    - do 2 red in e; exists x; rewrite find_block_eq; auto. 
+    - do 2 red in e; exists x; rewrite find_block_eq; auto.
     - rewrite find_block_ineq; [| auto].
       apply IH.
-      destruct IN; auto. 
+      destruct IN; auto.
       exfalso; subst; eapply n; reflexivity.
   Qed.
 
@@ -770,7 +770,7 @@ Proof.
       eapply free_in_cfg_cons; eauto.
 Qed.
 
-From Vellvm Require Import Syntax.TypToDtyp.
+
 
 Section DTyp.
 
@@ -781,8 +781,8 @@ Section DTyp.
     - induction brs as [| [τ i] brs IH]; cbn; auto.
       do 2 f_equal.
       inv IH; auto.
-    - induction brs; cbn; auto; f_equal; auto. 
-  Qed. 
+    - induction brs; cbn; auto; f_equal; auto.
+  Qed.
 
   Lemma convert_typ_outputs : forall (bks : ocfg typ),
       outputs (convert_typ [] bks) = outputs bks.
@@ -816,9 +816,9 @@ Section DTyp.
       change (wf_ocfg_bid (convert_typ env b :: convert_typ env bs)).
       apply list_norepet_cons.
       + apply wf_ocfg_bid_cons_not_in in NOREP.
-        cbn. 
+        cbn.
         rewrite inputs_convert_typ; auto.
       + eapply IH, wf_ocfg_bid_cons; eauto.
   Qed.
 
-End DTyp. 
+End DTyp.

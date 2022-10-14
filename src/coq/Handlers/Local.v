@@ -158,8 +158,7 @@ Section Locals.
 
 End Locals.
 
-From ExtLib Require Import
-     Data.Map.FMapAList.
+
 From Vellvm Require Import
      LLVMAst
      MemoryAddress.

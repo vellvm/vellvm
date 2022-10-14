@@ -20,9 +20,7 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Semantics.Denotation
      Semantics.IntrinsicsDefinitions
-     Handlers.Handlers
-     Semantics.InterpretationStack
-     Semantics.LLVMParams.
+     Semantics.InterpretationStack.
 
 Import MonadNotation.
 Import ListNotations.
@@ -148,7 +146,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
      * initialize the global environment;
      * point wise denote each function;
      * retrieve the address of the entry point function;
-     * tie the mutually recursive know and run it starting from the 
+     * tie the mutually recursive know and run it starting from the
      * entry point
      *
      * This code should be semantically equivalent to running the following
@@ -169,7 +167,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     dv_pred <- trigger (pick_uvalue (forall dt, ~concretize rv (DVALUE_Poison dt)) rv);;
     ret (proj1_sig dv_pred).
 
-  (* main_args and denote_vellvm_main may not be needed anymore, but I'm keeping them 
+  (* main_args and denote_vellvm_main may not be needed anymore, but I'm keeping them
      For backwards compatibility.
    *)
   (* (for now) assume that [main (i64 argc, i8** argv)]
@@ -197,7 +195,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     interp_mcfg4_exec t [] ([],[]) 0 initial_memory_state.
 
   (**
-     Finally, the reference interpreter assumes no user-defined intrinsics and starts 
+     Finally, the reference interpreter assumes no user-defined intrinsics and starts
      from "main" using bogus initial inputs.
    *)
   Definition interpreter
@@ -222,7 +220,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : PropT L4 res_L4 :=
     let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-    ℑs eq eq t [] ([],[]) 0 initial_memory_state. 
+    ℑs eq eq t [] ([],[]) 0 initial_memory_state.
 
   (**
      Finally, the official model assumes no user-defined intrinsics.

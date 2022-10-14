@@ -1,8 +1,5 @@
 (* begin hide *)
-From Coq Require Import
-     List
-     String
-     Logic.FunctionalExtensionality.
+
 
 From Vellvm Require Import
      Utils.Util
@@ -108,7 +105,7 @@ Program Fixpoint typ_to_dtyp (env : list (ident * typ)) (t : typ) {measure (List
     DTYPE_Array sz nt
 
   | TYPE_Function ret args varargs =>
-    DTYPE_Pointer 
+    DTYPE_Pointer
 
   | TYPE_Struct fields =>
     let nfields := map_In fields (fun t _ => typ_to_dtyp env t) in
@@ -335,7 +332,7 @@ Lemma mcfg_of_tle_app : forall x y,
     convert_types (mcfg_of_tle (x ++ y)) =
     modul_app (convert_types (mcfg_of_tle x)) (convert_types (mcfg_of_tle y)).
 Proof.
-  intros. 
+  intros.
   unfold mcfg_of_tle.
   rewrite modul_of_toplevel_entities_app.
   rewrite mcfg_of_app_modul.
@@ -350,4 +347,3 @@ Lemma mcfg_of_tle_cons : forall x y,
 Proof.
   intros; rewrite list_cons_app; apply mcfg_of_tle_app; auto.
 Qed.
-

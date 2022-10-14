@@ -22,13 +22,7 @@ From Vellvm Require Import
      Utils.MonadReturnsLaws
      Utils.Raise.
 
-From ITree Require Import
-     ITree
-     Basics.Basics
-     Events.Exception
-     Eq.Eq
-     Events.StateFacts
-     Events.State.
+
 
 Import Morphisms.
 
@@ -64,7 +58,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
     repeat apply lift.
     auto.
   Defined.
-  
+
   #[global] Instance Monad_EQ1_ErrSID_T {M} `{HME : Monad.Eq1 M} : Monad.Eq1 (ErrSID_T M).
   Proof.
     unfold Monad.Eq1.
@@ -106,7 +100,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
       destruct e' as [e_OOM | [e_UB | [[e_ERR] | a]]]; auto.
     - (* bind_bind *)
       intros A B C x f g.
-      
+
       cbn.
       destruct x as [[[[[e]]]]].
       cbn.
@@ -261,7 +255,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
       forall sid pr, exists x sid' pr',
         ErrSID_runs_to e sid pr x sid' pr'.
   Proof.
-    intros A e ESID sid pr. 
+    intros A e ESID sid pr.
     destruct e as [[[[[e]]]]].
     unfold ErrSID_succeeds in ESID.
     specialize (ESID sid pr).
@@ -404,7 +398,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
     destruct (ka' sid' pr') as [[pr'' [sid'' [OOM_ka' | [UB_ka' | [ERR_ka' | ka]]]]]] eqn:Hka';
       cbn in *; rewrite Hka' in KA'; cbn in *; try contradiction.
 
-    auto.          
+    auto.
   Qed.
 
   Definition err_to_ub {A} (e : err A) : ErrSID A

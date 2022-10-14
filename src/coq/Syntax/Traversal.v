@@ -103,7 +103,7 @@ Section Endo.
         | EXP_Zero_initializer
         | EXP_Undef => e
         | EXP_Cstring elts =>
-          EXP_Cstring (List.map (fun '(t,e) => (endo t, f_exp e)) elts)          
+          EXP_Cstring (List.map (fun '(t,e) => (endo t, f_exp e)) elts)
         | EXP_Struct fields =>
           EXP_Struct (List.map (fun '(t,e) => (endo t, f_exp e)) fields)
         | EXP_Packed_struct fields =>
@@ -176,7 +176,7 @@ Section Endo.
 
     #[global] Instance Endo_tint_literal
       : Endo tint_literal | 50 := id.
-    
+
     #[global] Instance Endo_instr
            `{Endo T}
            `{Endo (exp T)}
@@ -217,7 +217,7 @@ Section Endo.
         | TERM_Resume v => TERM_Resume (endo v)
         | TERM_Invoke fnptrval args to_label unwind_label =>
           TERM_Invoke (endo fnptrval) (endo args) (endo to_label) (endo unwind_label)
-        | TERM_Unreachable => TERM_Unreachable 
+        | TERM_Unreachable => TERM_Unreachable
         end.
 
     #[global] Instance Endo_phi
@@ -260,7 +260,7 @@ Section Endo.
         end
         .
 
-    
+
     #[global] Instance Endo_global
            `{Endo raw_id}
            `{Endo T}
@@ -428,11 +428,11 @@ Section TFunctor.
 
     Definition compose {A B C: Type} (f: A -> B) (g: B -> C): A -> C := fun a => g (f a).
 
-    #[global] Instance TFunctor_list 
+    #[global] Instance TFunctor_list
       : TFunctor list | 50 :=
       List.map.
 
-    #[global] Instance TFunctor_list' {F} `{TFunctor F} 
+    #[global] Instance TFunctor_list' {F} `{TFunctor F}
       : TFunctor (fun T => list (F T)) | 49 :=
       fun U V f => List.map (tfmap f).
 
@@ -455,7 +455,7 @@ Section TFunctor.
         let ftexp (te: U * exp U) := (f (fst te), f_exp (snd te)) in
         match e with
         | EXP_Ident id                       => EXP_Ident (endo id)
-        | EXP_Integer n                      => EXP_Integer n 
+        | EXP_Integer n                      => EXP_Integer n
         | EXP_Float   f                      => EXP_Float   f
         | EXP_Double  d                      => EXP_Double  d
         | EXP_Hex     f                      => EXP_Hex     f
@@ -483,7 +483,7 @@ Section TFunctor.
         | OP_Freeze v                        => OP_Freeze (ftexp v)
         end.
 
-    #[global] Instance TFunctor_texp 
+    #[global] Instance TFunctor_texp
            `{TFunctor exp}
       : TFunctor texp | 50 :=
       fun _ _ f '(t,e) => (f t, tfmap f e).
@@ -492,7 +492,7 @@ Section TFunctor.
            `{Endo bool}
            `{Endo icmp}
            `{Endo int}
-           `{Endo string}         
+           `{Endo string}
            `{Endo ordering}
            `{TFunctor texp}
            (* `{TFunctor typ} *)
@@ -512,8 +512,8 @@ Section TFunctor.
 
   #[global] Instance TFunctor_atomicrmw
            `{Endo bool}
-           `{Endo atomic_rmw_operation}          
-           `{Endo string}         
+           `{Endo atomic_rmw_operation}
+           `{Endo string}
            `{Endo ordering}
            `{Endo int}
            `{TFunctor texp}
@@ -529,23 +529,23 @@ Section TFunctor.
           (endo (a_ordering a))
           (endo (a_align a))
           (f (a_type a)).
-  
+
     #[global] Instance TFunctor_instr
            `{TFunctor exp}
       : TFunctor instr | 50 :=
       fun U V f ins =>
         match ins with
         | INSTR_Comment s => INSTR_Comment s
-        | INSTR_Op op => INSTR_Op (tfmap f op) 
+        | INSTR_Op op => INSTR_Op (tfmap f op)
         | INSTR_Call fn args => INSTR_Call  (tfmap f fn) (tfmap f args)
         | INSTR_Alloca t nb align => INSTR_Alloca (f t) (tfmap f nb) align
         | INSTR_Load volatile t ptr align => INSTR_Load volatile (f t) (tfmap f ptr) align
         | INSTR_Store volatile val ptr align => INSTR_Store volatile (tfmap f val) (tfmap f ptr) align
-        | INSTR_Fence syncscope o => INSTR_Fence syncscope o 
+        | INSTR_Fence syncscope o => INSTR_Fence syncscope o
         | INSTR_AtomicCmpXchg c => INSTR_AtomicCmpXchg (tfmap f c)
         | INSTR_AtomicRMW a => INSTR_AtomicRMW (tfmap f a)
         | INSTR_VAArg va t => INSTR_VAArg (tfmap f va) t
-        | INSTR_LandingPad => INSTR_LandingPad 
+        | INSTR_LandingPad => INSTR_LandingPad
         end.
 
     #[global] Instance TFunctor_tident
@@ -563,7 +563,7 @@ Section TFunctor.
         | TERM_Ret_void => TERM_Ret_void
         | TERM_Br v br1 br2 => TERM_Br (tfmap f v) (endo br1) (endo br2)
         | TERM_Br_1 br => TERM_Br_1 (endo br)
-        | TERM_Switch v default_dest brs => TERM_Switch (tfmap f v) (endo default_dest) (endo brs) 
+        | TERM_Switch v default_dest brs => TERM_Switch (tfmap f v) (endo default_dest) (endo brs)
         | TERM_IndirectBr v brs => TERM_IndirectBr (tfmap f v) (endo brs)
         | TERM_Resume v => TERM_Resume (tfmap f v)
         | TERM_Invoke fnptrval args to_label unwind_label => TERM_Invoke (tfmap f fnptrval) (tfmap f args) (endo to_label) (endo unwind_label)
@@ -590,10 +590,10 @@ Section TFunctor.
            `{TFunctor phi}
       : TFunctor block | 50  :=
       fun U V f b =>
-        mk_block (endo (blk_id b)) 
+        mk_block (endo (blk_id b))
                  (tfmap (fun '(id,phi) => (endo id, tfmap f phi)) (blk_phis b))
                  (tfmap f (blk_code b))
-                 (tfmap f (blk_term b)) 
+                 (tfmap f (blk_term b))
                  (blk_comments b).
 
     #[global] Instance TFunctor_metadata
@@ -611,7 +611,7 @@ Section TFunctor.
         | METADATA_Node mds => METADATA_Node (tfmap endo_metadata mds)
         end.
 
-    
+
     (* SAZ: Not as parameterized as it could be - how often do we want to change annnotations? *)
     #[global] Instance TFunctor_annotation
      `{TFunctor exp}
@@ -643,7 +643,7 @@ Section TFunctor.
         | ANN_personality t => ANN_personality (tfmap f t)
         end
         .
-    
+
     #[global] Instance TFunctor_global
            `{Endo raw_id}
            `{Endo bool}
@@ -730,9 +730,9 @@ Section TFunctor.
            `{Endo raw_id}
       : TFunctor (fun T => modul (FnBody T)) | 50 :=
       fun U V f m =>
-        mk_modul (endo (m_name m)) 
-                 (endo (m_target m)) (endo (m_datalayout m)) 
-                 (tfmap (fun '(id,t) => (id, f t)) (m_type_defs m)) 
+        mk_modul (endo (m_name m))
+                 (endo (m_target m)) (endo (m_datalayout m))
+                 (tfmap (fun '(id,t) => (id, f t)) (m_type_defs m))
                  (tfmap f (m_globals m))
                  (tfmap f (m_declarations m))
                  (tfmap f (m_definitions m)).
@@ -775,8 +775,7 @@ Proof.
 Qed.
 
 From ExtLib Require Import
-     Programming.Eqv
-     Structures.Monads.
+     Programming.Eqv.
 
 Import EqvNotation.
 
@@ -784,7 +783,7 @@ Section Examples.
 
   Section SubstId.
 
-    (** ** 
+    (** **
         Example definition of a transformation swapping identifier [x] for identifier [y] and reciprocally in a [cfg]
      *)
 
@@ -840,4 +839,3 @@ Section Examples.
   End SubstCFG.
 
 End Examples.
-

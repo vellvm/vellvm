@@ -10,7 +10,7 @@ From Vellvm Require Import
      Syntax.CFG
      Syntax.TypToDtyp.
 
-From ExtLib Require Import List.
+
 (* end hide *)
 
 (** * Scoping
@@ -101,7 +101,7 @@ Section LABELS_OPERATIONS.
       with the [inputs] of the latter.
 
       Under this assumption, the first part of the graph can be safely discarded
-      once the second part is reached: cf [DenotationTheory.denote_ocfg_app_no_edges] 
+      once the second part is reached: cf [DenotationTheory.denote_ocfg_app_no_edges]
       notably.
    *)
   Definition no_reentrance (bks1 bks2 : ocfg T) : Prop :=
@@ -121,7 +121,7 @@ Section LABELS_OPERATIONS.
       the branches of a conditional.
    *)
   Definition independent_flows (bks1 bks2 : ocfg T) : Prop :=
-    no_reentrance bks1 bks2 /\ 
+    no_reentrance bks1 bks2 /\
     no_reentrance bks2 bks1 /\
     no_duplicate_bid bks1 bks2.
 
@@ -225,12 +225,12 @@ Section REGISTER_OPERATIONS.
                         => use_sites id
 
                       | EXP_Integer _
-                      | EXP_Float _ 
+                      | EXP_Float _
                       | EXP_Double _
                       | EXP_Hex _
                       | EXP_Bool _
-                      | EXP_Null 
-                      | EXP_Zero_initializer 
+                      | EXP_Null
+                      | EXP_Zero_initializer
                       | EXP_Cstring _
                       | EXP_Undef
                         => []
@@ -243,7 +243,7 @@ Section REGISTER_OPERATIONS.
                       | OP_IBinop _ _ e1 e2
                       | OP_ICmp _ _ e1 e2
                       | OP_FBinop _ _ _ e1 e2
-                      | OP_FCmp _ _ e1 e2 
+                      | OP_FCmp _ _ e1 e2
                       | OP_ExtractElement (_,e1) (_,e2)
                       | OP_InsertValue (_,e1) (_,e2) _
                         => f e1 +++ f e2
@@ -255,7 +255,7 @@ Section REGISTER_OPERATIONS.
 
                       | EXP_Struct l
                       | EXP_Packed_struct l
-                      | EXP_Array l 
+                      | EXP_Array l
                       | EXP_Vector l
                         => set_flat_map (fun x => f (snd x)) l
 
@@ -271,13 +271,13 @@ Section REGISTER_OPERATIONS.
       {| use_sites := fun i => match i with
                           | INSTR_Op e => use_sites e
                           | INSTR_Call e l => use_sites e +++ set_flat_map use_sites l
-                          | INSTR_Alloca _ e _ 
-                          | INSTR_Load _ _ e _ 
+                          | INSTR_Alloca _ e _
+                          | INSTR_Load _ _ e _
                             => use_sites e
                           | INSTR_Store _ e1 e2 _
                             => use_sites e1 +++ use_sites e2
                           | INSTR_Fence _ _
-                          | INSTR_AtomicCmpXchg _ 
+                          | INSTR_AtomicCmpXchg _
                           | INSTR_AtomicRMW _
                           | INSTR_VAArg _ _
                           | INSTR_LandingPad
@@ -298,7 +298,7 @@ Section REGISTER_OPERATIONS.
                                  => use_sites e
 
                                | TERM_Switch e _ l =>
-                                 use_sites e 
+                                 use_sites e
 
                                | TERM_Ret_void
                                | TERM_Br_1 _

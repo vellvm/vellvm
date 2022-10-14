@@ -27,7 +27,7 @@ From ExtLib Require Import
 
 From Coq Require Import Relations RelationClasses.
 
-Require Import Morphisms.
+
 
 
 (* end hide *)
@@ -282,10 +282,10 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
              Can UVALUE_GetElementPtr t uvr idxs always concretize to
              DVALUE_Addr a?
 
-             
+
             *)
           induction idxs.
-          
+
           pose proof (ADDR.different_addrs a) as (b & DIFF_ADDR).
           specialize (H (DVALUE_Addr b)).
           forward H.
@@ -306,7 +306,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
                   concretize y dy /\
                   @eval_iop err_ub_oom _ _ _ _ op dx dy = ret dv.
           Proof.
-            
+
 
             da <- concretize_uvalueM ua;;
             dvs <- map_monad concretize_uvalueM uvs;;
@@ -317,7 +317,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
 
           Qed.
 
-          
+
           (* uvr is the thing being indexed... *)
 
           red_concretize.
@@ -327,7 +327,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
             subst; contradiction
 
 
-          
+
            subst.
         -- (* Case where uvr = undef *)
           pose proof REF as DTYP';
@@ -336,7 +336,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
             inversion DTYP'; subst;
 
             try solve [
-                remember (default_dvalue_of_dtyp DTYPE_Pointer) as DEF eqn:HDEF;          
+                remember (default_dvalue_of_dtyp DTYPE_Pointer) as DEF eqn:HDEF;
                 subst;
                 pose proof (ADDR.different_addrs a) as (b & DIFF_ADDR);
                 specialize (H (DVALUE_Addr b));
@@ -351,13 +351,13 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
             inversion DTYP'; subst.
 
 
-          remember (default_dvalue_of_dtyp DTYPE_Pointer) as DEF eqn:HDEF;          
+          remember (default_dvalue_of_dtyp DTYPE_Pointer) as DEF eqn:HDEF;
             subst;
             pose proof (ADDR.different_addrs a) as (b & DIFF_ADDR);
             specialize (H (DVALUE_Addr b));
             forward H;
             [red_concretize; cbn; constructor|];
-            
+
             red_concretize_in H; inversion H;
             subst; contradiction.
 
@@ -390,7 +390,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     split; typeclasses eauto.
   Qed.
 
-  (* Lemma 5.7 - uses this definition of refinement 
+  (* Lemma 5.7 - uses this definition of refinement
    note that refine_uvalue is the basic Uvalue refinement given by Definition 5.6 *)
   (* Refinement of uninterpreted mcfg *)
   Definition refine_L0: relation (itree L0 dvalue) := eutt eq.

@@ -10,7 +10,7 @@ From Coq Require Import
      Psatz
      List.
 
-From Vellvm Require Import 
+From Vellvm Require Import
      LLVMAst.
 
 Require Import Program.Equality.
@@ -39,7 +39,7 @@ Section FinSets.
   Global Instance Case_FinC : CoprodCase FinC app :=
     fun {n m p} (k : FinC n p) (k' : FinC m p) (x : FinSet (n ++ m)) =>
       match n with
-      | [] => 
+      | [] =>
       match split_fin_sum x with
       | inl x => k x
       | inr x => k' x
@@ -61,7 +61,7 @@ Section FinSets.
   Lemma to_nat'_FS {n} (k: Fin n):
     to_nat' (FS k) = S (to_nat' k).
   Proof.
-    unfold to_nat'; simpl; destruct (to_nat k); reflexivity. 
+    unfold to_nat'; simpl; destruct (to_nat k); reflexivity.
   Qed.
 
   Definition split_fin_S (n: nat) (k: Fin (S n)) : (Fin 1) + (Fin n) :=
@@ -87,7 +87,7 @@ Section FinSets.
 
   Lemma split_fin_S_left:
     forall (n: nat) (k : Fin (S n)) t,
-      split_fin_S n k = inl t -> k = F1. 
+      split_fin_S n k = inl t -> k = F1.
   Proof.
     unfold split_fin_S.
     intros; dependent destruction k; [reflexivity | inversion H].
@@ -95,12 +95,12 @@ Section FinSets.
 
   Lemma split_fin_S_right:
     forall (n: nat) (k : Fin (S n)) t,
-      split_fin_S n k = inr t -> to_nat' k = S (to_nat' t). 
+      split_fin_S n k = inr t -> to_nat' k = S (to_nat' t).
   Proof.
     unfold split_fin_S.
     intros; dependent destruction k.
     - inv H.
-    - inv H; apply to_nat'_FS. 
+    - inv H; apply to_nat'_FS.
   Qed.
 
   Lemma split_fin_sum_left:
@@ -131,7 +131,7 @@ Section FinSets.
   (* Proof. *)
   (*   intros; lia. *)
   (* Qed. *)
- 
+
   (* Fixpoint foo (n m: nat) (k: Fin (n + m)) : (Fin n) + (Fin m) := *)
   (*   match n with *)
   (*   | O => inr k *)
@@ -172,8 +172,8 @@ Section FinSets.
   (*     rewrite EQb in H. *)
   (*     dependent destruction b. *)
   (*   revert H. *)
-    
-    
+
+
 
   (* Lemma foo: *)
   (*   forall {m n: nat} (k: Fin.t (m + n)) k', *)
@@ -225,7 +225,7 @@ Section Label.
 
   Definition loop_Label {A B C : nat}: Label (C + A) (C + B) -> Label A B :=
     fun body =>
-      loop 
+      loop
         (fun l => match l with
                | inl l => ITree.map split_fin_sum (body (L _ l))
                | inr l => ITree.map split_fin_sum (body (R _ l))
@@ -234,4 +234,3 @@ Section Label.
   Definition lift_Label {A B} (f : FinC A B) : Label A B := fun a => Ret (f a).
 
 End Label.
-

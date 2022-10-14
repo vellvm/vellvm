@@ -10,7 +10,6 @@ From Vellvm Require Import
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
      Utils.Error
-     Utils.Monads
      Utils.Tactics.
 
 Import ListNotations.

@@ -9,10 +9,8 @@ From Vellvm Require Import
      Syntax.AstLib.
 
 From ExtLib Require Import
-     Core.RelDec
      Programming.Eqv
-     Structures.Monads
-     Data.Monads.OptionMonad.
+     Structures.Monads.
 
 
 

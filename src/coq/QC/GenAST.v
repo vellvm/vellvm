@@ -22,7 +22,7 @@ Require Import List.
 
 Import ListNotations.
 
-From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils.
+From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils Handlers.Handlers.
 Require Import Integers.
 
 
@@ -31,7 +31,7 @@ Import MonadNotation.
 Import ApplicativeNotation.
 
 From Coq Require Import
-     ZArith List String Lia Bool.Bool.
+     ZArith Lia Bool.Bool.
 
 From QuickChick Require Import QuickChick.
 Import QcDefaultNotation. Open Scope qc_scope.
@@ -2165,4 +2165,5 @@ Section InstrGenerators.
     ret (globals ++ functions ++ [main]).
 
 End InstrGenerators.
+
 

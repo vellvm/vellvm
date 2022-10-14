@@ -1,7 +1,6 @@
 (* begin hide *)
 From ITree Require Import
-     ITree
-     Basics.
+     ITree.
 
 From Vellvm Require Import
      Utils.PropT

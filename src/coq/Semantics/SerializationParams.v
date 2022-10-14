@@ -1,8 +1,5 @@
 From Vellvm Require Import
-     Semantics.LLVMEvents
      Semantics.LLVMParams
-     Semantics.GepM
-     Semantics.Memory.MemBytes
      Semantics.MemoryParams
      Handlers.Serialization.
 

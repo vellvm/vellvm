@@ -60,8 +60,7 @@ Import MonadNotation.
 Open Scope monad_scope.
 
 From Vellvm.Handlers Require Import
-     MemoryModel
-     MemoryInterpreters.
+     MemoryModel.
 
 From Vellvm.Handlers.MemoryModules Require Import
      FiniteAddresses
@@ -486,7 +485,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     (*   split. *)
 
 
-      
+
 
 
     (*   assert  *)
@@ -509,4 +508,3 @@ End MemoryBigIntptrInfiniteSpec.
 
 Module MemoryBigIntptrInfiniteSpecHelpers :=
   MemoryModelInfiniteSpecHelpers  LLVMParamsBigIntptr MemoryBigIntptr.MP MemoryBigIntptr.MMEP.MMSP MemoryBigIntptr.MMEP.MemSpec MemoryBigIntptrInfiniteSpec.
-

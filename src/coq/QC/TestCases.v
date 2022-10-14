@@ -45,7 +45,7 @@ Import ListNotations.
 
    Both of these programs should be equivalent, and they
    are... However, when generated and run through the interpreter in
-   QC it returns the wrong value.   
+   QC it returns the wrong value.
  *)
 
 
@@ -175,7 +175,7 @@ Definition shrunk_program : list (toplevel_entity typ (block typ * list (block t
      |}].
 
 QuickChick (vellvm_agrees_with_clang shrunk_program).
-  
+
 
 From ITree Require Import
      ITree
@@ -306,7 +306,7 @@ Proof.
   rewrite translate_ret.
   rewrite interp_cfg3_ret.
   rewrite bind_ret_l.
-  
+
   progress vred_r.
   rewrite interp_cfg3_LW.
   cbn.

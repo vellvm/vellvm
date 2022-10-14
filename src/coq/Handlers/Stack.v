@@ -153,9 +153,7 @@ End StackMap.
 
 From ExtLib Require Import
      Data.Map.FMapAList.
-From Vellvm Require Import
-     LLVMAst
-     MemoryAddress.
+
 
 (* Undecided about the status of this over-generalization of these events over domains of keys and values.
    The interface needs to be specialized anyway in [LLVMEvents].
@@ -166,4 +164,3 @@ From Vellvm Require Import
 Module Make (A : ADDRESS)(IP : INTPTR)(SIZEOF : Sizeof)(LLVMEvents : LLVM_INTERACTIONS(A)(IP)(SIZEOF)).
   Definition lstack := @stack (list (raw_id * LLVMEvents.DV.uvalue)).
 End Make.
-

@@ -29,16 +29,10 @@ From Vellvm Require Import
      Numeric.Floats
      Utilities
      Syntax
-     Semantics.DynamicValues
-     Semantics.MemoryAddress
-     Semantics.GepM
-     Semantics.Memory.Sizeof
-     Semantics.Memory.MemBytes
      Semantics.LLVMEvents
      Semantics.LLVMParams
      Semantics.MemoryParams
-     Semantics.SerializationParams
-     Handlers.Serialization.
+     Semantics.SerializationParams.
 
 Require Import Ceres.Ceres.
 
@@ -85,7 +79,7 @@ Open Scope N_scope.
     The exact interface used by each denotation function depends slightly on the object of consideration.
     Most specifically, three interfaces are used.
     - At the top level, in order to denote whole _VIR_ programs, we use the interface:
-      L0 ::=  ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE. 
+      L0 ::=  ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
       Noticeable:
       * there are no more internal calls, they are resolved through the itree combinator
         for mutual recursiion [mrec].
@@ -166,7 +160,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
     if is_concrete uv
     then lift_err ret (uvalue_to_dvalue uv)
     else dv <- trigger (pick_uvalue P uv);; ret (proj1_sig dv).
-  
+
   (* Pick a possibly poison value, treating poison as nondeterminism.
      This is used for freeze. *)
   Definition pick_your_poison {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue :=
@@ -250,10 +244,10 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
       | Some t => lift_err ret (fmap dvalue_to_uvalue (dv_zero_initializer t))
       end
 
-    | EXP_Cstring es => 
+    | EXP_Cstring es =>
       vs <- map_monad eval_texp es ;;
       ret (UVALUE_Array vs)
-          
+
     | EXP_Undef =>
       match top with
       | None   => raise "denote_exp given untyped EXP_Undef"
@@ -348,7 +342,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
         cnd <- denote_exp (Some dt) cnd ;;
         v1   <- denote_exp (Some dt1) op1 ;;
         v2   <- denote_exp (Some dt2) op2 ;;
-        ret (UVALUE_Select cnd v1 v2)    
+        ret (UVALUE_Select cnd v1 v2)
 
     | OP_Freeze (dt, e) =>
       uv <- denote_exp (Some dt) e ;;
@@ -419,7 +413,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
     | (IVoid _, INSTR_Comment _) => ret tt
 
     (* Currently unhandled itree instructions *)
-    | (_, INSTR_Fence _ _) 
+    | (_, INSTR_Fence _ _)
     | (_, INSTR_AtomicCmpXchg _)
     | (_, INSTR_AtomicRMW _)
     | (_, INSTR_VAArg _ _)
@@ -438,8 +432,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
     | [] => ret default_dest
     | (v,id):: switches =>
       match value, v with
-      | DVALUE_I1 i1, DVALUE_I1 i2    
-      | DVALUE_I8 i1, DVALUE_I8 i2   
+      | DVALUE_I1 i1, DVALUE_I1 i2
+      | DVALUE_I8 i1, DVALUE_I8 i2
       | DVALUE_I32 i1, DVALUE_I32 i2
       | DVALUE_I64 i1, DVALUE_I64 i2
         => if cmp Ceq i1 i2
@@ -463,7 +457,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
 
     | TERM_Br (dt,op) br1 br2 =>
       uv <- denote_exp (Some dt) op ;;
-      dv <- concretize_or_pick uv True ;; 
+      dv <- concretize_or_pick uv True ;;
       match dv with
       | DVALUE_I1 comparison_bit =>
         if equ comparison_bit one then
@@ -490,7 +484,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
                      dests;;
         lift_err (fun b => ret (inl b)) (select_switch selector default_br switches)
 
-    | TERM_Unreachable => raiseUB "IMPOSSIBLE: unreachable in reachable position" 
+    | TERM_Unreachable => raiseUB "IMPOSSIBLE: unreachable in reachable position"
 
     (* Currently unhandled VIR terminators *)
     | TERM_IndirectBr _ _
@@ -533,7 +527,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
          This is due to the _tail recursive_ nature of these jumps: they only occur as the last
          instruction of blocks. We hence can use a [loop] operator to do the linking, as opposed
          to the more general [mrec] operator that will be used to link internal calls.
-   
+
          The idea here is simply to enter the body through the [init] [block_id] of the [cfg].
          As long as the computation returns a new label to jump to, we feed it back to the loop.
          If it ever returns a dynamic value, we exit the loop by returning the [dvalue].
@@ -541,7 +535,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
   Definition denote_ocfg (bks: ocfg dtyp)
     : (block_id * block_id) -> itree instr_E ((block_id * block_id) + uvalue) :=
     iter (C := ktree _) (bif := sum)
-         (fun '((bid_from,bid_src) : block_id * block_id) => 
+         (fun '((bid_from,bid_src) : block_id * block_id) =>
             match find_block bks bid_src with
             | None => ret (inr (inl (bid_from,bid_src)))
             | Some block_src =>
@@ -613,7 +607,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
           (fun T call =>
              match call with
              | Call dt fv args =>
-               dfv <- concretize_or_pick fv True ;; 
+               dfv <- concretize_or_pick fv True ;;
                match (lookup_defn dfv fundefs) with
                | Some f_den => (* If the call is internal *)
                  f_den args

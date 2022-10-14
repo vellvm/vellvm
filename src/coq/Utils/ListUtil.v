@@ -1,6 +1,8 @@
-From Coq Require Import String List Lia ZArith Program.Wf.
+From Coq Require Import String List Lia ZArith.
 
-From Vellvm.Utils Require Import Error.
+
+From Vellvm.Utils Require Import Error Util.
+
 
 Import ListNotations.
 
@@ -540,7 +542,7 @@ Definition nextOrMaximumOpt {A} (leq : A -> A -> bool) (n : A) (l : list A) : op
 
 Lemma Nth_last :
   forall {A} (l : list A) x,
-    Util.Nth (l ++ [x]) (length l) x.
+    Nth (l ++ [x]) (length l) x.
 Proof.
   intros A l x.
   induction l; cbn; auto.
@@ -548,7 +550,7 @@ Qed.
 
 Lemma Nth_ix_lt_length :
   forall {X} ix (xs : list X) x,
-    Util.Nth xs ix x ->
+    Nth xs ix x ->
     (ix < length xs)%nat.
 Proof.
   intros X.
@@ -565,7 +567,7 @@ Qed.
 
 Lemma Nth_ix_lt_Zlength :
   forall {X} ix (xs : list X) x,
-    Util.Nth xs ix x ->
+    Nth xs ix x ->
     (Z.of_nat ix < Zlength xs)%Z.
 Proof.
   intros X ix xs x NTH.

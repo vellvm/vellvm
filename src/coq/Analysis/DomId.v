@@ -2,11 +2,9 @@ Require Import List.
 Import ListNotations.
 
 From Vellvm Require Import
-     Utils.Util
      Syntax.CFG
      Syntax.DynamicTypes
      Syntax.LLVMAst
-     Syntax.AstLib
      Syntax.Scope
      Analysis.Dom
      Analysis.DomKildall.
@@ -56,4 +54,3 @@ End idGraphCmp.
 (** Instantiate the dominance spec for this graph *)
 Module Export Dominance := Dom.Spec idGraph.
 Module Export Kildall := AlgdomKildall AstLib.RawIDOrd idGraph idGraphCmp.
-

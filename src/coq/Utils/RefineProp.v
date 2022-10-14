@@ -6,8 +6,7 @@ From Vellvm Require Import
      Utils.Tactics
      Utils.MonadReturnsLaws.
 
-From ExtLib Require Import
-     Structures.Monads.
+
 
 From ITree Require Import Basics.Monad.
 
@@ -231,3 +230,4 @@ Proof.
   - apply RefineProp_bind_bind.
   - apply @RefineProp_Proper_bind.
 Defined.
+

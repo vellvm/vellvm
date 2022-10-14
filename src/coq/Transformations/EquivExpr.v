@@ -22,8 +22,7 @@ From Vellvm Require Import
      Syntax
      Semantics
      Theory
-     Theory.InterpreterCFG
-     Utils.PostConditions.
+     Theory.Refinement.
 
 Import ITreeNotations.
 (* end hide *)
@@ -53,7 +52,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
 
   Module R := Refinement.Make LP LLVM.
   Import R.
-  
+
   Section ExpOptim.
 
     Definition exp_optimization := exp dtyp -> exp dtyp.
@@ -159,7 +158,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
           intro2.
           reflexivity.
       Qed.
-      
+
       Lemma exp_optim_correct_term : forall t g l,
           ⟦ t ⟧t2 g l ≈ ⟦ endo t ⟧t2 g l.
       Proof.
@@ -253,7 +252,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
           break_match_hyp; [inv Heqo |].
           reflexivity.
       Qed.
-      
+
       Lemma exp_optim_correct_phis : forall phis f g l,
           ⟦ phis ⟧Φs2 f g l ≈ ⟦ endo phis ⟧Φs2 f g l.
       Proof.
@@ -443,10 +442,10 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
   Ltac norm := autorewrite with opt.
 
   (* Induction on u *)
-  Lemma uvalue_poison_cases : forall u, exists dt, 
+  Lemma uvalue_poison_cases : forall u, exists dt,
       (concretize u (DVALUE_Poison dt)) \/ (~ concretize u (DVALUE_Poison dt)).
   Proof. Admitted.
-    
+
   Section MonadContext.
 
     Context (M: Type -> Type).
@@ -465,10 +464,10 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
 
     Existing Instance EQM.
     Existing Instance EQM_Laws_M.
-      
+
       (* Induction on d  *)
 
-(* Lemma 
+(* Lemma
 eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
         eq1 (bind f l (fun y => ret (Dvalue_Struct (a::ys)))) (ret (a::xs).
       *)
@@ -480,75 +479,75 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
       - rewrite map_monad_map.
         apply map_monad_g;
         induction fields; simpl; auto.
-       + rewrite bind_ret_l. 
+       + rewrite bind_ret_l.
          reflexivity.
-       + rewrite H. 
-          rewrite bind_ret_l. 
-          rewrite bind_bind. 
+       + rewrite H.
+          rewrite bind_ret_l.
+          rewrite bind_bind.
           setoid_rewrite bind_ret_l.
           apply map_monad_cons_ret.
-          exact a. 
-          apply IHfields. 
+          exact a.
+          apply IHfields.
           intros. apply H. apply in_cons. assumption.
-          apply in_eq. 
+          apply in_eq.
 
-       (* TODO: automate this *) 
+       (* TODO: automate this *)
       -  rewrite map_monad_map;
           apply map_monad_g;
           induction fields; simpl.
         + rewrite bind_ret_l.
           reflexivity.
-        + rewrite H. 
-          rewrite bind_ret_l. 
-          rewrite bind_bind. 
-          setoid_rewrite bind_ret_l. 
-          apply map_monad_cons_ret. 
-          exact a. 
-          apply IHfields. 
+        + rewrite H.
+          rewrite bind_ret_l.
+          rewrite bind_bind.
+          setoid_rewrite bind_ret_l.
+          apply map_monad_cons_ret.
+          exact a.
+          apply IHfields.
           intros. apply H. apply in_cons. assumption.
           apply in_eq.
 
-          
+
       - destruct Laws_M.
         rewrite map_monad_map;
           apply map_monad_g;
           induction elts; simpl.
         + rewrite bind_ret_l.
           reflexivity.
-        + rewrite H. 
-          rewrite bind_ret_l. 
-          rewrite bind_bind. 
-          setoid_rewrite bind_ret_l. 
-          apply map_monad_cons_ret. 
-          exact a. 
-          apply IHelts. 
+        + rewrite H.
+          rewrite bind_ret_l.
+          rewrite bind_bind.
+          setoid_rewrite bind_ret_l.
+          apply map_monad_cons_ret.
+          exact a.
+          apply IHelts.
           intros. apply H. apply in_cons. assumption.
           apply in_eq.
 
-          
+
       - destruct Laws_M.
         rewrite map_monad_map;
           apply map_monad_g;
           induction elts; simpl.
         + rewrite bind_ret_l.
           reflexivity.
-        + rewrite H. 
-          rewrite bind_ret_l. 
-          rewrite bind_bind. 
-          setoid_rewrite bind_ret_l. 
-          apply map_monad_cons_ret. 
-          exact a. 
-          apply IHelts. 
+        + rewrite H.
+          rewrite bind_ret_l.
+          rewrite bind_bind.
+          setoid_rewrite bind_ret_l.
+          apply map_monad_cons_ret.
+          exact a.
+          apply IHelts.
           intros. apply H. apply in_cons. assumption.
           apply in_eq.
-     Qed. 
+     Qed.
 
     End MonadContext.
-    
+
   Lemma uvalue_dvalue_to_uvalue : forall (d : dvalue) d',
       concretize (dvalue_to_uvalue d) d' -> d = d'.
   Proof.
-    (* clean attempt *) 
+    (* clean attempt *)
     intros. induction d.
     - admit.
     - admit.
@@ -562,11 +561,11 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
     - admit.
     - unfold concretize in H.
       unfold concretize_u in H.
-      rewrite concretize_uvalueM_equation in H. 
+      rewrite concretize_uvalueM_equation in H.
       simpl in H. unfold eq1 in H.
-      Admitted. 
+      Admitted.
 
-  
+
   Lemma add_zero : forall b1 b2 (e:exp dtyp),
     (OP_IBinop (Add b1 b2) (DTYPE_I 32) (EXP_Integer (0)%Z) e) ≐ [DTYPE_I 32] e.
   Proof.
@@ -575,7 +574,7 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
     cbn. (* SAZ: Something about the new monad stuff broke the automation. *)
 (*
     norm.
-    cbn. 
+    cbn.
     bind_ret_r2.          (* <- note how this adds a "ret" on the right *)
     eapply eutt_clo_bind.  (* <- this is the key lemma!! *)
     reflexivity.
@@ -587,11 +586,11 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
     intuition.
     unfold uvalue_eq.
     split.
-    - 
+    -
     (* TODO: Need some facts about [refine_uvalue]. *) *)
   Abort.
 
-  
+
   (** * Commutative expressions *)
   (*  *)
 
@@ -603,11 +602,11 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
     intros.
     cbn.
     norm.
-    (* To prove this, we need some lemma about the purity of e1 and e2 - it should be the case 
-       that they evaluate to [Ret u1] and [Ret u2] so that we can make progress.  If it is _not_ 
+    (* To prove this, we need some lemma about the purity of e1 and e2 - it should be the case
+       that they evaluate to [Ret u1] and [Ret u2] so that we can make progress.  If it is _not_
        the case that they are pure, e.g., if [e1] divides by 0, then this commutativity result
        does not hold in general, and we'd have to add some assumptions about when it is OK. *)
-    
+
   Admitted.
 
 End EquivExpr.

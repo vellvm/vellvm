@@ -9,11 +9,9 @@ From Vellvm Require Import
      Semantics.Memory.Sizeof
      Semantics.LLVMEvents
      Utils.Monads
-     Utils.NMaps
      Utils.OptionUtil
      Utils.ListUtil
      Utils.Error
-     Utils.Util
      Utils.MonadReturnsLaws
      Utils.MapMonadExtra.
 
