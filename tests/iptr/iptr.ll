@@ -20,4 +20,5 @@ false:
 }  
   
 
-;; ASSERT EQ: i1 1 = call i1 @test() 
+; ASSERT EQ: i1 1 = call i1 @test()
+
