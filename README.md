@@ -117,6 +117,7 @@ If you are a nix user the easiest way to install / compile vellvm is with nix. I
     If this is the first time you are using opam you need to initialize it: 
     + On Linux: `opam init`
     + On Mac:  `opam init --disable-sandboxing` (sandboxing needs to be disabled due to a known [issue](https://github.com/ocaml/opam-repository/issues/12973)).
+  - `gnu-sed` (`sed` defaults to `gnu-sed` on linux. For Mac OS X do: `brew install gnu-sed` and then create a symlink from `sed` to the `gsed` executable in your path.)
 - Add the Coq package repository:
     `opam repo add coq-released https://coq.inria.fr/opam/released`.
 - Finally, create an opam *switch* with:
