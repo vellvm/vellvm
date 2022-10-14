@@ -1938,11 +1938,13 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       | Inttoptr =>
         match t1, t2 with
         | DTYPE_I _, DTYPE_Pointer => Conv_ItoP x
+        | DTYPE_IPTR , DTYPE_Pointer => Conv_ItoP x
         | _, _ => Conv_Illegal "ERROR: Inttoptr got illegal arguments"
         end
       | Ptrtoint =>
         match t1, t2 with
         | DTYPE_Pointer, DTYPE_I _ => Conv_PtoI x
+        | DTYPE_Pointer, DTYPE_IPTR => Conv_PtoI x
         | _, _ => Conv_Illegal "ERROR: Ptrtoint got illegal arguments"
         end
 
