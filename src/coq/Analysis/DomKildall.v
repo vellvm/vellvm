@@ -9,7 +9,8 @@ From Vellvm Require Import
      Analysis.Dom
      Analysis.Kildall
      Utils.Util.
-Require Import FSets FMaps.
+Require Import FSets.
+
 
 Module Type GRAPH_CMP (G: GRAPH).
  Parameter succs : G.t -> G.V -> list G.V.
@@ -163,4 +164,5 @@ Module AlgdomKildall (PC:UsualDecidableType) (Import G: GRAPH with Definition V 
   Qed.
 
 End AlgdomKildall.
+
 

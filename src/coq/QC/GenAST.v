@@ -23,7 +23,8 @@ Require Import List.
 Import ListNotations.
 
 From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils.
-Require Import Integers Floats.
+Require Import Integers.
+
 
 Import ListNotations.
 Import MonadNotation.
@@ -2164,3 +2165,4 @@ Section InstrGenerators.
     ret (globals ++ functions ++ [main]).
 
 End InstrGenerators.
+

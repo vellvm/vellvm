@@ -2,9 +2,11 @@
 From Coq Require Import
      Morphisms.
 
-Require Import String List.
+Require Import List.
+
 Import ListNotations.
 Require Import ZArith.
+
 Require Import Coq.micromega.Lia.
 
 From ITree Require Import

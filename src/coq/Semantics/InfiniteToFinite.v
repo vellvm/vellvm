@@ -191,7 +191,7 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
   Module DVCrev := DVConvertMake LP2 LP1 AC2 E2 E1.
   Import DVC.
 
-  Require Import String.
+
 
   Definition L4_convert : Handler E1.L4 E2.L4.
     refine (fun A e => _).

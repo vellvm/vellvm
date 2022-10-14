@@ -3498,7 +3498,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   Require Import Error.
   Require Import MonadReturnsLaws.
   Require Import ItreeRaiseMReturns.
-  Require Import Utils.Raise.
+
 
   (* TODO: Move this *)
   Lemma exec_correct_weaken_pre :

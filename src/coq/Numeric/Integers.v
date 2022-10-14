@@ -16,9 +16,12 @@
 
 (** Formalizations of machine integers modulo $2^N$ #2<sup>N</sup>#. *)
 
-Require Import Eqdep_dec Zquot Zwf.
+Require Import Eqdep_dec Zquot.
+
 Require Import Coqlib.
+
 Require Import Coq.micromega.Lia.
+
 Require Archi.
 
 (** * Comparisons *)
@@ -5260,4 +5263,5 @@ Global Hint Resolve Ptrofs.modulus_pos Ptrofs.eqm_refl Ptrofs.eqm_refl2 Ptrofs.e
   Ptrofs.eqm_unsigned_repr Ptrofs.eqm_unsigned_repr_l Ptrofs.eqm_unsigned_repr_r
   Ptrofs.unsigned_range Ptrofs.unsigned_range_2
   Ptrofs.repr_unsigned Ptrofs.repr_signed Ptrofs.unsigned_repr : ints.
+
 

@@ -8,7 +8,6 @@ Require Import Paco.paco.
 
 Require Import List.
 Import ListNotations.
-Require Import ZArith.
 
 From ITree Require Import
      ITree

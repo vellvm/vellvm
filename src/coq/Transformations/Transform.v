@@ -8,7 +8,8 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-Require Import Ascii Strings.String.
+Require Import Strings.String.
+
 From Vellvm Require Import
      Syntax.LLVMAst.
 Open Scope string_scope.

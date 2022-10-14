@@ -1,6 +1,4 @@
 (* begin hide *)
-Require Import FunctionalExtensionality.
-
 From Coq Require Import
      String
      Classes.Morphisms.

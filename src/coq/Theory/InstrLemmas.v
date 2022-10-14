@@ -4,7 +4,6 @@ From Coq Require Import
 
 Require Import List.
 Import ListNotations.
-Require Import ZArith.
 
 From ITree Require Import
      ITree

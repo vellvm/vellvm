@@ -3802,7 +3802,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Require Import Error.
     Require Import MonadReturnsLaws.
-    Require Import ItreeRaiseMReturns.
+
 
     Lemma byte_allocated_add_all_index :
       forall (ms : MemState) (mem : memory) (bytes : list mem_byte) (ix : Z) (aid : AllocationId),
@@ -6701,3 +6701,4 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     End MemoryPrimatives.
 
 End FiniteMemoryModelExecPrimitives.
+

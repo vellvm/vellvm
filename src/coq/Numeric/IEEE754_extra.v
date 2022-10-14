@@ -23,7 +23,7 @@ Require Import Bool.
 Require Import Eqdep_dec.
 From Flocq Require Import Core Digits Operations Round Bracket Sterbenz Binary Round_odd.
 
-Require Import Coq.micromega.Lia.
+
 Local Open Scope Z_scope.
 
 Section Extra_ops.
@@ -1514,3 +1514,4 @@ Proof.
 Qed.
 
 End Compose_Conversions.
+

@@ -4,9 +4,8 @@ From Coq Require Import
      String
      Morphisms.
 
-Require Import Paco.paco.
-
 Require Import List.
+
 Import ListNotations.
 Require Import ZArith.
 

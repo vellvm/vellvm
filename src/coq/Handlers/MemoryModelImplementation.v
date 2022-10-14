@@ -70,7 +70,7 @@ From Vellvm.Handlers.MemoryModules Require Import
      FiniteSpecPrimitives
      FiniteExecPrimitives.
 
-Require Import Morphisms.
+
 
 #[local] Open Scope Z_scope.
 
@@ -509,3 +509,4 @@ End MemoryBigIntptrInfiniteSpec.
 
 Module MemoryBigIntptrInfiniteSpecHelpers :=
   MemoryModelInfiniteSpecHelpers  LLVMParamsBigIntptr MemoryBigIntptr.MP MemoryBigIntptr.MMEP.MMSP MemoryBigIntptr.MMEP.MemSpec MemoryBigIntptrInfiniteSpec.
+

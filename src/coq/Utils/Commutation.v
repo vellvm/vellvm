@@ -101,8 +101,6 @@ Qed.
 From Vellvm Require Import
      Utils.PostConditions.
 
-Require Import Coq.Logic.FunctionalExtensionality.
-
 Lemma eutt_post_bind_het :
   forall (E : Type -> Type) (A : Type) (QQ : A -> A -> Prop) (Q1 Q2 : A -> Prop)
     (t1 t2 : A -> itree E A) (k1 : A -> itree E A) (k2 : A -> itree E A) (a0 : A),

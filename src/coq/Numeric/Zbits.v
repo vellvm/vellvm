@@ -18,7 +18,7 @@
 
 Require Import Psatz Zquot.
 Require Import Coqlib.
-Require Import Coq.micromega.Lia.
+
 
 (** ** Modulo arithmetic *)
 
@@ -1027,3 +1027,4 @@ Proof.
   exploit (Zsize_interval_1 y). lia.
   lia.
 Qed.
+

@@ -1,5 +1,3 @@
-Require Import String.
-
 From ITree Require Import
      ITree
      Basics
@@ -20,7 +18,6 @@ From Coq Require Import Relations RelationClasses.
 
 Require Import Morphisms.
 Require Import Paco.paco.
-
 Require Import Coq.Program.Equality.
 
 Ltac inv_existT :=

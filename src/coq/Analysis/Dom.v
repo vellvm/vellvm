@@ -1,7 +1,8 @@
 (** Reasoning about dominators in a graph. *)
 
 Require Import List Equalities Orders RelationClasses Lia.
-Require Import FSets FMaps.
+Require Import FSets.
+
 Import ListNotations.
 From Vellvm Require Import Utils.Util.
 
@@ -359,3 +360,4 @@ Module AlgdomProperties (Import G:GRAPH) (Import A : Algdom G).
   Qed.
 
 End AlgdomProperties.
+

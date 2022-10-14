@@ -22,7 +22,7 @@ Require Import Coq.micromega.Lia.
 (*From Flocq*)
 From Flocq Require Import Binary Bits Core.
 Require Import IEEE754_extra.
-Require Import Program.
+
 Require Archi.
 
 Close Scope R_scope.
@@ -1454,3 +1454,4 @@ Global Opaque
   Float32.to_int Float32.to_intu Float32.to_long Float32.to_longu
   Float32.add Float32.sub Float32.mul Float32.div Float32.cmp Float32.ordered
   Float32.to_bits Float32.of_bits.
+

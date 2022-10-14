@@ -40,7 +40,7 @@ From ExtLib Require Import
      Structures.Functor.
 
 Require Import List.
-Require Import Floats.
+
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -263,3 +263,4 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams L
   End PickImplementation.
 
 End Make.
+

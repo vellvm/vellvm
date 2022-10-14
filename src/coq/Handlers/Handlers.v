@@ -42,7 +42,8 @@ Module Global := Global.Make MemoryModelImplementation.Addr MemoryModelImplement
 Module Local  := Local.Make  MemoryModelImplementation.Addr MemoryModelImplementation.BigIP MemoryModelImplementation.FinSizeof LLVMEvents.
 Module Stack  := Stack.Make  MemoryModelImplementation.Addr MemoryModelImplementation.BigIP MemoryModelImplementation.FinSizeof LLVMEvents.
 
-Require Import List ZArith String.
+Require Import List.
+
 Import ListNotations.
 
 From Vellvm Require Import
@@ -80,3 +81,4 @@ Import MonadNotation.
 
 (* Export LLVMEvents LLVMEvents.DV Global Local Stack Pick Intrinsics *)
 (*        MEM MEMORY_THEORY UndefinedBehaviour. *)
+

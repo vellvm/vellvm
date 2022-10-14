@@ -10,12 +10,12 @@ From Vellvm Require Import
 
 From QuickChick Require Import Show.
 
-Require Import Equalities OrderedType OrderedTypeEx Compare_dec.
+Require Import Equalities OrderedType OrderedTypeEx.
 Require Import ExtLib.Core.RelDec ExtLib.Data.Z.
 Require Import ExtLib.Programming.Eqv.
 Require Import Ascii.
-Import ListNotations.
 
+Import ListNotations.
 Import EqvNotation.
 
 (* end hide *)

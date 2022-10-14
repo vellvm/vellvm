@@ -29,7 +29,8 @@
 *)
 
 Require Import Equalities Orders.
-Require Import FSets FMaps.
+Require Import FMaps.
+
 
 From Vellvm Require Import
      Analysis.Iteration
@@ -389,3 +390,4 @@ Module ForwardSolver (PC:UsualDecidableType) (LAT:LATTICE)<:
 End ForwardSolver.
 
   
+
