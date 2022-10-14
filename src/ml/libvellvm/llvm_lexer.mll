@@ -300,6 +300,7 @@
   | "fast"           -> KW_FAST
 
   (*types*)
+  | "iptr"      -> KW_IPTR
   | "void"      -> KW_VOID
   | "half"      -> KW_HALF
   | "float"     -> KW_FLOAT

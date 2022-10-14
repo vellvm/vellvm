@@ -328,6 +328,7 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token KW_ARCP 
 %token KW_FAST
 %token<Camlcoq.N.t> I
+%token KW_IPTR
 %token KW_VOID 
 %token KW_HALF 
 %token KW_FLOAT 
@@ -928,6 +929,7 @@ typ_args:
 
 typ:
   | n=I                                               { TYPE_I n              }
+  | KW_IPTR                                           { TYPE_IPTR             }
   | KW_VOID                                           { TYPE_Void             }
   | KW_HALF                                           { TYPE_Half             }
   | KW_FLOAT                                          { TYPE_Float            }
@@ -939,7 +941,7 @@ typ:
   | KW_X86_MMX                                        { TYPE_X86_mmx          }
   | t=typ STAR                                        { TYPE_Pointer t        }
   | LSQUARE n=INTEGER KW_X t=typ RSQUARE              { TYPE_Array (n_of_z n, t)  }
-  | t=typ LPAREN args=typ_args RPAREN                    { let (ts,v) = args in TYPE_Function (t, ts, v) }
+  | t=typ LPAREN args=typ_args RPAREN                 { let (ts,v) = args in TYPE_Function (t, ts, v) }
   | LCURLY ts=separated_list(csep, typ) RCURLY        { TYPE_Struct ts        }
   | LTLCURLY ts=separated_list(csep, typ) RCURLYGT    { TYPE_Packed_struct ts }
   | KW_OPAQUE                                         { TYPE_Opaque           }
