@@ -46,6 +46,24 @@ Module Type SerializationBase (LP : LLVMParams) (MP : MemoryParams LP).
   Import SIZEOF.
   Import Events.
 
+  Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} icmp v1 v2 : M dvalue :=
+    match v1, v2 with
+    | DVALUE_I1 i1, DVALUE_I1 i2
+    | DVALUE_I8 i1, DVALUE_I8 i2
+    | DVALUE_I32 i1, DVALUE_I32 i2
+    | DVALUE_I64 i1, DVALUE_I64 i2
+    | DVALUE_IPTR i1, DVALUE_IPTR i2 => ret (eval_int_icmp icmp i1 i2)
+    | DVALUE_Poison t1, DVALUE_Poison t2 => ret (DVALUE_Poison t1)
+    | DVALUE_Poison t, _ => if is_DVALUE_IX v2 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
+    | _, DVALUE_Poison t => if is_DVALUE_IX v1 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
+    | DVALUE_Addr a1, DVALUE_Addr a2 =>
+        let i1 := ptr_to_int a1 in
+        let i2 := ptr_to_int a2 in
+        ret (eval_int_icmp icmp i1 i2)
+    | _, _ => raise_error "ill_typed-icmp"
+    end.
+  Arguments eval_icmp _ _ _ : simpl nomatch.
+
   Parameter ptr_size : nat.
   Parameter endianess : Endianess.
   Parameter concretize_uvalueM :
@@ -358,6 +376,24 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
 
   Module BYTE := Byte ADDR IP SIZEOF Events BYTE_IMPL.
   Export BYTE.
+
+  Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} icmp v1 v2 : M dvalue :=
+    match v1, v2 with
+    | DVALUE_I1 i1, DVALUE_I1 i2
+    | DVALUE_I8 i1, DVALUE_I8 i2
+    | DVALUE_I32 i1, DVALUE_I32 i2
+    | DVALUE_I64 i1, DVALUE_I64 i2
+    | DVALUE_IPTR i1, DVALUE_IPTR i2 => ret (eval_int_icmp icmp i1 i2)
+    | DVALUE_Poison t1, DVALUE_Poison t2 => ret (DVALUE_Poison t1)
+    | DVALUE_Poison t, _ => if is_DVALUE_IX v2 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
+    | _, DVALUE_Poison t => if is_DVALUE_IX v1 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
+    | DVALUE_Addr a1, DVALUE_Addr a2 =>
+        let i1 := ptr_to_int a1 in
+        let i2 := ptr_to_int a2 in
+        ret (eval_int_icmp icmp i1 i2)
+    | _, _ => raise_error "ill_typed-icmp"
+    end.
+  Arguments eval_icmp _ _ _ : simpl nomatch.
 
   (* Variable ptr_size : nat. *)
   (* Variable datalayout : DataLayout. *)
