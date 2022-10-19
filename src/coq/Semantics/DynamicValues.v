@@ -6,8 +6,9 @@ From Coq Require Import
      List
      String
      Bool.Bool
-     Lia.
-
+     Lia
+     Program.Wf.
+     
 Import BinInt.
 
 Require Import Ceres.Ceres.
@@ -2497,7 +2498,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 (*  ------------------------------------------------------------------------- *)
 
   (* Interpretation of [uvalue] in terms of sets of [dvalue].
-     Essentially used to implemenmt the handler for [pick], but also requuired to
+     Essentially used to implemenmt the handler for [pick], but also required to
      define some predicates passed as arguments to the [pick] events, hence why
      it's defined here.
    *)
@@ -2544,6 +2545,16 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     lia.
   Defined.
 
+  Lemma Forall_HIn_eq : forall A (l:list A) (f g : forall (x:A), In x l -> Prop),
+        (forall x H1 H2, f x H1 = g x H2) ->
+        Forall_HIn l f = Forall_HIn l g.
+  Proof.
+    induction l; intros; simpl; try reflexivity.
+    erewrite H. erewrite IHl. reflexivity.
+    intros.
+    erewrite H. reflexivity.
+  Qed.    
+  
   Lemma NO_VOID_equation :
     forall (dt : dtyp),
       NO_VOID dt = match dt with
@@ -2569,7 +2580,18 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                      Forall_HIn dts (fun dt HIn => NO_VOID dt)
                    end.
   Proof.
-  Admitted.
+    unfold NO_VOID at 1.
+    intros td.
+    apply Fix_sub_rect.
+    - intros. 
+      destruct x0; try reflexivity.
+      + erewrite H. reflexivity.
+      + apply Forall_HIn_eq. intros. erewrite H. reflexivity.
+      + apply Forall_HIn_eq. intros. erewrite H. reflexivity.
+      + erewrite H. reflexivity.
+    - intros.
+      destruct x; try reflexivity.
+  Qed.
 
   Lemma NO_VOID_Struct_fields :
     forall dts,
