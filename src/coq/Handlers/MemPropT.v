@@ -200,6 +200,10 @@ Proof.
     auto.
 Defined.
 
+Ltac destruct_err_ub_oom x :=
+  destruct x as [[[[[[[?oom_x] | [[?ub_x] | [[?err_x] | ?x]]]]]]]] eqn:?Hx.
+
+
 #[global] Instance MemPropT_MonadLawsE {MemState} : MonadLawsE (MemPropT MemState).
 Proof.
   split.
@@ -210,14 +214,59 @@ Proof.
       intros M.
     +
       (* TODO: Move to Error.v *)
-      Ltac destruct_err_ub_oom x :=
-        destruct x as [[[[[[[?oom_x] | [[?ub_x] | [[?err_x] | ?x]]]]]]]] eqn:?Hx.
-
       destruct_err_ub_oom x0; firstorder; subst; firstorder.
       repeat break_match_hyp.
       destruct M as (sab & a & (EQ1 & EQ2) & F); subst.
       auto.
-Admitted.
+    + destruct_err_ub_oom x0; firstorder.
+      destruct x1. exists ms. exists x. firstorder.
+  - intros A x.
+    cbn.
+    unfold eq1, MemPropT_Eq1 in *.
+    split;
+      intros M.
+    + destruct_err_ub_oom x0; firstorder; subst; firstorder.
+      repeat break_match_hyp.
+      destruct M as (sab & a' & F & (EQ1 & EQ2)); subst.
+      auto.
+    + destruct_err_ub_oom x0; firstorder.
+      destruct x1. exists m. exists a. firstorder.
+  - intros A B C x f g.
+    cbn.
+    unfold eq1, MemPropT_Eq1 in *.
+    split;
+      intros M.
+    + destruct_err_ub_oom x0; firstorder; subst; firstorder.
+      * right. exists x3. exists x4. firstorder.
+      * right. exists x3. exists x4. firstorder.
+      * right. exists x3. exists x4. firstorder.
+      * destruct x1.
+        destruct M as (sab & b & ((sab' & a' & (x' & f')) & g')); subst.
+        eexists. eexists. eauto.
+    + destruct_err_ub_oom x0; firstorder; subst; firstorder.
+      * right. eexists. eexists. eauto.
+      * right. eexists. eexists. eauto.
+      * right. eexists. eexists. eauto.
+      * destruct x1.
+        destruct M as (sab & a' & Hx & (sab' & b' & (f' & g'))); subst.
+        eexists. eexists. eauto.
+  - repeat red. intros.
+    split; cbn; intros.
+    + destruct_err_ub_oom x1; firstorder; subst; firstorder.
+      * right. exists x2. exists x3. split. apply H. assumption. apply H0. assumption.
+      * right. exists x2. exists x3. split. apply H. assumption. apply H0. assumption.
+      * right. exists x2. exists x3. split. apply H. assumption. apply H0. assumption.
+      * destruct x2.
+        destruct H1 as (sab & a & (HX & HY)).
+        exists sab. exists a. split. apply H. assumption. apply H0. assumption.
+    + destruct_err_ub_oom x1; firstorder; subst; firstorder.
+      * right. exists x2. exists x3. split. apply H. assumption. apply H0. assumption.
+      * right. exists x2. exists x3. split. apply H. assumption. apply H0. assumption.
+      * right. exists x2. exists x3. split. apply H. assumption. apply H0. assumption.
+      * destruct x2.
+        destruct H1 as (sab & a & (HX & HY)).
+        exists sab. exists a. split. apply H. assumption. apply H0. assumption.
+Qed.
 
 #[global] Instance MemPropT_MonadMemState {MemState : Type} : MonadMemState MemState (MemPropT MemState).
 Proof.
