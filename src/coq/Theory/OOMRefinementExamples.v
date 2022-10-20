@@ -484,7 +484,7 @@ Module Infinite.
     destruct INTERP as (?&?&?); do 4 red in H.
 
     epose proof allocate_dtyp_spec_can_always_succeed m m
-     (mkMemState (ms_memory_stack m) (next_provenance (ms_provenance m)))
+     (mkMemState (ms_memory_stack m) (InfiniteAddresses.InfPROV.next_provenance (ms_provenance m)))
      (DTYPE_I 64) 1 _ _ _ _ _ as (ms_final & addr & ALLOC).
     Unshelve. 6 : intro H0; inv H0.
     2 : exact (ms_provenance m). 2,3 : shelve.
@@ -556,7 +556,7 @@ Module Infinite.
     destruct INTERP as (?&?&?); do 4 red in H.
 
     epose proof allocate_dtyp_spec_can_always_succeed m m
-     (mkMemState (ms_memory_stack m) (next_provenance (ms_provenance m)))
+     (mkMemState (ms_memory_stack m) (InfiniteAddresses.InfPROV.next_provenance (ms_provenance m)))
      (DTYPE_I 64) 1 _ _ _ _ _ as (ms_final & addr & ALLOC).
     Unshelve. 6 : intro H0; inv H0.
     2 : exact (ms_provenance m). 2,3 : shelve.

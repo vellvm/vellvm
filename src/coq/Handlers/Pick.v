@@ -31,6 +31,7 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Semantics.LLVMParams
      Semantics.MemoryParams
+     Semantics.Memory.MemBytes
      Semantics.ConcretizationParams
      Handlers.Concretization.
 
@@ -50,7 +51,7 @@ Import MonadNotation.
   - The propositional one capture in [Prop] all possible values
   - The executable one interprets [undef] as 0 at the type
 *)
-Module Make (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationParams LP MP).
+Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (CP : ConcretizationParams LP MP Byte).
   Import CP.
   Import CONC.
   Import MP.

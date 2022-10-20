@@ -19,6 +19,33 @@ Module FinSizeof : Sizeof.
   (* TODO: make parameter? *)
   Definition ptr_size : nat := 8.
 
+  Definition round_up_to_eight (n : N) : N :=
+    if N.eqb 0 n
+    then 0
+    else (((n - 1) / 8) + 1) * 8.
+
+  Fixpoint bit_sizeof_dtyp (t : dtyp) : N :=
+    match t with
+    | DTYPE_I sz => N.max 1 sz
+    | DTYPE_IPTR => 64 (* TODO: probably kind of a lie... *)
+    | DTYPE_Pointer => 64
+    | DTYPE_Void => 0
+    | DTYPE_Half => 16
+    | DTYPE_Float => 32
+    | DTYPE_Double => 64
+    | DTYPE_X86_fp80 => 80
+    | DTYPE_Fp128 => 128
+    | DTYPE_Ppc_fp128 => 128
+    | DTYPE_Metadata => 0
+    | DTYPE_X86_mmx => 64
+    | DTYPE_Array sz t => sz * (round_up_to_eight (bit_sizeof_dtyp t))
+    | DTYPE_Struct fields
+    | DTYPE_Packed_struct fields =>
+        fold_right (fun x acc => (round_up_to_eight (bit_sizeof_dtyp x) + acc)%N) 0%N fields
+    | DTYPE_Opaque => 0
+    | DTYPE_Vector sz t => sz * bit_sizeof_dtyp t
+    end.
+
   Fixpoint sizeof_dtyp (ty:dtyp) : N :=
     match ty with
     | DTYPE_I 1          => 1 (* TODO: i1 sizes... *)

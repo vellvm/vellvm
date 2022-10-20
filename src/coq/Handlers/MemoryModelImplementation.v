@@ -144,7 +144,8 @@ Module MakeFiniteMemory (LP : LLVMParams) <: Memory LP.
   Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL MEM_SPEC_INTERP.
 
   (* Concretization *)
-  Module CP := ConcretizationParams.Make LP MP.
+  Module ByteM := MemBytes.Byte ADDR IP SIZEOF LP.Events MP.BYTE_IMPL.
+  Module CP := ConcretizationParams.Make LP MP ByteM.
 
   Export GEP Byte MP MEM_MODEL CP.
 End MakeFiniteMemory.
