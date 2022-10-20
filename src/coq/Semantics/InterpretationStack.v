@@ -29,20 +29,20 @@ From Vellvm.Handlers Require Export
 Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
   Module LLVM := Lang.Make LP MEM.
 
-  Export LP.Events.
-  Export LP.PROV.
-  Export LLVM.Intrinsics.
-  Export MEM.MEM_MODEL.
+  Import LP.Events.
+  Import LP.PROV.
+  Import LLVM.Intrinsics.
+  Import MEM.MEM_MODEL.
   Import MEM.MMEP.MMSP.
   Import MEM.MMEP.MemExecM.
   Import MEM.MEM_EXEC_INTERP.
   Import MEM.MEM_SPEC_INTERP.
-  Export MEM.GEP.
-  Export LLVM.Pick.
-  Export LLVM.Global.
-  Export LLVM.Local.
-  Export LLVM.Stack.
-  Export LLVM.D.
+  Import MEM.GEP.
+  Import LLVM.Pick.
+  Import LLVM.Global.
+  Import LLVM.Local.
+  Import LLVM.Stack.
+  Import LLVM.D.
 
   Section InterpreterMCFG.
     Context {MemM : Type -> Type}.
@@ -301,12 +301,12 @@ Module Type InterpreterStackBig <: InterpreterStack.
   Include InterpreterStack_common LP MEM.
 End InterpreterStackBig.
 
-Module Make (LP' : LLVMParams) (MEM' : Memory LP') : InterpreterStack
+Module Make (LP' : LLVMParams) (MEM' : Memory LP') <: InterpreterStack
 with Module LP := LP' with Module MEM := MEM'.
   Include InterpreterStack with Module LP := LP' with Module MEM := MEM'.
 End Make.
 
-Module MakeBig (LP' : LLVMParamsBig) (MEM' : Memory LP') : InterpreterStack
+Module MakeBig (LP' : LLVMParamsBig) (MEM' : Memory LP') <: InterpreterStack
 with Module LP := LP' with Module MEM := MEM'.
   Include InterpreterStackBig with Module LP := LP' with Module MEM := MEM'.
 End MakeBig.

@@ -22,7 +22,7 @@ From Vellvm Require Import
 Import MonadNotation.
 Import MonadReturnsLaws.
 
-Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationParams LP MP).
+Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (CP : ConcretizationParams LP MP Byte).
   Import CP.
   Import CONC.
   Import MP.
@@ -36,10 +36,8 @@ Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (CP : Concretizat
   Import DV.
   Import GEP.
 
-  Module BYTE := Byte ADDR IP SIZEOF Events BYTE_IMPL.
-  Export BYTE.
-
-  Import BYTE.
+  Export Byte.
+  Import Byte.
   Import BYTE_IMPL.
 
   Ltac eval_nseq :=
@@ -242,7 +240,7 @@ Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (CP : Concretizat
   Qed.
 End MemBytesTheory.
 
-Module SerializationTheory (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationParams LP MP).
+Module SerializationTheory (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (CP : ConcretizationParams LP MP Byte).
   Import CP.
   Import CONC.
   Import MP.
@@ -250,9 +248,9 @@ Module SerializationTheory (LP : LLVMParams) (MP : MemoryParams LP) (CP : Concre
 
   Import Events.
 
-  Module MBT := MemBytesTheory LP MP CP.
+  Module MBT := MemBytesTheory LP MP Byte CP.
   Import MBT.
-  Import BYTE.
+  Import Byte.
   Import SIZEOF.
 
   Module Mem := MakeFiniteMemory LP.
@@ -1029,244 +1027,244 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
       concretize uv dv ->
       dvalue_has_dtyp dv dt.
   Proof.
-    intros uv dv dt DTYP SUCC CONC.
-    generalize dependent dv.
-    induction DTYP; intros dv CONC.
-    unfold concretize in CONC.
-    cbn in CONC.
-    unfold concretize_u in CONC.
-    cbn in CONC.
-    rewrite concretize_uvalueM_equation in CONC.
-    cbn in CONC. inversion CONC. subst; solve [auto | constructor; try solve_no_void].
+    (* intros uv dv dt DTYP SUCC CONC. *)
+    (* generalize dependent dv. *)
+    (* induction DTYP; intros dv CONC. *)
+    (* unfold concretize in CONC. *)
+    (* cbn in CONC. *)
+    (* unfold concretize_u in CONC. *)
+    (* cbn in CONC. *)
+    (* rewrite concretize_uvalueM_equation in CONC. *)
+    (* cbn in CONC. inversion CONC. subst; solve [auto | constructor; try solve_no_void]. *)
 
-    Ltac unfold_concretize H :=
-      unfold concretize, concretize_u in H;
-      rewrite concretize_uvalueM_equation in H.
+    (* Ltac unfold_concretize H := *)
+    (*   unfold concretize, concretize_u in H; *)
+    (*   rewrite concretize_uvalueM_equation in H. *)
 
-    Ltac invert_concretize H :=
-      unfold_concretize H; inversion H.
+    (* Ltac invert_concretize H := *)
+    (*   unfold_concretize H; inversion H. *)
 
-    1-7: invert_concretize CONC; subst; solve [auto | constructor; try solve_no_void].
+    (* 1-7: invert_concretize CONC; subst; solve [auto | constructor; try solve_no_void]. *)
 
-    (* Poison structs *)
-    { invert_concretize CONC.
-      constructor.
-      rewrite NO_VOID_equation.
-      cbn. auto.
-    }
-    { invert_concretize CONC.
-      constructor.
+    (* (* Poison structs *) *)
+    (* { invert_concretize CONC. *)
+    (*   constructor. *)
+    (*   rewrite NO_VOID_equation. *)
+    (*   cbn. auto. *)
+    (* } *)
+    (* { invert_concretize CONC. *)
+    (*   constructor. *)
 
-      subst.
+    (*   subst. *)
 
-      (* Recover NO_VOID information *)
-      specialize (IHDTYP (concretize_succeeds_poison _) (DVALUE_Poison dt)).
-      forward IHDTYP.
-      { do 2 red.
-        rewrite concretize_uvalueM_equation; cbn.
-        reflexivity.
-      }
+    (*   (* Recover NO_VOID information *) *)
+    (*   specialize (IHDTYP (concretize_succeeds_poison _) (DVALUE_Poison dt)). *)
+    (*   forward IHDTYP. *)
+    (*   { do 2 red. *)
+    (*     rewrite concretize_uvalueM_equation; cbn. *)
+    (*     reflexivity. *)
+    (*   } *)
 
-      specialize (IHDTYP0 (concretize_succeeds_poison _) (DVALUE_Poison (DTYPE_Struct dts))).
-      forward IHDTYP0.
-      { do 2 red.
-        rewrite concretize_uvalueM_equation; cbn.
-        reflexivity.
-      }
+    (*   specialize (IHDTYP0 (concretize_succeeds_poison _) (DVALUE_Poison (DTYPE_Struct dts))). *)
+    (*   forward IHDTYP0. *)
+    (*   { do 2 red. *)
+    (*     rewrite concretize_uvalueM_equation; cbn. *)
+    (*     reflexivity. *)
+    (*   } *)
 
-      inversion IHDTYP; subst.
-      inversion IHDTYP0; subst.
+    (*   inversion IHDTYP; subst. *)
+    (*   inversion IHDTYP0; subst. *)
 
-      solve_no_void.
-    }
+    (*   solve_no_void. *)
+    (* } *)
 
-    (* Poison packed structs *)
-    { invert_concretize CONC.
-      constructor.
-      rewrite NO_VOID_equation.
-      cbn. auto.
-    }
-    { invert_concretize CONC.
-      constructor.
+    (* (* Poison packed structs *) *)
+    (* { invert_concretize CONC. *)
+    (*   constructor. *)
+    (*   rewrite NO_VOID_equation. *)
+    (*   cbn. auto. *)
+    (* } *)
+    (* { invert_concretize CONC. *)
+    (*   constructor. *)
 
-      subst.
+    (*   subst. *)
 
-      (* Recover NO_VOID information *)
-      specialize (IHDTYP (concretize_succeeds_poison _) (DVALUE_Poison dt)).
-      forward IHDTYP.
-      { do 2 red.
-        rewrite concretize_uvalueM_equation; cbn.
-        reflexivity.
-      }
+    (*   (* Recover NO_VOID information *) *)
+    (*   specialize (IHDTYP (concretize_succeeds_poison _) (DVALUE_Poison dt)). *)
+    (*   forward IHDTYP. *)
+    (*   { do 2 red. *)
+    (*     rewrite concretize_uvalueM_equation; cbn. *)
+    (*     reflexivity. *)
+    (*   } *)
 
-      specialize (IHDTYP0 (concretize_succeeds_poison _) (DVALUE_Poison (DTYPE_Packed_struct dts))).
-      forward IHDTYP0.
-      { do 2 red.
-        rewrite concretize_uvalueM_equation; cbn.
-        reflexivity.
-      }
+    (*   specialize (IHDTYP0 (concretize_succeeds_poison _) (DVALUE_Poison (DTYPE_Packed_struct dts))). *)
+    (*   forward IHDTYP0. *)
+    (*   { do 2 red. *)
+    (*     rewrite concretize_uvalueM_equation; cbn. *)
+    (*     reflexivity. *)
+    (*   } *)
 
-      inversion IHDTYP; subst.
-      inversion IHDTYP0; subst.
+    (*   inversion IHDTYP; subst. *)
+    (*   inversion IHDTYP0; subst. *)
 
-      solve_no_void.
-    }
+    (*   solve_no_void. *)
+    (* } *)
 
-    1-11: invert_concretize CONC; subst; solve [auto | constructor; try solve_no_void].
+    (* 1-11: invert_concretize CONC; subst; solve [auto | constructor; try solve_no_void]. *)
 
-    (* Structs *)
-    { (* Nil structs *)
-      unfold_concretize CONC.
-      cbn in CONC.
-      unfold bind_RefineProp in CONC.
-      destruct CONC as (ma & k' & pama & eqm & REST).
-      destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma;
-        cbn; auto; try contradiction.
-      subst.
+    (* (* Structs *) *)
+    (* { (* Nil structs *) *)
+    (*   unfold_concretize CONC. *)
+    (*   cbn in CONC. *)
+    (*   unfold bind_RefineProp in CONC. *)
+    (*   destruct CONC as (ma & k' & pama & eqm & REST). *)
+    (*   destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma; *)
+    (*     cbn; auto; try contradiction. *)
+    (*   subst. *)
 
-      destruct REST as [FAILS | REST].
-      inversion FAILS.
-      specialize (REST nil).
-      forward REST; [reflexivity|].
+    (*   destruct REST as [FAILS | REST]. *)
+    (*   inversion FAILS. *)
+    (*   specialize (REST nil). *)
+    (*   forward REST; [reflexivity|]. *)
 
-      destruct (k' nil) as [[[[[[[oom_k'nil] | [[ub_k'nil] | [[err_k'nil] | k'nil]]]]]]]] eqn:Hk'nil;
-        cbn; auto; try contradiction;
-      subst;
+    (*   destruct (k' nil) as [[[[[[[oom_k'nil] | [[ub_k'nil] | [[err_k'nil] | k'nil]]]]]]]] eqn:Hk'nil; *)
+    (*     cbn; auto; try contradiction; *)
+    (*   subst; *)
 
-      cbn in eqm;
-      rewrite Hk'nil in eqm;
-      cbn in eqm.
-      contradiction.
+    (*   cbn in eqm; *)
+    (*   rewrite Hk'nil in eqm; *)
+    (*   cbn in eqm. *)
+    (*   contradiction. *)
 
-      subst; constructor.
-    }
-    { (* Non-nil structs *)
-      unfold_concretize CONC.
-      cbn in CONC.
+    (*   subst; constructor. *)
+    (* } *)
+    (* { (* Non-nil structs *) *)
+    (*   unfold_concretize CONC. *)
+    (*   cbn in CONC. *)
 
-      (* Urgggghhh... Missing proper instance, I think *)
-      Fail rewrite RefineProp_bind_bind in CONC.
+    (*   (* Urgggghhh... Missing proper instance, I think *) *)
+    (*   Fail rewrite RefineProp_bind_bind in CONC. *)
 
-      epose proof RefineProp_Proper_bind.
-      Import Morphisms.
-      unfold Proper, respectful in H.
-      eapply H in CONC; cycle 1.
+    (*   epose proof RefineProp_Proper_bind. *)
+    (*   Import Morphisms. *)
+    (*   unfold Proper, respectful in H. *)
+    (*   eapply H in CONC; cycle 1. *)
 
-      admit.
-      admit.
-      admit.
-    }
+    (*   admit. *)
+    (*   admit. *)
+    (*   admit. *)
+    (* } *)
 
-    (* Packed Structs *)
-    admit.
-    admit.
+    (* (* Packed Structs *) *)
+    (* admit. *)
+    (* admit. *)
 
-    (* Arrays *)
-    {
-      admit.
+    (* (* Arrays *) *)
+    (* { *)
+    (*   admit. *)
 
-    }
+    (* } *)
 
-    (* Vectors *)
-    { admit.
+    (* (* Vectors *) *)
+    (* { admit. *)
 
-    }
+    (* } *)
 
-    Ltac ret_inv :=
-      match goal with
-      | |- MonadEq1Laws.Eq1_ret_inv _ =>
-            let H := fresh "H" in
-            constructor; intros * H; subst; inv H; auto
-      end.
+    (* Ltac ret_inv := *)
+    (*   match goal with *)
+    (*   | |- MonadEq1Laws.Eq1_ret_inv _ => *)
+    (*         let H := fresh "H" in *)
+    (*         constructor; intros * H; subst; inv H; auto *)
+    (*   end. *)
 
-    Ltac euo_crush :=
-      match goal with
-      | |- MonadEq1Laws.Eq1_ret_inv _ => ret_inv
-      | |- NoFailsRet err_ub_oom => constructor; intros;
-                                    eapply MReturns_MFails; apply MReturns_ret; eauto
-      | |- MFails_ERROR err_ub_oom => constructor; intros; constructor
-      | |- MFails_UB err_ub_oom => constructor; intros; constructor
-      end.
+    (* Ltac euo_crush := *)
+    (*   match goal with *)
+    (*   | |- MonadEq1Laws.Eq1_ret_inv _ => ret_inv *)
+    (*   | |- NoFailsRet err_ub_oom => constructor; intros; *)
+    (*                                 eapply MReturns_MFails; apply MReturns_ret; eauto *)
+    (*   | |- MFails_ERROR err_ub_oom => constructor; intros; constructor *)
+    (*   | |- MFails_UB err_ub_oom => constructor; intros; constructor *)
+    (*   end. *)
 
-    (* Binops *)
-    { eapply concretize_ibinop_inv in CONC; eauto.
-      destruct CONC as (dx & dy & SUCCx & CONCx & SUCCy & CONCy & EVAL).
+    (* (* Binops *) *)
+    (* { eapply concretize_ibinop_inv in CONC; eauto. *)
+    (*   destruct CONC as (dx & dy & SUCCx & CONCx & SUCCy & CONCy & EVAL). *)
 
-      eapply eval_iop_dtyp_i; try euo_crush.
-      eapply IHDTYP1; eauto.
-      eapply IHDTYP2; eauto.
-      rewrite EVAL.
-      reflexivity.
-    }
+    (*   eapply eval_iop_dtyp_i; try euo_crush. *)
+    (*   eapply IHDTYP1; eauto. *)
+    (*   eapply IHDTYP2; eauto. *)
+    (*   rewrite EVAL. *)
+    (*   reflexivity. *)
+    (* } *)
 
-    { eapply concretize_ibinop_inv in CONC; auto.
-      destruct CONC as (dx & dy & SUCCx & CONCx & SUCCy & CONCy & EVAL).
+    (* { eapply concretize_ibinop_inv in CONC; auto. *)
+    (*   destruct CONC as (dx & dy & SUCCx & CONCx & SUCCy & CONCy & EVAL). *)
 
-      eapply eval_iop_dtyp_iptr; try euo_crush.
-      eapply IHDTYP1; eauto.
-      eapply IHDTYP2; eauto.
-      rewrite EVAL.
-      reflexivity.
-    }
+    (*   eapply eval_iop_dtyp_iptr; try euo_crush. *)
+    (*   eapply IHDTYP1; eauto. *)
+    (*   eapply IHDTYP2; eauto. *)
+    (*   rewrite EVAL. *)
+    (*   reflexivity. *)
+    (* } *)
 
-    (* Integer Comparisons *)
-    admit.
-    admit.
-    admit.
-    admit.
-    admit.
+    (* (* Integer Comparisons *) *)
+    (* admit. *)
+    (* admit. *)
+    (* admit. *)
+    (* admit. *)
+    (* admit. *)
 
-    (* Floating point comparisons *)
-    admit.
-    admit.
-    admit.
-    admit.
+    (* (* Floating point comparisons *) *)
+    (* admit. *)
+    (* admit. *)
+    (* admit. *)
+    (* admit. *)
 
-    (* Conversions *)
-    admit.
-    admit.
-    admit.
-    admit.
-    admit.
-    admit.
-    admit.
-    admit.
-    admit.
-    admit.
-    admit.
-    admit.
+    (* (* Conversions *) *)
+    (* admit. *)
+    (* admit. *)
+    (* admit. *)
+    (* admit. *)
+    (* admit. *)
+    (* admit. *)
+    (* admit. *)
+    (* admit. *)
+    (* admit. *)
+    (* admit. *)
+    (* admit. *)
+    (* admit. *)
 
-    (* GetElementPtr *)
-    admit.
+    (* (* GetElementPtr *) *)
+    (* admit. *)
 
-    (* ExtractElement *)
-    admit.
-    admit.
+    (* (* ExtractElement *) *)
+    (* admit. *)
+    (* admit. *)
 
-    (* InsertElement *)
-    admit.
-    admit.
+    (* (* InsertElement *) *)
+    (* admit. *)
+    (* admit. *)
 
-    (* ShuffleVector *)
-    admit.
+    (* (* ShuffleVector *) *)
+    (* admit. *)
 
-    (* ExtractValue *)
-    admit.
-    admit.
-    admit.
-    admit.
-    admit.
-    admit.
+    (* (* ExtractValue *) *)
+    (* admit. *)
+    (* admit. *)
+    (* admit. *)
+    (* admit. *)
+    (* admit. *)
+    (* admit. *)
 
-    (* InsertValue *)
-    admit.
+    (* (* InsertValue *) *)
+    (* admit. *)
 
-    (* Select *)
-    admit.
-    admit.
+    (* (* Select *) *)
+    (* admit. *)
+    (* admit. *)
 
-    (* ConcatBytes *)
-    admit.
+    (* (* ConcatBytes *) *)
+    (* admit. *)
   Admitted.
 
 

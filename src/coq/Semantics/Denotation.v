@@ -32,6 +32,7 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Semantics.LLVMParams
      Semantics.MemoryParams
+     Semantics.Memory.MemBytes
      Semantics.ConcretizationParams.
 
 Require Import Ceres.Ceres.
@@ -101,28 +102,12 @@ Open Scope N_scope.
     itrees in the second phase.
  *)
 
-Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationParams LP MP).
+Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (CP : ConcretizationParams LP MP Byte).
   Import CP.
   Import CONC.
   Import MP.
   Import LP.
   Import Events.
-
-  Definition eval_conv_pure_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree conv_E dvalue :=
-    match get_conv_case conv t1 x t2 with
-    | Conv_Pure x => ret x
-    | Conv_Illegal s => raise s
-    | _ => raise "Non-pure conversion..."
-    end.
-
-  Definition eval_conv_pure (conv : conversion_type) (t1 : dtyp) (x : dvalue) (t2:dtyp) : itree conv_E dvalue :=
-    match t1, x with
-    | DTYPE_Vector s t, (DVALUE_Vector elts) =>
-      (* In the future, implement bitcast and etc with vectors *)
-      raise "vectors unimplemented"
-    | _, _ => eval_conv_pure_h conv t1 x t2
-    end.
-  Arguments eval_conv_pure _ _ _ _ : simpl nomatch.
 
   Definition dv_zero_initializer (t:dtyp) : err dvalue :=
     default_dvalue_of_dtyp t.

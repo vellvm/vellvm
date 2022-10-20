@@ -25,7 +25,8 @@ From Vellvm Require Import
     Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL MEM_SPEC_INTERP.
 
     (* Concretization *)
-    Module CP := ConcretizationParams.Make LP MP.
+    Module ByteM := MemBytes.Byte ADDR IP SIZEOF LP.Events MP.BYTE_IMPL.
+    Module CP := ConcretizationParams.Make LP MP ByteM.
 
     Export GEP Byte MP MEM_MODEL CP.
   End Memory.
@@ -44,10 +45,10 @@ From Vellvm Require Import
     Export MEM.
 
     (* Pick handler (depends on memory / concretization) *)
-    Module Pick := Pick.Make LP MP CP.
+    Module Pick := Pick.Make LP MP ByteM CP.
 
     (* Denotation *)
-    Module D := Denotation LP MP CP.
+    Module D := Denotation LP MP ByteM CP.
 
     Export Events Events.DV Global Local Stack Pick Intrinsics
            CP.CONC D.

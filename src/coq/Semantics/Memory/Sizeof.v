@@ -6,6 +6,9 @@ From Vellvm Require Import
 
 
 Module Type Sizeof.
+  (** ** Size of a dynamic type in bits *)
+  Parameter bit_sizeof_dtyp : dtyp -> N.
+
   (** ** Size of a dynamic type
       Computes the byte size of a [dtyp]. *)
   Parameter sizeof_dtyp : dtyp -> N.
