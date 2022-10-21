@@ -24,7 +24,8 @@ let exec_tests () =
   Printf.printf "%s\n" (outcome_to_string outcome);
   raise (Ran_tests (successful outcome))
 
-let dvalue_eq_assertion (got : unit -> DV.dvalue) (expected : unit -> DV.dvalue) () =
+let dvalue_eq_assertion name (got : unit -> DV.dvalue) (expected : unit -> DV.dvalue) () =
+  Platform.verb (Printf.sprintf "running ASSERT in %s" name);
   let dv1 = got () in
   let dv2 = expected () in
   if DV.dvalue_eqb dv1 dv2 then () else
@@ -33,7 +34,7 @@ let dvalue_eq_assertion (got : unit -> DV.dvalue) (expected : unit -> DV.dvalue)
                 (string_of_dvalue dv2))
 
 
-let make_test ll_ast t : string * assertion  =
+let make_test name ll_ast t : string * assertion  =
   let open Format in
 
   let run dtyp entry args ll_ast () =
@@ -56,7 +57,7 @@ let make_test ll_ast t : string * assertion  =
       Printf.sprintf "%s = %s(%s)" expected_str entry args_str
     in
     let result = run dtyp entry args ll_ast in
-    str, (dvalue_eq_assertion result (fun () -> expected))
+    str, (dvalue_eq_assertion name result (fun () -> expected))
 
   | Assertion.POISONTest (dtyp, entry, args) ->
      let expected = InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV.DVALUE_Poison dtyp in
@@ -70,7 +71,7 @@ let make_test ll_ast t : string * assertion  =
      in
 
      let result  = run dtyp entry args ll_ast in 
-     str, (dvalue_eq_assertion result (fun () -> expected))
+     str, (dvalue_eq_assertion name result (fun () -> expected))
          
   | Assertion.SRCTGTTest (expected_rett, generated_args) ->
      let (_t_args, v_args) = List.split generated_args in
@@ -83,7 +84,7 @@ let make_test ll_ast t : string * assertion  =
       in
        Printf.sprintf "src = tgt on generated input (%s)" args_str
      in
-     str,  (dvalue_eq_assertion res_src res_tgt) 
+     str,  (dvalue_eq_assertion name res_src res_tgt) 
 
 let test_pp_dir dir =
   let _ = Printf.printf "===> RUNNING PRETTY PRINTING TESTS IN: %s\n" dir in  
@@ -140,7 +141,7 @@ let test_file path =
     | "ll" -> 
       let tests = parse_tests path in
       let ll_ast = IO.parse_file path in
-      let suite = Test (path, List.map (make_test ll_ast) tests) in
+      let suite = Test (path, List.map (make_test path ll_ast) tests) in
       let outcome = run_suite [suite] in
       Printf.printf "%s\n" (outcome_to_string outcome);
       raise (Ran_tests (successful outcome))
@@ -163,12 +164,12 @@ let test_dir dir =
           let _ = Printf.printf "FAILURE %s\n\t%s\n%!" path s in
           None
       | _ ->
-        let _ = Printf.printf "FAILURE %s\n" path in
+        let _ = Printf.printf "FAILURE %s\n%!" path in
         None
     ) pathlist
   in
   let suite = List.map (fun (file, ast, tests) ->
-      Test (file, List.map (make_test ast) tests)) files in
+      Test (file, List.map (make_test file ast) tests)) files in
   let outcome = run_suite suite in
   Printf.printf "%s\n" (outcome_to_string outcome);
   raise (Ran_tests (successful outcome))

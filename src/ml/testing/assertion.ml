@@ -183,12 +183,18 @@ and parse_eq_assertion (line:string) : test list =
   else
     (* let _ = print_endline ("MATCH: " ^ line) in *)
     let lhs = Str.matched_group 1 line in
-    (* let _ = print_endline ("LHS: " ^ lhs) in     *)
+    (* let _ = print_endline ("LHS: " ^ lhs) in *)
     let rhs = Str.matched_group 2 line in
-    (* let _ = print_endline ("RHS: " ^ rhs) in         *)
+    (* let _ = print_endline ("RHS: " ^ rhs) in *)
     let l = Llvm_lexer.parse_texp (Lexing.from_string lhs) in
-    (* let _ = print_endline "PARSED LHS" in         *)
-    let r = Llvm_lexer.parse_test_call (Lexing.from_string rhs) in
+    (* let _ = print_endline "PARSED LHS" in *)
+    let r =
+      try 
+        Llvm_lexer.parse_test_call (Lexing.from_string rhs)
+      with
+      | _ -> failwith (Printf.sprintf "Ill-formed ASSERT EQ: %s" rhs)
+    in
+    (* let _ = print_endline "PARSED RHS" in     *)
     let uv = texp_to_dvalue l in
     let dt = typ_to_dtyp (fst l) in
     let (fn, args) = instr_to_call_data r in

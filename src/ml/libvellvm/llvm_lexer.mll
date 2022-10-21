@@ -465,7 +465,7 @@ and lexed_id = parse
 
   let parse_test_call lexbuf =
     try Llvm_parser.test_call token lexbuf
-    with Llvm_parser.Error -> parsing_err lexbuf "Error token encountered"
+    with Llvm_parser.Error -> parsing_err lexbuf "Parsing Error Encountered"
 
   let parse_texp lexbuf =
     try Llvm_parser.texp token lexbuf
