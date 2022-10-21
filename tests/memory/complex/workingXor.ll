@@ -267,10 +267,10 @@ continue:
   store %struct.node* %21, %struct.node** %3, align 8 ;; next
   %22 = load %struct.node*, %struct.node** %1, align 8
   store %struct.node* %22, %struct.node** %2, align 8 ;; prev
-  %storedValPtr = getelementptr %struct.node, %struct.node* %22, i32 0, i32 0
-  %storedVal = load i32, i32* %storedValPtr
-  %correctValCheck = icmp eq i32 %storedVal, 3
-  br i1 %correctValCheck, label %success, label %fail
+  %storedValPtr2 = getelementptr %struct.node, %struct.node* %22, i32 0, i32 0
+  %storedVal2 = load i32, i32* %storedValPtr2
+  %correctValCheck2 = icmp eq i32 %storedVal2, 3
+  br i1 %correctValCheck2, label %success, label %fail
 success:
   ret i32 1
 fail:

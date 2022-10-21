@@ -34,8 +34,8 @@ define i32 @testSingletonArray() {
   %ptr = alloca [4 x i32]
   store [4 x i32] [i32 10, i32 20, i32 30, i32 40], [4 x i32]* %ptr
   %agg1 = load [4 x i32], [4 x i32]* %ptr
-  %agg2 = insertvalue [1 x i32] %agg1, i32 60, 0
-  %val = extractvalue [1 x i32] %agg2, 0
+  %agg2 = insertvalue [4 x i32] %agg1, i32 60, 0
+  %val = extractvalue [4 x i32] %agg2, 0
   ret i32 %val
 }
 
