@@ -1,0 +1,116 @@
+* A Guide to the Memory Model
+
+The memory model is split up into numerous modules across several
+files. At a high level the important aspects of the code for the memory model consists of:
+
+- The abstract specification of memory
+- The concrete implementation of a memory model (that agrees with the specification)
+- Serialization / deserialization of values into bytes
+
+** Important Files
+
+- [[file:src/coq/Handlers/MemoryModel.v::From Vellvm.Syntax Require Import][src/coq/Handlers/MemoryModel.v]]
+
+*** Other Relevant Files
+
+- DynamicValues.v
+
+** Memory Specification
+
+There is a specification for memory models in [[file:src/coq/Handlers/MemoryModel.v::From Vellvm.Syntax Require
+ Import][src/coq/Handlers/MemoryModel.v]]. Any implementation of an LLVM memory
+model must abide by this specification.
+
+The specification is broken up into two modules:
+
+- [[file:src/coq/Handlers/MemoryModel.v::Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).][MemoryModelSpecPrimitives]]
+- [[file:src/coq/Handlers/MemoryModel.v::Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP).][MemoryModelSpec]]
+
+When implementing a custom memory model for LLVM in our framework an
+instance of [[file:src/coq/Handlers/MemoryModel.v::Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).][MemoryModelSpecPrimitives]] must be provided. This specifies
+the low level structure of memory, and some operations on the memory,
+such as reading symbolic bytes from memory.
+
+[[file:src/coq/Handlers/MemoryModel.v::Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP).][MemoryModelSpec]] is derived from [[file:src/coq/Handlers/MemoryModel.v::Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).][MemoryModelSpecPrimitives]]. It defines
+a number of predicates for each of the higher level operations on
+memory. All of these predicates are defined in terms of [[file:src/coq/Handlers/MemPropT.v::Definition MemPropT (MemState : Type) (X : Type) : Type][MemPropT]]:
+
+#+begin_src coq
+  Definition MemPropT (MemState : Type) (X : Type) : Type
+    := MemState -> err_ub_oom (MemState * X)%type -> Prop.
+#+end_src
+
+So, for instance:
+
+#+begin_src coq
+  Definition read_byte_spec_MemPropT (ptr : addr) : MemPropT MemState SByte
+#+end_src
+
+Will specify what the valid behaviour for reading a symbolic byte from
+memory at ~ptr~ is given a specific state of memory. The ~err_ub_oom~
+that we see in the definition of ~MemPropT~ is just an error monad
+allowing for errors, undefined behaviour, and out of memory to be
+raised instead of a value being returned along with a new memory
+state.
+
+Within [[file:src/coq/Handlers/MemoryModel.v::Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP).][MemoryModelSpec]] the interesting high level definitions are as follows:
+
+- [[file:src/coq/Handlers/MemoryModel.v::Definition read_byte_spec_MemPropT (ptr : addr) : MemPropT MemState SByte :=][read_byte_spec_MemPropT]]
+  + Reading a byte at an address
+- [[file:src/coq/Handlers/MemoryModel.v::Definition mempush_spec_MemPropT : MemPropT MemState unit :=][mempush_spec_MemPropT]]
+  + Pushing a fresh stack frame
+- [[file:src/coq/Handlers/MemoryModel.v::Definition mempop_spec_MemPropT : MemPropT MemState unit :=][mempop_spec_MemPropT]]
+  + Pop a stack frame
+- [[file:src/coq/Handlers/MemoryModel.v::Definition write_byte_spec_MemPropT (ptr : addr) (byte : SByte) : MemPropT MemState unit][write_byte_spec_MemPropT]]
+  + Write a symbolic byte to an address in memory
+- [[file:src/coq/Handlers/MemoryModel.v::Definition allocate_bytes_spec_MemPropT (t : dtyp) (init_bytes : list SByte)][allocate_bytes_spec_MemPropT]]
+  + Allocate bytes onto the stack
+- [[file:src/coq/Handlers/MemoryModel.v::Definition malloc_bytes_spec_MemPropT (init_bytes : list SByte)][malloc_bytes_spec_MemPropT]]
+  + Allocate bytes onto the heap
+- [[file:src/coq/Handlers/MemoryModel.v::Definition free_spec_MemPropT (root : addr) : MemPropT MemState unit :=][free_spec_MemPropT]]
+  + Free heap allocated blocks
+
+Many of these are actually wrappers around a ~Record~ definition which
+contains the actual meat of the specification for these operations on
+memory.
+
+The above operations are then used to specify loading / storing full
+symbolic values in memory, as well as allocations of types:
+
+- [[file:src/coq/Handlers/MemoryModel.v::Definition read_uvalue_spec (dt : dtyp) (ptr : addr) : MemPropT MemState uvalue :=][read_uvalue_spec]]
+- [[file:src/coq/Handlers/MemoryModel.v::Definition write_uvalue_spec (dt : dtyp) (ptr : addr) (uv : uvalue) : MemPropT MemState unit :=][write_uvalue_spec]]
+- [[file:src/coq/Handlers/MemoryModel.v::Definition allocate_dtyp_spec (dt : dtyp) : MemPropT MemState addr :=][allocate_dtyp_spec]]
+
+These specifications are what's ultimately used to [[file:src/coq/Handlers/MemoryModel.v::Definition handle_memory_prop : MemoryE ~> MemPropT MemState][handle memory events]] in our propositional model of LLVM.
+
+** Executable Memory Model
+
+The interface to the executable memory model is contained in [[file:src/coq/Handlers/MemoryModel.v::From Vellvm.Syntax Require
+ Import][src/coq/Handlers/MemoryModel.v]] in two files, just like the
+specification.
+
+- [[file:src/coq/Handlers/MemoryModel.v::Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).][MemoryModelExecPrimitives]]
+- [[file:src/coq/Handlers/MemoryModel.v::Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP).][MemoryModelExec]]
+
+[[file:src/coq/Handlers/MemoryModel.v::Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).][MemoryModelExecPrimitives]] is what needs to be implemented when
+creating an instance of the LLVM memory model, and [[file:src/coq/Handlers/MemoryModel.v::Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP).][MemoryModelExec]] is
+derived from it.
+
+To implement [[file:src/coq/Handlers/MemoryModel.v::Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).][MemoryModelExecPrimitives]] we need to provide
+implementations for low-level operations that read / write individual
+bytes, allocate a block of bytes on the stack / heap, as well as
+functions for freeing heap allocated blocks and stack allocated
+bytes. Additionally some correctness lemmas must be provided for each
+of these operations -- the executable operations must agree with their
+specifications.
+
+[[file:src/coq/Handlers/MemoryModel.v::Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP).][MemoryModelExec]] is derived from [[file:src/coq/Handlers/MemoryModel.v::Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).][MemoryModelExecPrimitives]], and it
+implements aggregate operations (such as reads / writes of abstract
+LLVM values, instead of just individual bytes), and also provides
+handlers for memory events for the executable interpreter of LLVM.
+
+** other things to talk about
+
+- MonadStoreId
+- MonadProvenance
+- Memory events?
