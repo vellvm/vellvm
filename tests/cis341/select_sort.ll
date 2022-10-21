@@ -39,11 +39,11 @@ nextsort:
   %idxcmp = icmp sgt i64 %minidx, 0
   br i1 %idxcmp, label %swappos, label %donothing
 donothing:
-  %currvalptr = getelementptr [5 x i64], [5 x i64]* @arr, i64 0, i64 %curridx
-  %currval = load i64, i64* %currvalptr
-  %newacc = add i64 %acc, %currval
+  %currvalptr1 = getelementptr [5 x i64], [5 x i64]* @arr, i64 0, i64 %curridx
+  %currval1 = load i64, i64* %currvalptr1
+  %newacc1 = add i64 %acc, %currval1
   %nextidx = add i64 %curridx, 1
-  %res = call i64 @selectsort(i64 %nextidx, i64 %newacc, i64 %arrsize)
+  %res = call i64 @selectsort(i64 %nextidx, i64 %newacc1, i64 %arrsize)
   ret i64 %res
 swappos:
   %currvalptr = getelementptr [5 x i64], [5 x i64]* @arr, i64 0, i64 %curridx

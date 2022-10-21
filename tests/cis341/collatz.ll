@@ -9,15 +9,15 @@ then:
 ret0:
   ret i64 0
 even:
-  %seven = ashr i64 %n, 1
-  %eight = call i64 @collatz(i64 %seven)
-  %nine = add i64 %eight, 1
-  ret i64 %nine
+  %seven1 = ashr i64 %n, 1
+  %eight1 = call i64 @collatz(i64 %seven1)
+  %nine1 = add i64 %eight1, 1
+  ret i64 %nine1
 odd:
-  %seven = mul i64 3, %n
-  %eight = add i64 1, %seven 
-  %nine = call i64 @collatz(i64 %eight)
-  %one0 = add i64 1, %nine
+  %seven2 = mul i64 3, %n
+  %eight2 = add i64 1, %seven2 
+  %nine2 = call i64 @collatz(i64 %eight2)
+  %one0 = add i64 1, %nine2
   ret i64 %one0
 }
 

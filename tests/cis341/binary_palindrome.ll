@@ -3,7 +3,7 @@ define i64 @reverse(i64 %input_x) {
   store i64 0, i64* %rev
 
   %x = alloca i64
-  store i64 %input_x, i64 %x
+  store i64 %input_x, i64* %x
 
   br label %loop
 
@@ -23,8 +23,8 @@ yes:
 
   %half_x_val = lshr i64 %x_val, 1
   
-  store i64 %half_x_val, i64 %x
-  store i64 %twice_rev_plus_last_bit, i64 %rev
+  store i64 %half_x_val, i64* %x
+  store i64 %twice_rev_plus_last_bit, i64* %rev
 
   br label %loop
 
