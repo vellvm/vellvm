@@ -67,7 +67,7 @@ Import MemoryAddress.
 
 
 Module Make (LP : LLVMParams) (LLVM : Lang LP).
-  Import LLVM.SP.SER.
+  Import LLVM.CP.CONC.
   Import LLVM.Events.
   Import LLVM.MEMORY_THEORY.ST.
 
@@ -152,7 +152,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         (* ma = inl (inl err) *)
         apply CONC'.
 
-        split; auto.        
+        split; auto.
       - (* uv1 succeeds *)
         do 2 red.
         rewrite concretize_uvalueM_equation.
@@ -300,7 +300,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         red in CONC.
         rewrite concretize_uvalueM_equation in CONC.
 
-        
+
         Import Util.
         rewrite Monads.map_monad_unfold in CONC.
         rewrite Monads.map_monad_unfold.
@@ -318,7 +318,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         (* assert ((y <- conc_a';; x <- conc_rest' y;; (@ret err_or_ub Monad_err_or_ub dvalue (DVALUE_Struct x))) (@ret err_or_ub Monad_err_or_ub dvalue dv)). *)
         (* replace ((x <- (x <- conc_a';; conc_rest' x);; ret (DVALUE_Struct x)) (ret dv)) with ((y <- conc_a';; x <- conc_rest' y;; ret (DVALUE_Struct x)) (ret dv)). *)
         (* (fun b => conc_rest'). (ret (b :: bs)). *)
-        
+
         (* erewrite  *)
 
         (* pose proof _ _ _ m *)
@@ -326,7 +326,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         (* rewrite map_monad_cons. *)
         admit.
     }
-    
+
   Abort.
 
   Lemma refine_uvalue_op_poison_l :
@@ -349,7 +349,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
       idtac pa;
         idtac k
     end.
-    
+
     unfold bind_RefineProp.
     cbn.
     exists (ret (DVALUE_Poison dt)).
@@ -446,11 +446,11 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
             cbn in *; try contradiction.
 
           subst.
-    - 
+    -
   Qed.
-    
+
   Instance proper_refine_uvalue_ibinop {op v2 rv} : Proper ((fun x y => refine_uvalue y x) ==> (fun (x y : Prop) => x -> y)) (fun v1 => refine_uvalue (UVALUE_IBinop op v1 v2) rv).
-  Proof.    
+  Proof.
     unfold Proper, respectful.
     intros x y Ryx Ribop.
 
@@ -523,9 +523,9 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
          *)
         (* In this case, eval_iop should return poison,
 
-           
+
          *)
-      
+
       inversion Ryx; subst.
       + red. red.
         rewrite concretize_uvalueM_equation.
@@ -564,7 +564,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
 
         [reflexivity|].
         split; [reflexivity|].
-        
+
         admit.
         admit.
       + admit.
@@ -578,7 +578,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
 
     (*   eapply Concretize_IBinop. *)
     (* } *)
-    
+
     (* eapply Concretize_IBinop. with (dv1:=DVALUE_I64 one) (dv2:=dv). *)
     (* - apply Concretize_Undef. constructor. *)
     (* - auto. *)
@@ -671,7 +671,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Lemma Int64_mul_mod :
     forall a b intrange,
       (DynamicValues.Int64.mul (DynamicValues.Int64.repr a)
-                               (DynamicValues.Int64.repr b)) = 
+                               (DynamicValues.Int64.repr b)) =
       {| DynamicValues.Int64.intval := ((a * b) mod DynamicValues.Int64.modulus);
          DynamicValues.Int64.intrange := intrange
       |}.
@@ -680,7 +680,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
 
   Theorem undef_refines_mul_undef_relprime :
     forall a,
-      Znumtheory.rel_prime a DynamicValues.Int64.modulus -> 
+      Znumtheory.rel_prime a DynamicValues.Int64.modulus ->
       refine_uvalue (UVALUE_Undef (DTYPE_I 64))
                     (UVALUE_IBinop (Mul false false)
                                    (UVALUE_Undef (DTYPE_I 64)) (UVALUE_I64 (DynamicValues.Int64.repr a))).
@@ -689,7 +689,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     constructor.
     intros dv H.
     inversion H; subst.
-    - inversion H0. 
+    - inversion H0.
     - inversion H1; subst; inversion H; subst.
       + inversion H0.
       + destruct x eqn:Hx.
@@ -711,7 +711,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
 
   Theorem undef_refines_mul_relprime_undef :
     forall a,
-      Znumtheory.rel_prime a DynamicValues.Int64.modulus -> 
+      Znumtheory.rel_prime a DynamicValues.Int64.modulus ->
       refine_uvalue (UVALUE_Undef (DTYPE_I 64))
                     (UVALUE_IBinop (Mul false false)
                                    (UVALUE_I64 (DynamicValues.Int64.repr a)) (UVALUE_Undef (DTYPE_I 64))).
@@ -720,7 +720,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     constructor.
     intros dv H.
     inversion H; subst.
-    - inversion H0. 
+    - inversion H0.
     - inversion H1; subst; inversion H; subst.
       + inversion H0.
       + destruct x eqn:Hx.
@@ -805,7 +805,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
           rewrite Z.land_comm.
           rewrite Z.land_ones by lia.
           rewrite Z.mod_small. reflexivity.
-          
+
           cbn.
           pose proof DynamicValues.Int64.unsigned_range_2 x.
           cbn in H0.

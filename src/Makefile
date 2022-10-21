@@ -38,20 +38,20 @@ COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/Memory/Sizeof Semantics/G
 		Semantics/VellvmIntegers Semantics/Memory/ErrSID \
 		Semantics/DynamicValues Semantics/LLVMEvents Semantics/LLVMParams\
 		Utils/ITreeRaise Semantics/ItreeRaiseMReturns Utils/Raise\
-		Semantics/MemoryParams Semantics/SerializationParams\
+		Semantics/MemoryParams Semantics/ConcretizationParams\
 		Semantics/IntrinsicsDefinitions\
 		Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel\
 		Semantics/Lang Semantics/InfiniteToFinite\
 		Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack\
 		Handlers/Pick Handlers/UndefinedBehaviour Handlers/OOM\
-		Handlers/Serialization Handlers/SerializationTheory\
+		Handlers/Concretization Handlers/SerializationTheory\
 		Handlers/MemPropT\
 		Handlers/MemoryModel Handlers/MemoryInterpreters Handlers/MemoryModelImplementation\
 		Handlers/MemoryHelpers\
 		Handlers/Handlers\
 		Semantics
 
-COQFILESANALYSIS := Analysis/Iteration Analysis/Kildall Analysis/Dom Analysis/DomKildall Analysis/ssa Analysis/DomId 
+COQFILESANALYSIS := Analysis/Iteration Analysis/Kildall Analysis/Dom Analysis/DomKildall Analysis/ssa Analysis/DomId
 
 COQFILESQC := Syntax/TypeUtil QC/Utils QC/GenAST QC/ShowAST QC/ReprAST
 COQFILESQCTEST := QC/QCVellvm
@@ -101,7 +101,7 @@ interp: coqinterp extracted vellvm
 coq: quickchick flocq-quickchick $(VOFILES)
 
 .PHONY: qc-tests
-qc-tests: rm-qc-test-vo coq $(QCVOFILES) $(QCVOFILESTEST) 
+qc-tests: rm-qc-test-vo coq $(QCVOFILES) $(QCVOFILESTEST)
 
 .PHONY: rm-qc-test-vo
 rm-qc-test-vo:

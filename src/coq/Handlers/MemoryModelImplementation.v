@@ -140,10 +140,10 @@ Module MakeFiniteMemory (LP : LLVMParams) <: Memory LP.
   Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec MMEP.MemExecM.
   Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL MEM_SPEC_INTERP.
 
-  (* Serialization *)
-  Module SP := SerializationParams.Make LP MP.
+  (* Concretization *)
+  Module CP := ConcretizationParams.Make LP MP.
 
-  Export GEP Byte MP MEM_MODEL SP.
+  Export GEP Byte MP MEM_MODEL CP.
 End MakeFiniteMemory.
 
 Module LLVMParamsBigIntptr := LLVMParams.MakeBig Addr BigIP FinSizeof FinPTOI FinPROV FinITOP BigIP_BIG.

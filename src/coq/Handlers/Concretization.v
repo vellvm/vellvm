@@ -36,7 +36,7 @@ Import IdentityMonad.
 Import ListNotations.
 Import MonadNotation.
 
-Module Type SerializationBase (LP : LLVMParams) (MP : MemoryParams LP).
+Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP).
   Import MP.
   Import LP.
   Import PTOI.
@@ -193,9 +193,9 @@ Module Type SerializationBase (LP : LLVMParams) (MP : MemoryParams LP).
                        ("concretize_uvalueM: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++
                                                                                                                                   uvalue_constructor_string u))
         end.
-End SerializationBase.
+End ConcretizationBase.
 
-Module Type Serialization (LP : LLVMParams) (MP : MemoryParams LP) (SER : SerializationBase LP MP) <: SerializationBase LP MP.
+Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (SER : ConcretizationBase LP MP) <: ConcretizationBase LP MP.
   Include SER.
   Import MP.
   Import LP.
@@ -360,9 +360,9 @@ Module Type Serialization (LP : LLVMParams) (MP : MemoryParams LP) (SER : Serial
     destruct (eval_iop iop dv1 dv2) as [[[[[[[oom_eval_iopiopdv1dv2] | [[ub_eval_iopiopdv1dv2] | [[err_eval_iopiopdv1dv2] | eval_iopiopdv1dv2]]]]]]]]; reflexivity.
   Qed.
 
-End Serialization.
+End Concretization.
 
-Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP MP.
+Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : ConcretizationBase LP MP.
   Import MP.
   Import LP.
   Import Events.
@@ -1163,6 +1163,6 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
   Set Guard Checking.
 End MakeBase.
 
-Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SER : SerializationBase LP MP) : Serialization LP MP SER.
-  Include Serialization LP MP SER.
+Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SER : ConcretizationBase LP MP) : Concretization LP MP SER.
+  Include Concretization LP MP SER.
 End Make.

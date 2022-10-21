@@ -26,10 +26,6 @@ From ExtLib Require Import
      Structures.Functor.
 
 From Coq Require Import Relations RelationClasses.
-
-
-
-
 (* end hide *)
 
 Module Make (LP : LLVMParams) (LLVM : Lang LP).
@@ -42,7 +38,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Import MEM.MEM_SPEC_INTERP.
 
   Import DV.
-  Import LLVM.MEM.SP.SER.
+  Import LLVM.MEM.CP.CONC.
   Import PROV.
 
   (* Refinement relation for uvalues *)

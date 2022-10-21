@@ -21,7 +21,7 @@ From Vellvm.Handlers Require Export
      MemPropT
      Pick
      OOM
-     Serialization
+     Concretization
      UndefinedBehaviour.
 
 (* end hide *)
