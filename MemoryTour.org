@@ -9,13 +9,26 @@ files. At a high level the important aspects of the code for the memory model co
 
 ** Important Files
 
+Memory model files:
+
 - [[file:src/coq/Handlers/MemoryModel.v::From Vellvm.Syntax Require Import][src/coq/Handlers/MemoryModel.v]]
+- [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::From Coq Require Import][src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v]]
+- [[file:src/coq/Handlers/MemoryModules/FiniteSpecPrimitives.v::From Coq Require Import][src/coq/Handlers/MemoryModules/FiniteSpecPrimitives.v]]
+- [[src/coq/Handlers/MemoryModelImplementation.v]]
+
+Serialization files:
+
+-
+
+Concretization files:
 
 *** Other Relevant Files
 
 - DynamicValues.v
 
-** Memory Specification
+
+** The Memory Model Itself
+*** Memory Specification
 
 There is a specification for memory models in [[file:src/coq/Handlers/MemoryModel.v::From Vellvm.Syntax Require
  Import][src/coq/Handlers/MemoryModel.v]]. Any implementation of an LLVM memory
@@ -83,7 +96,14 @@ symbolic values in memory, as well as allocations of types:
 
 These specifications are what's ultimately used to [[file:src/coq/Handlers/MemoryModel.v::Definition handle_memory_prop : MemoryE ~> MemPropT MemState][handle memory events]] in our propositional model of LLVM.
 
-** Executable Memory Model
+**** Implementation
+
+An implementation of [[file:src/coq/Handlers/MemoryModel.v::Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).][MemoryModelSpecPrimitives]] is available as [[file:src/coq/Handlers/MemoryModules/FiniteSpecPrimitives.v::Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) <: MemoryModelSpecPrimitives LP
+ MP.][FiniteMemoryModelSpecPrimitives]].  This module represents the state of
+memory is an ~IntMap~ of ~mem_bytes~, which are just symbolic bytes
+paired with an allocation id for keeping track of provenance.
+
+*** Executable Memory Model
 
 The interface to the executable memory model is contained in [[file:src/coq/Handlers/MemoryModel.v::From Vellvm.Syntax Require
  Import][src/coq/Handlers/MemoryModel.v]] in two files, just like the
@@ -109,7 +129,27 @@ implements aggregate operations (such as reads / writes of abstract
 LLVM values, instead of just individual bytes), and also provides
 handlers for memory events for the executable interpreter of LLVM.
 
-** Other Memory Model Odds and Ends
+**** Implementation
+
+An implementation of [[file:src/coq/Handlers/MemoryModel.v::Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).][MemoryModelExecPrimitives]] is available as [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) <: MemoryModelExecPrimitives LP
+ MP.][FiniteMemoryModelExecPrimitives]]. This module implements executable
+versions of raw byte-wise operations, and provides proofs of their
+correctness.
+
+*** Packaging up the memory model
+
+The [[src/coq/Handlers/MemoryModelImplementation.v]] file takes the
+implementation of the memory model primitive modules, and builds a
+full memory model from them.
+
+
+** Byte serialization
+
+
+
+** Concretization
+
+** TODO Other Memory Model Odds and Ends
 
 - MonadStoreId
 - MonadProvenance
