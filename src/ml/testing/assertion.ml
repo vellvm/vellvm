@@ -134,8 +134,8 @@ let texp_to_function_name (_, exp) : string =
 (* | INSTR_Call of 't texp * 't texp list *)
 let instr_to_call_data instr =
   match instr with
-  | INSTR_Call (fn, args) ->
-     (texp_to_function_name fn, List.map texp_to_uvalue args)
+  | INSTR_Call (fn, args, _) ->
+     (texp_to_function_name fn, List.map (fun x -> texp_to_uvalue (fst x)) args)
   | _ -> failwith "Assertion includes unsupported instruction (must be a call)"
 
 let texp_to_name_retty (texp : LLVMAst.typ texp) : DynamicTypes.dtyp * string =
@@ -146,13 +146,13 @@ let texp_to_name_retty (texp : LLVMAst.typ texp) : DynamicTypes.dtyp * string =
 
 let instr_to_call_data' instr =
   match instr with
-  | INSTR_Call (fn, args) ->
+  | INSTR_Call (fn, args, _) ->
      let (t, fname) = texp_to_name_retty fn in
-     (t, fname, List.map texp_to_uvalue args)
+     (t, fname, List.map (fun x -> texp_to_uvalue (fst x)) args)
   | _ -> failwith "Assertion includes unsupported instruction (must be a call)"
-  
 
-(* Top level for parsing assertions *)  
+
+(* Top level for parsing assertions *)
 let rec parse_assertion (filename: string)(line: string) : test list =
   let assertions = [
       parse_poison_assertion line;
@@ -174,7 +174,7 @@ and parse_poison_assertion (line: string) : test list =
 
 and parse_eq_assertion (line:string) : test list =
   (* ws* "ASSERT" ws+ "EQ" ws* ':' ws* (anything+ as l) ws* '=' ws* (anything+ as r)  *)
-  let regex = "^[ \t]*;[ \t]*ASSERT[ \t]+EQ[ \t]*:[ \t]*\\(.*\\)=\\(.*\\)" in 
+  let regex = "^[ \t]*;[ \t]*ASSERT[ \t]+EQ[ \t]*:[ \t]*\\(.*\\)=\\(.*\\)" in
   if not (Str.string_match (Str.regexp regex) line 0) then
     begin
       (* let _ = print_endline ("NO MATCH: " ^ line) in *)
@@ -216,12 +216,12 @@ and parse_srctgt_assertion (filename: string) (line: string) : test list =
     match toplevel_entity with
     | TLE_Definition df ->
       begin match df.df_prototype.dc_name with
-       | Name coqstr -> Camlcoq.camlstring_of_coqstring coqstr = fname 
+       | Name coqstr -> Camlcoq.camlstring_of_coqstring coqstr = fname
        | _ -> false
       end
     | _ -> false
   in
-  (* Find the function type for a given top level entity 
+  (* Find the function type for a given top level entity
      NOTE: does not work with vararg functions
   *)
   let find_ty toplevel_entity : (LLVMAst.typ list * LLVMAst.typ) =
@@ -232,7 +232,7 @@ and parse_srctgt_assertion (filename: string) (line: string) : test list =
        | _ -> failwith "given entity not a function definition"
        end
     | _ -> failwith "not a function definition"
-  in      
+  in
 
 
   if not (Str.string_match (Str.regexp regex) line 0) then
