@@ -19,74 +19,28 @@ COQMAKEFILE="$(COQBIN)coq_makefile"
 MENHIR=menhir
 CP=cp
 
-COQFILESNUMERIC := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats
+FRONTEND_EXE=_build/default/ml/frontend.exe
+COQFILES_FRONTEND := QC/ShowAST QC/ReprAST Utils/ParserHelper
+FRONTEND_VOFILES := $(COQFILES_FRONTEND:%=coq/%.vo)
 
-COQFILESUTILS := Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/Error Utils/ListUtil Utils/IntMaps Utils/NMaps\
-		Utils/Monads Utils/StateMonads Utils/MonadEq1Laws Utils/MonadExcLaws\
-		Utils/MonadReturnsLaws Utils/PropT Utils/RefineProp\
-		Utils/PostConditions Utils/TFor Utils/NoFailure Utils/NonEmpty Utils/Default Utils/OptionUtil Utils/MapMonadExtra\
-		Utilities
-
-COQFILESSYNTAX := Syntax/DataLayout Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
-		Syntax/Traversal Syntax/DynamicTypes Syntax/TypToDtyp\
-		Syntax/TypeUtil\
-		Syntax/Scope Syntax/SurfaceSyntax\
-		Syntax
-
-COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/Memory/Sizeof Semantics/GepM Semantics/Memory/MemBytes\
-		Semantics/Memory/Overlaps Semantics/Memory/FiniteProvenance Semantics/Memory/StoreId\
-		Semantics/VellvmIntegers Semantics/Memory/ErrSID \
-		Semantics/DynamicValues Semantics/LLVMEvents Semantics/LLVMParams\
-		Utils/ITreeRaise Semantics/ItreeRaiseMReturns Utils/Raise\
-		Semantics/MemoryParams Semantics/ConcretizationParams\
-		Semantics/IntrinsicsDefinitions\
-		Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel\
-		Semantics/Lang Semantics/InfiniteToFinite\
-		Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack\
-		Handlers/Pick Handlers/UndefinedBehaviour Handlers/OOM\
-		Handlers/Concretization Handlers/SerializationTheory\
-		Handlers/MemPropT\
-		Handlers/MemoryModel Handlers/MemoryInterpreters Handlers/MemoryModelImplementation\
-		Handlers/MemoryHelpers\
-		Handlers/Handlers\
-		Semantics
-
-COQFILESANALYSIS := Analysis/Iteration Analysis/Kildall Analysis/Dom Analysis/DomKildall Analysis/ssa Analysis/DomId
-
-COQFILESQC := Syntax/TypeUtil QC/Utils QC/GenAST QC/ShowAST QC/ReprAST
-COQFILESQCTEST := QC/QCVellvm
-
-COQFILESTHEORY := Syntax/ScopeTheory\
-		Theory/StatePredicates\
-		Theory/ContainsUB\
-		Theory/Refinement Theory/InterpreterMCFG Theory/InterpreterCFG\
-		Theory/ExpLemmas Theory/InstrLemmas Theory/DenotationTheory\
-		Theory/LocalFrame\
-		Theory/TopLevelRefinements Theory/SymbolicInterpreter\
-		Utils/NoEvent Utils/Commutation\
-		Theory
-
-COQFILESOPT    := Transformations/Transform\
-		Transformations/EquivExpr Transformations/BlockFusion Transformations/DeadCodeElimination
-
-COQFILESVIR      := $(COQFILESNUMERIC) $(COQFILESUTILS) $(COQFILESSYNTAX) $(COQFILESSEMANTICS)
-COQFILESCOMPILER := $(COQFILESVIR) $(COQFILESANALYSIS)
-COQFILESALL      := $(COQFILESCOMPILER) $(COQFILESTHEORY) $(COQFILESOPT) $(COQFILESQC)
-
-VFILES  := $(COQFILESALL:%=coq/%.v)
-VOFILES := $(COQFILESALL:%=coq/%.vo)
-QCVOFILES := $(COQFILESQC:%=coq/%.vo)
-QCVOFILESTEST := $(COQFILESQCTEST:%=coq/%.vo)
-
-KNOWNTARGETS := CoqMakefile extracted $(EXTRACTDIR)/STAMP interp coq qc-tests opam frontend frontend_exe distclean update-quickchick update-flocq-quickchick rm-qc-test-vo quickchick flocq-quickchick vellvm test check
-KNOWNFILES := Makefile _CoqProject
+KNOWNTARGETS := CoqMakefile extracted $(EXTRACTDIR)/STAMP interp .depend coq qc-tests opam frontend frontend_exe $(FRONTEND_EXE) distclean update-quickchick update-flocq-quickchick rm-qc-test-vo quickchick flocq-quickchick vellvm test check
+SKIPTARGETS := frontend frontend_exe $(FRONTEND_EXE) .depend
+KNOWNFILES := Makefile _CoqProject .depend
 .DEFAULT_GOAL := all
 
 CoqMakefile: Makefile _CoqProject
 	$(COQMAKEFILE) -f _CoqProject -o CoqMakefile
 
 invoke-coqmakefile: CoqMakefile
+ifeq ($(MAKECMDGOALS),)
 	$(MAKE) -j --no-print-directory -f CoqMakefile $(filter-out $(KNOWNTARGETS),$(MAKECMDGOALS))
+else
+ifeq ($(filter-out $(SKIPTARGETS),$(MAKECMDGOALS)),)
+	@true
+else
+	$(MAKE) -j --no-print-directory -f CoqMakefile $(filter-out $(KNOWNTARGETS),$(MAKECMDGOALS))
+endif
+endif
 
 clean-coqmakefile: CoqMakefile
 	$(MAKE) -j --no-print-directory -f CoqMakefile $(filter-out $(KNOWNTARGETS),$(MAKECMDGOALS)) clean
@@ -144,11 +98,6 @@ $(EXTRACTDIR)/STAMP: vok $(EXTRACTDIR)/Extract.v
 	patch -p0 < CRelationClasses.mli.patch
 	bash fix-extraction.sh
 	touch $(EXTRACTDIR)/STAMP
-
-%.vo: %.v
-	@rm -f doc/$(*F).glob
-	@echo "COQC $*.v"
-	@$(COQC) -dump-glob doc/$(*F).glob $*.v
 
 .depend: $(VFILES)
 	@echo "Analyzing Coq dependencies"
@@ -214,11 +163,6 @@ documentation: doc/coq2html $(VFILES)
 ############
 ### Facilities for building only the frontend - parser and pretty printer
 
-COQFILES_FRONTEND := QC/ShowAST QC/ReprAST Utils/ParserHelper
-
-FRONTEND_VOFILES := $(COQFILES_FRONTEND:%=coq/%.vo)
-
-
 $(EXTRACTDIR)/FRONTEND_STAMP: $(FRONTEND_VOFILES) $(EXTRACTDIR)/ExtractFrontend.v
 	@echo "Extracting Frontend"
 	rm -f $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
@@ -226,12 +170,11 @@ $(EXTRACTDIR)/FRONTEND_STAMP: $(FRONTEND_VOFILES) $(EXTRACTDIR)/ExtractFrontend.
 	patch -p0 < CRelationClasses.mli.patch
 	touch $(EXTRACTDIR)/FRONTEND_STAMP
 
-FRONTEND_EXE=_build/default/ml/frontend.exe
-
 $(FRONTEND_EXE): $(EXTRACTDIR)/FRONTEND_STAMP ml/dune ml/extracted/dune ml/testing/dune ml/frontend.ml ml/IO.ml
 	@echo "Compiling Vellvm (Frontend Only)"
 	dune build ml/frontend.exe
 
+.PHONY: frontend
 frontend: .depend
 	$(MAKE) $(FRONTEND_VOFILES)
 	$(MAKE) frontend_exe
