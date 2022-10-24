@@ -2,6 +2,9 @@ define i64 @f1(i64) {
   ret i64 %0
 }   
 
+; ASSERT EQ: i64 3 = call i64 @f1(i64 3)
+; ASSERT EQ: i64 6 = call i64 @f1(i64 6)
+
 define i64 @f1a(i64) {
 1:
   ret i64 %0
@@ -19,6 +22,10 @@ define i64 @f2(i64) {
 
   ret i64 %0
 }
+
+; ASSERT EQ: i64 3 = call i64 @f2(i64 3)
+; ASSERT EQ: i64 6 = call i64 @f2(i64 6)
+
 
 ; define i64 @f2a(i64) {
 ; 1:
@@ -64,6 +71,10 @@ define i64 @0() {
   ret i64 %1
 }
 
+; ASSERT EQ: i64 7 = call i64 @0()
+
 define i32 @boo(i32) {
   ret i32 %0
 }   
+
+; ASSERT EQ: i32 7 = call i32 @boo(i32 7)

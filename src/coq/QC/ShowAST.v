@@ -764,7 +764,7 @@ tes on cstring on LLVMAst.v *)
   Definition show_call_arg '(te, atts) :=
     let '(t, e) := (te:texp T) in
     let attrs := concat_with_space " " (List.map show (atts:list param_attr)) in
-    (show (t:T)) ++ " " ++ attrs ++ (show (e:exp T)).
+    (show (t:T)) ++ " " ++ attrs ++ (show_exp true (e:exp T)).
 
   Definition show_instr (i : instr T) : string
     := match i with

@@ -4,6 +4,6 @@ define i32 @test() {
   ret i32 %y
 }
 
-; ASSERT EQ 8, call i32 @test() 
+; ASSERT EQ: i32 8 = call i32 @test() 
 
 
