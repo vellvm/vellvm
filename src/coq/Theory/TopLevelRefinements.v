@@ -40,7 +40,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Export TOP.
   Export IS.
   Export IS.LLVM.
-  Export IS.LLVM.MEM.SP.SER.
+  Export IS.LLVM.MEM.CP.CONC.
   Export IS.LLVM.MEM.
   Import MEM.MEM_MODEL.
   Import MEM.MMEP.
@@ -181,7 +181,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       - unfold L3 in *.
         unfold refine_L2 in *.
         eapply interp_prop_Proper_eq in Ht; try typeclasses eauto; eauto.
-        Unshelve. 
+        Unshelve.
       - reflexivity.
     Qed.
 
@@ -203,7 +203,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         destruct Ht as [t_pre [T2 MODEL]].
         specialize (REF _ T2).
         destruct REF as [t_pre1 [T1 EUTT]].
-        exists t_pre1; split; auto.        
+        exists t_pre1; split; auto.
         eapply interp_prop_Proper_eq in MODEL; try typeclasses eauto.
         + unfold model_undef_h.
           apply MODEL.
@@ -310,7 +310,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     Ltac solve_refine :=
       auto 9 with refine_xx.
-    
+
     (**
    The chain of refinements is monotone, legitimating the ability to
    conduct reasoning before interpretation when suitable.
@@ -542,4 +542,3 @@ End Make.
 
 Module TopLevelRefinementsBigIntptr := Make InterpreterStackBigIntptr TopLevelBigIntptr.
 Module TopLevelRefinements64BitIntptr := Make InterpreterStack64BitIntptr TopLevel64BitIntptr.
-

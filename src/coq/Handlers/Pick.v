@@ -31,8 +31,8 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Semantics.LLVMParams
      Semantics.MemoryParams
-     Semantics.SerializationParams
-     Handlers.Serialization.
+     Semantics.ConcretizationParams
+     Handlers.Concretization.
 
 From ExtLib Require Import
      Data.Monads.EitherMonad
@@ -53,9 +53,9 @@ Import MonadNotation.
   - The propositional one capture in [Prop] all possible values
   - The executable one interprets [undef] as 0 at the type
 *)
-Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams LP MP).
-  Import SP.
-  Import SER.
+Module Make (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationParams LP MP).
+  Import CP.
+  Import CONC.
   Import MP.
   Import LP.
   Import Events.

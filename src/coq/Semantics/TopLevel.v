@@ -46,7 +46,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   Export IS.LLVM.D.
   Export IS.LLVM.MEM.
   Export IS.LLVM.MEM.MEM_MODEL.
-  Import IS.LLVM.MEM.SP.SER.
+  Import IS.LLVM.MEM.CP.CONC.
   Import MMEP.MMSP.
   Import MMEP.
   Import MEM_EXEC_INTERP.

@@ -36,7 +36,7 @@ Import IdentityMonad.
 Import ListNotations.
 Import MonadNotation.
 
-Module Type SerializationBase (LP : LLVMParams) (MP : MemoryParams LP).
+Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP).
   Import MP.
   Import LP.
   Import PTOI.
@@ -45,6 +45,24 @@ Module Type SerializationBase (LP : LLVMParams) (MP : MemoryParams LP).
   Import GEP.
   Import SIZEOF.
   Import Events.
+
+  Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} icmp v1 v2 : M dvalue :=
+    match v1, v2 with
+    | DVALUE_I1 i1, DVALUE_I1 i2
+    | DVALUE_I8 i1, DVALUE_I8 i2
+    | DVALUE_I32 i1, DVALUE_I32 i2
+    | DVALUE_I64 i1, DVALUE_I64 i2
+    | DVALUE_IPTR i1, DVALUE_IPTR i2 => ret (eval_int_icmp icmp i1 i2)
+    | DVALUE_Poison t1, DVALUE_Poison t2 => ret (DVALUE_Poison t1)
+    | DVALUE_Poison t, _ => if is_DVALUE_IX v2 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
+    | _, DVALUE_Poison t => if is_DVALUE_IX v1 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
+    | DVALUE_Addr a1, DVALUE_Addr a2 =>
+        let i1 := ptr_to_int a1 in
+        let i2 := ptr_to_int a2 in
+        ret (eval_int_icmp icmp i1 i2)
+    | _, _ => raise_error "ill_typed-icmp"
+    end.
+  Arguments eval_icmp _ _ _ : simpl nomatch.
 
   Parameter ptr_size : nat.
   Parameter endianess : Endianess.
@@ -175,9 +193,9 @@ Module Type SerializationBase (LP : LLVMParams) (MP : MemoryParams LP).
                        ("concretize_uvalueM: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++
                                                                                                                                   uvalue_constructor_string u))
         end.
-End SerializationBase.
+End ConcretizationBase.
 
-Module Type Serialization (LP : LLVMParams) (MP : MemoryParams LP) (SER : SerializationBase LP MP) <: SerializationBase LP MP.
+Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (SER : ConcretizationBase LP MP) <: ConcretizationBase LP MP.
   Include SER.
   Import MP.
   Import LP.
@@ -342,9 +360,9 @@ Module Type Serialization (LP : LLVMParams) (MP : MemoryParams LP) (SER : Serial
     destruct (eval_iop iop dv1 dv2) as [[[[[[[oom_eval_iopiopdv1dv2] | [[ub_eval_iopiopdv1dv2] | [[err_eval_iopiopdv1dv2] | eval_iopiopdv1dv2]]]]]]]]; reflexivity.
   Qed.
 
-End Serialization.
+End Concretization.
 
-Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP MP.
+Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : ConcretizationBase LP MP.
   Import MP.
   Import LP.
   Import Events.
@@ -358,6 +376,24 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
 
   Module BYTE := Byte ADDR IP SIZEOF Events BYTE_IMPL.
   Export BYTE.
+
+  Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} icmp v1 v2 : M dvalue :=
+    match v1, v2 with
+    | DVALUE_I1 i1, DVALUE_I1 i2
+    | DVALUE_I8 i1, DVALUE_I8 i2
+    | DVALUE_I32 i1, DVALUE_I32 i2
+    | DVALUE_I64 i1, DVALUE_I64 i2
+    | DVALUE_IPTR i1, DVALUE_IPTR i2 => ret (eval_int_icmp icmp i1 i2)
+    | DVALUE_Poison t1, DVALUE_Poison t2 => ret (DVALUE_Poison t1)
+    | DVALUE_Poison t, _ => if is_DVALUE_IX v2 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
+    | _, DVALUE_Poison t => if is_DVALUE_IX v1 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
+    | DVALUE_Addr a1, DVALUE_Addr a2 =>
+        let i1 := ptr_to_int a1 in
+        let i2 := ptr_to_int a2 in
+        ret (eval_int_icmp icmp i1 i2)
+    | _, _ => raise_error "ill_typed-icmp"
+    end.
+  Arguments eval_icmp _ _ _ : simpl nomatch.
 
   (* Variable ptr_size : nat. *)
   (* Variable datalayout : DataLayout. *)
@@ -1127,6 +1163,6 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
   Set Guard Checking.
 End MakeBase.
 
-Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SER : SerializationBase LP MP) : Serialization LP MP SER.
-  Include Serialization LP MP SER.
+Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SER : ConcretizationBase LP MP) : Concretization LP MP SER.
+  Include Concretization LP MP SER.
 End Make.

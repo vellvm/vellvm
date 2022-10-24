@@ -32,7 +32,7 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Semantics.LLVMParams
      Semantics.MemoryParams
-     Semantics.SerializationParams.
+     Semantics.ConcretizationParams.
 
 Require Import Ceres.Ceres.
 
@@ -101,9 +101,9 @@ Open Scope N_scope.
     itrees in the second phase.
  *)
 
-Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams LP MP).
-  Import SP.
-  Import SER.
+Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationParams LP MP).
+  Import CP.
+  Import CONC.
   Import MP.
   Import LP.
   Import Events.

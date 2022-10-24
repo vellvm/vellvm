@@ -27,7 +27,7 @@ From Vellvm.Handlers Require Export
      UndefinedBehaviour
      MemoryModelImplementation
      OOM
-     Serialization.
+     Concretization.
 
 From Vellvm.Semantics Require Import Memory.Sizeof Memory.MemBytes GepM.
 

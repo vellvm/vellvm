@@ -12,7 +12,7 @@
 ./coq/Handlers/Handlers.v
 ./coq/Handlers/MemPropT.v
 ./coq/Handlers/MemoryModel.v
-./coq/Handlers/Serialization.v
+./coq/Handlers/Concretization.v
 ./coq/Handlers/SerializationTheory.v
 ./coq/Handlers/Stack.v
 ./coq/Handlers/MemoryModules/Within.v
@@ -42,7 +42,7 @@
 ./coq/Semantics/Memory/ErrSID.v
 ./coq/Semantics/Memory/Sizeof.v
 ./coq/Semantics/Memory/MemBytes.v
-./coq/Semantics/SerializationParams.v
+./coq/Semantics/ConcretizationParams.v
 ./coq/Semantics/VellvmIntegers.v
 ./coq/Semantics/InterpretationStack.v
 ./coq/Semantics/TopLevel.v

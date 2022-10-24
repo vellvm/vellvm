@@ -2199,26 +2199,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     then DVALUE_I1 (Int1.one) else DVALUE_I1 (Int1.zero).
   Arguments eval_int_icmp _ _ _ : simpl nomatch.
 
-  Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} icmp v1 v2 : M dvalue :=
-    match v1, v2 with
-    | DVALUE_I1 i1, DVALUE_I1 i2
-    | DVALUE_I8 i1, DVALUE_I8 i2
-    | DVALUE_I32 i1, DVALUE_I32 i2
-    | DVALUE_I64 i1, DVALUE_I64 i2
-    | DVALUE_IPTR i1, DVALUE_IPTR i2 => ret (eval_int_icmp icmp i1 i2)
-    | DVALUE_Poison t1, DVALUE_Poison t2 => ret (DVALUE_Poison t1)
-    | DVALUE_Poison t, _ => if is_DVALUE_IX v2 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
-    | _, DVALUE_Poison t => if is_DVALUE_IX v1 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
-    | DVALUE_Addr a1, DVALUE_Addr a2 =>
-      match icmp with
-      | Eq => if A.eq_dec a1 a2 then ret (DVALUE_I1 (Int1.one)) else ret (DVALUE_I1 (Int1.zero))
-      | Ne => if A.eq_dec a1 a2 then ret (DVALUE_I1 (Int1.zero)) else ret (DVALUE_I1 (Int1.one))
-      | _ => raise_error "non-equality pointer comparison"
-      end
-    | _, _ => raise_error "ill_typed-icmp"
-    end.
-  Arguments eval_icmp _ _ _ : simpl nomatch.
-
   Definition double_op {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} (fop:fbinop) (v1:ll_double) (v2:ll_double) : M dvalue :=
     match fop with
     | FAdd => ret (DVALUE_Double (b64_plus FT_Rounding v1 v2))

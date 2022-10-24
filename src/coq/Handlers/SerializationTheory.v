@@ -17,14 +17,14 @@ From Vellvm Require Import
      Semantics.Denotation
      Semantics.Memory.MemBytes
      Semantics.MemoryParams
-     Semantics.SerializationParams.
+     Semantics.ConcretizationParams.
 
 Import MonadNotation.
 Import MonadReturnsLaws.
 
-Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams LP MP).
-  Import SP.
-  Import SER.
+Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationParams LP MP).
+  Import CP.
+  Import CONC.
   Import MP.
   Import LP.
 
@@ -242,15 +242,15 @@ Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : Serializati
   Qed.
 End MemBytesTheory.
 
-Module SerializationTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams LP MP).
-  Import SP.
-  Import SER.
+Module SerializationTheory (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationParams LP MP).
+  Import CP.
+  Import CONC.
   Import MP.
   Import LP.
 
   Import Events.
 
-  Module MBT := MemBytesTheory LP MP SP.
+  Module MBT := MemBytesTheory LP MP CP.
   Import MBT.
   Import BYTE.
   Import SIZEOF.

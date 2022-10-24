@@ -24,10 +24,10 @@ From Vellvm Require Import
     Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec MMEP.MemExecM.
     Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL MEM_SPEC_INTERP.
 
-    (* Serialization *)
-    Module SP := SerializationParams.Make LP MP.
+    (* Concretization *)
+    Module CP := ConcretizationParams.Make LP MP.
 
-    Export GEP Byte MP MEM_MODEL SP.
+    Export GEP Byte MP MEM_MODEL CP.
   End Memory.
 
   Module Type Lang (LP: LLVMParams).
@@ -43,14 +43,14 @@ From Vellvm Require Import
     Declare Module MEM : Memory LP.
     Export MEM.
 
-    (* Pick handler (depends on memory / serialization) *)
-    Module Pick := Pick.Make LP MP SP.
+    (* Pick handler (depends on memory / concretization) *)
+    Module Pick := Pick.Make LP MP CP.
 
     (* Denotation *)
-    Module D := Denotation LP MP SP.
+    Module D := Denotation LP MP CP.
 
     Export Events Events.DV Global Local Stack Pick Intrinsics
-           SP.SER D.
+           CP.CONC D.
   End Lang.
 
   Module Make (LP : LLVMParams) (MEM' : Memory LP) <: Lang LP with Module MEM := MEM'.
