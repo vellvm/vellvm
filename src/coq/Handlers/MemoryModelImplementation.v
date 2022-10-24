@@ -67,7 +67,8 @@ From Vellvm.Handlers.MemoryModules Require Import
      FiniteIntptr
      FiniteSizeof
      FiniteSpecPrimitives
-     FiniteExecPrimitives.
+     FiniteExecPrimitives
+     Within.
 
 
 
@@ -202,182 +203,162 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
 
   (* TODO: Move out of infinite stuff *)
   Lemma find_free_block_never_ub :
-    forall sz prov ms msg,
-      ~ find_free_block sz prov ms (raise_ub msg).
+    forall sz prov msg,
+      raise_ub msg ∉ find_free_block sz prov.
   Proof.
-    intros sz prov ms msg FREE.
+    intros sz prov msg FREE.
+    destruct FREE as [ms [ms' FREE]].
+    cbn in FREE; auto.
+  Qed.
+
+  (* TODO: Move out of infinite stuff *)
+  Lemma find_free_block_never_err :
+    forall sz prov msg,
+      raise_error msg ∉ find_free_block sz prov.
+  Proof.
+    intros sz prov msg FREE.
+    destruct FREE as [ms [ms' FREE]].
     cbn in FREE.
     auto.
   Qed.
 
-  Lemma find_free_block_never_err :
-    forall sz prov ms msg,
-      ~ find_free_block sz prov ms (raise_error msg).
-  Proof.
-    intros sz prov ms msg FREE.
-    cbn in FREE.
-    auto.
-  Qed.
+  Import MemSpec.MemHelpers.
+  Import LLVMParamsBigIntptr.
+  Import PROV.
 
   Lemma find_free_block_can_always_succeed :
-    forall (ms : MemState) (len : nat) (pr : Provenance),
+    forall ms (len : nat) (pr : Provenance),
     exists ptr ptrs,
-      find_free_block len pr ms (ret (ms, (ptr, ptrs))).
+      ret (ptr, ptrs) {{ms}} ∈ {{ms}} find_free_block len pr.
   Proof.
     intros ms len pr.
+    pose proof (find_free_block_correct len pr (fun _ _ => True) (Eff := Eff) (MemM:=MemStateFreshT (itree Eff))) as GET_FREE.
+    red in GET_FREE.
+    specialize (GET_FREE ms 0%N).
+    forward GET_FREE.
+    { (* TODO:
 
-    (* assert (exists ptr ptrs, get_free_block sz prov ≈ ret (ptr, ptrs)) as [ptr [ptrs GET_FREE]]. *)
-    (* admit. *)
+         May not be true, but should be able to find an st where it is
+         true... At least when `ms` is finite. *)
+      admit.
+    }
 
-    (* exists ptr. exists ptrs. *)
+    specialize (GET_FREE I).
+    destruct GET_FREE as [UB | GET_FREE].
 
-    (* pose proof (find_free_block_correct sz prov (fun _ _ => True)) as FREE. *)
+    { (* UB in find_free_block *)
+      firstorder.
+    }
 
-    (* unfold exec_correct in GET_FREE. *)
-    (* specialize (FREE ms st). *)
-    (* forward FREE. admit. *)
-    (* forward FREE; auto. *)
+    (* find_free_block doesn't necessarily UB *)
+    destruct GET_FREE as [res [st' [ms' [GET_FREE [FIND_FREE POST_FREE]]]]].
 
-    (* destruct FREE as [[ub_msg UB] | FREE]. *)
-    (* apply find_free_block_never_ub in UB; inv UB. *)
+    cbn in *.
+    red in GET_FREE.
+    destruct GET_FREE as [tptrs [IN REST]].
+    cbn in *.
 
-    (* destruct FREE as [ERR | [OOM | RET]]. *)
-    (* - destruct ERR as [err_msg [RUN [err_msg_spec ERR]]]. *)
-    (*   eapply find_free_block_never_err in ERR; inv ERR. *)
-    (* - cbn in *. *)
-    (*   split; auto. *)
-    (*   destruct OOM as [oom_msg [RUN _]]. *)
-    (*   unfold get_free_block in RUN. *)
-    (*   rewrite MemMonad_run_bind in RUN. *)
-    (*   rewrite MemMonad_get_mem_state in RUN. *)
-    (*   rewrite Monad.bind_ret_l in RUN. *)
-    (*   destruct ms as [[mem fs h] pr] eqn:HMS. *)
-    (*   cbn in *. *)
+    pose proof big_intptr_seq_succeeds 0 len as [seq SEQ].
+    rewrite SEQ in REST.
+    cbn in REST.
+    red in REST.
 
-    (*   epose proof (@get_consecutive_ptrs_succeeds *)
-    (*                  MemM *)
-    (*                  MM EQM _ _ _ _ MLAWS *)
-    (*                  (LLVMParamsBigIntptr.ITOP.int_to_ptr *)
-    (*                     (next_memory_key *)
-    (*                        {| *)
-    (*                          MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem; *)
-    (*                          MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs; *)
-    (*                          MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h *)
-    (*                        |}) *)
-    (*                     (LLVMParamsBigIntptr.PROV.allocation_id_to_prov *)
-    (*                        (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id prov))) *)
-    (*                  sz) as (ptrs' & GEP). *)
+    destruct ms; cbn in *.
+    destruct ms_memory_stack0; cbn in *.
 
-    (*   Set Nested Proofs Allowed. *)
-    (*   #[global] Instance MemMonad_eq1_runm_proper : *)
-    (*     forall A, *)
-    (*       Proper (@eq1 _ EQM A ==> eq ==> eq ==> *)
-    (*                    @eq1 (itree Eff) *)
-    (*                    (@MemMonad_eq1_runm ExtraState MemM (itree Eff) MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB *)
-    (*                                        RunOOM EQM EQRI MLAWS H) *)
-    (*                    _) MemMonad_run. *)
-    (*   Proof. *)
+    repeat rewrite bind_ret_l in REST.
+    cbn in REST.
 
-    (*     unfold Proper, respectful. *)
-    (*     intros A x y H0 x0 y0 H1 x1 y1 H2; subst. *)
-    (*   Admitted. *)
+    repeat rewrite bind_ret_l in REST.
+    cbn in REST.
 
-    (*   epose proof MemMonad_eq1_runm_proper. *)
-    (*   specialize (H0 (prod LLVMParamsBigIntptr.ADDR.addr (list LLVMParamsBigIntptr.ADDR.addr))). *)
-    (*   unfold Proper, respectful in H0. *)
+    destruct_err_ub_oom res.
 
-    (*   specialize (H0 *)
-    (*                 (ptrs <- (@MemSpec.MemHelpers.get_consecutive_ptrs *)
-    (*                            MemM MM MOOM MERR *)
-    (*                            (LLVMParamsBigIntptr.ITOP.int_to_ptr *)
-    (*                               (next_memory_key *)
-    (*                                  {| *)
-    (*                                    MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem; *)
-    (*                                    MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs; *)
-    (*                                    MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h *)
-    (*                                  |}) *)
-    (*                               (LLVMParamsBigIntptr.PROV.allocation_id_to_prov *)
-    (*                                  (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id prov))) sz);; *)
-    (*                  ret *)
-    (*                    (LLVMParamsBigIntptr.ITOP.int_to_ptr *)
-    (*                       (next_memory_key *)
-    (*                          {| *)
-    (*                            MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem; *)
-    (*                            MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs; *)
-    (*                            MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h *)
-    (*                          |}) *)
-    (*                       (LLVMParamsBigIntptr.PROV.allocation_id_to_prov *)
-    (*                          (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id prov)), ptrs)) *)
+    { (* OOM *)
+      exfalso.
+      cbn in *.
+      destruct IN as [oom_msg TPTRS].
+      rewrite TPTRS in REST.
+      setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_OOM _)) in REST.
 
-    (*                 (ret *)
-    (*                    (LLVMParamsBigIntptr.ITOP.int_to_ptr *)
-    (*                       (next_memory_key *)
-    (*                          {| *)
-    (*                            MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem; *)
-    (*                            MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs; *)
-    (*                            MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h *)
-    (*                          |}) *)
-    (*                       (LLVMParamsBigIntptr.PROV.allocation_id_to_prov *)
-    (*                          (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id prov)), ptrs')) *)
-    (*              ). *)
-    (*   forward H0. *)
-    (*   { admit. *)
-    (*   } *)
+      destruct (map_monad
+                  (fun ix : LLVMParamsBigIntptr.IP.intptr =>
+                     GEP.handle_gep_addr (DTYPE_I 8)
+                       (LLVMParamsBigIntptr.ITOP.int_to_ptr
+                          (next_memory_key
+                             {|
+                               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory :=
+                                 memory_stack_memory0;
+                               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack :=
+                                 memory_stack_frame_stack0;
+                               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap :=
+                                 memory_stack_heap0
+                             |})
+                          (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
+                             (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id pr)))
+                       [LLVMParamsBigIntptr.Events.DV.DVALUE_IPTR ix]) seq) eqn:HMAPM.
 
-    (*   specialize (H0 {| *)
-    (*                   MemoryBigIntptrInfiniteSpec.MMSP.ms_memory_stack := *)
-    (*                   {| *)
-    (*                     MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem; *)
-    (*                     MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs; *)
-    (*                     MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h *)
-    (*                   |}; *)
-    (*                   MemoryBigIntptrInfiniteSpec.MMSP.ms_provenance := pr *)
-    (*                 |} *)
-    (*                  {| *)
-    (*                    MemoryBigIntptrInfiniteSpec.MMSP.ms_memory_stack := *)
-    (*                    {| *)
-    (*                      MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem; *)
-    (*                      MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs; *)
-    (*                      MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h *)
-    (*                    |}; *)
-    (*                    MemoryBigIntptrInfiniteSpec.MMSP.ms_provenance := pr *)
-    (*                  |} *)
-    (*                  eq_refl). *)
-    (*   specialize (H0 st st eq_refl). *)
+      { (* Error, should be contradiction *)
+        cbn in REST.
+        repeat setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_Fail _)) in REST.
+        unfold raiseOOM in REST.
+        unfold LLVMEvents.raise in REST.
+        admit.
+      }
 
-    (*   rewrite H0 in RUN. *)
-    (*   clear H0. *)
-    (*   rewrite MemMonad_run_ret in RUN. *)
+      cbn in REST.
+      setoid_rewrite bind_ret_l in REST.
+      rewrite map_ret in REST.
+      cbn in REST.
+      symmetry in REST.
+      apply raiseOOM_ret_inv_itree in REST.
+      auto.
+    }
 
-    (*   cbn in RUN. *)
-    (*   apply MemMonad_eq1_raise_oom_inv in RUN. *)
-    (*   contradiction. *)
-    (* - destruct RET as [st' [ms' [[ptr' ptrs'] [RUN [FREE VALID]]]]]. *)
-    (*   cbn in *. *)
-    (*   destruct FREE as [MEMEQ FREE]. *)
-    (*   subst. *)
-    (*   split; [tauto|]. *)
+    { (* UB *)
+      cbn in *.
+      contradiction.
+    }
 
-    (*   unfold get_free_block in *. *)
-    (*   rewrite MemMonad_run_bind in RUN. *)
-    (*   rewrite MemMonad_get_mem_state in RUN. *)
-    (*   rewrite Monad.bind_ret_l in RUN. *)
+    { (* Error *)
+      cbn in *.
+      contradiction.
+    }
 
-    (*   destruct ms' as [[mem fs h] pr] eqn:HMS. *)
+    { (* Success *)
+      cbn in *.
+      destruct res0 as [ptr ptrs].
+      exists ptr. exists ptrs.
+      rewrite IN in REST.
 
-    (*   epose proof (@get_consecutive_ptrs_succeeds *)
-    (*                  MemM *)
-    (*                  MM EQM _ _ _ _ MLAWS *)
-    (*                  (LLVMParamsBigIntptr.ITOP.int_to_ptr *)
-    (*                     (next_memory_key *)
-    (*                        {| *)
-    (*                          MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem; *)
-    (*                          MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs; *)
-    (*                          MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h *)
-    (*                        |}) *)
-    (*                     (LLVMParamsBigIntptr.PROV.allocation_id_to_prov *)
-    (*                        (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id prov))) *)
-    (*                  sz) as (ptrs_gep & GEP). *)
+      destruct (map_monad
+                  (fun ix : LLVMParamsBigIntptr.IP.intptr =>
+                     GEP.handle_gep_addr (DTYPE_I 8)
+                       (LLVMParamsBigIntptr.ITOP.int_to_ptr
+                          (next_memory_key
+                             {|
+                               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory :=
+                                 memory_stack_memory0;
+                               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack :=
+                                 memory_stack_frame_stack0;
+                               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap :=
+                                 memory_stack_heap0
+                             |})
+                          (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
+                             (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id pr)))
+                       [LLVMParamsBigIntptr.Events.DV.DVALUE_IPTR ix]) seq) eqn:HMAPM.
+
+      { (* Error, should be contradiction *)
+        cbn in REST.
+        repeat setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_Fail _)) in REST.
+        unfold raiseOOM in REST.
+        unfold LLVMEvents.raise in REST.
+        exfalso.
+        admit.
+      }
+
+      tauto.
+    }
   Admitted.
 
   Lemma allocate_bytes_post_conditions_can_always_be_satisfied :
