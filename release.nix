@@ -78,11 +78,13 @@
 
       buildPhase = ''
   make -C src/
+  make -C src/ frontend
   '';
 
       installPhase = ''
   mkdir -p $out/bin
   install src/vellvm $out/bin/vellvm
+  install src/frontend $out/bin/frontend
   '';
 
       meta = {
