@@ -751,8 +751,8 @@ df_args:
 
 
 df_arg:
- | t=typ p=param_attr*                { ((t, p), None)   }  (* Later generate anonymous label *)
- | t=typ p=param_attr* l=bound_lident { ((t, p), Some l) }  (* Later validate anonymous or use name *)
+ | t=typ EOL* p=param_attr*                { ((t, p), None)   }  (* Later generate anonymous label *)
+ | t=typ EOL * p=param_attr* l=bound_lident { ((t, p), Some l) }  (* Later validate anonymous or use name *)
 
 %inline
 definition:
@@ -1391,12 +1391,15 @@ exp:
   | eo=expr_op { fun _ -> eo }
   | ev=expr_val { ev }
 
+%inline call_metadata:
+  | csep md=global_metadata { md }
+
 %inline instr:
   | eo=instr_op { INSTR_Op eo }
 
   | t=tailcall? KW_CALL fm=list(fast_math) cc=cconv? ra=list(param_attr) addr=addrspace?
     f=texp  a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
-    fa=list(fn_attr)  (* TODO: operand bundles? *)
+    fa=list(fn_attr) md=call_metadata? (* TODO: operand bundles? *)
     { let atts =
 	(opt_list t)
 	@ (List.map (fun f -> ANN_fast_math_flag f) fm)
@@ -1404,6 +1407,7 @@ exp:
         @ (List.map (fun r -> ANN_ret_attribute r) ra)
         @ (opt_list addr)
         @ (List.map (fun f -> ANN_fun_attribute f) fa)
+(*      @ (opt_list md) TODO: record metadata *)
       in
       INSTR_Call (f, a, atts) }
 

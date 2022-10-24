@@ -405,7 +405,7 @@ rule token = parse
            | ParseUtil.Named id ->
 	   (if id.[0] = '"' && id.[String.length id - 1] = '"'
                then METADATA_STRING (String.sub id 1 (String.length id - 2))
-               else metadata id)
+               else (metadata id))
 
 	   | ParseUtil.Anonymous n -> METADATA_ID (Anon (coq_of_int n))
 	   end
@@ -415,8 +415,8 @@ rule token = parse
 
   (* constants *)
   | ('-'? digit+) as d            { INTEGER (coq_of_int64 (Int64.of_string d)) }
-  | ('-'? digit* '.' digit+) as d { FLOAT d }
-  | ('-'? digit ('.' digit+)? 'e' ('+'|'-') digit+) as d { FLOAT d }
+  | ('-'? digit* '.' digit*) as d { FLOAT d }
+  | ('-'? digit ('.' digit*)? 'e' ('+'|'-') digit+) as d { FLOAT d }
   | ('0''x' hexdigit+) as d     { HEXCONSTANT (coqfloat_of_float (Int64.float_of_bits (Int64.of_string d))) }
   | '"'                         { STRING (string (Buffer.create 10) lexbuf) }
 

@@ -43,7 +43,7 @@ define i32 @tgt() noinline {
   ret i32 %ret
 }
 
-declare void @bar(%struct1* sret)
+declare void @bar(%struct1* sret(%struct1*))
 
 ; Assertions below this point were automatically generated
 

@@ -171,6 +171,7 @@ $(EXTRACTDIR)/FRONTEND_STAMP: $(FRONTEND_VOFILES) $(EXTRACTDIR)/ExtractFrontend.
 	patch -p0 < CRelationClasses.mli.patch
 	touch $(EXTRACTDIR)/FRONTEND_STAMP
 
+.PHONY: $(FRONTEND_EXE)
 $(FRONTEND_EXE): $(EXTRACTDIR)/FRONTEND_STAMP ml/dune ml/extracted/dune ml/testing/dune ml/frontend.ml ml/IO.ml
 	@echo "Compiling Vellvm (Frontend Only)"
 	dune build ml/frontend.exe

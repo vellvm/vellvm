@@ -937,7 +937,10 @@ tes on cstring on LLVMAst.v *)
 
   Definition show_arg (arg : local_id * T * list param_attr) : string
     := let '(i, t, parameter_attributes) := arg in
-       show t ++ concat " " (map (fun x => show x) (parameter_attributes)) ++ " %" ++ show i.
+       show t ++ (match parameter_attributes with
+                  | [] => ""
+                  | _ => " " ++ concat " " (map (fun x => show x) (parameter_attributes))
+                  end) ++ " %" ++ show i.
 
   Definition show_arg_list (args : list (local_id * T * list param_attr)) (varargs:bool) : string
     :=
