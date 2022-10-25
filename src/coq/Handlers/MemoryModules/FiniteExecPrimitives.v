@@ -4956,16 +4956,16 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       - admit. (* MemMonad_valid_state *)
     Admitted.
 
-    Lemma allocate_bytes_correct :
-      forall dt init_bytes pre, exec_correct pre (allocate_bytes dt init_bytes) (allocate_bytes_spec_MemPropT dt init_bytes).
+    Parameter allocate_bytes_with_pr_correct :
+      forall dt init_bytes pr pre, exec_correct pre (allocate_bytes_with_pr dt init_bytes pr) (allocate_bytes_with_pr_spec_MemPropT dt init_bytes pr).
+
+    Lemma allocater_bytes_with_pr_correct :
+      forall dt init_bytes pr pre, exec_correct pre (allocate_bytes_with_pr dt init_bytes pr) (allocate_bytes_with_pr_spec_MemPropT dt init_bytes pr).
     Proof.
       Opaque exec_correct.
-      intros dt init_bytes pre.
+      intros dt init_bytes pr pre.
 
-      unfold allocate_bytes, allocate_bytes_spec_MemPropT.
-      apply exec_correct_bind; eauto with EXEC_CORRECT.
-      intros pr ms ms_fresh_pr st st' FRESH_EXEC.
-
+      unfold allocate_bytes_with_pr, allocate_bytes_with_pr_spec_MemPropT.
       apply exec_correct_bind; eauto with EXEC_CORRECT.
       intros [ptr ptrs] ms' ms_find_free st'' st_find_free GET_FREE.
 
@@ -5093,15 +5093,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Qed.
 
     (** Malloc correctness *)
-    Lemma malloc_bytes_correct :
-      forall init_bytes pre, exec_correct pre (malloc_bytes init_bytes) (malloc_bytes_spec_MemPropT init_bytes).
+    Lemma malloc_bytes_with_pr_correct :
+      forall init_bytes pr pre, exec_correct pre (malloc_bytes_with_pr init_bytes pr) (malloc_bytes_with_pr_spec_MemPropT init_bytes pr).
     Proof.
-      intros init_bytes pre.
+      intros init_bytes pr pre.
 
-      unfold malloc_bytes.
-      apply exec_correct_bind; eauto with EXEC_CORRECT.
-      intros pr ms ms_fresh_pr st st' FRESH_EXEC.
-
+      unfold malloc_bytes_with_pr.
       apply exec_correct_bind; eauto with EXEC_CORRECT.
       intros [ptr ptrs] ms' ms_find_free st'' st_find_free GET_FREE.
 

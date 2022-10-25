@@ -363,11 +363,230 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
 
   Lemma allocate_bytes_post_conditions_can_always_be_satisfied :
     forall (ms_init : MemState) dt bytes pr ptr ptrs
-      (FIND_FREE : find_free_block (length bytes) pr ms_init (ret (ms_init, (ptr, ptrs))))
+      (FIND_FREE : ret (ptr, ptrs) {{ms_init}} ∈ {{ms_init}} find_free_block (length bytes) pr)
       (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length bytes))
       (NON_VOID : dt <> DTYPE_Void),
     exists ms_final,
       allocate_bytes_post_conditions ms_init dt bytes pr ms_final ptr ptrs.
+  Proof.
+    intros ms_init dt bytes pr ptr ptrs FIND_FREE BYTES_SIZE NON_VOID.
+
+    (* Memory state pre allocation *)
+    destruct ms_init as [mstack mprov] eqn:MSINIT.
+    destruct mstack as [mem fs h] eqn:MSTACK.
+
+    (* May make sense to look at these:
+       - allocate_bytes_correct
+       - allocate_bytes
+     *)
+
+
+    pose proof (allocate_bytes_correct dt bytes (fun _ _ => True) (Eff := Eff) (MemM:=MemStateFreshT (itree Eff))) as ALLOC.
+    red in ALLOC.
+    specialize (ALLOC ms_init 0%N).
+    forward ALLOC.
+    { (* TODO:
+
+         May not be true, but should be able to find an st where it is
+         true... At least when `ms` is finite. *)
+      admit.
+    }
+
+    specialize (ALLOC I).
+
+    destruct ALLOC as [UB | ALLOC].
+
+    { (* UB *)
+      cbn in UB.
+      destruct UB as [ub_ms [ub_msg [CONTRA | REST]]]; try contradiction.
+      destruct REST as [ms' [a [FRESH_PR REST]]].
+      destruct REST as [CONTRA | REST]; try contradiction.
+      destruct REST as [ms'' [[ptr' ptrs'] [[MEQ FREE] [[VOID_UB | SIZE_UB] | REST]]]];
+        firstorder.
+    }
+
+    (* allocate_bytes doesn't necessarily UB *)
+    destruct ALLOC as [res [st' [ms' [ALLOC_EXEC [ALLOC_SPEC POST_ALLOC]]]]].
+
+    cbn in ALLOC_EXEC.
+    red in ALLOC_EXEC.
+    destruct ALLOC_EXEC as [t_alloc [RES_T_ALLOC ALLOC_EXEC]].
+
+    repeat setoid_rewrite bind_ret_l in ALLOC_EXEC.
+    cbn in ALLOC_EXEC.
+    red in ALLOC_EXEC.
+
+    destruct (mem_state_fresh_provenance ms_init) as [p_fresh ms_fresh] eqn:FRESH_PR.
+    repeat setoid_rewrite bind_ret_l in ALLOC_EXEC.
+    cbn in ALLOC_EXEC.
+
+    pose proof big_intptr_seq_succeeds 0 (Datatypes.length bytes) as [seq SEQ].
+    rewrite SEQ in ALLOC_EXEC.
+    cbn in ALLOC_EXEC.
+
+    (* Memory state fresh provenance *)
+    destruct ms_fresh as [mstack_fresh mprov_fresh] eqn:MSFRESH.
+    destruct mstack_fresh as [mem_fresh fs_fresh h_fresh] eqn:MSTACK_FRESH.
+
+    cbn in ALLOC_EXEC.
+    repeat setoid_rewrite bind_ret_l in ALLOC_EXEC.
+    cbn in ALLOC_EXEC.
+
+    destruct (map_monad
+       (fun ix : IP.intptr =>
+          GEP.handle_gep_addr (DTYPE_I 8)
+            (ITOP.int_to_ptr
+               (next_memory_key
+                  {|
+                    MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory :=
+                      mem_fresh;
+                    MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack :=
+                      fs_fresh;
+                    MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h_fresh
+                  |})
+               (allocation_id_to_prov (provenance_to_allocation_id p_fresh)))
+            [Events.DV.DVALUE_IPTR ix]) seq) eqn:HMAPM.
+
+    { (* Error *)
+      cbn in ALLOC_EXEC.
+      repeat setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_Fail _)) in ALLOC_EXEC.
+
+      destruct_err_ub_oom res.
+      - (* OOM *)
+        cbn in RES_T_ALLOC.
+        destruct RES_T_ALLOC as [oom_msg RES_T_ALLOC].
+        rewrite RES_T_ALLOC in ALLOC_EXEC.
+        setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_OOM _)) in ALLOC_EXEC.
+        (* TODO: Contradiction in ALLOC_EXEC *)
+        admit.
+      - (* UB *)
+        cbn in RES_T_ALLOC.
+        destruct RES_T_ALLOC as [ub_msg RES_T_ALLOC].
+        rewrite RES_T_ALLOC in ALLOC_EXEC.
+        setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_UB _)) in ALLOC_EXEC.
+        (* TODO: Contradiction in ALLOC_EXEC *)
+        admit.
+      - (* Error *)
+        exfalso.
+        clear - ALLOC_SPEC.
+        cbn in ALLOC_SPEC.
+        destruct ALLOC_SPEC as [UB | REST]; [contradiction|].
+        destruct REST as [ms'' [a [FRESH_PR' REST]]].
+        destruct REST as [CONTRA | REST]; [contradiction|].
+        destruct REST as [ms''' [[ptr' ptrs'] [[MEQ FREE] [UB | REST]]]];
+          firstorder.
+      - (* Success *)
+        cbn in RES_T_ALLOC.
+        rewrite RES_T_ALLOC in ALLOC_EXEC.
+        rewrite bind_ret_l in ALLOC_EXEC.
+        eapply raise_ret_inv_itree in ALLOC_EXEC.
+        contradiction.
+    }
+
+    { (* Success *)
+      repeat setoid_rewrite bind_ret_l in ALLOC_EXEC.
+      cbn in ALLOC_EXEC.
+      repeat setoid_rewrite bind_ret_l in ALLOC_EXEC.
+      break_match_hyp; [contradiction|].
+      break_match_hyp; [|contradiction].
+      repeat rewrite bind_ret_l in ALLOC_EXEC.
+      cbn in ALLOC_EXEC.
+      repeat rewrite bind_ret_l in ALLOC_EXEC.
+      cbn in ALLOC_EXEC.
+
+      rewrite map_ret in ALLOC_EXEC.
+
+      destruct_err_ub_oom res.
+      - (* OOM *)
+        cbn in RES_T_ALLOC.
+        destruct RES_T_ALLOC as [oom_msg RES_T_ALLOC].
+        rewrite RES_T_ALLOC in ALLOC_EXEC.
+        setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_OOM _)) in ALLOC_EXEC.
+        symmetry in ALLOC_EXEC.
+        eapply raiseOOM_ret_inv_itree in ALLOC_EXEC; contradiction.
+      - (* UB *)
+        cbn in RES_T_ALLOC.
+        destruct RES_T_ALLOC as [ub_msg RES_T_ALLOC].
+        rewrite RES_T_ALLOC in ALLOC_EXEC.
+        setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_UB _)) in ALLOC_EXEC.
+        symmetry in ALLOC_EXEC.
+        eapply raiseUB_ret_inv_itree in ALLOC_EXEC; contradiction.
+      - (* Error *)
+        exfalso.
+        clear - ALLOC_SPEC.
+        cbn in ALLOC_SPEC.
+        destruct ALLOC_SPEC as [UB | REST]; [contradiction|].
+        destruct REST as [ms'' [a [FRESH_PR' REST]]].
+        destruct REST as [CONTRA | REST]; [contradiction|].
+        destruct REST as [ms''' [[ptr' ptrs'] [[MEQ FREE] [UB | REST]]]];
+          firstorder.
+      - (* Success *)
+        cbn in RES_T_ALLOC.
+        rewrite RES_T_ALLOC in ALLOC_EXEC.
+        rewrite bind_ret_l in ALLOC_EXEC.
+
+        epose proof (@eq1_ret_ret (itree Eff) _ _ _ _ _ _ ALLOC_EXEC) as RETINV.
+        inv RETINV.
+
+        cbn in ALLOC_SPEC.
+        exists
+          {|
+            MemoryBigIntptrInfiniteSpec.MMSP.ms_memory_stack :=
+              add_all_to_frame
+                {|
+                  MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory :=
+                    add_all_index
+                      (map (fun b : SByte => (b, provenance_to_allocation_id p_fresh)) bytes)
+                      (PTOI.ptr_to_int
+                         (ITOP.int_to_ptr
+                            (next_memory_key
+                               {|
+                                 MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory :=
+                                   mem_fresh;
+                                 MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack :=
+                                   fs_fresh;
+                                 MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h_fresh
+                               |})
+                            (allocation_id_to_prov (provenance_to_allocation_id p_fresh))))
+                      mem_fresh;
+                  MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs_fresh;
+                  MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h_fresh
+                |} (map PTOI.ptr_to_int l);
+            MemoryBigIntptrInfiniteSpec.MMSP.ms_provenance := mprov_fresh
+          |}.
+
+        cbn in ALLOC_SPEC.
+        destruct ALLOC_SPEC as [ms_fresh' [pr' [FRESH_SPEC ALLOC_SPEC]]].
+        destruct ALLOC_SPEC as [ms_fresh'' [[ptr'' ptrs''] [[MEQ FREE] ALLOC_SPEC]]].
+        subst ms_fresh''.
+        destruct ALLOC_SPEC as [ms_final' [[ptr''' ptrs'''] [[BYTE_POSTS [PEQ PSEQ]] ALLOC_SPEC]]].
+        subst.
+        destruct ALLOC_SPEC as [MEQ PEQ].
+        subst.
+        destruct BYTE_POSTS.
+        cbn in FIND_FREE.
+        destruct FIND_FREE as [_ BLOCK_FREE].
+        clear RES_T_ALLOC n e.
+        destruct FRESH_SPEC as [EXTEND_PR [RB_PRES [WBA_PRES [FBA_PRES [ALLOC_PRES [FS_PRES H_PRES]]]]]].
+        destruct EXTEND_PR as [OLD_PR NEW_PR].
+        split; eauto; try tauto.
+        + intros pr'0.
+          unfold used_provenance_prop in *.
+          cbn in *.
+          inv FRESH_PR.
+          clear - OLD_PR NEW_PR allocate_bytes_provenances_preserved0.
+          destruct NEW_PR as [UNUSED_PR' NEW_PR'].
+          split; intros PROV; firstorder.
+          assert (pr'0 = next_provenance mprov) by admit.
+          subst.
+          admit.
+        + admit.
+        + admit.
+        + admit.
+        + admit.
+        + admit.
+        + admit.
+    }
   Admitted.
 
   Section MemoryPrimitives.
