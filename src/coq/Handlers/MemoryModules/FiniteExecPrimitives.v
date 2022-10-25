@@ -1882,8 +1882,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       add_block aid ptr ptrs init_bytes;;
       add_ptrs_to_heap ptrs.
 
-    Definition allocate_bytes `{MemMonad ExtraState MemM (itree Eff)} (dt : dtyp) (init_bytes : list SByte) : MemM addr :=
-      pr <- fresh_provenance;;
+    Definition allocate_bytes_with_pr `{MemMonad ExtraState MemM (itree Eff)} (dt : dtyp) (init_bytes : list SByte) (pr : Provenance) : MemM addr :=
       let len := length init_bytes in
       '(ptr, ptrs) <- get_free_block len pr;;
       match dtyp_eq_dec dt DTYPE_Void with
@@ -1898,14 +1897,21 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           end
       end.
 
-    (** Heap allocation *)
-    Definition malloc_bytes `{MemMonad ExtraState MemM (itree Eff)} (init_bytes : list SByte) : MemM addr :=
+    Definition allocate_bytes `{MemMonad ExtraState MemM (itree Eff)} (dt : dtyp) (init_bytes : list SByte) : MemM addr :=
       pr <- fresh_provenance;;
+      allocate_bytes_with_pr dt init_bytes pr.
+
+    (** Heap allocation *)
+    Definition malloc_bytes_with_pr `{MemMonad ExtraState MemM (itree Eff)} (init_bytes : list SByte) (pr : Provenance) : MemM addr :=
       let len := length init_bytes in
       '(ptr, ptrs) <- get_free_block len pr;;
       let aid := provenance_to_allocation_id pr in
       add_block_to_heap aid ptr ptrs init_bytes;;
       ret ptr.
+
+    Definition malloc_bytes `{MemMonad ExtraState MemM (itree Eff)} (init_bytes : list SByte) : MemM addr :=
+      pr <- fresh_provenance;;
+      malloc_bytes_with_pr init_bytes pr.
 
     (** Frame stacks *)
     (* Check if an address is allocated in a frame *)
