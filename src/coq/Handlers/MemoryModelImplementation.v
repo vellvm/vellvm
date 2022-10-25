@@ -375,13 +375,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     destruct ms_init as [mstack mprov] eqn:MSINIT.
     destruct mstack as [mem fs h] eqn:MSTACK.
 
-    (* May make sense to look at these:
-       - allocate_bytes_correct
-       - allocate_bytes
-     *)
-
-
-    pose proof (allocate_bytes_correct dt bytes (fun _ _ => True) (Eff := Eff) (MemM:=MemStateFreshT (itree Eff))) as ALLOC.
+    pose proof (allocate_bytes_with_pr_correct dt bytes pr (fun _ _ => True) (Eff := Eff) (MemM:=MemStateFreshT (itree Eff))) as ALLOC.
     red in ALLOC.
     specialize (ALLOC ms_init 0%N).
     forward ALLOC.
@@ -399,8 +393,6 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     { (* UB *)
       cbn in UB.
       destruct UB as [ub_ms [ub_msg [CONTRA | REST]]]; try contradiction.
-      destruct REST as [ms' [a [FRESH_PR REST]]].
-      destruct REST as [CONTRA | REST]; try contradiction.
       destruct REST as [ms'' [[ptr' ptrs'] [[MEQ FREE] [[VOID_UB | SIZE_UB] | REST]]]];
         firstorder.
     }
@@ -416,7 +408,6 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     cbn in ALLOC_EXEC.
     red in ALLOC_EXEC.
 
-    destruct (mem_state_fresh_provenance ms_init) as [p_fresh ms_fresh] eqn:FRESH_PR.
     repeat setoid_rewrite bind_ret_l in ALLOC_EXEC.
     cbn in ALLOC_EXEC.
 
@@ -424,28 +415,26 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     rewrite SEQ in ALLOC_EXEC.
     cbn in ALLOC_EXEC.
 
-    (* Memory state fresh provenance *)
-    destruct ms_fresh as [mstack_fresh mprov_fresh] eqn:MSFRESH.
-    destruct mstack_fresh as [mem_fresh fs_fresh h_fresh] eqn:MSTACK_FRESH.
+    repeat setoid_rewrite bind_ret_l in ALLOC_EXEC.
+    cbn in ALLOC_EXEC.
 
+    rewrite MSINIT in ALLOC_EXEC.
     cbn in ALLOC_EXEC.
     repeat setoid_rewrite bind_ret_l in ALLOC_EXEC.
     cbn in ALLOC_EXEC.
 
     destruct (map_monad
-       (fun ix : IP.intptr =>
-          GEP.handle_gep_addr (DTYPE_I 8)
-            (ITOP.int_to_ptr
-               (next_memory_key
-                  {|
-                    MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory :=
-                      mem_fresh;
-                    MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack :=
-                      fs_fresh;
-                    MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h_fresh
-                  |})
-               (allocation_id_to_prov (provenance_to_allocation_id p_fresh)))
-            [Events.DV.DVALUE_IPTR ix]) seq) eqn:HMAPM.
+                (fun ix : IP.intptr =>
+                   GEP.handle_gep_addr (DTYPE_I 8)
+                     (ITOP.int_to_ptr
+                        (next_memory_key
+                           {|
+                             MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
+                             MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack :=
+                               fs;
+                             MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
+                           |}) (allocation_id_to_prov (provenance_to_allocation_id pr)))
+                     [Events.DV.DVALUE_IPTR ix]) seq) eqn:HMAPM.
 
     { (* Error *)
       cbn in ALLOC_EXEC.
@@ -471,8 +460,6 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
         clear - ALLOC_SPEC.
         cbn in ALLOC_SPEC.
         destruct ALLOC_SPEC as [UB | REST]; [contradiction|].
-        destruct REST as [ms'' [a [FRESH_PR' REST]]].
-        destruct REST as [CONTRA | REST]; [contradiction|].
         destruct REST as [ms''' [[ptr' ptrs'] [[MEQ FREE] [UB | REST]]]];
           firstorder.
       - (* Success *)
@@ -516,8 +503,6 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
         clear - ALLOC_SPEC.
         cbn in ALLOC_SPEC.
         destruct ALLOC_SPEC as [UB | REST]; [contradiction|].
-        destruct REST as [ms'' [a [FRESH_PR' REST]]].
-        destruct REST as [CONTRA | REST]; [contradiction|].
         destruct REST as [ms''' [[ptr' ptrs'] [[MEQ FREE] [UB | REST]]]];
           firstorder.
       - (* Success *)
@@ -529,58 +514,41 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
         inv RETINV.
 
         cbn in ALLOC_SPEC.
-        exists
-          {|
+        exists {|
             MemoryBigIntptrInfiniteSpec.MMSP.ms_memory_stack :=
               add_all_to_frame
                 {|
                   MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory :=
                     add_all_index
-                      (map (fun b : SByte => (b, provenance_to_allocation_id p_fresh)) bytes)
+                      (map (fun b : SByte => (b, provenance_to_allocation_id pr)) bytes)
                       (PTOI.ptr_to_int
                          (ITOP.int_to_ptr
                             (next_memory_key
                                {|
-                                 MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory :=
-                                   mem_fresh;
+                                 MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
                                  MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack :=
-                                   fs_fresh;
-                                 MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h_fresh
-                               |})
-                            (allocation_id_to_prov (provenance_to_allocation_id p_fresh))))
-                      mem_fresh;
-                  MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs_fresh;
-                  MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h_fresh
+                                   fs;
+                                 MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
+                               |}) (allocation_id_to_prov (provenance_to_allocation_id pr))))
+                      mem;
+                  MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs;
+                  MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
                 |} (map PTOI.ptr_to_int l);
-            MemoryBigIntptrInfiniteSpec.MMSP.ms_provenance := mprov_fresh
+            MemoryBigIntptrInfiniteSpec.MMSP.ms_provenance := mprov
           |}.
 
         cbn in ALLOC_SPEC.
-        destruct ALLOC_SPEC as [ms_fresh' [pr' [FRESH_SPEC ALLOC_SPEC]]].
-        destruct ALLOC_SPEC as [ms_fresh'' [[ptr'' ptrs''] [[MEQ FREE] ALLOC_SPEC]]].
-        subst ms_fresh''.
-        destruct ALLOC_SPEC as [ms_final' [[ptr''' ptrs'''] [[BYTE_POSTS [PEQ PSEQ]] ALLOC_SPEC]]].
+        destruct ALLOC_SPEC as [ms_final' [[ptr'' ptrs''] [[MEQ BLOCK_FREE_SPEC] ALLOC_SPEC]]].
+        subst ms_final'.
+        destruct ALLOC_SPEC as [ms_final' [[ptr''' ptrs'''] [[BYTES_POST [PTREQ PTRSEQ]] [MEQ ALLOC_SPEC]]]].
+        subst ms_final' ptr'' ptr''' ptrs'''.
+
         subst.
-        destruct ALLOC_SPEC as [MEQ PEQ].
-        subst.
-        destruct BYTE_POSTS.
+        destruct BYTES_POST.
         cbn in FIND_FREE.
         destruct FIND_FREE as [_ BLOCK_FREE].
         clear RES_T_ALLOC n e.
-        destruct FRESH_SPEC as [EXTEND_PR [RB_PRES [WBA_PRES [FBA_PRES [ALLOC_PRES [FS_PRES H_PRES]]]]]].
-        destruct EXTEND_PR as [OLD_PR NEW_PR].
-        split; eauto; try tauto.
-        + intros pr'0.
-          unfold used_provenance_prop in *.
-          cbn in *.
-          inv FRESH_PR.
-          clear - OLD_PR NEW_PR allocate_bytes_provenances_preserved0.
-          destruct NEW_PR as [UNUSED_PR' NEW_PR'].
-          split; intros PROV; firstorder.
-          assert (pr'0 = next_provenance mprov) by admit.
-          subst.
-          admit.
-        + admit.
+        split; eauto.
         + admit.
         + admit.
         + admit.
