@@ -4516,25 +4516,29 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Import Monad.
 
     Lemma exec_correct_re_sid_ubytes_helper :
-      forall bytes pre,
+      forall bytes pre nm,
         exec_correct pre
-                     (re_sid_ubytes_helper bytes (NM.empty MP.BYTE_IMPL.SByte))
-                     (re_sid_ubytes_helper bytes (NM.empty MP.BYTE_IMPL.SByte)).
+                     (re_sid_ubytes_helper bytes nm)
+                     (re_sid_ubytes_helper bytes nm).
     Proof.
-      induction bytes; intros pre.
+      intros bytes.
+      induction bytes using length_strong_ind; intros pre nm.
       - apply exec_correct_ret.
       - repeat rewrite re_sid_ubytes_helper_equation.
-        break_match; auto with EXEC_CORRECT.
-        break_match; auto with EXEC_CORRECT.
-        break_match; auto with EXEC_CORRECT.
+        break_match_goal; auto with EXEC_CORRECT.
+        break_match_goal; auto with EXEC_CORRECT.
+        break_match_goal; auto with EXEC_CORRECT.
+        break_match_goal; auto with EXEC_CORRECT.
         apply exec_correct_bind; auto with EXEC_CORRECT.
         intros a0.
-    (* Fiddly reasoning because it's not structural... we update
-           all of the sids that match the current one at once, and
-           then recursively call the function on the unmatched
-           bytes...
-     *)
-    Admitted.
+        intros ms_init ms_after_m st_init st_after_m RUN_FRESH_SID.
+        apply H.
+        subst.
+
+        cbn in H0.
+        apply filter_split_out_length in Heqp1.
+        lia.
+    Qed.
 
     Hint Resolve exec_correct_re_sid_ubytes_helper : EXEC_CORRECT.
 
