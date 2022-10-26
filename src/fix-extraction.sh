@@ -6,7 +6,7 @@ FILENAMES=("InterpretationStack.ml" "InterpretationStack.mli" "TopLevel.ml" "Top
 MEMORYFILES=("MemoryModelImplementation.mli")
 
 function replace () {
-    perl -i.bak -pgne "$1" $EXTRACT_DIR/$2
+    perl -i.bak -p0777ne "$1" $EXTRACT_DIR/$2
     rm -rf $EXTRACT_DIR/*.bak
 }
 
