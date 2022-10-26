@@ -35,6 +35,24 @@ Section Laws.
   Variable M : Type -> Type.
   Variable B : Type -> Type.
   Variable Pre Post : Type.
+  Context `{EQM : Eq1 M}.
+  Context `{WM : @Within M EQM B Pre Post}.
+
+  Lemma within_fold_exists :
+    forall {A} (pre : Pre) (post : Post) (b : B A) (m : M A),
+      b {{pre}} ∈ {{post}} m ->
+      b ∈ m.
+  Proof.
+    intros A pre post b m W.
+    exists pre. exists post.
+    auto.
+  Qed.
+End Laws.
+
+Section Laws.
+  Variable M : Type -> Type.
+  Variable B : Type -> Type.
+  Variable Pre Post : Type.
   Context `{HM : Monad M}.
   Context `{HMB : Monad B}.
   Context `{EQM : Eq1 M}.
