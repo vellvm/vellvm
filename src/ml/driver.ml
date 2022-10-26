@@ -31,6 +31,7 @@ let print_banner s =
 let parse_tests filename =
   let assertions = ref [] in
   let channel = open_in filename in
+  Assertion.reset_parsing_mode ();  (* Put the parser into "NormalMode" *)
   try
     while true; do
       let line = input_line channel in

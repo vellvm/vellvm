@@ -13,8 +13,9 @@ open Arg
 open Base    
 open Assert
 open Driver
-open InterpretationStack.InterpreterStackBigIntptr.LP.Events
-       
+
+module DV = InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV
+
 (* test harness ------------------------------------------------------------- *)
 exception Ran_tests of bool
 let suite = ref Test.suite
@@ -24,19 +25,32 @@ let exec_tests () =
   Printf.printf "%s\n" (outcome_to_string outcome);
   raise (Ran_tests (successful outcome))
 
-let compare_dvalues_exn dv1 dv2 : unit =
-  if DV.dvalue_eqb dv1 dv2 then () else
-    failwith (Printf.sprintf "dvalues different\ngot:\n\t%s\nexpected:\n\t%s"
+let compare_dvalues_exn dv1 dv2 ans : unit =
+  if DV.dvalue_eqb dv1 dv2 = ans then () else
+    failwith (Printf.sprintf "dvalue comparison for %s failed: \ngot:\n\t%s\nand:\n\t%s"
+                (if ans then "equality" else "inequality")
                 (string_of_dvalue dv1)
                 (string_of_dvalue dv2))
   
 
 let dvalue_eq_assertion name (got : unit -> DV.dvalue) (expected : unit -> DV.dvalue) () =
-  Platform.verb (Printf.sprintf "running ASSERT in %s" name);
+  Platform.verb (Printf.sprintf "running ASSERT in %s\n" name);
   let dv1 = got () in
   let dv2 = expected () in
-  compare_dvalues_exn dv1 dv2
+  compare_dvalues_exn dv1 dv2 true
 
+let compare_tgt_for_poison src tgt : unit =
+  match tgt with
+  | DV.DVALUE_Poison _ ->
+    begin match src with
+      | DV.DVALUE_Poison _ ->
+        failwith ("TargetMorePoisonous: expected src to be non-poison value, but got poison")
+      | _ -> ()
+    end
+  | _ -> failwith (Printf.sprintf "TargetMorePoisonous: expected tgt to be poison but got %s" (string_of_dvalue tgt))
+    
+
+(* TODO: This could be reformated to make it cleaner - move some of it to assertion.ml?. *) 
 let make_test name ll_ast t : string * assertion  =
   let open Format in
 
@@ -80,18 +94,26 @@ let make_test name ll_ast t : string * assertion  =
      let result  = run_to_value dtyp entry args ll_ast in 
      str, (dvalue_eq_assertion name result (fun () -> expected))
          
-  | Assertion.SRCTGTTest (expected_rett, generated_args) ->
+  | Assertion.SRCTGTTest (mode, expected_rett, generated_args) ->
     let (_t_args, v_args) = List.split generated_args in
     let assertion () = 
       let res_tgt = run expected_rett "tgt" v_args ll_ast in
       let res_src = run expected_rett "src" v_args ll_ast in
       begin match res_tgt with
         | Error (UndefinedBehavior _) -> ()  (* If the target is UB then the src can be anything! *)
-        | Error (UninterpretedCall _) -> Platform.verb (Printf.sprintf "src-tgt test %s passed due to uninterpreted call" name)
+        | Error (UninterpretedCall _) -> Platform.verb (Printf.sprintf "  src-tgt test %s passed due to uninterpreted call\n" name)
         | Ok v_tgt ->
           begin match res_src with
-            | Ok v_src -> compare_dvalues_exn v_src v_tgt
-            | Error (UninterpretedCall _) -> Platform.verb (Printf.sprintf "src-tgt test %s passed due to uninterpreted call" name)
+            | Ok v_src ->
+              Assertion.(begin match mode with
+                | NormalEquality -> compare_dvalues_exn v_src v_tgt true
+                | ValueMismatch -> compare_dvalues_exn v_src v_tgt false
+                | TargetMorePoisonous -> compare_tgt_for_poison v_src v_tgt
+                | TargetMoreUndefined -> failwith "todo: TargetMoreUndefined"
+                | SourceMoreDefined -> failwith "todo: SourceMoreDefined"
+                | MismatchInMemory -> failwith "todo: MismatchInMemory"
+              end)
+            | Error (UninterpretedCall _) -> Platform.verb (Printf.sprintf "  src-tgt test %s passed due to uninterpreted call\n" name)
             | Error e -> failwith (Printf.sprintf "src - %s" (Interpreter.string_of_exit_condition e))
           end
         | Error e -> failwith (Printf.sprintf "tgt - %s" (Interpreter.string_of_exit_condition e))
