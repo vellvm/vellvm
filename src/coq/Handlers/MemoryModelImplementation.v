@@ -362,15 +362,16 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Admitted.
 
   Lemma allocate_bytes_post_conditions_can_always_be_satisfied :
-    forall (ms_init : MemState) dt bytes pr ptr ptrs
-      (FIND_FREE : ret (ptr, ptrs) {{ms_init}} ∈ {{ms_init}} find_free_block (length bytes) pr)
+    forall (ms_init : MemState) dt bytes pr
       (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length bytes))
       (NON_VOID : dt <> DTYPE_Void),
-    exists ms_final,
+    exists ms_final ptr ptrs,
+      (ret (ptr, ptrs) {{ms_init}} ∈ {{ms_init}} find_free_block (length bytes) pr) /\
       allocate_bytes_post_conditions ms_init dt bytes pr ms_final ptr ptrs.
   Proof.
-    intros ms_init dt bytes pr ptr ptrs FIND_FREE BYTES_SIZE NON_VOID.
+    intros ms_init dt bytes pr BYTES_SIZE NON_VOID.
 
+    Opaque find_free_block.
     (* Memory state pre allocation *)
     destruct ms_init as [mstack mprov] eqn:MSINIT.
     destruct mstack as [mem fs h] eqn:MSTACK.
@@ -538,22 +539,22 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
           |}.
 
         cbn in ALLOC_SPEC.
-        destruct ALLOC_SPEC as [ms_final' [[ptr'' ptrs''] [[MEQ BLOCK_FREE_SPEC] ALLOC_SPEC]]].
+        destruct ALLOC_SPEC as [ms_final' [[ptr'' ptrs''] [FIND_FREE' ALLOC_SPEC]]].
+        pose proof FIND_FREE' as [MEQ BLOCK_FREE_SPEC].
         subst ms_final'.
         destruct ALLOC_SPEC as [ms_final' [[ptr''' ptrs'''] [[BYTES_POST [PTREQ PTRSEQ]] [MEQ ALLOC_SPEC]]]].
         subst ms_final' ptr'' ptr''' ptrs'''.
 
-        subst.
-        destruct BYTES_POST.
-        cbn in FIND_FREE.
-        destruct FIND_FREE as [_ BLOCK_FREE].
-        clear RES_T_ALLOC n e.
-        split; eauto.
-        + admit.
-        + admit.
-        + admit.
-        + admit.
-        + admit.
+        exists (ITOP.int_to_ptr
+             (next_memory_key
+                {|
+                  MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
+                  MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs;
+                  MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
+                |}) (allocation_id_to_prov (provenance_to_allocation_id pr))).
+        exists ptrs''.
+
+        eauto.
     }
   Admitted.
 

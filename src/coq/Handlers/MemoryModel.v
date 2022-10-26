@@ -5079,11 +5079,11 @@ Module Type MemoryModelInfiniteSpec (LP : LLVMParamsBig) (MP : MemoryParams LP) 
       ret (ptr, ptrs) {{ms}} ∈ {{ms}} find_free_block len pr.
 
   Parameter allocate_bytes_post_conditions_can_always_be_satisfied :
-    forall (ms_init : MemState) dt bytes pr ptr ptrs
-      (FIND_FREE : ret (ptr, ptrs) {{ms_init}} ∈ {{ms_init}} find_free_block (length bytes) pr)
+    forall (ms_init : MemState) dt bytes pr
       (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length bytes))
       (NON_VOID : dt <> DTYPE_Void),
-    exists ms_final,
+    exists ms_final ptr ptrs,
+      (ret (ptr, ptrs) {{ms_init}} ∈ {{ms_init}} find_free_block (length bytes) pr) /\
       allocate_bytes_post_conditions ms_init dt bytes pr ms_final ptr ptrs.
 
 End MemoryModelInfiniteSpec.
@@ -5109,6 +5109,31 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
 
   Import MMIS.
 
+  Lemma allocate_bytes_with_pr_spec_MemPropT_can_always_succeed :
+    forall (ms_init : MemState)
+      dt bytes pr
+      (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length bytes))
+      (NON_VOID : dt <> DTYPE_Void),
+    exists ms_final ptr,
+      ret ptr {{ms_init}} ∈ {{ms_final}} allocate_bytes_with_pr_spec_MemPropT dt bytes pr.
+  Proof.
+    intros ms_init dt bytes pr BYTES_SIZE NON_VOID.
+    unfold allocate_bytes_spec_MemPropT.
+
+    pose proof allocate_bytes_post_conditions_can_always_be_satisfied ms_init dt bytes pr BYTES_SIZE NON_VOID as (ms_final & ptr & ptrs & (_ & BLOCK_FREE) & ALLOC).
+
+    exists ms_final. exists ptr.
+    cbn.
+
+    (* Find free block *)
+    exists ms_init. exists (ptr, ptrs).
+    split; eauto.
+
+    (* Post conditions *)
+    exists ms_final. exists (ptr, ptrs).
+    split; split; auto.
+  Qed.
+
   Lemma allocate_bytes_spec_MemPropT_can_always_succeed :
     forall (ms_init ms_fresh_pr : MemState)
       dt bytes
@@ -5122,24 +5147,11 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
     intros ms_init ms_fresh_pr dt bytes pr FRESH_PR BYTES_SIZE NON_VOID.
     unfold allocate_bytes_spec_MemPropT.
 
-    pose proof find_free_block_can_always_succeed
-         ms_fresh_pr (length bytes) pr as (ptr & ptrs & FIND_FREE_SUCCESS).
-
-    pose proof allocate_bytes_post_conditions_can_always_be_satisfied ms_fresh_pr dt bytes pr ptr ptrs FIND_FREE_SUCCESS BYTES_SIZE NON_VOID as (ms_final & ALLOC).
+    pose proof allocate_bytes_with_pr_spec_MemPropT_can_always_succeed ms_fresh_pr dt bytes pr BYTES_SIZE NON_VOID as (ms_final & ptr & ALLOC).
 
     exists ms_final. exists ptr.
-
-    (* Fresh provenance *)
     exists ms_fresh_pr. exists pr.
     split; auto.
-
-    (* Find free block *)
-    exists ms_fresh_pr. exists (ptr, ptrs).
-    split; eauto.
-
-    (* Post conditions *)
-    exists ms_final. exists (ptr, ptrs).
-    split; split; auto.
   Qed.
 
   (* TODO: should this be here? *)
