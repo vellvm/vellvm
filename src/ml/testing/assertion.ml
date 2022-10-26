@@ -8,7 +8,7 @@ open Llvm_printer
 
 type raw_assertion_string =
   | Eq of { lhs : string ; rhs : string}
-  | Poison' of { fcall: string}
+  | Poison' of { fcall: string }
 
 type test =
   | EQTest of DV.dvalue * DynamicTypes.dtyp * string * DV.uvalue list
@@ -77,6 +77,7 @@ let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV
     end
   | TYPE_Float, EXP_Float f -> DVALUE_Float f
   | TYPE_Double, EXP_Double f -> DVALUE_Double f
+  | TYPE_Double, EXP_Hex f -> DVALUE_Float f
   | TYPE_Array _, EXP_Array elts -> DVALUE_Array (List.map texp_to_dvalue elts)
   | TYPE_Struct _, EXP_Struct elts -> DVALUE_Struct (List.map texp_to_dvalue elts)
   | TYPE_Packed_struct _, EXP_Packed_struct elts -> DVALUE_Packed_struct (List.map texp_to_dvalue elts)

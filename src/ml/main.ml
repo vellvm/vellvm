@@ -24,26 +24,33 @@ let exec_tests () =
   Printf.printf "%s\n" (outcome_to_string outcome);
   raise (Ran_tests (successful outcome))
 
-let dvalue_eq_assertion name (got : unit -> DV.dvalue) (expected : unit -> DV.dvalue) () =
-  Platform.verb (Printf.sprintf "running ASSERT in %s" name);
-  let dv1 = got () in
-  let dv2 = expected () in
+let compare_dvalues_exn dv1 dv2 : unit =
   if DV.dvalue_eqb dv1 dv2 then () else
     failwith (Printf.sprintf "dvalues different\ngot:\n\t%s\nexpected:\n\t%s"
                 (string_of_dvalue dv1)
                 (string_of_dvalue dv2))
+  
 
+let dvalue_eq_assertion name (got : unit -> DV.dvalue) (expected : unit -> DV.dvalue) () =
+  Platform.verb (Printf.sprintf "running ASSERT in %s" name);
+  let dv1 = got () in
+  let dv2 = expected () in
+  compare_dvalues_exn dv1 dv2
 
 let make_test name ll_ast t : string * assertion  =
   let open Format in
 
-  let run dtyp entry args ll_ast () =
-      match 
-        Interpreter.step
-          (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp (Camlcoq.coqstring_of_camlstring entry) args ll_ast)
-      with
-      | Ok dv -> dv
-      | Error e -> failwith e
+  let run dtyp entry args ll_ast  =
+    Interpreter.step
+      (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp (Camlcoq.coqstring_of_camlstring entry) args ll_ast)
+  in
+  
+  let run_to_value dtyp entry args ll_ast () =
+    match
+      run dtyp entry args ll_ast 
+    with
+    | Ok dv -> dv
+    | Error e -> failwith (Interpreter.string_of_exit_condition e)
   in
   
   match t with
@@ -56,7 +63,7 @@ let make_test name ll_ast t : string * assertion  =
       in
       Printf.sprintf "%s = %s(%s)" expected_str entry args_str
     in
-    let result = run dtyp entry args ll_ast in
+    let result = run_to_value dtyp entry args ll_ast in
     str, (dvalue_eq_assertion name result (fun () -> expected))
 
   | Assertion.POISONTest (dtyp, entry, args) ->
@@ -70,13 +77,26 @@ let make_test name ll_ast t : string * assertion  =
        Printf.sprintf "%s = %s(%s)" expected_str entry args_str
      in
 
-     let result  = run dtyp entry args ll_ast in 
+     let result  = run_to_value dtyp entry args ll_ast in 
      str, (dvalue_eq_assertion name result (fun () -> expected))
          
   | Assertion.SRCTGTTest (expected_rett, generated_args) ->
-     let (_t_args, v_args) = List.split generated_args in
-     let res_src = run expected_rett "src" v_args ll_ast in
-     let res_tgt = run expected_rett "tgt" v_args ll_ast in 
+    let (_t_args, v_args) = List.split generated_args in
+    let assertion () = 
+      let res_tgt = run expected_rett "tgt" v_args ll_ast in
+      let res_src = run expected_rett "src" v_args ll_ast in
+      begin match res_tgt with
+        | Error (UndefinedBehavior _) -> ()  (* If the target is UB then the src can be anything! *)
+        | Error (UninterpretedCall _) -> Platform.verb (Printf.sprintf "src-tgt test %s passed due to uninterpreted call" name)
+        | Ok v_tgt ->
+          begin match res_src with
+            | Ok v_src -> compare_dvalues_exn v_src v_tgt
+            | Error (UninterpretedCall _) -> Platform.verb (Printf.sprintf "src-tgt test %s passed due to uninterpreted call" name)
+            | Error e -> failwith (Printf.sprintf "src - %s" (Interpreter.string_of_exit_condition e))
+          end
+        | Error e -> failwith (Printf.sprintf "tgt - %s" (Interpreter.string_of_exit_condition e))
+      end
+    in
      let str = 
       let args_str: doc =
         pp_print_list ~pp_sep:(fun f () -> pp_print_string f ", ") Interpreter.pp_uvalue str_formatter v_args;
@@ -84,7 +104,7 @@ let make_test name ll_ast t : string * assertion  =
       in
        Printf.sprintf "src = tgt on generated input (%s)" args_str
      in
-     str,  (dvalue_eq_assertion name res_src res_tgt) 
+     (str,  assertion) 
 
 let test_pp_dir dir =
   let _ = Printf.printf "===> RUNNING PRETTY PRINTING TESTS IN: %s\n" dir in  

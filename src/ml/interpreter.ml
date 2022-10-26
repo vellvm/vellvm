@@ -54,6 +54,20 @@ let rec pp_uvalue : Format.formatter -> DV.uvalue -> unit =
 
 let debug_flag = ref false
 
+type exit_condition =
+  | UninterpretedCall of string
+  | OutOfMemory of string
+  | UndefinedBehavior of string
+  | Failed of string
+
+let string_of_exit_condition e =
+  match e with
+  | UninterpretedCall s -> "Uninterpreted Call: " ^ s
+  | OutOfMemory s -> "Out Of Memory: " ^ s
+  | UndefinedBehavior s -> "Undefined Behavior: " ^ s
+  | Failed s -> "Failed: " ^ s
+  
+
 (** Print a debug message to stdout if the `debug_flag` is enabled.
 
     This is used to implement `debugE` events.
@@ -72,7 +86,7 @@ let debug (msg:string) =
     Calling `step` could either loop forever, return an error,
     or return the dvalue result returned from the itree.
  *)
-let rec step (m : ('a coq_L4, MMEP.MMSP.coq_MemState * (MemPropT.store_id * ((local_env * lstack) * (global_env * DV.dvalue)))) itree) : (DV.dvalue, string) result =
+let rec step (m : ('a coq_L4, MMEP.MMSP.coq_MemState * (MemPropT.store_id * ((local_env * lstack) * (global_env * DV.dvalue)))) itree) : (DV.dvalue, exit_condition) result =
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
@@ -84,15 +98,15 @@ let rec step (m : ('a coq_L4, MMEP.MMSP.coq_MemState * (MemPropT.store_id * ((lo
 
   (* The ExternalCallE effect *)
   | VisF (Sum.Coq_inl1 (ExternalCall(_, _, _)), _) ->
-     Error "Uninterpreted Call"
+    Error (UninterpretedCall "Uninterpreted Call") (* TODO: More informative message *)
 
   (* The OOME effect *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 msg), _k) ->
-     Error ("Out of Memory: " ^ (Camlcoq.camlstring_of_coqstring msg))
+     Error (OutOfMemory (Camlcoq.camlstring_of_coqstring msg))
 
   (* UBE event *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 msg)), _k) ->
-     Error ("Undefined Behaviour: " ^ (Camlcoq.camlstring_of_coqstring msg))
+     Error (UndefinedBehavior(Camlcoq.camlstring_of_coqstring msg))
 
   (* The DebugE effect *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 msg))), k) ->
@@ -101,7 +115,7 @@ let rec step (m : ('a coq_L4, MMEP.MMSP.coq_MemState * (MemPropT.store_id * ((lo
 
   (* The FailureE effect is a failure *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 msg))), _) ->
-     Error ("Failure effect: " ^ (Camlcoq.camlstring_of_coqstring msg))
+     Error (Failed (Camlcoq.camlstring_of_coqstring msg))
 
   (* The only visible effects from LLVMIO that should propagate to the interpreter are:
      - Call to external functions
@@ -119,5 +133,5 @@ let rec step (m : ('a coq_L4, MMEP.MMSP.coq_MemState * (MemPropT.store_id * ((lo
     Note: programs consist of a non-empty list of blocks, represented by a
     tuple of a single block, and a possibly empty list of blocks.
  *)
-let interpret (prog:(LLVMAst.typ, (LLVMAst.typ LLVMAst.block * (LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.dvalue, string) result =
+let interpret (prog:(LLVMAst.typ, (LLVMAst.typ LLVMAst.block * (LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.dvalue, exit_condition) result =
   step (TopLevel.TopLevelBigIntptr.interpreter prog)
