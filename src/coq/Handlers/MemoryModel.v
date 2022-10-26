@@ -4565,6 +4565,163 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
 
     Hint Resolve exec_correct_re_sid_ubytes : EXEC_CORRECT.
 
+    Lemma dtyp_measure_strong_ind:
+      forall (P : dtyp -> Prop)
+        (BASE: forall dt, dtyp_measure dt = 1 -> P dt)
+        (IH: forall (n : nat) (dt: dtyp), (forall (dt : dtyp), dtyp_measure dt <= n -> P dt) -> dtyp_measure dt = S n -> P dt),
+      forall dt, P dt.
+    Proof.
+      intros P BASE IH.
+      assert (forall n dt, dtyp_measure dt <= n -> P dt) as IHDT.
+      { induction n using nat_strong_ind; intros dt SIZE.
+        - destruct dt; cbn in SIZE; lia.
+        - assert (dtyp_measure dt <= n \/ dtyp_measure dt = S n) as [LEQ | EQ] by lia;
+          eauto.
+      }
+
+      intros dt.
+      eapply IHDT.
+      reflexivity.
+    Qed.
+
+    Lemma exec_correct_serialize_sbytes_undef :
+      forall dt t pre,
+        exec_correct pre (serialize_sbytes (UVALUE_Undef t) dt) (serialize_sbytes (UVALUE_Undef t) dt).
+    Proof.
+      induction dt using dtyp_measure_strong_ind; intros t pre;
+        do 2 rewrite serialize_sbytes_equation;
+        auto with EXEC_CORRECT.
+
+      { (* Size 1 *)
+        destruct dt; inversion H; auto with EXEC_CORRECT.
+      }
+
+      { (* Larger sizes *)
+        revert t pre.
+        induction dt; intros t pre; try apply exec_correct_bind; auto with EXEC_CORRECT.
+
+        { (* Arrays *)
+          apply exec_correct_map_monad_In.
+          intros a pre0 IN.
+          apply In_repeatN in IN; subst.
+          eapply H.
+          cbn in H0.
+          lia.
+        }
+
+        { (* Structs *)
+          break_match_goal; auto with EXEC_CORRECT.
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+          eapply H; cbn in *; auto; lia.
+
+          intros a ms_init ms_after_m st_init st_after_m RUN.
+
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+
+          eapply H; cbn in *; auto.
+          unfold list_sum.
+          assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
+          lia.
+        }
+
+        { (* Packed Structs *)
+          break_match_goal; auto with EXEC_CORRECT.
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+          eapply H; cbn in *; auto; lia.
+
+          intros a ms_init ms_after_m st_init st_after_m RUN.
+
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+
+          eapply H; cbn in *; auto.
+          unfold list_sum.
+          assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
+          lia.
+        }
+
+        { (* Vectors *)
+          apply exec_correct_map_monad_In.
+          intros a pre0 IN.
+          apply In_repeatN in IN; subst.
+          eapply H.
+          cbn in H0.
+          lia.
+        }
+
+      }
+    Qed.
+
+    Hint Resolve exec_correct_serialize_sbytes_undef : EXEC_CORRECT.
+
+    Lemma exec_correct_serialize_sbytes_poison :
+      forall dt t pre,
+        exec_correct pre (serialize_sbytes (UVALUE_Poison t) dt) (serialize_sbytes (UVALUE_Poison t) dt).
+    Proof.
+      induction dt using dtyp_measure_strong_ind; intros t pre;
+        do 2 rewrite serialize_sbytes_equation;
+        auto with EXEC_CORRECT.
+
+      { (* Size 1 *)
+        destruct dt; inversion H; auto with EXEC_CORRECT.
+      }
+
+      { (* Larger sizes *)
+        revert t pre.
+        induction dt; intros t pre; try apply exec_correct_bind; auto with EXEC_CORRECT.
+
+        { (* Arrays *)
+          apply exec_correct_map_monad_In.
+          intros a pre0 IN.
+          apply In_repeatN in IN; subst.
+          eapply H.
+          cbn in H0.
+          lia.
+        }
+
+        { (* Structs *)
+          break_match_goal; auto with EXEC_CORRECT.
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+          eapply H; cbn in *; auto; lia.
+
+          intros a ms_init ms_after_m st_init st_after_m RUN.
+
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+
+          eapply H; cbn in *; auto.
+          unfold list_sum.
+          assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
+          lia.
+        }
+
+        { (* Packed Structs *)
+          break_match_goal; auto with EXEC_CORRECT.
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+          eapply H; cbn in *; auto; lia.
+
+          intros a ms_init ms_after_m st_init st_after_m RUN.
+
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+
+          eapply H; cbn in *; auto.
+          unfold list_sum.
+          assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
+          lia.
+        }
+
+        { (* Vectors *)
+          apply exec_correct_map_monad_In.
+          intros a pre0 IN.
+          apply In_repeatN in IN; subst.
+          eapply H.
+          cbn in H0.
+          lia.
+        }
+
+      }
+    Qed.
+
+    Hint Resolve exec_correct_serialize_sbytes_poison : EXEC_CORRECT.
+
     Lemma exec_correct_serialize_sbytes :
       forall uv dt pre,
         exec_correct pre (serialize_sbytes uv dt) (serialize_sbytes uv dt).
@@ -4573,28 +4730,32 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         do 2 rewrite serialize_sbytes_equation;
         auto with EXEC_CORRECT.
 
-      (* - (* Undef *) *)
-      (*   break_match; auto with EXEC_CORRECT. *)
-      (*   { apply exec_correct_bind; auto with EXEC_CORRECT. *)
-      (*     apply exec_correct_map_monad_In. *)
-      (*     intros a IN. *)
-      (*     apply In_repeatN in IN; subst. *)
-      (*     admit. *)
-      (*   } *)
-      (*   admit. *)
-      (* - (* Poison *) *)
-      (*   admit. *)
-      (* - (* Structs *) *)
-      (*   break_match; auto with EXEC_CORRECT. *)
-      (*   break_match; auto with EXEC_CORRECT. *)
-      (* - (* Packed structs *) *)
-      (*   break_match; auto with EXEC_CORRECT. *)
-      (*   break_match; auto with EXEC_CORRECT. *)
-      (* - (* Arrays *) *)
-      (*   break_match; auto with EXEC_CORRECT. *)
-      (* - (* Vectors *) *)
-      (*   break_match; auto with EXEC_CORRECT. *)
-    Admitted.
+
+      all: try solve
+             [break_match; auto with EXEC_CORRECT;
+              [
+                (* Arrays *)
+                apply exec_correct_bind; auto with EXEC_CORRECT;
+                apply exec_correct_map_monad_In;
+                intros a pre0 IN;
+                apply In_repeatN in IN; subst;
+                auto with EXEC_CORRECT
+              |
+                break_match_goal; auto with EXEC_CORRECT
+              |
+                break_match_goal; auto with EXEC_CORRECT
+              |
+                apply exec_correct_bind; auto with EXEC_CORRECT;
+                apply exec_correct_map_monad_In;
+                intros a pre0 IN;
+                apply In_repeatN in IN; subst;
+                auto with EXEC_CORRECT
+              ]
+             |
+               break_match_goal; auto with EXEC_CORRECT;
+               break_match_goal; auto with EXEC_CORRECT
+             ].
+    Qed.
 
     Lemma read_bytes_correct :
       forall len ptr pre,
