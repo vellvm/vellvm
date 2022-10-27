@@ -5461,37 +5461,72 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
   Qed.
 
   (* TODO: should this be here? *)
+  Lemma generate_num_undef_bytes_h_cons :
+    forall dt len sid start bytes,
+      generate_num_undef_bytes_h (N.succ start) len dt sid = NoOom bytes ->
+      generate_num_undef_bytes_h start (N.succ len) dt sid =
+        b <- generate_num_undef_bytes_h start 1 dt sid;;
+        rest <- generate_num_undef_bytes_h (N.succ start) len dt sid;;
+        NoOom (b ++ rest).
+  Proof.
+    intros dt len sid start bytes NOOM.
+    cbn.
+    unfold generate_num_undef_bytes_h in *.
+    match goal with
+    | H: _ |- N.recursion ?a ?f _ _ = _ =>
+        pose proof
+          (@N.recursion_succ (N -> OOM (list SByte)) eq
+             a
+             f
+          ) as S
+    end.
+    forward S.
+    reflexivity.
+    forward S.
+    { unfold Proper, respectful.
+      intros x y H0 x0 y0 H1; subst.
+      reflexivity.
+    }
+
+    specialize (S len).
+    cbn in *.
+    rewrite S.
+
+    break_match; break_match; auto.
+    inv NOOM.
+  Qed.
+
+  (* TODO: should this be here? *)
+  Lemma generate_num_undef_bytes_h_succeeds :
+    forall dt sid start,
+    exists bytes : list SByte, generate_num_undef_bytes_h start (sizeof_dtyp dt) dt sid = ret bytes.
+  Proof.
+    intros dt.
+    induction (sizeof_dtyp dt) using N.peano_ind;
+      intros sid start.
+
+    - cbn; eexists; auto.
+    - specialize (IHn sid (N.succ start)).
+      destruct IHn as [bytes IHn].
+      pose proof (from_Z_safe (Z.of_N start)).
+      break_match_hyp; [|contradiction].
+
+      eexists.
+      erewrite generate_num_undef_bytes_h_cons; eauto.
+      rewrite IHn.
+      cbn; rewrite Heqo; cbn.
+      reflexivity.
+  Qed.
+
+
+  (* TODO: should this be here? *)
   Lemma generate_num_undef_bytes_succeeds :
     forall dt sid,
     exists bytes : list SByte, generate_num_undef_bytes (sizeof_dtyp dt) dt sid = ret bytes.
   Proof.
     intros dt sid.
-    eexists. (* Going to need to fill this in manually. *)
-
-    induction (sizeof_dtyp dt) using N.peano_ind.
-    - cbn.
-      admit.
-    - unfold generate_num_undef_bytes, generate_num_undef_bytes_h in *.
-      match goal with
-      | H: _ |- N.recursion ?a ?f  _ _ = ret _ =>
-          pose proof
-               (@N.recursion_succ (N -> OOM (list SByte)) eq
-                                  a
-                                  f
-               )
-      end.
-
-      forward H.
-      reflexivity.
-      forward H.
-      { unfold Proper, respectful.
-        intros x y H0 x0 y0 H1; subst.
-        reflexivity.
-      }
-
-      specialize (H n).
-      rewrite H.
-  Admitted.
+    eapply generate_num_undef_bytes_h_succeeds.
+  Qed.
 
   (* TODO: should this be here? *)
   Lemma generate_undef_bytes_succeeds :
