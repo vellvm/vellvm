@@ -28,8 +28,8 @@
   let of_str = Camlcoq.camlstring_of_coqstring
   let coq_N_of_int = Camlcoq.N.of_int
   let coq_of_int = Camlcoq.Z.of_sint
-  let coq_of_int64 = Camlcoq.Z.of_sint64  
-  let coqfloat_of_float f = Floats.Float.of_bits(Camlcoq.coqint_of_camlint64(Int64.bits_of_float f))  
+  let coq_of_int64 = Camlcoq.Z.of_sint64
+  let coqfloat_of_float f = Floats.Float.of_bits(Camlcoq.coqint_of_camlint64(Int64.bits_of_float f))
 
   exception Lex_error_unterminated_string of Lexing.position
 
@@ -102,7 +102,7 @@
   | "signext"                      -> KW_SIGNEXT
   | "inreg"                        -> KW_INREG
   | "byval"                        -> KW_BYVAL
-  | "byref"                        -> KW_BYREF  
+  | "byref"                        -> KW_BYREF
   | "preallocated"                 -> KW_PREALLOCATED
   | "inalloca"                     -> KW_INALLOCA
   | "sret"                         -> KW_SRET
@@ -120,7 +120,7 @@
   | "swiftself"                    -> KW_SWIFTSELF
   | "swiftasync"                   -> KW_SWIFTASYNC
   | "swifterror"                   -> KW_SWIFTERROR
-  | "immarg"                       -> KW_IMMARG  
+  | "immarg"                       -> KW_IMMARG
   | "noundef"                      -> KW_NOUNDEF
   | "alignstack"                   -> KW_ALIGNSTACK
   | "allocalign"                   -> KW_ALLOCALIGN
@@ -170,7 +170,7 @@
   | "sanitize_address"             -> KW_SANITIZE_ADDRESS
   | "no_sanitize"                  -> KW_NO_SANITIZE
   | "no_sanitize_address"          -> KW_NO_SANITIZE_ADDRESS
-  | "no_sanitize_hwaddress"        -> KW_NO_SANITIZE_HWADDRESS  
+  | "no_sanitize_hwaddress"        -> KW_NO_SANITIZE_HWADDRESS
   | "sanitize_address_dyninit"     -> KW_SANITIZE_ADDRESS_DYNINIT
   | "sanitize_memory"              -> KW_SANITIZE_MEMORY
   | "sanitize_thread"              -> KW_SANITIZE_THREAD
@@ -199,6 +199,8 @@
   | "to"                           -> KW_TO
   | "unwind"                       -> KW_UNWIND
   | "tail"                         -> KW_TAIL
+  | "musttail"                     -> KW_MUSTTAIL
+  | "notail"                       -> KW_NOTAIL
   | "volatile"                     -> KW_VOLATILE
 
   (* instrs *)
@@ -297,7 +299,19 @@
   | "ninf"           -> KW_NINF
   | "nsz"            -> KW_NSZ
   | "arcp"           -> KW_ARCP
+  | "contract"       -> KW_CONTRACT
+  | "afn"            -> KW_AFN
+  | "reassoc"        -> KW_REASSOC
   | "fast"           -> KW_FAST
+
+  (* synchronization *)
+  | "syncscope"      -> KW_SYNCSCOPE
+  | "unordered"      -> KW_UNORDERED
+  | "monotonic"      -> KW_MONOTONIC
+  | "acquire"        -> KW_ACQUIRE
+  | "release"        -> KW_RELEASE
+  | "acq_rel"        -> KW_ACQ_REL
+  | "seq_cst"        -> KW_SEQ_CST
 
   (*types*)
   | "iptr"      -> KW_IPTR
@@ -321,7 +335,7 @@
   | "undef" -> KW_UNDEF
   | "zeroinitializer" -> KW_ZEROINITIALIZER
   | "c" -> KW_C
-  
+
   (* misc *)
   | "x" -> KW_X
 
@@ -330,6 +344,17 @@
 
   type ident_type = Named | NamedString | Unnamed
 
+
+  let metadata = function
+  | "nontemporal"             -> META_NONTEMPORAL
+  | "invariant.load"          -> META_INVARIANT_LOAD
+  | "invariant.group"         -> META_INVARIANT_GROUP
+  | "nonnull"                 -> META_NONNULL
+  | "dereferenceable"         -> META_DEREFERENCEABLE
+  | "dereferenceable_or_null" -> META_DEREFERENCEABLE_OR_NULL
+  | "align"                   -> META_ALIGN
+  | "noundef"                 -> META_NOUNDEF
+  | s                         -> METADATA_ID (Name (str s))
 }
 
 let ws = [' ' '\t']
@@ -376,11 +401,12 @@ rule token = parse
   (* FIXME: support metadata strings and struct. Parsed as identifier here. *)
   | "!{" { BANGLCURLY }
   | '!'  { let rid = lexed_id lexbuf in
-           begin match rid with 
+           begin match rid with
            | ParseUtil.Named id ->
 	   (if id.[0] = '"' && id.[String.length id - 1] = '"'
-               then METADATA_STRING id
-               else METADATA_ID (Name (str id)))
+               then METADATA_STRING (String.sub id 1 (String.length id - 2))
+               else (metadata id))
+
 	   | ParseUtil.Anonymous n -> METADATA_ID (Anon (coq_of_int n))
 	   end
          }
@@ -389,9 +415,9 @@ rule token = parse
 
   (* constants *)
   | ('-'? digit+) as d            { INTEGER (coq_of_int64 (Int64.of_string d)) }
-  | ('-'? digit* '.' digit+) as d { FLOAT d } 
-  | ('-'? digit ('.' digit+)? 'e' ('+'|'-') digit+) as d { FLOAT d }
-  | ('0''x' hexdigit+) as d     { HEXCONSTANT (coqfloat_of_float (Int64.float_of_bits (Int64.of_string d))) }			
+  | ('-'? digit* '.' digit*) as d { FLOAT d }
+  | ('-'? digit ('.' digit*)? 'e' ('+'|'-') digit+) as d { FLOAT d }
+  | ('0''x' hexdigit+) as d     { HEXCONSTANT (coqfloat_of_float (Int64.float_of_bits (Int64.of_string d))) }
   | '"'                         { STRING (string (Buffer.create 10) lexbuf) }
 
   (* types *)
@@ -430,19 +456,19 @@ and lexed_id = parse
 
   let parse lexbuf =
     try Llvm_parser.toplevel_entities token lexbuf
-    with 
+    with
     | Llvm_parser.Error -> parsing_err lexbuf "Error token encountered"
-    | Failure s -> 
+    | Failure s ->
       begin
         parsing_err lexbuf s
-      end   
+      end
 
-  let parse_test_call lexbuf = 
+  let parse_test_call lexbuf =
     try Llvm_parser.test_call token lexbuf
-    with Llvm_parser.Error -> parsing_err lexbuf "Error token encountered"
+    with Llvm_parser.Error -> parsing_err lexbuf "Parsing Error Encountered"
 
   let parse_texp lexbuf =
     try Llvm_parser.texp token lexbuf
     with Llvm_parser.Error -> parsing_err lexbuf "Error token encountered"
-    
+
 }

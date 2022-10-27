@@ -288,7 +288,7 @@ Variant fbinop : Set :=
   FAdd | FSub | FMul | FDiv | FRem.
 
 Variant fast_math : Set :=
-  Nnan | Ninf | Nsz | Arcp | Fast.
+  Nnan | Ninf | Nsz | Arcp | Contract | Afn | Reassoc | Fast.
 
 Variant conversion_type : Set :=
   Trunc | Zext | Sext | Fptrunc | Fpext | Uitofp | Sitofp | Fptoui |
@@ -367,12 +367,20 @@ Set Elimination Schemes.
 Definition texp : Set := T * exp.
 
 Inductive metadata : Set :=
-  | METADATA_Const  (tv:texp)
-  | METADATA_Null
-  | METADATA_Id     (id:raw_id)  (* local or global? *)
-  | METADATA_String (str:string)
-  | METADATA_Named  (strs:list string)
-  | METADATA_Node   (mds:list metadata)
+| METADATA_Const  (tv:texp)
+| METADATA_Null
+| METADATA_Nontemporal
+| METADATA_Invariant_load
+| METADATA_Invariant_group
+| METADATA_Nonnull
+| METADATA_Dereferenceable
+| METADATA_Dereferenceable_or_null
+| METADATA_Align
+| METADATA_Noundef
+| METADATA_Id     (id:raw_id)  (* local or global? *)
+| METADATA_String (str:string)
+| METADATA_Named  (strs:list string)
+| METADATA_Node   (mds:list metadata)
 .
 
 
@@ -381,23 +389,23 @@ Variant tint_literal : Set :=
   | TInt_Literal (sz:N) (x:int).
 
 Variant instr_id : Set :=
-| IId   (id:raw_id)    (* "Anonymous" or explicitly named instructions *)
-| IVoid (n:int)        (* "Void" return type, for "store",  "void call", and terminators.
-                           Each with unique number (NOTE: these are distinct from Anon raw_id) *)
+  | IId   (id:raw_id)    (* "Anonymous" or explicitly named instructions *)
+  | IVoid (n:int)        (* "Void" return type, for "store",  "void call", and terminators.
+                            Each with unique number (NOTE: these are distinct from Anon raw_id) *)
 .
 
 Variant phi : Set :=
-| Phi  (t:T) (args:list (block_id * exp))
+  | Phi  (t:T) (args:list (block_id * exp))
 .
 
 Variant ordering : Set :=
-  |Unordered
-  |Monotonic
-  |Acquire
-  |Release
-  |Acq_rel
-  |Seq_cst
-     .
+  | Unordered
+  | Monotonic
+  | Acquire
+  | Release
+  | Acq_rel
+  | Seq_cst
+.
 
 Record cmpxchg : Set :=
   mk_cmpxchg {
@@ -414,20 +422,20 @@ Record cmpxchg : Set :=
     }.
 
 Variant atomic_rmw_operation : Set :=
-  |Axchg
-  |Aadd
-  |Asub
-  |Aand
-  |Anand
-  |Aor
-  |Axor
-  |Amax
-  |Amin
-  |Aumax
-  |Aumin
-  |Afadd
-  |Afsub
-     .
+  | Axchg
+  | Aadd
+  | Asub
+  | Aand
+  | Anand
+  | Aor
+  | Axor
+  | Amax
+  | Amin
+  | Aumax
+  | Aumin
+  | Afadd
+  | Afsub
+.
 
 Record atomicrmw : Set :=
   mk_atomicrmw {
@@ -441,38 +449,17 @@ Record atomicrmw : Set :=
       a_type                 : T;
     }.
 
-Variant instr : Set :=
-| INSTR_Comment (msg:string)
-| INSTR_Op   (op:exp)                        (* INVARIANT: op must be of the form (OP_ ...) *)
-| INSTR_Call (fn:texp) (args:list texp)      (* CORNER CASE: return type is void treated specially *)
-| INSTR_Alloca (t:T) (nb: option texp) (align:option int)
-| INSTR_Load  (volatile:bool) (t:T) (ptr:texp) (align:option int)
-| INSTR_Store (volatile:bool) (val:texp) (ptr:texp) (align:option int)
-| INSTR_Fence (syncscope:option string) (o:ordering)
-| INSTR_AtomicCmpXchg (c : cmpxchg)
-| INSTR_AtomicRMW (a :atomicrmw )
-| INSTR_VAArg (va_list_and_arg_list : texp) (t: typ) (* arg_list isn't actually a list, this is just the name of the argument  *)
-| INSTR_LandingPad
-.
-
-Variant terminator : Set :=
-(* Terminators *)
-(* Types in branches are TYPE_Label constant *)
-| TERM_Ret        (v:texp)
-| TERM_Ret_void
-| TERM_Br         (v:texp) (br1:block_id) (br2:block_id)
-| TERM_Br_1       (br:block_id)
-| TERM_Switch     (v:texp) (default_dest:block_id) (brs: list (tint_literal * block_id))
-| TERM_IndirectBr (v:texp) (brs:list block_id) (* address * possible addresses (labels) *)
-| TERM_Resume     (v:texp)
-| TERM_Invoke     (fnptrval:tident) (args:list texp) (to_label:block_id) (unwind_label:block_id)
-| TERM_Unreachable
-.
 
 
 Variant unnamed_addr : Set :=
   | Unnamed_addr
   | Local_Unnamed_addr
+.
+
+Variant tailcall : Set :=
+  | Tail
+  | Musttail
+  | Notail
 .
 
 (* LLVM has many optional attributes and annotations for global values,
@@ -498,12 +485,19 @@ Variant annotation : Set :=
   | ANN_no_sanitize_address
   | ANN_no_sanitize_hwaddress
   | ANN_sanitize_address_dyninit
-  | ANN_metadata (l:list (raw_id * metadata))
+  | ANN_metadata (id:metadata) (v:metadata)  (* Invariant (?): id is not null or a node *)
   | ANN_cconv (c:cconv) (* declaration / definitions only *)
   | ANN_gc (s:string) (* declaration / definitions only *)
   | ANN_prefix (t:texp) (* declaration / definitions only *)
   | ANN_prologue (t:texp) (* declaration / definitions only *)
   | ANN_personality (t:texp) (* declaration / definitions only *)
+  | ANN_inalloca  (* alloca instruction only *)
+  | ANN_num_elements (t:texp) (* alloca instruction only *)
+  | ANN_volatile (* load / store *)
+  | ANN_tail (t:tailcall)
+  | ANN_fast_math_flag (f:fast_math)
+  | ANN_ret_attribute (p:param_attr)
+  | ANN_fun_attribute (f:fn_attr)
 .
 
 Definition ann_linkage (a:annotation) : option linkage :=
@@ -596,9 +590,9 @@ Definition ann_sanitize_address_dynint (a:annotation) : option unit :=
   | _ => None
   end.
 
-Definition ann_metadata (a:annotation) : option (list (raw_id * metadata)) :=
+Definition ann_metadata (a:annotation) : option (metadata * metadata) :=
   match a with
-  | ANN_metadata m => Some m
+  | ANN_metadata id m => Some (id, m)
   | _ => None
   end.
 
@@ -631,6 +625,77 @@ Definition ann_personality (a:annotation) : option texp :=
   | ANN_personality t => Some t
   | _ => None
   end.
+
+Definition ann_inalloca (a:annotation) : option unit :=
+  match a with
+  | ANN_inalloca => Some tt
+  | _ => None
+  end.
+
+Definition ann_num_elements (a:annotation) : option texp :=
+  match a with
+  | ANN_num_elements t => Some t
+  | _ => None
+  end.
+
+Definition ann_volatile (a:annotation) : option unit :=
+  match a with
+  | ANN_volatile => Some tt
+  | _ => None
+  end.
+
+Definition ann_tail (a:annotation) : option tailcall :=
+  match a with
+  | ANN_tail t => Some t
+  | _ => None
+  end.
+
+Definition ann_fast_math_flag (a:annotation) : option fast_math :=
+  match a with
+  | ANN_fast_math_flag f => Some f
+  | _ => None
+  end.
+
+Definition ann_ret_attribute (a:annotation) : option param_attr :=
+  match a with
+  | ANN_ret_attribute p => Some p
+  | _ => None
+  end.
+
+Definition ann_fun_attribute (a:annotation) : option fn_attr :=
+  match a with
+  | ANN_fun_attribute f => Some f
+  | _ => None
+  end.
+
+Variant instr : Set :=
+| INSTR_Comment (msg:string)
+| INSTR_Op   (op:exp)                                             (* INVARIANT: op must be of the form (OP_ ...) *)
+| INSTR_Call (fn:texp) (args:list (texp * (list param_attr))) (anns:list annotation)    (* CORNER CASE: return type is void treated specially *)
+| INSTR_Alloca (t:T) (anns: list annotation)
+| INSTR_Load  (t:T) (ptr:texp) (anns: list annotation)
+| INSTR_Store (val:texp) (ptr:texp) (anns: list annotation)
+| INSTR_Fence (syncscope:option string) (o:ordering)
+| INSTR_AtomicCmpXchg (c : cmpxchg)
+| INSTR_AtomicRMW (a :atomicrmw )
+| INSTR_VAArg (va_list_and_arg_list : texp) (t: typ) (* arg_list isn't actually a list, this is just the name of the argument  *)
+| INSTR_LandingPad
+.
+
+Variant terminator : Set :=
+(* Terminators *)
+(* Types in branches are TYPE_Label constant *)
+| TERM_Ret        (v:texp)
+| TERM_Ret_void
+| TERM_Br         (v:texp) (br1:block_id) (br2:block_id)
+| TERM_Br_1       (br:block_id)
+| TERM_Switch     (v:texp) (default_dest:block_id) (brs: list (tint_literal * block_id))
+| TERM_IndirectBr (v:texp) (brs:list block_id) (* address * possible addresses (labels) *)
+| TERM_Resume     (v:texp)
+| TERM_Invoke     (fnptrval:tident) (args:list (texp * (list param_attr))) (to_label:block_id) (unwind_label:block_id)
+| TERM_Unreachable
+.
+
 
 Record global : Set :=
   mk_global {
@@ -684,9 +749,8 @@ Definition g_no_sanitize_hwaddress (g:global) : option unit :=
 Definition g_sanitize_address_dyninit (g:global) : option unit :=
   find_option ann_sanitize_address_dynint (g_annotations g).
 
-Definition g_metadata (g:global) : option (list (raw_id * metadata)) :=
-  find_option ann_metadata (g_annotations g).
-
+Definition g_metadata (g:global) : (list (metadata * metadata)) :=
+  filter_option ann_metadata (g_annotations g).
 
 Record declaration : Set :=
   mk_declaration
@@ -743,8 +807,8 @@ Definition dc_prologue (d:declaration) : option texp :=
 Definition dc_personality (d:declaration) : option texp :=
   find_option ann_personality (dc_annotations d).
 
-Definition dc_metadata (d:declaration) : option (list (raw_id * metadata)) :=
-  find_option ann_metadata (dc_annotations d).
+Definition dc_metadata (d:declaration) : list (metadata * metadata) :=
+  filter_option ann_metadata (dc_annotations d).
 
 
 Definition code := list (instr_id * instr).

@@ -27,7 +27,8 @@ exit:
     ret i64 %max_so_far
 }
 define i64 @main(i64 %argc, i8** %arcv) {
-  %out = call i64 @kadane([0 x i64]* @gbl, i64 0, i64 0, i64 9, i64 0)
+  %ptr = bitcast [9 x i64]* @gbl to [0 x i64]*
+  %out = call i64 @kadane([0 x i64]* %ptr, i64 0, i64 0, i64 9, i64 0)
   ret i64 %out
 }
 

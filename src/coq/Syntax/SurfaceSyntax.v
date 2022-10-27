@@ -286,7 +286,8 @@ Section SurfaceSyntaxTest.
    (* TODO: phi-nodes? *)
  Abort.
 
-
+ (* TODO: regenerate this example with the new frontend syntax *)
+ (*
  Definition binarysearch := mcfg_of_tle
    [TLE_Type_decl (ID_Local (Name "struct.Node")) (TYPE_Struct [(TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))); (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))); (TYPE_I 64%N)]);
    TLE_Global {|g_ident := (Name "node1");
@@ -359,7 +360,7 @@ Section SurfaceSyntaxTest.
                        blk_id := (Anon 0%Z);
                        blk_phis := [];
                        blk_code := [(IId (Anon 1%Z), (INSTR_Op (OP_GetElementPtr (TYPE_Identified (ID_Local (Name "struct.Node"))) ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Local (Name "root")))) [((TYPE_I 32%N),(EXP_Integer (0)%Z)); ((TYPE_I 32%N),(EXP_Integer (2)%Z))])));
-                                   (IId (Anon 2%Z), (INSTR_Load false (TYPE_I 64%N) ((TYPE_Pointer (TYPE_I 64%N)), (EXP_Ident (ID_Local (Anon 1%Z)))) None));
+                                   (IId (Anon 2%Z), (INSTR_Load (TYPE_I 64%N) ((TYPE_Pointer (TYPE_I 64%N)), (EXP_Ident (ID_Local (Anon 1%Z)))) []));
                                    (IId (Anon 3%Z), (INSTR_Op (OP_ICmp Eq (TYPE_I 64%N) (EXP_Ident (ID_Local (Anon 2%Z))) (EXP_Ident (ID_Local (Name "value"))))))];
                        blk_term := TERM_Br ((TYPE_I 1%N), (EXP_Ident (ID_Local (Anon 3%Z)))) (Name "equal") (Name "notequal");
                        blk_comments := None
@@ -382,7 +383,7 @@ Section SurfaceSyntaxTest.
                      blk_id := (Name "left");
                      blk_phis := [];
                      blk_code := [(IId (Anon 5%Z), (INSTR_Op (OP_GetElementPtr (TYPE_Identified (ID_Local (Name "struct.Node"))) ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Local (Name "root")))) [((TYPE_I 32%N),(EXP_Integer (0)%Z)); ((TYPE_I 32%N),(EXP_Integer (0)%Z))])));
-                                 (IId (Anon 6%Z), (INSTR_Load false (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))) ((TYPE_Pointer (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node"))))), (EXP_Ident (ID_Local (Anon 5%Z)))) None));
+                                 (IId (Anon 6%Z), (INSTR_Load (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))) ((TYPE_Pointer (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node"))))), (EXP_Ident (ID_Local (Anon 5%Z)))) []));
                                  (IId (Anon 7%Z), (INSTR_Op (OP_ICmp Eq (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))) (EXP_Ident (ID_Local (Anon 6%Z))) EXP_Null)))];
                      blk_term := TERM_Br ((TYPE_I 1%N), (EXP_Ident (ID_Local (Anon 7%Z)))) (Name "none") (Name "left_next");
                      blk_comments := None
@@ -475,5 +476,5 @@ Section SurfaceSyntaxTest.
    unfold cfg_of_definition.
    cbn.
  Abort.
-
+*)
 End SurfaceSyntaxTest.

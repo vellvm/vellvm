@@ -212,11 +212,11 @@ Module Infinite.
   Qed.
 
   Definition alloc_code : code dtyp :=
-    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) None None)
+    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) [])
     ].
 
   Definition ptoi_code : code dtyp :=
-    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) None None);
+    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) []);
       (IId (Name "i"), INSTR_Op (OP_Conversion Ptrtoint DTYPE_Pointer (EXP_Ident (ID_Local (Name "ptr"))) (DTYPE_IPTR)))
     ].
 
@@ -973,11 +973,11 @@ Module Finite.
            end.
 
   Definition alloc_code : code dtyp :=
-    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) None None)
+    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) [])
     ].
 
   Definition ptoi_code : code dtyp :=
-    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) None None);
+    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) []);
       (IId (Name "i"), INSTR_Op (OP_Conversion Ptrtoint DTYPE_Pointer (EXP_Ident (ID_Local (Name "ptr"))) (DTYPE_IPTR)))
     ].
 
@@ -1204,4 +1204,3 @@ Module Finite.
         repeat constructor; auto.
   Qed.
 End Finite.
-

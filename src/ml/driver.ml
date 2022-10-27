@@ -31,6 +31,7 @@ let print_banner s =
 let parse_tests filename =
   let assertions = ref [] in
   let channel = open_in filename in
+  Assertion.reset_parsing_mode ();  (* Put the parser into "NormalMode" *)
   try
     while true; do
       let line = input_line channel in
@@ -65,7 +66,7 @@ let process_ll_file path file =
       | Ok dv ->
         Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv)
 
-      | Error msg -> failwith msg
+      | Error e -> failwith (Interpreter.string_of_exit_condition e)
     end
   in
   let ll_ast' = transform ll_ast in

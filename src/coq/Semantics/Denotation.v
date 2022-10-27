@@ -367,12 +367,12 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationP
       trigger (LocalWrite id uv)
 
     (* Allocation *)
-    | (IId id, INSTR_Alloca dt _ _) =>
+    | (IId id, INSTR_Alloca dt _) =>
       dv <- trigger (Alloca dt);;
       trigger (LocalWrite id (dvalue_to_uvalue dv))
 
     (* Load *)
-    | (IId id, INSTR_Load _ dt (du,ptr) _) =>
+    | (IId id, INSTR_Load dt (du,ptr) _) =>
       ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
       (* Load addresses must be unique *)
       da <- pickUnique ua;;
@@ -380,7 +380,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationP
       trigger (LocalWrite id uv)
 
     (* Store *)
-    | (IVoid _, INSTR_Store _ (dt, val) (du, ptr) _) =>
+    | (IVoid _, INSTR_Store (dt, val) (du, ptr) _) =>
       uv <- translate exp_to_instr (denote_exp (Some dt) val) ;;
       ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
       (* Store addresses must be unique *)
@@ -390,11 +390,11 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationP
       | _ => trigger (Store dt da uv)
       end
 
-    | (_, INSTR_Store _ _ _ _) => raise "ILL-FORMED itree ERROR: Store to non-void ID"
+    | (_, INSTR_Store _ _ _) => raise "ILL-FORMED itree ERROR: Store to non-void ID"
 
     (* Call *)
-    | (pt, INSTR_Call (dt, f) args) =>
-      uvs <- map_monad (fun '(t, op) => (translate exp_to_instr (denote_exp (Some t) op))) args ;;
+    | (pt, INSTR_Call (dt, f) args _) =>
+      uvs <- map_monad (fun '(t, op) => (translate exp_to_instr (denote_exp (Some t) op))) (List.map fst args) ;;
       returned_value <-
       match intrinsic_exp f with
       | Some s =>

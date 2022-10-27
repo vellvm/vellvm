@@ -5,7 +5,7 @@
  *)
 
 
-From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG DynamicTypes.
+From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG DynamicTypes.
 
 Require Import Integers Floats.
 
@@ -295,7 +295,7 @@ Section ShowInstances.
         | None => "vscale_range(" ++ show min ++ ")"
         | Some m => "vscale_range(" ++ show min ++ "," ++ show m ++ ")"
         end
-    | FNATTR_String s => """" ++ show s ++ """"  (* "no-see" *)
+    | FNATTR_String s => """" ++ s ++ """"  (* "no-see" *)
     | FNATTR_Key_value kv => """" ++ fst kv ++ """=" ++ """" ++ snd kv ++ """" (* "unsafe-fp-math"="false" *)
     | FNATTR_Attr_grp g => "#" ++ show g
     end.
@@ -434,6 +434,9 @@ Section ShowInstances.
        | Ninf => "ninf"
        | Nsz => "nsz"
        | Arcp => "arcp"
+       | Contract => "contract"
+       | Afn => "afn"
+       | Reassoc => "reassoc"
        | Fast => "fast"
        end.
 
@@ -478,8 +481,17 @@ Section ShowInstances.
   Definition show_c_string (ex : exp T) : string :=
     let n : nat := ex_to_nat ex in
     let x : Z := ex_to_int ex in
-    if ((n <? 32) || (126 <? n))%nat then NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N  x))
+    if ((n <? 32) || (126 <? n))%nat then (
+        let conversion :=  NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N  x)) in
+        if ((length (conversion)) =? (Z.to_nat 1))%nat then  "\0" ++ conversion
+        else "\" ++ conversion
+      )
+    (*Special case for decimal 34/hex 22*)
+    else if (n =? 34)%nat then "\22"
+    (*Special case for decimal 92/hex 5C*)
+    else if (n =? 92)%nat then "\\"
     else (string_of_list_ascii ((ascii_of_nat n) :: [])).
+
 
   Definition is_op (e : exp T) : bool :=
     match e with
@@ -490,7 +502,8 @@ Section ShowInstances.
     | EXP_Bool b =>     false
     | EXP_Null =>      false
     | EXP_Zero_initializer =>    false
-    (* see notes on cstring on LLVMAst.v *)
+    (* see no
+tes on cstring on LLVMAst.v *)
     (* I'm using string_of_list_ascii bc I couldn't find any other function that converted asciis to strings  *)
     | EXP_Cstring elts =>     false
     | EXP_Undef =>         false
@@ -525,12 +538,11 @@ Section ShowInstances.
     | EXP_Array elts => "["  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++  show_exp false ex) elts) ++ "]"
     | EXP_Vector elts => "<"  ++ concat ", " (map (fun '(ty,ex) => show ty ++ " " ++  show_exp false ex) elts) ++ ">"
     | OP_IBinop iop t v1 v2 =>
-       show iop ++ " " ++ add_parens b (show t ++ " " ++  show_exp true v1 ++ ", " ++  show_exp true v2)
+       let second_expression :=  if b then  show t ++ " " ++ show_exp true v2 else show_exp true v2 in
+       show iop ++ " " ++ add_parens b (show t ++ " " ++  show_exp true v1 ++ ", " ++ second_expression)
     | OP_ICmp cmp t v1 v2 =>
         let second_expression :=  if b then  show t ++ " " ++ show_exp true v2 else show_exp true v2 in
-
         "icmp " ++  show cmp ++ " " ++  add_parens b (show t ++ " " ++  show_exp true v1 ++ ", " ++ second_expression)
-                 (* "icmp " ++  show cmp ++ " " ++  add_parens b (show t ++ " " ++  show_exp true v1 ++ ", " ++ show_exp true v2) *)
     | OP_FBinop fop fmath t v1 v2 =>
         let fmath_string :=
           match fmath with
@@ -586,10 +598,10 @@ Section ShowInstances.
 
   Definition show_phi_block (p : block_id * exp T) : string :=
     let '(bid, e) := p in
-    "[ " ++ show e ++ ", " ++ "%" ++ show bid ++ " ]".
+    "[ " ++ show_exp true e ++ ", " ++ "%" ++ show bid ++ " ]".
 
   Definition intersperse (sep : string) (l : list string) : string
-    := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else s ++ sep ++ acc) l "".
+    := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else acc ++ sep ++ s) l "".
 
   #[global] Instance showPhi : Show (phi T)
     := {| show p :=
@@ -603,6 +615,13 @@ Section ShowInstances.
        | None   => ""
        | Some a => prefix ++ show a
        end.
+
+  Definition show_opt_list {A} `{Show A} (ma : option A) : list string
+    := match ma with
+       | None   => []
+       | Some a => [show a]
+       end.
+
 
   Definition show_ordering (o : ordering) : string :=
     match o with
@@ -682,31 +701,152 @@ Section ShowInstances.
   #[global] Instance showAtomicrmw : Show (atomicrmw T)
     := {| show := show_atomic_rmw |}.
 
+
+  Fixpoint show_metadata (md : metadata T)  : string :=
+    match md with
+    | METADATA_Const tv => show tv
+    | METADATA_Null => "null"
+    | METADATA_Nontemporal => "!nontemporal"
+    | METADATA_Invariant_load => "!invariant.load"
+    | METADATA_Invariant_group => "!invariant.group"
+    | METADATA_Nonnull => "!nonnull"
+    | METADATA_Dereferenceable => "!dereferenceable"
+    | METADATA_Dereferenceable_or_null => "!dereferenceable_or_null"
+    | METADATA_Align => "!align"
+    | METADATA_Noundef => "!noundef"
+    | METADATA_Id i => "!" ++ show i
+    | METADATA_String s => "!" ++ show s
+    | METADATA_Named strs => "!{" ++ intersperse " , " (List.map (fun x => "!" ++ x) strs) ++ "}"
+    | METADATA_Node mds => "!{" ++ intersperse " , " (List.map show_metadata mds) ++ "}"
+    end.
+
+  #[global] Instance showMetadata (md : metadata T) : Show (metadata T) :=
+    {| show := show_metadata |}.
+
+  Definition show_unnamed_addr (u:unnamed_addr) : string :=
+    match u with
+    | Unnamed_addr => "unnamed_addr"
+    | Local_Unnamed_addr => "local_unnamed_addr"
+    end.
+
+  #[global] Instance showUnnamedAddr : Show unnamed_addr :=
+    {| show := show_unnamed_addr |}.
+
+
+  Definition show_tailcall (t:tailcall) : string :=
+    match t with
+    | Tail => "tail"
+    | Musttail => "musttail"
+    | Notail => "notail"
+    end.
+
+  #[global]
+    Instance showTailcall : Show tailcall :=
+    {| show := show_tailcall |}.
+
   Definition show_texp (x : texp T) : string :=
     match x with
     | (t, exp) => show t ++ " " ++ show_exp true exp
       end.
 
+  Definition show_opt_space {A} (x:option A) : string :=
+    match x with
+    | Some _ => " "
+    | None => ""
+    end.
+
+  Definition concat_with_space (c:string) (l:list string) :=
+    match l with
+    | [] => ""
+    | _::_ => (concat c l) ++ " "
+    end.
+
+  Definition show_call_arg '(te, atts) :=
+    let '(t, e) := (te:texp T) in
+    let attrs := concat_with_space " " (List.map show (atts:list param_attr)) in
+    (show (t:T)) ++ " " ++ attrs ++ (show_exp true (e:exp T)).
+
   Definition show_instr (i : instr T) : string
     := match i with
        | INSTR_Comment s => "; " ++ s
+
        | INSTR_Op e => show e
-       (* Based on the old printer  *)
-       | INSTR_Call fn args => "call " ++ show fn ++ "(" ++ (concat ", " (map show_texp args)) ++ ")"
-       | INSTR_Alloca t nb align =>
-           "alloca " ++ show t ++ show_opt_prefix ", " nb ++ show_opt_prefix ", align " align
-       | INSTR_Load vol t ptr align =>
-           "load " ++ show t ++ ", " ++ show_texp ptr ++ show_opt_prefix ", align " align
-       | INSTR_Store vol tval ptr align =>
-           "store " ++ (if vol then "volatile " else "") ++ show_texp tval ++ ", " ++ show ptr ++ show_opt_prefix ", align " align
+
+       | INSTR_Call fn args anns =>
+           let tail := find_option ann_tail anns in
+           let fast_math_flags := filter_option ann_fast_math_flag anns in
+           let cconv := find_option ann_cconv anns in
+           let ret_attrs := filter_option ann_ret_attribute anns in
+           let addrspace := find_option ann_addrspace anns in
+           let fn_attrs := filter_option ann_fun_attribute anns in
+           (show_opt_prefix "" tail) ++ (show_opt_space tail)
+             ++
+             "call " ++
+             (concat_with_space " "
+                     ((map show_fast_math fast_math_flags)
+                        ++
+                        (show_opt_list cconv)
+                        ++
+                        (map show_param_attr ret_attrs)
+                        ++
+                        (show_opt_list addrspace)
+                     )
+             ) ++
+             show fn ++ "(" ++ (concat ", " (map show_call_arg args)) ++ ") " ++
+             (concat " " (map show_fn_attr fn_attrs))
+
+       | INSTR_Alloca t anns =>
+           let inalloca := match find_option ann_inalloca anns with
+                           | Some _ => "inalloca"
+                           | None => ""
+                           end
+           in
+           let nb := find_option ann_num_elements anns in
+           let align := find_option ann_align anns in
+           "alloca " ++ inalloca ++ show t ++ show_opt_prefix ", " nb ++ show_opt_prefix ", align " align
+
+       | INSTR_Load t ptr anns =>
+           let volatile := match find_option ann_volatile anns with
+                           | Some _ => "volatile"
+                           | None => ""
+                           end
+           in
+           let align := find_option ann_align anns in
+           let meta := filter_option ann_metadata anns in
+           let meta_str := concatStr (List.map (fun '(m1, m2) =>
+                                                  ", "
+                                                    ++ (show_metadata (m1:metadata T)) ++ " " ++
+                                                    (show_metadata (m2:metadata T))) meta)
+           in
+           "load " ++ volatile ++ show t ++ ", " ++ show_texp ptr ++ (show_opt_prefix ", align " align) ++ meta_str
+
+       | INSTR_Store tval ptr anns =>
+           let volatile := match find_option ann_volatile anns with
+                           | Some _ => "volatile"
+                           | None => ""
+                           end
+           in
+           let align := find_option ann_align anns in
+           let meta := filter_option ann_metadata anns in
+           let meta_str := concatStr (List.map (fun '(m1, m2) =>
+                                                  ", "
+                                                    ++ (show_metadata (m1:metadata T)) ++ " " ++
+                                                    (show_metadata (m2:metadata T))) meta)
+           in
+           "store " ++ volatile ++ show_texp tval ++ ", " ++ show_texp ptr ++ show_opt_prefix ", align " align ++ meta_str
+
        | INSTR_Fence syncscope ordering => let printable_sync := match syncscope with
                                                                  | None => ""
                                                                  | Some x => "[syncscope(""" ++ show x ++ """)]"
                                                                  end in
                                            "fence " ++ printable_sync ++ show ordering  ++" ; yields void"
+
        | INSTR_AtomicCmpXchg c => show_cmpxchg c
+
        | INSTR_AtomicRMW a => show_atomic_rmw a
+
        | INSTR_VAArg (va_list_and_arg_list) (t)  => "va_arg " ++ show va_list_and_arg_list ++ ", " ++ show t
+
        | INSTR_LandingPad => "skipping implementation at the moment"
        end.
 
@@ -797,7 +937,10 @@ Section ShowInstances.
 
   Definition show_arg (arg : local_id * T * list param_attr) : string
     := let '(i, t, parameter_attributes) := arg in
-       show t ++ concat " " (map (fun x => show x) (parameter_attributes)) ++ " %" ++ show i.
+       show t ++ (match parameter_attributes with
+                  | [] => ""
+                  | _ => " " ++ concat " " (map (fun x => show x) (parameter_attributes))
+                  end) ++ " %" ++ show i.
 
   Definition show_arg_list (args : list (local_id * T * list param_attr)) (varargs:bool) : string
     :=
@@ -828,18 +971,6 @@ Section ShowInstances.
        | (x::xs), (y::ys), (z::zs) => (x, y, z) :: zip3 xs ys zs
        end.
 
-  Fixpoint show_metadata (md : metadata T)  : string :=
-    match md with
-    | METADATA_Const tv => show tv
-    | METADATA_Null => "null"
-    | METADATA_Id i => "!" ++ show i
-    | METADATA_String s => "!" ++ show s
-    | METADATA_Named strs => "!{" ++ intersperse " , " (List.map (fun x => "!" ++ x) strs) ++ "}"
-    | METADATA_Node mds => "!{" ++ intersperse " , " (List.map show_metadata mds) ++ "}"
-    end.
-
-  #[global] Instance showMetadata (md : metadata T) : Show (metadata T) :=
-    {| show := show_metadata |}.
 
 End ShowInstances.
 
@@ -958,14 +1089,7 @@ Definition show_declaration (decl: declaration typ) : string :=
 Global Instance showDeclaration: Show (declaration typ) :=
   {| show := show_declaration |}.
 
-Definition show_unnamed_addr (u:unnamed_addr) : string :=
-  match u with
-  | Unnamed_addr => "unnamed_addr"
-  | Local_Unnamed_addr => "local_unnamed_addr"
-  end.
 
-#[global] Instance showUnnamedAddr : Show unnamed_addr :=
-  {| show := show_unnamed_addr |}.
 
 Definition show_global (g : global typ) : string :=
   let name  := g.(g_ident) in
@@ -1009,7 +1133,7 @@ Definition show_tle (tle : toplevel_entity typ (block typ * list (block typ))) :
      | TLE_Source_filename s => "source_filename = " ++ show s
      | TLE_Declaration decl => show decl
      | TLE_Global g => show g
-     | TLE_Metadata id md => "!" ++ show id ++ show_metadata md (* Can't use implicit *)
+     | TLE_Metadata id md => "!" ++ show id ++ " = " ++ show_metadata md (* Can't use implicit *)
      | TLE_Type_decl id t => concatStr [show_ident id ;  " = type " ; show t ]
      | TLE_Attribute_group i attrs => concatStr ["attributes #" ; show i ; " = { " ;
                                                 concat " " (map (fun x => show x) (attrs)) ; " }"  ]

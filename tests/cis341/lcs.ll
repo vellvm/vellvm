@@ -15,9 +15,9 @@ define i64 @lcs(i64 %m, i64 %n) {
  then:
  %m1 = sub i64 %m, 1
  %n1 = sub i64 %n, 1
- %3 = getelementptr %arr1, %arr1* @str1, i32 0, i32 %m1
+ %3 = getelementptr %arr1, %arr1* @str1, i32 0, i64 %m1
  %4 = load i64, i64* %3
- %5 = getelementptr %arr2, %arr2* @str2, i32 0, i32 %n1
+ %5 = getelementptr %arr2, %arr2* @str2, i32 0, i64 %n1
  %6 = load i64, i64* %5
  %7 = icmp eq i64 %4, %6
  br i1 %7, label %eq_recurse, label %not_eq_recurse

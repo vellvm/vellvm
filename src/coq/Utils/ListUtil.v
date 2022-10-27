@@ -18,6 +18,15 @@ Section FINDOPTION.
              end
     end.
 
+  Fixpoint filter_option (f : A -> option B) (l:list A) : list B :=
+    match l with
+    | [] => []
+    | x::xs => match f x with
+             | None => filter_option f xs
+             | Some y => y::(filter_option f xs)
+             end
+    end.
+
 End FINDOPTION.
 
 
