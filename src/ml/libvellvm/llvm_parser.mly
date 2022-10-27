@@ -1399,7 +1399,7 @@ exp:
 
   | t=tailcall? KW_CALL fm=list(fast_math) cc=cconv? ra=list(param_attr) addr=addrspace?
     f=texp  a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
-    fa=list(fn_attr) md=call_metadata? (* TODO: operand bundles? *)
+    fa=list(fn_attr) call_metadata? (* TODO: operand bundles? *)
     { let atts =
 	(opt_list t)
 	@ (List.map (fun f -> ANN_fast_math_flag f) fm)
