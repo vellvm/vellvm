@@ -6,7 +6,7 @@ FILENAMES=("InterpretationStack.ml" "InterpretationStack.mli" "TopLevel.ml" "Top
 MEMORYFILES=("MemoryModelImplementation.mli")
 
 function replace () {
-    sed -i.bak -e "$1" $EXTRACT_DIR/$2
+    perl -i.bak -p0777ne "$1" $EXTRACT_DIR/$2
     rm -rf $EXTRACT_DIR/*.bak
 }
 
@@ -39,10 +39,10 @@ done
 
 for f in "${MEMORYFILES[@]}"
 do
-    replace "/\([[:space:]]*\)type dvalue = LLVMParamsBigIntptr.Events.DV.dvalue =/{N; s/\([[:space:]]*\)type dvalue = LLVMParamsBigIntptr.Events.DV.dvalue =\([[:space:]]*\)| DVALUE_Addr of ADDR.addr/\1type dvalue = LLVMParamsBigIntptr.Events.DV.dvalue =\2| DVALUE_Addr of LLVMParamsBigIntptr.ADDR.addr/g}" $f
-    replace "/\([[:space:]]*\)type uvalue = LLVMParamsBigIntptr.Events.DV.uvalue =/{N; s/\([[:space:]]*\)type uvalue = LLVMParamsBigIntptr.Events.DV.uvalue =\([[:space:]]*\)| UVALUE_Addr of ADDR.addr/\1type uvalue = LLVMParamsBigIntptr.Events.DV.uvalue =\2| UVALUE_Addr of LLVMParamsBigIntptr.ADDR.addr/g}" $f
-    replace "/\([[:space:]]*\)type dvalue = LLVMParamsBigIntptr.Events.DV.dvalue =/{N;N;N;N;N;N;s/\(.*\)DVALUE_IPTR of IP.intptr/\1DVALUE_IPTR of LLVMParamsBigIntptr.IP.intptr/g}" $f
-    replace "/\([[:space:]]*\)type uvalue = LLVMParamsBigIntptr.Events.DV.uvalue =/{N;N;N;N;N;N;s/\(.*\)UVALUE_IPTR of IP.intptr/\1UVALUE_IPTR of LLVMParamsBigIntptr.IP.intptr/g}" $f
+    replace "s/^(\s*)type dvalue = LLVMParamsBigIntptr.Events.DV.dvalue =\n(\s*)\| DVALUE_Addr of ADDR.addr/\1type dvalue = LLVMParamsBigIntptr.Events.DV.dvalue =\n\2\| DVALUE_Addr of LLVMParamsBigIntptr.ADDR.addr/gm" $f
+    replace "s/^(\s*)type uvalue = LLVMParamsBigIntptr.Events.DV.uvalue =\n(\s*)\| UVALUE_Addr of ADDR.addr/\1type uvalue = LLVMParamsBigIntptr.Events.DV.uvalue =\n\2\| UVALUE_Addr of LLVMParamsBigIntptr.ADDR.addr/gm" $f
+    replace "s/(^\s*type dvalue = LLVMParamsBigIntptr.Events.DV.dvalue =(\n|.)*?DVALUE_IPTR of )IP.intptr/\1LLVMParamsBigIntptr.IP.intptr/gm" $f
+    replace "s/(^\s*type uvalue = LLVMParamsBigIntptr.Events.DV.uvalue =(\n|.)*?UVALUE_IPTR of )IP.intptr/\1LLVMParamsBigIntptr.IP.intptr/gm" $f
 done
 
 # Polymorphism issue

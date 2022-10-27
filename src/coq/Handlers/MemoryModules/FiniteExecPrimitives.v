@@ -1882,8 +1882,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       add_block aid ptr ptrs init_bytes;;
       add_ptrs_to_heap ptrs.
 
-    Definition allocate_bytes `{MemMonad ExtraState MemM (itree Eff)} (dt : dtyp) (init_bytes : list SByte) : MemM addr :=
-      pr <- fresh_provenance;;
+    Definition allocate_bytes_with_pr `{MemMonad ExtraState MemM (itree Eff)} (dt : dtyp) (init_bytes : list SByte) (pr : Provenance) : MemM addr :=
       let len := length init_bytes in
       '(ptr, ptrs) <- get_free_block len pr;;
       match dtyp_eq_dec dt DTYPE_Void with
@@ -1898,14 +1897,21 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           end
       end.
 
-    (** Heap allocation *)
-    Definition malloc_bytes `{MemMonad ExtraState MemM (itree Eff)} (init_bytes : list SByte) : MemM addr :=
+    Definition allocate_bytes `{MemMonad ExtraState MemM (itree Eff)} (dt : dtyp) (init_bytes : list SByte) : MemM addr :=
       pr <- fresh_provenance;;
+      allocate_bytes_with_pr dt init_bytes pr.
+
+    (** Heap allocation *)
+    Definition malloc_bytes_with_pr `{MemMonad ExtraState MemM (itree Eff)} (init_bytes : list SByte) (pr : Provenance) : MemM addr :=
       let len := length init_bytes in
       '(ptr, ptrs) <- get_free_block len pr;;
       let aid := provenance_to_allocation_id pr in
       add_block_to_heap aid ptr ptrs init_bytes;;
       ret ptr.
+
+    Definition malloc_bytes `{MemMonad ExtraState MemM (itree Eff)} (init_bytes : list SByte) : MemM addr :=
+      pr <- fresh_provenance;;
+      malloc_bytes_with_pr init_bytes pr.
 
     (** Frame stacks *)
     (* Check if an address is allocated in a frame *)
@@ -4044,7 +4050,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma find_free_block_extend_allocations :
       forall ms_init ms_found_free ms_extended pr ptr ptrs init_bytes,
-        find_free_block (length init_bytes) pr ms_init (ret (ms_found_free, (ptr, ptrs))) ->
+        ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr ->
         mem_state_memory ms_extended = add_all_index (map (fun b : SByte => (b, provenance_to_allocation_id pr)) init_bytes) (ptr_to_int ptr) (mem_state_memory ms_init) ->
         extend_allocations ms_init ptrs pr ms_extended.
     Proof.
@@ -4082,7 +4088,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma find_free_block_ms_eq :
       forall ms1 ms2 len pr ptr ptrs,
-        find_free_block len pr ms1 (ret (ms2, (ptr, ptrs))) ->
+        ret (ptr, ptrs) {{ms1}} ∈ {{ms2}} find_free_block len pr ->
         ms1 = ms2.
     Proof.
       intros ms1 ms2 len pr ptr ptrs [MS FREE].
@@ -4252,7 +4258,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma find_free_block_extend_reads :
       forall ms_init ms_found_free ms_extended pr ptr ptrs init_bytes,
-        find_free_block (length init_bytes) pr ms_init (ret (ms_found_free, (ptr, ptrs))) ->
+        ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr ->
         mem_state_memory ms_extended = add_all_index (map (fun b : SByte => (b, provenance_to_allocation_id pr)) init_bytes) (ptr_to_int ptr) (mem_state_memory ms_init) ->
         extend_reads ms_init ptrs init_bytes ms_extended.
     Proof.
@@ -4357,7 +4363,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma find_free_block_extend_read_byte_allowed :
       forall ms_init ms_found_free ms_extended pr ptr ptrs init_bytes,
-        find_free_block (length init_bytes) pr ms_init (ret (ms_found_free, (ptr, ptrs))) ->
+        ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr ->
         mem_state_memory ms_extended = add_all_index (map (fun b : SByte => (b, provenance_to_allocation_id pr)) init_bytes) (ptr_to_int ptr) (mem_state_memory ms_init) ->
         extend_read_byte_allowed ms_init ptrs ms_extended.
     Proof.
@@ -4467,7 +4473,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma find_free_block_extend_write_byte_allowed :
       forall ms_init ms_found_free ms_extended pr ptr ptrs init_bytes,
-        find_free_block (length init_bytes) pr ms_init (ret (ms_found_free, (ptr, ptrs))) ->
+        ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr ->
         mem_state_memory ms_extended = add_all_index (map (fun b : SByte => (b, provenance_to_allocation_id pr)) init_bytes) (ptr_to_int ptr) (mem_state_memory ms_init) ->
         extend_write_byte_allowed ms_init ptrs ms_extended.
     Proof.
@@ -4576,7 +4582,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma find_free_block_extend_free_byte_allowed :
       forall ms_init ms_found_free ms_extended pr ptr ptrs init_bytes,
-        find_free_block (length init_bytes) pr ms_init (ret (ms_found_free, (ptr, ptrs))) ->
+        ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr ->
         mem_state_memory ms_extended = add_all_index (map (fun b : SByte => (b, provenance_to_allocation_id pr)) init_bytes) (ptr_to_int ptr) (mem_state_memory ms_init) ->
         extend_free_byte_allowed ms_init ptrs ms_extended.
     Proof.
@@ -4618,7 +4624,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall dt pr ms_init ptr ptrs init_bytes,
         sizeof_dtyp dt = N.of_nat (Datatypes.length init_bytes) ->
         exec_correct
-          (fun ms_k _ => find_free_block (Datatypes.length init_bytes) pr ms_init (ret (ms_k, (ptr, ptrs))))
+          (fun ms_k _ => ret (ptr, ptrs) {{ms_init}} ∈ {{ms_k}} find_free_block (Datatypes.length init_bytes) pr)
           (_ <- add_block_to_stack (provenance_to_allocation_id pr) ptr ptrs init_bytes;; ret ptr)
           (_ <- allocate_bytes_post_conditions_MemPropT dt init_bytes pr ptr ptrs;; ret ptr).
     Proof.
@@ -4711,7 +4717,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                          |} (map ptr_to_int ptrs);
                        ms_provenance := ms_provenance0
                      |})
-            (FIND_FREE : find_free_block (length init_bytes) pr ms_init (ret (ms_found_free, (ptr, ptrs)))),
+            (FIND_FREE : ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr),
           allocate_bytes_post_conditions ms_found_free dt init_bytes pr ms_final ptr ptrs.
         Proof.
           intros ms_init ms_found_free ms_final dt init_bytes pr ptr ptrs memory_stack_memory0
@@ -4763,7 +4769,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           forall (ms_init ms_found_free : MemState) dt init_bytes pr ptr ptrs
             (SIZE : sizeof_dtyp dt = N.of_nat (length init_bytes))
             (NVOID : dt <> DTYPE_Void)
-            (FIND_FREE : find_free_block (length init_bytes) pr ms_init (ret (ms_found_free, (ptr, ptrs)))),
+            (FIND_FREE : ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr),
         exists ms_final,
           allocate_bytes_post_conditions ms_found_free dt init_bytes pr ms_final ptr ptrs.
         Proof.
@@ -4783,7 +4789,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma add_block_to_heap_correct :
       forall pr ms_init ptr ptrs init_bytes,
         exec_correct
-          (fun ms_k _ => find_free_block (Datatypes.length init_bytes) pr ms_init (ret (ms_k, (ptr, ptrs))))
+          (fun ms_k _ => ret (ptr, ptrs) {{ms_init}} ∈ {{ms_k}} find_free_block (Datatypes.length init_bytes) pr)
           (_ <- add_block_to_heap (provenance_to_allocation_id pr) ptr ptrs init_bytes;; ret ptr)
           (_ <- malloc_bytes_post_conditions_MemPropT init_bytes pr ptr ptrs;; ret ptr).
     Proof.
@@ -4863,7 +4869,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                          |} (map ptr_to_int ptrs);
                        ms_provenance := ms_provenance0
                      |})
-            (FIND_FREE : find_free_block (length init_bytes) pr ms_init (ret (ms_found_free, (ptr, ptrs)))),
+            (FIND_FREE : ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr),
             malloc_bytes_post_conditions ms_found_free init_bytes pr ms_final ptr ptrs.
         Proof.
           intros ms_init ms_found_free ms_final init_bytes pr ptr ptrs memory_stack_memory0
@@ -4950,16 +4956,16 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       - admit. (* MemMonad_valid_state *)
     Admitted.
 
-    Lemma allocate_bytes_correct :
-      forall dt init_bytes pre, exec_correct pre (allocate_bytes dt init_bytes) (allocate_bytes_spec_MemPropT dt init_bytes).
+    Parameter allocate_bytes_with_pr_correct :
+      forall dt init_bytes pr pre, exec_correct pre (allocate_bytes_with_pr dt init_bytes pr) (allocate_bytes_with_pr_spec_MemPropT dt init_bytes pr).
+
+    Lemma allocater_bytes_with_pr_correct :
+      forall dt init_bytes pr pre, exec_correct pre (allocate_bytes_with_pr dt init_bytes pr) (allocate_bytes_with_pr_spec_MemPropT dt init_bytes pr).
     Proof.
       Opaque exec_correct.
-      intros dt init_bytes pre.
+      intros dt init_bytes pr pre.
 
-      unfold allocate_bytes, allocate_bytes_spec_MemPropT.
-      apply exec_correct_bind; eauto with EXEC_CORRECT.
-      intros pr ms ms_fresh_pr st st' FRESH_EXEC.
-
+      unfold allocate_bytes_with_pr, allocate_bytes_with_pr_spec_MemPropT.
       apply exec_correct_bind; eauto with EXEC_CORRECT.
       intros [ptr ptrs] ms' ms_find_free st'' st_find_free GET_FREE.
 
@@ -5087,15 +5093,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Qed.
 
     (** Malloc correctness *)
-    Lemma malloc_bytes_correct :
-      forall init_bytes pre, exec_correct pre (malloc_bytes init_bytes) (malloc_bytes_spec_MemPropT init_bytes).
+    Lemma malloc_bytes_with_pr_correct :
+      forall init_bytes pr pre, exec_correct pre (malloc_bytes_with_pr init_bytes pr) (malloc_bytes_with_pr_spec_MemPropT init_bytes pr).
     Proof.
-      intros init_bytes pre.
+      intros init_bytes pr pre.
 
-      unfold malloc_bytes.
-      apply exec_correct_bind; eauto with EXEC_CORRECT.
-      intros pr ms ms_fresh_pr st st' FRESH_EXEC.
-
+      unfold malloc_bytes_with_pr.
       apply exec_correct_bind; eauto with EXEC_CORRECT.
       intros [ptr ptrs] ms' ms_find_free st'' st_find_free GET_FREE.
 

@@ -584,3 +584,41 @@ Proof.
   rewrite Zlength_correct.
   lia.
 Qed.
+
+(* TODO: do these induction principles exist already? *)
+Lemma nat_strong_ind :
+  forall (P: nat -> Prop)
+    (BASE: P 0)
+    (IH: forall (n : nat), (forall (m : nat), m <= n -> P m) -> P (S n)),
+  forall n, P n.
+Proof.
+  intros P BASE IH n.
+  destruct n.
+  - apply BASE.
+  - apply IH.
+    induction n; intros m LE.
+    + assert (m=0) by lia; subst; auto.
+    + assert (m <= n \/ m = S n) as [LE' | EQ] by lia;
+        subst; auto.
+Qed.
+
+Lemma length_strong_ind:
+  forall (X : Type) (P : list X -> Prop)
+    (BASE: P nil)
+    (IH: forall (n : nat) (xs: list X), (forall (xs : list X), length xs <= n -> P xs) -> length xs = S n -> P xs),
+  forall l, P l.
+Proof.
+  intros X P BASE IH.
+  assert (forall n l, length l <= n -> P l) as IHLEN.
+  { induction n using nat_strong_ind; intros l LEN; auto.
+    assert (length l = 0) as LEN' by lia.
+    apply length_zero_iff_nil in LEN'; subst; auto.
+
+    assert (length l <= n \/ length l = S n) as [LEQ | EQ] by lia;
+      eauto.
+  }
+
+  intros l.
+  eapply IHLEN.
+  reflexivity.
+Qed.

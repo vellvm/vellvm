@@ -2863,12 +2863,17 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
              allocate_bytes_post_conditions m1 t init_bytes prov m2 ptr ptrs /\ ptr = ptr' /\ ptrs = ptrs'
          end.
 
+  Definition allocate_bytes_with_pr_spec_MemPropT
+    (t : dtyp) (init_bytes : list SByte) (prov : Provenance)
+    : MemPropT MemState addr
+    := '(ptr, ptrs) <- find_free_block (length init_bytes) prov;;
+       allocate_bytes_post_conditions_MemPropT t init_bytes prov ptr ptrs;;
+       ret ptr.
+
   Definition allocate_bytes_spec_MemPropT (t : dtyp) (init_bytes : list SByte)
     : MemPropT MemState addr
     := prov <- fresh_provenance;;
-       '(ptr, ptrs) <- find_free_block (length init_bytes) prov;;
-       allocate_bytes_post_conditions_MemPropT t init_bytes prov ptr ptrs;;
-       ret ptr.
+       allocate_bytes_with_pr_spec_MemPropT t init_bytes prov.
 
   (*** Allocating bytes in the heap *)
   Record malloc_bytes_post_conditions (m1 : MemState) (init_bytes : list SByte) (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
@@ -2915,12 +2920,16 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
              malloc_bytes_post_conditions m1 init_bytes prov m2 ptr ptrs /\ ptr = ptr' /\ ptrs = ptrs'
          end.
 
+  Definition malloc_bytes_with_pr_spec_MemPropT (init_bytes : list SByte) (prov : Provenance)
+    : MemPropT MemState addr
+    := '(ptr, ptrs) <- find_free_block (length init_bytes) prov;;
+       malloc_bytes_post_conditions_MemPropT init_bytes prov ptr ptrs;;
+       ret ptr.
+
   Definition malloc_bytes_spec_MemPropT (init_bytes : list SByte)
     : MemPropT MemState addr
     := prov <- fresh_provenance;;
-       '(ptr, ptrs) <- find_free_block (length init_bytes) prov;;
-       malloc_bytes_post_conditions_MemPropT init_bytes prov ptr ptrs;;
-       ret ptr.
+       malloc_bytes_with_pr_spec_MemPropT init_bytes prov.
 
   (*** Freeing heap allocations *)
   Record free_operation_invariants (m1 : MemState) (m2 : MemState) :=
@@ -4208,16 +4217,16 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
       forall `{MemMonad ExtraState MemM (itree Eff)}, addr -> SByte -> MemM unit.
 
     (** Stack allocations *)
-    Parameter allocate_bytes :
-      forall `{MemMonad ExtraState MemM (itree Eff)}, dtyp -> list SByte -> MemM addr.
+    Parameter allocate_bytes_with_pr :
+      forall `{MemMonad ExtraState MemM (itree Eff)}, dtyp -> list SByte -> Provenance -> MemM addr.
 
     (** Frame stacks *)
     Parameter mempush : forall `{MemMonad ExtraState MemM (itree Eff)}, MemM unit.
     Parameter mempop : forall `{MemMonad ExtraState MemM (itree Eff)}, MemM unit.
 
     (** Heap operations *)
-    Parameter malloc_bytes :
-      forall `{MemMonad ExtraState MemM (itree Eff)}, list SByte -> MemM addr.
+    Parameter malloc_bytes_with_pr :
+      forall `{MemMonad ExtraState MemM (itree Eff)}, list SByte -> Provenance -> MemM addr.
 
     Parameter free :
       forall `{MemMonad ExtraState MemM (itree Eff)}, addr -> MemM unit.
@@ -4231,8 +4240,8 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
     Parameter write_byte_correct :
       forall ptr byte pre, exec_correct pre (write_byte ptr byte) (write_byte_spec_MemPropT ptr byte).
 
-    Parameter allocate_bytes_correct :
-      forall dt init_bytes pre, exec_correct pre (allocate_bytes dt init_bytes) (allocate_bytes_spec_MemPropT dt init_bytes).
+    Parameter allocate_bytes_with_pr_correct :
+      forall dt init_bytes pr pre, exec_correct pre (allocate_bytes_with_pr dt init_bytes pr) (allocate_bytes_with_pr_spec_MemPropT dt init_bytes pr).
 
     (** Correctness of frame stack operations *)
     Parameter mempush_correct :
@@ -4241,9 +4250,9 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
     Parameter mempop_correct :
       forall pre, exec_correct pre mempop mempop_spec_MemPropT.
 
-    Parameter malloc_bytes_correct :
-      forall init_bytes pre,
-        exec_correct pre (malloc_bytes init_bytes) (malloc_bytes_spec_MemPropT init_bytes).
+    Parameter malloc_bytes_with_pr_correct :
+      forall init_bytes pr pre,
+        exec_correct pre (malloc_bytes_with_pr init_bytes pr) (malloc_bytes_with_pr_spec_MemPropT init_bytes pr).
 
     Parameter free_correct :
       forall ptr pre,
@@ -4340,11 +4349,20 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       write_bytes ptr bytes.
 
     (** Allocating dtyps *)
+    Definition allocate_bytes `{MemMonad ExtraState MemM (itree Eff)} (dt : dtyp) (init_bytes : list SByte) : MemM addr :=
+      pr <- fresh_provenance;;
+      allocate_bytes_with_pr dt init_bytes pr.
+
     (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
     Definition allocate_dtyp `{MemMonad ExtraState MemM (itree Eff)} (dt : dtyp) : MemM addr :=
       sid <- fresh_sid;;
       bytes <- lift_OOM (generate_undef_bytes dt sid);;
       allocate_bytes dt bytes.
+
+    (** Malloc *)
+    Definition malloc_bytes `{MemMonad ExtraState MemM (itree Eff)} (init_bytes : list SByte) : MemM addr :=
+      pr <- fresh_provenance;;
+      malloc_bytes_with_pr init_bytes pr.
 
     (** Handle memcpy *)
     Definition memcpy `{MemMonad ExtraState MemM (itree Eff)} (src dst : addr) (len : Z) (align : N) (volatile : bool) : MemM unit :=
@@ -4498,25 +4516,29 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Import Monad.
 
     Lemma exec_correct_re_sid_ubytes_helper :
-      forall bytes pre,
+      forall bytes pre nm,
         exec_correct pre
-                     (re_sid_ubytes_helper bytes (NM.empty MP.BYTE_IMPL.SByte))
-                     (re_sid_ubytes_helper bytes (NM.empty MP.BYTE_IMPL.SByte)).
+                     (re_sid_ubytes_helper bytes nm)
+                     (re_sid_ubytes_helper bytes nm).
     Proof.
-      induction bytes; intros pre.
+      intros bytes.
+      induction bytes using length_strong_ind; intros pre nm.
       - apply exec_correct_ret.
       - repeat rewrite re_sid_ubytes_helper_equation.
-        break_match; auto with EXEC_CORRECT.
-        break_match; auto with EXEC_CORRECT.
-        break_match; auto with EXEC_CORRECT.
+        break_match_goal; auto with EXEC_CORRECT.
+        break_match_goal; auto with EXEC_CORRECT.
+        break_match_goal; auto with EXEC_CORRECT.
+        break_match_goal; auto with EXEC_CORRECT.
         apply exec_correct_bind; auto with EXEC_CORRECT.
         intros a0.
-    (* Fiddly reasoning because it's not structural... we update
-           all of the sids that match the current one at once, and
-           then recursively call the function on the unmatched
-           bytes...
-     *)
-    Admitted.
+        intros ms_init ms_after_m st_init st_after_m RUN_FRESH_SID.
+        apply H.
+        subst.
+
+        cbn in H0.
+        apply filter_split_out_length in Heqp1.
+        lia.
+    Qed.
 
     Hint Resolve exec_correct_re_sid_ubytes_helper : EXEC_CORRECT.
 
@@ -4543,6 +4565,163 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
 
     Hint Resolve exec_correct_re_sid_ubytes : EXEC_CORRECT.
 
+    Lemma dtyp_measure_strong_ind:
+      forall (P : dtyp -> Prop)
+        (BASE: forall dt, dtyp_measure dt = 1 -> P dt)
+        (IH: forall (n : nat) (dt: dtyp), (forall (dt : dtyp), dtyp_measure dt <= n -> P dt) -> dtyp_measure dt = S n -> P dt),
+      forall dt, P dt.
+    Proof.
+      intros P BASE IH.
+      assert (forall n dt, dtyp_measure dt <= n -> P dt) as IHDT.
+      { induction n using nat_strong_ind; intros dt SIZE.
+        - destruct dt; cbn in SIZE; lia.
+        - assert (dtyp_measure dt <= n \/ dtyp_measure dt = S n) as [LEQ | EQ] by lia;
+          eauto.
+      }
+
+      intros dt.
+      eapply IHDT.
+      reflexivity.
+    Qed.
+
+    Lemma exec_correct_serialize_sbytes_undef :
+      forall dt t pre,
+        exec_correct pre (serialize_sbytes (UVALUE_Undef t) dt) (serialize_sbytes (UVALUE_Undef t) dt).
+    Proof.
+      induction dt using dtyp_measure_strong_ind; intros t pre;
+        do 2 rewrite serialize_sbytes_equation;
+        auto with EXEC_CORRECT.
+
+      { (* Size 1 *)
+        destruct dt; inversion H; auto with EXEC_CORRECT.
+      }
+
+      { (* Larger sizes *)
+        revert t pre.
+        induction dt; intros t pre; try apply exec_correct_bind; auto with EXEC_CORRECT.
+
+        { (* Arrays *)
+          apply exec_correct_map_monad_In.
+          intros a pre0 IN.
+          apply In_repeatN in IN; subst.
+          eapply H.
+          cbn in H0.
+          lia.
+        }
+
+        { (* Structs *)
+          break_match_goal; auto with EXEC_CORRECT.
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+          eapply H; cbn in *; auto; lia.
+
+          intros a ms_init ms_after_m st_init st_after_m RUN.
+
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+
+          eapply H; cbn in *; auto.
+          unfold list_sum.
+          assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
+          lia.
+        }
+
+        { (* Packed Structs *)
+          break_match_goal; auto with EXEC_CORRECT.
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+          eapply H; cbn in *; auto; lia.
+
+          intros a ms_init ms_after_m st_init st_after_m RUN.
+
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+
+          eapply H; cbn in *; auto.
+          unfold list_sum.
+          assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
+          lia.
+        }
+
+        { (* Vectors *)
+          apply exec_correct_map_monad_In.
+          intros a pre0 IN.
+          apply In_repeatN in IN; subst.
+          eapply H.
+          cbn in H0.
+          lia.
+        }
+
+      }
+    Qed.
+
+    Hint Resolve exec_correct_serialize_sbytes_undef : EXEC_CORRECT.
+
+    Lemma exec_correct_serialize_sbytes_poison :
+      forall dt t pre,
+        exec_correct pre (serialize_sbytes (UVALUE_Poison t) dt) (serialize_sbytes (UVALUE_Poison t) dt).
+    Proof.
+      induction dt using dtyp_measure_strong_ind; intros t pre;
+        do 2 rewrite serialize_sbytes_equation;
+        auto with EXEC_CORRECT.
+
+      { (* Size 1 *)
+        destruct dt; inversion H; auto with EXEC_CORRECT.
+      }
+
+      { (* Larger sizes *)
+        revert t pre.
+        induction dt; intros t pre; try apply exec_correct_bind; auto with EXEC_CORRECT.
+
+        { (* Arrays *)
+          apply exec_correct_map_monad_In.
+          intros a pre0 IN.
+          apply In_repeatN in IN; subst.
+          eapply H.
+          cbn in H0.
+          lia.
+        }
+
+        { (* Structs *)
+          break_match_goal; auto with EXEC_CORRECT.
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+          eapply H; cbn in *; auto; lia.
+
+          intros a ms_init ms_after_m st_init st_after_m RUN.
+
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+
+          eapply H; cbn in *; auto.
+          unfold list_sum.
+          assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
+          lia.
+        }
+
+        { (* Packed Structs *)
+          break_match_goal; auto with EXEC_CORRECT.
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+          eapply H; cbn in *; auto; lia.
+
+          intros a ms_init ms_after_m st_init st_after_m RUN.
+
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+
+          eapply H; cbn in *; auto.
+          unfold list_sum.
+          assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
+          lia.
+        }
+
+        { (* Vectors *)
+          apply exec_correct_map_monad_In.
+          intros a pre0 IN.
+          apply In_repeatN in IN; subst.
+          eapply H.
+          cbn in H0.
+          lia.
+        }
+
+      }
+    Qed.
+
+    Hint Resolve exec_correct_serialize_sbytes_poison : EXEC_CORRECT.
+
     Lemma exec_correct_serialize_sbytes :
       forall uv dt pre,
         exec_correct pre (serialize_sbytes uv dt) (serialize_sbytes uv dt).
@@ -4551,28 +4730,32 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         do 2 rewrite serialize_sbytes_equation;
         auto with EXEC_CORRECT.
 
-      (* - (* Undef *) *)
-      (*   break_match; auto with EXEC_CORRECT. *)
-      (*   { apply exec_correct_bind; auto with EXEC_CORRECT. *)
-      (*     apply exec_correct_map_monad_In. *)
-      (*     intros a IN. *)
-      (*     apply In_repeatN in IN; subst. *)
-      (*     admit. *)
-      (*   } *)
-      (*   admit. *)
-      (* - (* Poison *) *)
-      (*   admit. *)
-      (* - (* Structs *) *)
-      (*   break_match; auto with EXEC_CORRECT. *)
-      (*   break_match; auto with EXEC_CORRECT. *)
-      (* - (* Packed structs *) *)
-      (*   break_match; auto with EXEC_CORRECT. *)
-      (*   break_match; auto with EXEC_CORRECT. *)
-      (* - (* Arrays *) *)
-      (*   break_match; auto with EXEC_CORRECT. *)
-      (* - (* Vectors *) *)
-      (*   break_match; auto with EXEC_CORRECT. *)
-    Admitted.
+
+      all: try solve
+             [break_match; auto with EXEC_CORRECT;
+              [
+                (* Arrays *)
+                apply exec_correct_bind; auto with EXEC_CORRECT;
+                apply exec_correct_map_monad_In;
+                intros a pre0 IN;
+                apply In_repeatN in IN; subst;
+                auto with EXEC_CORRECT
+              |
+                break_match_goal; auto with EXEC_CORRECT
+              |
+                break_match_goal; auto with EXEC_CORRECT
+              |
+                apply exec_correct_bind; auto with EXEC_CORRECT;
+                apply exec_correct_map_monad_In;
+                intros a pre0 IN;
+                apply In_repeatN in IN; subst;
+                auto with EXEC_CORRECT
+              ]
+             |
+               break_match_goal; auto with EXEC_CORRECT;
+               break_match_goal; auto with EXEC_CORRECT
+             ].
+    Qed.
 
     Lemma read_bytes_correct :
       forall len ptr pre,
@@ -4624,6 +4807,19 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       intros * RUN.
       apply write_bytes_correct.
     Qed.
+
+    Lemma allocate_bytes_correct :
+      forall dt bytes pre,
+        exec_correct pre (allocate_bytes dt bytes) (allocate_bytes_spec_MemPropT dt bytes).
+    Proof.
+      intros dt pr pre.
+      apply exec_correct_bind.
+      apply exec_correct_fresh_provenance.
+      intros a ms_init ms_after_m st_init st_after_m RUN0.
+      apply allocate_bytes_with_pr_correct.
+    Qed.
+
+    Hint Resolve allocate_bytes_correct : EXEC_CORRECT.
 
     Lemma allocate_dtyp_correct :
       forall dt pre,
@@ -4693,6 +4889,17 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       unfold handle_memcpy, handle_memcpy_prop.
       repeat (break_match; try apply exec_correct_raise_error).
       all: apply memcpy_correct.
+    Qed.
+
+    Lemma malloc_bytes_correct :
+      forall bytes pre,
+        exec_correct pre (malloc_bytes bytes) (malloc_bytes_spec_MemPropT bytes).
+    Proof.
+      intros bytes pre.
+      apply exec_correct_bind.
+      apply exec_correct_fresh_provenance.
+      intros a ms_init ms_after_m st_init st_after_m RUN0.
+      apply malloc_bytes_with_pr_correct.
     Qed.
 
     Hint Resolve malloc_bytes_correct : EXEC_CORRECT.
@@ -5032,16 +5239,16 @@ Module Type MemoryModelInfiniteSpec (LP : LLVMParamsBig) (MP : MemoryParams LP) 
   Import MP.BYTE_IMPL.
 
   Parameter find_free_block_can_always_succeed :
-    forall (ms : MemState) (len : nat) (pr : Provenance),
+    forall ms (len : nat) (pr : Provenance),
     exists ptr ptrs,
-      find_free_block len pr ms (ret (ms, (ptr, ptrs))).
+      ret (ptr, ptrs) {{ms}} ∈ {{ms}} find_free_block len pr.
 
   Parameter allocate_bytes_post_conditions_can_always_be_satisfied :
-    forall (ms_init : MemState) dt bytes pr ptr ptrs
-      (FIND_FREE : find_free_block (length bytes) pr ms_init (ret (ms_init, (ptr, ptrs))))
+    forall (ms_init : MemState) dt bytes pr
       (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length bytes))
       (NON_VOID : dt <> DTYPE_Void),
-    exists ms_final,
+    exists ms_final ptr ptrs,
+      (ret (ptr, ptrs) {{ms_init}} ∈ {{ms_init}} find_free_block (length bytes) pr) /\
       allocate_bytes_post_conditions ms_init dt bytes pr ms_final ptr ptrs.
 
 End MemoryModelInfiniteSpec.
@@ -5067,6 +5274,31 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
 
   Import MMIS.
 
+  Lemma allocate_bytes_with_pr_spec_MemPropT_can_always_succeed :
+    forall (ms_init : MemState)
+      dt bytes pr
+      (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length bytes))
+      (NON_VOID : dt <> DTYPE_Void),
+    exists ms_final ptr,
+      ret ptr {{ms_init}} ∈ {{ms_final}} allocate_bytes_with_pr_spec_MemPropT dt bytes pr.
+  Proof.
+    intros ms_init dt bytes pr BYTES_SIZE NON_VOID.
+    unfold allocate_bytes_spec_MemPropT.
+
+    pose proof allocate_bytes_post_conditions_can_always_be_satisfied ms_init dt bytes pr BYTES_SIZE NON_VOID as (ms_final & ptr & ptrs & (_ & BLOCK_FREE) & ALLOC).
+
+    exists ms_final. exists ptr.
+    cbn.
+
+    (* Find free block *)
+    exists ms_init. exists (ptr, ptrs).
+    split; eauto.
+
+    (* Post conditions *)
+    exists ms_final. exists (ptr, ptrs).
+    split; split; auto.
+  Qed.
+
   Lemma allocate_bytes_spec_MemPropT_can_always_succeed :
     forall (ms_init ms_fresh_pr : MemState)
       dt bytes
@@ -5075,29 +5307,16 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
       (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length bytes))
       (NON_VOID : dt <> DTYPE_Void),
     exists ms_final ptr,
-      allocate_bytes_spec_MemPropT dt bytes ms_init (ret (ms_final, ptr)).
+      ret ptr {{ms_init}} ∈ {{ms_final}} allocate_bytes_spec_MemPropT dt bytes.
   Proof.
     intros ms_init ms_fresh_pr dt bytes pr FRESH_PR BYTES_SIZE NON_VOID.
     unfold allocate_bytes_spec_MemPropT.
 
-    pose proof find_free_block_can_always_succeed
-         ms_fresh_pr (length bytes) pr as (ptr & ptrs & FIND_FREE_SUCCESS).
-
-    pose proof allocate_bytes_post_conditions_can_always_be_satisfied ms_fresh_pr dt bytes pr ptr ptrs FIND_FREE_SUCCESS BYTES_SIZE NON_VOID as (ms_final & ALLOC).
+    pose proof allocate_bytes_with_pr_spec_MemPropT_can_always_succeed ms_fresh_pr dt bytes pr BYTES_SIZE NON_VOID as (ms_final & ptr & ALLOC).
 
     exists ms_final. exists ptr.
-
-    (* Fresh provenance *)
     exists ms_fresh_pr. exists pr.
     split; auto.
-
-    (* Find free block *)
-    exists ms_fresh_pr. exists (ptr, ptrs).
-    split; eauto.
-
-    (* Post conditions *)
-    exists ms_final. exists (ptr, ptrs).
-    split; split; auto.
   Qed.
 
   (* TODO: should this be here? *)
@@ -5149,7 +5368,7 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
       (FRESH_PR : (fresh_provenance ms_fresh_sid (ret (ms_fresh_pr, pr))))
       (NON_VOID : dt <> DTYPE_Void),
     exists ms_final ptr,
-      allocate_dtyp_spec dt ms_init (ret (ms_final, ptr)).
+      ret ptr {{ms_init}} ∈ {{ms_final}} allocate_dtyp_spec dt.
   Proof.
     intros ms_init ms_fresh_sid ms_fresh_pr dt pr sid FRESH_SID FRESH_PR NON_VOID.
 

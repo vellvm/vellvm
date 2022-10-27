@@ -4,6 +4,7 @@
   version ? null,
   coq,
   dune_3,
+  perl,
   # All of these ocaml packages should probably come from the coq
   # version, or there will be disagreements between compiler versions.
   ocaml ? coq.ocaml,
@@ -25,6 +26,7 @@
       propagatedBuildInputs =
         [ coq
           dune_3
+          perl
         ] ++
         # Coq libraries
         [ mathcomp
@@ -78,11 +80,13 @@
 
       buildPhase = ''
   make -C src/
+  make -C src/ frontend
   '';
 
       installPhase = ''
   mkdir -p $out/bin
   install src/vellvm $out/bin/vellvm
+  install src/frontend $out/bin/frontend
   '';
 
       meta = {
