@@ -275,7 +275,7 @@ Module Infinite.
     denote_program ret_block.
 
   Definition t_alloc : itree L0 dvalue
-    := trigger (Alloca (DTYPE_I 64%N));; ret (DVALUE_I1 one).
+    := trigger (Alloca (DTYPE_I 64%N) 1%N None);; ret (DVALUE_I1 one).
 
   Definition t_ret : itree L0 dvalue
     := ret (DVALUE_I1 one).
@@ -303,7 +303,7 @@ Module Infinite.
 
       Import MMEP.MMSP.
       Import MemoryBigIntptr.MMEP.MMSP.
-      epose proof allocate_dtyp_spec_can_always_succeed m m (mkMemState (ms_memory_stack m) (next_provenance (ms_provenance m))) (DTYPE_I 64) _ _ _ _ _ as (ms_final & addr & ALLOC).
+      epose proof allocate_dtyp_spec_can_always_succeed m m (mkMemState (ms_memory_stack m) (next_provenance (ms_provenance m))) (DTYPE_I 64) 1 _ _ _ _ _ as (ms_final & addr & ALLOC).
 
       split.
       + go.
@@ -416,7 +416,7 @@ Module Infinite.
     Import MMEP.MMSP.
     Import MemoryBigIntptr.MMEP.MMSP.
     Import MapMonadExtra.
-    epose proof allocate_dtyp_spec_can_always_succeed m m (mkMemState (ms_memory_stack m) (next_provenance (ms_provenance m))) (DTYPE_I 64) _ _ _ _ _ as (ms_final & addr & ALLOC).
+    epose proof allocate_dtyp_spec_can_always_succeed m m (mkMemState (ms_memory_stack m) (next_provenance (ms_provenance m))) (DTYPE_I 64) 1 _ _ _ _ _ as (ms_final & addr & ALLOC).
 
 
     exists (Ret5 genv (FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
@@ -534,7 +534,7 @@ Module Infinite.
     rewrite TPRE in UNDEF.
     apply model_undef_h_ret_inv in UNDEF.
 
-    epose proof allocate_dtyp_spec_can_always_succeed m _ _ (DTYPE_I 64) _ _ _ _ _ as (ms_final & addr & ALLOC).
+    epose proof allocate_dtyp_spec_can_always_succeed m _ _ (DTYPE_I 64) 1 _ _ _ _ _ as (ms_final & addr & ALLOC).
 
     exists (Ret5 genv (FMapAList.alist_add (Name "i")
                                       (UVALUE_Conversion Ptrtoint DTYPE_Pointer (UVALUE_Addr addr) DTYPE_IPTR)
@@ -755,7 +755,7 @@ Module Infinite.
     destruct ALLOC as [sid' [ms' ALLOC]].
 
     Import MemTheory.
-    pose proof allocate_dtyp_spec_inv m (DTYPE_I 64) as ALLOCINV.
+    pose proof allocate_dtyp_spec_inv m (DTYPE_I 64) 1 as ALLOCINV.
     forward ALLOCINV. intros CONTRA; inv CONTRA.
 
     Transparent bind ret.
@@ -1036,7 +1036,7 @@ Module Finite.
     denote_program ret_block.
 
   Definition t_alloc : itree L0 dvalue
-    := trigger (Alloca (DTYPE_I 64%N));; ret (DVALUE_I1 one).
+    := trigger (Alloca (DTYPE_I 64%N) 1 None);; ret (DVALUE_I1 one).
 
   Definition t_ret : itree L0 dvalue
     := ret (DVALUE_I1 one).
@@ -1085,7 +1085,7 @@ Module Finite.
     destruct INTERP as [ta [k [ALLOC [K INTERP]]]].
     destruct ALLOC as [sid' [ms' ALLOC]].
 
-    pose proof allocate_dtyp_spec_inv m (DTYPE_I 64) as ALLOCINV.
+    pose proof allocate_dtyp_spec_inv m (DTYPE_I 64) 1 as ALLOCINV.
     forward ALLOCINV. intros CONTRA; inv CONTRA.
 
     Transparent bind ret.

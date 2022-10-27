@@ -11,8 +11,6 @@ From ExtLib Require Import
 From ITree Require Import
      Basics.Monad Basics.MonadState.
 
-
-
 Import Monads.
 
 Import MonadNotation.
@@ -59,8 +57,22 @@ Definition map_monad_ {A B}
   (f: A -> m B) (l: list A): m unit :=
   map_monad f l;; ret tt.
 
-Fixpoint sequence {a} (ms : list (m a)) : m (list a)
+Definition sequence {a} (ms : list (m a)) : m (list a)
   := map_monad id ms.
+
+Lemma sequence_cons :
+  forall {a} (ma : m a) (mas : list (m a)),
+    sequence (ma :: mas) =
+      a <- ma;;
+      rest <- sequence mas;;
+      ret (a :: rest).
+Proof.
+  intros a ma mas.
+  unfold sequence.
+  cbn.
+  unfold id.
+  reflexivity.
+Qed.
 
 Fixpoint foldM {a b} (f : b -> a -> m b ) (acc : b) (l : list a) : m b
   := match l with
@@ -70,6 +82,9 @@ Fixpoint foldM {a b} (f : b -> a -> m b ) (acc : b) (l : list a) : m b
        foldM f b xs
      end.
 
+Definition repeatM {A} (n : nat) (ma : m A) : m (list A)
+  := sequence (repeat ma n).
+
 End monad.
 Arguments monad_fold_right {_ _ _ _}.
 Arguments monad_app_fst {_ _ _ _ _}.
@@ -78,9 +93,6 @@ Arguments map_monad {_ _ _ _}.
 Arguments map_monad_ {_ _ _ _}.
 Arguments sequence {_ _ _}.
 Arguments foldM {_ _ _ _}.
-
-
-
 
 Global Instance EqM_sum {E} : Monad.Eq1 (sum E) :=
   fun (a : Type) (x y : sum E a) => x = y.

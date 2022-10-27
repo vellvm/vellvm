@@ -1,10 +1,19 @@
-From Coq Require Import String List Lia ZArith.
+From Coq Require Import
+  String
+  List
+  Lia
+  ZArith.
 
+From Vellvm.Utils Require Import
+  Error
+  Util
+  Monads.
 
-From Vellvm.Utils Require Import Error Util.
-
+From ExtLib Require Import
+     Structures.Monads.
 
 Import ListNotations.
+Import MonadNotation.
 
 Section FINDOPTION.
   Context {A B:Type}.
@@ -28,7 +37,6 @@ Section FINDOPTION.
     end.
 
 End FINDOPTION.
-
 
 
 (* TODO: Move. Also, do I really have to define this? *)
@@ -621,4 +629,43 @@ Proof.
   intros l.
   eapply IHLEN.
   reflexivity.
+Qed.
+
+Definition repeatMN {A m} `{Monad m} (n : N) (ma : m A) : m (list A)
+  := sequence (repeatN n ma).
+
+Lemma repeatMN_succ :
+  forall {A M} `{MM : Monad M} n (m : M A),
+    repeatMN (N.succ n) m =
+      a <- m;;
+      rest <- repeatMN n m;;
+      ret (a::rest).
+Proof.
+  intros A M MM n m.
+  unfold repeatMN.
+  rewrite repeatN_succ.
+  rewrite sequence_cons.
+  reflexivity.
+Qed.
+
+Lemma concat_length :
+  forall {X} (xxs : list (list X)) len
+    (INL : forall xs, In xs xxs -> length xs = len),
+    length (concat xxs) = len * (length xxs).
+Proof.
+  intros X xxs.
+  induction xxs; intros len INL.
+  - cbn; lia.
+  - rewrite concat_cons.
+    rewrite app_length.
+    cbn.
+    rewrite INL; cbn; eauto.
+    erewrite IHxxs.
+    2: {
+      intros xs H.
+      eapply INL.
+      cbn; auto.
+    }
+
+    lia.            
 Qed.

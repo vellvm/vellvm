@@ -358,19 +358,42 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationP
 
   (* An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
-             (i: (instr_id * instr dtyp)): itree instr_E unit :=
+    (i: (instr_id * instr dtyp)): itree instr_E unit :=
     match i with
     (* Pure operations *)
 
     | (IId id, INSTR_Op op) =>
-      uv <- translate exp_to_instr (denote_op op) ;;
-      trigger (LocalWrite id uv)
+        uv <- translate exp_to_instr (denote_op op) ;;
+        trigger (LocalWrite id uv)
 
     (* Allocation *)
-    | (IId id, INSTR_Alloca dt _) =>
-      dv <- trigger (Alloca dt);;
-      trigger (LocalWrite id (dvalue_to_uvalue dv))
-
+    | (IId id, INSTR_Alloca dt annotations) =>
+        let num_elements :=
+          match find
+                  (fun x => match x with | ANN_num_elements _ => true | _ => false end)
+                  annotations with
+          | Some (ANN_num_elements n) => Some n
+          | _ => None
+          end
+        in
+        let align :=
+          match find
+                  (fun x => match x with | ANN_align _ => true | _ => false end)
+                  annotations with
+          | Some (ANN_align a) => Some a
+          | _ => None
+          end
+        in
+        match num_elements with
+        | None =>
+            dv <- trigger (Alloca dt 1 align);;
+            trigger (LocalWrite id (dvalue_to_uvalue dv))
+        | Some (t, num_exp) =>
+            un <- translate exp_to_instr (denote_exp (Some t) num_exp);;
+            n <- pickUnique un;;
+            dv <- trigger (Alloca dt (Z.to_N (dvalue_int_unsigned n)) align);;
+            trigger (LocalWrite id (dvalue_to_uvalue dv))
+        end
     (* Load *)
     | (IId id, INSTR_Load dt (du,ptr) _) =>
       ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;

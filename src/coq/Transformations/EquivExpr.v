@@ -53,6 +53,40 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
   Module R := Refinement.Make LP LLVM.
   Import R.
 
+  Section MetadataInd.
+    Context {T : Set}.
+    Variable P : metadata T -> Prop.
+
+    Hypothesis IH_METADATA_Const  : forall tv, P (METADATA_Const tv).
+    Hypothesis IH_METADATA_Null : P METADATA_Null.
+    Hypothesis IH_METADATA_Nontemporal : P METADATA_Nontemporal.
+    Hypothesis IH_METADATA_Invariant_load : P METADATA_Invariant_load.
+    Hypothesis IH_METADATA_Invariant_group : P METADATA_Invariant_group.
+    Hypothesis IH_METADATA_Nonnull : P METADATA_Nonnull.
+    Hypothesis IH_METADATA_Dereferenceable : P METADATA_Dereferenceable.
+    Hypothesis IH_METADATA_Dereferenceable_or_null : P METADATA_Dereferenceable_or_null.
+    Hypothesis IH_METADATA_Align : P METADATA_Align.
+    Hypothesis IH_METADATA_Noundef : P METADATA_Noundef.
+    Hypothesis IH_METADATA_Id    : forall id, P (METADATA_Id id).
+    Hypothesis IH_METADATA_String : forall str, P (METADATA_String str).
+    Hypothesis IH_METADATA_Named : forall strs, P (METADATA_Named strs).
+    Hypothesis IH_METADATA_Node : forall (mds : list (metadata T)),
+        (forall md, In md mds -> P md) ->
+        P (METADATA_Node mds).
+
+    Lemma metadata_ind : forall (md:metadata T), P md.
+      fix IH 1.
+      remember P as P0 in IH.
+      destruct md; auto; subst.
+      - apply IH_METADATA_Node.
+        { revert mds.
+          fix IHMetadata 1. intros [|u mds']. intros. inversion H.
+          intros u' [<-|Hin]. apply IH. eapply IHMetadata. apply Hin.
+        }
+    Qed.
+  End MetadataInd.
+
+
   Section ExpOptim.
 
     Definition exp_optimization := exp dtyp -> exp dtyp.
@@ -76,6 +110,40 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
       rewrite IH.
       reflexivity.
       intros; apply EQ; right; auto.
+    Qed.
+
+    Lemma find_num_elements_annotation_endo :
+      forall anns,
+        find (fun x : annotation dtyp =>
+                match x with
+                | ANN_num_elements _ => true
+                | _ => false
+                end) anns = 
+          find (fun x : annotation dtyp =>
+                  match x with
+                  | ANN_num_elements _ => true
+                  | _ => false
+                  end) (endo anns).
+    Proof.
+      induction anns; cbn; auto.
+      - destruct a; cbn; auto.
+    Qed.
+
+    Lemma find_align_annotation_endo :
+      forall anns,
+        find (fun x : annotation dtyp =>
+                match x with
+                | ANN_align _ => true
+                | _ => false
+                end) anns = 
+          find (fun x : annotation dtyp =>
+                  match x with
+                  | ANN_align _ => true
+                  | _ => false
+                  end) (endo anns).
+    Proof.
+      induction anns; cbn; auto.
+      - destruct a; cbn; auto.
     Qed.
 
     Section ExpOptimCorrect.
@@ -139,11 +207,19 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
               intro2.
               reflexivity.
         - destruct x; cbn; try reflexivity.
+          rewrite <- find_align_annotation_endo.
+          rewrite <- find_num_elements_annotation_endo.
+          reflexivity.
+        - destruct x; cbn; try reflexivity.
           destruct ptr; cbn.
           rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
           rewrite opt_correct; reflexivity.
           intro2.
-          rewrite !interp_cfg2_bind; apply eutt_eq_bind.
+          rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
+          reflexivity.
+          intro2.
+          rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
+          reflexivity.
           intro2.
           reflexivity.
         - destruct x; cbn; try reflexivity.
@@ -151,7 +227,8 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
           rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
           rewrite opt_correct; reflexivity.
           intro2.
-          rewrite !interp_cfg2_bind, opt_correct; apply eutt_eq_bind.
+          rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
+          rewrite opt_correct; reflexivity.
           intro2.
           rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
           reflexivity.

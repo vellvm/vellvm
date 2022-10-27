@@ -362,21 +362,21 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Admitted.
 
   Lemma allocate_bytes_post_conditions_can_always_be_satisfied :
-    forall (ms_init : MemState) dt bytes pr
-      (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length bytes))
+    forall (ms_init : MemState) dt num_elements bytes pr
+      (BYTES_SIZE : (sizeof_dtyp dt * num_elements)%N = N.of_nat (length bytes))
       (NON_VOID : dt <> DTYPE_Void),
     exists ms_final ptr ptrs,
       (ret (ptr, ptrs) {{ms_init}} ∈ {{ms_init}} find_free_block (length bytes) pr) /\
-      allocate_bytes_post_conditions ms_init dt bytes pr ms_final ptr ptrs.
+      allocate_bytes_post_conditions ms_init dt num_elements bytes pr ms_final ptr ptrs.
   Proof.
-    intros ms_init dt bytes pr BYTES_SIZE NON_VOID.
+    intros ms_init dt num_elements bytes pr BYTES_SIZE NON_VOID.
 
     Opaque find_free_block.
     (* Memory state pre allocation *)
     destruct ms_init as [mstack mprov] eqn:MSINIT.
     destruct mstack as [mem fs h] eqn:MSTACK.
 
-    pose proof (allocate_bytes_with_pr_correct dt bytes pr (fun _ _ => True) (Eff := Eff) (MemM:=MemStateFreshT (itree Eff))) as ALLOC.
+    pose proof (allocate_bytes_with_pr_correct dt num_elements bytes pr (fun _ _ => True) (Eff := Eff) (MemM:=MemStateFreshT (itree Eff))) as ALLOC.
     red in ALLOC.
     specialize (ALLOC ms_init 0%N).
     forward ALLOC.
@@ -593,19 +593,19 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     (* Qed. *)
 
     (* Lemma allocate_bytes_post_conditions_can_always_be_satisfied : *)
-    (*   forall (ms_init ms_fresh_pr : MemState) dt bytes pr ptr ptrs *)
+    (*   forall (ms_init ms_fresh_pr : MemState) dt num_elements bytes pr ptr ptrs *)
     (*     (FRESH_PR : (@fresh_provenance Provenance (MemPropT MemState) _ ms_init (ret (ms_fresh_pr, pr)))) *)
     (*     (FIND_FREE : find_free_block (length bytes) pr ms_fresh_pr (ret (ms_fresh_pr, (ptr, ptrs)))) *)
-    (*     (BYTES_SIZE : sizeof_dtyp dt = N.of_nat (length bytes)) *)
+    (*     (BYTES_SIZE : (sizeof_dtyp dt * num_elements)%N = N.of_nat (length bytes)) *)
     (*     (NON_VOID : dt <> DTYPE_Void), *)
     (*   exists ms_final, *)
-    (*     allocate_bytes_post_conditions ms_fresh_pr dt bytes pr ms_final ptr ptrs. *)
+    (*     allocate_bytes_post_conditions ms_fresh_pr dt num_elements bytes pr ms_final ptr ptrs. *)
     (* Proof. *)
-    (*   intros ms_init ms_fresh_pr dt bytes pr ptr ptrs FRESH_PR FIND_FREE BYTES_SIZE NON_VOID. *)
+    (*   intros ms_init ms_fresh_pr dt num_elements bytes pr ptr ptrs FRESH_PR FIND_FREE BYTES_SIZE NON_VOID. *)
 
     (*   destruct ms_fresh_pr as [[mem fs h] pr'] eqn:HMS.       *)
 
-    (*   pose proof (allocate_bytes_correct dt bytes (fun _ _ => True) ms_init) as CORRECT. *)
+    (*   pose proof (allocate_bytes_correct dt num_elements bytes (fun _ _ => True) ms_init) as CORRECT. *)
     (*   unfold exec_correct in CORRECT. *)
     (*   assert (ExtraState) as st by admit. *)
     (*   specialize (CORRECT st). *)
@@ -660,11 +660,11 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     (*   assert  *)
     (*   pose proof (@MemMonad_run *)
     (*                 ExtraState MemM _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ H _ *)
-    (*                 (allocate_bytes dt bytes) *)
+    (*                 (allocate_bytes dt num_elements bytes) *)
     (*                 ms_fresh_pr *)
     (*                 initial_state (* Probably wrong, not guaranteed to be valid. May need existence lemma *) *)
     (*              ). *)
-    (*   (allocate_bytes dt bytes)). *)
+    (*   (allocate_bytes dt num_elements bytes)). *)
 
     (*   unfold exec_correct in CORRECT. *)
     (*    destruct CORRECT. *)

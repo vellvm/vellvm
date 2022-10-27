@@ -66,7 +66,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
    *)
 
   Definition allocate_global (g:global dtyp) : itree L0 unit :=
-    'v <- trigger (Alloca (g_typ g));;
+    'v <- trigger (Alloca (g_typ g) 1%N None);;
     trigger (GlobalWrite (g_ident g) v).
 
   Definition allocate_globals (gs:list (global dtyp)) : itree L0 unit :=
@@ -85,7 +85,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     match List.find (fun x => function_name_eq (dc_name d) (dc_name x)) defined_intrinsics_decls with
     | Some _ => Ret tt (* Don't allocate pointers for LLVM intrinsics declarations *)
     | None =>
-        'v <- trigger (Alloca DTYPE_Pointer);;
+        'v <- trigger (Alloca DTYPE_Pointer 1%N None);;
         trigger (GlobalWrite (dc_name d) v)
     end.
 
