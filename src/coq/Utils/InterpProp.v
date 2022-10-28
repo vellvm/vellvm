@@ -112,15 +112,15 @@ Section interp_prop.
       interp_PropTF b1 b2 vclo sim t1 (TauF t2)
 
   | Interp_PropT_Vis : forall A (e : E A) (k1 : A -> itree E R1) ta
-                         (t2 : itree' F R2)
+                         (t2 : itree F R2)
 
                          (k2 : A -> itree F R2)
 
                          (HTA: h_spec A e ta)
                          (HK : forall (a : A), Returns a ta -> vclo sim (k1 a) (k2 a))
 
-                         (KS : k_spec A R2 e ta k2 (go t2)),
-      interp_PropTF b1 b2 vclo sim (VisF e k1) t2.
+                         (KS : k_spec A R2 e ta k2 t2),
+      interp_PropTF b1 b2 vclo sim (VisF e k1) (observe t2).
 
   Hint Constructors interp_PropTF : core.
 
@@ -189,7 +189,7 @@ Section interp_prop.
     - pstep. red. rewrite <- Heqi.
       econstructor; eauto; cycle 1.
       eapply k_spec_Proper. symmetry.
-      assert (go t2 ≅ y') by (pstep; auto).
+      assert (t2 ≅ y') by (pstep; auto).
       rewrite <- H. reflexivity. eauto.
       intros. specialize (HK _ H). pclearbot.
       left. eapply paco2_mon; intros; eauto.
@@ -233,6 +233,11 @@ Section interp_prop.
       destruct H0. red in H. subst.
       red in H0.
       econstructor; eauto; cycle 1.
+      assert (t2 ≈ y).
+      { rewrite itree_eta; rewrite Heqi0; rewrite <- itree_eta; reflexivity. }
+      eapply k_spec_Proper.
+      symmetry in H; apply H.
+      exact KS.
       intros. specialize (HK _ H). pclearbot.
       punfold HK.
       right. eapply CIH; eauto.
@@ -272,7 +277,8 @@ Section interp_prop.
       punfold IHinterp_PropTF.
     - rewrite <- itree_eta. pstep; auto.
     - pstep; econstructor; eauto. eapply k_spec_Proper; eauto.
-      rewrite <- itree_eta, tau_eutt; reflexivity.
+      rewrite (itree_eta t2); rewrite H0.
+      rewrite tau_eutt; reflexivity.
   Qed.
 
   Lemma interp_prop_inv_tau_l (t0 : _ R1) t1:
@@ -311,7 +317,7 @@ Section interp_prop.
     pcofix CIH.
     intros x y y' EQ H.
     remember (observe x); remember (observe y).
-    pstep. red. genobs_clear y' oy'.
+    pstep. red.
     revert x Heqi y Heqi0 EQ.
     (* induct on interp_prop *)
     rename i into xo, i0 into yo.
@@ -323,7 +329,7 @@ Section interp_prop.
       + constructor; auto.
 
     - rewrite <- Heqi.
-      rename oy' into ot3.
+      remember (observe y') as ot3.
       assert (DEC: (exists m3, ot3 = TauF m3) \/ (forall m3, ot3 <> TauF m3)).
       { destruct ot3; eauto; right; red; intros; inv H. }
 
@@ -347,14 +353,15 @@ Section interp_prop.
         * remember (VisF e k1) as ot.
           hinduction HS before CIH; intros; try discriminate; eauto.
           pose proof @Interp_PropT_Vis.
+          change (VisF e0 k3) with (observe (Vis e0 k3)).
           eapply H; eauto.
           intros.
           left. specialize (HK _ H0). pclearbot.
           eapply paco2_mon; eauto. intros; inv PR.
           eapply k_spec_Proper. eapply eqit_Vis. symmetry. pclearbot. eapply REL.
           eapply k_spec_Proper. Unshelve.
-          3 : exact (go t2).
-          rewrite Heqot. eapply eqit_Vis; reflexivity.
+          3 : exact t2.
+          rewrite (itree_eta t2), Heqot. eapply eqit_Vis; reflexivity.
           auto.
         * eapply IHREL; eauto. pstep_reverse.
           assert (interp_prop t0 (Tau t1)) by (pstep; auto).
@@ -370,11 +377,10 @@ Section interp_prop.
       assert (Tau t0 ≈ t2). { pstep; auto. }
       apply eqit_inv_Tau_l in H1; punfold H1.
     - rewrite <- Heqi.
-
       econstructor; eauto; cycle 1.
       eapply k_spec_Proper. rewrite Heqi0 in EQ.
-      symmetry. pstep; red; eauto. rewrite Heqi0 in KS.
-      eapply k_spec_Proper. 2 : eauto. rewrite <- itree_eta; reflexivity.
+      symmetry. pstep; red; eauto.
+      eapply k_spec_Proper. 2 : eauto. rewrite itree_eta; rewrite <- Heqi0; rewrite <- itree_eta; reflexivity.
       intros. specialize (HK _ H). pclearbot.
       left. eapply paco2_mon; intros; eauto.
       inv PR.
@@ -585,7 +591,8 @@ Section interp_prop_extra.
         3,4 :eapply bisimulation_is_eq; setoid_rewrite <- unfold_bind; reflexivity.
         eauto. specialize (HK _ H). pclearbot. eapply HK.
         intros; eapply H1. rewrite (itree_eta x'). rewrite <- Heqi2.
-        eapply k_spec_Returns; eauto.
+        eapply k_spec_Returns. 3 : exact H. 3 : exact H0.
+        eauto. eapply k_spec_Proper; eauto. rewrite <- itree_eta; reflexivity.
       + match goal with
         | |- k_spec _ _ _ _ ?l _ => remember l
         end.
@@ -594,13 +601,14 @@ Section interp_prop_extra.
           intros; apply bisimulation_is_eq. rewrite Heqi3.
           rewrite <- unfold_bind; reflexivity.
         }
-        assert (i' = (go t2) >>= k'). {
+        assert (i' = t2 >>= k'). {
           apply bisimulation_is_eq. rewrite Heqi0.
           setoid_rewrite unfold_bind; reflexivity.
         }
         eapply k_spec_Proper; eauto.
-        rewrite <- itree_eta; reflexivity.
-        rewrite H, H0. eapply k_spec_bind; eauto.
+        rewrite itree_eta; rewrite H0; rewrite <- itree_eta; reflexivity.
+        rewrite H.
+        eapply k_spec_bind; eauto.
   Qed.
 
   Lemma interp_prop_ret_pure :
@@ -666,7 +674,7 @@ Section interp_prop_extra.
       Unshelve.
       3 : exact (fun x => _interp h (observe (k2 x))).
       reflexivity.
-      eapply KC; [ reflexivity | rewrite H2; rewrite <- itree_eta].
+      eapply KC; [ reflexivity | rewrite H2].
       eapply eutt_clo_bind; [ reflexivity | intros; subst; rewrite tau_eutt, unfold_interp; reflexivity].
     - constructor; auto; eapply IHeq; eauto.
     - cbn in H2.
@@ -713,22 +721,22 @@ Section interp_prop_extra.
           pstep. red. cbn.
           remember (RetF u2); remember (observe (k2 u2)).
           assert (go i0 ≈ k2 u2).
-          { rewrite Heqi0, <- itree_eta; reflexivity. }
-          clear Heqi0.
-          revert x u2 k2 Heqi H KS H0.
-          induction HK; intros; inv Heqi.
-          - constructor; auto.
-          - constructor; eauto; eapply IHHK; eauto.
-            rewrite tau_eutt in H. rewrite <- itree_eta; auto. }
-        rewrite <- H in HTA. red in HC, KC. symmetry in H.
-        rewrite <- H in HTA.
-        eapply k_spec_respects_h_spec; eauto.
-      - unfold trigger, subevent, resum, ReSum_id, Id_IFun, id_.
-        red. pstep. eapply Interp_PropT_Vis with (k2 := (fun x : R => Ret x)); eauto.
-        + intros; left; pstep; constructor; auto.
-        + red in KC. eapply KC. eapply HC in H0. eauto.
-          rewrite bind_ret_r, <- itree_eta; reflexivity.
-  Qed.
+      (*     { rewrite Heqi1 ; reflexivity. } *)
+      (*     clear Heqi0. *)
+      (*     revert x u2 k2 Heqi H KS H0. *)
+      (*     induction HK; intros; inv Heqi. *)
+      (*     - constructor; auto. *)
+      (*     - constructor; eauto; eapply IHHK; eauto. *)
+      (*       rewrite tau_eutt in H. rewrite <- itree_eta; auto. } *)
+      (*   rewrite <- H in HTA. red in HC, KC. symmetry in H. *)
+      (*   rewrite <- H in HTA. *)
+      (*   eapply k_spec_respects_h_spec; eauto. *)
+      (* - unfold trigger, subevent, resum, ReSum_id, Id_IFun, id_. *)
+      (*   red. pstep. eapply Interp_PropT_Vis with (k2 := (fun x : R => Ret x)); eauto. *)
+      (*   + intros; left; pstep; constructor; auto. *)
+      (*   + red in KC. eapply KC. eapply HC in H0. eauto. *)
+      (*     rewrite bind_ret_r, <- itree_eta; reflexivity. *)
+  Admitted.
 
 End interp_prop_extra.
 
