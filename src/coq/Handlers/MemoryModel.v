@@ -2158,25 +2158,24 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       unfold serialize_sbytes at 1.
       unfold serialize_sbytes_func at 1.
       rewrite Wf.WfExtensionality.fix_sub_eq_ext.  (* <<=== THIS STEP TAKES A LONG TIME *)
+      simpl. (* <<=== my *goals* buffer goes from 4.5M to 37130 lines (2.5M) of text *)
       destruct uv; simpl; try reflexivity.
-      (* destruct uv. *)
-      (* all: try reflexivity. *)
-      (* all: cbn. *)
-      (* - destruct dt; try reflexivity. *)
-      (*   destruct (Datatypes.length fields0 =? Datatypes.length fields)%nat eqn:Hlen. *)
-      (*   + cbn. *)
-      (*     reflexivity. *)
-      (*   + *)
-
-
-      (* destruct uv; try reflexivity. simpl. *)
-      (* destruct dt; try reflexivity. simpl. *)
-      (* break_match. *)
-      (*  destruct (find (fun a : ident * typ => Ident.eq_dec id (fst a)) env). *)
-      (* destruct p; simpl; eauto. *)
-      (* reflexivity. *)
-    Admitted.
-
+      - destruct dt; try reflexivity.
+        + destruct fields; try reflexivity.
+        + destruct fields; try reflexivity.
+      - destruct dt; try reflexivity.
+        + destruct fields; try reflexivity.
+        + destruct fields; try reflexivity.
+      - destruct fields; try reflexivity.
+        destruct dt; try reflexivity.
+        destruct fields0; try reflexivity.
+      - destruct fields; try reflexivity.
+        destruct dt; try reflexivity.
+        destruct fields0; try reflexivity.
+      - destruct dt; try reflexivity.
+      - destruct dt; try reflexivity.
+    Qed.
+          
     (* deserialize_sbytes takes a list of SBytes and turns them into a uvalue. *)
 
   (*    This relies on the similar, but different, from_ubytes function *)
