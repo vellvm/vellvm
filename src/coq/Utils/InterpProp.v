@@ -76,9 +76,9 @@ Section interp_prop.
   Class k_spec_WF := {
       k_spec_Returns: forall {A R} ta k2 t2 e,
         k_spec A R e ta k2 t2 -> forall a, Returns a ta -> forall a', Returns a' (k2 a) -> Returns a' t2;
-      k_spec_bind: forall {A R} ta k2 (t2 : itree F R) e (k' : _ -> itree F R),
-        k_spec A R e ta k2 t2 ->
-        k_spec A R e ta (fun x => bind (k2 x) k') (bind t2 k');
+      k_spec_bind: forall {A R1 R2} ta k2 (t2 : itree F _) e (k' : R1 -> itree F R2),
+        k_spec A _ e ta k2 t2 ->
+        k_spec A _ e ta (fun x => bind (k2 x) k') (bind t2 k');
       k_spec_Proper : forall {A R} ta k e,
         Proper (eutt eq ==> iff) (k_spec A R e ta k);
       k_spec_respects_h_spec : forall {A} (ta : itree F _) (k : _ -> itree F _) e x,
@@ -479,6 +479,103 @@ Hint Resolve interp_PropT_idclo_mono : paco.
     R (RR : relation R) (HR: Reflexive RR) (HT : Transitive RR),
     Proper (@eutt _ _ _ RR ==> eq ==> flip Basics.impl) (interp_prop RR h_spec k_spec).
 Proof.
+Admitted.
+
+Inductive eqit_clo {E R} (r : itree E R -> Prop)
+  : itree E R -> Prop :=
+| eqit_clo_intro b t t' (EQVl: eqit eq b false t t') (REL: r t')
+  : eqit_clo r t.
+Hint Constructors eqit_clo: core.
+
+Lemma eqit_clo_mon {E R} r1 r2 t
+      (IN: eqit_clo r1 t)
+      (LE: r1 <1= r2):
+  @eqit_clo E R r2 t.
+Proof.
+  destruct IN. econstructor; eauto.
+Qed.
+
+Lemma interp_prop_eqit_clo_wcompat {E R1 R2 RR h_spec k_spec b1 b2 vclo}
+    `{k_spec_WF _ _ h_spec k_spec}
+  (MON: monotone2 vclo)
+  (CMP: compose (eqitC RR b1 b2) vclo <3= compose vclo (eqitC RR b1 b2)):
+  wcompatible2 (@interp_PropT_ E E R1 R2 RR h_spec k_spec b1 b2 vclo) (eqitC RR b1 b2).
+Proof.
+  econstructor.
+  pmonauto.
+  intros.
+  destruct PR.
+  punfold EQVl.
+  punfold EQVr.
+  unfold_eqit. red in REL.
+  hinduction REL before r; intros; clear t1' t2'; red.
+  - remember (RetF r1) as x.
+    hinduction EQVl before r; intros; subst; try inv Heqx; eauto.
+    remember (RetF r3) as y.
+    hinduction EQVr before r; intros; subst; try inv Heqy; eauto.
+  - remember (TauF t1) as x.
+    hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK; eauto.
+    remember (TauF t2) as y.
+    hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; eauto.
+    pclearbot. econstructor. gclo. 
+    econstructor; eauto with paco.
+  - remember (TauF t1) as x.
+    hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK; eauto.
+    pclearbot. constructor; punfold REL.
+    eapply IHREL; eauto.
+  - remember (TauF t2) as y.
+    hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; eauto.
+    pclearbot;constructor; punfold REL.
+    eapply IHREL; eauto.
+  - remember (VisF e k1) as x.
+    hinduction EQVl before r; intros; try discriminate Heqx; eauto; inv_Vis.
+    pclearbot.
+    econstructor; intros; cycle 1.
+    eapply MON.
+    + apply CMP. specialize (HK _ H0). econstructor; eauto. admit.
+    + intros. apply gpaco2_clo, PR.
+    + admit.
+    + eauto.
+      Unshelve. eauto.
+Admitted.
+
+Inductive interp_prop_bind_clo {E} {R1 R2} h_spec k_spec b1 b2 (r : itree E R1 -> itree E R2 -> Prop) :
+  itree E R1 -> itree E R2 -> Prop :=
+| pbc_intro_h U1 U2 (RU : U1 -> U2 -> Prop) t1 t2 k1 k2
+      (EQV: interp_prop' RU h_spec k_spec b1 b2 t1 t2)
+      (REL: forall u1 u2, RU u1 u2 -> r (k1 u1) (k2 u2))
+  : interp_prop_bind_clo h_spec k_spec b1 b2 r (ITree.bind t1 k1) (ITree.bind t2 k2)
+.
+Hint Constructors interp_prop_bind_clo: core.
+
+Lemma interp_prop_clo_bind {E} R1 R2 (RR : R1 -> R2 -> Prop) h_spec k_spec {U1 U2 UU} t1 t2 k1 k2
+      `{k_spec_WF _ _ h_spec k_spec}
+      (EQT: @interp_prop E E U1 U2 UU h_spec k_spec t1 t2)
+      (EQK: forall u1 u2, UU u1 u2 -> interp_prop RR h_spec k_spec (k1 u1) (k2 u2)):
+  interp_prop RR h_spec k_spec (ITree.bind t1 k1) (ITree.bind t2 k2).
+Proof.
+  setoid_rewrite unfold_bind.
+  revert_until UU.
+  pcofix CIH.
+  intros.
+  punfold EQT.
+  red in EQT.
+  induction EQT; eauto; pclearbot.
+  - specialize (EQK _ _ REL). eapply paco2_mon; eauto. intros; contradiction.
+  - pstep. constructor. right.
+    specialize (CIH _ _ _ _ H0 HS EQK). admit.
+  - pstep. constructor; auto. admit.
+  - pstep. constructor; auto. admit.
+  - pstep. econstructor; eauto.
+    + intros. right. admit.
+    + eapply k_spec_Proper; cycle 1.
+      * rewrite <- unfold_bind. reflexivity.
+      * Unshelve.
+        2 : exact (fun x => bind (k3 x) k2).
+        pose proof @k_spec_bind as Hbind.
+        specialize (Hbind _ _ h_spec k_spec H0 _ _ _ _ _ _ _ k2 KS).
+        eapply Hbind. shelve.
+      * eauto.
 Admitted.
 
 Section interp_prop_extra.
