@@ -658,17 +658,119 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
                 1, 2 : inv x.
   Qed.
 
+Section interp_propC.
+
+  Context {E F : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop).
+
+  Context (h_spec : E ~> PropT E).
+
+  Context (k_spec : forall T R, E T -> itree E T -> (T -> itree E R) -> itree E R -> Prop).
+  (** *** "Up-to" principles for coinduction. *)
+
+  Inductive interp_prop_trans_clo (r : itree E R1 -> itree E R2 -> Prop)
+    : itree E R1 -> itree E R2 -> Prop :=
+  | interp_prop_trans_clo_intro t1 t2 t1' t2' RR1 RR2
+        (EQVl: interp_prop RR1 h_spec k_spec t1 t1')
+        (EQVr: interp_prop RR2 h_spec k_spec t2 t2')
+        (REL: r t1' t2')
+        (LERR1: forall x x' y, RR1 x x' -> RR x' y -> RR x y)
+        (LERR2: forall x y y', RR2 y y' -> RR x y' -> RR x y)
+    : interp_prop_trans_clo r t1 t2
+  .
+  Hint Constructors interp_prop_trans_clo: core.
+
+  Definition interp_propC := interp_prop_trans_clo.
+  Hint Unfold interp_propC : core.
+
+  Lemma interp_propC_mon r1 r2 t1 t2
+        (IN: interp_propC r1 t1 t2)
+        (LE: r1 <2= r2):
+    @interp_propC r2 t1 t2.
+  Proof.
+    destruct IN. econstructor; eauto.
+  Qed.
+
+  Hint Resolve interp_propC_mon : paco.
+
+  Lemma interp_propC_wcompat b1 b2 vclo
+        (MON: monotone2 vclo)
+        (CMP: compose (interp_propC) vclo <3= compose vclo (interp_propC)):
+    wcompatible2 (@interp_PropT_ E E R1 R2 RR h_spec k_spec b1 b2 vclo) (interp_propC).
+  Proof.
+    econstructor. pmonauto.
+    intros. destruct PR.
+    punfold EQVl. punfold EQVr. red in EQVl, EQVr, REL.
+    hinduction REL before r; intros; clear t1' t2'.
+    - red; remember (RetF r1) as x.
+      hinduction EQVl before r; intros; subst; try inv Heqx; eauto.
+  Admitted.
+
+  Hint Resolve interp_propC_wcompat : paco.
+
+  Lemma interp_prop_idclo_compat: compose (interp_propC) id <3= compose id (interp_propC).
+  Proof.
+    intros. apply PR.
+  Qed.
+  Hint Resolve interp_prop_idclo_compat : paco.
+
+  Lemma interp_propC_dist :
+    forall r1 r2, interp_propC (r1 \2/ r2) <2= (interp_propC r1 \2/ interp_propC r2).
+  Proof.
+    intros. destruct PR. destruct REL; eauto.
+  Qed.
+
+  Hint Resolve interp_propC_dist : paco.
+
+  Lemma interp_propC_clo_trans vclo b1 b2
+        (MON: monotone2 vclo)
+        (CMP: compose (interp_propC) vclo <3= compose vclo (interp_propC)):
+    interp_prop_trans_clo <3= gupaco2 (interp_PropT_ RR h_spec k_spec b1 b2 vclo) (interp_propC).
+  Proof.
+    intros. destruct PR. gclo. econstructor; eauto with paco.
+  Qed.
+
+End interp_propC.
+
+Global Hint Unfold interp_propC: core.
+Global Hint Resolve interp_propC_mon : paco.
+Global Hint Resolve interp_propC_wcompat : paco.
+Global Hint Resolve interp_prop_idclo_compat : paco.
+Global Hint Resolve interp_propC_dist : paco.
+Arguments interp_propC_clo_trans : clear implicits.
+Global Hint Constructors interp_prop_trans_clo: core.
+
+
+Inductive interp_prop_bind_clo {E} {R1 R2} b1 b2 (r : itree E R1 -> itree E R2 -> Prop) :
+  itree E R1 -> itree E R2 -> Prop :=
+| pbc_intro_h U1 U2 (RU : U1 -> U2 -> Prop) t1 t2 k1 k2
+      (EQV: interp_prop RU b1 b2 t1 t2)
+      (REL: forall u1 u2, RU u1 u2 -> r (k1 u1) (k2 u2))
+  : interp_prop_bind_clo b1 b2 r (ITree.bind t1 k1) (ITree.bind t2 k2)
+.
+Hint Constructors interp_prop_bind_clo: core.
+
+Lemma interp_prop_clo_bind {E} R1 R2 (RR : R1 -> R2 -> Prop) h_spec k_spec {U1 U2 UU} t1 t2 k1 k2
+      (EQT: @interp_prop E E U1 U2 UU h_spec k_spec t1 t2)
+      (EQK: forall u1 u2, UU u1 u2 -> interp_prop RR h_spec k_spec (k1 u1) (k2 u2)):
+  interp_prop RR h_spec k_spec (ITree.bind t1 k1) (ITree.bind t2 k2).
+Proof.
+  intros. ginit.
+  guclo interp_propC_clo_trans. econstructor; auto_ctrans_eq.
+Admitted.
+
   Lemma refine_OOM_h_bind :
     forall {T R E F} (x y : itree (E +' OOME +' F) T) (RR1 : relation T) (RR2 : relation R) k,
       (forall r1 r2, RR1 r1 r2 -> refine_OOM_h RR2 (k r1) (k r2)) ->
       refine_OOM_h RR1 x y ->
       refine_OOM_h RR2 (a <- x;; k a) (a <- y;; k a).
   Proof.
-    intros T R E F x y RR1 RR2 k RK H.
-    pinversion H; subst.
-    - cbn.
-      unfold refine_OOM_h.
-  Admitted.
+    intros T R E F.
+
+    unfold refine_OOM_h.
+    intros.
+    eapply interp_prop_clo_bind; eauto.
+  Qed.
+
 
   (* If
 
