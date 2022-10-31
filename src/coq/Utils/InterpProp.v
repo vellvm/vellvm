@@ -79,8 +79,8 @@ Section interp_prop.
       k_spec_bind: forall {A R1 R2} ta k2 (t2 : itree F _) e (k' : R1 -> itree F R2),
         k_spec A _ e ta k2 t2 ->
         k_spec A _ e ta (fun x => bind (k2 x) k') (bind t2 k');
-      k_spec_Proper : forall {A R} ta k e,
-        Proper (eutt eq ==> iff) (k_spec A R e ta k);
+      k_spec_Proper : forall {A R} (RR : relation R) ta k e,
+        Proper (eutt RR ==> iff) (k_spec A R e ta k);
       k_spec_respects_h_spec : forall {A} (ta : itree F _) (k : _ -> itree F _) e x,
            ta ≈ x <- ta ;; k x ->
            k_spec A _ e ta k x ->
@@ -360,7 +360,7 @@ Section interp_prop.
           eapply paco2_mon; eauto. intros; inv PR.
           eapply k_spec_Proper. eapply eqit_Vis. symmetry. pclearbot. eapply REL.
           eapply k_spec_Proper. Unshelve.
-          3 : exact t2.
+          4 : exact t2.
           rewrite (itree_eta t2), Heqot. eapply eqit_Vis; reflexivity.
           auto.
         * eapply IHREL; eauto. pstep_reverse.
@@ -481,20 +481,6 @@ Hint Resolve interp_PropT_idclo_mono : paco.
 Proof.
 Admitted.
 
-Inductive eqit_clo {E R} (r : itree E R -> Prop)
-  : itree E R -> Prop :=
-| eqit_clo_intro b t t' (EQVl: eqit eq b false t t') (REL: r t')
-  : eqit_clo r t.
-Hint Constructors eqit_clo: core.
-
-Lemma eqit_clo_mon {E R} r1 r2 t
-      (IN: eqit_clo r1 t)
-      (LE: r1 <1= r2):
-  @eqit_clo E R r2 t.
-Proof.
-  destruct IN. econstructor; eauto.
-Qed.
-
 Lemma interp_prop_eqit_clo_wcompat {E R1 R2 RR h_spec k_spec b1 b2 vclo}
     `{k_spec_WF _ _ h_spec k_spec}
   (MON: monotone2 vclo)
@@ -531,13 +517,20 @@ Proof.
     hinduction EQVl before r; intros; try discriminate Heqx; eauto; inv_Vis.
     pclearbot.
     econstructor; intros; cycle 1.
-    eapply MON.
-    + apply CMP. specialize (HK _ H0). econstructor; eauto. admit.
+    eapply MON; cycle 1.
     + intros. apply gpaco2_clo, PR.
-    + admit.
+    + apply CMP. econstructor. 1, 2, 3: eauto. reflexivity.
+      eauto. intros; subst; eauto.
+    + eapply k_spec_Proper; eauto.
+      destruct b2.
+      * assert (euttge RR2 t0 t2). { pstep; auto. }
+        apply euttge_sub_eutt; eauto.
+      * assert (eq_itree RR2 t0 t2). { pstep; auto. }
+        apply eq_sub_eutt; eauto.
     + eauto.
-      Unshelve. eauto.
-Admitted.
+Qed.
+
+Hint Resolve interp_prop_eqit_clo_wcompat : paco.
 
 Inductive interp_prop_bind_clo {E} {R1 R2} h_spec k_spec b1 b2 (r : itree E R1 -> itree E R2 -> Prop) :
   itree E R1 -> itree E R2 -> Prop :=
@@ -554,29 +547,41 @@ Lemma interp_prop_clo_bind {E} R1 R2 (RR : R1 -> R2 -> Prop) h_spec k_spec {U1 U
       (EQK: forall u1 u2, UU u1 u2 -> interp_prop RR h_spec k_spec (k1 u1) (k2 u2)):
   interp_prop RR h_spec k_spec (ITree.bind t1 k1) (ITree.bind t2 k2).
 Proof.
-  setoid_rewrite unfold_bind.
   revert_until UU.
-  pcofix CIH.
+
+  ginit. gcofix CIH.
   intros.
   punfold EQT.
   red in EQT.
+  gclo.
+  econstructor.
+  rewrite unfold_bind; reflexivity.
+  rewrite unfold_bind; reflexivity. 2,3: intros; subst; eauto.
+
+  gstep.
   induction EQT; eauto; pclearbot.
-  - specialize (EQK _ _ REL). eapply paco2_mon; eauto. intros; contradiction.
-  - pstep. constructor. right.
-    specialize (CIH _ _ _ _ H0 HS EQK). admit.
-  - pstep. constructor; auto. admit.
-  - pstep. constructor; auto. admit.
-  - pstep. econstructor; eauto.
-    + intros. right. admit.
+  - specialize (EQK _ _ REL).
+    punfold EQK.
+    eapply interp_PropTF_mono; eauto.
+    intros; eauto. pclearbot.
+    gfinal. right.
+    eapply paco2_mon; eauto.
+    intros; contradiction.
+  - constructor. gfinal. left.
+    specialize (CIH _ _ _ _ H0 HS EQK).
+    eauto.
+  - econstructor; auto.
+  - econstructor; auto.
+  - econstructor; eauto.
+    + intros. gbase; eapply CIH; eauto.
+      specialize (HK _ H). pclearbot; eauto.
     + eapply k_spec_Proper; cycle 1.
       * rewrite <- unfold_bind. reflexivity.
-      * Unshelve.
-        2 : exact (fun x => bind (k3 x) k2).
-        pose proof @k_spec_bind as Hbind.
+      * pose proof @k_spec_bind as Hbind.
         specialize (Hbind _ _ h_spec k_spec H0 _ _ _ _ _ _ _ k2 KS).
-        eapply Hbind. shelve.
+        eapply Hbind.
       * eauto.
-Admitted.
+Qed.
 
 Section interp_prop_extra.
 
