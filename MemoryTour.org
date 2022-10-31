@@ -109,8 +109,106 @@ implements aggregate operations (such as reads / writes of abstract
 LLVM values, instead of just individual bytes), and also provides
 handlers for memory events for the executable interpreter of LLVM.
 
-** other things to talk about
+** Other Memory Model Odds and Ends
 
 - MonadStoreId
 - MonadProvenance
 - Memory events?
+
+** Refinement Relations
+
+The LLVM specification and executable interpreter are both implemented
+with several "layers", with each type of abstract event being handled
+in its own layer. There is a refinement relation between programs at
+each of these layers, starting with [[file:src/coq/Theory/Refinement.v::Definition refine_L0: relation (itree L0 dvalue) := eutt eq.][refine_L0 in
+src/coq/Theory/Refinement.v]].
+
+- refine_L0: Equivalence relation before interpreting any events, this is just ~eutt~.
+- refine_L1: After interpreting global variable events, ~eutt~, but ignoring the final global variable state.
+- refine_L2: After local variable events, ~eutt~ ignoring local variable state.
+- refine_L3: After ~MemoryE~ events.
+- refine_L4: After ~PickeE~ events for nondeterministic values.
+- refine_L5: Relationship between programs taking undefined behaviour into account.
+- refine_L6: Relationship between programs taking out-of-memory events into account.
+
+*** Out of Memory Refinement
+
+[[file:src/coq/Theory/Refinement.v::Definition refine_L6 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)][refine_L6]] relies upon the [[file:src/coq/Handlers/OOM.v::Definition refine_OOM {T} (RR : relation T) (sources : PropT Effout T) (target : itree Effout T) : Prop][refine_OOM]] relation found in [[file:src/coq/Handlers/OOM.v::Definition refine_OOM {T} (RR : relation T) (sources : PropT Effout T) (target : itree Effout T) :
+ Prop][src/coq/Handlers/OOM.v]].
+
+The bulk of this definition is here:
+
+#+begin_src coq
+  Definition OOM_handler : OOME ~> PropT Effout
+    (* Any tree is accepted as long as OOM is raised *)
+    := fun T oome source => True.
+
+  Definition refine_OOM_handler : Effin ~> PropT Effout
+    := case_ E_trigger_model_prop (case_ OOM_handler F_trigger_model_prop).
+
+  Definition refine_OOM_h {T} (RR : relation T) (source target : itree Effout T) : Proph
+    := interp_prop (Basics.flip RR) refine_OOM_handler (@oom_k_spec) target source.
+
+  Definition refine_OOM {T} (RR : relation T) (sources : PropT Effout T) (target : itree Effout T) : Prop
+    := exists source, sources source /\ refine_OOM_h RR source target.
+#+end_src
+
+At a high level, if we have two programs ~A~ and ~B~, we want to say
+that ~B~ is an out-of-memory refinement of ~A~ if ~B~ is ~eutt~
+program ~A~ up to the point where ~B~ runs out of memory. I.e., ~A~
+and ~B~ are equivalent, except ~B~ may raise ~OOM~ at any point
+instead of continuing to compute.
+
+With [[file:src/coq/Handlers/OOM.v::Definition refine_OOM {T} (RR : relation T) (sources : PropT Effout T) (target : itree Effout T) : Prop][refine_OOM]] we have a set of behaviours for our source program
+(because there's non-determinism introduced by ~undef~ values and UB),
+and we say that a ~target~ behaviour is a refinement of this set of
+behaviours, if there exists an ~itree~ (~source~) in the set of source
+behaviours such that ~source~ is equivalent to the ~target~ up to the
+point where the target may raise ~OOM~.
+
+*** Refinement Relations between Memory Model Instances
+
+Each instance of LLVM interpreters and specs is a module which is
+instantiated with a module for the memory model. Our approach involves
+two-phases of compilation, starting with a version of LLVM with
+infinite memory, and converting this to a version of LLVM with finite
+memory. This lowering can be found in the file [[file:src/coq/Semantics/InfiniteToFinite.v::From Coq Require Import][InfiniteToFinite.v]].
+
+One of the complications is that our LLVM values, [[file:src/coq/Semantics/DynamicValues.v::Inductive dvalue : Set :=][~dvalue~]] and [[file:src/coq/Semantics/DynamicValues.v::Inductive uvalue : Type
+ :=][~uvalue~]], contain addresses, and therefor depend on the memory
+model. As ~dvalues~ and ~uvalues~ are part of the event types, for
+instance [[file:src/coq/Semantics/LLVMEvents.v::Variant MemoryE : Type -> Type :=][here]], we have to convert infinite LLVM events into finite
+LLVM events. This is implemented in the [[file:src/coq/Semantics/InfiniteToFinite.v::Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (AC2 : AddrConvert LP2.ADDR LP1.ADDR) (E1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (E2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF).][EventConvert]] module.
+
+The refinement relation between infinite and finite memory models can
+be found in the [[file:src/coq/Semantics/InfiniteToFinite.v::Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack64BitIntptr FinAddrConvert FinAddrConvert TopLevelBigIntptr TopLevel64BitIntptr TopLevelRefinements64BitIntptr.][InfiniteToFinite]] module, with the main lemmas being [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma refine_E1E2_L6_transitive
+ :][refine_E1E2_L6_transitive]] and [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma model_E1E2_L6_sound :][model_E1E2_L6_sound]].
+
+** Handling of Undefined Behaviour
+
+We handle UB events using [[file:src/coq/Handlers/UndefinedBehaviour.v::Definition model_UB {T} (ts : PropT Eff T) : PropT Eff T:=][model_UB in UndefinedBehaviour.v]].
+
+#+begin_src coq
+  Definition model_UB {T} (ts : PropT Eff T) : PropT Eff T:=
+    fun t =>
+      ts t \/ (exists ub, ts ub /\ contains_UB ub).
+
+#+end_src
+
+Given a set of ~itrees~, ~ts~, we say that a target ~itree~, ~t~ is
+contained within the set of behaviours ~ts~ whenever ~t~ is in ~ts~,
+or if there exists a trace ~ub~ in ~ts~ that [[file:src/coq/Theory/ContainsUB.v::Inductive contains_UB {R} : itree Eff R -> Prop :=][contains_UB]]. The [[file:src/coq/Theory/ContainsUB.v::Inductive contains_UB {R} : itree Eff R -> Prop
+ :=][contains_UB]] predicate within [[file:src/coq/Theory/ContainsUB.v::Inductive contains_UB {R} : itree Eff R -> Prop :=][src/coq/Theory/ContainsUB.v]] holds
+whenever the ~itree~ contains an undefined behaviour event.
+
+#+begin_src coq
+  Inductive contains_UB {R} : itree Eff R -> Prop :=
+  | CrawlTau  : forall t1 t2, t2 ≅ Tau t1 -> contains_UB t1 -> contains_UB t2
+  | CrawlVis1 : forall Y (e : (E +' F) Y) x k t2, t2 ≅ (vis e k) -> contains_UB (k x) -> contains_UB t2
+  | CrawlVis2 : forall Y (e : G Y) x k t2, t2 ≅ (vis e k) -> contains_UB (k x) -> contains_UB t2
+  | FindUB    : forall s k t2, t2 ≅ (vis (subevent _ (ThrowUB s)) k) -> contains_UB t2.
+#+end_src
+
+** More stuff
+
+- toplevel theorems to definitions
