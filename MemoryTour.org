@@ -11,45 +11,45 @@ files. At a high level the important aspects of the code for the memory model co
 
 Memory model files:
 
-- [[file:src/coq/Handlers/MemoryModel.v::From Vellvm.Syntax Require Import][src/coq/Handlers/MemoryModel.v]]
-- [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::From Coq Require Import][src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v]]
-- [[file:src/coq/Handlers/MemoryModules/FiniteSpecPrimitives.v::From Coq Require Import][src/coq/Handlers/MemoryModules/FiniteSpecPrimitives.v]]
-- [[src/coq/Handlers/MemoryModelImplementation.v]]
+- [[file:src/coq/Handlers/MemoryModel.v]]
+- [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v]]
+- [[file:src/coq/Handlers/MemoryModules/FiniteSpecPrimitives.v]]
+- [[file:src/coq/Handlers/MemoryModelImplementation.v]]
 
 Extra memory model files (mostly module types for interfaces used in the implementation):
 
-- [[file:src/coq/Semantics/MemoryAddress.v::(* -------------------------------------------------------------------------- *][MemoryAddress.v]]
+- [[file:src/coq/Semantics/MemoryAddress.v]]
   + Contains module types for addresses, provenance, and integer / pointer casting.
-- [[file:src/coq/Semantics/Memory/Overlaps.v::Require Import ZArith.][Overlaps.v]]
+- [[file:src/coq/Semantics/Memory/Overlaps.v]]
   + Notion of addresses overlapping in memory.
-- [[file:src/coq/Semantics/Memory/Sizeof.v::From Coq Require Import][Sizeof.v]]
+- [[file:src/coq/Semantics/Memory/Sizeof.v]]
   + Size of datatypes in bytes.
 
 Serialization files:
 
 - [[file:src/coq/Handlers/MemoryModel.v::Program Fixpoint serialize_sbytes][serialize_sbytes within src/coq/Handlers/MemoryModel.v]]
   + Implementation of serializing LLVM values (~uvalue~) to symbolic bytes.
-- [[file:src/coq/Semantics/Memory/MemBytes.v::From Coq Require Import String List ZArith.][src/coq/Semantics/Memory/MemBytes.v]]
+- [[file:src/coq/Semantics/Memory/MemBytes.v]]
   + Symbolic byte modules.
 
 Concretization files:
 
-- [[file:src/coq/Handlers/Concretization.v::From Vellvm Require Import][src/coq/Handlers/Concretization.v]]
-- [[file:src/coq/Handlers/Pick.v::begin hide *][src/coq/Handlers/Pick.v]]
+- [[file:src/coq/Handlers/Concretization.v]]
+- [[file:src/coq/Handlers/Pick.v]]
 
 *** Other Relevant Files
 
-- [[file:src/coq/Semantics/DynamicValues.v::begin hide *][src/coq/Semantics/DynamicValues.v]]
+- [[file:src/coq/Semantics/DynamicValues.v]]
   + Definition of LLVM values
-- [[file:src/coq/Semantics/LLVMEvents.v::From Coq Require Import][src/coq/Semantics/LLVMEvents.v]]
+- [[file:src/coq/Semantics/LLVMEvents.v]]
   + Definition of LLVM events for ~itrees~.
 
 ** The Memory Model Itself
 *** Memory Specification
 
-There is a specification for memory models in [[file:src/coq/Handlers/MemoryModel.v::From Vellvm.Syntax Require
- Import][src/coq/Handlers/MemoryModel.v]]. Any implementation of an LLVM memory
-model must abide by this specification.
+There is a specification for memory models in
+[[file:src/coq/Handlers/MemoryModel.v]]. Any implementation of an LLVM
+memory model must abide by this specification.
 
 The specification is broken up into two modules:
 
@@ -122,8 +122,7 @@ paired with an allocation id for keeping track of provenance.
 
 *** Executable Memory Model
 
-The interface to the executable memory model is contained in [[file:src/coq/Handlers/MemoryModel.v::From Vellvm.Syntax Require
- Import][src/coq/Handlers/MemoryModel.v]] in two files, just like the
+The interface to the executable memory model is contained in [[file:src/coq/Handlers/MemoryModel.v]] in two modules, just like the
 specification.
 
 - [[file:src/coq/Handlers/MemoryModel.v::Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).][MemoryModelExecPrimitives]]
@@ -155,7 +154,7 @@ correctness.
 
 *** Packaging up the memory model
 
-The [[src/coq/Handlers/MemoryModelImplementation.v]] file takes the
+The [[file:src/coq/Handlers/MemoryModelImplementation.v]] file takes the
 implementation of the memory model primitive modules, and builds a
 full memory model from them.
 
@@ -190,7 +189,7 @@ preserved.
 LLVM has non-deterministic values that result from uninitialized
 memory, represented by ~undef~. Eventually a choice must be made for
 these values in order to execute a program. This is done through [[file:src/coq/Semantics/LLVMEvents.v::Variant PickE {X Y} {Post : X -> Y -> Prop} : Type -> Type :=][PickE]]
-events. These events are handled in [[file:src/coq/Handlers/Pick.v::From Coq Require Import][src/coq/Handlers/Pick.v]]. There are two versions of the pick handler:
+events. These events are handled in [[file:src/coq/Handlers/Pick.v]]. There are two versions of the pick handler:
 
 - [[file:src/coq/Handlers/Pick.v::Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F}][model_undef]] for the LLVM spec
 - [[file:src/coq/Handlers/Pick.v::Definition exec_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :][exec_undef]] for the executable LLVM interpreter
@@ -273,7 +272,7 @@ Each instance of LLVM interpreters and specs is a module which is
 instantiated with a module for the memory model. Our approach involves
 two-phases of compilation, starting with a version of LLVM with
 infinite memory, and converting this to a version of LLVM with finite
-memory. This lowering can be found in the file [[file:src/coq/Semantics/InfiniteToFinite.v::From Coq Require Import][InfiniteToFinite.v]].
+memory. This lowering can be found in the file [[file:src/coq/Semantics/InfiniteToFinite.v]].
 
 One of the complications is that our LLVM values, [[file:src/coq/Semantics/DynamicValues.v::Inductive dvalue : Set :=][~dvalue~]] and [[file:src/coq/Semantics/DynamicValues.v::Inductive uvalue : Type
  :=][~uvalue~]], contain addresses, and therefor depend on the memory
