@@ -16,16 +16,33 @@ Memory model files:
 - [[file:src/coq/Handlers/MemoryModules/FiniteSpecPrimitives.v::From Coq Require Import][src/coq/Handlers/MemoryModules/FiniteSpecPrimitives.v]]
 - [[src/coq/Handlers/MemoryModelImplementation.v]]
 
+Extra memory model files (mostly module types for interfaces used in the implementation):
+
+- [[file:src/coq/Semantics/MemoryAddress.v::(* -------------------------------------------------------------------------- *][MemoryAddress.v]]
+  + Contains module types for addresses, provenance, and integer / pointer casting.
+- [[file:src/coq/Semantics/Memory/Overlaps.v::Require Import ZArith.][Overlaps.v]]
+  + Notion of addresses overlapping in memory.
+- [[file:src/coq/Semantics/Memory/Sizeof.v::From Coq Require Import][Sizeof.v]]
+  + Size of datatypes in bytes.
+
 Serialization files:
 
--
+- [[file:src/coq/Handlers/MemoryModel.v::Program Fixpoint serialize_sbytes][serialize_sbytes within src/coq/Handlers/MemoryModel.v]]
+  + Implementation of serializing LLVM values (~uvalue~) to symbolic bytes.
+- [[file:src/coq/Semantics/Memory/MemBytes.v::From Coq Require Import String List ZArith.][src/coq/Semantics/Memory/MemBytes.v]]
+  + Symbolic byte modules.
 
 Concretization files:
 
+- [[file:src/coq/Handlers/Concretization.v::From Vellvm Require Import][src/coq/Handlers/Concretization.v]]
+- [[file:src/coq/Handlers/Pick.v::begin hide *][src/coq/Handlers/Pick.v]]
+
 *** Other Relevant Files
 
-- DynamicValues.v
-
+- [[file:src/coq/Semantics/DynamicValues.v::begin hide *][src/coq/Semantics/DynamicValues.v]]
+  + Definition of LLVM values
+- [[file:src/coq/Semantics/LLVMEvents.v::From Coq Require Import][src/coq/Semantics/LLVMEvents.v]]
+  + Definition of LLVM events for ~itrees~.
 
 ** The Memory Model Itself
 *** Memory Specification
@@ -142,18 +159,62 @@ The [[src/coq/Handlers/MemoryModelImplementation.v]] file takes the
 implementation of the memory model primitive modules, and builds a
 full memory model from them.
 
-
 ** Byte serialization
 
+The LLVM [[file:src/coq/Semantics/DynamicValues.v::Inductive uvalue : Type :=][uvalues]] are turned into symbolic bytes in a fairly
+straightforward fashion in [[file:src/coq/Handlers/MemoryModel.v::Program Fixpoint serialize_sbytes][serialize_sbytes within
+src/coq/Handlers/MemoryModel.v]]. Each symbolic byte is represented as
+an byte-index into a ~uvalue~. Some care is taken to make sure that
+bytes have a store id associated with them. LLVM values, represented
+by [[file:src/coq/Semantics/DynamicValues.v::Inductive uvalue : Type :=][uvalues]] in our implementation, can have non-determinism in the form
+of ~undef~. This non-determinism is preserved as much as possible
+within LLVM and is only collapsed when necessary. This includes
+preserving non-determinism when loading and storing from memory. Each
+byte within a ~uvalue~ is entangled when stored in memory. For
+instance, if a value is constructed like:
 
+#+begin_src llvm
+%x = select i1 undef, i32 0xFFFFFFFF, i32 0x00000000
+#+end_src
+
+Then when ~%x~ is stored in memory and loaded back the bits should all
+be ~1~ or all be ~0~, but they should not be allowed to vary
+independently. The ~store_id~ associated with each symbolic byte lets
+us keep track of which bytes are entangled like this, so that when we
+convert the symbolic bytes back into ~uvalues~ with [[file:src/coq/Handlers/MemoryModel.v::Program Fixpoint deserialize_sbytes (bytes : list SByte) (dt : dtyp) {measure (dtyp_measure dt)} : err uvalue][deserialize_sbytes]]
+on a load from memory the appropriate amount of non-determinism is
+preserved.
 
 ** Concretization
 
-** TODO Other Memory Model Odds and Ends
+LLVM has non-deterministic values that result from uninitialized
+memory, represented by ~undef~. Eventually a choice must be made for
+these values in order to execute a program. This is done through [[file:src/coq/Semantics/LLVMEvents.v::Variant PickE {X Y} {Post : X -> Y -> Prop} : Type -> Type :=][PickE]]
+events. These events are handled in [[file:src/coq/Handlers/Pick.v::From Coq Require Import][src/coq/Handlers/Pick.v]]. There are two versions of the pick handler:
 
-- MonadStoreId
-- MonadProvenance
-- Memory events?
+- [[file:src/coq/Handlers/Pick.v::Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F}][model_undef]] for the LLVM spec
+- [[file:src/coq/Handlers/Pick.v::Definition exec_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :][exec_undef]] for the executable LLVM interpreter
+
+[[file:src/coq/Handlers/Pick.v::Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F}][model_undef]] is used in the specification, and represents a
+non-deterministic choice, yielding a set of ~itree~ computations,
+where each ~itree~ in the set is the result of a different choice.
+
+[[file:src/coq/Handlers/Pick.v::Definition exec_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :][exec_undef]] is used by the executable interpreter, and instead picks a
+particular value for the computation. Currently this just picks a
+default value for each instance of ~undef~ depending on the type of
+the ~undef~ value in an expression.
+
+** Other Memory Model Odds and Ends
+
+- [[file:src/coq/Handlers/MemPropT.v::Class MonadStoreId (M : Type -> Type) : Type :=][MonadStoreId]]
+  + Interface used to get a fresh store id.
+- [[file:src/coq/Semantics/MemoryAddress.v::Class MonadProvenance (Provenance : Type) (M : Type -> Type) : Type :=][MonadProvenance]]
+  + Interface used to get a fresh provenance for a new allocation.
+- [[file:src/coq/Semantics/LLVMEvents.v::Variant MemoryE : Type -> Type :=][MemoryE]]
+  + The events that an LLVM program can trigger to interact with
+    memory.
+  + These are handled for the spec by [[file:src/coq/Handlers/MemoryModel.v::Definition handle_memory_prop : MemoryE ~> MemPropT MemState][handle_memory_prop]]
+  + Handled for the executable interpreter by [[file:src/coq/Handlers/MemoryModel.v::Definition handle_memory `{MemMonad ExtraState MemM (itree Eff)} : MemoryE ~> MemM][handle_memory]]
 
 ** Refinement Relations
 
@@ -249,6 +310,6 @@ whenever the ~itree~ contains an undefined behaviour event.
   | FindUB    : forall s k t2, t2 ≅ (vis (subevent _ (ThrowUB s)) k) -> contains_UB t2.
 #+end_src
 
-** More stuff
+** TODO More stuff
 
 - toplevel theorems to definitions
