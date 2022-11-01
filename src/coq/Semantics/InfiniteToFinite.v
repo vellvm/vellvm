@@ -720,29 +720,29 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     split.
     - unfold L4_convert_PropT.
       exists rx_inf; split; auto.
-    - rewrite <- YZ.
-      subst ry_fin.
-      subst rx_fin.
+    (* - rewrite <- YZ. *)
+    (*   subst ry_fin. *)
+    (*   subst rx_fin. *)
 
-      (* There's probably a more general lemma hiding here *)
-      unfold L4_convert_tree.
+    (*   (* There's probably a more general lemma hiding here *) *)
+    (*   unfold L4_convert_tree. *)
 
-      Unset Universe Checking.
-      apply refine_OOM_h_L4_convert_tree.
-      eapply refine_OOM_h_bind; eauto.
+    (*   Unset Universe Checking. *)
+    (*   apply refine_OOM_h_L4_convert_tree. *)
+    (*   eapply refine_OOM_h_bind; eauto. *)
 
-      intros r1 r2 H.
-      unfold TLR_INF.R.refine_res3, TLR_INF.R.refine_res2, TLR_INF.R.refine_res1 in H.
-      destruct r1 as [r1a [r1sid [[r1b1 r1b2] [r1c dv1]]]].
-      destruct r2 as [r2a [r2sid [[r2b1 r2b2] [r2c dv2]]]].
-      inversion H; subst.
-      inversion H5; subst.
-      inversion H7; subst.
-      inversion H9; subst.
-      inversion H9; subst.
-      cbn.
-      reflexivity.
-  Qed.
+    (*   intros r1 r2 H. *)
+    (*   unfold TLR_INF.R.refine_res3, TLR_INF.R.refine_res2, TLR_INF.R.refine_res1 in H. *)
+    (*   destruct r1 as [r1a [r1sid [[r1b1 r1b2] [r1c dv1]]]]. *)
+    (*   destruct r2 as [r2a [r2sid [[r2b1 r2b2] [r2c dv2]]]]. *)
+    (*   inversion H; subst. *)
+    (*   inversion H5; subst. *)
+    (*   inversion H7; subst. *)
+    (*   inversion H9; subst. *)
+    (*   inversion H9; subst. *)
+    (*   cbn. *)
+      (*   reflexivity. *)
+  Abort.
 
   Lemma refine_E1E2_L6_compose_fin_to_inf :
     forall tx ty tz,
@@ -765,8 +765,9 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
 
     exists rx_fin.
     split; auto.
-    rewrite refine_inf_fin_x; auto.
-  Qed.
+    (* rewrite refine_inf_fin_x; auto. *)
+  Abort.
+
 
   Lemma refine_E1E2_L6_transitive :
     forall ti1 ti2 tf1 tf2,
@@ -777,9 +778,9 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
   Proof.
     intros ti1 ti2 tf1 tf2 RINF RITOF RFIN.
 
-    eapply refine_E1E2_L6_compose_fin_to_inf; eauto.
-    eapply refine_E1E2_L6_compose_inf_to_fin; eauto.
-  Qed.
+    (* eapply refine_E1E2_L6_compose_fin_to_inf; eauto. *)
+    (* eapply refine_E1E2_L6_compose_inf_to_fin; eauto. *)
+  Abort.
 
   (* TODO: move this *)
   Lemma model_E1E2_L6_sound :
