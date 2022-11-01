@@ -210,6 +210,8 @@ Section GenerationState.
     (* Type aliases *)
     ; gen_typ_ctx : type_context
     ; gen_ptrtoint_ctx : ptr_to_int_context
+    (* Global code that will be generated as patches*)
+    ; prev_global_code : list (global typ)
     }.
 
   Definition init_GenState : GenState
@@ -220,6 +222,7 @@ Section GenerationState.
         ; gen_ctx    := []
         ; gen_typ_ctx    := []
         ; gen_ptrtoint_ctx := []
+        ; prev_global_code := []
        |}.
 
   Definition increment_raw (gs : GenState) : GenState
@@ -230,6 +233,7 @@ Section GenerationState.
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; prev_global_code := gs.(prev_global_code)
        |}.
 
   Definition increment_global (gs : GenState) : GenState
@@ -240,6 +244,7 @@ Section GenerationState.
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; prev_global_code := gs.(prev_global_code)
        |}.
 
   Definition increment_void (gs : GenState) : GenState
@@ -250,6 +255,7 @@ Section GenerationState.
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; prev_global_code := gs.(prev_global_code)
        |}.
 
   Definition increment_blocks (gs : GenState) : GenState
@@ -260,6 +266,7 @@ Section GenerationState.
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; prev_global_code := gs.(prev_global_code)
        |}.
 
   Definition replace_ctx (ctx : list (ident * typ)) (gs : GenState) : GenState
@@ -270,6 +277,7 @@ Section GenerationState.
         ; gen_ctx     := ctx
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; prev_global_code := gs.(prev_global_code)
        |}.
 
   Definition replace_typ_ctx (typ_ctx : list (ident * typ)) (gs : GenState) : GenState
@@ -280,6 +288,7 @@ Section GenerationState.
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := typ_ctx
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; prev_global_code := gs.(prev_global_code)
        |}.
 
   Definition replace_ptrtoint_ctx (ptrtoint_ctx : list (typ * ident * typ)) (gs: GenState) : GenState
@@ -290,6 +299,18 @@ Section GenerationState.
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := ptrtoint_ctx
+        ; prev_global_code := gs.(prev_global_code)
+       |}.
+
+  Definition replace_prev_global_code (prev_code : list (global typ)) (gs : GenState)  : GenState
+    := {| num_void    := gs.(num_void)
+        ; num_raw     := gs.(num_raw)
+        ; num_global  := gs.(num_global)
+        ; num_blocks  := gs.(num_blocks)
+        ; gen_ctx     := gs.(gen_ctx)
+        ; gen_typ_ctx := gs.(gen_typ_ctx)
+        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; prev_global_code := prev_code
        |}.
 
   Definition GenLLVM := stateT GenState G.
@@ -463,6 +484,22 @@ Section GenerationState.
   Definition backtrack_variable_ctxs {A} (g: GenLLVM A) : GenLLVM A
     := backtrack_ctx (backtrack_ptrtoint_ctx g).
 
+  (* Section for changing the previous code that will be generated for a well-formed program *)
+  Definition reset_prev_global_code : GenLLVM unit
+    := modify (replace_prev_global_code []);; ret tt.
+
+  Definition get_prev_global_code : GenLLVM (list (global typ))
+    := gets (fun gs => gs.(prev_global_code)).
+
+  Definition app_prev_global_code_h (prev_c : list (global typ)): GenLLVM unit
+    := prev_code <- get_prev_global_code;;
+       modify (replace_prev_global_code (prev_c ++ prev_code));; ret tt.
+
+  Definition app_prev_global_code_t (prev_c : list (global typ)) : GenLLVM unit
+    := prev_code <- get_prev_global_code;;
+       modify (replace_prev_global_code (prev_code ++ prev_c));; ret tt.
+
+  (* GenLLVM functions *)
   Definition oneOf_LLVM {A} (gs : list (GenLLVM A)) : GenLLVM A
     := n <- lift (choose (0, List.length gs - 1)%nat);;
        nth n gs (lift failGen).
