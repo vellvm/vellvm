@@ -65,7 +65,7 @@ Section PARAMS_MODEL.
     :=
     match e with
     | inr1 (inl1 oom) => True
-    | _ => t2 ≈ bind ta k2
+    | _ => t2 ≈ (bind ta k2)
     end.
 
   From Paco Require Import paco.
@@ -75,7 +75,7 @@ Section PARAMS_MODEL.
           eq ==>
           (fun k1 k2 : T -> itree Effout R =>
              forall x : T, eqit eq true true (k1 x) (k2 x)) ==> eq ==> iff)
-      oom_k_spec.
+      (oom_k_spec).
   Proof.
     unfold Proper, respectful.
     intros x y H x0 y0 H0 x2 y2 H2 x3 y3 H3; subst.
@@ -84,7 +84,7 @@ Section PARAMS_MODEL.
     all : eapply eutt_clo_bind; [ reflexivity | intros; subst; eauto ; symmetry; eauto ].
   Qed .
 
-  Definition oom_k_spec_correct_trigger :
+  Definition oom_k_spec_correct_trigger:
     k_spec_correct (fun (T : Type) (e : Effout T) => trigger e) (@oom_k_spec).
   Proof.
     unfold k_spec_correct.
@@ -100,7 +100,6 @@ Section PARAMS_MODEL.
   Definition refine_OOM {T} (RR : relation T) (sources : PropT Effout T) (target : itree Effout T) : Prop
     := exists source, sources source /\ refine_OOM_h RR source target.
 
-
   #[global] Instance refine_OOM_h_reflexive {R} {RR : relation R} `{Reflexive _ RR} : Reflexive (refine_OOM_h RR).
   Proof.
     unfold Reflexive.
@@ -110,18 +109,6 @@ Section PARAMS_MODEL.
     - intros X [e | [oom | f]]; reflexivity.
     - apply oom_k_spec_correct_trigger.
   Qed.
-
-  #[global] Instance refine_OOM_h_transitive {R} {RR : relation R} `{Transitive _ RR} : Transitive (refine_OOM_h RR).
-  Proof.
-    (* y is eutt x, except it might run out of memory earlier *)
-    (* z is eutt y, except it might run out of memory earlier *)
-
-    (* Follows that z is eutt x, but might run out of memory earlier *)
-    unfold Transitive.
-    intros x y z H0 H1.
-
-    (* Might be able to have something more general with interp_prop... *)
-  Admitted.
 
 End PARAMS_MODEL.
 

@@ -14,6 +14,8 @@ From ITree Require Import
 From Vellvm Require Import 
      Semantics.LLVMEvents.
 
+Require Import Coq.Program.Equality.
+
 Require Import Paco.paco.
 
 Section Laws.
@@ -114,7 +116,47 @@ Section OOM.
       ITree.map f t ≈ raiseOOM x ->
       t ≈ raiseOOM x.
   Proof.
-  Admitted.
+    unfold ITree.map. intros A B.
+    ginit. gcofix CIH.
+    intros. rewrite unfold_bind in H0.
+    punfold H0. red in H0.
+    remember
+         (observe
+            match observe t with
+            | RetF r => Ret (f r)
+            | TauF t => Tau (ITree.bind t (fun x : A => Ret (f x)))
+            | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) (fun x0 : A => Ret (f x0)))
+            end); remember (observe (raiseOOM x)).
+
+    assert (go i ≅
+           match observe t with
+           | RetF r => Ret (f r)
+           | TauF t => Tau (ITree.bind t (fun x : A => Ret (f x)))
+           | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) (fun x0 : A => Ret (f x0)))
+           end). rewrite Heqi; rewrite <- itree_eta; reflexivity.
+    clear Heqi.
+    rewrite itree_eta; unfold raiseOOM; rewrite bind_trigger.
+    gstep.
+
+    revert t H.
+    induction H0; inv Heqi0.
+    - dependent destruction H1.
+      dependent destruction H2.
+      cbn in *. inv H0. intros.
+      destruct (observe t); eapply eqit_inv in H; inv H.
+      destruct H0 as (?&?). destruct H.
+      constructor. intros. inv v.
+    - intros.
+      destruct (observe t); eapply eqit_inv in H; try solve [inv H].
+      cbn in *. assert (t1 ≈ raiseOOM x). { pstep; eauto. }
+      clear H0.
+      assert (t1 ≅ ITree.map f t0). { punfold H; pstep; unfold ITree.map; eauto. }
+      clear H.
+      rewrite H0 in H1.
+      specialize (IHeqitF eq_refl).
+      setoid_rewrite <- unfold_bind in IHeqitF.
+      constructor; eauto. eapply IHeqitF; rewrite <- itree_eta; eauto.
+  Qed.
 
   Lemma raiseOOM_ret_inv_itree :
       forall A x (y : A),

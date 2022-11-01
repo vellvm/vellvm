@@ -179,6 +179,7 @@ Module Infinite.
     destruct INTERP as [t_pre [INTERP UNDEF]].
     unfold interp_memory_prop in INTERP.
     cbn in INTERP.
+
     go_in INTERP.
 
     eapply interp_prop_ret_inv in INTERP.
@@ -1063,6 +1064,7 @@ Module Finite.
     cbn in INTERP.
     rewrite interp_intrinsics_bind in INTERP.
     go_in INTERP.
+
     rewrite bind_trigger in INTERP.
     repeat setoid_rewrite bind_ret_l in INTERP.
     setoid_rewrite interp_local_stack_ret in INTERP.
