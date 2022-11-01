@@ -162,16 +162,16 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
     Qed.
 
-    (* #[global] Instance k_spec_WF_memory_k_spec sid ms : *)
-    (*   k_spec_WF *)
-    (*     (fun (T : Type) *)
-    (*       (e : (ExternalCallE +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T) *)
-    (*       (t : itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T) => *)
-    (*     exists (sid' : store_id) (ms' : MemState), *)
-    (*       interp_memory_prop_h e sid ms (fmap (fun x : T => (ms', (sid', x))) t)) *)
-    (*     (@memory_k_spec ExternalCallE (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)). *)
-    (* Proof. *)
-    (* Admitted. *)
+    #[global] Instance k_spec_WF_memory_k_spec sid ms :
+      k_spec_WF
+        (fun (T : Type)
+          (e : (ExternalCallE +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T)
+          (t : itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T) =>
+        exists (sid' : store_id) (ms' : MemState),
+          interp_memory_prop_h e sid ms (fmap (fun x : T => (ms', (sid', x))) t))
+        (@memory_k_spec ExternalCallE (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)).
+    Proof.
+    Admitted.
 
     Lemma refine_23 : forall t1 t2 sid m,
         refine_L2 t1 t2 -> refine_L3 (interp_memory_prop refine_res2 t1 sid m) (interp_memory_prop refine_res2 t2 sid m).

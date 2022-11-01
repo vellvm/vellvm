@@ -168,17 +168,6 @@ Module Infinite.
     auto.
   Qed.
 
-  #[global] Instance k_spec_WF_memory_k_spec sid ms :
-    k_spec_WF
-      (fun (T : Type)
-        (e : (ExternalCallE +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T)
-        (t : itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T) =>
-      exists (sid' : store_id) ms',
-        interp_memory_prop_h e sid ms (Functor.fmap (fun x : T => (ms', (sid', x))) t))
-      (@memory_k_spec ExternalCallE (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)).
-  Proof.
-  Admitted.
-
   Lemma interp_mcfg4_ret_inv :
     forall (x : dvalue) t genv lenv stack sid m,
       interp_mcfg4 eq eq (Ret x) genv (lenv, stack) sid m t ->
@@ -1053,6 +1042,15 @@ Module Finite.
   Definition t_ret : itree L0 dvalue
     := ret (DVALUE_I1 one).
 
+ k_spec_WF
+   (fun (T : Type)
+      (e : (ExternalCallE +'
+            LLVMParams64BitIntptr.Events.IntrinsicE +'
+            LLVMParams64BitIntptr.Events.MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T)
+      (t : itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T) =>
+    exists (sid' : store_id) (ms' : MMEP.MMSP.MemState),
+      interp_memory_prop_h e sid m (ITree.map (fun x : T => (ms', (sid', x))) t))
+   (@memory_k_spec ExternalCallE (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE))
   (* Add allocation in the finite language *)
   Lemma add_alloc :
     forall genv lenv stack sid m,
@@ -1075,6 +1073,10 @@ Module Finite.
     cbn in INTERP.
     rewrite interp_intrinsics_bind in INTERP.
     go_in INTERP.
+    Search interp_prop Proper.
+    eapply interp_prop_eutt_Proper in INTERP; [ | | |].
+    eapply interp_local_stack_bind in INTERP.
+
     rewrite bind_trigger in INTERP.
     repeat setoid_rewrite bind_ret_l in INTERP.
     setoid_rewrite interp_local_stack_ret in INTERP.
