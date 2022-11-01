@@ -2323,4 +2323,57 @@ Section InstrGenerators.
     prev_globals <- map_monad (fun x => ret (TLE_Global x)) prev_global_code;;
     ret (globals ++ prev_globals ++ functions ++ [main]).
 
+  Definition gen_main_test_def (name : global_id) (ret_t : typ) (args : list typ) (ret_call : typ) (args_call : list typ) (src_str tgt_str : string) : GenLLVM (definition typ (block typ * list (block typ)))
+    :=
+    ctxs <- get_variable_ctxs;;
+
+    (* Add arguments to context *)
+    args <- map_monad
+             (fun t =>
+                i <- new_raw_id;;
+                ret (i, t))
+             args;;
+    let args_ctx := map (fun '(i, t) => (ID_Local i, t)) args in
+    append_to_ctx args_ctx;;
+
+    bid <- new_block_id;;
+    (* bs <- gen_blocks ret_t;; (* Delete this *) *)
+    code <- gen_code;;
+    let id_src := ID_Global (Name src_str) in
+    let id_tgt := ID_Global (Name tgt_str) in
+    src_call <- gen_call [(id_src, TYPE_Pointer (TYPE_Function ret_call args_call false))];;
+    tgt_call <- gen_call [(id_tgt, TYPE_Pointer (TYPE_Function ret_call args_call false))];;
+    src_instr <- add_id_to_instr src_call;;
+    tgt_instr <- add_id_to_instr tgt_call;;
+    let main_code := code ++ [src_instr ; tgt_instr] in
+
+    '(term, bs) <- gen_terminator_sz 0 ret_t [];;
+    let b := {| blk_id := bid
+             ; blk_phis := []
+             ; blk_code := code
+             ; blk_term := term
+             ; blk_comments := None
+             |} in
+    let bs := (b, []) in
+
+    let args_t := map snd args in
+    let f_type := TYPE_Function ret_t args_t false in
+    let param_attr_slots := map (fun t => []) args in
+    let prototype :=
+      mk_declaration name f_type
+        ([], param_attr_slots)
+        []
+        []
+    in
+    (* Reset context *)
+    let '(ctx, ptoi_ctx) := ctxs in
+    restore_variable_ctxs ((ID_Global name, TYPE_Pointer f_type)::ctx, ptoi_ctx);;
+    ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs).
+
+  Definition gen_main_test (ret_t : typ) (ret_call : typ) (args_call : list typ) (src_str tgt_str : string) : GenLLVM (list (toplevel_entity typ (block typ * list (block typ)))) :=
+    main <- ret TLE_Definition <*> gen_main_test_def (Name "main") ret_t [] ret_call args_call src_str tgt_str;;
+    prev_global_code <- get_prev_global_code;;
+    prev_globals <- map_monad (fun x => ret (TLE_Global x)) prev_global_code;;
+    ret (prev_globals ++ [main]).
+
 End InstrGenerators.
