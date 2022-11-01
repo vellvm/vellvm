@@ -36,6 +36,8 @@ From ITree Require Import
      Basics.HeterogeneousRelations
      Eq.Eq.
 
+Require Import Coq.Program.Equality.
+
 Import InterpFacts.
 
 Import MonadNotation.
@@ -374,9 +376,6 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
   reflexivity.
   Qed.
 
-  Require Import Coq.Program.Equality.
-
-  (* FIXME: Need more information *)
   Lemma Returns_uvalue_convert_L1_L2 :
     forall a d f u l t args,
       EC.DVCrev.dvalue_convert a = NoOom d ->
@@ -384,9 +383,6 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
       @Returns E2 E2.DV.dvalue a (trigger (resum IFun E2.DV.dvalue (E2.ExternalCall t u l))) ->
       @Returns E1 E1.DV.dvalue d (trigger (E1.ExternalCall t f args)).
   Proof.
-    intros.
-    unfold resum, ReSum_inl, cat, Cat_IFun, inl_, Inl_sum1 in H1.
-    unfold resum, ReSum_id, cat, Cat_IFun, id_, Id_IFun in H1.
   Admitted.
 
   Lemma refine_OOM_h_L4_convert_tree :
@@ -662,7 +658,7 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
                 1, 2 : inv x.
   Qed.
 
-  Polymorphic Lemma refine_OOM_h_bind :
+  Lemma refine_OOM_h_bind :
     forall {T R E F} (x y : itree (E +' OOME +' F) T) (RR1 : relation T) (RR2 : relation R) k,
       (forall r1 r2, RR1 r1 r2 -> refine_OOM_h RR2 (k r1) (k r2)) ->
       refine_OOM_h RR1 x y ->
@@ -673,8 +669,8 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     unfold refine_OOM_h.
     intros.
     eapply interp_prop_clo_bind; eauto.
+    typeclasses eauto.
   Qed.
-
 
   (* If
 
@@ -867,4 +863,5 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     (* - apply eutt_refine_oom_h; try typeclasses eauto. *)
     (*   admit. *)
   Abort.
+
 End InfiniteToFinite.
