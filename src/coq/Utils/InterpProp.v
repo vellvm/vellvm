@@ -79,8 +79,8 @@ Section interp_prop.
       k_spec_bind: forall {A R1 R2} ta k2 (t2 : itree F _) e (k' : R1 -> itree F R2),
         k_spec A _ e ta k2 t2 ->
         k_spec A _ e ta (fun x => bind (k2 x) k') (bind t2 k');
-      k_spec_Proper : forall {A R} (RR : relation R) ta k e,
-        Proper (eutt RR ==> iff) (k_spec A R e ta k);
+      k_spec_Proper : forall {A R} ta k e,
+        Proper (eutt eq ==> iff) (k_spec A R e ta k);
       k_spec_respects_h_spec : forall {A} (ta : itree F _) (k : _ -> itree F _) e x,
            ta ≈ x <- ta ;; k x ->
            k_spec A _ e ta k x ->
@@ -360,7 +360,7 @@ Section interp_prop.
           eapply paco2_mon; eauto. intros; inv PR.
           eapply k_spec_Proper. eapply eqit_Vis. symmetry. pclearbot. eapply REL.
           eapply k_spec_Proper. Unshelve.
-          4 : exact t2.
+          3 : exact t2.
           rewrite (itree_eta t2), Heqot. eapply eqit_Vis; reflexivity.
           auto.
         * eapply IHREL; eauto. pstep_reverse.
@@ -481,11 +481,11 @@ Hint Resolve interp_PropT_idclo_mono : paco.
 Proof.
 Admitted.
 
-Lemma interp_prop_eqit_clo_wcompat {E R1 R2 RR h_spec k_spec b1 b2 vclo}
+Lemma interp_prop_eqit_clo_wcompat {E R RR h_spec k_spec b1 b2 vclo}
     `{k_spec_WF _ _ h_spec k_spec}
   (MON: monotone2 vclo)
-  (CMP: compose (eqitC RR b1 b2) vclo <3= compose vclo (eqitC RR b1 b2)):
-  wcompatible2 (@interp_PropT_ E E R1 R2 RR h_spec k_spec b1 b2 vclo) (eqitC RR b1 b2).
+  (CMP: compose (eqitC eq b1 b2) vclo <3= compose vclo (eqitC eq b1 b2)):
+  wcompatible2 (@interp_PropT_ E E R R RR h_spec k_spec b1 b2 vclo) (eqitC eq b1 b2).
 Proof.
   econstructor.
   pmonauto.
@@ -499,11 +499,13 @@ Proof.
     hinduction EQVl before r; intros; subst; try inv Heqx; eauto.
     remember (RetF r3) as y.
     hinduction EQVr before r; intros; subst; try inv Heqy; eauto.
+    constructor. specialize (LERR1 _ _ _ REL0 eq_refl). subst.
+    specialize (LERR2 _ _ _ REL eq_refl). subst. auto.
   - remember (TauF t1) as x.
     hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK; eauto.
     remember (TauF t2) as y.
     hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; eauto.
-    pclearbot. econstructor. gclo. 
+    pclearbot. econstructor. gclo.
     econstructor; eauto with paco.
   - remember (TauF t1) as x.
     hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK; eauto.
@@ -521,12 +523,10 @@ Proof.
     + intros. apply gpaco2_clo, PR.
     + apply CMP. econstructor. 1, 2, 3: eauto. reflexivity.
       eauto. intros; subst; eauto.
-    + eapply k_spec_Proper; eauto.
-      destruct b2.
-      * assert (euttge RR2 t0 t2). { pstep; auto. }
-        apply euttge_sub_eutt; eauto.
-      * assert (eq_itree RR2 t0 t2). { pstep; auto. }
-        apply eq_sub_eutt; eauto.
+    + assert (t0 ≈ t2).
+      { eapply eqit_mon. 4 : pstep; eapply EQVr.
+        1, 2: eauto. intros. specialize (LERR2 _ _ _ PR eq_refl). auto. }
+      eapply k_spec_Proper; eauto.
     + eauto.
 Qed.
 
@@ -541,7 +541,7 @@ Inductive interp_prop_bind_clo {E} {R1 R2} h_spec k_spec b1 b2 (r : itree E R1 -
 .
 Hint Constructors interp_prop_bind_clo: core.
 
-Lemma interp_prop_clo_bind {E} R1 R2 (RR : R1 -> R2 -> Prop) h_spec k_spec {U1 U2 UU} t1 t2 k1 k2
+Lemma interp_prop_clo_bind {E} R (RR : R -> R -> Prop) h_spec k_spec {U1 U2 UU} t1 t2 k1 k2
       `{k_spec_WF _ _ h_spec k_spec}
       (EQT: @interp_prop E E U1 U2 UU h_spec k_spec t1 t2)
       (EQK: forall u1 u2, UU u1 u2 -> interp_prop RR h_spec k_spec (k1 u1) (k2 u2)):
