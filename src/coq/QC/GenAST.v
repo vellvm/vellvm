@@ -84,6 +84,12 @@ Section DList.
 End DList.
 
 Section Helpers.
+  Definition isNil {A} (l : list A) : bool
+    := match l with
+       | nil => true
+       | _ => false
+       end.
+
   Fixpoint is_sized_type_h (t : typ) : bool
     := match t with
        | TYPE_I sz => true
@@ -586,7 +592,7 @@ Section TypGenerators.
               match normalize_type typ_ctx t with
               | TYPE_Array sz _ => N.ltb 0 sz
               | TYPE_Struct l
-              | TYPE_Packed_struct l => negb (seq.nilp l)
+              | TYPE_Packed_struct l => negb (isNil l)
               | _ => false
               end ) ctx.
 
@@ -1251,6 +1257,54 @@ Definition genTypHelper (n: nat): G (typ) :=
 Definition genType: G (typ) :=
   sized genTypHelper.
 
+(* filter the var context to get a global pointer *)
+  Fixpoint gen_exp_global (t : typ) {struct t} : GenLLVM (exp typ) :=
+    ctxs <- get_variable_ctxs;;
+    let var_global_ctx := fst (filter_global_from_variable_ctxs ctxs) in
+    let gen_idents (ts : var_context) : list (nat * GenLLVM (exp typ)) :=
+      match ts with
+      | [] => []
+      | _ => [(16%nat, fmap (fun '(i,_) => EXP_Ident i) (oneOf_LLVM (fmap ret ts)))]
+      end in
+    let fix gen_exp_global_0 (t0 : typ) : GenLLVM (exp typ) :=
+        match t0 with
+        | TYPE_Array n subt0 =>
+            es <- vectorOf_LLVM (N.to_nat n) (gen_exp_global_0 subt0);;
+            ret (EXP_Array (map (fun e => (subt0, e)) es))
+        | TYPE_Vector n subt0 =>
+            es <- vectorOf_LLVM (N.to_nat n) (gen_exp_global_0 subt0);;
+            ret (EXP_Vector (map (fun e => (subt0, e)) es))
+        | TYPE_Struct fields =>
+            (* Should we divide size evenly amongst components of struct? *)
+            tes <- map_monad (fun subt0 => e <- gen_exp_global_0 subt0;; ret (subt0, e)) fields;;
+            ret (EXP_Struct tes)
+        | TYPE_Packed_struct fields =>
+            tes <- map_monad (fun subt0 => e <- gen_exp_global_0 subt0;; ret (subt0, e)) fields;;
+            ret (EXP_Packed_struct tes)
+        | TYPE_I n => (* Actually generate a global variable *)
+            z <- lift (gen_unsigned_bitwidth n);;
+            ret (EXP_Integer z)
+        | TYPE_Float =>
+            ret EXP_Float <*> lift fing32
+        | TYPE_Pointer subt0 =>
+            let ts := filter_type t0 var_global_ctx in
+            if (isNil ts)
+            then
+              name <- new_global_id;;
+              exp <- gen_exp_global_0 subt0;;
+              add_to_ctx (ID_Global name, t0);;
+              let annotations := [] in
+              app_prev_global_code_t [(mk_global name subt0 false (Some exp) false annotations)];;
+              ret (EXP_Ident (ID_Global name))
+
+            else
+              freq_LLVM (gen_idents ts)
+        | _ => lift failGen
+
+        end
+    in
+  gen_exp_global_0 t.
+
   Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
     match sz with
     | 0%nat =>
@@ -1516,7 +1570,7 @@ Section InstrGenerators.
         if has_reach
         then (true, DList_cons (t_from, pre_path) reaches)
         else (false, DList_empty)
-    | TYPE_Pointer t => if seq.nilp (filter_type t_from ctx) then (false, DList_empty) else (true, DList_singleton (t_from, pre_path))
+    | TYPE_Pointer t => if isNil (filter_type t_from ctx) then (false, DList_empty) else (true, DList_singleton (t_from, pre_path))
     | TYPE_Vector _ t =>
         let '(has_subpaths, sub_paths) := get_index_paths_insertvalue_aux t DList_empty ctx in (* Get index path from the first element*)
         if has_subpaths then (true, DList_singleton (t_from, pre_path)) else (false, DList_empty)
@@ -1539,7 +1593,7 @@ Section InstrGenerators.
     | TYPE_Vector _ t => has_paths_insertvalue_aux t ctx
     | TYPE_Struct fields
     | TYPE_Packed_struct fields => fold_left (fun acc x => orb acc (has_paths_insertvalue_aux x ctx)) fields false
-    | TYPE_Pointer _ => seq.nilp (filter (fun '(_, x) => normalized_typ_eq x t_from) ctx)
+    | TYPE_Pointer _ => isNil (filter (fun '(_, x) => normalized_typ_eq x t_from) ctx)
     | _ => true
     end.
 
@@ -1944,21 +1998,21 @@ Section InstrGenerators.
            (* align <- ret None;; *)
            ret (TYPE_Pointer t, INSTR_Alloca t [])
         ] (* TODO: Generate atomic operations and other instructions *)
-         ++ (if seq.nilp sized_ptr_typs_in_ctx then [] else [
+         ++ (if isNil sized_ptr_typs_in_ctx then [] else [
                  (bind (get_typ_l sized_ptr_typs_in_ctx) gen_gep )
                  ; bind (get_typ_l sized_ptr_typs_in_ctx) gen_load
                  ; bind (get_typ_l sized_ptr_typs_in_ctx) gen_store])
-         ++ (if seq.nilp valid_ptr_vecptr_in_ctx then [] else [
+         ++ (if isNil valid_ptr_vecptr_in_ctx then [] else [
                  bind (get_typ_l valid_ptr_vecptr_in_ctx) gen_ptrtoint])
-         ++ (if seq.nilp ptrtoint_ctx then [] else [gen_inttoptr])
-         ++ (if seq.nilp agg_typs_in_ctx then [] else [
+         ++ (if isNil ptrtoint_ctx then [] else [gen_inttoptr])
+         ++ (if isNil agg_typs_in_ctx then [] else [
                  bind (get_typ_l agg_typs_in_ctx) gen_extractvalue])
-         ++ (if seq.nilp insertvalue_typs_in_ctx then [] else [
+         ++ (if isNil insertvalue_typs_in_ctx then [] else [
                  bind (get_typ_l insertvalue_typs_in_ctx) gen_insertvalue])
-         ++ (if seq.nilp vec_typs_in_ctx then [] else [
+         ++ (if isNil vec_typs_in_ctx then [] else [
                  bind (get_typ_l vec_typs_in_ctx) gen_extractelement
                  ; bind (get_typ_l vec_typs_in_ctx) gen_insertelement])
-         ++ (if seq.nilp fun_ptrs_in_ctx then [] else [
+         ++ (if isNil fun_ptrs_in_ctx then [] else [
                  bind (get_typ_l fun_ptrs_in_ctx) gen_call])).
 
   (* TODO: Generate instructions with ids *)
@@ -2265,6 +2319,8 @@ Section InstrGenerators.
     globals <- gen_global_tle_multiple;;
     functions <- gen_helper_function_tle_multiple;;
     main <- gen_main_tle;;
-    ret (globals ++ functions ++ [main]).
+    prev_global_code <- get_prev_global_code;;
+    prev_globals <- map_monad (fun x => ret (TLE_Global x)) prev_global_code;;
+    ret (globals ++ prev_globals ++ functions ++ [main]).
 
 End InstrGenerators.
