@@ -1753,6 +1753,8 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       lia.
     Defined.
 
+    From Coq Require Import FunctionalExtensionality.
+    
     Lemma re_sid_ubytes_helper_equation {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M}
           (bytes : list (N * SByte)) (acc : NMap SByte) :
       re_sid_ubytes_helper bytes acc =
@@ -1771,45 +1773,31 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
             end
         end.
     Proof.
-      unfold re_sid_ubytes_helper.
+      unfold re_sid_ubytes_helper at 1.
       unfold re_sid_ubytes_helper_func at 1.
       rewrite Wf.WfExtensionality.fix_sub_eq_ext.
       destruct bytes.
-      reflexivity.
-      cbn.
-      break_match; break_match; try reflexivity.
-      break_match.
-      break_match; subst.
-      - assert
-          (forall nsid acc,
-              (fold_left
-                 (fun (acc0 : NM.t SByte) (pat : NM.key * SByte) =>
-                    (let '(n0, ub) as anonymous' := pat return (anonymous' = pat -> NM.t SByte) in fun _ : (n0, ub) = pat => NM.add n0 (replace_sid nsid ub) acc0)
-                      eq_refl) l acc) =
-                (fold_left (fun (acc0 : NM.t SByte) '(n0, ub) => NM.add n0 (replace_sid nsid ub) acc0) l acc)) as FOLD.
-        { clear Heqp1 acc.
-          induction l; intros nsid acc.
-          - reflexivity.
-          - cbn.
-            rewrite <- IHl.
-            destruct a.
-            reflexivity.
-        }
-
+      - reflexivity.
+      - simpl. destruct p.
+        destruct (sbyte_to_extractbyte s); try reflexivity.
+        destruct (filter_sid_matches s bytes).
         apply f_equal.
-        Require Import FunctionalExtensionality.
         apply functional_extensionality.
-        intros nsid.
-        rewrite FOLD.
+        intros nsid. 
+        unfold re_sid_ubytes_helper.
+        unfold re_sid_ubytes_helper_func.
+        assert ((fun (acc : NM.t SByte) '(n, ub) => NM.add n (replace_sid nsid ub) acc) =
+                  (fun (acc : NM.t SByte) (pat : NM.key * SByte) =>
+                       (let
+                        '(n, ub) as anonymous' := pat return (anonymous' = pat -> NM.t SByte) in
+                         fun _ : (n, ub) = pat => NM.add n (replace_sid nsid ub) acc) eq_refl)) as EQN.
+        { apply functional_extensionality. intros.
+          apply functional_extensionality. intros.
+          destruct x0.
+          reflexivity. } 
+        rewrite EQN.
         reflexivity.
-      - apply f_equal.
-        apply functional_extensionality.
-        intros nsid.
-        break_match.
-        break_match.
-        all: try reflexivity.
-        cbn.
-    Admitted.
+    Qed.
 
     Definition re_sid_ubytes {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M}
                (bytes : list SByte) : M (list SByte)
@@ -2166,28 +2154,28 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
               re_sid_ubytes bytes'
           end.
     Proof.
-      (* intros uv dt. *)
-      (* unfold serialize_sbytes. *)
-      (* unfold serialize_sbytes_func at 1. *)
-      (* rewrite Wf.WfExtensionality.fix_sub_eq_ext. *)
-      (* destruct uv. *)
-      (* all: try reflexivity. *)
-      (* all: cbn. *)
-      (* - destruct dt; try reflexivity. *)
-      (*   destruct (Datatypes.length fields0 =? Datatypes.length fields)%nat eqn:Hlen. *)
-      (*   + cbn. *)
-      (*     reflexivity. *)
-      (*   + *)
-
-
-      (* destruct uv; try reflexivity. simpl. *)
-      (* destruct dt; try reflexivity. simpl. *)
-      (* break_match. *)
-      (*  destruct (find (fun a : ident * typ => Ident.eq_dec id (fst a)) env). *)
-      (* destruct p; simpl; eauto. *)
-      (* reflexivity. *)
-    Admitted.
-
+      intros.
+      unfold serialize_sbytes at 1.
+      unfold serialize_sbytes_func at 1.
+      rewrite Wf.WfExtensionality.fix_sub_eq_ext.  (* <<=== THIS STEP TAKES A LONG TIME *)
+      simpl. (* <<=== my *goals* buffer goes from 4.5M to 37130 lines (2.5M) of text *)
+      destruct uv; simpl; try reflexivity.
+      - destruct dt; try reflexivity.
+        + destruct fields; try reflexivity.
+        + destruct fields; try reflexivity.
+      - destruct dt; try reflexivity.
+        + destruct fields; try reflexivity.
+        + destruct fields; try reflexivity.
+      - destruct fields; try reflexivity.
+        destruct dt; try reflexivity.
+        destruct fields0; try reflexivity.
+      - destruct fields; try reflexivity.
+        destruct dt; try reflexivity.
+        destruct fields0; try reflexivity.
+      - destruct dt; try reflexivity.
+      - destruct dt; try reflexivity.
+    Qed.
+          
     (* deserialize_sbytes takes a list of SBytes and turns them into a uvalue. *)
 
   (*    This relies on the similar, but different, from_ubytes function *)

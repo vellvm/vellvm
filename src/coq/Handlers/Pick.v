@@ -109,10 +109,10 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationParams 
       Variable (E F: Type -> Type).
 
       Definition E_trigger_prop : E ~> PropT (E +' F) :=
-        fun R e => fun t => t = r <- trigger e ;; ret r.
+        fun R e => fun t => t ≈ r <- trigger e ;; ret r.
 
       Definition F_trigger_prop : F ~> PropT (E +' F) :=
-        fun R e => fun t => t = r <- trigger e ;; ret r.
+        fun R e => fun t => t ≈ r <- trigger e ;; ret r.
 
       Definition pick_uvalue_k_spec
                  {T R : Type}
