@@ -168,6 +168,17 @@ Module Infinite.
     auto.
   Qed.
 
+  #[global] Instance k_spec_WF_memory_k_spec sid ms :
+    k_spec_WF
+      (fun (T : Type)
+        (e : (ExternalCallE +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T)
+        (t : itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T) =>
+      exists (sid' : store_id) ms',
+        interp_memory_prop_h e sid ms (Functor.fmap (fun x : T => (ms', (sid', x))) t))
+      (@memory_k_spec ExternalCallE (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)).
+  Proof.
+  Admitted.
+
   Lemma interp_mcfg4_ret_inv :
     forall (x : dvalue) t genv lenv stack sid m,
       interp_mcfg4 eq eq (Ret x) genv (lenv, stack) sid m t ->
@@ -179,6 +190,7 @@ Module Infinite.
     destruct INTERP as [t_pre [INTERP UNDEF]].
     unfold interp_memory_prop in INTERP.
     cbn in INTERP.
+
     go_in INTERP.
 
     eapply interp_prop_ret_inv in INTERP.
