@@ -48,6 +48,62 @@ Concretization files:
 
 *** Regarding the correctness of the executable interpreter with respect to the specification
 
+The top level correctness of the executable interpreter with respect
+to the specification of LLVM is much the same as in the previous
+vellvm paper. We interpret several layers of events, and there is a
+refinement relationship between each layer. The primary difference
+between the previous vellvm release is the layers of interpretation
+are slightly different.
+
+Since the memory model now contains a substantial amount of
+non-determinism (for instance in addresses, since where a block is
+allocated is non-deterministic), interpreting memory events with in
+the specification now brings us into ~PropT~, so [[file:src/coq/Theory/Refinement.v::Definition refine_L3 : relation (itree L3 (MemState * (store_id * (local_env * stack * (global_env * dvalue)))) -> Prop)][refine_L3]] is a
+relation on sets of itrees, instead of just a relation between itrees
+themselves.
+
+The most interesting addition to the refinements between these layers
+of interpretation is [[file:src/coq/Theory/Refinement.v::Definition refine_L6 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)][refine_L6]] which relates programs where
+out-of-memory events have been handled. Essentially a behaviour is a
+refinement of another if they agree with respect to ~eutt~ up until
+the point where the refined program runs out of memory. [[Out of Memory Refinement][More
+information is found in this section]].
+
+[[Handling of Undefined Behaviour][Additionally we handle UB slightly differently.]] UB now allows for
+time-travel to better reflect the semantics of UB within LLVM, and
+allow for more optimizations.
+
+**** interpreter_sound
+
+The [[file:src/coq/Theory/TopLevelRefinements.v::Theorem interpreter_sound: forall p,][interpreter_sound]] lemma is the top-level theorem which states that
+the [[file:src/coq/Semantics/TopLevel.v::Definition interpreter][executable interpreter]] abides by our [[file:src/coq/Semantics/TopLevel.v::Definition model := model_gen (DTYPE_I 32%N) "main" main_args.][model (specification) of
+LLVM]].
+
+#+begin_src coq
+  Theorem interpreter_sound: forall p, model p (interpreter p).
+#+end_src
+
+This theorem depends largely on the [[file:src/coq/Theory/TopLevelRefinements.v::Lemma refine_UB][refine_UB]] and [[file:src/coq/Theory/TopLevelRefinements.v::Lemma refine_undef][refine_undef]] lemmas:
+
+#+begin_src coq
+  Lemma refine_undef
+    : forall (E F:Type -> Type) T TT (HR: Reflexive TT)  `{UBE -< F} `{FailureE -< F} `{OOME -< F}
+        (xs : PropT _ T),
+    forall x, xs x -> model_undef TT xs (@exec_undef E F _ _ _ _ x).
+
+  Lemma refine_UB
+    : forall (E F G : Type -> Type) T
+        (xs : PropT (E +' F +' UBE +' G) T) x,
+      xs x ->
+      model_UB xs x.
+#+end_src
+
+[[file:src/coq/Theory/TopLevelRefinements.v::Lemma refine_undef][refine_undef]] is used for the soundness of the executable [[file:src/coq/Semantics/LLVMEvents.v::Variant PickE {X Y} {Post : X -> Y -> Prop} : Type -> Type :=][PickE]]
+handlers, and [[file:src/coq/Theory/TopLevelRefinements.v::Lemma refine_UB][refine_UB]] is used for the soundness of the executable
+undefined behavior handlers. In the case of UB, the executable handler
+just leaves UB events uninterpreted so that they can be raised as an
+error in the executable.
+
 *** Regarding the conversion from infinite to finite memory models
 
 At a high level we need a relation between programs in the infinite
