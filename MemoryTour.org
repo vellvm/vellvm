@@ -56,6 +56,8 @@ this is contained within [[file:src/coq/Semantics/InfiniteToFinite.v]]
 and there are [[Refinement Relations between Memory Model
 Instances][some more notes on this file here.]]
 
+**** model_E1E2_L6_sound
+
 An important lemma is [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma model_E1E2_L6_sound :][model_E1E2_L6_sound]]:
 
 #+begin_src coq
@@ -67,7 +69,7 @@ An important lemma is [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma model_E
       model_E1E2_L6 p p.
 #+end_src
 
-This lemma specifies that a program ~p~ is interpreted in the finite
+This lemma specifies that when any program ~p~ is interpreted in the finite
 memory model, we get a refinement of the behaviors of the program when
 it's interpreted in the infinite memory model. This depends on these definitions as well:
 
@@ -105,6 +107,36 @@ conversion between the event types of the source and target
 have slightly different event structures because the events reference
 the LLVM values, and the address and intptr values differ between the
 infinite and finite versions.
+
+**** refine_E1E2_L6_transitive
+
+The other big important lemma is a transitivity relation between the
+refinements of programs at the infinite level and refinements between
+programs at the finite level [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma refine_E1E2_L6_transitive :][refine_E1E2_L6_transitive]]:
+
+#+begin_src coq
+  Lemma refine_E1E2_L6_transitive :
+    forall ti1 ti2 tf1 tf2,
+      TLR_INF.R.refine_L6 ti1 ti2 ->
+      refine_E1E2_L6 ti2 tf1 ->
+      TLR_FIN.R.refine_L6 tf1 tf2 ->
+      refine_E1E2_L6 ti1 tf2.
+#+end_src
+
+This states that if the infinite program ~ti2~ refines ~ti1~, and if
+the finite program ~tf1~ is a refinement (across the infinite to
+finite boundary) of ~ti2~, and if ~tf2~ is a refinement of ~tf1~, then
+we know that ~ti1~ is refined across the infinite to finite boundary
+by ~tf2~.
+
+More concretely, if we optimize an infinite LLVM program ~p1~ to an
+infinite LLVM program ~p2~, and if we lower that infinite program ~p2~
+to a finite program ~f1~, and then finally perform some optimizations
+in finite LLVM on ~f1~ to get ~f2~, then we can conclude that ~f2~ is
+indeed a refinement of our original program ~p1~.
+
+**** TODO Diagram would probably help.
+
 
 *** Regarding the examples of specific program transformations
 
