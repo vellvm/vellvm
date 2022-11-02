@@ -287,7 +287,33 @@ constructors in our development).
 
 **** Removing pointer to integer casts and allocations
 
+In the infinite language it is also possible to remove pointer to
+integer casts, as they are essentially noops.
+
 - [[file:src/coq/Theory/OOMRefinementExamples.v::Lemma remove_alloc_ptoi_block :][remove_alloc_ptoi_block]]
+
+  #+begin_src coq
+    Definition ptoi_code : code dtyp :=
+      [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) []);
+        (IId (Name "i"), INSTR_Op (OP_Conversion Ptrtoint DTYPE_Pointer (EXP_Ident (ID_Local (Name "ptr"))) (DTYPE_IPTR)))
+      ].
+
+    Definition ptoi_block : block dtyp :=
+      {|
+        blk_id := Name "";
+        blk_phis := [];
+        blk_code := ptoi_code;
+        blk_term := TERM_Ret (DTYPE_I 1%N, EXP_Bool true);
+        blk_comments := None;
+      |}.
+
+    Definition ptoi_tree : itree instr_E dvalue :=
+      denote_program ptoi_block.
+
+    Lemma remove_alloc_ptoi_block :
+      forall genv lenv stack sid m,
+        refine_L6 (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ptoi_tree) genv (lenv, stack) sid m) (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m).
+  #+end_src
 
 **** Adding allocations
 
