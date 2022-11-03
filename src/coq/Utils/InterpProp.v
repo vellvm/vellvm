@@ -24,7 +24,8 @@ From Coq Require Import
      List
      Program.Tactics Program.Equality.
 From ITree Require Import
-     Basics.Monad.
+     Basics.Monad
+     Eq.EqAxiom.
 
 From Vellvm Require Import
      Utils.PropT.
@@ -64,18 +65,16 @@ Section interp_prop.
                           (HS: interp_PropTF b1 b2 vclo sim t1 (observe t2)),
       interp_PropTF b1 b2 vclo sim t1 (TauF t2)
 
-  | Interp_PropT_Vis_OOM_R : forall A (e : OOM A) (k1 : A -> itree _ R) t1 (t2 : itree' _ R)
+  | Interp_PropT_Vis_OOM : forall A (e : OOM A) (k1 : A -> itree _ R) t1 (t2 : itree' _ R)
                          (HT1: t1 ≅ vis e k1),
       interp_PropTF b1 b2 vclo sim (observe t1) t2
 
-  | Interp_PropT_Vis : forall A (e : F A) (k1 : A -> itree E R) (t1 : itree' E R) (t2: itree' F R)
+  | Interp_PropT_Vis : forall A (e : F A) (k1 : A -> itree E R)
 
                          (k2 : A -> itree F R)
 
-                         (HK : forall (a : A), Returns a (trigger e) -> vclo sim (k1 a) (k2 a))
-                         (HT1: go t1 ≅ vis e k1)
-                         (KS : eutt RR (vis e k2) (go t2)),
-      interp_PropTF b1 b2 vclo sim t1 t2.
+                         (HK : forall (a : A), Returns a (trigger e) -> vclo sim (k1 a) (k2 a)),
+      interp_PropTF b1 b2 vclo sim (VisF (subevent _ e) k1) (VisF (subevent _ e) k2).
 
   Hint Constructors interp_PropTF : core.
 
@@ -143,13 +142,14 @@ Section interp_prop.
       punfold IHinterp_PropTF.
     - pstep. red. rewrite <- Heqi.
       econstructor; eauto.
-    - pstep. red. rewrite <- Heqi.
-      assert (go t2 ≅ y') by (pstep; auto).
-      eapply Interp_PropT_Vis; eauto; cycle 1.
-      + rewrite Heqi0, <- itree_eta. eauto. rewrite <- H. eauto.
-      + intros. specialize (HK _ H0); pclearbot; left; eapply paco2_mon; eauto.
-        intros; contradiction.
-  Qed.
+    (* - pstep. red. rewrite <- Heqi. *)
+    (*   inversion EQ. *)
+    (*   + dependent destruction H2. *)
+    (*     eapply Interp_PropT_Vis; eauto; cycle 1. *)
+      (* + rewrite Heqi0, <- itree_eta. eauto. rewrite <- H. eauto. *)
+        (* intros. specialize (HK _ H0); pclearbot; left; eapply paco2_mon; eauto. *)
+      (* intros; contradiction. *)
+  Admitted.
 
   #[global] Instance interp_prop_eq_itree_Proper_impl :
     Proper (eq_itree eq ==> eq_itree eq ==> impl) interp_prop.
@@ -304,12 +304,12 @@ Section interp_prop.
           intros; left; pclearbot; eapply paco2_mon; eauto; intros; inv PR0.
         * remember (VisF e k1) as ot.
           hinduction HS before CIH; intros; try discriminate; eauto.
-          pose proof @Interp_PropT_Vis.
-          change (VisF e0 k3) with (observe (Vis e0 k3)).
-          eapply H; eauto.
-          intros.
-          left. specialize (HK _ H0). pclearbot.
-          eapply paco2_mon; eauto. intros; inv PR.
+          (* pose proof @Interp_PropT_Vis. *)
+          (* change (VisF e0 k3) with (observe (Vis e0 k3)). *)
+          (* eapply H; eauto. *)
+          (* intros. *)
+          (* left. specialize (HK _ H0). pclearbot. *)
+          (* eapply paco2_mon; eauto. intros; inv PR. *)
     (*       eapply k_spec_WF_Proper. eapply eqit_Vis. symmetry. pclearbot. eauto. *)
     (*       eapply k_spec_WF_Proper. Unshelve. *)
     (*       3 : exact t2. *)
@@ -521,7 +521,6 @@ Hint Resolve interp_PropT_idclo_mono : paco.
 (*       * eauto. *)
 (* Qed. *)
 
-(* From ITree Require Import Eq.EqAxiom. *)
 
 (* Lemma interp_prop_clo_bind' {E F} R (RR : R -> R -> Prop) h_spec k_spec {U UU} t1 t2 k1 k2 *)
 (*       `{k_spec_WF _ _ h_spec k_spec} *)
@@ -571,8 +570,8 @@ Hint Resolve interp_PropT_idclo_mono : paco.
 
 Section interp_prop_extra.
 
-  Context {E F : Type -> Type}.
-  Context {R1 R2 : Type} (RR : R1 -> R2 -> Prop).
+  Context {E F OOM : Type -> Type} {OOME: OOM -< E} {OOMF: OOM -< F} {EF: F -< E}.
+  Context {R : Type} (RR : R -> R -> Prop).
 
   (* (* Figure 7: Interpreter law for Ret *) *)
   (* Lemma interp_prop_ret : *)
@@ -619,97 +618,104 @@ Section interp_prop_extra.
   (*   eapply k_spec_WF_mono; eauto. *)
   (* Qed. *)
 
-  (* Lemma interp_prop_bind_refine: *)
-  (*     forall (R : Type) (t : itree E R) (k : R -> itree E R) (y : itree F R), *)
-  (*       (x0 <- interp_prop eq h_spec k_spec t;; interp_prop eq h_spec k_spec (k x0)) y -> *)
-  (*       interp_prop eq h_spec k_spec (x <- t;; k x) y. *)
-  (* Proof. *)
-  (*   intros R t k y H0. *)
-  (*   destruct H0 as (x0&x1&?&?&?). *)
-  (*   rewrite H0. clear H0. clear y. *)
-  (*   setoid_rewrite unfold_bind. *)
-  (*   match goal with *)
-  (*   | |- interp_prop _ _ _ ?l ?r => remember l; remember r *)
-  (*   end. *)
-  (*   revert_until R. pcofix CIH. intros. *)
-  (*   red in H0. *)
-  (*   punfold H0; red in H0; cbn in H0. *)
-  (*   (* clear x. *) *)
-  (*   rename t into x, x2 into x'. *)
-  (*   rename x3 into k', i0 into i'. *)
-  (*   remember (observe x); remember (observe x'). *)
-  (*   revert_until H0. revert x x' Heqi1 Heqi2. *)
-  (*   induction H0; intros. *)
-  (*   - subst; eauto. setoid_rewrite (itree_eta x') in H1. *)
-  (*     rewrite <- Heqi2 in H1. *)
-  (*     assert (Returns (E := F) r2 (Ret r2)) by (econstructor; reflexivity). *)
-  (*     specialize (H1 _ H). eapply paco2_mon. punfold H1. *)
-  (*     intros; inv PR. *)
-  (*   - (* coinductive tau *) *)
-  (*     pstep. subst. constructor. right. eapply CIH. eauto. pclearbot. *)
-  (*     3,4:eapply bisimulation_is_eq; rewrite unfold_bind; reflexivity. *)
-  (*     pclearbot. punfold HS. pstep. eapply HS. *)
-  (*     intros; eapply H1. rewrite (itree_eta x'). *)
-  (*     rewrite <- Heqi2. eapply ReturnsTau; eauto. reflexivity. *)
-  (*   - rewrite Heqi. pstep. constructor; auto. *)
-  (*     specialize (IHinterp_PropTF t1 x' eq_refl Heqi2 H1 (bind t1 k)). *)
+  Lemma interp_prop_bind_refine:
+      forall (t : itree E R) (k : R -> itree E R) (y : itree F R),
+        (x0 <- interp_prop eq t;; interp_prop eq (k x0)) y ->
+        interp_prop eq (x <- t;; k x) y.
+  Proof.
+    intros t k y H0.
+    destruct H0 as (x0&x1&?&?&?).
+    rewrite H0. clear H0 y.
+    rename x0 into t', x1 into k'.
+    setoid_rewrite unfold_bind.
+    match goal with
+    | |- interp_prop _ ?l ?r => remember l; remember r
+    end.
+    revert_until RR. pcofix CIH. intros.
+    red in H0.
+    punfold H0; red in H0; cbn in H0.
+    remember (observe t); remember (observe t').
+    setoid_rewrite (itree_eta t') in H1.
+    revert t t' k k' Heqi1 Heqi2 H1 i i0 Heqi Heqi0.
+    induction H0; intros.
 
-  (*     assert (H' : x <- t1;; k x = *)
-  (*                 match observe t1 with *)
-  (*                 | RetF r => k r *)
-  (*                 | TauF t => Tau (ITree.bind t k) *)
-  (*                 | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k) *)
-  (*                 end). *)
-  (*     { *)
-  (*       apply bisimulation_is_eq; setoid_rewrite unfold_bind; reflexivity. *)
-  (*     } *)
-  (*     specialize (IHinterp_PropTF H' _ Heqi0). *)
-  (*     punfold IHinterp_PropTF. *)
-  (*   - rewrite Heqi0. pstep. constructor; auto. *)
-  (*     specialize (IHinterp_PropTF _ t2 Heqi1 eq_refl). *)
-  (*     assert (forall a : R, Returns a t2 -> interp_prop eq h_spec k_spec (k a) (k' a)). *)
-  (*     { intros; eapply H1. rewrite (itree_eta x'); rewrite <- Heqi2. *)
-  (*       rewrite tau_eutt; auto. } *)
-  (*     specialize (IHinterp_PropTF H _ Heqi (bind t2 k')). *)
+    - subst; eauto.
+      assert (Returns r2 t').
+      { rewrite itree_eta; rewrite <- Heqi2; constructor; reflexivity. }
+      setoid_rewrite <- itree_eta in H1.
+      specialize (H1 _ H). eapply paco2_mon. punfold H1.
+      intros; inv PR.
 
-  (*     assert (H' : x <- t2;; k' x = *)
-  (*                 match observe t2 with *)
-  (*                 | RetF r => k' r *)
-  (*                 | TauF t => Tau (ITree.bind t k') *)
-  (*                 | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k') *)
-  (*                 end). *)
-  (*     { *)
-  (*       apply bisimulation_is_eq; setoid_rewrite unfold_bind; reflexivity. *)
-  (*     } *)
-  (*     specialize (IHinterp_PropTF H'). *)
-  (*     punfold IHinterp_PropTF. *)
-  (*   - rewrite Heqi. pstep. econstructor; [ eauto | ..]. *)
-  (*     + intros. *)
-  (*       pclearbot. *)
-  (*       right. eapply CIH; [ auto | ..]. *)
-  (*       3,4 :eapply bisimulation_is_eq; setoid_rewrite <- unfold_bind; reflexivity. *)
-  (*       eauto. specialize (HK _ H). pclearbot. eapply HK. *)
-  (*       intros; eapply H1. rewrite (itree_eta x'). rewrite <- Heqi2. *)
-  (*       admit. *)
-  (*       (* eapply k_spec_Returns. 3 : exact H. 3 : exact H0. *) *)
-  (*       (* eauto. eapply k_spec_Proper; eauto. rewrite <- itree_eta; reflexivity. *) *)
-  (*     + match goal with *)
-  (*       | |- k_spec _ _ _ _ _ ?l _ => remember l *)
-  (*       end. *)
-  (*       assert (i0 = (fun a => k2 a >>= k')). { *)
-  (*         apply FunctionalExtensionality.functional_extensionality. *)
-  (*         intros; apply bisimulation_is_eq. rewrite Heqi3. *)
-  (*         rewrite <- unfold_bind; reflexivity. *)
-  (*       } *)
-  (*       assert (i' = t2 >>= k'). { *)
-  (*         apply bisimulation_is_eq. rewrite Heqi0. *)
-  (*         setoid_rewrite unfold_bind; reflexivity. *)
-  (*       } *)
-  (*       eapply k_spec_WF_Proper; eauto. *)
-  (*       rewrite itree_eta; rewrite H0; rewrite <- itree_eta; reflexivity. *)
-  (*       rewrite H. *)
-  (*       eapply k_spec_bind_; eauto. *)
-  (* Admitted. *)
+    - (* coinductive tau *)
+      pstep. subst. constructor. right. eapply CIH. eauto. pclearbot.
+      3,4:eapply bisimulation_is_eq; rewrite unfold_bind; reflexivity.
+      pclearbot. punfold HS. pstep. eapply HS.
+      intros; eapply H1. rewrite (itree_eta t').
+      rewrite <- Heqi2. eapply ReturnsTau; eauto. reflexivity.
+    - rewrite Heqi. pstep. constructor; auto.
+      specialize (IHinterp_PropTF t1 t' k k' eq_refl Heqi2 H1 (bind t1 k)).
+
+      assert (H' : x <- t1;; k x =
+                  match observe t1 with
+                  | RetF r => k r
+                  | TauF t => Tau (ITree.bind t k)
+                  | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k)
+                  end).
+      {
+        apply bisimulation_is_eq; setoid_rewrite unfold_bind; reflexivity.
+      }
+      specialize (IHinterp_PropTF i0 H' Heqi0).
+      punfold IHinterp_PropTF.
+    - rewrite Heqi0. pstep. constructor; auto.
+
+      specialize (IHinterp_PropTF _ _ k k' Heqi1 eq_refl).
+
+      assert (forall a : R, Returns a t2 -> interp_prop eq (k a) (k' a)).
+      { intros; eapply H1. rewrite (itree_eta t'); rewrite <- Heqi2.
+        rewrite tau_eutt; auto. rewrite <- itree_eta; auto. }
+
+      setoid_rewrite <- itree_eta in IHinterp_PropTF.
+      specialize (IHinterp_PropTF H).
+
+      assert (H' : x <- t2;; k' x =
+                  match observe t2 with
+                  | RetF r => k' r
+                  | TauF t => Tau (ITree.bind t k')
+                  | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k')
+                  end).
+      {
+        apply bisimulation_is_eq; setoid_rewrite unfold_bind; reflexivity.
+      }
+      specialize (IHinterp_PropTF _ _ Heqi H').
+      punfold IHinterp_PropTF.
+
+    - subst.
+      punfold HT1.
+      red in HT1. cbn in HT1.
+      remember (VisF (subevent A e) k1).
+      hinduction HT1 before e; intros; inv Heqi.
+      + dependent destruction H2.
+        pclearbot. pstep.
+        eapply Interp_PropT_Vis_OOM; eauto.
+        reflexivity.
+      + pstep. constructor; eauto.
+
+        assert (t0 >>= k =
+                  match observe t0 with
+                  | RetF r => k r
+                  | TauF t0 => Tau (ITree.bind t0 k)
+                  | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k)
+                  end). {
+          intros; apply bisimulation_is_eq.
+          rewrite <- unfold_bind; reflexivity. }
+        setoid_rewrite H.
+
+        specialize (IHHT1 _ eq_refl _ _ _ _ eq_refl H1).
+        punfold IHHT1.
+
+    - rewrite Heqi, Heqi0; clear Heqi Heqi0.
+      pstep. econstructor. reflexivity.
+  Qed.
 
   (* Lemma interp_prop_ret_pure : *)
   (*   forall {T} (RR : relation T) `{REF: Reflexive _ RR} (x : T), *)
