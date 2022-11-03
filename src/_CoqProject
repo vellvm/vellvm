@@ -15,6 +15,7 @@
 ./coq/Handlers/Stack.v
 ./coq/Handlers/MemoryModules/Within.v
 ./coq/Handlers/MemoryModules/FiniteAddresses.v
+./coq/Handlers/MemoryModules/InfiniteAddresses.v
 ./coq/Handlers/MemoryModules/FiniteIntptr.v
 ./coq/Handlers/MemoryModules/FiniteSizeof.v
 ./coq/Handlers/MemoryModules/FiniteSpecPrimitives.v

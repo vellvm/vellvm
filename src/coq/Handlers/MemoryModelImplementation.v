@@ -63,14 +63,13 @@ From Vellvm.Handlers Require Import
      MemoryModel.
 
 From Vellvm.Handlers.MemoryModules Require Import
-     FiniteAddresses
-     FiniteIntptr
-     FiniteSizeof
-     FiniteSpecPrimitives
-     FiniteExecPrimitives
-     Within.
-
-
+  FiniteAddresses
+  InfiniteAddresses
+  FiniteIntptr
+  FiniteSizeof
+  FiniteSpecPrimitives
+  FiniteExecPrimitives
+  Within.
 
 #[local] Open Scope Z_scope.
 
@@ -111,7 +110,8 @@ Inductive is_supported : dtyp -> Prop :=
 | is_supported_DTYPE_Vector : forall sz τ, is_supported τ -> vector_dtyp τ -> is_supported (DTYPE_Vector sz τ)
 .
 
-Module Addr := FiniteAddresses.Addr.
+Module FinAddr := FiniteAddresses.FinAddr.
+Module InfAddr := InfiniteAddresses.InfAddr.
 Module IP64Bit := FiniteIntptr.IP64Bit.
 Module BigIP := FiniteIntptr.BigIP.
 Module FinSizeof := FiniteSizeof.FinSizeof.
@@ -147,8 +147,8 @@ Module MakeFiniteMemory (LP : LLVMParams) <: Memory LP.
   Export GEP Byte MP MEM_MODEL CP.
 End MakeFiniteMemory.
 
-Module LLVMParamsBigIntptr := LLVMParams.MakeBig Addr BigIP FinSizeof FinPTOI FinPROV FinITOP BigIP_BIG.
-Module LLVMParams64BitIntptr := LLVMParams.Make Addr IP64Bit FinSizeof FinPTOI FinPROV FinITOP.
+Module LLVMParamsBigIntptr := LLVMParams.MakeBig InfAddr BigIP FinSizeof InfPTOI InfPROV InfITOP BigIP_BIG InfITOP_BIG.
+Module LLVMParams64BitIntptr := LLVMParams.Make FinAddr IP64Bit FinSizeof FinPTOI FinPROV FinITOP.
 
 Module MemoryBigIntptr := MakeFiniteMemory LLVMParamsBigIntptr.
 Module Memory64BitIntptr := MakeFiniteMemory LLVMParams64BitIntptr.
@@ -167,6 +167,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Import LP.ITOP.
   Import LP.PTOI.
   Import LP.IP_BIG.
+  Import LP.I2P_BIG.
   Import LP.IP.
   Import LP.ADDR.
   Import LP.PROV.
@@ -280,23 +281,31 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
       destruct IN as [oom_msg TPTRS].
       rewrite TPTRS in REST.
       setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_OOM _)) in REST.
+      pose proof (int_to_ptr_safe
+                    (next_memory_key
+                       {|
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := memory_stack_memory0;
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack :=
+                           memory_stack_frame_stack0;
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := memory_stack_heap0
+                       |})
+                    (allocation_id_to_prov (provenance_to_allocation_id pr))) as HITP_SAFE.
+      destruct (ITOP.int_to_ptr
+                    (next_memory_key
+                       {|
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := memory_stack_memory0;
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack :=
+                           memory_stack_frame_stack0;
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := memory_stack_heap0
+                       |}) (allocation_id_to_prov (provenance_to_allocation_id pr))) eqn:HITP;
+        inv HITP_SAFE.
 
+      cbn in REST.
+      repeat setoid_rewrite bind_ret_l in REST.
+      cbn in REST.
       destruct (map_monad
-                  (fun ix : LLVMParamsBigIntptr.IP.intptr =>
-                     GEP.handle_gep_addr (DTYPE_I 8)
-                       (LLVMParamsBigIntptr.ITOP.int_to_ptr
-                          (next_memory_key
-                             {|
-                               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory :=
-                                 memory_stack_memory0;
-                               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack :=
-                                 memory_stack_frame_stack0;
-                               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap :=
-                                 memory_stack_heap0
-                             |})
-                          (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
-                             (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id pr)))
-                       [LLVMParamsBigIntptr.Events.DV.DVALUE_IPTR ix]) seq) eqn:HMAPM.
+                  (fun ix : IP.intptr =>
+                     GEP.handle_gep_addr (DTYPE_I 8) a [Events.DV.DVALUE_IPTR ix]) seq) eqn:HMAPM.
 
       { (* Error, should be contradiction *)
         cbn in REST.
@@ -307,7 +316,28 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
       }
 
       cbn in REST.
-      setoid_rewrite bind_ret_l in REST.
+      repeat setoid_rewrite bind_ret_l in REST.
+      cbn in REST.
+      destruct (map_monad id l) eqn:HSEQUENCE.
+      2: {
+        (* One of the GEPs raised OOM, should not be possible *)
+        cbn in *.
+        apply map_monad_OOM_fail in HSEQUENCE as [a' [INl A'EQ]].
+        unfold id in A'EQ. inv A'EQ.
+        pose proof map_monad_err_In _ _ _ _ HMAPM INl as [ix [GEP INix]].
+        apply GEP.handle_gep_addr_ix_OOM in GEP; auto.
+        destruct GEP as [msg' GEP].
+        pose proof
+          (LP.I2P_BIG.int_to_ptr_safe (ptr_to_int a + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * to_Z ix)
+             (address_provenance a)) as SAFE.
+        rewrite GEP in SAFE.
+        contradiction.
+      }
+
+      cbn in REST.
+      rewrite bind_ret_l in REST.
+      cbn in REST.
+
       rewrite map_ret in REST.
       cbn in REST.
       symmetry in REST.
@@ -330,30 +360,37 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
       destruct res0 as [ptr ptrs].
       exists ptr. exists ptrs.
       rewrite IN in REST.
+      pose proof (int_to_ptr_safe
+                    (next_memory_key
+                       {|
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := memory_stack_memory0;
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack :=
+                           memory_stack_frame_stack0;
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := memory_stack_heap0
+                       |})
+                    (allocation_id_to_prov (provenance_to_allocation_id pr))) as HITP_SAFE.
+      destruct (ITOP.int_to_ptr
+                    (next_memory_key
+                       {|
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := memory_stack_memory0;
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack :=
+                           memory_stack_frame_stack0;
+                         MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := memory_stack_heap0
+                       |}) (allocation_id_to_prov (provenance_to_allocation_id pr))) eqn:HITP;
+        inv HITP_SAFE.
 
+      cbn in REST.
+      repeat setoid_rewrite bind_ret_l in REST.
+      cbn in REST.
       destruct (map_monad
-                  (fun ix : LLVMParamsBigIntptr.IP.intptr =>
-                     GEP.handle_gep_addr (DTYPE_I 8)
-                       (LLVMParamsBigIntptr.ITOP.int_to_ptr
-                          (next_memory_key
-                             {|
-                               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory :=
-                                 memory_stack_memory0;
-                               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack :=
-                                 memory_stack_frame_stack0;
-                               MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap :=
-                                 memory_stack_heap0
-                             |})
-                          (LLVMParamsBigIntptr.PROV.allocation_id_to_prov
-                             (LLVMParamsBigIntptr.PROV.provenance_to_allocation_id pr)))
-                       [LLVMParamsBigIntptr.Events.DV.DVALUE_IPTR ix]) seq) eqn:HMAPM.
+                  (fun ix : IP.intptr =>
+                     GEP.handle_gep_addr (DTYPE_I 8) a [Events.DV.DVALUE_IPTR ix]) seq) eqn:HMAPM.
 
       { (* Error, should be contradiction *)
         cbn in REST.
         repeat setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_Fail _)) in REST.
-        unfold raiseOOM in REST.
-        unfold LLVMEvents.raise in REST.
         exfalso.
+        (* eapply rbm_raise_ret_inv with (rbm_raise:=fun X s => @LLVMEvents.raise _ X _ s) in REST. *)
         admit.
       }
 
@@ -424,18 +461,31 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     repeat setoid_rewrite bind_ret_l in ALLOC_EXEC.
     cbn in ALLOC_EXEC.
 
+    pose proof (int_to_ptr_safe
+                  (next_memory_key
+                     {|
+                       MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
+                       MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs;
+                       MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
+                     |})
+                  (allocation_id_to_prov (provenance_to_allocation_id pr))) as HITP_SAFE.
+    destruct (ITOP.int_to_ptr
+                (next_memory_key
+                     {|
+                       MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
+                       MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs;
+                       MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
+                     |})
+                (allocation_id_to_prov (provenance_to_allocation_id pr))) eqn:HITP;
+      inv HITP_SAFE.
+
+    cbn in ALLOC_EXEC.
+    repeat setoid_rewrite bind_ret_l in ALLOC_EXEC.
+    cbn in ALLOC_EXEC.
+
     destruct (map_monad
                 (fun ix : IP.intptr =>
-                   GEP.handle_gep_addr (DTYPE_I 8)
-                     (ITOP.int_to_ptr
-                        (next_memory_key
-                           {|
-                             MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
-                             MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack :=
-                               fs;
-                             MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
-                           |}) (allocation_id_to_prov (provenance_to_allocation_id pr)))
-                     [Events.DV.DVALUE_IPTR ix]) seq) eqn:HMAPM.
+                   GEP.handle_gep_addr (DTYPE_I 8) a [Events.DV.DVALUE_IPTR ix]) seq) eqn:HMAPM.
 
     { (* Error *)
       cbn in ALLOC_EXEC.
@@ -482,6 +532,30 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
       repeat rewrite bind_ret_l in ALLOC_EXEC.
       cbn in ALLOC_EXEC.
 
+      destruct (map_monad id l) eqn:HSEQUENCE.
+      2: {
+        (* One of the GEPs raised OOM, should not be possible *)
+        cbn in *.
+        apply map_monad_OOM_fail in HSEQUENCE as [a' [INl A'EQ]].
+        unfold id in A'EQ. inv A'EQ.
+        pose proof map_monad_err_In _ _ _ _ HMAPM INl as [ix [GEP INix]].
+        apply GEP.handle_gep_addr_ix_OOM in GEP; auto.
+        destruct GEP as [msg' GEP].
+        pose proof
+          (LP.I2P_BIG.int_to_ptr_safe (ptr_to_int a + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * to_Z ix)
+             (address_provenance a)) as SAFE.
+        rewrite GEP in SAFE.
+        contradiction.
+      }
+
+      cbn in ALLOC_EXEC.
+      repeat setoid_rewrite bind_ret_l in ALLOC_EXEC.
+      cbn in ALLOC_EXEC.
+      repeat rewrite bind_ret_l in ALLOC_EXEC.
+      cbn in ALLOC_EXEC.
+      repeat rewrite bind_ret_l in ALLOC_EXEC.
+      cbn in ALLOC_EXEC.
+
       rewrite map_ret in ALLOC_EXEC.
 
       destruct_err_ub_oom res.
@@ -522,19 +596,11 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
                   MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory :=
                     add_all_index
                       (map (fun b : SByte => (b, provenance_to_allocation_id pr)) bytes)
-                      (PTOI.ptr_to_int
-                         (ITOP.int_to_ptr
-                            (next_memory_key
-                               {|
-                                 MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
-                                 MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack :=
-                                   fs;
-                                 MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
-                               |}) (allocation_id_to_prov (provenance_to_allocation_id pr))))
+                      (PTOI.ptr_to_int res0)
                       mem;
                   MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs;
                   MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
-                |} (map PTOI.ptr_to_int l);
+                |} l0;
             MemoryBigIntptrInfiniteSpec.MMSP.ms_provenance := mprov
           |}.
 
@@ -545,13 +611,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
         destruct ALLOC_SPEC as [ms_final' [[ptr''' ptrs'''] [[BYTES_POST [PTREQ PTRSEQ]] [MEQ ALLOC_SPEC]]]].
         subst ms_final' ptr'' ptr''' ptrs'''.
 
-        exists (ITOP.int_to_ptr
-             (next_memory_key
-                {|
-                  MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
-                  MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs;
-                  MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
-                |}) (allocation_id_to_prov (provenance_to_allocation_id pr))).
+        exists res0.
         exists ptrs''.
 
         eauto.
@@ -674,6 +734,5 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   End MemoryPrimitives.
 End MemoryBigIntptrInfiniteSpec.
 
-
 Module MemoryBigIntptrInfiniteSpecHelpers :=
-  MemoryModelInfiniteSpecHelpers  LLVMParamsBigIntptr MemoryBigIntptr.MP MemoryBigIntptr.MMEP.MMSP MemoryBigIntptr.MMEP.MemSpec MemoryBigIntptrInfiniteSpec.
+  MemoryModelInfiniteSpecHelpers LLVMParamsBigIntptr MemoryBigIntptr.MP MemoryBigIntptr.MMEP.MMSP MemoryBigIntptr.MMEP.MemSpec MemoryBigIntptrInfiniteSpec.

@@ -28,31 +28,42 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
   (* TODO: should this be here? *)
   Parameter handle_gep_h : dtyp -> Z -> list dvalue -> err Z.
 
-  Parameter handle_gep_addr : dtyp -> addr -> list dvalue -> err addr.
+  Parameter handle_gep_addr : dtyp -> addr -> list dvalue -> err (OOM addr).
 
   Parameter handle_gep_addr_0 :
     forall (dt : dtyp) (p : addr),
-      handle_gep_addr dt p [DVALUE_IPTR IP.zero] = inr p.
+      handle_gep_addr dt p [DVALUE_IPTR IP.zero] = inr (ret p).
 
   Parameter handle_gep_addr_ix :
     forall (dt : dtyp) (p p' : addr) ix,
-      handle_gep_addr dt p [DVALUE_IPTR ix] = inr p' ->
+      handle_gep_addr dt p [DVALUE_IPTR ix] = inr (ret p') ->
       ptr_to_int p' = (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z.
+
+  Parameter handle_gep_addr_ix_OOM :
+    forall (dt : dtyp) (p p' : addr) ix msg,
+      handle_gep_addr dt p [DVALUE_IPTR ix] = inr (Oom msg) ->
+      exists msg',
+        int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z (address_provenance p) = Oom msg'.
 
   Parameter handle_gep_addr_ix' :
     forall (dt : dtyp) (p p' : addr) ix,
-      p' = int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z (address_provenance p) ->
-      handle_gep_addr dt p [DVALUE_IPTR ix] = inr p'.
+      ret p' = int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z (address_provenance p) ->
+      handle_gep_addr dt p [DVALUE_IPTR ix] = inr (ret p').
+
+  Parameter handle_gep_addr_ix'_OOM :
+    forall (dt : dtyp) (p p' : addr) ix msg,
+      int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z (address_provenance p) = Oom msg ->
+      exists msg', handle_gep_addr dt p [DVALUE_IPTR ix] = inr (Oom msg').
 
   Parameter handle_gep_addr_preserves_provenance :
     forall (dt : dtyp) ixs (p p' : addr),
-      handle_gep_addr dt p ixs = inr p' ->
+      handle_gep_addr dt p ixs = inr (ret p') ->
       address_provenance p = address_provenance p'.
 
-  Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err dvalue :=
+  Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err (OOM dvalue) :=
     match dv with
-    | DVALUE_Addr a => fmap DVALUE_Addr (handle_gep_addr t a vs)
-    | _ => failwith "non-address"
+    | DVALUE_Addr a => fmap (F:=err) (fmap DVALUE_Addr) (handle_gep_addr t a vs)
+    | _ => inl "non-address"%string
     end.
 End GEPM.
 
@@ -131,7 +142,7 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
   (* At the toplevel, GEP takes a [dvalue] as an argument that must contain a pointer, but no other pointer can be recursively followed.
      The pointer set the block into which we look, and the initial offset. The first index value add to the initial offset passed to [handle_gep_h] for the actual access to structured data.
    *)
-  Definition handle_gep_addr (t:dtyp) (a:addr) (vs:list dvalue) : err addr :=
+  Definition handle_gep_addr (t:dtyp) (a:addr) (vs:list dvalue) : err (OOM addr) :=
     let ptr := ptr_to_int a in
     let prov := address_provenance a in
     match vs with
@@ -152,7 +163,7 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
 
   Lemma handle_gep_addr_0 :
     forall (dt : dtyp) (p : addr),
-      handle_gep_addr dt p [DVALUE_IPTR IP.zero] = inr p.
+      handle_gep_addr dt p [DVALUE_IPTR IP.zero] = inr (ret p).
   Proof.
     intros dt p.
     cbn.
@@ -163,30 +174,54 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
 
   Lemma handle_gep_addr_ix :
     forall (dt : dtyp) (p p' : addr) ix,
-      handle_gep_addr dt p [DVALUE_IPTR ix] = inr p' ->
+      handle_gep_addr dt p [DVALUE_IPTR ix] = inr (ret p') ->
       ptr_to_int p' = (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z.
   Proof.
     intros dt p p' ix GEP.
     cbn in *.
     inv GEP.
-    rewrite ptr_to_int_int_to_ptr.
-    reflexivity.
+    erewrite ptr_to_int_int_to_ptr; eauto.
+  Qed.
+
+  Lemma handle_gep_addr_ix_OOM :
+    forall (dt : dtyp) (p p' : addr) ix msg,
+      handle_gep_addr dt p [DVALUE_IPTR ix] = inr (Oom msg) ->
+      exists msg',
+        int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z (address_provenance p) = Oom msg'.
+  Proof.
+    intros dt p p' ix msg GEP.
+    cbn in *.
+    exists msg.
+    inv GEP.
+    auto.
   Qed.
 
   Lemma handle_gep_addr_ix' :
     forall (dt : dtyp) (p p' : addr) ix,
-      p' = int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z (address_provenance p) ->
-      handle_gep_addr dt p [DVALUE_IPTR ix] = inr p'.
+      ret p' = int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z (address_provenance p) ->
+      handle_gep_addr dt p [DVALUE_IPTR ix] = inr (ret p').
   Proof.
     intros dt p p' ix IX.
-    cbn.
-    subst.
+    cbn in *.
+    inv IX.
     reflexivity.
+  Qed.
+
+  Lemma handle_gep_addr_ix'_OOM :
+    forall (dt : dtyp) (p p' : addr) ix msg,
+      int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z (address_provenance p) = Oom msg ->
+      exists msg', handle_gep_addr dt p [DVALUE_IPTR ix] = inr (Oom msg').
+  Proof.
+    intros dt p p' ix msg IX.
+    cbn in *.
+    exists msg.
+    inv IX.
+    auto.
   Qed.
 
   Lemma handle_gep_addr_preserves_provenance :
     forall (dt : dtyp) ixs (p p' : addr),
-      handle_gep_addr dt p ixs = inr p' ->
+      handle_gep_addr dt p ixs = inr (ret p') ->
       address_provenance p = address_provenance p'.
   Proof.
     intros dt ixs.
@@ -197,22 +232,23 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
     cbn in GEP.
     destruct a; inversion GEP.
     - break_match_hyp; inv GEP.
-      rewrite int_to_ptr_provenance.
-      reflexivity.
+      cbn in *.
+      symmetry.
+      eapply int_to_ptr_provenance; eauto.
     - break_match_hyp; inv GEP.
-      rewrite int_to_ptr_provenance.
-      reflexivity.
+      symmetry.
+      eapply int_to_ptr_provenance; eauto.
     - break_match_hyp; inv GEP.
-      rewrite int_to_ptr_provenance.
-      reflexivity.
+      symmetry.
+      eapply int_to_ptr_provenance; eauto.
     - break_match_hyp; inv GEP.
-      rewrite int_to_ptr_provenance.
-      reflexivity.
+      symmetry.
+      eapply int_to_ptr_provenance; eauto.
   Qed.
 
-  Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err dvalue :=
+  Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err (OOM dvalue) :=
     match dv with
-    | DVALUE_Addr a => fmap DVALUE_Addr (handle_gep_addr t a vs)
-    | _ => failwith "non-address"
+    | DVALUE_Addr a => fmap (F:=err) (fmap DVALUE_Addr) (handle_gep_addr t a vs)
+    | _ => inl "non-address"%string
     end.
 End Make.

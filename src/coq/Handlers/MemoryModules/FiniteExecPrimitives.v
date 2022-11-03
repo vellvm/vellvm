@@ -174,7 +174,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       end.
 
     (* Register a concrete address in a frame *)
-    Definition add_to_frame (m : memory_stack) (k : Z) : memory_stack :=
+    Definition add_to_frame (m : memory_stack) (k : addr) : memory_stack :=
       let '(mkMemoryStack m s h) := m in
       match s with
       | Singleton f => mkMemoryStack m (Singleton (k :: f)) h
@@ -182,20 +182,20 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       end.
 
     (* Register a list of concrete addresses in a frame *)
-    Definition add_all_to_frame (m : memory_stack) (ks : list Z) : memory_stack
+    Definition add_all_to_frame (m : memory_stack) (ks : list addr) : memory_stack
       := fold_left (fun ms k => add_to_frame ms k) ks m.
 
     (* Register a ptr with the heap *)
-    Definition add_to_heap (m : memory_stack) (root : Z) (ptr : Z) : memory_stack :=
+    Definition add_to_heap (m : memory_stack) (root : addr) (ptr : addr) : memory_stack :=
       let '(mkMemoryStack m s h) := m in
-      let h' := add_with root ptr ret cons h in
+      let h' := add_with (ptr_to_int root) ptr ret cons h in
       mkMemoryStack m s h'.
 
     (* Register a list of concrete addresses in the heap *)
-    Definition add_all_to_heap' (m : memory_stack) (root : Z) (ks : list Z) : memory_stack
+    Definition add_all_to_heap' (m : memory_stack) (root : addr) (ks : list addr) : memory_stack
       := fold_left (fun ms k => add_to_heap ms root k) ks m.
 
-    Definition add_all_to_heap (m : memory_stack) (ks : list Z) : memory_stack
+    Definition add_all_to_heap (m : memory_stack) (ks : list addr) : memory_stack
       := match ks with
          | [] => m
          | (root :: _) =>
@@ -455,8 +455,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         { intros root'.
           unfold root_in_heap_prop.
           split; intros ROOT.
-          - destruct (Z.eq_dec (ptr_to_int root') root) as [EQR | NEQR].
-            + subst.
+          - destruct (Z.eq_dec (ptr_to_int root') (ptr_to_int root)) as [EQR | NEQR].
+            + rewrite EQR.
               unfold add_with in *.
               break_inner_match.
               { rewrite IP.F.add_eq_o in *; auto.
@@ -475,8 +475,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 do 2 apply member_add_preserved.
                 do 2 apply member_add_ineq in ROOT; auto.
               }
-          - destruct (Z.eq_dec (ptr_to_int root') root) as [EQR | NEQR].
-            + subst.
+          - destruct (Z.eq_dec (ptr_to_int root') (ptr_to_int root)) as [EQR | NEQR].
+            + rewrite EQR.
               unfold add_with in *.
               break_inner_match.
               { rewrite IP.F.add_eq_o in *; auto.
@@ -500,8 +500,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         intros root' a.
         unfold ptr_in_heap_prop in *.
         split; intros EQV.
-        + destruct (Z.eq_dec (ptr_to_int root') root) as [EQR | NEQR].
-          * subst.
+        + destruct (Z.eq_dec (ptr_to_int root') (ptr_to_int root)) as [EQR | NEQR].
+          * rewrite EQR.
             unfold add_with in *.
             break_inner_match;
               rewrite IP.F.add_eq_o in *; auto;
@@ -518,8 +518,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               rewrite IP.F.add_neq_o in *; auto.
               rewrite IP.F.add_neq_o in *; auto.
             }
-        + destruct (Z.eq_dec (ptr_to_int root') root) as [EQR | NEQR].
-          * subst.
+        + destruct (Z.eq_dec (ptr_to_int root') (ptr_to_int root)) as [EQR | NEQR].
+          * rewrite EQR.
             unfold add_with in *.
             break_inner_match;
               rewrite IP.F.add_eq_o in *; auto;
@@ -1260,12 +1260,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
         break_inner_match.
         { rewrite IP.F.add_neq_o in *; auto.
-          destruct (IM.find (elt:=list Iptr) b h2) eqn:Heqo0.
+          destruct (IM.find (elt:=list addr) b h2) eqn:Heqo0.
           rewrite IP.F.add_neq_o in *; auto.
           rewrite IP.F.add_neq_o in *; auto.
         }
         { rewrite IP.F.add_neq_o in *; auto.
-          destruct (IM.find (elt:=list Iptr) b h2) eqn:Heqo0.
+          destruct (IM.find (elt:=list addr) b h2) eqn:Heqo0.
           rewrite IP.F.add_neq_o in *; auto.
           rewrite IP.F.add_neq_o in *; auto.
         }
@@ -1569,13 +1569,13 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma add_to_frame_correct :
       forall ptr (ms ms' : memory_stack),
-        add_to_frame ms (ptr_to_int ptr) = ms' ->
+        add_to_frame ms ptr = ms' ->
         add_ptr_to_frame_stack (memory_stack_frame_stack ms) ptr (memory_stack_frame_stack ms').
     Proof.
       intros ptr ms ms' ADD.
       unfold add_ptr_to_frame_stack.
       intros f PEEK.
-      exists (ptr_to_int ptr :: f).
+      exists (ptr :: f).
       split; [|split].
       - (* add_ptr_to_frame *)
         split.
@@ -1604,7 +1604,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma add_all_to_frame_correct :
       forall ptrs (ms : memory_stack) (ms' : memory_stack),
-        add_all_to_frame ms (map ptr_to_int ptrs) = ms' ->
+        add_all_to_frame ms ptrs = ms' ->
         add_ptrs_to_frame_stack (memory_stack_frame_stack ms) ptrs (memory_stack_frame_stack ms').
     Proof.
       induction ptrs;
@@ -1624,14 +1624,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           apply add_all_to_frame_cons_inv in ADD_ALL.
           destruct ADD_ALL as [ms' [ADD ADD_ALL]].
 
-          destruct (add_all_to_frame (mkMemoryStack m fs h) (map ptr_to_int ptrs)) eqn:ADD_ALL'.
+          destruct (add_all_to_frame (mkMemoryStack m fs h) ptrs) eqn:ADD_ALL'.
           cbn.
 
           rename memory_stack_memory0 into m0.
           rename memory_stack_frame_stack0 into f.
           rename memory_stack_heap0 into h0.
 
-          assert (add_to_frame (mkMemoryStack m0 f h0) (ptr_to_int a) = add_to_frame (mkMemoryStack m0 f h0) (ptr_to_int a)) as ADD' by reflexivity.
+          assert (add_to_frame (mkMemoryStack m0 f h0) a = add_to_frame (mkMemoryStack m0 f h0) a) as ADD' by reflexivity.
           pose proof (add_all_to_frame_cons_swap _ _ _ _ _ _ _ ADD ADD_ALL ADD_ALL' ADD') as EQV.
           cbn in EQV.
           rewrite EQV.
@@ -1646,7 +1646,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma add_to_heap_correct :
       forall root ptr (ms : memory_stack) (ms' : memory_stack),
-        add_to_heap ms (ptr_to_int root) (ptr_to_int ptr) = ms' ->
+        add_to_heap ms root ptr = ms' ->
         add_ptr_to_heap (memory_stack_heap ms) root ptr (memory_stack_heap ms').
     Proof.
       intros root ptr ms ms' ADD.
@@ -1739,7 +1739,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma add_all_to_heap'_correct :
       forall ptrs root (ms : memory_stack) (ms' : memory_stack),
-        add_all_to_heap' ms (ptr_to_int root) (map ptr_to_int ptrs) = ms' ->
+        add_all_to_heap' ms root ptrs = ms' ->
         add_ptrs_to_heap' (memory_stack_heap ms) root ptrs (memory_stack_heap ms').
     Proof.
       induction ptrs;
@@ -1757,20 +1757,20 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           apply add_all_to_heap'_cons_inv in ADD_ALL.
           destruct ADD_ALL as [ms' [ADD ADD_ALL]].
 
-          destruct (add_all_to_heap' (mkMemoryStack m fs h) (ptr_to_int root) (map ptr_to_int ptrs)) eqn:ADD_ALL'.
+          destruct (add_all_to_heap' (mkMemoryStack m fs h) root ptrs) eqn:ADD_ALL'.
           cbn.
 
           rename memory_stack_memory0 into m0.
           rename memory_stack_frame_stack0 into f.
           rename memory_stack_heap0 into h0.
 
-          assert (add_to_heap (mkMemoryStack m0 f h0) (ptr_to_int root) (ptr_to_int a) = add_to_heap (mkMemoryStack m0 f h0) (ptr_to_int root) (ptr_to_int a)) as ADD' by reflexivity.
+          assert (add_to_heap (mkMemoryStack m0 f h0) root a = add_to_heap (mkMemoryStack m0 f h0) root a) as ADD' by reflexivity.
           pose proof (add_all_to_heap'_cons_swap _ _ _ _ _ _ _ _ ADD ADD_ALL ADD_ALL' ADD') as EQV.
           cbn in EQV.
           replace h0 with (memory_stack_heap (mkMemoryStack m0 fs h0)) at 1 by reflexivity.
           rewrite EQV.
-          replace (add_with (ptr_to_int root) (ptr_to_int a) (fun x : Z => [x]) cons h0)
-            with (memory_stack_heap (mkMemoryStack m0 fs (add_with (ptr_to_int root) (ptr_to_int a) (fun x : Z => [x]) cons h0))) by reflexivity.
+          replace (add_with (ptr_to_int root) a (fun x : addr => [x]) cons h0)
+            with (memory_stack_heap (mkMemoryStack m0 fs (add_with (ptr_to_int root) a (fun x : addr => [x]) cons h0))) by reflexivity.
           eapply add_to_heap_correct.
           cbn.
           reflexivity.
@@ -1778,7 +1778,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma add_all_to_heap_correct :
       forall ptrs (ms : memory_stack) (ms' : memory_stack),
-        add_all_to_heap ms (map ptr_to_int ptrs) = ms' ->
+        add_all_to_heap ms ptrs = ms' ->
         add_ptrs_to_heap (memory_stack_heap ms) ptrs (memory_stack_heap ms').
     Proof.
       intros ptrs ms ms' H0.
@@ -1839,7 +1839,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       let addr := next_memory_key mem_stack in
       let '(mkMemoryStack mem fs h) := ms_memory_stack ms in
       let aid := provenance_to_allocation_id pr in
-      let ptr := (int_to_ptr addr (allocation_id_to_prov aid)) in
+      ptr <- lift_OOM (int_to_ptr addr (allocation_id_to_prov aid));;
       ptrs <- get_consecutive_ptrs ptr len;;
       ret (ptr, ptrs).
 
@@ -1861,14 +1861,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       modify_mem_state
         (fun ms =>
            let mem := MemState_get_memory ms in
-           MemState_put_memory (add_all_to_frame mem (map ptr_to_int ptrs)) ms);;
+           MemState_put_memory (add_all_to_frame mem ptrs) ms);;
       ret tt.
 
     Definition add_ptrs_to_heap `{MemMonad ExtraState MemM (itree Eff)} (ptrs : list addr) : MemM unit :=
       modify_mem_state
         (fun ms =>
            let mem := MemState_get_memory ms in
-           MemState_put_memory (add_all_to_heap mem (map ptr_to_int ptrs)) ms);;
+           MemState_put_memory (add_all_to_heap mem ptrs) ms);;
       ret tt.
 
     (** Add a block of bytes to memory, and register it in the current stack frame. *)
@@ -1919,7 +1919,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (** Frame stacks *)
     (* Check if an address is allocated in a frame *)
     Definition ptr_in_frame (f : Frame) (ptr : addr) : bool
-      := existsb (fun p => Z.eqb (ptr_to_int ptr) p) f.
+      := existsb (fun p => Z.eqb (ptr_to_int ptr) p) (map ptr_to_int f).
 
     (* Check for the current frame *)
     Definition peek_frame_stack (fs : FrameStack) : Frame :=
@@ -2037,15 +2037,15 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       put_mem_state ms'.
 
     Definition free_byte
-               (b : Iptr)
+               (b : Z)
                (m : memory) : memory
       := delete b m.
 
     Definition free_frame_memory (f : Frame) (m : memory) : memory :=
-      fold_left (fun m key => free_byte key m) f m.
+      fold_left (fun m key => free_byte (ptr_to_int key) m) f m.
 
     Definition free_block_memory (block : Block) (m : memory) : memory :=
-      fold_left (fun m key => free_byte key m) block m.
+      fold_left (fun m key => free_byte (ptr_to_int key) m) block m.
 
     (** Stack free *)
     Definition mempop `{MemMonad ExtraState MemM (itree Eff)} : MemM unit :=
@@ -3510,13 +3510,26 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
              (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix])
              NOOM_seq) eqn:HMAPM.
         + cbn.
+          rewrite MemMonad_run_bind.
+          rewrite rbm_raise_bind; [|typeclasses eauto].
+
           rewrite MemMonad_run_raise_error.
+          rewrite rbm_raise_bind; eauto.
           rewrite rbm_raise_bind; eauto.
           reflexivity.
         + cbn.
+          rewrite MemMonad_run_bind.
           rewrite MemMonad_run_ret.
           rewrite bind_ret_l.
-          reflexivity.
+          rewrite bind_ret_l.
+          destruct (Monads.sequence l) eqn:HSEQUENCE.
+          * cbn; rewrite bind_ret_l.
+            rewrite MemMonad_run_ret.
+            reflexivity.
+          * cbn.
+            rewrite rbm_raise_bind; [|typeclasses eauto].
+            rewrite MemMonad_run_raise_oom.
+            reflexivity.
       - cbn.
         rewrite MemMonad_run_bind.
         unfold liftM.
@@ -3599,6 +3612,34 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       destruct ms as [[mem fs heap] pr'] eqn:Hms.
       cbn.
 
+      destruct (int_to_ptr (next_memory_key {| memory_stack_memory := mem; memory_stack_frame_stack := fs; memory_stack_heap := heap |})
+                  (allocation_id_to_prov (provenance_to_allocation_id pr))) eqn:HI2P.
+      2: {
+        (* OOM when getting the next pointer *)
+        cbn.
+        rename s into oom_msg.
+        exists (raise_oom oom_msg).
+        exists st. exists ms.
+        split.
+        { exists (raise_oom oom_msg).
+          cbn.
+          split.
+          - eexists; reflexivity.
+          - rewrite MemMonad_run_bind.
+            rewrite MemMonad_run_raise_oom.
+            rewrite rbm_raise_bind; [|typeclasses eauto].
+            rewrite rbm_raise_bind; [|typeclasses eauto].
+            reflexivity.
+        }
+
+        cbn.
+        split; auto.
+        intros [x CONTRA]; inv CONTRA.
+      }
+
+      cbn.
+      setoid_rewrite bind_ret_l.
+
       match goal with
       | _ : _ |- context [@get_consecutive_ptrs ?MemM ?MM ?OOM ?ERR ?ptr ?len] =>
           epose proof (@get_consecutive_ptrs_inv (itree Eff) MRun RunOOM RunERR (@MemMonad_eq1_runm ExtraState MemM (itree Eff) MM MRun MPROV MSID MMS MERR MUB MOOM RunERR
@@ -3630,14 +3671,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         split; auto.
         intros [x CONTRA]; inv CONTRA.
       - (* Finding consecutive block is successful *)
-        set (res := (int_to_ptr
-                       (next_memory_key
-                          {|
-                            memory_stack_memory := mem;
-                            memory_stack_frame_stack := fs;
-                            memory_stack_heap := heap
-                          |}) (allocation_id_to_prov (provenance_to_allocation_id pr)), ptrs)).
-        exists (ret res).
+        exists (ret (a, ptrs)).
         exists st.
         exists {|
               ms_memory_stack :=
@@ -3648,7 +3682,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           |}.
 
         split.
-        { exists (ret res).
+        { exists (ret (a, ptrs)).
           cbn.
           split.
           - reflexivity.
@@ -3675,21 +3709,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
            *)
           (* TODO: can probably clean this all up *)
           pose proof exec_correct_get_consecutive_pointers.
-          pose proof (exec_correct_get_consecutive_pointers len (int_to_ptr
-                     (next_memory_key
-                        {|
-                          memory_stack_memory := mem;
-                          memory_stack_frame_stack := fs;
-                          memory_stack_heap := heap
-                        |}) (allocation_id_to_prov (provenance_to_allocation_id pr)))).
+          pose proof (exec_correct_get_consecutive_pointers len a).
 
           unfold exec_correct in H1.
 
           specialize (H1 len
-                         (int_to_ptr
-                            (next_memory_key
-                               {| memory_stack_memory := mem; memory_stack_frame_stack := fs; memory_stack_heap := heap |})
-                            (allocation_id_to_prov (provenance_to_allocation_id pr)))
+                         a
                          pre {|
               ms_memory_stack :=
                 {|
@@ -3706,13 +3731,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       @get_consecutive_ptrs
                       (MemPropT MemState) (@MemPropT_Monad MemState)
                          (@MemPropT_RAISE_OOM MemState) (@MemPropT_RAISE_ERROR MemState)
-                         (int_to_ptr
-                            (next_memory_key
-                               {|
-                                 memory_stack_memory := mem;
-                                 memory_stack_frame_stack := fs;
-                                 memory_stack_heap := heap
-                               |}) (allocation_id_to_prov (provenance_to_allocation_id pr))) len) as CONTRA'.
+                         a len) as CONTRA'.
             { do 2 eexists.
               eapply CONTRA.
             }
@@ -3769,13 +3788,11 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             auto.
           }
         + (* TODO: autorewrite tactic? *)
-          rewrite int_to_ptr_provenance.
-          reflexivity.
+          erewrite int_to_ptr_provenance; eauto.
         + intros ptr IN.
 
           eapply get_consecutive_ptrs_prov_eq1 in CONSEC_RET; eauto.
-          rewrite int_to_ptr_provenance in CONSEC_RET.
-          auto.
+          apply int_to_ptr_provenance in HI2P; congruence.
         + intros ptr IN.
           (* Should follow from VALID... *)
           (* May actually follow from next_memory_key *)
@@ -3788,7 +3805,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           inv CONTRA.
 
           eapply get_consecutive_ptrs_ge_eq1 with (p := ptr) in CONSEC_RET; eauto.
-          rewrite ptr_to_int_int_to_ptr in CONSEC_RET.
+          erewrite ptr_to_int_int_to_ptr in CONSEC_RET; eauto.
           rewrite next_memory_key_next_key in CONSEC_RET.
           lia.
     Qed.
@@ -3898,8 +3915,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       exists ms2. exists l.
       split; auto.
 
-      destruct (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) eqn:HMAPM; cbn in *; inv MAPM.
-      tauto.
+      destruct (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) eqn:HMAPM; cbn in *.
+      destruct MAPM as [_ [_ [[] _]]].
+      destruct MAPM as [sab [a [[EQSAB EQA] SEQUENCE]]]; subst.
+      exists ms2. exists l0.
+      split; auto.
+
+      destruct (Monads.sequence l0) eqn:HSEQUENCE;
+        cbn in *; tauto.
     Qed.
 
     Lemma get_consecutive_ptrs_MemPropT_eq1 :
@@ -3914,7 +3937,16 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       destruct CONSEC as [ms' [ixs [SEQ MAPM]]].
       destruct (intptr_seq 0 len) eqn:HSEQ; cbn in SEQ; inv SEQ.
       destruct (map_monad
-                  (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) eqn:HMAPM; inv MAPM.
+                  (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) eqn:HMAPM.
+      destruct MAPM as [_ [_ [[] _]]].
+      destruct MAPM as [sab [a [[EQSAB EQA] SEQUENCE]]]; subst.
+      destruct (Monads.sequence l0) eqn:HSEQUENCE.
+      2: {
+        exfalso.
+        cbn in *.
+        auto.
+      }
+
       cbn.
       red.
       red.
@@ -3925,28 +3957,52 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           destruct CONSEC as [ms_ [ixs [[EQ1 EQ2] MAPM2]]].
           inv EQ1.
           rewrite HMAPM in MAPM2.
-          cbn in MAPM2; auto.
+          cbn in *.
+          destruct MAPM2 as [[] | MAPM2].
+          destruct MAPM2 as [sab [a [[EQSAB EQA] SEQUENCE']]]; subst.
+          rewrite HSEQUENCE in SEQUENCE'.
+          cbn in *.
+          auto.
         + destruct CONSEC as [[] | CONSEC].
           destruct CONSEC as [ms_ [ixs [[EQ1 EQ2] MAPM2]]].
           inv EQ1.
           rewrite HMAPM in MAPM2.
-          cbn in MAPM2; auto.
+          cbn in *.
+          destruct MAPM2 as [[] | MAPM2].
+          destruct MAPM2 as [sab [a [[EQSAB EQA] SEQUENCE']]]; subst.
+          rewrite HSEQUENCE in SEQUENCE'.
+          cbn in SEQUENCE'.
+          auto.
         + destruct CONSEC as [[] | CONSEC].
           destruct CONSEC as [ms_ [ixs [[EQ1 EQ2] MAPM2]]].
           inv EQ1.
           rewrite HMAPM in MAPM2.
-          cbn in MAPM2; auto.
+          destruct MAPM2 as [[] | MAPM2].
+          destruct MAPM2 as [sab [a [[EQSAB EQA] SEQUENCE']]]; subst.
+          rewrite HSEQUENCE in SEQUENCE'.
+          cbn in *.
+          auto.
         + destruct x0.
           destruct CONSEC as [ms_ [ixs [[EQ1 EQ2] MAPM2]]].
           inv EQ1.
           rewrite HMAPM in MAPM2.
-          cbn in MAPM2; auto.
+          destruct MAPM2 as [sab [a [[EQSAB EQA] SEQUENCE']]]; subst.
+          rewrite HSEQUENCE in SEQUENCE'.
+          cbn in *.
+          inv SEQUENCE.
+          inv SEQUENCE'.
+          auto.
       - destruct_err_ub_oom x; try inv CONSEC.
         destruct x0.
         inv CONSEC.
-        repeat eexists.
+        exists ms. exists l.
+        split; auto.
+        eexists. exists l0.
         rewrite HMAPM.
-        cbn. auto.
+        rewrite HSEQUENCE.
+        cbn. split; auto.
+        cbn in *.
+        tauto.
     Qed.
 
     Lemma byte_allocated_memory_eq :
@@ -4717,7 +4773,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                          (ptr_to_int ptr) memory_stack_memory0;
                            memory_stack_frame_stack := memory_stack_frame_stack0;
                            memory_stack_heap := memory_stack_heap0
-                         |} (map ptr_to_int ptrs);
+                         |} ptrs;
                        ms_provenance := ms_provenance0
                      |})
             (FIND_FREE : ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr),
@@ -4869,7 +4925,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                          (ptr_to_int ptr) memory_stack_memory0;
                            memory_stack_frame_stack := memory_stack_frame_stack0;
                            memory_stack_heap := memory_stack_heap0
-                         |} (map ptr_to_int ptrs);
+                         |} ptrs;
                        ms_provenance := ms_provenance0
                      |})
             (FIND_FREE : ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr),
@@ -5225,14 +5281,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall f m m' a,
         free_frame_memory (a :: f) m = m' ->
         exists m'',
-          free_byte a m  = m'' /\
+          free_byte (ptr_to_int a) m  = m'' /\
             free_frame_memory f m'' = m'.
     Proof.
       intros f m m' a FREE.
       rewrite list_cons_app in FREE.
       unfold free_frame_memory in *.
       rewrite fold_left_app in FREE.
-      set (m'' := fold_left (fun (m : memory) (key : Iptr) => free_byte key m) [a] m).
+      set (m'' := fold_left (fun (m : memory) (key : addr) => free_byte (ptr_to_int key) m) [a] m).
       exists m''.
       subst m''.
       cbn; split; auto.
@@ -5242,14 +5298,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall block m m' a,
         free_block_memory (a :: block) m = m' ->
         exists m'',
-          free_byte a m  = m'' /\
+          free_byte (ptr_to_int a) m  = m'' /\
             free_block_memory block m'' = m'.
     Proof.
       intros f m m' a FREE.
       rewrite list_cons_app in FREE.
       unfold free_block_memory in *.
       rewrite fold_left_app in FREE.
-      set (m'' := fold_left (fun (m : memory) (key : Iptr) => free_byte key m) [a] m).
+      set (m'' := fold_left (fun (m : memory) (key : addr) => free_byte (ptr_to_int key) m) [a] m).
       exists m''.
       subst m''.
       cbn; split; auto.
@@ -5310,7 +5366,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         destruct FREE as [m'' [FREEBYTE FREE]].
 
         destruct IN as [IN | IN].
-        + subst a.
+        + rewrite <- IN.
           eapply free_frame_memory_no_add; eauto.
           eapply free_byte_read_byte_raw; eauto.
         + eapply IHf; eauto.
@@ -5319,7 +5375,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma free_block_memory_read_byte_raw :
       forall (block : Block) (m m' : memory) ptr,
         free_block_memory block m = m' ->
-        In (ptr_to_int ptr) block ->
+        In (ptr_to_int ptr) (map ptr_to_int block) ->
         read_byte_raw m' (ptr_to_int ptr) = None.
     Proof.
       induction block;
@@ -5330,7 +5386,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         destruct FREE as [m'' [FREEBYTE FREE]].
 
         destruct IN as [IN | IN].
-        + subst a.
+        + rewrite <- IN.
           eapply free_block_memory_no_add; eauto.
           eapply free_byte_read_byte_raw; eauto.
         + eapply IHblock; eauto.
@@ -5382,7 +5438,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma free_block_memory_byte_not_allocated :
       forall (ms ms' : MemState) (m m' : memory) block (ptr : addr),
         free_block_memory block m = m' ->
-        In (ptr_to_int ptr) block ->
+        In (ptr_to_int ptr) (map ptr_to_int block) ->
         mem_state_memory ms = m ->
         mem_state_memory ms' = m' ->
         byte_not_allocated ms' ptr.
@@ -5529,6 +5585,10 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         tauto.
     Qed.
 
+    (** If a frame `f` is freed, and a pointer `ptr` does not appear
+        in the stack frame, then the allocation status of that `ptr`
+        does not change.
+     *)
     Lemma free_frame_memory_byte_disjoint_allocated :
       forall f (ms ms' : MemState) (m m' : memory) (ptr : addr) aid,
         free_frame_memory f m = m' ->
@@ -5545,17 +5605,16 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       - apply free_frame_memory_cons in FREE.
         destruct FREE as [m'' [FREEBYTE FREE]].
 
-        set (aptr := int_to_ptr a nil_prov).
         erewrite free_byte_byte_disjoint_allocated
-          with (ptr:=aptr) (ms':= mkMemState (mkMemoryStack m'' (Singleton initial_frame) initial_heap) initial_provenance).
+          with (ptr:=a) (ms':= mkMemState (mkMemoryStack m'' (Singleton initial_frame) initial_heap) initial_provenance).
         2: {
-          subst aptr. rewrite ptr_to_int_int_to_ptr; eauto.
+          cbn in *.
+          erewrite ptr_to_int_int_to_ptr; eauto.
+          rewrite int_to_ptr_ptr_to_int; auto.
         }
         all: eauto.
         2: {
-          subst aptr.
           unfold disjoint_ptr_byte.
-          rewrite ptr_to_int_int_to_ptr.
           firstorder.
         }
 
@@ -5566,7 +5625,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma free_block_memory_byte_disjoint_allocated :
       forall block (ms ms' : MemState) (m m' : memory) (ptr : addr) aid,
         free_block_memory block m = m' ->
-        ~In (ptr_to_int ptr) block ->
+        ~In (ptr_to_int ptr) (map ptr_to_int block) ->
         mem_state_memory ms = m ->
         mem_state_memory ms' = m' ->
         byte_allocated ms ptr aid <-> byte_allocated ms' ptr aid.
@@ -5579,17 +5638,15 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       - apply free_block_memory_cons in FREE.
         destruct FREE as [m'' [FREEBYTE FREE]].
 
-        set (aptr := int_to_ptr a nil_prov).
         erewrite free_byte_byte_disjoint_allocated
-          with (ptr:=aptr) (ms':= mkMemState (mkMemoryStack m'' (Singleton initial_frame) initial_heap) initial_provenance).
+          with (ptr:=a) (ms':= mkMemState (mkMemoryStack m'' (Singleton initial_frame) initial_heap) initial_provenance).
         2: {
-          subst aptr. rewrite ptr_to_int_int_to_ptr; eauto.
+          erewrite ptr_to_int_int_to_ptr; eauto.
+          rewrite int_to_ptr_ptr_to_int; auto.
         }
         all: eauto.
         2: {
-          subst aptr.
           unfold disjoint_ptr_byte.
-          rewrite ptr_to_int_int_to_ptr.
           firstorder.
         }
 
@@ -5696,7 +5753,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma free_block_memory_byte_disjoint_read_byte_allowed :
       forall block (ms ms' : MemState) (m m' : memory) (ptr : addr),
         free_block_memory block m = m' ->
-        ~In (ptr_to_int ptr) block ->
+        ~In (ptr_to_int ptr) (map ptr_to_int block) ->
         mem_state_memory ms = m ->
         mem_state_memory ms' = m' ->
         read_byte_allowed ms ptr <-> read_byte_allowed ms' ptr.
@@ -5796,7 +5853,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma free_block_memory_byte_disjoint_read_byte_prop :
       forall block (ms ms' : MemState) (m m' : memory) (ptr : addr) byte,
         free_block_memory block m = m' ->
-        ~In (ptr_to_int ptr) block ->
+        ~In (ptr_to_int ptr) (map ptr_to_int block) ->
         mem_state_memory ms = m ->
         mem_state_memory ms' = m' ->
         read_byte_prop ms ptr byte <-> read_byte_prop ms' ptr byte.
@@ -5961,7 +6018,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       with (ms := mkMemState (mkMemoryStack mem (Snoc fs f) h) pr)
                            (ms' := {|
                                     ms_memory_stack :=
-                                    (mkMemoryStack (fold_left (fun (m : memory) (key : Iptr) => free_byte key m) f mem) fs h);
+                                    (mkMemoryStack (fold_left (fun (m : memory) (key : addr) => free_byte (ptr_to_int key) m) f mem) fs h);
                                     ms_provenance := pr
                                   |});
                       eauto.
@@ -5975,7 +6032,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       with (ms := mkMemState (mkMemoryStack mem (Snoc fs f) h) pr)
                            (ms' := {|
                                     ms_memory_stack :=
-                                    (mkMemoryStack (fold_left (fun (m : memory) (key : Iptr) => free_byte key m) f mem) fs h);
+                                    (mkMemoryStack (fold_left (fun (m : memory) (key : addr) => free_byte (ptr_to_int key) m) f mem) fs h);
                                     ms_provenance := pr
                                   |});
                       eauto.
@@ -6179,7 +6236,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       pose proof List.Forall_dec _ BADEC as ALLOC.
       set (aid := provenance_to_allocation_id initial_provenance).
       set (prov := allocation_id_to_prov aid).
-      set (block := map (fun ip => int_to_ptr ip prov) b).
+      set (block := b).
       specialize (ALLOC block).
       destruct ALLOC as [ALL_ALLOCATED | NOT_ALL_ALLOCATED].
       - setoid_rewrite -> Forall_forall in ALL_ALLOCATED.
@@ -6191,11 +6248,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         forward INHEAP; [repeat red; reflexivity|].
         unfold ptr_in_heap_prop in INHEAP.
         rewrite BLOCK in INHEAP.
-        assert (In (int_to_ptr (ptr_to_int ptr) prov) block) as INBLOCK.
-        { subst block.
-          pose proof in_map.
-          specialize (H0 _ _ (fun ip : Z => int_to_ptr ip prov) b (ptr_to_int ptr) INHEAP).
-          auto.
+
+        pose proof INHEAP as INHEAP'.
+        apply list_in_map_inv in INHEAP'.
+        destruct INHEAP' as [ptr' [PEQ IN]].
+        assert (In ptr' block) as INBLOCK.
+        { subst block; auto.
         }
 
         specialize (ALL_ALLOCATED _ INBLOCK).
@@ -6204,7 +6262,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         exists aid'.
         eapply byte_allocated_ignores_provenance.
         apply ALL_ALLOCATED.
-        rewrite ptr_to_int_int_to_ptr. reflexivity.
+        auto.
       - setoid_rewrite -> Forall_forall in NOT_ALL_ALLOCATED.
         right.
         intros CONTRA.
@@ -6221,11 +6279,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           rewrite BLOCK.
           subst block.
           eapply in_map with (f:=ptr_to_int) in INBLOCK.
-          rewrite List.map_map in INBLOCK.
-          apply in_map_iff in INBLOCK.
-          destruct INBLOCK as (x & CAST & INBLOCK).
-          rewrite ptr_to_int_int_to_ptr in CAST.
-          subst.
           auto.
         }
 

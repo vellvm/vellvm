@@ -80,7 +80,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       i.e. when the function returns.
       A [frame_stack] is a list of such frames.
      *)
-    Definition Frame := list Iptr.
+    Definition Frame := list addr.
     Inductive FrameStack' : Type :=
     | Singleton (f : Frame)
     | Snoc (s : FrameStack') (f : Frame).
@@ -92,7 +92,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Definition FrameStack := FrameStack'.
 
     (** Heaps *)
-    Definition Block := list Iptr.
+    Definition Block := list addr.
     Definition Heap := IntMap Block.
 
     (** ** Memory stack
@@ -304,7 +304,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     end.
 
   Definition ptr_in_frame_prop (f : Frame) (ptr : addr) : Prop :=
-    In (ptr_to_int ptr) f.
+    In (ptr_to_int ptr) (map ptr_to_int f).
 
   Definition frame_eqv (f f' : Frame) : Prop :=
     forall ptr, ptr_in_frame_prop f ptr <-> ptr_in_frame_prop f' ptr.
@@ -386,7 +386,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Definition ptr_in_heap_prop (h : Heap) (root ptr : addr) : Prop
     := match IM.find (ptr_to_int root) h with
        | None => False
-       | Some ptrs => In (ptr_to_int ptr) ptrs
+       | Some ptrs => In (ptr_to_int ptr) (map ptr_to_int ptrs)
        end.
 
   Definition root_in_heap_prop (h : Heap) (root : addr) : Prop

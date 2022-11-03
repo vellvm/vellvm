@@ -669,3 +669,19 @@ Proof.
 
     lia.            
 Qed.
+
+Lemma sequence_OOM_length :
+  forall {A} (ms : list (OOM A)) xs,
+    sequence ms = NoOom xs ->
+    length ms = length xs.
+Proof.
+  intros A.
+  induction ms; intros xs SEQUENCE.
+  - cbn in *; inversion SEQUENCE; auto.
+  - cbn in *.
+    unfold id in *.
+    destruct a eqn:H; inversion SEQUENCE; subst.
+    destruct (map_monad (fun x : OOM A => x) ms) eqn:SEQ; inversion H1; subst.
+    apply IHms in SEQ.
+    cbn; auto.
+Qed.

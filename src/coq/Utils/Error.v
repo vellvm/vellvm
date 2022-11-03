@@ -50,6 +50,12 @@ Variant OOM (A:Type) : Type :=
 Arguments NoOom {_} _.
 Arguments Oom {_}.
 
+Definition OOM_to_err {A} (o : OOM A) : err A
+  := match o with
+     | NoOom x => inr x
+     | Oom msg => inl msg
+     end.
+
 Global Instance MonadOOM : Monad OOM.
 Proof.
   split.
@@ -398,6 +404,15 @@ Definition lift_OOM {M : Type -> Type} `{Monad M} `{RAISE_OOM M} {A} (ma : OOM A
   := match ma with
      | NoOom a => ret a
      | Oom s => raise_oom s
+     end.
+
+Definition lift_err_oom_RAISE_ERROR_OOM
+  {A} {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_OOM M}
+  (e : err (OOM A)) : M A
+  := match e with
+     | inl x => raise_error x
+     | inr (Oom msg) => raise_oom msg
+     | inr (NoOom x) => ret x
      end.
 
 Inductive err_ub_oom_T (m : Type -> Type) (A : Type) : Type

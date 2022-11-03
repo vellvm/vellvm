@@ -18,7 +18,7 @@ open Format
 open ITreeDefinition
 
 (* TODO: probably should be part of ADDRESS module interface*)
-let pp_addr : Format.formatter -> MemoryModelImplementation.Addr.addr -> unit
+let pp_addr : Format.formatter -> MemoryModelImplementation.InfAddr.addr -> unit
   = fun ppf _ -> fprintf ppf "UVALUE_Addr(?)"
 
 (* Converts `float` to a `string` at max precision.

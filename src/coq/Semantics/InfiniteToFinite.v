@@ -24,6 +24,8 @@ From Vellvm Require Import
      Utils.PropT
      Utils.InterpProp
      Utils.ListUtil
+     Handlers.MemoryModules.FiniteAddresses
+     Handlers.MemoryModules.InfiniteAddresses
      Handlers.MemoryModelImplementation.
 
 From ExtLib Require Import
@@ -47,9 +49,21 @@ Module Type AddrConvert (ADDR1 : ADDRESS) (ADDR2 : ADDRESS).
   Parameter addr_convert : ADDR1.addr -> OOM ADDR2.addr.
 End AddrConvert.
 
-Module FinAddrConvert : AddrConvert MemoryModelImplementation.Addr MemoryModelImplementation.Addr.
-  Definition addr_convert (a : MemoryModelImplementation.Addr.addr) : OOM MemoryModelImplementation.Addr.addr := ret a.
-End FinAddrConvert.
+Module InfToFinAddrConvert : AddrConvert InfAddr FinAddr.
+  Definition addr_convert (a : InfAddr.addr) : OOM FinAddr.addr :=
+    match a with
+    | (ix, pr) =>
+        FinITOP.int_to_ptr ix pr
+    end.
+End InfToFinAddrConvert.
+
+Module FinToInfAddrConvert : AddrConvert FinAddr InfAddr.
+  Definition addr_convert (a : FinAddr.addr) : OOM InfAddr.addr :=
+    match a with
+    | (ix, pr) =>
+        InfITOP.int_to_ptr (Int64.unsigned ix) pr
+    end.
+End FinToInfAddrConvert.
 
 Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF).
   Parameter dvalue_convert : Events1.DV.dvalue -> OOM Events2.DV.dvalue.
@@ -349,8 +363,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
 End LangRefine.
 
-Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack64BitIntptr FinAddrConvert FinAddrConvert TopLevelBigIntptr TopLevel64BitIntptr TopLevelRefinements64BitIntptr.
-  Include LangRefine InterpreterStackBigIntptr InterpreterStack64BitIntptr FinAddrConvert FinAddrConvert TopLevelBigIntptr TopLevel64BitIntptr TopLevelRefinements64BitIntptr.
+Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack64BitIntptr InfToFinAddrConvert FinToInfAddrConvert TopLevelBigIntptr TopLevel64BitIntptr TopLevelRefinements64BitIntptr.
+  Include LangRefine InterpreterStackBigIntptr InterpreterStack64BitIntptr InfToFinAddrConvert FinToInfAddrConvert TopLevelBigIntptr TopLevel64BitIntptr TopLevelRefinements64BitIntptr.
 
   From Vellvm Require Import InterpreterMCFG.
 

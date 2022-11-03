@@ -241,17 +241,37 @@ Module Type ITOP (Addr:MemoryAddress.ADDRESS) (PROV:PROVENANCE(Addr)) (PTOI:PTOI
   Import PTOI.
   Import Addr.
 
-  Parameter int_to_ptr : Z -> Prov -> addr.
+  Parameter int_to_ptr : Z -> Prov -> OOM addr.
   Parameter int_to_ptr_provenance :
-    forall (x : Z) (p : Prov),
-      address_provenance (int_to_ptr x p) = p.
+    forall (x : Z) (p : Prov) (a : addr),
+      int_to_ptr x p = ret a ->
+      address_provenance a = p.
 
   Parameter int_to_ptr_ptr_to_int :
     forall (a : addr) (p : Prov),
       address_provenance a = p ->
-      int_to_ptr (ptr_to_int a) p = a.
+      int_to_ptr (ptr_to_int a) p = ret a.
+
+  Parameter int_to_ptr_ptr_to_int_exists :
+    forall (a : addr) (p : Prov),
+    exists a',
+      int_to_ptr (ptr_to_int a) p = ret a' /\
+        ptr_to_int a' = ptr_to_int a /\
+        address_provenance a' = p.
 
   Parameter ptr_to_int_int_to_ptr :
-    forall (x : Z) (p : Prov),
-      ptr_to_int (int_to_ptr x p) = x.
+    forall (x : Z) (p : Prov) (a : addr),
+      int_to_ptr x p = ret a ->
+      ptr_to_int a = x.
 End ITOP.
+
+Module Type ITOP_BIG (Addr:MemoryAddress.ADDRESS) (PROV:PROVENANCE(Addr)) (PTOI:PTOI(Addr)) (ITOP : ITOP Addr PROV PTOI).
+  Import ITOP.
+
+  Parameter int_to_ptr_safe :
+    forall z pr,
+      match int_to_ptr z pr with
+      | NoOom _ => True
+      | Oom _ => False
+      end.
+End ITOP_BIG.

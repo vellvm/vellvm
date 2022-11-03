@@ -118,7 +118,13 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP).
             dv <- concretize_uvalueM M undef_handler ERR_M lift_ue v;;
             match get_conv_case conv t_from dv t_to with
             | Conv_Pure x => ret x
-            | Conv_ItoP x => ret (DVALUE_Addr (int_to_ptr (dvalue_int_unsigned x) wildcard_prov))
+            | Conv_ItoP x =>
+                match int_to_ptr (dvalue_int_unsigned x) wildcard_prov with
+                | NoOom a =>
+                    ret (DVALUE_Addr a)
+                | Oom msg =>
+                    lift_ue dvalue (raise_oom ("concretize_uvalueM OOM in Conv_ItoP: " ++ msg))
+                end
             | Conv_PtoI (DVALUE_Addr addr) =>
                 match t_to with
                 | DTYPE_I sz => lift_ue dvalue (coerce_integer_to_int (Some sz) (ptr_to_int addr))
@@ -133,7 +139,8 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP).
             dvs <- map_monad (concretize_uvalueM M undef_handler ERR_M lift_ue) uvs;;
             match handle_gep t da dvs with
             | inl err => lift_ue dvalue (raise_error err)
-            | inr dv => ret dv
+            | inr (Oom msg) => lift_ue dvalue (raise_oom ("concretize_uvalueM OOM in GetElementPtr: " ++ msg))
+            | inr (NoOom dv) => ret dv
             end
         | UVALUE_ExtractValue t uv idxs =>
             str <- concretize_uvalueM M undef_handler ERR_M lift_ue uv;;
@@ -747,7 +754,10 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : ConcretizationBase LP
                 TODO: not sure if this should truncate iptr value...
               *)
              zs <- map_monad dvalue_byte_value dbs;;
-             ret (DVALUE_Addr (int_to_ptr (concat_bytes_Z zs) wildcard_prov))
+             match int_to_ptr (concat_bytes_Z zs) wildcard_prov with
+             | NoOom a => ret (DVALUE_Addr a)
+             | Oom msg => raise_oom "dvalue_bytes_to_dvalue: OOM in DTYPE_Pointer case."
+             end
          | DTYPE_Void =>
              raise_error "dvalue_bytes_to_dvalue on void type."
          | DTYPE_Half =>
@@ -854,7 +864,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : ConcretizationBase LP
       (* Define a sum type f a, g b.... a + b. Mutual recursive
            function as one big function with sum type to select between
            which "function" is being called *)
-      Fixpoint concretize_uvalueM (u : uvalue) {struct u} : M dvalue:=
+      Fixpoint concretize_uvalueM (u : uvalue) {struct u} : M dvalue :=
         match u with
         | UVALUE_Addr a                          => ret (DVALUE_Addr a)
         | UVALUE_I1 x                            => ret (DVALUE_I1 x)
@@ -900,7 +910,13 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : ConcretizationBase LP
                 | _, _ =>
                     lift_ue (raise_error "Invalid PTOI conversion")
                 end
-            | Conv_ItoP x => ret (DVALUE_Addr (int_to_ptr (dvalue_int_unsigned x) wildcard_prov))
+            | Conv_ItoP x =>
+                match int_to_ptr (dvalue_int_unsigned x) wildcard_prov with
+                | NoOom a =>
+                    ret (DVALUE_Addr a)
+                | Oom msg =>
+                    lift_ue (raise_oom ("concretize_uvalueM OOM in Conv_ItoP: " ++ msg))
+                end
             | Conv_Pure x => ret x
             | Conv_Illegal s => lift_ue (raise_error s)
             end
@@ -909,10 +925,10 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : ConcretizationBase LP
             da <- concretize_uvalueM ua;;
             dvs <- map_monad concretize_uvalueM uvs;;
             match handle_gep t da dvs with
-            | inr dv  => ret dv
             | inl err => lift_ue (raise_error err)
+            | inr (Oom msg) => lift_ue (raise_oom ("concretize_uvalueM OOM in GetElementPtr: " ++ msg))
+            | inr (NoOom dv) => ret dv
             end
-
         | UVALUE_ExtractValue t uv idxs =>
             str <- concretize_uvalueM uv;;
             let fix loop str idxs : ERR_M dvalue :=
@@ -1078,7 +1094,13 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : ConcretizationBase LP
                     | _, _ =>
                         lift_ue (raise_error "Invalid PTOI conversion")
                     end
-                | Conv_ItoP x => ret (DVALUE_Addr (int_to_ptr (dvalue_int_unsigned x) wildcard_prov))
+                | Conv_ItoP x =>
+                    match int_to_ptr (dvalue_int_unsigned x) wildcard_prov with
+                    | NoOom a =>
+                        ret (DVALUE_Addr a)
+                    | Oom msg =>
+                        lift_ue (raise_oom ("concretize_uvalueM OOM in Conv_ItoP: " ++ msg))
+                    end
                 | Conv_Pure x => ret x
                 | Conv_Illegal s => lift_ue (raise_error s)
                 end
@@ -1087,8 +1109,9 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : ConcretizationBase LP
                 da <- concretize_uvalueM ua;;
                 dvs <- map_monad concretize_uvalueM uvs;;
                 match handle_gep t da dvs with
-                | inr dv  => ret dv
                 | inl err => lift_ue (raise_error err)
+                | inr (Oom msg) => lift_ue (raise_oom ("concretize_uvalueM OOM in GetElementPtr: " ++ msg))
+                | inr (NoOom dv) => ret dv
                 end
 
             | UVALUE_ExtractValue t uv idxs =>
