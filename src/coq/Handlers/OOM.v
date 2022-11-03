@@ -18,6 +18,8 @@ From ITree Require Import
      ITree
      Eq.Eq.
 
+From Paco Require Import paco.
+
 Set Implicit Arguments.
 Set Contextual Implicit.
 
@@ -68,7 +70,6 @@ Section PARAMS_MODEL.
     | _ => t2 ≈ (bind ta k2)
     end.
 
-  From Paco Require Import paco.
   #[global] Instance oom_k_spec_proper {T R : Type} {RR : R -> R -> Prop} :
     Proper
       (eq ==>
@@ -84,18 +85,13 @@ Section PARAMS_MODEL.
     all : eapply eutt_clo_bind; [ reflexivity | intros; subst; eauto ; symmetry; eauto ].
   Qed .
 
-  Definition oom_k_spec_correct_trigger:
-    k_spec_correct (fun (T : Type) (e : Effout T) => trigger e) (@oom_k_spec).
-  Proof.
-    unfold k_spec_correct.
-    intros T R [e | [e | e]] k1 k2 t2 H; cbn; auto.
-  Qed.
+  (* Qed. *)
 
   Definition refine_OOM_handler : Effin ~> PropT Effout
     := case_ E_trigger_model_prop (case_ OOM_handler F_trigger_model_prop).
 
   Definition refine_OOM_h {T} (RR : relation T) (source target : itree Effout T) : Prop
-    := interp_prop (Basics.flip RR) refine_OOM_handler (@oom_k_spec) target source.
+    := @interp_prop Effin Effout OOME _ _ (Basics.flip RR) target source.
 
   Definition refine_OOM {T} (RR : relation T) (sources : PropT Effout T) (target : itree Effout T) : Prop
     := exists source, sources source /\ refine_OOM_h RR source target.
@@ -104,11 +100,41 @@ Section PARAMS_MODEL.
   Proof.
     unfold Reflexive.
 
-    unfold refine_OOM_h. intros x.
-    apply interp_prop_refl; try typeclasses eauto.
-    - intros X [e | [oom | f]]; reflexivity.
-    - apply oom_k_spec_correct_trigger.
+    pcofix CIH. intros t.
+    assert (t ≅ t) by reflexivity.
+    punfold H0; red in H0; intros.
+    pstep; red.
+    hinduction H0 before t; try solve [constructor; auto]; try inv CHECK; intros.
+    cbn.
+    destruct e as [e | [ oom | f]].
+    - change (VisF (inl1 e) k2) with (observe (Vis (inl1 e) k2)).
+      eapply Interp_PropT_Vis; eauto.
+      Unshelve. 2 : exact (fun x e => trigger e).
+      setoid_rewrite bind_trigger; reflexivity.
+    - change (VisF (inr1 (inl1 oom)) k2) with (observe (Vis (inr1 (inl1 oom)) k2)).
+      eapply Interp_PropT_Vis_OOM. eapply eqit_Vis. intros; reflexivity.
+    - change (VisF (inr1 (inr1 f)) k2) with (observe (Vis (inr1 (inr1 f)) k2)).
+      eapply Interp_PropT_Vis; eauto.
+      Unshelve. 2 : exact (fun x e => trigger e).
+      setoid_rewrite bind_trigger; reflexivity.
   Qed.
+
+  #[global] Instance refine_OOM_h_transitive {R} {RR : relation R} `{Transitive _ RR} : Transitive (refine_OOM_h RR).
+  Proof.
+    unfold Transitive.
+
+    pcofix CIH. intros x y z EQl EQr.
+    punfold EQl; punfold EQr; red in EQl, EQr.
+    pstep; red.
+
+    hinduction EQl before x; intros.
+    - remember (RetF r1).
+      hinduction EQr before x; intros; inv Heqi; eauto.
+      rewrite itree_eta in H0; rewrite H2 in H0.
+      change (RetF r2) with (observe (Ret r2) : itree' Effout _).
+      eapply Interp_PropT_Vis; eauto.
+      admit.
+  Admitted.
 
 End PARAMS_MODEL.
 

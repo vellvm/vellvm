@@ -70,9 +70,7 @@ Section interp_prop.
       interp_PropTF b1 b2 vclo sim (observe t1) t2
 
   | Interp_PropT_Vis : forall A (e : E A) (k1 : A -> itree E R) ta (h : E ~> itree F)
-
                          (k2 : A -> itree F R)
-
                          (HK : forall (a : A), Returns a (h _ e) -> vclo sim (k1 a) (k2 a)),
       ta ≈ h _ e >>= k2 ->
       interp_PropTF b1 b2 vclo sim (VisF e k1) (observe ta).
@@ -749,29 +747,26 @@ End interp_prop_extra.
 
 Section interp_refl.
 
-  (* Lemma interp_prop_refl_h : *)
-  (*   forall {T E} (RR : relation T) `{REF: Reflexive _ RR} (t1 t2 : itree E T) *)
-  (*     (h : E ~> PropT E) *)
-  (*     (k_spec : forall T R REL, E T -> itree E T -> (T -> itree E R) -> itree E R -> Prop), *)
-  (*     (forall {X : Type} (e : E X), h X e (trigger e)) -> *)
-  (*     (k_spec_correct (fun T e => trigger e) k_spec) -> *)
-  (*     t1 ≈ t2 -> *)
-  (*     interp_prop RR h k_spec t1 t2. *)
-  (* Proof. *)
-  (* Admitted. *)
-
-  (* Lemma interp_prop_refl : *)
-  (*   forall {T E} (RR : relation T) `{REF: Reflexive _ RR} (t : itree E T) *)
-  (*     (h : forall X : Type, E X -> PropT E X) *)
-  (*     (k_spec : forall T R REL, E T -> itree E T -> (T -> itree E R) -> itree E R -> Prop), *)
-  (*     (forall {X : Type} (e : E X), h X e (trigger e)) -> *)
-  (*     (k_spec_correct (fun T e => trigger e) k_spec) -> *)
-  (*     interp_prop RR h k_spec t t. *)
-  (* Proof. *)
-  (*   intros T E0 RR REF t h k_spec H_SPEC K_SPEC. *)
-  (*   apply interp_prop_refl_h; eauto. *)
-  (*   reflexivity. *)
-  (* Qed. *)
+  Lemma interp_prop_refl :
+    forall {T E OOM} `{OOM -< E} (RR : relation T) `{REF: Reflexive _ RR} (t : itree E T) h,
+      @interp_prop E E OOM _ _ RR t (interp h t).
+  Proof.
+    intros T E OOM H RR REFL.
+    pcofix CIH. intros t h.
+    assert (interp h t = _interp h (observe t)). {
+      apply bisimulation_is_eq; rewrite unfold_interp; reflexivity.
+    }
+    rewrite H0.
+    assert (t ≅ t) by reflexivity.
+    punfold H1; red in H1; intros.
+    pstep; red.
+    hinduction H1 before t; try solve [constructor; auto]; try inv CHECK; intros.
+    cbn.
+    eapply Interp_PropT_Vis.
+    intros; right. eapply CIH.
+    eapply eutt_clo_bind; [ reflexivity | intros; subst].
+    rewrite tau_eutt. reflexivity.
+  Qed.
 
 End interp_refl.
 
