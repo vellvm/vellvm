@@ -438,7 +438,7 @@ Section interp_prop_extra.
     right. eapply self; eauto. eapply eqit_mon; eauto.
   Qed.
 
-  Lemma eqitC_wcompat g b1 b2 vclo
+  Lemma interp_PropT_wcompat g b1 b2 vclo
         (MON: monotone2 vclo)
         (CMP: compose (eqitC RR true true) vclo <3= compose vclo (eqitC RR b1 b2)):
     wcompatible2 (@interp_PropT_ E E OOM _ g _ RR b1 b2 vclo) (eqitC RR b1 b2).
@@ -478,7 +478,7 @@ Section interp_prop_extra.
       remember (VisF e k1).
       hinduction EQVl before r; intros; try discriminate Heqx; eauto; inv Heqi.
       dependent destruction H2. cbn in *. pclearbot.
-      assert (Vis e0 k1 = Vis e0 k0) by admit.
+      assert (Vis e0 k1 = Vis e0 k0) by admit. (* find the transitive closure here *)
       match goal with
       | |- interp_PropTF _ _ _ _ _ _ ?r _ => change r with (observe (go r))
       end.
@@ -506,7 +506,11 @@ Section interp_prop_extra.
       + match goal with
         | |- interp_PropTF _ _ _ _ _ _ _ ?r => change r with (observe (go r))
         end; try eapply Interp_PropT_Vis.
-        * admit.
+        * intros. specialize (HK _ H0).
+          eapply MON.
+          -- apply CMP. econstructor. 1, 2 : reflexivity.
+             2, 3 : intros; subst; eauto. eauto.
+          -- intros. apply gpaco2_clo, PR.
         * pose proof (@eqit_trans E R R R RR (flip RR2) true true) as HT. pclearbot.
           assert (eqit (E := E) (flip RR2) true true (Tau m2) (Tau m1)) by admit.
           specialize (HT _ _ _ H H0).
@@ -516,7 +520,11 @@ Section interp_prop_extra.
       + match goal with
         | |- interp_PropTF _ _ _ _ _ _ _ ?r => change r with (observe (go r))
         end; try eapply Interp_PropT_Vis.
-        * admit.
+        * intros. specialize (HK _ H0).
+          eapply MON.
+          -- apply CMP. econstructor. 1, 2 : reflexivity.
+             2, 3 : intros; subst; eauto. eauto.
+          -- intros. apply gpaco2_clo, PR.
 
         * pose proof (@eqit_trans E R R R RR (flip RR2) true true) as HT. pclearbot.
           assert (eqit (E := E) (flip RR2) true true (Vis e k2) (Vis e k1)) by admit.
