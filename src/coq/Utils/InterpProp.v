@@ -478,11 +478,11 @@ Section interp_prop_extra.
       remember (VisF e k1).
       hinduction EQVl before r; intros; try discriminate Heqx; eauto; inv Heqi.
       dependent destruction H2. cbn in *. pclearbot.
-      assert (Vis e0 k1 = Vis e0 k0) by admit. (* find the transitive closure here *)
+      (* assert (Vis e0 k1 = Vis e0 k0) by admit. (* find the transitive closure here *) *)
       match goal with
       | |- interp_PropTF _ _ _ _ _ _ ?r _ => change r with (observe (go r))
       end.
-      rewrite H0. clear H0. clear k1 REL.
+      (* rewrite H0. clear H0. clear k1 REL. *)
 
       hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; eauto.
       + pose proof H as H'. eapply eqit_inv_bind_ret in H.
@@ -494,7 +494,8 @@ Section interp_prop_extra.
           rewrite H in H1.
           eapply Returns_ret_inv in H1; subst.
           eapply MON.
-          -- apply CMP. econstructor. 1, 2 : reflexivity.
+          -- apply CMP. econstructor. 2 : reflexivity.
+             eapply eqit_mon; try eapply REL0; eauto.
              2, 3 : intros; subst; eauto. eauto.
           -- intros. apply gpaco2_clo, PR.
         * pose proof (@eqit_trans E R R R RR (flip RR2) true true) as HT.
@@ -508,11 +509,13 @@ Section interp_prop_extra.
         end; try eapply Interp_PropT_Vis.
         * intros. specialize (HK _ H0).
           eapply MON.
-          -- apply CMP. econstructor. 1, 2 : reflexivity.
+          -- apply CMP. econstructor. 2 : reflexivity.
+             eapply eqit_mon; try eapply REL0; eauto.
              2, 3 : intros; subst; eauto. eauto.
           -- intros. apply gpaco2_clo, PR.
         * pose proof (@eqit_trans E R R R RR (flip RR2) true true) as HT. pclearbot.
-          assert (eqit (E := E) (flip RR2) true true (Tau m2) (Tau m1)) by admit.
+          assert (eqit (E := E) (flip RR2) true true (Tau m2) (Tau m1)).
+          { apply eqit_flip, eqit_Tau; eapply eqit_mon; try eapply REL; eauto. }
           specialize (HT _ _ _ H H0).
           eapply eqit_mon; [ | | | apply HT]; eauto.
           intros. destruct PR; eauto.
@@ -522,16 +525,19 @@ Section interp_prop_extra.
         end; try eapply Interp_PropT_Vis.
         * intros. specialize (HK _ H0).
           eapply MON.
-          -- apply CMP. econstructor. 1, 2 : reflexivity.
+          -- apply CMP. econstructor. 2 : reflexivity.
+             eapply eqit_mon; try eapply REL0; eauto.
              2, 3 : intros; subst; eauto. eauto.
           -- intros. apply gpaco2_clo, PR.
 
         * pose proof (@eqit_trans E R R R RR (flip RR2) true true) as HT. pclearbot.
-          assert (eqit (E := E) (flip RR2) true true (Vis e k2) (Vis e k1)) by admit.
+          assert (eqit (E := E) (flip RR2) true true (Vis e k2) (Vis e k1)).
+          { apply eqit_flip, eqit_Vis; intros; eapply eqit_mon; try eapply REL; eauto. }
+
           specialize (HT _ _ _ H H0).
           eapply eqit_mon; [ | | | apply HT]; eauto.
           intros. destruct PR; eauto.
-  Admitted.
+  Qed.
 
   (* Figure 7: Interpreter law for Ret *)
   Lemma interp_prop_ret :
