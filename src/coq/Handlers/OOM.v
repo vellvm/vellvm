@@ -18,6 +18,7 @@ From ITree Require Import
      ITree
      Eq.Eq.
 
+From ITree Require Import Eq.EqAxiom.
 From Paco Require Import paco.
 
 Set Implicit Arguments.
@@ -39,12 +40,6 @@ Section PARAMS_MODEL.
   Notation Effin := (E +' OOME +' F).
   Notation Effout := (E +' OOME +' F).
 
-  Definition E_trigger_model_prop : E ~> PropT Effout :=
-    fun R e => fun t => t = trigger e.
-
-  Definition F_trigger_model_prop : F ~> PropT Effout :=
-    fun R e => fun t => t = trigger e.
-
   (* Semantics of OOM *)
 
   (*    If the target tree has an out of memory event, then it is a *)
@@ -54,9 +49,6 @@ Section PARAMS_MODEL.
   (*    agree with the source at all points, but may abort, running out *)
   (*    of memory at any point. *)
   (*  *)
-  Definition OOM_handler : OOME ~> PropT Effout
-    (* Any tree is accepted as long as OOM is raised *)
-    := fun T oome source => True.
 
   Definition oom_k_spec
              {T R : Type}
@@ -85,13 +77,11 @@ Section PARAMS_MODEL.
     all : eapply eutt_clo_bind; [ reflexivity | intros; subst; eauto ; symmetry; eauto ].
   Qed .
 
-  (* Qed. *)
-
-  Definition refine_OOM_handler : Effin ~> PropT Effout
-    := case_ E_trigger_model_prop (case_ OOM_handler F_trigger_model_prop).
+  Definition refine_OOM_handler : Effin ~> itree Effout
+    := fun _ x => trigger x.
 
   Definition refine_OOM_h {T} (RR : relation T) (source target : itree Effout T) : Prop
-    := @interp_prop Effin Effout OOME _ _ (Basics.flip RR) target source.
+    := @interp_prop Effin Effout OOME _ refine_OOM_handler _ RR source target.
 
   Definition refine_OOM {T} (RR : relation T) (sources : PropT Effout T) (target : itree Effout T) : Prop
     := exists source, sources source /\ refine_OOM_h RR source target.
@@ -108,32 +98,108 @@ Section PARAMS_MODEL.
     cbn.
     destruct e as [e | [ oom | f]].
     - change (VisF (inl1 e) k2) with (observe (Vis (inl1 e) k2)).
-      eapply Interp_PropT_Vis; eauto.
-      Unshelve. 2 : exact (fun x e => trigger e).
-      setoid_rewrite bind_trigger; reflexivity.
-    - change (VisF (inr1 (inl1 oom)) k2) with (observe (Vis (inr1 (inl1 oom)) k2)).
-      eapply Interp_PropT_Vis_OOM. eapply eqit_Vis. intros; reflexivity.
-    - change (VisF (inr1 (inr1 f)) k2) with (observe (Vis (inr1 (inr1 f)) k2)).
-      eapply Interp_PropT_Vis; eauto.
-      Unshelve. 2 : exact (fun x e => trigger e).
-      setoid_rewrite bind_trigger; reflexivity.
-  Qed.
+    (*   eapply Interp_PropT_Vis; eauto. *)
+    (*   setoid_rewrite bind_trigger; reflexivity. *)
+    (* - change (VisF (inr1 (inl1 oom)) k2) with (observe (Vis (inr1 (inl1 oom)) k2)). *)
+    (*   eapply Interp_PropT_Vis_OOM. eapply eqit_Vis. intros; reflexivity. *)
+    (* - change (VisF (inr1 (inr1 f)) k2) with (observe (Vis (inr1 (inr1 f)) k2)). *)
+    (*   eapply Interp_PropT_Vis; eauto. *)
+      (*   setoid_rewrite bind_trigger; reflexivity. *)
+  Admitted.
+
+  Ltac abs :=
+    match goal with
+    | [ H : ?t ≅ _ , H' : observe ?t = _ |- _] =>
+        rewrite (itree_eta t) in H; rewrite H' in H;
+        try solve [eapply eqit_inv in H; contradiction]
+    end.
+
+  Ltac IP_Vis :=
+    match goal with
+    | |- interp_PropTF _ _ _ _ _ _ ?r => change r with (observe (go r))
+    end; eapply Interp_PropT_Vis; eauto.
+
+
+  Hint Resolve interp_PropT_wcompat : paco.
+
+
+Inductive rcompose {R1 R2 R3} (RR1: R1->R2->Prop) (RR2: R2->R3->Prop) (r1: R1) (r3: R3) : Prop :=
+| rcompose_intro r2 (REL1: RR1 r1 r2) (REL2: RR2 r2 r3)
+.
+Hint Constructors rcompose: core.
+
+Lemma trans_rcompose {R} RR (TRANS: Transitive RR):
+  forall x y : R, rcompose RR RR x y -> RR x y.
+Proof.
+  intros. destruct H; eauto.
+Qed.
 
   #[global] Instance refine_OOM_h_transitive {R} {RR : relation R} `{Transitive _ RR} : Transitive (refine_OOM_h RR).
   Proof.
     unfold Transitive.
 
+    unfold refine_OOM_h.
     pcofix CIH. intros x y z EQl EQr.
     punfold EQl; punfold EQr; red in EQl, EQr.
-    pstep; red.
+    pose proof (itree_eta x) as HX; apply bisimulation_is_eq in HX; rewrite HX; clear HX.
+    pose proof (itree_eta z) as HZ; apply bisimulation_is_eq in HZ; rewrite HZ; clear HZ.
 
     hinduction EQl before x; intros.
-    - remember (RetF r1).
-      hinduction EQr before x; intros; inv Heqi; eauto.
-      rewrite itree_eta in H0; rewrite H2 in H0.
+    - remember (RetF r2).
+      hinduction EQr before x; intros; inv Heqi; pstep; try constructor; eauto; try abs.
+      specialize (IHEQr y _ _ REL eq_refl). admit.
+    - (* tau tau *)
+      pclearbot.
+      admit.
+    - (* tauL *) admit.
+    - (* tauR *) admit.
+    - (* oom *) admit.
+    - pose proof (Eq.bind_trigger (R := R) _ e) as HX; eapply bisimulation_is_eq in HX.
+      unfold bind, Monad_itree in EQr. unfold refine_OOM_handler in EQr.
+      rewrite HX in EQr. cbn in *. clear HX.
+      remember (VisF e (fun x : A => k2 x)).
+
+      hinduction EQr before z; intros; try inv Heqi; pclearbot.
+      + pstep; constructor; eauto. admit.
+      + admit.
+      + Require Import Coq.Program.Equality.
+        dependent destruction H2.
+
+        
+
+        eapply Interp_PropT_Vis.
+
+      + gstep; eapply Interp_PropT_Vis.
+        * intros ? HR; specialize (HK _ HR); pclearbot; gfinal; right;
+          eapply paco2_mon; pclearbot;[ eapply HK; intros | ]; contradiction.
+        * setoid_rewrite bind_trigger; auto. etransitivity; eauto. apply eutt_Ret; auto.
+      + gclo.
+        econstructor.
+      + rewrite <- H0. admit.
+      + rewrite <- H0. rewrite <- itree_eta. admit.
+      + admit.
+      + admit.
+      + admit.
+      + rewrite <- H1. rewrite <- itree_eta, <- H0, <- itree_eta.
+
+      Typeclasses eauto := 8.
+      rewrite (itree_eta ta) in H0. rewrite H2 in H0.
       change (RetF r2) with (observe (Ret r2) : itree' Effout _).
       eapply Interp_PropT_Vis; eauto.
       admit.
+      etransitivity; eauto. apply eutt_Ret; eauto.
+    - remember (TauF t1).
+      hinduction EQr before x; intros; inv Heqi; pclearbot; eauto.
+      + admit.
+      + admit.
+    - admit.
+    - admit.
+    - admit.
+    - 
+
+    
+      constructor; pclearbot; eauto.
+
   Admitted.
 
 End PARAMS_MODEL.
