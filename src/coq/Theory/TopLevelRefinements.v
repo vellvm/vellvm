@@ -592,6 +592,29 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         cbn in *; inv Heqe.
     Admitted.
 
+    Lemma eval_icmp_err_ub_oom_to_itree :
+      forall {E} `{OOME -< E} `{FailureE -< E} `{UBE -< E} icmp dv1 dv2,
+        (@eval_icmp (itree E) _ _ icmp dv1 dv2) ≈
+        match eval_icmp icmp dv1 dv2 with
+        | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>
+            match m with
+            | inl (OOM_message x) => raiseOOM x
+            | inr (inl (UB_message x)) => raiseUB x
+            | inr (inr (inl (ERR_message x))) => raise x
+            | inr (inr (inr x)) => ret x
+            end
+        end.
+    Proof.
+      intros E OOM FAIL UB fop dv1 dv2.
+      unfold eval_icmp.
+      cbn.
+      induction dv1, dv2; cbn;
+        try solve
+          [ reflexivity
+          | break_match; reflexivity
+          ].
+    Qed.
+
     Lemma double_op_err_ub_oom_to_itree :
       forall {E} `{OOME -< E} `{FailureE -< E} `{UBE -< E} fop dv1 dv2,
         (@double_op (itree E) _ _ _ fop dv1 dv2) ≈
@@ -1545,7 +1568,10 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
             ].
 
         setoid_rewrite bind_ret_l.
-        admit.
+        setoid_rewrite eval_icmp_err_ub_oom_to_itree.
+        destruct (eval_icmp cmp0 concu1 concu2 (M:=err_ub_oom)) as [[[[[[[oom_op] | [[ub_op] | [[err_op] | op]]]]]]]] eqn:Hop;
+          setoid_rewrite Hop;
+          cbn; reflexivity.
       - unfold concretize_uvalue; rewrite concretize_uvalueM_equation.
 
         unfold concretize_uvalue in *.
