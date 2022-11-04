@@ -482,13 +482,10 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Proof.
       intros E OOM FAIL UB.
       induction u using uvalue_ind'; unfold concretize_uvalue at 2; rewrite concretize_uvalueM_equation; 
-        try solve [unfold concretize_uvalue; rewrite concretize_uvalueM_equation; reflexivity].
+        try solve [unfold concretize_uvalue; rewrite concretize_uvalueM_equation;
+                   cbn; try rewrite bind_ret_l; reflexivity].
       - unfold concretize_uvalue; rewrite concretize_uvalueM_equation.
         destruct (default_dvalue_of_dtyp t); cbn in *; reflexivity.
-      - unfold concretize_uvalue; rewrite concretize_uvalueM_equation.
-        cbn.
-        rewrite bind_ret_l.
-        reflexivity.
       - unfold concretize_uvalue; rewrite concretize_uvalueM_equation.
         rewrite map_monad_unfold.
         rewrite map_monad_unfold.
@@ -671,6 +668,203 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                      (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) 
                      (itree E) (fun (A : Type) (x : itree E A) => x)) uvs)
                (fun x : list dvalue => Ret (DVALUE_Struct x))
+               _
+               IHu0
+            ).
+          destruct H as [[err_msg CONTRA] | [a [MAP RETEQ]]].
+          { rewrite CONTRA in IHu0.
+            setoid_rewrite raise_bind_itree in IHu0.
+            eapply raise_ret_inv_itree in IHu0.
+            destruct IHu0.
+          }
+
+          setoid_rewrite MAP.
+          rewrite bind_ret_l.
+          eapply eq1_ret_ret_itree in RETEQ.
+          inv RETEQ.
+          reflexivity.
+      - unfold concretize_uvalue; rewrite concretize_uvalueM_equation.
+        rewrite map_monad_unfold.
+        rewrite map_monad_unfold.
+        rewrite IHu.
+
+        unfold concretize_uvalue in *.
+        destruct
+          (concretize_uvalueM (err_ub_oom_T ident)
+             (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt))
+             (err_ub_oom_T ident) (fun (A : Type) (x : err_ub_oom_T ident A) => x) u)
+          as [[[[[[[oom_concu] | [[ub_concu] | [[err_concu] | concu]]]]]]]] eqn:HCONCU;
+          try solve
+            [ cbn;
+              rewrite bind_bind;
+              first
+                [ setoid_rewrite raiseOOM_bind_itree
+                | setoid_rewrite raiseUB_bind_itree
+                | setoid_rewrite raise_bind_itree
+                ];
+              reflexivity
+            ].
+
+        setoid_rewrite bind_ret_l.
+        rewrite concretize_uvalueM_equation in IHu0.
+        rewrite concretize_uvalueM_equation in IHu0.
+
+        destruct (map_monad
+                    (concretize_uvalueM (err_ub_oom_T ident)
+                       (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt))
+                       (err_ub_oom_T ident) (fun (A : Type) (x : err_ub_oom_T ident A) => x)) uvs)
+          as [[[[[[[oom_map] | [[ub_map] | [[err_map] | map]]]]]]]] eqn:HMAPM.
+
+        + (* OOM *)
+          cbn in IHu0.
+          cbn.
+          setoid_rewrite HMAPM.
+          cbn.
+          rewrite bind_bind.
+          setoid_rewrite bind_ret_l.
+
+          epose proof MFails_bind_inv.
+          specialize
+            (H (itree E) _ _
+               (@ITreeOomMonadReturns E OOM)
+               _ dvalue
+               (map_monad
+                  (concretize_uvalueM (itree E)
+                     (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) 
+                     (itree E) (fun (A : Type) (x : itree E A) => x)) uvs)
+               (fun x : list dvalue => Ret (DVALUE_Packed_struct x))
+            ).
+          cbn in H.
+          unfold ItreeRaiseMReturns.ITreeErrorMFails in *.
+          cbn in *.
+
+          forward H.
+          { exists oom_map.
+            apply IHu0.
+          }
+
+          destruct H as [[msg ERR_MAP] | [a [SUCC_MAP [msg CONTRA]]]].
+          2: {
+            exfalso.
+            symmetry in CONTRA.
+            eapply raiseOOM_ret_inv_itree in CONTRA.
+            destruct CONTRA.
+          }
+
+          rewrite ERR_MAP.
+          setoid_rewrite raiseOOM_bind_itree.
+
+          rewrite ERR_MAP in IHu0.
+          setoid_rewrite raiseOOM_bind_itree in IHu0.
+          eauto.
+        + (* UB *)
+          cbn in IHu0.
+          cbn.
+          setoid_rewrite HMAPM.
+          cbn.
+          rewrite bind_bind.
+          setoid_rewrite bind_ret_l.
+
+          epose proof MFails_bind_inv.
+          specialize
+            (H (itree E) _ _
+               (@ITreeUBMonadReturns E UB)
+               _ dvalue
+               (map_monad
+                  (concretize_uvalueM (itree E)
+                     (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) 
+                     (itree E) (fun (A : Type) (x : itree E A) => x)) uvs)
+               (fun x : list dvalue => Ret (DVALUE_Packed_struct x))
+            ).
+          cbn in H.
+          unfold ItreeRaiseMReturns.ITreeErrorMFails in *.
+          cbn in *.
+
+          forward H.
+          { exists ub_map.
+            apply IHu0.
+          }
+
+          destruct H as [[msg ERR_MAP] | [a [SUCC_MAP [msg CONTRA]]]].
+          2: {
+            exfalso.
+            symmetry in CONTRA.
+            eapply raiseUB_ret_inv_itree in CONTRA.
+            destruct CONTRA.
+          }
+
+          rewrite ERR_MAP.
+          setoid_rewrite raiseUB_bind_itree.
+
+          rewrite ERR_MAP in IHu0.
+          setoid_rewrite raiseUB_bind_itree in IHu0.
+          eauto.
+        + (* Error *)
+          cbn in IHu0.
+          cbn.
+          setoid_rewrite HMAPM.
+          cbn.
+          rewrite bind_bind.
+          setoid_rewrite bind_ret_l.
+
+          epose proof MFails_bind_inv.
+          specialize
+            (H (itree E) _ _
+               (@ITreeErrorMonadReturns E FAIL)
+               _ dvalue
+               (map_monad
+                  (concretize_uvalueM (itree E)
+                     (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) 
+                     (itree E) (fun (A : Type) (x : itree E A) => x)) uvs)
+               (fun x : list dvalue => Ret (DVALUE_Packed_struct x))
+            ).
+          cbn in H.
+          unfold ItreeRaiseMReturns.ITreeErrorMFails in *.
+          cbn in *.
+
+          forward H.
+          { exists err_map.
+            apply IHu0.
+          }
+
+          destruct H as [[msg ERR_MAP] | [a [SUCC_MAP [msg CONTRA]]]].
+          2: {
+            exfalso.
+            symmetry in CONTRA.
+            eapply raise_ret_inv_itree in CONTRA.
+            destruct CONTRA.
+          }
+
+          rewrite ERR_MAP.
+          setoid_rewrite raise_bind_itree.
+
+          rewrite ERR_MAP in IHu0.
+          setoid_rewrite raise_bind_itree in IHu0.
+          eauto.
+        + (* Success *)
+          cbn in IHu0.
+          cbn.
+          setoid_rewrite HMAPM.
+          cbn.
+          rewrite bind_bind.
+          setoid_rewrite bind_ret_l.
+
+          epose proof @MReturns_bind_inv.
+          specialize
+            (H (itree E) _ _
+               (@ITreeErrorMonadReturns E FAIL)).
+          unfold MReturns in H.
+          cbn in H.
+          unfold ITreeReturns in H.
+          unfold ItreeRaiseMReturns.ITreeErrorMFails in *.
+          cbn in H.
+          specialize
+            (H _ _
+               (map_monad
+                  (concretize_uvalueM (itree E)
+                     (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) 
+                     (itree E) (fun (A : Type) (x : itree E A) => x)) uvs)
+               (fun x : list dvalue => Ret (DVALUE_Packed_struct x))
                _
                IHu0
             ).
