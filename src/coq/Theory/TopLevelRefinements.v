@@ -467,6 +467,131 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Import Raise.
     Import MonadEq1Laws.
 
+    Lemma eval_iop_err_ub_oom_to_itree :
+      forall {E} `{OOME -< E} `{FailureE -< E} `{UBE -< E} iop dv1 dv2,
+        (@eval_iop (itree E) _ _ _ _ iop dv1 dv2) ≈
+        match eval_iop iop dv1 dv2 with
+        | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>
+            match m with
+            | inl (OOM_message x) => raiseOOM x
+            | inr (inl (UB_message x)) => raiseUB x
+            | inr (inr (inl (ERR_message x))) => raise x
+            | inr (inr (inr x)) => ret x
+            end
+        end.
+    Proof.
+      intros E OOM FAIL UB iop dv1 dv2.
+      unfold eval_iop.
+      induction dv1, dv2; cbn;
+        try solve
+          [ reflexivity
+          | break_match; reflexivity
+          ].
+
+      Ltac solve_eval_int_op :=
+        cbn;
+        solve
+          [ reflexivity
+          | repeat setoid_rewrite bind_ret_l; cbn in *;
+            try break_match; cbn in *;
+            repeat
+              match goal with
+              | H: _ = true |- _ =>
+                  setoid_rewrite H; clear H
+              end;
+            solve_eval_int_op
+          ].
+
+      1-4: destruct iop; solve_eval_int_op.
+
+      { destruct iop.
+        - cbn.
+          break_match.
+          reflexivity.
+          cbn.
+          destruct (VellvmIntegers.madd x x0); cbn.
+          + rewrite bind_ret_l.
+            reflexivity.
+          + setoid_rewrite raiseOOM_bind_itree.
+            reflexivity.
+        - cbn.
+          break_match.
+          reflexivity.
+          cbn.
+          destruct (VellvmIntegers.msub x x0); cbn.
+          + rewrite bind_ret_l.
+            reflexivity.
+          + setoid_rewrite raiseOOM_bind_itree.
+            reflexivity.
+        - cbn.
+          break_match.
+          { destruct (VellvmIntegers.mmul x x0); cbn.
+            + rewrite bind_ret_l.
+              reflexivity.
+            + setoid_rewrite raiseOOM_bind_itree.
+              reflexivity.
+          }
+          { destruct (VellvmIntegers.mmul x x0); cbn.
+            + rewrite bind_ret_l.
+              break_match; reflexivity.
+            + setoid_rewrite raiseOOM_bind_itree.
+              reflexivity.
+          }
+        - cbn.
+          break_match.
+          { destruct (VellvmIntegers.mshl x x0); cbn.
+            + rewrite bind_ret_l.
+              reflexivity.
+            + setoid_rewrite raiseOOM_bind_itree.
+              reflexivity.
+          }
+          { destruct (VellvmIntegers.mshl x x0); cbn.
+            + rewrite bind_ret_l.
+              break_match.
+              cbn. reflexivity.
+              break_match; break_match; try reflexivity.
+              { destruct (VellvmIntegers.mnegative i); cbn.
+                + rewrite bind_ret_l.
+                  break_match; reflexivity.
+                + setoid_rewrite raiseOOM_bind_itree.
+                  reflexivity.
+              }
+              { inv Heqi0.
+                reflexivity.
+              }
+            + setoid_rewrite raiseOOM_bind_itree.
+              reflexivity.
+          }
+        - solve_eval_int_op.
+        - cbn.
+          break_match; [reflexivity|].
+          break_match; [reflexivity|].
+          destruct (VellvmIntegers.mdivs x x0); cbn.
+          + rewrite bind_ret_l.
+            reflexivity.
+          + setoid_rewrite raiseOOM_bind_itree.
+            reflexivity.
+        - solve_eval_int_op.
+        - solve_eval_int_op.
+        - solve_eval_int_op.
+        - cbn.
+          break_match; [reflexivity|].
+          destruct (VellvmIntegers.mmods x x0); cbn.
+          + rewrite bind_ret_l.
+            reflexivity.
+          + setoid_rewrite raiseOOM_bind_itree.
+            reflexivity.
+        - solve_eval_int_op.
+        - solve_eval_int_op.
+        - solve_eval_int_op.
+      }
+
+      (* Vector operations *)
+      break_match.
+      destruct (vec_loop (eval_iop_integer_h iop) (combine elts elts0)) as [[[[[[[oom_vec] | [[ub_vec] | [[err_vec] | vec]]]]]]]] eqn:Hvec;
+        cbn in *; inv Heqe.
+    Admitted.
+
     Lemma concretize_uvalue_err_ub_oom_to_itree :
       forall {E} `{OOME -< E} `{FailureE -< E} `{UBE -< E} u,
         (@concretize_uvalue (itree E) _ _ _ _ u) ≈
@@ -1315,6 +1440,12 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
         setoid_rewrite bind_ret_l.
 
+        setoid_rewrite eval_iop_err_ub_oom_to_itree.
+        destruct (eval_iop iop concu1 concu2 (M:=err_ub_oom)) as [[[[[[[oom_op] | [[ub_op] | [[err_op] | op]]]]]]]] eqn:Hop;
+          setoid_rewrite Hop;
+          cbn; reflexivity.
+      -
+        cbn.
         Set Printing Implicit.
 
 
