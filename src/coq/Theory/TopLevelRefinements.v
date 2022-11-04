@@ -1706,7 +1706,21 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
         setoid_rewrite bind_ret_l.
         cbn.
-        admit.
+        break_match; cbn; try reflexivity.
+        + break_match; cbn; reflexivity.
+        + break_match; cbn; try reflexivity.
+          break_match; cbn; try reflexivity.
+          2: {
+            destruct (VellvmIntegers.mrepr (PTOI.ptr_to_int a)).
+            - cbn. rewrite bind_ret_l.
+              reflexivity.
+            - cbn.
+              setoid_rewrite raiseOOM_bind_itree.
+              reflexivity.
+          }
+
+          destruct sz as [|sz]; cbn; try reflexivity.
+          repeat (destruct sz as [sz | sz | sz]; cbn; try reflexivity).
       - (* GEP *)
         admit.
       - (* ExtractElement *)
