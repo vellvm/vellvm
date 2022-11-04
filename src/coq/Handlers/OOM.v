@@ -77,8 +77,8 @@ Section PARAMS_MODEL.
     all : eapply eutt_clo_bind; [ reflexivity | intros; subst; eauto ; symmetry; eauto ].
   Qed .
 
-  Definition refine_OOM_handler : Effin ~> itree Effout
-    := fun _ x => trigger x.
+  Definition refine_OOM_handler : Effin ~> PropT Effout
+    := fun _ e x => x ≈ trigger e.
 
   Definition refine_OOM_h {T} (RR : relation T) (source target : itree Effout T) : Prop
     := @interp_prop Effin Effout OOME _ refine_OOM_handler _ RR source target.
@@ -119,21 +119,6 @@ Section PARAMS_MODEL.
     | |- interp_PropTF _ _ _ _ _ _ ?r => change r with (observe (go r))
     end; eapply Interp_PropT_Vis; eauto.
 
-
-  Hint Resolve interp_PropT_wcompat : paco.
-
-
-Inductive rcompose {R1 R2 R3} (RR1: R1->R2->Prop) (RR2: R2->R3->Prop) (r1: R1) (r3: R3) : Prop :=
-| rcompose_intro r2 (REL1: RR1 r1 r2) (REL2: RR2 r2 r3)
-.
-Hint Constructors rcompose: core.
-
-Lemma trans_rcompose {R} RR (TRANS: Transitive RR):
-  forall x y : R, rcompose RR RR x y -> RR x y.
-Proof.
-  intros. destruct H; eauto.
-Qed.
-
   #[global] Instance refine_OOM_h_transitive {R} {RR : relation R} `{Transitive _ RR} : Transitive (refine_OOM_h RR).
   Proof.
     unfold Transitive.
@@ -147,60 +132,139 @@ Qed.
     hinduction EQl before x; intros.
     - remember (RetF r2).
       hinduction EQr before x; intros; inv Heqi; pstep; try constructor; eauto; try abs.
-      specialize (IHEQr y _ _ REL eq_refl). admit.
+      specialize (IHEQr y _ _ REL eq_refl). punfold IHEQr.
     - (* tau tau *)
-      pclearbot.
-      admit.
-    - (* tauL *) admit.
-    - (* tauR *) admit.
-    - (* oom *) admit.
-    - pose proof (Eq.bind_trigger (R := R) _ e) as HX; eapply bisimulation_is_eq in HX.
-      unfold bind, Monad_itree in EQr. unfold refine_OOM_handler in EQr.
-      rewrite HX in EQr. cbn in *. clear HX.
-      remember (VisF e (fun x : A => k2 x)).
+      assert (DEC: (exists m3, observe z= TauF m3) \/ (forall m3, observe z <> TauF m3)).
+      { destruct (observe z); eauto; right; red; intros; inv H0. }
+      destruct DEC as [EQ | EQ].
+      + destruct EQ as [m3 ?]; subst.
+        pstep. rewrite H0. econstructor; eauto. right. pclearbot.
+        rewrite H0 in EQr.
+        eapply CIH; eauto.
+        eapply interp_prop_inv_tau; eauto; pstep; auto.
+      + pclearbot.
+        inv EQr; try (exfalso; eapply EQ; eauto; fail).
+        * clear CHECK.
+          pstep; constructor; auto.
+          punfold HS. red in HS. cbn.
+          hinduction HS0 before CIH; intros; try (exfalso; eapply EQ; eauto; fail); try inv Heqot.
+          -- remember (RetF r1) as ot.
+             hinduction HS before CIH; intros; try (exfalso; eapply EQ; eauto; fail); inv Heqot.
+             ++ constructor. etransitivity; eauto.
+             ++ constructor; eauto.
+             ++ apply bisimulation_is_eq in HT1. rewrite HT1.
+                econstructor. reflexivity.
+             ++ red in H0. rewrite itree_eta in H1.
+                rewrite H3 in H1. rewrite H0 in H1.
+                setoid_rewrite bind_trigger in H1.
+                eapply eqit_inv in H1; inv H1.
+          -- eapply IHHS0; eauto.
+             assert (refine_OOM_h RR t3 (Tau t1)) by (pstep; apply HS).
+             eapply interp_prop_inv_tau_r in H0; punfold H0.
+          -- apply bisimulation_is_eq in HT1. rewrite HT1 in HS.
+             cbn in HS. remember (VisF (subevent A e) k1).
+             hinduction HS before CIH; intros; try (exfalso; eapply EQ; eauto; fail); inv Heqi.
+             ++ constructor; eauto.
+             ++ apply bisimulation_is_eq in HT1. rewrite HT1; econstructor; reflexivity.
+             ++ rewrite itree_eta in H1; rewrite H3 in H1.
+                red in H0; rewrite H0 in H1. setoid_rewrite bind_trigger in H1.
+                apply eqit_inv in H1; cbn in H1.
+                destruct H1 as (?&?&?); subst. cbn in H1.
+                unfold subevent in H1.
+                unfold subevent, resum, ReSum_id, id_, ReSum_inr, cat, Id_IFun, Cat_IFun, inr_,
+                  resum , ReSum_inl , cat, resum, Inr_sum1, inl_, Inl_sum1 in H1. inv H1.
+                change (VisF (inr1 (inl1 e0)) k1) with (observe (Vis (inr1 (inl1 e0)) k1)).
+                eapply Interp_PropT_Vis_OOM. unfold subevent.
+                apply eqit_Vis. reflexivity.
+          -- red in H0. rewrite H0 in H1.
+             remember (VisF e k1). rewrite itree_eta in H1.
+             hinduction HS before CIH; intros; try (exfalso; eapply EQ; eauto; fail); try solve [inv Heqi].
+             ++ constructor; eauto.
+             ++ apply bisimulation_is_eq in HT1. rewrite HT1; econstructor; reflexivity.
+             ++ rewrite itree_eta in H1. rewrite Heqi in H1.
+                red in H0. rewrite H0 in H1. setoid_rewrite bind_trigger in H1.
+                apply eqit_inv in H1. cbn in H1. rewrite <- itree_eta in H3.
+                destruct H1 as (?&?&?); subst. cbn in H1.
+                unfold subevent in H1.
+                unfold subevent, resum, ReSum_id, id_, ReSum_inr, cat, Id_IFun, Cat_IFun, inr_,
+                  resum , ReSum_inl , cat, resum, Inr_sum1, inl_, Inl_sum1 in H1. inv H1.
+                eapply Interp_PropT_Vis. 3 : eauto. 2 : red; reflexivity. red in H3.
 
+                setoid_rewrite H0 in HK. setoid_rewrite H2 in HK0.
+                intros; right; eapply CIH; pclearbot; eauto.
+                specialize (HK _ H1); pclearbot; eauto.
+                specialize (HK0 _ H1); pclearbot; eauto.
+                specialize (H4 a). rewrite <- H4. auto.
+        * exfalso. rewrite itree_eta in HT1. rewrite H1 in HT1.
+          apply eqit_inv in HT1; inv HT1.
+    - (* tauL *)
+      specialize (IHEQl _ EQr).
+      pstep; constructor; punfold IHEQl.
+    - (* tauR *)
+      assert (refine_OOM_h RR (Tau t2) z). { pstep; auto. }
+      red in H0. apply interp_prop_inv_tau_l in H0.
+      punfold H0.
+    - (* oom *)
+      apply bisimulation_is_eq in HT1. rewrite HT1; pstep; econstructor.
+      rewrite <- itree_eta; reflexivity.
+    - rewrite itree_eta in H1.
       hinduction EQr before z; intros; try inv Heqi; pclearbot.
-      + pstep; constructor; eauto. admit.
-      + admit.
-      + Require Import Coq.Program.Equality.
-        dependent destruction H2.
-
-        
-
-        eapply Interp_PropT_Vis.
-
-      + gstep; eapply Interp_PropT_Vis.
-        * intros ? HR; specialize (HK _ HR); pclearbot; gfinal; right;
-          eapply paco2_mon; pclearbot;[ eapply HK; intros | ]; contradiction.
-        * setoid_rewrite bind_trigger; auto. etransitivity; eauto. apply eutt_Ret; auto.
-      + gclo.
-        econstructor.
-      + rewrite <- H0. admit.
-      + rewrite <- H0. rewrite <- itree_eta. admit.
-      + admit.
-      + admit.
-      + admit.
-      + rewrite <- H1. rewrite <- itree_eta, <- H0, <- itree_eta.
-
-      Typeclasses eauto := 8.
-      rewrite (itree_eta ta) in H0. rewrite H2 in H0.
-      change (RetF r2) with (observe (Ret r2) : itree' Effout _).
-      eapply Interp_PropT_Vis; eauto.
-      admit.
-      etransitivity; eauto. apply eutt_Ret; eauto.
-    - remember (TauF t1).
-      hinduction EQr before x; intros; inv Heqi; pclearbot; eauto.
-      + admit.
-      + admit.
-    - admit.
-    - admit.
-    - admit.
-    - 
-
-    
-      constructor; pclearbot; eauto.
-
-  Admitted.
+      + red in H0. rewrite H0 in H1. apply eqit_inv in H1; inv H1.
+      + pstep; constructor; eauto.
+        red in H0. rewrite H0 in H1.
+        rewrite tau_eutt in H1. setoid_rewrite bind_vis in H1.
+        setoid_rewrite bind_ret_l in H1.
+        assert (refine_OOM_h RR t1 t0). do 2 red. apply HS.
+        unfold refine_OOM_h in H2. rewrite H1 in H2.
+        clear HS.
+        punfold H2; red in H2; cbn in H2.
+        remember (VisF (subevent A e) (fun x : A => k2 x)).
+        hinduction H2 before z; intros; try inv Heqi; pclearbot.
+        * constructor; auto; eapply IHinterp_PropTF.
+        * rewrite itree_eta in HT1. rewrite H3 in HT1.
+          apply eqit_inv in HT1. cbn in HT1. destruct HT1 as (?&?&?).
+          subst. cbn in H2.
+          Require Import Coq.Program.Equality.
+          eapply Interp_PropT_Vis_OOM.
+          unfold subevent, resum, ReSum_id, id_, ReSum_inr, cat, Id_IFun, Cat_IFun, inr_,
+            resum , ReSum_inl , cat, resum, Inr_sum1 in H2. inv H2.
+          apply eqit_Vis. intros; reflexivity.
+        * dependent destruction H6.
+          eapply Interp_PropT_Vis; eauto.
+          red in H2. rewrite H2 in H3. setoid_rewrite bind_trigger in H3.
+          intros. right; eapply CIH; eauto.
+          unfold subevent in H2.
+          unfold subevent, resum, ReSum_id, id_, ReSum_inr, cat, Id_IFun, Cat_IFun, inr_,
+            resum , ReSum_inl , cat, resum, Inr_sum1 in H2.
+          rewrite H2, <- H0 in H4.
+          specialize (HK _ H4); pclearbot. apply HK.
+          specialize (HK0 _ H4); pclearbot. apply HK0.
+      + eapply IHEQr. rewrite <- itree_eta. rewrite tau_eutt in H1; auto.
+      + specialize (IHEQr H1).
+        pstep; constructor; auto. punfold IHEQr.
+      + rewrite <- itree_eta in H1. rewrite HT1 in H1. red in H0.
+        rewrite H0 in H1. setoid_rewrite bind_trigger in H1.
+        apply eqit_inv in H1. cbn in H1.
+        destruct H1 as (?&?&?); subst.
+        pstep.
+        eapply Interp_PropT_Vis_OOM. red in H1.
+        unfold subevent, resum, ReSum_id, id_, ReSum_inr, cat, Id_IFun, Cat_IFun, inr_,
+          resum , ReSum_inl , cat, resum, Inr_sum1 in H1. inv H1.
+        apply eqit_Vis. intros; reflexivity.
+      + pstep.
+        red in H0; rewrite H0 in H1; setoid_rewrite bind_trigger in H1.
+        apply eqit_inv in H1; cbn in H1.
+        destruct H1 as (?&?&?); subst. cbn in H1.
+        unfold subevent in H1.
+        unfold subevent, resum, ReSum_id, id_, ReSum_inr, cat, Id_IFun, Cat_IFun, inr_,
+          resum , ReSum_inl , cat, resum, Inr_sum1, inl_, Inl_sum1 in H1. inv H1.
+        cbn in *. red in H2.
+        eapply Interp_PropT_Vis; eauto.
+        2 : rewrite <- itree_eta; eauto.
+        intros. right. eapply CIH; eauto.
+        rewrite H2 in H1; setoid_rewrite H0 in HK; specialize (HK _ H1); pclearbot; eauto.
+        specialize (HK0 _ H1); pclearbot; rewrite <- H4; eauto.
+  Qed.
 
 End PARAMS_MODEL.
 
