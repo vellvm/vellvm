@@ -3,7 +3,8 @@ From Coq Require Import
      Relations
      String
      RelationClasses
-     Morphisms.
+     Morphisms
+     Program.Equality.
 
 From ExtLib Require Import
      Structures.Monads.
@@ -80,32 +81,16 @@ Section PARAMS_MODEL.
   Definition refine_OOM_handler : Effin ~> PropT Effout
     := fun _ e x => x ≈ trigger e.
 
-  Definition refine_OOM_h {T} (RR : relation T) (source target : itree Effout T) : Prop
+  Definition refine_OOM_h_flip {T} (RR : relation T) (source target : itree Effout T) : Prop
     := @interp_prop Effin Effout OOME _ refine_OOM_handler _ RR source target.
+
+  Arguments refine_OOM_h_flip /.
+
+  Definition refine_OOM_h {T} (RR : relation T) (source target : itree Effout T) : Prop
+    := refine_OOM_h_flip (flip RR) target source.
 
   Definition refine_OOM {T} (RR : relation T) (sources : PropT Effout T) (target : itree Effout T) : Prop
     := exists source, sources source /\ refine_OOM_h RR source target.
-
-  #[global] Instance refine_OOM_h_reflexive {R} {RR : relation R} `{Reflexive _ RR} : Reflexive (refine_OOM_h RR).
-  Proof.
-    unfold Reflexive.
-
-    pcofix CIH. intros t.
-    assert (t ≅ t) by reflexivity.
-    punfold H0; red in H0; intros.
-    pstep; red.
-    hinduction H0 before t; try solve [constructor; auto]; try inv CHECK; intros.
-    cbn.
-    destruct e as [e | [ oom | f]].
-    - change (VisF (inl1 e) k2) with (observe (Vis (inl1 e) k2)).
-    (*   eapply Interp_PropT_Vis; eauto. *)
-    (*   setoid_rewrite bind_trigger; reflexivity. *)
-    (* - change (VisF (inr1 (inl1 oom)) k2) with (observe (Vis (inr1 (inl1 oom)) k2)). *)
-    (*   eapply Interp_PropT_Vis_OOM. eapply eqit_Vis. intros; reflexivity. *)
-    (* - change (VisF (inr1 (inr1 f)) k2) with (observe (Vis (inr1 (inr1 f)) k2)). *)
-    (*   eapply Interp_PropT_Vis; eauto. *)
-      (*   setoid_rewrite bind_trigger; reflexivity. *)
-  Admitted.
 
   Ltac abs :=
     match goal with
@@ -114,16 +99,11 @@ Section PARAMS_MODEL.
         try solve [eapply eqit_inv in H; contradiction]
     end.
 
-  Ltac IP_Vis :=
-    match goal with
-    | |- interp_PropTF _ _ _ _ _ _ ?r => change r with (observe (go r))
-    end; eapply Interp_PropT_Vis; eauto.
-
-  #[global] Instance refine_OOM_h_transitive {R} {RR : relation R} `{Transitive _ RR} : Transitive (refine_OOM_h RR).
+  #[global] Instance refine_OOM_h_flip_transitive {R} {RR : relation R} `{Transitive _ RR} : Transitive (refine_OOM_h_flip RR).
   Proof.
     unfold Transitive.
 
-    unfold refine_OOM_h.
+    unfold refine_OOM_h_flip.
     pcofix CIH. intros x y z EQl EQr.
     punfold EQl; punfold EQr; red in EQl, EQr.
     pose proof (itree_eta x) as HX; apply bisimulation_is_eq in HX; rewrite HX; clear HX.
@@ -159,7 +139,7 @@ Section PARAMS_MODEL.
                 setoid_rewrite bind_trigger in H1.
                 eapply eqit_inv in H1; inv H1.
           -- eapply IHHS0; eauto.
-             assert (refine_OOM_h RR t3 (Tau t1)) by (pstep; apply HS).
+             assert (refine_OOM_h_flip RR t3 (Tau t1)) by (pstep; apply HS).
              eapply interp_prop_inv_tau_r in H0; punfold H0.
           -- apply bisimulation_is_eq in HT1. rewrite HT1 in HS.
              cbn in HS. remember (VisF (subevent A e) k1).
@@ -201,7 +181,7 @@ Section PARAMS_MODEL.
       specialize (IHEQl _ EQr).
       pstep; constructor; punfold IHEQl.
     - (* tauR *)
-      assert (refine_OOM_h RR (Tau t2) z). { pstep; auto. }
+      assert (refine_OOM_h_flip RR (Tau t2) z). { pstep; auto. }
       red in H0. apply interp_prop_inv_tau_l in H0.
       punfold H0.
     - (* oom *)
@@ -214,8 +194,8 @@ Section PARAMS_MODEL.
         red in H0. rewrite H0 in H1.
         rewrite tau_eutt in H1. setoid_rewrite bind_vis in H1.
         setoid_rewrite bind_ret_l in H1.
-        assert (refine_OOM_h RR t1 t0). do 2 red. apply HS.
-        unfold refine_OOM_h in H2. rewrite H1 in H2.
+        assert (refine_OOM_h_flip RR t1 t0). do 2 red. apply HS.
+        unfold refine_OOM_h_flip in H2. rewrite H1 in H2.
         clear HS.
         punfold H2; red in H2; cbn in H2.
         remember (VisF (subevent A e) (fun x : A => k2 x)).
@@ -224,7 +204,6 @@ Section PARAMS_MODEL.
         * rewrite itree_eta in HT1. rewrite H3 in HT1.
           apply eqit_inv in HT1. cbn in HT1. destruct HT1 as (?&?&?).
           subst. cbn in H2.
-          Require Import Coq.Program.Equality.
           eapply Interp_PropT_Vis_OOM.
           unfold subevent, resum, ReSum_id, id_, ReSum_inr, cat, Id_IFun, Cat_IFun, inr_,
             resum , ReSum_inl , cat, resum, Inr_sum1 in H2. inv H2.
@@ -266,6 +245,35 @@ Section PARAMS_MODEL.
         specialize (HK0 _ H1); pclearbot; rewrite <- H4; eauto.
   Qed.
 
+  #[global] Instance refine_OOM_h_reflexive {R} {RR : relation R} `{Reflexive _ RR} : Reflexive (refine_OOM_h RR).
+  Proof.
+    unfold Reflexive.
+
+    pcofix CIH. intros t.
+    assert (t ≅ t) by reflexivity.
+    punfold H0; red in H0; intros.
+    pstep; red.
+    hinduction H0 before t; try solve [constructor; auto]; try inv CHECK; intros.
+    cbn.
+    destruct e as [e | [ oom | f]].
+    - change (VisF (inl1 e) k2) with (observe (Vis (inl1 e) k2)).
+      eapply Interp_PropT_Vis; eauto. red; reflexivity.
+      setoid_rewrite bind_trigger; reflexivity.
+    - change (VisF (inr1 (inl1 oom)) k2) with (observe (Vis (inr1 (inl1 oom)) k2)).
+      eapply Interp_PropT_Vis_OOM. eapply eqit_Vis. intros; reflexivity.
+    - change (VisF (inr1 (inr1 f)) k2) with (observe (Vis (inr1 (inr1 f)) k2)).
+      eapply Interp_PropT_Vis; eauto. red; reflexivity.
+      setoid_rewrite bind_trigger; reflexivity.
+  Qed.
+
+  #[global] Instance refine_OOM_h_transitive {R} {RR : relation R} `{Transitive _ RR} : Transitive (refine_OOM_h RR).
+  Proof.
+    unfold refine_OOM_h.
+    assert (Transitive (flip RR)).
+    { repeat intro. subst. unfold flip in *; etransitivity; eauto. }
+    repeat intro. etransitivity; eauto.
+  Qed.
+
 End PARAMS_MODEL.
 
 Section PARAMS_INTERP.
@@ -292,9 +300,6 @@ Section PARAMS_INTERP.
 
 End PARAMS_INTERP.
 
-Instance OOM_k_spec_WF E F : k_spec_WF (refine_OOM_handler (F:=F)) (@oom_k_spec E F).
-Admitted.
-
 Lemma eutt_refine_oom_h :
   forall {T} {E F} (RR : relation T) `{REF: Reflexive _ RR} `{TRANS : Transitive _ RR}
     (t1 t2 : itree (E +' OOME +' F) T),
@@ -302,18 +307,12 @@ Lemma eutt_refine_oom_h :
     refine_OOM_h RR t1 t2.
 Proof.
   intros T E F RR REF TRANS t1 t2 H.
-  (* apply eutt_flip in H. *)
   unfold refine_OOM_h.
-
   pose proof @interp_prop_Proper_eq.
   unfold Proper, respectful in H0.
 
-  eapply H0; eauto.
-  { apply eutt_flip. eauto. }
-
-  apply interp_prop_refl; eauto.
-  - intros X [e | [e | e]]; cbn; reflexivity.
-  - apply oom_k_spec_correct_trigger.
+  eapply H0; eauto. apply eutt_flip; eauto.
+  apply refine_OOM_h_reflexive; auto.
 Qed.
 
 Lemma refine_oom_h_raise_oom :
@@ -328,25 +327,17 @@ Proof.
   unfold refine_OOM_h.
 
   unfold raiseOOM.
-  eapply interp_prop_eutt_Proper. 1: typeclasses eauto.
-  rewrite bind_trigger. reflexivity. reflexivity.
+  eapply interp_prop_eutt_Proper.
+  rewrite bind_trigger. reflexivity.
+  reflexivity.
 
   red.
   pstep.
   econstructor.
 
   (* Instantiate ta *)
-  unshelve (instantiate (1:=_)).
-  exact (source;; trigger (ThrowOOM "")).
-  - cbn.
-    unfold OOM_handler.
-    auto.
-  - cbn.
-    intros a H.
-    destruct a.
-    Unshelve.
-    intros [].
-  - cbn; auto.
+  apply eqit_Vis; intros. inv u.
+  Unshelve. intro. inv H.
 Qed.
 
 #[global] Instance refine_OOM_h_eutt_Proper {T : Type} {RR : relation T} {E F}:
@@ -355,120 +346,12 @@ Proof.
   unfold Proper, respectful.
   intros x y XY z w ZW.
   split; intros REF; subst.
-  - unfold refine_OOM_h in *.
+  - unfold refine_OOM_h, refine_OOM_h_flip in *.
     rewrite ZW in REF.
     rewrite XY in REF.
     auto.
-  - unfold refine_OOM_h in *.
+  - unfold refine_OOM_h, refine_OOM_h_flip in *.
     rewrite <- ZW in REF.
     rewrite <- XY in REF.
     auto.
 Qed.
-
-
-(* Instance Transitive_refine_OOM_h {E F T} {RR} : Transitive (@refine_OOM_h E F T RR). *)
-(* Proof. *)
-(*   unfold Transitive. *)
-(*   intros x y z XY YZ. *)
-
-(*   epose proof interp_prop_Proper3. *)
-(*   epose proof interp_prop_Proper2. *)
-(*   epose proof interp_prop_Proper. *)
-(*   unfold Proper, respectful in *. *)
-
-
-(*   pose proof (itree_eta x) as Ix. *)
-(*   pose proof (itree_eta y) as Iy. *)
-(*   pose proof (itree_eta z) as Iz. *)
-
-(*   unfold refine_OOM_h in *. *)
-(*   eapply H. *)
-(*   3: eapply XY. *)
-(*   all:eauto. *)
-
-
-(*   destruct (observe z) eqn:Hz. *)
-(*   - pstep. red. *)
-
-(*     destruct (observe y) eqn:Hy. *)
-(*     + unfold refine_OOM_h in *. *)
-
-(*       assert (y = ret r1) by admit. *)
-(*       rewrite H in YZ. *)
-(*       rewrite H in XY. *)
-(*       clear H. *)
-
-(*       assert (z = ret r0) by admit. *)
-(*       rewrite H in YZ. *)
-(*       clear H. *)
-
-(*       apply interp_prop_ret_inv in XY as (rx & RRx & REST). *)
-(*       unfold flip in RRx. *)
-
-(*       apply  *)
-(*       replace y with (ret r1) in YZ. *)
-(*       rewrite Ix in XY. *)
-
-
-(*        to *)
-
-(*       unfold interp_prop in *. *)
-(*   epose proof interp_prop_Proper. *)
-(*   unfold Proper, respectful in H. *)
-(*   generalize dependent x. *)
-(*   generalize depy, z. *)
-(*   pcofix  *)
-(*   unfold Basics.flip, Basics.impl in H. *)
-(*   eapply H. *)
-(*   admit. *)
-(*   admit. *)
-(* Qed. *)
-
-(* Instance Transitive_refine_OOM_h {E F T} {RR} : Transitive (@refine_OOM_h E F T RR). *)
-(* Proof. *)
-(*   unfold Transitive. *)
-(*   Require Import Paco.paco. *)
-
-(*   pcofix CIH. *)
-(*   intros x y z XY YZ. *)
-
-(*   pose proof (itree_eta x) as Ix. *)
-(*   pose proof (itree_eta y) as Iy. *)
-(*   pose proof (itree_eta z) as Iz. *)
-
-(*   destruct (observe z) eqn:Hz. *)
-(*   - pstep. red. *)
-
-(*     destruct (observe y) eqn:Hy. *)
-(*     + unfold refine_OOM_h in *. *)
-
-(*       assert (y = ret r1) by admit. *)
-(*       rewrite H in YZ. *)
-(*       rewrite H in XY. *)
-(*       clear H. *)
-
-(*       assert (z = ret r0) by admit. *)
-(*       rewrite H in YZ. *)
-(*       clear H. *)
-
-(*       apply interp_prop_ret_inv in XY as (rx & RRx & REST). *)
-(*       unfold flip in RRx. *)
-
-(*       apply  *)
-(*       replace y with (ret r1) in YZ. *)
-(*       rewrite Ix in XY. *)
-
-
-(*        to *)
-
-(*       unfold interp_prop in *. *)
-(*   epose proof interp_prop_Proper. *)
-(*   unfold Proper, respectful in H. *)
-(*   generalize dependent x. *)
-(*   generalize depy, z. *)
-(*   pcofix  *)
-(*   unfold Basics.flip, Basics.impl in H. *)
-(*   eapply H. *)
-(*   admit. *)
-(*   admit. *)
-(* Qed. *)
