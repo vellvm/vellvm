@@ -844,7 +844,6 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     rewrite refine_inf_fin_x; auto.
   Qed.
 
-
   Lemma refine_E1E2_L6_transitive :
     forall ti1 ti2 tf1 tf2,
       TLR_INF.R.refine_L6 ti1 ti2 ->
@@ -857,6 +856,27 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     eapply refine_E1E2_L6_compose_fin_to_inf; eauto.
     eapply refine_E1E2_L6_compose_inf_to_fin; eauto.
   Qed.
+
+  From Vellvm Require Import Tactics.
+
+  From ITree Require Import
+        ITree
+        Basics.Monad
+        Events.StateFacts
+        Eq.Eq.
+
+  Import TranslateFacts.
+  Import TopLevelBigIntptr.
+  Import TopLevel64BitIntptr.
+  Import InterpreterStackBigIntptr.
+
+  Ltac force_rewrite H :=
+    let HB := fresh "HB" in
+    pose proof @H as HB; eapply bisimulation_is_eq in HB; rewrite HB; clear HB.
+
+  Tactic Notation "force_rewrite" constr(H) "in" hyp(H') :=
+    let HB := fresh "HB" in
+    pose proof @H as HB; eapply bisimulation_is_eq in HB; rewrite HB in H'; clear HB.
 
   (* TODO: move this *)
   Lemma model_E1E2_L6_sound :
@@ -884,61 +904,93 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
          with the events converted, and the resulting uvalue converted.
        *)
       induction p.
-      unfold model, model_gen in *.
-      (* cbn in m_fin. *)
-      (* red in m_fin. *)
-      (* rewrite bind_bind in m_fin. *)
-      (* setoid_rewrite bind_ret_l in m_fin. *)
-      (* + unfold TopLevelBigIntptr.model, TopLevelBigIntptr.model_gen. *)
-      (*   From Vellvm Require Import Tactics. *)
-      (*   exists (LLVMEvents.raise *)
-      (*        ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") "")). *)
-      (*   set (raise := (LLVMEvents.raise *)
-      (*             ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") ""))). *)
+      + unfold model, model_gen in *.
+        cbn in m_fin.
+        red in m_fin.
+        cbn in *.
 
-      (*   From ITree Require Import *)
-      (*        ITree *)
-      (*        Basics.Monad *)
-      (*        Events.StateFacts *)
-      (*        Eq.Eq. *)
+        repeat (force_rewrite @bind_bind in m_fin;
+        repeat force_rewrite @bind_ret_l in m_fin).
+        force_rewrite @translate_ret in m_fin.
+        force_rewrite @bind_ret_l in m_fin.
+        force_rewrite @bind_trigger in m_fin.
 
-      (*   unfold model in m_fin. *)
-      (*   unfold model_gen in m_fin. *)
-      (*   cbn in m_fin. *)
-      (*   unfold interp_mcfg5 in m_fin. *)
-    (*     repeat rewrite bind_ret_l in m_fin. *)
-    (*     Import TranslateFacts. *)
-    (*     rewrite translate_ret in m_fin. *)
-    (*     repeat rewrite bind_ret_l in m_fin. *)
+        unfold TopLevelBigIntptr.model, TopLevelBigIntptr.model_gen.
+        exists (LLVMEvents.raise
+             ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") "")).
+        set (raise := (LLVMEvents.raise
+                  ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") ""))).
 
+        unfold model in m_fin.
+        unfold model_gen in m_fin.
+        cbn in m_fin.
+        unfold interp_mcfg5 in m_fin.
+        split; eauto.
+        left.
+        cbn.
+        unfold InterpreterStackBigIntptr.interp_mcfg5.
+        unfold model_undef.
 
-    (*     split. *)
-    (*     left. *)
-    (*     cbn. *)
-    (*     unfold InterpreterStackBigIntptr.interp_mcfg5. *)
-    (*     MCFGTheoryBigIntptr.MCFGTactics.go. *)
-    (*     unfold LLVMEvents.raise. *)
-    (*     MCFGTheoryBigIntptr.MCFGTactics.go. *)
-    (*     rewrite InterpreterStackBigIntptr.LLVM.MEMORY_ITREE_THEORY.interp_memory_trigger. *)
-    (*     cbn. *)
-    (*     MCFGTheoryBigIntptr.MCFGTactics.go. *)
-    (*     rewrite bind_trigger. *)
-    (*     MCFGTheoryBigIntptr.MCFGTactics.go. *)
+        exists (LLVMEvents.raise
+             ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") "")).
+        split.
+        * unfold MEM.MEM_SPEC_INTERP.interp_memory_prop.
+          rewrite interp_intrinsics_bind, interp_global_bind, interp_local_stack_bind.
+          rewrite interp_intrinsics_bind, interp_global_bind, interp_local_stack_bind.
+          rewrite bind_bind.
+          rewrite bind_ret_l.
+          rewrite interp_intrinsics_ret, interp_global_ret, interp_local_stack_ret.
+          rewrite bind_ret_l.
+          rewrite bind_bind.
+          repeat rewrite bind_ret_l.
+          rewrite translate_ret.
+          rewrite interp_intrinsics_ret, interp_global_ret, interp_local_stack_ret.
+          repeat rewrite bind_ret_l.
+          rewrite bind_trigger.
+          rewrite interp_intrinsics_vis. cbn.
+          rewrite bind_trigger.
+          rewrite interp_global_vis; cbn.
+          unfold LLVMEvents.raise.
+          rewrite bind_trigger. rewrite bind_vis.
+          rewrite interp_local_stack_vis. cbn.
+          rewrite bind_bind, bind_trigger.
+          setoid_rewrite bind_ret_l; cbn.
+          pstep; eapply Interp_PropT_Vis.
+          -- intros; inv a.
+          -- unfold MEM.MEM_SPEC_INTERP.interp_memory_prop_h.
+             unfold case_, Case_sum1, case_sum1, subevent, resum, ReSum_inr, cat, resum,
+               Cat_IFun, inr_, Inr_sum1, ReSum_id, id_, Id_IFun.
+             unfold MEM.MEM_SPEC_INTERP.F_trigger; cbn.
+             setoid_rewrite bind_trigger. eexists _, _.
+             setoid_rewrite Raise.raise_map_itree.
+             unfold LLVMEvents.raise.
+             rewrite bind_trigger. unfold subevent.
+             unfold resum, ReSum_inr.
+             unfold case_, Case_sum1, case_sum1, subevent, resum, ReSum_inr, cat, resum,
+               Cat_IFun, inr_, Inr_sum1, ReSum_id, id_, Id_IFun.
+             Unshelve. 5 : typeclasses eauto.
+             unfold case_, Case_sum1, case_sum1, subevent, resum, ReSum_inr, cat, resum,
+               Cat_IFun, inr_, Inr_sum1, ReSum_id, id_, Id_IFun.
+             eapply eqit_Vis. intros. inv u. intros; contradiction.
+             all : shelve.
+          -- rewrite map_bind. rewrite bind_trigger. unfold LLVMEvents.raise.
+             rewrite bind_trigger. setoid_rewrite bind_vis.
+             eapply eqit_Vis; intros; inv u.
+        * red.
+          unfold raise, LLVMEvents.raise.
+          do 2 rewrite bind_trigger.
+          pstep; eapply Interp_PropT_Vis.
+          -- intros; inv a.
+          -- unfold case_, Case_sum1, case_sum1, subevent, resum, ReSum_inr, cat, resum,
+               Cat_IFun, inr_, Inr_sum1, ReSum_id, id_, Id_IFun, F_trigger_prop.
+             setoid_rewrite bind_ret_r. reflexivity.
+          -- unfold trigger. setoid_rewrite bind_vis.
+             eapply eqit_Vis; intros; inv u.
+      + red in m_fin. unfold model_gen in m_fin.
+        unfold denote_vellvm in m_fin.
+        red in m_fin. admit.
 
-    (*     match goal with *)
-    (*     | H: _ |-  InterpreterStackBigIntptr.LLVM.Pick.model_undef eq ?t _ => *)
-    (*         assert (t ≈ LLVMEvents.raise ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") "")) as Ht *)
-    (*     end. *)
-    (*     admit. *)
-
-    (*     rewrite Ht. *)
-    (*     unfold InterpreterStackBigIntptr.LLVM.Pick.model_undef. *)
-    (*     subst raise. *)
-    (*     admit. *)
-    (*     reflexivity. *)
-    (*   + admit. *)
-    (* - apply eutt_refine_oom_h; try typeclasses eauto. *)
-    (*   admit. *)
+    - apply eutt_refine_oom_h; try typeclasses eauto.
   Abort.
 
 End InfiniteToFinite.
