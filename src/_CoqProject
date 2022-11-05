@@ -3,12 +3,10 @@
 -I ../lib/QuickChick/plugin
 -R ../lib/QuickChick/src QuickChick
 -R ../lib/flocq-quickchick FlocqQuickChick
-./coq/Handlers/MemoryHelpers.v
 ./coq/Handlers/Global.v
 ./coq/Handlers/Intrinsics.v
 ./coq/Handlers/Local.v
 ./coq/Handlers/UndefinedBehaviour.v
-./coq/Handlers/SplitLCMemory.v
 ./coq/Handlers/Handlers.v
 ./coq/Handlers/MemPropT.v
 ./coq/Handlers/MemoryModel.v

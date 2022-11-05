@@ -22,8 +22,7 @@ From Vellvm Require Import
      Semantics.Memory.MemBytes
      Semantics.MemoryParams
      Semantics.LLVMEvents
-     Semantics.LLVMParams
-     Handlers.MemoryHelpers.
+     Semantics.LLVMParams.
 
 From ExtLib Require Import
      Structures.Monads

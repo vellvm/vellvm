@@ -9,17 +9,323 @@ files. At a high level the important aspects of the code for the memory model co
 
 ** Important Files
 
-- [[file:src/coq/Handlers/MemoryModel.v::From Vellvm.Syntax Require Import][src/coq/Handlers/MemoryModel.v]]
+Memory model files:
+
+- [[file:src/coq/Handlers/MemoryModel.v]]
+- [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v]]
+- [[file:src/coq/Handlers/MemoryModules/FiniteSpecPrimitives.v]]
+- [[file:src/coq/Handlers/MemoryModelImplementation.v]]
+
+Extra memory model files (mostly module types for interfaces used in the implementation):
+
+- [[file:src/coq/Semantics/MemoryAddress.v]]
+  + Contains module types for addresses, provenance, and integer / pointer casting.
+- [[file:src/coq/Semantics/Memory/Overlaps.v]]
+  + Notion of addresses overlapping in memory.
+- [[file:src/coq/Semantics/Memory/Sizeof.v]]
+  + Size of datatypes in bytes.
+
+Serialization files:
+
+- [[file:src/coq/Handlers/MemoryModel.v::Program Fixpoint serialize_sbytes][serialize_sbytes within src/coq/Handlers/MemoryModel.v]]
+  + Implementation of serializing LLVM values (~uvalue~) to symbolic bytes.
+- [[file:src/coq/Semantics/Memory/MemBytes.v]]
+  + Symbolic byte modules.
+
+Concretization files:
+
+- [[file:src/coq/Handlers/Concretization.v]]
+- [[file:src/coq/Handlers/Pick.v]]
 
 *** Other Relevant Files
 
-- DynamicValues.v
+- [[file:src/coq/Semantics/DynamicValues.v]]
+  + Definition of LLVM values
+- [[file:src/coq/Semantics/LLVMEvents.v]]
+  + Definition of LLVM events for ~itrees~.
 
-** Memory Specification
+** Important Top Level Lemmas
 
-There is a specification for memory models in [[file:src/coq/Handlers/MemoryModel.v::From Vellvm.Syntax Require
- Import][src/coq/Handlers/MemoryModel.v]]. Any implementation of an LLVM memory
-model must abide by this specification.
+*** Regarding the correctness of the executable interpreter with respect to the specification
+
+The top level correctness of the executable interpreter with respect
+to the specification of LLVM is much the same as in the previous
+vellvm paper. We interpret several layers of events, and there is a
+refinement relationship between each layer. The primary difference
+between the previous vellvm release is the layers of interpretation
+are slightly different.
+
+Since the memory model now contains a substantial amount of
+non-determinism (for instance in addresses, since where a block is
+allocated is non-deterministic), interpreting memory events with in
+the specification now brings us into ~PropT~, so [[file:src/coq/Theory/Refinement.v::Definition refine_L3 : relation (itree L3 (MemState * (store_id * (local_env * stack * (global_env * dvalue)))) -> Prop)][refine_L3]] is a
+relation on sets of itrees, instead of just a relation between itrees
+themselves.
+
+The most interesting addition to the refinements between these layers
+of interpretation is [[file:src/coq/Theory/Refinement.v::Definition refine_L6 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)][refine_L6]] which relates programs where
+out-of-memory events have been handled. Essentially a behaviour is a
+refinement of another if they agree with respect to ~eutt~ up until
+the point where the refined program runs out of memory. [[Out of Memory Refinement][More
+information is found in this section]].
+
+[[Handling of Undefined Behaviour][Additionally we handle UB slightly differently.]] UB now allows for
+time-travel to better reflect the semantics of UB within LLVM, and
+allow for more optimizations.
+
+**** interpreter_sound
+
+The [[file:src/coq/Theory/TopLevelRefinements.v::Theorem interpreter_sound: forall p,][interpreter_sound]] lemma is the top-level theorem which states that
+the [[file:src/coq/Semantics/TopLevel.v::Definition interpreter][executable interpreter]] abides by our [[file:src/coq/Semantics/TopLevel.v::Definition model := model_gen (DTYPE_I 32%N) "main" main_args.][model (specification) of
+LLVM]].
+
+#+begin_src coq
+  Theorem interpreter_sound: forall p, model p (interpreter p).
+#+end_src
+
+This theorem depends largely on the [[file:src/coq/Theory/TopLevelRefinements.v::Lemma refine_UB][refine_UB]] and [[file:src/coq/Theory/TopLevelRefinements.v::Lemma refine_undef][refine_undef]] lemmas:
+
+#+begin_src coq
+  Lemma refine_undef
+    : forall (E F:Type -> Type) T TT (HR: Reflexive TT)  `{UBE -< F} `{FailureE -< F} `{OOME -< F}
+        (xs : PropT _ T),
+    forall x, xs x -> model_undef TT xs (@exec_undef E F _ _ _ _ x).
+
+  Lemma refine_UB
+    : forall (E F G : Type -> Type) T
+        (xs : PropT (E +' F +' UBE +' G) T) x,
+      xs x ->
+      model_UB xs x.
+#+end_src
+
+[[file:src/coq/Theory/TopLevelRefinements.v::Lemma refine_undef][refine_undef]] is used for the soundness of the executable [[file:src/coq/Semantics/LLVMEvents.v::Variant PickE {X Y} {Post : X -> Y -> Prop} : Type -> Type :=][PickE]]
+handlers, and [[file:src/coq/Theory/TopLevelRefinements.v::Lemma refine_UB][refine_UB]] is used for the soundness of the executable
+undefined behavior handlers. In the case of UB, the executable handler
+just leaves UB events uninterpreted so that they can be raised as an
+error in the executable.
+
+*** Regarding the conversion from infinite to finite memory models
+
+At a high level we need a relation between programs in the infinite
+memory version of LLVM, and the finite memory version of LLVM. All of
+this is contained within [[file:src/coq/Semantics/InfiniteToFinite.v]]
+and there are [[Refinement Relations between Memory Model
+Instances][some more notes on this file here.]]
+
+**** model_E1E2_L6_sound
+
+An important lemma is [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma model_E1E2_L6_sound :][model_E1E2_L6_sound]]:
+
+#+begin_src coq
+  Lemma model_E1E2_L6_sound :
+    forall (p : list
+             (LLVMAst.toplevel_entity
+                LLVMAst.typ
+                (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))),
+      model_E1E2_L6 p p.
+#+end_src
+
+This lemma specifies that when any program ~p~ is interpreted in the finite
+memory model, we get a refinement of the behaviors of the program when
+it's interpreted in the infinite memory model. This depends on these definitions as well:
+
+#+begin_src coq
+  Definition refine_E1E2_L6 (srcs : PropT IS1.LP.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop
+    := refine_L6 (L4_convert_PropT res_L4_convert_unsafe srcs) tgts.
+
+  Definition model_E1E2_L6
+    (p1 p2 : list
+               (LLVMAst.toplevel_entity
+                  LLVMAst.typ
+                  (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
+    : Prop :=
+    refine_E1E2_L6 (LLVM1.model p1) (LLVM2.model p2).
+
+#+end_src
+
+Where [[file:src/coq/Theory/Refinement.v::Definition refine_L6 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)][~refine_L6~]] is the refinement relation in our interpreter stack that handles out-of-memory events.
+
+#+begin_src coq
+  Definition refine_L6 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)
+    := fun ts ts' =>
+         forall t', ts' t' ->
+               exists t, ts t /\ refine_OOM_h refine_res3 t t'.
+#+end_src
+
+[[file:src/coq/Theory/Refinement.v::Definition refine_L6 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)][refine_L6]] guarantees to that the behaviors of the finite memory
+program are contained within the set of behaviors in the infinite
+memory program, while allowing the finite memory programs to run out
+of memory at any point, instead of continuing execution.
+
+[[file:src/coq/Semantics/InfiniteToFinite.v::Definition refine_E1E2_L6 (srcs : PropT IS1.LP.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop][refine_E1E2_L6]] is essentially just [[file:src/coq/Theory/Refinement.v::Definition refine_L6 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)][refine_L6]], but it performs a
+conversion between the event types of the source and target
+~itrees~. The finite and infinite versions of the LLVM specification
+have slightly different event structures because the events reference
+the LLVM values, and the address and intptr values differ between the
+infinite and finite versions.
+
+**** refine_E1E2_L6_transitive
+
+The other big important lemma is a transitivity relation between the
+refinements of programs at the infinite level and refinements between
+programs at the finite level [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma refine_E1E2_L6_transitive :][refine_E1E2_L6_transitive]]:
+
+#+begin_src coq
+  Lemma refine_E1E2_L6_transitive :
+    forall ti1 ti2 tf1 tf2,
+      TLR_INF.R.refine_L6 ti1 ti2 ->
+      refine_E1E2_L6 ti2 tf1 ->
+      TLR_FIN.R.refine_L6 tf1 tf2 ->
+      refine_E1E2_L6 ti1 tf2.
+#+end_src
+
+This states that if the infinite program ~ti2~ refines ~ti1~, and if
+the finite program ~tf1~ is a refinement (across the infinite to
+finite boundary) of ~ti2~, and if ~tf2~ is a refinement of ~tf1~, then
+we know that ~ti1~ is refined across the infinite to finite boundary
+by ~tf2~.
+
+More concretely, if we optimize an infinite LLVM program ~p1~ to an
+infinite LLVM program ~p2~, and if we lower that infinite program ~p2~
+to a finite program ~f1~, and then finally perform some optimizations
+in finite LLVM on ~f1~ to get ~f2~, then we can conclude that ~f2~ is
+indeed a refinement of our original program ~p1~.
+
+**** TODO Diagram would probably help.
+
+
+*** Regarding the examples of specific program transformations
+
+We have verified that certain program transformations which are
+difficult to reconcile within a single memory model can be performed
+correctly. These examples lie in
+[[file:src/coq/Theory/OOMRefinementExamples.v]], which is broken up into
+an [[file:src/coq/Theory/OOMRefinementExamples.v::Module Infinite.][Infinite]] and a [[file:src/coq/Theory/OOMRefinementExamples.v::Module Finite.][Finite]] module which correspond to proofs within the
+infinite version of LLVM and finite version respectively.
+
+**** Removing dead allocations
+
+Within the infinite language it is possible to remove dead allocations
+from the program (this is not possible in the finite language because
+removing an allocation can introduce new behaviors to the program if
+it causes the program to no longer run out of memory in all cases). We
+have two examples of proofs demonstrating that we can remove
+allocations in the infinite memory model, while preserving the
+semantics of the program.
+
+- [[file:src/coq/Theory/OOMRefinementExamples.v::Lemma remove_alloc:][remove_alloc]]
+- [[file:src/coq/Theory/OOMRefinementExamples.v::Lemma remove_alloc_block :][remove_alloc_block]]
+
+The first, [[file:src/coq/Theory/OOMRefinementExamples.v::Lemma remove_alloc:][remove_alloc]], is a slightly simpler example, showing that
+if we have an itree with an unused ~Alloca~ event, then we can simply
+remove it and get a refinement according to [[file:src/coq/Theory/Refinement.v::Definition refine_L6 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)][refine_L6]] (see [[Refinement Relations][Refinement
+Relations]]).
+
+#+begin_src coq
+  Definition t_alloc : itree L0 dvalue
+    := trigger (Alloca (DTYPE_I 64%N) 1%N None);; ret (DVALUE_I1 one).
+
+  Definition t_ret : itree L0 dvalue
+    := ret (DVALUE_I1 one).
+
+  Lemma remove_alloc:
+    forall genv lenv stack sid m,
+      refine_L6 (interp_mcfg4 eq eq t_alloc genv (lenv, stack) sid m) (interp_mcfg4 eq eq t_ret genv (lenv, stack) sid m).
+#+end_src
+
+The [[file:src/coq/Theory/OOMRefinementExamples.v::Lemma remove_alloc_block :][remove_alloc_block]] lemma flexes slightly more of our stack, as we
+prove a refinement between actual LLVM programs (defined using the AST
+constructors in our development).
+
+#+begin_src coq
+  (* Allocation program *)
+  Definition alloc_code : code dtyp :=
+    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) [])
+    ].
+
+  Definition alloc_block : block dtyp :=
+    {|
+      blk_id := Name "";
+      blk_phis := [];
+      blk_code := alloc_code;
+      blk_term := TERM_Ret (DTYPE_I 1%N, EXP_Bool true);
+      blk_comments := None;
+    |}.
+
+  Definition alloc_tree : itree instr_E dvalue :=
+    denote_program alloc_block.
+
+  (* Simple return program *)
+  Definition ret_code : code dtyp :=
+    [].
+
+  Definition ret_block : block dtyp :=
+    {|
+      blk_id := Name "";
+      blk_phis := [];
+      blk_code := ret_code;
+      blk_term := TERM_Ret (DTYPE_I 1%N, EXP_Bool true);
+      blk_comments := None;
+    |}.
+
+  Definition ret_tree : itree instr_E dvalue :=
+    denote_program ret_block.
+
+  (* Refinement *)
+  Lemma remove_alloc_block :
+    forall genv lenv stack sid m,
+      refine_L6 (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ alloc_tree) genv (lenv, stack) sid m) (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m).
+#+end_src
+
+***** TODO What lemmas does this depend on?
+
+- allocate_dtyp_spec_can_always_succeed
+  + Probably most important
+- interp_mcfg4_ret_inv
+- interp_prop_ret_pure
+- model_undef_h_ret_pure
+
+**** Removing pointer to integer casts and allocations
+
+In the infinite language it is also possible to remove pointer to
+integer casts, as they are essentially noops.
+
+- [[file:src/coq/Theory/OOMRefinementExamples.v::Lemma remove_alloc_ptoi_block :][remove_alloc_ptoi_block]]
+
+  #+begin_src coq
+    Definition ptoi_code : code dtyp :=
+      [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) []);
+        (IId (Name "i"), INSTR_Op (OP_Conversion Ptrtoint DTYPE_Pointer (EXP_Ident (ID_Local (Name "ptr"))) (DTYPE_IPTR)))
+      ].
+
+    Definition ptoi_block : block dtyp :=
+      {|
+        blk_id := Name "";
+        blk_phis := [];
+        blk_code := ptoi_code;
+        blk_term := TERM_Ret (DTYPE_I 1%N, EXP_Bool true);
+        blk_comments := None;
+      |}.
+
+    Definition ptoi_tree : itree instr_E dvalue :=
+      denote_program ptoi_block.
+
+    Lemma remove_alloc_ptoi_block :
+      forall genv lenv stack sid m,
+        refine_L6 (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ptoi_tree) genv (lenv, stack) sid m) (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m).
+  #+end_src
+
+**** Adding allocations
+
+- [[file:src/coq/Theory/OOMRefinementExamples.v::Lemma add_alloc :][add_alloc]]
+- [[file:src/coq/Theory/OOMRefinementExamples.v::Add allocation in the finite language][add_alloc in finite language]]
+
+** The Memory Model Itself
+*** Memory Specification
+
+There is a specification for memory models in
+[[file:src/coq/Handlers/MemoryModel.v]]. Any implementation of an LLVM
+memory model must abide by this specification.
 
 The specification is broken up into two modules:
 
@@ -83,10 +389,16 @@ symbolic values in memory, as well as allocations of types:
 
 These specifications are what's ultimately used to [[file:src/coq/Handlers/MemoryModel.v::Definition handle_memory_prop : MemoryE ~> MemPropT MemState][handle memory events]] in our propositional model of LLVM.
 
-** Executable Memory Model
+**** Implementation
 
-The interface to the executable memory model is contained in [[file:src/coq/Handlers/MemoryModel.v::From Vellvm.Syntax Require
- Import][src/coq/Handlers/MemoryModel.v]] in two files, just like the
+An implementation of [[file:src/coq/Handlers/MemoryModel.v::Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).][MemoryModelSpecPrimitives]] is available as [[file:src/coq/Handlers/MemoryModules/FiniteSpecPrimitives.v::Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) <: MemoryModelSpecPrimitives LP
+ MP.][FiniteMemoryModelSpecPrimitives]].  This module represents the state of
+memory is an ~IntMap~ of ~mem_bytes~, which are just symbolic bytes
+paired with an allocation id for keeping track of provenance.
+
+*** Executable Memory Model
+
+The interface to the executable memory model is contained in [[file:src/coq/Handlers/MemoryModel.v]] in two modules, just like the
 specification.
 
 - [[file:src/coq/Handlers/MemoryModel.v::Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).][MemoryModelExecPrimitives]]
@@ -109,8 +421,166 @@ implements aggregate operations (such as reads / writes of abstract
 LLVM values, instead of just individual bytes), and also provides
 handlers for memory events for the executable interpreter of LLVM.
 
-** other things to talk about
+**** Implementation
 
-- MonadStoreId
-- MonadProvenance
-- Memory events?
+An implementation of [[file:src/coq/Handlers/MemoryModel.v::Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).][MemoryModelExecPrimitives]] is available as [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) <: MemoryModelExecPrimitives LP
+ MP.][FiniteMemoryModelExecPrimitives]]. This module implements executable
+versions of raw byte-wise operations, and provides proofs of their
+correctness.
+
+*** Packaging up the memory model
+
+The [[file:src/coq/Handlers/MemoryModelImplementation.v]] file takes the
+implementation of the memory model primitive modules, and builds a
+full memory model from them.
+
+** Byte serialization
+
+The LLVM [[file:src/coq/Semantics/DynamicValues.v::Inductive uvalue : Type :=][uvalues]] are turned into symbolic bytes in a fairly
+straightforward fashion in [[file:src/coq/Handlers/MemoryModel.v::Program Fixpoint serialize_sbytes][serialize_sbytes within
+src/coq/Handlers/MemoryModel.v]]. Each symbolic byte is represented as
+an byte-index into a ~uvalue~. Some care is taken to make sure that
+bytes have a store id associated with them. LLVM values, represented
+by [[file:src/coq/Semantics/DynamicValues.v::Inductive uvalue : Type :=][uvalues]] in our implementation, can have non-determinism in the form
+of ~undef~. This non-determinism is preserved as much as possible
+within LLVM and is only collapsed when necessary. This includes
+preserving non-determinism when loading and storing from memory. Each
+byte within a ~uvalue~ is entangled when stored in memory. For
+instance, if a value is constructed like:
+
+#+begin_src llvm
+%x = select i1 undef, i32 0xFFFFFFFF, i32 0x00000000
+#+end_src
+
+Then when ~%x~ is stored in memory and loaded back the bits should all
+be ~1~ or all be ~0~, but they should not be allowed to vary
+independently. The ~store_id~ associated with each symbolic byte lets
+us keep track of which bytes are entangled like this, so that when we
+convert the symbolic bytes back into ~uvalues~ with [[file:src/coq/Handlers/MemoryModel.v::Program Fixpoint deserialize_sbytes (bytes : list SByte) (dt : dtyp) {measure (dtyp_measure dt)} : err uvalue][deserialize_sbytes]]
+on a load from memory the appropriate amount of non-determinism is
+preserved.
+
+** Concretization
+
+LLVM has non-deterministic values that result from uninitialized
+memory, represented by ~undef~. Eventually a choice must be made for
+these values in order to execute a program. This is done through [[file:src/coq/Semantics/LLVMEvents.v::Variant PickE {X Y} {Post : X -> Y -> Prop} : Type -> Type :=][PickE]]
+events. These events are handled in [[file:src/coq/Handlers/Pick.v]]. There are two versions of the pick handler:
+
+- [[file:src/coq/Handlers/Pick.v::Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F}][model_undef]] for the LLVM spec
+- [[file:src/coq/Handlers/Pick.v::Definition exec_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :][exec_undef]] for the executable LLVM interpreter
+
+[[file:src/coq/Handlers/Pick.v::Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F}][model_undef]] is used in the specification, and represents a
+non-deterministic choice, yielding a set of ~itree~ computations,
+where each ~itree~ in the set is the result of a different choice.
+
+[[file:src/coq/Handlers/Pick.v::Definition exec_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :][exec_undef]] is used by the executable interpreter, and instead picks a
+particular value for the computation. Currently this just picks a
+default value for each instance of ~undef~ depending on the type of
+the ~undef~ value in an expression.
+
+** Other Memory Model Odds and Ends
+
+- [[file:src/coq/Handlers/MemPropT.v::Class MonadStoreId (M : Type -> Type) : Type :=][MonadStoreId]]
+  + Interface used to get a fresh store id.
+- [[file:src/coq/Semantics/MemoryAddress.v::Class MonadProvenance (Provenance : Type) (M : Type -> Type) : Type :=][MonadProvenance]]
+  + Interface used to get a fresh provenance for a new allocation.
+- [[file:src/coq/Semantics/LLVMEvents.v::Variant MemoryE : Type -> Type :=][MemoryE]]
+  + The events that an LLVM program can trigger to interact with
+    memory.
+  + These are handled for the spec by [[file:src/coq/Handlers/MemoryModel.v::Definition handle_memory_prop : MemoryE ~> MemPropT MemState][handle_memory_prop]]
+  + Handled for the executable interpreter by [[file:src/coq/Handlers/MemoryModel.v::Definition handle_memory `{MemMonad ExtraState MemM (itree Eff)} : MemoryE ~> MemM][handle_memory]]
+
+** Refinement Relations
+
+The LLVM specification and executable interpreter are both implemented
+with several "layers", with each type of abstract event being handled
+in its own layer. There is a refinement relation between programs at
+each of these layers, starting with [[file:src/coq/Theory/Refinement.v::Definition refine_L0: relation (itree L0 dvalue) := eutt eq.][refine_L0 in
+src/coq/Theory/Refinement.v]].
+
+- refine_L0: Equivalence relation before interpreting any events, this is just ~eutt~.
+- refine_L1: After interpreting global variable events, ~eutt~, but ignoring the final global variable state.
+- refine_L2: After local variable events, ~eutt~ ignoring local variable state.
+- refine_L3: After ~MemoryE~ events.
+- refine_L4: After ~PickeE~ events for nondeterministic values.
+- refine_L5: Relationship between programs taking undefined behaviour into account.
+- refine_L6: Relationship between programs taking out-of-memory events into account.
+
+*** Out of Memory Refinement
+
+[[file:src/coq/Theory/Refinement.v::Definition refine_L6 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)][refine_L6]] relies upon the [[file:src/coq/Handlers/OOM.v::Definition refine_OOM {T} (RR : relation T) (sources : PropT Effout T) (target : itree Effout T) : Prop][refine_OOM]] relation found in [[file:src/coq/Handlers/OOM.v::Definition refine_OOM {T} (RR : relation T) (sources : PropT Effout T) (target : itree Effout T) :
+ Prop][src/coq/Handlers/OOM.v]].
+
+The bulk of this definition is here:
+
+#+begin_src coq
+  Definition OOM_handler : OOME ~> PropT Effout
+    (* Any tree is accepted as long as OOM is raised *)
+    := fun T oome source => True.
+
+  Definition refine_OOM_handler : Effin ~> PropT Effout
+    := case_ E_trigger_model_prop (case_ OOM_handler F_trigger_model_prop).
+
+  Definition refine_OOM_h {T} (RR : relation T) (source target : itree Effout T) : Proph
+    := interp_prop (Basics.flip RR) refine_OOM_handler (@oom_k_spec) target source.
+
+  Definition refine_OOM {T} (RR : relation T) (sources : PropT Effout T) (target : itree Effout T) : Prop
+    := exists source, sources source /\ refine_OOM_h RR source target.
+#+end_src
+
+At a high level, if we have two programs ~A~ and ~B~, we want to say
+that ~B~ is an out-of-memory refinement of ~A~ if ~B~ is ~eutt~
+program ~A~ up to the point where ~B~ runs out of memory. I.e., ~A~
+and ~B~ are equivalent, except ~B~ may raise ~OOM~ at any point
+instead of continuing to compute.
+
+With [[file:src/coq/Handlers/OOM.v::Definition refine_OOM {T} (RR : relation T) (sources : PropT Effout T) (target : itree Effout T) : Prop][refine_OOM]] we have a set of behaviours for our source program
+(because there's non-determinism introduced by ~undef~ values and UB),
+and we say that a ~target~ behaviour is a refinement of this set of
+behaviours, if there exists an ~itree~ (~source~) in the set of source
+behaviours such that ~source~ is equivalent to the ~target~ up to the
+point where the target may raise ~OOM~.
+
+*** Refinement Relations between Memory Model Instances
+
+Each instance of LLVM interpreters and specs is a module which is
+instantiated with a module for the memory model. Our approach involves
+two-phases of compilation, starting with a version of LLVM with
+infinite memory, and converting this to a version of LLVM with finite
+memory. This lowering can be found in the file [[file:src/coq/Semantics/InfiniteToFinite.v]].
+
+One of the complications is that our LLVM values, [[file:src/coq/Semantics/DynamicValues.v::Inductive dvalue : Set :=][~dvalue~]] and [[file:src/coq/Semantics/DynamicValues.v::Inductive uvalue : Type
+ :=][~uvalue~]], contain addresses, and therefor depend on the memory
+model. As ~dvalues~ and ~uvalues~ are part of the event types, for
+instance [[file:src/coq/Semantics/LLVMEvents.v::Variant MemoryE : Type -> Type :=][here]], we have to convert infinite LLVM events into finite
+LLVM events. This is implemented in the [[file:src/coq/Semantics/InfiniteToFinite.v::Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (AC2 : AddrConvert LP2.ADDR LP1.ADDR) (E1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (E2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF).][EventConvert]] module.
+
+The refinement relation between infinite and finite memory models can
+be found in the [[file:src/coq/Semantics/InfiniteToFinite.v::Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack64BitIntptr FinAddrConvert FinAddrConvert TopLevelBigIntptr TopLevel64BitIntptr TopLevelRefinements64BitIntptr.][InfiniteToFinite]] module, with the main lemmas being [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma refine_E1E2_L6_transitive
+ :][refine_E1E2_L6_transitive]] and [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma model_E1E2_L6_sound :][model_E1E2_L6_sound]].
+
+** Handling of Undefined Behaviour
+
+We handle UB events using [[file:src/coq/Handlers/UndefinedBehaviour.v::Definition model_UB {T} (ts : PropT Eff T) : PropT Eff T:=][model_UB in UndefinedBehaviour.v]].
+
+#+begin_src coq
+  Definition model_UB {T} (ts : PropT Eff T) : PropT Eff T:=
+    fun t =>
+      ts t \/ (exists ub, ts ub /\ contains_UB ub).
+
+#+end_src
+
+Given a set of ~itrees~, ~ts~, we say that a target ~itree~, ~t~ is
+contained within the set of behaviours ~ts~ whenever ~t~ is in ~ts~,
+or if there exists a trace ~ub~ in ~ts~ that [[file:src/coq/Theory/ContainsUB.v::Inductive contains_UB {R} : itree Eff R -> Prop :=][contains_UB]]. The [[file:src/coq/Theory/ContainsUB.v::Inductive contains_UB {R} : itree Eff R -> Prop
+ :=][contains_UB]] predicate within [[file:src/coq/Theory/ContainsUB.v::Inductive contains_UB {R} : itree Eff R -> Prop :=][src/coq/Theory/ContainsUB.v]] holds
+whenever the ~itree~ contains an undefined behaviour event.
+
+#+begin_src coq
+  Inductive contains_UB {R} : itree Eff R -> Prop :=
+  | CrawlTau  : forall t1 t2, t2 ≅ Tau t1 -> contains_UB t1 -> contains_UB t2
+  | CrawlVis1 : forall Y (e : (E +' F) Y) x k t2, t2 ≅ (vis e k) -> contains_UB (k x) -> contains_UB t2
+  | CrawlVis2 : forall Y (e : G Y) x k t2, t2 ≅ (vis e k) -> contains_UB (k x) -> contains_UB t2
+  | FindUB    : forall s k t2, t2 ≅ (vis (subevent _ (ThrowUB s)) k) -> contains_UB t2.
+#+end_src
