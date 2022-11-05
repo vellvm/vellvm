@@ -201,13 +201,16 @@ Module DVConvertMake (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1
 
 End DVConvertMake.
 
+Notation LLVM_syntax :=
+  (list (LLVMAst.toplevel_entity
+              LLVMAst.typ
+              (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))).
+
 Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (AC2 : AddrConvert LP2.ADDR LP1.ADDR) (E1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (E2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF).
   (* TODO: should this be a parameter? *)
   Module DVC := DVConvertMake LP1 LP2 AC E1 E2.
   Module DVCrev := DVConvertMake LP2 LP1 AC2 E2 E1.
   Import DVC.
-
-
 
   Definition L4_convert : Handler E1.L4 E2.L4.
     refine (fun A e => _).
@@ -247,69 +250,10 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
     apply (raise_error "").
   Defined.
 
-  Definition L5_convert : Handler E1.L5 E2.L5.
-    refine (fun A e => _).
+  Definition L5_convert : Handler E1.L5 E2.L5 := L4_convert.
 
-    refine (match e with
-            | inl1 (E1.ExternalCall dt f args) =>
-                _
-            | inr1 (inl1 e0) =>
-                raise_oom ""
-            | inr1 (inr1 (inl1 e0)) =>
-                _
-            | inr1 (inr1 (inr1 e0)) =>
-                _
-            end).
+  Definition L6_convert : Handler E1.L6 E2.L6 := L4_convert.
 
-    (* External Calls *)
-    refine (f' <- lift_OOM (uvalue_convert f);;
-            args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
-            dv <- trigger (E2.ExternalCall dt f' args');;
-            _).
-
-    inversion e0.
-    apply (lift_OOM (DVCrev.dvalue_convert dv)).
-
-    (* DebugE *)
-    inversion e0.
-    apply (debug H).
-
-    (* FailureE *)
-    inversion e0.
-    apply (raise_error "").
-  Defined.
-
-  Definition L6_convert : Handler E1.L6 E2.L6.
-    refine (fun A e => _).
-
-    refine (match e with
-            | inl1 (E1.ExternalCall dt f args) =>
-                _
-            | inr1 (inl1 e0) =>
-                raise_oom ""
-            | inr1 (inr1 (inl1 e0)) =>
-                _
-            | inr1 (inr1 (inr1 e0)) =>
-                _
-            end).
-
-    (* External Calls *)
-    refine (f' <- lift_OOM (uvalue_convert f);;
-            args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
-            dv <- trigger (E2.ExternalCall dt f' args');;
-            _).
-
-    inversion e0.
-    apply (lift_OOM (DVCrev.dvalue_convert dv)).
-
-    (* DebugE *)
-    inversion e0.
-    apply (debug H).
-
-    (* FailureE *)
-    inversion e0.
-    apply (raise_error "").
-  Defined.
 End EventConvert.
 
 Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2).
@@ -321,6 +265,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Import EC.DVC.
 
   (* TODO: move this? *)
+  (* Converts infinite to finite versions of events within same layer *)
   Definition L4_convert_tree {T} (t : itree E1.L4 T) : itree E2.L4 T := interp L4_convert t.
   Definition L5_convert_tree {T} (t : itree E1.L5 T) : itree E2.L5 T := interp L5_convert t.
   Definition L6_convert_tree {T} (t : itree E1.L6 T) : itree E2.L6 T := interp L6_convert t.
@@ -330,35 +275,33 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Import TLR.
   Import TLR.R.
 
-  Definition L4_convert_PropT {A B} (f : A -> OOM B) (ts : PropT IS1.LP.Events.L4 A) : PropT E2.L4 B
+  Definition L6_convert_PropT {A B} (f : A -> OOM B) (ts : PropT IS1.LP.Events.L6 A) : PropT E2.L6 B
     := fun t_e2 => exists t_e1,
-           ts t_e1 /\ t_e2 = L4_convert_tree (uv <- t_e1;; lift_OOM (f uv)).
+           ts t_e1 /\ t_e2 = L6_convert_tree (uv <- t_e1;; lift_OOM (f uv)).
 
   (* Ideally we would convert memstates / local envs / local stacks /
      global envs... But for now we can get away with placeholders for
      these because the refine_res3 relation used by refine_L6 ignores
      these.
    *)
-  Definition res_L4_convert_unsafe (res : LLVM1.res_L4) : OOM LLVM2.res_L4
+  (* Take the resulting dvalue from the interpreted layer and throw an OOM-error
+   if we run out of memory. *)
+  Definition res_L6_convert_unsafe (res : LLVM1.res_L4) : OOM LLVM2.res_L6
     := match res with
        | (ms, (sid, ((lenv, lstack), (genv, dv)))) =>
            dv' <- dvalue_convert dv;;
            ret (MMEP.MMSP.initial_memory_state, (0, (([], []), ([], dv'))))
        end.
 
-  Definition refine_E1E2_L6 (srcs : PropT IS1.LP.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop
+  Definition refine_E1E2_L6 (srcs : PropT IS1.LP.Events.L6 LLVM1.res_L6) (tgts : PropT E2.L4 LLVM2.res_L6) : Prop
     :=
     (* res_L4_convert_unsafe should be fine here because refine_L6
        ignores all of the placeholder values *)
-    refine_L6 (L4_convert_PropT res_L4_convert_unsafe srcs) tgts.
+    refine_L6 (L6_convert_PropT res_L6_convert_unsafe srcs) tgts.
 
-  (* TODO: not sure about name... *)
-  Definition model_E1E2_L6
-             (p1 p2 : list
-                        (LLVMAst.toplevel_entity
-                           LLVMAst.typ
-                           (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
-    : Prop :=
+  (*  After fully interpreting LLVM syntax into an L6 program (using [LLVM*.model]),
+     The infinite interpretation of [p1] is refined by the finite interpretation of [p2]. *)
+  Definition model_E1E2_L6 (p1 p2 : LLVM_syntax) : Prop :=
     refine_E1E2_L6 (LLVM1.model p1) (LLVM2.model p2).
 
 End LangRefine.
@@ -785,16 +728,16 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     specialize (YZ_FIN rz TZ).
     destruct YZ_FIN as (ry_fin & TY_FIN & YZ).
 
-    unfold L4_convert_PropT in TY_FIN.
+    unfold L6_convert_PropT in TY_FIN.
     destruct TY_FIN as (ry_inf & TY_INF & ry_fin_inf).
 
     specialize (XY_INF ry_inf TY_INF).
     destruct XY_INF as (rx_inf & TX_INF & XY_INF).
 
-    set (rx_fin := L4_convert_tree (uv <- rx_inf;; lift_OOM (res_L4_convert_unsafe uv))).
+    set (rx_fin := L4_convert_tree (uv <- rx_inf;; lift_OOM (res_L6_convert_unsafe uv))).
     exists rx_fin.
     split.
-    - unfold L4_convert_PropT.
+    - unfold L6_convert_PropT.
       exists rx_inf; split; auto.
     - rewrite <- YZ.
       subst ry_fin.
@@ -844,7 +787,7 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     rewrite refine_inf_fin_x; auto.
   Qed.
 
-  Lemma refine_E1E2_L6_transitive :
+  Theorem refine_E1E2_L6_transitive :
     forall ti1 ti2 tf1 tf2,
       TLR_INF.R.refine_L6 ti1 ti2 ->
       refine_E1E2_L6 ti2 tf1 ->
@@ -869,6 +812,7 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
   Import TopLevelBigIntptr.
   Import TopLevel64BitIntptr.
   Import InterpreterStackBigIntptr.
+  Import TopLevelRefinements64BitIntptr.
 
   Ltac force_rewrite H :=
     let HB := fresh "HB" in
@@ -878,22 +822,27 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     let HB := fresh "HB" in
     pose proof @H as HB; eapply bisimulation_is_eq in HB; rewrite HB in H'; clear HB.
 
-  (* TODO: move this *)
-  Lemma model_E1E2_L6_sound :
-    forall (p : list
-             (LLVMAst.toplevel_entity
-                LLVMAst.typ
-                (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))),
+  (* Notation "t' ∈ p" := (model p t') (at level 50). *)
+
+  Theorem model_E1E2_L6_sound :
+    forall (p : LLVM_syntax),
       model_E1E2_L6 p p.
   Proof.
     intros p.
     unfold model_E1E2_L6.
-    intros t' m_fin.
-    exists (L4_convert_tree
-    (uv <-
-     LLVMEvents.raise
-       ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") "");;
-     lift_OOM (res_L4_convert_unsafe uv))).
+    unfold refine_E1E2_L6.
+
+    intros fin_t m_fin.
+
+    (* Show existence of infinite t *)
+    unfold refine_L6. (* change L4 to L6 *)
+
+    unfold model, model_gen in m_fin.
+    repeat red in m_fin.
+    unfold L6_convert_PropT.
+    unfold model in m_fin.
+    destruct m_fin.
+
     split.
     - unfold L4_convert_PropT.
       (* t_e1 is a tree in the model of the program in the infinite
@@ -988,9 +937,10 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
              eapply eqit_Vis; intros; inv u.
       + red in m_fin. unfold model_gen in m_fin.
         unfold denote_vellvm in m_fin.
-        red in m_fin. admit.
+        destruct m_fin; admit.
 
     - apply eutt_refine_oom_h; try typeclasses eauto.
+
   Abort.
 
 End InfiniteToFinite.
