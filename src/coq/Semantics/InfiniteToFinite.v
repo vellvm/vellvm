@@ -34,7 +34,7 @@ From ITree Require Import
      ITree
      Basics
      Basics.HeterogeneousRelations
-     Eq.Eq.
+     Eq.Eq Eq.EqAxiom.
 
 Require Import Coq.Program.Equality.
 
@@ -392,13 +392,13 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
   Proof.
     intros T.
 
-    unfold refine_OOM_h, L4_convert_tree.
+    unfold refine_OOM_h, L4_convert_tree, refine_OOM_h_flip.
     intros.
     rewrite (unfold_interp y_inf).
     rewrite (unfold_interp x_inf).
 
     match goal with
-    | |- interp_prop _ _ _ ?l ?r => remember l as i; remember r as i0
+    | |- interp_prop _ _ ?l ?r => remember l as i; remember r as i0
     end.
 
     assert (i ≅ _interp EC.L4_convert (observe y_inf)). {
@@ -458,12 +458,23 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
       specialize (IHinterp_PropTF _ _ H1 H2).
 
       punfold IHinterp_PropTF.
-    - pstep. cbn in H1, H2.
+    - pstep. apply bisimulation_is_eq in HT1.
+      rewrite HT1 in H1. cbn in H1.
+      setoid_rewrite bind_trigger in H1.
+      setoid_rewrite bind_vis in H1.
+      apply bisimulation_is_eq in H1. rewrite H1.
+      econstructor; eauto.
+      eapply eqit_Vis; intros; inv u.
+    - pstep. cbn in H2, H3. red in H.
+      rewrite H in H0.
+      rename H2 into H1.
+      rename H3 into H2.
+
       rewrite itree_eta in H1, H2.
-      red in KS.
       repeat destruct e; cbn in *.
       + rewrite bind_bind in H1.
-        unfold lift_OOM in H1. red in HTA. subst. rewrite bind_trigger in KS.
+        unfold lift_OOM in H1.
+        rename H0 into KS. rewrite bind_trigger in KS.
         cbn in *.
         destruct (EC.DVC.uvalue_convert f) eqn : Hf.
         { rewrite bind_ret_l, bind_bind in H1.
@@ -479,68 +490,69 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
             setoid_rewrite Heqi.
             destruct H1 as (?&?&?).
             dependent destruction x.
-            red in H, H0. rewrite H.
-            econstructor; [ constructor | ..]; cycle 1.
-            Unshelve.
-            3 : exact (fun u0 : E2.DV.dvalue =>
-            ITree.bind match EC.DVCrev.dvalue_convert u0 with
-                       | NoOom a0 => ret a0
-                       | Oom s => raise_oom s
-                       end (fun x1 : E1.DV.dvalue => Tau (interp EC.L4_convert (k2 x1)))).
-            - cbn. rewrite bind_trigger.
+            red in H, H0.
+            econstructor; [ constructor | ..]; eauto; cycle 1.
+            - red; reflexivity.
+            - cbn in *.
+              rewrite <- unfold_interp in H2.
               rewrite <- itree_eta in H2.
-              rewrite H2. rewrite <- unfold_interp.
-              rewrite KS.
-              rewrite interp_vis.
-              cbn.
-              rewrite bind_bind. unfold lift_OOM. rewrite Hf, Hm.
+              rewrite H2. rewrite KS. rewrite interp_vis. cbn.
+              rewrite bind_bind. unfold lift_OOM.
+              rewrite Hf. setoid_rewrite bind_ret_l.
+              setoid_rewrite bind_bind. rewrite Hm.
               setoid_rewrite bind_ret_l.
-              rewrite bind_bind.
-              setoid_rewrite bind_ret_l.
-              rewrite bind_bind.
-              rewrite bind_trigger.
-              apply eqit_Vis.
-              intros.
-              apply eqit_bind. reflexivity.
-              intro; subst.
-              reflexivity.
-            - intros.
-              specialize (H0 a). cbn.
-              destruct (EC.DVCrev.dvalue_convert a) eqn: Ht.
-              + right. eapply CIH with (y_inf := Tau (k1 d)) (x_inf := Tau (k2 d)); cycle 1.
-                * rewrite H0. rewrite bind_ret_l.
-                  rewrite <- unfold_interp. rewrite interp_tau; reflexivity.
-                * rewrite bind_ret_l.
-                  rewrite <- unfold_interp. rewrite interp_tau; reflexivity.
-                * pstep. constructor. apply HK.
-                  eapply Returns_uvalue_convert_L1_L2; eauto.
-              + setoid_rewrite bind_trigger in H0.
-                rewrite bind_vis in H0.
-                left. pstep.
-                match goal with
-                | [ H: eqit eq false false ?l ?r |- _ ] => assert (l ≅ r) by eauto; clear H
-                end.
+              setoid_rewrite bind_bind.
+              setoid_rewrite bind_trigger.
+              unfold subevent. rewrite H0.
+              eapply eqit_Vis. intros.
+              Unshelve.
+              3 : exact (fun u0 : E2.DV.dvalue =>
+              ITree.bind match EC.DVCrev.dvalue_convert u0 with
+                        | NoOom a0 => ret a0
+                        | Oom s => raise_oom s
+                         end (fun x1 : E1.DV.dvalue => Tau (interp EC.L4_convert (k2 x1)))).
+              reflexivity. intros. inv H.
+            - cbn. red in H1. subst.
+              eapply bisimulation_is_eq in H1. rewrite H1.
 
-                rewrite (itree_eta (k a)) in H3.
-                destruct (observe (k a)) eqn: Heqk;
-                  try apply eqit_inv in H3; cbn in H3; try contradiction; auto.
-                destruct H3 as (?&?&?).
-                dependent destruction x.
-                red in H0, H3. red. setoid_rewrite Heqk.
-                rewrite H0.
-                econstructor; eauto.
-                repeat red. auto. intros. inv a0.
-                constructor. }
+              destruct (EC.DVCrev.dvalue_convert a) eqn: Ht.
+              + setoid_rewrite H in HK. subst.
+                eapply Returns_uvalue_convert_L1_L2 in H3; eauto.
+                specialize (HK _ H3). pclearbot.
+                pose proof @bind_ret_l as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ.
+                pose proof @bind_ret_l as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ.
+                pstep; constructor; eauto. right; eauto.
+                eapply CIH; try rewrite <- unfold_interp; try reflexivity.
+                eapply HK.
+              + setoid_rewrite H in HK. subst.
+                unfold raiseOOM.
+                pose proof @bind_bind as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ.
+                pose proof @bind_trigger as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ.
+                pose proof @bind_bind as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ.
+                pose proof @bind_trigger as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ.
+                pstep; econstructor; eauto. unfold subevent.
+                reflexivity. }
           { unfold raiseOOM in H1. rewrite bind_trigger in H1.
             red. destruct (observe i) eqn: Heqi;
               try apply eqit_inv in H1; cbn in H1; try contradiction; auto.
             setoid_rewrite Heqi.
             destruct H1 as (?&?&?).
             dependent destruction x.
-            red in H, H0. rewrite H.
+            red in H, H0.
+            (* rewrite H1. *)
             econstructor; eauto.
-            intros. constructor. intros. inv a.
-            constructor. } }
+            - intros. inv a.
+            - red; reflexivity.
+            - cbn in *. rewrite <- itree_eta in H2.
+              rewrite H2. rewrite <- unfold_interp.
+              rewrite KS. rewrite interp_vis. cbn.
+              rewrite bind_bind. unfold lift_OOM.
+              rewrite Hf. setoid_rewrite bind_ret_l.
+              setoid_rewrite bind_bind. rewrite Hm.
+              setoid_rewrite bind_trigger.
+              setoid_rewrite bind_vis.
+              unfold subevent. rewrite H0.
+              eapply eqit_Vis. intros. inv u0. } }
 
           unfold raiseOOM in H1. rewrite bind_trigger in H1.
           red. destruct (observe i) eqn: Heqi;
@@ -548,13 +560,20 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
           setoid_rewrite Heqi.
           destruct H1 as (?&?&?).
           dependent destruction x.
-          red in H, H0. rewrite H.
+          red in H, H0. cbn in *.
           econstructor; eauto.
-          intros. constructor. intros. inv a.
-          constructor.
+        * intros. inv a.
+        * red; reflexivity.
+        * rewrite <- itree_eta in H2. rewrite H2.
+          rewrite <- unfold_interp. rewrite KS.
+          rewrite interp_vis.
+          cbn. rewrite bind_bind. unfold lift_OOM. rewrite Hf.
+          setoid_rewrite bind_trigger.
+          setoid_rewrite bind_vis.
+          unfold subevent. rewrite H0.
+          eapply eqit_Vis. intros. inv u.
       + destruct s.
-        * clear HTA.
-          unfold raiseOOM in H1. rewrite bind_bind, bind_trigger in H1.
+        * unfold raiseOOM in H1. rewrite bind_bind, bind_trigger in H1.
           rewrite itree_eta in H1, H2.
           red.
           destruct (observe i) eqn: Heqi;
@@ -562,9 +581,16 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
           setoid_rewrite Heqi.
           destruct H1 as (?&?&?).
           dependent destruction x.
-          red in H, H0. rewrite H.
+          red in H, H0. cbn in *.
           econstructor; eauto.
-          intros. inv a.
+          -- intros. inv a.
+          -- red; reflexivity.
+          -- rewrite <- itree_eta in H2. rewrite H2.
+             rewrite <- unfold_interp. rewrite H0.
+             rewrite bind_trigger.
+             rewrite interp_vis. cbn. do 2 setoid_rewrite bind_trigger.
+             rewrite bind_vis. subst.
+             apply eqit_Vis; intros; inv u.
         * destruct s; try destruct u; cbn in H1.
           -- repeat red in HTA.
               unfold raiseUB in H1. rewrite bind_trigger in H1.
@@ -574,27 +600,22 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
               setoid_rewrite Heqi.
               destruct H1 as (?&?&?).
               dependent destruction x.
-              red in H, H0. rewrite H.
+              red in H, H0.
               econstructor; eauto.
-              repeat red. reflexivity.
-              intros. inv a.
-
-              cbn.
+              repeat red. intros. inv a.
+              red; reflexivity.
               setoid_rewrite <- itree_eta in H2. rewrite H2.
-              rewrite bind_trigger.
-              rewrite HTA in KS.
-              rewrite bind_trigger in KS.
               rewrite <- unfold_interp.
-              rewrite KS. rewrite interp_vis.
+              rewrite H0. rewrite bind_trigger.
+              rewrite interp_vis.
               cbn.
-              setoid_rewrite bind_trigger. rewrite bind_vis. eapply eqit_Vis.
+              setoid_rewrite bind_trigger. rewrite bind_vis. cbn in *; subst. eapply eqit_Vis.
               intros. inv u.
           -- destruct s; try destruct u; cbn in H1.
              ++ destruct d. cbn in H1.
-                repeat red in HTA.
-                rewrite HTA in KS.
                 rewrite <- unfold_interp in H2.
 
+                rename H0 into KS.
                 setoid_rewrite bind_trigger in H1.
                 setoid_rewrite bind_trigger in KS.
 
@@ -604,29 +625,28 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
                 setoid_rewrite Heqi.
                 destruct H1 as (?&?&?).
                 dependent destruction x.
-                red in H, H0. rewrite H.
+                red in H, H0. subst. 
+                assert (Returns tt ta).
+                { rewrite H. unfold trigger. eapply ReturnsVis; eauto.
+                  unfold subevent. reflexivity.
+                  constructor; reflexivity. }
+                specialize (HK _ H0). pclearbot.
                 econstructor; eauto.
-                ** repeat red. reflexivity.
-                ** intros. right. eapply CIH with (y_inf := Tau (k1 a)) (x_inf := k2 a); cycle 1.
-                   --- rewrite <- unfold_interp.
-                       rewrite interp_tau; eauto.
-                   --- setoid_rewrite <- unfold_interp at 2; eauto. Unshelve.
-                       13 : exact (fun x => interp EC.L4_convert (k2 x)).
-                       reflexivity. all : shelve.
-                   --- rewrite HTA in HK.
-                       specialize (HK tt).
-                       pstep; constructor; auto.
-                       match goal with
-                       | [ H : Returns ?t ?l -> _ |- _ ] => assert (Returns t l)
-                       end.
-                       { eapply ReturnsVis.
-                         unfold trigger. reflexivity.
-                         cbn. constructor; eauto. reflexivity. }
-                       specialize (HK H3). pclearbot.
-                       destruct a; auto. punfold HK; apply HK.
-                ** cbn. rewrite <- itree_eta in H2; rewrite H2. rewrite KS.
-                   rewrite bind_trigger, interp_vis; cbn; setoid_rewrite bind_trigger.
-                   eapply eqit_Vis. intros; rewrite tau_eutt; reflexivity.
+                ** intros. red in H1. specialize (H1 tt).
+                   eapply bisimulation_is_eq in H1. destruct a.
+                   rewrite H1.
+                   right; eapply CIH.
+                   2 : { rewrite <- interp_tau, <- unfold_interp. reflexivity. }
+                   pstep; econstructor; eauto. punfold HK.
+                   rewrite <- unfold_interp. Unshelve.
+                   16 : exact (fun x => interp EC.L4_convert (k2 x)). reflexivity.
+                   all : shelve.
+                ** red; reflexivity.
+                ** rewrite <- itree_eta in H2.
+                   rewrite H2. rewrite KS.
+                   rewrite interp_vis. cbn. unfold debug.
+                   do 2 rewrite bind_trigger. unfold subevent, resum, ReSum_inr.
+                   eapply eqit_Vis. intros. rewrite tau_eutt. reflexivity.
              ++ repeat red in HTA.
                 destruct f. cbn in H1. setoid_rewrite bind_trigger in H1.
                 red.
@@ -635,27 +655,20 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
                 setoid_rewrite Heqi.
                 destruct H1 as (?&?&?).
                 dependent destruction x.
-                red in H, H0. rewrite H.
+                red in H, H0. cbn in *; subst.
                 econstructor; eauto.
-                repeat red. reflexivity.
                 intros. inv a.
-
-                cbn.
+                red; reflexivity.
                 setoid_rewrite <- itree_eta in H2. rewrite H2.
-                rewrite bind_trigger.
-                rewrite HTA in KS.
-                rewrite bind_trigger in KS.
                 rewrite <- unfold_interp.
-                rewrite KS. rewrite interp_vis.
-                cbn.
-                setoid_rewrite bind_trigger. rewrite bind_vis. eapply eqit_Vis.
-                intros. inv u.
+                rewrite H0. cbn. rewrite interp_bind.
+                rewrite interp_trigger. cbn. unfold LLVMEvents.raise.
+                do 2 rewrite bind_trigger. rewrite bind_vis.
+                apply eqit_Vis; intros; inv u.
 
                 Unshelve.
                 all : eauto.
-                1 : exact (bind (trigger e0) (fun x => match x:void return _ with end)).
-                1-3 : exact (bind (trigger e) (fun x => match x:void return _ with end)).
-                1, 2 : inv x.
+                all : inv x.
   Qed.
 
   Lemma refine_OOM_h_bind :
@@ -668,9 +681,9 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
 
     unfold refine_OOM_h.
     intros.
-    eapply interp_prop_clo_bind; eauto.
-    typeclasses eauto.
-  Qed.
+    (* eapply interp_prop_clo_bind; eauto. *)
+    (* typeclasses eauto. *)
+  Admitted.
 
   (* If
 
