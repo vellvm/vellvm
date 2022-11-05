@@ -277,7 +277,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Definition L6_convert_PropT {A B} (f : A -> OOM B) (ts : PropT IS1.LP.Events.L6 A) : PropT E2.L6 B
     := fun t_e2 => exists t_e1,
-           ts t_e1 /\ t_e2 = L6_convert_tree (uv <- t_e1;; lift_OOM (f uv)).
+           ts t_e1 /\ t_e2 ≈ L6_convert_tree (uv <- t_e1;; lift_OOM (f uv)).
 
   (* Ideally we would convert memstates / local envs / local stacks /
      global envs... But for now we can get away with placeholders for
@@ -739,8 +739,9 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     split.
     - unfold L6_convert_PropT.
       exists rx_inf; split; auto.
+      reflexivity.
     - rewrite <- YZ.
-      subst ry_fin.
+      rewrite ry_fin_inf.
       subst rx_fin.
 
       (* There's probably a more general lemma hiding here *)
@@ -822,8 +823,6 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     let HB := fresh "HB" in
     pose proof @H as HB; eapply bisimulation_is_eq in HB; rewrite HB in H'; clear HB.
 
-  (* Notation "t' ∈ p" := (model p t') (at level 50). *)
-
   Theorem model_E1E2_L6_sound :
     forall (p : LLVM_syntax),
       model_E1E2_L6 p p.
@@ -833,114 +832,14 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     unfold refine_E1E2_L6.
 
     intros fin_t m_fin.
+    exists fin_t.
+    split ; [ | reflexivity ].
 
-    (* Show existence of infinite t *)
-    unfold refine_L6. (* change L4 to L6 *)
+    (* m_fin: fin_t ∈ ⟦ p ⟧ *)
 
-    unfold model, model_gen in m_fin.
-    repeat red in m_fin.
     unfold L6_convert_PropT.
-    unfold model in m_fin.
-    destruct m_fin.
 
-    split.
-    - unfold L4_convert_PropT.
-      (* t_e1 is a tree in the model of the program in the infinite
-         semantics, and t_e1 "agrees" with the behavior (t') in the
-         finite semantics.
-
-         "Agrees" in this context means that t' is equivalent to t_e1
-         with the events converted, and the resulting uvalue converted.
-       *)
-      induction p.
-      + unfold model, model_gen in *.
-        cbn in m_fin.
-        red in m_fin.
-        cbn in *.
-
-        repeat (force_rewrite @bind_bind in m_fin;
-        repeat force_rewrite @bind_ret_l in m_fin).
-        force_rewrite @translate_ret in m_fin.
-        force_rewrite @bind_ret_l in m_fin.
-        force_rewrite @bind_trigger in m_fin.
-
-        unfold TopLevelBigIntptr.model, TopLevelBigIntptr.model_gen.
-        exists (LLVMEvents.raise
-             ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") "")).
-        set (raise := (LLVMEvents.raise
-                  ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") ""))).
-
-        unfold model in m_fin.
-        unfold model_gen in m_fin.
-        cbn in m_fin.
-        unfold interp_mcfg5 in m_fin.
-        split; eauto.
-        left.
-        cbn.
-        unfold InterpreterStackBigIntptr.interp_mcfg5.
-        unfold model_undef.
-
-        exists (LLVMEvents.raise
-             ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") "")).
-        split.
-        * unfold MEM.MEM_SPEC_INTERP.interp_memory_prop.
-          rewrite interp_intrinsics_bind, interp_global_bind, interp_local_stack_bind.
-          rewrite interp_intrinsics_bind, interp_global_bind, interp_local_stack_bind.
-          rewrite bind_bind.
-          rewrite bind_ret_l.
-          rewrite interp_intrinsics_ret, interp_global_ret, interp_local_stack_ret.
-          rewrite bind_ret_l.
-          rewrite bind_bind.
-          repeat rewrite bind_ret_l.
-          rewrite translate_ret.
-          rewrite interp_intrinsics_ret, interp_global_ret, interp_local_stack_ret.
-          repeat rewrite bind_ret_l.
-          rewrite bind_trigger.
-          rewrite interp_intrinsics_vis. cbn.
-          rewrite bind_trigger.
-          rewrite interp_global_vis; cbn.
-          unfold LLVMEvents.raise.
-          rewrite bind_trigger. rewrite bind_vis.
-          rewrite interp_local_stack_vis. cbn.
-          rewrite bind_bind, bind_trigger.
-          setoid_rewrite bind_ret_l; cbn.
-          pstep; eapply Interp_PropT_Vis.
-          -- intros; inv a.
-          -- unfold MEM.MEM_SPEC_INTERP.interp_memory_prop_h.
-             unfold case_, Case_sum1, case_sum1, subevent, resum, ReSum_inr, cat, resum,
-               Cat_IFun, inr_, Inr_sum1, ReSum_id, id_, Id_IFun.
-             unfold MEM.MEM_SPEC_INTERP.F_trigger; cbn.
-             setoid_rewrite bind_trigger. eexists _, _.
-             setoid_rewrite Raise.raise_map_itree.
-             unfold LLVMEvents.raise.
-             rewrite bind_trigger. unfold subevent.
-             unfold resum, ReSum_inr.
-             unfold case_, Case_sum1, case_sum1, subevent, resum, ReSum_inr, cat, resum,
-               Cat_IFun, inr_, Inr_sum1, ReSum_id, id_, Id_IFun.
-             Unshelve. 5 : typeclasses eauto.
-             unfold case_, Case_sum1, case_sum1, subevent, resum, ReSum_inr, cat, resum,
-               Cat_IFun, inr_, Inr_sum1, ReSum_id, id_, Id_IFun.
-             eapply eqit_Vis. intros. inv u. intros; contradiction.
-             all : shelve.
-          -- rewrite map_bind. rewrite bind_trigger. unfold LLVMEvents.raise.
-             rewrite bind_trigger. setoid_rewrite bind_vis.
-             eapply eqit_Vis; intros; inv u.
-        * red.
-          unfold raise, LLVMEvents.raise.
-          do 2 rewrite bind_trigger.
-          pstep; eapply Interp_PropT_Vis.
-          -- intros; inv a.
-          -- unfold case_, Case_sum1, case_sum1, subevent, resum, ReSum_inr, cat, resum,
-               Cat_IFun, inr_, Inr_sum1, ReSum_id, id_, Id_IFun, F_trigger_prop.
-             setoid_rewrite bind_ret_r. reflexivity.
-          -- unfold trigger. setoid_rewrite bind_vis.
-             eapply eqit_Vis; intros; inv u.
-      + red in m_fin. unfold model_gen in m_fin.
-        unfold denote_vellvm in m_fin.
-        destruct m_fin; admit.
-
-    - apply eutt_refine_oom_h; try typeclasses eauto.
-
+    (* [OOM] is left uninterpreted in [model] *)
   Abort.
 
 End InfiniteToFinite.

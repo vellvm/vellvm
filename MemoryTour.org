@@ -166,12 +166,12 @@ infinite and finite versions.
 
 **** refine_E1E2_L6_transitive
 
-The other big important lemma is a transitivity relation between the
+The other big important theorem is a transitivity relation between the
 refinements of programs at the infinite level and refinements between
 programs at the finite level [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma refine_E1E2_L6_transitive :][refine_E1E2_L6_transitive]]:
 
 #+begin_src coq
-  Lemma refine_E1E2_L6_transitive :
+  Theorem refine_E1E2_L6_transitive :
     forall ti1 ti2 tf1 tf2,
       TLR_INF.R.refine_L6 ti1 ti2 ->
       refine_E1E2_L6 ti2 tf1 ->
