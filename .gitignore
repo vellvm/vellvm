@@ -47,3 +47,4 @@ src/coq/.lia.cache
 CoqMakefile
 .CoqMakefile.d
 CoqMakefile.conf
+.#*
