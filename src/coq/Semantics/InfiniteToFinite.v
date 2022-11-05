@@ -679,11 +679,60 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
   Proof.
     intros T R E F.
 
-    unfold refine_OOM_h.
-    intros.
-    (* eapply interp_prop_clo_bind; eauto. *)
-    (* typeclasses eauto. *)
-  Admitted.
+    unfold refine_OOM_h, refine_OOM_h_flip.
+    intros t1 t2 RR1 RR2.
+
+    unfold bind, Monad_itree.
+    revert t1 t2. pcofix CIH.
+    intros t1 t2 k HK EQT.
+    punfold EQT.
+    red in EQT.
+
+    assert (a <- t1 ;; k a =
+              match observe t1 with
+              | RetF r => k r
+              | TauF t0 => Tau (ITree.bind t0 k)
+              | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k)
+              end).
+    { apply bisimulation_is_eq; setoid_rewrite unfold_bind; reflexivity. }
+    setoid_rewrite H; clear H.
+
+    assert (a <- t2 ;; k a =
+              match observe t2 with
+              | RetF r => k r
+              | TauF t0 => Tau (ITree.bind t0 k)
+              | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k)
+              end).
+    { apply bisimulation_is_eq; setoid_rewrite unfold_bind; reflexivity. }
+    setoid_rewrite H; clear H.
+
+    pstep.
+    induction EQT; eauto; pclearbot.
+    - specialize (HK _ _ REL).
+      punfold HK.
+      eapply interp_PropTF_mono. eapply HK.
+      intros. pclearbot. left.
+      eapply paco2_mon; eauto.
+      intros; contradiction.
+    - constructor. right.
+      eapply CIH; eauto.
+    - econstructor; auto.
+    - econstructor; auto.
+    - eapply Interp_PropT_Vis_OOM with (e := e).
+      punfold HT1; red in HT1. remember (observe (vis e k1)).
+      hinduction HT1 before k; intros; inv Heqi; try inv CHECK.
+      dependent destruction H1. unfold subevent.
+      eapply eqit_Vis.
+      Unshelve.
+      intros. cbn.
+      eapply eq_itree_clo_bind; pclearbot; eauto. intros; subst; reflexivity.
+    - eapply Interp_PropT_Vis; eauto.
+      intros; eauto. right. eapply CIH; eauto.
+      specialize (HK0 _ H1). pclearbot. eapply HK0; eauto.
+      rewrite <- unfold_bind.
+      setoid_rewrite <- Eq.bind_bind.
+      eapply eutt_clo_bind; eauto. intros; eauto. subst; reflexivity.
+  Qed.
 
   (* If
 
@@ -733,29 +782,29 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     split.
     - unfold L4_convert_PropT.
       exists rx_inf; split; auto.
-    (* - rewrite <- YZ. *)
-    (*   subst ry_fin. *)
-    (*   subst rx_fin. *)
+    - rewrite <- YZ.
+      subst ry_fin.
+      subst rx_fin.
 
-    (*   (* There's probably a more general lemma hiding here *) *)
-    (*   unfold L4_convert_tree. *)
+      (* There's probably a more general lemma hiding here *)
+      unfold L4_convert_tree.
 
-    (*   Unset Universe Checking. *)
-    (*   apply refine_OOM_h_L4_convert_tree. *)
-    (*   eapply refine_OOM_h_bind; eauto. *)
+      Unset Universe Checking.
+      apply refine_OOM_h_L4_convert_tree.
+      eapply refine_OOM_h_bind; eauto.
 
-    (*   intros r1 r2 H. *)
-    (*   unfold TLR_INF.R.refine_res3, TLR_INF.R.refine_res2, TLR_INF.R.refine_res1 in H. *)
-    (*   destruct r1 as [r1a [r1sid [[r1b1 r1b2] [r1c dv1]]]]. *)
-    (*   destruct r2 as [r2a [r2sid [[r2b1 r2b2] [r2c dv2]]]]. *)
-    (*   inversion H; subst. *)
-    (*   inversion H5; subst. *)
-    (*   inversion H7; subst. *)
-    (*   inversion H9; subst. *)
-    (*   inversion H9; subst. *)
-    (*   cbn. *)
-      (*   reflexivity. *)
-  Abort.
+      intros r1 r2 H.
+      unfold TLR_INF.R.refine_res3, TLR_INF.R.refine_res2, TLR_INF.R.refine_res1 in H.
+      destruct r1 as [r1a [r1sid [[r1b1 r1b2] [r1c dv1]]]].
+      destruct r2 as [r2a [r2sid [[r2b1 r2b2] [r2c dv2]]]].
+      inversion H; subst.
+      inversion H5; subst.
+      inversion H7; subst.
+      inversion H9; subst.
+      inversion H9; subst.
+      cbn.
+      reflexivity.
+  Qed.
 
   Lemma refine_E1E2_L6_compose_fin_to_inf :
     forall tx ty tz,
@@ -778,8 +827,8 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
 
     exists rx_fin.
     split; auto.
-    (* rewrite refine_inf_fin_x; auto. *)
-  Abort.
+    rewrite refine_inf_fin_x; auto.
+  Qed.
 
 
   Lemma refine_E1E2_L6_transitive :
@@ -791,9 +840,9 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
   Proof.
     intros ti1 ti2 tf1 tf2 RINF RITOF RFIN.
 
-    (* eapply refine_E1E2_L6_compose_fin_to_inf; eauto. *)
-    (* eapply refine_E1E2_L6_compose_inf_to_fin; eauto. *)
-  Abort.
+    eapply refine_E1E2_L6_compose_fin_to_inf; eauto.
+    eapply refine_E1E2_L6_compose_inf_to_fin; eauto.
+  Qed.
 
   (* TODO: move this *)
   Lemma model_E1E2_L6_sound :
