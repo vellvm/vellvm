@@ -58,11 +58,11 @@ Proof.
 Qed.
 
 Lemma interp_prop_vis :
-  forall {E F X} (h_spec : E ~> PropT F) k_spec {R} (RR : relation R)
+  forall {E F X} (h_spec : E ~> PropT F) {R} (RR : relation R)
     (e : E X) kk t,
-    interp_prop RR h_spec k_spec (Vis e kk) t <->
+    interp_prop h_spec RR (Vis e kk) t <->
       (x <- h_spec X e;;
-       interp_prop RR h_spec k_spec (kk x)) t. (* Do I need to use k_spec anywhere...? *)
+       interp_prop h_spec RR (kk x)) t.
 Proof.
 Admitted.
 
@@ -110,14 +110,12 @@ Module Infinite.
     split; intros INTERP.
     - eapply interp_prop_eutt_Proper_impl.
       + admit.
+      + admit.
       + eauto.
-      + reflexivity.
-      + auto.
     - eapply interp_prop_eutt_Proper_impl.
       + admit.
-      + symmetry. apply H.
-      + reflexivity.
-      + auto.
+      + admit.
+      + admit.
   Admitted.
 
   #[global] Instance refine_OOM_h_eutt_RR_Proper {T : Type} {RR : relation T} {E F}:
@@ -923,14 +921,7 @@ Module Finite.
     split; intros INTERP.
     - eapply interp_prop_eutt_Proper_impl.
       + admit.
-      + eauto.
-      + reflexivity.
-      + auto.
-    - eapply interp_prop_eutt_Proper_impl.
       + admit.
-      + symmetry. apply H.
-      + reflexivity.
-      + auto.
   Admitted.
 
   Lemma model_undef_h_oom :

@@ -162,17 +162,6 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
     Qed.
 
-    #[global] Instance k_spec_WF_memory_k_spec sid ms :
-      k_spec_WF
-        (fun (T : Type)
-          (e : (ExternalCallE +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T)
-          (t : itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) T) =>
-        exists (sid' : store_id) (ms' : MemState),
-          interp_memory_prop_h e sid ms (fmap (fun x : T => (ms', (sid', x))) t))
-        (@memory_k_spec ExternalCallE (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)).
-    Proof.
-    Admitted.
-
     Lemma refine_23 : forall t1 t2 sid m,
         refine_L2 t1 t2 -> refine_L3 (interp_memory_prop refine_res2 t1 sid m) (interp_memory_prop refine_res2 t2 sid m).
     Proof.
@@ -184,7 +173,6 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         Unshelve.
       - reflexivity.
     Qed.
-
 
     (* Things are different for L4 and L5: we get into the [Prop] monad. *)
     Lemma refine_34 : forall t1 t2,
@@ -440,24 +428,6 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         cbn in *. rewrite H2. assumption.
     Qed.
 
-    #[global] Instance k_spec_WF_pick_uvalue_k_spec F E `{UBE -< F}  `{FailureE -< F}  `{OOME -< F}:
-      k_spec_WF
-        (case_ (E_trigger_prop (F:=F))
-          (case_ PickUvalue_handler (F_trigger_prop (F:=F))))
-        (@pick_uvalue_k_spec E F).
-    Proof.
-      constructor; intros; unfold pick_uvalue_k_spec in *.
-      - rewrite H2. eapply Returns_bind. apply H3. apply H4.
-      - rewrite H2. rewrite Monad.bind_bind. reflexivity.
-      - repeat red.
-        intros. split; intros.
-        + rewrite <- H2. assumption.
-        + rewrite H2. assumption.
-      - assert (x ≈ ta).
-        { rewrite H3. rewrite H2 at 2. reflexivity. }
-        rewrite H5. assumption.
-    Qed.
-        
     (* TODO: prove and move this? *)
     Import EitherMonad.
     Import IdentityMonad.
@@ -516,66 +486,40 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         handler_correct (@PickUvalue_handler E _ _ _) concretize_picks.
     Proof.
       unfold handler_correct.
-      intros.
+      intros * EQ.
       destruct e as [Pre u].
-      cbn.
-      split.
-      - intros EQ.
-        rewrite EQ. 
-        apply PickUV_Ret with (res := concretize_uvalue u).
-        + apply concretize_u_concretize_uvalue.
-        + unfold ITree.map.
-          unfold lift_err_ub_oom_post_ret, lift_err_ub_oom_post.
-          rewrite concretize_uvalue_err_ub_oom_to_itree.
-          destruct ((concretize_uvalue u) : err_ub_oom_T _ _).
-          repeat break_match.
-          * unfold raiseOOM.
-            apply eutt_clo_bind with (UU:=fun _ _ => True).
-            rewrite bind_trigger. unfold trigger.
-            apply eqit_Vis. intros. inversion u0. intros.
-            inversion u2.
-          * unfold raiseUB.
-            apply eutt_clo_bind with (UU:=fun _ _ => True).            
-            rewrite bind_trigger. unfold trigger.
-            apply eqit_Vis. intros. inversion u1. intros.
-            inversion u2.
-          * unfold raise.
-            apply eutt_clo_bind with (UU:=fun _ _ => True).            
-            rewrite bind_trigger. unfold trigger.
-            apply eqit_Vis. intros. inversion u0.
-            intros. inversion u2.
-          * cbn. rewrite bind_ret_l. reflexivity.
-      - intros.
-        inversion H2.
-        + apply inj_pair2 in H5. subst. 
-          rewrite concretize_uvalue_err_ub_oom_to_itree.
-          (* SAZ: not sure why this follows *)
-          
-      (* apply PickUV_Ret with (res := concretize_uvalue u). *)
-      (* - apply concretize_u_concretize_uvalue. *)
-      (* - pose proof concretize_uvalue_err_ub_oom_to_itree u as CONC. *)
-      (*   repeat break_match_hyp; *)
-      (*     cbn; *)
-      (*     match goal with *)
-      (*     | H: concretize_uvalue ?u ≈ raiseOOM ?s |- _ => *)
-      (*         rewrite H; *)
-      (*         rewrite Raise.raiseOOM_map_itree; *)
-      (*         reflexivity *)
-      (*     | H: concretize_uvalue ?u ≈ raiseUB ?s |- _ => *)
-      (*         rewrite H; *)
-      (*         rewrite Raise.raiseUB_map_itree; *)
-      (*         reflexivity *)
-      (*     | H: concretize_uvalue ?u ≈ raise ?s |- _ => *)
-      (*         rewrite H; *)
-      (*         rewrite Raise.raise_map_itree; *)
-      (*         reflexivity *)
-      (*     | H: concretize_uvalue ?u ≈ ret ?s |- _ => *)
-      (*         rewrite H; *)
-      (*         cbn; *)
-      (*         rewrite map_ret; *)
-      (*         reflexivity *)
-      (*         end. *)
-    Admitted.
+      rewrite EQ.
+      apply PickUV_Ret with (res := concretize_uvalue u).
+      - apply concretize_u_concretize_uvalue.
+      - unfold ITree.map.
+        unfold lift_err_ub_oom_post_ret, lift_err_ub_oom_post.
+        destruct ((concretize_uvalue u) : err_ub_oom_T _ _) eqn: HU.
+        repeat break_match.
+        + unfold raiseOOM.
+          apply eutt_clo_bind with (UU:=fun _ _ => True).
+          setoid_rewrite concretize_uvalue_err_ub_oom_to_itree.
+          rewrite HU. unfold raiseOOM.
+          rewrite bind_trigger. unfold trigger.
+          apply eqit_Vis. intros. inversion u0.
+          intros; inv u2.
+        + unfold raiseUB.
+          apply eutt_clo_bind with (UU:=fun _ _ => True).
+          setoid_rewrite concretize_uvalue_err_ub_oom_to_itree.
+          rewrite HU.
+          unfold raiseUB. rewrite bind_trigger. unfold trigger.
+          apply eqit_Vis. intros. inversion u1. intros.
+          inversion u2.
+        + unfold raise.
+          apply eutt_clo_bind with (UU:=fun _ _ => True).
+          setoid_rewrite concretize_uvalue_err_ub_oom_to_itree.
+          rewrite HU. unfold raise.
+          rewrite bind_trigger. unfold trigger.
+          apply eqit_Vis. intros. inversion u0.
+          intros. inversion u2.
+        + cbn. unfold ITree.map.
+          setoid_rewrite concretize_uvalue_err_ub_oom_to_itree.
+          rewrite HU. setoid_rewrite bind_ret_l. reflexivity.
+    Qed.
 
     Lemma refine_undef
       : forall (E F:Type -> Type) T TT (HR: Reflexive TT)  `{UBE -< F} `{FailureE -< F} `{OOME -< F}
@@ -586,17 +530,12 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       unfold model_undef.
       unfold exec_undef.
       exists x; split; auto.
-      
       apply interp_prop_correct_exec; try reflexivity; auto.
-      - apply k_spec_WF_pick_uvalue_k_spec.
-      - apply case_prop_handler_correct.
-        + unfold handler_correct. intros. split; intros; apply H.
-        + unfold handler_correct. intros. 
-          apply case_prop_handler_correct.
-          * apply PickUvalue_handler_correct.
-          * unfold handler_correct. intros. split; intros; apply H.
-      - apply pick_k_spec_correct_pick_exec_h.
-   Qed.            
+      repeat intro.
+      unfold case_, Case_sum1, case_sum1.
+      destruct e as [ | [ | ]]; eauto.
+       apply PickUvalue_handler_correct; eauto.
+   Qed.
 
     (* TODO: probably a bad name... model_UB_exec is just... id *)
     Lemma refine_UB

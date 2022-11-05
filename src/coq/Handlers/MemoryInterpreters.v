@@ -419,42 +419,18 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Definition interp_memory_prop_h : forall T, Effin T -> MemStateFreshT (PropT Effout) T
       := case_ E_trigger (case_ my_handle_intrinsic_prop (case_ my_handle_memory_prop F_trigger)).
 
-    (* TODO: I find the lack of interp_prop here disturbing... *)
-    Definition memory_k_spec
-               {T R : Type}
-               (e : Effin T)
-               (ta : itree Effout T)
-               (k2 : T -> itree Effout R)
-               (t2 : itree Effout R) : Prop
-      := t2 ≈ (bind ta k2).
-
-    #[global] Instance memory_k_spec_proper {T R : Type} {RR : R -> R -> Prop} :
-      Proper
-        (eq ==>
-            eq ==>
-            (fun k1 k2 : T -> itree Effout R =>
-               forall x : T, eqit eq true true (k1 x) (k2 x)) ==> eq ==> iff)
-        (memory_k_spec).
-    Proof.
-      unfold Proper, respectful.
-      intros x y ? x0 y0 ? x1 y1 ? x3 y3 ?; subst.
-      split; intros; red.
-      red in H2; rewrite H2; eapply eutt_clo_bind; [ reflexivity | intros; subst]; eauto.
-      red in H2; rewrite H2; eapply eutt_clo_bind; [ reflexivity | intros; subst]; symmetry; eauto.
-    Qed.
-
     Definition interp_memory_prop' {R} (RR : R -> R -> Prop) :
       itree Effin R -> MemStateT (PropT Effout) R :=
       fun (t : itree Effin R) (ms : MemState) (t' : itree Effout (MemState * R)) =>
-        interp_prop RR (fun T e t => exists ms', @interp_memory_prop_h' T e ms (fmap (fun x => (ms', x)) t)) (@memory_k_spec) t (fmap snd t').
+        interp_prop (OOM := void1) (fun T e t => exists ms', @interp_memory_prop_h' T e ms (fmap (fun x => (ms', x)) t)) RR t (fmap snd t').
 
     (* Things line up a lot better if interp_memory_prop has the same
        type signature as interp_memory... *)
     Definition interp_memory_prop {R} (RR : R -> R -> Prop) :
       itree Effin R -> MemStateFreshT (PropT Effout) R :=
       fun (t : itree Effin R) (sid : store_id) (ms : MemState) (t' : itree Effout (MemState * (store_id * R))) =>
-        interp_prop RR (fun T (e : Effin T) (t : itree Effout T) => exists (sid' : store_id) (ms' : MemState),
-                         @interp_memory_prop_h T e sid ms (fmap (fun (x : T) => (ms', (sid', x))) t)) (@memory_k_spec) t ((fmap (fun '(_, (_, x)) => x) t') : itree Effout R).
+        interp_prop (OOM := void1) (fun T (e : Effin T) (t : itree Effout T) => exists (sid' : store_id) (ms' : MemState),
+                         @interp_memory_prop_h T e sid ms (fmap (fun (x : T) => (ms', (sid', x))) t)) RR t ((fmap (fun '(_, (_, x)) => x) t') : itree Effout R).
   End Interpreters.
 End MemorySpecInterpreter.
 
