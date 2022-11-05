@@ -681,6 +681,16 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       itree Effin ~> MemStateFreshT (itree Effout) :=
     State.interp_state interp_memory_h.
 
+    From ITree Require Import Interp.InterpFacts Eq.EqAxiom Events.StateFacts.
+
+    Ltac force_rewrite H :=
+      let HB := fresh "HB" in
+      pose proof @H as HB; eapply bisimulation_is_eq in HB; rewrite HB; clear HB.
+
+    Tactic Notation "force_rewrite" constr(H) "in" hyp(H') :=
+      let HB := fresh "HB" in
+      pose proof @H as HB; eapply bisimulation_is_eq in HB; rewrite HB in H'; clear HB.
+
     (* fmap throws away extra sid / provenance from state
        handler. This is fine because interp_memory_prop should include
        propositions that make sure ids and provenances are fresh when
@@ -693,9 +703,51 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       intros T t ms sid.
       unfold interp_memory_prop.
       unfold interp_memory.
-      unfold State.interp_state.
+      cbn.
+      match goal with
+      | |- interp_prop _ _ _ ?i => remember i
+      end.
+      match goal with
+      | [H : i = ?r |- _] => assert (i ≅ r) by (subst; reflexivity)
+      end. clear Heqi.
+      rename H2 into EQ.
 
+      revert t i EQ.
+      pcofix CIH.
+      intros.
+      pstep.
+      red.
+
+      unfold State.interp_state in EQ.
+      unfold ITree.map in EQ.
+      punfold EQ; red in EQ.
+      force_rewrite (itree_eta t) in EQ.
+      assert (HT: t ≅ t) by reflexivity.
+      punfold HT; red in HT.
+
+      hinduction HT before CIH; intros; subst.
+      - match goal with
+        | [ H : eqitF _ _ _ _ _ _ (observe (ITree.bind ?l _)) |- _] => remember l
+        end.
+
+        force_rewrite (@itree_eta Effin _ (Ret r2)) in Heqi0.
+        unfold interp in Heqi0.
+        unfold Basics.iter, MonadIter_stateT0, Basics.iter, MonadIter_itree in Heqi0.
+        force_rewrite @unfold_iter in Heqi0.
+        cbn in Heqi0.
+        repeat force_rewrite @bind_bind in Heqi0.
+        repeat force_rewrite @bind_ret_l in Heqi0.
+        cbn in Heqi0. subst.
+        force_rewrite @bind_ret_l in EQ.
+        assert (i = Ret r2). apply bisimulation_is_eq; pstep; auto.
+        rewrite H2.
+        constructor; auto.
+      - pclearbot.
+        match goal with
+        | [ H : eqitF _ _ _ _ _ _ (observe (ITree.bind ?l _)) |- _] => remember l
+        end.
     Admitted.
+
   End Interpreters.
 End MemoryExecInterpreter.
 
