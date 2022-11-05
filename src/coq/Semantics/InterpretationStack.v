@@ -99,7 +99,7 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
       let L4_trace       := exec_undef L3_trace in
       L4_trace.
 
-    Definition interp_mcfg5 {R} RR_mem RR_pick (t: itree L0 R) g l sid m : PropT L4 (MemState * (store_id * (local_env * @stack local_env * (global_env * R)))) :=
+    Definition interp_mcfg5 {R} RR_mem RR_pick (t: itree L0 R) g l sid m : PropT L5 (MemState * (store_id * (local_env * stack * (global_env * R)))) :=
       let uvalue_trace   := interp_intrinsics t in
       let L1_trace       := interp_global uvalue_trace g in
       let L2_trace       := interp_local_stack L1_trace l in
@@ -107,6 +107,20 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
       let L4_trace       := model_undef RR_pick L3_trace in
       let L5_trace       := model_UB L4_trace in
       L5_trace.
+
+    Definition interp_mcfg6 {R} RR_mem RR_pick (t: itree L0 R) g l sid m : PropT L6 (MemState * (store_id * (local_env * stack * (global_env * R)))) :=
+      let uvalue_trace   := interp_intrinsics t in
+      let L1_trace       := interp_global uvalue_trace g in
+      let L2_trace       := interp_local_stack L1_trace l in
+      let L3_trace       := interp_memory_prop RR_mem L2_trace sid m in
+      let L4_trace       := model_undef RR_pick L3_trace in
+      let L5_trace       := model_UB L4_trace in
+      let L6_trace       := refine_OOM
+                              (fun '(ms, (sid, ((lenv, stack), (genv, x))))
+                                 '(ms', (sid', ((lenv', stack'), (genv', y)))) =>
+                                 x = y)
+                              L5_trace in
+      L6_trace.
   End InterpreterMCFG.
 
   Section InterpreterCFG.
@@ -178,6 +192,19 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
       let L5_trace       := model_UB L4_trace in
       L5_trace.
 
+    Definition interp_cfg6 {R} RR_mem RR_pick (t: itree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : PropT (CallE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) :=
+      let L0_trace       := interp_intrinsics t in
+      let L1_trace       := interp_global L0_trace g in
+      let L2_trace       := interp_local L1_trace l in
+      let L3_trace       := interp_memory_prop RR_mem L2_trace sid m in
+      let L4_trace       := model_undef RR_pick L3_trace in
+      let L5_trace       := model_UB L4_trace in
+      let L6_trace       := refine_OOM
+                              (fun '(ms, (sid, (lenv, (genv, x))))
+                                 '(ms', (sid', (lenv', (genv', y)))) =>
+                                 x = y)
+                              L5_trace in
+      L6_trace.
   End InterpreterCFG.
 
   Module SemNotations.
@@ -187,6 +214,8 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
     Notation ℑ3 := interp_cfg3.
     Notation ℑ4 := interp_cfg4.
     Notation ℑ5 := interp_cfg5.
+    Notation ℑ6 := interp_cfg6.
+    (* TODO: should probably switch to interp_cfg6 *)
     Notation ℑ  := interp_cfg5.
 
     Notation ℑs1 := interp_mcfg1.
@@ -194,6 +223,8 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
     Notation ℑs3 := interp_mcfg3.
     Notation ℑs4 := interp_mcfg4.
     Notation ℑs5 := interp_mcfg5.
+    Notation ℑs6 := interp_mcfg6.
+    (* TODO: should probably switch to interp_mcfg6 *)
     Notation ℑs  := interp_mcfg5.
 
     Notation Ret1 g x     := (Ret (g,x)).

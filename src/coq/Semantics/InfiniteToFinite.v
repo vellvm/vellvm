@@ -253,7 +253,6 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
   Definition L5_convert : Handler E1.L5 E2.L5 := L4_convert.
 
   Definition L6_convert : Handler E1.L6 E2.L6 := L4_convert.
-
 End EventConvert.
 
 Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2).
@@ -299,10 +298,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
        ignores all of the placeholder values *)
     refine_L6 (L6_convert_PropT res_L6_convert_unsafe srcs) tgts.
 
-  (*  After fully interpreting LLVM syntax into an L6 program (using [LLVM*.model]),
-     The infinite interpretation of [p1] is refined by the finite interpretation of [p2]. *)
-  Definition model_E1E2_L6 (p1 p2 : LLVM_syntax) : Prop :=
-    refine_E1E2_L6 (LLVM1.model p1) (LLVM2.model p2).
+  (* TODO: not sure about name... *)
+  Definition model_E1E2_L6
+             (p1 p2 : list
+                        (LLVMAst.toplevel_entity
+                           LLVMAst.typ
+                           (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
+    : Prop :=
+    refine_E1E2_L6 (LLVM1.model_oom p1) (LLVM2.model_oom p2).
 
 End LangRefine.
 
@@ -582,7 +585,7 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
                 setoid_rewrite Heqi.
                 destruct H1 as (?&?&?).
                 dependent destruction x.
-                red in H, H0. subst. 
+                red in H, H0. subst.
                 assert (Returns tt ta).
                 { rewrite H. unfold trigger. eapply ReturnsVis; eauto.
                   unfold subevent. reflexivity.
@@ -829,7 +832,18 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
   Proof.
     intros p.
     unfold model_E1E2_L6.
-    unfold refine_E1E2_L6.
+    intros t' m_fin.
+
+    exists (L4_convert_tree
+    (uv <-
+     LLVMEvents.raise
+       ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") "");;
+     lift_OOM (res_L4_convert_unsafe uv))).
+    split.
+    - unfold L4_convert_PropT.
+      (* t_e1 is a tree in the model of the program in the infinite
+         semantics, and t_e1 "agrees" with the behavior (t') in the
+         finite semantics.
 
     intros fin_t m_fin.
     exists fin_t.

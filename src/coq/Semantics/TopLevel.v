@@ -224,10 +224,20 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
     ℑs eq eq t [] ([],[]) 0 initial_memory_state.
 
+  Definition model_gen_oom
+             (ret_typ : dtyp)
+             (entry : string)
+             (args : list uvalue)
+             (prog: list (toplevel_entity typ (block typ * list (block typ))))
+    : PropT L4 res_L4 :=
+    let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
+    ℑs6 eq eq t [] ([],[]) 0 initial_memory_state.
+
   (**
      Finally, the official model assumes no user-defined intrinsics.
    *)
   Definition model := model_gen (DTYPE_I 32%N) "main" main_args.
+  Definition model_oom := model_gen_oom (DTYPE_I 32%N) "main" main_args.
 End LLVMTopLevel.
 
 Module Make (IS : InterpreterStack) : LLVMTopLevel IS.
