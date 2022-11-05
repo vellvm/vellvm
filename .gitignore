@@ -43,3 +43,7 @@ src/coq/.lia.cache
 *.cache
 *.DS_Store
 *a.out
+
+CoqMakefile
+.CoqMakefile.d
+CoqMakefile.conf
