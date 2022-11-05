@@ -114,10 +114,10 @@ Instances][some more notes on this file here.]]
 
 **** model_E1E2_L6_sound
 
-An important lemma is [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma model_E1E2_L6_sound :][model_E1E2_L6_sound]]:
+An important adequacy theorem is [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma model_E1E2_L6_sound :][model_E1E2_L6_sound]]:
 
 #+begin_src coq
-  Lemma model_E1E2_L6_sound :
+  Theorem model_E1E2_L6_sound :
     forall (p : list
              (LLVMAst.toplevel_entity
                 LLVMAst.typ
@@ -125,7 +125,7 @@ An important lemma is [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma model_E
       model_E1E2_L6 p p.
 #+end_src
 
-This lemma specifies that when any program ~p~ is interpreted in the finite
+This theorem specifies that when any program ~p~ is interpreted in the finite
 memory model, we get a refinement of the behaviors of the program when
 it's interpreted in the infinite memory model. This depends on these definitions as well:
 
