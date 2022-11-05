@@ -140,6 +140,8 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   Notation res_L2 := (local_env * lstack * res_L1)%type.
   Notation res_L3 := (MemState * (store_id * res_L2))%type.
   Notation res_L4 := (MemState * (store_id * (local_env * lstack * (global_env * dvalue))))%type.
+  Notation res_L5 := (MemState * (store_id * (local_env * lstack * (global_env * dvalue))))%type.
+  Notation res_L6 := (MemState * (store_id * (local_env * lstack * (global_env * dvalue))))%type.
 
   (**
      Full denotation of a Vellvm program as an interaction tree:

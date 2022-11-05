@@ -275,11 +275,14 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
   Definition L3 := ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [PickUvalueE]*)
+  (* Interprets [Pick] events: forcing evaluation of [uvalue]s, [UBE] has no semantic meaning *)
   Definition L4 := ExternalCallE +' OOME +' UBE +' DebugE +' FailureE.
 
-  Definition L5 := ExternalCallE +' OOME +' DebugE +' FailureE.
+  (* [UBE] is still present in tree to identify failure, but the [model_UB] semantics allows [UB] to subsume all behavior *)
+  Definition L5 := ExternalCallE +' OOME +' UBE +' DebugE +' FailureE.
 
-  Definition L6 := ExternalCallE +' OOME +' DebugE +' FailureE.
+  (* [OOM] semantics is introduced through [interp_prop], so the semantic change is not apparent in the event signature *)
+  Definition L6 := ExternalCallE +' OOME +' UBE +' DebugE +' FailureE.
 
   Definition FUBO_to_L4 : (FailureE +' UBE +' OOME) ~> L4:=
     fun T e =>
