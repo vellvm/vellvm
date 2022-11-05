@@ -47,11 +47,11 @@ Local Open Scope cat_scope.
 Section interp_prop.
 
   Context {E F OOM : Type -> Type} {OOME: OOM -< E}.
-  Context (h_spec : E ~> PropT F) {R : Type} (RR : R -> R -> Prop).
+  Context (h_spec : E ~> PropT F) {R1 R2 : Type} (RR : R1 -> R2 -> Prop).
 
   Inductive interp_PropTF
-            (b1 b2 : bool) (sim : itree E R -> itree F R -> Prop)
-            : itree' E R -> itree' F R -> Prop :=
+            (b1 b2 : bool) (sim : itree E R1 -> itree F R2 -> Prop)
+            : itree' E R1 -> itree' F R2 -> Prop :=
   | Interp_PropT_Ret : forall r1 r2 (REL: RR r1 r2),
       interp_PropTF b1 b2 sim (RetF r1) (RetF r2)
 
@@ -90,7 +90,7 @@ Section interp_prop.
 
   Hint Resolve interp_PropTF_mono : paco.
 
-  Definition interp_PropT_ b1 b2 sim (t0 : itree _ R) (t1 : itree _ R) :=
+  Definition interp_PropT_ b1 b2 sim (t0 : itree _ R1) (t1 : itree _ R2) :=
     interp_PropTF b1 b2 sim (observe t0) (observe t1).
   Hint Unfold interp_PropT_ : core.
 
@@ -100,21 +100,21 @@ Section interp_prop.
   Qed.
   Hint Resolve interp_PropT__mono : paco.
 
-  Lemma interp_PropT_idclo_mono: monotone2 (@id (itree E R -> itree F R -> Prop)).
+  Lemma interp_PropT_idclo_mono: monotone2 (@id (itree E R1 -> itree F R2 -> Prop)).
   Proof. unfold id. eauto. Qed.
   Hint Resolve interp_PropT_idclo_mono : paco.
 
   (* Definition 5.2 *)
   Definition interp_prop' b1 b2 :
-    itree _ R -> PropT _ R :=
+    itree _ R1 -> PropT _ R2 :=
     paco2 (interp_PropT_ b1 b2) bot2.
 
   Definition interp_prop :
-    itree _ R -> PropT _ R :=
+    itree _ R1 -> PropT _ R2 :=
     interp_prop' true true.
 
   #[global] Instance interp_prop_eq_itree_Proper_impl_ :
-    forall (x : _ R), Proper (eq_itree eq ==> impl) (interp_prop x).
+    forall (x : _ R1), Proper (eq_itree eq ==> impl) (interp_prop x).
   Proof.
     repeat intro. eapply bisimulation_is_eq in H; subst; eauto.
   Qed.
@@ -142,7 +142,7 @@ Section interp_prop.
     eapply PROP; eauto.
   Qed.
 
-  Lemma interp_prop_inv_tau_r (t0 : _ R) t1:
+  Lemma interp_prop_inv_tau_r (t0 : _ R1) t1:
     interp_prop t0 (Tau t1) ->
     interp_prop t0 t1.
   Proof.
@@ -164,7 +164,7 @@ Section interp_prop.
       rewrite H2 in H0. rewrite tau_eutt in H0; eauto.
   Qed.
 
-  Lemma interp_prop_inv_tau_l (t0 : _ R) t1:
+  Lemma interp_prop_inv_tau_l (t0 : _ R1) t1:
     interp_prop (Tau t0) t1 ->
     interp_prop t0 t1.
   Proof.
@@ -183,7 +183,7 @@ Section interp_prop.
     - rewrite itree_eta in HT1; rewrite H0 in HT1; eapply eqit_inv in HT1; contradiction.
   Qed.
 
-  Lemma interp_prop_inv_tau (t0 : _ R) t1:
+  Lemma interp_prop_inv_tau (t0 : _ R1) t1:
     interp_prop (Tau t0) (Tau t1) ->
     interp_prop t0 t1.
   Proof.
@@ -193,7 +193,7 @@ Section interp_prop.
   Qed.
 
   #[global] Instance interp_prop_eutt_Proper_impl_ :
-    forall (x : _ R), Proper (eutt eq ==> impl) (interp_prop x).
+    forall (x : _ R1), Proper (eutt eq ==> impl) (interp_prop x).
   Proof.
     repeat intro. red in H0.
     punfold H; punfold H0; red in H; red in H0; cbn in *.
@@ -371,8 +371,8 @@ Section interp_prop.
 
 End interp_prop.
 
-Arguments interp_prop {_ _ _ _} _ {_}.
-Arguments interp_prop' {_ _ _ _} _ {_}.
+Arguments interp_prop {_ _ _ _} _ {_ _}.
+Arguments interp_prop' {_ _ _ _} _ {_ _}.
 
 Hint Constructors interp_PropTF : core.
 Hint Resolve interp_PropTF_mono : paco.
@@ -382,8 +382,8 @@ Hint Resolve interp_PropT_idclo_mono : paco.
 
 #[global] Instance interp_prop_Proper_eq :
   forall (E F OOM : Type -> Type) (h_spec : forall T : Type, E T -> PropT F T)
-    R (RR : relation R) (HR: Reflexive RR) (HT : Transitive RR) `{OOM -< E},
-    Proper (@eutt _ _ _ RR ==> eq ==> flip Basics.impl) (@interp_prop E F OOM _ h_spec _ RR).
+    R (RR : R -> R -> Prop) (HR: Reflexive RR) (HT : Transitive RR) `{OOM -< E},
+    Proper (@eutt _ _ _ RR ==> eq ==> flip Basics.impl) (@interp_prop E F OOM _ h_spec _ _ RR).
 Proof.
   intros E F OOM h_spec R RR REFL TRANS CONSTRAINT.
   intros y y' EQ x x' EQ' H. subst.
@@ -480,12 +480,12 @@ Section interp_prop_extra.
 
   Context {E F OOM : Type -> Type} {OOME: OOM -< E}.
   Context (h : E ~> PropT F).
-  Context {R : Type} (RR : R -> R -> Prop).
+  Context {R1 R2 : Type} (RR : R1 -> R2 -> Prop).
 
   Lemma interp_prop_clo_bind {U} t1 t2 k1 k2
-        (EQT: @interp_prop E F OOM _ h U eq t1 t2)
-        (EQK: forall u1 u2, eq u1 u2 -> @interp_prop E F OOM _ h _ eq (k1 u1) (k2 u2)):
-    @interp_prop E F OOM _ h _ eq (ITree.bind t1 k1) (ITree.bind (U := U) t2 k2).
+        (EQT: @interp_prop E F OOM _ h U _ eq t1 t2)
+        (EQK: forall u1 u2, eq u1 u2 -> @interp_prop E F OOM _ h _ _ eq (k1 u1) (k2 u2)):
+    @interp_prop E F OOM _ h _ _ eq (ITree.bind t1 k1) (ITree.bind (U := U) t2 k2).
   Proof.
     revert_until U.
 
@@ -546,7 +546,7 @@ Section interp_prop_extra.
     forall (R : Type) RR RR' t1 t2,
       (RR <2= RR') ->
       interp_prop h RR t1 t2 ->
-      interp_prop h (F := F) (R := R) RR' t1 t2.
+      interp_prop h (F := F) (R1 := R1) (R2 := R2) RR' t1 t2.
   Proof.
     intros ? ? ?.
     pcofix self. pstep. intros u v ? euv. punfold euv.
@@ -588,7 +588,7 @@ Section interp_prop_extra.
   Qed.
 
   Lemma interp_prop_bind_refine:
-      forall (t : itree E R) (k : R -> itree E R) (y : itree F R),
+      forall (t : itree E R1) (k : R1 -> itree E R2) (y : itree F R2),
         (x0 <- interp_prop h eq t;; interp_prop h eq (k x0)) y ->
         interp_prop h eq (x <- t;; k x) y.
   Proof.
@@ -639,7 +639,7 @@ Section interp_prop_extra.
 
       specialize (IHinterp_PropTF _ _ k k' Heqi1 eq_refl).
 
-      assert (forall a : R, Returns a t2 -> interp_prop h eq (k a) (k' a)).
+      assert (forall a , Returns a t2 -> interp_prop h eq (k a) (k' a)).
       { intros; eapply H1. rewrite (itree_eta t'); rewrite <- Heqi2.
         rewrite tau_eutt; auto. rewrite <- itree_eta; auto. }
 
@@ -725,12 +725,12 @@ Section interp_prop_extra.
 
   (* Lemma 5.4: interp_prop_correct - note that the paper presents a slightly simpler formulation where t = t' *)
   Lemma interp_prop_correct_exec:
-    forall `{Reflexive _ RR} (t : _ R) t' f
+    forall {R} RR `{Reflexive _ RR} (t : _ R) t' (f : (forall T : Type, E T -> itree F T))
       (HC : handler_correct h f),
       t ≈ t' ->
       interp_prop h RR t (interp f t').
   Proof.
-    intros H t t' f HC H1.
+    intros R RR0 H t t' f HC H1.
     setoid_rewrite unfold_interp.
     remember (_interp f (observe t')).
     assert (i ≅ _interp f (observe t')). {
@@ -821,8 +821,8 @@ Section interp_prop_extra.
   (* Admitted. *)
 
   Lemma interp_prop_ret_inv:
-    forall (r1 : R) (t : itree F R),
-      interp_prop (F := F) h RR (ret r1) t -> exists r2 : R, RR r1 r2 /\ t ≈ ret r2.
+    forall  r1 (t : itree F _),
+      interp_prop (F := F) h RR (ret r1) t -> exists r2 , RR r1 r2 /\ t ≈ ret r2.
   Proof.
     intros r1 t INTERP.
     punfold INTERP.
