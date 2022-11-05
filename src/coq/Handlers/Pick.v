@@ -39,9 +39,6 @@ From ExtLib Require Import
      Data.Monads.IdentityMonad
      Structures.Functor.
 
-
-
-
 Set Implicit Arguments.
 Set Contextual Implicit.
 
@@ -96,6 +93,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationParams 
 
     Arguments lift_err_ub_oom_post_ret {_ _ _ _ _ _} _ _ _.
 
+
     Inductive PickUvalue_handler {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E} : PickUvalueE ~> PropT E :=
     | PickUV_UB  : forall Pre uv t,
         ~Pre -> PickUvalue_handler (pick Pre uv) t
@@ -114,29 +112,8 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationParams 
       Definition F_trigger_prop : F ~> PropT (E +' F) :=
         fun R e => fun t => t ≈ r <- trigger e ;; ret r.
 
-      Definition pick_uvalue_k_spec
-                 {T R : Type}
-                 (e : (E +' PickUvalueE +' F) T)
-                 (ta : itree (E +' F) T)
-                 (k2 : T -> itree (E +' F) R)
-                 (t2 : itree (E +' F) R) : Prop
-        := t2 ≈ bind ta k2.
-
-      (* Global Instance pick_uvalue_k_spec_proper {T R : Type} {RR : R -> R -> Prop} {b a : bool} : *)
-      (*   Proper *)
-      (*     (eq ==> *)
-      (*         eq ==> *)
-      (*         (fun k1 k2 : T -> itree (E +' PickUvalueE +' F) R => *)
-      (*            forall x : T, eqit RR b a (k1 x) (k2 x)) ==> eq ==> eq ==> iff) *)
-      (*     pick_uvalue_k_spec. *)
-      (* Proof. *)
-      (*   unfold Proper, respectful. *)
-      (*   intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2 x3 y3 H3; subst. *)
-      (*   split; cbn; auto. *)
-      (* Qed. *)
-
       Definition model_undef_h `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} {R1 R2} (RR : R1 -> R2 -> Prop) :=
-        interp_prop RR (case_ E_trigger_prop (case_ PickUvalue_handler F_trigger_prop)) (@pick_uvalue_k_spec).
+        interp_prop (OOM := void1) (case_ E_trigger_prop (case_ PickUvalue_handler F_trigger_prop)) RR.
 
       Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F}
                  {T} (RR : T -> T -> Prop) (ts : PropT (E +' PickUvalueE +' F) T) : PropT (E +' F) T:=
@@ -244,15 +221,6 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationParams 
         (E +' PickE +' F) ~> itree (E +' F) :=
         case_ E_trigger
               (case_ concretize_picks F_trigger).
-
-      Definition pick_k_spec_correct_pick_exec_h
-                 `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :
-        k_spec_correct (@pick_exec_h _ _ _) (@pick_uvalue_k_spec _ _).
-      Proof.
-        unfold k_spec_correct.
-        intros.
-        unfold pick_uvalue_k_spec. eauto.
-      Qed.
 
       Definition exec_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :
         itree (E +' PickE +' F) ~> itree (E +' F) :=

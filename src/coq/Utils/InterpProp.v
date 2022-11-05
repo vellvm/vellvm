@@ -44,6 +44,10 @@ Local Open Scope cat_scope.
   Definition handler_correct {E F} (h_spec: E ~> PropT F) (h: E ~> itree F) :=
     (forall T e ta, ta ≈ h T e -> h_spec T e ta).
 
+#[global] Instance void1_unit {E} : void1 -< E.
+  repeat intro; contradiction.
+Qed.
+
 Section interp_prop.
 
   Context {E F OOM : Type -> Type} {OOME: OOM -< E}.
