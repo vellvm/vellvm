@@ -15,7 +15,8 @@ From Vellvm Require Import
      Semantics
      Theory.Refinement
      Theory.InterpreterMCFG
-     Theory.InterpreterCFG.
+     Theory.InterpreterCFG
+     Utils.InterpMemoryProp.
 
 From ExtLib Require Import
      Structures.Functor.
@@ -28,7 +29,6 @@ From Coq Require Import
      Relations
      List
      ZArith.
-
 
 
 Require Import Paco.paco.
@@ -169,7 +169,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       exists t; split.
       - unfold L3 in *.
         unfold refine_L2 in *.
-        eapply interp_prop_Proper_eq in Ht; try typeclasses eauto; eauto.
+        eapply interp_memory_prop_Proper_eq in Ht; try typeclasses eauto; eauto.
         Unshelve.
       - reflexivity.
     Qed.
