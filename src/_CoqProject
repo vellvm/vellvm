@@ -108,6 +108,7 @@
 ./coq/Utils/RefineProp.v
 ./coq/Utils/Util.v
 ./coq/Utils/InterpProp.v
+./coq/Utils/InterpMemoryProp.v
 ./coq/Utils/PropT.v
 ./coq/Analysis/DomId.v
 ./coq/Analysis/Dom.v
