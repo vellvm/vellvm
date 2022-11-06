@@ -721,21 +721,23 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       rewrite unfold_interp_memory; reflexivity.
     Qed.
 
-    Lemma my_handle_intrinsic_prop_correct {T} i sid ms :
-      my_handle_intrinsic_prop i sid ms (my_handle_intrinsic (T := T) i sid ms).
-    Proof.
-    Admitted.
-
-    Lemma my_handle_memory_prop_correct {T} m sid ms :
-      my_handle_memory_prop m sid ms (my_handle_memory (T := T) m sid ms).
-    Admitted.
-
     Lemma interp_memory_vis {T R} e k s sid :
       interp_memory (T := T) (Vis e k) s sid
         ≅ interp_memory_h e s sid >>= fun '(sid', sx) => Tau (interp_memory (k (snd sx)) (fst (B := R) sx) sid').
     Proof.
       rewrite unfold_interp_memory; reflexivity.
     Qed.
+
+    (* TODO: Import result from [handle_intrinsic_correct]*)
+    Lemma my_handle_intrinsic_prop_correct {T} i sid ms :
+      my_handle_intrinsic_prop i sid ms (my_handle_intrinsic (T := T) i sid ms).
+    Proof.
+    Admitted.
+
+    (* TODO: Import result from [handle_memory_correct]*)
+    Lemma my_handle_memory_prop_correct {T} m sid ms :
+      my_handle_memory_prop m sid ms (my_handle_memory (T := T) m sid ms).
+    Admitted.
 
     (* fmap throws away extra sid / provenance from state
        handler. This is fine because interp_memory_prop should include
