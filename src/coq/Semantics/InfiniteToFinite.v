@@ -212,6 +212,408 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
   Module DVCrev := DVConvertMake LP2 LP1 AC2 E2 E1.
   Import DVC.
 
+  Definition L0_convert : Handler E1.L0 E2.L0.
+    refine (fun A e => _).
+
+    refine (match e with
+            | inl1 (E1.ExternalCall dt f args) =>
+                _
+            | inr1 (inl1 (E1.Intrinsic dt name args)) =>
+                _ (* IntrinsicE *)
+            | inr1 (inr1 (inl1 e0)) =>
+                _ (* Globals *)
+            | inr1 (inr1 (inr1 (inl1 (inl1 e0)))) =>
+                _ (* Locals *)
+            | inr1 (inr1 (inr1 (inl1 (inr1 e0)))) =>
+                _ (* Stack *)
+            | inr1 (inr1 (inr1 (inr1 (inl1 e0)))) =>
+                _ (* MemoryE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0))))) =>
+                _ (* PickE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0)))))) =>
+                _ (* OOME *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0))))))) =>
+                _ (* UBE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0)))))))) =>
+                _ (* DebugE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e0)))))))) =>
+                _ (* FailureE *)
+            end).
+
+    (* External Calls *)
+    { refine (f' <- lift_OOM (uvalue_convert f);;
+              args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+              dv <- trigger (E2.ExternalCall dt f' args');;
+              _).
+
+      inversion e0.
+      apply (lift_OOM (DVCrev.dvalue_convert dv)).
+    }
+
+    (* Intrinsics *)
+    { inversion i; subst.
+      apply (args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+             dv <- trigger (E2.Intrinsic dt name args');;
+             lift_OOM (DVCrev.dvalue_convert dv)).
+    }
+
+    (* Globals *)
+    { inversion e0.
+      - (* Global write *)
+        apply (dv <- lift_OOM (dvalue_convert dv);;
+               trigger (GlobalWrite id dv)).
+      - (* Global read *)
+        apply (dv <- trigger (GlobalRead id);;
+               lift_OOM (DVCrev.dvalue_convert dv)).
+    }
+
+    (* Locals *)
+    { inversion e0.
+      - (* Local write *)
+        apply (dv <- lift_OOM (uvalue_convert dv);;
+               trigger (LocalWrite id dv)).
+      - (* Local read *)
+        apply (dv <- trigger (LocalRead id);;
+               lift_OOM (DVCrev.uvalue_convert dv)).
+    }
+
+    (* Stack *)
+    { inversion e0.
+      - (* Stack Push *)
+        apply (args' <- lift_OOM
+                         (map_monad_In args
+                            (fun '(id, uv) Hin =>
+                               uv' <- uvalue_convert uv;;
+                               ret (id, uv')
+                         ));;
+               trigger (StackPush args')).
+      - (* Stack Pop *)
+        apply (trigger StackPop).
+    }
+
+    (* MemoryE *)
+    { inversion e0.
+      - (* MemPush *)
+        apply (trigger E2.MemPush).
+      - (* MemPop *)
+        apply (trigger E2.MemPop).
+      - (* Alloca *)
+        apply (ptr <- trigger (E2.Alloca t num_elements align);;
+               lift_OOM (DVCrev.dvalue_convert ptr)).
+      - (* Load *)
+        apply (a' <- lift_OOM (dvalue_convert a);;
+               uv <- trigger (E2.Load t a');;
+               lift_OOM (DVCrev.uvalue_convert uv)).
+      - (* Store *)
+        apply (a' <- lift_OOM (dvalue_convert a);;
+               v' <- lift_OOM (uvalue_convert v);;
+               trigger (E2.Store t a' v')).
+    }
+
+    (* PickE *)
+    { (* TODO: confirm whether this is sane... *)
+      inversion e0.
+      subst.
+      refine (x' <- lift_OOM (uvalue_convert x);;
+              dv <- trigger (E2.pick Pre x');;
+              _).
+      destruct dv as [res _].
+      apply (res' <- lift_OOM (DVCrev.dvalue_convert res);;
+             ret (exist (fun x => True) res' I)).
+    }
+
+    (* OOME *)
+    { inversion e0.
+      apply (raise_oom H).
+    }
+
+    (* UBE *)
+    { inversion e0.
+      apply (raise_ub H).
+    }
+
+    (* DebugE *)
+    { inversion e0.
+      apply (debug H).
+    }
+
+    (* FailureE *)
+    { inversion e0.
+      apply (raise_error H).
+    }
+  Defined.
+
+  Definition L1_convert : Handler E1.L1 E2.L1.
+    refine (fun A e => _).
+
+    refine (match e with
+            | inl1 (E1.ExternalCall dt f args) =>
+                _
+            | inr1 (inl1 (E1.Intrinsic dt name args)) =>
+                _ (* IntrinsicE *)
+            | inr1 (inr1 (inl1 (inl1 e0))) =>
+                _ (* Locals *)
+            | inr1 (inr1 (inl1 (inr1 e0))) =>
+                _ (* Stack *)
+            | inr1 (inr1 (inr1 (inl1 e0))) =>
+                _ (* MemoryE *)
+            | inr1 (inr1 (inr1 (inr1 (inl1 e0)))) =>
+                _ (* PickE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0))))) =>
+                _ (* OOME *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0)))))) =>
+                _ (* UBE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0))))))) =>
+                _ (* DebugE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e0))))))) =>
+                _ (* FailureE *)
+            end).
+
+    (* External Calls *)
+    { refine (f' <- lift_OOM (uvalue_convert f);;
+              args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+              dv <- trigger (E2.ExternalCall dt f' args');;
+              _).
+
+      inversion e0.
+      apply (lift_OOM (DVCrev.dvalue_convert dv)).
+    }
+
+    (* Intrinsics *)
+    { inversion i; subst.
+      apply (args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+             dv <- trigger (E2.Intrinsic dt name args');;
+             lift_OOM (DVCrev.dvalue_convert dv)).
+    }
+
+    (* Locals *)
+    { inversion e0.
+      - (* Local write *)
+        apply (dv <- lift_OOM (uvalue_convert dv);;
+               trigger (LocalWrite id dv)).
+      - (* Local read *)
+        apply (dv <- trigger (LocalRead id);;
+               lift_OOM (DVCrev.uvalue_convert dv)).
+    }
+
+    (* Stack *)
+    { inversion e0.
+      - (* Stack Push *)
+        apply (args' <- lift_OOM
+                         (map_monad_In args
+                            (fun '(id, uv) Hin =>
+                               uv' <- uvalue_convert uv;;
+                               ret (id, uv')
+                         ));;
+               trigger (StackPush args')).
+      - (* Stack Pop *)
+        apply (trigger StackPop).
+    }
+
+    (* MemoryE *)
+    { inversion e0.
+      - (* MemPush *)
+        apply (trigger E2.MemPush).
+      - (* MemPop *)
+        apply (trigger E2.MemPop).
+      - (* Alloca *)
+        apply (ptr <- trigger (E2.Alloca t num_elements align);;
+               lift_OOM (DVCrev.dvalue_convert ptr)).
+      - (* Load *)
+        apply (a' <- lift_OOM (dvalue_convert a);;
+               uv <- trigger (E2.Load t a');;
+               lift_OOM (DVCrev.uvalue_convert uv)).
+      - (* Store *)
+        apply (a' <- lift_OOM (dvalue_convert a);;
+               v' <- lift_OOM (uvalue_convert v);;
+               trigger (E2.Store t a' v')).
+    }
+
+    (* PickE *)
+    { (* TODO: confirm whether this is sane... *)
+      inversion e0.
+      subst.
+      refine (x' <- lift_OOM (uvalue_convert x);;
+              dv <- trigger (E2.pick Pre x');;
+              _).
+      destruct dv as [res _].
+      apply (res' <- lift_OOM (DVCrev.dvalue_convert res);;
+             ret (exist (fun x => True) res' I)).
+    }
+
+    (* OOME *)
+    { inversion e0.
+      apply (raise_oom H).
+    }
+
+    (* UBE *)
+    { inversion e0.
+      apply (raise_ub H).
+    }
+
+    (* DebugE *)
+    { inversion e0.
+      apply (debug H).
+    }
+
+    (* FailureE *)
+    { inversion e0.
+      apply (raise_error H).
+    }
+  Defined.
+
+  Definition L2_convert : Handler E1.L2 E2.L2.
+    refine (fun A e => _).
+
+    refine (match e with
+            | inl1 (E1.ExternalCall dt f args) =>
+                _
+            | inr1 (inl1 (E1.Intrinsic dt name args)) =>
+                _ (* IntrinsicE *)
+            | inr1 (inr1 (inl1 e0)) =>
+                _ (* MemoryE *)
+            | inr1 (inr1 (inr1 (inl1 e0))) =>
+                _ (* PickE *)
+            | inr1 (inr1 (inr1 (inr1 (inl1 e0)))) =>
+                _ (* OOME *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0))))) =>
+                _ (* UBE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0)))))) =>
+                _ (* DebugE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e0)))))) =>
+                _ (* FailureE *)
+            end).
+
+    (* External Calls *)
+    { refine (f' <- lift_OOM (uvalue_convert f);;
+              args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+              dv <- trigger (E2.ExternalCall dt f' args');;
+              _).
+
+      inversion e0.
+      apply (lift_OOM (DVCrev.dvalue_convert dv)).
+    }
+
+    (* Intrinsics *)
+    { inversion i; subst.
+      apply (args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+             dv <- trigger (E2.Intrinsic dt name args');;
+             lift_OOM (DVCrev.dvalue_convert dv)).
+    }
+
+    (* MemoryE *)
+    { inversion e0.
+      - (* MemPush *)
+        apply (trigger E2.MemPush).
+      - (* MemPop *)
+        apply (trigger E2.MemPop).
+      - (* Alloca *)
+        apply (ptr <- trigger (E2.Alloca t num_elements align);;
+               lift_OOM (DVCrev.dvalue_convert ptr)).
+      - (* Load *)
+        apply (a' <- lift_OOM (dvalue_convert a);;
+               uv <- trigger (E2.Load t a');;
+               lift_OOM (DVCrev.uvalue_convert uv)).
+      - (* Store *)
+        apply (a' <- lift_OOM (dvalue_convert a);;
+               v' <- lift_OOM (uvalue_convert v);;
+               trigger (E2.Store t a' v')).
+    }
+
+    (* PickE *)
+    { (* TODO: confirm whether this is sane... *)
+      inversion e0.
+      subst.
+      refine (x' <- lift_OOM (uvalue_convert x);;
+              dv <- trigger (E2.pick Pre x');;
+              _).
+      destruct dv as [res _].
+      apply (res' <- lift_OOM (DVCrev.dvalue_convert res);;
+             ret (exist (fun x => True) res' I)).
+    }
+
+    (* OOME *)
+    { inversion e0.
+      apply (raise_oom H).
+    }
+
+    (* UBE *)
+    { inversion e0.
+      apply (raise_ub H).
+    }
+
+    (* DebugE *)
+    { inversion e0.
+      apply (debug H).
+    }
+
+    (* FailureE *)
+    { inversion e0.
+      apply (raise_error H).
+    }
+  Defined.
+
+  Definition L3_convert : Handler E1.L3 E2.L3.
+    refine (fun A e => _).
+
+    refine (match e with
+            | inl1 (E1.ExternalCall dt f args) =>
+                _
+            | inr1 (inl1 e0) =>
+                _ (* PickE *)
+            | inr1 (inr1 (inl1 e0)) =>
+                _ (* OOME *)
+            | inr1 (inr1 (inr1 (inl1 e0))) =>
+                _ (* UBE *)
+            | inr1 (inr1 (inr1 (inr1 (inl1 e0)))) =>
+                _ (* DebugE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 e0)))) =>
+                _ (* FailureE *)
+            end).
+
+    (* External Calls *)
+    { refine (f' <- lift_OOM (uvalue_convert f);;
+              args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+              dv <- trigger (E2.ExternalCall dt f' args');;
+              _).
+
+      inversion e0.
+      apply (lift_OOM (DVCrev.dvalue_convert dv)).
+    }
+
+    (* PickE *)
+    { (* TODO: confirm whether this is sane... *)
+      inversion e0.
+      subst.
+      refine (x' <- lift_OOM (uvalue_convert x);;
+              dv <- trigger (E2.pick Pre x');;
+              _).
+      destruct dv as [res _].
+      apply (res' <- lift_OOM (DVCrev.dvalue_convert res);;
+             ret (exist (fun x => True) res' I)).
+    }
+
+    (* OOME *)
+    { inversion e0.
+      apply (raise_oom H).
+    }
+
+    (* UBE *)
+    { inversion e0.
+      apply (raise_ub H).
+    }
+
+    (* DebugE *)
+    { inversion e0.
+      apply (debug H).
+    }
+
+    (* FailureE *)
+    { inversion e0.
+      apply (raise_error H).
+    }
+  Defined.
+
   Definition L4_convert : Handler E1.L4 E2.L4.
     refine (fun A e => _).
 
@@ -219,7 +621,7 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
             | inl1 (E1.ExternalCall dt f args) =>
                 _
             | inr1 (inl1 e0) =>
-                raise_oom ""
+                _
             | inr1 (inr1 (inl1 e0)) =>
                 _ (* UBE *)
             | inr1 (inr1 (inr1 (inl1 e0))) =>
@@ -237,17 +639,25 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
     inversion e0.
     apply (lift_OOM (DVCrev.dvalue_convert dv)).
 
+    (* OOME *)
+    { inversion e0.
+      apply (raise_oom H).
+    }
+
     (* UBE *)
-    inversion e0.
-    apply (raise_ub "").
+    { inversion e0.
+      apply (raise_ub H).
+    }
 
     (* DebugE *)
-    inversion e0.
-    apply (debug H).
+    { inversion e0.
+      apply (debug H).
+    }
 
     (* FailureE *)
-    inversion e0.
-    apply (raise_error "").
+    { inversion e0.
+      apply (raise_error H).
+    }
   Defined.
 
   Definition L5_convert : Handler E1.L5 E2.L5 := L4_convert.
@@ -264,39 +674,168 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Import EC.DVC.
 
   (* TODO: move this? *)
-  (* Converts infinite to finite versions of events within same layer *)
+  Definition L0_convert_tree {T} (t : itree E1.L0 T) : itree E2.L0 T := interp L0_convert t.
+  Definition L1_convert_tree {T} (t : itree E1.L1 T) : itree E2.L1 T := interp L1_convert t.
+  Definition L2_convert_tree {T} (t : itree E1.L2 T) : itree E2.L2 T := interp L2_convert t.
+  Definition L3_convert_tree {T} (t : itree E1.L3 T) : itree E2.L3 T := interp L3_convert t.
   Definition L4_convert_tree {T} (t : itree E1.L4 T) : itree E2.L4 T := interp L4_convert t.
   Definition L5_convert_tree {T} (t : itree E1.L5 T) : itree E2.L5 T := interp L5_convert t.
   Definition L6_convert_tree {T} (t : itree E1.L6 T) : itree E2.L6 T := interp L6_convert t.
+
+  (* TODO: move this? *)
+  Definition L0_convert_tree' {A B} (f : A -> OOM B) (t : itree E1.L0 A) : itree E2.L0 B
+    := a <- L0_convert_tree t;;
+       lift_OOM (f a).
+
+  Definition L1_convert_tree' {A B} (f : A -> OOM B) (t : itree E1.L1 A) : itree E2.L1 B
+    := a <- L1_convert_tree t;;
+       lift_OOM (f a).
+
+  Definition L2_convert_tree' {A B} (f : A -> OOM B) (t : itree E1.L2 A) : itree E2.L2 B
+    := a <- L2_convert_tree t;;
+       lift_OOM (f a).
+
+  Definition L3_convert_tree' {A B} (f : A -> OOM B) (t : itree E1.L3 A) : itree E2.L3 B
+    := a <- L3_convert_tree t;;
+       lift_OOM (f a).
+
+  Definition L4_convert_tree' {A B} (f : A -> OOM B) (t : itree E1.L4 A) : itree E2.L4 B
+    := a <- L4_convert_tree t;;
+       lift_OOM (f a).
+
+  Definition L5_convert_tree' {A B} (f : A -> OOM B) (t : itree E1.L5 A) : itree E2.L5 B
+    := a <- L5_convert_tree t;;
+       lift_OOM (f a).
+
+  Definition L6_convert_tree' {A B} (f : A -> OOM B) (t : itree E1.L6 A) : itree E2.L6 B
+    := a <- L6_convert_tree t;;
+       lift_OOM (f a).
+
+  Definition convert_uvalue_tree {E} `{OOME -< E} (t : itree E E1.DV.uvalue) : itree E E2.DV.uvalue
+    := uv <- t;;
+       lift_OOM (uvalue_convert uv).
+
+  Definition convert_dvalue_tree {E} `{OOME -< E} (t : itree E E1.DV.dvalue) : itree E E2.DV.dvalue
+    := dv <- t;;
+       lift_OOM (dvalue_convert dv).
 
   (* Relate trees at L4 with proper refinement relation... *)
   Import LLVM2.
   Import TLR.
   Import TLR.R.
 
-  Definition L6_convert_PropT {A B} (f : A -> OOM B) (ts : PropT IS1.LP.Events.L6 A) : PropT E2.L6 B
+  Definition L3_convert_PropT {A B} (RB : relation B) (f : A -> OOM B) (ts : PropT E1.L3 A) : PropT E2.L3 B
     := fun t_e2 => exists t_e1,
-           ts t_e1 /\ t_e2 ≈ L6_convert_tree (uv <- t_e1;; lift_OOM (f uv)).
+           ts t_e1 /\
+             (* refine_OOM_h type doesn't work out because of the event structure *)
+             eutt RB
+               (L3_convert_tree' f t_e1)
+               t_e2.
+
+  Definition L4_convert_PropT {A B} (RB : relation B) (f : A -> OOM B) (ts : PropT IS1.LP.Events.L4 A) : PropT E2.L4 B
+    := fun t_e2 => exists t_e1,
+           ts t_e1 /\
+             refine_OOM_h RB
+               (L4_convert_tree' f t_e1)
+               t_e2.
+
+  Definition L5_convert_PropT {A B}
+    (RB : relation B) (f : A -> OOM B) (ts : PropT IS1.LP.Events.L5 A)
+    : PropT E2.L5 B
+    := L4_convert_PropT RB f ts.
+
+  Definition L6_convert_PropT {A B}
+    (RB : relation B) (f : A -> OOM B) (ts : PropT IS1.LP.Events.L6 A)
+    : PropT E2.L6 B
+    := L4_convert_PropT RB f ts.
 
   (* Ideally we would convert memstates / local envs / local stacks /
      global envs... But for now we can get away with placeholders for
-     these because the refine_res3 relation used by refine_L6 ignores
+     these because the refine_resX relations used by refine_LX ignores
      these.
    *)
   (* Take the resulting dvalue from the interpreted layer and throw an OOM-error
    if we run out of memory. *)
-  Definition res_L6_convert_unsafe (res : LLVM1.res_L4) : OOM LLVM2.res_L6
+  Definition res_L1_convert_unsafe (res : LLVM1.res_L1) : OOM LLVM2.res_L1
+    := match res with
+       | (genv, dv) =>
+           dv' <- dvalue_convert dv;;
+           ret ([], dv')
+       end.
+
+  Definition res_L2_convert_unsafe (res : LLVM1.res_L2) : OOM LLVM2.res_L2
+    := match res with
+       | ((lenv, lstack), (genv, dv)) =>
+           dv' <- dvalue_convert dv;;
+           ret (([], []), ([], dv'))
+       end.
+
+  Definition res_L3_convert_unsafe (res : LLVM1.res_L3) : OOM LLVM2.res_L3
     := match res with
        | (ms, (sid, ((lenv, lstack), (genv, dv)))) =>
            dv' <- dvalue_convert dv;;
            ret (MMEP.MMSP.initial_memory_state, (0, (([], []), ([], dv'))))
        end.
 
-  Definition refine_E1E2_L6 (srcs : PropT IS1.LP.Events.L6 LLVM1.res_L6) (tgts : PropT E2.L4 LLVM2.res_L6) : Prop
+  Definition res_L4_convert_unsafe (res : LLVM1.res_L4) : OOM LLVM2.res_L4
+    := res_L3_convert_unsafe res.
+
+  Definition res_L5_convert_unsafe (res : LLVM1.res_L5) : OOM LLVM2.res_L5
+    := res_L4_convert_unsafe res.
+
+  Definition res_L6_convert_unsafe (res : LLVM1.res_L6) : OOM LLVM2.res_L6
+    := res_L5_convert_unsafe res.
+
+  Definition refine_E1E2_L0 (src : itree E1.L0 E1.DV.dvalue) (tgt : itree E2.L0 E2.DV.dvalue) : Prop
+    := refine_L0 (L0_convert_tree' dvalue_convert src) tgt.
+
+  Definition refine_E1E2_L1 (src : itree E1.L1 LLVM1.res_L1) (tgt : itree E2.L1 LLVM2.res_L1) : Prop
+    := refine_L1 (L1_convert_tree' res_L1_convert_unsafe src) tgt.
+
+  Definition refine_E1E2_L2 (src : itree E1.L2 LLVM1.res_L2) (tgt : itree E2.L2 LLVM2.res_L2) : Prop
+    := refine_L2 (L2_convert_tree' res_L2_convert_unsafe src) tgt.
+
+  Definition refine_E1E2_L3 (srcs : PropT IS1.LP.Events.L3 LLVM1.res_L3) (tgts : PropT E2.L3 LLVM2.res_L3) : Prop
+    :=
+    (* res_L4_convert_unsafe should be fine here because refine_L4
+       ignores all of the placeholder values *)
+    refine_L3 (L3_convert_PropT refine_res3 res_L3_convert_unsafe srcs) tgts.
+
+  Definition refine_E1E2_L4 (srcs : PropT IS1.LP.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop
+    :=
+    (* res_L4_convert_unsafe should be fine here because refine_L4
+       ignores all of the placeholder values *)
+    refine_L4 (L4_convert_PropT refine_res3 res_L4_convert_unsafe srcs) tgts.
+
+  Definition refine_E1E2_L5 (srcs : PropT IS1.LP.Events.L5 LLVM1.res_L5) (tgts : PropT E2.L5 LLVM2.res_L5) : Prop
+    :=
+    (* res_L4_convert_unsafe should be fine here because refine_L5
+       ignores all of the placeholder values *)
+    refine_L5 (L5_convert_PropT refine_res3 res_L5_convert_unsafe srcs) tgts.
+
+  Definition refine_E1E2_L6 (srcs : PropT IS1.LP.Events.L6 LLVM1.res_L6) (tgts : PropT E2.L6 LLVM2.res_L6) : Prop
     :=
     (* res_L4_convert_unsafe should be fine here because refine_L6
        ignores all of the placeholder values *)
-    refine_L6 (L6_convert_PropT res_L6_convert_unsafe srcs) tgts.
+    refine_L6 (L6_convert_PropT refine_res3 res_L6_convert_unsafe srcs) tgts.
+
+  (* TODO: not sure about name... *)
+  Definition model_E1E2_L4
+             (p1 p2 : list
+                        (LLVMAst.toplevel_entity
+                           LLVMAst.typ
+                           (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
+    : Prop :=
+    refine_E1E2_L4 (LLVM1.model_oom p1) (LLVM2.model_oom p2).
+
+  (* TODO: not sure about name... *)
+  Definition model_E1E2_L5
+             (p1 p2 : list
+                        (LLVMAst.toplevel_entity
+                           LLVMAst.typ
+                           (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
+    : Prop :=
+    refine_E1E2_L5 (LLVM1.model_oom p1) (LLVM2.model_oom p2).
 
   (* TODO: not sure about name... *)
   Definition model_E1E2_L6
@@ -309,8 +848,19 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
 End LangRefine.
 
-Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack64BitIntptr InfToFinAddrConvert FinToInfAddrConvert TopLevelBigIntptr TopLevel64BitIntptr TopLevelRefinements64BitIntptr.
-  Include LangRefine InterpreterStackBigIntptr InterpreterStack64BitIntptr InfToFinAddrConvert FinToInfAddrConvert TopLevelBigIntptr TopLevel64BitIntptr TopLevelRefinements64BitIntptr.
+Module MakeLangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) : LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR.
+  Include LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR.
+End MakeLangRefine.
+
+Module InfFinLangRefine := MakeLangRefine InterpreterStackBigIntptr InterpreterStack64BitIntptr InfToFinAddrConvert FinToInfAddrConvert TopLevelBigIntptr TopLevel64BitIntptr TopLevelRefinements64BitIntptr.
+
+(* Just planning on using this for L4_convert from finite to infinite events. *)
+Module FinInfLangRefine := MakeLangRefine InterpreterStack64BitIntptr InterpreterStackBigIntptr FinToInfAddrConvert InfToFinAddrConvert TopLevel64BitIntptr TopLevelBigIntptr TopLevelRefinementsBigIntptr.
+
+
+Module InfiniteToFinite.
+  Import FinInfLangRefine. (* Just planning on using this for L4_convert from finite to infinite events. *)
+  Import InfFinLangRefine.
 
   From Vellvm Require Import InterpreterMCFG.
 
@@ -346,9 +896,9 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
   Admitted.
 
   Lemma refine_OOM_h_L4_convert_tree :
-    forall T x_inf y_inf RR,
+    forall {T} x_inf y_inf (RR : relation T),
       refine_OOM_h RR x_inf y_inf ->
-      refine_OOM_h RR (@L4_convert_tree T x_inf) (@L4_convert_tree T y_inf).
+      refine_OOM_h RR (L4_convert_tree x_inf) (L4_convert_tree y_inf).
   Proof.
     intros T.
 
@@ -356,6 +906,7 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     intros.
     rewrite (unfold_interp y_inf).
     rewrite (unfold_interp x_inf).
+    cbn.
 
     match goal with
     | |- interp_prop _ _ ?l ?r => remember l as i; remember r as i0
@@ -378,7 +929,6 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     clear Heqoy Heqox.
 
     induction H; pclearbot; intros; subst; auto.
-
     - pstep. cbn in H1, H2.
       rewrite itree_eta in H1, H2.
       red.
@@ -420,8 +970,9 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
       punfold IHinterp_PropTF.
     - pstep. apply bisimulation_is_eq in HT1.
       rewrite HT1 in H1. cbn in H1.
-      setoid_rewrite bind_trigger in H1.
-      setoid_rewrite bind_vis in H1.
+      destruct (resum IFun A e).
+      cbn in H1.
+      repeat setoid_rewrite bind_vis in H1.
       apply bisimulation_is_eq in H1. rewrite H1.
       econstructor; eauto.
       eapply eqit_Vis; intros; inv u.
@@ -533,7 +1084,10 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
           unfold subevent. rewrite H0.
           eapply eqit_Vis. intros. inv u.
       + destruct s.
-        * unfold raiseOOM in H1. rewrite bind_bind, bind_trigger in H1.
+        * unfold raiseOOM in H1.
+          destruct o.
+          cbn in H1.
+          rewrite bind_bind, bind_trigger in H1.
           rewrite itree_eta in H1, H2.
           red.
           destruct (observe i) eqn: Heqi;
@@ -629,6 +1183,24 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
                 Unshelve.
                 all : eauto.
                 all : inv x.
+  Qed.
+
+  Lemma refine_OOM_h_L5_convert_tree :
+    forall {T} x_inf y_inf (RR : relation T),
+      refine_OOM_h RR x_inf y_inf ->
+      refine_OOM_h RR (L5_convert_tree x_inf) (L5_convert_tree y_inf).
+  Proof.
+    intros T.
+    apply refine_OOM_h_L4_convert_tree.
+  Qed.
+
+  Lemma refine_OOM_h_L6_convert_tree :
+    forall {T} x_inf y_inf (RR : relation T),
+      refine_OOM_h RR x_inf y_inf ->
+      refine_OOM_h RR (L6_convert_tree x_inf) (L6_convert_tree y_inf).
+  Proof.
+    intros T.
+    apply refine_OOM_h_L5_convert_tree.
   Qed.
 
   Lemma refine_OOM_h_bind :
@@ -737,34 +1309,36 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     specialize (XY_INF ry_inf TY_INF).
     destruct XY_INF as (rx_inf & TX_INF & XY_INF).
 
-    set (rx_fin := L4_convert_tree (uv <- rx_inf;; lift_OOM (res_L6_convert_unsafe uv))).
+    set (rx_fin := L4_convert_tree' res_L6_convert_unsafe rx_inf).
     exists rx_fin.
     split.
-    - unfold L6_convert_PropT.
+    - unfold L6_convert_PropT, L4_convert_PropT.
       exists rx_inf; split; auto.
+      subst rx_fin.
       reflexivity.
     - rewrite <- YZ.
-      rewrite ry_fin_inf.
+      rewrite <- ry_fin_inf.
       subst rx_fin.
 
       (* There's probably a more general lemma hiding here *)
-      unfold L4_convert_tree.
+      unfold L4_convert_tree'.
 
       Unset Universe Checking.
-      apply refine_OOM_h_L4_convert_tree.
-      eapply refine_OOM_h_bind; eauto.
-
-      intros r1 r2 H.
-      unfold TLR_INF.R.refine_res3, TLR_INF.R.refine_res2, TLR_INF.R.refine_res1 in H.
-      destruct r1 as [r1a [r1sid [[r1b1 r1b2] [r1c dv1]]]].
-      destruct r2 as [r2a [r2sid [[r2b1 r2b2] [r2c dv2]]]].
-      inversion H; subst.
-      inversion H5; subst.
-      inversion H7; subst.
-      inversion H9; subst.
-      inversion H9; subst.
-      cbn.
-      reflexivity.
+      eapply refine_OOM_h_bind with (RR1:=TopLevelRefinementsBigIntptr.R.refine_res3).
+      { intros r1 r2 H.
+        unfold TLR_INF.R.refine_res3, TLR_INF.R.refine_res2, TLR_INF.R.refine_res1 in H.
+        destruct r1 as [r1a [r1sid [[r1b1 r1b2] [r1c dv1]]]].
+        destruct r2 as [r2a [r2sid [[r2b1 r2b2] [r2c dv2]]]].
+        inversion H; subst.
+        inversion H5; subst.
+        inversion H7; subst.
+        inversion H9; subst.
+        inversion H9; subst.
+        cbn.
+        reflexivity.
+      }
+      { apply refine_OOM_h_L6_convert_tree; auto.
+      }
   Qed.
 
   Lemma refine_E1E2_L6_compose_fin_to_inf :
@@ -832,28 +1406,43 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
   Proof.
     intros p.
     unfold model_E1E2_L6.
-    intros t' m_fin.
+    intros tf m_fin.
 
-    exists (L4_convert_tree
-    (uv <-
-     LLVMEvents.raise
-       ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") "");;
-     lift_OOM (res_L4_convert_unsafe uv))).
+    exists tf.
+    split; [|reflexivity].
+    red.
+
+    (* `t_e1` is the itree that's a valid trace for the program `p`
+       under the infinite model that's ultimately supposed to be
+       related to the finite trace `tf`.
+
+       We should hopefully be able to construct a `t_e1` that
+       satisfies this:
+
+         refine_OOM_h refine_res3
+                    (L4_convert_tree (uv <- t_e1;; lift_OOM (res_L4_convert_unsafe uv))) tf
+
+       The idea would be to essentially run the reverse conversion, so
+       we would build `t_e1` from `tf`.
+     *)
+
+    exists (FinInfLangRefine.L4_convert_tree (uv <- tf;; lift_OOM (FinInfLangRefine.res_L4_convert_unsafe uv))).
     split.
-    - unfold L4_convert_PropT.
-      (* t_e1 is a tree in the model of the program in the infinite
-         semantics, and t_e1 "agrees" with the behavior (t') in the
-         finite semantics.
+    2: {
+      unfold L4_convert_tree.
+      unfold EC.L4_convert.
+      cbn.
 
-    intros fin_t m_fin.
-    exists fin_t.
-    split ; [ | reflexivity ].
+      unfold FinInfLangRefine.L4_convert_tree.
+      unfold FinInfLangRefine.EC.L4_convert.
+      cbn.
+      repeat rewrite interp_bind.
+      admit.
+    }
 
-    (* m_fin: fin_t ∈ ⟦ p ⟧ *)
+    { admit.
 
-    unfold L6_convert_PropT.
-
-    (* [OOM] is left uninterpreted in [model] *)
+    }
   Abort.
 
 End InfiniteToFinite.
