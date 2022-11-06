@@ -419,7 +419,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Definition interp_memory_prop {R} RR :
       itree Effin R -> MemStateFreshT (PropT Effout) R :=
       fun (t : itree Effin R) (sid : store_id) (ms : MemState) (t' : itree Effout (MemState * (store_id * R))) =>
-        interp_memory_prop interp_memory_prop_h RR t t'.
+        interp_memory_prop interp_memory_prop_h (fun x '(_, (_, y)) => RR x y) t t'.
 
   End Interpreters.
 End MemorySpecInterpreter.
@@ -746,7 +746,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
      *)
     Lemma interp_memory_correct :
       forall {T} t (ms : MemState) (sid : store_id),
-        interp_memory_prop (fun x '(_, (_, y)) => eq x y) t sid ms (@interp_memory T t sid ms).
+        interp_memory_prop eq t sid ms (@interp_memory T t sid ms).
     Proof.
       intros T t ms sid.
       red.
@@ -826,7 +826,6 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
   End Interpreters.
 End MemoryExecInterpreter.
-
 
 Module MakeMemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MS : MemoryModelSpec LP MP MMSP) (MemExecM : MemoryExecMonad LP MP MMSP MS) <: MemorySpecInterpreter LP MP MMSP MS MemExecM.
   Include MemorySpecInterpreter LP MP MMSP MS MemExecM.
