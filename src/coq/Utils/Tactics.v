@@ -1,7 +1,18 @@
 (* begin hide *)
 From Coq Require Import
      String.
+
+From ITree Require Import
+     Eq.EqAxiom.
 (* end hide *)
+
+Ltac force_rewrite H :=
+  let HB := fresh "HB" in
+  pose proof @H as HB; eapply bisimulation_is_eq in HB; rewrite HB; clear HB.
+
+Tactic Notation "force_rewrite:" constr(H) "in" hyp(H') :=
+  let HB := fresh "HB" in
+  pose proof @H as HB; eapply bisimulation_is_eq in HB; rewrite HB in H'; clear HB.
 
 Ltac flatten_goal :=
   match goal with

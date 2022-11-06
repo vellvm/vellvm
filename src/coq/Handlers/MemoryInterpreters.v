@@ -15,12 +15,17 @@ From Vellvm.Handlers Require Import
      MemoryModules.Within.
 
 From Vellvm.Utils Require Import
+     Tactics
      InterpProp
+     ITreeMap
      StateMonads.
 
 From ITree Require Import
      ITree
-     Eq.Eq.
+     Eq.Eq
+     Interp.InterpFacts
+     Eq.EqAxiom
+     Events.StateFacts.
 
 From ExtLib Require Import
      Structures.Functor
@@ -669,20 +674,9 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     Definition interp_memory_h : Effin ~> MemStateFreshT (itree Effout)
       := case_ E_trigger (case_ my_handle_intrinsic (case_ my_handle_memory F_trigger)).
 
-    (* TODO: I find the lack of interp_prop here disturbing... *)
     Definition interp_memory :
       itree Effin ~> MemStateFreshT (itree Effout) :=
     State.interp_state interp_memory_h.
-
-    From ITree Require Import Interp.InterpFacts Eq.EqAxiom Events.StateFacts.
-
-    Ltac force_rewrite H :=
-      let HB := fresh "HB" in
-      pose proof @H as HB; eapply bisimulation_is_eq in HB; rewrite HB; clear HB.
-
-    Tactic Notation "force_rewrite:" constr(H) "in" hyp(H') :=
-      let HB := fresh "HB" in
-      pose proof @H as HB; eapply bisimulation_is_eq in HB; rewrite HB in H'; clear HB.
 
     (* Interp Laws for [interp_memory] *)
     Definition _interp_memory {E F R}
