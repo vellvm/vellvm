@@ -40,10 +40,6 @@ Local Open Scope monad_scope.
 Local Open Scope cat_scope.
 (* end hide *)
 
-#[global] Instance void1_unit {E} : void1 -< E.
-  repeat intro; contradiction.
-Qed.
-
 Section interp_memory_prop.
 
   Context {S1 S2 : Type} {E F : Type -> Type}.
@@ -139,4 +135,218 @@ Section interp_memory_prop.
     eapply PROP; eauto.
   Qed.
 
+  Lemma interp_memory_prop_inv_tau_r t0 t1:
+    interp_memory_prop t0 (Tau t1) ->
+    interp_memory_prop t0 t1.
+  Proof.
+    intros H.
+    punfold H; red in H; cbn in H.
+    rewrite (itree_eta t0).
+    remember (observe t0); remember (TauF t1).
+    revert t0 Heqi t1 Heqi0.
+    induction H; intros; inv Heqi0; pclearbot; eauto.
+    - pstep; constructor; punfold HS; auto.
+    - pstep; constructor; auto.
+      specialize (IHinterp_memory_PropTF _ eq_refl _ eq_refl).
+      rewrite <- itree_eta in IHinterp_memory_PropTF.
+      punfold IHinterp_memory_PropTF.
+    - rewrite <- itree_eta. pstep; auto.
+    - pstep; eapply Interp_Memory_PropT_Vis; eauto.
+      rewrite (itree_eta t2) in H0.
+        rewrite H2 in H0. rewrite tau_eutt in H0; eauto.
+  Qed.
+
+  Lemma interp_memory_prop_inv_tau_l t0 t1:
+    interp_memory_prop (Tau t0) t1 ->
+    interp_memory_prop t0 t1.
+  Proof.
+    intros H.
+    punfold H; red in H; cbn in H.
+    rewrite (itree_eta t1).
+    remember (TauF t0); remember (observe t1).
+    revert t0 Heqi t1 Heqi0.
+    induction H; intros; inv Heqi; pclearbot; eauto.
+    - pstep; constructor; punfold HS; auto.
+    - rewrite <- itree_eta. pstep; auto.
+    - pstep; constructor; auto.
+      specialize (IHinterp_memory_PropTF _ eq_refl _ eq_refl).
+      rewrite <- itree_eta in IHinterp_memory_PropTF.
+      punfold IHinterp_memory_PropTF.
+  Qed.
+
+  Lemma interp_memory_prop_inv_tau t0 t1:
+    interp_memory_prop (Tau t0) (Tau t1) ->
+    interp_memory_prop t0 t1.
+  Proof.
+    intros H.
+    apply interp_memory_prop_inv_tau_l in H.
+    apply interp_memory_prop_inv_tau_r in H; auto.
+  Qed.
+
+  #[global] Instance interp_memory_prop_eutt_Proper_impl_ :
+    forall x, Proper (eutt eq ==> impl) (interp_memory_prop x).
+  Proof.
+    repeat intro. red in H0.
+    punfold H; punfold H0; red in H; red in H0; cbn in *.
+    revert_until RR.
+    pcofix CIH.
+    intros x y y' EQ H.
+    remember (observe x); remember (observe y).
+    pstep. red.
+    revert x Heqi y Heqi0 EQ.
+    (* induct on interp_memory_prop *)
+    rename i into xo, i0 into yo.
+    induction H; subst; pclearbot; intros.
+    - rewrite <- Heqi.
+      remember (RetF (E:= F) r2).
+      induction EQ; inv Heqi1; intros.
+      + constructor; auto.
+      + constructor; auto.
+
+    - rewrite <- Heqi.
+      remember (observe y') as ot3.
+      assert (DEC: (exists m3, ot3 = TauF m3) \/ (forall m3, ot3 <> TauF m3)).
+      { destruct ot3; eauto; right; red; intros; inv H. }
+
+      rename EQ into INR.
+      destruct DEC as [EQ | EQ].
+      + destruct EQ as [m3 ?]; rewrite H.
+        econstructor. right. pclearbot. eapply CIH; eauto with paco.
+        rewrite H in INR.
+        assert (Tau t2 ≈ Tau m3). pstep; auto.
+        eapply eqit_inv_Tau in H0. punfold H0.
+        punfold HS.
+
+      + inv INR; try (exfalso; eapply EQ; eauto; fail).
+        econstructor; eauto.
+        punfold HS. red in HS.
+        pclearbot.
+        hinduction REL before CIH; intros; try (exfalso; eapply EQ; eauto; fail).
+        * subst. remember (RetF r2) as ot.
+          eapply interp_memory_PropTF_mono; eauto.
+          intros; left; pclearbot; eapply paco2_mon; eauto; intros; inv PR0.
+        * remember (VisF e k1) as ot.
+          hinduction HS before CIH; intros; try discriminate; eauto.
+          pose proof @Interp_Memory_PropT_Vis.
+          change (VisF e0 k3) with (observe (Vis e0 k3)).
+          eapply H1; eauto.
+          intros.
+          left. specialize (HK _ b H2 H3). pclearbot.
+          eapply paco2_mon; eauto. intros; inv PR.
+          rewrite itree_eta in H0; rewrite Heqot in H0.
+          rewrite <- H0; apply eqit_Vis.
+          symmetry. pclearbot. eauto.
+        * eapply IHREL; eauto. pstep_reverse.
+          assert (interp_memory_prop t0 (Tau t1)) by (pstep; auto).
+          apply interp_memory_prop_inv_tau_r in H. punfold H.
+    - rewrite <- Heqi. constructor; auto.
+      specialize (IHinterp_memory_PropTF _ eq_refl _ Heqi0 EQ). auto.
+    - rewrite <- Heqi.
+      remember (TauF t2) as ot. clear Heqi0 y.
+      hinduction EQ before CIH; intros; try inversion Heqot; pclearbot; subst; eauto.
+      punfold REL.
+      eapply IHinterp_memory_PropTF; eauto.
+      constructor; eauto.
+      assert (Tau t0 ≈ t2). { pstep; auto. }
+      apply eqit_inv_Tau_l in H1; punfold H1.
+    - rewrite <- Heqi.
+      rewrite Heqi0 in EQ.
+      rewrite itree_eta in H0.
+      rewrite Heqi0, <- itree_eta in H0; clear Heqi0.
+      econstructor; eauto.
+      intros; eauto.
+      specialize (HK _ _ H1 H2). pclearbot.
+      left. eapply paco2_mon; intros; eauto.
+      inv PR. assert (y ≈ y') by (pstep; auto).
+      rewrite <- H1; auto.
+  Qed.
+
+  #[global] Instance interp_memory_prop_eutt_Proper_impl :
+    Proper (eutt eq ==> eutt eq ==> impl) (interp_memory_prop).
+  Proof.
+    intros y y' EQ x x' EQ' H.
+    rewrite <- EQ'. clear x' EQ'.
+    punfold H; punfold EQ; red in H; red in EQ; cbn in *.
+    revert_until RR.
+    pcofix CIH.
+    intros x x' EQ y H.
+    remember (observe x); remember (observe y).
+    pstep. red. genobs_clear x' ox'.
+    revert x Heqi y Heqi0 EQ.
+    (* induct on interp_memory_prop *)
+    rename i into xo, i0 into yo.
+    induction H; subst; pclearbot; intros.
+    - rewrite <- Heqi0.
+      remember (RetF (E:= E) r1).
+      induction EQ; inv Heqi1; intros.
+      + constructor; auto.
+      + constructor; auto.
+
+    - rewrite <- Heqi0.
+      rename ox' into ot3.
+      assert (DEC: (exists m3, ot3 = TauF m3) \/ (forall m3, ot3 <> TauF m3)).
+      { destruct ot3; eauto; right; red; intros; inv H. }
+
+      rename EQ into INR.
+      destruct DEC as [EQ | EQ].
+      + destruct EQ as [m3 ?]; rewrite H.
+        econstructor. right. pclearbot. eapply CIH; eauto with paco.
+        rewrite H in INR.
+        assert (Tau t1 ≈ Tau m3). pstep; auto.
+        eapply eqit_inv_Tau in H0. punfold H0.
+        punfold HS.
+
+      + inv INR; try (exfalso; eapply EQ; eauto; fail).
+        econstructor; eauto.
+        punfold HS. red in HS.
+        pclearbot.
+        hinduction REL before CIH; intros; try (exfalso; eapply EQ; eauto; fail).
+        * subst. remember (RetF r2) as ot.
+          eapply interp_memory_PropTF_mono; eauto.
+          intros; left; pclearbot; eapply paco2_mon; eauto; intros; inv PR0.
+        * remember (VisF e k1) as ot.
+          hinduction HS before CIH; intros; try discriminate; eauto.
+          inv Heqot.
+          dependent destruction H3. econstructor.
+          2, 3: eauto.
+          intros. right.
+          eapply CIH; eauto.
+          specialize (REL a). pclearbot. punfold REL.
+          specialize (HK _ _ H1 H2). pclearbot.
+          punfold HK.
+        * eapply IHREL; eauto. pstep_reverse.
+          assert (interp_memory_prop (Tau t0) t2) by (pstep; auto).
+          apply interp_memory_prop_inv_tau_l in H. punfold H.
+    - specialize (IHinterp_memory_PropTF _ eq_refl _ Heqi0).
+      assert (t1 ≈ go ox').
+      { rewrite <- tau_eutt; pstep; auto. }
+      punfold H0.
+    - rewrite <- Heqi0.
+      constructor; auto. eapply IHinterp_memory_PropTF; eauto.
+    - rewrite Heqi in EQ.
+      hinduction EQ before CIH; intros; try inversion Heqi1; pclearbot; inv Heqi.
+      + dependent destruction H3.
+        econstructor; eauto.
+        intros. specialize (HK _ _ H1 H2); pclearbot.
+        right; eapply CIH; [ | punfold HK].
+        specialize (REL a).
+        punfold REL. setoid_rewrite itree_eta at 1 ; rewrite <- Heqi0, <- itree_eta; auto.
+      + econstructor; eauto.
+  Qed.
+
+  #[global] Instance interp_memory_prop_eutt_Proper :
+    Proper (eutt eq ==> eutt eq ==> iff) interp_memory_prop.
+  Proof.
+    split; intros; [rewrite <- H, <- H0 | rewrite H, H0]; auto.
+  Qed.
+
 End interp_memory_prop.
+
+Arguments interp_memory_prop {_ _ _ _} _ {_ _}.
+Arguments interp_memory_prop' {_ _ _ _} _ {_ _}.
+
+Hint Constructors interp_memory_PropTF : core.
+Hint Resolve interp_memory_PropTF_mono : paco.
+Hint Unfold interp_memory_PropT_ : core.
+Hint Resolve interp_memory_PropT__mono : paco.
+Hint Resolve interp_memory_PropT_idclo_mono : paco.
