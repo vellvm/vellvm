@@ -65,6 +65,53 @@ Section Failure.
     intros [].
   Qed.
 
+  Lemma raise_map_itree_inv :
+    forall A B (f : A -> B) t x,
+      ITree.map f t ≈ raise x ->
+      t ≈ raise x.
+  Proof.
+    unfold ITree.map. intros A B.
+    ginit. gcofix CIH.
+    intros. rewrite unfold_bind in H0.
+    punfold H0. red in H0.
+    remember
+         (observe
+            match observe t with
+            | RetF r => Ret (f r)
+            | TauF t => Tau (ITree.bind t (fun x : A => Ret (f x)))
+            | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) (fun x0 : A => Ret (f x0)))
+            end); remember (observe (raise x)).
+
+    assert (go i ≅
+           match observe t with
+           | RetF r => Ret (f r)
+           | TauF t => Tau (ITree.bind t (fun x : A => Ret (f x)))
+           | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) (fun x0 : A => Ret (f x0)))
+           end). rewrite Heqi; rewrite <- itree_eta; reflexivity.
+    clear Heqi.
+    rewrite itree_eta; unfold raise; rewrite bind_trigger.
+    gstep.
+
+    revert t H.
+    induction H0; inv Heqi0.
+    - dependent destruction H1.
+      dependent destruction H2.
+      cbn in *. inv H0. intros.
+      destruct (observe t); eapply eqit_inv in H; inv H.
+      destruct H0 as (?&?). destruct H.
+      constructor. intros. inv v.
+    - intros.
+      destruct (observe t); eapply eqit_inv in H; try solve [inv H].
+      cbn in *. assert (t1 ≈ raise x). { pstep; eauto. }
+      clear H0.
+      assert (t1 ≅ ITree.map f t0). { punfold H; pstep; unfold ITree.map; eauto. }
+      clear H.
+      rewrite H0 in H1.
+      specialize (IHeqitF eq_refl).
+      setoid_rewrite <- unfold_bind in IHeqitF.
+      constructor; eauto. eapply IHeqitF; rewrite <- itree_eta; eauto.
+  Qed.
+
   Lemma raise_ret_inv_itree :
       forall A x (y : A),
         ~ (raise x) ≈ (ret y).
@@ -204,6 +251,54 @@ Section UB.
     intros [].
   Qed.
 
+  Lemma raiseUB_map_itree_inv :
+    forall A B (f : A -> B) t x,
+      ITree.map f t ≈ raiseUB x ->
+      t ≈ raiseUB x.
+  Proof.
+    unfold ITree.map. intros A B.
+    ginit. gcofix CIH.
+    intros. rewrite unfold_bind in H0.
+    punfold H0. red in H0.
+    remember
+         (observe
+            match observe t with
+            | RetF r => Ret (f r)
+            | TauF t => Tau (ITree.bind t (fun x : A => Ret (f x)))
+            | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) (fun x0 : A => Ret (f x0)))
+            end); remember (observe (raiseUB x)).
+
+    assert (go i ≅
+           match observe t with
+           | RetF r => Ret (f r)
+           | TauF t => Tau (ITree.bind t (fun x : A => Ret (f x)))
+           | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) (fun x0 : A => Ret (f x0)))
+           end). rewrite Heqi; rewrite <- itree_eta; reflexivity.
+    clear Heqi.
+    rewrite itree_eta; unfold raiseUB; rewrite bind_trigger.
+    gstep.
+
+    revert t H.
+    induction H0; inv Heqi0.
+    - dependent destruction H1.
+      dependent destruction H2.
+      cbn in *. inv H0. intros.
+      destruct (observe t); eapply eqit_inv in H; inv H.
+      destruct H0 as (?&?). destruct H.
+      constructor. intros. inv v.
+    - intros.
+      destruct (observe t); eapply eqit_inv in H; try solve [inv H].
+      cbn in *. assert (t1 ≈ raiseUB x). { pstep; eauto. }
+      clear H0.
+      assert (t1 ≅ ITree.map f t0). { punfold H; pstep; unfold ITree.map; eauto. }
+      clear H.
+      rewrite H0 in H1.
+      specialize (IHeqitF eq_refl).
+      setoid_rewrite <- unfold_bind in IHeqitF.
+      constructor; eauto. eapply IHeqitF; rewrite <- itree_eta; eauto.
+  Qed.
+
+
   Lemma raiseUB_ret_inv_itree :
       forall A x (y : A),
         ~ (raiseUB x) ≈ (ret y).
@@ -220,3 +315,28 @@ Section UB.
     }.
 End UB.
 
+(* TODO: Move this? *)
+Lemma itree_map_ret_inv :
+  forall Eff A B (f : A -> B) (t : itree Eff A) b,
+    ITree.map f t ≈ ret b ->
+    exists a, t ≈ ret a /\ f a = b.
+Proof.
+  intros * HM.
+  punfold HM.
+  cbn in *.
+  red in HM.
+  dependent induction HM.
+  - setoid_rewrite (itree_eta t).
+    unfold ITree.map,observe in x; cbn in x.
+    destruct (observe t) eqn:EQ'; try now inv x.
+    cbn in *; exists r; inv x; split; reflexivity.
+  - unfold ITree.map,observe in x; cbn in x.
+    setoid_rewrite (itree_eta t).
+    destruct (observe t) eqn:EQ'; try now inv x.
+    cbn in x.
+    inv x.
+    edestruct IHHM as (? & ? & ?).
+    all: try reflexivity.
+    exists x; split; auto.
+    rewrite H, tau_eutt; reflexivity.
+Qed.

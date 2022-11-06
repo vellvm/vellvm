@@ -439,6 +439,9 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
   Import MemSpec.
   Import MemExecM.
 
+  Module MemTheory := MemoryModelTheory LP MP MMEP MM.
+  Import MemTheory.
+
   Section Interpreters.
     Variable (E F : Type -> Type).
     Context `{FailureE -< F} `{UBE -< F} `{OOME -< F}.
@@ -728,15 +731,273 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       rewrite unfold_interp_memory; reflexivity.
     Qed.
 
-    (* TODO: Import result from [handle_intrinsic_correct]*)
+    (* TODO: Move these imports? *)
+    Import Raise Tactics.
+
     Lemma my_handle_intrinsic_prop_correct {T} i sid ms :
       my_handle_intrinsic_prop i sid ms (my_handle_intrinsic (T := T) i sid ms).
     Proof.
+      unfold my_handle_intrinsic_prop, my_handle_intrinsic.
+      cbn.
+
+      (* TODO: probably an easier more general lemma about
+         [exec_correct] and [MemPropT_lift_PropT_fresh] *)
+      epose proof @handle_intrinsic_correct (MemStateFreshT (itree Effout)) Effout
+        MemStateFreshT_State
+        (@Monad_stateT (MemStateT (itree Effout)) store_id
+           (@Monad_stateT (itree Effout) MemState (@Monad_itree Effout))) (@Monad_itree Effout)
+        (@MemStateFreshT_Provenance (itree Effout) (@Monad_itree Effout))
+        (@MemStateFreshT_MonadStoreId (itree Effout) (@Monad_itree Effout))
+        (@MemStateFreshT_MonadMemState (itree Effout) (@Monad_itree Effout))
+        (@RAISE_ERROR_E_MT (itree Effout) MemStateFreshT
+           (@MemStateFreshT_MonadT (itree Effout) (@Monad_itree Effout))
+           (@RAISE_ERR_ITREE_FAILUREE Effout
+              (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 FailureE F E H)))
+        (@RAISE_UB_E_MT (itree Effout) MemStateFreshT
+           (@MemStateFreshT_MonadT (itree Effout) (@Monad_itree Effout))
+           (@RAISE_UB_ITREE_UB Effout
+              (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 UBE F E H0)))
+        (@RAISE_OOM_E_MT (itree Effout) MemStateFreshT
+           (@MemStateFreshT_MonadT (itree Effout) (@Monad_itree Effout))
+           (@RAISE_OOM_ITREE_OOME Effout
+              (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME F E H1)))
+        (@RAISE_ERR_ITREE_FAILUREE Effout
+           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 FailureE F E H))
+        (@RAISE_UB_ITREE_UB Effout (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 UBE F E H0))
+        (@RAISE_OOM_ITREE_OOME Effout
+           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME F E H1))
+        (@MonadState.Eq1_stateTM (MemStateT (itree Effout)) store_id
+           (@MonadState.Eq1_stateTM (itree Effout) MemState (@ITreeMonad.Eq1_ITree Effout)))
+        (@MemStateFreshT_Eq1_ret_inv Effout
+           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 FailureE F E H)
+           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME F E H1)
+           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 UBE F E H0))
+        (@MonadState.MonadLawsE_stateTM (MemStateT (itree Effout)) store_id
+           (@MonadState.Eq1_stateTM (itree Effout) MemState (@ITreeMonad.Eq1_ITree Effout))
+           (@Monad_stateT (itree Effout) MemState (@Monad_itree Effout))
+           (@MonadState.Eq1Equivalence_stateTM (itree Effout) MemState (@ITreeMonad.Eq1_ITree Effout)
+              (@Monad_itree Effout) (@ITreeMonad.Eq1Equivalence_ITree Effout))
+           (@MonadState.MonadLawsE_stateTM (itree Effout) MemState (@ITreeMonad.Eq1_ITree Effout)
+              (@Monad_itree Effout) (@ITreeMonad.Eq1Equivalence_ITree Effout)
+              (@ITreeMonad.MonadLawsE_ITree Effout)))
+        (@MemStateFreshT_MemMonad Effout
+           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 FailureE F E H)
+           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME F E H1)
+           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 UBE F E H0))
+        T
+        i
+        (fun _ _ => True) as HANDLE_CORRECT.
+
+      red in HANDLE_CORRECT.
+      specialize (HANDLE_CORRECT ms sid).
+      forward HANDLE_CORRECT.
+      admit. (* TODO: MemMonad_valid_state *)
+      specialize (HANDLE_CORRECT I).
+
+      destruct HANDLE_CORRECT as [[ms' [ub_msg UB]] | HANDLE_CORRECT].
+      { (* UB.. *)
+        left.
+        exists ub_msg; eauto.
+      }
+
+      (* Not necessarily UB *)
+      destruct HANDLE_CORRECT as [exec_res [st' [ms' [EXEC [SPEC POST]]]]].
+      cbn in *.
+      red in EXEC, SPEC.
+      destruct EXEC as [m2 [EXEC EXEC_IN]].
+      cbn in EXEC.
+      red in EXEC.
+
+      cbn in EXEC_IN.
+      red in EXEC_IN.
+
+      destruct_err_ub_oom exec_res.
+
+      { (* OOM *)
+        cbn in *.
+        destruct EXEC as [oom_msg EXEC].
+        rewrite EXEC in EXEC_IN.
+
+        setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_OOM _)) in EXEC_IN.
+        apply raiseOOM_map_itree_inv in EXEC_IN.
+
+        red.
+        right; right; left.
+        exists oom_msg.
+        split; auto.
+        exists oom_x; auto.
+      }
+
+      { (* UB events *)
+        red.
+        left.
+        exists ub_x.
+        auto.
+      }
+
+      { (* Error *)
+        cbn in *.
+        destruct EXEC as [err_msg EXEC].
+        rewrite EXEC in EXEC_IN.
+        setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_Fail _)) in EXEC_IN.
+        apply raise_map_itree_inv in EXEC_IN.
+
+        red.
+        right; left.
+        exists err_msg.
+        split; auto.
+        exists err_x; auto.
+      }
+
+      { (* Success *)
+        subst.
+        cbn in *.
+        rewrite EXEC in EXEC_IN.
+        rewrite bind_ret_l in EXEC_IN.
+        apply itree_map_ret_inv in EXEC_IN.
+        destruct EXEC_IN as [[ms'' [sid'' res]] [EXEC_IN RES_EQ]].
+        inv RES_EQ.
+
+        red.
+        right; right; right.
+        do 3 eexists.
+        split; eauto.
+      }
     Admitted.
 
     (* TODO: Import result from [handle_memory_correct]*)
     Lemma my_handle_memory_prop_correct {T} m sid ms :
       my_handle_memory_prop m sid ms (my_handle_memory (T := T) m sid ms).
+      unfold my_handle_memory_prop, my_handle_memory.
+      cbn.
+
+      (* TODO: probably an easier more general lemma about
+         [exec_correct] and [MemPropT_lift_PropT_fresh] *)      
+      epose proof @handle_memory_correct
+        (MemStateFreshT (itree Effout)) Effout MemStateFreshT_State
+        (@Monad_stateT (MemStateT (itree Effout)) store_id
+           (@Monad_stateT (itree Effout) MemState (@Monad_itree Effout)))
+        (@Monad_itree Effout)
+        (@MemStateFreshT_Provenance (itree Effout) (@Monad_itree Effout))
+        (@MemStateFreshT_MonadStoreId (itree Effout) (@Monad_itree Effout))
+        (@MemStateFreshT_MonadMemState (itree Effout) (@Monad_itree Effout))
+        (@RAISE_ERROR_E_MT (itree Effout) MemStateFreshT
+           (@MemStateFreshT_MonadT (itree Effout) (@Monad_itree Effout))
+           (@RAISE_ERR_ITREE_FAILUREE Effout
+              (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 FailureE F E H)))
+        (@RAISE_UB_E_MT (itree Effout) MemStateFreshT
+           (@MemStateFreshT_MonadT (itree Effout) (@Monad_itree Effout))
+           (@RAISE_UB_ITREE_UB Effout
+              (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 UBE F E H0)))
+        (@RAISE_OOM_E_MT (itree Effout) MemStateFreshT
+           (@MemStateFreshT_MonadT (itree Effout) (@Monad_itree Effout))
+           (@RAISE_OOM_ITREE_OOME Effout
+              (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME F E H1)))
+        (@RAISE_ERR_ITREE_FAILUREE Effout
+           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 FailureE F E H))
+        (@RAISE_UB_ITREE_UB Effout
+           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 UBE F E H0))
+        (@RAISE_OOM_ITREE_OOME Effout
+           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME F E H1))
+        (@MonadState.Eq1_stateTM (MemStateT (itree Effout)) store_id
+           (@MonadState.Eq1_stateTM (itree Effout) MemState (@ITreeMonad.Eq1_ITree Effout)))
+        (@MemStateFreshT_Eq1_ret_inv Effout
+           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 FailureE F E H)
+           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME F E H1)
+           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 UBE F E H0))
+        (@MonadState.MonadLawsE_stateTM (MemStateT (itree Effout)) store_id
+           (@MonadState.Eq1_stateTM (itree Effout) MemState (@ITreeMonad.Eq1_ITree Effout))
+           (@Monad_stateT (itree Effout) MemState (@Monad_itree Effout))
+           (@MonadState.Eq1Equivalence_stateTM (itree Effout) MemState
+              (@ITreeMonad.Eq1_ITree Effout) (@Monad_itree Effout)
+              (@ITreeMonad.Eq1Equivalence_ITree Effout))
+           (@MonadState.MonadLawsE_stateTM (itree Effout) MemState
+              (@ITreeMonad.Eq1_ITree Effout) (@Monad_itree Effout)
+              (@ITreeMonad.Eq1Equivalence_ITree Effout)
+              (@ITreeMonad.MonadLawsE_ITree Effout)))
+        (@MemStateFreshT_MemMonad Effout
+           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 FailureE F E H)
+           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME F E H1)
+           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 UBE F E H0))
+        T
+        m
+        (fun _ _ => True) as HANDLE_CORRECT.
+
+      red in HANDLE_CORRECT.
+      specialize (HANDLE_CORRECT ms sid).
+      forward HANDLE_CORRECT.
+      admit. (* TODO: MemMonad_valid_state *)
+      specialize (HANDLE_CORRECT I).
+
+      destruct HANDLE_CORRECT as [[ms' [ub_msg UB]] | HANDLE_CORRECT].
+      { (* UB.. *)
+        left.
+        exists ub_msg; eauto.
+      }
+
+      (* Not necessarily UB *)
+      destruct HANDLE_CORRECT as [exec_res [st' [ms' [EXEC [SPEC POST]]]]].
+      cbn in *.
+      red in EXEC, SPEC.
+      destruct EXEC as [m2 [EXEC EXEC_IN]].
+      cbn in EXEC.
+      red in EXEC.
+
+      cbn in EXEC_IN.
+      red in EXEC_IN.
+
+      destruct_err_ub_oom exec_res.
+
+      { (* OOM *)
+        cbn in *.
+        destruct EXEC as [oom_msg EXEC].
+        rewrite EXEC in EXEC_IN.
+
+        setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_OOM _)) in EXEC_IN.
+        apply raiseOOM_map_itree_inv in EXEC_IN.
+
+        red.
+        right; right; left.
+        exists oom_msg.
+        split; auto.
+        exists oom_x; auto.
+      }
+
+      { (* UB events *)
+        red.
+        left.
+        exists ub_x.
+        auto.
+      }
+
+      { (* Error *)
+        cbn in *.
+        destruct EXEC as [err_msg EXEC].
+        rewrite EXEC in EXEC_IN.
+        setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_Fail _)) in EXEC_IN.
+        apply raise_map_itree_inv in EXEC_IN.
+
+        red.
+        right; left.
+        exists err_msg.
+        split; auto.
+        exists err_x; auto.
+      }
+
+      { (* Success *)
+        subst.
+        cbn in *.
+        rewrite EXEC in EXEC_IN.
+        rewrite bind_ret_l in EXEC_IN.
+        apply itree_map_ret_inv in EXEC_IN.
+        destruct EXEC_IN as [[ms'' [sid'' res]] [EXEC_IN RES_EQ]].
+        inv RES_EQ.
+
+        red.
+        right; right; right.
+        do 3 eexists.
+        split; eauto.
+      }
     Admitted.
 
     (* fmap throws away extra sid / provenance from state
