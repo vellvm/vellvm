@@ -108,14 +108,6 @@ Module Infinite.
     intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2.
     subst.
     split; intros INTERP.
-    - eapply interp_prop_eutt_Proper_impl.
-      + admit.
-      + admit.
-      + eauto.
-    - eapply interp_prop_eutt_Proper_impl.
-      + admit.
-      + admit.
-      + admit.
   Admitted.
 
   #[global] Instance refine_OOM_h_eutt_RR_Proper {T : Type} {RR : relation T} {E F}:
@@ -180,22 +172,22 @@ Module Infinite.
 
     go_in INTERP.
 
-    eapply interp_prop_ret_inv in INTERP.
-    destruct INTERP as [r2 [INTERP_TT EQ]].
-    apply itree_map_ret_inv in EQ.
-    destruct EQ as [[ms [sid' [lenv' [st res]]]] [TPRE RES]].
-    inv RES.
-    inv H.
+    (* eapply interp_memory_prop_ret_inv in INTERP. *)
+    (* destruct INTERP as [r2 [INTERP_TT EQ]]. *)
+    (* apply itree_map_ret_inv in EQ. *)
+    (* destruct EQ as [[ms [sid' [lenv' [st res]]]] [TPRE RES]]. *)
+    (* inv RES. *)
+    (* inv H. *)
 
-    rewrite TPRE in UNDEF.
-    eapply model_undef_h_ret_inv in UNDEF.
-    rewrite UNDEF.
+    (* rewrite TPRE in UNDEF. *)
+    (* eapply model_undef_h_ret_inv in UNDEF. *)
+    (* rewrite UNDEF. *)
 
-    apply eutt_Ret.
-    repeat constructor; auto.
-  Qed.
+    (* apply eutt_Ret. *)
+    (* repeat constructor; auto. *)
+  Admitted.
 
-  Lemma interp_memorp_prop_ret_inv :
+  Lemma interp_memory_prop_ret_inv :
     forall {E F : Type -> Type}
       `{FAIL : FailureE -< F}
       `{UB : UBE -< F}
@@ -206,9 +198,11 @@ Module Infinite.
   Proof.
     intros E F FAIL UB OOM X x sid m t INTERP.
     unfold interp_memory_prop in INTERP.
-    apply interp_prop_ret_inv in INTERP.
-    destruct INTERP as [r2 [EQ MAP]]; subst; auto.
-  Qed.
+  (*   apply interp_memory_prop_ret_inv in INTERP. *)
+  (*   destruct INTERP as [r2 [EQ MAP]]; subst; auto. *)
+    (* Qed. *)
+  Admitted.
+
 
   Definition alloc_code : code dtyp :=
     [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) [])
@@ -317,47 +311,7 @@ Module Infinite.
 
         Opaque MMEP.MemSpec.allocate_dtyp_spec.
 
-        eapply interp_prop_vis.
-        cbn.
-        unfold bind_PropT.
-
-        exists (ITree.map (fun '(_, (_, x)) => x) (Ret (lenv, (stack, DVALUE_Addr addr)))).
-        exists (fun dv => ret (lenv, stack, (genv, DVALUE_I1 DynamicValues.Int1.one))).
-        split; [|split].
-        * exists sid. exists ms_final.
-          unfold my_handle_memory_prop.
-          unfold MemPropT_lift_PropT_fresh.
-          right; right; right.
-          do 3 eexists.
-          split.
-          -- do 2 rewrite map_ret; cbn.
-             reflexivity.
-          -- cbn.
-             exists ms_final. exists addr.
-             tauto.
-        * rewrite map_ret.
-          setoid_rewrite map_bind.
-          rewrite bind_ret_l.
-          rewrite map_ret.
-          reflexivity.
-        * intros a RET.
-          rewrite map_ret in RET.
-          apply Returns_Ret in RET.
-          subst.
-          cbn.
-
-          go.
-          apply interp_prop_ret_pure; auto.
-      + apply model_undef_h_ret_pure; auto.
-    - rewrite INTERP.
-      cbn.
-      reflexivity.
-
-      Unshelve.
-      exact initial_provenance.
-      exact 0%N.
-      cbn.
-      all: admit.
+        pstep; eapply InterpMemoryProp.Interp_Memory_PropT_Vis.
   Admitted.
 
   Definition instr_E_to_L0 {T : Type} : instr_E T -> itree L0 T :=
@@ -403,7 +357,7 @@ Module Infinite.
     setoid_rewrite interp_global_ret in INTERP.
     setoid_rewrite interp_local_stack_ret in INTERP.
 
-    eapply interp_memorp_prop_ret_inv in INTERP.
+    eapply interp_memory_prop_ret_inv in INTERP.
     eapply itree_map_ret_inv in INTERP.
     destruct INTERP as [[ms' [sid' [lenv' [stack' res]]]] [TPRE EQ]].
     inv EQ.
@@ -448,55 +402,6 @@ Module Infinite.
       setoid_rewrite bind_ret_l.
       setoid_rewrite interp_local_stack_ret.
       setoid_rewrite bind_ret_l.
-
-      eapply interp_prop_vis.
-      cbn.
-      unfold bind_PropT.
-
-      (* was just ret r2... *)
-      exists (ITree.map (fun '(_, (_, x)) => x) (Ret (lenv, (stack, DVALUE_Addr addr)))).
-      exists (fun dv => ret (FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv, stack, (genv, DVALUE_I1 DynamicValues.Int1.one))).
-      split; [|split].
-      * exists sid. exists ms_final.
-        unfold my_handle_memory_prop.
-        unfold MemPropT_lift_PropT_fresh.
-        right; right; right.
-        do 3 eexists.
-        split.
-        -- do 2 rewrite map_ret; cbn.
-           reflexivity.
-        -- cbn.
-           exists ms_final. exists addr.
-           tauto.
-      * repeat rewrite map_ret.
-        cbn.
-        rewrite bind_ret_l.
-        reflexivity.
-      * intros a RET.
-        rewrite map_ret in RET.
-        apply Returns_Ret in RET.
-        subst.
-        cbn.
-        go.
-
-        rewrite interp_bind with (f:=@instr_E_to_L0);
-        rewrite interp_trigger; cbn; rewrite subevent_subevent.
-        go.
-        rewrite map_ret.
-        go.
-        rewrite interp_ret.
-        go.
-
-        apply interp_prop_ret_pure; auto.
-    - rewrite UNDEF.
-      apply eutt_refine_oom_h; try typeclasses eauto.
-      apply eutt_Ret; repeat constructor; auto.
-
-      Unshelve.
-      exact initial_provenance.
-      exact 0%N.
-      cbn.
-      all: admit.
   Admitted.
 
   Lemma remove_alloc_ptoi_block :
@@ -525,7 +430,7 @@ Module Infinite.
     setoid_rewrite interp_local_stack_ret in INTERP.
 
 
-    eapply interp_memorp_prop_ret_inv in INTERP.
+    eapply interp_memory_prop_ret_inv in INTERP.
     eapply itree_map_ret_inv in INTERP.
     destruct INTERP as [[ms' [sid' [lenv' [stack' res]]]] [TPRE EQ]].
     inv EQ.
@@ -571,84 +476,6 @@ Module Infinite.
       go.
 
       rewrite bind_trigger.
-      eapply interp_prop_vis.
-      cbn.
-      unfold bind_PropT.
-
-      (* was just ret r2... *)
-      exists (ITree.map (fun '(_, (_, x)) => x) (Ret (lenv, (stack, DVALUE_Addr addr)))).
-      exists (fun dv => ret (FMapAList.alist_add (Name "i")
-                                         (UVALUE_Conversion Ptrtoint DTYPE_Pointer (UVALUE_Addr addr) DTYPE_IPTR)
-                                         (FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv),
-                      stack, (genv, DVALUE_I1 DynamicValues.Int1.one))).
-      split; [|split].
-      * exists sid. exists ms_final.
-        unfold my_handle_memory_prop.
-        unfold MemPropT_lift_PropT_fresh.
-        right; right; right.
-        do 3 eexists.
-        split.
-        -- do 2 rewrite map_ret; cbn.
-           reflexivity.
-        -- cbn.
-           exists ms_final. exists addr.
-           tauto.
-      * repeat rewrite map_ret.
-        cbn.
-        rewrite bind_ret_l.
-        reflexivity.
-      * intros a RET.
-        rewrite map_ret in RET.
-        apply Returns_Ret in RET.
-        subst.
-        cbn.
-        go.
-
-        rewrite interp_bind with (f:=@instr_E_to_L0);
-          rewrite interp_trigger; cbn; rewrite subevent_subevent.
-        go.
-
-        rewrite map_ret.
-        go.
-
-        rewrite translate_trigger.
-        rewrite translate_bind.
-        rewrite bind_bind.
-        setoid_rewrite translate_ret.
-        setoid_rewrite bind_ret_l.
-
-        rewrite translate_trigger.
-        repeat setoid_rewrite subevent_subevent.
-
-        rewrite interp_bind with (f:=@instr_E_to_L0);
-          rewrite interp_trigger; cbn; rewrite subevent_subevent.
-        go.
-
-        rewrite map_ret.
-        go.
-
-        rewrite interp_bind with (f:=@instr_E_to_L0);
-          rewrite interp_trigger; cbn; rewrite subevent_subevent.
-        go.
-
-        rewrite map_ret.
-        go.
-
-        rewrite interp_ret.
-        go.
-
-        apply interp_prop_ret_pure; auto.
-    - rewrite UNDEF.
-      apply eutt_refine_oom_h; try typeclasses eauto.
-      apply eutt_Ret; repeat constructor; auto.
-
-      Unshelve.
-      exact initial_memory_state.
-      exact initial_memory_state.
-      exact initial_provenance.
-      exact 0%N.
-      cbn.
-      all: admit.
   Admitted.
 
   (* TODO: move this? *)
@@ -739,140 +566,8 @@ Module Infinite.
     setoid_rewrite interp_intrinsics_ret in INTERP.
     setoid_rewrite interp_global_ret in INTERP.
     setoid_rewrite interp_local_stack_ret in INTERP.
+  Admitted.
 
-    rewrite interp_prop_vis in INTERP.
-
-    (* Maybe write a lemma to unfold this... *)
-    cbn in INTERP.
-    Import MMEP.MemSpec.
-    unfold my_handle_memory_prop in INTERP.
-    Opaque bind ret.
-    Opaque MMEP.MemSpec.allocate_dtyp_spec.
-    cbn in INTERP.
-    unfold bind_PropT in INTERP.
-    destruct INTERP as [ta [k [ALLOC [K INTERP]]]].
-    destruct ALLOC as [sid' [ms' ALLOC]].
-
-    Import MemTheory.
-    pose proof allocate_dtyp_spec_inv m (DTYPE_I 64) 1 as ALLOCINV.
-    forward ALLOCINV. intros CONTRA; inv CONTRA.
-
-    Transparent bind ret.
-    Transparent MMEP.MemSpec.allocate_dtyp_spec.
-
-    (* TODO: move this *)
-    Arguments MMEP.MemSpec.allocate_dtyp_spec dt : simpl never.
-
-    cbn in ALLOC.
-    unfold MemPropT_lift_PropT_fresh in ALLOC.
-    cbn in ALLOC.
-
-    Transparent bind ret.
-    Transparent MMEP.MemSpec.allocate_dtyp_spec.
-
-    destruct ALLOC as [ALLOC_UB | [ALLOC_ERR | [ALLOC_OOM | ALLOC_SUC]]].
-    - (* UB *)
-      destruct ALLOC_UB as [ub_msg [ALLOC_UB | [sab [a [ALLOC_UB []]]]]].
-      apply ALLOCINV in ALLOC_UB.
-      destruct ALLOC_UB as [[ms_final [ptr ALLOC_UB]] | [oom_msg ALLOC_UB]];
-        inv ALLOC_UB.
-    - (* ERR *)
-      destruct ALLOC_ERR as [err_msg [MAP [spec_msg [ALLOC_ERR | [sab [a [ALLOC_ERR []]]]]]]].
-      apply ALLOCINV in ALLOC_ERR.
-      destruct ALLOC_ERR as [[ms_final [ptr ALLOC_ERR]] | [oom_msg ALLOC_ERR]];
-        inv ALLOC_ERR.
-    - (* OOM *)
-      destruct ALLOC_OOM as [err_msg [MAP [spec_msg [ALLOC_OOM | [sab [a [ALLOC_OOM []]]]]]]].
-      apply ALLOCINV in ALLOC_OOM.
-      destruct ALLOC_OOM as [[ms_final [ptr ALLOC_OOM]] | [oom_msg ALLOC_OOM]];
-        inv ALLOC_OOM.
-
-      Import Raise.
-      apply raiseOOM_map_itree_inv in MAP.
-      rewrite MAP in K.
-      rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_OOM _)) in K.
-      apply raiseOOM_map_itree_inv in K.
-
-      rewrite K in UNDEF.
-
-      assert (t' ≈ raiseOOM err_msg) as T' by (eapply model_undef_h_oom; eauto).
-
-      exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
-      split.
-      +  exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
-         (* exists (Ret2 genv (lenv, stack) (DVALUE_I1 DynamicValues.Int1.one)). *)
-         split.
-         * cbn.
-           go_prime.
-
-           (* TODO: ret lemma for interp_memory_prop *)
-           unfold interp_memory_prop.
-           cbn.
-           rewrite map_ret.
-           eapply interp_prop_ret_refine; reflexivity.
-         * red.
-           eapply interp_prop_ret_pure; eauto.
-      + rewrite T'.
-        eapply refine_oom_h_raise_oom; typeclasses eauto.
-    - (* Success *)
-      exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
-      split.
-      +  exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
-         (* exists (Ret2 genv (lenv, stack) (DVALUE_I1 DynamicValues.Int1.one)). *)
-         split.
-         * cbn.
-           go_prime.
-
-           (* TODO: ret lemma for interp_memory_prop *)
-           unfold interp_memory_prop.
-           cbn.
-           rewrite map_ret.
-           eapply interp_prop_ret_refine; reflexivity.
-         * red.
-           eapply interp_prop_ret_pure; eauto.
-      + (* t' is the successful result of t_alloc *)
-        destruct ALLOC_SUC as [sid'' [ ms'' [x [MAP ALLOC_SUC]]]].
-        destruct ALLOC_SUC as [ms''' [a [ALLOC [MEQ XEQ]]]].
-        subst.
-
-        apply itree_map_ret_inv in MAP as [x [TA EQ]].
-        rewrite TA in K.
-        setoid_rewrite bind_ret_l in K.
-
-        specialize (INTERP x).
-        forward INTERP.
-        { constructor; auto.
-        }
-
-        apply interp_prop_ret_inv in INTERP.
-        destruct INTERP as [[lenv' [stack' res']] [R2 K']].
-        rewrite K' in K.
-
-        apply itree_map_ret_inv in K.
-        destruct K as [[ms'''' [sid'''' [lenv'''' [stack'''' res]]]] [TPRE ENV]].
-        inv ENV.
-
-        unfold model_undef_h in UNDEF.
-
-        (* TODO: why can't I just do this rewrite? *)
-        rewrite TPRE in UNDEF.
-
-        eapply interp_prop_ret_inv in UNDEF.
-        destruct UNDEF as [r2 [RPICK T']].
-        destruct r2 as [ms''''' [sid''''' z]].
-        rewrite T'.
-        cbn.
-
-        inv RPICK.
-        inv R2.
-
-        (* Not quite reflexivity... *)
-        unfold refine_OOM_h.
-        apply interp_prop_ret_refine.
-        do 2 red.
-        unfold refine_res2, refine_res1.
-        repeat constructor; auto.
-  Qed.
 End Infinite.
 
 Module Finite.
@@ -919,9 +614,6 @@ Module Finite.
     intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2.
     subst.
     split; intros INTERP.
-    - eapply interp_prop_eutt_Proper_impl.
-      + admit.
-      + admit.
   Admitted.
 
   Lemma model_undef_h_oom :
@@ -1064,136 +756,6 @@ Module Finite.
     setoid_rewrite interp_intrinsics_ret in INTERP.
     setoid_rewrite interp_global_ret in INTERP.
     setoid_rewrite interp_local_stack_ret in INTERP.
+  Admitted.
 
-    rewrite interp_prop_vis in INTERP.
-
-    (* Maybe write a lemma to unfold this... *)
-    cbn in INTERP.
-    Import MMEP.MemSpec.
-    unfold my_handle_memory_prop in INTERP.
-    Opaque bind ret.
-    Opaque MMEP.MemSpec.allocate_dtyp_spec.
-    cbn in INTERP.
-    unfold bind_PropT in INTERP.
-    destruct INTERP as [ta [k [ALLOC [K INTERP]]]].
-    destruct ALLOC as [sid' [ms' ALLOC]].
-
-    pose proof allocate_dtyp_spec_inv m (DTYPE_I 64) 1 as ALLOCINV.
-    forward ALLOCINV. intros CONTRA; inv CONTRA.
-
-    Transparent bind ret.
-    Transparent MMEP.MemSpec.allocate_dtyp_spec.
-
-    (* TODO: move this *)
-    Arguments MMEP.MemSpec.allocate_dtyp_spec dt : simpl never.
-
-    cbn in ALLOC.
-    unfold MemPropT_lift_PropT_fresh in ALLOC.
-    cbn in ALLOC.
-
-    Transparent bind ret.
-    Transparent MMEP.MemSpec.allocate_dtyp_spec.
-
-    destruct ALLOC as [ALLOC_UB | [ALLOC_ERR | [ALLOC_OOM | ALLOC_SUC]]].
-    - (* UB *)
-      destruct ALLOC_UB as [ub_msg [ALLOC_UB | [sab [a [ALLOC_UB []]]]]].
-      apply ALLOCINV in ALLOC_UB.
-      destruct ALLOC_UB as [[ms_final [ptr ALLOC_UB]] | [oom_msg ALLOC_UB]];
-        inv ALLOC_UB.
-    - (* ERR *)
-      destruct ALLOC_ERR as [err_msg [MAP [spec_msg [ALLOC_ERR | [sab [a [ALLOC_ERR []]]]]]]].
-      apply ALLOCINV in ALLOC_ERR.
-      destruct ALLOC_ERR as [[ms_final [ptr ALLOC_ERR]] | [oom_msg ALLOC_ERR]];
-        inv ALLOC_ERR.
-    - (* OOM *)
-      destruct ALLOC_OOM as [err_msg [MAP [spec_msg [ALLOC_OOM | [sab [a [ALLOC_OOM []]]]]]]].
-      apply ALLOCINV in ALLOC_OOM.
-      destruct ALLOC_OOM as [[ms_final [ptr ALLOC_OOM]] | [oom_msg ALLOC_OOM]];
-        inv ALLOC_OOM.
-
-      Import Raise.
-      apply raiseOOM_map_itree_inv in MAP.
-      rewrite MAP in K.
-      rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_OOM _)) in K.
-      apply raiseOOM_map_itree_inv in K.
-
-      rewrite K in UNDEF.
-
-      assert (t' ≈ raiseOOM err_msg) as T' by (eapply model_undef_h_oom; eauto).
-
-      exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
-      split.
-      +  exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
-         (* exists (Ret2 genv (lenv, stack) (DVALUE_I1 DynamicValues.Int1.one)). *)
-         split.
-         * cbn.
-           go_prime.
-
-           (* TODO: ret lemma for interp_memory_prop *)
-           unfold interp_memory_prop.
-           cbn.
-           rewrite map_ret.
-           eapply interp_prop_ret_refine; reflexivity.
-         * red.
-           eapply interp_prop_ret_pure; eauto.
-      + rewrite T'.
-        eapply refine_oom_h_raise_oom; typeclasses eauto.
-    - (* Success *)
-      exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
-      split.
-      +  exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
-         (* exists (Ret2 genv (lenv, stack) (DVALUE_I1 DynamicValues.Int1.one)). *)
-         split.
-         * cbn.
-           go_prime.
-
-           (* TODO: ret lemma for interp_memory_prop *)
-           unfold interp_memory_prop.
-           cbn.
-           rewrite map_ret.
-           eapply interp_prop_ret_refine; reflexivity.
-         * red.
-           eapply interp_prop_ret_pure; eauto.
-      + (* t' is the successful result of t_alloc *)
-        destruct ALLOC_SUC as [sid'' [ ms'' [x [MAP ALLOC_SUC]]]].
-        destruct ALLOC_SUC as [ms''' [a [ALLOC [MEQ XEQ]]]].
-        subst.
-
-        apply itree_map_ret_inv in MAP as [x [TA EQ]].
-        rewrite TA in K.
-        setoid_rewrite bind_ret_l in K.
-
-        specialize (INTERP x).
-        forward INTERP.
-        { constructor; auto.
-        }
-
-        apply interp_prop_ret_inv in INTERP.
-        destruct INTERP as [[lenv' [stack' res']] [R2 K']].
-        rewrite K' in K.
-
-        apply itree_map_ret_inv in K.
-        destruct K as [[ms'''' [sid'''' [lenv'''' [stack'''' res]]]] [TPRE ENV]].
-        inv ENV.
-
-        unfold model_undef_h in UNDEF.
-
-        rewrite TPRE in UNDEF.
-
-        eapply interp_prop_ret_inv in UNDEF.
-        destruct UNDEF as [r2 [RPICK T']].
-        destruct r2 as [ms''''' [sid''''' z]].
-        rewrite T'.
-        cbn.
-
-        inv RPICK.
-        inv R2.
-
-        (* Not quite reflexivity... *)
-        unfold refine_OOM_h.
-        apply interp_prop_ret_refine.
-        do 2 red.
-        unfold refine_res2, refine_res1.
-        repeat constructor; auto.
-  Qed.
 End Finite.
