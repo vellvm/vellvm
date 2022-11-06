@@ -7,6 +7,7 @@ From Vellvm Require Import
      Utils.Tactics
      Utils.MonadEq1Laws
      Utils.InterpProp
+     Utils.ITreeMap
      Utils.Raise
      Theory.DenotationTheory
      Theory.InterpreterMCFG
@@ -31,16 +32,6 @@ Require Import Morphisms.
 Require Import Paco.paco.
 
 Require Import Coq.Program.Equality.
-
-(* TODO: Move all of this stuff *)
-Lemma interp_prop_vis :
-  forall {E F X} (h_spec : E ~> PropT F) {R} (RR : relation R)
-    (e : E X) kk t,
-    interp_prop h_spec RR (Vis e kk) t <->
-      (x <- h_spec X e;;
-       interp_prop h_spec RR (kk x)) t.
-Proof.
-Admitted.
 
 Module Infinite.
   Import TopLevelBigIntptr.
@@ -84,15 +75,9 @@ Module Infinite.
     intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2.
     subst.
     split; intros INTERP.
-  Admitted.
-
-  #[global] Instance refine_OOM_h_eutt_RR_Proper {T : Type} {RR : relation T} {E F}:
-    Proper (eutt RR ==> eutt RR ==> iff) (@refine_OOM_h E F T RR).
-  Proof.
-    unfold Proper, respectful.
-    intros x1 x2 X y1 y2 Y.
-    split; intros REFINE.
-  Admitted.
+    rewrite <- H; eauto.
+    rewrite H; eauto.
+  Qed.
 
   Lemma model_undef_h_oom :
     forall {R} {E F}
@@ -101,6 +86,7 @@ Module Infinite.
       model_undef_h eq (raiseOOM oom_msg) t' ->
       t' ≈ raiseOOM oom_msg.
   Proof.
+
   Admitted.
 
   Lemma model_undef_h_ret_pure :
@@ -161,22 +147,6 @@ Module Infinite.
 
     (* apply eutt_Ret. *)
     (* repeat constructor; auto. *)
-  Admitted.
-
-  Lemma interp_memory_prop_ret_inv :
-    forall {E F : Type -> Type}
-      `{FAIL : FailureE -< F}
-      `{UB : UBE -< F}
-      `{OOM : OOME -< F}
-      {X} (x : X) sid m (t : itree (E +' F) (MMEP.MMSP.MemState * (store_id * X))%type),
-      interp_memory_prop eq (Ret x) sid m t ->
-      Functor.fmap (fun '(_, (_, x)) => x) t ≈ Ret x.
-  Proof.
-    intros E F FAIL UB OOM X x sid m t INTERP.
-    unfold interp_memory_prop in INTERP.
-  (*   apply interp_memory_prop_ret_inv in INTERP. *)
-  (*   destruct INTERP as [r2 [EQ MAP]]; subst; auto. *)
-    (* Qed. *)
   Admitted.
 
 

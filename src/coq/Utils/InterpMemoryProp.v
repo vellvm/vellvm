@@ -341,6 +341,56 @@ Section interp_memory_prop.
     split; intros; [rewrite <- H, <- H0 | rewrite H, H0]; auto.
   Qed.
 
+  Lemma interp_memory_prop_ret_inv:
+    forall r1 t,
+      interp_memory_prop (ret r1) t -> exists r2 , RR r1 r2 /\ t ≈ ret r2.
+  Proof.
+    intros r1 t INTERP.
+    punfold INTERP.
+    red in INTERP.
+    setoid_rewrite itree_eta with (t:=t).
+    remember (observe (ret r1)); remember (observe t).
+    clear Heqi0.
+    induction INTERP; subst; pclearbot; intros.
+    - exists r2.
+      cbn in Heqi.
+      inv Heqi.
+      split; auto.
+      cbn.
+      reflexivity.
+    - inv Heqi.
+    - inv Heqi.
+    - cbn in INTERP.
+      inv INTERP.
+      + apply simpobs in H.
+        exists r2; split; auto.
+        rewrite H.
+        rewrite tau_eutt.
+        reflexivity.
+      + specialize (IHINTERP eq_refl).
+        destruct IHINTERP as [r2 [RRr1r2 EQ]].
+        exists r2; split; auto.
+        rewrite <- itree_eta in EQ.
+        rewrite EQ.
+        rewrite tau_eutt.
+        reflexivity.
+    - inv Heqi.
+  Qed.
+
+  Lemma interp_memory_prop_vis :
+    forall {X} (e : _ X) k t ta k' s1 s2,
+      t ≈ x <- ta;; k' x ->
+      h_spec X e s1 s2 ta ->
+      (forall (a : X) (b : stateful X),
+      Returns a (trigger e) ->
+      Returns b ta -> a = snd (snd b) -> interp_memory_prop (k a) (k' b)) ->
+      interp_memory_prop (Vis e k) t.
+  Proof.
+    intros.
+    red; pstep; econstructor; eauto.
+    intros. left; eauto. eapply H1; auto.
+  Qed.
+
 End interp_memory_prop.
 
 Arguments interp_memory_prop {_ _ _ _} _ {_ _}.
@@ -429,3 +479,4 @@ Proof.
       punfold REL. setoid_rewrite itree_eta at 1 ; rewrite <- Heqi0, <- itree_eta; auto.
     + econstructor; eauto.
 Qed.
+
