@@ -47,12 +47,12 @@ Section interp_memory_prop.
   Notation interp_memory_h_spec := (forall T, E T -> stateT S1 (stateT S2 (PropT F)) T).
   Notation stateful R := (S2 * (S1 * R))%type.
 
-  Context (h_spec : interp_memory_h_spec) {R1 R2 : Type} (RR : stateful R1 -> stateful R2 -> Prop).
+  Context (h_spec : interp_memory_h_spec) {R1 R2 : Type} (RR : R1 -> stateful R2 -> Prop).
 
   Inductive interp_memory_PropTF
-            (b1 b2 : bool) (sim : itree E (stateful R1) -> itree F (stateful R2) -> Prop)
-            : itree' E (stateful R1) -> itree' F (stateful R2) -> Prop :=
-  | Interp_Memory_PropT_Ret : forall (r1 : stateful R1) (r2 : stateful R2) (REL: RR r1 r2),
+            (b1 b2 : bool) (sim : itree E R1 -> itree F (stateful R2) -> Prop)
+            : itree' E R1 -> itree' F (stateful R2) -> Prop :=
+  | Interp_Memory_PropT_Ret : forall (r1 : R1) (r2 : stateful R2) (REL: RR r1 r2),
       interp_memory_PropTF b1 b2 sim (RetF r1) (RetF r2)
 
   | Interp_Memory_PropT_Tau : forall t1 t2 (HS: sim t1 t2),
@@ -71,10 +71,11 @@ Section interp_memory_prop.
   | Interp_Memory_PropT_Vis : forall A (e : E A)
                          (ta : itree F (stateful A))
                          t2 s1 s2
-                         (k1 : A -> itree E (stateful R1))
+                         (k1 : A -> itree E R1)
                          (k2 : stateful A -> itree F (stateful R2))
                          (HK : forall a b, Returns a (trigger e) ->
-                                    Returns b ta ->
+                                           Returns b ta ->
+                                           a = snd (snd b) ->
                                     sim (k1 a) (k2 b)),
         h_spec _ e s1 s2 ta ->
         t2 ≈ ta >>= k2 ->
@@ -231,7 +232,7 @@ Section interp_memory_prop.
           change (VisF e0 k3) with (observe (Vis e0 k3)).
           eapply H1; eauto.
           intros.
-          left. specialize (HK _ b H2 H3). pclearbot.
+          left. specialize (HK _ b H2 H3 H4). pclearbot.
           eapply paco2_mon; eauto. intros; inv PR.
           rewrite itree_eta in H0; rewrite Heqot in H0.
           rewrite <- H0; apply eqit_Vis.
@@ -255,7 +256,7 @@ Section interp_memory_prop.
       rewrite Heqi0, <- itree_eta in H0; clear Heqi0.
       econstructor; eauto.
       intros; eauto.
-      specialize (HK _ _ H1 H2). pclearbot.
+      specialize (HK _ _ H1 H2 H3). pclearbot.
       left. eapply paco2_mon; intros; eauto.
       inv PR. assert (y ≈ y') by (pstep; auto).
       rewrite <- H1; auto.
@@ -312,7 +313,7 @@ Section interp_memory_prop.
           intros. right.
           eapply CIH; eauto.
           specialize (REL a). pclearbot. punfold REL.
-          specialize (HK _ _ H1 H2). pclearbot.
+          specialize (HK _ _ H1 H2 H3). pclearbot.
           punfold HK.
         * eapply IHREL; eauto. pstep_reverse.
           assert (interp_memory_prop (Tau t0) t2) by (pstep; auto).
@@ -327,7 +328,7 @@ Section interp_memory_prop.
       hinduction EQ before CIH; intros; try inversion Heqi1; pclearbot; inv Heqi.
       + dependent destruction H3.
         econstructor; eauto.
-        intros. specialize (HK _ _ H1 H2); pclearbot.
+        intros. specialize (HK _ _ H1 H2 H3); pclearbot.
         right; eapply CIH; [ | punfold HK].
         specialize (REL a).
         punfold REL. setoid_rewrite itree_eta at 1 ; rewrite <- Heqi0, <- itree_eta; auto.

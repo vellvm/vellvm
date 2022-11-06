@@ -28,7 +28,7 @@ From ExtLib Require Import
 
 (* Needs to be after ITree.Events.State *)
 From Vellvm.Utils Require Import
-     PropT.
+     PropT InterpMemoryProp.
 
 Require Import Paco.paco.
 
@@ -413,24 +413,14 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       eapply handle_intrinsic_prop; auto.
     Defined.
 
-    Definition interp_memory_prop_h' : forall T, Effin T -> MemStateT (PropT Effout) T
-      := case_ E_trigger' (case_ my_handle_intrinsic_prop' (case_ my_handle_memory_prop' F_trigger')).
-
     Definition interp_memory_prop_h : forall T, Effin T -> MemStateFreshT (PropT Effout) T
       := case_ E_trigger (case_ my_handle_intrinsic_prop (case_ my_handle_memory_prop F_trigger)).
 
-    Definition interp_memory_prop' {R} (RR : R -> R -> Prop) :
-      itree Effin R -> MemStateT (PropT Effout) R :=
-      fun (t : itree Effin R) (ms : MemState) (t' : itree Effout (MemState * R)) =>
-        interp_prop (OOM := void1) (fun T e t => exists ms', @interp_memory_prop_h' T e ms (fmap (fun x => (ms', x)) t)) RR t (fmap snd t').
-
-    (* Things line up a lot better if interp_memory_prop has the same
-       type signature as interp_memory... *)
-    Definition interp_memory_prop {R} (RR : R -> R -> Prop) :
+    Definition interp_memory_prop {R} RR :
       itree Effin R -> MemStateFreshT (PropT Effout) R :=
       fun (t : itree Effin R) (sid : store_id) (ms : MemState) (t' : itree Effout (MemState * (store_id * R))) =>
-        interp_prop (OOM := void1) (fun T (e : Effin T) (t : itree Effout T) => exists (sid' : store_id) (ms' : MemState),
-                         @interp_memory_prop_h T e sid ms (fmap (fun (x : T) => (ms', (sid', x))) t)) RR t ((fmap (fun '(_, (_, x)) => x) t') : itree Effout R).
+        interp_memory_prop interp_memory_prop_h RR t t'.
+
   End Interpreters.
 End MemorySpecInterpreter.
 
@@ -733,6 +723,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
     Lemma my_handle_intrinsic_prop_correct {T} i sid ms :
       my_handle_intrinsic_prop i sid ms (my_handle_intrinsic (T := T) i sid ms).
+    Proof.
     Admitted.
 
     Lemma my_handle_memory_prop_correct {T} m sid ms :
@@ -753,7 +744,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
      *)
     Lemma interp_memory_correct :
       forall {T} t (ms : MemState) (sid : store_id),
-        interp_memory_prop eq t sid ms (@interp_memory T t sid ms).
+        interp_memory_prop (fun x '(_, (_, y)) => eq x y) t sid ms (@interp_memory T t sid ms).
     Proof.
       intros T t ms sid.
       red.
@@ -761,7 +752,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       unfold interp_memory.
       cbn.
       match goal with
-      | |- interp_prop _ _ _ ?i => remember i
+      | |- InterpMemoryProp.interp_memory_prop _ _ _ ?i => remember i
       end.
       match goal with
       | [H : i = ?r |- _] => assert (i ≅ r) by (subst; reflexivity)
@@ -769,6 +760,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       rename H2 into EQ.
 
       revert t i EQ.
+      revert ms sid.
       pcofix CIH.
       intros.
       pstep.
@@ -781,21 +773,13 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       punfold HT; red in HT.
 
       hinduction HT before CIH; intros; subst; try inv CHECK.
-      - match goal with
-        | [ H : eqitF _ _ _ _ _ _ (observe (ITree.map _ ?l)) |- _] => remember l
-        end.
-        force_rewrite: @interp_memory_ret in Heqi0. subst.
-        unfold ITree.map in EQ. force_rewrite: @bind_ret_l in EQ.
-        assert (i = Ret r2). apply bisimulation_is_eq; pstep; auto.
+      - force_rewrite: @interp_memory_ret in EQ.
+        assert (i = Ret (ms, (sid, r2))). apply bisimulation_is_eq; pstep; auto.
         rewrite H2.
         constructor; auto.
 
       - pclearbot.
-        match goal with
-        | [ H : eqitF _ _ _ _ _ _ (observe (ITree.map _ ?l)) |- _] => remember l
-        end.
-        force_rewrite: @interp_memory_tau in Heqi0. subst.
-        unfold ITree.map in EQ. force_rewrite: @bind_tau in EQ.
+        force_rewrite: @interp_memory_tau in EQ. subst.
         match goal with
         | [ H : eqitF _ _ _ _ _ _ (observe (Tau ?l)) |- _] => remember l
         end.
@@ -807,10 +791,9 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
       - pclearbot.
         match goal with
-        | [ H : eqitF _ _ _ _ _ _ (observe (ITree.map _ ?l)) |- _] => remember l
+        | [ H : eqitF _ _ _ _ _ _ (observe ?l) |- _] => remember l
         end.
         force_rewrite: @interp_memory_vis in Heqi0. subst.
-        unfold ITree.map in EQ. cbn in EQ. force_rewrite: @bind_bind in EQ.
         match goal with
         | [ H : eqitF _ _ _ _ _ _ (observe ?l) |- _] => remember l
         end.
@@ -818,25 +801,26 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         assert (i = i0).
         apply bisimulation_is_eq; pstep; red; auto.
         subst.
-        eapply Interp_PropT_Vis; eauto.
-        { intros. right; eapply CIH. Unshelve.
-          2 : exact (fun a => ITree.map (fun '(_, (_, x)) => x) (State.interp_state interp_memory_h (k2 a) sid ms)).
-          2 : shelve. reflexivity. }
+        eapply Interp_Memory_PropT_Vis; eauto.
+        { intros. right. destruct b, p. subst. eapply CIH.
+          Unshelve.
+          5 : exact (fun '(m, (s, a)) => State.interp_state interp_memory_h (k2 a) s m).
+          cbn in *.
+          2 : { eapply (interp_memory_h e sid ms). }
+          2 : exact sid. 2 : exact ms.
+          reflexivity. }
         2 : {
           Unshelve.
-          2 : exact ('(_,(_,u)) <- interp_memory_h e sid ms ;; Ret u).
-          setoid_rewrite bind_bind.
           eapply eutt_clo_bind; [ reflexivity | intros; subst ].
-          destruct u2, p. rewrite bind_ret_l. rewrite bind_tau.
-          rewrite tau_eutt. unfold ITree.map. cbn. unfold interp_memory.
-          admit. } (* FIXME: Generalize type of [h_spec] in interp_prop *)
-        + eexists sid,ms; red. unfold case_, case_, Case_sum1, case_sum1.
+          destruct u2, p. cbn.
+          rewrite tau_eutt. reflexivity. }
+        + red. unfold case_, case_, Case_sum1, case_sum1.
           destruct e as [ | [ | [ | ]]]; cbn.
           1,4 : red; tau_steps; apply eqit_Vis; intros;
             tau_steps; reflexivity.
-          * admit. (* apply my_handle_intrinsic_prop *)
-          * admit. (* apply my_handle_memory_prop *)
-    Admitted.
+          * eapply my_handle_intrinsic_prop_correct.
+          * eapply my_handle_memory_prop_correct.
+    Qed.
 
   End Interpreters.
 End MemoryExecInterpreter.
