@@ -33,15 +33,26 @@ Require Import Paco.paco.
 
 Require Import Coq.Program.Equality.
 
-(* TODO: Move all of this stuff *)
-Lemma interp_prop_vis :
-  forall {E F X} (h_spec : E ~> PropT F) {R} (RR : relation R)
-    (e : E X) kk t,
-    interp_prop h_spec RR (Vis e kk) t <->
-      (x <- h_spec X e;;
-       interp_prop h_spec RR (kk x)) t.
-Proof.
-Admitted.
+(* This file contains examples of program transformations allowed by the new
+    memory model:
+
+  Most notably, the infinite memory model allows for dead allocation removal
+  while the finite memory model does not. The main examples are as follows:
+
+  1. Example [remove_alloc_block]
+      Dead allocation removal (only allowed in infinite model):
+
+      alloc_tree ⪯ ret_tree
+
+  2. Example [remove_alloc_ptoi_block]
+    Dead allocation and ptoi cast removal (only allowed in infinite model):
+
+      ptoi_itree ⪯ ret_tree
+
+  3. Example [add_alloc]
+     Adding an allocation (allowed in both the infinite and finite model ):
+
+      ret_tree ⪯ alloc_tree *)
 
 Module Infinite.
   Import TopLevelBigIntptr.
