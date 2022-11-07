@@ -52,6 +52,8 @@ From Coq Require Import
      Relations
      RelationClasses.
 
+Require Import Paco.paco.
+
 Import ListNotations.
 Import ListUtil.
 Import Utils.Monads.
@@ -153,6 +155,17 @@ Module LLVMParams64BitIntptr := LLVMParams.Make FinAddr IP64Bit FinSizeof FinPTO
 Module MemoryBigIntptr := MakeFiniteMemory LLVMParamsBigIntptr.
 Module Memory64BitIntptr := MakeFiniteMemory LLVMParams64BitIntptr.
 
+From Coq Require Import Program.Equality.
+
+Tactic Notation "raise_abs:" hyp(H) :=
+  unfold raise_oom, raise_ub, raise_error in H;
+  cbn in H; unfold raiseOOM, raiseUB, LLVMEvents.raise in H;
+  repeat rewrite bind_trigger in H;
+  repeat red in H; unfold subevent in H;
+  punfold H; inversion H; subst;
+  try match goal with
+  | [ H : existT _ _ _ = existT _ _ _ |- _] => dependent destruction H
+  end; try inv H.
 
 Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntptr MemoryBigIntptr.MP MemoryBigIntptr.MMEP.MMSP MemoryBigIntptr.MMEP.MemSpec.
   (* Intptrs are "big" *)
@@ -197,7 +210,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Import SpecInterp.
   Import ExecInterp.
 
-  Definition Eff := FailureE +' OOME +' UBE.
+  Notation Eff := (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE).
 
   Import Eq.
   Import MMSP.
@@ -233,7 +246,9 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
       ret (ptr, ptrs) {{ms}} ∈ {{ms}} find_free_block len pr.
   Proof.
     intros ms len pr.
-    pose proof (find_free_block_correct len pr (fun _ _ => True) (Eff := Eff) (MemM:=MemStateFreshT (itree Eff))) as GET_FREE.
+    pose proof @find_free_block_correct as GET_FREE.
+    specialize (GET_FREE (MemStateFreshT (itree Eff)) Eff MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ _
+                  MemStateFreshT_MemMonad len pr (fun _ _ => True)).
     red in GET_FREE.
     specialize (GET_FREE ms 0%N).
     forward GET_FREE.
@@ -310,10 +325,8 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
       { (* Error, should be contradiction *)
         cbn in REST.
         repeat setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_Fail _)) in REST.
-        unfold raiseOOM in REST.
-        unfold LLVMEvents.raise in REST.
-        admit.
-      }
+
+        raise_abs: REST. }
 
       cbn in REST.
       repeat setoid_rewrite bind_ret_l in REST.
@@ -389,10 +402,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
       { (* Error, should be contradiction *)
         cbn in REST.
         repeat setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_Fail _)) in REST.
-        exfalso.
-        (* eapply rbm_raise_ret_inv with (rbm_raise:=fun X s => @LLVMEvents.raise _ X _ s) in REST. *)
-        admit.
-      }
+        raise_abs:REST. }
 
       tauto.
     }
@@ -497,15 +507,13 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
         destruct RES_T_ALLOC as [oom_msg RES_T_ALLOC].
         rewrite RES_T_ALLOC in ALLOC_EXEC.
         setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_OOM _)) in ALLOC_EXEC.
-        (* TODO: Contradiction in ALLOC_EXEC *)
-        admit.
+        raise_abs: ALLOC_EXEC.
       - (* UB *)
         cbn in RES_T_ALLOC.
         destruct RES_T_ALLOC as [ub_msg RES_T_ALLOC].
         rewrite RES_T_ALLOC in ALLOC_EXEC.
         setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_UB _)) in ALLOC_EXEC.
-        (* TODO: Contradiction in ALLOC_EXEC *)
-        admit.
+        raise_abs: ALLOC_EXEC.
       - (* Error *)
         exfalso.
         clear - ALLOC_SPEC.
