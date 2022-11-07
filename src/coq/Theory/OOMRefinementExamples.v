@@ -165,19 +165,15 @@ Module Infinite.
 
     eapply interp_memory_prop_ret_inv in INTERP.
     destruct INTERP as [r2 [INTERP_TT EQ]].
-    apply itree_map_ret_inv in EQ.
-    destruct EQ as [[ms [sid' [lenv' [st res]]]] [TPRE RES]].
-    inv RES.
-    inv H.
-
-    rewrite TPRE in UNDEF.
+    rewrite EQ in UNDEF. clear EQ.
     eapply model_undef_h_ret_inv in UNDEF.
     rewrite UNDEF.
 
     apply eutt_Ret.
-    repeat constructor; auto.
-  Admitted.
-
+    repeat red; cbn. destruct r2, p, p.
+    inv INTERP_TT.
+    repeat econstructor; eauto.
+  Qed.
 
   Definition alloc_code : code dtyp :=
     [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) [])
@@ -259,34 +255,52 @@ Module Infinite.
 
     unfold t_ret in *.
     eapply interp_mcfg4_ret_inv in INTERP.
+
+    exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)); split; cycle 1.
+    { eapply interp_prop_Proper_eq; try typeclasses eauto. 2: reflexivity. eapply eutt_flip. symmetry; eauto.
+      pstep; constructor; repeat red; repeat econstructor; eauto. }
+    repeat red.
+
     exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
-    split.
-    - cbn in *.
+    split; cycle 1.
+    { eapply model_undef_h_ret_pure; typeclasses eauto. }
 
-      (* TODO: Should make lemmas about ret, etc for interp_mcfg4 *)
-      unfold interp_mcfg4 in *.
-      unfold model_undef in *.
+    (* TODO: Should make lemmas about ret, etc for interp_mcfg4 *)
+    unfold interp_mcfg4 in *.
+    unfold model_undef in *.
 
-      exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
+    unfold t_alloc.
+    setoid_rewrite bind_trigger.
+    setoid_rewrite interp_intrinsics_vis.
+    setoid_rewrite bind_trigger.
+    setoid_rewrite interp_global_vis.
+    setoid_rewrite interp_local_stack_bind.
+    cbn.
+    setoid_rewrite bind_trigger.
+    setoid_rewrite interp_local_stack_vis.
+    rewrite bind_bind. cbn.
+    setoid_rewrite bind_trigger.
+    setoid_rewrite bind_vis.
+    repeat setoid_rewrite bind_ret_l.
+    setoid_rewrite interp_local_stack_ret.
+    setoid_rewrite bind_ret_l.
+    setoid_rewrite interp_intrinsics_ret.
+    setoid_rewrite interp_global_ret.
+    setoid_rewrite interp_local_stack_ret.
+    cbn.
 
-      Import MMEP.MMSP.
-      Import MemoryBigIntptr.MMEP.MMSP.
-      epose proof allocate_dtyp_spec_can_always_succeed m m (mkMemState (ms_memory_stack m) (next_provenance (ms_provenance m))) (DTYPE_I 64) 1 _ _ _ _ _ as (ms_final & addr & ALLOC).
-
-      split.
-      + go.
-        rewrite bind_trigger.
-        repeat setoid_rewrite bind_ret_l.
-        setoid_rewrite interp_local_stack_ret.
-        repeat setoid_rewrite bind_ret_l.
-
-        (* LEMMA *)
-        unfold interp_memory_prop.
-        cbn.
-
-        Opaque MMEP.MemSpec.allocate_dtyp_spec.
-
-        pstep; eapply InterpMemoryProp.Interp_Memory_PropT_Vis.
+    (* LEMMA *)
+    eapply interp_memory_prop_vis.
+    - Unshelve. all : eauto.
+      2 : exact (ret (m, (sid, DVALUE_I1 one))).
+      2 : { intros (?&?&?). exact (ret (m0, (s, (lenv, stack, (genv, d))))). }
+      setoid_rewrite bind_ret_l. red. reflexivity.
+    - repeat red. do 3 right. eexists _,_,_. split; [ reflexivity | ].
+      repeat red. admit.
+    - intros. destruct b as (?&?&?).
+      cbn; subst. Unshelve.
+      pstep; constructor; eauto.
+      eapply Returns_ret_inv in H0. inv H0; reflexivity.
   Admitted.
 
   Definition instr_E_to_L0 {T : Type} : instr_E T -> itree L0 T :=
@@ -333,50 +347,71 @@ Module Infinite.
     setoid_rewrite interp_local_stack_ret in INTERP.
 
     eapply interp_memory_prop_ret_inv in INTERP.
-    eapply itree_map_ret_inv in INTERP.
-    destruct INTERP as [[ms' [sid' [lenv' [stack' res]]]] [TPRE EQ]].
-    inv EQ.
+    destruct INTERP as [[ms' [sid' [[lenv' stack'] [genv' res]]]] [TPRE EQ]].
 
-    rewrite TPRE in UNDEF.
+    inv TPRE. rewrite EQ in UNDEF.
     apply model_undef_h_ret_inv in UNDEF.
 
     (* TODO: Turn this into an interp_memory_prop lemma *)
     Import MMEP.MMSP.
     Import MemoryBigIntptr.MMEP.MMSP.
     Import MapMonadExtra.
-    epose proof allocate_dtyp_spec_can_always_succeed m m (mkMemState (ms_memory_stack m) (next_provenance (ms_provenance m))) (DTYPE_I 64) 1 _ _ _ _ _ as (ms_final & addr & ALLOC).
+    epose proof allocate_dtyp_spec_can_always_succeed m m
+          (mkMemState (ms_memory_stack m) (next_provenance (ms_provenance m)))
+          (DTYPE_I 64) 1 _ _ _ _ _ as (ms_final & addr & ALLOC).
+    Unshelve.
+    all: eauto. 5 : intros H; inv H.
+    2-4: shelve.
 
+    exists t'.
+    split; [ | reflexivity ].
+    eexists.
+    split; [| rewrite UNDEF; apply model_undef_h_ret_pure; auto].
+    cbn in *.
+    go.
+    cbn.
 
-    exists (Ret5 genv (FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
-    split.
-    - exists (Ret5 genv (FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
-      cbn in *.
-      go.
-      cbn.
+    repeat setoid_rewrite bind_ret_l.
+    repeat setoid_rewrite bind_bind.
+    repeat setoid_rewrite bind_ret_l.
 
-      repeat setoid_rewrite bind_ret_l.
-      repeat setoid_rewrite bind_bind.
-      repeat setoid_rewrite bind_ret_l.
+    setoid_rewrite translate_ret.
+    setoid_rewrite bind_ret_l.
+    cbn.
 
-      setoid_rewrite translate_ret.
-      setoid_rewrite bind_ret_l.
-      cbn.
+    (* LEMMA *)
+    unfold interp_memory_prop.
+    cbn.
 
-      split; [| apply model_undef_h_ret_pure; auto].
+    rewrite interp_bind with (f:=@instr_E_to_L0);
+      rewrite interp_trigger; cbn; rewrite subevent_subevent.
+    go.
+    rewrite bind_trigger.
+    setoid_rewrite bind_ret_l.
+    setoid_rewrite interp_local_stack_ret.
+    setoid_rewrite bind_ret_l.
 
-      (* LEMMA *)
-      unfold interp_memory_prop.
-      cbn.
-
-      Opaque MMEP.MemSpec.allocate_dtyp_spec.
-
-      rewrite interp_bind with (f:=@instr_E_to_L0);
-        rewrite interp_trigger; cbn; rewrite subevent_subevent.
-      go.
-      rewrite bind_trigger.
-      setoid_rewrite bind_ret_l.
-      setoid_rewrite interp_local_stack_ret.
-      setoid_rewrite bind_ret_l.
+    eapply interp_memory_prop_vis.
+    Unshelve.
+    8 : { intros.
+          destruct x as (?&?&?).
+          exact (ret (m0, (s, (lenv', stack', (genv', d))))). }
+    cbn. setoid_rewrite bind_ret_l.
+    Unshelve.
+    9: exact (ms', (sid', (DVALUE_I1 DynamicValues.Int1.one))). all : eauto.
+    1: cbn; reflexivity.
+    2 : {
+      intros. destruct b, p. subst.
+      force_rewrite @bind_trigger.
+      force_rewrite @interp_vis.
+      cbn. force_rewrite @bind_trigger. admit. }
+    - unfold my_handle_memory_prop.
+      unfold MemPropT_lift_PropT_fresh.
+      repeat red in ALLOC. destruct ALLOC.
+      right; right; right.
+      do 3 eexists; split.
+      -- unfold ret, Monad_itree. red. reflexivity.
+      -- cbn. eexists _,_ ;split; eauto.
   Admitted.
 
   Lemma remove_alloc_ptoi_block :
@@ -404,21 +439,17 @@ Module Infinite.
     setoid_rewrite interp_global_ret in INTERP.
     setoid_rewrite interp_local_stack_ret in INTERP.
 
-
     eapply interp_memory_prop_ret_inv in INTERP.
-    eapply itree_map_ret_inv in INTERP.
-    destruct INTERP as [[ms' [sid' [lenv' [stack' res]]]] [TPRE EQ]].
-    inv EQ.
 
-    rewrite TPRE in UNDEF.
+    destruct INTERP as [[ms' [sid' [[lenv' stack'] [genv' res]]]] [TPRE EQ]].
+    inv TPRE.
+
+    rewrite EQ in UNDEF.
     apply model_undef_h_ret_inv in UNDEF.
 
     epose proof allocate_dtyp_spec_can_always_succeed m _ _ (DTYPE_I 64) 1 _ _ _ _ _ as (ms_final & addr & ALLOC).
 
-    exists (Ret5 genv (FMapAList.alist_add (Name "i")
-                                      (UVALUE_Conversion Ptrtoint DTYPE_Pointer (UVALUE_Addr addr) DTYPE_IPTR)
-                                      (FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv), stack)
-            sid m (DVALUE_I1 DynamicValues.Int1.one)).
+    exists t'.
     split.
     - exists (Ret5 genv (FMapAList.alist_add (Name "i")
                                          (UVALUE_Conversion Ptrtoint DTYPE_Pointer (UVALUE_Addr addr) DTYPE_IPTR)
