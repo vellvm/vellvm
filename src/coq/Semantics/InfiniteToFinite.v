@@ -673,6 +673,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Import EC.
   Import EC.DVC.
 
+  (**  Converting state between the two languages *)
+
+  Definition convert_global_env (g : IS1.LLVM.Global.global_env) : OOM IS2.LLVM.Global.global_env
+    := map_monad (fun '(k, dv) => dv' <- dvalue_convert dv;; ret (k, dv')) g.
+
+  Definition convert_local_env (l : IS1.LLVM.Local.local_env) : OOM IS2.LLVM.Local.local_env
+    := map_monad (fun '(k, uv) => uv' <- uvalue_convert uv;; ret (k, uv')) l.
+
+  (** Converting trees with events in language 1 to trees with events in language 2 *)
+
   (* TODO: move this? *)
   Definition L0_convert_tree {T} (t : itree E1.L0 T) : itree E2.L0 T := interp L0_convert t.
   Definition L1_convert_tree {T} (t : itree E1.L1 T) : itree E2.L1 T := interp L1_convert t.
@@ -749,6 +759,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     : PropT E2.L6 B
     := L4_convert_PropT RB f ts.
 
+  (** Conversions between results at different levels of interpretation *)
+
   (* Ideally we would convert memstates / local envs / local stacks /
      global envs... But for now we can get away with placeholders for
      these because the refine_resX relations used by refine_LX ignores
@@ -786,6 +798,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Definition res_L6_convert_unsafe (res : LLVM1.res_L6) : OOM LLVM2.res_L6
     := res_L5_convert_unsafe res.
 
+  (** Refinements between languages at different levels of interpretation *)
+
   Definition refine_E1E2_L0 (src : itree E1.L0 E1.DV.dvalue) (tgt : itree E2.L0 E2.DV.dvalue) : Prop
     := refine_L0 (L0_convert_tree' dvalue_convert src) tgt.
 
@@ -819,6 +833,42 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
        ignores all of the placeholder values *)
     refine_L6 (L6_convert_PropT refine_res3 res_L6_convert_unsafe srcs) tgts.
 
+  (** Refinement between states *)
+
+  (* Not sure if this is right...
+
+     Presumably if [g1] OOMs when converted, we wouldn't have a [g2]
+     anyway?
+   *)
+  Definition global_refine (g1 : IS1.LLVM.Global.global_env) (g2 : IS2.LLVM.Global.global_env) : Prop
+    := convert_global_env g1 = NoOom g2.
+
+  Lemma global_refine_empty :
+    global_refine [] [].
+  Proof.
+    reflexivity.
+  Qed.
+
+  (** Refinement lemmas *)
+  Lemma refine_E1E2_01 :
+    forall t1 t2 g1 g2,
+      refine_E1E2_L0 t1 t2 ->
+      global_refine g1 g2 ->
+      refine_E1E2_L1 (interp_global t1 g1) (interp_global t2 g2).
+  Proof.
+    intros t1 t2 g1 g2 RL0 GENVS.
+    red in RL0.
+    red in RL0.
+
+    red.
+    red.
+    rewrite <- RL0.
+    cbn.
+
+    (* Perhaps I need a lemma about L1_convert_tree and interp_global here? *)
+  Admitted.
+
+  (** Model *)
   Import DynamicTypes TypToDtyp CFG.
 
   (* TODO: not sure about name... *)
@@ -1454,9 +1504,10 @@ Module InfiniteToFinite.
     intros p.
     unfold model_E1E2_L0.
     red.
+    red.
     unfold L0_convert_tree'.
     unfold L0_convert_tree.
-    unfold EC.L0_convert.
+    (* This literally can't be true. Needs to be able to handle extra OOM *)
   Admitted.
 
   Theorem model_E1E2_L1_sound :
@@ -1478,13 +1529,13 @@ Module InfiniteToFinite.
     unfold model_gen_oom_L1.
     unfold interp_mcfg1.
 
-    (* TODO: obviously g1 and g2 need to be related somehow... Tricky. *)
-    assert (forall t1 t2 g1 g2, refine_E1E2_L0 t1 t2 -> refine_E1E2_L1 (interp_global t1 g1) (interp_global t2 g2)) as RL0L1.
-    admit.
+    apply refine_E1E2_01.
+    { (* Still need to deal with interp_intrinsics... *)
+      (* eapply model_E1E2_L0. *)
+      admit.
+    }
 
-    apply RL0L1.
-
-    (* Still need to deal with interp_intrinsics... *)
+    apply global_refine_empty.
   Admitted.
 
   Theorem model_E1E2_L6_sound :
@@ -1493,6 +1544,7 @@ Module InfiniteToFinite.
   Proof.
     intros p.
     unfold model_E1E2_L6.
+
     intros tf m_fin.
 
     exists tf.
