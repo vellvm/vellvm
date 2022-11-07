@@ -210,7 +210,8 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Import SpecInterp.
   Import ExecInterp.
 
-  Notation Eff := (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE).
+  Context {E : Type -> Type}.
+  Notation Eff := (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE).
 
   Import Eq.
   Import MMSP.

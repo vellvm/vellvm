@@ -63,7 +63,8 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
 
   Section Interpreters.
 
-    Notation E := ExternalCallE.
+    Context {E : Type -> Type}.
+
     Notation F := (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE).
 
     Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
@@ -395,9 +396,9 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Definition interp_memory_prop_h : forall T, Effin T -> MemStateFreshT (PropT Effout) T
       := case_ E_trigger (case_ my_handle_intrinsic_prop (case_ my_handle_memory_prop F_trigger)).
 
-    Definition interp_memory_prop {R} RR :
-      itree Effin R -> MemStateFreshT (PropT Effout) R :=
-      fun (t : itree Effin R) (sid : store_id) (ms : MemState) (t' : itree Effout (MemState * (store_id * R))) =>
+    Definition interp_memory_prop {R1 R2} (RR : R1 -> R2 -> Prop) :
+      itree Effin R1 -> MemStateFreshT (PropT Effout) R2 :=
+      fun (t : itree Effin R1) (sid : store_id) (ms : MemState) (t' : itree Effout (MemState * (store_id * R2))) =>
         interp_memory_prop interp_memory_prop_h (fun x '(_, (_, y)) => RR x y) t t'.
 
   End Interpreters.
@@ -424,6 +425,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
   Section Interpreters.
 
+    Context {E : Type -> Type}.
     Notation E := ExternalCallE.
     Notation F := (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE).
 
