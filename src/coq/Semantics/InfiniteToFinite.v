@@ -819,6 +819,52 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
        ignores all of the placeholder values *)
     refine_L6 (L6_convert_PropT refine_res3 res_L6_convert_unsafe srcs) tgts.
 
+  Import DynamicTypes TypToDtyp CFG.
+
+  (* TODO: not sure about name... *)
+  Definition model_E1E2_L0
+             (p1 p2 : list
+                        (LLVMAst.toplevel_entity
+                           LLVMAst.typ
+                           (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
+    : Prop :=
+    refine_E1E2_L0
+      (LLVM1.denote_vellvm (DTYPE_I 32%N) "main" LLVM1.main_args (convert_types (mcfg_of_tle p1)))
+      (LLVM2.denote_vellvm (DTYPE_I 32%N) "main" LLVM2.main_args (convert_types (mcfg_of_tle p1))).
+
+  (* TODO: not sure about name... *)
+  Definition model_E1E2_L1
+             (p1 p2 : list
+                        (LLVMAst.toplevel_entity
+                           LLVMAst.typ
+                           (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
+    : Prop :=
+    refine_E1E2_L1
+      (LLVM1.model_oom_L1 p1)
+      (LLVM2.model_oom_L1 p2).
+
+  (* TODO: not sure about name... *)
+  Definition model_E1E2_L2
+             (p1 p2 : list
+                        (LLVMAst.toplevel_entity
+                           LLVMAst.typ
+                           (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
+    : Prop :=
+    refine_E1E2_L2
+      (LLVM1.model_oom_L2 p1)
+      (LLVM2.model_oom_L2 p2).
+
+  (* TODO: not sure about name... *)
+  Definition model_E1E2_L3
+             (p1 p2 : list
+                        (LLVMAst.toplevel_entity
+                           LLVMAst.typ
+                           (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
+    : Prop :=
+    refine_E1E2_L3
+      (LLVM1.model_oom_L3 p1)
+      (LLVM2.model_oom_L3 p2).
+
   (* TODO: not sure about name... *)
   Definition model_E1E2_L4
              (p1 p2 : list
@@ -1399,6 +1445,47 @@ Module InfiniteToFinite.
   Tactic Notation "force_rewrite" constr(H) "in" hyp(H') :=
     let HB := fresh "HB" in
     pose proof @H as HB; eapply bisimulation_is_eq in HB; rewrite HB in H'; clear HB.
+
+
+  Theorem model_E1E2_L0_sound :
+    forall (p : LLVM_syntax),
+      model_E1E2_L0 p p.
+  Proof.
+    intros p.
+    unfold model_E1E2_L0.
+    red.
+    unfold L0_convert_tree'.
+    unfold L0_convert_tree.
+    unfold EC.L0_convert.
+  Admitted.
+
+  Theorem model_E1E2_L1_sound :
+    forall (p : LLVM_syntax),
+      model_E1E2_L1 p p.
+  Proof.
+    intros p.
+    red.
+
+  (* Maybe I need some lemmas akin to these:
+
+    Lemma refine_34 : forall t1 t2,
+        refine_L3 t1 t2 -> refine_L4 (model_undef refine_res3 t1) (model_undef refine_res3 t2).
+
+    But for crossing the infinite / finite boundary...
+
+   *)
+    unfold model_oom_L1.
+    unfold model_gen_oom_L1.
+    unfold interp_mcfg1.
+
+    (* TODO: obviously g1 and g2 need to be related somehow... Tricky. *)
+    assert (forall t1 t2 g1 g2, refine_E1E2_L0 t1 t2 -> refine_E1E2_L1 (interp_global t1 g1) (interp_global t2 g2)) as RL0L1.
+    admit.
+
+    apply RL0L1.
+
+    (* Still need to deal with interp_intrinsics... *)
+  Admitted.
 
   Theorem model_E1E2_L6_sound :
     forall (p : LLVM_syntax),
