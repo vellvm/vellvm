@@ -7,8 +7,10 @@ From Vellvm Require Import
      Utils.Tactics
      Utils.MonadEq1Laws
      Utils.InterpProp
+     Utils.InterpMemoryProp
      Utils.ITreeMap
      Utils.Raise
+     Utils.Tactics
      Theory.DenotationTheory
      Theory.InterpreterMCFG
      Handlers.MemoryModelImplementation.
@@ -80,14 +82,41 @@ Module Infinite.
   Qed.
 
   Lemma model_undef_h_oom :
-    forall {R} {E F}
-      `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} `{OOME -< E +' PickUvalueE +' F}
-      oom_msg (t' : itree (E +' F) R),
-      model_undef_h eq (raiseOOM oom_msg) t' ->
+    forall {R} oom_msg (t' : _ R),
+      model_undef_h (E := ExternalCallE) (F := OOME +' UBE +' DebugE +' FailureE) eq (raiseOOM oom_msg) t' ->
       t' ≈ raiseOOM oom_msg.
   Proof.
+    intros R.
+    pcofix CIH.
+    intros oom_msg t' Hmodel.
+    punfold Hmodel.
+    red in Hmodel.
 
-  Admitted.
+    pstep; red.
+    unfold raiseOOM in *.
+    force_rewrite: @bind_trigger in Hmodel.
+    force_rewrite @bind_trigger.
+    remember (observe
+                (vis (ThrowOOM oom_msg) (fun x : void => match x return (itree _ R) with
+                                                         end))).
+
+    hinduction Hmodel before CIH; cbn; intros; inv Heqi; eauto; [ inv e | ].
+    dependent destruction H3.
+    do 20 red in H.
+    setoid_rewrite bind_trigger in H.
+    rewrite H in H0.
+    setoid_rewrite bind_vis in H0.
+    setoid_rewrite bind_ret_l in H0.
+    clear -H0.
+    punfold H0.
+    red in H0.
+    cbn in *.
+    remember (VisF (subevent void (resum IFun void (ThrowOOM oom_msg))) (fun x : void => k2 x)).
+    hinduction H0 before i; intros; inv Heqi.
+    - dependent destruction H1.
+      econstructor; intros; contradiction.
+    - econstructor; auto; eapply IHeqitF.
+  Qed.
 
   Lemma model_undef_h_ret_pure :
     forall {E F : Type -> Type}
@@ -134,19 +163,19 @@ Module Infinite.
 
     go_in INTERP.
 
-    (* eapply interp_memory_prop_ret_inv in INTERP. *)
-    (* destruct INTERP as [r2 [INTERP_TT EQ]]. *)
-    (* apply itree_map_ret_inv in EQ. *)
-    (* destruct EQ as [[ms [sid' [lenv' [st res]]]] [TPRE RES]]. *)
-    (* inv RES. *)
-    (* inv H. *)
+    eapply interp_memory_prop_ret_inv in INTERP.
+    destruct INTERP as [r2 [INTERP_TT EQ]].
+    apply itree_map_ret_inv in EQ.
+    destruct EQ as [[ms [sid' [lenv' [st res]]]] [TPRE RES]].
+    inv RES.
+    inv H.
 
-    (* rewrite TPRE in UNDEF. *)
-    (* eapply model_undef_h_ret_inv in UNDEF. *)
-    (* rewrite UNDEF. *)
+    rewrite TPRE in UNDEF.
+    eapply model_undef_h_ret_inv in UNDEF.
+    rewrite UNDEF.
 
-    (* apply eutt_Ret. *)
-    (* repeat constructor; auto. *)
+    apply eutt_Ret.
+    repeat constructor; auto.
   Admitted.
 
 
