@@ -801,7 +801,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (** Refinements between languages at different levels of interpretation *)
 
   Definition refine_E1E2_L0 (src : itree E1.L0 E1.DV.dvalue) (tgt : itree E2.L0 E2.DV.dvalue) : Prop
-    := refine_L0 (L0_convert_tree' dvalue_convert src) tgt.
+    := exists src',
+      refine_OOM_h eq src src' /\
+        refine_L0 (L0_convert_tree' dvalue_convert src') tgt.
 
   Definition refine_E1E2_L1 (src : itree E1.L1 LLVM1.res_L1) (tgt : itree E2.L1 LLVM2.res_L1) : Prop
     := refine_L1 (L1_convert_tree' res_L1_convert_unsafe src) tgt.
@@ -858,12 +860,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Proof.
     intros t1 t2 g1 g2 RL0 GENVS.
     red in RL0.
-    red in RL0.
 
     red.
     red.
-    rewrite <- RL0.
-    cbn.
 
     (* Perhaps I need a lemma about L1_convert_tree and interp_global here? *)
   Admitted.
@@ -974,8 +973,7 @@ Module InfiniteToFinite.
 
   #[local] Notation E1 := (E1.ExternalCallE +' OOME +' UBE +' DebugE +' FailureE).
   #[local] Notation E2 := (E2.ExternalCallE +' OOME +' UBE +' DebugE +' FailureE).
-  #[local] Notation OOM_h := (refine_OOM_handler (F:=_)).
-  #[local] Notation OOM_spec := (@oom_k_spec _ _).
+  #[local] Notation OOM_h := (refine_OOM_handler).
 
   Instance refine_OOM_h_eq_itree {E F T RR} : Proper (eq_itree eq ==> eq_itree eq ==> iff) (@refine_OOM_h E F T RR).
   repeat intro. rewrite H, H0.
@@ -1013,7 +1011,7 @@ Module InfiniteToFinite.
     } clear Heqi.
     remember (_interp EC.L4_convert (observe x_inf)).
     assert (i0 ≅ _interp EC.L4_convert (observe x_inf)). {
-      rewrite Heqi0. reflexivity.
+      subst; reflexivity.
     } clear Heqi1 Heqi0.
     revert x_inf y_inf H i i0 H0 H1.
 
@@ -1030,14 +1028,12 @@ Module InfiniteToFinite.
       red.
       destruct (observe i) eqn: Heqi; destruct (observe i0) eqn: Heqi0;
         try apply eqit_inv in H1; try apply eqit_inv in H2; cbn in H1, H2; try contradiction; auto.
-      setoid_rewrite Heqi. setoid_rewrite Heqi0.
       subst; constructor; auto.
     - pstep. cbn in H1, H2.
       rewrite itree_eta in H1, H2.
       red.
       destruct (observe i) eqn: Heqi; destruct (observe i0) eqn: Heqi0;
         try apply eqit_inv in H1; try apply eqit_inv in H2; cbn in H1, H2; try contradiction; auto.
-      setoid_rewrite Heqi. setoid_rewrite Heqi0.
       subst; constructor; auto.
 
       right; eapply CIH; eauto;
@@ -1047,7 +1043,6 @@ Module InfiniteToFinite.
       red.
       destruct (observe i) eqn: Heqi;
         try apply eqit_inv in H1; cbn in H1; try contradiction; auto.
-      setoid_rewrite Heqi.
       subst; constructor; auto.
       rewrite unfold_interp in H1.
       specialize (IHinterp_PropTF _ _ H1 H2).
@@ -1058,7 +1053,6 @@ Module InfiniteToFinite.
       red.
       destruct (observe i0) eqn: Heqi;
         try apply eqit_inv in H2; cbn in H2; try contradiction; auto.
-      setoid_rewrite Heqi.
       subst; constructor; auto.
       rewrite unfold_interp in H2.
       specialize (IHinterp_PropTF _ _ H1 H2).
@@ -1142,7 +1136,6 @@ Module InfiniteToFinite.
           { unfold raiseOOM in H1. rewrite bind_trigger in H1.
             red. destruct (observe i) eqn: Heqi;
               try apply eqit_inv in H1; cbn in H1; try contradiction; auto.
-            setoid_rewrite Heqi.
             destruct H1 as (?&?&?).
             dependent destruction x.
             red in H, H0.
@@ -1164,7 +1157,6 @@ Module InfiniteToFinite.
           unfold raiseOOM in H1. rewrite bind_trigger in H1.
           red. destruct (observe i) eqn: Heqi;
             try apply eqit_inv in H1; cbn in H1; try contradiction; auto.
-          setoid_rewrite Heqi.
           destruct H1 as (?&?&?).
           dependent destruction x.
           red in H, H0. cbn in *.
@@ -1188,7 +1180,6 @@ Module InfiniteToFinite.
           red.
           destruct (observe i) eqn: Heqi;
             try apply eqit_inv in H1; cbn in H1; try contradiction; auto.
-          setoid_rewrite Heqi.
           destruct H1 as (?&?&?).
           dependent destruction x.
           red in H, H0. cbn in *.
@@ -1207,7 +1198,6 @@ Module InfiniteToFinite.
               red.
               destruct (observe i) eqn: Heqi;
                 try apply eqit_inv in H1; cbn in H1; try contradiction; auto.
-              setoid_rewrite Heqi.
               destruct H1 as (?&?&?).
               dependent destruction x.
               red in H, H0.
@@ -1232,7 +1222,6 @@ Module InfiniteToFinite.
                 red.
                 destruct (observe i) eqn: Heqi;
                   try apply eqit_inv in H1; cbn in H1; try contradiction; auto.
-                setoid_rewrite Heqi.
                 destruct H1 as (?&?&?).
                 dependent destruction x.
                 red in H, H0. subst.
@@ -1262,7 +1251,6 @@ Module InfiniteToFinite.
                 red.
                 destruct (observe i) eqn: Heqi;
                   try apply eqit_inv in H1; cbn in H1; try contradiction; auto.
-                setoid_rewrite Heqi.
                 destruct H1 as (?&?&?).
                 dependent destruction x.
                 red in H, H0. cbn in *; subst.
@@ -1504,10 +1492,8 @@ Module InfiniteToFinite.
     intros p.
     unfold model_E1E2_L0.
     red.
-    red.
     unfold L0_convert_tree'.
     unfold L0_convert_tree.
-    (* This literally can't be true. Needs to be able to handle extra OOM *)
   Admitted.
 
   Theorem model_E1E2_L1_sound :
