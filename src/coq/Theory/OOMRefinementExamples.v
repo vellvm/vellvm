@@ -243,71 +243,6 @@ Module Infinite.
   Definition ret_tree : itree instr_E dvalue :=
     denote_program ret_block.
 
-  Definition t_alloc : itree L0 dvalue
-    := trigger (Alloca (DTYPE_I 64%N) 1%N None);; ret (DVALUE_I1 one).
-
-  Definition t_ret : itree L0 dvalue
-    := ret (DVALUE_I1 one).
-
-  (* Remove allocation in infinite language *)
-  Lemma remove_alloc:
-    forall genv lenv stack sid m,
-      refine_L6 (interp_mcfg4 eq eq t_alloc genv (lenv, stack) sid m) (interp_mcfg4 eq eq t_ret genv (lenv, stack) sid m).
-  Proof.
-    intros genv lenv stack sid m.
-    unfold refine_L6.
-    intros t' INTERP.
-
-    unfold t_ret in *.
-    eapply interp_mcfg4_ret_inv in INTERP.
-
-    exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)); split; cycle 1.
-    { eapply interp_prop_Proper_eq; try typeclasses eauto. 2: reflexivity. eapply eutt_flip. symmetry; eauto.
-      pstep; constructor; repeat red; repeat econstructor; eauto. }
-    repeat red.
-
-    exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
-    split; cycle 1.
-    { eapply model_undef_h_ret_pure; typeclasses eauto. }
-
-    (* TODO: Should make lemmas about ret, etc for interp_mcfg4 *)
-    unfold interp_mcfg4 in *.
-    unfold model_undef in *.
-
-    unfold t_alloc.
-    setoid_rewrite bind_trigger.
-    setoid_rewrite interp_intrinsics_vis.
-    setoid_rewrite bind_trigger.
-    setoid_rewrite interp_global_vis.
-    setoid_rewrite interp_local_stack_bind.
-    cbn.
-    setoid_rewrite bind_trigger.
-    setoid_rewrite interp_local_stack_vis.
-    rewrite bind_bind. cbn.
-    setoid_rewrite bind_trigger.
-    setoid_rewrite bind_vis.
-    repeat setoid_rewrite bind_ret_l.
-    setoid_rewrite interp_local_stack_ret.
-    setoid_rewrite bind_ret_l.
-    setoid_rewrite interp_intrinsics_ret.
-    setoid_rewrite interp_global_ret.
-    setoid_rewrite interp_local_stack_ret.
-    cbn.
-
-    (* LEMMA *)
-    eapply interp_memory_prop_vis.
-    - Unshelve. all : eauto.
-      2 : exact (ret (m, (sid, DVALUE_I1 one))).
-      2 : { intros (?&?&?). exact (ret (m0, (s, (lenv, stack, (genv, d))))). }
-      setoid_rewrite bind_ret_l. red. reflexivity.
-    - repeat red. do 3 right. eexists _,_,_. split; [ reflexivity | ].
-      repeat red. admit.
-    - intros. destruct b as (?&?&?).
-      cbn; subst. Unshelve.
-      pstep; constructor; eauto.
-      eapply Returns_ret_inv in H0. inv H0; reflexivity.
-  Admitted.
-
   Definition instr_E_to_L0 {T : Type} : instr_E T -> itree L0 T :=
     fun (e : instr_E T) =>
       match e with
@@ -326,9 +261,35 @@ Module Infinite.
   Import TranslateFacts.
   Import StateFacts.
 
-  Lemma remove_alloc_block :
+  Ltac force_go_in H :=
+    repeat
+    match goal with
+    | H:context [ ITree.bind (trigger _ _) _ ] |- _ => unfold trigger in H; force_rewrite: @bind_vis in H
+    | H:context [ ITree.bind (ITree.bind _ _) _ ] |- _ => force_rewrite: @bind_bind in H
+    | H:context [ ITree.bind (Ret _) _ ] |- _ => force_rewrite: @bind_ret_l in H
+    | H:context [ interp_intrinsics (ITree.bind _ _) ] |- _ => force_rewrite: @interp_intrinsics_bind in H
+    | H:context [ interp_global (ITree.bind _ _) ] |- _ => force_rewrite: @interp_global_bind in H
+    | H:context [ interp_local_stack (ITree.bind _ _) ] |- _ => force_rewrite: @interp_local_stack_bind in H
+    | H:context [ interp_intrinsics (trigger _) ]
+      |- _ => force_rewrite: @interp_intrinsics_trigger in H; cbn in H; rewrite ?subevent_subevent in H
+    | H:context [ interp_global (trigger _) ]
+      |- _ => force_rewrite: @interp_global_trigger in H; cbn in H; rewrite ?subevent_subevent in H
+    | H:context [ interp_local_stack (trigger _) ]
+      |- _ => force_rewrite: @interp_local_stack_trigger in H; cbn in H; rewrite ?subevent_subevent in H
+    | H:context [ interp_intrinsics (Ret _) ] |- _ => force_rewrite: @interp_intrinsics_ret in H
+    | H:context [ interp_global (Ret _) ] |- _ => force_rewrite: @interp_global_ret in H
+    | H:context [ interp_local_stack (Ret _) ] |- _ => force_rewrite: @interp_local_stack_ret in H
+    | H:context [ interp _ (Ret _) ] |- _ => force_rewrite: @interp_ret in H
+    | H:context [ State.interp_state _ (Ret _) _] |- _ => force_rewrite: @interp_state_ret in H
+    | H:context [ State.interp_state _ (ITree.bind _) _] |- _ => force_rewrite: @interp_state_bind in H
+    | H:context [ State.interp_state _ (bind _) _] |- _ => force_rewrite: @interp_state_bind in H
+    | H:context [ translate _ (Ret _) ] |- _ => force_rewrite: @translate_ret in H
+    end.
+
+  Example remove_alloc_block :
     forall genv lenv stack sid m,
-      refine_L6 (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ alloc_tree) genv (lenv, stack) sid m) (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m).
+      refine_L6 (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ alloc_tree) genv (lenv, stack) sid m)
+                (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m).
   Proof.
     intros genv lenv stack sid m.
     unfold refine_L6.
@@ -339,12 +300,10 @@ Module Infinite.
 
     destruct INTERP as [t_pre [INTERP UNDEF]].
 
-    cbn in INTERP.
-    cbn in INTERP.
-    setoid_rewrite interp_ret in INTERP.
-    setoid_rewrite interp_intrinsics_ret in INTERP.
-    setoid_rewrite interp_global_ret in INTERP.
-    setoid_rewrite interp_local_stack_ret in INTERP.
+    do 2 (cbn in INTERP; force_go_in INTERP).
+    unfold interp_instr_E_to_L0 in INTERP.
+    unfold interp_intrinsics, interp_global, interp_local_stack in INTERP.
+    force_go_in INTERP.
 
     eapply interp_memory_prop_ret_inv in INTERP.
     destruct INTERP as [[ms' [sid' [[lenv' stack'] [genv' res]]]] [TPRE EQ]].
@@ -363,55 +322,6 @@ Module Infinite.
     all: eauto. 5 : intros H; inv H.
     2-4: shelve.
 
-    exists t'.
-    split; [ | reflexivity ].
-    eexists.
-    split; [| rewrite UNDEF; apply model_undef_h_ret_pure; auto].
-    cbn in *.
-    go.
-    cbn.
-
-    repeat setoid_rewrite bind_ret_l.
-    repeat setoid_rewrite bind_bind.
-    repeat setoid_rewrite bind_ret_l.
-
-    setoid_rewrite translate_ret.
-    setoid_rewrite bind_ret_l.
-    cbn.
-
-    (* LEMMA *)
-    unfold interp_memory_prop.
-    cbn.
-
-    rewrite interp_bind with (f:=@instr_E_to_L0);
-      rewrite interp_trigger; cbn; rewrite subevent_subevent.
-    go.
-    rewrite bind_trigger.
-    setoid_rewrite bind_ret_l.
-    setoid_rewrite interp_local_stack_ret.
-    setoid_rewrite bind_ret_l.
-
-    eapply interp_memory_prop_vis.
-    Unshelve.
-    8 : { intros.
-          destruct x as (?&?&?).
-          exact (ret (m0, (s, (lenv', stack', (genv', d))))). }
-    cbn. setoid_rewrite bind_ret_l.
-    Unshelve.
-    9: exact (ms', (sid', (DVALUE_I1 DynamicValues.Int1.one))). all : eauto.
-    1: cbn; reflexivity.
-    2 : {
-      intros. destruct b, p. subst.
-      force_rewrite @bind_trigger.
-      force_rewrite @interp_vis.
-      cbn. force_rewrite @bind_trigger. admit. }
-    - unfold my_handle_memory_prop.
-      unfold MemPropT_lift_PropT_fresh.
-      repeat red in ALLOC. destruct ALLOC.
-      right; right; right.
-      do 3 eexists; split.
-      -- unfold ret, Monad_itree. red. reflexivity.
-      -- cbn. eexists _,_ ;split; eauto.
   Admitted.
 
   Lemma remove_alloc_ptoi_block :
@@ -439,7 +349,7 @@ Module Infinite.
     (* setoid_rewrite interp_global_ret in INTERP. *)
     (* setoid_rewrite interp_local_stack_ret in INTERP. *)
 
-    eapply interp_memory_prop_ret_inv in INTERP.
+    (* eapply interp_memory_prop_ret_inv in INTERP. *)
   Admitted.
 
   (* TODO: move this? *)
@@ -504,7 +414,8 @@ Module Infinite.
   (* Add allocation in infinite language *)
   Lemma add_alloc :
     forall genv lenv stack sid m,
-      refine_L6 (interp_mcfg4 eq eq t_ret genv (lenv, stack) sid m) (interp_mcfg4 eq eq t_alloc genv (lenv, stack) sid m).
+      refine_L6 (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m)
+                (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ alloc_tree) genv (lenv, stack) sid m).
   Proof.
     intros genv lenv stack sid m.
     unfold refine_L6.
@@ -518,13 +429,10 @@ Module Infinite.
     unfold model_undef in *.
 
     destruct INTERP as [t_pre [INTERP UNDEF]].
-    unfold interp_memory_prop in INTERP.
-    unfold t_alloc in INTERP.
-    cbn in INTERP.
-    go_in INTERP.
-    rewrite bind_trigger in INTERP.
-    repeat setoid_rewrite bind_ret_l in INTERP.
-    setoid_rewrite interp_local_stack_ret in INTERP.
+    unfold interp_local_stack, interp_global, interp_intrinsics, interp_instr_E_to_L0 in INTERP.
+
+    do 2 (cbn in INTERP; force_go_in INTERP).
+
   Admitted.
 
 End Infinite.
@@ -562,14 +470,6 @@ Module Finite.
   Module MemTheory  := MemoryModelTheory LP MP MMEP MEM_MODEL.
   Import MemTheory.
 
-  Lemma model_undef_h_oom :
-    forall {R} {E F}
-      `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} `{OOME -< E +' PickUvalueE +' F}
-      oom_msg (t' : itree (E +' F) R),
-      model_undef_h eq (raiseOOM oom_msg) t' ->
-      t' ≈ raiseOOM oom_msg.
-  Proof.
-  Admitted.
 
   (* TODO: Move this, there are duplicates of this elsewhere too. *)
   Import TranslateFacts.
@@ -692,16 +592,16 @@ Module Finite.
     unfold t_alloc in INTERP.
     cbn in INTERP.
     rewrite interp_intrinsics_bind in INTERP.
-    go_in INTERP.
+    (* go_in INTERP. *)
 
-    rewrite bind_trigger in INTERP.
-    repeat setoid_rewrite bind_ret_l in INTERP.
-    setoid_rewrite interp_local_stack_ret in INTERP.
-    repeat setoid_rewrite bind_ret_l in INTERP.
+    (* rewrite bind_trigger in INTERP. *)
+    (* repeat setoid_rewrite bind_ret_l in INTERP. *)
+    (* setoid_rewrite interp_local_stack_ret in INTERP. *)
+    (* repeat setoid_rewrite bind_ret_l in INTERP. *)
 
-    setoid_rewrite interp_intrinsics_ret in INTERP.
-    setoid_rewrite interp_global_ret in INTERP.
-    setoid_rewrite interp_local_stack_ret in INTERP.
+    (* setoid_rewrite interp_intrinsics_ret in INTERP. *)
+    (* setoid_rewrite interp_global_ret in INTERP. *)
+    (* setoid_rewrite interp_local_stack_ret in INTERP. *)
   Admitted.
 
 End Finite.
