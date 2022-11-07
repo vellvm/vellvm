@@ -106,6 +106,7 @@
 ./coq/Utils/MonadReturnsLaws.v
 ./coq/Utils/Monads.v
 ./coq/Utils/RefineProp.v
+./coq/Utils/ITreeMap.v
 ./coq/Utils/Util.v
 ./coq/Utils/InterpProp.v
 ./coq/Utils/InterpMemoryProp.v
