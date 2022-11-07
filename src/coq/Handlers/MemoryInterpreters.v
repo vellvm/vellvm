@@ -1,7 +1,8 @@
 From Coq Require Import
      Morphisms
      ZArith
-     Lia.
+     Lia
+     Program.Equality.
 
 From Vellvm.Semantics Require Import
      MemoryParams
@@ -16,7 +17,7 @@ From Vellvm.Handlers Require Import
 
 From Vellvm.Utils Require Import
      InterpProp
-     StateMonads.
+     StateMonads Raise Tactics.
 
 From ITree Require Import
      ITree
@@ -41,6 +42,18 @@ Import Error.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
+Ltac raise_abs :=
+  let H := fresh "H" in
+  intro H; unfold raise_oom, raise_ub, raise_error in H;
+  cbn in H; unfold raiseOOM, raiseUB, LLVMEvents.raise in H;
+  do 2 rewrite bind_trigger in H;
+  do 2 red in H; unfold subevent in H; red in H;
+  punfold H; inversion H; subst;
+  match goal with
+  | [ H : existT _ _ _ = existT _ _ _ |- _] => dependent destruction H
+  end.
+
+
 Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MM : MemoryModelSpec LP MP MMSP) (MemExecM : MemoryExecMonad LP MP MMSP MM).
   Import MM.
   Import MMSP.
@@ -49,8 +62,10 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
   Import LP.PROV.
 
   Section Interpreters.
-    Variable (E F : Type -> Type).
-    Context `{FailureE -< F} `{UBE -< F} `{OOME -< F}.
+
+    Notation E := ExternalCallE.
+    Notation F := (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE).
+
     Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
     Notation Effout := (E +' F).
 
@@ -182,24 +197,6 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     eapply within_eq1_Proper_MemStateFreshT_itree; eauto.
   Defined.
 
-    Lemma oom_error_inv :
-      forall {A Eff} `{FailureE -< Eff} `{OOME -< Eff} oom_msg error_msg,
-        ~ (raise_oom oom_msg : itree Eff A) ≈ (raise_error error_msg).
-    Proof.
-    Admitted.
-
-    Lemma ub_error_inv :
-      forall {A Eff} `{FailureE -< Eff} `{UBE -< Eff} ub_msg error_msg,
-        ~ (raise_ub ub_msg : itree Eff A) ≈ (raise_error error_msg).
-    Proof.
-    Admitted.
-
-    Lemma oom_ub_inv :
-      forall {A Eff} `{UBE -< Eff} `{OOME -< Eff} oom_msg ub_msg,
-        ~ (raise_oom oom_msg : itree Eff A) ≈ (raise_ub ub_msg).
-    Proof.
-    Admitted.
-
     Import MonadEq1Laws.
 
     #[global] Instance MemStateFreshT_Eq1_ret_inv {Eff} `{FAIL: FailureE -< Eff} `{OOM: OOME -< Eff} `{UB: UBE -< Eff}
@@ -232,14 +229,14 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       reflexivity.
     Qed.
 
-    #[global] Instance MemStateFreshT_MemMonad {Eff} `{FAIL: FailureE -< Eff} `{OOM: OOME -< Eff} `{UB: UBE -< Eff}
-      : MemMonad MemStateFreshT_State (MemStateFreshT (itree Eff)) (itree Eff).
+    #[global] Instance MemStateFreshT_MemMonad:
+      MemMonad MemStateFreshT_State (MemStateFreshT (itree F)) (itree F).
     Proof.
       esplit with
-        (MemMonad_run := fun A => @MemStateFreshT_run A Eff)
+        (MemMonad_run := fun A => @MemStateFreshT_run A F)
         (MemMonad_valid_state := MemStateFreshT_valid_state); try solve [typeclasses eauto].
+      13-18:intros; raise_abs.
 
-      (* TODO: didn't need valid for ret / bind laws... *)
       - (* run bind *)
         intros A B ma k ms sid.
         unfold MemStateFreshT_run.
@@ -348,24 +345,6 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         intros A x error_msg.
         intros EQ.
         pinversion EQ.
-      - (* raise_oom_raise_error_inv *)
-        intros A oom_msg error_msg.
-        apply oom_error_inv.
-      - (* raise_error_raise_oom_inv *)
-        intros A oom_msg error_msg.
-        intros EQ.
-        symmetry in EQ.
-        apply oom_error_inv in EQ; auto.
-      - intros A ub_msg error_msg.
-        apply ub_error_inv.
-      - intros A ub_msg error_msg EQ.
-        symmetry in EQ.
-        apply ub_error_inv in EQ; auto.
-      - intros A oom_msg ub_msg.
-        apply oom_ub_inv.
-      - intros A oom_msg ub_msg EQ.
-        symmetry in EQ.
-        apply oom_ub_inv in EQ; auto.
     Defined.
 
     Definition E_trigger' : forall R, E R -> (MemStateT (PropT Effout) R) :=
@@ -442,9 +421,12 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
   Module MemTheory := MemoryModelTheory LP MP MMEP MM.
   Import MemTheory.
 
+
   Section Interpreters.
-    Variable (E F : Type -> Type).
-    Context `{FailureE -< F} `{UBE -< F} `{OOME -< F}.
+
+    Notation E := ExternalCallE.
+    Notation F := (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE).
+
     Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
     Notation Effout := (E +' F).
 
@@ -516,12 +498,13 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       := let sid := st in
          (forall sid', used_store_id ms sid' -> (sid' < sid)%N).
 
-    #[global] Instance MemStateFreshT_MemMonad {Eff} `{FAIL: FailureE -< Eff} `{OOM: OOME -< Eff} `{UB: UBE -< Eff}
-      : MemMonad MemStateFreshT_State (MemStateFreshT (itree Eff)) (itree Eff).
+    #[global] Instance MemStateFreshT_MemMonad :
+      MemMonad MemStateFreshT_State (MemStateFreshT (itree Effout)) (itree Effout).
     Proof.
       esplit with
-        (MemMonad_run := fun A => @MemStateFreshT_run A Eff FAIL OOM UB)
+        (MemMonad_run := fun A => @MemStateFreshT_run A Effout _ _ _)
         (MemMonad_valid_state := MemStateFreshT_valid_state); try solve [typeclasses eauto].
+      13-18: intros; raise_abs.
 
       (* TODO: didn't need valid for ret / bind laws... *)
       - (* run bind *)
@@ -632,24 +615,6 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         intros A x error_msg.
         intros EQ.
         pinversion EQ.
-      - (* raise_oom_raise_error_inv *)
-        intros A oom_msg error_msg.
-        eapply oom_error_inv; eauto.
-      - (* raise_error_raise_oom_inv *)
-        intros A oom_msg error_msg.
-        intros EQ.
-        symmetry in EQ.
-        eapply oom_error_inv in EQ; eauto.
-      - intros A ub_msg error_msg.
-        eapply ub_error_inv; eauto.
-      - intros A ub_msg error_msg EQ.
-        symmetry in EQ.
-        eapply ub_error_inv in EQ; eauto.
-      - intros A oom_msg ub_msg.
-        eapply oom_ub_inv; eauto.
-      - intros A oom_msg ub_msg EQ.
-        symmetry in EQ.
-        eapply oom_ub_inv in EQ; eauto.
     Defined.
 
     (** Handlers *)
@@ -731,9 +696,6 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       rewrite unfold_interp_memory; reflexivity.
     Qed.
 
-    (* TODO: Move these imports? *)
-    Import Raise Tactics.
-
     Lemma my_handle_intrinsic_prop_correct {T} i sid ms :
       my_handle_intrinsic_prop i sid ms (my_handle_intrinsic (T := T) i sid ms).
     Proof.
@@ -743,50 +705,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       (* TODO: probably an easier more general lemma about
          [exec_correct] and [MemPropT_lift_PropT_fresh] *)
       epose proof @handle_intrinsic_correct (MemStateFreshT (itree Effout)) Effout
-        MemStateFreshT_State
-        (@Monad_stateT (MemStateT (itree Effout)) store_id
-           (@Monad_stateT (itree Effout) MemState (@Monad_itree Effout))) (@Monad_itree Effout)
-        (@MemStateFreshT_Provenance (itree Effout) (@Monad_itree Effout))
-        (@MemStateFreshT_MonadStoreId (itree Effout) (@Monad_itree Effout))
-        (@MemStateFreshT_MonadMemState (itree Effout) (@Monad_itree Effout))
-        (@RAISE_ERROR_E_MT (itree Effout) MemStateFreshT
-           (@MemStateFreshT_MonadT (itree Effout) (@Monad_itree Effout))
-           (@RAISE_ERR_ITREE_FAILUREE Effout
-              (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 FailureE F E H)))
-        (@RAISE_UB_E_MT (itree Effout) MemStateFreshT
-           (@MemStateFreshT_MonadT (itree Effout) (@Monad_itree Effout))
-           (@RAISE_UB_ITREE_UB Effout
-              (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 UBE F E H0)))
-        (@RAISE_OOM_E_MT (itree Effout) MemStateFreshT
-           (@MemStateFreshT_MonadT (itree Effout) (@Monad_itree Effout))
-           (@RAISE_OOM_ITREE_OOME Effout
-              (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME F E H1)))
-        (@RAISE_ERR_ITREE_FAILUREE Effout
-           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 FailureE F E H))
-        (@RAISE_UB_ITREE_UB Effout (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 UBE F E H0))
-        (@RAISE_OOM_ITREE_OOME Effout
-           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME F E H1))
-        (@MonadState.Eq1_stateTM (MemStateT (itree Effout)) store_id
-           (@MonadState.Eq1_stateTM (itree Effout) MemState (@ITreeMonad.Eq1_ITree Effout)))
-        (@MemStateFreshT_Eq1_ret_inv Effout
-           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 FailureE F E H)
-           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME F E H1)
-           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 UBE F E H0))
-        (@MonadState.MonadLawsE_stateTM (MemStateT (itree Effout)) store_id
-           (@MonadState.Eq1_stateTM (itree Effout) MemState (@ITreeMonad.Eq1_ITree Effout))
-           (@Monad_stateT (itree Effout) MemState (@Monad_itree Effout))
-           (@MonadState.Eq1Equivalence_stateTM (itree Effout) MemState (@ITreeMonad.Eq1_ITree Effout)
-              (@Monad_itree Effout) (@ITreeMonad.Eq1Equivalence_ITree Effout))
-           (@MonadState.MonadLawsE_stateTM (itree Effout) MemState (@ITreeMonad.Eq1_ITree Effout)
-              (@Monad_itree Effout) (@ITreeMonad.Eq1Equivalence_ITree Effout)
-              (@ITreeMonad.MonadLawsE_ITree Effout)))
-        (@MemStateFreshT_MemMonad Effout
-           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 FailureE F E H)
-           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME F E H1)
-           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 UBE F E H0))
-        T
-        i
-        (fun _ _ => True) as HANDLE_CORRECT.
+        _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ T i (fun _ _ => True) as HANDLE_CORRECT.
 
       red in HANDLE_CORRECT.
       specialize (HANDLE_CORRECT ms sid).
@@ -863,6 +782,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         do 3 eexists.
         split; eauto.
       }
+
     Admitted.
 
     (* TODO: Import result from [handle_memory_correct]*)
@@ -873,55 +793,8 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
       (* TODO: probably an easier more general lemma about
          [exec_correct] and [MemPropT_lift_PropT_fresh] *)      
-      epose proof @handle_memory_correct
-        (MemStateFreshT (itree Effout)) Effout MemStateFreshT_State
-        (@Monad_stateT (MemStateT (itree Effout)) store_id
-           (@Monad_stateT (itree Effout) MemState (@Monad_itree Effout)))
-        (@Monad_itree Effout)
-        (@MemStateFreshT_Provenance (itree Effout) (@Monad_itree Effout))
-        (@MemStateFreshT_MonadStoreId (itree Effout) (@Monad_itree Effout))
-        (@MemStateFreshT_MonadMemState (itree Effout) (@Monad_itree Effout))
-        (@RAISE_ERROR_E_MT (itree Effout) MemStateFreshT
-           (@MemStateFreshT_MonadT (itree Effout) (@Monad_itree Effout))
-           (@RAISE_ERR_ITREE_FAILUREE Effout
-              (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 FailureE F E H)))
-        (@RAISE_UB_E_MT (itree Effout) MemStateFreshT
-           (@MemStateFreshT_MonadT (itree Effout) (@Monad_itree Effout))
-           (@RAISE_UB_ITREE_UB Effout
-              (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 UBE F E H0)))
-        (@RAISE_OOM_E_MT (itree Effout) MemStateFreshT
-           (@MemStateFreshT_MonadT (itree Effout) (@Monad_itree Effout))
-           (@RAISE_OOM_ITREE_OOME Effout
-              (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME F E H1)))
-        (@RAISE_ERR_ITREE_FAILUREE Effout
-           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 FailureE F E H))
-        (@RAISE_UB_ITREE_UB Effout
-           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 UBE F E H0))
-        (@RAISE_OOM_ITREE_OOME Effout
-           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME F E H1))
-        (@MonadState.Eq1_stateTM (MemStateT (itree Effout)) store_id
-           (@MonadState.Eq1_stateTM (itree Effout) MemState (@ITreeMonad.Eq1_ITree Effout)))
-        (@MemStateFreshT_Eq1_ret_inv Effout
-           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 FailureE F E H)
-           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME F E H1)
-           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 UBE F E H0))
-        (@MonadState.MonadLawsE_stateTM (MemStateT (itree Effout)) store_id
-           (@MonadState.Eq1_stateTM (itree Effout) MemState (@ITreeMonad.Eq1_ITree Effout))
-           (@Monad_stateT (itree Effout) MemState (@Monad_itree Effout))
-           (@MonadState.Eq1Equivalence_stateTM (itree Effout) MemState
-              (@ITreeMonad.Eq1_ITree Effout) (@Monad_itree Effout)
-              (@ITreeMonad.Eq1Equivalence_ITree Effout))
-           (@MonadState.MonadLawsE_stateTM (itree Effout) MemState
-              (@ITreeMonad.Eq1_ITree Effout) (@Monad_itree Effout)
-              (@ITreeMonad.Eq1Equivalence_ITree Effout)
-              (@ITreeMonad.MonadLawsE_ITree Effout)))
-        (@MemStateFreshT_MemMonad Effout
-           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 FailureE F E H)
-           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME F E H1)
-           (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 UBE F E H0))
-        T
-        m
-        (fun _ _ => True) as HANDLE_CORRECT.
+      epose proof @handle_memory_correct (MemStateFreshT (itree Effout)) Effout
+        _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ T m (fun _ _ => True) as HANDLE_CORRECT.
 
       red in HANDLE_CORRECT.
       specialize (HANDLE_CORRECT ms sid).
@@ -1020,7 +893,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       match goal with
       | [H : i = ?r |- _] => assert (i ≅ r) by (subst; reflexivity)
       end. clear Heqi.
-      rename H2 into EQ.
+      rename H into EQ.
 
       revert t i EQ.
       revert ms sid.
@@ -1038,7 +911,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       hinduction HT before CIH; intros; subst; try inv CHECK.
       - force_rewrite: @interp_memory_ret in EQ.
         assert (i = Ret (ms, (sid, r2))). apply bisimulation_is_eq; pstep; auto.
-        rewrite H2.
+        rewrite H.
         constructor; auto.
 
       - pclearbot.
