@@ -7,6 +7,7 @@ From Vellvm Require Import
      Utils.Tactics
      Utils.MonadEq1Laws
      Utils.InterpProp
+     Utils.InterpMemoryProp
      Utils.Raise
      Theory.DenotationTheory
      Theory.InterpreterMCFG
@@ -72,19 +73,6 @@ Module Infinite.
   Import List.
   Import ListNotations.
   Require Import Coq.Strings.String.
-
-  #[global] Instance interp_mem_prop_Proper3 :
-    forall {E F} `{FAIL : FailureE -< F} `{UB : UBE -< F} `{OOM : OOME -< F}
-      {R} (RR : R -> R -> Prop),
-      Proper (eutt eq ==> eq ==> eq ==> eq ==> iff) (@interp_memory_prop E F FAIL UB OOM R RR).
-  Proof.
-    intros E F FAIL UB OOM R RR.
-    unfold interp_memory_prop.
-    unfold Proper, respectful.
-    intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2.
-    subst.
-    split; intros INTERP.
-  Admitted.
 
   #[global] Instance refine_OOM_h_eutt_RR_Proper {T : Type} {RR : relation T} {E F}:
     Proper (eutt RR ==> eutt RR ==> iff) (@refine_OOM_h E F T RR).
@@ -164,15 +152,12 @@ Module Infinite.
   Admitted.
 
   Lemma interp_memory_prop_ret_inv :
-    forall {E F : Type -> Type}
-      `{FAIL : FailureE -< F}
-      `{UB : UBE -< F}
-      `{OOM : OOME -< F}
-      {X} (x : X) sid m (t : itree (E +' F) (MMEP.MMSP.MemState * (store_id * X))%type),
-      interp_memory_prop eq (Ret x) sid m t ->
+    forall {E : Type -> Type}
+      {X} (x : X) sid m (t : itree _ (MMEP.MMSP.MemState * (store_id * X))%type),
+      interp_memory_prop (E := E) eq (Ret x) sid m t ->
       Functor.fmap (fun '(_, (_, x)) => x) t ≈ Ret x.
   Proof.
-    intros E F FAIL UB OOM X x sid m t INTERP.
+    intros E X x sid m t INTERP.
     unfold interp_memory_prop in INTERP.
   (*   apply interp_memory_prop_ret_inv in INTERP. *)
   (*   destruct INTERP as [r2 [EQ MAP]]; subst; auto. *)
@@ -275,19 +260,7 @@ Module Infinite.
       epose proof allocate_dtyp_spec_can_always_succeed m m (mkMemState (ms_memory_stack m) (next_provenance (ms_provenance m))) (DTYPE_I 64) 1 _ _ _ _ _ as (ms_final & addr & ALLOC).
 
       split.
-      + go.
-        rewrite bind_trigger.
-        repeat setoid_rewrite bind_ret_l.
-        setoid_rewrite interp_local_stack_ret.
-        repeat setoid_rewrite bind_ret_l.
-
-        (* LEMMA *)
-        unfold interp_memory_prop.
-        cbn.
-
-        Opaque MMEP.MemSpec.allocate_dtyp_spec.
-
-        pstep; eapply InterpMemoryProp.Interp_Memory_PropT_Vis.
+      +
   Admitted.
 
   Definition instr_E_to_L0 {T : Type} : instr_E T -> itree L0 T :=
@@ -322,62 +295,60 @@ Module Infinite.
     destruct INTERP as [t_pre [INTERP UNDEF]].
 
     cbn in INTERP.
-    go_in INTERP.
     cbn in INTERP.
-    repeat rewrite bind_ret_l in INTERP.
-    rewrite TranslateFacts.translate_ret in INTERP.
-    repeat setoid_rewrite bind_ret_l in INTERP.
-    cbn in INTERP.
-    setoid_rewrite interp_ret in INTERP.
-    setoid_rewrite interp_intrinsics_ret in INTERP.
-    setoid_rewrite interp_global_ret in INTERP.
-    setoid_rewrite interp_local_stack_ret in INTERP.
+    (* rewrite TranslateFacts.translate_ret in INTERP. *)
+    (* repeat setoid_rewrite bind_ret_l in INTERP. *)
+    (* cbn in INTERP. *)
+    (* setoid_rewrite interp_ret in INTERP. *)
+    (* setoid_rewrite interp_intrinsics_ret in INTERP. *)
+    (* setoid_rewrite interp_global_ret in INTERP. *)
+    (* setoid_rewrite interp_local_stack_ret in INTERP. *)
 
-    eapply interp_memory_prop_ret_inv in INTERP.
-    eapply itree_map_ret_inv in INTERP.
-    destruct INTERP as [[ms' [sid' [lenv' [stack' res]]]] [TPRE EQ]].
-    inv EQ.
+    (* eapply interp_memory_prop_ret_inv in INTERP. *)
+    (* eapply itree_map_ret_inv in INTERP. *)
+    (* destruct INTERP as [[ms' [sid' [lenv' [stack' res]]]] [TPRE EQ]]. *)
+    (* inv EQ. *)
 
-    rewrite TPRE in UNDEF.
-    apply model_undef_h_ret_inv in UNDEF.
+    (* rewrite TPRE in UNDEF. *)
+    (* apply model_undef_h_ret_inv in UNDEF. *)
 
-    (* TODO: Turn this into an interp_memory_prop lemma *)
-    Import MMEP.MMSP.
-    Import MemoryBigIntptr.MMEP.MMSP.
-    Import MapMonadExtra.
-    epose proof allocate_dtyp_spec_can_always_succeed m m (mkMemState (ms_memory_stack m) (next_provenance (ms_provenance m))) (DTYPE_I 64) 1 _ _ _ _ _ as (ms_final & addr & ALLOC).
+    (* (* TODO: Turn this into an interp_memory_prop lemma *) *)
+    (* Import MMEP.MMSP. *)
+    (* Import MemoryBigIntptr.MMEP.MMSP. *)
+    (* Import MapMonadExtra. *)
+    (* epose proof allocate_dtyp_spec_can_always_succeed m m (mkMemState (ms_memory_stack m) (next_provenance (ms_provenance m))) (DTYPE_I 64) 1 _ _ _ _ _ as (ms_final & addr & ALLOC). *)
 
 
-    exists (Ret5 genv (FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
-    split.
-    - exists (Ret5 genv (FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
-      cbn in *.
-      go.
-      cbn.
+    (* exists (Ret5 genv (FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)). *)
+    (* split. *)
+    (* - exists (Ret5 genv (FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)). *)
+    (*   cbn in *. *)
+    (*   go. *)
+    (*   cbn. *)
 
-      repeat setoid_rewrite bind_ret_l.
-      repeat setoid_rewrite bind_bind.
-      repeat setoid_rewrite bind_ret_l.
+    (*   repeat setoid_rewrite bind_ret_l. *)
+    (*   repeat setoid_rewrite bind_bind. *)
+    (*   repeat setoid_rewrite bind_ret_l. *)
 
-      setoid_rewrite translate_ret.
-      setoid_rewrite bind_ret_l.
-      cbn.
+    (*   setoid_rewrite translate_ret. *)
+    (*   setoid_rewrite bind_ret_l. *)
+    (*   cbn. *)
 
-      split; [| apply model_undef_h_ret_pure; auto].
+    (*   split; [| apply model_undef_h_ret_pure; auto]. *)
 
-      (* LEMMA *)
-      unfold interp_memory_prop.
-      cbn.
+    (*   (* LEMMA *) *)
+    (*   unfold interp_memory_prop. *)
+    (*   cbn. *)
 
-      Opaque MMEP.MemSpec.allocate_dtyp_spec.
+    (*   Opaque MMEP.MemSpec.allocate_dtyp_spec. *)
 
-      rewrite interp_bind with (f:=@instr_E_to_L0);
-        rewrite interp_trigger; cbn; rewrite subevent_subevent.
-      go.
-      rewrite bind_trigger.
-      setoid_rewrite bind_ret_l.
-      setoid_rewrite interp_local_stack_ret.
-      setoid_rewrite bind_ret_l.
+    (*   rewrite interp_bind with (f:=@instr_E_to_L0); *)
+    (*     rewrite interp_trigger; cbn; rewrite subevent_subevent. *)
+    (*   go. *)
+    (*   rewrite bind_trigger. *)
+    (*   setoid_rewrite bind_ret_l. *)
+    (*   setoid_rewrite interp_local_stack_ret. *)
+    (*   setoid_rewrite bind_ret_l. *)
   Admitted.
 
   Lemma remove_alloc_ptoi_block :
@@ -394,64 +365,64 @@ Module Infinite.
     destruct INTERP as [t_pre [INTERP UNDEF]].
 
     cbn in INTERP.
-    go_in INTERP.
-    cbn in INTERP.
-    repeat rewrite bind_ret_l in INTERP.
-    rewrite TranslateFacts.translate_ret in INTERP.
-    repeat setoid_rewrite bind_ret_l in INTERP.
-    cbn in INTERP.
-    setoid_rewrite interp_ret in INTERP.
-    setoid_rewrite interp_intrinsics_ret in INTERP.
-    setoid_rewrite interp_global_ret in INTERP.
-    setoid_rewrite interp_local_stack_ret in INTERP.
+    (* go_in INTERP. *)
+    (* cbn in INTERP. *)
+    (* repeat rewrite bind_ret_l in INTERP. *)
+    (* rewrite TranslateFacts.translate_ret in INTERP. *)
+    (* repeat setoid_rewrite bind_ret_l in INTERP. *)
+    (* cbn in INTERP. *)
+    (* setoid_rewrite interp_ret in INTERP. *)
+    (* setoid_rewrite interp_intrinsics_ret in INTERP. *)
+    (* setoid_rewrite interp_global_ret in INTERP. *)
+    (* setoid_rewrite interp_local_stack_ret in INTERP. *)
 
 
-    eapply interp_memory_prop_ret_inv in INTERP.
-    eapply itree_map_ret_inv in INTERP.
-    destruct INTERP as [[ms' [sid' [lenv' [stack' res]]]] [TPRE EQ]].
-    inv EQ.
+    (* eapply interp_memory_prop_ret_inv in INTERP. *)
+    (* eapply itree_map_ret_inv in INTERP. *)
+    (* destruct INTERP as [[ms' [sid' [lenv' [stack' res]]]] [TPRE EQ]]. *)
+    (* inv EQ. *)
 
-    rewrite TPRE in UNDEF.
-    apply model_undef_h_ret_inv in UNDEF.
+    (* rewrite TPRE in UNDEF. *)
+    (* apply model_undef_h_ret_inv in UNDEF. *)
 
-    epose proof allocate_dtyp_spec_can_always_succeed m _ _ (DTYPE_I 64) 1 _ _ _ _ _ as (ms_final & addr & ALLOC).
+    (* epose proof allocate_dtyp_spec_can_always_succeed m _ _ (DTYPE_I 64) 1 _ _ _ _ _ as (ms_final & addr & ALLOC). *)
 
-    exists (Ret5 genv (FMapAList.alist_add (Name "i")
-                                      (UVALUE_Conversion Ptrtoint DTYPE_Pointer (UVALUE_Addr addr) DTYPE_IPTR)
-                                      (FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv), stack)
-            sid m (DVALUE_I1 DynamicValues.Int1.one)).
-    split.
-    - exists (Ret5 genv (FMapAList.alist_add (Name "i")
-                                         (UVALUE_Conversion Ptrtoint DTYPE_Pointer (UVALUE_Addr addr) DTYPE_IPTR)
-                                         (FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv), stack)
-              sid m (DVALUE_I1 DynamicValues.Int1.one)).
+    (* exists (Ret5 genv (FMapAList.alist_add (Name "i") *)
+    (*                                   (UVALUE_Conversion Ptrtoint DTYPE_Pointer (UVALUE_Addr addr) DTYPE_IPTR) *)
+    (*                                   (FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv), stack) *)
+    (*         sid m (DVALUE_I1 DynamicValues.Int1.one)). *)
+    (* split. *)
+    (* - exists (Ret5 genv (FMapAList.alist_add (Name "i") *)
+    (*                                      (UVALUE_Conversion Ptrtoint DTYPE_Pointer (UVALUE_Addr addr) DTYPE_IPTR) *)
+    (*                                      (FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv), stack) *)
+    (*           sid m (DVALUE_I1 DynamicValues.Int1.one)). *)
 
 
-      cbn in *.
-      go.
-      cbn.
+    (*   cbn in *. *)
+    (*   go. *)
+    (*   cbn. *)
 
-      repeat setoid_rewrite bind_ret_l.
-      repeat setoid_rewrite bind_bind.
-      repeat setoid_rewrite bind_ret_l.
+    (*   repeat setoid_rewrite bind_ret_l. *)
+    (*   repeat setoid_rewrite bind_bind. *)
+    (*   repeat setoid_rewrite bind_ret_l. *)
 
-      setoid_rewrite translate_ret.
-      setoid_rewrite bind_ret_l.
-      cbn.
+    (*   setoid_rewrite translate_ret. *)
+    (*   setoid_rewrite bind_ret_l. *)
+    (*   cbn. *)
 
-      split; [| apply model_undef_h_ret_pure; auto].
+    (*   split; [| apply model_undef_h_ret_pure; auto]. *)
 
-      (* LEMMA *)
-      unfold interp_memory_prop.
-      cbn.
+    (*   (* LEMMA *) *)
+    (*   unfold interp_memory_prop. *)
+    (*   cbn. *)
 
-      Opaque MMEP.MemSpec.allocate_dtyp_spec.
+    (*   Opaque MMEP.MemSpec.allocate_dtyp_spec. *)
 
-      rewrite interp_bind with (f:=@instr_E_to_L0);
-        rewrite interp_trigger; cbn; rewrite subevent_subevent.
-      go.
+    (*   rewrite interp_bind with (f:=@instr_E_to_L0); *)
+    (*     rewrite interp_trigger; cbn; rewrite subevent_subevent. *)
+    (*   go. *)
 
-      rewrite bind_trigger.
+    (*   rewrite bind_trigger. *)
   Admitted.
 
   (* TODO: move this? *)
@@ -537,11 +508,11 @@ Module Infinite.
     rewrite bind_trigger in INTERP.
     repeat setoid_rewrite bind_ret_l in INTERP.
     setoid_rewrite interp_local_stack_ret in INTERP.
-    repeat setoid_rewrite bind_ret_l in INTERP.
+    (* repeat setoid_rewrite bind_ret_l in INTERP. *)
 
-    setoid_rewrite interp_intrinsics_ret in INTERP.
-    setoid_rewrite interp_global_ret in INTERP.
-    setoid_rewrite interp_local_stack_ret in INTERP.
+    (* setoid_rewrite interp_intrinsics_ret in INTERP. *)
+    (* setoid_rewrite interp_global_ret in INTERP. *)
+    (* setoid_rewrite interp_local_stack_ret in INTERP. *)
   Admitted.
 
 End Infinite.
@@ -578,19 +549,6 @@ Module Finite.
 
   Module MemTheory  := MemoryModelTheory LP MP MMEP MEM_MODEL.
   Import MemTheory.
-
-  #[global] Instance interp_mem_prop_Proper3 :
-    forall {E F} `{FAIL : FailureE -< F} `{UB : UBE -< F} `{OOM : OOME -< F}
-      {R} (RR : R -> R -> Prop),
-      Proper (eutt eq ==> eq ==> eq ==> eq ==> iff) (@interp_memory_prop E F FAIL UB OOM R RR).
-  Proof.
-    intros E F FAIL UB OOM R RR.
-    unfold interp_memory_prop.
-    unfold Proper, respectful.
-    intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2.
-    subst.
-    split; intros INTERP.
-  Admitted.
 
   Lemma model_undef_h_oom :
     forall {R} {E F}
