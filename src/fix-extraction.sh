@@ -43,6 +43,12 @@ do
     replace "s/^(\s*)type uvalue = LLVMParamsBigIntptr.Events.DV.uvalue =\n(\s*)\| UVALUE_Addr of ADDR.addr/\1type uvalue = LLVMParamsBigIntptr.Events.DV.uvalue =\n\2\| UVALUE_Addr of LLVMParamsBigIntptr.ADDR.addr/gm" $f
     replace "s/(^\s*type dvalue = LLVMParamsBigIntptr.Events.DV.dvalue =(\n|.)*?DVALUE_IPTR of )IP.intptr/\1LLVMParamsBigIntptr.IP.intptr/gm" $f
     replace "s/(^\s*type uvalue = LLVMParamsBigIntptr.Events.DV.uvalue =(\n|.)*?UVALUE_IPTR of )IP.intptr/\1LLVMParamsBigIntptr.IP.intptr/gm" $f
+    replace "s/val ptr_to_int : InfAddr.addr -> coq_Z/val ptr_to_int : ADDR.addr -> coq_Z/g" $f
+    replace "s/val ptr_to_int : FinAddr.addr -> coq_Z/val ptr_to_int : ADDR.addr -> coq_Z/g" $f
+    replace "s/val address_provenance : InfAddr.addr -> coq_Prov/val address_provenance : ADDR.addr -> coq_Prov/g" $f
+    replace "s/val address_provenance : FinAddr.addr -> coq_Prov/val address_provenance : ADDR.addr -> coq_Prov/g" $f
+    replace "s/val int_to_ptr : coq_Z -> InfPROV.coq_Prov -> InfAddr.addr coq_OOM/val int_to_ptr : coq_Z -> InfPROV.coq_Prov -> ADDR.addr coq_OOM/g" $f
+    replace "s/val int_to_ptr : coq_Z -> FinPROV.coq_Prov -> FinAddr.addr coq_OOM/val int_to_ptr : coq_Z -> FinPROV.coq_Prov -> ADDR.addr coq_OOM/g" $f
 done
 
 # Polymorphism issue

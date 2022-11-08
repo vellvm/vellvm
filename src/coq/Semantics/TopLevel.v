@@ -231,7 +231,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : PropT L4 res_L4 :=
     let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-    ℑs6 eq eq t [] ([],[]) 0 initial_memory_state.
+    ℑs6 eq eq eq t [] ([],[]) 0 initial_memory_state.
 
   Definition model_gen_oom_L1
              (ret_typ : dtyp)
@@ -276,7 +276,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : PropT L5 res_L5 :=
     let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-    ℑs4 eq eq t [] ([], []) 0 initial_memory_state.
+    ℑs5 eq eq t [] ([], []) 0 initial_memory_state.
 
   Definition model_gen_oom_L6
              (ret_typ : dtyp)
@@ -285,7 +285,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : PropT L6 res_L6 :=
     let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-    ℑs4 eq eq t [] ([], []) 0 initial_memory_state.
+    ℑs6 eq eq eq t [] ([], []) 0 initial_memory_state.
 
   (**
      Finally, the official model assumes no user-defined intrinsics.

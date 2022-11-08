@@ -108,18 +108,14 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
       let L5_trace       := model_UB L4_trace in
       L5_trace.
 
-    Definition interp_mcfg6 {R} RR_mem RR_pick (t: itree L0 R) g l sid m : PropT L6 (MemState * (store_id * (local_env * @stack local_env * (global_env * R)))) :=
+    Definition interp_mcfg6 {R} RR_mem RR_pick RR_oom (t: itree L0 R) g l sid m : PropT L6 (MemState * (store_id * (local_env * @stack local_env * (global_env * R)))) :=
       let uvalue_trace   := interp_intrinsics t in
       let L1_trace       := interp_global uvalue_trace g in
       let L2_trace       := interp_local_stack L1_trace l in
       let L3_trace       := interp_memory_prop RR_mem L2_trace sid m in
       let L4_trace       := model_undef RR_pick L3_trace in
       let L5_trace       := model_UB L4_trace in
-      let L6_trace       := refine_OOM
-                              (fun '(ms, (sid, ((lenv, stack), (genv, x))))
-                                 '(ms', (sid', ((lenv', stack'), (genv', y)))) =>
-                                 x = y)
-                              L5_trace in
+      let L6_trace       := refine_OOM RR_oom L5_trace in
       L6_trace.
   End InterpreterMCFG.
 

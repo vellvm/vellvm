@@ -110,16 +110,17 @@ Module FinSizeof : Sizeof.
   Qed.
 End FinSizeof.
 
-Module FinByte (ADDR : MemoryAddress.ADDRESS) (IP : MemoryAddress.INTPTR) (SIZEOF : Sizeof) (LLVMEvents:LLVM_INTERACTIONS(ADDR)(IP)(SIZEOF)) : ByteImpl(ADDR)(IP)(SIZEOF)(LLVMEvents).
+Inductive UByte (uvalue : Type) :=
+| mkUByte (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : store_id) : UByte uvalue.
+
+Module FinByte (ADDR : MemoryAddress.ADDRESS) (IP : MemoryAddress.INTPTR) (SIZEOF : Sizeof) (LLVMEvents:LLVM_INTERACTIONS(ADDR)(IP)(SIZEOF)) : ByteImpl(ADDR)(IP)(SIZEOF)(LLVMEvents)
+with  Definition SByte := UByte LLVMEvents.DV.uvalue.
   Import LLVMEvents.
   Import DV.
 
-  Inductive UByte :=
-  | mkUByte (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : store_id) : UByte.
+  Definition SByte := UByte uvalue.
 
-  Definition SByte := UByte.
-
-  Definition uvalue_sbyte := mkUByte.
+  Definition uvalue_sbyte := mkUByte uvalue.
 
   Definition sbyte_to_extractbyte (byte : SByte) : uvalue
     := match byte with

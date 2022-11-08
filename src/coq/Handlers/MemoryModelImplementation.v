@@ -325,6 +325,10 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
 
       { (* Error, should be contradiction *)
         cbn in REST.
+        cbn in HMAPM.
+        erewrite ptr_to_int_int_to_ptr in HMAPM; eauto.
+        erewrite int_to_ptr_provenance in HMAPM; eauto.
+        setoid_rewrite HMAPM in REST.
         repeat setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_Fail _)) in REST.
 
         raise_abs: REST. }
@@ -348,6 +352,15 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
         contradiction.
       }
 
+      cbn in HMAPM.
+      erewrite ptr_to_int_int_to_ptr in HMAPM; eauto.
+      erewrite int_to_ptr_provenance in HMAPM; eauto.
+      setoid_rewrite HMAPM in REST.
+      cbn in REST.
+      rewrite bind_ret_l in REST.
+      cbn in REST.
+
+      setoid_rewrite HSEQUENCE in REST.
       cbn in REST.
       rewrite bind_ret_l in REST.
       cbn in REST.
@@ -402,6 +415,10 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
 
       { (* Error, should be contradiction *)
         cbn in REST.
+        cbn in HMAPM.
+        erewrite ptr_to_int_int_to_ptr in HMAPM; eauto.
+        erewrite int_to_ptr_provenance in HMAPM; eauto.
+        setoid_rewrite HMAPM in REST.
         repeat setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_Fail _)) in REST.
         raise_abs:REST. }
 
@@ -499,11 +516,16 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
                    GEP.handle_gep_addr (DTYPE_I 8) a [Events.DV.DVALUE_IPTR ix]) seq) eqn:HMAPM.
 
     { (* Error *)
+      cbn in HMAPM.
+      erewrite ptr_to_int_int_to_ptr in HMAPM; eauto.
+      erewrite int_to_ptr_provenance in HMAPM; eauto.
+      setoid_rewrite HMAPM in ALLOC_EXEC.
       cbn in ALLOC_EXEC.
       repeat setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_Fail _)) in ALLOC_EXEC.
 
       destruct_err_ub_oom res.
       - (* OOM *)
+        exfalso.
         cbn in RES_T_ALLOC.
         destruct RES_T_ALLOC as [oom_msg RES_T_ALLOC].
         rewrite RES_T_ALLOC in ALLOC_EXEC.
@@ -531,6 +553,11 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     }
 
     { (* Success *)
+      cbn in HMAPM.
+      erewrite ptr_to_int_int_to_ptr in HMAPM; eauto.
+      erewrite int_to_ptr_provenance in HMAPM; eauto.
+      setoid_rewrite HMAPM in ALLOC_EXEC.
+      cbn in ALLOC_EXEC.
       repeat setoid_rewrite bind_ret_l in ALLOC_EXEC.
       cbn in ALLOC_EXEC.
       repeat setoid_rewrite bind_ret_l in ALLOC_EXEC.
@@ -548,13 +575,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
         apply map_monad_OOM_fail in HSEQUENCE as [a' [INl A'EQ]].
         unfold id in A'EQ. inv A'EQ.
         pose proof map_monad_err_In _ _ _ _ HMAPM INl as [ix [GEP INix]].
-        apply GEP.handle_gep_addr_ix_OOM in GEP; auto.
-        destruct GEP as [msg' GEP].
-        pose proof
-          (LP.I2P_BIG.int_to_ptr_safe (ptr_to_int a + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * to_Z ix)
-             (address_provenance a)) as SAFE.
-        rewrite GEP in SAFE.
-        contradiction.
+        inv GEP.
       }
 
       cbn in ALLOC_EXEC.
@@ -605,7 +626,13 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
                   MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory :=
                     add_all_index
                       (map (fun b : SByte => (b, provenance_to_allocation_id pr)) bytes)
-                      (PTOI.ptr_to_int res0)
+                      (next_memory_key
+                         {|
+                           MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
+                           MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack :=
+                             fs;
+                           MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
+                         |})
                       mem;
                   MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs;
                   MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
@@ -620,7 +647,12 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
         destruct ALLOC_SPEC as [ms_final' [[ptr''' ptrs'''] [[BYTES_POST [PTREQ PTRSEQ]] [MEQ ALLOC_SPEC]]]].
         subst ms_final' ptr'' ptr''' ptrs'''.
 
-        exists res0.
+        exists (next_memory_key
+                        {|
+                          MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_memory := mem;
+                          MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_frame_stack := fs;
+                          MemoryBigIntptrInfiniteSpec.MMSP.memory_stack_heap := h
+                        |}, allocation_id_to_prov (provenance_to_allocation_id pr)).
         exists ptrs''.
 
         eauto.

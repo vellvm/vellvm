@@ -72,7 +72,13 @@ End InfPTOI.
 Module InfPROV : PROVENANCE(InfAddr)
 with Definition Prov := Prov
 with Definition address_provenance
-    := fun (a : InfAddr.addr) => snd a.
+    := fun (a : InfAddr.addr) => snd a
+with Definition Provenance := Provenance
+with Definition AllocationId := AllocationId
+with Definition wildcard_prov := wildcard_prov
+with Definition nil_prov := nil_prov
+with Definition initial_provenance := 0%N.
+
   Definition Provenance := Provenance.
   Definition AllocationId := AllocationId.
   Definition Prov := Prov.

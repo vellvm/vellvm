@@ -78,7 +78,13 @@ End FinPTOI.
 Module FinPROV : PROVENANCE(FinAddr)
 with Definition Prov := Prov
 with Definition address_provenance
-    := fun (a : FinAddr.addr) => snd a.
+    := fun (a : FinAddr.addr) => snd a
+with Definition Provenance := Provenance
+with Definition AllocationId := AllocationId
+with Definition wildcard_prov := wildcard_prov
+with Definition nil_prov := nil_prov
+with Definition initial_provenance := 0%N.
+
   Definition Provenance := Provenance.
   Definition AllocationId := AllocationId.
   Definition Prov := Prov.
@@ -273,7 +279,13 @@ with Definition address_provenance
   Definition show_allocation_id (aid : AllocationId) := Show.show aid.
 End FinPROV.
 
-Module FinITOP : ITOP(FinAddr)(FinPROV)(FinPTOI).
+Module FinITOP : ITOP(FinAddr)(FinPROV)(FinPTOI)
+with Definition int_to_ptr :=
+  fun (i : Z) (pr : Prov) =>
+    if (i <? 0)%Z || (i >=? Int64.modulus)%Z
+    then Oom ("FinITOP.int_to_ptr: out of range (" ++ show i ++ ").")
+    else NoOom (Int64.repr i, pr).
+
   Import FinAddr.
   Import FinPROV.
   Import FinPTOI.
