@@ -87,6 +87,9 @@ Module Infinite.
   Import ListNotations.
   Require Import Coq.Strings.String.
 
+  Import TranslateFacts.
+  Import StateFacts.
+
   Lemma model_undef_h_oom :
     forall {R} oom_msg (t' : _ R),
       model_undef_h (E := ExternalCallE) (F := OOME +' UBE +' DebugE +' FailureE) eq (raiseOOM oom_msg) t' ->
@@ -155,32 +158,42 @@ Module Infinite.
     auto.
   Qed.
 
-  Lemma interp_mcfg4_ret_inv :
-    forall (x : dvalue) t genv lenv stack sid m,
-      interp_mcfg4 eq eq (Ret x) genv (lenv, stack) sid m t ->
-      eutt eq t (Ret (m, (sid, (lenv, stack, (genv, x))))).
+  #[global] Instance interp_mem_prop_Proper3 :
+  forall {E}
+      {R} (RR : R -> R -> Prop),
+      Proper (eutt eq ==> eq ==> eq ==> eq ==> iff) (@interp_memory_prop E R R RR).
   Proof.
-  Admitted.
+    intros E R RR.
+    unfold interp_memory_prop.
+    unfold Proper, respectful.
+    intros.
+    subst.
+    split; intros INTERP.
+    - rewrite <- H. eauto.
+    - rewrite H. eauto.
+  Qed.
 
-  (*   intros x t genv lenv stack sid m INTERP. *)
-  (*   unfold interp_mcfg4 in *. *)
-
-  (*   destruct INTERP as [t_pre [INTERP UNDEF]]. *)
-  (*   unfold interp_memory_prop in INTERP. *)
-  (*   cbn in INTERP. *)
-
-  (*   go_in INTERP. *)
-  (*   eapply interp_memory_prop_ret_inv in INTERP. *)
-  (*   destruct INTERP as [r2 [INTERP_TT EQ]]. *)
-  (*   rewrite EQ in UNDEF. clear EQ. *)
-  (*   eapply model_undef_h_ret_inv in UNDEF. *)
-  (*   rewrite UNDEF. *)
-
-  (*   apply eutt_Ret. *)
-  (*   repeat red; cbn. destruct r2, p, p. *)
-  (*   inv INTERP_TT. *)
-  (*   repeat econstructor; eauto. *)
-  (* Qed. *)
+  Lemma interp_mcfg4_ret_inv :
+    forall R g l sid m (r : R) x,
+      ℑs4 eq eq (ret r) g l sid m x ->
+        exists m' sid', ret (m := PropT _) (m', (sid', (l, (g, r)))) x.
+  Proof.
+    intros.
+    unfold interp_mcfg4, model_undef.
+    destruct H as (?&?&?).
+    setoid_rewrite interp_intrinsics_ret in H.
+    setoid_rewrite interp_global_ret in H.
+    unfold interp_local_stack in H.
+    rewrite interp_state_ret in H.
+    unfold interp_memory_prop in H.
+    apply interp_memory_prop_ret_inv in H.
+    destruct H as (?&?&?).
+    destruct x1 as (?&?&?).
+    rewrite H1 in H0.
+    apply interp_prop_ret_inv in H0.
+    destruct H0 as (?&?&?). subst.
+    cbn. exists m0, s. rewrite H2. reflexivity.
+  Qed.
 
   Definition alloc_code : code dtyp :=
     [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) [])
@@ -260,106 +273,11 @@ Module Infinite.
   Definition interp_instr_E_to_L0 :=
     interp (@instr_E_to_L0).
 
-  Import TranslateFacts.
-  Import StateFacts.
-
-  Ltac force_go_in H :=
-    repeat
-    match goal with
-    | H:context [ ITree.bind (trigger _ _) _ ] |- _ => unfold trigger in H; force_rewrite: @bind_vis in H
-    | H:context [ ITree.bind (ITree.bind _ _) _ ] |- _ => force_rewrite: @bind_bind in H
-    | H:context [ ITree.bind (Ret _) _ ] |- _ => force_rewrite: @bind_ret_l in H
-    | H:context [ interp_intrinsics (ITree.bind _ _) ] |- _ => force_rewrite: @interp_intrinsics_bind in H
-    | H:context [ interp_global (ITree.bind _ _) ] |- _ => force_rewrite: @interp_global_bind in H
-    | H:context [ interp_local_stack (ITree.bind _ _) ] |- _ => force_rewrite: @interp_local_stack_bind in H
-    | H:context [ interp_intrinsics (trigger _) ]
-      |- _ => force_rewrite: @interp_intrinsics_trigger in H; cbn in H; rewrite ?subevent_subevent in H
-    | H:context [ interp_global (trigger _) ]
-      |- _ => force_rewrite: @interp_global_trigger in H; cbn in H; rewrite ?subevent_subevent in H
-    | H:context [ interp_local_stack (trigger _) ]
-      |- _ => force_rewrite: @interp_local_stack_trigger in H; cbn in H; rewrite ?subevent_subevent in H
-    | H:context [ interp_intrinsics (Ret _) ] |- _ => force_rewrite: @interp_intrinsics_ret in H
-    | H:context [ interp_global (Ret _) ] |- _ => force_rewrite: @interp_global_ret in H
-    | H:context [ interp_local_stack (Ret _) ] |- _ => force_rewrite: @interp_local_stack_ret in H
-    | H:context [ interp _ (Ret _) ] |- _ => force_rewrite: @interp_ret in H
-    | H:context [ State.interp_state _ (Ret _) _] |- _ => force_rewrite: @interp_state_ret in H
-    | H:context [ State.interp_state _ (ITree.bind _) _] |- _ => force_rewrite: @interp_state_bind in H
-    | H:context [ State.interp_state _ (bind _) _] |- _ => force_rewrite: @interp_state_bind in H
-    | H:context [ translate _ (Ret _) ] |- _ => force_rewrite: @translate_ret in H
-    end.
-
-  Ltac force_go :=
-    repeat match goal with
-            | |- context [State.interp_state _ (ITree.bind _ _)] => force_rewrite @interp_state_bind
-           | |- context [State.interp_state _ (trigger _)] => unfold trigger; force_rewrite @interp_state_vis
-            | |- context [ITree.bind (ITree.bind _ _) _] => force_rewrite @bind_bind
-            | |- context [ITree.bind (Vis _ _) _] => force_rewrite @bind_vis
-            | |- context [ITree.bind (trigger _) _] => unfold trigger; force_rewrite @bind_vis
-            | |- context [interp _ (Vis _ _)] => force_rewrite @interp_vis
-            | |- context [interp _ (ITree.bind _ _)] => force_rewrite @interp_bind
-            | |- context [interp _ (trigger _)] => unfold trigger; force_rewrite @interp_vis
-            | |- context [interp _ (ITree.trigger _)] => unfold ITree.trigger; force_rewrite @interp_vis
-            | |- context [interp_intrinsics (ITree.bind _ _)] => force_rewrite @interp_intrinsics_bind
-            | |- context [interp_global (ITree.bind _ _)] => force_rewrite @interp_global_bind
-            | |- context [interp_local_stack (ITree.bind _ _)] => force_rewrite @interp_local_stack_bind
-            (* | |- context [interp_memory (ITree.bind _ _)] => rewrite interp_memory_bind *)
-            | |- context [interp_intrinsics (trigger _)] => force_rewrite @interp_intrinsics_trigger; cbn; rewrite ?subevent_subevent
-            | |- context [interp_global (trigger _)] => force_rewrite @interp_global_trigger; cbn; rewrite ?subevent_subevent
-            | |- context [interp_local_stack (trigger _)] => force_rewrite @interp_local_stack_trigger; cbn; rewrite ?subevent_subevent
-            | |- context [interp_intrinsics (Ret _)] => force_rewrite @interp_intrinsics_ret
-            | |- context [interp_global (Ret _)] => force_rewrite @interp_global_ret
-            | |- context [interp_local_stack (Ret _)] => force_rewrite @interp_local_stack_ret
-            (* | |- context [interp_memory (Ret _)] => rewrite interp_memory_ret *)
-            | |- context [ITree.bind (Ret _) _] => force_rewrite @bind_ret_l
-            | |- context [translate _ (Ret _)] => force_rewrite @translate_ret
-           end.
-
-  Tactic Notation "force_go_fuel" integer(n) :=
-    do n match goal with
-            | |- context [State.interp_state _ (ITree.bind _ _)] => force_rewrite @interp_state_bind
-            | |- context [State.interp_state _ (trigger _)] => unfold trigger; force_rewrite @interp_state_vis
-            | |- context [ITree.bind (ITree.bind _ _) _] => force_rewrite @bind_bind
-            | |- context [ITree.bind (Vis _ _) _] => force_rewrite @bind_vis
-            | |- context [ITree.bind (trigger _) _] => unfold trigger; force_rewrite @bind_vis
-            | |- context [interp _ (Vis _ _)] => force_rewrite @interp_vis
-            | |- context [interp _ (ITree.bind _ _)] => force_rewrite @interp_bind
-            | |- context [interp _ (trigger _)] => unfold trigger; force_rewrite @interp_vis
-            | |- context [interp _ (ITree.trigger _)] => unfold ITree.trigger; force_rewrite @interp_vis
-            | |- context [interp_intrinsics (ITree.bind _ _)] => force_rewrite @interp_intrinsics_bind
-            | |- context [interp_global (ITree.bind _ _)] => force_rewrite @interp_global_bind
-            | |- context [interp_local_stack (ITree.bind _ _)] => force_rewrite @interp_local_stack_bind
-            (* | |- context [interp_memory (ITree.bind _ _)] => rewrite interp_memory_bind *)
-            | |- context [interp_intrinsics (trigger _)] => force_rewrite @interp_intrinsics_trigger; cbn; rewrite ?subevent_subevent
-            | |- context [interp_global (trigger _)] => force_rewrite @interp_global_trigger; cbn; rewrite ?subevent_subevent
-            | |- context [interp_local_stack (trigger _)] => force_rewrite @interp_local_stack_trigger; cbn; rewrite ?subevent_subevent
-            | |- context [interp_intrinsics (Ret _)] => force_rewrite @interp_intrinsics_ret
-            | |- context [interp_global (Ret _)] => force_rewrite @interp_global_ret
-            | |- context [interp_local_stack (Ret _)] => force_rewrite @interp_local_stack_ret
-            (* | |- context [interp_memory (Ret _)] => rewrite interp_memory_ret *)
-            | |- context [ITree.bind (Ret _) _] => force_rewrite @bind_ret_l
-            | |- context [translate _ (Ret _)] => force_rewrite @translate_ret
-         end.
-
   Definition t_alloc : itree L0 dvalue
     := trigger (Alloca (DTYPE_I 64%N) 1%N None);; ret (DVALUE_I1 one).
 
   Definition t_ret : itree L0 dvalue
     := ret (DVALUE_I1 one).
-
-  #[global] Instance interp_mem_prop_Proper3 :
-  forall {E}
-      {R} (RR : R -> R -> Prop),
-      Proper (eutt eq ==> eq ==> eq ==> eq ==> iff) (@interp_memory_prop E R R RR).
-  Proof.
-    intros E R RR.
-    unfold interp_memory_prop.
-    unfold Proper, respectful.
-    intros.
-    subst.
-    split; intros INTERP.
-    - rewrite <- H. eauto.
-    - rewrite H. eauto.
-  Qed.
 
   (* Remove allocation in infinite language *)
   Lemma remove_alloc:
@@ -384,7 +302,8 @@ Module Infinite.
     eapply interp_mcfg4_ret_inv in INTERP.
     exists (Ret5 genv (lenv, stack) sid ms_final (DVALUE_I1 DynamicValues.Int1.one)).
     split; cycle 1.
-    - do 2 red. rewrite INTERP.
+    - do 2 red. destruct INTERP as (?&?&?). do 4 red in H.
+      rewrite H.
       pstep; econstructor; eauto.
       repeat red; repeat econstructor; eauto.
     - clear INTERP. do 2 red.
@@ -428,8 +347,7 @@ Module Infinite.
 
           Unshelve.
           all : eauto.
-
-  (* Remaining proof obligations are about [MemMonad_valid_state] *)
+  (* Remaining proof obligations are related to broken [MemMonad_valid_state] *)
   Admitted.
 
   Example remove_alloc_block :
@@ -437,132 +355,111 @@ Module Infinite.
       refine_L6 (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ alloc_tree) genv (lenv, stack) sid m)
                 (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m).
   Proof.
-    intros genv lenv stack sid m.
-    unfold refine_L6.
-    intros t' INTERP.
-    exists t'. split; [ | reflexivity].
-
-    unfold interp_mcfg4 in *.
-    unfold model_undef in *.
-
-    destruct INTERP as [t_pre [INTERP UNDEF]].
-
-    do 2 (cbn in INTERP; force_go_in INTERP).
-    unfold interp_instr_E_to_L0, interp_intrinsics, interp_global, interp_local_stack in INTERP.
-    force_go_in INTERP.
-
-    eapply interp_memory_prop_ret_inv in INTERP.
-    destruct INTERP as [[ms' [sid' [[lenv' stack'] [genv' res]]]] [TPRE EQ]].
-
-    inv TPRE. rewrite EQ in UNDEF.
-    apply model_undef_h_ret_inv in UNDEF.
-
-    exists t_pre.
-
-    split; cycle 1.
-    { rewrite EQ, UNDEF. eapply model_undef_h_ret_pure; eauto. }
-
-    unfold interp_memory_prop. rewrite EQ.
-
-    do 2 (cbn; force_go).
-    unfold interp_instr_E_to_L0, interp_intrinsics, interp_global, interp_local_stack.
-    do 2 (cbn; force_go). cbn.
-    do 2 (cbn; force_go). unfold interp_local_stack_h; cbn.
-    force_go.
-
-    eapply interp_memory_prop_vis; cycle 2.
-    Search interp_instr_E_to_L0.
-    - intros. cbn.
-      force_rewrite @itree_eta. cbn.
-
   Admitted.
+
+  Ltac force_go_hyps :=
+    repeat
+      (match goal with
+      | [H : context [ITree.bind (ITree.bind _ _ ) _] |- _ ]
+          => force_rewrite: @bind_bind in H; cbn in H
+      | [H : context [ITree.bind (Ret _) _] |- _ ]
+          => force_rewrite: @bind_ret_l in H; cbn in H
+      | [H : context [interp _ (ITree.bind _ _) ] |- _ ]
+          => force_rewrite: @interp_bind in H; cbn in H
+      | [H : context [interp _ (Ret _) ] |- _ ]
+          => force_rewrite: @interp_ret in H; cbn in H
+      | [H : context [translate _ (Ret _) ] |- _ ]
+          => force_rewrite: @translate_ret in H; cbn in H
+        end).
+
+  Ltac force_go :=
+    repeat
+      (match goal with
+      | |- context [ITree.bind (ITree.trigger _) _ ] => force_rewrite @bind_trigger
+      | |- context [ITree.bind (ITree.bind _ _ ) _ ] => force_rewrite @bind_bind
+      | |- context [ITree.bind (Ret _) _ ] => force_rewrite @bind_ret_l
+      | |- context [interp _ (ITree.bind _ _) ] => force_rewrite @interp_bind
+      | |- context [interp _ (Ret _) ] => force_rewrite @interp_ret
+      | |- context [interp _ (Vis _ _) ] => force_rewrite @interp_vis
+      | |- context [translate _ (Ret _) ] => force_rewrite @translate_ret
+       end).
+
+  Lemma ptoi_tree_simpl :
+    interp_instr_E_to_L0 dvalue ptoi_tree ≈
+          Vis (subevent _ (Alloca (DTYPE_I 64) 1 None))
+          (fun u => Vis (subevent _ (LocalWrite (Name "ptr") (dvalue_to_uvalue u)))
+                      (fun x => Vis (subevent _ (LocalRead (Name "ptr")))
+                                (fun u1 => Vis (subevent _ (LocalWrite (Name "i") (UVALUE_Conversion Ptrtoint DTYPE_Pointer u1 DTYPE_IPTR)))
+                                            (fun _ => Ret (DVALUE_I1 DynamicValues.Int1.one))))).
+  Proof.
+    unfold interp_instr_E_to_L0.
+    unfold ptoi_tree. cbn. go. cbn. go.
+    unfold trigger. go.
+    force_go. unfold instr_E_to_L0.
+    cbn. force_go.
+    eapply eqit_Vis.
+    intros. force_go.
+    rewrite bind_tau. go. rewrite tau_eutt.
+    force_go. cbn. rewrite bind_trigger.
+    eapply eqit_Vis.
+    intros. force_go.
+    rewrite bind_tau. go. rewrite tau_eutt.
+    force_go. cbn. rewrite translate_vis.
+    force_rewrite @bind_vis.
+    force_rewrite @translate_vis.
+    force_go. cbn. rewrite bind_trigger.
+
+    eapply eqit_Vis.
+    intros. force_go.
+    rewrite bind_tau. go. rewrite tau_eutt.
+    force_go. cbn. rewrite bind_trigger.
+
+    eapply eqit_Vis.
+    intros. force_go.
+    rewrite bind_tau. go. rewrite tau_eutt.
+    force_go. cbn. reflexivity.
+  Qed.
 
   Example remove_alloc_ptoi_block :
     forall genv lenv stack sid m,
-      refine_L6 (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ptoi_tree) genv (lenv, stack) sid m) (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m).
+      refine_L6
+        (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ptoi_tree) genv (lenv, stack) sid m)
+        (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m).
   Proof.
     intros genv lenv stack sid m.
     unfold refine_L6.
     intros t' INTERP.
 
-    unfold interp_mcfg4 in *.
-    unfold model_undef in *.
-
-    destruct INTERP as [t_pre [INTERP UNDEF]].
+    unfold ret_tree, denote_program in INTERP.
 
     cbn in INTERP.
-    (* go_in INTERP. *)
-    (* cbn in INTERP. *)
-    (* repeat rewrite bind_ret_l in INTERP. *)
-    (* rewrite TranslateFacts.translate_ret in INTERP. *)
-    (* repeat setoid_rewrite bind_ret_l in INTERP. *)
-    (* cbn in INTERP. *)
-    (* setoid_rewrite interp_ret in INTERP. *)
-    (* setoid_rewrite interp_intrinsics_ret in INTERP. *)
-    (* setoid_rewrite interp_global_ret in INTERP. *)
-    (* setoid_rewrite interp_local_stack_ret in INTERP. *)
+    unfold interp_instr_E_to_L0 in INTERP.
 
-    (* eapply interp_memory_prop_ret_inv in INTERP. *)
+    force_go_hyps.
+    apply interp_mcfg4_ret_inv in INTERP.
+    destruct INTERP as (?&?&?); do 4 red in H.
+
+    epose proof allocate_dtyp_spec_can_always_succeed m m
+     (mkMemState (ms_memory_stack m) (next_provenance (ms_provenance m)))
+     (DTYPE_I 64) 1 _ _ _ _ _ as (ms_final & addr & ALLOC).
+    Unshelve. 6 : intro H0; inv H0.
+    2 : exact (ms_provenance m). 2,3 : shelve.
+    2 : shelve.
+
+    eexists (Ret5 genv (lenv, stack) sid ms_final _).
+    split; cycle 1.
+    { do 2 red. rewrite H.
+      pstep; econstructor; eauto;
+        repeat red; repeat econstructor; eauto. }
+
+    clear H.
+
+    eexists (Ret5 genv (lenv, stack) sid ms_final _).
+    split; cycle 1.
+    { eapply model_undef_h_ret_pure; typeclasses eauto. }
+
+    rewrite ptoi_tree_simpl.
   Admitted.
-
-  (* TODO: move this? *)
-  Ltac go_setoid :=
-    repeat match goal with
-           | |- context [interp_intrinsics (ITree.bind _ _)] => setoid_rewrite interp_intrinsics_bind
-           | |- context [interp_global (ITree.bind _ _)] => setoid_rewrite interp_global_bind
-           | |- context [interp_local_stack (ITree.bind _ _)] => setoid_rewrite interp_local_stack_bind
-           (* | |- context [interp_memory (ITree.bind _ _)] => setoid_rewrite interp_memory_bind *)
-           | |- context [interp_intrinsics (trigger _)] => setoid_rewrite interp_intrinsics_trigger; cbn; rewrite ?subevent_subevent
-           | |- context [interp_intrinsics (ITree.trigger _)] => setoid_rewrite interp_intrinsics_trigger; cbn; rewrite ?subevent_subevent
-           | |- context [interp_global (trigger _)] => setoid_rewrite interp_global_trigger; cbn; rewrite ?subevent_subevent
-           | |- context [interp_global (ITree.trigger _)] => setoid_rewrite interp_global_trigger; cbn; rewrite ?subevent_subevent
-           | |- context [interp_local_stack (trigger _)] => setoid_rewrite interp_local_stack_trigger; cbn; rewrite ?subevent_subevent
-           | |- context [interp_local_stack (ITree.trigger _)] => setoid_rewrite interp_local_stack_trigger; cbn; rewrite ?subevent_subevent
-           | |- context [ITree.bind (ITree.bind _ _) _] => setoid_rewrite bind_bind
-           | |- context [interp_intrinsics (Ret _)] => setoid_rewrite interp_intrinsics_ret
-           | |- context [interp_global (Ret _)] => setoid_rewrite interp_global_ret
-           | |- context [interp_local_stack (Ret _)] => setoid_rewrite interp_local_stack_ret
-           (* | |- context [interp_memory (Ret _)] => setoid_rewrite interp_memory_ret *)
-           | |- context [ITree.bind (Ret _) _] => setoid_rewrite bind_ret_l
-           | |- context [translate _ (Ret _)] => setoid_rewrite translate_ret
-           | |- context [interp _ (trigger _)] => setoid_rewrite interp_trigger
-           | |- context [interp _ (ITree.bind _ _)] => setoid_rewrite interp_bind
-           | |- context [interp _ (Ret _)] => setoid_rewrite interp_ret
-           | |- context [map _ (ret _)] => setoid_rewrite map_ret
-           | |- context [ITree.map _ (Ret _)] => setoid_rewrite map_ret
-           | |- context [translate _ (trigger _)] => setoid_rewrite translate_trigger; cbn; rewrite ?subevent_subevent
-           | |- context [translate _ (ITree.trigger _)] => setoid_rewrite translate_trigger; cbn; rewrite ?subevent_subevent
-           | |- context [translate _ (ITree.bind _ _)] => setoid_rewrite translate_bind
-           end.
-
-  Ltac go_prime :=
-    repeat match goal with
-           | |- context [interp_intrinsics (ITree.bind _ _)] => rewrite interp_intrinsics_bind
-           | |- context [interp_global (ITree.bind _ _)] => rewrite interp_global_bind
-           | |- context [interp_local_stack (ITree.bind _ _)] => rewrite interp_local_stack_bind
-           (* | |- context [interp_memory (ITree.bind _ _)] => rewrite interp_memory_bind *)
-           | |- context [interp_intrinsics (trigger _)] => rewrite interp_intrinsics_trigger; cbn; rewrite ?subevent_subevent
-           | |- context [interp_intrinsics (ITree.trigger _)] => rewrite interp_intrinsics_trigger; cbn; rewrite ?subevent_subevent
-           | |- context [interp_global (trigger _)] => rewrite interp_global_trigger; cbn; rewrite ?subevent_subevent
-           | |- context [interp_global (ITree.trigger _)] => rewrite interp_global_trigger; cbn; rewrite ?subevent_subevent
-           | |- context [interp_local_stack (trigger _)] => rewrite interp_local_stack_trigger; cbn; rewrite ?subevent_subevent
-           | |- context [interp_local_stack (ITree.trigger _)] => rewrite interp_local_stack_trigger; cbn; rewrite ?subevent_subevent
-           | |- context [ITree.bind (ITree.bind _ _) _] => rewrite bind_bind
-           | |- context [interp_intrinsics (Ret _)] => rewrite interp_intrinsics_ret
-           | |- context [interp_global (Ret _)] => rewrite interp_global_ret
-           | |- context [interp_local_stack (Ret _)] => rewrite interp_local_stack_ret
-           (* | |- context [interp_memory (Ret _)] => rewrite interp_memory_ret *)
-           | |- context [ITree.bind (Ret _) _] => rewrite bind_ret_l
-           | |- context [translate _ (Ret _)] => rewrite translate_ret
-           | |- context [interp _ (trigger _)] => rewrite interp_trigger
-           | |- context [interp _ (ITree.bind _ _)] => rewrite interp_bind
-           | |- context [interp _ (Ret _)] => rewrite interp_ret
-           | |- context [map _ (ret _)] => rewrite map_ret
-           | |- context [ITree.map _ (Ret _)] => rewrite map_ret
-           | |- context [translate _ (trigger _)] => rewrite translate_trigger; cbn; rewrite ?subevent_subevent
-           | |- context [translate _ (ITree.trigger _)] => rewrite translate_trigger; cbn; rewrite ?subevent_subevent
-           | |- context [translate _ (ITree.bind _ _)] => rewrite translate_bind
-           end.
 
   (* Add allocation in infinite language *)
   Example add_alloc :
