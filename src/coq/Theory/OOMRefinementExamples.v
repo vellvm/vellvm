@@ -420,6 +420,85 @@ Module Infinite.
     force_go. cbn. reflexivity.
   Qed.
 
+  Lemma L3_trace_vis_MemoryE:
+    forall R X g l sid m (e : MemoryE X) (k : X -> itree L0 R) t,
+      interp_memory_prop eq
+            (vis (subevent _ e) (fun x : X => interp_local_stack (interp_global (interp_intrinsics (k x)) g) l)) sid m t ->
+      interp_memory_prop eq (interp_local_stack (interp_global (interp_intrinsics (vis e k)) g) l) sid m t.
+  Proof.
+    intros.
+    rewrite interp_intrinsics_vis.
+    cbn. rewrite interp_global_bind.
+    rewrite interp_local_stack_bind.
+    rewrite interp_global_trigger. cbn.
+    rewrite bind_trigger.
+    rewrite interp_local_stack_vis.
+    rewrite bind_bind.
+    cbn. rewrite bind_bind, bind_trigger.
+    setoid_rewrite bind_ret_l.
+    setoid_rewrite interp_local_stack_ret.
+    setoid_rewrite bind_ret_l. cbn. auto.
+  Qed.
+
+  Lemma L3_trace_LocalWrite:
+    forall R g l s sid m (k : unit -> itree L0 R) t id dv,
+      interp_memory_prop eq
+        (interp_local_stack (interp_global (interp_intrinsics (k tt)) g) (FMapAList.alist_add id dv l, s)) sid m t ->
+      interp_memory_prop eq (interp_local_stack (interp_global (interp_intrinsics (vis (LocalWrite id dv) k)) g) (l, s)) sid m t.
+  Proof.
+    intros.
+    rewrite interp_intrinsics_vis.
+    cbn. rewrite interp_global_bind.
+    rewrite interp_local_stack_bind.
+    rewrite interp_global_trigger. cbn.
+    rewrite bind_trigger.
+    rewrite interp_local_stack_vis.
+    rewrite bind_bind.
+    cbn.
+    setoid_rewrite interp_local_stack_ret.
+    setoid_rewrite bind_ret_l.
+    unfold handle_local. cbn.
+    unfold handle_local_stack. cbn.
+    cbn. unfold ITree.map. rewrite bind_ret_l; auto.
+  Qed.
+
+  Lemma L3_trace_LocalRead:
+    forall R g l s sid m (k: _ -> itree L0 R) t id x,
+      FMapAList.alist_find id l = ret x ->
+      interp_memory_prop eq (interp_local_stack (interp_global (interp_intrinsics (k (snd (l, s, x)))) g) (fst (l, s, x)))
+        sid m t ->
+      interp_memory_prop eq (interp_local_stack (interp_global (interp_intrinsics (vis (LocalRead id) k)) g) (l, s)) sid m t.
+  Proof.
+    intros.
+    rewrite interp_intrinsics_vis.
+    cbn. rewrite interp_global_bind.
+    rewrite interp_local_stack_bind.
+    rewrite interp_global_trigger. cbn.
+    rewrite bind_trigger.
+    rewrite interp_local_stack_vis.
+    rewrite bind_bind.
+    cbn.
+    setoid_rewrite interp_local_stack_ret.
+    setoid_rewrite bind_ret_l.
+    unfold handle_local. cbn.
+    unfold handle_local_stack. cbn.
+    cbn. unfold ITree.map. rewrite H; cbn.
+    do 2 rewrite bind_ret_l; auto.
+  Qed.
+
+  Lemma L3_trace_ret:
+    forall R g l sid m r
+      (t : itree (ExternalCallE +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+            (MemState * (store_id * (FMapAList.alist raw_id uvalue * Stack.stack * (FMapAList.alist raw_id dvalue * R))))),
+      interp_memory_prop eq (Ret2 g l r) sid m t ->
+      interp_memory_prop eq (interp_local_stack (interp_global (interp_intrinsics (ret r)) g) l) sid m t.
+  Proof.
+    intros.
+    setoid_rewrite interp_intrinsics_ret.
+    setoid_rewrite interp_global_ret.
+    setoid_rewrite interp_local_stack_ret. auto.
+  Qed.
+
   Example remove_alloc_ptoi_block :
     forall genv lenv stack sid m,
       refine_L6
@@ -446,7 +525,7 @@ Module Infinite.
     2 : exact (ms_provenance m). 2,3 : shelve.
     2 : shelve.
 
-    eexists (Ret5 genv (lenv, stack) sid ms_final _).
+    eexists (Ret5 genv (_, stack) sid ms_final _).
     split; cycle 1.
     { do 2 red. rewrite H.
       pstep; econstructor; eauto;
@@ -454,11 +533,44 @@ Module Infinite.
 
     clear H.
 
-    eexists (Ret5 genv (lenv, stack) sid ms_final _).
+    eexists (Ret5 genv (_, stack) sid ms_final _).
     split; cycle 1.
     { eapply model_undef_h_ret_pure; typeclasses eauto. }
 
     rewrite ptoi_tree_simpl.
+
+    apply L3_trace_vis_MemoryE.
+    eapply (interp_memory_prop_vis _ _ _ _ _ (Ret _) (fun _ => Ret _))
+      ; [ setoid_rewrite bind_ret_l; reflexivity |..].
+
+    { cbn. unfold my_handle_memory_prop.
+      unfold MemPropT_lift_PropT_fresh.
+      right; right; right.
+      exists sid, ms_final, (DVALUE_Addr addr).
+      Unshelve.
+      5 : exact (ms_final, (sid, DVALUE_Addr addr)).
+      split; [ red; reflexivity |].
+      6 : exact m. cbn in *.
+      exists ms_final, addr. tauto.
+      all:shelve. }
+
+    intros. apply Returns_ret_inv in H0.
+    destruct b as (?&?&?). inv H0; subst. cbn in *.
+    eapply Returns_vis_inversion in H.
+    destruct H as (?&?).
+    apply Returns_ret_inv in H. subst.
+
+    go.
+    eapply L3_trace_LocalWrite.
+    eapply L3_trace_LocalRead; [ reflexivity | ].
+    eapply L3_trace_LocalWrite.
+    eapply L3_trace_ret.
+    pstep; constructor; eauto.
+
+    Unshelve.
+    all : eauto.
+
+  (* Remaining proof obligations are related to broken [MemMonad_valid_state] *)
   Admitted.
 
   (* Add allocation in infinite language *)
