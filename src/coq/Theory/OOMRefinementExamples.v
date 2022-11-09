@@ -117,6 +117,9 @@ Module Infinite.
   Import ListNotations.
   Require Import Coq.Strings.String.
 
+  Import MMEP.MMSP.
+  Import MemoryBigIntptr.MMEP.MMSP.
+
   #[global] Instance interp_mem_prop_Proper3 :
   forall {E}
       {R} (RR : R -> R -> Prop),
@@ -319,12 +322,6 @@ Module Infinite.
   Definition interp_instr_E_to_L0 :=
     interp (@instr_E_to_L0).
 
-  Definition t_alloc : itree L0 dvalue
-    := trigger (Alloca (DTYPE_I 64%N) 1%N None);; ret (DVALUE_I1 one).
-
-  Definition t_ret : itree L0 dvalue
-    := ret (DVALUE_I1 one).
-
   Lemma alloc_tree_simpl :
     interp_instr_E_to_L0 dvalue alloc_tree ≈
       Vis (subevent _ (Alloca (DTYPE_I 64) 1 None))
@@ -382,84 +379,6 @@ Module Infinite.
     rewrite bind_tau. go. rewrite tau_eutt.
     force_go. cbn. reflexivity.
   Qed.
-
-  (* Remove allocation in infinite language *)
-  Lemma remove_alloc:
-    forall genv lenv stack sid m,
-      refine_L6 (interp_mcfg4 eq eq t_alloc genv (lenv, stack) sid m) 
-                (interp_mcfg4 eq eq t_ret genv (lenv, stack) sid m).
-  Proof.
-    intros genv lenv stack sid m.
-    unfold refine_L6.
-    intros t' INTERP.
-
-    Import MMEP.MMSP.
-    Import MemoryBigIntptr.MMEP.MMSP.
-    epose proof allocate_dtyp_spec_can_always_succeed m m 
-     (mkMemState (ms_memory_stack m) (next_provenance (ms_provenance m))) 
-     (DTYPE_I 64) 1 _ _ _ _ _ as (ms_final & addr & ALLOC).
-     Unshelve. 6 : intro H; inv H.
-     2 : exact (ms_provenance m). 2,3 : shelve.
-     2 : shelve.
-
-    unfold t_ret in *.
-    eapply interp_mcfg4_ret_inv in INTERP.
-    exists (Ret5 genv (lenv, stack) sid ms_final (DVALUE_I1 DynamicValues.Int1.one)).
-    split; cycle 1.
-    - do 2 red. destruct INTERP as (?&?&?). do 4 red in H.
-      rewrite H.
-      pstep; econstructor; eauto.
-      repeat red; repeat econstructor; eauto.
-    - clear INTERP. do 2 red.
-      exists (Ret5 genv (lenv, stack) sid ms_final (DVALUE_I1 DynamicValues.Int1.one)).
-
-      split; cycle 1.
-      + eapply model_undef_h_ret_pure; typeclasses eauto.
-      + unfold t_alloc. cbn.
-        go.
-        rewrite bind_trigger.
-        repeat setoid_rewrite bind_ret_l.
-        setoid_rewrite interp_local_stack_ret.
-        repeat setoid_rewrite bind_ret_l.
-
-        (* LEMMA *)
-        unfold interp_memory_prop; cbn.
-
-        Opaque MMEP.MemSpec.allocate_dtyp_spec.
-
-        eapply interp_memory_prop_vis.
-        * cbn.
-          Unshelve.
-          2-4, 7-8:shelve.
-          2 : exact (Ret (ms_final, (sid, DVALUE_Addr addr))).
-          2 : { intros (m', (sid', dv')). exact (Ret (m', (sid', (lenv, stack, (genv, DVALUE_I1 DynamicValues.Int1.one))))). }
-          rewrite bind_ret_l. reflexivity.
-        * cbn. unfold my_handle_memory_prop.
-          unfold MemPropT_lift_PropT_fresh.
-          right; right; right.
-          exists sid, ms_final, (DVALUE_Addr addr). split; [ red; reflexivity |]. Unshelve.
-          6 : exact m. cbn in *.
-          exists ms_final, addr. tauto.
-          1-4:shelve.
-
-        * intros. apply Returns_ret_inv in H0.
-          destruct b as (?&?&?). inv H0; subst. cbn in *.
-          eapply Returns_vis_inversion in H.
-          destruct H as (?&?).
-          apply Returns_ret_inv in H. subst.
-          go. pstep; constructor; auto.
-
-          Unshelve.
-          all : eauto.
-  (* Remaining proof obligations are related to broken [MemMonad_valid_state] *)
-  Admitted.
-
-  Example remove_alloc_block :
-    forall genv lenv stack sid m,
-      refine_L6 (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ alloc_tree) genv (lenv, stack) sid m)
-                (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m).
-  Proof.
-  Admitted.
 
   (* Few remarks about [L3_trace] used in [interp_mcfg4] *)
   Remark L3_trace_MemoryE:
@@ -532,7 +451,7 @@ Module Infinite.
   Remark L3_trace_ret:
     forall R g l sid m r
       (t : itree (ExternalCallE +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
-            (MemState * (store_id * (FMapAList.alist raw_id uvalue * Stack.stack * (FMapAList.alist raw_id dvalue * R))))),
+            (_ * (store_id * (FMapAList.alist raw_id uvalue * Stack.stack * (FMapAList.alist raw_id dvalue * R))))),
       interp_memory_prop eq (Ret2 g l r) sid m t <->
       interp_memory_prop eq (interp_local_stack (interp_global (interp_intrinsics (ret r)) g) l) sid m t.
   Proof.
@@ -541,6 +460,80 @@ Module Infinite.
     setoid_rewrite interp_global_ret.
     setoid_rewrite interp_local_stack_ret. reflexivity.
   Qed.
+
+  Import MemTheory.
+
+  (* remove allocation in infinite language *)
+  Example remove_alloc_block :
+    forall genv lenv stack sid m,
+      refine_L6 (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ alloc_tree) genv (lenv, stack) sid m)
+                (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m).
+  Proof.
+    intros genv lenv stack sid m.
+    unfold refine_L6.
+    intros t' INTERP.
+
+    unfold ret_tree, denote_program in INTERP.
+
+    cbn in INTERP.
+    unfold interp_instr_E_to_L0 in INTERP.
+
+    force_go_hyps.
+    apply interp_mcfg4_ret_inv in INTERP.
+    destruct INTERP as (?&?&?); do 4 red in H.
+
+    epose proof allocate_dtyp_spec_can_always_succeed m m
+     (mkMemState (ms_memory_stack m) (next_provenance (ms_provenance m)))
+     (DTYPE_I 64) 1 _ _ _ _ _ as (ms_final & addr & ALLOC).
+    Unshelve. 6 : intro H0; inv H0.
+    2 : exact (ms_provenance m). 2,3 : shelve.
+    2 : shelve.
+
+    eexists (Ret5 genv (_, stack) sid ms_final _).
+    split; cycle 1.
+    { do 2 red. rewrite H.
+      pstep; econstructor; eauto;
+        repeat red; repeat econstructor; eauto. }
+
+    clear H.
+
+    eexists (Ret5 genv (_, stack) sid ms_final _).
+    split; cycle 1.
+    { eapply model_undef_h_ret_pure; typeclasses eauto. }
+
+    rewrite alloc_tree_simpl.
+
+    apply L3_trace_MemoryE.
+    eapply (interp_memory_prop_vis _ _ _ _ _ (Ret _) (fun _ => Ret _))
+      ; [ setoid_rewrite bind_ret_l; reflexivity |..].
+
+    { cbn. unfold my_handle_memory_prop.
+      unfold MemPropT_lift_PropT_fresh.
+      right; right; right.
+      exists sid, ms_final, (DVALUE_Addr addr).
+      Unshelve.
+      5 : exact (ms_final, (sid, DVALUE_Addr addr)).
+      split; [ red; reflexivity |].
+      6 : exact m. cbn in *.
+      exists ms_final, addr. tauto.
+      all:shelve. }
+
+    intros. apply Returns_ret_inv in H0.
+    destruct b as (?&?&?). inv H0; subst. cbn in *.
+    eapply Returns_vis_inversion in H.
+    destruct H as (?&?).
+    apply Returns_ret_inv in H. subst.
+
+    go.
+    eapply L3_trace_LocalWrite.
+    eapply L3_trace_ret.
+    pstep; constructor; eauto.
+
+    Unshelve.
+    all : eauto.
+
+  (* Remaining proof obligations are related to broken [MemMonad_valid_state] *)
+  Admitted.
 
   Example remove_alloc_ptoi_block :
     forall genv lenv stack sid m,
@@ -723,7 +716,6 @@ Module Infinite.
     destruct H as (alloc_t&k1&s1&ms1&EQ1&SPEC1&HK).
     rewrite EQ1 in H0. clear x EQ1.
 
-    Import MemTheory.
     pose proof allocate_dtyp_spec_inv ms1 (DTYPE_I 64) as ALLOCINV.
     assert (abs : DTYPE_I 64 <> DTYPE_Void) by (intros abs; inv abs).
     specialize (ALLOCINV 1%N abs); eauto; clear abs.
