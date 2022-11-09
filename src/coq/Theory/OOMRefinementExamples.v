@@ -573,6 +573,29 @@ Module Infinite.
   (* Remaining proof obligations are related to broken [MemMonad_valid_state] *)
   Admitted.
 
+  Lemma alloc_tree_simpl :
+    interp_instr_E_to_L0 dvalue alloc_tree ≈
+      Vis (subevent _ (Alloca (DTYPE_I 64) 1 None))
+          (fun u => Vis (subevent _ (LocalWrite (Name "ptr") (dvalue_to_uvalue u)))
+                     (fun _ => Ret (DVALUE_I1 DynamicValues.Int1.one))).
+
+  Proof.
+    unfold interp_instr_E_to_L0.
+    unfold alloc_tree. cbn. go. cbn. go.
+    unfold trigger. go.
+    force_go. unfold instr_E_to_L0.
+    cbn. force_go.
+    eapply eqit_Vis.
+    intros. force_go.
+    rewrite bind_tau. go. rewrite tau_eutt.
+    force_go. cbn. rewrite bind_trigger.
+    eapply eqit_Vis.
+    intros. force_go.
+    rewrite bind_tau. go. rewrite tau_eutt.
+    force_go. reflexivity.
+  Qed.
+
+
   (* Add allocation in infinite language *)
   Example add_alloc :
     forall genv lenv stack sid m,
@@ -583,17 +606,13 @@ Module Infinite.
     unfold refine_L6.
     intros t' INTERP.
 
+    unfold ret_tree, denote_program in INTERP.
+    destruct INTERP as (?&?&?).
+    rewrite alloc_tree_simpl in H.
+
     (* either t' succeeds and we're eqv some ret like t_ret...
        or t' runs out of memory because it's an allocation.
      *)
-
-    unfold interp_mcfg4 in *.
-    unfold model_undef in *.
-
-    destruct INTERP as [t_pre [INTERP UNDEF]].
-    unfold interp_local_stack, interp_global, interp_intrinsics, interp_instr_E_to_L0 in INTERP.
-
-    do 2 (cbn in INTERP; force_go_in INTERP).
 
   Admitted.
 
