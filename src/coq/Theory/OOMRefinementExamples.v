@@ -640,10 +640,10 @@ Module Infinite.
   Qed.
 
   Lemma refine_OOM_h_model_undef_h_raise_OOM:
-    forall {E} R t1 oom_msg (k1 : R -> _) t3,
-      refine_OOM_h (E := E) (F := UBE +' DebugE +' FailureE) refine_res3 t1 (raiseOOM oom_msg) ->
+    forall R t1 oom_msg (k1 : R -> _) t3,
+      refine_OOM_h (E := L4) refine_res3 t1 (raiseOOM oom_msg) ->
       model_undef_h eq (x <- Error.raise_oom oom_msg;; k1 x) t3 ->
-      refine_OOM_h (E := E) (F := UBE +' DebugE +' FailureE) refine_res3 t1 t3.
+      refine_OOM_h (E := L4) refine_res3 t1 t3.
   Proof.
     intros. punfold H. red in H.
     unfold Error.raise_oom, RAISE_OOM_ITREE_OOME, bind, Monad_itree, raiseOOM in *.
@@ -655,14 +655,14 @@ Module Infinite.
     punfold H0. red in H0; cbn in H0.
     remember (VisF (subevent void (ThrowOOM oom_msg))
             (fun x : void =>
-             ITree.bind match x return (itree (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) R) with
+             ITree.bind match x return (itree _ R) with
                         end (fun x0 : R => k1 x0))).
     remember (VisF (subevent void (ThrowOOM oom_msg))
            (fun x : void =>
             match
               x
               return
-                (itree (E +' OOME +' UBE +' DebugE +' FailureE)
+                (itree _
                    (LLVM.MEM.MMEP.MMSP.MemState * (store_id * (local_env * stack * res_L1))))
             with
             end)).
@@ -682,10 +682,10 @@ Module Infinite.
   Qed.
 
   Lemma refine_OOM_h_model_undef_h_raise_ret:
-    forall {E} t1 t3 r,
-      refine_OOM_h (E := E) (F := UBE +' DebugE +' FailureE) refine_res3 t1 (ret r) ->
+    forall t1 t3 r,
+      refine_OOM_h (E := L4) refine_res3 t1 (ret r) ->
       model_undef_h eq (ret r) t3 ->
-      refine_OOM_h (E := E) (F := UBE +' DebugE +' FailureE) refine_res3 t1 t3.
+      refine_OOM_h (E := L4) refine_res3 t1 t3.
   Proof.
     intros.
     eapply interp_prop_ret_inv in H0.
@@ -941,10 +941,10 @@ Module Finite.
   Qed.
 
   Lemma refine_OOM_h_model_undef_h_raise_OOM:
-    forall {E} R t1 oom_msg (k1 : R -> _) t3,
-      refine_OOM_h (E := E) (F := UBE +' DebugE +' FailureE) refine_res3 t1 (raiseOOM oom_msg) ->
+    forall R t1 oom_msg (k1 : R -> _) t3,
+      refine_OOM_h (E := L4) refine_res3 t1 (raiseOOM oom_msg) ->
       model_undef_h eq (x <- Error.raise_oom oom_msg;; k1 x) t3 ->
-      refine_OOM_h (E := E) (F := UBE +' DebugE +' FailureE) refine_res3 t1 t3.
+      refine_OOM_h (E := L4) refine_res3 t1 t3.
   Proof.
     intros. punfold H. red in H.
     unfold Error.raise_oom, RAISE_OOM_ITREE_OOME, bind, Monad_itree, raiseOOM in *.
@@ -956,14 +956,14 @@ Module Finite.
     punfold H0. red in H0; cbn in H0.
     remember (VisF (subevent void (ThrowOOM oom_msg))
             (fun x : void =>
-             ITree.bind match x return (itree (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) R) with
+             ITree.bind match x return (itree _ R) with
                         end (fun x0 : R => k1 x0))).
     remember (VisF (subevent void (ThrowOOM oom_msg))
            (fun x : void =>
             match
               x
               return
-                (itree (E +' OOME +' UBE +' DebugE +' FailureE)
+                (itree _
                    (LLVM.MEM.MMEP.MMSP.MemState * (store_id * (local_env * stack * res_L1))))
             with
             end)).
@@ -983,10 +983,10 @@ Module Finite.
   Qed.
 
   Lemma refine_OOM_h_model_undef_h_raise_ret:
-    forall {E} t1 t3 r,
-      refine_OOM_h (E := E) (F := UBE +' DebugE +' FailureE) refine_res3 t1 (ret r) ->
+    forall t1 t3 r,
+      refine_OOM_h (E := L4) refine_res3 t1 (ret r) ->
       model_undef_h eq (ret r) t3 ->
-      refine_OOM_h (E := E) (F := UBE +' DebugE +' FailureE) refine_res3 t1 t3.
+      refine_OOM_h (E := L4) refine_res3 t1 t3.
   Proof.
     intros.
     eapply interp_prop_ret_inv in H0.
