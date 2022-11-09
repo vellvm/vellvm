@@ -37,46 +37,10 @@ From Vellvm Require Import
      Utils.PropT.
 
 Section PARAMS_MODEL.
-  Variable (E F: Type -> Type).
-  Notation Effin := (E +' OOME +' F).
-  Notation Effout := (E +' OOME +' F).
-
-  (* Semantics of OOM *)
-
-  (*    If the target tree has an out of memory event, then it is a *)
-  (*    refinement of any source. *)
-
-  (*    I.e., when refining a program the behaviour of the target should *)
-  (*    agree with the source at all points, but may abort, running out *)
-  (*    of memory at any point. *)
-  (*  *)
-
-  Definition oom_k_spec
-             {T R : Type}
-             (e : Effin T)
-             (ta : itree Effout T)
-             (k2 : T -> itree Effout R)
-             (t2 : itree Effout R) : Prop
-    :=
-    match e with
-    | inr1 (inl1 oom) => True
-    | _ => t2 ≈ (bind ta k2)
-    end.
-
-  #[global] Instance oom_k_spec_proper {T R : Type} {RR : R -> R -> Prop} :
-    Proper
-      (eq ==>
-          eq ==>
-          (fun k1 k2 : T -> itree Effout R =>
-             forall x : T, eqit eq true true (k1 x) (k2 x)) ==> eq ==> iff)
-      (oom_k_spec).
-  Proof.
-    unfold Proper, respectful.
-    intros x y H x0 y0 H0 x2 y2 H2 x3 y3 H3; subst.
-    split; cbn; auto; intros EQ; destruct y; red; cbn in EQ; try rewrite EQ.
-    2, 4 : destruct s; auto; rewrite EQ.
-    all : eapply eutt_clo_bind; [ reflexivity | intros; subst; eauto ; symmetry; eauto ].
-  Qed .
+  Variable (E: Type -> Type).
+  Context `{O : OOME -< E}.
+  Notation Effin := E.
+  Notation Effout := E.
 
   Definition refine_OOM_handler : Effin ~> PropT Effout
     := fun _ e x => x ≈ trigger e.
@@ -153,7 +117,7 @@ Section PARAMS_MODEL.
                 unfold subevent in H1.
                 unfold subevent, resum, ReSum_id, id_, ReSum_inr, cat, Id_IFun, Cat_IFun, inr_,
                   resum , ReSum_inl , cat, resum, Inr_sum1, inl_, Inl_sum1 in H1. inv H1.
-                change (VisF (inr1 (inl1 e0)) k1) with (observe (Vis (inr1 (inl1 e0)) k1)).
+                change (VisF (O e0) k1) with (observe (Vis (O e0) k1)).
                 eapply Interp_PropT_Vis_OOM. unfold subevent.
                 apply eqit_Vis. reflexivity.
           -- red in H0. rewrite H0 in H1.
@@ -255,15 +219,10 @@ Section PARAMS_MODEL.
     pstep; red.
     hinduction H0 before t; try solve [constructor; auto]; try inv CHECK; intros.
     cbn.
-    destruct e as [e | [ oom | f]].
-    - change (VisF (inl1 e) k2) with (observe (Vis (inl1 e) k2)).
-      eapply Interp_PropT_Vis; eauto. red; reflexivity.
-      setoid_rewrite bind_trigger; reflexivity.
-    - change (VisF (inr1 (inl1 oom)) k2) with (observe (Vis (inr1 (inl1 oom)) k2)).
-      eapply Interp_PropT_Vis_OOM. eapply eqit_Vis. intros; reflexivity.
-    - change (VisF (inr1 (inr1 f)) k2) with (observe (Vis (inr1 (inr1 f)) k2)).
-      eapply Interp_PropT_Vis; eauto. red; reflexivity.
-      setoid_rewrite bind_trigger; reflexivity.
+
+    change (VisF e k2) with (observe (Vis e k2)).
+    eapply Interp_PropT_Vis; eauto. red; reflexivity.
+    setoid_rewrite bind_trigger; reflexivity.
   Qed.
 
   #[global] Instance refine_OOM_h_transitive {R} {RR : relation R} `{Transitive _ RR} : Transitive (refine_OOM_h RR).
