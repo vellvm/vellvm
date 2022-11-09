@@ -657,9 +657,51 @@ Module Infinite.
     force_rewrite: @bind_trigger in H.
     force_rewrite: @bind_vis in H0.
     red in H0. cbn in *. rewrite itree_eta, (itree_eta t3).
-    repeat red.
+    do 2 red.
     punfold H0. red in H0; cbn in H0.
-  Admitted.
+    remember (VisF (subevent void (ThrowOOM oom_msg))
+            (fun x : void =>
+             ITree.bind match x return (itree (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) R) with
+                        end (fun x0 : R => k1 x0))).
+    remember (VisF (subevent void (ThrowOOM oom_msg))
+           (fun x : void =>
+            match
+              x
+              return
+                (itree (E +' OOME +' UBE +' DebugE +' FailureE)
+                   (LLVM.MEM.MMEP.MMSP.MemState * (store_id * (local_env * stack * res_L1))))
+            with
+            end)).
+    hinduction H0 before i0; intros; inv Heqi.
+    - pstep; constructor; eauto.
+      specialize (IHinterp_PropTF eq_refl H eq_refl). punfold IHinterp_PropTF.
+    - inv e.
+    - dependent destruction H4.
+      do 20 red in H.
+      rewrite H in H0.
+      setoid_rewrite bind_bind in H0.
+      setoid_rewrite bind_trigger in H0.
+      rewrite <- itree_eta. rewrite H0.
+      pstep. eapply Interp_PropT_Vis_OOM.
+      eapply eqit_Vis. intros; inv u.
+      Unshelve. intros. inv H2.
+  Qed.
+
+  Lemma refine_OOM_h_model_undef_h_raise_ret:
+    forall {E} t1 t3 r,
+      refine_OOM_h (E := E) (F := UBE +' DebugE +' FailureE) refine_res3 t1 (ret r) ->
+      model_undef_h eq (ret r) t3 ->
+      refine_OOM_h (E := E) (F := UBE +' DebugE +' FailureE) refine_res3 t1 t3.
+  Proof.
+    intros.
+    eapply interp_prop_ret_inv in H0.
+    destruct H0 as (?&?&?).
+    subst. rewrite H1.
+    eapply interp_prop_ret_inv in H.
+    destruct H as (?&?&?).
+    subst. rewrite H0.
+    pstep; constructor; eauto.
+  Qed.
 
   (* Add allocation in infinite language *)
   Example add_alloc :
@@ -721,7 +763,35 @@ Module Infinite.
       force_go. cbn. force_go.
       apply interp_mcfg4_ret. }
 
-  Admitted.
+    assert (alloca_returns:
+             forall x, Returns
+                    (E := ExternalCallE +'
+                        LLVMParamsBigIntptr.Events.IntrinsicE +'
+                        LLVMParamsBigIntptr.Events.MemoryE +'
+                        LLVMParamsBigIntptr.Events.PickUvalueE +'
+                        OOME +' UBE +' DebugE +' FailureE)
+                                   x (trigger (subevent _ (Alloca (DTYPE_I 64) 1 None)))).
+    { intros. unfold trigger.
+      eapply ReturnsVis; [ reflexivity | ].
+      Unshelve. eapply ReturnsRet. reflexivity. }
+
+    assert (alloc_t_returns : Returns (x0, (x, x1)) alloc_t).
+    { rewrite H; apply ReturnsRet; reflexivity. }
+
+    specialize (HK _ _ (alloca_returns x1) alloc_t_returns eq_refl).
+    clear alloca_returns alloc_t_returns.
+
+    eapply L3_trace_LocalWrite in HK.
+    eapply L3_trace_ret in HK.
+    apply interp_memory_prop_ret_inv in HK.
+    destruct HK as (?&?&?).
+    destruct x2 as (?&?&?&?).
+    rewrite H3 in H0.
+
+    inv H2.
+    eapply refine_OOM_h_model_undef_h_raise_ret; eauto.
+    pstep; repeat constructor; eauto.
+  Qed.
 
 End Infinite.
 
