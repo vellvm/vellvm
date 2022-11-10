@@ -60,7 +60,16 @@ Fixpoint step (t : ITreeDefinition.itree L4 res_L4) : MlResult dvalue string
   := match observe t with
      | RetF (_,(_,(_,(_,x)))) => MlOk _ string x
      | TauF t => step t
-     | VisF e k => MlError _ string "Uninterpreted event"
+     | VisF (inl1 e) k =>
+         MlError _ string "Uninterpreted external call"
+     | VisF (inr1 (inl1 (ThrowOOM msg))) k =>
+         MlError _ string ("OOM: " ++ msg)%string
+     | VisF (inr1 (inr1 (inl1 (ThrowUB msg)))) k =>
+         MlError _ string ("UB: " ++ msg)%string
+     | VisF (inr1 (inr1 (inr1 (inl1 (Debug msg))))) k =>
+         MlError _ string ("Debug: " ++ msg)%string
+     | VisF (inr1 (inr1 (inr1 (inr1 (LLVMEvents.Throw msg))))) k =>
+         MlError _ string ("Failure: " ++ msg)%string
      end.
 Set Guard Checking.
 

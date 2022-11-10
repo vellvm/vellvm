@@ -56,7 +56,8 @@ interp: coqinterp extracted vellvm
 coq: quickchick flocq-quickchick $(VOFILES)
 
 .PHONY: qc-tests
-qc-tests: rm-qc-test-vo coq $(QCVOFILES) $(QCVOFILESTEST)
+qc-tests: rm-qc-test-vo coq
+	$(COQEXEC) coq/QC/QCVellvm.v
 
 .PHONY: rm-qc-test-vo
 rm-qc-test-vo:
