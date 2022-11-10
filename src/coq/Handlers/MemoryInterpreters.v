@@ -57,7 +57,8 @@ Ltac raise_abs :=
   end.
 
 
-Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MM : MemoryModelSpec LP MP MMSP) (MemExecM : MemoryExecMonad LP MP MMSP MM).
+Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP)
+       (MMSP : MemoryModelSpecPrimitives LP MP) (MM : MemoryModelSpec LP MP MMSP) (MemExecM : MemoryExecMonad LP MP MMSP MM).
   Import MM.
   Import MMSP.
   Import MemExecM.
@@ -75,6 +76,12 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
 
     Definition MemStateT M := stateT MemState M.
     Definition MemStateFreshT M := stateT store_id (MemStateT M).
+
+    #[global] Instance MemState_StoreIdFreshness : StoreIdFreshness MMSP.MemState.
+    Proof.
+      split.
+      apply used_store_id_prop.
+    Defined.
 
     Definition MemStateFreshT_from_MemStateT {M X} `{Monad M} (mst : MemStateT M X) : MemStateFreshT M X :=
       fun sid => x <- mst;; ret (sid, x).
@@ -105,12 +112,6 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       split.
       - apply (lift get).
       - intros ms; apply (lift (put ms)).
-    Defined.
-
-    #[global] Instance MemState_StoreIdFreshness : StoreIdFreshness MemState.
-    Proof.
-      split.
-      apply used_store_id_prop.
     Defined.
 
     Definition MemStateFreshT_State := store_id.
@@ -147,10 +148,6 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       intros [ms' [s' x]].
       apply (s', (ms', x)).
     Defined.
-
-    Definition MemStateFreshT_valid_state (ms : MemState) (st : MemStateFreshT_State) : Prop
-      := let sid := st in
-         (forall sid', used_store_id ms sid' -> (sid' < sid)%N).
 
   Definition within_MemStateFreshT_itree
     {Eff}
@@ -234,11 +231,11 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Qed.
 
     #[global] Instance MemStateFreshT_MemMonad:
-      MemMonad MemStateFreshT_State (MemStateFreshT (itree F)) (itree F).
+      MemMonad (MemStateFreshT (itree F)) (itree F).
     Proof.
       esplit with
-        (MemMonad_run := fun A => @MemStateFreshT_run A F)
-        (MemMonad_valid_state := MemStateFreshT_valid_state); try solve [typeclasses eauto].
+        (MemMonad_run := fun A => @MemStateFreshT_run A F);
+         try solve [typeclasses eauto].
       13-18:intros; raise_abs.
 
       - (* run bind *)
@@ -291,7 +288,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
           intros sid' USED.
           apply VALID_SID in USED.
           lia.
-        + intros USED.
+        + intros USED. red in VALID_SID.
           apply VALID_SID in USED.
           lia.
       - (* fresh_provenance *)
@@ -309,7 +306,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
 
         split; [|split].
         + reflexivity.
-        + unfold MemStateFreshT_valid_state in *; auto.
+        + unfold MemMonad_valid_state in *; auto.
           unfold used_store_id, used_store_id_prop in *. cbn in *.
           unfold used_store_id, used_store_id_prop in *. cbn in *.
           unfold read_byte_prop.
@@ -402,7 +399,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Definition interp_memory_prop {R1 R2} (RR : R1 -> R2 -> Prop) :
       itree Effin R1 -> MemStateFreshT (PropT Effout) R2 :=
       fun (t : itree Effin R1) (sid : store_id) (ms : MemState) (t' : itree Effout (MemState * (store_id * R2))) =>
-        interp_memory_prop interp_memory_prop_h (fun x '(_, (_, y)) => RR x y) t t'.
+        interp_memory_prop (flip MemMonad_valid_state) interp_memory_prop_h (fun x '(_, (_, y)) => RR x y) t t'.
 
   End Interpreters.
 End MemorySpecInterpreter.
@@ -503,11 +500,11 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
          (forall sid', used_store_id ms sid' -> (sid' < sid)%N).
 
     #[global] Instance MemStateFreshT_MemMonad :
-      MemMonad MemStateFreshT_State (MemStateFreshT (itree Effout)) (itree Effout).
+      MemMonad (MemStateFreshT (itree Effout)) (itree Effout).
     Proof.
       esplit with
-        (MemMonad_run := fun A => @MemStateFreshT_run A Effout _ _ _)
-        (MemMonad_valid_state := MemStateFreshT_valid_state); try solve [typeclasses eauto].
+        (MemMonad_run := fun A => @MemStateFreshT_run A Effout _ _ _);
+         try solve [typeclasses eauto].
       13-18: intros; raise_abs.
 
       (* TODO: didn't need valid for ret / bind laws... *)
@@ -579,7 +576,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
         split; [|split].
         + reflexivity.
-        + unfold MemStateFreshT_valid_state in *; auto.
+        + unfold MemMonad_valid_state in *; auto.
           unfold used_store_id, used_store_id_prop in *. cbn in *.
           unfold used_store_id, used_store_id_prop in *. cbn in *.
           unfold read_byte_prop.
@@ -630,10 +627,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
     (* TODO: get rid of this silly hack. *)
     Definition my_handle_memory : MemoryE ~> MemStateFreshT (itree Effout) :=
-      @handle_memory (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
+      handle_memory (H := MemStateFreshT_MemMonad).
 
     Definition my_handle_intrinsic : IntrinsicE ~> MemStateFreshT (itree Effout) :=
-      @handle_intrinsic (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
+      handle_intrinsic (H := MemStateFreshT_MemMonad).
 
     Definition interp_memory_h : Effin ~> MemStateFreshT (itree Effout)
       := case_ E_trigger (case_ my_handle_intrinsic (case_ my_handle_memory F_trigger)).
@@ -689,21 +686,21 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       rewrite unfold_interp_memory; reflexivity.
     Qed.
 
-    Lemma my_handle_intrinsic_prop_correct {T} i sid ms :
-      my_handle_intrinsic_prop i sid ms (my_handle_intrinsic (T := T) i sid ms).
+    Lemma my_handle_intrinsic_prop_correct :
+      forall ms sid, MemMonad_valid_state ms sid ->
+      forall T i, my_handle_intrinsic_prop i sid ms (my_handle_intrinsic (T := T) i sid ms).
     Proof.
       unfold my_handle_intrinsic_prop, my_handle_intrinsic.
-      cbn.
+      intros ? ? MVS ? ?.
 
       (* TODO: probably an easier more general lemma about
          [exec_correct] and [MemPropT_lift_PropT_fresh] *)
-      epose proof @handle_intrinsic_correct (MemStateFreshT (itree Effout)) Effout
-        _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ T i (fun _ _ => True) as HANDLE_CORRECT.
+      epose proof (handle_intrinsic_correct (MemM := MemStateFreshT (itree Effout)) (Eff := Effout)) as HANDLE_CORRECT.
+      specialize (HANDLE_CORRECT T i (fun _ _ => True)).
 
       red in HANDLE_CORRECT.
-      specialize (HANDLE_CORRECT ms sid).
-      forward HANDLE_CORRECT.
-      admit. (* TODO: MemMonad_valid_state *)
+      specialize (HANDLE_CORRECT ms sid MVS).
+
       specialize (HANDLE_CORRECT I).
 
       destruct HANDLE_CORRECT as [[ms' [ub_msg UB]] | HANDLE_CORRECT].
@@ -775,23 +772,23 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         do 3 eexists.
         split; eauto.
       }
-    Admitted.
+    Qed.
 
-    (* TODO: Import result from [handle_memory_correct]*)
-    Lemma my_handle_memory_prop_correct {T} m sid ms :
-      my_handle_memory_prop m sid ms (my_handle_memory (T := T) m sid ms).
+    Lemma my_handle_memory_prop_correct :
+      forall ms sid, MemMonad_valid_state ms sid ->
+      forall T m, my_handle_memory_prop m sid ms (my_handle_memory (T := T) m sid ms).
+    Proof.
       unfold my_handle_memory_prop, my_handle_memory.
-      cbn.
+      cbn. intros ? ? MVS ? ?.
 
       (* TODO: probably an easier more general lemma about
          [exec_correct] and [MemPropT_lift_PropT_fresh] *)      
-      epose proof @handle_memory_correct (MemStateFreshT (itree Effout)) Effout
-        _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ T m (fun _ _ => True) as HANDLE_CORRECT.
+      epose proof (handle_memory_correct (MemM := MemStateFreshT (itree Effout)) (Eff := Effout)) as HANDLE_CORRECT.
+      specialize (HANDLE_CORRECT T m (fun _ _ => True)).
 
       red in HANDLE_CORRECT.
-      specialize (HANDLE_CORRECT ms sid).
-      forward HANDLE_CORRECT.
-      admit. (* TODO: MemMonad_valid_state *)
+      specialize (HANDLE_CORRECT ms sid MVS).
+
       specialize (HANDLE_CORRECT I).
 
       destruct HANDLE_CORRECT as [[ms' [ub_msg UB]] | HANDLE_CORRECT].
@@ -863,7 +860,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         do 3 eexists.
         split; eauto.
       }
-    Admitted.
+    Qed.
 
     (* fmap throws away extra sid / provenance from state
        handler. This is fine because interp_memory_prop should include
@@ -872,15 +869,16 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
      *)
     Lemma interp_memory_correct :
       forall {T} t (ms : MemState) (sid : store_id),
+        MemMonad_valid_state ms sid ->
         interp_memory_prop eq t sid ms (@interp_memory T t sid ms).
     Proof.
-      intros T t ms sid.
+      intros T t ms sid MVS.
       red.
       unfold interp_memory_prop.
       unfold interp_memory.
       cbn.
       match goal with
-      | |- InterpMemoryProp.interp_memory_prop _ _ _ ?i => remember i
+      | |- InterpMemoryProp.interp_memory_prop _ _ _ _ ?i => remember i
       end.
       match goal with
       | [H : i = ?r |- _] => assert (i ≅ r) by (subst; reflexivity)
@@ -888,7 +886,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       rename H into EQ.
 
       revert t i EQ.
-      revert ms sid.
+      revert ms sid MVS.
       pcofix CIH.
       intros.
       pstep.
@@ -915,7 +913,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         assert (i = Tau i0).
         apply bisimulation_is_eq; pstep; red; auto.
         subst.
-        constructor; auto. right; eapply CIH; reflexivity.
+        constructor; auto. right; eapply CIH; eauto; reflexivity.
 
       - pclearbot.
         match goal with
@@ -929,25 +927,23 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         assert (i = i0).
         apply bisimulation_is_eq; pstep; red; auto.
         subst.
-        eapply Interp_Memory_PropT_Vis; eauto.
-        { intros. right. destruct b, p. subst. eapply CIH.
+        eapply Interp_Memory_PropT_Vis.
+        { intros. right. destruct b, p. subst. eapply CIH; eauto. cbn.
           Unshelve.
           5 : exact (fun '(m, (s, a)) => State.interp_state interp_memory_h (k2 a) s m).
-          cbn in *.
-          2 : { eapply (interp_memory_h e sid ms). }
-          2 : exact sid. 2 : exact ms.
-          reflexivity. }
+          cbn in *. eauto. cbn.
+          reflexivity. 1-3 : shelve. }
         2 : {
-          Unshelve.
+          Unshelve. 2 : exact (interp_memory_h e sid ms).
           eapply eutt_clo_bind; [ reflexivity | intros; subst ].
           destruct u2, p. cbn.
-          rewrite tau_eutt. reflexivity. }
+          rewrite tau_eutt. reflexivity. 1-2: eauto. }
         + red. unfold case_, case_, Case_sum1, case_sum1.
           destruct e as [ | [ | [ | ]]]; cbn.
           1,4 : red; tau_steps; apply eqit_Vis; intros;
             tau_steps; reflexivity.
-          * eapply my_handle_intrinsic_prop_correct.
-          * eapply my_handle_memory_prop_correct.
+          * eapply my_handle_intrinsic_prop_correct; eauto.
+          * eapply my_handle_memory_prop_correct; eauto.
     Qed.
 
   End Interpreters.
