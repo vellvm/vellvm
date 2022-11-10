@@ -3467,7 +3467,11 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   Require Import Within.
 
-  Context `{StoreIdFreshness MemState}.
+  #[global] Instance MemState_StoreIdFreshness : StoreIdFreshness MMSP.MemState.
+  Proof.
+    split.
+    apply used_store_id_prop.
+  Defined.
 
   Definition MemMonad_valid_state (ms : MemState) (st : N) : Prop
     := let sid := st in
