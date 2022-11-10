@@ -2118,46 +2118,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
   End ARITHMETIC.
 
-  (* Same deal as above with the helper *)
-  (* The pattern matching generates hundreds of subgoals, hence the factorization of the typeclass inference *)
-  Definition eval_select_h {M} `{HM: Monad M} `{ERR: RAISE_ERROR M} `{RAISE_UB M} (cnd : dvalue) (v1 v2 : uvalue) : M uvalue :=
-    let raise_error_local :=
-        @raise_error M
-                     ERR uvalue
-    in
-    let ret_local := @ret M _ uvalue in
-    match v1, v2 with
-    | UVALUE_Poison t, _ => ret_local (UVALUE_Poison t)
-    | _, UVALUE_Poison t => ret_local (UVALUE_Poison t)
-    | _, _ =>
-      match cnd with
-      | DVALUE_I1 i =>
-        ret_local (if (Int1.unsigned i =? 1)%Z then v1 else v2)
-      | DVALUE_Poison t => ret_local (UVALUE_Poison t)
-      | _ => raise_error_local "ill_typed select"
-      end
-    end.
-
-  Definition eval_select {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M}
-             cnd v1 v2 : M (uvalue) :=
-    match cnd, v1, v2 with
-    | (DVALUE_Vector es), (UVALUE_Vector es1), (UVALUE_Vector es2) =>
-      (* vec needs to loop over es, es1, and es2. Is there a way to
-         generalize vec_loop to cover this? (make v1,v2 generic?) *)
-      let fix loop elts :=
-          match elts with
-          | [] => ret []
-          | (cnd,(v1,v2)) :: tl =>
-              val <- eval_select_h cnd v1 v2 ;;
-              vec <- loop tl ;;
-              ret (val :: vec)
-          end in
-      val <- loop (List.combine es (List.combine es1 es2)) ;;
-      ret (UVALUE_Vector val)
-    | _, _, _ => eval_select_h cnd v1 v2
-    end.
-  Arguments eval_select _ _ _ : simpl nomatch.
-
   (* Helper function for indexing into a structured datatype
      for extractvalue and insertvalue *)
   Definition index_into_str {M} `{Monad M} `{RAISE_ERROR M} (v:uvalue) (idx:LLVMAst.int) : M uvalue :=

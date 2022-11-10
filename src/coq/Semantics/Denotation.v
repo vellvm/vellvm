@@ -325,8 +325,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
     | OP_Select (dt, cnd) (dt1, op1) (dt2, op2) =>
         cnd <- denote_exp (Some dt) cnd ;;
-        v1   <- denote_exp (Some dt1) op1 ;;
-        v2   <- denote_exp (Some dt2) op2 ;;
+        v1  <- denote_exp (Some dt1) op1 ;;
+        v2  <- denote_exp (Some dt2) op2 ;;
         ret (UVALUE_Select cnd v1 v2)
 
     | OP_Freeze (dt, e) =>
