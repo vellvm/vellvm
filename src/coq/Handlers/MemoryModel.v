@@ -4810,12 +4810,11 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         apply exec_correct_bind; auto with EXEC_CORRECT.
         intros a0.
         intros ms_init ms_after_m st_init st_after_m RUN_FRESH_SID.
-        apply H0.
+        apply H.
         subst.
 
         cbn in H0.
         apply filter_split_out_length in Heqp1.
-        cbn in H1.
         lia.
     Qed.
 
@@ -4872,7 +4871,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         auto with EXEC_CORRECT.
 
       { (* Size 1 *)
-        destruct dt; inversion H0; auto with EXEC_CORRECT.
+        destruct dt; inversion H; auto with EXEC_CORRECT.
       }
 
       { (* Larger sizes *)
@@ -4883,21 +4882,21 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           apply exec_correct_map_monad_In.
           intros a pre0 IN.
           apply In_repeatN in IN; subst.
-          eapply H0.
-          cbn in H1.
+          eapply H.
+          cbn in H0.
           lia.
         }
 
         { (* Structs *)
           break_match_goal; auto with EXEC_CORRECT.
           apply exec_correct_bind; auto with EXEC_CORRECT.
-          eapply H0; cbn in *; auto; lia.
+          eapply H; cbn in *; auto; lia.
 
           intros a ms_init ms_after_m st_init st_after_m RUN.
 
           apply exec_correct_bind; auto with EXEC_CORRECT.
 
-          eapply H0; cbn in *; auto.
+          eapply H; cbn in *; auto.
           unfold list_sum.
           assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
           lia.
@@ -4906,13 +4905,13 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         { (* Packed Structs *)
           break_match_goal; auto with EXEC_CORRECT.
           apply exec_correct_bind; auto with EXEC_CORRECT.
-          eapply H0; cbn in *; auto; lia.
+          eapply H; cbn in *; auto; lia.
 
           intros a ms_init ms_after_m st_init st_after_m RUN.
 
           apply exec_correct_bind; auto with EXEC_CORRECT.
 
-          eapply H0; cbn in *; auto.
+          eapply H; cbn in *; auto.
           unfold list_sum.
           assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
           lia.
@@ -4922,8 +4921,8 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           apply exec_correct_map_monad_In.
           intros a pre0 IN.
           apply In_repeatN in IN; subst.
-          eapply H0.
-          cbn in H1.
+          eapply H.
+          cbn in H0.
           lia.
         }
 
@@ -4941,7 +4940,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         auto with EXEC_CORRECT.
 
       { (* Size 1 *)
-        destruct dt; inversion H0; auto with EXEC_CORRECT.
+        destruct dt; inversion H; auto with EXEC_CORRECT.
       }
 
       { (* Larger sizes *)
@@ -4952,21 +4951,21 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           apply exec_correct_map_monad_In.
           intros a pre0 IN.
           apply In_repeatN in IN; subst.
-          eapply H0.
-          cbn in H1.
+          eapply H.
+          cbn in H0.
           lia.
         }
 
         { (* Structs *)
           break_match_goal; auto with EXEC_CORRECT.
           apply exec_correct_bind; auto with EXEC_CORRECT.
-          eapply H0; cbn in *; auto; lia.
+          eapply H; cbn in *; auto; lia.
 
           intros a ms_init ms_after_m st_init st_after_m RUN.
 
           apply exec_correct_bind; auto with EXEC_CORRECT.
 
-          eapply H0; cbn in *; auto.
+          eapply H; cbn in *; auto.
           unfold list_sum.
           assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
           lia.
@@ -4975,13 +4974,13 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         { (* Packed Structs *)
           break_match_goal; auto with EXEC_CORRECT.
           apply exec_correct_bind; auto with EXEC_CORRECT.
-          eapply H0; cbn in *; auto; lia.
+          eapply H; cbn in *; auto; lia.
 
           intros a ms_init ms_after_m st_init st_after_m RUN.
 
           apply exec_correct_bind; auto with EXEC_CORRECT.
 
-          eapply H0; cbn in *; auto.
+          eapply H; cbn in *; auto.
           unfold list_sum.
           assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
           lia.
@@ -4991,8 +4990,8 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           apply exec_correct_map_monad_In.
           intros a pre0 IN.
           apply In_repeatN in IN; subst.
-          eapply H0.
-          cbn in H1.
+          eapply H.
+          cbn in H0.
           lia.
         }
 
