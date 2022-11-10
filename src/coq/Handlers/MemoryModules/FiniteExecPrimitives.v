@@ -91,13 +91,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Section MemoryPrimatives.
     Context {MemM : Type -> Type}.
     Context {Eff : Type -> Type}.
-    (* Context `{Monad MemM}. *)
-    (* Context `{MonadProvenance Provenance MemM}. *)
-    (* Context `{MonadStoreID MemM}. *)
-    (* Context `{MonadMemState MemState MemM}. *)
-    (* Context `{RAISE_ERROR MemM} `{RAISE_UB MemM} `{RAISE_OOM MemM}. *)
     Context {ExtraState : Type}.
-    Context `{MemMonad ExtraState MemM (itree Eff)}.
+    Context `{MemMonad MemM (itree Eff)}.
 
     (*** Data types *)
 
@@ -128,7 +123,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     (*** Primitives on memory *)
     (** Reads *)
-    Definition read_byte `{MemMonad ExtraState MemM (itree Eff)} (ptr : addr) : MemM SByte :=
+    Definition read_byte `{MemMonad MemM (itree Eff)} (ptr : addr) : MemM SByte :=
       let addr := ptr_to_int ptr in
       let pr := address_provenance ptr in
       ms <- get_mem_state;;
@@ -145,7 +140,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       end.
 
     (** Writes *)
-    Definition write_byte `{MemMonad ExtraState MemM (itree Eff)} (ptr : addr) (byte : SByte) : MemM unit :=
+    Definition write_byte `{MemMonad MemM (itree Eff)} (ptr : addr) (byte : SByte) : MemM unit :=
       let addr := ptr_to_int ptr in
       let pr := address_provenance ptr in
       ms <- get_mem_state;;
@@ -165,7 +160,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       end.
 
     (** Allocations *)
-    Definition addr_allocated `{MemMonad ExtraState MemM (itree Eff)} (ptr : addr) (aid : AllocationId) : MemM bool :=
+    Definition addr_allocated `{MemMonad MemM (itree Eff)} (ptr : addr) (aid : AllocationId) : MemM bool :=
       ms <- get_mem_state;;
       match read_byte_raw (mem_state_memory ms) (ptr_to_int ptr) with
       | None => ret false
@@ -1833,7 +1828,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     #[global] Opaque add_all_to_heap.
     #[global] Opaque next_memory_key.
 
-    Definition get_free_block `{MemMonad ExtraState MemM (itree Eff)} (len : nat) (pr : Provenance) : MemM (addr * list addr)%type :=
+    Definition get_free_block `{MemMonad MemM (itree Eff)} (len : nat) (pr : Provenance) : MemM (addr * list addr)%type :=
       ms <- get_mem_state;;
       let mem_stack := ms_memory_stack ms in
       let addr := next_memory_key mem_stack in
@@ -1847,7 +1842,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       map (fun b => (b, aid)) bytes.
 
     (** Add block to memory with a given allocation id *)
-    Definition add_block `{MemMonad ExtraState MemM (itree Eff)} (aid : AllocationId) (ptr : addr) (ptrs : list addr) (init_bytes : list SByte) : MemM unit :=
+    Definition add_block `{MemMonad MemM (itree Eff)} (aid : AllocationId) (ptr : addr) (ptrs : list addr) (init_bytes : list SByte) : MemM unit :=
       let mem_bytes := sbytes_to_mem_bytes aid init_bytes in
       ms <- get_mem_state;;
       let '(mkMemoryStack mem fs h) := mem_state_memory_stack ms in
@@ -1857,14 +1852,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       put_mem_state (MemState_put_memory (mkMemoryStack mem' fs h) ms).
 
     (** Add pointers to the stack frame *)
-    Definition add_ptrs_to_frame `{MemMonad ExtraState MemM (itree Eff)} (ptrs : list addr) : MemM unit :=
+    Definition add_ptrs_to_frame `{MemMonad MemM (itree Eff)} (ptrs : list addr) : MemM unit :=
       modify_mem_state
         (fun ms =>
            let mem := MemState_get_memory ms in
            MemState_put_memory (add_all_to_frame mem ptrs) ms);;
       ret tt.
 
-    Definition add_ptrs_to_heap `{MemMonad ExtraState MemM (itree Eff)} (ptrs : list addr) : MemM unit :=
+    Definition add_ptrs_to_heap `{MemMonad MemM (itree Eff)} (ptrs : list addr) : MemM unit :=
       modify_mem_state
         (fun ms =>
            let mem := MemState_get_memory ms in
@@ -1872,17 +1867,17 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       ret tt.
 
     (** Add a block of bytes to memory, and register it in the current stack frame. *)
-    Definition add_block_to_stack `{MemMonad ExtraState MemM (itree Eff)} (aid : AllocationId) (ptr : addr) (ptrs : list addr) (init_bytes : list SByte) : MemM unit :=
+    Definition add_block_to_stack `{MemMonad MemM (itree Eff)} (aid : AllocationId) (ptr : addr) (ptrs : list addr) (init_bytes : list SByte) : MemM unit :=
       add_block aid ptr ptrs init_bytes;;
       add_ptrs_to_frame ptrs.
 
     (** Add a block of bytes to memory, and register it in the heap. *)
     (* Should we make sure ptr (the root) is added even if ptrs is empty? *)
-    Definition add_block_to_heap `{MemMonad ExtraState MemM (itree Eff)} (aid : AllocationId) (ptr : addr) (ptrs : list addr) (init_bytes : list SByte) : MemM unit :=
+    Definition add_block_to_heap `{MemMonad MemM (itree Eff)} (aid : AllocationId) (ptr : addr) (ptrs : list addr) (init_bytes : list SByte) : MemM unit :=
       add_block aid ptr ptrs init_bytes;;
       add_ptrs_to_heap ptrs.
 
-    Definition allocate_bytes_with_pr `{MemMonad ExtraState MemM (itree Eff)}
+    Definition allocate_bytes_with_pr `{MemMonad MemM (itree Eff)}
       (dt : dtyp) (num_elements : N) (init_bytes : list SByte) (pr : Provenance)
       : MemM addr
       := let len := length init_bytes in
@@ -1899,20 +1894,20 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
              end
          end.
 
-    Definition allocate_bytes `{MemMonad ExtraState MemM (itree Eff)}
+    Definition allocate_bytes `{MemMonad MemM (itree Eff)}
       (dt : dtyp) (num_elements : N) (init_bytes : list SByte) : MemM addr :=
       pr <- fresh_provenance;;
       allocate_bytes_with_pr dt num_elements init_bytes pr.
 
     (** Heap allocation *)
-    Definition malloc_bytes_with_pr `{MemMonad ExtraState MemM (itree Eff)} (init_bytes : list SByte) (pr : Provenance) : MemM addr :=
+    Definition malloc_bytes_with_pr `{MemMonad MemM (itree Eff)} (init_bytes : list SByte) (pr : Provenance) : MemM addr :=
       let len := length init_bytes in
       '(ptr, ptrs) <- get_free_block len pr;;
       let aid := provenance_to_allocation_id pr in
       add_block_to_heap aid ptr ptrs init_bytes;;
       ret ptr.
 
-    Definition malloc_bytes `{MemMonad ExtraState MemM (itree Eff)} (init_bytes : list SByte) : MemM addr :=
+    Definition malloc_bytes `{MemMonad MemM (itree Eff)} (init_bytes : list SByte) : MemM addr :=
       pr <- fresh_provenance;;
       malloc_bytes_with_pr init_bytes pr.
 
@@ -2029,7 +2024,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       auto.
     Qed.
 
-    Definition mempush `{MemMonad ExtraState MemM (itree Eff)} : MemM unit :=
+    Definition mempush `{MemMonad MemM (itree Eff)} : MemM unit :=
       ms <- get_mem_state;;
       let fs := mem_state_frame_stack ms in
       let fs' := push_frame_stack fs initial_frame in
@@ -2048,7 +2043,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       fold_left (fun m key => free_byte (ptr_to_int key) m) block m.
 
     (** Stack free *)
-    Definition mempop `{MemMonad ExtraState MemM (itree Eff)} : MemM unit :=
+    Definition mempop `{MemMonad MemM (itree Eff)} : MemM unit :=
       ms <- get_mem_state;;
       let '(mkMemoryStack mem fs h) := ms_memory_stack ms in
       let f := peek_frame_stack fs in
@@ -2059,7 +2054,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       put_mem_state ms'.
 
     (** Free from heap *)
-    Definition free `{MemMonad ExtraState MemM (itree Eff)} (ptr : addr) : MemM unit :=
+    Definition free `{MemMonad MemM (itree Eff)} (ptr : addr) : MemM unit :=
       ms <- get_mem_state;;
       let '(mkMemoryStack mem fs h) := ms_memory_stack ms in
       let raw_addr := ptr_to_int ptr in
@@ -2072,52 +2067,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           let ms' := mkMemState (mkMemoryStack mem' fs h') pr in
           put_mem_state ms'
       end.
-
-    (*** Correctness *)
-    (* Import ESID. *)
-    (* Definition MemStateM := ErrSID_T (state MemState). *)
-
-    (* Instance MemStateM_MonadAllocationId : MonadAllocationId AllocationId MemStateM. *)
-    (* Proof. *)
-    (*   split. *)
-    (*   apply ESID.fresh_allocation_id. *)
-    (* Defined. *)
-
-    (* Instance MemStateM_MonadStoreID : MonadStoreId MemStateM. *)
-    (* Proof. *)
-    (*   split. *)
-    (*   apply ESID.fresh_sid. *)
-    (* Defined. *)
-
-    (* Instance MemStateM_MonadMemState : MonadMemState MemState MemStateM. *)
-    (* Proof. *)
-    (*   split. *)
-    (*   - apply (lift MonadState.get). *)
-    (*   - intros ms. *)
-    (*     apply (lift (MonadState.put ms)). *)
-    (* Defined. *)
-
-    (* Instance ErrSIDMemMonad : MemMonad MemState ExtraState AllocationId (ESID.ErrSID_T (state MemState)). *)
-    (* Proof. *)
-    (*   split. *)
-    (*   - (* MemMonad_runs_to *) *)
-    (*     intros A ma ms. *)
-    (*     destruct ms eqn:Hms. *)
-    (*     pose proof (runState (runErrSID_T ma ms_sid0 ms_prov0) ms). *)
-    (*     destruct X as [[[res sid'] pr'] ms']. *)
-    (*     unfold err_ub_oom. *)
-    (*     constructor. *)
-    (*     repeat split. *)
-    (*     destruct res. *)
-    (*     left. apply o. *)
-    (*     destruct s. *)
-    (*     right. left. apply u. *)
-    (*     destruct s. *)
-    (*     right. right. left. apply e. *)
-    (*     repeat right. apply (ms', a). *)
-    (*   - (* MemMonad_lift_stateT *) *)
-    (*     admit. *)
-    (* Admitted. *)
 
     Import Monad.
 
@@ -3071,7 +3020,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       (* Context `{MonadMemState MemState MemM}. *)
       (* Context `{RAISE_ERROR MemM} `{RAISE_UB MemM} `{RAISE_OOM MemM}. *)
       Context {ExtraState : Type}.
-      Context `{MemMonad ExtraState MemM (itree Eff)}.
+      Context `{MemMonad MemM (itree Eff)}.
 
     (* TODO: add to solve_read_byte_allowed *)
     Lemma read_byte_allowed_set_frame_stack :
@@ -3385,10 +3334,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Qed.
 
     Lemma write_byte_correct :
-      forall ptr byte pre, exec_correct pre (write_byte ptr byte) (write_byte_spec_MemPropT ptr byte).
+      forall ptr byte (pre : MemState -> MemExecM.ExtraState -> Prop),
+        (forall ms st, pre ms st -> forall sid, sbyte_sid byte = ret sid -> sid < st)%N ->
+        exec_correct pre (write_byte ptr byte) (write_byte_spec_MemPropT ptr byte).
     Proof.
       unfold exec_correct.
-      intros ptr byte pre ms st VALID.
+      intros ptr byte pre HP ms st VALID.
 
       (* Need to destruct ahead of time so we know if UB happens *)
       destruct (read_byte_raw (mem_state_memory ms) (ptr_to_int ptr)) as [[sbyte aid]|] eqn:READ.
@@ -3428,9 +3379,19 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
         { unfold read_byte_spec_MemPropT.
           unfold lift_spec_to_MemPropT.
-          cbn.
-          solve_write_byte_spec.
+          cbn. admit.
+          (* solve_write_byte_spec. *)
         }
+
+        intros _. specialize (HP _ _ H0).
+        intros ? (addr'&byte'&HR&HB). repeat red in H1.
+
+
+        repeat red in H2. specialize (VALID sid').
+        eapply VALID. repeat red. destruct H1 as (?&?&?&?).
+        exists x, x0; split; eauto.
+        cbn in H2.
+        solve_read_byte_prop.
 
         (* TODO: Need something about valid_state being preserved with set_byte_raw...
 
