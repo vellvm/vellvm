@@ -17,6 +17,7 @@ From Vellvm Require Import
      Semantics.TopLevel
      Semantics.DynamicValues
      Semantics.LLVMParams
+     Semantics.RuttProps
      Theory.TopLevelRefinements
      Theory.ContainsUB
      Utils.Error
@@ -38,6 +39,7 @@ From ITree Require Import
      ITree
      Basics
      Basics.HeterogeneousRelations
+     Eq.Rutt
      Eq.Eqit
      Eq.EqAxiom.
 
@@ -2357,7 +2359,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     : Prop :=
     refine_E1E2_L0
       (LLVM1.denote_vellvm (DTYPE_I 32%N) "main" LLVM1.main_args (convert_types (mcfg_of_tle p1)))
-      (LLVM2.denote_vellvm (DTYPE_I 32%N) "main" LLVM2.main_args (convert_types (mcfg_of_tle p1))).
+      (LLVM2.denote_vellvm (DTYPE_I 32%N) "main" LLVM2.main_args (convert_types (mcfg_of_tle p2))).
 
   (* TODO: not sure about name... *)
   Definition model_E1E2_L1
@@ -2455,7 +2457,6 @@ Module InfiniteToFinite.
 
   Module InfLLVM := Vellvm.Semantics.InterpretationStack.InterpreterStackBigIntptr.LLVM.
   Module FinLLVM := Vellvm.Semantics.InterpretationStack.InterpreterStack64BitIntptr.LLVM.
-
   Module InfFinTC := Vellvm.Semantics.InfiniteToFinite.InfFinLangRefine.TC1.
   Module FinInfTC := Vellvm.Semantics.InfiniteToFinite.FinInfLangRefine.TC1.
 
@@ -2883,6 +2884,35 @@ Module InfiniteToFinite.
       refine_E1E2_L3 (InfMemInterp.interp_memory_prop eq t1 sid m1) (FinMemInterp.interp_memory_prop eq t2 sid m2).
   Proof.
     intros t1 t2 sid m1 m2 RL2.
+
+  (*
+    h1 and h2 are handlers
+
+    (* h2 refines h1 *)
+    (forall e,
+    refine_E1E2_L3 (h1 e) (h2 e)) ->
+    forall u : itree,
+    refine_E1E2_L3 (interp_prop h1 u) (interp_prop h2 u)
+
+    Need something a bit more general like rutt.
+
+    (forall e1 e2,
+    refine_events e1 e2 ->
+    refine_E1E2_L3 (h1 e1) (h2 e2)) ->
+    forall u1 u2 : itree,
+    rutt refine_events refine_dvalue eq u1 u2 ->
+    refine_E1E2_L3 (interp_prop h1 u1) (interp_prop h2 u2)
+
+
+    (forall e1 e2,
+    refine_events e1 e2 ->
+    refine_E1E2_L4 (h1 e1) (h2 e2)) ->
+    forall u1 u2 : itree,
+    refine_E1E2_L3 u1 u2 ->
+    refine_E1E2_L4 (interp_prop h1 u1) (interp_prop h2 u2)
+
+   *)
+    
     (* I'll probably need something about MemMonad_valid_state eventually... *)
   Admitted.
 
