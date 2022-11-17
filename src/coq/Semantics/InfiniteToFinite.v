@@ -2350,6 +2350,380 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (** Model *)
   Import DynamicTypes TypToDtyp CFG.
 
+  Definition event_refine A B (e1 : IS1.LP.Events.L0 A) (e2 : IS2.LP.Events.L0 B) : Prop.
+  Proof.
+    refine (match e1, e2 with
+            | inl1 (E1.ExternalCall dt1 f1 args1), inl1 (E2.ExternalCall dt2 f2 args2) =>
+                _
+            | inr1 (inl1 (E1.Intrinsic dt1 name1 args1)), inr1 (inl1 (E2.Intrinsic dt2 name2 args2)) =>
+                _ (* IntrinsicE *)
+            | inr1 (inr1 (inl1 e1)), inr1 (inr1 (inl1 e2)) =>
+                _ (* Globals *)
+            | inr1 (inr1 (inr1 (inl1 (inl1 e1)))), inr1 (inr1 (inr1 (inl1 (inl1 e2)))) =>
+                _ (* Locals *)
+            | inr1 (inr1 (inr1 (inl1 (inr1 e1)))), inr1 (inr1 (inr1 (inl1 (inr1 e2)))) =>
+                _ (* Stack *)
+            | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
+                _ (* MemoryE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))), inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))) =>
+                _ (* PickE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))) =>
+                _ (* OOME *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))))) =>
+                _ (* UBE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2)))))))) =>
+                _ (* DebugE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1)))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2)))))))) =>
+                _ (* FailureE *)
+            | _, _ =>
+                (* Mismatch of event types *)
+                False
+            end).
+
+    (* External Calls *)
+    { (* Doesn't say anything about return value... *)
+      apply (dt1 = dt2 /\
+               uvalue_convert f1 = NoOom f2 /\
+               (map_monad_In args1 (fun elt Hin => dvalue_convert elt)) = NoOom args2).
+    }
+
+    (* Intrinsics *)
+    { apply (dt1 = dt2 /\
+               name1 = name2 /\
+               (map_monad_In args1 (fun elt Hin => dvalue_convert elt)) = NoOom args2).
+    }
+
+    (* Globals *)
+    { inversion e1.
+      - (* Global write *)
+        destruct e2 eqn:HE2.
+        + apply (id = id0 /\
+                   dvalue_convert dv = NoOom dv0).
+        + apply False.
+      - (* Global read *)
+        destruct e2 eqn:HE2.
+        + apply False.
+        + apply (id = id0).
+    }
+
+    (* Locals *)
+    { inversion e1.
+      - (* Local write *)
+        destruct e2 eqn:HE2.
+        + apply (id = id0 /\
+                   uvalue_convert dv = NoOom dv0).
+        + apply False.
+      - (* Local read *)
+        destruct e2 eqn:HE2.
+        + apply False.
+        + apply (id = id0).
+    }
+
+    (* Stack *)
+    { inversion e1.
+      - (* Stack Push *)
+        destruct e2 eqn:HE2.
+        + apply
+            (map_monad_In args
+                            (fun '(id, uv) Hin =>
+                               uv' <- uvalue_convert uv;;
+                               ret (id, uv')) = NoOom args0).
+        + apply False.
+      - (* Stack Pop *)
+        destruct e2 eqn:HE2.
+        + apply False.
+        + apply True.
+    }
+
+    (* MemoryE *)
+    { inversion e1.
+      - (* MemPush *)
+        destruct e2 eqn:HE2.
+        2-5: apply False.
+
+        apply True.
+      - (* MemPop *)
+        destruct e2 eqn:HE2.
+        2: apply True.
+        all: apply False.
+      - (* Alloca *)
+        destruct e2 eqn:HE2.
+        1,2,4,5: apply False.
+
+        apply (t = t0 /\
+                 num_elements = num_elements0 /\
+                 align = align0).
+      - (* Load *)
+        destruct e2 eqn:HE2.
+        1-3,5: apply False.
+        apply (t = t0 /\
+                 dvalue_convert a = NoOom a0).
+      - (* Store *)
+        destruct e2 eqn:HE2.
+        1-4: apply False.
+
+        apply (t = t0 /\
+                 dvalue_convert a = NoOom a0 /\
+                 uvalue_convert v = NoOom v0).
+    }
+
+    (* PickE *)
+    { (* TODO: confirm whether this is sane... *)
+      inversion e1.
+      destruct e2 eqn:HE2.
+      apply ((Pre <-> Pre0) /\
+               uvalue_convert x = NoOom x0).
+    }
+
+    (* OOME *)
+    { apply True.
+    }
+
+    (* UBE *)
+    { apply True.
+    }
+
+    (* DebugE *)
+    { apply True.
+    }
+
+    (* FailureE *)
+    { apply True.
+    }
+  Defined.
+
+  Definition event_res_refine A B (e1 : IS1.LP.Events.L0 A) (res1 : A) (e2 : IS2.LP.Events.L0 B) (res2 : B) : Prop.
+  Proof.
+    refine (match e1, e2 with
+            | inl1 e1, inl1 e2 =>
+                _
+            | inr1 (inl1 e1), inr1 (inl1 e2) =>
+                _ (* IntrinsicE *)
+            | inr1 (inr1 (inl1 e1)), inr1 (inr1 (inl1 e2)) =>
+                _ (* Globals *)
+            | inr1 (inr1 (inr1 (inl1 (inl1 e1)))), inr1 (inr1 (inr1 (inl1 (inl1 e2)))) =>
+                _ (* Locals *)
+            | inr1 (inr1 (inr1 (inl1 (inr1 e1)))), inr1 (inr1 (inr1 (inl1 (inr1 e2)))) =>
+                _ (* Stack *)
+            | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
+                _ (* MemoryE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))), inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))) =>
+                _ (* PickE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))) =>
+                _ (* OOME *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))))) =>
+                _ (* UBE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2)))))))) =>
+                _ (* DebugE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1)))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2)))))))) =>
+                _ (* FailureE *)
+            | _, _ =>
+                (* Mismatch of event types *)
+                False
+            end).
+
+    (* External Calls *)
+    { inv e1.
+      inv e2.
+
+      apply (t = t0 /\
+               uvalue_convert f = NoOom f0 /\
+               (map_monad_In args (fun elt Hin => dvalue_convert elt)) = NoOom args0 /\
+               dvalue_convert res1 = NoOom res2
+            ).
+    }
+
+    (* Intrinsics *)
+    { inv e1.
+      inv e2.
+      apply (t = t0 /\
+               f = f0 /\
+               (map_monad_In args (fun elt Hin => dvalue_convert elt)) = NoOom args0 /\
+               dvalue_convert res1 = NoOom res2
+            ).
+    }
+
+    (* Globals *)
+    { inversion e1; subst.
+      - (* Global write *)
+        destruct e2 eqn:HE2.
+        + apply (id = id0 /\
+                   dvalue_convert dv = NoOom dv0).
+        + apply False.
+      - (* Global read *)
+        destruct e2 eqn:HE2.
+        + apply False.
+        + apply (id = id0 /\
+                   dvalue_convert res1 = NoOom res2
+                ).
+    }
+
+    (* Locals *)
+    { inversion e1; subst.
+      - (* Local write *)
+        destruct e2 eqn:HE2.
+        + apply (id = id0 /\
+                   uvalue_convert dv = NoOom dv0).
+        + apply False.
+      - (* Local read *)
+        destruct e2 eqn:HE2.
+        + apply False.
+        + apply (id = id0 /\
+                uvalue_convert res1 = NoOom res2).
+    }
+
+    (* Stack *)
+    { inversion e1; subst.
+      - (* Stack Push *)
+        destruct e2 eqn:HE2.
+        + apply
+            (map_monad_In args
+               (fun '(id, uv) Hin =>
+                  uv' <- uvalue_convert uv;;
+                  ret (id, uv')) = NoOom args0).
+        + apply False.
+      - (* Stack Pop *)
+        destruct e2 eqn:HE2.
+        + apply False.
+        + apply True.
+    }
+
+    (* MemoryE *)
+    { inversion e1; subst.
+      - (* MemPush *)
+        destruct e2 eqn:HE2.
+        2-5: apply False.
+
+        apply True.
+      - (* MemPop *)
+        destruct e2 eqn:HE2.
+        2: apply True.
+        all: apply False.
+      - (* Alloca *)
+        destruct e2 eqn:HE2.
+        1,2,4,5: apply False.
+
+        apply (t = t0 /\
+                 num_elements = num_elements0 /\
+                 align = align0 /\
+                 dvalue_convert res1 = NoOom res2).
+      - (* Load *)
+        destruct e2 eqn:HE2.
+        1-3,5: apply False.
+        apply (t = t0 /\
+                 dvalue_convert a = NoOom a0 /\
+                 uvalue_convert res1 = NoOom res2).
+      - (* Store *)
+        destruct e2 eqn:HE2.
+        1-4: apply False.
+
+        apply (t = t0 /\
+                 dvalue_convert a = NoOom a0 /\
+                 uvalue_convert v = NoOom v0).
+    }
+
+    (* PickE *)
+    { (* TODO: confirm whether this is sane... *)
+      inversion e1; subst.
+      destruct e2 eqn:HE2.
+      destruct res1 as [r1 P1].
+      destruct res2 as [r2 P2].
+      apply ((Pre <-> Pre0) /\
+               uvalue_convert x = NoOom x0 /\
+            dvalue_convert r1 = NoOom r2).
+    }
+
+    (* OOME *)
+    { apply True.
+    }
+
+    (* UBE *)
+    { apply True.
+    }
+
+    (* DebugE *)
+    { apply True.
+    }
+
+    (* FailureE *)
+    { apply True.
+    }
+  Defined.
+
+  Definition dvalue_refine (dv1 : IS1.LP.Events.DV.dvalue) (dv2 : IS2.LP.Events.DV.dvalue) : Prop
+    := dvalue_convert dv1 = NoOom dv2.
+
+  Definition uvalue_refine (uv1 : IS1.LP.Events.DV.uvalue) (uv2 : IS2.LP.Events.DV.uvalue) : Prop
+    := uvalue_convert uv1 = NoOom uv2.
+
+  Definition model_E1E2_rutt
+    (p1 p2 : list
+               (LLVMAst.toplevel_entity
+                  LLVMAst.typ
+                  (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
+    : Prop :=
+    rutt
+      event_refine
+      event_res_refine
+      dvalue_refine
+      (LLVM1.denote_vellvm (DTYPE_I 32%N) "main" LLVM1.main_args (convert_types (mcfg_of_tle p1)))
+      (LLVM2.denote_vellvm (DTYPE_I 32%N) "main" LLVM2.main_args (convert_types (mcfg_of_tle p2))).
+
+  Import TranslateFacts.
+  Lemma model_E1E2_rutt_sound
+    (p : list
+           (LLVMAst.toplevel_entity
+              LLVMAst.typ
+              (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))) :
+    model_E1E2_rutt p p.
+  Proof.
+    induction p.
+    - red.
+      cbn.
+      repeat setoid_rewrite bind_ret_l.
+      repeat setoid_rewrite translate_ret.
+      repeat setoid_rewrite bind_ret_l.
+      rewrite bind_trigger.
+      rewrite bind_trigger.
+      apply rutt_Vis.
+      { (* Global read refine *)
+        cbn.
+        reflexivity.
+      }
+
+      intros t1 t2 [NAME REF].
+      eapply rutt_bind with (RR:=uvalue_refine).
+      { (* denote_mcfg... needs stuff about mrec? *)
+        unfold IS1.LLVM.D.denote_mcfg, IS2.LLVM.D.denote_mcfg.
+        cbn.
+        admit.
+      }
+
+      intros r1 r2 RR.
+      repeat rewrite bind_trigger.
+      eapply rutt_Vis.
+      { (* Pick refine *)
+        cbn.
+        unfold uvalue_refine in *.
+        split; auto.
+
+        (* This should have something to do with RR
+
+           In theory if I have uvalue_convert r1 = NoOom r2... I
+           should know that r1 cannot be concretized to poison if and
+           only if r2 cannot be concretized to poison.
+         *)
+        admit.
+      }
+
+      cbn.
+      intros [res1 P1] [res2 P2] PROP.
+      cbn.
+      eapply rutt_Ret.
+      tauto.
+    - admit.
+  Admitted.
+
   (* TODO: not sure about name... *)
   Definition model_E1E2_L0
              (p1 p2 : list
