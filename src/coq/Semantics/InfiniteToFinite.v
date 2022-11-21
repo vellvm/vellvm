@@ -2975,9 +2975,23 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     (* induction e. *) (* Ugh *)
   Admitted.
 
-  Lemma GlobalRead_E1E2_rutt :
+  Lemma GlobalRead_exp_E_E1E2_rutt :
     forall g,
       rutt exp_E_refine exp_E_res_refine dvalue_refine (trigger (GlobalRead g)) (trigger (GlobalRead g)).
+  Proof.
+    intros g.
+    apply rutt_trigger.
+    cbn. auto.
+
+    intros t1 t2 H.
+    cbn in H.
+    red.
+    tauto.
+  Qed.
+
+  Lemma GlobalRead_L0_E1E2_rutt :
+    forall g,
+      rutt event_refine event_res_refine dvalue_refine (trigger (GlobalRead g)) (trigger (GlobalRead g)).
   Proof.
     intros g.
     apply rutt_trigger.
@@ -3014,7 +3028,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     intros g.
     cbn.
     eapply rutt_bind with (RR:=dvalue_refine).
-    apply GlobalRead_E1E2_rutt.
+    apply GlobalRead_exp_E_E1E2_rutt.
 
     intros r1 r2 R1R2.
     apply rutt_bind with (RR:=uvalue_refine).
@@ -3113,21 +3127,65 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
            ).
   Defined.
 
-  Lemma address_one_functions_E1E2_rutt :
+  Lemma address_one_function_E1E2_rutt :
     forall dfn,
       rutt event_refine event_res_refine (dvalue_refine × function_denotation_refine)
         (LLVM1.address_one_function dfn)
         (LLVM2.address_one_function dfn).
   Proof.
     intros dfn.
+    cbn.
+    eapply rutt_bind with (RR:=dvalue_refine).
+    apply GlobalRead_L0_E1E2_rutt.
+
+    intros r1 r2 R1R2.
+
+    (* Universe problem?? *)
+    (* apply rutt_Ret. *)
+    admit.
   Admitted.
 
 
-  (* Lemma address_one_functions_E1E2_rutt : *)
-  (*   rutt event_refine event_res_refine ?RR *)
-  (*     (map_monad LLVM1.address_one_function (m_definitions (convert_types (mcfg_of_tle p)))) *)
-  (*     (map_monad address_one_function (m_definitions (convert_types (mcfg_of_tle p)))) *)
+  Lemma address_one_functions_E1E2_rutt :
+    forall dfns,
+      rutt event_refine event_res_refine
+        (Forall2 (dvalue_refine × function_denotation_refine))
+        (map_monad LLVM1.address_one_function dfns)
+        (map_monad address_one_function dfns).
+  Proof.
+    induction dfns.
+    { cbn.
+      (* Universe problem?? *)
+      (* apply rutt_Ret. *)
+      admit.
+    }
+    { do 2 rewrite map_monad_unfold.
+      eapply rutt_bind.
+      apply address_one_function_E1E2_rutt.
+
+      intros r1 r2 R1R2.
+      eapply rutt_bind.
+      eapply IHdfns.
+
+      intros r0 r3 H.
+
+      (* Universe problem?? *)
+      (* apply rutt_Ret. *)
+      admit.      
+    }
+  Admitted.
   
+  Lemma denote_mcfg_E1E2_rutt :
+    forall dfns1 dfns2 dt f1 f2 args1 args2,
+      (Forall2 (dvalue_refine × function_denotation_refine) dfns1 dfns2) ->
+      (uvalue_refine f1 f2) ->
+      (Forall2 uvalue_refine args1 args2) ->
+      rutt event_refine event_res_refine uvalue_refine
+        (IS1.LLVM.D.denote_mcfg dfns1 dt f1 args1)
+        (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2).
+  Proof.
+  Admitted.
+
   Lemma model_E1E2_rutt_sound
     (p : list
            (LLVMAst.toplevel_entity
@@ -3142,58 +3200,28 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     eapply rutt_bind; [apply build_global_environment_E1E2_rutt_sound|].
 
     intros [] [] _.
+    eapply rutt_bind; [apply address_one_functions_E1E2_rutt|].
+
+    intros r1 r2 R1R2.
+    eapply rutt_bind; [apply GlobalRead_L0_E1E2_rutt|].
+
+    intros r3 r4 R3R4.
     eapply rutt_bind.
 
-    unfold build_global_environment.
-    
-    (* induction p. *)
-    (* - red. *)
-    (*   cbn. *)
-    (*   repeat setoid_rewrite bind_ret_l. *)
-    (*   repeat setoid_rewrite translate_ret. *)
-    (*   repeat setoid_rewrite bind_ret_l. *)
-    (*   rewrite bind_trigger. *)
-    (*   rewrite bind_trigger. *)
-    (*   apply rutt_Vis. *)
-    (*   { (* Global read refine *) *)
-    (*     cbn. *)
-    (*     reflexivity. *)
-    (*   } *)
+    { apply denote_mcfg_E1E2_rutt; auto.
+      admit.
+      admit.
+    }
 
-    (*   intros t1 t2 [NAME REF]. *)
-    (*   eapply rutt_bind with (RR:=uvalue_refine). *)
-    (*   { (* denote_mcfg... needs stuff about mrec? *) *)
-    (*     unfold IS1.LLVM.D.denote_mcfg, IS2.LLVM.D.denote_mcfg. *)
-    (*     rewrite RecursionFacts.mrec_as_interp. *)
-    (*     rewrite RecursionFacts.mrec_as_interp. *)
-    (*     admit. *)
-    (*   } *)
+    intros r0 r5 H.
+    eapply rutt_bind with (RR:=fun x y => dvalue_refine (proj1_sig x) (proj1_sig y)).
+    { (* Pick *)
+      admit.
+    }
 
-    (*   intros r1 r2 RR. *)
-    (*   repeat rewrite bind_trigger. *)
-    (*   eapply rutt_Vis. *)
-    (*   { (* Pick refine *) *)
-    (*     cbn. *)
-    (*     unfold uvalue_refine in *. *)
-    (*     split; auto. *)
-
-    (*     (* This should have something to do with RR *)
-
-    (*        In theory if I have uvalue_convert r1 = NoOom r2... I *)
-    (*        should know that r1 cannot be concretized to poison if and *)
-    (*        only if r2 cannot be concretized to poison. *)
-    (*      *) *)
-    (*     admit. *)
-    (*   } *)
-
-    (*   cbn. *)
-    (*   intros [res1 P1] [res2 P2] PROP. *)
-    (*   cbn. *)
-    (*   eapply rutt_Ret. *)
-    (*   tauto. *)
-    (* - red. *)
-    (*   red in IHp. *)
-      
+    intros r6 r7 H0.
+    cbn.
+    apply rutt_Ret; auto.
   Admitted.
 
   (* TODO: not sure about name... *)
