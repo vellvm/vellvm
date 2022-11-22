@@ -32,8 +32,9 @@
                   { version = "5.0.0";
                     name = "coq8.15-InteractionTrees-${version}";
                     src = fetchTarball {
-                      url = "https://github.com/DeepSpec/InteractionTrees/archive/refs/tags/5.0.0.zip";
-                      sha256 = "1cnq5qb9n6908xw117z9d5c3is9m42aa0xabw7nna22szycc4apz";
+                      # Version with rutt theory and mrec rutt theory.
+                      url = "https://github.com/DeepSpec/InteractionTrees/archive/9c1637ea57d1afcef587eb438438c73247639c0e.zip";
+                      sha256 = "sha256:0hcwplpaj2gx6c2abyp3w4g83hzvjnzfsh1sl9kfhd0r3pb9biar";
                     };
                     meta.broken = false;
                   });

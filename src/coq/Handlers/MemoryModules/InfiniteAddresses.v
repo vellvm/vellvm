@@ -30,7 +30,9 @@ Definition wildcard_prov : Prov := None.
 Definition nil_prov : Prov := Some [].
 
 (* TODO: If Prov is an NSet, I get a universe inconsistency here... *)
-Module InfAddr : MemoryAddress.ADDRESS with Definition addr := (Iptr * Prov) % type.
+Module InfAddr : MemoryAddress.ADDRESS
+with Definition addr := (Iptr * Prov) % type
+with Definition null := (0, nil_prov)%Z.
   Definition addr := (Iptr * Prov) % type.
   Definition null : addr := (0, nil_prov)%Z.
 

@@ -17,7 +17,6 @@ From Vellvm Require Import
      Semantics.TopLevel
      Semantics.DynamicValues
      Semantics.LLVMParams
-     Semantics.RuttProps
      Theory.TopLevelRefinements
      Theory.ContainsUB
      Utils.Error
@@ -40,6 +39,7 @@ From ITree Require Import
      Basics
      Basics.HeterogeneousRelations
      Eq.Rutt
+     Eq.RuttFacts
      Eq.Eqit
      Eq.EqAxiom.
 
@@ -53,6 +53,8 @@ Import ListNotations.
 
 Module Type AddrConvert (ADDR1 : ADDRESS) (ADDR2 : ADDRESS).
   Parameter addr_convert : ADDR1.addr -> OOM ADDR2.addr.
+  Parameter addr_convert_null :
+    addr_convert ADDR1.null = NoOom ADDR2.null.
 End AddrConvert.
 
 Module InfToFinAddrConvert : AddrConvert InfAddr FinAddr
@@ -68,6 +70,15 @@ Definition addr_convert (a : InfAddr.addr) : OOM FinAddr.addr :=
   | (ix, pr) =>
       FinITOP.int_to_ptr ix pr
   end.
+
+Lemma addr_convert_null :
+  addr_convert InfAddr.null = NoOom FinAddr.null.
+Proof.
+  unfold addr_convert.
+  cbn.
+  reflexivity.
+Qed.
+
 End InfToFinAddrConvert.
 
 Module FinToInfAddrConvert : AddrConvert FinAddr InfAddr
@@ -83,6 +94,15 @@ Definition addr_convert (a : FinAddr.addr) : OOM InfAddr.addr :=
   | (ix, pr) =>
       InfITOP.int_to_ptr (Int64.unsigned ix) pr
   end.
+
+Lemma addr_convert_null :
+  addr_convert FinAddr.null = NoOom InfAddr.null.
+Proof.
+  unfold addr_convert.
+  cbn.
+  reflexivity.
+Qed.
+
 End FinToInfAddrConvert.
 
 Module Type AddrConvertSafe (ADDR1 : ADDRESS) (ADDR2 : ADDRESS) (AC1 : AddrConvert ADDR1 ADDR2) (AC2 : AddrConvert ADDR2 ADDR1).
@@ -2692,6 +2712,31 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
+  Definition call_refine (A B : Type) (c1 : IS1.LP.Events.CallE A) (c2 : CallE B) : Prop.
+  Proof.
+    (* Calls *)
+    { (* Doesn't say anything about return value... *)
+      inv c1.
+      inv c2.
+      apply (t = t0 /\
+               uvalue_convert f = NoOom f0 /\
+               (map_monad_In args (fun elt Hin => uvalue_convert elt)) = NoOom args0).
+    }
+  Defined.
+
+  Definition call_res_refine (A B : Type) (c1 : IS1.LP.Events.CallE A) (res1 : A) (c2 : CallE B) (res2 : B) : Prop.
+  Proof.
+    (* Calls *)
+    { (* Doesn't say anything about return value... *)
+      inv c1.
+      inv c2.
+      apply (t = t0 /\
+               uvalue_convert f = NoOom f0 /\
+               (map_monad_In args (fun elt Hin => uvalue_convert elt)) = NoOom args0 /\
+               uvalue_convert res1 = NoOom res2).
+    }
+  Defined.
+
   Definition exp_E_refine A B (e1 : IS1.LP.Events.exp_E A) (e2 : IS2.LP.Events.exp_E B) : Prop.
   Proof.
     refine (match e1, e2 with
@@ -2920,16 +2965,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Definition uvalue_refine (uv1 : IS1.LP.Events.DV.uvalue) (uv2 : IS2.LP.Events.DV.uvalue) : Prop
     := uvalue_convert uv1 = NoOom uv2.
 
-  Definition model_E1E2_rutt
-    (p1 p2 : list
-               (LLVMAst.toplevel_entity
-                  LLVMAst.typ
-                  (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
+  Definition L0_E1E2_rutt t1 t2
     : Prop :=
     rutt
       event_refine
       event_res_refine
       dvalue_refine
+      t1 t2.
+
+  Definition model_E1E2_rutt p1 p2 :=
+    L0_E1E2_rutt
       (LLVM1.denote_vellvm (DTYPE_I 32%N) "main" LLVM1.main_args (convert_types (mcfg_of_tle p1)))
       (LLVM2.denote_vellvm (DTYPE_I 32%N) "main" LLVM2.main_args (convert_types (mcfg_of_tle p2))).
 
@@ -3051,7 +3096,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (map_monad initialize_global m_globals).
   Proof.
     cbn.
-    
+
     induction m_globals.
     { cbn.
       apply rutt_Ret.
@@ -3141,10 +3186,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     intros r1 r2 R1R2.
 
     (* Universe problem?? *)
-    (* apply rutt_Ret. *)
-    admit.
-  Admitted.
+    apply rutt_Ret.
 
+    constructor.
+    - cbn; auto.
+    - cbn.
+      red.
+      intros args1 args2 ARGS.
+      cbn.
+      eapply rutt_bind.
+  Admitted.
 
   Lemma address_one_functions_E1E2_rutt :
     forall dfns,
@@ -3169,12 +3220,103 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       intros r0 r3 H.
 
+      (*
+        Unset Universe Checking.
+        Unset Auto Template Polymorphism.
+      *)
+
       (* Universe problem?? *)
-      (* apply rutt_Ret. *)
-      admit.      
+      apply rutt_Ret.
+      (* May get tricky *)
+      admit.
     }
   Admitted.
-  
+
+  Lemma denote_mcfg_E1E2_rutt' :
+    forall dfns1 dfns2 dt f1 f2 args1 args2,
+      (Forall2 (dvalue_refine × function_denotation_refine) dfns1 dfns2) ->
+      (uvalue_refine f1 f2) ->
+      (Forall2 uvalue_refine args1 args2) ->
+      call_refine IS1.LP.Events.DV.uvalue IS2.LP.Events.DV.uvalue (IS1.LP.Events.Call dt f1 args1) (Call dt f2 args2) ->
+      rutt event_refine event_res_refine (fun res1 res2 => call_res_refine IS1.LP.Events.DV.uvalue IS2.LP.Events.DV.uvalue (IS1.LP.Events.Call dt f1 args1) res1 (Call dt f2 args2) res2)
+        (IS1.LLVM.D.denote_mcfg dfns1 dt f1 args1)
+        (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2).
+  Proof.
+    (* May be a more generic mrec lemma hiding in this. Maybe ask Lucas *)
+    intros dfns1 dfns2 dt f1 f2 args1 args2 DFNS F1F2 ARGS.
+    unfold IS1.LLVM.D.denote_mcfg.
+    unfold denote_mcfg.
+
+    eapply mrec_rutt with (RPreInv:=call_refine).
+    { intros A B d1 d2 PRE.
+
+      cbn.
+      destruct d1.
+      destruct d2.
+
+      cbn in PRE.
+
+      eapply rutt_bind with (RR:=dvalue_refine).
+      { (* This may be tricky... *)
+        (* Hopefully follows from uvalue_convert f = NoOom f0 in PRE *)
+        admit.
+      }
+
+      intros r1 r2 R1R2.
+      (* Should be able to determine that the lookups
+         are equivalent using DFNS *)
+      cbn.
+
+      Set Nested Proofs Allowed.
+      Lemma lookup_defn_some_refine :
+        forall dfns1 dfns2 r1 r2 f_den1,
+          Forall2 (dvalue_refine × function_denotation_refine) dfns1 dfns2 ->
+          dvalue_refine r1 r2 ->
+          IS1.LLVM.D.lookup_defn r1 dfns1 = Some f_den1 ->
+          exists f_den2,
+            IS2.LLVM.D.lookup_defn r2 dfns2 = Some f_den2 /\
+              function_denotation_refine f_den1 f_den2.
+      Proof.
+      Admitted.
+
+      Lemma lookup_defn_none :
+        forall dfns1 dfns2 r1 r2,
+          Forall2 (dvalue_refine × function_denotation_refine) dfns1 dfns2 ->
+          dvalue_refine r1 r2 ->
+          IS1.LLVM.D.lookup_defn r1 dfns1 = None ->
+          IS2.LLVM.D.lookup_defn r2 dfns2 = None.
+      Proof.
+      Admitted.
+
+      break_match.
+      { eapply lookup_defn_some_refine in Heqo; eauto.
+        destruct Heqo as (f_den2 & LUP2 & FDEN2).
+
+        rewrite LUP2.
+        red in FDEN2.
+        specialize (FDEN2 args1 args2 ARGS).
+
+        (* Need to figure out the situation with post / pre conditions
+           here... *)
+        admit.
+      }
+
+      eapply lookup_defn_none in Heqo; eauto.
+      rewrite Heqo.
+
+      eapply rutt_bind with (RR:=Forall2 dvalue_refine).
+      { (* Pick *)
+        admit.
+      }
+
+      intros r3 r4 R3R4.
+      cbn.
+
+      (* Probably need something about map *)
+      admit.
+    }
+  Admitted.
+
   Lemma denote_mcfg_E1E2_rutt :
     forall dfns1 dfns2 dt f1 f2 args1 args2,
       (Forall2 (dvalue_refine × function_denotation_refine) dfns1 dfns2) ->
@@ -3184,6 +3326,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (IS1.LLVM.D.denote_mcfg dfns1 dt f1 args1)
         (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2).
   Proof.
+    (* May be a more generic mrec lemma hiding in this. Maybe ask Lucas *)
+    intros dfns1 dfns2 dt f1 f2 args1 args2 H H0 H1.
+    unfold IS1.LLVM.D.denote_mcfg.
+    unfold denote_mcfg.
   Admitted.
 
   Lemma model_E1E2_rutt_sound
@@ -3209,8 +3355,20 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     eapply rutt_bind.
 
     { apply denote_mcfg_E1E2_rutt; auto.
-      admit.
-      admit.
+      - admit.
+      - (* TODO: fold into main_args lemma probably *)
+        unfold main_args.
+        unfold LLVM1.main_args.
+        constructor.
+        + red.
+          rewrite uvalue_convert_equation.
+          reflexivity.
+        + constructor; [|constructor].
+          red.
+          rewrite uvalue_convert_equation.
+          cbn.
+          rewrite AC1.addr_convert_null.
+          reflexivity.
     }
 
     intros r0 r5 H.
@@ -3223,6 +3381,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     cbn.
     apply rutt_Ret; auto.
   Admitted.
+
 
   (* TODO: not sure about name... *)
   Definition model_E1E2_L0
@@ -3633,7 +3792,7 @@ Module InfiniteToFinite.
     rewrite EC1.DVC.dvalue_convert_equation.
     destruct dv_i.
     - (* Addresses *)
-      
+
     setoid_rewrite EC2.DVC.dvalue_convert_equation.
 
     (* TODO: Ugh, everything is opaque. Fix and prove. *)
@@ -3786,7 +3945,7 @@ Module InfiniteToFinite.
     refine_E1E2_L4 (interp_prop h1 u1) (interp_prop h2 u2)
 
    *)
-    
+
     (* I'll probably need something about MemMonad_valid_state eventually... *)
   Admitted.
 
