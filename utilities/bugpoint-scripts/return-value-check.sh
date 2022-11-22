@@ -25,23 +25,26 @@ __cleanup()
 trap __cleanup EXIT SIGHUP SIGINT SIGQUIT SIGABRT
 
 llvm-dis $1 -o "$LL_FILE"
-$VELLVM_EXE -interpret "$LL_INPUT" 2> "$VELLVM_STDERR" 1> "$VELLVM_STDOUT"
+$VELLVM_EXE -interpret "$LL_FILE" 2> "$VELLVM_STDERR" 1> "$VELLVM_STDOUT"
 VELLVM_EXIT=$?
-
-VELLVM_ERR=$(cat "$VELLVM_STDERR")
 if [[ $VELLVM_EXIT != 0 ]]; then
-    # Failure instead of return value, uninteresting test case.
+    echo "Failure instead of return value, uninteresting test case. $VELLVM_EXIT"
     exit 0
 fi
 
 VELLVM_BUGPOINT_EXIT_CODE=$(perl -ne '/Program terminated with: .* (\d+)/ and printf $1' "$VELLVM_STDOUT")
 
 # Compile with clang and get exit code...
-$CLANG_EXE $LL_INPUT -o $EXECUTABLE
+$CLANG_EXE $LL_FILE -o $EXECUTABLE
+if [[ $? != 0 ]]; then
+    echo "Couldn't compile file... Bad test."
+    exit 0
+fi
+
 $EXECUTABLE
 EXEC_BUGPOINT_EXIT_CODE=$?
 
-if [[ $VELLVM_EXIT_CODE == $VELLVM_BUGPOINT_EXIT_CODE && $EXE_EXIT_CODE == $EXE_BUGPOINT_EXIT_CODE ]]; then
+if [[ $VELLVM_EXIT_CODE == $VELLVM_BUGPOINT_EXIT_CODE && $EXEC_EXIT_CODE == $EXEC_BUGPOINT_EXIT_CODE ]]; then
     exit 1
 fi
 
