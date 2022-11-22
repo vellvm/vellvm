@@ -20,14 +20,14 @@ help()
     exit 2
 }
 
-LL_OUTPUT=
-LL_INPUT=
-CLANG_EXE=$(which clang)
-BUGPOINT_EXE=$(which bugpoint)
-OPT_EXE=$(which opt)
-VELLVM_EXE=$(PATH=$PATH:. which vellvm)
+export LL_OUTPUT=
+export LL_INPUT=
+export CLANG_EXE=$(which clang)
+export BUGPOINT_EXE=$(which bugpoint)
+export OPT_EXE=$(which opt)
+export VELLVM_EXE=$(PATH=$PATH:. which vellvm)
 if [[ $? != "0" ]]; then
-    VELLVM_EXE=
+    export VELLVM_EXE=
 fi;
 
 PARSED_ARGUMENTS=$(getopt -a -n $(basename $0) -o ho:i: -l help,output:,input:,clang:,bugpoint:,opt:,vellvm: -- "$@")
@@ -43,17 +43,17 @@ while true; do
         -h | --help)
             help; exit;;
         -o | --output)
-            LL_OUTPUT="$2"; shift 2;;
+            export LL_OUTPUT="$2"; shift 2;;
         -i | --input)
-            LL_INPUT="$2"; shift 2;;
+            export LL_INPUT="$2"; shift 2;;
         --clang)
-            CLANG_EXE="$2"; shift 2;;
+            export CLANG_EXE="$2"; shift 2;;
         --bugpoint)
-            BUGPOINT_EXE="$2"; shift 2;;
+            export BUGPOINT_EXE="$2"; shift 2;;
         --opt)
-            OPT_EXE="$2"; shift 2;;
+            export OPT_EXE="$2"; shift 2;;
         --vellvm)
-            VELLVM_EXE="$2"; shift 2;;
+            export VELLVM_EXE="$2"; shift 2;;
         --)
             shift; break;;
         *)
@@ -72,11 +72,11 @@ if [[ -z $1 && -z $LL_INPUT ]]; then
 fi
 
 if [[ -n $1 && -z $LL_INPUT ]]; then
-    LL_INPUT=$1
+    export LL_INPUT="$1"
 fi
 
 if [[ -z $LL_OUTPUT ]]; then
-    LL_OUTPUT="${LL_INPUT%.ll}-reduced.ll"
+    export LL_OUTPUT="${LL_INPUT%.ll}-reduced.ll"
 fi
 
 if [[ -z $VELLVM_EXE ]]; then
@@ -88,12 +88,12 @@ if [[ -z $VELLVM_EXE ]]; then
     help
 fi
 
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
 EXECUTABLE=$(mktemp)
 VELLVM_STDERR=$(mktemp)
 VELLVM_STDOUT=$(mktemp)
 BUGPOINT_DIR=$(mktemp -d)
-
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 __cleanup()
 {
@@ -114,29 +114,28 @@ __cleanup()
 trap __cleanup EXIT SIGHUP SIGINT SIGQUIT SIGABRT
 
 # Get vellvm return.
-$VELLVM_EXE -interpret $LL_INPUT 2> $VELLVM_STDERR 1> $VELLVM_STDOUT
+"$VELLVM_EXE" -interpret "$LL_INPUT" 2> "$VELLVM_STDERR" 1> "$VELLVM_STDOUT"
 VELLVM_EXIT=$?
 
-VELLVM_ERR=$(cat $VELLVM_STDERR)
+export VELLVM_ERR=$(cat $VELLVM_STDERR)
 if [ $VELLVM_EXIT != 0 ]; then
     # Run with error preserving script...
-    bugpoint -compile-custom -compile-command=$SCRIPT_DIR/bugpoint-scripts/vellvm-error-check.sh -opt-command="$OPT_EXE" "$LL_INPUT"
+    echo -e "\e[32mRunning bugscript for vellvm errors...\e[0m"
+    bugpoint -compile-custom -compile-command="$SCRIPT_DIR/bugpoint-scripts/vellvm-error-check.sh" -opt-command="$OPT_EXE" "$LL_INPUT"
     llvm-dis bugpoint-reduced-simplified.bc -o "$LL_OUTPUT"
     exit 0
 fi
 
-VELLVM_EXIT_CODE=$(perl -ne '/Program terminated with: .* (\d+)/ and printf $1' $VELLVM_STDOUT)
+export VELLVM_EXIT_CODE=$(perl -ne '/Program terminated with: .* (\d+)/ and printf $1' "$VELLVM_STDOUT")
 
 # Compile with clang and get exit code...
-$CLANG_EXE $LL_INPUT -o $EXECUTABLE
-$EXECUTABLE
-EXEC_EXIT_CODE=$?
-
-echo $VELLVM_EXIT_CODE
-echo $EXEC_EXIT_CODE
+"$CLANG_EXE" "$LL_INPUT" -o "$EXECUTABLE"
+"$EXECUTABLE"
+export EXEC_EXIT_CODE=$?
 
 # Run script that checks return codes...
-bugpoint -compile-custom -compile-command=$SCRIPT_DIR/bugpoint-scripts/return-value-check.sh -opt-command="$OPT_EXE" "$LL_INPUT"
+echo -e "\e[32mRunning bugscript for comparing return values between vellvm and clang...\e[0m"
+bugpoint -compile-custom -compile-command="$SCRIPT_DIR/bugpoint-scripts/return-value-check.sh" -opt-command="$OPT_EXE" "$LL_INPUT"
 llvm-dis bugpoint-reduced-simplified.bc -o "$LL_OUTPUT"
 
 exit 0
