@@ -1,0 +1,23 @@
+* Utilities
+
+Some utilities to help with Vellvm development.
+
+** ~vellvm-reduce.sh~
+
+Utility to reduce test cases using [[https://llvm.org/docs/Bugpoint.html][bugpoint]]. This script will run the
+program using ~vellvm~ to determine if it spits out an error of some
+kind (UB, failure, etc). If the program /does/ have some kind of error
+when run with ~vellvm~, it will shrink the program using [[https://llvm.org/docs/Bugpoint.html][bugpoint]],
+while attempting to preserve the error message given by ~vellvm~. If
+the program /does not/ have some kind of error when run with ~vellvm~
+it will run the program using ~clang~, and it will attempt to preserve
+the return values from both ~vellvm~ and ~clang~.
+
+Basic usage is as follows:
+
+#+begin_src sh
+  ./vellvm-reduce.sh --help
+  ./vellvm-reduce.sh --vellvm <VELLVM_EXECUTABLE_PATH> -i <LLVM_FILE_TO_SHRINK> -o <REDUCED_LLVM_OUTPUT_FILE>
+#+end_src
+
+*Note:* This script currently spits out a bunch of ~.bc~ files in your current directory.

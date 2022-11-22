@@ -53,7 +53,7 @@ all: quickchick flocq-quickchick vok extracted vellvm
 interp: coqinterp extracted vellvm
 
 .PHONY: coq
-coq: quickchick flocq-quickchick $(VOFILES)
+coq: quickchick flocq-quickchick real-all
 
 .PHONY: qc-tests
 qc-tests: rm-qc-test-vo coq

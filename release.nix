@@ -23,7 +23,7 @@
 
       inherit version;
 
-      propagatedBuildInputs =
+      buildInputs =
         [ coq
           dune_3
           perl
@@ -69,6 +69,7 @@
           exclude = [
             ./src/doc
             ./src/cachix-push.sh
+            ./utilities
             (nix-filter.matchExt "org")
             (nix-filter.matchExt "md")
             (nix-filter.matchExt "txt")
