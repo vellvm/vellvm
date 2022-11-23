@@ -1,10 +1,15 @@
 #! @shell@
 set -eu
 
-if [[ ! -v NIX_REMOTE ]]; then
-    echo "$0: warning: recursive Nix is disabled" >&2
-    exec @next@/bin/@program@ "$@"
-fi
+COQC_ORIG=@next@/bin/@program@
+
+# if [[ ! -v NIX_REMOTE ]]; then
+#     echo -e "\e[31m!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\e[0m"
+#     echo -e "\e[31m$0: warning: recursive Nix is disabled\e[0m" >&2
+#     echo -e "\e[31m!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\e[0m"
+
+#     exec $COQC_ORIG "$@"
+# fi
 
 # I believe the final argument to coqc will be the file we want to
 # compile... May also just be able to look for the .v extension.
@@ -14,9 +19,11 @@ fi
 dest=
 inputFile=
 compileFlags=()
-includes=()
-requiresPaths=()
-requiresNames=()
+export includes=()
+export requiresPaths=()
+export requiresNames=()
+reqArgs=""
+includeArgs=""
 unknownArg=0
 
 args=("$@")
@@ -38,12 +45,14 @@ for ((n = 0; n < $#; n++)); do
     elif [[ $arg = -I ]]; then
         : $((n++))
         includes+=("${args[$n]}")
+        includeArgs+="-I ${args[$n]} "
     elif [[ $arg = -R ]]; then
         : $(((n++)++))
         requiresPaths+=("${args[$n-1]}")
         requiresNames+=("${args[$n]}")
+        reqArgs+="-R ${args[$n-1]} ${args[$n]} "
     elif [[ $arg =~ ^.*\.v ]]; then
-        inputFile = "$arg"
+        inputFile="$arg"
     elif [[ ! $arg =~ ^- ]]; then
         sources+=("$arg")
     else
@@ -52,7 +61,8 @@ for ((n = 0; n < $#; n++)); do
 done
 
 if [[ unknownArg == 1 ]]; then
-    exec @next@/bin/@program@ "$@"
+    echo -e "\e[31m$0: Unknown argument to coqc\e[0m" >&2
+    exec $COQC_ORIG "$@"
 fi
 
 # TODO / NOTE:
@@ -99,34 +109,51 @@ function cleanup_tmp_dir {
 trap cleanup_tmp_dir EXIT
 
 mkdir ${TMP_DIR}/deps
-DEPS=$(coqdep $reqArgs $includeArgs $inputFile -sort)
+DEPS=$(coqdep "$reqArgs" "$includeArgs" "$inputFile" -sort)
 
 # Copy dependencies
 for i in $DEPS; do rsync --quiet -Ravz "${i}o" ${TMP_DIR}/deps; done
 # Make sure we remove the vo file we want to create, if an old version got copied.
 rm -f ${TMP_DIR}/deps/${coq-file}o
 
+mkdir ${TMP_DIR}/src
+cp "$inputFile" ${TMP_DIR}/src
 
+outputFile="$(basename $inputFile .v).vo"
 
-# Need to have a nix build that
-#
+# escapedArgs="-R \$src/deps Vellvm \$src/$inputFile"
 
-# @nix@/bin/nix build --quiet -o "$dest.link" -E '(
-#   derivation {
-#     name = "coqc";
-#     system = "@system@";
-#     reqPaths = [ '"$requiresPaths"' ];
-#     reqNames = [ '"$requiresNames"' ];
-#     coqIncludes = [ '"$includes"' ];
-#     builder = builtins.storePath "@next@/bin/@program@";
-#     args = [ '"$escapedArgs"' ];
-#   }
+BUILD=$(@nix@/bin/nix-build -o "$dest.link" -E '(
+  derivation rec {
+    name = "coqc";
+    system = "@system@";
+    coqc = builtins.storePath "@next@/bin/@program@";
+    builder = builtins.storePath "@shell@";
+    coreutils = builtins.storePath "@coreutils@";
+    src = '"${TMP_DIR}"';
+    inputFile = "${src}/src/'"$(basename $inputFile)"'";
+    outputFile = "'"$outputFile"'";
+    args = [ @compile_coq@ ];
+  }
+)')
+
+# @nix@/bin/nix-build -o "$dest.link" -E '(
+#   runCommand "coq-cached"
+#       rec
+#       { coqc = builtins.storePath "@next@/bin/@program@";
+#         reqsString = "";
+#         incsString = "";
+#         src = '"$TMP_DIR"';
+#         inputFile = "${src}"/'"$inputFile"';
+#       }
+#       '"''"'
+#       $coqc $reqsString $incsString $inputFile -o $out/$(basename $inputFile)
+#       '"''"'
 # )' > /dev/null
 
-# Use source file and `deps` directory in a recursive nix build
-BUILD=$( nix-build -E 'import ${ ./compile-coq.nix } ${coq} ./deps "$src/${coq-file}" "" ""' )
-BUILD_CA=$( nix --experimental-features nix-command store make-content-addressable --json "$BUILD" | jq -r '.rewrites."'"$BUILD"'"' )
 
-# Copy output from building coq file
-mkdir $out
-cp -r "$BUILD_CA"/* $out/
+# Use source file and `deps` directory in a recursive nix build
+#BUILD=$( @nix@/bin/nix-build -E "import @COMPILE_COQ_NIX@ \"$COQC_ORIG\" \"${TMP_DIR}/deps\" \"$inputFile\" \"\" \"\"" )
+BUILD_CA=$( @nix@/bin/nix --experimental-features nix-command store make-content-addressed --json "$BUILD" | @jq@/bin/jq -r '.rewrites."'"$BUILD"'"' )
+echo "$BUILD"
+echo "$BUILD_CA"

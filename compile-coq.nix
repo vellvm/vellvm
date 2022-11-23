@@ -5,7 +5,7 @@ with import <nixpkgs> {};
 runCommand "compile-coq" { buildInputs = [ coq ]; }
 ''
   cd "${ deps }"
-  ${coq}/bin/coqc ${reqsString} ${incsString} ${ coq-file }
+  ${coq} ${reqsString} ${incsString} ${ coq-file }
   mkdir $out
   cp *\.vo $out
   cp *\.vos $out

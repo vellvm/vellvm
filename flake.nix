@@ -10,7 +10,13 @@
   outputs = { self, nixpkgs, flake-utils, nix-filter }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs { inherit system; };
+        mkPkgs = pkgs: extraOverlays: import pkgs {
+      	  inherit system;
+	        overlays = extraOverlays;
+        };
+
+        pkgs = mkPkgs nixpkgs [ ((import ./cache-build.nix).cache-coq-overlay) ];
+
         lib = pkgs.lib;
         coq = pkgs.coq_8_15;
         ocamlPkgs = coq.ocamlPackages;
@@ -115,7 +121,7 @@
           # Include a fixed version of clang in the development environment for testing.
           default = pkgs.mkShell {
             inputsFrom = [ packages.default ];
-            buildInputs = [ pkgs.clang_13 ];
+            buildInputs = [ pkgs.clang_13 pkgs.cache-coq ];
           };
         };
 
