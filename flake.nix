@@ -121,7 +121,19 @@
           # Include a fixed version of clang in the development environment for testing.
           default = pkgs.mkShell {
             inputsFrom = [ packages.default ];
-            buildInputs = [ pkgs.clang_13 pkgs.cache-coq ];
+            buildInputs = [ pkgs.clang_13
+                            (pkgs.cache-coq
+                              (with coqPkgs;
+                                [ mathcomp
+                                  mathcomp-ssreflect
+                                  coq-ext-lib
+                                  paco
+                                  ITree
+                                  flocq
+                                  ceres
+                                  simple-io
+                                ]))
+                          ];
           };
         };
 

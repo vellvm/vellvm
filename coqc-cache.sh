@@ -112,7 +112,7 @@ mkdir ${TMP_DIR}/deps
 DEPS=$(coqdep "$reqArgs" "$includeArgs" "$inputFile" -sort)
 
 # Copy dependencies
-for i in $DEPS; do rsync --quiet -Ravz "${i}o" ${TMP_DIR}/deps; done
+for i in $DEPS; do rsync --ignore-missing-args --quiet -Ravz "${i}o" ${TMP_DIR}/deps; done
 # Make sure we remove the vo file we want to create, if an old version got copied.
 rm -f ${TMP_DIR}/deps/${coq-file}o
 
@@ -133,6 +133,8 @@ BUILD=$(@nix@/bin/nix-build -o "$dest.link" -E '(
     src = '"${TMP_DIR}"';
     inputFile = "${src}/src/'"$(basename $inputFile)"'";
     outputFile = "'"$outputFile"'";
+    coqPkgs = builtins.map builtins.storePath [ @coqPkgs@ ];
+    COQPATH = builtins.foldl'"'"' (a: b: a + (if a == "" then "" else ":") + b + "/lib/coq/8.15/user-contrib/") "" coqPkgs;
     args = [ @compile_coq@ ];
   }
 )')
