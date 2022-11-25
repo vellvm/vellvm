@@ -4,7 +4,6 @@
       { next = final.coq_8_15;
         nix = final.nix;
         coreutils = final.coreutils;
-        findutils = final.findutils;
         jq = final.jq;
         inherit coqPkgs;
         requiredSystemFeatures = [ "recursive-nix" ];
@@ -19,7 +18,6 @@
         --subst-var nix \
         --subst-var system \
         --subst-var coreutils \
-        --subst-var findutils \
         --subst-var jq \
         --subst-var coqPkgs \
         --subst-var-by compile_coq ${./build-coq.sh}

@@ -105,7 +105,6 @@ fi
 # deletes the temp directory
 function cleanup_tmp_dir {
   rm -rf "$TMP_DIR"
-  echo "Deleted temp working directory $TMP_DIR"
 }
 
 # register the cleanup function to be called on the EXIT signal
@@ -121,15 +120,14 @@ find-up () {
 
 mkdir ${TMP_DIR}/deps
 DEPS=$(coqdep $reqArgs "$inputFile" -sort)
-echo -e "\e[32mDEPS: $DEPS\e[0m"
 
 # Copy dependencies
-# rsync takes a long time...
-for i in $DEPS; do rsync --ignore-missing-args --quiet -Ravz --no-owner --no-perms "${i}o" ${TMP_DIR}/deps; done
-# Make sure we remove the vo file we want to create, if an old version got copied.
-rm -f ${TMP_DIR}/deps/${coq-file}o
+for i in $DEPS; do cp --reflink=auto --parents "${i}o" ${TMP_DIR}/deps || true; done
 
-rsync --quiet -Ravz "$inputFile" ${TMP_DIR}/deps
+# Make sure we remove the vo file we want to create, if an old version got copied.
+rm -f ${TMP_DIR}/deps/${inputFile}o
+
+cp --reflink=auto --parents "$inputFile" ${TMP_DIR}/deps
 outputFile=${inputFile%.v}.vo
 
 # Use source file and `deps` directory in a recursive nix build
@@ -140,7 +138,6 @@ BUILD=$(@nix@/bin/nix-build -o "$dest.link" -E '(
     coqc = builtins.storePath "@next@/bin/@program@";
     builder = builtins.storePath "@shell@";
     coreutils = builtins.storePath "@coreutils@";
-    findutils = builtins.storePath "@findutils@";
     src = builtins.path {path='"${TMP_DIR}"'; name = name;};
     quickChick = ../lib/QuickChick/src;
     quickChickPlugin = ../lib/QuickChick/plugin;
