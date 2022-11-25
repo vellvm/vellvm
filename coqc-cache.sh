@@ -60,7 +60,7 @@ for ((n = 0; n < $#; n++)); do
     fi
 done
 
-if [[ unknownArg == 1 ]]; then
+if [[ $unknownArg == 1 ]]; then
     echo -e "\e[31m$0: Unknown argument to coqc\e[0m" >&2
     exec $COQC_ORIG "$@"
 fi
@@ -127,9 +127,7 @@ for i in $DEPS; do rsync --ignore-missing-args --quiet -Ravz "${i}o" ${TMP_DIR}/
 # Make sure we remove the vo file we want to create, if an old version got copied.
 rm -f ${TMP_DIR}/deps/${coq-file}o
 
-mkdir ${TMP_DIR}/src
-cp "$inputFile" ${TMP_DIR}/src
-
+rsync --quiet -Ravz "$inputFile" ${TMP_DIR}/deps
 outputFile="$(basename $inputFile .v).vo"
 
 # escapedArgs="-R \$src/deps Vellvm \$src/$inputFile"
@@ -145,7 +143,7 @@ BUILD=$(@nix@/bin/nix-build -o "$dest.link" -E '(
     quickChick = ../lib/QuickChick/src;
     flocqQuickChick = ../lib/flocq-quickchick;
     reqsString = "-R ${src}/deps/coq Vellvm -R ${quickChick} QuickChick -R ${flocqQuickChick} FlocqQuickChick";
-    inputFile = "${src}/src/'"$(basename $inputFile)"'";
+    inputFile = "${src}/deps/'"$inputFile"'";
     outputFile = "'"$outputFile"'";
     coqPkgs = builtins.map builtins.storePath [ @coqPkgs@ ];
     COQPATH = builtins.foldl'"'"' (a: b: a + (if a == "" then "" else ":") + b + "/lib/coq/8.15/user-contrib/") "" coqPkgs;
@@ -173,3 +171,4 @@ BUILD=$(@nix@/bin/nix-build -o "$dest.link" -E '(
 BUILD_CA=$( @nix@/bin/nix --experimental-features nix-command store make-content-addressed --json "$BUILD" | @jq@/bin/jq -r '.rewrites."'"$BUILD"'"' )
 echo "$BUILD"
 echo "$BUILD_CA"
+cp $BUILD_CA/* $(dirname $inputFile)
