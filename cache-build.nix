@@ -1,11 +1,12 @@
 {
   cache-coq-overlay = final: prev: {
-    cache-coq = coqProject: coqPkgs: final.runCommand "cache-coq"
+    cache-coq = coqPkgs: final.runCommand "cache-coq"
       { next = final.coq_8_15;
         nix = final.nix;
         coreutils = final.coreutils;
+        findutils = final.findutils;
         jq = final.jq;
-        inherit coqPkgs coqProject;
+        inherit coqPkgs;
         requiredSystemFeatures = [ "recursive-nix" ];
       }
       ''
@@ -18,9 +19,9 @@
         --subst-var nix \
         --subst-var system \
         --subst-var coreutils \
+        --subst-var findutils \
         --subst-var jq \
         --subst-var coqPkgs \
-        --subst-var coqProject \
         --subst-var-by compile_coq ${./build-coq.sh}
 
       chmod +x $out/bin/coqc-cache

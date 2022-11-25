@@ -123,7 +123,6 @@
             inputsFrom = [ packages.default ];
             buildInputs = [ pkgs.clang_13
                             (pkgs.cache-coq
-                              ./src/_CoqProject
                               (with coqPkgs;
                                 [ mathcomp
                                   mathcomp-ssreflect

@@ -48,9 +48,11 @@ for ((n = 0; n < $#; n++)); do
         includeArgs+="-I ${args[$n]} "
     elif [[ $arg = -R ]]; then
         : $((n+=2))
-        requiresPaths+=("${args[$n-1]}")
-        requiresNames+=("${args[$n]}")
-        reqArgs+="-R ${args[$n-1]} ${args[$n]} "
+        if [[ ${args[$n]} != "QuickChick" && ${args[$n]} != "FlocqQuickChick" ]]; then
+            requiresPaths+=("${args[$n-1]}")
+            requiresNames+=("${args[$n]}")
+            reqArgs+="-R ${args[$n-1]} ${args[$n]} "
+        fi
     elif [[ $arg =~ ^.*\.v ]]; then
         inputFile="$arg"
     elif [[ ! $arg =~ ^- ]]; then
@@ -63,6 +65,7 @@ done
 if [[ $unknownArg == 1 ]]; then
     echo -e "\e[31m$0: Unknown argument to coqc\e[0m" >&2
     exec $COQC_ORIG "$@"
+    exit 0
 fi
 
 # TODO / NOTE:
@@ -116,22 +119,20 @@ find-up () {
   echo "$path"
 }
 
-#COQPROJECT="src/_CoqProject" # "$(find-up "_CoqProject")/_CoqProject"
 mkdir ${TMP_DIR}/deps
 DEPS=$(coqdep $reqArgs "$inputFile" -sort)
 echo -e "\e[32mDEPS: $DEPS\e[0m"
 
 # Copy dependencies
 # rsync takes a long time...
-for i in $DEPS; do rsync --ignore-missing-args --quiet -Ravz "${i}o" ${TMP_DIR}/deps; done
+for i in $DEPS; do rsync --ignore-missing-args --quiet -Ravz --no-owner --no-perms "${i}o" ${TMP_DIR}/deps; done
 # Make sure we remove the vo file we want to create, if an old version got copied.
 rm -f ${TMP_DIR}/deps/${coq-file}o
 
 rsync --quiet -Ravz "$inputFile" ${TMP_DIR}/deps
-outputFile="$(basename $inputFile .v).vo"
+outputFile=${inputFile%.v}.vo
 
-# escapedArgs="-R \$src/deps Vellvm \$src/$inputFile"
-
+# Use source file and `deps` directory in a recursive nix build
 BUILD=$(@nix@/bin/nix-build -o "$dest.link" -E '(
   derivation rec {
     name = "coqc";
@@ -139,11 +140,14 @@ BUILD=$(@nix@/bin/nix-build -o "$dest.link" -E '(
     coqc = builtins.storePath "@next@/bin/@program@";
     builder = builtins.storePath "@shell@";
     coreutils = builtins.storePath "@coreutils@";
+    findutils = builtins.storePath "@findutils@";
     src = builtins.path {path='"${TMP_DIR}"'; name = name;};
     quickChick = ../lib/QuickChick/src;
+    quickChickPlugin = ../lib/QuickChick/plugin;
     flocqQuickChick = ../lib/flocq-quickchick;
-    reqsString = "-R ${src}/deps/coq Vellvm -R ${quickChick} QuickChick -R ${flocqQuickChick} FlocqQuickChick";
-    inputFile = "${src}/deps/'"$inputFile"'";
+    reqsString = "-R coq Vellvm -R ${quickChick} QuickChick -R ${flocqQuickChick} FlocqQuickChick";
+    incsString = "-I ${quickChick} -I ${quickChickPlugin}";
+    inputFile = "'"$inputFile"'";
     outputFile = "'"$outputFile"'";
     coqPkgs = builtins.map builtins.storePath [ @coqPkgs@ ];
     COQPATH = builtins.foldl'"'"' (a: b: a + (if a == "" then "" else ":") + b + "/lib/coq/8.15/user-contrib/") "" coqPkgs;
@@ -151,24 +155,12 @@ BUILD=$(@nix@/bin/nix-build -o "$dest.link" -E '(
   }
 )')
 
-# @nix@/bin/nix-build -o "$dest.link" -E '(
-#   runCommand "coq-cached"
-#       rec
-#       { coqc = builtins.storePath "@next@/bin/@program@";
-#         reqsString = "";
-#         incsString = "";
-#         src = '"$TMP_DIR"';
-#         inputFile = "${src}"/'"$inputFile"';
-#       }
-#       '"''"'
-#       $coqc $reqsString $incsString $inputFile -o $out/$(basename $inputFile)
-#       '"''"'
-# )' > /dev/null
-
-
-# Use source file and `deps` directory in a recursive nix build
-#BUILD=$( @nix@/bin/nix-build -E "import @COMPILE_COQ_NIX@ \"$COQC_ORIG\" \"${TMP_DIR}/deps\" \"$inputFile\" \"\" \"\"" )
 BUILD_CA=$( @nix@/bin/nix --experimental-features nix-command store make-content-addressed --json "$BUILD" | @jq@/bin/jq -r '.rewrites."'"$BUILD"'"' )
+
 echo "$BUILD"
 echo "$BUILD_CA"
-cp $BUILD_CA/* $(dirname $inputFile)
+
+cp $BUILD_CA/*\.vo $(dirname $inputFile)
+cp $BUILD_CA/*\.vos $(dirname $inputFile)
+cp $BUILD_CA/*\.vok $(dirname $inputFile)
+cp $BUILD_CA/*\.glob $(dirname $inputFile)
