@@ -47,7 +47,7 @@ for ((n = 0; n < $#; n++)); do
         includes+=("${args[$n]}")
         includeArgs+="-I ${args[$n]} "
     elif [[ $arg = -R ]]; then
-        : $(((n++)++))
+        : $((n+=2))
         requiresPaths+=("${args[$n-1]}")
         requiresNames+=("${args[$n]}")
         reqArgs+="-R ${args[$n-1]} ${args[$n]} "
@@ -108,10 +108,21 @@ function cleanup_tmp_dir {
 # register the cleanup function to be called on the EXIT signal
 trap cleanup_tmp_dir EXIT
 
+find-up () {
+  path=$(pwd)
+  while [[ "$path" != "" && ! -e "$path/$1" ]]; do
+    path=${path%/*}
+  done
+  echo "$path"
+}
+
+#COQPROJECT="src/_CoqProject" # "$(find-up "_CoqProject")/_CoqProject"
 mkdir ${TMP_DIR}/deps
-DEPS=$(coqdep "$reqArgs" "$includeArgs" "$inputFile" -sort)
+DEPS=$(coqdep $reqArgs "$inputFile" -sort)
+echo -e "\e[32mDEPS: $DEPS\e[0m"
 
 # Copy dependencies
+# rsync takes a long time...
 for i in $DEPS; do rsync --ignore-missing-args --quiet -Ravz "${i}o" ${TMP_DIR}/deps; done
 # Make sure we remove the vo file we want to create, if an old version got copied.
 rm -f ${TMP_DIR}/deps/${coq-file}o
@@ -130,7 +141,10 @@ BUILD=$(@nix@/bin/nix-build -o "$dest.link" -E '(
     coqc = builtins.storePath "@next@/bin/@program@";
     builder = builtins.storePath "@shell@";
     coreutils = builtins.storePath "@coreutils@";
-    src = '"${TMP_DIR}"';
+    src = builtins.path {path='"${TMP_DIR}"'; name = name;};
+    quickChick = ../lib/QuickChick/src;
+    flocqQuickChick = ../lib/flocq-quickchick;
+    reqsString = "-R ${src}/deps/coq Vellvm -R ${quickChick} QuickChick -R ${flocqQuickChick} FlocqQuickChick";
     inputFile = "${src}/src/'"$(basename $inputFile)"'";
     outputFile = "'"$outputFile"'";
     coqPkgs = builtins.map builtins.storePath [ @coqPkgs@ ];
