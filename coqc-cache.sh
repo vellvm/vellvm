@@ -131,7 +131,7 @@ cp --reflink=auto --parents "$inputFile" ${TMP_DIR}/deps
 outputFile=${inputFile%.v}.vo
 
 # Use source file and `deps` directory in a recursive nix build
-BUILD=$(@nix@/bin/nix-build -o "$dest.link" -E '(
+BUILD=$(@nix@/bin/nix-build -E '(
   derivation rec {
     name = "coqc";
     system = "@system@";

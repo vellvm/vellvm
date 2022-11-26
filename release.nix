@@ -24,6 +24,8 @@
 
       inherit version;
 
+      requiredSystemFeatures = [ "recursive-nix" ];
+
       buildInputs =
         [ coq
           cache-coq
@@ -83,7 +85,7 @@
         };
 
       buildPhase = ''
-  echo "COQC=coqc-cache" > src/CoqMakefile.local
+  echo "COQC=${cache-coq}/bin/coqc-cache" > src/CoqMakefile.local
   make -C src/
   make -C src/ frontend
   '';

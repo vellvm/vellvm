@@ -74,10 +74,12 @@ coqinterp: $(COQFILESVIR:%=coq/%.vo)
 quickchick:
 	$(MAKE) -C $(QUICKCHICKDIR) compat
 	$(MAKE) -C $(QUICKCHICKDIR)
+	find $(QUICKCHICKDIR) -name "*\.aux" -delete
 
 .PHONY: flocq-quickchick
 flocq-quickchick: quickchick
 	make -C $(FLOCQQUICKCHICKDIR)
+	find $(FLOCQQUICKCHICKDIR) -name "*\.aux" -delete
 
 .PHONY: update-quickchick
 update-quickchick:
