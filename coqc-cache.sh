@@ -122,7 +122,7 @@ mkdir ${TMP_DIR}/deps
 DEPS=$(coqdep $reqArgs "$inputFile" -sort)
 
 # Copy dependencies
-for i in $DEPS; do cp --reflink=auto --parents "${i}o" ${TMP_DIR}/deps || true; done
+for i in $DEPS; do cp --reflink=auto --parents "${i}o" ${TMP_DIR}/deps 2>/dev/null || true; done
 
 # Make sure we remove the vo file we want to create, if an old version got copied.
 rm -f ${TMP_DIR}/deps/${inputFile}o
@@ -154,10 +154,7 @@ BUILD=$(@nix@/bin/nix-build -o "$dest.link" -E '(
 
 BUILD_CA=$( @nix@/bin/nix --experimental-features nix-command store make-content-addressed --json "$BUILD" | @jq@/bin/jq -r '.rewrites."'"$BUILD"'"' )
 
-echo "$BUILD"
-echo "$BUILD_CA"
-
-cp $BUILD_CA/*\.vo $(dirname $inputFile)
-cp $BUILD_CA/*\.vos $(dirname $inputFile)
-cp $BUILD_CA/*\.vok $(dirname $inputFile)
-cp $BUILD_CA/*\.glob $(dirname $inputFile)
+install -m 644 $BUILD_CA/*\.vo $(dirname $inputFile)
+install -m 644 $BUILD_CA/*\.vos $(dirname $inputFile)
+install -m 644 $BUILD_CA/*\.vok $(dirname $inputFile)
+install -m 644 $BUILD_CA/*\.glob $(dirname $inputFile)

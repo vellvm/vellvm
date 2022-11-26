@@ -56,10 +56,22 @@
                   });
             });
 
+        cache-coq = (pkgs.cache-coq
+          (with coqPkgs;
+            [ mathcomp
+              mathcomp-ssreflect
+              coq-ext-lib
+              paco
+              ITree
+              flocq
+              ceres
+              simple-io
+            ]));
+
         version = "vellvm:master";
       in rec {
         packages = {
-          default = (pkgs.callPackage ./release.nix (ocamlPkgs // coqPkgs // { nix-filter = nix-filter.lib; perl = pkgs.perl; inherit coq version; })).vellvm;
+          default = (pkgs.callPackage ./release.nix (ocamlPkgs // coqPkgs // { nix-filter = nix-filter.lib; perl = pkgs.perl; inherit coq version cache-coq; })).vellvm;
         };
 
         defaultPackage = packages.default;
@@ -121,19 +133,7 @@
           # Include a fixed version of clang in the development environment for testing.
           default = pkgs.mkShell {
             inputsFrom = [ packages.default ];
-            buildInputs = [ pkgs.clang_13
-                            (pkgs.cache-coq
-                              (with coqPkgs;
-                                [ mathcomp
-                                  mathcomp-ssreflect
-                                  coq-ext-lib
-                                  paco
-                                  ITree
-                                  flocq
-                                  ceres
-                                  simple-io
-                                ]))
-                          ];
+            buildInputs = [ pkgs.clang_13 ];
           };
         };
 

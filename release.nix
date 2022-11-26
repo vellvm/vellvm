@@ -3,6 +3,7 @@
   mkCoqDerivation,
   version ? null,
   coq,
+  cache-coq,
   dune_3,
   perl,
   # All of these ocaml packages should probably come from the coq
@@ -25,6 +26,7 @@
 
       buildInputs =
         [ coq
+          cache-coq
           dune_3
           perl
         ] ++
@@ -81,6 +83,7 @@
         };
 
       buildPhase = ''
+  echo "COQC=coqc-cache" > src/CoqMakefile.local
   make -C src/
   make -C src/ frontend
   '';
