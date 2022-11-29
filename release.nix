@@ -81,14 +81,19 @@
         };
 
       buildPhase = ''
+  runHook preBuild
   make -C src/
   make -C src/ frontend
+  runHook postBuild
   '';
 
       installPhase = ''
+  runHook preInstall
   mkdir -p $out/bin
   install src/vellvm $out/bin/vellvm
   install src/frontend $out/bin/frontend
+  COQLIBINSTALL=$out/lib/coq/${coq.coq-version}/user-contrib make -C src/ install
+  runHook postInstall
   '';
 
       meta = {
