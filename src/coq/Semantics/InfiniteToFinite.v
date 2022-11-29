@@ -3450,9 +3450,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Proof.
     induction dfns.
     { cbn.
-      (* Universe problem?? *)
-      (* apply rutt_Ret. *)
-      admit.
+      apply rutt_Ret.
+      constructor.
     }
     { do 2 rewrite map_monad_unfold.
       eapply rutt_bind.
@@ -3462,19 +3461,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       eapply rutt_bind.
       eapply IHdfns.
 
-      intros r0 r3 H.
+      intros r0 r3 R0R3.
 
-      (*
-        Unset Universe Checking.
-        Unset Auto Template Polymorphism.
-      *)
-
-      (* Universe problem?? *)
       apply rutt_Ret.
-      (* May get tricky *)
-      admit.
+      constructor; auto.
     }
-  Admitted.
+  Qed.
 
   Lemma denote_mcfg_E1E2_rutt' :
     forall dfns1 dfns2 dt f1 f2 args1 args2,
