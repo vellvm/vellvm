@@ -586,7 +586,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       bs <- lift_err ret (combine_lists_err (df_args df) args) ;;
       (* generate the corresponding writes to the local stack frame *)
       trigger MemPush ;;
-      trigger (StackPush (map (fun '(k,v) => (k, v)) bs)) ;;
+      trigger (StackPush bs) ;;
       rv <- translate instr_to_L0' (denote_cfg (df_instrs df)) ;;
       trigger StackPop ;;
       trigger MemPop ;;

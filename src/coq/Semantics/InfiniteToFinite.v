@@ -2404,13 +2404,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { (* Doesn't say anything about return value... *)
       apply (dt1 = dt2 /\
                uvalue_convert f1 = NoOom f2 /\
-               (map_monad_In args1 (fun elt Hin => dvalue_convert elt)) = NoOom args2).
+               (map_monad dvalue_convert args1) = NoOom args2).
     }
 
     (* Intrinsics *)
     { apply (dt1 = dt2 /\
                name1 = name2 /\
-               (map_monad_In args1 (fun elt Hin => dvalue_convert elt)) = NoOom args2).
+               (map_monad dvalue_convert args1) = NoOom args2).
     }
 
     (* Globals *)
@@ -2444,10 +2444,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Stack Push *)
         destruct e2 eqn:HE2.
         + apply
-            (map_monad_In args
-                            (fun '(id, uv) Hin =>
-                               uv' <- uvalue_convert uv;;
-                               ret (id, uv')) = NoOom args0).
+            (map_monad
+               (fun '(id, uv) =>
+                  uv' <- uvalue_convert uv;;
+                  ret (id, uv'))
+             args = NoOom args0).
         + apply False.
       - (* Stack Pop *)
         destruct e2 eqn:HE2.
@@ -2548,7 +2549,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       apply (t = t0 /\
                uvalue_convert f = NoOom f0 /\
-               (map_monad_In args (fun elt Hin => dvalue_convert elt)) = NoOom args0 /\
+               (map_monad dvalue_convert args) = NoOom args0 /\
                dvalue_convert res1 = NoOom res2
             ).
     }
@@ -2558,7 +2559,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inv e2.
       apply (t = t0 /\
                f = f0 /\
-               (map_monad_In args (fun elt Hin => dvalue_convert elt)) = NoOom args0 /\
+               (map_monad dvalue_convert args) = NoOom args0 /\
                dvalue_convert res1 = NoOom res2
             ).
     }
@@ -2597,10 +2598,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Stack Push *)
         destruct e2 eqn:HE2.
         + apply
-            (map_monad_In args
-               (fun '(id, uv) Hin =>
+            (map_monad
+               (fun '(id, uv) =>
                   uv' <- uvalue_convert uv;;
-                  ret (id, uv')) = NoOom args0).
+                  ret (id, uv'))
+             args = NoOom args0).
         + apply False.
       - (* Stack Pop *)
         destruct e2 eqn:HE2.
@@ -2685,7 +2687,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { (* Doesn't say anything about return value... *)
       apply (dt1 = dt2 /\
                uvalue_convert f1 = NoOom f2 /\
-               (map_monad_In args1 (fun elt Hin => uvalue_convert elt)) = NoOom args2).
+               (map_monad (fun elt => uvalue_convert elt) args1) = NoOom args2).
     }
   Defined.
 
@@ -2706,7 +2708,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       apply (dt1 = dt2 /\
                uvalue_convert f1 = NoOom f2 /\
-               (map_monad_In args1 (fun elt Hin => uvalue_convert elt)) = NoOom args2 /\
+               (map_monad (fun elt => uvalue_convert elt) args1) = NoOom args2 /\
                uvalue_convert res1 = NoOom res2
             ).
     }
@@ -2727,8 +2729,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Definition call_res_refine (A B : Type) (c1 : IS1.LP.Events.CallE A) (res1 : A) (c2 : CallE B) (res2 : B) : Prop.
   Proof.
     (* Calls *)
-    { (* Doesn't say anything about return value... *)
-      inv c1.
+    { inv c1.
       inv c2.
       apply (t = t0 /\
                uvalue_convert f = NoOom f0 /\
@@ -3172,6 +3173,115 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
            ).
   Defined.
 
+  Lemma denote_ocfg_rutt :
+    forall cfg bids,
+      rutt L0'_refine L0'_res_refine (sum_rel (eq × eq) uvalue_refine)
+        (translate IS1.LP.Events.instr_to_L0'
+           (IS1.LLVM.D.denote_ocfg cfg bids))
+        (translate instr_to_L0'
+           (denote_ocfg cfg bids)).
+  Proof.
+    intros cfg [bid_from bid_src].
+    induction cfg.
+    - unfold denote_ocfg, IS1.LLVM.D.denote_ocfg.
+  Admitted.
+
+  (* TODO: Move these combine_lists lemmas *)
+  Lemma combine_lists_err_inl_contra :
+    forall {X Y} (xs : list X) (ys : list Y) msg,
+      ~ (combine_lists_err xs ys = inl msg).
+  Proof.
+    intros X Y.
+    induction xs, ys; intros msg CONTRA;
+      inv CONTRA.
+    destruct (combine_lists_err xs ys) eqn:COMB.
+    apply IHxs in COMB; auto.
+    inv H0.
+  Qed.
+
+  Lemma combine_lists_err_length_eq :
+    forall {A B C D} xs1 ys1 xs2 ys2 zs1 zs2,
+      @combine_lists_err A B xs1 ys1 = inr zs1 ->
+      @combine_lists_err C D xs2 ys2 = inr zs2 ->
+      length ys1 = length ys2 ->
+      length xs1 = length xs2 ->
+      length zs1 = length zs2.
+  Proof.
+    intros A B C D.
+    induction xs1, ys1, xs2, ys2;
+      intros zs1 zs2
+        COMB1 COMB2 LEN1 LEN2;
+      try solve [cbn in *;
+                 inv COMB1; inv COMB2;
+                 auto
+                | inv LEN1; inv LEN2
+        ].
+    cbn in *.
+
+    destruct (combine_lists_err xs1 ys1) eqn:COMB1';
+      inv COMB1.
+
+    destruct (combine_lists_err xs2 ys2) eqn:COMB2';
+      inv COMB2.
+    cbn.
+    apply Nat.succ_inj_wd.
+    eapply IHxs1; eauto.
+  Qed.
+
+  Import Util.
+  Lemma combine_lists_err_Nth :
+    forall {X Y} xs ys (x : X) (y : Y) zs i,
+      Nth xs i x ->
+      Nth ys i y ->
+      combine_lists_err xs ys = inr zs ->
+      Nth zs i (x, y).
+  Proof.
+    intros X Y.
+    induction xs, ys;
+      intros x' y' zs i NTH_xs NTH_ys COMB;
+      cbn in *;
+      try
+        solve [ apply not_Nth_nil in NTH_xs; contradiction
+              | apply not_Nth_nil in NTH_ys; contradiction
+        ].
+
+    destruct (combine_lists_err xs ys) eqn:COMB';
+      inv COMB.
+
+    destruct i.
+    - cbn in *.
+      inv NTH_xs; inv NTH_ys.
+      reflexivity.
+    - cbn in *.
+      eauto.
+  Qed.
+
+  Lemma combine_lists_err_Nth_inv :
+    forall {X Y} xs ys (x : X) (y : Y) zs i,
+      Nth zs i (x, y) ->
+      combine_lists_err xs ys = inr zs ->
+      Nth xs i x /\ Nth ys i y.
+  Proof.
+    intros X Y.
+    induction xs, ys;
+      intros x' y' zs i NTH COMB;
+      try
+        solve [ cbn in COMB; inv COMB;
+                apply not_Nth_nil in NTH; contradiction
+        ].
+
+    cbn in *.
+    destruct (combine_lists_err xs ys) eqn:COMB';
+      inv COMB.
+
+    destruct i.
+    - cbn in *.
+      inv NTH.
+      auto.
+    - cbn in *.
+      eauto.
+  Qed.
+
   Lemma address_one_function_E1E2_rutt :
     forall dfn,
       rutt event_refine event_res_refine (dvalue_refine × function_denotation_refine)
@@ -3194,8 +3304,142 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       red.
       intros args1 args2 ARGS.
       cbn.
-      eapply rutt_bind.
-  Admitted.
+      eapply rutt_bind with (RR:=Forall2 (eq × uvalue_refine)).
+      { cbn.
+        pose proof (Util.Forall2_length ARGS) as LEN.
+        destruct (IS1.LLVM.D.combine_lists_err (LLVMAst.df_args dfn) args1) eqn:HARGS1.
+        { (* Error, means args1 differs in length *)
+          (* Currently combine_lists_err does not ever error... This
+             may change in the future.*)
+          apply combine_lists_err_inl_contra in HARGS1.
+          contradiction.
+        }
+
+        { assert (length args1 = length args2) as ARGSLEN by eauto using Util.Forall2_length.
+          cbn.
+          destruct (combine_lists_err (LLVMAst.df_args dfn) args2) eqn:HARGS2.
+          apply combine_lists_err_inl_contra in HARGS2; contradiction.
+
+          (* I know args2 is a uvalue refinement of args1.
+
+             I also know that in HARGS1 and HARGS2, args1 and args2
+             are being combined with the same list.
+
+             This should mean that `l` and `l0` have the same length...
+
+             And also something like...
+
+             Forall2 (eq × uvalue_refine) l l0
+           *)
+
+          assert (Forall2 (eq × uvalue_refine) l l0) as LL0.
+          { assert (length l = length l0) as LENLL0.
+            { eapply combine_lists_err_length_eq; eauto.
+            }
+
+            cbn.
+            apply Util.Forall2_forall.
+            split; auto.
+
+            intros i a b NTHl NTHl0.
+            destruct a as [a1 a2].
+            destruct b as [b1 b2].
+            epose proof (combine_lists_err_Nth_inv _ _ _ _ _ _ NTHl HARGS1) as [AARGS AARGS1].
+            epose proof (combine_lists_err_Nth_inv _ _ _ _ _ _ NTHl0 HARGS2) as [BARGS BARGS1].
+
+            constructor; cbn.
+            - cbn in *.
+              rewrite AARGS in BARGS.
+              inv BARGS.
+              reflexivity.
+            - eapply Forall2_Nth; eauto.
+          }
+
+          cbn.
+          apply rutt_Ret; auto.
+        }
+      }
+
+
+      intros params1 params2 PARAMS.
+      eapply rutt_bind with (RR:=eq).
+      { apply rutt_trigger.
+        cbn; auto.
+
+        intros [] [] _.
+        reflexivity.
+      }
+
+      intros [] [] _.
+
+      eapply rutt_bind with (RR:=eq).
+      { apply rutt_trigger.
+        - cbn.
+          induction PARAMS.
+          + cbn. reflexivity.
+          + destruct x as [xid xuv].
+            destruct y as [yid yuv].
+            inv H.
+            cbn in fst_rel, snd_rel. subst.
+            red in snd_rel.
+            rewrite map_monad_unfold.
+            rewrite snd_rel.
+            cbn.
+            setoid_rewrite IHPARAMS.
+            reflexivity.
+        - intros [] [] _.
+          reflexivity.
+      }
+
+      intros [] [] _.
+      eapply rutt_bind with (RR:=uvalue_refine).
+      { rewrite translate_bind.
+        rewrite translate_bind.
+
+        eapply rutt_bind with (RR:=sum_rel (eq × eq) uvalue_refine).
+        { (* ocfg stuff *)
+          apply denote_ocfg_rutt.
+        }
+
+        intros r0 r3 H.
+        inv H.
+        - inv H0.
+          destruct a1, a2.
+          cbn in *.
+          subst.
+          unfold LLVMEvents.raise.
+          rewrite bind_trigger.
+          rewrite bind_trigger.
+          rewrite translate_vis.
+          rewrite translate_vis.
+          cbn.
+          apply rutt_Vis; cbn; auto.
+          tauto.
+        - do 2 rewrite translate_ret.
+          apply rutt_Ret.
+          auto.
+      }
+
+      intros r0 r3 R0R3.
+      eapply rutt_bind with (RR:=eq).
+      { eapply rutt_trigger.
+        cbn; auto.
+        intros [] [] _.
+        reflexivity.
+      }
+
+      intros [] [] _.
+      eapply rutt_bind with (RR:=eq).
+      { eapply rutt_trigger.
+        cbn; auto.
+        intros [] [] _.
+        reflexivity.
+      }
+
+      intros [] [] _.
+      eapply rutt_Ret.
+      auto.
+  Qed.
 
   Lemma address_one_functions_E1E2_rutt :
     forall dfns,
@@ -3242,7 +3486,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (IS1.LLVM.D.denote_mcfg dfns1 dt f1 args1)
         (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2).
   Proof.
-    (* May be a more generic mrec lemma hiding in this. Maybe ask Lucas *)
     intros dfns1 dfns2 dt f1 f2 args1 args2 DFNS F1F2 ARGS.
     unfold IS1.LLVM.D.denote_mcfg.
     unfold denote_mcfg.
@@ -3313,8 +3556,31 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn.
 
       (* Probably need something about map *)
+      unfold ITree.map.
       admit.
     }
+  Admitted.
+
+  (* TODO: Should go in the library *)
+  (* EuttExtras.eutt_subrel *)
+  (* (LERR: RR <2= RR'): *)
+  (* Lemma rutt_res_weaken : *)
+  (*   forall {E1 E2} {R1 R2} (ER : E1 -> E2 -> Prop) EAns (ResR1 ResR2 : R1 -> R2 -> Prop) t1 t2, *)
+  (*     rutt ER EAns ResR1 t1 t2 -> *)
+  (*     (forall r1 r2, (ResR1 r1 r2 -> ResR2 r1 r2)) -> *)
+  (*     rutt ER EAns ResR2 t1 t2. *)
+
+  Lemma denote_mcfg_E1E2_rutt'_rutt :
+    forall dfns1 dfns2 dt f1 f2 args1 args2,
+      rutt event_refine event_res_refine (fun res1 res2 => call_res_refine IS1.LP.Events.DV.uvalue IS2.LP.Events.DV.uvalue (IS1.LP.Events.Call dt f1 args1) res1 (Call dt f2 args2) res2)
+        (IS1.LLVM.D.denote_mcfg dfns1 dt f1 args1)
+        (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2) ->
+      rutt event_refine event_res_refine uvalue_refine
+        (IS1.LLVM.D.denote_mcfg dfns1 dt f1 args1)
+        (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2).
+  Proof.
+    intros dfns1 dfns2 dt f1 f2 args1 args2 H.
+    (* rutt_res_weaken *)
   Admitted.
 
   Lemma denote_mcfg_E1E2_rutt :
@@ -3326,10 +3592,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (IS1.LLVM.D.denote_mcfg dfns1 dt f1 args1)
         (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2).
   Proof.
-    (* May be a more generic mrec lemma hiding in this. Maybe ask Lucas *)
     intros dfns1 dfns2 dt f1 f2 args1 args2 H H0 H1.
-    unfold IS1.LLVM.D.denote_mcfg.
-    unfold denote_mcfg.
+    eapply denote_mcfg_E1E2_rutt'_rutt.
+    eapply denote_mcfg_E1E2_rutt'; auto.
+    cbn.
+    split; auto.
+    split; auto.
+    admit.
   Admitted.
 
   Lemma model_E1E2_rutt_sound
