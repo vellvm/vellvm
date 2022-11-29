@@ -3517,6 +3517,156 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Proof.
   Admitted.
 
+  (* TODO: Move this? *)
+  Lemma dvalue_refine_dvalue_to_uvalue :
+    forall dv1 dv2,
+      dvalue_refine dv1 dv2 ->
+      uvalue_refine (IS1.LP.Events.DV.dvalue_to_uvalue dv1) (IS2.LP.Events.DV.dvalue_to_uvalue dv2).
+  Proof.
+    induction dv1; intros dv2 REF;
+      red in REF;
+      rewrite dvalue_convert_equation in REF;
+      try
+        solve [
+          cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn;
+          first [ break_match_hyp; inv REF
+                | inv REF
+            ];
+          cbn; auto
+        ].
+    - (* Structs *)
+      cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn.
+      break_match_hyp; inv REF.
+      generalize dependent l.
+      induction fields; intros l Heqo.
+      { cbn in *.
+        inv Heqo.
+        cbn.
+        reflexivity.
+      }
+      { rewrite map_monad_In_unfold in Heqo.
+        rewrite map_cons.
+        rewrite map_monad_In_unfold.
+
+        cbn in *.
+        destruct (dvalue_convert a) eqn:A; inv Heqo.
+        pose proof (H a) as AIND.
+        forward AIND; auto.
+        specialize (AIND _ A).
+        red in AIND.
+        rewrite AIND.
+
+        forward IHfields.
+        { intros u H0 dv2 H2.
+          eauto.
+        }
+
+        break_match_hyp; inv H1.
+        specialize (IHfields l0 eq_refl).
+        break_match_hyp; inv IHfields.
+        cbn.
+        reflexivity.            
+      }
+    - (* Packed structs *)
+      cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn.
+      break_match_hyp; inv REF.
+      generalize dependent l.
+      induction fields; intros l Heqo.
+      { cbn in *.
+        inv Heqo.
+        cbn.
+        reflexivity.
+      }
+      { rewrite map_monad_In_unfold in Heqo.
+        rewrite map_cons.
+        rewrite map_monad_In_unfold.
+
+        cbn in *.
+        destruct (dvalue_convert a) eqn:A; inv Heqo.
+        pose proof (H a) as AIND.
+        forward AIND; auto.
+        specialize (AIND _ A).
+        red in AIND.
+        rewrite AIND.
+
+        forward IHfields.
+        { intros u H0 dv2 H2.
+          eauto.
+        }
+
+        break_match_hyp; inv H1.
+        specialize (IHfields l0 eq_refl).
+        break_match_hyp; inv IHfields.
+        cbn.
+        reflexivity.            
+      }
+    - (* Arrays *)
+      cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn.
+      break_match_hyp; inv REF.
+      generalize dependent l.
+      induction elts; intros l Heqo.
+      { cbn in *.
+        inv Heqo.
+        cbn.
+        reflexivity.
+      }
+      { rewrite map_monad_In_unfold in Heqo.
+        rewrite map_cons.
+        rewrite map_monad_In_unfold.
+
+        cbn in *.
+        destruct (dvalue_convert a) eqn:A; inv Heqo.
+        pose proof (H a) as AIND.
+        forward AIND; auto.
+        specialize (AIND _ A).
+        red in AIND.
+        rewrite AIND.
+
+        forward IHelts.
+        { intros u H0 dv2 H2.
+          eauto.
+        }
+
+        break_match_hyp; inv H1.
+        specialize (IHelts l0 eq_refl).
+        break_match_hyp; inv IHelts.
+        cbn.
+        reflexivity.            
+      }
+    - (* Vectors *)
+      cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn.
+      break_match_hyp; inv REF.
+      generalize dependent l.
+      induction elts; intros l Heqo.
+      { cbn in *.
+        inv Heqo.
+        cbn.
+        reflexivity.
+      }
+      { rewrite map_monad_In_unfold in Heqo.
+        rewrite map_cons.
+        rewrite map_monad_In_unfold.
+
+        cbn in *.
+        destruct (dvalue_convert a) eqn:A; inv Heqo.
+        pose proof (H a) as AIND.
+        forward AIND; auto.
+        specialize (AIND _ A).
+        red in AIND.
+        rewrite AIND.
+
+        forward IHelts.
+        { intros u H0 dv2 H2.
+          eauto.
+        }
+
+        break_match_hyp; inv H1.
+        specialize (IHelts l0 eq_refl).
+        break_match_hyp; inv IHelts.
+        cbn.
+        reflexivity.            
+      }
+  Qed.
 
   Lemma denote_mcfg_E1E2_rutt' :
     forall dfns1 dfns2 dt f1 f2 args1 args2,
@@ -3639,7 +3789,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       split; split; auto.
       split; auto.
 
-      admit.
+      red in R0R5.
+      apply dvalue_refine_dvalue_to_uvalue; auto.
     }
   Admitted.
 
