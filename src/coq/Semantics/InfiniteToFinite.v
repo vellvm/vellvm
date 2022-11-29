@@ -3468,6 +3468,56 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Qed.
 
+  (* TODO: move this? *)
+  Lemma uvalue_convert_preserves_is_concrete :
+    forall uv uvc b,
+      uvalue_convert uv = NoOom uvc ->
+      IS1.LP.Events.DV.is_concrete uv = b ->
+      IS2.LP.Events.DV.is_concrete uvc = b.
+  Proof.
+    intros uv uvc b UVC CONC.
+    induction uv; cbn in *; inv CONC;
+      rewrite uvalue_convert_equation in UVC;
+      try
+        solve [ cbn in UVC; inv UVC; cbn; auto
+              | cbn in UVC;
+                break_match_hyp; inv UVC;
+                cbn; auto
+              | cbn in *;
+                break_match_hyp; inv UVC;
+                break_match_hyp; inv H1;
+                cbn; auto
+        ].
+  Admitted.
+
+  (* TODO: move these? *)
+  Lemma lookup_defn_some_refine :
+    forall dfns1 dfns2 r1 r2 f_den1,
+      Forall2 (dvalue_refine × function_denotation_refine) dfns1 dfns2 ->
+      dvalue_refine r1 r2 ->
+      IS1.LLVM.D.lookup_defn r1 dfns1 = Some f_den1 ->
+      exists f_den2,
+        IS2.LLVM.D.lookup_defn r2 dfns2 = Some f_den2 /\
+          function_denotation_refine f_den1 f_den2.
+  Proof.
+    intros dfns1 dfns2 r1 r2 f_den1 DFNS R1R2 LUP.
+
+    pose proof DFNS as NTH.
+    apply Forall2_forall in NTH as [LEN NTH].
+
+    (* Tricky assoc stuff... *)
+  Admitted.
+
+  Lemma lookup_defn_none :
+    forall dfns1 dfns2 r1 r2,
+      Forall2 (dvalue_refine × function_denotation_refine) dfns1 dfns2 ->
+      dvalue_refine r1 r2 ->
+      IS1.LLVM.D.lookup_defn r1 dfns1 = None ->
+      IS2.LLVM.D.lookup_defn r2 dfns2 = None.
+  Proof.
+  Admitted.
+
+
   Lemma denote_mcfg_E1E2_rutt' :
     forall dfns1 dfns2 dt f1 f2 args1 args2,
       (Forall2 (dvalue_refine × function_denotation_refine) dfns1 dfns2) ->
@@ -3494,35 +3544,47 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       eapply rutt_bind with (RR:=dvalue_refine).
       { (* This may be tricky... *)
         (* Hopefully follows from uvalue_convert f = NoOom f0 in PRE *)
-        admit.
+        unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick.
+        destruct PRE as [T [UV ARGS_CONV]]; subst.
+
+        break_match;
+          eapply uvalue_convert_preserves_is_concrete in Heqb;
+          eauto; rewrite Heqb.
+        - (* Concrete so just use uvalue_to_dvalue (simple) conversion *)
+          admit.
+        - (* Not concrete, trigger pick events *)
+          eapply rutt_bind with (RR:= fun (t1 : {_ : IS1.LP.Events.DV.dvalue | True}) (t2 : {_ : dvalue | True}) => dvalue_convert (proj1_sig t1) = NoOom (proj1_sig t2)) .
+          { apply rutt_trigger.
+            { constructor.
+              cbn.
+              tauto.
+            }
+
+            { intros t1 t2 H.
+              inv H.
+              cbn in *.
+              apply inj_pair2 in H0, H3, H4, H5.
+              subst.
+
+              destruct t1 as [dv1 P1].
+              destruct t2 as [dv2 P2].
+              cbn in H6.
+              cbn.
+              tauto.
+            }
+          }
+
+          intros r1 r2 R1R2.
+          apply rutt_Ret.
+          destruct r1, r2.
+          cbn in *.
+          auto.
       }
 
       intros r1 r2 R1R2.
       (* Should be able to determine that the lookups
          are equivalent using DFNS *)
       cbn.
-
-      Set Nested Proofs Allowed.
-      Lemma lookup_defn_some_refine :
-        forall dfns1 dfns2 r1 r2 f_den1,
-          Forall2 (dvalue_refine × function_denotation_refine) dfns1 dfns2 ->
-          dvalue_refine r1 r2 ->
-          IS1.LLVM.D.lookup_defn r1 dfns1 = Some f_den1 ->
-          exists f_den2,
-            IS2.LLVM.D.lookup_defn r2 dfns2 = Some f_den2 /\
-              function_denotation_refine f_den1 f_den2.
-      Proof.
-      Admitted.
-
-      Lemma lookup_defn_none :
-        forall dfns1 dfns2 r1 r2,
-          Forall2 (dvalue_refine × function_denotation_refine) dfns1 dfns2 ->
-          dvalue_refine r1 r2 ->
-          IS1.LLVM.D.lookup_defn r1 dfns1 = None ->
-          IS2.LLVM.D.lookup_defn r2 dfns2 = None.
-      Proof.
-      Admitted.
-
       break_match.
       { eapply lookup_defn_some_refine in Heqo; eauto.
         destruct Heqo as (f_den2 & LUP2 & FDEN2).
@@ -3547,8 +3609,36 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       intros r3 r4 R3R4.
       cbn.
 
-      (* Probably need something about map *)
+      destruct PRE as [T [UV ARGS_CONV]]; subst.
+
       unfold ITree.map.
+      eapply rutt_bind with (RR:=dvalue_refine).
+      {
+        apply rutt_trigger.
+        { constructor.
+          cbn.
+          split; split; auto.
+
+          apply map_monad_oom_forall2.
+          auto.
+        }
+
+        intros t1 t2 H.
+        inv H.
+        cbn in *.
+        apply inj_pair2 in H0, H3, H4, H5.
+        subst.
+
+        cbn in H6.
+        tauto.
+      }
+
+      intros r0 r5 R0R5.
+      apply rutt_Ret.
+
+      split; split; auto.
+      split; auto.
+
       admit.
     }
   Admitted.
