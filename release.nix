@@ -28,6 +28,17 @@
           dune_3
           perl
         ] ++
+        # These ocaml packages have to come from coq.ocamlPackages to
+        # avoid disagreements between ocaml compiler versions.
+        [ ocaml
+          ocamlbuild
+          findlib
+          menhir
+          qcheck
+          cppo
+        ];
+
+      propagatedBuildInputs =
         # Coq libraries
         [ mathcomp
           mathcomp-ssreflect
@@ -38,15 +49,6 @@
           ceres
           simple-io
           zarith
-        ] ++
-        # These ocaml packages have to come from coq.ocamlPackages to
-        # avoid disagreements between ocaml compiler versions.
-        [ ocaml
-          ocamlbuild
-          findlib
-          menhir
-          qcheck
-          cppo
         ];
 
       src =
