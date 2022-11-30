@@ -4554,6 +4554,83 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Qed.
 
+  (* TODO: Should go in the library *)
+  Lemma rutt_weaken :
+    forall {E1 E2} {R1 R2}
+      (PRE1 PRE2 : prerel E1 E2)
+      (POST1 POST2 : postrel E1 E2)
+      (ResR1 ResR2 : R1 -> R2 -> Prop)
+      t1 t2,
+      rutt PRE1 POST1 ResR1 t1 t2 ->
+      (forall {A B} e1 e2, (PRE1 A B e1 e2 -> PRE2 _ _ e1 e2)) ->
+      (forall {A B} e1 r1 e2 r2, (POST2 A B e1 r1 e2 r2 -> POST1 _ _ e1 r1 e2 r2)) ->
+      (forall r1 r2, (ResR1 r1 r2 -> ResR2 r1 r2)) ->
+      rutt PRE2 POST2 ResR2 t1 t2.
+  Proof.
+    intros E1 E2 R1 R2 PRE1 PRE2 POST1 POST2 ResR1 ResR2.
+
+    Hint Resolve rutt_monot : paco.
+    Hint Constructors ruttF : itree.
+    Hint Unfold rutt_ : itree.
+    Hint Unfold rutt : itree.
+
+    pcofix CIH. pstep. intros t1 t2 RUTT. punfold RUTT.
+    red in RUTT |- *. induction RUTT; pclearbot; eauto 7 with paco itree.
+
+    intros H2 H3 H4.
+    constructor; auto.
+    intros a b H1.
+    apply H3 in H1.
+    apply H0 in H1.
+    pclearbot.
+    eauto with paco itree.
+  Qed.
+
+  Lemma pickUnique_rutt :
+    forall uv1 uv2,
+      uvalue_refine uv1 uv2 ->
+      rutt (sum_prerel call_refine event_refine)
+        (sum_postrel call_res_refine event_res_refine) dvalue_refine
+        (IS1.LLVM.D.pickUnique uv1) (pickUnique uv2).
+  Proof.
+    intros uv1 uv2 REF.
+    unfold IS1.LLVM.D.pickUnique, IS1.LLVM.D.concretize_or_pick.
+    unfold pickUnique, concretize_or_pick.
+    cbn.
+    break_match;
+      eapply uvalue_convert_preserves_is_concrete with (uvc:=uv2) in Heqb; eauto;
+      rewrite Heqb.
+
+    apply lift_err_uvalue_to_dvalue_rutt; auto.
+
+    repeat rewrite bind_trigger.
+    apply rutt_Vis.
+
+    { constructor.
+      cbn.
+      split; auto.
+      admit. (* Need something *)
+    }
+
+    intros t1 t2 H.
+    apply rutt_Ret.
+    destruct t1, t2.
+    cbn in *.
+    destruct H; cbn in *.
+    { red in H.
+      destruct e1; cbn in *.
+      destruct d1; cbn in *.
+      admit. (* ???? *)
+    }
+    { destruct e2; cbn in *.
+      admit.
+      cbn in *.
+      destruct d2; cbn in *.
+      repeat (destruct s; try inv H).
+      admit.
+    }
+  Admitted.
+
   Lemma denote_mcfg_E1E2_rutt' :
     forall dfns1 dfns2 dt f1 f2 args1 args2,
       (Forall2 (dvalue_refine × function_denotation_refine) dfns1 dfns2) ->
@@ -4564,9 +4641,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (IS1.LLVM.D.denote_mcfg dfns1 dt f1 args1)
         (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2).
   Proof.
-    intros dfns1 dfns2 dt f1 f2 args1 args2 DFNS F1F2 ARGS.
+    intros dfns1 dfns2 dt f1 f2 args1 args2 DFNS F1F2 ARGS PRE12.
     unfold IS1.LLVM.D.denote_mcfg.
     unfold denote_mcfg.
+    cbn in PRE12.
+    destruct PRE12 as [DT [CONVf1f2 MAPM12]]; subst.
 
     eapply mrec_rutt with (RPreInv:=call_refine).
     { intros A B d1 d2 PRE.
@@ -4627,53 +4706,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
         rewrite LUP2.
         red in FDEN2.
-        specialize (FDEN2 args1 args2 ARGS).
-
-        Set Nested Proofs Allowed.
-        (* TODO: Should go in the library *)
-        Lemma rutt_weaken :
-          forall {E1 E2} {R1 R2}
-            (PRE1 PRE2 : prerel E1 E2)
-            (POST1 POST2 : postrel E1 E2)
-            (ResR1 ResR2 : R1 -> R2 -> Prop)
-            t1 t2,
-            rutt PRE1 POST1 ResR1 t1 t2 ->
-            (forall {A B} e1 e2, (PRE1 A B e1 e2 -> PRE2 _ _ e1 e2)) ->
-            (forall {A B} e1 r1 e2 r2, (POST2 A B e1 r1 e2 r2 -> POST1 _ _ e1 r1 e2 r2)) ->
-            (forall r1 r2, (ResR1 r1 r2 -> ResR2 r1 r2)) ->
-            rutt PRE2 POST2 ResR2 t1 t2.
-        Proof.
-          intros E1 E2 R1 R2 PRE1 PRE2 POST1 POST2 ResR1 ResR2.
-
-          Hint Resolve rutt_monot : paco.
-          Hint Constructors ruttF : itree.
-          Hint Unfold rutt_ : itree.
-          Hint Unfold rutt : itree.
-
-          pcofix CIH. pstep. intros t1 t2 RUTT. punfold RUTT.
-          red in RUTT |- *. induction RUTT; pclearbot; eauto 7 with paco itree.
-
-          intros H2 H3 H4.
-          constructor; auto.
-          intros a b H1.
-          apply H3 in H1.
-          apply H0 in H1.
-          pclearbot.
-          eauto with paco itree.
-        Qed.
-
-        assert (args0 = args2) as ARGS02.
-        { (* Should follow from ARGS and PRE *)
-          admit.
+        specialize (FDEN2 args args0).
+        forward FDEN2.
+        { apply map_monad_oom_forall2; tauto.
         }
-        subst.
 
-        assert (args1 = args) as ARGS1.
-        { (* Should follow from ARGS and PRE *)
-          (* May be trickier than previous one, though... *)
-          admit.
-        }
-        subst.
+        destruct PRE as [T [CONV MAPM]]; subst.
 
         eapply rutt_weaken; eauto.
         - intros A B e1 e2 H.
@@ -4684,7 +4722,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             destruct c.
             constructor.
             cbn.
-            destruct H as [T1T2 [CONV MAPM]]; subst.
+            destruct H as [T1T2 [CONV' MAPM']]; subst.
             auto.
           }
           destruct e2; [contradiction|].
@@ -4705,9 +4743,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           red in H6.
           red.
           auto.
-        - intros r0 r3 H.
-          red in H.
-          tauto.
       }
 
       eapply lookup_defn_none in Heqo; eauto.
@@ -4715,7 +4750,25 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       eapply rutt_bind with (RR:=Forall2 dvalue_refine).
       { (* Pick *)
-        admit.
+        destruct PRE as [T [CONV MAPM]].
+        apply map_monad_oom_forall2 in MAPM.
+        induction MAPM.
+        - cbn.
+          apply rutt_Ret; auto.
+        - do 2 rewrite map_monad_unfold.
+          cbn.
+          eapply rutt_bind with (RR:=dvalue_refine).
+          {
+            apply pickUnique_rutt; auto.
+          }
+
+          intros r0 r3 R0R3.
+          eapply rutt_bind with (RR:=Forall2 dvalue_refine);
+            eauto.
+
+          intros r4 r5 R4R5.
+          eapply rutt_Ret.
+          constructor; eauto.
       }
 
       intros r3 r4 R3R4.
@@ -4754,16 +4807,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       red in R0R5.
       apply dvalue_refine_dvalue_to_uvalue; auto.
     }
-  Admitted.
 
-  (* TODO: Should go in the library *)
-  (* EuttExtras.eutt_subrel *)
-  (* (LERR: RR <2= RR'): *)
-  (* Lemma rutt_res_weaken : *)
-  (*   forall {E1 E2} {R1 R2} (ER : E1 -> E2 -> Prop) EAns (ResR1 ResR2 : R1 -> R2 -> Prop) t1 t2, *)
-  (*     rutt ER EAns ResR1 t1 t2 -> *)
-  (*     (forall r1 r2, (ResR1 r1 r2 -> ResR2 r1 r2)) -> *)
-  (*     rutt ER EAns ResR2 t1 t2. *)
+    cbn. auto.
+  Qed.
 
   Lemma denote_mcfg_E1E2_rutt'_rutt :
     forall dfns1 dfns2 dt f1 f2 args1 args2,
@@ -4775,8 +4821,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2).
   Proof.
     intros dfns1 dfns2 dt f1 f2 args1 args2 H.
-    (* rutt_res_weaken *)
-  Admitted.
+    eapply rutt_weaken; eauto.
+    intros r1 r2 H0.
+    cbn in H0.
+    red. tauto.
+  Qed.
 
   Lemma denote_mcfg_E1E2_rutt :
     forall dfns1 dfns2 dt f1 f2 args1 args2,
@@ -4793,8 +4842,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     cbn.
     split; auto.
     split; auto.
-    admit.
-  Admitted.
+    apply map_monad_oom_forall2; auto.
+  Qed.
 
   Lemma model_E1E2_rutt_sound
     (p : list
@@ -4819,7 +4868,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     eapply rutt_bind.
 
     { apply denote_mcfg_E1E2_rutt; auto.
-      - admit.
+      - apply dvalue_refine_dvalue_to_uvalue; auto.
       - (* TODO: fold into main_args lemma probably *)
         unfold main_args.
         unfold LLVM1.main_args.
@@ -4838,14 +4887,21 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     intros r0 r5 H.
     eapply rutt_bind with (RR:=fun x y => dvalue_refine (proj1_sig x) (proj1_sig y)).
     { (* Pick *)
-      admit.
+      apply rutt_trigger.
+      { cbn.
+        split; auto.
+        admit. (* Probably need something about concretize *)
+      }
+
+      intros t1 t2 H0.
+      cbn in *.
+      destruct t1, t2; tauto.
     }
 
     intros r6 r7 H0.
     cbn.
     apply rutt_Ret; auto.
   Admitted.
-
 
   (* TODO: not sure about name... *)
   Definition model_E1E2_L0
