@@ -2697,7 +2697,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             | inl1 (E1.Call dt1 f1 args1), inl1 (E2.Call dt2 f2 args2) =>
                 _ (* Calls *)
             | inr1 e1, inr1 e2 =>
-                event_refine _ _ e1 e2
+                event_res_refine _ _ e1 res1 e2 res2
             | _, _ =>
                 False
             end).
@@ -2722,7 +2722,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inv c2.
       apply (t = t0 /\
                uvalue_convert f = NoOom f0 /\
-               (map_monad_In args (fun elt Hin => uvalue_convert elt)) = NoOom args0).
+               map_monad uvalue_convert args = NoOom args0).
     }
   Defined.
 
@@ -2733,7 +2733,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inv c2.
       apply (t = t0 /\
                uvalue_convert f = NoOom f0 /\
-               (map_monad_In args (fun elt Hin => uvalue_convert elt)) = NoOom args0 /\
+               map_monad uvalue_convert args = NoOom args0 /\
                uvalue_convert res1 = NoOom res2).
     }
   Defined.
@@ -4629,9 +4629,69 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         red in FDEN2.
         specialize (FDEN2 args1 args2 ARGS).
 
-        (* Need to figure out the situation with post / pre conditions
-           here... *)
-        admit.
+        Set Nested Proofs Allowed.
+        (* TODO: Should go in the library *)
+        (* EuttExtras.eutt_subrel *)
+        (* (LERR: RR <2= RR'): *)
+        Lemma rutt_weaken :
+          forall {E1 E2} {R1 R2}
+            (PRE1 PRE2 : prerel E1 E2)
+            (POST1 POST2 : postrel E1 E2)
+            (ResR1 ResR2 : R1 -> R2 -> Prop)
+            t1 t2,
+            rutt PRE1 POST1 ResR1 t1 t2 ->
+            (forall {A B} e1 e2, (PRE1 A B e1 e2 -> PRE2 _ _ e1 e2)) ->
+            (forall {A B} e1 r1 e2 r2, (POST1 A B e1 r1 e2 r2 -> POST2 _ _ e1 r1 e2 r2)) ->
+            (forall r1 r2, (ResR1 r1 r2 -> ResR2 r1 r2)) ->
+            rutt PRE2 POST2 ResR2 t1 t2.
+        Proof.
+        Admitted.
+
+        assert (args0 = args2) as ARGS02.
+        { (* Should follow from ARGS and PRE *)
+          admit.
+        }
+        subst.
+
+        assert (args1 = args) as ARGS1.
+        { (* Should follow from ARGS and PRE *)
+          (* May be trickier than previous one, though... *)
+          admit.
+        }
+        subst.
+
+        eapply rutt_weaken; eauto.
+        - intros A B e1 e2 H.
+          red in H.
+          destruct e1.
+          { destruct c.
+            destruct e2; [| tauto].
+            destruct c.
+            constructor.
+            cbn.
+            destruct H as [T1T2 [CONV MAPM]]; subst.
+            auto.
+          }
+          destruct e2; [contradiction|].
+
+          constructor.
+          auto.
+        - intros A B e1 r0 e2 r3 H.
+          red in H.
+          destruct e1.
+          { destruct c.
+            destruct e2; [|tauto].
+            destruct c.
+            constructor.
+            cbn in *.
+            auto.
+          }
+          destruct e2; [contradiction|].
+
+          constructor; auto.
+        - intros r0 r3 H.
+          red in H.
+          tauto.
       }
 
       eapply lookup_defn_none in Heqo; eauto.
