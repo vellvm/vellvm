@@ -4631,8 +4631,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
         Set Nested Proofs Allowed.
         (* TODO: Should go in the library *)
-        (* EuttExtras.eutt_subrel *)
-        (* (LERR: RR <2= RR'): *)
         Lemma rutt_weaken :
           forall {E1 E2} {R1 R2}
             (PRE1 PRE2 : prerel E1 E2)
@@ -4641,11 +4639,28 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             t1 t2,
             rutt PRE1 POST1 ResR1 t1 t2 ->
             (forall {A B} e1 e2, (PRE1 A B e1 e2 -> PRE2 _ _ e1 e2)) ->
-            (forall {A B} e1 r1 e2 r2, (POST1 A B e1 r1 e2 r2 -> POST2 _ _ e1 r1 e2 r2)) ->
+            (forall {A B} e1 r1 e2 r2, (POST2 A B e1 r1 e2 r2 -> POST1 _ _ e1 r1 e2 r2)) ->
             (forall r1 r2, (ResR1 r1 r2 -> ResR2 r1 r2)) ->
             rutt PRE2 POST2 ResR2 t1 t2.
         Proof.
-        Admitted.
+          intros E1 E2 R1 R2 PRE1 PRE2 POST1 POST2 ResR1 ResR2.
+
+          Hint Resolve rutt_monot : paco.
+          Hint Constructors ruttF : itree.
+          Hint Unfold rutt_ : itree.
+          Hint Unfold rutt : itree.
+
+          pcofix CIH. pstep. intros t1 t2 RUTT. punfold RUTT.
+          red in RUTT |- *. induction RUTT; pclearbot; eauto 7 with paco itree.
+
+          intros H2 H3 H4.
+          constructor; auto.
+          intros a b H1.
+          apply H3 in H1.
+          apply H0 in H1.
+          pclearbot.
+          eauto with paco itree.
+        Qed.
 
         assert (args0 = args2) as ARGS02.
         { (* Should follow from ARGS and PRE *)
@@ -4677,18 +4692,19 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           constructor.
           auto.
         - intros A B e1 r0 e2 r3 H.
-          red in H.
-          destruct e1.
-          { destruct c.
-            destruct e2; [|tauto].
-            destruct c.
-            constructor.
-            cbn in *.
-            auto.
-          }
-          destruct e2; [contradiction|].
+          inv H.
+          apply inj_pair2 in H0, H3, H4, H5; subst.
+          red in H6.
+          red.
+          auto.
+          destruct e0.
+          destruct d1.
+          auto.
 
-          constructor; auto.
+          apply inj_pair2 in H0, H3, H4, H5; subst.
+          red in H6.
+          red.
+          auto.
         - intros r0 r3 H.
           red in H.
           tauto.
