@@ -3294,8 +3294,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     apply GlobalRead_L0_E1E2_rutt.
 
     intros r1 r2 R1R2.
-
-    (* Universe problem?? *)
     apply rutt_Ret.
 
     constructor.
@@ -3475,11 +3473,22 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       IS1.LP.Events.DV.is_concrete uv = b ->
       IS2.LP.Events.DV.is_concrete uvc = b.
   Proof.
-    intros uv uvc b UVC CONC.
-    induction uv; cbn in *; inv CONC;
+    induction uv using IS1.LP.Events.DV.uvalue_ind';
+      intros uvc b UVC CONC; cbn in *;
       rewrite uvalue_convert_equation in UVC;
       try
         solve [ cbn in UVC; inv UVC; cbn; auto
+              | subst;
+                cbn in UVC;
+                break_match_hyp; inv UVC;
+                break_match_hyp; inv H0;
+                cbn; auto
+              | inv CONC; subst;
+                cbn in UVC;
+                break_match_hyp; inv UVC;
+                break_match_hyp; inv H1;
+                break_match_hyp; inv H2;
+                cbn; auto
               | cbn in UVC;
                 break_match_hyp; inv UVC;
                 cbn; auto
@@ -3488,7 +3497,284 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                 break_match_hyp; inv H1;
                 cbn; auto
         ].
-  Admitted.
+
+    - (* Structs *)
+      rewrite map_monad_In_unfold in UVC.
+      cbn in UVC.
+      break_inner_match_hyp; inv UVC.
+      break_inner_match_hyp; inv H0.
+      cbn.
+
+      destruct (IS1.LP.Events.DV.is_concrete uv) eqn:UVB.
+      + cbn in *.
+        specialize (IHuv u true eq_refl eq_refl).
+        rewrite IHuv.
+        cbn.
+
+        destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB.
+        * specialize (IHuv0 (UVALUE_Struct l) true).
+          forward IHuv0.
+          { rewrite uvalue_convert_equation.
+            rewrite Heqo0.
+            cbn.
+            reflexivity.
+          }
+          specialize (IHuv0 eq_refl).
+
+          cbn in IHuv0.
+          auto.
+        * specialize (IHuv0 (UVALUE_Struct l) false).
+          forward IHuv0.
+          { rewrite uvalue_convert_equation.
+            rewrite Heqo0.
+            cbn.
+            reflexivity.
+          }
+          specialize (IHuv0 eq_refl).
+
+          cbn in IHuv0.
+          auto.
+      + cbn in *.
+        specialize (IHuv u false eq_refl eq_refl).
+        rewrite IHuv.
+        cbn.
+
+        destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB.
+        * specialize (IHuv0 (UVALUE_Struct l) true).
+          forward IHuv0.
+          { rewrite uvalue_convert_equation.
+            rewrite Heqo0.
+            cbn.
+            reflexivity.
+          }
+          specialize (IHuv0 eq_refl).
+
+          cbn in IHuv0.
+          auto.
+        * specialize (IHuv0 (UVALUE_Struct l) false).
+          forward IHuv0.
+          { rewrite uvalue_convert_equation.
+            rewrite Heqo0.
+            cbn.
+            reflexivity.
+          }
+          specialize (IHuv0 eq_refl).
+
+          cbn in IHuv0.
+          auto.
+    - (* Packed structs *)
+      rewrite map_monad_In_unfold in UVC.
+      cbn in UVC.
+      break_inner_match_hyp; inv UVC.
+      break_inner_match_hyp; inv H0.
+      cbn.
+
+      destruct (IS1.LP.Events.DV.is_concrete uv) eqn:UVB.
+      + cbn in *.
+        specialize (IHuv u true eq_refl eq_refl).
+        rewrite IHuv.
+        cbn.
+
+        destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB.
+        * specialize (IHuv0 (UVALUE_Packed_struct l) true).
+          forward IHuv0.
+          { rewrite uvalue_convert_equation.
+            rewrite Heqo0.
+            cbn.
+            reflexivity.
+          }
+          specialize (IHuv0 eq_refl).
+
+          cbn in IHuv0.
+          auto.
+        * specialize (IHuv0 (UVALUE_Packed_struct l) false).
+          forward IHuv0.
+          { rewrite uvalue_convert_equation.
+            rewrite Heqo0.
+            cbn.
+            reflexivity.
+          }
+          specialize (IHuv0 eq_refl).
+
+          cbn in IHuv0.
+          auto.
+      + cbn in *.
+        specialize (IHuv u false eq_refl eq_refl).
+        rewrite IHuv.
+        cbn.
+
+        destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB.
+        * specialize (IHuv0 (UVALUE_Packed_struct l) true).
+          forward IHuv0.
+          { rewrite uvalue_convert_equation.
+            rewrite Heqo0.
+            cbn.
+            reflexivity.
+          }
+          specialize (IHuv0 eq_refl).
+
+          cbn in IHuv0.
+          auto.
+        * specialize (IHuv0 (UVALUE_Packed_struct l) false).
+          forward IHuv0.
+          { rewrite uvalue_convert_equation.
+            rewrite Heqo0.
+            cbn.
+            reflexivity.
+          }
+          specialize (IHuv0 eq_refl).
+
+          cbn in IHuv0.
+          auto.
+    - (* Arrays *)
+      rewrite map_monad_In_unfold in UVC.
+      cbn in UVC.
+      break_inner_match_hyp; inv UVC.
+      break_inner_match_hyp; inv H0.
+      cbn.
+
+      destruct (IS1.LP.Events.DV.is_concrete uv) eqn:UVB.
+      + cbn in *.
+        specialize (IHuv u true eq_refl eq_refl).
+        rewrite IHuv.
+        cbn.
+
+        destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB.
+        * specialize (IHuv0 (UVALUE_Array l) true).
+          forward IHuv0.
+          { rewrite uvalue_convert_equation.
+            rewrite Heqo0.
+            cbn.
+            reflexivity.
+          }
+          specialize (IHuv0 eq_refl).
+
+          cbn in IHuv0.
+          auto.
+        * specialize (IHuv0 (UVALUE_Array l) false).
+          forward IHuv0.
+          { rewrite uvalue_convert_equation.
+            rewrite Heqo0.
+            cbn.
+            reflexivity.
+          }
+          specialize (IHuv0 eq_refl).
+
+          cbn in IHuv0.
+          auto.
+      + cbn in *.
+        specialize (IHuv u false eq_refl eq_refl).
+        rewrite IHuv.
+        cbn.
+
+        destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB.
+        * specialize (IHuv0 (UVALUE_Array l) true).
+          forward IHuv0.
+          { rewrite uvalue_convert_equation.
+            rewrite Heqo0.
+            cbn.
+            reflexivity.
+          }
+          specialize (IHuv0 eq_refl).
+
+          cbn in IHuv0.
+          auto.
+        * specialize (IHuv0 (UVALUE_Array l) false).
+          forward IHuv0.
+          { rewrite uvalue_convert_equation.
+            rewrite Heqo0.
+            cbn.
+            reflexivity.
+          }
+          specialize (IHuv0 eq_refl).
+
+          cbn in IHuv0.
+          auto.
+    - (* Vectors *)
+      rewrite map_monad_In_unfold in UVC.
+      cbn in UVC.
+      break_inner_match_hyp; inv UVC.
+      break_inner_match_hyp; inv H0.
+      cbn.
+
+      destruct (IS1.LP.Events.DV.is_concrete uv) eqn:UVB.
+      + cbn in *.
+        specialize (IHuv u true eq_refl eq_refl).
+        rewrite IHuv.
+        cbn.
+
+        destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB.
+        * specialize (IHuv0 (UVALUE_Vector l) true).
+          forward IHuv0.
+          { rewrite uvalue_convert_equation.
+            rewrite Heqo0.
+            cbn.
+            reflexivity.
+          }
+          specialize (IHuv0 eq_refl).
+
+          cbn in IHuv0.
+          auto.
+        * specialize (IHuv0 (UVALUE_Vector l) false).
+          forward IHuv0.
+          { rewrite uvalue_convert_equation.
+            rewrite Heqo0.
+            cbn.
+            reflexivity.
+          }
+          specialize (IHuv0 eq_refl).
+
+          cbn in IHuv0.
+          auto.
+      + cbn in *.
+        specialize (IHuv u false eq_refl eq_refl).
+        rewrite IHuv.
+        cbn.
+
+        destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB.
+        * specialize (IHuv0 (UVALUE_Vector l) true).
+          forward IHuv0.
+          { rewrite uvalue_convert_equation.
+            rewrite Heqo0.
+            cbn.
+            reflexivity.
+          }
+          specialize (IHuv0 eq_refl).
+
+          cbn in IHuv0.
+          auto.
+        * specialize (IHuv0 (UVALUE_Vector l) false).
+          forward IHuv0.
+          { rewrite uvalue_convert_equation.
+            rewrite Heqo0.
+            cbn.
+            reflexivity.
+          }
+          specialize (IHuv0 eq_refl).
+
+          cbn in IHuv0.
+          auto.
+
+    (* Not sure why these ones didn't get solved above *)
+    - inv CONC; subst;
+        cbn in UVC;
+        break_match_hyp; inv UVC;
+        break_match_hyp; inv H1;
+        break_match_hyp; inv H2;
+        cbn; auto.
+    - inv CONC; subst;
+        cbn in UVC;
+        break_match_hyp; inv UVC;
+        break_match_hyp; inv H1;
+        break_match_hyp; inv H2;
+        cbn; auto.
+    - inv CONC; subst;
+        cbn in UVC;
+        break_match_hyp; inv UVC;
+        break_match_hyp; inv H1;
+        break_match_hyp; inv H2;
+        cbn; auto.
+  Qed.
 
   (* TODO: move these? *)
   Lemma lookup_defn_some_refine :
