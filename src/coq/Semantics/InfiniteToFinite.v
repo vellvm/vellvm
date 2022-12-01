@@ -6,6 +6,8 @@ From Coq Require Import
      ZArith
      Morphisms.
 
+Require Import Coq.Logic.ProofIrrelevance.
+
 From Vellvm Require Import
      Semantics.InterpretationStack
      Semantics.LLVMEvents
@@ -55,6 +57,12 @@ Module Type AddrConvert (ADDR1 : ADDRESS) (ADDR2 : ADDRESS).
   Parameter addr_convert : ADDR1.addr -> OOM ADDR2.addr.
   Parameter addr_convert_null :
     addr_convert ADDR1.null = NoOom ADDR2.null.
+
+  Parameter addr_convert_injective :
+    forall a b c,
+      addr_convert a = NoOom c ->
+      addr_convert b = NoOom c ->
+      a = b.
 End AddrConvert.
 
 Module InfToFinAddrConvert : AddrConvert InfAddr FinAddr
@@ -79,6 +87,42 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma addr_convert_injective :
+  forall a b c,
+    addr_convert a = NoOom c ->
+    addr_convert b = NoOom c ->
+    a = b.
+Proof.
+  intros a b c AC BC.
+  unfold addr_convert in *.
+  destruct a, b.
+  unfold FinITOP.int_to_ptr in *.
+  break_match_hyp; inv BC.
+  break_match_hyp; inv AC.
+  induction i, i0;
+    cbn in *; auto; inv Heqb0.
+
+  {
+    break_match.
+    break_match.
+    subst.
+
+    pose proof proof_irrelevance _ intrange intrange0; subst.
+    rewrite <- Heqi in Heqi0.
+    exfalso.
+
+    inversion Heqi0.
+
+    pose proof Int64.eq_spec (Int64.repr (Z.pos p)) (Int64.repr 0).
+    inv Heqi0.
+    break_match.
+    break_match.
+    subst.
+    inv Heqi.
+    admit.
+  }
+Admitted.
+
 End InfToFinAddrConvert.
 
 Module FinToInfAddrConvert : AddrConvert FinAddr InfAddr
@@ -100,6 +144,24 @@ Lemma addr_convert_null :
 Proof.
   unfold addr_convert.
   cbn.
+  reflexivity.
+Qed.
+
+Lemma addr_convert_injective :
+  forall a b c,
+    addr_convert a = NoOom c ->
+    addr_convert b = NoOom c ->
+    a = b.
+Proof.
+  intros a b c AC BC.
+  unfold addr_convert in *.
+  destruct a, b.
+  inv AC. inv BC.
+  unfold Int64.unsigned in *.
+  destruct i0, i.
+  cbn in *.
+  inv H0.
+  pose proof proof_irrelevance _ intrange intrange0; subst.
   reflexivity.
 Qed.
 
@@ -3776,6 +3838,136 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         cbn; auto.
   Qed.
 
+  (* Typeclass? *)
+  (* Deterministic...? *)
+  (* Inversion? *)
+  Definition R2_injective
+    {R1 R2} (RR : R1 -> R2 -> Prop) : Prop :=
+    forall (r1 : R1) (r2 : R2) a b,
+      RR r1 r2 ->
+      RR a b ->
+      a = r1 <-> b = r2.
+
+  Lemma dvalue_refine_R2_injective :
+    R2_injective dvalue_refine.
+  Proof.
+    red.
+    intros r1 r2 a b R1R2 AB.
+    split; intros EQ; subst.
+    - unfold dvalue_refine in *.
+      rewrite R1R2 in AB. inv AB.
+      auto.
+    - unfold dvalue_refine in *.
+      generalize dependent r2.
+      induction r1, a; intros r2 R1R2 AB;
+        try
+          solve
+          [ rewrite dvalue_convert_equation in R1R2, AB;
+            cbn in *;
+            break_match_hyp; inv AB;
+            break_match_hyp; inv R1R2;
+            pose proof (AC1.addr_convert_injective _ _ _ Heqo0 Heqo);
+            subst; auto
+          | rewrite dvalue_convert_equation in R1R2, AB;
+            cbn in *;
+            break_match_hyp; inv R1R2;
+            inv AB
+          | rewrite dvalue_convert_equation in R1R2, AB;
+            cbn in *;
+            inv AB; inv R1R2; auto
+          | rewrite dvalue_convert_equation in R1R2, AB;
+            cbn in *;
+            break_match_hyp; inv AB;
+            break_match_hyp; inv R1R2;
+            apply IP.from_Z_to_Z in Heqo, Heqo0;
+            rewrite Heqo in Heqo0;
+            apply IS1.LP.IP.to_Z_inj in Heqo0;
+            subst;
+            auto
+          ].
+
+      { rewrite dvalue_convert_equation in R1R2, AB;
+          cbn in *.
+
+        break_match_hyp; inv AB.
+        break_match_hyp; inv R1R2.
+        admit.
+      }
+  Admitted.
+
+  Lemma assoc_similar_lookup :
+    forall {A B C D}
+      `{RDA : @RelDec.RelDec A eq}
+      `{RDC : @RelDec.RelDec C eq}
+      `{RDCA : @RelDec.RelDec_Correct _ _ RDA}
+      `{RDCC : @RelDec.RelDec_Correct _ _ RDC}
+      (RAC : A -> C -> Prop)
+      (RBD : B -> D -> Prop)
+      (xs : list (A * B)%type)
+      (ys : list (C * D)%type)
+      a b,
+      R2_injective RAC ->
+      Forall2 (RAC × RBD) xs ys ->
+      assoc a xs = Some b ->
+      exists c d i,
+        assoc c ys = Some d /\
+          Nth xs i (a, b) /\
+          Nth ys i (c, d).
+  Proof.
+    intros A B C D RDA RDC RDCA RDCC RAC RBD xs.
+    induction xs, ys; intros a' b' RINJ ALL ASSOC.
+    - cbn in *; inv ASSOC.
+    - cbn in *; inv ASSOC.
+    - inv ALL.
+    - inv ALL.
+      cbn in ASSOC.
+      destruct a.
+      break_match_hyp.
+      + assert (a' = a) as AA by
+            (eapply RelDec.rel_dec_correct; eauto);
+          subst.
+
+        inv ASSOC.
+        destruct p.
+        inv H2.
+        cbn in *.
+
+        red in RINJ.
+        exists c. exists d. exists 0%nat.
+        rewrite RelDec.rel_dec_eq_true; auto.
+      + specialize (IHxs _ _ _ RINJ H4 ASSOC).
+        destruct IHxs as [c [d [i [ASSOC' [NTH1 NTH2]]]]].
+        exists c. exists d. exists (S i).
+        cbn.
+        break_inner_match_goal.
+        subst.
+        cbn in *.
+        break_inner_match_goal.
+        { (* c = c0 *)
+          (* Should be a contradiction using RINJ, Heqb0, and Heqb1 *)
+          inv H2.
+          cbn in *.
+
+          assert (c = c0) as CC by
+              (eapply RelDec.rel_dec_correct; eauto).
+
+          red in RINJ.
+          apply Forall2_forall in H4 as [LEN NTH].
+          specialize (NTH _ _ _ NTH1 NTH2).
+          inv NTH.
+          cbn in *.
+
+          assert (a' = a).
+          { eapply RINJ; eauto. }
+          subst.
+
+          eapply RelDec.neg_rel_dec_correct in Heqb0.
+          contradiction.
+        }
+
+        tauto.
+  Qed.
+
   (* TODO: move these? *)
   Lemma lookup_defn_some_refine :
     forall dfns1 dfns2 r1 r2 f_den1,
@@ -3792,7 +3984,91 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     apply Forall2_forall in NTH as [LEN NTH].
 
     (* Tricky assoc stuff... *)
-  Admitted.
+    (* lookup_defn uses assoc and it uses RelDec to determine if
+       dvalues are equal.
+
+       I need to know that dvalue_refine preserves this equality
+       relation.
+
+       I.e.,
+
+       dvalue_refine r1 r2 ->
+       dvalue_refine a b ->
+       eq a r1 <-> eq b r2
+
+     *)
+
+    pose proof LUP as LUP'.
+    eapply assoc_similar_lookup with
+      (xs:=dfns1) (ys:=dfns2) (a:=r1) (b:=f_den1) in LUP';
+      eauto.
+    2: {
+      apply dvalue_refine_R2_injective.
+    }
+
+    destruct LUP' as [c [d [i [ASSOC [NTH1 NTH2]]]]].
+    exists d.
+
+    pose proof (NTH i (r1, f_den1) (c, d) NTH1 NTH2).
+    inv H; cbn in *.
+    split; auto.
+
+    assert (c = r2) as CR2.
+    { eapply dvalue_refine_R2_injective; eauto.
+    }
+
+    subst.
+    auto.
+  Qed.
+
+  Lemma assoc_similar_no_lookup :
+    forall {A B C D}
+      `{RDA : @RelDec.RelDec A eq}
+      `{RDC : @RelDec.RelDec C eq}
+      `{RDCA : @RelDec.RelDec_Correct _ _ RDA}
+      `{RDCC : @RelDec.RelDec_Correct _ _ RDC}
+      (RAC : A -> C -> Prop)
+      (RBD : B -> D -> Prop)
+      (xs : list (A * B)%type)
+      (ys : list (C * D)%type)
+      a,
+      R2_injective RAC ->
+      Forall2 (RAC × RBD) xs ys ->
+      assoc a xs = None ->
+      forall c,
+        RAC a c ->
+        assoc c ys = None.
+  Proof.
+    intros A B C D RDA RDC RDCA RDCC RAC RBD xs.
+    induction xs, ys; intros a' RINJ ALL ASSOC.
+    - cbn in *; auto.
+    - cbn in *; inv ALL.
+    - inv ALL.
+    - inv ALL.
+      cbn in ASSOC.
+      destruct a.
+      break_match_hyp.
+      + inv ASSOC.
+      + specialize (IHxs _ _ RINJ H4 ASSOC).
+        intros c H.
+        specialize (IHxs _ H).
+        inv H2.
+        cbn in *.
+        destruct p; cbn in *.
+        break_match.
+        { assert (c = c0) as CC by
+              (eapply RelDec.rel_dec_correct; eauto).
+          subst.
+          exfalso.
+
+          red in RINJ.
+          pose proof RINJ _ _ _ _ H fst_rel.
+          apply RelDec.neg_rel_dec_correct in Heqb0.
+          apply Heqb0.
+          symmetry; apply H0; auto.
+        }
+        auto.
+  Qed.
 
   Lemma lookup_defn_none :
     forall dfns1 dfns2 r1 r2,
@@ -3801,7 +4077,31 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       IS1.LLVM.D.lookup_defn r1 dfns1 = None ->
       IS2.LLVM.D.lookup_defn r2 dfns2 = None.
   Proof.
-  Admitted.
+    intros dfns1 dfns2 r1 r2 ALL.
+    revert r1. revert r2.
+    induction ALL; intros r2 r1 REF LUP;
+      cbn in *; auto.
+
+    destruct x, y.
+    cbn in *.
+
+    inv H.
+    cbn in *.
+
+    break_match_hyp; inv LUP.
+    eapply RelDec.neg_rel_dec_correct in Heqb.
+    pose proof dvalue_refine_R2_injective _ _ _ _ REF fst_rel.
+    assert (d0 <> r2).
+    { intros D0R2.
+      apply H in D0R2; auto.
+    }
+    { assert (r2 <> d0) by auto.
+      apply RelDec.neg_rel_dec_correct in H2.
+      rewrite H2.
+      eapply assoc_similar_no_lookup with (xs:=l) (RAC:=dvalue_refine); eauto.
+      apply dvalue_refine_R2_injective.
+    }
+  Qed.
 
   (* TODO: Move this? *)
   Lemma dvalue_refine_dvalue_to_uvalue :
