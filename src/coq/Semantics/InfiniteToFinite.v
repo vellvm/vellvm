@@ -113,12 +113,14 @@ Proof.
 
     inversion Heqi0.
 
-    pose proof Int64.eq_spec (Int64.repr (Z.pos p)) (Int64.repr 0).
     inv Heqi0.
     break_match.
     break_match.
     subst.
     inv Heqi.
+    Transparent Int64.repr.
+    unfold Int64.repr in *.
+    Opaque Int64.repr.
     admit.
   }
 Admitted.
@@ -3072,6 +3074,208 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Proof.
   Admitted.
 
+  (* TODO: Move this? *)
+  Lemma dvalue_refine_dvalue_to_uvalue :
+    forall dv1 dv2,
+      dvalue_refine dv1 dv2 ->
+      uvalue_refine (IS1.LP.Events.DV.dvalue_to_uvalue dv1) (IS2.LP.Events.DV.dvalue_to_uvalue dv2).
+  Proof.
+    induction dv1; intros dv2 REF;
+      red in REF;
+      rewrite dvalue_convert_equation in REF;
+      try
+        solve [
+          cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn;
+          first [ break_match_hyp; inv REF
+                | inv REF
+            ];
+          cbn; auto
+        ].
+    - (* Structs *)
+      cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn.
+      break_match_hyp; inv REF.
+      generalize dependent l.
+      induction fields; intros l Heqo.
+      { cbn in *.
+        inv Heqo.
+        cbn.
+        reflexivity.
+      }
+      { rewrite map_monad_In_unfold in Heqo.
+        rewrite map_cons.
+        rewrite map_monad_In_unfold.
+
+        cbn in *.
+        destruct (dvalue_convert a) eqn:A; inv Heqo.
+        pose proof (H a) as AIND.
+        forward AIND; auto.
+        specialize (AIND _ A).
+        red in AIND.
+        rewrite AIND.
+
+        forward IHfields.
+        { intros u H0 dv2 H2.
+          eauto.
+        }
+
+        break_match_hyp; inv H1.
+        specialize (IHfields l0 eq_refl).
+        break_match_hyp; inv IHfields.
+        cbn.
+        reflexivity.
+      }
+    - (* Packed structs *)
+      cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn.
+      break_match_hyp; inv REF.
+      generalize dependent l.
+      induction fields; intros l Heqo.
+      { cbn in *.
+        inv Heqo.
+        cbn.
+        reflexivity.
+      }
+      { rewrite map_monad_In_unfold in Heqo.
+        rewrite map_cons.
+        rewrite map_monad_In_unfold.
+
+        cbn in *.
+        destruct (dvalue_convert a) eqn:A; inv Heqo.
+        pose proof (H a) as AIND.
+        forward AIND; auto.
+        specialize (AIND _ A).
+        red in AIND.
+        rewrite AIND.
+
+        forward IHfields.
+        { intros u H0 dv2 H2.
+          eauto.
+        }
+
+        break_match_hyp; inv H1.
+        specialize (IHfields l0 eq_refl).
+        break_match_hyp; inv IHfields.
+        cbn.
+        reflexivity.
+      }
+    - (* Arrays *)
+      cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn.
+      break_match_hyp; inv REF.
+      generalize dependent l.
+      induction elts; intros l Heqo.
+      { cbn in *.
+        inv Heqo.
+        cbn.
+        reflexivity.
+      }
+      { rewrite map_monad_In_unfold in Heqo.
+        rewrite map_cons.
+        rewrite map_monad_In_unfold.
+
+        cbn in *.
+        destruct (dvalue_convert a) eqn:A; inv Heqo.
+        pose proof (H a) as AIND.
+        forward AIND; auto.
+        specialize (AIND _ A).
+        red in AIND.
+        rewrite AIND.
+
+        forward IHelts.
+        { intros u H0 dv2 H2.
+          eauto.
+        }
+
+        break_match_hyp; inv H1.
+        specialize (IHelts l0 eq_refl).
+        break_match_hyp; inv IHelts.
+        cbn.
+        reflexivity.
+      }
+    - (* Vectors *)
+      cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn.
+      break_match_hyp; inv REF.
+      generalize dependent l.
+      induction elts; intros l Heqo.
+      { cbn in *.
+        inv Heqo.
+        cbn.
+        reflexivity.
+      }
+      { rewrite map_monad_In_unfold in Heqo.
+        rewrite map_cons.
+        rewrite map_monad_In_unfold.
+
+        cbn in *.
+        destruct (dvalue_convert a) eqn:A; inv Heqo.
+        pose proof (H a) as AIND.
+        forward AIND; auto.
+        specialize (AIND _ A).
+        red in AIND.
+        rewrite AIND.
+
+        forward IHelts.
+        { intros u H0 dv2 H2.
+          eauto.
+        }
+
+        break_match_hyp; inv H1.
+        specialize (IHelts l0 eq_refl).
+        break_match_hyp; inv IHelts.
+        cbn.
+        reflexivity.
+      }
+  Qed.
+
+  Hint Resolve dvalue_refine_dvalue_to_uvalue : DVALUE_REFINE.
+
+  Lemma translate_LU_to_exp_lookup_id_rutt :
+    forall id : LLVMAst.ident,
+      rutt exp_E_refine exp_E_res_refine uvalue_refine
+        (translate IS1.LP.Events.LU_to_exp (IS1.LLVM.D.lookup_id id)) (translate LU_to_exp (lookup_id id)).
+  Proof.
+    intros id.
+    destruct id.
+    - cbn.
+      repeat rewrite translate_bind.
+      repeat rewrite translate_trigger.
+      repeat setoid_rewrite translate_ret.
+
+      repeat rewrite bind_trigger.
+      apply rutt_Vis;
+        cbn; auto.
+
+      intros * ?.
+      apply rutt_Ret.
+      apply dvalue_refine_dvalue_to_uvalue.
+      tauto.
+    - cbn.
+      repeat rewrite translate_bind.
+      repeat rewrite translate_trigger.
+      repeat setoid_rewrite translate_ret.
+
+      repeat rewrite bind_trigger.
+      apply rutt_Vis;
+        cbn; auto.
+
+      intros * ?.
+      apply rutt_Ret.
+      tauto.
+  Qed.
+
+  (* TODO: generalize *)
+  Lemma rutt_raise :
+    forall {E1 E2 : Type -> Type} {R1 R2 : Type} `{FailureE -< E1} `{FailureE -< E2}
+      {PRE : prerel E1 E2} {POST : postrel E1 E2} {R1R2 : R1 -> R2 -> Prop}
+      msg1 msg2,
+      PRE void void (subevent void (Throw msg1)) (subevent void (Throw msg2)) ->
+      rutt PRE POST R1R2 (LLVMEvents.raise msg1) (LLVMEvents.raise msg2).
+  Proof.
+    intros E1 E2 R1 R2 FAIL1 FAIL2 PRE POST R1R2 msg1 msg2 PRETHROW.
+    unfold LLVMEvents.raise.
+    repeat rewrite bind_trigger.
+    apply rutt_Vis; auto.
+    intros [] [] _.
+  Qed.
+
   Lemma denote_exp_E1E2_rutt :
     forall e odt,
       rutt exp_E_refine
@@ -3080,7 +3284,41 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (IS2.LLVM.D.denote_exp odt e).
   Proof.
     intros e odt.
-    (* induction e. *) (* Ugh *)
+    induction e using AstLib.exp_ind.
+    - apply translate_LU_to_exp_lookup_id_rutt.
+    - destruct odt as [dt | ].
+      { destruct dt; cbn;
+          try solve [ apply rutt_raise; cbn; auto ].
+
+
+        { (* Normal integers *)
+          pose proof (@IX_supported_dec sz)
+            as [SUPPORTED | UNSUPPORTED];
+            [
+              inv SUPPORTED;
+              repeat rewrite map_ret;
+              apply rutt_Ret;
+              cbn;
+              unfold uvalue_refine;
+              rewrite uvalue_convert_equation;
+              reflexivity
+            |
+              repeat rewrite unsupported_cases_match; auto;
+              repeat rewrite Raise.raise_map_itree;
+              apply rutt_raise; cbn; auto
+            ].
+        }
+
+        { (* Intptrs *)
+          repeat rewrite map_bind.
+          eapply rutt_bind.
+          unfold lift_OOM.
+          { unfold VellvmIntegers.mrepr.
+            admit.
+          }
+          admit.
+        }
+      }
   Admitted.
 
   Lemma GlobalRead_exp_E_E1E2_rutt :
@@ -4103,157 +4341,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Qed.
 
-  (* TODO: Move this? *)
-  Lemma dvalue_refine_dvalue_to_uvalue :
-    forall dv1 dv2,
-      dvalue_refine dv1 dv2 ->
-      uvalue_refine (IS1.LP.Events.DV.dvalue_to_uvalue dv1) (IS2.LP.Events.DV.dvalue_to_uvalue dv2).
-  Proof.
-    induction dv1; intros dv2 REF;
-      red in REF;
-      rewrite dvalue_convert_equation in REF;
-      try
-        solve [
-          cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn;
-          first [ break_match_hyp; inv REF
-                | inv REF
-            ];
-          cbn; auto
-        ].
-    - (* Structs *)
-      cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn.
-      break_match_hyp; inv REF.
-      generalize dependent l.
-      induction fields; intros l Heqo.
-      { cbn in *.
-        inv Heqo.
-        cbn.
-        reflexivity.
-      }
-      { rewrite map_monad_In_unfold in Heqo.
-        rewrite map_cons.
-        rewrite map_monad_In_unfold.
-
-        cbn in *.
-        destruct (dvalue_convert a) eqn:A; inv Heqo.
-        pose proof (H a) as AIND.
-        forward AIND; auto.
-        specialize (AIND _ A).
-        red in AIND.
-        rewrite AIND.
-
-        forward IHfields.
-        { intros u H0 dv2 H2.
-          eauto.
-        }
-
-        break_match_hyp; inv H1.
-        specialize (IHfields l0 eq_refl).
-        break_match_hyp; inv IHfields.
-        cbn.
-        reflexivity.
-      }
-    - (* Packed structs *)
-      cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn.
-      break_match_hyp; inv REF.
-      generalize dependent l.
-      induction fields; intros l Heqo.
-      { cbn in *.
-        inv Heqo.
-        cbn.
-        reflexivity.
-      }
-      { rewrite map_monad_In_unfold in Heqo.
-        rewrite map_cons.
-        rewrite map_monad_In_unfold.
-
-        cbn in *.
-        destruct (dvalue_convert a) eqn:A; inv Heqo.
-        pose proof (H a) as AIND.
-        forward AIND; auto.
-        specialize (AIND _ A).
-        red in AIND.
-        rewrite AIND.
-
-        forward IHfields.
-        { intros u H0 dv2 H2.
-          eauto.
-        }
-
-        break_match_hyp; inv H1.
-        specialize (IHfields l0 eq_refl).
-        break_match_hyp; inv IHfields.
-        cbn.
-        reflexivity.
-      }
-    - (* Arrays *)
-      cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn.
-      break_match_hyp; inv REF.
-      generalize dependent l.
-      induction elts; intros l Heqo.
-      { cbn in *.
-        inv Heqo.
-        cbn.
-        reflexivity.
-      }
-      { rewrite map_monad_In_unfold in Heqo.
-        rewrite map_cons.
-        rewrite map_monad_In_unfold.
-
-        cbn in *.
-        destruct (dvalue_convert a) eqn:A; inv Heqo.
-        pose proof (H a) as AIND.
-        forward AIND; auto.
-        specialize (AIND _ A).
-        red in AIND.
-        rewrite AIND.
-
-        forward IHelts.
-        { intros u H0 dv2 H2.
-          eauto.
-        }
-
-        break_match_hyp; inv H1.
-        specialize (IHelts l0 eq_refl).
-        break_match_hyp; inv IHelts.
-        cbn.
-        reflexivity.
-      }
-    - (* Vectors *)
-      cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn.
-      break_match_hyp; inv REF.
-      generalize dependent l.
-      induction elts; intros l Heqo.
-      { cbn in *.
-        inv Heqo.
-        cbn.
-        reflexivity.
-      }
-      { rewrite map_monad_In_unfold in Heqo.
-        rewrite map_cons.
-        rewrite map_monad_In_unfold.
-
-        cbn in *.
-        destruct (dvalue_convert a) eqn:A; inv Heqo.
-        pose proof (H a) as AIND.
-        forward AIND; auto.
-        specialize (AIND _ A).
-        red in AIND.
-        rewrite AIND.
-
-        forward IHelts.
-        { intros u H0 dv2 H2.
-          eauto.
-        }
-
-        break_match_hyp; inv H1.
-        specialize (IHelts l0 eq_refl).
-        break_match_hyp; inv IHelts.
-        cbn.
-        reflexivity.
-      }
-  Qed.
-
   (* TODO: Move these? *)
   Lemma uvalue_to_dvalue_dvalue_refine :
     forall uv1 uv2 dv1,
@@ -5096,21 +5183,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         }
   Qed.
 
-  (* TODO: generalize *)
-  Lemma rutt_raise :
-    forall {E1 E2 : Type -> Type} {R1 R2 : Type} `{FailureE -< E1} `{FailureE -< E2}
-      {PRE : prerel E1 E2} {POST : postrel E1 E2} {R1R2 : R1 -> R2 -> Prop}
-      msg1 msg2,
-      PRE void void (subevent void (Throw msg1)) (subevent void (Throw msg2)) ->
-      rutt PRE POST R1R2 (LLVMEvents.raise msg1) (LLVMEvents.raise msg2).
-  Proof.
-    intros E1 E2 R1 R2 FAIL1 FAIL2 PRE POST R1R2 msg1 msg2 PRETHROW.
-    unfold LLVMEvents.raise.
-    repeat rewrite bind_trigger.
-    apply rutt_Vis; auto.
-    intros [] [] _.
-  Qed.
-
   Lemma lift_err_uvalue_to_dvalue_rutt :
     forall uv1 uv2,
       uvalue_convert uv1 = NoOom uv2 ->
@@ -5172,6 +5244,243 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     eauto with paco itree.
   Qed.
 
+  (* TODO: Move this *)
+  (* TODO: May not hold for addresses / iptr depending on their size *)
+  (* May be weird for integer sizes as well... *)
+  Lemma undef_not_unique_prop :
+    forall dt,
+      dt <> DTYPE_Void ->
+      ~ unique_prop (UVALUE_Undef dt).
+  Proof.
+    induction dt;
+      intros NVOID;
+      try contradiction.
+
+  (*   { intros [dv UNIQUE]. *)
+  (*     setoid_rewrite concretize_equation in UNIQUE. *)
+  (*     unfold concretize_u in UNIQUE. *)
+  (*     cbn in UNIQUE. *)
+
+  (*     induction (dvalue_has_dtyp dv (DTYPE_I a)). *)
+  (*   } *)
+  (*   red in UNIQUE. *)
+  (*   assert (dt = DTYPE_Void). *)
+  (*   admit. *)
+  (*   subst. *)
+  (*   destruct UNIQUE as [dv UNIQUE]. *)
+  (*   specialize (UNIQUE DVALUE_None). *)
+  (*   unfold concretize, concretize_u in UNIQUE. *)
+  (*   rewrite concretize_uvalueM_equation in UNIQUE. *)
+  (*   cbn in *. *)
+  (*   forward UNIQUE. *)
+  (*   constructor. *)
+  (*   subst. *)
+  (* Qed. *)
+  Admitted.
+
+  Lemma uvalue_refine_unique_prop :
+    forall uv1 uv2,
+      uvalue_refine uv1 uv2 ->
+      IS1.LLVM.D.unique_prop uv1 <-> unique_prop uv2.
+  Proof.
+    split.
+    { revert uv2 H.
+      induction uv1 using IS1.LP.Events.DV.uvalue_ind'; intros uv2 REF [dv UNIQUE];
+        try
+          solve
+          [
+            red in REF;
+            rewrite uvalue_convert_equation in REF;
+            cbn in REF;
+            first [break_match_hyp; inv REF | inv REF];
+            eexists;
+            intros dv0 CONC;
+            do 2 red in CONC;
+            rewrite concretize_uvalueM_equation in CONC;
+            inv CONC;
+            auto
+          ].
+
+      { (* Undef will be a contradiction in most cases...
+           Though not all *)
+        admit.
+      }
+
+      { (* Struct nil *)
+        red in REF;
+          rewrite uvalue_convert_equation in REF;
+          cbn in REF;
+          first [break_match_hyp; inv REF | inv REF];
+          eexists;
+          intros dv0 CONC.
+        do 2 red in CONC.
+        rewrite concretize_uvalueM_equation in CONC.
+        cbn in CONC.
+        red in CONC.
+        destruct CONC as [ma [k' [ARGS [CONC1 CONC2]]]].
+        destruct_err_ub_oom ma; inv ARGS; try contradiction.
+        cbn in CONC2.
+        cbn in CONC1.
+        destruct CONC2 as [CONTRA | CONC2]; try contradiction.
+        specialize (CONC2 [] eq_refl).
+        set (k'_nil := k' []).
+        destruct_err_ub_oom k'_nil; subst k'_nil;
+          rewrite Hx in CONC2, CONC1;
+          try contradiction.
+
+        cbn in CONC1.
+        inv CONC1.
+        reflexivity.
+      }
+
+      { (* Structs *)
+        admit.
+      }
+
+      { (* Packed struct nil *)
+        red in REF;
+          rewrite uvalue_convert_equation in REF;
+          cbn in REF;
+          first [break_match_hyp; inv REF | inv REF];
+          eexists;
+          intros dv0 CONC.
+        do 2 red in CONC.
+        rewrite concretize_uvalueM_equation in CONC.
+        cbn in CONC.
+        red in CONC.
+        destruct CONC as [ma [k' [ARGS [CONC1 CONC2]]]].
+        destruct_err_ub_oom ma; inv ARGS; try contradiction.
+        cbn in CONC2.
+        cbn in CONC1.
+        destruct CONC2 as [CONTRA | CONC2]; try contradiction.
+        specialize (CONC2 [] eq_refl).
+        set (k'_nil := k' []).
+        destruct_err_ub_oom k'_nil; subst k'_nil;
+          rewrite Hx in CONC2, CONC1;
+          try contradiction.
+
+        cbn in CONC1.
+        inv CONC1.
+        reflexivity.
+      }
+
+      { (* Packed structs *)
+        admit.
+      }
+
+      { (* Array nil *)
+        red in REF;
+          rewrite uvalue_convert_equation in REF;
+          cbn in REF;
+          first [break_match_hyp; inv REF | inv REF];
+          eexists;
+          intros dv0 CONC.
+        do 2 red in CONC.
+        rewrite concretize_uvalueM_equation in CONC.
+        cbn in CONC.
+        red in CONC.
+        destruct CONC as [ma [k' [ARGS [CONC1 CONC2]]]].
+        destruct_err_ub_oom ma; inv ARGS; try contradiction.
+        cbn in CONC2.
+        cbn in CONC1.
+        destruct CONC2 as [CONTRA | CONC2]; try contradiction.
+        specialize (CONC2 [] eq_refl).
+        set (k'_nil := k' []).
+        destruct_err_ub_oom k'_nil; subst k'_nil;
+          rewrite Hx in CONC2, CONC1;
+          try contradiction.
+
+        cbn in CONC1.
+        inv CONC1.
+        reflexivity.
+      }
+
+      { (* Arrays *)
+        admit.
+      }
+
+      { (* Vector nil *)
+        red in REF;
+          rewrite uvalue_convert_equation in REF;
+          cbn in REF;
+          first [break_match_hyp; inv REF | inv REF];
+          eexists;
+          intros dv0 CONC.
+        do 2 red in CONC.
+        rewrite concretize_uvalueM_equation in CONC.
+        cbn in CONC.
+        red in CONC.
+        destruct CONC as [ma [k' [ARGS [CONC1 CONC2]]]].
+        destruct_err_ub_oom ma; inv ARGS; try contradiction.
+        cbn in CONC2.
+        cbn in CONC1.
+        destruct CONC2 as [CONTRA | CONC2]; try contradiction.
+        specialize (CONC2 [] eq_refl).
+        set (k'_nil := k' []).
+        destruct_err_ub_oom k'_nil; subst k'_nil;
+          rewrite Hx in CONC2, CONC1;
+          try contradiction.
+
+        cbn in CONC1.
+        inv CONC1.
+        reflexivity.
+      }
+
+      { (* Vectors *)
+        admit.
+      }
+
+      { (* IBinop *)
+        red in REF;
+          rewrite uvalue_convert_equation in REF;
+          cbn in REF.
+        first [
+            break_match_hyp; inv REF;
+            break_match_hyp; inv H0
+          |
+            break_match_hyp; inv REF | inv REF].
+
+        red.
+        eexists.
+        intros dv0 CONC.
+
+        do 2 red in CONC.
+        rewrite concretize_uvalueM_equation in CONC.
+        cbn in CONC.
+        destruct CONC as [ma [k' [MA [CONC1 CONC2]]]].
+        destruct_err_ub_oom ma; subst; cbn in CONC1, CONC2.
+        - (* OOM *)
+          inv CONC1.
+        - (* UB *)
+          (* May be a contradiction with UNIQUE? *)
+          rename dv into BLAH.
+          admit.
+        - (* Error *)
+          admit.
+        - (* Success *)
+          destruct CONC2 as [[] | CONC2].
+          specialize (CONC2 ma0 eq_refl).
+          red in CONC2.
+          destruct CONC2 as [ma [k'0 CONC2]].
+          destruct CONC2 as [CONC2 [CONC2_EQV CONC2_RET]].
+
+          rewrite concretize_uvalueM_equation in CONC2.
+
+        cbn in CONC2.
+        cbn in CONC1.
+        (* specialize (CONC2 [] eq_refl). *)
+        (* set (k'_nil := k' []). *)
+        (* destruct_err_ub_oom k'_nil; subst k'_nil; *)
+        (*   rewrite Hx in CONC2, CONC1; *)
+        (*   try contradiction. *)
+
+        (* cbn in CONC1. *)
+        (* inv CONC1. *)
+        (* reflexivity. *)
+        admit.
+      }
+  Admitted.
+
   Lemma pickUnique_rutt :
     forall uv1 uv2,
       uvalue_refine uv1 uv2 ->
@@ -5195,7 +5504,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { constructor.
       cbn.
       split; auto.
-      admit. (* Need something *)
+      apply uvalue_refine_unique_prop;
+        eauto.
     }
 
     intros t1 t2 H.
@@ -5216,6 +5526,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       admit.
     }
   Admitted.
+
+  Lemma uvalue_refine_concretize_poison :
+    forall uv1 uv2,
+      uvalue_refine uv1 uv2 ->
+      (forall dt : dtyp, ~ IS1.LLVM.MEM.CP.CONC.concretize uv1 (IS1.LP.Events.DV.DVALUE_Poison dt)) <->
+        (forall dt : dtyp, ~ concretize uv2 (DVALUE_Poison dt)).
+  Proof.
+    (* This may not be true if uv2 can OOM... *)
+  Admitted.
+
 
   Lemma denote_mcfg_E1E2_rutt' :
     forall dfns1 dfns2 dt f1 f2 args1 args2,
@@ -5476,7 +5796,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       apply rutt_trigger.
       { cbn.
         split; auto.
-        admit. (* Probably need something about concretize *)
+        (* TODO: this lemma may not even be true *)
+        apply uvalue_refine_concretize_poison; auto.
       }
 
       intros t1 t2 H0.
@@ -5487,7 +5808,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     intros r6 r7 H0.
     cbn.
     apply rutt_Ret; auto.
-  Admitted.
+  Qed.
 
   (* TODO: not sure about name... *)
   Definition model_E1E2_L0
