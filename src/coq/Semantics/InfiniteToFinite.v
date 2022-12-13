@@ -5250,6 +5250,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       rename l0 into dvs.
       rename d into dv.
 
+      pose proof IHuv1 as IHuv1'.
+      pose proof IHuv0 as IHuv0'.
+      move IHuv1' at top.
+      move IHuv0' at top.
+
       cbn in *.
       rewrite Heqs in IHuv0.
 
@@ -5377,6 +5382,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         }
 
         { break_match_hyp; try contradiction.
+          rename u into fld.
+          rename l into fields'.
           destruct CONV as [UREF UVSREF].
           cbn in *.
 
@@ -5395,29 +5402,42 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
           rewrite U2Ddv'.
 
-          (* TODO: Move this *)
-          Lemma map_monad_err_forall2_HIn:
-            forall {A B : Type} (f : A -> err B) (l : list A) (res : list B),
-              map_monad f l = inr res <->
-                Forall2_HIn l res (fun (a : A) (b : B) (INA : In a l) (INB : In b res) => f a = inr b).
-          Proof.
-          Admitted.
-
-          destruct (map_monad uvalue_to_dvalue l) eqn:MAPML.
-          { exfalso.
-            apply map_monad_err_fail in MAPML as [a [IN U2DA]].
-            apply Forall2_HIn_forall in UVSREF.
-            apply map_monad_err_forall2 in Heqs.
-            apply Forall2_forall in Heqs.
-
-            rewrite dvalue_refine_equation in DV2'REF.
-            cbn in DV2'REF.
-            
-
+          (* Testing *)
+          pose proof (IHuv0' (UVALUE_Struct fields') (IS1.LP.Events.DV.DVALUE_Struct dvs)) as IHfields.
+          rewrite Heqs in IHfields.
+          forward IHfields.
+          { rewrite uvalue_refine_equation.
+            cbn.
+            right; auto.
           }
-          (* I think l0 might be related to l through UVSREF *)
-          assert (map_monad uvalue_to_dvalue l = inr l0).
-          { (* TODO: Move this *)
+          specialize (IHfields eq_refl).
+          destruct IHfields as [fields2 [U2Dfields FIELDSREF]].
+          cbn in U2Dfields.
+          break_match_hyp; inv U2Dfields.
+          eexists; split; auto.
+
+          rewrite dvalue_refine_equation.
+          rewrite dvalue_convert_equation.
+          rewrite map_In_cons.
+          cbn.
+
+          rewrite dvalue_refine_equation in FIELDSREF.
+          cbn in FIELDSREF.
+          destruct FIELDSREF as [FIELDSREF | FIELDSREF]; auto.
+
+          { rewrite dvalue_convert_equation in FIELDSREF.
+            cbn in *. inv FIELDSREF.
+            right.
+            split; auto.
+
+            (* TODO: Move this *)
+            Lemma map_monad_err_forall2_HIn:
+              forall {A B : Type} (f : A -> err B) (l : list A) (res : list B),
+                map_monad f l = inr res <->
+                  Forall2_HIn l res (fun (a : A) (b : B) (INA : In a l) (INB : In b res) => f a = inr b).
+            Proof.
+            Admitted.
+
             Lemma map_monad_err_length :
               forall {A B} l (f : A -> err B) res,
                 map_monad f l = inr res ->
@@ -5435,72 +5455,33 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                 auto.
             Qed.
 
-            apply map_monad_err_forall2.
-            apply Forall2_forall.
+            apply map_monad_err_forall2_HIn in Heqs2.
+            apply Forall2_HIn_forall.
+            apply Forall2_HIn_forall in Heqs2 as [LEN Heqs2].
             split.
-            { apply map_monad_err_length in Heqs, Heqs1.
-              rewrite map_In_length in Heqs1.
-
-              apply Forall2_HIn_forall in UVSREF as [LEN _].
-              lia.
-            }
-            { intros i a b NA NB.
-              apply Forall2_HIn_forall in UVSREF as [LEN UVSREF].
-              apply map_monad_err_forall2 in Heqs1.
-              apply Forall2_forall in Heqs1 as [LEN' Heqs1].
-              eapply Heqs1; eauto.
-
-              rename l into blah.
-              apply Nth_map_In_iff.
-              admit.
-            }
-          }
-          rewrite H.
-          eexists; split; auto.
-
-          rewrite dvalue_refine_equation.
-          rewrite dvalue_convert_equation.
-          rewrite map_In_cons.
-          cbn.
-
-          rewrite dvalue_refine_equation in DV2'REF.
-          right.
-          split; auto.
-
-          apply Forall2_HIn_forall.
-          destruct DV2'REF as [DV2'REF | DV2'REF].
-          - rewrite dvalue_convert_equation in DV2'REF.
-            inv DV2'REF.
-
-            split.
-            { (* Length *)
-              rewrite map_In_length.
-              auto.
-            }
-
+            rewrite map_In_length; auto.
             intros i a b NA NB.
 
             exists (Nth_In NA).
             exists (Nth_In NB).
 
-            apply Nth_map_In_iff in NB.
-            destruct NB as [x [INX [CONV NTH]]].
-
-            rewrite <- CONV.
-
-            apply map_monad_err_forall2 in H.
-            cbn in NA, NTH.
-            rewrite NA in NTH.
-            inv NTH.
-            apply dvalue_refine_dvalue_convert.
-          - apply Forall2_HIn_forall in DV2'REF as [LENGTH DV2'REF].
-            split; auto.
+            pose proof NB as NB'.
+            apply Nth_map_In_iff in NB' as [x [INX [CONVX NTHX]]].
+            cbn in *.
+            rewrite NA in NTHX. inv NTHX.
+            apply dvalue_refine_dvalue_convert.            
+          }
         }
     - (* Packed Structures *)
       admit.
-    - (* Arrays *)
+    - (* Arrays nil *)
       admit.
-    - 
+    - (* Arrays cons *)
+      admit.
+    - (* Vectors nil *)
+      admit.
+    - (* Vectors cons *)
+      admit.
   Qed.
 
   Lemma uvalue_to_dvalue_fail_conversion :
