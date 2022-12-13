@@ -2221,6 +2221,35 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
               lift_OOM (to_ubytes uv dt sid)
           end
 
+      (* Oom values, possibly aggregates *)
+      | UVALUE_Oom _ =>
+          match dt with
+          | DTYPE_Struct [] =>
+              ret []
+          | DTYPE_Struct (t::ts) =>
+              f_bytes <- serialize_sbytes (UVALUE_Oom t) t;; (* How do I know this is smaller? *)
+              fields_bytes <- serialize_sbytes (UVALUE_Oom (DTYPE_Struct ts)) (DTYPE_Struct ts);;
+              ret (f_bytes ++ fields_bytes)
+
+          | DTYPE_Packed_struct [] =>
+              ret []
+          | DTYPE_Packed_struct (t::ts) =>
+              f_bytes <- serialize_sbytes (UVALUE_Oom t) t;; (* How do I know this is smaller? *)
+              fields_bytes <- serialize_sbytes (UVALUE_Oom (DTYPE_Packed_struct ts)) (DTYPE_Packed_struct ts);;
+              ret (f_bytes ++ fields_bytes)
+
+          | DTYPE_Array sz t =>
+              field_bytes <- map_monad_In (repeatN sz (UVALUE_Oom t)) (fun elt Hin => serialize_sbytes elt t);;
+              ret (concat field_bytes)
+
+          | DTYPE_Vector sz t =>
+              field_bytes <- map_monad_In (repeatN sz (UVALUE_Oom t)) (fun elt Hin => serialize_sbytes elt t);;
+              ret (concat field_bytes)
+          | _ =>
+              sid <- fresh_sid;;
+              lift_OOM (to_ubytes uv dt sid)
+          end
+
       (* TODO: each field gets a separate store id... Is that sensible? *)
       (* Padded aggregate types *)
       | UVALUE_Struct [] =>
@@ -2367,6 +2396,35 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
 
               | DTYPE_Vector sz t =>
                   field_bytes <- map_monad_In (repeatN sz (UVALUE_Poison t)) (fun elt Hin => serialize_sbytes elt t);;
+                  ret (concat field_bytes)
+              | _ =>
+                  sid <- fresh_sid;;
+                  lift_OOM (to_ubytes uv dt sid)
+              end
+
+          (* Oom values, possibly aggregates *)
+          | UVALUE_Oom _ =>
+              match dt with
+              | DTYPE_Struct [] =>
+                  ret []
+              | DTYPE_Struct (t::ts) =>
+                  f_bytes <- serialize_sbytes (UVALUE_Oom t) t;; (* How do I know this is smaller? *)
+                  fields_bytes <- serialize_sbytes (UVALUE_Oom (DTYPE_Struct ts)) (DTYPE_Struct ts);;
+                  ret (f_bytes ++ fields_bytes)
+
+              | DTYPE_Packed_struct [] =>
+                  ret []
+              | DTYPE_Packed_struct (t::ts) =>
+                  f_bytes <- serialize_sbytes (UVALUE_Oom t) t;; (* How do I know this is smaller? *)
+                  fields_bytes <- serialize_sbytes (UVALUE_Oom (DTYPE_Packed_struct ts)) (DTYPE_Packed_struct ts);;
+                  ret (f_bytes ++ fields_bytes)
+
+              | DTYPE_Array sz t =>
+                  field_bytes <- map_monad_In (repeatN sz (UVALUE_Oom t)) (fun elt Hin => serialize_sbytes elt t);;
+                  ret (concat field_bytes)
+
+              | DTYPE_Vector sz t =>
+                  field_bytes <- map_monad_In (repeatN sz (UVALUE_Oom t)) (fun elt Hin => serialize_sbytes elt t);;
                   ret (concat field_bytes)
               | _ =>
                   sid <- fresh_sid;;
@@ -5006,6 +5064,75 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Qed.
 
     Hint Resolve exec_correct_serialize_sbytes_poison : EXEC_CORRECT.
+
+    Lemma exec_correct_serialize_sbytes_oom :
+      forall dt t pre,
+        exec_correct pre (serialize_sbytes (UVALUE_Oom t) dt) (serialize_sbytes (UVALUE_Oom t) dt).
+    Proof.
+      induction dt using dtyp_measure_strong_ind; intros t pre;
+        do 2 rewrite serialize_sbytes_equation;
+        auto with EXEC_CORRECT.
+
+      { (* Size 1 *)
+        destruct dt; inversion H; auto with EXEC_CORRECT.
+      }
+
+      { (* Larger sizes *)
+        revert t pre.
+        induction dt; intros t pre; try apply exec_correct_bind; auto with EXEC_CORRECT.
+
+        { (* Arrays *)
+          apply exec_correct_map_monad_In.
+          intros a pre0 IN.
+          apply In_repeatN in IN; subst.
+          eapply H.
+          cbn in H0.
+          lia.
+        }
+
+        { (* Structs *)
+          break_match_goal; auto with EXEC_CORRECT.
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+          eapply H; cbn in *; auto; lia.
+
+          intros a ms_init ms_after_m st_init st_after_m RUN.
+
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+
+          eapply H; cbn in *; auto.
+          unfold list_sum.
+          assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
+          lia.
+        }
+
+        { (* Packed Structs *)
+          break_match_goal; auto with EXEC_CORRECT.
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+          eapply H; cbn in *; auto; lia.
+
+          intros a ms_init ms_after_m st_init st_after_m RUN.
+
+          apply exec_correct_bind; auto with EXEC_CORRECT.
+
+          eapply H; cbn in *; auto.
+          unfold list_sum.
+          assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
+          lia.
+        }
+
+        { (* Vectors *)
+          apply exec_correct_map_monad_In.
+          intros a pre0 IN.
+          apply In_repeatN in IN; subst.
+          eapply H.
+          cbn in H0.
+          lia.
+        }
+
+      }
+    Qed.
+
+    Hint Resolve exec_correct_serialize_sbytes_oom : EXEC_CORRECT.
 
     Lemma exec_correct_serialize_sbytes :
       forall uv dt pre,

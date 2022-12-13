@@ -311,6 +311,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
         | UVALUE_Float x => ret (DVALUE_Float x)
         | UVALUE_Undef t => undef_handler t
         | UVALUE_Poison t => ret (DVALUE_Poison t)
+        | UVALUE_Oom t => ret (DVALUE_Oom t)
         | UVALUE_None => ret DVALUE_None
         | UVALUE_Struct fields =>
             x <- map_monad (concretize_uvalueM M undef_handler ERR_M lift_ue) fields;; ret (DVALUE_Struct x)
@@ -1013,15 +1014,78 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
       { raise_poison := fun A dt => lift (raise_poison dt);
       }.
 
-    Definition ErrOOMPoison := eitherT ERR_MESSAGE (eitherT OOM_MESSAGE Poisonable).
+    (* TODO: Move this??? *)
+    Inductive Oomable (A : Type) : Type :=
+    | Unoomed : A -> Oomable A
+    | Oomed : forall (dt : dtyp), Oomable A
+    .
 
-    Definition ErrOOMPoison_handle_poison_dv {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_OOM M} (ep : ErrOOMPoison dvalue) : M dvalue
-      := match unEitherT (unEitherT ep) with
+    Arguments Unoomed {A} a.
+    Arguments Oomed {A}.
+
+    #[global] Instance MonadOomable : Monad Oomable
+      := { ret  := @Unoomed;
+           bind := fun _ _ ma mab => match ma with
+                                     | Oomed dt => Oomed dt
+                                     | Unoomed v => mab v
+                                     end
+      }.
+
+    Class RAISE_OOMABLE (M : Type -> Type) :=
+      { raise_oomable : forall {A}, dtyp -> M A }.
+
+    #[global] Instance RAISE_OOMABLE_Oomable : RAISE_OOMABLE Oomable :=
+      { raise_oomable := fun A dt => Oomed dt }.
+
+    #[global] Instance RAISE_OOMABLE_E_MT {M : Type -> Type} {MT : (Type -> Type) -> Type -> Type} `{MonadT (MT M) M} `{RAISE_OOMABLE M} : RAISE_OOMABLE (MT M) :=
+      { raise_oomable := fun A dt => lift (raise_oomable dt);
+      }.
+
+    Inductive OomableT (m : Type -> Type) (A : Type) : Type :=
+      mkOomableT
+        { unMkOomableT : m (Oomable A)
+        }.
+
+    Arguments mkOomableT {m A}.
+    Arguments unMkOomableT {m A}.
+
+    #[global] Instance MonadT_OomableT (m : Type -> Type) `{Monad m} : MonadT (OomableT m) m :=
+      { lift := fun T c => mkOomableT (liftM ret c) }.
+
+    Definition lift_OOMABLE {M : Type -> Type} `{Monad M} `{RAISE_OOMABLE M} {A} (dt : dtyp) (ma : OOM A) : M A
+      := match ma with
+         | NoOom a => ret a
+         | Oom s => raise_oomable dt
+         end.
+
+    #[global] Instance Monad_OomableT (m : Type -> Type) `{Monad m} : Monad (OomableT m) :=
+      {
+        ret := fun T x => mkOomableT (ret (Unoomed x));
+        bind := fun A B ma mab =>
+                  mkOomableT
+                    (oom_a <- unMkOomableT ma;;
+                     match oom_a with
+                     | Oomed dt =>
+                         ret (Oomed dt)
+                     | Unoomed a =>
+                         unMkOomableT (mab a)
+                     end
+                    )
+      }.
+
+    #[global] Instance RAISE_OOMABLE_OomableT m `{Monad m} : RAISE_OOMABLE (OomableT m) :=
+      { raise_oomable := fun A dt => mkOomableT (ret (Oomed dt)) }.
+
+    Definition ErrOOMPoison := eitherT ERR_MESSAGE (OomableT Poisonable).
+
+    Definition ErrOOMPoison_handle_poison_and_oom_dv {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_OOM M} (ep : ErrOOMPoison dvalue) : M dvalue
+      := match unMkOomableT (unEitherT ep) with
          | Unpoisoned edv =>
              match edv with
-             | inl (OOM_message msg) => raise_oom msg
-             | inr (inl (ERR_message msg)) => raise_error msg
-             | inr (inr val) => ret val
+             (* TODO: Should we use lazy OOM, or should we raise OOM here? *)
+             | Oomed dt => raise_oom "ErrOOMPoison_handle_poison_and_oom_dv: OOM."
+             | Unoomed (inl (ERR_message msg)) => raise_error msg
+             | Unoomed (inr val) => ret val
              end
          | Poison dt => ret (DVALUE_Poison dt)
          end.
@@ -1048,7 +1112,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
          size depends on the type.
      *)
     Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia | solve_dvalue_measure].
-    Program Fixpoint dvalue_extract_byte {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} (dv : dvalue) (dt : dtyp) (idx : Z) {measure (dvalue_measure dv)} : M Z
+    Program Fixpoint dvalue_extract_byte {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} `{RAISE_OOMABLE M} (dv : dvalue) (dt : dtyp) (idx : Z) {measure (dvalue_measure dv)} : M Z
       := match dv with
          | DVALUE_I1 x
          | DVALUE_I8 x
@@ -1065,6 +1129,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
          | DVALUE_Double d =>
              ret (extract_byte_Z (unsigned (Float.to_bits d)) idx)
          | DVALUE_Poison dt => raise_poison dt
+         | DVALUE_Oom dt => raise_oomable dt
          | DVALUE_None =>
              (* TODO: Not sure if this should be an error, poison, or what. *)
              raise_error "dvalue_extract_byte on DVALUE_None"
@@ -1143,14 +1208,14 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
     | DVALUE_ExtractByte (dv : dvalue) (dt : dtyp) (idx : N) : dvalue_byte
     .
 
-    Definition dvalue_byte_value {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} (db : dvalue_byte) : M Z
+    Definition dvalue_byte_value {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} `{RAISE_OOMABLE M} (db : dvalue_byte) : M Z
       := match db with
          | DVALUE_ExtractByte dv dt idx =>
              dvalue_extract_byte dv dt (Z.of_N idx)
          end.
 
     Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia].
-    Program Fixpoint dvalue_bytes_to_dvalue {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} `{RAISE_OOM M} (dbs : list dvalue_byte) (dt : dtyp) {measure (dtyp_measure dt)} : M dvalue
+    Program Fixpoint dvalue_bytes_to_dvalue {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} `{RAISE_OOMABLE M} (dbs : list dvalue_byte) (dt : dtyp) {measure (dtyp_measure dt)} : M dvalue
       := match dt with
          | DTYPE_I sz =>
              zs <- map_monad dvalue_byte_value dbs;;
@@ -1167,16 +1232,17 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
              end
          | DTYPE_IPTR =>
              zs <- map_monad dvalue_byte_value dbs;;
-             val <- lift_OOM (IP.from_Z (concat_bytes_Z zs));;
+             val <- lift_OOMABLE DTYPE_IPTR (IP.from_Z (concat_bytes_Z zs));;
              ret (DVALUE_IPTR val)
          | DTYPE_Pointer =>
              (* TODO: not sure if this should be wildcard provenance.
                 TODO: not sure if this should truncate iptr value...
               *)
+             (* TODO: not sure if this should be lazy OOM or not *)
              zs <- map_monad dvalue_byte_value dbs;;
              match int_to_ptr (concat_bytes_Z zs) wildcard_prov with
              | NoOom a => ret (DVALUE_Addr a)
-             | Oom msg => raise_oom "dvalue_bytes_to_dvalue: OOM in DTYPE_Pointer case."
+             | Oom msg => raise_oomable DTYPE_Pointer
              end
          | DTYPE_Void =>
              raise_error "dvalue_bytes_to_dvalue on void type."
@@ -1296,6 +1362,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
         | UVALUE_Float x                         => ret (DVALUE_Float x)
         | UVALUE_Undef t                         => undef_handler t
         | UVALUE_Poison t                        => ret (DVALUE_Poison t)
+        | UVALUE_Oom t                           => ret (DVALUE_Oom t)
         | UVALUE_None                            => ret DVALUE_None
         | UVALUE_Struct fields                   => 'dfields <- map_monad concretize_uvalueM fields ;;
                                                     ret (DVALUE_Struct dfields)
@@ -1463,7 +1530,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
       with
       extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) {struct uvs} : M dvalue
       := dvbs <- concretize_uvalue_bytes uvs;;
-         lift_ue (ErrOOMPoison_handle_poison_dv (dvalue_bytes_to_dvalue dvbs dt))
+         lift_ue (ErrOOMPoison_handle_poison_and_oom_dv (dvalue_bytes_to_dvalue dvbs dt))
 
       with
       eval_select
@@ -1549,6 +1616,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
             | UVALUE_Float x                         => ret (DVALUE_Float x)
             | UVALUE_Undef t                         => undef_handler t
             | UVALUE_Poison t                        => ret (DVALUE_Poison t)
+            | UVALUE_Oom t                           => ret (DVALUE_Oom t)
             | UVALUE_None                            => ret DVALUE_None
             | UVALUE_Struct fields                   => 'dfields <- map_monad concretize_uvalueM fields ;;
                                                         ret (DVALUE_Struct dfields)

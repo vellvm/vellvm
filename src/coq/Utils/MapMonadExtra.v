@@ -637,6 +637,31 @@ Arguments map_monad_map {_ _ _ _ _ _ _ _}.
 Arguments map_monad_g {_ _ _ _ _ _ _ _}.
 
 (* TODO: move / generalize these *)
+Lemma map_monad_err_nil :
+  forall {A B} (f : A -> err B) res,
+    map_monad f [] = inr res <-> res = [].
+Proof.
+  intros A B f res.
+  split; intros MAP.
+  - cbn in MAP. inv MAP.
+    auto.
+  - inv MAP.
+    cbn; auto.
+Qed.
+
+Lemma map_monad_oom_nil :
+  forall {A B} (f : A -> OOM B) res,
+    map_monad f [] = NoOom res <-> res = [].
+Proof.
+  intros A B f res.
+  split; intros MAP.
+  - cbn in MAP. inv MAP.
+    auto.
+  - inv MAP.
+    cbn; auto.
+Qed.
+
+(* TODO: move / generalize these *)
 Lemma map_monad_err_forall2 :
   forall {A B} (f : A -> err B) l res,
     map_monad f l = inr res <->

@@ -4,6 +4,8 @@ From Coq Require Import
   Lia
   ZArith.
 
+Require Import Coq.Logic.ProofIrrelevance.
+
 From Vellvm.Utils Require Import
   Error
   Util
@@ -63,6 +65,27 @@ Proof.
     intuition.
 Qed.
 
+Lemma Nth_map_iff :
+  forall {X Y} (f : X -> Y) xs i y,
+    Util.Nth (map f xs) i y <-> (exists x, f x = y /\ Util.Nth xs i x).
+Proof.
+Admitted.
+
+Lemma map_inj :
+  forall {X Y} (f : X -> Y) xs1 xs2,
+    (forall a b, In a xs1 -> In b xs2 -> f a = f b -> a = b) ->
+    map f xs1 = map f xs2 ->
+    xs1 = xs2.
+Proof.
+  intros X Y f.
+  induction xs1, xs2; intros INJ MAP; auto; inversion MAP.
+
+  apply INJ in H0; subst; cbn; auto.
+  apply IHxs1 in H1; subst; cbn; auto.
+  intros a b H H0 H2.
+  apply INJ; cbn; auto.
+Qed.
+
 Lemma map_In {A B : Type} (l : list A) (f : forall (x : A), In x l -> B) : list B.
 Proof.
   induction l.
@@ -72,6 +95,14 @@ Proof.
     + intros x H. apply (f x). simpl. auto.
 Defined.
 
+Lemma map_In_cons :
+  forall {X Y} xs (x : X) (f : forall (a : X), In a (x::xs) -> Y),
+    map_In (x::xs) f = f x (or_introl eq_refl) :: map_In xs (fun x IN => f x (or_intror IN)).
+Proof.
+  cbn.
+  reflexivity.
+Qed.
+
 Lemma Forall_HIn {A : Type} (l : list A) (f : forall (x : A), In x l -> Prop) : Prop.
 Proof.
   induction l.
@@ -80,6 +111,108 @@ Proof.
     + simpl. auto.
     + intros x H. apply (f x). simpl. auto.
 Defined.
+
+Program Fixpoint Forall2_HIn {A B : Type}
+  (xs : list A) (ys : list B) (R : forall a b, In a xs -> In b ys -> Prop) : Prop :=
+  match xs, ys with
+  | [], [] => True
+  | (x::xs), (y::ys) =>
+      R x y _ _ /\ Forall2_HIn xs ys (fun x y IN1 IN2 => R x y _ _)
+  | _, _ =>
+      False
+  end.
+Next Obligation.
+  exact (or_introl eq_refl).
+Defined.
+Next Obligation.
+  exact (or_introl eq_refl).
+Defined.
+Next Obligation.
+  exact (or_intror IN1).
+Defined.
+Next Obligation.
+  exact (or_intror IN2).
+Defined.
+Next Obligation.
+  split.
+  intros x xs0 y ys0 CONTRA.
+  inversion CONTRA.
+  inversion H1.
+
+  intros [_ CONTRA].
+  inversion CONTRA.
+Defined.
+Next Obligation.
+  split.
+  intros x xs0 y ys0 [_ CONTRA].
+  inversion CONTRA.
+
+  intros [CONTRA _].
+  inversion CONTRA.
+Defined.
+
+Lemma Forall2_HIn_cons {A B : Type} :
+  forall (xs : list A) (ys : list B) x y (R : forall a b, In a (x :: xs) -> In b (y :: ys) -> Prop),
+  R x y (or_introl eq_refl) (or_introl eq_refl) ->
+  Forall2_HIn xs ys (fun x y IN1 IN2 => R x y (or_intror IN1) (or_intror IN2)) ->
+  Forall2_HIn (x::xs) (y::ys) R.
+Proof.
+  induction xs, ys; intros x y R HR ALL.
+  - cbn; split; auto.
+  - cbn in ALL.
+    contradiction.
+  - cbn in ALL.
+    contradiction.
+  - cbn in *.
+    auto.
+Qed.
+
+Lemma Forall2_HIn_forall :
+  forall {A B} al bl (P : forall (x : A) (y : B), In x al -> In y bl -> Prop),
+    Forall2_HIn al bl P <->
+      (length al = length bl /\
+         forall i a b (NA : Util.Nth al i a) (NB : Util.Nth bl i b),
+         exists IN1 IN2, P a b IN1 IN2).
+Proof.
+  induction al; simpl; intros.
+  - destruct bl.
+    split; [intro H; inversion H; subst | intros [H ?]].
+    + split; auto; intros ? ? ? Hnth ?; destruct i; simpl in Hnth;
+        inversion Hnth.
+    + inversion H; auto.
+    + split; intros CONTRA; try contradiction.
+      inversion CONTRA. inversion H.
+  - destruct bl; simpl; [split; [intro H | intros [H ?]]; inversion H|].
+    split; [intro H | intros [H ?]]; inversion H; subst.
+    + rewrite IHal in *; destruct H1; split; auto; intros i a1 b1 Ha1 Hb1.
+      destruct i; eauto.
+      * inversion Ha1; inversion Hb1; subst; auto.
+        do 2 eexists.
+        apply H0.
+      * inversion Ha1; inversion Hb1; subst; auto.
+        specialize (H2 i _ _ H4 H5) as [IN1 [IN2 PP]].
+        exists (or_intror IN1).
+        exists (or_intror IN2).
+        auto.
+    + constructor.
+      * specialize (H0 0%nat a b eq_refl eq_refl).
+        destruct H0 as [IN1 [IN2 PP]].
+        cbn in *.
+        rewrite proof_irrelevance at 1.
+        rewrite proof_irrelevance at 1.
+        eauto.
+      * rewrite IHal; split; auto; intros.
+        specialize (H0 (S i) _ _ NA NB).
+        destruct H0 as [IN1 [IN2 PP]].
+
+        pose proof Util.Nth_In NA.
+        pose proof Util.Nth_In NB.
+
+        exists H0. exists H1.
+        rewrite proof_irrelevance at 1.
+        rewrite proof_irrelevance at 1.
+        eauto.
+Qed.
 
 Lemma list_sum_map :
   forall {X} (f : X -> nat) x xs,
@@ -667,7 +800,7 @@ Proof.
       cbn; auto.
     }
 
-    lia.            
+    lia.
 Qed.
 
 Lemma sequence_OOM_length :

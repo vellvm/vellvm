@@ -19,6 +19,7 @@ From Vellvm Require Import
      Semantics.TopLevel
      Semantics.DynamicValues
      Semantics.LLVMParams
+     Syntax.DynamicTypes
      Theory.TopLevelRefinements
      Theory.ContainsUB
      Utils.Error
@@ -52,6 +53,7 @@ Import InterpFacts.
 
 Import MonadNotation.
 Import ListNotations.
+
 
 Module Type AddrConvert (ADDR1 : ADDRESS) (ADDR2 : ADDRESS).
   Parameter addr_convert : ADDR1.addr -> OOM ADDR2.addr.
@@ -222,125 +224,135 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
 
   Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia | DV1.solve_dvalue_measure | DV1.solve_uvalue_measure].
 
-  Program Fixpoint dvalue_convert (dv1 : DV1.dvalue) {measure (DV1.dvalue_measure dv1)} : OOM DV2.dvalue
+  Program Fixpoint dvalue_convert (dv1 : DV1.dvalue) {measure (DV1.dvalue_measure dv1)} : DV2.dvalue
     := match dv1 with
        | DV1.DVALUE_Addr a =>
-           a' <- addr_convert a;;
-           ret (DV2.DVALUE_Addr a')
-       | DV1.DVALUE_I1 x  => ret (DV2.DVALUE_I1 x)
-       | DV1.DVALUE_I8 x  => ret (DV2.DVALUE_I8 x)
-       | DV1.DVALUE_I32 x => ret (DV2.DVALUE_I32 x)
-       | DV1.DVALUE_I64 x => ret (DV2.DVALUE_I64 x)
+           match addr_convert a with
+           | Oom msg => DV2.DVALUE_Oom DTYPE_Pointer
+           | NoOom a' => DV2.DVALUE_Addr a'
+           end
+       | DV1.DVALUE_I1 x  => DV2.DVALUE_I1 x
+       | DV1.DVALUE_I8 x  => DV2.DVALUE_I8 x
+       | DV1.DVALUE_I32 x => DV2.DVALUE_I32 x
+       | DV1.DVALUE_I64 x => DV2.DVALUE_I64 x
        | DV1.DVALUE_IPTR x =>
            let xz := LP1.IP.to_Z x in
-           x' <- LP2.IP.from_Z xz;;
-           ret (DV2.DVALUE_IPTR x')
-       | DV1.DVALUE_Double x => ret (DV2.DVALUE_Double x)
-       | DV1.DVALUE_Float x => ret (DV2.DVALUE_Float x)
-       | DV1.DVALUE_Poison t => ret (DV2.DVALUE_Poison t)
-       | DV1.DVALUE_None => ret DV2.DVALUE_None
+           match LP2.IP.from_Z xz with
+           | Oom msg => DV2.DVALUE_Oom DTYPE_IPTR
+           | NoOom x' => DV2.DVALUE_IPTR x'
+           end
+       | DV1.DVALUE_Double x => DV2.DVALUE_Double x
+       | DV1.DVALUE_Float x => DV2.DVALUE_Float x
+       | DV1.DVALUE_Poison t => DV2.DVALUE_Poison t
+       | DV1.DVALUE_Oom t => DV2.DVALUE_Oom t
+       | DV1.DVALUE_None => DV2.DVALUE_None
        | DV1.DVALUE_Struct fields =>
-           fields' <- map_monad_In fields (fun elt Hin => dvalue_convert elt);;
-           ret (DV2.DVALUE_Struct fields')
+           let fields' := map_In fields (fun elt HIn => dvalue_convert elt)in
+           DV2.DVALUE_Struct fields'
        | DV1.DVALUE_Packed_struct fields =>
-           fields' <- map_monad_In fields (fun elt Hin => dvalue_convert elt);;
-           ret (DV2.DVALUE_Packed_struct fields')
+           let fields' := map_In fields (fun elt HIn => dvalue_convert elt)in
+           DV2.DVALUE_Packed_struct fields'
        | DV1.DVALUE_Array elts =>
-           elts' <- map_monad_In elts (fun elt Hin => dvalue_convert elt);;
-           ret (DV2.DVALUE_Array elts')
+           let elts' := map_In elts (fun elt HIn => dvalue_convert elt)in
+           DV2.DVALUE_Array elts'
        | DV1.DVALUE_Vector elts =>
-           elts' <- map_monad_In elts (fun elt Hin => dvalue_convert elt);;
-           ret (DV2.DVALUE_Vector elts')
+           let elts' := map_In elts (fun elt HIn => dvalue_convert elt)in
+           DV2.DVALUE_Vector elts'
        end.
 
-  Program Fixpoint uvalue_convert (uv1 : DV1.uvalue) {measure (DV1.uvalue_measure uv1)} : OOM DV2.uvalue
+  Program Fixpoint uvalue_convert (uv1 : DV1.uvalue) {measure (DV1.uvalue_measure uv1)} : DV2.uvalue
     := match uv1 with
        | DV1.UVALUE_Addr a =>
-           a' <- addr_convert a;;
-           ret (DV2.UVALUE_Addr a')
-       | DV1.UVALUE_I1 x  => ret (DV2.UVALUE_I1 x)
-       | DV1.UVALUE_I8 x  => ret (DV2.UVALUE_I8 x)
-       | DV1.UVALUE_I32 x => ret (DV2.UVALUE_I32 x)
-       | DV1.UVALUE_I64 x => ret (DV2.UVALUE_I64 x)
+           match addr_convert a with
+           | Oom msg => DV2.UVALUE_Oom DTYPE_Pointer
+           | NoOom a' => DV2.UVALUE_Addr a'
+           end
+       | DV1.UVALUE_I1 x  => DV2.UVALUE_I1 x
+       | DV1.UVALUE_I8 x  => DV2.UVALUE_I8 x
+       | DV1.UVALUE_I32 x => DV2.UVALUE_I32 x
+       | DV1.UVALUE_I64 x => DV2.UVALUE_I64 x
        | DV1.UVALUE_IPTR x =>
            let xz := LP1.IP.to_Z x in
-           x' <- LP2.IP.from_Z xz;;
-           ret (DV2.UVALUE_IPTR x')
-       | DV1.UVALUE_Double x => ret (DV2.UVALUE_Double x)
-       | DV1.UVALUE_Float x => ret (DV2.UVALUE_Float x)
-       | DV1.UVALUE_Poison t => ret (DV2.UVALUE_Poison t)
-       | DV1.UVALUE_None => ret DV2.UVALUE_None
+           match LP2.IP.from_Z xz with
+           | Oom msg => DV2.UVALUE_Oom DTYPE_IPTR
+           | NoOom x' => DV2.UVALUE_IPTR x'
+           end
+       | DV1.UVALUE_Double x => DV2.UVALUE_Double x
+       | DV1.UVALUE_Float x => DV2.UVALUE_Float x
+       | DV1.UVALUE_Poison t => DV2.UVALUE_Poison t
+       | DV1.UVALUE_Oom t => DV2.UVALUE_Oom t
+       | DV1.UVALUE_None => DV2.UVALUE_None
        | DV1.UVALUE_Struct fields =>
-           fields' <- map_monad_In fields (fun elt Hin => uvalue_convert elt);;
-           ret (DV2.UVALUE_Struct fields')
+           let fields' := map_In fields (fun elt HIn => uvalue_convert elt)in
+           DV2.UVALUE_Struct fields'
        | DV1.UVALUE_Packed_struct fields =>
-           fields' <- map_monad_In fields (fun elt Hin => uvalue_convert elt);;
-           ret (DV2.UVALUE_Packed_struct fields')
+           let fields' := map_In fields (fun elt HIn => uvalue_convert elt)in
+           DV2.UVALUE_Packed_struct fields'
        | DV1.UVALUE_Array elts =>
-           elts' <- map_monad_In elts (fun elt Hin => uvalue_convert elt);;
-           ret (DV2.UVALUE_Array elts')
+           let elts' := map_In elts (fun elt HIn => uvalue_convert elt)in
+           DV2.UVALUE_Array elts'
        | DV1.UVALUE_Vector elts =>
-           elts' <- map_monad_In elts (fun elt Hin => uvalue_convert elt);;
-           ret (DV2.UVALUE_Vector elts')
+           let elts' := map_In elts (fun elt HIn => uvalue_convert elt)in
+           DV2.UVALUE_Vector elts'
        | DV1.UVALUE_Undef dt =>
            (* Could be a bit odd with intptr *)
-           ret (DV2.UVALUE_Undef dt)
+           DV2.UVALUE_Undef dt
        | DV1.UVALUE_IBinop iop v1 v2 =>
-           v1' <- uvalue_convert v1;;
-           v2' <- uvalue_convert v2;;
-           ret (DV2.UVALUE_IBinop iop v1' v2')
+           let v1' := uvalue_convert v1 in
+           let v2' := uvalue_convert v2 in
+           DV2.UVALUE_IBinop iop v1' v2'
        | DV1.UVALUE_ICmp cmp v1 v2 =>
-           v1' <- uvalue_convert v1;;
-           v2' <- uvalue_convert v2;;
-           ret (DV2.UVALUE_ICmp cmp v1' v2')
+           let v1' := uvalue_convert v1 in
+           let v2' := uvalue_convert v2 in
+           DV2.UVALUE_ICmp cmp v1' v2'
        | DV1.UVALUE_FBinop fop fm v1 v2 =>
-           v1' <- uvalue_convert v1;;
-           v2' <- uvalue_convert v2;;
-           ret (DV2.UVALUE_FBinop fop fm v1' v2')
+           let v1' := uvalue_convert v1 in
+           let v2' := uvalue_convert v2 in
+           DV2.UVALUE_FBinop fop fm v1' v2'
        | DV1.UVALUE_FCmp cmp v1 v2 =>
-           v1' <- uvalue_convert v1;;
-           v2' <- uvalue_convert v2;;
-           ret (DV2.UVALUE_FCmp cmp v1' v2')
+           let v1' := uvalue_convert v1 in
+           let v2' := uvalue_convert v2 in
+           DV2.UVALUE_FCmp cmp v1' v2'
        | DV1.UVALUE_Conversion conv t_from v t_to =>
-           v' <- uvalue_convert v;;
-           ret (DV2.UVALUE_Conversion conv t_from v' t_to)
+           let v' := uvalue_convert v in
+           DV2.UVALUE_Conversion conv t_from v' t_to
        | DV1.UVALUE_GetElementPtr t ptrval idxs =>
-           ptrval' <- uvalue_convert ptrval;;
-           idxs' <- map_monad_In idxs (fun elt Hin => uvalue_convert elt);;
-           ret (DV2.UVALUE_GetElementPtr t ptrval' idxs')
+           let ptrval' := uvalue_convert ptrval in
+           let idxs' := map_In idxs (fun elt Hin => uvalue_convert elt) in
+           DV2.UVALUE_GetElementPtr t ptrval' idxs'
        | DV1.UVALUE_ExtractElement t vec idx =>
-           vec' <- uvalue_convert vec;;
-           idx' <- uvalue_convert idx;;
-           ret (DV2.UVALUE_ExtractElement t vec' idx')
+           let vec' := uvalue_convert vec in
+           let idx' := uvalue_convert idx in
+           DV2.UVALUE_ExtractElement t vec' idx'
        | DV1.UVALUE_InsertElement t vec elt idx =>
-           vec' <- uvalue_convert vec;;
-           elt' <- uvalue_convert elt;;
-           idx' <- uvalue_convert idx;;
-           ret (DV2.UVALUE_InsertElement t vec' elt' idx')
+           let vec' := uvalue_convert vec in
+           let elt' := uvalue_convert elt in
+           let idx' := uvalue_convert idx in
+           DV2.UVALUE_InsertElement t vec' elt' idx'
        | DV1.UVALUE_ShuffleVector vec1 vec2 idxmask =>
-           vec1' <- uvalue_convert vec1;;
-           vec2' <- uvalue_convert vec2;;
-           idxmask' <- uvalue_convert idxmask;;
-           ret (DV2.UVALUE_ShuffleVector vec1' vec2' idxmask')
+           let vec1' := uvalue_convert vec1 in
+           let vec2' := uvalue_convert vec2 in
+           let idxmask' := uvalue_convert idxmask in
+           DV2.UVALUE_ShuffleVector vec1' vec2' idxmask'
        | DV1.UVALUE_ExtractValue t vec idxs =>
-           vec' <- uvalue_convert vec;;
-           ret (DV2.UVALUE_ExtractValue t vec' idxs)
+           let vec' := uvalue_convert vec in
+           DV2.UVALUE_ExtractValue t vec' idxs
        | DV1.UVALUE_InsertValue t vec elt idxs =>
-           vec' <- uvalue_convert vec;;
-           elt' <- uvalue_convert elt;;
-           ret (DV2.UVALUE_InsertValue t vec' elt' idxs)
+           let vec' := uvalue_convert vec in
+           let elt' := uvalue_convert elt in
+           DV2.UVALUE_InsertValue t vec' elt' idxs
        | DV1.UVALUE_Select cnd v1 v2 =>
-           cnd' <- uvalue_convert cnd;;
-           v1' <- uvalue_convert v1;;
-           v2' <- uvalue_convert v2;;
-           ret (DV2.UVALUE_Select cnd' v1' v2')
+           let cnd' := uvalue_convert cnd in
+           let v1' := uvalue_convert v1 in
+           let v2' := uvalue_convert v2 in
+           DV2.UVALUE_Select cnd' v1' v2'
        | DV1.UVALUE_ExtractByte uv dt idx sid =>
-           uv' <- uvalue_convert uv;;
-           idx' <- uvalue_convert idx;;
-           ret (DV2.UVALUE_ExtractByte uv' dt idx' sid)
+           let uv' := uvalue_convert uv in
+           let idx' := uvalue_convert idx in
+           DV2.UVALUE_ExtractByte uv' dt idx' sid
        | DV1.UVALUE_ConcatBytes uvs dt =>
-           uvs' <- map_monad_In uvs (fun elt Hin => uvalue_convert elt);;
-           ret (DV2.UVALUE_ConcatBytes uvs' dt)
+           let uvs' := map_In uvs (fun elt Hin => uvalue_convert elt) in
+           DV2.UVALUE_ConcatBytes uvs' dt
        end.
 
   Opaque dvalue_convert.
@@ -349,39 +361,46 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       dvalue_convert dv =
         match dv with
         | DV1.DVALUE_Addr a =>
-            a' <- addr_convert a;;
-            ret (DV2.DVALUE_Addr a')
-        | DV1.DVALUE_I1 x  => ret (DV2.DVALUE_I1 x)
-        | DV1.DVALUE_I8 x  => ret (DV2.DVALUE_I8 x)
-        | DV1.DVALUE_I32 x => ret (DV2.DVALUE_I32 x)
-        | DV1.DVALUE_I64 x => ret (DV2.DVALUE_I64 x)
+            match addr_convert a with
+            | Oom msg => DV2.DVALUE_Oom DTYPE_Pointer
+            | NoOom a' => DV2.DVALUE_Addr a'
+            end
+        | DV1.DVALUE_I1 x  => DV2.DVALUE_I1 x
+        | DV1.DVALUE_I8 x  => DV2.DVALUE_I8 x
+        | DV1.DVALUE_I32 x => DV2.DVALUE_I32 x
+        | DV1.DVALUE_I64 x => DV2.DVALUE_I64 x
         | DV1.DVALUE_IPTR x =>
             let xz := LP1.IP.to_Z x in
-            x' <- LP2.IP.from_Z xz;;
-            ret (DV2.DVALUE_IPTR x')
-        | DV1.DVALUE_Double x => ret (DV2.DVALUE_Double x)
-        | DV1.DVALUE_Float x => ret (DV2.DVALUE_Float x)
-        | DV1.DVALUE_Poison t => ret (DV2.DVALUE_Poison t)
-        | DV1.DVALUE_None => ret DV2.DVALUE_None
+            match LP2.IP.from_Z xz with
+            | Oom msg => DV2.DVALUE_Oom DTYPE_IPTR
+            | NoOom x' => DV2.DVALUE_IPTR x'
+            end
+        | DV1.DVALUE_Double x => DV2.DVALUE_Double x
+        | DV1.DVALUE_Float x => DV2.DVALUE_Float x
+        | DV1.DVALUE_Poison t => DV2.DVALUE_Poison t
+        | DV1.DVALUE_Oom t => DV2.DVALUE_Oom t
+        | DV1.DVALUE_None => DV2.DVALUE_None
         | DV1.DVALUE_Struct fields =>
-            fields' <- map_monad_In fields (fun elt Hin => dvalue_convert elt);;
-            ret (DV2.DVALUE_Struct fields')
+            let fields' := map_In fields (fun elt HIn => dvalue_convert elt)in
+            DV2.DVALUE_Struct fields'
         | DV1.DVALUE_Packed_struct fields =>
-            fields' <- map_monad_In fields (fun elt Hin => dvalue_convert elt);;
-            ret (DV2.DVALUE_Packed_struct fields')
+            let fields' := map_In fields (fun elt HIn => dvalue_convert elt)in
+            DV2.DVALUE_Packed_struct fields'
         | DV1.DVALUE_Array elts =>
-            elts' <- map_monad_In elts (fun elt Hin => dvalue_convert elt);;
-            ret (DV2.DVALUE_Array elts')
+            let elts' := map_In elts (fun elt HIn => dvalue_convert elt)in
+            DV2.DVALUE_Array elts'
         | DV1.DVALUE_Vector elts =>
-            elts' <- map_monad_In elts (fun elt Hin => dvalue_convert elt);;
-            ret (DV2.DVALUE_Vector elts')
+            let elts' := map_In elts (fun elt HIn => dvalue_convert elt)in
+            DV2.DVALUE_Vector elts'
         end.
   Proof.
     intros dv.
     Transparent dvalue_convert.
     unfold dvalue_convert at 1.
     rewrite Wf.WfExtensionality.fix_sub_eq_ext.
-    destruct dv; reflexivity.
+    destruct dv; try reflexivity.
+    break_match; reflexivity.
+    break_match; reflexivity.
   Qed.
 
   Lemma uvalue_convert_equation:
@@ -389,91 +408,96 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       uvalue_convert uv =
         match uv with
         | DV1.UVALUE_Addr a =>
-            a' <- addr_convert a;;
-            ret (DV2.UVALUE_Addr a')
-        | DV1.UVALUE_I1 x  => ret (DV2.UVALUE_I1 x)
-        | DV1.UVALUE_I8 x  => ret (DV2.UVALUE_I8 x)
-        | DV1.UVALUE_I32 x => ret (DV2.UVALUE_I32 x)
-        | DV1.UVALUE_I64 x => ret (DV2.UVALUE_I64 x)
+            match addr_convert a with
+            | Oom msg => DV2.UVALUE_Oom DTYPE_Pointer
+            | NoOom a' => DV2.UVALUE_Addr a'
+            end
+        | DV1.UVALUE_I1 x  => DV2.UVALUE_I1 x
+        | DV1.UVALUE_I8 x  => DV2.UVALUE_I8 x
+        | DV1.UVALUE_I32 x => DV2.UVALUE_I32 x
+        | DV1.UVALUE_I64 x => DV2.UVALUE_I64 x
         | DV1.UVALUE_IPTR x =>
             let xz := LP1.IP.to_Z x in
-            x' <- LP2.IP.from_Z xz;;
-            ret (DV2.UVALUE_IPTR x')
-        | DV1.UVALUE_Double x => ret (DV2.UVALUE_Double x)
-        | DV1.UVALUE_Float x => ret (DV2.UVALUE_Float x)
-        | DV1.UVALUE_Poison t => ret (DV2.UVALUE_Poison t)
-        | DV1.UVALUE_None => ret DV2.UVALUE_None
+            match LP2.IP.from_Z xz with
+            | Oom msg => DV2.UVALUE_Oom DTYPE_IPTR
+            | NoOom x' => DV2.UVALUE_IPTR x'
+            end
+        | DV1.UVALUE_Double x => DV2.UVALUE_Double x
+        | DV1.UVALUE_Float x => DV2.UVALUE_Float x
+        | DV1.UVALUE_Poison t => DV2.UVALUE_Poison t
+        | DV1.UVALUE_Oom t => DV2.UVALUE_Oom t
+        | DV1.UVALUE_None => DV2.UVALUE_None
         | DV1.UVALUE_Struct fields =>
-            fields' <- map_monad_In fields (fun elt Hin => uvalue_convert elt);;
-            ret (DV2.UVALUE_Struct fields')
+            let fields' := map_In fields (fun elt HIn => uvalue_convert elt)in
+            DV2.UVALUE_Struct fields'
         | DV1.UVALUE_Packed_struct fields =>
-            fields' <- map_monad_In fields (fun elt Hin => uvalue_convert elt);;
-            ret (DV2.UVALUE_Packed_struct fields')
+            let fields' := map_In fields (fun elt HIn => uvalue_convert elt)in
+            DV2.UVALUE_Packed_struct fields'
         | DV1.UVALUE_Array elts =>
-            elts' <- map_monad_In elts (fun elt Hin => uvalue_convert elt);;
-            ret (DV2.UVALUE_Array elts')
+            let elts' := map_In elts (fun elt HIn => uvalue_convert elt)in
+            DV2.UVALUE_Array elts'
         | DV1.UVALUE_Vector elts =>
-            elts' <- map_monad_In elts (fun elt Hin => uvalue_convert elt);;
-            ret (DV2.UVALUE_Vector elts')
+            let elts' := map_In elts (fun elt HIn => uvalue_convert elt)in
+            DV2.UVALUE_Vector elts'
         | DV1.UVALUE_Undef dt =>
             (* Could be a bit odd with intptr *)
-            ret (DV2.UVALUE_Undef dt)
+            DV2.UVALUE_Undef dt
         | DV1.UVALUE_IBinop iop v1 v2 =>
-            v1' <- uvalue_convert v1;;
-            v2' <- uvalue_convert v2;;
-            ret (DV2.UVALUE_IBinop iop v1' v2')
+            let v1' := uvalue_convert v1 in
+            let v2' := uvalue_convert v2 in
+            DV2.UVALUE_IBinop iop v1' v2'
         | DV1.UVALUE_ICmp cmp v1 v2 =>
-            v1' <- uvalue_convert v1;;
-            v2' <- uvalue_convert v2;;
-            ret (DV2.UVALUE_ICmp cmp v1' v2')
+            let v1' := uvalue_convert v1 in
+            let v2' := uvalue_convert v2 in
+            DV2.UVALUE_ICmp cmp v1' v2'
         | DV1.UVALUE_FBinop fop fm v1 v2 =>
-            v1' <- uvalue_convert v1;;
-            v2' <- uvalue_convert v2;;
-            ret (DV2.UVALUE_FBinop fop fm v1' v2')
+            let v1' := uvalue_convert v1 in
+            let v2' := uvalue_convert v2 in
+            DV2.UVALUE_FBinop fop fm v1' v2'
         | DV1.UVALUE_FCmp cmp v1 v2 =>
-            v1' <- uvalue_convert v1;;
-            v2' <- uvalue_convert v2;;
-            ret (DV2.UVALUE_FCmp cmp v1' v2')
+            let v1' := uvalue_convert v1 in
+            let v2' := uvalue_convert v2 in
+            DV2.UVALUE_FCmp cmp v1' v2'
         | DV1.UVALUE_Conversion conv t_from v t_to =>
-            v' <- uvalue_convert v;;
-            ret (DV2.UVALUE_Conversion conv t_from v' t_to)
+            let v' := uvalue_convert v in
+            DV2.UVALUE_Conversion conv t_from v' t_to
         | DV1.UVALUE_GetElementPtr t ptrval idxs =>
-            ptrval' <- uvalue_convert ptrval;;
-            idxs' <- map_monad_In idxs (fun elt Hin => uvalue_convert elt);;
-            ret (DV2.UVALUE_GetElementPtr t ptrval' idxs')
+            let ptrval' := uvalue_convert ptrval in
+            let idxs' := map_In idxs (fun elt Hin => uvalue_convert elt) in
+            DV2.UVALUE_GetElementPtr t ptrval' idxs'
         | DV1.UVALUE_ExtractElement t vec idx =>
-            vec' <- uvalue_convert vec;;
-            idx' <- uvalue_convert idx;;
-            ret (DV2.UVALUE_ExtractElement t vec' idx')
+            let vec' := uvalue_convert vec in
+            let idx' := uvalue_convert idx in
+            DV2.UVALUE_ExtractElement t vec' idx'
         | DV1.UVALUE_InsertElement t vec elt idx =>
-            vec' <- uvalue_convert vec;;
-            elt' <- uvalue_convert elt;;
-            idx' <- uvalue_convert idx;;
-            ret (DV2.UVALUE_InsertElement t vec' elt' idx')
+            let vec' := uvalue_convert vec in
+            let elt' := uvalue_convert elt in
+            let idx' := uvalue_convert idx in
+            DV2.UVALUE_InsertElement t vec' elt' idx'
         | DV1.UVALUE_ShuffleVector vec1 vec2 idxmask =>
-            vec1' <- uvalue_convert vec1;;
-            vec2' <- uvalue_convert vec2;;
-            idxmask' <- uvalue_convert idxmask;;
-            ret (DV2.UVALUE_ShuffleVector vec1' vec2' idxmask')
+            let vec1' := uvalue_convert vec1 in
+            let vec2' := uvalue_convert vec2 in
+            let idxmask' := uvalue_convert idxmask in
+            DV2.UVALUE_ShuffleVector vec1' vec2' idxmask'
         | DV1.UVALUE_ExtractValue t vec idxs =>
-            vec' <- uvalue_convert vec;;
-            ret (DV2.UVALUE_ExtractValue t vec' idxs)
+            let vec' := uvalue_convert vec in
+            DV2.UVALUE_ExtractValue t vec' idxs
         | DV1.UVALUE_InsertValue t vec elt idxs =>
-            vec' <- uvalue_convert vec;;
-            elt' <- uvalue_convert elt;;
-            ret (DV2.UVALUE_InsertValue t vec' elt' idxs)
+            let vec' := uvalue_convert vec in
+            let elt' := uvalue_convert elt in
+            DV2.UVALUE_InsertValue t vec' elt' idxs
         | DV1.UVALUE_Select cnd v1 v2 =>
-            cnd' <- uvalue_convert cnd;;
-            v1' <- uvalue_convert v1;;
-            v2' <- uvalue_convert v2;;
-            ret (DV2.UVALUE_Select cnd' v1' v2')
+            let cnd' := uvalue_convert cnd in
+            let v1' := uvalue_convert v1 in
+            let v2' := uvalue_convert v2 in
+            DV2.UVALUE_Select cnd' v1' v2'
         | DV1.UVALUE_ExtractByte uv dt idx sid =>
-            uv' <- uvalue_convert uv;;
-            idx' <- uvalue_convert idx;;
-            ret (DV2.UVALUE_ExtractByte uv' dt idx' sid)
+            let uv' := uvalue_convert uv in
+            let idx' := uvalue_convert idx in
+            DV2.UVALUE_ExtractByte uv' dt idx' sid
         | DV1.UVALUE_ConcatBytes uvs dt =>
-            uvs' <- map_monad_In uvs (fun elt Hin => uvalue_convert elt);;
-            ret (DV2.UVALUE_ConcatBytes uvs' dt)
+            let uvs' := map_In uvs (fun elt Hin => uvalue_convert elt) in
+            DV2.UVALUE_ConcatBytes uvs' dt
         end.
   Proof.
     (* intros uv. *)
@@ -485,8 +509,221 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
     (* destruct uv; reflexivity. *)
   Admitted.
 
+  Obligation Tactic :=
+    try Tactics.program_simpl;
+  try solve [ cbn; try lia
+            | DV1.solve_dvalue_measure
+            | DV1.solve_uvalue_measure
+            | repeat split;
+              intros * [CONTRA1 CONTRA2];
+              solve [ inv CONTRA1
+                    | inv CONTRA2
+                ]
+    ].
+  Program Fixpoint dvalue_refine (dv1 : DV1.dvalue) (dv2 : DV2.dvalue) {measure (DV1.dvalue_measure dv1)} : Prop
+    := let dvc := dvalue_convert dv1 in
+       dvc = dv2 \/
+         match dv1, dv2 with
+         | _, DV2.DVALUE_Oom t2 =>
+             DV1.dvalue_has_dtyp dv1 t2
+         | DV1.DVALUE_Struct fields1, DV2.DVALUE_Struct fields2 =>
+             Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => dvalue_refine e1 e2)
+         | DV1.DVALUE_Packed_struct fields1, DV2.DVALUE_Packed_struct fields2 =>
+             Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => dvalue_refine e1 e2)
+         | DV1.DVALUE_Array elts1, DV2.DVALUE_Array elts2 =>
+             Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => dvalue_refine e1 e2)
+         | DV1.DVALUE_Vector elts1, DV2.DVALUE_Vector elts2 =>
+             Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => dvalue_refine e1 e2)
+         | _, _ =>
+             False
+         end.
+
+  Lemma dvalue_refine_equation :
+    forall dv1 dv2,
+      dvalue_refine dv1 dv2 =
+        let dvc := dvalue_convert dv1 in
+        dvc = dv2 \/
+          match dv1, dv2 with
+          | _, DV2.DVALUE_Oom t2 =>
+              DV1.dvalue_has_dtyp dv1 t2
+          | DV1.DVALUE_Struct fields1, DV2.DVALUE_Struct fields2 =>
+              Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => dvalue_refine e1 e2)
+          | DV1.DVALUE_Packed_struct fields1, DV2.DVALUE_Packed_struct fields2 =>
+              Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => dvalue_refine e1 e2)
+          | DV1.DVALUE_Array elts1, DV2.DVALUE_Array elts2 =>
+              Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => dvalue_refine e1 e2)
+          | DV1.DVALUE_Vector elts1, DV2.DVALUE_Vector elts2 =>
+              Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => dvalue_refine e1 e2)
+          | _, _ =>
+              False
+          end.
+  Proof.
+  Admitted.
+
+  Program Fixpoint uvalue_refine (uv1 : DV1.uvalue) (uv2 : DV2.uvalue) {measure (DV1.uvalue_measure uv1)} : Prop
+    := let uvc := uvalue_convert uv1 in
+       uvc = uv2 \/
+         match uv1, uv2 with
+         | _, DV2.UVALUE_Oom t2 =>
+             DV1.uvalue_has_dtyp uv1 t2
+         | DV1.UVALUE_Struct fields1, DV2.UVALUE_Struct fields2 =>
+             Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => uvalue_refine e1 e2)
+         | DV1.UVALUE_Packed_struct fields1, DV2.UVALUE_Packed_struct fields2 =>
+             Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => uvalue_refine e1 e2)
+         | DV1.UVALUE_Array elts1, DV2.UVALUE_Array elts2 =>
+             Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => uvalue_refine e1 e2)
+         | DV1.UVALUE_Vector elts1, DV2.UVALUE_Vector elts2 =>
+             Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => uvalue_refine e1 e2)
+         | DV1.UVALUE_IBinop iop1 v1_1 v2_1, DV2.UVALUE_IBinop iop2 v1_2 v2_2 =>
+             iop1 = iop2 /\
+               uvalue_refine v1_1 v1_2 /\
+               uvalue_refine v2_1 v2_2
+         | DV1.UVALUE_ICmp cmp1 v1_1 v2_1, DV2.UVALUE_ICmp cmp2 v1_2 v2_2 =>
+             cmp1 = cmp2 /\
+               uvalue_refine v1_1 v1_2 /\
+               uvalue_refine v2_1 v2_2
+         | DV1.UVALUE_FBinop fop1 fm1 v1_1 v2_1, DV2.UVALUE_FBinop fop2 fm2 v1_2 v2_2 =>
+             fop1 = fop2 /\
+               fm1 = fm2 /\
+               uvalue_refine v1_1 v1_2 /\
+               uvalue_refine v2_1 v2_2
+         | DV1.UVALUE_FCmp cmp1 v1_1 v2_1, DV2.UVALUE_FCmp cmp2 v1_2 v2_2 =>
+             cmp1 = cmp2 /\
+               uvalue_refine v1_1 v1_2 /\
+               uvalue_refine v2_1 v2_2
+         | DV1.UVALUE_Conversion conv1 t_from1 v1 t_to1, DV2.UVALUE_Conversion conv2 t_from2 v2 t_to2 =>
+             conv1 = conv2 /\
+               uvalue_refine v1 v2 /\
+               t_from1 = t_from2 /\
+               t_to1 = t_to2
+         | DV1.UVALUE_GetElementPtr t1 ptrval1 idxs1, DV2.UVALUE_GetElementPtr t2 ptrval2 idxs2 =>
+             t1 = t2 /\
+               uvalue_refine ptrval1 ptrval2 /\
+               Forall2_HIn idxs1 idxs2 (fun ix1 ix2 IN1 IN2 => uvalue_refine ix1 ix2)
+         | DV1.UVALUE_ExtractElement vec_typ1 vec1 idx1, DV2.UVALUE_ExtractElement vec_typ2 vec2 idx2 =>
+             vec_typ1 = vec_typ2 /\
+               uvalue_refine vec1 vec2 /\
+               uvalue_refine idx1 idx2
+         | DV1.UVALUE_InsertElement vec_typ1 vec1 elt1 idx1, DV2.UVALUE_InsertElement vec_typ2 vec2 elt2 idx2 =>
+             vec_typ1 = vec_typ2 /\
+               uvalue_refine vec1 vec2 /\
+               uvalue_refine elt1 elt2 /\
+               uvalue_refine idx1 idx2             
+         | DV1.UVALUE_ShuffleVector vec1_1 vec2_1 idxmask1, DV2.UVALUE_ShuffleVector vec1_2 vec2_2 idxmask2 =>
+             uvalue_refine vec1_1 vec1_2 /\
+             uvalue_refine vec2_1 vec2_2 /\
+               uvalue_refine idxmask1 idxmask2             
+         | DV1.UVALUE_ExtractValue vec_typ1 vec1 idxs1, DV2.UVALUE_ExtractValue vec_typ2 vec2 idxs2 =>
+             vec_typ1 = vec_typ2 /\
+               uvalue_refine vec1 vec2 /\
+               idxs1 = idxs2
+         | DV1.UVALUE_InsertValue vec_typ1 vec1 elt1 idxs1, DV2.UVALUE_InsertValue vec_typ2 vec2 elt2 idxs2 =>
+             vec_typ1 = vec_typ2 /\
+               uvalue_refine vec1 vec2 /\
+               uvalue_refine elt1 elt2 /\
+               idxs1 = idxs2
+         | DV1.UVALUE_Select cnd1 v1_1 v2_1, DV2.UVALUE_Select cnd2 v1_2 v2_2 =>
+             uvalue_refine cnd1 cnd2 /\
+               uvalue_refine v1_1 v1_2 /\
+               uvalue_refine v2_1 v2_2
+         | DV1.UVALUE_ExtractByte uv1 dt1 idx1 sid1, DV2.UVALUE_ExtractByte uv2 dt2 idx2 sid2 =>
+             uvalue_refine uv1 uv2 /\
+               dt1 = dt2 /\
+               uvalue_refine idx1 idx2 /\
+               sid1 = sid2
+         | DV1.UVALUE_ConcatBytes uvs1 dt1, DV2.UVALUE_ConcatBytes uvs2 dt2 =>
+             Forall2_HIn uvs1 uvs2 (fun uv1 uv2 IN1 IN2 => uvalue_refine uv1 uv2) /\
+               dt1 = dt2
+         | _, _ =>
+             False
+         end.
+
+  Lemma uvalue_refine_equation :
+    forall uv1 uv2,
+      uvalue_refine uv1 uv2 =
+        let uvc := uvalue_convert uv1 in
+        uvc = uv2 \/
+          match uv1, uv2 with
+          | _, DV2.UVALUE_Oom t2 =>
+              DV1.uvalue_has_dtyp uv1 t2
+          | DV1.UVALUE_Struct fields1, DV2.UVALUE_Struct fields2 =>
+              Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => uvalue_refine e1 e2)
+          | DV1.UVALUE_Packed_struct fields1, DV2.UVALUE_Packed_struct fields2 =>
+              Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => uvalue_refine e1 e2)
+          | DV1.UVALUE_Array elts1, DV2.UVALUE_Array elts2 =>
+              Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => uvalue_refine e1 e2)
+          | DV1.UVALUE_Vector elts1, DV2.UVALUE_Vector elts2 =>
+              Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => uvalue_refine e1 e2)
+          | DV1.UVALUE_IBinop iop1 v1_1 v2_1, DV2.UVALUE_IBinop iop2 v1_2 v2_2 =>
+              iop1 = iop2 /\
+                uvalue_refine v1_1 v1_2 /\
+                uvalue_refine v2_1 v2_2
+          | DV1.UVALUE_ICmp cmp1 v1_1 v2_1, DV2.UVALUE_ICmp cmp2 v1_2 v2_2 =>
+              cmp1 = cmp2 /\
+                uvalue_refine v1_1 v1_2 /\
+                uvalue_refine v2_1 v2_2
+          | DV1.UVALUE_FBinop fop1 fm1 v1_1 v2_1, DV2.UVALUE_FBinop fop2 fm2 v1_2 v2_2 =>
+              fop1 = fop2 /\
+                fm1 = fm2 /\
+                uvalue_refine v1_1 v1_2 /\
+                uvalue_refine v2_1 v2_2
+          | DV1.UVALUE_FCmp cmp1 v1_1 v2_1, DV2.UVALUE_FCmp cmp2 v1_2 v2_2 =>
+              cmp1 = cmp2 /\
+                uvalue_refine v1_1 v1_2 /\
+                uvalue_refine v2_1 v2_2
+          | DV1.UVALUE_Conversion conv1 t_from1 v1 t_to1, DV2.UVALUE_Conversion conv2 t_from2 v2 t_to2 =>
+              conv1 = conv2 /\
+                uvalue_refine v1 v2 /\
+                t_from1 = t_from2 /\
+                t_to1 = t_to2
+          | DV1.UVALUE_GetElementPtr t1 ptrval1 idxs1, DV2.UVALUE_GetElementPtr t2 ptrval2 idxs2 =>
+              t1 = t2 /\
+                uvalue_refine ptrval1 ptrval2 /\
+                Forall2_HIn idxs1 idxs2 (fun ix1 ix2 IN1 IN2 => uvalue_refine ix1 ix2)
+          | DV1.UVALUE_ExtractElement vec_typ1 vec1 idx1, DV2.UVALUE_ExtractElement vec_typ2 vec2 idx2 =>
+              vec_typ1 = vec_typ2 /\
+                uvalue_refine vec1 vec2 /\
+                uvalue_refine idx1 idx2
+          | DV1.UVALUE_InsertElement vec_typ1 vec1 elt1 idx1, DV2.UVALUE_InsertElement vec_typ2 vec2 elt2 idx2 =>
+              vec_typ1 = vec_typ2 /\
+                uvalue_refine vec1 vec2 /\
+                uvalue_refine elt1 elt2 /\
+                uvalue_refine idx1 idx2             
+          | DV1.UVALUE_ShuffleVector vec1_1 vec2_1 idxmask1, DV2.UVALUE_ShuffleVector vec1_2 vec2_2 idxmask2 =>
+              uvalue_refine vec1_1 vec1_2 /\
+                uvalue_refine vec2_1 vec2_2 /\
+                uvalue_refine idxmask1 idxmask2             
+          | DV1.UVALUE_ExtractValue vec_typ1 vec1 idxs1, DV2.UVALUE_ExtractValue vec_typ2 vec2 idxs2 =>
+              vec_typ1 = vec_typ2 /\
+                uvalue_refine vec1 vec2 /\
+                idxs1 = idxs2
+          | DV1.UVALUE_InsertValue vec_typ1 vec1 elt1 idxs1, DV2.UVALUE_InsertValue vec_typ2 vec2 elt2 idxs2 =>
+              vec_typ1 = vec_typ2 /\
+                uvalue_refine vec1 vec2 /\
+                uvalue_refine elt1 elt2 /\
+                idxs1 = idxs2
+          | DV1.UVALUE_Select cnd1 v1_1 v2_1, DV2.UVALUE_Select cnd2 v1_2 v2_2 =>
+              uvalue_refine cnd1 cnd2 /\
+                uvalue_refine v1_1 v1_2 /\
+                uvalue_refine v2_1 v2_2
+          | DV1.UVALUE_ExtractByte uv1 dt1 idx1 sid1, DV2.UVALUE_ExtractByte uv2 dt2 idx2 sid2 =>
+              uvalue_refine uv1 uv2 /\
+                dt1 = dt2 /\
+                uvalue_refine idx1 idx2 /\
+                sid1 = sid2
+          | DV1.UVALUE_ConcatBytes uvs1 dt1, DV2.UVALUE_ConcatBytes uvs2 dt2 =>
+              Forall2_HIn uvs1 uvs2 (fun uv1 uv2 IN1 IN2 => uvalue_refine uv1 uv2) /\
+                dt1 = dt2
+          | _, _ =>
+              False
+          end.
+  Proof.
+  Admitted.
+
   Opaque dvalue_convert.
   Opaque uvalue_convert.
+  Opaque dvalue_refine.
+  Opaque uvalue_refine.
 End DVConvert.
 
 Module DVConvertMake (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF) : DVConvert LP1 LP2 AC Events1 Events2.
@@ -497,69 +734,69 @@ Module Type DVConvertSafe (LP1 : LLVMParams) (LP2 : LLVMParams) (AC1 : AddrConve
   Import ACSafe.
   Import BIG_IP.
 
-  Lemma dvalue_convert_safe :
-    forall dv_i,
-    exists dv_f,
-      DVC1.dvalue_convert dv_i = NoOom dv_f /\
-        DVC2.dvalue_convert dv_f = NoOom dv_i.
-  Proof.
-    intros dv_i.
-    rewrite DVC1.dvalue_convert_equation.
-    induction dv_i;
-      try solve [eexists; split; auto].
-    - (* Addresses *)
-      cbn.
-      pose proof (ACSafe.addr_convert_succeeds a) as [a2 ACSUC].
-      rewrite ACSUC.
-      exists (DVC1.DV2.DVALUE_Addr a2).
-      rewrite (ACSafe.addr_convert_safe a);
-        auto.
-    - (* Intptr expressions... *)
-      cbn.
-      pose proof (from_Z_safe (LP1.IP.to_Z x)) as FZS.
-      destruct (LP2.IP.from_Z (LP1.IP.to_Z x)); inv FZS.
-      exists (DVC1.DV2.DVALUE_IPTR i).
-      split; auto.
-      (* TODO: Need to know something about the round trip of these intptr conversions :) *)
-      admit.
-    - (* Structures *)
-      induction fields.
-      + (* No fields *)
-        exists (DVC1.DV2.DVALUE_Struct []).
-        cbn.
-        split; auto.
-      + (* Fields *)
-        assert (In a (a :: fields)) as INA by (cbn; auto).
-        pose proof (H a INA) as HA.
-        destruct HA as [dv_a [CONV1_a CONV2_a]].
+  (* Lemma dvalue_convert_safe : *)
+  (*   forall dv_i, *)
+  (*   exists dv_f, *)
+  (*     DVC1.dvalue_convert dv_i = NoOom dv_f /\ *)
+  (*       DVC2.dvalue_convert dv_f = NoOom dv_i. *)
+  (* Proof. *)
+  (*   intros dv_i. *)
+  (*   rewrite DVC1.dvalue_convert_equation. *)
+  (*   induction dv_i; *)
+  (*     try solve [eexists; split; auto]. *)
+  (*   - (* Addresses *) *)
+  (*     cbn. *)
+  (*     pose proof (ACSafe.addr_convert_succeeds a) as [a2 ACSUC]. *)
+  (*     rewrite ACSUC. *)
+  (*     exists (DVC1.DV2.DVALUE_Addr a2). *)
+  (*     rewrite (ACSafe.addr_convert_safe a); *)
+  (*       auto. *)
+  (*   - (* Intptr expressions... *) *)
+  (*     cbn. *)
+  (*     pose proof (from_Z_safe (LP1.IP.to_Z x)) as FZS. *)
+  (*     destruct (LP2.IP.from_Z (LP1.IP.to_Z x)); inv FZS. *)
+  (*     exists (DVC1.DV2.DVALUE_IPTR i). *)
+  (*     split; auto. *)
+  (*     (* TODO: Need to know something about the round trip of these intptr conversions :) *) *)
+  (*     admit. *)
+  (*   - (* Structures *) *)
+  (*     induction fields. *)
+  (*     + (* No fields *) *)
+  (*       exists (DVC1.DV2.DVALUE_Struct []). *)
+  (*       cbn. *)
+  (*       split; auto. *)
+  (*     + (* Fields *) *)
+  (*       assert (In a (a :: fields)) as INA by (cbn; auto). *)
+  (*       pose proof (H a INA) as HA. *)
+  (*       destruct HA as [dv_a [CONV1_a CONV2_a]]. *)
 
-        rewrite map_monad_In_unfold.
-        rewrite DVC1.dvalue_convert_equation.
-        rewrite CONV1_a.
-        Opaque DVC1.dvalue_convert.
-        Opaque DVC2.dvalue_convert.
-        cbn.
+  (*       rewrite map_monad_In_unfold. *)
+  (*       rewrite DVC1.dvalue_convert_equation. *)
+  (*       rewrite CONV1_a. *)
+  (*       Opaque DVC1.dvalue_convert. *)
+  (*       Opaque DVC2.dvalue_convert. *)
+  (*       cbn. *)
 
-        destruct (map_monad_In fields (fun (x : DVC1.DV1.dvalue) (_ : In x fields) => DVC1.dvalue_convert x)) eqn:HMAPM.
-        -- (* Fields converted successfully *)
-          exists (DVC1.DV2.DVALUE_Struct (dv_a :: l)).
-          cbn; split; auto.
+  (*       destruct (map_monad_In fields (fun (x : DVC1.DV1.dvalue) (_ : In x fields) => DVC1.dvalue_convert x)) eqn:HMAPM. *)
+  (*       -- (* Fields converted successfully *) *)
+  (*         exists (DVC1.DV2.DVALUE_Struct (dv_a :: l)). *)
+  (*         cbn; split; auto. *)
 
-          rewrite DVC2.dvalue_convert_equation.
-          cbn.
-          rewrite CONV2_a.
-          cbn.
-          admit.
-        -- (* OOM when converting fields, should be a contradiction.
+  (*         rewrite DVC2.dvalue_convert_equation. *)
+  (*         cbn. *)
+  (*         rewrite CONV2_a. *)
+  (*         cbn. *)
+  (*         admit. *)
+  (*       -- (* OOM when converting fields, should be a contradiction. *)
 
-              Contradiction should arise from HMAPM returning OOM...
+  (*             Contradiction should arise from HMAPM returning OOM... *)
 
-              This means there exists u in fields, such that
-              dvalue_convert u returns OOM, but IHfields contradicts
-              that.
-            *)
-          admit.
-  Admitted.
+  (*             This means there exists u in fields, such that *)
+  (*             dvalue_convert u returns OOM, but IHfields contradicts *)
+  (*             that. *)
+  (*           *) *)
+  (*         admit. *)
+  (* Admitted. *)
 End DVConvertSafe.
 
 Notation LLVM_syntax :=
@@ -602,51 +839,48 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
             end).
 
     (* External Calls *)
-    { refine (f' <- lift_OOM (uvalue_convert f);;
-              args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+    { refine (let f' := uvalue_convert f in
+              let args' := map_In args (fun elt Hin => dvalue_convert elt) in
               dv <- trigger (E2.ExternalCall dt f' args');;
               _).
 
       inversion e0.
-      apply (lift_OOM (DVCrev.dvalue_convert dv)).
+      apply (ret (DVCrev.dvalue_convert dv)).
     }
 
     (* Intrinsics *)
     { inversion i; subst.
-      apply (args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+      apply (let args' := map_In args (fun elt Hin => dvalue_convert elt) in
              dv <- trigger (E2.Intrinsic dt name args');;
-             lift_OOM (DVCrev.dvalue_convert dv)).
+             ret (DVCrev.dvalue_convert dv)).
     }
 
     (* Globals *)
     { inversion e0.
       - (* Global write *)
-        apply (dv <- lift_OOM (dvalue_convert dv);;
+        apply (let dv := dvalue_convert dv in
                trigger (GlobalWrite id dv)).
       - (* Global read *)
         apply (dv <- trigger (GlobalRead id);;
-               lift_OOM (DVCrev.dvalue_convert dv)).
+               ret (DVCrev.dvalue_convert dv)).
     }
 
     (* Locals *)
     { inversion e0.
       - (* Local write *)
-        apply (dv <- lift_OOM (uvalue_convert dv);;
+        apply (let dv := uvalue_convert dv in
                trigger (LocalWrite id dv)).
       - (* Local read *)
         apply (dv <- trigger (LocalRead id);;
-               lift_OOM (DVCrev.uvalue_convert dv)).
+               ret (DVCrev.uvalue_convert dv)).
     }
 
     (* Stack *)
     { inversion e0.
       - (* Stack Push *)
-        apply (args' <- lift_OOM
-                         (map_monad_In args
-                            (fun '(id, uv) Hin =>
-                               uv' <- uvalue_convert uv;;
-                               ret (id, uv')
-                         ));;
+        apply (let args' := map_In args
+                              (fun '(id, uv) Hin =>
+                                 (id, uvalue_convert uv)) in
                trigger (StackPush args')).
       - (* Stack Pop *)
         apply (trigger StackPop).
@@ -660,14 +894,14 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
         apply (trigger E2.MemPop).
       - (* Alloca *)
         apply (ptr <- trigger (E2.Alloca t num_elements align);;
-               lift_OOM (DVCrev.dvalue_convert ptr)).
+               ret (DVCrev.dvalue_convert ptr)).
       - (* Load *)
-        apply (a' <- lift_OOM (dvalue_convert a);;
+        apply (let a' := dvalue_convert a in
                uv <- trigger (E2.Load t a');;
-               lift_OOM (DVCrev.uvalue_convert uv)).
+               ret (DVCrev.uvalue_convert uv)).
       - (* Store *)
-        apply (a' <- lift_OOM (dvalue_convert a);;
-               v' <- lift_OOM (uvalue_convert v);;
+        apply (let a' := dvalue_convert a in
+               let v' := uvalue_convert v in
                trigger (E2.Store t a' v')).
     }
 
@@ -675,11 +909,11 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
     { (* TODO: confirm whether this is sane... *)
       inversion e0.
       subst.
-      refine (x' <- lift_OOM (uvalue_convert x);;
+      refine (let x' := uvalue_convert x in
               dv <- trigger (E2.pick Pre x');;
               _).
       destruct dv as [res _].
-      apply (res' <- lift_OOM (DVCrev.dvalue_convert res);;
+      apply (let res' := DVCrev.dvalue_convert res in
              ret (exist (fun x => True) res' I)).
     }
 
@@ -731,41 +965,38 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
             end).
 
     (* External Calls *)
-    { refine (f' <- lift_OOM (uvalue_convert f);;
-              args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+    { refine (let f' := uvalue_convert f in
+              let args' := map_In args (fun elt Hin => dvalue_convert elt) in
               dv <- trigger (E2.ExternalCall dt f' args');;
               _).
 
       inversion e0.
-      apply (lift_OOM (DVCrev.dvalue_convert dv)).
+      apply (ret (DVCrev.dvalue_convert dv)).
     }
 
     (* Intrinsics *)
     { inversion i; subst.
-      apply (args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+      apply (let args' := map_In args (fun elt Hin => dvalue_convert elt) in
              dv <- trigger (E2.Intrinsic dt name args');;
-             lift_OOM (DVCrev.dvalue_convert dv)).
+             ret (DVCrev.dvalue_convert dv)).
     }
 
     (* Locals *)
     { inversion e0.
       - (* Local write *)
-        apply (dv <- lift_OOM (uvalue_convert dv);;
+        apply (let dv := uvalue_convert dv in
                trigger (LocalWrite id dv)).
       - (* Local read *)
         apply (dv <- trigger (LocalRead id);;
-               lift_OOM (DVCrev.uvalue_convert dv)).
+               ret (DVCrev.uvalue_convert dv)).
     }
 
     (* Stack *)
     { inversion e0.
       - (* Stack Push *)
-        apply (args' <- lift_OOM
-                         (map_monad_In args
-                            (fun '(id, uv) Hin =>
-                               uv' <- uvalue_convert uv;;
-                               ret (id, uv')
-                         ));;
+        apply (let args' := map_In args
+                              (fun '(id, uv) Hin =>
+                                 (id, uvalue_convert uv)) in
                trigger (StackPush args')).
       - (* Stack Pop *)
         apply (trigger StackPop).
@@ -779,14 +1010,14 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
         apply (trigger E2.MemPop).
       - (* Alloca *)
         apply (ptr <- trigger (E2.Alloca t num_elements align);;
-               lift_OOM (DVCrev.dvalue_convert ptr)).
+               ret (DVCrev.dvalue_convert ptr)).
       - (* Load *)
-        apply (a' <- lift_OOM (dvalue_convert a);;
+        apply (let a' := dvalue_convert a in
                uv <- trigger (E2.Load t a');;
-               lift_OOM (DVCrev.uvalue_convert uv)).
+               ret (DVCrev.uvalue_convert uv)).
       - (* Store *)
-        apply (a' <- lift_OOM (dvalue_convert a);;
-               v' <- lift_OOM (uvalue_convert v);;
+        apply (let a' := dvalue_convert a in
+               let v' := uvalue_convert v in
                trigger (E2.Store t a' v')).
     }
 
@@ -794,11 +1025,11 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
     { (* TODO: confirm whether this is sane... *)
       inversion e0.
       subst.
-      refine (x' <- lift_OOM (uvalue_convert x);;
+      refine (let x' := uvalue_convert x in
               dv <- trigger (E2.pick Pre x');;
               _).
       destruct dv as [res _].
-      apply (res' <- lift_OOM (DVCrev.dvalue_convert res);;
+      apply (let res' := DVCrev.dvalue_convert res in
              ret (exist (fun x => True) res' I)).
     }
 
@@ -846,20 +1077,20 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
             end).
 
     (* External Calls *)
-    { refine (f' <- lift_OOM (uvalue_convert f);;
-              args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+    { refine (let f' := uvalue_convert f in
+              let args' := map_In args (fun elt Hin => dvalue_convert elt) in
               dv <- trigger (E2.ExternalCall dt f' args');;
               _).
 
       inversion e0.
-      apply (lift_OOM (DVCrev.dvalue_convert dv)).
+      apply (ret (DVCrev.dvalue_convert dv)).
     }
 
     (* Intrinsics *)
     { inversion i; subst.
-      apply (args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+      apply (let args' := map_In args (fun elt Hin => dvalue_convert elt) in
              dv <- trigger (E2.Intrinsic dt name args');;
-             lift_OOM (DVCrev.dvalue_convert dv)).
+             ret (DVCrev.dvalue_convert dv)).
     }
 
     (* MemoryE *)
@@ -870,14 +1101,14 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
         apply (trigger E2.MemPop).
       - (* Alloca *)
         apply (ptr <- trigger (E2.Alloca t num_elements align);;
-               lift_OOM (DVCrev.dvalue_convert ptr)).
+               ret (DVCrev.dvalue_convert ptr)).
       - (* Load *)
-        apply (a' <- lift_OOM (dvalue_convert a);;
+        apply (let a' := dvalue_convert a in
                uv <- trigger (E2.Load t a');;
-               lift_OOM (DVCrev.uvalue_convert uv)).
+               ret (DVCrev.uvalue_convert uv)).
       - (* Store *)
-        apply (a' <- lift_OOM (dvalue_convert a);;
-               v' <- lift_OOM (uvalue_convert v);;
+        apply (let a' := dvalue_convert a in
+               let v' := uvalue_convert v in
                trigger (E2.Store t a' v')).
     }
 
@@ -885,11 +1116,11 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
     { (* TODO: confirm whether this is sane... *)
       inversion e0.
       subst.
-      refine (x' <- lift_OOM (uvalue_convert x);;
+      refine (let x' := uvalue_convert x in
               dv <- trigger (E2.pick Pre x');;
               _).
       destruct dv as [res _].
-      apply (res' <- lift_OOM (DVCrev.dvalue_convert res);;
+      apply (let res' := DVCrev.dvalue_convert res in
              ret (exist (fun x => True) res' I)).
     }
 
@@ -933,24 +1164,24 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
             end).
 
     (* External Calls *)
-    { refine (f' <- lift_OOM (uvalue_convert f);;
-              args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+    { refine (let f' := uvalue_convert f in
+              let args' := map_In args (fun elt Hin => dvalue_convert elt) in
               dv <- trigger (E2.ExternalCall dt f' args');;
               _).
 
       inversion e0.
-      apply (lift_OOM (DVCrev.dvalue_convert dv)).
+      apply (ret (DVCrev.dvalue_convert dv)).
     }
 
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
       inversion e0.
       subst.
-      refine (x' <- lift_OOM (uvalue_convert x);;
+      refine (let x' := uvalue_convert x in
               dv <- trigger (E2.pick Pre x');;
               _).
       destruct dv as [res _].
-      apply (res' <- lift_OOM (DVCrev.dvalue_convert res);;
+      apply (let res' := DVCrev.dvalue_convert res in
              ret (exist (fun x => True) res' I)).
     }
 
@@ -992,13 +1223,13 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
             end).
 
     (* External Calls *)
-    refine (f' <- lift_OOM (uvalue_convert f);;
-            args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+    refine (let f' := uvalue_convert f in
+            let args' := map_In args (fun elt Hin => dvalue_convert elt) in
             dv <- trigger (E2.ExternalCall dt f' args');;
             _).
 
     inversion e0.
-    apply (lift_OOM (DVCrev.dvalue_convert dv)).
+    apply (ret (DVCrev.dvalue_convert dv)).
 
     (* OOME *)
     { inversion e0.
@@ -1104,36 +1335,29 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
   Defined.
 
   (* TODO: move this? *)
-  Definition L0_convert_tree' {A B} (f : A -> OOM B) (t : itree E1.L0 A) : itree E2.L0 B
-    := a <- L0_convert_tree t;;
-       lift_OOM (f a).
+  Definition L0_convert_tree' {A B} (f : A -> B) (t : itree E1.L0 A) : itree E2.L0 B
+    := fmap f (L0_convert_tree t).
 
-  Definition L1_convert_tree' {A B} (f : A -> OOM B) (t : itree E1.L1 A) : itree E2.L1 B
-    := a <- L1_convert_tree t;;
-       lift_OOM (f a).
+  Definition L1_convert_tree' {A B} (f : A -> B) (t : itree E1.L1 A) : itree E2.L1 B
+    := fmap f (L1_convert_tree t).
 
-  Definition L2_convert_tree' {A B} (f : A -> OOM B) (t : itree E1.L2 A) : itree E2.L2 B
-    := a <- L2_convert_tree t;;
-       lift_OOM (f a).
+  Definition L2_convert_tree' {A B} (f : A -> B) (t : itree E1.L2 A) : itree E2.L2 B
+    := fmap f (L2_convert_tree t).
 
-  Definition L3_convert_tree' {A B} (f : A -> OOM B) (t : itree E1.L3 A) : itree E2.L3 B
-    := a <- L3_convert_tree t;;
-       lift_OOM (f a).
+  Definition L3_convert_tree' {A B} (f : A -> B) (t : itree E1.L3 A) : itree E2.L3 B
+    := fmap f (L3_convert_tree t).
 
-  Definition L4_convert_tree' {A B} (f : A -> OOM B) (t : itree E1.L4 A) : itree E2.L4 B
-    := a <- L4_convert_tree t;;
-       lift_OOM (f a).
+  Definition L4_convert_tree' {A B} (f : A -> B) (t : itree E1.L4 A) : itree E2.L4 B
+    := fmap f (L4_convert_tree t).
 
-  Definition L5_convert_tree' {A B} (f : A -> OOM B) (t : itree E1.L5 A) : itree E2.L5 B
-    := a <- L5_convert_tree t;;
-       lift_OOM (f a).
+  Definition L5_convert_tree' {A B} (f : A -> B) (t : itree E1.L5 A) : itree E2.L5 B
+    := fmap f (L5_convert_tree t).
 
-  Definition L6_convert_tree' {A B} (f : A -> OOM B) (t : itree E1.L6 A) : itree E2.L6 B
-    := a <- L6_convert_tree t;;
-       lift_OOM (f a).
+  Definition L6_convert_tree' {A B} (f : A -> B) (t : itree E1.L6 A) : itree E2.L6 B
+    := fmap f (L6_convert_tree t).
 
   #[global] Instance L0_convert_tree'_eutt_proper {A B} {RA : relation A} {RB : relation B} f :
-    (forall u1 u2, RA u1 u2 -> @eutt E2.L0 _ _ RB (lift_OOM (f u1)) (lift_OOM (f u2))) ->
+    (forall u1 u2, RA u1 u2 -> @eutt E2.L0 _ _ RB (ret (f u1)) (ret (f u2))) ->
     Proper (eutt RA ==> eutt RB) (L0_convert_tree' f).
   Proof.
     unfold Proper, respectful.
@@ -1145,7 +1369,7 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
   Defined.
 
   #[global] Instance L1_convert_tree'_eutt_proper {A B} {RA : relation A} {RB : relation B} f :
-    (forall u1 u2, RA u1 u2 -> @eutt E2.L1 _ _ RB (lift_OOM (f u1)) (lift_OOM (f u2))) ->
+    (forall u1 u2, RA u1 u2 -> @eutt E2.L1 _ _ RB (ret (f u1)) (ret (f u2))) ->
     Proper (eutt RA ==> eutt RB) (L1_convert_tree' f).
   Proof.
     unfold Proper, respectful.
@@ -1157,7 +1381,7 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
   Defined.
 
   #[global] Instance L2_convert_tree'_eutt_proper {A B} {RA : relation A} {RB : relation B} f :
-    (forall u1 u2, RA u1 u2 -> @eutt E2.L2 _ _ RB (lift_OOM (f u1)) (lift_OOM (f u2))) ->
+    (forall u1 u2, RA u1 u2 -> @eutt E2.L2 _ _ RB (ret (f u1)) (ret (f u2))) ->
     Proper (eutt RA ==> eutt RB) (L2_convert_tree' f).
   Proof.
     unfold Proper, respectful.
@@ -1169,7 +1393,7 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
   Defined.
 
   #[global] Instance L3_convert_tree'_eutt_proper {A B} {RA : relation A} {RB : relation B} f :
-    (forall u1 u2, RA u1 u2 -> @eutt E2.L3 _ _ RB (lift_OOM (f u1)) (lift_OOM (f u2))) ->
+    (forall u1 u2, RA u1 u2 -> @eutt E2.L3 _ _ RB (ret (f u1)) (ret (f u2))) ->
     Proper (eutt RA ==> eutt RB) (L3_convert_tree' f).
   Proof.
     unfold Proper, respectful.
@@ -1181,7 +1405,7 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
   Defined.
 
   #[global] Instance L4_convert_tree'_eutt_proper {A B} {RA : relation A} {RB : relation B} f :
-    (forall u1 u2, RA u1 u2 -> @eutt E2.L4 _ _ RB (lift_OOM (f u1)) (lift_OOM (f u2))) ->
+    (forall u1 u2, RA u1 u2 -> @eutt E2.L4 _ _ RB (ret (f u1)) (ret (f u2))) ->
     Proper (eutt RA ==> eutt RB) (L4_convert_tree' f).
   Proof.
     unfold Proper, respectful.
@@ -1193,7 +1417,7 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
   Defined.
 
   #[global] Instance L5_convert_tree'_eutt_proper {A B} {RA : relation A} {RB : relation B} f :
-    (forall u1 u2, RA u1 u2 -> @eutt E2.L5 _ _ RB (lift_OOM (f u1)) (lift_OOM (f u2))) ->
+    (forall u1 u2, RA u1 u2 -> @eutt E2.L5 _ _ RB (ret (f u1)) (ret (f u2))) ->
     Proper (eutt RA ==> eutt RB) (L5_convert_tree' f).
   Proof.
     unfold Proper, respectful.
@@ -1205,7 +1429,7 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
   Defined.
 
   #[global] Instance L6_convert_tree'_eutt_proper {A B} {RA : relation A} {RB : relation B} f :
-    (forall u1 u2, RA u1 u2 -> @eutt E2.L6 _ _ RB (lift_OOM (f u1)) (lift_OOM (f u2))) ->
+    (forall u1 u2, RA u1 u2 -> @eutt E2.L6 _ _ RB (ret (f u1)) (ret (f u2))) ->
     Proper (eutt RA ==> eutt RB) (L6_convert_tree' f).
   Proof.
     unfold Proper, respectful.
@@ -1217,21 +1441,19 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
   Defined.
 
   Definition convert_uvalue_tree {E} `{OOME -< E} (t : itree E E1.DV.uvalue) : itree E E2.DV.uvalue
-    := uv <- t;;
-       lift_OOM (uvalue_convert uv).
+    := fmap uvalue_convert t.
 
   Definition convert_dvalue_tree {E} `{OOME -< E} (t : itree E E1.DV.dvalue) : itree E E2.DV.dvalue
-    := dv <- t;;
-       lift_OOM (dvalue_convert dv).
+    := fmap dvalue_convert t.
 
-  Definition L3_convert_PropT {A B} (RB : relation B) (f : A -> OOM B) (ts : PropT E1.L3 A) : PropT E2.L3 B
+  Definition L3_convert_PropT {A B} (RB : relation B) (f : A -> B) (ts : PropT E1.L3 A) : PropT E2.L3 B
     := fun t_e2 => exists t_e1,
            ts t_e1 /\
              refine_OOM_h RB
                (L3_convert_tree' f t_e1)
                t_e2.
 
-  Definition L4_convert_PropT {A B} (RB : relation B) (f : A -> OOM B) (ts : PropT IS1.LP.Events.L4 A) : PropT E2.L4 B
+  Definition L4_convert_PropT {A B} (RB : relation B) (f : A -> B) (ts : PropT IS1.LP.Events.L4 A) : PropT E2.L4 B
     := fun t_e2 => exists t_e1,
            ts t_e1 /\
              refine_OOM_h RB
@@ -1239,12 +1461,12 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
                t_e2.
 
   Definition L5_convert_PropT {A B}
-    (RB : relation B) (f : A -> OOM B) (ts : PropT IS1.LP.Events.L5 A)
+    (RB : relation B) (f : A -> B) (ts : PropT IS1.LP.Events.L5 A)
     : PropT E2.L5 B
     := L4_convert_PropT RB f ts.
 
   Definition L6_convert_PropT {A B}
-    (RB : relation B) (f : A -> OOM B) (ts : PropT IS1.LP.Events.L6 A)
+    (RB : relation B) (f : A -> B) (ts : PropT IS1.LP.Events.L6 A)
     : PropT E2.L6 B
     := L4_convert_PropT RB f ts.
 
@@ -1260,14 +1482,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   (**  Converting state between the two languages *)
 
-  Definition convert_global_env (g : IS1.LLVM.Global.global_env) : OOM IS2.LLVM.Global.global_env
-    := map_monad (fun '(k, dv) => dv' <- dvalue_convert dv;; ret (k, dv')) g.
+  Definition convert_global_env (g : IS1.LLVM.Global.global_env) : IS2.LLVM.Global.global_env
+    := map (fun '(k, dv) => (k, dvalue_convert dv)) g.
 
-  Definition convert_local_env (l : IS1.LLVM.Local.local_env) : OOM IS2.LLVM.Local.local_env
-    := map_monad (fun '(k, uv) => uv' <- uvalue_convert uv;; ret (k, uv')) l.
+  Definition convert_local_env (l : IS1.LLVM.Local.local_env) : IS2.LLVM.Local.local_env
+    := map (fun '(k, uv) => (k, uvalue_convert uv)) l.
 
-  Definition convert_stack (s : @stack IS1.LLVM.Local.local_env) : OOM (@stack IS2.LLVM.Local.local_env)
-    := map_monad convert_local_env s.
+  Definition convert_stack (s : @stack IS1.LLVM.Local.local_env) : (@stack IS2.LLVM.Local.local_env)
+    := map convert_local_env s.
 
   (** Conversions between results at different levels of interpretation *)
 
@@ -1276,36 +1498,31 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
      these because the refine_resX relations used by refine_LX ignores
      these.
    *)
-  (* Take the resulting dvalue from the interpreted layer and throw an OOM-error
-   if we run out of memory. *)
-  Definition res_L1_convert_unsafe (res : LLVM1.res_L1) : OOM LLVM2.res_L1
+  Definition res_L1_convert_unsafe (res : LLVM1.res_L1) : LLVM2.res_L1
     := match res with
        | (genv, dv) =>
-           dv' <- dvalue_convert dv;;
-           ret ([], dv')
+           ([], dvalue_convert dv)
        end.
 
-  Definition res_L2_convert_unsafe (res : LLVM1.res_L2) : OOM LLVM2.res_L2
+  Definition res_L2_convert_unsafe (res : LLVM1.res_L2) : LLVM2.res_L2
     := match res with
        | ((lenv, lstack), (genv, dv)) =>
-           dv' <- dvalue_convert dv;;
-           ret (([], []), ([], dv'))
+           (([], []), ([], dvalue_convert dv))
        end.
 
-  Definition res_L3_convert_unsafe (res : LLVM1.res_L3) : OOM LLVM2.res_L3
+  Definition res_L3_convert_unsafe (res : LLVM1.res_L3) : LLVM2.res_L3
     := match res with
        | (ms, (sid, ((lenv, lstack), (genv, dv)))) =>
-           dv' <- dvalue_convert dv;;
-           ret (IS2.MEM.MMEP.MMSP.initial_memory_state, (0, (([], []), ([], dv'))))
+           (IS2.MEM.MMEP.MMSP.initial_memory_state, (0, (([], []), ([], dvalue_convert dv))))
        end.
 
-  Definition res_L4_convert_unsafe (res : LLVM1.res_L4) : OOM LLVM2.res_L4
+  Definition res_L4_convert_unsafe (res : LLVM1.res_L4) : LLVM2.res_L4
     := res_L3_convert_unsafe res.
 
-  Definition res_L5_convert_unsafe (res : LLVM1.res_L5) : OOM LLVM2.res_L5
+  Definition res_L5_convert_unsafe (res : LLVM1.res_L5) : LLVM2.res_L5
     := res_L4_convert_unsafe res.
 
-  Definition res_L6_convert_unsafe (res : LLVM1.res_L6) : OOM LLVM2.res_L6
+  Definition res_L6_convert_unsafe (res : LLVM1.res_L6) : LLVM2.res_L6
     := res_L5_convert_unsafe res.
 
   (** Refinements between languages at different levels of interpretation *)
@@ -1351,36 +1568,301 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   (** Refinement between states *)
 
+  Definition alist_refine {K V1 V2} `{RD_K : RelDec.RelDec K} (R: V1 -> V2 -> Prop) (m1 : FMapAList.alist K V1) (m2 : FMapAList.alist K V2) :=
+    (forall k,
+        (exists v1, FMapAList.alist_find k m1 = Some v1) <->
+          (exists v2, FMapAList.alist_find k m2 = Some v2)) /\
+      (forall k v1 v2,
+          FMapAList.alist_find k m1 = Some v1 ->
+          FMapAList.alist_find k m2 = Some v2 ->
+          R v1 v2).
+
+  Lemma alist_refine_empty {K V1 V2} `{RD_K : RelDec.RelDec K} (R: V1 -> V2 -> Prop) :
+    alist_refine R [] [].
+  Proof.
+    red.
+    split.
+    { intros k.
+      split; intros [dv CONTRA];
+        cbn in *; inv CONTRA.
+    }
+
+    { intros k dv1 dv2 CONTRA1 CONTRA2.
+      inv CONTRA1.
+    }
+  Qed.
+
+  Lemma alist_refine_cons :
+    forall {K V1 V2}
+      `{RD_K : @RelDec.RelDec K (@eq K)}
+      `{RD_K_CORRECT : @RelDec.RelDec_Correct _ eq RD_K}
+      (R: V1 -> V2 -> Prop) xs ys x y,
+      fst x = fst y ->
+      R (snd x) (snd y) ->
+      alist_refine R xs ys ->
+      alist_refine R (x :: xs) (y :: ys).
+  Proof.
+    intros K V1 V2 RD_K RD_K_CORRECT R.
+    induction xs, ys; intros x y H H0 H1.
+    - destruct x, y.
+      cbn in *.
+      split.
+      intros k1.
+
+      split; intros FIND.
+      + destruct FIND as [v1 FIND].
+        cbn in FIND.
+        break_match_hyp; inv FIND.
+        cbn.
+        rewrite Heqb.
+        exists v0.
+        reflexivity.
+      + destruct FIND as [v1 FIND].
+        cbn in FIND.
+        break_match_hyp; inv FIND.
+        cbn.
+        rewrite Heqb.
+        exists v.
+        reflexivity.
+      + intros k1 v1 v2 H2 H3.
+        cbn in H2, H3.
+        break_match_hyp; inv H3.
+        break_match_hyp; inv H2.
+        auto.
+    - destruct x, y.
+      cbn in *.
+      split.
+      intros k1.
+
+      split; intros FIND.
+      + destruct FIND as [v1 FIND].
+        cbn in FIND.
+        break_match_hyp; inv FIND.
+        cbn.
+        rewrite Heqb.
+        exists v0.
+        reflexivity.
+      + destruct p.
+        destruct FIND as [v2 FIND].
+        cbn in FIND.
+        break_match_hyp; inv FIND.
+        * exists v.
+          cbn.
+          rewrite Heqb.
+          reflexivity.
+        * break_match_hyp; inv H3.
+          -- exfalso.
+             red in H1. destruct H1 as [[H1 H1'] H2].
+             cbn in *.
+             rewrite Heqb0 in H1'.
+             forward H1'.
+             exists v2; auto.
+             destruct H1' as [v1 CONTRA].
+             inv CONTRA.
+          -- exfalso.
+             red in H1. destruct H1 as [[H1 H1'] H3].
+             cbn in *.
+             rewrite Heqb0 in H1'.
+             forward H1'.
+             exists v2; auto.
+             destruct H1' as [v1' CONTRA].
+             inv CONTRA.
+      + destruct p; subst.
+        intros k v2 v3 H2 H3.
+        cbn in H2, H3.
+        break_match_hyp; inv H2.
+        inv H3.
+        auto.
+    - destruct x, y, a.
+      cbn in *; subst.
+      split.
+      intros k.
+
+      split; intros FIND.
+      + destruct FIND as [v2 FIND].
+        cbn in FIND.
+        break_match_hyp; inv FIND.
+        * cbn.
+          rewrite Heqb.
+          exists v0.
+          reflexivity.
+        * break_match_hyp; inv H2.
+          -- exfalso.
+             red in H1. destruct H1 as [[H1 H1'] H2].
+             cbn in *.
+             rewrite Heqb0 in H1.
+             forward H1.
+             eexists; auto.
+             destruct H1 as [v2' CONTRA].
+             inv CONTRA.
+          -- exfalso.
+             red in H1. destruct H1 as [[H1 H1'] H2].
+             cbn in *.
+             rewrite Heqb0 in H1.
+             rewrite H3 in H1.
+             forward H1.
+             eexists; auto.
+             destruct H1 as [v2' CONTRA].
+             inv CONTRA.
+      + destruct FIND as [v2 FIND].
+        cbn in FIND.
+        break_match_hyp; inv FIND.
+        cbn.
+        rewrite Heqb.
+        eexists; auto.
+      + intros k v2 v3 H2 H3.
+        cbn in H2, H3.
+        break_match_hyp; inv H3.
+        inv H2.
+        auto.
+    - pose proof IHxs ys a p as IH.
+      destruct x, y, a, p; cbn in *; subst.
+      red.
+      split.
+      + intros k.
+        split; intros FIND.
+        * cbn in *.
+          break_match_hyp; inv FIND;
+            try solve [eexists; auto].
+
+          break_match_hyp; inv H.
+          -- break_match_goal.
+             eexists; auto.
+
+             red in H1.
+             destruct H1 as [H1 H1'].
+             cbn in *.
+             specialize (H1 k).
+             specialize (H1' k).
+             rewrite Heqb0 in H1.
+             rewrite Heqb0 in H1'.
+             destruct H1 as [H1a H1b].
+             forward H1a.
+             eexists; auto.
+             rewrite Heqb1 in H1a.
+             auto.
+          -- break_match_goal.
+             eexists; auto.
+
+             red in H1.
+             destruct H1 as [H1 H1'].
+             cbn in *.
+             specialize (H1 k).
+             specialize (H1' k).
+             rewrite Heqb0 in H1.
+             rewrite Heqb0 in H1'.
+             destruct H1 as [H1a H1b].
+             forward H1a.
+             eexists; eauto.
+             rewrite Heqb1 in H1a.
+             auto.
+        * cbn in *.
+          break_match_hyp; inv FIND;
+            try solve [eexists; auto].
+
+          break_match_hyp; inv H.
+          -- break_match_goal.
+             eexists; auto.
+
+             red in H1.
+             destruct H1 as [H1 H1'].
+             cbn in *.
+             specialize (H1 k).
+             specialize (H1' k).
+             rewrite Heqb0 in H1, H1'.
+             rewrite Heqb1 in H1, H1'.
+             destruct H1 as [H1a H1b].
+             forward H1b.
+             eexists; auto.
+             auto.
+          -- break_match_goal.
+             eexists; auto.
+
+             red in H1.
+             destruct H1 as [H1 H1'].
+             cbn in *.
+             specialize (H1 k).
+             specialize (H1' k).
+             rewrite Heqb0 in H1, H1'.
+             rewrite Heqb1 in H1, H1'.
+             destruct H1 as [H1a H1b].
+             eapply H1b.
+             eexists; eauto.
+      + intros k v3 v4 H H2.
+        cbn in *.
+        break_match_hyp; inv H; inv H2; auto.
+        break_match_hyp; inv H3.
+        * break_match_hyp; inv H4.
+          -- forward IH.
+             pose proof (@RelDec.rel_dec_correct _ _ RD_K RD_K_CORRECT k k1) as [KK1 _].
+             pose proof (@RelDec.rel_dec_correct _ _ RD_K RD_K_CORRECT k k2) as [KK2 _].
+             rewrite <- KK1, KK2; auto.
+
+             red in H1.
+             destruct H1 as [H1 H1'].
+             cbn in *.
+             specialize (H1 k).
+             specialize (H1' k).
+             rewrite Heqb0 in H1, H1'.
+             rewrite Heqb1 in H1, H1'.
+             eauto.
+          -- red in H1.
+             destruct H1 as [H1 H1'].
+             cbn in *.
+             specialize (H1 k).
+             specialize (H1' k).
+             rewrite Heqb0 in H1, H1'.
+             rewrite Heqb1 in H1, H1'.
+             eauto.
+        * break_match_hyp; inv H4.
+          -- red in H1.
+             destruct H1 as [H1 H1'].
+             cbn in *.
+             specialize (H1 k).
+             specialize (H1' k).
+             rewrite Heqb0 in H1, H1'.
+             rewrite Heqb1 in H1, H1'.
+             eauto.
+          -- red in H1.
+             destruct H1 as [H1 H1'].
+             cbn in *.
+             specialize (H1 k).
+             specialize (H1' k).
+             rewrite Heqb0 in H1, H1'.
+             rewrite Heqb1 in H1, H1'.
+             eauto.
+  Qed.
+
   (* Not sure if this is right...
 
      Presumably if [g1] OOMs when converted, we wouldn't have a [g2]
      anyway?
    *)
   Definition global_refine (g1 : IS1.LLVM.Global.global_env) (g2 : IS2.LLVM.Global.global_env) : Prop
-    := convert_global_env g1 = NoOom g2.
+    := alist_refine dvalue_refine g1 g2.
 
   Lemma global_refine_empty :
     global_refine [] [].
   Proof.
-    reflexivity.
+    apply alist_refine_empty.
   Qed.
 
   Definition local_refine (l1 : IS1.LLVM.Local.local_env) (l2 : IS2.LLVM.Local.local_env) : Prop
-    := convert_local_env l1 = NoOom l2.
+    := alist_refine uvalue_refine l1 l2.
 
   Lemma local_refine_empty :
     local_refine [] [].
   Proof.
-    reflexivity.
+    apply alist_refine_empty.
   Qed.
 
   Definition stack_refine (s1 : @stack IS1.LLVM.Local.local_env) (s2 : @stack IS2.LLVM.Local.local_env) : Prop
-    := convert_stack s1 = NoOom s2.
+    := Forall2 local_refine s1 s2.
 
   Lemma stack_refine_empty :
     stack_refine [] [].
   Proof.
-    reflexivity.
+    constructor.
   Qed.
 
   Definition local_stack_refine
@@ -1396,336 +1878,338 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     local_stack_refine ([], []) ([], []).
   Proof.
     cbn.
-    split; reflexivity.
+    split.
+    apply local_refine_empty.
+    apply stack_refine_empty.
   Qed.
 
   (** OOM Refinements *)
-  Lemma Returns_uvalue_convert_L1_L2 :
-    forall a d f u l t args,
-      EC.DVCrev.dvalue_convert a = NoOom d ->
-      EC.DVC.uvalue_convert f = NoOom u ->
-      @Returns (E2.ExternalCallE +' OOME +' UBE +' DebugE +' FailureE) E2.DV.dvalue a (trigger (E2.ExternalCall t u l)) ->
-      @Returns (E1.ExternalCallE +' OOME +' UBE +' DebugE +' FailureE) E1.DV.dvalue d (trigger (E1.ExternalCall t f args)).
-  Proof.
-  Admitted.
+  (* Lemma Returns_uvalue_convert_L1_L2 : *)
+  (*   forall a d f u l t args, *)
+  (*     EC.DVCrev.dvalue_convert a = NoOom d -> *)
+  (*     EC.DVC.uvalue_convert f = NoOom u -> *)
+  (*     @Returns (E2.ExternalCallE +' OOME +' UBE +' DebugE +' FailureE) E2.DV.dvalue a (trigger (E2.ExternalCall t u l)) -> *)
+  (*     @Returns (E1.ExternalCallE +' OOME +' UBE +' DebugE +' FailureE) E1.DV.dvalue d (trigger (E1.ExternalCall t f args)). *)
+  (* Proof. *)
+  (* Admitted. *)
 
-  Lemma Returns_uvalue_convert_L0 :
-    forall a d f u l t args,
-      EC.DVCrev.dvalue_convert a = NoOom d ->
-      EC.DVC.uvalue_convert f = NoOom u ->
-      @Returns E2.L0 E2.DV.dvalue a (trigger (E2.ExternalCall t u l)) ->
-      @Returns E1.L0 E1.DV.dvalue d (trigger (E1.ExternalCall t f args)).
-  Proof.
-  Admitted.
+  (* Lemma Returns_uvalue_convert_L0 : *)
+  (*   forall a d f u l t args, *)
+  (*     EC.DVCrev.dvalue_convert a = NoOom d -> *)
+  (*     EC.DVC.uvalue_convert f = NoOom u -> *)
+  (*     @Returns E2.L0 E2.DV.dvalue a (trigger (E2.ExternalCall t u l)) -> *)
+  (*     @Returns E1.L0 E1.DV.dvalue d (trigger (E1.ExternalCall t f args)). *)
+  (* Proof. *)
+  (* Admitted. *)
 
-  Lemma Returns_uvalue_convert_L3 :
-    forall a d f u l t args,
-      EC.DVCrev.dvalue_convert a = NoOom d ->
-      EC.DVC.uvalue_convert f = NoOom u ->
-      @Returns E2.L3 E2.DV.dvalue a (trigger (E2.ExternalCall t u l)) ->
-      @Returns E1.L3 E1.DV.dvalue d (trigger (E1.ExternalCall t f args)).
-  Proof.
-  Admitted.
+  (* Lemma Returns_uvalue_convert_L3 : *)
+  (*   forall a d f u l t args, *)
+  (*     EC.DVCrev.dvalue_convert a = NoOom d -> *)
+  (*     EC.DVC.uvalue_convert f = NoOom u -> *)
+  (*     @Returns E2.L3 E2.DV.dvalue a (trigger (E2.ExternalCall t u l)) -> *)
+  (*     @Returns E1.L3 E1.DV.dvalue d (trigger (E1.ExternalCall t f args)). *)
+  (* Proof. *)
+  (* Admitted. *)
 
-  Lemma refine_OOM_h_L0_convert_tree :
-    forall {T} x_inf y_inf (RR : relation T),
-      refine_OOM_h RR x_inf y_inf ->
-      refine_OOM_h RR (L0_convert_tree x_inf) (L0_convert_tree y_inf).
-  Proof.
-    (* intros T. *)
+  (* Lemma refine_OOM_h_L0_convert_tree : *)
+  (*   forall {T} x_inf y_inf (RR : relation T), *)
+  (*     refine_OOM_h RR x_inf y_inf -> *)
+  (*     refine_OOM_h RR (L0_convert_tree x_inf) (L0_convert_tree y_inf). *)
+  (* Proof. *)
+  (*   (* intros T. *) *)
 
-    (* unfold refine_OOM_h, L0_convert_tree, refine_OOM_h_flip. *)
-    (* intros. *)
-    (* rewrite (unfold_interp y_inf). *)
-    (* rewrite (unfold_interp x_inf). *)
-    (* cbn. *)
+  (*   (* unfold refine_OOM_h, L0_convert_tree, refine_OOM_h_flip. *) *)
+  (*   (* intros. *) *)
+  (*   (* rewrite (unfold_interp y_inf). *) *)
+  (*   (* rewrite (unfold_interp x_inf). *) *)
+  (*   (* cbn. *) *)
 
-    (* match goal with *)
-    (* | |- interp_prop _ _ ?l ?r => remember l as i; remember r as i0 *)
-    (* end. *)
+  (*   (* match goal with *) *)
+  (*   (* | |- interp_prop _ _ ?l ?r => remember l as i; remember r as i0 *) *)
+  (*   (* end. *) *)
 
-    (* assert (i ≅ _interp EC.L0_convert (observe y_inf)). { *)
-    (*   rewrite Heqi. reflexivity. *)
-    (* } clear Heqi. *)
-    (* remember (_interp EC.L0_convert (observe x_inf)). *)
-    (* assert (i0 ≅ _interp EC.L0_convert (observe x_inf)). { *)
-    (*   subst; reflexivity. *)
-    (* } clear Heqi1 Heqi0. *)
-    (* revert x_inf y_inf H i i0 H0 H1. *)
+  (*   (* assert (i ≅ _interp EC.L0_convert (observe y_inf)). { *) *)
+  (*   (*   rewrite Heqi. reflexivity. *) *)
+  (*   (* } clear Heqi. *) *)
+  (*   (* remember (_interp EC.L0_convert (observe x_inf)). *) *)
+  (*   (* assert (i0 ≅ _interp EC.L0_convert (observe x_inf)). { *) *)
+  (*   (*   subst; reflexivity. *) *)
+  (*   (* } clear Heqi1 Heqi0. *) *)
+  (*   (* revert x_inf y_inf H i i0 H0 H1. *) *)
 
-    (* pcofix CIH. *)
+  (*   (* pcofix CIH. *) *)
 
-    (* intros * H. *)
-    (* punfold H; red in H. *)
-    (* remember (observe y_inf) as oy; remember (observe x_inf) as ox. *)
-    (* clear Heqoy Heqox. *)
+  (*   (* intros * H. *) *)
+  (*   (* punfold H; red in H. *) *)
+  (*   (* remember (observe y_inf) as oy; remember (observe x_inf) as ox. *) *)
+  (*   (* clear Heqoy Heqox. *) *)
 
-    (* induction H; pclearbot; intros; subst; auto. *)
-    (* - pstep. cbn in H1, H2. *)
-    (*   rewrite itree_eta in H1, H2. *)
-    (*   red. *)
-    (*   destruct (observe i) eqn: Heqi; destruct (observe i0) eqn: Heqi0; *)
-    (*     try apply eqit_inv in H1; try apply eqit_inv in H2; cbn in H1, H2; try contradiction; auto. *)
-    (*   subst; constructor; auto. *)
-    (* - pstep. cbn in H1, H2. *)
-    (*   rewrite itree_eta in H1, H2. *)
-    (*   red. *)
-    (*   destruct (observe i) eqn: Heqi; destruct (observe i0) eqn: Heqi0; *)
-    (*     try apply eqit_inv in H1; try apply eqit_inv in H2; cbn in H1, H2; try contradiction; auto. *)
-    (*   subst; constructor; auto. *)
+  (*   (* induction H; pclearbot; intros; subst; auto. *) *)
+  (*   (* - pstep. cbn in H1, H2. *) *)
+  (*   (*   rewrite itree_eta in H1, H2. *) *)
+  (*   (*   red. *) *)
+  (*   (*   destruct (observe i) eqn: Heqi; destruct (observe i0) eqn: Heqi0; *) *)
+  (*   (*     try apply eqit_inv in H1; try apply eqit_inv in H2; cbn in H1, H2; try contradiction; auto. *) *)
+  (*   (*   subst; constructor; auto. *) *)
+  (*   (* - pstep. cbn in H1, H2. *) *)
+  (*   (*   rewrite itree_eta in H1, H2. *) *)
+  (*   (*   red. *) *)
+  (*   (*   destruct (observe i) eqn: Heqi; destruct (observe i0) eqn: Heqi0; *) *)
+  (*   (*     try apply eqit_inv in H1; try apply eqit_inv in H2; cbn in H1, H2; try contradiction; auto. *) *)
+  (*   (*   subst; constructor; auto. *) *)
 
-    (*   right; eapply CIH; eauto; *)
-    (*   rewrite unfold_interp in H1, H2; auto. *)
-    (* - pstep. cbn in H1, H2. *)
-    (*   rewrite itree_eta in H1, H2. *)
-    (*   red. *)
-    (*   destruct (observe i) eqn: Heqi; *)
-    (*     try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*   subst; constructor; auto. *)
-    (*   rewrite unfold_interp in H1. *)
-    (*   specialize (IHinterp_PropTF _ _ H1 H2). *)
+  (*   (*   right; eapply CIH; eauto; *) *)
+  (*   (*   rewrite unfold_interp in H1, H2; auto. *) *)
+  (*   (* - pstep. cbn in H1, H2. *) *)
+  (*   (*   rewrite itree_eta in H1, H2. *) *)
+  (*   (*   red. *) *)
+  (*   (*   destruct (observe i) eqn: Heqi; *) *)
+  (*   (*     try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*   subst; constructor; auto. *) *)
+  (*   (*   rewrite unfold_interp in H1. *) *)
+  (*   (*   specialize (IHinterp_PropTF _ _ H1 H2). *) *)
 
-    (*   punfold IHinterp_PropTF. *)
-    (* - pstep. cbn in H1, H2. *)
-    (*   rewrite itree_eta in H1, H2. *)
-    (*   red. *)
-    (*   destruct (observe i0) eqn: Heqi; *)
-    (*     try apply eqit_inv in H2; cbn in H2; try contradiction; auto. *)
-    (*   subst; constructor; auto. *)
-    (*   rewrite unfold_interp in H2. *)
-    (*   specialize (IHinterp_PropTF _ _ H1 H2). *)
+  (*   (*   punfold IHinterp_PropTF. *) *)
+  (*   (* - pstep. cbn in H1, H2. *) *)
+  (*   (*   rewrite itree_eta in H1, H2. *) *)
+  (*   (*   red. *) *)
+  (*   (*   destruct (observe i0) eqn: Heqi; *) *)
+  (*   (*     try apply eqit_inv in H2; cbn in H2; try contradiction; auto. *) *)
+  (*   (*   subst; constructor; auto. *) *)
+  (*   (*   rewrite unfold_interp in H2. *) *)
+  (*   (*   specialize (IHinterp_PropTF _ _ H1 H2). *) *)
 
-    (*   punfold IHinterp_PropTF. *)
-    (* - pstep. apply bisimulation_is_eq in HT1. *)
-    (*   rewrite HT1 in H1. cbn in H1. *)
-    (*   destruct (resum IFun A e). *)
-    (*   cbn in H1. *)
-    (*   repeat setoid_rewrite bind_vis in H1. *)
-    (*   apply bisimulation_is_eq in H1. rewrite H1. *)
-    (*   econstructor; eauto. *)
-    (*   eapply eqit_Vis; intros; inv u. *)
-    (* - pstep. cbn in H2, H3. red in H. *)
-    (*   rewrite H in H0. *)
-    (*   rename H2 into H1. *)
-    (*   rename H3 into H2. *)
+  (*   (*   punfold IHinterp_PropTF. *) *)
+  (*   (* - pstep. apply bisimulation_is_eq in HT1. *) *)
+  (*   (*   rewrite HT1 in H1. cbn in H1. *) *)
+  (*   (*   destruct (resum IFun A e). *) *)
+  (*   (*   cbn in H1. *) *)
+  (*   (*   repeat setoid_rewrite bind_vis in H1. *) *)
+  (*   (*   apply bisimulation_is_eq in H1. rewrite H1. *) *)
+  (*   (*   econstructor; eauto. *) *)
+  (*   (*   eapply eqit_Vis; intros; inv u. *) *)
+  (*   (* - pstep. cbn in H2, H3. red in H. *) *)
+  (*   (*   rewrite H in H0. *) *)
+  (*   (*   rename H2 into H1. *) *)
+  (*   (*   rename H3 into H2. *) *)
 
-    (*   rewrite itree_eta in H1, H2. *)
-    (*   repeat destruct e; cbn in *. *)
-    (*   + rewrite bind_bind in H1. *)
-    (*     unfold lift_OOM in H1. *)
-    (*     rename H0 into KS. rewrite bind_trigger in KS. *)
-    (*     cbn in *. *)
-    (*     destruct (EC.DVC.uvalue_convert f) eqn : Hf. *)
-    (*     { rewrite bind_ret_l, bind_bind in H1. *)
-    (*       destruct *)
-    (*         (map_monad_In args *)
-    (*           (fun (elt : E1.DV.dvalue) (_ : In elt args) => EC.DVC.dvalue_convert elt)) eqn: Hm. *)
-    (*       { rewrite bind_ret_l, bind_bind in H1. *)
-    (*         rewrite bind_trigger in H1. *)
+  (*   (*   rewrite itree_eta in H1, H2. *) *)
+  (*   (*   repeat destruct e; cbn in *. *) *)
+  (*   (*   + rewrite bind_bind in H1. *) *)
+  (*   (*     unfold lift_OOM in H1. *) *)
+  (*   (*     rename H0 into KS. rewrite bind_trigger in KS. *) *)
+  (*   (*     cbn in *. *) *)
+  (*   (*     destruct (EC.DVC.uvalue_convert f) eqn : Hf. *) *)
+  (*   (*     { rewrite bind_ret_l, bind_bind in H1. *) *)
+  (*   (*       destruct *) *)
+  (*   (*         (map_monad_In args *) *)
+  (*   (*           (fun (elt : E1.DV.dvalue) (_ : In elt args) => EC.DVC.dvalue_convert elt)) eqn: Hm. *) *)
+  (*   (*       { rewrite bind_ret_l, bind_bind in H1. *) *)
+  (*   (*         rewrite bind_trigger in H1. *) *)
 
-    (*         destruct (observe i) eqn: Heqi; *)
-    (*           try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*         red. *)
-    (*         setoid_rewrite Heqi. *)
-    (*         destruct H1 as (?&?&?). *)
-    (*         dependent destruction x. *)
-    (*         red in H, H0. *)
-    (*         econstructor; [ constructor | ..]; eauto; cycle 1. *)
-    (*         - red; reflexivity. *)
-    (*         - cbn in *. *)
-    (*           rewrite <- unfold_interp in H2. *)
-    (*           rewrite <- itree_eta in H2. *)
-    (*           rewrite H2. rewrite KS. rewrite interp_vis. cbn. *)
-    (*           rewrite bind_bind. unfold lift_OOM. *)
-    (*           rewrite Hf. setoid_rewrite bind_ret_l. *)
-    (*           setoid_rewrite bind_bind. rewrite Hm. *)
-    (*           setoid_rewrite bind_ret_l. *)
-    (*           setoid_rewrite bind_bind. *)
-    (*           setoid_rewrite bind_trigger. *)
-    (*           unfold subevent. rewrite H0. *)
-    (*           eapply eqit_Vis. intros. *)
-    (*           Unshelve. *)
-    (*           3 : exact (fun u0 : E2.DV.dvalue => *)
-    (*           ITree.bind match EC.DVCrev.dvalue_convert u0 with *)
-    (*                     | NoOom a0 => ret a0 *)
-    (*                     | Oom s => raise_oom s *)
-    (*                      end (fun x1 : E1.DV.dvalue => Tau (interp EC.L0_convert (k2 x1)))). *)
-    (*           reflexivity. intros. inv H. *)
-    (*         - cbn. red in H1. subst. *)
-    (*           eapply bisimulation_is_eq in H1. rewrite H1. *)
+  (*   (*         destruct (observe i) eqn: Heqi; *) *)
+  (*   (*           try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*         red. *) *)
+  (*   (*         setoid_rewrite Heqi. *) *)
+  (*   (*         destruct H1 as (?&?&?). *) *)
+  (*   (*         dependent destruction x. *) *)
+  (*   (*         red in H, H0. *) *)
+  (*   (*         econstructor; [ constructor | ..]; eauto; cycle 1. *) *)
+  (*   (*         - red; reflexivity. *) *)
+  (*   (*         - cbn in *. *) *)
+  (*   (*           rewrite <- unfold_interp in H2. *) *)
+  (*   (*           rewrite <- itree_eta in H2. *) *)
+  (*   (*           rewrite H2. rewrite KS. rewrite interp_vis. cbn. *) *)
+  (*   (*           rewrite bind_bind. unfold lift_OOM. *) *)
+  (*   (*           rewrite Hf. setoid_rewrite bind_ret_l. *) *)
+  (*   (*           setoid_rewrite bind_bind. rewrite Hm. *) *)
+  (*   (*           setoid_rewrite bind_ret_l. *) *)
+  (*   (*           setoid_rewrite bind_bind. *) *)
+  (*   (*           setoid_rewrite bind_trigger. *) *)
+  (*   (*           unfold subevent. rewrite H0. *) *)
+  (*   (*           eapply eqit_Vis. intros. *) *)
+  (*   (*           Unshelve. *) *)
+  (*   (*           3 : exact (fun u0 : E2.DV.dvalue => *) *)
+  (*   (*           ITree.bind match EC.DVCrev.dvalue_convert u0 with *) *)
+  (*   (*                     | NoOom a0 => ret a0 *) *)
+  (*   (*                     | Oom s => raise_oom s *) *)
+  (*   (*                      end (fun x1 : E1.DV.dvalue => Tau (interp EC.L0_convert (k2 x1)))). *) *)
+  (*   (*           reflexivity. intros. inv H. *) *)
+  (*   (*         - cbn. red in H1. subst. *) *)
+  (*   (*           eapply bisimulation_is_eq in H1. rewrite H1. *) *)
 
-    (*           destruct (EC.DVCrev.dvalue_convert a) eqn: Ht. *)
-    (*           + setoid_rewrite H in HK. subst. *)
-    (*             eapply Returns_uvalue_convert_L0 in H3; eauto. *)
-    (*             specialize (HK _ H3). pclearbot. *)
-    (*             pose proof @bind_ret_l as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *)
-    (*             pose proof @bind_ret_l as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ. *)
-    (*             pstep; constructor; eauto. right; eauto. *)
-    (*             eapply CIH; try rewrite <- unfold_interp; try reflexivity. *)
-    (*             eapply HK. *)
-    (*           + setoid_rewrite H in HK. subst. *)
-    (*             unfold raiseOOM. *)
-    (*             pose proof @bind_bind as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *)
-    (*             pose proof @bind_trigger as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *)
-    (*             pose proof @bind_bind as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *)
-    (*             pose proof @bind_trigger as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *)
-    (*             pstep; econstructor; eauto. unfold subevent. *)
-    (*             reflexivity. } *)
-    (*       { unfold raiseOOM in H1. rewrite bind_trigger in H1. *)
-    (*         red. destruct (observe i) eqn: Heqi; *)
-    (*           try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*         destruct H1 as (?&?&?). *)
-    (*         dependent destruction x. *)
-    (*         red in H, H0. *)
-    (*         (* rewrite H1. *) *)
-    (*         econstructor; eauto. *)
-    (*         - intros. inv a. *)
-    (*         - red; reflexivity. *)
-    (*         - cbn in *. rewrite <- itree_eta in H2. *)
-    (*           rewrite H2. rewrite <- unfold_interp. *)
-    (*           rewrite KS. rewrite interp_vis. cbn. *)
-    (*           rewrite bind_bind. unfold lift_OOM. *)
-    (*           rewrite Hf. setoid_rewrite bind_ret_l. *)
-    (*           setoid_rewrite bind_bind. rewrite Hm. *)
-    (*           setoid_rewrite bind_trigger. *)
-    (*           setoid_rewrite bind_vis. *)
-    (*           unfold subevent. rewrite H0. *)
-    (*           eapply eqit_Vis. intros. inv u0. } } *)
+  (*   (*           destruct (EC.DVCrev.dvalue_convert a) eqn: Ht. *) *)
+  (*   (*           + setoid_rewrite H in HK. subst. *) *)
+  (*   (*             eapply Returns_uvalue_convert_L0 in H3; eauto. *) *)
+  (*   (*             specialize (HK _ H3). pclearbot. *) *)
+  (*   (*             pose proof @bind_ret_l as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *) *)
+  (*   (*             pose proof @bind_ret_l as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ. *) *)
+  (*   (*             pstep; constructor; eauto. right; eauto. *) *)
+  (*   (*             eapply CIH; try rewrite <- unfold_interp; try reflexivity. *) *)
+  (*   (*             eapply HK. *) *)
+  (*   (*           + setoid_rewrite H in HK. subst. *) *)
+  (*   (*             unfold raiseOOM. *) *)
+  (*   (*             pose proof @bind_bind as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *) *)
+  (*   (*             pose proof @bind_trigger as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *) *)
+  (*   (*             pose proof @bind_bind as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *) *)
+  (*   (*             pose proof @bind_trigger as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *) *)
+  (*   (*             pstep; econstructor; eauto. unfold subevent. *) *)
+  (*   (*             reflexivity. } *) *)
+  (*   (*       { unfold raiseOOM in H1. rewrite bind_trigger in H1. *) *)
+  (*   (*         red. destruct (observe i) eqn: Heqi; *) *)
+  (*   (*           try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*         destruct H1 as (?&?&?). *) *)
+  (*   (*         dependent destruction x. *) *)
+  (*   (*         red in H, H0. *) *)
+  (*   (*         (* rewrite H1. *) *) *)
+  (*   (*         econstructor; eauto. *) *)
+  (*   (*         - intros. inv a. *) *)
+  (*   (*         - red; reflexivity. *) *)
+  (*   (*         - cbn in *. rewrite <- itree_eta in H2. *) *)
+  (*   (*           rewrite H2. rewrite <- unfold_interp. *) *)
+  (*   (*           rewrite KS. rewrite interp_vis. cbn. *) *)
+  (*   (*           rewrite bind_bind. unfold lift_OOM. *) *)
+  (*   (*           rewrite Hf. setoid_rewrite bind_ret_l. *) *)
+  (*   (*           setoid_rewrite bind_bind. rewrite Hm. *) *)
+  (*   (*           setoid_rewrite bind_trigger. *) *)
+  (*   (*           setoid_rewrite bind_vis. *) *)
+  (*   (*           unfold subevent. rewrite H0. *) *)
+  (*   (*           eapply eqit_Vis. intros. inv u0. } } *) *)
 
-    (*       unfold raiseOOM in H1. rewrite bind_trigger in H1. *)
-    (*       red. destruct (observe i) eqn: Heqi; *)
-    (*         try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*       destruct H1 as (?&?&?). *)
-    (*       dependent destruction x. *)
-    (*       red in H, H0. cbn in *. *)
-    (*       econstructor; eauto. *)
-    (*     * intros. inv a. *)
-    (*     * red; reflexivity. *)
-    (*     * rewrite <- itree_eta in H2. rewrite H2. *)
-    (*       rewrite <- unfold_interp. rewrite KS. *)
-    (*       rewrite interp_vis. *)
-    (*       cbn. rewrite bind_bind. unfold lift_OOM. rewrite Hf. *)
-    (*       setoid_rewrite bind_trigger. *)
-    (*       setoid_rewrite bind_vis. *)
-    (*       unfold subevent. rewrite H0. *)
-    (*       eapply eqit_Vis. intros. inv u. *)
-    (*   + destruct s. *)
-    (*     { (* Intrinsic *) *)
-    (*       admit. *)
-    (*     } *)
-    (*     destruct s. *)
-    (*     { (* Globals *) *)
-    (*       admit. *)
-    (*     } *)
-    (*     destruct s. *)
-    (*     { (* Locals + Stack *) *)
-    (*       admit. *)
-    (*     } *)
-    (*     destruct s. *)
-    (*     { (* Memory *) *)
-    (*       admit. *)
-    (*     } *)
-    (*     destruct s. *)
-    (*     { (* Pick *) *)
-    (*       admit. *)
-    (*     } *)
-    (*     destruct s. *)
-    (*     * unfold raiseOOM in H1. *)
-    (*       destruct o. *)
-    (*       cbn in H1. *)
-    (*       rewrite bind_bind, bind_trigger in H1. *)
-    (*       rewrite itree_eta in H1, H2. *)
-    (*       red. *)
-    (*       destruct (observe i) eqn: Heqi; *)
-    (*         try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*       destruct H1 as (?&?&?). *)
-    (*       dependent destruction x. *)
-    (*       red in H, H0. cbn in *. *)
-    (*       econstructor; eauto. *)
-    (*       -- intros. inv a. *)
-    (*       -- red; reflexivity. *)
-    (*       -- rewrite <- itree_eta in H2. rewrite H2. *)
-    (*          rewrite <- unfold_interp. rewrite H0. *)
-    (*          rewrite bind_trigger. *)
-    (*          rewrite interp_vis. cbn. do 2 setoid_rewrite bind_trigger. *)
-    (*          rewrite bind_vis. subst. *)
-    (*          apply eqit_Vis; intros; inv u. *)
-    (*     * destruct s; try destruct u; cbn in H1. *)
-    (*       -- repeat red in HTA. *)
-    (*           unfold raiseUB in H1. rewrite bind_trigger in H1. *)
-    (*           red. *)
-    (*           destruct (observe i) eqn: Heqi; *)
-    (*             try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*           destruct H1 as (?&?&?). *)
-    (*           dependent destruction x. *)
-    (*           red in H, H0. *)
-    (*           econstructor; eauto. *)
-    (*           repeat red. intros. inv a. *)
-    (*           red; reflexivity. *)
-    (*           setoid_rewrite <- itree_eta in H2. rewrite H2. *)
-    (*           rewrite <- unfold_interp. *)
-    (*           rewrite H0. rewrite bind_trigger. *)
-    (*           rewrite interp_vis. *)
-    (*           cbn. *)
-    (*           setoid_rewrite bind_trigger. rewrite bind_vis. cbn in *; subst. eapply eqit_Vis. *)
-    (*           intros. inv u. *)
-    (*       -- destruct s; try destruct u; cbn in H1. *)
-    (*          ++ destruct d. cbn in H1. *)
-    (*             rewrite <- unfold_interp in H2. *)
+  (*   (*       unfold raiseOOM in H1. rewrite bind_trigger in H1. *) *)
+  (*   (*       red. destruct (observe i) eqn: Heqi; *) *)
+  (*   (*         try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*       destruct H1 as (?&?&?). *) *)
+  (*   (*       dependent destruction x. *) *)
+  (*   (*       red in H, H0. cbn in *. *) *)
+  (*   (*       econstructor; eauto. *) *)
+  (*   (*     * intros. inv a. *) *)
+  (*   (*     * red; reflexivity. *) *)
+  (*   (*     * rewrite <- itree_eta in H2. rewrite H2. *) *)
+  (*   (*       rewrite <- unfold_interp. rewrite KS. *) *)
+  (*   (*       rewrite interp_vis. *) *)
+  (*   (*       cbn. rewrite bind_bind. unfold lift_OOM. rewrite Hf. *) *)
+  (*   (*       setoid_rewrite bind_trigger. *) *)
+  (*   (*       setoid_rewrite bind_vis. *) *)
+  (*   (*       unfold subevent. rewrite H0. *) *)
+  (*   (*       eapply eqit_Vis. intros. inv u. *) *)
+  (*   (*   + destruct s. *) *)
+  (*   (*     { (* Intrinsic *) *) *)
+  (*   (*       admit. *) *)
+  (*   (*     } *) *)
+  (*   (*     destruct s. *) *)
+  (*   (*     { (* Globals *) *) *)
+  (*   (*       admit. *) *)
+  (*   (*     } *) *)
+  (*   (*     destruct s. *) *)
+  (*   (*     { (* Locals + Stack *) *) *)
+  (*   (*       admit. *) *)
+  (*   (*     } *) *)
+  (*   (*     destruct s. *) *)
+  (*   (*     { (* Memory *) *) *)
+  (*   (*       admit. *) *)
+  (*   (*     } *) *)
+  (*   (*     destruct s. *) *)
+  (*   (*     { (* Pick *) *) *)
+  (*   (*       admit. *) *)
+  (*   (*     } *) *)
+  (*   (*     destruct s. *) *)
+  (*   (*     * unfold raiseOOM in H1. *) *)
+  (*   (*       destruct o. *) *)
+  (*   (*       cbn in H1. *) *)
+  (*   (*       rewrite bind_bind, bind_trigger in H1. *) *)
+  (*   (*       rewrite itree_eta in H1, H2. *) *)
+  (*   (*       red. *) *)
+  (*   (*       destruct (observe i) eqn: Heqi; *) *)
+  (*   (*         try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*       destruct H1 as (?&?&?). *) *)
+  (*   (*       dependent destruction x. *) *)
+  (*   (*       red in H, H0. cbn in *. *) *)
+  (*   (*       econstructor; eauto. *) *)
+  (*   (*       -- intros. inv a. *) *)
+  (*   (*       -- red; reflexivity. *) *)
+  (*   (*       -- rewrite <- itree_eta in H2. rewrite H2. *) *)
+  (*   (*          rewrite <- unfold_interp. rewrite H0. *) *)
+  (*   (*          rewrite bind_trigger. *) *)
+  (*   (*          rewrite interp_vis. cbn. do 2 setoid_rewrite bind_trigger. *) *)
+  (*   (*          rewrite bind_vis. subst. *) *)
+  (*   (*          apply eqit_Vis; intros; inv u. *) *)
+  (*   (*     * destruct s; try destruct u; cbn in H1. *) *)
+  (*   (*       -- repeat red in HTA. *) *)
+  (*   (*           unfold raiseUB in H1. rewrite bind_trigger in H1. *) *)
+  (*   (*           red. *) *)
+  (*   (*           destruct (observe i) eqn: Heqi; *) *)
+  (*   (*             try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*           destruct H1 as (?&?&?). *) *)
+  (*   (*           dependent destruction x. *) *)
+  (*   (*           red in H, H0. *) *)
+  (*   (*           econstructor; eauto. *) *)
+  (*   (*           repeat red. intros. inv a. *) *)
+  (*   (*           red; reflexivity. *) *)
+  (*   (*           setoid_rewrite <- itree_eta in H2. rewrite H2. *) *)
+  (*   (*           rewrite <- unfold_interp. *) *)
+  (*   (*           rewrite H0. rewrite bind_trigger. *) *)
+  (*   (*           rewrite interp_vis. *) *)
+  (*   (*           cbn. *) *)
+  (*   (*           setoid_rewrite bind_trigger. rewrite bind_vis. cbn in *; subst. eapply eqit_Vis. *) *)
+  (*   (*           intros. inv u. *) *)
+  (*   (*       -- destruct s; try destruct u; cbn in H1. *) *)
+  (*   (*          ++ destruct d. cbn in H1. *) *)
+  (*   (*             rewrite <- unfold_interp in H2. *) *)
 
-    (*             rename H0 into KS. *)
-    (*             setoid_rewrite bind_trigger in H1. *)
-    (*             setoid_rewrite bind_trigger in KS. *)
+  (*   (*             rename H0 into KS. *) *)
+  (*   (*             setoid_rewrite bind_trigger in H1. *) *)
+  (*   (*             setoid_rewrite bind_trigger in KS. *) *)
 
-    (*             red. *)
-    (*             destruct (observe i) eqn: Heqi; *)
-    (*               try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*             destruct H1 as (?&?&?). *)
-    (*             dependent destruction x. *)
-    (*             red in H, H0. subst. *)
-    (*             assert (Returns tt ta). *)
-    (*             { rewrite H. unfold trigger. eapply ReturnsVis; eauto. *)
-    (*               unfold subevent. reflexivity. *)
-    (*               constructor; reflexivity. } *)
-    (*             specialize (HK _ H0). pclearbot. *)
-    (*             econstructor; eauto. *)
-    (*             ** intros. red in H1. specialize (H1 tt). *)
-    (*                eapply bisimulation_is_eq in H1. destruct a. *)
-    (*                rewrite H1. *)
-    (*                right; eapply CIH. *)
-    (*                2 : { rewrite <- interp_tau, <- unfold_interp. reflexivity. } *)
-    (*                pstep; econstructor; eauto. punfold HK. *)
-    (*                rewrite <- unfold_interp. Unshelve. *)
-    (*                16 : exact (fun x => interp EC.L0_convert (k2 x)). reflexivity. *)
-    (*                all : shelve. *)
-    (*             ** red; reflexivity. *)
-    (*             ** rewrite <- itree_eta in H2. *)
-    (*                rewrite H2. rewrite KS. *)
-    (*                rewrite interp_vis. cbn. unfold debug. *)
-    (*                do 2 rewrite bind_trigger. unfold subevent, resum, ReSum_inr. *)
-    (*                eapply eqit_Vis. intros. rewrite tau_eutt. reflexivity. *)
-    (*          ++ repeat red in HTA. *)
-    (*             destruct f. cbn in H1. setoid_rewrite bind_trigger in H1. *)
-    (*             red. *)
-    (*             destruct (observe i) eqn: Heqi; *)
-    (*               try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*             destruct H1 as (?&?&?). *)
-    (*             dependent destruction x. *)
-    (*             red in H, H0. cbn in *; subst. *)
-    (*             econstructor; eauto. *)
-    (*             intros. inv a. *)
-    (*             red; reflexivity. *)
-    (*             setoid_rewrite <- itree_eta in H2. rewrite H2. *)
-    (*             rewrite <- unfold_interp. *)
-    (*             rewrite H0. cbn. rewrite interp_bind. *)
-    (*             rewrite interp_trigger. cbn. unfold LLVMEvents.raise. *)
-    (*             do 2 rewrite bind_trigger. rewrite bind_vis. *)
-    (*             apply eqit_Vis; intros; inv u. *)
+  (*   (*             red. *) *)
+  (*   (*             destruct (observe i) eqn: Heqi; *) *)
+  (*   (*               try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*             destruct H1 as (?&?&?). *) *)
+  (*   (*             dependent destruction x. *) *)
+  (*   (*             red in H, H0. subst. *) *)
+  (*   (*             assert (Returns tt ta). *) *)
+  (*   (*             { rewrite H. unfold trigger. eapply ReturnsVis; eauto. *) *)
+  (*   (*               unfold subevent. reflexivity. *) *)
+  (*   (*               constructor; reflexivity. } *) *)
+  (*   (*             specialize (HK _ H0). pclearbot. *) *)
+  (*   (*             econstructor; eauto. *) *)
+  (*   (*             ** intros. red in H1. specialize (H1 tt). *) *)
+  (*   (*                eapply bisimulation_is_eq in H1. destruct a. *) *)
+  (*   (*                rewrite H1. *) *)
+  (*   (*                right; eapply CIH. *) *)
+  (*   (*                2 : { rewrite <- interp_tau, <- unfold_interp. reflexivity. } *) *)
+  (*   (*                pstep; econstructor; eauto. punfold HK. *) *)
+  (*   (*                rewrite <- unfold_interp. Unshelve. *) *)
+  (*   (*                16 : exact (fun x => interp EC.L0_convert (k2 x)). reflexivity. *) *)
+  (*   (*                all : shelve. *) *)
+  (*   (*             ** red; reflexivity. *) *)
+  (*   (*             ** rewrite <- itree_eta in H2. *) *)
+  (*   (*                rewrite H2. rewrite KS. *) *)
+  (*   (*                rewrite interp_vis. cbn. unfold debug. *) *)
+  (*   (*                do 2 rewrite bind_trigger. unfold subevent, resum, ReSum_inr. *) *)
+  (*   (*                eapply eqit_Vis. intros. rewrite tau_eutt. reflexivity. *) *)
+  (*   (*          ++ repeat red in HTA. *) *)
+  (*   (*             destruct f. cbn in H1. setoid_rewrite bind_trigger in H1. *) *)
+  (*   (*             red. *) *)
+  (*   (*             destruct (observe i) eqn: Heqi; *) *)
+  (*   (*               try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*             destruct H1 as (?&?&?). *) *)
+  (*   (*             dependent destruction x. *) *)
+  (*   (*             red in H, H0. cbn in *; subst. *) *)
+  (*   (*             econstructor; eauto. *) *)
+  (*   (*             intros. inv a. *) *)
+  (*   (*             red; reflexivity. *) *)
+  (*   (*             setoid_rewrite <- itree_eta in H2. rewrite H2. *) *)
+  (*   (*             rewrite <- unfold_interp. *) *)
+  (*   (*             rewrite H0. cbn. rewrite interp_bind. *) *)
+  (*   (*             rewrite interp_trigger. cbn. unfold LLVMEvents.raise. *) *)
+  (*   (*             do 2 rewrite bind_trigger. rewrite bind_vis. *) *)
+  (*   (*             apply eqit_Vis; intros; inv u. *) *)
 
-    (*             Unshelve. *)
-    (*             all : eauto. *)
-    (*             all : inv x. *)
-  Admitted.
+  (*   (*             Unshelve. *) *)
+  (*   (*             all : eauto. *) *)
+  (*   (*             all : inv x. *) *)
+  (* Admitted. *)
 
   Lemma refine_OOM_h_L1_convert_tree :
     forall {T} x_inf y_inf (RR : relation T),
@@ -2129,306 +2613,311 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Opaque InfPROV.initial_provenance.
   Opaque dvalue_convert.
   Opaque uvalue_convert.
+  Opaque dvalue_refine.
+  Opaque uvalue_refine.
   Opaque DVCrev.dvalue_convert.
   Opaque DVCrev.uvalue_convert.
+  Opaque DVCrev.dvalue_refine.
+  Opaque DVCrev.uvalue_refine.
 
-  Lemma refine_OOM_h_L4_convert_tree :
-    forall {T} x_inf y_inf (RR : relation T),
-      refine_OOM_h RR x_inf y_inf ->
-      refine_OOM_h RR (L4_convert_tree x_inf) (L4_convert_tree y_inf).
-  Proof.
-    intros T.
 
-    unfold refine_OOM_h, L4_convert_tree, refine_OOM_h_flip.
-    intros.
-    rewrite (unfold_interp y_inf).
-    rewrite (unfold_interp x_inf).
-    cbn.
+  (* Lemma refine_OOM_h_L4_convert_tree : *)
+  (*   forall {T} x_inf y_inf (RR : relation T), *)
+  (*     refine_OOM_h RR x_inf y_inf -> *)
+  (*     refine_OOM_h RR (L4_convert_tree x_inf) (L4_convert_tree y_inf). *)
+  (* Proof. *)
+  (*   intros T. *)
 
-    match goal with
-    | |- interp_prop _ _ ?l ?r => remember l as i; remember r as i0
-    end.
+  (*   unfold refine_OOM_h, L4_convert_tree, refine_OOM_h_flip. *)
+  (*   intros. *)
+  (*   rewrite (unfold_interp y_inf). *)
+  (*   rewrite (unfold_interp x_inf). *)
+  (*   cbn. *)
 
-    assert (i ≅ _interp EC.L4_convert (observe y_inf)). {
-      rewrite Heqi. reflexivity.
-    } clear Heqi.
-    remember (_interp EC.L4_convert (observe x_inf)).
-    assert (i0 ≅ _interp EC.L4_convert (observe x_inf)). {
-      subst; reflexivity.
-    } clear Heqi1 Heqi0.
-    revert x_inf y_inf H i i0 H0 H1.
+  (*   match goal with *)
+  (*   | |- interp_prop _ _ ?l ?r => remember l as i; remember r as i0 *)
+  (*   end. *)
 
-    pcofix CIH.
+  (*   assert (i ≅ _interp EC.L4_convert (observe y_inf)). { *)
+  (*     rewrite Heqi. reflexivity. *)
+  (*   } clear Heqi. *)
+  (*   remember (_interp EC.L4_convert (observe x_inf)). *)
+  (*   assert (i0 ≅ _interp EC.L4_convert (observe x_inf)). { *)
+  (*     subst; reflexivity. *)
+  (*   } clear Heqi1 Heqi0. *)
+  (*   revert x_inf y_inf H i i0 H0 H1. *)
 
-    intros * H.
-    punfold H; red in H.
-    remember (observe y_inf) as oy; remember (observe x_inf) as ox.
-    clear Heqoy Heqox.
+  (*   pcofix CIH. *)
 
-    induction H; pclearbot; intros; subst; auto.
-    - pstep. cbn in H1, H2.
-      rewrite itree_eta in H1, H2.
-      red.
-      destruct (observe i) eqn: Heqi; destruct (observe i0) eqn: Heqi0;
-        try apply eqit_inv in H1; try apply eqit_inv in H2; cbn in H1, H2; try contradiction; auto.
-      subst; constructor; auto.
-    - pstep. cbn in H1, H2.
-      rewrite itree_eta in H1, H2.
-      red.
-      destruct (observe i) eqn: Heqi; destruct (observe i0) eqn: Heqi0;
-        try apply eqit_inv in H1; try apply eqit_inv in H2; cbn in H1, H2; try contradiction; auto.
-      subst; constructor; auto.
+  (*   intros * H. *)
+  (*   punfold H; red in H. *)
+  (*   remember (observe y_inf) as oy; remember (observe x_inf) as ox. *)
+  (*   clear Heqoy Heqox. *)
 
-      right; eapply CIH; eauto;
-      rewrite unfold_interp in H1, H2; auto.
-    - pstep. cbn in H1, H2.
-      rewrite itree_eta in H1, H2.
-      red.
-      destruct (observe i) eqn: Heqi;
-        try apply eqit_inv in H1; cbn in H1; try contradiction; auto.
-      subst; constructor; auto.
-      rewrite unfold_interp in H1.
-      specialize (IHinterp_PropTF _ _ H1 H2).
+  (*   induction H; pclearbot; intros; subst; auto. *)
+  (*   - pstep. cbn in H1, H2. *)
+  (*     rewrite itree_eta in H1, H2. *)
+  (*     red. *)
+  (*     destruct (observe i) eqn: Heqi; destruct (observe i0) eqn: Heqi0; *)
+  (*       try apply eqit_inv in H1; try apply eqit_inv in H2; cbn in H1, H2; try contradiction; auto. *)
+  (*     subst; constructor; auto. *)
+  (*   - pstep. cbn in H1, H2. *)
+  (*     rewrite itree_eta in H1, H2. *)
+  (*     red. *)
+  (*     destruct (observe i) eqn: Heqi; destruct (observe i0) eqn: Heqi0; *)
+  (*       try apply eqit_inv in H1; try apply eqit_inv in H2; cbn in H1, H2; try contradiction; auto. *)
+  (*     subst; constructor; auto. *)
 
-      punfold IHinterp_PropTF.
-    - pstep. cbn in H1, H2.
-      rewrite itree_eta in H1, H2.
-      red.
-      destruct (observe i0) eqn: Heqi;
-        try apply eqit_inv in H2; cbn in H2; try contradiction; auto.
-      subst; constructor; auto.
-      rewrite unfold_interp in H2.
-      specialize (IHinterp_PropTF _ _ H1 H2).
+  (*     right; eapply CIH; eauto; *)
+  (*     rewrite unfold_interp in H1, H2; auto. *)
+  (*   - pstep. cbn in H1, H2. *)
+  (*     rewrite itree_eta in H1, H2. *)
+  (*     red. *)
+  (*     destruct (observe i) eqn: Heqi; *)
+  (*       try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
+  (*     subst; constructor; auto. *)
+  (*     rewrite unfold_interp in H1. *)
+  (*     specialize (IHinterp_PropTF _ _ H1 H2). *)
 
-      punfold IHinterp_PropTF.
-    - pstep. apply bisimulation_is_eq in HT1.
-      rewrite HT1 in H1. cbn in H1.
-      destruct (resum IFun A e).
-      cbn in H1.
-      repeat setoid_rewrite bind_vis in H1.
-      apply bisimulation_is_eq in H1. rewrite H1.
-      econstructor; eauto.
-      eapply eqit_Vis; intros; inv u.
-    - pstep. cbn in H2, H3. red in H.
-      rewrite H in H0.
-      rename H2 into H1.
-      rename H3 into H2.
+  (*     punfold IHinterp_PropTF. *)
+  (*   - pstep. cbn in H1, H2. *)
+  (*     rewrite itree_eta in H1, H2. *)
+  (*     red. *)
+  (*     destruct (observe i0) eqn: Heqi; *)
+  (*       try apply eqit_inv in H2; cbn in H2; try contradiction; auto. *)
+  (*     subst; constructor; auto. *)
+  (*     rewrite unfold_interp in H2. *)
+  (*     specialize (IHinterp_PropTF _ _ H1 H2). *)
 
-      rewrite itree_eta in H1, H2.
-      repeat destruct e; cbn in *.
-      + rewrite bind_bind in H1.
-        unfold lift_OOM in H1.
-        rename H0 into KS. rewrite bind_trigger in KS.
-        cbn in *.
-        destruct (EC.DVC.uvalue_convert f) eqn : Hf.
-        { rewrite bind_ret_l, bind_bind in H1.
-          destruct
-            (map_monad_In args
-              (fun (elt : E1.DV.dvalue) (_ : In elt args) => EC.DVC.dvalue_convert elt)) eqn: Hm.
-          { rewrite bind_ret_l, bind_bind in H1.
-            rewrite bind_trigger in H1.
+  (*     punfold IHinterp_PropTF. *)
+  (*   - pstep. apply bisimulation_is_eq in HT1. *)
+  (*     rewrite HT1 in H1. cbn in H1. *)
+  (*     destruct (resum IFun A e). *)
+  (*     cbn in H1. *)
+  (*     repeat setoid_rewrite bind_vis in H1. *)
+  (*     apply bisimulation_is_eq in H1. rewrite H1. *)
+  (*     econstructor; eauto. *)
+  (*     eapply eqit_Vis; intros; inv u. *)
+  (*   - pstep. cbn in H2, H3. red in H. *)
+  (*     rewrite H in H0. *)
+  (*     rename H2 into H1. *)
+  (*     rename H3 into H2. *)
 
-            destruct (observe i) eqn: Heqi;
-              try apply eqit_inv in H1; cbn in H1; try contradiction; auto.
-            red.
-            setoid_rewrite Heqi.
-            destruct H1 as (?&?&?).
-            dependent destruction x.
-            red in H, H0.
-            econstructor; [ constructor | ..]; eauto; cycle 1.
-            - red; reflexivity.
-            - cbn in *.
-              rewrite <- unfold_interp in H2.
-              rewrite <- itree_eta in H2.
-              rewrite H2. rewrite KS. rewrite interp_vis. cbn.
-              rewrite bind_bind. unfold lift_OOM.
-              rewrite Hf. setoid_rewrite bind_ret_l.
-              setoid_rewrite bind_bind. rewrite Hm.
-              setoid_rewrite bind_ret_l.
-              setoid_rewrite bind_bind.
-              setoid_rewrite bind_trigger.
-              unfold subevent. rewrite H0.
-              eapply eqit_Vis. intros.
-              Unshelve.
-              3 : exact (fun u0 : E2.DV.dvalue =>
-              ITree.bind match EC.DVCrev.dvalue_convert u0 with
-                        | NoOom a0 => ret a0
-                        | Oom s => raise_oom s
-                         end (fun x1 : E1.DV.dvalue => Tau (interp EC.L4_convert (k2 x1)))).
-              reflexivity. intros. inv H.
-            - cbn. red in H1. subst.
-              eapply bisimulation_is_eq in H1. rewrite H1.
+  (*     rewrite itree_eta in H1, H2. *)
+  (*     repeat destruct e; cbn in *. *)
+  (*     + rewrite bind_bind in H1. *)
+  (*       unfold lift_OOM in H1. *)
+  (*       rename H0 into KS. rewrite bind_trigger in KS. *)
+  (*       cbn in *. *)
+  (*       destruct (EC.DVC.uvalue_convert f) eqn : Hf. *)
+  (*       { rewrite bind_ret_l, bind_bind in H1. *)
+  (*         destruct *)
+  (*           (map_monad_In args *)
+  (*             (fun (elt : E1.DV.dvalue) (_ : In elt args) => EC.DVC.dvalue_convert elt)) eqn: Hm. *)
+  (*         { rewrite bind_ret_l, bind_bind in H1. *)
+  (*           rewrite bind_trigger in H1. *)
 
-              destruct (EC.DVCrev.dvalue_convert a) eqn: Ht.
-              + setoid_rewrite H in HK. subst.
-                eapply Returns_uvalue_convert_L1_L2 in H3; eauto.
-                specialize (HK _ H3). pclearbot.
-                pose proof @bind_ret_l as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ.
-                pose proof @bind_ret_l as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ.
-                pstep; constructor; eauto. right; eauto.
-                eapply CIH; try rewrite <- unfold_interp; try reflexivity.
-                eapply HK.
-              + setoid_rewrite H in HK. subst.
-                unfold raiseOOM.
-                pose proof @bind_bind as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ.
-                pose proof @bind_trigger as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ.
-                pose proof @bind_bind as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ.
-                pose proof @bind_trigger as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ.
-                pstep; econstructor; eauto. unfold subevent.
-                reflexivity. }
-          { unfold raiseOOM in H1. rewrite bind_trigger in H1.
-            red. destruct (observe i) eqn: Heqi;
-              try apply eqit_inv in H1; cbn in H1; try contradiction; auto.
-            destruct H1 as (?&?&?).
-            dependent destruction x.
-            red in H, H0.
-            (* rewrite H1. *)
-            econstructor; eauto.
-            - intros. inv a.
-            - red; reflexivity.
-            - cbn in *. rewrite <- itree_eta in H2.
-              rewrite H2. rewrite <- unfold_interp.
-              rewrite KS. rewrite interp_vis. cbn.
-              rewrite bind_bind. unfold lift_OOM.
-              rewrite Hf. setoid_rewrite bind_ret_l.
-              setoid_rewrite bind_bind. rewrite Hm.
-              setoid_rewrite bind_trigger.
-              setoid_rewrite bind_vis.
-              unfold subevent. rewrite H0.
-              eapply eqit_Vis. intros. inv u0. } }
+  (*           destruct (observe i) eqn: Heqi; *)
+  (*             try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
+  (*           red. *)
+  (*           setoid_rewrite Heqi. *)
+  (*           destruct H1 as (?&?&?). *)
+  (*           dependent destruction x. *)
+  (*           red in H, H0. *)
+  (*           econstructor; [ constructor | ..]; eauto; cycle 1. *)
+  (*           - red; reflexivity. *)
+  (*           - cbn in *. *)
+  (*             rewrite <- unfold_interp in H2. *)
+  (*             rewrite <- itree_eta in H2. *)
+  (*             rewrite H2. rewrite KS. rewrite interp_vis. cbn. *)
+  (*             rewrite bind_bind. unfold lift_OOM. *)
+  (*             rewrite Hf. setoid_rewrite bind_ret_l. *)
+  (*             setoid_rewrite bind_bind. rewrite Hm. *)
+  (*             setoid_rewrite bind_ret_l. *)
+  (*             setoid_rewrite bind_bind. *)
+  (*             setoid_rewrite bind_trigger. *)
+  (*             unfold subevent. rewrite H0. *)
+  (*             eapply eqit_Vis. intros. *)
+  (*             Unshelve. *)
+  (*             3 : exact (fun u0 : E2.DV.dvalue => *)
+  (*             ITree.bind match EC.DVCrev.dvalue_convert u0 with *)
+  (*                       | NoOom a0 => ret a0 *)
+  (*                       | Oom s => raise_oom s *)
+  (*                        end (fun x1 : E1.DV.dvalue => Tau (interp EC.L4_convert (k2 x1)))). *)
+  (*             reflexivity. intros. inv H. *)
+  (*           - cbn. red in H1. subst. *)
+  (*             eapply bisimulation_is_eq in H1. rewrite H1. *)
 
-          unfold raiseOOM in H1. rewrite bind_trigger in H1.
-          red. destruct (observe i) eqn: Heqi;
-            try apply eqit_inv in H1; cbn in H1; try contradiction; auto.
-          destruct H1 as (?&?&?).
-          dependent destruction x.
-          red in H, H0. cbn in *.
-          econstructor; eauto.
-        * intros. inv a.
-        * red; reflexivity.
-        * rewrite <- itree_eta in H2. rewrite H2.
-          rewrite <- unfold_interp. rewrite KS.
-          rewrite interp_vis.
-          cbn. rewrite bind_bind. unfold lift_OOM. rewrite Hf.
-          setoid_rewrite bind_trigger.
-          setoid_rewrite bind_vis.
-          unfold subevent. rewrite H0.
-          eapply eqit_Vis. intros. inv u.
-      + destruct s.
-        * unfold raiseOOM in H1.
-          destruct o.
-          cbn in H1.
-          rewrite bind_bind, bind_trigger in H1.
-          rewrite itree_eta in H1, H2.
-          red.
-          destruct (observe i) eqn: Heqi;
-            try apply eqit_inv in H1; cbn in H1; try contradiction; auto.
-          destruct H1 as (?&?&?).
-          dependent destruction x.
-          red in H, H0. cbn in *.
-          econstructor; eauto.
-          -- intros. inv a.
-          -- red; reflexivity.
-          -- rewrite <- itree_eta in H2. rewrite H2.
-             rewrite <- unfold_interp. rewrite H0.
-             rewrite bind_trigger.
-             rewrite interp_vis. cbn. do 2 setoid_rewrite bind_trigger.
-             rewrite bind_vis. subst.
-             apply eqit_Vis; intros; inv u.
-        * destruct s; try destruct u; cbn in H1.
-          -- repeat red in HTA.
-              unfold raiseUB in H1. rewrite bind_trigger in H1.
-              red.
-              destruct (observe i) eqn: Heqi;
-                try apply eqit_inv in H1; cbn in H1; try contradiction; auto.
-              destruct H1 as (?&?&?).
-              dependent destruction x.
-              red in H, H0.
-              econstructor; eauto.
-              repeat red. intros. inv a.
-              red; reflexivity.
-              setoid_rewrite <- itree_eta in H2. rewrite H2.
-              rewrite <- unfold_interp.
-              rewrite H0. rewrite bind_trigger.
-              rewrite interp_vis.
-              cbn.
-              setoid_rewrite bind_trigger. rewrite bind_vis. cbn in *; subst. eapply eqit_Vis.
-              intros. inv u.
-          -- destruct s; try destruct u; cbn in H1.
-             ++ destruct d. cbn in H1.
-                rewrite <- unfold_interp in H2.
+  (*             destruct (EC.DVCrev.dvalue_convert a) eqn: Ht. *)
+  (*             + setoid_rewrite H in HK. subst. *)
+  (*               eapply Returns_uvalue_convert_L1_L2 in H3; eauto. *)
+  (*               specialize (HK _ H3). pclearbot. *)
+  (*               pose proof @bind_ret_l as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *)
+  (*               pose proof @bind_ret_l as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ. *)
+  (*               pstep; constructor; eauto. right; eauto. *)
+  (*               eapply CIH; try rewrite <- unfold_interp; try reflexivity. *)
+  (*               eapply HK. *)
+  (*             + setoid_rewrite H in HK. subst. *)
+  (*               unfold raiseOOM. *)
+  (*               pose proof @bind_bind as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *)
+  (*               pose proof @bind_trigger as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *)
+  (*               pose proof @bind_bind as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *)
+  (*               pose proof @bind_trigger as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *)
+  (*               pstep; econstructor; eauto. unfold subevent. *)
+  (*               reflexivity. } *)
+  (*         { unfold raiseOOM in H1. rewrite bind_trigger in H1. *)
+  (*           red. destruct (observe i) eqn: Heqi; *)
+  (*             try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
+  (*           destruct H1 as (?&?&?). *)
+  (*           dependent destruction x. *)
+  (*           red in H, H0. *)
+  (*           (* rewrite H1. *) *)
+  (*           econstructor; eauto. *)
+  (*           - intros. inv a. *)
+  (*           - red; reflexivity. *)
+  (*           - cbn in *. rewrite <- itree_eta in H2. *)
+  (*             rewrite H2. rewrite <- unfold_interp. *)
+  (*             rewrite KS. rewrite interp_vis. cbn. *)
+  (*             rewrite bind_bind. unfold lift_OOM. *)
+  (*             rewrite Hf. setoid_rewrite bind_ret_l. *)
+  (*             setoid_rewrite bind_bind. rewrite Hm. *)
+  (*             setoid_rewrite bind_trigger. *)
+  (*             setoid_rewrite bind_vis. *)
+  (*             unfold subevent. rewrite H0. *)
+  (*             eapply eqit_Vis. intros. inv u0. } } *)
 
-                rename H0 into KS.
-                setoid_rewrite bind_trigger in H1.
-                setoid_rewrite bind_trigger in KS.
+  (*         unfold raiseOOM in H1. rewrite bind_trigger in H1. *)
+  (*         red. destruct (observe i) eqn: Heqi; *)
+  (*           try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
+  (*         destruct H1 as (?&?&?). *)
+  (*         dependent destruction x. *)
+  (*         red in H, H0. cbn in *. *)
+  (*         econstructor; eauto. *)
+  (*       * intros. inv a. *)
+  (*       * red; reflexivity. *)
+  (*       * rewrite <- itree_eta in H2. rewrite H2. *)
+  (*         rewrite <- unfold_interp. rewrite KS. *)
+  (*         rewrite interp_vis. *)
+  (*         cbn. rewrite bind_bind. unfold lift_OOM. rewrite Hf. *)
+  (*         setoid_rewrite bind_trigger. *)
+  (*         setoid_rewrite bind_vis. *)
+  (*         unfold subevent. rewrite H0. *)
+  (*         eapply eqit_Vis. intros. inv u. *)
+  (*     + destruct s. *)
+  (*       * unfold raiseOOM in H1. *)
+  (*         destruct o. *)
+  (*         cbn in H1. *)
+  (*         rewrite bind_bind, bind_trigger in H1. *)
+  (*         rewrite itree_eta in H1, H2. *)
+  (*         red. *)
+  (*         destruct (observe i) eqn: Heqi; *)
+  (*           try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
+  (*         destruct H1 as (?&?&?). *)
+  (*         dependent destruction x. *)
+  (*         red in H, H0. cbn in *. *)
+  (*         econstructor; eauto. *)
+  (*         -- intros. inv a. *)
+  (*         -- red; reflexivity. *)
+  (*         -- rewrite <- itree_eta in H2. rewrite H2. *)
+  (*            rewrite <- unfold_interp. rewrite H0. *)
+  (*            rewrite bind_trigger. *)
+  (*            rewrite interp_vis. cbn. do 2 setoid_rewrite bind_trigger. *)
+  (*            rewrite bind_vis. subst. *)
+  (*            apply eqit_Vis; intros; inv u. *)
+  (*       * destruct s; try destruct u; cbn in H1. *)
+  (*         -- repeat red in HTA. *)
+  (*             unfold raiseUB in H1. rewrite bind_trigger in H1. *)
+  (*             red. *)
+  (*             destruct (observe i) eqn: Heqi; *)
+  (*               try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
+  (*             destruct H1 as (?&?&?). *)
+  (*             dependent destruction x. *)
+  (*             red in H, H0. *)
+  (*             econstructor; eauto. *)
+  (*             repeat red. intros. inv a. *)
+  (*             red; reflexivity. *)
+  (*             setoid_rewrite <- itree_eta in H2. rewrite H2. *)
+  (*             rewrite <- unfold_interp. *)
+  (*             rewrite H0. rewrite bind_trigger. *)
+  (*             rewrite interp_vis. *)
+  (*             cbn. *)
+  (*             setoid_rewrite bind_trigger. rewrite bind_vis. cbn in *; subst. eapply eqit_Vis. *)
+  (*             intros. inv u. *)
+  (*         -- destruct s; try destruct u; cbn in H1. *)
+  (*            ++ destruct d. cbn in H1. *)
+  (*               rewrite <- unfold_interp in H2. *)
 
-                red.
-                destruct (observe i) eqn: Heqi;
-                  try apply eqit_inv in H1; cbn in H1; try contradiction; auto.
-                destruct H1 as (?&?&?).
-                dependent destruction x.
-                red in H, H0. subst.
-                assert (Returns tt ta).
-                { rewrite H. unfold trigger. eapply ReturnsVis; eauto.
-                  unfold subevent. reflexivity.
-                  constructor; reflexivity. }
-                specialize (HK _ H0). pclearbot.
-                econstructor; eauto.
-                ** intros. red in H1. specialize (H1 tt).
-                   eapply bisimulation_is_eq in H1. destruct a.
-                   rewrite H1.
-                   right; eapply CIH.
-                   2 : { rewrite <- interp_tau, <- unfold_interp. reflexivity. }
-                   pstep; econstructor; eauto. punfold HK.
-                   rewrite <- unfold_interp. Unshelve.
-                   16 : exact (fun x => interp EC.L4_convert (k2 x)). reflexivity.
-                   all : shelve.
-                ** red; reflexivity.
-                ** rewrite <- itree_eta in H2.
-                   rewrite H2. rewrite KS.
-                   rewrite interp_vis. cbn. unfold debug.
-                   do 2 rewrite bind_trigger. unfold subevent, resum, ReSum_inr.
-                   eapply eqit_Vis. intros. rewrite tau_eutt. reflexivity.
-             ++ repeat red in HTA.
-                destruct f. cbn in H1. setoid_rewrite bind_trigger in H1.
-                red.
-                destruct (observe i) eqn: Heqi;
-                  try apply eqit_inv in H1; cbn in H1; try contradiction; auto.
-                destruct H1 as (?&?&?).
-                dependent destruction x.
-                red in H, H0. cbn in *; subst.
-                econstructor; eauto.
-                intros. inv a.
-                red; reflexivity.
-                setoid_rewrite <- itree_eta in H2. rewrite H2.
-                rewrite <- unfold_interp.
-                rewrite H0. cbn. rewrite interp_bind.
-                rewrite interp_trigger. cbn. unfold LLVMEvents.raise.
-                do 2 rewrite bind_trigger. rewrite bind_vis.
-                apply eqit_Vis; intros; inv u.
+  (*               rename H0 into KS. *)
+  (*               setoid_rewrite bind_trigger in H1. *)
+  (*               setoid_rewrite bind_trigger in KS. *)
 
-                Unshelve.
-                all : eauto.
-                all : inv x.
-  Admitted.
+  (*               red. *)
+  (*               destruct (observe i) eqn: Heqi; *)
+  (*                 try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
+  (*               destruct H1 as (?&?&?). *)
+  (*               dependent destruction x. *)
+  (*               red in H, H0. subst. *)
+  (*               assert (Returns tt ta). *)
+  (*               { rewrite H. unfold trigger. eapply ReturnsVis; eauto. *)
+  (*                 unfold subevent. reflexivity. *)
+  (*                 constructor; reflexivity. } *)
+  (*               specialize (HK _ H0). pclearbot. *)
+  (*               econstructor; eauto. *)
+  (*               ** intros. red in H1. specialize (H1 tt). *)
+  (*                  eapply bisimulation_is_eq in H1. destruct a. *)
+  (*                  rewrite H1. *)
+  (*                  right; eapply CIH. *)
+  (*                  2 : { rewrite <- interp_tau, <- unfold_interp. reflexivity. } *)
+  (*                  pstep; econstructor; eauto. punfold HK. *)
+  (*                  rewrite <- unfold_interp. Unshelve. *)
+  (*                  16 : exact (fun x => interp EC.L4_convert (k2 x)). reflexivity. *)
+  (*                  all : shelve. *)
+  (*               ** red; reflexivity. *)
+  (*               ** rewrite <- itree_eta in H2. *)
+  (*                  rewrite H2. rewrite KS. *)
+  (*                  rewrite interp_vis. cbn. unfold debug. *)
+  (*                  do 2 rewrite bind_trigger. unfold subevent, resum, ReSum_inr. *)
+  (*                  eapply eqit_Vis. intros. rewrite tau_eutt. reflexivity. *)
+  (*            ++ repeat red in HTA. *)
+  (*               destruct f. cbn in H1. setoid_rewrite bind_trigger in H1. *)
+  (*               red. *)
+  (*               destruct (observe i) eqn: Heqi; *)
+  (*                 try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
+  (*               destruct H1 as (?&?&?). *)
+  (*               dependent destruction x. *)
+  (*               red in H, H0. cbn in *; subst. *)
+  (*               econstructor; eauto. *)
+  (*               intros. inv a. *)
+  (*               red; reflexivity. *)
+  (*               setoid_rewrite <- itree_eta in H2. rewrite H2. *)
+  (*               rewrite <- unfold_interp. *)
+  (*               rewrite H0. cbn. rewrite interp_bind. *)
+  (*               rewrite interp_trigger. cbn. unfold LLVMEvents.raise. *)
+  (*               do 2 rewrite bind_trigger. rewrite bind_vis. *)
+  (*               apply eqit_Vis; intros; inv u. *)
 
-  Lemma refine_OOM_h_L5_convert_tree :
-    forall {T} x_inf y_inf (RR : relation T),
-      refine_OOM_h RR x_inf y_inf ->
-      refine_OOM_h RR (L5_convert_tree x_inf) (L5_convert_tree y_inf).
-  Proof.
-    intros T.
-    apply refine_OOM_h_L4_convert_tree.
-  Qed.
+  (*               Unshelve. *)
+  (*               all : eauto. *)
+  (*               all : inv x. *)
+  (* Admitted. *)
 
-  Lemma refine_OOM_h_L6_convert_tree :
-    forall {T} x_inf y_inf (RR : relation T),
-      refine_OOM_h RR x_inf y_inf ->
-      refine_OOM_h RR (L6_convert_tree x_inf) (L6_convert_tree y_inf).
-  Proof.
-    intros T.
-    apply refine_OOM_h_L5_convert_tree.
-  Qed.
+  (* Lemma refine_OOM_h_L5_convert_tree : *)
+  (*   forall {T} x_inf y_inf (RR : relation T), *)
+  (*     refine_OOM_h RR x_inf y_inf -> *)
+  (*     refine_OOM_h RR (L5_convert_tree x_inf) (L5_convert_tree y_inf). *)
+  (* Proof. *)
+  (*   intros T. *)
+  (*   apply refine_OOM_h_L4_convert_tree. *)
+  (* Qed. *)
+
+  (* Lemma refine_OOM_h_L6_convert_tree : *)
+  (*   forall {T} x_inf y_inf (RR : relation T), *)
+  (*     refine_OOM_h RR x_inf y_inf -> *)
+  (*     refine_OOM_h RR (L6_convert_tree x_inf) (L6_convert_tree y_inf). *)
+  (* Proof. *)
+  (*   intros T. *)
+  (*   apply refine_OOM_h_L5_convert_tree. *)
+  (* Qed. *)
 
 
   (** Model *)
@@ -2467,14 +2956,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     (* External Calls *)
     { (* Doesn't say anything about return value... *)
       apply (dt1 = dt2 /\
-               uvalue_convert f1 = NoOom f2 /\
-               (map_monad dvalue_convert args1) = NoOom args2).
+               uvalue_refine f1 f2 /\
+               Forall2 dvalue_refine args1 args2).
     }
 
     (* Intrinsics *)
     { apply (dt1 = dt2 /\
                name1 = name2 /\
-               (map_monad dvalue_convert args1) = NoOom args2).
+               Forall2 dvalue_refine args1 args2).
     }
 
     (* Globals *)
@@ -2482,7 +2971,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Global write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   dvalue_convert dv = NoOom dv0).
+                   dvalue_refine dv dv0).
         + apply False.
       - (* Global read *)
         destruct e2 eqn:HE2.
@@ -2495,7 +2984,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Local write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   uvalue_convert dv = NoOom dv0).
+                   uvalue_refine dv dv0).
         + apply False.
       - (* Local read *)
         destruct e2 eqn:HE2.
@@ -2507,12 +2996,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { inversion e1.
       - (* Stack Push *)
         destruct e2 eqn:HE2.
-        + apply
-            (map_monad
-               (fun '(id, uv) =>
-                  uv' <- uvalue_convert uv;;
-                  ret (id, uv'))
-             args = NoOom args0).
+        + apply (local_refine args args0).
         + apply False.
       - (* Stack Pop *)
         destruct e2 eqn:HE2.
@@ -2542,14 +3026,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         destruct e2 eqn:HE2.
         1-3,5: apply False.
         apply (t = t0 /\
-                 dvalue_convert a = NoOom a0).
+                 dvalue_refine a a0).
       - (* Store *)
         destruct e2 eqn:HE2.
         1-4: apply False.
 
         apply (t = t0 /\
-                 dvalue_convert a = NoOom a0 /\
-                 uvalue_convert v = NoOom v0).
+                 dvalue_refine a a0 /\
+                 uvalue_refine v v0).
     }
 
     (* PickE *)
@@ -2557,7 +3041,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inversion e1.
       destruct e2 eqn:HE2.
       apply ((Pre <-> Pre0) /\
-               uvalue_convert x = NoOom x0).
+               uvalue_refine x x0).
     }
 
     (* OOME *)
@@ -2612,9 +3096,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inv e2.
 
       apply (t = t0 /\
-               uvalue_convert f = NoOom f0 /\
-               (map_monad dvalue_convert args) = NoOom args0 /\
-               dvalue_convert res1 = NoOom res2
+               uvalue_refine f f0 /\
+               Forall2 dvalue_refine args args0 /\
+               dvalue_refine res1 res2
             ).
     }
 
@@ -2623,8 +3107,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inv e2.
       apply (t = t0 /\
                f = f0 /\
-               (map_monad dvalue_convert args) = NoOom args0 /\
-               dvalue_convert res1 = NoOom res2
+               Forall2 dvalue_refine args args0 /\
+               dvalue_refine res1 res2
             ).
     }
 
@@ -2633,13 +3117,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Global write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   dvalue_convert dv = NoOom dv0).
+                   dvalue_refine dv dv0).
         + apply False.
       - (* Global read *)
         destruct e2 eqn:HE2.
         + apply False.
         + apply (id = id0 /\
-                   dvalue_convert res1 = NoOom res2
+                   dvalue_refine res1 res2
                 ).
     }
 
@@ -2648,25 +3132,20 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Local write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   uvalue_convert dv = NoOom dv0).
+                   uvalue_refine dv dv0).
         + apply False.
       - (* Local read *)
         destruct e2 eqn:HE2.
         + apply False.
         + apply (id = id0 /\
-                uvalue_convert res1 = NoOom res2).
+                uvalue_refine res1 res2).
     }
 
     (* Stack *)
     { inversion e1; subst.
       - (* Stack Push *)
         destruct e2 eqn:HE2.
-        + apply
-            (map_monad
-               (fun '(id, uv) =>
-                  uv' <- uvalue_convert uv;;
-                  ret (id, uv'))
-             args = NoOom args0).
+        + apply (local_refine args args0).
         + apply False.
       - (* Stack Pop *)
         destruct e2 eqn:HE2.
@@ -2692,20 +3171,20 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         apply (t = t0 /\
                  num_elements = num_elements0 /\
                  align = align0 /\
-                 dvalue_convert res1 = NoOom res2).
+                 dvalue_refine res1 res2).
       - (* Load *)
         destruct e2 eqn:HE2.
         1-3,5: apply False.
         apply (t = t0 /\
-                 dvalue_convert a = NoOom a0 /\
-                 uvalue_convert res1 = NoOom res2).
+                 dvalue_refine a a0 /\
+                 uvalue_refine res1 res2).
       - (* Store *)
         destruct e2 eqn:HE2.
         1-4: apply False.
 
         apply (t = t0 /\
-                 dvalue_convert a = NoOom a0 /\
-                 uvalue_convert v = NoOom v0).
+                 dvalue_refine a a0 /\
+                 uvalue_refine v v0).
     }
 
     (* PickE *)
@@ -2715,8 +3194,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       destruct res1 as [r1 P1].
       destruct res2 as [r2 P2].
       apply ((Pre <-> Pre0) /\
-               uvalue_convert x = NoOom x0 /\
-            dvalue_convert r1 = NoOom r2).
+               uvalue_refine x x0 /\
+               dvalue_refine r1 r2).
     }
 
     (* OOME *)
@@ -2750,8 +3229,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     (* Calls *)
     { (* Doesn't say anything about return value... *)
       apply (dt1 = dt2 /\
-               uvalue_convert f1 = NoOom f2 /\
-               (map_monad (fun elt => uvalue_convert elt) args1) = NoOom args2).
+               uvalue_refine f1 f2 /\
+               Forall2 uvalue_refine args1 args2).
     }
   Defined.
 
@@ -2771,9 +3250,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inv c0.
 
       apply (dt1 = dt2 /\
-               uvalue_convert f1 = NoOom f2 /\
-               (map_monad (fun elt => uvalue_convert elt) args1) = NoOom args2 /\
-               uvalue_convert res1 = NoOom res2
+               uvalue_refine f1 f2 /\
+               Forall2 uvalue_refine args1 args2 /\
+               uvalue_refine res1 res2
             ).
     }
   Defined.
@@ -2785,8 +3264,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inv c1.
       inv c2.
       apply (t = t0 /\
-               uvalue_convert f = NoOom f0 /\
-               map_monad uvalue_convert args = NoOom args0).
+               uvalue_refine f f0 /\
+               Forall2 uvalue_refine args args0).
     }
   Defined.
 
@@ -2796,9 +3275,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { inv c1.
       inv c2.
       apply (t = t0 /\
-               uvalue_convert f = NoOom f0 /\
-               map_monad uvalue_convert args = NoOom args0 /\
-               uvalue_convert res1 = NoOom res2).
+               uvalue_refine f f0 /\
+               Forall2 uvalue_refine args args0 /\
+               uvalue_refine res1 res2).
     }
   Defined.
 
@@ -2831,7 +3310,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Global write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   dvalue_convert dv = NoOom dv0).
+                   dvalue_refine dv dv0).
         + apply False.
       - (* Global read *)
         destruct e2 eqn:HE2.
@@ -2844,7 +3323,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Local write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   uvalue_convert dv = NoOom dv0).
+                   uvalue_refine dv dv0).
         + apply False.
       - (* Local read *)
         destruct e2 eqn:HE2.
@@ -2874,14 +3353,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         destruct e2 eqn:HE2.
         1-3,5: apply False.
         apply (t = t0 /\
-                 dvalue_convert a = NoOom a0).
+                 dvalue_refine a a0).
       - (* Store *)
         destruct e2 eqn:HE2.
         1-4: apply False.
 
         apply (t = t0 /\
-                 dvalue_convert a = NoOom a0 /\
-                 uvalue_convert v = NoOom v0).
+                 dvalue_refine a a0 /\
+                 uvalue_refine v v0).
     }
 
     (* PickE *)
@@ -2889,7 +3368,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inversion e1.
       destruct e2 eqn:HE2.
       apply ((Pre <-> Pre0) /\
-               uvalue_convert x = NoOom x0).
+               uvalue_refine x x0).
     }
 
     (* OOME *)
@@ -2938,13 +3417,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Global write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   dvalue_convert dv = NoOom dv0).
+                   dvalue_refine dv dv0).
         + apply False.
       - (* Global read *)
         destruct e2 eqn:HE2.
         + apply False.
         + apply (id = id0 /\
-                   dvalue_convert res1 = NoOom res2
+                   dvalue_refine res1 res2
                 ).
     }
 
@@ -2953,13 +3432,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Local write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   uvalue_convert dv = NoOom dv0).
+                   uvalue_refine dv dv0).
         + apply False.
       - (* Local read *)
         destruct e2 eqn:HE2.
         + apply False.
         + apply (id = id0 /\
-                uvalue_convert res1 = NoOom res2).
+                uvalue_refine res1 res2).
     }
 
     (* MemoryE *)
@@ -2980,20 +3459,20 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         apply (t = t0 /\
                  num_elements = num_elements0 /\
                  align = align0 /\
-                 dvalue_convert res1 = NoOom res2).
+                 dvalue_refine res1 res2).
       - (* Load *)
         destruct e2 eqn:HE2.
         1-3,5: apply False.
         apply (t = t0 /\
-                 dvalue_convert a = NoOom a0 /\
-                 uvalue_convert res1 = NoOom res2).
+                 dvalue_refine a a0 /\
+                 uvalue_refine res1 res2).
       - (* Store *)
         destruct e2 eqn:HE2.
         1-4: apply False.
 
         apply (t = t0 /\
-                 dvalue_convert a = NoOom a0 /\
-                 uvalue_convert v = NoOom v0).
+                 dvalue_refine a a0 /\
+                 uvalue_refine v v0).
     }
 
     (* PickE *)
@@ -3003,8 +3482,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       destruct res1 as [r1 P1].
       destruct res2 as [r2 P2].
       apply ((Pre <-> Pre0) /\
-               uvalue_convert x = NoOom x0 /\
-            dvalue_convert r1 = NoOom r2).
+               uvalue_refine x x0 /\
+            dvalue_refine r1 r2).
     }
 
     (* OOME *)
@@ -3023,12 +3502,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { apply True.
     }
   Defined.
-
-  Definition dvalue_refine (dv1 : IS1.LP.Events.DV.dvalue) (dv2 : IS2.LP.Events.DV.dvalue) : Prop
-    := dvalue_convert dv1 = NoOom dv2.
-
-  Definition uvalue_refine (uv1 : IS1.LP.Events.DV.uvalue) (uv2 : IS2.LP.Events.DV.uvalue) : Prop
-    := uvalue_convert uv1 = NoOom uv2.
 
   Definition L0_E1E2_rutt t1 t2
     : Prop :=
@@ -3074,156 +3547,480 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Proof.
   Admitted.
 
+  Lemma uvalue_convert_dv_to_uv_dvalue_convert :
+    forall dv,
+      uvalue_convert (IS1.LP.Events.DV.dvalue_to_uvalue dv) = dvalue_to_uvalue (dvalue_convert dv).
+  Proof.
+    induction dv; cbn;
+      try
+        solve [ rewrite uvalue_convert_equation, dvalue_convert_equation; cbn; auto;
+                break_match; cbn; auto
+              | rewrite uvalue_convert_equation, dvalue_convert_equation; cbn; auto
+        ].
+
+    { (* Structs *)
+      rewrite uvalue_convert_equation, dvalue_convert_equation; cbn.
+      induction fields.
+      - cbn; auto.
+      - rewrite map_In_cons, map_cons.
+        rewrite map_In_cons, map_cons.
+
+        forward IHfields.
+        { intros u IN.
+          apply H; cbn; auto.
+        }
+
+        inv IHfields.
+        rewrite H; cbn; auto.
+    }
+
+    { (* Packed structs *)
+      rewrite uvalue_convert_equation, dvalue_convert_equation; cbn.
+      induction fields.
+      - cbn; auto.
+      - rewrite map_In_cons, map_cons.
+        rewrite map_In_cons, map_cons.
+
+        forward IHfields.
+        { intros u IN.
+          apply H; cbn; auto.
+        }
+
+        inv IHfields.
+        rewrite H; cbn; auto.
+    }
+
+    { (* Arrays *)
+      rewrite uvalue_convert_equation, dvalue_convert_equation; cbn.
+      induction elts.
+      - cbn; auto.
+      - rewrite map_In_cons, map_cons.
+        rewrite map_In_cons, map_cons.
+
+        forward IHelts.
+        { intros u IN.
+          apply H; cbn; auto.
+        }
+
+        inv IHelts.
+        rewrite H; cbn; auto.
+    }
+
+    { (* Vectors *)
+      rewrite uvalue_convert_equation, dvalue_convert_equation; cbn.
+      induction elts.
+      - cbn; auto.
+      - rewrite map_In_cons, map_cons.
+        rewrite map_In_cons, map_cons.
+
+        forward IHelts.
+        { intros u IN.
+          apply H; cbn; auto.
+        }
+
+        inv IHelts.
+        rewrite H; cbn; auto.
+    }
+  Qed.
+
   (* TODO: Move this? *)
   Lemma dvalue_refine_dvalue_to_uvalue :
     forall dv1 dv2,
       dvalue_refine dv1 dv2 ->
       uvalue_refine (IS1.LP.Events.DV.dvalue_to_uvalue dv1) (IS2.LP.Events.DV.dvalue_to_uvalue dv2).
   Proof.
-    induction dv1; intros dv2 REF;
-      red in REF;
-      rewrite dvalue_convert_equation in REF;
-      try
-        solve [
-          cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn;
-          first [ break_match_hyp; inv REF
-                | inv REF
-            ];
-          cbn; auto
+    induction dv1; intros dv2 REF.
+
+    1-11:
+      solve [
+          rewrite dvalue_refine_equation in REF;
+          rewrite dvalue_convert_equation in REF;
+          rewrite uvalue_refine_equation;
+          cbn in *; rewrite uvalue_convert_equation; cbn in *;
+          solve
+            [ (cbn in REF;
+               destruct REF as [REF | REF];
+               [ subst; auto
+               | destruct dv2; inv REF;
+                 unfold dvalue_to_uvalue;
+                 try solve [auto | right; constructor; auto]
+              ])
+            | break_match_hyp;
+              (cbn in REF;
+               destruct REF as [REF | REF];
+               [ subst; auto
+               | destruct dv2; inv REF;
+                 unfold dvalue_to_uvalue;
+                 try solve [auto | right; constructor; auto]
+              ])
+            ]
         ].
-    - (* Structs *)
-      cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn.
-      break_match_hyp; inv REF.
-      generalize dependent l.
-      induction fields; intros l Heqo.
-      { cbn in *.
-        inv Heqo.
+
+    { rewrite dvalue_refine_equation in REF;
+        rewrite dvalue_convert_equation in REF.
+
+      destruct REF as [REF | REF].
+      - subst; auto.
+        left.
         cbn.
-        reflexivity.
-      }
-      { rewrite map_monad_In_unfold in Heqo.
-        rewrite map_cons.
-        rewrite map_monad_In_unfold.
 
-        cbn in *.
-        destruct (dvalue_convert a) eqn:A; inv Heqo.
-        pose proof (H a) as AIND.
-        forward AIND; auto.
-        specialize (AIND _ A).
-        red in AIND.
-        rewrite AIND.
+        induction fields.
+        + cbn. reflexivity.
+        + rewrite map_cons, map_In_cons.
+          rewrite uvalue_convert_equation in IHfields.
+          rewrite uvalue_convert_equation.
+          rewrite map_In_cons, map_cons.
 
-        forward IHfields.
-        { intros u H0 dv2 H2.
-          eauto.
-        }
+          forward IHfields.
+          { intros u H0 dv2 H1.
+            apply H; cbn; auto.
+          }
 
-        break_match_hyp; inv H1.
-        specialize (IHfields l0 eq_refl).
-        break_match_hyp; inv IHfields.
+          inv IHfields.
+
+          assert
+            (uvalue_convert (IS1.LP.Events.DV.dvalue_to_uvalue a) = dvalue_to_uvalue (dvalue_convert a)).
+          { apply uvalue_convert_dv_to_uv_dvalue_convert.
+          }
+
+          rewrite H0.
+          reflexivity.
+      - destruct dv2; try solve [inv REF].
+        + (* OOM *)
+          cbn. inv REF.
+          * right; constructor; auto.
+          * (* Struct *)
+            right.
+            cbn.
+            constructor.
+            { apply DV1.dvalue_to_uvalue_preserves_dtyp; auto.
+            }
+            { pose proof (DV1.dvalue_to_uvalue_preserves_dtyp H2).
+              inv H0.
+              - constructor.
+              - cbn. constructor; auto.
+            }
+        + (* Struct *)
+          rewrite uvalue_refine_equation.
+          right.
+          unfold IS1.LP.Events.DV.dvalue_to_uvalue at 1.
+          unfold dvalue_to_uvalue at  1.
+
+          induction fields, fields0; inversion REF.
+          { cbn; auto.
+          }
+          { rewrite map_cons.
+            rewrite map_cons.
+            repeat fold dvalue_to_uvalue in *.
+            repeat fold IS1.LP.Events.DV.dvalue_to_uvalue in *.
+            apply Forall2_HIn_cons.
+            apply H; cbn; auto.
+
+            apply Forall2_HIn_forall.
+            apply Forall2_HIn_forall in H1 as [LEN H1].
+            split.
+            - repeat rewrite map_length. auto.
+            - intros i a0 b NA NB.
+              eexists.
+              eapply Util.Nth_In; eauto.
+              eexists.
+              eapply Util.Nth_In; eauto.
+
+              pose proof NA as NA'.
+              pose proof NB as NB'.
+              apply Nth_map_iff in NA', NB'.
+              destruct NA' as [a' [DVA' NA']].
+              destruct NB' as [b' [DVB' NB']].
+
+              apply Util.Nth_In in NA, NB.
+              apply in_map_iff in NA, NB.
+              destruct NA as [dv1 [DV1 IN1]].
+              destruct NB as [dv2 [DV2 IN2]].
+              subst.
+              apply H.
+              right; auto.
+
+              pose proof (H1 _ _ _ NA' NB') as [IN1' [IN2' REF']].
+              apply dvalue_to_uvalue_inj in DVB'; subst.
+              apply IS1.LP.Events.DV.dvalue_to_uvalue_inj in DVA'; subst.
+              auto.
+          }
+    }
+
+    { rewrite dvalue_refine_equation in REF;
+        rewrite dvalue_convert_equation in REF.
+
+      destruct REF as [REF | REF].
+      - subst; auto.
+        left.
         cbn.
-        reflexivity.
-      }
-    - (* Packed structs *)
-      cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn.
-      break_match_hyp; inv REF.
-      generalize dependent l.
-      induction fields; intros l Heqo.
-      { cbn in *.
-        inv Heqo.
+
+        induction fields.
+        + cbn. reflexivity.
+        + rewrite map_cons, map_In_cons.
+          rewrite uvalue_convert_equation in IHfields.
+          rewrite uvalue_convert_equation.
+          rewrite map_In_cons, map_cons.
+
+          forward IHfields.
+          { intros u H0 dv2 H1.
+            apply H; cbn; auto.
+          }
+
+          inv IHfields.
+
+          assert
+            (uvalue_convert (IS1.LP.Events.DV.dvalue_to_uvalue a) = dvalue_to_uvalue (dvalue_convert a)).
+          { apply uvalue_convert_dv_to_uv_dvalue_convert.
+          }
+
+          rewrite H0.
+          reflexivity.
+      - destruct dv2; try solve [inv REF].
+        + (* OOM *)
+          cbn. inv REF.
+          * right; constructor; auto.
+          * (* Struct *)
+            right.
+            cbn.
+            constructor.
+            { apply DV1.dvalue_to_uvalue_preserves_dtyp; auto.
+            }
+            { pose proof (DV1.dvalue_to_uvalue_preserves_dtyp H2).
+              inv H0.
+              - constructor.
+              - cbn. constructor; auto.
+            }
+        + (* Struct *)
+          rewrite uvalue_refine_equation.
+          right.
+          unfold IS1.LP.Events.DV.dvalue_to_uvalue at 1.
+          unfold dvalue_to_uvalue at  1.
+
+          induction fields, fields0; inversion REF.
+          { cbn; auto.
+          }
+          { rewrite map_cons.
+            rewrite map_cons.
+            repeat fold dvalue_to_uvalue in *.
+            repeat fold IS1.LP.Events.DV.dvalue_to_uvalue in *.
+            apply Forall2_HIn_cons.
+            apply H; cbn; auto.
+
+            apply Forall2_HIn_forall.
+            apply Forall2_HIn_forall in H1 as [LEN H1].
+            split.
+            - repeat rewrite map_length. auto.
+            - intros i a0 b NA NB.
+              eexists.
+              eapply Util.Nth_In; eauto.
+              eexists.
+              eapply Util.Nth_In; eauto.
+
+              pose proof NA as NA'.
+              pose proof NB as NB'.
+              apply Nth_map_iff in NA', NB'.
+              destruct NA' as [a' [DVA' NA']].
+              destruct NB' as [b' [DVB' NB']].
+
+              apply Util.Nth_In in NA, NB.
+              apply in_map_iff in NA, NB.
+              destruct NA as [dv1 [DV1 IN1]].
+              destruct NB as [dv2 [DV2 IN2]].
+              subst.
+              apply H.
+              right; auto.
+
+              pose proof (H1 _ _ _ NA' NB') as [IN1' [IN2' REF']].
+              apply dvalue_to_uvalue_inj in DVB'; subst.
+              apply IS1.LP.Events.DV.dvalue_to_uvalue_inj in DVA'; subst.
+              auto.
+          }
+    }
+
+    { rewrite dvalue_refine_equation in REF;
+        rewrite dvalue_convert_equation in REF.
+
+      destruct REF as [REF | REF].
+      - subst; auto.
+        left.
         cbn.
-        reflexivity.
-      }
-      { rewrite map_monad_In_unfold in Heqo.
-        rewrite map_cons.
-        rewrite map_monad_In_unfold.
 
-        cbn in *.
-        destruct (dvalue_convert a) eqn:A; inv Heqo.
-        pose proof (H a) as AIND.
-        forward AIND; auto.
-        specialize (AIND _ A).
-        red in AIND.
-        rewrite AIND.
+        rename elts into fields.
+        induction fields.
+        + cbn. reflexivity.
+        + rewrite map_cons, map_In_cons.
+          rewrite uvalue_convert_equation in IHfields.
+          rewrite uvalue_convert_equation.
+          rewrite map_In_cons, map_cons.
 
-        forward IHfields.
-        { intros u H0 dv2 H2.
-          eauto.
-        }
+          forward IHfields.
+          { intros u H0 dv2 H1.
+            apply H; cbn; auto.
+          }
 
-        break_match_hyp; inv H1.
-        specialize (IHfields l0 eq_refl).
-        break_match_hyp; inv IHfields.
+          inv IHfields.
+
+          assert
+            (uvalue_convert (IS1.LP.Events.DV.dvalue_to_uvalue a) = dvalue_to_uvalue (dvalue_convert a)).
+          { apply uvalue_convert_dv_to_uv_dvalue_convert.
+          }
+
+          rewrite H0.
+          reflexivity.
+      - destruct dv2; try solve [inv REF].
+        + (* OOM *)
+          cbn. inv REF.
+          right.
+          constructor.
+          * apply Forall_forall.
+            intros x IN.
+            apply in_map_iff in IN as [x' [CONV IN]].
+            apply Forall_forall with (x:=x') in H1; auto.
+            subst.
+            apply DV1.dvalue_to_uvalue_preserves_dtyp; auto.
+          * rewrite map_length; auto.
+        + (* Struct *)
+          rewrite uvalue_refine_equation.
+          right.
+          unfold IS1.LP.Events.DV.dvalue_to_uvalue at 1.
+          unfold dvalue_to_uvalue at 1.
+
+          repeat fold dvalue_to_uvalue in *.
+          repeat fold IS1.LP.Events.DV.dvalue_to_uvalue in *.
+
+          induction elts, elts0; inversion REF.
+          { cbn; auto.
+          }
+          { rewrite map_cons.
+            rewrite map_cons.
+            apply Forall2_HIn_cons.
+            apply H; cbn; auto.
+
+            apply Forall2_HIn_forall.
+            apply Forall2_HIn_forall in H1 as [LEN H1].
+            split.
+            - repeat rewrite map_length. auto.
+            - intros i a0 b NA NB.
+              eexists.
+              eapply Util.Nth_In; eauto.
+              eexists.
+              eapply Util.Nth_In; eauto.
+
+              pose proof NA as NA'.
+              pose proof NB as NB'.
+              apply Nth_map_iff in NA', NB'.
+              destruct NA' as [a' [DVA' NA']].
+              destruct NB' as [b' [DVB' NB']].
+
+              apply Util.Nth_In in NA, NB.
+              apply in_map_iff in NA, NB.
+              destruct NA as [dv1 [DV1 IN1]].
+              destruct NB as [dv2 [DV2 IN2]].
+              subst.
+              apply H.
+              right; auto.
+
+              pose proof (H1 _ _ _ NA' NB') as [IN1' [IN2' REF']].
+              apply dvalue_to_uvalue_inj in DVB'; subst.
+              apply IS1.LP.Events.DV.dvalue_to_uvalue_inj in DVA'; subst.
+              auto.
+          }
+    }
+
+    { rewrite dvalue_refine_equation in REF;
+        rewrite dvalue_convert_equation in REF.
+
+      destruct REF as [REF | REF].
+      - subst; auto.
+        left.
         cbn.
-        reflexivity.
-      }
-    - (* Arrays *)
-      cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn.
-      break_match_hyp; inv REF.
-      generalize dependent l.
-      induction elts; intros l Heqo.
-      { cbn in *.
-        inv Heqo.
-        cbn.
-        reflexivity.
-      }
-      { rewrite map_monad_In_unfold in Heqo.
-        rewrite map_cons.
-        rewrite map_monad_In_unfold.
 
-        cbn in *.
-        destruct (dvalue_convert a) eqn:A; inv Heqo.
-        pose proof (H a) as AIND.
-        forward AIND; auto.
-        specialize (AIND _ A).
-        red in AIND.
-        rewrite AIND.
+        rename elts into fields.
+        induction fields.
+        + cbn. reflexivity.
+        + rewrite map_cons, map_In_cons.
+          rewrite uvalue_convert_equation in IHfields.
+          rewrite uvalue_convert_equation.
+          rewrite map_In_cons, map_cons.
 
-        forward IHelts.
-        { intros u H0 dv2 H2.
-          eauto.
-        }
+          forward IHfields.
+          { intros u H0 dv2 H1.
+            apply H; cbn; auto.
+          }
 
-        break_match_hyp; inv H1.
-        specialize (IHelts l0 eq_refl).
-        break_match_hyp; inv IHelts.
-        cbn.
-        reflexivity.
-      }
-    - (* Vectors *)
-      cbn in REF; cbn; red; rewrite uvalue_convert_equation; cbn.
-      break_match_hyp; inv REF.
-      generalize dependent l.
-      induction elts; intros l Heqo.
-      { cbn in *.
-        inv Heqo.
-        cbn.
-        reflexivity.
-      }
-      { rewrite map_monad_In_unfold in Heqo.
-        rewrite map_cons.
-        rewrite map_monad_In_unfold.
+          inv IHfields.
 
-        cbn in *.
-        destruct (dvalue_convert a) eqn:A; inv Heqo.
-        pose proof (H a) as AIND.
-        forward AIND; auto.
-        specialize (AIND _ A).
-        red in AIND.
-        rewrite AIND.
+          assert
+            (uvalue_convert (IS1.LP.Events.DV.dvalue_to_uvalue a) = dvalue_to_uvalue (dvalue_convert a)).
+          { apply uvalue_convert_dv_to_uv_dvalue_convert.
+          }
 
-        forward IHelts.
-        { intros u H0 dv2 H2.
-          eauto.
-        }
+          rewrite H0.
+          reflexivity.
+      - destruct dv2; try solve [inv REF].
+        + (* OOM *)
+          cbn. inv REF.
+          right.
+          constructor.
+          * apply Forall_forall.
+            intros x IN.
+            apply in_map_iff in IN as [x' [CONV IN]].
+            apply Forall_forall with (x:=x') in H1; auto.
+            subst.
+            apply DV1.dvalue_to_uvalue_preserves_dtyp; auto.
+          * rewrite map_length; auto.
+          * auto.
+        + (* Struct *)
+          rewrite uvalue_refine_equation.
+          right.
+          unfold IS1.LP.Events.DV.dvalue_to_uvalue at 1.
+          unfold dvalue_to_uvalue at 1.
 
-        break_match_hyp; inv H1.
-        specialize (IHelts l0 eq_refl).
-        break_match_hyp; inv IHelts.
-        cbn.
-        reflexivity.
-      }
-  Qed.
+          repeat fold dvalue_to_uvalue in *.
+          repeat fold IS1.LP.Events.DV.dvalue_to_uvalue in *.
+
+          induction elts, elts0; inversion REF.
+          { cbn; auto.
+          }
+          { rewrite map_cons.
+            rewrite map_cons.
+            apply Forall2_HIn_cons.
+            apply H; cbn; auto.
+
+            apply Forall2_HIn_forall.
+            apply Forall2_HIn_forall in H1 as [LEN H1].
+            split.
+            - repeat rewrite map_length. auto.
+            - intros i a0 b NA NB.
+              eexists.
+              eapply Util.Nth_In; eauto.
+              eexists.
+              eapply Util.Nth_In; eauto.
+
+              pose proof NA as NA'.
+              pose proof NB as NB'.
+              apply Nth_map_iff in NA', NB'.
+              destruct NA' as [a' [DVA' NA']].
+              destruct NB' as [b' [DVB' NB']].
+
+              apply Util.Nth_In in NA, NB.
+              apply in_map_iff in NA, NB.
+              destruct NA as [dv1 [DV1 IN1]].
+              destruct NB as [dv2 [DV2 IN2]].
+              subst.
+              apply H.
+              right; auto.
+
+              pose proof (H1 _ _ _ NA' NB') as [IN1' [IN2' REF']].
+              apply dvalue_to_uvalue_inj in DVB'; subst.
+              apply IS1.LP.Events.DV.dvalue_to_uvalue_inj in DVA'; subst.
+              auto.
+          }
+    }
+
+    (* This QED takes foreeeever *)
+  Admitted.
 
   Hint Resolve dvalue_refine_dvalue_to_uvalue : DVALUE_REFINE.
 
@@ -3241,12 +4038,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       repeat rewrite bind_trigger.
       apply rutt_Vis;
-        cbn; auto.
+        [cbn; auto|].
 
       intros * ?.
       apply rutt_Ret.
       apply dvalue_refine_dvalue_to_uvalue.
-      tauto.
+      destruct H.
+      auto.
     - cbn.
       repeat rewrite translate_bind.
       repeat rewrite translate_trigger.
@@ -3254,11 +4052,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       repeat rewrite bind_trigger.
       apply rutt_Vis;
-        cbn; auto.
+        [cbn; auto|].
 
       intros * ?.
       apply rutt_Ret.
-      tauto.
+      destruct H.
+      auto.
   Qed.
 
   (* TODO: generalize *)
@@ -3293,20 +4092,18 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
         { (* Normal integers *)
           pose proof (@IX_supported_dec sz)
-            as [SUPPORTED | UNSUPPORTED];
-            [
-              inv SUPPORTED;
+            as [SUPPORTED | UNSUPPORTED].
+          - inv SUPPORTED;
               repeat rewrite map_ret;
               apply rutt_Ret;
-              cbn;
-              unfold uvalue_refine;
+              rewrite uvalue_refine_equation;
+              left;
               rewrite uvalue_convert_equation;
-              reflexivity
-            |
-              repeat rewrite unsupported_cases_match; auto;
+              cbn;
+              reflexivity.
+          - repeat rewrite unsupported_cases_match; auto;
               repeat rewrite Raise.raise_map_itree;
-              apply rutt_raise; cbn; auto
-            ].
+              apply rutt_raise; cbn; auto.
         }
 
         { (* Intptrs *)
@@ -3331,7 +4128,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
     intros t1 t2 H.
     cbn in H.
-    red.
     tauto.
   Qed.
 
@@ -3345,7 +4141,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
     intros t1 t2 H.
     cbn in H.
-    red.
     tauto.
   Qed.
 
@@ -3381,7 +4176,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { break_match.
       apply denote_exp_E1E2_rutt.
       eapply rutt_Ret.
-      red.
+      rewrite uvalue_refine_equation.
+      left.
       rewrite uvalue_convert_equation.
       reflexivity.
     }
@@ -3674,17 +4470,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       { apply rutt_trigger.
         - cbn.
           induction PARAMS.
-          + cbn. reflexivity.
+          + apply local_refine_empty.
           + destruct x as [xid xuv].
             destruct y as [yid yuv].
             inv H.
             cbn in fst_rel, snd_rel. subst.
-            red in snd_rel.
-            rewrite map_monad_unfold.
-            rewrite snd_rel.
-            cbn.
-            setoid_rewrite IHPARAMS.
-            reflexivity.
+            apply alist_refine_cons; auto.
         - intros [] [] _.
           reflexivity.
       }
@@ -3766,315 +4557,315 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Qed.
 
-  (* TODO: move this? *)
-  Lemma uvalue_convert_preserves_is_concrete :
-    forall uv uvc b,
-      uvalue_convert uv = NoOom uvc ->
-      IS1.LP.Events.DV.is_concrete uv = b ->
-      IS2.LP.Events.DV.is_concrete uvc = b.
-  Proof.
-    induction uv using IS1.LP.Events.DV.uvalue_ind';
-      intros uvc b UVC CONC; cbn in *;
-      rewrite uvalue_convert_equation in UVC;
-      try
-        solve [ cbn in UVC; inv UVC; cbn; auto
-              | subst;
-                cbn in UVC;
-                break_match_hyp; inv UVC;
-                break_match_hyp; inv H0;
-                cbn; auto
-              | inv CONC; subst;
-                cbn in UVC;
-                break_match_hyp; inv UVC;
-                break_match_hyp; inv H1;
-                break_match_hyp; inv H2;
-                cbn; auto
-              | cbn in UVC;
-                break_match_hyp; inv UVC;
-                cbn; auto
-              | cbn in *;
-                break_match_hyp; inv UVC;
-                break_match_hyp; inv H1;
-                cbn; auto
-        ].
+  (* (* TODO: move this? *) *)
+  (* Lemma uvalue_convert_preserves_is_concrete : *)
+  (*   forall uv uvc b, *)
+  (*     uvalue_convert uv = NoOom uvc -> *)
+  (*     IS1.LP.Events.DV.is_concrete uv = b -> *)
+  (*     IS2.LP.Events.DV.is_concrete uvc = b. *)
+  (* Proof. *)
+  (*   induction uv using IS1.LP.Events.DV.uvalue_ind'; *)
+  (*     intros uvc b UVC CONC; cbn in *; *)
+  (*     rewrite uvalue_convert_equation in UVC; *)
+  (*     try *)
+  (*       solve [ cbn in UVC; inv UVC; cbn; auto *)
+  (*             | subst; *)
+  (*               cbn in UVC; *)
+  (*               break_match_hyp; inv UVC; *)
+  (*               break_match_hyp; inv H0; *)
+  (*               cbn; auto *)
+  (*             | inv CONC; subst; *)
+  (*               cbn in UVC; *)
+  (*               break_match_hyp; inv UVC; *)
+  (*               break_match_hyp; inv H1; *)
+  (*               break_match_hyp; inv H2; *)
+  (*               cbn; auto *)
+  (*             | cbn in UVC; *)
+  (*               break_match_hyp; inv UVC; *)
+  (*               cbn; auto *)
+  (*             | cbn in *; *)
+  (*               break_match_hyp; inv UVC; *)
+  (*               break_match_hyp; inv H1; *)
+  (*               cbn; auto *)
+  (*       ]. *)
 
-    - (* Structs *)
-      rewrite map_monad_In_unfold in UVC.
-      cbn in UVC.
-      break_inner_match_hyp; inv UVC.
-      break_inner_match_hyp; inv H0.
-      cbn.
+  (*   - (* Structs *) *)
+  (*     rewrite map_monad_In_unfold in UVC. *)
+  (*     cbn in UVC. *)
+  (*     break_inner_match_hyp; inv UVC. *)
+  (*     break_inner_match_hyp; inv H0. *)
+  (*     cbn. *)
 
-      destruct (IS1.LP.Events.DV.is_concrete uv) eqn:UVB.
-      + cbn in *.
-        specialize (IHuv u true eq_refl eq_refl).
-        rewrite IHuv.
-        cbn.
+  (*     destruct (IS1.LP.Events.DV.is_concrete uv) eqn:UVB. *)
+  (*     + cbn in *. *)
+  (*       specialize (IHuv u true eq_refl eq_refl). *)
+  (*       rewrite IHuv. *)
+  (*       cbn. *)
 
-        destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB.
-        * specialize (IHuv0 (UVALUE_Struct l) true).
-          forward IHuv0.
-          { rewrite uvalue_convert_equation.
-            rewrite Heqo0.
-            cbn.
-            reflexivity.
-          }
-          specialize (IHuv0 eq_refl).
+  (*       destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB. *)
+  (*       * specialize (IHuv0 (UVALUE_Struct l) true). *)
+  (*         forward IHuv0. *)
+  (*         { rewrite uvalue_convert_equation. *)
+  (*           rewrite Heqo0. *)
+  (*           cbn. *)
+  (*           reflexivity. *)
+  (*         } *)
+  (*         specialize (IHuv0 eq_refl). *)
 
-          cbn in IHuv0.
-          auto.
-        * specialize (IHuv0 (UVALUE_Struct l) false).
-          forward IHuv0.
-          { rewrite uvalue_convert_equation.
-            rewrite Heqo0.
-            cbn.
-            reflexivity.
-          }
-          specialize (IHuv0 eq_refl).
+  (*         cbn in IHuv0. *)
+  (*         auto. *)
+  (*       * specialize (IHuv0 (UVALUE_Struct l) false). *)
+  (*         forward IHuv0. *)
+  (*         { rewrite uvalue_convert_equation. *)
+  (*           rewrite Heqo0. *)
+  (*           cbn. *)
+  (*           reflexivity. *)
+  (*         } *)
+  (*         specialize (IHuv0 eq_refl). *)
 
-          cbn in IHuv0.
-          auto.
-      + cbn in *.
-        specialize (IHuv u false eq_refl eq_refl).
-        rewrite IHuv.
-        cbn.
+  (*         cbn in IHuv0. *)
+  (*         auto. *)
+  (*     + cbn in *. *)
+  (*       specialize (IHuv u false eq_refl eq_refl). *)
+  (*       rewrite IHuv. *)
+  (*       cbn. *)
 
-        destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB.
-        * specialize (IHuv0 (UVALUE_Struct l) true).
-          forward IHuv0.
-          { rewrite uvalue_convert_equation.
-            rewrite Heqo0.
-            cbn.
-            reflexivity.
-          }
-          specialize (IHuv0 eq_refl).
+  (*       destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB. *)
+  (*       * specialize (IHuv0 (UVALUE_Struct l) true). *)
+  (*         forward IHuv0. *)
+  (*         { rewrite uvalue_convert_equation. *)
+  (*           rewrite Heqo0. *)
+  (*           cbn. *)
+  (*           reflexivity. *)
+  (*         } *)
+  (*         specialize (IHuv0 eq_refl). *)
 
-          cbn in IHuv0.
-          auto.
-        * specialize (IHuv0 (UVALUE_Struct l) false).
-          forward IHuv0.
-          { rewrite uvalue_convert_equation.
-            rewrite Heqo0.
-            cbn.
-            reflexivity.
-          }
-          specialize (IHuv0 eq_refl).
+  (*         cbn in IHuv0. *)
+  (*         auto. *)
+  (*       * specialize (IHuv0 (UVALUE_Struct l) false). *)
+  (*         forward IHuv0. *)
+  (*         { rewrite uvalue_convert_equation. *)
+  (*           rewrite Heqo0. *)
+  (*           cbn. *)
+  (*           reflexivity. *)
+  (*         } *)
+  (*         specialize (IHuv0 eq_refl). *)
 
-          cbn in IHuv0.
-          auto.
-    - (* Packed structs *)
-      rewrite map_monad_In_unfold in UVC.
-      cbn in UVC.
-      break_inner_match_hyp; inv UVC.
-      break_inner_match_hyp; inv H0.
-      cbn.
+  (*         cbn in IHuv0. *)
+  (*         auto. *)
+  (*   - (* Packed structs *) *)
+  (*     rewrite map_monad_In_unfold in UVC. *)
+  (*     cbn in UVC. *)
+  (*     break_inner_match_hyp; inv UVC. *)
+  (*     break_inner_match_hyp; inv H0. *)
+  (*     cbn. *)
 
-      destruct (IS1.LP.Events.DV.is_concrete uv) eqn:UVB.
-      + cbn in *.
-        specialize (IHuv u true eq_refl eq_refl).
-        rewrite IHuv.
-        cbn.
+  (*     destruct (IS1.LP.Events.DV.is_concrete uv) eqn:UVB. *)
+  (*     + cbn in *. *)
+  (*       specialize (IHuv u true eq_refl eq_refl). *)
+  (*       rewrite IHuv. *)
+  (*       cbn. *)
 
-        destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB.
-        * specialize (IHuv0 (UVALUE_Packed_struct l) true).
-          forward IHuv0.
-          { rewrite uvalue_convert_equation.
-            rewrite Heqo0.
-            cbn.
-            reflexivity.
-          }
-          specialize (IHuv0 eq_refl).
+  (*       destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB. *)
+  (*       * specialize (IHuv0 (UVALUE_Packed_struct l) true). *)
+  (*         forward IHuv0. *)
+  (*         { rewrite uvalue_convert_equation. *)
+  (*           rewrite Heqo0. *)
+  (*           cbn. *)
+  (*           reflexivity. *)
+  (*         } *)
+  (*         specialize (IHuv0 eq_refl). *)
 
-          cbn in IHuv0.
-          auto.
-        * specialize (IHuv0 (UVALUE_Packed_struct l) false).
-          forward IHuv0.
-          { rewrite uvalue_convert_equation.
-            rewrite Heqo0.
-            cbn.
-            reflexivity.
-          }
-          specialize (IHuv0 eq_refl).
+  (*         cbn in IHuv0. *)
+  (*         auto. *)
+  (*       * specialize (IHuv0 (UVALUE_Packed_struct l) false). *)
+  (*         forward IHuv0. *)
+  (*         { rewrite uvalue_convert_equation. *)
+  (*           rewrite Heqo0. *)
+  (*           cbn. *)
+  (*           reflexivity. *)
+  (*         } *)
+  (*         specialize (IHuv0 eq_refl). *)
 
-          cbn in IHuv0.
-          auto.
-      + cbn in *.
-        specialize (IHuv u false eq_refl eq_refl).
-        rewrite IHuv.
-        cbn.
+  (*         cbn in IHuv0. *)
+  (*         auto. *)
+  (*     + cbn in *. *)
+  (*       specialize (IHuv u false eq_refl eq_refl). *)
+  (*       rewrite IHuv. *)
+  (*       cbn. *)
 
-        destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB.
-        * specialize (IHuv0 (UVALUE_Packed_struct l) true).
-          forward IHuv0.
-          { rewrite uvalue_convert_equation.
-            rewrite Heqo0.
-            cbn.
-            reflexivity.
-          }
-          specialize (IHuv0 eq_refl).
+  (*       destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB. *)
+  (*       * specialize (IHuv0 (UVALUE_Packed_struct l) true). *)
+  (*         forward IHuv0. *)
+  (*         { rewrite uvalue_convert_equation. *)
+  (*           rewrite Heqo0. *)
+  (*           cbn. *)
+  (*           reflexivity. *)
+  (*         } *)
+  (*         specialize (IHuv0 eq_refl). *)
 
-          cbn in IHuv0.
-          auto.
-        * specialize (IHuv0 (UVALUE_Packed_struct l) false).
-          forward IHuv0.
-          { rewrite uvalue_convert_equation.
-            rewrite Heqo0.
-            cbn.
-            reflexivity.
-          }
-          specialize (IHuv0 eq_refl).
+  (*         cbn in IHuv0. *)
+  (*         auto. *)
+  (*       * specialize (IHuv0 (UVALUE_Packed_struct l) false). *)
+  (*         forward IHuv0. *)
+  (*         { rewrite uvalue_convert_equation. *)
+  (*           rewrite Heqo0. *)
+  (*           cbn. *)
+  (*           reflexivity. *)
+  (*         } *)
+  (*         specialize (IHuv0 eq_refl). *)
 
-          cbn in IHuv0.
-          auto.
-    - (* Arrays *)
-      rewrite map_monad_In_unfold in UVC.
-      cbn in UVC.
-      break_inner_match_hyp; inv UVC.
-      break_inner_match_hyp; inv H0.
-      cbn.
+  (*         cbn in IHuv0. *)
+  (*         auto. *)
+  (*   - (* Arrays *) *)
+  (*     rewrite map_monad_In_unfold in UVC. *)
+  (*     cbn in UVC. *)
+  (*     break_inner_match_hyp; inv UVC. *)
+  (*     break_inner_match_hyp; inv H0. *)
+  (*     cbn. *)
 
-      destruct (IS1.LP.Events.DV.is_concrete uv) eqn:UVB.
-      + cbn in *.
-        specialize (IHuv u true eq_refl eq_refl).
-        rewrite IHuv.
-        cbn.
+  (*     destruct (IS1.LP.Events.DV.is_concrete uv) eqn:UVB. *)
+  (*     + cbn in *. *)
+  (*       specialize (IHuv u true eq_refl eq_refl). *)
+  (*       rewrite IHuv. *)
+  (*       cbn. *)
 
-        destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB.
-        * specialize (IHuv0 (UVALUE_Array l) true).
-          forward IHuv0.
-          { rewrite uvalue_convert_equation.
-            rewrite Heqo0.
-            cbn.
-            reflexivity.
-          }
-          specialize (IHuv0 eq_refl).
+  (*       destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB. *)
+  (*       * specialize (IHuv0 (UVALUE_Array l) true). *)
+  (*         forward IHuv0. *)
+  (*         { rewrite uvalue_convert_equation. *)
+  (*           rewrite Heqo0. *)
+  (*           cbn. *)
+  (*           reflexivity. *)
+  (*         } *)
+  (*         specialize (IHuv0 eq_refl). *)
 
-          cbn in IHuv0.
-          auto.
-        * specialize (IHuv0 (UVALUE_Array l) false).
-          forward IHuv0.
-          { rewrite uvalue_convert_equation.
-            rewrite Heqo0.
-            cbn.
-            reflexivity.
-          }
-          specialize (IHuv0 eq_refl).
+  (*         cbn in IHuv0. *)
+  (*         auto. *)
+  (*       * specialize (IHuv0 (UVALUE_Array l) false). *)
+  (*         forward IHuv0. *)
+  (*         { rewrite uvalue_convert_equation. *)
+  (*           rewrite Heqo0. *)
+  (*           cbn. *)
+  (*           reflexivity. *)
+  (*         } *)
+  (*         specialize (IHuv0 eq_refl). *)
 
-          cbn in IHuv0.
-          auto.
-      + cbn in *.
-        specialize (IHuv u false eq_refl eq_refl).
-        rewrite IHuv.
-        cbn.
+  (*         cbn in IHuv0. *)
+  (*         auto. *)
+  (*     + cbn in *. *)
+  (*       specialize (IHuv u false eq_refl eq_refl). *)
+  (*       rewrite IHuv. *)
+  (*       cbn. *)
 
-        destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB.
-        * specialize (IHuv0 (UVALUE_Array l) true).
-          forward IHuv0.
-          { rewrite uvalue_convert_equation.
-            rewrite Heqo0.
-            cbn.
-            reflexivity.
-          }
-          specialize (IHuv0 eq_refl).
+  (*       destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB. *)
+  (*       * specialize (IHuv0 (UVALUE_Array l) true). *)
+  (*         forward IHuv0. *)
+  (*         { rewrite uvalue_convert_equation. *)
+  (*           rewrite Heqo0. *)
+  (*           cbn. *)
+  (*           reflexivity. *)
+  (*         } *)
+  (*         specialize (IHuv0 eq_refl). *)
 
-          cbn in IHuv0.
-          auto.
-        * specialize (IHuv0 (UVALUE_Array l) false).
-          forward IHuv0.
-          { rewrite uvalue_convert_equation.
-            rewrite Heqo0.
-            cbn.
-            reflexivity.
-          }
-          specialize (IHuv0 eq_refl).
+  (*         cbn in IHuv0. *)
+  (*         auto. *)
+  (*       * specialize (IHuv0 (UVALUE_Array l) false). *)
+  (*         forward IHuv0. *)
+  (*         { rewrite uvalue_convert_equation. *)
+  (*           rewrite Heqo0. *)
+  (*           cbn. *)
+  (*           reflexivity. *)
+  (*         } *)
+  (*         specialize (IHuv0 eq_refl). *)
 
-          cbn in IHuv0.
-          auto.
-    - (* Vectors *)
-      rewrite map_monad_In_unfold in UVC.
-      cbn in UVC.
-      break_inner_match_hyp; inv UVC.
-      break_inner_match_hyp; inv H0.
-      cbn.
+  (*         cbn in IHuv0. *)
+  (*         auto. *)
+  (*   - (* Vectors *) *)
+  (*     rewrite map_monad_In_unfold in UVC. *)
+  (*     cbn in UVC. *)
+  (*     break_inner_match_hyp; inv UVC. *)
+  (*     break_inner_match_hyp; inv H0. *)
+  (*     cbn. *)
 
-      destruct (IS1.LP.Events.DV.is_concrete uv) eqn:UVB.
-      + cbn in *.
-        specialize (IHuv u true eq_refl eq_refl).
-        rewrite IHuv.
-        cbn.
+  (*     destruct (IS1.LP.Events.DV.is_concrete uv) eqn:UVB. *)
+  (*     + cbn in *. *)
+  (*       specialize (IHuv u true eq_refl eq_refl). *)
+  (*       rewrite IHuv. *)
+  (*       cbn. *)
 
-        destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB.
-        * specialize (IHuv0 (UVALUE_Vector l) true).
-          forward IHuv0.
-          { rewrite uvalue_convert_equation.
-            rewrite Heqo0.
-            cbn.
-            reflexivity.
-          }
-          specialize (IHuv0 eq_refl).
+  (*       destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB. *)
+  (*       * specialize (IHuv0 (UVALUE_Vector l) true). *)
+  (*         forward IHuv0. *)
+  (*         { rewrite uvalue_convert_equation. *)
+  (*           rewrite Heqo0. *)
+  (*           cbn. *)
+  (*           reflexivity. *)
+  (*         } *)
+  (*         specialize (IHuv0 eq_refl). *)
 
-          cbn in IHuv0.
-          auto.
-        * specialize (IHuv0 (UVALUE_Vector l) false).
-          forward IHuv0.
-          { rewrite uvalue_convert_equation.
-            rewrite Heqo0.
-            cbn.
-            reflexivity.
-          }
-          specialize (IHuv0 eq_refl).
+  (*         cbn in IHuv0. *)
+  (*         auto. *)
+  (*       * specialize (IHuv0 (UVALUE_Vector l) false). *)
+  (*         forward IHuv0. *)
+  (*         { rewrite uvalue_convert_equation. *)
+  (*           rewrite Heqo0. *)
+  (*           cbn. *)
+  (*           reflexivity. *)
+  (*         } *)
+  (*         specialize (IHuv0 eq_refl). *)
 
-          cbn in IHuv0.
-          auto.
-      + cbn in *.
-        specialize (IHuv u false eq_refl eq_refl).
-        rewrite IHuv.
-        cbn.
+  (*         cbn in IHuv0. *)
+  (*         auto. *)
+  (*     + cbn in *. *)
+  (*       specialize (IHuv u false eq_refl eq_refl). *)
+  (*       rewrite IHuv. *)
+  (*       cbn. *)
 
-        destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB.
-        * specialize (IHuv0 (UVALUE_Vector l) true).
-          forward IHuv0.
-          { rewrite uvalue_convert_equation.
-            rewrite Heqo0.
-            cbn.
-            reflexivity.
-          }
-          specialize (IHuv0 eq_refl).
+  (*       destruct (forallb IS1.LP.Events.DV.is_concrete uvs) eqn:UVSB. *)
+  (*       * specialize (IHuv0 (UVALUE_Vector l) true). *)
+  (*         forward IHuv0. *)
+  (*         { rewrite uvalue_convert_equation. *)
+  (*           rewrite Heqo0. *)
+  (*           cbn. *)
+  (*           reflexivity. *)
+  (*         } *)
+  (*         specialize (IHuv0 eq_refl). *)
 
-          cbn in IHuv0.
-          auto.
-        * specialize (IHuv0 (UVALUE_Vector l) false).
-          forward IHuv0.
-          { rewrite uvalue_convert_equation.
-            rewrite Heqo0.
-            cbn.
-            reflexivity.
-          }
-          specialize (IHuv0 eq_refl).
+  (*         cbn in IHuv0. *)
+  (*         auto. *)
+  (*       * specialize (IHuv0 (UVALUE_Vector l) false). *)
+  (*         forward IHuv0. *)
+  (*         { rewrite uvalue_convert_equation. *)
+  (*           rewrite Heqo0. *)
+  (*           cbn. *)
+  (*           reflexivity. *)
+  (*         } *)
+  (*         specialize (IHuv0 eq_refl). *)
 
-          cbn in IHuv0.
-          auto.
+  (*         cbn in IHuv0. *)
+  (*         auto. *)
 
-    (* Not sure why these ones didn't get solved above *)
-    - inv CONC; subst;
-        cbn in UVC;
-        break_match_hyp; inv UVC;
-        break_match_hyp; inv H1;
-        break_match_hyp; inv H2;
-        cbn; auto.
-    - inv CONC; subst;
-        cbn in UVC;
-        break_match_hyp; inv UVC;
-        break_match_hyp; inv H1;
-        break_match_hyp; inv H2;
-        cbn; auto.
-    - inv CONC; subst;
-        cbn in UVC;
-        break_match_hyp; inv UVC;
-        break_match_hyp; inv H1;
-        break_match_hyp; inv H2;
-        cbn; auto.
-  Qed.
+  (*   (* Not sure why these ones didn't get solved above *) *)
+  (*   - inv CONC; subst; *)
+  (*       cbn in UVC; *)
+  (*       break_match_hyp; inv UVC; *)
+  (*       break_match_hyp; inv H1; *)
+  (*       break_match_hyp; inv H2; *)
+  (*       cbn; auto. *)
+  (*   - inv CONC; subst; *)
+  (*       cbn in UVC; *)
+  (*       break_match_hyp; inv UVC; *)
+  (*       break_match_hyp; inv H1; *)
+  (*       break_match_hyp; inv H2; *)
+  (*       cbn; auto. *)
+  (*   - inv CONC; subst; *)
+  (*       cbn in UVC; *)
+  (*       break_match_hyp; inv UVC; *)
+  (*       break_match_hyp; inv H1; *)
+  (*       break_match_hyp; inv H2; *)
+  (*       cbn; auto. *)
+  (* Qed. *)
 
   (* Typeclass? *)
   (* Deterministic...? *)
@@ -4086,178 +4877,180 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       RR a b ->
       a = r1 <-> b = r2.
 
-  Lemma dvalue_refine_R2_injective :
-    R2_injective dvalue_refine.
-  Proof.
-    red.
-    intros r1 r2 a b R1R2 AB.
-    split; intros EQ; subst.
-    - unfold dvalue_refine in *.
-      rewrite R1R2 in AB. inv AB.
-      auto.
-    - unfold dvalue_refine in *.
-      generalize dependent r2.
-      induction r1, a; intros r2 R1R2 AB;
-        try
-          solve
-          [ rewrite dvalue_convert_equation in R1R2, AB;
-            cbn in *;
-            break_match_hyp; inv AB;
-            break_match_hyp; inv R1R2;
-            pose proof (AC1.addr_convert_injective _ _ _ Heqo0 Heqo);
-            subst; auto
-          | rewrite dvalue_convert_equation in R1R2, AB;
-            cbn in *;
-            break_match_hyp; inv R1R2;
-            inv AB
-          | rewrite dvalue_convert_equation in R1R2, AB;
-            cbn in *;
-            inv AB; inv R1R2; auto
-          | rewrite dvalue_convert_equation in R1R2, AB;
-            cbn in *;
-            break_match_hyp; inv AB;
-            break_match_hyp; inv R1R2;
-            apply IP.from_Z_to_Z in Heqo, Heqo0;
-            rewrite Heqo in Heqo0;
-            apply IS1.LP.IP.to_Z_inj in Heqo0;
-            subst;
-            auto
-          ].
+  (* (* Not true with new dvalue_refine *) *)
+  (* Lemma dvalue_refine_R2_injective : *)
+  (*   R2_injective dvalue_refine. *)
+  (* Proof. *)
+  (*   red. *)
+  (*   intros r1 r2 a b R1R2 AB. *)
+  (*   split; intros EQ; subst. *)
+  (*   - unfold dvalue_refine in *. *)
+  (*     rewrite R1R2 in AB. inv AB. *)
+  (*     auto. *)
+  (*   - unfold dvalue_refine in *. *)
+  (*     generalize dependent r2. *)
+  (*     induction r1, a; intros r2 R1R2 AB; *)
+  (*       try *)
+  (*         solve *)
+  (*         [ rewrite dvalue_convert_equation in R1R2, AB; *)
+  (*           cbn in *; *)
+  (*           break_match_hyp; inv AB; *)
+  (*           break_match_hyp; inv R1R2; *)
+  (*           pose proof (AC1.addr_convert_injective _ _ _ Heqo0 Heqo); *)
+  (*           subst; auto *)
+  (*         | rewrite dvalue_convert_equation in R1R2, AB; *)
+  (*           cbn in *; *)
+  (*           break_match_hyp; inv R1R2; *)
+  (*           inv AB *)
+  (*         | rewrite dvalue_convert_equation in R1R2, AB; *)
+  (*           cbn in *; *)
+  (*           inv AB; inv R1R2; auto *)
+  (*         | rewrite dvalue_convert_equation in R1R2, AB; *)
+  (*           cbn in *; *)
+  (*           break_match_hyp; inv AB; *)
+  (*           break_match_hyp; inv R1R2; *)
+  (*           apply IP.from_Z_to_Z in Heqo, Heqo0; *)
+  (*           rewrite Heqo in Heqo0; *)
+  (*           apply IS1.LP.IP.to_Z_inj in Heqo0; *)
+  (*           subst; *)
+  (*           auto *)
+  (*         ]. *)
 
-      { rewrite dvalue_convert_equation in R1R2, AB;
-          cbn in *.
+  (*     { rewrite dvalue_convert_equation in R1R2, AB; *)
+  (*         cbn in *. *)
 
-        break_match_hyp; inv AB.
-        break_match_hyp; inv R1R2.
-        admit.
-      }
-  Admitted.
+  (*       break_match_hyp; inv AB. *)
+  (*       break_match_hyp; inv R1R2. *)
+  (*       admit. *)
+  (*     } *)
+  (* Admitted. *)
 
-  Lemma assoc_similar_lookup :
-    forall {A B C D}
-      `{RDA : @RelDec.RelDec A eq}
-      `{RDC : @RelDec.RelDec C eq}
-      `{RDCA : @RelDec.RelDec_Correct _ _ RDA}
-      `{RDCC : @RelDec.RelDec_Correct _ _ RDC}
-      (RAC : A -> C -> Prop)
-      (RBD : B -> D -> Prop)
-      (xs : list (A * B)%type)
-      (ys : list (C * D)%type)
-      a b,
-      R2_injective RAC ->
-      Forall2 (RAC × RBD) xs ys ->
-      assoc a xs = Some b ->
-      exists c d i,
-        assoc c ys = Some d /\
-          Nth xs i (a, b) /\
-          Nth ys i (c, d).
-  Proof.
-    intros A B C D RDA RDC RDCA RDCC RAC RBD xs.
-    induction xs, ys; intros a' b' RINJ ALL ASSOC.
-    - cbn in *; inv ASSOC.
-    - cbn in *; inv ASSOC.
-    - inv ALL.
-    - inv ALL.
-      cbn in ASSOC.
-      destruct a.
-      break_match_hyp.
-      + assert (a' = a) as AA by
-            (eapply RelDec.rel_dec_correct; eauto);
-          subst.
+  (* Lemma assoc_similar_lookup : *)
+  (*   forall {A B C D} *)
+  (*     `{RDA : @RelDec.RelDec A eq} *)
+  (*     `{RDC : @RelDec.RelDec C eq} *)
+  (*     `{RDCA : @RelDec.RelDec_Correct _ _ RDA} *)
+  (*     `{RDCC : @RelDec.RelDec_Correct _ _ RDC} *)
+  (*     (RAC : A -> C -> Prop) *)
+  (*     (RBD : B -> D -> Prop) *)
+  (*     (xs : list (A * B)%type) *)
+  (*     (ys : list (C * D)%type) *)
+  (*     a b, *)
+  (*     R2_injective RAC -> *)
+  (*     Forall2 (RAC × RBD) xs ys -> *)
+  (*     assoc a xs = Some b -> *)
+  (*     exists c d i, *)
+  (*       assoc c ys = Some d /\ *)
+  (*         Nth xs i (a, b) /\ *)
+  (*         Nth ys i (c, d). *)
+  (* Proof. *)
+  (*   intros A B C D RDA RDC RDCA RDCC RAC RBD xs. *)
+  (*   induction xs, ys; intros a' b' RINJ ALL ASSOC. *)
+  (*   - cbn in *; inv ASSOC. *)
+  (*   - cbn in *; inv ASSOC. *)
+  (*   - inv ALL. *)
+  (*   - inv ALL. *)
+  (*     cbn in ASSOC. *)
+  (*     destruct a. *)
+  (*     break_match_hyp. *)
+  (*     + assert (a' = a) as AA by *)
+  (*           (eapply RelDec.rel_dec_correct; eauto); *)
+  (*         subst. *)
 
-        inv ASSOC.
-        destruct p.
-        inv H2.
-        cbn in *.
+  (*       inv ASSOC. *)
+  (*       destruct p. *)
+  (*       inv H2. *)
+  (*       cbn in *. *)
 
-        red in RINJ.
-        exists c. exists d. exists 0%nat.
-        rewrite RelDec.rel_dec_eq_true; auto.
-      + specialize (IHxs _ _ _ RINJ H4 ASSOC).
-        destruct IHxs as [c [d [i [ASSOC' [NTH1 NTH2]]]]].
-        exists c. exists d. exists (S i).
-        cbn.
-        break_inner_match_goal.
-        subst.
-        cbn in *.
-        break_inner_match_goal.
-        { (* c = c0 *)
-          (* Should be a contradiction using RINJ, Heqb0, and Heqb1 *)
-          inv H2.
-          cbn in *.
+  (*       red in RINJ. *)
+  (*       exists c. exists d. exists 0%nat. *)
+  (*       rewrite RelDec.rel_dec_eq_true; auto. *)
+  (*     + specialize (IHxs _ _ _ RINJ H4 ASSOC). *)
+  (*       destruct IHxs as [c [d [i [ASSOC' [NTH1 NTH2]]]]]. *)
+  (*       exists c. exists d. exists (S i). *)
+  (*       cbn. *)
+  (*       break_inner_match_goal. *)
+  (*       subst. *)
+  (*       cbn in *. *)
+  (*       break_inner_match_goal. *)
+  (*       { (* c = c0 *) *)
+  (*         (* Should be a contradiction using RINJ, Heqb0, and Heqb1 *) *)
+  (*         inv H2. *)
+  (*         cbn in *. *)
 
-          assert (c = c0) as CC by
-              (eapply RelDec.rel_dec_correct; eauto).
+  (*         assert (c = c0) as CC by *)
+  (*             (eapply RelDec.rel_dec_correct; eauto). *)
 
-          red in RINJ.
-          apply Forall2_forall in H4 as [LEN NTH].
-          specialize (NTH _ _ _ NTH1 NTH2).
-          inv NTH.
-          cbn in *.
+  (*         red in RINJ. *)
+  (*         apply Forall2_forall in H4 as [LEN NTH]. *)
+  (*         specialize (NTH _ _ _ NTH1 NTH2). *)
+  (*         inv NTH. *)
+  (*         cbn in *. *)
 
-          assert (a' = a).
-          { eapply RINJ; eauto. }
-          subst.
+  (*         assert (a' = a). *)
+  (*         { eapply RINJ; eauto. } *)
+  (*         subst. *)
 
-          eapply RelDec.neg_rel_dec_correct in Heqb0.
-          contradiction.
-        }
+  (*         eapply RelDec.neg_rel_dec_correct in Heqb0. *)
+  (*         contradiction. *)
+  (*       } *)
 
-        tauto.
-  Qed.
+  (*       tauto. *)
+  (* Qed. *)
 
-  (* TODO: move these? *)
-  Lemma lookup_defn_some_refine :
-    forall dfns1 dfns2 r1 r2 f_den1,
-      Forall2 (dvalue_refine × function_denotation_refine) dfns1 dfns2 ->
-      dvalue_refine r1 r2 ->
-      IS1.LLVM.D.lookup_defn r1 dfns1 = Some f_den1 ->
-      exists f_den2,
-        IS2.LLVM.D.lookup_defn r2 dfns2 = Some f_den2 /\
-          function_denotation_refine f_den1 f_den2.
-  Proof.
-    intros dfns1 dfns2 r1 r2 f_den1 DFNS R1R2 LUP.
+  (* (* TODO: move these? *) *)
+  (* (* Probably not true with new refine *) *)
+  (* Lemma lookup_defn_some_refine : *)
+  (*   forall dfns1 dfns2 r1 r2 f_den1, *)
+  (*     Forall2 (dvalue_refine × function_denotation_refine) dfns1 dfns2 -> *)
+  (*     dvalue_refine r1 r2 -> *)
+  (*     IS1.LLVM.D.lookup_defn r1 dfns1 = Some f_den1 -> *)
+  (*     exists f_den2, *)
+  (*       IS2.LLVM.D.lookup_defn r2 dfns2 = Some f_den2 /\ *)
+  (*         function_denotation_refine f_den1 f_den2. *)
+  (* Proof. *)
+  (*   intros dfns1 dfns2 r1 r2 f_den1 DFNS R1R2 LUP. *)
 
-    pose proof DFNS as NTH.
-    apply Forall2_forall in NTH as [LEN NTH].
+  (*   pose proof DFNS as NTH. *)
+  (*   apply Forall2_forall in NTH as [LEN NTH]. *)
 
-    (* Tricky assoc stuff... *)
-    (* lookup_defn uses assoc and it uses RelDec to determine if
-       dvalues are equal.
+  (*   (* Tricky assoc stuff... *) *)
+  (*   (* lookup_defn uses assoc and it uses RelDec to determine if *)
+  (*      dvalues are equal. *)
 
-       I need to know that dvalue_refine preserves this equality
-       relation.
+  (*      I need to know that dvalue_refine preserves this equality *)
+  (*      relation. *)
 
-       I.e.,
+  (*      I.e., *)
 
-       dvalue_refine r1 r2 ->
-       dvalue_refine a b ->
-       eq a r1 <-> eq b r2
+  (*      dvalue_refine r1 r2 -> *)
+  (*      dvalue_refine a b -> *)
+  (*      eq a r1 <-> eq b r2 *)
 
-     *)
+  (*    *) *)
 
-    pose proof LUP as LUP'.
-    eapply assoc_similar_lookup with
-      (xs:=dfns1) (ys:=dfns2) (a:=r1) (b:=f_den1) in LUP';
-      eauto.
-    2: {
-      apply dvalue_refine_R2_injective.
-    }
+  (*   pose proof LUP as LUP'. *)
+  (*   eapply assoc_similar_lookup with *)
+  (*     (xs:=dfns1) (ys:=dfns2) (a:=r1) (b:=f_den1) in LUP'; *)
+  (*     eauto. *)
+  (*   2: { *)
+  (*     apply dvalue_refine_R2_injective. *)
+  (*   } *)
 
-    destruct LUP' as [c [d [i [ASSOC [NTH1 NTH2]]]]].
-    exists d.
+  (*   destruct LUP' as [c [d [i [ASSOC [NTH1 NTH2]]]]]. *)
+  (*   exists d. *)
 
-    pose proof (NTH i (r1, f_den1) (c, d) NTH1 NTH2).
-    inv H; cbn in *.
-    split; auto.
+  (*   pose proof (NTH i (r1, f_den1) (c, d) NTH1 NTH2). *)
+  (*   inv H; cbn in *. *)
+  (*   split; auto. *)
 
-    assert (c = r2) as CR2.
-    { eapply dvalue_refine_R2_injective; eauto.
-    }
+  (*   assert (c = r2) as CR2. *)
+  (*   { eapply dvalue_refine_R2_injective; eauto. *)
+  (*   } *)
 
-    subst.
-    auto.
-  Qed.
+  (*   subst. *)
+  (*   auto. *)
+  (* Qed. *)
 
   Lemma assoc_similar_no_lookup :
     forall {A B C D}
@@ -4308,38 +5101,100 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         auto.
   Qed.
 
-  Lemma lookup_defn_none :
-    forall dfns1 dfns2 r1 r2,
-      Forall2 (dvalue_refine × function_denotation_refine) dfns1 dfns2 ->
-      dvalue_refine r1 r2 ->
-      IS1.LLVM.D.lookup_defn r1 dfns1 = None ->
-      IS2.LLVM.D.lookup_defn r2 dfns2 = None.
+  (* (* May not be true with new dvalue_refine *) *)
+  (* Lemma lookup_defn_none : *)
+  (*   forall dfns1 dfns2 r1 r2, *)
+  (*     Forall2 (dvalue_refine × function_denotation_refine) dfns1 dfns2 -> *)
+  (*     dvalue_refine r1 r2 -> *)
+  (*     IS1.LLVM.D.lookup_defn r1 dfns1 = None -> *)
+  (*     IS2.LLVM.D.lookup_defn r2 dfns2 = None. *)
+  (* Proof. *)
+  (*   intros dfns1 dfns2 r1 r2 ALL. *)
+  (*   revert r1. revert r2. *)
+  (*   induction ALL; intros r2 r1 REF LUP; *)
+  (*     cbn in *; auto. *)
+
+  (*   destruct x, y. *)
+  (*   cbn in *. *)
+
+  (*   inv H. *)
+  (*   cbn in *. *)
+
+  (*   break_match_hyp; inv LUP. *)
+  (*   eapply RelDec.neg_rel_dec_correct in Heqb. *)
+  (*   pose proof dvalue_refine_R2_injective _ _ _ _ REF fst_rel. *)
+  (*   assert (d0 <> r2). *)
+  (*   { intros D0R2. *)
+  (*     apply H in D0R2; auto. *)
+  (*   } *)
+  (*   { assert (r2 <> d0) by auto. *)
+  (*     apply RelDec.neg_rel_dec_correct in H2. *)
+  (*     rewrite H2. *)
+  (*     eapply assoc_similar_no_lookup with (xs:=l) (RAC:=dvalue_refine); eauto. *)
+  (*     apply dvalue_refine_R2_injective. *)
+  (*   } *)
+  (* Qed. *)
+
+  Lemma dvalue_refine_dvalue_convert :
+    forall dv,
+      dvalue_refine dv (dvalue_convert dv).
   Proof.
-    intros dfns1 dfns2 r1 r2 ALL.
-    revert r1. revert r2.
-    induction ALL; intros r2 r1 REF LUP;
-      cbn in *; auto.
-
-    destruct x, y.
-    cbn in *.
-
-    inv H.
-    cbn in *.
-
-    break_match_hyp; inv LUP.
-    eapply RelDec.neg_rel_dec_correct in Heqb.
-    pose proof dvalue_refine_R2_injective _ _ _ _ REF fst_rel.
-    assert (d0 <> r2).
-    { intros D0R2.
-      apply H in D0R2; auto.
-    }
-    { assert (r2 <> d0) by auto.
-      apply RelDec.neg_rel_dec_correct in H2.
-      rewrite H2.
-      eapply assoc_similar_no_lookup with (xs:=l) (RAC:=dvalue_refine); eauto.
-      apply dvalue_refine_R2_injective.
-    }
+    intros dv.
+    induction dv;
+      rewrite dvalue_refine_equation;
+      left; auto.
   Qed.
+
+  Lemma uvalue_refine_uvalue_convert :
+    forall dv,
+      uvalue_refine dv (uvalue_convert dv).
+  Proof.
+    intros dv.
+    induction dv;
+      rewrite uvalue_refine_equation;
+      left; auto.
+  Qed.
+
+  (* TODO: Move? *)
+  Lemma dvalue_refine_oom :
+    forall dv dt,
+      DV1.dvalue_has_dtyp dv dt ->
+      dvalue_refine dv (DV2.DVALUE_Oom dt).
+  Proof.
+    intros dv dt H.
+    destruct dv;
+    rewrite dvalue_refine_equation; right; auto.
+  Qed.
+
+  (* TODO: Move? *)
+  Lemma uvalue_refine_oom :
+    forall uv dt,
+      DV1.uvalue_has_dtyp uv dt ->
+      uvalue_refine uv (DV2.UVALUE_Oom dt).
+  Proof.
+    intros uv dt H.
+    destruct uv;
+    rewrite uvalue_refine_equation; right; auto.
+  Qed.
+
+  (* TODO: move to ListUtils *)
+  Lemma map_In_length :
+    forall {X Y} (l : list X) (f : forall (x : X), In x l -> Y),
+      length (map_In l f) = length l.
+  Proof.
+    induction l; intros f.
+    - cbn. auto.
+    - rewrite map_In_cons.
+      cbn.
+      congruence.
+  Qed.
+
+  (* TODO: move to ListUtils *)
+  Lemma Nth_map_In_iff:
+    forall {X Y : Type} (xs : list X) (f : forall x : X, In x xs -> Y) (i : nat) (y : Y),
+      Nth (map_In xs f) i y <-> (exists (x : X) IN, f x IN = y /\ Nth xs i x).
+  Proof.
+  Admitted.
 
   (* TODO: Move these? *)
   Lemma uvalue_to_dvalue_dvalue_refine :
@@ -4351,583 +5206,301 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Proof.
     induction uv1 using IS1.LP.Events.DV.uvalue_ind';
       intros uv2 dv1 CONV UV1;
-      red in CONV;
-      try
-        solve [
-          rewrite uvalue_convert_equation in CONV;
-          cbn in CONV; inv CONV;
-          cbn in *; inv UV1;
-          eexists; split;
-          [ auto
-          | red;
-            rewrite dvalue_convert_equation;
-            cbn; auto
-          ]
-        |
+      try solve
+        [ rewrite uvalue_refine_equation in CONV;
           rewrite uvalue_convert_equation in CONV;
           cbn in CONV;
-          break_match_hyp; inv CONV;
-          cbn in *; inv UV1;
-          eexists; split;
-          [ auto
-          | red;
-            rewrite dvalue_convert_equation;
-            cbn; rewrite Heqo; auto
-          ]
-        |
-          rewrite uvalue_convert_equation in CONV;
-          cbn in CONV; inv CONV;
-          cbn in *; inv UV1
-        ].
+          (destruct CONV as [CONV | CONV];
+           destruct uv2;
+           try first [break_match_hyp; inv CONV];
+           try solve
+             [ contradiction
+             | inv UV1;
+               cbn; eexists; split; auto;
+               rewrite dvalue_refine_equation; cbn;
+               rewrite dvalue_convert_equation; rewrite Heqo;
+               auto
+             | inv CONV; cbn in UV1; inv UV1;
+               cbn; eexists; split; auto;
+               rewrite dvalue_refine_equation; cbn;
+               rewrite dvalue_convert_equation; try rewrite Heqo;
+               auto
+             | inv UV1;
+               cbn; eexists; split; auto;
+               rewrite dvalue_refine_equation; cbn;
+               rewrite dvalue_convert_equation;
+               inv CONV; right; constructor
+             | cbn in *; inv UV1;
+               cbn; eexists; split; auto;
+               rewrite dvalue_refine_equation; cbn;
+               rewrite dvalue_convert_equation; cbn; try rewrite Heqo;
+               auto
+             | inv CONV;
+               cbn in UV1; inv UV1;
+               cbn; eexists; split; auto;
+               rewrite dvalue_refine_equation; cbn;
+               rewrite dvalue_convert_equation; cbn; try rewrite Heqo;
+               right; constructor; auto
+        ])].
+    - cbn in UV1.
+      break_match_hyp; inv UV1.
+      break_match_hyp; inv Heqs.
+      break_match_hyp; inv H0.
 
-    - (* Structs *)
-      (* TODO: it feels like I made this longer and more
-                 convoluted than necessary... *)
-      rewrite uvalue_convert_equation in CONV.
-      rewrite map_monad_In_unfold in CONV.
+      rename l0 into dvs.
+      rename d into dv.
+
       cbn in *.
+      rewrite Heqs in IHuv0.
 
-      destruct (uvalue_convert uv1) eqn:CONV1;
+      specialize (IHuv0 (DV2.UVALUE_Struct (map_In uvs (fun (x : DV1.uvalue) (_ : In x uvs) => uvalue_convert x))) (IS1.LP.Events.DV.DVALUE_Struct dvs)).
+      rewrite uvalue_refine_equation in CONV;
+        rewrite uvalue_convert_equation in CONV.
+      rewrite map_In_cons in CONV.
+      cbn in CONV.
+      destruct CONV as [CONV | CONV].
+      + (* No oom in conversion *)
         inv CONV.
-
-      destruct (IS1.LP.Events.DV.uvalue_to_dvalue uv1) eqn:UV1_to_dvalue;
-        inv UV1.
-
-      destruct (map_monad_In uvs (fun (x : DV1.uvalue) (_ : In x uvs) => uvalue_convert x)) eqn:MAPM_IN; inv H0.
-      destruct (map_monad IS1.LP.Events.DV.uvalue_to_dvalue uvs) eqn:MAPM; inv H1.
-
-      cbn.
-
-      pose proof (IHuv1 u d CONV1 eq_refl) as [dv2 [DV2 DVREF]].
-      rewrite DV2.
-
-      generalize dependent l0.
-      generalize dependent l.
-      induction uvs; intros l MAPM_IN l0 MAPM.
-      { cbn in *.
-        inv MAPM_IN; inv MAPM.
-        cbn.
-        eexists; split; auto.
-        red.
-        rewrite dvalue_convert_equation.
-        cbn.
-        rewrite DVREF.
-        reflexivity.
-      }
-
-      { rewrite map_monad_In_unfold in MAPM_IN.
-        rewrite map_monad_unfold in MAPM.
-
-        cbn in *.
-        intros IHuv0.
-
-        destruct (uvalue_convert a) eqn:A; inv MAPM_IN.
-        destruct (IS1.LP.Events.DV.uvalue_to_dvalue a) eqn:A'; inv MAPM.
-        break_match_hyp; inv H1.
-        break_match_hyp; inv H0.
-
-        specialize (IHuvs _ eq_refl _ eq_refl).
-        forward IHuvs.
-        { intros uv2 dv1 H H0.
-          red in H.
-          rewrite uvalue_convert_equation in H.
-          cbn in H.
-          break_match_hyp; inv H.
-          inv Heqo.
-          inv H0.
-
-          pose proof (IHuv0 (DV2.UVALUE_Struct (u0 :: l0)) (IS1.LP.Events.DV.DVALUE_Struct (d0 :: l1))) as IHuv0'.
-          forward IHuv0'.
-          { red.
+        forward IHuv0.
+        { rewrite uvalue_refine_equation;
             rewrite uvalue_convert_equation.
-            rewrite map_monad_In_unfold.
-            rewrite A.
-            rewrite Heqo0.
+          cbn.
+          auto.
+        }
+        specialize (IHuv0 eq_refl).
+        destruct IHuv0 as [dv2 [IH DV2REF]].
+        specialize (IHuv1 (uvalue_convert uv1) dv).
+        forward IHuv1. apply uvalue_refine_uvalue_convert.
+        forward IHuv1. reflexivity.
+        destruct IHuv1 as [dc [DC DCREF]].
+
+        cbn in IH.
+        break_match_hyp; inv IH.
+        rename l into dvs2.
+
+        exists (DV2.DVALUE_Struct (dc :: dvs2)).
+
+        split.
+        { cbn.
+          rewrite DC.
+          rewrite Heqs1.
+          reflexivity.
+        }
+
+        { rewrite dvalue_refine_equation in DV2REF.
+          cbn in DV2REF.
+          destruct DV2REF as [DV2REF | DV2REF].
+          - (* No oom in refinement *)
+            rewrite dvalue_convert_equation in DV2REF.
+            cbn in DV2REF; inv DV2REF.
+
+            rewrite dvalue_refine_equation in DCREF.
+            destruct DCREF as [DCREF | DCREF].
+            + (* No oom in refinement *)
+              left.
+              cbn.
+              rewrite dvalue_convert_equation.
+              rewrite map_In_cons.
+              cbn.
+              rewrite DCREF.
+              reflexivity.
+            + (* First field possibly has OOM somewhere in refinement... *)              
+              rewrite dvalue_refine_equation.
+              cbn.
+              rewrite dvalue_refine_equation.
+              subst.
+              rewrite dvalue_convert_equation.
+              rewrite map_In_cons.
+              cbn.
+              right.
+              split; auto.
+
+              apply Forall2_HIn_forall.
+              split.
+
+              rewrite map_In_length; auto.
+              intros i a0 b NA NB.
+
+              apply Nth_map_In_iff in NB.
+              destruct NB as [x [INX [CONVX NTHX]]].
+              rewrite <- CONVX.
+
+              exists (Nth_In NA).
+              eexists.
+              { Set Nested Proofs Allowed.
+                (* TODO: Move to list utils *)
+                Lemma in_map_In :
+                  forall {A B} l x (f : forall (a : A) (INA : In a l), B) (INX : In x l),
+                    In (f x INX) (map_In l f).
+                Proof.
+                  intros A B l; induction l; firstorder (subst; auto).
+                  rewrite map_In_cons.
+                  cbn.
+                  destruct INX; subst; auto.
+                  right.
+                  specialize (IHl x (fun (x0 : A) (IN : In x0 l) => f x0 (or_intror IN)) i).
+                  cbn in IHl.
+                  auto.                  
+                Qed.
+
+                Lemma in_map_In' :
+                  forall {A B} l x (f : forall (a : A), B) (INX : In x l),
+                    In (f x) (map_In l (fun x (INX : In x l) => f x)).
+                Proof.
+                  intros A B l; induction l; firstorder (subst; auto).
+                Qed.
+
+                apply in_map_In'; auto.
+              }
+
+              cbn in NA, NTHX.
+              rewrite NA in NTHX. inv NTHX.
+              apply dvalue_refine_dvalue_convert.
+          - (* OOM in refinement of fields *)
+            rewrite dvalue_refine_equation.
             cbn.
-            reflexivity.
-          }
+            right.
+            split; auto.
+        }
+      + (* OOM in conversion... *)
+        destruct uv2; try contradiction.
+        { (* OOM *)
+          exists (DV2.DVALUE_Oom t).
+          cbn; split; auto.
+          apply dvalue_refine_oom.
+          inv CONV.
+          constructor.
+          eapply DV1.uvalue_to_dvalue_preserves_dtyp; eauto.
+          eapply DV1.uvalue_to_dvalue_preserves_dtyp; eauto.
+          cbn. rewrite Heqs.
+          reflexivity.
+        }
 
-          specialize (IHuv0' eq_refl).
-          destruct IHuv0' as [dv2' [UV2DV DVREF']].
-
+        { break_match_hyp; try contradiction.
+          destruct CONV as [UREF UVSREF].
           cbn in *.
-          break_match_hyp; inv UV2DV.
-          break_match_hyp; inv Heqs0.
-          break_match_hyp; inv H0.
-          red in DVREF'.
-          rewrite dvalue_convert_equation in DVREF'.
-          rewrite map_monad_In_unfold in DVREF'.
-          cbn in DVREF'.
 
-          break_match_hyp; inv DVREF'.
-          break_match_hyp; inv Heqo.
-          break_match_hyp; inv H0.
+          specialize (IHuv1 _ _ UREF eq_refl).
+          forward IHuv0.
+          { rewrite uvalue_refine_equation.
+            rewrite uvalue_convert_equation.
+            cbn.
+            left; auto.
+          }
+          specialize (IHuv0 eq_refl).
+
+          destruct IHuv1 as [dv' [U2Ddv' DV'REF]].
+          destruct IHuv0 as [dv2' [U2Ddv2' DV2'REF]].
+          break_match_hyp; inv U2Ddv2'.
+
+          rewrite U2Ddv'.
+
+          (* TODO: Move this *)
+          Lemma map_monad_err_forall2_HIn:
+            forall {A B : Type} (f : A -> err B) (l : list A) (res : list B),
+              map_monad f l = inr res <->
+                Forall2_HIn l res (fun (a : A) (b : B) (INA : In a l) (INB : In b res) => f a = inr b).
+          Proof.
+          Admitted.
+
+          destruct (map_monad uvalue_to_dvalue l) eqn:MAPML.
+          { exfalso.
+            apply map_monad_err_fail in MAPML as [a [IN U2DA]].
+            apply Forall2_HIn_forall in UVSREF.
+            apply map_monad_err_forall2 in Heqs.
+            apply Forall2_forall in Heqs.
+
+            rewrite dvalue_refine_equation in DV2'REF.
+            cbn in DV2'REF.
+            
+
+          }
+          (* I think l0 might be related to l through UVSREF *)
+          assert (map_monad uvalue_to_dvalue l = inr l0).
+          { (* TODO: Move this *)
+            Lemma map_monad_err_length :
+              forall {A B} l (f : A -> err B) res,
+                map_monad f l = inr res ->
+                length l = length res.
+            Proof.
+              intros A B l.
+              induction l; intros f res H.
+              - rewrite map_monad_err_nil in H; subst; auto.
+              - rewrite map_monad_unfold in H.
+                cbn in *.
+                break_match_hyp; inv H.
+                break_match_hyp; inv H1.
+                apply IHl in Heqs0.
+                cbn.
+                auto.
+            Qed.
+
+            apply map_monad_err_forall2.
+            apply Forall2_forall.
+            split.
+            { apply map_monad_err_length in Heqs, Heqs1.
+              rewrite map_In_length in Heqs1.
+
+              apply Forall2_HIn_forall in UVSREF as [LEN _].
+              lia.
+            }
+            { intros i a b NA NB.
+              apply Forall2_HIn_forall in UVSREF as [LEN UVSREF].
+              apply map_monad_err_forall2 in Heqs1.
+              apply Forall2_forall in Heqs1 as [LEN' Heqs1].
+              eapply Heqs1; eauto.
+
+              rename l into blah.
+              apply Nth_map_In_iff.
+              admit.
+            }
+          }
+          rewrite H.
           eexists; split; auto.
 
-          red.
+          rewrite dvalue_refine_equation.
           rewrite dvalue_convert_equation.
-          rewrite Heqo.
+          rewrite map_In_cons.
           cbn.
-          reflexivity.
+
+          rewrite dvalue_refine_equation in DV2'REF.
+          right.
+          split; auto.
+
+          apply Forall2_HIn_forall.
+          destruct DV2'REF as [DV2'REF | DV2'REF].
+          - rewrite dvalue_convert_equation in DV2'REF.
+            inv DV2'REF.
+
+            split.
+            { (* Length *)
+              rewrite map_In_length.
+              auto.
+            }
+
+            intros i a b NA NB.
+
+            exists (Nth_In NA).
+            exists (Nth_In NB).
+
+            apply Nth_map_In_iff in NB.
+            destruct NB as [x [INX [CONV NTH]]].
+
+            rewrite <- CONV.
+
+            apply map_monad_err_forall2 in H.
+            cbn in NA, NTH.
+            rewrite NA in NTH.
+            inv NTH.
+            apply dvalue_refine_dvalue_convert.
+          - apply Forall2_HIn_forall in DV2'REF as [LENGTH DV2'REF].
+            split; auto.
         }
-
-        destruct IHuvs as [dv3 [IHuvs1 IHuvs2]].
-        break_match_hyp; inv IHuvs1.
-        break_match_hyp; inv Heqs0.
-        rewrite map_monad_unfold.
-        cbn.
-
-        red in IHuvs2.
-        rewrite dvalue_convert_equation in IHuvs2.
-        rewrite map_monad_In_unfold in IHuvs2.
-        cbn in IHuvs2.
-        red in DVREF.
-        rewrite DVREF in IHuvs2.
-
-        cbn in IHuv0.
-        epose proof (IHuv0 _ (IS1.LP.Events.DV.DVALUE_Struct (d0 :: l1))) as IHuv0'.
-        forward IHuv0'.
-        { red.
-          rewrite uvalue_convert_equation.
-          rewrite map_monad_In_unfold.
-          cbn.
-          rewrite A.
-          rewrite Heqo.
-          reflexivity.
-        }
-
-        forward IHuv0'; auto.
-        destruct IHuv0' as [dv2' [DV2' DV2REF]].
-
-        cbn in DV2'.
-        break_inner_match_hyp; inv DV2'.
-        break_inner_match_hyp; inv H0.
-
-        eexists; split; auto.
-
-        red.
-        rewrite dvalue_convert_equation.
-        rewrite map_monad_In_unfold.
-        rewrite DVREF.
-        red in DV2REF.
-        rewrite dvalue_convert_equation in DV2REF.
-        rewrite map_monad_In_unfold in DV2REF.
-        cbn in DV2REF.
-        rewrite map_monad_In_unfold.
-        cbn.
-        break_inner_match; inv DV2REF.
-        break_inner_match; inv H0.
-        reflexivity.
-      }
-    - (* Packed Structs *)
-      (* TODO: it feels like I made this longer and more
-                 convoluted than necessary... *)
-      rewrite uvalue_convert_equation in CONV.
-      rewrite map_monad_In_unfold in CONV.
-      cbn in *.
-
-      destruct (uvalue_convert uv1) eqn:CONV1;
-        inv CONV.
-
-      destruct (IS1.LP.Events.DV.uvalue_to_dvalue uv1) eqn:UV1_to_dvalue;
-        inv UV1.
-
-      destruct (map_monad_In uvs (fun (x : DV1.uvalue) (_ : In x uvs) => uvalue_convert x)) eqn:MAPM_IN; inv H0.
-      destruct (map_monad IS1.LP.Events.DV.uvalue_to_dvalue uvs) eqn:MAPM; inv H1.
-
-      cbn.
-
-      pose proof (IHuv1 u d CONV1 eq_refl) as [dv2 [DV2 DVREF]].
-      rewrite DV2.
-
-      generalize dependent l0.
-      generalize dependent l.
-      induction uvs; intros l MAPM_IN l0 MAPM.
-      { cbn in *.
-        inv MAPM_IN; inv MAPM.
-        cbn.
-        eexists; split; auto.
-        red.
-        rewrite dvalue_convert_equation.
-        cbn.
-        rewrite DVREF.
-        reflexivity.
-      }
-
-      { rewrite map_monad_In_unfold in MAPM_IN.
-        rewrite map_monad_unfold in MAPM.
-
-        cbn in *.
-        intros IHuv0.
-
-        destruct (uvalue_convert a) eqn:A; inv MAPM_IN.
-        destruct (IS1.LP.Events.DV.uvalue_to_dvalue a) eqn:A'; inv MAPM.
-        break_match_hyp; inv H1.
-        break_match_hyp; inv H0.
-
-        specialize (IHuvs _ eq_refl _ eq_refl).
-        forward IHuvs.
-        { intros uv2 dv1 H H0.
-          red in H.
-          rewrite uvalue_convert_equation in H.
-          cbn in H.
-          break_match_hyp; inv H.
-          inv Heqo.
-          inv H0.
-
-          pose proof (IHuv0 (DV2.UVALUE_Packed_struct (u0 :: l0)) (IS1.LP.Events.DV.DVALUE_Packed_struct (d0 :: l1))) as IHuv0'.
-          forward IHuv0'.
-          { red.
-            rewrite uvalue_convert_equation.
-            rewrite map_monad_In_unfold.
-            rewrite A.
-            rewrite Heqo0.
-            cbn.
-            reflexivity.
-          }
-
-          specialize (IHuv0' eq_refl).
-          destruct IHuv0' as [dv2' [UV2DV DVREF']].
-
-          cbn in *.
-          break_match_hyp; inv UV2DV.
-          break_match_hyp; inv Heqs0.
-          break_match_hyp; inv H0.
-          red in DVREF'.
-          rewrite dvalue_convert_equation in DVREF'.
-          rewrite map_monad_In_unfold in DVREF'.
-          cbn in DVREF'.
-
-          break_match_hyp; inv DVREF'.
-          break_match_hyp; inv Heqo.
-          break_match_hyp; inv H0.
-          eexists; split; auto.
-
-          red.
-          rewrite dvalue_convert_equation.
-          rewrite Heqo.
-          cbn.
-          reflexivity.
-        }
-
-        destruct IHuvs as [dv3 [IHuvs1 IHuvs2]].
-        break_match_hyp; inv IHuvs1.
-        break_match_hyp; inv Heqs0.
-        rewrite map_monad_unfold.
-        cbn.
-
-        red in IHuvs2.
-        rewrite dvalue_convert_equation in IHuvs2.
-        rewrite map_monad_In_unfold in IHuvs2.
-        cbn in IHuvs2.
-        red in DVREF.
-        rewrite DVREF in IHuvs2.
-
-        cbn in IHuv0.
-        epose proof (IHuv0 _ (IS1.LP.Events.DV.DVALUE_Packed_struct (d0 :: l1))) as IHuv0'.
-        forward IHuv0'.
-        { red.
-          rewrite uvalue_convert_equation.
-          rewrite map_monad_In_unfold.
-          cbn.
-          rewrite A.
-          rewrite Heqo.
-          reflexivity.
-        }
-
-        forward IHuv0'; auto.
-        destruct IHuv0' as [dv2' [DV2' DV2REF]].
-
-        cbn in DV2'.
-        break_inner_match_hyp; inv DV2'.
-        break_inner_match_hyp; inv H0.
-
-        eexists; split; auto.
-
-        red.
-        rewrite dvalue_convert_equation.
-        rewrite map_monad_In_unfold.
-        rewrite DVREF.
-        red in DV2REF.
-        rewrite dvalue_convert_equation in DV2REF.
-        rewrite map_monad_In_unfold in DV2REF.
-        cbn in DV2REF.
-        rewrite map_monad_In_unfold.
-        cbn.
-        break_inner_match; inv DV2REF.
-        break_inner_match; inv H0.
-        reflexivity.
-      }
+    - (* Packed Structures *)
+      admit.
     - (* Arrays *)
-      (* TODO: it feels like I made this longer and more
-                 convoluted than necessary... *)
-      rewrite uvalue_convert_equation in CONV.
-      rewrite map_monad_In_unfold in CONV.
-      cbn in *.
-
-      destruct (uvalue_convert uv1) eqn:CONV1;
-        inv CONV.
-
-      destruct (IS1.LP.Events.DV.uvalue_to_dvalue uv1) eqn:UV1_to_dvalue;
-        inv UV1.
-
-      destruct (map_monad_In uvs (fun (x : DV1.uvalue) (_ : In x uvs) => uvalue_convert x)) eqn:MAPM_IN; inv H0.
-      destruct (map_monad IS1.LP.Events.DV.uvalue_to_dvalue uvs) eqn:MAPM; inv H1.
-
-      cbn.
-
-      pose proof (IHuv1 u d CONV1 eq_refl) as [dv2 [DV2 DVREF]].
-      rewrite DV2.
-
-      generalize dependent l0.
-      generalize dependent l.
-      induction uvs; intros l MAPM_IN l0 MAPM H.
-      { cbn in *.
-        inv MAPM_IN; inv MAPM.
-        cbn.
-        eexists; split; auto.
-        red.
-        rewrite dvalue_convert_equation.
-        cbn.
-        rewrite DVREF.
-        reflexivity.
-      }
-
-      { rewrite map_monad_In_unfold in MAPM_IN.
-        rewrite map_monad_unfold in MAPM.
-
-        cbn in *.
-
-        destruct (uvalue_convert a) eqn:A; inv MAPM_IN.
-        destruct (IS1.LP.Events.DV.uvalue_to_dvalue a) eqn:A'; inv MAPM.
-        break_match_hyp; inv H2.
-        break_match_hyp; inv H1.
-
-        specialize (IHuvs _ eq_refl _ eq_refl).
-        forward IHuvs.
-        { intros uv2 dv1 H' H0.
-          red in H'.
-          rewrite uvalue_convert_equation in H'.
-          cbn in H'.
-          break_match_hyp; inv H'.
-          inv Heqo.
-          specialize (H
-                        (IS2.LP.Events.DV.UVALUE_Array (u0 :: l0))
-                        (IS1.LP.Events.DV.DVALUE_Array (d0 :: l1))).
-          forward H.
-          { red.
-            rewrite uvalue_convert_equation.
-            rewrite map_monad_In_unfold.
-            rewrite A, Heqo0.
-            cbn.
-            reflexivity.
-          }
-          forward H; auto.
-          destruct H as [dv0 [DV0 DV0CONV]].
-          cbn in *.
-          break_inner_match_hyp; inv DV0.
-          break_inner_match_hyp; inv H1.
-          inv H0.
-
-          exists (DVALUE_Array l).
-          split; auto.
-
-          red.
-          red in DV0CONV.
-
-          rewrite dvalue_convert_equation.
-          rewrite dvalue_convert_equation in DV0CONV.
-          rewrite map_monad_In_unfold in DV0CONV.
-          cbn in *.
-
-          break_inner_match_hyp; inv DV0CONV.
-          break_inner_match_hyp; inv H0.
-
-          reflexivity.
-        }
-
-        destruct IHuvs as [dv3 [IHuvs1 IHuvs2]].
-        break_match_hyp; inv IHuvs1.
-        break_match_hyp; inv Heqs0.
-        rewrite map_monad_unfold.
-        cbn.
-
-        red in IHuvs2.
-        rewrite dvalue_convert_equation in IHuvs2.
-        rewrite map_monad_In_unfold in IHuvs2.
-        cbn in IHuvs2.
-        red in DVREF.
-        rewrite DVREF in IHuvs2.
-
-        specialize (H (IS2.LP.Events.DV.UVALUE_Array (u0 :: l0)) (IS1.LP.Events.DV.DVALUE_Array (d0 :: l1))).
-        forward H.
-        { red.
-          rewrite uvalue_convert_equation.
-          rewrite map_monad_In_unfold.
-          cbn.
-          rewrite A.
-          rewrite Heqo.
-          reflexivity.
-        }
-
-        forward H; auto.
-        destruct H as [dv2' [DV2' DV2REF]].
-
-        cbn in DV2'.
-        break_inner_match_hyp; inv DV2'.
-        break_inner_match_hyp; inv H0.
-
-        eexists; split; auto.
-
-        red.
-        rewrite dvalue_convert_equation.
-        rewrite map_monad_In_unfold.
-        rewrite DVREF.
-        red in DV2REF.
-        rewrite dvalue_convert_equation in DV2REF.
-        rewrite map_monad_In_unfold in DV2REF.
-        cbn in DV2REF.
-        rewrite map_monad_In_unfold.
-        cbn.
-        break_inner_match; inv DV2REF.
-        break_inner_match; inv H0.
-        reflexivity.
-      }
-    - (* Vectors *)
-      (* TODO: it feels like I made this longer and more
-                 convoluted than necessary... *)
-      rewrite uvalue_convert_equation in CONV.
-      rewrite map_monad_In_unfold in CONV.
-      cbn in *.
-
-      destruct (uvalue_convert uv1) eqn:CONV1;
-        inv CONV.
-
-      destruct (IS1.LP.Events.DV.uvalue_to_dvalue uv1) eqn:UV1_to_dvalue;
-        inv UV1.
-
-      destruct (map_monad_In uvs (fun (x : DV1.uvalue) (_ : In x uvs) => uvalue_convert x)) eqn:MAPM_IN; inv H0.
-      destruct (map_monad IS1.LP.Events.DV.uvalue_to_dvalue uvs) eqn:MAPM; inv H1.
-
-      cbn.
-
-      pose proof (IHuv1 u d CONV1 eq_refl) as [dv2 [DV2 DVREF]].
-      rewrite DV2.
-
-      generalize dependent l0.
-      generalize dependent l.
-      induction uvs; intros l MAPM_IN l0 MAPM H.
-      { cbn in *.
-        inv MAPM_IN; inv MAPM.
-        cbn.
-        eexists; split; auto.
-        red.
-        rewrite dvalue_convert_equation.
-        cbn.
-        rewrite DVREF.
-        reflexivity.
-      }
-
-      { rewrite map_monad_In_unfold in MAPM_IN.
-        rewrite map_monad_unfold in MAPM.
-
-        cbn in *.
-
-        destruct (uvalue_convert a) eqn:A; inv MAPM_IN.
-        destruct (IS1.LP.Events.DV.uvalue_to_dvalue a) eqn:A'; inv MAPM.
-        break_match_hyp; inv H2.
-        break_match_hyp; inv H1.
-
-        specialize (IHuvs _ eq_refl _ eq_refl).
-        forward IHuvs.
-        { intros uv2 dv1 H' H0.
-          red in H'.
-          rewrite uvalue_convert_equation in H'.
-          cbn in H'.
-          break_match_hyp; inv H'.
-          inv Heqo.
-          specialize (H
-                        (IS2.LP.Events.DV.UVALUE_Vector (u0 :: l0))
-                        (IS1.LP.Events.DV.DVALUE_Vector (d0 :: l1))).
-          forward H.
-          { red.
-            rewrite uvalue_convert_equation.
-            rewrite map_monad_In_unfold.
-            rewrite A, Heqo0.
-            cbn.
-            reflexivity.
-          }
-          forward H; auto.
-          destruct H as [dv0 [DV0 DV0CONV]].
-          cbn in *.
-          break_inner_match_hyp; inv DV0.
-          break_inner_match_hyp; inv H1.
-          inv H0.
-
-          exists (DVALUE_Vector l).
-          split; auto.
-
-          red.
-          red in DV0CONV.
-
-          rewrite dvalue_convert_equation.
-          rewrite dvalue_convert_equation in DV0CONV.
-          rewrite map_monad_In_unfold in DV0CONV.
-          cbn in *.
-
-          break_inner_match_hyp; inv DV0CONV.
-          break_inner_match_hyp; inv H0.
-
-          reflexivity.
-        }
-
-        destruct IHuvs as [dv3 [IHuvs1 IHuvs2]].
-        break_match_hyp; inv IHuvs1.
-        break_match_hyp; inv Heqs0.
-        rewrite map_monad_unfold.
-        cbn.
-
-        red in IHuvs2.
-        rewrite dvalue_convert_equation in IHuvs2.
-        rewrite map_monad_In_unfold in IHuvs2.
-        cbn in IHuvs2.
-        red in DVREF.
-        rewrite DVREF in IHuvs2.
-
-        specialize (H (IS2.LP.Events.DV.UVALUE_Vector (u0 :: l0)) (IS1.LP.Events.DV.DVALUE_Vector (d0 :: l1))).
-        forward H.
-        { red.
-          rewrite uvalue_convert_equation.
-          rewrite map_monad_In_unfold.
-          cbn.
-          rewrite A.
-          rewrite Heqo.
-          reflexivity.
-        }
-
-        forward H; auto.
-        destruct H as [dv2' [DV2' DV2REF]].
-
-        cbn in DV2'.
-        break_inner_match_hyp; inv DV2'.
-        break_inner_match_hyp; inv H0.
-
-        eexists; split; auto.
-
-        red.
-        rewrite dvalue_convert_equation.
-        rewrite map_monad_In_unfold.
-        rewrite DVREF.
-        red in DV2REF.
-        rewrite dvalue_convert_equation in DV2REF.
-        rewrite map_monad_In_unfold in DV2REF.
-        cbn in DV2REF.
-        rewrite map_monad_In_unfold.
-        cbn.
-        break_inner_match; inv DV2REF.
-        break_inner_match; inv H0.
-        reflexivity.
-      }
+      admit.
+    - 
   Qed.
 
   Lemma uvalue_to_dvalue_fail_conversion :
@@ -5278,10 +5851,31 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (* Qed. *)
   Admitted.
 
+
+  (* Maybe I can use something like this for uvalue_refine_unique_prop *)
+  Lemma convert_concretize :
+    uvalue_convert uv1 = uv2 ->
+    concretize uv2 dv2 ->
+    (exists t, dv2 = DVALUE_Oom t) (* May need to be a contains OOM predicate *) \/
+      (exists dv1, concretize uv1 dv1 /\
+                dvalue_convert dv1 = dv2).
+  Qed.
+
+  Lemma blah :
+    forall uv1 dv1,
+      concretize uv1 dv1 ->
+      concretize (uvalue_convert uv1) (dvalue_convert dv1).
+  Qed.
+
+  Lemma blah2  :
+    IS1.LLVM.D.unique_prop uv1 -> unique_prop (uvalue_convert uv1)
+
+  (* Change unique_prop to be a specific dvalue instead of existential? *)
+
   Lemma uvalue_refine_unique_prop :
     forall uv1 uv2,
       uvalue_refine uv1 uv2 ->
-      IS1.LLVM.D.unique_prop uv1 <-> unique_prop uv2.
+      IS1.LLVM.D.unique_prop uv1 -> unique_prop uv2.
   Proof.
     split.
     { revert uv2 H.

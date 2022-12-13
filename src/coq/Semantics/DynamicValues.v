@@ -205,6 +205,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | DVALUE_Double (x:ll_double)
   | DVALUE_Float (x:ll_float)
   | DVALUE_Poison (t:dtyp)
+  | DVALUE_Oom (t:dtyp)
   | DVALUE_None
   | DVALUE_Struct        (fields: list dvalue)
   | DVALUE_Packed_struct (fields: list dvalue)
@@ -224,6 +225,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_Double x => "double " ++ show x
     | DVALUE_Float x => "float " ++ show x
     | DVALUE_Poison t => "poison[" ++ show_dtyp t ++ "]"
+    | DVALUE_Oom t => "oom[" ++ show_dtyp t ++ "]"
     | DVALUE_None => "none"
     | DVALUE_Struct fields => "{" ++ String.concat ", " (map show_dvalue fields) ++ "}"
     | DVALUE_Packed_struct fields => "{<" ++ String.concat ", " (map show_dvalue fields) ++ ">}"
@@ -242,6 +244,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_Double x => 1
     | DVALUE_Float x => 1
     | DVALUE_Poison t => 1
+    | DVALUE_Oom t => 1
     | DVALUE_None => 1
     | DVALUE_Struct fields => S (S (list_sum (map dvalue_measure fields)))
     | DVALUE_Packed_struct fields => S (S (list_sum (map dvalue_measure fields)))
@@ -279,6 +282,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_Double        : forall x, P (DVALUE_Double x).
     Hypothesis IH_Float         : forall x, P (DVALUE_Float x).
     Hypothesis IH_Poison        : forall t, P (DVALUE_Poison t).
+    Hypothesis IH_Oom           : forall t, P (DVALUE_Oom t).
     Hypothesis IH_None          : P DVALUE_None.
     Hypothesis IH_Struct        : forall (fields: list dvalue), (forall u, In u fields -> P u) -> P (DVALUE_Struct fields).
     Hypothesis IH_Packed_Struct : forall (fields: list dvalue), (forall u, In u fields -> P u) -> P (DVALUE_Packed_struct fields).
@@ -325,6 +329,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | UVALUE_Float (x:ll_float)
   | UVALUE_Undef (t:dtyp)
   | UVALUE_Poison (t:dtyp)
+  | UVALUE_Oom (t:dtyp)
   | UVALUE_None
   | UVALUE_Struct        (fields: list uvalue)
   | UVALUE_Packed_struct (fields: list uvalue)
@@ -362,6 +367,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | UVALUE_Float x => 1
     | UVALUE_Undef t => 1
     | UVALUE_Poison t => 1
+    | UVALUE_Oom t => 1
     | UVALUE_None => 1
     | UVALUE_Struct fields => S (S (list_sum (map uvalue_measure fields)))
     | UVALUE_Packed_struct fields => S (S (list_sum (map uvalue_measure fields)))
@@ -465,6 +471,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_Float          : forall x, P (UVALUE_Float x).
     Hypothesis IH_Undef          : forall t, P (UVALUE_Undef t).
     Hypothesis IH_Poison         : forall t, P (UVALUE_Poison t).
+    Hypothesis IH_Oom            : forall t, P (UVALUE_Oom t).
     Hypothesis IH_None           : P UVALUE_None.
     Hypothesis IH_Struct         : forall (fields: list uvalue), (forall u, In u fields -> P u) -> P (UVALUE_Struct fields).
     Hypothesis IH_Packed_Struct  : forall (fields: list uvalue), (forall u, In u fields -> P u) -> P (UVALUE_Packed_struct fields).
@@ -548,6 +555,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_Float          : forall x, P (UVALUE_Float x).
     Hypothesis IH_Undef          : forall t, P (UVALUE_Undef t).
     Hypothesis IH_Poison         : forall t, P (UVALUE_Poison t).
+    Hypothesis IH_Oom            : forall t, P (UVALUE_Oom t).
     Hypothesis IH_None           : P UVALUE_None.
     Hypothesis IH_Struct_nil     : P (UVALUE_Struct []).
     Hypothesis IH_Struct_cons    : forall uv uvs, P uv -> P (UVALUE_Struct uvs) -> P (UVALUE_Struct (uv :: uvs)).
@@ -696,6 +704,37 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         ((forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) ->
         P (UVALUE_Poison t).
 
+    (* Oom *)
+    Hypothesis IH_Oom_Array    :
+      forall sz t
+        (IH: P (UVALUE_Oom t)),
+        P (UVALUE_Oom (DTYPE_Array sz t)).
+
+    Hypothesis IH_Oom_Vector    :
+      forall sz t
+        (IH: P (UVALUE_Oom t)),
+        P (UVALUE_Oom (DTYPE_Vector sz t)).
+
+    Hypothesis IH_Oom_Struct_nil    :
+        P (UVALUE_Oom (DTYPE_Struct [])).
+
+    Hypothesis IH_Oom_Struct_cons    : forall dt dts,
+        P (UVALUE_Oom dt) ->
+        P (UVALUE_Oom (DTYPE_Struct dts)) ->
+        P (UVALUE_Oom (DTYPE_Struct (dt :: dts))).
+
+    Hypothesis IH_Oom_Packed_struct_nil    :
+        P (UVALUE_Oom (DTYPE_Packed_struct [])).
+
+    Hypothesis IH_Oom_Packed_struct_cons    : forall dt dts,
+        P (UVALUE_Oom dt) ->
+        P (UVALUE_Oom (DTYPE_Packed_struct dts)) ->
+        P (UVALUE_Oom (DTYPE_Packed_struct (dt :: dts))).
+
+    Hypothesis IH_Oom          : forall t,
+        ((forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) ->
+        P (UVALUE_Oom t).
+
     Hypothesis IH_None           : P UVALUE_None.
     Hypothesis IH_Struct_nil     : P (UVALUE_Struct []).
     Hypothesis IH_Struct_cons    : forall uv uvs, P uv -> P (UVALUE_Struct uvs) -> P (UVALUE_Struct (uv :: uvs)).
@@ -796,6 +835,44 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         { apply IH_Poison_Vector.
           apply IHτ.
         }
+
+      - generalize dependent t.
+        fix IHτ 1.
+        intros τ.
+        destruct τ eqn:Hτ; try contradiction;
+          try solve [eapply IH_Oom;
+                     repeat split; solve [intros * CONTRA; inversion CONTRA]].
+
+        (* Oom Arrays *)
+        { apply IH_Oom_Array.
+          apply IHτ.
+        }
+
+        (* Oom Structs *)
+        { clear Hτ.
+          generalize dependent fields.
+          induction fields.
+          - apply IH_Oom_Struct_nil.
+          - apply IH_Oom_Struct_cons.
+            apply IHτ.
+            apply IHfields.
+        }
+
+        (* Oom Packed structs *)
+        { clear Hτ.
+          generalize dependent fields.
+          induction fields.
+          - apply IH_Oom_Packed_struct_nil.
+          - apply IH_Oom_Packed_struct_cons.
+            apply IHτ.
+            apply IHfields.
+        }
+
+        (* Oom Vectors *)
+        { apply IH_Oom_Vector.
+          apply IHτ.
+        }
+
       - revert fields.
         fix IHfields 1. intros [|u' fields']. intros. apply IH_Struct_nil.
         apply IH_Struct_cons.
@@ -854,6 +931,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_Double x => UVALUE_Double x
     | DVALUE_Float x => UVALUE_Float x
     | DVALUE_Poison t => UVALUE_Poison t
+    | DVALUE_Oom t => UVALUE_Oom t
     | DVALUE_None => UVALUE_None
     | DVALUE_Struct fields => UVALUE_Struct (map dvalue_to_uvalue fields)
     | DVALUE_Packed_struct fields => UVALUE_Packed_struct (map dvalue_to_uvalue fields)
@@ -874,6 +952,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | UVALUE_Float x                         => ret (DVALUE_Float x)
     | UVALUE_Undef t                         => failwith "Attempting to convert a non-defined uvalue to dvalue. The conversion should be guarded by is_concrete"
     | UVALUE_Poison t                        => ret (DVALUE_Poison t)
+    | UVALUE_Oom t                           => ret (DVALUE_Oom t)
     | UVALUE_None                            => ret (DVALUE_None)
 
     | UVALUE_Struct fields                   =>
@@ -964,6 +1043,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | UVALUE_Float x => true
     | UVALUE_Undef t => false
     | UVALUE_Poison t => true
+    | UVALUE_Oom t => true (* A little unsure about this *)
     | UVALUE_None => true
     | UVALUE_Struct fields => forallb is_concrete fields
     | UVALUE_Packed_struct fields => forallb is_concrete fields
@@ -1013,6 +1093,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       | DVALUE_Double x => Atom "dvalue(double)"
       | DVALUE_Float x => Atom "dvalue(float)"
       | DVALUE_Poison t => Atom "poison"
+      | DVALUE_Oom t => Atom "oom"
       | DVALUE_None => Atom "none"
       | DVALUE_Struct fields
         => [Atom "{" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom ","]) fields) ; Atom "}"]
@@ -1112,6 +1193,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                 | DVALUE_Double x1, DVALUE_Double x2 => _
                 | DVALUE_Float x1, DVALUE_Float x2 => _
                 | DVALUE_Poison _, DVALUE_Poison _ => _
+                | DVALUE_Oom _, DVALUE_Oom _ => _
                 | DVALUE_None, DVALUE_None => _
                 | DVALUE_Struct f1, DVALUE_Struct f2 => _
                 | DVALUE_Packed_struct f1, DVALUE_Packed_struct f2 => _
@@ -1141,6 +1223,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         * left; subst; reflexivity.
         * right; intros H; inversion H. contradiction.
       - destruct (Float32.eq_dec x1 x2).
+        * left; subst; reflexivity.
+        * right; intros H; inversion H. contradiction.
+      - destruct (dtyp_eq_dec d d0).
         * left; subst; reflexivity.
         * right; intros H; inversion H. contradiction.
       - destruct (dtyp_eq_dec d d0).
@@ -1219,6 +1304,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                 | UVALUE_Float x1, UVALUE_Float x2 => _
                 | UVALUE_Undef t1, UVALUE_Undef t2 => _
                 | UVALUE_Poison t1, UVALUE_Poison t2 => _
+                | UVALUE_Oom t1, UVALUE_Oom t2 => _
                 | UVALUE_None, UVALUE_None => _
                 | UVALUE_Struct f1, UVALUE_Struct f2 => _
                 | UVALUE_Packed_struct f1, UVALUE_Packed_struct f2 => _
@@ -1248,6 +1334,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       - destruct (IP.eq_dec x1 x2)...
       - destruct (Float.eq_dec x1 x2)...
       - destruct (Float32.eq_dec x1 x2)...
+      - destruct (dtyp_eq_dec t1 t2)...
       - destruct (dtyp_eq_dec t1 t2)...
       - destruct (dtyp_eq_dec t1 t2)...
       - destruct (lsteq_dec f1 f2)...
@@ -2489,6 +2576,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Float
   | DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
   | DVALUE_Poison_typ  : forall τ, NO_VOID τ -> dvalue_has_dtyp (DVALUE_Poison τ) τ
+  | DVALUE_Oom_typ  : forall τ, NO_VOID τ -> dvalue_has_dtyp (DVALUE_Oom τ) τ
 
   | DVALUE_Struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Struct []) (DTYPE_Struct [])
   | DVALUE_Struct_Cons_typ :
@@ -2532,6 +2620,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | UVALUE_Float_typ  : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Float
   | UVALUE_None_typ   : uvalue_has_dtyp UVALUE_None DTYPE_Void
   | UVALUE_Poison_typ  : forall τ, NO_VOID τ -> uvalue_has_dtyp (UVALUE_Poison τ) τ
+  | UVALUE_Oom_typ  : forall τ, NO_VOID τ -> uvalue_has_dtyp (UVALUE_Oom τ) τ
   | UVALUE_Undef_typ  : forall τ, NO_VOID τ -> uvalue_has_dtyp (UVALUE_Undef τ) τ
 
   | UVALUE_Struct_Nil_typ  : uvalue_has_dtyp (UVALUE_Struct []) (DTYPE_Struct [])
@@ -2792,7 +2881,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_I32            : forall x, P (DVALUE_I32 x) (DTYPE_I 32).
     Hypothesis IH_I64            : forall x, P (DVALUE_I64 x) (DTYPE_I 64).
     Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x) DTYPE_IPTR.
-    Hypothesis IH_Poison         : forall t, P (DVALUE_Poison t) t.
+    Hypothesis IH_Poison         : forall t (NV: NO_VOID t), P (DVALUE_Poison t) t.
+    Hypothesis IH_Oom            : forall t (NV: NO_VOID t), P (DVALUE_Oom t) t.
     Hypothesis IH_Double         : forall x, P (DVALUE_Double x) DTYPE_Double.
     Hypothesis IH_Float          : forall x, P (DVALUE_Float x) DTYPE_Float.
     Hypothesis IH_None           : P DVALUE_None DTYPE_Void.
@@ -2904,8 +2994,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         P (UVALUE_Poison (DTYPE_Packed_struct dts)) (DTYPE_Packed_struct dts) ->
         P (UVALUE_Poison (DTYPE_Packed_struct (dt :: dts))) (DTYPE_Packed_struct (dt :: dts)).
 
-    Hypothesis IH_Poison          : forall t, (NO_VOID t /\ (forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) -> P (UVALUE_Poison t) t
-.
+    Hypothesis IH_Poison          : forall t, (NO_VOID t /\ (forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) -> P (UVALUE_Poison t) t.
 
     (* Undef *)
     Hypothesis IH_Undef_Array    : forall sz t
@@ -2933,8 +3022,36 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         P (UVALUE_Undef (DTYPE_Packed_struct dts)) (DTYPE_Packed_struct dts) ->
         P (UVALUE_Undef (DTYPE_Packed_struct (dt :: dts))) (DTYPE_Packed_struct (dt :: dts)).
 
-    Hypothesis IH_Undef          : forall t, (NO_VOID t /\ (forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) -> P (UVALUE_Undef t) t
-.
+    Hypothesis IH_Undef          : forall t, (NO_VOID t /\ (forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) -> P (UVALUE_Undef t) t.
+
+    (* Oom *)
+    Hypothesis IH_Oom_Array    : forall sz t
+                                     (NV: NO_VOID t)
+                                     (IH: P (UVALUE_Oom t) t),
+        P (UVALUE_Oom (DTYPE_Array sz t)) (DTYPE_Array sz t).
+    Hypothesis IH_Oom_Vector    : forall sz t
+                                     (NV: NO_VOID t)
+                                     (IH: P (UVALUE_Oom t) t),
+        P (UVALUE_Oom (DTYPE_Vector sz t)) (DTYPE_Vector sz t).
+
+    Hypothesis IH_Oom_Struct_nil    :
+        P (UVALUE_Oom (DTYPE_Struct [])) (DTYPE_Struct []).
+
+    Hypothesis IH_Oom_Struct_cons    : forall dt dts,
+        P (UVALUE_Oom dt) dt ->
+        P (UVALUE_Oom (DTYPE_Struct dts)) (DTYPE_Struct dts) ->
+        P (UVALUE_Oom (DTYPE_Struct (dt :: dts))) (DTYPE_Struct (dt :: dts)).
+
+    Hypothesis IH_Oom_Packed_struct_nil    :
+        P (UVALUE_Oom (DTYPE_Packed_struct [])) (DTYPE_Packed_struct []).
+
+    Hypothesis IH_Oom_Packed_struct_cons    : forall dt dts,
+        P (UVALUE_Oom dt) dt ->
+        P (UVALUE_Oom (DTYPE_Packed_struct dts)) (DTYPE_Packed_struct dts) ->
+        P (UVALUE_Oom (DTYPE_Packed_struct (dt :: dts))) (DTYPE_Packed_struct (dt :: dts)).
+
+    Hypothesis IH_Oom          : forall t, (NO_VOID t /\ (forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) -> P (UVALUE_Oom t) t.
+
     Hypothesis IH_Double         : forall x, P (UVALUE_Double x) DTYPE_Double.
     Hypothesis IH_Float          : forall x, P (UVALUE_Float x) DTYPE_Float.
     Hypothesis IH_None           : P UVALUE_None DTYPE_Void.
@@ -3376,6 +3493,62 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         Unshelve.
         all: try solve [exact 0%N | exact DTYPE_Void | exact ([] : list dtyp)].
 
+      - generalize dependent τ.
+        fix IHτ 1.
+        intros τ NV.
+        destruct τ eqn:Hτ; try contradiction;
+          try solve [eapply IH_Oom;
+                     repeat split; solve [intros * CONTRA; inversion CONTRA]].
+
+        (* Oom Arrays *)
+        { pose proof NV as NVd.
+          rewrite NO_VOID_equation in NVd.
+          apply IH_Oom_Array; auto.
+        }
+
+        (* Oom Structs *)
+        { pose proof NV as NVfs.
+          rewrite NO_VOID_equation in NVfs.
+          clear Hτ.
+          generalize dependent fields.
+          induction fields; intros NV NVfs.
+          - apply IH_Oom_Struct_nil.
+          - apply IH_Oom_Struct_cons.
+            apply IHτ.
+            eapply NO_VOID_Struct_fields in NV.
+            apply NV.
+            left; auto.
+            apply IHfields.
+            eapply NO_VOID_Struct_cons; eauto.
+            eapply Forall_HIn_cons; eauto.
+        }
+
+        (* Oom Packed structs *)
+        { pose proof NV as NVfs.
+          rewrite NO_VOID_equation in NVfs.
+          clear Hτ.
+          generalize dependent fields.
+          induction fields; intros NV NVfs.
+          - apply IH_Oom_Packed_struct_nil.
+          - apply IH_Oom_Packed_struct_cons.
+            apply IHτ.
+            eapply NO_VOID_Packed_struct_fields in NV.
+            apply NV.
+            left; auto.
+            apply IHfields.
+
+            eapply NO_VOID_Packed_struct_cons; eauto.
+            eapply Forall_HIn_cons; eauto.
+        }
+
+        (* Oom Vectors *)
+        { pose proof NV as NVd.
+          rewrite NO_VOID_equation in NVd.
+          apply IH_Oom_Vector; auto.
+        }
+
+        Unshelve.
+        all: try solve [exact 0%N | exact DTYPE_Void | exact ([] : list dtyp)].
 
       - generalize dependent τ.
         fix IHτ 1.
@@ -3889,6 +4062,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
        | UVALUE_Float x => "UVALUE_Float"
        | UVALUE_Undef t => "UVALUE_Undef"
        | UVALUE_Poison t => "UVALUE_Poison"
+       | UVALUE_Oom t => "UVALUE_Oom"
        | UVALUE_None => "UVALUE_None"
        | UVALUE_Struct fields => "UVALUE_Struct"
        | UVALUE_Packed_struct fields => "UVALUE_Packed_struct"
@@ -3909,4 +4083,142 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
        | UVALUE_ExtractByte uv dt idx sid => "UVALUE_ExtractByte"
        | UVALUE_ConcatBytes uvs dt => "UVALUE_ConcatBytes"
        end.
+
+  Lemma dvalue_to_uvalue_preserves_dtyp :
+    forall dv dt,
+      dvalue_has_dtyp dv dt ->
+      uvalue_has_dtyp (dvalue_to_uvalue dv) dt.
+  Proof.
+    intros dv dt DT.
+    induction DT;
+      try solve [cbn; constructor; auto].
+    - cbn.
+      constructor.
+      + apply Forall_forall.
+        intros x IN.
+        apply in_map_iff in IN as [dvx [X IN]].
+        subst.
+        auto.
+      + rewrite map_length; auto.
+    - cbn.
+      constructor.
+      + apply Forall_forall.
+        intros x IN.
+        apply in_map_iff in IN as [dvx [X IN]].
+        subst.
+        auto.
+      + rewrite map_length; auto.
+      + auto.
+  Qed.
+
+  Lemma uvalue_to_dvalue_preserves_dtyp :
+    forall uv dv dt,
+      uvalue_has_dtyp uv dt ->
+      uvalue_to_dvalue uv = inr dv ->
+      dvalue_has_dtyp dv dt.
+  Proof.
+    intros uv dv dt UT; revert dv;
+    induction UT; intros dv U2D;
+      try solve
+        [ cbn in U2D; inv U2D; cbn; constructor; solve [auto | solve_no_void ] ].
+
+    1,3,5,7: cbn in U2D; inv U2D; constructor; cbn; auto.
+    all:
+      try solve
+        [ cbn in U2D; inv U2D;
+          cbn in *;
+          specialize (IHUT _ eq_refl);
+          specialize (IHUT0 _ eq_refl);
+          inv IHUT;
+          inv IHUT0;
+          rewrite NO_VOID_equation in H2;
+          constructor;
+          rewrite NO_VOID_equation;
+          apply Forall_HIn_cons_inv; auto
+        ].
+
+    - cbn in U2D; inv U2D.
+      break_match_hyp; inv H0.
+      rewrite map_monad_unfold in Heqs.
+      cbn in Heqs.
+      break_match_hyp; inv Heqs.
+      break_match_hyp; inv H0.
+
+      constructor; auto.
+      inv UT2.
+      + rewrite map_monad_err_nil in Heqs; subst.
+        constructor.
+      + specialize (IHUT1 _ eq_refl).
+        cbn in IHUT2.
+        setoid_rewrite Heqs in IHUT2.
+        specialize (IHUT2 _ eq_refl).
+
+        rewrite map_monad_unfold in Heqs.
+        cbn in Heqs.
+        break_match_hyp; inv Heqs.
+        break_match_hyp; inv H0.        
+
+        constructor; inv IHUT2; auto.
+
+    - cbn in U2D; inv U2D.
+      break_match_hyp; inv H0.
+      rewrite map_monad_unfold in Heqs.
+      cbn in Heqs.
+      break_match_hyp; inv Heqs.
+      break_match_hyp; inv H0.
+
+      constructor; auto.
+      inv UT2.
+      + rewrite map_monad_err_nil in Heqs; subst.
+        constructor.
+      + specialize (IHUT1 _ eq_refl).
+        cbn in IHUT2.
+        setoid_rewrite Heqs in IHUT2.
+        specialize (IHUT2 _ eq_refl).
+
+        rewrite map_monad_unfold in Heqs.
+        cbn in Heqs.
+        break_match_hyp; inv Heqs.
+        break_match_hyp; inv H0.        
+
+        constructor; inv IHUT2; auto.
+
+    - cbn in U2D; inv U2D.
+      break_match_hyp; inv H1.
+      constructor.
+      + apply Forall_forall.
+        intros x H.
+        eapply map_monad_err_In with (x:=x) in Heqs; auto.
+        destruct Heqs as [y [U2D INY]]; eauto.
+      + apply map_monad_err_forall2 in Heqs.
+        apply Forall2_length in Heqs.
+        auto.
+
+    - cbn in U2D; inv U2D.
+      break_match_hyp; inv H2.
+      constructor.
+      + apply Forall_forall.
+        intros x H.
+        eapply map_monad_err_In with (x:=x) in Heqs; auto.
+        destruct Heqs as [y [U2D INY]]; eauto.
+      + apply map_monad_err_forall2 in Heqs.
+        apply Forall2_length in Heqs.
+        auto.
+      + auto.
+  Qed.
+
+  Lemma dvalue_to_uvalue_inj :
+    forall a b,
+      dvalue_to_uvalue a = dvalue_to_uvalue b ->
+      a = b.
+  Proof.
+    intros a.
+    induction a; intros b EQ;
+      destruct b; cbn in EQ; inv EQ; auto.
+    - apply map_inj in H1; subst; auto.
+    - apply map_inj in H1; subst; auto.
+    - apply map_inj in H1; subst; auto.
+    - apply map_inj in H1; subst; auto.
+  Qed.
+
 End DVALUE.
