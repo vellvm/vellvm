@@ -224,7 +224,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
 
   Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia | DV1.solve_dvalue_measure | DV1.solve_uvalue_measure].
 
-  Program Fixpoint dvalue_convert (dv1 : DV1.dvalue) {measure (DV1.dvalue_measure dv1)} : DV2.dvalue
+  Program Fixpoint dvalue_convert_lazy (dv1 : DV1.dvalue) {measure (DV1.dvalue_measure dv1)} : DV2.dvalue
     := match dv1 with
        | DV1.DVALUE_Addr a =>
            match addr_convert a with
@@ -247,20 +247,20 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
        | DV1.DVALUE_Oom t => DV2.DVALUE_Oom t
        | DV1.DVALUE_None => DV2.DVALUE_None
        | DV1.DVALUE_Struct fields =>
-           let fields' := map_In fields (fun elt HIn => dvalue_convert elt)in
+           let fields' := map_In fields (fun elt HIn => dvalue_convert_lazy elt)in
            DV2.DVALUE_Struct fields'
        | DV1.DVALUE_Packed_struct fields =>
-           let fields' := map_In fields (fun elt HIn => dvalue_convert elt)in
+           let fields' := map_In fields (fun elt HIn => dvalue_convert_lazy elt)in
            DV2.DVALUE_Packed_struct fields'
        | DV1.DVALUE_Array elts =>
-           let elts' := map_In elts (fun elt HIn => dvalue_convert elt)in
+           let elts' := map_In elts (fun elt HIn => dvalue_convert_lazy elt)in
            DV2.DVALUE_Array elts'
        | DV1.DVALUE_Vector elts =>
-           let elts' := map_In elts (fun elt HIn => dvalue_convert elt)in
+           let elts' := map_In elts (fun elt HIn => dvalue_convert_lazy elt)in
            DV2.DVALUE_Vector elts'
        end.
 
-  Program Fixpoint uvalue_convert (uv1 : DV1.uvalue) {measure (DV1.uvalue_measure uv1)} : DV2.uvalue
+  Program Fixpoint uvalue_convert_lazy (uv1 : DV1.uvalue) {measure (DV1.uvalue_measure uv1)} : DV2.uvalue
     := match uv1 with
        | DV1.UVALUE_Addr a =>
            match addr_convert a with
@@ -283,82 +283,82 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
        | DV1.UVALUE_Oom t => DV2.UVALUE_Oom t
        | DV1.UVALUE_None => DV2.UVALUE_None
        | DV1.UVALUE_Struct fields =>
-           let fields' := map_In fields (fun elt HIn => uvalue_convert elt)in
+           let fields' := map_In fields (fun elt HIn => uvalue_convert_lazy elt)in
            DV2.UVALUE_Struct fields'
        | DV1.UVALUE_Packed_struct fields =>
-           let fields' := map_In fields (fun elt HIn => uvalue_convert elt)in
+           let fields' := map_In fields (fun elt HIn => uvalue_convert_lazy elt)in
            DV2.UVALUE_Packed_struct fields'
        | DV1.UVALUE_Array elts =>
-           let elts' := map_In elts (fun elt HIn => uvalue_convert elt)in
+           let elts' := map_In elts (fun elt HIn => uvalue_convert_lazy elt)in
            DV2.UVALUE_Array elts'
        | DV1.UVALUE_Vector elts =>
-           let elts' := map_In elts (fun elt HIn => uvalue_convert elt)in
+           let elts' := map_In elts (fun elt HIn => uvalue_convert_lazy elt)in
            DV2.UVALUE_Vector elts'
        | DV1.UVALUE_Undef dt =>
            (* Could be a bit odd with intptr *)
            DV2.UVALUE_Undef dt
        | DV1.UVALUE_IBinop iop v1 v2 =>
-           let v1' := uvalue_convert v1 in
-           let v2' := uvalue_convert v2 in
+           let v1' := uvalue_convert_lazy v1 in
+           let v2' := uvalue_convert_lazy v2 in
            DV2.UVALUE_IBinop iop v1' v2'
        | DV1.UVALUE_ICmp cmp v1 v2 =>
-           let v1' := uvalue_convert v1 in
-           let v2' := uvalue_convert v2 in
+           let v1' := uvalue_convert_lazy v1 in
+           let v2' := uvalue_convert_lazy v2 in
            DV2.UVALUE_ICmp cmp v1' v2'
        | DV1.UVALUE_FBinop fop fm v1 v2 =>
-           let v1' := uvalue_convert v1 in
-           let v2' := uvalue_convert v2 in
+           let v1' := uvalue_convert_lazy v1 in
+           let v2' := uvalue_convert_lazy v2 in
            DV2.UVALUE_FBinop fop fm v1' v2'
        | DV1.UVALUE_FCmp cmp v1 v2 =>
-           let v1' := uvalue_convert v1 in
-           let v2' := uvalue_convert v2 in
+           let v1' := uvalue_convert_lazy v1 in
+           let v2' := uvalue_convert_lazy v2 in
            DV2.UVALUE_FCmp cmp v1' v2'
        | DV1.UVALUE_Conversion conv t_from v t_to =>
-           let v' := uvalue_convert v in
+           let v' := uvalue_convert_lazy v in
            DV2.UVALUE_Conversion conv t_from v' t_to
        | DV1.UVALUE_GetElementPtr t ptrval idxs =>
-           let ptrval' := uvalue_convert ptrval in
-           let idxs' := map_In idxs (fun elt Hin => uvalue_convert elt) in
+           let ptrval' := uvalue_convert_lazy ptrval in
+           let idxs' := map_In idxs (fun elt Hin => uvalue_convert_lazy elt) in
            DV2.UVALUE_GetElementPtr t ptrval' idxs'
        | DV1.UVALUE_ExtractElement t vec idx =>
-           let vec' := uvalue_convert vec in
-           let idx' := uvalue_convert idx in
+           let vec' := uvalue_convert_lazy vec in
+           let idx' := uvalue_convert_lazy idx in
            DV2.UVALUE_ExtractElement t vec' idx'
        | DV1.UVALUE_InsertElement t vec elt idx =>
-           let vec' := uvalue_convert vec in
-           let elt' := uvalue_convert elt in
-           let idx' := uvalue_convert idx in
+           let vec' := uvalue_convert_lazy vec in
+           let elt' := uvalue_convert_lazy elt in
+           let idx' := uvalue_convert_lazy idx in
            DV2.UVALUE_InsertElement t vec' elt' idx'
        | DV1.UVALUE_ShuffleVector vec1 vec2 idxmask =>
-           let vec1' := uvalue_convert vec1 in
-           let vec2' := uvalue_convert vec2 in
-           let idxmask' := uvalue_convert idxmask in
+           let vec1' := uvalue_convert_lazy vec1 in
+           let vec2' := uvalue_convert_lazy vec2 in
+           let idxmask' := uvalue_convert_lazy idxmask in
            DV2.UVALUE_ShuffleVector vec1' vec2' idxmask'
        | DV1.UVALUE_ExtractValue t vec idxs =>
-           let vec' := uvalue_convert vec in
+           let vec' := uvalue_convert_lazy vec in
            DV2.UVALUE_ExtractValue t vec' idxs
        | DV1.UVALUE_InsertValue t vec elt idxs =>
-           let vec' := uvalue_convert vec in
-           let elt' := uvalue_convert elt in
+           let vec' := uvalue_convert_lazy vec in
+           let elt' := uvalue_convert_lazy elt in
            DV2.UVALUE_InsertValue t vec' elt' idxs
        | DV1.UVALUE_Select cnd v1 v2 =>
-           let cnd' := uvalue_convert cnd in
-           let v1' := uvalue_convert v1 in
-           let v2' := uvalue_convert v2 in
+           let cnd' := uvalue_convert_lazy cnd in
+           let v1' := uvalue_convert_lazy v1 in
+           let v2' := uvalue_convert_lazy v2 in
            DV2.UVALUE_Select cnd' v1' v2'
        | DV1.UVALUE_ExtractByte uv dt idx sid =>
-           let uv' := uvalue_convert uv in
-           let idx' := uvalue_convert idx in
+           let uv' := uvalue_convert_lazy uv in
+           let idx' := uvalue_convert_lazy idx in
            DV2.UVALUE_ExtractByte uv' dt idx' sid
        | DV1.UVALUE_ConcatBytes uvs dt =>
-           let uvs' := map_In uvs (fun elt Hin => uvalue_convert elt) in
+           let uvs' := map_In uvs (fun elt Hin => uvalue_convert_lazy elt) in
            DV2.UVALUE_ConcatBytes uvs' dt
        end.
 
-  Opaque dvalue_convert.
-  Lemma dvalue_convert_equation :
+  Opaque dvalue_convert_lazy.
+  Lemma dvalue_convert_lazy_equation :
     forall dv,
-      dvalue_convert dv =
+      dvalue_convert_lazy dv =
         match dv with
         | DV1.DVALUE_Addr a =>
             match addr_convert a with
@@ -381,31 +381,31 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         | DV1.DVALUE_Oom t => DV2.DVALUE_Oom t
         | DV1.DVALUE_None => DV2.DVALUE_None
         | DV1.DVALUE_Struct fields =>
-            let fields' := map_In fields (fun elt HIn => dvalue_convert elt)in
+            let fields' := map_In fields (fun elt HIn => dvalue_convert_lazy elt)in
             DV2.DVALUE_Struct fields'
         | DV1.DVALUE_Packed_struct fields =>
-            let fields' := map_In fields (fun elt HIn => dvalue_convert elt)in
+            let fields' := map_In fields (fun elt HIn => dvalue_convert_lazy elt)in
             DV2.DVALUE_Packed_struct fields'
         | DV1.DVALUE_Array elts =>
-            let elts' := map_In elts (fun elt HIn => dvalue_convert elt)in
+            let elts' := map_In elts (fun elt HIn => dvalue_convert_lazy elt)in
             DV2.DVALUE_Array elts'
         | DV1.DVALUE_Vector elts =>
-            let elts' := map_In elts (fun elt HIn => dvalue_convert elt)in
+            let elts' := map_In elts (fun elt HIn => dvalue_convert_lazy elt)in
             DV2.DVALUE_Vector elts'
         end.
   Proof.
     intros dv.
-    Transparent dvalue_convert.
-    unfold dvalue_convert at 1.
+    Transparent dvalue_convert_lazy.
+    unfold dvalue_convert_lazy at 1.
     rewrite Wf.WfExtensionality.fix_sub_eq_ext.
     destruct dv; try reflexivity.
     break_match; reflexivity.
     break_match; reflexivity.
   Qed.
 
-  Lemma uvalue_convert_equation:
+  Lemma uvalue_convert_lazy_equation:
     forall uv,
-      uvalue_convert uv =
+      uvalue_convert_lazy uv =
         match uv with
         | DV1.UVALUE_Addr a =>
             match addr_convert a with
@@ -428,82 +428,82 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         | DV1.UVALUE_Oom t => DV2.UVALUE_Oom t
         | DV1.UVALUE_None => DV2.UVALUE_None
         | DV1.UVALUE_Struct fields =>
-            let fields' := map_In fields (fun elt HIn => uvalue_convert elt)in
+            let fields' := map_In fields (fun elt HIn => uvalue_convert_lazy elt)in
             DV2.UVALUE_Struct fields'
         | DV1.UVALUE_Packed_struct fields =>
-            let fields' := map_In fields (fun elt HIn => uvalue_convert elt)in
+            let fields' := map_In fields (fun elt HIn => uvalue_convert_lazy elt)in
             DV2.UVALUE_Packed_struct fields'
         | DV1.UVALUE_Array elts =>
-            let elts' := map_In elts (fun elt HIn => uvalue_convert elt)in
+            let elts' := map_In elts (fun elt HIn => uvalue_convert_lazy elt)in
             DV2.UVALUE_Array elts'
         | DV1.UVALUE_Vector elts =>
-            let elts' := map_In elts (fun elt HIn => uvalue_convert elt)in
+            let elts' := map_In elts (fun elt HIn => uvalue_convert_lazy elt)in
             DV2.UVALUE_Vector elts'
         | DV1.UVALUE_Undef dt =>
             (* Could be a bit odd with intptr *)
             DV2.UVALUE_Undef dt
         | DV1.UVALUE_IBinop iop v1 v2 =>
-            let v1' := uvalue_convert v1 in
-            let v2' := uvalue_convert v2 in
+            let v1' := uvalue_convert_lazy v1 in
+            let v2' := uvalue_convert_lazy v2 in
             DV2.UVALUE_IBinop iop v1' v2'
         | DV1.UVALUE_ICmp cmp v1 v2 =>
-            let v1' := uvalue_convert v1 in
-            let v2' := uvalue_convert v2 in
+            let v1' := uvalue_convert_lazy v1 in
+            let v2' := uvalue_convert_lazy v2 in
             DV2.UVALUE_ICmp cmp v1' v2'
         | DV1.UVALUE_FBinop fop fm v1 v2 =>
-            let v1' := uvalue_convert v1 in
-            let v2' := uvalue_convert v2 in
+            let v1' := uvalue_convert_lazy v1 in
+            let v2' := uvalue_convert_lazy v2 in
             DV2.UVALUE_FBinop fop fm v1' v2'
         | DV1.UVALUE_FCmp cmp v1 v2 =>
-            let v1' := uvalue_convert v1 in
-            let v2' := uvalue_convert v2 in
+            let v1' := uvalue_convert_lazy v1 in
+            let v2' := uvalue_convert_lazy v2 in
             DV2.UVALUE_FCmp cmp v1' v2'
         | DV1.UVALUE_Conversion conv t_from v t_to =>
-            let v' := uvalue_convert v in
+            let v' := uvalue_convert_lazy v in
             DV2.UVALUE_Conversion conv t_from v' t_to
         | DV1.UVALUE_GetElementPtr t ptrval idxs =>
-            let ptrval' := uvalue_convert ptrval in
-            let idxs' := map_In idxs (fun elt Hin => uvalue_convert elt) in
+            let ptrval' := uvalue_convert_lazy ptrval in
+            let idxs' := map_In idxs (fun elt Hin => uvalue_convert_lazy elt) in
             DV2.UVALUE_GetElementPtr t ptrval' idxs'
         | DV1.UVALUE_ExtractElement t vec idx =>
-            let vec' := uvalue_convert vec in
-            let idx' := uvalue_convert idx in
+            let vec' := uvalue_convert_lazy vec in
+            let idx' := uvalue_convert_lazy idx in
             DV2.UVALUE_ExtractElement t vec' idx'
         | DV1.UVALUE_InsertElement t vec elt idx =>
-            let vec' := uvalue_convert vec in
-            let elt' := uvalue_convert elt in
-            let idx' := uvalue_convert idx in
+            let vec' := uvalue_convert_lazy vec in
+            let elt' := uvalue_convert_lazy elt in
+            let idx' := uvalue_convert_lazy idx in
             DV2.UVALUE_InsertElement t vec' elt' idx'
         | DV1.UVALUE_ShuffleVector vec1 vec2 idxmask =>
-            let vec1' := uvalue_convert vec1 in
-            let vec2' := uvalue_convert vec2 in
-            let idxmask' := uvalue_convert idxmask in
+            let vec1' := uvalue_convert_lazy vec1 in
+            let vec2' := uvalue_convert_lazy vec2 in
+            let idxmask' := uvalue_convert_lazy idxmask in
             DV2.UVALUE_ShuffleVector vec1' vec2' idxmask'
         | DV1.UVALUE_ExtractValue t vec idxs =>
-            let vec' := uvalue_convert vec in
+            let vec' := uvalue_convert_lazy vec in
             DV2.UVALUE_ExtractValue t vec' idxs
         | DV1.UVALUE_InsertValue t vec elt idxs =>
-            let vec' := uvalue_convert vec in
-            let elt' := uvalue_convert elt in
+            let vec' := uvalue_convert_lazy vec in
+            let elt' := uvalue_convert_lazy elt in
             DV2.UVALUE_InsertValue t vec' elt' idxs
         | DV1.UVALUE_Select cnd v1 v2 =>
-            let cnd' := uvalue_convert cnd in
-            let v1' := uvalue_convert v1 in
-            let v2' := uvalue_convert v2 in
+            let cnd' := uvalue_convert_lazy cnd in
+            let v1' := uvalue_convert_lazy v1 in
+            let v2' := uvalue_convert_lazy v2 in
             DV2.UVALUE_Select cnd' v1' v2'
         | DV1.UVALUE_ExtractByte uv dt idx sid =>
-            let uv' := uvalue_convert uv in
-            let idx' := uvalue_convert idx in
+            let uv' := uvalue_convert_lazy uv in
+            let idx' := uvalue_convert_lazy idx in
             DV2.UVALUE_ExtractByte uv' dt idx' sid
         | DV1.UVALUE_ConcatBytes uvs dt =>
-            let uvs' := map_In uvs (fun elt Hin => uvalue_convert elt) in
+            let uvs' := map_In uvs (fun elt Hin => uvalue_convert_lazy elt) in
             DV2.UVALUE_ConcatBytes uvs' dt
         end.
   Proof.
     (* intros uv. *)
-    (* Transparent uvalue_convert. *)
-    (* unfold uvalue_convert at 1. *)
-    (* Opaque uvalue_convert. *)
+    (* Transparent uvalue_convert_lazy. *)
+    (* unfold uvalue_convert_lazy at 1. *)
+    (* Opaque uvalue_convert_lazy. *)
     (* (* TODO: This is really slow *) *)
     (* rewrite Wf.WfExtensionality.fix_sub_eq_ext. *)
     (* destruct uv; reflexivity. *)
@@ -520,254 +520,530 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
                     | inv CONTRA2
                 ]
     ].
-  Program Fixpoint dvalue_refine (dv1 : DV1.dvalue) (dv2 : DV2.dvalue) {measure (DV1.dvalue_measure dv1)} : Prop
-    := let dvc := dvalue_convert dv1 in
-       dvc = dv2 \/
+
+  Definition uvalue_converted_lazy (uv1 : DV1.uvalue) (uv2 : DV2.uvalue) : Prop :=
+    uvalue_convert_lazy uv1 = uv2.
+
+  Definition dvalue_converted_lazy (dv1 : DV1.dvalue) (dv2 : DV2.dvalue) : Prop :=
+    dvalue_convert_lazy dv1 = dv2.
+
+  (** A version of dvalue refinement between languages where OOM can be the lazy OOM value *)
+  Program Fixpoint dvalue_refine_lazy (dv1 : DV1.dvalue) (dv2 : DV2.dvalue) {measure (DV1.dvalue_measure dv1)} : Prop
+    := dvalue_converted_lazy dv1 dv2 \/
          match dv1, dv2 with
          | _, DV2.DVALUE_Oom t2 =>
              DV1.dvalue_has_dtyp dv1 t2
          | DV1.DVALUE_Struct fields1, DV2.DVALUE_Struct fields2 =>
-             Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => dvalue_refine e1 e2)
+             Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => dvalue_refine_lazy e1 e2)
          | DV1.DVALUE_Packed_struct fields1, DV2.DVALUE_Packed_struct fields2 =>
-             Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => dvalue_refine e1 e2)
+             Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => dvalue_refine_lazy e1 e2)
          | DV1.DVALUE_Array elts1, DV2.DVALUE_Array elts2 =>
-             Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => dvalue_refine e1 e2)
+             Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => dvalue_refine_lazy e1 e2)
          | DV1.DVALUE_Vector elts1, DV2.DVALUE_Vector elts2 =>
-             Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => dvalue_refine e1 e2)
+             Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => dvalue_refine_lazy e1 e2)
          | _, _ =>
              False
          end.
 
-  Lemma dvalue_refine_equation :
+  Lemma dvalue_refine_lazy_equation :
     forall dv1 dv2,
-      dvalue_refine dv1 dv2 =
-        let dvc := dvalue_convert dv1 in
-        dvc = dv2 \/
+      dvalue_refine_lazy dv1 dv2 =
+        (dvalue_converted_lazy dv1 dv2 \/
           match dv1, dv2 with
           | _, DV2.DVALUE_Oom t2 =>
               DV1.dvalue_has_dtyp dv1 t2
           | DV1.DVALUE_Struct fields1, DV2.DVALUE_Struct fields2 =>
-              Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => dvalue_refine e1 e2)
+              Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => dvalue_refine_lazy e1 e2)
           | DV1.DVALUE_Packed_struct fields1, DV2.DVALUE_Packed_struct fields2 =>
-              Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => dvalue_refine e1 e2)
+              Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => dvalue_refine_lazy e1 e2)
           | DV1.DVALUE_Array elts1, DV2.DVALUE_Array elts2 =>
-              Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => dvalue_refine e1 e2)
+              Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => dvalue_refine_lazy e1 e2)
           | DV1.DVALUE_Vector elts1, DV2.DVALUE_Vector elts2 =>
-              Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => dvalue_refine e1 e2)
+              Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => dvalue_refine_lazy e1 e2)
           | _, _ =>
               False
-          end.
+          end).
   Proof.
   Admitted.
 
-  Definition uvalue_converted (uv1 : DV1.uvalue) (uv2 : DV2.uvalue) : Prop :=
-    uvalue_convert uv1 = uv2.
-
-  Definition dvalue_converted (dv1 : DV1.dvalue) (dv2 : DV2.dvalue) : Prop :=
-    dvalue_convert dv1 = dv2.
-
-  Program Fixpoint uvalue_refine (uv1 : DV1.uvalue) (uv2 : DV2.uvalue) {measure (DV1.uvalue_measure uv1)} : Prop
-    := let uvc := uvalue_convert uv1 in
-       uvc = uv2 \/
+  Program Fixpoint uvalue_refine_lazy (uv1 : DV1.uvalue) (uv2 : DV2.uvalue) {measure (DV1.uvalue_measure uv1)} : Prop
+    := uvalue_converted_lazy uv1 uv2 \/
          match uv1, uv2 with
          | _, DV2.UVALUE_Oom t2 =>
              DV1.uvalue_has_dtyp uv1 t2
          | DV1.UVALUE_Struct fields1, DV2.UVALUE_Struct fields2 =>
-             Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => uvalue_refine e1 e2)
+             Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => uvalue_refine_lazy e1 e2)
          | DV1.UVALUE_Packed_struct fields1, DV2.UVALUE_Packed_struct fields2 =>
-             Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => uvalue_refine e1 e2)
+             Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => uvalue_refine_lazy e1 e2)
          | DV1.UVALUE_Array elts1, DV2.UVALUE_Array elts2 =>
-             Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => uvalue_refine e1 e2)
+             Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => uvalue_refine_lazy e1 e2)
          | DV1.UVALUE_Vector elts1, DV2.UVALUE_Vector elts2 =>
-             Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => uvalue_refine e1 e2)
+             Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => uvalue_refine_lazy e1 e2)
          | DV1.UVALUE_IBinop iop1 v1_1 v2_1, DV2.UVALUE_IBinop iop2 v1_2 v2_2 =>
              iop1 = iop2 /\
-               uvalue_refine v1_1 v1_2 /\
-               uvalue_refine v2_1 v2_2
+               uvalue_refine_lazy v1_1 v1_2 /\
+               uvalue_refine_lazy v2_1 v2_2
          | DV1.UVALUE_ICmp cmp1 v1_1 v2_1, DV2.UVALUE_ICmp cmp2 v1_2 v2_2 =>
              cmp1 = cmp2 /\
-               uvalue_refine v1_1 v1_2 /\
-               uvalue_refine v2_1 v2_2
+               uvalue_refine_lazy v1_1 v1_2 /\
+               uvalue_refine_lazy v2_1 v2_2
          | DV1.UVALUE_FBinop fop1 fm1 v1_1 v2_1, DV2.UVALUE_FBinop fop2 fm2 v1_2 v2_2 =>
              fop1 = fop2 /\
                fm1 = fm2 /\
-               uvalue_refine v1_1 v1_2 /\
-               uvalue_refine v2_1 v2_2
+               uvalue_refine_lazy v1_1 v1_2 /\
+               uvalue_refine_lazy v2_1 v2_2
          | DV1.UVALUE_FCmp cmp1 v1_1 v2_1, DV2.UVALUE_FCmp cmp2 v1_2 v2_2 =>
              cmp1 = cmp2 /\
-               uvalue_refine v1_1 v1_2 /\
-               uvalue_refine v2_1 v2_2
+               uvalue_refine_lazy v1_1 v1_2 /\
+               uvalue_refine_lazy v2_1 v2_2
          | DV1.UVALUE_Conversion conv1 t_from1 v1 t_to1, DV2.UVALUE_Conversion conv2 t_from2 v2 t_to2 =>
              conv1 = conv2 /\
-               uvalue_refine v1 v2 /\
+               uvalue_refine_lazy v1 v2 /\
                t_from1 = t_from2 /\
                t_to1 = t_to2
          | DV1.UVALUE_GetElementPtr t1 ptrval1 idxs1, DV2.UVALUE_GetElementPtr t2 ptrval2 idxs2 =>
              t1 = t2 /\
-               uvalue_refine ptrval1 ptrval2 /\
-               Forall2_HIn idxs1 idxs2 (fun ix1 ix2 IN1 IN2 => uvalue_refine ix1 ix2)
+               uvalue_refine_lazy ptrval1 ptrval2 /\
+               Forall2_HIn idxs1 idxs2 (fun ix1 ix2 IN1 IN2 => uvalue_refine_lazy ix1 ix2)
          | DV1.UVALUE_ExtractElement vec_typ1 vec1 idx1, DV2.UVALUE_ExtractElement vec_typ2 vec2 idx2 =>
              vec_typ1 = vec_typ2 /\
-               uvalue_refine vec1 vec2 /\
-               uvalue_refine idx1 idx2
+               uvalue_refine_lazy vec1 vec2 /\
+               uvalue_refine_lazy idx1 idx2
          | DV1.UVALUE_InsertElement vec_typ1 vec1 elt1 idx1, DV2.UVALUE_InsertElement vec_typ2 vec2 elt2 idx2 =>
              vec_typ1 = vec_typ2 /\
-               uvalue_refine vec1 vec2 /\
-               uvalue_refine elt1 elt2 /\
-               uvalue_refine idx1 idx2
+               uvalue_refine_lazy vec1 vec2 /\
+               uvalue_refine_lazy elt1 elt2 /\
+               uvalue_refine_lazy idx1 idx2
          | DV1.UVALUE_ShuffleVector vec1_1 vec2_1 idxmask1, DV2.UVALUE_ShuffleVector vec1_2 vec2_2 idxmask2 =>
-             uvalue_refine vec1_1 vec1_2 /\
-             uvalue_refine vec2_1 vec2_2 /\
-               uvalue_refine idxmask1 idxmask2
+             uvalue_refine_lazy vec1_1 vec1_2 /\
+             uvalue_refine_lazy vec2_1 vec2_2 /\
+               uvalue_refine_lazy idxmask1 idxmask2
          | DV1.UVALUE_ExtractValue vec_typ1 vec1 idxs1, DV2.UVALUE_ExtractValue vec_typ2 vec2 idxs2 =>
              vec_typ1 = vec_typ2 /\
-               uvalue_refine vec1 vec2 /\
+               uvalue_refine_lazy vec1 vec2 /\
                idxs1 = idxs2
          | DV1.UVALUE_InsertValue vec_typ1 vec1 elt1 idxs1, DV2.UVALUE_InsertValue vec_typ2 vec2 elt2 idxs2 =>
              vec_typ1 = vec_typ2 /\
-               uvalue_refine vec1 vec2 /\
-               uvalue_refine elt1 elt2 /\
+               uvalue_refine_lazy vec1 vec2 /\
+               uvalue_refine_lazy elt1 elt2 /\
                idxs1 = idxs2
          | DV1.UVALUE_Select cnd1 v1_1 v2_1, DV2.UVALUE_Select cnd2 v1_2 v2_2 =>
-             uvalue_refine cnd1 cnd2 /\
-               uvalue_refine v1_1 v1_2 /\
-               uvalue_refine v2_1 v2_2
+             uvalue_refine_lazy cnd1 cnd2 /\
+               uvalue_refine_lazy v1_1 v1_2 /\
+               uvalue_refine_lazy v2_1 v2_2
          | DV1.UVALUE_ExtractByte uv1 dt1 idx1 sid1, DV2.UVALUE_ExtractByte uv2 dt2 idx2 sid2 =>
-             uvalue_refine uv1 uv2 /\
+             uvalue_refine_lazy uv1 uv2 /\
                dt1 = dt2 /\
-               uvalue_refine idx1 idx2 /\
+               uvalue_refine_lazy idx1 idx2 /\
                sid1 = sid2
          | DV1.UVALUE_ConcatBytes uvs1 dt1, DV2.UVALUE_ConcatBytes uvs2 dt2 =>
-             Forall2_HIn uvs1 uvs2 (fun uv1 uv2 IN1 IN2 => uvalue_refine uv1 uv2) /\
+             Forall2_HIn uvs1 uvs2 (fun uv1 uv2 IN1 IN2 => uvalue_refine_lazy uv1 uv2) /\
                dt1 = dt2
          | _, _ =>
              False
          end.
 
-  Lemma uvalue_refine_equation :
+  Lemma uvalue_refine_lazy_equation :
     forall uv1 uv2,
-      uvalue_refine uv1 uv2 =
-        let uvc := uvalue_convert uv1 in
-        uvc = uv2 \/
+      uvalue_refine_lazy uv1 uv2 =
+        (uvalue_converted_lazy uv1 uv2 \/
           match uv1, uv2 with
           | _, DV2.UVALUE_Oom t2 =>
               DV1.uvalue_has_dtyp uv1 t2
           | DV1.UVALUE_Struct fields1, DV2.UVALUE_Struct fields2 =>
-              Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => uvalue_refine e1 e2)
+              Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => uvalue_refine_lazy e1 e2)
           | DV1.UVALUE_Packed_struct fields1, DV2.UVALUE_Packed_struct fields2 =>
-              Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => uvalue_refine e1 e2)
+              Forall2_HIn fields1 fields2 (fun e1 e2 IN1 IN2 => uvalue_refine_lazy e1 e2)
           | DV1.UVALUE_Array elts1, DV2.UVALUE_Array elts2 =>
-              Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => uvalue_refine e1 e2)
+              Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => uvalue_refine_lazy e1 e2)
           | DV1.UVALUE_Vector elts1, DV2.UVALUE_Vector elts2 =>
-              Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => uvalue_refine e1 e2)
+              Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => uvalue_refine_lazy e1 e2)
           | DV1.UVALUE_IBinop iop1 v1_1 v2_1, DV2.UVALUE_IBinop iop2 v1_2 v2_2 =>
               iop1 = iop2 /\
-                uvalue_refine v1_1 v1_2 /\
-                uvalue_refine v2_1 v2_2
+                uvalue_refine_lazy v1_1 v1_2 /\
+                uvalue_refine_lazy v2_1 v2_2
           | DV1.UVALUE_ICmp cmp1 v1_1 v2_1, DV2.UVALUE_ICmp cmp2 v1_2 v2_2 =>
               cmp1 = cmp2 /\
-                uvalue_refine v1_1 v1_2 /\
-                uvalue_refine v2_1 v2_2
+                uvalue_refine_lazy v1_1 v1_2 /\
+                uvalue_refine_lazy v2_1 v2_2
           | DV1.UVALUE_FBinop fop1 fm1 v1_1 v2_1, DV2.UVALUE_FBinop fop2 fm2 v1_2 v2_2 =>
               fop1 = fop2 /\
                 fm1 = fm2 /\
-                uvalue_refine v1_1 v1_2 /\
-                uvalue_refine v2_1 v2_2
+                uvalue_refine_lazy v1_1 v1_2 /\
+                uvalue_refine_lazy v2_1 v2_2
           | DV1.UVALUE_FCmp cmp1 v1_1 v2_1, DV2.UVALUE_FCmp cmp2 v1_2 v2_2 =>
               cmp1 = cmp2 /\
-                uvalue_refine v1_1 v1_2 /\
-                uvalue_refine v2_1 v2_2
+                uvalue_refine_lazy v1_1 v1_2 /\
+                uvalue_refine_lazy v2_1 v2_2
           | DV1.UVALUE_Conversion conv1 t_from1 v1 t_to1, DV2.UVALUE_Conversion conv2 t_from2 v2 t_to2 =>
               conv1 = conv2 /\
-                uvalue_refine v1 v2 /\
+                uvalue_refine_lazy v1 v2 /\
                 t_from1 = t_from2 /\
                 t_to1 = t_to2
           | DV1.UVALUE_GetElementPtr t1 ptrval1 idxs1, DV2.UVALUE_GetElementPtr t2 ptrval2 idxs2 =>
               t1 = t2 /\
-                uvalue_refine ptrval1 ptrval2 /\
-                Forall2_HIn idxs1 idxs2 (fun ix1 ix2 IN1 IN2 => uvalue_refine ix1 ix2)
+                uvalue_refine_lazy ptrval1 ptrval2 /\
+                Forall2_HIn idxs1 idxs2 (fun ix1 ix2 IN1 IN2 => uvalue_refine_lazy ix1 ix2)
           | DV1.UVALUE_ExtractElement vec_typ1 vec1 idx1, DV2.UVALUE_ExtractElement vec_typ2 vec2 idx2 =>
               vec_typ1 = vec_typ2 /\
-                uvalue_refine vec1 vec2 /\
-                uvalue_refine idx1 idx2
+                uvalue_refine_lazy vec1 vec2 /\
+                uvalue_refine_lazy idx1 idx2
           | DV1.UVALUE_InsertElement vec_typ1 vec1 elt1 idx1, DV2.UVALUE_InsertElement vec_typ2 vec2 elt2 idx2 =>
               vec_typ1 = vec_typ2 /\
-                uvalue_refine vec1 vec2 /\
-                uvalue_refine elt1 elt2 /\
-                uvalue_refine idx1 idx2
+                uvalue_refine_lazy vec1 vec2 /\
+                uvalue_refine_lazy elt1 elt2 /\
+                uvalue_refine_lazy idx1 idx2
           | DV1.UVALUE_ShuffleVector vec1_1 vec2_1 idxmask1, DV2.UVALUE_ShuffleVector vec1_2 vec2_2 idxmask2 =>
-              uvalue_refine vec1_1 vec1_2 /\
-                uvalue_refine vec2_1 vec2_2 /\
-                uvalue_refine idxmask1 idxmask2
+              uvalue_refine_lazy vec1_1 vec1_2 /\
+                uvalue_refine_lazy vec2_1 vec2_2 /\
+                uvalue_refine_lazy idxmask1 idxmask2
           | DV1.UVALUE_ExtractValue vec_typ1 vec1 idxs1, DV2.UVALUE_ExtractValue vec_typ2 vec2 idxs2 =>
               vec_typ1 = vec_typ2 /\
-                uvalue_refine vec1 vec2 /\
+                uvalue_refine_lazy vec1 vec2 /\
                 idxs1 = idxs2
           | DV1.UVALUE_InsertValue vec_typ1 vec1 elt1 idxs1, DV2.UVALUE_InsertValue vec_typ2 vec2 elt2 idxs2 =>
               vec_typ1 = vec_typ2 /\
-                uvalue_refine vec1 vec2 /\
-                uvalue_refine elt1 elt2 /\
+                uvalue_refine_lazy vec1 vec2 /\
+                uvalue_refine_lazy elt1 elt2 /\
                 idxs1 = idxs2
           | DV1.UVALUE_Select cnd1 v1_1 v2_1, DV2.UVALUE_Select cnd2 v1_2 v2_2 =>
-              uvalue_refine cnd1 cnd2 /\
-                uvalue_refine v1_1 v1_2 /\
-                uvalue_refine v2_1 v2_2
+              uvalue_refine_lazy cnd1 cnd2 /\
+                uvalue_refine_lazy v1_1 v1_2 /\
+                uvalue_refine_lazy v2_1 v2_2
           | DV1.UVALUE_ExtractByte uv1 dt1 idx1 sid1, DV2.UVALUE_ExtractByte uv2 dt2 idx2 sid2 =>
-              uvalue_refine uv1 uv2 /\
+              uvalue_refine_lazy uv1 uv2 /\
                 dt1 = dt2 /\
-                uvalue_refine idx1 idx2 /\
+                uvalue_refine_lazy idx1 idx2 /\
                 sid1 = sid2
           | DV1.UVALUE_ConcatBytes uvs1 dt1, DV2.UVALUE_ConcatBytes uvs2 dt2 =>
-              Forall2_HIn uvs1 uvs2 (fun uv1 uv2 IN1 IN2 => uvalue_refine uv1 uv2) /\
+              Forall2_HIn uvs1 uvs2 (fun uv1 uv2 IN1 IN2 => uvalue_refine_lazy uv1 uv2) /\
                 dt1 = dt2
           | _, _ =>
               False
-          end.
+          end).
   Proof.
   Admitted.
 
-  Lemma dvalue_refine_dvalue_convert :
+  Lemma dvalue_refine_lazy_dvalue_convert_lazy :
     forall dv,
-      dvalue_refine dv (dvalue_convert dv).
+      dvalue_refine_lazy dv (dvalue_convert_lazy dv).
   Proof.
     intros dv.
     induction dv;
-      rewrite dvalue_refine_equation;
-      left; auto.
+      rewrite dvalue_refine_lazy_equation;
+      left; red; auto.
   Qed.
 
-  Lemma uvalue_refine_uvalue_convert :
+  Lemma uvalue_refine_lazy_uvalue_convert_lazy :
     forall dv,
-      uvalue_refine dv (uvalue_convert dv).
+      uvalue_refine_lazy dv (uvalue_convert_lazy dv).
   Proof.
     intros dv.
     induction dv;
-      rewrite uvalue_refine_equation;
-      left; auto.
+      rewrite uvalue_refine_lazy_equation;
+      left; red; auto.
   Qed.
 
-  Lemma dvalue_refine_dvalue_converted :
+  Lemma dvalue_refine_lazy_dvalue_converted_lazy :
     forall dv1 dv2,
-      dvalue_converted dv1 dv2 ->
-      dvalue_refine dv1 dv2.
+      dvalue_converted_lazy dv1 dv2 ->
+      dvalue_refine_lazy dv1 dv2.
   Proof.
     intros dv1 dv2 CONV; inv CONV.
-    apply dvalue_refine_dvalue_convert.
+    apply dvalue_refine_lazy_dvalue_convert_lazy.
   Qed.
 
   Lemma uvalue_refine_uvalue_converted :
     forall uv1 uv2,
-      uvalue_converted uv1 uv2 ->
-      uvalue_refine uv1 uv2.
+      uvalue_converted_lazy uv1 uv2 ->
+      uvalue_refine_lazy uv1 uv2.
   Proof.
     intros uv1 uv2 CONV; inv CONV.
-    apply uvalue_refine_uvalue_convert.
+    apply uvalue_refine_lazy_uvalue_convert_lazy.
   Qed.
 
-  Opaque dvalue_convert.
-  Opaque uvalue_convert.
-  Opaque dvalue_refine.
-  Opaque uvalue_refine.
+  Program Fixpoint dvalue_convert_strict (dv1 : DV1.dvalue) {measure (DV1.dvalue_measure dv1)} : OOM DV2.dvalue
+    := match dv1 with
+       | DV1.DVALUE_Addr a =>
+           a' <- addr_convert a;;
+           ret (DV2.DVALUE_Addr a')
+       | DV1.DVALUE_I1 x  => ret (DV2.DVALUE_I1 x)
+       | DV1.DVALUE_I8 x  => ret (DV2.DVALUE_I8 x)
+       | DV1.DVALUE_I32 x => ret (DV2.DVALUE_I32 x)
+       | DV1.DVALUE_I64 x => ret (DV2.DVALUE_I64 x)
+       | DV1.DVALUE_IPTR x =>
+           let xz := LP1.IP.to_Z x in
+           x' <- LP2.IP.from_Z xz;;
+           ret (DV2.DVALUE_IPTR x')
+       | DV1.DVALUE_Double x => ret (DV2.DVALUE_Double x)
+       | DV1.DVALUE_Float x => ret (DV2.DVALUE_Float x)
+       | DV1.DVALUE_Oom t => ret (DV2.DVALUE_Oom t)
+       | DV1.DVALUE_Poison t => ret (DV2.DVALUE_Poison t)
+       | DV1.DVALUE_None => ret DV2.DVALUE_None
+       | DV1.DVALUE_Struct fields =>
+           fields' <- map_monad_In fields (fun elt Hin => dvalue_convert_strict elt);;
+           ret (DV2.DVALUE_Struct fields')
+       | DV1.DVALUE_Packed_struct fields =>
+           fields' <- map_monad_In fields (fun elt Hin => dvalue_convert_strict elt);;
+           ret (DV2.DVALUE_Packed_struct fields')
+       | DV1.DVALUE_Array elts =>
+           elts' <- map_monad_In elts (fun elt Hin => dvalue_convert_strict elt);;
+           ret (DV2.DVALUE_Array elts')
+       | DV1.DVALUE_Vector elts =>
+           elts' <- map_monad_In elts (fun elt Hin => dvalue_convert_strict elt);;
+           ret (DV2.DVALUE_Vector elts')
+       end.
+
+  Program Fixpoint uvalue_convert_strict (uv1 : DV1.uvalue) {measure (DV1.uvalue_measure uv1)} : OOM DV2.uvalue
+    := match uv1 with
+       | DV1.UVALUE_Addr a =>
+           a' <- addr_convert a;;
+           ret (DV2.UVALUE_Addr a')
+       | DV1.UVALUE_I1 x  => ret (DV2.UVALUE_I1 x)
+       | DV1.UVALUE_I8 x  => ret (DV2.UVALUE_I8 x)
+       | DV1.UVALUE_I32 x => ret (DV2.UVALUE_I32 x)
+       | DV1.UVALUE_I64 x => ret (DV2.UVALUE_I64 x)
+       | DV1.UVALUE_IPTR x =>
+           let xz := LP1.IP.to_Z x in
+           x' <- LP2.IP.from_Z xz;;
+           ret (DV2.UVALUE_IPTR x')
+       | DV1.UVALUE_Double x => ret (DV2.UVALUE_Double x)
+       | DV1.UVALUE_Float x => ret (DV2.UVALUE_Float x)
+       | DV1.UVALUE_Oom t => ret (DV2.UVALUE_Oom t)
+       | DV1.UVALUE_Poison t => ret (DV2.UVALUE_Poison t)
+       | DV1.UVALUE_None => ret DV2.UVALUE_None
+       | DV1.UVALUE_Struct fields =>
+           fields' <- map_monad_In fields (fun elt Hin => uvalue_convert_strict elt);;
+           ret (DV2.UVALUE_Struct fields')
+       | DV1.UVALUE_Packed_struct fields =>
+           fields' <- map_monad_In fields (fun elt Hin => uvalue_convert_strict elt);;
+           ret (DV2.UVALUE_Packed_struct fields')
+       | DV1.UVALUE_Array elts =>
+           elts' <- map_monad_In elts (fun elt Hin => uvalue_convert_strict elt);;
+           ret (DV2.UVALUE_Array elts')
+       | DV1.UVALUE_Vector elts =>
+           elts' <- map_monad_In elts (fun elt Hin => uvalue_convert_strict elt);;
+           ret (DV2.UVALUE_Vector elts')
+       | DV1.UVALUE_Undef dt =>
+           (* Could be a bit odd with intptr *)
+           ret (DV2.UVALUE_Undef dt)
+       | DV1.UVALUE_IBinop iop v1 v2 =>
+           v1' <- uvalue_convert_strict v1;;
+           v2' <- uvalue_convert_strict v2;;
+           ret (DV2.UVALUE_IBinop iop v1' v2')
+       | DV1.UVALUE_ICmp cmp v1 v2 =>
+           v1' <- uvalue_convert_strict v1;;
+           v2' <- uvalue_convert_strict v2;;
+           ret (DV2.UVALUE_ICmp cmp v1' v2')
+       | DV1.UVALUE_FBinop fop fm v1 v2 =>
+           v1' <- uvalue_convert_strict v1;;
+           v2' <- uvalue_convert_strict v2;;
+           ret (DV2.UVALUE_FBinop fop fm v1' v2')
+       | DV1.UVALUE_FCmp cmp v1 v2 =>
+           v1' <- uvalue_convert_strict v1;;
+           v2' <- uvalue_convert_strict v2;;
+           ret (DV2.UVALUE_FCmp cmp v1' v2')
+       | DV1.UVALUE_Conversion conv t_from v t_to =>
+           v' <- uvalue_convert_strict v;;
+           ret (DV2.UVALUE_Conversion conv t_from v' t_to)
+       | DV1.UVALUE_GetElementPtr t ptrval idxs =>
+           ptrval' <- uvalue_convert_strict ptrval;;
+           idxs' <- map_monad_In idxs (fun elt Hin => uvalue_convert_strict elt);;
+           ret (DV2.UVALUE_GetElementPtr t ptrval' idxs')
+       | DV1.UVALUE_ExtractElement t vec idx =>
+           vec' <- uvalue_convert_strict vec;;
+           idx' <- uvalue_convert_strict idx;;
+           ret (DV2.UVALUE_ExtractElement t vec' idx')
+       | DV1.UVALUE_InsertElement t vec elt idx =>
+           vec' <- uvalue_convert_strict vec;;
+           elt' <- uvalue_convert_strict elt;;
+           idx' <- uvalue_convert_strict idx;;
+           ret (DV2.UVALUE_InsertElement t vec' elt' idx')
+       | DV1.UVALUE_ShuffleVector vec1 vec2 idxmask =>
+           vec1' <- uvalue_convert_strict vec1;;
+           vec2' <- uvalue_convert_strict vec2;;
+           idxmask' <- uvalue_convert_strict idxmask;;
+           ret (DV2.UVALUE_ShuffleVector vec1' vec2' idxmask')
+       | DV1.UVALUE_ExtractValue t vec idxs =>
+           vec' <- uvalue_convert_strict vec;;
+           ret (DV2.UVALUE_ExtractValue t vec' idxs)
+       | DV1.UVALUE_InsertValue t vec elt idxs =>
+           vec' <- uvalue_convert_strict vec;;
+           elt' <- uvalue_convert_strict elt;;
+           ret (DV2.UVALUE_InsertValue t vec' elt' idxs)
+       | DV1.UVALUE_Select cnd v1 v2 =>
+           cnd' <- uvalue_convert_strict cnd;;
+           v1' <- uvalue_convert_strict v1;;
+           v2' <- uvalue_convert_strict v2;;
+           ret (DV2.UVALUE_Select cnd' v1' v2')
+       | DV1.UVALUE_ExtractByte uv dt idx sid =>
+           uv' <- uvalue_convert_strict uv;;
+           idx' <- uvalue_convert_strict idx;;
+           ret (DV2.UVALUE_ExtractByte uv' dt idx' sid)
+       | DV1.UVALUE_ConcatBytes uvs dt =>
+           uvs' <- map_monad_In uvs (fun elt Hin => uvalue_convert_strict elt);;
+           ret (DV2.UVALUE_ConcatBytes uvs' dt)
+       end.
+
+  Opaque dvalue_convert_strict.
+  Lemma dvalue_convert_strict_equation :
+    forall dv,
+      dvalue_convert_strict dv =
+        match dv with
+        | DV1.DVALUE_Addr a =>
+            a' <- addr_convert a;;
+            ret (DV2.DVALUE_Addr a')
+        | DV1.DVALUE_I1 x  => ret (DV2.DVALUE_I1 x)
+        | DV1.DVALUE_I8 x  => ret (DV2.DVALUE_I8 x)
+        | DV1.DVALUE_I32 x => ret (DV2.DVALUE_I32 x)
+        | DV1.DVALUE_I64 x => ret (DV2.DVALUE_I64 x)
+        | DV1.DVALUE_IPTR x =>
+            let xz := LP1.IP.to_Z x in
+            x' <- LP2.IP.from_Z xz;;
+            ret (DV2.DVALUE_IPTR x')
+        | DV1.DVALUE_Double x => ret (DV2.DVALUE_Double x)
+        | DV1.DVALUE_Float x => ret (DV2.DVALUE_Float x)
+        | DV1.DVALUE_Oom t => ret (DV2.DVALUE_Oom t)  
+        | DV1.DVALUE_Poison t => ret (DV2.DVALUE_Poison t)
+        | DV1.DVALUE_None => ret DV2.DVALUE_None
+        | DV1.DVALUE_Struct fields =>
+            fields' <- map_monad_In fields (fun elt Hin => dvalue_convert_strict elt);;
+            ret (DV2.DVALUE_Struct fields')
+        | DV1.DVALUE_Packed_struct fields =>
+            fields' <- map_monad_In fields (fun elt Hin => dvalue_convert_strict elt);;
+            ret (DV2.DVALUE_Packed_struct fields')
+        | DV1.DVALUE_Array elts =>
+            elts' <- map_monad_In elts (fun elt Hin => dvalue_convert_strict elt);;
+            ret (DV2.DVALUE_Array elts')
+        | DV1.DVALUE_Vector elts =>
+            elts' <- map_monad_In elts (fun elt Hin => dvalue_convert_strict elt);;
+            ret (DV2.DVALUE_Vector elts')
+        end.
+  Proof.
+    intros dv.
+    Transparent dvalue_convert_strict.
+    unfold dvalue_convert_strict at 1.
+    rewrite Wf.WfExtensionality.fix_sub_eq_ext.
+    destruct dv; reflexivity.
+  Qed.
+
+  Lemma uvalue_convert_strict_equation:
+    forall uv,
+      uvalue_convert_strict uv =
+        match uv with
+        | DV1.UVALUE_Addr a =>
+            a' <- addr_convert a;;
+            ret (DV2.UVALUE_Addr a')
+        | DV1.UVALUE_I1 x  => ret (DV2.UVALUE_I1 x)
+        | DV1.UVALUE_I8 x  => ret (DV2.UVALUE_I8 x)
+        | DV1.UVALUE_I32 x => ret (DV2.UVALUE_I32 x)
+        | DV1.UVALUE_I64 x => ret (DV2.UVALUE_I64 x)
+        | DV1.UVALUE_IPTR x =>
+            let xz := LP1.IP.to_Z x in
+            x' <- LP2.IP.from_Z xz;;
+            ret (DV2.UVALUE_IPTR x')
+        | DV1.UVALUE_Double x => ret (DV2.UVALUE_Double x)
+        | DV1.UVALUE_Float x => ret (DV2.UVALUE_Float x)
+        | DV1.UVALUE_Oom t => ret (DV2.UVALUE_Oom t)
+        | DV1.UVALUE_Poison t => ret (DV2.UVALUE_Poison t)
+        | DV1.UVALUE_None => ret DV2.UVALUE_None
+        | DV1.UVALUE_Struct fields =>
+            fields' <- map_monad_In fields (fun elt Hin => uvalue_convert_strict elt);;
+            ret (DV2.UVALUE_Struct fields')
+        | DV1.UVALUE_Packed_struct fields =>
+            fields' <- map_monad_In fields (fun elt Hin => uvalue_convert_strict elt);;
+            ret (DV2.UVALUE_Packed_struct fields')
+        | DV1.UVALUE_Array elts =>
+            elts' <- map_monad_In elts (fun elt Hin => uvalue_convert_strict elt);;
+            ret (DV2.UVALUE_Array elts')
+        | DV1.UVALUE_Vector elts =>
+            elts' <- map_monad_In elts (fun elt Hin => uvalue_convert_strict elt);;
+            ret (DV2.UVALUE_Vector elts')
+        | DV1.UVALUE_Undef dt =>
+            (* Could be a bit odd with intptr *)
+            ret (DV2.UVALUE_Undef dt)
+        | DV1.UVALUE_IBinop iop v1 v2 =>
+            v1' <- uvalue_convert_strict v1;;
+            v2' <- uvalue_convert_strict v2;;
+            ret (DV2.UVALUE_IBinop iop v1' v2')
+        | DV1.UVALUE_ICmp cmp v1 v2 =>
+            v1' <- uvalue_convert_strict v1;;
+            v2' <- uvalue_convert_strict v2;;
+            ret (DV2.UVALUE_ICmp cmp v1' v2')
+        | DV1.UVALUE_FBinop fop fm v1 v2 =>
+            v1' <- uvalue_convert_strict v1;;
+            v2' <- uvalue_convert_strict v2;;
+            ret (DV2.UVALUE_FBinop fop fm v1' v2')
+        | DV1.UVALUE_FCmp cmp v1 v2 =>
+            v1' <- uvalue_convert_strict v1;;
+            v2' <- uvalue_convert_strict v2;;
+            ret (DV2.UVALUE_FCmp cmp v1' v2')
+        | DV1.UVALUE_Conversion conv t_from v t_to =>
+            v' <- uvalue_convert_strict v;;
+            ret (DV2.UVALUE_Conversion conv t_from v' t_to)
+        | DV1.UVALUE_GetElementPtr t ptrval idxs =>
+            ptrval' <- uvalue_convert_strict ptrval;;
+            idxs' <- map_monad_In idxs (fun elt Hin => uvalue_convert_strict elt);;
+            ret (DV2.UVALUE_GetElementPtr t ptrval' idxs')
+        | DV1.UVALUE_ExtractElement t vec idx =>
+            vec' <- uvalue_convert_strict vec;;
+            idx' <- uvalue_convert_strict idx;;
+            ret (DV2.UVALUE_ExtractElement t vec' idx')
+        | DV1.UVALUE_InsertElement t vec elt idx =>
+            vec' <- uvalue_convert_strict vec;;
+            elt' <- uvalue_convert_strict elt;;
+            idx' <- uvalue_convert_strict idx;;
+            ret (DV2.UVALUE_InsertElement t vec' elt' idx')
+        | DV1.UVALUE_ShuffleVector vec1 vec2 idxmask =>
+            vec1' <- uvalue_convert_strict vec1;;
+            vec2' <- uvalue_convert_strict vec2;;
+            idxmask' <- uvalue_convert_strict idxmask;;
+            ret (DV2.UVALUE_ShuffleVector vec1' vec2' idxmask')
+        | DV1.UVALUE_ExtractValue t vec idxs =>
+            vec' <- uvalue_convert_strict vec;;
+            ret (DV2.UVALUE_ExtractValue t vec' idxs)
+        | DV1.UVALUE_InsertValue t vec elt idxs =>
+            vec' <- uvalue_convert_strict vec;;
+            elt' <- uvalue_convert_strict elt;;
+            ret (DV2.UVALUE_InsertValue t vec' elt' idxs)
+        | DV1.UVALUE_Select cnd v1 v2 =>
+            cnd' <- uvalue_convert_strict cnd;;
+            v1' <- uvalue_convert_strict v1;;
+            v2' <- uvalue_convert_strict v2;;
+            ret (DV2.UVALUE_Select cnd' v1' v2')
+        | DV1.UVALUE_ExtractByte uv dt idx sid =>
+            uv' <- uvalue_convert_strict uv;;
+            idx' <- uvalue_convert_strict idx;;
+            ret (DV2.UVALUE_ExtractByte uv' dt idx' sid)
+        | DV1.UVALUE_ConcatBytes uvs dt =>
+            uvs' <- map_monad_In uvs (fun elt Hin => uvalue_convert_strict elt);;
+            ret (DV2.UVALUE_ConcatBytes uvs' dt)
+        end.
+  Proof.
+    (* intros uv. *)
+    (* Transparent uvalue_convert_strict. *)
+    (* unfold uvalue_convert_strict at 1. *)
+    (* Opaque uvalue_convert_strict. *)
+    (* (* TODO: This is really slow *) *)
+    (* rewrite Wf.WfExtensionality.fix_sub_eq_ext. *)
+    (* destruct uv; reflexivity. *)
+  Admitted.
+
+  Definition dvalue_refine_strict (dv1 : DV1.dvalue) (dv2 : DV2.dvalue) : Prop
+    := dvalue_convert_strict dv1 = NoOom dv2.
+
+  Definition uvalue_refine_strict (uv1 : DV1.uvalue) (uv2 : DV2.uvalue) : Prop
+    := uvalue_convert_strict uv1 = NoOom uv2.
+
+  #[global] Opaque dvalue_convert_lazy.
+  #[global] Opaque uvalue_convert_lazy.
+  #[global] Opaque dvalue_refine_lazy.
+  #[global] Opaque uvalue_refine_lazy.
+
+  #[global] Opaque dvalue_convert_strict.
+  #[global] Opaque uvalue_convert_strict.
+  #[global] Opaque dvalue_refine_strict.
+  #[global] Opaque uvalue_refine_strict.
 End DVConvert.
 
 Module DVConvertMake (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF) : DVConvert LP1 LP2 AC Events1 Events2.
@@ -854,7 +1130,12 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
   Module DVCrev := DVConvertMake LP2 LP1 AC2 E2 E1.
   Import DVC.
 
-  Definition L0_convert : Handler E1.L0 E2.L0.
+  Definition L0_convert_helper
+    (dvalue_convert : DV1.dvalue -> OOM DV2.dvalue)
+    (uvalue_convert : DV1.uvalue -> OOM DV2.uvalue)
+    (rev_dvalue_convert : DV2.dvalue -> OOM DV1.dvalue)
+    (rev_uvalue_convert : DV2.uvalue -> OOM DV1.uvalue)
+    : Handler E1.L0 E2.L0.
     refine (fun A e => _).
 
     refine (match e with
@@ -883,48 +1164,51 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
             end).
 
     (* External Calls *)
-    { refine (let f' := uvalue_convert f in
-              let args' := map_In args (fun elt Hin => dvalue_convert elt) in
+    { refine (f' <- lift_OOM (uvalue_convert f);;
+              args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
               dv <- trigger (E2.ExternalCall dt f' args');;
               _).
 
       inversion e0.
-      apply (ret (DVCrev.dvalue_convert dv)).
+      apply (lift_OOM (rev_dvalue_convert dv)).
     }
 
     (* Intrinsics *)
     { inversion i; subst.
-      apply (let args' := map_In args (fun elt Hin => dvalue_convert elt) in
+      apply (args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
              dv <- trigger (E2.Intrinsic dt name args');;
-             ret (DVCrev.dvalue_convert dv)).
+             lift_OOM (rev_dvalue_convert dv)).
     }
 
     (* Globals *)
     { inversion e0.
       - (* Global write *)
-        apply (let dv := dvalue_convert dv in
+        apply (dv <- lift_OOM (dvalue_convert dv);;
                trigger (GlobalWrite id dv)).
       - (* Global read *)
         apply (dv <- trigger (GlobalRead id);;
-               ret (DVCrev.dvalue_convert dv)).
+               lift_OOM (rev_dvalue_convert dv)).
     }
 
     (* Locals *)
     { inversion e0.
       - (* Local write *)
-        apply (let dv := uvalue_convert dv in
+        apply (dv <- lift_OOM (uvalue_convert dv);;
                trigger (LocalWrite id dv)).
       - (* Local read *)
         apply (dv <- trigger (LocalRead id);;
-               ret (DVCrev.uvalue_convert dv)).
+               lift_OOM (rev_uvalue_convert dv)).
     }
 
     (* Stack *)
     { inversion e0.
       - (* Stack Push *)
-        apply (let args' := map_In args
-                              (fun '(id, uv) Hin =>
-                                 (id, uvalue_convert uv)) in
+        apply (args' <- lift_OOM
+                         (map_monad_In args
+                            (fun '(id, uv) Hin =>
+                               uv' <- uvalue_convert uv;;
+                               ret (id, uv')
+                         ));;
                trigger (StackPush args')).
       - (* Stack Pop *)
         apply (trigger StackPop).
@@ -938,14 +1222,14 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
         apply (trigger E2.MemPop).
       - (* Alloca *)
         apply (ptr <- trigger (E2.Alloca t num_elements align);;
-               ret (DVCrev.dvalue_convert ptr)).
+               lift_OOM (rev_dvalue_convert ptr)).
       - (* Load *)
-        apply (let a' := dvalue_convert a in
+        apply (a' <- lift_OOM (dvalue_convert a);;
                uv <- trigger (E2.Load t a');;
-               ret (DVCrev.uvalue_convert uv)).
+               lift_OOM (rev_uvalue_convert uv)).
       - (* Store *)
-        apply (let a' := dvalue_convert a in
-               let v' := uvalue_convert v in
+        apply (a' <- lift_OOM (dvalue_convert a);;
+               v' <- lift_OOM (uvalue_convert v);;
                trigger (E2.Store t a' v')).
     }
 
@@ -953,11 +1237,11 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
     { (* TODO: confirm whether this is sane... *)
       inversion e0.
       subst.
-      refine (let x' := uvalue_convert x in
+      refine (x' <- lift_OOM (uvalue_convert x);;
               dv <- trigger (E2.pick Pre x');;
               _).
       destruct dv as [res _].
-      apply (let res' := DVCrev.dvalue_convert res in
+      apply (res' <- lift_OOM (rev_dvalue_convert res);;
              ret (exist (fun x => True) res' I)).
     }
 
@@ -982,7 +1266,12 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
     }
   Defined.
 
-  Definition L1_convert : Handler E1.L1 E2.L1.
+  Definition L1_convert_helper
+    (dvalue_convert : DV1.dvalue -> OOM DV2.dvalue)
+    (uvalue_convert : DV1.uvalue -> OOM DV2.uvalue)
+    (rev_dvalue_convert : DV2.dvalue -> OOM DV1.dvalue)
+    (rev_uvalue_convert : DV2.uvalue -> OOM DV1.uvalue)
+    : Handler E1.L1 E2.L1.
     refine (fun A e => _).
 
     refine (match e with
@@ -1009,38 +1298,41 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
             end).
 
     (* External Calls *)
-    { refine (let f' := uvalue_convert f in
-              let args' := map_In args (fun elt Hin => dvalue_convert elt) in
+    { refine (f' <- lift_OOM (uvalue_convert f);;
+              args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
               dv <- trigger (E2.ExternalCall dt f' args');;
               _).
 
       inversion e0.
-      apply (ret (DVCrev.dvalue_convert dv)).
+      apply (lift_OOM (rev_dvalue_convert dv)).
     }
 
     (* Intrinsics *)
     { inversion i; subst.
-      apply (let args' := map_In args (fun elt Hin => dvalue_convert elt) in
+      apply (args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
              dv <- trigger (E2.Intrinsic dt name args');;
-             ret (DVCrev.dvalue_convert dv)).
+             lift_OOM (rev_dvalue_convert dv)).
     }
 
     (* Locals *)
     { inversion e0.
       - (* Local write *)
-        apply (let dv := uvalue_convert dv in
+        apply (dv <- lift_OOM (uvalue_convert dv);;
                trigger (LocalWrite id dv)).
       - (* Local read *)
         apply (dv <- trigger (LocalRead id);;
-               ret (DVCrev.uvalue_convert dv)).
+               lift_OOM (rev_uvalue_convert dv)).
     }
 
     (* Stack *)
     { inversion e0.
       - (* Stack Push *)
-        apply (let args' := map_In args
-                              (fun '(id, uv) Hin =>
-                                 (id, uvalue_convert uv)) in
+        apply (args' <- lift_OOM
+                         (map_monad_In args
+                            (fun '(id, uv) Hin =>
+                               uv' <- uvalue_convert uv;;
+                               ret (id, uv')
+                         ));;
                trigger (StackPush args')).
       - (* Stack Pop *)
         apply (trigger StackPop).
@@ -1054,14 +1346,14 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
         apply (trigger E2.MemPop).
       - (* Alloca *)
         apply (ptr <- trigger (E2.Alloca t num_elements align);;
-               ret (DVCrev.dvalue_convert ptr)).
+               lift_OOM (rev_dvalue_convert ptr)).
       - (* Load *)
-        apply (let a' := dvalue_convert a in
+        apply (a' <- lift_OOM (dvalue_convert a);;
                uv <- trigger (E2.Load t a');;
-               ret (DVCrev.uvalue_convert uv)).
+               lift_OOM (rev_uvalue_convert uv)).
       - (* Store *)
-        apply (let a' := dvalue_convert a in
-               let v' := uvalue_convert v in
+        apply (a' <- lift_OOM (dvalue_convert a);;
+               v' <- lift_OOM (uvalue_convert v);;
                trigger (E2.Store t a' v')).
     }
 
@@ -1069,11 +1361,11 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
     { (* TODO: confirm whether this is sane... *)
       inversion e0.
       subst.
-      refine (let x' := uvalue_convert x in
+      refine (x' <- lift_OOM (uvalue_convert x);;
               dv <- trigger (E2.pick Pre x');;
               _).
       destruct dv as [res _].
-      apply (let res' := DVCrev.dvalue_convert res in
+      apply (res' <- lift_OOM (rev_dvalue_convert res);;
              ret (exist (fun x => True) res' I)).
     }
 
@@ -1098,7 +1390,12 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
     }
   Defined.
 
-  Definition L2_convert : Handler E1.L2 E2.L2.
+  Definition L2_convert_helper
+    (dvalue_convert : DV1.dvalue -> OOM DV2.dvalue)
+    (uvalue_convert : DV1.uvalue -> OOM DV2.uvalue)
+    (rev_dvalue_convert : DV2.dvalue -> OOM DV1.dvalue)
+    (rev_uvalue_convert : DV2.uvalue -> OOM DV1.uvalue)
+    : Handler E1.L2 E2.L2.
     refine (fun A e => _).
 
     refine (match e with
@@ -1121,20 +1418,20 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
             end).
 
     (* External Calls *)
-    { refine (let f' := uvalue_convert f in
-              let args' := map_In args (fun elt Hin => dvalue_convert elt) in
+    { refine (f' <- lift_OOM (uvalue_convert f);;
+              args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
               dv <- trigger (E2.ExternalCall dt f' args');;
               _).
 
       inversion e0.
-      apply (ret (DVCrev.dvalue_convert dv)).
+      apply (lift_OOM (rev_dvalue_convert dv)).
     }
 
     (* Intrinsics *)
     { inversion i; subst.
-      apply (let args' := map_In args (fun elt Hin => dvalue_convert elt) in
+      apply (args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
              dv <- trigger (E2.Intrinsic dt name args');;
-             ret (DVCrev.dvalue_convert dv)).
+             lift_OOM (rev_dvalue_convert dv)).
     }
 
     (* MemoryE *)
@@ -1145,14 +1442,14 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
         apply (trigger E2.MemPop).
       - (* Alloca *)
         apply (ptr <- trigger (E2.Alloca t num_elements align);;
-               ret (DVCrev.dvalue_convert ptr)).
+               lift_OOM (rev_dvalue_convert ptr)).
       - (* Load *)
-        apply (let a' := dvalue_convert a in
+        apply (a' <- lift_OOM (dvalue_convert a);;
                uv <- trigger (E2.Load t a');;
-               ret (DVCrev.uvalue_convert uv)).
+               lift_OOM (rev_uvalue_convert uv)).
       - (* Store *)
-        apply (let a' := dvalue_convert a in
-               let v' := uvalue_convert v in
+        apply (a' <- lift_OOM (dvalue_convert a);;
+               v' <- lift_OOM (uvalue_convert v);;
                trigger (E2.Store t a' v')).
     }
 
@@ -1160,11 +1457,11 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
     { (* TODO: confirm whether this is sane... *)
       inversion e0.
       subst.
-      refine (let x' := uvalue_convert x in
+      refine (x' <- lift_OOM (uvalue_convert x);;
               dv <- trigger (E2.pick Pre x');;
               _).
       destruct dv as [res _].
-      apply (let res' := DVCrev.dvalue_convert res in
+      apply (res' <- lift_OOM (rev_dvalue_convert res);;
              ret (exist (fun x => True) res' I)).
     }
 
@@ -1189,7 +1486,12 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
     }
   Defined.
 
-  Definition L3_convert : Handler E1.L3 E2.L3.
+  Definition L3_convert_helper
+    (dvalue_convert : DV1.dvalue -> OOM DV2.dvalue)
+    (uvalue_convert : DV1.uvalue -> OOM DV2.uvalue)
+    (rev_dvalue_convert : DV2.dvalue -> OOM DV1.dvalue)
+    (rev_uvalue_convert : DV2.uvalue -> OOM DV1.uvalue)
+    : Handler E1.L3 E2.L3.
     refine (fun A e => _).
 
     refine (match e with
@@ -1208,24 +1510,24 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
             end).
 
     (* External Calls *)
-    { refine (let f' := uvalue_convert f in
-              let args' := map_In args (fun elt Hin => dvalue_convert elt) in
+    { refine (f' <- lift_OOM (uvalue_convert f);;
+              args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
               dv <- trigger (E2.ExternalCall dt f' args');;
               _).
 
       inversion e0.
-      apply (ret (DVCrev.dvalue_convert dv)).
+      apply (lift_OOM (rev_dvalue_convert dv)).
     }
 
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
       inversion e0.
       subst.
-      refine (let x' := uvalue_convert x in
+      refine (x' <- lift_OOM (uvalue_convert x);;
               dv <- trigger (E2.pick Pre x');;
               _).
       destruct dv as [res _].
-      apply (let res' := DVCrev.dvalue_convert res in
+      apply (res' <- lift_OOM (rev_dvalue_convert res);;
              ret (exist (fun x => True) res' I)).
     }
 
@@ -1250,7 +1552,12 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
     }
   Defined.
 
-  Definition L4_convert : Handler E1.L4 E2.L4.
+  Definition L4_convert_helper
+    (dvalue_convert : DV1.dvalue -> OOM DV2.dvalue)
+    (uvalue_convert : DV1.uvalue -> OOM DV2.uvalue)
+    (rev_dvalue_convert : DV2.dvalue -> OOM DV1.dvalue)
+    (rev_uvalue_convert : DV2.uvalue -> OOM DV1.uvalue)
+    : Handler E1.L4 E2.L4.
     refine (fun A e => _).
 
     refine (match e with
@@ -1267,13 +1574,14 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
             end).
 
     (* External Calls *)
-    refine (let f' := uvalue_convert f in
-            let args' := map_In args (fun elt Hin => dvalue_convert elt) in
-            dv <- trigger (E2.ExternalCall dt f' args');;
-            _).
+    { refine (f' <- lift_OOM (uvalue_convert f);;
+              args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+              dv <- trigger (E2.ExternalCall dt f' args');;
+              _).
 
-    inversion e0.
-    apply (ret (DVCrev.dvalue_convert dv)).
+      inversion e0.
+      apply (lift_OOM (rev_dvalue_convert dv)).
+    }
 
     (* OOME *)
     { inversion e0.
@@ -1296,9 +1604,35 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
     }
   Defined.
 
-  Definition L5_convert : Handler E1.L5 E2.L5 := L4_convert.
+  Definition L5_convert_helper
+    (dvalue_convert : DV1.dvalue -> OOM DV2.dvalue)
+    (uvalue_convert : DV1.uvalue -> OOM DV2.uvalue)
+    (rev_dvalue_convert : DV2.dvalue -> OOM DV1.dvalue)
+    (rev_uvalue_convert : DV2.uvalue -> OOM DV1.uvalue)
+    : Handler E1.L5 E2.L5 := L4_convert_helper dvalue_convert uvalue_convert rev_dvalue_convert rev_uvalue_convert.
 
-  Definition L6_convert : Handler E1.L6 E2.L6 := L4_convert.
+  Definition L6_convert_helper
+    (dvalue_convert : DV1.dvalue -> OOM DV2.dvalue)
+    (uvalue_convert : DV1.uvalue -> OOM DV2.uvalue)
+    (rev_dvalue_convert : DV2.dvalue -> OOM DV1.dvalue)
+    (rev_uvalue_convert : DV2.uvalue -> OOM DV1.uvalue)
+    : Handler E1.L6 E2.L6 := L5_convert_helper dvalue_convert uvalue_convert rev_dvalue_convert rev_uvalue_convert.
+
+  Definition L0_convert_lazy : Handler E1.L0 E2.L0 := L0_convert_helper (ret ∘ dvalue_convert_lazy) (ret ∘ uvalue_convert_lazy) (ret ∘ DVCrev.dvalue_convert_lazy) (ret ∘ DVCrev.uvalue_convert_lazy).
+  Definition L1_convert_lazy : Handler E1.L1 E2.L1 := L1_convert_helper (ret ∘ dvalue_convert_lazy) (ret ∘ uvalue_convert_lazy) (ret ∘ DVCrev.dvalue_convert_lazy) (ret ∘ DVCrev.uvalue_convert_lazy).
+  Definition L2_convert_lazy : Handler E1.L2 E2.L2 := L2_convert_helper (ret ∘ dvalue_convert_lazy) (ret ∘ uvalue_convert_lazy) (ret ∘ DVCrev.dvalue_convert_lazy) (ret ∘ DVCrev.uvalue_convert_lazy).
+  Definition L3_convert_lazy : Handler E1.L3 E2.L3 := L3_convert_helper (ret ∘ dvalue_convert_lazy) (ret ∘ uvalue_convert_lazy) (ret ∘ DVCrev.dvalue_convert_lazy) (ret ∘ DVCrev.uvalue_convert_lazy).
+  Definition L4_convert_lazy : Handler E1.L4 E2.L4 := L4_convert_helper (ret ∘ dvalue_convert_lazy) (ret ∘ uvalue_convert_lazy) (ret ∘ DVCrev.dvalue_convert_lazy) (ret ∘ DVCrev.uvalue_convert_lazy).
+  Definition L5_convert_lazy : Handler E1.L5 E2.L5 := L5_convert_helper (ret ∘ dvalue_convert_lazy) (ret ∘ uvalue_convert_lazy) (ret ∘ DVCrev.dvalue_convert_lazy) (ret ∘ DVCrev.uvalue_convert_lazy).
+  Definition L6_convert_lazy : Handler E1.L6 E2.L6 := L6_convert_helper (ret ∘ dvalue_convert_lazy) (ret ∘ uvalue_convert_lazy) (ret ∘ DVCrev.dvalue_convert_lazy) (ret ∘ DVCrev.uvalue_convert_lazy).
+
+  Definition L0_convert_strict : Handler E1.L0 E2.L0 := L0_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict DVCrev.uvalue_convert_strict.
+  Definition L1_convert_strict : Handler E1.L1 E2.L1 := L1_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict DVCrev.uvalue_convert_strict.
+  Definition L2_convert_strict : Handler E1.L2 E2.L2 := L2_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict DVCrev.uvalue_convert_strict.
+  Definition L3_convert_strict : Handler E1.L3 E2.L3 := L3_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict DVCrev.uvalue_convert_strict.
+  Definition L4_convert_strict : Handler E1.L4 E2.L4 := L4_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict DVCrev.uvalue_convert_strict.
+  Definition L5_convert_strict : Handler E1.L5 E2.L5 := L5_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict DVCrev.uvalue_convert_strict.
+  Definition L6_convert_strict : Handler E1.L6 E2.L6 := L6_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict DVCrev.uvalue_convert_strict.
 End EventConvert.
 
 Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR).
@@ -6811,37 +7145,37 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Qed.
 
-  Lemma lift_err_uvalue_to_dvalue_rutt_converted' :
-    forall uv1 uv2,
-      uvalue_converted uv1 uv2 ->
-      rutt (sum_prerel call_converted event_converted)
-        (sum_postrel call_res_converted event_res_converted)
-        (fun (r1 : DV1.dvalue) (r2 : DV2.dvalue) =>
-           dvalue_converted r1 r2 /\ (forall t : dtyp, r2 <> DVALUE_Oom t))
-        (LLVMEvents.lift_err ret (IS1.LP.Events.DV.uvalue_to_dvalue uv1))
-        (LLVMEvents.lift_err ret (uvalue_to_dvalue uv2)).
-  Proof.
-    intros uv1 uv2 H.
+  (* Lemma lift_err_uvalue_to_dvalue_rutt_converted' : *)
+  (*   forall uv1 uv2, *)
+  (*     uvalue_converted uv1 uv2 -> *)
+  (*     rutt (sum_prerel call_converted event_converted) *)
+  (*       (sum_postrel call_res_converted event_res_converted) *)
+  (*       (fun (r1 : DV1.dvalue) (r2 : DV2.dvalue) => *)
+  (*          dvalue_converted r1 r2 /\ (forall t : dtyp, r2 <> DVALUE_Oom t)) *)
+  (*       (LLVMEvents.lift_err ret (IS1.LP.Events.DV.uvalue_to_dvalue uv1)) *)
+  (*       (LLVMEvents.lift_err ret (uvalue_to_dvalue uv2)). *)
+  (* Proof. *)
+  (*   intros uv1 uv2 H. *)
 
-    destruct (IS1.LP.Events.DV.uvalue_to_dvalue uv1) eqn:UV1.
-    { eapply uvalue_to_dvalue_fail_conversion in UV1; eauto.
-      destruct UV1 as [msg2 UV2].
-      rewrite UV2.
-      cbn.
+  (*   destruct (IS1.LP.Events.DV.uvalue_to_dvalue uv1) eqn:UV1. *)
+  (*   { eapply uvalue_to_dvalue_fail_conversion in UV1; eauto. *)
+  (*     destruct UV1 as [msg2 UV2]. *)
+  (*     rewrite UV2. *)
+  (*     cbn. *)
 
-      apply rutt_raise.
-      constructor; cbn; auto.
-    }
+  (*     apply rutt_raise. *)
+  (*     constructor; cbn; auto. *)
+  (*   } *)
 
-    { pose proof UV1 as UV2.
-      eapply uvalue_to_dvalue_dvalue_converted in UV2; eauto.
-      destruct UV2 as [dv2 [UV2 CONV2]].
-      rewrite UV2.
-      cbn.
-      apply rutt_Ret; eauto.
-      split; auto.
-    }
-  Qed.
+  (*   { pose proof UV1 as UV2. *)
+  (*     eapply uvalue_to_dvalue_dvalue_converted in UV2; eauto. *)
+  (*     destruct UV2 as [dv2 [UV2 CONV2]]. *)
+  (*     rewrite UV2. *)
+  (*     cbn. *)
+  (*     apply rutt_Ret; eauto. *)
+  (*     split; auto. *)
+  (*   } *)
+  (* Qed. *)
 
 
   (* TODO: Should go in the library *)
@@ -7215,7 +7549,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       cbn in PRE.
 
-      eapply rutt_bind with (RR:=(fun r1 r2 => dvalue_converted r1 r2 /\ forall t, r2 <> DVALUE_Oom t)).
+      eapply rutt_bind with (RR:=(fun r1 r2 => dvalue_converted r1 r2)).
       { (* This may be tricky... *)
         (* Hopefully follows from uvalue_convert f = NoOom f0 in PRE *)
         unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick.
