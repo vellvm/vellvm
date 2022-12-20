@@ -13,6 +13,7 @@ From ITree Require Import
   Core.Subevent
   Basics.HeterogeneousRelations
   Eq.Rutt
+  Eq.RuttFacts
   Props.Leaf.
 
 From Vellvm Require Import
@@ -487,3 +488,41 @@ Section OruttMrec.
   Qed.
 
 End OruttMrec.
+
+
+Lemma rutt_orutt {E1 E2 OOM OOME R1 R2 REv RAns RR} (t1 : itree E1 R1) (t2 : itree E2 R2) :
+  rutt REv RAns RR t1 t2 ->
+  (forall A (e2 : E2 A), {forall o : OOM A, e2 <> subevent _ o} + {exists o : OOM A, e2 = subevent _ o}) ->
+  @orutt E1 E2 OOM OOME R1 R2 REv RAns RR t1 t2.
+Proof.
+  intros Hrutt.
+  revert t1 t2 Hrutt; pcofix CIH; intros t1 t2 Hrutt DEC_OOM.
+  pstep. punfold Hrutt. red in Hrutt; red.
+  hinduction Hrutt before CIH; subst; try solve [constructor; auto]; intros DEC_OOM.
+  - specialize (CIH m1 m2).
+    constructor. pclearbot.
+    punfold H.
+    red in H.
+    right.
+    apply CIH.
+    pstep. red.
+    auto.
+    auto.
+  - pose proof DEC_OOM as DEC_OOM'.
+    specialize (DEC_OOM' _ e2).
+    destruct DEC_OOM' as [NO_OOM | YES_OOM].
+    { constructor; auto.
+      { intros a b H1.
+        specialize (H0 a b H1).
+        pclearbot.
+        right.
+        apply CIH.
+        auto.
+        auto.
+      }
+    }
+    { destruct YES_OOM as [o YES_OOM].
+      inv YES_OOM.
+      apply EqVisOOM.
+    }
+Qed.
