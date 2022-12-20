@@ -1801,26 +1801,33 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
     := fmap f (L6_convert_tree_lazy t).
 
   (* TODO: move this? *)
-  Definition L0_convert_tree_strict' {A B} (f : A -> B) (t : itree E1.L0 A) : itree E2.L0 B
-    := fmap f (L0_convert_tree_strict t).
+  Definition L0_convert_tree_strict' {A B} (f : A -> OOM B) (t : itree E1.L0 A) : itree E2.L0 B
+    := x <- L0_convert_tree_strict t;;
+       lift_OOM (f x).
 
-  Definition L1_convert_tree_strict' {A B} (f : A -> B) (t : itree E1.L1 A) : itree E2.L1 B
-    := fmap f (L1_convert_tree_strict t).
+  Definition L1_convert_tree_strict' {A B} (f : A -> OOM B) (t : itree E1.L1 A) : itree E2.L1 B
+    := x <- L1_convert_tree_strict t;;
+       lift_OOM (f x).
 
-  Definition L2_convert_tree_strict' {A B} (f : A -> B) (t : itree E1.L2 A) : itree E2.L2 B
-    := fmap f (L2_convert_tree_strict t).
+  Definition L2_convert_tree_strict' {A B} (f : A -> OOM B) (t : itree E1.L2 A) : itree E2.L2 B
+    := x <- L2_convert_tree_strict t;;
+       lift_OOM (f x).
 
-  Definition L3_convert_tree_strict' {A B} (f : A -> B) (t : itree E1.L3 A) : itree E2.L3 B
-    := fmap f (L3_convert_tree_strict t).
+  Definition L3_convert_tree_strict' {A B} (f : A -> OOM B) (t : itree E1.L3 A) : itree E2.L3 B
+    := x <- L3_convert_tree_strict t;;
+       lift_OOM (f x).
 
-  Definition L4_convert_tree_strict' {A B} (f : A -> B) (t : itree E1.L4 A) : itree E2.L4 B
-    := fmap f (L4_convert_tree_strict t).
+  Definition L4_convert_tree_strict' {A B} (f : A -> OOM B) (t : itree E1.L4 A) : itree E2.L4 B
+    := x <- L4_convert_tree_strict t;;
+       lift_OOM (f x).
 
-  Definition L5_convert_tree_strict' {A B} (f : A -> B) (t : itree E1.L5 A) : itree E2.L5 B
-    := fmap f (L5_convert_tree_strict t).
+  Definition L5_convert_tree_strict' {A B} (f : A -> OOM B) (t : itree E1.L5 A) : itree E2.L5 B
+    := x <- L5_convert_tree_strict t;;
+       lift_OOM (f x).
 
-  Definition L6_convert_tree_strict' {A B} (f : A -> B) (t : itree E1.L6 A) : itree E2.L6 B
-    := fmap f (L6_convert_tree_strict t).
+  Definition L6_convert_tree_strict' {A B} (f : A -> OOM B) (t : itree E1.L6 A) : itree E2.L6 B
+    := x <- L6_convert_tree_strict t;;
+       lift_OOM (f x).
 
   #[global] Instance L0_convert_tree_lazy'_eutt_proper {A B} {RA : relation A} {RB : relation B} f :
     (forall u1 u2, RA u1 u2 -> @eutt E2.L0 _ _ RB (ret (f u1)) (ret (f u2))) ->
@@ -1907,7 +1914,7 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
   Defined.
 
   #[global] Instance L0_convert_tree_strict'_eutt_proper {A B} {RA : relation A} {RB : relation B} f :
-    (forall u1 u2, RA u1 u2 -> @eutt E2.L0 _ _ RB (ret (f u1)) (ret (f u2))) ->
+    (forall u1 u2, RA u1 u2 -> @eutt E2.L0 _ _ RB (lift_OOM (f u1)) (lift_OOM (f u2))) ->
     Proper (eutt RA ==> eutt RB) (L0_convert_tree_strict' f).
   Proof.
     unfold Proper, respectful.
@@ -1919,7 +1926,7 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
   Defined.
 
   #[global] Instance L1_convert_tree_strict'_eutt_proper {A B} {RA : relation A} {RB : relation B} f :
-    (forall u1 u2, RA u1 u2 -> @eutt E2.L1 _ _ RB (ret (f u1)) (ret (f u2))) ->
+    (forall u1 u2, RA u1 u2 -> @eutt E2.L1 _ _ RB (lift_OOM (f u1)) (lift_OOM (f u2))) ->
     Proper (eutt RA ==> eutt RB) (L1_convert_tree_strict' f).
   Proof.
     unfold Proper, respectful.
@@ -1931,7 +1938,7 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
   Defined.
 
   #[global] Instance L2_convert_tree_strict'_eutt_proper {A B} {RA : relation A} {RB : relation B} f :
-    (forall u1 u2, RA u1 u2 -> @eutt E2.L2 _ _ RB (ret (f u1)) (ret (f u2))) ->
+    (forall u1 u2, RA u1 u2 -> @eutt E2.L2 _ _ RB (lift_OOM (f u1)) (lift_OOM (f u2))) ->
     Proper (eutt RA ==> eutt RB) (L2_convert_tree_strict' f).
   Proof.
     unfold Proper, respectful.
@@ -1943,7 +1950,7 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
   Defined.
 
   #[global] Instance L3_convert_tree_strict'_eutt_proper {A B} {RA : relation A} {RB : relation B} f :
-    (forall u1 u2, RA u1 u2 -> @eutt E2.L3 _ _ RB (ret (f u1)) (ret (f u2))) ->
+    (forall u1 u2, RA u1 u2 -> @eutt E2.L3 _ _ RB (lift_OOM (f u1)) (lift_OOM (f u2))) ->
     Proper (eutt RA ==> eutt RB) (L3_convert_tree_strict' f).
   Proof.
     unfold Proper, respectful.
@@ -1955,7 +1962,7 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
   Defined.
 
   #[global] Instance L4_convert_tree_strict'_eutt_proper {A B} {RA : relation A} {RB : relation B} f :
-    (forall u1 u2, RA u1 u2 -> @eutt E2.L4 _ _ RB (ret (f u1)) (ret (f u2))) ->
+    (forall u1 u2, RA u1 u2 -> @eutt E2.L4 _ _ RB (lift_OOM (f u1)) (lift_OOM (f u2))) ->
     Proper (eutt RA ==> eutt RB) (L4_convert_tree_strict' f).
   Proof.
     unfold Proper, respectful.
@@ -1967,7 +1974,7 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
   Defined.
 
   #[global] Instance L5_convert_tree_strict'_eutt_proper {A B} {RA : relation A} {RB : relation B} f :
-    (forall u1 u2, RA u1 u2 -> @eutt E2.L5 _ _ RB (ret (f u1)) (ret (f u2))) ->
+    (forall u1 u2, RA u1 u2 -> @eutt E2.L5 _ _ RB (lift_OOM (f u1)) (lift_OOM (f u2))) ->
     Proper (eutt RA ==> eutt RB) (L5_convert_tree_strict' f).
   Proof.
     unfold Proper, respectful.
@@ -1979,7 +1986,7 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
   Defined.
 
   #[global] Instance L6_convert_tree_strict'_eutt_proper {A B} {RA : relation A} {RB : relation B} f :
-    (forall u1 u2, RA u1 u2 -> @eutt E2.L6 _ _ RB (ret (f u1)) (ret (f u2))) ->
+    (forall u1 u2, RA u1 u2 -> @eutt E2.L6 _ _ RB (lift_OOM (f u1)) (lift_OOM (f u2))) ->
     Proper (eutt RA ==> eutt RB) (L6_convert_tree_strict' f).
   Proof.
     unfold Proper, respectful.
@@ -2028,14 +2035,14 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
     : PropT E2.L6 B
     := L4_convert_PropT_lazy RB f ts.
 
-  Definition L3_convert_PropT_strict {A B} (RB : relation B) (f : A -> B) (ts : PropT E1.L3 A) : PropT E2.L3 B
+  Definition L3_convert_PropT_strict {A B} (RB : relation B) (f : A -> OOM B) (ts : PropT E1.L3 A) : PropT E2.L3 B
     := fun t_e2 => exists t_e1,
            ts t_e1 /\
              refine_OOM_h RB
                (L3_convert_tree_strict' f t_e1)
                t_e2.
 
-  Definition L4_convert_PropT_strict {A B} (RB : relation B) (f : A -> B) (ts : PropT IS1.LP.Events.L4 A) : PropT E2.L4 B
+  Definition L4_convert_PropT_strict {A B} (RB : relation B) (f : A -> OOM B) (ts : PropT IS1.LP.Events.L4 A) : PropT E2.L4 B
     := fun t_e2 => exists t_e1,
            ts t_e1 /\
              refine_OOM_h RB
@@ -2043,15 +2050,14 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
                t_e2.
 
   Definition L5_convert_PropT_strict {A B}
-    (RB : relation B) (f : A -> B) (ts : PropT IS1.LP.Events.L5 A)
+    (RB : relation B) (f : A -> OOM B) (ts : PropT IS1.LP.Events.L5 A)
     : PropT E2.L5 B
     := L4_convert_PropT_strict RB f ts.
 
   Definition L6_convert_PropT_strict {A B}
-    (RB : relation B) (f : A -> B) (ts : PropT IS1.LP.Events.L6 A)
+    (RB : relation B) (f : A -> OOM B) (ts : PropT IS1.LP.Events.L6 A)
     : PropT E2.L6 B
     := L4_convert_PropT_strict RB f ts.
-
 
 End TreeConvert.
 
@@ -2065,14 +2071,25 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   (**  Converting state between the two languages *)
 
-  Definition convert_global_env (g : IS1.LLVM.Global.global_env) : IS2.LLVM.Global.global_env
-    := map (fun '(k, dv) => (k, dvalue_convert dv)) g.
+  Definition convert_global_env_lazy (g : IS1.LLVM.Global.global_env) : IS2.LLVM.Global.global_env
+    := map (fun '(k, dv) => (k, dvalue_convert_lazy dv)) g.
 
-  Definition convert_local_env (l : IS1.LLVM.Local.local_env) : IS2.LLVM.Local.local_env
-    := map (fun '(k, uv) => (k, uvalue_convert uv)) l.
+  Definition convert_local_env_lazy (l : IS1.LLVM.Local.local_env) : IS2.LLVM.Local.local_env
+    := map (fun '(k, uv) => (k, uvalue_convert_lazy uv)) l.
 
-  Definition convert_stack (s : @stack IS1.LLVM.Local.local_env) : (@stack IS2.LLVM.Local.local_env)
-    := map convert_local_env s.
+  Definition convert_global_env_strict (g : IS1.LLVM.Global.global_env) : OOM IS2.LLVM.Global.global_env
+    := map_monad (fun '(k, dv) => dv' <- dvalue_convert_strict dv;;
+                               ret (k, dv')) g.
+
+  Definition convert_local_env_strict (l : IS1.LLVM.Local.local_env) : OOM IS2.LLVM.Local.local_env
+    := map_monad (fun '(k, uv) => uv' <- uvalue_convert_strict uv;;
+                               ret (k, uv')) l.
+
+  Definition convert_stack_lazy (s : @stack IS1.LLVM.Local.local_env) : (@stack IS2.LLVM.Local.local_env)
+    := map convert_local_env_lazy s.
+
+  Definition convert_stack_strict (s : @stack IS1.LLVM.Local.local_env) : OOM (@stack IS2.LLVM.Local.local_env)
+    := map_monad convert_local_env_strict s.
 
   (** Conversions between results at different levels of interpretation *)
 
@@ -2081,73 +2098,142 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
      these because the refine_resX relations used by refine_LX ignores
      these.
    *)
-  Definition res_L1_convert_unsafe (res : LLVM1.res_L1) : LLVM2.res_L1
+  Definition res_L1_convert_lazy_unsafe (res : LLVM1.res_L1) : LLVM2.res_L1
     := match res with
        | (genv, dv) =>
-           ([], dvalue_convert dv)
+           ([], dvalue_convert_lazy dv)
        end.
 
-  Definition res_L2_convert_unsafe (res : LLVM1.res_L2) : LLVM2.res_L2
+  Definition res_L2_convert_lazy_unsafe (res : LLVM1.res_L2) : LLVM2.res_L2
     := match res with
        | ((lenv, lstack), (genv, dv)) =>
-           (([], []), ([], dvalue_convert dv))
+           (([], []), ([], dvalue_convert_lazy dv))
        end.
 
-  Definition res_L3_convert_unsafe (res : LLVM1.res_L3) : LLVM2.res_L3
+  Definition res_L3_convert_lazy_unsafe (res : LLVM1.res_L3) : LLVM2.res_L3
     := match res with
        | (ms, (sid, ((lenv, lstack), (genv, dv)))) =>
-           (IS2.MEM.MMEP.MMSP.initial_memory_state, (0, (([], []), ([], dvalue_convert dv))))
+           (IS2.MEM.MMEP.MMSP.initial_memory_state, (0, (([], []), ([], dvalue_convert_lazy dv))))
        end.
 
-  Definition res_L4_convert_unsafe (res : LLVM1.res_L4) : LLVM2.res_L4
-    := res_L3_convert_unsafe res.
+  Definition res_L4_convert_lazy_unsafe (res : LLVM1.res_L4) : LLVM2.res_L4
+    := res_L3_convert_lazy_unsafe res.
 
-  Definition res_L5_convert_unsafe (res : LLVM1.res_L5) : LLVM2.res_L5
-    := res_L4_convert_unsafe res.
+  Definition res_L5_convert_lazy_unsafe (res : LLVM1.res_L5) : LLVM2.res_L5
+    := res_L4_convert_lazy_unsafe res.
 
-  Definition res_L6_convert_unsafe (res : LLVM1.res_L6) : LLVM2.res_L6
-    := res_L5_convert_unsafe res.
+  Definition res_L6_convert_lazy_unsafe (res : LLVM1.res_L6) : LLVM2.res_L6
+    := res_L5_convert_lazy_unsafe res.
+
+  Definition res_L1_convert_strict_unsafe (res : LLVM1.res_L1) : OOM LLVM2.res_L1
+    := match res with
+       | (genv, dv) =>
+           dv' <- dvalue_convert_strict dv;;
+           ret ([], dv')
+       end.
+
+  Definition res_L2_convert_strict_unsafe (res : LLVM1.res_L2) : OOM LLVM2.res_L2
+    := match res with
+       | ((lenv, lstack), (genv, dv)) =>
+           dv' <- dvalue_convert_strict dv;;
+           ret (([], []), ([], dv'))
+       end.
+
+  Definition res_L3_convert_strict_unsafe (res : LLVM1.res_L3) : OOM LLVM2.res_L3
+    := match res with
+       | (ms, (sid, ((lenv, lstack), (genv, dv)))) =>
+           dv' <- dvalue_convert_strict dv;;
+           ret (IS2.MEM.MMEP.MMSP.initial_memory_state, (0, (([], []), ([], dv'))))
+       end.
+
+  Definition res_L4_convert_strict_unsafe (res : LLVM1.res_L4) : OOM LLVM2.res_L4
+    := res_L3_convert_strict_unsafe res.
+
+  Definition res_L5_convert_strict_unsafe (res : LLVM1.res_L5) : OOM LLVM2.res_L5
+    := res_L4_convert_strict_unsafe res.
+
+  Definition res_L6_convert_strict_unsafe (res : LLVM1.res_L6) : OOM LLVM2.res_L6
+    := res_L5_convert_strict_unsafe res.
 
   (** Refinements between languages at different levels of interpretation *)
 
-  Definition refine_E1E2_L0 (src : itree E1.L0 E1.DV.dvalue) (tgt : itree E2.L0 E2.DV.dvalue) : Prop
+  Definition refine_E1E2_L0_lazy (src : itree E1.L0 E1.DV.dvalue) (tgt : itree E2.L0 E2.DV.dvalue) : Prop
     := exists src',
       (* Need to allow for target to have more OOM than source *)
       refine_OOM_h eq src src' /\
-        refine_L0 (L0_convert_tree' dvalue_convert src') tgt.
+        refine_L0 (L0_convert_tree_lazy' dvalue_convert_lazy src') tgt.
 
-  Definition refine_E1E2_L1 (src : itree E1.L1 LLVM1.res_L1) (tgt : itree E2.L1 LLVM2.res_L1) : Prop
+  Definition refine_E1E2_L1_lazy (src : itree E1.L1 LLVM1.res_L1) (tgt : itree E2.L1 LLVM2.res_L1) : Prop
     := exists src',
       (* Need to allow for target to have more OOM than source *)
       refine_OOM_h eq src src' /\
-        refine_L1 (L1_convert_tree' res_L1_convert_unsafe src) tgt.
+        refine_L1 (L1_convert_tree_lazy' res_L1_convert_lazy_unsafe src) tgt.
 
-  Definition refine_E1E2_L2 (src : itree E1.L2 LLVM1.res_L2) (tgt : itree E2.L2 LLVM2.res_L2) : Prop
+  Definition refine_E1E2_L2_lazy (src : itree E1.L2 LLVM1.res_L2) (tgt : itree E2.L2 LLVM2.res_L2) : Prop
     := exists src',
       (* Need to allow for target to have more OOM than source *)
       refine_OOM_h eq src src' /\
-        refine_L2 (L2_convert_tree' res_L2_convert_unsafe src) tgt.
+        refine_L2 (L2_convert_tree_lazy' res_L2_convert_lazy_unsafe src) tgt.
 
-  Definition refine_E1E2_L3 (srcs : PropT IS1.LP.Events.L3 LLVM1.res_L3) (tgts : PropT E2.L3 LLVM2.res_L3) : Prop
-    := (* res_L3_convert_unsafe should be fine here because refine_L3
+  Definition refine_E1E2_L3_lazy (srcs : PropT IS1.LP.Events.L3 LLVM1.res_L3) (tgts : PropT E2.L3 LLVM2.res_L3) : Prop
+    := (* res_L3_convert_lazy_unsafe should be fine here because refine_L3
           ignores all of the placeholder values *)
-    refine_L3 (L3_convert_PropT refine_res3 res_L3_convert_unsafe (refine_OOM eq srcs)) tgts.
+    refine_L3 (L3_convert_PropT_lazy refine_res3 res_L3_convert_lazy_unsafe (refine_OOM eq srcs)) tgts.
 
-  Definition refine_E1E2_L4 (srcs : PropT IS1.LP.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop
-    := (* res_L4_convert_unsafe should be fine here because refine_L4
+  Definition refine_E1E2_L4_lazy (srcs : PropT IS1.LP.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop
+    := (* res_L4_convert_lazy_unsafe should be fine here because refine_L4
           ignores all of the placeholder values *)
-    refine_L4 (L4_convert_PropT refine_res3 res_L4_convert_unsafe (refine_OOM eq srcs)) tgts.
+    refine_L4 (L4_convert_PropT_lazy refine_res3 res_L4_convert_lazy_unsafe (refine_OOM eq srcs)) tgts.
 
-  Definition refine_E1E2_L5 (srcs : PropT IS1.LP.Events.L5 LLVM1.res_L5) (tgts : PropT E2.L5 LLVM2.res_L5) : Prop
-    := (* res_L5_convert_unsafe should be fine here because refine_L5
+  Definition refine_E1E2_L5_lazy (srcs : PropT IS1.LP.Events.L5 LLVM1.res_L5) (tgts : PropT E2.L5 LLVM2.res_L5) : Prop
+    := (* res_L5_convert_lazy_unsafe should be fine here because refine_L5
           ignores all of the placeholder values *)
-    refine_L5 (L5_convert_PropT refine_res3 res_L5_convert_unsafe (refine_OOM eq srcs)) tgts.
+    refine_L5 (L5_convert_PropT_lazy refine_res3 res_L5_convert_lazy_unsafe (refine_OOM eq srcs)) tgts.
 
-  Definition refine_E1E2_L6 (srcs : PropT IS1.LP.Events.L6 LLVM1.res_L6) (tgts : PropT E2.L6 LLVM2.res_L6) : Prop
+  Definition refine_E1E2_L6_lazy (srcs : PropT IS1.LP.Events.L6 LLVM1.res_L6) (tgts : PropT E2.L6 LLVM2.res_L6) : Prop
     :=
-    (* res_L4_convert_unsafe should be fine here because refine_L6
+    (* res_L4_convert_lazy_unsafe should be fine here because refine_L6
        ignores all of the placeholder values *)
-    refine_L6 (L6_convert_PropT refine_res3 res_L6_convert_unsafe srcs) tgts.
+    refine_L6 (L6_convert_PropT_lazy refine_res3 res_L6_convert_lazy_unsafe srcs) tgts.
+
+  Definition refine_E1E2_L0_strict (src : itree E1.L0 E1.DV.dvalue) (tgt : itree E2.L0 E2.DV.dvalue) : Prop
+    := exists src',
+      (* Need to allow for target to have more OOM than source *)
+      refine_OOM_h eq src src' /\
+        refine_L0 (L0_convert_tree_strict' dvalue_convert_strict src') tgt.
+
+  Definition refine_E1E2_L1_strict (src : itree E1.L1 LLVM1.res_L1) (tgt : itree E2.L1 LLVM2.res_L1) : Prop
+    := exists src',
+      (* Need to allow for target to have more OOM than source *)
+      refine_OOM_h eq src src' /\
+        refine_L1 (L1_convert_tree_strict' res_L1_convert_strict_unsafe src) tgt.
+
+  Definition refine_E1E2_L2_strict (src : itree E1.L2 LLVM1.res_L2) (tgt : itree E2.L2 LLVM2.res_L2) : Prop
+    := exists src',
+      (* Need to allow for target to have more OOM than source *)
+      refine_OOM_h eq src src' /\
+        refine_L2 (L2_convert_tree_strict' res_L2_convert_strict_unsafe src) tgt.
+
+  Definition refine_E1E2_L3_strict (srcs : PropT IS1.LP.Events.L3 LLVM1.res_L3) (tgts : PropT E2.L3 LLVM2.res_L3) : Prop
+    := (* res_L3_convert_strict_unsafe should be fine here because refine_L3
+          ignores all of the placeholder values *)
+    refine_L3 (L3_convert_PropT_strict refine_res3 res_L3_convert_strict_unsafe (refine_OOM eq srcs)) tgts.
+
+  Definition refine_E1E2_L4_strict (srcs : PropT IS1.LP.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop
+    := (* res_L4_convert_strict_unsafe should be fine here because refine_L4
+          ignores all of the placeholder values *)
+    refine_L4 (L4_convert_PropT_strict refine_res3 res_L4_convert_strict_unsafe (refine_OOM eq srcs)) tgts.
+
+  Definition refine_E1E2_L5_strict (srcs : PropT IS1.LP.Events.L5 LLVM1.res_L5) (tgts : PropT E2.L5 LLVM2.res_L5) : Prop
+    := (* res_L5_convert_strict_unsafe should be fine here because refine_L5
+          ignores all of the placeholder values *)
+    refine_L5 (L5_convert_PropT_strict refine_res3 res_L5_convert_strict_unsafe (refine_OOM eq srcs)) tgts.
+
+  Definition refine_E1E2_L6_strict (srcs : PropT IS1.LP.Events.L6 LLVM1.res_L6) (tgts : PropT E2.L6 LLVM2.res_L6) : Prop
+    :=
+    (* res_L4_convert_strict_unsafe should be fine here because refine_L6
+       ignores all of the placeholder values *)
+    refine_L6 (L6_convert_PropT_strict refine_res3 res_L6_convert_strict_unsafe srcs) tgts.
 
   (** Refinement between states *)
 
@@ -2421,49 +2507,94 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
      Presumably if [g1] OOMs when converted, we wouldn't have a [g2]
      anyway?
    *)
-  Definition global_refine (g1 : IS1.LLVM.Global.global_env) (g2 : IS2.LLVM.Global.global_env) : Prop
-    := alist_refine dvalue_refine g1 g2.
+  Definition global_refine_lazy (g1 : IS1.LLVM.Global.global_env) (g2 : IS2.LLVM.Global.global_env) : Prop
+    := alist_refine dvalue_refine_lazy g1 g2.
 
-  Lemma global_refine_empty :
-    global_refine [] [].
+  Lemma global_refine_lazy_empty :
+    global_refine_lazy [] [].
   Proof.
     apply alist_refine_empty.
   Qed.
 
-  Definition local_refine (l1 : IS1.LLVM.Local.local_env) (l2 : IS2.LLVM.Local.local_env) : Prop
-    := alist_refine uvalue_refine l1 l2.
+  Definition global_refine_strict (g1 : IS1.LLVM.Global.global_env) (g2 : IS2.LLVM.Global.global_env) : Prop
+    := alist_refine dvalue_refine_strict g1 g2.
 
-  Lemma local_refine_empty :
-    local_refine [] [].
+  Lemma global_refine_strict_empty :
+    global_refine_strict [] [].
   Proof.
     apply alist_refine_empty.
   Qed.
 
-  Definition stack_refine (s1 : @stack IS1.LLVM.Local.local_env) (s2 : @stack IS2.LLVM.Local.local_env) : Prop
-    := Forall2 local_refine s1 s2.
+  Definition local_refine_lazy (l1 : IS1.LLVM.Local.local_env) (l2 : IS2.LLVM.Local.local_env) : Prop
+    := alist_refine uvalue_refine_lazy l1 l2.
 
-  Lemma stack_refine_empty :
-    stack_refine [] [].
+  Lemma local_refine_lazy_empty :
+    local_refine_lazy [] [].
+  Proof.
+    apply alist_refine_empty.
+  Qed.
+
+  Definition local_refine_strict (l1 : IS1.LLVM.Local.local_env) (l2 : IS2.LLVM.Local.local_env) : Prop
+    := alist_refine uvalue_refine_strict l1 l2.
+
+  Lemma local_refine_strict_empty :
+    local_refine_strict [] [].
+  Proof.
+    apply alist_refine_empty.
+  Qed.
+
+  Definition stack_refine_lazy (s1 : @stack IS1.LLVM.Local.local_env) (s2 : @stack IS2.LLVM.Local.local_env) : Prop
+    := Forall2 local_refine_lazy s1 s2.
+
+  Lemma stack_refine_lazy_empty :
+    stack_refine_lazy [] [].
   Proof.
     constructor.
   Qed.
 
-  Definition local_stack_refine
+  Definition stack_refine_strict (s1 : @stack IS1.LLVM.Local.local_env) (s2 : @stack IS2.LLVM.Local.local_env) : Prop
+    := Forall2 local_refine_strict s1 s2.
+
+  Lemma stack_refine_strict_empty :
+    stack_refine_strict [] [].
+  Proof.
+    constructor.
+  Qed.
+
+  Definition local_stack_refine_lazy
     (ls1 : (IS1.LLVM.Local.local_env * @stack IS1.LLVM.Local.local_env)%type)
     (ls2 : (IS2.LLVM.Local.local_env * @stack IS2.LLVM.Local.local_env)%type)
     : Prop :=
     match ls1, ls2 with
     | (l1, s1), (l2, s2) =>
-        local_refine l1 l2 /\ stack_refine s1 s2
+        local_refine_lazy l1 l2 /\ stack_refine_lazy s1 s2
     end.
 
-  Lemma local_stack_refine_empty :
-    local_stack_refine ([], []) ([], []).
+  Lemma local_stack_refine_lazy_empty :
+    local_stack_refine_lazy ([], []) ([], []).
   Proof.
     cbn.
     split.
-    apply local_refine_empty.
-    apply stack_refine_empty.
+    apply local_refine_lazy_empty.
+    apply stack_refine_lazy_empty.
+  Qed.
+
+  Definition local_stack_refine_strict
+    (ls1 : (IS1.LLVM.Local.local_env * @stack IS1.LLVM.Local.local_env)%type)
+    (ls2 : (IS2.LLVM.Local.local_env * @stack IS2.LLVM.Local.local_env)%type)
+    : Prop :=
+    match ls1, ls2 with
+    | (l1, s1), (l2, s2) =>
+        local_refine_strict l1 l2 /\ stack_refine_strict s1 s2
+    end.
+
+  Lemma local_stack_refine_strict_empty :
+    local_stack_refine_strict ([], []) ([], []).
+  Proof.
+    cbn.
+    split.
+    apply local_refine_strict_empty.
+    apply stack_refine_strict_empty.
   Qed.
 
   (** OOM Refinements *)
@@ -2794,415 +2925,422 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (*   (*             all : inv x. *) *)
   (* Admitted. *)
 
-  Lemma refine_OOM_h_L1_convert_tree :
-    forall {T} x_inf y_inf (RR : relation T),
-      refine_OOM_h RR x_inf y_inf ->
-      refine_OOM_h RR (L1_convert_tree x_inf) (L1_convert_tree y_inf).
-  Proof.
-  Admitted.
+  (* Lemma refine_OOM_h_L1_convert_tree : *)
+  (*   forall {T} x_inf y_inf (RR : relation T), *)
+  (*     refine_OOM_h RR x_inf y_inf -> *)
+  (*     refine_OOM_h RR (L1_convert_tree x_inf) (L1_convert_tree y_inf). *)
+  (* Proof. *)
+  (* Admitted. *)
 
-  Lemma refine_OOM_h_L2_convert_tree :
-    forall {T} x_inf y_inf (RR : relation T),
-      refine_OOM_h RR x_inf y_inf ->
-      refine_OOM_h RR (L2_convert_tree x_inf) (L2_convert_tree y_inf).
-  Proof.
-  Admitted.
+  (* Lemma refine_OOM_h_L2_convert_tree : *)
+  (*   forall {T} x_inf y_inf (RR : relation T), *)
+  (*     refine_OOM_h RR x_inf y_inf -> *)
+  (*     refine_OOM_h RR (L2_convert_tree x_inf) (L2_convert_tree y_inf). *)
+  (* Proof. *)
+  (* Admitted. *)
 
-  Lemma refine_OOM_h_L3_convert_tree :
-    forall {T} x_inf y_inf (RR : relation T),
-      refine_OOM_h RR x_inf y_inf ->
-      refine_OOM_h RR (L3_convert_tree x_inf) (L3_convert_tree y_inf).
-  Proof.
-    (* intros T. *)
+  (* Lemma refine_OOM_h_L3_convert_tree : *)
+  (*   forall {T} x_inf y_inf (RR : relation T), *)
+  (*     refine_OOM_h RR x_inf y_inf -> *)
+  (*     refine_OOM_h RR (L3_convert_tree x_inf) (L3_convert_tree y_inf). *)
+  (* Proof. *)
+  (*   (* intros T. *) *)
 
-    (* unfold refine_OOM_h, L3_convert_tree, refine_OOM_h_flip. *)
-    (* intros. *)
-    (* rewrite (unfold_interp y_inf). *)
-    (* rewrite (unfold_interp x_inf). *)
-    (* cbn. *)
+  (*   (* unfold refine_OOM_h, L3_convert_tree, refine_OOM_h_flip. *) *)
+  (*   (* intros. *) *)
+  (*   (* rewrite (unfold_interp y_inf). *) *)
+  (*   (* rewrite (unfold_interp x_inf). *) *)
+  (*   (* cbn. *) *)
 
-    (* match goal with *)
-    (* | |- interp_prop _ _ ?l ?r => remember l as i; remember r as i0 *)
-    (* end. *)
+  (*   (* match goal with *) *)
+  (*   (* | |- interp_prop _ _ ?l ?r => remember l as i; remember r as i0 *) *)
+  (*   (* end. *) *)
 
-    (* assert (i ≅ _interp EC.L3_convert (observe y_inf)). { *)
-    (*   rewrite Heqi. reflexivity. *)
-    (* } clear Heqi. *)
-    (* remember (_interp EC.L3_convert (observe x_inf)). *)
-    (* assert (i0 ≅ _interp EC.L3_convert (observe x_inf)). { *)
-    (*   subst; reflexivity. *)
-    (* } clear Heqi1 Heqi0. *)
-    (* revert x_inf y_inf H i i0 H0 H1. *)
+  (*   (* assert (i ≅ _interp EC.L3_convert (observe y_inf)). { *) *)
+  (*   (*   rewrite Heqi. reflexivity. *) *)
+  (*   (* } clear Heqi. *) *)
+  (*   (* remember (_interp EC.L3_convert (observe x_inf)). *) *)
+  (*   (* assert (i0 ≅ _interp EC.L3_convert (observe x_inf)). { *) *)
+  (*   (*   subst; reflexivity. *) *)
+  (*   (* } clear Heqi1 Heqi0. *) *)
+  (*   (* revert x_inf y_inf H i i0 H0 H1. *) *)
 
-    (* pcofix CIH. *)
+  (*   (* pcofix CIH. *) *)
 
-    (* intros * H. *)
-    (* punfold H; red in H. *)
-    (* remember (observe y_inf) as oy; remember (observe x_inf) as ox. *)
-    (* clear Heqoy Heqox. *)
+  (*   (* intros * H. *) *)
+  (*   (* punfold H; red in H. *) *)
+  (*   (* remember (observe y_inf) as oy; remember (observe x_inf) as ox. *) *)
+  (*   (* clear Heqoy Heqox. *) *)
 
-    (* induction H; pclearbot; intros; subst; auto. *)
-    (* - pstep. cbn in H1, H2. *)
-    (*   rewrite itree_eta in H1, H2. *)
-    (*   red. *)
-    (*   destruct (observe i) eqn: Heqi; destruct (observe i0) eqn: Heqi0; *)
-    (*     try apply eqit_inv in H1; try apply eqit_inv in H2; cbn in H1, H2; try contradiction; auto. *)
-    (*   subst; constructor; auto. *)
-    (* - pstep. cbn in H1, H2. *)
-    (*   rewrite itree_eta in H1, H2. *)
-    (*   red. *)
-    (*   destruct (observe i) eqn: Heqi; destruct (observe i0) eqn: Heqi0; *)
-    (*     try apply eqit_inv in H1; try apply eqit_inv in H2; cbn in H1, H2; try contradiction; auto. *)
-    (*   subst; constructor; auto. *)
+  (*   (* induction H; pclearbot; intros; subst; auto. *) *)
+  (*   (* - pstep. cbn in H1, H2. *) *)
+  (*   (*   rewrite itree_eta in H1, H2. *) *)
+  (*   (*   red. *) *)
+  (*   (*   destruct (observe i) eqn: Heqi; destruct (observe i0) eqn: Heqi0; *) *)
+  (*   (*     try apply eqit_inv in H1; try apply eqit_inv in H2; cbn in H1, H2; try contradiction; auto. *) *)
+  (*   (*   subst; constructor; auto. *) *)
+  (*   (* - pstep. cbn in H1, H2. *) *)
+  (*   (*   rewrite itree_eta in H1, H2. *) *)
+  (*   (*   red. *) *)
+  (*   (*   destruct (observe i) eqn: Heqi; destruct (observe i0) eqn: Heqi0; *) *)
+  (*   (*     try apply eqit_inv in H1; try apply eqit_inv in H2; cbn in H1, H2; try contradiction; auto. *) *)
+  (*   (*   subst; constructor; auto. *) *)
 
-    (*   right; eapply CIH; eauto; *)
-    (*   rewrite unfold_interp in H1, H2; auto. *)
-    (* - pstep. cbn in H1, H2. *)
-    (*   rewrite itree_eta in H1, H2. *)
-    (*   red. *)
-    (*   destruct (observe i) eqn: Heqi; *)
-    (*     try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*   subst; constructor; auto. *)
-    (*   rewrite unfold_interp in H1. *)
-    (*   specialize (IHinterp_PropTF _ _ H1 H2). *)
+  (*   (*   right; eapply CIH; eauto; *) *)
+  (*   (*   rewrite unfold_interp in H1, H2; auto. *) *)
+  (*   (* - pstep. cbn in H1, H2. *) *)
+  (*   (*   rewrite itree_eta in H1, H2. *) *)
+  (*   (*   red. *) *)
+  (*   (*   destruct (observe i) eqn: Heqi; *) *)
+  (*   (*     try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*   subst; constructor; auto. *) *)
+  (*   (*   rewrite unfold_interp in H1. *) *)
+  (*   (*   specialize (IHinterp_PropTF _ _ H1 H2). *) *)
 
-    (*   punfold IHinterp_PropTF. *)
-    (* - pstep. cbn in H1, H2. *)
-    (*   rewrite itree_eta in H1, H2. *)
-    (*   red. *)
-    (*   destruct (observe i0) eqn: Heqi; *)
-    (*     try apply eqit_inv in H2; cbn in H2; try contradiction; auto. *)
-    (*   subst; constructor; auto. *)
-    (*   rewrite unfold_interp in H2. *)
-    (*   specialize (IHinterp_PropTF _ _ H1 H2). *)
+  (*   (*   punfold IHinterp_PropTF. *) *)
+  (*   (* - pstep. cbn in H1, H2. *) *)
+  (*   (*   rewrite itree_eta in H1, H2. *) *)
+  (*   (*   red. *) *)
+  (*   (*   destruct (observe i0) eqn: Heqi; *) *)
+  (*   (*     try apply eqit_inv in H2; cbn in H2; try contradiction; auto. *) *)
+  (*   (*   subst; constructor; auto. *) *)
+  (*   (*   rewrite unfold_interp in H2. *) *)
+  (*   (*   specialize (IHinterp_PropTF _ _ H1 H2). *) *)
 
-    (*   punfold IHinterp_PropTF. *)
-    (* - pstep. apply bisimulation_is_eq in HT1. *)
-    (*   rewrite HT1 in H1. cbn in H1. *)
-    (*   destruct (resum IFun A e). *)
-    (*   cbn in H1. *)
-    (*   repeat setoid_rewrite bind_vis in H1. *)
-    (*   apply bisimulation_is_eq in H1. rewrite H1. *)
-    (*   econstructor; eauto. *)
-    (*   eapply eqit_Vis; intros; inv u. *)
-    (* - pstep. cbn in H2, H3. red in H. *)
-    (*   rewrite H in H0. *)
-    (*   rename H2 into H1. *)
-    (*   rename H3 into H2. *)
+  (*   (*   punfold IHinterp_PropTF. *) *)
+  (*   (* - pstep. apply bisimulation_is_eq in HT1. *) *)
+  (*   (*   rewrite HT1 in H1. cbn in H1. *) *)
+  (*   (*   destruct (resum IFun A e). *) *)
+  (*   (*   cbn in H1. *) *)
+  (*   (*   repeat setoid_rewrite bind_vis in H1. *) *)
+  (*   (*   apply bisimulation_is_eq in H1. rewrite H1. *) *)
+  (*   (*   econstructor; eauto. *) *)
+  (*   (*   eapply eqit_Vis; intros; inv u. *) *)
+  (*   (* - pstep. cbn in H2, H3. red in H. *) *)
+  (*   (*   rewrite H in H0. *) *)
+  (*   (*   rename H2 into H1. *) *)
+  (*   (*   rename H3 into H2. *) *)
 
-    (*   rewrite itree_eta in H1, H2. *)
-    (*   repeat destruct e; cbn in *. *)
-    (*   + rewrite bind_bind in H1. *)
-    (*     unfold lift_OOM in H1. *)
-    (*     rename H0 into KS. rewrite bind_trigger in KS. *)
-    (*     cbn in *. *)
-    (*     destruct (EC.DVC.uvalue_convert f) eqn : Hf. *)
-    (*     { rewrite bind_ret_l, bind_bind in H1. *)
-    (*       destruct *)
-    (*         (map_monad_In args *)
-    (*           (fun (elt : InterpreterStackBigIntptr.LP.Events.DV.dvalue) (_ : In elt args) => EC.DVC.dvalue_convert elt)) eqn: Hm. *)
-    (*       { rewrite bind_ret_l, bind_bind in H1. *)
-    (*         rewrite bind_trigger in H1. *)
+  (*   (*   rewrite itree_eta in H1, H2. *) *)
+  (*   (*   repeat destruct e; cbn in *. *) *)
+  (*   (*   + rewrite bind_bind in H1. *) *)
+  (*   (*     unfold lift_OOM in H1. *) *)
+  (*   (*     rename H0 into KS. rewrite bind_trigger in KS. *) *)
+  (*   (*     cbn in *. *) *)
+  (*   (*     destruct (EC.DVC.uvalue_convert f) eqn : Hf. *) *)
+  (*   (*     { rewrite bind_ret_l, bind_bind in H1. *) *)
+  (*   (*       destruct *) *)
+  (*   (*         (map_monad_In args *) *)
+  (*   (*           (fun (elt : InterpreterStackBigIntptr.LP.Events.DV.dvalue) (_ : In elt args) => EC.DVC.dvalue_convert elt)) eqn: Hm. *) *)
+  (*   (*       { rewrite bind_ret_l, bind_bind in H1. *) *)
+  (*   (*         rewrite bind_trigger in H1. *) *)
 
-    (*         destruct (observe i) eqn: Heqi; *)
-    (*           try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*         red. *)
-    (*         setoid_rewrite Heqi. *)
-    (*         destruct H1 as (?&?&?). *)
-    (*         dependent destruction x. *)
-    (*         red in H, H0. *)
-    (*         econstructor; [ constructor | ..]; eauto; cycle 1. *)
-    (*         - red; reflexivity. *)
-    (*         - cbn in *. *)
-    (*           rewrite <- unfold_interp in H2. *)
-    (*           rewrite <- itree_eta in H2. *)
-    (*           rewrite H2. rewrite KS. rewrite interp_vis. cbn. *)
-    (*           rewrite bind_bind. unfold lift_OOM. *)
-    (*           rewrite Hf. setoid_rewrite bind_ret_l. *)
-    (*           setoid_rewrite bind_bind. rewrite Hm. *)
-    (*           setoid_rewrite bind_ret_l. *)
-    (*           setoid_rewrite bind_bind. *)
-    (*           setoid_rewrite bind_trigger. *)
-    (*           unfold subevent. rewrite H0. *)
-    (*           eapply eqit_Vis. intros. *)
-    (*           Unshelve. *)
-    (*           3 : exact (fun u0 : E2.DV.dvalue => *)
-    (*           ITree.bind match EC.DVCrev.dvalue_convert u0 with *)
-    (*                     | NoOom a0 => ret a0 *)
-    (*                     | Oom s => raise_oom s *)
-    (*                      end (fun x1 : E1.DV.dvalue => Tau (interp EC.L3_convert (k2 x1)))). *)
-    (*           reflexivity. intros. inv H. *)
-    (*         - cbn. red in H1. subst. *)
-    (*           eapply bisimulation_is_eq in H1. rewrite H1. *)
+  (*   (*         destruct (observe i) eqn: Heqi; *) *)
+  (*   (*           try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*         red. *) *)
+  (*   (*         setoid_rewrite Heqi. *) *)
+  (*   (*         destruct H1 as (?&?&?). *) *)
+  (*   (*         dependent destruction x. *) *)
+  (*   (*         red in H, H0. *) *)
+  (*   (*         econstructor; [ constructor | ..]; eauto; cycle 1. *) *)
+  (*   (*         - red; reflexivity. *) *)
+  (*   (*         - cbn in *. *) *)
+  (*   (*           rewrite <- unfold_interp in H2. *) *)
+  (*   (*           rewrite <- itree_eta in H2. *) *)
+  (*   (*           rewrite H2. rewrite KS. rewrite interp_vis. cbn. *) *)
+  (*   (*           rewrite bind_bind. unfold lift_OOM. *) *)
+  (*   (*           rewrite Hf. setoid_rewrite bind_ret_l. *) *)
+  (*   (*           setoid_rewrite bind_bind. rewrite Hm. *) *)
+  (*   (*           setoid_rewrite bind_ret_l. *) *)
+  (*   (*           setoid_rewrite bind_bind. *) *)
+  (*   (*           setoid_rewrite bind_trigger. *) *)
+  (*   (*           unfold subevent. rewrite H0. *) *)
+  (*   (*           eapply eqit_Vis. intros. *) *)
+  (*   (*           Unshelve. *) *)
+  (*   (*           3 : exact (fun u0 : E2.DV.dvalue => *) *)
+  (*   (*           ITree.bind match EC.DVCrev.dvalue_convert u0 with *) *)
+  (*   (*                     | NoOom a0 => ret a0 *) *)
+  (*   (*                     | Oom s => raise_oom s *) *)
+  (*   (*                      end (fun x1 : E1.DV.dvalue => Tau (interp EC.L3_convert (k2 x1)))). *) *)
+  (*   (*           reflexivity. intros. inv H. *) *)
+  (*   (*         - cbn. red in H1. subst. *) *)
+  (*   (*           eapply bisimulation_is_eq in H1. rewrite H1. *) *)
 
-    (*           destruct (EC.DVCrev.dvalue_convert a) eqn: Ht. *)
-    (*           + setoid_rewrite H in HK. subst. *)
-    (*             rewrite subevent_subevent in H3. *)
-    (*             eapply Returns_uvalue_convert_L3 in H3; eauto. *)
-    (*             specialize (HK _ H3). pclearbot. *)
-    (*             pose proof @bind_ret_l as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *)
-    (*             pose proof @bind_ret_l as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ. *)
-    (*             pstep; constructor; eauto. right; eauto. *)
-    (*             eapply CIH; try rewrite <- unfold_interp; try reflexivity. *)
-    (*             eapply HK. *)
-    (*           + setoid_rewrite H in HK. subst. *)
-    (*             unfold raiseOOM. *)
-    (*             pose proof @bind_bind as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *)
-    (*             pose proof @bind_trigger as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *)
-    (*             pose proof @bind_bind as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *)
-    (*             pose proof @bind_trigger as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *)
-    (*             pstep; econstructor; eauto. unfold subevent. *)
-    (*             reflexivity. } *)
-    (*       { unfold raiseOOM in H1. rewrite bind_trigger in H1. *)
-    (*         red. destruct (observe i) eqn: Heqi; *)
-    (*           try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*         destruct H1 as (?&?&?). *)
-    (*         dependent destruction x. *)
-    (*         red in H, H0. *)
-    (*         (* rewrite H1. *) *)
-    (*         econstructor; eauto. *)
-    (*         - intros. inv a. *)
-    (*         - red; reflexivity. *)
-    (*         - cbn in *. rewrite <- itree_eta in H2. *)
-    (*           rewrite H2. rewrite <- unfold_interp. *)
-    (*           rewrite KS. rewrite interp_vis. cbn. *)
-    (*           rewrite bind_bind. unfold lift_OOM. *)
-    (*           rewrite Hf. setoid_rewrite bind_ret_l. *)
-    (*           setoid_rewrite bind_bind. rewrite Hm. *)
-    (*           setoid_rewrite bind_trigger. *)
-    (*           setoid_rewrite bind_vis. *)
-    (*           unfold subevent. rewrite H0. *)
-    (*           eapply eqit_Vis. intros. inv u0. } } *)
+  (*   (*           destruct (EC.DVCrev.dvalue_convert a) eqn: Ht. *) *)
+  (*   (*           + setoid_rewrite H in HK. subst. *) *)
+  (*   (*             rewrite subevent_subevent in H3. *) *)
+  (*   (*             eapply Returns_uvalue_convert_L3 in H3; eauto. *) *)
+  (*   (*             specialize (HK _ H3). pclearbot. *) *)
+  (*   (*             pose proof @bind_ret_l as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *) *)
+  (*   (*             pose proof @bind_ret_l as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ. *) *)
+  (*   (*             pstep; constructor; eauto. right; eauto. *) *)
+  (*   (*             eapply CIH; try rewrite <- unfold_interp; try reflexivity. *) *)
+  (*   (*             eapply HK. *) *)
+  (*   (*           + setoid_rewrite H in HK. subst. *) *)
+  (*   (*             unfold raiseOOM. *) *)
+  (*   (*             pose proof @bind_bind as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *) *)
+  (*   (*             pose proof @bind_trigger as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *) *)
+  (*   (*             pose proof @bind_bind as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *) *)
+  (*   (*             pose proof @bind_trigger as HEQ; eapply bisimulation_is_eq in HEQ; rewrite HEQ; clear HEQ. *) *)
+  (*   (*             pstep; econstructor; eauto. unfold subevent. *) *)
+  (*   (*             reflexivity. } *) *)
+  (*   (*       { unfold raiseOOM in H1. rewrite bind_trigger in H1. *) *)
+  (*   (*         red. destruct (observe i) eqn: Heqi; *) *)
+  (*   (*           try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*         destruct H1 as (?&?&?). *) *)
+  (*   (*         dependent destruction x. *) *)
+  (*   (*         red in H, H0. *) *)
+  (*   (*         (* rewrite H1. *) *) *)
+  (*   (*         econstructor; eauto. *) *)
+  (*   (*         - intros. inv a. *) *)
+  (*   (*         - red; reflexivity. *) *)
+  (*   (*         - cbn in *. rewrite <- itree_eta in H2. *) *)
+  (*   (*           rewrite H2. rewrite <- unfold_interp. *) *)
+  (*   (*           rewrite KS. rewrite interp_vis. cbn. *) *)
+  (*   (*           rewrite bind_bind. unfold lift_OOM. *) *)
+  (*   (*           rewrite Hf. setoid_rewrite bind_ret_l. *) *)
+  (*   (*           setoid_rewrite bind_bind. rewrite Hm. *) *)
+  (*   (*           setoid_rewrite bind_trigger. *) *)
+  (*   (*           setoid_rewrite bind_vis. *) *)
+  (*   (*           unfold subevent. rewrite H0. *) *)
+  (*   (*           eapply eqit_Vis. intros. inv u0. } } *) *)
 
-    (*       unfold raiseOOM in H1. rewrite bind_trigger in H1. *)
-    (*       red. destruct (observe i) eqn: Heqi; *)
-    (*         try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*       destruct H1 as (?&?&?). *)
-    (*       dependent destruction x. *)
-    (*       red in H, H0. cbn in *. *)
-    (*       econstructor; eauto. *)
-    (*     * intros. inv a. *)
-    (*     * red; reflexivity. *)
-    (*     * rewrite <- itree_eta in H2. rewrite H2. *)
-    (*       rewrite <- unfold_interp. rewrite KS. *)
-    (*       rewrite interp_vis. *)
-    (*       cbn. rewrite bind_bind. unfold lift_OOM. rewrite Hf. *)
-    (*       setoid_rewrite bind_trigger. *)
-    (*       setoid_rewrite bind_vis. *)
-    (*       unfold subevent. rewrite H0. *)
-    (*       eapply eqit_Vis. intros. inv u. *)
-    (*   + destruct s. *)
-    (*     { destruct p. *)
-    (*       cbn in *. *)
-    (*       destruct (EC.DVC.uvalue_convert x) eqn:Ht. *)
-    (*       - cbn in *. *)
-    (*         rewrite bind_ret_l in H1. *)
-    (*         rewrite bind_trigger in H1. *)
-    (*         rewrite bind_vis in H1. *)
-    (*         red. *)
-    (*         destruct (observe i) eqn: Heqi; *)
-    (*           try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*         destruct H1 as (?&?&?). *)
-    (*         cbn in *. *)
-    (*         dependent destruction x. *)
-    (*         red in H, H0. *)
-    (*         econstructor; eauto. *)
-    (*         repeat red. intros. inv a. *)
-    (*         red; reflexivity. *)
-    (*         setoid_rewrite <- itree_eta in H2. rewrite H2. *)
-    (*         rewrite <- unfold_interp. *)
-    (*         rewrite H0. rewrite bind_trigger. *)
-    (*         rewrite interp_vis. *)
-    (*         cbn. *)
-    (*         setoid_rewrite bind_trigger. rewrite bind_vis. cbn in *; subst. eapply eqit_Vis. *)
-    (*         intros. inv u. *)
+  (*   (*       unfold raiseOOM in H1. rewrite bind_trigger in H1. *) *)
+  (*   (*       red. destruct (observe i) eqn: Heqi; *) *)
+  (*   (*         try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*       destruct H1 as (?&?&?). *) *)
+  (*   (*       dependent destruction x. *) *)
+  (*   (*       red in H, H0. cbn in *. *) *)
+  (*   (*       econstructor; eauto. *) *)
+  (*   (*     * intros. inv a. *) *)
+  (*   (*     * red; reflexivity. *) *)
+  (*   (*     * rewrite <- itree_eta in H2. rewrite H2. *) *)
+  (*   (*       rewrite <- unfold_interp. rewrite KS. *) *)
+  (*   (*       rewrite interp_vis. *) *)
+  (*   (*       cbn. rewrite bind_bind. unfold lift_OOM. rewrite Hf. *) *)
+  (*   (*       setoid_rewrite bind_trigger. *) *)
+  (*   (*       setoid_rewrite bind_vis. *) *)
+  (*   (*       unfold subevent. rewrite H0. *) *)
+  (*   (*       eapply eqit_Vis. intros. inv u. *) *)
+  (*   (*   + destruct s. *) *)
+  (*   (*     { destruct p. *) *)
+  (*   (*       cbn in *. *) *)
+  (*   (*       destruct (EC.DVC.uvalue_convert x) eqn:Ht. *) *)
+  (*   (*       - cbn in *. *) *)
+  (*   (*         rewrite bind_ret_l in H1. *) *)
+  (*   (*         rewrite bind_trigger in H1. *) *)
+  (*   (*         rewrite bind_vis in H1. *) *)
+  (*   (*         red. *) *)
+  (*   (*         destruct (observe i) eqn: Heqi; *) *)
+  (*   (*           try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*         destruct H1 as (?&?&?). *) *)
+  (*   (*         cbn in *. *) *)
+  (*   (*         dependent destruction x. *) *)
+  (*   (*         red in H, H0. *) *)
+  (*   (*         econstructor; eauto. *) *)
+  (*   (*         repeat red. intros. inv a. *) *)
+  (*   (*         red; reflexivity. *) *)
+  (*   (*         setoid_rewrite <- itree_eta in H2. rewrite H2. *) *)
+  (*   (*         rewrite <- unfold_interp. *) *)
+  (*   (*         rewrite H0. rewrite bind_trigger. *) *)
+  (*   (*         rewrite interp_vis. *) *)
+  (*   (*         cbn. *) *)
+  (*   (*         setoid_rewrite bind_trigger. rewrite bind_vis. cbn in *; subst. eapply eqit_Vis. *) *)
+  (*   (*         intros. inv u. *) *)
 
-    (*         rewrite bind_trigger in H1. *)
-
-
-    (*       destruct s; try destruct u; cbn in H1. *)
-    (*       -- repeat red in HTA. *)
-    (*           unfold raiseUB in H1. rewrite bind_trigger in H1. *)
-    (*           red. *)
-    (*           destruct (observe i) eqn: Heqi; *)
-    (*             try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*           destruct H1 as (?&?&?). *)
-    (*           dependent destruction x. *)
-    (*           red in H, H0. *)
-    (*           econstructor; eauto. *)
-    (*           repeat red. intros. inv a. *)
-    (*           red; reflexivity. *)
-    (*           setoid_rewrite <- itree_eta in H2. rewrite H2. *)
-    (*           rewrite <- unfold_interp. *)
-    (*           rewrite H0. rewrite bind_trigger. *)
-    (*           rewrite interp_vis. *)
-    (*           cbn. *)
-    (*           setoid_rewrite bind_trigger. rewrite bind_vis. cbn in *; subst. eapply eqit_Vis. *)
-    (*           intros. inv u. *)
-    (*       -- destruct s; try destruct u; cbn in H1. *)
-    (*          ++ destruct d. cbn in H1. *)
-    (*             rewrite <- unfold_interp in H2. *)
-
-    (*             rename H0 into KS. *)
-    (*             setoid_rewrite bind_trigger in H1. *)
-    (*             setoid_rewrite bind_trigger in KS. *)
-
-    (*             red. *)
-    (*             destruct (observe i) eqn: Heqi; *)
-    (*               try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*             destruct H1 as (?&?&?). *)
-    (*             dependent destruction x. *)
-    (*             red in H, H0. subst. *)
-    (*             assert (Returns tt ta). *)
-    (*             { rewrite H. unfold trigger. eapply ReturnsVis; eauto. *)
-    (*               unfold subevent. reflexivity. *)
-    (*               constructor; reflexivity. } *)
-    (*             specialize (HK _ H0). pclearbot. *)
-    (*             econstructor; eauto. *)
-    (*             ** intros. red in H1. specialize (H1 tt). *)
-    (*                eapply bisimulation_is_eq in H1. destruct a. *)
-    (*                rewrite H1. *)
-    (*                right; eapply CIH. *)
-    (*                2 : { rewrite <- interp_tau, <- unfold_interp. reflexivity. } *)
-    (*                pstep; econstructor; eauto. punfold HK. *)
-    (*                rewrite <- unfold_interp. Unshelve. *)
-    (*                16 : exact (fun x => interp EC.L3_convert (k2 x)). reflexivity. *)
-    (*                all : shelve. *)
-    (*             ** red; reflexivity. *)
-    (*             ** rewrite <- itree_eta in H2. *)
-    (*                rewrite H2. rewrite KS. *)
-    (*                rewrite interp_vis. cbn. unfold debug. *)
-    (*                do 2 rewrite bind_trigger. unfold subevent, resum, ReSum_inr. *)
-    (*                eapply eqit_Vis. intros. rewrite tau_eutt. reflexivity. *)
-    (*          ++ repeat red in HTA. *)
-    (*             destruct f. cbn in H1. setoid_rewrite bind_trigger in H1. *)
-    (*             red. *)
-    (*             destruct (observe i) eqn: Heqi; *)
-    (*               try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*             destruct H1 as (?&?&?). *)
-    (*             dependent destruction x. *)
-    (*             red in H, H0. cbn in *; subst. *)
-    (*             econstructor; eauto. *)
-    (*             intros. inv a. *)
-    (*             red; reflexivity. *)
-    (*             setoid_rewrite <- itree_eta in H2. rewrite H2. *)
-    (*             rewrite <- unfold_interp. *)
-    (*             rewrite H0. cbn. rewrite interp_bind. *)
-    (*             rewrite interp_trigger. cbn. unfold LLVMEvents.raise. *)
-    (*             do 2 rewrite bind_trigger. rewrite bind_vis. *)
-    (*             apply eqit_Vis; intros; inv u. *)
+  (*   (*         rewrite bind_trigger in H1. *) *)
 
 
-    (*     } *)
-    (*     destruct s. *)
-    (*     * unfold raiseOOM in H1. *)
-    (*       destruct o. *)
-    (*       cbn in H1. *)
-    (*       rewrite bind_bind, bind_trigger in H1. *)
-    (*       rewrite itree_eta in H1, H2. *)
-    (*       red. *)
-    (*       destruct (observe i) eqn: Heqi; *)
-    (*         try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*       destruct H1 as (?&?&?). *)
-    (*       dependent destruction x. *)
-    (*       red in H, H0. cbn in *. *)
-    (*       econstructor; eauto. *)
-    (*       -- intros. inv a. *)
-    (*       -- red; reflexivity. *)
-    (*       -- rewrite <- itree_eta in H2. rewrite H2. *)
-    (*          rewrite <- unfold_interp. rewrite H0. *)
-    (*          rewrite bind_trigger. *)
-    (*          rewrite interp_vis. cbn. do 2 setoid_rewrite bind_trigger. *)
-    (*          rewrite bind_vis. subst. *)
-    (*          apply eqit_Vis; intros; inv u. *)
-    (*     * destruct s; try destruct u; cbn in H1. *)
-    (*       -- repeat red in HTA. *)
-    (*           unfold raiseUB in H1. rewrite bind_trigger in H1. *)
-    (*           red. *)
-    (*           destruct (observe i) eqn: Heqi; *)
-    (*             try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*           destruct H1 as (?&?&?). *)
-    (*           dependent destruction x. *)
-    (*           red in H, H0. *)
-    (*           econstructor; eauto. *)
-    (*           repeat red. intros. inv a. *)
-    (*           red; reflexivity. *)
-    (*           setoid_rewrite <- itree_eta in H2. rewrite H2. *)
-    (*           rewrite <- unfold_interp. *)
-    (*           rewrite H0. rewrite bind_trigger. *)
-    (*           rewrite interp_vis. *)
-    (*           cbn. *)
-    (*           setoid_rewrite bind_trigger. rewrite bind_vis. cbn in *; subst. eapply eqit_Vis. *)
-    (*           intros. inv u. *)
-    (*       -- destruct s; try destruct u; cbn in H1. *)
-    (*          ++ destruct d. cbn in H1. *)
-    (*             rewrite <- unfold_interp in H2. *)
+  (*   (*       destruct s; try destruct u; cbn in H1. *) *)
+  (*   (*       -- repeat red in HTA. *) *)
+  (*   (*           unfold raiseUB in H1. rewrite bind_trigger in H1. *) *)
+  (*   (*           red. *) *)
+  (*   (*           destruct (observe i) eqn: Heqi; *) *)
+  (*   (*             try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*           destruct H1 as (?&?&?). *) *)
+  (*   (*           dependent destruction x. *) *)
+  (*   (*           red in H, H0. *) *)
+  (*   (*           econstructor; eauto. *) *)
+  (*   (*           repeat red. intros. inv a. *) *)
+  (*   (*           red; reflexivity. *) *)
+  (*   (*           setoid_rewrite <- itree_eta in H2. rewrite H2. *) *)
+  (*   (*           rewrite <- unfold_interp. *) *)
+  (*   (*           rewrite H0. rewrite bind_trigger. *) *)
+  (*   (*           rewrite interp_vis. *) *)
+  (*   (*           cbn. *) *)
+  (*   (*           setoid_rewrite bind_trigger. rewrite bind_vis. cbn in *; subst. eapply eqit_Vis. *) *)
+  (*   (*           intros. inv u. *) *)
+  (*   (*       -- destruct s; try destruct u; cbn in H1. *) *)
+  (*   (*          ++ destruct d. cbn in H1. *) *)
+  (*   (*             rewrite <- unfold_interp in H2. *) *)
 
-    (*             rename H0 into KS. *)
-    (*             setoid_rewrite bind_trigger in H1. *)
-    (*             setoid_rewrite bind_trigger in KS. *)
+  (*   (*             rename H0 into KS. *) *)
+  (*   (*             setoid_rewrite bind_trigger in H1. *) *)
+  (*   (*             setoid_rewrite bind_trigger in KS. *) *)
 
-    (*             red. *)
-    (*             destruct (observe i) eqn: Heqi; *)
-    (*               try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*             destruct H1 as (?&?&?). *)
-    (*             dependent destruction x. *)
-    (*             red in H, H0. subst. *)
-    (*             assert (Returns tt ta). *)
-    (*             { rewrite H. unfold trigger. eapply ReturnsVis; eauto. *)
-    (*               unfold subevent. reflexivity. *)
-    (*               constructor; reflexivity. } *)
-    (*             specialize (HK _ H0). pclearbot. *)
-    (*             econstructor; eauto. *)
-    (*             ** intros. red in H1. specialize (H1 tt). *)
-    (*                eapply bisimulation_is_eq in H1. destruct a. *)
-    (*                rewrite H1. *)
-    (*                right; eapply CIH. *)
-    (*                2 : { rewrite <- interp_tau, <- unfold_interp. reflexivity. } *)
-    (*                pstep; econstructor; eauto. punfold HK. *)
-    (*                rewrite <- unfold_interp. Unshelve. *)
-    (*                16 : exact (fun x => interp EC.L3_convert (k2 x)). reflexivity. *)
-    (*                all : shelve. *)
-    (*             ** red; reflexivity. *)
-    (*             ** rewrite <- itree_eta in H2. *)
-    (*                rewrite H2. rewrite KS. *)
-    (*                rewrite interp_vis. cbn. unfold debug. *)
-    (*                do 2 rewrite bind_trigger. unfold subevent, resum, ReSum_inr. *)
-    (*                eapply eqit_Vis. intros. rewrite tau_eutt. reflexivity. *)
-    (*          ++ repeat red in HTA. *)
-    (*             destruct f. cbn in H1. setoid_rewrite bind_trigger in H1. *)
-    (*             red. *)
-    (*             destruct (observe i) eqn: Heqi; *)
-    (*               try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *)
-    (*             destruct H1 as (?&?&?). *)
-    (*             dependent destruction x. *)
-    (*             red in H, H0. cbn in *; subst. *)
-    (*             econstructor; eauto. *)
-    (*             intros. inv a. *)
-    (*             red; reflexivity. *)
-    (*             setoid_rewrite <- itree_eta in H2. rewrite H2. *)
-    (*             rewrite <- unfold_interp. *)
-    (*             rewrite H0. cbn. rewrite interp_bind. *)
-    (*             rewrite interp_trigger. cbn. unfold LLVMEvents.raise. *)
-    (*             do 2 rewrite bind_trigger. rewrite bind_vis. *)
-    (*             apply eqit_Vis; intros; inv u. *)
+  (*   (*             red. *) *)
+  (*   (*             destruct (observe i) eqn: Heqi; *) *)
+  (*   (*               try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*             destruct H1 as (?&?&?). *) *)
+  (*   (*             dependent destruction x. *) *)
+  (*   (*             red in H, H0. subst. *) *)
+  (*   (*             assert (Returns tt ta). *) *)
+  (*   (*             { rewrite H. unfold trigger. eapply ReturnsVis; eauto. *) *)
+  (*   (*               unfold subevent. reflexivity. *) *)
+  (*   (*               constructor; reflexivity. } *) *)
+  (*   (*             specialize (HK _ H0). pclearbot. *) *)
+  (*   (*             econstructor; eauto. *) *)
+  (*   (*             ** intros. red in H1. specialize (H1 tt). *) *)
+  (*   (*                eapply bisimulation_is_eq in H1. destruct a. *) *)
+  (*   (*                rewrite H1. *) *)
+  (*   (*                right; eapply CIH. *) *)
+  (*   (*                2 : { rewrite <- interp_tau, <- unfold_interp. reflexivity. } *) *)
+  (*   (*                pstep; econstructor; eauto. punfold HK. *) *)
+  (*   (*                rewrite <- unfold_interp. Unshelve. *) *)
+  (*   (*                16 : exact (fun x => interp EC.L3_convert (k2 x)). reflexivity. *) *)
+  (*   (*                all : shelve. *) *)
+  (*   (*             ** red; reflexivity. *) *)
+  (*   (*             ** rewrite <- itree_eta in H2. *) *)
+  (*   (*                rewrite H2. rewrite KS. *) *)
+  (*   (*                rewrite interp_vis. cbn. unfold debug. *) *)
+  (*   (*                do 2 rewrite bind_trigger. unfold subevent, resum, ReSum_inr. *) *)
+  (*   (*                eapply eqit_Vis. intros. rewrite tau_eutt. reflexivity. *) *)
+  (*   (*          ++ repeat red in HTA. *) *)
+  (*   (*             destruct f. cbn in H1. setoid_rewrite bind_trigger in H1. *) *)
+  (*   (*             red. *) *)
+  (*   (*             destruct (observe i) eqn: Heqi; *) *)
+  (*   (*               try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*             destruct H1 as (?&?&?). *) *)
+  (*   (*             dependent destruction x. *) *)
+  (*   (*             red in H, H0. cbn in *; subst. *) *)
+  (*   (*             econstructor; eauto. *) *)
+  (*   (*             intros. inv a. *) *)
+  (*   (*             red; reflexivity. *) *)
+  (*   (*             setoid_rewrite <- itree_eta in H2. rewrite H2. *) *)
+  (*   (*             rewrite <- unfold_interp. *) *)
+  (*   (*             rewrite H0. cbn. rewrite interp_bind. *) *)
+  (*   (*             rewrite interp_trigger. cbn. unfold LLVMEvents.raise. *) *)
+  (*   (*             do 2 rewrite bind_trigger. rewrite bind_vis. *) *)
+  (*   (*             apply eqit_Vis; intros; inv u. *) *)
 
-    (*             Unshelve. *)
-    (*             all : eauto. *)
-    (*             all : inv x.     *)
-  Admitted.
+
+  (*   (*     } *) *)
+  (*   (*     destruct s. *) *)
+  (*   (*     * unfold raiseOOM in H1. *) *)
+  (*   (*       destruct o. *) *)
+  (*   (*       cbn in H1. *) *)
+  (*   (*       rewrite bind_bind, bind_trigger in H1. *) *)
+  (*   (*       rewrite itree_eta in H1, H2. *) *)
+  (*   (*       red. *) *)
+  (*   (*       destruct (observe i) eqn: Heqi; *) *)
+  (*   (*         try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*       destruct H1 as (?&?&?). *) *)
+  (*   (*       dependent destruction x. *) *)
+  (*   (*       red in H, H0. cbn in *. *) *)
+  (*   (*       econstructor; eauto. *) *)
+  (*   (*       -- intros. inv a. *) *)
+  (*   (*       -- red; reflexivity. *) *)
+  (*   (*       -- rewrite <- itree_eta in H2. rewrite H2. *) *)
+  (*   (*          rewrite <- unfold_interp. rewrite H0. *) *)
+  (*   (*          rewrite bind_trigger. *) *)
+  (*   (*          rewrite interp_vis. cbn. do 2 setoid_rewrite bind_trigger. *) *)
+  (*   (*          rewrite bind_vis. subst. *) *)
+  (*   (*          apply eqit_Vis; intros; inv u. *) *)
+  (*   (*     * destruct s; try destruct u; cbn in H1. *) *)
+  (*   (*       -- repeat red in HTA. *) *)
+  (*   (*           unfold raiseUB in H1. rewrite bind_trigger in H1. *) *)
+  (*   (*           red. *) *)
+  (*   (*           destruct (observe i) eqn: Heqi; *) *)
+  (*   (*             try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*           destruct H1 as (?&?&?). *) *)
+  (*   (*           dependent destruction x. *) *)
+  (*   (*           red in H, H0. *) *)
+  (*   (*           econstructor; eauto. *) *)
+  (*   (*           repeat red. intros. inv a. *) *)
+  (*   (*           red; reflexivity. *) *)
+  (*   (*           setoid_rewrite <- itree_eta in H2. rewrite H2. *) *)
+  (*   (*           rewrite <- unfold_interp. *) *)
+  (*   (*           rewrite H0. rewrite bind_trigger. *) *)
+  (*   (*           rewrite interp_vis. *) *)
+  (*   (*           cbn. *) *)
+  (*   (*           setoid_rewrite bind_trigger. rewrite bind_vis. cbn in *; subst. eapply eqit_Vis. *) *)
+  (*   (*           intros. inv u. *) *)
+  (*   (*       -- destruct s; try destruct u; cbn in H1. *) *)
+  (*   (*          ++ destruct d. cbn in H1. *) *)
+  (*   (*             rewrite <- unfold_interp in H2. *) *)
+
+  (*   (*             rename H0 into KS. *) *)
+  (*   (*             setoid_rewrite bind_trigger in H1. *) *)
+  (*   (*             setoid_rewrite bind_trigger in KS. *) *)
+
+  (*   (*             red. *) *)
+  (*   (*             destruct (observe i) eqn: Heqi; *) *)
+  (*   (*               try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*             destruct H1 as (?&?&?). *) *)
+  (*   (*             dependent destruction x. *) *)
+  (*   (*             red in H, H0. subst. *) *)
+  (*   (*             assert (Returns tt ta). *) *)
+  (*   (*             { rewrite H. unfold trigger. eapply ReturnsVis; eauto. *) *)
+  (*   (*               unfold subevent. reflexivity. *) *)
+  (*   (*               constructor; reflexivity. } *) *)
+  (*   (*             specialize (HK _ H0). pclearbot. *) *)
+  (*   (*             econstructor; eauto. *) *)
+  (*   (*             ** intros. red in H1. specialize (H1 tt). *) *)
+  (*   (*                eapply bisimulation_is_eq in H1. destruct a. *) *)
+  (*   (*                rewrite H1. *) *)
+  (*   (*                right; eapply CIH. *) *)
+  (*   (*                2 : { rewrite <- interp_tau, <- unfold_interp. reflexivity. } *) *)
+  (*   (*                pstep; econstructor; eauto. punfold HK. *) *)
+  (*   (*                rewrite <- unfold_interp. Unshelve. *) *)
+  (*   (*                16 : exact (fun x => interp EC.L3_convert (k2 x)). reflexivity. *) *)
+  (*   (*                all : shelve. *) *)
+  (*   (*             ** red; reflexivity. *) *)
+  (*   (*             ** rewrite <- itree_eta in H2. *) *)
+  (*   (*                rewrite H2. rewrite KS. *) *)
+  (*   (*                rewrite interp_vis. cbn. unfold debug. *) *)
+  (*   (*                do 2 rewrite bind_trigger. unfold subevent, resum, ReSum_inr. *) *)
+  (*   (*                eapply eqit_Vis. intros. rewrite tau_eutt. reflexivity. *) *)
+  (*   (*          ++ repeat red in HTA. *) *)
+  (*   (*             destruct f. cbn in H1. setoid_rewrite bind_trigger in H1. *) *)
+  (*   (*             red. *) *)
+  (*   (*             destruct (observe i) eqn: Heqi; *) *)
+  (*   (*               try apply eqit_inv in H1; cbn in H1; try contradiction; auto. *) *)
+  (*   (*             destruct H1 as (?&?&?). *) *)
+  (*   (*             dependent destruction x. *) *)
+  (*   (*             red in H, H0. cbn in *; subst. *) *)
+  (*   (*             econstructor; eauto. *) *)
+  (*   (*             intros. inv a. *) *)
+  (*   (*             red; reflexivity. *) *)
+  (*   (*             setoid_rewrite <- itree_eta in H2. rewrite H2. *) *)
+  (*   (*             rewrite <- unfold_interp. *) *)
+  (*   (*             rewrite H0. cbn. rewrite interp_bind. *) *)
+  (*   (*             rewrite interp_trigger. cbn. unfold LLVMEvents.raise. *) *)
+  (*   (*             do 2 rewrite bind_trigger. rewrite bind_vis. *) *)
+  (*   (*             apply eqit_Vis; intros; inv u. *) *)
+
+  (*   (*             Unshelve. *) *)
+  (*   (*             all : eauto. *) *)
+  (*   (*             all : inv x.     *) *)
+  (* Admitted. *)
 
   Opaque FinPROV.initial_provenance.
   Opaque InfPROV.initial_provenance.
-  Opaque dvalue_convert.
-  Opaque uvalue_convert.
-  Opaque dvalue_refine.
-  Opaque uvalue_refine.
-  Opaque DVCrev.dvalue_convert.
-  Opaque DVCrev.uvalue_convert.
-  Opaque DVCrev.dvalue_refine.
-  Opaque DVCrev.uvalue_refine.
-
+  Opaque dvalue_convert_lazy.
+  Opaque uvalue_convert_lazy.
+  Opaque dvalue_refine_lazy.
+  Opaque uvalue_refine_lazy.
+  Opaque DVCrev.dvalue_convert_lazy.
+  Opaque DVCrev.uvalue_convert_lazy.
+  Opaque DVCrev.dvalue_refine_lazy.
+  Opaque DVCrev.uvalue_refine_lazy.
+  Opaque dvalue_convert_strict.
+  Opaque uvalue_convert_strict.
+  Opaque dvalue_refine_strict.
+  Opaque uvalue_refine_strict.
+  Opaque DVCrev.dvalue_convert_strict.
+  Opaque DVCrev.uvalue_convert_strict.
+  Opaque DVCrev.dvalue_refine_strict.
+  Opaque DVCrev.uvalue_refine_strict.
 
   (* Lemma refine_OOM_h_L4_convert_tree : *)
   (*   forall {T} x_inf y_inf (RR : relation T), *)
@@ -3506,7 +3644,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (** Model *)
   Import DynamicTypes TypToDtyp CFG.
 
-  Definition event_refine A B (e1 : IS1.LP.Events.L0 A) (e2 : IS2.LP.Events.L0 B) : Prop.
+  Definition event_refine_lazy A B (e1 : IS1.LP.Events.L0 A) (e2 : IS2.LP.Events.L0 B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 (E1.ExternalCall dt1 f1 args1), inl1 (E2.ExternalCall dt2 f2 args2) =>
@@ -3539,14 +3677,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     (* External Calls *)
     { (* Doesn't say anything about return value... *)
       apply (dt1 = dt2 /\
-               uvalue_refine f1 f2 /\
-               Forall2 dvalue_refine args1 args2).
+               uvalue_refine_lazy f1 f2 /\
+               Forall2 dvalue_refine_lazy args1 args2).
     }
 
     (* Intrinsics *)
     { apply (dt1 = dt2 /\
                name1 = name2 /\
-               Forall2 dvalue_refine args1 args2).
+               Forall2 dvalue_refine_lazy args1 args2).
     }
 
     (* Globals *)
@@ -3554,7 +3692,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Global write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   dvalue_refine dv dv0).
+                   dvalue_refine_lazy dv dv0).
         + apply False.
       - (* Global read *)
         destruct e2 eqn:HE2.
@@ -3567,7 +3705,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Local write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   uvalue_refine dv dv0).
+                   uvalue_refine_lazy dv dv0).
         + apply False.
       - (* Local read *)
         destruct e2 eqn:HE2.
@@ -3579,7 +3717,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { inversion e1.
       - (* Stack Push *)
         destruct e2 eqn:HE2.
-        + apply (local_refine args args0).
+        + apply (local_refine_lazy args args0).
         + apply False.
       - (* Stack Pop *)
         destruct e2 eqn:HE2.
@@ -3609,14 +3747,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         destruct e2 eqn:HE2.
         1-3,5: apply False.
         apply (t = t0 /\
-                 dvalue_refine a a0).
+                 dvalue_refine_lazy a a0).
       - (* Store *)
         destruct e2 eqn:HE2.
         1-4: apply False.
 
         apply (t = t0 /\
-                 dvalue_refine a a0 /\
-                 uvalue_refine v v0).
+                 dvalue_refine_lazy a a0 /\
+                 uvalue_refine_lazy v v0).
     }
 
     (* PickE *)
@@ -3624,7 +3762,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inversion e1.
       destruct e2 eqn:HE2.
       apply ((Pre <-> Pre0) /\
-               uvalue_refine x x0).
+               uvalue_refine_lazy x x0).
     }
 
     (* OOME *)
@@ -3644,7 +3782,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition event_converted A B (e1 : IS1.LP.Events.L0 A) (e2 : IS2.LP.Events.L0 B) : Prop.
+  Definition event_refine_strict A B (e1 : IS1.LP.Events.L0 A) (e2 : IS2.LP.Events.L0 B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 (E1.ExternalCall dt1 f1 args1), inl1 (E2.ExternalCall dt2 f2 args2) =>
@@ -3677,14 +3815,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     (* External Calls *)
     { (* Doesn't say anything about return value... *)
       apply (dt1 = dt2 /\
-               uvalue_converted f1 f2 /\
-               Forall2 dvalue_converted args1 args2).
+               uvalue_refine_strict f1 f2 /\
+               Forall2 dvalue_refine_strict args1 args2).
     }
 
     (* Intrinsics *)
     { apply (dt1 = dt2 /\
                name1 = name2 /\
-               Forall2 dvalue_converted args1 args2).
+               Forall2 dvalue_refine_strict args1 args2).
     }
 
     (* Globals *)
@@ -3692,7 +3830,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Global write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   dvalue_converted dv dv0).
+                   dvalue_refine_strict dv dv0).
         + apply False.
       - (* Global read *)
         destruct e2 eqn:HE2.
@@ -3705,7 +3843,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Local write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   uvalue_converted dv dv0).
+                   uvalue_refine_strict dv dv0).
         + apply False.
       - (* Local read *)
         destruct e2 eqn:HE2.
@@ -3717,7 +3855,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { inversion e1.
       - (* Stack Push *)
         destruct e2 eqn:HE2.
-        + apply (local_refine args args0).
+        + apply (local_refine_strict args args0).
         + apply False.
       - (* Stack Pop *)
         destruct e2 eqn:HE2.
@@ -3747,14 +3885,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         destruct e2 eqn:HE2.
         1-3,5: apply False.
         apply (t = t0 /\
-                 dvalue_converted a a0).
+                 dvalue_refine_strict a a0).
       - (* Store *)
         destruct e2 eqn:HE2.
         1-4: apply False.
 
         apply (t = t0 /\
-                 dvalue_converted a a0 /\
-                 uvalue_converted v v0).
+                 dvalue_refine_strict a a0 /\
+                 uvalue_refine_strict v v0).
     }
 
     (* PickE *)
@@ -3762,7 +3900,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inversion e1.
       destruct e2 eqn:HE2.
       apply ((Pre <-> Pre0) /\
-               uvalue_converted x x0).
+               uvalue_refine_strict x x0).
     }
 
     (* OOME *)
@@ -3782,8 +3920,145 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
+  Definition event_converted_lazy A B (e1 : IS1.LP.Events.L0 A) (e2 : IS2.LP.Events.L0 B) : Prop.
+  Proof.
+    refine (match e1, e2 with
+            | inl1 (E1.ExternalCall dt1 f1 args1), inl1 (E2.ExternalCall dt2 f2 args2) =>
+                _
+            | inr1 (inl1 (E1.Intrinsic dt1 name1 args1)), inr1 (inl1 (E2.Intrinsic dt2 name2 args2)) =>
+                _ (* IntrinsicE *)
+            | inr1 (inr1 (inl1 e1)), inr1 (inr1 (inl1 e2)) =>
+                _ (* Globals *)
+            | inr1 (inr1 (inr1 (inl1 (inl1 e1)))), inr1 (inr1 (inr1 (inl1 (inl1 e2)))) =>
+                _ (* Locals *)
+            | inr1 (inr1 (inr1 (inl1 (inr1 e1)))), inr1 (inr1 (inr1 (inl1 (inr1 e2)))) =>
+                _ (* Stack *)
+            | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
+                _ (* MemoryE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))), inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))) =>
+                _ (* PickE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))) =>
+                _ (* OOME *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))))) =>
+                _ (* UBE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2)))))))) =>
+                _ (* DebugE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1)))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2)))))))) =>
+                _ (* FailureE *)
+            | _, _ =>
+                (* Mismatch of event types *)
+                False
+            end).
 
-  Definition event_res_refine A B (e1 : IS1.LP.Events.L0 A) (res1 : A) (e2 : IS2.LP.Events.L0 B) (res2 : B) : Prop.
+    (* External Calls *)
+    { (* Doesn't say anything about return value... *)
+      apply (dt1 = dt2 /\
+               uvalue_converted_lazy f1 f2 /\
+               Forall2 dvalue_converted_lazy args1 args2).
+    }
+
+    (* Intrinsics *)
+    { apply (dt1 = dt2 /\
+               name1 = name2 /\
+               Forall2 dvalue_converted_lazy args1 args2).
+    }
+
+    (* Globals *)
+    { inversion e1.
+      - (* Global write *)
+        destruct e2 eqn:HE2.
+        + apply (id = id0 /\
+                   dvalue_converted_lazy dv dv0).
+        + apply False.
+      - (* Global read *)
+        destruct e2 eqn:HE2.
+        + apply False.
+        + apply (id = id0).
+    }
+
+    (* Locals *)
+    { inversion e1.
+      - (* Local write *)
+        destruct e2 eqn:HE2.
+        + apply (id = id0 /\
+                   uvalue_converted_lazy dv dv0).
+        + apply False.
+      - (* Local read *)
+        destruct e2 eqn:HE2.
+        + apply False.
+        + apply (id = id0).
+    }
+
+    (* Stack *)
+    { inversion e1.
+      - (* Stack Push *)
+        destruct e2 eqn:HE2.
+        + apply (local_refine_lazy args args0).
+        + apply False.
+      - (* Stack Pop *)
+        destruct e2 eqn:HE2.
+        + apply False.
+        + apply True.
+    }
+
+    (* MemoryE *)
+    { inversion e1.
+      - (* MemPush *)
+        destruct e2 eqn:HE2.
+        2-5: apply False.
+
+        apply True.
+      - (* MemPop *)
+        destruct e2 eqn:HE2.
+        2: apply True.
+        all: apply False.
+      - (* Alloca *)
+        destruct e2 eqn:HE2.
+        1,2,4,5: apply False.
+
+        apply (t = t0 /\
+                 num_elements = num_elements0 /\
+                 align = align0).
+      - (* Load *)
+        destruct e2 eqn:HE2.
+        1-3,5: apply False.
+        apply (t = t0 /\
+                 dvalue_converted_lazy a a0).
+      - (* Store *)
+        destruct e2 eqn:HE2.
+        1-4: apply False.
+
+        apply (t = t0 /\
+                 dvalue_converted_lazy a a0 /\
+                 uvalue_converted_lazy v v0).
+    }
+
+    (* PickE *)
+    { (* TODO: confirm whether this is sane... *)
+      inversion e1.
+      destruct e2 eqn:HE2.
+      apply ((Pre <-> Pre0) /\
+               uvalue_converted_lazy x x0).
+    }
+
+    (* OOME *)
+    { apply True.
+    }
+
+    (* UBE *)
+    { apply True.
+    }
+
+    (* DebugE *)
+    { apply True.
+    }
+
+    (* FailureE *)
+    { apply True.
+    }
+  Defined.
+
+  Definition event_res_refine_lazy A B (e1 : IS1.LP.Events.L0 A) (res1 : A) (e2 : IS2.LP.Events.L0 B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -3818,9 +4093,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inv e2.
 
       apply (t = t0 /\
-               uvalue_refine f f0 /\
-               Forall2 dvalue_refine args args0 /\
-               dvalue_refine res1 res2
+               uvalue_refine_lazy f f0 /\
+               Forall2 dvalue_refine_lazy args args0 /\
+               dvalue_refine_lazy res1 res2
             ).
     }
 
@@ -3829,8 +4104,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inv e2.
       apply (t = t0 /\
                f = f0 /\
-               Forall2 dvalue_refine args args0 /\
-               dvalue_refine res1 res2
+               Forall2 dvalue_refine_lazy args args0 /\
+               dvalue_refine_lazy res1 res2
             ).
     }
 
@@ -3839,13 +4114,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Global write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   dvalue_refine dv dv0).
+                   dvalue_refine_lazy dv dv0).
         + apply False.
       - (* Global read *)
         destruct e2 eqn:HE2.
         + apply False.
         + apply (id = id0 /\
-                   dvalue_refine res1 res2
+                   dvalue_refine_lazy res1 res2
                 ).
     }
 
@@ -3854,20 +4129,20 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Local write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   uvalue_refine dv dv0).
+                   uvalue_refine_lazy dv dv0).
         + apply False.
       - (* Local read *)
         destruct e2 eqn:HE2.
         + apply False.
         + apply (id = id0 /\
-                uvalue_refine res1 res2).
+                uvalue_refine_lazy res1 res2).
     }
 
     (* Stack *)
     { inversion e1; subst.
       - (* Stack Push *)
         destruct e2 eqn:HE2.
-        + apply (local_refine args args0).
+        + apply (local_refine_lazy args args0).
         + apply False.
       - (* Stack Pop *)
         destruct e2 eqn:HE2.
@@ -3893,20 +4168,20 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         apply (t = t0 /\
                  num_elements = num_elements0 /\
                  align = align0 /\
-                 dvalue_refine res1 res2).
+                 dvalue_refine_lazy res1 res2).
       - (* Load *)
         destruct e2 eqn:HE2.
         1-3,5: apply False.
         apply (t = t0 /\
-                 dvalue_refine a a0 /\
-                 uvalue_refine res1 res2).
+                 dvalue_refine_lazy a a0 /\
+                 uvalue_refine_lazy res1 res2).
       - (* Store *)
         destruct e2 eqn:HE2.
         1-4: apply False.
 
         apply (t = t0 /\
-                 dvalue_refine a a0 /\
-                 uvalue_refine v v0).
+                 dvalue_refine_lazy a a0 /\
+                 uvalue_refine_lazy v v0).
     }
 
     (* PickE *)
@@ -3916,8 +4191,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       destruct res1 as [r1 P1].
       destruct res2 as [r2 P2].
       apply ((Pre <-> Pre0) /\
-               uvalue_refine x x0 /\
-               dvalue_refine r1 r2).
+               uvalue_refine_lazy x x0 /\
+               dvalue_refine_lazy r1 r2).
     }
 
     (* OOME *)
@@ -3937,13 +4212,167 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition L0'_refine A B (e1 : IS1.LP.Events.L0' A) (e2 : IS2.LP.Events.L0' B) : Prop.
+  Definition event_res_refine_strict A B (e1 : IS1.LP.Events.L0 A) (res1 : A) (e2 : IS2.LP.Events.L0 B) (res2 : B) : Prop.
+  Proof.
+    refine (match e1, e2 with
+            | inl1 e1, inl1 e2 =>
+                _
+            | inr1 (inl1 e1), inr1 (inl1 e2) =>
+                _ (* IntrinsicE *)
+            | inr1 (inr1 (inl1 e1)), inr1 (inr1 (inl1 e2)) =>
+                _ (* Globals *)
+            | inr1 (inr1 (inr1 (inl1 (inl1 e1)))), inr1 (inr1 (inr1 (inl1 (inl1 e2)))) =>
+                _ (* Locals *)
+            | inr1 (inr1 (inr1 (inl1 (inr1 e1)))), inr1 (inr1 (inr1 (inl1 (inr1 e2)))) =>
+                _ (* Stack *)
+            | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
+                _ (* MemoryE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))), inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))) =>
+                _ (* PickE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))) =>
+                _ (* OOME *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))))) =>
+                _ (* UBE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2)))))))) =>
+                _ (* DebugE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1)))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2)))))))) =>
+                _ (* FailureE *)
+            | _, _ =>
+                (* Mismatch of event types *)
+                False
+            end).
+
+    (* External Calls *)
+    { inv e1.
+      inv e2.
+
+      apply (t = t0 /\
+               uvalue_refine_strict f f0 /\
+               Forall2 dvalue_refine_strict args args0 /\
+               dvalue_refine_strict res1 res2
+            ).
+    }
+
+    (* Intrinsics *)
+    { inv e1.
+      inv e2.
+      apply (t = t0 /\
+               f = f0 /\
+               Forall2 dvalue_refine_strict args args0 /\
+               dvalue_refine_strict res1 res2
+            ).
+    }
+
+    (* Globals *)
+    { inversion e1; subst.
+      - (* Global write *)
+        destruct e2 eqn:HE2.
+        + apply (id = id0 /\
+                   dvalue_refine_strict dv dv0).
+        + apply False.
+      - (* Global read *)
+        destruct e2 eqn:HE2.
+        + apply False.
+        + apply (id = id0 /\
+                   dvalue_refine_strict res1 res2
+                ).
+    }
+
+    (* Locals *)
+    { inversion e1; subst.
+      - (* Local write *)
+        destruct e2 eqn:HE2.
+        + apply (id = id0 /\
+                   uvalue_refine_strict dv dv0).
+        + apply False.
+      - (* Local read *)
+        destruct e2 eqn:HE2.
+        + apply False.
+        + apply (id = id0 /\
+                uvalue_refine_strict res1 res2).
+    }
+
+    (* Stack *)
+    { inversion e1; subst.
+      - (* Stack Push *)
+        destruct e2 eqn:HE2.
+        + apply (local_refine_strict args args0).
+        + apply False.
+      - (* Stack Pop *)
+        destruct e2 eqn:HE2.
+        + apply False.
+        + apply True.
+    }
+
+    (* MemoryE *)
+    { inversion e1; subst.
+      - (* MemPush *)
+        destruct e2 eqn:HE2.
+        2-5: apply False.
+
+        apply True.
+      - (* MemPop *)
+        destruct e2 eqn:HE2.
+        2: apply True.
+        all: apply False.
+      - (* Alloca *)
+        destruct e2 eqn:HE2.
+        1,2,4,5: apply False.
+
+        apply (t = t0 /\
+                 num_elements = num_elements0 /\
+                 align = align0 /\
+                 dvalue_refine_strict res1 res2).
+      - (* Load *)
+        destruct e2 eqn:HE2.
+        1-3,5: apply False.
+        apply (t = t0 /\
+                 dvalue_refine_strict a a0 /\
+                 uvalue_refine_strict res1 res2).
+      - (* Store *)
+        destruct e2 eqn:HE2.
+        1-4: apply False.
+
+        apply (t = t0 /\
+                 dvalue_refine_strict a a0 /\
+                 uvalue_refine_strict v v0).
+    }
+
+    (* PickE *)
+    { (* TODO: confirm whether this is sane... *)
+      inversion e1; subst.
+      destruct e2 eqn:HE2.
+      destruct res1 as [r1 P1].
+      destruct res2 as [r2 P2].
+      apply ((Pre <-> Pre0) /\
+               uvalue_refine_strict x x0 /\
+               dvalue_refine_strict r1 r2).
+    }
+
+    (* OOME *)
+    { apply True.
+    }
+
+    (* UBE *)
+    { apply True.
+    }
+
+    (* DebugE *)
+    { apply True.
+    }
+
+    (* FailureE *)
+    { apply True.
+    }
+  Defined.
+
+  Definition L0'_refine_lazy A B (e1 : IS1.LP.Events.L0' A) (e2 : IS2.LP.Events.L0' B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 (E1.Call dt1 f1 args1), inl1 (E2.Call dt2 f2 args2) =>
                 _ (* Calls *)
             | inr1 e1, inr1 e2 =>
-                event_refine _ _ e1 e2
+                event_refine_lazy _ _ e1 e2
             | _, _ =>
                 False
             end).
@@ -3951,18 +4380,37 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     (* Calls *)
     { (* Doesn't say anything about return value... *)
       apply (dt1 = dt2 /\
-               uvalue_refine f1 f2 /\
-               Forall2 uvalue_refine args1 args2).
+               uvalue_refine_lazy f1 f2 /\
+               Forall2 uvalue_refine_lazy args1 args2).
     }
   Defined.
 
-  Definition L0'_res_refine A B (e1 : IS1.LP.Events.L0' A) (res1 : A) (e2 : IS2.LP.Events.L0' B) (res2 : B) : Prop.
+  Definition L0'_refine_strict A B (e1 : IS1.LP.Events.L0' A) (e2 : IS2.LP.Events.L0' B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 (E1.Call dt1 f1 args1), inl1 (E2.Call dt2 f2 args2) =>
                 _ (* Calls *)
             | inr1 e1, inr1 e2 =>
-                event_res_refine _ _ e1 res1 e2 res2
+                event_refine_strict _ _ e1 e2
+            | _, _ =>
+                False
+            end).
+
+    (* Calls *)
+    { (* Doesn't say anything about return value... *)
+      apply (dt1 = dt2 /\
+               uvalue_refine_strict f1 f2 /\
+               Forall2 uvalue_refine_strict args1 args2).
+    }
+  Defined.
+
+  Definition L0'_res_refine_lazy A B (e1 : IS1.LP.Events.L0' A) (res1 : A) (e2 : IS2.LP.Events.L0' B) (res2 : B) : Prop.
+  Proof.
+    refine (match e1, e2 with
+            | inl1 (E1.Call dt1 f1 args1), inl1 (E2.Call dt2 f2 args2) =>
+                _ (* Calls *)
+            | inr1 e1, inr1 e2 =>
+                event_res_refine_lazy _ _ e1 res1 e2 res2
             | _, _ =>
                 False
             end).
@@ -3972,38 +4420,85 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inv c0.
 
       apply (dt1 = dt2 /\
-               uvalue_refine f1 f2 /\
-               Forall2 uvalue_refine args1 args2 /\
-               uvalue_refine res1 res2
+               uvalue_refine_lazy f1 f2 /\
+               Forall2 uvalue_refine_lazy args1 args2 /\
+               uvalue_refine_lazy res1 res2
             ).
     }
   Defined.
 
-  Definition call_refine (A B : Type) (c1 : IS1.LP.Events.CallE A) (c2 : CallE B) : Prop.
+  Definition L0'_res_refine_strict A B (e1 : IS1.LP.Events.L0' A) (res1 : A) (e2 : IS2.LP.Events.L0' B) (res2 : B) : Prop.
+  Proof.
+    refine (match e1, e2 with
+            | inl1 (E1.Call dt1 f1 args1), inl1 (E2.Call dt2 f2 args2) =>
+                _ (* Calls *)
+            | inr1 e1, inr1 e2 =>
+                event_res_refine_strict _ _ e1 res1 e2 res2
+            | _, _ =>
+                False
+            end).
+
+    (* Calls *)
+    { inv c.
+      inv c0.
+
+      apply (dt1 = dt2 /\
+               uvalue_refine_strict f1 f2 /\
+               Forall2 uvalue_refine_strict args1 args2 /\
+               uvalue_refine_strict res1 res2
+            ).
+    }
+  Defined.
+
+  Definition call_refine_lazy (A B : Type) (c1 : IS1.LP.Events.CallE A) (c2 : CallE B) : Prop.
   Proof.
     (* Calls *)
     { (* Doesn't say anything about return value... *)
       inv c1.
       inv c2.
       apply (t = t0 /\
-               uvalue_refine f f0 /\
-               Forall2 uvalue_refine args args0).
+               uvalue_refine_lazy f f0 /\
+               Forall2 uvalue_refine_lazy args args0).
     }
   Defined.
 
-  Definition call_res_refine (A B : Type) (c1 : IS1.LP.Events.CallE A) (res1 : A) (c2 : CallE B) (res2 : B) : Prop.
+  Definition call_refine_strict (A B : Type) (c1 : IS1.LP.Events.CallE A) (c2 : CallE B) : Prop.
+  Proof.
+    (* Calls *)
+    { (* Doesn't say anything about return value... *)
+      inv c1.
+      inv c2.
+      apply (t = t0 /\
+               uvalue_refine_strict f f0 /\
+               Forall2 uvalue_refine_strict args args0).
+    }
+  Defined.
+
+  Definition call_res_refine_lazy (A B : Type) (c1 : IS1.LP.Events.CallE A) (res1 : A) (c2 : CallE B) (res2 : B) : Prop.
   Proof.
     (* Calls *)
     { inv c1.
       inv c2.
       apply (t = t0 /\
-               uvalue_refine f f0 /\
-               Forall2 uvalue_refine args args0 /\
-               uvalue_refine res1 res2).
+               uvalue_refine_lazy f f0 /\
+               Forall2 uvalue_refine_lazy args args0 /\
+               uvalue_refine_lazy res1 res2).
     }
   Defined.
 
-  Definition exp_E_refine A B (e1 : IS1.LP.Events.exp_E A) (e2 : IS2.LP.Events.exp_E B) : Prop.
+  Definition call_res_refine_strict (A B : Type) (c1 : IS1.LP.Events.CallE A) (res1 : A) (c2 : CallE B) (res2 : B) : Prop.
+  Proof.
+    (* Calls *)
+    { inv c1.
+      inv c2.
+      apply (t = t0 /\
+               uvalue_refine_strict f f0 /\
+               Forall2 uvalue_refine_strict args args0 /\
+               uvalue_refine_strict res1 res2).
+    }
+  Defined.
+
+  Definition exp_E_refine_lazy A B (e1 : IS1.LP.Events.exp_E A) (e2 : IS2.LP.Events.exp_E B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -4032,7 +4527,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Global write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   dvalue_refine dv dv0).
+                   dvalue_refine_lazy dv dv0).
         + apply False.
       - (* Global read *)
         destruct e2 eqn:HE2.
@@ -4045,7 +4540,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Local write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   uvalue_refine dv dv0).
+                   uvalue_refine_lazy dv dv0).
         + apply False.
       - (* Local read *)
         destruct e2 eqn:HE2.
@@ -4075,14 +4570,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         destruct e2 eqn:HE2.
         1-3,5: apply False.
         apply (t = t0 /\
-                 dvalue_refine a a0).
+                 dvalue_refine_lazy a a0).
       - (* Store *)
         destruct e2 eqn:HE2.
         1-4: apply False.
 
         apply (t = t0 /\
-                 dvalue_refine a a0 /\
-                 uvalue_refine v v0).
+                 dvalue_refine_lazy a a0 /\
+                 uvalue_refine_lazy v v0).
     }
 
     (* PickE *)
@@ -4090,7 +4585,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inversion e1.
       destruct e2 eqn:HE2.
       apply ((Pre <-> Pre0) /\
-               uvalue_refine x x0).
+               uvalue_refine_lazy x x0).
     }
 
     (* OOME *)
@@ -4110,7 +4605,114 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition exp_E_res_refine A B (e1 : IS1.LP.Events.exp_E A) (res1 : A) (e2 : IS2.LP.Events.exp_E B) (res2 : B) : Prop.
+  Definition exp_E_refine_strict A B (e1 : IS1.LP.Events.exp_E A) (e2 : IS2.LP.Events.exp_E B) : Prop.
+  Proof.
+    refine (match e1, e2 with
+            | inl1 e1, inl1 e2 =>
+                _ (* Globals *)
+            | inr1 (inl1 e1), inr1 (inl1 e2) =>
+                _ (* Locals *)
+            | inr1 (inr1 (inl1 e1)), inr1 (inr1 (inl1 e2)) =>
+                _ (* MemoryE *)
+            | inr1 (inr1 (inr1 (inl1 e1))), inr1 (inr1 (inr1 (inl1 e2))) =>
+                _ (* PickE *)
+            | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
+                _ (* OOME *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))), inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))) =>
+                _ (* UBE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2)))))) =>
+                _ (* DebugE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2)))))) =>
+                _ (* FailureE *)
+            | _, _ =>
+                (* Mismatch of event types *)
+                False
+            end).
+
+    (* Globals *)
+    { inversion e1.
+      - (* Global write *)
+        destruct e2 eqn:HE2.
+        + apply (id = id0 /\
+                   dvalue_refine_strict dv dv0).
+        + apply False.
+      - (* Global read *)
+        destruct e2 eqn:HE2.
+        + apply False.
+        + apply (id = id0).
+    }
+
+    (* Locals *)
+    { inversion e1.
+      - (* Local write *)
+        destruct e2 eqn:HE2.
+        + apply (id = id0 /\
+                   uvalue_refine_strict dv dv0).
+        + apply False.
+      - (* Local read *)
+        destruct e2 eqn:HE2.
+        + apply False.
+        + apply (id = id0).
+    }
+
+    (* MemoryE *)
+    { inversion e1.
+      - (* MemPush *)
+        destruct e2 eqn:HE2.
+        2-5: apply False.
+
+        apply True.
+      - (* MemPop *)
+        destruct e2 eqn:HE2.
+        2: apply True.
+        all: apply False.
+      - (* Alloca *)
+        destruct e2 eqn:HE2.
+        1,2,4,5: apply False.
+
+        apply (t = t0 /\
+                 num_elements = num_elements0 /\
+                 align = align0).
+      - (* Load *)
+        destruct e2 eqn:HE2.
+        1-3,5: apply False.
+        apply (t = t0 /\
+                 dvalue_refine_strict a a0).
+      - (* Store *)
+        destruct e2 eqn:HE2.
+        1-4: apply False.
+
+        apply (t = t0 /\
+                 dvalue_refine_strict a a0 /\
+                 uvalue_refine_strict v v0).
+    }
+
+    (* PickE *)
+    { (* TODO: confirm whether this is sane... *)
+      inversion e1.
+      destruct e2 eqn:HE2.
+      apply ((Pre <-> Pre0) /\
+               uvalue_refine_strict x x0).
+    }
+
+    (* OOME *)
+    { apply True.
+    }
+
+    (* UBE *)
+    { apply True.
+    }
+
+    (* DebugE *)
+    { apply True.
+    }
+
+    (* FailureE *)
+    { apply True.
+    }
+  Defined.
+
+  Definition exp_E_res_refine_lazy A B (e1 : IS1.LP.Events.exp_E A) (res1 : A) (e2 : IS2.LP.Events.exp_E B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -4139,13 +4741,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Global write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   dvalue_refine dv dv0).
+                   dvalue_refine_lazy dv dv0).
         + apply False.
       - (* Global read *)
         destruct e2 eqn:HE2.
         + apply False.
         + apply (id = id0 /\
-                   dvalue_refine res1 res2
+                   dvalue_refine_lazy res1 res2
                 ).
     }
 
@@ -4154,13 +4756,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Local write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   uvalue_refine dv dv0).
+                   uvalue_refine_lazy dv dv0).
         + apply False.
       - (* Local read *)
         destruct e2 eqn:HE2.
         + apply False.
         + apply (id = id0 /\
-                uvalue_refine res1 res2).
+                uvalue_refine_lazy res1 res2).
     }
 
     (* MemoryE *)
@@ -4181,20 +4783,20 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         apply (t = t0 /\
                  num_elements = num_elements0 /\
                  align = align0 /\
-                 dvalue_refine res1 res2).
+                 dvalue_refine_lazy res1 res2).
       - (* Load *)
         destruct e2 eqn:HE2.
         1-3,5: apply False.
         apply (t = t0 /\
-                 dvalue_refine a a0 /\
-                 uvalue_refine res1 res2).
+                 dvalue_refine_lazy a a0 /\
+                 uvalue_refine_lazy res1 res2).
       - (* Store *)
         destruct e2 eqn:HE2.
         1-4: apply False.
 
         apply (t = t0 /\
-                 dvalue_refine a a0 /\
-                 uvalue_refine v v0).
+                 dvalue_refine_lazy a a0 /\
+                 uvalue_refine_lazy v v0).
     }
 
     (* PickE *)
@@ -4204,8 +4806,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       destruct res1 as [r1 P1].
       destruct res2 as [r2 P2].
       apply ((Pre <-> Pre0) /\
-               uvalue_refine x x0 /\
-            dvalue_refine r1 r2).
+               uvalue_refine_lazy x x0 /\
+            dvalue_refine_lazy r1 r2).
     }
 
     (* OOME *)
@@ -4225,34 +4827,157 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition L0_E1E2_rutt t1 t2
+  Definition exp_E_res_refine_strict A B (e1 : IS1.LP.Events.exp_E A) (res1 : A) (e2 : IS2.LP.Events.exp_E B) (res2 : B) : Prop.
+  Proof.
+    refine (match e1, e2 with
+            | inl1 e1, inl1 e2 =>
+                _ (* Globals *)
+            | inr1 (inl1 e1), inr1 (inl1 e2) =>
+                _ (* Locals *)
+            | inr1 (inr1 (inl1 e1)), inr1 (inr1 (inl1 e2)) =>
+                _ (* MemoryE *)
+            | inr1 (inr1 (inr1 (inl1 e1))), inr1 (inr1 (inr1 (inl1 e2))) =>
+                _ (* PickE *)
+            | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
+                _ (* OOME *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))), inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))) =>
+                _ (* UBE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2)))))) =>
+                _ (* DebugE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2)))))) =>
+                _ (* FailureE *)
+            | _, _ =>
+                (* Mismatch of event types *)
+                False
+            end).
+
+    (* Globals *)
+    { inversion e1; subst.
+      - (* Global write *)
+        destruct e2 eqn:HE2.
+        + apply (id = id0 /\
+                   dvalue_refine_strict dv dv0).
+        + apply False.
+      - (* Global read *)
+        destruct e2 eqn:HE2.
+        + apply False.
+        + apply (id = id0 /\
+                   dvalue_refine_strict res1 res2
+                ).
+    }
+
+    (* Locals *)
+    { inversion e1; subst.
+      - (* Local write *)
+        destruct e2 eqn:HE2.
+        + apply (id = id0 /\
+                   uvalue_refine_strict dv dv0).
+        + apply False.
+      - (* Local read *)
+        destruct e2 eqn:HE2.
+        + apply False.
+        + apply (id = id0 /\
+                uvalue_refine_strict res1 res2).
+    }
+
+    (* MemoryE *)
+    { inversion e1; subst.
+      - (* MemPush *)
+        destruct e2 eqn:HE2.
+        2-5: apply False.
+
+        apply True.
+      - (* MemPop *)
+        destruct e2 eqn:HE2.
+        2: apply True.
+        all: apply False.
+      - (* Alloca *)
+        destruct e2 eqn:HE2.
+        1,2,4,5: apply False.
+
+        apply (t = t0 /\
+                 num_elements = num_elements0 /\
+                 align = align0 /\
+                 dvalue_refine_strict res1 res2).
+      - (* Load *)
+        destruct e2 eqn:HE2.
+        1-3,5: apply False.
+        apply (t = t0 /\
+                 dvalue_refine_strict a a0 /\
+                 uvalue_refine_strict res1 res2).
+      - (* Store *)
+        destruct e2 eqn:HE2.
+        1-4: apply False.
+
+        apply (t = t0 /\
+                 dvalue_refine_strict a a0 /\
+                 uvalue_refine_strict v v0).
+    }
+
+    (* PickE *)
+    { (* TODO: confirm whether this is sane... *)
+      inversion e1; subst.
+      destruct e2 eqn:HE2.
+      destruct res1 as [r1 P1].
+      destruct res2 as [r2 P2].
+      apply ((Pre <-> Pre0) /\
+               uvalue_refine_strict x x0 /\
+            dvalue_refine_strict r1 r2).
+    }
+
+    (* OOME *)
+    { apply True.
+    }
+
+    (* UBE *)
+    { apply True.
+    }
+
+    (* DebugE *)
+    { apply True.
+    }
+
+    (* FailureE *)
+    { apply True.
+    }
+  Defined.
+
+  Definition L0_E1E2_rutt_lazy t1 t2
     : Prop :=
     rutt
-      event_refine
-      event_res_refine
-      dvalue_refine
+      event_refine_lazy
+      event_res_refine_lazy
+      dvalue_refine_lazy
       t1 t2.
 
-  Definition model_E1E2_rutt p1 p2 :=
-    L0_E1E2_rutt
+  Definition L0_E1E2_rutt_strict t1 t2
+    : Prop :=
+    rutt
+      event_refine_strict
+      event_res_refine_strict
+      dvalue_refine_strict
+      t1 t2.
+
+  Definition model_E1E2_rutt_strict p1 p2 :=
+    L0_E1E2_rutt_strict
       (LLVM1.denote_vellvm (DTYPE_I 32%N) "main" LLVM1.main_args (convert_types (mcfg_of_tle p1)))
       (LLVM2.denote_vellvm (DTYPE_I 32%N) "main" LLVM2.main_args (convert_types (mcfg_of_tle p2))).
 
   Import TranslateFacts.
   Import RecursionFacts.
 
-  Lemma allocate_one_E1E2_rutt_sound :
+  Lemma allocate_one_E1E2_rutt_strict_sound :
     forall (m_declarations : list (LLVMAst.declaration dtyp))
       (m_definitions : list (LLVMAst.definition dtyp (cfg dtyp))),
-      rutt event_refine event_res_refine eq
+      rutt event_refine_strict event_res_refine_strict eq
         (map_monad LLVM1.allocate_declaration (m_declarations ++ map LLVMAst.df_prototype m_definitions))
         (map_monad allocate_declaration (m_declarations ++ map LLVMAst.df_prototype m_definitions)).
   Proof.
   Admitted.
 
-  Lemma allocate_global_E1E2_rutt_sound :
+  Lemma allocate_global_E1E2_rutt_strict_sound :
     forall (m_globals : list (LLVMAst.global dtyp)),
-      rutt event_refine event_res_refine eq
+      rutt event_refine_strict event_res_refine_strict eq
         (map_monad LLVM1.allocate_global m_globals)
         (map_monad allocate_global m_globals).
   Proof.
@@ -4260,28 +4985,28 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Lemma translate_exp_to_L0_E1E2_rutt :
     forall {R1 R2} {RR : R1 -> R2 -> Prop} t1 t2,
-      rutt exp_E_refine exp_E_res_refine RR
+      rutt exp_E_refine_strict exp_E_res_refine_strict RR
         t1
         t2 ->
-      rutt event_refine event_res_refine RR
+      rutt event_refine_strict event_res_refine_strict RR
         (translate IS1.LP.Events.exp_to_L0 t1)
         (translate exp_to_L0 t2).
   Proof.
   Admitted.
 
-  Lemma uvalue_convert_dv_to_uv_dvalue_convert :
+  Lemma uvalue_convert_lazy_dv_to_uv_dvalue_convert_lazy :
     forall dv,
-      uvalue_convert (IS1.LP.Events.DV.dvalue_to_uvalue dv) = dvalue_to_uvalue (dvalue_convert dv).
+      uvalue_convert_lazy (IS1.LP.Events.DV.dvalue_to_uvalue dv) = dvalue_to_uvalue (dvalue_convert_lazy dv).
   Proof.
     induction dv; cbn;
       try
-        solve [ rewrite uvalue_convert_equation, dvalue_convert_equation; cbn; auto;
+        solve [ rewrite uvalue_convert_lazy_equation, dvalue_convert_lazy_equation; cbn; auto;
                 break_match; cbn; auto
-              | rewrite uvalue_convert_equation, dvalue_convert_equation; cbn; auto
+              | rewrite uvalue_convert_lazy_equation, dvalue_convert_lazy_equation; cbn; auto
         ].
 
     { (* Structs *)
-      rewrite uvalue_convert_equation, dvalue_convert_equation; cbn.
+      rewrite uvalue_convert_lazy_equation, dvalue_convert_lazy_equation; cbn.
       induction fields.
       - cbn; auto.
       - rewrite map_In_cons, map_cons.
@@ -4297,7 +5022,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     { (* Packed structs *)
-      rewrite uvalue_convert_equation, dvalue_convert_equation; cbn.
+      rewrite uvalue_convert_lazy_equation, dvalue_convert_lazy_equation; cbn.
       induction fields.
       - cbn; auto.
       - rewrite map_In_cons, map_cons.
@@ -4313,7 +5038,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     { (* Arrays *)
-      rewrite uvalue_convert_equation, dvalue_convert_equation; cbn.
+      rewrite uvalue_convert_lazy_equation, dvalue_convert_lazy_equation; cbn.
       induction elts.
       - cbn; auto.
       - rewrite map_In_cons, map_cons.
@@ -4329,7 +5054,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     { (* Vectors *)
-      rewrite uvalue_convert_equation, dvalue_convert_equation; cbn.
+      rewrite uvalue_convert_lazy_equation, dvalue_convert_lazy_equation; cbn.
       induction elts.
       - cbn; auto.
       - rewrite map_In_cons, map_cons.
@@ -4345,7 +5070,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Qed.
 
-  Definition event_res_converted A B (e1 : IS1.LP.Events.L0 A) (res1 : A) (e2 : IS2.LP.Events.L0 B) (res2 : B) : Prop.
+  Definition event_res_converted_lazy A B (e1 : IS1.LP.Events.L0 A) (res1 : A) (e2 : IS2.LP.Events.L0 B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -4380,9 +5105,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inv e2.
 
       apply (t = t0 /\
-               uvalue_converted f f0 /\
-               Forall2 dvalue_converted args args0 /\
-               dvalue_converted res1 res2
+               uvalue_converted_lazy f f0 /\
+               Forall2 dvalue_converted_lazy args args0 /\
+               dvalue_converted_lazy res1 res2
             ).
     }
 
@@ -4391,8 +5116,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inv e2.
       apply (t = t0 /\
                f = f0 /\
-               Forall2 dvalue_converted args args0 /\
-               dvalue_converted res1 res2
+               Forall2 dvalue_converted_lazy args args0 /\
+               dvalue_converted_lazy res1 res2
             ).
     }
 
@@ -4401,13 +5126,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Global write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   dvalue_converted dv dv0).
+                   dvalue_converted_lazy dv dv0).
         + apply False.
       - (* Global read *)
         destruct e2 eqn:HE2.
         + apply False.
         + apply (id = id0 /\
-                   dvalue_converted res1 res2
+                   dvalue_converted_lazy res1 res2
                 ).
     }
 
@@ -4416,20 +5141,20 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Local write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   uvalue_converted dv dv0).
+                   uvalue_converted_lazy dv dv0).
         + apply False.
       - (* Local read *)
         destruct e2 eqn:HE2.
         + apply False.
         + apply (id = id0 /\
-                uvalue_converted res1 res2).
+                uvalue_converted_lazy res1 res2).
     }
 
     (* Stack *)
     { inversion e1; subst.
       - (* Stack Push *)
         destruct e2 eqn:HE2.
-        + apply (local_refine args args0).
+        + apply (local_refine_lazy args args0).
         + apply False.
       - (* Stack Pop *)
         destruct e2 eqn:HE2.
@@ -4455,20 +5180,20 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         apply (t = t0 /\
                  num_elements = num_elements0 /\
                  align = align0 /\
-                 dvalue_converted res1 res2).
+                 dvalue_converted_lazy res1 res2).
       - (* Load *)
         destruct e2 eqn:HE2.
         1-3,5: apply False.
         apply (t = t0 /\
-                 dvalue_converted a a0 /\
-                 uvalue_converted res1 res2).
+                 dvalue_converted_lazy a a0 /\
+                 uvalue_converted_lazy res1 res2).
       - (* Store *)
         destruct e2 eqn:HE2.
         1-4: apply False.
 
         apply (t = t0 /\
-                 dvalue_converted a a0 /\
-                 uvalue_converted v v0).
+                 dvalue_converted_lazy a a0 /\
+                 uvalue_converted_lazy v v0).
     }
 
     (* PickE *)
@@ -4478,8 +5203,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       destruct res1 as [r1 P1].
       destruct res2 as [r2 P2].
       apply ((Pre <-> Pre0) /\
-               uvalue_converted x x0 /\
-               dvalue_converted r1 r2).
+               uvalue_converted_lazy x x0 /\
+               dvalue_converted_lazy r1 r2).
     }
 
     (* OOME *)
@@ -4499,13 +5224,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition L0'_converted A B (e1 : IS1.LP.Events.L0' A) (e2 : IS2.LP.Events.L0' B) : Prop.
+  Definition L0'_converted_lazy A B (e1 : IS1.LP.Events.L0' A) (e2 : IS2.LP.Events.L0' B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 (E1.Call dt1 f1 args1), inl1 (E2.Call dt2 f2 args2) =>
                 _ (* Calls *)
             | inr1 e1, inr1 e2 =>
-                event_refine _ _ e1 e2
+                event_refine_lazy _ _ e1 e2
             | _, _ =>
                 False
             end).
@@ -4513,18 +5238,18 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     (* Calls *)
     { (* Doesn't say anything about return value... *)
       apply (dt1 = dt2 /\
-               uvalue_refine f1 f2 /\
-               Forall2 uvalue_refine args1 args2).
+               uvalue_refine_lazy f1 f2 /\
+               Forall2 uvalue_refine_lazy args1 args2).
     }
   Defined.
 
-  Definition L0'_res_converted A B (e1 : IS1.LP.Events.L0' A) (res1 : A) (e2 : IS2.LP.Events.L0' B) (res2 : B) : Prop.
+  Definition L0'_res_converted_lazy A B (e1 : IS1.LP.Events.L0' A) (res1 : A) (e2 : IS2.LP.Events.L0' B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 (E1.Call dt1 f1 args1), inl1 (E2.Call dt2 f2 args2) =>
                 _ (* Calls *)
             | inr1 e1, inr1 e2 =>
-                event_res_converted _ _ e1 res1 e2 res2
+                event_res_converted_lazy _ _ e1 res1 e2 res2
             | _, _ =>
                 False
             end).
@@ -4534,38 +5259,38 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inv c0.
 
       apply (dt1 = dt2 /\
-               uvalue_converted f1 f2 /\
-               Forall2 uvalue_converted args1 args2 /\
-               uvalue_converted res1 res2
+               uvalue_converted_lazy f1 f2 /\
+               Forall2 uvalue_converted_lazy args1 args2 /\
+               uvalue_converted_lazy res1 res2
             ).
     }
   Defined.
 
-  Definition call_converted (A B : Type) (c1 : IS1.LP.Events.CallE A) (c2 : CallE B) : Prop.
+  Definition call_converted_lazy (A B : Type) (c1 : IS1.LP.Events.CallE A) (c2 : CallE B) : Prop.
   Proof.
     (* Calls *)
     { (* Doesn't say anything about return value... *)
       inv c1.
       inv c2.
       apply (t = t0 /\
-               uvalue_converted f f0 /\
-               Forall2 uvalue_converted args args0).
+               uvalue_converted_lazy f f0 /\
+               Forall2 uvalue_converted_lazy args args0).
     }
   Defined.
 
-  Definition call_res_converted (A B : Type) (c1 : IS1.LP.Events.CallE A) (res1 : A) (c2 : CallE B) (res2 : B) : Prop.
+  Definition call_res_converted_lazy (A B : Type) (c1 : IS1.LP.Events.CallE A) (res1 : A) (c2 : CallE B) (res2 : B) : Prop.
   Proof.
     (* Calls *)
     { inv c1.
       inv c2.
       apply (t = t0 /\
-               uvalue_converted f f0 /\
-               Forall2 uvalue_converted args args0 /\
-               uvalue_converted res1 res2).
+               uvalue_converted_lazy f f0 /\
+               Forall2 uvalue_converted_lazy args args0 /\
+               uvalue_converted_lazy res1 res2).
     }
   Defined.
 
-  Definition exp_E_converted A B (e1 : IS1.LP.Events.exp_E A) (e2 : IS2.LP.Events.exp_E B) : Prop.
+  Definition exp_E_converted_lazy A B (e1 : IS1.LP.Events.exp_E A) (e2 : IS2.LP.Events.exp_E B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -4594,7 +5319,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Global write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   dvalue_converted dv dv0).
+                   dvalue_converted_lazy dv dv0).
         + apply False.
       - (* Global read *)
         destruct e2 eqn:HE2.
@@ -4607,7 +5332,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Local write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   uvalue_converted dv dv0).
+                   uvalue_converted_lazy dv dv0).
         + apply False.
       - (* Local read *)
         destruct e2 eqn:HE2.
@@ -4637,14 +5362,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         destruct e2 eqn:HE2.
         1-3,5: apply False.
         apply (t = t0 /\
-                 dvalue_converted a a0).
+                 dvalue_converted_lazy a a0).
       - (* Store *)
         destruct e2 eqn:HE2.
         1-4: apply False.
 
         apply (t = t0 /\
-                 dvalue_converted a a0 /\
-                 uvalue_converted v v0).
+                 dvalue_converted_lazy a a0 /\
+                 uvalue_converted_lazy v v0).
     }
 
     (* PickE *)
@@ -4652,7 +5377,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inversion e1.
       destruct e2 eqn:HE2.
       apply ((Pre <-> Pre0) /\
-               uvalue_converted x x0).
+               uvalue_converted_lazy x x0).
     }
 
     (* OOME *)
@@ -4672,7 +5397,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition exp_E_res_converted A B (e1 : IS1.LP.Events.exp_E A) (res1 : A) (e2 : IS2.LP.Events.exp_E B) (res2 : B) : Prop.
+  Definition exp_E_res_converted_lazy A B (e1 : IS1.LP.Events.exp_E A) (res1 : A) (e2 : IS2.LP.Events.exp_E B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -4701,13 +5426,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Global write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   dvalue_converted dv dv0).
+                   dvalue_converted_lazy dv dv0).
         + apply False.
       - (* Global read *)
         destruct e2 eqn:HE2.
         + apply False.
         + apply (id = id0 /\
-                   dvalue_converted res1 res2
+                   dvalue_converted_lazy res1 res2
                 ).
     }
 
@@ -4716,13 +5441,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       - (* Local write *)
         destruct e2 eqn:HE2.
         + apply (id = id0 /\
-                   uvalue_converted dv dv0).
+                   uvalue_converted_lazy dv dv0).
         + apply False.
       - (* Local read *)
         destruct e2 eqn:HE2.
         + apply False.
         + apply (id = id0 /\
-                uvalue_converted res1 res2).
+                uvalue_converted_lazy res1 res2).
     }
 
     (* MemoryE *)
@@ -4743,20 +5468,20 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         apply (t = t0 /\
                  num_elements = num_elements0 /\
                  align = align0 /\
-                 dvalue_converted res1 res2).
+                 dvalue_converted_lazy res1 res2).
       - (* Load *)
         destruct e2 eqn:HE2.
         1-3,5: apply False.
         apply (t = t0 /\
-                 dvalue_converted a a0 /\
-                 uvalue_converted res1 res2).
+                 dvalue_converted_lazy a a0 /\
+                 uvalue_converted_lazy res1 res2).
       - (* Store *)
         destruct e2 eqn:HE2.
         1-4: apply False.
 
         apply (t = t0 /\
-                 dvalue_converted a a0 /\
-                 uvalue_converted v v0).
+                 dvalue_converted_lazy a a0 /\
+                 uvalue_converted_lazy v v0).
     }
 
     (* PickE *)
@@ -4766,8 +5491,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       destruct res1 as [r1 P1].
       destruct res2 as [r2 P2].
       apply ((Pre <-> Pre0) /\
-               uvalue_converted x x0 /\
-            dvalue_converted r1 r2).
+               uvalue_converted_lazy x x0 /\
+            dvalue_converted_lazy r1 r2).
     }
 
     (* OOME *)
@@ -4787,61 +5512,63 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition L0_E1E2_rutt_converted t1 t2
+  Definition L0_E1E2_rutt_converted_lazy t1 t2
     : Prop :=
     rutt
-      event_converted
-      event_res_converted
-      dvalue_converted
+      event_converted_lazy
+      event_res_converted_lazy
+      dvalue_converted_lazy
       t1 t2.
 
-  Definition model_E1E2_rutt_converted p1 p2 :=
-    L0_E1E2_rutt_converted
+  Definition model_E1E2_rutt_converted_lazy p1 p2 :=
+    L0_E1E2_rutt_converted_lazy
       (LLVM1.denote_vellvm (DTYPE_I 32%N) "main" LLVM1.main_args (convert_types (mcfg_of_tle p1)))
       (LLVM2.denote_vellvm (DTYPE_I 32%N) "main" LLVM2.main_args (convert_types (mcfg_of_tle p2))).
 
-  Lemma allocate_one_E1E2_rutt_converted_sound :
+  Lemma allocate_one_E1E2_rutt_converted_lazy_sound :
     forall (m_declarations : list (LLVMAst.declaration dtyp))
       (m_definitions : list (LLVMAst.definition dtyp (cfg dtyp))),
-      rutt event_converted event_res_converted eq
+      rutt event_converted_lazy event_res_converted_lazy eq
         (map_monad LLVM1.allocate_declaration (m_declarations ++ map LLVMAst.df_prototype m_definitions))
         (map_monad allocate_declaration (m_declarations ++ map LLVMAst.df_prototype m_definitions)).
   Proof.
   Admitted.
 
-  Lemma allocate_global_E1E2_rutt_converted_sound :
+  Lemma allocate_global_E1E2_rutt_converted_lazy_sound :
     forall (m_globals : list (LLVMAst.global dtyp)),
-      rutt event_converted event_res_converted eq
+      rutt event_converted_lazy event_res_converted_lazy eq
         (map_monad LLVM1.allocate_global m_globals)
         (map_monad allocate_global m_globals).
   Proof.
   Admitted.
 
-  Lemma translate_exp_to_L0_E1E2_converted_rutt :
+  Lemma translate_exp_to_L0_E1E2_converted_lazy_rutt :
     forall {R1 R2} {RR : R1 -> R2 -> Prop} t1 t2,
-      rutt exp_E_converted exp_E_res_converted RR
+      rutt exp_E_converted_lazy exp_E_res_converted_lazy RR
         t1
         t2 ->
-      rutt event_converted event_res_converted RR
+      rutt event_converted_lazy event_res_converted_lazy RR
         (translate IS1.LP.Events.exp_to_L0 t1)
         (translate exp_to_L0 t2).
   Proof.
   Admitted.
 
   (* TODO: Move this? *)
-  Lemma dvalue_refine_dvalue_to_uvalue :
+  Lemma dvalue_refine_lazy_dvalue_to_uvalue :
     forall dv1 dv2,
-      dvalue_refine dv1 dv2 ->
-      uvalue_refine (IS1.LP.Events.DV.dvalue_to_uvalue dv1) (IS2.LP.Events.DV.dvalue_to_uvalue dv2).
+      dvalue_refine_lazy dv1 dv2 ->
+      uvalue_refine_lazy (IS1.LP.Events.DV.dvalue_to_uvalue dv1) (IS2.LP.Events.DV.dvalue_to_uvalue dv2).
   Proof.
     induction dv1; intros dv2 REF.
-
+    
     1-11:
       solve [
-          rewrite dvalue_refine_equation in REF;
-          rewrite dvalue_convert_equation in REF;
-          rewrite uvalue_refine_equation;
-          cbn in *; rewrite uvalue_convert_equation; cbn in *;
+          rewrite dvalue_refine_lazy_equation in REF;
+          unfold dvalue_converted_lazy in *;
+          rewrite dvalue_convert_lazy_equation in REF;
+          rewrite uvalue_refine_lazy_equation;
+          cbn in *; unfold uvalue_converted_lazy in *;
+          rewrite uvalue_convert_lazy_equation; cbn in *;
           solve
             [ (cbn in REF;
                destruct REF as [REF | REF];
@@ -4861,8 +5588,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             ]
         ].
 
-    { rewrite dvalue_refine_equation in REF;
-        rewrite dvalue_convert_equation in REF.
+    { rewrite dvalue_refine_lazy_equation in REF;
+        unfold dvalue_converted_lazy in *;
+        rewrite dvalue_convert_lazy_equation in REF.
 
       destruct REF as [REF | REF].
       - subst; auto.
@@ -4872,8 +5600,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         induction fields.
         + cbn. reflexivity.
         + rewrite map_cons, map_In_cons.
-          rewrite uvalue_convert_equation in IHfields.
-          rewrite uvalue_convert_equation.
+          unfold uvalue_converted_lazy in *;
+          rewrite uvalue_convert_lazy_equation in IHfields.
+          rewrite uvalue_convert_lazy_equation.
           rewrite map_In_cons, map_cons.
 
           forward IHfields.
@@ -4884,8 +5613,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           inv IHfields.
 
           assert
-            (uvalue_convert (IS1.LP.Events.DV.dvalue_to_uvalue a) = dvalue_to_uvalue (dvalue_convert a)).
-          { apply uvalue_convert_dv_to_uv_dvalue_convert.
+            (uvalue_convert_lazy (IS1.LP.Events.DV.dvalue_to_uvalue a) = dvalue_to_uvalue (dvalue_convert_lazy a)).
+          { apply uvalue_convert_lazy_dv_to_uv_dvalue_convert_lazy.
           }
 
           rewrite H0.
@@ -4906,7 +5635,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               - cbn. constructor; auto.
             }
         + (* Struct *)
-          rewrite uvalue_refine_equation.
+          rewrite uvalue_refine_lazy_equation.
           right.
           unfold IS1.LP.Events.DV.dvalue_to_uvalue at 1.
           unfold dvalue_to_uvalue at  1.
@@ -4952,8 +5681,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           }
     }
 
-    { rewrite dvalue_refine_equation in REF;
-        rewrite dvalue_convert_equation in REF.
+    { rewrite dvalue_refine_lazy_equation in REF;
+        unfold dvalue_converted_lazy in *;
+        rewrite dvalue_convert_lazy_equation in REF.
 
       destruct REF as [REF | REF].
       - subst; auto.
@@ -4963,8 +5693,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         induction fields.
         + cbn. reflexivity.
         + rewrite map_cons, map_In_cons.
-          rewrite uvalue_convert_equation in IHfields.
-          rewrite uvalue_convert_equation.
+          unfold uvalue_converted_lazy in *.
+          rewrite uvalue_convert_lazy_equation in IHfields.
+          rewrite uvalue_convert_lazy_equation.
           rewrite map_In_cons, map_cons.
 
           forward IHfields.
@@ -4975,8 +5706,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           inv IHfields.
 
           assert
-            (uvalue_convert (IS1.LP.Events.DV.dvalue_to_uvalue a) = dvalue_to_uvalue (dvalue_convert a)).
-          { apply uvalue_convert_dv_to_uv_dvalue_convert.
+            (uvalue_convert_lazy (IS1.LP.Events.DV.dvalue_to_uvalue a) = dvalue_to_uvalue (dvalue_convert_lazy a)).
+          { apply uvalue_convert_lazy_dv_to_uv_dvalue_convert_lazy.
           }
 
           rewrite H0.
@@ -4997,7 +5728,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               - cbn. constructor; auto.
             }
         + (* Struct *)
-          rewrite uvalue_refine_equation.
+          rewrite uvalue_refine_lazy_equation.
           right.
           unfold IS1.LP.Events.DV.dvalue_to_uvalue at 1.
           unfold dvalue_to_uvalue at  1.
@@ -5043,8 +5774,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           }
     }
 
-    { rewrite dvalue_refine_equation in REF;
-        rewrite dvalue_convert_equation in REF.
+    { rewrite dvalue_refine_lazy_equation in REF;
+        unfold dvalue_converted_lazy in *; rewrite dvalue_convert_lazy_equation in REF.
 
       destruct REF as [REF | REF].
       - subst; auto.
@@ -5055,8 +5786,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         induction fields.
         + cbn. reflexivity.
         + rewrite map_cons, map_In_cons.
-          rewrite uvalue_convert_equation in IHfields.
-          rewrite uvalue_convert_equation.
+          unfold uvalue_converted_lazy in *.
+          rewrite uvalue_convert_lazy_equation in IHfields.
+          rewrite uvalue_convert_lazy_equation.
           rewrite map_In_cons, map_cons.
 
           forward IHfields.
@@ -5067,8 +5799,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           inv IHfields.
 
           assert
-            (uvalue_convert (IS1.LP.Events.DV.dvalue_to_uvalue a) = dvalue_to_uvalue (dvalue_convert a)).
-          { apply uvalue_convert_dv_to_uv_dvalue_convert.
+            (uvalue_convert_lazy (IS1.LP.Events.DV.dvalue_to_uvalue a) = dvalue_to_uvalue (dvalue_convert_lazy a)).
+          { apply uvalue_convert_lazy_dv_to_uv_dvalue_convert_lazy.
           }
 
           rewrite H0.
@@ -5086,7 +5818,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             apply DV1.dvalue_to_uvalue_preserves_dtyp; auto.
           * rewrite map_length; auto.
         + (* Struct *)
-          rewrite uvalue_refine_equation.
+          rewrite uvalue_refine_lazy_equation.
           right.
           unfold IS1.LP.Events.DV.dvalue_to_uvalue at 1.
           unfold dvalue_to_uvalue at 1.
@@ -5133,8 +5865,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           }
     }
 
-    { rewrite dvalue_refine_equation in REF;
-        rewrite dvalue_convert_equation in REF.
+    { rewrite dvalue_refine_lazy_equation in REF;
+        unfold dvalue_converted_lazy in *; rewrite dvalue_convert_lazy_equation in REF.
       destruct REF as [REF | REF].
       - subst; auto.
         left.
@@ -5143,8 +5875,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         induction fields.
         + cbn. reflexivity.
         + rewrite map_cons, map_In_cons.
-          rewrite uvalue_convert_equation in IHfields.
-          rewrite uvalue_convert_equation.
+          unfold uvalue_converted_lazy in *.
+          rewrite uvalue_convert_lazy_equation in IHfields.
+          rewrite uvalue_convert_lazy_equation.
           rewrite map_In_cons, map_cons.
           forward IHfields.
           { intros u H0 dv2 H1.
@@ -5152,8 +5885,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           }
           inv IHfields.
           assert
-            (uvalue_convert (IS1.LP.Events.DV.dvalue_to_uvalue a) = dvalue_to_uvalue (dvalue_convert a)).
-          { apply uvalue_convert_dv_to_uv_dvalue_convert.
+            (uvalue_convert_lazy (IS1.LP.Events.DV.dvalue_to_uvalue a) = dvalue_to_uvalue (dvalue_convert_lazy a)).
+          { apply uvalue_convert_lazy_dv_to_uv_dvalue_convert_lazy.
           }
 
           rewrite H0.
@@ -5172,7 +5905,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           * rewrite map_length; auto.
           * auto.
         + (* Struct *)
-          rewrite uvalue_refine_equation.
+          rewrite uvalue_refine_lazy_equation.
           right.
           unfold IS1.LP.Events.DV.dvalue_to_uvalue at 1.
           unfold dvalue_to_uvalue at 1.
@@ -5222,11 +5955,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     (* This QED takes foreeeever *)
   Admitted.
 
-  Hint Resolve dvalue_refine_dvalue_to_uvalue : DVALUE_REFINE.
+  Hint Resolve dvalue_refine_lazy_dvalue_to_uvalue : DVALUE_REFINE.
 
-  Lemma translate_LU_to_exp_lookup_id_rutt :
+  Lemma translate_LU_to_exp_lookup_id_rutt_lazy :
     forall id : LLVMAst.ident,
-      rutt exp_E_refine exp_E_res_refine uvalue_refine
+      rutt exp_E_refine_lazy exp_E_res_refine_lazy uvalue_refine_lazy
         (translate IS1.LP.Events.LU_to_exp (IS1.LLVM.D.lookup_id id)) (translate LU_to_exp (lookup_id id)).
   Proof.
     intros id.
@@ -5242,7 +5975,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       intros * ?.
       apply rutt_Ret.
-      apply dvalue_refine_dvalue_to_uvalue.
+      apply dvalue_refine_lazy_dvalue_to_uvalue.
       destruct H.
       auto.
     - cbn.
@@ -5415,7 +6148,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Qed.
 
-  Lemma build_global_environment_E1E2_rutt_sound :
+  Lemma build_global_environment_E1E2_rutt_strict_sound :
     forall (m : mcfg dtyp),
       rutt
         event_refine
@@ -5428,7 +6161,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     cbn.
     apply rutt_bind with (RR:=eq).
     { apply rutt_bind with (RR:=eq).
-      apply allocate_one_E1E2_rutt_sound.
+      apply allocate_one_E1E2_rutt_strict_sound.
       intros r1 r2 EQ; subst.
       apply rutt_Ret; auto.
     }
@@ -5438,7 +6171,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
     apply rutt_bind with (RR:=eq).
     { apply rutt_bind with (RR:=eq).
-      apply allocate_global_E1E2_rutt_sound.
+      apply allocate_global_E1E2_rutt_strict_sound.
       intros r1 r2 EQ; subst.
       apply rutt_Ret; auto.
     }
@@ -7943,7 +8676,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     apply map_monad_oom_forall2; auto.
   Qed.
 
-  Lemma model_E1E2_rutt_sound
+  Lemma model_E1E2_rutt_strict_sound
     (p : list
            (LLVMAst.toplevel_entity
               LLVMAst.typ
@@ -7954,7 +8687,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
     unfold denote_vellvm.
     unfold LLVM1.denote_vellvm.
-    eapply rutt_bind; [apply build_global_environment_E1E2_rutt_sound|].
+    eapply rutt_bind; [apply build_global_environment_E1E2_rutt_strict_sound|].
 
     intros [] [] _.
     eapply rutt_bind; [apply address_one_functions_E1E2_rutt|].
