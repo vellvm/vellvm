@@ -29,6 +29,8 @@ From Vellvm Require Import
      Utils.InterpProp
      Utils.ListUtil
      Utils.Tactics
+     Utils.OOMRutt
+     Utils.OOMRuttProps
      Handlers.MemoryModules.FiniteAddresses
      Handlers.MemoryModules.InfiniteAddresses
      Handlers.MemoryModelImplementation.
@@ -1034,6 +1036,21 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
 
   Definition uvalue_refine_strict (uv1 : DV1.uvalue) (uv2 : DV2.uvalue) : Prop
     := uvalue_convert_strict uv1 = NoOom uv2.
+
+  Lemma dvalue_refine_strict_equation :
+    forall (dv1 : DV1.dvalue) (dv2 : DV2.dvalue),
+      dvalue_refine_strict dv1 dv2 = (dvalue_convert_strict dv1 = NoOom dv2).
+  Proof.
+    intros dv1 dv2.
+    reflexivity.
+  Qed.
+
+  Lemma uvalue_refine_strict_equation :
+    forall (uv1 : DV1.uvalue) (uv2 : DV2.uvalue),
+      uvalue_refine_strict uv1 uv2 = (uvalue_convert_strict uv1 = NoOom uv2).
+  Proof.
+    reflexivity.
+  Qed.
 
   #[global] Opaque dvalue_convert_lazy.
   #[global] Opaque uvalue_convert_lazy.
@@ -4952,11 +4969,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Definition L0_E1E2_rutt_strict t1 t2
     : Prop :=
-    rutt
+    orutt
       event_refine_strict
       event_res_refine_strict
       dvalue_refine_strict
-      t1 t2.
+      t1 t2 (OOM:=OOME).
 
   Definition model_E1E2_rutt_strict p1 p2 :=
     L0_E1E2_rutt_strict
@@ -5957,6 +5974,395 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Hint Resolve dvalue_refine_lazy_dvalue_to_uvalue : DVALUE_REFINE.
 
+  (* TODO: This seems better than lazy proof... Can probably do the same? *)
+  Lemma dvalue_refine_strict_dvalue_to_uvalue :
+    forall dv1 dv2,
+      dvalue_refine_strict dv1 dv2 ->
+      uvalue_refine_strict (IS1.LP.Events.DV.dvalue_to_uvalue dv1) (IS2.LP.Events.DV.dvalue_to_uvalue dv2).
+  Proof.
+    induction dv1; intros dv2 REF;
+      rewrite dvalue_refine_strict_equation in REF;
+      rewrite dvalue_convert_strict_equation in REF;
+      rewrite uvalue_refine_strict_equation;
+      cbn in *;
+      rewrite uvalue_convert_strict_equation; cbn in *.
+    
+    1-11:
+      solve
+        [ break_match_hyp; inv REF; auto
+        | inv REF; auto
+        ].
+
+    { (* Structures *)
+      break_match_goal; break_match_hyp; inv REF.
+      - revert l0 Heqo0 l Heqo. induction fields; intros l0 Heqo0 l Heqo.
+        + cbn in *.
+          inv Heqo0; inv Heqo.
+          reflexivity.
+        + rewrite map_cons, map_monad_In_unfold in Heqo.
+          rewrite map_monad_In_unfold in Heqo0.
+          cbn in *.
+
+          destruct (dvalue_convert_strict a) eqn:CONVA; inv Heqo0.
+          pose proof H as IH.
+          specialize (H a (or_introl eq_refl) d).
+          forward H.
+          rewrite dvalue_refine_strict_equation in *; auto.
+          rewrite uvalue_refine_strict_equation in *.
+          rewrite H in Heqo.
+
+          break_match_hyp; inv H1.
+          break_match_hyp; inv Heqo.
+
+          cbn.
+
+          forward IHfields.
+          { intros u H0 dv2 H1.
+            auto.
+          }
+          specialize (IHfields l1 eq_refl l0 eq_refl).
+
+          inv IHfields.
+          auto.
+      - cbn.
+        (* TODO: Move this *)
+        Set Nested Proofs Allowed.
+        Lemma map_monad_In_cons
+          {M} `{MM : Monad M}
+          {A B} l (x:A) (f: forall (a : A), In a (x::l) -> M B) :
+          (map_monad_In (x::l) f) =
+            (b <- f x (or_introl eq_refl);;
+             bs2 <- map_monad_In l (fun x HIn => f x (or_intror HIn));;
+             ret (b :: bs2)).
+        Proof.
+          reflexivity.
+        Qed.
+
+        (* TODO: Move this *)
+        Lemma map_monad_In_OOM_fail :
+          forall {A B} l (f : forall (a : A), In a l -> OOM B) b,
+            map_monad_In l f = Oom b ->
+            exists a (HIn : In a l), f a HIn = Oom b.
+        Proof.
+          intros A B l f b MAP.
+          generalize dependent b.
+          generalize dependent l.
+          induction l; intros f b MAP.
+          - cbn in MAP.
+            inv MAP.
+          - rewrite map_monad_In_cons in MAP.
+            cbn in *.
+            destruct (f a (or_introl eq_refl)) eqn:Hfa; inv MAP;
+              setoid_rewrite Hfa in H0; inv H0.
+            + rename H1 into MAP.
+              destruct (map_monad_In l (fun (x : A) (HIn : In x l) => f x (or_intror HIn))) eqn:HMAP; inv MAP.
+              specialize (IHl (fun (x : A) (HIn : In x l) => f x (or_intror HIn)) b HMAP) as [a' [IN FA]].
+              exists a'. exists (or_intror IN). auto.
+            + exists a. exists (or_introl eq_refl). auto.
+        Qed.
+
+        (* TODO: Move this *)
+        Lemma map_monad_In_OOM_fail' :
+          forall {A B} l (f : forall (a : A), In a l -> OOM B),
+          (exists a b (HIn : In a l), f a HIn = Oom b) ->
+          (exists s, map_monad_In l f = Oom s).
+        Proof.
+          intros A B l f FAIL.
+          generalize dependent l.
+          induction l; intros f FAIL.
+          - cbn in FAIL.
+            destruct FAIL as [_ [_ [CONTRA _]]].
+            contradiction.
+          - destruct FAIL as [a0 [b [HIn FAIL]]].
+            destruct HIn.
+            + subst.
+              rewrite map_monad_In_cons.
+              cbn.
+              setoid_rewrite FAIL.
+              eauto.
+            + rewrite map_monad_In_cons.
+              cbn.
+              break_match_goal.
+              * specialize (IHl (fun (x : A) (HIn : In x l) => f x (or_intror HIn))).
+                forward IHl; eauto.
+                destruct IHl as [s IHl].
+                exists s.
+                rewrite IHl.
+                auto.
+              * exists s; auto.
+        Qed.
+
+        (* TODO: move / generalize these *)
+        Lemma map_monad_In_oom_forall2 :
+          forall {A B} l (f : forall (a : A), In a l -> OOM B) res,
+            map_monad_In l f = NoOom res <->
+              Forall2_HIn l res (fun a b INA INB => f a INA = NoOom b).
+        Proof.
+          intros A B.
+          induction l; intros f res.
+          - split; intros MAP.
+            + cbn in *.
+              inv MAP.
+              auto.
+            + cbn in *.
+              break_match_hyp; tauto.
+          - split; intros MAP.
+            + rewrite map_monad_In_unfold in MAP.
+              cbn in *.
+              break_match_hyp; inv MAP.
+              break_match_hyp; inv H0.
+
+              pose proof (IHl (fun (x : A) (HIn : In x l) => f x (or_intror HIn)) l0) as FORALL.
+              constructor; auto.
+              eapply FORALL. eauto.
+            + rewrite map_monad_In_cons.
+              cbn in *.
+              break_match_hyp; try contradiction.
+              cbn in *.
+              destruct MAP as [FA MAP].
+              rewrite FA.
+
+              pose proof (IHl (fun (x : A) (HIn : In x l) => f x (or_intror HIn)) l0) as FORALL.
+              apply FORALL in MAP.
+              rewrite MAP.
+              auto.
+        Qed.
+
+        Lemma In_Nth :
+          forall {X} xs (x : X),
+            In x xs -> exists i, Util.Nth xs i x.
+        Proof.
+          induction xs; intros x IN.
+          - inv IN.
+          - destruct IN; subst.
+            + exists (0%nat). cbn. auto.
+            + apply IHxs in H as [i H].
+              exists (S i).
+              cbn; auto.
+        Qed.
+
+        Lemma map_monad_In_OOM_succeeds' :
+          forall {A B} l (f : forall (a : A), In a l -> OOM B) res,
+            map_monad_In l f = ret res ->
+            (forall a (HIn : In a l), exists b, f a HIn = ret b).
+        Proof.
+          intros A B.
+          induction l; intros f res MAP.
+          - intros _ [].
+          - rewrite map_monad_In_cons in MAP.
+            cbn in *.
+            break_match_hyp; inv MAP.
+            rename H0 into MAP.
+            break_match_hyp; inv MAP.
+
+            intros a0 [HIn | HIn]; subst.
+            + exists b; auto.
+            + apply IHl with (a:=a0) (HIn:=HIn) in Heqo0.
+              auto.
+        Qed.
+
+        eapply map_monad_In_OOM_fail in Heqo.
+        destruct Heqo as [a [INA Heqo]].
+
+        pose proof INA as INA'.
+        apply In_Nth in INA' as [i NTHA].
+        pose proof NTHA as NTHA'.
+        apply Nth_map_iff in NTHA'.
+        destruct NTHA' as [x [A NTHX]].
+        pose proof NTHX as INX.
+        apply Util.Nth_In in INX.
+
+        pose proof Heqo0 as SUC.
+        apply map_monad_In_OOM_succeeds' with (a:=x) in SUC; auto.
+        destruct SUC as [b CONVX].
+
+        setoid_rewrite dvalue_refine_strict_equation in H.
+        pose proof H as IH.
+        specialize (H x INX b CONVX).
+
+        rewrite A in H.
+        rewrite uvalue_refine_strict_equation in H.
+        rewrite H in Heqo.
+        inv Heqo.
+    }
+
+    { (* Packed Structures *)
+      break_match_goal; break_match_hyp; inv REF.
+      - revert l0 Heqo0 l Heqo. induction fields; intros l0 Heqo0 l Heqo.
+        + cbn in *.
+          inv Heqo0; inv Heqo.
+          reflexivity.
+        + rewrite map_cons, map_monad_In_unfold in Heqo.
+          rewrite map_monad_In_unfold in Heqo0.
+          cbn in *.
+
+          destruct (dvalue_convert_strict a) eqn:CONVA; inv Heqo0.
+          pose proof H as IH.
+          specialize (H a (or_introl eq_refl) d).
+          forward H.
+          rewrite dvalue_refine_strict_equation in *; auto.
+          rewrite uvalue_refine_strict_equation in *.
+          rewrite H in Heqo.
+
+          break_match_hyp; inv H1.
+          break_match_hyp; inv Heqo.
+
+          cbn.
+
+          forward IHfields.
+          { intros u H0 dv2 H1.
+            auto.
+          }
+          specialize (IHfields l1 eq_refl l0 eq_refl).
+
+          inv IHfields.
+          auto.
+      - cbn.
+
+        eapply map_monad_In_OOM_fail in Heqo.
+        destruct Heqo as [a [INA Heqo]].
+
+        pose proof INA as INA'.
+        apply In_Nth in INA' as [i NTHA].
+        pose proof NTHA as NTHA'.
+        apply Nth_map_iff in NTHA'.
+        destruct NTHA' as [x [A NTHX]].
+        pose proof NTHX as INX.
+        apply Util.Nth_In in INX.
+
+        pose proof Heqo0 as SUC.
+        apply map_monad_In_OOM_succeeds' with (a:=x) in SUC; auto.
+        destruct SUC as [b CONVX].
+
+        setoid_rewrite dvalue_refine_strict_equation in H.
+        pose proof H as IH.
+        specialize (H x INX b CONVX).
+
+        rewrite A in H.
+        rewrite uvalue_refine_strict_equation in H.
+        rewrite H in Heqo.
+        inv Heqo.
+    }
+
+    { (* Arrays *)
+      break_match_goal; break_match_hyp; inv REF.
+      - revert l0 Heqo0 l Heqo. induction elts; intros l0 Heqo0 l Heqo.
+        + cbn in *.
+          inv Heqo0; inv Heqo.
+          reflexivity.
+        + rewrite map_cons, map_monad_In_unfold in Heqo.
+          rewrite map_monad_In_unfold in Heqo0.
+          cbn in *.
+
+          destruct (dvalue_convert_strict a) eqn:CONVA; inv Heqo0.
+          pose proof H as IH.
+          specialize (H a (or_introl eq_refl) d).
+          forward H.
+          rewrite dvalue_refine_strict_equation in *; auto.
+          rewrite uvalue_refine_strict_equation in *.
+          rewrite H in Heqo.
+
+          break_match_hyp; inv H1.
+          break_match_hyp; inv Heqo.
+
+          cbn.
+
+          forward IHelts.
+          { intros u H0 dv2 H1.
+            auto.
+          }
+          specialize (IHelts l1 eq_refl l0 eq_refl).
+
+          inv IHelts.
+          auto.
+      - cbn.
+
+        eapply map_monad_In_OOM_fail in Heqo.
+        destruct Heqo as [a [INA Heqo]].
+
+        pose proof INA as INA'.
+        apply In_Nth in INA' as [i NTHA].
+        pose proof NTHA as NTHA'.
+        apply Nth_map_iff in NTHA'.
+        destruct NTHA' as [x [A NTHX]].
+        pose proof NTHX as INX.
+        apply Util.Nth_In in INX.
+
+        pose proof Heqo0 as SUC.
+        apply map_monad_In_OOM_succeeds' with (a:=x) in SUC; auto.
+        destruct SUC as [b CONVX].
+
+        setoid_rewrite dvalue_refine_strict_equation in H.
+        pose proof H as IH.
+        specialize (H x INX b CONVX).
+
+        rewrite A in H.
+        rewrite uvalue_refine_strict_equation in H.
+        rewrite H in Heqo.
+        inv Heqo.
+    }
+
+    { (* Vectors *)
+      break_match_goal; break_match_hyp; inv REF.
+      - revert l0 Heqo0 l Heqo. induction elts; intros l0 Heqo0 l Heqo.
+        + cbn in *.
+          inv Heqo0; inv Heqo.
+          reflexivity.
+        + rewrite map_cons, map_monad_In_unfold in Heqo.
+          rewrite map_monad_In_unfold in Heqo0.
+          cbn in *.
+
+          destruct (dvalue_convert_strict a) eqn:CONVA; inv Heqo0.
+          pose proof H as IH.
+          specialize (H a (or_introl eq_refl) d).
+          forward H.
+          rewrite dvalue_refine_strict_equation in *; auto.
+          rewrite uvalue_refine_strict_equation in *.
+          rewrite H in Heqo.
+
+          break_match_hyp; inv H1.
+          break_match_hyp; inv Heqo.
+
+          cbn.
+
+          forward IHelts.
+          { intros u H0 dv2 H1.
+            auto.
+          }
+          specialize (IHelts l1 eq_refl l0 eq_refl).
+
+          inv IHelts.
+          auto.
+      - cbn.
+
+        eapply map_monad_In_OOM_fail in Heqo.
+        destruct Heqo as [a [INA Heqo]].
+
+        pose proof INA as INA'.
+        apply In_Nth in INA' as [i NTHA].
+        pose proof NTHA as NTHA'.
+        apply Nth_map_iff in NTHA'.
+        destruct NTHA' as [x [A NTHX]].
+        pose proof NTHX as INX.
+        apply Util.Nth_In in INX.
+
+        pose proof Heqo0 as SUC.
+        apply map_monad_In_OOM_succeeds' with (a:=x) in SUC; auto.
+        destruct SUC as [b CONVX].
+
+        setoid_rewrite dvalue_refine_strict_equation in H.
+        pose proof H as IH.
+        specialize (H x INX b CONVX).
+
+        rewrite A in H.
+        rewrite uvalue_refine_strict_equation in H.
+        rewrite H in Heqo.
+        inv Heqo.
+    }
+  Qed.
+
+  Hint Resolve dvalue_refine_strict_dvalue_to_uvalue : DVALUE_REFINE.
+
   Lemma translate_LU_to_exp_lookup_id_rutt_lazy :
     forall id : LLVMAst.ident,
       rutt exp_E_refine_lazy exp_E_res_refine_lazy uvalue_refine_lazy
@@ -5993,6 +6399,46 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       auto.
   Qed.
 
+  Lemma translate_LU_to_exp_lookup_id_orutt :
+    forall id : LLVMAst.ident,
+      orutt exp_E_refine_strict exp_E_res_refine_strict uvalue_refine_strict
+        (translate IS1.LP.Events.LU_to_exp (IS1.LLVM.D.lookup_id id)) (translate LU_to_exp (lookup_id id))
+        (OOM:=OOME).
+  Proof.
+    intros id.
+    destruct id.
+    - cbn.
+      repeat rewrite translate_bind.
+      repeat rewrite translate_trigger.
+      repeat setoid_rewrite translate_ret.
+
+      repeat rewrite bind_trigger.
+      apply orutt_Vis;
+        [cbn; auto| |].
+
+      intros * ?.
+      apply orutt_Ret.
+      cbn in H.
+      Transparent uvalue_refine_strict.
+      unfold uvalue_refine_strict.
+      apply dvalue_refine_lazy_dvalue_to_uvalue.
+      destruct H.
+      auto.
+    - cbn.
+      repeat rewrite translate_bind.
+      repeat rewrite translate_trigger.
+      repeat setoid_rewrite translate_ret.
+
+      repeat rewrite bind_trigger.
+      apply rutt_Vis;
+        [cbn; auto|].
+
+      intros * ?.
+      apply rutt_Ret.
+      destruct H.
+      auto.
+  Qed.
+
   (* TODO: generalize *)
   Lemma rutt_raise :
     forall {E1 E2 : Type -> Type} {R1 R2 : Type} `{FailureE -< E1} `{FailureE -< E2}
@@ -6010,10 +6456,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Lemma denote_exp_E1E2_rutt :
     forall e odt,
-      rutt exp_E_refine
-        exp_E_res_refine uvalue_refine
+      orutt exp_E_refine_strict
+        exp_E_res_refine_strict uvalue_refine_strict
         (IS1.LLVM.D.denote_exp odt e)
-        (IS2.LLVM.D.denote_exp odt e).
+        (IS2.LLVM.D.denote_exp odt e)
+        (OOM:=OOME).
   Proof.
     intros e odt.
     induction e using AstLib.exp_ind.
