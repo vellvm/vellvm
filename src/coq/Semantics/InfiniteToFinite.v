@@ -905,7 +905,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
             ret (DV2.DVALUE_IPTR x')
         | DV1.DVALUE_Double x => ret (DV2.DVALUE_Double x)
         | DV1.DVALUE_Float x => ret (DV2.DVALUE_Float x)
-        | DV1.DVALUE_Oom t => ret (DV2.DVALUE_Oom t)  
+        | DV1.DVALUE_Oom t => ret (DV2.DVALUE_Oom t)
         | DV1.DVALUE_Poison t => ret (DV2.DVALUE_Poison t)
         | DV1.DVALUE_None => ret DV2.DVALUE_None
         | DV1.DVALUE_Struct fields =>
@@ -5577,7 +5577,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       uvalue_refine_lazy (IS1.LP.Events.DV.dvalue_to_uvalue dv1) (IS2.LP.Events.DV.dvalue_to_uvalue dv2).
   Proof.
     induction dv1; intros dv2 REF.
-    
+
     1-11:
       solve [
           rewrite dvalue_refine_lazy_equation in REF;
@@ -5986,7 +5986,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       rewrite uvalue_refine_strict_equation;
       cbn in *;
       rewrite uvalue_convert_strict_equation; cbn in *.
-    
+
     1-11:
       solve
         [ break_match_hyp; inv REF; auto
@@ -6419,24 +6419,28 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       intros * ?.
       apply orutt_Ret.
       cbn in H.
-      Transparent uvalue_refine_strict.
-      unfold uvalue_refine_strict.
-      apply dvalue_refine_lazy_dvalue_to_uvalue.
+      apply dvalue_refine_strict_dvalue_to_uvalue.
       destruct H.
       auto.
+
+      intros o CONTRA.
+      dependent destruction CONTRA.
     - cbn.
       repeat rewrite translate_bind.
       repeat rewrite translate_trigger.
       repeat setoid_rewrite translate_ret.
 
       repeat rewrite bind_trigger.
-      apply rutt_Vis;
-        [cbn; auto|].
+      apply orutt_Vis;
+        [cbn; auto| |].
 
       intros * ?.
-      apply rutt_Ret.
+      apply orutt_Ret.
       destruct H.
       auto.
+
+      intros o CONTRA.
+      dependent destruction CONTRA.
   Qed.
 
   (* TODO: generalize *)
@@ -6454,6 +6458,22 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     intros [] [] _.
   Qed.
 
+  (* TODO: generalize *)
+  Lemma orutt_raise :
+    forall {E1 E2 OOM : Type -> Type} OOME {R1 R2 : Type} `{FAIL1 : FailureE -< E1} `{FAIL2 : FailureE -< E2}
+      {PRE : prerel E1 E2} {POST : postrel E1 E2} {R1R2 : R1 -> R2 -> Prop}
+      msg1 msg2,
+      (forall msg (o : OOM _), @subevent FailureE E2 FAIL2 void (Throw msg) <> @subevent OOM E2 OOME void o) ->
+      PRE void void (subevent void (Throw msg1)) (subevent void (Throw msg2)) ->
+      orutt PRE POST R1R2 (LLVMEvents.raise msg1) (LLVMEvents.raise msg2) (OOM:=OOM) (OOME:=OOME).
+  Proof.
+    intros E1 E2 OOM OOME R1 R2 FAIL1 FAIL2 PRE POST R1R2 msg1 msg2 OOM_NOT_FAIL PRETHROW.
+    unfold LLVMEvents.raise.
+    repeat rewrite bind_trigger.
+    apply orutt_Vis; auto.
+    intros [] [] _.
+  Qed.
+
   Lemma denote_exp_E1E2_rutt :
     forall e odt,
       orutt exp_E_refine_strict
@@ -6464,34 +6484,53 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Proof.
     intros e odt.
     induction e using AstLib.exp_ind.
-    - apply translate_LU_to_exp_lookup_id_rutt.
+    - apply translate_LU_to_exp_lookup_id_orutt.
     - destruct odt as [dt | ].
       { destruct dt; cbn;
-          try solve [ apply rutt_raise; cbn; auto ].
-
+          try solve [
+              apply orutt_raise;
+              [intros * CONTRA; dependent destruction CONTRA | cbn; auto]
+            ].
 
         { (* Normal integers *)
           pose proof (@IX_supported_dec sz)
             as [SUPPORTED | UNSUPPORTED].
           - inv SUPPORTED;
               repeat rewrite map_ret;
-              apply rutt_Ret;
-              rewrite uvalue_refine_equation;
-              left;
-              rewrite uvalue_convert_equation;
+              apply orutt_Ret;
+              rewrite uvalue_refine_strict_equation;
+              rewrite uvalue_convert_strict_equation;
               cbn;
               reflexivity.
           - repeat rewrite unsupported_cases_match; auto;
               repeat rewrite Raise.raise_map_itree;
-              apply rutt_raise; cbn; auto.
+              apply orutt_raise;
+              [intros * CONTRA; dependent destruction CONTRA | cbn; auto].
         }
 
         { (* Intptrs *)
           repeat rewrite map_bind.
-          eapply rutt_bind.
+          eapply orutt_bind with
+            (RR:=(fun (ip1 : IS1.LP.IP.intptr) (ip2 : IS2.LP.IP.intptr) => IS1.LP.IP.to_Z ip1 = IS2.LP.IP.to_Z ip2)).
           unfold lift_OOM.
-          { unfold VellvmIntegers.mrepr.
-            admit.
+          { break_match; break_match.
+            - apply orutt_Ret.
+              unfold VellvmIntegers.mrepr in *.
+              unfold IS1.LP.Events.DV.VMemInt_intptr' in *.
+              (* Need to make this transparent in MemoryAddress.v... *)
+              admit.
+            - (* TODO: Make a lemma about raise_oom *)
+              cbn.
+              unfold raiseOOM.
+              rewrite bind_trigger.
+              cbn.
+              admit.
+            - (* TODO: This should be a contradiction based on the
+                 assumption that the right hand side has more OOM. I
+                 believe this lemma is too abstract right now. *)
+              admit.
+            - (* TODO: lemma bout raise_oom and orutt should solve this *)
+              admit.
           }
           admit.
         }
