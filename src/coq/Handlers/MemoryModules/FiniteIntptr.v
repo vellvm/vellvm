@@ -164,6 +164,13 @@ Definition from_Z := (fun (x : Z) => ret x : OOM Z).
     cbn. reflexivity.
   Qed.
 
+  Lemma VMemInt_intptr_mrepr_from_Z :
+    forall x,
+      @mrepr intptr VMemInt_intptr x = from_Z x.
+  Proof.
+    reflexivity.
+  Qed.
+
 End BigIP.
 
 Module BigIP_BIG : MemoryAddress.INTPTR_BIG BigIP.
@@ -353,6 +360,13 @@ Module IP64Bit : MemoryAddress.INTPTR.
     @mdtyp_of_int intptr VMemInt_intptr = DTYPE_IPTR.
   Proof.
     cbn. reflexivity.
+  Qed.
+
+  Lemma VMemInt_intptr_mrepr_from_Z :
+    forall x,
+      @mrepr intptr VMemInt_intptr x = from_Z x.
+  Proof.
+    reflexivity.
   Qed.
 
 End IP64Bit.

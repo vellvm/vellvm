@@ -78,6 +78,10 @@ Module Type INTPTR.
 
   Parameter VMemInt_intptr_dtyp :
     @mdtyp_of_int intptr VMemInt_intptr = DTYPE_IPTR.
+
+  Parameter VMemInt_intptr_mrepr_from_Z :
+    forall x,
+      @mrepr intptr VMemInt_intptr x = from_Z x.
 End INTPTR.
 
 Module Type INTPTR_BIG (IP : INTPTR).
