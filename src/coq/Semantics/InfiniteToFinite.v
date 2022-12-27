@@ -6474,6 +6474,29 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     intros [] [] _.
   Qed.
 
+  Lemma orutt_raiseOOM :
+    forall {E1 E2 : Type -> Type} `{OOME2 : OOME -< E2} {R1 R2 : Type}
+      {PRE : prerel E1 E2} {POST : postrel E1 E2} {R1R2 : R1 -> R2 -> Prop} t msg,
+        orutt PRE POST R1R2 t (raiseOOM msg) (OOM:=OOME) (OOME:=OOME2).
+  Proof.
+    intros E1 E2 OOME2 R1 R2 PRE POST R1R2 t msg.
+    unfold raiseOOM.
+    rewrite bind_trigger.
+    pfold. red.
+    cbn.
+    apply EqVisOOM.
+  Qed.
+
+  Lemma orutt_raise_oom :
+    forall {E1 E2 : Type -> Type} `{OOME2 : OOME -< E2} {R1 R2 : Type}
+      {PRE : prerel E1 E2} {POST : postrel E1 E2} {R1R2 : R1 -> R2 -> Prop} t msg,
+        orutt PRE POST R1R2 t (raise_oom msg) (OOM:=OOME) (OOME:=OOME2).
+  Proof.
+    intros E1 E2 OOME R1 R2 PRE POST R1R2 t msg.
+    cbn.
+    apply orutt_raiseOOM.
+  Qed.
+
   Lemma denote_exp_E1E2_rutt :
     forall e odt,
       orutt exp_E_refine_strict
@@ -6515,26 +6538,35 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           unfold lift_OOM.
           { break_match; break_match.
             - apply orutt_Ret.
-              unfold VellvmIntegers.mrepr in *.
-              unfold IS1.LP.Events.DV.VMemInt_intptr' in *.
-              (* Need to make this transparent in MemoryAddress.v... *)
-              admit.
-            - (* TODO: Make a lemma about raise_oom *)
-              cbn.
-              unfold raiseOOM.
-              rewrite bind_trigger.
-              cbn.
-              admit.
+              rewrite IS1.LP.IP.VMemInt_intptr_mrepr_from_Z in Heqo.
+              rewrite IS2.LP.IP.VMemInt_intptr_mrepr_from_Z in Heqo0.
+              erewrite IP.from_Z_to_Z; eauto.
+              erewrite IS1.LP.IP.from_Z_to_Z; eauto.
+            - apply orutt_raise_oom.
             - (* TODO: This should be a contradiction based on the
                  assumption that the right hand side has more OOM. I
                  believe this lemma is too abstract right now. *)
               admit.
-            - (* TODO: lemma bout raise_oom and orutt should solve this *)
-              admit.
+            - apply orutt_raise_oom.
           }
-          admit.
+
+          intros r1 r2 H.
+          do 2 rewrite map_ret.
+          apply orutt_Ret.
+          cbn.
+          rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
+          cbn.
+          rewrite H.
+          rewrite IP.to_Z_from_Z; auto.
         }
       }
+
+      cbn.
+      apply orutt_raise; cbn; auto.
+      intros msg o CONTRA.
+      inv CONTRA.
+    -
+
   Admitted.
 
   Lemma GlobalRead_exp_E_E1E2_rutt :
