@@ -33,7 +33,8 @@ Open Scope monad_scope.
 
 Module BigIP : MemoryAddress.INTPTR with
 Definition intptr := Z with
-Definition from_Z := (fun (x : Z) => ret x : OOM Z).
+Definition from_Z := (fun (x : Z) => ret x : OOM Z) with
+Definition to_Z := fun (x : Z) => x.
   Definition intptr := Z.
   Definition zero := 0%Z.
 
