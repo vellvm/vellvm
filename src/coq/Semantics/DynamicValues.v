@@ -1079,6 +1079,123 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
        | inr a => a
        end.
 
+  Lemma uvalue_to_dvalue_list :
+    forall fields,
+      (forall u : uvalue,
+          List.In u fields ->
+          is_concrete u = true -> exists dv : dvalue, uvalue_to_dvalue u = inr dv) ->
+      forallb is_concrete fields = true ->
+      exists dfields, map_monad uvalue_to_dvalue fields = inr dfields.
+  Proof.
+    induction fields; intros H ALL.
+    - exists nil. reflexivity.
+    - assert (List.In a (a :: fields)) as IN by intuition.
+
+      change (a :: fields) with ([a] ++ fields)%list in ALL.
+      rewrite forallb_app in ALL.
+      apply andb_prop in ALL as (CONC_A & CONC_FIELDS).
+
+      cbn in CONC_A.
+      rewrite Bool.andb_true_r in CONC_A.
+      pose proof (H a IN CONC_A) as (dv & CONV_A).
+
+      assert (forall u : uvalue,
+                 List.In u fields -> is_concrete u = true -> exists dv : dvalue, uvalue_to_dvalue u = inr dv) as HCONV.
+      { intros u INFS CONCU.
+        apply H; intuition.
+      }
+
+      pose proof (IHfields HCONV CONC_FIELDS) as (dfields & CONV_DFIELDS).
+      exists (dv :: dfields).
+
+      change (a :: fields) with ([a] ++ fields)%list.
+      rewrite map_monad_app.
+      cbn.
+      rewrite CONV_A.
+      rewrite CONV_DFIELDS.
+      reflexivity.
+  Qed.
+
+  Lemma is_concrete_uvalue_to_dvalue :
+    forall uv,
+      is_concrete uv = true ->
+      exists dv, uvalue_to_dvalue uv = inr dv.
+  Proof.
+    intros uv CONC.
+    induction uv;
+      inversion CONC; try (eexists; reflexivity).
+    - cbn.
+      pose proof uvalue_to_dvalue_list _ H H1 as (dv & MAP).
+      exists (DVALUE_Struct dv). rewrite MAP.
+      reflexivity.
+    - cbn.
+      pose proof uvalue_to_dvalue_list _ H H1 as (dv & MAP).
+      exists (DVALUE_Packed_struct dv). rewrite MAP.
+      reflexivity.
+    - cbn.
+      pose proof uvalue_to_dvalue_list _ H H1 as (dv & MAP).
+      exists (DVALUE_Array dv). rewrite MAP.
+      reflexivity.
+    - cbn.
+      pose proof uvalue_to_dvalue_list _ H H1 as (dv & MAP).
+      exists (DVALUE_Vector dv). rewrite MAP.
+      reflexivity.
+  Qed.
+
+  Lemma uvalue_to_dvalue_list_concrete :
+    forall fields dfields,
+      (forall u : uvalue,
+          In u fields ->
+          (exists dv : dvalue, uvalue_to_dvalue u = inr dv) -> is_concrete u = true) ->
+      map_monad uvalue_to_dvalue fields = inr dfields ->
+      forallb is_concrete fields = true.
+  Proof.
+    induction fields; intros dfields H MAP; auto.
+    cbn. apply andb_true_intro.
+    split.
+    - apply H.
+      + apply in_eq.
+      + inversion MAP.
+        destruct (uvalue_to_dvalue a) eqn:Hdv; inversion H1.
+        exists d. reflexivity.
+    - inversion MAP.
+      destruct (uvalue_to_dvalue a) eqn:Hdv; inversion H1.
+      destruct (map_monad uvalue_to_dvalue fields) eqn:Hmap; inversion H2.
+      assert (forall u : uvalue,
+                 In u fields -> (exists dv : dvalue, uvalue_to_dvalue u = inr dv) -> is_concrete u = true) as BLAH.
+      { intros u IN (dv & CONV).
+        apply H.
+        - cbn. auto.
+        - exists dv. auto.
+      }
+      apply (IHfields l BLAH eq_refl).
+  Qed.
+
+  Lemma uvalue_to_dvalue_is_concrete :
+    forall uv dv,
+      uvalue_to_dvalue uv = inr dv ->
+      is_concrete uv = true.
+  Proof.
+    induction uv;
+      intros dv CONV; cbn; inversion CONV; auto.
+    - break_match; inversion H1.
+      eapply uvalue_to_dvalue_list_concrete; eauto.
+      intros u IN (dv' & CONV').
+      eapply H; eauto.
+    - break_match; inversion H1.
+      eapply uvalue_to_dvalue_list_concrete; eauto.
+      intros u IN (dv' & CONV').
+      eapply H; eauto.
+    - break_match; inversion H1.
+      eapply uvalue_to_dvalue_list_concrete; eauto.
+      intros u IN (dv' & CONV').
+      eapply H; eauto.
+    - break_match; inversion H1.
+      eapply uvalue_to_dvalue_list_concrete; eauto.
+      intros u IN (dv' & CONV').
+      eapply H; eauto.
+  Qed.
+
   Section hiding_notation.
     #[local] Open Scope sexp_scope.
 

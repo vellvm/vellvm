@@ -133,60 +133,6 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     cbn.  lia.
   Qed.
 
-  Lemma uvalue_to_dvalue_list_concrete :
-    forall fields dfields,
-      (forall u : uvalue,
-          In u fields ->
-          (exists dv : dvalue, uvalue_to_dvalue u = inr dv) -> is_concrete u = true) ->
-      map_monad uvalue_to_dvalue fields = inr dfields ->
-      forallb is_concrete fields = true.
-  Proof.
-    induction fields; intros dfields H MAP; auto.
-    cbn. apply andb_true_intro.
-    split.
-    - apply H.
-      + apply in_eq.
-      + inversion MAP.
-        destruct (uvalue_to_dvalue a) eqn:Hdv; inversion H1.
-        exists d. reflexivity.
-    - inversion MAP.
-      destruct (uvalue_to_dvalue a) eqn:Hdv; inversion H1.
-      destruct (map_monad uvalue_to_dvalue fields) eqn:Hmap; inversion H2.
-      assert (forall u : uvalue,
-                 In u fields -> (exists dv : dvalue, uvalue_to_dvalue u = inr dv) -> is_concrete u = true) as BLAH.
-      { intros u IN (dv & CONV).
-        apply H.
-        - cbn. auto.
-        - exists dv. auto.
-      }
-      apply (IHfields l BLAH eq_refl).
-  Qed.
-
-  Lemma uvalue_to_dvalue_is_concrete :
-    forall uv dv,
-      uvalue_to_dvalue uv = inr dv ->
-      is_concrete uv = true.
-  Proof.
-    induction uv;
-      intros dv CONV; cbn; inversion CONV; auto.
-    - break_match; inversion H1.
-      eapply uvalue_to_dvalue_list_concrete; eauto.
-      intros u IN (dv' & CONV').
-      eapply H; eauto.
-    - break_match; inversion H1.
-      eapply uvalue_to_dvalue_list_concrete; eauto.
-      intros u IN (dv' & CONV').
-      eapply H; eauto.
-    - break_match; inversion H1.
-      eapply uvalue_to_dvalue_list_concrete; eauto.
-      intros u IN (dv' & CONV').
-      eapply H; eauto.
-    - break_match; inversion H1.
-      eapply uvalue_to_dvalue_list_concrete; eauto.
-      intros u IN (dv' & CONV').
-      eapply H; eauto.
-  Qed.
-
   Module ExpTactics.
 
     Hint Rewrite @bind_ret_l : rwexp.
