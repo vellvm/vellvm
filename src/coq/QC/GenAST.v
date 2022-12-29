@@ -22,7 +22,7 @@ Require Import List.
 
 Import ListNotations.
 
-From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils Handlers.Handlers.
+From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils Handlers.Handlers DList.
 Require Import Integers.
 
 
@@ -43,45 +43,12 @@ From ExtLib.Structures Require Export
      Functor.
 Open Scope Z_scope.
 
-
 (* Disable guard checking. This file is only used for generating test
     cases. Some of our generation functions terminate in non-trivial
     ways, but since they're only used to generate test cases (and are
     not used in proofs) it's not terribly important to prove that they
     actually terminate.  *)
 Unset Guard Checking.
-(** Difference lists *)
-Section DList.
-  Definition DList (A : Type) := list A -> list A.
-
-  Definition DList_to_list {A} (dl : DList A) : list A
-    := dl [].
-
-  Definition DList_append {A} (dl1 dl2 : DList A) : DList A
-    := fun xs => dl1 (dl2 xs).
-
-  Definition DList_singleton {A} (a : A) : DList A
-    := cons a.
-
-  Definition DList_cons {A} (a : A) (dl : DList A) : DList A
-    := DList_append (DList_singleton a) dl.
-
-  Definition DList_empty {A} : DList A
-    := fun xs => xs.
-
-  Definition DList_from_list {A} (l : list A) : DList A
-    := fold_right DList_cons DList_empty l.
-
-  Definition DList_map {A B} (f : A -> B) (dl : DList A) : DList B
-    := fold_right (fun a => DList_cons (f a)) (@DList_empty B) (DList_to_list dl).
-
-  #[global] Instance DList_Functor : Functor DList.
-  Proof.
-    split.
-    intros A B X X0.
-    eapply DList_map; eauto.
-  Defined.
-End DList.
 
 Section Helpers.
   Fixpoint is_sized_type_h (t : typ) : bool
