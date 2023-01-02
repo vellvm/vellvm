@@ -7892,9 +7892,214 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           rewrite REFdv2 in FAIL.
           inv FAIL.
       + (* Struct zero initialization *)
-        admit.
+        unfold denote_exp, IS1.LLVM.D.denote_exp.
+        cbn.
+        repeat break_match; cbn; inv Heqs0; inv Heqs; try solve_orutt_raise.
+        * apply map_monad_err_fail in Heqs2.
+          destruct Heqs2 as [a [IN Heqs2]].
+          apply map_monad_err_forall2 in Heqs1.
+          apply Util.Forall2_forall in Heqs1 as [LEN Heqs1].
+          apply In_Nth in IN as [i NTH].
+          pose proof IS1.LLVM.MEM.CP.CONC.MemHelpers.Nth_exists l i as NTHl.
+          forward NTHl.
+          { apply Nth_ix_lt_length in NTH. lia. }
+          destruct NTHl as [x NTHl].
+          specialize (Heqs1 _ _ _ NTH NTHl).
+          apply default_dvalue_of_dtyp_dv1_dv2_same_error in Heqs2.
+          rewrite Heqs2 in Heqs1; inv Heqs1.
+        * apply map_monad_err_fail in Heqs1.
+          destruct Heqs1 as [a [IN Heqs1]].
+          apply map_monad_err_forall2 in Heqs2.
+          apply Util.Forall2_forall in Heqs2 as [LEN Heqs2].
+          apply In_Nth in IN as [i NTH].
+          pose proof IS1.LLVM.MEM.CP.CONC.MemHelpers.Nth_exists l i as NTHl.
+          forward NTHl.
+          { apply Nth_ix_lt_length in NTH. lia. }
+          destruct NTHl as [x NTHl].
+          specialize (Heqs2 _ _ _ NTH NTHl).
+          apply default_dvalue_of_dtyp_dv1_dv2_same_error in Heqs1.
+          rewrite Heqs2 in Heqs1; inv Heqs1.
+        * apply orutt_Ret.
+          unfold_uvalue_refine_strict_goal.
+          cbn in *.
+
+          break_match.
+          {
+            (* TODO: move this *)
+            Lemma map_monad_In_map :
+              forall {M : Type -> Type} {HM : Monad M} {EQM : Monad.Eq1 M},
+                Monad.Eq1Equivalence M ->
+                Monad.MonadLawsE M ->
+                forall (A B C : Type) (xs : list A) (g : A -> B) (f : forall (b : B) (HIn : In b (map g xs)), M C),
+                  Monad.eq1 (map_monad_In (map g xs) f) (map_monad_In xs (fun (x : A) IN => f (g x) (in_map g xs x IN))).
+            Proof.
+              intros. induction xs.
+              - simpl. reflexivity.
+              - simpl.
+                setoid_rewrite IHxs.
+                cbn.
+                assert (f (g a) (or_introl eq_refl) = f (g a) (in_map g (a :: xs) a (or_introl eq_refl))).
+                { apply f_equal.
+                  apply proof_irrelevance.
+                }
+            Admitted.
+
+            (* TODO: Move this!!! *)
+            Lemma map_monad_map_monad_In :
+              forall {M A B} `{HM : Monad M} xs (f : A -> M B),
+                map_monad f xs = map_monad_In xs (fun x _ => f x).
+            Proof.
+              intros M A B HM xs.
+              induction xs; intros f.
+              - cbn. reflexivity.
+              - rewrite map_monad_unfold, map_monad_In_cons.
+                rewrite IHxs.
+                reflexivity.
+            Qed.
+
+            Lemma map_monad_map_err :
+              forall (A B C : Type) (xs : list A) (g : A -> B) (f : B -> err C),
+                map_monad f (map g xs) = map_monad (fun (x : A) => f (g x)) xs.
+            Proof.
+              intros. induction xs.
+              - simpl. reflexivity.
+              - simpl.
+                break_match; auto.
+                setoid_rewrite IHxs.
+                reflexivity.
+            Qed.
+
+            Lemma map_monad_map_oom :
+              forall (A B C : Type) (xs : list A) (g : A -> B) (f : B -> OOM C),
+                map_monad f (map g xs) = map_monad (fun (x : A) => f (g x)) xs.
+            Proof.
+              intros. induction xs.
+              - simpl. reflexivity.
+              - simpl.
+                break_match; auto.
+                setoid_rewrite IHxs.
+                reflexivity.
+            Qed.
+
+            generalize dependent l0.
+            generalize dependent l1.
+            generalize dependent l.
+            induction fields; intros defs2 DEFS2 conv defs1 DEFS1 CONV.
+            - cbn in *.
+              inv DEFS1; inv DEFS2.
+              cbn in *.
+              inv CONV; auto.
+            - cbn in *.
+              break_match_hyp; inv DEFS1.
+              break_match_hyp; inv H0.
+              break_match_hyp; inv DEFS2.
+              break_match_hyp; inv H0.
+
+              apply default_dvalue_of_dtyp_dv1_dv2_equiv in Heqs as [dv2 [DEFdv2 REFdv2]].
+              rewrite DEFdv2 in Heqs1. inv Heqs1.
+              rewrite map_cons in CONV.
+              rewrite map_monad_In_cons in CONV.
+              cbn in *.
+              break_match_hyp; inv CONV.
+              break_match_hyp; inv H0.
+              specialize (IHfields l0 eq_refl l1 l eq_refl Heqo0).
+              inv IHfields.
+              pose proof dvalue_refine_strict_dvalue_to_uvalue _ _ REFdv2.
+              rewrite uvalue_refine_strict_equation in H.
+              rewrite Heqo in H.
+              inv H.
+              reflexivity.
+          }
+
+          apply map_monad_In_OOM_fail in Heqo as [a [IN FAIL]].
+          apply in_map_iff in IN.
+          destruct IN as [a' [EQ IN]].
+          subst.
+
+          pose proof Heqs2.
+          eapply map_monad_err_In in H; eauto.
+          destruct H as [y [DEFy INy]].
+          pose proof DEFy as A'.
+          apply default_dvalue_of_dtyp_dv1_dv2_equiv in DEFy as [dv2 [DEFdv2 REFdv2]].
+          pose proof dvalue_refine_strict_dvalue_to_uvalue _ _ REFdv2.
+          rewrite H in FAIL.
+          inv FAIL.
       + (* Packed struct zero initialization *)
-        admit.
+        unfold denote_exp, IS1.LLVM.D.denote_exp.
+        cbn.
+        repeat break_match; cbn; inv Heqs0; inv Heqs; try solve_orutt_raise.
+        * apply map_monad_err_fail in Heqs2.
+          destruct Heqs2 as [a [IN Heqs2]].
+          apply map_monad_err_forall2 in Heqs1.
+          apply Util.Forall2_forall in Heqs1 as [LEN Heqs1].
+          apply In_Nth in IN as [i NTH].
+          pose proof IS1.LLVM.MEM.CP.CONC.MemHelpers.Nth_exists l i as NTHl.
+          forward NTHl.
+          { apply Nth_ix_lt_length in NTH. lia. }
+          destruct NTHl as [x NTHl].
+          specialize (Heqs1 _ _ _ NTH NTHl).
+          apply default_dvalue_of_dtyp_dv1_dv2_same_error in Heqs2.
+          rewrite Heqs2 in Heqs1; inv Heqs1.
+        * apply map_monad_err_fail in Heqs1.
+          destruct Heqs1 as [a [IN Heqs1]].
+          apply map_monad_err_forall2 in Heqs2.
+          apply Util.Forall2_forall in Heqs2 as [LEN Heqs2].
+          apply In_Nth in IN as [i NTH].
+          pose proof IS1.LLVM.MEM.CP.CONC.MemHelpers.Nth_exists l i as NTHl.
+          forward NTHl.
+          { apply Nth_ix_lt_length in NTH. lia. }
+          destruct NTHl as [x NTHl].
+          specialize (Heqs2 _ _ _ NTH NTHl).
+          apply default_dvalue_of_dtyp_dv1_dv2_same_error in Heqs1.
+          rewrite Heqs2 in Heqs1; inv Heqs1.
+        * apply orutt_Ret.
+          unfold_uvalue_refine_strict_goal.
+          cbn in *.
+
+          break_match.
+          { generalize dependent l0.
+            generalize dependent l1.
+            generalize dependent l.
+            induction fields; intros defs2 DEFS2 conv defs1 DEFS1 CONV.
+            - cbn in *.
+              inv DEFS1; inv DEFS2.
+              cbn in *.
+              inv CONV; auto.
+            - cbn in *.
+              break_match_hyp; inv DEFS1.
+              break_match_hyp; inv H0.
+              break_match_hyp; inv DEFS2.
+              break_match_hyp; inv H0.
+
+              apply default_dvalue_of_dtyp_dv1_dv2_equiv in Heqs as [dv2 [DEFdv2 REFdv2]].
+              rewrite DEFdv2 in Heqs1. inv Heqs1.
+              rewrite map_cons in CONV.
+              rewrite map_monad_In_cons in CONV.
+              cbn in *.
+              break_match_hyp; inv CONV.
+              break_match_hyp; inv H0.
+              specialize (IHfields l0 eq_refl l1 l eq_refl Heqo0).
+              inv IHfields.
+              pose proof dvalue_refine_strict_dvalue_to_uvalue _ _ REFdv2.
+              rewrite uvalue_refine_strict_equation in H.
+              rewrite Heqo in H.
+              inv H.
+              reflexivity.
+          }
+
+          apply map_monad_In_OOM_fail in Heqo as [a [IN FAIL]].
+          apply in_map_iff in IN.
+          destruct IN as [a' [EQ IN]].
+          subst.
+
+          pose proof Heqs2.
+          eapply map_monad_err_In in H; eauto.
+          destruct H as [y [DEFy INy]].
+          pose proof DEFy as A'.
+          apply default_dvalue_of_dtyp_dv1_dv2_equiv in DEFy as [dv2 [DEFdv2 REFdv2]].
+          pose proof dvalue_refine_strict_dvalue_to_uvalue _ _ REFdv2.
+          rewrite H in FAIL.
+          inv FAIL.
       + (* Vector zero initialization *)
         unfold denote_exp, IS1.LLVM.D.denote_exp.
         cbn.
@@ -8527,19 +8732,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               pose proof (E1.DV.is_concrete_uvalue_to_dvalue a CONCa) as [dv UV2DVdv].
               pose proof uvalue_to_dvalue_dvalue_refine_strict _ _ _ Heqo0 UV2DVdv as [dv2 [UV2DVdv2 REFdv2]].
               rewrite UV2DVdv, UV2DVdv2.
-
-              (* TODO: Move this!!! *)
-              Lemma map_monad_map_monad_In :
-                forall {M A B} `{HM : Monad M} xs (f : A -> M B),
-                  map_monad f xs = map_monad_In xs (fun x _ => f x).
-              Proof.
-                intros M A B HM xs.
-                induction xs; intros f.
-                - cbn. reflexivity.
-                - rewrite map_monad_unfold, map_monad_In_cons.
-                  rewrite IHxs.
-                  reflexivity.
-              Qed.
 
               pose proof (map_monad_err_succeeds IS1.LP.Events.DV.uvalue_to_dvalue fields) as UV2DVfields.
               forward UV2DVfields.
