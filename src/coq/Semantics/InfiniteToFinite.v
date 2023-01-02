@@ -7893,8 +7893,107 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           inv FAIL.
       + (* Struct zero initialization *)
         admit.
-      + admit.
-      + admit.
+      + (* Packed struct zero initialization *)
+        admit.
+      + (* Vector zero initialization *)
+        unfold denote_exp, IS1.LLVM.D.denote_exp.
+        cbn.
+        repeat break_match; cbn; inv Heqs0; inv Heqs; try solve_orutt_raise.
+        * apply default_dvalue_of_dtyp_i_dv1_dv2_same_error in Heqs2.
+          rewrite Heqs2 in Heqs1; inv Heqs1.
+        * apply default_dvalue_of_dtyp_i_dv1_dv2_same_error in Heqs1.
+          rewrite Heqs2 in Heqs1; inv Heqs1.
+        * apply default_dvalue_of_dtyp_i_dv1_dv2_equiv in Heqs2 as [dv2 [DEFdv2 REFdv2]].
+          rewrite DEFdv2 in Heqs1; inv Heqs1.
+
+          apply orutt_Ret.
+          unfold_uvalue_refine_strict_goal.
+          cbn in *.
+          break_match.
+          { destruct (N.to_nat sz).
+            - cbn in *; inv Heqo.
+              reflexivity.
+            - rewrite map_repeat in Heqo.
+              rewrite map_repeat.
+              eapply map_monad_In_OOM_repeat_success in Heqo; subst; cbn; auto.
+              rewrite Heqo. reflexivity.
+              rewrite <- uvalue_refine_strict_equation.
+              apply dvalue_refine_strict_dvalue_to_uvalue; auto.
+          }
+
+          apply map_monad_In_OOM_fail in Heqo as [a [IN FAIL]].
+          rewrite map_repeat in IN.
+          apply repeat_spec in IN; subst.
+          apply dvalue_refine_strict_dvalue_to_uvalue in REFdv2.
+          rewrite REFdv2 in FAIL.
+          inv FAIL.
+        * apply orutt_Ret.
+          unfold_uvalue_refine_strict_goal.
+          cbn in *.
+          break_match.
+          { destruct (N.to_nat sz).
+            - cbn in *; inv Heqo.
+              reflexivity.
+            - rewrite map_repeat in Heqo.
+              rewrite map_repeat.
+              eapply map_monad_In_OOM_repeat_success in Heqo; subst; cbn; auto.
+              rewrite Heqo. reflexivity.
+              rewrite <- uvalue_refine_strict_equation.
+              solve_uvalue_refine_strict.
+          }
+
+          apply map_monad_In_OOM_fail in Heqo as [a [IN FAIL]].
+          rewrite map_repeat in IN.
+          apply repeat_spec in IN; subst.
+          cbn in FAIL.
+          rewrite uvalue_convert_strict_equation in FAIL.
+          cbn in *.
+          rewrite AC1.addr_convert_null in FAIL.
+          inv FAIL.
+        * apply orutt_Ret.
+          unfold_uvalue_refine_strict_goal.
+          cbn in *.
+          break_match.
+          { destruct (N.to_nat sz).
+            - cbn in *; inv Heqo.
+              reflexivity.
+            - rewrite map_repeat in Heqo.
+              rewrite map_repeat.
+              eapply map_monad_In_OOM_repeat_success in Heqo; subst; cbn; auto.
+              rewrite Heqo. reflexivity.
+              rewrite <- uvalue_refine_strict_equation.
+              solve_uvalue_refine_strict.
+          }
+
+          apply map_monad_In_OOM_fail in Heqo as [a [IN FAIL]].
+          rewrite map_repeat in IN.
+          apply repeat_spec in IN; subst.
+          cbn in FAIL.
+          rewrite uvalue_convert_strict_equation in FAIL.
+          cbn in *.
+          inv FAIL.
+        * apply orutt_Ret.
+          unfold_uvalue_refine_strict_goal.
+          cbn in *.
+          break_match.
+          { destruct (N.to_nat sz).
+            - cbn in *; inv Heqo.
+              reflexivity.
+            - rewrite map_repeat in Heqo.
+              rewrite map_repeat.
+              eapply map_monad_In_OOM_repeat_success in Heqo; subst; cbn; auto.
+              rewrite Heqo. reflexivity.
+              rewrite <- uvalue_refine_strict_equation.
+              solve_uvalue_refine_strict.
+          }
+
+          apply map_monad_In_OOM_fail in Heqo as [a [IN FAIL]].
+          rewrite map_repeat in IN.
+          apply repeat_spec in IN; subst.
+          cbn in FAIL.
+          rewrite uvalue_convert_strict_equation in FAIL.
+          cbn in *.
+          inv FAIL.
     - (* Cstrings *)
       cbn.
       eapply orutt_bind with (RR:=(fun uvs1 uvs2 => uvalue_refine_strict (DV1.UVALUE_Array uvs1) (UVALUE_Array uvs2))).
