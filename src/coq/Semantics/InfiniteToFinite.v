@@ -8672,7 +8672,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           rewrite Heqo.
           reflexivity.
         - (* iptr *)
-          admit.
+          break_match_hyp; inv H.
+          cbn.
+          apply orutt_Ret.
+          unfold_dvalue_refine_strict.
+          cbn.
+          rewrite Heqo.
+          reflexivity.
         - (* undef *)
           inv H.
           cbn.
