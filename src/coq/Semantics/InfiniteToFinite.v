@@ -5374,6 +5374,66 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     - rewrite tau_euttge, unfold_translate. eauto with itree.
   Qed.
 
+  Lemma translate_exp_to_L0_E1E2_orutt :
+    forall {R1 R2} {RR : R1 -> R2 -> Prop} t1 t2,
+      orutt exp_E_refine_strict exp_E_res_refine_strict RR
+        t1
+        t2
+        (OOM:=OOME) ->
+      orutt event_refine_strict event_res_refine_strict RR
+        (translate IS1.LP.Events.exp_to_L0 t1)
+        (translate exp_to_L0 t2)
+        (OOM:=OOME).
+  Proof.
+    intros *.
+    revert t1 t2.
+    ginit.
+    gcofix CIH.
+    intros * RUTT.
+    rewrite !unfold_translate. punfold RUTT. red in RUTT.
+    induction RUTT; intros; subst; simpl; pclearbot.
+    - gstep.
+      constructor.
+      auto.
+    - gstep.
+      red.
+      constructor.
+      gbase.
+      apply CIH.
+      auto.
+    - gstep; eauto.
+      red.
+      constructor; eauto.
+      apply exp_E_refine_strict_event_refine_strict; auto.
+
+      intros a b H2.
+
+      gbase.
+      apply CIH.
+
+      apply event_res_refine_strict_exp_E_res_refine_strict_inv in H2.
+      apply H0 in H2.
+      pclearbot.
+      pfold. red.
+      punfold H2.
+      intros o CONTRA.
+      specialize (H1 o).
+      apply H1.
+      destruct e2; inv CONTRA.
+      destruct s; inv H3.
+      reflexivity.
+    - gstep; eauto.
+      red.
+      cbn.
+      change (inr1 (inr1 (inr1 (inr1 (resum IFun A e))))) with (@subevent _ _ (ReSum_inr IFun sum1 OOME
+                                                                               (IntrinsicE +'
+                                                                                              LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                                                                               ExternalCallE) A e).
+      apply EqVisOOM.
+    - rewrite tau_euttge, unfold_translate. eauto with itree.
+    - rewrite tau_euttge, unfold_translate. eauto with itree.
+  Qed.
+
   Lemma uvalue_convert_lazy_dv_to_uv_dvalue_convert_lazy :
     forall dv,
       uvalue_convert_lazy (IS1.LP.Events.DV.dvalue_to_uvalue dv) = dvalue_to_uvalue (dvalue_convert_lazy dv).
@@ -10001,39 +10061,38 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     intros r1 r2 EQ; subst.
     inv r2.
 
-    apply rutt_orutt; [| apply L0_dec_oom].
-    eapply translate_exp_to_L0_E1E2_rutt.
-    apply rutt_bind with (RR:=eq).
+    eapply translate_exp_to_L0_E1E2_orutt.
+    apply orutt_bind with (RR:=eq).
     apply initialize_globals_E1E2_orutt.
 
     intros r1 r2 R1R2; subst.
-    apply rutt_Ret.
+    apply orutt_Ret.
     reflexivity.
   Qed.
 
-  Definition function_denotation_refine : IS1.LLVM.D.function_denotation -> IS2.LLVM.D.function_denotation -> Prop.
+  Definition function_denotation_refine_strict : IS1.LLVM.D.function_denotation -> IS2.LLVM.D.function_denotation -> Prop.
   Proof.
     intros d1 d2.
     unfold function_denotation in *.
     unfold IS1.LLVM.D.function_denotation in *.
 
     refine (forall args1 args2,
-               Forall2 uvalue_refine args1 args2 ->
-               rutt L0'_refine L0'_res_refine uvalue_refine
+               Forall2 uvalue_refine_strict args1 args2 ->
+               rutt L0'_refine_strict L0'_res_refine_strict uvalue_refine_strict
                  (d1 args1)
                  (d2 args2)
            ).
   Defined.
 
-  Definition function_denotation_converted : IS1.LLVM.D.function_denotation -> IS2.LLVM.D.function_denotation -> Prop.
+  Definition function_denotation_converted_lazy : IS1.LLVM.D.function_denotation -> IS2.LLVM.D.function_denotation -> Prop.
   Proof.
     intros d1 d2.
     unfold function_denotation in *.
     unfold IS1.LLVM.D.function_denotation in *.
 
     refine (forall args1 args2,
-               Forall2 uvalue_converted args1 args2 ->
-               rutt L0'_refine L0'_res_refine uvalue_converted
+               Forall2 uvalue_converted_lazy args1 args2 ->
+               rutt L0'_refine_lazy L0'_res_refine_lazy uvalue_converted_lazy
                  (d1 args1)
                  (d2 args2)
            ).
@@ -10041,7 +10100,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Lemma denote_ocfg_rutt :
     forall cfg bids,
-      rutt L0'_refine L0'_res_refine (sum_rel (eq × eq) uvalue_refine)
+      rutt L0'_refine_strict L0'_res_refine_strict (sum_rel (eq × eq) uvalue_refine_strict)
         (translate IS1.LP.Events.instr_to_L0'
            (IS1.LLVM.D.denote_ocfg cfg bids))
         (translate instr_to_L0'
@@ -10150,13 +10209,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Lemma address_one_function_E1E2_rutt :
     forall dfn,
-      rutt event_refine event_res_refine (dvalue_refine × function_denotation_refine)
+      rutt event_refine_strict event_res_refine_strict (dvalue_refine_strict × function_denotation_refine_strict)
         (LLVM1.address_one_function dfn)
         (LLVM2.address_one_function dfn).
   Proof.
     intros dfn.
     cbn.
-    eapply rutt_bind with (RR:=dvalue_refine).
+    eapply rutt_bind with (RR:=dvalue_refine_strict).
     apply GlobalRead_L0_E1E2_rutt.
 
     intros r1 r2 R1R2.
@@ -10168,7 +10227,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       red.
       intros args1 args2 ARGS.
       cbn.
-      eapply rutt_bind with (RR:=Forall2 (eq × uvalue_refine)).
+      eapply rutt_bind with (RR:=Forall2 (eq × uvalue_refine_strict)).
       { cbn.
         pose proof (Util.Forall2_length ARGS) as LEN.
         destruct (IS1.LLVM.D.combine_lists_err (LLVMAst.df_args dfn) args1) eqn:HARGS1.
@@ -10196,7 +10255,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
              Forall2 (eq × uvalue_refine) l l0
            *)
 
-          assert (Forall2 (eq × uvalue_refine) l l0) as LL0.
+          assert (Forall2 (eq × uvalue_refine_strict) l l0) as LL0.
           { assert (length l = length l0) as LENLL0.
             { eapply combine_lists_err_length_eq; eauto.
             }
@@ -10240,7 +10299,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       { apply rutt_trigger.
         - cbn.
           induction PARAMS.
-          + apply local_refine_empty.
+          + apply local_refine_strict_empty.
           + destruct x as [xid xuv].
             destruct y as [yid yuv].
             inv H.
@@ -10251,11 +10310,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       }
 
       intros [] [] _.
-      eapply rutt_bind with (RR:=uvalue_refine).
+      eapply rutt_bind with (RR:=uvalue_refine_strict).
       { rewrite translate_bind.
         rewrite translate_bind.
 
-        eapply rutt_bind with (RR:=sum_rel (eq × eq) uvalue_refine).
+        eapply rutt_bind with (RR:=sum_rel (eq × eq) uvalue_refine_strict).
         { (* ocfg stuff *)
           apply denote_ocfg_rutt.
         }
@@ -10302,8 +10361,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Lemma address_one_functions_E1E2_rutt :
     forall dfns,
-      rutt event_refine event_res_refine
-        (Forall2 (dvalue_refine × function_denotation_refine))
+      rutt event_refine_strict event_res_refine_strict
+        (Forall2 (dvalue_refine_strict × function_denotation_refine_strict))
         (map_monad LLVM1.address_one_function dfns)
         (map_monad address_one_function dfns).
   Proof.
@@ -10344,12 +10403,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       RR a b ->
       a = r1 -> b = r2.
 
-  Lemma dvalue_converted_R2_deterministic :
-    R2_deterministic dvalue_converted.
+  Lemma dvalue_converted_lazy_R2_deterministic :
+    R2_deterministic dvalue_converted_lazy.
   Proof.
     red.
     intros r1 r2 a b R1R2 AB.
-    unfold dvalue_converted in *.
+    unfold dvalue_converted_lazy in *.
     intros EQ; subst; auto.
   Qed.
 
@@ -10548,25 +10607,25 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (* Qed. *)
 
   (* TODO: Move? *)
-  Lemma dvalue_refine_oom :
+  Lemma dvalue_refine_lazy_oom :
     forall dv dt,
       DV1.dvalue_has_dtyp dv dt ->
-      dvalue_refine dv (DV2.DVALUE_Oom dt).
+      dvalue_refine_lazy dv (DV2.DVALUE_Oom dt).
   Proof.
     intros dv dt H.
     destruct dv;
-    rewrite dvalue_refine_equation; right; auto.
+    rewrite dvalue_refine_lazy_equation; right; auto.
   Qed.
 
   (* TODO: Move? *)
-  Lemma uvalue_refine_oom :
+  Lemma uvalue_refine_lazy_oom :
     forall uv dt,
       DV1.uvalue_has_dtyp uv dt ->
-      uvalue_refine uv (DV2.UVALUE_Oom dt).
+      uvalue_refine_lazy uv (DV2.UVALUE_Oom dt).
   Proof.
     intros uv dt H.
     destruct uv;
-    rewrite uvalue_refine_equation; right; auto.
+    rewrite uvalue_refine_lazy_equation; right; auto.
   Qed.
 
   (* TODO: move to ListUtils *)
@@ -10663,6 +10722,39 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     intros a b H1.
     apply H3 in H1.
     apply H0 in H1.
+    pclearbot.
+    eauto with paco itree.
+  Qed.
+
+  (* TODO: Should go in the library *)
+  (* TODO: MOVE INTO ORUTT STUFF *)
+  Lemma orutt_weaken :
+    forall {E1 E2 OOM} `{OOME : OOM -< E2} {R1 R2}
+      (PRE1 PRE2 : prerel E1 E2)
+      (POST1 POST2 : postrel E1 E2)
+      (ResR1 ResR2 : R1 -> R2 -> Prop)
+      t1 t2,
+      orutt PRE1 POST1 ResR1 t1 t2 (OOM:=OOM) ->
+      (forall {A B} e1 e2, (PRE1 A B e1 e2 -> PRE2 _ _ e1 e2)) ->
+      (forall {A B} e1 r1 e2 r2, (POST2 A B e1 r1 e2 r2 -> POST1 _ _ e1 r1 e2 r2)) ->
+      (forall r1 r2, (ResR1 r1 r2 -> ResR2 r1 r2)) ->
+      orutt PRE2 POST2 ResR2 t1 t2 (OOM:=OOM).
+  Proof.
+    intros E1 E2 OOM OOME R1 R2 PRE1 PRE2 POST1 POST2 ResR1 ResR2.
+
+    Hint Resolve orutt_monot : paco.
+    Hint Constructors oruttF : itree.
+    Hint Unfold orutt_ : itree.
+    Hint Unfold orutt : itree.
+
+    pcofix CIH. pstep. intros t1 t2 RUTT. punfold RUTT.
+    red in RUTT |- *. induction RUTT; pclearbot; eauto 7 with paco itree.
+
+    intros H2 H3 H4.
+    apply OOMRutt.EqVis; auto.
+    intros a b H5.
+    apply H3 in H5.
+    apply H0 in H5.
     pclearbot.
     eauto with paco itree.
   Qed.
