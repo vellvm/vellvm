@@ -5024,6 +5024,62 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Import TranslateFacts.
   Import RecursionFacts.
 
+  (* TODO: Could be worth considering making sure this isn't behind a module? *)
+  Lemma function_name_eq_equiv :
+    forall id1 id2,
+      LLVM1.function_name_eq id1 id2 = LLVM2.function_name_eq id1 id2.
+  Proof.
+    intros id1 id2.
+    unfold LLVM1.function_name_eq, LLVM2.function_name_eq.
+    reflexivity.
+  Qed.
+
+  Lemma trigger_alloca_E1E2_rutt_strict_sound :
+    forall dt n osz,
+      rutt event_refine_strict event_res_refine_strict dvalue_refine_strict
+        (trigger (IS1.LP.Events.Alloca dt n osz)) (trigger (Alloca dt n osz)).
+  Proof.
+    intros dt n osz.
+    apply rutt_trigger.
+    - cbn. auto.
+    - intros t1 t2 H.
+      cbn in *.
+      tauto.
+  Qed.
+
+  Lemma trigger_globalwrite_E1E2_rutt_strict_sound :
+    forall gid r1 r2,
+      dvalue_refine_strict r1 r2 ->
+      rutt event_refine_strict event_res_refine_strict eq (trigger (GlobalWrite gid r1))
+        (trigger (GlobalWrite gid r2)).
+  Proof.
+    intros gid r1 r2 H.
+    apply rutt_trigger.
+    - cbn. auto.
+    - intros [] [] _.
+      auto.
+  Qed.
+
+  Lemma allocate_declarations_E1E2_rutt_strict_sound :
+    forall a,
+      rutt event_refine_strict event_res_refine_strict eq (LLVM1.allocate_declaration a) (allocate_declaration a).
+  Proof.
+    intros a.
+    induction a.
+    unfold LLVM1.allocate_declaration, allocate_declaration.
+    cbn.
+    repeat setoid_rewrite function_name_eq_equiv.
+    break_match.
+    - apply rutt_Ret; reflexivity.
+    - eapply rutt_bind with (RR:=dvalue_refine_strict).
+      { apply trigger_alloca_E1E2_rutt_strict_sound.        
+      }
+
+      intros r1 r2 H.
+      apply trigger_globalwrite_E1E2_rutt_strict_sound.
+      auto.
+  Qed.
+
   Lemma allocate_one_E1E2_rutt_strict_sound :
     forall (m_declarations : list (LLVMAst.declaration dtyp))
       (m_definitions : list (LLVMAst.definition dtyp (cfg dtyp))),
@@ -5031,7 +5087,26 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (map_monad LLVM1.allocate_declaration (m_declarations ++ map LLVMAst.df_prototype m_definitions))
         (map_monad allocate_declaration (m_declarations ++ map LLVMAst.df_prototype m_definitions)).
   Proof.
-  Admitted.
+    intros m_declarations m_definitions.
+    remember (m_declarations ++ map LLVMAst.df_prototype m_definitions) as declarations.
+    clear m_declarations m_definitions Heqdeclarations.
+    induction declarations.
+    - cbn.
+      apply rutt_Ret.
+      reflexivity.
+    - cbn.
+      eapply rutt_bind with (RR:=eq).
+      { apply allocate_declarations_E1E2_rutt_strict_sound.
+      }
+
+      intros [] [] _.
+      eapply rutt_bind with (RR:=eq); auto.
+
+      intros r1 r2 R1R2.
+      subst.
+      apply rutt_Ret.
+      reflexivity.
+  Qed.
 
   Lemma allocate_global_E1E2_rutt_strict_sound :
     forall (m_globals : list (LLVMAst.global dtyp)),
@@ -5050,7 +5125,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (translate IS1.LP.Events.exp_to_L0 t1)
         (translate exp_to_L0 t2).
   Proof.
-  Admitted.
+    intros R1 R2 RR t1 t2 RUTT.
+
+  Qed.
 
   Lemma uvalue_convert_lazy_dv_to_uv_dvalue_convert_lazy :
     forall dv,
@@ -9507,7 +9584,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Lemma GlobalRead_exp_E_E1E2_rutt :
     forall g,
-      rutt exp_E_refine exp_E_res_refine dvalue_refine (trigger (GlobalRead g)) (trigger (GlobalRead g)).
+      rutt exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict (trigger (GlobalRead g)) (trigger (GlobalRead g)).
   Proof.
     intros g.
     apply rutt_trigger.
@@ -9520,7 +9597,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Lemma GlobalRead_L0_E1E2_rutt :
     forall g,
-      rutt event_refine event_res_refine dvalue_refine (trigger (GlobalRead g)) (trigger (GlobalRead g)).
+      rutt event_refine_strict event_res_refine_strict dvalue_refine_strict (trigger (GlobalRead g)) (trigger (GlobalRead g)).
   Proof.
     intros g.
     apply rutt_trigger.
@@ -9533,9 +9610,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Lemma Store_E1E2_rutt :
     forall dt r1 r2 r3 r4,
-      dvalue_refine r1 r2 ->
-      uvalue_refine r3 r4 ->
-      rutt exp_E_refine exp_E_res_refine eq
+      dvalue_refine_strict r1 r2 ->
+      uvalue_refine_strict r3 r4 ->
+      rutt exp_E_refine_strict exp_E_res_refine_strict eq
         (trigger (IS1.LP.Events.Store dt r1 r3))
         (trigger (IS2.LP.Events.Store dt r2 r4)).
   Proof.
@@ -9547,95 +9624,142 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     reflexivity.
   Qed.
 
-  Lemma initialize_global_E1E2_rutt :
+  Lemma initialize_global_E1E2_orutt :
     forall g,
-      rutt exp_E_refine exp_E_res_refine eq
+      orutt exp_E_refine_strict exp_E_res_refine_strict eq
         (LLVM1.initialize_global g)
-        (LLVM2.initialize_global g).
+        (LLVM2.initialize_global g)
+        (OOM:=OOME).
   Proof.
     intros g.
     cbn.
-    eapply rutt_bind with (RR:=dvalue_refine).
-    apply GlobalRead_exp_E_E1E2_rutt.
+    eapply orutt_bind with (RR:=dvalue_refine_strict).
+    { apply rutt_orutt.
+      apply GlobalRead_exp_E_E1E2_rutt.
+      intros A e2.
+
+      (* TODO: move this! *)
+      Lemma exp_E_dec_oom :
+        forall A (e : exp_E A), {forall o : OOME A, e <> subevent _ o} + {exists o : OOME A, e = subevent _ o}.
+      Proof.
+        intros A s.
+        repeat destruct s;
+          try solve
+            [
+              left;
+              intros o CONTRA;
+              inv CONTRA
+            ].
+
+        right.
+        exists o.
+        reflexivity.
+      Qed.
+
+      apply exp_E_dec_oom.
+    }
 
     intros r1 r2 R1R2.
-    apply rutt_bind with (RR:=uvalue_refine).
+    apply orutt_bind with (RR:=uvalue_refine_strict).
     { break_match.
-      apply denote_exp_E1E2_rutt.
-      eapply rutt_Ret.
-      rewrite uvalue_refine_equation.
-      left.
-      rewrite uvalue_convert_equation.
-      reflexivity.
+      apply denote_exp_E1E2_orutt.
+      eapply orutt_Ret.
+      solve_uvalue_refine_strict.
     }
 
     intros r3 r4 R3R4.
+    apply rutt_orutt; [| apply exp_E_dec_oom].
     apply Store_E1E2_rutt; auto.
   Qed.
 
-  Lemma initialize_globals_E1E2_rutt :
+  Lemma initialize_globals_E1E2_orutt :
     forall m_globals,
-      rutt exp_E_refine exp_E_res_refine eq
+      orutt exp_E_refine_strict exp_E_res_refine_strict eq
         (map_monad LLVM1.initialize_global m_globals)
-        (map_monad initialize_global m_globals).
+        (map_monad initialize_global m_globals)
+        (OOM:=OOME).
   Proof.
     cbn.
 
     induction m_globals.
     { cbn.
-      apply rutt_Ret.
+      apply orutt_Ret.
       reflexivity.
     }
     { rewrite map_monad_unfold.
       rewrite map_monad_unfold.
 
-      apply rutt_bind with (RR:=eq).
-      apply initialize_global_E1E2_rutt.
+      apply orutt_bind with (RR:=eq).
+      apply initialize_global_E1E2_orutt.
 
       intros [] [] _.
-      apply rutt_bind with (RR:=eq).
+      apply orutt_bind with (RR:=eq).
       apply IHm_globals.
 
       intros r1 r2 R1R2; subst.
-      apply rutt_Ret.
+      apply orutt_Ret.
       reflexivity.
     }
   Qed.
 
-  Lemma build_global_environment_E1E2_rutt_strict_sound :
+  Lemma build_global_environment_E1E2_orutt_strict_sound :
     forall (m : mcfg dtyp),
-      rutt
-        event_refine
-        event_res_refine
+      orutt
+        event_refine_strict
+        event_res_refine_strict
         eq
         (LLVM1.build_global_environment m)
-        (LLVM2.build_global_environment m).
+        (LLVM2.build_global_environment m)
+        (OOM:=OOME).
   Proof.
     destruct m.
     cbn.
-    apply rutt_bind with (RR:=eq).
-    { apply rutt_bind with (RR:=eq).
+    apply orutt_bind with (RR:=eq).
+    { apply orutt_bind with (RR:=eq).
+
+      (* TODO: move this! *)
+      Lemma L0_dec_oom :
+        forall A (e : L0 A), {forall o : OOME A, e <> subevent _ o} + {exists o : OOME A, e = subevent _ o}.
+      Proof.
+        intros A s.
+        repeat destruct s;
+          try solve
+            [
+              left;
+              intros o CONTRA;
+              inv CONTRA
+            ].
+
+        right.
+        exists o.
+        reflexivity.
+      Qed.
+
+      (* In the future this allocate_one_E1E2_rutt_strict_sound lemma may be orutt *)
+      apply rutt_orutt; [| apply L0_dec_oom].
       apply allocate_one_E1E2_rutt_strict_sound.
       intros r1 r2 EQ; subst.
-      apply rutt_Ret; auto.
+      apply orutt_Ret; auto.
     }
 
     intros r1 r2 EQ; subst.
     inv r2.
 
-    apply rutt_bind with (RR:=eq).
-    { apply rutt_bind with (RR:=eq).
+    apply orutt_bind with (RR:=eq).
+    { apply orutt_bind with (RR:=eq).
+      apply rutt_orutt; [| apply L0_dec_oom].
       apply allocate_global_E1E2_rutt_strict_sound.
       intros r1 r2 EQ; subst.
-      apply rutt_Ret; auto.
+      apply orutt_Ret; auto.
     }
 
     intros r1 r2 EQ; subst.
     inv r2.
 
+    apply rutt_orutt; [| apply L0_dec_oom].
     eapply translate_exp_to_L0_E1E2_rutt.
     apply rutt_bind with (RR:=eq).
-    apply initialize_globals_E1E2_rutt.
+    apply initialize_globals_E1E2_orutt.
 
     intros r1 r2 R1R2; subst.
     apply rutt_Ret.
