@@ -5136,6 +5136,200 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       reflexivity.
   Qed.
 
+  Lemma exp_E_refine_strict_event_refine_strict :
+    forall A B (e1 : IS1.LP.Events.exp_E A) (e2 : exp_E B),
+      exp_E_refine_strict A B e1 e2 ->
+      event_refine_strict A B (IS1.LP.Events.exp_to_L0 e1) (exp_to_L0 e2).
+  Proof.
+    intros A B e1 e2 H.
+    destruct e1, e2.
+    2,3: (cbn in H;
+          (repeat break_match_hyp; try contradiction)).
+
+    - destruct l, l0.
+      2,3: (cbn in H;
+            (repeat break_match_hyp; try contradiction)).
+
+      all: cbn in *; auto.
+    - destruct s, s0.
+      2,3: (cbn in H;
+            (repeat break_match_hyp; try contradiction)).
+
+      + destruct l, l0.
+        2,3: (cbn in H;
+              (repeat break_match_hyp; try contradiction)).
+
+        all: cbn in *; auto.
+
+      + destruct s, s0.
+        2,3: (cbn in H;
+              (repeat break_match_hyp; try contradiction)).
+
+        { destruct m, m0; cbn; auto.
+        }
+
+        { destruct s, s0.
+          2,3: (cbn in H;
+                (repeat break_match_hyp; try contradiction)).
+
+          { destruct p, p0; cbn; auto. }
+
+          destruct s, s0.
+          2,3: (cbn in H;
+                (repeat break_match_hyp; try contradiction)).
+
+          { destruct o, o0; cbn; auto. }
+
+          destruct s, s0.
+          2,3: (cbn in H;
+                (repeat break_match_hyp; try contradiction)).
+
+          { destruct u, u0; cbn; auto. }
+
+          destruct s, s0.
+          2,3: (cbn in H;
+                (repeat break_match_hyp; try contradiction)).
+
+          { destruct d, d0; cbn; auto. }
+          { destruct f, f0; cbn; auto. }
+
+        }
+  Qed.
+
+  Lemma event_refine_strict_exp_E_refine_strict_inv :
+    forall A B (e1 : IS1.LP.Events.exp_E A) (e2 : exp_E B) a b,
+      event_res_refine_strict A B (IS1.LP.Events.exp_to_L0 e1) a (exp_to_L0 e2) b ->
+      exp_E_refine_strict A B e1 e2.
+  Proof.
+    intros A B e1 e2 a b H.
+    destruct e1, e2.
+    2-3: (cbn in *;
+          break_match_hyp; subst; cbn in *; auto).
+
+    2: {
+      repeat (break_match_hyp; subst; cbn in *; auto).
+      all: inv Heql0.
+    }
+
+    - destruct l, l0.
+      2,3: (cbn in H;
+            (repeat break_match_hyp; try contradiction)).
+
+      all: cbn in *; tauto.
+    - destruct s, s0.
+      2,3: (cbn in H;
+            (repeat break_match_hyp; try contradiction)).
+
+      + destruct l, l0.
+        2,3: (cbn in H;
+              (repeat break_match_hyp; try contradiction)).
+
+        all: cbn in *; tauto.
+
+      + destruct s, s0.
+        2,3: (cbn in H;
+              (repeat break_match_hyp; try contradiction)).
+
+        { destruct m, m0; cbn in *; tauto.
+        }
+
+        { destruct s, s0.
+          2,3: (cbn in H;
+                (repeat break_match_hyp; try contradiction)).
+
+          { destruct p, p0; cbn in *; auto.
+            destruct a, b.
+            tauto.
+          }
+
+          destruct s, s0.
+          2,3: (cbn in H;
+                (repeat break_match_hyp; try contradiction)).
+
+          { destruct o, o0; cbn; auto. }
+
+          destruct s, s0.
+          2,3: (cbn in H;
+                (repeat break_match_hyp; try contradiction)).
+
+          { destruct u, u0; cbn; auto. }
+
+          destruct s, s0.
+          2,3: (cbn in H;
+                (repeat break_match_hyp; try contradiction)).
+
+          { destruct d, d0; cbn; auto. }
+          { destruct f, f0; cbn; auto. }
+
+        }
+  Qed.
+
+  Lemma event_res_refine_strict_exp_E_res_refine_strict_inv :
+    forall A B (e1 : IS1.LP.Events.exp_E A) (e2 : exp_E B) a b,
+      event_res_refine_strict A B (IS1.LP.Events.exp_to_L0 e1) a (exp_to_L0 e2) b ->
+      exp_E_res_refine_strict A B e1 a e2 b.
+  Proof.
+    intros A B e1 e2 a b H.
+    destruct e1, e2.
+    2-3: (cbn in *;
+          break_match_hyp; subst; cbn in *; auto).
+
+    2: {
+      repeat (break_match_hyp; subst; cbn in *; auto).
+      all: inv Heql0.
+    }
+
+    - destruct l, l0.
+      2,3: (cbn in H;
+            (repeat break_match_hyp; try contradiction)).
+
+      all: cbn in *; tauto.
+    - destruct s, s0.
+      2,3: (cbn in H;
+            (repeat break_match_hyp; try contradiction)).
+
+      + destruct l, l0.
+        2,3: (cbn in H;
+              (repeat break_match_hyp; try contradiction)).
+
+        all: cbn in *; tauto.
+
+      + destruct s, s0.
+        2,3: (cbn in H;
+              (repeat break_match_hyp; try contradiction)).
+
+        { destruct m, m0; cbn in *; tauto.
+        }
+
+        { destruct s, s0.
+          2,3: (cbn in H;
+                (repeat break_match_hyp; try contradiction)).
+
+          { destruct p, p0; cbn in *; auto.
+          }
+
+          destruct s, s0.
+          2,3: (cbn in H;
+                (repeat break_match_hyp; try contradiction)).
+
+          { destruct o, o0; cbn; auto. }
+
+          destruct s, s0.
+          2,3: (cbn in H;
+                (repeat break_match_hyp; try contradiction)).
+
+          { destruct u, u0; cbn; auto. }
+
+          destruct s, s0.
+          2,3: (cbn in H;
+                (repeat break_match_hyp; try contradiction)).
+
+          { destruct d, d0; cbn; auto. }
+          { destruct f, f0; cbn; auto. }
+
+        }
+  Qed.
+
   Lemma translate_exp_to_L0_E1E2_rutt :
     forall {R1 R2} {RR : R1 -> R2 -> Prop} t1 t2,
       rutt exp_E_refine_strict exp_E_res_refine_strict RR
@@ -5145,8 +5339,39 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (translate IS1.LP.Events.exp_to_L0 t1)
         (translate exp_to_L0 t2).
   Proof.
-    intros R1 R2 RR t1 t2 RUTT.
+    intros *.
+    revert t1 t2.
+    ginit.
+    gcofix CIH.
+    intros * RUTT.
+    rewrite !unfold_translate. punfold RUTT. red in RUTT.
+    induction RUTT; intros; subst; simpl; pclearbot.
+    - gstep.
+      constructor.
+      auto.
+    - gstep.
+      red.
+      constructor.
+      gbase.
+      apply CIH.
+      auto.
+    - gstep; eauto.
+      red.
+      constructor; eauto.
+      apply exp_E_refine_strict_event_refine_strict; auto.
 
+      intros a b H1.
+
+      gbase.
+      apply CIH.
+
+      apply event_res_refine_strict_exp_E_res_refine_strict_inv in H1.
+      apply H0 in H1.
+      pclearbot.
+      pfold. red.
+      punfold H1.
+    - rewrite tau_euttge, unfold_translate. eauto with itree.
+    - rewrite tau_euttge, unfold_translate. eauto with itree.
   Qed.
 
   Lemma uvalue_convert_lazy_dv_to_uv_dvalue_convert_lazy :
