@@ -5072,7 +5072,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     break_match.
     - apply rutt_Ret; reflexivity.
     - eapply rutt_bind with (RR:=dvalue_refine_strict).
-      { apply trigger_alloca_E1E2_rutt_strict_sound.        
+      { apply trigger_alloca_E1E2_rutt_strict_sound.
       }
 
       intros r1 r2 H.
@@ -5114,7 +5114,27 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (map_monad LLVM1.allocate_global m_globals)
         (map_monad allocate_global m_globals).
   Proof.
-  Admitted.
+    intros m_globals.
+    induction m_globals.
+    - cbn; apply rutt_Ret; reflexivity.
+    - cbn.
+      eapply rutt_bind with (RR:=eq).
+      { eapply rutt_bind with (RR:=dvalue_refine_strict).
+        { apply trigger_alloca_E1E2_rutt_strict_sound.
+        }
+
+        intros r1 r2 H.
+        apply trigger_globalwrite_E1E2_rutt_strict_sound; auto.
+      }
+
+      intros [] [] _.
+      eapply rutt_bind with (RR:=eq); auto.
+
+      intros r1 r2 R1R2.
+      subst.
+      apply rutt_Ret.
+      reflexivity.
+  Qed.
 
   Lemma translate_exp_to_L0_E1E2_rutt :
     forall {R1 R2} {RR : R1 -> R2 -> Prop} t1 t2,
