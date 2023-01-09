@@ -10814,214 +10814,216 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   (* (* Change unique_prop to be a specific dvalue instead of existential? *) *)
 
-  (* Lemma uvalue_refine_unique_prop : *)
-  (*   forall uv1 uv2, *)
-  (*     uvalue_refine uv1 uv2 -> *)
-  (*     IS1.LLVM.D.unique_prop uv1 -> unique_prop uv2. *)
-  (* Proof. *)
-  (*   split. *)
-  (*   { revert uv2 H. *)
-  (*     induction uv1 using IS1.LP.Events.DV.uvalue_ind'; intros uv2 REF [dv UNIQUE]; *)
-  (*       try *)
-  (*         solve *)
-  (*         [ *)
-  (*           red in REF; *)
-  (*           rewrite uvalue_convert_equation in REF; *)
-  (*           cbn in REF; *)
-  (*           first [break_match_hyp; inv REF | inv REF]; *)
-  (*           eexists; *)
-  (*           intros dv0 CONC; *)
-  (*           do 2 red in CONC; *)
-  (*           rewrite concretize_uvalueM_equation in CONC; *)
-  (*           inv CONC; *)
-  (*           auto *)
-  (*         ]. *)
-
-  (*     { (* Undef will be a contradiction in most cases... *)
-  (*          Though not all *) *)
-  (*       admit. *)
-  (*     } *)
-
-  (*     { (* Struct nil *) *)
-  (*       red in REF; *)
-  (*         rewrite uvalue_convert_equation in REF; *)
-  (*         cbn in REF; *)
-  (*         first [break_match_hyp; inv REF | inv REF]; *)
-  (*         eexists; *)
-  (*         intros dv0 CONC. *)
-  (*       do 2 red in CONC. *)
-  (*       rewrite concretize_uvalueM_equation in CONC. *)
-  (*       cbn in CONC. *)
-  (*       red in CONC. *)
-  (*       destruct CONC as [ma [k' [ARGS [CONC1 CONC2]]]]. *)
-  (*       destruct_err_ub_oom ma; inv ARGS; try contradiction. *)
-  (*       cbn in CONC2. *)
-  (*       cbn in CONC1. *)
-  (*       destruct CONC2 as [CONTRA | CONC2]; try contradiction. *)
-  (*       specialize (CONC2 [] eq_refl). *)
-  (*       set (k'_nil := k' []). *)
-  (*       destruct_err_ub_oom k'_nil; subst k'_nil; *)
-  (*         rewrite Hx in CONC2, CONC1; *)
-  (*         try contradiction. *)
-
-  (*       cbn in CONC1. *)
-  (*       inv CONC1. *)
-  (*       reflexivity. *)
-  (*     } *)
-
-  (*     { (* Structs *) *)
-  (*       admit. *)
-  (*     } *)
-
-  (*     { (* Packed struct nil *) *)
-  (*       red in REF; *)
-  (*         rewrite uvalue_convert_equation in REF; *)
-  (*         cbn in REF; *)
-  (*         first [break_match_hyp; inv REF | inv REF]; *)
-  (*         eexists; *)
-  (*         intros dv0 CONC. *)
-  (*       do 2 red in CONC. *)
-  (*       rewrite concretize_uvalueM_equation in CONC. *)
-  (*       cbn in CONC. *)
-  (*       red in CONC. *)
-  (*       destruct CONC as [ma [k' [ARGS [CONC1 CONC2]]]]. *)
-  (*       destruct_err_ub_oom ma; inv ARGS; try contradiction. *)
-  (*       cbn in CONC2. *)
-  (*       cbn in CONC1. *)
-  (*       destruct CONC2 as [CONTRA | CONC2]; try contradiction. *)
-  (*       specialize (CONC2 [] eq_refl). *)
-  (*       set (k'_nil := k' []). *)
-  (*       destruct_err_ub_oom k'_nil; subst k'_nil; *)
-  (*         rewrite Hx in CONC2, CONC1; *)
-  (*         try contradiction. *)
-
-  (*       cbn in CONC1. *)
-  (*       inv CONC1. *)
-  (*       reflexivity. *)
-  (*     } *)
-
-  (*     { (* Packed structs *) *)
-  (*       admit. *)
-  (*     } *)
-
-  (*     { (* Array nil *) *)
-  (*       red in REF; *)
-  (*         rewrite uvalue_convert_equation in REF; *)
-  (*         cbn in REF; *)
-  (*         first [break_match_hyp; inv REF | inv REF]; *)
-  (*         eexists; *)
-  (*         intros dv0 CONC. *)
-  (*       do 2 red in CONC. *)
-  (*       rewrite concretize_uvalueM_equation in CONC. *)
-  (*       cbn in CONC. *)
-  (*       red in CONC. *)
-  (*       destruct CONC as [ma [k' [ARGS [CONC1 CONC2]]]]. *)
-  (*       destruct_err_ub_oom ma; inv ARGS; try contradiction. *)
-  (*       cbn in CONC2. *)
-  (*       cbn in CONC1. *)
-  (*       destruct CONC2 as [CONTRA | CONC2]; try contradiction. *)
-  (*       specialize (CONC2 [] eq_refl). *)
-  (*       set (k'_nil := k' []). *)
-  (*       destruct_err_ub_oom k'_nil; subst k'_nil; *)
-  (*         rewrite Hx in CONC2, CONC1; *)
-  (*         try contradiction. *)
-
-  (*       cbn in CONC1. *)
-  (*       inv CONC1. *)
-  (*       reflexivity. *)
-  (*     } *)
-
-  (*     { (* Arrays *) *)
-  (*       admit. *)
-  (*     } *)
-
-  (*     { (* Vector nil *) *)
-  (*       red in REF; *)
-  (*         rewrite uvalue_convert_equation in REF; *)
-  (*         cbn in REF; *)
-  (*         first [break_match_hyp; inv REF | inv REF]; *)
-  (*         eexists; *)
-  (*         intros dv0 CONC. *)
-  (*       do 2 red in CONC. *)
-  (*       rewrite concretize_uvalueM_equation in CONC. *)
-  (*       cbn in CONC. *)
-  (*       red in CONC. *)
-  (*       destruct CONC as [ma [k' [ARGS [CONC1 CONC2]]]]. *)
-  (*       destruct_err_ub_oom ma; inv ARGS; try contradiction. *)
-  (*       cbn in CONC2. *)
-  (*       cbn in CONC1. *)
-  (*       destruct CONC2 as [CONTRA | CONC2]; try contradiction. *)
-  (*       specialize (CONC2 [] eq_refl). *)
-  (*       set (k'_nil := k' []). *)
-  (*       destruct_err_ub_oom k'_nil; subst k'_nil; *)
-  (*         rewrite Hx in CONC2, CONC1; *)
-  (*         try contradiction. *)
-
-  (*       cbn in CONC1. *)
-  (*       inv CONC1. *)
-  (*       reflexivity. *)
-  (*     } *)
-
-  (*     { (* Vectors *) *)
-  (*       admit. *)
-  (*     } *)
-
-  (*     { (* IBinop *) *)
-  (*       red in REF; *)
-  (*         rewrite uvalue_convert_equation in REF; *)
-  (*         cbn in REF. *)
-  (*       first [ *)
-  (*           break_match_hyp; inv REF; *)
-  (*           break_match_hyp; inv H0 *)
-  (*         | *)
-  (*           break_match_hyp; inv REF | inv REF]. *)
-
-  (*       red. *)
-  (*       eexists. *)
-  (*       intros dv0 CONC. *)
-
-  (*       do 2 red in CONC. *)
-  (*       rewrite concretize_uvalueM_equation in CONC. *)
-  (*       cbn in CONC. *)
-  (*       destruct CONC as [ma [k' [MA [CONC1 CONC2]]]]. *)
-  (*       destruct_err_ub_oom ma; subst; cbn in CONC1, CONC2. *)
-  (*       - (* OOM *) *)
-  (*         inv CONC1. *)
-  (*       - (* UB *) *)
-  (*         (* May be a contradiction with UNIQUE? *) *)
-  (*         rename dv into BLAH. *)
-  (*         admit. *)
-  (*       - (* Error *) *)
-  (*         admit. *)
-  (*       - (* Success *) *)
-  (*         destruct CONC2 as [[] | CONC2]. *)
-  (*         specialize (CONC2 ma0 eq_refl). *)
-  (*         red in CONC2. *)
-  (*         destruct CONC2 as [ma [k'0 CONC2]]. *)
-  (*         destruct CONC2 as [CONC2 [CONC2_EQV CONC2_RET]]. *)
-
-  (*         rewrite concretize_uvalueM_equation in CONC2. *)
-
-  (*       cbn in CONC2. *)
-  (*       cbn in CONC1. *)
-  (*       (* specialize (CONC2 [] eq_refl). *) *)
-  (*       (* set (k'_nil := k' []). *) *)
-  (*       (* destruct_err_ub_oom k'_nil; subst k'_nil; *) *)
-  (*       (*   rewrite Hx in CONC2, CONC1; *) *)
-  (*       (*   try contradiction. *) *)
-
-  (*       (* cbn in CONC1. *) *)
-  (*       (* inv CONC1. *) *)
-  (*       (* reflexivity. *) *)
-  (*       admit. *)
-  (*     } *)
-  (* Admitted. *)
-
-  Lemma pickUnique_rutt :
+  Lemma uvalue_refine_strict_unique_prop :
     forall uv1 uv2,
-      uvalue_refine uv1 uv2 ->
-      rutt (sum_prerel call_refine event_refine)
-        (sum_postrel call_res_refine event_res_refine) dvalue_refine
+      uvalue_refine_strict uv1 uv2 ->
+      IS1.LLVM.D.unique_prop uv1 -> unique_prop uv2.
+  Proof.
+    intros uv1 uv2 H H0.
+
+    split.
+    { revert uv2 H.
+      induction uv1 using IS1.LP.Events.DV.uvalue_ind'; intros uv2 REF [dv UNIQUE];
+        try
+          solve
+          [
+            red in REF;
+            rewrite uvalue_convert_strict_equation in REF;
+            cbn in REF;
+            first [break_match_hyp; inv REF | inv REF];
+            eexists;
+            intros dv0 CONC;
+            do 2 red in CONC;
+            rewrite concretize_uvalueM_equation in CONC;
+            inv CONC;
+            auto
+          ].
+
+      { (* Undef will be a contradiction in most cases... *)
+  (*          Though not all *)
+        admit.
+      }
+
+      { (* Struct nil *)
+        red in REF;
+          rewrite uvalue_convert_strict_equation in REF;
+          cbn in REF;
+          first [break_match_hyp; inv REF | inv REF];
+          eexists;
+          intros dv0 CONC.
+        do 2 red in CONC.
+        rewrite concretize_uvalueM_equation in CONC.
+        cbn in CONC.
+        red in CONC.
+        destruct CONC as [ma [k' [ARGS [CONC1 CONC2]]]].
+        destruct_err_ub_oom ma; inv ARGS; try contradiction.
+        cbn in CONC2.
+        cbn in CONC1.
+        destruct CONC2 as [CONTRA | CONC2]; try contradiction.
+        specialize (CONC2 [] eq_refl).
+        set (k'_nil := k' []).
+        destruct_err_ub_oom k'_nil; subst k'_nil;
+          rewrite Hx in CONC2, CONC1;
+          try contradiction.
+
+        cbn in CONC1.
+        inv CONC1.
+        reflexivity.
+      }
+
+      { (* Structs *)
+        admit.
+      }
+
+      { (* Packed struct nil *)
+        red in REF;
+          rewrite uvalue_convert_strict_equation in REF;
+          cbn in REF;
+          first [break_match_hyp; inv REF | inv REF];
+          eexists;
+          intros dv0 CONC.
+        do 2 red in CONC.
+        rewrite concretize_uvalueM_equation in CONC.
+        cbn in CONC.
+        red in CONC.
+        destruct CONC as [ma [k' [ARGS [CONC1 CONC2]]]].
+        destruct_err_ub_oom ma; inv ARGS; try contradiction.
+        cbn in CONC2.
+        cbn in CONC1.
+        destruct CONC2 as [CONTRA | CONC2]; try contradiction.
+        specialize (CONC2 [] eq_refl).
+        set (k'_nil := k' []).
+        destruct_err_ub_oom k'_nil; subst k'_nil;
+          rewrite Hx in CONC2, CONC1;
+          try contradiction.
+
+        cbn in CONC1.
+        inv CONC1.
+        reflexivity.
+      }
+
+      { (* Packed structs *)
+        admit.
+      }
+
+      { (* Array nil *)
+        red in REF;
+          rewrite uvalue_convert_strict_equation in REF;
+          cbn in REF;
+          first [break_match_hyp; inv REF | inv REF];
+          eexists;
+          intros dv0 CONC.
+        do 2 red in CONC.
+        rewrite concretize_uvalueM_equation in CONC.
+        cbn in CONC.
+        red in CONC.
+        destruct CONC as [ma [k' [ARGS [CONC1 CONC2]]]].
+        destruct_err_ub_oom ma; inv ARGS; try contradiction.
+        cbn in CONC2.
+        cbn in CONC1.
+        destruct CONC2 as [CONTRA | CONC2]; try contradiction.
+        specialize (CONC2 [] eq_refl).
+        set (k'_nil := k' []).
+        destruct_err_ub_oom k'_nil; subst k'_nil;
+          rewrite Hx in CONC2, CONC1;
+          try contradiction.
+
+        cbn in CONC1.
+        inv CONC1.
+        reflexivity.
+      }
+
+      { (* Arrays *)
+        admit.
+      }
+
+      { (* Vector nil *)
+        red in REF;
+          rewrite uvalue_convert_strict_equation in REF;
+          cbn in REF;
+          first [break_match_hyp; inv REF | inv REF];
+          eexists;
+          intros dv0 CONC.
+        do 2 red in CONC.
+        rewrite concretize_uvalueM_equation in CONC.
+        cbn in CONC.
+        red in CONC.
+        destruct CONC as [ma [k' [ARGS [CONC1 CONC2]]]].
+        destruct_err_ub_oom ma; inv ARGS; try contradiction.
+        cbn in CONC2.
+        cbn in CONC1.
+        destruct CONC2 as [CONTRA | CONC2]; try contradiction.
+        specialize (CONC2 [] eq_refl).
+        set (k'_nil := k' []).
+        destruct_err_ub_oom k'_nil; subst k'_nil;
+          rewrite Hx in CONC2, CONC1;
+          try contradiction.
+
+        cbn in CONC1.
+        inv CONC1.
+        reflexivity.
+      }
+
+      { (* Vectors *)
+        admit.
+      }
+
+      { (* IBinop *)
+        red in REF;
+          rewrite uvalue_convert_strict_equation in REF;
+          cbn in REF.
+        first [
+            break_match_hyp; inv REF;
+            break_match_hyp; inv H0
+          |
+            break_match_hyp; inv REF | inv REF].
+
+        red.
+        eexists.
+        intros dv0 CONC.
+
+        do 2 red in CONC.
+        rewrite concretize_uvalueM_equation in CONC.
+        cbn in CONC.
+        destruct CONC as [ma [k' [MA [CONC1 CONC2]]]].
+        destruct_err_ub_oom ma; subst; cbn in CONC1, CONC2.
+        - (* OOM *)
+          inv CONC1.
+        - (* UB *)
+          (* May be a contradiction with UNIQUE? *)
+          rename dv into BLAH.
+          admit.
+        - (* Error *)
+          admit.
+        - (* Success *)
+          destruct CONC2 as [[] | CONC2].
+          specialize (CONC2 ma0 eq_refl).
+          red in CONC2.
+          destruct CONC2 as [ma [k'0 CONC2]].
+          destruct CONC2 as [CONC2 [CONC2_EQV CONC2_RET]].
+
+          rewrite concretize_uvalueM_equation in CONC2.
+
+        cbn in CONC2.
+        cbn in CONC1.
+        (* specialize (CONC2 [] eq_refl). *)
+        (* set (k'_nil := k' []). *)
+        (* destruct_err_ub_oom k'_nil; subst k'_nil; *)
+        (*   rewrite Hx in CONC2, CONC1; *)
+        (*   try contradiction. *)
+
+        (* cbn in CONC1. *)
+        (* inv CONC1. *)
+        (* reflexivity. *)
+        admit.
+      }
+  Admitted.
+
+  Lemma pickUnique_lazy_rutt :
+    forall uv1 uv2,
+      uvalue_refine_lazy uv1 uv2 ->
+      rutt (sum_prerel call_refine_lazy event_refine_lazy)
+        (sum_postrel call_res_refine_lazy event_res_refine_lazy) dvalue_refine_lazy
         (IS1.LLVM.D.pickUnique uv1) (pickUnique uv2).
   Proof.
     (* intros uv1 uv2 REF. *)
@@ -11029,7 +11031,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     (* unfold pickUnique, concretize_or_pick. *)
     (* cbn. *)
     (* break_match; *)
-    (*   eapply uvalue_convert_preserves_is_concrete with (uvc:=uv2) in Heqb; eauto; *)
+    (*   eapply uvalue_convert_lazy_preserves_is_concrete with (uvc:=uv2) in Heqb; eauto; *)
     (*   rewrite Heqb. *)
 
     (* apply lift_err_uvalue_to_dvalue_rutt; auto. *)
@@ -11040,7 +11042,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     (* { constructor. *)
     (*   cbn. *)
     (*   split; auto. *)
-    (*   apply uvalue_refine_unique_prop; *)
+    (*   apply uvalue_refine_lazy_unique_prop; *)
     (*     eauto. *)
     (* } *)
 
@@ -11061,6 +11063,117 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     (*   repeat (destruct s; try inv H). *)
     (*   admit. *)
     (* } *)
+  Admitted.
+
+  Lemma lift_err_uvalue_to_dvalue_rutt :
+    forall uv1 uv2,
+      uvalue_refine_strict uv1 uv2 ->
+      rutt (sum_prerel call_refine_strict event_refine_strict) (sum_postrel call_res_refine_strict event_res_refine_strict) dvalue_refine_strict
+        (LLVMEvents.lift_err (fun x : IS1.LP.Events.DV.dvalue => Ret x) (IS1.LP.Events.DV.uvalue_to_dvalue uv1))
+        (LLVMEvents.lift_err (fun x : dvalue => Ret x) (uvalue_to_dvalue uv2)).
+  Proof.
+    intros uv1 uv2 H.
+    destruct uv1; cbn in *;
+      try solve
+        [ unfold_uvalue_refine_strict_in H;
+          cbn in *; inv H; cbn;
+          apply rutt_Ret;
+          unfold_dvalue_refine_strict_goal; reflexivity
+        | unfold_uvalue_refine_strict_in H;
+          cbn in *; inv H; cbn;
+          apply rutt_raise; constructor; cbn; auto
+        ].
+    - unfold_uvalue_refine_strict_in H.
+      cbn in *.
+      break_match_hyp; inv H.
+      cbn.
+      apply rutt_Ret.
+      unfold_dvalue_refine_strict_goal.
+      rewrite Heqo.
+      cbn.
+      reflexivity.
+    - unfold_uvalue_refine_strict_in H.
+      cbn in *.
+      break_match_hyp; inv H.
+      cbn.
+      apply rutt_Ret.
+      unfold_dvalue_refine_strict_goal.
+      cbn.
+      rewrite Heqo.
+      reflexivity.
+    - (* Structs *)
+      unfold_uvalue_refine_strict_in H.
+      cbn in *.
+      break_match_hyp; inv H.
+      rewrite <- map_monad_map_monad_In in Heqo.
+      break_match_goal.
+      { (* Contradiction using uvalue_to_dvalue_dvalue_refine_strict? *)
+        admit.
+      }
+
+      cbn.
+      break_match_goal.
+      { (* Probably a contradiction? *)
+        admit.
+      }
+
+      cbn.
+      apply rutt_Ret.
+      unfold_dvalue_refine_strict.
+      cbn.
+      break_match_goal.
+      2: {
+        (* Contradiction *)
+        admit.
+      }
+
+      admit.
+  Admitted.
+
+  Lemma pickUnique_rutt_strict :
+    forall uv1 uv2,
+      uvalue_refine_strict uv1 uv2 ->
+      rutt (sum_prerel call_refine_strict event_refine_strict)
+        (sum_postrel call_res_refine_strict event_res_refine_strict) dvalue_refine_strict
+        (IS1.LLVM.D.pickUnique uv1) (pickUnique uv2).
+  Proof.
+    intros uv1 uv2 REF.
+    unfold IS1.LLVM.D.pickUnique, IS1.LLVM.D.concretize_or_pick.
+    unfold pickUnique, concretize_or_pick.
+    cbn.
+    break_match;
+      eapply uvalue_refine_strict_preserves_is_concrete with (uvc:=uv2) in Heqb; eauto;
+      rewrite Heqb.
+
+    apply lift_err_uvalue_to_dvalue_rutt; auto.
+
+    repeat rewrite bind_trigger.
+    apply rutt_Vis.
+
+    { constructor.
+      cbn.
+      split; auto.
+      apply uvalue_refine_strict_unique_prop;
+        eauto.
+    }
+
+    intros t1 t2 H.
+    apply rutt_Ret.
+    destruct t1, t2.
+    cbn in *.
+    destruct H; cbn in *.
+    { red in H.
+      destruct e1; cbn in *.
+      destruct d1; cbn in *.
+      admit. (* ???? *)
+    }
+    { destruct e2; cbn in *.
+      admit.
+      cbn in *.
+      destruct d2; cbn in *.
+      repeat (destruct s; try inv H).
+      admit.
+    }
   Admitted.
 
   Lemma uvalue_refine_concretize_poison :
