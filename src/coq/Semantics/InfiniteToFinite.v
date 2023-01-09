@@ -5000,6 +5000,79 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
+  Definition instr_E_refine_strict A B (e1 : IS1.LP.Events.instr_E A) (e2 : IS2.LP.Events.instr_E B) : Prop.
+  Proof.
+    refine (match e1, e2 with
+            | inl1 e1, inl1 e2 =>
+                call_refine_strict _ _ e1 e2
+            | inr1 (inl1 e1), inr1 (inl1 e2) =>
+                (* Intrinsics *)
+                _
+            | inr1 (inr1 e1), inr1 (inr1 e2) =>
+                exp_E_refine_strict _ _ e1 e2
+            | _, _ =>
+                False
+            end).
+
+    (* Intrinsics *)
+    { inv e1.
+      inv e2.
+      apply (t = t0 /\
+               f = f0 /\
+               Forall2 dvalue_refine_strict args args0
+            ).
+    }
+  Defined.
+
+  Definition instr_E_res_refine_lazy A B (e1 : IS1.LP.Events.instr_E A) (res1 : A) (e2 : IS2.LP.Events.instr_E B) (res2 : B) : Prop.
+  Proof.
+    refine (match e1, e2 with
+            | inl1 e1, inl1 e2 =>
+                call_refine_lazy _ _ e1 e2
+            | inr1 (inl1 e1), inr1 (inl1 e2) =>
+                (* Intrinsics *)
+                _
+            | inr1 (inr1 e1), inr1 (inr1 e2) =>
+                exp_E_refine_lazy _ _ e1 e2
+            | _, _ =>
+                False
+            end).
+
+    (* Intrinsics *)
+    { inv e1.
+      inv e2.
+      apply (t = t0 /\
+               f = f0 /\
+               Forall2 dvalue_refine_lazy args args0
+            ).
+    }
+  Defined.
+
+  Definition instr_E_res_refine_strict A B (e1 : IS1.LP.Events.instr_E A) (res1 : A) (e2 : IS2.LP.Events.instr_E B) (res2 : B) : Prop.
+  Proof.
+    refine (match e1, e2 with
+            | inl1 e1, inl1 e2 =>
+                call_refine_strict _ _ e1 e2
+            | inr1 (inl1 e1), inr1 (inl1 e2) =>
+                (* Intrinsics *)
+                _
+            | inr1 (inr1 e1), inr1 (inr1 e2) =>
+                exp_E_refine_strict _ _ e1 e2
+            | _, _ =>
+                False
+            end).
+
+    (* Intrinsics *)
+    { inv e1.
+      inv e2.
+      apply (t = t0 /\
+               f = f0 /\
+               Forall2 dvalue_refine_strict args args0 /\
+               dvalue_refine_strict res1 res2
+            ).
+    }
+  Defined.
+
   Definition L0_E1E2_rutt_lazy t1 t2
     : Prop :=
     rutt
@@ -5196,6 +5269,62 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         }
   Qed.
 
+  Lemma instr_E_refine_strict_L0'_refine_strict :
+    forall A B (e1 : IS1.LP.Events.instr_E A) (e2 : instr_E B),
+      instr_E_refine_strict A B e1 e2 ->
+      L0'_refine_strict A B (IS1.LP.Events.instr_to_L0' e1) (instr_to_L0' e2).
+  Proof.
+    intros A B e1 e2 H.
+    destruct e1, e2.
+    2,3: (cbn in H;
+          (repeat break_match_hyp; try contradiction)).
+
+    - destruct c, c0.
+      cbn in *.
+      tauto.
+    - destruct s, s0.
+      2,3: (cbn in H;
+            (repeat break_match_hyp; try contradiction)).
+
+      + destruct i, i0.
+        cbn in *.
+        tauto.
+
+      + destruct e, e0.
+        2,3: (cbn in H;
+              (repeat break_match_hyp; try contradiction)).
+
+        { destruct l, l0; cbn; auto.
+        }
+
+        { destruct s, s0.
+          2,3: (cbn in H;
+                (repeat break_match_hyp; try contradiction)).
+
+          { destruct l, l0; cbn; auto. }
+
+          destruct s, s0.
+          2,3: (cbn in H;
+                (repeat break_match_hyp; try contradiction)).
+
+          { destruct m, m0; cbn; auto. }
+
+          destruct s, s0.
+          2,3: (cbn in H;
+                (repeat break_match_hyp; try contradiction)).
+
+          { destruct p, p0; cbn; auto. }
+
+          destruct s, s0.
+          2,3: (cbn in H;
+                (repeat break_match_hyp; try contradiction)).
+
+          { destruct o, o0; cbn; auto. }
+          { destruct s, s0; cbn; auto. }
+
+        }
+  Qed.
+
   Lemma event_refine_strict_exp_E_refine_strict_inv :
     forall A B (e1 : IS1.LP.Events.exp_E A) (e2 : exp_E B) a b,
       event_res_refine_strict A B (IS1.LP.Events.exp_to_L0 e1) a (exp_to_L0 e2) b ->
@@ -5330,6 +5459,46 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         }
   Qed.
 
+  Lemma L0'_res_refine_strict_instr_E_res_refine_strict_inv :
+    forall A B (e1 : IS1.LP.Events.instr_E A) (e2 : instr_E B) a b,
+      L0'_res_refine_strict A B (IS1.LP.Events.instr_to_L0' e1) a (instr_to_L0' e2) b ->
+      instr_E_res_refine_strict A B e1 a e2 b.
+  Proof.
+    intros A B e1 e2 a b H.
+    destruct e1, e2.
+    1-3: (cbn in *;
+          repeat (break_match_hyp; subst; cbn in *; auto);
+          solve
+            [ tauto
+            | inv Heql
+            ]).
+
+    - destruct s, s0.
+      1-3: (cbn in *;
+            repeat (break_match_hyp; subst; cbn in *; auto);
+            solve
+              [ tauto
+              | inv Heql
+           ]).
+
+      destruct e, e0.
+      1,3: (cbn in *;
+            repeat (break_match_hyp; subst; cbn in *; auto);
+            solve
+              [ tauto
+              | inv Heql
+           ]).
+
+      + destruct s; auto.
+      + destruct s, s0.
+        1-4: (cbn in *;
+              repeat (break_match_hyp; subst; cbn in *; auto);
+              solve
+                [ tauto
+                | inv Heql
+             ]).
+  Qed.
+
   Lemma translate_exp_to_L0_E1E2_rutt :
     forall {R1 R2} {RR : R1 -> R2 -> Prop} t1 t2,
       rutt exp_E_refine_strict exp_E_res_refine_strict RR
@@ -5430,6 +5599,48 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                                                                                               LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
                                                                                ExternalCallE) A e).
       apply EqVisOOM.
+    - rewrite tau_euttge, unfold_translate. eauto with itree.
+    - rewrite tau_euttge, unfold_translate. eauto with itree.
+  Qed.
+
+  Lemma translate_instr_to_L0'_E1E2_rutt_strict :
+    forall {R1 R2} {RR : R1 -> R2 -> Prop} t1 t2,
+      rutt instr_E_refine_strict instr_E_res_refine_strict RR t1 t2 ->
+      rutt L0'_refine_strict L0'_res_refine_strict RR
+        (translate IS1.LP.Events.instr_to_L0' t1)
+        (translate instr_to_L0' t2).
+  Proof.
+    intros *.
+    revert t1 t2.
+    ginit.
+    gcofix CIH.
+    intros * RUTT.
+    rewrite !unfold_translate. punfold RUTT. red in RUTT.
+    induction RUTT; intros; subst; simpl; pclearbot.
+    - gstep.
+      constructor.
+      auto.
+    - gstep.
+      red.
+      constructor.
+      gbase.
+      apply CIH.
+      auto.
+    - gstep; eauto.
+      red.
+      constructor; eauto.
+      apply instr_E_refine_strict_L0'_refine_strict; auto.
+
+      intros a b H2.
+
+      gbase.
+      apply CIH.
+
+      apply L0'_res_refine_strict_instr_E_res_refine_strict_inv in H2.
+      apply H0 in H2.
+      pclearbot.
+      pfold. red.
+      punfold H2.
     - rewrite tau_euttge, unfold_translate. eauto with itree.
     - rewrite tau_euttge, unfold_translate. eauto with itree.
   Qed.
@@ -5972,7 +6183,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (map_monad LLVM1.allocate_declaration (m_declarations ++ map LLVMAst.df_prototype m_definitions))
         (map_monad allocate_declaration (m_declarations ++ map LLVMAst.df_prototype m_definitions)).
   Proof.
-  Admitted.
+  Abort.
 
   Lemma allocate_global_E1E2_rutt_converted_lazy_sound :
     forall (m_globals : list (LLVMAst.global dtyp)),
@@ -5980,7 +6191,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (map_monad LLVM1.allocate_global m_globals)
         (map_monad allocate_global m_globals).
   Proof.
-  Admitted.
+  Abort.
 
   Lemma translate_exp_to_L0_E1E2_converted_lazy_rutt :
     forall {R1 R2} {RR : R1 -> R2 -> Prop} t1 t2,
@@ -5991,7 +6202,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (translate IS1.LP.Events.exp_to_L0 t1)
         (translate exp_to_L0 t2).
   Proof.
-  Admitted.
+  Abort.
 
   (* TODO: Move this? *)
   Lemma dvalue_refine_lazy_dvalue_to_uvalue :
@@ -10334,8 +10545,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
            (denote_ocfg cfg bids)).
   Proof.
     intros cfg [bid_from bid_src].
-    induction cfg.
-    - unfold denote_ocfg, IS1.LLVM.D.denote_ocfg.
+    unfold denote_ocfg, IS1.LLVM.D.denote_ocfg.
+    cbn.
+    apply translate_instr_to_L0'_E1E2_rutt_strict.
+    cbn.
   Admitted.
 
   (* TODO: Move these combine_lists lemmas *)
@@ -11701,9 +11914,22 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           eapply uvalue_refine_strict_preserves_is_concrete in Heqb;
           eauto; rewrite Heqb.
         - (* Concrete so just use uvalue_to_dvalue (simple) conversion *)
-          apply lift_err_uvalue_to_dvalue_rutt_ref; auto.
+          apply rutt_orutt.
+          apply lift_err_uvalue_to_dvalue_rutt_strict; auto.
+          intros A s.
+          repeat destruct s;
+            try solve
+              [
+                left;
+                intros o CONTRA;
+                inv CONTRA
+              ].
+
+          right.
+          exists o.
+          reflexivity.
         - (* Not concrete, trigger pick events *)
-          eapply rutt_bind with (RR:= fun (t1 : {_ : IS1.LP.Events.DV.dvalue | True}) (t2 : {_ : dvalue | True}) => dvalue_convert (proj1_sig t1) = (proj1_sig t2)) .
+          eapply rutt_bind with (RR:= fun (t1 : {_ : IS1.LP.Events.DV.dvalue | True}) (t2 : {_ : dvalue | True}) => dvalue_refine_strict (proj1_sig t1) (proj1_sig t2)) .
           { apply rutt_trigger.
             { constructor.
               cbn.
