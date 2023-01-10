@@ -10978,39 +10978,39 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         auto.
   Qed.
 
-  (* (* May not be true with new dvalue_refine *) *)
-  (* Lemma lookup_defn_none : *)
-  (*   forall dfns1 dfns2 r1 r2, *)
-  (*     Forall2 (dvalue_refine × function_denotation_refine) dfns1 dfns2 -> *)
-  (*     dvalue_refine r1 r2 -> *)
-  (*     IS1.LLVM.D.lookup_defn r1 dfns1 = None -> *)
-  (*     IS2.LLVM.D.lookup_defn r2 dfns2 = None. *)
-  (* Proof. *)
-  (*   intros dfns1 dfns2 r1 r2 ALL. *)
-  (*   revert r1. revert r2. *)
-  (*   induction ALL; intros r2 r1 REF LUP; *)
-  (*     cbn in *; auto. *)
+  (* May not be true with new dvalue_refine *)
+  Lemma lookup_defn_none_strict :
+    forall dfns1 dfns2 r1 r2,
+      Forall2 (dvalue_refine_strict × function_denotation_refine_strict) dfns1 dfns2 ->
+      dvalue_refine_strict r1 r2 ->
+      IS1.LLVM.D.lookup_defn r1 dfns1 = None ->
+      IS2.LLVM.D.lookup_defn r2 dfns2 = None.
+  Proof.
+    intros dfns1 dfns2 r1 r2 ALL.
+    revert r1. revert r2.
+    induction ALL; intros r2 r1 REF LUP;
+      cbn in *; auto.
 
-  (*   destruct x, y. *)
-  (*   cbn in *. *)
+    destruct x, y.
+    cbn in *.
 
-  (*   inv H. *)
-  (*   cbn in *. *)
+    inv H.
+    cbn in *.
 
-  (*   break_match_hyp; inv LUP. *)
-  (*   eapply RelDec.neg_rel_dec_correct in Heqb. *)
-  (*   pose proof dvalue_refine_R2_injective _ _ _ _ REF fst_rel. *)
-  (*   assert (d0 <> r2). *)
-  (*   { intros D0R2. *)
-  (*     apply H in D0R2; auto. *)
-  (*   } *)
-  (*   { assert (r2 <> d0) by auto. *)
-  (*     apply RelDec.neg_rel_dec_correct in H2. *)
-  (*     rewrite H2. *)
-  (*     eapply assoc_similar_no_lookup with (xs:=l) (RAC:=dvalue_refine); eauto. *)
-  (*     apply dvalue_refine_R2_injective. *)
-  (*   } *)
-  (* Qed. *)
+    break_match_hyp; inv LUP.
+    eapply RelDec.neg_rel_dec_correct in Heqb.
+    pose proof dvalue_refine_strict_R2_injective _ _ _ _ REF fst_rel.
+    assert (d0 <> r2).
+    { intros D0R2.
+      apply H in D0R2; auto.
+    }
+    { assert (r2 <> d0) by auto.
+      apply RelDec.neg_rel_dec_correct in H2.
+      rewrite H2.
+      eapply assoc_similar_no_lookup with (xs:=l) (RAC:=dvalue_refine_strict); eauto.
+      apply dvalue_refine_strict_R2_injective.
+    }
+  Qed.
 
   (* TODO: Move? *)
   Lemma dvalue_refine_lazy_oom :
