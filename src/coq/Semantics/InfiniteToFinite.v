@@ -4443,71 +4443,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition L0'_refine_strict A B (e1 : IS1.LP.Events.L0' A) (e2 : IS2.LP.Events.L0' B) : Prop.
-  Proof.
-    refine (match e1, e2 with
-            | inl1 (E1.Call dt1 f1 args1), inl1 (E2.Call dt2 f2 args2) =>
-                _ (* Calls *)
-            | inr1 e1, inr1 e2 =>
-                event_refine_strict _ _ e1 e2
-            | _, _ =>
-                False
-            end).
-
-    (* Calls *)
-    { (* Doesn't say anything about return value... *)
-      apply (dt1 = dt2 /\
-               uvalue_refine_strict f1 f2 /\
-               Forall2 uvalue_refine_strict args1 args2).
-    }
-  Defined.
-
-  Definition L0'_res_refine_lazy A B (e1 : IS1.LP.Events.L0' A) (res1 : A) (e2 : IS2.LP.Events.L0' B) (res2 : B) : Prop.
-  Proof.
-    refine (match e1, e2 with
-            | inl1 (E1.Call dt1 f1 args1), inl1 (E2.Call dt2 f2 args2) =>
-                _ (* Calls *)
-            | inr1 e1, inr1 e2 =>
-                event_res_refine_lazy _ _ e1 res1 e2 res2
-            | _, _ =>
-                False
-            end).
-
-    (* Calls *)
-    { inv c.
-      inv c0.
-
-      apply (dt1 = dt2 /\
-               uvalue_refine_lazy f1 f2 /\
-               Forall2 uvalue_refine_lazy args1 args2 /\
-               uvalue_refine_lazy res1 res2
-            ).
-    }
-  Defined.
-
-  Definition L0'_res_refine_strict A B (e1 : IS1.LP.Events.L0' A) (res1 : A) (e2 : IS2.LP.Events.L0' B) (res2 : B) : Prop.
-  Proof.
-    refine (match e1, e2 with
-            | inl1 (E1.Call dt1 f1 args1), inl1 (E2.Call dt2 f2 args2) =>
-                _ (* Calls *)
-            | inr1 e1, inr1 e2 =>
-                event_res_refine_strict _ _ e1 res1 e2 res2
-            | _, _ =>
-                False
-            end).
-
-    (* Calls *)
-    { inv c.
-      inv c0.
-
-      apply (dt1 = dt2 /\
-               uvalue_refine_strict f1 f2 /\
-               Forall2 uvalue_refine_strict args1 args2 /\
-               uvalue_refine_strict res1 res2
-            ).
-    }
-  Defined.
-
   Definition call_refine_lazy (A B : Type) (c1 : IS1.LP.Events.CallE A) (c2 : CallE B) : Prop.
   Proof.
     (* Calls *)
@@ -4555,6 +4490,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                uvalue_refine_strict res1 res2).
     }
   Defined.
+
+  Definition L0'_refine_strict A B (e1 : IS1.LP.Events.L0' A) (e2 : IS2.LP.Events.L0' B) : Prop
+    := (sum_prerel call_refine_strict event_refine_strict) _ _ e1 e2.
+
+  Definition L0'_res_refine_lazy A B (e1 : IS1.LP.Events.L0' A) (res1 : A) (e2 : IS2.LP.Events.L0' B) (res2 : B) : Prop
+    := (sum_postrel call_res_refine_lazy event_res_refine_lazy) _ _ e1 res1 e2 res2.
+
+  Definition L0'_res_refine_strict A B (e1 : IS1.LP.Events.L0' A) (res1 : A) (e2 : IS2.LP.Events.L0' B) (res2 : B) : Prop
+    := (sum_postrel call_res_refine_strict event_res_refine_strict) _ _ e1 res1 e2 res2.
 
   Definition exp_E_refine_lazy A B (e1 : IS1.LP.Events.exp_E A) (e2 : IS2.LP.Events.exp_E B) : Prop.
   Proof.
@@ -5275,12 +5219,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       L0'_refine_strict A B (IS1.LP.Events.instr_to_L0' e1) (instr_to_L0' e2).
   Proof.
     intros A B e1 e2 H.
+    unfold L0'_refine_strict.
     destruct e1, e2.
     2,3: (cbn in H;
           (repeat break_match_hyp; try contradiction)).
 
     - destruct c, c0.
       cbn in *.
+      constructor; cbn.
       tauto.
     - destruct s, s0.
       2,3: (cbn in H;
@@ -5288,40 +5234,40 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       + destruct i, i0.
         cbn in *.
+        constructor; cbn.
         tauto.
 
       + destruct e, e0.
         2,3: (cbn in H;
               (repeat break_match_hyp; try contradiction)).
 
-        { destruct l, l0; cbn; auto.
+        { destruct l, l0; cbn; constructor; cbn; auto.
         }
 
         { destruct s, s0.
           2,3: (cbn in H;
                 (repeat break_match_hyp; try contradiction)).
 
-          { destruct l, l0; cbn; auto. }
+          { destruct l, l0; cbn; constructor; cbn; auto. }
 
           destruct s, s0.
           2,3: (cbn in H;
                 (repeat break_match_hyp; try contradiction)).
 
-          { destruct m, m0; cbn; auto. }
+          { destruct m, m0; cbn; constructor; cbn; auto. }
 
           destruct s, s0.
           2,3: (cbn in H;
                 (repeat break_match_hyp; try contradiction)).
 
-          { destruct p, p0; cbn; auto. }
+          { destruct p, p0; cbn; constructor; cbn; auto. }
 
           destruct s, s0.
           2,3: (cbn in H;
                 (repeat break_match_hyp; try contradiction)).
 
-          { destruct o, o0; cbn; auto. }
-          { destruct s, s0; cbn; auto. }
-
+          { destruct o, o0; cbn; constructor; cbn; auto. }
+          { destruct s, s0; cbn; constructor; cbn; auto. }
         }
   Qed.
 
@@ -5466,37 +5412,51 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Proof.
     intros A B e1 e2 a b H.
     destruct e1, e2.
-    1-3: (cbn in *;
-          repeat (break_match_hyp; subst; cbn in *; auto);
-          solve
-            [ tauto
-            | inv Heql
-            ]).
+    1-3:
+      (cbn in *;
+       repeat (first [ tauto
+                     | break_match_hyp; subst; cbn in *; auto
+                     | repeat match goal with
+                         | H: L0'_res_refine_strict _ _ _ _ _ _ |- _ =>
+                             inv H; subst_existT; unfold call_res_refine_strict in *; cbn in *
+                         end
+                 ]
+         )).
 
     - destruct s, s0.
-      1-3: (cbn in *;
-            repeat (break_match_hyp; subst; cbn in *; auto);
-            solve
-              [ tauto
-              | inv Heql
-           ]).
+      1-3:
+        (cbn in *;
+         repeat (first [ tauto
+                       | break_match_hyp; subst; cbn in *; auto
+                       | repeat match goal with
+                           | H: L0'_res_refine_strict _ _ _ _ _ _ |- _ =>
+                               inv H; subst_existT; unfold call_res_refine_strict in *; cbn in *
+                           end
+                   ]
+        )).
 
       destruct e, e0.
-      1,3: (cbn in *;
-            repeat (break_match_hyp; subst; cbn in *; auto);
-            solve
-              [ tauto
-              | inv Heql
-           ]).
+      1-3:
+        (cbn in *;
+         repeat (first [ tauto
+                       | break_match_hyp; subst; cbn in *; auto
+                       | repeat match goal with
+                           | H: L0'_res_refine_strict _ _ _ _ _ _ |- _ =>
+                               inv H; subst_existT; unfold call_res_refine_strict in *; cbn in *
+                           end
+                   ]
+        )).
 
-      + destruct s; auto.
-      + destruct s, s0.
-        1-4: (cbn in *;
-              repeat (break_match_hyp; subst; cbn in *; auto);
-              solve
-                [ tauto
-                | inv Heql
-             ]).
+      + destruct s;
+          (cbn in *;
+           repeat (first [ tauto
+                         | break_match_hyp; subst; cbn in *; auto
+                         | repeat match goal with
+                             | H: L0'_res_refine_strict _ _ _ _ _ _ |- _ =>
+                                 inv H; subst_existT; unfold call_res_refine_strict in *; cbn in *
+                             end
+                     ]
+          )).
   Qed.
 
   Lemma translate_exp_to_L0_E1E2_rutt :
@@ -10437,6 +10397,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       { apply rutt_trigger.
         cbn; auto.
 
+        constructor.
+        constructor.
         intros [] [] _.
         reflexivity.
       }
@@ -10447,11 +10409,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       { apply rutt_trigger.
         - cbn.
           induction PARAMS.
-          + apply local_refine_strict_empty.
+          + constructor; cbn.
+            apply local_refine_strict_empty.
           + destruct x as [xid xuv].
             destruct y as [yid yuv].
             inv H.
             cbn in fst_rel, snd_rel. subst.
+            constructor; cbn.
+            inv IHPARAMS; subst_existT.
             apply alist_refine_cons; auto.
         - intros [] [] _.
           reflexivity.
@@ -10480,7 +10445,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           rewrite translate_vis.
           cbn.
           apply rutt_Vis; cbn; auto.
-          tauto.
+          constructor; cbn; auto.
+          intros [] [] _.
         - do 2 rewrite translate_ret.
           apply rutt_Ret.
           auto.
@@ -10489,7 +10455,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       intros r0 r3 R0R3.
       eapply rutt_bind with (RR:=eq).
       { eapply rutt_trigger.
-        cbn; auto.
+        cbn; constructor; cbn; auto.
         intros [] [] _.
         reflexivity.
       }
@@ -10497,7 +10463,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       intros [] [] _.
       eapply rutt_bind with (RR:=eq).
       { eapply rutt_trigger.
-        cbn; auto.
+        cbn; constructor; cbn; auto.
         intros [] [] _.
         reflexivity.
       }
@@ -11954,48 +11920,21 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
          are equivalent using DFNS *)
       cbn.
       break_match.
-      { eapply lookup_defn_some_refine in Heqo; eauto.
+      { eapply lookup_defn_some_refine_strict in Heqo; eauto.
         destruct Heqo as (f_den2 & LUP2 & FDEN2).
 
         rewrite LUP2.
         red in FDEN2.
         specialize (FDEN2 args args0).
         forward FDEN2.
-        { apply map_monad_oom_forall2; tauto.
+        { tauto.
         }
 
         destruct PRE as [T [CONV MAPM]]; subst.
 
-        eapply rutt_weaken; eauto.
-        - intros A B e1 e2 H.
-          red in H.
-          destruct e1.
-          { destruct c.
-            destruct e2; [| tauto].
-            destruct c.
-            constructor.
-            cbn.
-            destruct H as [T1T2 [CONV' MAPM']]; subst.
-            auto.
-          }
-          destruct e2; [contradiction|].
-
-          constructor.
-          auto.
-        - intros A B e1 r0 e2 r3 H.
-          inv H.
-          apply inj_pair2 in H0, H3, H4, H5; subst.
-          red in H6.
-          red.
-          auto.
-          destruct e0.
-          destruct d1.
-          auto.
-
-          apply inj_pair2 in H0, H3, H4, H5; subst.
-          red in H6.
-          red.
-          auto.
+        eapply orutt_weaken; eauto.
+        eapply rutt_orutt; eauto.
+        solve_dec_oom.
       }
 
       eapply lookup_defn_none in Heqo; eauto.
