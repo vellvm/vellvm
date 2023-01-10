@@ -10560,6 +10560,298 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     intros EQ; subst; auto.
   Qed.
 
+  Lemma dvalue_refine_strict_R2_injective :
+    R2_injective dvalue_refine_strict.
+  Proof.
+    red.
+    intros r1 r2 a b R1R2 AB.
+    split; intros EQ; subst.
+    - unfold_dvalue_refine_strict.
+      rewrite R1R2 in AB. inv AB.
+      auto.
+    - generalize dependent r2.
+      generalize dependent a.
+      induction r1; intros a'; induction a'; intros r2 R1R2 AB;
+        try
+          solve
+          [ unfold_dvalue_refine_strict;
+            cbn in *;
+            break_match_hyp; inv AB;
+            break_match_hyp; inv R1R2;
+            pose proof (AC1.addr_convert_injective _ _ _ Heqo0 Heqo);
+            subst; auto
+          | unfold_dvalue_refine_strict;
+            cbn in *;
+            break_match_hyp; inv R1R2;
+            inv AB
+          | unfold_dvalue_refine_strict;
+            cbn in *;
+            inv AB; inv R1R2; auto
+          | unfold_dvalue_refine_strict;
+            cbn in *;
+            break_match_hyp; inv AB;
+            break_match_hyp; inv R1R2;
+            apply IP.from_Z_to_Z in Heqo, Heqo0;
+            rewrite Heqo in Heqo0;
+            apply IS1.LP.IP.to_Z_inj in Heqo0;
+            subst;
+            auto
+          | unfold_dvalue_refine_strict;
+            cbn in R1R2;
+            break_match_hyp; inv R1R2;
+            inv AB
+          | unfold_dvalue_refine_strict;
+            cbn in *;
+            break_match_hyp; inv AB;
+            break_match_hyp; inv R1R2
+          ].
+
+      { (* Structs *)
+        unfold_dvalue_refine_strict_in R1R2.
+        unfold_dvalue_refine_strict_in AB.
+        cbn in *;
+          break_match_hyp; inv AB;
+          break_match_hyp; inv R1R2.
+
+        clear H0.
+        generalize dependent l.
+        generalize dependent fields0.
+        induction fields; intros fields0 l Heqo0 Heqo.
+        { clear H.
+          cbn in *.
+          inv Heqo0.
+
+          (* TODO: Move this to MapMonadExtra *)
+          Set Nested Proofs Allowed.
+          Lemma map_monad_In_OOM_nil_inv :
+            forall {A B : Type} (l : list A) (f : forall a : A, In a l -> OOM B),
+              map_monad_In l f = ret [] -> l = [].
+          Proof.
+            intros A B l f H.
+            induction l; auto.
+
+            rewrite map_monad_In_cons in H.
+            cbn in H.
+            break_match_hyp; inv H.
+            break_match_hyp; inv H1.
+          Qed.
+
+          (* TODO: Move this *)
+          Lemma In_cons_right :
+            forall {A} {l : list A} {a x xs}
+              (EQ : l = x :: xs) (HIn : In a xs),
+              In a l.
+          Proof.
+            intros A l x xs EQ a HIn.
+            subst.
+            cbn.
+            right.
+            auto.
+          Qed.
+
+          (* TODO: Move this *)
+          Lemma map_monad_In_OOM_cons_inv :
+            forall {A B : Type} (l : list A) (f : forall a : A, In a l -> OOM B) r res,
+              map_monad_In l f = ret (r :: res) ->
+              exists x xs HInx (EQ : l = x :: xs),
+                  f x HInx = ret r /\
+                    map_monad_In xs (fun a HIn => f a (In_cons_right EQ HIn)) = ret res.
+          Proof.
+            intros A B l.
+            induction l; intros f r res H.
+            - cbn in *.
+              inv H.
+            - rewrite map_monad_In_cons in H.
+              cbn in H.
+              break_match_hyp; inv H.
+              break_match_hyp; inv H1.
+              exists a.
+              exists l.
+              exists (or_introl eq_refl).
+              exists eq_refl.
+              split; auto.
+              cbn.
+
+              assert ((fun (x : A) (HIn : In x l) => f x (or_intror HIn)) =
+                        (fun (a0 : A) (HIn : In a0 l) => f a0 (In_cons_right eq_refl HIn))).
+              { Require Import FunctionalExtensionality.
+                eapply functional_extensionality_dep.
+                intros x.
+                eapply functional_extensionality_dep.
+                intros x0.
+                assert (or_intror x0 = @In_cons_right A (a :: l) x a l (@eq_refl (list A) (a :: l)) x0) as PROOFS.
+                { apply proof_irrelevance.
+                }
+
+                rewrite PROOFS.
+                reflexivity.
+              }
+              rewrite <- H.
+              auto.
+          Qed.
+
+          apply map_monad_In_OOM_nil_inv in Heqo; subst.
+          reflexivity.
+        }
+
+        { rewrite map_monad_In_cons in Heqo0.
+          cbn in Heqo0.
+          break_match_hyp; inv Heqo0.
+          break_match_hyp; inv H1.
+
+          apply map_monad_In_OOM_cons_inv in Heqo as [x [xs [HInx [FIELDS0 [CONVX CONVXS]]]]].
+          subst.
+
+          forward IHfields.
+          { intros u H1 a0 r2 R1R2 AB.
+            eapply H.
+            right; auto.
+            eauto.
+            eauto.
+          }
+
+          specialize (IHfields xs l0 eq_refl CONVXS).
+          inv IHfields.
+
+          specialize (H a (or_introl eq_refl) x d Heqo1 CONVX).
+          subst.
+          auto.
+        }
+      }
+
+      { (* Packed Structs *)
+        unfold_dvalue_refine_strict_in R1R2.
+        unfold_dvalue_refine_strict_in AB.
+        cbn in *;
+          break_match_hyp; inv AB;
+          break_match_hyp; inv R1R2.
+
+        clear H0.
+        generalize dependent l.
+        generalize dependent fields0.
+        induction fields; intros fields0 l Heqo0 Heqo.
+        { clear H.
+          cbn in *.
+          inv Heqo0.
+
+          apply map_monad_In_OOM_nil_inv in Heqo; subst.
+          reflexivity.
+        }
+
+        { rewrite map_monad_In_cons in Heqo0.
+          cbn in Heqo0.
+          break_match_hyp; inv Heqo0.
+          break_match_hyp; inv H1.
+
+          apply map_monad_In_OOM_cons_inv in Heqo as [x [xs [HInx [FIELDS0 [CONVX CONVXS]]]]].
+          subst.
+
+          forward IHfields.
+          { intros u H1 a0 r2 R1R2 AB.
+            eapply H.
+            right; auto.
+            eauto.
+            eauto.
+          }
+
+          specialize (IHfields xs l0 eq_refl CONVXS).
+          inv IHfields.
+
+          specialize (H a (or_introl eq_refl) x d Heqo1 CONVX).
+          subst.
+          auto.
+        }
+      }
+
+      { (* Arrays *)
+        unfold_dvalue_refine_strict_in R1R2.
+        unfold_dvalue_refine_strict_in AB.
+        cbn in *;
+          break_match_hyp; inv AB;
+          break_match_hyp; inv R1R2.
+
+        clear H0.
+        generalize dependent l.
+        generalize dependent elts0.
+        induction elts; intros elts0 l Heqo0 Heqo.
+        { clear H.
+          cbn in *.
+          inv Heqo0.
+
+          apply map_monad_In_OOM_nil_inv in Heqo; subst.
+          reflexivity.
+        }
+
+        { rewrite map_monad_In_cons in Heqo0.
+          cbn in Heqo0.
+          break_match_hyp; inv Heqo0.
+          break_match_hyp; inv H1.
+
+          apply map_monad_In_OOM_cons_inv in Heqo as [x [xs [HInx [FIELDS0 [CONVX CONVXS]]]]].
+          subst.
+
+          forward IHelts.
+          { intros u H1 a0 r2 R1R2 AB.
+            eapply H.
+            right; auto.
+            eauto.
+            eauto.
+          }
+
+          specialize (IHelts xs l0 eq_refl CONVXS).
+          inv IHelts.
+
+          specialize (H a (or_introl eq_refl) x d Heqo1 CONVX).
+          subst.
+          auto.
+        }
+      }
+
+      { (* Vectors *)
+        unfold_dvalue_refine_strict_in R1R2.
+        unfold_dvalue_refine_strict_in AB.
+        cbn in *;
+          break_match_hyp; inv AB;
+          break_match_hyp; inv R1R2.
+
+        clear H0.
+        generalize dependent l.
+        generalize dependent elts0.
+        induction elts; intros elts0 l Heqo0 Heqo.
+        { clear H.
+          cbn in *.
+          inv Heqo0.
+
+          apply map_monad_In_OOM_nil_inv in Heqo; subst.
+          reflexivity.
+        }
+
+        { rewrite map_monad_In_cons in Heqo0.
+          cbn in Heqo0.
+          break_match_hyp; inv Heqo0.
+          break_match_hyp; inv H1.
+
+          apply map_monad_In_OOM_cons_inv in Heqo as [x [xs [HInx [FIELDS0 [CONVX CONVXS]]]]].
+          subst.
+
+          forward IHelts.
+          { intros u H1 a0 r2 R1R2 AB.
+            eapply H.
+            right; auto.
+            eauto.
+            eauto.
+          }
+
+          specialize (IHelts xs l0 eq_refl CONVXS).
+          inv IHelts.
+
+          specialize (H a (or_introl eq_refl) x d Heqo1 CONVX).
+          subst.
+          auto.
+        }
+      }
+  Qed.
+
   Lemma assoc_similar_lookup :
     forall {A B C D}
       `{RDA : @RelDec.RelDec A eq}
@@ -10634,42 +10926,42 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   (* TODO: move these? *)
-  (* Lemma lookup_defn_some_converted : *)
-  (*   forall dfns1 dfns2 r1 r2 f_den1, *)
-  (*     Forall2 (dvalue_converted × function_denotation_converted) dfns1 dfns2 -> *)
-  (*     dvalue_converted r1 r2 -> *)
-  (*     IS1.LLVM.D.lookup_defn r1 dfns1 = Some f_den1 -> *)
-  (*     exists f_den2, *)
-  (*       IS2.LLVM.D.lookup_defn r2 dfns2 = Some f_den2 /\ *)
-  (*         function_denotation_converted f_den1 f_den2. *)
-  (* Proof. *)
-  (*   intros dfns1 dfns2 r1 r2 f_den1 DFNS R1R2 LUP. *)
+  Lemma lookup_defn_some_refine_strict :
+    forall dfns1 dfns2 r1 r2 f_den1,
+      Forall2 (dvalue_refine_strict × function_denotation_refine_strict) dfns1 dfns2 ->
+      dvalue_refine_strict r1 r2 ->
+      IS1.LLVM.D.lookup_defn r1 dfns1 = Some f_den1 ->
+      exists f_den2,
+        IS2.LLVM.D.lookup_defn r2 dfns2 = Some f_den2 /\
+          function_denotation_refine_strict f_den1 f_den2.
+  Proof.
+    intros dfns1 dfns2 r1 r2 f_den1 DFNS R1R2 LUP.
 
-  (*   pose proof DFNS as NTH. *)
-  (*   apply Forall2_forall in NTH as [LEN NTH]. *)
+    pose proof DFNS as NTH.
+    apply Forall2_forall in NTH as [LEN NTH].
 
-  (*   pose proof LUP as LUP'. *)
-  (*   eapply assoc_similar_lookup with *)
-  (*     (xs:=dfns1) (ys:=dfns2) (a:=r1) (b:=f_den1) in LUP'; *)
-  (*     eauto. *)
-  (*   2: { *)
-  (*     apply dvalue_refine_R2_injective. *)
-  (*   } *)
+    pose proof LUP as LUP'.
+    eapply assoc_similar_lookup with
+      (xs:=dfns1) (ys:=dfns2) (a:=r1) (b:=f_den1) in LUP';
+      eauto.
+    2: {
+      apply dvalue_refine_strict_R2_injective.
+    }
 
-  (*   destruct LUP' as [c [d [i [ASSOC [NTH1 NTH2]]]]]. *)
-  (*   exists d. *)
+    destruct LUP' as [c [d [i [ASSOC [NTH1 NTH2]]]]].
+    exists d.
 
-  (*   pose proof (NTH i (r1, f_den1) (c, d) NTH1 NTH2). *)
-  (*   inv H; cbn in *. *)
-  (*   split; auto. *)
+    pose proof (NTH i (r1, f_den1) (c, d) NTH1 NTH2).
+    inv H; cbn in *.
+    split; auto.
 
-  (*   assert (c = r2) as CR2. *)
-  (*   { eapply dvalue_refine_R2_injective; eauto. *)
-  (*   } *)
+    assert (c = r2) as CR2.
+    { eapply dvalue_refine_R2_injective; eauto.
+    }
 
-  (*   subst. *)
-  (*   auto. *)
-  (* Qed. *)
+    subst.
+    auto.
+  Qed.
 
   Lemma assoc_similar_no_lookup :
     forall {A B C D}
