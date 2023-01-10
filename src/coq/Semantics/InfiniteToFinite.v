@@ -5025,7 +5025,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       dvalue_refine_lazy
       t1 t2.
 
-  Definition L0_E1E2_rutt_strict t1 t2
+  Definition L0_E1E2_orutt_strict t1 t2
     : Prop :=
     orutt
       event_refine_strict
@@ -5033,8 +5033,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       dvalue_refine_strict
       t1 t2 (OOM:=OOME).
 
-  Definition model_E1E2_rutt_strict p1 p2 :=
-    L0_E1E2_rutt_strict
+  Definition model_E1E2_orutt_strict p1 p2 :=
+    L0_E1E2_orutt_strict
       (LLVM1.denote_vellvm (DTYPE_I 32%N) "main" LLVM1.main_args (convert_types (mcfg_of_tle p1)))
       (LLVM2.denote_vellvm (DTYPE_I 32%N) "main" LLVM2.main_args (convert_types (mcfg_of_tle p2))).
 
@@ -11837,14 +11837,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Admitted.
 
-  (* Lemma uvalue_refine_concretize_poison : *)
-  (*   forall uv1 uv2, *)
-  (*     uvalue_refine uv1 uv2 -> *)
-  (*     (forall dt : dtyp, ~ IS1.LLVM.MEM.CP.CONC.concretize uv1 (IS1.LP.Events.DV.DVALUE_Poison dt)) <-> *)
-  (*       (forall dt : dtyp, ~ concretize uv2 (DVALUE_Poison dt)). *)
-  (* Proof. *)
-  (*   (* This may not be true if uv2 can OOM... *) *)
-  (* Admitted. *)
+  Lemma uvalue_refine_strict_concretize_poison :
+    forall uv1 uv2,
+      uvalue_refine_strict uv1 uv2 ->
+      (forall dt : dtyp, ~ IS1.LLVM.MEM.CP.CONC.concretize uv1 (IS1.LP.Events.DV.DVALUE_Poison dt)) <->
+        (forall dt : dtyp, ~ concretize uv2 (DVALUE_Poison dt)).
+  Proof.
+    (* This may not be true if uv2 can OOM... *)
+  Admitted.
 
   Lemma denote_mcfg_E1E2_orutt' :
     forall dfns1 dfns2 dt f1 f2 args1 args2,
@@ -12040,63 +12040,66 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     split; auto.
   Qed.
 
-  Lemma model_E1E2_rutt_strict_sound
+  Lemma model_E1E2_orutt_strict_sound
     (p : list
            (LLVMAst.toplevel_entity
               LLVMAst.typ
               (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))) :
-    model_E1E2_rutt p p.
+    model_E1E2_orutt_strict p p.
   Proof.
     red.
 
     unfold denote_vellvm.
     unfold LLVM1.denote_vellvm.
-    eapply rutt_bind; [apply build_global_environment_E1E2_rutt_strict_sound|].
+    eapply orutt_bind; [apply build_global_environment_E1E2_orutt_strict_sound|].
 
     intros [] [] _.
-    eapply rutt_bind; [apply address_one_functions_E1E2_rutt|].
+    eapply orutt_bind;
+      [apply rutt_orutt;
+       [apply address_one_functions_E1E2_rutt | solve_dec_oom]|].
 
     intros r1 r2 R1R2.
-    eapply rutt_bind; [apply GlobalRead_L0_E1E2_rutt|].
+    eapply orutt_bind;
+      [apply rutt_orutt;
+       [apply GlobalRead_L0_E1E2_rutt | solve_dec_oom]|].
 
     intros r3 r4 R3R4.
-    eapply rutt_bind.
+    eapply orutt_bind.
 
-    { apply denote_mcfg_E1E2_rutt; auto.
-      - apply dvalue_refine_dvalue_to_uvalue; auto.
+    { apply denote_mcfg_E1E2_orutt; auto.
+      - apply dvalue_refine_strict_dvalue_to_uvalue; auto.
       - (* TODO: fold into main_args lemma probably *)
         unfold main_args.
         unfold LLVM1.main_args.
         constructor.
-        + red.
-          rewrite uvalue_convert_equation.
+        + unfold_uvalue_refine_strict_goal.
           reflexivity.
         + constructor; [|constructor].
-          red.
-          rewrite uvalue_convert_equation.
+          unfold_uvalue_refine_strict_goal.
           cbn.
           rewrite AC1.addr_convert_null.
           reflexivity.
     }
 
     intros r0 r5 H.
-    eapply rutt_bind with (RR:=fun x y => dvalue_refine (proj1_sig x) (proj1_sig y)).
+    eapply orutt_bind with (RR:=fun x y => dvalue_refine_strict (proj1_sig x) (proj1_sig y)).
     { (* Pick *)
-      apply rutt_trigger.
+      apply orutt_trigger.
       { cbn.
         split; auto.
         (* TODO: this lemma may not even be true *)
-        apply uvalue_refine_concretize_poison; auto.
+        apply uvalue_refine_strict_concretize_poison; auto.
       }
 
       intros t1 t2 H0.
       cbn in *.
       destruct t1, t2; tauto.
+      intros o CONTRA; inv CONTRA.
     }
 
     intros r6 r7 H0.
     cbn.
-    apply rutt_Ret; auto.
+    apply orutt_Ret; auto.
   Qed.
 
   (* TODO: not sure about name... *)
@@ -12106,7 +12109,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                            LLVMAst.typ
                            (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
     : Prop :=
-    refine_E1E2_L0
+    refine_E1E2_L0_strict
       (LLVM1.denote_vellvm (DTYPE_I 32%N) "main" LLVM1.main_args (convert_types (mcfg_of_tle p1)))
       (LLVM2.denote_vellvm (DTYPE_I 32%N) "main" LLVM2.main_args (convert_types (mcfg_of_tle p2))).
 
@@ -12117,7 +12120,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                            LLVMAst.typ
                            (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
     : Prop :=
-    refine_E1E2_L1
+    refine_E1E2_L1_strict
       (LLVM1.model_oom_L1 p1)
       (LLVM2.model_oom_L1 p2).
 
@@ -12128,7 +12131,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                            LLVMAst.typ
                            (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
     : Prop :=
-    refine_E1E2_L2
+    refine_E1E2_L2_strict
       (LLVM1.model_oom_L2 p1)
       (LLVM2.model_oom_L2 p2).
 
@@ -12139,7 +12142,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                            LLVMAst.typ
                            (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
     : Prop :=
-    refine_E1E2_L3
+    refine_E1E2_L3_strict
       (LLVM1.model_oom_L3 p1)
       (LLVM2.model_oom_L3 p2).
 
@@ -12150,7 +12153,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                            LLVMAst.typ
                            (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
     : Prop :=
-    refine_E1E2_L4 (LLVM1.model_oom_L4 p1) (LLVM2.model_oom_L4 p2).
+    refine_E1E2_L4_strict (LLVM1.model_oom_L4 p1) (LLVM2.model_oom_L4 p2).
 
   (* TODO: not sure about name... *)
   Definition model_E1E2_L5
@@ -12159,7 +12162,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                            LLVMAst.typ
                            (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
     : Prop :=
-    refine_E1E2_L5 (LLVM1.model_oom_L5 p1) (LLVM2.model_oom_L5 p2).
+    refine_E1E2_L5_strict (LLVM1.model_oom_L5 p1) (LLVM2.model_oom_L5 p2).
 
   (* TODO: not sure about name... *)
   Definition model_E1E2_L6
@@ -12168,21 +12171,21 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                            LLVMAst.typ
                            (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
     : Prop :=
-    refine_E1E2_L6 (LLVM1.model_oom_L6 p1) (LLVM2.model_oom_L6 p2).
+    refine_E1E2_L6_strict (LLVM1.model_oom_L6 p1) (LLVM2.model_oom_L6 p2).
 
 End LangRefine.
 
-Module MakeLangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) : LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR.
-  Include LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR.
+Module MakeLangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (ACS : AddrConvertSafe IS2.LP.ADDR IS1.LP.ADDR AC2 AC1) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) : LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR ACS IPS.
+  Include LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR ACS IPS.
 End MakeLangRefine.
 
-Module InfFinLangRefine := MakeLangRefine InterpreterStackBigIntptr InterpreterStack64BitIntptr InfToFinAddrConvert FinToInfAddrConvert TopLevelBigIntptr TopLevel64BitIntptr TopLevelRefinements64BitIntptr.
+Module InfFinLangRefine := MakeLangRefine InterpreterStackBigIntptr InterpreterStack64BitIntptr InfToFinAddrConvert FinToInfAddrConvert TopLevelBigIntptr TopLevel64BitIntptr TopLevelRefinements64BitIntptr FinToInfAddrConvertSafe FinToInfIntptrConvertSafe.
 
 (* Just planning on using this for L4_convert from finite to infinite events. *)
-Module FinInfLangRefine := MakeLangRefine InterpreterStack64BitIntptr InterpreterStackBigIntptr FinToInfAddrConvert InfToFinAddrConvert TopLevel64BitIntptr TopLevelBigIntptr TopLevelRefinementsBigIntptr.
+(* Module FinInfLangRefine := MakeLangRefine InterpreterStack64BitIntptr InterpreterStackBigIntptr FinToInfAddrConvert InfToFinAddrConvert TopLevel64BitIntptr TopLevelBigIntptr TopLevelRefinementsBigIntptr FinToInfAddrConvertSafe FinToInfIntptrConvertSafe. *)
 
 Module InfiniteToFinite.
-  Import FinInfLangRefine. (* Just planning on using this for L4_convert from finite to infinite events. *)
+  (* Import FinInfLangRefine. (* Just planning on using this for L4_convert from finite to infinite events. *) *)
   Import InfFinLangRefine.
 
   From Vellvm Require Import InterpreterMCFG.
@@ -12207,10 +12210,10 @@ Module InfiniteToFinite.
   Module InfLLVM := Vellvm.Semantics.InterpretationStack.InterpreterStackBigIntptr.LLVM.
   Module FinLLVM := Vellvm.Semantics.InterpretationStack.InterpreterStack64BitIntptr.LLVM.
   Module InfFinTC := Vellvm.Semantics.InfiniteToFinite.InfFinLangRefine.TC1.
-  Module FinInfTC := Vellvm.Semantics.InfiniteToFinite.FinInfLangRefine.TC1.
+  (* Module FinInfTC := Vellvm.Semantics.InfiniteToFinite.FinInfLangRefine.TC1. *)
 
   Module EC1 := InfFinTC.EC.
-  Module EC2 := FinInfTC.EC.
+  (* Module EC2 := FinInfTC.EC. *)
 
   Module InfMem := MemoryBigIntptr.
   Module FinMem := Memory64BitIntptr.
