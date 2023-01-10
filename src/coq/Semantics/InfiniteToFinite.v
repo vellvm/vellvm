@@ -10956,7 +10956,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     split; auto.
 
     assert (c = r2) as CR2.
-    { eapply dvalue_refine_R2_injective; eauto.
+    { eapply dvalue_refine_strict_R2_injective; eauto.
     }
 
     subst.
