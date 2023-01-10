@@ -818,3 +818,77 @@ Proof.
     apply IHms in SEQ.
     cbn; auto.
 Qed.
+
+Lemma sequence_OOM_In :
+  forall {A} (ms : list (OOM A)) xs x,
+    sequence ms = NoOom xs ->
+    In (NoOom x) ms ->
+    In x xs.
+Proof.
+  intros A.
+  induction ms; intros xs x SEQUENCE IN.
+  - inversion IN.
+  - inversion IN; subst.
+    + cbn in *.
+      destruct (map_monad id ms) eqn:MAP; inversion SEQUENCE; subst.
+      cbn; auto.
+    + cbn in *.
+      destruct a; cbn in *; [|inversion SEQUENCE].
+      destruct (map_monad id ms) eqn:MAP; inversion SEQUENCE; subst.
+      right.
+      eauto.
+Qed.
+
+Lemma sequence_OOM_NoOom_In :
+  forall {A} (ms : list (OOM A)) (xs : list A),
+    sequence ms = NoOom xs ->
+    forall (oom_msg : string), ~ In (Oom oom_msg) ms.
+Proof.
+  intros A.
+  induction ms; intros xs SEQUENCE msg IN.
+  - inversion IN.
+  - inversion IN; subst.
+    + cbn in *.
+      inversion SEQUENCE.
+    + cbn in *.
+      destruct a; inversion SEQUENCE.
+      destruct (map_monad id ms) eqn:MAP; inversion SEQUENCE; subst.
+      eapply IHms in H; eauto.
+Qed.
+
+Lemma Nth_exists :
+  forall {X} (xs : list X) n,
+    n < length xs ->
+    exists x, Nth xs n x.
+Proof.
+  intros X xs.
+  induction xs; intros n LEN.
+  - cbn in *; lia.
+  - cbn in LEN.
+    destruct n.
+    + exists a; cbn; auto.
+    + cbn.
+      apply IHxs.
+      lia.
+Qed.
+
+Lemma In_Nth :
+  forall {X} xs (x : X),
+    In x xs -> exists i, Util.Nth xs i x.
+Proof.
+  induction xs; intros x IN.
+  - inversion IN.
+  - destruct IN; subst.
+    + exists (0%nat). cbn. auto.
+    + apply IHxs in H as [i H].
+      exists (S i).
+      cbn; auto.
+Qed.
+
+Lemma repeat_S :
+  forall X (x : X) n,
+    repeat x (S n) = x :: repeat x n.
+Proof.
+  intros X x n.
+  reflexivity.
+Qed.

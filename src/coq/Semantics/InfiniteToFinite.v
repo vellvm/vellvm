@@ -6659,142 +6659,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           inv IHfields.
           auto.
       - cbn.
-        (* TODO: Move this *)
-        Set Nested Proofs Allowed.
-        Lemma map_monad_In_cons
-          {M} `{MM : Monad M}
-          {A B} l (x:A) (f: forall (a : A), In a (x::l) -> M B) :
-          (map_monad_In (x::l) f) =
-            (b <- f x (or_introl eq_refl);;
-             bs2 <- map_monad_In l (fun x HIn => f x (or_intror HIn));;
-             ret (b :: bs2)).
-        Proof.
-          reflexivity.
-        Qed.
-
-        (* TODO: Move this *)
-        Lemma map_monad_In_OOM_fail :
-          forall {A B} l (f : forall (a : A), In a l -> OOM B) b,
-            map_monad_In l f = Oom b ->
-            exists a (HIn : In a l), f a HIn = Oom b.
-        Proof.
-          intros A B l f b MAP.
-          generalize dependent b.
-          generalize dependent l.
-          induction l; intros f b MAP.
-          - cbn in MAP.
-            inv MAP.
-          - rewrite map_monad_In_cons in MAP.
-            cbn in *.
-            destruct (f a (or_introl eq_refl)) eqn:Hfa; inv MAP;
-              setoid_rewrite Hfa in H0; inv H0.
-            + rename H1 into MAP.
-              destruct (map_monad_In l (fun (x : A) (HIn : In x l) => f x (or_intror HIn))) eqn:HMAP; inv MAP.
-              specialize (IHl (fun (x : A) (HIn : In x l) => f x (or_intror HIn)) b HMAP) as [a' [IN FA]].
-              exists a'. exists (or_intror IN). auto.
-            + exists a. exists (or_introl eq_refl). auto.
-        Qed.
-
-        (* TODO: Move this *)
-        Lemma map_monad_In_OOM_fail' :
-          forall {A B} l (f : forall (a : A), In a l -> OOM B),
-          (exists a b (HIn : In a l), f a HIn = Oom b) ->
-          (exists s, map_monad_In l f = Oom s).
-        Proof.
-          intros A B l f FAIL.
-          generalize dependent l.
-          induction l; intros f FAIL.
-          - cbn in FAIL.
-            destruct FAIL as [_ [_ [CONTRA _]]].
-            contradiction.
-          - destruct FAIL as [a0 [b [HIn FAIL]]].
-            destruct HIn.
-            + subst.
-              rewrite map_monad_In_cons.
-              cbn.
-              setoid_rewrite FAIL.
-              eauto.
-            + rewrite map_monad_In_cons.
-              cbn.
-              break_match_goal.
-              * specialize (IHl (fun (x : A) (HIn : In x l) => f x (or_intror HIn))).
-                forward IHl; eauto.
-                destruct IHl as [s IHl].
-                exists s.
-                rewrite IHl.
-                auto.
-              * exists s; auto.
-        Qed.
-
-        (* TODO: move / generalize these *)
-        Lemma map_monad_In_oom_forall2 :
-          forall {A B} l (f : forall (a : A), In a l -> OOM B) res,
-            map_monad_In l f = NoOom res <->
-              Forall2_HIn l res (fun a b INA INB => f a INA = NoOom b).
-        Proof.
-          intros A B.
-          induction l; intros f res.
-          - split; intros MAP.
-            + cbn in *.
-              inv MAP.
-              auto.
-            + cbn in *.
-              break_match_hyp; tauto.
-          - split; intros MAP.
-            + rewrite map_monad_In_unfold in MAP.
-              cbn in *.
-              break_match_hyp; inv MAP.
-              break_match_hyp; inv H0.
-
-              pose proof (IHl (fun (x : A) (HIn : In x l) => f x (or_intror HIn)) l0) as FORALL.
-              constructor; auto.
-              eapply FORALL. eauto.
-            + rewrite map_monad_In_cons.
-              cbn in *.
-              break_match_hyp; try contradiction.
-              cbn in *.
-              destruct MAP as [FA MAP].
-              rewrite FA.
-
-              pose proof (IHl (fun (x : A) (HIn : In x l) => f x (or_intror HIn)) l0) as FORALL.
-              apply FORALL in MAP.
-              rewrite MAP.
-              auto.
-        Qed.
-
-        Lemma In_Nth :
-          forall {X} xs (x : X),
-            In x xs -> exists i, Util.Nth xs i x.
-        Proof.
-          induction xs; intros x IN.
-          - inv IN.
-          - destruct IN; subst.
-            + exists (0%nat). cbn. auto.
-            + apply IHxs in H as [i H].
-              exists (S i).
-              cbn; auto.
-        Qed.
-
-        Lemma map_monad_In_OOM_succeeds' :
-          forall {A B} l (f : forall (a : A), In a l -> OOM B) res,
-            map_monad_In l f = ret res ->
-            (forall a (HIn : In a l), exists b, f a HIn = ret b).
-        Proof.
-          intros A B.
-          induction l; intros f res MAP.
-          - intros _ [].
-          - rewrite map_monad_In_cons in MAP.
-            cbn in *.
-            break_match_hyp; inv MAP.
-            rename H0 into MAP.
-            break_match_hyp; inv MAP.
-
-            intros a0 [HIn | HIn]; subst.
-            + exists b; auto.
-            + apply IHl with (a:=a0) (HIn:=HIn) in Heqo0.
-              auto.
-        Qed.
-
         eapply map_monad_In_OOM_fail in Heqo.
         destruct Heqo as [a [INA Heqo]].
 
@@ -7993,47 +7857,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         inv CONVa.
       }
 
-      (* Something about map_monad and repeat? *)
-      (* TODO: move this *)
-      Lemma repeat_S :
-        forall X (x : X) n,
-          repeat x (S n) = x :: repeat x n.
-      Proof.
-        intros X x n.
-        reflexivity.
-      Qed.
-
-      (* TODO: move this *)
-      Lemma map_monad_In_OOM_repeat_success :
-        forall {A B} sz x (f : forall (a : A), In a (repeat x sz) -> OOM B) res y
-          (INx : In x (repeat x sz)),
-          map_monad_In (repeat x sz) f = ret res ->
-          f x INx = NoOom y ->
-          res = repeat y sz.
-      Proof.
-        intros A B sz.
-        induction sz; intros x f res y INx MAP F.
-        - inv INx.
-        - cbn.
-          unfold repeat in MAP.
-          rewrite map_monad_In_cons in MAP.
-          cbn in MAP.
-          assert (INx = or_introl eq_refl) by apply proof_irrelevance.
-          subst.
-          rewrite F in MAP.
-          break_match_hyp; inv MAP.
-          specialize (IHsz x).
-          destruct sz.
-          + cbn in *. inv Heqo.
-            reflexivity.
-          + eapply IHsz in Heqo.
-            rewrite Heqo; eauto.
-            erewrite (proof_irrelevance _ (or_introl eq_refl)) in F; eauto.
-
-            Unshelve.
-            cbn; auto.
-      Qed.
-
       destruct (N.to_nat sz).
       + cbn in *.
         inv Heqo; auto.
@@ -8790,117 +8613,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             apply map_monad_err_In with (x:=a') in Heqs; auto.
             destruct Heqs as [y [UV2DVy INy]].
 
-
-            (* TODO: Move this *)
-            Lemma map_monad_In_err_fail :
-              forall {A B} l (f : forall (a : A), In a l -> err B) b,
-                map_monad_In l f = inl b ->
-                exists a (HIn : In a l), f a HIn = inl b.
-            Proof.
-              intros A B l f b MAP.
-              generalize dependent b.
-              generalize dependent l.
-              induction l; intros f b MAP.
-              - cbn in MAP.
-                inv MAP.
-              - rewrite map_monad_In_cons in MAP.
-                cbn in *.
-                destruct (f a (or_introl eq_refl)) eqn:Hfa; inv MAP;
-                  setoid_rewrite Hfa in H0; inv H0.
-                + exists a. exists (or_introl eq_refl). auto.
-                + rename H1 into MAP.
-                  destruct (map_monad_In l (fun (x : A) (HIn : In x l) => f x (or_intror HIn))) eqn:HMAP; inv MAP.
-                  specialize (IHl (fun (x : A) (HIn : In x l) => f x (or_intror HIn)) b HMAP) as [a' [IN FA]].
-                  exists a'. exists (or_intror IN). auto.
-            Qed.
-
-            (* TODO: Move this *)
-            Lemma map_monad_In_err_fail' :
-              forall {A B} l (f : forall (a : A), In a l -> err B),
-                (exists a b (HIn : In a l), f a HIn = inl b) ->
-                (exists s, map_monad_In l f = inl s).
-            Proof.
-              intros A B l f FAIL.
-              generalize dependent l.
-              induction l; intros f FAIL.
-              - cbn in FAIL.
-                destruct FAIL as [_ [_ [CONTRA _]]].
-                contradiction.
-              - destruct FAIL as [a0 [b [HIn FAIL]]].
-                destruct HIn.
-                + subst.
-                  rewrite map_monad_In_cons.
-                  cbn.
-                  setoid_rewrite FAIL.
-                  eauto.
-                + rewrite map_monad_In_cons.
-                  cbn.
-                  break_match_goal.
-                  * exists s; auto.
-                  * specialize (IHl (fun (x : A) (HIn : In x l) => f x (or_intror HIn))).
-                    forward IHl; eauto.
-                    destruct IHl as [s IHl].
-                    exists s.
-                    rewrite IHl.
-                    auto.
-            Qed.
-
-            (* TODO: move / generalize these *)
-            Lemma map_monad_In_err_forall2 :
-              forall {A B} l (f : forall (a : A), In a l -> err B) res,
-                map_monad_In l f = inr res <->
-                  Forall2_HIn l res (fun a b INA INB => f a INA = inr b).
-            Proof.
-              intros A B.
-              induction l; intros f res.
-              - split; intros MAP.
-                + cbn in *.
-                  inv MAP.
-                  auto.
-                + cbn in *.
-                  break_match_hyp; tauto.
-              - split; intros MAP.
-                + rewrite map_monad_In_unfold in MAP.
-                  cbn in *.
-                  break_match_hyp; inv MAP.
-                  break_match_hyp; inv H0.
-
-                  pose proof (IHl (fun (x : A) (HIn : In x l) => f x (or_intror HIn)) l0) as FORALL.
-                  constructor; auto.
-                  eapply FORALL. eauto.
-                + rewrite map_monad_In_cons.
-                  cbn in *.
-                  break_match_hyp; try contradiction.
-                  cbn in *.
-                  destruct MAP as [FA MAP].
-                  rewrite FA.
-
-                  pose proof (IHl (fun (x : A) (HIn : In x l) => f x (or_intror HIn)) l0) as FORALL.
-                  apply FORALL in MAP.
-                  rewrite MAP.
-                  auto.
-            Qed.
-
-            Lemma map_monad_In_err_succeeds' :
-              forall {A B} l (f : forall (a : A), In a l -> err B) res,
-                map_monad_In l f = ret res ->
-                (forall a (HIn : In a l), exists b, f a HIn = ret b).
-            Proof.
-              intros A B.
-              induction l; intros f res MAP.
-              - intros _ [].
-              - rewrite map_monad_In_cons in MAP.
-                cbn in *.
-                break_match_hyp; inv MAP.
-                rename H0 into MAP.
-                break_match_hyp; inv MAP.
-
-                intros a0 [HIn | HIn]; subst.
-                + exists b; auto.
-                + apply IHl with (a:=a0) (HIn:=HIn) in Heqs0.
-                  auto.
-            Qed.
-
             eapply map_monad_In_OOM_succeeds' in Heqo; eauto.
             destruct Heqo as [b UVCyb].
             pose proof (uvalue_to_dvalue_dvalue_refine_strict _ _ _ UVCyb UV2DVy) as [dva' [UV2DVa' REFa']].
@@ -9621,7 +9333,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           apply map_monad_err_forall2 in Heqs1.
           apply Util.Forall2_forall in Heqs1 as [LEN Heqs1].
           apply In_Nth in IN as [i NTH].
-          pose proof IS1.LLVM.MEM.CP.CONC.MemHelpers.Nth_exists l i as NTHl.
+          pose proof Nth_exists l i as NTHl.
           forward NTHl.
           { apply Nth_ix_lt_length in NTH. lia. }
           destruct NTHl as [x NTHl].
@@ -9633,7 +9345,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           apply map_monad_err_forall2 in Heqs2.
           apply Util.Forall2_forall in Heqs2 as [LEN Heqs2].
           apply In_Nth in IN as [i NTH].
-          pose proof IS1.LLVM.MEM.CP.CONC.MemHelpers.Nth_exists l i as NTHl.
+          pose proof Nth_exists l i as NTHl.
           forward NTHl.
           { apply Nth_ix_lt_length in NTH. lia. }
           destruct NTHl as [x NTHl].
@@ -9697,7 +9409,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           apply map_monad_err_forall2 in Heqs1.
           apply Util.Forall2_forall in Heqs1 as [LEN Heqs1].
           apply In_Nth in IN as [i NTH].
-          pose proof IS1.LLVM.MEM.CP.CONC.MemHelpers.Nth_exists l i as NTHl.
+          pose proof Nth_exists l i as NTHl.
           forward NTHl.
           { apply Nth_ix_lt_length in NTH. lia. }
           destruct NTHl as [x NTHl].
@@ -9709,7 +9421,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           apply map_monad_err_forall2 in Heqs2.
           apply Util.Forall2_forall in Heqs2 as [LEN Heqs2].
           apply In_Nth in IN as [i NTH].
-          pose proof IS1.LLVM.MEM.CP.CONC.MemHelpers.Nth_exists l i as NTHl.
+          pose proof Nth_exists l i as NTHl.
           forward NTHl.
           { apply Nth_ix_lt_length in NTH. lia. }
           destruct NTHl as [x NTHl].
@@ -10367,6 +10079,40 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     reflexivity.
   Qed.
 
+  (* TODO: move this! Probably somewhere that I get a version for each language? *)
+  Ltac solve_dec_oom :=
+    let s := fresh "s" in
+    first [intros ? s | intros s];
+    repeat destruct s;
+    try solve
+      [
+        left;
+        intros o CONTRA;
+        inv CONTRA
+      ];
+    right;
+    eexists; reflexivity.
+
+  Lemma exp_E_dec_oom :
+    forall A (e : exp_E A), {forall o : OOME A, e <> subevent _ o} + {exists o : OOME A, e = subevent _ o}.
+  Proof.
+    solve_dec_oom.
+  Qed.
+
+  (* TODO: move this! *)
+  Lemma L0'_dec_oom :
+    forall A (e : L0' A), {forall o : OOME A, e <> subevent _ o} + {exists o : OOME A, e = subevent _ o}.
+  Proof.
+    solve_dec_oom.
+  Qed.
+
+  (* TODO: move this! *)
+  Lemma L0_dec_oom :
+    forall A (e : L0 A), {forall o : OOME A, e <> subevent _ o} + {exists o : OOME A, e = subevent _ o}.
+  Proof.
+    solve_dec_oom.
+  Qed.
+
   Lemma initialize_global_E1E2_orutt :
     forall g,
       orutt exp_E_refine_strict exp_E_res_refine_strict eq
@@ -10380,25 +10126,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { apply rutt_orutt.
       apply GlobalRead_exp_E_E1E2_rutt.
       intros A e2.
-
-      (* TODO: move this! *)
-      Lemma exp_E_dec_oom :
-        forall A (e : exp_E A), {forall o : OOME A, e <> subevent _ o} + {exists o : OOME A, e = subevent _ o}.
-      Proof.
-        intros A s.
-        repeat destruct s;
-          try solve
-            [
-              left;
-              intros o CONTRA;
-              inv CONTRA
-            ].
-
-        right.
-        exists o.
-        reflexivity.
-      Qed.
-
       apply exp_E_dec_oom.
     }
 
@@ -10459,25 +10186,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     cbn.
     apply orutt_bind with (RR:=eq).
     { apply orutt_bind with (RR:=eq).
-
-      (* TODO: move this! *)
-      Lemma L0_dec_oom :
-        forall A (e : L0 A), {forall o : OOME A, e <> subevent _ o} + {exists o : OOME A, e = subevent _ o}.
-      Proof.
-        intros A s.
-        repeat destruct s;
-          try solve
-            [
-              left;
-              intros o CONTRA;
-              inv CONTRA
-            ].
-
-        right.
-        exists o.
-        reflexivity.
-      Qed.
-
       (* In the future this allocate_one_E1E2_rutt_strict_sound lemma may be orutt *)
       apply rutt_orutt; [| apply L0_dec_oom].
       apply allocate_one_E1E2_rutt_strict_sound.
@@ -11916,21 +11624,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         - (* Concrete so just use uvalue_to_dvalue (simple) conversion *)
           apply rutt_orutt.
           apply lift_err_uvalue_to_dvalue_rutt_strict; auto.
-          intros A s.
-          repeat destruct s;
-            try solve
-              [
-                left;
-                intros o CONTRA;
-                inv CONTRA
-              ].
-
-          right.
-          exists o.
-          reflexivity.
+          solve_dec_oom.
         - (* Not concrete, trigger pick events *)
-          eapply rutt_bind with (RR:= fun (t1 : {_ : IS1.LP.Events.DV.dvalue | True}) (t2 : {_ : dvalue | True}) => dvalue_refine_strict (proj1_sig t1) (proj1_sig t2)) .
-          { apply rutt_trigger.
+          eapply orutt_bind with (RR:= fun (t1 : {_ : IS1.LP.Events.DV.dvalue | True}) (t2 : {_ : dvalue | True}) => dvalue_refine_strict (proj1_sig t1) (proj1_sig t2)) .
+          { apply orutt_trigger.
             { constructor.
               cbn.
               tauto.
@@ -11948,10 +11645,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               cbn.
               tauto.
             }
+
+            intros o CONTRA.
+            inv CONTRA.
           }
 
           intros r1 r2 R1R2.
-          apply rutt_Ret.
+          apply orutt_Ret.
           destruct r1, r2.
           cbn in *.
           auto.

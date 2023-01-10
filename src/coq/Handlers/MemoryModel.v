@@ -809,52 +809,10 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
             erewrite IP.from_Z_to_Z in GEP; [|apply FROMZ].
             lia.
 
-            unfold sequence in HSEQUENCE.
-
-            (* TODO: move *)
-            Set Nested Proofs Allowed.
-            Lemma sequence_OOM_In :
-              forall {A} (ms : list (OOM A)) xs x,
-                sequence ms = NoOom xs ->
-                In (NoOom x) ms ->
-                In x xs.
-            Proof.
-              intros A.
-              induction ms; intros xs x SEQUENCE IN.
-              - inversion IN.
-              - inversion IN; subst.
-                + cbn in *.
-                  destruct (map_monad id ms) eqn:MAP; inversion SEQUENCE; subst.
-                  cbn; auto.
-                + cbn in *.
-                  destruct a; cbn in *; [|inversion SEQUENCE].
-                  destruct (map_monad id ms) eqn:MAP; inversion SEQUENCE; subst.
-                  right.
-                  eauto.
-            Qed.
-                
+            unfold sequence in HSEQUENCE.                
             eapply sequence_OOM_In; eauto.
           }
           { subst.
-
-            (* TODO: move *)
-            Lemma sequence_OOM_NoOom_In :
-              forall {A} (ms : list (OOM A)) (xs : list A),
-                sequence ms = NoOom xs ->
-                forall (oom_msg : string), ~ In (Oom oom_msg) ms.
-            Proof.
-              intros A.
-              induction ms; intros xs SEQUENCE msg IN.
-              - inversion IN.
-              - inversion IN; subst.
-                + cbn in *.
-                  inversion SEQUENCE.
-                + cbn in *.
-                  destruct a; inversion SEQUENCE.
-                  destruct (map_monad id ms) eqn:MAP; inversion SEQUENCE; subst.
-                  eapply IHms in H; eauto.
-            Qed.
-
             eapply sequence_OOM_NoOom_In in HSEQUENCE.
             apply HSEQUENCE in IN.
             contradiction.    
@@ -1045,59 +1003,6 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           pose proof (intptr_seq_nth _ _ _ _ _ SEQ_SHIFT NTH) as IX.
           pose proof (intptr_seq_nth _ _ _ _ _ SEQ NTH') as IX'.
           cbn in IX'.
-
-          (* TODO: move *)
-          (* TODO: can I generalize this? *)
-          Lemma map_monad_OOM_Nth :
-            forall {A B} (f : A -> OOM B) l res x n,
-              map_monad f l = ret res ->
-              Util.Nth res n x ->
-              exists y, f y = ret x /\ Util.Nth l n y.
-          Proof.
-            intros A B f l res x n MAP NTH.
-            generalize dependent l. generalize dependent n. revert x.
-            induction res; intros x n NTH l MAP.
-            - inversion NTH.
-              rewrite nth_error_nil in *; inv H0.
-            - cbn in NTH.
-              induction n.
-              + cbn in NTH.
-                inv NTH.
-
-                destruct l as [_ | h ls].
-                * cbn in MAP.
-                  inv MAP.
-                * exists h.
-                  cbn in MAP.
-                  break_match_hyp; inv MAP.
-                  break_match_hyp; inv H0.
-                  split; cbn; auto.
-
-              + cbn in NTH.
-                destruct l as [_ | h ls].
-                * cbn in MAP.
-                  inv MAP.
-                * cbn in MAP.
-                  break_match_hyp; [break_match_hyp|]; inv MAP.
-                  epose proof (IHres _ _ NTH ls Heqo0) as [y [HF INy]].
-                  exists y; split; cbn; eauto.
-          Qed.
-
-          Lemma Nth_exists :
-            forall {X} (xs : list X) n,
-              n < length xs ->
-              exists x, Nth xs n x.
-          Proof.
-            intros X xs.
-            induction xs; intros n LEN.
-            - cbn in *; lia.
-            - cbn in LEN.
-              destruct n.
-              + exists a; cbn; auto.
-              + cbn.
-                apply IHxs.
-                lia.
-          Qed.
 
           (* Exists n in ptrs *)
           pose proof sequence_OOM_length _ _ Heqo as PTRS_LENGTH.
@@ -5761,31 +5666,7 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
       cbn.
       reflexivity.
     }
-    { (* TODO: move this *)
-      Set Nested Proofs Allowed.
-      (* TODO: can I generalize this? *)
-      Lemma map_monad_OOM_fail :
-        forall {A B} (f : A -> OOM B) l b,
-          map_monad f l = Oom b ->
-          exists a, In a l /\ f a = Oom b.
-      Proof.
-        intros A B f l b MAP.
-        generalize dependent b.
-        generalize dependent l.
-        induction l; intros b MAP.
-        - cbn in MAP.
-          inv MAP.
-        - cbn.
-          cbn in MAP.
-          destruct (f a) eqn:Hfa; inv MAP.
-          + rename H0 into MAP.
-            destruct (map_monad f l) eqn:HMAP; inv MAP.
-            specialize (IHl b eq_refl) as [a' [IN FA]].
-            exists a'. tauto.
-          + exists a. split; auto.
-      Qed.
-
-      apply map_monad_OOM_fail in HSEQUENCE as [a [IN EQA]].
+    { apply map_monad_OOM_fail in HSEQUENCE as [a [IN EQA]].
       unfold id in EQA. subst.
 
       pose proof map_monad_err_In _ _ _ _ HMAPM IN as [ix [GEP INix]].
