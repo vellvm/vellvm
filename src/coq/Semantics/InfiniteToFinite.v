@@ -12005,38 +12005,39 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     cbn. auto.
   Qed.
 
-  Lemma denote_mcfg_E1E2_rutt'_rutt :
+  Lemma denote_mcfg_E1E2_orutt'_orutt :
     forall dfns1 dfns2 dt f1 f2 args1 args2,
-      rutt event_refine event_res_refine (fun res1 res2 => call_res_refine IS1.LP.Events.DV.uvalue IS2.LP.Events.DV.uvalue (IS1.LP.Events.Call dt f1 args1) res1 (Call dt f2 args2) res2)
+      orutt event_refine_strict event_res_refine_strict (fun res1 res2 => call_res_refine_strict IS1.LP.Events.DV.uvalue IS2.LP.Events.DV.uvalue (IS1.LP.Events.Call dt f1 args1) res1 (Call dt f2 args2) res2)
         (IS1.LLVM.D.denote_mcfg dfns1 dt f1 args1)
-        (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2) ->
-      rutt event_refine event_res_refine uvalue_refine
+        (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2)
+        (OOM:=OOME) ->
+      orutt event_refine_strict event_res_refine_strict uvalue_refine_strict
         (IS1.LLVM.D.denote_mcfg dfns1 dt f1 args1)
-        (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2).
+        (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2)
+        (OOM:=OOME).
   Proof.
     intros dfns1 dfns2 dt f1 f2 args1 args2 H.
-    eapply rutt_weaken; eauto.
+    eapply orutt_weaken; eauto.
     intros r1 r2 H0.
     cbn in H0.
-    red. tauto.
+    tauto.
   Qed.
 
-  Lemma denote_mcfg_E1E2_rutt :
+  Lemma denote_mcfg_E1E2_orutt :
     forall dfns1 dfns2 dt f1 f2 args1 args2,
-      (Forall2 (dvalue_refine × function_denotation_refine) dfns1 dfns2) ->
-      (uvalue_refine f1 f2) ->
-      (Forall2 uvalue_refine args1 args2) ->
-      rutt event_refine event_res_refine uvalue_refine
+      (Forall2 (dvalue_refine_strict × function_denotation_refine_strict) dfns1 dfns2) ->
+      (uvalue_refine_strict f1 f2) ->
+      (Forall2 uvalue_refine_strict args1 args2) ->
+      orutt event_refine_strict event_res_refine_strict uvalue_refine_strict
         (IS1.LLVM.D.denote_mcfg dfns1 dt f1 args1)
-        (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2).
+        (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2)
+        (OOM:=OOME).
   Proof.
     intros dfns1 dfns2 dt f1 f2 args1 args2 H H0 H1.
-    eapply denote_mcfg_E1E2_rutt'_rutt.
-    eapply denote_mcfg_E1E2_rutt'; auto.
+    eapply denote_mcfg_E1E2_orutt'_orutt.
+    eapply denote_mcfg_E1E2_orutt'; auto.
     cbn.
     split; auto.
-    split; auto.
-    apply map_monad_oom_forall2; auto.
   Qed.
 
   Lemma model_E1E2_rutt_strict_sound
