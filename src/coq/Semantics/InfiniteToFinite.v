@@ -11789,51 +11789,53 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       reflexivity.
   Qed.
 
-  (* Lemma pickUnique_rutt_strict : *)
-  (*   forall uv1 uv2, *)
-  (*     uvalue_refine_strict uv1 uv2 -> *)
-  (*     rutt (sum_prerel call_refine_strict event_refine_strict) *)
-  (*       (sum_postrel call_res_refine_strict event_res_refine_strict) dvalue_refine_strict *)
-  (*       (IS1.LLVM.D.pickUnique uv1) (pickUnique uv2). *)
-  (* Proof. *)
-  (*   intros uv1 uv2 REF. *)
-  (*   unfold IS1.LLVM.D.pickUnique, IS1.LLVM.D.concretize_or_pick. *)
-  (*   unfold pickUnique, concretize_or_pick. *)
-  (*   cbn. *)
-  (*   break_match; *)
-  (*     eapply uvalue_refine_strict_preserves_is_concrete with (uvc:=uv2) in Heqb; eauto; *)
-  (*     rewrite Heqb. *)
+  Lemma pickUnique_rutt_strict :
+    forall uv1 uv2,
+      uvalue_refine_strict uv1 uv2 ->
+      rutt (sum_prerel call_refine_strict event_refine_strict)
+        (sum_postrel call_res_refine_strict event_res_refine_strict) dvalue_refine_strict
+        (IS1.LLVM.D.pickUnique uv1) (pickUnique uv2).
+  Proof.
+    intros uv1 uv2 REF.
+    unfold IS1.LLVM.D.pickUnique, IS1.LLVM.D.concretize_or_pick.
+    unfold pickUnique, concretize_or_pick.
+    cbn.
+    break_match;
+      eapply uvalue_refine_strict_preserves_is_concrete with (uvc:=uv2) in Heqb; eauto;
+      rewrite Heqb.
 
-  (*   apply lift_err_uvalue_to_dvalue_rutt; auto. *)
+    apply lift_err_uvalue_to_dvalue_rutt_strict; auto.
 
-  (*   repeat rewrite bind_trigger. *)
-  (*   apply rutt_Vis. *)
+    repeat rewrite bind_trigger.
+    apply rutt_Vis.
 
-  (*   { constructor. *)
-  (*     cbn. *)
-  (*     split; auto. *)
-  (*     apply uvalue_refine_strict_unique_prop; *)
-  (*       eauto. *)
-  (*   } *)
+    { constructor.
+      cbn.
+      split; auto.
+      split.
+      - apply uvalue_refine_strict_unique_prop;
+        eauto.
+      - admit.
+    }
 
-  (*   intros t1 t2 H. *)
-  (*   apply rutt_Ret. *)
-  (*   destruct t1, t2. *)
-  (*   cbn in *. *)
-  (*   destruct H; cbn in *. *)
-  (*   { red in H. *)
-  (*     destruct e1; cbn in *. *)
-  (*     destruct d1; cbn in *. *)
-  (*     admit. (* ???? *) *)
-  (*   } *)
-  (*   { destruct e2; cbn in *. *)
-  (*     admit. *)
-  (*     cbn in *. *)
-  (*     destruct d2; cbn in *. *)
-  (*     repeat (destruct s; try inv H). *)
-  (*     admit. *)
-  (*   } *)
-  (* Admitted. *)
+    intros t1 t2 H.
+    apply rutt_Ret.
+    destruct t1, t2.
+    cbn in *.
+    destruct H; cbn in *.
+    { red in H.
+      destruct e1; cbn in *.
+      destruct d1; cbn in *.
+      admit. (* ???? *)
+    }
+    { destruct e2; cbn in *.
+      admit.
+      cbn in *.
+      destruct d2; cbn in *.
+      repeat (destruct s; try inv H).
+      admit.
+    }
+  Admitted.
 
   (* Lemma uvalue_refine_concretize_poison : *)
   (*   forall uv1 uv2, *)
@@ -11937,29 +11939,30 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         solve_dec_oom.
       }
 
-      eapply lookup_defn_none in Heqo; eauto.
+      eapply lookup_defn_none_strict in Heqo; eauto.
       rewrite Heqo.
 
-      eapply rutt_bind with (RR:=Forall2 dvalue_refine).
+      eapply orutt_bind with (RR:=Forall2 dvalue_refine_strict).
       { (* Pick *)
         destruct PRE as [T [CONV MAPM]].
-        apply map_monad_oom_forall2 in MAPM.
         induction MAPM.
         - cbn.
-          apply rutt_Ret; auto.
+          apply orutt_Ret; auto.
         - do 2 rewrite map_monad_unfold.
           cbn.
-          eapply rutt_bind with (RR:=dvalue_refine).
+          eapply orutt_bind with (RR:=dvalue_refine_strict).
           {
-            apply pickUnique_rutt; auto.
+            apply rutt_orutt.
+            apply pickUnique_rutt_strict; auto.
+            solve_dec_oom.
           }
 
           intros r0 r3 R0R3.
-          eapply rutt_bind with (RR:=Forall2 dvalue_refine);
+          eapply orutt_bind with (RR:=Forall2 dvalue_refine_strict);
             eauto.
 
           intros r4 r5 R4R5.
-          eapply rutt_Ret.
+          eapply orutt_Ret.
           constructor; eauto.
       }
 
@@ -11969,15 +11972,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       destruct PRE as [T [UV ARGS_CONV]]; subst.
 
       unfold ITree.map.
-      eapply rutt_bind with (RR:=dvalue_refine).
+      eapply orutt_bind with (RR:=dvalue_refine_strict).
       {
-        apply rutt_trigger.
+        apply orutt_trigger.
         { constructor.
           cbn.
           split; split; auto.
-
-          apply map_monad_oom_forall2.
-          auto.
         }
 
         intros t1 t2 H.
@@ -11988,16 +11988,18 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
         cbn in H6.
         tauto.
+
+        intros o CONTRA.
+        inv CONTRA.
       }
 
       intros r0 r5 R0R5.
-      apply rutt_Ret.
+      apply orutt_Ret.
 
       split; split; auto.
       split; auto.
 
-      red in R0R5.
-      apply dvalue_refine_dvalue_to_uvalue; auto.
+      eapply dvalue_refine_strict_dvalue_to_uvalue; auto.
     }
 
     cbn. auto.
