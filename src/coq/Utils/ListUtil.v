@@ -892,3 +892,13 @@ Proof.
   intros X x n.
   reflexivity.
 Qed.
+
+Lemma map_repeat :
+  forall {A B} (f : A -> B) a sz,
+    map f (repeat a sz) = repeat (f a) sz.
+Proof.
+  intros A B f a sz.
+  induction sz.
+  - cbn; auto.
+  - cbn. rewrite IHsz; auto.
+Qed.

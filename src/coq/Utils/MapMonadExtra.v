@@ -1049,3 +1049,57 @@ Proof.
     + apply IHl with (a:=a0) (HIn:=HIn) in Heqs0.
       auto.
 Qed.
+
+Lemma map_monad_In_map :
+  forall {M : Type -> Type} {HM : Monad M} {EQM : Monad.Eq1 M},
+    Monad.Eq1Equivalence M ->
+    Monad.MonadLawsE M ->
+    forall (A B C : Type) (xs : list A) (g : A -> B) (f : forall (b : B) (HIn : In b (map g xs)), M C),
+      Monad.eq1 (map_monad_In (map g xs) f) (map_monad_In xs (fun (x : A) IN => f (g x) (in_map g xs x IN))).
+Proof.
+  intros. induction xs.
+  - simpl. reflexivity.
+  - simpl.
+    setoid_rewrite IHxs.
+    cbn.
+    assert (f (g a) (or_introl eq_refl) = f (g a) (in_map g (a :: xs) a (or_introl eq_refl))).
+    { apply f_equal.
+      apply proof_irrelevance.
+    }
+Abort.
+
+Lemma map_monad_map_monad_In :
+  forall {M A B} `{HM : Monad M} xs (f : A -> M B),
+    map_monad f xs = map_monad_In xs (fun x _ => f x).
+Proof.
+  intros M A B HM xs.
+  induction xs; intros f.
+  - cbn. reflexivity.
+  - rewrite map_monad_unfold, map_monad_In_cons.
+    rewrite IHxs.
+    reflexivity.
+Qed.
+
+Lemma map_monad_map_err :
+  forall (A B C : Type) (xs : list A) (g : A -> B) (f : B -> err C),
+    map_monad f (map g xs) = map_monad (fun (x : A) => f (g x)) xs.
+Proof.
+  intros. induction xs.
+  - simpl. reflexivity.
+  - simpl.
+    break_match; auto.
+    setoid_rewrite IHxs.
+    reflexivity.
+Qed.
+
+Lemma map_monad_map_oom :
+  forall (A B C : Type) (xs : list A) (g : A -> B) (f : B -> OOM C),
+    map_monad f (map g xs) = map_monad (fun (x : A) => f (g x)) xs.
+Proof.
+  intros. induction xs.
+  - simpl. reflexivity.
+  - simpl.
+    break_match; auto.
+    setoid_rewrite IHxs.
+    reflexivity.
+Qed.

@@ -55,8 +55,13 @@
 ./coq/Semantics/Lang.v
 ./coq/Semantics/MemoryAddress.v
 ./coq/Semantics/MemoryParams.v
-./coq/Semantics/InfiniteToFinite.v
 ./coq/Semantics/RuttProps.v
+./coq/Semantics/InfiniteToFinite/Conversions/BaseConversions.v
+./coq/Semantics/InfiniteToFinite/Conversions/DvalueConversions.v
+./coq/Semantics/InfiniteToFinite/Conversions/EventConversions.v
+./coq/Semantics/InfiniteToFinite/Conversions/TreeConversions.v
+./coq/Semantics/InfiniteToFinite/LangRefine.v
+./coq/Semantics/InfiniteToFinite.v
 ./coq/Syntax/ScopeTheory.v
 ./coq/Syntax/DataLayout.v
 ./coq/Syntax/CFG.v
