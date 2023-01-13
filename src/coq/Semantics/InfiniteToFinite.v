@@ -431,47 +431,47 @@ Module InfiniteToFinite.
     destruct RL0 as [t1' [OOM_T1 RL0]].
     red in RL0.
     red.
-    exists (FinInfTC.L0_convert_tree_strict' EC2.DVC.dvalue_convert (FinLLVM.Intrinsics.interp_intrinsics t2)).
-    split.
-    - assert ((FinInfTC.L0_convert_tree' EC2.DVC.dvalue_convert (FinLLVM.Intrinsics.interp_intrinsics t2)) ≈  (FinInfTC.L0_convert_tree' EC2.DVC.dvalue_convert (LLVM.Intrinsics.interp_intrinsics (InfFinTC.L0_convert_tree' EC1.DVC.dvalue_convert t1')))) as EQT2.
-      { eapply @FinInfTC.L0_convert_tree'_eutt_proper with (RA:=eq).
-        intros u1 u2 H; subst.
-        reflexivity.
+    (* exists (FinInfTC.L0_convert_tree_strict' EC2.DVC.dvalue_convert (FinLLVM.Intrinsics.interp_intrinsics t2)). *)
+    (* split. *)
+    (* - assert ((FinInfTC.L0_convert_tree' EC2.DVC.dvalue_convert (FinLLVM.Intrinsics.interp_intrinsics t2)) ≈  (FinInfTC.L0_convert_tree' EC2.DVC.dvalue_convert (LLVM.Intrinsics.interp_intrinsics (InfFinTC.L0_convert_tree' EC1.DVC.dvalue_convert t1')))) as EQT2. *)
+    (*   { eapply @FinInfTC.L0_convert_tree'_eutt_proper with (RA:=eq). *)
+    (*     intros u1 u2 H; subst. *)
+    (*     reflexivity. *)
 
-        rewrite RL0.
-        reflexivity.
-      }
+    (*     rewrite RL0. *)
+    (*     reflexivity. *)
+    (*   } *)
 
-      rewrite EQT2.
+    (*   rewrite EQT2. *)
 
-      eapply refine_OOM_h_transitive with (y:=(InfLLVM.Intrinsics.interp_intrinsics t1')); try typeclasses eauto.
-      (* May hold... OOM_T1 *)
-      admit.
+    (*   eapply refine_OOM_h_transitive with (y:=(InfLLVM.Intrinsics.interp_intrinsics t1')); try typeclasses eauto. *)
+    (*   (* May hold... OOM_T1 *) *)
+    (*   admit. *)
 
-      red.
-      red.
-      (* This might actually be provable by walking through t1'?
+    (*   red. *)
+    (*   red. *)
+    (*   (* This might actually be provable by walking through t1'? *)
 
-         The conversions may cause early OOM, but otherwise preserves
-         the event structure.
-       *)
-      admit.
-    - red.
-      (* This can't hold unless I know converting from E2 -> E1 -> E2
-         is "safe" and doesn't cause any OOM.
+    (*      The conversions may cause early OOM, but otherwise preserves *)
+    (*      the event structure. *)
+    (*    *) *)
+    (*   admit. *)
+    (* - red. *)
+    (*   (* This can't hold unless I know converting from E2 -> E1 -> E2 *)
+    (*      is "safe" and doesn't cause any OOM. *)
 
-         This should be the case for the particular Inf / Fin case we
-         care about, though.
-       *)
-      rewrite L0_convert_safe.
-      reflexivity.
+    (*      This should be the case for the particular Inf / Fin case we *)
+    (*      care about, though. *)
+    (*    *) *)
+    (*   rewrite L0_convert_safe. *)
+    (*   reflexivity. *)
   Admitted.
 
-  Lemma refine_E1E2_interp_global :
+  Lemma refine_E1E2_interp_global_strict :
     forall t1 t2 g1 g2,
-      refine_E1E2_L0 t1 t2 ->
-      global_refine g1 g2 ->
-      refine_E1E2_L1 (interp_global t1 g1) (interp_global t2 g2).
+      refine_E1E2_L0_strict t1 t2 ->
+      global_refine_strict g1 g2 ->
+      refine_E1E2_L1_strict (interp_global t1 g1) (interp_global t2 g2).
   Proof.
     intros t1 t2 g1 g2 RL0 GENVS.
     red in RL0.
@@ -481,44 +481,44 @@ Module InfiniteToFinite.
     (* Perhaps I need a lemma about L1_convert_tree and interp_global here? *)
   Admitted.
 
-  Lemma refine_E1E2_interp_local_stack :
+  Lemma refine_E1E2_interp_local_stack_strict :
     forall t1 t2 ls1 ls2,
-      refine_E1E2_L1 t1 t2 ->
-      local_stack_refine ls1 ls2 ->
-      refine_E1E2_L2 (interp_local_stack t1 ls1) (interp_local_stack t2 ls2).
+      refine_E1E2_L1_strict t1 t2 ->
+      local_stack_refine_strict ls1 ls2 ->
+      refine_E1E2_L2_strict (interp_local_stack t1 ls1) (interp_local_stack t2 ls2).
   Proof.
   Admitted.
 
   (* Most of these are aliases of the above, but some levels of the interpreter interpret more than one event *)
-  Lemma refine_E1E2_01 :
+  Lemma refine_E1E2_01_strict :
     forall t1 t2 g1 g2,
-      refine_E1E2_L0 t1 t2 ->
-      global_refine g1 g2 ->
-      refine_E1E2_L1 (interp_global (InfLLVM.Intrinsics.interp_intrinsics t1) g1) (interp_global (FinLLVM.Intrinsics.interp_intrinsics t2) g2).
+      refine_E1E2_L0_strict t1 t2 ->
+      global_refine_strict g1 g2 ->
+      refine_E1E2_L1_strict (interp_global (InfLLVM.Intrinsics.interp_intrinsics t1) g1) (interp_global (FinLLVM.Intrinsics.interp_intrinsics t2) g2).
   Proof.
     intros t1 t2 g1 g2 RL0 GENVS.
     red in RL0.
-    apply refine_E1E2_interp_global; auto.
-    apply refine_E1E2_L0_interp_intrinsics; auto.
+    apply refine_E1E2_interp_global_strict; auto.
+    apply refine_E1E2_L0_strict_interp_intrinsics; auto.
   Qed.
 
-  Lemma refine_E1E2_12 :
+  Lemma refine_E1E2_12_strict :
     forall t1 t2 l1 l2,
-      refine_E1E2_L1 t1 t2 ->
-      local_stack_refine l1 l2 ->
-      refine_E1E2_L2 (interp_local_stack t1 l1) (interp_local_stack t2 l2).
+      refine_E1E2_L1_strict t1 t2 ->
+      local_stack_refine_strict l1 l2 ->
+      refine_E1E2_L2_strict (interp_local_stack t1 l1) (interp_local_stack t2 l2).
   Proof.
     intros t1 t2 g1 g2 RL1 GENVS.
     red in RL1.
-    apply refine_E1E2_interp_local_stack; auto.
+    apply refine_E1E2_interp_local_stack_strict; auto.
   Qed.
 
   Import InterpMemoryProp.
-  Lemma refine_E1E2_23 :
+  Lemma refine_E1E2_23_strict :
     forall t1 t2 sid m1 m2,
-      refine_E1E2_L2 t1 t2 ->
+      refine_E1E2_L2_strict t1 t2 ->
       MemState_refine m1 m2 ->
-      refine_E1E2_L3 (InfMemInterp.interp_memory_prop eq t1 sid m1) (FinMemInterp.interp_memory_prop eq t2 sid m2).
+      refine_E1E2_L3_strict (InfMemInterp.interp_memory_prop eq t1 sid m1) (FinMemInterp.interp_memory_prop eq t2 sid m2).
   Proof.
     intros t1 t2 sid m1 m2 RL2.
 
@@ -553,28 +553,28 @@ Module InfiniteToFinite.
     (* I'll probably need something about MemMonad_valid_state eventually... *)
   Admitted.
 
-  Lemma refine_E1E2_34 :
+  Lemma refine_E1E2_34_strict :
     forall t1 t2,
-      refine_E1E2_L3 t1 t2 ->
-      refine_E1E2_L4 (InfLLVM.Pick.model_undef eq t1) (FinLLVM.Pick.model_undef eq t2).
+      refine_E1E2_L3_strict t1 t2 ->
+      refine_E1E2_L4_strict (InfLLVM.Pick.model_undef eq t1) (FinLLVM.Pick.model_undef eq t2).
   Proof.
     intros t1 t2 RL3.
     red.
   Admitted.
 
-  Lemma refine_E1E2_45 :
+  Lemma refine_E1E2_45_strict :
     forall t1 t2,
-      refine_E1E2_L4 t1 t2 ->
-      refine_E1E2_L5 (model_UB t1) (model_UB t2).
+      refine_E1E2_L4_strict t1 t2 ->
+      refine_E1E2_L5_strict (model_UB t1) (model_UB t2).
   Proof.
     intros t1 t2 RL4.
     red.
   Admitted.
 
-  Lemma refine_E1E2_56 :
+  Lemma refine_E1E2_56_strict :
     forall t1 t2,
-      refine_E1E2_L5 t1 t2 ->
-      refine_E1E2_L6 (refine_OOM eq t1) (refine_OOM eq t2).
+      refine_E1E2_L5_strict t1 t2 ->
+      refine_E1E2_L6_strict (refine_OOM eq t1) (refine_OOM eq t2).
   Proof.
     intros t1 t2 RL4.
     red.
@@ -613,22 +613,22 @@ Module InfiniteToFinite.
     unfold model_E1E2_L0.
     red.
     unfold refine_L0.
-    unfold L0_convert_tree'.
-    unfold L0_convert_tree.
+    unfold L0_convert_tree_strict'.
+    unfold L0_convert_tree_strict.
 
-    exists (FinInfTC.L0_convert_tree' EC2.DVC.dvalue_convert
-         (denote_vellvm (DynamicTypes.DTYPE_I 32) "main" main_args
-            (TypToDtyp.convert_types (CFG.mcfg_of_tle p)))).
+    (* exists (FinInfTC.L0_convert_tree_strict' EC2.DVC.dvalue_convert *)
+    (*      (denote_vellvm (DynamicTypes.DTYPE_I 32) "main" main_args *)
+    (*         (TypToDtyp.convert_types (CFG.mcfg_of_tle p)))). *)
 
-    split.
-    - (* src' may have additional OOM *)
-      (* I think this pretty much has to be by induction over the syntax? *)
-      admit.
-    - (* src' when converted agrees with target *)
-      (* Target may just be OOM for all we know *)
-      red.
-      setoid_rewrite L0_convert_safe.
-      reflexivity.
+    (* split. *)
+    (* - (* src' may have additional OOM *) *)
+    (*   (* I think this pretty much has to be by induction over the syntax? *) *)
+    (*   admit. *)
+    (* - (* src' when converted agrees with target *) *)
+    (*   (* Target may just be OOM for all we know *) *)
+    (*   red. *)
+    (*   setoid_rewrite L0_convert_safe. *)
+    (*   reflexivity. *)
   Admitted.
 
   Theorem model_E1E2_L1_sound :
@@ -650,12 +650,12 @@ Module InfiniteToFinite.
     unfold model_gen_oom_L1.
     unfold interp_mcfg1.
 
-    apply refine_E1E2_01.
+    apply refine_E1E2_01_strict.
     { (* Still need to deal with interp_intrinsics... *)
       apply model_E1E2_L0_sound.
     }
 
-    apply global_refine_empty.
+    apply global_refine_strict_empty.
   Qed.
 
   Theorem model_E1E2_L2_sound :
@@ -664,7 +664,7 @@ Module InfiniteToFinite.
   Proof.
     intros p.
     red.
-    apply refine_E1E2_12; [| apply local_stack_refine_empty].
+    apply refine_E1E2_12_strict; [| apply local_stack_refine_strict_empty].
     apply model_E1E2_L1_sound.
   Qed.
 
@@ -674,7 +674,7 @@ Module InfiniteToFinite.
   Proof.
     intros p.
     red.
-    apply refine_E1E2_23; [| apply MemState_refine_initial].
+    apply refine_E1E2_23_strict; [| apply MemState_refine_initial].
     apply model_E1E2_L2_sound.
   Qed.
 
@@ -684,7 +684,7 @@ Module InfiniteToFinite.
   Proof.
     intros p.
     red.
-    apply refine_E1E2_34.
+    apply refine_E1E2_34_strict.
     apply model_E1E2_L3_sound.
   Qed.
 
@@ -694,7 +694,7 @@ Module InfiniteToFinite.
   Proof.
     intros p.
     red.
-    apply refine_E1E2_45.
+    apply refine_E1E2_45_strict.
     apply model_E1E2_L4_sound.
   Qed.
 
@@ -704,7 +704,7 @@ Module InfiniteToFinite.
   Proof.
     intros p.
     red.
-    apply refine_E1E2_56.
+    apply refine_E1E2_56_strict.
     apply model_E1E2_L5_sound.
   Qed.
 

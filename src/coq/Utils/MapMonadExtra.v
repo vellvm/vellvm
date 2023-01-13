@@ -17,6 +17,7 @@ From Vellvm Require Import
   Utils.Tactics.
 
 Require Import Lia.
+Require Import FunctionalExtensionality.
 
 Import Monads.
 
@@ -1102,4 +1103,80 @@ Proof.
     break_match; auto.
     setoid_rewrite IHxs.
     reflexivity.
+Qed.
+
+Lemma map_monad_In_OOM_nil_inv :
+  forall {A B : Type} (l : list A) (f : forall a : A, In a l -> OOM B),
+    map_monad_In l f = ret [] -> l = [].
+Proof.
+  intros A B l f H.
+  induction l; auto.
+
+  rewrite map_monad_In_cons in H.
+  cbn in H.
+  break_match_hyp; inv H.
+  break_match_hyp; inv H1.
+Qed.
+
+Lemma map_monad_In_OOM_cons_inv :
+  forall {A B : Type} (l : list A) (f : forall a : A, In a l -> OOM B) r res,
+    map_monad_In l f = ret (r :: res) ->
+    exists x xs HInx (EQ : l = x :: xs),
+      f x HInx = ret r /\
+        map_monad_In xs (fun a HIn => f a (In_cons_right EQ HIn)) = ret res.
+Proof.
+  intros A B l.
+  induction l; intros f r res H.
+  - cbn in *.
+    inv H.
+  - rewrite map_monad_In_cons in H.
+    cbn in H.
+    break_match_hyp; inv H.
+    break_match_hyp; inv H1.
+    exists a.
+    exists l.
+    exists (or_introl eq_refl).
+    exists eq_refl.
+    split; auto.
+    cbn.
+
+    assert ((fun (x : A) (HIn : In x l) => f x (or_intror HIn)) =
+              (fun (a0 : A) (HIn : In a0 l) => f a0 (In_cons_right eq_refl HIn))).
+    { eapply functional_extensionality_dep.
+      intros x.
+      eapply functional_extensionality_dep.
+      intros x0.
+      assert (or_intror x0 = @In_cons_right A (a :: l) x a l (@eq_refl (list A) (a :: l)) x0) as PROOFS.
+      { apply proof_irrelevance.
+      }
+
+      rewrite PROOFS.
+      reflexivity.
+    }
+    rewrite <- H.
+    auto.
+Qed.
+
+Lemma map_monad_err_forall2_HIn:
+  forall {A B : Type} (f : A -> err B) (l : list A) (res : list B),
+    map_monad f l = inr res <->
+      Forall2_HIn l res (fun (a : A) (b : B) (INA : In a l) (INB : In b res) => f a = inr b).
+Proof.
+Admitted.
+
+Lemma map_monad_err_length :
+  forall {A B} l (f : A -> err B) res,
+    map_monad f l = inr res ->
+    length l = length res.
+Proof.
+  intros A B l.
+  induction l; intros f res H.
+  - rewrite map_monad_err_nil in H; subst; auto.
+  - rewrite map_monad_unfold in H.
+    cbn in *.
+    break_match_hyp; inv H.
+    break_match_hyp; inv H1.
+    apply IHl in Heqs0.
+    cbn.
+    auto.
 Qed.

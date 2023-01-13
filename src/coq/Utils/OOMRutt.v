@@ -407,7 +407,7 @@ Proof.
     try eapply eqit_mon; try apply H; try apply H0; auto.
 Qed.
 
-Global Instance gorutt_cong_euttge {R1 R2 : Type} {E1 E2 OOM : Type -> Type} OOME {REv : forall A B, E1 A -> E2 B -> Prop}
+#[global] Instance gorutt_cong_euttge {R1 R2 : Type} {E1 E2 OOM : Type -> Type} OOME {REv : forall A B, E1 A -> E2 B -> Prop}
        {RAns : forall A B, E1 A -> A -> E2 B -> B -> Prop} {RR1 RR2} {RS : R1 -> R2 -> Prop} r rg
        (LERR1: forall x x' y, (RR1 x x': Prop) -> (RS x' y: Prop) -> RS x y)
        (LERR2: forall x y y', (RR2 y y': Prop) -> RS x y' -> RS x y) :

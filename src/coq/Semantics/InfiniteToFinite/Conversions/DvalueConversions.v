@@ -20,6 +20,7 @@ From Vellvm Require Import
      Semantics.DynamicValues
      Semantics.LLVMParams
      Semantics.InfiniteToFinite.Conversions.BaseConversions
+     Semantics.InfiniteToFinite.R2Injective
      Syntax.DynamicTypes
      Theory.TopLevelRefinements
      Theory.ContainsUB
@@ -2989,6 +2990,260 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         auto.
     }
   Qed.
+
+  Lemma dvalue_converted_lazy_R2_deterministic :
+    R2_deterministic dvalue_converted_lazy.
+  Proof.
+    red.
+    intros r1 r2 a b R1R2 AB.
+    unfold dvalue_converted_lazy in *.
+    intros EQ; subst; auto.
+  Qed.
+
+  Lemma dvalue_refine_strict_R2_injective :
+    R2_injective dvalue_refine_strict.
+  Proof.
+    red.
+    intros r1 r2 a b R1R2 AB.
+    split; intros EQ; subst.
+    - unfold_dvalue_refine_strict.
+      rewrite R1R2 in AB. inv AB.
+      auto.
+    - generalize dependent r2.
+      generalize dependent a.
+      induction r1; intros a'; induction a'; intros r2 R1R2 AB;
+        try
+          solve
+          [ unfold_dvalue_refine_strict;
+            cbn in *;
+            break_match_hyp; inv AB;
+            break_match_hyp; inv R1R2;
+            pose proof (addr_convert_injective _ _ _ Heqo0 Heqo);
+            subst; auto
+          | unfold_dvalue_refine_strict;
+            cbn in *;
+            break_match_hyp; inv R1R2;
+            inv AB
+          | unfold_dvalue_refine_strict;
+            cbn in *;
+            inv AB; inv R1R2; auto
+          | unfold_dvalue_refine_strict;
+            cbn in *;
+            break_match_hyp; inv AB;
+            break_match_hyp; inv R1R2;
+            apply LP2.IP.from_Z_to_Z in Heqo, Heqo0;
+            rewrite Heqo in Heqo0;
+            apply LP1.IP.to_Z_inj in Heqo0;
+            subst;
+            auto
+          | unfold_dvalue_refine_strict;
+            cbn in R1R2;
+            break_match_hyp; inv R1R2;
+            inv AB
+          | unfold_dvalue_refine_strict;
+            cbn in *;
+            break_match_hyp; inv AB;
+            break_match_hyp; inv R1R2
+          ].
+
+      { (* Structs *)
+        unfold_dvalue_refine_strict_in R1R2.
+        unfold_dvalue_refine_strict_in AB.
+        cbn in *;
+          break_match_hyp; inv AB;
+          break_match_hyp; inv R1R2.
+
+        clear H0.
+        generalize dependent l.
+        generalize dependent fields0.
+        induction fields; intros fields0 l Heqo0 Heqo.
+        { clear H.
+          cbn in *.
+          inv Heqo0.
+          apply map_monad_In_OOM_nil_inv in Heqo; subst.
+          reflexivity.
+        }
+
+        { rewrite map_monad_In_cons in Heqo0.
+          cbn in Heqo0.
+          break_match_hyp; inv Heqo0.
+          break_match_hyp; inv H1.
+
+          apply map_monad_In_OOM_cons_inv in Heqo as [x [xs [HInx [FIELDS0 [CONVX CONVXS]]]]].
+          subst.
+
+          forward IHfields.
+          { intros u H1 a0 r2 R1R2 AB.
+            eapply H.
+            right; auto.
+            eauto.
+            eauto.
+          }
+
+          specialize (IHfields xs l0 eq_refl CONVXS).
+          inv IHfields.
+
+          specialize (H a (or_introl eq_refl) x d Heqo1 CONVX).
+          subst.
+          auto.
+        }
+      }
+
+      { (* Packed Structs *)
+        unfold_dvalue_refine_strict_in R1R2.
+        unfold_dvalue_refine_strict_in AB.
+        cbn in *;
+          break_match_hyp; inv AB;
+          break_match_hyp; inv R1R2.
+
+        clear H0.
+        generalize dependent l.
+        generalize dependent fields0.
+        induction fields; intros fields0 l Heqo0 Heqo.
+        { clear H.
+          cbn in *.
+          inv Heqo0.
+
+          apply map_monad_In_OOM_nil_inv in Heqo; subst.
+          reflexivity.
+        }
+
+        { rewrite map_monad_In_cons in Heqo0.
+          cbn in Heqo0.
+          break_match_hyp; inv Heqo0.
+          break_match_hyp; inv H1.
+
+          apply map_monad_In_OOM_cons_inv in Heqo as [x [xs [HInx [FIELDS0 [CONVX CONVXS]]]]].
+          subst.
+
+          forward IHfields.
+          { intros u H1 a0 r2 R1R2 AB.
+            eapply H.
+            right; auto.
+            eauto.
+            eauto.
+          }
+
+          specialize (IHfields xs l0 eq_refl CONVXS).
+          inv IHfields.
+
+          specialize (H a (or_introl eq_refl) x d Heqo1 CONVX).
+          subst.
+          auto.
+        }
+      }
+
+      { (* Arrays *)
+        unfold_dvalue_refine_strict_in R1R2.
+        unfold_dvalue_refine_strict_in AB.
+        cbn in *;
+          break_match_hyp; inv AB;
+          break_match_hyp; inv R1R2.
+
+        clear H0.
+        generalize dependent l.
+        generalize dependent elts0.
+        induction elts; intros elts0 l Heqo0 Heqo.
+        { clear H.
+          cbn in *.
+          inv Heqo0.
+
+          apply map_monad_In_OOM_nil_inv in Heqo; subst.
+          reflexivity.
+        }
+
+        { rewrite map_monad_In_cons in Heqo0.
+          cbn in Heqo0.
+          break_match_hyp; inv Heqo0.
+          break_match_hyp; inv H1.
+
+          apply map_monad_In_OOM_cons_inv in Heqo as [x [xs [HInx [FIELDS0 [CONVX CONVXS]]]]].
+          subst.
+
+          forward IHelts.
+          { intros u H1 a0 r2 R1R2 AB.
+            eapply H.
+            right; auto.
+            eauto.
+            eauto.
+          }
+
+          specialize (IHelts xs l0 eq_refl CONVXS).
+          inv IHelts.
+
+          specialize (H a (or_introl eq_refl) x d Heqo1 CONVX).
+          subst.
+          auto.
+        }
+      }
+
+      { (* Vectors *)
+        unfold_dvalue_refine_strict_in R1R2.
+        unfold_dvalue_refine_strict_in AB.
+        cbn in *;
+          break_match_hyp; inv AB;
+          break_match_hyp; inv R1R2.
+
+        clear H0.
+        generalize dependent l.
+        generalize dependent elts0.
+        induction elts; intros elts0 l Heqo0 Heqo.
+        { clear H.
+          cbn in *.
+          inv Heqo0.
+
+          apply map_monad_In_OOM_nil_inv in Heqo; subst.
+          reflexivity.
+        }
+
+        { rewrite map_monad_In_cons in Heqo0.
+          cbn in Heqo0.
+          break_match_hyp; inv Heqo0.
+          break_match_hyp; inv H1.
+
+          apply map_monad_In_OOM_cons_inv in Heqo as [x [xs [HInx [FIELDS0 [CONVX CONVXS]]]]].
+          subst.
+
+          forward IHelts.
+          { intros u H1 a0 r2 R1R2 AB.
+            eapply H.
+            right; auto.
+            eauto.
+            eauto.
+          }
+
+          specialize (IHelts xs l0 eq_refl CONVXS).
+          inv IHelts.
+
+          specialize (H a (or_introl eq_refl) x d Heqo1 CONVX).
+          subst.
+          auto.
+        }
+      }
+  Qed.
+
+  (** Lemmas about values with types... *)
+
+  Lemma dvalue_refine_lazy_oom :
+    forall dv dt,
+      DV1.dvalue_has_dtyp dv dt ->
+      dvalue_refine_lazy dv (DV2.DVALUE_Oom dt).
+  Proof.
+    intros dv dt H.
+    destruct dv;
+    rewrite dvalue_refine_lazy_equation; right; auto.
+  Qed.
+
+  Lemma uvalue_refine_lazy_oom :
+    forall uv dt,
+      DV1.uvalue_has_dtyp uv dt ->
+      uvalue_refine_lazy uv (DV2.UVALUE_Oom dt).
+  Proof.
+    intros uv dt H.
+    destruct uv;
+    rewrite uvalue_refine_lazy_equation; right; auto.
+  Qed.
+
 End DVConvert.
 
 Module DVConvertMake (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF) : DVConvert LP1 LP2 AC Events1 Events2.

@@ -60,6 +60,7 @@
 ./coq/Semantics/InfiniteToFinite/Conversions/DvalueConversions.v
 ./coq/Semantics/InfiniteToFinite/Conversions/EventConversions.v
 ./coq/Semantics/InfiniteToFinite/Conversions/TreeConversions.v
+./coq/Semantics/InfiniteToFinite/R2Injective.v
 ./coq/Semantics/InfiniteToFinite/LangRefine.v
 ./coq/Semantics/InfiniteToFinite.v
 ./coq/Syntax/ScopeTheory.v
@@ -119,6 +120,7 @@
 ./coq/Utils/PropT.v
 ./coq/Utils/OOMRutt.v
 ./coq/Utils/OOMRuttProps.v
+./coq/Utils/RuttPropsExtra.v
 ./coq/Analysis/DomId.v
 ./coq/Analysis/Dom.v
 ./coq/Analysis/DomKildall.v

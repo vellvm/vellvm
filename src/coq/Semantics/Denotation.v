@@ -33,7 +33,8 @@ From Vellvm Require Import
      Semantics.LLVMParams
      Semantics.MemoryParams
      Semantics.Memory.MemBytes
-     Semantics.ConcretizationParams.
+     Semantics.ConcretizationParams
+     Utils.ListUtil.
 
 Require Import Ceres.Ceres.
 
@@ -559,20 +560,6 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     match r with
     | inl bid => raise ("Can't find block in denote_cfg " ++ to_string (snd bid))
     | inr uv  => ret uv
-    end.
-
-  Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B)) :=
-    match l1, l2 with
-    | [], [] => ret []
-    | x::xs, y::ys =>
-      l <- combine_lists_err xs ys ;;
-      ret ((x,y)::l)
-    | _, _ =>
-      (* YZ: This should be a failure, but we first need to have a proper
-          story to handle main arguments since at the moment we expect exactly
-          argc and argv, and feed default values to them *)
-      (* failwith "combine_lists_err: different length lists" *)
-      ret []
     end.
 
   (* The denotation of an itree function is a coq function that takes

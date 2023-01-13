@@ -13,7 +13,6 @@ From ITree Require Import
   Core.Subevent
   Basics.HeterogeneousRelations
   Eq.Rutt
-  Eq.RuttFacts
   Props.Leaf.
 
 From Vellvm Require Import
@@ -526,3 +525,81 @@ Proof.
       apply EqVisOOM.
     }
 Qed.
+
+Hint Resolve orutt_monot : paco.
+Hint Constructors oruttF : itree.
+Hint Unfold orutt_ : itree.
+Hint Unfold orutt : itree.
+
+Lemma orutt_weaken :
+  forall {E1 E2 OOM} `{OOME : OOM -< E2} {R1 R2}
+    (PRE1 PRE2 : prerel E1 E2)
+    (POST1 POST2 : postrel E1 E2)
+    (ResR1 ResR2 : R1 -> R2 -> Prop)
+    t1 t2,
+    orutt PRE1 POST1 ResR1 t1 t2 (OOM:=OOM) ->
+    (forall {A B} e1 e2, (PRE1 A B e1 e2 -> PRE2 _ _ e1 e2)) ->
+    (forall {A B} e1 r1 e2 r2, (POST2 A B e1 r1 e2 r2 -> POST1 _ _ e1 r1 e2 r2)) ->
+    (forall r1 r2, (ResR1 r1 r2 -> ResR2 r1 r2)) ->
+    orutt PRE2 POST2 ResR2 t1 t2 (OOM:=OOM).
+Proof.
+  intros E1 E2 OOM OOME R1 R2 PRE1 PRE2 POST1 POST2 ResR1 ResR2.
+  pcofix CIH. pstep. intros t1 t2 RUTT. punfold RUTT.
+  red in RUTT |- *. induction RUTT; pclearbot; eauto 7 with paco itree.
+
+  intros H2 H3 H4.
+  apply OOMRutt.EqVis; auto.
+  intros a b H5.
+  apply H3 in H5.
+  apply H0 in H5.
+  pclearbot.
+  eauto with paco itree.
+Qed.
+
+From Vellvm Require Import
+  LLVMEvents
+  Utils.Error.
+
+(* TODO: generalize *)
+Lemma orutt_raise :
+  forall {E1 E2 OOM : Type -> Type} OOME {R1 R2 : Type} `{FAIL1 : FailureE -< E1} `{FAIL2 : FailureE -< E2}
+    {PRE : prerel E1 E2} {POST : postrel E1 E2} {R1R2 : R1 -> R2 -> Prop}
+    msg1 msg2,
+    (forall msg (o : OOM _), @subevent FailureE E2 FAIL2 void (Throw msg) <> @subevent OOM E2 OOME void o) ->
+    PRE void void (subevent void (Throw msg1)) (subevent void (Throw msg2)) ->
+    orutt PRE POST R1R2 (LLVMEvents.raise msg1) (LLVMEvents.raise msg2) (OOM:=OOM) (OOME:=OOME).
+Proof.
+  intros E1 E2 OOM OOME R1 R2 FAIL1 FAIL2 PRE POST R1R2 msg1 msg2 OOM_NOT_FAIL PRETHROW.
+  unfold LLVMEvents.raise.
+  repeat rewrite bind_trigger.
+  apply orutt_Vis; auto.
+  intros [] [] _.
+Qed.
+
+Lemma orutt_raiseOOM :
+  forall {E1 E2 : Type -> Type} `{OOME2 : OOME -< E2} {R1 R2 : Type}
+    {PRE : prerel E1 E2} {POST : postrel E1 E2} {R1R2 : R1 -> R2 -> Prop} t msg,
+    orutt PRE POST R1R2 t (raiseOOM msg) (OOM:=OOME) (OOME:=OOME2).
+Proof.
+  intros E1 E2 OOME2 R1 R2 PRE POST R1R2 t msg.
+  unfold raiseOOM.
+  rewrite bind_trigger.
+  pfold. red.
+  cbn.
+  apply EqVisOOM.
+Qed.
+
+Lemma orutt_raise_oom :
+  forall {E1 E2 : Type -> Type} `{OOME2 : OOME -< E2} {R1 R2 : Type}
+    {PRE : prerel E1 E2} {POST : postrel E1 E2} {R1R2 : R1 -> R2 -> Prop} t msg,
+    orutt PRE POST R1R2 t (raise_oom msg) (OOM:=OOME) (OOME:=OOME2).
+Proof.
+  intros E1 E2 OOME R1 R2 PRE POST R1R2 t msg.
+  cbn.
+  apply orutt_raiseOOM.
+Qed.
+
+Ltac solve_orutt_raise :=
+  apply orutt_raise; cbn; auto;
+  intros msg o CONTRA;
+  inv CONTRA.

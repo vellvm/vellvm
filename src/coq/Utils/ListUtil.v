@@ -12,7 +12,7 @@ From Vellvm.Utils Require Import
   Monads.
 
 From ExtLib Require Import
-     Structures.Monads.
+  Structures.Monads.
 
 Import ListNotations.
 Import MonadNotation.
@@ -39,7 +39,6 @@ Section FINDOPTION.
     end.
 
 End FINDOPTION.
-
 
 (* TODO: Move. Also, do I really have to define this? *)
 Fixpoint zipWith {A B C} (f : A -> B -> C) (xs : list A) (ys : list B) : list C
@@ -153,9 +152,9 @@ Defined.
 
 Lemma Forall2_HIn_cons {A B : Type} :
   forall (xs : list A) (ys : list B) x y (R : forall a b, In a (x :: xs) -> In b (y :: ys) -> Prop),
-  R x y (or_introl eq_refl) (or_introl eq_refl) ->
-  Forall2_HIn xs ys (fun x y IN1 IN2 => R x y (or_intror IN1) (or_intror IN2)) ->
-  Forall2_HIn (x::xs) (y::ys) R.
+    R x y (or_introl eq_refl) (or_introl eq_refl) ->
+    Forall2_HIn xs ys (fun x y IN1 IN2 => R x y (or_intror IN1) (or_intror IN2)) ->
+    Forall2_HIn (x::xs) (y::ys) R.
 Proof.
   induction xs, ys; intros x y R HR ALL.
   - cbn; split; auto.
@@ -349,18 +348,18 @@ Fixpoint drop {A} (n : N) (l : list A) : list A
   := match l with
      | [] => []
      | (x::xs) =>
-       if N.eqb 0 n
-       then l
-       else drop (N.pred n) xs
+         if N.eqb 0 n
+         then l
+         else drop (N.pred n) xs
      end.
 
 Fixpoint take {A} (n : N) (l : list A) : list A
   := match l with
      | [] => []
      | (x::xs) =>
-       if N.eqb 0 n
-       then []
-       else x :: take (N.pred n) xs
+         if N.eqb 0 n
+         then []
+         else x :: take (N.pred n) xs
      end.
 
 Definition between {A} (lo hi : N) (l : list A) : list A
@@ -371,10 +370,10 @@ Fixpoint filter_split {A} (pred : A -> bool) (xs : list A) : (list A * list A)
   := match xs with
      | [] => ([], [])
      | (x::xs) =>
-       let '(ins, outs) := filter_split pred xs in
-       if pred x
-       then (x::ins, outs)
-       else (ins, x::outs)
+         let '(ins, outs) := filter_split pred xs in
+         if pred x
+         then (x::ins, outs)
+         else (ins, x::outs)
      end.
 
 Lemma filter_split_in_length :
@@ -469,7 +468,7 @@ Program Fixpoint split_every_pos {A} (n : positive) (xs : list A) {measure (leng
   := match xs with
      | [] => []
      | _ =>
-       take (Npos n) xs :: split_every_pos n (drop (Npos n) xs)
+         take (Npos n) xs :: split_every_pos n (drop (Npos n) xs)
      end.
 Next Obligation.
   destruct xs; try contradiction.
@@ -480,13 +479,13 @@ Definition split_every {A} (n : N) (xs : list A) : err (list (list A))
   := match n with
      | N0 => failwith "split_every: called with n = 0."
      | Npos n =>
-       inr (split_every_pos n xs)
+         inr (split_every_pos n xs)
      end.
 
 Lemma fold_sum_acc :
   forall {A} (dts : list A) n (f : A -> N),
     (fold_left (fun (acc : N) (x : A) => acc + f x) dts n =
-     n + fold_left (fun (acc : N) (x : A) => acc + f x) dts 0)%N.
+       n + fold_left (fun (acc : N) (x : A) => acc + f x) dts 0)%N.
 Proof.
   induction dts; intros n f.
   - cbn. rewrite N.add_0_r. reflexivity.
@@ -569,8 +568,8 @@ Qed.
 
 Lemma not_Forall_HIn_cons_elem :
   forall {X} (x : X) (xs : list X) (f : forall y : X, List.In y (x :: xs) -> Prop),
-  ~ f x (or_introl eq_refl) ->
-  ~Forall_HIn (x::xs) f.
+    ~ f x (or_introl eq_refl) ->
+    ~Forall_HIn (x::xs) f.
 Proof.
   intros X x xs.
   revert x.
@@ -585,8 +584,8 @@ Qed.
 
 Lemma Forall_HIn_dec :
   forall {A} (l : list A) f,
-  (forall (u : A) (In : List.In u l), {f u In} + {~ f u In}) ->
-  {Forall_HIn l f} + {~Forall_HIn l f}.
+    (forall (u : A) (In : List.In u l), {f u In} + {~ f u In}) ->
+    {Forall_HIn l f} + {~Forall_HIn l f}.
 Proof.
   intros A l.
   induction l; intros f EQDEC.
@@ -643,6 +642,18 @@ Proof.
   auto.
   apply H0 in H1.
   contradiction.
+Qed.
+
+Lemma In_cons_right :
+  forall {A} {l : list A} {a x xs}
+    (EQ : l = x :: xs) (HIn : In a xs),
+    In a l.
+Proof.
+  intros A l x xs EQ a HIn.
+  subst.
+  cbn.
+  right.
+  auto.
 Qed.
 
 Lemma Forall_HIn_cons_inv :
@@ -729,8 +740,8 @@ Qed.
 (* TODO: do these induction principles exist already? *)
 Lemma nat_strong_ind :
   forall (P: nat -> Prop)
-    (BASE: P 0)
-    (IH: forall (n : nat), (forall (m : nat), m <= n -> P m) -> P (S n)),
+         (BASE: P 0)
+         (IH: forall (n : nat), (forall (m : nat), m <= n -> P m) -> P (S n)),
   forall n, P n.
 Proof.
   intros P BASE IH n.
@@ -745,8 +756,8 @@ Qed.
 
 Lemma length_strong_ind:
   forall (X : Type) (P : list X -> Prop)
-    (BASE: P nil)
-    (IH: forall (n : nat) (xs: list X), (forall (xs : list X), length xs <= n -> P xs) -> length xs = S n -> P xs),
+         (BASE: P nil)
+         (IH: forall (n : nat) (xs: list X), (forall (xs : list X), length xs <= n -> P xs) -> length xs = S n -> P xs),
   forall l, P l.
 Proof.
   intros X P BASE IH.
@@ -783,7 +794,7 @@ Qed.
 
 Lemma concat_length :
   forall {X} (xxs : list (list X)) len
-    (INL : forall xs, In xs xxs -> length xs = len),
+         (INL : forall xs, In xs xxs -> length xs = len),
     length (concat xxs) = len * (length xxs).
 Proof.
   intros X xxs.
@@ -901,4 +912,151 @@ Proof.
   induction sz.
   - cbn; auto.
   - cbn. rewrite IHsz; auto.
+Qed.
+
+Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B)) :=
+  match l1, l2 with
+  | [], [] => ret []
+  | x::xs, y::ys =>
+      l <- combine_lists_err xs ys ;;
+      ret ((x,y)::l)
+  | _, _ =>
+      (* YZ: This should be a failure, but we first need to have a proper
+          story to handle main arguments since at the moment we expect exactly
+          argc and argv, and feed default values to them *)
+      (* failwith "combine_lists_err: different length lists" *)
+      ret []
+  end.
+
+Lemma combine_lists_err_inl_contra :
+  forall {X Y} (xs : list X) (ys : list Y) msg,
+    ~ (combine_lists_err xs ys = inl msg).
+Proof.
+  intros X Y.
+  induction xs, ys; intros msg CONTRA;
+    inversion CONTRA.
+  destruct (combine_lists_err xs ys) eqn:COMB.
+  apply IHxs in COMB; auto.
+  inversion H0.
+Qed.
+
+Lemma combine_lists_err_length_eq :
+  forall {A B C D} xs1 ys1 xs2 ys2 zs1 zs2,
+    @combine_lists_err A B xs1 ys1 = inr zs1 ->
+    @combine_lists_err C D xs2 ys2 = inr zs2 ->
+    length ys1 = length ys2 ->
+    length xs1 = length xs2 ->
+    length zs1 = length zs2.
+Proof.
+  intros A B C D.
+  induction xs1, ys1, xs2, ys2;
+    intros zs1 zs2
+      COMB1 COMB2 LEN1 LEN2;
+    try solve [cbn in *;
+               inversion COMB1; inversion COMB2;
+               auto
+              | inversion LEN1; inversion LEN2
+      ].
+  cbn in *.
+
+  destruct (combine_lists_err xs1 ys1) eqn:COMB1';
+    inversion COMB1.
+
+  destruct (combine_lists_err xs2 ys2) eqn:COMB2';
+    inversion COMB2.
+  cbn.
+  apply Nat.succ_inj_wd.
+  eapply IHxs1; eauto.
+Qed.
+
+Lemma combine_lists_err_Nth :
+  forall {X Y} xs ys (x : X) (y : Y) zs i,
+    Nth xs i x ->
+    Nth ys i y ->
+    combine_lists_err xs ys = inr zs ->
+    Nth zs i (x, y).
+Proof.
+  intros X Y.
+  induction xs, ys;
+    intros x' y' zs i NTH_xs NTH_ys COMB;
+    cbn in *;
+    try
+      solve [ apply not_Nth_nil in NTH_xs; contradiction
+            | apply not_Nth_nil in NTH_ys; contradiction
+      ].
+
+  destruct (combine_lists_err xs ys) eqn:COMB';
+    inversion COMB.
+
+  destruct i.
+  - cbn in *.
+    inversion NTH_xs; inversion NTH_ys.
+    reflexivity.
+  - cbn in *.
+    eauto.
+Qed.
+
+Lemma combine_lists_err_Nth_inv :
+  forall {X Y} xs ys (x : X) (y : Y) zs i,
+    Nth zs i (x, y) ->
+    combine_lists_err xs ys = inr zs ->
+    Nth xs i x /\ Nth ys i y.
+Proof.
+  intros X Y.
+  induction xs, ys;
+    intros x' y' zs i NTH COMB;
+    try
+      solve [ cbn in COMB; inversion COMB; subst;
+              apply not_Nth_nil in NTH; contradiction
+      ].
+
+  cbn in *.
+  destruct (combine_lists_err xs ys) eqn:COMB';
+    inversion COMB.
+
+  destruct i.
+  - cbn in *.
+    inversion NTH; subst.
+    inversion H1; subst.
+    auto.
+  - cbn in *; subst.
+    eauto.
+Qed.
+
+Lemma map_In_length :
+  forall {X Y} (l : list X) (f : forall (x : X), In x l -> Y),
+    length (map_In l f) = length l.
+Proof.
+  induction l; intros f.
+  - cbn. auto.
+  - rewrite map_In_cons.
+    cbn.
+    congruence.
+Qed.
+
+Lemma Nth_map_In_iff:
+  forall {X Y : Type} (xs : list X) (f : forall x : X, In x xs -> Y) (i : nat) (y : Y),
+    Nth (map_In xs f) i y <-> (exists (x : X) IN, f x IN = y /\ Nth xs i x).
+Proof.
+Admitted.
+
+Lemma in_map_In :
+  forall {A B} l x (f : forall (a : A) (INA : In a l), B) (INX : In x l),
+    In (f x INX) (map_In l f).
+Proof.
+  intros A B l; induction l; firstorder (subst; auto).
+  rewrite map_In_cons.
+  cbn.
+  destruct INX; subst; auto.
+  right.
+  specialize (IHl x (fun (x0 : A) (IN : In x0 l) => f x0 (or_intror IN)) i).
+  cbn in IHl.
+  auto.
+Qed.
+
+Lemma in_map_In' :
+  forall {A B} l x (f : forall (a : A), B) (INX : In x l),
+    In (f x) (map_In l (fun x (INX : In x l) => f x)).
+Proof.
+  intros A B l; induction l; firstorder (subst; auto).
 Qed.
