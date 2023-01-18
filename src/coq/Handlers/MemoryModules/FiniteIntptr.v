@@ -172,6 +172,14 @@ Definition to_Z := fun (x : Z) => x.
     reflexivity.
   Qed.
 
+  Lemma to_Z_to_unsigned :
+    forall x,
+      to_Z x = to_unsigned x.
+  Proof.
+    intros x.
+    reflexivity.
+  Qed.
+
 End BigIP.
 
 Module BigIP_BIG : MemoryAddress.INTPTR_BIG BigIP.
@@ -367,6 +375,14 @@ Module IP64Bit : MemoryAddress.INTPTR.
     forall x,
       @mrepr intptr VMemInt_intptr x = from_Z x.
   Proof.
+    reflexivity.
+  Qed.
+
+  Lemma to_Z_to_unsigned :
+    forall x,
+      to_Z x = to_unsigned x.
+  Proof.
+    intros x.
     reflexivity.
   Qed.
 

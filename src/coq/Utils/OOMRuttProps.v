@@ -599,7 +599,27 @@ Proof.
   apply orutt_raiseOOM.
 Qed.
 
+Lemma orutt_raiseUB :
+  forall {E1 E2 OOM : Type -> Type} OOME {R1 R2 : Type} `{UB1 : UBE -< E1} `{UB2 : UBE -< E2}
+    {PRE : prerel E1 E2} {POST : postrel E1 E2} {R1R2 : R1 -> R2 -> Prop}
+    msg1 msg2,
+    (forall msg (o : OOM _), @subevent UBE E2 UB2 void (ThrowUB msg) <> @subevent OOM E2 OOME void o) ->
+    PRE void void (subevent void (ThrowUB msg1)) (subevent void (ThrowUB msg2)) ->
+    orutt PRE POST R1R2 (raiseUB msg1) (raiseUB msg2) (OOM:=OOM) (OOME:=OOME).
+Proof.
+  intros E1 E2 OOM OOME R1 R2 UB1 UB2 PRE POST R1R2 msg1 msg2 H H0.
+  unfold raiseUB.
+  repeat rewrite bind_trigger.
+  apply orutt_Vis; auto.
+  intros [] [] _.
+Qed.
+
 Ltac solve_orutt_raise :=
   apply orutt_raise; cbn; auto;
+  intros msg o CONTRA;
+  inv CONTRA.
+
+Ltac solve_orutt_raiseUB :=
+  apply orutt_raiseUB; cbn; auto;
   intros msg o CONTRA;
   inv CONTRA.

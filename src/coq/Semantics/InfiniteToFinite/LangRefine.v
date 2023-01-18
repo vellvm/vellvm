@@ -6394,6 +6394,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     eapply orutt_Ret; auto.
   Qed.
 
+  (* TODO: Move this *)
   Lemma map_monad_orutt :
     forall {V} (elts : list V) {OOM E1 E2} `{OOME : OOM -< E2} {R1 R2} (pre : prerel E1 E2) (post : postrel E1 E2) (RR: R1 -> R2 -> Prop) (denote1 : V -> itree E1 R1) (denote2 : V -> itree E2 R2),
       (forall e,
@@ -6410,6 +6411,31 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       intros r1 r2 H0.
       eapply orutt_bind; eauto.
       intros r0 r3 H1.
+      eapply orutt_Ret.
+      constructor; auto.
+  Qed.
+
+  (* TODO: move this *)
+  Lemma map_monad_orutt2 :
+    forall {V1 V2} (elts1 : list V1) (elts2 : list V2) {OOM E1 E2} `{OOME : OOM -< E2} {R1 R2} (pre : prerel E1 E2) (post : postrel E1 E2) (VV : V1 -> V2 -> Prop) (RR: R1 -> R2 -> Prop) (denote1 : V1 -> itree E1 R1) (denote2 : V2 -> itree E2 R2),
+      (Forall2 VV elts1 elts2) ->
+      (forall e1 e2,
+          VV e1 e2 ->
+          orutt pre post RR (denote1 e1) (denote2 e2) (OOM:=OOM)) ->
+      orutt pre post (Forall2 RR) (map_monad denote1 elts1) (map_monad denote2 elts2) (OOM:=OOM).
+  Proof.
+    intros V1 V2 elts1 elts2 OOM E1 E2 OOME R1 R2 pre post VV RR denote1 denote2 VVS H.
+    induction VVS.
+    - cbn.
+      apply orutt_Ret.
+      constructor.
+    - repeat rewrite map_monad_unfold.
+      eapply orutt_bind; eauto.
+
+      intros r1 r2 H1.
+      eapply orutt_bind; eauto.
+
+      intros r0 r3 H2.
       eapply orutt_Ret.
       constructor; auto.
   Qed.
@@ -7157,6 +7183,36 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Admitted.
 
+  Lemma pickUnique_orutt_strict :
+    forall uv1 uv2,
+      uvalue_refine_strict uv1 uv2 ->
+      orutt (sum_prerel call_refine_strict event_refine_strict)
+        (sum_postrel call_res_refine_strict event_res_refine_strict) dvalue_refine_strict
+        (IS1.LLVM.D.pickUnique uv1) (pickUnique uv2)
+        (OOM:=OOME).
+  Proof.
+  Admitted.
+
+  (* TODO: can these pickUnique lemmas be generalized? Different
+  prerel / postrel, but fundamentally the same lemma... *)
+  Lemma pickUnique_instr_E_orutt_strict :
+    forall uv1 uv2,
+      uvalue_refine_strict uv1 uv2 ->
+      orutt instr_E_refine_strict instr_E_res_refine_strict dvalue_refine_strict
+        (IS1.LLVM.D.pickUnique uv1) (pickUnique uv2)
+        (OOM:=OOME).
+  Proof.
+  Admitted.
+
+  Lemma pickUnique_exp_E_orutt_strict :
+    forall uv1 uv2,
+      uvalue_refine_strict uv1 uv2 ->
+      orutt exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
+        (IS1.LLVM.D.pickUnique uv1) (pickUnique uv2)
+        (OOM:=OOME).
+  Proof.
+  Admitted.
+
   Lemma uvalue_refine_strict_concretize_poison :
     forall uv1 uv2,
       uvalue_refine_strict uv1 uv2 ->
@@ -7165,6 +7221,31 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Proof.
     (* This may not be true if uv2 can OOM... *)
   Admitted.
+
+  Lemma dvalue_int_unsigned_E1E2 :
+    forall x y,
+      dvalue_refine_strict x y ->
+      IS1.LP.Events.DV.dvalue_int_unsigned x = dvalue_int_unsigned y.
+  Proof.
+    induction x; intros y REF;
+      try
+        solve
+        [ unfold_dvalue_refine_strict;
+          cbn in *; inv REF; cbn; auto
+        | unfold_dvalue_refine_strict;
+          cbn in *;
+          break_match_hyp; inv REF;
+          cbn; auto
+        ].
+    - unfold_dvalue_refine_strict.
+      cbn in *.
+      break_match_hyp; inv REF.
+      cbn; auto.
+      apply IP.from_Z_to_Z in Heqo.
+      rewrite <- IP.to_Z_to_unsigned.
+      rewrite <- IS1.LP.IP.to_Z_to_unsigned.
+      auto.
+  Qed.
 
   Lemma denote_instr_orutt_strict :
     forall instr,
@@ -7205,8 +7286,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         apply orutt_bind with (RR:=uvalue_refine_strict).
         { break_match.
           - apply orutt_bind with (RR:=Forall2 dvalue_refine_strict).
-            + (* TODO: may need a fancier version of `map_monad_orutt`, and some stuff about pickUnique *)
-              admit.
+            + eapply map_monad_orutt2; eauto.
+              intros e1 e2 H0.
+              apply pickUnique_instr_E_orutt_strict; auto.
             + intros r0 r3 H0.
               unfold ITree.map.
               eapply orutt_bind with (RR:=dvalue_refine_strict).
@@ -7262,8 +7344,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
           intros r1 r2 H.
           eapply orutt_bind with (RR:=dvalue_refine_strict).
-          (* TODO: pickUnique *)
-          admit.
+          apply pickUnique_instr_E_orutt_strict; auto.
 
           intros r0 r3 H0.
           eapply orutt_bind with (RR:=dvalue_refine_strict).
@@ -7272,8 +7353,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
             split; auto.
             split; auto.
-            (* TODO: need something about dvalue_int_unsigned *)
-            admit.
+
+            erewrite dvalue_int_unsigned_E1E2; eauto.
           }
 
           intros r4 r5 H1.
@@ -7294,7 +7375,167 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             | intros o CONTRA; inv CONTRA
             ].
         }
-  Admitted.
+
+      - destruct ptr.
+        eapply orutt_bind.
+        { apply translate_exp_to_instr_E1E2_orutt_strict.
+          apply denote_exp_E1E2_orutt.
+        }
+
+        intros r1 r2 H.
+        eapply orutt_bind.
+        { apply pickUnique_instr_E_orutt_strict; auto.
+        }
+
+        intros r0 r3 H0.
+        eapply orutt_bind.
+        { apply orutt_trigger; cbn; auto.
+          intros t1 t2 H1.
+          apply H1.
+
+          intros o CONTRA; inv CONTRA.
+        }
+
+        intros r4 r5 H1.
+        cbn in H1.
+        apply orutt_trigger; cbn; auto.
+        tauto.
+        intros [] [] _; auto.
+        intros o CONTRA; inv CONTRA.
+      - apply orutt_raise; cbn; auto.
+        intros msg o0 CONTRA; inv CONTRA.
+    }
+
+    { cbn.
+      destruct instr; try solve_orutt_raise.
+      - apply orutt_Ret; cbn; auto.
+      - destruct fn.
+        apply orutt_bind with (RR:=Forall2 uvalue_refine_strict).
+        { apply map_monad_orutt.
+          intros e0. destruct e0.
+          apply translate_exp_to_instr_E1E2_orutt_strict.
+          apply denote_exp_E1E2_orutt.
+        }
+
+        intros r1 r2 H.
+        apply orutt_bind with (RR:=uvalue_refine_strict).
+        { break_match.
+          { apply orutt_bind with (RR:=Forall2 dvalue_refine_strict).
+            { eapply map_monad_orutt2; eauto.
+              intros e1 e2 H0.
+              apply pickUnique_instr_E_orutt_strict; auto.
+            }
+
+            intros r0 r3 H0.
+            apply orutt_bind with (RR:=dvalue_refine_strict).
+            { apply orutt_trigger; cbn; auto.
+              intros t1 t2 H1.
+              apply H1.
+
+              intros o CONTRA; inv CONTRA.
+            }
+
+            intros r4 r5 H1.
+            apply orutt_Ret.
+            apply dvalue_refine_strict_dvalue_to_uvalue; auto.
+          }
+
+          { apply orutt_bind with (RR:=uvalue_refine_strict).
+            { apply translate_exp_to_instr_E1E2_orutt_strict.
+              apply denote_exp_E1E2_orutt.
+            }
+
+            intros r0 r3 H0.
+            apply orutt_trigger; cbn; auto.
+            intros t1 t2 H1.
+            apply H1.
+
+            intros o CONTRA; inv CONTRA.
+          }
+        }
+
+        intros r0 r3 H0.
+        apply orutt_Ret; auto.
+      - destruct val, ptr.
+        apply orutt_bind with (RR:=uvalue_refine_strict).
+        { apply translate_exp_to_instr_E1E2_orutt_strict.
+          apply denote_exp_E1E2_orutt.
+        }
+
+        intros r1 r2 H.
+        apply orutt_bind with (RR:=uvalue_refine_strict).
+        { apply translate_exp_to_instr_E1E2_orutt_strict.
+          apply denote_exp_E1E2_orutt.
+        }
+
+        intros r0 r3 H0.
+        apply orutt_bind with (RR:=dvalue_refine_strict).
+        { apply pickUnique_instr_E_orutt_strict; auto.
+        }
+
+        intros r4 r5 H1.
+        { destruct r4; unfold_dvalue_refine_strict; cbn in *; try break_match_hyp; inv H1; cbn;
+            try
+              solve
+              [ apply orutt_trigger; cbn; auto;
+                [ split; auto;
+                  split; auto; solve_dvalue_refine_strict
+                | intros [] [] _; auto
+                | intros o CONTRA; inv CONTRA
+                ]
+              | solve_orutt_raiseUB
+              ].
+          - apply orutt_trigger; cbn; auto.
+            split; auto.
+            split; auto.
+            unfold_dvalue_refine_strict; cbn; rewrite Heqo; auto.
+
+            intros [] [] _; auto.
+            intros o CONTRA; inv CONTRA.
+          - apply orutt_trigger; cbn; auto.
+            split; auto.
+            split; auto.
+            unfold_dvalue_refine_strict; cbn; rewrite Heqo; auto.
+
+            intros [] [] _; auto.
+            intros o CONTRA; inv CONTRA.
+          - apply orutt_trigger; cbn; auto.
+            split; auto.
+            split; auto.
+            unfold_dvalue_refine_strict; cbn; rewrite Heqo; auto.
+
+            intros [] [] _; auto.
+            intros o CONTRA; inv CONTRA.
+          - apply orutt_trigger; cbn; auto.
+            + split; auto.
+              split; auto.
+              unfold_dvalue_refine_strict.
+              rewrite Heqo.
+              cbn; auto.
+            + intros [] [] _; auto.
+            + intros o CONTRA; inv CONTRA.
+          - apply orutt_trigger; cbn; auto.
+            + split; auto.
+              split; auto.
+              unfold_dvalue_refine_strict.
+              rewrite Heqo.
+              cbn; auto.
+            + intros [] [] _; auto.
+            + intros o CONTRA; inv CONTRA.
+          - apply orutt_trigger; cbn; auto.
+            + split; auto.
+              split; auto.
+              unfold_dvalue_refine_strict.
+              rewrite Heqo.
+              cbn; auto.
+            + intros [] [] _; auto.
+            + intros o CONTRA; inv CONTRA.
+        }
+
+      - clear o.
+        solve_orutt_raise.
+    }
+  Qed.
 
   Lemma denote_terminator_orutt_strict :
     forall term,
@@ -7329,30 +7570,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           ].
 
       break_match; apply orutt_Ret; auto.
-      (* TODO: Need something about orutt and raiseUB *)
-      (* TODO: move to OOMRuttprops *)
-      Set Nested Proofs Allowed.
-      Lemma orutt_raiseUB :
-        forall {E1 E2 OOM : Type -> Type} OOME {R1 R2 : Type} `{UB1 : UBE -< E1} `{UB2 : UBE -< E2}
-          {PRE : prerel E1 E2} {POST : postrel E1 E2} {R1R2 : R1 -> R2 -> Prop}
-          msg1 msg2,
-          (forall msg (o : OOM _), @subevent UBE E2 UB2 void (ThrowUB msg) <> @subevent OOM E2 OOME void o) ->
-          PRE void void (subevent void (ThrowUB msg1)) (subevent void (ThrowUB msg2)) ->
-          orutt PRE POST R1R2 (raiseUB msg1) (raiseUB msg2) (OOM:=OOM) (OOME:=OOME).
-      Proof.
-        intros E1 E2 OOM OOME R1 R2 UB1 UB2 PRE POST R1R2 msg1 msg2 H H0.
-        unfold raiseUB.
-        repeat rewrite bind_trigger.
-        apply orutt_Vis; auto.
-        intros [] [] _.
-      Qed.
-
-      (* TODO: Move this too *)
-      Ltac solve_orutt_raiseUB :=
-        apply orutt_raiseUB; cbn; auto;
-        intros msg o CONTRA;
-        inv CONTRA.
-
       solve_orutt_raiseUB.
     - apply orutt_Ret; auto.
     - destruct v.
@@ -7361,10 +7578,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       intros r1 r2 H.
       eapply orutt_bind with (RR:=dvalue_refine_strict).
-      (* TODO: pickUnique *)
-      admit.
+      apply pickUnique_exp_E_orutt_strict; auto.
 
       intros r0 r3 H0.
+      Set Nested Proofs Allowed.
       Lemma dvalue_refine_strict_preserves_dvalue_is_poison :
         forall x y,
           dvalue_refine_strict x y ->

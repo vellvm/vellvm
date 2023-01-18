@@ -82,6 +82,10 @@ Module Type INTPTR.
   Parameter VMemInt_intptr_mrepr_from_Z :
     forall x,
       @mrepr intptr VMemInt_intptr x = from_Z x.
+
+  Parameter to_Z_to_unsigned :
+    forall x,
+      to_Z x = to_unsigned x.
 End INTPTR.
 
 Module Type INTPTR_BIG (IP : INTPTR).
