@@ -6273,28 +6273,84 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
            ).
   Defined.
 
-  (* Lemma rutt_iter_gen : *)
-  (*   forall {E1 E2 : Type -> Type} {A B : Type} {R : relation A} {S : relationH B B} (pre : prerel E1 E2) (post : postrel E1 E2), *)
-  (*     Proper ((R ==> rutt pre post (sum_rel R S)) ==> R ==> rutt S (E1:=E1) (E2:=E2)) CategoryOps.iter. *)
-  (* Proof. *)
-  (* Admitted. *)
+  (* TODO: Move this to rutt library *)
+  Lemma rutt_iter' {E1 E2 I1 I2 R1 R2}
+    (RI : I1 -> I2 -> Prop)
+    (RR : R1 -> R2 -> Prop)
+    (pre : prerel E1 E2) (post : postrel E1 E2)
+    (body1 : I1 -> itree E1 (I1 + R1))
+    (body2 : I2 -> itree E2 (I2 + R2))
+    (rutt_body
+      : forall j1 j2, RI j1 j2 -> rutt pre post (sum_rel RI RR) (body1 j1) (body2 j2))
+    : forall (i1 : I1) (i2 : I2) (RI_i : RI i1 i2),
+      rutt pre post RR (ITree.iter body1 i1) (ITree.iter body2 i2).
+  Proof.
+    ginit. gcofix CIH. intros.
+    specialize (rutt_body i1 i2 RI_i).
+    do 2 rewrite unfold_iter.
+    eapply gpaco2_uclo; [|eapply rutt_clo_bind|]; eauto with paco.
+    econstructor; eauto. intros ? ? [].
+    - gstep.
+      red; cbn.
+      constructor.
+      gbase.
+      auto.
+    - gstep.
+      red.
+      constructor.
+      auto.
+  Qed.
 
-
+  (* TODO: Move this to rutt library *)
   Lemma rutt_iter_gen :
     forall {E1 E2 : Type -> Type} {A B1 B2 : Type} {R : relation A} {S : relationH B1 B2} (pre : prerel E1 E2) (post : postrel E1 E2),
     forall (x : A -> itree E1 (A + B1)) (y : A -> itree E2 (A + B2)),
       (forall x0 y0 : A, R x0 y0 -> rutt pre post (sum_rel R S) (x x0) (y y0)) ->
       forall x0 y0 : A, R x0 y0 -> rutt pre post S (CategoryOps.iter x x0) (CategoryOps.iter y y0).
   Proof.
-  Admitted.
+    intros E1 E2 A B1 B2 R S pre post body1 body2 EQ_BODY x y Hxy.
+    eapply rutt_iter'; eauto.
+  Qed.
 
+
+  (* TODO: Move this to rutt library *)
+  Lemma orutt_iter' {OOME E1 E2 I1 I2 R1 R2} `{OOM: OOME -< E2}
+    (RI : I1 -> I2 -> Prop)
+    (RR : R1 -> R2 -> Prop)
+    (pre : prerel E1 E2) (post : postrel E1 E2)
+    (body1 : I1 -> itree E1 (I1 + R1))
+    (body2 : I2 -> itree E2 (I2 + R2))
+    (rutt_body
+      : forall j1 j2, RI j1 j2 -> orutt pre post (sum_rel RI RR) (body1 j1) (body2 j2) (OOM:=OOME))
+    : forall (i1 : I1) (i2 : I2) (RI_i : RI i1 i2),
+      orutt pre post RR (ITree.iter body1 i1) (ITree.iter body2 i2) (OOM:=OOME).
+  Proof.
+    ginit. gcofix CIH. intros.
+    specialize (rutt_body i1 i2 RI_i).
+    do 2 rewrite unfold_iter.
+    eapply gpaco2_uclo; [|eapply orutt_clo_bind|]; eauto with paco.
+    econstructor; eauto. intros ? ? [].
+    - gstep.
+      red; cbn.
+      constructor.
+      gbase.
+      auto.
+    - gstep.
+      red.
+      constructor.
+      auto.
+  Qed.
+
+  (* TODO: Move this to orutt library *)
   Lemma orutt_iter_gen :
     forall {OOME E1 E2 : Type -> Type} `{OOM: OOME -< E2} {A B1 B2 : Type} {R : relation A} {S : relationH B1 B2} (pre : prerel E1 E2) (post : postrel E1 E2),
     forall (x : A -> itree E1 (A + B1)) (y : A -> itree E2 (A + B2)),
       (forall x0 y0 : A, R x0 y0 -> orutt pre post (sum_rel R S) (x x0) (y y0) (OOM:=OOME)) ->
       forall x0 y0 : A, R x0 y0 -> orutt pre post S (CategoryOps.iter x x0) (CategoryOps.iter y y0) (OOM:=OOME).
   Proof.
-  Admitted.
+    intros OOME E1 E2 OOM A B1 B2 R S pre post body1 body2 EQ_BODY x y Hxy.
+    eapply orutt_iter'; eauto.
+  Qed.
 
   Lemma denote_phi_orutt :
     forall bid_from id_p,
@@ -6565,6 +6621,25 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (*   IS1.LLVM.D.unique_prop uv1 -> unique_prop (uvalue_convert uv1) *)
 
   (* (* Change unique_prop to be a specific dvalue instead of existential? *) *)
+  Require Import Coq.Logic.Classical_Pred_Type.
+  Lemma uvalue_refine_strict_unique_prop_contra :
+    forall uv1 uv2,
+      uvalue_refine_strict uv1 uv2 ->
+      ~ unique_prop uv2 -> ~ IS1.LLVM.D.unique_prop uv1.
+  Proof.
+    intros uv1 uv2 REF NUNIQUE.
+
+    unfold unique_prop in NUNIQUE.
+    unfold IS1.LLVM.D.unique_prop.
+
+    apply all_not_not_ex.
+    intros dv1 CONTRA.
+
+    rewrite uvalue_refine_strict_equation in REF.
+    eapply not_ex_all_not in NUNIQUE.
+    apply NUNIQUE.
+    intros dv H.
+  Admitted.
 
   Lemma uvalue_refine_strict_unique_prop :
     forall uv1 uv2,
@@ -6774,6 +6849,30 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (*       admit. *)
   (*     } *)
   Admitted.
+
+  (* TODO: This may not actually be true...
+
+     Suppose uv1 is in the infinite language, and uv2 is in the finite
+     language...
+
+     If uv2 causes OOM (e.g., it represents an intptr expression of
+     any value greater than 2^64), then `unique_prop uv2` would
+     actually hold vacuously...
+
+        Definition unique_prop (uv : uvalue) : Prop
+          := exists x, forall dv, concretize uv dv -> dv = x.
+
+     because `forall dv, concretize uv2 dv <-> False`...
+
+     However in the infinite language `uv1` might not be unique.
+   *)
+  Lemma uvalue_refine_strict_unique_prop_rev :
+    forall uv1 uv2,
+      uvalue_refine_strict uv1 uv2 ->
+      unique_prop uv2 -> IS1.LLVM.D.unique_prop uv1.
+  Proof.
+  Abort.
+
 
   (* Lemma pickUnique_lazy_rutt : *)
   (*   forall uv1 uv2, *)
@@ -7135,6 +7234,335 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       reflexivity.
   Qed.
 
+  Lemma lift_err_uvalue_to_dvalue_orutt_strict :
+    forall uv1 uv2,
+      uvalue_refine_strict uv1 uv2 ->
+      orutt (sum_prerel call_refine_strict event_refine_strict) (sum_postrel call_res_refine_strict event_res_refine_strict) dvalue_refine_strict
+        (LLVMEvents.lift_err (fun x : IS1.LP.Events.DV.dvalue => Ret x) (IS1.LP.Events.DV.uvalue_to_dvalue uv1))
+        (LLVMEvents.lift_err (fun x : dvalue => Ret x) (uvalue_to_dvalue uv2))
+        (OOM:=OOME).
+  Proof.
+    intros uv1 uv2 H.
+    destruct uv1; cbn in *;
+      try solve
+        [ unfold_uvalue_refine_strict_in H;
+          cbn in *; inv H; cbn;
+          apply orutt_Ret;
+          unfold_dvalue_refine_strict_goal; reflexivity
+        | unfold_uvalue_refine_strict_in H;
+          cbn in *; inv H; cbn;
+          apply orutt_raise;
+          [ intros msg o CONTRA; inv CONTRA
+          | constructor; cbn; auto
+          ]
+        | unfold_uvalue_refine_strict_in H;
+          cbn in *;
+          break_match_hyp; inv H;
+          break_match_hyp; inv H1;
+          cbn;
+          apply orutt_raise;
+          [ intros msg o CONTRA; inv CONTRA
+          | constructor; constructor; cbn; auto
+          ]
+        | unfold_uvalue_refine_strict;
+          cbn in *;
+          break_match_hyp; inv H;
+          cbn;
+          apply orutt_raise;
+          [ intros msg o CONTRA; inv CONTRA
+          | constructor; constructor; cbn; auto
+          ]
+        | unfold_uvalue_refine_strict;
+          cbn in *;
+          break_match_hyp; inv H;
+          break_match_hyp; inv H1;
+          break_match_hyp; inv H0;
+          cbn;
+          apply orutt_raise;
+          [ intros msg o CONTRA; inv CONTRA
+          | constructor; constructor; cbn; auto
+          ]
+        ].
+    - unfold_uvalue_refine_strict_in H.
+      cbn in *.
+      break_match_hyp; inv H.
+      cbn.
+      apply orutt_Ret.
+      unfold_dvalue_refine_strict_goal.
+      rewrite Heqo.
+      cbn.
+      reflexivity.
+    - unfold_uvalue_refine_strict_in H.
+      cbn in *.
+      break_match_hyp; inv H.
+      cbn.
+      apply orutt_Ret.
+      unfold_dvalue_refine_strict_goal.
+      cbn.
+      rewrite Heqo.
+      reflexivity.
+    - (* Structs *)
+      unfold_uvalue_refine_strict_in H.
+      cbn in *.
+      break_match_hyp; inv H.
+
+      assert (uvalue_refine_strict (DV1.UVALUE_Struct fields) (DV2.UVALUE_Struct l)) as REF.
+      { unfold_uvalue_refine_strict.
+        cbn.
+        rewrite Heqo.
+        reflexivity.
+      }
+
+      break_match_goal.
+      { cbn.
+        epose proof uvalue_to_dvalue_dvalue_refine_strict_error _ _ _ REF.
+        cbn in H.
+        rewrite Heqs in H.
+        forward H. reflexivity.
+        destruct H as [s' H].
+        break_match_hyp; inv H.
+
+        cbn.
+        apply orutt_raise;
+          [ intros msg o CONTRA; inv CONTRA
+          | constructor; constructor; cbn; auto
+          ].
+      }
+
+      cbn.
+      break_match_goal.
+      { (* Probably a contradiction? *)
+        cbn.
+        epose proof uvalue_to_dvalue_dvalue_refine_strict _ _ _ REF.
+        cbn in H.
+        rewrite Heqs in H.
+        forward H. reflexivity.
+        destruct H as [dv2 H].
+        rewrite Heqs0 in H.
+        destruct H as [CONTRA _].
+        inv CONTRA.
+      }
+
+      cbn.
+      apply orutt_Ret.
+      unfold_dvalue_refine_strict.
+      cbn.
+
+      epose proof uvalue_to_dvalue_dvalue_refine_strict _ _ _ REF.
+      cbn in *.
+      rewrite Heqs in H.
+      forward H. reflexivity.
+      destruct H as [dv2 [H1 H2]].
+      break_match_hyp; inv H1.
+      unfold_dvalue_refine_strict.
+      break_match_goal.
+      2: {
+        (* Contradiction *)
+        exfalso.
+        cbn in H2.
+        inv H2.
+      }
+
+      cbn in *.
+      inv H2; inv Heqs0.
+      reflexivity.
+    - (* Packed Structs *)
+      unfold_uvalue_refine_strict_in H.
+      cbn in *.
+      break_match_hyp; inv H.
+
+      assert (uvalue_refine_strict (DV1.UVALUE_Struct fields) (DV2.UVALUE_Struct l)) as REF.
+      { unfold_uvalue_refine_strict.
+        cbn.
+        rewrite Heqo.
+        reflexivity.
+      }
+
+      break_match_goal.
+      { cbn.
+        epose proof uvalue_to_dvalue_dvalue_refine_strict_error _ _ _ REF.
+        cbn in H.
+        rewrite Heqs in H.
+        forward H. reflexivity.
+        destruct H as [s' H].
+        break_match_hyp; inv H.
+
+        cbn.
+        apply orutt_raise;
+          [ intros msg o CONTRA; inv CONTRA
+          | constructor; constructor; cbn; auto
+          ].
+      }
+
+      cbn.
+      break_match_goal.
+      { (* Probably a contradiction? *)
+        cbn.
+        epose proof uvalue_to_dvalue_dvalue_refine_strict _ _ _ REF.
+        cbn in H.
+        rewrite Heqs in H.
+        forward H. reflexivity.
+        destruct H as [dv2 H].
+        rewrite Heqs0 in H.
+        destruct H as [CONTRA _].
+        inv CONTRA.
+      }
+
+      cbn.
+      apply orutt_Ret.
+      unfold_dvalue_refine_strict.
+      cbn.
+
+      epose proof uvalue_to_dvalue_dvalue_refine_strict _ _ _ REF.
+      cbn in *.
+      rewrite Heqs in H.
+      forward H. reflexivity.
+      destruct H as [dv2 [H1 H2]].
+      break_match_hyp; inv H1.
+      unfold_dvalue_refine_strict.
+      break_match_goal.
+      2: {
+        (* Contradiction *)
+        exfalso.
+        cbn in H2.
+        inv H2.
+      }
+
+      cbn in *.
+      inv H2; inv Heqs0.
+      reflexivity.
+    - (* Arrays *)
+      unfold_uvalue_refine_strict_in H.
+      cbn in *.
+      break_match_hyp; inv H.
+
+      assert (uvalue_refine_strict (DV1.UVALUE_Array elts) (DV2.UVALUE_Array l)) as REF.
+      { unfold_uvalue_refine_strict.
+        cbn.
+        rewrite Heqo.
+        reflexivity.
+      }
+
+      break_match_goal.
+      { cbn.
+        epose proof uvalue_to_dvalue_dvalue_refine_strict_error _ _ _ REF.
+        cbn in H.
+        rewrite Heqs in H.
+        forward H. reflexivity.
+        destruct H as [s' H].
+        break_match_hyp; inv H.
+
+        cbn.
+        apply orutt_raise;
+          [ intros msg o CONTRA; inv CONTRA
+          | constructor; constructor; cbn; auto
+          ].
+      }
+
+      cbn.
+      break_match_goal.
+      { (* Probably a contradiction? *)
+        cbn.
+        epose proof uvalue_to_dvalue_dvalue_refine_strict _ _ _ REF.
+        cbn in H.
+        rewrite Heqs in H.
+        forward H. reflexivity.
+        destruct H as [dv2 H].
+        rewrite Heqs0 in H.
+        destruct H as [CONTRA _].
+        inv CONTRA.
+      }
+
+      cbn.
+      apply orutt_Ret.
+      unfold_dvalue_refine_strict.
+      cbn.
+
+      epose proof uvalue_to_dvalue_dvalue_refine_strict _ _ _ REF.
+      cbn in *.
+      rewrite Heqs in H.
+      forward H. reflexivity.
+      destruct H as [dv2 [H1 H2]].
+      break_match_hyp; inv H1.
+      unfold_dvalue_refine_strict.
+      break_match_goal.
+      2: {
+        (* Contradiction *)
+        exfalso.
+        cbn in H2.
+        inv H2.
+      }
+
+      cbn in *.
+      inv H2; inv Heqs0.
+      reflexivity.
+    - (* Vectors *)
+      unfold_uvalue_refine_strict_in H.
+      cbn in *.
+      break_match_hyp; inv H.
+
+      assert (uvalue_refine_strict (DV1.UVALUE_Array elts) (DV2.UVALUE_Array l)) as REF.
+      { unfold_uvalue_refine_strict.
+        cbn.
+        rewrite Heqo.
+        reflexivity.
+      }
+
+      break_match_goal.
+      { cbn.
+        epose proof uvalue_to_dvalue_dvalue_refine_strict_error _ _ _ REF.
+        cbn in H.
+        rewrite Heqs in H.
+        forward H. reflexivity.
+        destruct H as [s' H].
+        break_match_hyp; inv H.
+
+        cbn.
+        apply orutt_raise;
+          [ intros msg o CONTRA; inv CONTRA
+          | constructor; constructor; cbn; auto
+          ].
+      }
+
+      cbn.
+      break_match_goal.
+      { (* Probably a contradiction? *)
+        cbn.
+        epose proof uvalue_to_dvalue_dvalue_refine_strict _ _ _ REF.
+        cbn in H.
+        rewrite Heqs in H.
+        forward H. reflexivity.
+        destruct H as [dv2 H].
+        rewrite Heqs0 in H.
+        destruct H as [CONTRA _].
+        inv CONTRA.
+      }
+
+      cbn.
+      apply orutt_Ret.
+      unfold_dvalue_refine_strict.
+      cbn.
+
+      epose proof uvalue_to_dvalue_dvalue_refine_strict _ _ _ REF.
+      cbn in *.
+      rewrite Heqs in H.
+      forward H. reflexivity.
+      destruct H as [dv2 [H1 H2]].
+      break_match_hyp; inv H1.
+      unfold_dvalue_refine_strict.
+      break_match_goal.
+      2: {
+        (* Contradiction *)
+        exfalso.
+        cbn in H2.
+        inv H2.
+      }
+
+      cbn in *.
+      inv H2; inv Heqs0.
+      reflexivity.
+  Qed.
+
   Lemma pickUnique_rutt_strict :
     forall uv1 uv2,
       uvalue_refine_strict uv1 uv2 ->
@@ -7159,28 +7587,17 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn.
       split; auto.
       split.
-      - apply uvalue_refine_strict_unique_prop;
-        eauto.
-      - admit.
+      - apply uvalue_refine_strict_unique_prop; auto.
+      - admit. (* apply uvalue_refine_strict_unique_prop_rev; auto. *) (* This rev lemma may not hold... *)
     }
 
     intros t1 t2 H.
     apply rutt_Ret.
-    destruct t1, t2.
+    destruct t1 as [dv1 []].
+    destruct t2 as [dv2 []].
     cbn in *.
-    destruct H; cbn in *.
-    { red in H.
-      destruct e1; cbn in *.
-      destruct d1; cbn in *.
-      admit. (* ???? *)
-    }
-    { destruct e2; cbn in *.
-      admit.
-      cbn in *.
-      destruct d2; cbn in *.
-      repeat (destruct s; try inv H).
-      admit.
-    }
+    inv H; subst_existT; cbn in *.
+    tauto.
   Admitted.
 
   Lemma pickUnique_orutt_strict :
@@ -7191,6 +7608,36 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (IS1.LLVM.D.pickUnique uv1) (pickUnique uv2)
         (OOM:=OOME).
   Proof.
+    intros uv1 uv2 REF.
+    unfold IS1.LLVM.D.pickUnique, IS1.LLVM.D.concretize_or_pick.
+    unfold pickUnique, concretize_or_pick.
+    cbn.
+    break_match;
+      eapply uvalue_refine_strict_preserves_is_concrete with (uvc:=uv2) in Heqb; eauto;
+      rewrite Heqb.
+
+    apply lift_err_uvalue_to_dvalue_orutt_strict; auto.
+
+    repeat rewrite bind_trigger.
+    apply orutt_Vis.
+
+    { constructor.
+      cbn.
+      split; auto.
+      split.
+      - apply uvalue_refine_strict_unique_prop; auto.
+      - admit. (* apply uvalue_refine_strict_unique_prop_rev; auto. *) (* This rev lemma may not actually hold *)
+    }
+
+    intros t1 t2 H.
+    apply orutt_Ret.
+    destruct t1 as [dv1 []].
+    destruct t2 as [dv2 []].
+    cbn in *.
+    inv H; subst_existT; cbn in *.
+    tauto.
+
+    intros o CONTRA; inv CONTRA.
   Admitted.
 
   (* TODO: can these pickUnique lemmas be generalized? Different
