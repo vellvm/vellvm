@@ -156,7 +156,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     end.
 
   Definition unique_prop (uv : uvalue) : Prop
-    := exists x, forall dv, concretize uv dv -> dv = x.
+    := exists x, concretize uv x /\ forall dv, concretize uv dv -> dv = x.
 
   Definition pickUnique {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue
     := concretize_or_pick uv (unique_prop uv).

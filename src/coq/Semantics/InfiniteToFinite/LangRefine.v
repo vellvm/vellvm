@@ -6638,7 +6638,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     rewrite uvalue_refine_strict_equation in REF.
     eapply not_ex_all_not in NUNIQUE.
     apply NUNIQUE.
-    intros dv H.
   Admitted.
 
   Lemma uvalue_refine_strict_unique_prop :
