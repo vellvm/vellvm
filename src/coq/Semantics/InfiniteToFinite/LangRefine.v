@@ -9100,6 +9100,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (h2 : forall T, E2 T -> Monads.stateT S2 (itree F2) T)
         t1 t2 s1 s2,
         @orutt E1 E2 OOM1 OOME1 R1 R2 pre1 post1 RR t1 t2 ->
+        SS s1 s2 ->
         (forall A B e1 e2 s1 s2,
             pre1 A B e1 e2 ->
             SS s1 s2 ->
@@ -9108,6 +9109,147 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (forall A (o : OOM1 A) s, exists (o' : OOM2 A) k, h2 A (subevent A o) s ≈ (vis o' k)) ->
         @orutt F1 F2 OOM2 OOME2 (S1 * R1)%type (S2 * R2)%type pre2 post2 (SS × RR) (State.interp_state h1 t1 s1) (State.interp_state h2 t2 s2).
     Proof.
+      intros E1 E2 F1 F2 OOM1 OOME1 OOM2 OOME2 R1 R2 RR S1 S2 SS pre1 post1 pre2 post2 h1 h2 t1 t2 s1 s2 EQ SSINIT HANDLER OOMSPEC.
+      revert EQ SSINIT. revert t1 t2 s1 s2.
+      ginit. gcofix CIH.
+      intros t1 t2 s1 s2 EQ SSINIT.
+      punfold EQ; red in EQ.
+      dependent induction EQ; subst; setoid_rewrite StateFacts.unfold_interp_state.
+      - rewrite <- x, <- x0.
+        cbn; gstep; red; cbn.
+        constructor; constructor; cbn; auto.
+      - rewrite <- x, <- x0.
+        cbn; gstep; red; cbn.
+        constructor; auto.
+        gbase; pclearbot.
+        eapply CIH; eauto.
+      - rename H0 into KEQ.
+        (* KEQ may be what I need to relate the continuations after the handler *)
+        (* I may need to know something about how pre1 / pre2 and post1 / post2 relate to each other *)
+        pose proof H as HSPEC.
+        eapply HANDLER in HSPEC; eauto.
+        punfold HSPEC; red in HSPEC.
+        revert HSPEC.
+        gcofix CIH2.
+        intros HSPEC.
+        dependent induction HSPEC.
+        + cbn in *.
+          rewrite <- x0, <- x1.
+          cbn. do 2 rewrite unfold_bind.
+          rewrite <- x, <- x2.
+          gstep; red; cbn.
+          constructor.
+          gbase.
+          destruct r1, r2.
+          destruct H0.
+          eapply CIH; eauto.
+          specialize (KEQ _ _ H0).
+          pclearbot.
+          eauto.
+        + cbn in *.
+          rewrite <- x0, <- x1.
+          cbn. do 2 rewrite unfold_bind.
+          rewrite <- x, <- x2.
+          gstep; red; cbn.
+          constructor.
+          pclearbot.
+          eapply gpaco2_uclo; [|eapply orutt_clo_bind|]; eauto with paco.
+          econstructor; eauto. intros ? ? ?.
+          * gstep.
+            red; cbn.
+            constructor.
+            gbase.
+            destruct u1, u2, H2.
+            eapply CIH; eauto.
+            cbn in *.
+            apply KEQ in H2.
+            pclearbot.
+            eauto.
+        + cbn in *.
+          rewrite <- x0, <- x1.
+          cbn. do 2 rewrite unfold_bind.
+          rewrite <- x, <- x2.
+          gstep; red; cbn.
+          constructor; eauto.
+          intros a b H8.
+          eapply gpaco2_uclo; [|eapply orutt_clo_bind|]; eauto with paco.
+          econstructor; eauto.
+
+          apply H0 in H8.
+          pclearbot.
+          eauto.
+
+          intros u1 u2 H9.
+          cbn in *.
+          gstep; red; cbn.
+          constructor; eauto.
+          gbase.
+          destruct u1, u2, H9.
+          eapply CIH; eauto.
+          eapply KEQ in H4; eauto.
+          pclearbot; eauto.
+        + (* OOM *)
+          cbn in *.
+          rewrite <- x0, <- x1.
+          cbn. do 2 rewrite unfold_bind.
+          rewrite <- x.
+          gstep; red; cbn.
+          constructor.
+        + (* TauL *)
+          cbn in *.
+          rewrite <- x0, <- x1.
+          eapply gpaco2_uclo; [|eapply orutt_clo_bind|]; eauto with paco.
+          econstructor; eauto. intros ? ? ?.
+          * gstep.
+            red; cbn.
+            constructor.
+            gbase.
+            destruct u1, u2, H0; cbn in *.
+            eapply CIH; eauto.
+            cbn in *.
+            apply KEQ in H0.
+            pclearbot.
+            eauto.
+        + (* TauR *)
+          cbn in *.
+          rewrite <- x0, <- x1.
+          eapply gpaco2_uclo; [|eapply orutt_clo_bind|]; eauto with paco.
+          econstructor; eauto. intros ? ? ?.
+          * gstep.
+            red; cbn.
+            constructor.
+            gbase.
+            destruct u1, u2, H0.
+            eapply CIH; eauto.
+            cbn in *.
+            apply KEQ in H0.
+            pclearbot.
+            eauto.
+      - (* OOM *)
+        specialize (OOMSPEC _ e s2).
+        destruct OOMSPEC as [o' [k OOMEQ]].
+        rewrite <- x.
+        cbn.
+        (* TODO: figure out how to do this rewrite *)
+        (* setoid_rewrite OOMEQ. *)
+        (* rewrite bind_vis. *)
+        (* gstep; red; cbn. *)
+        (* constructor. *)
+        admit.
+      - (* TauL *)
+        cbn in *.
+        rewrite <- x.
+        cbn.
+        rewrite tau_euttge.
+        rewrite <- StateFacts.unfold_interp_state.
+        eapply IHEQ; eauto.
+      - (* TauR *)
+        cbn in *.
+        rewrite <- x.
+        cbn.
+        rewrite tau_euttge.
+        rewrite <- StateFacts.unfold_interp_state.
+        eapply IHEQ; eauto.
     Admitted.
 
     Lemma orutt_interp_global_h :
@@ -9119,11 +9261,166 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           (interp_global_h e1 genv1) (interp_global_h e2 genv2)
           (OOM:=OOME).
     Proof.
-    Admitted.
+    intros A B e1 e2 genv1 genv2 REF GREF.
+    destruct e1; repeat (destruct e); repeat (destruct s);
+    try
+      solve
+        [
+          cbn in REF;
+          destruct e2; try inv REF;
+          repeat (break_match_hyp; try inv REF);
+          cbn in *;
+          pstep; red; cbn;
+          constructor; cbn; auto;
+          [ intros ? ? ?;
+              left;
+            pstep; red; cbn;
+            constructor; auto
+          | intros o CONTRA; inv CONTRA
+          ]
+        ].
+
+    all: try
+           solve
+           [ cbn in REF;
+             destruct e2; try inv REF;
+             repeat (break_match_hyp; try inv REF);
+             cbn in *;
+             (pstep; red; cbn;
+              constructor; cbn; try tauto;
+              [ intros ? ? ?; left; apply orutt_Ret; tauto
+              | intros o CONTRA; inv CONTRA
+             ])
+           |
+             cbn in REF;
+             destruct e2; try inv REF;
+             repeat (break_match_hyp; try inv REF);
+             cbn in *;
+             (pstep; red; cbn;
+              constructor; cbn;
+              [ first [red; red; auto | tauto]
+              | intros ? ? ?; left; apply orutt_Ret; tauto
+              | intros o CONTRA; inv CONTRA
+             ])
+           ].
+
+    -
+      cbn in REF;
+        destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF).
+      + cbn in *.
+        apply orutt_Ret.
+        split; auto.
+
+        (* TODO: move this *)
+        Lemma alist_refine_remove :
+          forall {K V1 V2}
+            `{RD_K : @RelDec.RelDec K (@eq K)}
+            `{RD_K_CORRECT : @RelDec.RelDec_Correct _ eq RD_K}
+            (R: V1 -> V2 -> Prop) xs ys rid,
+            alist_refine R xs ys ->
+            alist_refine R (FMapAList.alist_remove rid xs) (FMapAList.alist_remove rid ys).
+        Proof.
+          intros K V1 V2 RD_K RD_K_CORRECT R.
+          induction xs, ys; intros rid REF.
+          - cbn; auto.
+          - red in REF.
+            destruct REF.
+            destruct p.
+            specialize (H k).
+            destruct H.
+            forward H1.
+            exists v. cbn.
+            rewrite RelDec.rel_dec_eq_true; auto.
+            destruct H1.
+            cbn in H1.
+            inv H1.
+          - red in REF.
+            destruct REF.
+            destruct a.
+            specialize (H k).
+            destruct H.
+            forward H.
+            exists v. cbn.
+            rewrite RelDec.rel_dec_eq_true; auto.
+            destruct H.
+            cbn in H.
+            inv H.
+          - red.
+            split.
+            { split; intros [v FIND].
+              - pose proof RelDec.rel_dec_p k rid as [EQ | NEQ]; subst.
+                + rewrite FMapAList.remove_eq_alist in FIND; auto.
+                  inv FIND.
+                + rewrite FMapAList.remove_neq_alist in FIND; eauto; try typeclasses eauto.
+                  rewrite FMapAList.remove_neq_alist; eauto; try typeclasses eauto.
+                  destruct REF.
+                  specialize (H k).
+                  destruct H.
+                  apply H.
+                  exists v; auto.
+              - pose proof RelDec.rel_dec_p k rid as [EQ | NEQ]; subst.
+                + rewrite FMapAList.remove_eq_alist in FIND; auto.
+                  inv FIND.
+                + rewrite FMapAList.remove_neq_alist in FIND; eauto; try typeclasses eauto.
+                  rewrite FMapAList.remove_neq_alist; eauto; try typeclasses eauto.
+                  destruct REF.
+                  specialize (H k).
+                  destruct H.
+                  apply H1.
+                  exists v; auto.
+            }
+            { intros k v1 v2 H H0.
+              destruct REF.
+              pose proof RelDec.rel_dec_p k rid as [EQ | NEQ]; subst.
+              + rewrite FMapAList.remove_eq_alist in H0; auto.
+                inv H0.
+              + rewrite FMapAList.remove_neq_alist in H, H0; auto; try typeclasses eauto.
+                eauto.
+            }
+        Qed.
+
+        (* TODO: move this *)
+        Lemma alist_refine_add :
+          forall {K V1 V2}
+            `{RD_K : @RelDec.RelDec K (@eq K)}
+            `{RD_K_CORRECT : @RelDec.RelDec_Correct _ eq RD_K}
+            (R: V1 -> V2 -> Prop) xs ys x y,
+            fst x = fst y ->
+            R (snd x) (snd y) ->
+            alist_refine R xs ys ->
+            alist_refine R (FMapAList.alist_add (fst x) (snd x) xs) (FMapAList.alist_add (fst y) (snd y) ys).
+        Proof.
+          intros K V1 V2 RD_K RD_K_CORRECT R xs ys x y H H0 H1.
+          apply alist_refine_cons; cbn; auto.
+          rewrite H.
+          apply alist_refine_remove; auto.
+        Qed.
+
+        (* TODO: move this *)
+        Lemma global_refine_strict_add :
+          forall rid genv1 genv2 dv1 dv2,
+            global_refine_strict genv1 genv2 ->
+            dvalue_refine_strict dv1 dv2 ->
+            global_refine_strict (FMapAList.alist_add rid dv1 genv1) (FMapAList.alist_add rid dv2 genv2).
+        Proof.
+          intros rid genv1 genv2 dv1 dv2 H H0.
+          eapply alist_refine_add with (x:=(rid, dv1)) (y:=(rid, dv2)); cbn; eauto.
+        Qed.
+
+        red.
+
+        cbn in *.
+      destruct H0 as [FEQ REFARGS]; subst.
+      repeat break_inner_match_goal;
+        try solve_orutt_raise.
+
+
+    Qed.
 
     eapply orutt_interp_state; eauto.
     { intros A B e1 e2 s1 s2 H H0.
-      apply orutt_interp_global_h; auto.      
+      apply orutt_interp_global_h; auto.
     }
     { intros A o s.
       cbn.
@@ -9166,7 +9463,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
            [ cbn in REF;
              destruct e2; try inv REF;
              repeat (break_match_hyp; try inv REF);
-             cbn in *;      
+             cbn in *;
              (pstep; red; cbn;
               constructor; cbn; try tauto;
               [ intros ? ? ?; left; apply orutt_Ret; tauto
@@ -9178,14 +9475,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
              repeat (break_match_hyp; try inv REF);
              cbn in *;
              (pstep; red; cbn;
-              constructor; cbn;        
+              constructor; cbn;
               [ first [red; red; auto | tauto]
               | intros ? ? ?; left; apply orutt_Ret; tauto
               | intros o CONTRA; inv CONTRA
              ])
            ].
 
-    - 
+    -
       cbn in REF;
         destruct e2; try inv REF;
         repeat (break_match_hyp; try inv REF);
@@ -9362,7 +9659,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                           CallE) A e).
 
       eapply EqVisOOM.
-      constructor; cbn;        
+      constructor; cbn;
         [ first [red; red; auto | tauto]
         | intros ? ? ?; left; apply orutt_Ret; tauto
         | intros o CONTRA; inv CONTRA
@@ -9370,7 +9667,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     - cbn in REF;
         destruct e2; try inv REF;
         repeat (break_match_hyp; try inv REF);
-        cbn in *;      
+        cbn in *;
         (pstep; red; cbn;
          constructor; cbn; try tauto;
          [ intros ? ? ?; left; apply orutt_Ret; tauto
@@ -9392,7 +9689,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         try solve_orutt_raise.
 
   Qed.
-  
+
   Lemma E1E2_interp_intrinsics_orutt_strict :
     forall t1 t2,
       L0_E1E2_orutt_strict t1 t2 ->
@@ -9407,7 +9704,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
     eapply orutt_interp; eauto.
     { intros A B e1 e2 H.
-      apply orutt_interp_intrinsics_h; auto.      
+      apply orutt_interp_intrinsics_h; auto.
     }
     { intros A o.
       exists (resum IFun A o).
