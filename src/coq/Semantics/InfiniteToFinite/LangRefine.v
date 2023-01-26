@@ -9768,42 +9768,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         repeat (break_match_hyp; try inv REF);
         cbn in *.
       pstep; red; cbn.
-      unfold subevent.
-      change (inr1 (inr1 (resum IFun A e))) with
+      change (inr1 (inr1 (inr1 (inr1 (inl1 o0))))) with
         (@subevent _ _ (ReSum_inr IFun sum1 OOME
-                          (IntrinsicE +' exp_E)
-                          CallE) A e).
+                          ((LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                          LLVMGEnvE
 
+           ) B o0).
+      rewrite subevent_subevent.
       eapply EqVisOOM.
-      constructor; cbn;
-        [ first [red; red; auto | tauto]
-        | intros ? ? ?; left; apply orutt_Ret; tauto
-        | intros o CONTRA; inv CONTRA
-        ]).
-    - cbn in REF;
-        destruct e2; try inv REF;
-        repeat (break_match_hyp; try inv REF);
-        cbn in *;
-        (pstep; red; cbn;
-         constructor; cbn; try tauto;
-         [ intros ? ? ?; left; apply orutt_Ret; tauto
-         | intros o CONTRA; inv CONTRA
-        ]).
-      pstep; red; cbn;
-        constructor; cbn; try tauto;
-          [ intros ? ? ?; left; apply orutt_Ret; tauto
-          | intros o CONTRA; inv CONTRA
-          ].
-
-      + pstep; red; cbn.
-        constructor; cbn; try tauto;
-          [ intros ? ? ?; left; apply orutt_Ret; tauto
-          | intros o CONTRA; inv CONTRA
-          ].
-      destruct H0 as [FEQ REFARGS]; subst.
-      repeat break_inner_match_goal;
-        try solve_orutt_raise.
-
   Qed.
 
   Lemma E1E2_interp_intrinsics_orutt_strict :
