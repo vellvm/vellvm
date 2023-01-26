@@ -9408,14 +9408,130 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           eapply alist_refine_add with (x:=(rid, dv1)) (y:=(rid, dv2)); cbn; eauto.
         Qed.
 
-        red.
+        apply global_refine_strict_add; auto.
 
-        cbn in *.
-      destruct H0 as [FEQ REFARGS]; subst.
-      repeat break_inner_match_goal;
-        try solve_orutt_raise.
+      + cbn.
+        break_match_goal.
+        { (* Found id in genv *)
+          pose proof GREF as GREF'.
+          destruct GREF.
+          specialize (H id0).
+          destruct H.
+          forward H. eexists; eauto.
+          destruct H.
+          rewrite H.
+          apply orutt_Ret.
+          split; eauto.
+        }
 
+        { (* Id not found in genv *)
+          pose proof GREF as GREF'.
+          break_match_goal.
+          { (* Contradiction *)
+            exfalso.
+            destruct GREF.
+            specialize (H id0).
+            destruct H.
+            forward H1. eexists; eauto.
+            destruct H1.
+            rewrite H1 in Heqo.
+            inv Heqo.
+          }
 
+          solve_orutt_raise.
+        }
+    - cbn in REF;
+        destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF).
+
+      { cbn.
+        apply orutt_bind with (RR:=eq).
+        apply orutt_trigger; cbn; eauto.
+        intros [] [] _; auto.
+        intros o CONTRA; inv CONTRA.
+        intros [] [] _.
+        apply orutt_Ret; tauto.
+      }
+
+      { cbn.
+        apply orutt_bind with (RR:=uvalue_refine_strict).
+        apply orutt_trigger; cbn; eauto.
+        intros x y [_ REFxy]; auto.
+        intros o CONTRA; inv CONTRA.
+        intros r1 r2 REFr1r2.
+        apply orutt_Ret; tauto.
+      }
+    - cbn in REF;
+        destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF).
+
+       { cbn.
+         apply orutt_bind with (RR:=eq).
+         { apply orutt_trigger; cbn; eauto.
+           split; auto.
+           intros [] [] _; auto.
+           intros o CONTRA; inv CONTRA.
+         }
+         intros [] [] _.
+         apply orutt_Ret; split; auto.
+         split; auto.
+      }
+
+       { cbn.
+         apply orutt_bind with (RR:=eq).
+         { apply orutt_trigger; cbn; eauto.
+           intros [] [] _; auto.
+           intros o CONTRA; inv CONTRA.
+         }
+         intros [] [] _.
+         apply orutt_Ret; split; auto.
+      }
+    - cbn in REF;
+        destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF);
+
+        try (cbn;
+         try apply orutt_bind with (RR:=eq);
+         [ apply orutt_trigger; cbn; eauto;
+           [ intros [] [] _; auto
+           | intros o CONTRA; inv CONTRA
+           ]
+         |
+         ];
+         intros [] [] _;
+             apply orutt_Ret; split; auto).
+
+      { cbn.
+        apply orutt_bind with (RR:=dvalue_refine_strict).
+        apply orutt_trigger; cbn; eauto.
+        intros t1 t2 H; tauto.
+        intros o CONTRA; inv CONTRA.
+        intros r1 r2 H.
+        apply orutt_Ret; tauto.
+      }
+      { cbn.
+        apply orutt_bind with (RR:=uvalue_refine_strict).
+        apply orutt_trigger; cbn; eauto.
+        intros t1 t2 H; tauto.
+        intros o CONTRA; inv CONTRA.
+        intros r1 r2 H.
+        apply orutt_Ret; tauto.
+      }
+    - cbn in REF;
+        destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF).
+
+      cbn.
+      do 2 rewrite bind_trigger.
+      change (inr1 (inr1 (inr1 (inl1 o0)))) with
+        (@subevent _ _ (ReSum_inr IFun sum1 OOME
+                          (IS2.LP.Events.MemoryE +' IS2.LP.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                          (IS2.LP.Events.LLVMEnvE +' IS2.LP.Events.LLVMStackE)
+
+           ) B o0).
+      pstep; red; cbn.
+      rewrite subevent_subevent.
+      eapply EqVisOOM.
     Qed.
 
     eapply orutt_interp_state; eauto.
