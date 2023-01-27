@@ -1310,20 +1310,19 @@ Definition genType: G (typ) :=
 
 (* A function use to add var_flag malloc_poitner_child if needed *)
 Definition update_malloc (e : exp typ) (t : typ) : GenLLVM unit :=
+  let fix update_malloc_h (l : list var_flag) (parent_i : ident) (parent_t : typ): GenLLVM unit :=
+    match l with
+    | nil => ret tt
+    | (malloc_pointer _)::tl => update_curr_varflags (malloc_pointer_child [(parent_i, parent_t)])
+    | (malloc_pointer_child ps)::tl => update_curr_varflags (malloc_pointer_child ((parent_i, parent_t)::ps))
+    | hd::tl => update_malloc_h tl parent_i parent_t
+    end in
   match e with
   | EXP_Ident i =>
       backend_ctx <- get_ctx;;
-      let filtered_i := filter (fun '(i1, t1, _) => normalized_var_eq (i,t) (i1, t1)) backend_ctx in
-      match filtered_i with
-      | (_, _, l)::tl =>
-          let fix update_malloc_h (l : list var_flag): GenLLVM unit :=
-            match l with
-            | nil => ret tt
-            | (malloc_pointer _)::tl => update_curr_varflags (malloc_pointer_child [(i, t)])
-            | (malloc_pointer_child ps)::tl => update_curr_varflags (malloc_pointer_child ((i, t)::ps))
-            | hd::tl => update_malloc_h tl
-            end
-          in update_malloc_h l
+      let filtered_var := filter (fun '(i1, t1, _) => normalized_var_eq (i,t) (i1, t1)) backend_ctx in
+      match filtered_var with
+      | (filter_i, filter_t, l)::tl => update_malloc_h l filter_i filter_t 
       | nil => ret tt
       end
   | _ => ret tt
@@ -1337,7 +1336,10 @@ Definition update_malloc (e : exp typ) (t : typ) : GenLLVM unit :=
       let gen_idents :=
           match ts with
           | [] => []
-          | _ => [(16%nat, fmap (fun '(i,_) => EXP_Ident i) (oneOf_LLVM (fmap ret ts)))]
+          | _ =>
+(* Need to sort out the pointer in here *)
+
+              [(16%nat, fmap (fun '(i,_) => EXP_Ident i) (oneOf_LLVM (fmap ret ts)))]
           end in
       let fix gen_size_0 (t: typ) :=
           match t with
