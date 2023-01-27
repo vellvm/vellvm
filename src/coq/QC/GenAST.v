@@ -83,6 +83,147 @@ Section DList.
   Defined.
 End DList.
 
+Section Equalities.
+    (* TODO: Move this*)
+  (* This only returns what you expect on normalized typs *)
+  (* TODO: I don't think this does the right thing for pointers to
+           identified types... It should be conservative and say that
+           the types are *not* equal always, though.
+   *)
+  Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
+    := match a with
+       | TYPE_I sz =>
+         match b with
+         | TYPE_I sz' => if N.eq_dec sz sz' then true else false
+         | _ => false
+         end
+       | TYPE_IPTR =>
+         match b with
+         | TYPE_IPTR => true
+         | _ => false
+         end
+       | TYPE_Pointer t =>
+         match b with
+         | TYPE_Pointer t' => normalized_typ_eq t t'
+         | _ => false
+         end
+       | TYPE_Void =>
+         match b with
+         | TYPE_Void => true
+         | _ => false
+         end
+       | TYPE_Half =>
+         match b with
+         | TYPE_Half => true
+         | _ => false
+         end
+       | TYPE_Float =>
+         match b with
+         | TYPE_Float => true
+         | _ => false
+         end
+       | TYPE_Double =>
+         match b with
+         | TYPE_Double => true
+         | _ => false
+         end
+       | TYPE_X86_fp80 =>
+         match b with
+         | TYPE_X86_fp80 => true
+         | _ => false
+         end
+       | TYPE_Fp128 =>
+         match b with
+         | TYPE_Fp128 => true
+         | _ => false
+         end
+       | TYPE_Ppc_fp128 =>
+         match b with
+         | TYPE_Ppc_fp128 => true
+         | _ => false
+         end
+       | TYPE_Metadata =>
+         match b with
+         | TYPE_Metadata => true
+         | _ => false
+         end
+       | TYPE_X86_mmx =>
+         match b with
+         | TYPE_X86_mmx => true
+         | _ => false
+         end
+       | TYPE_Array sz t =>
+         match b with
+         | TYPE_Array sz' t' =>
+           if N.eq_dec sz sz'
+           then normalized_typ_eq t t'
+           else false
+         | _ => false
+         end
+       | TYPE_Function ret args varargs=>
+         match b with
+         | TYPE_Function ret' args' varargs' =>
+             Nat.eqb (Datatypes.length args) (Datatypes.length args') &&
+               normalized_typ_eq ret ret' &&
+               forallb id (zipWith (fun a b => normalized_typ_eq a b) args args')
+             && Bool.eqb varargs varargs'
+         | _ => false
+         end
+       | TYPE_Struct fields =>
+         match b with
+         | TYPE_Struct fields' =>
+             Nat.eqb (Datatypes.length fields) (Datatypes.length fields') &&
+             forallb id (zipWith (fun a b => normalized_typ_eq a b) fields fields')
+         | _ => false
+         end
+       | TYPE_Packed_struct fields =>
+         match b with
+         | TYPE_Packed_struct fields' =>
+             Nat.eqb (Datatypes.length fields) (Datatypes.length fields') &&
+             forallb id (zipWith (fun a b => normalized_typ_eq a b) fields fields')
+         | _ => false
+         end
+       | TYPE_Opaque =>
+         match b with
+         | TYPE_Opaque => false (* TODO: Unsure if this should compare equal *)
+         | _ => false
+         end
+       | TYPE_Vector sz t =>
+         match b with
+         | TYPE_Vector sz' t' =>
+           if N.eq_dec sz sz'
+           then normalized_typ_eq t t'
+           else false
+         | _ => false
+         end
+       | TYPE_Identified id => false
+       end.
+
+Definition normalized_raw_id_eq (na : raw_id) (nb : raw_id) : bool
+    := match na, nb with
+       | Name sa, Name sb => (sa =? sb)%string
+       | Anon ia, Anon ib
+       | Raw ia, Raw ib => (ia =? ib)%Z
+       | _, _ => false
+       end.
+  Notation "A =? B" := (normalized_raw_id_eq A B).
+
+  Definition normalized_ident_eq (ia : ident) (ib : ident) : bool
+    := match ia, ib with
+       | ID_Global na, ID_Global nb
+       | ID_Local na, ID_Local nb => normalized_raw_id_eq na nb
+       | _, _ => false
+       end.
+  Notation "A =? B" := (normalized_ident_eq A B).
+
+  Definition normalized_var_eq (a : ident * typ) (b : ident * typ) : bool :=
+    let '(ia, ta) := a in
+    let '(ib, tb) := b in
+    normalized_typ_eq ta tb && (ia =? ib).
+End Equalities.
+
+Notation "A =? B" := (normalized_var_eq A B).
+
 Section Helpers.
   Fixpoint is_sized_type_h (t : typ) : bool
     := match t with
@@ -533,8 +674,8 @@ Section GenerationState.
 
 End GenerationState.
 
-Section TypGenerators.
-  (*filter all the (ident, typ) in ctx such that typ is a ptr*)
+Section Filters.
+    (*filter all the (ident, typ) in ctx such that typ is a ptr*)
 
   Fixpoint is_malloc_ptr (l : list var_flag) : bool :=
     match l with
@@ -607,6 +748,9 @@ Section TypGenerators.
               | TYPE_Vector _ (TYPE_Pointer t) => is_sized_type typ_ctx t
               | _ => false
               end) ctx.
+End Filters.
+
+Section TypGenerators.
 
   (* TODO: These currently don't generate pointer types either. *)
 
@@ -966,144 +1110,6 @@ Section ExpGenerators.
            else false
        | DTYPE_Vector _ _, _ => false
        end.
-
-  (* TODO: Move this*)
-  (* This only returns what you expect on normalized typs *)
-  (* TODO: I don't think this does the right thing for pointers to
-           identified types... It should be conservative and say that
-           the types are *not* equal always, though.
-   *)
-  Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
-    := match a with
-       | TYPE_I sz =>
-         match b with
-         | TYPE_I sz' => if N.eq_dec sz sz' then true else false
-         | _ => false
-         end
-       | TYPE_IPTR =>
-         match b with
-         | TYPE_IPTR => true
-         | _ => false
-         end
-       | TYPE_Pointer t =>
-         match b with
-         | TYPE_Pointer t' => normalized_typ_eq t t'
-         | _ => false
-         end
-       | TYPE_Void =>
-         match b with
-         | TYPE_Void => true
-         | _ => false
-         end
-       | TYPE_Half =>
-         match b with
-         | TYPE_Half => true
-         | _ => false
-         end
-       | TYPE_Float =>
-         match b with
-         | TYPE_Float => true
-         | _ => false
-         end
-       | TYPE_Double =>
-         match b with
-         | TYPE_Double => true
-         | _ => false
-         end
-       | TYPE_X86_fp80 =>
-         match b with
-         | TYPE_X86_fp80 => true
-         | _ => false
-         end
-       | TYPE_Fp128 =>
-         match b with
-         | TYPE_Fp128 => true
-         | _ => false
-         end
-       | TYPE_Ppc_fp128 =>
-         match b with
-         | TYPE_Ppc_fp128 => true
-         | _ => false
-         end
-       | TYPE_Metadata =>
-         match b with
-         | TYPE_Metadata => true
-         | _ => false
-         end
-       | TYPE_X86_mmx =>
-         match b with
-         | TYPE_X86_mmx => true
-         | _ => false
-         end
-       | TYPE_Array sz t =>
-         match b with
-         | TYPE_Array sz' t' =>
-           if N.eq_dec sz sz'
-           then normalized_typ_eq t t'
-           else false
-         | _ => false
-         end
-       | TYPE_Function ret args varargs=>
-         match b with
-         | TYPE_Function ret' args' varargs' =>
-             Nat.eqb (Datatypes.length args) (Datatypes.length args') &&
-               normalized_typ_eq ret ret' &&
-               forallb id (zipWith (fun a b => normalized_typ_eq a b) args args')
-             && Bool.eqb varargs varargs'
-         | _ => false
-         end
-       | TYPE_Struct fields =>
-         match b with
-         | TYPE_Struct fields' =>
-             Nat.eqb (Datatypes.length fields) (Datatypes.length fields') &&
-             forallb id (zipWith (fun a b => normalized_typ_eq a b) fields fields')
-         | _ => false
-         end
-       | TYPE_Packed_struct fields =>
-         match b with
-         | TYPE_Packed_struct fields' =>
-             Nat.eqb (Datatypes.length fields) (Datatypes.length fields') &&
-             forallb id (zipWith (fun a b => normalized_typ_eq a b) fields fields')
-         | _ => false
-         end
-       | TYPE_Opaque =>
-         match b with
-         | TYPE_Opaque => false (* TODO: Unsure if this should compare equal *)
-         | _ => false
-         end
-       | TYPE_Vector sz t =>
-         match b with
-         | TYPE_Vector sz' t' =>
-           if N.eq_dec sz sz'
-           then normalized_typ_eq t t'
-           else false
-         | _ => false
-         end
-       | TYPE_Identified id => false
-       end.
-
-Definition normalized_raw_id_eq (na : raw_id) (nb : raw_id) : bool
-    := match na, nb with
-       | Name sa, Name sb => (sa =? sb)%string
-       | Anon ia, Anon ib
-       | Raw ia, Raw ib => (ia =? ib)%Z
-       | _, _ => false
-       end.
-  Notation "A =? B" := (normalized_raw_id_eq A B).
-
-  Definition normalized_ident_eq (ia : ident) (ib : ident) : bool
-    := match ia, ib with
-       | ID_Global na, ID_Global nb
-       | ID_Local na, ID_Local nb => normalized_raw_id_eq na nb
-       | _, _ => false
-       end.
-  Notation "A =? B" := (normalized_ident_eq A B).
-
-  Definition normalized_var_eq (a : ident * typ) (b : ident * typ) : bool :=
-    let '(ia, ta) := a in
-    let '(ib, tb) := b in
-    normalized_typ_eq ta tb && (ia =? ib).
-  Notation "A =? B" := (normalized_var_eq A B).
 
   (* Helper function for update_curr_varflags_h. Add var as adding in set*)
   Fixpoint set_l_var_add (v : ident * typ) (prev next : var_context) :=
@@ -2053,7 +2059,8 @@ Section InstrGenerators.
            (* TODO: generate multiple element allocas. Will involve changing initialization *)
            (* num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *) *)
            (* align <- ret None;; *)
-           ret (TYPE_Pointer t, INSTR_Alloca t [])
+           ret (TYPE_Pointer t, INSTR_Alloca t []);
+         gen_malloc
         ] (* TODO: Generate atomic operations and other instructions *)
          ++ (if seq.nilp sized_ptr_typs_in_ctx then [] else [
                  (bind (get_typ_l sized_ptr_typs_in_ctx) gen_gep )
