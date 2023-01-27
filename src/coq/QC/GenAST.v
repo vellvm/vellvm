@@ -338,7 +338,7 @@ Section GenerationState.
   Variant var_flag :=
     | ptrtoint_pointer (prev_typ : typ)
     | malloc_pointer (sz : N)
-    | malloc_pointer_child (parents : list (ident * typ))
+    | malloc_pointer_child (parents : list (ident))
   .
 
   Definition type_context := list (ident * typ).
@@ -1112,13 +1112,13 @@ Section ExpGenerators.
        end.
 
   (* Helper function for update_curr_varflags_h. Add var as adding in set*)
-  Fixpoint set_l_var_add (v : ident * typ) (prev next : var_context) :=
+  Fixpoint set_l_var_add (id : ident) (prev next : list ident) :=
     match next with
-    | nil => prev ++ [v]
+    | nil => prev ++ [id]
     | hd::tl =>
-        if normalized_var_eq hd v
+        if normalized_ident_eq hd id
         then prev ++ next
-        else set_l_var_add v (prev ++ [hd]) tl
+        else set_l_var_add id (prev ++ [hd]) tl
     end.
 
   Fixpoint update_curr_varflags_h (varflag : var_flag) (prev next : list var_flag) : list var_flag :=
@@ -1129,8 +1129,10 @@ Section ExpGenerators.
         | ptrtoint_pointer t1, ptrtoint_pointer t2 => prev ++ [varflag] ++ tl
         | malloc_pointer sz, malloc_pointer sz' => prev ++ [varflag] ++ tl
         | malloc_pointer_child parents1, malloc_pointer_child parents2 =>
+            (*
             let l_updated_var := fold_left (fun acc v => set_l_var_add v [] acc) (parents1 ++ parents2) [] in
-            prev ++ [malloc_pointer_child l_updated_var] ++ tl
+            prev ++ [malloc_pointer_child l_updated_var] ++ tl *)
+            prev ++ [malloc_pointer_child (parents1 ++ parents2)] ++ tl
         | _, _ => update_curr_varflags_h varflag (prev ++ [hd]) tl
         end
     end.
@@ -1309,20 +1311,20 @@ Definition genType: G (typ) :=
   sized genTypHelper.
 
 (* A function use to add var_flag malloc_poitner_child if needed *)
-Definition update_malloc (e : exp typ) (t : typ) : GenLLVM unit :=
-  let fix update_malloc_h (l : list var_flag) (parent_i : ident) (parent_t : typ): GenLLVM unit :=
+Definition update_malloc (e : exp typ) : GenLLVM unit :=
+  let fix update_malloc_h (l : list var_flag) (parent_i : ident): GenLLVM unit :=
     match l with
     | nil => ret tt
-    | (malloc_pointer _)::tl => update_curr_varflags (malloc_pointer_child [(parent_i, parent_t)])
-    | (malloc_pointer_child ps)::tl => update_curr_varflags (malloc_pointer_child ((parent_i, parent_t)::ps))
-    | hd::tl => update_malloc_h tl parent_i parent_t
+    | (malloc_pointer _)::tl => update_curr_varflags (malloc_pointer_child [parent_i])
+    | (malloc_pointer_child ps)::tl => update_curr_varflags (malloc_pointer_child (parent_i::ps))
+    | hd::tl => update_malloc_h tl parent_i
     end in
   match e with
   | EXP_Ident i =>
       backend_ctx <- get_ctx;;
-      let filtered_var := filter (fun '(i1, t1, _) => normalized_var_eq (i,t) (i1, t1)) backend_ctx in
+      let filtered_var := filter (fun '(i1, _, _) => normalized_ident_eq i i1) backend_ctx in
       match filtered_var with
-      | (filter_i, filter_t, l)::tl => update_malloc_h l filter_i filter_t 
+      | (filter_i, _ , l)::tl => update_malloc_h l filter_i
       | nil => ret tt
       end
   | _ => ret tt
@@ -1430,7 +1432,7 @@ Definition update_malloc (e : exp typ) (t : typ) : GenLLVM unit :=
       in
       (* short-circuit to size 0 *)
       expression <- oneOf_LLVM (gen_exp_size 0 t :: gens);;
-      update_malloc expression t;;
+      update_malloc expression;;
       ret expression
     end
   with
@@ -1672,7 +1674,7 @@ Section InstrGenerators.
     let paths_in_ptr := get_index_paths_ptr t_in_ptr in (* Inner paths: Paths after removing the outer pointer *)
     '(ret_t, path) <- oneOf_LLVM (map ret paths_in_ptr);; (* Select one path from the paths *)
     let path_for_gep := map (fun x => (TYPE_I 32, EXP_Integer (x))) path in (* Turning the path to integer *)
-    ret (TYPE_Pointer ret_t, INSTR_Op (OP_GetElementPtr t_in_ptr (TYPE_Pointer t_in_ptr, eptr) path_for_gep)).
+    ret (TYPE_Pointer ret_t, INSTR_Op (OP_GetElementPtr t_in_ptr (tptr, eptr) path_for_gep)).
 
   Definition gen_extractvalue (tagg : typ): GenLLVM (typ * instr typ) :=
     eagg <- gen_exp_size 0 tagg;;
@@ -1958,16 +1960,17 @@ Section InstrGenerators.
     ret (ret_t, INSTR_Call (snd malloc_function, EXP_Ident (fst malloc_function)) [((TYPE_I 8, EXP_Integer x), [])] []).
 
   (* Free Generator *)
-  Fixpoint has_malloc_parent (var : ident * typ) (l_var_flag : list var_flag) : bool :=
+  Fixpoint has_malloc_parent (var : ident) (l_var_flag : list var_flag) : bool :=
     match l_var_flag with
-    | (malloc_pointer_child l)::tl => seq.nilp (filter (fun parent => normalized_var_eq parent var) l)
+    | (malloc_pointer_child l)::tl => negb (seq.nilp (filter (fun parent => normalized_ident_eq parent var) l))
     | nil => false
     | _::tl => has_malloc_parent var tl
     end.
 
   Definition free_malloc_pointers (var : ident * typ) : GenLLVM unit :=
     backend_ctx <- get_ctx;;
-    let updated_ctx := fold_left (fun acc '(i, t, l) => if orb (has_malloc_parent var l) (normalized_var_eq (i, t) var) then acc else acc ++ [(i, t, l)]) backend_ctx [] in
+    let '(var_i, var_t) := var in
+    let updated_ctx := fold_left (fun acc '(i, t, l) => if orb (has_malloc_parent var_i l) (normalized_var_eq (i, t) var) then acc else acc ++ [(i, t, l)]) backend_ctx [] in
     set_ctx updated_ctx.
 
   Definition gen_free (malloc_ptrs : var_context) : GenLLVM (typ * instr typ) :=
