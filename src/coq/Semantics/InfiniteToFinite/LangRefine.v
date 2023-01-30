@@ -10026,12 +10026,272 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     apply E1E2_interp_intrinsics_orutt_strict; auto.
   Qed.
 
+  (* TODO: move this *)
+  Lemma local_stack_refine_strict_add :
+    forall rid lenv1 lenv2 uv1 uv2,
+      local_refine_strict lenv1 lenv2 ->
+      uvalue_refine_strict uv1 uv2 ->
+      local_refine_strict (FMapAList.alist_add rid uv1 lenv1) (FMapAList.alist_add rid uv2 lenv2).
+  Proof.
+    intros rid lenv1 lenv2 uv1 uv2 H H0.
+    eapply alist_refine_add with (x:=(rid, uv1)) (y:=(rid, uv2)); cbn; eauto.
+  Qed.
+
+  (* TODO: move this *)
+  Lemma stack_refine_strict_add :
+    forall s1 s2 lenv1 lenv2,
+      stack_refine_strict s1 s2 ->
+      local_refine_strict lenv1 lenv2 ->
+      stack_refine_strict (lenv1 :: s1) (lenv2 :: s2).
+  Proof.
+    intros s1 s2 lenv1 lenv2 H H0.
+    red.
+    apply Forall2_cons; auto.
+  Qed.
+
+  Lemma orutt_interp_local_stack_h :
+    forall A B e1 e2 ls1 ls2,
+      L1_refine_strict A B e1 e2 ->
+      local_stack_refine_strict ls1 ls2 ->
+      orutt L2_refine_strict L2_res_refine_strict
+        (fun '(s0, a) '(s3, b) =>
+           L1_res_refine_strict A B e1 a e2 b /\ (local_refine_strict × stack_refine_strict) s0 s3)
+        (interp_local_stack_h (handle_local (v:=IS1.LP.Events.DV.uvalue)) e1 ls1)
+        (interp_local_stack_h (handle_local (v:=uvalue)) e2 ls2)
+        (OOM:=OOME).
+  Proof.
+    intros A B e1 e2 ls1 ls2 REF LSR.
+    destruct e1; repeat (destruct e); repeat (destruct s);
+    try
+      solve
+        [ cbn in REF;
+          destruct e2; try inv REF;
+          repeat (break_match_hyp; try inv REF);
+          cbn in *;
+          repeat rewrite bind_trigger;
+          pstep; red; cbn;
+          constructor;
+          [ cbn; tauto
+          | intros a b H;
+            left; apply orutt_Ret;
+            split; try tauto;
+            destruct ls1, ls2; constructor; cbn in *; tauto
+          | intros o CONTRA; inv CONTRA
+          ]
+        ].
+
+    - cbn in REF;
+        destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF).
+      + cbn in *.
+        destruct ls1, ls2.
+        cbn.
+        repeat rewrite map_ret.
+        apply orutt_Ret;
+          split; try tauto.
+        constructor; cbn in *; try tauto.
+        apply local_stack_refine_strict_add; tauto.
+      + cbn in *.
+        destruct ls1, ls2.
+        cbn.
+        repeat rewrite map_ret.
+
+        (* TODO: move this *)
+        Definition option_rel2 {X1 X2 : Type} (R : X1 -> X2 -> Prop) : (option X1 -> option X2 -> Prop) :=
+          fun mx my => match mx,my with
+                    | Some x, Some y => R x y
+                    | None, None => True
+                    | _, _ => False
+                    end.
+        #[export] Hint Unfold option_rel2 : core.
+
+        (* TODO: move this *)
+        Lemma alist_refine_find :
+          forall {K V1 V2}
+            `{RD_K : @RelDec.RelDec K (@eq K)}
+            `{RD_K_CORRECT : @RelDec.RelDec_Correct _ eq RD_K}
+            (R: V1 -> V2 -> Prop) xs ys id,
+            alist_refine R xs ys ->
+            option_rel2 R (FMapAList.alist_find id xs) (FMapAList.alist_find id ys).
+        Proof.
+          intros K V1 V2 RD_K RD_K_CORRECT R xs ys id H.
+          red.
+          break_match.
+          - destruct H.
+            specialize (H id).
+            destruct H.
+            forward H. eexists; eauto.
+            destruct H.
+            rewrite H.
+            eauto.
+          - destruct H.
+            break_match_goal.
+            + specialize (H id).
+              destruct H.
+              forward H1. eexists; eauto.
+              destruct H1.
+              rewrite H1 in Heqo; inv Heqo.
+            + auto.
+        Qed.
+
+        destruct LSR.
+        pose proof alist_refine_find _ _ _ id0 H as FIND.
+        red in FIND.
+        break_match_hyp; break_match_hyp; inv FIND.
+        repeat rewrite map_ret.
+        apply orutt_Ret; split; try tauto.
+        constructor; cbn in *; try tauto.
+
+        apply orutt_bind with (RR:=local_refine_strict × uvalue_refine_strict).
+        solve_orutt_raise.
+        intros [l1 r1] [l2 r2] [L R]; cbn in *.
+        apply orutt_Ret.
+        split; try tauto.
+        constructor; tauto.
+
+    - cbn in REF;
+        destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF).
+      + assert (local_refine_strict args args0) as ARGS.
+        constructor; auto.
+        clear H H0.        
+
+        cbn in *.
+        destruct ls1, ls2.
+        cbn.
+        apply orutt_Ret;
+          split; try tauto.
+        constructor; cbn in *; try tauto.
+        { (* TODO: Move this *)
+          Lemma alist_refine_strict_fold_right_add :
+            forall {K V1 V2}
+              `{RD_K : @RelDec.RelDec K (@eq K)}
+              `{RD_K_CORRECT : @RelDec.RelDec_Correct _ eq RD_K}
+              (R: V1 -> V2 -> Prop) vs1 vs2,
+              alist_refine R vs1 vs2 ->
+              alist_refine R (fold_right (fun '(id, v) => FMapAList.alist_add id v) [] vs1) (fold_right (fun '(id, v) => FMapAList.alist_add id v) [] vs2).
+          Proof.
+            intros K V1 V2 RD_K RD_K_CORRECT R vs1 vs2 REF.
+            hinduction vs1 before vs2; intros vs2 REF.
+            - destruct vs2.
+              cbn; auto.
+
+              { destruct REF, p.
+                specialize (H k).
+                destruct H.
+                forward H1.
+                eexists; cbn.
+                rewrite RelDec.rel_dec_eq_true; auto.
+
+                destruct H1.
+                cbn in H1.
+                inv H1.
+              }
+            - induction vs2.
+              { destruct REF, a.
+                specialize (H k).
+                destruct H.
+                forward H.
+                eexists; cbn.
+                rewrite RelDec.rel_dec_eq_true; auto.
+
+                destruct H.
+                cbn in H.
+                inv H.
+              }
+
+              { cbn.
+                destruct REF.
+                cbn in *.
+                destruct a, a0.
+                (* TODO: Ugh, equivalent alists may not be in the same
+                order *)
+                eapply alist_refine_add with (x:=(k,v)) (y:=(k0,v0)); cbn; auto.
+                all: admit.
+              }
+          Admitted.
+
+          apply alist_refine_strict_fold_right_add; auto.
+        }
+
+        apply stack_refine_strict_add; tauto.
+      + cbn in *.
+        destruct ls1, ls2.
+        cbn.
+        repeat rewrite map_ret.
+
+        destruct LSR.
+        destruct s; inv H0.
+        -- solve_orutt_raise.
+        -- apply orutt_Ret. split; auto.
+    - (* Memory Events *)
+      cbn in REF;
+        destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF);
+        try solve [cbn;
+         repeat rewrite bind_trigger;
+         red; pstep; red; cbn;
+         constructor; cbn; auto;
+         [ intros ?a ?b ?H;
+           left;
+           pstep; red; cbn;
+           constructor; cbn; auto;
+           split; auto;
+           destruct ls1, ls2; cbn in *;
+           constructor; tauto
+         | intros o CONTRA; inv CONTRA
+          ]].
+    - (* Pick events *)
+      cbn in REF;
+        destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF);
+        try solve [cbn;
+         repeat rewrite bind_trigger;
+         red; pstep; red; cbn;
+         constructor; cbn; auto;
+         [ intros ?a ?b ?H;
+           left;
+           pstep; red; cbn;
+           constructor; cbn; auto;
+           split; auto;
+           destruct ls1, ls2; cbn in *;
+           constructor; tauto
+         | intros o CONTRA; inv CONTRA
+          ]].
+    - (* OOM Events *)
+      cbn in REF;
+        destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF).
+
+      cbn.
+      repeat rewrite bind_trigger.
+      change (inr1 (inr1 (inl1 o0))) with
+        (@subevent _ _ (ReSum_inr IFun sum1 OOME
+                          (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                          MemoryE
+           ) B o0).
+      pstep; red; cbn.
+      rewrite subevent_subevent.
+      eapply EqVisOOM.
+  Qed.
+
   Lemma model_E1E2_12_orutt_strict :
     forall t1 t2 ls1 ls2,
       L1_E1E2_orutt_strict t1 t2 ->
       local_stack_refine_strict ls1 ls2 ->
       L2_E1E2_orutt_strict (interp_local_stack t1 ls1) (interp_local_stack t2 ls2).
   Proof.
+    intros t1 t2 ls1 ls2 RL1 LSR.
+    red in RL1.
+
+    unfold interp_local_stack.
+    eapply orutt_interp_state; eauto.
+    { unfold local_stack_refine_strict in *.
+      destruct ls1, ls2;
+      constructor; tauto.
+    }
+
+    intros A B e1 e2 s1 s2 H H0.
   Admitted.
 
   Lemma model_E1E2_L1_orutt_strict_sound
