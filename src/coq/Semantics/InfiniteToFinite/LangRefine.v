@@ -10292,7 +10292,17 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     intros A B e1 e2 s1 s2 H H0.
-  Admitted.
+    eapply orutt_interp_local_stack_h; eauto.
+    inv H0.
+    destruct s1, s2; cbn in *; auto.
+
+    intros A o s.
+    exists o.
+    cbn.
+    setoid_rewrite bind_trigger.
+    exists (fun x : A => SemNotations.Ret1 s x).
+    reflexivity.
+  Qed.
 
   Lemma model_E1E2_L1_orutt_strict_sound
     (p : list
