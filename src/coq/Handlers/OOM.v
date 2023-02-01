@@ -317,3 +317,74 @@ Proof.
     rewrite <- XY in REF.
     auto.
 Qed.
+
+#[global] Instance refine_OOM_h_eq_itree {E F T RR} : Proper (eq_itree eq ==> eq_itree eq ==> iff) (@refine_OOM_h E F T RR).
+repeat intro. rewrite H, H0.
+reflexivity.
+Qed.
+
+Lemma refine_OOM_h_bind :
+  forall {T R E F} (x y : itree (E +' OOME +' F) T) (RR1 : relation T) (RR2 : relation R) k,
+    (forall r1 r2, RR1 r1 r2 -> refine_OOM_h RR2 (k r1) (k r2)) ->
+    refine_OOM_h RR1 x y ->
+    refine_OOM_h RR2 (a <- x;; k a) (a <- y;; k a).
+Proof.
+  intros T R E F.
+
+  unfold refine_OOM_h, refine_OOM_h_flip.
+  intros t1 t2 RR1 RR2.
+
+  unfold bind, Monad_itree.
+  revert t1 t2. pcofix CIH.
+  intros t1 t2 k HK EQT.
+  punfold EQT.
+  red in EQT.
+
+  assert (a <- t1 ;; k a =
+            match observe t1 with
+            | RetF r => k r
+            | TauF t0 => Tau (ITree.bind t0 k)
+            | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k)
+            end).
+  { apply bisimulation_is_eq; setoid_rewrite unfold_bind; reflexivity. }
+  setoid_rewrite H; clear H.
+
+  assert (a <- t2 ;; k a =
+            match observe t2 with
+            | RetF r => k r
+            | TauF t0 => Tau (ITree.bind t0 k)
+            | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k)
+            end).
+  { apply bisimulation_is_eq; setoid_rewrite unfold_bind; reflexivity. }
+  setoid_rewrite H; clear H.
+
+  pstep.
+  induction EQT; eauto; pclearbot.
+  - specialize (HK _ _ REL).
+    punfold HK.
+    eapply interp_PropTF_mono. eapply HK.
+    intros. pclearbot. left.
+    eapply paco2_mon; eauto.
+    intros; contradiction.
+  - constructor. right.
+    eapply CIH; eauto.
+  - econstructor; auto.
+  - econstructor; auto.
+  - eapply Interp_PropT_Vis_OOM with (e := e).
+    punfold HT1; red in HT1. remember (observe (vis e k1)).
+    hinduction HT1 before k; intros; inv Heqi; try inv CHECK.
+    dependent destruction H1. unfold subevent.
+    eapply eqit_Vis.
+    Unshelve.
+    intros. cbn.
+    eapply eq_itree_clo_bind; pclearbot; eauto.
+    apply REL.
+    intros; subst; reflexivity.
+  - eapply Interp_PropT_Vis; eauto.
+    intros; eauto. right. eapply CIH; eauto.
+    specialize (HK0 _ H1). pclearbot. eapply HK0; eauto.
+    rewrite <- unfold_bind.
+    setoid_rewrite <- Eqit.bind_bind.
+    eapply eutt_clo_bind; eauto. intros; eauto.
+    subst; reflexivity.
+Qed.

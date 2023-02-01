@@ -1,16 +1,17 @@
 (* begin hide *)
 From ExtLib Require Import
-     Core.RelDec
-     Data.Map.FMapAList
-     Structures.Maps.
+  Core.RelDec
+  Data.Map.FMapAList
+  Structures.Maps.
 
 From Vellvm Require Import
-     Utils.Tactics
-     Utils.Util.
+  Utils.Tactics
+  Utils.Util
+  Utils.OptionUtil.
 
 From Coq Require Import
-     RelationClasses
-     List.
+  RelationClasses
+  List.
 
 Import ListNotations.
 (* end hide *)
@@ -25,7 +26,7 @@ Import ListNotations.
 
 (** * Propositional variant to [alist_find]. *)
 Definition alist_In {K R RD_K V} k m v :=
-   @alist_find K R RD_K V k m = Some v.
+  @alist_find K R RD_K V k m = Some v.
 
 (** * Freshness predicate: [alist_fresh k m] if [k] is a fresh key in [m] *)
 Definition alist_fresh {K R RD_K V} (k : K) (m : alist K V) := 
@@ -129,7 +130,7 @@ Section alistFacts.
       forall (m : alist K V) (k : K) (v : V) (k' : K),
         k <> k' ->
         alist_In k (alist_remove k' m) v <->
-        alist_In k m v.
+          alist_In k m v.
     Proof.
       intros; split; eauto using In_In_remove_ineq, In_remove_In_ineq.
     Qed.       
@@ -236,9 +237,9 @@ Section alistFacts.
 
     (* Binding to fresh keys preserves the [alist_In] predicate *)
     Lemma add_fresh_lu : forall m (k1 k2 : K) (v1 v2 : V),
-      alist_fresh k2 m ->
-      alist_In k1 m v1 ->
-      alist_In k1 (alist_add k2 v2 m) v1.
+        alist_fresh k2 m ->
+        alist_In k1 m v1 ->
+        alist_In k1 (alist_add k2 v2 m) v1.
     Proof.
       intros; apply In_add_ineq_iff; auto.
       unfold alist_fresh, alist_In in *; intros ->.
@@ -274,9 +275,9 @@ Section alistFacts.
 
     Lemma alist_find_remove_none:
       forall (m : list (K*V)) (k1 k2 : K), 
-      k2 <> k1 -> 
-      alist_find k1 (alist_remove k2 m) = None -> 
-      alist_find k1 m = None.
+        k2 <> k1 -> 
+        alist_find k1 (alist_remove k2 m) = None -> 
+        alist_find k1 m = None.
     Proof.
       induction m as [| [? ?] m IH]; intros ?k1 ?k2 ineq HF; simpl in *.
       - reflexivity.
@@ -324,12 +325,12 @@ Section alistFacts.
     Qed.
 
     Lemma alist_find_cons_neq
-          (k k0 : K)
-          (v0 : V)
-          (xs: alist K V)
+      (k k0 : K)
+      (v0 : V)
+      (xs: alist K V)
       :
-        (k <> k0) ->
-        alist_find k ((k0,v0)::xs) = alist_find k xs.
+      (k <> k0) ->
+      alist_find k ((k0,v0)::xs) = alist_find k xs.
     Proof.
       intros H.
       cbn.
@@ -341,9 +342,9 @@ Section alistFacts.
     Qed.
 
     Lemma alist_find_cons_eq
-          (k k0 : K)
-          (v0 : V)
-          (xs: alist K V)
+      (k k0 : K)
+      (v0 : V)
+      (xs: alist K V)
       : (k = k0) ->
         alist_find k ((k0,v0)::xs) = Some v0.
     Proof.
@@ -471,3 +472,142 @@ Section alistFacts.
 
 End alistFacts.
 
+Section Alist_refine.
+  Context {K V1 V2: Type}.
+  Context {RR : @RelDec K (@eq K)}.
+  Context {RRC : @RelDec_Correct K (@eq K) RR}.
+  Variable (R : V1 -> V2 -> Prop).
+
+  Definition alist_refine (m1 : alist K V1) (m2 : alist K V2):=
+    forall k, option_rel2 R (alist_find k m1) (alist_find k m2).
+
+  Lemma alist_refine_find_some_iff :
+    forall m1 m2,
+      alist_refine m1 m2 ->
+      forall k,
+        (exists v1, alist_find k m1 = Some v1) <->
+          (exists v2, alist_find k m2 = Some v2).
+  Proof.
+    intros m1 m2 REF k.
+    split; intros [v FIND]; specialize (REF k).
+    - red in REF.
+      rewrite FIND in REF.
+      break_match_hyp; try contradiction.
+      exists v0; auto.
+    - red in REF.
+      rewrite FIND in REF.
+      break_match_hyp; try contradiction.
+      exists v0; auto.
+  Qed.
+
+  Lemma alist_refine_find_some :
+    forall m1 m2,
+      alist_refine m1 m2 ->
+      (forall k v1 v2,
+          alist_find k m1 = Some v1 ->
+          alist_find k m2 = Some v2 ->
+          R v1 v2).
+  Proof.
+    intros m1 m2 REF k v1 v2 FIND1 FIND2.
+    specialize (REF k).
+    rewrite FIND1, FIND2 in REF.
+    cbn in REF.
+    auto.
+  Qed.
+
+  Lemma alist_refine_empty :
+    alist_refine [] [].
+  Proof.
+    red.
+    intros k.
+    cbn. auto.
+  Qed.
+
+  Lemma alist_refine_cons :
+    forall xs ys x y,
+      fst x = fst y ->
+      R (snd x) (snd y) ->
+      alist_refine xs ys ->
+      alist_refine (x :: xs) (y :: ys).
+  Proof.
+    induction xs, ys; intros x y H H0 H1.
+    - destruct x, y.
+      cbn in *.
+      red.
+      intros k1.
+      cbn.
+      red. subst.
+      break_inner_match_goal; auto.
+    - red in H1.
+      cbn in H1.
+      destruct p.
+      specialize (H1 k).
+      pose proof @rel_dec_correct K _ _ _ k k as [_ EQ].
+      specialize (EQ eq_refl).
+      rewrite EQ in H1.
+      contradiction.
+    - red in H1.
+      cbn in H1.
+      destruct a.
+      specialize (H1 k).
+      pose proof @rel_dec_correct K _ _ _ k k as [_ EQ].
+      specialize (EQ eq_refl).
+      rewrite EQ in H1.
+      contradiction.
+    - pose proof IHxs ys a p as IH.
+      red.
+      intros k.
+      destruct x, y, a, p.
+      cbn in H.
+      destruct (rel_dec_p k k1); subst.
+      + rewrite alist_find_cons_eq; auto.
+        rewrite alist_find_cons_eq; auto.
+      + rewrite alist_find_cons_neq; auto.
+        setoid_rewrite alist_find_cons_neq at 2; auto.
+  Qed.
+
+  Lemma alist_refine_remove :
+    forall xs ys rid,
+      alist_refine xs ys ->
+      alist_refine (FMapAList.alist_remove rid xs) (FMapAList.alist_remove rid ys).
+  Proof.
+    induction xs, ys; intros rid REF.
+    - cbn; auto.
+    - red in REF.
+      cbn in REF.
+      destruct p.
+      specialize (REF k).
+      pose proof @rel_dec_correct K _ _ _ k k as [_ EQ].
+      specialize (EQ eq_refl).
+      rewrite EQ in REF.
+      contradiction.
+    - red in REF.
+      cbn in REF.
+      destruct a.
+      specialize (REF k).
+      pose proof @rel_dec_correct K _ _ _ k k as [_ EQ].
+      specialize (EQ eq_refl).
+      rewrite EQ in REF.
+      contradiction.
+    - pose proof IHxs ys rid as IH.
+      red.
+      intros k.
+      destruct a, p.
+      pose proof RelDec.rel_dec_p k rid as [EQ | NEQ]; subst.
+      + repeat rewrite remove_eq_alist; auto.
+      + repeat rewrite remove_neq_alist; auto; typeclasses eauto.
+  Qed.
+
+  Lemma alist_refine_add :
+    forall xs ys x y,
+      fst x = fst y ->
+      R (snd x) (snd y) ->
+      alist_refine xs ys ->
+      alist_refine (FMapAList.alist_add (fst x) (snd x) xs) (FMapAList.alist_add (fst y) (snd y) ys).
+  Proof.
+    intros xs ys x y H H0 H1.
+    apply alist_refine_cons; cbn; auto.
+    rewrite H.
+    apply alist_refine_remove; auto.
+  Qed.
+End Alist_refine.
