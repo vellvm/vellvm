@@ -37,6 +37,7 @@ From Vellvm Require Import
      Utils.OOMRutt
      Utils.OOMRuttProps
      Utils.RuttPropsExtra
+     Utils.AListFacts
      Handlers.MemoryModules.FiniteAddresses
      Handlers.MemoryModules.InfiniteAddresses
      Handlers.MemoryModelImplementation.
@@ -93,417 +94,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Definition convert_stack_strict (s : @stack IS1.LLVM.Local.local_env) : OOM (@stack IS2.LLVM.Local.local_env)
     := map_monad convert_local_env_strict s.
 
-  (** Conversions between results at different levels of interpretation *)
-
-  (* Ideally we would convert memstates / local envs / local stacks /
-     global envs... But for now we can get away with placeholders for
-     these because the refine_resX relations used by refine_LX ignores
-     these.
-   *)
-  Definition res_L1_convert_lazy_unsafe (res : LLVM1.res_L1) : LLVM2.res_L1
-    := match res with
-       | (genv, dv) =>
-           ([], dvalue_convert_lazy dv)
-       end.
-
-  Definition res_L2_convert_lazy_unsafe (res : LLVM1.res_L2) : LLVM2.res_L2
-    := match res with
-       | ((lenv, lstack), (genv, dv)) =>
-           (([], []), ([], dvalue_convert_lazy dv))
-       end.
-
-  Definition res_L3_convert_lazy_unsafe (res : LLVM1.res_L3) : LLVM2.res_L3
-    := match res with
-       | (ms, (sid, ((lenv, lstack), (genv, dv)))) =>
-           (IS2.MEM.MMEP.MMSP.initial_memory_state, (0, (([], []), ([], dvalue_convert_lazy dv))))
-       end.
-
-  Definition res_L4_convert_lazy_unsafe (res : LLVM1.res_L4) : LLVM2.res_L4
-    := res_L3_convert_lazy_unsafe res.
-
-  Definition res_L5_convert_lazy_unsafe (res : LLVM1.res_L5) : LLVM2.res_L5
-    := res_L4_convert_lazy_unsafe res.
-
-  Definition res_L6_convert_lazy_unsafe (res : LLVM1.res_L6) : LLVM2.res_L6
-    := res_L5_convert_lazy_unsafe res.
-
-  Definition res_L1_convert_strict_unsafe (res : LLVM1.res_L1) : OOM LLVM2.res_L1
-    := match res with
-       | (genv, dv) =>
-           dv' <- dvalue_convert_strict dv;;
-           ret ([], dv')
-       end.
-
-  Definition res_L2_convert_strict_unsafe (res : LLVM1.res_L2) : OOM LLVM2.res_L2
-    := match res with
-       | ((lenv, lstack), (genv, dv)) =>
-           dv' <- dvalue_convert_strict dv;;
-           ret (([], []), ([], dv'))
-       end.
-
-  Definition res_L3_convert_strict_unsafe (res : LLVM1.res_L3) : OOM LLVM2.res_L3
-    := match res with
-       | (ms, (sid, ((lenv, lstack), (genv, dv)))) =>
-           dv' <- dvalue_convert_strict dv;;
-           ret (IS2.MEM.MMEP.MMSP.initial_memory_state, (0, (([], []), ([], dv'))))
-       end.
-
-  Definition res_L4_convert_strict_unsafe (res : LLVM1.res_L4) : OOM LLVM2.res_L4
-    := res_L3_convert_strict_unsafe res.
-
-  Definition res_L5_convert_strict_unsafe (res : LLVM1.res_L5) : OOM LLVM2.res_L5
-    := res_L4_convert_strict_unsafe res.
-
-  Definition res_L6_convert_strict_unsafe (res : LLVM1.res_L6) : OOM LLVM2.res_L6
-    := res_L5_convert_strict_unsafe res.
-
-  (** Refinements between languages at different levels of interpretation *)
-
-  Definition refine_E1E2_L0_lazy (src : itree E1.L0 E1.DV.dvalue) (tgt : itree E2.L0 E2.DV.dvalue) : Prop
-    := exists src',
-      (* Need to allow for target to have more OOM than source *)
-      refine_OOM_h eq src src' /\
-        refine_L0 (L0_convert_tree_lazy' dvalue_convert_lazy src') tgt.
-
-  Definition refine_E1E2_L1_lazy (src : itree E1.L1 LLVM1.res_L1) (tgt : itree E2.L1 LLVM2.res_L1) : Prop
-    := exists src',
-      (* Need to allow for target to have more OOM than source *)
-      refine_OOM_h eq src src' /\
-        refine_L1 (L1_convert_tree_lazy' res_L1_convert_lazy_unsafe src) tgt.
-
-  Definition refine_E1E2_L2_lazy (src : itree E1.L2 LLVM1.res_L2) (tgt : itree E2.L2 LLVM2.res_L2) : Prop
-    := exists src',
-      (* Need to allow for target to have more OOM than source *)
-      refine_OOM_h eq src src' /\
-        refine_L2 (L2_convert_tree_lazy' res_L2_convert_lazy_unsafe src) tgt.
-
-  Definition refine_E1E2_L3_lazy (srcs : PropT IS1.LP.Events.L3 LLVM1.res_L3) (tgts : PropT E2.L3 LLVM2.res_L3) : Prop
-    := (* res_L3_convert_lazy_unsafe should be fine here because refine_L3
-          ignores all of the placeholder values *)
-    refine_L3 (L3_convert_PropT_lazy refine_res3 res_L3_convert_lazy_unsafe (refine_OOM eq srcs)) tgts.
-
-  Definition refine_E1E2_L4_lazy (srcs : PropT IS1.LP.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop
-    := (* res_L4_convert_lazy_unsafe should be fine here because refine_L4
-          ignores all of the placeholder values *)
-    refine_L4 (L4_convert_PropT_lazy refine_res3 res_L4_convert_lazy_unsafe (refine_OOM eq srcs)) tgts.
-
-  Definition refine_E1E2_L5_lazy (srcs : PropT IS1.LP.Events.L5 LLVM1.res_L5) (tgts : PropT E2.L5 LLVM2.res_L5) : Prop
-    := (* res_L5_convert_lazy_unsafe should be fine here because refine_L5
-          ignores all of the placeholder values *)
-    refine_L5 (L5_convert_PropT_lazy refine_res3 res_L5_convert_lazy_unsafe (refine_OOM eq srcs)) tgts.
-
-  Definition refine_E1E2_L6_lazy (srcs : PropT IS1.LP.Events.L6 LLVM1.res_L6) (tgts : PropT E2.L6 LLVM2.res_L6) : Prop
-    :=
-    (* res_L4_convert_lazy_unsafe should be fine here because refine_L6
-       ignores all of the placeholder values *)
-    refine_L6 (L6_convert_PropT_lazy refine_res3 res_L6_convert_lazy_unsafe srcs) tgts.
-
-  Definition refine_E1E2_L0_strict (src : itree E1.L0 E1.DV.dvalue) (tgt : itree E2.L0 E2.DV.dvalue) : Prop
-    := exists src',
-      (* Need to allow for target to have more OOM than source *)
-      refine_OOM_h eq src src' /\
-        refine_L0 (L0_convert_tree_strict' dvalue_convert_strict src') tgt.
-
-  Definition refine_E1E2_L1_strict (src : itree E1.L1 LLVM1.res_L1) (tgt : itree E2.L1 LLVM2.res_L1) : Prop
-    := exists src',
-      (* Need to allow for target to have more OOM than source *)
-      refine_OOM_h eq src src' /\
-        refine_L1 (L1_convert_tree_strict' res_L1_convert_strict_unsafe src) tgt.
-
-  Definition refine_E1E2_L2_strict (src : itree E1.L2 LLVM1.res_L2) (tgt : itree E2.L2 LLVM2.res_L2) : Prop
-    := exists src',
-      (* Need to allow for target to have more OOM than source *)
-      refine_OOM_h eq src src' /\
-        refine_L2 (L2_convert_tree_strict' res_L2_convert_strict_unsafe src) tgt.
-
-  Definition refine_E1E2_L3_strict (srcs : PropT IS1.LP.Events.L3 LLVM1.res_L3) (tgts : PropT E2.L3 LLVM2.res_L3) : Prop
-    := (* res_L3_convert_strict_unsafe should be fine here because refine_L3
-          ignores all of the placeholder values *)
-    refine_L3 (L3_convert_PropT_strict refine_res3 res_L3_convert_strict_unsafe (refine_OOM eq srcs)) tgts.
-
-  Definition refine_E1E2_L4_strict (srcs : PropT IS1.LP.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop
-    := (* res_L4_convert_strict_unsafe should be fine here because refine_L4
-          ignores all of the placeholder values *)
-    refine_L4 (L4_convert_PropT_strict refine_res3 res_L4_convert_strict_unsafe (refine_OOM eq srcs)) tgts.
-
-  Definition refine_E1E2_L5_strict (srcs : PropT IS1.LP.Events.L5 LLVM1.res_L5) (tgts : PropT E2.L5 LLVM2.res_L5) : Prop
-    := (* res_L5_convert_strict_unsafe should be fine here because refine_L5
-          ignores all of the placeholder values *)
-    refine_L5 (L5_convert_PropT_strict refine_res3 res_L5_convert_strict_unsafe (refine_OOM eq srcs)) tgts.
-
-  Definition refine_E1E2_L6_strict (srcs : PropT IS1.LP.Events.L6 LLVM1.res_L6) (tgts : PropT E2.L6 LLVM2.res_L6) : Prop
-    :=
-    (* res_L4_convert_strict_unsafe should be fine here because refine_L6
-       ignores all of the placeholder values *)
-    refine_L6 (L6_convert_PropT_strict refine_res3 res_L6_convert_strict_unsafe srcs) tgts.
-
   (** Refinement between states *)
-
-  Definition alist_refine {K V1 V2} `{RD_K : RelDec.RelDec K} (R: V1 -> V2 -> Prop) (m1 : FMapAList.alist K V1) (m2 : FMapAList.alist K V2) :=
-    (forall k,
-        (exists v1, FMapAList.alist_find k m1 = Some v1) <->
-          (exists v2, FMapAList.alist_find k m2 = Some v2)) /\
-      (forall k v1 v2,
-          FMapAList.alist_find k m1 = Some v1 ->
-          FMapAList.alist_find k m2 = Some v2 ->
-          R v1 v2).
-
-  Lemma alist_refine_empty {K V1 V2} `{RD_K : RelDec.RelDec K} (R: V1 -> V2 -> Prop) :
-    alist_refine R [] [].
-  Proof.
-    red.
-    split.
-    { intros k.
-      split; intros [dv CONTRA];
-        cbn in *; inv CONTRA.
-    }
-
-    { intros k dv1 dv2 CONTRA1 CONTRA2.
-      inv CONTRA1.
-    }
-  Qed.
-
-  Lemma alist_refine_cons :
-    forall {K V1 V2}
-      `{RD_K : @RelDec.RelDec K (@eq K)}
-      `{RD_K_CORRECT : @RelDec.RelDec_Correct _ eq RD_K}
-      (R: V1 -> V2 -> Prop) xs ys x y,
-      fst x = fst y ->
-      R (snd x) (snd y) ->
-      alist_refine R xs ys ->
-      alist_refine R (x :: xs) (y :: ys).
-  Proof.
-    intros K V1 V2 RD_K RD_K_CORRECT R.
-    induction xs, ys; intros x y H H0 H1.
-    - destruct x, y.
-      cbn in *.
-      split.
-      intros k1.
-
-      split; intros FIND.
-      + destruct FIND as [v1 FIND].
-        cbn in FIND.
-        break_match_hyp; inv FIND.
-        cbn.
-        rewrite Heqb.
-        exists v0.
-        reflexivity.
-      + destruct FIND as [v1 FIND].
-        cbn in FIND.
-        break_match_hyp; inv FIND.
-        cbn.
-        rewrite Heqb.
-        exists v.
-        reflexivity.
-      + intros k1 v1 v2 H2 H3.
-        cbn in H2, H3.
-        break_match_hyp; inv H3.
-        break_match_hyp; inv H2.
-        auto.
-    - destruct x, y.
-      cbn in *.
-      split.
-      intros k1.
-
-      split; intros FIND.
-      + destruct FIND as [v1 FIND].
-        cbn in FIND.
-        break_match_hyp; inv FIND.
-        cbn.
-        rewrite Heqb.
-        exists v0.
-        reflexivity.
-      + destruct p.
-        destruct FIND as [v2 FIND].
-        cbn in FIND.
-        break_match_hyp; inv FIND.
-        * exists v.
-          cbn.
-          rewrite Heqb.
-          reflexivity.
-        * break_match_hyp; inv H3.
-          -- exfalso.
-             red in H1. destruct H1 as [[H1 H1'] H2].
-             cbn in *.
-             rewrite Heqb0 in H1'.
-             forward H1'.
-             exists v2; auto.
-             destruct H1' as [v1 CONTRA].
-             inv CONTRA.
-          -- exfalso.
-             red in H1. destruct H1 as [[H1 H1'] H3].
-             cbn in *.
-             rewrite Heqb0 in H1'.
-             forward H1'.
-             exists v2; auto.
-             destruct H1' as [v1' CONTRA].
-             inv CONTRA.
-      + destruct p; subst.
-        intros k v2 v3 H2 H3.
-        cbn in H2, H3.
-        break_match_hyp; inv H2.
-        inv H3.
-        auto.
-    - destruct x, y, a.
-      cbn in *; subst.
-      split.
-      intros k.
-
-      split; intros FIND.
-      + destruct FIND as [v2 FIND].
-        cbn in FIND.
-        break_match_hyp; inv FIND.
-        * cbn.
-          rewrite Heqb.
-          exists v0.
-          reflexivity.
-        * break_match_hyp; inv H2.
-          -- exfalso.
-             red in H1. destruct H1 as [[H1 H1'] H2].
-             cbn in *.
-             rewrite Heqb0 in H1.
-             forward H1.
-             eexists; auto.
-             destruct H1 as [v2' CONTRA].
-             inv CONTRA.
-          -- exfalso.
-             red in H1. destruct H1 as [[H1 H1'] H2].
-             cbn in *.
-             rewrite Heqb0 in H1.
-             rewrite H3 in H1.
-             forward H1.
-             eexists; auto.
-             destruct H1 as [v2' CONTRA].
-             inv CONTRA.
-      + destruct FIND as [v2 FIND].
-        cbn in FIND.
-        break_match_hyp; inv FIND.
-        cbn.
-        rewrite Heqb.
-        eexists; auto.
-      + intros k v2 v3 H2 H3.
-        cbn in H2, H3.
-        break_match_hyp; inv H3.
-        inv H2.
-        auto.
-    - pose proof IHxs ys a p as IH.
-      destruct x, y, a, p; cbn in *; subst.
-      red.
-      split.
-      + intros k.
-        split; intros FIND.
-        * cbn in *.
-          break_match_hyp; inv FIND;
-            try solve [eexists; auto].
-
-          break_match_hyp; inv H.
-          -- break_match_goal.
-             eexists; auto.
-
-             red in H1.
-             destruct H1 as [H1 H1'].
-             cbn in *.
-             specialize (H1 k).
-             specialize (H1' k).
-             rewrite Heqb0 in H1.
-             rewrite Heqb0 in H1'.
-             destruct H1 as [H1a H1b].
-             forward H1a.
-             eexists; auto.
-             rewrite Heqb1 in H1a.
-             auto.
-          -- break_match_goal.
-             eexists; auto.
-
-             red in H1.
-             destruct H1 as [H1 H1'].
-             cbn in *.
-             specialize (H1 k).
-             specialize (H1' k).
-             rewrite Heqb0 in H1.
-             rewrite Heqb0 in H1'.
-             destruct H1 as [H1a H1b].
-             forward H1a.
-             eexists; eauto.
-             rewrite Heqb1 in H1a.
-             auto.
-        * cbn in *.
-          break_match_hyp; inv FIND;
-            try solve [eexists; auto].
-
-          break_match_hyp; inv H.
-          -- break_match_goal.
-             eexists; auto.
-
-             red in H1.
-             destruct H1 as [H1 H1'].
-             cbn in *.
-             specialize (H1 k).
-             specialize (H1' k).
-             rewrite Heqb0 in H1, H1'.
-             rewrite Heqb1 in H1, H1'.
-             destruct H1 as [H1a H1b].
-             forward H1b.
-             eexists; auto.
-             auto.
-          -- break_match_goal.
-             eexists; auto.
-
-             red in H1.
-             destruct H1 as [H1 H1'].
-             cbn in *.
-             specialize (H1 k).
-             specialize (H1' k).
-             rewrite Heqb0 in H1, H1'.
-             rewrite Heqb1 in H1, H1'.
-             destruct H1 as [H1a H1b].
-             eapply H1b.
-             eexists; eauto.
-      + intros k v3 v4 H H2.
-        cbn in *.
-        break_match_hyp; inv H; inv H2; auto.
-        break_match_hyp; inv H3.
-        * break_match_hyp; inv H4.
-          -- forward IH.
-             pose proof (@RelDec.rel_dec_correct _ _ RD_K RD_K_CORRECT k k1) as [KK1 _].
-             pose proof (@RelDec.rel_dec_correct _ _ RD_K RD_K_CORRECT k k2) as [KK2 _].
-             rewrite <- KK1, KK2; auto.
-
-             red in H1.
-             destruct H1 as [H1 H1'].
-             cbn in *.
-             specialize (H1 k).
-             specialize (H1' k).
-             rewrite Heqb0 in H1, H1'.
-             rewrite Heqb1 in H1, H1'.
-             eauto.
-          -- red in H1.
-             destruct H1 as [H1 H1'].
-             cbn in *.
-             specialize (H1 k).
-             specialize (H1' k).
-             rewrite Heqb0 in H1, H1'.
-             rewrite Heqb1 in H1, H1'.
-             eauto.
-        * break_match_hyp; inv H4.
-          -- red in H1.
-             destruct H1 as [H1 H1'].
-             cbn in *.
-             specialize (H1 k).
-             specialize (H1' k).
-             rewrite Heqb0 in H1, H1'.
-             rewrite Heqb1 in H1, H1'.
-             eauto.
-          -- red in H1.
-             destruct H1 as [H1 H1'].
-             cbn in *.
-             specialize (H1 k).
-             specialize (H1' k).
-             rewrite Heqb0 in H1, H1'.
-             rewrite Heqb1 in H1, H1'.
-             eauto.
-  Qed.
-
   (* Not sure if this is right...
 
      Presumably if [g1] OOMs when converted, we wouldn't have a [g2]
@@ -525,6 +116,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     global_refine_strict [] [].
   Proof.
     apply alist_refine_empty.
+  Qed.
+
+  Lemma global_refine_strict_add :
+    forall rid genv1 genv2 dv1 dv2,
+      global_refine_strict genv1 genv2 ->
+      dvalue_refine_strict dv1 dv2 ->
+      global_refine_strict (FMapAList.alist_add rid dv1 genv1) (FMapAList.alist_add rid dv2 genv2).
+  Proof.
+    intros rid genv1 genv2 dv1 dv2 H H0.
+    eapply alist_refine_add with (x:=(rid, dv1)) (y:=(rid, dv2)); cbn; eauto.
   Qed.
 
   Definition local_refine_lazy (l1 : IS1.LLVM.Local.local_env) (l2 : IS2.LLVM.Local.local_env) : Prop
@@ -597,6 +198,29 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     split.
     apply local_refine_strict_empty.
     apply stack_refine_strict_empty.
+  Qed.
+
+  (* TODO: move this *)
+  Lemma local_stack_refine_strict_add :
+    forall rid lenv1 lenv2 uv1 uv2,
+      local_refine_strict lenv1 lenv2 ->
+      uvalue_refine_strict uv1 uv2 ->
+      local_refine_strict (FMapAList.alist_add rid uv1 lenv1) (FMapAList.alist_add rid uv2 lenv2).
+  Proof.
+    intros rid lenv1 lenv2 uv1 uv2 H H0.
+    eapply alist_refine_add with (x:=(rid, uv1)) (y:=(rid, uv2)); cbn; eauto.
+  Qed.
+
+  (* TODO: move this *)
+  Lemma stack_refine_strict_add :
+    forall s1 s2 lenv1 lenv2,
+      stack_refine_strict s1 s2 ->
+      local_refine_strict lenv1 lenv2 ->
+      stack_refine_strict (lenv1 :: s1) (lenv2 :: s2).
+  Proof.
+    intros s1 s2 lenv1 lenv2 H H0.
+    red.
+    apply Forall2_cons; auto.
   Qed.
 
   (** OOM Refinements *)
@@ -2207,6 +1831,58 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
+  Definition L3_refine_strict A B (e1 : IS1.LP.Events.L3 A) (e2 : IS2.LP.Events.L3 B) : Prop.
+  Proof.
+    refine (match e1, e2 with
+            | inl1 (E1.ExternalCall dt1 f1 args1), inl1 (E2.ExternalCall dt2 f2 args2) =>
+                _
+            | inr1 (inl1 e1), inr1 (inl1 e2) =>
+                _ (* PickE *)
+            | inr1 (inr1 (inl1 e0)), inr1 (inr1 (inl1 e1)) =>
+                _ (* OOME *)
+            | inr1 (inr1 (inr1 (inl1 e1))), inr1 (inr1 (inr1 (inl1 e2))) =>
+                _ (* UBE *)
+            | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
+                _ (* DebugE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 e1)))), inr1 (inr1 (inr1 (inr1 (inr1 e2)))) =>
+                _ (* FailureE *)
+            | _, _ =>
+                (* Mismatch of event types *)
+                False
+            end).
+
+    (* External Calls *)
+    { (* Doesn't say anything about return value... *)
+      apply (dt1 = dt2 /\
+               uvalue_refine_strict f1 f2 /\
+               Forall2 dvalue_refine_strict args1 args2).
+    }
+
+    (* PickE *)
+    { (* TODO: confirm whether this is sane... *)
+      inversion e1.
+      destruct e2 eqn:HE2.
+      apply ((Pre <-> Pre0) /\
+               uvalue_refine_strict x x0).
+    }
+
+    (* OOME *)
+    { apply True.
+    }
+
+    (* UBE *)
+    { apply True.
+    }
+
+    (* DebugE *)
+    { apply True.
+    }
+
+    (* FailureE *)
+    { apply True.
+    }
+  Defined.
+
   Definition event_converted_lazy A B (e1 : IS1.LP.Events.L0 A) (e2 : IS2.LP.Events.L0 B) : Prop.
   Proof.
     refine (match e1, e2 with
@@ -2866,6 +2542,65 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         apply (t = t0 /\
                  dvalue_refine_strict a a0 /\
                  uvalue_refine_strict v v0).
+    }
+
+    (* PickE *)
+    { (* TODO: confirm whether this is sane... *)
+      inversion e1; subst.
+      destruct e2 eqn:HE2.
+      destruct res1 as [r1 P1].
+      destruct res2 as [r2 P2].
+      apply ((Pre <-> Pre0) /\
+               uvalue_refine_strict x x0 /\
+               dvalue_refine_strict r1 r2).
+    }
+
+    (* OOME *)
+    { apply True.
+    }
+
+    (* UBE *)
+    { apply True.
+    }
+
+    (* DebugE *)
+    { apply True.
+    }
+
+    (* FailureE *)
+    { apply True.
+    }
+  Defined.
+
+  Definition L3_res_refine_strict A B (e1 : IS1.LP.Events.L3 A) (res1 : A) (e2 : IS2.LP.Events.L3 B) (res2 : B) : Prop.
+  Proof.
+    refine (match e1, e2 with
+            | inl1 e1, inl1 e2 =>
+                _
+            | inr1 (inl1 e1), inr1 (inl1 e2) =>
+                _ (* PickE *)
+            | inr1 (inr1 (inl1 e0)), inr1 (inr1 (inl1 e1)) =>
+                _ (* OOME *)
+            | inr1 (inr1 (inr1 (inl1 e1))), inr1 (inr1 (inr1 (inl1 e2))) =>
+                _ (* UBE *)
+            | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
+                _ (* DebugE *)
+            | inr1 (inr1 (inr1 (inr1 (inr1 e1)))), inr1 (inr1 (inr1 (inr1 (inr1 e2)))) =>
+                _ (* FailureE *)
+            | _, _ =>
+                (* Mismatch of event types *)
+                False
+            end).
+
+    (* External Calls *)
+    { inv e1.
+      inv e2.
+
+      apply (t = t0 /\
+               uvalue_refine_strict f f0 /\
+               Forall2 dvalue_refine_strict args args0 /\
+               dvalue_refine_strict res1 res2
+            ).
     }
 
     (* PickE *)
@@ -9524,133 +9259,22 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       + cbn in *.
         apply orutt_Ret.
         split; auto.
-
-        (* TODO: move this *)
-        Lemma alist_refine_remove :
-          forall {K V1 V2}
-            `{RD_K : @RelDec.RelDec K (@eq K)}
-            `{RD_K_CORRECT : @RelDec.RelDec_Correct _ eq RD_K}
-            (R: V1 -> V2 -> Prop) xs ys rid,
-            alist_refine R xs ys ->
-            alist_refine R (FMapAList.alist_remove rid xs) (FMapAList.alist_remove rid ys).
-        Proof.
-          intros K V1 V2 RD_K RD_K_CORRECT R.
-          induction xs, ys; intros rid REF.
-          - cbn; auto.
-          - red in REF.
-            destruct REF.
-            destruct p.
-            specialize (H k).
-            destruct H.
-            forward H1.
-            exists v. cbn.
-            rewrite RelDec.rel_dec_eq_true; auto.
-            destruct H1.
-            cbn in H1.
-            inv H1.
-          - red in REF.
-            destruct REF.
-            destruct a.
-            specialize (H k).
-            destruct H.
-            forward H.
-            exists v. cbn.
-            rewrite RelDec.rel_dec_eq_true; auto.
-            destruct H.
-            cbn in H.
-            inv H.
-          - red.
-            split.
-            { split; intros [v FIND].
-              - pose proof RelDec.rel_dec_p k rid as [EQ | NEQ]; subst.
-                + rewrite FMapAList.remove_eq_alist in FIND; auto.
-                  inv FIND.
-                + rewrite FMapAList.remove_neq_alist in FIND; eauto; try typeclasses eauto.
-                  rewrite FMapAList.remove_neq_alist; eauto; try typeclasses eauto.
-                  destruct REF.
-                  specialize (H k).
-                  destruct H.
-                  apply H.
-                  exists v; auto.
-              - pose proof RelDec.rel_dec_p k rid as [EQ | NEQ]; subst.
-                + rewrite FMapAList.remove_eq_alist in FIND; auto.
-                  inv FIND.
-                + rewrite FMapAList.remove_neq_alist in FIND; eauto; try typeclasses eauto.
-                  rewrite FMapAList.remove_neq_alist; eauto; try typeclasses eauto.
-                  destruct REF.
-                  specialize (H k).
-                  destruct H.
-                  apply H1.
-                  exists v; auto.
-            }
-            { intros k v1 v2 H H0.
-              destruct REF.
-              pose proof RelDec.rel_dec_p k rid as [EQ | NEQ]; subst.
-              + rewrite FMapAList.remove_eq_alist in H0; auto.
-                inv H0.
-              + rewrite FMapAList.remove_neq_alist in H, H0; auto; try typeclasses eauto.
-                eauto.
-            }
-        Qed.
-
-        (* TODO: move this *)
-        Lemma alist_refine_add :
-          forall {K V1 V2}
-            `{RD_K : @RelDec.RelDec K (@eq K)}
-            `{RD_K_CORRECT : @RelDec.RelDec_Correct _ eq RD_K}
-            (R: V1 -> V2 -> Prop) xs ys x y,
-            fst x = fst y ->
-            R (snd x) (snd y) ->
-            alist_refine R xs ys ->
-            alist_refine R (FMapAList.alist_add (fst x) (snd x) xs) (FMapAList.alist_add (fst y) (snd y) ys).
-        Proof.
-          intros K V1 V2 RD_K RD_K_CORRECT R xs ys x y H H0 H1.
-          apply alist_refine_cons; cbn; auto.
-          rewrite H.
-          apply alist_refine_remove; auto.
-        Qed.
-
-        (* TODO: move this *)
-        Lemma global_refine_strict_add :
-          forall rid genv1 genv2 dv1 dv2,
-            global_refine_strict genv1 genv2 ->
-            dvalue_refine_strict dv1 dv2 ->
-            global_refine_strict (FMapAList.alist_add rid dv1 genv1) (FMapAList.alist_add rid dv2 genv2).
-        Proof.
-          intros rid genv1 genv2 dv1 dv2 H H0.
-          eapply alist_refine_add with (x:=(rid, dv1)) (y:=(rid, dv2)); cbn; eauto.
-        Qed.
-
         apply global_refine_strict_add; auto.
 
       + cbn.
+        pose proof GREF as GREF'.
+        do 2 red in GREF.
+        specialize (GREF id0).
+        red in GREF.
         break_match_goal.
         { (* Found id in genv *)
-          pose proof GREF as GREF'.
-          destruct GREF.
-          specialize (H id0).
-          destruct H.
-          forward H. eexists; eauto.
-          destruct H.
-          rewrite H.
+          break_match_goal; try contradiction.
           apply orutt_Ret.
           split; eauto.
         }
 
         { (* Id not found in genv *)
-          pose proof GREF as GREF'.
-          break_match_goal.
-          { (* Contradiction *)
-            exfalso.
-            destruct GREF.
-            specialize (H id0).
-            destruct H.
-            forward H1. eexists; eauto.
-            destruct H1.
-            rewrite H1 in Heqo.
-            inv Heqo.
-          }
-
+          break_match_goal; try contradiction.
           solve_orutt_raise.
         }
     - cbn in REF;
@@ -9681,13 +9305,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
        { cbn.
          apply orutt_bind with (RR:=eq).
          { apply orutt_trigger; cbn; eauto.
-           split; auto.
            intros [] [] _; auto.
            intros o CONTRA; inv CONTRA.
          }
          intros [] [] _.
          apply orutt_Ret; split; auto.
-         split; auto.
       }
 
        { cbn.
@@ -10026,29 +9648,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     apply E1E2_interp_intrinsics_orutt_strict; auto.
   Qed.
 
-  (* TODO: move this *)
-  Lemma local_stack_refine_strict_add :
-    forall rid lenv1 lenv2 uv1 uv2,
-      local_refine_strict lenv1 lenv2 ->
-      uvalue_refine_strict uv1 uv2 ->
-      local_refine_strict (FMapAList.alist_add rid uv1 lenv1) (FMapAList.alist_add rid uv2 lenv2).
-  Proof.
-    intros rid lenv1 lenv2 uv1 uv2 H H0.
-    eapply alist_refine_add with (x:=(rid, uv1)) (y:=(rid, uv2)); cbn; eauto.
-  Qed.
-
-  (* TODO: move this *)
-  Lemma stack_refine_strict_add :
-    forall s1 s2 lenv1 lenv2,
-      stack_refine_strict s1 s2 ->
-      local_refine_strict lenv1 lenv2 ->
-      stack_refine_strict (lenv1 :: s1) (lenv2 :: s2).
-  Proof.
-    intros s1 s2 lenv1 lenv2 H H0.
-    red.
-    apply Forall2_cons; auto.
-  Qed.
-
   Lemma orutt_interp_local_stack_h :
     forall A B e1 e2 ls1 ls2,
       L1_refine_strict A B e1 e2 ->
@@ -10095,47 +9694,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         destruct ls1, ls2.
         cbn.
         repeat rewrite map_ret.
-
-        (* TODO: move this *)
-        Definition option_rel2 {X1 X2 : Type} (R : X1 -> X2 -> Prop) : (option X1 -> option X2 -> Prop) :=
-          fun mx my => match mx,my with
-                    | Some x, Some y => R x y
-                    | None, None => True
-                    | _, _ => False
-                    end.
-        #[export] Hint Unfold option_rel2 : core.
-
-        (* TODO: move this *)
-        Lemma alist_refine_find :
-          forall {K V1 V2}
-            `{RD_K : @RelDec.RelDec K (@eq K)}
-            `{RD_K_CORRECT : @RelDec.RelDec_Correct _ eq RD_K}
-            (R: V1 -> V2 -> Prop) xs ys id,
-            alist_refine R xs ys ->
-            option_rel2 R (FMapAList.alist_find id xs) (FMapAList.alist_find id ys).
-        Proof.
-          intros K V1 V2 RD_K RD_K_CORRECT R xs ys id H.
-          red.
-          break_match.
-          - destruct H.
-            specialize (H id).
-            destruct H.
-            forward H. eexists; eauto.
-            destruct H.
-            rewrite H.
-            eauto.
-          - destruct H.
-            break_match_goal.
-            + specialize (H id).
-              destruct H.
-              forward H1. eexists; eauto.
-              destruct H1.
-              rewrite H1 in Heqo; inv Heqo.
-            + auto.
-        Qed.
-
         destruct LSR.
-        pose proof alist_refine_find _ _ _ id0 H as FIND.
+        pose proof H as FIND.
+        do 2 red in FIND.
+        specialize (FIND id0).
         red in FIND.
         break_match_hyp; break_match_hyp; inv FIND.
         repeat rewrite map_ret.
@@ -10152,10 +9714,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     - cbn in REF;
         destruct e2; try inv REF;
         repeat (break_match_hyp; try inv REF).
-      + assert (local_refine_strict args args0) as ARGS.
-        constructor; auto.
-        clear H H0.        
-
+      + red in REF.
         cbn in *.
         destruct ls1, ls2.
         cbn.
@@ -10163,6 +9722,67 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           split; try tauto.
         constructor; cbn in *; try tauto.
         { (* TODO: Move this *)
+          (* Lemma alist_refine_strict_fold_right_add : *)
+          (*   forall {K V1 V2} *)
+          (*     `{RD_K : @RelDec.RelDec K (@eq K)} *)
+          (*     `{RD_K_CORRECT : @RelDec.RelDec_Correct _ eq RD_K} *)
+          (*     (R: V1 -> V2 -> Prop) xs ys vs1 vs2, *)
+          (*     alist_refine R (vs1 ++ xs) (vs2 ++ ys) -> *)
+          (*     alist_refine R (fold_right (fun '(id, v) => FMapAList.alist_add id v) xs vs1) (fold_right (fun '(id, v) => FMapAList.alist_add id v) ys vs2). *)
+          (* Proof. *)
+          (*   unfold FMapAList.alist_add. *)
+          (*   unfold  *)
+          (*   hinduction vs1 before vs2; intros vs2 REF. *)
+          (*   - destruct vs2. *)
+          (*     cbn; auto. *)
+
+          (*     { destruct REF, p. *)
+          (*       specialize (H k). *)
+          (*       destruct H. *)
+          (*       forward H1. *)
+          (*       eexists; cbn. *)
+          (*       rewrite RelDec.rel_dec_eq_true; auto. *)
+
+          (*       destruct H1. *)
+          (*       cbn in H1. *)
+          (*       inv H1. *)
+          (*     } *)
+          (*   - induction vs2. *)
+          (*     { destruct REF, a. *)
+          (*       specialize (H k). *)
+          (*       destruct H. *)
+          (*       forward H. *)
+          (*       eexists; cbn. *)
+          (*       rewrite RelDec.rel_dec_eq_true; auto. *)
+
+          (*       destruct H. *)
+          (*       cbn in H. *)
+          (*       inv H. *)
+          (*     } *)
+
+          (*     { cbn. *)
+          (*       destruct REF. *)
+          (*       cbn in *. *)
+          (*       destruct a, a0. *)
+          (*       (* TODO: Ugh, equivalent alists may not be in the same *)
+          (*       order *) *)
+          (*       eapply alist_refine_add with (x:=(k,v)) (y:=(k0,v0)); cbn; auto. *)
+          (*       all: admit. *)
+          (*     } *)
+          (* Admitted. *)
+
+          (* Lemma alist_refine_remove_cons : *)
+          (*   forall {K V1 V2} *)
+          (*     `{RD_K : @RelDec.RelDec K (@eq K)} *)
+          (*     `{RD_K_CORRECT : @RelDec.RelDec_Correct _ eq RD_K} *)
+          (*     (R: V1 -> V2 -> Prop) k1 v1 vs1 k2 v2 vs2, *)
+          (*     alist_refine R ((k1,v1) :: vs1) ((k2,v2) :: vs2) -> *)
+          (*     alist_refine R ((k1,v1) :: FMapAList.alist_remove k1 vs1) ((k2,v2) :: vs2) *)
+          (*   alist_refine R *)
+          (*     ((k, v) :: FMapAList.alist_remove k (fold_right (fun '(id, v1) (m : FMapAList.alist K V1) => (id, v1) :: FMapAList.alist_remove id m) [] vs1)) *)
+          (*     ((k0, v0) :: FMapAList.alist_remove k0 (fold_right (fun '(id, v1) (m : FMapAList.alist K V2) => (id, v1) :: FMapAList.alist_remove id m) [] vs2)) *)
+
+          (* TODO: look at frame stack equivalence *)
           Lemma alist_refine_strict_fold_right_add :
             forall {K V1 V2}
               `{RD_K : @RelDec.RelDec K (@eq K)}
@@ -10172,43 +9792,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               alist_refine R (fold_right (fun '(id, v) => FMapAList.alist_add id v) [] vs1) (fold_right (fun '(id, v) => FMapAList.alist_add id v) [] vs2).
           Proof.
             intros K V1 V2 RD_K RD_K_CORRECT R vs1 vs2 REF.
+            unfold FMapAList.alist_add.
             hinduction vs1 before vs2; intros vs2 REF.
-            - destruct vs2.
-              cbn; auto.
-
-              { destruct REF, p.
-                specialize (H k).
-                destruct H.
-                forward H1.
-                eexists; cbn.
-                rewrite RelDec.rel_dec_eq_true; auto.
-
-                destruct H1.
-                cbn in H1.
-                inv H1.
-              }
-            - induction vs2.
-              { destruct REF, a.
-                specialize (H k).
-                destruct H.
-                forward H.
-                eexists; cbn.
-                rewrite RelDec.rel_dec_eq_true; auto.
-
-                destruct H.
-                cbn in H.
-                inv H.
-              }
-
-              { cbn.
-                destruct REF.
-                cbn in *.
-                destruct a, a0.
-                (* TODO: Ugh, equivalent alists may not be in the same
-                order *)
-                eapply alist_refine_add with (x:=(k,v)) (y:=(k0,v0)); cbn; auto.
-                all: admit.
-              }
+            (* TODO: Ugh, equivalent alists may not be in the same
+               order *)
           Admitted.
 
           apply alist_refine_strict_fold_right_add; auto.
@@ -10329,77 +9916,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       | apply local_stack_refine_strict_empty
       ].
   Qed.
-
-  (* TODO: not sure about name... *)
-  Definition model_E1E2_L0
-             (p1 p2 : list
-                        (LLVMAst.toplevel_entity
-                           LLVMAst.typ
-                           (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
-    : Prop :=
-    refine_E1E2_L0_strict
-      (LLVM1.denote_vellvm (DTYPE_I 32%N) "main" LLVM1.main_args (convert_types (mcfg_of_tle p1)))
-      (LLVM2.denote_vellvm (DTYPE_I 32%N) "main" LLVM2.main_args (convert_types (mcfg_of_tle p2))).
-
-  (* TODO: not sure about name... *)
-  Definition model_E1E2_L1
-             (p1 p2 : list
-                        (LLVMAst.toplevel_entity
-                           LLVMAst.typ
-                           (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
-    : Prop :=
-    refine_E1E2_L1_strict
-      (LLVM1.model_oom_L1 p1)
-      (LLVM2.model_oom_L1 p2).
-
-  (* TODO: not sure about name... *)
-  Definition model_E1E2_L2
-             (p1 p2 : list
-                        (LLVMAst.toplevel_entity
-                           LLVMAst.typ
-                           (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
-    : Prop :=
-    refine_E1E2_L2_strict
-      (LLVM1.model_oom_L2 p1)
-      (LLVM2.model_oom_L2 p2).
-
-  (* TODO: not sure about name... *)
-  Definition model_E1E2_L3
-             (p1 p2 : list
-                        (LLVMAst.toplevel_entity
-                           LLVMAst.typ
-                           (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
-    : Prop :=
-    refine_E1E2_L3_strict
-      (LLVM1.model_oom_L3 p1)
-      (LLVM2.model_oom_L3 p2).
-
-  (* TODO: not sure about name... *)
-  Definition model_E1E2_L4
-             (p1 p2 : list
-                        (LLVMAst.toplevel_entity
-                           LLVMAst.typ
-                           (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
-    : Prop :=
-    refine_E1E2_L4_strict (LLVM1.model_oom_L4 p1) (LLVM2.model_oom_L4 p2).
-
-  (* TODO: not sure about name... *)
-  Definition model_E1E2_L5
-             (p1 p2 : list
-                        (LLVMAst.toplevel_entity
-                           LLVMAst.typ
-                           (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
-    : Prop :=
-    refine_E1E2_L5_strict (LLVM1.model_oom_L5 p1) (LLVM2.model_oom_L5 p2).
-
-  (* TODO: not sure about name... *)
-  Definition model_E1E2_L6
-             (p1 p2 : list
-                        (LLVMAst.toplevel_entity
-                           LLVMAst.typ
-                           (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
-    : Prop :=
-    refine_E1E2_L6_strict (LLVM1.model_oom_L6 p1) (LLVM2.model_oom_L6 p2).
 
 End LangRefine.
 

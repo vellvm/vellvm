@@ -66,6 +66,8 @@ Notation LLVM_syntax :=
               LLVMAst.typ
               (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))).
 
+Infix "×" := prod_rel (at level 90, left associativity).
+
 Module InfiniteToFinite.
   (* Import FinInfLangRefine. (* Just planning on using this for L4_convert from finite to infinite events. *) *)
   Import InfFinLangRefine.
@@ -105,6 +107,9 @@ Module InfiniteToFinite.
 
   Module InfMemInterp := MemoryBigIntptr.MEM_SPEC_INTERP.
   Module FinMemInterp := Memory64BitIntptr.MEM_SPEC_INTERP.
+
+  Module InfLP := InterpreterStackBigIntptr.LP.
+  Module FinLP := InterpreterStackBigIntptr.LP.
 
   (* Could not put with the other conversions, need to know what memory structures like MemState are *)
   Definition convert_SByte (sb1 : MemoryBigIntptr.MP.BYTE_IMPL.SByte) : OOM (Memory64BitIntptr.MP.BYTE_IMPL.SByte).
@@ -198,76 +203,101 @@ Module InfiniteToFinite.
     reflexivity.
   Qed.
 
-  Instance refine_OOM_h_eq_itree {E F T RR} : Proper (eq_itree eq ==> eq_itree eq ==> iff) (@refine_OOM_h E F T RR).
-  repeat intro. rewrite H, H0.
-  reflexivity.
-  Qed.
+  (** More refinement relations *)
+  Definition L3_E1E2_orutt_strict (t1 : PropT InfLP.Events.L3 (InfMemMMSP.MemState *
+                                                                 (MemPropT.store_id * (InfLLVM.Local.local_env * InfLLVM.Stack.lstack * (InfLLVM.Global.global_env * InfLP.Events.DV.dvalue))))) t2
+    : Prop :=
+    forall t', t2 t' ->
+          exists t, t1 t /\
+                 orutt
+                   L3_refine_strict
+                   L3_res_refine_strict
+                   (MemState_refine × (eq × (local_refine_strict × stack_refine_strict × (global_refine_strict × EC.DVC.dvalue_refine_strict))))
+                   t t' (OOM:=OOME).
 
-  Lemma refine_OOM_h_bind :
-    forall {T R E F} (x y : itree (E +' OOME +' F) T) (RR1 : relation T) (RR2 : relation R) k,
-      (forall r1 r2, RR1 r1 r2 -> refine_OOM_h RR2 (k r1) (k r2)) ->
-      refine_OOM_h RR1 x y ->
-      refine_OOM_h RR2 (a <- x;; k a) (a <- y;; k a).
+  Definition model_E1E2_L3_orutt_strict p1 p2 :=
+    L3_E1E2_orutt_strict
+      (TopLevelBigIntptr.model_oom_L3 p1)
+      (TopLevel64BitIntptr.model_oom_L3 p2).
+
+  Lemma model_E1E2_23_orutt_strict :
+    forall t1 t2 sid ms1 ms2,
+      L2_E1E2_orutt_strict t1 t2 ->
+      MemState_refine ms1 ms2 ->
+      L3_E1E2_orutt_strict (InfMemInterp.interp_memory_prop eq t1 sid ms1) (FinMemInterp.interp_memory_prop eq t2 sid ms2).
   Proof.
-    intros T R E F.
+    intros t1 t2 sid ms1 ms2 RL2 MSR.
+    red in RL2.
 
-    unfold refine_OOM_h, refine_OOM_h_flip.
-    intros t1 t2 RR1 RR2.
+    unfold L3_E1E2_orutt_strict.
+    intros t' H.
 
-    unfold bind, Monad_itree.
-    revert t1 t2. pcofix CIH.
-    intros t1 t2 k HK EQT.
-    punfold EQT.
-    red in EQT.
+    (* I need to find a `t` that corresponds to the `t'` that's in the
+       set given by the interpretation of memory events in `t2`...
 
-    assert (a <- t1 ;; k a =
-              match observe t1 with
-              | RetF r => k r
-              | TauF t0 => Tau (ITree.bind t0 k)
-              | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k)
-              end).
-    { apply bisimulation_is_eq; setoid_rewrite unfold_bind; reflexivity. }
-    setoid_rewrite H; clear H.
+       I guess I need to know what decisions were made to get `t'` out
+       of `t2`, and make similar decisions to get `t` out of `t1`.
 
-    assert (a <- t2 ;; k a =
-              match observe t2 with
-              | RetF r => k r
-              | TauF t0 => Tau (ITree.bind t0 k)
-              | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k)
-              end).
-    { apply bisimulation_is_eq; setoid_rewrite unfold_bind; reflexivity. }
-    setoid_rewrite H; clear H.
+       I guess we need to do coinduction on `t2`?
 
-    pstep.
-    induction EQT; eauto; pclearbot.
-    - specialize (HK _ _ REL).
-      punfold HK.
-      eapply interp_PropTF_mono. eapply HK.
-      intros. pclearbot. left.
-      eapply paco2_mon; eauto.
-      intros; contradiction.
-    - constructor. right.
-      eapply CIH; eauto.
-    - econstructor; auto.
-    - econstructor; auto.
-    - eapply Interp_PropT_Vis_OOM with (e := e).
-      punfold HT1; red in HT1. remember (observe (vis e k1)).
-      hinduction HT1 before k; intros; inv Heqi; try inv CHECK.
-      dependent destruction H1. unfold subevent.
-      eapply eqit_Vis.
-      Unshelve.
-      intros. cbn.
-      eapply eq_itree_clo_bind; pclearbot; eauto.
-      apply REL.
-      intros; subst; reflexivity.
-    - eapply Interp_PropT_Vis; eauto.
-      intros; eauto. right. eapply CIH; eauto.
-      specialize (HK0 _ H1). pclearbot. eapply HK0; eauto.
-      rewrite <- unfold_bind.
-      setoid_rewrite <- Eqit.bind_bind.
-      eapply eutt_clo_bind; eauto. intros; eauto.
-      subst; reflexivity.
-  Qed.
+       - Whenever we have a `Ret` `t'` is should going to end up being
+         basically the same `Ret`...
+       - Tau nodes should basically be irrelevant...
+       - Vis nodes have two cases...
+         1. The vis node is an event that isn't interpreted by the
+            memory handler... No non-determinism in this, so the
+            corresponding `t` should just raise the same event again.
+         2. The vis node is a memory event...
+
+       In the second case where the vis is a memory event that we
+       interpret we can have non-determinism. E.g., we might have an
+       Alloca event, and we will have to pick the location in memory
+       that the block gets allocated. `t'` can be any tree where a
+       valid address for the allocated block is returned... So, we'll
+       need to show that any valid address to allocate a block in the
+       current state of the finite memory corresponds to a valid
+       address to allocate a block in the current state of the
+       corresponding infinite memory. This should hopefully not be too
+       bad because the infinite and finite memories will have the same
+       layout (this assumption is missing from the initial draft
+       of this lemma).
+     *)
+
+  (*   unfold IS1.MEM.MEM_SPEC_INTERP.interp_memory_prop. *)
+  (*   unfold IS2.MEM.MEM_SPEC_INTERP.interp_memory_prop. *)
+  (*   cbn. *)
+  (*   eapply orutt_interp_state; eauto. *)
+  (*   { unfold local_stack_refine_strict in *. *)
+  (*     destruct ls1, ls2; *)
+  (*     constructor; tauto. *)
+  (*   } *)
+
+  (*   intros A B e1 e2 s1 s2 H H0. *)
+  (*   eapply orutt_interp_local_stack_h; eauto. *)
+  (*   inv H0. *)
+  (*   destruct s1, s2; cbn in *; auto. *)
+
+  (*   intros A o s. *)
+  (*   exists o. *)
+  (*   cbn. *)
+  (*   setoid_rewrite bind_trigger. *)
+  (*   exists (fun x : A => SemNotations.Ret1 s x). *)
+  (*   reflexivity. *)
+    (* Qed. *)
+  Admitted.
+
+  (* Lemma model_E1E2_L3_orutt_strict_sound *)
+  (*   (p : list *)
+  (*          (LLVMAst.toplevel_entity *)
+  (*             LLVMAst.typ *)
+  (*             (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))) : *)
+  (*   model_E1E2_L3_orutt_strict p p. *)
+  (* Proof. *)
+  (*   apply model_E1E2_13_orutt_strict; *)
+  (*     [ apply model_E1E2_L2_orutt_strict_sound *)
+  (*     | apply local_stack_refine_strict_empty *)
+  (*     ]. *)
+  (* Qed. *)
 
   (* If
 
