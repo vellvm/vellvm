@@ -430,11 +430,96 @@ Section GenerationState.
   Definition backtrack_variable_ctxs {A} (g: GenLLVM A) : GenLLVM A
     := backtrack_ctx (backtrack_ptrtoint_ctx g).
 
+  (* Elems implemented with reservoir sampling *)
+  Definition elems_res {A} (def : G A) (l : list A) : G A
+    := fst
+         (fold_left
+            (fun '(gacc, k) a =>
+               let gen' :=
+                 swap <- fmap (N.eqb 0) (choose (0%N, k));;
+                 if swap
+                 then (* swap *)
+                   ret a
+                 else (* No swap *)
+                   gacc
+               in (gen', (k+1)%N))
+            l (def, 0%N)).
+
   Definition oneOf_LLVM {A} (gs : list (GenLLVM A)) : GenLLVM A
-    := n <- lift (choose (0, List.length gs - 1)%nat);;
-       nth n gs (lift failGen).
+    := fst
+         (fold_left
+            (fun '(gacc, k) a =>
+               let gen' :=
+                 swap <- lift (fmap (N.eqb 0) (choose (0%N, k)));;
+                 if swap
+                 then (* swap *)
+                   a
+                 else (* No swap *)
+                   gacc
+               in (gen', (k+1)%N))
+            gs (lift failGen, 0%N)).
+
+  Definition oneOf_res {A} (def : G A) (gs : list (G A)) : G A
+    := fst
+         (fold_left
+            (fun '(gacc, k) a =>
+               let gen' :=
+                 swap <- fmap (N.eqb 0) (choose (0%N, k));;
+                 if swap
+                 then (* swap *)
+                   a
+                 else (* No swap *)
+                   gacc
+               in (gen', (k+1)%N))
+            gs (def, 0%N)).
+
+  Definition freq_res {A} (def : G A) (gs : list (N * G A)) : G A
+    := fst
+         (fold_left
+            (fun '(gacc, k) '(fk, a) =>
+               let k' := (k + fk)%N in
+               let gen' :=
+                 swap <- fmap (fun x => N.leb x fk) (choose (0%N, k'));;
+                 if swap
+                 then (* swap *)
+                   a
+                 else (* No swap *)
+                   gacc
+               in (gen', k'))
+            gs (def, 0%N)).
+
+  Definition freq_LLVM_N {A} (gs : list (N * GenLLVM A)) : GenLLVM A
+    := fst
+         (fold_left
+            (fun '(gacc, k) '(fk, a) =>
+               let k' := (k + fk)%N in
+               let gen' :=
+                 swap <- lift (fmap (fun x => N.leb x fk) (choose (0%N, k')));;
+                 if swap
+                 then (* swap *)
+                   a
+                 else (* No swap *)
+                   gacc
+               in (gen', k'))
+            gs (lift failGen, 0%N)).
 
   Definition freq_LLVM {A} (gs : list (nat * GenLLVM A)) : GenLLVM A
+    := fst
+         (fold_left
+            (fun '(gacc, k) '(fk, a) =>
+               let fkn := N.of_nat fk in
+               let k' := (k + fkn)%N in
+               let gen' :=
+                 swap <- lift (fmap (fun x => N.leb x fkn) (choose (0%N, k')));;
+                 if swap
+                 then (* swap *)
+                   a
+                 else (* No swap *)
+                   gacc
+               in (gen', k'))
+            gs (lift failGen, 0%N)).
+
+  Definition freq_LLVM' {A} (gs : list (nat * GenLLVM A)) : GenLLVM A
     := mkStateT
          (fun st => freq_ failGen (fmap (fun '(n, g) => (n, runStateT g st)) gs)).
 
@@ -443,23 +528,81 @@ Section GenerationState.
        thunk tt.
 
   Definition oneOf_LLVM_thunked {A} (gs : list (unit -> GenLLVM A)) : GenLLVM A
+    := thunkGen_LLVM
+         (fst
+            (fold_left
+               (fun '(gacc, k) a =>
+                  let gen' := fun x =>
+                    swap <- lift (fmap (N.eqb 0) (choose (0%N, k)));;
+                    if swap
+                    then (* swap *)
+                      a x
+                    else (* No swap *)
+                      gacc x
+                  in (gen', (k+1)%N))
+               gs (fun _ => lift failGen, 0%N))).
+
+  Definition oneOf_LLVM_thunked' {A} (gs : list (unit -> GenLLVM A)) : GenLLVM A
     := n <- lift (choose (0, List.length gs - 1)%nat);;
        thunkGen_LLVM (nth n gs (fun _ => lift failGen)).
 
+  Definition freq_LLVM_thunked_N {A} (gs : list (N * (unit -> GenLLVM A))) : GenLLVM A
+    := thunkGen_LLVM
+         (fst
+            (fold_left
+               (fun '(gacc, k) '(fk, a) =>
+                  let k' := (k + fk)%N in
+                  let gen' := fun x =>
+                    swap <- lift (fmap (fun x => N.leb x fk) (choose (0%N, k')));;
+                    if swap
+                    then (* swap *)
+                      a x
+                    else (* No swap *)
+                      gacc x
+                  in (gen', k'))
+               gs (fun _ => lift failGen, 0%N))).
+
   Definition freq_LLVM_thunked {A} (gs : list (nat * (unit -> GenLLVM A))) : GenLLVM A
+    := thunkGen_LLVM
+         (fst
+            (fold_left
+               (fun '(gacc, k) '(fk, a) =>
+                  let fkn := N.of_nat fk in
+                  let k' := (k + fkn)%N in
+                  let gen' := fun x =>
+                    swap <- lift (fmap (fun x => N.leb x fkn) (choose (0%N, k')));;
+                    if swap
+                    then (* swap *)
+                      a x
+                    else (* No swap *)
+                      gacc x
+                  in (gen', k'))
+               gs (fun _ => lift failGen, 0%N))).
+
+  Definition freq_LLVM_thunked' {A} (gs : list (nat * (unit -> GenLLVM A))) : GenLLVM A
     := mkStateT
          (fun st => freq_ failGen (fmap (fun '(n, g) => (n, runStateT (thunkGen_LLVM g) st)) gs)).
 
-  Definition elems_LLVM {A : Type} (l: list A) : GenLLVM A (* TODO: Need a more efficient way*)
-    := n <- lift (choose (0, List.length l - 1)%nat);;
-       nth n (map ret l) (lift failGen).
+  Definition elems_LLVM {A : Type} (l: list A) : GenLLVM A
+    := fst
+         (fold_left
+            (fun '(gacc, k) a =>
+               let gen' :=
+                 swap <- lift (fmap (N.eqb 0) (choose (0%N, k)));;
+                 if swap
+                 then (* swap *)
+                   ret a
+                 else (* No swap *)
+                   gacc
+               in (gen', (k+1)%N))
+            l (lift failGen, 0%N)).
 
   Definition vectorOf_LLVM {A : Type} (k : nat) (g : GenLLVM A)
     : GenLLVM (list A) :=
-    fold_right (fun m m' =>
-                  x <- m;;
-                  xs <- m';;
-                  ret (x :: xs)) (ret []) (repeat g k).
+    fold_left (fun m' m =>
+                 x <- m;;
+                 xs <- m';;
+                 ret (x :: xs)) (repeat g k) (ret []).
 
   Definition sized_LLVM {A : Type} (gn : nat -> GenLLVM A) : GenLLVM A
     := mkStateT
