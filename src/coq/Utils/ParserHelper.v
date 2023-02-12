@@ -1,6 +1,6 @@
 Require Import ZArith Lia Basics RelationClasses Program.
 Require Import SpecFloat.
-Require Import Flocq.IEEE754.Binary Flocq.Core.Defs Flocq.Core.Zaux.
+Require Import Flocq3.IEEE754.Binary Flocq3.Core.Defs Flocq3.Core.Zaux.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.OptionMonad.
 Require Import Floats.
 
@@ -8,8 +8,8 @@ Require Import Floats.
 Open Scope Z.
 
 (* a basic float - a pair of two integers - mantissa and exponent *)
-Definition bfloat := Flocq.Core.Defs.float radix2.
-Definition BFloat := Flocq.Core.Defs.Float radix2.
+Definition bfloat := Flocq3.Core.Defs.float radix2.
+Definition BFloat := Flocq3.Core.Defs.Float radix2.
 
 (** * converting between floats in the same cohort *)
 
@@ -138,7 +138,7 @@ Section Correctness.
 
   (** ** Flocq's Binary.bounded rewritten in a form close to IEEE-754 *)
   Lemma bounded_closed_form (prec emax : Z)
-        (prec_gt_0 : Flocq.Core.FLX.Prec_gt_0 prec) (Hmax : (prec < emax)%Z)
+        (prec_gt_0 : Flocq3.Core.FLX.Prec_gt_0 prec) (Hmax : (prec < emax)%Z)
         (m : positive) (e : Z) :
     bounded prec emax m e = true
     <->

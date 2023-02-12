@@ -8,7 +8,7 @@ Require Import Ceres.Ceres.
 
 Require Import Integers Floats.
 
-From Flocq.IEEE754 Require Import
+From Flocq3.IEEE754 Require Import
      Bits
      BinarySingleNaN
      Binary.
@@ -1378,13 +1378,13 @@ Class VInt I : Type :=
     end.
 
   Definition not_nan32 (f:ll_float) : bool :=
-    negb (Flocq.IEEE754.Binary.is_nan _ _ f).
+    negb (Flocq3.IEEE754.Binary.is_nan _ _ f).
 
   Definition ordered32 (f1 f2:ll_float) : bool :=
     andb (not_nan32 f1) (not_nan32 f2).
 
   Definition not_nan64 (f:ll_double) : bool :=
-    negb (Flocq.IEEE754.Binary.is_nan _ _ f).
+    negb (Flocq3.IEEE754.Binary.is_nan _ _ f).
 
   Definition ordered64 (f1 f2:ll_double) : bool :=
     andb (not_nan64 f1) (not_nan64 f2).
