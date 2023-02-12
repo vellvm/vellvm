@@ -1,6 +1,6 @@
 Require Import ZArith Lia Basics RelationClasses Program.
 Require Import SpecFloat.
-Require Import Flocq3.IEEE754.Binary Flocq3.Core.Defs Flocq.Core.Zaux.
+Require Import Flocq3.IEEE754.Binary Flocq3.Core.Defs Flocq3.Core.Zaux.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.OptionMonad.
 Require Import Floats.
 
