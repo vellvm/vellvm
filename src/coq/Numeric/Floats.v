@@ -20,7 +20,7 @@
 Require Import Coqlib Zbits Integers.
 Require Import Coq.micromega.Lia.
 (*From Flocq*)
-From Flocq Require Import Binary Bits Core.
+From Flocq3 Require Import Binary Bits Core.
 Require Import IEEE754_extra.
 Require Import Program.
 Require Archi.

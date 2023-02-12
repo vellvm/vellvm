@@ -18,7 +18,7 @@ From Vellvm Require Import
 From ITree Require Import
      ITree.
 
-From Flocq.IEEE754 Require Import
+From Flocq3.IEEE754 Require Import
      BinarySingleNaN
      Binary
      Bits.

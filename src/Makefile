@@ -6,7 +6,7 @@ COQLIBDIR = ../lib
 MLDIR = ml
 EXTRACTDIR = ml/extracted
 
-OPAMPKGS=coq coq-ext-lib coq-paco coq-ceres coq-flocq coq-mathcomp-ssreflect coq-simple-io coq-itree cppo dune menhir qcheck ocamlbuild
+OPAMPKGS=coq coq-ext-lib coq-paco coq-ceres coq-flocq3 coq-mathcomp-ssreflect coq-simple-io coq-itree cppo dune menhir qcheck ocamlbuild
 
 QUICKCHICKDIR=../lib/QuickChick
 FLOCQQUICKCHICKDIR=../lib/flocq-quickchick
