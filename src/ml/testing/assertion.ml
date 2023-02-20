@@ -52,6 +52,8 @@ type test =
 (* DVALUE equality *)
 (* TODO: implement this in ASTLib and use extraction *)
 let rec eq_dvalue (l: DV.dvalue) (r: DV.dvalue) : bool =
+  DV.dvalue_eqb l r
+(*  
   match l, r with
   | DVALUE_I1 l', DVALUE_I1 r' ->
      let bitwidth = Camlcoq.Z.of_uint 1 in
@@ -87,7 +89,7 @@ let rec eq_dvalue (l: DV.dvalue) (r: DV.dvalue) : bool =
   | DVALUE_Vector ul, DVALUE_Vector ur ->
      List.for_all2 eq_dvalue ul ur
   | _ -> false
-
+*)
 (*  Directly converts a piece of syntax to a dvalue without going through semantic interpretation.
     Only works on literals.
  *)
