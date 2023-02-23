@@ -9,7 +9,7 @@ Require Import ZArith.
 From ITree Require Import
      ITree
      Basics.Monad
-     Eq.Eq
+     Eq.Eqit
      TranslateFacts.
 
 From Vellvm Require Import
@@ -96,7 +96,7 @@ Lemma is_concrete_uvalue_to_dvalue :
 Proof.
   intros uv CONC.
   induction uv;
-    inversion CONC; try (eexists; reflexivity). 
+    inversion CONC; try (eexists; reflexivity).
   - cbn.
     pose proof uvalue_to_dvalue_list _ H H1 as (dv & MAP).
     exists (DVALUE_Struct dv). rewrite MAP.
@@ -145,12 +145,12 @@ Qed.
 
 Module InstrTactics.
 
-  Hint Rewrite @bind_ret_l : rwexp.
-  Hint Rewrite @translate_ret : rwexp.
-  Hint Rewrite @interp_cfg3_ret : rwexp.
-  Hint Rewrite @translate_bind : rwexp.
-  Hint Rewrite @interp_cfg3_bind : rwexp.
-  Hint Rewrite @translate_trigger : rwexp.
+  #[export] Hint Rewrite @bind_ret_l : rwexp.
+  #[export] Hint Rewrite @translate_ret : rwexp.
+  #[export] Hint Rewrite @interp_cfg3_ret : rwexp.
+  #[export] Hint Rewrite @translate_bind : rwexp.
+  #[export] Hint Rewrite @interp_cfg3_bind : rwexp.
+  #[export] Hint Rewrite @translate_trigger : rwexp.
 
   Ltac go := autorewrite with rwexp.
 
@@ -257,7 +257,7 @@ Proof.
   pose proof interp_cfg3_alloca m τ g l NV as (m' & a & ALLOC & TRIGGER).
   exists m', a. split; auto.
 
-  cbn. go. 
+  cbn. go.
   rewrite TRIGGER; cbn.
   rewrite bind_ret_l.
   step; reflexivity.
@@ -296,7 +296,7 @@ Lemma denote_instr_gep_array :
       read m ptr_res τ = inr val /\
       ⟦ (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)])) ⟧i3 g l m
       ≈
-      Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l'') m tt. 
+      Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l'') m tt.
 Proof.
   intros * PTR IX GET.
 
@@ -366,7 +366,7 @@ Lemma denote_instr_gep_array_no_read_addr :
     handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (Int64.repr 0); DVALUE_I64 (Int64.repr (Z.of_nat ix))] = inr ptr_res ->
     ⟦ (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)])) ⟧i3 g l m
     ≈
-    Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l'') m tt. 
+    Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l'') m tt.
 Proof.
   intros * PTR IX FITS HGEP.
   pose proof @interp_cfg3_GEP_array_no_read_addr τ a size g l'' m ix ptr_res FITS.
@@ -495,4 +495,3 @@ Proof.
   go.
   reflexivity.
 Qed.
-

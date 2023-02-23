@@ -12,7 +12,7 @@ From ITree Require Import
      Events.StateFacts
      InterpFacts
      KTreeFacts
-     Eq.Eq.
+     Eq.Eqit.
 
 From Vellvm Require Import
      Utilities
@@ -37,7 +37,7 @@ Import SemNotations.
 
 (* end hide *)
 
-(** * Structural equations at the representation level 
+(** * Structural equations at the representation level
 
 We prove here the equational theory that holds independently of the
 interpretation of events.
@@ -52,11 +52,11 @@ In particular, notice that since [interp] is a iterative-monad morphism that res
 
 Module DenoteTactics.
 
-  Hint Rewrite @bind_ret_l : rwexp.
-  Hint Rewrite @bind_bind : rwexp.
-  Hint Rewrite @translate_ret : rwexp.
-  Hint Rewrite @translate_bind : rwexp.
-  Hint Rewrite @translate_trigger : rwexp.
+  #[export] Hint Rewrite @bind_ret_l : rwexp.
+  #[export] Hint Rewrite @bind_bind : rwexp.
+  #[export] Hint Rewrite @translate_ret : rwexp.
+  #[export] Hint Rewrite @translate_bind : rwexp.
+  #[export] Hint Rewrite @translate_trigger : rwexp.
 
   Ltac go := autorewrite with rwexp.
 
@@ -205,7 +205,7 @@ Lemma denote_block_unfold :
     ⟦ mk_block id phis c t s ⟧b origin ≈
     ⟦ phis ⟧Φs origin;;
     ⟦ c ⟧c;;
-    translate exp_to_instr ⟦ t ⟧t. 
+    translate exp_to_instr ⟦ t ⟧t.
 Proof.
   intros; cbn; reflexivity.
 Qed.
@@ -241,7 +241,7 @@ Proof.
   rewrite tau_eutt; reflexivity.
 Qed.
 
-Lemma denote_ocfg_unfold_not_in: forall bks bid_from bid_src, 
+Lemma denote_ocfg_unfold_not_in: forall bks bid_from bid_src,
     find_block bks bid_src = None ->
     ⟦ bks ⟧bs (bid_from, bid_src) ≈ Ret (inl (bid_from,bid_src)).
 Proof.
@@ -322,7 +322,7 @@ Proof.
 Qed.
 
 Section Outputs.
-  
+
   (** * outputs soundness *)
 
   Lemma raise_has_all_posts : forall {E X} `{FailureE -< E} s Q,
@@ -338,7 +338,7 @@ Section Outputs.
     unfold raise; intros.
     apply has_post_bind; intros [].
   Qed.
-  
+
   Lemma unEither_eta : forall {T m A} (x : eitherT T m A), {|unEitherT := unEitherT x|} = x.
   Proof.
     intros.
@@ -351,7 +351,7 @@ Section Outputs.
       ⟦ term ⟧t ⤳ sum_pred (fun id => In id (terminator_outputs term)) TT.
   Proof.
     intros []; cbn; try (apply raise_has_all_posts || apply eutt_Ret; cbn; eauto).
-    - destruct v.  
+    - destruct v.
       apply has_post_bind; intros ?.
       apply eutt_Ret; cbn; eauto.
     - destruct v; cbn.
@@ -422,7 +422,7 @@ Section Outputs.
            (IND : forall fto (b : block dtyp),
                Qb fto ->
                find_block bks (snd fto) = Some b ->
-               ⟦ b ⟧b (fst fto) ⤳ sum_pred (fun to => Qb (snd fto, to)) Qv), 
+               ⟦ b ⟧b (fst fto) ⤳ sum_pred (fun to => Qb (snd fto, to)) Qv),
       ⟦ bks ⟧bs fto ⤳ sum_pred Qb Qv.
   Proof.
     intros * INIT IND.
@@ -442,7 +442,7 @@ Section Outputs.
    *)
   Lemma denote_ocfg_has_post :
     forall (bks : ocfg _) fto (Qb : block_id -> Prop) (Qv : uvalue -> Prop)
-           (ENTER : In (snd fto) (inputs bks)) 
+           (ENTER : In (snd fto) (inputs bks))
            (IND : forall fto (b : block dtyp),
                find_block bks (snd fto) = Some b ->
                ⟦ b ⟧b (fst fto) ⤳ sum_pred Qb Qv),
@@ -460,7 +460,7 @@ Section Outputs.
       split; auto.
       destruct HYP as [abs | POST]; auto.
       apply find_block_in_inputs in abs as [? abs]; cbn in abs; rewrite abs in Heq; inv Heq.
-  Qed.  
+  Qed.
 
   Lemma denote_ocfg_exits_in_outputs :
     forall bks fto,
@@ -605,7 +605,7 @@ Proof.
   clear CIHH.
   intros * WF.
   destruct (find_block bks' to) as [bk |] eqn:EQ.
-  - unfold denote_ocfg at 1 3. 
+  - unfold denote_ocfg at 1 3.
     setoid_rewrite KTreeFacts.unfold_iter_ktree.
     cbn; rewrite !bind_bind.
     assert (find_block (prefix ++ bks' ++ postfix) to = Some bk).

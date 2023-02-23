@@ -15,7 +15,6 @@ From Coq Require Import
      String
      Setoid
      Morphisms
-     Omega
      Classes.RelationClasses.
 
 From ExtLib Require Import
@@ -165,7 +164,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   Definition unique_prop (uv : uvalue) : Prop
     := exists x, forall dv, concretize uv dv -> dv = x.
 
-  Definition pickAll (p : uvalue -> PickE dvalue) := map_monad (fun uv => trigger (p uv)).
+  Definition pickAll (p : uvalue -> PickE dvalue)  := map_monad (fun uv => (trigger (p uv):itree PickE _)).
 
   (* The signatures for computations that we will use during the successive stages of the interpretation of LLVM programs *)
   (* TODO: The events and handlers are parameterized by the types of key and value.

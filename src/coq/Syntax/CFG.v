@@ -1,17 +1,7 @@
-(* -------------------------------------------------------------------------- *
- *                     Vellvm - the Verified LLVM project                     *
- *                                                                            *
- *     Copyright (c) 2017 Steve Zdancewic <stevez@cis.upenn.edu>              *
- *                                                                            *
- *   This file is distributed under the terms of the GNU General Public       *
- *   License as published by the Free Software Foundation, either version     *
- *   3 of the License, or (at your option) any later version.                 *
- ---------------------------------------------------------------------------- *)
-
 (* begin hide *)
 Require Import Equalities.
 
-From Coq Require Import ZArith List String Omega.
+From Coq Require Import ZArith List String.
 
 From Vellvm Require Import
      Utilities
@@ -156,6 +146,58 @@ Section CFG.
       m_definitions := flat_map definitions_of tles;
     |}.
 
+  Definition tle_of_name {X} (m_name: option string): toplevel_entities T X :=
+    match m_name with
+    | None => []
+    | Some n => [TLE_Source_filename n]
+    end.
+
+  Definition tle_of_target {X} (m_target: option string): toplevel_entities T X :=
+    match m_target with
+    | None => []
+    | Some n => [TLE_Target n]
+    end.
+
+  Definition tle_of_datalayout {X} (m_datalayout: option string): toplevel_entities T X :=
+    match m_datalayout with
+    | None => []
+    | Some n => [TLE_Datalayout n]
+    end.
+
+  Fixpoint tle_of_type_defs {X} (m_type_defs: list (ident * T)): toplevel_entities T X :=
+    match m_type_defs with
+    | [] => []
+    | (id, t)::l => (TLE_Type_decl id t)::(tle_of_type_defs l)
+    end.
+
+  Fixpoint tle_of_globals {X} (m_globals: list (global T)): toplevel_entities T X :=
+    match m_globals with
+    | [] => []
+    | g::gs => (TLE_Global g)::(tle_of_globals gs)
+    end.
+
+  Fixpoint tle_of_declarations {X} (m_declarations: list (declaration T)): toplevel_entities T X :=
+    match m_declarations with
+    | [] => []
+    | d::ds => (TLE_Declaration d)::(tle_of_declarations ds)
+    end.
+
+  Fixpoint tle_of_definitions {X} (m_definitions: list (definition T X)): toplevel_entities T X :=
+    match m_definitions with
+    | [] => []
+    | d::ds => (TLE_Definition d)::(tle_of_definitions ds)
+    end.
+
+  Definition toplevel_entities_of_modul {X} (m: @modul X): toplevel_entities T X :=
+    tle_of_name (m_name m)
+    ++ tle_of_target (m_target m)
+    ++ tle_of_datalayout (m_datalayout m)
+    ++ tle_of_type_defs (m_type_defs m)
+    ++ tle_of_globals (m_globals m)
+    ++ tle_of_declarations (m_declarations m)
+    ++ tle_of_definitions (m_definitions m)
+  .
+
   Definition init_of_definition (d : definition T (block T * list (block T))) : block_id :=
     blk_id (fst (df_instrs d)).
 
@@ -186,10 +228,45 @@ Section CFG.
   Definition find_block (bs: list (block T)) block_id : option (block T) :=
     find (fun b => if (blk_id b) ~=? block_id then true else false) bs.
 
+  Fixpoint modul_defns_of_mcfg_defns (ds: list (definition T cfg)): option (list (definition T (block T * list (block T)))) :=
+    match ds with
+    | [] => Some []
+    | d::ds => match blks (df_instrs d) with
+              | [] => None
+              | x::xs => match modul_defns_of_mcfg_defns ds with
+                        | None => None
+                        | Some l => Some (
+                                       {|
+                                         df_prototype := df_prototype d;
+                                         df_args := df_args d;
+                                         df_instrs := (x, xs)
+                                       |}
+                                         ::l)
+                        end
+              end
+    end.
+
+  Definition modul_of_mcfg (m: mcfg): option (@modul (block T * list (block T))) :=
+    match modul_defns_of_mcfg_defns (m_definitions m) with
+    | None => None
+    | Some defns => Some
+                     {|
+                       m_name := m_name m;
+                       m_target := m_target m;
+                       m_datalayout := m_datalayout m;
+                       m_type_defs := m_type_defs m;
+                       m_globals := m_globals m;
+                       m_declarations := m_declarations m;
+                       m_definitions := defns
+                     |}
+    end.
+
 End CFG.
 
 Arguments modul_of_toplevel_entities {T X}.
 Arguments mcfg_of_modul {T}.
+Arguments modul_of_mcfg {T}.
+Arguments modul_defns_of_mcfg_defns {T}.
 
 (* Conversion of the output of the parser to the [mcfg] structure manipulated internally *)
 Definition mcfg_of_tle (p : toplevel_entities typ (block typ * list (block typ))) :=
@@ -212,6 +289,31 @@ Arguments args {_}.
 
 Section TLE_To_Modul.
 
+  Lemma modul_defns_of_mcfg_defns_map_cfg_of_definition:
+    forall {T} (l: list (definition T (block T * list (block T)))),
+      modul_defns_of_mcfg_defns (map (fun d => {|
+                                          df_prototype := df_prototype d;
+                                          df_args := df_args d;
+                                          df_instrs := cfg_of_definition T d
+                                        |}) l) = Some l.
+  Proof.
+    induction l; simpl; auto.
+    rewrite IHl. repeat f_equal.
+    destruct a; simpl; f_equal.
+    destruct df_instrs; simpl; auto.
+  Qed.
+
+  Lemma modul_of_mcfg_of_modul:
+    forall {T} (m: @modul T _),
+      modul_of_mcfg (mcfg_of_modul m) = Some m.
+  Proof.
+    destruct m.
+    unfold mcfg_of_modul; simpl.
+    unfold modul_of_mcfg; simpl.
+    rewrite modul_defns_of_mcfg_defns_map_cfg_of_definition.
+    reflexivity.
+  Qed.
+
   Definition opt_first {T: Type} (o1 o2: option T): option T :=
     match o1 with | Some x => Some x | None => o2 end.
 
@@ -229,7 +331,7 @@ Section TLE_To_Modul.
     |}.
 
   Lemma modul_of_toplevel_entities_cons:
-    forall {T X} tle tles, 
+    forall {T X} tle tles,
       @modul_of_toplevel_entities T X (tle :: tles) = modul_app (modul_of_toplevel_entities [tle]) (modul_of_toplevel_entities tles).
   Proof.
     intros.
@@ -238,7 +340,7 @@ Section TLE_To_Modul.
   Qed.
 
   Lemma modul_of_toplevel_entities_app:
-    forall {T X} tle1 tle2, 
+    forall {T X} tle1 tle2,
     @modul_of_toplevel_entities T X (tle1 ++ tle2) = modul_app (modul_of_toplevel_entities tle1) (modul_of_toplevel_entities tle2).
   Proof.
     induction tle1 as [| tle tle1 IH]; intros; cbn; [reflexivity |].
@@ -297,9 +399,9 @@ Section TLE_To_Modul.
         f a = Some b /\
         map_option f l = Some r' /\
         r = b :: r'.
-  Proof.      
+  Proof.
     intros.
-    cbn in H; do 2 (break_match_hyp; try inv_option). 
+    cbn in H; do 2 (break_match_hyp; try inv_option).
     do 2 eexists; repeat split; auto.
   Qed.
 
@@ -307,7 +409,7 @@ Section TLE_To_Modul.
         f a = Some b ->
         map_option f l = Some r ->
         map_option f (a :: l) = Some (b :: r).
-  Proof.      
+  Proof.
     intros * EQ1 EQ2; simpl; rewrite EQ1, EQ2; reflexivity.
   Qed.
 
@@ -319,19 +421,19 @@ Section TLE_To_Modul.
         r = r1 ++ r2.
   Proof.
     induction l1 as [| x l1 IH]; intros * EQ.
-    - do 2 eexists; repeat split; try reflexivity; auto. 
-    - generalize EQ; intros EQ'; apply map_option_cons_inv in EQ'; destruct EQ' as (b & ? & EQ1 & EQ2 & ->). 
+    - do 2 eexists; repeat split; try reflexivity; auto.
+    - generalize EQ; intros EQ'; apply map_option_cons_inv in EQ'; destruct EQ' as (b & ? & EQ1 & EQ2 & ->).
       apply IH in EQ2; destruct EQ2 as (r1 & r2 & EQ2 & EQ3 & ->).
-      exists (b::r1), r2; repeat split; auto. 
+      exists (b::r1), r2; repeat split; auto.
       apply map_option_cons; auto.
   Qed.
 
-  Lemma mcfg_of_app_modul: forall {T} (p1 p2 : @modul T _), 
+  Lemma mcfg_of_app_modul: forall {T} (p1 p2 : @modul T _),
       mcfg_of_modul (p1 @@ p2) = mcfg_of_modul p1 @@ mcfg_of_modul p2.
   Proof.
     intros; cbn.
     unfold mcfg_of_modul.
-    rewrite  m_name_app, m_target_app, m_datalayout_app, m_type_defs_app, m_globals_app, m_declarations_app; f_equal; try reflexivity. 
+    rewrite  m_name_app, m_target_app, m_datalayout_app, m_type_defs_app, m_globals_app, m_declarations_app; f_equal; try reflexivity.
     rewrite m_definitions_app, map_app; reflexivity.
   Qed.
 

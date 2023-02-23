@@ -173,7 +173,7 @@ Definition expand_nan s p H : {x | is_nan _ _ x = true} :=
 
 Definition of_single_nan (f : float32) : { x : float | is_nan _ _ x = true } :=
   match f with
-  | B754_nan s p H =>
+  | B754_nan _ _ s p H =>
     if Archi.float_of_single_preserves_sNaN
     then expand_nan s p H
     else quiet_nan_64 (s, expand_nan_payload p)
@@ -189,7 +189,7 @@ Definition reduce_nan_payload (p: positive) :=
 
 Definition to_single_nan (f : float) : { x : float32 | is_nan _ _ x = true } :=
   match f with
-  | B754_nan s p H => quiet_nan_32 (s, reduce_nan_payload p)
+  | B754_nan _ _ s p H => quiet_nan_32 (s, reduce_nan_payload p)
   | _ => default_nan_32
   end.
 
@@ -197,13 +197,13 @@ Definition to_single_nan (f : float) : { x : float32 | is_nan _ _ x = true } :=
 
 Definition neg_nan (f : float) : { x : float | is_nan _ _ x = true } :=
   match f with
-  | B754_nan s p H => exist _ (B754_nan 53 1024 (negb s) p H) (eq_refl true)
+  | B754_nan _ _ s p H => exist _ (B754_nan 53 1024 (negb s) p H) (eq_refl true)
   | _ => default_nan_64
   end.
 
 Definition abs_nan (f : float) : { x : float | is_nan _ _ x = true } :=
   match f with
-  | B754_nan s p H => exist _ (B754_nan 53 1024 false p H) (eq_refl true)
+  | B754_nan _ _ s p H => exist _ (B754_nan 53 1024 false p H) (eq_refl true)
   | _ => default_nan_64
   end.
 
@@ -222,7 +222,7 @@ Additionally, signaling NaNs are converted to quiet NaNs, as required by the sta
 *)
 
 Definition cons_pl (x: float) (l: list (bool * positive)) :=
-  match x with B754_nan s p _ => (s, p) :: l | _ => l end.
+  match x with B754_nan _ _ s p _ => (s, p) :: l | _ => l end.
 
 Definition unop_nan (x: float) : {x : float | is_nan _ _ x = true} :=
   quiet_nan_64 (Archi.choose_nan_64 (cons_pl x nil)).
@@ -248,7 +248,7 @@ Definition fma_nan_1 (x y z: float) : {x : float | is_nan _ _ x = true} :=
 
 Definition fma_nan (x y z: float) : {x : float | is_nan _ _ x = true} :=
   match x, y with
-  | B754_infinity _, B754_zero _ | B754_zero _, B754_infinity _ =>
+  | B754_infinity _ _ _, B754_zero _ _ _ | B754_zero _ _ _, B754_infinity _ _ _ =>
       if Archi.fma_invalid_mul_is_nan
       then quiet_nan_64 (Archi.choose_nan_64 (Archi.default_nan_64 :: cons_pl z nil))
       else fma_nan_1 x y z
@@ -999,18 +999,18 @@ Module Float32.
 
 Definition neg_nan (f : float32) : { x : float32 | is_nan _ _ x = true } :=
   match f with
-  | B754_nan s p H => exist _ (B754_nan 24 128 (negb s) p H) (eq_refl true)
+  | B754_nan _ _ s p H => exist _ (B754_nan 24 128 (negb s) p H) (eq_refl true)
   | _ => default_nan_32
   end.
 
 Definition abs_nan (f : float32) : { x : float32 | is_nan _ _ x = true } :=
   match f with
-  | B754_nan s p H => exist _ (B754_nan 24 128 false p H) (eq_refl true)
+  | B754_nan _ _ s p H => exist _ (B754_nan 24 128 false p H) (eq_refl true)
   | _ => default_nan_32
   end.
 
 Definition cons_pl (x: float32) (l: list (bool * positive)) :=
-  match x with B754_nan s p _ => (s, p) :: l | _ => l end.
+  match x with B754_nan _ _ s p _ => (s, p) :: l | _ => l end.
 
 Definition unop_nan (x: float32) : {x : float32 | is_nan _ _ x = true} :=
   quiet_nan_32 (Archi.choose_nan_32 (cons_pl x nil)).
@@ -1024,7 +1024,7 @@ Definition fma_nan_1 (x y z: float32) : {x : float32 | is_nan _ _ x = true} :=
 
 Definition fma_nan (x y z: float32) : {x : float32 | is_nan _ _ x = true} :=
   match x, y with
-  | B754_infinity _, B754_zero _ | B754_zero _, B754_infinity _ =>
+  | B754_infinity _ _ _, B754_zero _ _ _ | B754_zero _ _ _, B754_infinity _ _ _ =>
       if Archi.fma_invalid_mul_is_nan
       then quiet_nan_32 (Archi.choose_nan_32 (Archi.default_nan_32 :: cons_pl z nil))
       else fma_nan_1 x y z

@@ -8,7 +8,7 @@ From ExtLib Require Import
 
 From ITree Require Import
      ITree
-     Eq.Eq
+     Eq.Eqit
      Events.State
      Events.StateFacts.
 
@@ -80,7 +80,7 @@ Section Locals.
         setoid_rewrite interp_state_bind.
         apply eq_itree_clo_bind with (UU := Logic.eq).
         reflexivity.
-        intros [] [] EQ; inv EQ; reflexivity.
+        intros [] [] EQ; inversion EQ; reflexivity.
       Qed.
 
       Lemma interp_local_ret :

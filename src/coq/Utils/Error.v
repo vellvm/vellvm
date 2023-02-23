@@ -1,13 +1,3 @@
-(* -------------------------------------------------------------------------- *
- *                     Vellvm - the Verified LLVM project                     *
- *                                                                            *
- *     Copyright (c) 2017 Steve Zdancewic <stevez@cis.upenn.edu>              *
- *                                                                            *
- *   This file is distributed under the terms of the GNU General Public       *
- *   License as published by the Free Software Foundation, either version     *
- *   3 of the License, or (at your option) any later version.                 *
- ---------------------------------------------------------------------------- *)
-
 (* begin hide *)
 From Coq Require Import String.
 Require Import ExtLib.Structures.Monads.
@@ -29,12 +19,12 @@ From ITree Require Import
 
 Notation err := (sum string).
 
-Instance Monad_err : Monad err := Monad_either string.
-Instance Exception_err : MonadExc string err := Exception_either string.
+#[global] Instance Monad_err : Monad err := Monad_either string.
+#[global] Instance Exception_err : MonadExc string err := Exception_either string.
 
-Instance EqM_err: Monad.Eq1 err := fun a x y => @eq (err a) x y.
+#[global] Instance EqM_err: Monad.Eq1 err := fun a x y => @eq (err a) x y.
 
-Instance EqMProps_err: Monad.Eq1Equivalence err.
+#[global] Instance EqMProps_err: Monad.Eq1Equivalence err.
   constructor.
   - repeat intro. repeat red. destruct x; reflexivity.
   - repeat intro. repeat red. repeat red in H.
@@ -43,7 +33,7 @@ Instance EqMProps_err: Monad.Eq1Equivalence err.
     destruct x, y, z; auto; try contradiction; try etransitivity; eauto.
 Qed.
 
-Instance MonadLaws_err: Monad.MonadLawsE err.
+#[global] Instance MonadLaws_err: Monad.MonadLawsE err.
   constructor.
   - intros. repeat red. cbn. auto.
   - intros. repeat red. cbn. destruct x eqn: Hx; auto.
@@ -65,28 +55,22 @@ Definition failwith {A:Type} {F} `{Monad F} `{MonadExc string F} (s:string) : F 
 #[export] Hint Unfold failwith: core.
 Arguments failwith _ _ _ _: simpl nomatch.
 
-(* SAZ:
-   I believe that these refer to "undefined behavior", not "undef" values.  
-   Raname them to "UB" and "UB_or_err"?
-   YZ: I agree 
-   TODO
-*)
 Definition undef := err.
 Definition undef_or_err := eitherT string err.
 
-Instance Monad_undef_or_err : Monad undef_or_err.
+#[global] Instance Monad_undef_or_err : Monad undef_or_err.
 unfold undef_or_err. typeclasses eauto.
 Defined.
 
-Instance EqM_undef_or_err : Monad.Eq1 undef_or_err :=
+#[global] Instance EqM_undef_or_err : Monad.Eq1 undef_or_err :=
   fun (a : Type) (x y : undef_or_err a) => x = y.
 
-Instance EqMProps_undef_or_err : Monad.Eq1Equivalence undef_or_err.
+#[global] Instance EqMProps_undef_or_err : Monad.Eq1Equivalence undef_or_err.
 constructor; intuition.
 repeat intro. etransitivity; eauto.
 Defined.
 
-Instance MonadLaws_undef_or_err: Monad.MonadLawsE undef_or_err.
+#[global] Instance MonadLaws_undef_or_err: Monad.MonadLawsE undef_or_err.
 constructor.
 - repeat intro. cbn. destruct (f x). cbn. reflexivity.
 - repeat intro. cbn. destruct x. cbn. destruct unEitherT; try reflexivity.

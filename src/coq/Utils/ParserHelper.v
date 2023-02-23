@@ -1,4 +1,5 @@
 Require Import ZArith Lia Basics RelationClasses Program.
+Require Import SpecFloat.
 Require Import Flocq.IEEE754.Binary Flocq.Core.Defs Flocq.Core.Zaux.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.OptionMonad.
 Require Import Floats.
@@ -85,13 +86,13 @@ Definition can_convert_exactly (prec__target emax__target : Z) (m : positive) (e
 
 Definition can_convert_float_to_float32 (v : float) : bool :=
   match v with
-  | B754_finite _ m e _ => can_convert_exactly 24 128 m e
+  | B754_finite _ _ _ m e _ => can_convert_exactly 24 128 m e
   | _ => true
   end.
 
 Definition can_convert_float_to_float64 (v : float) : bool :=
   match v with
-  | B754_finite _ m e _ => can_convert_exactly 53 1024 m e
+  | B754_finite _ _ _ m e _ => can_convert_exactly 53 1024 m e
   | _ => true
   end.
 
@@ -145,8 +146,9 @@ Section Correctness.
       (digits m < prec /\ e = 3 - emax - prec)
       (digits m = prec /\ 3 - emax - prec <= e <= emax - prec).
   Proof.
-    unfold FLX.Prec_gt_0, bounded, canonical_mantissa, FLT.FLT_exp in *.
+    unfold FLX.Prec_gt_0, bounded, canonical_mantissa, FLX.Prec_gt_0 in *.
     rewrite Bool.andb_true_iff, Z.leb_le, <-Zeq_is_eq_bool, digits2_pos_digits.
+    unfold FLT.FLT_exp.
     remember (3 - emax - prec) as emin.
     split; intro.
     all: destruct (Z_lt_le_dec (digits m + e - prec) emin).
@@ -441,8 +443,6 @@ Section Correctness.
     rewrite Z.log2_mul_pow2.
     all: subst.
     all: try lia.
-    all: try (destruct (Z.eq_dec (2 ^ Z.pos d) 0); [ rewrite e in M; lia | assumption ]). (* For backward compatibility *)
-    destruct (Z.eq_dec x 0); subst; lia.
     assert (m mod 2 ^ Z.pos d < 2 ^ Z.pos d); try lia.
     apply Zmod_pos_bound.
     apply Z.pow_pos_nonneg; lia.

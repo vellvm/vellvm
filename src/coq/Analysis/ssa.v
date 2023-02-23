@@ -1,3 +1,4 @@
+(* begin hide *)
 From Vellvm Require Import
      Utils.Util
      Syntax.CFG
@@ -7,7 +8,7 @@ From Vellvm Require Import
      Syntax.Scope
      Analysis.Dom
      Analysis.DomKildall.
-
+(* end hide *)
 
   Lemma instr_id_eq_dec : forall (x y : instr_id), {x = y} + {x <> y}.
   Proof.
@@ -69,8 +70,6 @@ Module idGraph <: GRAPH.
   Definition edge := succ_instr.
   Definition mem := mem_instr.
 End idGraph.
-
-
 
 (** Instantiate the dominance spec for this graph *)
 

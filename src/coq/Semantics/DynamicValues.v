@@ -1,20 +1,17 @@
-(* -------------------------------------------------------------------------- *
- *                     Vellvm - the Verified LLVM project                     *
- *                                                                            *
- *     Copyright (c) 2017 Steve Zdancewic <stevez@cis.upenn.edu>              *
- *                                                                            *
- *   This file is distributed under the terms of the GNU General Public       *
- *   License as published by the Free Software Foundation, either version     *
- *   3 of the License, or (at your option) any later version.                 *
- ---------------------------------------------------------------------------- *)
-
 (* begin hide *)
 From Coq Require Import
-     ZArith DecidableClass List String Omega Bool.Bool.
+     ZArith DecidableClass List String Bool.Bool.
 
 Import BinInt.
 
 Require Import Ceres.Ceres.
+
+Require Import Integers Floats.
+
+From Flocq.IEEE754 Require Import
+     Bits
+     BinarySingleNaN
+     Binary.
 
 From ExtLib Require Import
      Core.RelDec
@@ -29,12 +26,6 @@ From Vellvm Require Import
      Utilities
      Syntax
      Semantics.MemoryAddress.
-
-Require Import Integers Floats.
-
-From Flocq.IEEE754 Require Import
-     Bits
-     Binary.
 
 Import EqvNotation.
 Import MonadNotation.
@@ -101,7 +92,7 @@ Inductive IX_supported : N -> Prop :=
 .
 
 (* TODO: This probably should live somewhere else... *)
-#[refine] Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
+#[global,refine] Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
   Decidable_witness := N.eqb x y
 }.
  apply N.eqb_eq.
@@ -154,7 +145,7 @@ Function unsupported_cases_match_ {X} (sz : N) (x64 x32 x8 x1 x : X) :=
     | _ => x
     end.
 
-Lemma unsupported_cases_match : forall {X} (sz : N) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X), 
+Lemma unsupported_cases_match : forall {X} (sz : N) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X),
     match sz with
     | 64 => x64
     | 32 => x32
@@ -269,8 +260,8 @@ Inductive uvalue : Set :=
 | UVALUE_ExtractElement   (vec: uvalue) (idx: uvalue)
 | UVALUE_InsertElement    (vec: uvalue) (elt:uvalue) (idx:uvalue)
 | UVALUE_ShuffleVector    (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue)
-| UVALUE_ExtractValue     (vec:uvalue) (idxs:list int)
-| UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list int)
+| UVALUE_ExtractValue     (vec:uvalue) (idxs:list Integers.int)
+| UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list Integers.int)
 | UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue)
 .
 Set Elimination Schemes.
@@ -300,8 +291,8 @@ Section UvalueInd.
   Hypothesis IH_ExtractElement : forall (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement vec idx).
   Hypothesis IH_InsertElement  : forall (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement vec elt idx).
   Hypothesis IH_ShuffleVector  : forall (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector vec1 vec2 idxmask).
-  Hypothesis IH_ExtractValue   : forall (vec:uvalue) (idxs:list int), P vec -> P (UVALUE_ExtractValue vec idxs).
-  Hypothesis IH_InsertValue    : forall (vec:uvalue) (elt:uvalue) (idxs:list int), P vec -> P elt -> P (UVALUE_InsertValue vec elt idxs).
+  Hypothesis IH_ExtractValue   : forall (vec:uvalue) (idxs:list Integers.int), P vec -> P (UVALUE_ExtractValue vec idxs).
+  Hypothesis IH_InsertValue    : forall (vec:uvalue) (elt:uvalue) (idxs:list Integers.int), P vec -> P elt -> P (UVALUE_InsertValue vec elt idxs).
   Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
 
   Lemma uvalue_ind : forall (uv:uvalue), P uv.
@@ -452,9 +443,6 @@ Qed.
 
 
 (* returns true iff the uvalue contains no occurrence of UVALUE_Undef. *)
-(* YZ: See my comment above. If I'm correct, then we should also fail on operators and hence have:
-   is_concrete uv = true <-> uvalue_to_dvalue uv = Some v
- *)
 Fixpoint is_concrete (uv : uvalue) : bool :=
   match uv with
   | UVALUE_Addr a => true
@@ -1882,7 +1870,7 @@ Class VInt I : Type :=
     Qed.
   End dvalue_has_dtyp_ind.
 
-  Inductive concretize_u : uvalue -> undef_or_err dvalue -> Prop := 
+  Inductive concretize_u : uvalue -> undef_or_err dvalue -> Prop :=
   (* Concrete uvalue are contretized into their singleton *)
   | Pick_concrete             : forall uv (dv : dvalue), uvalue_to_dvalue uv = inr dv -> concretize_u uv (ret dv)
   | Pick_fail                 : forall uv v s, ~ (uvalue_to_dvalue uv = inr v)  -> concretize_u uv (lift (failwith s))
@@ -1899,7 +1887,7 @@ Class VInt I : Type :=
                    (dv1 <- e1 ;;
                     dv2 <- e2 ;;
                     (eval_iop iop dv1 dv2))
-  
+
   | Concretize_ICmp : forall cmp uv1 e1 uv2 e2 ,
       concretize_u uv1 e1 ->
       concretize_u uv2 e2 ->
@@ -1954,7 +1942,7 @@ Class VInt I : Type :=
 
   | Concretize_Array_Cons : forall u e us es,
       concretize_u u e ->
-      concretize_u (UVALUE_Array us) es ->      
+      concretize_u (UVALUE_Array us) es ->
       concretize_u (UVALUE_Array (u :: us))
                    (d <- e ;;
                     vs <- es ;;
@@ -1968,7 +1956,7 @@ Class VInt I : Type :=
 
   | Concretize_Vector_Cons : forall u e us es,
       concretize_u u e ->
-      concretize_u (UVALUE_Vector us) es ->      
+      concretize_u (UVALUE_Vector us) es ->
       concretize_u (UVALUE_Vector (u :: us))
                    (d <- e ;;
                     vs <- es ;;
@@ -1979,5 +1967,5 @@ Class VInt I : Type :=
   .
 
   Definition concretize (uv: uvalue) (dv : dvalue) := concretize_u uv (ret dv).
-  
+
 End DVALUE.

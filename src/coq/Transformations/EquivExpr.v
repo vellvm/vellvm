@@ -13,7 +13,7 @@ Require Import ZArith.
 From ITree Require Import
      ITree
      Basics.Monad
-     Eq.Eq
+     Eq.Eqit
      InterpFacts
      TranslateFacts.
 
