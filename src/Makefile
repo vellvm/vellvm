@@ -49,7 +49,7 @@ endif
 clean-coqmakefile: CoqMakefile
 	$(MAKE) -j --no-print-directory -f CoqMakefile $(filter-out $(KNOWNTARGETS),$(MAKECMDGOALS)) clean
 
-.PHONY: all invoke-coqmakefile clean-coqmakefile vok
+.PHONY: all invoke-coqmakefile clean-coqmakefile $(KNOWNFILES) vok
 all: quickchick flocq-quickchick vok extracted vellvm
 
 .PHONY: interp
