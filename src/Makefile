@@ -8,13 +8,7 @@ EXTRACTDIR = ml/extracted
 
 OPAMPKGS=coq coq-ext-lib coq-paco coq-ceres coq-flocq coq-mathcomp-ssreflect coq-simple-io coq-itree cppo dune menhir qcheck ocamlbuild
 
-QUICKCHICKDIR=../lib/QuickChick
-QUICKCHICK_STAMP=$(COQLIBDIR)/.QUICKCHICK_STAMP
-
-FLOCQQUICKCHICKDIR=../lib/flocq-quickchick
-FLOCQUICKCHICK_STAMP=$(COQLIBDIR)/.FLOCQQUICKCHICK_STAMP
-
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(QUICKCHICKDIR)/src/ QuickChick -I $(QUICKCHICKDIR)/src -I $(QUICKCHICKDIR)/plugin -R $(FLOCQQUICKCHICKDIR) FlocqQuickChick
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract 
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
@@ -26,7 +20,8 @@ FRONTEND_EXE=_build/default/ml/frontend.exe
 COQFILES_FRONTEND := QC/ShowAST QC/ReprAST Utils/ParserHelper
 FRONTEND_VOFILES := $(COQFILES_FRONTEND:%=coq/%.vo)
 
-KNOWNTARGETS := CoqMakefile extracted $(EXTRACTDIR)/STAMP $(QUICKCHICK_STAMP) $(FLOCQUICKCHICK_STAMP) interp .depend coq qc-tests opam frontend frontend_exe $(FRONTEND_EXE) distclean update-quickchick update-flocq-quickchick rm-qc-test-vo quickchick flocq-quickchick vellvm test check
+### WARNING - every target of *this* Makefile must be listed here
+KNOWNTARGETS := CoqMakefile extracted $(EXTRACTDIR)/STAMP interp .depend coq qc-tests opam frontend frontend_exe $(FRONTEND_EXE) clean update-quickchick rm-qc-test-vo quickchick vellvm test check
 SKIPTARGETS := frontend frontend_exe $(FRONTEND_EXE) .depend
 KNOWNFILES := Makefile _CoqProject .depend
 
@@ -50,13 +45,13 @@ clean-coqmakefile: CoqMakefile
 	$(MAKE) -j --no-print-directory -f CoqMakefile $(filter-out $(KNOWNTARGETS),$(MAKECMDGOALS)) clean
 
 .PHONY: all invoke-coqmakefile clean-coqmakefile $(KNOWNFILES) vok
-all: quickchick flocq-quickchick vok extracted vellvm
+all: vellvm
 
 .PHONY: interp
 interp: coqinterp extracted vellvm
 
 .PHONY: coq
-coq: quickchick flocq-quickchick real-all
+coq: real-all
 
 .PHONY: qc-tests
 qc-tests: rm-qc-test-vo coq
@@ -72,34 +67,6 @@ opam:
 
 .PHONY: coqinterp
 coqinterp: $(COQFILESVIR:%=coq/%.vo)
-
-.PHONY: quickchick
-quickchick: $(QUICKCHICK_STAMP)
-
-$(QUICKCHICK_STAMP):
-	$(MAKE) -C $(QUICKCHICKDIR) compat
-	$(MAKE) -C $(QUICKCHICKDIR)
-	touch $(QUICKCHICK_STAMP)
-
-.PHONY: flocq-quickchick
-flocq-quickchick: $(FLOCQUICKCHICK_STAMP) quickchick
-
-$(FLOCQUICKCHICK_STAMP):
-	make -C $(FLOCQQUICKCHICKDIR)
-	touch $(FLOCQUICKCHICK_STAMP)
-
-.PHONY: update-quickchick
-update-quickchick:
-	git submodule update -- $(QUICKCHICKDIR)
-	rm $(QUICKCHICK_STAMP)
-
-.PHONY: update-flocq-quickchick
-update-flocq-quickchick:
-	git submodule update -- $(FLOCQQUICKCHICKDIR)
-	rm $(FLOCQUICKCHICK_STAMP)
-
-.PHONY: update-submodules
-update-submodules: update-quickchick update-flocq-quickchick
 
 .PHONY: extracted
 extracted: $(EXTRACTDIR)/STAMP
@@ -154,13 +121,6 @@ clean: extractedclean clean-coqmakefile
 .PHONY: extractedclean
 extractedclean:
 	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/FRONTEND_STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
-
-.PHONY: distclean
-distclean: clean
-	make -C $(QUICKCHICKDIR) clean
-	make -C $(FLOCQQUICKCHICKDIR) clean
-	rm $(QUICKCHICK_STAMP)
-	rm $(FLOCQUICKCHICK_STAMP)
 
 doc/coq2html:
 	make -C ../lib/coq2html
