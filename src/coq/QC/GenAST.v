@@ -12,18 +12,21 @@
     more details. *)
 Require Import Ceres.Ceres.
 
+From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils QC.Generators Handlers.Handlers DList.
+Require Import Integers.
+
+
 From ExtLib.Structures Require Export
      Functor Applicative Monads Monoid.
 
 Require Import ExtLib.Data.Monads.StateMonad.
+Require Import ExtLib.Data.Monads.OptionMonad.
 Require Import ExtLib.Structures.Monads.
 
 Require Import List.
 
 Import ListNotations.
 
-From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils QC.Generators Handlers.Handlers DList.
-Require Import Integers.
 
 
 Import ListNotations.
@@ -40,13 +43,6 @@ Set Warnings "-extraction-opaque-accessed,-extraction".
 From ExtLib.Structures Require Export
      Functor.
 Open Scope Z_scope.
-
-(* SAZ: 
-     [failGen] was the one piece of the backtracking variant of QuickChick we
-     needed.  For now, we just axiomatize it.
- *)
-Axiom failGen : forall A:Type, G A.
-Arguments failGen {_}.
 
 (* Disable guard checking. This file is only used for generating test
     cases. Some of our generation functions terminate in non-trivial
@@ -264,8 +260,9 @@ Section GenerationState.
         ; gen_ptrtoint_ctx := ptrtoint_ctx
        |}.
 
-  Definition GenLLVM := stateT GenState G.
+  Definition GenLLVM := optionT (stateT GenState G).
 
+  
   (* Need this because extlib doesn't declare this instance as global :|. *)
   #[global] Instance monad_stateT {s m} `{Monad m} : Monad (stateT s m).
   Proof.
@@ -285,12 +282,33 @@ Section GenerationState.
   Definition get_blocks (gs : GenState) : N
     := gs.(num_blocks).
 
-  #[global] Instance MGEN : Monad GenLLVM.
-  unfold GenLLVM.
+  #[global] Instance STGST : Monad (stateT GenState G).
   apply Monad_stateT.
   typeclasses eauto.
   Defined.
 
+  #[global] Instance MGEN : Monad GenLLVM.
+  unfold GenLLVM.
+  apply Monad_optionT.
+  typeclasses eauto.
+  Defined.
+
+  Definition lift_GenLLVM {A} (g : G A) : GenLLVM A
+    := mkOptionT (mkStateT (fun st => a <- g;; ret (Some a, st))).
+  
+  #[global] Instance MGENT: MonadT GenLLVM G.
+  unfold GenLLVM.
+  constructor.
+  exact @lift_GenLLVM.
+  Defined.
+  
+  (* SAZ: 
+     [failGen] was the one piece of the backtracking variant of QuickChick we
+     needed.  
+   *)
+  Definition failGen {A:Type} : GenLLVM A :=
+    mkOptionT (ret None).
+  
   Definition new_raw_id : GenLLVM raw_id
     := n <- gets get_raw;;
        modify increment_raw;;
@@ -462,7 +480,7 @@ Section GenerationState.
                  else (* No swap *)
                    gacc
                in (gen', (k+1)%N))
-            gs (lift failGen, 0%N)).
+            gs (failGen, 0%N)).
 
   Definition oneOf_res {A} (def : G A) (gs : list (G A)) : G A
     := fst
@@ -506,7 +524,7 @@ Section GenerationState.
                  else (* No swap *)
                    gacc
                in (gen', k'))
-            gs (lift failGen, 0%N)).
+            gs (failGen, 0%N)).
 
   Definition freq_LLVM {A} (gs : list (nat * GenLLVM A)) : GenLLVM A
     := fst
@@ -522,11 +540,16 @@ Section GenerationState.
                  else (* No swap *)
                    gacc
                in (gen', k'))
-            gs (lift failGen, 0%N)).
+            gs (failGen, 0%N)).
 
+  (* SAZ: Where do we need this? *)
+  (*
   Definition freq_LLVM' {A} (gs : list (nat * GenLLVM A)) : GenLLVM A
-    := mkStateT
-         (fun st => freq_ failGen (fmap (fun '(n, g) => (n, runStateT g st)) gs)).
+    :=
+        mkStateT
+          (fun st => freq_ failGen (fmap (fun '(n, g) => (n, runStateT g st)) gs)).
+   *)
+    
 
   Definition thunkGen_LLVM {A} (thunk : unit -> GenLLVM A) : GenLLVM A
     := u <- ret tt;;
@@ -545,11 +568,11 @@ Section GenerationState.
                     else (* No swap *)
                       gacc x
                   in (gen', (k+1)%N))
-               gs (fun _ => lift failGen, 0%N))).
+               gs (fun _ => failGen, 0%N))).
 
   Definition oneOf_LLVM_thunked' {A} (gs : list (unit -> GenLLVM A)) : GenLLVM A
     := n <- lift (choose (0, List.length gs - 1)%nat);;
-       thunkGen_LLVM (nth n gs (fun _ => lift failGen)).
+       thunkGen_LLVM (nth n gs (fun _ => failGen)).
 
   Definition freq_LLVM_thunked_N {A} (gs : list (N * (unit -> GenLLVM A))) : GenLLVM A
     := thunkGen_LLVM
@@ -565,7 +588,7 @@ Section GenerationState.
                     else (* No swap *)
                       gacc x
                   in (gen', k'))
-               gs (fun _ => lift failGen, 0%N))).
+               gs (fun _ => failGen, 0%N))).
 
   Definition freq_LLVM_thunked {A} (gs : list (nat * (unit -> GenLLVM A))) : GenLLVM A
     := thunkGen_LLVM
@@ -582,11 +605,14 @@ Section GenerationState.
                     else (* No swap *)
                       gacc x
                   in (gen', k'))
-               gs (fun _ => lift failGen, 0%N))).
+               gs (fun _ => failGen, 0%N))).
 
+  (* SAZ: do we need this? *)
+  (*
   Definition freq_LLVM_thunked' {A} (gs : list (nat * (unit -> GenLLVM A))) : GenLLVM A
     := mkStateT
          (fun st => freq_ failGen (fmap (fun '(n, g) => (n, runStateT (thunkGen_LLVM g) st)) gs)).
+   *)
 
   Definition elems_LLVM {A : Type} (l: list A) : GenLLVM A
     := fst
@@ -600,7 +626,7 @@ Section GenerationState.
                  else (* No swap *)
                    gacc
                in (gen', (k+1)%N))
-            l (lift failGen, 0%N)).
+            l (failGen, 0%N)).
 
   Definition vectorOf_LLVM {A : Type} (k : nat) (g : GenLLVM A)
     : GenLLVM (list A) :=
@@ -610,12 +636,12 @@ Section GenerationState.
                  ret (x :: xs)) (repeat g k) (ret []).
 
   Definition sized_LLVM {A : Type} (gn : nat -> GenLLVM A) : GenLLVM A
-    := mkStateT
-         (fun st => sized (fun n => runStateT (gn n) st)).
+    := mkOptionT (mkStateT
+                    (fun st => sized (fun n => runStateT (unOptionT (gn n)) st))).
 
   Definition resize_LLVM {A : Type} (sz : nat) (g : GenLLVM A) : GenLLVM A
-    := mkStateT
-         (fun st => resize sz (runStateT g st)).
+    := mkOptionT (mkStateT
+                    (fun st => resize sz (runStateT (unOptionT g) st))).
 
   Definition listOf_LLVM {A : Type} (g : GenLLVM A) : GenLLVM (list A) :=
     sized_LLVM (fun n =>
@@ -628,11 +654,8 @@ Section GenerationState.
                      k <- lift (choose (1, n)%nat);;
                      vectorOf_LLVM k g).
 
-  Definition run_GenLLVM {A} (g : GenLLVM A) : G A
-    := fmap fst (runStateT g init_GenState).
-
-  Definition lift_GenLLVM {A} (g : G A) : GenLLVM A
-    := mkStateT (fun st => a <- g;; ret (a, st)).
+  Definition run_GenLLVM {A} (g : GenLLVM A) : G (option A)
+    := fmap fst (runStateT (unOptionT g) init_GenState).
 
 End GenerationState.
 
@@ -956,8 +979,11 @@ End TypGenerators.
 
 Section ExpGenerators.
 
+  (* SAZ: Here there were old uses of [failGen] that I replaced (arbitrarily) with the 
+     last element of the non-empty list. *)
+  
   Definition gen_ibinop : G ibinop :=
-     oneOf_ failGen
+     oneOf_ (ret Xor) (* SAZ: This default case is a hack *)
            [ ret LLVMAst.Add <*> ret false <*> ret false
            ; ret Sub <*> ret false <*> ret false
            ; ret Mul <*> ret false <*> ret false
@@ -975,7 +1001,7 @@ Section ExpGenerators.
 
   (*Float operations*)
   Definition gen_fbinop : G fbinop :=
-    oneOf_ failGen
+    oneOf_ (ret FRem) (* SAZ: This default case is a hack *)
             [ ret LLVMAst.FAdd
             ; ret FSub
             ; ret FMul
@@ -984,12 +1010,12 @@ Section ExpGenerators.
             ].
 
   Definition gen_icmp : G icmp :=
-    oneOf_ failGen
+    oneOf_ (ret Sle)
            (map ret
                 [ Eq; Ne; Ugt; Uge; Ult; Ule; Sgt; Sge; Slt; Sle]).
 
   Definition gen_fcmp : G fcmp :=
-    oneOf_ failGen
+    oneOf_ (ret FTrue)
             (map ret
                   [FFalse; FOeq; FOgt; FOge; FOlt; FOle; FOne; FOrd;
                    FUno; FUeq; FUgt; FUge; FUlt; FUle; FUne; FTrue]).
@@ -1318,23 +1344,23 @@ Section ExpGenerators.
        | TYPE_I n => ret EXP_Integer <*> lift (gen_non_zero (Some n))
        | TYPE_IPTR => ret EXP_Integer <*> lift (gen_non_zero None)
        | TYPE_Float => ret EXP_Float <*> lift fing32 (* TODO: is this actually non-zero...? *)
-       | TYPE_Double => lift failGen(*ret EXP_Double <*> lift fing64*) (*TODO : Fix generator for double*)
-       | _ => lift failGen
+       | TYPE_Double => failGen(*ret EXP_Double <*> lift fing64*) (*TODO : Fix generator for double*)
+       | _ => failGen
        end.
 
   Definition gen_gt_zero_exp_size (sz : nat) (t : typ) : GenLLVM (exp typ)
     := match t with
        | TYPE_I n => ret EXP_Integer <*> lift (gen_gt_zero (Some n))
        | TYPE_IPTR => ret EXP_Integer <*> lift (gen_gt_zero None)
-       | TYPE_Float => lift failGen
-       | TYPE_Double => lift failGen(*ret EXP_Double <*> lift fing64*) (*TODO : Fix generator for double*)
-       | _ => lift failGen
+       | TYPE_Float => failGen
+       | TYPE_Double => failGen(*ret EXP_Double <*> lift fing64*) (*TODO : Fix generator for double*)
+       | _ => failGen
        end.
 
-Definition genTypHelper (n: nat): G (typ) :=
+Definition genTypHelper (n: nat): G (option typ) :=
   run_GenLLVM (gen_typ_non_void_size n).
 
-Definition genType: G (typ) :=
+Definition genType: G (option typ) :=
   sized genTypHelper.
 
   Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
@@ -1355,11 +1381,11 @@ Definition genType: G (typ) :=
           (* lift (x <- (arbitrary : G nat);; ret (Z.of_nat x))
            (* TODO: should the integer be forced to be in bounds? *) *)
           | TYPE_IPTR => ret EXP_Integer <*> lift (arbitrary : G Z)
-          | TYPE_Pointer subtyp       => lift failGen
+          | TYPE_Pointer subtyp       => failGen
           (* Only pointer type expressions might be conversions? Maybe GEP? *)
-          | TYPE_Void                 => lift failGen (* There should be no expressions of type void *)
-          | TYPE_Function ret args _   => lift failGen (* No expressions of function type *)
-          | TYPE_Opaque               => lift failGen (* TODO: not sure what these should be... *)
+          | TYPE_Void                 => failGen (* There should be no expressions of type void *)
+          | TYPE_Function ret args _   => failGen (* No expressions of function type *)
+          | TYPE_Opaque               => failGen (* TODO: not sure what these should be... *)
 
           (* Generate literals for aggregate structures *)
           | TYPE_Array n t =>
@@ -1380,18 +1406,18 @@ Definition genType: G (typ) :=
           | TYPE_Identified id        =>
             ctx <- get_ctx;;
             match find_pred (fun '(i,t) => if Ident.eq_dec id i then true else false) ctx with
-            | None => lift failGen
+            | None => failGen
             | Some (i,t) => gen_exp_size 0 t
             end
           (* Not generating these types for now *)
-          | TYPE_Half                 => lift failGen
+          | TYPE_Half                 => failGen
           | TYPE_Float                => ret EXP_Float <*> lift fing32(* referred to genarators in flocq-quickchick*)
-          | TYPE_Double               => lift failGen (*ret EXP_Double <*> lift fing64*) (* TODO: Fix generator for double*)
-          | TYPE_X86_fp80             => lift failGen
-          | TYPE_Fp128                => lift failGen
-          | TYPE_Ppc_fp128            => lift failGen
-          | TYPE_Metadata             => lift failGen
-          | TYPE_X86_mmx              => lift failGen
+          | TYPE_Double               => failGen (*ret EXP_Double <*> lift fing64*) (* TODO: Fix generator for double*)
+          | TYPE_X86_fp80             => failGen
+          | TYPE_Fp128                => failGen
+          | TYPE_Ppc_fp128            => failGen
+          | TYPE_Metadata             => failGen
+          | TYPE_X86_mmx              => failGen
           end in
       (* Hack to avoid failing way too much *)
       match t with
@@ -1416,21 +1442,21 @@ Definition genType: G (typ) :=
           | TYPE_Struct fields => []
           | TYPE_Packed_struct fields => []
 
-          | TYPE_Void              => [lift failGen] (* No void type expressions *)
-          | TYPE_Function ret args _ => [lift failGen] (* These shouldn't exist, I think *)
-          | TYPE_Opaque            => [lift failGen] (* TODO: not sure what these should be... *)
-          | TYPE_Half              => [lift failGen]
+          | TYPE_Void              => [failGen] (* No void type expressions *)
+          | TYPE_Function ret args _ => [failGen] (* These shouldn't exist, I think *)
+          | TYPE_Opaque            => [failGen] (* TODO: not sure what these should be... *)
+          | TYPE_Half              => [failGen]
           | TYPE_Float             => [gen_fbinop_exp TYPE_Float]
-          | TYPE_Double            => [(*gen_fbinop_exp TYPE_Double*)lift failGen]
-          | TYPE_X86_fp80          => [lift failGen]
-          | TYPE_Fp128             => [lift failGen]
-          | TYPE_Ppc_fp128         => [lift failGen]
-          | TYPE_Metadata          => [lift failGen]
-          | TYPE_X86_mmx           => [lift failGen]
+          | TYPE_Double            => [(*gen_fbinop_exp TYPE_Double*)failGen]
+          | TYPE_X86_fp80          => [failGen]
+          | TYPE_Fp128             => [failGen]
+          | TYPE_Ppc_fp128         => [failGen]
+          | TYPE_Metadata          => [failGen]
+          | TYPE_X86_mmx           => [failGen]
           | TYPE_Identified id     =>
             [ctx <- get_ctx;;
              match find_pred (fun '(i,t) => if Ident.eq_dec id i then true else false) ctx with
-             | None => lift failGen
+             | None => failGen
              | Some (i,t) => gen_exp_size sz t
              end]
           end
@@ -1481,7 +1507,7 @@ Definition genType: G (typ) :=
        if (Handlers.LLVMEvents.DV.fop_is_div fbinop)
        then ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_exp_size 0 ty
        else ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_exp_size 0 ty
-       | _ => lift failGen
+       | _ => failGen
       end.
 
  Definition gen_exp (t : typ) : GenLLVM (exp typ)
@@ -1506,7 +1532,7 @@ Definition genType: G (typ) :=
               gen_ibinop_exp isz
             | TYPE_Float => gen_fbinop_exp TYPE_Float
             | TYPE_Double => gen_fbinop_exp TYPE_Double
-            | _ => lift failGen
+            | _ => failGen
             end).
 
   Definition gen_int_texp : GenLLVM (texp typ)
@@ -1637,7 +1663,7 @@ Section InstrGenerators.
     '(ptr_ident, ptr_typ) <- elems_LLVM ptrs_in_context;;
     match ptr_typ with
     | TYPE_Pointer t => ret (ptr_ident, t)
-    | _ => lift failGen (* Should not happen *)
+    | _ => failGen (* Should not happen *)
     end.
 
   Definition get_ctx_sized_ptr : GenLLVM (ident * typ) :=
@@ -1645,7 +1671,7 @@ Section InstrGenerators.
     '(ptr_ident, ptr_typ) <- elems_LLVM ptrs_in_context;;
     match ptr_typ with
     | TYPE_Pointer t => ret (ptr_ident, t)
-    | _ => lift failGen (* Should not happen *)
+    | _ => failGen (* Should not happen *)
     end.
 
   Definition get_ctx_agg_typs : GenLLVM (list (ident * typ)) :=
@@ -1670,7 +1696,7 @@ Section InstrGenerators.
     let get_typ_in_ptr (tptr : typ) :=
       match tptr with
       | TYPE_Pointer t => ret t
-      | _ => lift failGen
+      | _ => failGen
       end in
     t_in_ptr <- get_typ_in_ptr tptr;;
     eptr <- gen_exp_size 0 tptr;;
@@ -1945,7 +1971,7 @@ Section InstrGenerators.
                       args;;
         let args_with_params := map (fun arg => (arg, [])) args_texp in
         ret (ret_t, INSTR_Call (TYPE_Function ret_t args varargs, efun) args_with_params [])
-    | _ => lift failGen
+    | _ => failGen
     end.
 
   (* TODO: move this *)
@@ -1957,7 +1983,7 @@ Section InstrGenerators.
 
   (* TODO: move this. Also give a less confusing name because genOption is a thing? *)
   Definition gen_option {A} (g : G A) : G (option A)
-    := freq_ failGen [(1%nat, ret None); (7%nat, liftM Some g)].
+    := freq_ (ret None) [(1%nat, ret None); (7%nat, liftM Some g)].
 
   (* TODO: move these *)
   Definition opt_add_state {A} {ST} (st : ST) (o : option (A * ST)) : (option A * ST)
@@ -1967,15 +1993,15 @@ Section InstrGenerators.
        end.
 
   Definition gen_opt_LLVM {A} (g : GenLLVM A) : GenLLVM (option A)
-    := mkStateT
+    := mkOptionT (mkStateT
          (fun st =>
-            opt <- gen_option (runStateT g st);;
-            ret (opt_add_state st opt)).
+            opt <- gen_option (runStateT (unOptionT g) st);;
+            ret (opt_add_state st opt))).
 
   Definition get_typ_in_ptr (pt : typ) : GenLLVM typ :=
     match pt with
     | TYPE_Pointer t => ret t
-    | _ => lift failGen
+    | _ => failGen
     end.
 
   Definition gen_load (tptr : typ) : GenLLVM (typ * instr typ)
@@ -1994,7 +2020,7 @@ Section InstrGenerators.
         let val := (t, e) in
 
         ret (TYPE_Void, INSTR_Store val ptr [ANN_align 1])
-    | _ => lift failGen
+    | _ => failGen
     end.
 
   Definition gen_store (tptr : typ) : GenLLVM (typ * instr typ)

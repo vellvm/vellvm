@@ -199,19 +199,23 @@ Definition vellvm_agrees_with_clang_parallel (p : PROG) : Checker
 
 (** Basic property to make sure that Vellvm and Clang agree when they
     both produce values *)
-Definition vellvm_agrees_with_clang (p : PROG) : Checker
+Definition vellvm_agrees_with_clang (p : option PROG) : Checker
   :=
-  (* collect (show prog) *)
-  let '(Prog prog) := p in
-  let clang_res := run_llc prog in
-  let vellvm_res := interpret prog in
-  match clang_res, vellvm_res with
-  | DVALUE_I8 y, MlOk _ _ (DVALUE_I8 x) =>
-      if equ x y
-      then checker true
-      else whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false
-  | _, _ =>
-      whenFail ("Something else went wrong... Vellvm: " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
+  match p with
+  | None => checker false
+  | Some p => 
+      (* collect (show prog) *)
+      let '(Prog prog) := p in
+      let clang_res := run_llc prog in
+      let vellvm_res := interpret prog in
+      match clang_res, vellvm_res with
+      | DVALUE_I8 y, MlOk _ _ (DVALUE_I8 x) =>
+          if equ x y
+          then checker true
+          else whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false
+      | _, _ =>
+          whenFail ("Something else went wrong... Vellvm: " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
+      end
   end.
 
 (* Definition agrees := (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang). *)
