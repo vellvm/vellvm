@@ -221,8 +221,12 @@ Definition vellvm_agrees_with_clang (p : option PROG) : Checker
 (* Definition agrees := (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang). *)
 
 Extract Constant defNumTests    => "5000".
-QCInclude "../../ml/*".
-QCInclude "../../ml/libvellvm/*".
+
+(* SAZ: These paths are relative to where the coqc command that runs the extraction is executed. 
+   For invoking `make qc-tests` from the `/src` directory, we need these:
+*)
+QCInclude "ml/*".
+QCInclude "ml/libvellvm/*".
 
 
 (* QCInclude "../../ml/libvellvm/llvm_printer.ml". *)
