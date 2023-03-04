@@ -1,0 +1,34 @@
+name: Vellvm Test
+
+on:
+  - pull_request
+  - push
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - ubuntu-latest
+        ocaml-compiler:
+          - 4.14.0
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Use OCaml ${{ matrix.ocaml-compiler }}
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+
+      - run: |
+          opam install . --deps-only --with-doc --with-test
+          opam repo add coq-released http://coq.inria.fr/opam/released || true
+          make -C src/ pin-coq
+          make -C src/ opam
+          make -C /src test
