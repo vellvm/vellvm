@@ -31,4 +31,4 @@ jobs:
           opam repo add coq-released http://coq.inria.fr/opam/released || true
           make -C src/ pin-coq
           make -C src/ opam
-          make -C /src test
+          make -C src/ test
