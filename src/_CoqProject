@@ -1,8 +1,10 @@
 -R coq Vellvm
 
 # -arg -w -arg +default
-# -arg -w -arg -warning-to-silence1
-# -arg -w -arg -warning-to-silence1
+-arg -w -arg -masking-absolute-name
+-arg -w -arg -deprecated-hint-without-locality
+-arg -w -arg -deprecated-hint-rewrite-without-locality
+-arg -w -arg -require-in-module
 
 ./coq/Handlers/Global.v
 ./coq/Handlers/Intrinsics.v
