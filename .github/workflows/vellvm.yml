@@ -1,4 +1,4 @@
-name: Vellvm Test
+name: Vellvm Compilation Test
 
 on:
   - pull_request
@@ -10,25 +10,21 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - macos-latest
           - ubuntu-latest
-        ocaml-compiler:
-          - 4.14.0
+        coq_version:
+          - 8.15.2
+        ocaml_version:
+          - 4.14.0-flambda
 
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Use OCaml ${{ matrix.ocaml-compiler }}
-        uses: ocaml/setup-ocaml@v2
+      - name: Setup Build Environment
+        uses: coq-community/docker-coq-action@v1
         with:
-          ocaml-compiler: ${{ matrix.ocaml-compiler }}
-
-      - run: |
-          opam install . --deps-only --with-doc --with-test
-          opam repo add coq-released http://coq.inria.fr/opam/released || true
-          make -C src/ pin-coq
-          make -C src/ opam
-          make -C src/ test
+          opam_file: 'coq-vellvm.opam'
+          coq_version: ${{ matrix.coq_version }}
+          ocaml_version: ${{ matrix.ocaml_version }}
