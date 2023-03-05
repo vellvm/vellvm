@@ -10,7 +10,7 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-latest
+          - ubuntu-20.04
         coq_version:
           - 8.15.2
         ocaml_version:
@@ -22,7 +22,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Setup Build Environment
+      - name: Compiling Vellvm
         uses: coq-community/docker-coq-action@v1
         with:
           opam_file: 'coq-vellvm.opam'

@@ -31,7 +31,11 @@ The file `.github/workflows/vellvm.yml` specifies the CI testing.  It uses
 
 - [Docker-Coq Action](https://github.com/marketplace/actions/docker-coq-action)
 
+- see: [this list](https://hub.docker.com/r/coqorg/coq/) for available Coq + ocaml combinations
+
 - The file `coq-vellvm.opam` specifies the opam dependencies installed by the workflow.
+
+
 
 Since we need to maintain an `opam`-compatible build/deploy system, using that
 infrastructure for CI too makes sense.
