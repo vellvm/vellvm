@@ -1060,3 +1060,11 @@ Lemma in_map_In' :
 Proof.
   intros A B l; induction l; firstorder (subst; auto).
 Qed.
+
+Variant FalseT : Type := .
+
+Fixpoint InT {A} (a:A) (l:list A) : Type :=
+  match l with
+  | [] => FalseT
+  | b :: m => (b = a) + (InT a m)
+  end.
