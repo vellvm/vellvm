@@ -218,35 +218,35 @@ Proof.
 Qed.
 
 Lemma map_monad_InT_OOM_repeat_success :
-  forall {A B} sz x (f : forall (a : A), InT a (repeat x sz) -> OOM B) res y
-    (INx : InT x (repeat x sz)),
+  forall {A B} sz x (f : forall (a : A), InT a (repeat x sz) -> OOM B) res y,
     map_monad_InT (repeat x sz) f = ret res ->
-    f x INx = NoOom y ->
+    (forall INx : InT x (repeat x sz), f x INx = NoOom y) ->
     res = repeat y sz.
 Proof.
-  (* intros A B sz. *)
-  (* induction sz; intros x f res y INx MAP F. *)
-  (* - inv INx. *)
-  (* - cbn. *)
-  (*   unfold repeat in MAP. *)
-  (*   rewrite map_monad_InT_cons in MAP. *)
-  (*   cbn in MAP. *)
-  (*   cbn in *. *)
-  (*   assert (INx = inl eq_refl) by apply proof_irrelevance. *)
-  (*   subst. *)
-  (*   rewrite F in MAP. *)
-  (*   break_match_hyp; inv MAP. *)
-  (*   specialize (IHsz x). *)
-  (*   destruct sz. *)
-  (*   + cbn in *. inv Heqo. *)
-  (*     reflexivity. *)
-  (*   + eapply IHsz in Heqo. *)
-  (*     rewrite Heqo; eauto. *)
-  (*     erewrite (proof_irrelevance _ (or_introl eq_refl)) in F; eauto. *)
+  intros A B sz.
+  induction sz; intros x f res y MAP F.
+  - cbn in *.
+    inv MAP.
+    reflexivity.
+  - cbn.
+    unfold repeat in MAP.
+    rewrite map_monad_InT_cons in MAP.
+    cbn in MAP.
+    cbn in *.
+    break_match_hyp; inv MAP.
+    break_match_hyp; inv H0.
 
-  (*     Unshelve. *)
-  (*     cbn; auto. *)
-Admitted.
+    pose proof (F (inl eq_refl)).
+    setoid_rewrite Heqo in H.
+    inv H.
+
+    cbn.
+    erewrite <- IHsz; eauto.
+
+    intros INx.
+    cbn.
+    eauto.
+Qed.
 
 Lemma map_monad_InT_OOM_nil_inv :
   forall {A B : Type} (l : list A) (f : forall a : A, InT a l -> OOM B),
@@ -271,7 +271,7 @@ Proof.
   cbn.
   right.
   auto.
-Qed.
+Defined.
 
 Require Import FunctionalExtensionality.
 Lemma map_monad_InT_OOM_cons_inv :
@@ -294,25 +294,7 @@ Proof.
     exists (inl eq_refl).
     exists eq_refl.
     split; auto.
-    cbn.
-
-    assert ((fun (x : A) (HIn : InT x l) => f x (inr HIn)) =
-              (fun (a0 : A) (HIn : InT a0 l) => f a0 (InT_cons_right eq_refl HIn))).
-    { eapply functional_extensionality_dep.
-      intros x.
-      eapply functional_extensionality_dep.
-      intros x0.
-      assert (inr x0 = @InT_cons_right A (a :: l) x a l (@eq_refl (list A) (a :: l)) x0) as PROOFS.
-      { (* apply proof_irrelevance. *)
-        admit.
-      }
-
-      rewrite PROOFS.
-      reflexivity.
-    }
-    rewrite <- H.
-    auto.
-Admitted.
+Qed.
 
 Lemma InT_Nth :
   forall {X} xs (x : X),
