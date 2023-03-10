@@ -58,13 +58,316 @@ Import InterpFacts.
 Import MonadNotation.
 Import ListNotations.
 
+(* TODO: Move this *)
+Theorem repeat_spec_InT {X} n (x : X) y:
+  InT y (repeat x n) -> y=x.
+Proof.
+  induction n as [|k Hrec]; simpl; destruct 1; auto.
+Qed.
+
+(* TODO: Move this *)
+Lemma nth_error_InT {X} l n (x : X) : nth_error l n = Some x -> InT x l.
+Proof.
+  revert n. induction l as [|a l IH]; intros [|n]; simpl; try easy.
+  - injection 1; auto.
+  - eauto.
+Qed.
+
+Lemma Nth_InT :
+  forall {X} (xs : list X) i (x : X),
+    Util.Nth xs i x ->
+    InT x xs.
+Proof.
+  intros X xs i x NTH.
+  unfold Util.Nth in *.
+  eapply nth_error_InT; eauto.
+Qed.
+
+(* TODO: Move this *)
+Lemma list_sum_map_InT :
+  forall {X} (f : X -> nat) x xs,
+    InT x xs ->
+    (list_sum (map f xs) >= f x)%nat.
+Proof.
+  induction xs; intros In; [contradiction|].
+  destruct In; subst.
+  - cbn. lia.
+  - cbn. specialize (IHxs i).
+    unfold list_sum in IHxs.
+    lia.
+Qed.
+
+(* TODO: Move this *)
+Lemma In_InT :
+  forall {X} (x : X) xs,
+    InT x xs -> In x xs.
+Proof.
+  intros X x xs X0.
+  induction xs.
+  - inversion X0.
+  - cbn in *.
+    destruct X0; subst; auto.
+Qed.
+
+Lemma map_monad_InT {M : Type -> Type} `{HM : Monad M} {A B} (l : list A) (f: forall (x : A), InT x l -> M B) : M (list B).
+Proof.
+  induction l.
+  - exact (ret []).
+  - refine (b <- f a _;; bs <- IHl _;; ret (b::bs)).
+    + cbn; auto.
+    + intros x Hin.
+      apply (f x).
+      cbn; auto.
+Defined.
+
+Lemma map_monad_InT_unfold :
+  forall {M} `{HM : Monad M} {A B} (x : A) (xs : list A) (f : forall (elt:A), InT elt (x::xs) -> M B),
+    map_monad_InT (x::xs) f = b <- f x (inl eq_refl);;
+                             bs <- map_monad_InT xs (fun x HIn => f x (inr HIn));;
+                             ret (b :: bs).
+Proof.
+  intros M HM A B x xs f.
+  induction xs; cbn; auto.
+Qed.
+
+Lemma map_monad_InT_cons
+  {M} `{MM : Monad M}
+  {A B} l (x:A) (f: forall (a : A), InT a (x::l) -> M B) :
+  (map_monad_InT (x::l) f) =
+    (b <- f x (inl eq_refl);;
+     bs2 <- map_monad_InT l (fun x HIn => f x (inr HIn));;
+     ret (b :: bs2)).
+Proof.
+  reflexivity.
+Qed.
+
+Lemma map_monad_map_monad_InT :
+  forall {M} {A B} `{HM : Monad M} xs (f : A -> M B),
+    @map_monad M HM A B f xs = @map_monad_InT M HM A B xs (fun x HIn => f x).
+Proof.
+  intros M A B HM xs.
+  induction xs; intros f.
+  - cbn. reflexivity.
+  - rewrite map_monad_unfold, map_monad_InT_cons.
+    rewrite IHxs.
+    reflexivity.
+Qed.
+
+Lemma map_monad_InT_OOM_fail :
+  forall {A B} l (f : forall (a : A), InT a l -> OOM B) b,
+    map_monad_InT l f = Oom b ->
+    exists a (HIn : InT a l), f a HIn = Oom b.
+Proof.
+  intros A B l f b MAP.
+  generalize dependent b.
+  generalize dependent l.
+  induction l; intros f b MAP.
+  - cbn in MAP.
+    inv MAP.
+  - rewrite map_monad_InT_cons in MAP.
+    cbn in *.
+    destruct (f a (inl eq_refl)) eqn:Hfa; inv MAP;
+      setoid_rewrite Hfa in H0; inv H0.
+    + rename H1 into MAP.
+      destruct (map_monad_InT l (fun (x : A) (HIn : InT x l) => f x (inr HIn))) eqn:HMAP; inv MAP.
+      specialize (IHl (fun (x : A) (HIn : InT x l) => f x (inr HIn)) b HMAP) as [a' [IN FA]].
+      exists a'. exists (inr IN). auto.
+    + exists a. exists (inl eq_refl). auto.
+Qed.
+
+Lemma map_monad_InT_OOM_failT :
+  forall {A B} l (f : forall (a : A), InT a l -> OOM B) b,
+    map_monad_InT l f = Oom b ->
+    {a & {HIn : InT a l & f a HIn = Oom b}}.
+Proof.
+  intros A B l f b MAP.
+  generalize dependent b.
+  generalize dependent l.
+  induction l; intros f b MAP.
+  - cbn in MAP.
+    inv MAP.
+  - rewrite map_monad_InT_cons in MAP.
+    cbn in *.
+    destruct (f a (inl eq_refl)) eqn:Hfa; inv MAP;
+      setoid_rewrite Hfa in H0; inv H0.
+    + rename H1 into MAP.
+      destruct (map_monad_InT l (fun (x : A) (HIn : InT x l) => f x (inr HIn))) eqn:HMAP; inv MAP.
+      specialize (IHl (fun (x : A) (HIn : InT x l) => f x (inr HIn)) b HMAP) as [a' [IN FA]].
+      exists a'. exists (inr IN). auto.
+    + exists a. exists (inl eq_refl). auto.
+Qed.
+
+Lemma map_monad_InT_OOM_succeeds' :
+  forall {A B} l (f : forall (a : A), InT a l -> OOM B) res,
+    map_monad_InT l f = ret res ->
+    (forall a (HIn : InT a l), exists b, f a HIn = ret b).
+Proof.
+  intros A B.
+  induction l; intros f res MAP.
+  - intros _ [].
+  - rewrite map_monad_InT_cons in MAP.
+    cbn in *.
+    break_match_hyp; inv MAP.
+    rename H0 into MAP.
+    break_match_hyp; inv MAP.
+
+    intros a0 [HIn | HIn]; subst.
+    + exists b; auto.
+    + apply IHl with (a:=a0) (HIn:=HIn) in Heqo0.
+      auto.
+Qed.
+
+Lemma map_monad_InT_OOM_repeat_success :
+  forall {A B} sz x (f : forall (a : A), InT a (repeat x sz) -> OOM B) res y
+    (INx : InT x (repeat x sz)),
+    map_monad_InT (repeat x sz) f = ret res ->
+    f x INx = NoOom y ->
+    res = repeat y sz.
+Proof.
+  (* intros A B sz. *)
+  (* induction sz; intros x f res y INx MAP F. *)
+  (* - inv INx. *)
+  (* - cbn. *)
+  (*   unfold repeat in MAP. *)
+  (*   rewrite map_monad_InT_cons in MAP. *)
+  (*   cbn in MAP. *)
+  (*   cbn in *. *)
+  (*   assert (INx = inl eq_refl) by apply proof_irrelevance. *)
+  (*   subst. *)
+  (*   rewrite F in MAP. *)
+  (*   break_match_hyp; inv MAP. *)
+  (*   specialize (IHsz x). *)
+  (*   destruct sz. *)
+  (*   + cbn in *. inv Heqo. *)
+  (*     reflexivity. *)
+  (*   + eapply IHsz in Heqo. *)
+  (*     rewrite Heqo; eauto. *)
+  (*     erewrite (proof_irrelevance _ (or_introl eq_refl)) in F; eauto. *)
+
+  (*     Unshelve. *)
+  (*     cbn; auto. *)
+Admitted.
+
+Lemma map_monad_InT_OOM_nil_inv :
+  forall {A B : Type} (l : list A) (f : forall a : A, InT a l -> OOM B),
+    map_monad_InT l f = ret [] -> l = [].
+Proof.
+  intros A B l f H.
+  induction l; auto.
+
+  rewrite map_monad_InT_cons in H.
+  cbn in H.
+  break_match_hyp; inv H.
+  break_match_hyp; inv H1.
+Qed.
+
+Lemma InT_cons_right :
+  forall {A} {l : list A} {a x xs}
+    (EQ : l = x :: xs) (HIn : InT a xs),
+    InT a l.
+Proof.
+  intros A l x xs EQ a HIn.
+  subst.
+  cbn.
+  right.
+  auto.
+Qed.
+
+Require Import FunctionalExtensionality.
+Lemma map_monad_InT_OOM_cons_inv :
+  forall {A B : Type} (l : list A) (f : forall a : A, InT a l -> OOM B) r res,
+    map_monad_InT l f = ret (r :: res) ->
+    exists x xs HInx (EQ : l = x :: xs),
+      f x HInx = ret r /\
+        map_monad_InT xs (fun a HIn => f a (InT_cons_right EQ HIn)) = ret res.
+Proof.
+  intros A B l.
+  induction l; intros f r res H.
+  - cbn in *.
+    inv H.
+  - rewrite map_monad_InT_cons in H.
+    cbn in H.
+    break_match_hyp; inv H.
+    break_match_hyp; inv H1.
+    exists a.
+    exists l.
+    exists (inl eq_refl).
+    exists eq_refl.
+    split; auto.
+    cbn.
+
+    assert ((fun (x : A) (HIn : InT x l) => f x (inr HIn)) =
+              (fun (a0 : A) (HIn : InT a0 l) => f a0 (InT_cons_right eq_refl HIn))).
+    { eapply functional_extensionality_dep.
+      intros x.
+      eapply functional_extensionality_dep.
+      intros x0.
+      assert (inr x0 = @InT_cons_right A (a :: l) x a l (@eq_refl (list A) (a :: l)) x0) as PROOFS.
+      { (* apply proof_irrelevance. *)
+        admit.
+      }
+
+      rewrite PROOFS.
+      reflexivity.
+    }
+    rewrite <- H.
+    auto.
+Admitted.
+
+Lemma InT_Nth :
+  forall {X} xs (x : X),
+    InT x xs -> exists i, Util.Nth xs i x.
+Proof.
+  induction xs; intros x IN.
+  - inversion IN.
+  - destruct IN; subst.
+    + exists (0%nat). cbn. auto.
+    + apply IHxs in i as [i H].
+      exists (S i).
+      cbn; auto.
+Qed.
+
 Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF).
   Import AC.
 
   Module DV1 := Events1.DV.
   Module DV2 := Events2.DV.
 
-  Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia | DV1.solve_dvalue_measure | DV1.solve_uvalue_measure].
+  (* TODO: Move into Dvalue *)
+  Ltac solve_dvalue_measure :=
+    match goal with
+    | Hin : In ?e ?fields |- context [DV1.dvalue_measure _]
+      => pose proof list_sum_map DV1.dvalue_measure _ _ Hin;
+        cbn; lia
+    | Hin : InT ?e ?fields |- context [DV1.dvalue_measure _]
+      => pose proof list_sum_map_InT DV1.dvalue_measure _ _ Hin;
+        cbn; lia
+    | H: Some ?f = List.nth_error ?fields _ |- context [DV1.dvalue_measure ?f]
+      => symmetry in H; apply nth_error_In in H;
+        pose proof list_sum_map DV1.dvalue_measure _ _ H;
+        cbn; lia
+    end.
+
+  Ltac solve_uvalue_measure :=
+    cbn;
+    first [ lia
+          | match goal with
+            | _ : _ |- context [(DV1.uvalue_measure ?t + fold_right _ _ _)%nat]
+              => pose proof (DV1.uvalue_measure_gt_0 t); unfold list_sum; lia
+            end
+          | match goal with
+            | HIn : In ?x ?xs |- context [ list_sum (map ?f _)] =>
+                pose proof (list_sum_map f x xs HIn)
+            end;
+            cbn in *; lia
+          | match goal with
+            | HIn : InT ?x ?xs |- context [ list_sum (map ?f _)] =>
+                pose proof (list_sum_map_InT f x xs HIn)
+            end;
+            cbn in *; lia
+      ].
+
+  Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia | solve_dvalue_measure | solve_uvalue_measure].
 
   Program Fixpoint dvalue_convert_lazy (dv1 : DV1.dvalue) {measure (DV1.dvalue_measure dv1)} : DV2.dvalue
     := match dv1 with
@@ -354,8 +657,8 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
   Obligation Tactic :=
     try Tactics.program_simpl;
   try solve [ cbn; try lia
-            | DV1.solve_dvalue_measure
-            | DV1.solve_uvalue_measure
+            | solve_dvalue_measure
+            | solve_uvalue_measure
             | repeat split;
               intros * [CONTRA1 CONTRA2];
               solve [ inv CONTRA1
@@ -623,16 +926,16 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
        | DV1.DVALUE_Poison t => ret (DV2.DVALUE_Poison t)
        | DV1.DVALUE_None => ret DV2.DVALUE_None
        | DV1.DVALUE_Struct fields =>
-           fields' <- map_monad_In fields (fun elt Hin => dvalue_convert_strict elt);;
+           fields' <- map_monad_InT fields (fun elt Hin => dvalue_convert_strict elt);;
            ret (DV2.DVALUE_Struct fields')
        | DV1.DVALUE_Packed_struct fields =>
-           fields' <- map_monad_In fields (fun elt Hin => dvalue_convert_strict elt);;
+           fields' <- map_monad_InT fields (fun elt Hin => dvalue_convert_strict elt);;
            ret (DV2.DVALUE_Packed_struct fields')
        | DV1.DVALUE_Array elts =>
-           elts' <- map_monad_In elts (fun elt Hin => dvalue_convert_strict elt);;
+           elts' <- map_monad_InT elts (fun elt Hin => dvalue_convert_strict elt);;
            ret (DV2.DVALUE_Array elts')
        | DV1.DVALUE_Vector elts =>
-           elts' <- map_monad_In elts (fun elt Hin => dvalue_convert_strict elt);;
+           elts' <- map_monad_InT elts (fun elt Hin => dvalue_convert_strict elt);;
            ret (DV2.DVALUE_Vector elts')
        end.
 
@@ -655,16 +958,16 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
        | DV1.UVALUE_Poison t => ret (DV2.UVALUE_Poison t)
        | DV1.UVALUE_None => ret DV2.UVALUE_None
        | DV1.UVALUE_Struct fields =>
-           fields' <- map_monad_In fields (fun elt Hin => uvalue_convert_strict elt);;
+           fields' <- map_monad_InT fields (fun elt Hin => uvalue_convert_strict elt);;
            ret (DV2.UVALUE_Struct fields')
        | DV1.UVALUE_Packed_struct fields =>
-           fields' <- map_monad_In fields (fun elt Hin => uvalue_convert_strict elt);;
+           fields' <- map_monad_InT fields (fun elt Hin => uvalue_convert_strict elt);;
            ret (DV2.UVALUE_Packed_struct fields')
        | DV1.UVALUE_Array elts =>
-           elts' <- map_monad_In elts (fun elt Hin => uvalue_convert_strict elt);;
+           elts' <- map_monad_InT elts (fun elt Hin => uvalue_convert_strict elt);;
            ret (DV2.UVALUE_Array elts')
        | DV1.UVALUE_Vector elts =>
-           elts' <- map_monad_In elts (fun elt Hin => uvalue_convert_strict elt);;
+           elts' <- map_monad_InT elts (fun elt Hin => uvalue_convert_strict elt);;
            ret (DV2.UVALUE_Vector elts')
        | DV1.UVALUE_Undef dt =>
            (* Could be a bit odd with intptr *)
@@ -690,7 +993,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
            ret (DV2.UVALUE_Conversion conv t_from v' t_to)
        | DV1.UVALUE_GetElementPtr t ptrval idxs =>
            ptrval' <- uvalue_convert_strict ptrval;;
-           idxs' <- map_monad_In idxs (fun elt Hin => uvalue_convert_strict elt);;
+           idxs' <- map_monad_InT idxs (fun elt Hin => uvalue_convert_strict elt);;
            ret (DV2.UVALUE_GetElementPtr t ptrval' idxs')
        | DV1.UVALUE_ExtractElement t vec idx =>
            vec' <- uvalue_convert_strict vec;;
@@ -723,7 +1026,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
            idx' <- uvalue_convert_strict idx;;
            ret (DV2.UVALUE_ExtractByte uv' dt idx' sid)
        | DV1.UVALUE_ConcatBytes uvs dt =>
-           uvs' <- map_monad_In uvs (fun elt Hin => uvalue_convert_strict elt);;
+           uvs' <- map_monad_InT uvs (fun elt Hin => uvalue_convert_strict elt);;
            ret (DV2.UVALUE_ConcatBytes uvs' dt)
        end.
 
@@ -749,16 +1052,16 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         | DV1.DVALUE_Poison t => ret (DV2.DVALUE_Poison t)
         | DV1.DVALUE_None => ret DV2.DVALUE_None
         | DV1.DVALUE_Struct fields =>
-            fields' <- map_monad_In fields (fun elt Hin => dvalue_convert_strict elt);;
+            fields' <- map_monad_InT fields (fun elt Hin => dvalue_convert_strict elt);;
             ret (DV2.DVALUE_Struct fields')
         | DV1.DVALUE_Packed_struct fields =>
-            fields' <- map_monad_In fields (fun elt Hin => dvalue_convert_strict elt);;
+            fields' <- map_monad_InT fields (fun elt Hin => dvalue_convert_strict elt);;
             ret (DV2.DVALUE_Packed_struct fields')
         | DV1.DVALUE_Array elts =>
-            elts' <- map_monad_In elts (fun elt Hin => dvalue_convert_strict elt);;
+            elts' <- map_monad_InT elts (fun elt Hin => dvalue_convert_strict elt);;
             ret (DV2.DVALUE_Array elts')
         | DV1.DVALUE_Vector elts =>
-            elts' <- map_monad_In elts (fun elt Hin => dvalue_convert_strict elt);;
+            elts' <- map_monad_InT elts (fun elt Hin => dvalue_convert_strict elt);;
             ret (DV2.DVALUE_Vector elts')
         end.
   Proof.
@@ -790,16 +1093,16 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         | DV1.UVALUE_Poison t => ret (DV2.UVALUE_Poison t)
         | DV1.UVALUE_None => ret DV2.UVALUE_None
         | DV1.UVALUE_Struct fields =>
-            fields' <- map_monad_In fields (fun elt Hin => uvalue_convert_strict elt);;
+            fields' <- map_monad_InT fields (fun elt Hin => uvalue_convert_strict elt);;
             ret (DV2.UVALUE_Struct fields')
         | DV1.UVALUE_Packed_struct fields =>
-            fields' <- map_monad_In fields (fun elt Hin => uvalue_convert_strict elt);;
+            fields' <- map_monad_InT fields (fun elt Hin => uvalue_convert_strict elt);;
             ret (DV2.UVALUE_Packed_struct fields')
         | DV1.UVALUE_Array elts =>
-            elts' <- map_monad_In elts (fun elt Hin => uvalue_convert_strict elt);;
+            elts' <- map_monad_InT elts (fun elt Hin => uvalue_convert_strict elt);;
             ret (DV2.UVALUE_Array elts')
         | DV1.UVALUE_Vector elts =>
-            elts' <- map_monad_In elts (fun elt Hin => uvalue_convert_strict elt);;
+            elts' <- map_monad_InT elts (fun elt Hin => uvalue_convert_strict elt);;
             ret (DV2.UVALUE_Vector elts')
         | DV1.UVALUE_Undef dt =>
             (* Could be a bit odd with intptr *)
@@ -825,7 +1128,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
             ret (DV2.UVALUE_Conversion conv t_from v' t_to)
         | DV1.UVALUE_GetElementPtr t ptrval idxs =>
             ptrval' <- uvalue_convert_strict ptrval;;
-            idxs' <- map_monad_In idxs (fun elt Hin => uvalue_convert_strict elt);;
+            idxs' <- map_monad_InT idxs (fun elt Hin => uvalue_convert_strict elt);;
             ret (DV2.UVALUE_GetElementPtr t ptrval' idxs')
         | DV1.UVALUE_ExtractElement t vec idx =>
             vec' <- uvalue_convert_strict vec;;
@@ -858,7 +1161,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
             idx' <- uvalue_convert_strict idx;;
             ret (DV2.UVALUE_ExtractByte uv' dt idx' sid)
         | DV1.UVALUE_ConcatBytes uvs dt =>
-            uvs' <- map_monad_In uvs (fun elt Hin => uvalue_convert_strict elt);;
+            uvs' <- map_monad_InT uvs (fun elt Hin => uvalue_convert_strict elt);;
             ret (DV2.UVALUE_ConcatBytes uvs' dt)
         end.
   Proof.
@@ -1404,8 +1707,8 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         + cbn in *.
           inv Heqo0; inv Heqo.
           reflexivity.
-        + rewrite map_cons, map_monad_In_unfold in Heqo.
-          rewrite map_monad_In_unfold in Heqo0.
+        + rewrite map_cons, map_monad_InT_unfold in Heqo.
+          rewrite map_monad_InT_unfold in Heqo0.
           cbn in *.
 
           destruct (dvalue_convert_strict a) eqn:CONVA; inv Heqo0.
@@ -1430,24 +1733,24 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
           inv IHfields.
           auto.
       - cbn.
-        eapply map_monad_In_OOM_fail in Heqo.
+        eapply map_monad_InT_OOM_fail in Heqo.
         destruct Heqo as [a [INA Heqo]].
 
         pose proof INA as INA'.
-        apply In_Nth in INA' as [i NTHA].
+        apply InT_Nth in INA' as [i NTHA].
         pose proof NTHA as NTHA'.
         apply Nth_map_iff in NTHA'.
         destruct NTHA' as [x [A NTHX]].
         pose proof NTHX as INX.
-        apply Util.Nth_In in INX.
+        apply Nth_InT in INX.
 
         pose proof Heqo0 as SUC.
-        apply map_monad_In_OOM_succeeds' with (a:=x) in SUC; auto.
+        apply map_monad_InT_OOM_succeeds' with (a:=x) in SUC; auto.
         destruct SUC as [b CONVX].
 
         setoid_rewrite dvalue_refine_strict_equation in H.
         pose proof H as IH.
-        specialize (H x INX b CONVX).
+        specialize (H x (In_InT _ _ INX) b CONVX).
 
         rewrite A in H.
         rewrite uvalue_refine_strict_equation in H.
@@ -1461,8 +1764,8 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         + cbn in *.
           inv Heqo0; inv Heqo.
           reflexivity.
-        + rewrite map_cons, map_monad_In_unfold in Heqo.
-          rewrite map_monad_In_unfold in Heqo0.
+        + rewrite map_cons, map_monad_InT_unfold in Heqo.
+          rewrite map_monad_InT_unfold in Heqo0.
           cbn in *.
 
           destruct (dvalue_convert_strict a) eqn:CONVA; inv Heqo0.
@@ -1488,24 +1791,24 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
           auto.
       - cbn.
 
-        eapply map_monad_In_OOM_fail in Heqo.
+        eapply map_monad_InT_OOM_fail in Heqo.
         destruct Heqo as [a [INA Heqo]].
 
         pose proof INA as INA'.
-        apply In_Nth in INA' as [i NTHA].
+        apply InT_Nth in INA' as [i NTHA].
         pose proof NTHA as NTHA'.
         apply Nth_map_iff in NTHA'.
         destruct NTHA' as [x [A NTHX]].
         pose proof NTHX as INX.
-        apply Util.Nth_In in INX.
+        apply Nth_InT in INX.
 
         pose proof Heqo0 as SUC.
-        apply map_monad_In_OOM_succeeds' with (a:=x) in SUC; auto.
+        apply map_monad_InT_OOM_succeeds' with (a:=x) in SUC; auto.
         destruct SUC as [b CONVX].
 
         setoid_rewrite dvalue_refine_strict_equation in H.
         pose proof H as IH.
-        specialize (H x INX b CONVX).
+        specialize (H x (In_InT _ _ INX) b CONVX).
 
         rewrite A in H.
         rewrite uvalue_refine_strict_equation in H.
@@ -1519,8 +1822,8 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         + cbn in *.
           inv Heqo0; inv Heqo.
           reflexivity.
-        + rewrite map_cons, map_monad_In_unfold in Heqo.
-          rewrite map_monad_In_unfold in Heqo0.
+        + rewrite map_cons, map_monad_InT_unfold in Heqo.
+          rewrite map_monad_InT_unfold in Heqo0.
           cbn in *.
 
           destruct (dvalue_convert_strict a) eqn:CONVA; inv Heqo0.
@@ -1546,24 +1849,24 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
           auto.
       - cbn.
 
-        eapply map_monad_In_OOM_fail in Heqo.
+        eapply map_monad_InT_OOM_fail in Heqo.
         destruct Heqo as [a [INA Heqo]].
 
         pose proof INA as INA'.
-        apply In_Nth in INA' as [i NTHA].
+        apply InT_Nth in INA' as [i NTHA].
         pose proof NTHA as NTHA'.
         apply Nth_map_iff in NTHA'.
         destruct NTHA' as [x [A NTHX]].
         pose proof NTHX as INX.
-        apply Util.Nth_In in INX.
+        apply Nth_InT in INX.
 
         pose proof Heqo0 as SUC.
-        apply map_monad_In_OOM_succeeds' with (a:=x) in SUC; auto.
+        apply map_monad_InT_OOM_succeeds' with (a:=x) in SUC; auto.
         destruct SUC as [b CONVX].
 
         setoid_rewrite dvalue_refine_strict_equation in H.
         pose proof H as IH.
-        specialize (H x INX b CONVX).
+        specialize (H x (In_InT _ _ INX) b CONVX).
 
         rewrite A in H.
         rewrite uvalue_refine_strict_equation in H.
@@ -1577,8 +1880,8 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         + cbn in *.
           inv Heqo0; inv Heqo.
           reflexivity.
-        + rewrite map_cons, map_monad_In_unfold in Heqo.
-          rewrite map_monad_In_unfold in Heqo0.
+        + rewrite map_cons, map_monad_InT_unfold in Heqo.
+          rewrite map_monad_InT_unfold in Heqo0.
           cbn in *.
 
           destruct (dvalue_convert_strict a) eqn:CONVA; inv Heqo0.
@@ -1604,24 +1907,24 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
           auto.
       - cbn.
 
-        eapply map_monad_In_OOM_fail in Heqo.
+        eapply map_monad_InT_OOM_fail in Heqo.
         destruct Heqo as [a [INA Heqo]].
 
         pose proof INA as INA'.
-        apply In_Nth in INA' as [i NTHA].
+        apply InT_Nth in INA' as [i NTHA].
         pose proof NTHA as NTHA'.
         apply Nth_map_iff in NTHA'.
         destruct NTHA' as [x [A NTHX]].
         pose proof NTHX as INX.
-        apply Util.Nth_In in INX.
+        apply Nth_InT in INX.
 
         pose proof Heqo0 as SUC.
-        apply map_monad_In_OOM_succeeds' with (a:=x) in SUC; auto.
+        apply map_monad_InT_OOM_succeeds' with (a:=x) in SUC; auto.
         destruct SUC as [b CONVX].
 
         setoid_rewrite dvalue_refine_strict_equation in H.
         pose proof H as IH.
-        specialize (H x INX b CONVX).
+        specialize (H x (In_InT _ _ INX) b CONVX).
 
         rewrite A in H.
         rewrite uvalue_refine_strict_equation in H.
@@ -1779,7 +2082,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         ].
 
     - (* Structs *)
-      rewrite map_monad_In_cons in UVC.
+      rewrite map_monad_InT_cons in UVC.
       cbn in UVC.
       subst.
       break_match_hyp; inv UVC.
@@ -1801,7 +2104,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       + rewrite IHuv with (b:=false); auto.
 
     - (* Packed Structs *)
-      rewrite map_monad_In_cons in UVC.
+      rewrite map_monad_InT_cons in UVC.
       cbn in UVC.
       subst.
       break_match_hyp; inv UVC.
@@ -1823,7 +2126,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       + rewrite IHuv with (b:=false); auto.
 
     - (* Arrays *)
-      rewrite map_monad_In_cons in UVC.
+      rewrite map_monad_InT_cons in UVC.
       cbn in UVC.
       subst.
       break_match_hyp; inv UVC.
@@ -1845,7 +2148,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       + rewrite IHuv with (b:=false); auto.
 
     - (* Vectors *)
-      rewrite map_monad_In_cons in UVC.
+      rewrite map_monad_InT_cons in UVC.
       cbn in UVC.
       subst.
       break_match_hyp; inv UVC.
@@ -1912,7 +2215,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         ])].
     - (* Structures *)
       unfold_uvalue_refine_strict.
-      rewrite map_monad_In_cons in CONV.
+      rewrite map_monad_InT_cons in CONV.
       cbn in CONV.
 
       cbn in UV1.
@@ -1966,7 +2269,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         cbn in DV2REF.
         break_match_hyp; inv DV2REF.
         unfold_dvalue_refine_strict_goal.
-        rewrite map_monad_In_cons.
+        rewrite map_monad_InT_cons.
         cbn.
         rewrite DCREF.
         rewrite Heqo.
@@ -1974,7 +2277,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       }
     - (* Packed structures *)
       unfold_uvalue_refine_strict.
-      rewrite map_monad_In_cons in CONV.
+      rewrite map_monad_InT_cons in CONV.
       cbn in CONV.
 
       cbn in UV1.
@@ -2028,7 +2331,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         cbn in DV2REF.
         break_match_hyp; inv DV2REF.
         unfold_dvalue_refine_strict_goal.
-        rewrite map_monad_In_cons.
+        rewrite map_monad_InT_cons.
         cbn.
         rewrite DCREF.
         rewrite Heqo.
@@ -2041,7 +2344,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       break_match_hyp; inv H0.
 
       unfold_uvalue_refine_strict.
-      rewrite map_monad_In_cons in CONV.
+      rewrite map_monad_InT_cons in CONV.
       cbn in CONV.
 
       break_match_hyp; inv CONV.
@@ -2071,7 +2374,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       break_match_hyp; inv U2Ddvs.
       eexists; split; auto.
       unfold_dvalue_refine_strict_goal.
-      rewrite map_monad_In_cons.
+      rewrite map_monad_InT_cons.
       cbn.
       rewrite DV2REF.
       unfold_dvalue_refine_strict_in DVSREF.
@@ -2085,7 +2388,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       break_match_hyp; inv H0.
 
       unfold_uvalue_refine_strict.
-      rewrite map_monad_In_cons in CONV.
+      rewrite map_monad_InT_cons in CONV.
       cbn in CONV.
 
       break_match_hyp; inv CONV.
@@ -2115,7 +2418,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       break_match_hyp; inv U2Ddvs.
       eexists; split; auto.
       unfold_dvalue_refine_strict_goal.
-      rewrite map_monad_In_cons.
+      rewrite map_monad_InT_cons.
       cbn.
       rewrite DV2REF.
       unfold_dvalue_refine_strict_in DVSREF.
@@ -2166,7 +2469,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         ].
     - (* Structures *)
       unfold_uvalue_refine_strict.
-      rewrite map_monad_In_cons in CONV.
+      rewrite map_monad_InT_cons in CONV.
       cbn in CONV.
       cbn in UV1.
       break_match_hyp; inv UV1.
@@ -2217,7 +2520,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         inv H.
     - (* Packed structures *)
       unfold_uvalue_refine_strict.
-      rewrite map_monad_In_cons in CONV.
+      rewrite map_monad_InT_cons in CONV.
       cbn in CONV.
       cbn in UV1.
       break_match_hyp; inv UV1.
@@ -2271,7 +2574,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       break_match_hyp; inv UV1.
       break_match_hyp; inv Heqs.
       + unfold_uvalue_refine_strict.
-        rewrite map_monad_In_cons in CONV.
+        rewrite map_monad_InT_cons in CONV.
         cbn in *.
         break_match_hyp; inv CONV.
         break_match_hyp; inv Heqo.
@@ -2284,7 +2587,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         eexists; reflexivity.
       + break_match_hyp; inv H0.
         unfold_uvalue_refine_strict.
-        rewrite map_monad_In_cons in CONV.
+        rewrite map_monad_InT_cons in CONV.
         cbn in *.
         break_match_hyp; inv CONV.
         break_match_hyp; inv Heqo.
@@ -2312,7 +2615,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       break_match_hyp; inv UV1.
       break_match_hyp; inv Heqs.
       + unfold_uvalue_refine_strict.
-        rewrite map_monad_In_cons in CONV.
+        rewrite map_monad_InT_cons in CONV.
         cbn in *.
         break_match_hyp; inv CONV.
         break_match_hyp; inv Heqo.
@@ -2325,7 +2628,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         eexists; reflexivity.
       + break_match_hyp; inv H0.
         unfold_uvalue_refine_strict.
-        rewrite map_monad_In_cons in CONV.
+        rewrite map_monad_InT_cons in CONV.
         cbn in *.
         break_match_hyp; inv CONV.
         break_match_hyp; inv Heqo.
@@ -2481,9 +2784,9 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       cbn.
       break_match.
       2: {
-        apply map_monad_In_OOM_fail in Heqo.
+        apply map_monad_InT_OOM_fail in Heqo.
         destruct Heqo as [a [IN CONVa]].
-        apply repeat_spec in IN; subst.
+        apply repeat_spec_InT in IN; subst.
         rewrite REFv2 in CONVa.
         inv CONVa.
       }
@@ -2491,7 +2794,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       destruct (N.to_nat sz).
       + cbn in *.
         inv Heqo; auto.
-      + apply map_monad_In_OOM_repeat_success with (y:=v2) in Heqo; cbn; auto.
+      + apply map_monad_InT_OOM_repeat_success with (y:=v2) in Heqo; cbn; auto.
         cbn in *.
         subst.
         auto.
@@ -2522,7 +2825,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       eexists; split; eauto.
 
       unfold_dvalue_refine_strict_goal.
-      rewrite map_monad_In_cons.
+      rewrite map_monad_InT_cons.
       cbn.
       rewrite REFv2.
 
@@ -2556,7 +2859,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       eexists; split; eauto.
 
       unfold_dvalue_refine_strict_goal.
-      rewrite map_monad_In_cons.
+      rewrite map_monad_InT_cons.
       cbn.
       rewrite REFv2.
 
@@ -2574,9 +2877,9 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         cbn.
         break_match.
         2: {
-          apply map_monad_In_OOM_fail in Heqo.
+          apply map_monad_InT_OOM_fail in Heqo.
           destruct Heqo as [a [IN CONVa]].
-          apply repeat_spec in IN; subst.
+          apply repeat_spec_InT in IN; subst.
           rewrite REFv2 in CONVa.
           inv CONVa.
         }
@@ -2584,7 +2887,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         destruct (N.to_nat sz).
         + cbn in *.
           inv Heqo; auto.
-        + apply map_monad_In_OOM_repeat_success with (y:=v2) in Heqo; cbn; auto.
+        + apply map_monad_InT_OOM_repeat_success with (y:=v2) in Heqo; cbn; auto.
           cbn in *.
           subst.
           auto.
@@ -2595,9 +2898,9 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         cbn.
         break_match.
         2: {
-          apply map_monad_In_OOM_fail in Heqo.
+          apply map_monad_InT_OOM_fail in Heqo.
           destruct Heqo as [a [IN CONVa]].
-          apply repeat_spec in IN; subst.
+          apply repeat_spec_InT in IN; subst.
           rewrite dvalue_convert_strict_equation in *.
           cbn in *.
           rewrite addr_convert_null in CONVa; inv CONVa.
@@ -2606,7 +2909,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         destruct (N.to_nat sz).
         + cbn in *.
           inv Heqo; auto.
-        + apply map_monad_In_OOM_repeat_success with (y:=DV2.DVALUE_Addr LP2.ADDR.null) in Heqo; cbn; auto.
+        + apply map_monad_InT_OOM_repeat_success with (y:=DV2.DVALUE_Addr LP2.ADDR.null) in Heqo; cbn; auto.
           cbn in *.
           subst.
           auto.
@@ -2619,9 +2922,9 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         cbn.
         break_match.
         2: {
-          apply map_monad_In_OOM_fail in Heqo.
+          apply map_monad_InT_OOM_fail in Heqo.
           destruct Heqo as [a [IN CONVa]].
-          apply repeat_spec in IN; subst.
+          apply repeat_spec_InT in IN; subst.
           rewrite dvalue_convert_strict_equation in *.
           cbn in *.
           inv CONVa.
@@ -2630,7 +2933,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         destruct (N.to_nat sz).
         + cbn in *.
           inv Heqo; auto.
-        + apply map_monad_In_OOM_repeat_success with (y:=DV2.DVALUE_Float Floats.Float32.zero) in Heqo; cbn; auto.
+        + apply map_monad_InT_OOM_repeat_success with (y:=DV2.DVALUE_Float Floats.Float32.zero) in Heqo; cbn; auto.
           cbn in *.
           subst.
           auto.
@@ -2641,9 +2944,9 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         cbn.
         break_match.
         2: {
-          apply map_monad_In_OOM_fail in Heqo.
+          apply map_monad_InT_OOM_fail in Heqo.
           destruct Heqo as [a [IN CONVa]].
-          apply repeat_spec in IN; subst.
+          apply repeat_spec_InT in IN; subst.
           rewrite dvalue_convert_strict_equation in *.
           cbn in *.
           inv CONVa.
@@ -2652,7 +2955,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         destruct (N.to_nat sz).
         + cbn in *.
           inv Heqo; auto.
-        + apply map_monad_In_OOM_repeat_success with (y:=DV2.DVALUE_Double (Floats.Float32.to_double Floats.Float32.zero)) in Heqo; cbn; auto.
+        + apply map_monad_InT_OOM_repeat_success with (y:=DV2.DVALUE_Double (Floats.Float32.to_double Floats.Float32.zero)) in Heqo; cbn; auto.
           cbn in *.
           subst.
           auto.
@@ -2694,9 +2997,9 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       cbn.
       break_match.
       2: {
-        apply map_monad_In_OOM_fail in Heqo.
+        apply map_monad_InT_OOM_fail in Heqo.
         destruct Heqo as [a [IN CONVa]].
-        apply repeat_spec in IN; subst.
+        apply repeat_spec_InT in IN; subst.
         rewrite REFv1 in CONVa.
         inv CONVa.
       }
@@ -2704,7 +3007,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       destruct (N.to_nat sz).
       + cbn in *.
         inv Heqo; auto.
-      + eapply map_monad_In_OOM_repeat_success with (y:=d) in Heqo; cbn; auto.
+      + eapply map_monad_InT_OOM_repeat_success with (y:=d) in Heqo; cbn; auto.
         cbn in *.
         subst.
         auto.
@@ -2735,7 +3038,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       eexists; split; eauto.
 
       unfold_dvalue_refine_strict_goal.
-      rewrite map_monad_In_cons.
+      rewrite map_monad_InT_cons.
       cbn.
       rewrite REFv1.
 
@@ -2769,7 +3072,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       eexists; split; eauto.
 
       unfold_dvalue_refine_strict_goal.
-      rewrite map_monad_In_cons.
+      rewrite map_monad_InT_cons.
       cbn.
       rewrite REFv1.
 
@@ -2787,9 +3090,9 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         cbn.
         break_match.
         2: {
-          apply map_monad_In_OOM_fail in Heqo.
+          apply map_monad_InT_OOM_fail in Heqo.
           destruct Heqo as [a [IN CONVa]].
-          apply repeat_spec in IN; subst.
+          apply repeat_spec_InT in IN; subst.
           rewrite REFv1 in CONVa.
           inv CONVa.
         }
@@ -2797,7 +3100,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         destruct (N.to_nat sz).
         + cbn in *.
           inv Heqo; auto.
-        + apply map_monad_In_OOM_repeat_success with (y:=d) in Heqo; cbn; auto.
+        + apply map_monad_InT_OOM_repeat_success with (y:=d) in Heqo; cbn; auto.
           cbn in *.
           subst.
           auto.
@@ -2808,9 +3111,9 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         cbn.
         break_match.
         2: {
-          apply map_monad_In_OOM_fail in Heqo.
+          apply map_monad_InT_OOM_fail in Heqo.
           destruct Heqo as [a [IN CONVa]].
-          apply repeat_spec in IN; subst.
+          apply repeat_spec_InT in IN; subst.
           rewrite dvalue_convert_strict_equation in *.
           cbn in *.
           rewrite addr_convert_null in CONVa; inv CONVa.
@@ -2819,7 +3122,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         destruct (N.to_nat sz).
         + cbn in *.
           inv Heqo; auto.
-        + apply map_monad_In_OOM_repeat_success with (y:=DV2.DVALUE_Addr LP2.ADDR.null) in Heqo; cbn; auto.
+        + apply map_monad_InT_OOM_repeat_success with (y:=DV2.DVALUE_Addr LP2.ADDR.null) in Heqo; cbn; auto.
           cbn in *.
           subst.
           auto.
@@ -2832,9 +3135,9 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         cbn.
         break_match.
         2: {
-          apply map_monad_In_OOM_fail in Heqo.
+          apply map_monad_InT_OOM_fail in Heqo.
           destruct Heqo as [a [IN CONVa]].
-          apply repeat_spec in IN; subst.
+          apply repeat_spec_InT in IN; subst.
           rewrite dvalue_convert_strict_equation in *.
           cbn in *.
           inv CONVa.
@@ -2843,7 +3146,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         destruct (N.to_nat sz).
         + cbn in *.
           inv Heqo; auto.
-        + apply map_monad_In_OOM_repeat_success with (y:=DV2.DVALUE_Float Floats.Float32.zero) in Heqo; cbn; auto.
+        + apply map_monad_InT_OOM_repeat_success with (y:=DV2.DVALUE_Float Floats.Float32.zero) in Heqo; cbn; auto.
           cbn in *.
           subst.
           auto.
@@ -2854,9 +3157,9 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         cbn.
         break_match.
         2: {
-          apply map_monad_In_OOM_fail in Heqo.
+          apply map_monad_InT_OOM_fail in Heqo.
           destruct Heqo as [a [IN CONVa]].
-          apply repeat_spec in IN; subst.
+          apply repeat_spec_InT in IN; subst.
           rewrite dvalue_convert_strict_equation in *.
           cbn in *.
           inv CONVa.
@@ -2865,7 +3168,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         destruct (N.to_nat sz).
         + cbn in *.
           inv Heqo; auto.
-        + apply map_monad_In_OOM_repeat_success with (y:=DV2.DVALUE_Double (Floats.Float32.to_double Floats.Float32.zero)) in Heqo; cbn; auto.
+        + apply map_monad_InT_OOM_repeat_success with (y:=DV2.DVALUE_Double (Floats.Float32.to_double Floats.Float32.zero)) in Heqo; cbn; auto.
           cbn in *.
           subst.
           auto.
@@ -3060,16 +3363,16 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         { clear H.
           cbn in *.
           inv Heqo0.
-          apply map_monad_In_OOM_nil_inv in Heqo; subst.
+          apply map_monad_InT_OOM_nil_inv in Heqo; subst.
           reflexivity.
         }
 
-        { rewrite map_monad_In_cons in Heqo0.
+        { rewrite map_monad_InT_cons in Heqo0.
           cbn in Heqo0.
           break_match_hyp; inv Heqo0.
           break_match_hyp; inv H1.
 
-          apply map_monad_In_OOM_cons_inv in Heqo as [x [xs [HInx [FIELDS0 [CONVX CONVXS]]]]].
+          apply map_monad_InT_OOM_cons_inv in Heqo as [x [xs [HInx [FIELDS0 [CONVX CONVXS]]]]].
           subst.
 
           forward IHfields.
@@ -3104,16 +3407,16 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
           cbn in *.
           inv Heqo0.
 
-          apply map_monad_In_OOM_nil_inv in Heqo; subst.
+          apply map_monad_InT_OOM_nil_inv in Heqo; subst.
           reflexivity.
         }
 
-        { rewrite map_monad_In_cons in Heqo0.
+        { rewrite map_monad_InT_cons in Heqo0.
           cbn in Heqo0.
           break_match_hyp; inv Heqo0.
           break_match_hyp; inv H1.
 
-          apply map_monad_In_OOM_cons_inv in Heqo as [x [xs [HInx [FIELDS0 [CONVX CONVXS]]]]].
+          apply map_monad_InT_OOM_cons_inv in Heqo as [x [xs [HInx [FIELDS0 [CONVX CONVXS]]]]].
           subst.
 
           forward IHfields.
@@ -3148,16 +3451,16 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
           cbn in *.
           inv Heqo0.
 
-          apply map_monad_In_OOM_nil_inv in Heqo; subst.
+          apply map_monad_InT_OOM_nil_inv in Heqo; subst.
           reflexivity.
         }
 
-        { rewrite map_monad_In_cons in Heqo0.
+        { rewrite map_monad_InT_cons in Heqo0.
           cbn in Heqo0.
           break_match_hyp; inv Heqo0.
           break_match_hyp; inv H1.
 
-          apply map_monad_In_OOM_cons_inv in Heqo as [x [xs [HInx [FIELDS0 [CONVX CONVXS]]]]].
+          apply map_monad_InT_OOM_cons_inv in Heqo as [x [xs [HInx [FIELDS0 [CONVX CONVXS]]]]].
           subst.
 
           forward IHelts.
@@ -3192,16 +3495,16 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
           cbn in *.
           inv Heqo0.
 
-          apply map_monad_In_OOM_nil_inv in Heqo; subst.
+          apply map_monad_InT_OOM_nil_inv in Heqo; subst.
           reflexivity.
         }
 
-        { rewrite map_monad_In_cons in Heqo0.
+        { rewrite map_monad_InT_cons in Heqo0.
           cbn in Heqo0.
           break_match_hyp; inv Heqo0.
           break_match_hyp; inv H1.
 
-          apply map_monad_In_OOM_cons_inv in Heqo as [x [xs [HInx [FIELDS0 [CONVX CONVXS]]]]].
+          apply map_monad_InT_OOM_cons_inv in Heqo as [x [xs [HInx [FIELDS0 [CONVX CONVXS]]]]].
           subst.
 
           forward IHelts.
@@ -3262,9 +3565,9 @@ Module DVConvertSafe
 
   Lemma dvalue_convert_strict_safe :
     forall dv_f,
-      exists dv_i,
-        DVC1.dvalue_convert_strict dv_f = NoOom dv_i /\
-          DVC2.dvalue_convert_strict dv_i = NoOom dv_f.
+      { dv_i : DVC1.DV2.dvalue &
+                 ((DVC1.dvalue_convert_strict dv_f = NoOom dv_i) *
+                    (DVC2.dvalue_convert_strict dv_i = NoOom dv_f))%type}.
   Proof.
     intros dv_f.
     induction dv_f;
@@ -3294,26 +3597,26 @@ Module DVConvertSafe
         cbn.
         split; auto.
       + (* Fields *)
-        assert (In a (a :: fields)) as INA by (cbn; auto).
-        pose proof (H a INA) as HA.
+        assert (InT a (a :: fields)) as INA by (cbn; auto).
+        pose proof (X a INA) as HA.
         destruct HA as [dv_a [CONV1_a CONV2_a]].
 
         rewrite DVC1.dvalue_convert_strict_equation.
-        rewrite map_monad_In_unfold.
+        rewrite map_monad_InT_unfold.
         cbn.
         rewrite CONV1_a.
         cbn.
 
-        destruct (map_monad_In fields (fun (x : DVC1.DV1.dvalue) (_ : In x fields) => DVC1.dvalue_convert_strict x)) eqn:HMAPM.
+        destruct (map_monad_InT fields (fun (x : DVC1.DV1.dvalue) (_ : InT x fields) => DVC1.dvalue_convert_strict x)) eqn:HMAPM.
         -- eexists; split; eauto.
            rewrite DVC2.dvalue_convert_strict_equation.
-           rewrite map_monad_In_unfold.
+           rewrite map_monad_InT_unfold.
            cbn.
            rewrite CONV2_a.
            break_inner_match_goal.
            ++ assert (l0 = fields).
-              { clear - H HMAPM Heqo.
-                revert H HMAPM Heqo.
+              { clear - X HMAPM Heqo.
+                revert X HMAPM Heqo.
                 revert l l0.
 
                 induction fields; intros l l0 H HMAPM Heqo.
@@ -3321,23 +3624,23 @@ Module DVConvertSafe
                 cbn in Heqo; inv Heqo.
                 reflexivity.
 
-                rewrite map_monad_In_unfold in HMAPM.
+                rewrite map_monad_InT_unfold in HMAPM.
                 cbn in HMAPM.
                 destruct (DVC1.dvalue_convert_strict a0) eqn:Ha0; inv HMAPM.
                 break_match_hyp; inv H1.
-                rewrite map_monad_In_unfold in Heqo.
+                rewrite map_monad_InT_unfold in Heqo.
                 cbn in Heqo.
                 break_match_hyp; inv Heqo.
                 break_match_hyp; inv H1.
 
                 pose proof (H a0).
-                forward H0. cbn; auto.
-                destruct H0.
-                rewrite Ha0 in H0.
+                forward X. cbn; auto.
+                destruct X.
+                rewrite Ha0 in p.
+                inv p.
                 inv H0.
+                rewrite Heqo1 in H1.
                 inv H1.
-                rewrite Heqo1 in H2.
-                inv H2.
 
                 specialize (IHfields l1 l).
                 forward IHfields.
@@ -3354,25 +3657,28 @@ Module DVConvertSafe
               subst.
               auto.
            ++ (* Should be a contradiction *)
-             apply map_monad_In_OOM_fail in Heqo.
+             apply map_monad_InT_OOM_fail in Heqo.
              destruct Heqo as [dv [HIN DVOOM]].
              pose proof HIN as HIN'.
-             apply In_Nth in HIN' as [i HNTH].
+             apply InT_Nth in HIN' as [i HNTH].
 
-             rewrite <- map_monad_map_monad_In in HMAPM.
+             rewrite <- map_monad_map_monad_InT in HMAPM.
              pose proof (map_monad_OOM_Nth _ _ _ _ _ HMAPM HNTH) as [y [CONVy NTHy]].
-             apply Util.Nth_In in NTHy.
-             specialize (H y).
-             forward H; cbn; auto.
-             destruct H as [dv_i [CONVy_dvi CONVdvi_y]].
+             apply Nth_InT in NTHy.
+             specialize (X y).
+             forward X.
+             { cbn.
+               auto.
+             }
+             destruct X as [dv_i [CONVy_dvi CONVdvi_y]].
              rewrite CONVy_dvi in CONVy. inv CONVy.
              rewrite CONVdvi_y in DVOOM.
              inv DVOOM.
-        -- apply map_monad_In_OOM_fail in HMAPM.
+        -- apply map_monad_InT_OOM_failT in HMAPM.
            destruct HMAPM as [dv [HIN DVOOM]].
-           specialize (H dv).
-           forward H; cbn; auto.
-           destruct H as [? [CONTRA ?]].
+           specialize (X dv).
+           forward X; cbn; auto.
+           destruct X as [? [CONTRA ?]].
            rewrite CONTRA in DVOOM.
            inv DVOOM.
     - (* Packed structs *)
@@ -3381,26 +3687,26 @@ Module DVConvertSafe
         rewrite DVC1.dvalue_convert_strict_equation.
         cbn. eexists; split; eauto.
       + (* Fields *)
-        assert (In a (a :: fields)) as INA by (cbn; auto).
-        pose proof (H a INA) as HA.
+        assert (InT a (a :: fields)) as INA by (cbn; auto).
+        pose proof (X a INA) as HA.
         destruct HA as [dv_a [CONV1_a CONV2_a]].
 
         rewrite DVC1.dvalue_convert_strict_equation.
-        rewrite map_monad_In_unfold.
+        rewrite map_monad_InT_unfold.
         cbn.
         rewrite CONV1_a.
         cbn.
 
-        destruct (map_monad_In fields (fun (x : DVC1.DV1.dvalue) (_ : In x fields) => DVC1.dvalue_convert_strict x)) eqn:HMAPM.
+        destruct (map_monad_InT fields (fun (x : DVC1.DV1.dvalue) (_ : InT x fields) => DVC1.dvalue_convert_strict x)) eqn:HMAPM.
         -- eexists; split; eauto.
            rewrite DVC2.dvalue_convert_strict_equation.
-           rewrite map_monad_In_unfold.
+           rewrite map_monad_InT_unfold.
            cbn.
            rewrite CONV2_a.
            break_inner_match_goal.
            ++ assert (l0 = fields).
-              { clear - H HMAPM Heqo.
-                revert H HMAPM Heqo.
+              { clear - X HMAPM Heqo.
+                revert X HMAPM Heqo.
                 revert l l0.
 
                 induction fields; intros l l0 H HMAPM Heqo.
@@ -3408,23 +3714,23 @@ Module DVConvertSafe
                 cbn in Heqo; inv Heqo.
                 reflexivity.
 
-                rewrite map_monad_In_unfold in HMAPM.
+                rewrite map_monad_InT_unfold in HMAPM.
                 cbn in HMAPM.
                 destruct (DVC1.dvalue_convert_strict a0) eqn:Ha0; inv HMAPM.
                 break_match_hyp; inv H1.
-                rewrite map_monad_In_unfold in Heqo.
+                rewrite map_monad_InT_unfold in Heqo.
                 cbn in Heqo.
                 break_match_hyp; inv Heqo.
                 break_match_hyp; inv H1.
 
                 pose proof (H a0).
-                forward H0. cbn; auto.
-                destruct H0.
-                rewrite Ha0 in H0.
+                forward X. cbn; auto.
+                destruct X.
+                rewrite Ha0 in p.
+                inv p.
                 inv H0.
+                rewrite Heqo1 in H1.
                 inv H1.
-                rewrite Heqo1 in H2.
-                inv H2.
 
                 specialize (IHfields l1 l).
                 forward IHfields.
@@ -3441,50 +3747,50 @@ Module DVConvertSafe
               subst.
               auto.
            ++ (* Should be a contradiction *)
-             apply map_monad_In_OOM_fail in Heqo.
+             apply map_monad_InT_OOM_fail in Heqo.
              destruct Heqo as [dv [HIN DVOOM]].
              pose proof HIN as HIN'.
-             apply In_Nth in HIN' as [i HNTH].
+             apply InT_Nth in HIN' as [i HNTH].
 
-             rewrite <- map_monad_map_monad_In in HMAPM.
+             rewrite <- map_monad_map_monad_InT in HMAPM.
              pose proof (map_monad_OOM_Nth _ _ _ _ _ HMAPM HNTH) as [y [CONVy NTHy]].
-             apply Util.Nth_In in NTHy.
-             specialize (H y).
-             forward H; cbn; auto.
-             destruct H as [dv_i [CONVy_dvi CONVdvi_y]].
+             apply Nth_InT in NTHy.
+             specialize (X y).
+             forward X; cbn; auto.
+             destruct X as [dv_i [CONVy_dvi CONVdvi_y]].
              rewrite CONVy_dvi in CONVy. inv CONVy.
              rewrite CONVdvi_y in DVOOM.
              inv DVOOM.
-        -- apply map_monad_In_OOM_fail in HMAPM.
+        -- apply map_monad_InT_OOM_failT in HMAPM.
            destruct HMAPM as [dv [HIN DVOOM]].
-           specialize (H dv).
-           forward H; cbn; auto.
-           destruct H as [? [CONTRA ?]].
+           specialize (X dv).
+           forward X; cbn; auto.
+           destruct X as [? [CONTRA ?]].
            rewrite CONTRA in DVOOM.
            inv DVOOM.
     - (* Arrays *)
       induction elts.
       + rewrite DVC1.dvalue_convert_strict_equation.
         cbn. eexists; split; eauto.
-      + assert (In a (a :: elts)) as INA by (cbn; auto).
-        pose proof (H a INA) as HA.
+      + assert (InT a (a :: elts)) as INA by (cbn; auto).
+        pose proof (X a INA) as HA.
         destruct HA as [dv_a [CONV1_a CONV2_a]].
 
         rewrite DVC1.dvalue_convert_strict_equation.
-        rewrite map_monad_In_unfold.
+        rewrite map_monad_InT_unfold.
         cbn.
         rewrite CONV1_a.
 
-        destruct (map_monad_In elts (fun (x : DVC1.DV1.dvalue) (_ : In x elts) => DVC1.dvalue_convert_strict x)) eqn:HMAPM.
+        destruct (map_monad_InT elts (fun (x : DVC1.DV1.dvalue) (_ : InT x elts) => DVC1.dvalue_convert_strict x)) eqn:HMAPM.
         -- eexists; split; eauto.
            rewrite DVC2.dvalue_convert_strict_equation.
-           rewrite map_monad_In_unfold.
+           rewrite map_monad_InT_unfold.
            cbn.
            rewrite CONV2_a.
            break_inner_match_goal.
            ++ assert (l0 = elts).
-              { clear - H HMAPM Heqo.
-                revert H HMAPM Heqo.
+              { clear - X HMAPM Heqo.
+                revert X HMAPM Heqo.
                 revert l l0.
 
                 induction elts; intros l l0 H HMAPM Heqo.
@@ -3492,23 +3798,23 @@ Module DVConvertSafe
                 cbn in Heqo; inv Heqo.
                 reflexivity.
 
-                rewrite map_monad_In_unfold in HMAPM.
+                rewrite map_monad_InT_unfold in HMAPM.
                 cbn in HMAPM.
                 destruct (DVC1.dvalue_convert_strict a0) eqn:Ha0; inv HMAPM.
                 break_match_hyp; inv H1.
-                rewrite map_monad_In_unfold in Heqo.
+                rewrite map_monad_InT_unfold in Heqo.
                 cbn in Heqo.
                 break_match_hyp; inv Heqo.
                 break_match_hyp; inv H1.
 
                 pose proof (H a0).
-                forward H0. cbn; auto.
-                destruct H0.
-                rewrite Ha0 in H0.
+                forward X. cbn; auto.
+                destruct X.
+                rewrite Ha0 in p.
+                inv p.
                 inv H0.
+                rewrite Heqo1 in H1.
                 inv H1.
-                rewrite Heqo1 in H2.
-                inv H2.
 
                 specialize (IHelts l1 l).
                 forward IHelts.
@@ -3525,50 +3831,50 @@ Module DVConvertSafe
               subst.
               auto.
            ++ (* Should be a contradiction *)
-             apply map_monad_In_OOM_fail in Heqo.
+             apply map_monad_InT_OOM_failT in Heqo.
              destruct Heqo as [dv [HIN DVOOM]].
              pose proof HIN as HIN'.
-             apply In_Nth in HIN' as [i HNTH].
+             apply InT_Nth in HIN' as [i HNTH].
 
-             rewrite <- map_monad_map_monad_In in HMAPM.
+             rewrite <- map_monad_map_monad_InT in HMAPM.
              pose proof (map_monad_OOM_Nth _ _ _ _ _ HMAPM HNTH) as [y [CONVy NTHy]].
-             apply Util.Nth_In in NTHy.
-             specialize (H y).
-             forward H; cbn; auto.
-             destruct H as [dv_i [CONVy_dvi CONVdvi_y]].
+             apply Nth_InT in NTHy.
+             specialize (X y).
+             forward X; cbn; auto.
+             destruct X as [dv_i [CONVy_dvi CONVdvi_y]].
              rewrite CONVy_dvi in CONVy. inv CONVy.
              rewrite CONVdvi_y in DVOOM.
              inv DVOOM.
-        -- apply map_monad_In_OOM_fail in HMAPM.
+        -- apply map_monad_InT_OOM_failT in HMAPM.
            destruct HMAPM as [dv [HIN DVOOM]].
-           specialize (H dv).
-           forward H; cbn; auto.
-           destruct H as [? [CONTRA ?]].
+           specialize (X dv).
+           forward X; cbn; auto.
+           destruct X as [? [CONTRA ?]].
            rewrite CONTRA in DVOOM.
            inv DVOOM.
     - (* Vectors *)
       induction elts.
       + rewrite DVC1.dvalue_convert_strict_equation.
         cbn. eexists; split; eauto.
-      + assert (In a (a :: elts)) as INA by (cbn; auto).
-        pose proof (H a INA) as HA.
+      + assert (InT a (a :: elts)) as INA by (cbn; auto).
+        pose proof (X a INA) as HA.
         destruct HA as [dv_a [CONV1_a CONV2_a]].
 
         rewrite DVC1.dvalue_convert_strict_equation.
-        rewrite map_monad_In_unfold.
+        rewrite map_monad_InT_unfold.
         cbn.
         rewrite CONV1_a.
 
-        destruct (map_monad_In elts (fun (x : DVC1.DV1.dvalue) (_ : In x elts) => DVC1.dvalue_convert_strict x)) eqn:HMAPM.
+        destruct (map_monad_InT elts (fun (x : DVC1.DV1.dvalue) (_ : InT x elts) => DVC1.dvalue_convert_strict x)) eqn:HMAPM.
         -- eexists; split; eauto.
            rewrite DVC2.dvalue_convert_strict_equation.
-           rewrite map_monad_In_unfold.
+           rewrite map_monad_InT_unfold.
            cbn.
            rewrite CONV2_a.
            break_inner_match_goal.
            ++ assert (l0 = elts).
-              { clear - H HMAPM Heqo.
-                revert H HMAPM Heqo.
+              { clear - X HMAPM Heqo.
+                revert X HMAPM Heqo.
                 revert l l0.
 
                 induction elts; intros l l0 H HMAPM Heqo.
@@ -3576,23 +3882,23 @@ Module DVConvertSafe
                 cbn in Heqo; inv Heqo.
                 reflexivity.
 
-                rewrite map_monad_In_unfold in HMAPM.
+                rewrite map_monad_InT_unfold in HMAPM.
                 cbn in HMAPM.
                 destruct (DVC1.dvalue_convert_strict a0) eqn:Ha0; inv HMAPM.
                 break_match_hyp; inv H1.
-                rewrite map_monad_In_unfold in Heqo.
+                rewrite map_monad_InT_unfold in Heqo.
                 cbn in Heqo.
                 break_match_hyp; inv Heqo.
                 break_match_hyp; inv H1.
 
                 pose proof (H a0).
-                forward H0. cbn; auto.
-                destruct H0.
-                rewrite Ha0 in H0.
+                forward X. cbn; auto.
+                destruct X.
+                rewrite Ha0 in p.
+                inv p.
                 inv H0.
+                rewrite Heqo1 in H1.
                 inv H1.
-                rewrite Heqo1 in H2.
-                inv H2.
 
                 specialize (IHelts l1 l).
                 forward IHelts.
@@ -3609,34 +3915,34 @@ Module DVConvertSafe
               subst.
               auto.
            ++ (* Should be a contradiction *)
-             apply map_monad_In_OOM_fail in Heqo.
+             apply map_monad_InT_OOM_failT in Heqo.
              destruct Heqo as [dv [HIN DVOOM]].
              pose proof HIN as HIN'.
-             apply In_Nth in HIN' as [i HNTH].
+             apply InT_Nth in HIN' as [i HNTH].
 
-             rewrite <- map_monad_map_monad_In in HMAPM.
+             rewrite <- map_monad_map_monad_InT in HMAPM.
              pose proof (map_monad_OOM_Nth _ _ _ _ _ HMAPM HNTH) as [y [CONVy NTHy]].
-             apply Util.Nth_In in NTHy.
-             specialize (H y).
-             forward H; cbn; auto.
-             destruct H as [dv_i [CONVy_dvi CONVdvi_y]].
+             apply Nth_InT in NTHy.
+             specialize (X y).
+             forward X; cbn; auto.
+             destruct X as [dv_i [CONVy_dvi CONVdvi_y]].
              rewrite CONVy_dvi in CONVy. inv CONVy.
              rewrite CONVdvi_y in DVOOM.
              inv DVOOM.
-        -- apply map_monad_In_OOM_fail in HMAPM.
+        -- apply map_monad_InT_OOM_failT in HMAPM.
            destruct HMAPM as [dv [HIN DVOOM]].
-           specialize (H dv).
-           forward H; cbn; auto.
-           destruct H as [? [CONTRA ?]].
+           specialize (X dv).
+           forward X; cbn; auto.
+           destruct X as [? [CONTRA ?]].
            rewrite CONTRA in DVOOM.
            inv DVOOM.
   Qed.
 
   Lemma uvalue_convert_strict_safe :
     forall uv_f,
-      exists uv_i,
-        DVC1.uvalue_convert_strict uv_f = NoOom uv_i /\
-          DVC2.uvalue_convert_strict uv_i = NoOom uv_f.
+      { uv_i : DVC1.DV2.uvalue &
+                 ((DVC1.uvalue_convert_strict uv_f = NoOom uv_i) *
+                    (DVC2.uvalue_convert_strict uv_i = NoOom uv_f))%type}.
   Proof.
     intros uv_f.
     induction uv_f;
@@ -3695,26 +4001,26 @@ Module DVConvertSafe
         cbn.
         split; auto.
       + (* Fields *)
-        assert (In a (a :: fields)) as INA by (cbn; auto).
-        pose proof (H a INA) as HA.
+        assert (InT a (a :: fields)) as INA by (cbn; auto).
+        pose proof (X a INA) as HA.
         destruct HA as [dv_a [CONV1_a CONV2_a]].
 
         rewrite DVC1.uvalue_convert_strict_equation.
-        rewrite map_monad_In_unfold.
+        rewrite map_monad_InT_unfold.
         cbn.
         rewrite CONV1_a.
         cbn.
 
-        destruct (map_monad_In fields (fun (x : DVC1.DV1.uvalue) (_ : In x fields) => DVC1.uvalue_convert_strict x)) eqn:HMAPM.
+        destruct (map_monad_InT fields (fun (x : DVC1.DV1.uvalue) (_ : InT x fields) => DVC1.uvalue_convert_strict x)) eqn:HMAPM.
         -- eexists; split; eauto.
            rewrite DVC2.uvalue_convert_strict_equation.
-           rewrite map_monad_In_unfold.
+           rewrite map_monad_InT_unfold.
            cbn.
            rewrite CONV2_a.
            break_inner_match_goal.
            ++ assert (l0 = fields).
-              { clear - H HMAPM Heqo.
-                revert H HMAPM Heqo.
+              { clear - X HMAPM Heqo.
+                revert X HMAPM Heqo.
                 revert l l0.
 
                 induction fields; intros l l0 H HMAPM Heqo.
@@ -3722,23 +4028,23 @@ Module DVConvertSafe
                 cbn in Heqo; inv Heqo.
                 reflexivity.
 
-                rewrite map_monad_In_unfold in HMAPM.
+                rewrite map_monad_InT_unfold in HMAPM.
                 cbn in HMAPM.
                 destruct (DVC1.uvalue_convert_strict a0) eqn:Ha0; inv HMAPM.
                 break_match_hyp; inv H1.
-                rewrite map_monad_In_unfold in Heqo.
+                rewrite map_monad_InT_unfold in Heqo.
                 cbn in Heqo.
                 break_match_hyp; inv Heqo.
                 break_match_hyp; inv H1.
 
                 pose proof (H a0).
-                forward H0. cbn; auto.
-                destruct H0.
-                rewrite Ha0 in H0.
+                forward X. cbn; auto.
+                destruct X.
+                rewrite Ha0 in p.
+                inv p.
                 inv H0.
+                rewrite Heqo1 in H1.
                 inv H1.
-                rewrite Heqo1 in H2.
-                inv H2.
 
                 specialize (IHfields l1 l).
                 forward IHfields.
@@ -3755,25 +4061,25 @@ Module DVConvertSafe
               subst.
               auto.
            ++ (* Should be a contradiction *)
-             apply map_monad_In_OOM_fail in Heqo.
+             apply map_monad_InT_OOM_fail in Heqo.
              destruct Heqo as [dv [HIN DVOOM]].
              pose proof HIN as HIN'.
-             apply In_Nth in HIN' as [i HNTH].
+             apply InT_Nth in HIN' as [i HNTH].
 
-             rewrite <- map_monad_map_monad_In in HMAPM.
+             rewrite <- map_monad_map_monad_InT in HMAPM.
              pose proof (map_monad_OOM_Nth _ _ _ _ _ HMAPM HNTH) as [y [CONVy NTHy]].
-             apply Util.Nth_In in NTHy.
-             specialize (H y).
-             forward H; cbn; auto.
-             destruct H as [dv_i [CONVy_dvi CONVdvi_y]].
+             apply Nth_InT in NTHy.
+             specialize (X y).
+             forward X; cbn; auto.
+             destruct X as [dv_i [CONVy_dvi CONVdvi_y]].
              rewrite CONVy_dvi in CONVy. inv CONVy.
              rewrite CONVdvi_y in DVOOM.
              inv DVOOM.
-        -- apply map_monad_In_OOM_fail in HMAPM.
+        -- apply map_monad_InT_OOM_failT in HMAPM.
            destruct HMAPM as [dv [HIN DVOOM]].
-           specialize (H dv).
-           forward H; cbn; auto.
-           destruct H as [? [CONTRA ?]].
+           specialize (X dv).
+           forward X; cbn; auto.
+           destruct X as [? [CONTRA ?]].
            rewrite CONTRA in DVOOM.
            inv DVOOM.
     - (* Packed structs *)
@@ -3782,26 +4088,26 @@ Module DVConvertSafe
         rewrite DVC1.uvalue_convert_strict_equation.
         cbn. eexists; split; eauto.
       + (* Fields *)
-        assert (In a (a :: fields)) as INA by (cbn; auto).
-        pose proof (H a INA) as HA.
+        assert (InT a (a :: fields)) as INA by (cbn; auto).
+        pose proof (X a INA) as HA.
         destruct HA as [dv_a [CONV1_a CONV2_a]].
 
         rewrite DVC1.uvalue_convert_strict_equation.
-        rewrite map_monad_In_unfold.
+        rewrite map_monad_InT_unfold.
         cbn.
         rewrite CONV1_a.
         cbn.
 
-        destruct (map_monad_In fields (fun (x : DVC1.DV1.uvalue) (_ : In x fields) => DVC1.uvalue_convert_strict x)) eqn:HMAPM.
+        destruct (map_monad_InT fields (fun (x : DVC1.DV1.uvalue) (_ : InT x fields) => DVC1.uvalue_convert_strict x)) eqn:HMAPM.
         -- eexists; split; eauto.
            rewrite DVC2.uvalue_convert_strict_equation.
-           rewrite map_monad_In_unfold.
+           rewrite map_monad_InT_unfold.
            cbn.
            rewrite CONV2_a.
            break_inner_match_goal.
            ++ assert (l0 = fields).
-              { clear - H HMAPM Heqo.
-                revert H HMAPM Heqo.
+              { clear - X HMAPM Heqo.
+                revert X HMAPM Heqo.
                 revert l l0.
 
                 induction fields; intros l l0 H HMAPM Heqo.
@@ -3809,23 +4115,23 @@ Module DVConvertSafe
                 cbn in Heqo; inv Heqo.
                 reflexivity.
 
-                rewrite map_monad_In_unfold in HMAPM.
+                rewrite map_monad_InT_unfold in HMAPM.
                 cbn in HMAPM.
                 destruct (DVC1.uvalue_convert_strict a0) eqn:Ha0; inv HMAPM.
                 break_match_hyp; inv H1.
-                rewrite map_monad_In_unfold in Heqo.
+                rewrite map_monad_InT_unfold in Heqo.
                 cbn in Heqo.
                 break_match_hyp; inv Heqo.
                 break_match_hyp; inv H1.
 
                 pose proof (H a0).
-                forward H0. cbn; auto.
-                destruct H0.
-                rewrite Ha0 in H0.
+                forward X. cbn; auto.
+                destruct X.
+                rewrite Ha0 in p.
+                inv p.
                 inv H0.
+                rewrite Heqo1 in H1.
                 inv H1.
-                rewrite Heqo1 in H2.
-                inv H2.
 
                 specialize (IHfields l1 l).
                 forward IHfields.
@@ -3842,50 +4148,50 @@ Module DVConvertSafe
               subst.
               auto.
            ++ (* Should be a contradiction *)
-             apply map_monad_In_OOM_fail in Heqo.
+             apply map_monad_InT_OOM_fail in Heqo.
              destruct Heqo as [dv [HIN DVOOM]].
              pose proof HIN as HIN'.
-             apply In_Nth in HIN' as [i HNTH].
+             apply InT_Nth in HIN' as [i HNTH].
 
-             rewrite <- map_monad_map_monad_In in HMAPM.
+             rewrite <- map_monad_map_monad_InT in HMAPM.
              pose proof (map_monad_OOM_Nth _ _ _ _ _ HMAPM HNTH) as [y [CONVy NTHy]].
-             apply Util.Nth_In in NTHy.
-             specialize (H y).
-             forward H; cbn; auto.
-             destruct H as [dv_i [CONVy_dvi CONVdvi_y]].
+             apply Nth_InT in NTHy.
+             specialize (X y).
+             forward X; cbn; auto.
+             destruct X as [dv_i [CONVy_dvi CONVdvi_y]].
              rewrite CONVy_dvi in CONVy. inv CONVy.
              rewrite CONVdvi_y in DVOOM.
              inv DVOOM.
-        -- apply map_monad_In_OOM_fail in HMAPM.
+        -- apply map_monad_InT_OOM_failT in HMAPM.
            destruct HMAPM as [dv [HIN DVOOM]].
-           specialize (H dv).
-           forward H; cbn; auto.
-           destruct H as [? [CONTRA ?]].
+           specialize (X dv).
+           forward X; cbn; auto.
+           destruct X as [? [CONTRA ?]].
            rewrite CONTRA in DVOOM.
            inv DVOOM.
     - (* Arrays *)
       induction elts.
       + rewrite DVC1.uvalue_convert_strict_equation.
         cbn. eexists; split; eauto.
-      + assert (In a (a :: elts)) as INA by (cbn; auto).
-        pose proof (H a INA) as HA.
+      + assert (InT a (a :: elts)) as INA by (cbn; auto).
+        pose proof (X a INA) as HA.
         destruct HA as [dv_a [CONV1_a CONV2_a]].
 
         rewrite DVC1.uvalue_convert_strict_equation.
-        rewrite map_monad_In_unfold.
+        rewrite map_monad_InT_unfold.
         cbn.
         rewrite CONV1_a.
 
-        destruct (map_monad_In elts (fun (x : DVC1.DV1.uvalue) (_ : In x elts) => DVC1.uvalue_convert_strict x)) eqn:HMAPM.
+        destruct (map_monad_InT elts (fun (x : DVC1.DV1.uvalue) (_ : InT x elts) => DVC1.uvalue_convert_strict x)) eqn:HMAPM.
         -- eexists; split; eauto.
            rewrite DVC2.uvalue_convert_strict_equation.
-           rewrite map_monad_In_unfold.
+           rewrite map_monad_InT_unfold.
            cbn.
            rewrite CONV2_a.
            break_inner_match_goal.
            ++ assert (l0 = elts).
-              { clear - H HMAPM Heqo.
-                revert H HMAPM Heqo.
+              { clear - X HMAPM Heqo.
+                revert X HMAPM Heqo.
                 revert l l0.
 
                 induction elts; intros l l0 H HMAPM Heqo.
@@ -3893,23 +4199,23 @@ Module DVConvertSafe
                 cbn in Heqo; inv Heqo.
                 reflexivity.
 
-                rewrite map_monad_In_unfold in HMAPM.
+                rewrite map_monad_InT_unfold in HMAPM.
                 cbn in HMAPM.
                 destruct (DVC1.uvalue_convert_strict a0) eqn:Ha0; inv HMAPM.
                 break_match_hyp; inv H1.
-                rewrite map_monad_In_unfold in Heqo.
+                rewrite map_monad_InT_unfold in Heqo.
                 cbn in Heqo.
                 break_match_hyp; inv Heqo.
                 break_match_hyp; inv H1.
 
                 pose proof (H a0).
-                forward H0. cbn; auto.
-                destruct H0.
-                rewrite Ha0 in H0.
+                forward X. cbn; auto.
+                destruct X.
+                rewrite Ha0 in p.
+                inv p.
                 inv H0.
+                rewrite Heqo1 in H1.
                 inv H1.
-                rewrite Heqo1 in H2.
-                inv H2.
 
                 specialize (IHelts l1 l).
                 forward IHelts.
@@ -3926,50 +4232,50 @@ Module DVConvertSafe
               subst.
               auto.
            ++ (* Should be a contradiction *)
-             apply map_monad_In_OOM_fail in Heqo.
+             apply map_monad_InT_OOM_fail in Heqo.
              destruct Heqo as [dv [HIN DVOOM]].
              pose proof HIN as HIN'.
-             apply In_Nth in HIN' as [i HNTH].
+             apply InT_Nth in HIN' as [i HNTH].
 
-             rewrite <- map_monad_map_monad_In in HMAPM.
+             rewrite <- map_monad_map_monad_InT in HMAPM.
              pose proof (map_monad_OOM_Nth _ _ _ _ _ HMAPM HNTH) as [y [CONVy NTHy]].
-             apply Util.Nth_In in NTHy.
-             specialize (H y).
-             forward H; cbn; auto.
-             destruct H as [dv_i [CONVy_dvi CONVdvi_y]].
+             apply Nth_InT in NTHy.
+             specialize (X y).
+             forward X; cbn; auto.
+             destruct X as [dv_i [CONVy_dvi CONVdvi_y]].
              rewrite CONVy_dvi in CONVy. inv CONVy.
              rewrite CONVdvi_y in DVOOM.
              inv DVOOM.
-        -- apply map_monad_In_OOM_fail in HMAPM.
+        -- apply map_monad_InT_OOM_failT in HMAPM.
            destruct HMAPM as [dv [HIN DVOOM]].
-           specialize (H dv).
-           forward H; cbn; auto.
-           destruct H as [? [CONTRA ?]].
+           specialize (X dv).
+           forward X; cbn; auto.
+           destruct X as [? [CONTRA ?]].
            rewrite CONTRA in DVOOM.
            inv DVOOM.
     - (* Vectors *)
       induction elts.
       + rewrite DVC1.uvalue_convert_strict_equation.
         cbn. eexists; split; eauto.
-      + assert (In a (a :: elts)) as INA by (cbn; auto).
-        pose proof (H a INA) as HA.
+      + assert (InT a (a :: elts)) as INA by (cbn; auto).
+        pose proof (X a INA) as HA.
         destruct HA as [dv_a [CONV1_a CONV2_a]].
 
         rewrite DVC1.uvalue_convert_strict_equation.
-        rewrite map_monad_In_unfold.
+        rewrite map_monad_InT_unfold.
         cbn.
         rewrite CONV1_a.
 
-        destruct (map_monad_In elts (fun (x : DVC1.DV1.uvalue) (_ : In x elts) => DVC1.uvalue_convert_strict x)) eqn:HMAPM.
+        destruct (map_monad_InT elts (fun (x : DVC1.DV1.uvalue) (_ : InT x elts) => DVC1.uvalue_convert_strict x)) eqn:HMAPM.
         -- eexists; split; eauto.
            rewrite DVC2.uvalue_convert_strict_equation.
-           rewrite map_monad_In_unfold.
+           rewrite map_monad_InT_unfold.
            cbn.
            rewrite CONV2_a.
            break_inner_match_goal.
            ++ assert (l0 = elts).
-              { clear - H HMAPM Heqo.
-                revert H HMAPM Heqo.
+              { clear - X HMAPM Heqo.
+                revert X HMAPM Heqo.
                 revert l l0.
 
                 induction elts; intros l l0 H HMAPM Heqo.
@@ -3977,23 +4283,23 @@ Module DVConvertSafe
                 cbn in Heqo; inv Heqo.
                 reflexivity.
 
-                rewrite map_monad_In_unfold in HMAPM.
+                rewrite map_monad_InT_unfold in HMAPM.
                 cbn in HMAPM.
                 destruct (DVC1.uvalue_convert_strict a0) eqn:Ha0; inv HMAPM.
                 break_match_hyp; inv H1.
-                rewrite map_monad_In_unfold in Heqo.
+                rewrite map_monad_InT_unfold in Heqo.
                 cbn in Heqo.
                 break_match_hyp; inv Heqo.
                 break_match_hyp; inv H1.
 
                 pose proof (H a0).
-                forward H0. cbn; auto.
-                destruct H0.
-                rewrite Ha0 in H0.
+                forward X. cbn; auto.
+                destruct X.
+                rewrite Ha0 in p.
+                inv p.
                 inv H0.
+                rewrite Heqo1 in H1.
                 inv H1.
-                rewrite Heqo1 in H2.
-                inv H2.
 
                 specialize (IHelts l1 l).
                 forward IHelts.
@@ -4010,25 +4316,25 @@ Module DVConvertSafe
               subst.
               auto.
            ++ (* Should be a contradiction *)
-             apply map_monad_In_OOM_fail in Heqo.
+             apply map_monad_InT_OOM_fail in Heqo.
              destruct Heqo as [dv [HIN DVOOM]].
              pose proof HIN as HIN'.
-             apply In_Nth in HIN' as [i HNTH].
+             apply InT_Nth in HIN' as [i HNTH].
 
-             rewrite <- map_monad_map_monad_In in HMAPM.
+             rewrite <- map_monad_map_monad_InT in HMAPM.
              pose proof (map_monad_OOM_Nth _ _ _ _ _ HMAPM HNTH) as [y [CONVy NTHy]].
-             apply Util.Nth_In in NTHy.
-             specialize (H y).
-             forward H; cbn; auto.
-             destruct H as [dv_i [CONVy_dvi CONVdvi_y]].
+             apply Nth_InT in NTHy.
+             specialize (X y).
+             forward X; cbn; auto.
+             destruct X as [dv_i [CONVy_dvi CONVdvi_y]].
              rewrite CONVy_dvi in CONVy. inv CONVy.
              rewrite CONVdvi_y in DVOOM.
              inv DVOOM.
-        -- apply map_monad_In_OOM_fail in HMAPM.
+        -- apply map_monad_InT_OOM_failT in HMAPM.
            destruct HMAPM as [dv [HIN DVOOM]].
-           specialize (H dv).
-           forward H; cbn; auto.
-           destruct H as [? [CONTRA ?]].
+           specialize (X dv).
+           forward X; cbn; auto.
+           destruct X as [? [CONTRA ?]].
            rewrite CONTRA in DVOOM.
            inv DVOOM.
     - (* GEP *)
@@ -4037,7 +4343,7 @@ Module DVConvertSafe
         rewrite UVfi.
         cbn.
 
-        destruct (map_monad_In idxs (fun (elt : DVC1.DV1.uvalue) (_ : In elt idxs) => DVC1.uvalue_convert_strict elt)) eqn:HMAPM.
+        destruct (map_monad_InT idxs (fun (elt : DVC1.DV1.uvalue) (_ : InT elt idxs) => DVC1.uvalue_convert_strict elt)) eqn:HMAPM.
       + eexists; split; eauto.
         rewrite DVC2.uvalue_convert_strict_equation.
         rewrite UVif.
@@ -4045,8 +4351,8 @@ Module DVConvertSafe
 
         break_match_goal.
         * assert (l0 = idxs).
-          { clear - H HMAPM Heqo.
-            revert H HMAPM Heqo.
+          { clear - X HMAPM Heqo.
+            revert X HMAPM Heqo.
             revert l l0.
 
             induction idxs; intros l l0 H HMAPM Heqo.
@@ -4054,23 +4360,23 @@ Module DVConvertSafe
             cbn in Heqo; inv Heqo.
             reflexivity.
 
-            rewrite map_monad_In_unfold in HMAPM.
+            rewrite map_monad_InT_unfold in HMAPM.
             cbn in HMAPM.
             destruct (DVC1.uvalue_convert_strict a) eqn:Ha0; inv HMAPM.
             break_match_hyp; inv H1.
-            rewrite map_monad_In_unfold in Heqo.
+            rewrite map_monad_InT_unfold in Heqo.
             cbn in Heqo.
             break_match_hyp; inv Heqo.
             break_match_hyp; inv H1.
 
             pose proof (H a).
-            forward H0. cbn; auto.
-            destruct H0.
-            rewrite Ha0 in H0.
+            forward X. cbn; auto.
+            destruct X.
+            rewrite Ha0 in p.
+            inv p.
             inv H0.
+            rewrite Heqo1 in H1.
             inv H1.
-            rewrite Heqo1 in H2.
-            inv H2.
 
             specialize (IHidxs l1 l).
             forward IHidxs.
@@ -4087,40 +4393,40 @@ Module DVConvertSafe
           subst.
           auto.
         * exfalso.
-          apply map_monad_In_OOM_fail in Heqo.
+          apply map_monad_InT_OOM_fail in Heqo.
           destruct Heqo as [dv [HIN DVOOM]].
           pose proof HIN as HIN'.
-          apply In_Nth in HIN' as [i HNTH].
+          apply InT_Nth in HIN' as [i HNTH].
 
-          rewrite <- map_monad_map_monad_In in HMAPM.
+          rewrite <- map_monad_map_monad_InT in HMAPM.
           pose proof (map_monad_OOM_Nth _ _ _ _ _ HMAPM HNTH) as [y [CONVy NTHy]].
-          apply Util.Nth_In in NTHy.
-          specialize (H y).
-          forward H; cbn; auto.
-          destruct H as [dv_i [CONVy_dvi CONVdvi_y]].
+          apply Nth_InT in NTHy.
+          specialize (X y).
+          forward X; cbn; auto.
+          destruct X as [dv_i [CONVy_dvi CONVdvi_y]].
           rewrite CONVy_dvi in CONVy. inv CONVy.
           rewrite CONVdvi_y in DVOOM.
           inv DVOOM.
-      + apply map_monad_In_OOM_fail in HMAPM.
+      + apply map_monad_InT_OOM_failT in HMAPM.
         destruct HMAPM as [dv [HIN DVOOM]].
-        specialize (H dv).
-        forward H; cbn; auto.
-        destruct H as [? [CONTRA ?]].
+        specialize (X dv).
+        forward X; cbn; auto.
+        destruct X as [? [CONTRA ?]].
         rewrite CONTRA in DVOOM.
         inv DVOOM.
     - (* ConcatBytes *)
       rewrite DVC1.uvalue_convert_strict_equation.
       cbn.
 
-      destruct (map_monad_In uvs (fun (elt : DVC1.DV1.uvalue) (_ : In elt uvs) => DVC1.uvalue_convert_strict elt)) eqn:HMAPM.
+      destruct (map_monad_InT uvs (fun (elt : DVC1.DV1.uvalue) (_ : InT elt uvs) => DVC1.uvalue_convert_strict elt)) eqn:HMAPM.
       + eexists; split; eauto.
         rewrite DVC2.uvalue_convert_strict_equation.
         cbn.
 
         break_match_goal.
         * assert (l0 = uvs).
-          { clear - H HMAPM Heqo.
-            revert H HMAPM Heqo.
+          { clear - X HMAPM Heqo.
+            revert X HMAPM Heqo.
             revert l l0.
 
             induction uvs; intros l l0 H HMAPM Heqo.
@@ -4128,23 +4434,23 @@ Module DVConvertSafe
             cbn in Heqo; inv Heqo.
             reflexivity.
 
-            rewrite map_monad_In_unfold in HMAPM.
+            rewrite map_monad_InT_unfold in HMAPM.
             cbn in HMAPM.
             destruct (DVC1.uvalue_convert_strict a) eqn:Ha0; inv HMAPM.
             break_match_hyp; inv H1.
-            rewrite map_monad_In_unfold in Heqo.
+            rewrite map_monad_InT_unfold in Heqo.
             cbn in Heqo.
             break_match_hyp; inv Heqo.
             break_match_hyp; inv H1.
 
             pose proof (H a).
-            forward H0. cbn; auto.
-            destruct H0.
-            rewrite Ha0 in H0.
+            forward X. cbn; auto.
+            destruct X.
+            rewrite Ha0 in p.
+            inv p.
             inv H0.
+            rewrite Heqo1 in H1.
             inv H1.
-            rewrite Heqo1 in H2.
-            inv H2.
 
             specialize (IHuvs l1 l).
             forward IHuvs.
@@ -4161,25 +4467,25 @@ Module DVConvertSafe
           subst.
           auto.
         * exfalso.
-          apply map_monad_In_OOM_fail in Heqo.
+          apply map_monad_InT_OOM_fail in Heqo.
           destruct Heqo as [dv [HIN DVOOM]].
           pose proof HIN as HIN'.
-          apply In_Nth in HIN' as [i HNTH].
+          apply InT_Nth in HIN' as [i HNTH].
 
-          rewrite <- map_monad_map_monad_In in HMAPM.
+          rewrite <- map_monad_map_monad_InT in HMAPM.
           pose proof (map_monad_OOM_Nth _ _ _ _ _ HMAPM HNTH) as [y [CONVy NTHy]].
-          apply Util.Nth_In in NTHy.
-          specialize (H y).
-          forward H; cbn; auto.
-          destruct H as [dv_i [CONVy_dvi CONVdvi_y]].
+          apply Nth_InT in NTHy.
+          specialize (X y).
+          forward X; cbn; auto.
+          destruct X as [dv_i [CONVy_dvi CONVdvi_y]].
           rewrite CONVy_dvi in CONVy. inv CONVy.
           rewrite CONVdvi_y in DVOOM.
           inv DVOOM.
-      + apply map_monad_In_OOM_fail in HMAPM.
+      + apply map_monad_InT_OOM_failT in HMAPM.
         destruct HMAPM as [dv [HIN DVOOM]].
-        specialize (H dv).
-        forward H; cbn; auto.
-        destruct H as [? [CONTRA ?]].
+        specialize (X dv).
+        forward X; cbn; auto.
+        destruct X as [? [CONTRA ?]].
         rewrite CONTRA in DVOOM.
         inv DVOOM.
   Qed.

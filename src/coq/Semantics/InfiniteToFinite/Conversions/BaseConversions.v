@@ -177,7 +177,7 @@ Module Type AddrConvertSafe (ADDR1 : ADDRESS) (ADDR2 : ADDRESS) (AC1 : AddrConve
 
   Parameter addr_convert_succeeds :
     forall a1,
-    exists a2, AC1.addr_convert a1 = NoOom a2.
+    {a2 & AC1.addr_convert a1 = NoOom a2}.
 
   Parameter addr_convert_safe :
     forall a1 a2,
@@ -190,7 +190,7 @@ Module Type IPConvertSafe (IP1 : INTPTR) (IP2 : INTPTR).
 
   Parameter intptr_convert_succeeds :
     forall i1,
-    exists i2, IP2.from_Z (IP1.to_Z i1) = NoOom i2.
+      {i2 & IP2.from_Z (IP1.to_Z i1) = NoOom i2}.
 
   Parameter intptr_convert_safe :
     forall i1 i2,
@@ -201,7 +201,7 @@ End IPConvertSafe.
 Module FinToInfAddrConvertSafe : AddrConvertSafe FinAddr InfAddr FinToInfAddrConvert InfToFinAddrConvert.
   Lemma addr_convert_succeeds :
     forall a1,
-    exists a2, FinToInfAddrConvert.addr_convert a1 = NoOom a2.
+    {a2 & FinToInfAddrConvert.addr_convert a1 = NoOom a2}.
   Proof.
     intros a1.
     destruct a1.
@@ -235,7 +235,7 @@ End FinToInfAddrConvertSafe.
 Module FinToInfIntptrConvertSafe : IPConvertSafe IP64Bit BigIP.
   Lemma intptr_convert_succeeds :
     forall i1,
-    exists i2, BigIP.from_Z (IP64Bit.to_Z i1) = NoOom i2.
+      {i2 & BigIP.from_Z (IP64Bit.to_Z i1) = NoOom i2}.
   Proof.
     intros i1.
     cbn.
