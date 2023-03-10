@@ -1,6 +1,5 @@
 -R coq Vellvm
 
-# -arg -w -arg +default
 -arg -w -arg -masking-absolute-name
 -arg -w -arg -deprecated-hint-without-locality
 -arg -w -arg -deprecated-hint-rewrite-without-locality

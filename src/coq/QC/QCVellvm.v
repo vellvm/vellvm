@@ -197,13 +197,20 @@ Definition vellvm_agrees_with_clang_parallel (p : PROG) : Checker
         whenFail ("Something else went wrong... Vellvm: " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
     end.
 
+#[global] Instance Show_sum {A B} `{Show A} `{Show B} : Show (A + B) :=
+  { show :=  (fun x =>
+    match x with
+    | inl a => ("inl " ++ show a)%string
+    | inr b => ("inr " ++ show b)%string 
+    end) }.
+
 (** Basic property to make sure that Vellvm and Clang agree when they
     both produce values *)
-Definition vellvm_agrees_with_clang (p : option PROG) : Checker
+Definition vellvm_agrees_with_clang (p : string + PROG) : Checker
   :=
   match p with
-  | None => checker false
-  | Some p => 
+  | inl msg => checker false
+  | inr p => 
       (* collect (show prog) *)
       let '(Prog prog) := p in
       let clang_res := run_llc prog in
