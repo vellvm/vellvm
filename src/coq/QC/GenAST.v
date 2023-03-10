@@ -1364,69 +1364,69 @@ Definition genTypHelper (n: nat): G (string + typ) :=
 Definition genType: G (string + typ) :=
   sized genTypHelper.
 
-  Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
-    match sz with
-    | 0%nat =>
+Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
+  match sz with
+  | 0%nat =>
       ctx <- get_ctx;;
       let ts := filter_type t ctx in
       let gen_idents :=
-          match ts with
-          | [] => []
-          | _ => [(16%nat, fmap (fun '(i,_) => EXP_Ident i) (elems_LLVM ts))]
-          end in
+        match ts with
+        | [] => []
+        | _ => [(16%nat, fmap (fun '(i,_) => EXP_Ident i) (elems_LLVM ts))]
+        end in
       let fix gen_size_0 (t: typ) :=
-          match t with
-          | TYPE_I n                  =>
-              z <- lift (gen_unsigned_bitwidth n);;
-              ret (EXP_Integer z)
-          (* lift (x <- (arbitrary : G nat);; ret (Z.of_nat x))
-           (* TODO: should the integer be forced to be in bounds? *) *)
-          | TYPE_IPTR => ret EXP_Integer <*> lift (arbitrary : G Z)
-          | TYPE_Pointer subtyp       => failGen "gen_exp_size TYPE_Pointer"
-          (* Only pointer type expressions might be conversions? Maybe GEP? *)
-          | TYPE_Void                 => failGen "gen_exp_size TYPE_Void" (* There should be no expressions of type void *)
-          | TYPE_Function ret args _   => failGen "gen_exp_size TYPE_Function"(* No expressions of function type *)
-          | TYPE_Opaque               => failGen "gen_exp_size TYPE_Opaque" (* TODO: not sure what these should be... *)
+        match t with
+        | TYPE_I n                  =>
+            z <- lift (gen_unsigned_bitwidth n);;
+            ret (EXP_Integer z)
+        (* lift (x <- (arbitrary : G nat);; ret (Z.of_nat x))
+         (* TODO: should the integer be forced to be in bounds? *) *)
+        | TYPE_IPTR => ret EXP_Integer <*> lift (arbitrary : G Z)
+        | TYPE_Pointer subtyp       => failGen "gen_exp_size TYPE_Pointer"
+        (* Only pointer type expressions might be conversions? Maybe GEP? *)
+        | TYPE_Void                 => failGen "gen_exp_size TYPE_Void" (* There should be no expressions of type void *)
+        | TYPE_Function ret args _   => failGen "gen_exp_size TYPE_Function"(* No expressions of function type *)
+        | TYPE_Opaque               => failGen "gen_exp_size TYPE_Opaque" (* TODO: not sure what these should be... *)
 
-          (* Generate literals for aggregate structures *)
-          | TYPE_Array n t =>
-              es <- vectorOf_LLVM (N.to_nat n) (gen_size_0 t);;
-              ret (EXP_Array (map (fun e => (t, e)) es))
-          | TYPE_Vector n t =>
-              es <- vectorOf_LLVM (N.to_nat n) (gen_size_0 t);;
-              ret (EXP_Vector (map (fun e => (t, e)) es))
-          | TYPE_Struct fields =>
-              (* Should we divide size evenly amongst components of struct? *)
-              tes <- map_monad (fun t => e <- gen_size_0 t;; ret (t, e)) fields;;
-              ret (EXP_Struct tes)
-          | TYPE_Packed_struct fields =>
-              (* Should we divide size evenly amongst components of struct? *)
-              tes <- map_monad (fun t => e <- gen_size_0 t;; ret (t, e)) fields;;
-              ret (EXP_Packed_struct tes)
+        (* Generate literals for aggregate structures *)
+        | TYPE_Array n t =>
+            es <- vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t);;
+            ret (EXP_Array (map (fun e => (t, e)) es))
+        | TYPE_Vector n t =>
+            es <- vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t);;
+            ret (EXP_Vector (map (fun e => (t, e)) es))
+        | TYPE_Struct fields =>
+            (* Should we divide size evenly amongst components of struct? *)
+            tes <- map_monad (fun t => e <- gen_exp_size 0 t;; ret (t, e)) fields;;
+            ret (EXP_Struct tes)
+        | TYPE_Packed_struct fields =>
+            (* Should we divide size evenly amongst components of struct? *)
+            tes <- map_monad (fun t => e <- gen_exp_size 0 t;; ret (t, e)) fields;;
+            ret (EXP_Packed_struct tes)
 
-          | TYPE_Identified id        =>
+        | TYPE_Identified id        =>
             ctx <- get_ctx;;
             match find_pred (fun '(i,t) => if Ident.eq_dec id i then true else false) ctx with
             | None => failGen "gen_exp_size TYPE_Identified"
             | Some (i,t) => gen_exp_size 0 t
             end
-          (* Not generating these types for now *)
-          | TYPE_Half                 => failGen "gen_exp_size TYPE_Half"
-          | TYPE_Float                => ret EXP_Float <*> lift fing32(* referred to genarators in flocq-quickchick*)
-          | TYPE_Double               => failGen "gen_exp_size TYPE_Double" (*ret EXP_Double <*> lift fing64*) (* TODO: Fix generator for double*)
-          | TYPE_X86_fp80             => failGen "gen_exp_size TYPE_X86_fp80"
-          | TYPE_Fp128                => failGen "gen_exp_size TYPE_Fp128"
-          | TYPE_Ppc_fp128            => failGen "gen_exp_size TYPE_Ppc_fp128"
-          | TYPE_Metadata             => failGen "gen_exp_size TYPE_Metadata"
-          | TYPE_X86_mmx              => failGen "gen_exp_size TYPE_X86_mmx"
-          end in
+        (* Not generating these types for now *)
+        | TYPE_Half                 => failGen "gen_exp_size TYPE_Half"
+        | TYPE_Float                => ret EXP_Float <*> lift fing32(* referred to genarators in flocq-quickchick*)
+        | TYPE_Double               => failGen "gen_exp_size TYPE_Double" (*ret EXP_Double <*> lift fing64*) (* TODO: Fix generator for double*)
+        | TYPE_X86_fp80             => failGen "gen_exp_size TYPE_X86_fp80"
+        | TYPE_Fp128                => failGen "gen_exp_size TYPE_Fp128"
+        | TYPE_Ppc_fp128            => failGen "gen_exp_size TYPE_Ppc_fp128"
+        | TYPE_Metadata             => failGen "gen_exp_size TYPE_Metadata"
+        | TYPE_X86_mmx              => failGen "gen_exp_size TYPE_X86_mmx"
+        end in
       (* Hack to avoid failing way too much *)
       match t with
       | TYPE_Pointer t => freq_LLVM gen_idents
       | _ => freq_LLVM
-               (gen_idents ++ [(1%nat, gen_size_0 t)])
+              (gen_idents ++ [(1%nat, gen_size_0 t)])
       end
-    | (S sz') =>
+  | (S sz') =>
       let gens :=
           match t with
           | TYPE_I isz =>
