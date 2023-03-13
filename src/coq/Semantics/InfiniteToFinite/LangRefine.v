@@ -63,6 +63,90 @@ Import InterpFacts.
 Import MonadNotation.
 Import ListNotations.
 
+(* TODO: Move these *)
+Program Fixpoint Forall2_HInT {A B : Type}
+  (xs : list A) (ys : list B) (R : forall a b, InT a xs -> InT b ys -> Prop) : Prop :=
+  match xs, ys with
+  | [], [] => True
+  | (x::xs), (y::ys) =>
+      R x y _ _ /\ Forall2_HInT xs ys (fun x y IN1 IN2 => R x y _ _)
+  | _, _ =>
+      False
+  end.
+Next Obligation.
+  exact (inl eq_refl).
+Defined.
+Next Obligation.
+  exact (inl eq_refl).
+Defined.
+Next Obligation.
+  exact (inr IN1).
+Defined.
+Next Obligation.
+  exact (inr IN2).
+Defined.
+Next Obligation.
+  split.
+  intros x xs0 y ys0 CONTRA.
+  inversion CONTRA.
+  inversion H1.
+
+  intros [_ CONTRA].
+  inversion CONTRA.
+Defined.
+Next Obligation.
+  split.
+  intros x xs0 y ys0 [_ CONTRA].
+  inversion CONTRA.
+
+  intros [CONTRA _].
+  inversion CONTRA.
+Defined.
+
+Lemma map_monad_InT_oom_forall2 :
+  forall {A B} l (f : forall (a : A), InT a l -> OOM B) res,
+    map_monad_InT l f = NoOom res <->
+      Forall2_HInT l res (fun a b INA INB => f a INA = NoOom b).
+Proof.
+  intros A B.
+  induction l; intros f res.
+  - split; intros MAP.
+    + cbn in *.
+      inv MAP.
+      auto.
+    + cbn in *.
+      break_match_hyp; tauto.
+  - split; intros MAP.
+    + rewrite map_monad_InT_unfold in MAP.
+      cbn in *.
+      break_match_hyp; inv MAP.
+      break_match_hyp; inv H0.
+
+      pose proof (IHl (fun (x : A) (HIn : InT x l) => f x (inr HIn)) l0) as FORALL.
+      constructor; auto.
+      eapply FORALL. eauto.
+    + rewrite map_monad_InT_cons.
+      cbn in *.
+      break_match_hyp; try contradiction.
+      cbn in *.
+      destruct MAP as [FA MAP].
+      rewrite FA.
+
+      pose proof (IHl (fun (x : A) (HIn : InT x l) => f x (inr HIn)) l0) as FORALL.
+      apply FORALL in MAP.
+      rewrite MAP.
+      auto.
+Qed.
+
+Lemma Forall2_Forall2_HInT :
+  forall {A B : Type} (xs : list A) (ys : list B) f,
+    Forall2 f xs ys ->
+    Forall2_HInT xs ys (fun a b HIna HInb => f a b).
+Proof.
+  intros A B xs ys f H.
+  induction H; cbn; auto.
+Qed.
+
 Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP).
   Import TLR.
 
@@ -4786,7 +4870,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         cbn.
         apply orutt_Ret; auto.
         solve_dvalue_refine_strict.
-      + rewrite map_monad_In_cons in Heqo.
+      + rewrite map_monad_InT_cons in Heqo.
         cbn in Heqo.
         break_match_hyp; inv Heqo.
         break_match_hyp; inv H0.
@@ -4806,7 +4890,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           induction fields; intros l0 Heqo.
           - cbn in *; inv Heqo.
             cbn. auto.
-          - rewrite map_monad_In_cons in Heqo.
+          - rewrite map_monad_InT_cons in Heqo.
             cbn in *.
             break_match_hyp; inv Heqo.
             break_match_hyp; inv H0.
@@ -4851,18 +4935,18 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           apply orutt_Ret.
 
           unfold_dvalue_refine_strict_goal.
-          rewrite map_monad_In_cons.
+          rewrite map_monad_InT_cons.
           cbn.
           rewrite REFdvu.
 
           break_inner_match_goal.
           2: {
-            apply map_monad_In_OOM_fail in Heqo1.
+            apply map_monad_InT_OOM_failT in Heqo1.
             destruct Heqo1 as [a' [INa' CONVa']].
-            apply map_monad_err_In with (x:=a') in Heqs; auto.
+            apply map_monad_err_InT with (x:=a') in Heqs; auto.
             destruct Heqs as [y [UV2DVy INy]].
 
-            eapply map_monad_In_OOM_succeeds' in Heqo; eauto.
+            eapply map_monad_InT_OOM_succeeds' in Heqo; eauto.
             destruct Heqo as [b UVCyb].
             pose proof (uvalue_to_dvalue_dvalue_refine_strict _ _ _ UVCyb UV2DVy) as [dva' [UV2DVa' REFa']].
             rewrite REFa' in CONVa'.
@@ -4891,7 +4975,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             apply orutt_trigger; cbn.
             split; [tauto | ].
             { unfold_uvalue_refine_strict_goal.
-              rewrite map_monad_In_cons.
+              rewrite map_monad_InT_cons.
               cbn.
               rewrite Heqo0.
               rewrite Heqo.
@@ -4915,7 +4999,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         cbn.
         apply orutt_Ret; auto.
         solve_dvalue_refine_strict.
-      + rewrite map_monad_In_cons in Heqo.
+      + rewrite map_monad_InT_cons in Heqo.
         cbn in Heqo.
         break_match_hyp; inv Heqo.
         break_match_hyp; inv H0.
@@ -4935,7 +5019,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           induction fields; intros l0 Heqo.
           - cbn in *; inv Heqo.
             cbn. auto.
-          - rewrite map_monad_In_cons in Heqo.
+          - rewrite map_monad_InT_cons in Heqo.
             cbn in *.
             break_match_hyp; inv Heqo.
             break_match_hyp; inv H0.
@@ -4980,18 +5064,18 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           apply orutt_Ret.
 
           unfold_dvalue_refine_strict_goal.
-          rewrite map_monad_In_cons.
+          rewrite map_monad_InT_cons.
           cbn.
           rewrite REFdvu.
 
           break_inner_match_goal.
           2: {
-            apply map_monad_In_OOM_fail in Heqo1.
+            apply map_monad_InT_OOM_failT in Heqo1.
             destruct Heqo1 as [a' [INa' CONVa']].
-            apply map_monad_err_In with (x:=a') in Heqs; auto.
+            apply map_monad_err_InT with (x:=a') in Heqs; auto.
             destruct Heqs as [y [UV2DVy INy]].
 
-            eapply map_monad_In_OOM_succeeds' in Heqo; eauto.
+            eapply map_monad_InT_OOM_succeeds' in Heqo; eauto.
             destruct Heqo as [b UVCyb].
             pose proof (uvalue_to_dvalue_dvalue_refine_strict _ _ _ UVCyb UV2DVy) as [dva' [UV2DVa' REFa']].
             rewrite REFa' in CONVa'.
@@ -5020,7 +5104,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             apply orutt_trigger; cbn.
             split; [tauto | ].
             { unfold_uvalue_refine_strict_goal.
-              rewrite map_monad_In_cons.
+              rewrite map_monad_InT_cons.
               cbn.
               rewrite Heqo0.
               rewrite Heqo.
@@ -5044,7 +5128,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         cbn.
         apply orutt_Ret.
         solve_dvalue_refine_strict.
-      + rewrite map_monad_In_cons in Heqo.
+      + rewrite map_monad_InT_cons in Heqo.
         cbn in *.
         break_match_hyp; inv Heqo.
         break_match_hyp; inv H0.
@@ -5062,7 +5146,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           induction elts; intros l0 Heqo.
           - cbn in *; inv Heqo.
             cbn. auto.
-          - rewrite map_monad_In_cons in Heqo.
+          - rewrite map_monad_InT_cons in Heqo.
             cbn in *.
             break_match_hyp; inv Heqo.
             break_match_hyp; inv H0.
@@ -5107,18 +5191,18 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           apply orutt_Ret.
 
           unfold_dvalue_refine_strict_goal.
-          rewrite map_monad_In_cons.
+          rewrite map_monad_InT_cons.
           cbn.
           rewrite REFdvu.
 
           break_inner_match_goal.
           2: {
-            apply map_monad_In_OOM_fail in Heqo1.
+            apply map_monad_InT_OOM_fail in Heqo1.
             destruct Heqo1 as [a' [INa' CONVa']].
-            apply map_monad_err_In with (x:=a') in Heqs; auto.
+            apply map_monad_err_InT with (x:=a') in Heqs; auto.
             destruct Heqs as [y [UV2DVy INy]].
 
-            eapply map_monad_In_OOM_succeeds' in Heqo; eauto.
+            eapply map_monad_InT_OOM_succeeds' in Heqo; eauto.
             destruct Heqo as [b UVCyb].
             pose proof (uvalue_to_dvalue_dvalue_refine_strict _ _ _ UVCyb UV2DVy) as [dva' [UV2DVa' REFa']].
             rewrite REFa' in CONVa'.
@@ -5146,7 +5230,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             apply orutt_trigger; cbn.
             split; [tauto | ].
             { unfold_uvalue_refine_strict_goal.
-              rewrite map_monad_In_cons.
+              rewrite map_monad_InT_cons.
               cbn.
               rewrite Heqo0.
               rewrite Heqo.
@@ -5170,7 +5254,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         cbn.
         apply orutt_Ret.
         solve_dvalue_refine_strict.
-      + rewrite map_monad_In_cons in Heqo.
+      + rewrite map_monad_InT_cons in Heqo.
         cbn in *.
         break_match_hyp; inv Heqo.
         break_match_hyp; inv H0.
@@ -5188,7 +5272,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           induction elts; intros l0 Heqo.
           - cbn in *; inv Heqo.
             cbn. auto.
-          - rewrite map_monad_In_cons in Heqo.
+          - rewrite map_monad_InT_cons in Heqo.
             cbn in *.
             break_match_hyp; inv Heqo.
             break_match_hyp; inv H0.
@@ -5233,18 +5317,18 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           apply orutt_Ret.
 
           unfold_dvalue_refine_strict_goal.
-          rewrite map_monad_In_cons.
+          rewrite map_monad_InT_cons.
           cbn.
           rewrite REFdvu.
 
           break_inner_match_goal.
           2: {
-            apply map_monad_In_OOM_fail in Heqo1.
+            apply map_monad_InT_OOM_fail in Heqo1.
             destruct Heqo1 as [a' [INa' CONVa']].
-            apply map_monad_err_In with (x:=a') in Heqs; auto.
+            apply map_monad_err_InT with (x:=a') in Heqs; auto.
             destruct Heqs as [y [UV2DVy INy]].
 
-            eapply map_monad_In_OOM_succeeds' in Heqo; eauto.
+            eapply map_monad_InT_OOM_succeeds' in Heqo; eauto.
             destruct Heqo as [b UVCyb].
             pose proof (uvalue_to_dvalue_dvalue_refine_strict _ _ _ UVCyb UV2DVy) as [dva' [UV2DVa' REFa']].
             rewrite REFa' in CONVa'.
@@ -5272,7 +5356,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             apply orutt_trigger; cbn.
             split; [tauto | ].
             { unfold_uvalue_refine_strict_goal.
-              rewrite map_monad_In_cons.
+              rewrite map_monad_InT_cons.
               cbn.
               rewrite Heqo0.
               rewrite Heqo.
@@ -5561,15 +5645,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               reflexivity.
             - rewrite map_repeat in Heqo.
               rewrite map_repeat.
-              eapply map_monad_In_OOM_repeat_success in Heqo; subst; cbn; auto.
+              eapply map_monad_InT_OOM_repeat_success in Heqo; subst; cbn; auto.
               rewrite Heqo. reflexivity.
               rewrite <- uvalue_refine_strict_equation.
+              intros INx.
               apply dvalue_refine_strict_dvalue_to_uvalue; auto.
           }
 
-          apply map_monad_In_OOM_fail in Heqo as [a [IN FAIL]].
+          apply map_monad_InT_OOM_failT in Heqo as [a [IN FAIL]].
           rewrite map_repeat in IN.
-          apply repeat_spec in IN; subst.
+          apply repeat_spec_InT in IN; subst.
           apply dvalue_refine_strict_dvalue_to_uvalue in REFdv2.
           rewrite REFdv2 in FAIL.
           inv FAIL.
@@ -5623,7 +5708,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               apply default_dvalue_of_dtyp_dv1_dv2_equiv in Heqs as [dv2 [DEFdv2 REFdv2]].
               rewrite DEFdv2 in Heqs1. inv Heqs1.
               rewrite map_cons in CONV.
-              rewrite map_monad_In_cons in CONV.
+              rewrite map_monad_InT_cons in CONV.
               cbn in *.
               break_match_hyp; inv CONV.
               break_match_hyp; inv H0.
@@ -5636,13 +5721,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               reflexivity.
           }
 
-          apply map_monad_In_OOM_fail in Heqo as [a [IN FAIL]].
-          apply in_map_iff in IN.
+          apply map_monad_InT_OOM_failT in Heqo as [a [IN FAIL]].
+          apply InT_map_impl in IN.
           destruct IN as [a' [EQ IN]].
           subst.
 
           pose proof Heqs2.
-          eapply map_monad_err_In in H; eauto.
+          eapply map_monad_err_InT in H; eauto.
           destruct H as [y [DEFy INy]].
           pose proof DEFy as A'.
           apply default_dvalue_of_dtyp_dv1_dv2_equiv in DEFy as [dv2 [DEFdv2 REFdv2]].
@@ -5699,7 +5784,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               apply default_dvalue_of_dtyp_dv1_dv2_equiv in Heqs as [dv2 [DEFdv2 REFdv2]].
               rewrite DEFdv2 in Heqs1. inv Heqs1.
               rewrite map_cons in CONV.
-              rewrite map_monad_In_cons in CONV.
+              rewrite map_monad_InT_cons in CONV.
               cbn in *.
               break_match_hyp; inv CONV.
               break_match_hyp; inv H0.
@@ -5712,13 +5797,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               reflexivity.
           }
 
-          apply map_monad_In_OOM_fail in Heqo as [a [IN FAIL]].
-          apply in_map_iff in IN.
+          apply map_monad_InT_OOM_fail in Heqo as [a [IN FAIL]].
+          apply InT_map_impl in IN.
           destruct IN as [a' [EQ IN]].
           subst.
 
           pose proof Heqs2.
-          eapply map_monad_err_In in H; eauto.
+          eapply map_monad_err_InT in H; eauto.
           destruct H as [y [DEFy INy]].
           pose proof DEFy as A'.
           apply default_dvalue_of_dtyp_dv1_dv2_equiv in DEFy as [dv2 [DEFdv2 REFdv2]].
@@ -5745,15 +5830,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               reflexivity.
             - rewrite map_repeat in Heqo.
               rewrite map_repeat.
-              eapply map_monad_In_OOM_repeat_success in Heqo; subst; cbn; auto.
+              eapply map_monad_InT_OOM_repeat_success in Heqo; subst; cbn; auto.
               rewrite Heqo. reflexivity.
               rewrite <- uvalue_refine_strict_equation.
+              intros INx.
               apply dvalue_refine_strict_dvalue_to_uvalue; auto.
           }
 
-          apply map_monad_In_OOM_fail in Heqo as [a [IN FAIL]].
+          apply map_monad_InT_OOM_fail in Heqo as [a [IN FAIL]].
           rewrite map_repeat in IN.
-          apply repeat_spec in IN; subst.
+          apply repeat_spec_InT in IN; subst.
           apply dvalue_refine_strict_dvalue_to_uvalue in REFdv2.
           rewrite REFdv2 in FAIL.
           inv FAIL.
@@ -5766,15 +5852,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               reflexivity.
             - rewrite map_repeat in Heqo.
               rewrite map_repeat.
-              eapply map_monad_In_OOM_repeat_success in Heqo; subst; cbn; auto.
+              eapply map_monad_InT_OOM_repeat_success in Heqo; subst; cbn; auto.
               rewrite Heqo. reflexivity.
               rewrite <- uvalue_refine_strict_equation.
               solve_uvalue_refine_strict.
           }
 
-          apply map_monad_In_OOM_fail in Heqo as [a [IN FAIL]].
+          apply map_monad_InT_OOM_fail in Heqo as [a [IN FAIL]].
           rewrite map_repeat in IN.
-          apply repeat_spec in IN; subst.
+          apply repeat_spec_InT in IN; subst.
           cbn in FAIL.
           rewrite uvalue_convert_strict_equation in FAIL.
           cbn in *.
@@ -5789,15 +5875,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               reflexivity.
             - rewrite map_repeat in Heqo.
               rewrite map_repeat.
-              eapply map_monad_In_OOM_repeat_success in Heqo; subst; cbn; auto.
+              eapply map_monad_InT_OOM_repeat_success in Heqo; subst; cbn; auto.
               rewrite Heqo. reflexivity.
               rewrite <- uvalue_refine_strict_equation.
               solve_uvalue_refine_strict.
           }
 
-          apply map_monad_In_OOM_fail in Heqo as [a [IN FAIL]].
+          apply map_monad_InT_OOM_fail in Heqo as [a [IN FAIL]].
           rewrite map_repeat in IN.
-          apply repeat_spec in IN; subst.
+          apply repeat_spec_InT in IN; subst.
           cbn in FAIL.
           rewrite uvalue_convert_strict_equation in FAIL.
           cbn in *.
@@ -5811,15 +5897,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               reflexivity.
             - rewrite map_repeat in Heqo.
               rewrite map_repeat.
-              eapply map_monad_In_OOM_repeat_success in Heqo; subst; cbn; auto.
+              eapply map_monad_InT_OOM_repeat_success in Heqo; subst; cbn; auto.
               rewrite Heqo. reflexivity.
               rewrite <- uvalue_refine_strict_equation.
               solve_uvalue_refine_strict.
           }
 
-          apply map_monad_In_OOM_fail in Heqo as [a [IN FAIL]].
+          apply map_monad_InT_OOM_fail in Heqo as [a [IN FAIL]].
           rewrite map_repeat in IN.
-          apply repeat_spec in IN; subst.
+          apply repeat_spec_InT in IN; subst.
           cbn in FAIL.
           rewrite uvalue_convert_strict_equation in FAIL.
           cbn in *.
@@ -5853,7 +5939,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           apply orutt_Ret.
           rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in H1.
           rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
-          rewrite map_monad_In_cons.
+          rewrite map_monad_InT_cons.
           cbn.
           cbn in H1.
           break_match_hyp; inv H1.
@@ -5893,7 +5979,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           apply orutt_Ret.
           rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in H1.
           rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
-          rewrite map_monad_In_cons.
+          rewrite map_monad_InT_cons.
           cbn.
           cbn in H1.
           break_match_hyp; inv H1.
@@ -5949,7 +6035,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           apply orutt_Ret.
           rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in H1.
           rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
-          rewrite map_monad_In_cons.
+          rewrite map_monad_InT_cons.
           cbn.
           cbn in H1.
           break_match_hyp; inv H1.
@@ -5989,7 +6075,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           apply orutt_Ret.
           rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in H1.
           rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
-          rewrite map_monad_In_cons.
+          rewrite map_monad_InT_cons.
           cbn.
           cbn in H1.
           break_match_hyp; inv H1.
@@ -6029,7 +6115,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           apply orutt_Ret.
           rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in H1.
           rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
-          rewrite map_monad_In_cons.
+          rewrite map_monad_InT_cons.
           cbn.
           cbn in H1.
           break_match_hyp; inv H1.
@@ -6134,7 +6220,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           apply orutt_Ret.
           rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in H2.
           rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
-          rewrite map_monad_In_cons.
+          rewrite map_monad_InT_cons.
           cbn.
           cbn in H2.
           break_match_hyp; inv H2.
@@ -6749,8 +6835,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             change uvalue_refine_strict with (fun a b => uvalue_refine_strict a b) in H;
             unfold uvalue_refine_strict in H;
             eapply orutt_Ret;
-            apply Forall2_Forall2_HIn in H;
-            eapply map_monad_In_oom_forall2 in H;
+            apply Forall2_Forall2_HInT in H;
+            eapply map_monad_InT_oom_forall2 in H;
             unfold_uvalue_refine_strict;
             cbn;
             rewrite H;

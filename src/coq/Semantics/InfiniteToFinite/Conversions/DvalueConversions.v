@@ -261,6 +261,33 @@ Proof.
   break_match_hyp; inv H1.
 Qed.
 
+Lemma map_monad_err_InT :
+  forall {A B} (f : A -> err B) l res x,
+    map_monad f l = ret res ->
+    InT x res ->
+    {y & ((f y = ret x) * (InT y l))%type}.
+Proof.
+  intros A B f l res x MAP IN.
+  generalize dependent l.
+  induction res; intros l MAP.
+  - inversion IN.
+  - inversion IN; subst.
+    + destruct l as [_ | h ls].
+      * cbn in MAP.
+        inv MAP.
+      * exists h.
+        cbn in MAP.
+        break_match_hyp; [|break_match_hyp]; inv MAP.
+        split; cbn; auto.
+    + destruct l as [_ | h ls].
+      * cbn in MAP.
+        inv MAP.
+      * cbn in MAP.
+        break_match_hyp; [|break_match_hyp]; inv MAP.
+        epose proof (IHres X ls Heqs0) as [y [HF INy]].
+        exists y; split; cbn; eauto.
+Qed.
+
 Lemma InT_cons_right :
   forall {A} {l : list A} {a x xs}
     (EQ : l = x :: xs) (HIn : InT a xs),
@@ -272,6 +299,20 @@ Proof.
   right.
   auto.
 Defined.
+
+Lemma InT_map_impl : forall {X Y} (f : X -> Y) l {y : Y},
+    InT y (map f l) -> {x & ((f x = y) * (InT x l))%type}.
+Proof.
+  intros X Y f l.
+  induction l; firstorder (subst; auto).
+Qed.
+
+Lemma InT_map_flip : forall {X Y} (f : X -> Y) l {y : Y},
+    {x & ((f x = y) * (InT x l))%type} -> InT y (map f l).
+Proof.
+  intros X Y f l.
+  induction l; firstorder (subst; auto).
+Qed.
 
 Require Import FunctionalExtensionality.
 Lemma map_monad_InT_OOM_cons_inv :
@@ -3531,7 +3572,10 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
 
 End DVConvert.
 
-Module DVConvertMake (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF) : DVConvert LP1 LP2 AC Events1 Events2.
+Module DVConvertMake (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF) : DVConvert LP1 LP2 AC Events1 Events2
+with Module DV1 := Events1.DV
+with Module DV2 := Events2.DV.
+
   Include DVConvert LP1 LP2 AC Events1 Events2.
 End DVConvertMake.
 
