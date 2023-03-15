@@ -58,10 +58,7 @@ Import InterpFacts.
 Import MonadNotation.
 Import ListNotations.
 
-Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (AC2 : AddrConvert LP2.ADDR LP1.ADDR) (E1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (E2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF).
-  (* TODO: should this be a parameter? *)
-  Module DVC := DVConvertMake LP1 LP2 AC E1 E2.
-  Module DVCrev := DVConvertMake LP2 LP1 AC2 E2 E1.
+Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (AC2 : AddrConvert LP2.ADDR LP1.ADDR) (E1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (E2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF) (DVC : DVConvert LP1 LP2 AC E1 E2) (DVCrev : DVConvert LP2 LP1 AC2 E2 E1).
   Import DVC.
 
   Definition L0_convert_helper
@@ -569,47 +566,56 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
   Definition L6_convert_strict : Handler E1.L6 E2.L6 := L6_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict DVCrev.uvalue_convert_strict.
 End EventConvert.
 
+Module EventConvertMake (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (AC2 : AddrConvert LP2.ADDR LP1.ADDR) (E1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (E2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF) (DVC : DVConvert LP1 LP2 AC E1 E2) (DVCrev : DVConvert LP2 LP1 AC2 E2 E1) : EventConvert LP1 LP2 AC AC2 E1 E2 DVC DVCrev.
+  Include EventConvert LP1 LP2 AC AC2 E1 E2 DVC DVCrev.
+End EventConvertMake.
+
 Module EventConvertSafe
   (LP1 : LLVMParams) (LP2 : LLVMParams)
   (AC1 : AddrConvert LP1.ADDR LP2.ADDR) (AC2 : AddrConvert LP2.ADDR LP1.ADDR)
   (ACSafe : AddrConvertSafe LP1.ADDR LP2.ADDR AC1 AC2)
   (IPSafe : IPConvertSafe LP1.IP LP2.IP)
-  (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF).
-  Module EC := EventConvert LP1 LP2 AC1 AC2 Events1 Events2.
-  Module DVCSafe := DVConvertSafe LP1 LP2 AC1 AC2 ACSafe IPSafe Events1 Events2 EC.DVC EC.DVCrev.
+  (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF)
+  (DVC : DVConvert LP1 LP2 AC1 Events1 Events2) (DVCrev : DVConvert LP2 LP1 AC2 Events2 Events1) (EC : EventConvert LP1 LP2 AC1 AC2 Events1 Events2 DVC DVCrev).
+  Module DVCSafe := DVConvertSafe LP1 LP2 AC1 AC2 ACSafe IPSafe Events1 Events2 DVC DVCrev.
 
   (* Converting finite events to infinite events... *)
-  Module DV1 := EC.DVC.DV1. (* Finite *)
-  Module DV2 := EC.DVC.DV2. (* Infinite *)
+  Module DV1 := DVC.DV1. (* Finite *)
+  Module DV2 := DVC.DV2. (* Infinite *)
 
   (* DVC : Fin -> Inf
      DVCrev : Inf -> Fin
    *)
 
   Definition dvalue_convert (dv : DV1.dvalue) : OOM DV2.dvalue
-    := EC.DVC.dvalue_convert_strict dv.
+    := DVC.dvalue_convert_strict dv.
 
   Definition dvalue_convert_safe (dv : DV1.dvalue) : DV2.dvalue.
   Proof.
     pose proof DVCSafe.dvalue_convert_strict_safe dv.
-    (* Uggggh, can't destruct H because constructing a Type :'C *)
-    (* destruct H as [dv_i [CONVf CONVi]]. *)
-    (* remember (EC.DVC.dvalue_convert_strict dv). *)
-    (* destruct o *)
-  Admitted.
+    destruct H as [dv_i [CONVf CONVi]].
+    remember (DVC.dvalue_convert_strict dv).
+    destruct o; inv CONVf.
+    exact dv_i.
+  Defined.
 
   Definition uvalue_convert (uv : DV1.uvalue) : OOM DV2.uvalue
-    := EC.DVC.uvalue_convert_strict uv.
+    := DVC.uvalue_convert_strict uv.
 
   Definition uvalue_convert_safe (uv : DV1.uvalue) : DV2.uvalue.
   Proof.
-  Admitted.
+    pose proof DVCSafe.uvalue_convert_strict_safe uv.
+    destruct H as [uv_i [CONVf CONVi]].
+    remember (DVC.uvalue_convert_strict uv).
+    destruct o; inv CONVf.
+    exact uv_i.
+  Defined.
 
   Definition rev_dvalue_convert (dv : DV2.dvalue) : OOM DV1.dvalue
-    := EC.DVCrev.dvalue_convert_strict dv.
+    := DVCrev.dvalue_convert_strict dv.
 
   Definition rev_uvalue_convert (uv : DV2.uvalue) : OOM DV1.uvalue
-    := EC.DVCrev.uvalue_convert_strict uv.
+    := DVCrev.uvalue_convert_strict uv.
 
   Module E1 := Events1.
   Module E2 := Events2.

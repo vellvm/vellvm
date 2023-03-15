@@ -59,13 +59,12 @@ Import InterpFacts.
 Import MonadNotation.
 Import ListNotations.
 
-Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR).
+Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev).
   Module E1 := IS1.LP.Events.
   Module E2 := IS2.LP.Events.
 
-  Module EC := EventConvert IS1.LP IS2.LP AC1 AC2 E1 E2.
   Import EC.
-  Import EC.DVC.
+  Import DVC.
 
   (** Converting trees with events in language 1 to trees with events in language 2 *)
 

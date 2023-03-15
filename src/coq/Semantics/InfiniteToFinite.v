@@ -96,9 +96,9 @@ Module InfiniteToFinite.
   Module InfFinTC := Vellvm.Semantics.InfiniteToFinite.LangRefine.InfFinLangRefine.TC1.
   (* Module FinInfTC := Vellvm.Semantics.InfiniteToFinite.LangRefine.FinInfLangRefine.TC1. *)
 
-  Module EC1 := InfFinTC.EC.
-  Module DVC1 := EC1.DVC.
-  (* Module EC2 := FinInfTC.EC. *)
+  Module EC1 := Vellvm.Semantics.InfiniteToFinite.LangRefine.InfFinLangRefine.EC.
+  Module DVC1 := Vellvm.Semantics.InfiniteToFinite.LangRefine.InfFinLangRefine.DVC.
+  Module DVC2 := Vellvm.Semantics.InfiniteToFinite.LangRefine.InfFinLangRefine.DVCrev.
 
   Module InfMem := MemoryBigIntptr.
   Module FinMem := Memory64BitIntptr.
@@ -112,8 +112,7 @@ Module InfiniteToFinite.
   Module InfLP := InterpreterStackBigIntptr.LP.
   Module FinLP := InterpreterStack64BitIntptr.LP.
 
-  Module EC2 := EventConvert FinLP InfLP FinToInfAddrConvert InfToFinAddrConvert FinLP.Events InfLP.Events.
-  Module DVC2 := EC2.DVC.
+  (* Module EC2 := EventConvert FinLP InfLP FinToInfAddrConvert InfToFinAddrConvert FinLP.Events InfLP.Events DVC1. *)
 
   Module DVCS := DVConvertSafe FinLP InfLP FinToInfAddrConvert InfToFinAddrConvert FinToInfAddrConvertSafe FinToInfIntptrConvertSafe FinLP.Events InfLP.Events DVC2 DVC1.
   Import DVCS.
@@ -121,14 +120,14 @@ Module InfiniteToFinite.
   (* Could not put with the other conversions, need to know what memory structures like MemState are *)
   Definition convert_SByte (sb1 : MemoryBigIntptr.MP.BYTE_IMPL.SByte) : OOM (Memory64BitIntptr.MP.BYTE_IMPL.SByte).
     destruct sb1.
-    refine (uv' <- EC.DVC.uvalue_convert_strict uv;;
-            idx' <- EC.DVC.uvalue_convert_strict idx;;
+    refine (uv' <- DVC.uvalue_convert_strict uv;;
+            idx' <- DVC.uvalue_convert_strict idx;;
             ret (FiniteSizeof.mkUByte LLVMParams64BitIntptr.Events.DV.uvalue uv' dt idx' sid)).
   Defined.
 
   Definition lift_SByte (sb1 : Memory64BitIntptr.MP.BYTE_IMPL.SByte) : MemoryBigIntptr.MP.BYTE_IMPL.SByte.
     destruct sb1.
-    remember (EC2.DVC.uvalue_convert_strict uv).
+    remember (DVC2.uvalue_convert_strict uv).
     pose proof uvalue_convert_strict_safe uv as [uv_i [CONV REVCONV]].
     pose proof (uvalue_convert_strict_safe idx) as [idx_i [CONV_idx REVCONV_idx]].
     exact (FiniteSizeof.mkUByte LLVMParams64BitIntptr.Events.DV.uvalue uv_i dt idx_i sid).

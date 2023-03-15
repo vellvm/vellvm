@@ -150,10 +150,14 @@ Qed.
 Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP).
   Import TLR.
 
-  Module TC1 := TreeConvert IS1 IS2 AC1 AC2.
+  Module DVC := DVConvertMake IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events.
+  Module DVCrev := DVConvertMake IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events.
+  Module EC := EventConvertMake IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev.
+  Module TC1 := TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC.
+
   Import TC1.
   Import EC.
-  Import EC.DVC.
+  Import DVC.
   Import IPS.
 
   (**  Converting state between the two languages *)
@@ -468,11 +472,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         unfold lift_OOM in H1.
         rename H0 into KS. rewrite bind_trigger in KS.
         cbn in *.
-        destruct (EC.DVC.uvalue_convert_strict f) eqn : Hf.
+        destruct (DVC.uvalue_convert_strict f) eqn : Hf.
         { rewrite bind_ret_l, bind_bind in H1.
           destruct
             (map_monad_In args
-              (fun (elt : E1.DV.dvalue) (_ : In elt args) => EC.DVC.dvalue_convert_strict elt)) eqn: Hm.
+              (fun (elt : E1.DV.dvalue) (_ : In elt args) => DVC.dvalue_convert_strict elt)) eqn: Hm.
           { rewrite bind_ret_l, bind_bind in H1.
             rewrite bind_trigger in H1.
 
@@ -499,7 +503,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               eapply eqit_Vis. intros.
               Unshelve.
               3 : exact (fun u0 : E2.DV.dvalue =>
-              ITree.bind match EC.DVCrev.dvalue_convert_strict u0 with
+              ITree.bind match DVCrev.dvalue_convert_strict u0 with
                         | NoOom a0 => ret a0
                         | Oom s => raise_oom s
                          end (fun x1 : E1.DV.dvalue => Tau (interp EC.L0_convert_strict (k2 x1)))).
@@ -507,7 +511,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             - cbn. red in H1. subst.
               eapply bisimulation_is_eq in H1. rewrite H1.
 
-              destruct (EC.DVCrev.dvalue_convert_strict a) eqn: Ht.
+              destruct (DVCrev.dvalue_convert_strict a) eqn: Ht.
               + setoid_rewrite H in HK. subst.
                 (* TODO: Originally used Returns_uvalue_convert_L0
                 applied to H3... But it seems Returns is weird with
@@ -1201,11 +1205,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         unfold lift_OOM in H1.
         rename H0 into KS. rewrite bind_trigger in KS.
         cbn in *.
-        destruct (EC.DVC.uvalue_convert_strict f) eqn : Hf.
+        destruct (DVC.uvalue_convert_strict f) eqn : Hf.
         { rewrite bind_ret_l, bind_bind in H1.
           destruct
             (map_monad_In args
-              (fun (elt : E1.DV.dvalue) (_ : In elt args) => EC.DVC.dvalue_convert_strict elt)) eqn: Hm.
+              (fun (elt : E1.DV.dvalue) (_ : In elt args) => DVC.dvalue_convert_strict elt)) eqn: Hm.
           { rewrite bind_ret_l, bind_bind in H1.
             rewrite bind_trigger in H1.
 
@@ -1232,7 +1236,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               eapply eqit_Vis. intros.
               Unshelve.
               3 : exact (fun u0 : E2.DV.dvalue =>
-              ITree.bind match EC.DVCrev.dvalue_convert_strict u0 with
+              ITree.bind match DVCrev.dvalue_convert_strict u0 with
                         | NoOom a0 => ret a0
                         | Oom s => raise_oom s
                          end (fun x1 : E1.DV.dvalue => Tau (interp EC.L4_convert_strict (k2 x1)))).
@@ -1240,7 +1244,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             - cbn. red in H1. subst.
               eapply bisimulation_is_eq in H1. rewrite H1.
 
-              destruct (EC.DVCrev.dvalue_convert_strict a) eqn: Ht.
+              destruct (DVCrev.dvalue_convert_strict a) eqn: Ht.
               + setoid_rewrite H in HK. subst.
                 (* TODO: Originally used Returns_uvalue_convert_L0
                 applied to H3... But it seems Returns is weird with
