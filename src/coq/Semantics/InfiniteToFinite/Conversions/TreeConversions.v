@@ -59,7 +59,7 @@ Import InterpFacts.
 Import MonadNotation.
 Import ListNotations.
 
-Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev).
+Module Type TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev).
   Module E1 := IS1.LP.Events.
   Module E2 := IS2.LP.Events.
 
@@ -483,3 +483,10 @@ Module TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : Addr
     := L4_convert_PropT_strict RB f ts.
 
 End TreeConvert.
+
+Module TreeConvertMake (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC.
+  Include TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC.
+End TreeConvertMake.
+
+Module TCFinInf := TreeConvertMake InterpreterStack64BitIntptr InterpreterStackBigIntptr FinToInfAddrConvert InfToFinAddrConvert DVCFinInf DVCInfFin ECFinInf.
+Module TCInfFin := TreeConvertMake InterpreterStackBigIntptr InterpreterStack64BitIntptr InfToFinAddrConvert FinToInfAddrConvert DVCInfFin DVCFinInf ECInfFin.

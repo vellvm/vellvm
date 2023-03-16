@@ -3579,6 +3579,9 @@ with Module DV2 := Events2.DV.
   Include DVConvert LP1 LP2 AC Events1 Events2.
 End DVConvertMake.
 
+Module DVCFinInf := DVConvertMake InterpreterStack64BitIntptr.LP InterpreterStackBigIntptr.LP FinToInfAddrConvert InterpreterStack64BitIntptr.LP.Events InterpreterStackBigIntptr.LP.Events.
+Module DVCInfFin := DVConvertMake InterpreterStackBigIntptr.LP InterpreterStack64BitIntptr.LP InfToFinAddrConvert InterpreterStackBigIntptr.LP.Events InterpreterStack64BitIntptr.LP.Events.
+
 Module DVConvertSafe
   (LP1 : LLVMParams) (LP2 : LLVMParams)
   (AC1 : AddrConvert LP1.ADDR LP2.ADDR) (AC2 : AddrConvert LP2.ADDR LP1.ADDR)

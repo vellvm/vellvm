@@ -85,23 +85,6 @@ Defined.
 Next Obligation.
   exact (inr IN2).
 Defined.
-Next Obligation.
-  split.
-  intros x xs0 y ys0 CONTRA.
-  inversion CONTRA.
-  inversion H1.
-
-  intros [_ CONTRA].
-  inversion CONTRA.
-Defined.
-Next Obligation.
-  split.
-  intros x xs0 y ys0 [_ CONTRA].
-  inversion CONTRA.
-
-  intros [CONTRA _].
-  inversion CONTRA.
-Defined.
 
 Lemma map_monad_InT_oom_forall2 :
   forall {A B} l (f : forall (a : A), InT a l -> OOM B) res,
@@ -147,15 +130,10 @@ Proof.
   induction H; cbn; auto.
 Qed.
 
-Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP).
+Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC).
   Import TLR.
 
-  Module DVC := DVConvertMake IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events.
-  Module DVCrev := DVConvertMake IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events.
-  Module EC := EventConvertMake IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev.
-  Module TC1 := TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC.
-
-  Import TC1.
+  Import TC.
   Import EC.
   Import DVC.
   Import IPS.
@@ -10009,11 +9987,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
 End LangRefine.
 
-Module MakeLangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) : LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR IPS.
-  Include LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR IPS.
+Module MakeLangRefine
+  (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC) : LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR IPS DVC DVCrev EC TC.
+  Include LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR IPS DVC DVCrev EC TC.
 End MakeLangRefine.
 
-Module InfFinLangRefine := MakeLangRefine InterpreterStackBigIntptr InterpreterStack64BitIntptr InfToFinAddrConvert FinToInfAddrConvert TopLevelBigIntptr TopLevel64BitIntptr TopLevelRefinements64BitIntptr FinToInfIntptrConvertSafe.
+Module InfFinLangRefine := MakeLangRefine InterpreterStackBigIntptr InterpreterStack64BitIntptr InfToFinAddrConvert FinToInfAddrConvert TopLevelBigIntptr TopLevel64BitIntptr TopLevelRefinements64BitIntptr FinToInfIntptrConvertSafe DVCInfFin DVCFinInf ECInfFin TCInfFin.
 
 (* Just planning on using this for L4_convert from finite to infinite events. *)
-(* Module FinInfLangRefine := MakeLangRefine InterpreterStack64BitIntptr InterpreterStackBigIntptr FinToInfAddrConvert InfToFinAddrConvert TopLevel64BitIntptr TopLevelBigIntptr TopLevelRefinementsBigIntptr FinToInfIntptrConvertSafe. *)
+(* Module FinInfLangRefine := MakeLangRefine InterpreterStack64BitIntptr InterpreterStackBigIntptr FinToInfAddrConvert InfToFinAddrConvert TopLevel64BitIntptr TopLevelBigIntptr TopLevelRefinementsBigIntptr FinToInfIntptrConvertSafe. DVCFinInf DVCInfFin ECFinInf . *)

@@ -85,7 +85,9 @@ Module InfiniteToFinite.
   (* TODO: Move these refine_OOM_h lemmas? *)
   Import Morphisms.
 
-  Import TC1.
+
+  Module E1 := InterpreterStackBigIntptr.LP.Events.
+  Module E2 := InterpreterStack64BitIntptr.LP.Events.
 
   #[local] Notation E1 := (E1.ExternalCallE +' OOME +' UBE +' DebugE +' FailureE).
   #[local] Notation E2 := (E2.ExternalCallE +' OOME +' UBE +' DebugE +' FailureE).
@@ -93,12 +95,10 @@ Module InfiniteToFinite.
 
   Module InfLLVM := Vellvm.Semantics.InterpretationStack.InterpreterStackBigIntptr.LLVM.
   Module FinLLVM := Vellvm.Semantics.InterpretationStack.InterpreterStack64BitIntptr.LLVM.
-  Module InfFinTC := Vellvm.Semantics.InfiniteToFinite.LangRefine.InfFinLangRefine.TC1.
-  (* Module FinInfTC := Vellvm.Semantics.InfiniteToFinite.LangRefine.FinInfLangRefine.TC1. *)
 
-  Module EC1 := Vellvm.Semantics.InfiniteToFinite.LangRefine.InfFinLangRefine.EC.
-  Module DVC1 := Vellvm.Semantics.InfiniteToFinite.LangRefine.InfFinLangRefine.DVC.
-  Module DVC2 := Vellvm.Semantics.InfiniteToFinite.LangRefine.InfFinLangRefine.DVCrev.
+  Module EC1 := ECInfFin.
+  Module DVC1 := DVCInfFin.
+  Module DVC2 := DVCFinInf.
 
   Module InfMem := MemoryBigIntptr.
   Module FinMem := Memory64BitIntptr.
@@ -120,8 +120,8 @@ Module InfiniteToFinite.
   (* Could not put with the other conversions, need to know what memory structures like MemState are *)
   Definition convert_SByte (sb1 : MemoryBigIntptr.MP.BYTE_IMPL.SByte) : OOM (Memory64BitIntptr.MP.BYTE_IMPL.SByte).
     destruct sb1.
-    refine (uv' <- DVC.uvalue_convert_strict uv;;
-            idx' <- DVC.uvalue_convert_strict idx;;
+    refine (uv' <- DVC1.uvalue_convert_strict uv;;
+            idx' <- DVC1.uvalue_convert_strict idx;;
             ret (FiniteSizeof.mkUByte LLVMParams64BitIntptr.Events.DV.uvalue uv' dt idx' sid)).
   Defined.
 
@@ -130,10 +130,7 @@ Module InfiniteToFinite.
     remember (DVC2.uvalue_convert_strict uv).
     pose proof uvalue_convert_strict_safe uv as [uv_i [CONV REVCONV]].
     pose proof (uvalue_convert_strict_safe idx) as [idx_i [CONV_idx REVCONV_idx]].
-    exact (FiniteSizeof.mkUByte LLVMParams64BitIntptr.Events.DV.uvalue uv_i dt idx_i sid).
-    refine (uv' <- EC2.DVC.uvalue_convert_strict uv;;
-            idx' <- EC2.DVC.uvalue_convert_strict idx;;
-            ret (FiniteSizeof.mkUByte LLVMParams64BitIntptr.Events.DV.uvalue uv' dt idx' sid)).
+    exact (FiniteSizeof.mkUByte DVC2.DV2.uvalue uv_i dt idx_i sid).
   Defined.
 
   Definition convert_mem_byte (mb1 : InfMemMMSP.mem_byte) : OOM (FinMemMMSP.mem_byte).
@@ -144,6 +141,13 @@ Module InfiniteToFinite.
     constructor.
     apply s'.
     apply a.
+  Defined.
+
+  Definition lift_mem_byte (mb1 : FinMemMMSP.mem_byte) : InfMemMMSP.mem_byte.
+    destruct mb1.
+    constructor.
+    - exact (lift_SByte s).
+    - apply a.
   Defined.
 
   (* Slightly tricky.
@@ -164,12 +168,33 @@ Module InfiniteToFinite.
               ret (ix, mb')).
   Defined.
 
+  Definition lift_memory (mem : FinMemMMSP.memory) : InfMemMMSP.memory.
+    refine (let elems := map _ (IntMaps.IM.elements mem) in
+            IntMaps.IP.of_list elems).
+
+    refine (fun '(ix, mb) =>
+              let mb' := lift_mem_byte mb in
+              (ix, mb')).
+  Defined.
+
   Definition convert_Frame (f : InfMemMMSP.Frame) : OOM (FinMemMMSP.Frame).
     induction f.
     - exact (ret []).
     - refine (a' <- InfToFinAddrConvert.addr_convert a;;
               f' <- IHf;;
               ret (a' :: f')).
+  Defined.
+
+  (* TODO: Should we move this? *)
+  Definition fin_to_inf_addr (a : FinAddr.addr) : InfAddr.addr.
+    pose proof FinToInfAddrConvertSafe.addr_convert_succeeds a as [a' CONV].
+    apply a'.
+  Defined.
+
+  Definition lift_Frame (f : FinMemMMSP.Frame) : InfMemMMSP.Frame.
+    induction f.
+    - exact [].
+    - exact (fin_to_inf_addr a :: IHf).
   Defined.
 
   Definition convert_FrameStack (fs : InfMemMMSP.FrameStack) : OOM (FinMemMMSP.FrameStack).
@@ -181,8 +206,19 @@ Module InfiniteToFinite.
               ret (FinMemMMSP.Snoc fs' f')).
   Defined.
 
+  Definition lift_FrameStack (fs : FinMemMMSP.FrameStack) : InfMemMMSP.FrameStack.
+    induction fs.
+    - refine (let f' := lift_Frame f in
+              InfMemMMSP.Singleton f').
+    - refine (let f' := lift_Frame f in
+              InfMemMMSP.Snoc IHfs f').
+  Defined.
+
   Definition convert_Block (b : InfMemMMSP.Block) : OOM (FinMemMMSP.Block)
     := map_monad InfToFinAddrConvert.addr_convert b.
+
+  Definition lift_Block (b : FinMemMMSP.Block) : InfMemMMSP.Block
+    := map fin_to_inf_addr b.
 
   Definition convert_Heap (h : InfMemMMSP.Heap) : OOM (FinMemMMSP.Heap).
     refine (blocks <- map_monad _ (IntMaps.IM.elements h);;
@@ -191,6 +227,15 @@ Module InfiniteToFinite.
     refine (fun '(ix, b) =>
               b' <- convert_Block b;;
               ret (ix, b')).
+  Defined.
+
+  Definition lift_Heap (h : FinMemMMSP.Heap) : InfMemMMSP.Heap.
+    refine (let blocks := map _ (IntMaps.IM.elements h) in
+            IntMaps.IP.of_list blocks).
+
+    refine (fun '(ix, b) =>
+              let b' := lift_Block b in
+              (ix, b')).
   Defined.
 
   Definition convert_memory_stack (ms1 : InfMemMMSP.memory_stack) : OOM (FinMemMMSP.memory_stack).
@@ -203,10 +248,28 @@ Module InfiniteToFinite.
     constructor; auto.
   Defined.
 
+  Definition lift_memory_stack (ms1 : FinMemMMSP.memory_stack) : InfMemMMSP.memory_stack.
+    destruct ms1 as [mem fs h].
+    refine (let mem' := lift_memory mem in
+            let fs' := lift_FrameStack fs in
+            let h' := lift_Heap h in
+            _).
+
+    constructor; auto.
+  Defined.
+
   Definition convert_MemState (m1 : InfMem.MMEP.MMSP.MemState) : OOM (FinMem.MMEP.MMSP.MemState).
     destruct m1 as [ms pr].
     refine (ms' <- convert_memory_stack ms;;
             ret _).
+
+    constructor; auto.
+  Defined.
+
+  Definition lift_MemState (m1 : FinMem.MMEP.MMSP.MemState) : InfMem.MMEP.MMSP.MemState.
+    destruct m1 as [ms pr].
+    refine (let ms' := lift_memory_stack ms in
+            _).
 
     constructor; auto.
   Defined.
@@ -229,7 +292,7 @@ Module InfiniteToFinite.
                  orutt
                    L3_refine_strict
                    L3_res_refine_strict
-                   (MemState_refine × (eq × (local_refine_strict × stack_refine_strict × (global_refine_strict × EC.DVC.dvalue_refine_strict))))
+                   (MemState_refine × (eq × (local_refine_strict × stack_refine_strict × (global_refine_strict × DVC1.dvalue_refine_strict))))
                    t t' (OOM:=OOME).
 
   Definition model_E1E2_L3_orutt_strict p1 p2 :=
@@ -267,7 +330,7 @@ Module InfiniteToFinite.
 
     - (* Ret *)
       cbn.
-      
+
 
   Defined.
 
@@ -286,9 +349,9 @@ Module InfiniteToFinite.
     assert (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6).
 
 
-    
+
     { revert FIN_HANDLED.
-      revert REL.      
+      revert REL.
       revert t_inf t_fin t_fin2.
       cofix CIH.
 
@@ -337,7 +400,7 @@ Module InfiniteToFinite.
      Admitted.
 
      apply interp_prop_inv_Type in REL.
-     pinversion REL.      
+     pinversion REL.
 
      }
 
@@ -345,7 +408,7 @@ Module InfiniteToFinite.
      red in RL2.
      punfold H.
      red in H.
-     
+
 
      Set Nested Proofs Allowed.
 
@@ -364,7 +427,7 @@ Module InfiniteToFinite.
          (* Convert the finite values to infinite ones*)
          constructor; [|constructor; [| constructor; [| constructor]]].
          + (* MemState conversion *)
-           admit.          
+           admit.
          + exact sid.
          + (* Locals and local stack *)
            admit.

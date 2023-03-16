@@ -570,6 +570,9 @@ Module EventConvertMake (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert 
   Include EventConvert LP1 LP2 AC AC2 E1 E2 DVC DVCrev.
 End EventConvertMake.
 
+Module ECFinInf := EventConvertMake InterpreterStack64BitIntptr.LP InterpreterStackBigIntptr.LP FinToInfAddrConvert InfToFinAddrConvert InterpreterStack64BitIntptr.LP.Events InterpreterStackBigIntptr.LP.Events DVCFinInf DVCInfFin.
+Module ECInfFin := EventConvertMake InterpreterStackBigIntptr.LP InterpreterStack64BitIntptr.LP InfToFinAddrConvert FinToInfAddrConvert InterpreterStackBigIntptr.LP.Events InterpreterStack64BitIntptr.LP.Events DVCInfFin DVCFinInf.
+
 Module EventConvertSafe
   (LP1 : LLVMParams) (LP2 : LLVMParams)
   (AC1 : AddrConvert LP1.ADDR LP2.ADDR) (AC2 : AddrConvert LP2.ADDR LP1.ADDR)
