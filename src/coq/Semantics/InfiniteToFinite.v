@@ -117,6 +117,24 @@ Module InfiniteToFinite.
   Module DVCS := DVConvertSafe FinLP InfLP FinToInfAddrConvert InfToFinAddrConvert FinToInfAddrConvertSafe FinToInfIntptrConvertSafe FinLP.Events InfLP.Events DVC2 DVC1.
   Import DVCS.
 
+  (* TODO: Should we move this? *)
+  Definition fin_to_inf_addr (a : FinAddr.addr) : InfAddr.addr.
+    pose proof FinToInfAddrConvertSafe.addr_convert_succeeds a as [a' CONV].
+    apply a'.
+  Defined.
+
+  (* TODO: Should we move this? *)
+  Definition fin_to_inf_dvalue (dv : LLVMParams64BitIntptr.Events.DV.dvalue) : LLVMParamsBigIntptr.Events.DV.dvalue.
+    pose proof dvalue_convert_strict_safe dv as [dvi [CONV RCONV]].
+    apply dvi.
+  Defined.
+
+  (* TODO: Should we move this? *)
+  Definition fin_to_inf_uvalue (uv : LLVMParams64BitIntptr.Events.DV.uvalue) : LLVMParamsBigIntptr.Events.DV.uvalue.
+    pose proof uvalue_convert_strict_safe uv as [uvi [CONV RCONV]].
+    apply uvi.
+  Defined.
+
   (* Could not put with the other conversions, need to know what memory structures like MemState are *)
   Definition convert_SByte (sb1 : MemoryBigIntptr.MP.BYTE_IMPL.SByte) : OOM (Memory64BitIntptr.MP.BYTE_IMPL.SByte).
     destruct sb1.
@@ -128,9 +146,7 @@ Module InfiniteToFinite.
   Definition lift_SByte (sb1 : Memory64BitIntptr.MP.BYTE_IMPL.SByte) : MemoryBigIntptr.MP.BYTE_IMPL.SByte.
     destruct sb1.
     remember (DVC2.uvalue_convert_strict uv).
-    pose proof uvalue_convert_strict_safe uv as [uv_i [CONV REVCONV]].
-    pose proof (uvalue_convert_strict_safe idx) as [idx_i [CONV_idx REVCONV_idx]].
-    exact (FiniteSizeof.mkUByte DVC2.DV2.uvalue uv_i dt idx_i sid).
+    exact (FiniteSizeof.mkUByte DVC2.DV2.uvalue (fin_to_inf_uvalue uv) dt (fin_to_inf_uvalue idx) sid).
   Defined.
 
   Definition convert_mem_byte (mb1 : InfMemMMSP.mem_byte) : OOM (FinMemMMSP.mem_byte).
@@ -183,12 +199,6 @@ Module InfiniteToFinite.
     - refine (a' <- InfToFinAddrConvert.addr_convert a;;
               f' <- IHf;;
               ret (a' :: f')).
-  Defined.
-
-  (* TODO: Should we move this? *)
-  Definition fin_to_inf_addr (a : FinAddr.addr) : InfAddr.addr.
-    pose proof FinToInfAddrConvertSafe.addr_convert_succeeds a as [a' CONV].
-    apply a'.
   Defined.
 
   Definition lift_Frame (f : FinMemMMSP.Frame) : InfMemMMSP.Frame.
@@ -300,6 +310,28 @@ Module InfiniteToFinite.
       (TopLevelBigIntptr.model_oom_L3 p1)
       (TopLevel64BitIntptr.model_oom_L3 p2).
 
+  Definition lift_local_env (lenv : InterpreterStack64BitIntptr.LLVM.Local.local_env) : InterpreterStackBigIntptr.LLVM.Local.local_env.
+    refine (map _ lenv).
+
+    refine (fun '(ix, uv) =>
+              let uv' := fin_to_inf_uvalue uv in
+              (ix, uv')).
+  Defined.
+
+  Definition lift_global_env (genv : InterpreterStack64BitIntptr.LLVM.Global.global_env) : InterpreterStackBigIntptr.LLVM.Global.global_env.
+    refine (map _ genv).
+
+    refine (fun '(ix, dv) =>
+              let dv' := fin_to_inf_dvalue dv in
+              (ix, dv')).
+  Defined.
+
+  Definition lift_stack (stack : InterpreterStack64BitIntptr.LLVM.Stack.lstack) : InterpreterStackBigIntptr.LLVM.Stack.lstack.
+    induction stack.
+    - exact [].
+    - exact (lift_local_env a :: IHstack).
+  Defined.
+
   Definition get_inf_tree :
     forall (t_fin2 : itree L3 (FinMem.MMEP.MMSP.MemState * (MemPropT.store_id * (local_env * @stack local_env * res_L1)))), itree InfLP.Events.L3 TopLevelBigIntptr.res_L6.
   Proof.
@@ -309,12 +341,22 @@ Module InfiniteToFinite.
     inversion _observe.
     - (* Ret *)
       refine (ret _).
-      destruct r as [ms [sid [[lid s] [genv res]]]].
+      destruct r as [ms [sid [[lenv s] [genv res]]]].
       constructor.
-      Unset Printing Notations.
-      unfold TopLevelBigIntptr.res_L6.
-      apply (ret (if r then 1 else 0)).
-    - (* Tau *)
+      exact (lift_MemState ms).
+
+      constructor.
+      exact sid.
+
+      constructor.
+      constructor.
+      exact (lift_local_env lenv).
+      exact (lift_stack s).
+
+      constructor.
+      exact (lift_global_env genv).
+      exact (fin_to_inf_dvalue res).
+    - (*Tau *)
       apply go.
       apply TauF.
       apply CIH.
