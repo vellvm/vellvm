@@ -362,18 +362,70 @@ Module InfiniteToFinite.
       apply CIH.
       apply t.
     - (* Vis *)
-      inversion e; subst.
-      rename H into r.
-      apply go.
-      apply (VisF (nat_ev (if r then 1 else 0))).
-      intros n. (* Result *)
-      apply CIH.
-      apply (if Nat.eqb n 0 then k false else if Nat.eqb n 1 then k true else k false).
+      inversion e; clear e; subst.
+      { (* ExternalCallE *)
+        inversion H; subst.
+        apply go.
+        apply (VisF (subevent _ (E1.ExternalCall t (fin_to_inf_uvalue f) (map fin_to_inf_dvalue args)))).
 
-    - (* Ret *)
-      cbn.
+        (* Continuation *)
+        intros x.
+        apply CIH.
 
+        pose proof (DVCInfFin.dvalue_convert_strict x).
+        destruct H0.
+        - exact (k d).
+        - (* OOM -- somewhat worried about this case *)
+          exact (raiseOOM s).
+      }
 
+      inversion X0; clear X0; subst.
+      { (* PickUvalue *)
+        inversion X1; subst.
+        apply go.
+        apply (VisF (subevent _ (E1.pick Pre (fin_to_inf_uvalue x)))).
+
+        (* Continuation *)
+        intros res.
+        destruct res.
+        apply CIH.
+
+        pose proof (DVCInfFin.dvalue_convert_strict x0).
+        destruct H.
+        - apply k.
+          constructor.
+          apply d.
+          apply t.
+        - (* OOM -- somewhat worried about this case *)
+          exact (raiseOOM s).
+      }
+
+      inversion H; clear H; subst.
+      { (* OOM *)
+        inversion H0; subst.
+        exact (raiseOOM H).
+      }
+
+      inversion H0; clear H0; subst.
+      { (* UBE *)
+        inversion H; subst.
+        exact (raiseUB H0).
+      }
+
+      inversion H; clear H; subst.
+      { (* DebugE *)
+        inversion H0; subst.
+        apply go.
+        apply (VisF (subevent _ (Debug H))).
+        intros H1.
+        apply CIH.
+        apply k; auto.
+      }
+
+      { (* FailureE *)
+        inversion H0; subst.
+        exact (LLVMEvents.raise H).
+      }
   Defined.
 
   Lemma model_E1E2_23_orutt_strict :
