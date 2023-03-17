@@ -569,109 +569,125 @@ Module InfiniteToFinite.
     - (* Vis nodes *)
       destruct e.
       { (* ExternalCallE *)
-        inversion e; subst.
+        destruct e.
         pstep; red; cbn.
 
-        unfold get_inf_tree.
-        
         constructor.
-        red. destruct b; red; tauto.
+        { red. cbn.
+          split; auto.
+          split.
+          apply fin_to_inf_uvalue_refine_strict.
+          apply Util.Forall2_forall.
+          split.
+          apply map_length.
 
-        intros a b0 H.
-        cbn in H.
-        destruct H.
+          intros i a b H H0.
+          apply Nth_map_iff in H.
+          destruct H. destruct H.
+          subst.
 
-        destruct H0 as [[A B0] | [A B0]]; subst; cbn.
-        + right.
-          rewrite (itree_eta_ (k _)).
+          cbn in *.
+          rewrite H1 in H0.
+          inv H0.
+          apply fin_to_inf_dvalue_refine_strict.
+        }
+
+        { intros a b [TT [F [ARGS AB]]].
+          rewrite DVCInfFin.dvalue_refine_strict_equation in AB.
+          rewrite AB.
+          rewrite (itree_eta_ (k b)).
+          right.
           apply CIH.
-        + right.
-          rewrite (itree_eta_ (k _)).
-          apply CIH.
+        }
 
-
-        apply go.
-        apply (VisF (subevent _ (E1.ExternalCall t (fin_to_inf_uvalue f) (map fin_to_inf_dvalue args)))).
-
-        (* Continuation *)
-        intros x.
-        apply CIH.
-
-        pose proof (DVCInfFin.dvalue_convert_strict x).
-        destruct H0.
-        - exact (k d).
-        - (* OOM -- somewhat worried about this case *)
-          exact (raiseOOM s).
+        { intros o CONTRA; inv CONTRA.
+        }
       }
 
-      inversion X0; clear X0; subst.
+      destruct s.
       { (* PickUvalue *)
-        inversion X1; subst.
-        apply go.
-        apply (VisF (subevent _ (E1.pick Pre (fin_to_inf_uvalue x)))).
+        destruct p.
+        pstep; red; cbn.
 
-        (* Continuation *)
-        intros res.
-        destruct res.
-        apply CIH.
+        constructor.
+        { red. cbn.
+          split; [tauto|].
+          apply fin_to_inf_uvalue_refine_strict.
+        }
 
-        pose proof (DVCInfFin.dvalue_convert_strict x0).
-        destruct H.
-        - apply k.
-          constructor.
-          apply d.
-          apply t.
-        - (* OOM -- somewhat worried about this case *)
-          exact (raiseOOM s).
+        { intros [a []] [b []] [_ [X AB]].
+          rewrite DVCInfFin.dvalue_refine_strict_equation in AB.
+          rewrite AB.
+          rewrite (itree_eta_ (k _)).
+          right.
+          apply CIH.
+        }
+
+        { intros o CONTRA; inv CONTRA.
+        }
       }
 
-      inversion H; clear H; subst.
+      destruct s.
       { (* OOM *)
-        inversion H0; subst.
-        exact (raiseOOM H).
+        destruct o.
+        pstep; red; cbn.
+
+        change (inr1 (inr1 (inl1 (ThrowOOM s)))) with (@subevent _ _ (ReSum_inr IFun sum1 OOME
+                                                                                 (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                                                                                 ExternalCallE) _ (ThrowOOM s)).
+
+        apply EqVisOOM.
       }
 
-      inversion H0; clear H0; subst.
+      destruct s.
       { (* UBE *)
-        inversion H; subst.
-        exact (raiseUB H0).
+        destruct u.
+        pstep; red; cbn.
+
+        constructor.
+        { cbn; auto.
+        }
+
+        { intros [] [] _.
+        }
+
+        { intros o CONTRA; inv CONTRA.
+        }
       }
 
-      inversion H; clear H; subst.
+      destruct s.
       { (* DebugE *)
-        inversion H0; subst.
-        apply go.
-        apply (VisF (subevent _ (Debug H))).
-        intros H1.
-        apply CIH.
-        apply k; auto.
+        destruct d.
+        pstep; red; cbn.
+
+        constructor.
+        { cbn; auto.
+        }
+
+        { intros [] [] _.
+          rewrite (itree_eta_ (k _)).
+          right.
+          apply CIH.
+        }
+
+        { intros o CONTRA; inv CONTRA.
+        }
       }
 
       { (* FailureE *)
-        inversion H0; subst.
-        exact (LLVMEvents.raise H).
+        destruct f.
+        pstep; red; cbn.
+
+        constructor.
+        { cbn; auto.
+        }
+
+        { intros [] [] _.
+        }
+
+        { intros o CONTRA; inv CONTRA.
+        }
       }
-
-
-      destruct e.
-
-
-      
-      pstep; red; cbn.
-      constructor.
-      red. destruct b; red; tauto.
-
-      intros a b0 H.
-      cbn in H.
-      destruct H.
-
-      destruct H0 as [[A B0] | [A B0]]; subst; cbn.
-      + right.
-        rewrite (itree_eta_ (k _)).
-        apply CIH.
-      + right.
-        rewrite (itree_eta_ (k _)).
-        apply CIH.
   Qed.
 
   Lemma model_E1E2_23_orutt_strict :
@@ -1298,9 +1314,9 @@ Module InfiniteToFinite.
     (* } *)
     admit.
 
-    { apply get_nat_tree'_rutt.
+    { apply get_inf_tree_rutt.
     }
-  Qed.
+  Admitted.
 
 
     assert (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6).
