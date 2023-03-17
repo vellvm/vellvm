@@ -610,4 +610,34 @@ Section Alist_refine.
     rewrite H.
     apply alist_refine_remove; auto.
   Qed.
+
+  Lemma alist_refine_nil_cons_inv :
+    forall p l,
+      ~ (alist_refine [] (p::l)).
+  Proof.
+    intros p l REF.
+    red in REF.
+    cbn in REF.
+    destruct p.
+    specialize (REF k).
+    pose proof @rel_dec_correct K _ _ _ k k as [_ EQ].
+    forward EQ; auto.
+    rewrite EQ in REF.
+    auto.
+  Qed.
+
+  Lemma alist_refine_cons_nil_inv :
+    forall p l,
+      ~ (alist_refine (p::l) []).
+  Proof.
+    intros p l REF.
+    red in REF.
+    cbn in REF.
+    destruct p.
+    specialize (REF k).
+    pose proof @rel_dec_correct K _ _ _ k k as [_ EQ].
+    forward EQ; auto.
+    rewrite EQ in REF.
+    auto.
+  Qed.
 End Alist_refine.
