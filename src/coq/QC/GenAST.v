@@ -261,7 +261,7 @@ Section GenerationState.
         ; gen_ptrtoint_ctx := ptrtoint_ctx
        |}.
 
-  Definition GenLLVM := eitherT string (stateT GenState G).
+  Definition GenLLVM := (eitherT string (stateT (list string) (stateT GenState G))).
 
   
   (* Need this because extlib doesn't declare this instance as global :|. *)
@@ -294,8 +294,15 @@ Section GenerationState.
   typeclasses eauto.
   Defined.
 
-  Definition lift_GenLLVM {A} (g : G A) : GenLLVM A
-    := mkEitherT (mkStateT (fun st => a <- g;; ret (inr a, st))).
+  Definition lift_GenLLVM {A} (g : G A) : GenLLVM A.
+    unfold GenLLVM.
+    apply mkEitherT.
+    apply mkStateT.
+    refine (fun stack => _).
+    apply mkStateT.
+    refine (fun st => a <- g ;; ret _).
+    exact (inr a, stack, st).
+  Defined.
   
   #[global] Instance MGENT: MonadT GenLLVM G.
   unfold GenLLVM.
@@ -307,8 +314,24 @@ Section GenerationState.
      [failGen] was the one piece of the backtracking variant of QuickChick we
      needed.  
    *)
-  Definition failGen {A:Type} (s:string) : GenLLVM A :=
-    mkEitherT (ret (inl s)).
+  Definition failGen {A:Type} (s:string) : GenLLVM A.
+    apply mkEitherT.
+    apply mkStateT.
+    refine (fun stack => _).
+    exact (ret (inl s, stack)).
+  Defined.
+
+  Definition annotate {A:Type} (s:string) (g : GenLLVM A) : GenLLVM A.
+    apply mkEitherT.
+    apply mkStateT.
+    refine (fun stack => _).
+    apply mkStateT.
+    refine (fun s => _).
+    refine (let opt := unEitherT g in
+            let ann := runStateT opt (s0::stack) in
+            let ans := runStateT ann s in
+            ans
+           ).
   
   Definition new_raw_id : GenLLVM raw_id
     := n <- gets get_raw;;
