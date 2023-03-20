@@ -6,8 +6,8 @@ From ITree Require Import
      Basics.MonadState
      Extra.IForest
      Events.Exception
-     Events.State.
-
+     Events.State
+     Props.Leaf.
 
 From Vellvm Require Import 
      Utils.PostConditions
@@ -104,10 +104,34 @@ Section Handle_Fail.
 
 End Handle_Fail.
 
-Lemma post_returns : forall {E X} (t : itree E X), t ⤳ fun a => Returns a t.
+Lemma eutt_Leaf_ : forall {E} {R} (RR : R -> Prop) (ta : itree E R)
+   (IN: forall (a : R), Leaf a ta -> RR a), eutt (fun u1 u2 => u1 = u2 /\ RR u1) ta ta.
 Proof.
-  intros; eapply eqit_mon; eauto.
-  2: eapply eutt_Returns.
+  intros E R.
+  ginit.
+  gcofix CIH; intros.
+
+  setoid_rewrite (itree_eta ta) in IN.
+
+  gstep. red.
+
+  destruct (observe ta).
+  - econstructor.  split; auto. apply IN. econstructor. reflexivity.
+  - econstructor. gfinal. left. apply CIH. intros. eapply IN. rewrite tau_eutt. assumption.
+  - econstructor. intros. red.
+    gfinal. left. apply CIH. intros. eapply IN. eapply Leaf_Vis_sub. apply H.
+Qed.
+
+Lemma eutt_Leaf : forall E R (ta : itree E R), eutt (fun u1 u2 => u1 = u2 /\ Leaf u1 ta) ta ta.
+Proof.
+  intros.
+  apply eutt_Leaf_. auto.
+Qed.
+
+Lemma post_returns : forall {E X} (t : itree E X), t ⤳ fun a => Leaf a t.
+Proof.
+  intros. eapply eqit_mon; eauto.
+  2 : apply eutt_Leaf.
   intros ? ? [<- ?]; auto.
 Qed.
 
@@ -115,7 +139,7 @@ Lemma eutt_clo_bind_returns {E R1 R2 RR U1 U2 UU}
       (t1 : itree E U1) (t2 : itree E U2)
       (k1 : U1 -> itree E R1) (k2 : U2 -> itree E R2)
       (EQT: @eutt E U1 U2 UU t1 t2)
-      (EQK: forall u1 u2, UU u1 u2 -> Returns u1 t1 -> Returns u2 t2 -> eutt RR (k1 u1) (k2 u2)):
+      (EQK: forall u1 u2, UU u1 u2 -> Leaf u1 t1 -> Leaf u2 t2 -> eutt RR (k1 u1) (k2 u2)):
   eutt RR (x <- t1;; k1 x) (x <- t2;; k2 x).
 Proof.
   intros; eapply eutt_post_bind_gen; eauto using post_returns.
@@ -169,13 +193,13 @@ Section No_Failure.
 
   Lemma no_failure_bind_cont : forall {E X Y} (t : _ X) (k : X -> _ Y),
       no_failure (bind (m := failT (itree E)) t k) ->
-      forall u, Returns (E := E) (Some u) t -> 
+      forall u, Leaf (E := E) (Some u) t -> 
               no_failure (k u).
   Proof.
     intros * NOFAIL * ISRET.
     unfold no_failure in *.
     cbn in *.
-    eapply eqit_bind_Returns_inv in NOFAIL; eauto. 
+    eapply eqit_bind_Leaf_inv in NOFAIL; eauto. 
     apply NOFAIL.
   Qed.
 
@@ -271,7 +295,7 @@ Section No_Failure.
                                 end) n m a0) ->
       forall k a,
         (n <= k < m)%nat ->
-        Returns (Some a) (tfor (fun k x => match x with
+        Leaf (Some a) (tfor (fun k x => match x with
                                         | Some a => body k a
                                         | None => Ret None
                                         end) n k a0) ->
@@ -289,16 +313,14 @@ Section No_Failure.
       + subst.
         clear INEQ1.
         rewrite tfor_unroll_fail in NOFAIL; [| auto].
-        rewrite tfor_0 in RET.
-        apply Returns_Ret in RET.
-        subst.
+        rewrite tfor_0 in RET. inv RET; inv H.
         apply no_failure_bind_prefix in NOFAIL; auto.
       + specialize (IH (S n)).
         forward IH; [lia |].
         rewrite tfor_unroll_fail in NOFAIL; [| lia].
         rewrite tfor_unroll_fail in RET; [| lia].
         cbn in RET.
-        apply Returns_bind_inversion in RET.
+        apply Leaf_bind_inv in RET.
         destruct RET as (a1 & RET1 & RET2).
         destruct a0 as [a0|]; cycle 1.
         { cbn in *.
@@ -307,10 +329,7 @@ Section No_Failure.
         }
         cbn in *.
         destruct a1 as [a1|]; cycle 1.
-        {
-          apply Returns_Ret in RET2.
-          inv RET2.
-        }
+        { inv RET2; inv H. }
         apply no_failure_bind_cont with (u := a1) in NOFAIL; auto.
         eapply IH; eauto.
         lia.
