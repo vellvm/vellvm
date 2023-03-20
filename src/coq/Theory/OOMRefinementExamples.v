@@ -611,7 +611,10 @@ Module Infinite.
   Admitted.
 
   Lemma interp_memory_prop_vis_inv:
-    forall E R X (e : _ X) k sid m x,
+    forall E R X
+      (e : (E +' LLVMParamsBigIntptr.Events.IntrinsicE +' LLVMParamsBigIntptr.Events.MemoryE +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X)
+      k sid m x,
+      (forall (o : OOME X), e <> subevent _ o) ->
       interp_memory_prop (E:=E) (R2 := R) eq (Vis e k) sid m x ->
       (exists ta k2 s1 s2 ,
         x ≈ x <- ta;; k2 x /\
@@ -623,15 +626,22 @@ Module Infinite.
             interp_memory_prop (E := E) eq (k a) sid m (k2 b))).
   Proof.
     intros.
+    rename H into NOOM.
+    rename H0 into H.
     punfold H.
     red in H. cbn in H.
     setoid_rewrite (itree_eta x).
     remember (VisF e k).
     hinduction H before sid; intros; inv Heqi; eauto.
-    - specialize (IHinterp_memory_PropTF m eq_refl).
+    - specialize (IHinterp_memory_PropTF m NOOM eq_refl).
       destruct IHinterp_memory_PropTF as (?&?&?&?&?&?&?).
       eexists _,_,_,_; split; eauto. rewrite tau_eutt.
       rewrite <- itree_eta in H1. eauto.
+    - rewrite itree_eta in HT1.
+      rewrite H0 in HT1.
+      pinversion HT1; repeat subst_existT.
+      specialize (NOOM e0).
+      contradiction.
     - dependent destruction H3.
       eexists _,_,_,_; split; eauto.
       + rewrite <- itree_eta; eauto.
@@ -785,6 +795,8 @@ Module Infinite.
     inv H2.
     eapply refine_OOM_h_model_undef_h_raise_ret; eauto.
     pstep; repeat constructor; eauto.
+
+    intros o CONTRA. inv CONTRA.
   Qed.
 
 End Infinite.
@@ -1082,7 +1094,10 @@ Module Finite.
   Qed.
 
   Lemma interp_memory_prop_vis_inv:
-    forall E R X (e : _ X) k sid m x,
+    forall E R X
+      (e : (E +' LLVMParams64BitIntptr.Events.IntrinsicE +' LLVMParams64BitIntptr.Events.MemoryE +' LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X)
+      k sid m x,
+      (forall (o : OOME X), e <> subevent _ o) ->
       interp_memory_prop (E:=E) (R2 := R) eq (Vis e k) sid m x ->
       (exists ta k2 s1 s2 ,
         x ≈ x <- ta;; k2 x /\
@@ -1094,15 +1109,22 @@ Module Finite.
             interp_memory_prop (E := E) eq (k a) sid m (k2 b))).
   Proof.
     intros.
+    rename H into NOOM.
+    rename H0 into H.
     punfold H.
     red in H. cbn in H.
     setoid_rewrite (itree_eta x).
     remember (VisF e k).
     hinduction H before sid; intros; inv Heqi; eauto.
-    - specialize (IHinterp_memory_PropTF m eq_refl).
+    - specialize (IHinterp_memory_PropTF m NOOM eq_refl).
       destruct IHinterp_memory_PropTF as (?&?&?&?&?&?&?).
       eexists _,_,_,_; split; eauto. rewrite tau_eutt.
       rewrite <- itree_eta in H1. eauto.
+    - rewrite itree_eta in HT1.
+      rewrite H0 in HT1.
+      pinversion HT1; repeat subst_existT.
+      specialize (NOOM e0).
+      contradiction.
     - dependent destruction H3.
       eexists _,_,_,_; split; eauto.
       + rewrite <- itree_eta; eauto.
@@ -1270,6 +1292,8 @@ Module Finite.
     inv H2.
     eapply refine_OOM_h_model_undef_h_raise_ret; eauto.
     pstep; repeat constructor; eauto.
+
+    intros o CONTRA; inv CONTRA.
   Qed.
 
 End Finite.

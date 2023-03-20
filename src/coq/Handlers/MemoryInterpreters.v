@@ -402,7 +402,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Definition interp_memory_prop {R1 R2} (RR : R1 -> R2 -> Prop) :
       itree Effin R1 -> MemStateFreshT (PropT Effout) R2 :=
       fun (t : itree Effin R1) (sid : store_id) (ms : MemState) (t' : itree Effout (MemState * (store_id * R2))) =>
-        interp_memory_prop interp_memory_prop_h (fun x '(_, (_, y)) => RR x y) t t'.
+        interp_memory_prop (OOM:=OOME) interp_memory_prop_h (fun x '(_, (_, y)) => RR x y) t t'.
 
   End Interpreters.
 End MemorySpecInterpreter.
