@@ -825,6 +825,23 @@ Module InfiniteToFinite.
       punfold IHEQ.
   Qed.
 
+  (* TODO: not 100% sure what R, T1T2, pre, post should be / what constraints are needed for them *)
+  Lemma oom_orutt :
+    forall {E F T1 T2}
+      `{OE : OOME -< E}
+      `{OF : OOME -< F}
+      (R : relation T1)
+      (T1T2 : T1 -> T2 -> Prop)
+      (pre : prerel E F)
+      (post : postrel E F)
+      (t_source t_oom : itree E T1) (t_final : itree F T2),
+      refine_OOM_h R t_source t_oom ->
+      orutt (OOM:=OOME) pre post T1T2 t_oom t_final ->
+      orutt (OOM:=OOME) pre post T1T2 t_source t_final.
+  Proof.
+    intros E F T1 T2 OE OF R T1T2 pre post t_source t_oom t_final REF_OOM ORUTT.
+  Admitted.    
+
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
       L2_E1E2_orutt_strict t_inf t_fin ->
