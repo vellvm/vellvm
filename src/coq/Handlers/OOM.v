@@ -11,7 +11,7 @@ From ExtLib Require Import
 
 From Vellvm Require Import
      Utils.RefineProp
-     Utils.InterpProp
+     Utils.InterpPropOOM
      Utils.Error
      Utils.Tactics
      Semantics.LLVMEvents.
@@ -47,7 +47,7 @@ Section PARAMS_MODEL.
     := fun _ e x => x ≈ trigger e.
 
   Definition refine_OOM_h_flip {T} (RR : relation T) (source target : itree Effout T) : Prop
-    := @interp_prop Effin Effout OOME _ refine_OOM_handler _ _ RR source target.
+    := @interp_prop_oom Effin Effout OOME _ refine_OOM_handler _ _ RR source target.
 
   Arguments refine_OOM_h_flip /.
 
@@ -86,7 +86,7 @@ Section PARAMS_MODEL.
         pstep. rewrite H0. econstructor; eauto. right. pclearbot.
         rewrite H0 in EQr.
         eapply CIH; eauto.
-        eapply interp_prop_inv_tau; eauto; pstep; auto.
+        eapply interp_prop_oom_inv_tau; eauto; pstep; auto.
       + pclearbot.
         inv EQr; try (exfalso; eapply EQ; eauto; fail).
         * clear CHECK.
@@ -105,7 +105,7 @@ Section PARAMS_MODEL.
                 eapply eqit_inv in H1; inv H1.
           -- eapply IHHS0; eauto.
              assert (refine_OOM_h_flip RR t3 (Tau t1)) by (pstep; apply HS).
-             eapply interp_prop_inv_tau_r in H0; punfold H0.
+             eapply interp_prop_oom_inv_tau_r in H0; punfold H0.
           -- apply bisimulation_is_eq in HT1. rewrite HT1 in HS.
              cbn in HS. remember (VisF (subevent A e) k1).
              hinduction HS before CIH; intros; try (exfalso; eapply EQ; eauto; fail); inv Heqi.
@@ -119,7 +119,7 @@ Section PARAMS_MODEL.
                 unfold subevent, resum, ReSum_id, id_, ReSum_inr, cat, Id_IFun, Cat_IFun, inr_,
                   resum , ReSum_inl , cat, resum, Inr_sum1, inl_, Inl_sum1 in H1. inv H1.
                 change (VisF (O e0) k1) with (observe (Vis (O e0) k1)).
-                eapply Interp_PropT_Vis_OOM. unfold subevent.
+                eapply Interp_Prop_OomT_Vis_OOM. unfold subevent.
                 apply eqit_Vis. reflexivity.
           -- red in H0. rewrite H0 in H1.
              remember (VisF e k1). rewrite itree_eta in H1.
@@ -133,7 +133,7 @@ Section PARAMS_MODEL.
                 unfold subevent in H1.
                 unfold subevent, resum, ReSum_id, id_, ReSum_inr, cat, Id_IFun, Cat_IFun, inr_,
                   resum , ReSum_inl , cat, resum, Inr_sum1, inl_, Inl_sum1 in H1. inv H1.
-                eapply Interp_PropT_Vis. 3 : eauto. 2 : red; reflexivity. red in H3.
+                eapply Interp_Prop_OomT_Vis. 3 : eauto. 2 : red; reflexivity. red in H3.
 
                 setoid_rewrite H0 in HK. setoid_rewrite H2 in HK0.
                 intros; right; eapply CIH; pclearbot; eauto.
@@ -147,7 +147,7 @@ Section PARAMS_MODEL.
       pstep; constructor; punfold IHEQl.
     - (* tauR *)
       assert (refine_OOM_h_flip RR (Tau t2) z). { pstep; auto. }
-      red in H0. apply interp_prop_inv_tau_l in H0.
+      red in H0. apply interp_prop_oom_inv_tau_l in H0.
       punfold H0.
     - (* oom *)
       apply bisimulation_is_eq in HT1. rewrite HT1; pstep; econstructor.
@@ -165,16 +165,16 @@ Section PARAMS_MODEL.
         punfold H2; red in H2; cbn in H2.
         remember (VisF (subevent A e) (fun x : A => k2 x)).
         hinduction H2 before z; intros; try inv Heqi; pclearbot.
-        * constructor; auto; eapply IHinterp_PropTF.
+        * constructor; auto; eapply IHinterp_prop_oomTF.
         * rewrite itree_eta in HT1. rewrite H3 in HT1.
           apply eqit_inv in HT1. cbn in HT1. destruct HT1 as (?&?&?).
           subst. cbn in H2.
-          eapply Interp_PropT_Vis_OOM.
+          eapply Interp_Prop_OomT_Vis_OOM.
           unfold subevent, resum, ReSum_id, id_, ReSum_inr, cat, Id_IFun, Cat_IFun, inr_,
             resum , ReSum_inl , cat, resum, Inr_sum1 in H2. inv H2.
           apply eqit_Vis. intros; reflexivity.
         * dependent destruction H6.
-          eapply Interp_PropT_Vis; eauto.
+          eapply Interp_Prop_OomT_Vis; eauto.
           red in H2. rewrite H2 in H3. setoid_rewrite bind_trigger in H3.
           intros. right; eapply CIH; eauto.
           unfold subevent in H2.
@@ -191,7 +191,7 @@ Section PARAMS_MODEL.
         apply eqit_inv in H1. cbn in H1.
         destruct H1 as (?&?&?); subst.
         pstep.
-        eapply Interp_PropT_Vis_OOM. red in H1.
+        eapply Interp_Prop_OomT_Vis_OOM. red in H1.
         unfold subevent, resum, ReSum_id, id_, ReSum_inr, cat, Id_IFun, Cat_IFun, inr_,
           resum , ReSum_inl , cat, resum, Inr_sum1 in H1. inv H1.
         apply eqit_Vis. intros; reflexivity.
@@ -203,7 +203,7 @@ Section PARAMS_MODEL.
         unfold subevent, resum, ReSum_id, id_, ReSum_inr, cat, Id_IFun, Cat_IFun, inr_,
           resum , ReSum_inl , cat, resum, Inr_sum1, inl_, Inl_sum1 in H1. inv H1.
         cbn in *. red in H2.
-        eapply Interp_PropT_Vis; eauto.
+        eapply Interp_Prop_OomT_Vis; eauto.
         2 : rewrite <- itree_eta; eauto.
         intros. right. eapply CIH; eauto.
         rewrite H2 in H1; setoid_rewrite H0 in HK; specialize (HK _ H1); pclearbot; eauto.
@@ -222,7 +222,7 @@ Section PARAMS_MODEL.
     constructor; reflexivity.
 
     change (VisF e k2) with (observe (Vis e k2)).
-    eapply Interp_PropT_Vis; eauto. red; reflexivity.
+    eapply Interp_Prop_OomT_Vis; eauto. red; reflexivity.
     setoid_rewrite bind_trigger; reflexivity.
   Qed.
 
@@ -268,7 +268,7 @@ Lemma eutt_refine_oom_h :
 Proof.
   intros T E F RR REF TRANS t1 t2 H.
   unfold refine_OOM_h.
-  pose proof @interp_prop_Proper_eq.
+  pose proof @interp_prop_oom_Proper_eq.
   unfold Proper, respectful in H0.
 
   eapply H0; eauto.
@@ -289,7 +289,7 @@ Proof.
   unfold refine_OOM_h.
 
   unfold raiseOOM.
-  eapply interp_prop_eutt_Proper.
+  eapply interp_prop_oom_eutt_Proper.
   rewrite bind_trigger. reflexivity.
   reflexivity.
 
@@ -362,7 +362,7 @@ Proof.
   induction EQT; eauto; pclearbot.
   - specialize (HK _ _ REL).
     punfold HK.
-    eapply interp_PropTF_mono. eapply HK.
+    eapply interp_prop_oomTF_mono. eapply HK.
     intros. pclearbot. left.
     eapply paco2_mon; eauto.
     intros; contradiction.
@@ -370,7 +370,7 @@ Proof.
     eapply CIH; eauto.
   - econstructor; auto.
   - econstructor; auto.
-  - eapply Interp_PropT_Vis_OOM with (e := e).
+  - eapply Interp_Prop_OomT_Vis_OOM with (e := e).
     punfold HT1; red in HT1. remember (observe (vis e k1)).
     hinduction HT1 before k; intros; inv Heqi; try inv CHECK.
     dependent destruction H1. unfold subevent.
@@ -380,7 +380,7 @@ Proof.
     eapply eq_itree_clo_bind; pclearbot; eauto.
     apply REL.
     intros; subst; reflexivity.
-  - eapply Interp_PropT_Vis; eauto.
+  - eapply Interp_Prop_OomT_Vis; eauto.
     intros; eauto. right. eapply CIH; eauto.
     specialize (HK0 _ H1). pclearbot. eapply HK0; eauto.
     rewrite <- unfold_bind.

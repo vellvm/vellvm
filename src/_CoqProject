@@ -116,6 +116,7 @@
 ./coq/Utils/ITreeMap.v
 ./coq/Utils/Util.v
 ./coq/Utils/InterpProp.v
+./coq/Utils/InterpPropOOM.v
 ./coq/Utils/InterpMemoryProp.v
 ./coq/Utils/PropT.v
 ./coq/Utils/OOMRutt.v
