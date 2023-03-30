@@ -114,7 +114,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
         fun R e => fun t => t ≈ r <- trigger e ;; ret r.
 
       Definition model_undef_h `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} {R1 R2} (RR : R1 -> R2 -> Prop) :=
-        interp_prop (OOM := void1) (case_ E_trigger_prop (case_ PickUvalue_handler F_trigger_prop)) RR.
+        interp_prop (case_ E_trigger_prop (case_ PickUvalue_handler F_trigger_prop)) RR.
 
       Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F}
                  {T} (RR : T -> T -> Prop) (ts : PropT (E +' PickUvalueE +' F) T) : PropT (E +' F) T:=

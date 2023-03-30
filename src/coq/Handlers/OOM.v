@@ -47,7 +47,7 @@ Section PARAMS_MODEL.
     := fun _ e x => x ≈ trigger e.
 
   Definition refine_OOM_h_flip {T} (RR : relation T) (source target : itree Effout T) : Prop
-    := @interp_prop_oom Effin Effout OOME _ refine_OOM_handler _ _ RR source target.
+    := @interp_prop_oom Effin Effout OOME _ _ refine_OOM_handler _ _ RR source target.
 
   Arguments refine_OOM_h_flip /.
 
