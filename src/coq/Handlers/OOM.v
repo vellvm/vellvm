@@ -37,6 +37,27 @@ Open Scope monad_scope.
 From Vellvm Require Import
      Utils.PropT.
 
+(* TODO: Move and use in interp_prop_oom / interp_memory_prop *)
+Ltac observe_vis :=
+  match goal with
+  | |- context [VisF ?e ?k] =>
+      change (VisF e k) with (observe (Vis e k))
+  end.
+
+Ltac observe_vis_r :=
+  match goal with
+  | |- interp_prop_oomTF _ _ _ _ _ _ _ _ (VisF ?e ?k) =>
+      change (VisF e k) with (observe (Vis e k))
+  end.
+
+Hint Constructors interp_prop_oomTF : INTERP_PROP_OOM.
+Hint Extern 1 (Vis _ _ ≅ Vis _ _) => reflexivity : INTERP_PROP_OOM.
+Hint Extern 5 (interp_prop_oomTF _ _ _ _ _ _ _
+                 _ (VisF _ _)) => observe_vis : INTERP_PROP_OOM.
+
+Ltac solve_interp_prop_oom :=
+  eauto with INTERP_PROP_OOM.
+
 Section PARAMS_MODEL.
   Variable (E: Type -> Type).
   Context `{O : OOME -< E}.
@@ -78,6 +99,10 @@ Section PARAMS_MODEL.
     - remember (RetF r2).
       hinduction EQr before x; intros; inv Heqi; pstep; try constructor; eauto; try abs.
       specialize (IHEQr y _ _ REL eq_refl). punfold IHEQr.
+      punfold HT1. red in HT1. cbn in HT1.
+      dependent induction HT1.
+      rewrite <- x.
+      solve_interp_prop_oom.
     - (* tau tau *)
       assert (DEC: (exists m3, observe z= TauF m3) \/ (forall m3, observe z <> TauF m3)).
       { destruct (observe z); eauto; right; red; intros; inv H0. }
@@ -98,7 +123,10 @@ Section PARAMS_MODEL.
              ++ constructor. etransitivity; eauto.
              ++ constructor; eauto.
              ++ apply bisimulation_is_eq in HT1. rewrite HT1.
-                econstructor. reflexivity.
+                solve_interp_prop_oom.
+             ++ rewrite itree_eta in HT1.
+                rewrite H1 in HT1.
+                pinversion HT1.
              ++ red in H0. rewrite itree_eta in H1.
                 rewrite H3 in H1. rewrite H0 in H1.
                 setoid_rewrite bind_trigger in H1.
@@ -110,22 +138,31 @@ Section PARAMS_MODEL.
              cbn in HS. remember (VisF (subevent A e) k1).
              hinduction HS before CIH; intros; try (exfalso; eapply EQ; eauto; fail); inv Heqi.
              ++ constructor; eauto.
-             ++ apply bisimulation_is_eq in HT1. rewrite HT1; econstructor; reflexivity.
-             ++ rewrite itree_eta in H1; rewrite H3 in H1.
-                red in H0; rewrite H0 in H1. setoid_rewrite bind_trigger in H1.
-                apply eqit_inv in H1; cbn in H1.
-                destruct H1 as (?&?&?); subst. cbn in H1.
-                unfold subevent in H1.
-                unfold subevent, resum, ReSum_id, id_, ReSum_inr, cat, Id_IFun, Cat_IFun, inr_,
-                  resum , ReSum_inl , cat, resum, Inr_sum1, inl_, Inl_sum1 in H1. inv H1.
-                change (VisF (O e0) k1) with (observe (Vis (O e0) k1)).
-                eapply Interp_Prop_OomT_Vis_OOM. unfold subevent.
-                apply eqit_Vis. reflexivity.
+             ++ apply bisimulation_is_eq in HT1. rewrite HT1.
+                solve_interp_prop_oom.
+             ++ inv CHECK0.
+             ++ inv CHECK.
+          -- punfold HT1. red in HT1. cbn in HT1.
+             dependent induction HT1.
+             rewrite <- x.
+             observe_vis. solve_interp_prop_oom.
           -- red in H0. rewrite H0 in H1.
+             setoid_rewrite bind_trigger in H1.
              remember (VisF e k1). rewrite itree_eta in H1.
-             hinduction HS before CIH; intros; try (exfalso; eapply EQ; eauto; fail); try solve [inv Heqi].
-             ++ constructor; eauto.
-             ++ apply bisimulation_is_eq in HT1. rewrite HT1; econstructor; reflexivity.
+             hinduction HS before CIH; intros; try (exfalso; eapply EQ; eauto; fail); try solve [inv Heqi]; solve_interp_prop_oom.
+             ++ punfold HT1. red in HT1. cbn in HT1.
+                dependent induction HT1; repeat subst_existT.
+                rewrite <- itree_eta in H1.
+                punfold H1; red in H1; cbn in H1.
+                dependent induction H1; subst_existT.
+                ** rewrite Heqi in x0.
+                   inv x0; subst_existT.
+                   rewrite <- x.
+                   observe_vis.
+                   eapply Interp_Prop_OomT_Vis_OOM_R with (e:=subevent A0 e); auto.
+                   reflexivity.
+                ** rewrite <- x in EQ.
+                   exfalso; eapply EQ; eauto.
              ++ rewrite itree_eta in H1. rewrite Heqi in H1.
                 red in H0. rewrite H0 in H1. setoid_rewrite bind_trigger in H1.
                 apply eqit_inv in H1. cbn in H1. rewrite <- itree_eta in H3.
@@ -138,10 +175,22 @@ Section PARAMS_MODEL.
                 setoid_rewrite H0 in HK. setoid_rewrite H2 in HK0.
                 intros; right; eapply CIH; pclearbot; eauto.
                 specialize (HK _ H1); pclearbot; eauto.
+                2: {
+                  rewrite H3.
+                  setoid_rewrite bind_trigger.
+                  reflexivity.
+                }
+
                 specialize (HK0 _ H1); pclearbot; eauto.
-                specialize (H4 a). rewrite <- H4. auto.
+                specialize (H4 a). repeat rewrite <- H4. auto.
         * exfalso. rewrite itree_eta in HT1. rewrite H1 in HT1.
           apply eqit_inv in HT1; inv HT1.
+        * punfold HT1. red in HT1. cbn in HT1.
+          dependent induction HT1.
+          rewrite <- x.
+          pstep. red. cbn.
+          observe_vis.
+          solve_interp_prop_oom.
     - (* tauL *)
       specialize (IHEQl _ EQr).
       pstep; constructor; punfold IHEQl.
@@ -149,9 +198,34 @@ Section PARAMS_MODEL.
       assert (refine_OOM_h_flip RR (Tau t2) z). { pstep; auto. }
       red in H0. apply interp_prop_oom_inv_tau_l in H0.
       punfold H0.
-    - (* oom *)
-      apply bisimulation_is_eq in HT1. rewrite HT1; pstep; econstructor.
-      rewrite <- itree_eta; reflexivity.
+    - (* oom left *)
+      inv CHECK.
+    - (* oom right *)
+      punfold HT1; red in HT1; cbn in HT1.
+      dependent induction HT1.
+      rewrite <- x in EQr.
+      pstep; red; cbn.
+      dependent induction EQr.
+      + (* Tau *)
+        rewrite <- x. constructor; eauto.
+      + (* vis *)
+        rewrite <- x.
+        punfold HT1; red in HT1; cbn in HT1.
+        dependent induction HT1.
+        rewrite <- x.
+        observe_vis; solve_interp_prop_oom.
+      + (* oom *)
+        rewrite <- x.
+        rewrite H1 in H0.
+        setoid_rewrite bind_trigger in H0.
+        punfold H0; red in H0; cbn in H0.
+        dependent induction H0.
+        -- rewrite <- x.
+           observe_vis_r.
+           eapply Interp_Prop_OomT_Vis_OOM_R with (e:=subevent A e); eauto.
+           reflexivity.
+        -- rewrite <- x.
+           constructor; eauto.
     - rewrite itree_eta in H1.
       hinduction EQr before z; intros; try inv Heqi; pclearbot.
       + red in H0. rewrite H0 in H1. apply eqit_inv in H1; inv H1.
@@ -166,13 +240,12 @@ Section PARAMS_MODEL.
         remember (VisF (subevent A e) (fun x : A => k2 x)).
         hinduction H2 before z; intros; try inv Heqi; pclearbot.
         * constructor; auto; eapply IHinterp_prop_oomTF.
-        * rewrite itree_eta in HT1. rewrite H3 in HT1.
-          apply eqit_inv in HT1. cbn in HT1. destruct HT1 as (?&?&?).
-          subst. cbn in H2.
-          eapply Interp_Prop_OomT_Vis_OOM.
-          unfold subevent, resum, ReSum_id, id_, ReSum_inr, cat, Id_IFun, Cat_IFun, inr_,
-            resum , ReSum_inl , cat, resum, Inr_sum1 in H2. inv H2.
-          apply eqit_Vis. intros; reflexivity.
+        * inv CHECK.
+        * rewrite itree_eta in HT1.
+          punfold HT1; red in HT1; cbn in HT1.
+          dependent induction HT1.
+          rewrite <- x.
+          observe_vis_r; solve_interp_prop_oom.
         * dependent destruction H6.
           eapply Interp_Prop_OomT_Vis; eauto.
           red in H2. rewrite H2 in H3. setoid_rewrite bind_trigger in H3.
@@ -186,15 +259,12 @@ Section PARAMS_MODEL.
       + eapply IHEQr. rewrite <- itree_eta. rewrite tau_eutt in H1; auto.
       + specialize (IHEQr H1).
         pstep; constructor; auto. punfold IHEQr.
-      + rewrite <- itree_eta in H1. rewrite HT1 in H1. red in H0.
-        rewrite H0 in H1. setoid_rewrite bind_trigger in H1.
-        apply eqit_inv in H1. cbn in H1.
-        destruct H1 as (?&?&?); subst.
-        pstep.
-        eapply Interp_Prop_OomT_Vis_OOM. red in H1.
-        unfold subevent, resum, ReSum_id, id_, ReSum_inr, cat, Id_IFun, Cat_IFun, inr_,
-          resum , ReSum_inl , cat, resum, Inr_sum1 in H1. inv H1.
-        apply eqit_Vis. intros; reflexivity.
+      + inv CHECK.
+      + punfold HT1; red in HT1; cbn in HT1.
+        dependent induction HT1.
+        rewrite <- x.
+        pstep; red; cbn.
+        observe_vis_r; solve_interp_prop_oom.
       + pstep.
         red in H0; rewrite H0 in H1; setoid_rewrite bind_trigger in H1.
         apply eqit_inv in H1; cbn in H1.
@@ -294,7 +364,8 @@ Proof.
   reflexivity.
 
   red.
-  pstep.
+  pstep; red; cbn.
+  observe_vis; solve_interp_prop_oom.
   econstructor.
 
   (* Instantiate ta *)
