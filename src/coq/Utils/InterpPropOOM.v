@@ -578,6 +578,32 @@ Proof.
   split; intros; subst; [rewrite <- H1, <- H2 | rewrite H1, H2]; auto.
 Qed.
 
+#[global] Instance interp_prop_oom_l_eutt_Proper :
+  forall {E F OOM h_spec R1 R2 RR} `{OOME: OOM -< E} `{OOMF: OOM -< F},
+    Proper (eutt eq ==> eutt eq ==> iff) (@interp_prop_oom_l E F OOM OOME OOMF h_spec R1 R2 RR).
+Proof.
+  split; intros; subst.
+  - eapply interp_prop_oom_eutt_Proper.
+    5: apply H1.
+    all: eauto; symmetry; eauto.
+  - eapply interp_prop_oom_eutt_Proper.
+    5: apply H1.
+    all: eauto; symmetry; eauto.
+Qed.
+
+#[global] Instance interp_prop_oom_r_eutt_Proper :
+  forall {E F OOM h_spec R1 R2 RR} `{OOME: OOM -< E} `{OOMF: OOM -< F},
+    Proper (eutt eq ==> eutt eq ==> iff) (@interp_prop_oom_r E F OOM OOME OOMF h_spec R1 R2 RR).
+Proof.
+  split; intros; subst.
+  - eapply interp_prop_oom_eutt_Proper.
+    5: apply H1.
+    all: eauto; symmetry; eauto.
+  - eapply interp_prop_oom_eutt_Proper.
+    5: apply H1.
+    all: eauto; symmetry; eauto.
+Qed.
+
 Section interp_prop_oom_extra.
 
   Context {E F OOM : Type -> Type} `{OOME: OOM -< E} `{OOMF: OOM -< F}.
