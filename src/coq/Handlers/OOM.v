@@ -346,18 +346,12 @@ Proof.
   unfold refine_OOM_h.
 
   unfold raiseOOM.
-  eapply interp_prop_oom_eutt_Proper.
-  rewrite bind_trigger. reflexivity.
-  reflexivity.
+  red.
+  rewrite bind_trigger.
 
   red.
   pstep; red; cbn.
   observe_vis; solve_interp_prop_oom.
-  econstructor.
-
-  (* Instantiate ta *)
-  apply eqit_Vis; intros. inv u.
-  Unshelve. intro. inv H.
 Qed.
 
 #[global] Instance refine_OOM_h_eutt_Proper {T : Type} {RR : relation T} {E F}:
@@ -417,7 +411,7 @@ Proof.
   setoid_rewrite H; clear H.
 
   pstep.
-  induction EQT; eauto; pclearbot.
+  induction EQT; eauto; pclearbot; try discriminate.
   - specialize (HK _ _ REL).
     punfold HK.
     eapply interp_prop_oomTF_mono. eapply HK.
@@ -428,16 +422,10 @@ Proof.
     eapply CIH; eauto.
   - econstructor; auto.
   - econstructor; auto.
-  - eapply Interp_Prop_OomT_Vis_OOM with (e := e).
-    punfold HT1; red in HT1. remember (observe (vis e k1)).
-    hinduction HT1 before k; intros; inv Heqi; try inv CHECK.
-    dependent destruction H1. unfold subevent.
-    eapply eqit_Vis.
-    Unshelve.
-    intros. cbn.
-    eapply eq_itree_clo_bind; pclearbot; eauto.
-    apply REL.
-    intros; subst; reflexivity.
+  - punfold HT1; red in HT1; cbn in HT1.
+    dependent induction HT1.
+    rewrite <- x.
+    red. solve_interp_prop_oom.
   - eapply Interp_Prop_OomT_Vis; eauto.
     intros; eauto. right. eapply CIH; eauto.
     specialize (HK0 _ H1). pclearbot. eapply HK0; eauto.
