@@ -16,8 +16,7 @@ From Vellvm Require Import
      Theory.Refinement
      Theory.InterpreterMCFG
      Theory.InterpreterCFG
-     Utils.InterpMemoryProp
-     Utils.InterpPropOOM.
+     Utils.InterpMemoryProp.
 
 From ExtLib Require Import
      Structures.Functor.
@@ -187,7 +186,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         specialize (REF _ T2).
         destruct REF as [t_pre1 [T1 EUTT]].
         exists t_pre1; split; auto.
-        eapply interp_prop_oom_Proper_eq in MODEL; try typeclasses eauto; eauto.
+        eapply interp_prop_Proper_eq in MODEL; try typeclasses eauto; eauto.
       - reflexivity.
     Qed.
 
@@ -527,7 +526,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       unfold model_undef.
       unfold exec_undef.
       exists x; split; auto.
-      apply interp_prop_oom_correct_exec; try reflexivity; auto.
+      apply interp_prop_correct_exec; try reflexivity; auto.
       repeat intro.
       unfold case_, Case_sum1, case_sum1.
       destruct e as [ | [ | ]]; eauto.

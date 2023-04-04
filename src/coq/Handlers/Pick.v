@@ -19,7 +19,6 @@ From ITree Require Import
 
 From Vellvm Require Import
   Utilities
-  Utils.InterpPropOOM
   Syntax.LLVMAst
   Syntax.AstLib
   Syntax.DynamicTypes
@@ -114,10 +113,10 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
       Definition F_trigger_prop : F ~> PropT (E +' F) :=
         fun R e => fun t => t ≈ r <- trigger e ;; ret r.
 
-      Definition model_undef_h `{FAIL: FailureE -< E +' F} `{UB: UBE -< E +' F} `{OOM_IN : OOME -< E +' PickUvalueE +' F} `{OOM_OUT : OOME -< E +' F} {R1 R2} (RR : R1 -> R2 -> Prop) :=
-        @interp_prop_oom_r (E +' PickUvalueE +' F) (E +' F) _ OOM_IN OOM_OUT (case_ E_trigger_prop (case_ PickUvalue_handler F_trigger_prop)) _ _ RR.
+      Definition model_undef_h `{FAIL: FailureE -< E +' F} `{UB: UBE -< E +' F} `{OOM_OUT : OOME -< E +' F} {R1 R2} (RR : R1 -> R2 -> Prop) :=
+        interp_prop (case_ E_trigger_prop (case_ PickUvalue_handler F_trigger_prop)) RR.
 
-      Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' PickUvalueE +' F} `{OOME -< E +' F}
+      Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F}
         {T} (RR : T -> T -> Prop) (ts : PropT (E +' PickUvalueE +' F) T) : PropT (E +' F) T:=
         fun t_picked => exists t_pre, ts t_pre /\ model_undef_h RR t_pre t_picked.
     End PARAMS_MODEL.
@@ -205,7 +204,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
     Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} : PickUvalueE ~> itree E :=
       fun T p =>
         match p with
-        | pick Pre u =>
+        | pick Pre u => 
             let res_t := concretize_uvalue u in
             fmap (fun dv => exist _ dv I) res_t
         end.

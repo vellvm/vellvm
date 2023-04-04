@@ -155,11 +155,7 @@ Module Infinite.
                 (vis (ThrowOOM oom_msg) (fun x : void => match x return (itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) R) with
                                                          end))).
 
-    hinduction Hmodel before CIH; cbn; intros; inv Heqi; eauto; [solve [cbn in *; eapply EqTauL; auto] | | | ]; try discriminate.
-    { punfold HT1; red in HT1; cbn in HT1.
-      dependent induction HT1.
-      rewrite <- x.
-    }
+    hinduction Hmodel before CIH; cbn; intros; inv Heqi; eauto; [solve [cbn in *; eapply EqTauL; auto] |]; try discriminate.
 
     dependent destruction H3.
     do 20 red in H.
