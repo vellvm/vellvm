@@ -399,74 +399,77 @@ Section interp_memory_prop.
   Qed.
 
   (* OOM case changes this lemma, and it may require knowing that OOM events only return void *)
-  (* Lemma interp_memory_prop_ret_inv: *)
-  (*   forall r1 t, *)
-  (*     interp_memory_prop (ret r1) t -> (exists r2 , RR r1 r2 /\ t ≈ ret r2) \/ (exists (e : OOM R2) k, t ≈ vis e k)%type. *)
-  (* Proof. *)
-  (*   intros r1 t INTERP. *)
-  (*   punfold INTERP. *)
-  (*   red in INTERP. *)
-  (*   setoid_rewrite itree_eta with (t:=t). *)
-  (*   remember (observe (ret r1)); remember (observe t). *)
-  (*   clear Heqi0. *)
-  (*   dependent induction INTERP; subst; pclearbot; intros. *)
-  (*   - left. *)
-  (*     exists r2. *)
-  (*     cbn in Heqi. *)
-  (*     inv Heqi. *)
-  (*     split; auto. *)
-  (*     cbn. *)
-  (*     reflexivity. *)
-  (*   - inv Heqi. *)
-  (*   - inv Heqi. *)
-  (*   - cbn in INTERP. *)
-  (*     inv INTERP. *)
-  (*     + apply simpobs in H. *)
-  (*       left. *)
-  (*       exists r2; split; auto. *)
-  (*       rewrite H. *)
-  (*       rewrite tau_eutt. *)
-  (*       reflexivity. *)
-  (*     + specialize (IHINTERP eq_refl). *)
-  (*       destruct IHINTERP as [[r2 [RRr1r2 EQ]] | [e [k VIS]]]. *)
-  (*       * left. *)
-  (*         exists r2; split; auto. *)
-  (*         rewrite <- itree_eta in EQ. *)
-  (*         rewrite EQ. *)
-  (*         rewrite tau_eutt. *)
-  (*         reflexivity. *)
-  (*       * right. *)
-  (*         exists e. exists k. *)
-  (*         rewrite <- itree_eta in VIS. *)
-  (*         rewrite VIS. *)
-  (*         rewrite tau_eutt. *)
-  (*         reflexivity. *)
-  (*     + specialize (IHINTERP eq_refl). *)
-  (*       destruct IHINTERP as [[r2 [RRr1r2 EQ]] | [e' [k' VIS]]]. *)
-  (*       * left. *)
-  (*         exists r2; split; auto. *)
-  (*         rewrite <- itree_eta in EQ. *)
-  (*         rewrite EQ. *)
-  (*         rewrite tau_eutt. *)
-  (*         reflexivity. *)
-  (*       * right. *)
-  (*         exists e'. exists k'. *)
-  (*         rewrite <- itree_eta in VIS. *)
-  (*         rewrite VIS. *)
-  (*         rewrite tau_eutt. *)
-  (*         reflexivity. *)
-  (*   - right. *)
-  (*     apply eqitree_inv_Vis_r in HT1. *)
-  (*     destruct HT1 as [k' [VIS K]]. *)
-  (*     exists e. exists k. *)
-
-
-  (*   - rewrite itree_eta in HT1. *)
-  (*     rewrite Heqi in HT1. *)
-  (*     cbn in HT1. *)
-  (*     pinversion HT1. *)
-  (*   - inv Heqi. *)
-  (* Qed. *)
+  Lemma interp_memory_prop_ret_inv:
+    forall r1 t,
+      interp_memory_prop (ret r1) t -> (exists r2 , RR r1 r2 /\ t ≈ ret r2) \/ (exists A (e : OOM A) k, t ≈ vis e k)%type.
+  Proof.
+    intros r1 t INTERP.
+    punfold INTERP.
+    red in INTERP.
+    setoid_rewrite itree_eta with (t:=t).
+    remember (observe (ret r1)); remember (observe t).
+    clear Heqi0.
+    dependent induction INTERP; subst; pclearbot; intros.
+    - left.
+      exists r2.
+      cbn in Heqi.
+      inv Heqi.
+      split; auto.
+      cbn.
+      reflexivity.
+    - inv Heqi.
+    - inv Heqi.
+    - cbn in INTERP.
+      inv INTERP.
+      + apply simpobs in H.
+        left.
+        exists r2; split; auto.
+        rewrite H.
+        rewrite tau_eutt.
+        reflexivity.
+      + specialize (IHINTERP eq_refl).
+        destruct IHINTERP as [[r2 [RRr1r2 EQ]] | [A [e [k VIS]]]].
+        * left.
+          exists r2; split; auto.
+          rewrite <- itree_eta in EQ.
+          rewrite EQ.
+          rewrite tau_eutt.
+          reflexivity.
+        * right.
+          exists A.
+          exists e. exists k.
+          rewrite <- itree_eta in VIS.
+          rewrite VIS.
+          rewrite tau_eutt.
+          reflexivity.
+      + specialize (IHINTERP eq_refl).
+        destruct IHINTERP as [[r2 [RRr1r2 EQ]] | [A' [e' [k' VIS]]]].
+        * left.
+          exists r2; split; auto.
+          rewrite <- itree_eta in EQ.
+          rewrite EQ.
+          rewrite tau_eutt.
+          reflexivity.
+        * right.
+          exists A'. exists e'. exists k'.
+          rewrite <- itree_eta in VIS.
+          rewrite VIS.
+          rewrite tau_eutt.
+          reflexivity.
+    - right.
+      apply eqitree_inv_Vis_r in HT1.
+      destruct HT1 as [k' [VIS K]].
+      exists A. exists e. exists k.
+      rewrite VIS.
+      pstep; red; cbn.
+      constructor.
+      intros v. red.
+      left.
+      rewrite K.
+      assert (k v ≈ k v) by reflexivity.
+      auto.
+    - inv Heqi.
+  Qed.
 
   Lemma interp_memory_prop_vis :
     forall {X} (e : E X) k t ta k' s1 s2,
