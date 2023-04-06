@@ -1024,7 +1024,7 @@ Section interp_prop_oom_extra.
           rewrite <- itree_eta in EUTT.
           exists A'. exists e'. exists k'.
           auto.
-        }.
+        }
 
         left.
         exists r2; split; auto.
