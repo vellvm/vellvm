@@ -227,7 +227,8 @@ Module Infinite.
   Lemma interp_mcfg4_ret_inv :
     forall R g l sid m (r : R) x,
       ℑs4 eq eq (ret r) g l sid m x ->
-        exists m' sid', ret (m := PropT _) (m', (sid', (l, (g, r)))) x.
+      (exists m' sid', ret (m := PropT _) (m', (sid', (l, (g, r)))) x) \/
+        (exists A (e : OOME A) k, x ≈ vis e k)%type.
   Proof.
     intros.
     unfold interp_mcfg4, model_undef.
@@ -238,12 +239,44 @@ Module Infinite.
     rewrite interp_state_ret in H.
     unfold interp_memory_prop in H.
     apply interp_memory_prop_ret_inv in H.
-    destruct H as (?&?&?).
-    destruct x1 as (?&?&?).
-    rewrite H1 in H0.
-    apply interp_prop_ret_inv in H0.
-    destruct H0 as (?&?&?). subst.
-    cbn. exists m0, s. rewrite H2. reflexivity.
+    destruct H as [(?&?&?) | (A&e&k&?)].
+    { destruct x1 as (?&?&?).
+      rewrite H1 in H0.
+      apply interp_prop_ret_inv in H0.
+      destruct H0 as (?&?&?). subst.
+      cbn. left. exists m0, s. rewrite H2. reflexivity.
+    }
+
+    right.
+    rewrite H in H0.
+    clear H.
+    red in H0.
+    setoid_rewrite (itree_eta x) in H0.
+    setoid_rewrite itree_eta.
+    genobs x ox.
+    clear x Heqox.    
+
+    punfold H0; red in H0; cbn in H0.
+    dependent induction H0.
+    - setoid_rewrite tau_eutt.
+      setoid_rewrite itree_eta.
+      eapply IHinterp_PropTF; eauto.
+    - red in H; cbn in H; red in H.
+      setoid_rewrite bind_ret_r in H.
+      rewrite H in H0.
+      setoid_rewrite bind_trigger in H0.
+
+      punfold H0; red in H0; cbn in H0.
+      dependent induction H0.
+      + rewrite <- x.
+        cbn.
+        exists A. exists (resum IFun A e). exists k1.
+        reflexivity.
+      + rewrite <- x.
+        cbn.
+        setoid_rewrite tau_eutt.
+        setoid_rewrite itree_eta.
+        eapply IHeqitF; eauto.
   Qed.
 
   Definition alloc_code : code dtyp :=
