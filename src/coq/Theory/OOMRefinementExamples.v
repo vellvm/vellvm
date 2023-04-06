@@ -7,6 +7,7 @@ From Vellvm Require Import
      Utils.Tactics
      Utils.MonadEq1Laws
      Utils.InterpProp
+     Utils.InterpPropOOM
      Utils.InterpMemoryProp
      Utils.ITreeMap
      Utils.Raise
@@ -836,14 +837,13 @@ Module Infinite.
     hinduction H0 before i0; intros; inv Heqi.
     - pstep; constructor; eauto.
       specialize (IHinterp_PropTF eq_refl H eq_refl). punfold IHinterp_PropTF.
-    - inv e.
     - dependent destruction H4.
-      do 20 red in H.
+      cbn in H. red in H.
       rewrite H in H0.
       setoid_rewrite bind_bind in H0.
       setoid_rewrite bind_trigger in H0.
       rewrite <- itree_eta. rewrite H0.
-      pstep. eapply Interp_PropT_Vis_OOM.
+      pstep. eapply Interp_Prop_OomT_Vis_OOM_L; auto.
       eapply eqit_Vis. intros; inv u.
       Unshelve. intros. inv H2.
   Qed.
