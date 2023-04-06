@@ -970,58 +970,90 @@ Section interp_prop_oom_extra.
       (*     rewrite bind_ret_r; reflexivity. *)
   (* Admitted. *)
 
-  (* Not true if OOM allowed for t *)
-  (* Lemma interp_prop_oom_ret_inv: *)
-  (*   forall  r1 (t : itree F _), *)
-  (*     interp_prop_oom (F := F) (OOME:=OOME) h RR (ret r1) t -> exists r2 , RR r1 r2 /\ t ≈ ret r2. *)
-  (* Proof. *)
-  (*   intros r1 t INTERP. *)
-  (*   punfold INTERP. *)
-  (*   red in INTERP. *)
-  (*   setoid_rewrite itree_eta with (t:=t). *)
-  (*   remember (observe (ret r1)); remember (observe t). *)
-  (*   clear Heqi0. *)
-  (*   induction INTERP; subst; pclearbot; intros. *)
-  (*   - exists r2. *)
-  (*     cbn in Heqi. *)
-  (*     inv Heqi. *)
-  (*     split; auto. *)
-  (*     cbn. *)
-  (*     reflexivity. *)
-  (*   - inv Heqi. *)
-  (*   - inv Heqi. *)
-  (*   - cbn in INTERP. *)
-  (*     inv INTERP. *)
-  (*     + apply simpobs in H. *)
-  (*       exists r2; split; auto. *)
-  (*       rewrite H. *)
-  (*       rewrite tau_eutt. *)
-  (*       reflexivity. *)
-  (*     + specialize (IHINTERP eq_refl). *)
-  (*       destruct IHINTERP as [r2 [RRr1r2 EQ]]. *)
-  (*       exists r2; split; auto. *)
-  (*       rewrite <- itree_eta in EQ. *)
-  (*       rewrite EQ. *)
-  (*       rewrite tau_eutt. *)
-  (*       reflexivity. *)
-  (*     + setoid_rewrite tau_eutt. *)
-  (*       specialize (IHINTERP eq_refl). *)
-  (*       destruct IHINTERP as [r2 [RRr1r2 EQ]]. *)
-  (*       exists r2; split; auto. *)
-  (*       rewrite <- itree_eta in EQ. *)
-  (*       rewrite EQ. *)
-  (*       reflexivity. *)
-  (*     + setoid_rewrite tau_eutt. *)
-  (*       specialize (IHINTERP eq_refl). *)
-  (*       destruct IHINTERP as [r2 [RRr1r2 EQ]]. *)
-  (*       exists r2; split; auto. *)
-  (*       rewrite <- itree_eta in EQ. *)
-  (*       rewrite EQ. *)
-  (*       reflexivity. *)
-  (*   - inv Heqi. *)
-  (*     rewrite itree_eta in HT1; rewrite H0 in HT1; apply eqit_inv in HT1; contradiction. *)
-  (*   -  *)
-  (*   - inv Heqi. *)
-  (* Qed. *)
+  Lemma interp_prop_oom_ret_inv:
+    forall  r1 (t : itree F _) b1 b2 o1 o2,
+      interp_prop_oom' (F := F) (OOME:=OOME) h RR b1 b2 o1 o2 (ret r1) t ->
+      (exists r2 , RR r1 r2 /\ t ≈ ret r2) \/
+        (exists A (e : OOM A) k, t ≈ vis e k)%type.
+  Proof.
+    intros r1 t b1 b2 o1 o2 INTERP.
+    punfold INTERP.
+    red in INTERP.
+    setoid_rewrite itree_eta with (t:=t).
+    remember (observe (ret r1)); remember (observe t).
+    clear Heqi0.
+    induction INTERP; subst; pclearbot; intros.
+    - left.
+      exists r2.
+      cbn in Heqi.
+      inv Heqi.
+      split; auto.
+      cbn.
+      reflexivity.
+    - inv Heqi.
+    - inv Heqi.
+    - cbn in INTERP.
+      inv INTERP.
+      + apply simpobs in H.
+        left.
+        exists r2; split; auto.
+        rewrite H.
+        rewrite tau_eutt.
+        reflexivity.
+      + specialize (IHINTERP eq_refl).
+        destruct IHINTERP as [[r2 [RRr1r2 EQ]] | [A [e [k EUTT]]]].
+        2: {
+          right.
+          setoid_rewrite tau_eutt.
+          rewrite <- itree_eta in EUTT.
+          exists A. exists e. exists k.
+          auto.
+        }
+
+        left.
+        exists r2; split; auto.
+        rewrite <- itree_eta in EQ.
+        rewrite EQ.
+        rewrite tau_eutt.
+        reflexivity.
+      + setoid_rewrite tau_eutt.
+        specialize (IHINTERP eq_refl).
+        destruct IHINTERP as [[r2 [RRr1r2 EQ]] | [A' [e' [k' EUTT]]]].
+        2: {
+          right.
+          rewrite <- itree_eta in EUTT.
+          exists A'. exists e'. exists k'.
+          auto.
+        }.
+
+        left.
+        exists r2; split; auto.
+        rewrite <- itree_eta in EQ.
+        rewrite EQ.
+        reflexivity.
+      + setoid_rewrite tau_eutt.
+        specialize (IHINTERP eq_refl).
+        destruct IHINTERP as [[r2 [RRr1r2 EQ]] | [A' [e' [k' EUTT]]]].
+        2: {
+          right.
+          rewrite <- itree_eta in EUTT.
+          exists A'. exists e'. exists k'.
+          auto.
+        }
+
+        left.
+        exists r2; split; auto.
+        rewrite <- itree_eta in EQ.
+        rewrite EQ.
+        reflexivity.
+    - inv Heqi.
+      rewrite itree_eta in HT1; rewrite H0 in HT1; apply eqit_inv in HT1; contradiction.
+    - right.
+      setoid_rewrite <- itree_eta.
+      exists A. exists e. exists k2.
+      rewrite HT1.
+      reflexivity.
+    - inv Heqi.
+  Qed.
 
 End interp_prop_oom_extra.
