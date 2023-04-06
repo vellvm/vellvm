@@ -254,7 +254,7 @@ Module Infinite.
     setoid_rewrite (itree_eta x) in H0.
     setoid_rewrite itree_eta.
     genobs x ox.
-    clear x Heqox.    
+    clear x Heqox.
 
     punfold H0; red in H0; cbn in H0.
     dependent induction H0.
@@ -759,35 +759,46 @@ Module Infinite.
     forall E R X
       (e : (E +' LLVMParamsBigIntptr.Events.IntrinsicE +' LLVMParamsBigIntptr.Events.MemoryE +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X)
       k sid m x,
-      (forall (o : OOME X), e <> subevent _ o) ->
       interp_memory_prop (E:=E) (R2 := R) eq (Vis e k) sid m x ->
-      (exists ta k2 s1 s2 ,
+      ((exists ta k2 s1 s2 ,
         x ≈ x <- ta;; k2 x /\
           interp_memory_prop_h e s1 s2 ta /\
           (forall (a : X) (b : MMEP.MMSP.MemState * (store_id * X)),
             @Returns (E +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X a (trigger e) ->
             @Returns (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) (MMEP.MMSP.MemState * (store_id * X)) b ta ->
             a = snd (snd b) ->
-            interp_memory_prop (E := E) eq (k a) sid m (k2 b))).
+            interp_memory_prop (E := E) eq (k a) sid m (k2 b))) \/
+        (exists A (e : OOME A) k, x ≈ vis e k)%type).
   Proof.
     intros.
-    rename H into NOOM.
-    rename H0 into H.
     punfold H.
     red in H. cbn in H.
     setoid_rewrite (itree_eta x).
     remember (VisF e k).
+    genobs x ox.
+    clear x Heqox.
     hinduction H before sid; intros; inv Heqi; eauto.
-    - specialize (IHinterp_memory_PropTF m NOOM eq_refl).
-      destruct IHinterp_memory_PropTF as (?&?&?&?&?&?&?).
+    - specialize (IHinterp_memory_PropTF m eq_refl).
+      destruct IHinterp_memory_PropTF as [(?&?&?&?&?&?&?) | (?&?&?&?)].
+      2: {
+        right.
+        setoid_rewrite tau_eutt.
+        rewrite <- itree_eta in H1.
+        setoid_rewrite H1.
+        exists x. exists x0. exists x1.
+        reflexivity.
+      }
+
+      left.
       eexists _,_,_,_; split; eauto. rewrite tau_eutt.
       rewrite <- itree_eta in H1. eauto.
-    - rewrite itree_eta in HT1.
-      rewrite H0 in HT1.
-      pinversion HT1; repeat subst_existT.
-      specialize (NOOM e0).
-      contradiction.
+    - setoid_rewrite <- itree_eta.
+      setoid_rewrite HT1.
+      right.
+      exists A. exists e0. exists k0.
+      reflexivity.
     - dependent destruction H3.
+      left.
       eexists _,_,_,_; split; eauto.
       + rewrite <- itree_eta; eauto.
       + split; eauto.
