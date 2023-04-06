@@ -642,6 +642,62 @@ Module Infinite.
 
     force_go_hyps.
     apply interp_mcfg4_ret_inv in INTERP.
+
+    destruct INTERP as [INTERP | OOM].
+    2: {
+      destruct OOM as [A [e [k EUTT]]].
+      exists t'.
+      split.
+      - unfold interp_mcfg4.
+        red.
+        destruct e.
+        exists (raiseOOM s).
+        split.
+        + unfold raiseOOM.
+          eapply interp_mem_prop_Proper3.
+          4: {
+            eapply EqAxiom.bisimulation_is_eq.
+            setoid_rewrite bind_trigger.
+            reflexivity.
+          }
+          all: eauto.
+          * reflexivity.
+          * pstep; red; cbn.
+            change
+              (VisF (subevent void (ThrowOOM s))
+                 (fun x : void =>
+                    match
+                      x
+                      return
+                      (itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                         (MMEP.MMSP.MemState * (store_id * (local_env * Stack.stack * res_L1))))
+                    with
+                    end)) with
+              (observe (Vis (subevent void (ThrowOOM s))
+                          (fun x : void =>
+                             match
+                               x
+                               return
+                               (itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                                  (MMEP.MMSP.MemState * (store_id * (local_env * @Stack.stack local_env * res_L1))))
+                             with
+                             end))).
+            eapply Interp_Memory_PropT_Vis_OOM.
+            reflexivity.
+        + rewrite EUTT.
+          red.
+          pstep; red; cbn.
+          change (VisF (subevent void (ThrowOOM s)) k) with (observe (Vis (subevent void (ThrowOOM s)) k)).
+          econstructor.
+          * intros [] _.
+          * cbn. red.
+            setoid_rewrite bind_ret_r.
+            reflexivity.
+          * setoid_rewrite bind_trigger.
+            reflexivity.
+      - reflexivity.
+    }
+
     destruct INTERP as (?&?&?); do 4 red in H.
 
     epose proof allocate_dtyp_spec_can_always_succeed m m
