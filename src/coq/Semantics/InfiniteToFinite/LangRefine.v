@@ -32,6 +32,7 @@ From Vellvm Require Import
      Utils.MapMonadExtra
      Utils.PropT
      Utils.InterpProp
+     Utils.InterpPropOOM
      Utils.ListUtil
      Utils.Tactics
      Utils.OOMRutt
@@ -376,7 +377,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     cbn.
 
     match goal with
-    | |- interp_prop _ _ ?l ?r => remember l as i; remember r as i0
+    | |- interp_prop_oom_l _ _ ?l ?r => remember l as i; remember r as i0
     end.
 
     assert (i ≅ _interp EC.L0_convert_strict (observe y_inf)). {
@@ -418,9 +419,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         try apply eqit_inv in H1; cbn in H1; try contradiction; auto.
       subst; constructor; auto.
       rewrite unfold_interp in H1.
-      specialize (IHinterp_PropTF _ _ H1 H2).
-
-      punfold IHinterp_PropTF.
+      specialize (IHinterp_prop_oomTF _ _ H1 H2).
+      punfold IHinterp_prop_oomTF.
     - pstep. cbn in H1, H2.
       rewrite itree_eta in H1, H2.
       red.
@@ -428,9 +428,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         try apply eqit_inv in H2; cbn in H2; try contradiction; auto.
       subst; constructor; auto.
       rewrite unfold_interp in H2.
-      specialize (IHinterp_PropTF _ _ H1 H2).
-
-      punfold IHinterp_PropTF.
+      specialize (IHinterp_prop_oomTF _ _ H1 H2).
+      punfold IHinterp_prop_oomTF.
     - pstep. apply bisimulation_is_eq in HT1.
       rewrite HT1 in H1. cbn in H1.
       destruct (resum IFun A e).
@@ -439,6 +438,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       apply bisimulation_is_eq in H1. rewrite H1.
       econstructor; eauto.
       eapply eqit_Vis; intros; inv u.
+    - discriminate.
     - pstep. cbn in H2, H3. red in H.
       rewrite H in H0.
       rename H2 into H1.
@@ -517,20 +517,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             destruct H1 as (?&?&?).
             dependent destruction x.
             red in H, H0.
-            (* rewrite H1. *)
-            econstructor; eauto.
-            - intros. inv a.
-            - red; reflexivity.
-            - cbn in *. rewrite <- itree_eta in H2.
-              rewrite H2. rewrite <- unfold_interp.
-              rewrite KS. rewrite interp_vis. cbn.
-              rewrite bind_bind. unfold lift_OOM.
-              rewrite Hf. setoid_rewrite bind_ret_l.
-              setoid_rewrite bind_bind. rewrite Hm.
-              setoid_rewrite bind_trigger.
-              setoid_rewrite bind_vis.
-              unfold subevent. rewrite H0.
-              eapply eqit_Vis. intros. inv u0. } }
+            inv H0.
+            observe_vis; solve_interp_prop_oom.
+        } }
 
           unfold raiseOOM in H1. rewrite bind_trigger in H1.
           red. destruct (observe i) eqn: Heqi;
@@ -538,17 +527,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           destruct H1 as (?&?&?).
           dependent destruction x.
           red in H, H0. cbn in *.
-          econstructor; eauto.
-        * intros. inv a.
-        * red; reflexivity.
-        * rewrite <- itree_eta in H2. rewrite H2.
-          rewrite <- unfold_interp. rewrite KS.
-          rewrite interp_vis.
-          cbn. rewrite bind_bind. unfold lift_OOM. rewrite Hf.
-          setoid_rewrite bind_trigger.
-          setoid_rewrite bind_vis.
-          unfold subevent. rewrite H0.
-          eapply eqit_Vis. intros. inv u.
+          inv H0.
+          observe_vis; solve_interp_prop_oom.
       + destruct s.
         { (* Intrinsic *)
           admit.
@@ -592,15 +572,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           destruct H1 as (?&?&?).
           dependent destruction x.
           red in H, H0. cbn in *.
-          econstructor; eauto.
-          -- intros. inv a.
-          -- red; reflexivity.
-          -- rewrite <- itree_eta in H2. rewrite H2.
-             rewrite <- unfold_interp. rewrite H0.
-             rewrite bind_trigger.
-             rewrite interp_vis. cbn. do 2 setoid_rewrite bind_trigger.
-             rewrite bind_vis. subst.
-             apply eqit_Vis; intros; inv u.
+          inv H0.
+          observe_vis; solve_interp_prop_oom.
         * destruct s; try destruct u; cbn in H1.
           -- repeat red in HTA.
               unfold raiseUB in H1. rewrite bind_trigger in H1.
@@ -610,8 +583,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               destruct H1 as (?&?&?).
               dependent destruction x.
               red in H, H0.
-              econstructor; eauto.
-              repeat red. intros. inv a.
+              eapply Interp_Prop_OomT_Vis; eauto.
+              repeat red. intros.
+              inv a.
               red; reflexivity.
               setoid_rewrite <- itree_eta in H2. rewrite H2.
               rewrite <- unfold_interp.
@@ -639,7 +613,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                   unfold subevent. reflexivity.
                   constructor; reflexivity. }
                 specialize (HK _ H0). pclearbot.
-                econstructor; eauto.
+                eapply Interp_Prop_OomT_Vis; eauto.
                 ** intros. red in H1. specialize (H1 tt).
                    eapply bisimulation_is_eq in H1. destruct a.
                    rewrite H1.
@@ -647,7 +621,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                    2 : { rewrite <- interp_tau, <- unfold_interp. reflexivity. }
                    pstep; econstructor; eauto. punfold HK.
                    rewrite <- unfold_interp. Unshelve.
-                   16 : exact (fun x => interp EC.L0_convert_strict (k2 x)). reflexivity.
+                   3: exact (fun x => interp EC.L0_convert_strict (k2 x)). reflexivity.
+                   intros [].
                    all : shelve.
                 ** red; reflexivity.
                 ** rewrite <- itree_eta in H2.
@@ -663,7 +638,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                 destruct H1 as (?&?&?).
                 dependent destruction x.
                 red in H, H0. cbn in *; subst.
-                econstructor; eauto.
+                eapply Interp_Prop_OomT_Vis; eauto.
                 intros. inv a.
                 red; reflexivity.
                 setoid_rewrite <- itree_eta in H2. rewrite H2.
@@ -1109,7 +1084,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     cbn.
 
     match goal with
-    | |- interp_prop _ _ ?l ?r => remember l as i; remember r as i0
+    | |- interp_prop_oom_l _ _ ?l ?r => remember l as i; remember r as i0
     end.
 
     assert (i ≅ _interp EC.L4_convert_strict (observe y_inf)). {
@@ -1151,9 +1126,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         try apply eqit_inv in H1; cbn in H1; try contradiction; auto.
       subst; constructor; auto.
       rewrite unfold_interp in H1.
-      specialize (IHinterp_PropTF _ _ H1 H2).
-
-      punfold IHinterp_PropTF.
+      specialize (IHinterp_prop_oomTF _ _ H1 H2).
+      punfold IHinterp_prop_oomTF.
     - pstep. cbn in H1, H2.
       rewrite itree_eta in H1, H2.
       red.
@@ -1161,9 +1135,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         try apply eqit_inv in H2; cbn in H2; try contradiction; auto.
       subst; constructor; auto.
       rewrite unfold_interp in H2.
-      specialize (IHinterp_PropTF _ _ H1 H2).
-
-      punfold IHinterp_PropTF.
+      specialize (IHinterp_prop_oomTF _ _ H1 H2).
+      punfold IHinterp_prop_oomTF.
     - pstep. apply bisimulation_is_eq in HT1.
       rewrite HT1 in H1. cbn in H1.
       destruct (resum IFun A e).
@@ -1172,6 +1145,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       apply bisimulation_is_eq in H1. rewrite H1.
       econstructor; eauto.
       eapply eqit_Vis; intros; inv u.
+    - discriminate.
     - pstep. cbn in H2, H3. red in H.
       rewrite H in H0.
       rename H2 into H1.
@@ -1254,7 +1228,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             dependent destruction x.
             red in H, H0.
             (* rewrite H1. *)
-            econstructor; eauto.
+            eapply Interp_Prop_OomT_Vis; eauto.
             - intros. inv a.
             - red; reflexivity.
             - cbn in *. rewrite <- itree_eta in H2.
@@ -1274,17 +1248,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           destruct H1 as (?&?&?).
           dependent destruction x.
           red in H, H0. cbn in *.
-          econstructor; eauto.
-        * intros. inv a.
-        * red; reflexivity.
-        * rewrite <- itree_eta in H2. rewrite H2.
-          rewrite <- unfold_interp. rewrite KS.
-          rewrite interp_vis.
-          cbn. rewrite bind_bind. unfold lift_OOM. rewrite Hf.
-          setoid_rewrite bind_trigger.
-          setoid_rewrite bind_vis.
-          unfold subevent. rewrite H0.
-          eapply eqit_Vis. intros. inv u.
+          inv e.
+          observe_vis.
+          eapply Interp_Prop_OomT_Vis_OOM_L; eauto.
+          reflexivity.
+          observe_vis.
+          eapply Interp_Prop_OomT_Vis_OOM_L; eauto.
+          reflexivity.
       + destruct s.
         * unfold raiseOOM in H1.
           destruct o.
@@ -1297,15 +1267,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           destruct H1 as (?&?&?).
           dependent destruction x.
           red in H, H0. cbn in *.
-          econstructor; eauto.
-          -- intros. inv a.
-          -- red; reflexivity.
-          -- rewrite <- itree_eta in H2. rewrite H2.
-             rewrite <- unfold_interp. rewrite H0.
-             rewrite bind_trigger.
-             rewrite interp_vis. cbn. do 2 setoid_rewrite bind_trigger.
-             rewrite bind_vis. subst.
-             apply eqit_Vis; intros; inv u.
+          inv e.
+          observe_vis.
+          eapply Interp_Prop_OomT_Vis_OOM_L; eauto.
+          reflexivity.
+          observe_vis.
+          eapply Interp_Prop_OomT_Vis_OOM_L; eauto.
+          reflexivity.
         * destruct s; try destruct u; cbn in H1.
           -- repeat red in HTA.
               unfold raiseUB in H1. rewrite bind_trigger in H1.
@@ -1315,7 +1283,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               destruct H1 as (?&?&?).
               dependent destruction x.
               red in H, H0.
-              econstructor; eauto.
+              eapply Interp_Prop_OomT_Vis; eauto.
               repeat red. intros. inv a.
               red; reflexivity.
               setoid_rewrite <- itree_eta in H2. rewrite H2.
@@ -1344,7 +1312,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                   unfold subevent. reflexivity.
                   constructor; reflexivity. }
                 specialize (HK _ H0). pclearbot.
-                econstructor; eauto.
+                eapply Interp_Prop_OomT_Vis; eauto.
                 ** intros. red in H1. specialize (H1 tt).
                    eapply bisimulation_is_eq in H1. destruct a.
                    rewrite H1.
@@ -1352,7 +1320,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                    2 : { rewrite <- interp_tau, <- unfold_interp. reflexivity. }
                    pstep; econstructor; eauto. punfold HK.
                    rewrite <- unfold_interp. Unshelve.
-                   16 : exact (fun x => interp EC.L4_convert_strict (k2 x)). reflexivity.
+                   8 : exact (fun x => interp EC.L4_convert_strict (k2 x)). reflexivity.
                    all : shelve.
                 ** red; reflexivity.
                 ** rewrite <- itree_eta in H2.
@@ -1368,7 +1336,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                 destruct H1 as (?&?&?).
                 dependent destruction x.
                 red in H, H0. cbn in *; subst.
-                econstructor; eauto.
+                eapply Interp_Prop_OomT_Vis; eauto.
                 intros. inv a.
                 red; reflexivity.
                 setoid_rewrite <- itree_eta in H2. rewrite H2.
