@@ -262,7 +262,6 @@ Section GenerationState.
        |}.
 
   Definition GenLLVM := (eitherT string (stateT (list string) (stateT GenState G))).
-
   
   (* Need this because extlib doesn't declare this instance as global :|. *)
   #[global] Instance monad_stateT {s m} `{Monad m} : Monad (stateT s m).
@@ -294,10 +293,15 @@ Section GenerationState.
   typeclasses eauto.
   Defined.
 
+  (* GC: For following, I will leave pieces defined in another way so I can learn more about how to use monad *)
+  (* Definition lift_GenLLVM {A} (g : G A) : GenLLVM A := *)
+  (* mkEitherT (mkStateT (fun stack => mkStateT (fun st => a <- g;; ret (inr a, stack, st)))). *)
+  
   Definition lift_GenLLVM {A} (g : G A) : GenLLVM A.
     unfold GenLLVM.
     apply mkEitherT.
     apply mkStateT.
+    (* intros. *)
     refine (fun stack => _).
     apply mkStateT.
     refine (fun st => a <- g ;; ret _).
@@ -314,6 +318,9 @@ Section GenerationState.
      [failGen] was the one piece of the backtracking variant of QuickChick we
      needed.  
    *)
+  (* Definition failGen {A:Type} (s:string) : GenLLVM A := *)
+  (* mkEitherT (mkStateT (fun stack => ret (inl s, stack))). *)
+  
   Definition failGen {A:Type} (s:string) : GenLLVM A.
     apply mkEitherT.
     apply mkStateT.
@@ -321,17 +328,49 @@ Section GenerationState.
     exact (ret (inl s, stack)).
   Defined.
 
+  (* Definition annotate {A : Type} (s:string) (g : GenLLVM A) : GenLLVM A := *)
+  (*   mkEitherT *)
+  (*     (mkStateT (fun stack => *)
+  (*                  (mkStateT (fun st => *)
+  (*                               let opt := unEitherT g in *)
+  (*                               let ann := runStateT opt (s::stack) in *)
+  (*                               let ans := runStateT ann st in ans *)
+  (*                  )) *)
+  (*     )). *)
+  
   Definition annotate {A:Type} (s:string) (g : GenLLVM A) : GenLLVM A.
     apply mkEitherT.
     apply mkStateT.
     refine (fun stack => _).
     apply mkStateT.
     refine (fun s => _).
+    (* refine (let opt := unEitherT g in _). *)
+    (* refine (let ann := runStateT opt (s0::stack) in _). *)
+    (* refine (let ans := runStateT ann s in _). *)
+    (* refine ans. *)
     refine (let opt := unEitherT g in
             let ann := runStateT opt (s0::stack) in
             let ans := runStateT ann s in
             ans
            ).
+    Defined.
+  
+  Definition flush {A : Type} (g : GenLLVM A) : GenLLVM A.
+    unfold GenLLVM.
+    apply mkEitherT.
+    apply mkStateT.
+    refine (fun stack => _).
+        refine (let debug := fold_right (fun m gen_msg => (m ++ "\n" ++ gen_msg)%string) EmptyString stack in _).
+    apply mkStateT.
+    refine (fun st => _).
+    refine (let debug := fold_right (fun m gen_msg => (m ++ "\n" ++ gen_msg)%string) EmptyString stack in _).
+    refine (let opt := unEitherT g in
+            _).
+    Print stateT.
+    refine (let ann := runStateT opt [] in _).
+    refine (let ans := runStateT ann st in _).
+    refine ans.
+    
   
   Definition new_raw_id : GenLLVM raw_id
     := n <- gets get_raw;;
