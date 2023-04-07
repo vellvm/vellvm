@@ -890,7 +890,17 @@ Module InfiniteToFinite.
       dependent induction REL; intros Heqr'.
       - subst.
         apply interp_memory_prop_ret_inv in RUN.
-        destruct RUN as [r3 [REQ EQ]]; subst.
+        destruct RUN as [[r3 [REQ EQ]] | [A [e [k EUTT]]]]; subst.
+        2: {
+          eapply paco2_mon_bot; eauto.
+          rewrite EUTT.
+          pstep; red; cbn.
+          econstructor.
+          destruct e.
+          pstep; red; cbn.
+          constructor.
+          intros [] _.
+        }
 
         (assert (eutt eq (get_inf_tree {| _observe := ot_fin2 |}) (get_inf_tree (ret r3)))).
         { rewrite <- EQ.
@@ -1072,14 +1082,13 @@ Module InfiniteToFinite.
            }
 
            { rewrite itree_eta in HT1.
-             rewrite H1 in HT1.
+             rewrite H2 in HT1.
              pinversion HT1.
            }
 
            { rewrite itree_eta in HT1.
-             rewrite H1 in HT1.
+             rewrite H2 in HT1.
              pinversion HT1.
-             inversion REL0.
            }
         -- specialize (EQ t2).
            contradiction.
@@ -1095,6 +1104,16 @@ Module InfiniteToFinite.
            apply H0.
         -- specialize (EQ t2).
            contradiction.
+        -- rewrite itree_eta in HT1.
+           genobs t2 ot2. clear t2 Heqot2.
+           punfold HT1; red in HT1; cbn in HT1.
+           dependent induction HT1.
+           ++ destruct e.
+              econstructor.
+              pstep; red; cbn.
+              constructor.
+              intros [] _.
+           ++ specialize (EQ t0); contradiction.
         -- { dependent induction RUN; subst.
              - specialize (EQ t2).
                contradiction.
