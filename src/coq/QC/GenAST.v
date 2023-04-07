@@ -328,6 +328,17 @@ Section GenerationState.
     exact (ret (inl s, stack)).
   Defined.
 
+  (* Definition popStack {A : Type} (g:GenLLVM A) : stateT (list string) (stateT GenState G) A. *)
+  
+  
+  (* Definition debugGen {A:Type} (g :GenLLVM A) : GenLLVM A. *)
+  (*   unfold GenLLVM. *)
+  (*   apply mkEitherT. *)
+  (*   apply mkStateT. *)
+  (*   refine (fun stack => _). *)
+  (*   apply mkStateT. *)
+  (*   refine (fun st => a <- g ;; ret _). *)
+
   (* Definition annotate {A : Type} (s:string) (g : GenLLVM A) : GenLLVM A := *)
   (*   mkEitherT *)
   (*     (mkStateT (fun stack => *)
@@ -355,21 +366,13 @@ Section GenerationState.
            ).
     Defined.
   
-  Definition flush {A : Type} (g : GenLLVM A) : GenLLVM A.
-    unfold GenLLVM.
-    apply mkEitherT.
-    apply mkStateT.
-    refine (fun stack => _).
-        refine (let debug := fold_right (fun m gen_msg => (m ++ "\n" ++ gen_msg)%string) EmptyString stack in _).
-    apply mkStateT.
-    refine (fun st => _).
-    refine (let debug := fold_right (fun m gen_msg => (m ++ "\n" ++ gen_msg)%string) EmptyString stack in _).
-    refine (let opt := unEitherT g in
-            _).
-    Print stateT.
-    refine (let ann := runStateT opt [] in _).
-    refine (let ans := runStateT ann st in _).
-    refine ans.
+  (* Definition flush {A : Type} (g : GenLLVM A) : GenLLVM A. *)
+  (*   unfold GenLLVM. *)
+  (*   apply mkEitherT. *)
+  (*   apply mkStateT. *)
+  (*   refine (fun stack => _). *)
+  (*   refine (let debug := fold_right (fun m gen_msg => (m ++ "\n" ++ gen_msg)%string) EmptyString stack in _). *)
+  (*   refine (ret _). *)
     
   
   Definition new_raw_id : GenLLVM raw_id
@@ -698,13 +701,37 @@ Section GenerationState.
                  xs <- m';;
                  ret (x :: xs)) (repeat g k) (ret []).
 
-  Definition sized_LLVM {A : Type} (gn : nat -> GenLLVM A) : GenLLVM A
-    := mkEitherT (mkStateT
-                    (fun st => sized (fun n => runStateT (unEitherT (gn n)) st))).
+  Definition sized_LLVM {A : Type} (gn : nat -> GenLLVM A) : GenLLVM A.
+    apply mkEitherT.
+    apply mkStateT.
+    refine (fun stack => _).
+    apply mkStateT.
+    refine (fun st => sized _).
+    refine (fun n => _).
+    refine (let opt := unEitherT (gn n) in _).
+    refine (let ann := runStateT opt stack in _).
+    refine (let ans := runStateT ann st in ans).
+    Defined.
+  
+  (* Definition sized_LLVM {A : Type} (gn : nat -> GenLLVM A) : GenLLVM A *)
+  (*   := mkEitherT (mkStateT *)
+  (*                   (fun st => sized (fun n => runStateT (unEitherT (gn n)) st))). *)
 
-  Definition resize_LLVM {A : Type} (sz : nat) (g : GenLLVM A) : GenLLVM A
-    := mkEitherT (mkStateT
-                    (fun st => resize sz (runStateT (unEitherT g) st))).
+  Definition resize_LLVM {A : Type} (sz : nat) (g : GenLLVM A) : GenLLVM A.
+    apply mkEitherT.
+    apply mkStateT.
+    refine (fun stack => _).
+    apply mkStateT.
+    refine (fun st => _).
+    refine (let opt := unEitherT g in _).
+    refine (let ann := runStateT opt stack in _).
+    refine (let ans := runStateT ann st in _).
+    refine (resize sz ans).
+    Defined.
+  
+  (* Definition resize_LLVM {A : Type} (sz : nat) (g : GenLLVM A) : GenLLVM A *)
+  (*   := mkEitherT (mkStateT *)
+  (*                   (fun st => resize sz (runStateT (unEitherT g) st))). *)
 
   Definition listOf_LLVM {A : Type} (g : GenLLVM A) : GenLLVM (list A) :=
     sized_LLVM (fun n =>
@@ -716,9 +743,32 @@ Section GenerationState.
     := sized_LLVM (fun n =>
                      k <- lift (choose (1, n)%nat);;
                      vectorOf_LLVM k g).
+  
+  (* Definition flush_ERR {A} (g : GenLLVM A) : GenLLVM A. *)
+  (*   apply mkEitherT. *)
+  (*   apply mkStateT. *)
+  (*   refine (fun stack => _). *)
+  (*   apply mkStateT. *)
+  (*   refine (fun st => _). *)
+  (*   refine (let debug := fold_right (fun op ops => (op ++ "\n" ++ ops)%string) "" stack in _). *)
+  (*   refine (let opt := unEitherT g in _). *)
+  (*   refine (let ann := runStateT opt [] in _). *)
+  (*   refine (let ans := runStateT ann st in _). *)
+  (*   refine (a <- ans;; _). *)
+  (*   refine (let t := fmap fst a in _). *)
+    
 
-  Definition run_GenLLVM {A} (g : GenLLVM A) : G (string + A)
-    := fmap fst (runStateT (unEitherT g) init_GenState).
+    
+  (* TODO: I don't think this is correct. Maybe need to change the definition a little bit.*)
+  Definition run_GenLLVM {A} (g : GenLLVM A) : G (string + A).
+    refine (let opt := unEitherT g in _).
+    refine (let ann := runStateT opt [] in _).
+    refine (let ans := runStateT ann init_GenState in _).
+    refine (fmap fst (fmap fst ans)).
+    Defined.
+  
+  (* Definition run_GenLLVM {A} (g : GenLLVM A) : G (string + A) *)
+  (*   := fmap fst (runStateT (unEitherT g) init_GenState). *)
 
 End GenerationState.
 
@@ -2062,19 +2112,28 @@ Section InstrGenerators.
        | inr (a, st') => (inr a, st')
        end.
 
-  Definition opt_err_add_state {A} {ST} (st:ST) (o : option (err A * ST)) : err (option A) * ST :=
+  Definition opt_err_add_state {A} {ST} (st:ST) (o : option (err A * list string * ST)) : err (option A) * list string * ST :=
     match o with
-    | None => (inr None, st)
-    | Some (inl msg, st) => (inl msg, st)
-    | Some (inr a, st)  => (inr (Some a), st)
+    | None => (inr None, [], st)
+    | Some (inl msg, stack, st) => (inl msg, stack, st)
+    | Some (inr a, stack, st) => (inr (Some a), stack, st)
     end.
-  
+
   Definition gen_opt_LLVM {A} (g : GenLLVM A) : GenLLVM (option A)
-    := mkEitherT (mkStateT
-         (fun st =>
-            opt <- gen_option (runStateT (unEitherT g) st);;
-            ret (opt_err_add_state st opt)
-            )).
+    := mkEitherT
+         (mkStateT (fun stack =>
+                      (mkStateT (fun st =>
+                                   opt <- gen_option (runStateT (runStateT (unEitherT g) stack) st);;
+                                   ret (opt_err_add_state st opt)
+                      ))
+         )).
+  
+  (* Definition gen_opt_LLVM {A} (g : GenLLVM A) : GenLLVM (option A) *)
+  (*   := mkEitherT (mkStateT *)
+  (*        (fun st => *)
+  (*           opt <- gen_option (runStateT (unEitherT g) st);; *)
+  (*           ret (opt_err_add_state st opt) *)
+  (*           )). *)
 
   Definition get_typ_in_ptr (pt : typ) : GenLLVM typ :=
     match pt with
