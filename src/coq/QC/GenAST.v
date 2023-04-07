@@ -756,16 +756,24 @@ Section GenerationState.
   (*   refine (let ans := runStateT ann st in _). *)
   (*   refine (a <- ans;; _). *)
   (*   refine (let t := fmap fst a in _). *)
-    
 
+  (* GC : Maybe need to check the definition a little bit *)
+  Definition run_GenLLVM {A} (g: GenLLVM A) : G (string + A) :=
+    let ran := runStateT (runStateT (unEitherT g) []) init_GenState in
+    '(err_a,stack) <- fmap fst ran;;
+    let debug : string := fold_right (fun d1 drest => (d1 ++ "\n" ++ drest)%string) "" stack in
+    let flushed_err := match err_a with
+                | inl err_str => inl (err_str ++ "\n\nDEBUG SECTION: \n" ++ debug ++ "\n")%string
+                | inr _ => err_a
+                end in
+    ret flushed_err.
     
-  (* TODO: I don't think this is correct. Maybe need to change the definition a little bit.*)
-  Definition run_GenLLVM {A} (g : GenLLVM A) : G (string + A).
-    refine (let opt := unEitherT g in _).
-    refine (let ann := runStateT opt [] in _).
-    refine (let ans := runStateT ann init_GenState in _).
-    refine (fmap fst (fmap fst ans)).
-    Defined.
+  (* Definition run_GenLLVM {A} (g : GenLLVM A) : G (string + A). *)
+  (*   refine (let opt := unEitherT g in _). *)
+  (*   refine (let ann := runStateT opt [] in _). *)
+  (*   refine (let ans := runStateT ann init_GenState in _). *)
+  (*   refine (fmap fst (fmap fst ans)). *)
+  (*   Defined. *)
   
   (* Definition run_GenLLVM {A} (g : GenLLVM A) : G (string + A) *)
   (*   := fmap fst (runStateT (unEitherT g) init_GenState). *)
