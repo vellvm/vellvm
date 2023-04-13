@@ -2361,6 +2361,206 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                     contradiction.
                   }
                 }
+
+                { (* Intrinsic *)
+                  destruct EV_REL as (T&F&ARGS); subst.
+                  red in H0.
+                  red in H0.
+                  destruct H0 as [UB | [ERR | [OOM | H0]]].
+                  { (* Handler raises UB *)
+                    admit.
+                  }
+
+                  { (* Handler raises Error *)
+                    admit.
+                  }
+
+                  { (* Handler raises OOM *)
+                    admit.
+                  }
+
+                  (* Handler succeeds *)
+                  destruct H0 as (st1&ms'&d&H0&INTRINSIC).
+                  rewrite H0 in VIS_HANDLED.
+                  setoid_rewrite bind_ret_l in VIS_HANDLED.
+
+                  { eapply Interp_Memory_PropT_Vis with
+                      (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                              match DVCInfFin.dvalue_convert_strict dv_inf with
+                              | NoOom dv_fin =>
+                                  match convert_MemState ms_inf with
+                                  | NoOom ms_fin =>
+                                      get_inf_tree (k2 (ms_fin, (st1, dv_fin)))
+                                  | Oom s => raiseOOM s
+                                  end
+                              | Oom s => raiseOOM s
+                              end)
+                      )
+                      (s1:=s1)
+                      (s2:=lift_MemState s2).
+                    2: {
+                      cbn. red. red.
+                      repeat right.
+                      exists s1.
+                      exists (lift_MemState ms').
+                      exists (fin_to_inf_dvalue d).
+                      split; try reflexivity.
+
+                      (* TODO: Lemma about lifting intrinsic handlers *)
+                      (* TODO: Move this *)
+                      Lemma handle_intrinsic_fin_inf :
+                        forall t f args args0 s2 ms' d
+                          (ARGS: Forall2 DVCInfFin.dvalue_refine_strict args0 args),
+                          Memory64BitIntptr.MMEP.MemSpec.handle_intrinsic_prop
+                            LLVMParams64BitIntptr.Events.DV.dvalue
+                            (LLVMParams64BitIntptr.Events.Intrinsic t f args) s2 (ret (ms', d)) ->
+                          MemoryBigIntptr.MMEP.MemSpec.handle_intrinsic_prop DVCInfFin.DV1.dvalue
+                            (InterpreterStackBigIntptr.LP.Events.Intrinsic t f args0) (lift_MemState s2)
+                            (ret (lift_MemState ms', fin_to_inf_dvalue d)).
+                      Proof.
+                        intros t f args args0 s2 ms' d ARGS INTRINSIC.
+                        red in INTRINSIC.
+                        red.
+                        break_match.
+                        { (* Memcpy *)
+                          cbn in *.
+                          destruct INTRINSIC as [sab [[] [HANDLER [SAB D]]]].
+                          subst.
+                          exists (lift_MemState sab).
+                          exists tt.
+                          repeat split; auto.
+                          - (* Handler *)
+                            repeat (destruct ARGS;
+                                    [solve [ inversion HANDLER
+                                           | red in HANDLER;
+                                             repeat break_match_hyp; inversion HANDLER
+                                       ]
+                                    |
+                                   ]).
+                            red in HANDLER.
+                            repeat break_match_hyp; try inversion HANDLER.
+                            { (* 32 bit memcpy *)
+                              admit.
+                            }
+
+                            { (* 64 bit memcpy *)
+                              admit.
+                            }
+
+                            { (* iptr memcpy *)
+                              admit.
+                            }
+                          - unfold fin_to_inf_dvalue.
+                            break_match.
+                            destruct p; cbn in *.
+                            clear Heqs.
+                            rewrite DVC2.dvalue_convert_strict_equation in e.
+                            inv e.
+                            reflexivity.
+                        }
+
+                        admit.
+                      Admitted.
+
+                      eapply handle_intrinsic_fin_inf; eauto.
+                    }
+                    2: {
+                      cbn.
+                      setoid_rewrite bind_ret_l.
+                      rewrite VIS_HANDLED.
+                      pstep; red; cbn.
+
+                      (* TODO: Move this, make uvalue versions *)
+                      Lemma dvalue_fin_to_inf_to_fin :
+                        forall d,
+                          DVCInfFin.dvalue_convert_strict (fin_to_inf_dvalue d) = NoOom d.
+                      Proof.
+                        intros d.
+                        pose proof fin_to_inf_dvalue_refine_strict d.
+                        auto.
+                      Qed.
+
+                      Lemma MemState_fin_to_inf_to_fin :
+                        forall ms,
+                          convert_MemState (lift_MemState ms) = NoOom ms.
+                      Proof.
+                      Admitted.
+
+                      rewrite dvalue_fin_to_inf_to_fin.
+                      rewrite MemState_fin_to_inf_to_fin.
+                      eapply Reflexive_eqitF_eq.
+                      { red. intros x.
+                        left.
+                        apply paco2_eqit_refl.
+                      }
+                    }
+
+                    clear INTRINSIC.
+                    intros a (ms''&sid'&b) RET H1 H2; cbn in *; subst.
+                    apply Returns_ret_inv in H1.
+                    inv H1.
+
+                    break_match_goal.
+                    2: {
+                      (* OOM *)
+                      cbn.
+                      left.
+                      pstep; red; cbn.
+                      observe_vis; solve_interp_prop_oom.
+                    }
+                    break_match_goal.
+                    2: {
+                      (* OOM *)
+                      cbn.
+                      left.
+                      pstep; red; cbn.
+                      observe_vis; solve_interp_prop_oom.
+                    }
+
+                    pclearbot.
+                    right.
+                    rewrite (itree_eta_ (k0 _)).
+                    rewrite (itree_eta_ (k2 _)).
+
+                    eapply CIH;
+                      repeat rewrite <- itree_eta_.
+
+                    2: {
+                      red.
+                      specialize (HK d (ms', (st1, d))).
+                      forward HK.
+                      { eapply ReturnsVis.
+                        pstep; red; cbn.
+                        constructor.
+                        intros v. red.
+                        left; apply paco2_eqit_refl.
+                        constructor.
+                        reflexivity.
+                      }
+                      forward HK.
+                      { rewrite H0.
+                        constructor.
+                        reflexivity.
+                      }
+                      forward HK; cbn; auto.
+                      pclearbot.
+                      rewrite MemState_fin_to_inf_to_fin in Heqo0; inv Heqo0.
+                      rewrite dvalue_fin_to_inf_to_fin in Heqo; inv Heqo.
+                      apply HK.
+                    }
+                    
+                    rewrite REL.
+                    eapply K_RUTT; split; auto.
+                  }
+                }
+
+                { (* MemPush *)
+                  admit.
+                }
+
+                { (* MemPop *)
+                  admit.
+                }
                 
                 admit.
                 admit.
