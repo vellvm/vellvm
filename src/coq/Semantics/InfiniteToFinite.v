@@ -2368,6 +2368,51 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                   red in H0.
                   destruct H0 as [UB | [ERR | [OOM | H0]]].
                   { (* Handler raises UB *)
+                    destruct UB as [ub_msg INTRINSIC].
+                    red in INTRINSIC.
+                    break_match_hyp.
+                    { (* memcpy *)
+                      cbn in *.
+                      destruct INTRINSIC as [HANDLER | [sab [[] [HANDLER []]]]].
+                      red in HANDLER.
+                      repeat (destruct ARGS;
+                              [solve [ inversion HANDLER
+                                     | red in HANDLER;
+                                       repeat break_match_hyp; cbn in HANDLER; inversion HANDLER
+                                 ]
+                              |
+                             ]).
+                      repeat break_match_hyp; cbn in HANDLER; try contradiction.
+
+                      { (* 32 bit *)
+                        red in HANDLER.
+                        break_match_hyp.
+                        { (* Negative length UB *)
+                          admit.
+                        }
+
+                        break_match_hyp.
+                        2: {
+                          (* Overlapping UB *)
+                          admit.
+                        }
+
+                        (* No UB *)
+                        (* May be UB in read / write... *)
+                        cbn in HANDLER.
+                        admit.
+                      }
+
+                      { (* 64 bit *)
+                        admit.
+                      }
+
+                      { (* iptr *)
+                        admit.
+                      }
+                    }
+
+                    (* Not memcpy... *)
                     admit.
                   }
 
@@ -2376,7 +2421,27 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                   }
 
                   { (* Handler raises OOM *)
-                    admit.
+                    destruct OOM as [oom_msg [TA HANDLER]].
+                    unfold raise_oom in TA.
+                    cbn in TA.
+                    unfold raiseOOM in TA.
+                    rewrite bind_trigger in TA.
+
+                    rewrite TA in VIS_HANDLED.
+                    rewrite bind_vis in VIS_HANDLED.
+
+                    punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
+                    dependent induction VIS_HANDLED.
+                    2: {
+                      specialize (EQ t1); contradiction.
+                    }
+
+                    econstructor.
+                    rewrite get_inf_tree_equation.
+                    cbn.
+                    unfold raiseOOM.
+                    rewrite bind_trigger.
+                    reflexivity.
                   }
 
                   (* Handler succeeds *)
@@ -2561,7 +2626,39 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                 { (* MemPop *)
                   admit.
                 }
-                
+
+                { (* Alloca *)
+                  admit.
+                }
+
+                { (* Load *)
+                  admit.
+                }
+
+                { (* Store *)
+                  admit.
+                }
+
+                { (* Pick *)
+                  admit.
+                }
+
+                { (* OOM *)
+                  admit.
+                }
+
+                { (* UBE *)
+                  admit.
+                }
+
+                { (* DebugE *)
+                  admit.
+                }
+
+                { (* FailureE *)
+                  admit.
+                }
+
                 admit.
                 admit.
                 admit.
