@@ -63,20 +63,20 @@ let rec eq_uvalue (l: DV.uvalue) (r: DV.uvalue) : bool =
      fl = fr && ml = mr && eq_uvalue l1 r1 && eq_uvalue l2 r2
   | UVALUE_FCmp (bl, l1, l2), UVALUE_FCmp (br, r1, r2) ->
      bl = br && eq_uvalue l1 r1 && eq_uvalue l2 r2
-  | UVALUE_Conversion (t, l, tl), UVALUE_Conversion (t', r, tr) ->
-     t = t' && eq_uvalue l r && tl = tr
+  (* | UVALUE_Conversion (t, l, tl), UVALUE_Conversion (t', r, tr) -> *)
+     (* t = t' && eq_uvalue l r && tl = tr *)
   | UVALUE_GetElementPtr (ctl, l', ls), UVALUE_GetElementPtr(ctr, r', rs) ->
      ctl = ctr && eq_uvalue l' r' && List.for_all2 eq_uvalue ls rs
-  | UVALUE_ExtractElement (a,b), UVALUE_ExtractElement (c,d) ->
-     eq_uvalue a c && eq_uvalue b d
-  | UVALUE_InsertElement (l1, l2, l3), UVALUE_InsertElement (r1,r2,r3) ->
-     eq_uvalue l1 r1 && eq_uvalue l2 r2 && eq_uvalue l3 r3
+  (* | UVALUE_ExtractElement (a,b), UVALUE_ExtractElement (c,d) -> *)
+  (*    eq_uvalue a c && eq_uvalue b d *)
+  (* | UVALUE_InsertElement (l1, l2, l3), UVALUE_InsertElement (r1,r2,r3) -> *)
+  (*    eq_uvalue l1 r1 && eq_uvalue l2 r2 && eq_uvalue l3 r3 *)
   | UVALUE_ShuffleVector (l1, l2, l3), UVALUE_ShuffleVector (r1,r2,r3) ->
      eq_uvalue l1 r1 && eq_uvalue l2 r2 && eq_uvalue l3 r3
-  | UVALUE_ExtractValue (l, ls), UVALUE_ExtractValue (r, rs) ->
-     eq_uvalue l r && ls = rs
-  | UVALUE_InsertValue (l1, l2, ls), UVALUE_InsertValue (r1, r2, rs) ->
-     eq_uvalue l1 r1 && eq_uvalue l2 r2 && ls = rs
+  (* | UVALUE_ExtractValue (l, ls), UVALUE_ExtractValue (r, rs) -> *)
+  (*    eq_uvalue l r && ls = rs *)
+  (* | UVALUE_InsertValue (l1, l2, ls), UVALUE_InsertValue (r1, r2, rs) -> *)
+  (*    eq_uvalue l1 r1 && eq_uvalue l2 r2 && ls = rs *)
   | UVALUE_Select (l1, l2, l3), UVALUE_Select (r1,r2,r3) ->
      eq_uvalue l1 r1 && eq_uvalue l2 r2 && eq_uvalue l3 r3
   | _ -> false

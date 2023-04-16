@@ -203,111 +203,111 @@ Tactic Notation "vred_C3_k'" integer(k) := vred_C3_k k.
 Tactic Notation "vred_C3" := vred_C3_k' 0.
 Tactic Notation "vred_C3D" := vred_C3_k' 1.
 
-Ltac vred_E3 :=
-first [rewrite denote_exp_LR; cycle 1 |
-         rewrite denote_exp_GR; cycle 1 |
-         rewrite denote_exp_i64 |
-         rewrite denote_exp_i64_repr |
-         rewrite denote_exp_double |
-         rewrite denote_ibinop_concrete; cycle 1; try reflexivity |
-         rewrite denote_fbinop_concrete; cycle 1; try reflexivity |
-         rewrite denote_icmp_concrete; cycle 1; try reflexivity |
-         rewrite denote_fcmp_concrete; cycle 1; try reflexivity |
-         rewrite denote_conversion_concrete; cycle 1 |
-         idtac].
+(* Ltac vred_E3 := *)
+(* first [rewrite denote_exp_LR; cycle 1 | *)
+(*          rewrite denote_exp_GR; cycle 1 | *)
+(*          rewrite denote_exp_i64 | *)
+(*          rewrite denote_exp_i64_repr | *)
+(*          rewrite denote_exp_double | *)
+(*          rewrite denote_ibinop_concrete; cycle 1; try reflexivity | *)
+(*          rewrite denote_fbinop_concrete; cycle 1; try reflexivity | *)
+(*          rewrite denote_icmp_concrete; cycle 1; try reflexivity | *)
+(*          rewrite denote_fcmp_concrete; cycle 1; try reflexivity | *)
+(*          rewrite denote_conversion_concrete; cycle 1 | *)
+(*          idtac]. *)
 
-Ltac vred_I3 :=
-  first [rewrite denote_instr_load; eauto; cycle 1 |
-         rewrite denote_instr_intrinsic; cycle 1; try reflexivity |
-         rewrite denote_instr_op; cycle 1 |
-         idtac
-        ].
+(* Ltac vred_I3 := *)
+(*   first [rewrite denote_instr_load; eauto; cycle 1 | *)
+(*          rewrite denote_instr_intrinsic; cycle 1; try reflexivity | *)
+(*          rewrite denote_instr_op; cycle 1 | *)
+(*          idtac *)
+(*         ]. *)
 
-Ltac vred_BL3 := rewrite denote_term_br_l;
-                 [rewrite 1?interp_cfg3_ret, 1?bind_ret_l, 1?interp_cfg3_bind, 1?bind_bind |];
-                 cycle 1.
-Ltac vred_BR3 := rewrite denote_term_br_r;
-                 [rewrite 1?interp_cfg3_ret, 1?bind_ret_l, 1?interp_cfg3_bind, 1?bind_bind |];
-                 cycle 1.
+(* Ltac vred_BL3 := rewrite denote_term_br_l; *)
+(*                  [rewrite 1?interp_cfg3_ret, 1?bind_ret_l, 1?interp_cfg3_bind, 1?bind_bind |]; *)
+(*                  cycle 1. *)
+(* Ltac vred_BR3 := rewrite denote_term_br_r; *)
+(*                  [rewrite 1?interp_cfg3_ret, 1?bind_ret_l, 1?interp_cfg3_bind, 1?bind_bind |]; *)
+(*                  cycle 1. *)
 
-Ltac vstep3 :=
-  first [progress vred_E3 | vred_I3];
-  rewrite 1?interp_cfg3_ret, 1?bind_ret_l;
-  rewrite 1?interp_cfg3_bind, 1?bind_bind.
+(* Ltac vstep3 := *)
+(*   first [progress vred_E3 | vred_I3]; *)
+(*   rewrite 1?interp_cfg3_ret, 1?bind_ret_l; *)
+(*   rewrite 1?interp_cfg3_bind, 1?bind_bind. *)
 
 
-(** * Focusing during [eutt] proofs
+(* (** * Focusing during [eutt] proofs *)
 
-    During a proof based on [eutt], the recurrent pattern consists in reducing the considered
-    computations as sequences of computations using the equational theory of interest.
-    This leads to situations where the goal is cluttered by continuations where only the prefix
-    is currently of interest.
+(*     During a proof based on [eutt], the recurrent pattern consists in reducing the considered *)
+(*     computations as sequences of computations using the equational theory of interest. *)
+(*     This leads to situations where the goal is cluttered by continuations where only the prefix *)
+(*     is currently of interest. *)
 
-    The following tactics simply put in the context such continuations.
+(*     The following tactics simply put in the context such continuations. *)
 
-    We may want to hide the continuations altogether as is done for the [cfg].
+(*     We may want to hide the continuations altogether as is done for the [cfg]. *)
 
- *)
+(*  *) *)
 
-Ltac focus_single_step_r :=
-  match goal with
-    |- eutt _ _ (ITree.bind _ ?x) => remember x
-  end.
+(* Ltac focus_single_step_r := *)
+(*   match goal with *)
+(*     |- eutt _ _ (ITree.bind _ ?x) => remember x *)
+(*   end. *)
 
-Ltac focus_single_step_l :=
-  match goal with
-    |- eutt _ (ITree.bind _ ?x) _ => remember x
-  end.
+(* Ltac focus_single_step_l := *)
+(*   match goal with *)
+(*     |- eutt _ (ITree.bind _ ?x) _ => remember x *)
+(*   end. *)
 
-Ltac focus_single_step :=
-  match goal with
-    |- eutt _ (ITree.bind _ ?x) (ITree.bind _ ?y) => remember x; remember y
-  end.
+(* Ltac focus_single_step := *)
+(*   match goal with *)
+(*     |- eutt _ (ITree.bind _ ?x) (ITree.bind _ ?y) => remember x; remember y *)
+(*   end. *)
 
-(** * Hiding a side during [eutt] proofs
+(* (** * Hiding a side during [eutt] proofs *)
 
-    General tactics to move to the context parts of an [eutt] goal.
- *)
+(*     General tactics to move to the context parts of an [eutt] goal. *)
+(*  *) *)
 
-Ltac eutt_hide_left_named H :=
-  match goal with
-    |- eutt _ ?t _ => remember t as H
-  end.
+(* Ltac eutt_hide_left_named H := *)
+(*   match goal with *)
+(*     |- eutt _ ?t _ => remember t as H *)
+(*   end. *)
 
-(* with hypothesis name provided *)
-Tactic Notation "eutt_hide_left" ident(hypname) :=
-  eutt_hide_left_named hypname.
+(* (* with hypothesis name provided *) *)
+(* Tactic Notation "eutt_hide_left" ident(hypname) := *)
+(*   eutt_hide_left_named hypname. *)
 
-(* with hypothesis name auto-generated *)
-Tactic Notation "eutt_hide_left" :=
-  let H := fresh "EL" in
-  eutt_hide_left_named H.
+(* (* with hypothesis name auto-generated *) *)
+(* Tactic Notation "eutt_hide_left" := *)
+(*   let H := fresh "EL" in *)
+(*   eutt_hide_left_named H. *)
 
-Ltac eutt_hide_right_named H :=
-  match goal with
-    |- eutt _ _ ?t => remember t as H
-  end.
+(* Ltac eutt_hide_right_named H := *)
+(*   match goal with *)
+(*     |- eutt _ _ ?t => remember t as H *)
+(*   end. *)
 
-(* with hypothesis name provided *)
-Tactic Notation "eutt_hide_right" ident(hypname) :=
-  eutt_hide_right_named hypname.
+(* (* with hypothesis name provided *) *)
+(* Tactic Notation "eutt_hide_right" ident(hypname) := *)
+(*   eutt_hide_right_named hypname. *)
 
-(* with hypothesis name auto-generated *)
-Tactic Notation "eutt_hide_right" :=
-  let H := fresh "ER" in
-  eutt_hide_right_named H.
+(* (* with hypothesis name auto-generated *) *)
+(* Tactic Notation "eutt_hide_right" := *)
+(*   let H := fresh "ER" in *)
+(*   eutt_hide_right_named H. *)
 
-Ltac eutt_hide_rel_named H :=
-  match goal with
-    |- eutt ?t _ _ => remember t as H
-  end.
+(* Ltac eutt_hide_rel_named H := *)
+(*   match goal with *)
+(*     |- eutt ?t _ _ => remember t as H *)
+(*   end. *)
 
-(* with hypothesis name provided *)
-Tactic Notation "eutt_hide_rel" ident(hypname) :=
-  eutt_hide_rel_named hypname.
+(* (* with hypothesis name provided *) *)
+(* Tactic Notation "eutt_hide_rel" ident(hypname) := *)
+(*   eutt_hide_rel_named hypname. *)
 
-(* with hypothesis name auto-generated *)
-Tactic Notation "eutt_hide_rel" :=
-  let H := fresh "ER" in
-  eutt_hide_rel_named H.
+(* (* with hypothesis name auto-generated *) *)
+(* Tactic Notation "eutt_hide_rel" := *)
+(*   let H := fresh "ER" in *)
+(*   eutt_hide_rel_named H. *)
 

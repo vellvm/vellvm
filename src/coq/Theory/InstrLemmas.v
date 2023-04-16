@@ -285,138 +285,138 @@ Proof.
   go; step; reflexivity.
 Qed.
 
-Lemma denote_instr_gep_array :
-  forall i size τ e_ix ix ptr a val g l l' l'' m,
-    ⟦ ptr at DTYPE_Pointer ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a)
-    ->
-    ⟦ e_ix at DTYPE_I 64 ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_I64 (repr (Z.of_nat ix)))
-    ->
-    get_array_cell m a ix τ = inr val
-    ->
-    exists ptr_res,
-      read m ptr_res τ = inr val /\
-      ⟦ (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)])) ⟧i3 g l m
-      ≈
-      Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l'') m tt.
-Proof.
-  intros * PTR IX GET.
+(* Lemma denote_instr_gep_array : *)
+(*   forall i size τ e_ix ix ptr a val g l l' l'' m, *)
+(*     ⟦ ptr at DTYPE_Pointer ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a) *)
+(*     -> *)
+(*     ⟦ e_ix at DTYPE_I 64 ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_I64 (repr (Z.of_nat ix))) *)
+(*     -> *)
+(*     get_array_cell m a ix τ = inr val *)
+(*     -> *)
+(*     exists ptr_res, *)
+(*       read m ptr_res τ = inr val /\ *)
+(*       ⟦ (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)])) ⟧i3 g l m *)
+(*       ≈ *)
+(*       Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l'') m tt. *)
+(* Proof. *)
+(*   intros * PTR IX GET. *)
 
-  pose proof interp_cfg3_GEP_array τ a size g l'' m val ix GET as (ptr_res & EQ & READ).
-  exists ptr_res. split; auto.
+(*   pose proof interp_cfg3_GEP_array τ a size g l'' m val ix GET as (ptr_res & EQ & READ). *)
+(*   exists ptr_res. split; auto. *)
 
-  cbn.
-  go.
-  rewrite PTR.
-  go.
-  rewrite !bind_bind.
-  rewrite IX; cbn.
-  go.
-  cbn.
-  unfold ITree.map.
-  go.
-  rewrite EQ.
-  go.
-  step.
-  reflexivity.
-Qed.
+(*   cbn. *)
+(*   go. *)
+(*   rewrite PTR. *)
+(*   go. *)
+(*   rewrite !bind_bind. *)
+(*   rewrite IX; cbn. *)
+(*   go. *)
+(*   cbn. *)
+(*   unfold ITree.map. *)
+(*   go. *)
+(*   rewrite EQ. *)
+(*   go. *)
+(*   step. *)
+(*   reflexivity. *)
+(* Qed. *)
 
-Lemma denote_instr_gep_array' :
-  forall i size τ e_ix ix ptr a val g l l' l'' m,
-    ⟦ ptr at DTYPE_Pointer ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a)
-    ->
-    ⟦ e_ix at DTYPE_I 64 ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_I64 (repr (Z.of_nat ix)))
-    ->
-    get_array_cell m a ix τ = inr val
-    ->
-    exists ptr_res,
-      read m ptr_res τ = inr val /\
-      handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat ix))] = inr ptr_res /\
-      ⟦ (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)])) ⟧i3 g l m
-      ≈
-      Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l'') m tt.
-Proof.
-  intros * PTR IX GET.
+(* Lemma denote_instr_gep_array' : *)
+(*   forall i size τ e_ix ix ptr a val g l l' l'' m, *)
+(*     ⟦ ptr at DTYPE_Pointer ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a) *)
+(*     -> *)
+(*     ⟦ e_ix at DTYPE_I 64 ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_I64 (repr (Z.of_nat ix))) *)
+(*     -> *)
+(*     get_array_cell m a ix τ = inr val *)
+(*     -> *)
+(*     exists ptr_res, *)
+(*       read m ptr_res τ = inr val /\ *)
+(*       handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat ix))] = inr ptr_res /\ *)
+(*       ⟦ (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)])) ⟧i3 g l m *)
+(*       ≈ *)
+(*       Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l'') m tt. *)
+(* Proof. *)
+(*   intros * PTR IX GET. *)
 
-  pose proof interp_cfg3_GEP_array' τ a size g l'' m val ix GET as (ptr_res & EQ & GEP & READ).
-  exists ptr_res.
-  split; auto.
-  split; auto.
+(*   pose proof interp_cfg3_GEP_array' τ a size g l'' m val ix GET as (ptr_res & EQ & GEP & READ). *)
+(*   exists ptr_res. *)
+(*   split; auto. *)
+(*   split; auto. *)
 
-  cbn.
-  go.
-  rewrite !bind_bind.
-  rewrite PTR.
-  go.
-  rewrite IX.
-  go.
-  cbn; unfold ITree.map.
-  go.
-  rewrite EQ.
-  go.
-  step.
-  reflexivity.
-Qed.
+(*   cbn. *)
+(*   go. *)
+(*   rewrite !bind_bind. *)
+(*   rewrite PTR. *)
+(*   go. *)
+(*   rewrite IX. *)
+(*   go. *)
+(*   cbn; unfold ITree.map. *)
+(*   go. *)
+(*   rewrite EQ. *)
+(*   go. *)
+(*   step. *)
+(*   reflexivity. *)
+(* Qed. *)
 
-Lemma denote_instr_gep_array_no_read_addr :
-  forall i size τ e_ix ix ptr a g l l' l'' m ptr_res,
-    ⟦ ptr at DTYPE_Pointer ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a)
-    ->
-    ⟦ e_ix at DTYPE_I 64 ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_I64 (repr (Z.of_nat ix)))
-    ->
-    dtyp_fits m a (DTYPE_Array size τ) ->
-    handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (Int64.repr 0); DVALUE_I64 (Int64.repr (Z.of_nat ix))] = inr ptr_res ->
-    ⟦ (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)])) ⟧i3 g l m
-    ≈
-    Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l'') m tt.
-Proof.
-  intros * PTR IX FITS HGEP.
-  pose proof @interp_cfg3_GEP_array_no_read_addr τ a size g l'' m ix ptr_res FITS.
+(* Lemma denote_instr_gep_array_no_read_addr : *)
+(*   forall i size τ e_ix ix ptr a g l l' l'' m ptr_res, *)
+(*     ⟦ ptr at DTYPE_Pointer ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a) *)
+(*     -> *)
+(*     ⟦ e_ix at DTYPE_I 64 ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_I64 (repr (Z.of_nat ix))) *)
+(*     -> *)
+(*     dtyp_fits m a (DTYPE_Array size τ) -> *)
+(*     handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (Int64.repr 0); DVALUE_I64 (Int64.repr (Z.of_nat ix))] = inr ptr_res -> *)
+(*     ⟦ (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)])) ⟧i3 g l m *)
+(*     ≈ *)
+(*     Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l'') m tt. *)
+(* Proof. *)
+(*   intros * PTR IX FITS HGEP. *)
+(*   pose proof @interp_cfg3_GEP_array_no_read_addr τ a size g l'' m ix ptr_res FITS. *)
 
-  cbn.
-  go.
-  rewrite PTR.
-  go.
-  rewrite IX.
-  go.
-  cbn; unfold ITree.map; go.
-  rewrite H; auto.
-  go.
-  step.
-  reflexivity.
-Qed.
+(*   cbn. *)
+(*   go. *)
+(*   rewrite PTR. *)
+(*   go. *)
+(*   rewrite IX. *)
+(*   go. *)
+(*   cbn; unfold ITree.map; go. *)
+(*   rewrite H; auto. *)
+(*   go. *)
+(*   step. *)
+(*   reflexivity. *)
+(* Qed. *)
 
-Lemma denote_instr_gep_array_no_read :
-  forall i size τ e_ix ix ptr a g l l' l'' m,
-    ⟦ ptr at DTYPE_Pointer ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a)
-    ->
-    ⟦ e_ix at DTYPE_I 64 ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_I64 (repr (Z.of_nat ix)))
-    ->
-    dtyp_fits m a (DTYPE_Array size τ) ->
-    exists ptr_res,
-      handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat ix))] = inr ptr_res /\
-      ⟦ (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)])) ⟧i3 g l m
-      ≈
-      Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l'') m tt.
-Proof.
-  intros * PTR IX FITS.
+(* Lemma denote_instr_gep_array_no_read : *)
+(*   forall i size τ e_ix ix ptr a g l l' l'' m, *)
+(*     ⟦ ptr at DTYPE_Pointer ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a) *)
+(*     -> *)
+(*     ⟦ e_ix at DTYPE_I 64 ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_I64 (repr (Z.of_nat ix))) *)
+(*     -> *)
+(*     dtyp_fits m a (DTYPE_Array size τ) -> *)
+(*     exists ptr_res, *)
+(*       handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat ix))] = inr ptr_res /\ *)
+(*       ⟦ (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)])) ⟧i3 g l m *)
+(*       ≈ *)
+(*       Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l'') m tt. *)
+(* Proof. *)
+(*   intros * PTR IX FITS. *)
 
-  pose proof interp_cfg3_GEP_array_no_read τ a size g l'' m ix FITS as (ptr_res & EQ & GEP).
-  exists ptr_res.
-  split; auto.
+(*   pose proof interp_cfg3_GEP_array_no_read τ a size g l'' m ix FITS as (ptr_res & EQ & GEP). *)
+(*   exists ptr_res. *)
+(*   split; auto. *)
 
-  cbn.
-  go.
-  rewrite PTR.
-  go.
-  rewrite IX.
-  unfold ITree.map; cbn.
-  go.
-  cbn.
-  go.
-  rewrite EQ.
-  go.
-  step; reflexivity.
-Qed.
+(*   cbn. *)
+(*   go. *)
+(*   rewrite PTR. *)
+(*   go. *)
+(*   rewrite IX. *)
+(*   unfold ITree.map; cbn. *)
+(*   go. *)
+(*   cbn. *)
+(*   go. *)
+(*   rewrite EQ. *)
+(*   go. *)
+(*   step; reflexivity. *)
+(* Qed. *)
 
 Lemma denote_instr_intrinsic :
   forall i τ fn in_n sem_f args arg_vs conc_args res g l m,

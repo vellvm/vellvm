@@ -53,6 +53,64 @@ Inductive dtyp : Set :=
 .
 Set Elimination Schemes.
 
+Ltac dec_dtyp :=
+  match goal with
+  | [ |- { ?X ?a = ?X ?b} + { ?X ?a <> ?X ?b} ] => idtac
+  | [ |- { ?X ?a = ?Y ?b} + { ?X ?a <> ?Y ?b} ] => right; intros H; inversion H
+  | [ |- { ?X = ?X } + { ?X <> ?X } ] => left; reflexivity
+  | [ |- { ?X = ?Y } + { ?X <> ?Y } ] => right; intros H; inversion H
+  end.
+
+Lemma dtyp_eq_dec : forall (t1 t2:dtyp), {t1 = t2} + {t1 <> t2}.
+  refine (fix f t1 t2 :=
+            let lsteq_dec := list_eq_dec f in
+            match t1, t2 with
+            | DTYPE_I n, DTYPE_I m => _
+            | DTYPE_Pointer, DTYPE_Pointer => _
+            | DTYPE_Void, DTYPE_Void => _
+            | DTYPE_Half, DTYPE_Half => _
+            | DTYPE_Float, DTYPE_Float => _
+            | DTYPE_Double, DTYPE_Double => _
+            | DTYPE_Fp128, DTYPE_Fp128 => _
+            | DTYPE_X86_fp80, DTYPE_X86_fp80 => _
+            | DTYPE_Ppc_fp128, DTYPE_Ppc_fp128 => _
+            | DTYPE_Metadata, DTYPE_Metadata => _
+            | DTYPE_X86_mmx, DTYPE_X86_mmx => _
+            | DTYPE_Array n t, DTYPE_Array m t' => _
+            | DTYPE_Struct l, DTYPE_Struct l' => _
+            | DTYPE_Packed_struct l, DTYPE_Packed_struct l' => _
+            | DTYPE_Opaque, DTYPE_Opaque => _
+            | DTYPE_Vector n t, DTYPE_Vector m t' => _
+            | _, _ => _
+            end); try (ltac:(dec_dtyp); fail).
+  - destruct (N.eq_dec n m).
+    * left; subst; reflexivity.
+    * right; intros H; inversion H. contradiction.
+  - destruct (N.eq_dec n m).
+    * destruct (f t t').
+    + left; subst; reflexivity.
+    + right; intros H; inversion H. contradiction.
+      * right; intros H; inversion H. contradiction.
+  - destruct (lsteq_dec l l').
+    * left; subst; reflexivity.
+    * right; intros H; inversion H. contradiction.
+  - destruct (lsteq_dec l l').
+    * left; subst; reflexivity.
+    * right; intros H; inversion H. contradiction.
+  - destruct (N.eq_dec n m).
+    * destruct (f t t').
+    + left; subst; reflexivity.
+    + right; intros H; inversion H. contradiction.
+      * right; intros H; inversion H. contradiction.
+Defined.
+Arguments dtyp_eq_dec: clear implicits.
+
+Definition dtyp_eqb (dt1 dt2 : dtyp) : bool
+  := match @dtyp_eq_dec dt1 dt2 with
+      | left x => true
+      | right x => false
+      end.
+
 Definition vector_dtyp dt :=
   (exists n, dt = DTYPE_I n) \/ dt = DTYPE_Pointer \/ dt = DTYPE_Half \/ dt = DTYPE_Float \/
   dt = DTYPE_Double \/ dt = DTYPE_X86_fp80 \/ dt = DTYPE_Fp128 \/ dt = DTYPE_Ppc_fp128.

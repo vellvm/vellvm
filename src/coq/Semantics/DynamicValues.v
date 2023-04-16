@@ -236,7 +236,7 @@ End DvalueInd.
 
 (* The set of dynamic values manipulated by an LLVM program. *)
 Unset Elimination Schemes.
-Inductive uvalue : Set :=
+Inductive uvalue : Type :=
 | UVALUE_Addr (a:A.addr)
 | UVALUE_I1 (x:int1)
 | UVALUE_I8 (x:int8)
@@ -255,14 +255,17 @@ Inductive uvalue : Set :=
 | UVALUE_ICmp             (cmp:icmp)   (v1:uvalue) (v2:uvalue)
 | UVALUE_FBinop           (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue)
 | UVALUE_FCmp             (cmp:fcmp)   (v1:uvalue) (v2:uvalue)
-| UVALUE_Conversion       (conv:conversion_type) (v:uvalue) (t_to:dtyp)
+| UVALUE_Conversion       (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp)
 | UVALUE_GetElementPtr    (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)) (* TODO: do we ever need this? GEP raises an event? *)
-| UVALUE_ExtractElement   (vec: uvalue) (idx: uvalue)
-| UVALUE_InsertElement    (vec: uvalue) (elt:uvalue) (idx:uvalue)
+| UVALUE_ExtractElement   (vec_typ : dtyp) (vec: uvalue) (idx: uvalue)
+| UVALUE_InsertElement    (vec_typ : dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue)
 | UVALUE_ShuffleVector    (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue)
-| UVALUE_ExtractValue     (vec:uvalue) (idxs:list Integers.int)
-| UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list Integers.int)
+| UVALUE_ExtractValue     (vec_typ : dtyp) (vec:uvalue) (idxs:list LLVMAst.int)
+| UVALUE_InsertValue      (vec_typ : dtyp) (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int)
 | UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue)
+(* Extract the `idx` byte from a uvalue `uv`, which was stored with
+  type `dt`. `idx` 0 is the least significant byte. `sid` is the "store
+  id". *)
 .
 Set Elimination Schemes.
 
@@ -286,13 +289,13 @@ Section UvalueInd.
   Hypothesis IH_ICmp           : forall (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp cmp v1 v2).
   Hypothesis IH_FBinop         : forall (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FBinop fop fm v1 v2).
   Hypothesis IH_FCmp           : forall (cmp:fcmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FCmp cmp v1 v2).
-  Hypothesis IH_Conversion     : forall (conv:conversion_type) (v:uvalue) (t_to:dtyp), P v -> P (UVALUE_Conversion conv v t_to).
+  Hypothesis IH_Conversion     : forall (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp), P v -> P (UVALUE_Conversion conv t_from v t_to).
   Hypothesis IH_GetElementPtr  : forall (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)), P ptrval -> (forall idx, In idx idxs -> P idx) -> P (UVALUE_GetElementPtr t ptrval idxs).
-  Hypothesis IH_ExtractElement : forall (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement vec idx).
-  Hypothesis IH_InsertElement  : forall (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement vec elt idx).
+  Hypothesis IH_ExtractElement : forall (t:dtyp) (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement t vec idx).
+  Hypothesis IH_InsertElement  : forall (t:dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement t vec elt idx).
   Hypothesis IH_ShuffleVector  : forall (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector vec1 vec2 idxmask).
-  Hypothesis IH_ExtractValue   : forall (vec:uvalue) (idxs:list Integers.int), P vec -> P (UVALUE_ExtractValue vec idxs).
-  Hypothesis IH_InsertValue    : forall (vec:uvalue) (elt:uvalue) (idxs:list Integers.int), P vec -> P elt -> P (UVALUE_InsertValue vec elt idxs).
+  Hypothesis IH_ExtractValue   : forall (t:dtyp) (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue t vec idxs).
+  Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec elt idxs).
   Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
 
   Lemma uvalue_ind : forall (uv:uvalue), P uv.
@@ -554,7 +557,6 @@ Ltac dec_dvalue :=
   | [ |- { ?X = ?Y } + { ?X <> ?Y } ] => right; intros H; inversion H
   end.
 
-
 Section DecidableEquality.
 
   Fixpoint dvalue_eqb (d1 d2:dvalue) : bool :=
@@ -752,14 +754,14 @@ Section DecidableEquality.
               | UVALUE_ICmp op uv1 uv2, UVALUE_ICmp op' uv1' uv2' => _
               | UVALUE_FBinop op fm uv1 uv2, UVALUE_FBinop op' fm' uv1' uv2' => _
               | UVALUE_FCmp op uv1 uv2, UVALUE_FCmp op' uv1' uv2' => _
-              | UVALUE_Conversion ct u t, UVALUE_Conversion ct' u' t' => _
+              | UVALUE_Conversion ct tf u t, UVALUE_Conversion ct' tf' u' t' => _
               | UVALUE_GetElementPtr t u l, UVALUE_GetElementPtr t' u' l' => _
-              | UVALUE_ExtractElement u v, UVALUE_ExtractElement u' v' => _
-              | UVALUE_InsertElement u v t, UVALUE_InsertElement u' v' t' => _
-              | UVALUE_ShuffleVector u v t, UVALUE_ShuffleVector u' v' t' => _
-              | UVALUE_ExtractValue u l, UVALUE_ExtractValue u' l' => _
-              | UVALUE_InsertValue u v l, UVALUE_InsertValue u' v' l' => _
-              | UVALUE_Select u v t, UVALUE_Select u' v' t' => _
+              | UVALUE_ExtractElement t u v, UVALUE_ExtractElement t' u' v' => _
+              | UVALUE_InsertElement t u v x, UVALUE_InsertElement t' u' v' x' => _
+              | UVALUE_ShuffleVector u v x, UVALUE_ShuffleVector u' v' x' => _
+              | UVALUE_ExtractValue t u l, UVALUE_ExtractValue t' u' l' => _
+              | UVALUE_InsertValue t u v l, UVALUE_InsertValue t' u' v' l' => _
+              | UVALUE_Select u v w, UVALUE_Select u' v' w' => _
               | _, _ => _
               end); try (ltac:(dec_dvalue); fail).
     - destruct (A.eq_dec a1 a2)...
@@ -789,26 +791,31 @@ Section DecidableEquality.
       destruct (f uv2 uv2')...
     - destruct (conversion_type_eq_dec ct ct')...
       destruct (f u u')...
+      destruct (dtyp_eq_dec tf tf')...
       destruct (dtyp_eq_dec t t')...
     - destruct (dtyp_eq_dec t t')...
       destruct (f u u')...
       destruct (lsteq_dec l l')...
+    - destruct (dtyp_eq_dec t t')...
+      destruct (f u u')...
+      destruct (f v v')...
+    - destruct (dtyp_eq_dec t t')...
+      destruct (f u u')...
+      destruct (f v v')...
+      destruct (f x x')...
     - destruct (f u u')...
       destruct (f v v')...
+      destruct (f x x')...
+    - destruct (dtyp_eq_dec t t')...
+      destruct (f u u')...
+      destruct (list_eq_dec Z.eq_dec l l')...
+    - destruct (dtyp_eq_dec t t')...
+      destruct (f u u')...
+      destruct (f v v')...
+      destruct (list_eq_dec Z.eq_dec l l')...
     - destruct (f u u')...
       destruct (f v v')...
-      destruct (f t t')...
-    - destruct (f u u')...
-      destruct (f v v')...
-      destruct (f t t')...
-    - destruct (f u u')...
-      destruct (list_eq_dec Int.eq_dec l l')...
-    - destruct (f u u')...
-      destruct (f v v')...
-      destruct (list_eq_dec Int.eq_dec l l')...
-    - destruct (f u u')...
-      destruct (f v v')...
-      destruct (f t t')...
+      destruct (f w w')...
   Qed.
 
   #[global] Instance eq_dec_uvalue : RelDec (@eq uvalue) := RelDec_from_dec (@eq uvalue) (@uvalue_eq_dec).
@@ -1152,86 +1159,86 @@ Class VInt I : Type :=
                     (andb nsw (equ (add_overflow x y zero) one))
              then DVALUE_Poison else to_dvalue (add x y))
 
-    | Sub nuw nsw =>
-      ret (if orb (andb nuw (equ (sub_borrow x y zero) one))
-                  (andb nsw (equ (sub_overflow x y zero) one))
-           then DVALUE_Poison else to_dvalue (sub x y))
+      | Sub nuw nsw =>
+        ret (if orb (andb nuw (equ (sub_borrow x y zero) one))
+                    (andb nsw (equ (sub_overflow x y zero) one))
+            then DVALUE_Poison else to_dvalue (sub x y))
 
-    | Mul nuw nsw =>
-      (* I1 mul can't overflow, just based on the 4 possible multiplications. *)
-      if (bitwidth ~=? 1)%nat then ret (to_dvalue (mul x y))
-      else
-        let res := mul x y in
-        let res_s' := ((signed x) * (signed y))%Z in
-        if orb (andb nuw ((unsigned x) * (unsigned y) >?
-                      unsigned res))
-             (andb nsw (orb (min_signed >? res_s')
-                            (res_s' >? max_signed)))
-      then ret DVALUE_Poison else ret (to_dvalue res)
+      | Mul nuw nsw =>
+        (* I1 mul can't overflow, just based on the 4 possible multiplications. *)
+        if (bitwidth ~=? 1)%nat then ret (to_dvalue (mul x y))
+        else
+          let res := mul x y in
+          let res_s' := ((signed x) * (signed y))%Z in
+          if orb (andb nuw ((unsigned x) * (unsigned y) >?
+                        unsigned res))
+              (andb nsw (orb (min_signed >? res_s')
+                              (res_s' >? max_signed)))
+        then ret DVALUE_Poison else ret (to_dvalue res)
 
-    | Shl nuw nsw =>
-      let bz := Z.of_nat bitwidth in
-      let res := shl x y in
-      let res_u := unsigned res in
-      let res_u' := Z.shiftl (unsigned x) (unsigned y) in
-      (* Unsigned shift x right by bitwidth - y. If shifted x != sign bit * (2^y - 1),
-         then there is overflow. *)
-      if (unsigned y) >=? bz then ret DVALUE_Poison
-      else if orb (andb nuw (res_u' >? res_u))
-                  (andb nsw (negb (Z.shiftr (unsigned x)
-                                            (bz - unsigned y)
-                                   =? (unsigned (negative res))
-                                      * (Z.pow 2 (unsigned y) - 1))%Z))
-           then ret DVALUE_Poison else ret (to_dvalue res)
+      | Shl nuw nsw =>
+        let bz := Z.of_nat bitwidth in
+        let res := shl x y in
+        let res_u := unsigned res in
+        let res_u' := Z.shiftl (unsigned x) (unsigned y) in
+        (* Unsigned shift x right by bitwidth - y. If shifted x != sign bit * (2^y - 1),
+          then there is overflow. *)
+        if (unsigned y) >=? bz then ret DVALUE_Poison
+        else if orb (andb nuw (res_u' >? res_u))
+                    (andb nsw (negb (Z.shiftr (unsigned x)
+                                              (bz - unsigned y)
+                                    =? (unsigned (negative res))
+                                        * (Z.pow 2 (unsigned y) - 1))%Z))
+            then ret DVALUE_Poison else ret (to_dvalue res)
 
-    | UDiv ex =>
-      if (unsigned y =? 0)%Z
-      then failwith "Unsigned division by 0."
-      else if andb ex (negb ((unsigned x) mod (unsigned y) =? 0))%Z
-           then ret DVALUE_Poison
-           else ret (to_dvalue (divu x y))
+      | UDiv ex =>
+        if (unsigned y =? 0)%Z
+        then failwith "Unsigned division by 0."
+        else if andb ex (negb ((unsigned x) mod (unsigned y) =? 0))%Z
+            then ret DVALUE_Poison
+            else ret (to_dvalue (divu x y))
 
-    | SDiv ex =>
-      (* What does signed i1 mean? *)
-      if (signed y =? 0)%Z
-      then failwith "Signed division by 0."
-      else if andb ex (negb ((signed x) mod (signed y) =? 0))%Z
-           then ret DVALUE_Poison
-           else ret (to_dvalue (divs x y))
+      | SDiv ex =>
+        (* What does signed i1 mean? *)
+        if (signed y =? 0)%Z
+        then failwith "Signed division by 0."
+        else if andb ex (negb ((signed x) mod (signed y) =? 0))%Z
+            then ret DVALUE_Poison
+            else ret (to_dvalue (divs x y))
 
-    | LShr ex =>
-      let bz := Z.of_nat bitwidth in
-      if (unsigned y) >=? bz then ret DVALUE_Poison
-      else if andb ex (negb ((unsigned x)
-                               mod (Z.pow 2 (unsigned y)) =? 0))%Z
-           then ret DVALUE_Poison else ret (to_dvalue (shru x y))
+      | LShr ex =>
+        let bz := Z.of_nat bitwidth in
+        if (unsigned y) >=? bz then ret DVALUE_Poison
+        else if andb ex (negb ((unsigned x)
+                                mod (Z.pow 2 (unsigned y)) =? 0))%Z
+            then ret DVALUE_Poison else ret (to_dvalue (shru x y))
 
-    | AShr ex =>
-      let bz := Z.of_nat bitwidth in
-      if (unsigned y) >=? bz then ret DVALUE_Poison
-      else if andb ex (negb ((unsigned x)
-                               mod (Z.pow 2 (unsigned y)) =? 0))%Z
-           then ret DVALUE_Poison else ret (to_dvalue (shr x y))
+      | AShr ex =>
+        let bz := Z.of_nat bitwidth in
+        if (unsigned y) >=? bz then ret DVALUE_Poison
+        else if andb ex (negb ((unsigned x)
+                                mod (Z.pow 2 (unsigned y)) =? 0))%Z
+            then ret DVALUE_Poison else ret (to_dvalue (shr x y))
 
-    | URem =>
-      if (unsigned y =? 0)%Z
-      then failwith "Unsigned mod 0."
-      else ret (to_dvalue (modu x y))
+      | URem =>
+        if (unsigned y =? 0)%Z
+        then failwith "Unsigned mod 0."
+        else ret (to_dvalue (modu x y))
 
-    | SRem =>
-      if (signed y =? 0)%Z
-      then failwith "Signed mod 0."
-      else ret (to_dvalue (mods x y))
+      | SRem =>
+        if (signed y =? 0)%Z
+        then failwith "Signed mod 0."
+        else ret (to_dvalue (mods x y))
 
-    | And =>
-      ret (to_dvalue (and x y))
+      | And =>
+        ret (to_dvalue (and x y))
 
-    | Or =>
-      ret (to_dvalue (or x y))
+      | Or =>
+        ret (to_dvalue (or x y))
 
-    | Xor =>
-      ret (to_dvalue (xor x y))
-    end.
+      | Xor =>
+        ret (to_dvalue (xor x y))
+      end.
   Arguments eval_int_op _ _ _ : simpl nomatch.
 
   (* Evaluate the given iop on the given arguments according to the bitsize *)
@@ -1307,6 +1314,81 @@ Class VInt I : Type :=
     | _, _ => eval_iop_integer_h iop v1 v2
     end.
   Arguments eval_iop _ _ _ : simpl nomatch.
+
+  Definition default_dvalue_of_dtyp_i (sz : N) : err dvalue:=
+    (if (sz =? 64) then ret (DVALUE_I64 (repr 0))
+     else if (sz =? 32) then ret (DVALUE_I32 (repr 0))
+          else if (sz =? 8) then ret (DVALUE_I8 (repr 0))
+               else if (sz =? 1) then ret (DVALUE_I1 (repr 0))
+                    else failwith
+                           "Illegal size for generating default dvalue of DTYPE_I").
+
+  (* Handler for PickE which concretizes everything to 0 *)
+  (* If this succeeds the dvalue returned should agree with
+     dvalue_has_dtyp for the sake of the dvalue_default lemma. *)
+  Fixpoint default_dvalue_of_dtyp (dt : dtyp) : err dvalue :=
+    match dt with
+    | DTYPE_I sz => default_dvalue_of_dtyp_i sz
+    | DTYPE_Pointer => ret (DVALUE_Addr A.null)
+    | DTYPE_Void => ret DVALUE_None
+    | DTYPE_Half => failwith "Unimplemented default type: half"
+    | DTYPE_Float => ret (DVALUE_Float Float32.zero)
+    | DTYPE_Double => ret (DVALUE_Double (Float32.to_double Float32.zero))
+    | DTYPE_X86_fp80 => failwith "Unimplemented default type: x86_fp80"
+    | DTYPE_Fp128 => failwith "Unimplemented default type: fp128"
+    | DTYPE_Ppc_fp128 => failwith "Unimplemented default type: ppc_fp128"
+    | DTYPE_Metadata => failwith "Unimplemented default type: metadata"
+    | DTYPE_X86_mmx => failwith "Unimplemented default type: x86_mmx"
+    | DTYPE_Opaque => failwith "Unimplemented default type: opaque"
+    | DTYPE_Array sz t =>
+        v <- default_dvalue_of_dtyp t ;;
+        (ret (DVALUE_Array (repeat v (N.to_nat sz))))
+
+    (* Matching valid Vector types... *)
+    (* Currently commented out unsupported ones *)
+    (* | DTYPE_Vector sz (DTYPE_Half) => *)
+    (*   if (0 <=? sz) then *)
+    (*     (ret (DVALUE_Vector *)
+    (*             (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))) *)
+    (*   else *)
+    (*     failwith ("Negative array length for generating default value" ++ *)
+    (*     "of DTYPE_Array or DTYPE_Vector") *)
+    | DTYPE_Vector sz (DTYPE_Float) =>
+        ret (DVALUE_Vector
+               (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))
+    | DTYPE_Vector sz (DTYPE_Double) =>
+        ret (DVALUE_Vector
+               (repeat (DVALUE_Double (Float32.to_double Float32.zero))
+                       (N.to_nat sz)))
+    (* | DTYPE_Vector sz (DTYPE_X86_fp80) => *)
+    (*   if (0 <=? sz) then *)
+    (*     (ret (DVALUE_Vector *)
+    (*             (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))) *)
+    (*   else *)
+    (*     failwith ("Negative array length for generating default value" ++ *)
+    (*     "of DTYPE_Array or DTYPE_Vector") *)
+    (* | DTYPE_Vector sz (DTYPE_Fp128) => *)
+    (*   if (0 <=? sz) then *)
+    (*     (ret (DVALUE_Vector *)
+    (*             (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))) *)
+    (*   else *)
+    (*     failwith ("Negative array length for generating default value" ++ *)
+    (*     "of DTYPE_Array or DTYPE_Vector") *)
+    | DTYPE_Vector sz (DTYPE_I n) =>
+        v <- default_dvalue_of_dtyp_i n ;;
+        ret (DVALUE_Vector (repeat v (N.to_nat sz)))
+
+    | DTYPE_Vector sz DTYPE_Pointer =>
+        ret (DVALUE_Vector (repeat (DVALUE_Addr A.null) (N.to_nat sz)))
+
+    | DTYPE_Vector _ _ => failwith ("Non-valid or unsupported vector type when generating default vector")
+    | DTYPE_Struct fields =>
+        v <- @map_monad err _ dtyp dvalue default_dvalue_of_dtyp fields;;
+        ret (DVALUE_Struct v)
+    | DTYPE_Packed_struct fields =>
+        v <- @map_monad err _ dtyp dvalue default_dvalue_of_dtyp fields;;
+        ret (DVALUE_Packed_struct v)
+    end.
 
   Definition eval_int_icmp {Int} `{VInt Int} icmp (x y : Int) : dvalue :=
     if match icmp with
@@ -1666,35 +1748,32 @@ Class VInt I : Type :=
       forall from_sz to_sz value,
         from_sz > to_sz ->
         uvalue_has_dtyp value (DTYPE_I from_sz) ->
-        uvalue_has_dtyp (UVALUE_Conversion Trunc value (DTYPE_I to_sz)) (DTYPE_I to_sz)
+        uvalue_has_dtyp (UVALUE_Conversion Trunc (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz)
   | UVALUE_Conversion_trunc_vec_typ :
       forall from_sz to_sz n value,
         from_sz > to_sz ->
         uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        uvalue_has_dtyp (UVALUE_Conversion Trunc value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
-
+        uvalue_has_dtyp (UVALUE_Conversion Trunc (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
   | UVALUE_Conversion_zext_int_typ :
       forall from_sz to_sz value,
         from_sz < to_sz ->
         uvalue_has_dtyp value (DTYPE_I from_sz) ->
-        uvalue_has_dtyp (UVALUE_Conversion Zext value (DTYPE_I to_sz)) (DTYPE_I to_sz)
+        uvalue_has_dtyp (UVALUE_Conversion Zext (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz)
   | UVALUE_Conversion_zext_vec_typ :
       forall from_sz to_sz n value,
         from_sz < to_sz ->
         uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        uvalue_has_dtyp (UVALUE_Conversion Zext value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
-
+        uvalue_has_dtyp (UVALUE_Conversion Zext (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
   | UVALUE_Conversion_sext_int_typ :
       forall from_sz to_sz value,
         from_sz < to_sz ->
         uvalue_has_dtyp value (DTYPE_I from_sz) ->
-        uvalue_has_dtyp (UVALUE_Conversion Sext value (DTYPE_I to_sz)) (DTYPE_I to_sz)
+        uvalue_has_dtyp (UVALUE_Conversion Sext (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz)
   | UVALUE_Conversion_sext_vec_typ :
       forall from_sz to_sz n value,
         from_sz < to_sz ->
         uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        uvalue_has_dtyp (UVALUE_Conversion Sext value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
-
+        uvalue_has_dtyp (UVALUE_Conversion Sext (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
   | UVALUE_GetElementPtr_typ :
       forall dt uv idxs,
         uvalue_has_dtyp (UVALUE_GetElementPtr dt uv idxs) DTYPE_Pointer
@@ -1703,14 +1782,14 @@ Class VInt I : Type :=
         IX_supported sz ->
         uvalue_has_dtyp idx (DTYPE_I sz) ->
         uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
-        uvalue_has_dtyp (UVALUE_ExtractElement vect idx) t
+        uvalue_has_dtyp (UVALUE_ExtractElement (DTYPE_Vector (N.of_nat n) t) vect idx) t
   | UVALUE_InsertElement_typ :
       forall n vect val idx t sz,
         IX_supported sz ->
         uvalue_has_dtyp idx (DTYPE_I sz) ->
         uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
         uvalue_has_dtyp val t ->
-        uvalue_has_dtyp (UVALUE_InsertElement vect val idx) (DTYPE_Vector (N.of_nat n) t)
+        uvalue_has_dtyp (UVALUE_InsertElement (DTYPE_Vector (N.of_nat n) t) vect val idx) (DTYPE_Vector (N.of_nat n) t)
   | UVALUE_ShuffleVector_typ :
       forall n m v1 v2 idxs t,
         uvalue_has_dtyp idxs (DTYPE_Vector (N.of_nat m) (DTYPE_I 32)) ->
@@ -1718,54 +1797,54 @@ Class VInt I : Type :=
         uvalue_has_dtyp v2 (DTYPE_Vector (N.of_nat n) t) ->
         uvalue_has_dtyp (UVALUE_ShuffleVector v1 v2 idxs) (DTYPE_Vector (N.of_nat m) t)
   | UVALUE_ExtractValue_Struct_sing_typ :
-      forall fields fts dt idx,
+      forall fields fts dt (idx : LLVMAst.int),
         uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
-        (0 <= Int32.intval idx)%Z ->
-        Nth fts (Z.to_nat (Int32.intval idx)) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Struct fields) [idx]) dt
+        (0 <= idx)%Z ->
+        Nth fts (Z.to_nat idx) dt ->
+        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Struct fts) (UVALUE_Struct fields) [idx]) dt
   | UVALUE_ExtractValue_Struct_cons_typ :
       forall fields fts fld ft dt idx idxs,
         uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
-        (0 <= Int32.intval idx)%Z ->
-        Nth fts (Z.to_nat (Int32.intval idx)) dt ->
-        Nth fields (Z.to_nat (Int32.intval idx)) fld ->
+        (0 <= idx)%Z ->
+        Nth fts (Z.to_nat idx) ft ->
+        Nth fields (Z.to_nat idx) fld ->
         uvalue_has_dtyp fld ft ->
-        uvalue_has_dtyp (UVALUE_ExtractValue fld idxs) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Struct fields) (idx :: idxs)) dt
+        uvalue_has_dtyp (UVALUE_ExtractValue ft fld idxs) dt ->
+        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Struct fts) (UVALUE_Struct fields) (idx :: idxs)) dt
   | UVALUE_ExtractValue_Packed_struct_sing_typ :
       forall fields fts dt idx,
         uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct fts) ->
-        (0 <= Int32.intval idx)%Z ->
-        Nth fts (Z.to_nat (Int32.intval idx)) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Packed_struct fields) [idx]) dt
+        (0 <= idx)%Z ->
+        Nth fts (Z.to_nat idx) dt ->
+        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Packed_struct fts) (UVALUE_Packed_struct fields) [idx]) dt
   | UVALUE_ExtractValue_Packed_struct_cons_typ :
       forall fields fts fld ft dt idx idxs,
         uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct fts) ->
-        (0 <= Int32.intval idx)%Z ->
-        Nth fts (Z.to_nat (Int32.intval idx)) dt ->
-        Nth fields (Z.to_nat (Int32.intval idx)) fld ->
+        (0 <= idx)%Z ->
+        Nth fts (Z.to_nat idx) ft ->
+        Nth fields (Z.to_nat idx) fld ->
         uvalue_has_dtyp fld ft ->
-        uvalue_has_dtyp (UVALUE_ExtractValue fld idxs) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Packed_struct fields) (idx :: idxs)) dt
+        uvalue_has_dtyp (UVALUE_ExtractValue ft fld idxs) dt ->
+        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Packed_struct fts) (UVALUE_Packed_struct fields) (idx :: idxs)) dt
   | UVALUE_ExtractValue_Array_sing_typ :
       forall elements dt idx n,
         uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n dt) ->
-        (0 <= Int32.intval idx <= Z.of_N n)%Z ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Array elements) [idx]) dt
+        (0 <= idx <= Z.of_N n)%Z ->
+        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Array n dt) (UVALUE_Array elements) [idx]) dt
   | UVALUE_ExtractValue_Array_cons_typ :
       forall elements elem et dt n idx idxs,
-        uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n dt) ->
-        (0 <= Int32.intval idx <= Z.of_N n)%Z ->
-        Nth elements (Z.to_nat (Int32.intval idx)) elem ->
+        uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n et) ->
+        (0 <= idx <= Z.of_N n)%Z ->
+        Nth elements (Z.to_nat idx) elem ->
         uvalue_has_dtyp elem et ->
-        uvalue_has_dtyp (UVALUE_ExtractValue elem idxs) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Array elements) (idx :: idxs)) dt
+        uvalue_has_dtyp (UVALUE_ExtractValue et elem idxs) dt ->
+        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Array n et) (UVALUE_Array elements) (idx :: idxs)) dt
   | UVALUE_InsertValue_typ :
       forall struc idxs uv st dt,
-        uvalue_has_dtyp (UVALUE_ExtractValue struc idxs) dt ->
+        uvalue_has_dtyp (UVALUE_ExtractValue st struc idxs) dt ->
         uvalue_has_dtyp uv dt ->
         uvalue_has_dtyp struc st ->
-        uvalue_has_dtyp (UVALUE_InsertValue struc uv idxs) st
+        uvalue_has_dtyp (UVALUE_InsertValue st struc uv idxs) st
   | UVALUE_Select_i1 :
       forall cond x y t,
         uvalue_has_dtyp cond (DTYPE_I 1) ->

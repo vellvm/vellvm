@@ -310,7 +310,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
   End CONVERSIONS.
 
   Definition dv_zero_initializer (t:dtyp) : err dvalue :=
-    failwith "dv_zero_initializer unimplemented".
+    default_dvalue_of_dtyp t.
 
   (** ** Ident lookups
       Look-ups depend on the nature of the [ident], that may be local or global.
@@ -371,7 +371,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
      Expressions are denoted as itrees that return a [uvalue].
  *)
-
   Fixpoint denote_exp
            (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E uvalue :=
         let eval_texp '(dt,ex) := denote_exp (Some dt) ex
@@ -422,13 +421,13 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | EXP_Zero_initializer =>
           match top with
           | None   => raise "denote_exp given untyped EXP_Zero_initializer"
-          | Some t => lift_err ret (fmap dvalue_to_uvalue (dv_zero_initializer t))
+          | Some t => lift_err ret (fmap (F :=err) dvalue_to_uvalue (dv_zero_initializer t))
           end
 
-        | EXP_Cstring es => 
+        | EXP_Cstring es =>
           vs <- map_monad eval_texp es ;;
           ret (UVALUE_Array vs)
-          
+
         | EXP_Undef =>
           match top with
           | None   => raise "denote_exp given untyped EXP_Undef"
@@ -459,185 +458,74 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           vs <- map_monad eval_texp es ;;
           ret (UVALUE_Vector vs)
 
-        (* The semantics of operators is complicated by both uvalues and
-           undefined behaviors.
-           We denote each operands first, but the denotation of the operator itself
-           depends on whether it may raise UB, and how.
-         *)
+        (* The semantics of operators is complicated by both uvalues and *)
+        (*    undefined behaviors. *)
+        (*    We denote each operands first, but the denotation of the operator itself *)
+        (*    depends on whether it may raise UB, and how. *)
+        (*  *)
         | OP_IBinop iop dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
-          if iop_is_div iop && negb (is_concrete v2)
-          then
-            dv2 <- concretize_or_pick v2 (forall dv2, concretize v2 dv2 -> dvalue_not_zero dv2) ;;
-            uvalue_to_dvalue_binop2
-              (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
-              (fun v1 v2 => translate FUB_to_exp
-                                   (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_iop iop v1 v2))))
-              v1 dv2
-          else
-            uvalue_to_dvalue_binop
-              (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
-              (fun v1 v2 => translate FUB_to_exp
-                                   (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_iop iop v1 v2))))
-              v1 v2
+          ret (UVALUE_IBinop iop v1 v2)
 
         | OP_ICmp cmp dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
-          uvalue_to_dvalue_binop
-            (fun v1 v2 => ret (UVALUE_ICmp cmp v1 v2))
-            (fun v1 v2 => lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_icmp cmp v1 v2)))
-            v1 v2
+          ret (UVALUE_ICmp cmp v1 v2)
 
         | OP_FBinop fop fm dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
-          if fop_is_div fop && negb (is_concrete v2)
-          then
-            dv2 <- concretize_or_pick v2 (forall dv2, concretize v2 dv2 -> dvalue_is_zero dv2) ;;
-            uvalue_to_dvalue_binop2
-              (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
-              (fun v1 v2 =>
-                 translate FUB_to_exp
-                                   (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2))))
-              v1 dv2
-          else
-            uvalue_to_dvalue_binop
-            (fun v1 v2 =>
-               ret (UVALUE_FBinop fop fm v1 v2))
-              (fun v1 v2 =>
-                 translate FUB_to_exp
-                                   (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2))))
-              v1 v2
+          ret (UVALUE_FBinop fop fm v1 v2)
 
         | OP_FCmp fcmp dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
-          uvalue_to_dvalue_binop
-            (fun v1 v2 => ret (UVALUE_FCmp fcmp v1 v2))
-            (fun v1 v2 => lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_fcmp fcmp v1 v2)))
-            v1 v2
+          ret (UVALUE_FCmp fcmp v1 v2)
 
-        | OP_Conversion conv dt1 op t2 =>
-          v <- denote_exp (Some dt1) op ;;
-          uvalue_to_dvalue_uop
-            (fun v => ret (UVALUE_Conversion conv v t2))
-            (fun v => translate conv_to_exp
-                             (fmap dvalue_to_uvalue (eval_conv conv dt1 v t2)))
-            v
+        | OP_Conversion conv dt_from op dt_to =>
+          v <- denote_exp (Some dt_from) op ;;
+          ret (UVALUE_Conversion conv dt_from v dt_to)
 
-        (* CB TODO: Do we actually need to pick here? GEP doesn't do any derefs. Does it make sense to leave it as a UVALUE? *)
-        (* CB TODO: This is probably not what we want in the long term!
-
-           There are a couple of points here:
-
-           1. We do not want to use uvalue_to_dvalue
-           2. We do not want to do picks instead of uvalue_to_dvalue (current situation)
-           3. We do not want to use UVALUE_GetElementPtr
-
-           For each of these points:
-
-           1. This is bad because uvalue_to_dvalue is "partial". It
-              raises an error when the uvalue given to it is not fully
-              concrete already. Arguably most of the time we would
-              want the arguments to GetElementPtr to be concrete,
-              because nondeterministic addresses likely causes
-              UB... But it might not, and for instance an index could
-              reasonably be `0 * undef`
-           2. We could concretize everything using `pick` events,
-              which initially might seem like a good option. Things
-              like `0 * undef` will go through without a hitch. BUT
-              suppose r = GetElementPtr a i such that r ≈ {v1, v2},
-              i.e., the result is nondeterministically one of v1 or
-              v2. Then a store to r should raise UB, which is
-              currently handled using the predicate for pick events:
-
-              da <- trigger (pick ua (exists x, forall da, concretize ua da -> da = x)) ;;
-
-              However, if we pick before calling store the address
-              will be concrete at this point, and so UB will not be
-              raised, the nondeterminism is collapsed too early :(.
-           3. Using UVALUE_GetElementPtr to delay the evaluation of
-              GetElementPtr until it's used. This would be ideal
-              because it would keep the address nondeterministic and
-              allow us to raise UB if the address to a store
-              concretizes to two different addresses... But this is
-              problematic because GEP is handled by memory events,
-              which should be interpreted before pick events, so
-              raising more when handling pick is :(.
-
-           This may be something worth readdressing when we modify the
-           memory model interface to take uvalues. The problem should,
-           essentially, go away?
-
-         *)
         | OP_GetElementPtr dt1 (dt2, ptrval) idxs =>
           vptr <- denote_exp (Some dt2) ptrval ;;
           vs <- map_monad (fun '(dt, index) => denote_exp (Some dt) index) idxs ;;
+          ret (UVALUE_GetElementPtr dt1 vptr vs)
 
-          let maybe_dvs := dvptr <- uvalue_to_dvalue vptr ;;
-                           dvs <- map_monad uvalue_to_dvalue vs ;;
-                           ret (dvptr, dvs)
-          in
+        | OP_ExtractElement (dt_vec, vecop) (dt_idx, idx) =>
+            vec <- denote_exp (Some dt_vec) vecop ;;
+            idx <- denote_exp (Some dt_idx) idx ;;
+            ret (UVALUE_ExtractElement dt_vec vec idx)
 
-          match maybe_dvs with
-          | inr (dvptr, dvs) => fmap dvalue_to_uvalue (trigger (GEP dt1 dvptr dvs))
-          | inl _ =>
-            (* Pick to get dvalues *)
-            dvptr <- concretize_or_pick vptr True ;;
-            dvs <- map_monad (fun v => concretize_or_pick v True) vs ;;
-            fmap dvalue_to_uvalue (trigger (GEP dt1 dvptr dvs))
-          end
+        | OP_InsertElement (dt_vec, vecop) (dt_elt, eltop) (dt_idx, idx) =>
+            vec <- denote_exp (Some dt_vec) vecop ;;
+            elt <- denote_exp (Some dt_elt) eltop ;;
+            idx <- denote_exp (Some dt_idx) idx ;;
+            ret (UVALUE_InsertElement dt_vec vec elt idx)
 
-        | OP_ExtractElement vecop idx =>
-          raise "extractelement not implemented" (* TODO: Extract Element *)
-
-        | OP_InsertElement vecop eltop idx =>
-          raise "insertelement not implemented" (* TODO *)
-
-        | OP_ShuffleVector vecop1 vecop2 idxmask =>
-          raise "shufflevector not implemented" (* TODO *)
+        | OP_ShuffleVector (dt_vec1, vecop1) (dt_vec2, vecop2) (dt_mask, idxmask) =>
+            vec1 <- denote_exp (Some dt_vec1) vecop1 ;;
+            vec2 <- denote_exp (Some dt_vec2) vecop2 ;;
+            idxmask <- denote_exp (Some dt_mask) idxmask;;
+            ret (UVALUE_ShuffleVector vec1 vec2 idxmask)
 
         | OP_ExtractValue (dt, str) idxs =>
-          str <- denote_exp (Some dt) str;;
-          let fix loop str idxs : undef_or_err uvalue :=
-              match idxs with
-              | [] => ret str
-              | i :: tl =>
-                v <- index_into_str str i ;;
-               loop v tl
-              end in
-          lift_undef_or_err ret (loop str idxs)
+            str <- denote_exp (Some dt) str ;;
+            ret (UVALUE_ExtractValue dt str idxs)
 
-        | OP_InsertValue strop eltop idxs =>
-          (*
-            '(t1, str) <- monad_app_snd (denote_exp e) strop;
-            '(t2, v) <- monad_app_snd (denote_exp e) eltop;
-            let fix loop str idxs : err dvalue :=
-            match idxs with
-            | [] => raise "invalid indices"
-            | [i] =>
-            insert_into_str str v i
-            | i :: tl =>
-            '(_, v) <- index_into_str str i;
-            'v <- loop v tl;
-            insert_into_str str v i
-            end in
-            loop str idxs*)
-          raise "TODO"
+        | OP_InsertValue (dt_str, strop) (dt_elt, eltop) idxs =>
+            str <- denote_exp (Some dt_str) strop ;;
+            elt <- denote_exp (Some dt_elt) eltop ;;
+            ret (UVALUE_InsertValue dt_str str elt idxs)
 
         | OP_Select (dt, cnd) (dt1, op1) (dt2, op2) =>
-          cndv <- denote_exp (Some dt) cnd ;;
-          v1   <- denote_exp (Some dt1) op1 ;;
-          v2   <- denote_exp (Some dt2) op2 ;;
-          match uvalue_to_dvalue cndv with
-          | inl e => ret (UVALUE_Select cndv v1 v2)
-          | inr dcndv => lift_undef_or_err ret (eval_select dcndv v1 v2)
-          end
+            cnd <- denote_exp (Some dt) cnd ;;
+            v1  <- denote_exp (Some dt1) op1 ;;
+            v2  <- denote_exp (Some dt2) op2 ;;
+            ret (UVALUE_Select cnd v1 v2)
 
         | OP_Freeze (dt, e) =>
-          uv <- denote_exp (Some dt) e ;;
+          uv <- denote_exp (Some dt) e;;
           dv <- pick_your_poison dt uv;;
           ret (dvalue_to_uvalue dv)
         end.
