@@ -493,41 +493,25 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           ret (UVALUE_GetElementPtr dt1 vptr vs)
 
         | OP_ExtractElement (dt_vec, vecop) (dt_idx, idx) =>
-            vec <- denote_exp (Some dt_vec) vecop ;;
-            idx <- denote_exp (Some dt_idx) idx ;;
-            ret (UVALUE_ExtractElement dt_vec vec idx)
+            raise "Unsupported expression: ExtractElement"
 
         | OP_InsertElement (dt_vec, vecop) (dt_elt, eltop) (dt_idx, idx) =>
-            vec <- denote_exp (Some dt_vec) vecop ;;
-            elt <- denote_exp (Some dt_elt) eltop ;;
-            idx <- denote_exp (Some dt_idx) idx ;;
-            ret (UVALUE_InsertElement dt_vec vec elt idx)
+            raise "Unsupported expression: InsertElement"
 
         | OP_ShuffleVector (dt_vec1, vecop1) (dt_vec2, vecop2) (dt_mask, idxmask) =>
-            vec1 <- denote_exp (Some dt_vec1) vecop1 ;;
-            vec2 <- denote_exp (Some dt_vec2) vecop2 ;;
-            idxmask <- denote_exp (Some dt_mask) idxmask;;
-            ret (UVALUE_ShuffleVector vec1 vec2 idxmask)
+            raise "Unsupported expression: ShuffleVector"
 
         | OP_ExtractValue (dt, str) idxs =>
-            str <- denote_exp (Some dt) str ;;
-            ret (UVALUE_ExtractValue dt str idxs)
+            raise "Unsupported expression: ExtractValue"
 
         | OP_InsertValue (dt_str, strop) (dt_elt, eltop) idxs =>
-            str <- denote_exp (Some dt_str) strop ;;
-            elt <- denote_exp (Some dt_elt) eltop ;;
-            ret (UVALUE_InsertValue dt_str str elt idxs)
+            raise "Unsupported expression: InsertValue"
 
         | OP_Select (dt, cnd) (dt1, op1) (dt2, op2) =>
-            cnd <- denote_exp (Some dt) cnd ;;
-            v1  <- denote_exp (Some dt1) op1 ;;
-            v2  <- denote_exp (Some dt2) op2 ;;
-            ret (UVALUE_Select cnd v1 v2)
+            raise "Unsupported expression: Select"
 
         | OP_Freeze (dt, e) =>
-          uv <- denote_exp (Some dt) e;;
-          dv <- pick_your_poison dt uv;;
-          ret (dvalue_to_uvalue dv)
+            raise "Unsupported expression: Freeze"
         end.
   Arguments denote_exp _ : simpl nomatch.
 
