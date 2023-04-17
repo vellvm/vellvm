@@ -59,19 +59,10 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
 
   Import SemNotations.
 
-  (* SAZ: TODO - is there a better location to put this information? *)
-  (** * Built-in Functions
-
-      This is a list of standard library functions whose semantics can/must be
-      expressed directly in the semantic model.  They are not LLVM intrinsics, so
-      they do get addresses.
-
-      These definitions assume that the built-in functions are declared in the ll file and
-      but that their semantics as itrees are defined here.  Note that the type at which
-      the function is declared in the ll file should match that used for the semantics,
-      but there is no check about that.
-   *)
-
+  (* IO & built-in functions -------------------------------------------------------------------- *)
+  (* SAZ: Is there a better location to put this information? It depends on many of the
+     modules that are in scope at this point.
+  *)
   (** * puts 
       [int  puts(const char *s);]
       The function puts() writes the string s, and a terminating newline character, to the stream stdout.
@@ -100,6 +91,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     | _ => raise "i8_str_index failed with non-DVALUE_I8"
     end.
 
+  (* SAZ: tail recursive version of list reversal -- is this already in our libraries somehwere? *)
   Definition listrev {A:Type} (l:list A) : list A :=
     (fix rev_tail (l:list A) (acc:list A) : list A :=
       match l with
@@ -109,7 +101,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   
   (** Semantic function that treats [u_strptr] as a C-style string pointer:
       - reads i8 values from memory until it encounters a null-terminator (i8 0)
-      - triggers an IO_stdout event with the bytes
+      - triggers an IO_stdout event with the bytes plus a newline
    *)
   Definition puts_denotation : function_denotation :=
     let puts_body (u_strptr:uvalue) : itree L0' uvalue :=
@@ -139,17 +131,37 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       | strptr::[] => puts_body strptr
       | _ => raise "puts called with zero or more than one arguments"
       end.
-  
+
+
+  (** * [built_in_functions]
+
+      This is a list of standard library functions whose semantics can/must be
+      expressed directly in the semantic model.  They are not LLVM intrinsics, so
+      they _do_ get addresses.
+
+      These definitions assume that the built-in functions are declared in the .ll file
+      but that their semantics as itrees are defined here.  Note that the type at which
+      the function is declared in the ll file should match that used for the semantics,
+      but there is no check about that.
+
+      For example, to use the C [<stdio.h> puts] function, one would include the
+      following declaration as part of the ll file:
+      [declare i32 puts(i8* %str)] 
+      See /tests/io for some examples.
+   *)
   Definition built_in_functions : list (function_id * function_denotation) := 
     [(Name "puts", puts_denotation)]. 
 
+
+  (* TOPLEVEL Semantics  ------------------------------------------------------------------------- *)
   
   (** * Initialization
-    The initialization phase allocates and initializes globals,
-    and allocates function pointers. This initialization phase is internalized
-    in [Vellvm], it is an [itree] as any other.
-   *)
 
+    The initialization phase allocates and initializes globals, and allocates
+   function pointers. This initialization phase is internalizedin [Vellvm], it
+   is an [itree] as any other.  *)
+
+  (** Allocate space for a global *)
   Definition allocate_global (g:global dtyp) : itree L0 unit :=
     'v <- trigger (Alloca (g_typ g) 1%N None);;
     trigger (GlobalWrite (g_ident g) v).
@@ -157,9 +169,16 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   Definition allocate_globals (gs:list (global dtyp)) : itree L0 unit :=
     map_monad_ allocate_global gs.
 
-  (* Who is in charge of allocating the addresses for external functions declared in this mcfg? *)
+  (* Who is in charge of allocating the addresses for external functions declared in this mcfg? 
+     - For now we assume that there is only one mcfg, so we allocate addresses for all declared 
+       and defined functions.
+     - If we ever do some kind of "linking" we may need to revisit this, but it presumably
+       would be resolved by an operation of type [link : mcfg -> mcfg -> mcfg] that 
+       combines two mcfgs coherently
+   *)
 
   (* Returns `true` only if both function are named and have the same name.  *)
+  (* TODO: move to AstLib? *)
   Definition function_name_eq (a b:function_id) : bool :=
     match a, b with
     | Name aname, Name bname => eqb aname bname
@@ -177,6 +196,10 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   Definition allocate_declarations (ds:list (declaration dtyp)) : itree L0 unit :=
     map_monad_ allocate_declaration ds.
 
+  (* We have to initialize the global definitions after allocating them because they
+     might be mutually recursive.  It is possible to declare cyclic data structures 
+     statically at the global level in LLVM.
+   *)
   Definition initialize_global (g:global dtyp) : itree exp_E unit :=
     let dt := (g_typ g) in
     a <- trigger (GlobalRead (g_ident g));;
@@ -241,7 +264,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   (**
      Full denotation of a Vellvm program as an interaction tree:
      * initialize the global environment;
-     * point wise denote each function;
+     * pointwise denote each function (and builtin)
      * retrieve the address of the entry point function;
      * tie the mutually recursive know and run it starting from the
      * entry point
@@ -270,7 +293,9 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
    *)
   (* (for now) assume that [main (i64 argc, i8** argv)]
     pass in 0 and null as the arguments to main
-    Note: this isn't compliant with standard C semantics
+    Note: this isn't compliant with standard C semantics, but integrating the actual
+    inputs from the command line is nontrivial since we have martial C-level strings
+    into the Vellvm memory.  
    *)
   Definition main_args := [DV.UVALUE_I64 (DynamicValues.Int64.zero);
                            DV.UVALUE_Addr null
