@@ -491,8 +491,8 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
     refine (fun A e => _).
 
     refine (match e with
-            | inl1 (E1.ExternalCall dt f args) =>
-                _
+            | inl1 e0 =>
+                _ (* ExternalCallE *)
             | inr1 (inl1 (E1.Intrinsic dt name args)) =>
                 _ (* IntrinsicE *)
             | inr1 (inr1 (inl1 e0)) =>
@@ -516,13 +516,14 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
             end).
 
     (* External Calls *)
-    { refine (f' <- lift_OOM (uvalue_convert f);;
+    { inversion e0.
+      - (* ExternalCall *)
+        apply (f' <- lift_OOM (uvalue_convert f);;
               args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
-              dv <- trigger (E2.ExternalCall dt f' args');;
-              _).
-
-      inversion e0.
-      apply (lift_OOM (DVCrev.dvalue_convert dv)).
+              dv <- trigger (E2.ExternalCall t f' args');;
+              lift_OOM (DVCrev.dvalue_convert dv)).
+      - apply (trigger (E2.IO_stdout str)).
+      - apply (trigger (E2.IO_stderr str)).
     }
 
     (* Intrinsics *)
@@ -622,8 +623,8 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
     refine (fun A e => _).
 
     refine (match e with
-            | inl1 (E1.ExternalCall dt f args) =>
-                _
+            | inl1 e0 =>
+                _ (* ExternalCallE *)
             | inr1 (inl1 (E1.Intrinsic dt name args)) =>
                 _ (* IntrinsicE *)
             | inr1 (inr1 (inl1 (inl1 e0))) =>
@@ -645,13 +646,13 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
             end).
 
     (* External Calls *)
-    { refine (f' <- lift_OOM (uvalue_convert f);;
+    { inversion e0.
+      - apply (f' <- lift_OOM (uvalue_convert f);;
               args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
-              dv <- trigger (E2.ExternalCall dt f' args');;
-              _).
-
-      inversion e0.
-      apply (lift_OOM (DVCrev.dvalue_convert dv)).
+              dv <- trigger (E2.ExternalCall t f' args');;
+              (lift_OOM (DVCrev.dvalue_convert dv))).
+      - apply (trigger (E2.IO_stdout str)).
+      - apply (trigger (E2.IO_stderr str)).
     }
 
     (* Intrinsics *)
@@ -741,8 +742,8 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
     refine (fun A e => _).
 
     refine (match e with
-            | inl1 (E1.ExternalCall dt f args) =>
-                _
+            | inl1 e0 =>
+                _ (* ExternalCallE *)
             | inr1 (inl1 (E1.Intrinsic dt name args)) =>
                 _ (* IntrinsicE *)
             | inr1 (inr1 (inl1 e0)) =>
@@ -760,13 +761,13 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
             end).
 
     (* External Calls *)
-    { refine (f' <- lift_OOM (uvalue_convert f);;
+    { inversion e0.
+      - apply (f' <- lift_OOM (uvalue_convert f);;
               args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
-              dv <- trigger (E2.ExternalCall dt f' args');;
-              _).
-
-      inversion e0.
-      apply (lift_OOM (DVCrev.dvalue_convert dv)).
+              dv <- trigger (E2.ExternalCall t f' args');;
+              (lift_OOM (DVCrev.dvalue_convert dv))).
+      - apply (trigger (E2.IO_stdout str)).
+      - apply (trigger (E2.IO_stderr str)).
     }
 
     (* Intrinsics *)
@@ -832,8 +833,8 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
     refine (fun A e => _).
 
     refine (match e with
-            | inl1 (E1.ExternalCall dt f args) =>
-                _
+            | inl1 e0 =>
+                _ (* ExternalCallE *)
             | inr1 (inl1 e0) =>
                 _ (* PickE *)
             | inr1 (inr1 (inl1 e0)) =>
@@ -847,13 +848,13 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
             end).
 
     (* External Calls *)
-    { refine (f' <- lift_OOM (uvalue_convert f);;
+    { inversion e0.
+      - apply (f' <- lift_OOM (uvalue_convert f);;
               args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
-              dv <- trigger (E2.ExternalCall dt f' args');;
-              _).
-
-      inversion e0.
-      apply (lift_OOM (DVCrev.dvalue_convert dv)).
+              dv <- trigger (E2.ExternalCall t f' args');;
+              (lift_OOM (DVCrev.dvalue_convert dv))).
+      - apply (trigger (E2.IO_stdout str)).
+      - apply (trigger (E2.IO_stderr str)).
     }
 
     (* PickE *)
@@ -893,10 +894,10 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
     refine (fun A e => _).
 
     refine (match e with
-            | inl1 (E1.ExternalCall dt f args) =>
-                _
+            | inl1 e0 =>
+                _ (* ExternalCallE *)
             | inr1 (inl1 e0) =>
-                _
+                _ (* OOME *)
             | inr1 (inr1 (inl1 e0)) =>
                 _ (* UBE *)
             | inr1 (inr1 (inr1 (inl1 e0))) =>
@@ -906,14 +907,15 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
             end).
 
     (* External Calls *)
-    refine (f' <- lift_OOM (uvalue_convert f);;
+    { inversion e0.
+      - apply (f' <- lift_OOM (uvalue_convert f);;
             args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
-            dv <- trigger (E2.ExternalCall dt f' args');;
-            _).
-
-    inversion e0.
-    apply (lift_OOM (DVCrev.dvalue_convert dv)).
-
+            dv <- trigger (E2.ExternalCall t f' args');;
+            (lift_OOM (DVCrev.dvalue_convert dv))).
+      - apply (trigger (E2.IO_stdout str)).
+      - apply (trigger (E2.IO_stderr str)).
+    }
+        
     (* OOME *)
     { inversion e0.
       apply (raise_oom H).
@@ -2228,6 +2230,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           setoid_rewrite bind_vis.
           unfold subevent. rewrite H0.
           eapply eqit_Vis. intros. inv u.
+      + (* SAZ: admitted new case for IO_stdout *) admit.
+      + (* SAZ: admitted new case for IO_stderr *) admit.
+             
       + destruct s.
         * unfold raiseOOM in H1.
           destruct o.

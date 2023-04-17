@@ -52,6 +52,14 @@ let rec pp_uvalue : Format.formatter -> DV.uvalue -> unit =
   | UVALUE_Vector        l -> fprintf ppf "UVALUE_Vector(%a)"        (pp_print_list ~pp_sep:pp_comma_space pp_uvalue) l
   | _ -> fprintf ppf "pp_uvalue: todo"
 
+
+let char_of_I8 x = char_of_int (Camlcoq.Z.to_int (DynamicValues.Int8.unsigned x))
+
+(* Converts a list of DynamicValues.Int8 values to OCaml string *)
+let string_of_bytes (bytes : DynamicValues.Int8.int list) : bytes =
+  (List.map char_of_I8  bytes) |>
+  List.to_seq  |> Bytes.of_seq
+
 let debug_flag = ref false
 
 type exit_condition =
@@ -99,6 +107,16 @@ let rec step (m : ('a coq_L4, MMEP.MMSP.coq_MemState * (MemPropT.store_id * ((lo
   (* The ExternalCallE effect *)
   | VisF (Sum.Coq_inl1 (ExternalCall(_, _, _)), _) ->
     Error (UninterpretedCall "Uninterpreted Call") (* TODO: More informative message *)
+
+  (* The IO_stdout effect *)
+  | VisF (Sum.Coq_inl1 (IO_stdout(bytes)), k) ->
+    let str = string_of_bytes bytes in
+    output_bytes stdout str; step (k (Obj.magic ()))
+
+  (* The IO_stderr effect *)
+  | VisF (Sum.Coq_inl1 (IO_stderr(bytes)), k) ->
+    let str = string_of_bytes bytes in
+    output_bytes stderr str; step (k (Obj.magic ()))
 
   (* The OOME effect *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 msg), _k) ->

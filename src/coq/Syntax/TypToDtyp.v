@@ -261,6 +261,9 @@ Section ConvertTyp.
   #[global] Instance ConvertTyp_block : ConvertTyp block :=
     fun env => tfmap (typ_to_dtyp env).
 
+  #[global] Instance ConvertTyp_declaration : ConvertTyp declaration :=
+    fun env => tfmap (typ_to_dtyp env).
+  
   #[global] Instance ConvertTyp_cfg : ConvertTyp cfg :=
     fun env => tfmap (typ_to_dtyp env).
 
