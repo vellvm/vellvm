@@ -168,7 +168,12 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
     | Call        : forall (t:dtyp) (f:uvalue) (args:list uvalue), CallE uvalue.
 
     Variant ExternalCallE : Type -> Type :=
-    | ExternalCall        : forall (t:dtyp) (f:uvalue) (args:list dvalue), ExternalCallE dvalue.
+      | ExternalCall        : forall (t:dtyp) (f:uvalue) (args:list dvalue), ExternalCallE dvalue
+
+      (* This event corresponds to writing to the [stdout] channel. ] *)                              
+      | IO_stdout : forall (str : list int8), ExternalCallE unit
+      (* This event corresponds to writing to the [stdout] channel. ] *)                              
+      | IO_stderr : forall (str : list int8), ExternalCallE unit.
 
     (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)
     Variant IntrinsicE : Type -> Type :=

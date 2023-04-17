@@ -59,6 +59,91 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
 
   Import SemNotations.
 
+  (* SAZ: TODO - is there a better location to put this information? *)
+  (** * Built-in Functions
+
+      This is a list of standard library functions whose semantics can/must be
+      expressed directly in the semantic model.  They are not LLVM intrinsics, so
+      they do get addresses.
+
+      These definitions assume that the built-in functions are declared in the ll file and
+      but that their semantics as itrees are defined here.  Note that the type at which
+      the function is declared in the ll file should match that used for the semantics,
+      but there is no check about that.
+   *)
+
+  (** * puts 
+      [int  puts(const char *s);]
+      The function puts() writes the string s, and a terminating newline character, to the stream stdout.
+      The functions fputs() and puts() return a nonnegative integer on success and EOF on error.
+
+      SAZ: it isn't clear what kinds of errors count as "errors" for puts. Our implementation 
+      will never explicitly return EOF (since that seems to be a stdout stream error.  It will
+      only ever raise "semantic" errors.
+   *)
+
+  (** A semantic function to read an i8 value at [strptr + index] from the memory. 
+      Propagates all memory failures and raises a Vellvm "Failure" if the 
+      value read does not concretize to a DVALUE_I8.
+   *)
+  Definition i8_str_index (strptr : addr) (index : Z) : itree L0' DynamicValues.Int8.int :=
+    iptr <- (@lift_OOM (itree L0') _ _ _ (LP.IP.from_Z index)) ;;
+    addr <-
+      match handle_gep_addr (DTYPE_I 8) strptr [DVALUE_IPTR iptr] with
+            | inl msg => raise msg 
+            | inr c => @lift_OOM (itree L0') _ _ _ c
+            end ;;
+    u_byte <- trigger (Load (DTYPE_I 8) (DVALUE_Addr addr)) ;;
+    d_byte <- concretize_or_pick u_byte True ;;
+    match d_byte with
+    | DVALUE_I8 b => ret b
+    | _ => raise "i8_str_index failed with non-DVALUE_I8"
+    end.
+
+  Definition listrev {A:Type} (l:list A) : list A :=
+    (fix rev_tail (l:list A) (acc:list A) : list A :=
+      match l with
+      | [] => acc
+      | x::xs => rev_tail xs (x::acc)
+      end) l [].
+  
+  (** Semantic function that treats [u_strptr] as a C-style string pointer:
+      - reads i8 values from memory until it encounters a null-terminator (i8 0)
+      - triggers an IO_stdout event with the bytes
+   *)
+  Definition puts_denotation : function_denotation :=
+    let puts_body (u_strptr:uvalue) : itree L0' uvalue :=
+      dv <- concretize_or_pick u_strptr True ;;
+      match dv with
+      | DVALUE_Addr strptr =>
+          char <- i8_str_index strptr 0%Z ;;
+          bytes <- 
+            ITree.iter
+              (fun '(c, bytes, offset) =>
+                 if DynamicValues.Int8.eq c (DynamicValues.Int8.zero) then
+                   (* null terminated string so end the iteration, add the newline *)
+                   ret (inr ((DynamicValues.Int8.repr 10) :: bytes))
+                 else 
+                   next_char <- i8_str_index strptr offset ;;
+                   ret (inl (next_char, c::bytes, (offset + 1)%Z))
+              )
+              (char, [], 1%Z) ;;
+          v <- trigger (IO_stdout (listrev bytes)) ;;
+          ret (UVALUE_I8 (DynamicValues.Int8.zero))
+      | _ => raiseUB "puts got non-address argument"
+      end
+    in
+    
+    fun (args : list uvalue) =>
+      match args with
+      | strptr::[] => puts_body strptr
+      | _ => raise "puts called with zero or more than one arguments"
+      end.
+  
+  Definition built_in_functions : list (function_id * function_denotation) := 
+    [(Name "puts", puts_denotation)]. 
+
+  
   (** * Initialization
     The initialization phase allocates and initializes globals,
     and allocates function pointers. This initialization phase is internalized
@@ -121,11 +206,21 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
    Denotes a function and returns its pointer.
    *)
 
-  Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)) : itree L0 (dvalue * function_denotation) :=
+  Definition address_one_function (df : definition dtyp (CFG.cfg dtyp))
+    : itree L0 (dvalue * function_denotation) :=
     let fid := (dc_name (df_prototype df)) in
     fv <- trigger (GlobalRead fid) ;;
     ret (fv, ⟦ df ⟧f).
 
+  (**
+   Denotes a builtin function 
+   *)
+  Definition address_one_builtin_function (builtin : function_id * function_denotation) 
+    : itree L0 (dvalue * function_denotation) :=
+    let (fid, den) := builtin in 
+    fv <- trigger (GlobalRead fid) ;;
+    ret (fv, den).
+  
   (**
    We are now ready to define our semantics. Guided by the events and handlers,
    we work in layers: the first layer is defined as the uninterpreted [itree]
@@ -164,8 +259,9 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (mcfg : CFG.mcfg dtyp) : itree L0 dvalue :=
     build_global_environment mcfg ;;
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
+    'builtins <- map_monad address_one_builtin_function built_in_functions ;;
     'addr <- trigger (GlobalRead (Name entry)) ;;
-    'rv <- denote_mcfg defns ret_typ (dvalue_to_uvalue addr) args ;;
+    'rv <- denote_mcfg (defns ++ builtins) ret_typ (dvalue_to_uvalue addr) args ;;
     dv_pred <- trigger (pick_uvalue (forall dt, ~concretize rv (DVALUE_Poison dt)) rv);;
     ret (proj1_sig dv_pred).
 
