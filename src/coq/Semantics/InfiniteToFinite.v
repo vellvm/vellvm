@@ -2416,9 +2416,127 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                     admit.
                   }
 
-                  { (* Handler raises Error *)
-                    admit.
-                  }
+ (*                  { (* Handler raises Error *) *)
+ (*                    destruct ERR as [err_msg [TA HANDLER]]. *)
+ (*                    unfold raise_error in TA. *)
+ (*                    cbn in TA. *)
+ (*                    unfold LLVMEvents.raise in TA. *)
+ (*                    rewrite bind_trigger in TA. *)
+
+ (*                    rewrite TA in VIS_HANDLED. *)
+ (*                    rewrite bind_vis in VIS_HANDLED. *)
+
+ (*                    punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED. *)
+ (*                    dependent induction VIS_HANDLED. *)
+ (*                    2: { *)
+ (*                      specialize (EQ t1); contradiction. *)
+ (*                    } *)
+
+ (*                    eapply Interp_Memory_PropT_Vis with (ta:= *)
+ (*                                                           vis (Throw err_msg) *)
+ (*                                                             (fun x : void => *)
+ (*                                                                match *)
+ (*                                                                  x *)
+ (*                                                                  return *)
+ (*                                                                  (itree *)
+ (*                                                                     (InterpreterStackBigIntptr.LP.Events.ExternalCallE +' *)
+ (*                                                                                       LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) *)
+ (*                                                                     (MemoryBigIntptr.MMEP.MMSP.MemState * *)
+ (*                                                                        (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue))) *)
+ (*                                                                with *)
+ (*                                                                end)). *)
+
+ (*                    3: { *)
+ (*                      rewrite get_inf_tree_equation. *)
+ (*                      cbn. unfold LLVMEvents.raise. *)
+ (*                      rewrite bind_trigger. *)
+ (*                      rewrite bind_vis. *)
+ (*                      pstep; red; cbn. *)
+ (*                      constructor. *)
+ (*                      intros []. *)
+ (*                    } *)
+
+ (*                    { intros a (ms_b, (sid_b, b)) RET1 RET2 AB. *)
+ (*                      cbn in AB; subst. *)
+
+ (*                      pclearbot. *)
+ (*                      right. *)
+ (*                      rewrite (itree_eta_ (k0 _)). *)
+ (*                      rewrite (itree_eta_). *)
+
+ (*                      eapply CIH; *)
+ (*                        repeat rewrite <- itree_eta_. *)
+
+ (*                      2: { *)
+ (*                        red. *)
+ (*                        specialize (HK d (ms', (st1, d))). *)
+ (*                        forward HK. *)
+ (*                        { eapply ReturnsVis. *)
+ (*                          pstep; red; cbn. *)
+ (*                          constructor. *)
+ (*                          intros v. red. *)
+ (*                          left; apply paco2_eqit_refl. *)
+ (*                          constructor. *)
+ (*                          reflexivity. *)
+ (*                        } *)
+ (*                        forward HK. *)
+ (*                        { rewrite H0. *)
+ (*                          constructor. *)
+ (*                          reflexivity. *)
+ (*                        } *)
+ (*                        forward HK; cbn; auto. *)
+ (*                        pclearbot. *)
+ (*                        rewrite MemState_fin_to_inf_to_fin in Heqo0; inv Heqo0. *)
+ (*                        rewrite dvalue_fin_to_inf_to_fin in Heqo; inv Heqo. *)
+ (*                        apply HK. *)
+ (*                      } *)
+                      
+ (*                      rewrite REL. *)
+ (*                      eapply K_RUTT; split; auto. *)
+ (*                    } *)
+
+ (*                    eapply CIH. *)
+                    
+ (*                  } *)
+                    
+ (*                    2: { *)
+ (*                      red. cbn. red. cbn. *)
+ (*                    } *)
+
+ (*                      with *)
+ (*                      (k2:=(fun '(ms_inf, (sid', dv_inf)) => *)
+ (*                              match DVCInfFin.dvalue_convert_strict dv_inf with *)
+ (*                              | NoOom dv_fin => get_inf_tree (k5 dv_fin) *)
+ (*                              | Oom s => raiseOOM s *)
+ (*                              end) *)
+ (*                      ). *)
+
+ (*                      (k2:=tt). *)
+ (* "MemoryBigIntptr.MMEP.MMSP.MemState * *)
+ (*  (MemPropT.store_id * InterpreterStackBigIntptr.LP.Events.DV.dvalue) -> *)
+ (*  itree *)
+ (*    (InterpreterStackBigIntptr.LP.Events.ExternalCallE +' *)
+ (*     LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) *)
+ (*    TopLevelBigIntptr.res_L6". *)
+
+ (*                    3: { *)
+ (*                      rewrite get_inf_tree_equation. *)
+ (*                      cbn. *)
+ (*                      unfold LLVMEvents.raise. *)
+ (*                      rewrite bind_trigger. *)
+ (*                      setoid_rewrite bind_trigger. *)
+ (*                    } *)
+ (*                    rewrite get_inf_tree_equation. *)
+ (*                    cbn. *)
+ (*                    unfold LLVMEvents.raise. *)
+ (*                    rewrite bind_trigger. *)
+ (*                    Unset Printing Notations. *)
+ (*                    Set Printing Implicit. *)
+ (*                    reflexivity. *)
+                    
+ (*                    admit. *)
+                  (*                  } *)
+                  admit.
 
                   { (* Handler raises OOM *)
                     destruct OOM as [oom_msg [TA HANDLER]].
@@ -2503,7 +2621,7 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                                     |
                                    ]).
                             red in HANDLER.
-                            repeat break_match_hyp; try inversion HANDLER.
+                            repeat break_match_hyp; try inversion HANDLER; subst.
                             { (* 32 bit memcpy *)
                               admit.
                             }
@@ -2513,6 +2631,662 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                             }
 
                             { (* iptr memcpy *)
+                              inversion ARGS; subst.
+                              clear ARGS.
+                              rewrite DVCInfFin.dvalue_refine_strict_equation in H, H0, H1, H2, H3.
+
+                              (* TODO: inversion lemmas for dvalue_convert_strict *)
+                              Lemma dvalue_convert_strict_addr_inv :
+                                forall x a,
+                                  DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_Addr a) ->
+                                  exists a', 
+                                    InfToFinAddrConvert.addr_convert a' = NoOom a /\
+                                      x = DVCInfFin.DV1.DVALUE_Addr a'.
+                              Proof.
+                                intros x a H.
+                                rewrite DVCInfFin.dvalue_convert_strict_equation in H.
+                                destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+                                break_match_hyp; inv H1.
+                                exists a0; auto.
+                              Qed.
+
+                              Lemma dvalue_convert_strict_iptr_inv :
+                                forall x n,
+                                  DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_IPTR n) ->
+                                  exists n', 
+                                    IP.from_Z (InterpreterStackBigIntptr.LP.IP.to_Z n') = NoOom n /\
+                                      x = DVCInfFin.DV1.DVALUE_IPTR n'.
+                              Proof.
+                                intros x n H.
+                                rewrite DVCInfFin.dvalue_convert_strict_equation in H.
+                                destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+                                break_match_hyp; inv H1.
+                                exists x; auto.
+                              Qed.
+
+                              Lemma dvalue_convert_strict_i1_inv :
+                                forall x n,
+                                  DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_I1 n) ->
+                                  x = DVCInfFin.DV1.DVALUE_I1 n.
+                              Proof.
+                                intros x n H.
+                                rewrite DVCInfFin.dvalue_convert_strict_equation in H.
+                                destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+                                subst.
+                                auto.
+                              Qed.
+
+                              apply dvalue_convert_strict_addr_inv in H as (a' & H & X); subst.
+                              apply dvalue_convert_strict_addr_inv in H0 as (a0' & H0 & X0); subst.
+                              apply dvalue_convert_strict_iptr_inv in H1 as (x4' & H1 & X4); subst.
+                              apply dvalue_convert_strict_iptr_inv in H2 as (x5' & H2 & X5); subst.
+                              apply dvalue_convert_strict_i1_inv in H3; subst.
+
+                              red. red.                              
+                              red in HANDLER.
+
+                              assert (LLVMParams64BitIntptr.IP.to_Z x4 = LLVMParamsBigIntptr.IP.to_Z x4') as X4.
+                              { (* TODO: weird iptr reasoning... *)
+                                admit.
+                              }
+                              rewrite <- X4; clear X4.
+
+                              break_match_hyp; auto.
+
+                              Lemma fin_inf_no_overlap :
+                                forall a1 sz1 a2 sz2 a1' a2',
+                                  InfToFinAddrConvert.addr_convert a1' = NoOom a1 ->
+                                  InfToFinAddrConvert.addr_convert a2' = NoOom a2 ->
+                                  Memory64BitIntptr.MMEP.MemSpec.OVER_H.no_overlap a1 sz1 a2 sz2 = MemoryBigIntptr.MMEP.MemSpec.OVER_H.no_overlap a1' sz1 a2' sz2.
+                              Proof.
+                              Admitted.
+
+                              Lemma fin_inf_ptoi :
+                                forall a a',
+                                  InfToFinAddrConvert.addr_convert a' = NoOom a ->
+                                  LLVMParams64BitIntptr.PTOI.ptr_to_int a = LLVMParamsBigIntptr.PTOI.ptr_to_int a'.
+                              Proof.
+                              Admitted.
+
+                              erewrite <- fin_inf_no_overlap; eauto.
+                              repeat erewrite <- fin_inf_ptoi; eauto.
+                              break_match_goal; auto.
+
+                              Lemma blah :
+                                forall ip_f z,
+                                  LLVMParams64BitIntptr.IP.from_Z z = NoOom ip_f ->
+                                  exists ip_i,
+                                    LLVMParamsBigIntptr.IP.from_Z z = NoOom ip_i.
+                              Proof.
+                              Admitted.
+
+                              (* TODO: Move this and use it in picky intptr reasoning admits *)
+                              Lemma fin_inf_from_Z_to_Z :
+                                forall z x y,
+                                  LLVMParamsBigIntptr.IP.from_Z z = NoOom x ->
+                                  LLVMParams64BitIntptr.IP.from_Z z = NoOom y ->
+                                  LLVMParams64BitIntptr.IP.to_Z y = LLVMParamsBigIntptr.IP.to_Z x.
+                              Proof.
+                                intros z x y ZX ZY.
+                                pose proof BigIP.from_Z_to_Z z x ZX.
+                                pose proof IP.from_Z_to_Z z y ZY.
+                                rewrite H, H0.
+                                auto.
+                              Qed.
+
+                              Lemma fin_inf_intptr_seq :
+                                forall start len ips,
+                                  Memory64BitIntptr.MMEP.MemSpec.MemHelpers.intptr_seq start len = NoOom ips ->
+                                  exists ips_big, MemoryBigIntptr.MMEP.MemSpec.MemHelpers.intptr_seq start len = NoOom ips_big /\
+                              Forall2 (fun a b => LLVMParams64BitIntptr.IP.to_Z a = LLVMParamsBigIntptr.IP.to_Z b) ips ips_big.
+                              Proof.
+                                intros start len ips SEQ.
+                                pose proof Memory64BitIntptr.MMEP.MemSpec.MemHelpers.intptr_seq_len _ _ _ SEQ as LEN.
+                                generalize dependent start.
+                                generalize dependent len.
+                                induction ips; intros len LEN start SEQ.
+                                - cbn in *; subst.
+                                  exists [].
+                                  split.
+                                  + cbn; auto.
+                                  + constructor.
+                                - cbn in *; inv LEN.
+                                  pose proof SEQ.
+                                  rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.intptr_seq_succ in H0.
+                                  cbn in H0.
+                                  break_match_hyp; inv H0.
+                                  break_match_hyp; inv H2.
+
+                                  pose proof Heqo.
+                                  apply blah in Heqo as [ip_i IP_I].
+                                  specialize (IHips (Datatypes.length ips) eq_refl (Z.succ start) Heqo0).
+                                  destruct IHips as [ips_big [SEQ' ALL]].
+                                  exists (ip_i :: ips_big).
+                                  split.
+                                  + rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.intptr_seq_succ.
+                                    cbn.
+                                    rewrite SEQ'.
+                                    cbn in IP_I.
+                                    inv IP_I.
+                                    auto.
+                                  + constructor; eauto.
+                                    eapply fin_inf_from_Z_to_Z; eauto.
+                              Qed.
+
+  (* CONSEC : (ixs <- lift_OOM (Memory64BitIntptr.MMEP.MemSpec.MemHelpers.intptr_seq 0 n);; *)
+  (*           addrs <- *)
+  (*           lift_err_RAISE_ERROR *)
+  (*             (map_monad *)
+  (*                (fun ix : LLVMParams64BitIntptr.IP.intptr => *)
+  (*                 Memory64BitIntptr.MP.GEP.handle_gep_addr (DTYPE_I 8) a *)
+  (*                   [LLVMParams64BitIntptr.Events.DV.DVALUE_IPTR ix]) ixs);; *)
+  (*           lift_OOM (Monads.sequence addrs)) ms (OOM_unERR_UB_OOM oom_x) *)
+  (* oom_x0 : string *)
+  (* Hx0 : y = OOM_unERR_UB_OOM oom_x0 *)
+  (* ============================ *)
+  (* (ixs <- lift_OOM (MemoryBigIntptr.MMEP.MemSpec.MemHelpers.intptr_seq 0 n);; *)
+
+                              Lemma fin_inf_get_consecutive_ptrs_success :
+                                forall a a' n ms ms' ms_x xs ms_y ys,
+                                  (* TODO: ADDR probably not necessary, can conclude this from ADDRS...
+                                   *)
+                                  InfToFinAddrConvert.addr_convert a' = NoOom a ->
+                                  Forall2 (fun x y => InfToFinAddrConvert.addr_convert y = NoOom x) xs ys ->
+                                   (@Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs
+                                     (MemPropT Memory64BitIntptr.MMEP.MMSP.MemState)
+                                     (@MemPropT_Monad Memory64BitIntptr.MMEP.MMSP.MemState)
+                                     (@MemPropT_RAISE_OOM Memory64BitIntptr.MMEP.MMSP.MemState)
+                                     (@MemPropT_RAISE_ERROR Memory64BitIntptr.MMEP.MMSP.MemState) a n ms (success_unERR_UB_OOM (ms_x, xs))) ->
+                                  (@MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs
+                                     (MemPropT MemoryBigIntptr.MMEP.MMSP.MemState)
+                                     (@MemPropT_Monad MemoryBigIntptr.MMEP.MMSP.MemState)
+                                     (@MemPropT_RAISE_OOM MemoryBigIntptr.MMEP.MMSP.MemState)
+                                     (@MemPropT_RAISE_ERROR MemoryBigIntptr.MMEP.MMSP.MemState) a' n ms' (success_unERR_UB_OOM (ms_y, ys))).
+                              Proof.
+                                intros a a' n ms ms' ms_x xs ms_y ys ADDR ADDRS CONSEC.
+                                cbn in *.
+                                destruct CONSEC as [sab [a0 [SEQ_OOM CONSEC]]].
+                                destruct (Memory64BitIntptr.MMEP.MemSpec.MemHelpers.intptr_seq 0 n) eqn:SEQ; cbn in *; try contradiction.
+                                destruct SEQ_OOM; subst.
+
+                                destruct CONSEC as [sab [addrs CONSEC]].
+
+                                pose proof (fin_inf_intptr_seq _ _ _ SEQ).
+                                destruct H as [lb [SEQ_BIG ALL]].
+                                exists ms'. exists lb.
+                                split.
+                                { rewrite SEQ_BIG.
+                                  cbn; auto.
+                                }
+
+                                destruct CONSEC as [GEN_ADDRS SEQ_ADDRS].
+                                destruct (map_monad
+                                            (fun ix : LLVMParams64BitIntptr.IP.intptr =>
+                                               inr
+                                                 (LLVMParams64BitIntptr.ITOP.int_to_ptr
+                                                    (LLVMParams64BitIntptr.PTOI.ptr_to_int a +
+                                                       Z.of_N (LLVMParams64BitIntptr.SIZEOF.sizeof_dtyp (DTYPE_I 8)) *
+                                                         LLVMParams64BitIntptr.IP.to_Z ix)
+                                                    (LLVMParams64BitIntptr.PROV.address_provenance a))) l) eqn:HMAPM; cbn in *; try contradiction.
+
+                                destruct GEN_ADDRS; subst.
+
+                                destruct (@map_monad err (EitherMonad.Monad_either string) LLVMParamsBigIntptr.IP.intptr
+                                            (OOM LLVMParamsBigIntptr.ADDR.addr)
+                                            (fun ix : LLVMParamsBigIntptr.IP.intptr =>
+                                               @inr string (OOM LLVMParamsBigIntptr.ADDR.addr)
+                                                 (@NoOom (Z * Prov)
+                                                    ((LLVMParamsBigIntptr.PTOI.ptr_to_int a' +
+                                                        Z.of_N (LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp (DTYPE_I 8)) *
+                                                          LLVMParamsBigIntptr.IP.to_Z ix)%Z, LLVMParamsBigIntptr.PROV.address_provenance a')))
+                                            lb) eqn:HMAPM'.
+                                { (* Should be a contradiction *)
+                                  apply map_monad_err_fail in HMAPM'.
+                                  destruct HMAPM' as [a'' [IN CONTRA]].
+                                  inv CONTRA.
+                                }
+
+                                exists ms'. exists l1.
+                                split.
+                                {
+                                  red.
+                                  (* I have no clue why this rewrite won't work *)
+                                  (* rewrite HMAPM'. *)
+                                  break_match_goal.
+                                  { apply map_monad_err_fail in Heqs.
+                                    destruct Heqs as [a'' [IN CONTRA]].
+                                    inv CONTRA.
+                                  }
+                                  setoid_rewrite HMAPM' in Heqs.
+                                  inv Heqs.
+
+                                  cbn.
+                                  split; reflexivity.
+                                }
+
+                                red.
+                                break_match_goal.
+                                2: {
+                                  (* TODO: There's probably a nice lemma in here *)
+                                  cbn.
+                                  apply map_monad_OOM_fail in Heqo.
+                                  destruct Heqo as [x [INx OOMx]].
+                                  unfold id in OOMx.
+                                  inv OOMx.
+
+                                  apply map_monad_err_forall2 in HMAPM'.
+                                  apply Util.Forall2_forall in HMAPM' as [LEN HMAPM'].
+                                  apply In_Nth in INx. destruct INx as [i NTHl1].
+                                  
+                                  epose proof (Nth_exists lb i) as NTHlb.
+                                  forward NTHlb.
+                                  { apply Nth_ix_lt_length in NTHl1.
+                                    lia.
+                                  }
+                                  destruct NTHlb as (?&NTHlb).
+                                  specialize (HMAPM' _ _ _ NTHlb NTHl1).
+                                  inv HMAPM'.
+                                }
+
+                                cbn.
+
+                                split.
+                                { (* ??? *)
+                                  admit.
+                                }
+
+                                { (* Might follow from ADDRS? *)
+                                  red in SEQ_ADDRS.
+                                  break_match_hyp; cbn in *; try contradiction.
+                                  inv SEQ_ADDRS.
+                                  rename l3 into xs.
+
+                                  assert (forall i a b, Util.Nth ys i a -> Util.Nth l2 i b -> a = b) as NTHysl2.
+                                  {
+                                    intros i y x NTHy NTHx.
+
+                                    inversion ADDRS; subst.
+                                    - cbn in NTHy; rewrite Util.nth_error_nil in NTHy; inv NTHy.
+                                    -
+                                      (* TODO: Move this *)
+                                      Lemma map_monad_err_nil_inv :
+                                        forall {A B} (f : A -> err B) l,
+                                          map_monad f l = inr [] ->
+                                          l = [].
+                                      Proof.
+                                        intros A B f l H.
+                                        induction l; cbn; auto.
+                                        cbn in H.
+                                        break_match_hyp; inv H.
+                                        break_match_hyp; inv H1.
+                                      Qed.
+
+                                      (* TODO: Move this *)
+                                      Lemma map_monad_err_cons :
+                                        forall {A B} (f : A -> err B) x xs res,
+                                          map_monad f (x :: xs) = inr res ->
+                                          exists b bs, res = b :: bs.
+                                      Proof.
+                                        intros A B f x xs res H.
+                                        cbn in H.
+                                        break_match_hyp; inv H.
+                                        break_match_hyp; inv H1.
+                                        exists b. exists l.
+                                        reflexivity.
+                                      Qed.
+
+                                      (* TODO: Move this *)
+                                      Lemma map_monad_err_cons_inv :
+                                        forall {A B} (f : A -> err B) b bs l,
+                                          map_monad f l = inr (b :: bs) ->
+                                          exists x xs, l = x :: xs.
+                                      Proof.
+                                        intros A B f b bs l H.
+                                        induction l; cbn in *.
+                                        - inv H.
+                                        - break_match_hyp; inv H.
+                                          break_match_hyp; inv H1.
+                                          exists a. exists l.
+                                          reflexivity.
+                                      Qed.
+
+                                      (* TODO: Move this *)
+                                      Lemma sequence_oom_cons_inv :
+                                        forall {B} (b : B) bs l,
+                                          Monads.sequence l = NoOom (b :: bs) ->
+                                          exists x xs, l = x :: xs.
+                                      Proof.
+                                        intros B b bs l H.
+                                        induction l; cbn in *.
+                                        - inv H.
+                                        - break_match_hyp; inv H.
+                                          break_match_hyp; inv H1.
+                                          exists a. exists l.
+                                          reflexivity.
+                                      Qed.
+
+                                      (* TODO: Move this *)
+                                      Lemma sequence_oom_cons :
+                                        forall {B} (x : OOM B) xs res,
+                                          Monads.sequence (x :: xs) = NoOom res ->
+                                          exists b bs, res = b :: bs.
+                                      Proof.
+                                        intros B x xs res H.
+                                        cbn in *.
+                                        break_match_hyp; inv H.
+                                        break_match_hyp; inv H1.
+                                        exists b. exists l.
+                                        reflexivity.
+                                      Qed.
+
+                                      apply sequence_oom_cons_inv in Heqo0.
+                                      destruct Heqo0 as (?&?&?); subst.
+
+                                      (* TODO: Move this *)
+                                      Lemma sequence_oom_nth :
+                                        forall {A : Type} (l : list (OOM A)) (res : list A) (x : A) (n : nat),
+                                          Monads.sequence l = ret res -> Util.Nth res n x -> Util.Nth l n (NoOom x).
+                                      Proof.
+                                        intros A l.
+                                        induction l; intros res x n SEQ NTH.
+                                        - cbn in *.
+                                          inv SEQ.
+                                          rewrite Util.nth_error_nil in NTH; inv NTH.
+                                        - generalize dependent x.
+                                          induction n; intros x NTH.
+                                          + cbn in *.
+                                            break_match_hyp; inv NTH.
+                                            break_match_hyp; inv SEQ.
+                                            break_match_hyp; inv H0.
+                                            unfold id in Heqo; subst.
+                                            reflexivity.
+                                          + cbn in SEQ.
+                                            break_match_hyp; inv SEQ.
+                                            break_match_hyp; inv H0.
+                                            cbn in *.
+                                            subst.
+                                            eauto.
+                                      Qed.
+
+                                      (* TODO: Move this *)
+                                      Lemma sequence_oom_nth' :
+                                        forall {A : Type} (l : list (OOM A)) (res : list A),
+                                          Monads.sequence l = ret res -> forall n x, Util.Nth res n x <-> Util.Nth l n (NoOom x).
+                                      Proof.
+                                        intros A l.
+                                        induction l; intros res SEQ n x.
+                                        - cbn in *.
+                                          inv SEQ.
+                                          split; intros NTH;
+                                          rewrite Util.nth_error_nil in NTH; inv NTH.
+                                        - generalize dependent x.
+                                          induction n; intros x.
+                                          + cbn in *.
+                                            split; intros NTH.
+                                            * break_match_hyp; inv NTH.
+                                              break_match_hyp; inv SEQ.
+                                              break_match_hyp; inv H0.
+                                              unfold id in Heqo; subst.
+                                              reflexivity.
+                                            * break_match_hyp; inv SEQ.
+                                              break_match_hyp; inv H0.
+                                              unfold id in Heqo; subst.
+                                              inv NTH.
+                                              reflexivity.
+                                          + cbn in SEQ.
+                                            break_match_hyp; inv SEQ.
+                                            break_match_hyp; inv H0.
+                                            cbn in *.
+                                            subst.
+                                            eauto.
+                                      Qed.
+
+                                      pose proof sequence_oom_nth' _ _ Heqo.
+                                      specialize (H1 i x) as [NTH1x NTH2x].
+                                      specialize (NTH1x NTHx).
+
+                                      pose proof (map_monad_err_Nth _ _ _ _ _ HMAPM' NTH1x).
+                                      destruct H1 as (x_ip & X_IP & NTHxip).
+                                      inv X_IP.
+
+                                      induction i.
+                                      + cbn in *.
+                                        destruct l2; inv NTHx.
+                                        inv NTHy.
+                                        destruct y as [y_ptr y_prov].
+                                        destruct lb; inv NTHxip.
+                                        destruct l1; inv NTH1x.
+
+                                        pose proof MemoryBigIntptr.MMEP.MemSpec.MemHelpers.intptr_seq_nth 0 n (x_ip :: lb) 0 x_ip SEQ_BIG eq_refl as X_IP0.
+                                        erewrite FiniteIntptr.BigIP.from_Z_to_Z; eauto.
+                                        replace ((LLVMParamsBigIntptr.PTOI.ptr_to_int a' +
+                                                    Z.of_N (LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp (DTYPE_I 8)) * (0 + Z.of_nat 0))%Z) with (LLVMParamsBigIntptr.PTOI.ptr_to_int a') by lia.
+                                        destruct a' as [a'_ptr a'_prov]; cbn.
+
+                                        rewrite map_monad_unfold in HMAPM'.
+                                        cbn in HMAPM'.
+                                        break_match_hyp; inv HMAPM'.
+
+                                        pose proof HMAPM as HMAPM2.
+                                        apply map_monad_err_cons_inv in HMAPM2.
+                                        destruct HMAPM2 as (?&?&?); subst.
+
+                                        rewrite map_monad_unfold in HMAPM.
+                                        cbn in HMAPM.
+                                        break_match_hyp; inv HMAPM.
+                                        clear NTH2x.
+ 
+                                        pose proof HMAPM' as HMAPM''.
+                                        apply map_monad_err_cons_inv in HMAPM''.
+                                        destruct HMAPM'' as (?&?&?).
+                                        inv H1.
+                                        clear NTH2x.
+
+                                        rename a into blah.
+                                        
+                                        (* Right hand side is literally a'... *)
+                                        assert (((LLVMParamsBigIntptr.PTOI.ptr_to_int a' +
+                                                    Z.of_N (LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp (DTYPE_I 8)) * LLVMParamsBigIntptr.IP.to_Z x_ip)%Z,
+                                                  LLVMParamsBigIntptr.PROV.address_provenance a') = a').
+                                        { destruct a'. cbn.
+                                          
+                                        }
+
+
+InfToFinAddrConvert.addr_convert_injective:
+  forall (a b : InfAddr.addr) (c : FinAddr.addr),
+  InfToFinAddrConvert.addr_convert a = NoOom c ->
+  InfToFinAddrConvert.addr_convert b = NoOom c -> a = b
+
+                                        rename y into blah.
+
+                                      pose proof sequence_oom_nth' _ _ Heqo.
+
+                                      pose proof HMAPM.
+                                      apply map_monad_err_cons_inv in HMAPM as (?&?&?); subst.
+                                      inversion ALL; subst.
+
+                                      apply map_monad_err_cons in HMAPM' as (?&?&?); subst.
+                                      apply sequence_oom_cons in Heqo as (?&?&?); subst.
+
+                                      induction i.
+                                      + cbn in *.
+                                        inv NTHy; inv NTHx.
+
+                                        rename x into blah.
+                                      
+                                    admit.
+                                  }
+
+                                  epose proof (Util.Forall2_forall eq ys l2).
+                                  destruct H as [_ H].
+                                  forward H.
+                                  { split.
+                                    - (* Length *)
+                                      (* TODO: Use a hint DB for this? *)
+                                      (* Hint Resolve sequence_OOM_length map_monad_err_length Memory64BitIntptr.MMEP.MemSpec.MemHelpers.intptr_seq_len MemoryBigIntptr.MMEP.MemSpec.MemHelpers.intptr_seq_len Util.Forall2_length : LENGTH. *)
+                                      (* Hint Extern 0 => lia : LENGTH. *)
+                                      
+                                      apply sequence_OOM_length in Heqo, Heqo0.
+                                      apply map_monad_err_length in HMAPM', HMAPM.
+                                      apply Memory64BitIntptr.MMEP.MemSpec.MemHelpers.intptr_seq_len in SEQ.
+                                      apply MemoryBigIntptr.MMEP.MemSpec.MemHelpers.intptr_seq_len in SEQ_BIG.
+                                      apply Util.Forall2_length in ALL.
+                                      apply Util.Forall2_length in ADDRS.
+                                      lia.
+                                    - intros i a0 b NTHys NTHls.
+                                      eauto.                                      
+                                  }
+
+                                  clear - H.
+                                  induction H; subst; auto.
+                                }
+
+
+                                  
+                                  eapply Util.Forall2_Nth.
+                                  apply Forall2
+
+                                  induction ADDRS.
+                                  - apply sequence_OOM_length in Heqo0.
+                                    cbn in *.
+                                    apply length_zero_iff_nil in Heqo0; subst.
+                                    apply map_monad_err_nil_inv in HMAPM; subst.
+                                    inversion ALL; subst.
+
+                                    apply map_monad_err_nil in HMAPM'; subst.
+                                    cbn in *.
+                                    inv Heqo.
+                                    auto.
+                                  - pose proof Heqo0.
+                                    apply sequence_oom_cons_inv in Heqo0.
+                                    destruct Heqo0 as (x'&xs&Heqo0).
+                                    subst.
+
+                                    apply map_monad_err_cons_inv in HMAPM.
+                                    destruct HMAPM as (?&?&?); subst.
+
+                                    inversion ALL; subst.
+                                    pose proof HMAPM'.
+                                    apply map_monad_err_cons in HMAPM'.
+                                    destruct HMAPM' as (?&?&?); subst.
+
+                                    cbn in Heqo.
+
+                                    break_match_hyp; inv Heqo.
+                                    break_match_hyp; inv H4.
+                                    apply 
+
+                                }
+
+                                (* TODO: Move this *)
+                                Lemma sequence_noom :
+                                  forall {X} (l : list (OOM X)),
+                                    Forall (fun x => exists y, x = NoOom y) l ->
+                                    exists l', Monads.sequence l = NoOom l'.
+                                Proof.
+                                  
+                                Abort.
+
+                                apply map_monad_err_forall2 in HMAPM'.
+                                red.
+                                break_match_goal.
+                                cbn.
+                                2: {
+                                  (* Heqo should end up being a contradiction *)
+                                  admit.
+                                }
+                                split; auto.
+
+                                (* ys is related to xs...
+                                   xs is related to l0
+                                 *)
+
+                                Set Printing Implicit.
+                                assert (map_monad
+                                  (fun ix : LLVMParamsBigIntptr.IP.intptr =>
+                                     inr
+                                       (LLVMParamsBigIntptr.ITOP.int_to_ptr
+                                          (LLVMParamsBigIntptr.PTOI.ptr_to_int a' +
+                                             Z.of_N (LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp (DTYPE_I 8)) *
+                                               LLVMParamsBigIntptr.IP.to_Z ix) (LLVMParamsBigIntptr.PROV.address_provenance a')))
+                                    lb = inr y).
+                                
+                                exists ms_x.
+                                
+                              Admitted.
+
+                              (* TODO: Need lemmas for read_bytes_spec and write_bytes_spec... *)
+                              Lemma fin_inf_read_bytes_spec :
+                                forall a a' n ms ms' x y,
+                                  InfToFinAddrConvert.addr_convert a' = NoOom a ->
+                                  Memory64BitIntptr.MMEP.MemSpec.read_bytes_spec a n ms x ->
+                                  MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec a' n ms' y.
+                              Proof.
+                                intros a a' n ms ms' x y ACONV READ.
+                                red.
+                                red in READ.
+                              Admitted.
+
+                              cbn in HANDLER.
+                              
+                                
+                                destruct_err_ub_oom x.
+                              Unset Printing Notations.
+                              Set Printing Implicit.
+
+(@Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs
+              (MemPropT Memory64BitIntptr.MMEP.MMSP.MemState)
+              (@MemPropT_Monad Memory64BitIntptr.MMEP.MMSP.MemState)
+              (@MemPropT_RAISE_OOM Memory64BitIntptr.MMEP.MMSP.MemState)
+              (@MemPropT_RAISE_ERROR Memory64BitIntptr.MMEP.MMSP.MemState) a n)
+
+    (@MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs
+       (MemPropT MemoryBigIntptr.MMEP.MMSP.MemState)
+       (@MemPropT_Monad MemoryBigIntptr.MMEP.MMSP.MemState)
+       (@MemPropT_RAISE_OOM MemoryBigIntptr.MMEP.MMSP.MemState)
+       (@MemPropT_RAISE_ERROR MemoryBigIntptr.MMEP.MMSP.MemState) a' n)
+                              Lemma fin_inf_get_consecutive_ptrs :
+                                forall a a' n ms ms' x y,
+                                  InfToFinAddrConvert.addr_convert a' = NoOom a ->
+                                  Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a n ms x->
+                                  MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a' n ms' y.
+
+  READ : (ptrs <- Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a n;;
+          map_monad
+            (fun ptr : LLVMParams64BitIntptr.ADDR.addr =>
+             Memory64BitIntptr.MMEP.MemSpec.read_byte_spec_MemPropT ptr) ptrs) ms
+           (OOM_unERR_UB_OOM oom_x)
+  ub_x : string
+  Hx0 : y = UB_unERR_UB_OOM ub_x
+  ============================
+  (ptrs <- MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a' n;;
+
+                                - destruct_err_ub_oom y.
+                                  + admit.
+                                  + cbn in *.
+                                cbn in *.
+                                destruct x.
+                              Qed.
+
+                              cbn.
+                                .
+                              
+
+                              - (* Negative length UB in finite case *)
+                                cbn in *.
+                                rewrite DVCInfFin.dvalue_convert_strict_equation in H1.
+                                destruct x1; inversion H1; try solve [ break_match_hyp; inv H5 ].
+                                break_match_hyp; inv H5.
+                                (* TODO: silly intptr reasoning... *)
+                                red.
+                                setoid_rewrite (IP.to_Z_from_Z x1). in Heqo.
+                                unfold DVCInfFin.dvalue_convert_strict in H1.
+                                red in H2.
+                                break_match_goal.
+                                + admit.
+                                + cbn in *.
+                                  
                               admit.
                             }
                           - unfold fin_to_inf_dvalue.
