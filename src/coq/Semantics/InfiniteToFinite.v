@@ -3216,7 +3216,165 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                             split; reflexivity.
                       Qed.
 
+                      Lemma fin_inf_read_byte_raw :
+                        forall m_inf m_fin ptr b_fin b_inf aid,
+                          convert_memory m_inf = NoOom m_fin ->
+                          Memory64BitIntptr.MMEP.MMSP.read_byte_raw
+                            m_fin
+                            ptr = Some (b_fin, aid) ->
+                          MemoryBigIntptr.MMEP.MMSP.read_byte_raw
+                            m_inf
+                            ptr = Some (b_inf, aid).
+                      Proof.
+                        intros m_inf m_fin ptr b_fin b_inf aid CONV READ.
+                        Transparent Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
+                        Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+                        unfold Memory64BitIntptr.MMEP.MMSP.read_byte_raw in READ.
+                        unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+
+                        cbn in CONV.
+                        break_match_hyp; inv CONV.
+
+                        Opaque Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
+                        Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+                      Admitted.
+
+                      (* TODO: Maybe swap MemState for memory_stack to get rid of MemState_get_memory *)
+                      Lemma fin_inf_addr_allocated_prop :
+                        forall addr_fin addr_inf ms_fin ms_inf aid,
+                          convert_memory_stack ms_inf = NoOom ms_fin ->
+                          InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+                          Memory64BitIntptr.MMEP.MMSP.addr_allocated_prop addr_fin aid
+                            ms_fin
+                            (success_unERR_UB_OOM (ms_fin, true)) ->
+                          MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop addr_inf aid
+                            ms_inf
+                            (success_unERR_UB_OOM (ms_inf, true)).
+                      Proof.
+                        intros addr_fin addr_inf ms_fin ms_inf aid MSR ADDR_CONV ALLOCATED.
+                        cbn in *.
+                        destruct ALLOCATED as [mst_fin [mst_fin' [[MST MST'] ALLOCATED]]]; subst.
+                        exists ms_inf.
+                        exists ms_inf.
+                        split; auto.
+                        break_match_hyp; cbn in *.
+                        2: {
+                          destruct ALLOCATED.
+                          discriminate.
+                        }
+
+                        destruct m.
+                        destruct ms_inf, mst_fin.
+                        Opaque convert_memory.
+                        cbn in *.
+                        break_match_hyp; inv MSR.
+                        break_match_hyp; inv H0.
+                        break_match_hyp; inv H1.
+                        break_match_hyp; inv Heqo2.
+
+                        eapply fin_inf_read_byte_raw in Heqo; eauto.
+                        erewrite fin_inf_ptoi in Heqo; eauto.
+                        rewrite Heqo.
+
+                        destruct ALLOCATED.
+                        split; auto.
+
+                        destruct (LLVMParams64BitIntptr.PROV.aid_eq_dec aid a); cbn in *; try discriminate; subst.
+                        destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec a a); cbn in *; try contradiction; auto.
+                        Unshelve.
+                        constructor.
+                        exact LLVMParamsBigIntptr.Events.DV.UVALUE_None.
+                        exact DTYPE_Void.
+                        exact LLVMParamsBigIntptr.Events.DV.UVALUE_None.
+                        exact 0.
+                      Qed.
+
+                      Lemma fin_inf_byte_allocated_MemPropT :
+                        forall addr_fin addr_inf ms_fin ms_inf aid,
+                          MemState_refine ms_inf ms_fin ->
+                          InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+                          Memory64BitIntptr.MMEP.MemSpec.byte_allocated_MemPropT addr_fin aid ms_fin (ret (ms_fin, tt)) ->
+                          MemoryBigIntptr.MMEP.MemSpec.byte_allocated_MemPropT addr_inf aid ms_inf (ret (ms_inf, tt)).
+                      Proof.
+                        intros addr_fin addr_inf ms_fin ms_inf aid MSR ADDR_CONV ALLOCATED.
+                        red; red in ALLOCATED.
+                        Opaque Memory64BitIntptr.MMEP.MMSP.addr_allocated_prop.
+                        Opaque MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop.
+                        cbn in *.
+                        destruct ALLOCATED as [ms_fin' [res [ALLOCATED [MS RES]]]]; subst.
+                        exists ms_inf. exists true.
+                        split; auto.
+                        red.
+                        destruct ALLOCATED.
+                        split.
+                        - eapply fin_inf_addr_allocated_prop; eauto.
+                          admit.
+                          admit.
+                        - intros ms' x H1.
+                          cbn in *.
+                          inv H1.
+                          auto.
+                      Qed.
+
+
+
+                      Lemma fin_inf_byte_allocated :
+                        forall addr_fin addr_inf ms_fin ms_inf aid,
+                          MemState_refine ms_inf ms_fin ->
+                          InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+                          Memory64BitIntptr.MMEP.MemSpec.byte_allocated ms_fin addr_fin aid ->
+                          MemoryBigIntptr.MMEP.MemSpec.byte_allocated ms_inf addr_inf aid.
+                      Proof.
+                        intros addr_fin addr_inf ms_fin ms_inf aid MSR ADDR_CONV ALLOCATED.
+                        red; red in ALLOCATED.
+                      Qed.
+
+                      Lemma fin_inf_read_byte_allowed :
+                        forall addr_fin addr_inf ms_fin ms_inf,
+                          MemState_refine ms_inf ms_fin ->
+                          InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+                          Memory64BitIntptr.MMEP.MemSpec.read_byte_allowed ms_fin addr_fin ->
+                          MemoryBigIntptr.MMEP.MemSpec.read_byte_allowed ms_inf addr_inf.
+                      Proof.
+                        intros addr_fin addr_inf ms_fin ms_inf MSR ADDR_CONV READ_ALLOWED.
+                        red. red in READ_ALLOWED.
+
+                        destruct READ_ALLOWED as [aid [BYTE_ALLOCATED ACCESS_ALLOWED]].
+                        exists aid.
+                        split.
+                        - 
+                      Qed.
+
+                      Lemma fin_inf_read_byte_spec :
+                        forall addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf,
+                          MemState_refine ms_inf ms_fin ->
+                          InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+                          Memory64BitIntptr.MMEP.MemSpec.read_byte_spec ms_fin addr_fin byte_fin->
+                          MemoryBigIntptr.MMEP.MemSpec.read_byte_spec ms_inf addr_inf byte_inf.
+                      Proof.
+                        intros addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf MSR ADDR_CONV READ_SPEC.
+                        destruct READ_SPEC.
+                        split.
+                        - 
+                      Qed.
+
+                      Lemma fin_inf_read_byte_spec_MemPropT :
+                        forall addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf,
+                          MemState_refine ms_inf ms_fin ->
+                          InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+                          Memory64BitIntptr.MMEP.MemSpec.read_byte_spec_MemPropT addr_fin ms_fin (success_unERR_UB_OOM (ms_fin, byte_fin)) ->
+                          MemoryBigIntptr.MMEP.MemSpec.read_byte_spec_MemPropT addr_inf ms_inf (success_unERR_UB_OOM (ms_inf, byte_inf)).
+                      Proof.
+                        intros addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf MSR ADDR_CONV READ_SPEC.
+                        red. cbn.
+                        split; auto.
+                        red in READ_SPEC. cbn in READ_SPEC.
+                        destruct READ_SPEC.
+                        eapply fin_inf_read_byte_spec; eauto.
+                      Qed.
+
                       (* TODO: need to relate bytes_fin and bytes_inf *)
+                      (* Will need ms_fin and ms_inf to be related as well *)
                       Lemma fin_inf_read_bytes_spec :
                         forall a_fin a_inf n ms_fin ms_inf bytes_fin bytes_inf,
                           InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
@@ -3232,7 +3390,9 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                         cbn in *.
                         destruct READ_SPEC as (ms_fin' & addrs_fin & CONSEC & READ_SPEC).
                         exists ms_inf.
-                        pose proof fin_inf_get_consecutive_ptrs_success a_fin a_inf n ms_fin ms_fin' addrs_fin ms_inf _ ADDR_CONV.
+                        pose proof fin_inf_get_consecutive_ptrs_success_exists a_fin a_inf n ms_fin ms_fin' addrs_fin ms_inf ADDR_CONV CONSEC as (addrs_inf & GCP).
+                        exists addrs_inf.
+                        split; auto.
                       Qed.
 
                       (* TODO: Lemma about lifting intrinsic handlers *)
