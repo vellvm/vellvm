@@ -3289,6 +3289,20 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                         exact 0.
                       Qed.
 
+                      Lemma MemState_refine_convert_memory_stack :
+                        forall ms_inf ms_fin,
+                          MemState_refine ms_inf ms_fin ->
+                          convert_memory_stack (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf) = NoOom (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin).
+                      Proof.
+                        intros ms_inf ms_fin REF.
+                        destruct ms_inf; cbn in *.
+                        unfold MemState_refine in REF.
+                        cbn in *.
+                        break_match_hyp; inv REF.
+                        cbn.
+                        reflexivity.
+                      Qed.
+
                       Lemma fin_inf_byte_allocated_MemPropT :
                         forall addr_fin addr_inf ms_fin ms_inf aid,
                           MemState_refine ms_inf ms_fin ->
@@ -3308,15 +3322,14 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                         destruct ALLOCATED.
                         split.
                         - eapply fin_inf_addr_allocated_prop; eauto.
-                          admit.
-                          admit.
+                          + eapply MemState_refine_convert_memory_stack; eauto.
+                          + destruct ms_fin. cbn in *.
+                            eauto.
                         - intros ms' x H1.
                           cbn in *.
                           inv H1.
                           auto.
                       Qed.
-
-
 
                       Lemma fin_inf_byte_allocated :
                         forall addr_fin addr_inf ms_fin ms_inf aid,
