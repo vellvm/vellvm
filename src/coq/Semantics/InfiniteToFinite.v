@@ -3288,7 +3288,43 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                             intros ms x.
                             split.
                             - intros GCP'.
-                              admit.
+                              cbn.
+                              destruct_err_ub_oom x.
+                              + (* Contradiction *)
+                                admit.
+                              + (* Contradiction *)
+                                admit.
+                              + (* Contradiction *)
+                                admit.
+                              + destruct x0.
+                                inv Hx.
+                                (* Should be able to conclude this with a mix of GCP' and GCP *)
+                                cbn in *.
+                                destruct GCP' as [ms' [a [SEQ_FIN GCP']]].
+                                red in SEQ_FIN.
+                                break_match_hyp; inv SEQ_FIN.
+                                destruct GCP' as [sab [a [GCP' SEQ_FIN]]].
+
+                                red in SEQ_FIN.
+                                break_match_hyp; inv SEQ_FIN.
+
+                                red in GCP'.
+                                break_match_hyp; inv GCP'.
+                                split; auto.
+
+                                destruct GCP as [ms' [a [[MS L] GCP]]].
+                                subst.
+                                destruct GCP as [ms' [a [GCP SEQ]]].
+                                red in GCP.
+                                break_match_hyp; inv GCP.
+                                red in SEQ.
+                                break_match_hyp; inv SEQ.
+
+                                clear H0 H.
+                                inv Heqs.
+                                rewrite Heqo1 in Heqo0.
+                                inv Heqo0.
+                                reflexivity.
                             - intros RET.
                               cbn in RET.
                               destruct_err_ub_oom x; try inv RET.
