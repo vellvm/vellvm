@@ -3291,11 +3291,101 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                               cbn.
                               destruct_err_ub_oom x.
                               + (* Contradiction *)
-                                admit.
+                                cbn in GCP'.
+                                clear H0.
+                                cbn in GCP.
+                                move GCP after GCP'.
+                                destruct GCP as [ms' [a [SEQ GCP]]].
+                                red in SEQ.
+                                break_match_hyp; inv SEQ.
+
+                                destruct GCP'.
+                                cbn in H0; auto.
+
+                                destruct H0 as [sab [a [[MS LA] GCP']]].
+                                subst.
+
+                                destruct GCP as [ms' [a [GCP SEQ_FIN]]].
+                                red in GCP.
+                                break_match_hyp; inv GCP.
+                                rename Heqs into GCP.
+
+                                red in SEQ_FIN.
+                                break_match_hyp; inv SEQ_FIN.
+
+                                destruct GCP' as [GCP' | GCP'];
+                                  cbn in *; auto.
+
+                                destruct GCP' as [sab [a [[MS LA] SEQ]]].
+                                subst.
+
+                                rewrite Heqo0 in SEQ.
+                                cbn in SEQ.
+                                auto.
                               + (* Contradiction *)
-                                admit.
+                                cbn in GCP'.
+                                clear H0.
+                                cbn in GCP.
+                                move GCP after GCP'.
+                                destruct GCP as [ms' [a [SEQ GCP]]].
+                                red in SEQ.
+                                break_match_hyp; inv SEQ.
+
+                                destruct GCP'.
+                                cbn in H0; auto.
+
+                                destruct H0 as [sab [a [[MS LA] GCP']]].
+                                subst.
+
+                                destruct GCP as [ms' [a [GCP SEQ_FIN]]].
+                                red in GCP.
+                                break_match_hyp; inv GCP.
+                                rename Heqs into GCP.
+
+                                red in SEQ_FIN.
+                                break_match_hyp; inv SEQ_FIN.
+
+                                destruct GCP' as [GCP' | GCP'];
+                                  cbn in *; auto.
+
+                                destruct GCP' as [sab [a [[MS LA] SEQ]]].
+                                subst.
+
+                                rewrite Heqo0 in SEQ.
+                                cbn in SEQ.
+                                auto.
                               + (* Contradiction *)
-                                admit.
+cbn in GCP'.
+                                clear H0.
+                                cbn in GCP.
+                                move GCP after GCP'.
+                                destruct GCP as [ms' [a [SEQ GCP]]].
+                                red in SEQ.
+                                break_match_hyp; inv SEQ.
+
+                                destruct GCP'.
+                                cbn in H0; auto.
+
+                                destruct H0 as [sab [a [[MS LA] GCP']]].
+                                subst.
+
+                                destruct GCP as [ms' [a [GCP SEQ_FIN]]].
+                                red in GCP.
+                                break_match_hyp; inv GCP.
+                                rename Heqs into GCP.
+
+                                red in SEQ_FIN.
+                                break_match_hyp; inv SEQ_FIN.
+
+                                destruct GCP' as [GCP' | GCP'];
+                                  cbn in *; auto.
+
+                                destruct GCP' as [sab [a [[MS LA] SEQ]]].
+                                subst.
+
+                                rewrite Heqo0 in SEQ.
+                                cbn in SEQ.
+                                auto.
                               + destruct x0.
                                 inv Hx.
                                 (* Should be able to conclude this with a mix of GCP' and GCP *)
