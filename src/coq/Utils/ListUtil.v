@@ -9,7 +9,8 @@ Require Import Coq.Logic.ProofIrrelevance.
 From Vellvm.Utils Require Import
   Error
   Util
-  Monads.
+  Monads
+  Tactics.
 
 From ExtLib Require Import
   Structures.Monads.
@@ -211,6 +212,26 @@ Proof.
         rewrite proof_irrelevance at 1.
         rewrite proof_irrelevance at 1.
         eauto.
+Qed.
+
+Lemma Forall2_map_eq :
+  forall {A B} (f : A -> B) l1 l2,
+    Forall2 (fun a b => f a = b) l1 l2 ->
+    map f l1 = l2.
+Proof.
+  intros A B f l1 l2 ALL.
+  induction ALL; auto.
+  rewrite map_cons.
+  congruence.
+Qed.
+
+Lemma Forall2_flip :
+  forall {A B} (P : A -> B -> Prop) l1 l2,
+    Forall2 P l1 l2 <-> Forall2 (flip P) l2 l1.
+Proof.
+  intros A B f l1 l2.
+  split; intros ALL;
+    induction ALL; auto.
 Qed.
 
 Lemma list_sum_map :
@@ -1068,3 +1089,24 @@ Fixpoint InT {A} (a:A) (l:list A) : Type :=
   | [] => FalseT
   | b :: m => (b = a) + (InT a m)
   end.
+
+Lemma Nth_eq :
+  forall {X} xs1 xs2,
+    (forall (i : nat) (a b : X), Util.Nth xs1 i a -> Util.Nth xs2 i b -> a = b) ->
+    Datatypes.length xs1 = Datatypes.length xs2 ->
+    xs1 = xs2.
+Proof.
+  intros X xs1.
+  induction xs1, xs2; intros NTHEQ LEN; auto.
+  - inversion LEN.
+  - inversion LEN.
+  - cbn in *.
+    pose proof (NTHEQ 0%nat a x).
+    forward H; auto.
+    forward H; auto.
+    subst.
+
+    erewrite IHxs1; eauto.
+    intros i a b H H0.
+    apply NTHEQ with (i:=S i); cbn; auto.
+Qed.

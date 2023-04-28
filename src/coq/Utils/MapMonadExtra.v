@@ -1180,3 +1180,101 @@ Proof.
     cbn.
     auto.
 Qed.
+
+Lemma map_monad_oom_length :
+  forall {A B} l (f : A -> OOM B) res,
+    map_monad f l = NoOom res ->
+    length l = length res.
+Proof.
+  intros A B l.
+  induction l; intros f res H.
+  - rewrite map_monad_oom_nil in H; subst; auto.
+  - rewrite map_monad_unfold in H.
+    cbn in *.
+    break_match_hyp; inv H.
+    break_match_hyp; inv H1.
+    apply IHl in Heqo0.
+    cbn.
+    auto.
+Qed.
+
+Lemma map_monad_err_nil_inv :
+  forall {A B} (f : A -> err B) l,
+    map_monad f l = inr [] ->
+    l = [].
+Proof.
+  intros A B f l H.
+  induction l; cbn; auto.
+  cbn in H.
+  break_match_hyp; inv H.
+  break_match_hyp; inv H1.
+Qed.
+
+Lemma map_monad_err_cons :
+  forall {A B} (f : A -> err B) x xs res,
+    map_monad f (x :: xs) = inr res ->
+    exists b bs, res = b :: bs.
+Proof.
+  intros A B f x xs res H.
+  cbn in H.
+  break_match_hyp; inv H.
+  break_match_hyp; inv H1.
+  exists b. exists l.
+  reflexivity.
+Qed.
+
+Lemma map_monad_err_cons_inv :
+  forall {A B} (f : A -> err B) b bs l,
+    map_monad f l = inr (b :: bs) ->
+    exists x xs, l = x :: xs.
+Proof.
+  intros A B f b bs l H.
+  induction l; cbn in *.
+  - inv H.
+  - break_match_hyp; inv H.
+    break_match_hyp; inv H1.
+    exists a. exists l.
+    reflexivity.
+Qed.
+
+(* TODO: can I generalize this? *)
+Lemma map_monad_oom_succeeds :
+  forall {A B} (f : A -> OOM B) l,
+    (forall a, In a l -> exists b, f a = ret b) ->
+    exists res, map_monad f l = ret res.
+Proof.
+  intros A B f l IN.
+  generalize dependent l.
+  induction l; intros IN.
+  - exists [].
+    reflexivity.
+  - cbn.
+    forward IHl.
+    { intros a0 IN'.
+      eapply IN.
+      right; auto.
+    }
+
+    specialize (IN a).
+    forward IN; cbn; auto.
+    destruct IN as (b & IN).
+    destruct IHl as (res & IHl).
+
+    exists (b :: res).
+    rewrite IHl, IN.
+    cbn.
+    reflexivity.
+Qed.
+
+Lemma map_monad_oom_In :
+  forall {A B : Type} (f : A -> OOM B) (l : list A) (res : list B) (x : B),
+    map_monad f l = ret res ->
+    In x res -> exists y : A, f y = ret x /\ In y l.
+Proof.
+  intros A B f l res x HMAPM IN.
+  pose proof In_Nth _ _ IN as (n&NTH).
+  pose proof map_monad_OOM_Nth _ _ _ _ _ HMAPM NTH as (y&FY&NTHy).
+  exists y.
+  split; auto.
+  eapply Util.Nth_In; eauto.
+Qed.

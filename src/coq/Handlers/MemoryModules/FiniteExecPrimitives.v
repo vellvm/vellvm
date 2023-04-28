@@ -3925,6 +3925,24 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         cbn in *; tauto.
     Qed.
 
+    Lemma get_consecutive_ptrs_MemPropT_MemState_eq :
+      forall ptr len ptrs ms1 ms2 ,
+        (@get_consecutive_ptrs (MemPropT MemState) (@MemPropT_Monad MemState) (@MemPropT_RAISE_OOM MemState)
+           (@MemPropT_RAISE_ERROR MemState) ptr len ms1 (ret (ms2, ptrs))) ->
+        ms1 = ms2.
+    Proof.
+      intros ptr len ptrs ms1 ms2 CONSEC.
+      cbn in *.
+      destruct CONSEC as [ms' [ixs [SEQ MAPM]]].
+      destruct (intptr_seq 0 len) eqn:HSEQ; cbn in SEQ; inv SEQ.
+      cbn.
+      destruct (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) eqn:HMAPM; cbn in *.
+      destruct MAPM as [_ [_ [[] _]]].
+      destruct MAPM as [sab [a [[EQSAB EQA] SEQUENCE]]]; subst.
+      destruct (Monads.sequence l0) eqn:HSEQUENCE;
+        cbn in *; inv SEQUENCE; auto.
+    Qed.
+
     Lemma get_consecutive_ptrs_MemPropT_eq1 :
       forall ptr len ptrs ms1,
         (@get_consecutive_ptrs (MemPropT MemState) (@MemPropT_Monad MemState) (@MemPropT_RAISE_OOM MemState)

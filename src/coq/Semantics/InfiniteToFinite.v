@@ -2231,28 +2231,6 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                       setoid_rewrite bind_trigger.
                       pstep; red; cbn.
 
-                      (* TODO: move this *)
-                      Lemma Forall2_map_eq :
-                        forall {A B} (f : A -> B) l1 l2,
-                          Forall2 (fun a b => f a = b) l1 l2 ->
-                          map f l1 = l2.
-                      Proof.
-                        intros A B f l1 l2 ALL.
-                        induction ALL; auto.
-                        rewrite map_cons.
-                        congruence.
-                      Qed.
-
-                      (* TODO: move this *)
-                      Lemma Forall2_flip :
-                        forall {A B} (P : A -> B -> Prop) l1 l2,
-                          Forall2 P l1 l2 <-> Forall2 (flip P) l2 l1.
-                      Proof.
-                        intros A B f l1 l2.
-                        split; intros ALL;
-                          induction ALL; auto.
-                      Qed.
-
                       pose proof (fin_to_inf_uvalue_refine_strict' _ _ F).
                       rewrite <- H.
 
@@ -2706,175 +2684,6 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                             eapply fin_inf_from_Z_to_Z; eauto.
                       Qed.
 
-                      Lemma Nth_eq :
-                        forall {X} xs1 xs2,
-                          (forall (i : nat) (a b : X), Util.Nth xs1 i a -> Util.Nth xs2 i b -> a = b) ->
-                          Datatypes.length xs1 = Datatypes.length xs2 ->
-                          xs1 = xs2.
-                      Proof.
-                        intros X xs1.
-                        induction xs1, xs2; intros NTHEQ LEN; auto.
-                        - inv LEN.
-                        - inv LEN.
-                        - cbn in *.
-                          pose proof (NTHEQ 0%nat a x).
-                          forward H; auto.
-                          forward H; auto.
-                          subst.
-
-                          erewrite IHxs1; eauto.
-                          intros i a b H H0.
-                          apply NTHEQ with (i:=S i); cbn; auto.
-                      Qed.
-
-                      (* TODO: Move this *)
-                      Lemma map_monad_oom_length :
-                        forall {A B} l (f : A -> OOM B) res,
-                          map_monad f l = NoOom res ->
-                          length l = length res.
-                      Proof.
-                        intros A B l.
-                        induction l; intros f res H.
-                        - rewrite map_monad_oom_nil in H; subst; auto.
-                        - rewrite map_monad_unfold in H.
-                          cbn in *.
-                          break_match_hyp; inv H.
-                          break_match_hyp; inv H1.
-                          apply IHl in Heqo0.
-                          cbn.
-                          auto.
-                      Qed.
-
-                      (* TODO: Move this *)
-                      Lemma map_monad_err_nil_inv :
-                        forall {A B} (f : A -> err B) l,
-                          map_monad f l = inr [] ->
-                          l = [].
-                      Proof.
-                        intros A B f l H.
-                        induction l; cbn; auto.
-                        cbn in H.
-                        break_match_hyp; inv H.
-                        break_match_hyp; inv H1.
-                      Qed.
-
-                      (* TODO: Move this *)
-                      Lemma map_monad_err_cons :
-                        forall {A B} (f : A -> err B) x xs res,
-                          map_monad f (x :: xs) = inr res ->
-                          exists b bs, res = b :: bs.
-                      Proof.
-                        intros A B f x xs res H.
-                        cbn in H.
-                        break_match_hyp; inv H.
-                        break_match_hyp; inv H1.
-                        exists b. exists l.
-                        reflexivity.
-                      Qed.
-
-                      (* TODO: Move this *)
-                      Lemma map_monad_err_cons_inv :
-                        forall {A B} (f : A -> err B) b bs l,
-                          map_monad f l = inr (b :: bs) ->
-                          exists x xs, l = x :: xs.
-                      Proof.
-                        intros A B f b bs l H.
-                        induction l; cbn in *.
-                        - inv H.
-                        - break_match_hyp; inv H.
-                          break_match_hyp; inv H1.
-                          exists a. exists l.
-                          reflexivity.
-                      Qed.
-
-                      (* TODO: Move this *)
-                      Lemma sequence_oom_cons_inv :
-                        forall {B} (b : B) bs l,
-                          Monads.sequence l = NoOom (b :: bs) ->
-                          exists x xs, l = x :: xs.
-                      Proof.
-                        intros B b bs l H.
-                        induction l; cbn in *.
-                        - inv H.
-                        - break_match_hyp; inv H.
-                          break_match_hyp; inv H1.
-                          exists a. exists l.
-                          reflexivity.
-                      Qed.
-
-                      (* TODO: Move this *)
-                      Lemma sequence_oom_cons :
-                        forall {B} (x : OOM B) xs res,
-                          Monads.sequence (x :: xs) = NoOom res ->
-                          exists b bs, res = b :: bs.
-                      Proof.
-                        intros B x xs res H.
-                        cbn in *.
-                        break_match_hyp; inv H.
-                        break_match_hyp; inv H1.
-                        exists b. exists l.
-                        reflexivity.
-                      Qed.
-
-                      (* TODO: Move this *)
-                      Lemma sequence_oom_nth :
-                        forall {A : Type} (l : list (OOM A)) (res : list A) (x : A) (n : nat),
-                          Monads.sequence l = ret res -> Util.Nth res n x -> Util.Nth l n (NoOom x).
-                      Proof.
-                        intros A l.
-                        induction l; intros res x n SEQ NTH.
-                        - cbn in *.
-                          inv SEQ.
-                          rewrite Util.nth_error_nil in NTH; inv NTH.
-                        - generalize dependent x.
-                          induction n; intros x NTH.
-                          + cbn in *.
-                            break_match_hyp; inv NTH.
-                            break_match_hyp; inv SEQ.
-                            break_match_hyp; inv H0.
-                            unfold id in Heqo; subst.
-                            reflexivity.
-                          + cbn in SEQ.
-                            break_match_hyp; inv SEQ.
-                            break_match_hyp; inv H0.
-                            cbn in *.
-                            subst.
-                            eauto.
-                      Qed.
-
-                      (* TODO: Move this *)
-                      Lemma sequence_oom_nth' :
-                        forall {A : Type} (l : list (OOM A)) (res : list A),
-                          Monads.sequence l = ret res -> forall n x, Util.Nth res n x <-> Util.Nth l n (NoOom x).
-                      Proof.
-                        intros A l.
-                        induction l; intros res SEQ n x.
-                        - cbn in *.
-                          inv SEQ.
-                          split; intros NTH;
-                            rewrite Util.nth_error_nil in NTH; inv NTH.
-                        - generalize dependent x.
-                          induction n; intros x.
-                          + cbn in *.
-                            split; intros NTH.
-                            * break_match_hyp; inv NTH.
-                              break_match_hyp; inv SEQ.
-                              break_match_hyp; inv H0.
-                              unfold id in Heqo; subst.
-                              reflexivity.
-                            * break_match_hyp; inv SEQ.
-                              break_match_hyp; inv H0.
-                              unfold id in Heqo; subst.
-                              inv NTH.
-                              reflexivity.
-                          + cbn in SEQ.
-                            break_match_hyp; inv SEQ.
-                            break_match_hyp; inv H0.
-                            cbn in *.
-                            subst.
-                            eauto.
-                      Qed.
-
                       Lemma fin_inf_get_consecutive_ptrs_success :
                         forall a a' n ms ms_x xs ms_y ys,
                           (* TODO: ADDR probably not necessary, can conclude this from ADDRS...
@@ -3134,50 +2943,6 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                         }
 
                         destruct ADDRS_INF as [oaddrs_inf ADDRS_INF].
-
-                        (* TODO: can I generalize this? *)
-                        (* TODO: move this *)
-                        Lemma map_monad_oom_succeeds :
-                          forall {A B} (f : A -> OOM B) l,
-                            (forall a, In a l -> exists b, f a = ret b) ->
-                            exists res, map_monad f l = ret res.
-                        Proof.
-                          intros A B f l IN.
-                          generalize dependent l.
-                          induction l; intros IN.
-                          - exists [].
-                            reflexivity.
-                          - cbn.
-                            forward IHl.
-                            { intros a0 IN'.
-                              eapply IN.
-                              right; auto.
-                            }
-
-                            specialize (IN a).
-                            forward IN; cbn; auto.
-                            destruct IN as (b & IN).
-                            destruct IHl as (res & IHl).
-
-                            exists (b :: res).
-                            rewrite IHl, IN.
-                            cbn.
-                            reflexivity.
-                        Qed.
-
-                        (* TODO: Move this *)
-                        Lemma map_monad_oom_In :
-                          forall {A B : Type} (f : A -> OOM B) (l : list A) (res : list B) (x : B),
-                            map_monad f l = ret res ->
-                            In x res -> exists y : A, f y = ret x /\ In y l.
-                        Proof.
-                          intros A B f l res x HMAPM IN.
-                          pose proof In_Nth _ _ IN as (n&NTH).
-                          pose proof map_monad_OOM_Nth _ _ _ _ _ HMAPM NTH as (y&FY&NTHy).
-                          exists y.
-                          split; auto.
-                          eapply Util.Nth_In; eauto.
-                        Qed.
 
                         pose proof
                           map_monad_oom_succeeds id oaddrs_inf as SEQ.
@@ -3813,15 +3578,25 @@ cbn in GCP'.
                         eapply fin_inf_read_byte_spec; eauto.
                       Qed.
 
+                      (* TODO: move this *)
+                      Definition sbyte_refine byte_inf byte_fin : Prop :=
+                        convert_SByte byte_inf = NoOom byte_fin.
+
+                      (* TODO: move this *)
+                      Definition sbytes_refine bytes_inf bytes_fin : Prop :=
+                        Forall2 sbyte_refine bytes_inf bytes_fin.
+
                       (* TODO: need to relate bytes_fin and bytes_inf *)
                       (* Will need ms_fin and ms_inf to be related as well *)
                       Lemma fin_inf_read_bytes_spec :
                         forall a_fin a_inf n ms_fin ms_inf bytes_fin bytes_inf,
                           InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
+                          MemState_refine ms_inf ms_fin ->
+                          sbytes_refine bytes_inf bytes_fin ->
                           Memory64BitIntptr.MMEP.MemSpec.read_bytes_spec a_fin n ms_fin (success_unERR_UB_OOM (ms_fin, bytes_fin)) ->
                           MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec a_inf n ms_inf (success_unERR_UB_OOM (ms_inf, bytes_inf)).
                       Proof.
-                        intros a_fin a_inf n ms_fin ms_inf bytes_fin bytes_inf ADDR_CONV READ_SPEC.
+                        intros a_fin a_inf n ms_fin ms_inf bytes_fin bytes_inf ADDR_CONV MEM_REF BYTES_REF READ_SPEC.
 
                         (* TODO: Make these opaque earlier *)
                         Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
@@ -3830,15 +3605,92 @@ cbn in GCP'.
                         cbn in *.
                         destruct READ_SPEC as (ms_fin' & addrs_fin & CONSEC & READ_SPEC).
                         exists ms_inf.
-                        pose proof fin_inf_get_consecutive_ptrs_success_exists a_fin a_inf n ms_fin ms_fin' addrs_fin ms_inf ADDR_CONV CONSEC as (addrs_inf & GCP).
+                        pose proof fin_inf_get_consecutive_ptrs_success_exists a_fin a_inf n ms_fin ms_fin' addrs_fin ms_inf ADDR_CONV CONSEC as (addrs_inf & GCP & ADDRS_CONV).
                         exists addrs_inf.
                         split; auto.
 
                         (* Not sure if induction is the right thing to do here *)
-                        induction addrs_fin.
+                        generalize dependent a_fin.
+                        generalize dependent a_inf.
+                        generalize dependent n.
+                        generalize dependent bytes_fin.
+                        generalize dependent bytes_inf.
+                        induction ADDRS_CONV; intros bytes_inf bytes_fin BYTES_REF READ_SPEC n a_inf GCP a_fin ADDR_CONV CONSEC.
                         - cbn in *.
                           destruct READ_SPEC; subst.
+                          inv BYTES_REF.
+                          auto.
+                        - rewrite map_monad_unfold.
+                          cbn.
 
+                          rename l into addrs_fin.
+                          rename l' into addrs_inf.
+                          rename y into x_inf.
+                          rename x into x_fin.
+
+                          cbn in READ_SPEC.
+                          destruct READ_SPEC as [ms_fin'' [a [[MS READ_SPEC] READ_SPEC_REST]]]; subst.
+
+                          assert (ms_fin'' = ms_fin) as MSFIN.
+                          {
+                            (* TODO: make this a lemma *)
+                            Transparent Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+                            unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs in CONSEC.
+                            cbn in CONSEC.
+                            destruct CONSEC as [sab [ips [SEQ CONSEC]]].
+                            red in SEQ.
+                            break_match_hyp; inv SEQ.
+                            destruct CONSEC as [sab [addrs [CONSEC SEQ]]].
+                            red in CONSEC.
+                            break_match_hyp; inv CONSEC.
+                            red in SEQ.
+                            break_match_hyp; inv SEQ.                                                   auto.
+                            Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+                          }
+                          subst.
+
+                          destruct READ_SPEC_REST as [ms_fin' [bytes_fin' READ_SPEC_REST]].
+                          destruct READ_SPEC_REST as [READ_SPEC_REST [MS BYTES_FIN]].
+                          subst.
+
+                          inversion BYTES_REF; subst.
+                          rename l into bytes_inf'.
+
+                          exists ms_inf. exists x.
+                          split.
+                          { split; auto.
+                            eapply fin_inf_read_byte_spec; eauto.                                     }
+
+                          assert ((exists (pre : MemoryBigIntptr.MMEP.MMSP.MemState) (post : MemoryBigIntptr.MMEP.MMSP.MemState),
+                                      Within.within (InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_inf n) pre
+                                        (ret (x_inf :: addrs_inf)) post)).
+                          { admit.
+                          }
+
+                          epose proof InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons _ _ _ _ H0.
+                          destruct H1 as [XA [ptr' [len' [LEN [pre [post WITHIN]]]]]].
+                          destruct H0 as [pre' [post' WITHIN']].
+                          cbn in WITHIN'.
+                          red in WITHIN'.
+                          cbn in WITHIN'.
+                          
+                          
+                          subst.
+                          cbn in WITHIN.
+                          red in WITHIN.
+                          cbn in WITHIN.
+                          
+                          exists ms_inf. exists bytes_inf'.
+                          split; auto.
+                          eapply IHADDRS_CONV.
+                          + eauto.
+                          + eauto.
+                          + eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState.
+                            pose proof WITHIN as PREPOST.
+                            eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in PREPOST.
+                            subst.
+                            eapply WITHIN.
+                          + 
                       Qed.
 
                       (* TODO: Lemma about lifting intrinsic handlers *)
@@ -4786,28 +4638,6 @@ InfToFinAddrConvert.addr_convert_injective:
                         rewrite bind_vis.
                         pose proof (fin_to_inf_uvalue_refine_strict' _ _ F).
                         rewrite <- H.
-
-                        (* TODO: move this *)
-                        Lemma Forall2_map_eq :
-                          forall {A B} (f : A -> B) l1 l2,
-                            Forall2 (fun a b => f a = b) l1 l2 ->
-                            map f l1 = l2.
-                        Proof.
-                          intros A B f l1 l2 ALL.
-                          induction ALL; auto.
-                          rewrite map_cons.
-                          congruence.
-                        Qed.
-
-                        (* TODO: move this *)
-                        Lemma Forall2_flip :
-                          forall {A B} (P : A -> B -> Prop) l1 l2,
-                            Forall2 P l1 l2 <-> Forall2 (flip P) l2 l1.
-                        Proof.
-                          intros A B f l1 l2.
-                          split; intros ALL;
-                            induction ALL; auto.
-                        Qed.
 
                         rewrite Forall2_map_eq with (l2:=args).
                         2: {

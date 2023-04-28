@@ -110,6 +110,7 @@
 ./coq/Utils/IntMaps.v
 ./coq/Utils/ListUtil.v
 ./coq/Utils/MapMonadExtra.v
+./coq/Utils/SequenceExtra.v
 ./coq/Utils/MonadReturnsLaws.v
 ./coq/Utils/Monads.v
 ./coq/Utils/RefineProp.v
