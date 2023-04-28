@@ -3350,16 +3350,25 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                           pose proof GEP' as GEP''.
                           apply Memory64BitIntptr.GEP.handle_gep_addr_preserves_provenance in GEP'.
 
-                          unfold InfToFinAddrConvert.addr_convert.
-                          unfold FinITOP.int_to_ptr.
-                          rewrite <- GEP.
-                              red.
+                          Lemma inf_fin_addr_convert_provenance :
+                            forall a_inf a_fin,
+                              InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
+                              LLVMParamsBigIntptr.PROV.address_provenance a_inf = LLVMParams64BitIntptr.PROV.address_provenance a_fin.
+                          Proof.
+                            intros a_inf a_fin ADDR_CONV.
+                            destruct a_inf, a_fin.
+                            cbn in *.
+                            apply ITOP.int_to_ptr_provenance in ADDR_CONV.
+                            cbn in *.
+                            auto.
+                          Qed.
 
-                          (* TODO: why does get_consecutive_ptrs care about memory state at all?
+                          erewrite inf_fin_addr_convert_provenance; eauto.
+                          rewrite GEP'.
 
-                             Might just be the monad it's instantiated with? Seems like it.
-                           *)
-                          }
+                          cbn.
+                          apply ITOP.int_to_ptr_ptr_to_int.
+                          reflexivity.
                       Qed.
 
                       (* TODO: Some tricky IntMap reasoning *)
