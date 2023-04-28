@@ -3113,7 +3113,8 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                                (MemPropT MemoryBigIntptr.MMEP.MMSP.MemState)
                                (@MemPropT_Monad MemoryBigIntptr.MMEP.MMSP.MemState)
                                (@MemPropT_RAISE_OOM MemoryBigIntptr.MMEP.MMSP.MemState)
-                               (@MemPropT_RAISE_ERROR MemoryBigIntptr.MMEP.MMSP.MemState) a_inf n ms_inf (success_unERR_UB_OOM (ms_inf, addrs_inf))).
+                               (@MemPropT_RAISE_ERROR MemoryBigIntptr.MMEP.MMSP.MemState) a_inf n ms_inf (success_unERR_UB_OOM (ms_inf, addrs_inf))) /\
+                              Forall2 (fun x y => InfToFinAddrConvert.addr_convert y = NoOom x) addrs_fin addrs_inf.
                       Proof.
                         intros a_fin a_inf n ms_fin ms_fin' addrs_fin ms_inf ADDR_CONV GCP.
                         pose proof fin_inf_get_consecutive_ptrs_success a_fin a_inf n ms_fin ms_fin' addrs_fin ms_inf.
@@ -3193,29 +3194,175 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
 
                         cbn.
                         eexists.
-                        eexists.
-                        eexists.
                         split.
-                        - red.
-                          rewrite SEQ_INF.
-                          cbn.
-                          split; auto.
-                        - eexists. eexists.
+                        { eexists.
+                          eexists.
                           split.
-                          + red.
-                            (* TODO: Why can't I rewrite with ADDRS_INF? *)
-                            break_match_goal;
-                              setoid_rewrite ADDRS_INF in Heqs;
-                              inv Heqs.
+                          - red.
+                            rewrite SEQ_INF.
                             cbn.
                             split; auto.
-                          + red.
-                            unfold Monads.sequence.
-                            rewrite MAP_INF.
-                            cbn.
-                            split; reflexivity.
+                          - eexists. eexists.
+                            split.
+                            + red.
+                              (* TODO: Why can't I rewrite with ADDRS_INF? *)
+                              break_match_goal;
+                                setoid_rewrite ADDRS_INF in Heqs;
+                                inv Heqs.
+                              cbn.
+                              split; auto.
+                            + red.
+                              unfold Monads.sequence.
+                              rewrite MAP_INF.
+                              cbn.
+                              split; reflexivity.
+                        }
+
+                        apply Util.Forall2_forall.
+                        split.
+                        - apply map_monad_oom_length in MAP_INF.
+                          apply map_monad_err_length in ADDRS_INF.
+
+                          (* Need something about get_consecutive_ptrs_length...
+
+                             There is one: FinLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_length.
+
+                             Need to refresh memory on Within, though.
+                           *)
+
+                          assert (n = Datatypes.length addrs_fin) as ADDRS_FIN_LEN.
+                          {
+                            assert (exists (pre : Memory64BitIntptr.MMEP.MMSP.MemState) (post : Memory64BitIntptr.MMEP.MMSP.MemState),
+                                       Within.within (FinLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_fin n) pre 
+                                         (ret addrs_fin) post).
+                            {
+                              exists FinMemMMSP.initial_memory_state. exists FinMemMMSP.initial_memory_state.
+                              cbn.
+                              exists FinMemMMSP.initial_memory_state.
+
+                              red in GCP.
+                              destruct (Memory64BitIntptr.MMEP.MemSpec.MemHelpers.intptr_seq 0 n) eqn:SEQ_FIN; cbn in GCP.
+                              2: { destruct GCP as [sab [a [[] _]]]. }.
+
+                              destruct GCP as [sab [a [[MS A] GCP]]]; subst.
+                              destruct GCP as [sab [a [GCP SEQ]]]; subst.
+                              destruct (map_monad
+                                          (fun ix : LLVMParams64BitIntptr.IP.intptr =>
+                                             inr
+                                               (LLVMParams64BitIntptr.ITOP.int_to_ptr
+                                                  (LLVMParams64BitIntptr.PTOI.ptr_to_int a_fin +
+                                                     Z.of_N (LLVMParams64BitIntptr.SIZEOF.sizeof_dtyp (DTYPE_I 8)) *
+                                                       LLVMParams64BitIntptr.IP.to_Z ix)
+                                                  (LLVMParams64BitIntptr.PROV.address_provenance a_fin))) l) eqn:HMAPM; cbn in GCP; try contradiction.
+                              destruct GCP; subst.
+                              red in SEQ.
+                              break_match_hyp; inv SEQ.
+
+                              eexists; split; cbn; eauto.
+                              exists FinMemMMSP.initial_memory_state.
+                              eexists; split; cbn; eauto.
+                              rewrite HMAPM.
+                              cbn; eauto.
+                              rewrite Heqo. cbn. auto.
+                            }
+
+                            pose proof FinLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_length _ _ _ H0; eauto.
+                          }
+
+                          apply MemoryBigIntptr.MMEP.MemSpec.MemHelpers.intptr_seq_len in SEQ_INF.
+                          congruence.
+                        - intros i a b NTHaddrs NTHres.
+                          pose proof (map_monad_OOM_Nth _ _ _ _ _ MAP_INF NTHres) as (y&Y&NTHoaddrs).
+                          unfold id in Y; subst.
+
+                          pose proof (map_monad_err_Nth _ _ _ _ _ ADDRS_INF NTHoaddrs) as (y&Y&NTHips).
+                          cbn in Y. inv Y.
+
+                          rename a into ptr_fin.
+
+                          (* Need to break apart GCP to find out about ptr_fin *)
+                          pose proof Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_nth_eq1 a_fin n addrs_fin.
+                          forward H0.
+                          {
+                            red. red.
+                            intros ms x.
+                            split.
+                            - intros GCP'.
+                              admit.
+                            - intros RET.
+                              cbn in RET.
+                              destruct_err_ub_oom x; try inv RET.
+                              destruct x0.
+                              destruct RET; subst.
+
+                              red in GCP.
+                              destruct (Memory64BitIntptr.MMEP.MemSpec.MemHelpers.intptr_seq 0 n) eqn:SEQ_FIN; cbn in GCP.
+                              2: { destruct GCP as [sab [a [[] _]]]. }.
+                              destruct GCP as [sab [a [[MS A] GCP]]]; subst.
+                              destruct GCP as [sab [a [GCP SEQ]]]; subst.
+                              destruct (map_monad
+                                          (fun ix : LLVMParams64BitIntptr.IP.intptr =>
+                                             inr
+                                               (LLVMParams64BitIntptr.ITOP.int_to_ptr
+                                                  (LLVMParams64BitIntptr.PTOI.ptr_to_int a_fin +
+                                                     Z.of_N (LLVMParams64BitIntptr.SIZEOF.sizeof_dtyp (DTYPE_I 8)) *
+                                                       LLVMParams64BitIntptr.IP.to_Z ix)
+                                                  (LLVMParams64BitIntptr.PROV.address_provenance a_fin))) l) eqn:HMAPM; cbn in GCP; try contradiction.
+                              destruct GCP; subst.
+                              red in SEQ.
+                              break_match_hyp; inv SEQ.
+
+                              cbn.
+                              exists ms. exists l.
+                              split.
+                              rewrite SEQ_FIN; cbn; auto.
+
+                              exists ms. exists l0.
+                              rewrite HMAPM. cbn.
+                              split; auto.
+                              rewrite Heqo; cbn; auto.
+                          }
+
+                          specialize (H0 _ _ NTHaddrs).
+                          destruct H0 as [ip [IP GEP]].
+                          pose proof GEP as GEP'.
+                          apply FinLLVM.MEM.MP.GEP.handle_gep_addr_ix in GEP.
+
+                          assert (LLVMParamsBigIntptr.IP.to_Z y = Z.of_nat i) as IPI.
+                          { pose proof MemoryBigIntptr.MMEP.MemSpec.MemHelpers.intptr_seq_nth _ _ _ _ _ SEQ_INF NTHips.
+                            replace (0 + (Z.of_nat i))%Z with (Z.of_nat i) in H0 by lia.
+                            eapply FiniteIntptr.BigIP.from_Z_to_Z.
+                            apply H0.
+                          }
+                          rewrite IPI.
+
+                          symmetry in IP.
+                          eapply FinLP.IP.from_Z_to_Z in IP.
+                          rewrite IP in GEP.
+
+                          replace (LLVMParamsBigIntptr.PTOI.ptr_to_int a_inf +
+                                     Z.of_N (LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp (DTYPE_I 8)) * Z.of_nat i)%Z with (PTOI.ptr_to_int ptr_fin).
+                          2: {
+                            rewrite GEP.
+                            erewrite fin_inf_ptoi; eauto.
+                          }
+
+                          pose proof GEP' as GEP''.
+                          apply Memory64BitIntptr.GEP.handle_gep_addr_preserves_provenance in GEP'.
+
+                          unfold InfToFinAddrConvert.addr_convert.
+                          unfold FinITOP.int_to_ptr.
+                          rewrite <- GEP.
+                              red.
+
+                          (* TODO: why does get_consecutive_ptrs care about memory state at all?
+
+                             Might just be the monad it's instantiated with? Seems like it.
+                           *)
+                          }
                       Qed.
 
+                      (* TODO: Some tricky IntMap reasoning *)
                       Lemma fin_inf_read_byte_raw :
                         forall m_inf m_fin ptr b_fin b_inf aid,
                           convert_memory m_inf = NoOom m_fin ->
@@ -3227,6 +3374,30 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                             ptr = Some (b_inf, aid).
                       Proof.
                         intros m_inf m_fin ptr b_fin b_inf aid CONV READ.
+                        Transparent Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
+                        Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+                        unfold Memory64BitIntptr.MMEP.MMSP.read_byte_raw in READ.
+                        unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+
+                        cbn in CONV.
+                        break_match_hyp; inv CONV.
+
+                        Opaque Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
+                        Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+                      Admitted.
+
+                      (* TODO: Some tricky IntMap reasoning *)
+                      Lemma fin_inf_read_byte_raw_None :
+                        forall m_inf m_fin ptr,
+                          convert_memory m_inf = NoOom m_fin ->
+                          Memory64BitIntptr.MMEP.MMSP.read_byte_raw
+                            m_fin
+                            ptr = None ->
+                          MemoryBigIntptr.MMEP.MMSP.read_byte_raw
+                            m_inf
+                            ptr = None.
+                      Proof.
+                        intros m_inf m_fin ptr CONV READ.
                         Transparent Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
                         Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
                         unfold Memory64BitIntptr.MMEP.MMSP.read_byte_raw in READ.
@@ -3303,6 +3474,48 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                         reflexivity.
                       Qed.
 
+                      Lemma MemState_refine_convert_memory :
+                        forall ms_inf ms_fin,
+                          MemState_refine ms_inf ms_fin ->
+                          convert_memory (MemoryBigIntptr.MMEP.MMSP.mem_state_memory ms_inf) = NoOom (Memory64BitIntptr.MMEP.MMSP.mem_state_memory ms_fin).
+                      Proof.
+                        intros ms_inf ms_fin REF.
+                        destruct ms_inf; cbn in *.
+                        unfold MemState_refine in REF.
+                        cbn in *.
+                        break_match_hyp; inv REF.
+                        destruct ms_memory_stack; cbn in *.
+                        destruct memory_stack_memory; cbn in *.
+                        break_match_hyp; inv Heqo.
+                        break_match_hyp; inv H0.
+                        break_match_hyp; inv H1.
+                        break_match_hyp; inv Heqo1.
+                        cbn in *.
+                        reflexivity.
+                      Qed.
+
+                      Lemma MemState_refine_convert_memory' :
+                        forall ms_inf ms_fin,
+                          MemState_refine ms_inf ms_fin ->
+                          convert_memory (MemoryBigIntptr.MMEP.MMSP.memory_stack_memory
+                                            (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf)) = NoOom (Memory64BitIntptr.MMEP.MMSP.memory_stack_memory
+                                                                                                               (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin)).
+                      Proof.
+                        intros ms_inf ms_fin REF.
+                        destruct ms_inf; cbn in *.
+                        unfold MemState_refine in REF.
+                        cbn in *.
+                        break_match_hyp; inv REF.
+                        destruct ms_memory_stack; cbn in *.
+                        destruct memory_stack_memory; cbn in *.
+                        break_match_hyp; inv Heqo.
+                        break_match_hyp; inv H0.
+                        break_match_hyp; inv H1.
+                        break_match_hyp; inv Heqo1.
+                        cbn in *.
+                        reflexivity.
+                      Qed.
+
                       Lemma fin_inf_byte_allocated_MemPropT :
                         forall addr_fin addr_inf ms_fin ms_inf aid,
                           MemState_refine ms_inf ms_fin ->
@@ -3340,7 +3553,26 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                       Proof.
                         intros addr_fin addr_inf ms_fin ms_inf aid MSR ADDR_CONV ALLOCATED.
                         red; red in ALLOCATED.
+                        eapply fin_inf_byte_allocated_MemPropT; eauto.
                       Qed.
+
+                      Lemma fin_inf_access_allowed :
+                        forall addr_fin addr_inf aid res,
+                          InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+                          LLVMParams64BitIntptr.PROV.access_allowed
+                            (LLVMParams64BitIntptr.PROV.address_provenance addr_fin) aid = res ->
+                          LLVMParamsBigIntptr.PROV.access_allowed (LLVMParamsBigIntptr.PROV.address_provenance addr_inf) aid = res.
+                      Proof.
+                        intros addr_fin addr_inf aid res ADDR_CONV ACCESS.
+                        destruct addr_inf.
+                        cbn in *.
+                        pose proof ITOP.int_to_ptr_provenance _ _ _ ADDR_CONV. subst.
+                        unfold LLVMParams64BitIntptr.PROV.access_allowed in *.
+                        unfold LLVMParamsBigIntptr.PROV.access_allowed in *.
+
+                        (* TODO: Need to expose access_allowed *)
+                        admit.
+                      Admitted.
 
                       Lemma fin_inf_read_byte_allowed :
                         forall addr_fin addr_inf ms_fin ms_inf,
@@ -3355,7 +3587,66 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                         destruct READ_ALLOWED as [aid [BYTE_ALLOCATED ACCESS_ALLOWED]].
                         exists aid.
                         split.
-                        - 
+                        - eapply fin_inf_byte_allocated; eauto.
+                        - eapply fin_inf_access_allowed; eauto.
+                      Qed.
+
+                      Lemma fin_inf_read_byte_prop_MemPropT :
+                        forall addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf,
+                          MemState_refine ms_inf ms_fin ->
+                          InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+                          Memory64BitIntptr.MMEP.MMSP.read_byte_MemPropT addr_fin
+                            (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin)
+                            (ret (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin, byte_fin)) ->
+                          MemoryBigIntptr.MMEP.MMSP.read_byte_MemPropT addr_inf
+                            (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf)
+                            (ret (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf, byte_inf)).
+                      Proof.
+                        intros addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf MSR ADDR_CONV RBP.
+                        (* TODO: make things opaque? *)
+                        destruct RBP as [ms_fin' [ms_fin'' [[MS MS'] READ]]].
+                        subst.
+                        destruct ms_fin eqn:MSFIN. cbn in READ.
+                        break_match_hyp.
+                        - destruct m.
+                          epose proof fin_inf_read_byte_raw _ _ _ _ _ _ _ Heqo.
+                          cbn.
+                          eexists. eexists.
+                          split; eauto.
+                          erewrite fin_inf_ptoi in H; eauto.
+                          rewrite H.
+                          erewrite fin_inf_access_allowed; cbn; eauto.
+                          break_match_goal; cbn; eauto.
+                        - epose proof fin_inf_read_byte_raw_None _ _ _ _ Heqo.
+                          cbn.
+                          eexists. eexists.
+                          split; eauto.
+                          erewrite fin_inf_ptoi in H; eauto.
+                          rewrite H.
+                          auto.
+
+                          Unshelve.
+                          all: clear READ.
+                          + replace (Memory64BitIntptr.MMEP.MMSP.memory_stack_memory ms_memory_stack) with (Memory64BitIntptr.MMEP.MMSP.memory_stack_memory
+       (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin)).
+                            eapply MemState_refine_convert_memory'; subst; eauto.
+                            subst; cbn. auto.
+                          + replace (Memory64BitIntptr.MMEP.MMSP.memory_stack_memory ms_memory_stack) with (Memory64BitIntptr.MMEP.MMSP.memory_stack_memory
+       (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin)).
+                            eapply MemState_refine_convert_memory'; subst; eauto.
+                            subst; cbn. auto.
+                      Qed.
+
+                      Lemma fin_inf_read_byte_prop :
+                        forall addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf,
+                          MemState_refine ms_inf ms_fin ->
+                          InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+                          Memory64BitIntptr.MMEP.MemSpec.read_byte_prop ms_fin addr_fin byte_fin ->
+                          MemoryBigIntptr.MMEP.MemSpec.read_byte_prop ms_inf addr_inf byte_inf.
+                      Proof.
+                        intros addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf MSR ADDR_CONV RBP.
+                        red. red in RBP.
+                        eapply fin_inf_read_byte_prop_MemPropT; eauto.
                       Qed.
 
                       Lemma fin_inf_read_byte_spec :
@@ -3368,7 +3659,8 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                         intros addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf MSR ADDR_CONV READ_SPEC.
                         destruct READ_SPEC.
                         split.
-                        - 
+                        - eapply fin_inf_read_byte_allowed; eauto.
+                        - eapply fin_inf_read_byte_prop; eauto.
                       Qed.
 
                       Lemma fin_inf_read_byte_spec_MemPropT :
@@ -3406,6 +3698,12 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                         pose proof fin_inf_get_consecutive_ptrs_success_exists a_fin a_inf n ms_fin ms_fin' addrs_fin ms_inf ADDR_CONV CONSEC as (addrs_inf & GCP).
                         exists addrs_inf.
                         split; auto.
+
+                        (* Not sure if induction is the right thing to do here *)
+                        induction addrs_fin.
+                        - cbn in *.
+                          destruct READ_SPEC; subst.
+
                       Qed.
 
                       (* TODO: Lemma about lifting intrinsic handlers *)
