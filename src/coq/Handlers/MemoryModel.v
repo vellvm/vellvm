@@ -871,7 +871,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
       ptr len p ptrs,
       (ret (p :: ptrs) ∈ get_consecutive_ptrs ptr len)%monad ->
-      p = ptr /\ (exists ptr' len', len = S len' /\ (ret ptrs ∈ get_consecutive_ptrs ptr' len')%monad).
+      p = ptr /\ ((ptrs = [] /\ len = 1) \/ exists ptr' ip len', len = S len' /\ to_Z ip = 1%Z /\ handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ip] = inr (NoOom ptr') /\ (ret ptrs ∈ get_consecutive_ptrs ptr' len')%monad).
   Proof.
     intros M HM EQM' Pre Post B MB WM EQRET WRET EQV OOM ERR LAWS RAISE_OOM RAISE_ERR RWOOM RWERR ptr len p ptrs CONSEC.
 
@@ -934,14 +934,8 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           cbn in Heqs.
           inv Heqs.
           inv Heqo.
-          exists p. exists 0.
-          split; auto.
-          cbn.
-          setoid_rewrite bind_ret_l.
-          cbn.
-          setoid_rewrite bind_ret_l.
-          cbn.
-          apply within_ret_refl; typeclasses eauto.
+          left.
+          auto.
         + pose proof Heqo0 as SEQ.
           rewrite intptr_seq_succ in SEQ.
           cbn in SEQ.
@@ -959,7 +953,11 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           inv MAPM.
           destruct o as [p' | oom_msg]; [|inversion Heqo].
           rename l1 into ptrs'.
-          exists p'. exists (S len).
+          right.
+          exists p'. exists one. exists (S len).
+          split; auto.
+          split.
+          apply from_Z_to_Z; auto.
           split; auto.
 
           (* Need something about sequences *)
@@ -1136,7 +1134,11 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         subst.
         lia.
       + pose proof CONSEC as CONSEC'.
-        apply get_consecutive_ptrs_cons in CONSEC as (START & ptr' & len' & LENEQ & CONSEC).
+        apply get_consecutive_ptrs_cons in CONSEC as (START & [(PTRS & LEN) | (ptr' & one & len' & LENEQ & ONE & GEP & CONSEC)]).
+        { subst.
+          inv IN.
+        }
+
         subst.
         pose proof IHptrs as IHptrs'.
         specialize (IHptrs' _ _ CONSEC _ IN).
@@ -1160,7 +1162,14 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
 
         (* Need to show that ptr'0 = ptr' *)
         pose proof CONSEC as CONSEC''.
-        apply get_consecutive_ptrs_cons in CONSEC as (ptreq & ptr'' & len'' & LENEQ & CONSEC).
+        apply get_consecutive_ptrs_cons in CONSEC as (ptreq & [[PTRS LEN] | (ptr'' & one' & len'' & LENEQ & ONE' & GEP' & CONSEC)]).
+        { subst.
+          cbn in IN.
+          destruct IN as [IN | []].
+          subst.
+          apply handle_gep_addr_ix in GEP.
+          lia.
+        }
         subst.
 
         assert (ptr_to_int ptr < ptr_to_int ptr')%Z.
@@ -1289,11 +1298,14 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     - inv IN.
     - induction IN as [IN | IN].
       + subst.
-        apply get_consecutive_ptrs_cons in CONSEC as (START & ptr' & len' & LENEQ & CONSEC).
-        subst.
-        lia.
+        apply get_consecutive_ptrs_cons in CONSEC as (START & [[PTRS LEN] | (ptr' & one & len' & LENEQ & ONE & GEP & CONSEC)]);
+          subst; lia.
       + pose proof CONSEC as CONSEC'.
-        apply get_consecutive_ptrs_cons in CONSEC as (START & ptr' & len' & LENEQ & CONSEC).
+        apply get_consecutive_ptrs_cons in CONSEC as (START & [[PTRS LEN] | (ptr' & one & len' & LENEQ & ONE & GEP & CONSEC)]).
+        { subst.
+          inv IN.
+        }
+
         subst.
         pose proof IHptrs as IHptrs'.
         specialize (IHptrs' _ _ CONSEC _ IN).
@@ -1317,7 +1329,17 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
 
         (* Need to show that ptr'0 = ptr' *)
         pose proof CONSEC as CONSEC''.
-        apply get_consecutive_ptrs_cons in CONSEC as (ptreq & ptr'' & len'' & LENEQ & CONSEC).
+        apply get_consecutive_ptrs_cons in CONSEC as (ptreq & [[PTRS LEN] | (ptr'' & one' & len'' & LENEQ' & ONE' & GEP' & CONSEC)]).
+        {
+          subst.
+          destruct IN as [IN | []].
+          subst.
+          apply handle_gep_addr_ix in GEP.
+          rewrite GEP.
+          rewrite sizeof_dtyp_i8.
+          lia.
+        }
+
         subst.
 
         assert (Z.succ (ptr_to_int ptr) = ptr_to_int ptr')%Z.
