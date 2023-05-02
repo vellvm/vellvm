@@ -1811,7 +1811,7 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
       orutt (OOM:=OOME) pre post T1T2 t_source t_final.
   Proof.
     intros E F T1 T2 OE OF R T1T2 pre post t_source t_oom t_final REF_OOM ORUTT.
-  Admitted.    
+  Admitted.
 
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
@@ -2282,7 +2282,7 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                         a = snd (snd b) ->
                         upaco2
                           (interp_memory_PropT_ FinMemInterp.interp_memory_prop_h
-                          (fun (x : res_L2) '(_, (_, y)) => TLR_FIN.R.refine_res2 x y) true true) bot2 
+                          (fun (x : res_L2) '(_, (_, y)) => TLR_FIN.R.refine_res2 x y) true true) bot2
                           (k1 a) (k2 b)
 
                       K_RUTT : forall (v1 : InterpreterStackBigIntptr.LP.Events.DV.dvalue) (v2 : dvalue),
@@ -2291,10 +2291,10 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                          Forall2 DVCInfFin.dvalue_refine_strict args0 args /\ DVCInfFin.dvalue_refine_strict v1 v2 ->
                          orutt L2_refine_strict L2_res_refine_strict
                          (local_refine_strict × stack_refine_strict
-                         × (global_refine_strict × DVCInfFin.dvalue_refine_strict)) (k3 v1) 
+                         × (global_refine_strict × DVCInfFin.dvalue_refine_strict)) (k3 v1)
                          (k1 v2)
 
-                      
+
                      *)
 
                     pclearbot.
@@ -2331,7 +2331,7 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                       pclearbot.
                       apply HK.
                     }
-                    
+
                     rewrite REL.
                     eapply K_RUTT; split; auto.
                   }
@@ -2468,15 +2468,15 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
  (*                        rewrite dvalue_fin_to_inf_to_fin in Heqo; inv Heqo. *)
  (*                        apply HK. *)
  (*                      } *)
-                      
+
  (*                      rewrite REL. *)
  (*                      eapply K_RUTT; split; auto. *)
  (*                    } *)
 
  (*                    eapply CIH. *)
-                    
+
  (*                  } *)
-                    
+
  (*                    2: { *)
  (*                      red. cbn. red. cbn. *)
  (*                    } *)
@@ -2511,7 +2511,7 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
  (*                    Unset Printing Notations. *)
  (*                    Set Printing Implicit. *)
  (*                    reflexivity. *)
-                    
+
  (*                    admit. *)
                   (*                  } *)
                   admit.
@@ -2571,7 +2571,7 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                       Lemma dvalue_convert_strict_addr_inv :
                         forall x a,
                           DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_Addr a) ->
-                          exists a', 
+                          exists a',
                             InfToFinAddrConvert.addr_convert a' = NoOom a /\
                               x = DVCInfFin.DV1.DVALUE_Addr a'.
                       Proof.
@@ -2585,7 +2585,7 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                       Lemma dvalue_convert_strict_iptr_inv :
                         forall x n,
                           DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_IPTR n) ->
-                          exists n', 
+                          exists n',
                             IP.from_Z (InterpreterStackBigIntptr.LP.IP.to_Z n') = NoOom n /\
                               x = DVCInfFin.DV1.DVALUE_IPTR n'.
                       Proof.
@@ -2775,7 +2775,7 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                           apply map_monad_err_forall2 in HMAPM'.
                           apply Util.Forall2_forall in HMAPM' as [LEN HMAPM'].
                           apply In_Nth in INx. destruct INx as [i NTHl1].
-                          
+
                           epose proof (Nth_exists lb i) as NTHlb.
                           forward NTHlb.
                           { apply Nth_ix_lt_length in NTHl1.
@@ -2907,7 +2907,7 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                         }
                       Qed.
 
-                      Lemma fin_inf_get_consecutive_ptrs_success_exists : 
+                      Lemma fin_inf_get_consecutive_ptrs_success_exists :
                         forall a_fin a_inf n ms_fin ms_fin' addrs_fin ms_inf,
                           (* TODO: ADDR probably not necessary, can conclude this from ADDRS...
                            *)
@@ -2998,7 +2998,7 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
                           assert (n = Datatypes.length addrs_fin) as ADDRS_FIN_LEN.
                           {
                             assert (exists (pre : Memory64BitIntptr.MMEP.MMSP.MemState) (post : Memory64BitIntptr.MMEP.MMSP.MemState),
-                                       Within.within (FinLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_fin n) pre 
+                                       Within.within (FinLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_fin n) pre
                                          (ret addrs_fin) post).
                             {
                               exists FinMemMMSP.initial_memory_state. exists FinMemMMSP.initial_memory_state.
@@ -3649,6 +3649,7 @@ cbn in GCP'.
                           }
                           subst.
 
+                          pose proof READ_SPEC_REST as READ_SPEC_REST'.
                           destruct READ_SPEC_REST as [ms_fin' [bytes_fin' READ_SPEC_REST]].
                           destruct READ_SPEC_REST as [READ_SPEC_REST [MS BYTES_FIN]].
                           subst.
@@ -3659,7 +3660,8 @@ cbn in GCP'.
                           exists ms_inf. exists x.
                           split.
                           { split; auto.
-                            eapply fin_inf_read_byte_spec; eauto.                                     }
+                            eapply fin_inf_read_byte_spec; eauto.
+                          }
 
                           assert ((exists (pre : MemoryBigIntptr.MMEP.MMSP.MemState) (post : MemoryBigIntptr.MMEP.MMSP.MemState),
                                       Within.within (InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_inf n) pre
@@ -3667,30 +3669,175 @@ cbn in GCP'.
                           { admit.
                           }
 
+                          specialize (IHADDRS_CONV _ _ H4).
+                          forward IHADDRS_CONV; eauto.
+
                           epose proof InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons _ _ _ _ H0.
-                          destruct H1 as [XA [ptr' [len' [LEN [pre [post WITHIN]]]]]].
+                          destruct H1 as [XA [[PTRS N] | [ptr' [ip' [len' [LEN [IP [GEP [pre [post WITHIN]]]]]]]]]].
+                          { subst.
+                            cbn in *.
+                            exists ms_inf. exists [].
+                            split; auto.
+                            split; auto.
+
+                            specialize (IHADDRS_CONV 0%nat a_inf).
+                            forward IHADDRS_CONV.
+                            { cbn.
+                              (* TODO: This should probably be a lemma *)
+                              Transparent MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+                              unfold MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+                              Opaque MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+                              cbn.
+                              exists ms_inf. exists [].
+                              split; auto.
+                              exists ms_inf. exists [].
+                              cbn.
+                              auto.
+                            }
+
+                            specialize (IHADDRS_CONV _ H).
+                            inv ADDRS_CONV.
+                            forward IHADDRS_CONV.
+                            { cbn.
+                              (* TODO: This should probably be a lemma *)
+                              Transparent Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+                              unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+                              Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+                              cbn.
+                              exists ms_fin'. exists [].
+                              split; auto.
+                              exists ms_fin'. exists [].
+                              cbn.
+                              auto.
+                            }
+
+                            destruct IHADDRS_CONV; subst.
+                            auto.
+                          }
+
                           destruct H0 as [pre' [post' WITHIN']].
                           cbn in WITHIN'.
                           red in WITHIN'.
                           cbn in WITHIN'.
-                          
-                          
+
+
                           subst.
                           cbn in WITHIN.
                           red in WITHIN.
                           cbn in WITHIN.
-                          
+
+                          pose proof WITHIN as PREPOST.
+                          eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in PREPOST.
+                          subst.
+
                           exists ms_inf. exists bytes_inf'.
                           split; auto.
+
+                          destruct addrs_inf as [? | a_inf' addrs_inf].
+                          {
+                            destruct addrs_fin as [? | a_fin' addrs_fin].
+                            {
+                              cbn in READ_SPEC_REST.
+                              destruct READ_SPEC_REST; subst.
+                              inv H4.
+                              cbn; auto.
+                            }
+
+                            (* Should be a contradiction *)
+                            inv ADDRS_CONV.
+                          }
+
+                          destruct addrs_fin as [? | a_fin' addrs_fin].
+                          { (* Should be a contradiction *)
+                            inv ADDRS_CONV.
+                          }
+
                           eapply IHADDRS_CONV.
-                          + eauto.
-                          + eauto.
                           + eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState.
-                            pose proof WITHIN as PREPOST.
-                            eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in PREPOST.
-                            subst.
                             eapply WITHIN.
-                          + 
+                          + (* How do I know ptr' is safe to convert
+                               to a finite pointer?
+
+                               I know it's a_inf + 1...
+
+                               Need to show that a_inf' is a_inf + 1
+                               as well, and that it relates to a_fin'.
+                             *)
+
+                            (* ptr' is a_inf + 1 (AKA a_inf'). It
+                               should share the same provenance as well.
+                             *)
+
+                            pose proof (MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_nth_eq1 a_inf (S len') (a_inf :: a_inf' :: addrs_inf)).
+                            forward H0.
+                            { admit.
+                              (* red. red. *)
+                              (* intros ms x0. *)
+                              (* split. *)
+                              (* - intros GCP'. *)
+                              (*   destruct_err_ub_oom x0. *)
+                              (*   + (* Contradiction *) *)
+                              (*     admit. *)
+                              (*   + (* Contradiction *) *)
+                              (*     admit. *)
+                              (*   + (* Contradiction *) *)
+                              (*     admit. *)
+                              (*   + cbn. *)
+                              (*     destruct x1. *)
+                            }
+
+                            specialize (H0 a_inf' 1%nat).
+                            forward H0; cbn; auto.
+                            destruct H0 as [ix [IX GEP_IX]].
+
+                            (* Show that ip' = ix *)
+                            assert (ip' = ix) as IPIX.
+                            {
+                              cbn in IX.
+                              inv IX.
+                              unfold InterpreterStackBigIntptr.LP.IP.to_Z in IP.
+                              auto.
+                            }
+                            subst.
+
+                            rewrite GEP in GEP_IX.
+                            inv GEP_IX.
+                            inv ADDRS_CONV.
+                            eauto.
+                          + (* Should follow from CONSEC *)
+
+                            assert ((exists (pre : FinMem.MMEP.MMSP.MemState) (post : FinMem.MMEP.MMSP.MemState),
+                                        Within.within (FinLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_fin (S len')) pre
+                                          (ret (x_fin :: a_fin' :: addrs_fin)) post)).
+                            { admit.
+                            }
+
+                            pose proof FinMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons _ _ _ _ H0.
+                            destruct H1.
+                            destruct H2.
+                            { destruct H2; discriminate.
+                            }
+
+                            destruct H2 as [ptr'' [ip [len'' [LEN [IP' [GEP'' WITHIN'']]]]]].
+                            (* GEP'' suggests ptr'' = a_fin' *)
+                            assert (ptr'' = a_fin').
+                            {
+                              subst.
+                              pose proof FinMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons _ _ _ _ WITHIN''.
+                              destruct H1.
+                              auto.
+                            }
+                            subst.
+
+                            destruct WITHIN'' as [pre [post'' WITHIN'']].
+                            cbn in WITHIN''.
+                            red in WITHIN''.
+                            cbn in WITHIN''.
+                            pose proof WITHIN''.
+                            inv LEN.
+                            apply FinMem.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in H1; subst.
+                            eapply FinMem.MMEP.get_consecutive_ptrs_MemPropT_MemState; eauto.
+                            eapply WITHIN''.
                       Qed.
 
                       (* TODO: Lemma about lifting intrinsic handlers *)
@@ -3745,7 +3892,7 @@ cbn in GCP'.
                               apply dvalue_convert_strict_iptr_inv in H2 as (x5' & H2 & X5); subst.
                               apply dvalue_convert_strict_i1_inv in H3; subst.
 
-                              red. red.                              
+                              red. red.
                               red in HANDLER.
 
                               assert (LLVMParams64BitIntptr.IP.to_Z x4 = LLVMParamsBigIntptr.IP.to_Z x4') as X4.
@@ -3769,7 +3916,7 @@ cbn in GCP'.
                                     break_match_goal.
                                     admit.
 
-                                    
+
 
                                     pose proof (fin_inf_ptoi a a').
                                     assert (InfToFinAddrConvert.addr_convert a' = NoOom a) as AA'.
@@ -3786,7 +3933,7 @@ cbn in GCP'.
 
                                     rewrite <- H1.
                                     change (LLVMParams64BitIntptr.PTOI.ptr_to_int a) with (FinPTOI.ptr_to_int a).
-                                    
+
                                     eapply FinITOP.int_to_ptr_ptr_to_int.
                                     eapply ITOP.int_to_ptr_ptr_to_int.
 
@@ -3831,16 +3978,16 @@ cbn in GCP'.
                                         reflexivity.
                                       }
 
-                                      
-                                      
+
+
                                       rename l1 into addrs_inf_oom.
                                       rename l2 into addrs_inf.
                                       rename l0 into addrs_fin.
                                       rename l' into addrs_inf_of_fin.
-                                      
+
                                       eapply IHADDRS.
 
-                                      
+
 
                                       pose proof sequence_oom_nth' _ _ Heqo.
                                       specialize (H1 i x) as [NTH1x NTH2x].
@@ -3883,7 +4030,7 @@ cbn in GCP'.
 
 
                                         *)
- 
+
                                         pose proof HMAPM' as HMAPM''.
                                         apply map_monad_err_cons_inv in HMAPM''.
                                         destruct HMAPM'' as (?&?&?).
@@ -3891,13 +4038,13 @@ cbn in GCP'.
                                         clear NTH2x.
 
                                         rename a into blah.
-                                        
+
                                         (* Right hand side is literally a'... *)
                                         assert (((LLVMParamsBigIntptr.PTOI.ptr_to_int a' +
                                                     Z.of_N (LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp (DTYPE_I 8)) * LLVMParamsBigIntptr.IP.to_Z x_ip)%Z,
                                                   LLVMParamsBigIntptr.PROV.address_provenance a') = a').
                                         { destruct a'. cbn.
-                                          
+
                                         }
 
 
@@ -3922,7 +4069,7 @@ InfToFinAddrConvert.addr_convert_injective:
                                         inv NTHy; inv NTHx.
 
                                         rename x into blah.
-                                      
+
                                     admit.
                                   }
 
@@ -3934,7 +4081,7 @@ InfToFinAddrConvert.addr_convert_injective:
                                       (* TODO: Use a hint DB for this? *)
                                       (* Hint Resolve sequence_OOM_length map_monad_err_length Memory64BitIntptr.MMEP.MemSpec.MemHelpers.intptr_seq_len MemoryBigIntptr.MMEP.MemSpec.MemHelpers.intptr_seq_len Util.Forall2_length : LENGTH. *)
                                       (* Hint Extern 0 => lia : LENGTH. *)
-                                      
+
                                       apply sequence_OOM_length in Heqo, Heqo0.
                                       apply map_monad_err_length in HMAPM', HMAPM.
                                       apply Memory64BitIntptr.MMEP.MemSpec.MemHelpers.intptr_seq_len in SEQ.
@@ -3943,7 +4090,7 @@ InfToFinAddrConvert.addr_convert_injective:
                                       apply Util.Forall2_length in ADDRS.
                                       lia.
                                     - intros i a0 b NTHys NTHls.
-                                      eauto.                                      
+                                      eauto.
                                   }
 
                                   clear - H.
@@ -3951,7 +4098,7 @@ InfToFinAddrConvert.addr_convert_injective:
                                 }
 
 
-                                  
+
                                   eapply Util.Forall2_Nth.
                                   apply Forall2
 
@@ -3983,7 +4130,7 @@ InfToFinAddrConvert.addr_convert_injective:
 
                                     break_match_hyp; inv Heqo.
                                     break_match_hyp; inv H4.
-                                    apply 
+                                    apply
 
                                 }
 
@@ -3993,7 +4140,7 @@ InfToFinAddrConvert.addr_convert_injective:
                                     Forall (fun x => exists y, x = NoOom y) l ->
                                     exists l', Monads.sequence l = NoOom l'.
                                 Proof.
-                                  
+
                                 Abort.
 
                                 apply map_monad_err_forall2 in HMAPM'.
@@ -4019,9 +4166,9 @@ InfToFinAddrConvert.addr_convert_injective:
                                              Z.of_N (LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp (DTYPE_I 8)) *
                                                LLVMParamsBigIntptr.IP.to_Z ix) (LLVMParamsBigIntptr.PROV.address_provenance a')))
                                     lb = inr y).
-                                
+
                                 exists ms_x.
-                                
+
                               Admitted.
 
                               (* TODO: Need lemmas for read_bytes_spec and write_bytes_spec... *)
@@ -4037,8 +4184,8 @@ InfToFinAddrConvert.addr_convert_injective:
                               Admitted.
 
                               cbn in HANDLER.
-                              
-                                
+
+
                                 destruct_err_ub_oom x.
                               Unset Printing Notations.
                               Set Printing Implicit.
@@ -4079,7 +4226,7 @@ InfToFinAddrConvert.addr_convert_injective:
 
                               cbn.
                                 .
-                              
+
 
                               - (* Negative length UB in finite case *)
                                 cbn in *.
@@ -4094,7 +4241,7 @@ InfToFinAddrConvert.addr_convert_injective:
                                 break_match_goal.
                                 + admit.
                                 + cbn in *.
-                                  
+
                               admit.
                             }
                           - unfold fin_to_inf_dvalue.
@@ -4195,7 +4342,7 @@ InfToFinAddrConvert.addr_convert_injective:
                       rewrite dvalue_fin_to_inf_to_fin in Heqo; inv Heqo.
                       apply HK.
                     }
-                    
+
                     rewrite REL.
                     eapply K_RUTT; split; auto.
                   }
@@ -4604,7 +4751,7 @@ InfToFinAddrConvert.addr_convert_injective:
                         pclearbot.
                         rewrite REL0.
 
-                        
+
 
                         inversion RUN.
                         { rewrite itree_eta in HT1.
@@ -4627,8 +4774,8 @@ InfToFinAddrConvert.addr_convert_injective:
                         dependent destruction RUN.
                         admit.
 
-                        
-                        
+
+
                         admit.
                       + cbn. red.
                         setoid_rewrite bind_trigger.
@@ -4662,18 +4809,18 @@ InfToFinAddrConvert.addr_convert_injective:
                       constructor; auto.
                   }
                 * specialize (EQ t1). contradiction.
-              + 
+              +
 
                 genobs m1 om1.
                 clear m1 Heqom1 IHRUN.
 
                 cbn in *.
-                
 
-                
+
+
                 repeat red in EV_REL.
 
-                
+
                 assert (get_inf_tree {| _observe := t2 |} ≈ get_inf_tree (vis (@resum (Type -> Type) IFun OOME
                                                                                  (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
                                                                                  (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME
@@ -4681,7 +4828,7 @@ InfToFinAddrConvert.addr_convert_injective:
                                                                                     (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME
                                                                                        (UBE +' DebugE +' FailureE)
                                                                                        (@ReSum_id (Type -> Type) IFun Id_IFun OOME))) A o) (fun x : A => ITree.bind (ret (s2, (s1, x))) k2))).
-                { 
+                {
                   rewrite H1.
                   reflexivity.
                 }
@@ -4751,7 +4898,7 @@ H5 : DVCInfFin.uvalue_refine_strict f f0
                        constructor.
                      reflexivity.
 
-                     
+
 
   Notation res_L6 := (MemState * (store_id * (local_env * lstack * (global_env * dvalue))))%type.
 
@@ -4802,13 +4949,13 @@ with (ta:=(vis (E1.ExternalCall t0 (fin_to_inf_uvalue f0) (map fin_to_inf_dvalue
        upaco2
          (orutt_ L2_refine_strict L2_res_refine_strict
             (local_refine_strict × stack_refine_strict
-             × (global_refine_strict × DVCInfFin.dvalue_refine_strict))) bot2 
+             × (global_refine_strict × DVCInfFin.dvalue_refine_strict))) bot2
          (k0 a) (k1 b)
 
 
-                 
+
              - pclearbot.
-               
+
                do 4 red in H0.
                break_match_hyp.
                + red in H0.
@@ -4823,9 +4970,9 @@ with (ta:=(vis (E1.ExternalCall t0 (fin_to_inf_uvalue f0) (map fin_to_inf_dvalue
                    reflexivity.
                    (* TODO: Why won't this evaluate? *)
                    admit.
-                 * 
+                 *
                + red in H0. repeat red in H0.
-                 
+
                cbn in H0.
              - (* TauL *)
                clear IHRUN.
@@ -4907,13 +5054,13 @@ with (ta:=(vis (E1.ExternalCall t0 (fin_to_inf_uvalue f0) (map fin_to_inf_dvalue
                  Goal (Prop) -> False.
                    intros H.
                    induction H.
-                 
+
                  admit.
-               + 
+               +
                  cbn in *.
-                 
+
                  subst.
-               
+
                cbn.
                constructor; eauto.
                eapply IHRUN.
@@ -5200,13 +5347,13 @@ with (ta:=(vis (E1.ExternalCall t0 (fin_to_inf_uvalue f0) (map fin_to_inf_dvalue
 
         punfold RUN. red in RUN.
 
-        
-        
+
+
         apply interp_memory_prop _tau_inv in RUN.
         destruct RUN as [r3 [REQ EQ]]; subst.
 
         inversion REQ; cbn in *.
-        
+
         red.
         red.
 
@@ -5230,7 +5377,7 @@ with (ta:=(vis (E1.ExternalCall t0 (fin_to_inf_uvalue f0) (map fin_to_inf_dvalue
             destruct p, a.
             cbn.
         Qed.
-        
+
         destruct H as [[R1 R3] | [R1 R3]]; subst; auto.
       - punfold RUN.
         red in RUN.
