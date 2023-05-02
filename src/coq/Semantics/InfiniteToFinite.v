@@ -3809,7 +3809,10 @@ cbn in GCP'.
                             assert ((exists (pre : FinMem.MMEP.MMSP.MemState) (post : FinMem.MMEP.MMSP.MemState),
                                         Within.within (FinLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_fin (S len')) pre
                                           (ret (x_fin :: a_fin' :: addrs_fin)) post)).
-                            { admit.
+                            {
+                              exists ms_fin'. exists ms_fin'.
+                              cbn. red. cbn.
+                              auto.
                             }
 
                             pose proof FinMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons _ _ _ _ H0.
