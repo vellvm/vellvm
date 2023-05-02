@@ -3666,7 +3666,9 @@ cbn in GCP'.
                           assert ((exists (pre : MemoryBigIntptr.MMEP.MMSP.MemState) (post : MemoryBigIntptr.MMEP.MMSP.MemState),
                                       Within.within (InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_inf n) pre
                                         (ret (x_inf :: addrs_inf)) post)).
-                          { admit.
+                          { exists ms_inf. exists ms_inf.
+                            cbn. red. cbn.
+                            auto.
                           }
 
                           specialize (IHADDRS_CONV _ _ H4).
@@ -3770,7 +3772,15 @@ cbn in GCP'.
 
                             pose proof (MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_nth_eq1 a_inf (S len') (a_inf :: a_inf' :: addrs_inf)).
                             forward H0.
-                            { admit.
+                            { red. red.
+                              intros ms x0.
+                              split.
+                              - intros GCP'.
+                                cbn.
+                                (* Ideally want to use GCP to show this... *)
+
+
+                              admit.
                               (* red. red. *)
                               (* intros ms x0. *)
                               (* split. *)

@@ -95,6 +95,23 @@ Section Laws.
   Context `{HMB : Monad B}.
   Context `{EQM : Eq1 M}.
   Context `{WM : @Within M EQM B Pre Post}.
+
+  Class RetInvWithin :=
+    { rw_ret_inv :
+      forall X (x : B X) (y : X),
+        x ∈ ret y ->
+        x = ret y;
+    }.
+End Laws.
+
+Section Laws.
+  Variable M : Type -> Type.
+  Variable B : Type -> Type.
+  Variable Pre Post : Type.
+  Context `{HM : Monad M}.
+  Context `{HMB : Monad B}.
+  Context `{EQM : Eq1 M}.
+  Context `{WM : @Within M EQM B Pre Post}.
   Variable MSG : Type.
   Variable raise1 : forall {X}, MSG -> B X.
   Variable raise2 : forall {X}, MSG -> M X.

@@ -1717,6 +1717,68 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       eapply rw_raise_nin_ret in CONTRA; eauto.
   Qed.
 
+  Lemma get_consecutive_ptrs_success_always_succeeds :
+    forall {M : Type -> Type}
+      `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
+      {Pre Post : Type}
+      {B} `{MB : Monad B}
+      `{WM : @Within M EQM B Pre Post}
+      `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
+      `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
+      `{LAWS: @MonadLawsE M EQM HM}
+      `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
+      `{RBMERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
+      `{RWOOM : @RaiseWithin M B _ _ _ EQM WM string (@raise_oom M OOM)}
+      `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
+      `{RIW : @RetInvWithin M B _ _ _ _ EQM WM}
+      ptr len ptrs_res x,
+      (ret ptrs_res ∈ get_consecutive_ptrs ptr len)%monad ->
+      (x ∈ get_consecutive_ptrs ptr len)%monad ->
+      (exists y, x = ret y).
+  Proof.
+    intros M HM EQM EQV Pre Post B MB WM WRET OOM ERR LAWS RBMOOM RBMERR RWOOM RWERR RIW ptr len ptrs_res x GCP GCP'.
+    unfold get_consecutive_ptrs in *.
+    destruct (intptr_seq 0 len) eqn:HSEQ.
+    - pose proof (map_monad_err_succeeds
+                    (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) as HMAPM.
+      forward HMAPM.
+      { intros a IN.
+        destruct (int_to_ptr (ptr_to_int ptr + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * IP.to_Z a)%Z (address_provenance ptr)) eqn:IX.
+        - exists (ret a0).
+          apply handle_gep_addr_ix'; cbn; auto.
+        - eapply handle_gep_addr_ix'_OOM in IX; auto.
+          destruct IX as [msg IX].
+          exists (Oom msg).
+          cbn; auto.
+      }
+
+      destruct HMAPM as (ptrs & HMAPM).
+      cbn in *.
+      setoid_rewrite bind_ret_l in GCP.
+      setoid_rewrite bind_ret_l in GCP'.
+      rewrite HMAPM in GCP, GCP'.
+      cbn in *.
+      setoid_rewrite bind_ret_l in GCP.
+      setoid_rewrite bind_ret_l in GCP'.
+
+      destruct (sequence ptrs) eqn:HSEQUENCE.
+      { rename l0 into ptrs'.
+        cbn in *.
+        apply within_ret_ret in GCP; eauto; subst.
+        exists ptrs'.
+        eapply rw_ret_inv in GCP'; eauto.
+      }
+
+      { cbn in *.
+        apply rw_ret_nin_raise in GCP; eauto.
+        contradiction.
+      }
+    - cbn in *.
+      setoid_rewrite rbm_raise_bind in GCP; eauto.
+      apply rw_ret_nin_raise in GCP; eauto.
+      contradiction.
+  Qed.
+
   Definition generate_num_undef_bytes_h (start_ix : N) (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
     N.recursion
       (fun (x : N) => ret [])
