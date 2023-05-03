@@ -3651,14 +3651,13 @@ cbn in GCP'.
                       (* TODO: need to relate bytes_fin and bytes_inf *)
                       (* Will need ms_fin and ms_inf to be related as well *)
                       Lemma fin_inf_read_bytes_spec :
-                        forall a_fin a_inf n ms_fin ms_inf bytes_fin bytes_inf,
+                        forall a_fin a_inf n ms_fin ms_inf bytes_fin,
                           InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
                           MemState_refine ms_inf ms_fin ->
-                          sbytes_refine bytes_inf bytes_fin ->
                           Memory64BitIntptr.MMEP.MemSpec.read_bytes_spec a_fin n ms_fin (success_unERR_UB_OOM (ms_fin, bytes_fin)) ->
                           MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec a_inf n ms_inf (success_unERR_UB_OOM (ms_inf, map lift_SByte bytes_fin)).
                       Proof.
-                        intros a_fin a_inf n ms_fin ms_inf bytes_fin bytes_inf ADDR_CONV MEM_REF BYTES_REF READ_SPEC.
+                        intros a_fin a_inf n ms_fin ms_inf bytes_fin ADDR_CONV MEM_REF READ_SPEC.
 
                         (* TODO: Make these opaque earlier *)
                         Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
@@ -3676,11 +3675,9 @@ cbn in GCP'.
                         generalize dependent a_inf.
                         generalize dependent n.
                         generalize dependent bytes_fin.
-                        generalize dependent bytes_inf.
-                        induction ADDRS_CONV; intros bytes_inf bytes_fin BYTES_REF READ_SPEC n a_inf GCP a_fin ADDR_CONV CONSEC.
+                        induction ADDRS_CONV; intros bytes_fin READ_SPEC n a_inf GCP a_fin ADDR_CONV CONSEC.
                         - cbn in *.
-                          destruct READ_SPEC; subst.
-                          inv BYTES_REF.
+                          destruct READ_SPEC; subst; cbn.
                           auto.
                         - rewrite map_monad_unfold.
                           cbn.
@@ -3716,9 +3713,6 @@ cbn in GCP'.
                           destruct READ_SPEC_REST as [READ_SPEC_REST [MS BYTES_FIN]].
                           subst.
 
-                          inversion BYTES_REF; subst.
-                          rename l into bytes_inf'.
-
                           exists ms_inf. exists (lift_SByte a).
                           split.
                           { split; auto.
@@ -3733,8 +3727,7 @@ cbn in GCP'.
                             auto.
                           }
 
-                          specialize (IHADDRS_CONV _ _ H4).
-                          forward IHADDRS_CONV; eauto.
+                          specialize (IHADDRS_CONV _ READ_SPEC_REST).
 
                           epose proof InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons _ _ _ _ H0.
                           destruct H1 as [XA [[PTRS N] | [ptr' [ip' [len' [LEN [IP [GEP [pre [post WITHIN]]]]]]]]]].
@@ -3777,14 +3770,7 @@ cbn in GCP'.
 
                             destruct IHADDRS_CONV; subst.
                             pose proof (map_eq_nil _ _ H2) as BYTES_FIN'_NIL; subst.
-                            red in H3.
-                            destruct x.
-                            cbn in H3.
-                            break_match_hyp; inv H3.
-                            break_match_hyp; inv H6.
-                            cbn.
-
-                            auto.
+                            cbn; auto.
                           }
 
                           pose proof H0 as WITHIN_INF.
@@ -3812,7 +3798,6 @@ cbn in GCP'.
                             {
                               cbn in READ_SPEC_REST.
                               destruct READ_SPEC_REST; subst.
-                              inv H4.
                               cbn; auto.
                             }
 
@@ -4014,7 +3999,68 @@ cbn in GCP'.
 
                               do 2 red in HANDLER.
                               destruct HANDLER as (ms_read&bytes_fin&READ&WRITE).
-                              epose proof fin_inf_read_bytes_spec _ _ _ _ _ _ _ H0 MS_REF.
+                              epose proof fin_inf_read_bytes_spec _ _ _ _ _ _ H0 MS_REF.
+                              (* TODO: Move this to somewhere it can
+                                 be instantiated for all memory model
+                                 instances
+                               *)
+                              Lemma read_bytes_spec_MemState_eq :
+                                forall a sz ms ms' res,
+                                  Memory64BitIntptr.MMEP.MemSpec.read_bytes_spec a sz ms (ret (ms', res)) ->
+                                  ms = ms'.
+                              Proof.
+                                intros a sz ms ms' res READ.
+                                red in READ.
+                                cbn in *.
+                                destruct READ as [sab [a0 [GCP HMAPM]]].
+                                apply Memory64BitIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in GCP. subst.
+                                generalize dependent res.
+                                induction a0; intros res HMAPM.
+                                - cbn in *.
+                                  destruct HMAPM; subst; auto.
+                                - rewrite map_monad_unfold in HMAPM.
+                                  cbn in *.
+                                  destruct HMAPM as [sab0 [a' [[MS READ] HMAPM]]]; subst.
+                                  destruct HMAPM as [sab [a'' [HMAPM [MS RES]]]]; subst.
+                                  eapply IHa0.
+                                  eapply HMAPM.
+                              Qed.
+
+                              pose proof READ as READ'.
+                              eapply read_bytes_spec_MemState_eq in READ'; subst.
+                              forward H3.
+                              { eapply READ.
+                              }
+
+                              destruct H3 as [ms [addrs [GCP READ']]].
+                              red. red.
+                              exists ms. exists (map lift_SByte bytes_fin).
+                              split.
+                              { (* Read portion *)
+                                red.
+                                cbn.
+                                exists ms. exists addrs.
+                                split; auto.
+
+                                assert (ms = lift_MemState ms_read).
+                                {
+                                  symmetry.
+                                  eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq; eauto.
+                                }
+                                subst; eauto.
+                              }
+
+                              (* Write bytes portion *)
+                              
+
+                              -
+
+
+                              red. red.
+                              
+                              cbn in READ'.
+                              destruct READ' as [ms
+                              
 
                               Set Printing Implicit.
 
