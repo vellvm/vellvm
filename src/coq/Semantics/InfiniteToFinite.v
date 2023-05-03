@@ -3007,7 +3007,7 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
 
                               red in GCP.
                               destruct (Memory64BitIntptr.MMEP.MemSpec.MemHelpers.intptr_seq 0 n) eqn:SEQ_FIN; cbn in GCP.
-                              2: { destruct GCP as [sab [a [[] _]]]. }.
+                              2: { destruct GCP as [sab [a [[] _]]]. }
 
                               destruct GCP as [sab [a [[MS A] GCP]]]; subst.
                               destruct GCP as [sab [a [GCP SEQ]]]; subst.
@@ -3717,6 +3717,7 @@ cbn in GCP'.
                             auto.
                           }
 
+                          pose proof H0 as WITHIN_INF.
                           destruct H0 as [pre' [post' WITHIN']].
                           cbn in WITHIN'.
                           red in WITHIN'.
@@ -3770,7 +3771,7 @@ cbn in GCP'.
                                should share the same provenance as well.
                              *)
 
-                            pose proof (MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_nth_eq1 a_inf (S len') (a_inf :: a_inf' :: addrs_inf)).
+                            pose proof (MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_nth_eq1  a_inf (S len') (a_inf :: a_inf' :: addrs_inf) (M:=(MemPropT MemoryBigIntptr.MMEP.MMSP.MemState))).
                             forward H0.
                             { red. red.
                               intros ms x0.
@@ -3778,22 +3779,39 @@ cbn in GCP'.
                               - intros GCP'.
                                 cbn.
                                 (* Ideally want to use GCP to show this... *)
+                                assert (exists (pre : MemoryBigIntptr.MMEP.MMSP.MemState) (post : MemoryBigIntptr.MMEP.MMSP.MemState),
+                                           @Within.within (MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) (@MemPropT_Eq1 MemoryBigIntptr.MMEP.MMSP.MemState) err_ub_oom MemoryBigIntptr.MMEP.MMSP.MemState MemoryBigIntptr.MMEP.MMSP.MemState _ _ (MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_inf (S len')) pre (fmap snd x0) post).
+                                { exists ms. exists ms.
+                                  red. red. red.
+                                  destruct_err_ub_oom x0;
+                                    cbn; auto.
 
+                                  destruct x1; cbn in *.
+                                  pose proof GCP' as GCP''.
+                                  assert (success_unERR_UB_OOM (m, l) = @ret _ _ _ (m, l)); cbn; auto.
+                                  rewrite H1 in GCP''.
 
-                              admit.
-                              (* red. red. *)
-                              (* intros ms x0. *)
-                              (* split. *)
-                              (* - intros GCP'. *)
-                              (*   destruct_err_ub_oom x0. *)
-                              (*   + (* Contradiction *) *)
-                              (*     admit. *)
-                              (*   + (* Contradiction *) *)
-                              (*     admit. *)
-                              (*   + (* Contradiction *) *)
-                              (*     admit. *)
-                              (*   + cbn. *)
-                              (*     destruct x1. *)
+                                  pose proof MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq a_inf (S len') l ms m GCP''; subst.
+                                  eauto.
+                                }
+
+                                pose proof MemoryBigIntptr.CP.CONCBASE.MemHelpers.get_consecutive_ptrs_success_always_succeeds (M:=(MemPropT MemoryBigIntptr.MMEP.MMSP.MemState)) (B:=err_ub_oom) a_inf (S len') (a_inf :: a_inf' :: addrs_inf) _ WITHIN_INF H1.
+                                destruct_err_ub_oom x0; cbn in *; inv H2.
+                                destruct x1; cbn in *; subst.
+                                pose proof GCP' as MM.
+                                apply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in MM.
+                                subst.
+                                split; auto.
+                              - intros H1.
+                                cbn in H1.
+                                destruct_err_ub_oom x0; try inv H1.
+                                destruct x1.
+                                destruct H1.
+                                subst.
+                                pose proof WITHIN'.
+                                apply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in H1; subst.
+                                eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState.
+                                eapply WITHIN'.
                             }
 
                             specialize (H0 a_inf' 1%nat).
