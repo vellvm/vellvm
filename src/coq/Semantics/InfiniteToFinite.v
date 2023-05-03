@@ -293,6 +293,12 @@ Module InfiniteToFinite.
     reflexivity.
   Qed.
 
+  Definition sbyte_refine byte_inf byte_fin : Prop :=
+    convert_SByte byte_inf = NoOom byte_fin.
+
+  Definition sbytes_refine bytes_inf bytes_fin : Prop :=
+    Forall2 sbyte_refine bytes_inf bytes_fin.
+
   (** More refinement relations *)
   Definition L3_E1E2_orutt_strict (t1 : PropT InfLP.Events.L3 (InfMemMMSP.MemState *
                                                                  (MemPropT.store_id * (InfLLVM.Local.local_env * InfLLVM.Stack.lstack * (InfLLVM.Global.global_env * InfLP.Events.DV.dvalue))))) t2
@@ -3264,27 +3270,70 @@ cbn in GCP'.
 
                       (* TODO: Some tricky IntMap reasoning *)
                       Lemma fin_inf_read_byte_raw :
-                        forall m_inf m_fin ptr b_fin b_inf aid,
+                        forall m_inf m_fin ptr b_fin aid,
                           convert_memory m_inf = NoOom m_fin ->
                           Memory64BitIntptr.MMEP.MMSP.read_byte_raw
                             m_fin
                             ptr = Some (b_fin, aid) ->
-                          MemoryBigIntptr.MMEP.MMSP.read_byte_raw
-                            m_inf
-                            ptr = Some (b_inf, aid).
+                          exists b_inf,
+                            MemoryBigIntptr.MMEP.MMSP.read_byte_raw
+                              m_inf
+                              ptr = Some (b_inf, aid) /\
+                              sbyte_refine b_inf b_fin.
                       Proof.
-                        intros m_inf m_fin ptr b_fin b_inf aid CONV READ.
+                        intros m_inf m_fin ptr b_fin aid CONV READ.
                         Transparent Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
                         Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
                         unfold Memory64BitIntptr.MMEP.MMSP.read_byte_raw in READ.
                         unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+                        Opaque Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
+                        Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
 
                         cbn in CONV.
                         break_match_hyp; inv CONV.
+                        rename Heqo into CONV.
+                        rename l into m_fin_elems.
 
-                        Opaque Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
-                        Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
-                      Admitted.
+                        (* I should be able to use CONV.
+
+                           We know that m_fin_elems is derived from
+                           the elements of m_inf... So when I look up
+                           an element in (IntMaps.IP.of_list m_fin_elems),
+                           like in READ, we should get a byte from a
+                           convert_mem_byte call on the same byte in
+                           m_inf.
+                         *)
+
+                        Lemma IntMap_find_NoOom_elements :
+                          forall {X Y} (m : IntMaps.IM.t X) (f : (IntMaps.IM.key * X) -> OOM (IntMaps.IM.key * Y)) m_elts (n : Z) (y : Y),
+                            map_monad f (IntMaps.IM.elements (elt:=X) m) = NoOom m_elts ->
+                            (forall '(ix, x) ix', f (ix, x) = NoOom (ix', y) -> ix = ix') ->
+                            IntMaps.IM.find (elt:=Y) n (IntMaps.IP.of_list m_elts) = Some y ->
+                            exists x, IntMaps.IM.find (elt:=X) n m = Some x /\ NoOom (n, y) = f (n, x).
+                        Proof.
+                          intros X Y m f m_elts n y HMAPM F FIND.
+                        Admitted.
+
+                        epose proof IntMap_find_NoOom_elements _ _ _ ptr _ CONV.
+                        forward H.
+                        {
+                          intros pat. destruct pat.
+                          intros ix' H0.
+                          break_match_hyp; inv H0.
+                          auto.
+                        }
+                        forward H.
+                        {
+                          exact READ.
+                        }
+
+                        destruct H as [[b_inf aid'] [FIND BYTE_INF]].
+                        exists b_inf.
+                        cbn in *.
+                        break_match_hyp; inv BYTE_INF.
+                        break_match_hyp; inv Heqo.
+                        split; auto.
+                      Qed.
 
                       (* TODO: Some tricky IntMap reasoning *)
                       Lemma fin_inf_read_byte_raw_None :
@@ -3345,6 +3394,7 @@ cbn in GCP'.
 
                         eapply fin_inf_read_byte_raw in Heqo; eauto.
                         erewrite fin_inf_ptoi in Heqo; eauto.
+                        destruct Heqo as [b_inf [Heqo REF]].
                         rewrite Heqo.
 
                         destruct ALLOCATED.
@@ -3352,12 +3402,6 @@ cbn in GCP'.
 
                         destruct (LLVMParams64BitIntptr.PROV.aid_eq_dec aid a); cbn in *; try discriminate; subst.
                         destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec a a); cbn in *; try contradiction; auto.
-                        Unshelve.
-                        constructor.
-                        exact LLVMParamsBigIntptr.Events.DV.UVALUE_None.
-                        exact DTYPE_Void.
-                        exact LLVMParamsBigIntptr.Events.DV.UVALUE_None.
-                        exact 0.
                       Qed.
 
                       Lemma MemState_refine_convert_memory_stack :
@@ -3492,24 +3536,47 @@ cbn in GCP'.
                       Qed.
 
                       Lemma fin_inf_read_byte_prop_MemPropT :
-                        forall addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf,
+                        forall addr_fin addr_inf ms_fin ms_inf byte_fin,
                           MemState_refine ms_inf ms_fin ->
                           InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
                           Memory64BitIntptr.MMEP.MMSP.read_byte_MemPropT addr_fin
                             (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin)
                             (ret (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin, byte_fin)) ->
-                          MemoryBigIntptr.MMEP.MMSP.read_byte_MemPropT addr_inf
-                            (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf)
-                            (ret (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf, byte_inf)).
+                          exists byte_inf, MemoryBigIntptr.MMEP.MMSP.read_byte_MemPropT addr_inf
+                                        (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf)
+                                        (ret (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf, byte_inf)) /\
+                                        sbyte_refine byte_inf byte_fin.
                       Proof.
-                        intros addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf MSR ADDR_CONV RBP.
+                        intros addr_fin addr_inf ms_fin ms_inf byte_fin MSR ADDR_CONV RBP.
                         (* TODO: make things opaque? *)
                         destruct RBP as [ms_fin' [ms_fin'' [[MS MS'] READ]]].
                         subst.
                         destruct ms_fin eqn:MSFIN. cbn in READ.
+                        destruct ms_inf eqn:MSINF.
                         break_match_hyp.
+                        (* read_byte_MemPropT may have UB... Which
+                           means sbyte_refine byte_inf byte_fin might not
+                           hold because byte_fin could be any byte.
+                         *)
                         - destruct m.
-                          epose proof fin_inf_read_byte_raw _ _ _ _ _ _ _ Heqo.
+                          epose proof fin_inf_read_byte_raw (MemoryBigIntptr.MMEP.MMSP.memory_stack_memory ms_memory_stack0) _ _ _ _ _ Heqo.
+                          destruct H as [b_inf [H REF]].
+                          exists b_inf.
+                          split.
+                          2: {
+                            cbn in READ.
+                            break_match_hyp.
+                            - destruct READ; subst; auto.
+                            - rename a into aid.
+                              red in MSR.
+                              cbn in MSR.
+                              break_match_hyp; inv MSR.
+                              red 
+
+                              setoid_rewrite Heqo in H.
+                            rename s into blah.
+                          }
+
                           cbn.
                           eexists. eexists.
                           split; eauto.
@@ -3577,14 +3644,6 @@ cbn in GCP'.
                         destruct READ_SPEC.
                         eapply fin_inf_read_byte_spec; eauto.
                       Qed.
-
-                      (* TODO: move this *)
-                      Definition sbyte_refine byte_inf byte_fin : Prop :=
-                        convert_SByte byte_inf = NoOom byte_fin.
-
-                      (* TODO: move this *)
-                      Definition sbytes_refine bytes_inf bytes_fin : Prop :=
-                        Forall2 sbyte_refine bytes_inf bytes_fin.
 
                       (* TODO: need to relate bytes_fin and bytes_inf *)
                       (* Will need ms_fin and ms_inf to be related as well *)
@@ -3874,16 +3933,20 @@ cbn in GCP'.
                       (* TODO: Lemma about lifting intrinsic handlers *)
                       (* TODO: Move this *)
                       Lemma handle_intrinsic_fin_inf :
-                        forall t f args args0 s2 ms' d
+                        forall t f args args0 ms ms' d
                           (ARGS: Forall2 DVCInfFin.dvalue_refine_strict args0 args),
                           Memory64BitIntptr.MMEP.MemSpec.handle_intrinsic_prop
                             LLVMParams64BitIntptr.Events.DV.dvalue
-                            (LLVMParams64BitIntptr.Events.Intrinsic t f args) s2 (ret (ms', d)) ->
+                            (LLVMParams64BitIntptr.Events.Intrinsic t f args) ms (ret (ms', d)) ->
                           MemoryBigIntptr.MMEP.MemSpec.handle_intrinsic_prop DVCInfFin.DV1.dvalue
-                            (InterpreterStackBigIntptr.LP.Events.Intrinsic t f args0) (lift_MemState s2)
+                            (InterpreterStackBigIntptr.LP.Events.Intrinsic t f args0) (lift_MemState ms)
                             (ret (lift_MemState ms', fin_to_inf_dvalue d)).
                       Proof.
-                        intros t f args args0 s2 ms' d ARGS INTRINSIC.
+                        intros t f args args0 ms ms' d ARGS INTRINSIC.
+
+                        pose proof lift_MemState_refine ms as MS_REF.
+                        pose proof lift_MemState_refine ms' as MS'_REF.
+
                         red in INTRINSIC.
                         red.
                         break_match.
@@ -3937,6 +4000,10 @@ cbn in GCP'.
                               erewrite <- fin_inf_no_overlap; eauto.
                               repeat erewrite <- fin_inf_ptoi; eauto.
                               break_match_goal; auto.
+
+                              do 2 red in HANDLER.
+                              destruct HANDLER as (ms_read&bytes_fin&READ&WRITE).
+                              epose proof fin_inf_read_bytes_spec _ _ _ _ _ _ _ H0 MS_REF.
 
                               Set Printing Implicit.
 
