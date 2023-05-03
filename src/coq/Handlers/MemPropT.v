@@ -444,6 +444,31 @@ Proof.
   auto.
 Defined.
 
+#[global] Instance RetInvWithin_MemPropT {MemState} :
+  RetInvWithin (MemPropT MemState) err_ub_oom MemState MemState.
+Proof.
+  split.
+  intros X msg x.
+  cbn.
+  intros [ms [ms' CONTRA]].
+  auto.
+  break_match_hyp.
+  break_match_hyp.
+  break_match_hyp.
+  break_match_hyp.
+  break_match_hyp.
+  break_match_hyp.
+  break_match_hyp; inv CONTRA.
+  break_match_hyp.
+  break_match_hyp; inv CONTRA.
+  break_match_hyp.
+  break_match_hyp; inv CONTRA.
+  destruct p.
+  destruct CONTRA; subst.
+  destruct_err_ub_oom msg; cbn in *; inv Heqe.
+  auto.
+Defined.
+
 #[global] Instance DisjointRaiseWithin_UB_MemPropT {MemState} :
   DisjointRaiseWithin (MemPropT MemState) err_ub_oom MemState MemState string
     (@raise_ub err_ub_oom RAISE_UB_err_ub_oom_T) (@raise_oom (MemPropT MemState) MemPropT_RAISE_OOM).

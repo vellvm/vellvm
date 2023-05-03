@@ -1734,7 +1734,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       ptr len ptrs_res x,
       (ret ptrs_res ∈ get_consecutive_ptrs ptr len)%monad ->
       (x ∈ get_consecutive_ptrs ptr len)%monad ->
-      (exists y, x = ret y).
+      x = ret ptrs_res.
   Proof.
     intros M HM EQM EQV Pre Post B MB WM WRET OOM ERR LAWS RBMOOM RBMERR RWOOM RWERR RIW ptr len ptrs_res x GCP GCP'.
     unfold get_consecutive_ptrs in *.
@@ -1765,7 +1765,6 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       { rename l0 into ptrs'.
         cbn in *.
         apply within_ret_ret in GCP; eauto; subst.
-        exists ptrs'.
         eapply rw_ret_inv in GCP'; eauto.
       }
 
