@@ -3656,7 +3656,7 @@ cbn in GCP'.
                           MemState_refine ms_inf ms_fin ->
                           sbytes_refine bytes_inf bytes_fin ->
                           Memory64BitIntptr.MMEP.MemSpec.read_bytes_spec a_fin n ms_fin (success_unERR_UB_OOM (ms_fin, bytes_fin)) ->
-                          MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec a_inf n ms_inf (success_unERR_UB_OOM (ms_inf, bytes_inf)).
+                          MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec a_inf n ms_inf (success_unERR_UB_OOM (ms_inf, map lift_SByte bytes_fin)).
                       Proof.
                         intros a_fin a_inf n ms_fin ms_inf bytes_fin bytes_inf ADDR_CONV MEM_REF BYTES_REF READ_SPEC.
 
@@ -3776,17 +3776,14 @@ cbn in GCP'.
                             }
 
                             destruct IHADDRS_CONV; subst.
+                            pose proof (map_eq_nil _ _ H2) as BYTES_FIN'_NIL; subst.
                             red in H3.
                             destruct x.
                             cbn in H3.
                             break_match_hyp; inv H3.
-                            break_match_hyp; inv H5.
+                            break_match_hyp; inv H6.
                             cbn.
 
-                            erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
-                            erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
-
-                            rewrite DVC1.uvalue_refine_strict_equation.
                             auto.
                           }
 
@@ -3806,7 +3803,7 @@ cbn in GCP'.
                           eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in PREPOST.
                           subst.
 
-                          exists ms_inf. exists bytes_inf'.
+                          exists ms_inf. exists (map lift_SByte bytes_fin').
                           split; auto.
 
                           destruct addrs_inf as [? | a_inf' addrs_inf].
@@ -3942,19 +3939,6 @@ cbn in GCP'.
                             apply FinMem.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in H1; subst.
                             eapply FinMem.MMEP.get_consecutive_ptrs_MemPropT_MemState; eauto.
                             eapply WITHIN''.
-
-                          + split; auto.
-                            destruct x. red in H3.
-                            cbn in H3.
-                            break_match_hyp; inv H3.
-                            break_match_hyp; inv H1.
-                            cbn.
-
-                            erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
-                            erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
-
-                            rewrite DVC1.uvalue_refine_strict_equation.
-                            auto.      
                       Qed.
 
                       (* TODO: Lemma about lifting intrinsic handlers *)
