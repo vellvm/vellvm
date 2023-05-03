@@ -492,25 +492,25 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           vs <- map_monad (fun '(dt, index) => denote_exp (Some dt) index) idxs ;;
           ret (UVALUE_GetElementPtr dt1 vptr vs)
 
-        | OP_ExtractElement (dt_vec, vecop) (dt_idx, idx) =>
+        | OP_ExtractElement _ _ =>
             raise "Unsupported expression: ExtractElement"
 
-        | OP_InsertElement (dt_vec, vecop) (dt_elt, eltop) (dt_idx, idx) =>
+        | OP_InsertElement _ _ _ =>
             raise "Unsupported expression: InsertElement"
 
-        | OP_ShuffleVector (dt_vec1, vecop1) (dt_vec2, vecop2) (dt_mask, idxmask) =>
+        | OP_ShuffleVector _ _ _ =>
             raise "Unsupported expression: ShuffleVector"
 
-        | OP_ExtractValue (dt, str) idxs =>
+        | OP_ExtractValue _ _ =>
             raise "Unsupported expression: ExtractValue"
 
-        | OP_InsertValue (dt_str, strop) (dt_elt, eltop) idxs =>
+        | OP_InsertValue _ _ _ =>
             raise "Unsupported expression: InsertValue"
 
-        | OP_Select (dt, cnd) (dt1, op1) (dt2, op2) =>
+        | OP_Select _ _ _ =>
             raise "Unsupported expression: Select"
 
-        | OP_Freeze (dt, e) =>
+        | OP_Freeze _ =>
             raise "Unsupported expression: Freeze"
         end.
   Arguments denote_exp _ : simpl nomatch.
@@ -679,7 +679,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         dvs <- Util.map_monad
                 (fun x => translate exp_to_instr (denote_phi bid_from x))
                 phis;;
-        Util.map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
+        Util.map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs ;;
         ret tt.
 
       (* A block ends with a terminator, it either jumps to another block,
@@ -697,7 +697,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          This is due to the _tail recursive_ nature of these jumps: they only occur as the last
          instruction of blocks. We hence can use a [loop] operator to do the linking, as opposed
          to the more general [mrec] operator that will be used to link internal calls.
-   
+
          The idea here is simply to enter the body through the [init] [block_id] of the [cfg].
          As long as the computation returns a new label to jump to, we feed it back to the loop.
          If it ever returns a dynamic value, we exit the loop by returning the [dvalue].
@@ -748,7 +748,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           bs <- lift_err ret (combine_lists_err (df_args df) args) ;;
           (* generate the corresponding writes to the local stack frame *)
           trigger MemPush ;;
-          trigger (StackPush (map (fun '(k,v) => (k, v)) bs)) ;;
+          trigger (StackPush bs) ;;
           rv <- translate instr_to_L0' (denote_cfg (df_instrs df)) ;;
           trigger StackPop ;;
           trigger MemPop ;;
