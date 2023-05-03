@@ -3275,11 +3275,9 @@ cbn in GCP'.
                           Memory64BitIntptr.MMEP.MMSP.read_byte_raw
                             m_fin
                             ptr = Some (b_fin, aid) ->
-                          exists b_inf,
                             MemoryBigIntptr.MMEP.MMSP.read_byte_raw
                               m_inf
-                              ptr = Some (b_inf, aid) /\
-                              sbyte_refine b_inf b_fin.
+                              ptr = Some (lift_SByte b_fin, aid).
                       Proof.
                         intros m_inf m_fin ptr b_fin aid CONV READ.
                         Transparent Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
@@ -3328,11 +3326,21 @@ cbn in GCP'.
                         }
 
                         destruct H as [[b_inf aid'] [FIND BYTE_INF]].
-                        exists b_inf.
                         cbn in *.
                         break_match_hyp; inv BYTE_INF.
                         break_match_hyp; inv Heqo.
-                        split; auto.
+
+                        unfold lift_SByte.
+                        destruct b_inf. cbn in Heqo0.
+                        break_match_hyp; inv Heqo0.
+                        break_match_hyp; inv H0.
+                        rewrite FIND.
+
+                        erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+                        erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+
+                        rewrite DVC1.uvalue_refine_strict_equation.
+                        auto.
                       Qed.
 
                       (* TODO: Some tricky IntMap reasoning *)
@@ -3394,7 +3402,6 @@ cbn in GCP'.
 
                         eapply fin_inf_read_byte_raw in Heqo; eauto.
                         erewrite fin_inf_ptoi in Heqo; eauto.
-                        destruct Heqo as [b_inf [Heqo REF]].
                         rewrite Heqo.
 
                         destruct ALLOCATED.
@@ -3542,10 +3549,9 @@ cbn in GCP'.
                           Memory64BitIntptr.MMEP.MMSP.read_byte_MemPropT addr_fin
                             (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin)
                             (ret (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin, byte_fin)) ->
-                          exists byte_inf, MemoryBigIntptr.MMEP.MMSP.read_byte_MemPropT addr_inf
-                                        (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf)
-                                        (ret (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf, byte_inf)) /\
-                                        sbyte_refine byte_inf byte_fin.
+                          MemoryBigIntptr.MMEP.MMSP.read_byte_MemPropT addr_inf
+                            (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf)
+                            (ret (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf, lift_SByte byte_fin)).
                       Proof.
                         intros addr_fin addr_inf ms_fin ms_inf byte_fin MSR ADDR_CONV RBP.
                         (* TODO: make things opaque? *)
@@ -3560,22 +3566,6 @@ cbn in GCP'.
                          *)
                         - destruct m.
                           epose proof fin_inf_read_byte_raw (MemoryBigIntptr.MMEP.MMSP.memory_stack_memory ms_memory_stack0) _ _ _ _ _ Heqo.
-                          destruct H as [b_inf [H REF]].
-                          exists b_inf.
-                          split.
-                          2: {
-                            cbn in READ.
-                            break_match_hyp.
-                            - destruct READ; subst; auto.
-                            - rename a into aid.
-                              red in MSR.
-                              cbn in MSR.
-                              break_match_hyp; inv MSR.
-                              red 
-
-                              setoid_rewrite Heqo in H.
-                            rename s into blah.
-                          }
 
                           cbn.
                           eexists. eexists.
@@ -3584,6 +3574,13 @@ cbn in GCP'.
                           rewrite H.
                           erewrite fin_inf_access_allowed; cbn; eauto.
                           break_match_goal; cbn; eauto.
+
+                          break_match_hyp.
+                          destruct READ; subst; auto.
+
+                          cbn in Heqb0.
+                          rewrite Heqb0 in Heqb.
+                          discriminate.
                         - epose proof fin_inf_read_byte_raw_None _ _ _ _ Heqo.
                           cbn.
                           eexists. eexists.
@@ -3596,34 +3593,40 @@ cbn in GCP'.
                           all: clear READ.
                           + replace (Memory64BitIntptr.MMEP.MMSP.memory_stack_memory ms_memory_stack) with (Memory64BitIntptr.MMEP.MMSP.memory_stack_memory
        (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin)).
+                            replace (MemoryBigIntptr.MMEP.MMSP.memory_stack_memory ms_memory_stack0) with (MemoryBigIntptr.MMEP.MMSP.memory_stack_memory
+                                                                                                              (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf)).
                             eapply MemState_refine_convert_memory'; subst; eauto.
+                            subst; cbn. auto.
                             subst; cbn. auto.
                           + replace (Memory64BitIntptr.MMEP.MMSP.memory_stack_memory ms_memory_stack) with (Memory64BitIntptr.MMEP.MMSP.memory_stack_memory
        (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin)).
+                            replace (MemoryBigIntptr.MMEP.MMSP.memory_stack_memory ms_memory_stack0) with (MemoryBigIntptr.MMEP.MMSP.memory_stack_memory
+                                                                                                              (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf)).
                             eapply MemState_refine_convert_memory'; subst; eauto.
+                            subst; cbn. auto.
                             subst; cbn. auto.
                       Qed.
 
                       Lemma fin_inf_read_byte_prop :
-                        forall addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf,
+                        forall addr_fin addr_inf ms_fin ms_inf byte_fin,
                           MemState_refine ms_inf ms_fin ->
                           InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
                           Memory64BitIntptr.MMEP.MemSpec.read_byte_prop ms_fin addr_fin byte_fin ->
-                          MemoryBigIntptr.MMEP.MemSpec.read_byte_prop ms_inf addr_inf byte_inf.
+                          MemoryBigIntptr.MMEP.MemSpec.read_byte_prop ms_inf addr_inf (lift_SByte byte_fin).
                       Proof.
-                        intros addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf MSR ADDR_CONV RBP.
+                        intros addr_fin addr_inf ms_fin ms_inf byte_fin MSR ADDR_CONV RBP.
                         red. red in RBP.
                         eapply fin_inf_read_byte_prop_MemPropT; eauto.
                       Qed.
 
                       Lemma fin_inf_read_byte_spec :
-                        forall addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf,
+                        forall addr_fin addr_inf ms_fin ms_inf byte_fin,
                           MemState_refine ms_inf ms_fin ->
                           InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
-                          Memory64BitIntptr.MMEP.MemSpec.read_byte_spec ms_fin addr_fin byte_fin->
-                          MemoryBigIntptr.MMEP.MemSpec.read_byte_spec ms_inf addr_inf byte_inf.
+                          Memory64BitIntptr.MMEP.MemSpec.read_byte_spec ms_fin addr_fin byte_fin ->
+                          MemoryBigIntptr.MMEP.MemSpec.read_byte_spec ms_inf addr_inf (lift_SByte byte_fin).
                       Proof.
-                        intros addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf MSR ADDR_CONV READ_SPEC.
+                        intros addr_fin addr_inf ms_fin ms_inf byte_fin MSR ADDR_CONV READ_SPEC.
                         destruct READ_SPEC.
                         split.
                         - eapply fin_inf_read_byte_allowed; eauto.
@@ -3631,13 +3634,13 @@ cbn in GCP'.
                       Qed.
 
                       Lemma fin_inf_read_byte_spec_MemPropT :
-                        forall addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf,
+                        forall addr_fin addr_inf ms_fin ms_inf byte_fin,
                           MemState_refine ms_inf ms_fin ->
                           InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
                           Memory64BitIntptr.MMEP.MemSpec.read_byte_spec_MemPropT addr_fin ms_fin (success_unERR_UB_OOM (ms_fin, byte_fin)) ->
-                          MemoryBigIntptr.MMEP.MemSpec.read_byte_spec_MemPropT addr_inf ms_inf (success_unERR_UB_OOM (ms_inf, byte_inf)).
+                          MemoryBigIntptr.MMEP.MemSpec.read_byte_spec_MemPropT addr_inf ms_inf (success_unERR_UB_OOM (ms_inf, lift_SByte byte_fin)).
                       Proof.
-                        intros addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf MSR ADDR_CONV READ_SPEC.
+                        intros addr_fin addr_inf ms_fin ms_inf byte_fin MSR ADDR_CONV READ_SPEC.
                         red. cbn.
                         split; auto.
                         red in READ_SPEC. cbn in READ_SPEC.
@@ -3716,7 +3719,7 @@ cbn in GCP'.
                           inversion BYTES_REF; subst.
                           rename l into bytes_inf'.
 
-                          exists ms_inf. exists x.
+                          exists ms_inf. exists (lift_SByte a).
                           split.
                           { split; auto.
                             eapply fin_inf_read_byte_spec; eauto.
@@ -3773,6 +3776,17 @@ cbn in GCP'.
                             }
 
                             destruct IHADDRS_CONV; subst.
+                            red in H3.
+                            destruct x.
+                            cbn in H3.
+                            break_match_hyp; inv H3.
+                            break_match_hyp; inv H5.
+                            cbn.
+
+                            erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+                            erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+
+                            rewrite DVC1.uvalue_refine_strict_equation.
                             auto.
                           }
 
@@ -3928,6 +3942,19 @@ cbn in GCP'.
                             apply FinMem.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in H1; subst.
                             eapply FinMem.MMEP.get_consecutive_ptrs_MemPropT_MemState; eauto.
                             eapply WITHIN''.
+
+                          + split; auto.
+                            destruct x. red in H3.
+                            cbn in H3.
+                            break_match_hyp; inv H3.
+                            break_match_hyp; inv H1.
+                            cbn.
+
+                            erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+                            erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+
+                            rewrite DVC1.uvalue_refine_strict_equation.
+                            auto.      
                       Qed.
 
                       (* TODO: Lemma about lifting intrinsic handlers *)
