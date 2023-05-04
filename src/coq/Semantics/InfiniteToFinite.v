@@ -3542,6 +3542,23 @@ cbn in GCP'.
                         - eapply fin_inf_access_allowed; eauto.
                       Qed.
 
+                      Lemma fin_inf_write_byte_allowed :
+                        forall addr_fin addr_inf ms_fin ms_inf,
+                          MemState_refine ms_inf ms_fin ->
+                          InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+                          Memory64BitIntptr.MMEP.MemSpec.write_byte_allowed ms_fin addr_fin ->
+                          MemoryBigIntptr.MMEP.MemSpec.write_byte_allowed ms_inf addr_inf.
+                      Proof.
+                        intros addr_fin addr_inf ms_fin ms_inf MSR ADDR_CONV WRITE_ALLOWED.
+                        red. red in WRITE_ALLOWED.
+
+                        destruct WRITE_ALLOWED as [aid [BYTE_ALLOCATED ACCESS_ALLOWED]].
+                        exists aid.
+                        split.
+                        - eapply fin_inf_byte_allocated; eauto.
+                        - eapply fin_inf_access_allowed; eauto.
+                      Qed.
+
                       Lemma fin_inf_read_byte_prop_MemPropT :
                         forall addr_fin addr_inf ms_fin ms_inf byte_fin,
                           MemState_refine ms_inf ms_fin ->
@@ -3922,6 +3939,53 @@ cbn in GCP'.
                             apply FinMem.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in H1; subst.
                             eapply FinMem.MMEP.get_consecutive_ptrs_MemPropT_MemState; eauto.
                             eapply WITHIN''.
+                      Qed.
+
+                      Lemma fin_inf_set_byte_memory :
+                        forall addr_inf addr_fin byte_fin ms_fin ms_inf,
+                          MemState_refine ms_inf ms_fin ->
+                          InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+                          Memory64BitIntptr.MMEP.MemSpec.set_byte_memory ms_fin addr_fin byte_fin ms_fin ->
+                          MemoryBigIntptr.MMEP.MemSpec.set_byte_memory ms_inf addr_inf (lift_SByte byte_fin) ms_inf.
+                      Proof.
+                        intros addr_inf addr_fin byte_fin ms_fin ms_inf REF CONV SET.
+                        destruct SET.
+                        split.
+                        - eapply fin_inf_read_byte_spec; eauto.
+                        - intros ptr' byte' DISJOINT.
+                          split; intros READ; eauto.
+                      Qed.
+
+                      Lemma fin_inf_write_byte_operation_invariants :
+                        forall addr_inf addr_fin ms_fin ms_inf,
+                          MemState_refine ms_inf ms_fin ->
+                          InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+                          Memory64BitIntptr.MMEP.MemSpec.write_byte_operation_invariants ms_fin ms_fin ->
+                          MemoryBigIntptr.MMEP.MemSpec.write_byte_operation_invariants ms_inf ms_inf.
+                      Proof.
+                        intros addr_inf addr_fin ms_fin ms_inf REF CONV INV.
+                        destruct INV.
+                        split; try solve [split; eauto].
+                      Qed.
+
+                      Lemma fin_inf_write_byte_spec_MemPropT :
+                        forall addr_fin addr_inf ms_fin ms_inf byte_fin,
+                          MemState_refine ms_inf ms_fin ->
+                          InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+                          Memory64BitIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_fin byte_fin
+                            ms_fin
+                            (ret (ms_fin, tt)) ->
+                          MemoryBigIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_inf (lift_SByte byte_fin)
+                            ms_inf
+                            (ret (ms_inf, tt)).
+                      Proof.
+                        intros addr_fin addr_inf ms_fin ms_inf byte_fin MSR ADDR_CONV WBP.
+                        (* TODO: make things opaque? *)
+                        destruct WBP.
+                        split.
+                        - eapply fin_inf_write_byte_allowed; eauto.
+                        - eapply fin_inf_set_byte_memory; eauto.
+                        - eapply fin_inf_write_byte_operation_invariants; eauto.
                       Qed.
 
                       Lemma fin_inf_write_bytes_spec :
