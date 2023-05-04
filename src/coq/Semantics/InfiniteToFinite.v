@@ -3941,19 +3941,123 @@ cbn in GCP'.
                             eapply WITHIN''.
                       Qed.
 
-                      Lemma fin_inf_set_byte_memory :
-                        forall addr_inf addr_fin byte_fin ms_fin ms_inf,
-                          MemState_refine ms_inf ms_fin ->
+                      Lemma fin_inf_disjoint_ptr_byte :
+                        forall addr_fin addr_fin' addr_inf addr_inf',
                           InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
-                          Memory64BitIntptr.MMEP.MemSpec.set_byte_memory ms_fin addr_fin byte_fin ms_fin ->
-                          MemoryBigIntptr.MMEP.MemSpec.set_byte_memory ms_inf addr_inf (lift_SByte byte_fin) ms_inf.
+                          InfToFinAddrConvert.addr_convert addr_inf' = NoOom addr_fin' ->
+                          Memory64BitIntptr.MMEP.MemSpec.disjoint_ptr_byte addr_fin addr_fin' <->
+                          MemoryBigIntptr.MMEP.MemSpec.disjoint_ptr_byte addr_inf addr_inf'.
                       Proof.
-                        intros addr_inf addr_fin byte_fin ms_fin ms_inf REF CONV SET.
+                        intros addr_fin addr_fin' addr_inf addr_inf' CONV CONV'.
+                        split; intros DISJOINT.
+                        - red in DISJOINT.
+                          red.
+                          unfold InfToFinAddrConvert.addr_convert in *.
+                          destruct addr_inf, addr_inf'.
+                          cbn in *.
+                          erewrite FinLP.ITOP.ptr_to_int_int_to_ptr in DISJOINT; [| apply CONV].
+                          erewrite FinLP.ITOP.ptr_to_int_int_to_ptr in DISJOINT; [| apply CONV'].
+                          auto.
+                        - red in DISJOINT.
+                          red.
+                          unfold InfToFinAddrConvert.addr_convert in *.
+                          destruct addr_inf, addr_inf'.
+                          cbn in *.
+                          erewrite FinLP.ITOP.ptr_to_int_int_to_ptr; [| apply CONV].
+                          erewrite FinLP.ITOP.ptr_to_int_int_to_ptr; [| apply CONV'].
+                          auto.
+                      Qed.
+
+                      Lemma fin_inf_set_byte_memory :
+                        forall addr_inf addr_fin byte_fin ms_fin ms_inf ms_fin' ms_inf',
+                          MemState_refine ms_inf ms_fin ->
+                          MemState_refine ms_inf' ms_fin' ->
+                          InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+                          Memory64BitIntptr.MMEP.MemSpec.set_byte_memory ms_fin addr_fin byte_fin ms_fin' ->
+                          MemoryBigIntptr.MMEP.MemSpec.set_byte_memory ms_inf addr_inf (lift_SByte byte_fin) ms_inf'.
+                      Proof.
+                        intros addr_inf addr_fin byte_fin ms_fin ms_inf ms_fin' ms_inf' REF REF' CONV SET.
                         destruct SET.
                         split.
                         - eapply fin_inf_read_byte_spec; eauto.
                         - intros ptr' byte' DISJOINT.
-                          split; intros READ; eauto.
+                          split; intros READ.
+                          +
+                            destruct (InfToFinAddrConvert.addr_convert ptr') eqn:CONVPTR.
+                            {
+                              epose proof fin_inf_read_byte_spec _ _ _ _ _ REF' CONVPTR.
+                              pose proof fin_inf_disjoint_ptr_byte _ _ _ _ CONV CONVPTR as [_ DISJOINT_a].
+                              specialize (DISJOINT_a DISJOINT).
+                              specialize (old_lu a).
+
+                            }
+                            destruct READ.
+                            (* TODO: Move this *)
+                            (* TODO: Ask about in meeting? *)
+                            Lemma fin_inf_big_addresses_no_byte_to_read :
+                              forall mem_inf mem_fin addr_inf oom_msg,
+                                convert_memory mem_inf = NoOom mem_fin ->
+                                InfToFinAddrConvert.addr_convert addr_inf = Oom oom_msg ->
+                                MemoryBigIntptr.MMEP.MMSP.read_byte_raw mem_inf (LLVMParamsBigIntptr.PTOI.ptr_to_int addr_inf) = None.
+                            Proof.
+                              intros mem_inf mem_fin addr_inf oom_msg MEM_CONV ADDR_CONV.
+                              unfold InfToFinAddrConvert.addr_convert in *.
+                              destruct addr_inf as [ix_inf pr].
+                              Transparent convert_memory.
+                              unfold convert_memory in MEM_CONV.
+                              Opaque convert_memory.
+                              cbn in *.
+                              break_match_hyp; inv MEM_CONV.
+                            Admitted.
+
+                            destruct read_byte_allowed_spec.
+                            destruct H.
+                            destruct H.
+                            destruct H.
+                            destruct H.
+                            red in H.
+                            destruct H.
+                            cbn in H1.
+                            cbn in H.
+                            Transparent MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop.
+                            unfold MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop in H.
+                            cbn in H.
+                            destruct H.
+                            destruct H.
+                            destruct H.
+                            destruct H.
+                            clear read_byte_value.
+                            erewrite fin_inf_big_addresses_no_byte_to_read in H3; eauto.
+                            * destruct H3, H1.
+                              destruct ms_inf; cbn in *; subst.
+                              discriminate.
+                            * replace (MemoryBigIntptr.MMEP.MMSP.memory_stack_memory x3) with (MemoryBigIntptr.MMEP.MMSP.mem_state_memory ms_inf).
+                              eapply MemState_refine_convert_memory; eauto.
+                              destruct ms_inf; cbn in *; subst.
+                              unfold MemoryBigIntptr.MMEP.MMSP.mem_state_memory.
+                              cbn.
+                              reflexivity.
+                            * 
+                            cbn in *.
+
+                            (* TODO: Move this *)
+                            Lemma fin_inf_big_addresses_not_allocated :
+                              forall ms_inf ms_fin addr_inf oom_msg aid,
+                                MemState_refine ms_inf ms_fin ->
+                                InfToFinAddrConvert.addr_convert addr_inf = Oom oom_msg ->
+                                ~MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop addr_inf aid ms_inf.
+                                addr
+                              read_byte_allowed
+
+                            
+                          + destruct (InfToFinAddrConvert.addr_convert ptr') eqn:PTR.
+                            * admit.
+                            * 
+
+                            pose proof (old_lu ptr' byte_fin).
+                            forward H.
+                            eapply fin_inf_disjoint_ptr_byte; [| | eauto].
+                            
                       Qed.
 
                       Lemma fin_inf_write_byte_operation_invariants :
@@ -3969,17 +4073,18 @@ cbn in GCP'.
                       Qed.
 
                       Lemma fin_inf_write_byte_spec_MemPropT :
-                        forall addr_fin addr_inf ms_fin ms_inf byte_fin,
+                        forall addr_fin addr_inf ms_fin ms_inf ms_fin' ms_inf' byte_fin,
                           MemState_refine ms_inf ms_fin ->
+                          MemState_refine ms_inf' ms_fin' ->
                           InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
                           Memory64BitIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_fin byte_fin
                             ms_fin
-                            (ret (ms_fin, tt)) ->
+                            (ret (ms_fin', tt)) ->
                           MemoryBigIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_inf (lift_SByte byte_fin)
                             ms_inf
-                            (ret (ms_inf, tt)).
+                            (ret (ms_inf', tt)).
                       Proof.
-                        intros addr_fin addr_inf ms_fin ms_inf byte_fin MSR ADDR_CONV WBP.
+                        intros addr_fin addr_inf ms_fin ms_inf ms_fin' ms_inf' byte_fin MSR MSR' ADDR_CONV WBP.
                         (* TODO: make things opaque? *)
                         destruct WBP.
                         split.
@@ -3989,11 +4094,11 @@ cbn in GCP'.
                       Qed.
 
                       Lemma fin_inf_write_bytes_spec :
-                        forall a_fin a_inf ms_fin ms_inf bytes_fin,
+                        forall a_fin a_inf ms_fin ms_inf ms_fin' ms_inf' bytes_fin,
                           InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
                           MemState_refine ms_inf ms_fin ->
-                          Memory64BitIntptr.MMEP.MemSpec.write_bytes_spec a_fin bytes_fin ms_fin (success_unERR_UB_OOM (ms_fin, tt)) ->
-                          MemoryBigIntptr.MMEP.MemSpec.write_bytes_spec a_inf (map lift_SByte bytes_fin) ms_inf (success_unERR_UB_OOM (ms_inf, tt)).
+                          Memory64BitIntptr.MMEP.MemSpec.write_bytes_spec a_fin bytes_fin ms_fin (success_unERR_UB_OOM (ms_fin', tt)) ->
+                          MemoryBigIntptr.MMEP.MemSpec.write_bytes_spec a_inf (map lift_SByte bytes_fin) ms_inf (success_unERR_UB_OOM (ms_inf', tt)).
                       Proof.
                         intros a_fin a_inf ms_fin ms_inf bytes_fin ADDR_CONV MEM_REF WRITE_SPEC.
 
@@ -4042,7 +4147,27 @@ cbn in GCP'.
                           }
                           subst.
 
-                          
+                          induction bytes_fin.
+                          {
+                            cbn in *; tauto.
+                          }
+
+                          {
+                            rewrite MemoryBigIntptrInfiniteSpec.MemTheory.zip_cons in HMAPM.
+                            cbn in HMAPM.
+                            destruct HMAPM as [sab [a0 [WRITE HMAPM]]].
+                            destruct HMAPM as [sab0 [a' [HMAPM [MS RES]]]].
+                            subst.
+
+                            specialize (IHADDRS_CONV bytes_fin).
+                            forward IHADDRS_CONV.
+                            {
+                              exists sab0. exists a'.
+                              split; auto.
+                            }
+                          }
+                           
+                          epose proof fin_inf_write_byte_spec_MemPropT _ _ _ _ _ MEM_REF ADDR_CONV.
                           
                         rewrite map_monad_unfold.
                           cbn.
