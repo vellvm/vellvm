@@ -3304,21 +3304,76 @@ cbn in GCP'.
 
                         (* TODO: Maybe change MemState_refine to be propositional in terms of find *)
 
+                        Lemma IntMap_find_NoOom_assoc_list :
+                          forall {X Y} (l : list (IntMaps.IM.key * X)) (f : (IntMaps.IM.key * X) -> OOM (IntMaps.IM.key * Y)) m_elts (n : Z) (y : Y),
+                            SetoidList.NoDupA (IntMaps.IM.eq_key (elt:=X)) l ->
+                            map_monad f l = NoOom m_elts ->
+                            (forall '(ix, x) '(ix', y), f (ix, x) = NoOom (ix', y) -> ix = ix') ->
+                            IntMaps.IM.find (elt:=Y) n (IntMaps.IP.of_list m_elts) = Some y ->
+                            exists x, SetoidList.findA (IntMaps.IP.F.eqb n) l = Some x /\ NoOom (n, y) = f (n, x).
+                        Proof.
+                          induction l; intros f m_elts n y NODUP HMAPM F FIND.
+                          - cbn in *.
+                            inv HMAPM.
+                            cbn in *.
+                            inv FIND.
+                          - cbn in *.
+                            break_match_hyp; [|inv HMAPM].
+                            break_match_hyp; [|inv HMAPM].
+                            inv HMAPM.
+                            destruct a as [a_k a_v].
+                            destruct p as [p_k p_v].
+                            pose proof (F (a_k, a_v) (p_k, p_v) Heqo); subst.
+                            Opaque IntMaps.IM.find.
+                            Opaque IntMaps.IM.add.
+                            cbn in *.
+                            break_match_goal.
+                            + (* New element *)
+                              exists a_v.
+                              split; auto.
+                              unfold IntMaps.IP.F.eqb in Heqb.
+                              break_match_hyp; subst; try discriminate.
+                              unfold IntMaps.IP.uncurry in FIND.
+                              rewrite IntMaps.IP.F.add_eq_o in FIND; cbn; auto.
+                              cbn in FIND.
+                              inv FIND.
+                              auto.
+                            + (* Old element *)
+                              inversion NODUP; subst.
+                              rename H1 into NIN.
+                              rename H2 into NODUP'.
+
+                              unfold IntMaps.IP.F.eqb in Heqb.
+                              break_match_hyp; subst; try discriminate.
+                              unfold IntMaps.IP.uncurry in FIND.
+                              rewrite IntMaps.IP.F.add_neq_o in FIND; cbn; auto.
+
+                              eauto.
+                        Qed.
+
                         Lemma IntMap_find_NoOom_elements :
                           forall {X Y} (m : IntMaps.IM.t X) (f : (IntMaps.IM.key * X) -> OOM (IntMaps.IM.key * Y)) m_elts (n : Z) (y : Y),
                             map_monad f (IntMaps.IM.elements (elt:=X) m) = NoOom m_elts ->
-                            (forall '(ix, x) ix', f (ix, x) = NoOom (ix', y) -> ix = ix') ->
+                            (forall '(ix, x) '(ix', y), f (ix, x) = NoOom (ix', y) -> ix = ix') ->
                             IntMaps.IM.find (elt:=Y) n (IntMaps.IP.of_list m_elts) = Some y ->
                             exists x, IntMaps.IM.find (elt:=X) n m = Some x /\ NoOom (n, y) = f (n, x).
                         Proof.
                           intros X Y m f m_elts n y HMAPM F FIND.
-                        Admitted.
+                          pose proof IntMaps.IP.F.elements_o.
+                          setoid_rewrite H.
+                          eapply IntMap_find_NoOom_assoc_list.
+                          2: {
+                            exact HMAPM.
+                          }
+                          all: auto.
+                          apply IntMaps.IM.elements_3w.
+                        Qed.
 
                         epose proof IntMap_find_NoOom_elements _ _ _ ptr _ CONV.
                         forward H.
                         {
                           intros pat. destruct pat.
-                          intros ix' H0.
+                          intros [ix' y] H0.
                           break_match_hyp; inv H0.
                           auto.
                         }
