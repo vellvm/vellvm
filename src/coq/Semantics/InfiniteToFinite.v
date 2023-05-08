@@ -4118,11 +4118,16 @@ cbn in GCP'.
                                   auto.
                                 }
 
-                                {
-
+                                { (* Read failed, Heqo *)
+                                  (* Probably a contradiction with read_byte_allowed_spec *)
+                                  clear READ_INF.
+                                  destruct read_byte_allowed_spec as [aid_fin [BYTE_ALLOCATED_FIN ACCESS_ALLOWED_FIN]].
+                                  apply fin_byte_allocated_read_byte_raw in BYTE_ALLOCATED_FIN.
+                                  destruct BYTE_ALLOCATED_FIN.
+                                  rewrite H in Heqo.
+                                  inv Heqo.
                                 }
-                                
-                              Admitted.
+                              Qed.
 
                             (* a is disjoint from addr_fin, which means that old_lu should hold
 
