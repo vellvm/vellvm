@@ -3302,6 +3302,8 @@ cbn in GCP'.
                            m_inf.
                          *)
 
+                        (* TODO: Maybe change MemState_refine to be propositional in terms of find *)
+
                         Lemma IntMap_find_NoOom_elements :
                           forall {X Y} (m : IntMaps.IM.t X) (f : (IntMaps.IM.key * X) -> OOM (IntMaps.IM.key * Y)) m_elts (n : Z) (y : Y),
                             map_monad f (IntMaps.IM.elements (elt:=X) m) = NoOom m_elts ->
@@ -3985,11 +3987,157 @@ cbn in GCP'.
                           +
                             destruct (InfToFinAddrConvert.addr_convert ptr') eqn:CONVPTR.
                             {
+                              (* ptr' exists in the finite space as 'a' *)
                               epose proof fin_inf_read_byte_spec _ _ _ _ _ REF' CONVPTR.
                               pose proof fin_inf_disjoint_ptr_byte _ _ _ _ CONV CONVPTR as [_ DISJOINT_a].
                               specialize (DISJOINT_a DISJOINT).
                               specialize (old_lu a).
 
+                              (* The problem I'm having with this is
+                              UB when access is not allowed... Access
+                              not allowed seems to mean that any byte
+                              can be read, and that's a bit
+                              confusing. *)
+                              Lemma read_byte_spec_ref_byte_is_lifted :
+                                forall ms_inf ms_fin addr_inf addr_fin byte_inf byte_fin,
+                                  MemState_refine ms_inf ms_fin ->
+                                  InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+                                  Memory64BitIntptr.MMEP.MemSpec.read_byte_spec ms_fin addr_fin byte_fin ->
+                                  MemoryBigIntptr.MMEP.MemSpec.read_byte_spec ms_inf addr_inf byte_inf ->
+                                  byte_inf = lift_SByte byte_fin.
+                              Proof.
+                                intros ms_inf ms_fin addr_inf addr_fin byte_inf byte_fin MEM_REF ADDR_CONV READ_FIN READ_INF.
+                                destruct READ_FIN, READ_INF.
+                                cbn in read_byte_value, read_byte_value0.
+                                destruct read_byte_value as [ms_fin' [ms_fin'' [[MS_FIN MS_FIN'] READ_FIN]]].
+                                destruct read_byte_value0 as [ms_inf' [ms_inf'' [[MS_INF MS_INF'] READ_INF]]].
+                                move READ_FIN after READ_INF.
+                                subst.
+                                break_match_hyp.
+                                {
+                                  pose proof Heqo as Heqo'.
+                                  pose proof MemState_refine_convert_memory' ms_inf ms_fin MEM_REF.
+                                  destruct m as [mem_byte_value mem_byte_aid].
+                                  epose proof fin_inf_read_byte_raw _ _ _ _ _ H Heqo as READ_INF_RAW.
+                                  assert (LLVMParams64BitIntptr.PTOI.ptr_to_int addr_fin = LLVMParamsBigIntptr.PTOI.ptr_to_int addr_inf).
+                                  {
+                                    destruct addr_inf.
+                                    cbn in ADDR_CONV.
+                                    erewrite FinLP.ITOP.ptr_to_int_int_to_ptr; eauto.
+                                  }
+                                  rewrite H0 in READ_INF_RAW.
+                                  rewrite READ_INF_RAW in READ_INF.
+
+                                  (* READ_FIN and READ_INF both have an access control check...
+                                     Presumably this check should be true for both or false for both...
+                                   *)
+
+                                  (* If access is not allowed, then
+                                    READ_FIN and READ_INF are both
+                                    useless True propositions.
+
+                                    mem_byte_value and mem_byte_aid
+                                    come from the read_byte_raw
+                                    operation... They're from the
+                                    mem_byte that is read from memory.
+
+                                     LLVMParamsBigIntptr.PROV.access_allowed
+                                       (LLVMParamsBigIntptr.PROV.address_provenance
+                                       addr_inf) (snd (lift_SByte mem_byte_value,
+                                       mem_byte_aid)) = false
+
+                                    It means that read_byte_spec is a
+                                    contradiction, presumably in
+                                    read_byte_allowed_spec...
+
+                                    read_byte_allowed states:
+
+                                    Memory64BitIntptr.MMEP.MemSpec.read_byte_allowed = 
+                                      fun (ms : Memory64BitIntptr.MMEP.MMSP.MemState) (ptr : LLVMParams64BitIntptr.ADDR.addr) =>
+                                      exists aid : LLVMParams64BitIntptr.PROV.AllocationId,
+                                      Memory64BitIntptr.MMEP.MemSpec.byte_allocated ms ptr aid /\
+                                      LLVMParams64BitIntptr.PROV.access_allowed (LLVMParams64BitIntptr.PROV.address_provenance ptr) aid = true
+
+                                   I.e., there is some mem_byte in
+                                   memory at 'ptr' with the allocation
+                                   id 'aid', and the provenance of our
+                                   pointer is allowed to access it.
+
+                                   *)
+                                  destruct read_byte_allowed_spec as [aid_fin [BYTE_ALLOCATED_FIN ACCESS_ALLOWED_FIN]].
+                                  destruct read_byte_allowed_spec0 as [aid_inf [BYTE_ALLOCATED_INF ACCESS_ALLOWED_INF]].
+
+                                  (* With byte_allocated... Maybe I
+                                     can conclude that aid_fin = aid_inf
+                                     = mem_byte_aid
+
+                                     Yep... It uses read_byte_raw
+                                     behind the scenes.
+
+                                     Use below lemmas and Heqo + Heqo'
+                                   *)
+
+                                  (* TODO: Move this into lemmas about primitives *)
+                                  Lemma fin_byte_allocated_read_byte_raw :
+                                    forall ms ptr aid,
+                                      Memory64BitIntptr.MMEP.MemSpec.byte_allocated ms ptr aid ->
+                                      exists byte,
+                                        Memory64BitIntptr.MMEP.MMSP.read_byte_raw
+                                          (Memory64BitIntptr.MMEP.MMSP.memory_stack_memory
+                                             (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms))
+                                          (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr) = Some (byte, aid).
+                                  Proof.
+                                  Admitted.
+
+                                  (* TODO: Move this into lemmas about primitives *)
+                                  Lemma inf_byte_allocated_read_byte_raw :
+                                    forall ms ptr aid,
+                                      MemoryBigIntptr.MMEP.MemSpec.byte_allocated ms ptr aid ->
+                                      exists byte,
+                                        MemoryBigIntptr.MMEP.MMSP.read_byte_raw
+                                          (MemoryBigIntptr.MMEP.MMSP.memory_stack_memory
+                                             (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms))
+                                          (LLVMParamsBigIntptr.PTOI.ptr_to_int ptr) = Some (byte, aid).
+                                  Proof.
+                                  Admitted.
+
+                                  apply fin_byte_allocated_read_byte_raw in BYTE_ALLOCATED_FIN as [byte_fin' BYTE_ALLOCATED_FIN].
+                                  apply inf_byte_allocated_read_byte_raw in BYTE_ALLOCATED_INF as [byte_inf' BYTE_ALLOCATED_INF].
+
+                                  rewrite BYTE_ALLOCATED_FIN in Heqo.
+                                  rewrite BYTE_ALLOCATED_INF in READ_INF_RAW.
+                                  inv Heqo; inv READ_INF_RAW.
+
+                                  cbn in *.
+                                  rewrite ACCESS_ALLOWED_INF in READ_INF.
+                                  rewrite ACCESS_ALLOWED_FIN in READ_FIN.
+
+                                  destruct READ_INF.
+                                  destruct READ_FIN.
+                                  subst.
+                                  auto.
+                                }
+
+                                {
+
+                                }
+                                
+                              Admitted.
+
+                            (* a is disjoint from addr_fin, which means that old_lu should hold
+
+                               If there's a byte to read in ms_fin
+                               then the same byte can be read in
+                               ms_fin'...
+
+                               Then with H we can conclude...
+
+                               MemoryBigIntptr.MMEP.MemSpec.read_byte_spec ms_inf' ptr' (lift_SByte ?byte_fin)
+
+                               But I don't know how this relates to byte' in the goal.
+
+                             *)
+                              admit.
                             }
                             destruct READ.
                             (* TODO: Move this *)
