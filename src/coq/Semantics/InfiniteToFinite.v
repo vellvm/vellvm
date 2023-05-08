@@ -4087,7 +4087,34 @@ cbn in GCP'.
                                              (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms))
                                           (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr) = Some (byte, aid).
                                   Proof.
-                                  Admitted.
+                                    intros ms ptr aid ALLOC.
+                                    cbn in ALLOC.
+                                    destruct ALLOC as [ms' [b ALLOC]].
+                                    destruct ALLOC as (?&?&?).
+                                    subst.
+                                    red in H.
+                                    destruct H.
+                                    clear H0.
+                                    Transparent Memory64BitIntptr.MMEP.MMSP.addr_allocated_prop.
+                                    unfold Memory64BitIntptr.MMEP.MMSP.addr_allocated_prop in H.
+                                    cbn in H.
+
+                                    destruct H as [ms' [ms'' [[MS MS'] H]]].
+                                    break_match_hyp.
+                                    {
+                                      destruct m.
+                                      exists s.
+                                      destruct H.
+                                      cbn in H0.
+                                      destruct (LLVMParams64BitIntptr.PROV.aid_eq_dec aid a) eqn:AID; 
+                                        cbn in *; subst; try discriminate.
+                                      auto.
+                                    }
+
+                                    {
+                                      destruct H; discriminate.
+                                    }
+                                  Qed.
 
                                   (* TODO: Move this into lemmas about primitives *)
                                   Lemma inf_byte_allocated_read_byte_raw :
@@ -4098,8 +4125,35 @@ cbn in GCP'.
                                           (MemoryBigIntptr.MMEP.MMSP.memory_stack_memory
                                              (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms))
                                           (LLVMParamsBigIntptr.PTOI.ptr_to_int ptr) = Some (byte, aid).
-                                  Proof.
-                                  Admitted.
+Proof.
+                                    intros ms ptr aid ALLOC.
+                                    cbn in ALLOC.
+                                    destruct ALLOC as [ms' [b ALLOC]].
+                                    destruct ALLOC as (?&?&?).
+                                    subst.
+                                    red in H.
+                                    destruct H.
+                                    clear H0.
+                                    Transparent MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop.
+                                    unfold MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop in H.
+                                    cbn in H.
+
+                                    destruct H as [ms' [ms'' [[MS MS'] H]]].
+                                    break_match_hyp.
+                                    {
+                                      destruct m.
+                                      exists s.
+                                      destruct H.
+                                      cbn in H0.
+                                      destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid a) eqn:AID; 
+                                        cbn in *; subst; try discriminate.
+                                      auto.
+                                    }
+
+                                    {
+                                      destruct H; discriminate.
+                                    }
+                                  Qed.
 
                                   apply fin_byte_allocated_read_byte_raw in BYTE_ALLOCATED_FIN as [byte_fin' BYTE_ALLOCATED_FIN].
                                   apply inf_byte_allocated_read_byte_raw in BYTE_ALLOCATED_INF as [byte_inf' BYTE_ALLOCATED_INF].
