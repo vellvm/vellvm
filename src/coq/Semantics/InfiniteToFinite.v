@@ -3194,7 +3194,7 @@ cbn in GCP'.
 
                               red in GCP.
                               destruct (Memory64BitIntptr.MMEP.MemSpec.MemHelpers.intptr_seq 0 n) eqn:SEQ_FIN; cbn in GCP.
-                              2: { destruct GCP as [sab [a [[] _]]]. }.
+                              2: { destruct GCP as [sab [a [[] _]]]. }
                               destruct GCP as [sab [a [[MS A] GCP]]]; subst.
                               destruct GCP as [sab [a [GCP SEQ]]]; subst.
                               destruct (map_monad
@@ -4037,7 +4037,7 @@ cbn in GCP'.
                         destruct SET.
                         split.
                         - eapply fin_inf_read_byte_spec; eauto.
-                        - intros ptr' byte' DISJOINT.
+                        - intros ptr' DISJOINT byte'.
                           split; intros READ.
                           +
                             destruct (InfToFinAddrConvert.addr_convert ptr') eqn:CONVPTR.
@@ -4107,7 +4107,7 @@ cbn in GCP'.
 
                                     read_byte_allowed states:
 
-                                    Memory64BitIntptr.MMEP.MemSpec.read_byte_allowed = 
+                                    Memory64BitIntptr.MMEP.MemSpec.read_byte_allowed =
                                       fun (ms : Memory64BitIntptr.MMEP.MMSP.MemState) (ptr : LLVMParams64BitIntptr.ADDR.addr) =>
                                       exists aid : LLVMParams64BitIntptr.PROV.AllocationId,
                                       Memory64BitIntptr.MMEP.MemSpec.byte_allocated ms ptr aid /\
@@ -4161,7 +4161,7 @@ cbn in GCP'.
                                       exists s.
                                       destruct H.
                                       cbn in H0.
-                                      destruct (LLVMParams64BitIntptr.PROV.aid_eq_dec aid a) eqn:AID; 
+                                      destruct (LLVMParams64BitIntptr.PROV.aid_eq_dec aid a) eqn:AID;
                                         cbn in *; subst; try discriminate.
                                       auto.
                                     }
@@ -4200,7 +4200,7 @@ Proof.
                                       exists s.
                                       destruct H.
                                       cbn in H0.
-                                      destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid a) eqn:AID; 
+                                      destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid a) eqn:AID;
                                         cbn in *; subst; try discriminate.
                                       auto.
                                     }
@@ -4251,7 +4251,10 @@ Proof.
                                But I don't know how this relates to byte' in the goal.
 
                              *)
-                              admit.
+
+
+
+
                             }
                             destruct READ.
                             (* TODO: Move this *)
@@ -4299,7 +4302,7 @@ Proof.
                               unfold MemoryBigIntptr.MMEP.MMSP.mem_state_memory.
                               cbn.
                               reflexivity.
-                            * 
+                            *
                             cbn in *.
 
                             (* TODO: Move this *)
@@ -4311,15 +4314,15 @@ Proof.
                                 addr
                               read_byte_allowed
 
-                            
+
                           + destruct (InfToFinAddrConvert.addr_convert ptr') eqn:PTR.
                             * admit.
-                            * 
+                            *
 
                             pose proof (old_lu ptr' byte_fin).
                             forward H.
                             eapply fin_inf_disjoint_ptr_byte; [| | eauto].
-                            
+
                       Qed.
 
                       Lemma fin_inf_write_byte_operation_invariants :
@@ -4428,9 +4431,9 @@ Proof.
                               split; auto.
                             }
                           }
-                           
+
                           epose proof fin_inf_write_byte_spec_MemPropT _ _ _ _ _ MEM_REF ADDR_CONV.
-                          
+
                         rewrite map_monad_unfold.
                           cbn.
 
@@ -4803,16 +4806,16 @@ Proof.
                               }
 
                               (* Write bytes portion *)
-                              
+
 
                               -
 
 
                               red. red.
-                              
+
                               cbn in READ'.
                               destruct READ' as [ms
-                              
+
 
                               Set Printing Implicit.
 

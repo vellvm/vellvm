@@ -3004,9 +3004,9 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   Record set_byte_memory (m1 : MemState) (ptr : addr) (byte : SByte) (m2 : MemState) : Prop :=
     {
       new_lu : read_byte_spec m2 ptr byte;
-      old_lu : forall ptr' byte',
+      old_lu : forall ptr',
         disjoint_ptr_byte ptr ptr' ->
-        (read_byte_spec m1 ptr' byte' <-> read_byte_spec m2 ptr' byte');
+        (forall byte', read_byte_spec m1 ptr' byte' <-> read_byte_spec m2 ptr' byte');
     }.
 
   Record write_byte_operation_invariants (m1 m2 : MemState) : Prop :=
