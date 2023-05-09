@@ -3582,6 +3582,25 @@ cbn in GCP'.
                         admit.
                       Admitted.
 
+                      Lemma inf_fin_access_allowed :
+                        forall addr_fin addr_inf aid res,
+                          InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+                          LLVMParamsBigIntptr.PROV.access_allowed
+                            (LLVMParamsBigIntptr.PROV.address_provenance addr_inf) aid = res ->
+                          LLVMParams64BitIntptr.PROV.access_allowed
+                            (LLVMParams64BitIntptr.PROV.address_provenance addr_fin) aid = res.
+                      Proof.
+                        intros addr_fin addr_inf aid res ADDR_CONV ACCESS.
+                        destruct addr_inf.
+                        cbn in *.
+                        pose proof ITOP.int_to_ptr_provenance _ _ _ ADDR_CONV. subst.
+                        unfold LLVMParams64BitIntptr.PROV.access_allowed in *.
+                        unfold LLVMParamsBigIntptr.PROV.access_allowed in *.
+
+                        (* TODO: Need to expose access_allowed *)
+                        admit.
+                      Admitted.
+
                       Lemma fin_inf_read_byte_allowed :
                         forall addr_fin addr_inf ms_fin ms_inf,
                           MemState_refine ms_inf ms_fin ->
@@ -4278,7 +4297,7 @@ Proof.
 
                                 (* TODO: Move this *)
                                 Lemma read_byte_allowed_read_byte_raw :
-                                  forall ms ptr,
+                                  forall {ms ptr},
                                     MemoryBigIntptr.MMEP.MemSpec.read_byte_allowed ms ptr ->
                                     exists byte aid,
                                       MemoryBigIntptr.MMEP.MMSP.read_byte_raw (InfMem.MMEP.MMSP.mem_state_memory ms) (LLVMParamsBigIntptr.PTOI.ptr_to_int ptr) = Some (byte, aid) /\
@@ -4312,7 +4331,7 @@ Proof.
 
                                 (* TODO: Move and make something for both fin / inf memory *)
                                 Lemma read_byte_spec_read_byte_raw :
-                                  forall ms ptr byte,
+                                  forall {ms ptr byte},
                                     MemoryBigIntptr.MMEP.MemSpec.read_byte_spec ms ptr byte ->
                                     exists aid,
                                       MemoryBigIntptr.MMEP.MMSP.read_byte_raw (InfMem.MMEP.MMSP.mem_state_memory ms) (LLVMParamsBigIntptr.PTOI.ptr_to_int ptr) = Some (byte, aid) /\
@@ -4333,15 +4352,91 @@ Proof.
                                   auto.
                                 Qed.
 
-                                destruct RBS.
-                                cbn in read_byte_value.
-                                destruct read_byte_value as [ms [ms' [[MS MS'] READ]]]; subst.
-                                cbn in READ.
-                                break_match_hyp;
-                                cbn in READ.
-                                admit.
-                                do 2 red in read_byte_value.
-                                cbn in *.
+                                pose proof read_byte_spec_read_byte_raw RBS as [aid [READ_RAW_INF ALLOWED]].
+
+                                cbn in READ_RAW_INF.
+
+                                (* (* Not sure there was a point to this *) *)
+                                (* destruct RBS. *)
+                                (* cbn in read_byte_value. *)
+                                (* destruct read_byte_value as [ms [ms' [[MS MS'] READ]]]; subst. *)
+                                (* cbn in READ. *)
+                                (* rewrite READ_RAW_INF in READ. *)
+                                (* cbn in READ. *)
+                                (* rewrite ALLOWED in READ. *)
+
+                                Lemma inf_fin_read_byte_raw :
+                                  forall {m_inf m_fin addr ptr_fin byte_inf aid},
+                                    convert_memory m_inf = NoOom m_fin ->
+                                    LLVMParams64BitIntptr.PTOI.ptr_to_int ptr_fin = addr ->
+                                    MemoryBigIntptr.MMEP.MMSP.read_byte_raw m_inf addr = Some (byte_inf, aid) ->
+                                    exists byte_fin,
+                                      Memory64BitIntptr.MMEP.MMSP.read_byte_raw m_fin addr = Some (byte_fin, aid) /\
+                                        sbyte_refine byte_inf byte_fin.
+                                Proof.
+                                Admitted.
+
+                                assert (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr_fin = LLVMParamsBigIntptr.PTOI.ptr_to_int ptr_inf) as PTR.
+                                { eapply fin_inf_ptoi; eauto.
+                                }
+                                
+                                epose proof inf_fin_read_byte_raw Heqo0 PTR READ_RAW_INF as [byte_fin [READ_BYTE_RAW_FIN BYTE_REF]].
+
+                                exists byte_fin.
+                                split.
+                                { (* Read byte spec *)
+                                  split.
+                                  - red.
+                                    exists aid.
+                                    split.
+                                    + cbn. eexists. exists true.
+                                      split; auto.
+                                      cbn.
+                                      red.
+                                      split.
+                                      2: {
+                                        intros ms' x H.
+                                        cbn in *.
+                                        inv H.
+                                        cbn.
+                                        auto.
+                                      }
+
+                                      cbn.
+                                      exists {|
+                                        FinMemMMSP.memory_stack_memory := m0;
+                                                                          FinMemMMSP.memory_stack_frame_stack := f;
+                                                                                                                 FinMemMMSP.memory_stack_heap := IntMaps.IP.of_list l
+                                      |}.
+                                      exists {|
+                                        FinMemMMSP.memory_stack_memory := m0;
+                                                                          FinMemMMSP.memory_stack_frame_stack := f;
+                                                                                                                 FinMemMMSP.memory_stack_heap := IntMaps.IP.of_list l
+                                        |}.
+                                      split; auto.
+
+                                      cbn in *.
+
+                                      rewrite PTR.
+                                      rewrite READ_BYTE_RAW_FIN.
+                                      split; auto.
+                                      apply LLVMParams64BitIntptr.PROV.aid_eq_dec_refl.
+                                    + eapply inf_fin_access_allowed; eauto.
+                                  - repeat red.
+                                    do 2 eexists.
+                                    split; [split; auto|].
+                                    cbn.
+
+                                    rewrite PTR.
+                                    rewrite READ_BYTE_RAW_FIN.
+                                    cbn.
+                                    erewrite inf_fin_access_allowed; eauto; cbn.
+                                    split; auto.
+                                }
+
+                                { (* Byte refinement *)
+                                  auto.
+                                }
                               Qed.
 
                               pose proof inf_fin_read_byte_spec REF CONVPTR READ as [byte_fin' [READ_FIN BYTE_REF]].
