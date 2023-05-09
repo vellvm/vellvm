@@ -4039,11 +4039,10 @@ cbn in GCP'.
                         - eapply fin_inf_read_byte_spec; eauto.
                         - intros ptr' DISJOINT byte'.
                           split; intros READ.
-                          +
+                          + (* Old memory to new *)
                             destruct (InfToFinAddrConvert.addr_convert ptr') eqn:CONVPTR.
                             {
                               (* ptr' exists in the finite space as 'a' *)
-                              epose proof fin_inf_read_byte_spec _ _ _ _ _ REF' CONVPTR.
                               pose proof fin_inf_disjoint_ptr_byte _ _ _ _ CONV CONVPTR as [_ DISJOINT_a].
                               specialize (DISJOINT_a DISJOINT).
                               specialize (old_lu a).
@@ -4252,10 +4251,117 @@ Proof.
 
                              *)
 
+                              specialize (old_lu DISJOINT_a).
 
+                              Lemma inf_fin_read_byte_spec :
+                                forall {ms_inf ms_fin ptr_inf ptr_fin byte_inf},
+                                  MemState_refine ms_inf ms_fin ->
+                                  InfToFinAddrConvert.addr_convert ptr_inf = NoOom ptr_fin ->
+                                  MemoryBigIntptr.MMEP.MemSpec.read_byte_spec ms_inf ptr_inf byte_inf ->
+                                  exists byte_fin,
+                                    Memory64BitIntptr.MMEP.MemSpec.read_byte_spec ms_fin ptr_fin byte_fin /\
+                                      sbyte_refine byte_inf byte_fin.
+                              Proof.
+                                intros ms_inf ms_fin ptr_inf ptr_fin byte_inf MEM_REF ADDR_CONV RBS.
+                                red in MEM_REF.
+                                unfold convert_MemState in MEM_REF.
+                                cbn in MEM_REF.
+                                destruct ms_inf.
+                                break_match_hyp; inv MEM_REF.
+                                destruct ms_memory_stack.
+                                cbn in *.
 
+                                break_match_hyp; inv Heqo.
+                                break_match_hyp; inv H0.
+                                break_match_hyp; inv H1.
+                                break_match_hyp; inv Heqo1.
 
+                                (* TODO: Move this *)
+                                Lemma read_byte_allowed_read_byte_raw :
+                                  forall ms ptr,
+                                    MemoryBigIntptr.MMEP.MemSpec.read_byte_allowed ms ptr ->
+                                    exists byte aid,
+                                      MemoryBigIntptr.MMEP.MMSP.read_byte_raw (InfMem.MMEP.MMSP.mem_state_memory ms) (LLVMParamsBigIntptr.PTOI.ptr_to_int ptr) = Some (byte, aid) /\
+                                        InfPROV.access_allowed (InfLP.PROV.address_provenance ptr) aid = true.
+                                Proof.
+                                  intros ms ptr ALLOWED.
+                                  red in ALLOWED.
+                                  destruct ALLOWED as [aid [BYTE_ALLOCATED ALLOWED]].
+                                  repeat red in BYTE_ALLOCATED.
+                                  destruct BYTE_ALLOCATED as [ms' [a [ADDR_ALLOCATED [MS A]]]]; subst.
+                                  red in ADDR_ALLOCATED.
+                                  destruct ADDR_ALLOCATED as [ADDR_ALLOCATED PROV].
+                                  repeat red in ADDR_ALLOCATED.
+                                  destruct ADDR_ALLOCATED as [ms' [ms'' [GET_MEM_STATE READ]]].
+                                  cbn in GET_MEM_STATE. destruct GET_MEM_STATE; subst.
+                                  break_match_hyp.
+                                  2: {
+                                    cbn in READ.
+                                    destruct READ; discriminate.
+                                  }
+
+                                  destruct m.
+                                  exists s. exists a.
+                                  split; auto.
+
+                                  cbn in READ.
+                                  destruct READ as [_ AID].
+                                  destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid a) eqn:AID'; subst; cbn in *; try discriminate.
+                                  auto.
+                                Qed.
+
+                                (* TODO: Move and make something for both fin / inf memory *)
+                                Lemma read_byte_spec_read_byte_raw :
+                                  forall ms ptr byte,
+                                    MemoryBigIntptr.MMEP.MemSpec.read_byte_spec ms ptr byte ->
+                                    exists aid,
+                                      MemoryBigIntptr.MMEP.MMSP.read_byte_raw (InfMem.MMEP.MMSP.mem_state_memory ms) (LLVMParamsBigIntptr.PTOI.ptr_to_int ptr) = Some (byte, aid) /\
+                                        InfPROV.access_allowed (InfLP.PROV.address_provenance ptr) aid = true.
+                                Proof.
+                                  intros ms ptr byte [ALLOWED READ].
+                                  apply read_byte_allowed_read_byte_raw in ALLOWED as [byte' [aid [READ' ALLOWED]]].
+                                  exists aid. split; auto.
+                                  cbn in READ.
+                                  destruct READ as [ms' [ms'' [[MS MS'] READ]]]; subst.
+                                  destruct ms.
+                                  destruct ms_memory_stack.
+                                  cbn in READ, READ'.
+                                  rewrite READ' in READ.
+                                  cbn in READ.
+                                  rewrite ALLOWED in READ.
+                                  destruct READ; subst.
+                                  auto.
+                                Qed.
+
+                                destruct RBS.
+                                cbn in read_byte_value.
+                                destruct read_byte_value as [ms [ms' [[MS MS'] READ]]]; subst.
+                                cbn in READ.
+                                break_match_hyp;
+                                cbn in READ.
+                                admit.
+                                do 2 red in read_byte_value.
+                                cbn in *.
+                              Qed.
+
+                              pose proof inf_fin_read_byte_spec REF CONVPTR READ as [byte_fin' [READ_FIN BYTE_REF]].
+                              apply old_lu in READ_FIN.
+                              epose proof fin_inf_read_byte_spec _ _ _ _ _ REF' CONVPTR READ_FIN.
+
+                              (* TODO: should probably clean this up / make it a separate lemma *)
+                              red in BYTE_REF.
+                              unfold convert_SByte in BYTE_REF.
+                              destruct byte'.
+                              cbn in BYTE_REF.
+                              break_match_hyp; [|inv BYTE_REF].
+                              break_match_hyp; [|inv BYTE_REF].
+                              inv BYTE_REF.
+
+                              cbn in *.
+                              do 2 erewrite <- fin_to_inf_uvalue_refine_strict' in H; eauto.
+                              exact Heqo.
                             }
+
                             destruct READ.
                             (* TODO: Move this *)
                             (* TODO: Ask about in meeting? *)
@@ -4302,6 +4408,7 @@ Proof.
                               unfold MemoryBigIntptr.MMEP.MMSP.mem_state_memory.
                               cbn.
                               reflexivity.
+                          + (* New memory to old *)
                             *
                             cbn in *.
 
