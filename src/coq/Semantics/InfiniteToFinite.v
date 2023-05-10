@@ -4460,6 +4460,15 @@ Proof.
                             destruct READ.
                             (* TODO: Move this *)
                             (* TODO: Ask about in meeting? *)
+                            (* TODO: This may not currently be true
+                               because of how convert_memory works...
+
+                               Both memories use Z as the key for
+                               pointers... But there's no constraint
+                               on the bounds of the keys when
+                               converting between memories (at least currently,
+                               this can be changed).
+                             *)
                             Lemma fin_inf_big_addresses_no_byte_to_read :
                               forall mem_inf mem_fin addr_inf oom_msg,
                                 convert_memory mem_inf = NoOom mem_fin ->
@@ -4504,26 +4513,116 @@ Proof.
                               cbn.
                               reflexivity.
                           + (* New memory to old *)
-                            *
-                            cbn in *.
+                            destruct (InfToFinAddrConvert.addr_convert ptr') eqn:CONVPTR.
+                            {
+                              (* ptr' exists in the finite space as 'a' *)
+                              pose proof fin_inf_disjoint_ptr_byte _ _ _ _ CONV CONVPTR as [_ DISJOINT_a].
+                              specialize (DISJOINT_a DISJOINT).
+                              specialize (old_lu a).
 
-                            (* TODO: Move this *)
-                            Lemma fin_inf_big_addresses_not_allocated :
-                              forall ms_inf ms_fin addr_inf oom_msg aid,
-                                MemState_refine ms_inf ms_fin ->
-                                InfToFinAddrConvert.addr_convert addr_inf = Oom oom_msg ->
-                                ~MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop addr_inf aid ms_inf.
-                                addr
-                              read_byte_allowed
+                              (* a is disjoint from addr_fin, which means that old_lu should hold
+
+                               If there's a byte to read in ms_fin
+                               then the same byte can be read in
+                               ms_fin'...
+
+                               Then with H we can conclude...
+
+                               MemoryBigIntptr.MMEP.MemSpec.read_byte_spec ms_inf' ptr' (lift_SByte ?byte_fin)
+
+                               But I don't know how this relates to byte' in the goal.
+                             *)
+
+                              specialize (old_lu DISJOINT_a).
+
+                              pose proof inf_fin_read_byte_spec REF' CONVPTR READ as [byte_fin' [READ_FIN BYTE_REF]].
+                              apply old_lu in READ_FIN.
+                              epose proof fin_inf_read_byte_spec _ _ _ _ _ REF CONVPTR READ_FIN.
+
+                              (* TODO: should probably clean this up / make it a separate lemma *)
+                              red in BYTE_REF.
+                              unfold convert_SByte in BYTE_REF.
+                              destruct byte'.
+                              cbn in BYTE_REF.
+                              break_match_hyp; [|inv BYTE_REF].
+                              break_match_hyp; [|inv BYTE_REF].
+                              inv BYTE_REF.
+
+                              cbn in *.
+                              do 2 erewrite <- fin_to_inf_uvalue_refine_strict' in H; eauto.
+                              exact Heqo.
+                            }
+
+                            destruct READ.
+
+                            destruct read_byte_allowed_spec.
+                            destruct H.
+                            destruct H.
+                            destruct H.
+                            destruct H.
+                            red in H.
+                            destruct H.
+                            cbn in H1.
+                            cbn in H.
+                            Transparent MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop.
+                            unfold MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop in H.
+                            cbn in H.
+                            destruct H.
+                            destruct H.
+                            destruct H.
+                            destruct H.
+                            clear read_byte_value.
+                            erewrite fin_inf_big_addresses_no_byte_to_read in H3; eauto.
+                            * destruct H3, H1.
+                              destruct ms_inf; cbn in *; subst.
+                              discriminate.
+                            * replace (MemoryBigIntptr.MMEP.MMSP.memory_stack_memory x3) with (MemoryBigIntptr.MMEP.MMSP.mem_state_memory ms_inf').
+                              eapply MemState_refine_convert_memory; eauto.
+                              destruct ms_inf; cbn in *; subst.
+                              unfold MemoryBigIntptr.MMEP.MMSP.mem_state_memory.
+                              cbn.
+                              reflexivity.
+                      Qed.
+
+
+                      pose proof inf_fin_read_byte_spec REF CONVPTR READ as [byte_fin' [READ_FIN BYTE_REF]].
+                      apply old_lu in READ_FIN.
+                      epose proof fin_inf_read_byte_spec _ _ _ _ _ REF' CONVPTR READ_FIN.
+
+                      (* TODO: should probably clean this up / make it a separate lemma *)
+                      red in BYTE_REF.
+                      unfold convert_SByte in BYTE_REF.
+                      destruct byte'.
+                      cbn in BYTE_REF.
+                      break_match_hyp; [|inv BYTE_REF].
+                      break_match_hyp; [|inv BYTE_REF].
+                      inv BYTE_REF.
+
+                      cbn in *.
+                      do 2 erewrite <- fin_to_inf_uvalue_refine_strict' in H; eauto.
+                      exact Heqo.
+                    }                            
+                    
+                    *
+                      cbn in *.
+
+                      (* TODO: Move this *)
+                      Lemma fin_inf_big_addresses_not_allocated :
+                        forall ms_inf ms_fin addr_inf oom_msg aid,
+                          MemState_refine ms_inf ms_fin ->
+                          InfToFinAddrConvert.addr_convert addr_inf = Oom oom_msg ->
+                          ~MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop addr_inf aid ms_inf.
+                        addr
+                          read_byte_allowed
 
 
                           + destruct (InfToFinAddrConvert.addr_convert ptr') eqn:PTR.
-                            * admit.
-                            *
+                        * admit.
+                        *
 
-                            pose proof (old_lu ptr' byte_fin).
-                            forward H.
-                            eapply fin_inf_disjoint_ptr_byte; [| | eauto].
+                          pose proof (old_lu ptr' byte_fin).
+                          forward H.
+                          eapply fin_inf_disjoint_ptr_byte; [| | eauto].
 
                       Qed.
 
