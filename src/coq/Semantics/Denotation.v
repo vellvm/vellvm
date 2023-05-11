@@ -538,11 +538,10 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | (IId id, INSTR_Load _ dt (du,ptr) _) =>
           ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
           da <- concretize_or_pick ua True ;;
-          match da with
-          | DVALUE_Poison => raiseUB "Load from poisoned address."
-          | _ => dv <- trigger (Load dt da);;
+          if (dvalue_eqb da DVALUE_Poison)
+          then raiseUB "Load from poisoned address."
+          else dv <- trigger (Load dt da);;
                 trigger (LocalWrite id dv)
-          end
 
         (* Store *)
         | (IVoid _, INSTR_Store _ (dt, val) (du, ptr) _) =>
@@ -550,10 +549,9 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           dv <- concretize_or_pick uv True ;;
           ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
           da <- pickUnique ua ;;
-          match da with
-          | DVALUE_Poison => raiseUB "Store to poisoned address."
-          | _ => trigger (Store da dv)
-          end
+          if (dvalue_eqb da DVALUE_Poison)
+          then raiseUB "Store to poisoned address."
+          else trigger (Store da dv)
 
         | (_, INSTR_Store _ _ _ _) => raise "ILL-FORMED itree ERROR: Store to non-void ID"
 

@@ -197,7 +197,7 @@ Proof.
   rewrite EXP.
   go.
   cbn.
-  go.
+  go. cbn. go.
   step.
   step.
   reflexivity.
@@ -224,6 +224,8 @@ Proof.
   rewrite CONC_UV.
   go.
   rewrite PTR.
+  go.
+  cbn.
   go.
   cbn.
   go.
