@@ -173,13 +173,16 @@ Module InfiniteToFinite.
 
      The Z indexes in the finite memory may need to be limited to the
      range of the address type, but it may not matter because trying
-     to look these up in a program should cause OOM anyway.
+     to look these up in a program should cause OOM anyway. Currently
+     this check is added.
    *)
   Definition convert_memory (mem : InfMemMMSP.memory) : OOM (FinMemMMSP.memory).
     refine (elems <- map_monad _ (IntMaps.IM.elements mem);;
             ret (IntMaps.IP.of_list elems)).
 
     refine (fun '(ix, mb) =>
+              (* Check if address fits in finite memory space :) *)
+              LLVMParams64BitIntptr.ITOP.int_to_ptr ix PROV.nil_prov;;
               mb' <- convert_mem_byte mb;;
               ret (ix, mb')).
   Defined.
@@ -2693,6 +2696,7 @@ Module InfiniteToFinite.
       intros pat. destruct pat.
       intros [ix' y] H0.
       break_match_hyp; inv H0.
+      break_match_hyp; inv H2.
       auto.
     }
     forward H.
@@ -2703,11 +2707,12 @@ Module InfiniteToFinite.
     destruct H as [[b_inf aid'] [FIND BYTE_INF]].
     cbn in *.
     break_match_hyp; inv BYTE_INF.
-    break_match_hyp; inv Heqo.
+    break_match_hyp; inv H0.
 
     unfold lift_SByte.
     destruct b_inf. cbn in Heqo0.
     break_match_hyp; inv Heqo0.
+    break_match_hyp; inv Heqo1.
     break_match_hyp; inv H0.
     rewrite FIND.
 
@@ -4058,6 +4063,305 @@ Module InfiniteToFinite.
           reflexivity.
   Qed.
 
+  (* TODO: Move this, prove this. *)
+  Lemma int_to_ptr_succeeds_regardless_of_provenance :
+    forall {pr1 pr2 addr ptr},
+      LLVMParams64BitIntptr.ITOP.int_to_ptr addr pr1 = NoOom ptr ->
+      exists ptr', LLVMParams64BitIntptr.ITOP.int_to_ptr addr pr2 = NoOom ptr'.
+  Proof.
+  Admitted.
+
+  (* TODO: Move. Probably a better name for this. *)
+  Lemma IntMap_find_NoOom_assoc_list' :
+    forall {X Y} (l : list (IntMaps.IM.key * X)) (f : (IntMaps.IM.key * X) -> OOM (IntMaps.IM.key * Y)) m_elts (n : Z) (x : X),
+      SetoidList.NoDupA (IntMaps.IM.eq_key (elt:=X)) l ->
+      map_monad f l = NoOom m_elts ->
+      (forall '(ix, x) '(ix', y), f (ix, x) = NoOom (ix', y) -> ix = ix') ->
+      SetoidList.findA (IntMaps.IP.F.eqb n) l = Some x ->
+      exists y,
+        IntMaps.IM.find (elt:=Y) n (IntMaps.IP.of_list m_elts) = Some y /\
+          NoOom (n, y) = f (n, x).
+  Proof.
+    induction l; intros f m_elts n x NODUP HMAPM F FIND.
+    - cbn in *.
+      inv HMAPM.
+      cbn in *.
+      inv FIND.
+    - cbn in *.
+      break_match_hyp; inv HMAPM.
+      break_match_hyp; inv H0.
+      break_match_hyp; inv H1.
+
+      rename k into a_k.
+      rename x0 into a_v.
+      destruct p as [p_k p_v].
+      pose proof (F (a_k, a_v) (p_k, p_v) Heqo); subst.
+      Opaque IntMaps.IM.find.
+      Opaque IntMaps.IM.add.
+      cbn in *.
+      break_match_hyp.
+      + (* New element *)
+        inv FIND.
+        unfold IntMaps.IP.F.eqb in Heqb.
+        break_match_hyp; inv Heqb.
+        exists p_v.
+        split; auto.
+        unfold IntMaps.IP.uncurry.
+        cbn.
+        rewrite IntMaps.IP.F.add_eq_o; cbn; auto.
+      + (* Old element *)
+        inversion NODUP; subst.
+        rename H1 into NIN.
+        rename H2 into NODUP'.
+
+        unfold IntMaps.IP.F.eqb in Heqb.
+        break_match_hyp; inv Heqb.
+
+        unfold IntMaps.IP.uncurry.
+        rewrite IntMaps.IP.F.add_neq_o; cbn; auto.
+  Qed.
+
+  (* TODO: Move. Probably a better name for this. *)
+  Lemma IntMap_find_NoOom_elements' :
+    forall {X Y} (m : IntMaps.IM.t X) (f : (IntMaps.IM.key * X) -> OOM (IntMaps.IM.key * Y)) m_elts (n : Z) (x : X),
+      map_monad f (IntMaps.IM.elements (elt:=X) m) = NoOom m_elts ->
+      (forall '(ix, x) '(ix', y), f (ix, x) = NoOom (ix', y) -> ix = ix') ->
+      IntMaps.IM.find (elt:=X) n m = Some x ->
+      exists y,
+        IntMaps.IM.find (elt:=Y) n (IntMaps.IP.of_list m_elts) = Some y /\
+          NoOom (n, y) = f (n, x).
+  Proof.
+    intros X Y m f m_elts n x HMAPM F FIND.
+
+    pose proof IntMaps.IP.F.elements_o.
+    setoid_rewrite H.
+    epose proof IntMap_find_NoOom_assoc_list' (IntMaps.IM.elements (elt:=X) m) f m_elts n x.
+    forward H0.
+    {
+      apply IntMaps.IM.elements_3w.
+    }
+    specialize (H0 HMAPM F).
+    forward H0.
+    {
+      rewrite <- H; auto.
+    }
+
+    destruct H0 as [y [FINDY RES]].
+    exists y.
+    split; auto.
+
+    rewrite <- IntMaps.IP.F.elements_o; auto.
+  Qed.
+
+  Lemma fin_inf_allocations_preserved :
+    forall ms_fin ms_inf ms_fin' ms_inf',
+      MemState_refine ms_inf ms_fin ->
+      MemState_refine ms_inf' ms_fin' ->
+      Memory64BitIntptr.MMEP.MemSpec.allocations_preserved ms_fin ms_fin' ->
+      MemoryBigIntptr.MMEP.MemSpec.allocations_preserved ms_inf ms_inf'.
+  Proof.
+    intros ms_fin ms_inf ms_fin' ms_inf' REF REF' ALLOCS_PRESERVED.
+    red.
+    intros ptr aid.
+    split; intros BYTE_ALLOCATED.
+    - destruct (InfToFinAddrConvert.addr_convert ptr) eqn:PTRCONV.
+      + eapply fin_inf_byte_allocated; eauto.
+        red in ALLOCS_PRESERVED.
+        eapply ALLOCS_PRESERVED.
+        eapply inf_fin_byte_allocated; eauto.
+      + (* This should be a contradiction based on ptr / BYTE_ALLOCATED *)
+        exfalso.
+
+        (* TODO: break this reasoning out into a lemma *)
+        red in REF.
+        destruct ms_inf.
+        cbn in REF.
+        destruct ms_memory_stack.
+        cbn in REF.
+        break_match_hyp; inv REF.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+        break_match_hyp; inv H1.
+        break_match_hyp; inv Heqo1.
+        Transparent convert_memory.
+        unfold convert_memory in Heqo0.
+        Opaque convert_memory.
+        cbn in Heqo0.
+        break_match_hyp; inv Heqo0.
+
+        clear - Heqo1 BYTE_ALLOCATED PTRCONV.
+        (* I know that ptr is in memory_stack_memory because of BYTE_ALLOCATED,
+             and it follows that INF.ptr_to_int ptr = addr, and
+             LLVMParams64BitIntptr.ITOP.int_to_ptr addr PROV.nil_prov = NoOom ...
+         *)
+        assert (exists ptr_fin, LLVMParams64BitIntptr.ITOP.int_to_ptr (LLVMParamsBigIntptr.PTOI.ptr_to_int ptr) PROV.nil_prov = NoOom ptr_fin) as (ptr_fin&PTRCONV').
+        {
+          (* TODO: Do I need this? *)
+          (* epose proof IntMap_find_NoOom_elements _ _ _ _ _ Heqo1. *)
+          (* forward H. *)
+          (* intros [ix x] [ix' y] F. *)
+          (* break_match_hyp; inv F. *)
+          (* break_match_hyp; inv H1. *)
+          (* auto. *)
+
+          apply inf_byte_allocated_read_byte_raw in BYTE_ALLOCATED as [byte RAW].
+          cbn in RAW.
+
+          Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+          unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw in RAW.
+          Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+
+          epose proof IntMap_find_NoOom_elements' _ _ _ _ _ Heqo1.
+          forward H.
+          {
+            intros [ix x] [ix' y] ?.
+            break_match_hyp; inv H0.
+            break_match_hyp; inv H2.
+            auto.
+          }
+          specialize (H RAW).
+          destruct H as [y [FINDY RESY]].
+          break_match_hyp; inv RESY.
+          exists a; auto.
+        }
+
+        unfold InfToFinAddrConvert.addr_convert in PTRCONV.
+        destruct ptr.
+        epose proof int_to_ptr_succeeds_regardless_of_provenance PTRCONV' as [ptr' CONV].
+        cbn in CONV.
+        rewrite PTRCONV in CONV.
+        inv CONV.
+    - destruct (InfToFinAddrConvert.addr_convert ptr) eqn:PTRCONV.
+      + eapply fin_inf_byte_allocated; eauto.
+        red in ALLOCS_PRESERVED.
+        eapply ALLOCS_PRESERVED.
+        eapply inf_fin_byte_allocated; eauto.
+      + (* This should be a contradiction based on ptr / BYTE_ALLOCATED *)
+        exfalso.
+
+        (* TODO: break this reasoning out into a lemma *)
+        red in REF'.
+        destruct ms_inf'.
+        cbn in REF'.
+        destruct ms_memory_stack.
+        cbn in REF'.
+        break_match_hyp; inv REF'.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+        break_match_hyp; inv H1.
+        break_match_hyp; inv Heqo1.
+        Transparent convert_memory.
+        unfold convert_memory in Heqo0.
+        Opaque convert_memory.
+        cbn in Heqo0.
+        break_match_hyp; inv Heqo0.
+
+        clear - Heqo1 BYTE_ALLOCATED PTRCONV.
+        (* I know that ptr is in memory_stack_memory because of BYTE_ALLOCATED,
+             and it follows that INF.ptr_to_int ptr = addr, and
+             LLVMParams64BitIntptr.ITOP.int_to_ptr addr PROV.nil_prov = NoOom ...
+         *)
+        assert (exists ptr_fin, LLVMParams64BitIntptr.ITOP.int_to_ptr (LLVMParamsBigIntptr.PTOI.ptr_to_int ptr) PROV.nil_prov = NoOom ptr_fin) as (ptr_fin&PTRCONV').
+        {
+          (* TODO: Do I need this? *)
+          (* epose proof IntMap_find_NoOom_elements _ _ _ _ _ Heqo1. *)
+          (* forward H. *)
+          (* intros [ix x] [ix' y] F. *)
+          (* break_match_hyp; inv F. *)
+          (* break_match_hyp; inv H1. *)
+          (* auto. *)
+
+          apply inf_byte_allocated_read_byte_raw in BYTE_ALLOCATED as [byte RAW].
+          cbn in RAW.
+
+          Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+          unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw in RAW.
+          Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+
+          epose proof IntMap_find_NoOom_elements' _ _ _ _ _ Heqo1.
+          forward H.
+          {
+            intros [ix x] [ix' y] ?.
+            break_match_hyp; inv H0.
+            break_match_hyp; inv H2.
+            auto.
+          }
+          specialize (H RAW).
+          destruct H as [y [FINDY RESY]].
+          break_match_hyp; inv RESY.
+          exists a; auto.
+        }
+
+        unfold InfToFinAddrConvert.addr_convert in PTRCONV.
+        destruct ptr.
+        epose proof int_to_ptr_succeeds_regardless_of_provenance PTRCONV' as [ptr' CONV].
+        cbn in CONV.
+        rewrite PTRCONV in CONV.
+        inv CONV.
+  Qed.
+
+  Lemma fin_inf_frame_stack_preserved :
+    forall ms_fin ms_inf ms_fin' ms_inf',
+      MemState_refine ms_inf ms_fin ->
+      MemState_refine ms_inf' ms_fin' ->
+      Memory64BitIntptr.MMEP.MemSpec.frame_stack_preserved ms_fin ms_fin' ->
+      MemoryBigIntptr.MMEP.MemSpec.frame_stack_preserved ms_inf ms_inf'.
+  Proof.
+    intros ms_fin ms_inf ms_fin' ms_inf' REF REF' FSP.
+    red in FSP.
+    red.
+  Admitted.
+
+  Lemma fin_inf_heap_preserved :
+    forall ms_fin ms_inf ms_fin' ms_inf',
+      MemState_refine ms_inf ms_fin ->
+      MemState_refine ms_inf' ms_fin' ->
+      Memory64BitIntptr.MMEP.MemSpec.heap_preserved ms_fin ms_fin' ->
+      MemoryBigIntptr.MMEP.MemSpec.heap_preserved ms_inf ms_inf'.
+  Proof.
+    intros ms_fin ms_inf ms_fin' ms_inf' REF REF' HP.
+  Admitted.
+
+  Lemma fin_inf_read_byte_allowed_all_preserved :
+    forall ms_fin ms_inf ms_fin' ms_inf',
+      MemState_refine ms_inf ms_fin ->
+      MemState_refine ms_inf' ms_fin' ->
+      Memory64BitIntptr.MMEP.MemSpec.read_byte_allowed_all_preserved ms_fin ms_fin' ->
+      MemoryBigIntptr.MMEP.MemSpec.read_byte_allowed_all_preserved ms_inf ms_inf'.
+  Proof.
+    intros ms_fin ms_inf ms_fin' ms_inf' REF REF' RBA.
+  Admitted.
+
+  Lemma fin_inf_write_byte_allowed_all_preserved :
+    forall ms_fin ms_inf ms_fin' ms_inf',
+      MemState_refine ms_inf ms_fin ->
+      MemState_refine ms_inf' ms_fin' ->
+      Memory64BitIntptr.MMEP.MemSpec.write_byte_allowed_all_preserved ms_fin ms_fin' ->
+      MemoryBigIntptr.MMEP.MemSpec.write_byte_allowed_all_preserved ms_inf ms_inf'.
+  Proof.
+    intros ms_fin ms_inf ms_fin' ms_inf' REF REF' HP.
+  Admitted.
+
+  Lemma fin_inf_free_byte_allowed_all_preserved :
+    forall ms_fin ms_inf ms_fin' ms_inf',
+      MemState_refine ms_inf ms_fin ->
+      MemState_refine ms_inf' ms_fin' ->
+      Memory64BitIntptr.MMEP.MemSpec.free_byte_allowed_all_preserved ms_fin ms_fin' ->
+      MemoryBigIntptr.MMEP.MemSpec.free_byte_allowed_all_preserved ms_inf ms_inf'.
+  Proof.
+    intros ms_fin ms_inf ms_fin' ms_inf' REF REF' HP.
+  Admitted.
+
+  Lemma fin_inf_preserve_allocation_ids :
+    forall ms_fin ms_inf ms_fin' ms_inf',
+      MemState_refine ms_inf ms_fin ->
+      MemState_refine ms_inf' ms_fin' ->
+      Memory64BitIntptr.MMEP.MemSpec.preserve_allocation_ids ms_fin ms_fin' ->
+      MemoryBigIntptr.MMEP.MemSpec.preserve_allocation_ids ms_inf ms_inf'.
+  Proof.
+    intros ms_fin ms_inf ms_fin' ms_inf' REF REF' HP.
+  Admitted.
+
   Lemma fin_inf_write_byte_operation_invariants :
     forall addr_inf addr_fin ms_fin ms_inf ms_fin' ms_inf',
       MemState_refine ms_inf ms_fin ->
@@ -4070,33 +4374,13 @@ Module InfiniteToFinite.
     destruct INV.
     split.
 
-    Set Nested Proofs Allowed.
-    Lemma fin_inf_allocations_preserved :
-      forall ms_fin ms_inf ms_fin' ms_inf',
-        MemState_refine ms_inf ms_fin ->
-        MemState_refine ms_inf' ms_fin' ->
-        Memory64BitIntptr.MMEP.MemSpec.allocations_preserved ms_fin ms_fin' ->
-        MemoryBigIntptr.MMEP.MemSpec.allocations_preserved ms_inf ms_inf'.
-    Proof.
-      intros ms_fin ms_inf ms_fin' ms_inf' REF REF' ALLOCS_PRESERVED.
-      red.
-      intros ptr aid.
-      split; intros BYTE_ALLOCATED.
-      - destruct (InfToFinAddrConvert.addr_convert ptr) eqn:PTRCONV.
-        + eapply fin_inf_byte_allocated; eauto.
-          red in ALLOCS_PRESERVED.
-          eapply ALLOCS_PRESERVED.
-          eapply inf_fin_byte_allocated; eauto.
-        + (* This should be a contradiction based on ptr / BYTE_ALLOCATED *)
-          red in BYTE_ALLOCATED.
-          cbn in BYTE_ALLOCATED.
-          eapply fin_inf_byte_allocated; eauto.
-          red in ALLOCS_PRESERVED.
-          eapply ALLOCS_PRESERVED.
-          eapply inf_fin_byte_allocated; eauto.
-    Qed.
-
-    try solve [split; eauto].
+    - eapply fin_inf_allocations_preserved; eauto.
+    - eapply fin_inf_frame_stack_preserved; eauto.
+    - eapply fin_inf_heap_preserved; eauto.
+    - eapply fin_inf_read_byte_allowed_all_preserved; eauto.
+    - eapply fin_inf_write_byte_allowed_all_preserved; eauto.
+    - eapply fin_inf_free_byte_allowed_all_preserved; eauto.
+    - eapply fin_inf_preserve_allocation_ids; eauto.
   Qed.
 
   Lemma fin_inf_write_byte_spec_MemPropT :
