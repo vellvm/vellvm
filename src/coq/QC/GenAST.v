@@ -2270,9 +2270,11 @@ Section InstrGenerators.
     match t_instr with
     | (TYPE_Void, instr) =>
         vid <- new_void_id;;
-        ret (vid, instr)
+        annotate ("------Generate: " ++ show instr) (
+        ret (vid, instr))
     | (t, instr) =>
         i <- new_raw_id;;
+        annotate ("------Generate: " ++ show instr) (
         match instr with
         | INSTR_Op (OP_Conversion Ptrtoint t_from v t_to) =>
             add_to_ptrtoint_ctx (t_from, ID_Local i, t_to);; (* Register the local variable to ptrtoint_ctx*)
@@ -2280,7 +2282,7 @@ Section InstrGenerators.
         | _ =>
             add_to_ctx (ID_Local i, t);;
             ret (IId i, instr)
-        end
+        end)
     end.
 
   (* Generate a block of code, spitting out a new context. *)
@@ -2492,9 +2494,7 @@ Section InstrGenerators.
     :=
     ctxs <- get_variable_ctxs;;
 
-      annotate
-        ("--Generate: " ++ show name)
-        (
+
       (* Add arguments to context *)
       args <- map_monad
                (fun t =>
@@ -2516,6 +2516,9 @@ Section InstrGenerators.
                          []
       in
 
+      annotate
+        ("--Generate: " ++ show prototype)
+        (
       bs <- gen_blocks ret_t;;
       
       (* Reset context *)
