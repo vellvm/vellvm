@@ -1510,18 +1510,18 @@ Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
 
         (* Generate literals for aggregate structures *)
         | TYPE_Array n t =>
-            es <- vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t);;
+            es <- hide_ctx (vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t));;
             ret (EXP_Array (map (fun e => (t, e)) es))
         | TYPE_Vector n t =>
-            es <- vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t);;
+            es <- hide_ctx (vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t));;
             ret (EXP_Vector (map (fun e => (t, e)) es))
         | TYPE_Struct fields =>
             (* Should we divide size evenly amongst components of struct? *)
-            tes <- map_monad (fun t => e <- gen_exp_size 0 t;; ret (t, e)) fields;;
+            tes <- map_monad (fun t => e <- hide_ctx (gen_exp_size 0 t);; ret (t, e)) fields;;
             ret (EXP_Struct tes)
         | TYPE_Packed_struct fields =>
             (* Should we divide size evenly amongst components of struct? *)
-            tes <- map_monad (fun t => e <- gen_exp_size 0 t;; ret (t, e)) fields;;
+            tes <- map_monad (fun t => e <- hide_ctx (gen_exp_size 0 t);; ret (t, e)) fields;;
             ret (EXP_Packed_struct tes)
 
         | TYPE_Identified id        =>
