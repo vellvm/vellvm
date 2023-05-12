@@ -90,14 +90,22 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     | DVALUE_I8 b => ret b
     | _ => raise "i8_str_index failed with non-DVALUE_I8"
     end.
+Search rev.
+(* SAZ: tail recursive version of list reversal -- is this already in our libraries somehwere? -
+ GC: I think so. It's defined in DList. Maybe we can mark this as resolved?
+ *)
 
-  (* SAZ: tail recursive version of list reversal -- is this already in our libraries somehwere? *)
-  Definition listrev {A:Type} (l:list A) : list A :=
-    (fix rev_tail (l:list A) (acc:list A) : list A :=
-      match l with
-      | [] => acc
-      | x::xs => rev_tail xs (x::acc)
-      end) l [].
+Search "rev".
+Print DList.rev_tail_rec.
+
+Definition listrev {A : Type} (l : list A): list A := DList.rev_tail_rec l.
+
+  (* Definition listrev {A:Type} (l:list A) : list A := *)
+  (*   (fix rev_tail (l:list A) (acc:list A) : list A := *)
+  (*     match l with *)
+  (*     | [] => acc *)
+  (*     | x::xs => rev_tail xs (x::acc) *)
+  (*     end) l []. *)
   
   (** Semantic function that treats [u_strptr] as a C-style string pointer:
       - reads i8 values from memory until it encounters a null-terminator (i8 0)
