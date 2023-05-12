@@ -90,13 +90,10 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     | DVALUE_I8 b => ret b
     | _ => raise "i8_str_index failed with non-DVALUE_I8"
     end.
-Search rev.
 (* SAZ: tail recursive version of list reversal -- is this already in our libraries somehwere? -
  GC: I think so. It's defined in DList. Maybe we can mark this as resolved?
  *)
 
-Search "rev".
-Print DList.rev_tail_rec.
 
 Definition listrev {A : Type} (l : list A): list A := DList.rev_tail_rec l.
 

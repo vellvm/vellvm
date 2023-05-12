@@ -2517,11 +2517,22 @@ Section InstrGenerators.
   Definition gen_global_tle_multiple : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     := listOf_LLVM  gen_global_tle.
 
+  Definition list_high_level_dec : list (declaration typ) :=
+    [
+      let puts_id := Name "puts" in
+      let puts_typ := TYPE_Function (TYPE_I 32) [(TYPE_Pointer (TYPE_I 8))] false in
+      mk_declaration puts_id puts_typ ([], []) [] []
+    ].
+
+  Definition gen_list_high_level_tle : GenLLVM (list (toplevel_entity typ (block typ * list (block typ)))) :=
+    ret (map TLE_Declaration list_high_level_dec).
+  
   Definition gen_llvm : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     :=
+    high_levels <- gen_list_high_level_tle;;
     globals <- gen_global_tle_multiple;;
     functions <- gen_helper_function_tle_multiple;;
     main <- gen_main_tle;;
-    ret (globals ++ functions ++ [main])%list.
+    ret (high_levels ++ globals ++ functions ++ [main])%list.
 
 End InstrGenerators.
