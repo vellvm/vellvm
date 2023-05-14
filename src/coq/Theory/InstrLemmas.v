@@ -197,7 +197,9 @@ Proof.
   rewrite EXP.
   go.
   cbn.
-  go. cbn. go.
+  go.
+  destruct (dvalue_eq_dec (d1:=DVALUE_Addr a) (d2:=DVALUE_Poison)); try inversion e.
+  go.
   step.
   step.
   reflexivity.
@@ -229,6 +231,8 @@ Proof.
   go.
   cbn.
   go.
+
+  destruct (dvalue_eq_dec (d1:=DVALUE_Addr a) (d2:=DVALUE_Poison)); try inversion e.
   step.
   reflexivity.
 Qed.

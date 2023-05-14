@@ -524,7 +524,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                  (i: (instr_id * instr dtyp)): itree instr_E unit :=
         match i with
         (* Pure operations *)
-
         | (IId id, INSTR_Op op) =>
           dv <- translate exp_to_instr (denote_op op) ;;
           trigger (LocalWrite id dv)
@@ -538,7 +537,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | (IId id, INSTR_Load _ dt (du,ptr) _) =>
           ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
           da <- concretize_or_pick ua True ;;
-          if (dvalue_eqb da DVALUE_Poison)
+          if (@dvalue_eq_dec da DVALUE_Poison)
           then raiseUB "Load from poisoned address."
           else dv <- trigger (Load dt da);;
                 trigger (LocalWrite id dv)
@@ -549,7 +548,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           dv <- concretize_or_pick uv True ;;
           ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
           da <- pickUnique ua ;;
-          if (dvalue_eqb da DVALUE_Poison)
+          if (@dvalue_eq_dec da DVALUE_Poison)
           then raiseUB "Store to poisoned address."
           else trigger (Store da dv)
 
