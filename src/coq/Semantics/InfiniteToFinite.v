@@ -4709,24 +4709,29 @@ Module InfiniteToFinite.
   Qed.
 
   Lemma fin_inf_write_byte_spec_MemPropT :
-    forall addr_fin addr_inf ms_fin ms_inf ms_fin' ms_inf' byte_fin,
+    forall addr_fin addr_inf ms_fin ms_inf ms_fin' byte_fin,
       MemState_refine ms_inf ms_fin ->
-      MemState_refine ms_inf' ms_fin' ->
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
       Memory64BitIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_fin byte_fin
         ms_fin
         (ret (ms_fin', tt)) ->
-      MemoryBigIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_inf (lift_SByte byte_fin)
-        ms_inf
-        (ret (ms_inf', tt)).
+      exists ms_inf',
+        MemoryBigIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_inf (lift_SByte byte_fin)
+          ms_inf
+          (ret (ms_inf', tt)) /\
+          MemState_refine ms_inf' ms_fin'.
   Proof.
-    intros addr_fin addr_inf ms_fin ms_inf ms_fin' ms_inf' byte_fin MSR MSR' ADDR_CONV WBP.
+    intros addr_fin addr_inf ms_fin ms_inf ms_fin' byte_fin MSR ADDR_CONV WBP.
     (* TODO: make things opaque? *)
     destruct WBP.
+    exists (lift_MemState ms_fin').
+    split; [| apply lift_MemState_refine ].
     split.
     - eapply fin_inf_write_byte_allowed; eauto.
     - eapply fin_inf_set_byte_memory; eauto.
+      apply lift_MemState_refine.
     - eapply fin_inf_write_byte_operation_invariants; eauto.
+      apply lift_MemState_refine.
   Qed.
 
   Lemma fin_inf_write_bytes_spec :
