@@ -638,22 +638,10 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         | TERM_Br_1 br => ret (inl br)
 
-        | TERM_Switch (dt,e) default_br dests =>
-          uselector <- denote_exp (Some dt) e;;
-          (* Selection on [undef] is UB *)
-          selector <- pickUnique uselector;;
-          if dvalue_is_poison selector
-          then raiseUB "Switching on poison."
-          else (* We evaluate all the selectors. Note that they are enforced to be constants, we could reflect this in the syntax and avoid this step *)
-            switches <- lift_undef_or_err ret
-                                         (map_monad
-                                            (fun '((TInt_Literal sz x),id) => s <- (coerce_integer_to_int sz x);; ret (s,id))
-                                            dests);;
-            lift_err (fun b => ret (inl b)) (select_switch selector default_br switches)
-
         | TERM_Unreachable => raiseUB "IMPOSSIBLE: unreachable in reachable position" 
 
         (* Currently unhandled VIR terminators *)
+        | TERM_Switch _ _ _
         | TERM_IndirectBr _ _
         | TERM_Resume _
         | TERM_Invoke _ _ _ _ => raise "Unsupport itree terminator"

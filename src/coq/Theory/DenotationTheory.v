@@ -338,40 +338,6 @@ Section Outputs.
       apply has_post_bind; intros ?.
       break_match_goal; try (apply raise_has_all_posts || apply raiseUB_has_all_posts).
       break_match_goal; apply eutt_Ret; cbn; eauto.
-    - destruct v; cbn.
-      apply has_post_bind; intros ?.
-      apply has_post_bind; intros ?.
-      break_match_goal;
-        try (apply raise_has_all_posts || apply raiseUB_has_all_posts).
-      unfold lift_undef_or_err.
-      do 2 break_match_goal.
-      unfold raiseUB; go; apply has_post_bind; intros [].
-      break_match_goal.
-      unfold raise; go; apply has_post_bind; intros [].
-      go.
-      subst.
-      assert (List.map snd brs = List.map snd l).
-      {
-        revert l Hequ; induction brs as [| br brs IH].
-        - intros ? eq; inv eq; reflexivity.
-        - intros ? eq; inv eq.
-          repeat (break_match_hyp; cbn in *; try inv_sum).
-          f_equal; apply IH.
-          rewrite <- Heqs1.
-          Set Nested Proofs Allowed.
-
-          rewrite unEither_eta.
-          reflexivity.
-      }
-      rewrite H.
-      clear.
-      induction l as [| br brs IH].
-      + cbn; intros.
-        apply eutt_Ret; red; auto.
-      + cbn; intros.
-        repeat (cbn; break_match_goal; try apply raise_has_all_posts).
-        all: try apply eutt_Ret; red; auto.
-        all: try subst; eapply has_post_weaken; [apply IH | intros [] ?; cbn in *; intuition].
     - apply raiseUB_has_all_posts.
   Qed.
 
