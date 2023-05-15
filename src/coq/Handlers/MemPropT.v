@@ -377,6 +377,21 @@ Proof.
     auto.
 Defined.
 
+#[global] Instance Within_ret_pre_post_inv_MemPropT {MemState} :
+  Within_ret_pre_post_inv (MemPropT MemState) err_ub_oom MemState.
+Proof.
+  split.
+  - intros A pre post x y H.
+    cbn in *.
+    firstorder.
+  - intros A pre x.
+    cbn.
+    auto.
+  - intros A pre1 post1 pre2 post2 x y z w H H0.
+    cbn in *.
+    tauto.
+Defined.
+
 #[global] Instance RaiseBindM_OOM_MemPropT {MemState} {IMS : Inhabited MemState} :
   RaiseBindM (MemPropT MemState) string (@raise_oom (MemPropT MemState) MemPropT_RAISE_OOM).
 Proof.

@@ -139,6 +139,22 @@ Section Laws.
     }.
 End Laws.
 
+Section Laws.
+  Variable M : Type -> Type.
+  Variable B : Type -> Type.
+  Variable Pre : Type.
+  Context `{HM : Monad M}.
+  Context `{HMB : Monad B}.
+  Context `{EQM : Eq1 M}.
+  Context `{WM : @Within M EQM B Pre Pre}.
+
+  Class Within_ret_pre_post_inv : Prop :=
+    { within_ret_ret_pre_post : forall {A pre post} (x y : A), ret x {{pre}} ∈ {{post}} ret y -> x = y;
+      within_ret_refl_pre_post : forall {A pre} (x : A), ret x {{pre}} ∈ {{pre}} ret x;
+      within_ret_pre_post_always : forall {A pre1 post1 pre2 post2} (x y z w : A), ret x {{pre1}} ∈ {{post1}} ret y -> ret z {{pre2}} ∈ {{post2}} ret w -> ret z {{pre1}} ∈ {{post1}} ret w;
+    }.
+End Laws.
+
 Definition transitive_within {Pre Post} {M1 M2 M3} `{EQM2 : Eq1 M2} `{EQM3 : Eq1 M3} `{WM1M2 : @Within M2 EQM2 M1 Pre Post} `{WM2M3 : @Within M3 EQM3 M2 Pre Post}
   {A} (m3 : M3 A) (pre : Pre) (m1 : M1 A) (post : Post) : Prop :=
   exists (m2 : M2 A),
@@ -235,6 +251,27 @@ Proof.
     exists inhabitant0.
     red.
     reflexivity.
+Defined.
+
+#[global] Instance Reflexive_Within_ret_pre_post_inv
+  {Pre} {M} `{MM : Monad M}
+  `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M MM EQM}
+  `{EQR : @Eq1_ret_inv M EQM MM}:
+  @Within_ret_pre_post_inv M M Pre MM MM EQM (@Reflexive_Within Pre Pre M MM EQM EQV).
+Proof.
+  split.
+  - intros A pre post x y RET.
+    cbn in RET.
+    unfold reflexive_within in *.
+    eapply eq1_ret_ret in RET; eauto.
+  - intros A pre x.
+    cbn.
+    red.
+    reflexivity.
+  - intros A pre1 post1 pre2 post2 x y z w H H0.
+    cbn in *.
+    red. red in H, H0.
+    congruence.
 Defined.
 
 #[global] Instance Reflexive_OOM_RaiseWithin

@@ -4709,7 +4709,7 @@ Module InfiniteToFinite.
   Qed.
 
   Lemma fin_inf_write_byte_spec_MemPropT :
-    forall addr_fin addr_inf ms_fin ms_inf ms_fin' byte_fin,
+    forall {addr_fin addr_inf ms_fin ms_inf ms_fin' byte_fin},
       MemState_refine ms_inf ms_fin ->
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
       Memory64BitIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_fin byte_fin
@@ -4734,19 +4734,465 @@ Module InfiniteToFinite.
       apply lift_MemState_refine.
   Qed.
 
+  Lemma fin_inf_write_byte_spec :
+    forall {addr_fin addr_inf ms_fin ms_inf ms_fin' byte_fin},
+      MemState_refine ms_inf ms_fin ->
+      InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.write_byte_spec ms_fin addr_fin byte_fin ms_fin' ->
+      exists ms_inf',
+        MemoryBigIntptr.MMEP.MemSpec.write_byte_spec ms_inf addr_inf (lift_SByte byte_fin) ms_inf' /\
+          MemState_refine ms_inf' ms_fin'.
+  Proof.
+    intros addr_fin addr_inf ms_fin ms_inf ms_fin' byte_fin MSR ADDR_CONV WBP.
+    (* TODO: make things opaque? *)
+    destruct WBP.
+    exists (lift_MemState ms_fin').
+    split; [| apply lift_MemState_refine ].
+    split.
+    - eapply fin_inf_write_byte_allowed; eauto.
+    - eapply fin_inf_set_byte_memory; eauto.
+      apply lift_MemState_refine.
+    - eapply fin_inf_write_byte_operation_invariants; eauto.
+      apply lift_MemState_refine.
+  Qed.
+
   Lemma fin_inf_write_bytes_spec :
-    forall a_fin a_inf ms_fin ms_inf ms_fin' ms_inf' bytes_fin,
+    forall a_fin a_inf ms_fin ms_inf ms_fin' bytes_fin,
       InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
       MemState_refine ms_inf ms_fin ->
-      MemState_refine ms_inf' ms_fin' ->
       Memory64BitIntptr.MMEP.MemSpec.write_bytes_spec a_fin bytes_fin ms_fin (success_unERR_UB_OOM (ms_fin', tt)) ->
-      MemoryBigIntptr.MMEP.MemSpec.write_bytes_spec a_inf (map lift_SByte bytes_fin) ms_inf (success_unERR_UB_OOM (ms_inf', tt)).
+      exists ms_inf',
+        MemoryBigIntptr.MMEP.MemSpec.write_bytes_spec a_inf (map lift_SByte bytes_fin) ms_inf (success_unERR_UB_OOM (ms_inf', tt)) /\
+        MemState_refine ms_inf' ms_fin'.
   Proof.
-    intros a_fin a_inf ms_fin ms_inf ms_fin' ms_inf' bytes_fin ADDR_CONV MEM_REF MEM_REF' WRITE_SPEC.
+    intros a_fin a_inf ms_fin ms_inf ms_fin' bytes_fin ADDR_CONV MEM_REF WRITE_SPEC.
 
     (* TODO: Make these opaque earlier *)
     Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
     Opaque MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+
+    cbn in *.
+    destruct WRITE_SPEC as (ms_fin_gep & addrs_fin & CONSEC & WRITE_SPEC).
+    destruct WRITE_SPEC as (ms_fin_writes & WRITE_RES & WRITE_SPEC & MS & _).
+    pose proof fin_inf_get_consecutive_ptrs_success_exists a_fin a_inf (Datatypes.length bytes_fin) ms_fin ms_fin_gep addrs_fin ms_inf ADDR_CONV CONSEC as (addrs_inf & GCP & ADDRS_CONV).
+    pose proof Memory64BitIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq _ _ _ _ _ CONSEC; subst.
+
+    (* Not sure if induction is the right thing to do here *)
+    generalize dependent a_fin.
+    generalize dependent a_inf.
+    generalize dependent bytes_fin.
+    revert WRITE_RES ms_inf ms_fin_gep MEM_REF ms_fin_writes.
+    induction ADDRS_CONV; intros WRITE_RES ms_inf ms_fin_gep MEM_REF ms_fin_writes bytes_fin WRITE_SPEC a_inf GCP a_fin ADDR_CONV CONSEC.
+
+    - cbn in *.
+      destruct WRITE_SPEC; subst.
+
+      (* Final MemState *)
+      exists (lift_MemState ms_fin_gep).
+      split; [| apply lift_MemState_refine].
+
+      (* MemState after GEP *)
+      exists ms_inf.
+      exists [].
+      split.
+      + (* GEP *)
+        rewrite map_length.
+        auto.
+      + exists (lift_MemState ms_fin_gep).
+        exists [].
+        split; auto.
+
+        cbn in *.
+        split; auto.
+        red in MEM_REF.
+
+        (* TODO: Move this *)
+        Lemma lift_MemState_convert_MemState_inverse :
+          forall {ms_inf ms_fin},
+            convert_MemState ms_inf = NoOom ms_fin ->
+            lift_MemState ms_fin = ms_inf.
+        Proof.
+        Admitted.
+
+        (* TODO: Move this *)
+        Lemma MemState_fin_to_inf_to_fin :
+          forall ms,
+            convert_MemState (lift_MemState ms) = NoOom ms.
+        Proof.
+          intros ms.
+        Admitted.
+
+        apply lift_MemState_convert_MemState_inverse; auto.
+
+    - (* Final MemState *)
+      (* May need to hold off on this until we can call induction hypothesis *)
+      exists (lift_MemState ms_fin_writes).
+      split; [| apply lift_MemState_refine].
+
+      (* MemState after GEP *)
+      exists ms_inf.
+
+      (* GCP results *)
+      exists (y :: l').
+      split.
+
+      { (* GCP *)
+        rewrite map_length.
+        auto.
+      }
+
+      exists (lift_MemState ms_fin_writes).
+      exists WRITE_RES.
+      split; auto.
+
+      assert (exists (pre : MemoryBigIntptr.MMEP.MMSP.MemState) (post : MemoryBigIntptr.MMEP.MMSP.MemState),
+                 Within.within (InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_inf (Datatypes.length bytes_fin)) pre
+                   (ret (y::l')) post) as WITHIN.
+      {
+        exists ms_inf. exists ms_inf.
+        cbn.
+        auto.
+      }
+
+      (* TODO: Move this import *)
+      Import Within.
+
+      assert ((ret (y::l')) {{ms_inf}} ∈ {{ms_inf}} (InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_inf (Datatypes.length bytes_fin))) as WITHIN'.
+      {
+        cbn. red. cbn.
+        auto.
+      }
+
+      pose proof InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons' _ _ _ _ WITHIN' as GCP_CONS.
+      pose proof InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_length _ _ _ WITHIN as BYTES_LENGTH.
+      clear WITHIN.
+      cbn in BYTES_LENGTH.
+      destruct bytes_fin.
+      inv BYTES_LENGTH.
+      rename s into byte_fin.
+
+      cbn.
+
+      (* After writing first byte *)
+      cbn in WRITE_SPEC.
+      destruct WRITE_SPEC as [ms_fin_write [[] WRITE_SPEC]].
+      destruct WRITE_SPEC as [WRITE_SPEC [ms_fin_writes' [writes_res' [WRITES_SPEC [MS RES]]]]].
+      subst.
+
+      pose proof fin_inf_write_byte_spec MEM_REF H WRITE_SPEC as [ms_inf_write [WRITE_SPEC_INF MEM_REF_WRITE]].
+
+      exists ms_inf_write. exists tt.
+      split; auto.
+
+      (* Writing the rest of the bytes *)
+      destruct GCP_CONS as [A_INF [[L LENGTH] | GCP_CONS]]. subst.
+
+      { (* Only one byte being written *)
+        exists (lift_MemState ms_fin_writes').
+        exists writes_res'.
+        split; auto.
+        cbn.
+
+        inv ADDRS_CONV.
+        cbn in WRITES_SPEC.
+        destruct WRITES_SPEC.
+        subst.
+        split; auto.
+
+        apply lift_MemState_convert_MemState_inverse; auto.
+      }
+
+      (* More than one byte to write *)
+      destruct GCP_CONS as (ptr'&ip&len'&LENGTH'&IP&GEP&GCP_CONS).
+
+      (* This may be a problem, not sure what pre / post are *)
+      destruct GCP_CONS as (pre&post&GCP_CONS).
+      cbn in GCP_CONS.
+      red in GCP_CONS.
+      cbn in GCP_CONS.
+
+      specialize (IHADDRS_CONV _ _ _ MEM_REF_WRITE _ _ WRITES_SPEC _ GCP_CONS).
+
+      assert (x0 = ms_fin').
+      {
+        eapply Memory64BitIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq.
+        exact CONSEC.
+      }
+      subst.
+
+      induction bytes_fin.
+      {
+        cbn in *; tauto.
+      }
+
+      {
+        rewrite MemoryBigIntptrInfiniteSpec.MemTheory.zip_cons in HMAPM.
+        cbn in HMAPM.
+        destruct HMAPM as [sab [a0 [WRITE HMAPM]]].
+        destruct HMAPM as [sab0 [a' [HMAPM [MS RES]]]].
+        subst.
+
+        specialize (IHADDRS_CONV bytes_fin).
+        forward IHADDRS_CONV.
+        {
+          exists sab0. exists a'.
+          split; auto.
+        }
+      }
+
+      epose proof fin_inf_write_byte_spec_MemPropT _ _ _ _ _ MEM_REF ADDR_CONV.
+
+      rewrite map_monad_unfold.
+      cbn.
+
+      rename l into addrs_fin.
+      rename l' into addrs_inf.
+      rename y into x_inf.
+      rename x into x_fin.
+
+      cbn in READ_SPEC.
+      destruct READ_SPEC as [ms_fin'' [a [[MS READ_SPEC] READ_SPEC_REST]]]; subst.
+
+      assert (ms_fin'' = ms_fin) as MSFIN.
+      {
+        (* TODO: make this a lemma *)
+        Transparent Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+        unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs in CONSEC.
+        cbn in CONSEC.
+        destruct CONSEC as [sab [ips [SEQ CONSEC]]].
+        red in SEQ.
+        break_match_hyp; inv SEQ.
+        destruct CONSEC as [sab [addrs [CONSEC SEQ]]].
+        red in CONSEC.
+        break_match_hyp; inv CONSEC.
+        red in SEQ.
+        break_match_hyp; inv SEQ.                                                   auto.
+        Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+      }
+      subst.
+
+      pose proof READ_SPEC_REST as READ_SPEC_REST'.
+      destruct READ_SPEC_REST as [ms_fin' [bytes_fin' READ_SPEC_REST]].
+      destruct READ_SPEC_REST as [READ_SPEC_REST [MS BYTES_FIN]].
+      subst.
+
+      exists ms_inf. exists (lift_SByte a).
+      split.
+      { split; auto.
+        eapply fin_inf_read_byte_spec; eauto.
+      }
+
+      assert ((exists (pre : MemoryBigIntptr.MMEP.MMSP.MemState) (post : MemoryBigIntptr.MMEP.MMSP.MemState),
+                  Within.within (InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_inf n) pre
+                    (ret (x_inf :: addrs_inf)) post)).
+      { exists ms_inf. exists ms_inf.
+        cbn. red. cbn.
+        auto.
+      }
+
+      specialize (IHADDRS_CONV _ READ_SPEC_REST).
+
+      epose proof InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons _ _ _ _ H0.
+      destruct H1 as [XA [[PTRS N] | [ptr' [ip' [len' [LEN [IP [GEP [pre [post WITHIN]]]]]]]]]].
+      { subst.
+        cbn in *.
+        exists ms_inf. exists [].
+        split; auto.
+        split; auto.
+
+        specialize (IHADDRS_CONV 0%nat a_inf).
+        forward IHADDRS_CONV.
+        { cbn.
+          (* TODO: This should probably be a lemma *)
+          Transparent MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+          unfold MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+          Opaque MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+          cbn.
+          exists ms_inf. exists [].
+          split; auto.
+          exists ms_inf. exists [].
+          cbn.
+          auto.
+        }
+
+        specialize (IHADDRS_CONV _ H).
+        inv ADDRS_CONV.
+        forward IHADDRS_CONV.
+        { cbn.
+          (* TODO: This should probably be a lemma *)
+          Transparent Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+          unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+          Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+          cbn.
+          exists ms_fin'. exists [].
+          split; auto.
+          exists ms_fin'. exists [].
+          cbn.
+          auto.
+        }
+
+        destruct IHADDRS_CONV; subst.
+        pose proof (map_eq_nil _ _ H2) as BYTES_FIN'_NIL; subst.
+        cbn; auto.
+      }
+
+      pose proof H0 as WITHIN_INF.
+      destruct H0 as [pre' [post' WITHIN']].
+      cbn in WITHIN'.
+      red in WITHIN'.
+      cbn in WITHIN'.
+
+
+      subst.
+      cbn in WITHIN.
+      red in WITHIN.
+      cbn in WITHIN.
+
+      pose proof WITHIN as PREPOST.
+      eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in PREPOST.
+      subst.
+
+      exists ms_inf. exists (map lift_SByte bytes_fin').
+      split; auto.
+
+      destruct addrs_inf as [? | a_inf' addrs_inf].
+      {
+        destruct addrs_fin as [? | a_fin' addrs_fin].
+        {
+          cbn in READ_SPEC_REST.
+          destruct READ_SPEC_REST; subst.
+          cbn; auto.
+        }
+
+        (* Should be a contradiction *)
+        inv ADDRS_CONV.
+      }
+
+      destruct addrs_fin as [? | a_fin' addrs_fin].
+      { (* Should be a contradiction *)
+        inv ADDRS_CONV.
+      }
+
+      eapply IHADDRS_CONV.
+      + eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState.
+        eapply WITHIN.
+      + (* How do I know ptr' is safe to convert
+                               to a finite pointer?
+
+                               I know it's a_inf + 1...
+
+                               Need to show that a_inf' is a_inf + 1
+                               as well, and that it relates to a_fin'.
+         *)
+
+        (* ptr' is a_inf + 1 (AKA a_inf'). It
+                               should share the same provenance as well.
+         *)
+
+        pose proof (MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_nth_eq1  a_inf (S len') (a_inf :: a_inf' :: addrs_inf) (M:=(MemPropT MemoryBigIntptr.MMEP.MMSP.MemState))).
+        forward H0.
+        { red. red.
+          intros ms x0.
+          split.
+          - intros GCP'.
+            cbn.
+            (* Ideally want to use GCP to show this... *)
+            assert (exists (pre : MemoryBigIntptr.MMEP.MMSP.MemState) (post : MemoryBigIntptr.MMEP.MMSP.MemState),
+                       @Within.within (MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) (@MemPropT_Eq1 MemoryBigIntptr.MMEP.MMSP.MemState) err_ub_oom MemoryBigIntptr.MMEP.MMSP.MemState MemoryBigIntptr.MMEP.MMSP.MemState _ _ (MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_inf (S len')) pre (fmap snd x0) post).
+            { exists ms. exists ms.
+              red. red. red.
+              destruct_err_ub_oom x0;
+                cbn; auto.
+
+              destruct x1; cbn in *.
+              pose proof GCP' as GCP''.
+              assert (success_unERR_UB_OOM (m, l) = @ret _ _ _ (m, l)); cbn; auto.
+              rewrite H1 in GCP''.
+
+              pose proof MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq a_inf (S len') l ms m GCP''; subst.
+              eauto.
+            }
+
+            pose proof MemoryBigIntptr.CP.CONCBASE.MemHelpers.get_consecutive_ptrs_success_always_succeeds (M:=(MemPropT MemoryBigIntptr.MMEP.MMSP.MemState)) (B:=err_ub_oom) a_inf (S len') (a_inf :: a_inf' :: addrs_inf) _ WITHIN_INF H1.
+            destruct_err_ub_oom x0; cbn in *; inv H2.
+            destruct x1; cbn in *; subst.
+            pose proof GCP' as MM.
+            apply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in MM.
+            subst.
+            split; auto.
+          - intros H1.
+            cbn in H1.
+            destruct_err_ub_oom x0; try inv H1.
+            destruct x1.
+            destruct H1.
+            subst.
+            pose proof WITHIN'.
+            apply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in H1; subst.
+            eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState.
+            eapply WITHIN'.
+        }
+
+        specialize (H0 a_inf' 1%nat).
+        forward H0; cbn; auto.
+        destruct H0 as [ix [IX GEP_IX]].
+
+        (* Show that ip' = ix *)
+        assert (ip' = ix) as IPIX.
+        {
+          cbn in IX.
+          inv IX.
+          unfold InterpreterStackBigIntptr.LP.IP.to_Z in IP.
+          auto.
+        }
+        subst.
+
+        rewrite GEP in GEP_IX.
+        inv GEP_IX.
+        inv ADDRS_CONV.
+        eauto.
+      + (* Should follow from CONSEC *)
+
+        assert ((exists (pre : FinMem.MMEP.MMSP.MemState) (post : FinMem.MMEP.MMSP.MemState),
+                    Within.within (FinLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_fin (S len')) pre
+                      (ret (x_fin :: a_fin' :: addrs_fin)) post)).
+        {
+          exists ms_fin'. exists ms_fin'.
+          cbn. red. cbn.
+          auto.
+        }
+
+        pose proof FinMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons _ _ _ _ H0.
+        destruct H1.
+        destruct H2.
+        { destruct H2; discriminate.
+        }
+
+        destruct H2 as [ptr'' [ip [len'' [LEN [IP' [GEP'' WITHIN'']]]]]].
+        (* GEP'' suggests ptr'' = a_fin' *)
+        assert (ptr'' = a_fin').
+        {
+          subst.
+          pose proof FinMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons _ _ _ _ WITHIN''.
+          destruct H1.
+          auto.
+        }
+        subst.
+
+        destruct WITHIN'' as [pre [post'' WITHIN'']].
+        cbn in WITHIN''.
+        red in WITHIN''.
+        cbn in WITHIN''.
+        pose proof WITHIN''.
+        inv LEN.
+        apply FinMem.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in H1; subst.
+        eapply FinMem.MMEP.get_consecutive_ptrs_MemPropT_MemState; eauto.
+        eapply WITHIN''.
+
+    (* **** OLD STUFF BEFORE EXISTENTIAL SWITCH *)
+
+    (* Not sure about this existential... May need to do induction first. *)
+    exists (lift_MemState ms_fin').
+    
     red. red in WRITE_SPEC.
     cbn in *.
     destruct WRITE_SPEC as (ms_fin'' & addrs_fin & CONSEC & WRITE_SPEC).
@@ -6153,12 +6599,6 @@ Module InfiniteToFinite.
                                                             pose proof fin_to_inf_dvalue_refine_strict d.
                                                             auto.
                                                           Qed.
-
-                                                          Lemma MemState_fin_to_inf_to_fin :
-                                                            forall ms,
-                                                              convert_MemState (lift_MemState ms) = NoOom ms.
-                                                          Proof.
-                                                          Admitted.
 
                                                           rewrite dvalue_fin_to_inf_to_fin.
                                                           rewrite MemState_fin_to_inf_to_fin.
