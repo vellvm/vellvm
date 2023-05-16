@@ -4863,7 +4863,7 @@ Module InfiniteToFinite.
         auto.
       }
 
-      pose proof InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons' _ _ _ _ WITHIN' as GCP_CONS.
+      pose proof InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons' _ _ _ _ _ _ WITHIN' as GCP_CONS.
       pose proof InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_length _ _ _ WITHIN as BYTES_LENGTH.
       clear WITHIN.
       cbn in BYTES_LENGTH.
@@ -4904,14 +4904,155 @@ Module InfiniteToFinite.
 
       (* More than one byte to write *)
       destruct GCP_CONS as (ptr'&ip&len'&LENGTH'&IP&GEP&GCP_CONS).
+      subst.
+      inv LENGTH'.
 
-      (* This may be a problem, not sure what pre / post are *)
-      destruct GCP_CONS as (pre&post&GCP_CONS).
-      cbn in GCP_CONS.
-      red in GCP_CONS.
-      cbn in GCP_CONS.
+      cbn.
+      specialize (IHADDRS_CONV _ _ _ MEM_REF_WRITE _ _ WRITES_SPEC ptr').
+      forward IHADDRS_CONV.
+      {
+        cbn in GCP_CONS.
+        red in GCP_CONS.
+        cbn in *.
+        eapply InfMem.MMEP.get_consecutive_ptrs_MemPropT_MemState.
+        apply GCP_CONS.
+      }
 
-      specialize (IHADDRS_CONV _ _ _ MEM_REF_WRITE _ _ WRITES_SPEC _ GCP_CONS).
+      destruct bytes_fin.
+      {
+        cbn in *.
+        red in GCP_CONS.
+        cbn in GCP_CONS.
+
+        (* TODO: Move this *)
+        Lemma get_consecutive_ptrs_0_is_nil :
+          forall ms ms' ptr res,
+            @InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs
+              (MemPropT InfMem.MMEP.MMSP.MemState)
+               (@MemPropT_Monad InfMem.MMEP.MMSP.MemState)
+               (@MemPropT_RAISE_OOM InfMem.MMEP.MMSP.MemState)
+               (@MemPropT_RAISE_ERROR InfMem.MMEP.MMSP.MemState)
+               ptr 0 ms (success_unERR_UB_OOM (ms', res)) ->
+            res = [].
+        Proof.
+          intros ms ms' ptr res GCP.
+          Transparent InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+          unfold InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs in GCP.
+          Opaque InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+
+          cbn in *.
+          destruct GCP as (?&?&(?&?)&?&?&?&?); subst.
+          cbn in *.
+          destruct H1; subst.
+          cbn in *.
+          destruct H2; subst.
+          auto.
+        Qed.
+
+        apply get_consecutive_ptrs_0_is_nil in GCP_CONS; subst.
+        cbn.
+        exists ms_inf_write. exists [].
+        split; auto.
+
+        inv ADDRS_CONV.
+        cbn in *.
+        destruct WRITES_SPEC; subst.
+        split; auto.
+
+        eapply lift_MemState_convert_MemState_inverse.
+        eauto.
+      }
+
+      inv BYTES_LENGTH.
+      destruct l'; inv H1.
+      inv ADDRS_CONV.
+
+      rename a into ptr''.
+      rename x0 into ptr'_fin.
+
+      assert (ptr'' = ptr').
+      {
+        pose proof InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons' _ _ _ _ _ _ GCP_CONS as GCP_CONS'.
+
+        (* Single byte *)
+        destruct GCP_CONS' as [A_INF [[L LENGTH] | GCP_CONS']]; subst; auto.
+      }
+
+      subst.
+
+      specialize (IHADDRS_CONV ptr'_fin H4).
+
+      forward IHADDRS_CONV.
+      {
+        assert ((ret (x::ptr'_fin::l0)) {{ms_fin_gep}} ∈ {{ms_fin_gep}} (FinLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_fin (Datatypes.length (byte_fin :: s :: bytes_fin)))) as WITHIN_FIN.
+        {
+          cbn. red. cbn.
+          auto.
+        }
+
+        pose proof FinMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons' _ _ _ _ _ _ WITHIN_FIN.
+        destruct H0; subst.
+        destruct H1.
+        - destruct H0; discriminate.
+        - destruct H0 as (?&?&?&?&?&?&?).
+          pose proof FinMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons' _ _ _ _ _ _ H6.
+          destruct H7.
+          cbn in *. subst.
+
+          inv H0.
+          eapply FinMem.MMEP.get_consecutive_ptrs_MemPropT_MemState.
+          eapply H6.
+      }
+
+      destruct IHADDRS_CONV as [ms_inf' IHADDRS_CONV].
+      destruct IHADDRS_CONV.
+      destruct H0.
+      destruct H0.
+      destruct H0.
+      rename H0 into GCP'.
+      rename x1 into ptrs_res.
+      rename x0 into ms_inf_write'.
+
+      assert (ptrs_res = ptr' :: l') as PTRS_RES.
+      {
+        (* Should follow from GCP' and GCP_CONS *)
+        admit.
+      }
+
+      subst.
+
+      destruct H3 as [ms_inf'' [writes_res [HMAPM [MS _]]]].
+      subst.
+      assert (writes_res = writes_res').
+      {
+        admit.
+      }
+      subst.
+
+      exists ms_inf''.
+      exists writes_res'.
+      split; auto.
+      apply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in GCP'.
+      subst.
+      apply HMAPM.
+      split; auto.
+
+      apply lift_MemState_convert_MemState_inverse; auto.
+  Qed.
+      destruct H3.
+      destruct H3.
+      destruct H3.
+      destruct H6.
+      subst.
+      exists x0. exists writes_res'.
+      split; auto.
+
+      eapply IHADDRS_CONV.
+      exists (lift_MemState ms_fin_writes').
+      exists writes_res'.
+      split; auto.
+
+      
 
       assert (x0 = ms_fin').
       {
