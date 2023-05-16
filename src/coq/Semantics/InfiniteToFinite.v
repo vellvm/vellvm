@@ -5162,6 +5162,276 @@ Module InfiniteToFinite.
       apply lift_MemState_convert_MemState_inverse; auto.
   Qed.
 
+  (* TODO: Move this to somewhere it can
+     be instantiated for all memory model
+     instances
+   *)
+  Lemma read_bytes_spec_MemState_eq :
+    forall a sz ms ms' res,
+      Memory64BitIntptr.MMEP.MemSpec.read_bytes_spec a sz ms (ret (ms', res)) ->
+      ms = ms'.
+  Proof.
+    intros a sz ms ms' res READ.
+    red in READ.
+    cbn in *.
+    destruct READ as [sab [a0 [GCP HMAPM]]].
+    apply Memory64BitIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in GCP. subst.
+    generalize dependent res.
+    induction a0; intros res HMAPM.
+    - cbn in *.
+      destruct HMAPM; subst; auto.
+    - rewrite map_monad_unfold in HMAPM.
+      cbn in *.
+      destruct HMAPM as [sab0 [a' [[MS READ] HMAPM]]]; subst.
+      destruct HMAPM as [sab [a'' [HMAPM [MS RES]]]]; subst.
+      eapply IHa0.
+      eapply HMAPM.
+  Qed.
+
+  (* TODO: Lemma about lifting intrinsic handlers *)
+  (* TODO: Move this *)
+  Lemma handle_intrinsic_fin_inf :
+    forall t f args args0 ms ms' d
+      (ARGS: Forall2 DVCInfFin.dvalue_refine_strict args0 args),
+      Memory64BitIntptr.MMEP.MemSpec.handle_intrinsic_prop
+        LLVMParams64BitIntptr.Events.DV.dvalue
+        (LLVMParams64BitIntptr.Events.Intrinsic t f args) ms (ret (ms', d)) ->
+      MemoryBigIntptr.MMEP.MemSpec.handle_intrinsic_prop DVCInfFin.DV1.dvalue
+        (InterpreterStackBigIntptr.LP.Events.Intrinsic t f args0) (lift_MemState ms)
+        (ret (lift_MemState ms', fin_to_inf_dvalue d)).
+  Proof.
+    intros t f args args0 ms ms' d ARGS INTRINSIC.
+
+    pose proof lift_MemState_refine ms as MS_REF.
+    pose proof lift_MemState_refine ms' as MS'_REF.
+
+    red in INTRINSIC.
+    red.
+    break_match.
+    { (* Memcpy *)
+      cbn in *.
+      destruct INTRINSIC as [sab [[] [HANDLER [SAB D]]]].
+      subst.
+      exists (lift_MemState sab).
+      exists tt.
+      repeat split; auto.
+      - (* Handler *)
+        repeat (destruct ARGS;
+                [solve [ inversion HANDLER
+                       | red in HANDLER;
+                         repeat break_match_hyp; inversion HANDLER
+                   ]
+                |
+               ]).
+        red in HANDLER.
+        repeat break_match_hyp; try inversion HANDLER; subst.
+        { (* 32 bit memcpy *)
+          inversion ARGS; subst.
+          clear ARGS.
+          rewrite DVCInfFin.dvalue_refine_strict_equation in H, H0, H1, H2, H3.
+
+          apply dvalue_convert_strict_addr_inv in H as (a' & H & X); subst.
+          apply dvalue_convert_strict_addr_inv in H0 as (a0' & H0 & X0); subst.
+          apply dvalue_convert_strict_i32_inv in H1.
+          apply dvalue_convert_strict_i32_inv in H2; subst.
+          apply dvalue_convert_strict_i1_inv in H3; subst.
+
+          red. red.
+          red in HANDLER.
+
+          assert (LLVMParams64BitIntptr.Events.DV.unsigned x4 = LLVMParamsBigIntptr.Events.DV.unsigned x4) as X4.
+          { reflexivity.
+          }
+          rewrite <- X4; clear X4.
+
+          break_match_hyp; auto.
+
+          erewrite <- fin_inf_no_overlap; eauto.
+          repeat erewrite <- fin_inf_ptoi; eauto.
+          break_match_goal; auto.
+
+          do 2 red in HANDLER.
+          destruct HANDLER as (ms_read&bytes_fin&READ&WRITE).
+          epose proof fin_inf_read_bytes_spec _ _ _ _ _ _ H0 MS_REF.
+
+          pose proof READ as READ'.
+          eapply read_bytes_spec_MemState_eq in READ'; subst.
+          forward H1.
+          { eapply READ.
+          }
+
+          destruct H1 as [ms [addrs [GCP READ']]].
+          red. red.
+          exists ms. exists (map lift_SByte bytes_fin).
+          split.
+          { (* Read portion *)
+            red.
+            cbn.
+            exists ms. exists addrs.
+            split; auto.
+
+            assert (ms = lift_MemState ms_read).
+            {
+              symmetry.
+              eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq; eauto.
+            }
+            subst; eauto.
+          }
+
+          { (* Write bytes portion *)
+            pose proof fin_inf_write_bytes_spec _ _ _ _ _ _ H MS_REF WRITE as [ms_inf' [WRITE_INF MS_REF_INF]].
+            erewrite lift_MemState_convert_MemState_inverse; eauto.
+            eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in GCP.
+            subst.
+            apply WRITE_INF.
+          }
+        }
+
+        { (* 64 bit memcpy *)
+          inversion ARGS; subst.
+          clear ARGS.
+          rewrite DVCInfFin.dvalue_refine_strict_equation in H, H0, H1, H2, H3.
+
+          apply dvalue_convert_strict_addr_inv in H as (a' & H & X); subst.
+          apply dvalue_convert_strict_addr_inv in H0 as (a0' & H0 & X0); subst.
+          apply dvalue_convert_strict_i64_inv in H1.
+          apply dvalue_convert_strict_i64_inv in H2; subst.
+          apply dvalue_convert_strict_i1_inv in H3; subst.
+
+          red. red.
+          red in HANDLER.
+
+          assert (LLVMParams64BitIntptr.Events.DV.unsigned x4 = LLVMParamsBigIntptr.Events.DV.unsigned x4) as X4.
+          { reflexivity.
+          }
+          rewrite <- X4; clear X4.
+
+          break_match_hyp; auto.
+
+          erewrite <- fin_inf_no_overlap; eauto.
+          repeat erewrite <- fin_inf_ptoi; eauto.
+          break_match_goal; auto.
+
+          do 2 red in HANDLER.
+          destruct HANDLER as (ms_read&bytes_fin&READ&WRITE).
+          epose proof fin_inf_read_bytes_spec _ _ _ _ _ _ H0 MS_REF.
+
+          pose proof READ as READ'.
+          eapply read_bytes_spec_MemState_eq in READ'; subst.
+          forward H1.
+          { eapply READ.
+          }
+
+          destruct H1 as [ms [addrs [GCP READ']]].
+          red. red.
+          exists ms. exists (map lift_SByte bytes_fin).
+          split.
+          { (* Read portion *)
+            red.
+            cbn.
+            exists ms. exists addrs.
+            split; auto.
+
+            assert (ms = lift_MemState ms_read).
+            {
+              symmetry.
+              eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq; eauto.
+            }
+            subst; eauto.
+          }
+
+          { (* Write bytes portion *)
+            pose proof fin_inf_write_bytes_spec _ _ _ _ _ _ H MS_REF WRITE as [ms_inf' [WRITE_INF MS_REF_INF]].
+            erewrite lift_MemState_convert_MemState_inverse; eauto.
+            eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in GCP.
+            subst.
+            apply WRITE_INF.
+          }
+        }
+
+        { (* iptr memcpy *)
+          inversion ARGS; subst.
+          clear ARGS.
+          rewrite DVCInfFin.dvalue_refine_strict_equation in H, H0, H1, H2, H3.
+
+          apply dvalue_convert_strict_addr_inv in H as (a' & H & X); subst.
+          apply dvalue_convert_strict_addr_inv in H0 as (a0' & H0 & X0); subst.
+          apply dvalue_convert_strict_iptr_inv in H1 as (x4' & H1 & X4); subst.
+          apply dvalue_convert_strict_iptr_inv in H2 as (x5' & H2 & X5); subst.
+          apply dvalue_convert_strict_i1_inv in H3; subst.
+
+          red. red.
+          red in HANDLER.
+
+          assert (LLVMParams64BitIntptr.IP.to_Z x4 = LLVMParamsBigIntptr.IP.to_Z x4') as X4.
+          { unfold LLVMParams64BitIntptr.IP.to_Z, LLVMParamsBigIntptr.IP.to_Z.
+            unfold InterpreterStackBigIntptr.LP.IP.to_Z in *.
+            erewrite IP.from_Z_to_Z; eauto.
+          }
+          rewrite <- X4; clear X4.
+
+          break_match_hyp; auto.
+
+          erewrite <- fin_inf_no_overlap; eauto.
+          repeat erewrite <- fin_inf_ptoi; eauto.
+          break_match_goal; auto.
+
+          do 2 red in HANDLER.
+          destruct HANDLER as (ms_read&bytes_fin&READ&WRITE).
+          epose proof fin_inf_read_bytes_spec _ _ _ _ _ _ H0 MS_REF.
+
+          pose proof READ as READ'.
+          eapply read_bytes_spec_MemState_eq in READ'; subst.
+          forward H3.
+          { eapply READ.
+          }
+
+          destruct H3 as [ms [addrs [GCP READ']]].
+          red. red.
+          exists ms. exists (map lift_SByte bytes_fin).
+          split.
+          { (* Read portion *)
+            red.
+            cbn.
+            exists ms. exists addrs.
+            split; auto.
+
+            assert (ms = lift_MemState ms_read).
+            {
+              symmetry.
+              eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq; eauto.
+            }
+            subst; eauto.
+          }
+
+          { (* Write bytes portion *)
+            pose proof fin_inf_write_bytes_spec _ _ _ _ _ _ H MS_REF WRITE as [ms_inf' [WRITE_INF MS_REF_INF]].
+            erewrite lift_MemState_convert_MemState_inverse; eauto.
+            eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in GCP.
+            subst.
+            apply WRITE_INF.
+          }
+        }
+      - erewrite <- fin_to_inf_dvalue_refine_strict'; eauto.
+        rewrite DVC1.dvalue_refine_strict_equation.
+        rewrite DVC1.dvalue_convert_strict_equation.
+        reflexivity.
+    }
+
+    break_match.
+    { (* Malloc *)
+      admit.
+    }
+
+    break_match.
+    { (* Free *)
+      admit.
+    }
+
+    (* Unknown intrinsic *)
+    cbn in *; auto.
+  Qed.
+
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
       L2_E1E2_orutt_strict t_inf t_fin ->
@@ -5755,277 +6025,9 @@ Module InfiniteToFinite.
                       (* } *)
 
                       (* * *)
-                      (*   cbn in *. *)
+                        (*   cbn in *. *)
 
-                        (* TODO: Lemma about lifting intrinsic handlers *)
-                        (* TODO: Move this *)
-                        Lemma handle_intrinsic_fin_inf :
-                          forall t f args args0 ms ms' d
-                            (ARGS: Forall2 DVCInfFin.dvalue_refine_strict args0 args),
-                            Memory64BitIntptr.MMEP.MemSpec.handle_intrinsic_prop
-                              LLVMParams64BitIntptr.Events.DV.dvalue
-                              (LLVMParams64BitIntptr.Events.Intrinsic t f args) ms (ret (ms', d)) ->
-                            MemoryBigIntptr.MMEP.MemSpec.handle_intrinsic_prop DVCInfFin.DV1.dvalue
-                              (InterpreterStackBigIntptr.LP.Events.Intrinsic t f args0) (lift_MemState ms)
-                              (ret (lift_MemState ms', fin_to_inf_dvalue d)).
-                        Proof.
-                          intros t f args args0 ms ms' d ARGS INTRINSIC.
-
-                          pose proof lift_MemState_refine ms as MS_REF.
-                          pose proof lift_MemState_refine ms' as MS'_REF.
-
-                          red in INTRINSIC.
-                          red.
-                          break_match.
-                          { (* Memcpy *)
-                            cbn in *.
-                            destruct INTRINSIC as [sab [[] [HANDLER [SAB D]]]].
-                            subst.
-                            exists (lift_MemState sab).
-                            exists tt.
-                            repeat split; auto.
-                            - (* Handler *)
-                              repeat (destruct ARGS;
-                                      [solve [ inversion HANDLER
-                                             | red in HANDLER;
-                                               repeat break_match_hyp; inversion HANDLER
-                                         ]
-                                      |
-                                     ]).
-                              red in HANDLER.
-                              repeat break_match_hyp; try inversion HANDLER; subst.
-                              { (* 32 bit memcpy *)
-                                inversion ARGS; subst.
-                                clear ARGS.
-                                rewrite DVCInfFin.dvalue_refine_strict_equation in H, H0, H1, H2, H3.
-
-                                apply dvalue_convert_strict_addr_inv in H as (a' & H & X); subst.
-                                apply dvalue_convert_strict_addr_inv in H0 as (a0' & H0 & X0); subst.
-                                apply dvalue_convert_strict_i32_inv in H1.
-                                apply dvalue_convert_strict_i32_inv in H2; subst.
-                                apply dvalue_convert_strict_i1_inv in H3; subst.
-
-                                red. red.
-                                red in HANDLER.
-
-                                assert (LLVMParams64BitIntptr.Events.DV.unsigned x4 = LLVMParamsBigIntptr.Events.DV.unsigned x4) as X4.
-                                { (* TODO: weird unsigned reasoning... *)
-                                  admit.
-                                }
-                                rewrite <- X4; clear X4.
-
-                                break_match_hyp; auto.
-
-                                erewrite <- fin_inf_no_overlap; eauto.
-                                repeat erewrite <- fin_inf_ptoi; eauto.
-                                break_match_goal; auto.
-
-                                do 2 red in HANDLER.
-                                destruct HANDLER as (ms_read&bytes_fin&READ&WRITE).
-                                epose proof fin_inf_read_bytes_spec _ _ _ _ _ _ H0 MS_REF.
-                                (* TODO: Move this to somewhere it can
-                                 be instantiated for all memory model
-                                 instances
-                                 *)
-                                Lemma read_bytes_spec_MemState_eq :
-                                  forall a sz ms ms' res,
-                                    Memory64BitIntptr.MMEP.MemSpec.read_bytes_spec a sz ms (ret (ms', res)) ->
-                                    ms = ms'.
-                                Proof.
-                                  intros a sz ms ms' res READ.
-                                  red in READ.
-                                  cbn in *.
-                                  destruct READ as [sab [a0 [GCP HMAPM]]].
-                                  apply Memory64BitIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in GCP. subst.
-                                  generalize dependent res.
-                                  induction a0; intros res HMAPM.
-                                  - cbn in *.
-                                    destruct HMAPM; subst; auto.
-                                  - rewrite map_monad_unfold in HMAPM.
-                                    cbn in *.
-                                    destruct HMAPM as [sab0 [a' [[MS READ] HMAPM]]]; subst.
-                                    destruct HMAPM as [sab [a'' [HMAPM [MS RES]]]]; subst.
-                                    eapply IHa0.
-                                    eapply HMAPM.
-                                Qed.
-
-                                pose proof READ as READ'.
-                                eapply read_bytes_spec_MemState_eq in READ'; subst.
-                                forward H1.
-                                { eapply READ.
-                                }
-
-                                destruct H1 as [ms [addrs [GCP READ']]].
-                                red. red.
-                                exists ms. exists (map lift_SByte bytes_fin).
-                                split.
-                                { (* Read portion *)
-                                  red.
-                                  cbn.
-                                  exists ms. exists addrs.
-                                  split; auto.
-
-                                  assert (ms = lift_MemState ms_read).
-                                  {
-                                    symmetry.
-                                    eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq; eauto.
-                                  }
-                                  subst; eauto.
-                                }
-
-                                { (* Write bytes portion *)
-                                  pose proof fin_inf_write_bytes_spec _ _ _ _ _ _ H MS_REF WRITE as [ms_inf' [WRITE_INF MS_REF_INF]].
-                                  erewrite lift_MemState_convert_MemState_inverse; eauto.
-                                  eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in GCP.
-                                  subst.
-                                  apply WRITE_INF.
-                                }
-                              }
-
-                              { (* 64 bit memcpy *)
-                                inversion ARGS; subst.
-                                clear ARGS.
-                                rewrite DVCInfFin.dvalue_refine_strict_equation in H, H0, H1, H2, H3.
-
-                                apply dvalue_convert_strict_addr_inv in H as (a' & H & X); subst.
-                                apply dvalue_convert_strict_addr_inv in H0 as (a0' & H0 & X0); subst.
-                                apply dvalue_convert_strict_i64_inv in H1.
-                                apply dvalue_convert_strict_i64_inv in H2; subst.
-                                apply dvalue_convert_strict_i1_inv in H3; subst.
-
-                                red. red.
-                                red in HANDLER.
-
-                                assert (LLVMParams64BitIntptr.Events.DV.unsigned x4 = LLVMParamsBigIntptr.Events.DV.unsigned x4) as X4.
-                                { (* TODO: weird unsigned reasoning... *)
-                                  admit.
-                                }
-                                rewrite <- X4; clear X4.
-
-                                break_match_hyp; auto.
-
-                                erewrite <- fin_inf_no_overlap; eauto.
-                                repeat erewrite <- fin_inf_ptoi; eauto.
-                                break_match_goal; auto.
-
-                                do 2 red in HANDLER.
-                                destruct HANDLER as (ms_read&bytes_fin&READ&WRITE).
-                                epose proof fin_inf_read_bytes_spec _ _ _ _ _ _ H0 MS_REF.
-
-                                pose proof READ as READ'.
-                                eapply read_bytes_spec_MemState_eq in READ'; subst.
-                                forward H1.
-                                { eapply READ.
-                                }
-
-                                destruct H1 as [ms [addrs [GCP READ']]].
-                                red. red.
-                                exists ms. exists (map lift_SByte bytes_fin).
-                                split.
-                                { (* Read portion *)
-                                  red.
-                                  cbn.
-                                  exists ms. exists addrs.
-                                  split; auto.
-
-                                  assert (ms = lift_MemState ms_read).
-                                  {
-                                    symmetry.
-                                    eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq; eauto.
-                                  }
-                                  subst; eauto.
-                                }
-
-                                { (* Write bytes portion *)
-                                  pose proof fin_inf_write_bytes_spec _ _ _ _ _ _ H MS_REF WRITE as [ms_inf' [WRITE_INF MS_REF_INF]].
-                                  erewrite lift_MemState_convert_MemState_inverse; eauto.
-                                  eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in GCP.
-                                  subst.
-                                  apply WRITE_INF.
-                                }
-                              }
-
-                              { (* iptr memcpy *)
-                                inversion ARGS; subst.
-                                clear ARGS.
-                                rewrite DVCInfFin.dvalue_refine_strict_equation in H, H0, H1, H2, H3.
-
-                                apply dvalue_convert_strict_addr_inv in H as (a' & H & X); subst.
-                                apply dvalue_convert_strict_addr_inv in H0 as (a0' & H0 & X0); subst.
-                                apply dvalue_convert_strict_iptr_inv in H1 as (x4' & H1 & X4); subst.
-                                apply dvalue_convert_strict_iptr_inv in H2 as (x5' & H2 & X5); subst.
-                                apply dvalue_convert_strict_i1_inv in H3; subst.
-
-                                red. red.
-                                red in HANDLER.
-
-                                assert (LLVMParams64BitIntptr.IP.to_Z x4 = LLVMParamsBigIntptr.IP.to_Z x4') as X4.
-                                { (* TODO: weird iptr reasoning... *)
-                                  admit.
-                                }
-                                rewrite <- X4; clear X4.
-
-                                break_match_hyp; auto.
-
-                                erewrite <- fin_inf_no_overlap; eauto.
-                                repeat erewrite <- fin_inf_ptoi; eauto.
-                                break_match_goal; auto.
-
-                                do 2 red in HANDLER.
-                                destruct HANDLER as (ms_read&bytes_fin&READ&WRITE).
-                                epose proof fin_inf_read_bytes_spec _ _ _ _ _ _ H0 MS_REF.
-
-                                pose proof READ as READ'.
-                                eapply read_bytes_spec_MemState_eq in READ'; subst.
-                                forward H3.
-                                { eapply READ.
-                                }
-
-                                destruct H3 as [ms [addrs [GCP READ']]].
-                                red. red.
-                                exists ms. exists (map lift_SByte bytes_fin).
-                                split.
-                                { (* Read portion *)
-                                  red.
-                                  cbn.
-                                  exists ms. exists addrs.
-                                  split; auto.
-
-                                  assert (ms = lift_MemState ms_read).
-                                  {
-                                    symmetry.
-                                    eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq; eauto.
-                                  }
-                                  subst; eauto.
-                                }
-
-                                { (* Write bytes portion *)
-                                  pose proof fin_inf_write_bytes_spec _ _ _ _ _ _ H MS_REF WRITE as [ms_inf' [WRITE_INF MS_REF_INF]].
-                                  erewrite lift_MemState_convert_MemState_inverse; eauto.
-                                  eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in GCP.
-                                  subst.
-                                  apply WRITE_INF.
-                                }
-                              }
-                            - erewrite <- fin_to_inf_dvalue_refine_strict'; eauto.
-                              rewrite DVC1.dvalue_refine_strict_equation.
-                              rewrite DVC1.dvalue_convert_strict_equation.
-                              reflexivity.
-                          }
-
-                          break_match.
-                          { (* Malloc *)
-                            admit.
-                          }
-
-                          break_match.
-                          { (* Free *)
-                            admit.
-                          }
-
-                          (* Unknown intrinsic *)
-                          cbn in *; auto.
-                        Qed.
+                        (* This is where handle_intrinsic was... *)
 
 
                                 -
