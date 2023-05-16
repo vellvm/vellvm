@@ -5055,7 +5055,63 @@ Module InfiniteToFinite.
       subst.
       assert (writes_res = writes_res').
       {
-        admit.
+        clear - H5 HMAPM WRITES_SPEC.
+        (* Should just need the length of writes_res and writes_res' to be the same *)
+
+        (* TODO: Move this *)
+        Lemma map_monad_MemPropT_length :
+          forall {S A B} {l} {f : A -> MemPropT S B} {s1 s2 res},
+            @map_monad (MemPropT S) (@MemPropT_Monad S)
+              A B f l s1 (success_unERR_UB_OOM (s2, res)) ->
+            length res = length l.
+        Proof.
+          intros S A B l.
+          induction l; intros f s1 s2 res HMAPM.
+          cbn in *.
+          destruct HMAPM; subst; auto.
+
+          rewrite map_monad_unfold in HMAPM.
+          cbn in HMAPM.
+          destruct HMAPM as (?&?&?&?&?&?&?&?).
+          subst.
+          apply IHl in H0.
+          cbn.
+          auto.
+        Qed.
+
+        apply map_monad_MemPropT_length in WRITES_SPEC.
+        apply map_monad_MemPropT_length in HMAPM.
+
+        (* Need to know the length of l' and l0 ... From H5 *)
+        apply Util.Forall2_length in H5.
+
+        (* TODO: Move this *)
+        Lemma zip_length :
+          forall {A B C D} {x : list A} {y : list B} {z : list C} {w : list D},
+            length x = length z ->
+            length y = length w ->
+            length (zip x y) = length (zip z w).
+        Proof.
+        Admitted.
+
+        assert (length (ptr' :: l') = length (ptr'_fin :: l0)).
+        cbn; auto.
+        assert (length (map lift_SByte (s :: bytes_fin)) = length (s :: bytes_fin)).
+        rewrite map_length; auto.
+
+        epose proof (zip_length H H0).
+        rewrite H1 in HMAPM.
+        unfold zip in HMAPM.
+        rewrite <- WRITES_SPEC in HMAPM.
+
+        clear - HMAPM.
+        revert writes_res' HMAPM.
+        induction writes_res; intros writes_res' HMAPM.
+        - destruct writes_res'; inv HMAPM; auto.
+        - destruct writes_res'; inv HMAPM; auto.
+          apply IHwrites_res in H0.
+          destruct a, u.
+          congruence.
       }
       subst.
 
@@ -5082,7 +5138,7 @@ Module InfiniteToFinite.
       exists writes_res'.
       split; auto.
 
-      
+
 
       assert (x0 = ms_fin').
       {
@@ -5363,7 +5419,7 @@ Module InfiniteToFinite.
 
     (* Not sure about this existential... May need to do induction first. *)
     exists (lift_MemState ms_fin').
-    
+
     red. red in WRITE_SPEC.
     cbn in *.
     destruct WRITE_SPEC as (ms_fin'' & addrs_fin & CONSEC & WRITE_SPEC).
