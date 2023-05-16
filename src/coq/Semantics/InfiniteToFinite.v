@@ -5016,7 +5016,37 @@ Module InfiniteToFinite.
       assert (ptrs_res = ptr' :: l') as PTRS_RES.
       {
         (* Should follow from GCP' and GCP_CONS *)
-        admit.
+        clear - GCP' GCP_CONS.
+
+        assert (ret (ptr' :: l') ∈
+                  @InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs
+                  (MemPropT InfMem.MMEP.MMSP.MemState)
+                  (@MemPropT_Monad InfMem.MMEP.MMSP.MemState)
+                  (@MemPropT_RAISE_OOM InfMem.MMEP.MMSP.MemState)
+                  (@MemPropT_RAISE_ERROR InfMem.MMEP.MMSP.MemState) ptr'
+                  (@Datatypes.length Memory64BitIntptr.MP.BYTE_IMPL.SByte (s :: bytes_fin)))
+          as GCP_CONS'.
+        {
+          do 2 eexists; eauto.
+        }
+
+        assert (ret ptrs_res ∈ @MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs
+                  (MemPropT MemoryBigIntptr.MMEP.MMSP.MemState)
+                  (@MemPropT_Monad MemoryBigIntptr.MMEP.MMSP.MemState)
+                  (@MemPropT_RAISE_OOM MemoryBigIntptr.MMEP.MMSP.MemState)
+                  (@MemPropT_RAISE_ERROR MemoryBigIntptr.MMEP.MMSP.MemState) ptr'
+                  (@Datatypes.length MemoryBigIntptr.MP.BYTE_IMPL.SByte
+                     (@map Memory64BitIntptr.MP.BYTE_IMPL.SByte MemoryBigIntptr.MP.BYTE_IMPL.SByte lift_SByte
+                        (s :: bytes_fin)))) as GCP.
+        {
+          do 2 eexists; cbn; red; cbn; eauto.
+        }
+
+        clear GCP' GCP_CONS.
+        rewrite map_length in GCP.
+        pose proof InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_success_always_succeeds _ _ _ _ GCP GCP_CONS'.
+        inv H.
+        auto.
       }
 
       subst.
