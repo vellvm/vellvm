@@ -5430,6 +5430,26 @@ Module InfiniteToFinite.
 
     (* Unknown intrinsic *)
     cbn in *; auto.
+  Admitted.
+
+  (* TODO: Move this *)
+  Lemma dvalue_fin_to_inf_to_fin :
+    forall d,
+      DVCInfFin.dvalue_convert_strict (fin_to_inf_dvalue d) = NoOom d.
+  Proof.
+    intros d.
+    pose proof fin_to_inf_dvalue_refine_strict d.
+    auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma uvalue_fin_to_inf_to_fin :
+    forall u,
+      DVCInfFin.uvalue_convert_strict (fin_to_inf_uvalue u) = NoOom u.
+  Proof.
+    intros u.
+    pose proof fin_to_inf_uvalue_refine_strict u.
+    auto.
   Qed.
 
   Lemma model_E1E2_23_orutt_strict :
@@ -6005,6 +6025,68 @@ Module InfiniteToFinite.
                         exists (fin_to_inf_dvalue d).
                         split; try reflexivity.
 
+                        eapply handle_intrinsic_fin_inf; eauto.
+                      }
+
+                      2: {
+                        cbn.
+                        rewrite bind_ret_l.
+                        rewrite dvalue_fin_to_inf_to_fin.
+                        rewrite MemState_fin_to_inf_to_fin.
+                        rewrite VIS_HANDLED.
+                        reflexivity.
+                      }
+
+                      (* Continuation for vis node *)
+                      intros a b H H1 H2.
+                      destruct b as [ms [sid' res]].
+                      cbn in H1.
+                      apply Returns_ret_inv in H1.
+                      inv H1.
+
+                      cbn.
+                      rewrite dvalue_fin_to_inf_to_fin.
+                      rewrite MemState_fin_to_inf_to_fin.
+                      rewrite (itree_eta_ (k0 (fin_to_inf_dvalue d))).
+                      rewrite (itree_eta_ (k2 (ms', (st1, d)))).
+                      right.
+                      eapply CIH.
+                      2: {
+                        repeat red.
+                        specialize (HK d (ms', (st1, d))).
+                        forward HK.
+                        { eapply ReturnsVis.
+                          unfold trigger.
+                          reflexivity.
+                          cbn.
+                          constructor.
+                          reflexivity.
+                        }
+                        forward HK.
+                        { rewrite H0.
+                          constructor.
+                          reflexivity.
+                        }
+
+                        forward HK; auto.
+                        pclearbot.
+
+                        repeat rewrite <- itree_eta.
+                        apply HK.
+                      }
+
+                      specialize (REL (fin_to_inf_dvalue d)).
+                      red in REL.
+                      pclearbot.
+
+                      repeat rewrite <- itree_eta.
+                      rewrite REL.
+                      eapply K_RUTT.
+                      repeat (split; auto).
+                      apply fin_to_inf_dvalue_refine_strict.
+                    }
+                  }
+
                         (* CONTINUE *)
                       (*   pose proof inf_fin_read_byte_spec REF CONVPTR READ as [byte_fin' [READ_FIN BYTE_REF]]. *)
                       (*   apply old_lu in READ_FIN. *)
@@ -6028,7 +6110,7 @@ Module InfiniteToFinite.
                         (*   cbn in *. *)
 
                         (* This is where handle_intrinsic was... *)
-
+                      }
 
                                 -
 
@@ -6395,16 +6477,6 @@ Module InfiniteToFinite.
                                                           setoid_rewrite bind_ret_l.
                                                           rewrite VIS_HANDLED.
                                                           pstep; red; cbn.
-
-                                                          (* TODO: Move this, make uvalue versions *)
-                                                          Lemma dvalue_fin_to_inf_to_fin :
-                                                            forall d,
-                                                              DVCInfFin.dvalue_convert_strict (fin_to_inf_dvalue d) = NoOom d.
-                                                          Proof.
-                                                            intros d.
-                                                            pose proof fin_to_inf_dvalue_refine_strict d.
-                                                            auto.
-                                                          Qed.
 
                                                           rewrite dvalue_fin_to_inf_to_fin.
                                                           rewrite MemState_fin_to_inf_to_fin.
