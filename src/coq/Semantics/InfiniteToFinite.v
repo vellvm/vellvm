@@ -6267,15 +6267,14 @@ Module InfiniteToFinite.
                       inv H1.
 
                       cbn.
-                      rewrite dvalue_fin_to_inf_to_fin.
                       rewrite MemState_fin_to_inf_to_fin.
-                      rewrite (itree_eta_ (k0 (fin_to_inf_dvalue d))).
-                      rewrite (itree_eta_ (k2 (ms', (st1, d)))).
+                      rewrite (itree_eta_ (k0 tt)).
+                      rewrite (itree_eta_ (k2 (ms_push, (st', tt)))).
                       right.
                       eapply CIH.
                       2: {
                         repeat red.
-                        specialize (HK d (ms', (st1, d))).
+                        specialize (HK tt (ms_push, (st', tt))).
                         forward HK.
                         { eapply ReturnsVis.
                           unfold trigger.
@@ -6285,7 +6284,7 @@ Module InfiniteToFinite.
                           reflexivity.
                         }
                         forward HK.
-                        { rewrite H0.
+                        { rewrite TA.
                           constructor.
                           reflexivity.
                         }
@@ -6297,7 +6296,7 @@ Module InfiniteToFinite.
                         apply HK.
                       }
 
-                      specialize (REL (fin_to_inf_dvalue d)).
+                      specialize (REL tt).
                       red in REL.
                       pclearbot.
 
@@ -6305,11 +6304,7 @@ Module InfiniteToFinite.
                       rewrite REL.
                       eapply K_RUTT.
                       repeat (split; auto).
-                      apply fin_to_inf_dvalue_refine_strict.
                     }
-
-                    setoid_rewrite VIS_HANDLED.
-                    admit.
                   }
 
                   { (* MemPop *)
