@@ -6019,6 +6019,13 @@ Module InfiniteToFinite.
     auto.
   Qed.
 
+  (* TODO: Move and prove this *)
+  Lemma lift_SByte_convert_SByte_inverse:
+    forall {byte_inf byte_fin},
+      convert_SByte byte_inf = NoOom byte_fin -> lift_SByte byte_fin = byte_inf.
+  Proof.
+  Admitted.
+
   (* TODO: Move this *)
   Lemma mem_pop_spec_fin_inf :
     forall {m1_fin m2_fin m1_inf m2_inf},
@@ -6073,23 +6080,38 @@ Module InfiniteToFinite.
         pose proof inf_fin_big_address_byte_not_allocated MSR1 PTR_CONV.
         pose proof inf_fin_big_address_byte_not_allocated MSR2 PTR_CONV.
         split; intros.
-        - exfalso. eapply H; eauto.
-        - exfalso. eapply H0; eauto.
+        - exfalso.
+          destruct H1.
+          destruct read_byte_allowed_spec.
+          destruct H1.
+          eapply H; eauto.
+        - exfalso.
+          destruct H1.
+          destruct read_byte_allowed_spec.
+          destruct H1.
+          eapply H0; eauto.
       }
 
-      eapply inf_fin_ptr_not_in_current_frame in PTR; eauto.
+      split; intros READ.
+      + pose proof inf_fin_read_byte_spec MSR1 PTR_CONV READ as [byte_fin [READ_FIN BYTE_REF]].
+        red in BYTE_REF.
 
-      specialize (NON_FRAME_BYTES_PRESERVED a aid PTR).
+        apply lift_SByte_convert_SByte_inverse in BYTE_REF.
+        subst.
+        eapply inf_fin_ptr_not_in_current_frame in PTR; eauto.
+        specialize (NON_FRAME_BYTES_READ a byte_fin PTR).
+        eapply NON_FRAME_BYTES_READ in READ_FIN.
+        eapply fin_inf_read_byte_spec; eauto.
+      + pose proof inf_fin_read_byte_spec MSR2 PTR_CONV READ as [byte_fin [READ_FIN BYTE_REF]].
+        red in BYTE_REF.
 
-      split; intros BYTE_ALLOCATED.
-      + eapply inf_fin_byte_allocated in BYTE_ALLOCATED; eauto.
-        apply NON_FRAME_BYTES_PRESERVED in BYTE_ALLOCATED.
-        eapply fin_inf_byte_allocated; eauto.
-      + eapply inf_fin_byte_allocated in BYTE_ALLOCATED; eauto.
-        apply NON_FRAME_BYTES_PRESERVED in BYTE_ALLOCATED.
-        eapply fin_inf_byte_allocated; eauto.
-
-    -
+        apply lift_SByte_convert_SByte_inverse in BYTE_REF.
+        subst.
+        eapply inf_fin_ptr_not_in_current_frame in PTR; eauto.
+        specialize (NON_FRAME_BYTES_READ a byte_fin PTR).
+        eapply NON_FRAME_BYTES_READ in READ_FIN.
+        eapply fin_inf_read_byte_spec; eauto.
+    - (* 
 
 
       (* When I pop, I get a framestack that's equivalent to fs2... *)
