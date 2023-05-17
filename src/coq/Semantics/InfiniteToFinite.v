@@ -6983,21 +6983,22 @@ Module InfiniteToFinite.
                       }
 
                       (* Continuation for vis node *)
-                      intros a b H H1 H2.
+                      intros [] b H H1 H2.
                       destruct b as [ms [sid' res]].
                       cbn in H1.
+                      cbn in H2. inv H2.
                       apply Returns_ret_inv in H1.
                       inv H1.
 
                       cbn.
                       rewrite MemState_fin_to_inf_to_fin.
                       rewrite (itree_eta_ (k0 tt)).
-                      rewrite (itree_eta_ (k2 (ms_push, (st', tt)))).
+                      rewrite (itree_eta_ (k2 (ms_pop, (st', tt)))).
                       right.
                       eapply CIH.
                       2: {
                         repeat red.
-                        specialize (HK tt (ms_push, (st', tt))).
+                        specialize (HK tt (ms_pop, (st', tt))).
                         forward HK.
                         { eapply ReturnsVis.
                           unfold trigger.
@@ -7028,8 +7029,6 @@ Module InfiniteToFinite.
                       eapply K_RUTT.
                       repeat (split; auto).
                     }
-
-                    admit.
                   }
 
                   { (* Alloca *)
