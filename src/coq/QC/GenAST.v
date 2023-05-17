@@ -366,6 +366,12 @@ Section GenerationState.
            ).
   Defined.
 
+  Definition gen_unit : GenLLVM unit :=
+    lift_GenLLVM (ret tt). 
+
+  Definition annotate_debug (s : string) : GenLLVM unit :=
+    annotate s gen_unit.
+
   (* Definition pre_annotate {A:Type} (s:string) (g : GenLLVM A) : GenLLVM A. *)
   (*   apply mkEitherT. *)
   (*   apply mkStateT. *)
@@ -1582,6 +1588,7 @@ Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
         | TYPE_X86_mmx              => failGen "gen_exp_size TYPE_X86_mmx"
         end in
       (* Hack to avoid failing way too much *)
+      annotate_debug ("++++++++Generexp: " ++ show t);;
       match t with
       | TYPE_Pointer t => freq_LLVM gen_idents
       | _ => freq_LLVM
@@ -1623,6 +1630,7 @@ Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
              end]
           end
       in
+      annotate_debug ("++++++++GeneExpS: " ++ show t);;
       (* short-circuit to size 0 *)
       oneOf_LLVM (gen_exp_size 0 t :: gens)
     end
@@ -2215,6 +2223,16 @@ Section InstrGenerators.
     ptr_typ <- get_typ_in_ptr tptr;;
     gen_store_to(tptr, eptr).
 
+  (* Definition func_params_ctx_filter (func_ptrs ctx : var_context) (typ_ctx : type_context) := *)
+  (*   filter *)
+  (*     (fun '(id, typ) => *)
+  (*        match typ with *)
+  (*        | TYPE_Pointer (TYPE_Function _ params _) => *)
+             
+  (*        | _ => false *)
+
+  (*     ) *)
+  
   (* Generate an instruction, as well as its type...
 
      The type is sometimes void for instructions that don't really
@@ -2242,22 +2260,22 @@ Section InstrGenerators.
            (* align <- ret None;; *)
            ret (TYPE_Pointer t, INSTR_Alloca t [])
         ] (* TODO: Generate atomic operations and other instructions *)
-         ++ (if seq.nilp sized_ptr_typs_in_ctx then [] else [
-                 (bind (get_typ_l sized_ptr_typs_in_ctx) gen_gep )
-                 ; bind (get_typ_l sized_ptr_typs_in_ctx) gen_load
-                 ; bind (get_typ_l sized_ptr_typs_in_ctx) gen_store])
-         ++ (if seq.nilp valid_ptr_vecptr_in_ctx then [] else [
-                 bind (get_typ_l valid_ptr_vecptr_in_ctx) gen_ptrtoint])
-         ++ (if seq.nilp ptrtoint_ctx then [] else [gen_inttoptr])
-         ++ (if seq.nilp agg_typs_in_ctx then [] else [
-                 bind (get_typ_l agg_typs_in_ctx) gen_extractvalue])
-         ++ (if seq.nilp insertvalue_typs_in_ctx then [] else [
-                 bind (get_typ_l insertvalue_typs_in_ctx) gen_insertvalue])
-         ++ (if seq.nilp vec_typs_in_ctx then [] else [
-                 bind (get_typ_l vec_typs_in_ctx) gen_extractelement
-                 ; bind (get_typ_l vec_typs_in_ctx) gen_insertelement])
-         ++ (if seq.nilp fun_ptrs_in_ctx then [] else [
-                 bind (get_typ_l fun_ptrs_in_ctx) gen_call])).
+         (* ++ (if seq.nilp sized_ptr_typs_in_ctx then [] else [ *)
+         (*         (bind (get_typ_l sized_ptr_typs_in_ctx) gen_gep ) *)
+         (*         ; bind (get_typ_l sized_ptr_typs_in_ctx) gen_load *)
+         (*         ; bind (get_typ_l sized_ptr_typs_in_ctx) gen_store]) *)
+         (* ++ (if seq.nilp valid_ptr_vecptr_in_ctx then [] else [ *)
+         (*         bind (get_typ_l valid_ptr_vecptr_in_ctx) gen_ptrtoint]) *)
+         (* ++ (if seq.nilp ptrtoint_ctx then [] else [gen_inttoptr]) *)
+         (* ++ (if seq.nilp agg_typs_in_ctx then [] else [ *)
+         (*         bind (get_typ_l agg_typs_in_ctx) gen_extractvalue]) *)
+         (* ++ (if seq.nilp insertvalue_typs_in_ctx then [] else [ *)
+         (*         bind (get_typ_l insertvalue_typs_in_ctx) gen_insertvalue]) *)
+         (* ++ (if seq.nilp vec_typs_in_ctx then [] else [ *)
+         (*         bind (get_typ_l vec_typs_in_ctx) gen_extractelement *)
+         (*         ; bind (get_typ_l vec_typs_in_ctx) gen_insertelement]) *)
+         (* ++ (if seq.nilp fun_ptrs_in_ctx then [] else [ *)
+         (*         bind (get_typ_l fun_ptrs_in_ctx) gen_call]) *)).
 
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
@@ -2270,11 +2288,11 @@ Section InstrGenerators.
     match t_instr with
     | (TYPE_Void, instr) =>
         vid <- new_void_id;;
-        annotate ("------Generate: " ++ show instr) (
-        ret (vid, instr))
+        annotate_debug ("------Generate: " ++ show instr);;
+        ret (vid, instr)
     | (t, instr) =>
         i <- new_raw_id;;
-        annotate ("------Generate: " ++ show instr) (
+        annotate_debug ("------Generate: " ++ show instr);;
         match instr with
         | INSTR_Op (OP_Conversion Ptrtoint t_from v t_to) =>
             add_to_ptrtoint_ctx (t_from, ID_Local i, t_to);; (* Register the local variable to ptrtoint_ctx*)
@@ -2282,7 +2300,7 @@ Section InstrGenerators.
         | _ =>
             add_to_ctx (ID_Local i, t);;
             ret (IId i, instr)
-        end)
+        end
     end.
 
   (* Generate a block of code, spitting out a new context. *)
@@ -2383,7 +2401,7 @@ Section InstrGenerators.
          {struct t} : GenLLVM (block typ * (block typ * list (block typ)))
        :=
          bid <- new_block_id;;
-         annotate ("----Generate: Block: " ++ show bid) (
+         annotate_debug ("----Generate: Block: " ++ show bid);;
            code <- gen_code;;
            '(term, bs) <- gen_terminator_sz (sz - 1) t back_blocks;;
            let b := {| blk_id   := bid
@@ -2392,7 +2410,7 @@ Section InstrGenerators.
                      ; blk_term := term
                      ; blk_comments := None
                     |} in
-           ret (b, (b, bs)))
+           ret (b, (b, bs))
   with gen_loop_sz
          (sz : nat)
          (t : typ)
@@ -2516,15 +2534,14 @@ Section InstrGenerators.
                          []
       in
 
-      annotate
-        ("--Generate: " ++ show prototype)
-        (
+      annotate_debug
+        ("--Generate: " ++ show prototype);;
       bs <- gen_blocks ret_t;;
       
       (* Reset context *)
       let '(ctx, ptoi_ctx) := ctxs in
       restore_variable_ctxs ((ID_Global name, TYPE_Pointer f_type)::ctx, ptoi_ctx);;
-      ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs)).
+      ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs).
 
   Definition gen_new_definition (ret_t : typ) (args : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
@@ -2551,7 +2568,9 @@ Section InstrGenerators.
 
   Definition gen_global_var : GenLLVM (global typ)
     :=
-      name <- new_global_id;;
+
+    name <- new_global_id;;
+    annotate_debug ("--Generate: Global: " ++ show name);;
       t <- hide_ctx gen_sized_typ_ptrinctx;;
       opt_exp <- fmap Some (hide_ctx (gen_exp_size 0 t));;
       add_to_ctx (ID_Global name, TYPE_Pointer t);;
@@ -2561,6 +2580,7 @@ Section InstrGenerators.
         | Some _ => []
         end in
       let annotations := ann_linkage in (* TODO: Add more flags *)
+
       ret (mk_global name t false opt_exp false annotations).
 
   Definition gen_global_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
