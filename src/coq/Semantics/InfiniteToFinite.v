@@ -5524,7 +5524,7 @@ Module InfiniteToFinite.
       break_match_hyp; inv H3.
       break_match_hyp; inv H4.
       break_match_hyp; inv Heqo1.
-      
+
       red in MSR2.
       cbn in MSR2.
       break_match_hyp; inv MSR2.
@@ -5625,6 +5625,68 @@ Module InfiniteToFinite.
   Qed.
 
   (* TODO: Move this *)
+  Lemma inf_fin_ptr_in_frame_prop :
+    forall {f_inf f_fin ptr_fin},
+      convert_Frame f_inf = NoOom f_fin ->
+      Memory64BitIntptr.MMEP.MMSP.ptr_in_frame_prop f_fin ptr_fin ->
+      exists ptr_inf,
+        InfToFinAddrConvert.addr_convert ptr_inf = NoOom ptr_fin /\
+          MemoryBigIntptr.MMEP.MMSP.ptr_in_frame_prop f_inf ptr_inf.
+  Proof.
+    induction f_inf; intros f_fin ptr_inf F PTR.
+    - cbn in *.
+      inv F.
+      cbn in *.
+      contradiction.
+   - rewrite convert_Frame_cons_equation in F.
+     cbn in F.
+     break_match_hyp; inv F.
+     break_match_hyp; inv H0.
+     pose proof PTR as PTR'.
+     red in PTR.
+     cbn in PTR.
+     destruct PTR.
+     + destruct ptr_inf.
+       destruct a.
+       cbn in *; subst.
+       destruct a0.
+       unfold LLVMParams64BitIntptr.PTOI.ptr_to_int in H.
+       cbn in *.
+       exists (i0, p).
+       cbn.
+       split; auto.
+       unfold FinITOP.int_to_ptr in *.
+       break_match_hyp; inv Heqo.
+       rewrite Int64.unsigned_repr in H.
+       2: {
+         apply Bool.orb_false_elim in Heqb.
+         destruct Heqb.
+         apply Z.ltb_nlt in H0.
+         rewrite Z.geb_leb in H1.
+         apply Z.leb_gt in H1.
+         unfold Int64.max_unsigned.
+         lia.
+       }
+       subst.
+
+       rewrite Int64.repr_unsigned.
+       auto.
+     + specialize (IHf_inf f ptr_inf eq_refl).
+       forward IHf_inf.
+       {
+         red. auto.
+       }
+
+       destruct IHf_inf as (?&?&?).
+       exists x.
+       split; auto.
+       red.
+       cbn.
+       right.
+       auto.
+  Qed.
+
+  (* TODO: Move this *)
   Lemma fin_inf_ptr_in_current_frame :
     forall {ms_inf ms_fin ptr_inf},
       MemState_refine ms_inf ms_fin ->
@@ -5701,6 +5763,87 @@ Module InfiniteToFinite.
       auto.
     }
   Qed.
+
+  (* TODO: Move this *)
+  Lemma inf_fin_ptr_in_current_frame :
+    forall {ms_inf ms_fin ptr_fin},
+      MemState_refine ms_inf ms_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.ptr_in_current_frame ms_fin ptr_fin ->
+      exists ptr_inf,
+        InfToFinAddrConvert.addr_convert ptr_inf = NoOom ptr_fin /\
+          MemoryBigIntptr.MMEP.MemSpec.ptr_in_current_frame ms_inf ptr_inf.
+  Proof.
+    intros ms_inf ms_fin ptr_inf MSR PTR.
+    destruct ms_fin as [[ms_fin fss_fin hs_fin] msprovs_fin], ms_inf as [[ms_inf fss_inf hs_inf] msprovs_inf].
+    red in PTR.
+    cbn in *.
+    specialize (PTR fss_fin).
+    forward PTR; [red; cbn; reflexivity|].
+    destruct fss_inf.
+    { (* Single frame *)
+      cbn in *.
+
+      red in MSR.
+      cbn in MSR.
+      break_match_hyp; inv MSR.
+      break_match_hyp; inv Heqo.
+      break_match_hyp; inv H0.
+      break_match_hyp; inv H1.
+      break_match_hyp; inv Heqo1.
+      break_match_hyp; inv Heqo.
+
+      specialize (PTR f0).
+      forward PTR; [red; cbn; reflexivity|].
+
+      eapply inf_fin_ptr_in_frame_prop in PTR; eauto.
+      destruct PTR as (?&?&?).
+      exists x.
+      split; auto.
+      red.
+      intros fs H1 f1 H2. cbn in *.
+      red in H1.
+      cbn in H1.
+      rewrite <- H1 in H2.
+      cbn in H2.
+      rewrite H2.
+      auto.
+    }
+
+    { (* Multiple frames *)
+      cbn in *.
+
+      red in MSR.
+      unfold convert_MemState in MSR.
+      unfold convert_memory_stack in MSR.
+      rewrite convert_FrameStack_Snoc_equation in MSR.
+      cbn in MSR.
+      break_match_hyp; inv MSR.
+      break_match_hyp; inv Heqo.
+      break_match_hyp; inv H0.
+      break_match_hyp; inv H1.
+      break_match_hyp; inv Heqo1.
+      break_match_hyp; inv Heqo.
+      break_match_hyp; inv H0.
+
+      specialize (PTR f0).
+      forward PTR; [red; cbn; reflexivity|].
+
+      eapply inf_fin_ptr_in_frame_prop in PTR; eauto.
+      destruct PTR as (?&?&?).
+      exists x.
+      split; auto.
+      red.
+      intros fs H1 f2 H2.
+      cbn in *.
+      red in H1.
+      cbn in H1.
+      rewrite <- H1 in H2.
+      cbn in H2.
+      rewrite H2.
+      auto.
+    }
+  Qed.
+
   (* TODO: Move this *)
   Lemma mem_pop_spec_fin_inf :
     forall {m1_fin m2_fin m1_inf m2_inf},
@@ -5712,17 +5855,19 @@ Module InfiniteToFinite.
     intros m1_fin m2_fin m1_inf m2_inf MSR1 MSR2 [BYTES_FREED NON_FRAME_BYTES_PRESERVED NON_FRAME_BYTES_READ POP_FRAME INVARIANTS].
     destruct m1_fin as [[m1_fin fs1_fin h1_fin] msprov1_fin], m2_fin as [[m2_fin fs2_fin h2_fin] msprov2_fin].
     destruct m1_inf as [[m1_inf fs1_inf h1_inf] msprov1_inf], m2_inf as [[m2_inf fs2_inf h2_inf] msprov2_inf].
-    cbn in *.
-    split; cbn in *.
+    split.
     - (* Bytes freed *)
       clear NON_FRAME_BYTES_PRESERVED NON_FRAME_BYTES_READ POP_FRAME INVARIANTS.
+      cbn in *.
       intros ptr PTR.
 
       (* ptr is in the current frame, which has a finite refinement,
          so there should be a finite version of ptr as well *)
       pose proof fin_inf_ptr_in_current_frame MSR1 PTR as (ptr_fin&PTR_CONV&PTR_FIN).
       eapply fin_inf_byte_not_allocated; eauto.
-    - 
+    - clear - NON_FRAME_BYTES_PRESERVED.
+      intros ptr aid PTR.
+
 
       (* When I pop, I get a framestack that's equivalent to fs2... *)
       unfold MemoryBigIntptr.MMEP.MMSP.memory_stack_frame_stack_prop, Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *.
@@ -5735,7 +5880,7 @@ Module InfiniteToFinite.
       break_match_hyp; inv H3.
       break_match_hyp; inv H4.
       break_match_hyp; inv Heqo1.
-      
+
       red in MSR2.
       cbn in MSR2.
       break_match_hyp; inv MSR2.
