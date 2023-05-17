@@ -4672,6 +4672,32 @@ Module InfiniteToFinite.
     (* - specialize (FSP fs) as [FSP1 FSP2]. *)
   Admitted.
 
+  (* TODO: Move this *)
+  Lemma convert_FrameStack_Snoc_equation :
+    forall fs f,
+      convert_FrameStack (MemoryBigIntptr.MMEP.MMSP.Snoc fs f) =
+        f' <- convert_Frame f;;
+        fs' <- convert_FrameStack fs;;
+        ret (Memory64BitIntptr.MMEP.MMSP.Snoc fs' f').
+  Proof.
+    intros fs.
+    induction fs; intros f'; cbn; auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma convert_FrameStack_snoc :
+    forall {fs_inf f_inf fs_fin f_fin},
+      convert_FrameStack fs_inf = NoOom fs_fin ->
+      convert_Frame f_inf = NoOom f_fin ->
+      convert_FrameStack (MemoryBigIntptr.MMEP.MMSP.Snoc fs_inf f_inf) = NoOom (Memory64BitIntptr.MMEP.MMSP.Snoc fs_fin f_fin).
+  Proof.
+    intros fs_inf f_inf fs_fin f_fin FS F.
+    rewrite convert_FrameStack_Snoc_equation.
+    rewrite F, FS.
+    cbn.
+    reflexivity.
+  Qed.
+
   Lemma fin_inf_heap_preserved :
     forall ms_fin ms_inf ms_fin' ms_inf',
       MemState_refine ms_inf ms_fin ->
@@ -4691,6 +4717,16 @@ Module InfiniteToFinite.
       MemoryBigIntptr.MMEP.MemSpec.read_byte_allowed_all_preserved ms_inf ms_inf'.
   Proof.
     intros ms_fin ms_inf ms_fin' ms_inf' REF REF' RBA.
+  Admitted.
+
+  Lemma fin_inf_read_byte_prop_all_preserved :
+    forall ms_fin ms_inf ms_fin' ms_inf',
+      MemState_refine ms_inf ms_fin ->
+      MemState_refine ms_inf' ms_fin' ->
+      Memory64BitIntptr.MMEP.MemSpec.read_byte_prop_all_preserved ms_fin ms_fin' ->
+      MemoryBigIntptr.MMEP.MemSpec.read_byte_prop_all_preserved ms_inf ms_inf'.
+  Proof.
+    intros ms_fin ms_inf ms_fin' ms_inf' REF REF' RBP.
   Admitted.
 
   Lemma fin_inf_write_byte_allowed_all_preserved :
@@ -5433,6 +5469,78 @@ Module InfiniteToFinite.
   Admitted.
 
   (* TODO: Move this *)
+  Lemma mem_push_spec_fin_inf :
+    forall {m1_fin m2_fin m1_inf m2_inf},
+      MemState_refine m1_inf m1_fin ->
+      MemState_refine m2_inf m2_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.mempush_spec m1_fin m2_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.mempush_spec m1_inf m2_inf.
+  Proof.
+    intros m1_fin m2_fin m1_inf m2_inf MSR1 MSR2 [FRESH INVARIANTS].
+    destruct m1_fin as [[m1_fin fs1_fin h1_fin] msprov1_fin], m2_fin as [[m2_fin fs2_fin h2_fin] msprov2_fin].
+    destruct m1_inf as [[m1_inf fs1_inf h1_inf] msprov1_inf], m2_inf as [[m2_inf fs2_inf h2_inf] msprov2_inf].
+    cbn in *.
+    split; cbn in *.
+    - (* Fresh frame *)
+      clear INVARIANTS.
+      intros fs1 fs2 f H H0 H1.
+
+      (* When I pop, I get a framestack that's equivalent to fs2... *)
+      unfold MemoryBigIntptr.MMEP.MMSP.memory_stack_frame_stack_prop, Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *.
+      cbn in *.
+
+      red in MSR1.
+      cbn in MSR1.
+      break_match_hyp; inv MSR1.
+      break_match_hyp; inv Heqo.
+      break_match_hyp; inv H3.
+      break_match_hyp; inv H4.
+      break_match_hyp; inv Heqo1.
+      
+      red in MSR2.
+      cbn in MSR2.
+      break_match_hyp; inv MSR2.
+      break_match_hyp; inv Heqo1.
+      break_match_hyp; inv H3.
+      break_match_hyp; inv H4.
+      break_match_hyp; inv Heqo4.
+
+      destruct H1.
+      red in can_pop.
+      destruct fs2; try contradiction.
+      cbn in new_frame.
+
+      rewrite <- new_frame.
+      rewrite can_pop.
+      rewrite <- H.
+      pose proof InfMem.MMEP.empty_frame_eqv _ _ H0 MemoryBigIntptr.MMEP.empty_frame_nil as FNIL.
+      rewrite FNIL.
+
+      eapply convert_FrameStack_eqv_rev; eauto.
+      {
+        eapply convert_FrameStack_snoc; eauto.
+        cbn. reflexivity.
+      }
+
+      eapply FRESH.
+      reflexivity.
+      apply Memory64BitIntptr.MMEP.empty_frame_nil.
+
+      split; red; reflexivity.
+    - (* mempush_operation_invariants *)
+      destruct INVARIANTS.
+      split; cbn in *.
+      + split; destruct mempush_op_reads.
+        * eapply fin_inf_read_byte_allowed_all_preserved; eauto.
+        * eapply fin_inf_read_byte_prop_all_preserved; eauto.
+      + eapply fin_inf_write_byte_allowed_all_preserved; eauto.
+      + eapply fin_inf_free_byte_allowed_all_preserved; eauto.
+      + eapply fin_inf_allocations_preserved; eauto.
+      + eapply fin_inf_preserve_allocation_ids; eauto.
+      + eapply fin_inf_heap_preserved; eauto.
+  Qed.
+
+  (* TODO: Move this *)
   Lemma dvalue_fin_to_inf_to_fin :
     forall d,
       DVCInfFin.dvalue_convert_strict (fin_to_inf_dvalue d) = NoOom d.
@@ -6087,792 +6195,200 @@ Module InfiniteToFinite.
                     }
                   }
 
-                        (* CONTINUE *)
-                      (*   pose proof inf_fin_read_byte_spec REF CONVPTR READ as [byte_fin' [READ_FIN BYTE_REF]]. *)
-                      (*   apply old_lu in READ_FIN. *)
-                      (*   epose proof fin_inf_read_byte_spec _ _ _ _ _ REF' CONVPTR READ_FIN. *)
+                  { (* MemPush *)
+                    repeat red in H0.
+                    rename s2 into m1.
+                    destruct H0 as [UB | [ERR | [OOM | H0]]].
+                    { (* Handler raises UB *)
+                      destruct UB as [ub_msg UB].
+                      cbn in UB.
 
-                      (*   (* TODO: should probably clean this up / make it a separate lemma *) *)
-                      (*   red in BYTE_REF. *)
-                      (*   unfold convert_SByte in BYTE_REF. *)
-                      (*   destruct byte'. *)
-                      (*   cbn in BYTE_REF. *)
-                      (*   break_match_hyp; [|inv BYTE_REF]. *)
-                      (*   break_match_hyp; [|inv BYTE_REF]. *)
-                      (*   inv BYTE_REF. *)
+                      (* TODO: look into lemmas like:
 
-                      (*   cbn in *. *)
-                      (*   do 2 erewrite <- fin_to_inf_uvalue_refine_strict' in H; eauto. *)
-                      (*   exact Heqo. *)
-                      (* } *)
+                         - get_consecutive_ptrs_no_ub
+                         - allocate_bytes_spec_MemPropT_no_ub
+                       *)
+                      admit.
+                    }
 
-                      (* * *)
-                        (*   cbn in *. *)
+                    { (* Handler raises error *)
+                      admit.
+                    }
 
-                        (* This is where handle_intrinsic was... *)
+                    { (* Handler raises OOM *)
+                      admit.
+                    }
+
+                    (* Handler succeeds *)
+                    destruct H0 as [st' [ms_push [[] [TA PUSH_HANDLER]]]].
+                    cbn in PUSH_HANDLER.
+
+                    rewrite TA in VIS_HANDLED.
+                    cbn in VIS_HANDLED.
+                    rewrite bind_ret_l in VIS_HANDLED.
+
+
+                    { eapply Interp_Memory_PropT_Vis with
+                        (k2:=(fun '(ms_inf, (sid', _)) =>
+                                match convert_MemState ms_inf with
+                                | NoOom ms_fin =>
+                                    get_inf_tree (k2 (ms_fin, (st', tt)))
+                                | Oom s => raiseOOM s
+                                end)
+                        )
+                        (s1:=s1)
+                        (s2:=lift_MemState m1).
+
+                      2: {
+                        cbn. red. red.
+                        repeat right.
+                        exists s1.
+                        exists (lift_MemState ms_push).
+                        exists tt.
+                        split; try reflexivity.
+                        cbn.
+
+                        eapply mem_push_spec_fin_inf; eauto; apply lift_MemState_refine.
                       }
 
-                                -
-
-
-                                  red. red.
-
-                                  cbn in READ'.
-                                  destruct READ' as [ms
-
-
-                                                       Set Printing Implicit.
-
-                                                     unfold LLVMParams64BitIntptr.ITOP.int_to_ptr in H2.
-                                                     unfold FinITOP.int_to_ptr.
-
-                                                     break_match_hyp; inv H2.
-                                                     break_match_goal.
-                                                     admit.
-
-
-
-                                                     pose proof (fin_inf_ptoi a a').
-                                                     assert (InfToFinAddrConvert.addr_convert a' = NoOom a) as AA'.
-                                                     { (* clear - ADDRS HMAPM Heqo0. *)
-                                                       (* pose proof (Util.Forall2_Nth_right H ADDRS) as [x [NTHxs CONVxy]]. *)
-                                                       (* pose proof (map_monad_OOM_Nth _ _ _ x 0 Heqo0 NTHxs) as [x'' [X NTHoxs]]. *)
-                                                       (* unfold id in X. cbn in X. inv X. clear H1. *)
-                                                       (* pose proof (map_monad_err_Nth _ _ _ _ i HMAPM NTHoxs) as [x'' [X NTHixs]]. *)
-
-                                                       (* Can maybe do this by induction on i or something *)
-                                                       admit.
-                                                     }
-                                                     specialize (H1 AA').
-
-                                                     rewrite <- H1.
-                                                     change (LLVMParams64BitIntptr.PTOI.ptr_to_int a) with (FinPTOI.ptr_to_int a).
-
-                                                     eapply FinITOP.int_to_ptr_ptr_to_int.
-                                                     eapply ITOP.int_to_ptr_ptr_to_int.
-
-                                                     rewrite <- H2 in CONVxy.
-
-
-                                                     eapply CONVxy.
-                                                     pose proof FinLP.ITOP.ptr_to_int_int_to_ptr _ _ _ H2.
-                                                     pose proof ITOP.int_to_ptr_provenance _ _ _ H2.
-                                                     unfold InfToFinAddrConvert.addr_convert in CONVxy.
-                                                     destruct y.
-                                                     unfold FinITOP.int_to_ptr in CONVxy.
-                                                     cbn in CONVxy.
-                                                     clear H
-                                                       inv Y.
-                                                     destruct H1.
-                                      }
-
-                                      assert (forall i a b, Util.Nth ys i a -> Util.Nth l2 i b -> a = b) as NTHysl2.
-                                                     {
-                                                       intros i y x NTHy NTHx.
-
-                                                       generalize dependent l0.
-                                                       induction ADDRS; intros l0' HMAPM Heqo0.
-                                                       - cbn in NTHy; rewrite Util.nth_error_nil in NTHy; inv NTHy.
-                                                       - pose proof Heqo0 as SEQ_XS.
-                                                         apply sequence_oom_cons_inv in Heqo0.
-                                                         destruct Heqo0 as (?&?&?); subst.
-                                                         rename l0 into xs.
-                                                         rename l' into ys.
-                                                         rename H into ADDR.
-
-                                                         rename x0 into ox.
-                                                         rename x1 into oxs.
-
-                                                         specialize (IHADDRS oxs).
-                                                         forward IHADDRS.
-                                                         { rewrite sequence_cons in SEQ_XS.
-                                                           cbn in SEQ_XS.
-                                                           break_match_hyp; inv SEQ_XS.
-                                                           break_match_hyp; inv H0.
-                                                           reflexivity.
-                                                         }
-
-
-
-                                                         rename l1 into addrs_inf_oom.
-                                                         rename l2 into addrs_inf.
-                                                         rename l0 into addrs_fin.
-                                                         rename l' into addrs_inf_of_fin.
-
-                                                         eapply IHADDRS.
-
-
-
-                                                         pose proof sequence_oom_nth' _ _ Heqo.
-                                                         specialize (H1 i x) as [NTH1x NTH2x].
-                                                         specialize (NTH1x NTHx).
-
-                                                         pose proof (map_monad_err_Nth _ _ _ _ _ HMAPM' NTH1x).
-                                                         destruct H1 as (x_ip & X_IP & NTHxip).
-                                                         inv X_IP.
-
-                                                         induction i.
-                                                         + cbn in *.
-                                                           destruct l2; inv NTHx.
-                                                           inv NTHy.
-                                                           destruct y as [y_ptr y_prov].
-                                                           destruct lb; inv NTHxip.
-                                                           destruct l1; inv NTH1x.
-
-                                                           pose proof MemoryBigIntptr.MMEP.MemSpec.MemHelpers.intptr_seq_nth 0 n (x_ip :: lb) 0 x_ip SEQ_BIG eq_refl as X_IP0.
-                                                           erewrite FiniteIntptr.BigIP.from_Z_to_Z; eauto.
-                                                           replace ((LLVMParamsBigIntptr.PTOI.ptr_to_int a' +
-                                                                       Z.of_N (LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp (DTYPE_I 8)) * (0 + Z.of_nat 0))%Z) with (LLVMParamsBigIntptr.PTOI.ptr_to_int a') by lia.
-                                                           destruct a' as [a'_ptr a'_prov]; cbn.
-
-                                                           rewrite map_monad_unfold in HMAPM'.
-                                                           cbn in HMAPM'.
-                                                           break_match_hyp; inv HMAPM'.
-
-                                                           pose proof HMAPM as HMAPM2.
-                                                           apply map_monad_err_cons_inv in HMAPM2.
-                                                           destruct HMAPM2 as (?&?&?); subst.
-
-                                                           rewrite map_monad_unfold in HMAPM.
-                                                           cbn in HMAPM.
-                                                           break_match_hyp; inv HMAPM.
-                                                           clear NTH2x.
-
-                                                           (* I don't know anything about...
-
-                                        H : InfToFinAddrConvert.addr_convert (y_ptr, y_prov) = NoOom x0
-
-
-                                                            *)
-
-                                                           pose proof HMAPM' as HMAPM''.
-                                                           apply map_monad_err_cons_inv in HMAPM''.
-                                                           destruct HMAPM'' as (?&?&?).
-                                                           inv H1.
-                                                           clear NTH2x.
-
-                                                           rename a into blah.
-
-                                                           (* Right hand side is literally a'... *)
-                                                           assert (((LLVMParamsBigIntptr.PTOI.ptr_to_int a' +
-                                                                       Z.of_N (LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp (DTYPE_I 8)) * LLVMParamsBigIntptr.IP.to_Z x_ip)%Z,
-                                                                     LLVMParamsBigIntptr.PROV.address_provenance a') = a').
-                                                           { destruct a'. cbn.
-
-                                                           }
-
-
-                                                           InfToFinAddrConvert.addr_convert_injective:
-                                                             forall (a b : InfAddr.addr) (c : FinAddr.addr),
-                                                               InfToFinAddrConvert.addr_convert a = NoOom c ->
-                                                               InfToFinAddrConvert.addr_convert b = NoOom c -> a = b
-
-                                                                                                                    rename y into blah.
-
-                                                           pose proof sequence_oom_nth' _ _ Heqo.
-
-                                                           pose proof HMAPM.
-                                                           apply map_monad_err_cons_inv in HMAPM as (?&?&?); subst.
-                                                           inversion ALL; subst.
-
-                                                           apply map_monad_err_cons in HMAPM' as (?&?&?); subst.
-                                                           apply sequence_oom_cons in Heqo as (?&?&?); subst.
-
-                                                           induction i.
-                                                         + cbn in *.
-                                                           inv NTHy; inv NTHx.
-
-                                                           rename x into blah.
-
-                                                           admit.
-                                                     }
-
-                                                     epose proof (Util.Forall2_forall eq ys l2).
-                                                     destruct H as [_ H].
-                                                     forward H.
-                                                     { split.
-                                                       - (* Length *)
-                                                         (* TODO: Use a hint DB for this? *)
-                                                         (* Hint Resolve sequence_OOM_length map_monad_err_length Memory64BitIntptr.MMEP.MemSpec.MemHelpers.intptr_seq_len MemoryBigIntptr.MMEP.MemSpec.MemHelpers.intptr_seq_len Util.Forall2_length : LENGTH. *)
-                                                         (* Hint Extern 0 => lia : LENGTH. *)
-
-                                                         apply sequence_OOM_length in Heqo, Heqo0.
-                                                         apply map_monad_err_length in HMAPM', HMAPM.
-                                                         apply Memory64BitIntptr.MMEP.MemSpec.MemHelpers.intptr_seq_len in SEQ.
-                                                         apply MemoryBigIntptr.MMEP.MemSpec.MemHelpers.intptr_seq_len in SEQ_BIG.
-                                                         apply Util.Forall2_length in ALL.
-                                                         apply Util.Forall2_length in ADDRS.
-                                                         lia.
-                                                       - intros i a0 b NTHys NTHls.
-                                                         eauto.
-                                                     }
-
-                                                     clear - H.
-                                                     induction H; subst; auto.
-                                      }
-
-
-
-                                      eapply Util.Forall2_Nth.
-                                                     apply Forall2
-
-                                                       induction ADDRS.
-                                                     - apply sequence_OOM_length in Heqo0.
-                                                       cbn in *.
-                                                       apply length_zero_iff_nil in Heqo0; subst.
-                                                       apply map_monad_err_nil_inv in HMAPM; subst.
-                                                       inversion ALL; subst.
-
-                                                       apply map_monad_err_nil in HMAPM'; subst.
-                                                       cbn in *.
-                                                       inv Heqo.
-                                                       auto.
-                                                     - pose proof Heqo0.
-                                                       apply sequence_oom_cons_inv in Heqo0.
-                                                       destruct Heqo0 as (x'&xs&Heqo0).
-                                                       subst.
-
-                                                       apply map_monad_err_cons_inv in HMAPM.
-                                                       destruct HMAPM as (?&?&?); subst.
-
-                                                       inversion ALL; subst.
-                                                       pose proof HMAPM'.
-                                                       apply map_monad_err_cons in HMAPM'.
-                                                       destruct HMAPM' as (?&?&?); subst.
-
-                                                       cbn in Heqo.
-
-                                                       break_match_hyp; inv Heqo.
-                                                       break_match_hyp; inv H4.
-                                                       apply
-
-                          }
-
-                            (* TODO: Move this *)
-                            Lemma sequence_noom :
-                            forall {X} (l : list (OOM X)),
-                              Forall (fun x => exists y, x = NoOom y) l ->
-                              exists l', Monads.sequence l = NoOom l'.
-                          Proof.
-
-                          Abort.
-
-                          apply map_monad_err_forall2 in HMAPM'.
-                          red.
-                          break_match_goal.
+                      2: {
+                        cbn.
+                        rewrite bind_ret_l.
+                        rewrite MemState_fin_to_inf_to_fin.
+                        rewrite VIS_HANDLED.
+                        reflexivity.
+                      }
+
+                      (* Continuation for vis node *)
+                      intros a b H H1 H2.
+                      destruct b as [ms [sid' res]].
+                      cbn in H1.
+                      apply Returns_ret_inv in H1.
+                      inv H1.
+
+                      cbn.
+                      rewrite dvalue_fin_to_inf_to_fin.
+                      rewrite MemState_fin_to_inf_to_fin.
+                      rewrite (itree_eta_ (k0 (fin_to_inf_dvalue d))).
+                      rewrite (itree_eta_ (k2 (ms', (st1, d)))).
+                      right.
+                      eapply CIH.
+                      2: {
+                        repeat red.
+                        specialize (HK d (ms', (st1, d))).
+                        forward HK.
+                        { eapply ReturnsVis.
+                          unfold trigger.
+                          reflexivity.
                           cbn.
-                          2: {
-                            (* Heqo should end up being a contradiction *)
-                            admit.
-                          }
-                          split; auto.
+                          constructor.
+                          reflexivity.
+                        }
+                        forward HK.
+                        { rewrite H0.
+                          constructor.
+                          reflexivity.
+                        }
 
-                          (* ys is related to xs...
-                                   xs is related to l0
-                           *)
+                        forward HK; auto.
+                        pclearbot.
 
-                          Set Printing Implicit.
-                          assert (map_monad
-                                    (fun ix : LLVMParamsBigIntptr.IP.intptr =>
-                                       inr
-                                         (LLVMParamsBigIntptr.ITOP.int_to_ptr
-                                            (LLVMParamsBigIntptr.PTOI.ptr_to_int a' +
-                                               Z.of_N (LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp (DTYPE_I 8)) *
-                                                 LLVMParamsBigIntptr.IP.to_Z ix) (LLVMParamsBigIntptr.PROV.address_provenance a')))
-                                    lb = inr y).
+                        repeat rewrite <- itree_eta.
+                        apply HK.
+                      }
 
-                          exists ms_x.
+                      specialize (REL (fin_to_inf_dvalue d)).
+                      red in REL.
+                      pclearbot.
 
-                        Admitted.
+                      repeat rewrite <- itree_eta.
+                      rewrite REL.
+                      eapply K_RUTT.
+                      repeat (split; auto).
+                      apply fin_to_inf_dvalue_refine_strict.
+                    }
 
-                        (* TODO: Need lemmas for read_bytes_spec and write_bytes_spec... *)
-                        Lemma fin_inf_read_bytes_spec :
-                          forall a a' n ms ms' x y,
-                            InfToFinAddrConvert.addr_convert a' = NoOom a ->
-                            Memory64BitIntptr.MMEP.MemSpec.read_bytes_spec a n ms x ->
-                            MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec a' n ms' y.
-                        Proof.
-                          intros a a' n ms ms' x y ACONV READ.
-                          red.
-                          red in READ.
-                        Admitted.
+                    setoid_rewrite VIS_HANDLED.
+                    admit.
+                  }
 
-                        cbn in HANDLER.
+                  { (* MemPop *)
+                    repeat red in H0.
+                    destruct H0 as [UB | [ERR | [OOM | H0]]].
+                    { (* Handler raises UB *)
+                      admit.
+                    }
 
+                    { (* Handler raises error *)
+                      admit.
+                    }
 
-                        destruct_err_ub_oom x.
-                        Unset Printing Notations.
-                        Set Printing Implicit.
+                    { (* Handler raises OOM *)
+                      admit.
+                    }
 
-                        (@Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs
-                           (MemPropT Memory64BitIntptr.MMEP.MMSP.MemState)
-                           (@MemPropT_Monad Memory64BitIntptr.MMEP.MMSP.MemState)
-                           (@MemPropT_RAISE_OOM Memory64BitIntptr.MMEP.MMSP.MemState)
-                           (@MemPropT_RAISE_ERROR Memory64BitIntptr.MMEP.MMSP.MemState) a n)
+                    (* Handler succeeds *)
+                    admit.
+                  }
 
-                          (@MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs
-                             (MemPropT MemoryBigIntptr.MMEP.MMSP.MemState)
-                             (@MemPropT_Monad MemoryBigIntptr.MMEP.MMSP.MemState)
-                             (@MemPropT_RAISE_OOM MemoryBigIntptr.MMEP.MMSP.MemState)
-                             (@MemPropT_RAISE_ERROR MemoryBigIntptr.MMEP.MMSP.MemState) a' n)
-                          Lemma fin_inf_get_consecutive_ptrs :
-                          forall a a' n ms ms' x y,
-                            InfToFinAddrConvert.addr_convert a' = NoOom a ->
-                            Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a n ms x->
-                            MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a' n ms' y.
+                  { (* Alloca *)
+                    admit.
+                  }
 
-                        READ : (ptrs <- Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a n;;
-                                map_monad
-                                  (fun ptr : LLVMParams64BitIntptr.ADDR.addr =>
-                                     Memory64BitIntptr.MMEP.MemSpec.read_byte_spec_MemPropT ptr) ptrs) ms
-                                 (OOM_unERR_UB_OOM oom_x)
-                                 ub_x : string
-                                          Hx0 : y = UB_unERR_UB_OOM ub_x
-                                                      ============================
-                                                      (ptrs <- MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a' n;;
+                  { (* Load *)
+                    admit.
+                  }
 
-                                                       - destruct_err_ub_oom y.
-                                                       + admit.
-                                                       + cbn in *.
-                                                         cbn in *.
-                                                         destruct x.
-                                                       Qed.
+                  { (* Store *)
+                    admit.
+                  }
 
-                                                       cbn.
-                                                       .
+                  { (* Pick *)
+                    admit.
+                  }
 
+                  { (* OOM *)
+                    admit.
+                  }
 
-                                                       - (* Negative length UB in finite case *)
-                                                         cbn in *.
-                                                         rewrite DVCInfFin.dvalue_convert_strict_equation in H1.
-                                                         destruct x1; inversion H1; try solve [ break_match_hyp; inv H5 ].
-                                                         break_match_hyp; inv H5.
-                                                         (* TODO: silly intptr reasoning... *)
-                                                         red.
-                                                         setoid_rewrite (IP.to_Z_from_Z x1). in Heqo.
-                                                         unfold DVCInfFin.dvalue_convert_strict in H1.
-                                                         red in H2.
-                                                         break_match_goal.
-                                                         + admit.
-                                                         + cbn in *.
+                  { (* UBE *)
+                    admit.
+                  }
 
-                                                           admit.
-                                                        }
-                                                       - unfold fin_to_inf_dvalue.
-                                                         break_match.
-                                                         destruct p; cbn in *.
-                                                         clear Heqs.
-                                                         rewrite DVC2.dvalue_convert_strict_equation in e.
-                                                         inv e.
-                                                         reflexivity.
-                                                        }
+                  { (* DebugE *)
+                    admit.
+                  }
 
-                                                        admit.
-                                                       Admitted.
+                  { (* FailureE *)
+                    admit.
+                  }
 
-                                                       eapply handle_intrinsic_fin_inf; eauto.
-                                                        }
-                                                        2: {
-                                                          cbn.
-                                                          setoid_rewrite bind_ret_l.
-                                                          rewrite VIS_HANDLED.
-                                                          pstep; red; cbn.
-
-                                                          rewrite dvalue_fin_to_inf_to_fin.
-                                                          rewrite MemState_fin_to_inf_to_fin.
-                                                          eapply Reflexive_eqitF_eq.
-                                                          { red. intros x.
-                                                            left.
-                                                            apply paco2_eqit_refl.
-                                                          }
-                                                        }
-
-                                                        clear INTRINSIC.
-                                                       intros a (ms''&sid'&b) RET H1 H2; cbn in *; subst.
-                                                       apply Returns_ret_inv in H1.
-                                                       inv H1.
-
-                                                       break_match_goal.
-                                                       2: {
-                                                         (* OOM *)
-                                                         cbn.
-                                                         left.
-                                                         pstep; red; cbn.
-                                                         observe_vis; solve_interp_prop_oom.
-                                                       }
-                                                       break_match_goal.
-                                                       2: {
-                                                         (* OOM *)
-                                                         cbn.
-                                                         left.
-                                                         pstep; red; cbn.
-                                                         observe_vis; solve_interp_prop_oom.
-                                                       }
-
-                                                       pclearbot.
-                                                       right.
-                                                       rewrite (itree_eta_ (k0 _)).
-                                                       rewrite (itree_eta_ (k2 _)).
-
-                                                       eapply CIH;
-                                                         repeat rewrite <- itree_eta_.
-
-                                                       2: {
-                                                         red.
-                                                         specialize (HK d (ms', (st1, d))).
-                                                         forward HK.
-                                                         { eapply ReturnsVis.
-                                                           pstep; red; cbn.
-                                                           constructor.
-                                                           intros v. red.
-                                                           left; apply paco2_eqit_refl.
-                                                           constructor.
-                                                           reflexivity.
-                                                         }
-                                                         forward HK.
-                                                         { rewrite H0.
-                                                           constructor.
-                                                           reflexivity.
-                                                         }
-                                                         forward HK; cbn; auto.
-                                                         pclearbot.
-                                                         rewrite MemState_fin_to_inf_to_fin in Heqo0; inv Heqo0.
-                                                         rewrite dvalue_fin_to_inf_to_fin in Heqo; inv Heqo.
-                                                         apply HK.
-                                                       }
-
-                                                       rewrite REL.
-                                                       eapply K_RUTT; split; auto.
-                                                        }
-                                                        }
-
-                                                        { (* MemPush *)
-                                                          admit.
-                                                        }
-
-                                                        { (* MemPop *)
-                                                          admit.
-                                                        }
-
-                                                        { (* Alloca *)
-                                                          admit.
-                                                        }
-
-                                                        { (* Load *)
-                                                          admit.
-                                                        }
-
-                                                        { (* Store *)
-                                                          admit.
-                                                        }
-
-                                                        { (* Pick *)
-                                                          admit.
-                                                        }
-
-                                                        { (* OOM *)
-                                                          admit.
-                                                        }
-
-                                                        { (* UBE *)
-                                                          admit.
-                                                        }
-
-                                                        { (* DebugE *)
-                                                          admit.
-                                                        }
-
-                                                        { (* FailureE *)
-                                                          admit.
-                                                        }
-
-                                                        admit.
-                                                       admit.
-                                                       admit.
-                                                       admit.
-                                                       cbn in *.
-                                                       discriminate.
-                                                       admit.
-                                                       destruct e, e1. try destruct n; try destruct n0; cbn in EV_REL; try inversion EV_REL.
-
-                                                       { (* Nondeterminism events *)
-                                                         red in H0.
-                                                         destruct H0.
-                                                         - (* True *)
-                                                           subst.
-                                                           setoid_rewrite bind_ret_l in VIS_HANDLED.
-
-                                                           specialize (HK true).
-                                                           forward HK. constructor; reflexivity.
-                                                           pclearbot.
-                                                           rewrite <- VIS_HANDLED in HK.
-
-                                                           eapply Interp_PropT_Vis with (k2 := fun _ => get_nat_tree' {| _observe := observe t2 |}).
-                                                           2: {
-                                                             red.
-                                                             left; auto.
-                                                           }
-                                                           2: {
-                                                             setoid_rewrite bind_ret_l.
-                                                             reflexivity.
-                                                           }
-
-                                                           intros a RET.
-                                                           eapply Returns_Ret_ in RET; [| reflexivity]; subst.
-
-                                                           right.
-                                                           rewrite (itree_eta_ (k0 _)).
-
-                                                           eapply CIH.
-                                                           + specialize (K_RUTT true true).
-                                                             forward K_RUTT; cbn; auto.
-                                                             pclearbot.
-                                                             repeat rewrite <- itree_eta_.
-                                                             assert (k0 true ≈ k3 true) as K0K3 by apply REL.
-                                                             rewrite K0K3.
-                                                             punfold K_RUTT. red in K_RUTT. cbn in K_RUTT.
-                                                             pstep; red; cbn; eauto.
-                                                           + repeat rewrite <- itree_eta_.
-                                                             eapply HK.
-                                                         - (* False *)
-                                                           subst.
-                                                           setoid_rewrite bind_ret_l in VIS_HANDLED.
-
-                                                           specialize (HK false).
-                                                           forward HK. constructor; reflexivity.
-                                                           pclearbot.
-                                                           rewrite <- VIS_HANDLED in HK.
-
-                                                           eapply Interp_PropT_Vis with (k2 := fun _ => get_nat_tree' {| _observe := observe t2 |}).
-                                                           2: {
-                                                             red.
-                                                             right; auto.
-                                                           }
-                                                           2: {
-                                                             setoid_rewrite bind_ret_l.
-                                                             reflexivity.
-                                                           }
-
-                                                           intros a RET.
-                                                           eapply Returns_Ret_ in RET; [| reflexivity]; subst.
-
-                                                           right.
-                                                           rewrite (itree_eta_ (k0 _)).
-
-                                                           eapply CIH.
-                                                           + specialize (K_RUTT false false).
-                                                             forward K_RUTT; cbn; auto.
-                                                             pclearbot.
-                                                             repeat rewrite <- itree_eta_.
-                                                             assert (k0 false ≈ k3 false) as K0K3 by apply REL.
-                                                             rewrite K0K3.
-
-                                                             punfold K_RUTT. red in K_RUTT. cbn in K_RUTT.
-                                                             pstep; red; cbn; eauto.
-                                                           + repeat rewrite <- itree_eta_.
-                                                             eapply HK.
-                                                       }
-
-                                                       { (* Regular events *)
-                                                         destruct b.
-                                                         red in H0.
-                                                         rewrite H0 in VIS_HANDLED.
-
-                                                         setoid_rewrite bind_trigger in VIS_HANDLED.
-                                                         punfold VIS_HANDLED. red in VIS_HANDLED.
-                                                         cbn in VIS_HANDLED.
-                                                         dependent induction VIS_HANDLED.
-                                                         { rewrite <- x.
-
-                                                           eapply Interp_PropT_Vis with (k2:=(fun n0 : nat =>
-                                                                                                get_nat_tree' (k2 (if Nat.eqb n0 0 then false else if Nat.eqb n0 1 then true else false)))).
-                                                           2: {
-                                                             red.
-                                                             reflexivity.
-                                                           }
-                                                           2: {
-                                                             cbn.
-                                                             setoid_rewrite bind_trigger.
-                                                             pstep; red; cbn.
-
-                                                             destruct EV_REL as [[R1 R3] | [R1 R3]]; subst; auto.
-                                                             - constructor.
-                                                               intros v.
-                                                               red.
-                                                               specialize (REL0 (if Nat.eqb v 0 then false else if Nat.eqb v 1 then true else false)).
-                                                               red in REL0.
-                                                               pclearbot.
-                                                               assert (k5 (if Nat.eqb v 0 then false else if Nat.eqb v 1 then true else false) ≈ k2 (if Nat.eqb v 0 then false else if Nat.eqb v 1 then true else false)) as K0K2.
-                                                               { eapply REL0.
-                                                               }
-
-                                                               setoid_rewrite H0 in HK.
-
-                                                               destruct v; [| destruct v]; cbn in *.
-                                                               + repeat (rewrite <- itree_eta_).
-                                                                 specialize (HK false).
-                                                                 forward HK.
-                                                                 { eapply ReturnsVis.
-                                                                   unfold ITree.trigger.
-                                                                   reflexivity.
-                                                                   constructor. reflexivity.
-                                                                 }
-                                                                 pclearbot.
-                                                                 left.
-                                                                 setoid_rewrite K0K2.
-                                                                 assert ((get_nat_tree' (k2 false)) ≈ (get_nat_tree' (k2 false))).
-                                                                 reflexivity.
-                                                                 eauto.
-                                                               + repeat (rewrite <- itree_eta_).
-                                                                 specialize (HK true).
-                                                                 forward HK.
-                                                                 { eapply ReturnsVis.
-                                                                   unfold ITree.trigger.
-                                                                   reflexivity.
-                                                                   constructor. reflexivity.
-                                                                 }
-                                                                 pclearbot.
-                                                                 left.
-                                                                 setoid_rewrite K0K2.
-                                                                 assert ((get_nat_tree' (k2 true)) ≈ (get_nat_tree' (k2 true))).
-                                                                 reflexivity.
-                                                                 eauto.
-                                                               + (* Bogus case *)
-                                                                 repeat (rewrite <- itree_eta_).
-                                                                 specialize (HK false).
-                                                                 forward HK.
-                                                                 { eapply ReturnsVis.
-                                                                   unfold ITree.trigger.
-                                                                   reflexivity.
-                                                                   constructor. reflexivity.
-                                                                 }
-                                                                 pclearbot.
-                                                                 left.
-                                                                 setoid_rewrite K0K2.
-                                                                 assert ((get_nat_tree' (k2 false)) ≈ (get_nat_tree' (k2 false))).
-                                                                 reflexivity.
-                                                                 eauto.
-                                                             - constructor.
-                                                               intros v.
-                                                               red.
-                                                               specialize (REL0 (if Nat.eqb v 0 then false else if Nat.eqb v 1 then true else false)).
-                                                               red in REL0.
-                                                               pclearbot.
-                                                               assert (k5 (if Nat.eqb v 0 then false else if Nat.eqb v 1 then true else false) ≈ k2 (if Nat.eqb v 0 then false else if Nat.eqb v 1 then true else false)) as K0K2.
-                                                               { eapply REL0.
-                                                               }
-
-                                                               setoid_rewrite H0 in HK.
-
-                                                               destruct v; [| destruct v]; cbn in *.
-                                                               + repeat (rewrite <- itree_eta_).
-                                                                 specialize (HK false).
-                                                                 forward HK.
-                                                                 { eapply ReturnsVis.
-                                                                   unfold ITree.trigger.
-                                                                   reflexivity.
-                                                                   constructor. reflexivity.
-                                                                 }
-                                                                 pclearbot.
-                                                                 left.
-                                                                 setoid_rewrite K0K2.
-                                                                 assert ((get_nat_tree' (k2 false)) ≈ (get_nat_tree' (k2 false))).
-                                                                 reflexivity.
-                                                                 eauto.
-                                                               + repeat (rewrite <- itree_eta_).
-                                                                 specialize (HK true).
-                                                                 forward HK.
-                                                                 { eapply ReturnsVis.
-                                                                   unfold ITree.trigger.
-                                                                   reflexivity.
-                                                                   constructor. reflexivity.
-                                                                 }
-                                                                 pclearbot.
-                                                                 left.
-                                                                 setoid_rewrite K0K2.
-                                                                 assert ((get_nat_tree' (k2 true)) ≈ (get_nat_tree' (k2 true))).
-                                                                 reflexivity.
-                                                                 eauto.
-                                                               + (* Bogus case *)
-                                                                 repeat (rewrite <- itree_eta_).
-                                                                 specialize (HK false).
-                                                                 forward HK.
-                                                                 { eapply ReturnsVis.
-                                                                   unfold ITree.trigger.
-                                                                   reflexivity.
-                                                                   constructor. reflexivity.
-                                                                 }
-                                                                 pclearbot.
-                                                                 left.
-                                                                 setoid_rewrite K0K2.
-                                                                 assert ((get_nat_tree' (k2 false)) ≈ (get_nat_tree' (k2 false))).
-                                                                 reflexivity.
-                                                                 eauto.
-                                                           }
-
-                                                           intros a RET.
-                                                           specialize (K_RUTT a (if Nat.eqb a 0 then false else if Nat.eqb a 1 then true else false)).
-                                                           forward K_RUTT.
-                                                           cbn; auto.
-
-                                                           specialize (HK (if Nat.eqb a 0 then false else if Nat.eqb a 1 then true else false)).
-                                                           rewrite H0 in HK.
-                                                           forward HK.
-                                                           { eapply ReturnsVis.
-                                                             unfold ITree.trigger.
-                                                             reflexivity.
-                                                             cbn.
-                                                             constructor.
-                                                             reflexivity.
-                                                           }
-
-                                                           right.
-                                                           rewrite (itree_eta_ (k0 a)).
-                                                           rewrite (itree_eta_ (k2 _)).
-                                                           pclearbot.
-                                                           eapply CIH;
-                                                             repeat rewrite <- itree_eta_.
-
-                                                           repeat rewrite <- itree_eta_.
-                                                           assert (k0 a ≈ k3 a) as K0K3 by apply REL.
-                                                           rewrite K0K3.
-                                                           eapply K_RUTT.
-                                                           red.
-                                                           eapply HK.
-                                                         }
-
-                                                         { rewrite <- x in EQ.
-                                                           specialize (EQ t1).
-                                                           contradiction.
-                                                         }
-                                                       }
-                                                       admit.
-                                                       + (* om1 = Tau *)
-                                                         (* Tau on the left... *)
-                                                         constructor; auto.
-                                                         eapply IHM1; eauto.
-                                                       - (* TauL *)
-                                                         pclearbot.
-                                                         apply orutt_inv_Vis_r in H.
-                                                         destruct H as [[U1 [e1 [k3 [M1 [EV_REL K_RUTT]]]]] | OOM].
-                                                         2: {
-                                                           destruct OOM as [o OOM].
-                                                           inv OOM.
-                                                           repeat red in H0.
-                                                           rewrite H0 in H1.
-                                                           setoid_rewrite bind_trigger in H1.
-                                                           setoid_rewrite bind_vis in H1.
-                                                           punfold H1; red in H1; cbn in H1.
-                                                           dependent induction H1.
-                                                           - destruct o.
-                                                             eapply Interp_Memory_PropT_Vis_OOM.
-                                                             rewrite get_inf_tree_equation.
-                                                             cbn.
-                                                             unfold raiseOOM.
-                                                             rewrite bind_trigger.
-                                                             reflexivity.
-                                                           - specialize (EQ t1). contradiction.
-                                                         }
+                + (* om1 = Tau *)
+                  (* Tau on the left... *)
+                  constructor; auto.
+                  eapply IHM1; eauto.
+              - (* TauL *)
+                pclearbot.
+                apply orutt_inv_Vis_r in H.
+                destruct H as [[U1 [e1 [k3 [M1 [EV_REL K_RUTT]]]]] | OOM].
+                2: {
+                  destruct OOM as [o OOM].
+                  inv OOM.
+                  repeat red in H0.
+                  rewrite H0 in H1.
+                  setoid_rewrite bind_trigger in H1.
+                  setoid_rewrite bind_vis in H1.
+                  punfold H1; red in H1; cbn in H1.
+                  dependent induction H1.
+                  - destruct o.
+                    eapply Interp_Memory_PropT_Vis_OOM.
+                    rewrite get_inf_tree_equation.
+                    cbn.
+                    unfold raiseOOM.
+                    rewrite bind_trigger.
+                    reflexivity.
+                  - specialize (EQ t1). contradiction.
+                }
 
                                                          repeat red in H0.
                                                          destruct e; cbn in *.
