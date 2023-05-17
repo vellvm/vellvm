@@ -3196,7 +3196,7 @@ Module InfiniteToFinite.
   Qed.
 
   Lemma inf_fin_big_address_byte_not_allocated :
-    forall addr_inf ms_fin ms_inf msg,
+    forall {addr_inf ms_fin ms_inf msg},
       MemState_refine ms_inf ms_fin ->
       InfToFinAddrConvert.addr_convert addr_inf = Oom msg ->
       MemoryBigIntptr.MMEP.MemSpec.byte_not_allocated ms_inf addr_inf.
@@ -6003,6 +6003,22 @@ Module InfiniteToFinite.
     }
   Qed.
 
+  Lemma inf_fin_ptr_not_in_current_frame :
+    forall {ms_inf ms_fin ptr_inf ptr_fin},
+      MemState_refine ms_inf ms_fin ->
+      InfToFinAddrConvert.addr_convert ptr_inf = NoOom ptr_fin ->
+      ~ MemoryBigIntptr.MMEP.MemSpec.ptr_in_current_frame ms_inf ptr_inf ->
+      ~ Memory64BitIntptr.MMEP.MemSpec.ptr_in_current_frame ms_fin ptr_fin.
+  Proof.
+    intros ms_inf ms_fin ptr_inf ptr_fin MSR ADDR_CONV PTR_NIN_FRAME PTR_IN_FRAME.
+    eapply PTR_NIN_FRAME.
+    eapply inf_fin_ptr_in_current_frame in PTR_IN_FRAME; eauto.
+    destruct PTR_IN_FRAME as (?&?&?).
+    pose proof InfToFinAddrConvert.addr_convert_injective _ _ _ ADDR_CONV H.
+    subst.
+    auto.
+  Qed.
+
   (* TODO: Move this *)
   Lemma mem_pop_spec_fin_inf :
     forall {m1_fin m2_fin m1_inf m2_inf},
@@ -6024,15 +6040,57 @@ Module InfiniteToFinite.
          so there should be a finite version of ptr as well *)
       pose proof fin_inf_ptr_in_current_frame MSR1 PTR as (ptr_fin&PTR_CONV&PTR_FIN).
       eapply fin_inf_byte_not_allocated; eauto.
-    - clear - NON_FRAME_BYTES_PRESERVED.
+    - (* NON_FRAME_BYTES_PRESERVED *)
+      clear - MSR1 MSR2 NON_FRAME_BYTES_PRESERVED.
       intros ptr aid PTR.
 
-      Lemma inf_fin_ptr_not_in_current_frame :
-        forall ms_inf ptr_inf,
-          ~ MemoryBigIntptr.MMEP.MemSpec.ptr_in_current_frame ms_inf ptr_inf ->
-          
+      destruct (InfToFinAddrConvert.addr_convert ptr) eqn:PTR_CONV.
+      2: {
+        pose proof inf_fin_big_address_byte_not_allocated MSR1 PTR_CONV.
+        pose proof inf_fin_big_address_byte_not_allocated MSR2 PTR_CONV.
+        split; intros.
+        - exfalso. eapply H; eauto.
+        - exfalso. eapply H0; eauto.
+      }
 
-      specialize NON_FRAME_BYTES_PRESERVED ptr.
+      eapply inf_fin_ptr_not_in_current_frame in PTR; eauto.
+
+      specialize (NON_FRAME_BYTES_PRESERVED a aid PTR).
+
+      split; intros BYTE_ALLOCATED.
+      + eapply inf_fin_byte_allocated in BYTE_ALLOCATED; eauto.
+        apply NON_FRAME_BYTES_PRESERVED in BYTE_ALLOCATED.
+        eapply fin_inf_byte_allocated; eauto.
+      + eapply inf_fin_byte_allocated in BYTE_ALLOCATED; eauto.
+        apply NON_FRAME_BYTES_PRESERVED in BYTE_ALLOCATED.
+        eapply fin_inf_byte_allocated; eauto.
+    - (* NON_FRAME_BYTES_READ *)
+      clear - MSR1 MSR2 NON_FRAME_BYTES_READ.
+      intros ptr byte PTR.
+
+      destruct (InfToFinAddrConvert.addr_convert ptr) eqn:PTR_CONV.
+      2: {
+        pose proof inf_fin_big_address_byte_not_allocated MSR1 PTR_CONV.
+        pose proof inf_fin_big_address_byte_not_allocated MSR2 PTR_CONV.
+        split; intros.
+        - exfalso. eapply H; eauto.
+        - exfalso. eapply H0; eauto.
+      }
+
+      eapply inf_fin_ptr_not_in_current_frame in PTR; eauto.
+
+      specialize (NON_FRAME_BYTES_PRESERVED a aid PTR).
+
+      split; intros BYTE_ALLOCATED.
+      + eapply inf_fin_byte_allocated in BYTE_ALLOCATED; eauto.
+        apply NON_FRAME_BYTES_PRESERVED in BYTE_ALLOCATED.
+        eapply fin_inf_byte_allocated; eauto.
+      + eapply inf_fin_byte_allocated in BYTE_ALLOCATED; eauto.
+        apply NON_FRAME_BYTES_PRESERVED in BYTE_ALLOCATED.
+        eapply fin_inf_byte_allocated; eauto.
+
+    -
+
 
       (* When I pop, I get a framestack that's equivalent to fs2... *)
       unfold MemoryBigIntptr.MMEP.MMSP.memory_stack_frame_stack_prop, Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *.
