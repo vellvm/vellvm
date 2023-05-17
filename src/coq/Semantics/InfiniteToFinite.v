@@ -2839,6 +2839,18 @@ Module InfiniteToFinite.
   Proof.
   Admitted.
 
+  (* TODO: Prove this *)
+  Lemma inf_fin_read_byte_raw_exists :
+    forall {m_inf m_fin addr byte_inf aid},
+      convert_memory m_inf = NoOom m_fin ->
+      MemoryBigIntptr.MMEP.MMSP.read_byte_raw m_inf addr = Some (byte_inf, aid) ->
+      exists ptr_fin byte_fin,
+        LLVMParams64BitIntptr.PTOI.ptr_to_int ptr_fin = addr /\
+        Memory64BitIntptr.MMEP.MMSP.read_byte_raw m_fin addr = Some (byte_fin, aid) /\
+          sbyte_refine byte_inf byte_fin.
+  Proof.
+  Admitted.
+
   Lemma inf_fin_addr_allocated_prop :
     forall addr_fin addr_inf ms_fin ms_inf aid,
       convert_memory_stack ms_inf = NoOom ms_fin ->
@@ -2883,6 +2895,73 @@ Module InfiniteToFinite.
     - destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid a); cbn in *; try discriminate; subst; auto.
       destruct (LLVMParams64BitIntptr.PROV.aid_eq_dec a a); cbn in *; try contradiction; auto; subst.
     - apply fin_inf_ptoi; eauto.
+  Qed.
+
+  Lemma inf_fin_addr_allocated_prop_exists :
+    forall {addr_inf ms_fin ms_inf aid},
+      convert_memory_stack ms_inf = NoOom ms_fin ->
+      MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop addr_inf aid
+        ms_inf
+        (success_unERR_UB_OOM (ms_inf, true)) ->
+      exists addr_fin,
+        InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin /\
+        Memory64BitIntptr.MMEP.MMSP.addr_allocated_prop addr_fin aid
+          ms_fin
+          (success_unERR_UB_OOM (ms_fin, true)).
+  Proof.
+    intros addr_inf ms_fin ms_inf aid MSR ALLOCATED.
+    cbn in *.
+    destruct ALLOCATED as [mst_inf [mst_inf' [[MST MST'] ALLOCATED]]]; subst.
+    destruct mst_inf.
+    cbn in *.
+    move MSR after ALLOCATED.
+    break_match_hyp; inv MSR.
+    break_match_hyp; inv H0.
+    break_match_hyp; inv H1.
+    break_match_hyp; inv Heqo1.
+
+    break_match_hyp.
+    2: {
+      (* Should be a contradiction *)
+      destruct ALLOCATED; discriminate.
+    }
+
+    destruct m0.
+    pose proof inf_fin_read_byte_raw_exists Heqo Heqo1.
+    destruct H as (?&?&?&?).
+    destruct x.
+    destruct addr_inf.
+
+    assert (LLVMParams64BitIntptr.PTOI.ptr_to_int (i, p0) = i0).
+    unfold LLVMParams64BitIntptr.PTOI.ptr_to_int in *. cbn; auto.
+
+    exists (i, p0).
+    split.
+    {
+      unfold InfToFinAddrConvert.addr_convert.
+      cbn in *.
+
+      rewrite <- H1.
+      rewrite FinLP.ITOP.int_to_ptr_ptr_to_int; auto.
+    }
+
+    eexists.
+    eexists.
+    split; eauto.
+    cbn in *.
+
+    rewrite H1.
+    eapply inf_fin_read_byte_raw in Heqo1.
+    destruct Heqo1 as (?&?&?).
+    rewrite H2.
+    split; auto.
+
+    destruct ALLOCATED.
+    destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid a); cbn in *; try discriminate; subst; auto.
+    destruct (LLVMParams64BitIntptr.PROV.aid_eq_dec a a); cbn in *; try contradiction; auto; subst.
+
+    auto.
+    eauto.
   Qed.
 
   Lemma MemState_refine_convert_memory_stack :
@@ -2997,6 +3076,60 @@ Module InfiniteToFinite.
       auto.
   Qed.
 
+  Lemma inf_fin_byte_allocated_MemPropT_exists :
+    forall addr_inf ms_fin ms_inf aid,
+      MemState_refine ms_inf ms_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.byte_allocated_MemPropT addr_inf aid ms_inf (ret (ms_inf, tt)) ->
+      exists addr_fin,
+        InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin /\
+        Memory64BitIntptr.MMEP.MemSpec.byte_allocated_MemPropT addr_fin aid ms_fin (ret (ms_fin, tt)).
+  Proof.
+    intros addr_inf ms_fin ms_inf aid MSR ALLOCATED.
+    red in ALLOCATED.
+    unfold Memory64BitIntptr.MMEP.MemSpec.byte_allocated_MemPropT.
+    Opaque Memory64BitIntptr.MMEP.MMSP.addr_allocated_prop.
+    Opaque MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop.
+    cbn in *.
+    destruct ALLOCATED as [ms_fin' [res [ALLOCATED [MS RES]]]]; subst.
+    red in ALLOCATED.
+    cbn in *.
+    destruct ALLOCATED.
+
+    pose proof MSR.
+    destruct ms_fin as [[ms_fin fss_fin hs_fin] msprovs_fin], ms_inf as [[ms_inf fss_inf hs_inf] msprovs_inf].
+
+    Opaque convert_memory_stack.
+    red in H1.
+    cbn in H1.
+    break_match_hyp; inv H1.
+    Transparent convert_memory_stack.
+    pose proof inf_fin_addr_allocated_prop_exists Heqo H.
+    destruct H1 as (?&?&?).
+    exists x.
+    split; auto.
+
+    exists {|
+        FinMemMMSP.ms_memory_stack :=
+          {|
+            FinMemMMSP.memory_stack_memory := ms_fin;
+            FinMemMMSP.memory_stack_frame_stack := fss_fin;
+            FinMemMMSP.memory_stack_heap := hs_fin
+          |};
+        FinMemMMSP.ms_provenance := msprovs_fin
+      |}.
+
+    exists true.
+
+    split; auto.
+    red.
+    split; auto.
+
+    intros ms' x0 H3.
+    cbn in *.
+    inv H3.
+    auto.
+  Qed.
+
   Lemma fin_inf_byte_allocated :
     forall addr_fin addr_inf ms_fin ms_inf aid,
       MemState_refine ms_inf ms_fin ->
@@ -3019,6 +3152,19 @@ Module InfiniteToFinite.
     intros addr_fin addr_inf ms_fin ms_inf aid MSR ADDR_CONV ALLOCATED.
     red; red in ALLOCATED.
     eapply inf_fin_byte_allocated_MemPropT; eauto.
+  Qed.
+
+  Lemma inf_fin_byte_allocated_exists :
+    forall addr_inf ms_fin ms_inf aid,
+      MemState_refine ms_inf ms_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.byte_allocated ms_inf addr_inf aid ->
+      exists addr_fin,
+        InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin /\
+        Memory64BitIntptr.MMEP.MemSpec.byte_allocated ms_fin addr_fin aid.
+  Proof.
+    intros addr_inf ms_fin ms_inf aid MSR ALLOCATED.
+    red in ALLOCATED.
+    eapply inf_fin_byte_allocated_MemPropT_exists; eauto.
   Qed.
 
   Lemma fin_inf_byte_not_allocated :
@@ -3047,6 +3193,19 @@ Module InfiniteToFinite.
     intros aid ALLOCATED.
     eapply fin_inf_byte_allocated in ALLOCATED; eauto.
     eapply NALLOCATED; eauto.
+  Qed.
+
+  Lemma inf_fin_big_address_byte_not_allocated :
+    forall addr_inf ms_fin ms_inf msg,
+      MemState_refine ms_inf ms_fin ->
+      InfToFinAddrConvert.addr_convert addr_inf = Oom msg ->
+      MemoryBigIntptr.MMEP.MemSpec.byte_not_allocated ms_inf addr_inf.
+  Proof.
+    intros addr_inf ms_fin ms_inf msg MSR ADDR_CONV aid ALLOCATED.
+    eapply inf_fin_byte_allocated_exists in ALLOCATED; eauto.
+    destruct ALLOCATED as (?&?&?).
+    rewrite ADDR_CONV in H.
+    discriminate.
   Qed.
 
   Lemma fin_inf_access_allowed :
@@ -5868,6 +6027,12 @@ Module InfiniteToFinite.
     - clear - NON_FRAME_BYTES_PRESERVED.
       intros ptr aid PTR.
 
+      Lemma inf_fin_ptr_not_in_current_frame :
+        forall ms_inf ptr_inf,
+          ~ MemoryBigIntptr.MMEP.MemSpec.ptr_in_current_frame ms_inf ptr_inf ->
+          
+
+      specialize NON_FRAME_BYTES_PRESERVED ptr.
 
       (* When I pop, I get a framestack that's equivalent to fs2... *)
       unfold MemoryBigIntptr.MMEP.MMSP.memory_stack_frame_stack_prop, Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *.
