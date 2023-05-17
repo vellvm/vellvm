@@ -3021,6 +3021,34 @@ Module InfiniteToFinite.
     eapply inf_fin_byte_allocated_MemPropT; eauto.
   Qed.
 
+  Lemma fin_inf_byte_not_allocated :
+    forall addr_fin addr_inf ms_fin ms_inf,
+      MemState_refine ms_inf ms_fin ->
+      InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.byte_not_allocated ms_fin addr_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.byte_not_allocated ms_inf addr_inf.
+  Proof.
+    intros addr_fin addr_inf ms_fin ms_inf MSR ADDR_CONV NALLOCATED.
+    red; red in NALLOCATED.
+    intros aid ALLOCATED.
+    eapply inf_fin_byte_allocated in ALLOCATED; eauto.
+    eapply NALLOCATED; eauto.
+  Qed.
+
+  Lemma inf_fin_byte_not_allocated :
+    forall addr_fin addr_inf ms_fin ms_inf,
+      MemState_refine ms_inf ms_fin ->
+      InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.byte_not_allocated ms_inf addr_inf ->
+      Memory64BitIntptr.MMEP.MemSpec.byte_not_allocated ms_fin addr_fin.
+  Proof.
+    intros addr_fin addr_inf ms_fin ms_inf MSR ADDR_CONV NALLOCATED.
+    red; red in NALLOCATED.
+    intros aid ALLOCATED.
+    eapply fin_inf_byte_allocated in ALLOCATED; eauto.
+    eapply NALLOCATED; eauto.
+  Qed.
+
   Lemma fin_inf_access_allowed :
     forall addr_fin addr_inf aid res,
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
@@ -5541,6 +5569,217 @@ Module InfiniteToFinite.
   Qed.
 
   (* TODO: Move this *)
+  Lemma convert_Frame_cons_equation :
+    forall {f a},
+      convert_Frame (a :: f) =
+        a' <- InfToFinAddrConvert.addr_convert a;;
+        f' <- convert_Frame f;;
+        NoOom (a' :: f').
+  Proof.
+    intros f a.
+    induction f; cbn; auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma fin_inf_ptr_in_frame_prop :
+    forall {f_inf f_fin ptr_inf},
+      convert_Frame f_inf = NoOom f_fin ->
+      MemoryBigIntptr.MMEP.MMSP.ptr_in_frame_prop f_inf ptr_inf ->
+      exists ptr_fin,
+        InfToFinAddrConvert.addr_convert ptr_inf = NoOom ptr_fin /\
+          Memory64BitIntptr.MMEP.MMSP.ptr_in_frame_prop f_fin ptr_fin.
+  Proof.
+    induction f_inf; intros f_fin ptr_inf F PTR.
+    - cbn in *. contradiction.
+    - rewrite convert_Frame_cons_equation in F.
+      cbn in F.
+      break_match_hyp; inv F.
+      break_match_hyp; inv H0.
+      pose proof PTR as PTR'.
+      red in PTR.
+      cbn in PTR.
+      destruct PTR.
+      + destruct ptr_inf.
+        destruct a.
+        cbn in *; subst.
+        pose proof int_to_ptr_succeeds_regardless_of_provenance Heqo (pr2:=p).
+        destruct H.
+        exists x.
+        split; auto.
+        left.
+        erewrite ITOP.ptr_to_int_int_to_ptr; eauto.
+        erewrite ITOP.ptr_to_int_int_to_ptr; eauto.
+      + specialize (IHf_inf f ptr_inf eq_refl).
+        forward IHf_inf.
+        {
+          red. auto.
+        }
+
+        destruct IHf_inf as (?&?&?).
+        exists x.
+        split; auto.
+        red.
+        cbn.
+        right.
+        auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma fin_inf_ptr_in_current_frame :
+    forall {ms_inf ms_fin ptr_inf},
+      MemState_refine ms_inf ms_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.ptr_in_current_frame ms_inf ptr_inf ->
+      exists ptr_fin,
+        InfToFinAddrConvert.addr_convert ptr_inf = NoOom ptr_fin /\
+          Memory64BitIntptr.MMEP.MemSpec.ptr_in_current_frame ms_fin ptr_fin.
+  Proof.
+    intros ms_inf ms_fin ptr_inf MSR PTR.
+    destruct ms_fin as [[ms_fin fss_fin hs_fin] msprovs_fin], ms_inf as [[ms_inf fss_inf hs_inf] msprovs_inf].
+    red in PTR.
+    cbn in *.
+    specialize (PTR fss_inf).
+    forward PTR; [red; cbn; reflexivity|].
+    destruct fss_inf.
+    { (* Single frame *)
+      cbn in *.
+      specialize (PTR f).
+      forward PTR; [reflexivity|].
+
+      red in MSR.
+      cbn in MSR.
+      break_match_hyp; inv MSR.
+      break_match_hyp; inv Heqo.
+      break_match_hyp; inv H0.
+      break_match_hyp; inv H1.
+      break_match_hyp; inv Heqo1.
+      break_match_hyp; inv Heqo.
+
+      eapply fin_inf_ptr_in_frame_prop in PTR; eauto.
+      destruct PTR as (?&?&?).
+      exists x.
+      split; auto.
+      red.
+      intros fs H1 f1 H2. cbn in *.
+      red in H1.
+      cbn in H1.
+      rewrite <- H1 in H2.
+      cbn in H2.
+      rewrite H2.
+      auto.
+    }
+
+    { (* Multiple frames *)
+      cbn in *.
+      specialize (PTR f).
+      forward PTR; [reflexivity|].
+
+      red in MSR.
+      unfold convert_MemState in MSR.
+      unfold convert_memory_stack in MSR.
+      rewrite convert_FrameStack_Snoc_equation in MSR.
+      cbn in MSR.
+      break_match_hyp; inv MSR.
+      break_match_hyp; inv Heqo.
+      break_match_hyp; inv H0.
+      break_match_hyp; inv H1.
+      break_match_hyp; inv Heqo1.
+      break_match_hyp; inv Heqo.
+      break_match_hyp; inv H0.
+
+      eapply fin_inf_ptr_in_frame_prop in PTR; eauto.
+      destruct PTR as (?&?&?).
+      exists x.
+      split; auto.
+      red.
+      intros fs H1 f2 H2.
+      cbn in *.
+      red in H1.
+      cbn in H1.
+      rewrite <- H1 in H2.
+      cbn in H2.
+      rewrite H2.
+      auto.
+    }
+  Qed.
+  (* TODO: Move this *)
+  Lemma mem_pop_spec_fin_inf :
+    forall {m1_fin m2_fin m1_inf m2_inf},
+      MemState_refine m1_inf m1_fin ->
+      MemState_refine m2_inf m2_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.mempop_spec m1_fin m2_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.mempop_spec m1_inf m2_inf.
+  Proof.
+    intros m1_fin m2_fin m1_inf m2_inf MSR1 MSR2 [BYTES_FREED NON_FRAME_BYTES_PRESERVED NON_FRAME_BYTES_READ POP_FRAME INVARIANTS].
+    destruct m1_fin as [[m1_fin fs1_fin h1_fin] msprov1_fin], m2_fin as [[m2_fin fs2_fin h2_fin] msprov2_fin].
+    destruct m1_inf as [[m1_inf fs1_inf h1_inf] msprov1_inf], m2_inf as [[m2_inf fs2_inf h2_inf] msprov2_inf].
+    cbn in *.
+    split; cbn in *.
+    - (* Bytes freed *)
+      clear NON_FRAME_BYTES_PRESERVED NON_FRAME_BYTES_READ POP_FRAME INVARIANTS.
+      intros ptr PTR.
+
+      (* ptr is in the current frame, which has a finite refinement,
+         so there should be a finite version of ptr as well *)
+      pose proof fin_inf_ptr_in_current_frame MSR1 PTR as (ptr_fin&PTR_CONV&PTR_FIN).
+      eapply fin_inf_byte_not_allocated; eauto.
+    - 
+
+      (* When I pop, I get a framestack that's equivalent to fs2... *)
+      unfold MemoryBigIntptr.MMEP.MMSP.memory_stack_frame_stack_prop, Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *.
+      cbn in *.
+
+      red in MSR1.
+      cbn in MSR1.
+      break_match_hyp; inv MSR1.
+      break_match_hyp; inv Heqo.
+      break_match_hyp; inv H3.
+      break_match_hyp; inv H4.
+      break_match_hyp; inv Heqo1.
+      
+      red in MSR2.
+      cbn in MSR2.
+      break_match_hyp; inv MSR2.
+      break_match_hyp; inv Heqo1.
+      break_match_hyp; inv H3.
+      break_match_hyp; inv H4.
+      break_match_hyp; inv Heqo4.
+
+      destruct H1.
+      red in can_pop.
+      destruct fs2; try contradiction.
+      cbn in new_frame.
+
+      rewrite <- new_frame.
+      rewrite can_pop.
+      rewrite <- H.
+      pose proof InfMem.MMEP.empty_frame_eqv _ _ H0 MemoryBigIntptr.MMEP.empty_frame_nil as FNIL.
+      rewrite FNIL.
+
+      eapply convert_FrameStack_eqv_rev; eauto.
+      {
+        eapply convert_FrameStack_snoc; eauto.
+        cbn. reflexivity.
+      }
+
+      eapply FRESH.
+      reflexivity.
+      apply Memory64BitIntptr.MMEP.empty_frame_nil.
+
+      split; red; reflexivity.
+    - (* mempush_operation_invariants *)
+      destruct INVARIANTS.
+      split; cbn in *.
+      + split; destruct mempush_op_reads.
+        * eapply fin_inf_read_byte_allowed_all_preserved; eauto.
+        * eapply fin_inf_read_byte_prop_all_preserved; eauto.
+      + eapply fin_inf_write_byte_allowed_all_preserved; eauto.
+      + eapply fin_inf_free_byte_allowed_all_preserved; eauto.
+      + eapply fin_inf_allocations_preserved; eauto.
+      + eapply fin_inf_preserve_allocation_ids; eauto.
+      + eapply fin_inf_heap_preserved; eauto.
+  Qed.
+
+  (* TODO: Move this *)
   Lemma dvalue_fin_to_inf_to_fin :
     forall d,
       DVCInfFin.dvalue_convert_strict (fin_to_inf_dvalue d) = NoOom d.
@@ -6323,10 +6562,110 @@ Module InfiniteToFinite.
                     }
 
                     (* Handler succeeds *)
+                    destruct H0 as [st' [ms_pop [[] [TA POP_HANDLER]]]].
+                    cbn in POP_HANDLER.
+
+                    rewrite TA in VIS_HANDLED.
+                    cbn in VIS_HANDLED.
+                    rewrite bind_ret_l in VIS_HANDLED.
+
+                    { eapply Interp_Memory_PropT_Vis with
+                        (k2:=(fun '(ms_inf, (sid', _)) =>
+                                match convert_MemState ms_inf with
+                                | NoOom ms_fin =>
+                                    get_inf_tree (k2 (ms_fin, (st', tt)))
+                                | Oom s => raiseOOM s
+                                end)
+                        )
+                        (s1:=s1)
+                        (s2:=lift_MemState s2).
+
+                      2: {
+                        cbn. red. red.
+                        repeat right.
+                        exists s1.
+                        exists (lift_MemState ms_pop).
+                        exists tt.
+                        split; try reflexivity.
+                        cbn.
+
+                        eapply mem_pop_spec_fin_inf; eauto; apply lift_MemState_refine.
+                      }
+
+                      2: {
+                        cbn.
+                        rewrite bind_ret_l.
+                        rewrite MemState_fin_to_inf_to_fin.
+                        rewrite VIS_HANDLED.
+                        reflexivity.
+                      }
+
+                      (* Continuation for vis node *)
+                      intros a b H H1 H2.
+                      destruct b as [ms [sid' res]].
+                      cbn in H1.
+                      apply Returns_ret_inv in H1.
+                      inv H1.
+
+                      cbn.
+                      rewrite MemState_fin_to_inf_to_fin.
+                      rewrite (itree_eta_ (k0 tt)).
+                      rewrite (itree_eta_ (k2 (ms_push, (st', tt)))).
+                      right.
+                      eapply CIH.
+                      2: {
+                        repeat red.
+                        specialize (HK tt (ms_push, (st', tt))).
+                        forward HK.
+                        { eapply ReturnsVis.
+                          unfold trigger.
+                          reflexivity.
+                          cbn.
+                          constructor.
+                          reflexivity.
+                        }
+                        forward HK.
+                        { rewrite TA.
+                          constructor.
+                          reflexivity.
+                        }
+
+                        forward HK; auto.
+                        pclearbot.
+
+                        repeat rewrite <- itree_eta.
+                        apply HK.
+                      }
+
+                      specialize (REL tt).
+                      red in REL.
+                      pclearbot.
+
+                      repeat rewrite <- itree_eta.
+                      rewrite REL.
+                      eapply K_RUTT.
+                      repeat (split; auto).
+                    }
+
                     admit.
                   }
 
                   { (* Alloca *)
+                    repeat red in H0.
+                    destruct H0 as [UB | [ERR | [OOM | H0]]].
+                    { (* Handler raises UB *)
+                      admit.
+                    }
+
+                    { (* Handler raises error *)
+                      admit.
+                    }
+
+                    { (* Handler raises OOM *)
+                      admit.
+                    }
+
+                    (* Handler succeeds *)
                     admit.
                   }
 
@@ -6335,10 +6674,40 @@ Module InfiniteToFinite.
                   }
 
                   { (* Store *)
+                    repeat red in H0.
+                    destruct H0 as [UB | [ERR | [OOM | H0]]].
+                    { (* Handler raises UB *)
+                      admit.
+                    }
+
+                    { (* Handler raises error *)
+                      admit.
+                    }
+
+                    { (* Handler raises OOM *)
+                      admit.
+                    }
+
+                    (* Handler succeeds *)
                     admit.
                   }
 
                   { (* Pick *)
+                    repeat red in H0.
+                    destruct H0 as [UB | [ERR | [OOM | H0]]].
+                    { (* Handler raises UB *)
+                      admit.
+                    }
+
+                    { (* Handler raises error *)
+                      admit.
+                    }
+
+                    { (* Handler raises OOM *)
+                      admit.
+                    }
+
+                    (* Handler succeeds *)
                     admit.
                   }
 
