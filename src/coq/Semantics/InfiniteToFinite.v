@@ -6111,60 +6111,52 @@ Module InfiniteToFinite.
         specialize (NON_FRAME_BYTES_READ a byte_fin PTR).
         eapply NON_FRAME_BYTES_READ in READ_FIN.
         eapply fin_inf_read_byte_spec; eauto.
-    - (* 
-
-
-      (* When I pop, I get a framestack that's equivalent to fs2... *)
-      unfold MemoryBigIntptr.MMEP.MMSP.memory_stack_frame_stack_prop, Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *.
+    - (* POP_FRAME *)
+      clear - MSR1 MSR2 POP_FRAME.
+      intros fs1 fs2 FSP POP.
+      red; red in FSP.
       cbn in *.
 
-      red in MSR1.
-      cbn in MSR1.
-      break_match_hyp; inv MSR1.
+      red in MSR1, MSR2.
+      cbn in MSR1, MSR2.
+
+      break_match_hyp; inv MSR2.
       break_match_hyp; inv Heqo.
-      break_match_hyp; inv H3.
-      break_match_hyp; inv H4.
+      break_match_hyp; inv H0.
+      break_match_hyp; inv H1.
       break_match_hyp; inv Heqo1.
 
-      red in MSR2.
-      cbn in MSR2.
-      break_match_hyp; inv MSR2.
+      break_match_hyp; inv MSR1.
       break_match_hyp; inv Heqo1.
-      break_match_hyp; inv H3.
-      break_match_hyp; inv H4.
+      break_match_hyp; inv H0.
+      break_match_hyp; inv H1.
       break_match_hyp; inv Heqo4.
 
-      destruct H1.
-      red in can_pop.
-      destruct fs2; try contradiction.
-      cbn in new_frame.
+      red in POP.
+      destruct fs1; try contradiction.
+      rewrite <- POP.
 
-      rewrite <- new_frame.
-      rewrite can_pop.
+      destruct fs1_inf.
+      apply MemoryBigIntptrInfiniteSpec.MMSP.frame_stack_eqv_sing_snoc_inv in FSP; contradiction.
+
+      rewrite convert_FrameStack_Snoc_equation in Heqo1.
+      cbn in Heqo1.
+      break_match_hyp; inv Heqo1.
+      break_match_hyp; inv H0.
+
+      pose proof InfMemMMSP.frame_stack_snoc_inv_fs _ _ _ _ FSP.
       rewrite <- H.
-      pose proof InfMem.MMEP.empty_frame_eqv _ _ H0 MemoryBigIntptr.MMEP.empty_frame_nil as FNIL.
-      rewrite FNIL.
 
       eapply convert_FrameStack_eqv_rev; eauto.
-      {
-        eapply convert_FrameStack_snoc; eauto.
-        cbn. reflexivity.
-      }
-
-      eapply FRESH.
-      reflexivity.
-      apply Memory64BitIntptr.MMEP.empty_frame_nil.
-
-      split; red; reflexivity.
-    - (* mempush_operation_invariants *)
+ 
+      specialize (POP_FRAME (Memory64BitIntptr.MMEP.MMSP.Snoc f2 f1) f2).
+      forward POP_FRAME; [red; cbn; reflexivity|].
+      forward POP_FRAME; [red; cbn; reflexivity|].
+      red in POP_FRAME; cbn in POP_FRAME.
+      auto.
+    - (* mempop_operation_invariants *)
       destruct INVARIANTS.
       split; cbn in *.
-      + split; destruct mempush_op_reads.
-        * eapply fin_inf_read_byte_allowed_all_preserved; eauto.
-        * eapply fin_inf_read_byte_prop_all_preserved; eauto.
-      + eapply fin_inf_write_byte_allowed_all_preserved; eauto.
-      + eapply fin_inf_free_byte_allowed_all_preserved; eauto.
-      + eapply fin_inf_allocations_preserved; eauto.
       + eapply fin_inf_preserve_allocation_ids; eauto.
       + eapply fin_inf_heap_preserved; eauto.
   Qed.
