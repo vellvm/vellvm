@@ -6181,6 +6181,147 @@ Module InfiniteToFinite.
     auto.
   Qed.
 
+  Lemma allocate_dtyp_spec_fin_inf :
+    forall t num_elements ms ms_alloc addr_fin addr_inf,
+      InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.allocate_dtyp_spec t num_elements ms (ret (ms_alloc, addr_fin)) ->
+      MemoryBigIntptr.MMEP.MemSpec.allocate_dtyp_spec t num_elements (lift_MemState ms)
+        (ret (lift_MemState ms_alloc, addr_inf)).
+  Proof.
+    intros t num_elements ms ms_alloc addr_fin addr_inf CONV ALLOCA.
+    red; red in ALLOCA.
+
+    (* TODO: Move this... *)
+    Lemma MemPropT_bind_ret_inv :
+      forall {S A B}
+        (ma : MemPropT S A)
+        (mab : A -> MemPropT S B)
+        {s1 s2 b}
+        (M :
+          (a <- ma;;
+           mab a) s1 (ret (s2, b))),
+      exists s' a, ma s1 (ret (s', a)) /\ mab a s' (ret (s2, b)).
+    Proof.
+      intros S A B ma mab s1 s2 b M.
+      auto.
+    Qed.
+
+    (* This might be a good idea, but I think I need an A_INF and
+       A_FIN... And then probably some relation between those. Still,
+       this should make the proofs more modular, which is a plus. *)
+    Lemma MemPropT_fin_inf_bind :
+      forall {ms_inf ms_inf' : MemoryBigIntptr.MMEP.MMSP.MemState}
+        {ms_fin ms_fin' : Memory64BitIntptr.MMEP.MMSP.MemState}
+        {A_FIN A_INF B_FIN B_INF}
+        (ma_fin : MemPropT Memory64BitIntptr.MMEP.MMSP.MemState A_FIN)
+        {ma_inf : MemPropT MemoryBigIntptr.MMEP.MMSP.MemState A_INF}
+        {mab_fin : A_FIN -> MemPropT Memory64BitIntptr.MMEP.MMSP.MemState B_FIN}
+        {mab_inf : A_INF -> MemPropT MemoryBigIntptr.MMEP.MMSP.MemState B_INF}
+        {res_fin res_inf}
+        (A_REF : A_INF -> A_FIN -> Prop)
+        (B_REF : B_INF -> B_FIN -> Prop)
+        (MEM_REF : MemState_refine ms_inf ms_fin)
+        (MEM_REF' : MemState_refine ms_inf' ms_fin')
+        (MA: forall ms_inf' ms_fin' a_fin a_inf, ma_fin ms_fin (ret (ms_fin', a_fin)) -> ma_inf ms_inf (ret (ms_inf', a_inf)) /\ A_REF a_inf a_fin /\ MemState_refine ms_inf' ms_fin')
+        (K: forall ms_inf ms_fin ms_inf' ms_fin' a_fin a_inf b_fin b_inf,
+            A_REF a_inf a_fin ->
+            B_REF b_inf b_fin ->
+            MemState_refine ms_inf ms_fin ->
+            MemState_refine ms_inf' ms_fin' ->
+            mab_fin a_fin ms_fin (ret (ms_fin', b_fin)) ->
+            mab_inf a_inf ms_inf (ret (ms_inf', b_inf)))
+        (FIN: (a <- ma_fin;;
+               mab_fin a) ms_fin (ret (ms_fin', res_fin))),
+        (a <- ma_inf;;
+         mab_inf a) ms_inf (ret (ms_inf', res_inf)).
+    Proof.
+    Admitted.
+
+    eapply MemPropT_fin_inf_bind with
+      (A_REF:=eq)
+      (B_REF:=fun a_inf a_fin => InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin)
+      (ma_fin:=fresh_sid)
+      (mab_fin:=(fun (s : MemPropT.store_id) (m : Memory64BitIntptr.MMEP.MMSP.MemState)
+                   (e : err_ub_oom (Memory64BitIntptr.MMEP.MMSP.MemState * FinAddr.addr)) =>
+                   (element_bytes <-
+                      repeatMN num_elements
+                        (lift_OOM (Memory64BitIntptr.MMEP.MemSpec.MemHelpers.generate_undef_bytes t s));;
+                    Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_spec_MemPropT t num_elements
+                      (concat element_bytes)) m e)).
+    - apply lift_MemState_refine.
+    - apply lift_MemState_refine.
+    - (* MA *)
+      (* TODO: Factor out lemma about fresh_sid *)
+      Lemma fresh_sid_fin_inf :
+        forall (ms_inf ms_inf' : MemoryBigIntptr.MMEP.MMSP.MemState)
+          (ms_fin ms_fin' : Memory64BitIntptr.MMEP.MMSP.MemState) (sid : MemPropT.store_id),
+          MemState_refine ms_inf ms_fin ->
+          fresh_sid ms_fin (ret (ms_fin', sid)) ->
+          @fresh_sid (MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) _  ms_inf (ret (ms_inf', sid)) /\ MemState_refine ms_inf' ms_fin'.
+      Proof.
+        intros ms_inf ms_inf' ms_fin ms_fin' sid MSR FRESH.
+        cbn in *.
+        (* MemState_refine here may be tricky... Actually not true, even... Heap / frame could be reordered :| *)
+      Admitted.
+      intros ms_inf' ms_fin' a_fin a_inf H.
+      admit.
+    - (* K *)
+      intros ms_inf ms_fin ms_inf' ms_fin' a_fin a_inf b_fin b_inf H H0 H1 H2 H3.
+      subst.
+      rename a_fin into sid.
+      eapply MemPropT_fin_inf_bind.
+
+      (* Need a MemState_refine_prop that takes all of the predicates
+      like write_byte_all_preserved and bundles them in one place
+      between memories. Should use this for these lemmas... *)      
+
+    - (* FIN *)
+      apply MemPropT_bind_ret_inv in ALLOCA as [s' [a [FRESH REST]]].
+      repeat red.
+      exists s'. exists a.
+      split; auto.
+      apply REST.        
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma handle_alloca_fin_inf :
+    forall t num_elements align ms ms' d,
+      Memory64BitIntptr.MMEP.MemSpec.handle_memory_prop
+        LLVMParams64BitIntptr.Events.DV.dvalue
+        (LLVMParams64BitIntptr.Events.Alloca t num_elements align) ms (ret (ms', d)) ->
+      MemoryBigIntptr.MMEP.MemSpec.handle_memory_prop DVCInfFin.DV1.dvalue
+        (InterpreterStackBigIntptr.LP.Events.Alloca t num_elements align) (lift_MemState ms)
+        (ret (lift_MemState ms', fin_to_inf_dvalue d)).
+  Proof.
+    intros t num_elements align ms ms' d HANDLE.
+    repeat red in HANDLE.
+    destruct HANDLE as [ms_alloc [addr [ALLOC ADDR]]].
+    cbn in ADDR.
+    destruct ADDR; subst.
+
+    repeat red.
+    exists (lift_MemState ms_alloc).
+
+    pose proof FinToInfAddrConvertSafe.addr_convert_succeeds addr as [addr_inf CONV].
+    pose proof FinToInfAddrConvertSafe.addr_convert_safe addr addr_inf CONV.
+
+    exists addr_inf.
+    split.
+    2: {
+      cbn.
+      split; auto.
+      erewrite <- fin_to_inf_dvalue_refine_strict'.
+      reflexivity.
+      rewrite DVC1.dvalue_refine_strict_equation.
+      rewrite DVC1.dvalue_convert_strict_equation.
+      cbn.
+      rewrite H.
+      reflexivity.
+    }
+
+    eapply allocate_dtyp_spec_fin_inf; eauto.
+  Qed.
+
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
       L2_E1E2_orutt_strict t_inf t_fin ->
@@ -7047,7 +7188,118 @@ Module InfiniteToFinite.
                     }
 
                     (* Handler succeeds *)
-                    admit.
+                    destruct H0 as [st' [ms_alloca [d [TA ALLOCA_HANDLER]]]].
+
+                    rewrite TA in VIS_HANDLED.
+                    cbn in VIS_HANDLED.
+                    rewrite bind_ret_l in VIS_HANDLED.
+                    destruct EV_REL as (?&?&?); subst.
+
+                    { eapply Interp_Memory_PropT_Vis with
+                        (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                                match DVCInfFin.dvalue_convert_strict dv_inf with
+                                | NoOom dv_fin =>
+                                    match convert_MemState ms_inf with
+                                    | NoOom ms_fin =>
+                                        get_inf_tree (k2 (ms_fin, (st', dv_fin)))
+                                    | Oom s => raiseOOM s
+                                    end
+                                | Oom s => raiseOOM s
+                                end)
+                        )
+                        (s1:=s1)
+                        (s2:=lift_MemState s2).
+
+                      2: {
+                        cbn. red. red.
+                        repeat right.
+                        exists s1.
+                        exists (lift_MemState ms_alloca).
+                        exists (fin_to_inf_dvalue d).
+                        split; try reflexivity.
+
+                        eapply handle_alloca_fin_inf; eauto.
+                      }
+
+                      (* Mess *)
+                    { eapply Interp_Memory_PropT_Vis with
+                        (k2:=(fun '(ms_inf, (sid', _)) =>
+                                match convert_MemState ms_inf with
+                                | NoOom ms_fin =>
+                                    get_inf_tree (k2 (ms_fin, (st', tt)))
+                                | Oom s => raiseOOM s
+                                end)
+                        )
+                        (s1:=s1)
+                        (s2:=lift_MemState s2).
+
+                      2: {
+                        cbn. red. red.
+                        repeat right.
+                        exists s1.
+                        exists (lift_MemState ms_pop).
+                        exists tt.
+                        split; try reflexivity.
+                        cbn.
+
+                        eapply mem_pop_spec_fin_inf; eauto; apply lift_MemState_refine.
+                      }
+
+                      2: {
+                        cbn.
+                        rewrite bind_ret_l.
+                        rewrite MemState_fin_to_inf_to_fin.
+                        rewrite VIS_HANDLED.
+                        reflexivity.
+                      }
+
+                      (* Continuation for vis node *)
+                      intros [] b H H1 H2.
+                      destruct b as [ms [sid' res]].
+                      cbn in H1.
+                      cbn in H2. inv H2.
+                      apply Returns_ret_inv in H1.
+                      inv H1.
+
+                      cbn.
+                      rewrite MemState_fin_to_inf_to_fin.
+                      rewrite (itree_eta_ (k0 tt)).
+                      rewrite (itree_eta_ (k2 (ms_pop, (st', tt)))).
+                      right.
+                      eapply CIH.
+                      2: {
+                        repeat red.
+                        specialize (HK tt (ms_pop, (st', tt))).
+                        forward HK.
+                        { eapply ReturnsVis.
+                          unfold trigger.
+                          reflexivity.
+                          cbn.
+                          constructor.
+                          reflexivity.
+                        }
+                        forward HK.
+                        { rewrite TA.
+                          constructor.
+                          reflexivity.
+                        }
+
+                        forward HK; auto.
+                        pclearbot.
+
+                        repeat rewrite <- itree_eta.
+                        apply HK.
+                      }
+
+                      specialize (REL tt).
+                      red in REL.
+                      pclearbot.
+
+                      repeat rewrite <- itree_eta.
+                      rewrite REL.
+                      eapply K_RUTT.
+                      repeat (split; auto).
+                    }
                   }
 
                   { (* Load *)
