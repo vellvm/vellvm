@@ -1571,18 +1571,18 @@ Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
 
         (* Generate literals for aggregate structures *)
         | TYPE_Array n t =>
-            es <- hide_local_ctx (vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t));;
+            es <- (vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t));;
             ret (EXP_Array (map (fun e => (t, e)) es))
         | TYPE_Vector n t =>
-            es <- hide_local_ctx (vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t));;
+            es <- (vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t));;
             ret (EXP_Vector (map (fun e => (t, e)) es))
         | TYPE_Struct fields =>
             (* Should we divide size evenly amongst components of struct? *)
-            tes <- map_monad (fun t => e <- hide_local_ctx (gen_exp_size 0 t);; ret (t, e)) fields;;
+            tes <- map_monad (fun t => e <- (gen_exp_size 0 t);; ret (t, e)) fields;;
             ret (EXP_Struct tes)
         | TYPE_Packed_struct fields =>
             (* Should we divide size evenly amongst components of struct? *)
-            tes <- map_monad (fun t => e <- hide_local_ctx (gen_exp_size 0 t);; ret (t, e)) fields;;
+            tes <- map_monad (fun t => e <- (gen_exp_size 0 t);; ret (t, e)) fields;;
             ret (EXP_Packed_struct tes)
 
         | TYPE_Identified id        =>
@@ -1603,9 +1603,9 @@ Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
         end in
       (* Hack to avoid failing way too much *)
       match t with
-      | TYPE_Pointer t => freq_LLVM gen_idents
+      | TYPE_Pointer t => freq_LLVM (gen_idents)
       | _ => freq_LLVM
-              (gen_idents ++ [(1%nat, gen_size_0 t)])
+              ((1%nat, gen_size_0 t) :: gen_idents)
       end
   | (S sz') =>
       let gens :=
