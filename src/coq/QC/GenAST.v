@@ -1546,10 +1546,7 @@ Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
   match sz with
   | 0%nat =>
       ctx <- get_ctx;;
-      annotate_debug ("++++++++Generexp: " ++ show t);;
       let ts := filter_type t ctx in
-      annotate_debug ("++++++++CTX: " ++ show ctx);;
-      annotate_debug ("++++++++Filtered Context: " ++ show ts);;
       let gen_idents :=
         match ts with
         | [] => []
@@ -1603,7 +1600,7 @@ Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
         end in
       (* Hack to avoid failing way too much *)
       match t with
-      | TYPE_Pointer t => freq_LLVM (gen_idents)
+      | TYPE_Pointer t => freq_LLVM ((1%nat, ret EXP_Undef) :: gen_idents)
       | _ => freq_LLVM
               ((1%nat, gen_size_0 t) :: gen_idents)
       end
@@ -1643,7 +1640,6 @@ Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
              end]
           end
       in
-      annotate_debug ("++++++++GeneExpS: " ++ show t);;
       (* short-circuit to size 0 *)
       oneOf_LLVM (gen_exp_size 0 t :: gens)
     end
@@ -1692,6 +1688,174 @@ Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
        else ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_exp_size 0 ty
        | _ => failGen "gen_fbinop_exp"
       end.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(* Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) := *)
+(*   match sz with *)
+(*   | 0%nat => *)
+(*       ctx <- get_ctx;; *)
+(*       annotate_debug ("++++++++Generexp: " ++ show t);; *)
+(*       let ts := filter_type t ctx in *)
+(*       annotate_debug ("++++++++CTX: " ++ show ctx);; *)
+(*       annotate_debug ("++++++++Filtered Context: " ++ show ts);; *)
+(*       let gen_idents := *)
+(*         match ts with *)
+(*         | [] => [] *)
+(*         | _ => [(16%nat, fmap (fun '(i,_) => EXP_Ident i) (elems_LLVM ts))] *)
+(*         end in *)
+(*       let fix gen_size_0 (t: typ) := *)
+(*         match t with *)
+(*         | TYPE_I n                  => *)
+(*             z <- lift (gen_unsigned_bitwidth n);; *)
+(*             ret (EXP_Integer z) *)
+(*         (* lift (x <- (arbitrary : G nat);; ret (Z.of_nat x)) *)
+(*          (* TODO: should the integer be forced to be in bounds? *) *) *)
+(*         | TYPE_IPTR => ret EXP_Integer <*> lift (arbitrary : G Z) *)
+(*         | TYPE_Pointer subtyp       => failGen "gen_exp_size TYPE_Pointer" *)
+(*         (* Only pointer type expressions might be conversions? Maybe GEP? *) *)
+(*         | TYPE_Void                 => failGen "gen_exp_size TYPE_Void" (* There should be no expressions of type void *) *)
+(*         | TYPE_Function ret args _   => failGen "gen_exp_size TYPE_Function"(* No expressions of function type *) *)
+(*         | TYPE_Opaque               => failGen "gen_exp_size TYPE_Opaque" (* TODO: not sure what these should be... *) *)
+
+(*         (* Generate literals for aggregate structures *) *)
+(*         | TYPE_Array n t => *)
+(*             es <- (vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t));; *)
+(*             ret (EXP_Array (map (fun e => (t, e)) es)) *)
+(*         | TYPE_Vector n t => *)
+(*             es <- (vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t));; *)
+(*             ret (EXP_Vector (map (fun e => (t, e)) es)) *)
+(*         | TYPE_Struct fields => *)
+(*             (* Should we divide size evenly amongst components of struct? *) *)
+(*             tes <- map_monad (fun t => e <- (gen_exp_size 0 t);; ret (t, e)) fields;; *)
+(*             ret (EXP_Struct tes) *)
+(*         | TYPE_Packed_struct fields => *)
+(*             (* Should we divide size evenly amongst components of struct? *) *)
+(*             tes <- map_monad (fun t => e <- (gen_exp_size 0 t);; ret (t, e)) fields;; *)
+(*             ret (EXP_Packed_struct tes) *)
+
+(*         | TYPE_Identified id        => *)
+(*             ctx <- get_ctx;; *)
+(*             match find_pred (fun '(i,t) => if Ident.eq_dec id i then true else false) ctx with *)
+(*             | None => failGen "gen_exp_size TYPE_Identified" *)
+(*             | Some (i,t) => gen_exp_size 0 t *)
+(*             end *)
+(*         (* Not generating these types for now *) *)
+(*         | TYPE_Half                 => failGen "gen_exp_size TYPE_Half" *)
+(*         | TYPE_Float                => ret EXP_Float <*> lift fing32(* referred to genarators in flocq-quickchick*) *)
+(*         | TYPE_Double               => failGen "gen_exp_size TYPE_Double" (*ret EXP_Double <*> lift fing64*) (* TODO: Fix generator for double*) *)
+(*         | TYPE_X86_fp80             => failGen "gen_exp_size TYPE_X86_fp80" *)
+(*         | TYPE_Fp128                => failGen "gen_exp_size TYPE_Fp128" *)
+(*         | TYPE_Ppc_fp128            => failGen "gen_exp_size TYPE_Ppc_fp128" *)
+(*         | TYPE_Metadata             => failGen "gen_exp_size TYPE_Metadata" *)
+(*         | TYPE_X86_mmx              => failGen "gen_exp_size TYPE_X86_mmx" *)
+(*         end in *)
+(*       (* Hack to avoid failing way too much *) *)
+(*       match t with *)
+(*       | TYPE_Pointer t => freq_LLVM ((1%nat, ret EXP_Undef) :: gen_idents) *)
+(*       | _ => freq_LLVM *)
+(*               ((1%nat, gen_size_0 t) :: gen_idents) *)
+(*       end *)
+(*   | (S sz') => *)
+(*       let gens := *)
+(*           match t with *)
+(*           | TYPE_I isz => *)
+(*             (* TODO: If I1 also allow ICmp and FCmp *) *)
+(*             [gen_ibinop_exp isz] *)
+(*           | TYPE_IPTR => *)
+(*             (* TODO: If I1 also allow ICmp and FCmp *) *)
+(*             [gen_ibinop_exp_typ TYPE_IPTR] *)
+(*           | TYPE_Pointer t         => [] (* GEP? *) *)
+
+(*           (* TODO: currently only generate literals for aggregate structures with size 0 exps *) *)
+(*           | TYPE_Array n t => [] *)
+(*           | TYPE_Vector n t => [] *)
+(*           | TYPE_Struct fields => [] *)
+(*           | TYPE_Packed_struct fields => [] *)
+
+(*           | TYPE_Void              => [failGen "gen_exp_size TYPE_VOID list"] (* No void type expressions *) *)
+(*           | TYPE_Function ret args _ => [failGen "gen_exp_size TYPE_Function list"] (* These shouldn't exist, I think *) *)
+(*           | TYPE_Opaque            => [failGen "gen_exp_size TYPE_Opaque list"] (* TODO: not sure what these should be... *) *)
+(*           | TYPE_Half              => [failGen "gen_exp_size TYPE_Half list" ] *)
+(*           | TYPE_Float             => [gen_fbinop_exp TYPE_Float] *)
+(*           | TYPE_Double            => [(*gen_fbinop_exp TYPE_Double*)failGen "gen_exp_size TYPE_Double list"] *)
+(*           | TYPE_X86_fp80          => [failGen "gen_exp_size TYPE_X86_fp80 list"] *)
+(*           | TYPE_Fp128             => [failGen "gen_exp_size TYPE_Fp128 list"] *)
+(*           | TYPE_Ppc_fp128         => [failGen "gen_exp_size TYPE_Ppc_fp128 list"] *)
+(*           | TYPE_Metadata          => [failGen "gen_exp_size TYPE_Metadata list"] *)
+(*           | TYPE_X86_mmx           => [failGen "gen_exp_size TYPE_X86_mmx list"] *)
+(*           | TYPE_Identified id     => *)
+(*             [ctx <- get_ctx;; *)
+(*              match find_pred (fun '(i,t) => if Ident.eq_dec id i then true else false) ctx with *)
+(*              | None => failGen "gen_exp_size TYPE_Identified list" *)
+(*              | Some (i,t) => gen_exp_size sz t *)
+(*              end] *)
+(*           end *)
+(*       in *)
+(*       annotate_debug ("++++++++GeneExpS: " ++ show t);; *)
+(*       (* short-circuit to size 0 *) *)
+(*       oneOf_LLVM (gen_exp_size 0 t :: gens) *)
+(*     end *)
+(*   with *)
+(*   (* TODO: Make sure we don't divide by 0 *) *)
+(*   gen_ibinop_exp_typ (t : typ) : GenLLVM (exp typ) *)
+(*   := *)
+(*     ibinop <- lift gen_ibinop;; *)
+
+(*     if Handlers.LLVMEvents.DV.iop_is_div ibinop && Handlers.LLVMEvents.DV.iop_is_signed ibinop *)
+(*     then *)
+(*       ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t *)
+(*     else *)
+(*       if Handlers.LLVMEvents.DV.iop_is_div ibinop *)
+(*       then *)
+(*         ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_gt_zero_exp_size 0 t *)
+(*       else *)
+(*         exp_value <- gen_exp_size 0 t;; *)
+(*         if Handlers.LLVMEvents.DV.iop_is_shift ibinop *)
+(*         then *)
+(*           let max_shift_size := *)
+(*             match t with *)
+(*             | TYPE_I i => BinIntDef.Z.of_N (i - 1) *)
+(*             | _ => 0 *)
+(*             end in *)
+(*           x <- lift (choose (0, max_shift_size));; *)
+(*           let exp_value2 : exp typ := EXP_Integer x in *)
+(*           ret (OP_IBinop ibinop t exp_value exp_value2) *)
+(*         else ret (OP_IBinop ibinop t exp_value) <*> gen_exp_size 0 t *)
+(*   with *)
+(*   gen_ibinop_exp (isz : N) : GenLLVM (exp typ) *)
+(*   := *)
+(*     let t := TYPE_I isz in *)
+(*       gen_ibinop_exp_typ t *)
+(*   with *)
+(*   gen_fbinop_exp (ty: typ) : GenLLVM (exp typ) *)
+(*     := *)
+(*       match ty with *)
+(*        | TYPE_Float => fbinop <- lift gen_fbinop;; *)
+(*        if (Handlers.LLVMEvents.DV.fop_is_div fbinop) *)
+(*        then ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_exp_size 0 ty *)
+(*        else ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_exp_size 0 ty *)
+(*        | TYPE_Double => fbinop <- lift gen_fbinop;; *)
+(*        if (Handlers.LLVMEvents.DV.fop_is_div fbinop) *)
+(*        then ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_exp_size 0 ty *)
+(*        else ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_exp_size 0 ty *)
+(*        | _ => failGen "gen_fbinop_exp" *)
+(*       end. *)
 
  Definition gen_exp (t : typ) : GenLLVM (exp typ)
     := sized_LLVM (fun sz => gen_exp_size sz t).
@@ -2224,9 +2388,7 @@ Section InstrGenerators.
     match ptr with
     | (TYPE_Pointer t, pexp) =>
         ctx <- get_ctx;;
-        annotate_debug ("Current context is: " ++ show ctx);;
-        annotate_debug ("------Generate: Store to: " ++ show t);;
-        e <- resize_LLVM 0 (gen_exp t);;
+        e <- hide_local_ctx (gen_exp_size 0 t);;
         let val := (t, e) in
 
         ret (TYPE_Void, INSTR_Store val ptr [ANN_align 1])
@@ -2304,11 +2466,9 @@ Section InstrGenerators.
     match t_instr with
     | (TYPE_Void, instr) =>
         vid <- new_void_id;;
-        annotate_debug ("------Generate: " ++ show instr);;
         ret (vid, instr)
     | (t, instr) =>
         i <- new_raw_id;;
-        annotate_debug ("------Generate: " ++ show instr);;
         match instr with
         | INSTR_Op (OP_Conversion Ptrtoint t_from v t_to) =>
             add_to_ptrtoint_ctx (t_from, ID_Local i, t_to);; (* Register the local variable to ptrtoint_ctx*)
@@ -2370,7 +2530,7 @@ Section InstrGenerators.
          match (typ_to_dtyp ctx t) with
          | DTYPE_Void => ret (TERM_Ret_void, [])
          | _ =>
-           e <- gen_exp_size 0 t;;
+           e <- hide_local_ctx (gen_exp_size 0 t);;
            ret (TERM_Ret (t, e), [])
          end
        | S sz' =>
@@ -2417,7 +2577,6 @@ Section InstrGenerators.
          {struct t} : GenLLVM (block typ * (block typ * list (block typ)))
        :=
          bid <- new_block_id;;
-         annotate_debug ("----Generate: Block: " ++ show bid);;
            code <- gen_code;;
            '(term, bs) <- gen_terminator_sz (sz - 1) t back_blocks;;
            let b := {| blk_id   := bid
@@ -2550,8 +2709,6 @@ Section InstrGenerators.
                          []
       in
 
-      annotate_debug
-        ("--Generate: " ++ show prototype);;
       bs <- gen_blocks ret_t;;
       
       (* Reset context *)
@@ -2586,12 +2743,10 @@ Section InstrGenerators.
     :=
 
     name <- new_global_id;;
-    annotate_debug ("--Generate: Global: " ++ show name);;
     t <- hide_ctx gen_sized_typ_ptrinctx;;
     opt_exp <- fmap Some (hide_ctx (gen_exp_size 0 t));;
     add_to_ctx (ID_Global name, TYPE_Pointer t);;
     ctx <- get_ctx;;
-    annotate_debug ("Context Currently has: " ++ show ctx);;
     let ann_linkage : list (annotation typ) :=
       match opt_exp with
       | None => [ANN_linkage (LINKAGE_External)]
