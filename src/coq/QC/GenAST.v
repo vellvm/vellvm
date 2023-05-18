@@ -532,6 +532,20 @@ Section GenerationState.
        append_to_ctx saved_ctx;;
        ret a.
 
+  Definition hide_local_ctx {A} (g : GenLLVM A) : GenLLVM A
+    :=saved_ctx <- get_ctx;;
+      let ctx_wo_local :=
+        filter
+          (fun '(id, _) =>
+             match id with
+             | ID_Global _ => true
+             | ID_Local _ => false
+             end) saved_ctx in
+      set_ctx ctx_wo_local;;
+      a <- g;;
+      append_to_ctx saved_ctx;;
+      ret a.
+
   Definition hide_ptrtoint_ctx {A} (g: GenLLVM A) : GenLLVM A
     := saved_ctx <- get_ptrtoint_ctx;;
        reset_ptrtoint_ctx;;
@@ -1557,18 +1571,18 @@ Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
 
         (* Generate literals for aggregate structures *)
         | TYPE_Array n t =>
-            es <- (vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t));;
+            es <- hide_local_ctx (vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t));;
             ret (EXP_Array (map (fun e => (t, e)) es))
         | TYPE_Vector n t =>
-            es <- (vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t));;
+            es <- hide_local_ctx (vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t));;
             ret (EXP_Vector (map (fun e => (t, e)) es))
         | TYPE_Struct fields =>
             (* Should we divide size evenly amongst components of struct? *)
-            tes <- map_monad (fun t => e <- (gen_exp_size 0 t);; ret (t, e)) fields;;
+            tes <- map_monad (fun t => e <- hide_local_ctx (gen_exp_size 0 t);; ret (t, e)) fields;;
             ret (EXP_Struct tes)
         | TYPE_Packed_struct fields =>
             (* Should we divide size evenly amongst components of struct? *)
-            tes <- map_monad (fun t => e <- (gen_exp_size 0 t);; ret (t, e)) fields;;
+            tes <- map_monad (fun t => e <- hide_local_ctx (gen_exp_size 0 t);; ret (t, e)) fields;;
             ret (EXP_Packed_struct tes)
 
         | TYPE_Identified id        =>
