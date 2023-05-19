@@ -6206,6 +6206,34 @@ Module InfiniteToFinite.
       auto.
     Qed.
 
+    (* TODO: Need a MemState_refine_prop that takes all of the predicates
+      like write_byte_all_preserved and bundles them in one place
+      between memories. Should use this for these lemmas... *)
+    (* TODO: Confirm and move this *)
+    Definition MemState_refine_prop ms_inf ms_fin :=
+      let ms_fin_lifted := lift_MemState ms_fin in
+      InfMem.MMEP.MemSpec.preserve_allocation_ids ms_inf ms_fin_lifted /\
+        InfMem.MMEP.MemSpec.read_byte_preserved ms_inf ms_fin_lifted /\
+        InfMem.MMEP.MemSpec.write_byte_allowed_all_preserved ms_inf ms_fin_lifted /\
+        InfMem.MMEP.MemSpec.free_byte_allowed_all_preserved ms_inf ms_fin_lifted /\
+        InfMem.MMEP.MemSpec.allocations_preserved ms_inf ms_fin_lifted /\
+        InfMem.MMEP.MemSpec.frame_stack_preserved ms_inf ms_fin_lifted /\
+        InfMem.MMEP.MemSpec.heap_preserved ms_inf ms_fin_lifted.
+
+    (* TODO: move this *)
+    Lemma MemState_refine_MemState_refine_prop :
+      forall ms_inf ms_fin,
+        MemState_refine ms_inf ms_fin ->
+        MemState_refine_prop ms_inf ms_fin.
+    Proof.
+      intros ms_inf ms_fin MSR.
+      red.
+      red in MSR.
+      erewrite lift_MemState_convert_MemState_inverse; eauto.
+      split; [|split; [|split; [|split; [|split; [|split]]]]]; try (red; reflexivity).
+      split; red; reflexivity.
+    Qed.
+
     (* This might be a good idea, but I think I need an A_INF and
        A_FIN... And then probably some relation between those. Still,
        this should make the proofs more modular, which is a plus. *)
@@ -6220,14 +6248,16 @@ Module InfiniteToFinite.
         {res_fin res_inf}
         (A_REF : A_INF -> A_FIN -> Prop)
         (B_REF : B_INF -> B_FIN -> Prop)
-        (MEM_REF : MemState_refine ms_inf ms_fin)
-        (MEM_REF' : MemState_refine ms_inf' ms_fin')
-        (MA: forall ms_inf' ms_fin' a_fin a_inf, ma_fin ms_fin (ret (ms_fin', a_fin)) -> ma_inf ms_inf (ret (ms_inf', a_inf)) /\ A_REF a_inf a_fin /\ MemState_refine ms_inf' ms_fin')
+        (MEM_REF : MemState_refine_prop ms_inf ms_fin)
+        (MEM_REF' : MemState_refine_prop ms_inf' ms_fin')
+        (MA: forall ms_fin' a_fin,
+            ma_fin ms_fin (ret (ms_fin', a_fin)) ->
+            exists a_inf ms_inf', ma_inf ms_inf (ret (ms_inf', a_inf)) /\ A_REF a_inf a_fin /\ MemState_refine_prop ms_inf' ms_fin')
         (K: forall ms_inf ms_fin ms_inf' ms_fin' a_fin a_inf b_fin b_inf,
             A_REF a_inf a_fin ->
             B_REF b_inf b_fin ->
-            MemState_refine ms_inf ms_fin ->
-            MemState_refine ms_inf' ms_fin' ->
+            MemState_refine_prop ms_inf ms_fin ->
+            MemState_refine_prop ms_inf' ms_fin' ->
             mab_fin a_fin ms_fin (ret (ms_fin', b_fin)) ->
             mab_inf a_inf ms_inf (ret (ms_inf', b_inf)))
         (FIN: (a <- ma_fin;;
@@ -6248,32 +6278,112 @@ Module InfiniteToFinite.
                         (lift_OOM (Memory64BitIntptr.MMEP.MemSpec.MemHelpers.generate_undef_bytes t s));;
                     Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_spec_MemPropT t num_elements
                       (concat element_bytes)) m e)).
-    - apply lift_MemState_refine.
-    - apply lift_MemState_refine.
+    - apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
+    - apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
     - (* MA *)
       (* TODO: Factor out lemma about fresh_sid *)
       Lemma fresh_sid_fin_inf :
-        forall (ms_inf ms_inf' : MemoryBigIntptr.MMEP.MMSP.MemState)
+        forall (ms_inf : MemoryBigIntptr.MMEP.MMSP.MemState)
           (ms_fin ms_fin' : Memory64BitIntptr.MMEP.MMSP.MemState) (sid : MemPropT.store_id),
-          MemState_refine ms_inf ms_fin ->
+          MemState_refine_prop ms_inf ms_fin ->
           fresh_sid ms_fin (ret (ms_fin', sid)) ->
-          @fresh_sid (MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) _  ms_inf (ret (ms_inf', sid)) /\ MemState_refine ms_inf' ms_fin'.
+          exists ms_inf',
+            @fresh_sid (MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) _  ms_inf (ret (ms_inf', sid)) /\
+              MemState_refine_prop ms_inf' ms_fin'.
       Proof.
-        intros ms_inf ms_inf' ms_fin ms_fin' sid MSR FRESH.
+        intros ms_inf ms_fin ms_fin' sid MSR FRESH.
         cbn in *.
-        (* MemState_refine here may be tricky... Actually not true, even... Heap / frame could be reordered :| *)
+        red in MSR.
+        exists (lift_MemState ms_fin).
+        cbn.
+        destruct MSR as (?&?&?&?&?&?&?).
+        destruct FRESH as (?&?&?&?&?&?&?&?).
+        split.
+        { split; [|split; [|split; [|split; [|split; [|split; [|split]]]]]]; auto.
+
+          (* TODO: separate into lemma? *)
+          (* lift_MemState does not change which sids are used *)
+          Lemma used_store_id_lift_MemState :
+            forall ms_fin sid,
+              FinMem.MMEP.MemSpec.used_store_id_prop ms_fin sid <->
+                InfMem.MMEP.MemSpec.used_store_id_prop (lift_MemState ms_fin) sid.
+          Proof.
+          Admitted.
+
+          intros USED.
+          apply used_store_id_lift_MemState in USED.
+          apply H6.
+
+          (* TODO: Move this somewhere I can use it for both fin / inf *)
+          Lemma used_store_id_read_byte_preserved_fin :
+            forall ms1 ms2 sid,
+              FinMem.MMEP.MemSpec.read_byte_preserved ms1 ms2 ->
+              FinMem.MMEP.MemSpec.used_store_id_prop ms1 sid <-> FinMem.MMEP.MemSpec.used_store_id_prop ms2 sid.
+          Proof.
+            intros ms1 ms2 sid RBP.
+            split; intros [addr [byte [RB SID]]].
+            - red.
+              exists addr. exists byte.
+              split; auto.
+              apply RBP. auto.
+            - red.
+              exists addr. exists byte.
+              split; auto.
+              apply RBP. auto.
+          Qed.
+
+          (* TODO: Move this somewhere I can use it for both fin / inf *)
+          #[global] Instance fin_read_byte_allowed_all_preserved_symmetric :
+            Symmetric FinMem.MMEP.MemSpec.read_byte_allowed_all_preserved.
+          Proof.
+            intros x y RBA.
+            red; red in RBA.
+            intros ptr. split; intros RA.
+            apply RBA; auto.
+            apply RBA; auto.
+          Qed.
+
+          (* TODO: Move this somewhere I can use it for both fin / inf *)
+          #[global] Instance fin_read_byte_prop_all_preserved_symmetric :
+            Symmetric FinMem.MMEP.MemSpec.read_byte_prop_all_preserved.
+          Proof.
+            red.
+            intros x y RBP.
+            red; red in RBP.
+            intros ptr byte. split; intros RB.
+            apply RBP; auto.
+            apply RBP; auto.
+          Qed.
+
+          (* TODO: Move this somewhere I can use it for both fin / inf *)
+          #[global] Instance fin_read_byte_preserved_symmetric :
+            Symmetric FinMem.MMEP.MemSpec.read_byte_preserved.
+          Proof.
+            red.
+            intros x y H.
+            destruct H.
+            red.
+            split; symmetry; auto.
+          Qed.
+
+          eapply used_store_id_read_byte_preserved_fin; eauto.
+          symmetry; auto.
+        }
       Admitted.
-      intros ms_inf' ms_fin' a_fin a_inf H.
-      admit.
+
+      intros ms_fin' a_fin H.
+      eapply fresh_sid_fin_inf in H; eauto.
+      destruct H.
+      destruct H.
+      exists a_fin. exists x.
+      split; auto.
+      apply H.
+      apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
     - (* K *)
       intros ms_inf ms_fin ms_inf' ms_fin' a_fin a_inf b_fin b_inf H H0 H1 H2 H3.
       subst.
       rename a_fin into sid.
-      eapply MemPropT_fin_inf_bind.
-
-      (* Need a MemState_refine_prop that takes all of the predicates
-      like write_byte_all_preserved and bundles them in one place
-      between memories. Should use this for these lemmas... *)      
+      eapply MemPropT_fin_inf_bind; eauto.
 
     - (* FIN *)
       apply MemPropT_bind_ret_inv in ALLOCA as [s' [a [FRESH REST]]].
