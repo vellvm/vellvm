@@ -53,6 +53,13 @@ Open Scope Z_scope.
 Unset Guard Checking.
 
 Section Helpers.
+  Definition l_is_empty {A : Type} (l : list A) : bool :=
+    match l with
+    | [] => true
+    | _ => false
+    end.
+                                                
+  
   Fixpoint is_sized_type_h (t : typ) : bool
     := match t with
        | TYPE_I sz => true
@@ -541,9 +548,9 @@ Section GenerationState.
              | ID_Global _ => true
              | ID_Local _ => false
              end) saved_ctx in
-      set_ctx ctx_wo_local;;
+      set_ctx ctx_wo_local;; (* -> Not memorizing the newer stuff *)
       a <- g;;
-      append_to_ctx saved_ctx;;
+      set_ctx saved_ctx;;
       ret a.
 
   Definition hide_ptrtoint_ctx {A} (g: GenLLVM A) : GenLLVM A
@@ -650,7 +657,7 @@ Section GenerationState.
   Definition freq_LLVM {A} (gs : list (nat * GenLLVM A)) : GenLLVM A
     :=
     ctx <- get_ctx;;
-    let is_empty := seq.nilp ctx in
+    let is_empty := l_is_empty ctx in
     fst
          (fold_left
             (fun '(gacc, k) '(fk, a) =>
@@ -866,7 +873,7 @@ Section TypGenerators.
               match normalize_type typ_ctx t with
               | TYPE_Array sz _ => N.ltb 0 sz
               | TYPE_Struct l
-              | TYPE_Packed_struct l => negb (seq.nilp l)
+              | TYPE_Packed_struct l => negb (l_is_empty l)
               | _ => false
               end ) ctx.
 
@@ -1543,15 +1550,23 @@ Definition genType: G (string + typ) :=
   sized genTypHelper.
 
 Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
+  ctx <- get_ctx;;
+  let ts := filter_type t ctx in
+  let gen_idents : list (nat * GenLLVM (exp typ)) :=
+    match ts with
+    | [] => []
+    | _ => [(16%nat, fmap (fun '(i,_) => EXP_Ident i) (elems_LLVM ts))]
+    end in
   match sz with
   | 0%nat =>
+      annotate_debug ("++++++++GenExpOT: " ++ show t);;
       ctx <- get_ctx;;
       let ts := filter_type t ctx in
-      let gen_idents :=
-        match ts with
-        | [] => []
-        | _ => [(16%nat, fmap (fun '(i,_) => EXP_Ident i) (elems_LLVM ts))]
-        end in
+      (* let gen_idents := *)
+      (*   match ts with *)
+      (*   | [] => [] *)
+      (*   | _ => [(16%nat, fmap (fun '(i,_) => EXP_Ident i) (elems_LLVM ts))] *)
+      (*   end in *)
       let fix gen_size_0 (t: typ) :=
         match t with
         | TYPE_I n                  =>
@@ -1600,7 +1615,8 @@ Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
         end in
       (* Hack to avoid failing way too much *)
       match t with
-      | TYPE_Pointer t => freq_LLVM ((1%nat, ret EXP_Undef) :: gen_idents)
+      | TYPE_Pointer t => freq_LLVM ((* (1%nat, ret EXP_Undef) :: *) gen_idents)
+                                   
       | _ => freq_LLVM
               ((1%nat, gen_size_0 t) :: gen_idents)
       end
@@ -1960,7 +1976,7 @@ Section InstrGenerators.
     typ_ctx <- get_typ_ctx;;
     ctx <- get_ctx;;
     ret (filter_sized_ptr_typs typ_ctx ctx).
-
+  
   (* Index path without getting into vector *)
   Fixpoint get_index_paths_insertvalue_aux (t_from : typ) (pre_path : DList Z) (ctx : list (ident * typ)) {struct t_from}: bool * DList (typ * DList (Z)) :=
     match t_from with
@@ -1975,7 +1991,7 @@ Section InstrGenerators.
         if has_reach
         then (true, DList_cons (t_from, pre_path) reaches)
         else (false, DList_empty)
-    | TYPE_Pointer t => if seq.nilp (filter_type t_from ctx) then (false, DList_empty) else (true, DList_singleton (t_from, pre_path))
+    | TYPE_Pointer t => if l_is_empty (filter_type t_from ctx) then (false, DList_empty) else (true, DList_singleton (t_from, pre_path))
     | TYPE_Vector _ t =>
         let '(has_subpaths, sub_paths) := get_index_paths_insertvalue_aux t DList_empty ctx in (* Get index path from the first element*)
         if has_subpaths then (true, DList_singleton (t_from, pre_path)) else (false, DList_empty)
@@ -1998,7 +2014,7 @@ Section InstrGenerators.
     | TYPE_Vector _ t => has_paths_insertvalue_aux t ctx
     | TYPE_Struct fields
     | TYPE_Packed_struct fields => fold_left (fun acc x => orb acc (has_paths_insertvalue_aux x ctx)) fields false
-    | TYPE_Pointer _ => seq.nilp (filter (fun '(_, x) => normalized_typ_eq x t_from) ctx)
+    | TYPE_Pointer _ => l_is_empty (filter (fun '(_, x) => normalized_typ_eq x t_from) ctx)
     | _ => true
     end.
 
@@ -2465,9 +2481,11 @@ Section InstrGenerators.
     :=
     match t_instr with
     | (TYPE_Void, instr) =>
+        annotate_debug ("------GenInstr: " ++ show instr);;
         vid <- new_void_id;;
         ret (vid, instr)
     | (t, instr) =>
+        annotate_debug ("------GenInstr: " ++ show instr);;
         i <- new_raw_id;;
         match instr with
         | INSTR_Op (OP_Conversion Ptrtoint t_from v t_to) =>
@@ -2486,6 +2504,9 @@ Section InstrGenerators.
   Definition fix_alloca (iid : instr_id * instr typ) : GenLLVM (list (instr_id * instr typ))
     := match iid with
        | (IId i, INSTR_Alloca t _) =>
+           ctx <- get_ctx;;
+           annotate_debug ("*****Current Context: " ++ show ctx);;
+           annotate_debug ("-----Store to: " ++ show t);;
          t_instr <- gen_store_to (TYPE_Pointer t, EXP_Ident (ID_Local i));;
          instr <- add_id_to_instr t_instr;;
          ret [instr]
@@ -2577,6 +2598,7 @@ Section InstrGenerators.
          {struct t} : GenLLVM (block typ * (block typ * list (block typ)))
        :=
          bid <- new_block_id;;
+         annotate_debug ("----Genblock: " ++ show bid);;
            code <- gen_code;;
            '(term, bs) <- gen_terminator_sz (sz - 1) t back_blocks;;
            let b := {| blk_id   := bid
@@ -2697,10 +2719,10 @@ Section InstrGenerators.
       let args_ctx := map (fun '(i, t) => (ID_Local i, t)) args in
       append_to_ctx args_ctx;;
 
-
-
       let args_t := map snd args in
       let f_type := TYPE_Function ret_t args_t false in
+      annotate_debug ("--Generate: @" ++ show name ++ " " ++ show f_type);;
+      
       let param_attr_slots := map (fun t => []) args in
       let prototype :=
           mk_declaration name f_type
@@ -2744,6 +2766,7 @@ Section InstrGenerators.
 
     name <- new_global_id;;
     t <- hide_ctx gen_sized_typ_ptrinctx;;
+    annotate_debug ("--Generate: Global: @" ++ show name ++ " " ++ show t);;
     opt_exp <- fmap Some (hide_ctx (gen_exp_size 0 t));;
     add_to_ctx (ID_Global name, TYPE_Pointer t);;
     ctx <- get_ctx;;
