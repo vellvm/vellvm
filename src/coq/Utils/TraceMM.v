@@ -208,18 +208,6 @@ Module Simple.
 
     Definition can_do := fun h a => valid_history h /\ can_do_step h a.
 
-    Lemma handler_prop_valid : valid can_do.
-    Proof.
-      constructor.
-      (* - intros * SITE; split; intros CAN. *)
-      (*   + destruct a, a'; try now constructor.  *)
-      (*     * cbn in CAN. *)
-      (*       inv CAN. *)
-      (*       constructor. *)
-      (*       dependent destruction CAN. *)
-      (*       cbn in x. *)
-    Admitted.
-
   End WithDom.
 
 End Simple.

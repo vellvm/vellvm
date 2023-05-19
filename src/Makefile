@@ -45,7 +45,6 @@ COQFILESTHEORY := Syntax/ScopeTheory\
 		Theory/StatePredicates\
 		Theory/Refinement Theory/InterpreterMCFG Theory/InterpreterCFG\
 		Theory/ExpLemmas Theory/InstrLemmas Theory/DenotationTheory\
-		Theory/LocalFrame\
 		Theory/TopLevelRefinements Theory/SymbolicInterpreter\
 		Utils/NoEvent Utils/Commutation\
 		Theory
