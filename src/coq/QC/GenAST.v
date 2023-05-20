@@ -2618,69 +2618,66 @@ Section InstrGenerators.
            (back_blocks : list block_id) (* Blocks that I'm allowed to jump back to *)
            {struct t} : GenLLVM (terminator typ * list (block typ))
     :=
-    (* GC: Temporary fix for get_ctx. Will modify later to not have three lines everytime *)
     ctx <- get_ctx;;
-      match sz with
-       | 0%nat =>
-         (* Only returns allowed *)
-         match (typ_to_dtyp ctx t) with
-         | DTYPE_Void => ret (TERM_Ret_void, [])
-         | _ =>
-           e <- gen_exp_size 0 t FULL_CTX;;
-           ret (TERM_Ret (t, e), [])
-         end
-       | S sz' =>
-         (* Need to lift oneOf to GenLLVM ...*)
-         freq_LLVM_thunked
-           ([ (6%nat, fun _ => gen_terminator_sz 0 t back_blocks)
-           (* Simple jump *)
-           ; (min sz' 6%nat, fun _ => '(b, (bh, bs)) <- gen_blocks_sz sz' t back_blocks;; ret (TERM_Br_1 (blk_id b), (bh::bs)))
-           (* Conditional branch, with no backloops *)
-           ; (min sz' 6%nat,
-               fun _ =>
-                 c <- gen_exp_size 0 (TYPE_I 1);;
+    match sz with
+    | 0%nat =>
+        (* Only returns allowed *)
+        match (typ_to_dtyp ctx t) with
+        | DTYPE_Void => ret (TERM_Ret_void, [])
+        | _ =>
+            e <- gen_exp_size 0 t FULL_CTX;;
+            ret (TERM_Ret (t, e), [])
+        end
+    | S sz' =>
+            (* Need to lift oneOf to GenLLVM ...*)
+        freq_LLVM_thunked
+          ([ (6%nat, fun _ => gen_terminator_sz 0 t back_blocks)
+               (* Simple jump *)
+             ; (min sz' 6%nat, fun _ => '(b, (bh, bs)) <- gen_blocks_sz sz' t back_blocks;; ret (TERM_Br_1 (blk_id b), (bh::bs)))
+                 (* Conditional branch, with no backloops *)
+             ; (min sz' 6%nat,
+                 fun _ =>
+                   c <- gen_exp_size 0 (TYPE_I 1) FULL_CTX;;
 
-                 (* Generate first branch *)
-                 (* We backtrack contexts so blocks in second branch
-                      don't refer to variables from the first
-                      branch. *)
-                 '(b1, (bh1, bs1)) <- backtrack_variable_ctxs (gen_blocks_sz (sz / 2) t back_blocks);;
+                   (* Generate first branch *)
+                   (* We backtrack contexts so blocks in second branch *)
+                   (* don't refer to variables from the first *)
+                   (* branch. *)
+                   '(b1, (bh1, bs1)) <- backtrack_variable_ctxs (gen_blocks_sz (sz / 2) t back_blocks);;
+                   '(b2, (bh2, bs2)) <- gen_blocks_sz (sz / 2) t back_blocks;;
 
-                 '(b2, (bh2, bs2)) <- gen_blocks_sz (sz / 2) t back_blocks;;
-
-                 ret (TERM_Br (TYPE_I 1, c) (blk_id b1) (blk_id b2), ((bh1::bs1) ++ (bh2::bs2))%list))
-            (* Sometimes generate a loop *)
-            ; (min sz' 6%nat,
-                fun _ =>
-                  '(t, (b, bs)) <- gen_loop_sz sz' t back_blocks 10;; (* TODO: Should I replace sz with sz' here*)
-                  ret (t, (b :: bs)))
-           ]
-              ++
-              (* Loop back sometimes *)
-              match back_blocks with
-              | (b::bs) =>
-                  [(min sz' 1%nat,
-                     fun _ =>
-                       bid <- lift_GenLLVM (elems_ b back_blocks);;
-                       ret (TERM_Br_1 bid, []))]
-              | nil => []
-              end)
-       end
+                   ret (TERM_Br (TYPE_I 1, c) (blk_id b1) (blk_id b2), ((bh1::bs1) ++ (bh2::bs2))%list))
+                 (* Sometimes generate a loop *)
+             ; (min sz' 6%nat,
+                 fun _ =>
+                   '(t, (b, bs)) <- gen_loop_sz sz' t back_blocks 10;; (* TODO: Should I replace sz with sz' here*)
+                   ret (t, (b :: bs)))
+            ]
+             ++
+             (* Loop back sometimes *)
+             match back_blocks with
+             | (b::bs) =>
+                 [(min sz' 1%nat,
+                    fun _ =>
+                      bid <- lift_GenLLVM (elems_ b back_blocks);;
+                      ret (TERM_Br_1 bid, []))]
+             | nil => []
+             end)
+    end
   with gen_blocks_sz
          (sz : nat)
          (t : typ) (* Return type *)
          (back_blocks : list block_id) (* Blocks that I'm allowed to jump back to *)
          {struct t} : GenLLVM (block typ * (block typ * list (block typ)))
-       :=
-         bid <- new_block_id : GenLLVM block_id;;
+       := bid <- new_block_id;;
          annotate_debug ("----Genblock: " ++ show bid);;
          code <- gen_code;;
          '(term, bs) <- gen_terminator_sz (sz - 1) t back_blocks;;
          let b := {| blk_id   := bid
-                  ; blk_phis := []
-                  ; blk_code := code
-                  ; blk_term := term
-                  ; blk_comments := None
+                  ;  blk_phis := []
+                  ;  blk_code := code
+                  ;  blk_term := term
+                  ;  blk_comments := None
                   |} in
          ret (b, (b, bs))
   with gen_loop_sz
