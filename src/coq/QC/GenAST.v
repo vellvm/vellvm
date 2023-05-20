@@ -336,6 +336,11 @@ Section GenerationState.
   Definition get_global_ctx : GenLLVM var_context
     := gets (fun gs => gs.(gen_global_ctx)).
 
+  Definition get_ctx : GenLLVM var_context
+    := lctx <- get_local_ctx;;
+       gctx <- get_global_ctx;;
+       ret (lctx ++ gctx).
+
   Definition get_typ_ctx : GenLLVM type_context
     := gets (fun gs => gs.(gen_typ_ctx)).
 
@@ -716,9 +721,7 @@ Section GenerationState.
 
   Definition freq_LLVM {A} (gs : list (nat * GenLLVM A)) : GenLLVM A
     :=
-    local_ctx <- get_local_ctx;;
-    global_ctx <- get_global_ctx;;
-    let ctx := local_ctx ++ global_ctx in
+    ctx <- get_ctx;;
     let is_empty := l_is_empty ctx in
     fst
          (fold_left
@@ -1008,9 +1011,7 @@ Section TypGenerators.
     match sz with
     | O => gen_sized_typ_0
     | (S sz') =>
-        local_ctx <- get_local_ctx;;
-        global_ctx <- get_global_ctx;;
-        let ctx := local_ctx ++ global_ctx in
+        ctx <- get_ctx;;
         aliases <- get_typ_ctx;;
         let typs_in_ctx := filter_sized_typs aliases ctx in
         freq_LLVM_thunked_N
@@ -1038,9 +1039,7 @@ Section TypGenerators.
     match sz with
     | 0%nat => gen_sized_typ_0
     | (S sz') =>
-        local_ctx <- get_local_ctx;;
-        global_ctx <- get_global_ctx;;
-        let ctx := local_ctx ++ global_ctx in
+        ctx <- get_ctx;;
         aliases <- get_typ_ctx;;
         let typs_in_ctx := filter_sized_typs aliases ctx in
         freq_LLVM_thunked_N
@@ -1098,9 +1097,7 @@ Section TypGenerators.
     match sz with
     | 0%nat => gen_typ_0
     | (S sz') =>
-        local_ctx <- get_local_ctx;;
-        global_ctx <- get_global_ctx;;
-        let ctx := local_ctx ++ global_ctx in
+        ctx <- get_ctx;;
         (* not filter sized types for this one *)
         freq_LLVM_thunked_N
         ([(N.min (lengthN ctx) 10, (fun _ => gen_typ_from_ctx ctx))] ++
@@ -1159,9 +1156,7 @@ Section TypGenerators.
     | 0%nat => gen_typ_non_void_0
     | (S sz') =>
         typ_ctx <- get_typ_ctx;;
-        local_ctx <- get_local_ctx;;
-        global_ctx <- get_global_ctx;;
-        let ctx := local_ctx ++ global_ctx in
+        ctx <- get_ctx;;
         let ctx := filter_non_void_typs typ_ctx ctx in
         freq_LLVM_thunked_N
         ([(N.min (lengthN ctx) 10, fun _ => gen_typ_from_ctx ctx)] ++
@@ -1181,9 +1176,7 @@ Section TypGenerators.
   match sz with
   | 0%nat => gen_typ_non_void_0
   | (S sz') =>
-      local_ctx <- get_local_ctx;;
-      global_ctx <- get_global_ctx;;
-      let ctx := local_ctx ++ global_ctx in
+      ctx <- get_ctx;;
       aliases <- get_typ_ctx;;
       let ctx := filter_sized_typs aliases ctx in
       freq_LLVM_thunked_N
@@ -1638,8 +1631,7 @@ Fixpoint gen_exp_size (sz : nat) (t : typ) (es : exp_source) {struct t} : GenLLV
                    end in
   ctx <- (if andb (sz =? 0)%nat (only_global_ctx)
          then get_global_ctx
-         else local_ctx <- get_local_ctx;; ret (local_ctx ++ global_ctx));;
-  (* let ctx := local_ctx ++ global_ctx in *)
+         else get_ctx);;
   match sz with
   | 0%nat =>
       annotate_debug ("++++++++GenExpOT: " ++ show t);;
@@ -2050,16 +2042,12 @@ Section InstrGenerators.
 
   Definition get_ctx_ptrs  : GenLLVM (list (ident * typ)) :=
     typ_ctx <- get_typ_ctx;;
-    local_ctx <- get_local_ctx;;
-    global_ctx <- get_global_ctx;;
-    let ctx := local_ctx ++ global_ctx in
+    ctx <- get_ctx;;
     ret (filter_ptr_typs typ_ctx ctx).
 
   Definition get_ctx_sized_ptrs  : GenLLVM (list (ident * typ)) :=
     typ_ctx <- get_typ_ctx;;
-    local_ctx <- get_local_ctx;;
-    global_ctx <- get_global_ctx;;
-    let ctx := local_ctx ++ global_ctx in
+    ctx <- get_ctx;;
     ret (filter_sized_ptr_typs typ_ctx ctx).
   
   (* Index path without getting into vector *)
@@ -2124,9 +2112,7 @@ Section InstrGenerators.
 
   Definition get_ctx_agg_typs : GenLLVM (list (ident * typ)) :=
     typ_ctx <- get_typ_ctx;;
-    local_ctx <- get_local_ctx;;
-    global_ctx <- get_global_ctx;;
-    let ctx := local_ctx ++ global_ctx in
+    ctx <- get_ctx;;
     ret (filter_agg_typs typ_ctx ctx).
 
   Definition get_ctx_agg_typ : GenLLVM (ident * typ) :=
@@ -2135,9 +2121,7 @@ Section InstrGenerators.
 
   Definition get_ctx_vec_typs : GenLLVM (list (ident * typ)) :=
     typ_ctx <- get_typ_ctx;;
-    local_ctx <- get_local_ctx;;
-    global_ctx <- get_global_ctx;;
-    let ctx := local_ctx ++ global_ctx in
+    ctx <- get_ctx;;
     ret (filter_vec_typs typ_ctx ctx).
 
   Definition get_ctx_vec_typ : GenLLVM (ident * typ) :=
@@ -2165,9 +2149,7 @@ Section InstrGenerators.
 
   Definition gen_insertvalue (tagg: typ): GenLLVM (typ * instr typ) :=
     eagg <- gen_exp_size 0 tagg FULL_CTX;;
-    local_ctx <- get_local_ctx;;
-    global_ctx <- get_global_ctx;;
-    let ctx := local_ctx ++ global_ctx in
+    ctx <- get_ctx;;
     let paths_in_agg := get_index_paths_insertvalue tagg ctx in
     '(tsub, path_for_insertvalue) <- elems_LLVM paths_in_agg;;
     (* GC: THIS IS FALSE and will cause trouble because maybe the type we want is not in the context!!! NEED TO CHANGE TO SOMETHING ELSE*)
@@ -2264,9 +2246,7 @@ Section InstrGenerators.
   pointer, vector, array, struct, packed struct
   Aggregate structures used the types above. *)
   Fixpoint gen_typ_le_size (max_byte_sz : N) : GenLLVM typ :=
-    local_ctx <- get_local_ctx;;
-    global_ctx <- get_global_ctx;;
-    let ctx := local_ctx ++ global_ctx in
+    ctx <- get_ctx;;
     oneOf_LLVM
       ( (* Primitive types *)
         get_prim_typ_le_size max_byte_sz ++
@@ -2408,9 +2388,7 @@ Section InstrGenerators.
     end.
 
   Definition gen_bitcast : GenLLVM (typ * instr typ) :=
-    local_ctx <- get_local_ctx;;
-    global_ctx <- get_global_ctx;;
-    let ctx := local_ctx ++ global_ctx in
+    ctx <- get_ctx;;
     let first_class_typs_in_ctx := filter_first_class_typs ctx in
     trivial_typ <- oneOf_LLVM [ret (TYPE_I 1); ret (TYPE_I 8); ret (TYPE_I 32); ret (TYPE_I 64); ret (TYPE_Float); ret (TYPE_Double); ret TYPE_Vector <*> lift_GenLLVM genN <*> gen_typ_non_void_0];;
     let gen_first_class_typs := (ret trivial_typ)::(map (fun '(_, t) => ret t) first_class_typs_in_ctx) in
@@ -2499,9 +2477,7 @@ Section InstrGenerators.
     :=
     match ptr with
     | (TYPE_Pointer t, pexp) =>
-        local_ctx <- get_local_ctx;;
-        global_ctx <- get_global_ctx;;
-        let ctx := local_ctx ++ global_ctx in
+        ctx <- get_ctx;;
         e <- (gen_exp_size 0 t FULL_CTX);;
         let val := (t, e) in
 
@@ -2532,9 +2508,7 @@ Section InstrGenerators.
    *)
   Definition gen_instr : GenLLVM (typ * instr typ) :=
     typ_ctx <- get_typ_ctx;;
-    local_ctx <- get_local_ctx;;
-    global_ctx <- get_global_ctx;;
-    let ctx := local_ctx ++ global_ctx in
+    ctx <- get_ctx;;
     ptrtoint_ctx <- get_ptrtoint_ctx;;
     let agg_typs_in_ctx := filter_agg_typs typ_ctx ctx in
     let ptr_vecptr_in_ctx := filter_sized_ptr_vecptr_typs typ_ctx ctx in
@@ -2604,9 +2578,7 @@ Section InstrGenerators.
   Definition fix_alloca (iid : instr_id * instr typ) : GenLLVM (list (instr_id * instr typ))
     := match iid with
        | (IId i, INSTR_Alloca t _) =>
-           local_ctx <- get_local_ctx;;
-           global_ctx <- get_global_ctx;;
-           let ctx := local_ctx ++ global_ctx in
+           ctx <- get_ctx;;
            annotate_debug ("*****Current Context: " ++ show ctx);;
            annotate_debug ("-----Store to: " ++ show t);;
          t_instr <- gen_store_to (TYPE_Pointer t, EXP_Ident (ID_Local i));;
@@ -2647,9 +2619,7 @@ Section InstrGenerators.
            {struct t} : GenLLVM (terminator typ * list (block typ))
     :=
     (* GC: Temporary fix for get_ctx. Will modify later to not have three lines everytime *)
-    local_ctx <- get_local_ctx;;
-    global_ctx <- get_global_ctx;;
-    let ctx := local_ctx ++ global_ctx in
+    ctx <- get_ctx;;
       match sz with
        | 0%nat =>
          (* Only returns allowed *)
@@ -2702,8 +2672,8 @@ Section InstrGenerators.
          (back_blocks : list block_id) (* Blocks that I'm allowed to jump back to *)
          {struct t} : GenLLVM (block typ * (block typ * list (block typ)))
        :=
-         bid <- new_block_id;;
-         annotate_debug ("----Genblock: " ++ show bid);; (* <- Where the error is.*)
+         bid <- new_block_id : GenLLVM block_id;;
+         annotate_debug ("----Genblock: " ++ show bid);;
          code <- gen_code;;
          '(term, bs) <- gen_terminator_sz (sz - 1) t back_blocks;;
          let b := {| blk_id   := bid
