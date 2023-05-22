@@ -1035,31 +1035,42 @@ Section TypGenerators.
   Definition gen_sized_typ : GenLLVM typ
     := sized_LLVM (fun sz => gen_sized_typ_size sz).
 
- Program Fixpoint gen_sized_typ_size_ptrinctx (sz : nat) {measure sz} : GenLLVM typ :=
+ Program Fixpoint gen_sized_typ_size_ptrinctx (sz : nat) (typs_in_ctx : var_context)  {measure sz} : GenLLVM typ :=
     match sz with
     | 0%nat => gen_sized_typ_0
     | (S sz') =>
-        ctx <- get_ctx;;
-        aliases <- get_typ_ctx;;
-        let typs_in_ctx := filter_sized_typs aliases ctx in
+        (* ctx <- get_ctx;; *)
+        (* aliases <- get_typ_ctx;; *)
+        (* let typs_in_ctx := filter_sized_typs aliases ctx in *)
         freq_LLVM_thunked_N
         ([(N.min (lengthN typs_in_ctx) 10, (fun _ => gen_typ_from_ctx typs_in_ctx))] ++
         [(1%N, (fun _ => gen_sized_typ_0))
         (* TODO: Might want to restrict the size to something reasonable *)
-        ; (1%N, (fun _ => ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size_ptrinctx sz'))
-        ; (1%N, (fun _ => ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_sized_typ_size_ptrinctx 0))
+        ; (1%N, (fun _ => ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size_ptrinctx sz' typs_in_ctx))
+        ; (1%N, (fun _ => ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_sized_typ_size_ptrinctx 0 typs_in_ctx))
         (* TODO: I don't think functions are sized types? *)
         (* ; let n := Nat.div sz 2 in *)
         (*   ret TYPE_Function <*> gen_sized_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) *)
-        ; (1%N, (fun _ => ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size_ptrinctx sz')))
-        ; (1%N, (fun _ => ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size_ptrinctx sz')))])
+        ; (1%N, (fun _ => ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size_ptrinctx sz' typs_in_ctx)))
+        ; (1%N, (fun _ => ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size_ptrinctx sz' typs_in_ctx)))])
     end.
   Next Obligation.
   lia.
   Defined.
 
-  Definition gen_sized_typ_ptrinctx : GenLLVM typ
-    := sized_LLVM (fun sz => gen_sized_typ_size_ptrinctx sz).
+  Definition gen_sized_typ_ptrin_fctx : GenLLVM typ
+    :=
+    ctx <- get_ctx;;
+    aliases <- get_typ_ctx;;
+    let typs_in_ctx := filter_sized_typs aliases ctx in
+    sized_LLVM (fun sz => gen_sized_typ_size_ptrinctx sz typs_in_ctx).
+
+  Definition gen_sized_typ_ptrin_gctx : GenLLVM typ
+    :=
+    gctx <- get_global_ctx;;
+    aliases <- get_typ_ctx;;
+    let typs_in_ctx := filter_sized_typs aliases gctx in
+    sized_LLVM (fun sz => gen_sized_typ_size_ptrinctx sz typs_in_ctx).
 
   (* Generate a type of size 0 *)
   Definition gen_typ_0 : GenLLVM typ :=
@@ -2157,7 +2168,6 @@ Section InstrGenerators.
     (* Generate all of the type*)
     ret (tagg, INSTR_Op (OP_InsertValue (tagg, eagg) (tsub, esub) path_for_insertvalue)).
 
-
   (* ExtractElement *)
   Definition gen_extractelement (tvec : typ): GenLLVM (typ * instr typ) :=
     evec <- gen_exp_size 0 tvec FULL_CTX;;
@@ -2522,7 +2532,7 @@ Section InstrGenerators.
       ret (snd var) in
     oneOf_LLVM
       ([ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
-         ; t <- gen_sized_typ_ptrinctx;;
+         ; t <- gen_sized_typ_ptrin_gctx;;
            (* TODO: generate multiple element allocas. Will involve changing initialization *)
            (* num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *) *)
            (* align <- ret None;; *)
@@ -2776,7 +2786,6 @@ Section InstrGenerators.
        end.
   (* Don't want to generate CFGs, actually. Want to generated TLEs *)
 
-Search "ctx".
   Definition gen_definition (name : global_id) (ret_t : typ) (args : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
     ctxs <- get_variable_ctxs;;
@@ -2817,8 +2826,8 @@ Search "ctx".
 
   Definition gen_helper_function: GenLLVM (definition typ (block typ * list (block typ)))
     :=
-    ret_t <- hide_ctx gen_sized_typ_ptrinctx;;
-    args  <- listOf_LLVM (hide_ctx gen_sized_typ_ptrinctx);;
+    ret_t <- hide_ctx gen_sized_typ_ptrin_fctx;;
+    args  <- listOf_LLVM (hide_ctx gen_sized_typ_ptrin_fctx);;
     gen_new_definition ret_t args.
 
   Definition gen_helper_function_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
@@ -2837,7 +2846,7 @@ Search "ctx".
     :=
 
     name <- new_global_id;;
-    t <- hide_ctx gen_sized_typ_ptrinctx;;
+    t <- hide_ctx gen_sized_typ_ptrin_fctx;;
     annotate_debug ("--Generate: Global: @" ++ show name ++ " " ++ show t);;
     opt_exp <- fmap Some (hide_ctx (gen_exp_size 0 t FULL_CTX));;
     add_to_global_ctx (ID_Global name, TYPE_Pointer t);;
