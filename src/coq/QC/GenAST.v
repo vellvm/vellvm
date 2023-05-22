@@ -2776,7 +2776,7 @@ Section InstrGenerators.
        end.
   (* Don't want to generate CFGs, actually. Want to generated TLEs *)
 
-
+Search "ctx".
   Definition gen_definition (name : global_id) (ret_t : typ) (args : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
     ctxs <- get_variable_ctxs;;
@@ -2789,7 +2789,7 @@ Section InstrGenerators.
                   ret (i, t))
                args;;
       let args_ctx := map (fun '(i, t) => (ID_Local i, t)) args in
-      append_to_ctx args_ctx;;
+      append_to_local_ctx args_ctx;;
 
       let args_t := map snd args in
       let f_type := TYPE_Function ret_t args_t false in
@@ -2806,8 +2806,8 @@ Section InstrGenerators.
       bs <- gen_blocks ret_t;;
       
       (* Reset context *)
-      let '(ctx, ptoi_ctx) := ctxs in
-      restore_variable_ctxs ((ID_Global name, TYPE_Pointer f_type)::ctx, ptoi_ctx);;
+      let '(lctx, gctx, ptoi_ctx) := ctxs in
+      restore_variable_ctxs (lctx, (ID_Global name, TYPE_Pointer f_type)::gctx, ptoi_ctx);;
       ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs).
 
   Definition gen_new_definition (ret_t : typ) (args : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
@@ -2839,8 +2839,8 @@ Section InstrGenerators.
     name <- new_global_id;;
     t <- hide_ctx gen_sized_typ_ptrinctx;;
     annotate_debug ("--Generate: Global: @" ++ show name ++ " " ++ show t);;
-    opt_exp <- fmap Some (hide_ctx (gen_exp_size 0 t));;
-    add_to_ctx (ID_Global name, TYPE_Pointer t);;
+    opt_exp <- fmap Some (hide_ctx (gen_exp_size 0 t FULL_CTX));;
+    add_to_global_ctx (ID_Global name, TYPE_Pointer t);;
     ctx <- get_ctx;;
     let ann_linkage : list (annotation typ) :=
       match opt_exp with
