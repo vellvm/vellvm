@@ -6496,6 +6496,7 @@ Module InfiniteToFinite.
     Qed.
 
     (* This might be a good idea, should make the proofs more modular... *)
+    (* TODO: Move this *)
     Lemma MemPropT_fin_inf_bind :
       forall {ms_inf ms_inf' : MemoryBigIntptr.MMEP.MMSP.MemState}
         {ms_fin ms_fin' : Memory64BitIntptr.MMEP.MMSP.MemState}
@@ -6560,6 +6561,8 @@ Module InfiniteToFinite.
                       (concat element_bytes)) m e)).
     - apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
     - apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
+    - (* B *)
+      eauto.
     - (* MA *)
       (* TODO: Factor out lemma about fresh_sid *)
       Lemma fresh_sid_fin_inf :
@@ -6765,21 +6768,234 @@ Module InfiniteToFinite.
       apply H.
       apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
     - (* K *)
-      intros ms_inf ms_fin ms_inf' ms_fin' a_fin a_inf b_fin b_inf H H0 H1 H2 H3.
-      subst.
-      rename a_fin into sid.
-      eapply MemPropT_fin_inf_bind; eauto.
+      intros ms_inf ms_fin ms_inf' ms_fin' sid_fin sid_inf b_fin b_inf H H0 H1 H2 H3.
 
+      (*
+      apply MemPropT_bind_ret_inv in ALLOCA.
+      destruct ALLOCA as (ms'&sid'&FRESH&ALLOCA).
+
+      apply MemPropT_bind_ret_inv in ALLOCA.
+      destruct ALLOCA as (ms''&byte_blocks&UNDEF&ALLOCA).
+       *)
+
+      subst.
+      eapply MemPropT_fin_inf_bind with
+        (A_REF:=Forall2 (Forall2 sbyte_refine))
+        (B_REF:=fun a_inf a_fin => InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin)
+        (ma_fin:=repeatMN num_elements
+          (lift_OOM (Memory64BitIntptr.MMEP.MemSpec.MemHelpers.generate_undef_bytes t sid_fin))); eauto.
       + (* Undef Bytes *)
-        admit.
+        intros ms_fin'0 bytes_blocks_fin H.
+
+        (* TODO: Move this / put it somewhere I get it for fin / inf *)
+        Lemma generate_num_undef_bytes_h_succ_inv :
+          forall sz start_ix t sid bytes_fin,
+            Memory64BitIntptr.MMEP.MemSpec.MemHelpers.generate_num_undef_bytes_h start_ix (N.succ sz) t sid = NoOom bytes_fin ->
+            exists byte bytes_fin',
+              Memory64BitIntptr.MMEP.MemSpec.MemHelpers.generate_num_undef_bytes_h (N.succ start_ix) sz t sid = NoOom bytes_fin' /\
+                (x' <- IP.from_Z (Z.of_N start_ix);;
+                 ret (uvalue_sbyte (UVALUE_Undef t) t (UVALUE_IPTR x') sid)) = NoOom byte /\
+                bytes_fin = byte :: bytes_fin'.
+        Proof.
+          induction sz using N.peano_rect; intros start_ix t sid bytes_fin GEN.
+          unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.generate_num_undef_bytes_h in *.
+          - cbn in *.
+            break_match_hyp; inv GEN.
+            do 2 eexists.
+            split; eauto.
+          - unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.generate_num_undef_bytes_h in GEN.
+
+            pose proof @N.recursion_succ (N -> OOM (list SByte)) eq (fun _ : N => ret [])
+              (fun (_ : N) (mf : N -> OOM (list SByte)) (x : N) =>
+                 rest_bytes <- mf (N.succ x);;
+                 x' <- IP.from_Z (Z.of_N x);;
+                 ret (uvalue_sbyte (UVALUE_Undef t) t (UVALUE_IPTR x') sid :: rest_bytes))
+              eq_refl.
+            forward H.
+            { unfold Proper, respectful.
+              intros x y H0 x0 y0 H1; subst.
+              reflexivity.
+            }
+            specialize (H (N.succ sz)).
+            rewrite H in GEN.
+            clear H.
+
+            cbn in *.
+            break_match_hyp; inv GEN.
+            break_match_hyp; inv H0.
+
+            specialize (IHsz (N.succ start_ix) t sid l Heqo).
+            destruct IHsz as (byte&bytes_fin'&GEN'&BYTE&BYTES).
+            break_match_hyp; inv BYTE.
+
+            eexists.
+            eexists.
+            split; eauto.
+        Qed.
+
+        (* TODO: Move this / put it somewhere I get it for fin / inf (get rid of this version) *)
+        Lemma generate_num_undef_bytes_h_succ_inv_inf :
+          forall sz start_ix t sid bytes_inf,
+            MemoryBigIntptr.MMEP.MemSpec.MemHelpers.generate_num_undef_bytes_h start_ix (N.succ sz) t sid = NoOom bytes_inf ->
+            exists byte bytes_inf',
+              MemoryBigIntptr.MMEP.MemSpec.MemHelpers.generate_num_undef_bytes_h (N.succ start_ix) sz t sid = NoOom bytes_inf' /\
+                (x' <- InfLP.IP.from_Z (Z.of_N start_ix);;
+                 ret (MemoryBigIntptr.Byte.uvalue_sbyte (LLVMParamsBigIntptr.Events.DV.UVALUE_Undef t) t (LLVMParamsBigIntptr.Events.DV.UVALUE_IPTR x') sid)) = NoOom byte /\
+                bytes_inf = byte :: bytes_inf'.
+        Proof.
+          induction sz using N.peano_rect; intros start_ix t sid bytes_fin GEN.
+          unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.generate_num_undef_bytes_h in *.
+          - cbn in *.
+            inv GEN.
+            do 2 eexists.
+            split; eauto.
+          - unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.generate_num_undef_bytes_h in GEN.
+
+            pose proof @N.recursion_succ (N -> OOM (list InfMem.MP.BYTE_IMPL.SByte)) eq (fun _ : N => ret [])
+              (fun (_ : N) (mf : N -> OOM (list InfMem.MP.BYTE_IMPL.SByte)) (x : N) =>
+                 rest_bytes <- mf (N.succ x);;
+                 x' <- InfLP.IP.from_Z (Z.of_N x);;
+                 ret (MemoryBigIntptr.Byte.uvalue_sbyte (LLVMParamsBigIntptr.Events.DV.UVALUE_Undef t) t (LLVMParamsBigIntptr.Events.DV.UVALUE_IPTR x') sid :: rest_bytes))
+              eq_refl.
+            forward H.
+            { unfold Proper, respectful.
+              intros x y H0 x0 y0 H1; subst.
+              reflexivity.
+            }
+            specialize (H (N.succ sz)).
+            unfold MemoryBigIntptr.MMEP.MemSpec.MemHelpers.generate_num_undef_bytes_h in GEN.
+            rewrite H in GEN.
+            clear H.
+
+            cbn in *.
+            break_match_hyp; inv GEN.
+
+            specialize (IHsz (N.succ start_ix) t sid l Heqo).
+            destruct IHsz as (byte&bytes_fin'&GEN'&BYTE&BYTES).
+            inv BYTE.
+
+            eexists.
+            eexists.
+            split; eauto.
+        Qed.
+
+        (* TODO: Move this *)
+        Lemma generate_num_undef_bytes_h_fin_inf :
+          forall sz start_ix t sid bytes_fin,
+            Memory64BitIntptr.MMEP.MemSpec.MemHelpers.generate_num_undef_bytes_h start_ix sz t sid = NoOom bytes_fin ->
+            exists bytes_inf,
+              MemoryBigIntptr.MMEP.MemSpec.MemHelpers.generate_num_undef_bytes_h start_ix sz t sid = NoOom bytes_inf /\
+                sbytes_refine bytes_inf bytes_fin.
+        Proof.
+          induction sz using N.peano_ind; intros start_ix t sid bytes_fin GEN.
+          - cbn in *. inv GEN.
+            exists [].
+            split; auto.
+            red.
+            auto.
+          - cbn in GEN.
+            pose proof GEN as GEN'.
+            apply generate_num_undef_bytes_h_succ_inv in GEN'.
+            destruct GEN' as (byte&bytes_fin'&GEN'&BYTE&BYTES).
+            subst.
+            cbn in *.
+            break_match_hyp; inv BYTE.
+
+            specialize (IHsz _ t sid bytes_fin' GEN') as (bytes_inf&GEN_INF&BYTES_REF).
+            exists (MemoryBigIntptr.Byte.uvalue_sbyte (LLVMParamsBigIntptr.Events.DV.UVALUE_Undef t) t (LLVMParamsBigIntptr.Events.DV.UVALUE_IPTR (Z.of_N start_ix)) sid :: bytes_inf).
+            split.
+            + setoid_rewrite MemoryBigIntptrInfiniteSpecHelpers.generate_num_undef_bytes_h_cons.
+              cbn.
+              setoid_rewrite GEN_INF.
+              reflexivity.
+              eauto.
+            + red.
+              eapply Forall2_cons; eauto.
+              red.
+              unfold convert_SByte.
+              break_match_goal.
+              unfold MemoryBigIntptr.Byte.uvalue_sbyte in *.
+              inv Heqs.
+              cbn in *.
+              repeat rewrite DVC1.uvalue_convert_strict_equation.
+              cbn.
+              unfold InterpreterStackBigIntptr.LP.IP.to_Z.
+              rewrite Heqo.
+              reflexivity.
+        Qed.
+
+        (* TODO: Move this *)
+        Lemma generate_undef_bytes_fin_inf :
+          forall {t sid bytes_fin},
+            Memory64BitIntptr.MMEP.MemSpec.MemHelpers.generate_undef_bytes t sid = NoOom bytes_fin ->
+            exists bytes_inf,
+              MemoryBigIntptr.MMEP.MemSpec.MemHelpers.generate_undef_bytes t sid = NoOom bytes_inf /\
+                sbytes_refine bytes_inf bytes_fin.
+        Proof.
+          intros t sid bytes_fin GEN.
+          unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.generate_undef_bytes in GEN.
+          eapply generate_num_undef_bytes_h_fin_inf in GEN.
+          eauto.
+        Qed.
+
+        clear ALLOCA. clear H3. revert H. revert bytes_blocks_fin.
+        induction num_elements using N.peano_ind; intros bytes_blocks_fin H.
+        { (* No elements allocated *)
+          cbn in H.
+          destruct H; subst.
+          cbn.
+          exists []. exists ms_inf.
+          split; auto.
+        }
+
+        destruct (Memory64BitIntptr.MMEP.MemSpec.MemHelpers.generate_undef_bytes t sid_fin) eqn:GEN.
+        2: {
+          rewrite repeatMN_succ in H.
+          repeat red in H.
+          destruct H as (?&?&?&?).
+          cbn in H.
+          contradiction.
+        }
+
+        rewrite repeatMN_succ in H.
+        apply MemPropT_bind_ret_inv in H as (s'&bytes&L&REPEAT).
+        destruct L; subst.
+        rename l into bytes.
+
+        apply MemPropT_bind_ret_inv in REPEAT as (s'&byte_blocks_fin&REPEAT&RES).
+        cbn in RES.
+        destruct RES; subst.
+
+        pose proof REPEAT as IH.
+        apply IHnum_elements in IH.
+        destruct IH as (byte_blocks_inf & ms_inf'' & REPEAT_INF & BYTE_BLOCK_REF & MSR).
+
+        apply generate_undef_bytes_fin_inf in GEN as (bytes_inf&GEN&BYTE_REF).
+
+        eexists. exists ms_inf''.
+        split.
+        * rewrite repeatMN_succ.
+          rewrite GEN in *.
+          repeat red.
+          exists ms_inf. exists bytes_inf.
+          split.
+          cbn; auto.
+          exists ms_inf''. exists byte_blocks_inf.
+          split; eauto.
+          cbn.
+          split; reflexivity.
+        * split; auto.
       + (* K' *)
-        
+        intros ms_inf0 ms_fin0 ms_inf'0 ms_fin'0 a_fin a_inf b_fin0 b_inf0 H H4 H5 H6 H7.        
+        subst.
+
+        admit.
+      + admit.
     - (* FIN *)
       apply MemPropT_bind_ret_inv in ALLOCA as [s' [a [FRESH REST]]].
       repeat red.
       exists s'. exists a.
       split; auto.
-      apply REST.        
   Qed.
 
   (* TODO: Move this *)
