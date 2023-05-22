@@ -2783,6 +2783,30 @@ Module InfiniteToFinite.
     Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
   Admitted.
 
+  (* TODO: Some tricky IntMap reasoning *)
+  Lemma inf_fin_read_byte_raw_None :
+    forall m_inf m_fin ptr,
+      convert_memory m_inf = NoOom m_fin ->
+      MemoryBigIntptr.MMEP.MMSP.read_byte_raw
+        m_inf
+        ptr = None ->
+      Memory64BitIntptr.MMEP.MMSP.read_byte_raw
+        m_fin
+        ptr = None.
+  Proof.
+    intros m_inf m_fin ptr CONV READ.
+    Transparent Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
+    Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+    unfold Memory64BitIntptr.MMEP.MMSP.read_byte_raw in READ.
+    unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+
+    cbn in CONV.
+    break_match_hyp; inv CONV.
+
+    Opaque Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
+    Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+  Admitted.
+
   (* TODO: Maybe swap MemState for memory_stack to get rid of MemState_get_memory *)
   Lemma fin_inf_addr_allocated_prop :
     forall addr_fin addr_inf ms_fin ms_inf aid,
@@ -3344,6 +3368,238 @@ Module InfiniteToFinite.
         subst; cbn. auto.
   Qed.
 
+  Lemma inf_fin_read_byte_prop_MemPropT :
+    forall addr_fin addr_inf ms_fin ms_inf byte_fin,
+      MemState_refine ms_inf ms_fin ->
+      InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+      MemoryBigIntptr.MMEP.MMSP.read_byte_MemPropT addr_inf
+        (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf)
+        (ret (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf, lift_SByte byte_fin)) ->
+      Memory64BitIntptr.MMEP.MMSP.read_byte_MemPropT addr_fin
+        (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin)
+        (ret (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin, byte_fin)).
+  Proof.
+    intros addr_fin addr_inf ms_fin ms_inf byte_fin MSR ADDR_CONV RBP.
+    (* TODO: make things opaque? *)
+    destruct RBP as [ms_inf' [ms_inf'' [[MS MS'] READ]]].
+    subst.
+    destruct ms_inf eqn:MSINF. cbn in READ.
+    destruct ms_fin eqn:MSFIN.
+
+    break_match_hyp.
+    (* read_byte_MemPropT may have UB... Which
+                           means sbyte_refine byte_inf byte_fin might not
+                           hold because byte_fin could be any byte.
+     *)
+    - destruct m.
+      pose proof MemState_refine_convert_memory _ _ MSR as CONV_MEM.
+      pose proof fin_inf_ptoi _ _ ADDR_CONV as PTOI.
+      pose proof inf_fin_read_byte_raw CONV_MEM PTOI Heqo.
+      destruct H as [byte_fin' [H BYTE_REF]].
+      unfold Memory64BitIntptr.MMEP.MMSP.mem_state_memory in H.
+      cbn in H.
+
+      cbn.
+      eexists. eexists.
+      split; eauto.
+      rewrite <- PTOI in H.
+      rewrite H.
+      erewrite inf_fin_access_allowed; cbn; eauto.
+      break_match_goal; cbn; eauto.
+
+      break_match_hyp.
+      destruct READ; subst; auto.
+
+      red in BYTE_REF.
+      cbn in H1.
+      Set Nested Proofs Allowed.
+      (* TODO: Move this *)
+      Lemma lift_SByte_convert_SByte_inverse :
+        forall {b1 b2},
+          convert_SByte b1 = NoOom b2 ->
+          lift_SByte b2 = b1.
+      Proof.
+      Admitted.
+
+      Lemma fin_to_inf_uvalue_injective :
+        forall uv1 uv2,
+          fin_to_inf_uvalue uv1 = fin_to_inf_uvalue uv2 ->
+          uv1 = uv2.
+      Proof.
+        intros uv1 uv2 FININF.
+        unfold fin_to_inf_uvalue in *.
+        destruct (uvalue_convert_strict_safe uv1) as (?&?&?).
+        destruct (uvalue_convert_strict_safe uv2) as (?&?&?).
+        subst.
+        rewrite e0 in e2. inv e2.
+        auto.
+      Qed.
+
+      Lemma lift_SByte_injective :
+        forall b1 b2,
+          lift_SByte b1 = lift_SByte b2 ->
+          b1 = b2.
+      Proof.
+        intros b1 b2 H.
+        destruct b1, b2.
+        cbn in *.
+        inv H.
+        apply fin_to_inf_uvalue_injective in H1, H3.
+        subst.
+        auto.
+      Qed.
+
+      apply lift_SByte_convert_SByte_inverse in BYTE_REF.
+      rewrite <- H1 in BYTE_REF.
+      apply lift_SByte_injective in BYTE_REF; subst; auto.
+
+      cbn in Heqb0.
+      rewrite Heqb0 in Heqb.
+      discriminate.
+    - epose proof inf_fin_read_byte_raw_None _ _ _ _ Heqo.
+      cbn.
+      eexists. eexists.
+      split; eauto.
+      erewrite fin_inf_ptoi; eauto.
+      rewrite H.
+      auto.
+
+      Unshelve.
+      all: clear READ.
+      + replace (Memory64BitIntptr.MMEP.MMSP.memory_stack_memory ms_memory_stack0) with (Memory64BitIntptr.MMEP.MMSP.memory_stack_memory
+                                                                                          (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin)).
+        replace (MemoryBigIntptr.MMEP.MMSP.memory_stack_memory ms_memory_stack) with (MemoryBigIntptr.MMEP.MMSP.memory_stack_memory
+                                                                                         (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf)).
+        eapply MemState_refine_convert_memory'; subst; eauto.
+        subst; cbn. auto.
+        subst; cbn. auto.
+  Qed.
+
+  (* Lemma inf_fin_read_byte_prop_MemPropT_exists : *)
+  (*   forall addr_inf ms_fin ms_inf byte_inf, *)
+  (*     MemState_refine ms_inf ms_fin -> *)
+  (*     MemoryBigIntptr.MMEP.MMSP.read_byte_MemPropT addr_inf *)
+  (*       (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf) *)
+  (*       (ret (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf, byte_inf)) -> *)
+  (*     exists addr_fin byte_fin, *)
+  (*       Memory64BitIntptr.MMEP.MMSP.read_byte_MemPropT addr_fin *)
+  (*         (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin) *)
+  (*         (ret (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin, byte_fin)) /\ *)
+  (*         InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin /\ *)
+  (*         sbyte_refine byte_inf byte_fin. *)
+  (* Proof. *)
+  (*   intros addr_inf ms_fin ms_inf byte_inf MSR RBP. *)
+  (*   (* TODO: make things opaque? *) *)
+  (*   destruct RBP as [ms_inf' [ms_inf'' [[MS MS'] READ]]]. *)
+  (*   subst. *)
+  (*   destruct ms_inf eqn:MSINF. cbn in READ. *)
+  (*   destruct ms_fin eqn:MSFIN. *)
+
+  (*   break_match_hyp. *)
+  (*   (* read_byte_MemPropT may have UB... Which *)
+  (*                          means sbyte_refine byte_inf byte_fin might not *)
+  (*                          hold because byte_fin could be any byte. *)
+  (*    *) *)
+  (*   - destruct m. *)
+  (*     pose proof MemState_refine_convert_memory _ _ MSR as CONV_MEM. *)
+  (*     pose proof inf_fin_read_byte_raw_exists CONV_MEM Heqo. *)
+  (*     destruct H as [ptr_fin [byte_fin' [PTOI [H BYTE_REF]]]]. *)
+
+  (*     unfold Memory64BitIntptr.MMEP.MMSP.mem_state_memory in H. *)
+  (*     cbn in H. *)
+
+  (*     cbn. *)
+  (*     destruct addr_inf as [ptr_inf pr_inf]. *)
+  (*     exfalso. *)
+  (*     pose proof ITOP.int_to_ptr_ptr_to_int. *)
+  (*     eapply H0. *)
+  (*     cbn in *. *)
+  (*     exists ( *)
+  (*     exists ptr_fin. exists byte_fin'. *)
+  (*     split; eauto. *)
+  (*     2: { *)
+  (*       split. *)
+  (*       -  *)
+  (*         cbn in *. *)
+  (*         rewrite <- PTOI. *)
+  (*     } *)
+  (*     rewrite <- PTOI in H. *)
+  (*     eexists. eexists. *)
+  (*     split; auto. *)
+  (*     rewrite H. *)
+  (*     erewrite inf_fin_access_allowed; cbn; eauto. *)
+  (*     break_match_goal; cbn; eauto. *)
+
+  (*     break_match_hyp. *)
+  (*     destruct READ; subst; auto. *)
+  (*     unfold InfToFinAddrConvert.addr_convert; cbn. *)
+  (*     unfold InfToFinAddrConvert.addr_convert; cbn. *)
+      
+
+  (*     red in BYTE_REF. *)
+  (*     Set Nested Proofs Allowed. *)
+  (*     (* TODO: Move this *) *)
+  (*     Lemma lift_SByte_convert_SByte_inverse : *)
+  (*       forall {b1 b2}, *)
+  (*         convert_SByte b1 = NoOom b2 -> *)
+  (*         lift_SByte b2 = b1. *)
+  (*     Proof. *)
+  (*     Admitted. *)
+
+  (*     Lemma fin_to_inf_uvalue_injective : *)
+  (*       forall uv1 uv2, *)
+  (*         fin_to_inf_uvalue uv1 = fin_to_inf_uvalue uv2 -> *)
+  (*         uv1 = uv2. *)
+  (*     Proof. *)
+  (*       intros uv1 uv2 FININF. *)
+  (*       unfold fin_to_inf_uvalue in *. *)
+  (*       destruct (uvalue_convert_strict_safe uv1) as (?&?&?). *)
+  (*       destruct (uvalue_convert_strict_safe uv2) as (?&?&?). *)
+  (*       subst. *)
+  (*       rewrite e0 in e2. inv e2. *)
+  (*       auto. *)
+  (*     Qed. *)
+
+  (*     Lemma lift_SByte_injective : *)
+  (*       forall b1 b2, *)
+  (*         lift_SByte b1 = lift_SByte b2 -> *)
+  (*         b1 = b2. *)
+  (*     Proof. *)
+  (*       intros b1 b2 H. *)
+  (*       destruct b1, b2. *)
+  (*       cbn in *. *)
+  (*       inv H. *)
+  (*       apply fin_to_inf_uvalue_injective in H1, H3. *)
+  (*       subst. *)
+  (*       auto. *)
+  (*     Qed. *)
+
+  (*     apply lift_SByte_convert_SByte_inverse in BYTE_REF. *)
+  (*     rewrite <- H1 in BYTE_REF. *)
+  (*     apply lift_SByte_injective in BYTE_REF; subst; auto. *)
+
+  (*     cbn in Heqb0. *)
+  (*     rewrite Heqb0 in Heqb. *)
+  (*     discriminate. *)
+  (*   - epose proof inf_fin_read_byte_raw_None _ _ _ _ Heqo. *)
+  (*     cbn. *)
+  (*     eexists. eexists. *)
+  (*     split; eauto. *)
+  (*     erewrite fin_inf_ptoi; eauto. *)
+  (*     rewrite H. *)
+  (*     auto. *)
+
+  (*     Unshelve. *)
+  (*     all: clear READ. *)
+  (*     + replace (Memory64BitIntptr.MMEP.MMSP.memory_stack_memory ms_memory_stack0) with (Memory64BitIntptr.MMEP.MMSP.memory_stack_memory *)
+  (*                                                                                         (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin)). *)
+  (*       replace (MemoryBigIntptr.MMEP.MMSP.memory_stack_memory ms_memory_stack) with (MemoryBigIntptr.MMEP.MMSP.memory_stack_memory *)
+  (*                                                                                        (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms_inf)). *)
+  (*       eapply MemState_refine_convert_memory'; subst; eauto. *)
+  (*       subst; cbn. auto. *)
+  (*       subst; cbn. auto. *)
+  (* Qed. *)
+
   Lemma fin_inf_read_byte_prop :
     forall addr_fin addr_inf ms_fin ms_inf byte_fin,
       MemState_refine ms_inf ms_fin ->
@@ -3354,6 +3610,18 @@ Module InfiniteToFinite.
     intros addr_fin addr_inf ms_fin ms_inf byte_fin MSR ADDR_CONV RBP.
     red. red in RBP.
     eapply fin_inf_read_byte_prop_MemPropT; eauto.
+  Qed.
+
+  Lemma inf_fin_read_byte_prop :
+    forall addr_fin addr_inf ms_fin ms_inf byte_fin,
+      MemState_refine ms_inf ms_fin ->
+      InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.read_byte_prop ms_inf addr_inf (lift_SByte byte_fin) ->
+      Memory64BitIntptr.MMEP.MemSpec.read_byte_prop ms_fin addr_fin byte_fin.
+  Proof.
+    intros addr_fin addr_inf ms_fin ms_inf byte_fin MSR ADDR_CONV RBP.
+    red. red in RBP.
+    eapply inf_fin_read_byte_prop_MemPropT; eauto.
   Qed.
 
   Lemma fin_inf_read_byte_spec :
@@ -6019,13 +6287,6 @@ Module InfiniteToFinite.
     auto.
   Qed.
 
-  (* TODO: Move and prove this *)
-  Lemma lift_SByte_convert_SByte_inverse:
-    forall {byte_inf byte_fin},
-      convert_SByte byte_inf = NoOom byte_fin -> lift_SByte byte_fin = byte_inf.
-  Proof.
-  Admitted.
-
   (* TODO: Move this *)
   Lemma mem_pop_spec_fin_inf :
     forall {m1_fin m2_fin m1_inf m2_inf},
@@ -6234,9 +6495,7 @@ Module InfiniteToFinite.
       split; red; reflexivity.
     Qed.
 
-    (* This might be a good idea, but I think I need an A_INF and
-       A_FIN... And then probably some relation between those. Still,
-       this should make the proofs more modular, which is a plus. *)
+    (* This might be a good idea, should make the proofs more modular... *)
     Lemma MemPropT_fin_inf_bind :
       forall {ms_inf ms_inf' : MemoryBigIntptr.MMEP.MMSP.MemState}
         {ms_fin ms_fin' : Memory64BitIntptr.MMEP.MMSP.MemState}
@@ -6246,13 +6505,21 @@ Module InfiniteToFinite.
         {mab_fin : A_FIN -> MemPropT Memory64BitIntptr.MMEP.MMSP.MemState B_FIN}
         {mab_inf : A_INF -> MemPropT MemoryBigIntptr.MMEP.MMSP.MemState B_INF}
         {res_fin res_inf}
+
         (A_REF : A_INF -> A_FIN -> Prop)
         (B_REF : B_INF -> B_FIN -> Prop)
+
         (MEM_REF : MemState_refine_prop ms_inf ms_fin)
         (MEM_REF' : MemState_refine_prop ms_inf' ms_fin')
+
+        (B : B_REF res_inf res_fin)
+
+        (* Not sure about quantification *)
         (MA: forall ms_fin' a_fin,
             ma_fin ms_fin (ret (ms_fin', a_fin)) ->
             exists a_inf ms_inf', ma_inf ms_inf (ret (ms_inf', a_inf)) /\ A_REF a_inf a_fin /\ MemState_refine_prop ms_inf' ms_fin')
+
+        (* Not sure about quantification *)
         (K: forall ms_inf ms_fin ms_inf' ms_fin' a_fin a_inf b_fin b_inf,
             A_REF a_inf a_fin ->
             B_REF b_inf b_fin ->
@@ -6260,12 +6527,25 @@ Module InfiniteToFinite.
             MemState_refine_prop ms_inf' ms_fin' ->
             mab_fin a_fin ms_fin (ret (ms_fin', b_fin)) ->
             mab_inf a_inf ms_inf (ret (ms_inf', b_inf)))
+
         (FIN: (a <- ma_fin;;
                mab_fin a) ms_fin (ret (ms_fin', res_fin))),
+
         (a <- ma_inf;;
          mab_inf a) ms_inf (ret (ms_inf', res_inf)).
     Proof.
-    Admitted.
+      intros ms_inf ms_inf' ms_fin ms_fin' A_FIN A_INF B_FIN B_INF ma_fin ma_inf mab_fin mab_inf res_fin res_inf A_REF B_REF MEM_REF MEM_REF' B MA K FIN.
+      repeat red in FIN.
+      repeat red.
+
+      destruct FIN as (sab&a&FIN&FIN_AB).
+
+      apply MA in FIN as (a_inf&ms_inf''&INF&A&MSR).
+      exists ms_inf''. exists a_inf.
+      split; auto.
+
+      eapply K in FIN_AB; eauto.
+    Qed.
 
     eapply MemPropT_fin_inf_bind with
       (A_REF:=eq)
@@ -6301,6 +6581,71 @@ Module InfiniteToFinite.
         split.
         { split; [|split; [|split; [|split; [|split; [|split; [|split]]]]]]; auto.
 
+          (* TODO: Move *)
+          Lemma lift_SByte_sbyte_sid :
+            forall byte sid,
+              FinMem.MMEP.MMSP.MemByte.sbyte_sid byte = inr sid ->
+              InfMem.MMEP.MMSP.MemByte.sbyte_sid (lift_SByte byte) = inr sid.
+          Proof.
+            intros byte sid H.
+            unfold FinMem.MMEP.MMSP.MemByte.sbyte_sid in H.
+            unfold InfMem.MMEP.MMSP.MemByte.sbyte_sid.
+
+            (* Need to expose some things about sbyte_extractbypte / mkUbyte *)
+          Admitted.
+
+          (* TODO: separate into lemma? *)
+          (* lift_MemState does not change which sids are used *)
+          Lemma used_store_id_fin_inf :
+            forall ms_inf ms_fin sid,
+              MemState_refine ms_inf ms_fin ->
+              FinMem.MMEP.MemSpec.used_store_id_prop ms_fin sid <->
+                InfMem.MMEP.MemSpec.used_store_id_prop ms_inf sid.
+          Proof.
+            intros ms_inf ms_fin sid MSR.
+            split; intros USED.
+            {
+              cbn in *.
+              red; red in USED.
+              destruct USED as [ptr [byte [READ BYTE]]].
+
+              pose proof FinToInfAddrConvertSafe.addr_convert_succeeds ptr as [ptr_inf CONV].
+              pose proof FinToInfAddrConvertSafe.addr_convert_safe ptr ptr_inf CONV as CONV_INF.
+              exists ptr_inf. exists (lift_SByte byte).
+              split.
+              - eapply fin_inf_read_byte_prop; eauto.
+              - apply lift_SByte_sbyte_sid; auto.
+            }
+            {
+              cbn in *.
+              red; red in USED.
+              destruct USED as [ptr [byte [READ BYTE]]].
+
+              (* TODO: Move this *)
+              Lemma inf_fin_read_byte_prop_exists :
+                forall {ptr_inf byte_inf ms_inf ms_fin},
+                  MemState_refine ms_inf ms_fin ->
+                  InfMem.MMEP.MemSpec.read_byte_prop ms_inf ptr_inf byte_inf ->
+                  exists ptr_fin byte_fin,
+                    FinMem.MMEP.MemSpec.read_byte_prop ms_fin ptr_fin byte_fin /\
+                      sbyte_refine byte_inf byte_fin.
+              Proof.
+                intros ptr_inf byte_inf ms_inf ms_fin MSR RBP.
+              Admitted.
+
+              pose proof inf_fin_read_byte_prop_exists MSR READ as (ptr_fin&byte_fin&READ_FIN&BYTE_REFINE).
+              exists ptr_fin. exists byte_fin.
+              split; auto.
+
+              unfold sbyte_refine, convert_SByte in BYTE_REFINE.
+              break_match_hyp; cbn in BYTE_REFINE.
+              break_match_hyp; inv BYTE_REFINE.
+              break_match_hyp; inv H0.
+
+              (* TODO: Need lemmas about sbyte_sid *)
+              admit.
+          Admitted.
+
           (* TODO: separate into lemma? *)
           (* lift_MemState does not change which sids are used *)
           Lemma used_store_id_lift_MemState :
@@ -6308,6 +6653,46 @@ Module InfiniteToFinite.
               FinMem.MMEP.MemSpec.used_store_id_prop ms_fin sid <->
                 InfMem.MMEP.MemSpec.used_store_id_prop (lift_MemState ms_fin) sid.
           Proof.
+            intros ms_fin; intros sid.
+            split; intros USED.
+            {
+              cbn in *.
+              red; red in USED.
+              destruct USED as [ptr [byte [READ BYTE]]].
+
+              pose proof FinToInfAddrConvertSafe.addr_convert_succeeds ptr as [ptr_inf CONV].
+              pose proof FinToInfAddrConvertSafe.addr_convert_safe ptr ptr_inf CONV as CONV_INF.
+              exists ptr_inf. exists (lift_SByte byte).
+              split.
+              - eapply fin_inf_read_byte_prop; eauto.                
+                apply lift_MemState_refine.
+              - destruct byte. cbn.
+                unfold InfMem.MMEP.MMSP.MemByte.sbyte_sid.
+                admit.
+            }
+            {
+              cbn in *.
+              red; red in USED.
+              destruct USED as [ptr [byte [READ BYTE]]].
+
+              pose proof lift_MemState_refine ms_fin as MSR.
+
+              pose proof inf_fin_read_byte_prop_exists MSR READ as (ptr_fin&byte_fin&READ_FIN&BYTE_REFINE).
+              exists ptr_fin. exists byte_fin.
+              split; auto.
+
+              unfold sbyte_refine, convert_SByte in BYTE_REFINE.
+              break_match_hyp; cbn in BYTE_REFINE.
+              break_match_hyp; inv BYTE_REFINE.
+              break_match_hyp; inv H0.
+
+              (* TODO: Need lemmas about sbyte_sid *)
+              unfold FinMem.MMEP.MMSP.MemByte.sbyte_sid, InfMem.MMEP.MMSP.MemByte.sbyte_sid in *.
+              break_match_hyp; inv BYTE.
+              cbn in Hequ1.
+              unfold FinMem.MP.BYTE_IMPL.sbyte_to_extractbyte.
+              (* unfold Memory64BitIntptr.Byte.sbyte_to_extractbyte. *)
+              admit.
           Admitted.
 
           intros USED.
@@ -6385,6 +6770,10 @@ Module InfiniteToFinite.
       rename a_fin into sid.
       eapply MemPropT_fin_inf_bind; eauto.
 
+      + (* Undef Bytes *)
+        admit.
+      + (* K' *)
+        
     - (* FIN *)
       apply MemPropT_bind_ret_inv in ALLOCA as [s' [a [FRESH REST]]].
       repeat red.
