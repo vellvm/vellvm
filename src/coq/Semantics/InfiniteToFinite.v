@@ -2916,6 +2916,19 @@ Module InfiniteToFinite.
     auto.
   Qed.
 
+  (* TODO: Move this somewhere it can apply to fin / inf *)
+  Lemma memory_stack_memory_mem_state_memory_fin :
+    forall m,
+      FinMem.MMEP.MMSP.memory_stack_memory (FinMem.MMEP.MMSP.MemState_get_memory m) = FinMemMMSP.mem_state_memory m.
+  Proof.
+    intros m.
+    destruct m.
+    cbn.
+    destruct ms_memory_stack.
+    cbn.
+    auto.
+  Qed.
+
   Lemma read_byte_raw_lifted :
     forall mem byte_lifted addr aid,
       InfMem.MMEP.MMSP.read_byte_raw (lift_memory mem) addr = Some (byte_lifted, aid) ->
@@ -2944,31 +2957,32 @@ Module InfiniteToFinite.
     Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
   Qed.
 
+  Lemma read_byte_raw_fin_addr :
+    forall {m_inf m_fin addr byte_fin aid},
+      MemState_refine_prop m_inf m_fin ->
+      Memory64BitIntptr.MMEP.MMSP.read_byte_raw (Memory64BitIntptr.MMEP.MMSP.mem_state_memory m_fin) addr = Some (byte_fin, aid) ->
+      (forall pr, exists ptr, FinITOP.int_to_ptr addr pr = NoOom ptr).
+  Proof.
+  Admitted.
+
   (* TODO: Prove this *)
   Lemma inf_fin_read_byte_raw :
-    forall {m_inf m_fin addr ptr_fin byte_inf aid},
+    forall {m_inf m_fin addr byte_inf aid},
       MemState_refine_prop m_inf m_fin ->
-      (* TODO: Might not need to constraint addr like this at all *)
-      LLVMParams64BitIntptr.PTOI.ptr_to_int ptr_fin = addr ->
       MemoryBigIntptr.MMEP.MMSP.read_byte_raw (MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory m_inf) addr = Some (byte_inf, aid) ->
       exists byte_fin,
         Memory64BitIntptr.MMEP.MMSP.read_byte_raw (Memory64BitIntptr.MMEP.MMSP.mem_state_memory m_fin) addr = Some (byte_fin, aid) /\
           sbyte_refine byte_inf byte_fin.
   Proof.
-    intros m_inf m_fin addr0 ptr_fin byte_inf aid MSR PTOI READ_RAW.
+    intros m_inf m_fin addr byte_inf aid MSR READ_RAW.
     destruct MSR.
     destruct H0.
     clear H1 H.
     destruct H0 as [ALLOWED RBP].
     unfold InfMem.MMEP.MemSpec.read_byte_prop_all_preserved in RBP.
-    remember (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr_fin, MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov aid) as ptr_inf.
+    remember (addr, MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov aid) as ptr_inf.
     specialize (RBP ptr_inf byte_inf).
     specialize (ALLOWED ptr_inf).
-
-    (* assert (LLVMParamsBigIntptr.PROV.access_allowed (FinPROV.address_provenance ptr_fin) aid = true) as ACCESS. *)
-    (* { destruct ALLOWED as [ALLOWED ALLOWED']. *)
-      
-    (* } *)
 
     assert (InfMem.MMEP.MemSpec.read_byte_prop m_inf ptr_inf byte_inf) as RBP_INF.
     {
@@ -3039,7 +3053,7 @@ Module InfiniteToFinite.
     assert (exists s aid', InfMem.MMEP.MMSP.read_byte_raw
                         (InfMem.MMEP.MMSP.memory_stack_memory
                            (InfMem.MMEP.MMSP.MemState_get_memory (lift_MemState m_fin)))
-                        (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr_fin) = Some (s, aid') /\
+                        addr = Some (s, aid') /\
                         LLVMParamsBigIntptr.PROV.access_allowed
                           (MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov aid) aid' = true) as [byte_fin_lifted [aid' [READ_BYTE_FIN_LIFTED ACCESS_ALLOWED_BYTE_FIN_LIFTED]]].
     {
@@ -3093,30 +3107,6 @@ Module InfiniteToFinite.
     auto.
   Admitted.
 
-  (* TODO: Prove this *)
-  Lemma inf_fin_read_byte_raw :
-    forall {m_inf m_fin addr ptr_fin byte_inf aid},
-      convert_memory m_inf = NoOom m_fin ->
-      LLVMParams64BitIntptr.PTOI.ptr_to_int ptr_fin = addr ->
-      MemoryBigIntptr.MMEP.MMSP.read_byte_raw m_inf addr = Some (byte_inf, aid) ->
-      exists byte_fin,
-        Memory64BitIntptr.MMEP.MMSP.read_byte_raw m_fin addr = Some (byte_fin, aid) /\
-          sbyte_refine byte_inf byte_fin.
-  Proof.
-  Admitted.
-
-  (* TODO: Prove this *)
-  Lemma inf_fin_read_byte_raw_exists :
-    forall {m_inf m_fin addr byte_inf aid},
-      convert_memory m_inf = NoOom m_fin ->
-      MemoryBigIntptr.MMEP.MMSP.read_byte_raw m_inf addr = Some (byte_inf, aid) ->
-      exists ptr_fin byte_fin,
-        LLVMParams64BitIntptr.PTOI.ptr_to_int ptr_fin = addr /\
-        Memory64BitIntptr.MMEP.MMSP.read_byte_raw m_fin addr = Some (byte_fin, aid) /\
-          sbyte_refine byte_inf byte_fin.
-  Proof.
-  Admitted.
-
   Lemma inf_fin_addr_allocated_prop :
     forall addr_fin addr_inf ms_fin ms_inf aid,
       MemState_refine_prop ms_inf ms_fin ->
@@ -3140,142 +3130,62 @@ Module InfiniteToFinite.
       discriminate.
     }
 
-    destruct m.
-    destruct ms_fin, ms_inf.
-    cbn in *.
-    destruct ms_fin, mst_inf.
-    Opaque convert_memory.
-    cbn in *.
-    break_match_hyp; inv MSR.
-    break_match_hyp; inv H0.
-    break_match_hyp; inv H1.
-    break_match_hyp; inv Heqo2.
+    destruct m as [byte_inf aid'].
+    epose proof inf_fin_read_byte_raw MSR Heqo as [byte_fin [READ_FIN BYTE_REF]].
+    erewrite fin_inf_ptoi; eauto.
+    rewrite memory_stack_memory_mem_state_memory_fin.
+    rewrite READ_FIN.
 
-    eapply inf_fin_read_byte_raw in Heqo; eauto.
-    erewrite <- fin_inf_ptoi in Heqo; eauto.
-    destruct Heqo.
-    destruct H.
-    rewrite H.
-
-    destruct ALLOCATED.
     split; auto.
+    destruct ALLOCATED; auto.
 
-    - destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid a); cbn in *; try discriminate; subst; auto.
-      destruct (LLVMParams64BitIntptr.PROV.aid_eq_dec a a); cbn in *; try contradiction; auto; subst.
-    - apply fin_inf_ptoi; eauto.
-  Qed.
-
-  Lemma inf_fin_addr_allocated_prop :
-    forall addr_fin addr_inf ms_fin ms_inf aid,
-      convert_memory_stack ms_inf = NoOom ms_fin ->
-      InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
-      MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop addr_inf aid
-        ms_inf
-        (success_unERR_UB_OOM (ms_inf, true)) ->
-      Memory64BitIntptr.MMEP.MMSP.addr_allocated_prop addr_fin aid
-        ms_fin
-        (success_unERR_UB_OOM (ms_fin, true)).
-  Proof.
-    intros addr_fin addr_inf ms_fin ms_inf aid MSR ADDR_CONV ALLOCATED.
-    cbn in *.
-    destruct ALLOCATED as [mst_inf [mst_inf' [[MST MST'] ALLOCATED]]]; subst.
-    exists ms_fin.
-    exists ms_fin.
-    split; auto.
-    break_match_hyp; cbn in *.
-    2: {
-      destruct ALLOCATED.
-      discriminate.
-    }
-
-    destruct m.
-    destruct ms_fin, mst_inf.
-    Opaque convert_memory.
-    cbn in *.
-    break_match_hyp; inv MSR.
-    break_match_hyp; inv H0.
-    break_match_hyp; inv H1.
-    break_match_hyp; inv Heqo2.
-
-    eapply inf_fin_read_byte_raw in Heqo; eauto.
-    erewrite <- fin_inf_ptoi in Heqo; eauto.
-    destruct Heqo.
-    destruct H.
-    rewrite H.
-
-    destruct ALLOCATED.
-    split; auto.
-
-    - destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid a); cbn in *; try discriminate; subst; auto.
-      destruct (LLVMParams64BitIntptr.PROV.aid_eq_dec a a); cbn in *; try contradiction; auto; subst.
-    - apply fin_inf_ptoi; eauto.
+    destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid aid'); inv H0.
+    apply LLVMParams64BitIntptr.PROV.aid_eq_dec_refl.
   Qed.
 
   Lemma inf_fin_addr_allocated_prop_exists :
     forall {addr_inf ms_fin ms_inf aid},
-      convert_memory_stack ms_inf = NoOom ms_fin ->
+      MemState_refine_prop ms_inf ms_fin ->
       MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop addr_inf aid
-        ms_inf
-        (success_unERR_UB_OOM (ms_inf, true)) ->
+        (InfMem.MMEP.MMSP.MemState_get_memory ms_inf)
+        (success_unERR_UB_OOM (InfMem.MMEP.MMSP.MemState_get_memory ms_inf, true)) ->
       exists addr_fin,
         InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin /\
         Memory64BitIntptr.MMEP.MMSP.addr_allocated_prop addr_fin aid
-          ms_fin
-          (success_unERR_UB_OOM (ms_fin, true)).
+          (FinMem.MMEP.MMSP.MemState_get_memory ms_fin)
+          (success_unERR_UB_OOM (FinMem.MMEP.MMSP.MemState_get_memory ms_fin, true)).
   Proof.
     intros addr_inf ms_fin ms_inf aid MSR ALLOCATED.
-    cbn in *.
-    destruct ALLOCATED as [mst_inf [mst_inf' [[MST MST'] ALLOCATED]]]; subst.
-    destruct mst_inf.
-    cbn in *.
-    move MSR after ALLOCATED.
-    break_match_hyp; inv MSR.
-    break_match_hyp; inv H0.
-    break_match_hyp; inv H1.
-    break_match_hyp; inv Heqo1.
+    repeat red in ALLOCATED.
+    destruct ALLOCATED as [ms_inf' [ms_inf'' [[MST MST'] ALLOCATED]]]; subst.
 
     break_match_hyp.
     2: {
-      (* Should be a contradiction *)
-      destruct ALLOCATED; discriminate.
+      cbn in *. destruct ALLOCATED; discriminate.
     }
 
-    destruct m0.
-    pose proof inf_fin_read_byte_raw_exists Heqo Heqo1.
-    destruct H as (?&?&?&?).
-    destruct x.
+    destruct m.
+
+    epose proof inf_fin_read_byte_raw MSR Heqo.
+    destruct H as (byte_fin&READ_FIN&BYTE_REF).
     destruct addr_inf.
-
-    assert (LLVMParams64BitIntptr.PTOI.ptr_to_int (i, p0) = i0).
-    unfold LLVMParams64BitIntptr.PTOI.ptr_to_int in *. cbn; auto.
-
-    exists (i, p0).
-    split.
-    {
-      unfold InfToFinAddrConvert.addr_convert.
-      cbn in *.
-
-      rewrite <- H1.
-      rewrite FinLP.ITOP.int_to_ptr_ptr_to_int; auto.
-    }
-
-    eexists.
-    eexists.
-    split; eauto.
     cbn in *.
 
-    rewrite H1.
-    eapply inf_fin_read_byte_raw in Heqo1.
-    destruct Heqo1 as (?&?&?).
-    rewrite H2.
+    pose proof read_byte_raw_fin_addr MSR READ_FIN p as [ptr CONV].
+    exists ptr. split; auto.
+    exists (FinMem.MMEP.MMSP.MemState_get_memory ms_fin).
+    exists (FinMem.MMEP.MMSP.MemState_get_memory ms_fin).
     split; auto.
 
-    destruct ALLOCATED.
-    destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid a); cbn in *; try discriminate; subst; auto.
-    destruct (LLVMParams64BitIntptr.PROV.aid_eq_dec a a); cbn in *; try contradiction; auto; subst.
+    erewrite FinLP.ITOP.ptr_to_int_int_to_ptr; eauto.
+    rewrite memory_stack_memory_mem_state_memory_fin.
+    rewrite READ_FIN.
 
-    auto.
-    eauto.
+    split; auto.
+    destruct ALLOCATED; auto.
+
+    destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid a); inv H0.
+    apply LLVMParams64BitIntptr.PROV.aid_eq_dec_refl.
   Qed.
 
   Lemma MemState_refine_convert_memory_stack :
