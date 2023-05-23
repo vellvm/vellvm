@@ -172,9 +172,12 @@ Section GenerationState.
 
   Definition type_context := list (ident * typ).
   Definition var_context := list (ident * typ).
+  Definition d_var_context := DList (ident * typ).
   Definition ptr_to_int_context := list (typ * ident * typ).
   Definition all_local_var_contexts := (var_context * ptr_to_int_context)%type.
+  Definition d_all_local_var_contexts := (d_var_context * ptr_to_int_context)%type.
   Definition all_var_contexts := (var_context * var_context * ptr_to_int_context)%type.
+  Definition d_all_var_contexts := (d_var_context * d_var_context * ptr_to_int_context)%type.
 
   Record GenState :=
     mkGenState
@@ -183,8 +186,8 @@ Section GenerationState.
     ; num_global : N
     ; num_blocks : N
     (* Types of values *)
-    ; gen_local_ctx : var_context
-    ; gen_global_ctx : var_context
+    ; gen_local_ctx : d_var_context
+    ; gen_global_ctx : d_var_context
     (* Type aliases *)
     ; gen_typ_ctx : type_context
     ; gen_ptrtoint_ctx : ptr_to_int_context
@@ -195,8 +198,8 @@ Section GenerationState.
         ; num_raw    := 0
         ; num_global := 0
         ; num_blocks := 0
-        ; gen_local_ctx  := []
-        ; gen_global_ctx := []
+        ; gen_local_ctx  := DList_empty
+        ; gen_global_ctx := DList_empty
         ; gen_typ_ctx    := []
         ; gen_ptrtoint_ctx := []
        |}.
@@ -245,7 +248,7 @@ Section GenerationState.
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
        |}.
 
-  Definition replace_local_ctx (ctx : var_context) (gs : GenState) : GenState
+  Definition replace_local_ctx (ctx : d_var_context) (gs : GenState) : GenState
     := {| num_void    := gs.(num_void)
         ; num_raw     := gs.(num_raw)
         ; num_global  := gs.(num_global)
@@ -256,7 +259,7 @@ Section GenerationState.
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
        |}.
 
-  Definition replace_global_ctx (ctx : var_context) (gs : GenState) : GenState
+  Definition replace_global_ctx (ctx : d_var_context) (gs : GenState) : GenState
     := {| num_void    := gs.(num_void)
         ; num_raw     := gs.(num_raw)
         ; num_global  := gs.(num_global)
@@ -330,16 +333,16 @@ Section GenerationState.
        modify increment_blocks;;
        ret (Name ("b" ++ show n)).
 
-  Definition get_local_ctx : GenLLVM var_context
+  Definition get_local_ctx : GenLLVM d_var_context
     := gets (fun gs => gs.(gen_local_ctx)).
   
-  Definition get_global_ctx : GenLLVM var_context
+  Definition get_global_ctx : GenLLVM d_var_context
     := gets (fun gs => gs.(gen_global_ctx)).
 
-  Definition get_ctx : GenLLVM var_context
+  Definition get_ctx : GenLLVM d_var_context
     := lctx <- get_local_ctx;;
        gctx <- get_global_ctx;;
-       ret (lctx ++ gctx).
+       ret (DList_append lctx gctx).
 
   Definition get_typ_ctx : GenLLVM type_context
     := gets (fun gs => gs.(gen_typ_ctx)).
@@ -348,17 +351,17 @@ Section GenerationState.
     := gets (fun gs => gs.(gen_ptrtoint_ctx)).
 
   (* Get all variable contexts that might need to be saved *)
-  Definition get_variable_ctxs : GenLLVM all_var_contexts
+  Definition get_variable_ctxs : GenLLVM d_all_var_contexts
     := local_ctx <- get_local_ctx;;
        global_ctx <- get_global_ctx;;
        ptoi_ctx <- get_ptrtoint_ctx;;
        ret (local_ctx, global_ctx, ptoi_ctx).
 
-  Definition set_local_ctx (ctx : var_context) : GenLLVM unit
+  Definition set_local_ctx (ctx : d_var_context) : GenLLVM unit
     := modify (replace_local_ctx ctx);;
        ret tt.
 
-  Definition set_global_ctx (ctx : var_context) : GenLLVM unit
+  Definition set_global_ctx (ctx : d_var_context) : GenLLVM unit
     := modify (replace_global_ctx ctx);;
        ret tt.
 
@@ -366,7 +369,7 @@ Section GenerationState.
     := modify (replace_ptrtoint_ctx ptoi_ctx);;
        ret tt.
 
-  Definition restore_variable_ctxs (ctxs : all_var_contexts) : GenLLVM unit
+  Definition restore_variable_ctxs (ctxs : d_all_var_contexts) : GenLLVM unit
     := match ctxs with
        | (local_ctx, global_ctx, ptoi_ctx) =>
            set_local_ctx local_ctx;;
@@ -374,7 +377,7 @@ Section GenerationState.
            set_ptrtoint_ctx ptoi_ctx
        end.
 
-  Definition restore_local_variable_ctxs (ctxs : all_local_var_contexts) : GenLLVM unit
+  Definition restore_local_variable_ctxs (ctxs : d_all_local_var_contexts) : GenLLVM unit
     := match ctxs with
        | (local_ctx, ptoi_ctx) =>
            set_local_ctx local_ctx;;
@@ -516,7 +519,7 @@ Section GenerationState.
   (*   refine (ret _). *)
 
   (* TODO: Do we need this? *)
-  Definition filter_global_from_variable_ctxs (ctxs : all_var_contexts) : (var_context * ptr_to_int_context)
+  Definition filter_global_from_variable_ctxs (ctxs : d_all_var_contexts) : (d_var_context * ptr_to_int_context)
     := let is_global_id (id: ident) :=
          match id with
          | ID_Global _ => true
@@ -530,13 +533,13 @@ Section GenerationState.
 
   Definition add_to_local_ctx (x : (ident * typ)) : GenLLVM unit
     := local_ctx <- get_local_ctx;;
-       let new_ctx := x :: local_ctx in
+       let new_ctx := DList_cons x local_ctx in
        modify (replace_local_ctx new_ctx);;
        ret tt.
 
   Definition add_to_global_ctx (x : (ident * typ)) : GenLLVM unit
     := global_ctx <- get_global_ctx;;
-       let new_ctx := x :: global_ctx in
+       let new_ctx := DList_cons x global_ctx in
        modify (replace_global_ctx new_ctx);;
        ret tt.
 
@@ -552,15 +555,15 @@ Section GenerationState.
        modify (replace_ptrtoint_ctx new_ctx);;
        ret tt.
 
-  Definition append_to_local_ctx (vars : list (ident * typ)) : GenLLVM unit
+  Definition append_to_local_ctx (vars : DList (ident * typ)) : GenLLVM unit
     := local_ctx <- get_local_ctx;;
-       let new_ctx := (vars ++ local_ctx)%list in
+       let new_ctx := DList_append vars local_ctx in
        modify (replace_local_ctx new_ctx);;
        ret tt.
 
-  Definition append_to_global_ctx (vars : list (ident * typ)) : GenLLVM unit
+  Definition append_to_global_ctx (vars : DList (ident * typ)) : GenLLVM unit
     := global_ctx <- get_global_ctx;;
-       let new_ctx := (vars ++ global_ctx)%list in
+       let new_ctx := (vars ++ global_ctx in
        modify (replace_global_ctx new_ctx);;
        ret tt.
 
@@ -2532,7 +2535,7 @@ Section InstrGenerators.
       ret (snd var) in
     oneOf_LLVM
       ([ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
-         ; t <- gen_sized_typ_ptrin_gctx;;
+         ; t <- gen_sized_typ_ptrin_fctx;;
            (* TODO: generate multiple element allocas. Will involve changing initialization *)
            (* num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *) *)
            (* align <- ret None;; *)

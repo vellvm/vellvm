@@ -3,8 +3,9 @@ From Coq Require Import List String.
 Import ListNotations Ascii.
 Local Open Scope string_scope.
 
-Section DList.
 
+Declare Scope DList.
+Module DList.
   Definition DList (A : Type) := list A -> list A.
 
   Definition DList_to_list {A} (dl : DList A) : list A
@@ -35,6 +36,16 @@ Section DList.
     eapply DList_map; eauto.
   Defined.
 
+  Infix "d::" := (DList_cons) (at level 60, right associativity) : DList.
+  Notation "d[]" := DList_empty : DList.
+  Notation "d[ x ; .. ; y ]" := (DList_cons x .. (DList_cons y nil) ..) : DList.
+  Infix "d++" := (DList_append) (at level 60, right associativity) : DList.
+
+  Delimit Scope DList with DList.
+End DList.
+
+Import DList.
+Section DString.
   Definition DString := DList ascii.
 
   (* TODO: move this? *)
@@ -78,4 +89,6 @@ Section DList.
   Definition DList_join {A} (ls : list (DList A)) :=
     fold_left DList_append ls DList_empty.
 
-End DList.
+End DString.
+
+Definition example1 : DList nat := (1 d:: d[])%DList.
