@@ -148,6 +148,7 @@ Module Type PROVENANCE(Addr:MemoryAddress.ADDRESS).
   (* Conversions *)
   Parameter allocation_id_to_prov : AllocationId -> Prov.
   Parameter provenance_to_allocation_id : Provenance -> AllocationId.
+  Parameter provenance_to_prov : Provenance -> Prov.
 
   (* Provenance allocation *)
   Parameter initial_provenance : Provenance.
@@ -168,10 +169,15 @@ Module Type PROVENANCE(Addr:MemoryAddress.ADDRESS).
     forall aid aid',
       allocation_id_to_prov aid = allocation_id_to_prov aid' ->
       aid = aid'.
+
   Parameter provenance_to_allocation_id_inv :
     forall pr pr',
       provenance_to_allocation_id pr = provenance_to_allocation_id pr' ->
       pr = pr'.
+
+  Parameter allocation_id_to_prov_provenance_to_allocation_id :
+    forall pr,
+      allocation_id_to_prov (provenance_to_allocation_id pr) = provenance_to_prov pr.
 
   Parameter provenance_eq_dec :
     forall (pr pr' : Provenance),

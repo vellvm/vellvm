@@ -79,7 +79,8 @@ with Definition Provenance := Provenance
 with Definition AllocationId := AllocationId
 with Definition wildcard_prov := wildcard_prov
 with Definition nil_prov := nil_prov
-with Definition initial_provenance := 0%N.
+with Definition initial_provenance := 0%N
+with Definition provenance_to_prov := fun (pr : Provenance) => Some [pr].
 
   Definition Provenance := Provenance.
   Definition AllocationId := AllocationId.
@@ -117,6 +118,9 @@ with Definition initial_provenance := 0%N.
 
   Definition provenance_to_allocation_id (pr : Provenance) : AllocationId
     := Some pr.
+
+  Definition provenance_to_prov (pr : Provenance) : Prov
+    := Some [pr].
 
   Definition next_provenance (pr : Provenance) : Provenance
     := N.succ pr.
@@ -170,6 +174,15 @@ with Definition initial_provenance := 0%N.
     intros pr pr' H.
     unfold provenance_to_allocation_id in *.
     inv H; auto.
+  Qed.
+
+  Lemma allocation_id_to_prov_provenance_to_allocation_id :
+    forall pr,
+      allocation_id_to_prov (provenance_to_allocation_id pr) = provenance_to_prov pr.
+  Proof.
+    intros pr.
+    cbn.
+    auto.
   Qed.
 
   Lemma provenance_eq_dec :

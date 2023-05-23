@@ -6450,6 +6450,8 @@ Module InfiniteToFinite.
         (ret (lift_MemState ms_alloc, addr_inf)).
   Proof.
     intros t num_elements ms ms_alloc addr_fin addr_inf CONV ALLOCA.
+    (* TODO: Do I even need ALLOCA with the bind lemma? It seems like
+       I *should*... But I haven't had to use it? *)
     red; red in ALLOCA.
 
     (* TODO: Move this... *)
@@ -6779,11 +6781,19 @@ Module InfiniteToFinite.
        *)
 
       subst.
+
+      apply MemPropT_bind_ret_inv in H3.
+      destruct H3 as (ms_fin_undef_bytes&element_bytes&GEN&ALLOC).
+
       eapply MemPropT_fin_inf_bind with
         (A_REF:=Forall2 (Forall2 sbyte_refine))
         (B_REF:=fun a_inf a_fin => InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin)
         (ma_fin:=repeatMN num_elements
-          (lift_OOM (Memory64BitIntptr.MMEP.MemSpec.MemHelpers.generate_undef_bytes t sid_fin))); eauto.
+                   (lift_OOM (Memory64BitIntptr.MMEP.MemSpec.MemHelpers.generate_undef_bytes t sid_fin)))
+        (mab_fin:=(fun (element_bytes : list (list (Memory64BitIntptr.MP.BYTE_IMPL.SByte))) (m : Memory64BitIntptr.MMEP.MMSP.MemState)
+                     (e : err_ub_oom (Memory64BitIntptr.MMEP.MMSP.MemState * FinAddr.addr)) =>
+                     (Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_spec_MemPropT t num_elements
+                        (concat element_bytes)) m e)); eauto.
       + (* Undef Bytes *)
         intros ms_fin'0 bytes_blocks_fin H.
 
@@ -6938,7 +6948,7 @@ Module InfiniteToFinite.
           eauto.
         Qed.
 
-        clear ALLOCA. clear H3. revert H. revert bytes_blocks_fin.
+        clear ALLOCA. clear GEN. clear ALLOC. revert H. revert bytes_blocks_fin.
         induction num_elements using N.peano_ind; intros bytes_blocks_fin H.
         { (* No elements allocated *)
           cbn in H.
@@ -6986,11 +6996,166 @@ Module InfiniteToFinite.
           split; reflexivity.
         * split; auto.
       + (* K' *)
-        intros ms_inf0 ms_fin0 ms_inf'0 ms_fin'0 a_fin a_inf b_fin0 b_inf0 H H4 H5 H6 H7.        
+        intros ms_inf0 ms_fin0 ms_inf'0 ms_fin'0 a_fin a_inf b_fin0 b_inf0 H H4 H5 H6 H7.
         subst.
 
-        admit.
-      + admit.
+        (* TODO: Move this *)
+        Lemma Forall2_concat :
+          forall {X Y} xs ys (P : X -> Y -> Prop),
+            Forall2 (Forall2 P) xs ys ->
+            Forall2 P (concat xs) (concat ys).
+        Proof.
+          intros X Y xs ys P ALL.
+          induction ALL.
+          - cbn; auto.
+          - cbn.
+            apply Forall2_app; auto.
+        Qed.
+
+        red.
+        red in H7.
+        (* TODO: Move this *)
+        Lemma fresh_provenance_fin_inf :
+          forall (ms_inf : MemoryBigIntptr.MMEP.MMSP.MemState)
+            (ms_fin ms_fin' : Memory64BitIntptr.MMEP.MMSP.MemState) (pr : LLVMParamsBigIntptr.PROV.Provenance),
+            MemState_refine_prop ms_inf ms_fin ->
+            fresh_provenance ms_fin (ret (ms_fin', pr)) ->
+            exists ms_inf',
+              @fresh_provenance _ (MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) _  ms_inf (ret (ms_inf', pr)) /\
+                MemState_refine_prop ms_inf' ms_fin'.
+        Proof.
+        Admitted.
+
+        Lemma block_is_free_fin_inf :
+          forall {ms_fin ms_inf addr_fin addrs_fin addr_inf addrs_inf len pr},
+            MemState_refine_prop ms_inf ms_fin ->
+            InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+            Forall2 (fun addr_inf addr_fin => InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin) addrs_inf addrs_fin ->
+            Memory64BitIntptr.MMEP.MemSpec.block_is_free ms_fin len pr addr_fin addrs_fin ->
+            MemoryBigIntptr.MMEP.MemSpec.block_is_free ms_inf len pr addr_inf addrs_inf.
+        Proof.
+          intros ms_fin ms_inf addr_fin addrs_fin addr_inf addrs_inf len pr MSR ADDR_CONV ADDRS_CONV BLOCK_FREE.
+          destruct BLOCK_FREE.
+          split.
+          - eapply fin_inf_get_consecutive_ptrs_success; eauto.
+            eapply Forall2_flip.
+            unfold Util.flip, flip.
+            eauto.
+            apply block_is_free_consecutive.
+          - erewrite inf_fin_addr_convert_provenance; eauto.
+            rewrite MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov_provenance_to_allocation_id.
+            rewrite PROV.allocation_id_to_prov_provenance_to_allocation_id in block_is_free_ptr_provenance.
+            unfold MemoryBigIntptrInfiniteSpec.LP.PROV.provenance_to_prov.
+            unfold PROV.provenance_to_prov in *.
+            rewrite <- block_is_free_ptr_provenance.
+            reflexivity.
+          - intros ptr H.
+            apply In_Nth in H. destruct H.
+            eapply Util.Forall2_Nth_left in ADDRS_CONV; eauto.
+            destruct ADDRS_CONV as (?&?&?).
+
+            pose proof Util.Nth_In H0.
+
+            specialize (block_is_free_ptrs_provenance _ H2).
+
+            erewrite inf_fin_addr_convert_provenance; eauto.
+            rewrite MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov_provenance_to_allocation_id.
+            rewrite PROV.allocation_id_to_prov_provenance_to_allocation_id in block_is_free_ptrs_provenance.
+            unfold MemoryBigIntptrInfiniteSpec.LP.PROV.provenance_to_prov.
+            unfold PROV.provenance_to_prov in *.
+            rewrite <- block_is_free_ptrs_provenance.
+            reflexivity.
+          - intros ptr H.
+            apply In_Nth in H. destruct H.
+            eapply Util.Forall2_Nth_left in ADDRS_CONV; eauto.
+            destruct ADDRS_CONV as (?&?&?).
+
+            pose proof Util.Nth_In H0.
+
+            specialize (block_is_free_bytes_are_free _ H2).
+
+            eapply fin_inf_byte_not_allocated; eauto.
+
+            erewrite inf_fin_addr_convert_provenance; eauto.
+            rewrite MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov_provenance_to_allocation_id.
+            rewrite PROV.allocation_id_to_prov_provenance_to_allocation_id in block_is_free_ptrs_provenance.
+            unfold MemoryBigIntptrInfiniteSpec.LP.PROV.provenance_to_prov.
+            unfold PROV.provenance_to_prov in *.
+            rewrite <- block_is_free_ptrs_provenance.
+            reflexivity.
+
+        Qed.
+
+        Lemma find_free_block_fin_inf :
+          forall {ms_fin ms_fin' ms_inf ms_inf' len addr_fin addrs_fin addr_inf addrs_inf pr},
+            MemState_refine_prop ms_inf ms_fin ->
+            MemState_refine_prop ms_inf' ms_fin' ->
+            InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+            Forall2 (fun addr_inf addr_fin => InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin) addrs_inf addrs_fin ->
+            Memory64BitIntptr.MMEP.MemSpec.find_free_block len pr ms_fin (ret (ms_fin', (addr_fin, addrs_fin))) ->
+            MemoryBigIntptr.MMEP.MemSpec.find_free_block len pr ms_inf (ret (ms_inf', (addr_inf, addrs_inf))).
+        Proof.
+          intros ms_fin ms_fin' ms_inf ms_inf' len addr_fin addrs_fin addr_inf addrs_inf pr MSR1 MSR2 CONV_ADDR CONV_ADDRS FIND_FREE_BLOCK.
+          cbn in FIND_FREE_BLOCK.
+          destruct FIND_FREE_BLOCK; subst.
+
+        Qed.
+        
+        Lemma allocate_bytes_with_pr_spec_MemPropT_fin_inf :
+          forall {ms_fin ms_fin' ms_inf ms_inf' t num_elements bytes_fin addr_fin bytes_inf addr_inf pr},
+            MemState_refine_prop ms_inf ms_fin ->
+            MemState_refine_prop ms_inf' ms_fin' ->
+            InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+            (Forall2 sbyte_refine) bytes_inf bytes_fin ->
+            Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_with_pr_spec_MemPropT t num_elements bytes_fin pr ms_fin (ret (ms_fin', addr_fin)) ->
+            MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_with_pr_spec_MemPropT t num_elements bytes_inf pr ms_inf (ret (ms_inf', addr_inf)).
+        Proof.
+          intros ms_fin ms_fin' ms_inf ms_inf' t num_elements bytes_fin addr_fin bytes_inf addr_inf pr H H0 H1 H2 H3.
+          red.
+          eapply MemPropT_fin_inf_bind; eauto.
+          
+
+        Qed.
+
+        Lemma allocate_bytes_spec_MemPropT_fin_inf :
+          forall {ms_fin ms_fin' ms_inf ms_inf' t num_elements bytes_fin addr_fin bytes_inf addr_inf},
+            MemState_refine_prop ms_inf ms_fin ->
+            MemState_refine_prop ms_inf' ms_fin' ->
+            InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+            (Forall2 sbyte_refine) bytes_inf bytes_fin ->
+            Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_spec_MemPropT t num_elements 
+              bytes_fin ms_fin (ret (ms_fin', addr_fin)) ->
+            MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_spec_MemPropT t num_elements 
+              bytes_inf ms_inf (ret (ms_inf', addr_inf)).
+        Proof.
+          intros ms_fin ms_fin' ms_inf ms_inf' t num_elements bytes_fin addr_fin bytes_inf addr_inf MSR1 MSR2 CONV BYTES_REF ALLOCA_FIN.
+          red.
+
+          eapply MemPropT_fin_inf_bind with
+            (A_REF:=eq)
+            (B_REF:=fun a_inf a_fin => InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin); eauto.
+
+          {
+            intros ms_fin'0 a_fin H.
+            eapply fresh_provenance_fin_inf in H; eauto.
+            destruct H as (?&?&?).
+            exists a_fin. exists x.
+            split; auto.
+          }
+
+          intros ms_inf0 ms_fin0 ms_inf'0 ms_fin'0 a_fin a_inf b_fin b_inf PR_EQ ADDR_CONV MSR1' MSR2' ALLOC.
+          subst.
+          cbn in H.
+
+          FinPROV.Provenance
+          eapply fresh_provenance_fin_inf.
+        Qed.
+
+        eapply allocate_bytes_spec_MemPropT_fin_inf; eauto.
+        apply Forall2_concat; auto.
+      + apply MemPropT_bind_ret_inv in H3.
+        destruct H3 as (?&?&?&?).
+        
     - (* FIN *)
       apply MemPropT_bind_ret_inv in ALLOCA as [s' [a [FRESH REST]]].
       repeat red.
