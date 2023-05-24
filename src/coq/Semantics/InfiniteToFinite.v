@@ -4450,37 +4450,15 @@ Module InfiniteToFinite.
           sbyte_refine byte_inf byte_fin.
   Proof.
     intros ms_inf ms_fin ptr_inf ptr_fin byte_inf MEM_REF ADDR_CONV RBS.
-    red in MEM_REF.
-    unfold convert_MemState in MEM_REF.
-    cbn in MEM_REF.
-    destruct ms_inf.
-    break_match_hyp; inv MEM_REF.
-    destruct ms_memory_stack.
-    cbn in *.
-
-    break_match_hyp; inv Heqo.
-    break_match_hyp; inv H0.
-    break_match_hyp; inv H1.
-    break_match_hyp; inv Heqo1.
-
     pose proof read_byte_spec_read_byte_raw RBS as [aid [READ_RAW_INF ALLOWED]].
 
     cbn in READ_RAW_INF.
-
-    (* (* Not sure there was a point to this *) *)
-    (* destruct RBS. *)
-    (* cbn in read_byte_value. *)
-    (* destruct read_byte_value as [ms [ms' [[MS MS'] READ]]]; subst. *)
-    (* cbn in READ. *)
-    (* rewrite READ_RAW_INF in READ. *)
-    (* cbn in READ. *)
-    (* rewrite ALLOWED in READ. *)
 
     assert (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr_fin = LLVMParamsBigIntptr.PTOI.ptr_to_int ptr_inf) as PTR.
     { eapply fin_inf_ptoi; eauto.
     }
 
-    epose proof inf_fin_read_byte_raw Heqo0 PTR READ_RAW_INF as [byte_fin [READ_BYTE_RAW_FIN BYTE_REF]].
+    epose proof inf_fin_read_byte_raw MEM_REF READ_RAW_INF as [byte_fin [READ_BYTE_RAW_FIN BYTE_REF]].
 
     exists byte_fin.
     split.
@@ -4503,21 +4481,12 @@ Module InfiniteToFinite.
           }
 
           cbn.
-          exists {|
-              FinMemMMSP.memory_stack_memory := m0;
-              FinMemMMSP.memory_stack_frame_stack := f;
-              FinMemMMSP.memory_stack_heap := IntMaps.IP.of_list l
-            |}.
-          exists {|
-              FinMemMMSP.memory_stack_memory := m0;
-              FinMemMMSP.memory_stack_frame_stack := f;
-              FinMemMMSP.memory_stack_heap := IntMaps.IP.of_list l
-            |}.
+          exists (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin).
+          exists (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin).
           split; auto.
 
-          cbn in *.
-
           rewrite PTR.
+          rewrite memory_stack_memory_mem_state_memory_fin.
           rewrite READ_BYTE_RAW_FIN.
           split; auto.
           apply LLVMParams64BitIntptr.PROV.aid_eq_dec_refl.
@@ -4528,6 +4497,7 @@ Module InfiniteToFinite.
         cbn.
 
         rewrite PTR.
+        rewrite memory_stack_memory_mem_state_memory_fin.
         rewrite READ_BYTE_RAW_FIN.
         cbn.
         erewrite inf_fin_access_allowed; eauto; cbn.
