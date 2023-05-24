@@ -4512,28 +4512,21 @@ Module InfiniteToFinite.
   (* TODO: Move this *)
   (* TODO: Ask about in meeting? *)
   (* TODO: This may not currently be true
-     because of how convert_memory works...
+     because of how lift_memory works...
 
-     Both memories use Z as the key for
-     pointers... But there's no constraint
-     on the bounds of the keys when
-     converting between memories (at least currently,
-     this can be changed).
+     No constraint on the bounds of addresses... This can be changed,
+     though... May make sense to just add it as another condition to
+     MemState_refine_prop.
    *)
   Lemma fin_inf_big_addresses_no_byte_to_read :
-    forall mem_inf mem_fin addr_inf oom_msg,
-      convert_memory mem_inf = NoOom mem_fin ->
+    forall ms_inf ms_fin addr_inf oom_msg,
+      MemState_refine_prop ms_inf ms_fin ->
       InfToFinAddrConvert.addr_convert addr_inf = Oom oom_msg ->
-      MemoryBigIntptr.MMEP.MMSP.read_byte_raw mem_inf (LLVMParamsBigIntptr.PTOI.ptr_to_int addr_inf) = None.
+      MemoryBigIntptr.MMEP.MMSP.read_byte_raw (InfMem.MMEP.MMSP.mem_state_memory ms_inf) (LLVMParamsBigIntptr.PTOI.ptr_to_int addr_inf) = None.
   Proof.
     intros mem_inf mem_fin addr_inf oom_msg MEM_CONV ADDR_CONV.
     unfold InfToFinAddrConvert.addr_convert in *.
     destruct addr_inf as [ix_inf pr].
-    Transparent convert_memory.
-    unfold convert_memory in MEM_CONV.
-    Opaque convert_memory.
-    cbn in *.
-    break_match_hyp; inv MEM_CONV.
   Admitted.
 
   (* TODO: a little unsure of this one, but it seems plausible. *)
@@ -4611,8 +4604,8 @@ Module InfiniteToFinite.
   (** Lemmas about writing bytes *)
   Lemma fin_inf_set_byte_memory :
     forall addr_inf addr_fin byte_fin ms_fin ms_inf ms_fin' ms_inf',
-      MemState_refine ms_inf ms_fin ->
-      MemState_refine ms_inf' ms_fin' ->
+      MemState_refine_prop ms_inf ms_fin ->
+      MemState_refine_prop ms_inf' ms_fin' ->
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
       Memory64BitIntptr.MMEP.MemSpec.set_byte_memory ms_fin addr_fin byte_fin ms_fin' ->
       MemoryBigIntptr.MMEP.MemSpec.set_byte_memory ms_inf addr_inf (lift_SByte byte_fin) ms_inf'.
@@ -4683,17 +4676,13 @@ Module InfiniteToFinite.
         destruct H.
         destruct H.
         destruct H.
+        subst.
         clear read_byte_value.
+        rewrite memory_stack_memory_mem_state_memory in H3.
         erewrite fin_inf_big_addresses_no_byte_to_read in H3; eauto.
-        * destruct H3, H1.
-          destruct ms_inf; cbn in *; subst.
-          discriminate.
-        * replace (MemoryBigIntptr.MMEP.MMSP.memory_stack_memory x3) with (MemoryBigIntptr.MMEP.MMSP.mem_state_memory ms_inf).
-          eapply MemState_refine_convert_memory; eauto.
-          destruct ms_inf; cbn in *; subst.
-          unfold MemoryBigIntptr.MMEP.MMSP.mem_state_memory.
-          cbn.
-          reflexivity.
+        destruct H3, H1.
+        destruct ms_inf; cbn in *; subst.
+        discriminate.
       + (* New memory to old *)
         destruct (InfToFinAddrConvert.addr_convert ptr') eqn:CONVPTR.
         {
@@ -4754,16 +4743,12 @@ Module InfiniteToFinite.
         destruct H.
         destruct H.
         clear read_byte_value.
+        subst.
+        rewrite memory_stack_memory_mem_state_memory in H3.
         erewrite fin_inf_big_addresses_no_byte_to_read in H3; eauto.
-        * destruct H3, H1.
-          destruct ms_inf; cbn in *; subst.
-          discriminate.
-        * replace (MemoryBigIntptr.MMEP.MMSP.memory_stack_memory x3) with (MemoryBigIntptr.MMEP.MMSP.mem_state_memory ms_inf').
-          eapply MemState_refine_convert_memory; eauto.
-          destruct ms_inf; cbn in *; subst.
-          unfold MemoryBigIntptr.MMEP.MMSP.mem_state_memory.
-          cbn.
-          reflexivity.
+        destruct H3, H1.
+        destruct ms_inf; cbn in *; subst.
+        discriminate.
   Qed.
 
   (* TODO: Move this, prove this. *)
