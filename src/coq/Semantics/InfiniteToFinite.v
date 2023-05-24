@@ -5493,8 +5493,8 @@ Module InfiniteToFinite.
 
   Lemma fin_inf_heap_preserved :
     forall ms_fin ms_inf ms_fin' ms_inf',
-      MemState_refine ms_inf ms_fin ->
-      MemState_refine ms_inf' ms_fin' ->
+      MemState_refine_prop ms_inf ms_fin ->
+      MemState_refine_prop ms_inf' ms_fin' ->
       Memory64BitIntptr.MMEP.MemSpec.heap_preserved ms_fin ms_fin' ->
       MemoryBigIntptr.MMEP.MemSpec.heap_preserved ms_inf ms_inf'.
   Proof.
@@ -5504,8 +5504,8 @@ Module InfiniteToFinite.
 
   Lemma fin_inf_read_byte_allowed_all_preserved :
     forall ms_fin ms_inf ms_fin' ms_inf',
-      MemState_refine ms_inf ms_fin ->
-      MemState_refine ms_inf' ms_fin' ->
+      MemState_refine_prop ms_inf ms_fin ->
+      MemState_refine_prop ms_inf' ms_fin' ->
       Memory64BitIntptr.MMEP.MemSpec.read_byte_allowed_all_preserved ms_fin ms_fin' ->
       MemoryBigIntptr.MMEP.MemSpec.read_byte_allowed_all_preserved ms_inf ms_inf'.
   Proof.
@@ -5514,8 +5514,8 @@ Module InfiniteToFinite.
 
   Lemma fin_inf_read_byte_prop_all_preserved :
     forall ms_fin ms_inf ms_fin' ms_inf',
-      MemState_refine ms_inf ms_fin ->
-      MemState_refine ms_inf' ms_fin' ->
+      MemState_refine_prop ms_inf ms_fin ->
+      MemState_refine_prop ms_inf' ms_fin' ->
       Memory64BitIntptr.MMEP.MemSpec.read_byte_prop_all_preserved ms_fin ms_fin' ->
       MemoryBigIntptr.MMEP.MemSpec.read_byte_prop_all_preserved ms_inf ms_inf'.
   Proof.
@@ -5524,8 +5524,8 @@ Module InfiniteToFinite.
 
   Lemma fin_inf_write_byte_allowed_all_preserved :
     forall ms_fin ms_inf ms_fin' ms_inf',
-      MemState_refine ms_inf ms_fin ->
-      MemState_refine ms_inf' ms_fin' ->
+      MemState_refine_prop ms_inf ms_fin ->
+      MemState_refine_prop ms_inf' ms_fin' ->
       Memory64BitIntptr.MMEP.MemSpec.write_byte_allowed_all_preserved ms_fin ms_fin' ->
       MemoryBigIntptr.MMEP.MemSpec.write_byte_allowed_all_preserved ms_inf ms_inf'.
   Proof.
@@ -5534,8 +5534,8 @@ Module InfiniteToFinite.
 
   Lemma fin_inf_free_byte_allowed_all_preserved :
     forall ms_fin ms_inf ms_fin' ms_inf',
-      MemState_refine ms_inf ms_fin ->
-      MemState_refine ms_inf' ms_fin' ->
+      MemState_refine_prop ms_inf ms_fin ->
+      MemState_refine_prop ms_inf' ms_fin' ->
       Memory64BitIntptr.MMEP.MemSpec.free_byte_allowed_all_preserved ms_fin ms_fin' ->
       MemoryBigIntptr.MMEP.MemSpec.free_byte_allowed_all_preserved ms_inf ms_inf'.
   Proof.
@@ -5544,8 +5544,8 @@ Module InfiniteToFinite.
 
   Lemma fin_inf_preserve_allocation_ids :
     forall ms_fin ms_inf ms_fin' ms_inf',
-      MemState_refine ms_inf ms_fin ->
-      MemState_refine ms_inf' ms_fin' ->
+      MemState_refine_prop ms_inf ms_fin ->
+      MemState_refine_prop ms_inf' ms_fin' ->
       Memory64BitIntptr.MMEP.MemSpec.preserve_allocation_ids ms_fin ms_fin' ->
       MemoryBigIntptr.MMEP.MemSpec.preserve_allocation_ids ms_inf ms_inf'.
   Proof.
@@ -5554,8 +5554,8 @@ Module InfiniteToFinite.
 
   Lemma fin_inf_write_byte_operation_invariants :
     forall addr_inf addr_fin ms_fin ms_inf ms_fin' ms_inf',
-      MemState_refine ms_inf ms_fin ->
-      MemState_refine ms_inf' ms_fin' ->
+      MemState_refine_prop ms_inf ms_fin ->
+      MemState_refine_prop ms_inf' ms_fin' ->
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
       Memory64BitIntptr.MMEP.MemSpec.write_byte_operation_invariants ms_fin ms_fin' ->
       MemoryBigIntptr.MMEP.MemSpec.write_byte_operation_invariants ms_inf ms_inf'.
@@ -5575,7 +5575,7 @@ Module InfiniteToFinite.
 
   Lemma fin_inf_write_byte_spec_MemPropT :
     forall {addr_fin addr_inf ms_fin ms_inf ms_fin' byte_fin},
-      MemState_refine ms_inf ms_fin ->
+      MemState_refine_prop ms_inf ms_fin ->
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
       Memory64BitIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_fin byte_fin
         ms_fin
@@ -5584,51 +5584,116 @@ Module InfiniteToFinite.
         MemoryBigIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_inf (lift_SByte byte_fin)
           ms_inf
           (ret (ms_inf', tt)) /\
-          MemState_refine ms_inf' ms_fin'.
+          MemState_refine_prop ms_inf' ms_fin'.
   Proof.
     intros addr_fin addr_inf ms_fin ms_inf ms_fin' byte_fin MSR ADDR_CONV WBP.
     (* TODO: make things opaque? *)
     destruct WBP.
     exists (lift_MemState ms_fin').
-    split; [| apply lift_MemState_refine ].
+    split; [| apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine ].
     split.
     - eapply fin_inf_write_byte_allowed; eauto.
     - eapply fin_inf_set_byte_memory; eauto.
-      apply lift_MemState_refine.
+      apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
     - eapply fin_inf_write_byte_operation_invariants; eauto.
-      apply lift_MemState_refine.
+      apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
   Qed.
 
   Lemma fin_inf_write_byte_spec :
     forall {addr_fin addr_inf ms_fin ms_inf ms_fin' byte_fin},
-      MemState_refine ms_inf ms_fin ->
+      MemState_refine_prop ms_inf ms_fin ->
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
       Memory64BitIntptr.MMEP.MemSpec.write_byte_spec ms_fin addr_fin byte_fin ms_fin' ->
       exists ms_inf',
         MemoryBigIntptr.MMEP.MemSpec.write_byte_spec ms_inf addr_inf (lift_SByte byte_fin) ms_inf' /\
-          MemState_refine ms_inf' ms_fin'.
+          MemState_refine_prop ms_inf' ms_fin'.
   Proof.
     intros addr_fin addr_inf ms_fin ms_inf ms_fin' byte_fin MSR ADDR_CONV WBP.
     (* TODO: make things opaque? *)
     destruct WBP.
     exists (lift_MemState ms_fin').
-    split; [| apply lift_MemState_refine ].
+    split; [| apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine ].
     split.
     - eapply fin_inf_write_byte_allowed; eauto.
     - eapply fin_inf_set_byte_memory; eauto.
-      apply lift_MemState_refine.
+      apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
     - eapply fin_inf_write_byte_operation_invariants; eauto.
-      apply lift_MemState_refine.
+      apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma get_consecutive_ptrs_0_is_nil :
+    forall ms ms' ptr res,
+      @InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs
+        (MemPropT InfMem.MMEP.MMSP.MemState)
+        (@MemPropT_Monad InfMem.MMEP.MMSP.MemState)
+        (@MemPropT_RAISE_OOM InfMem.MMEP.MMSP.MemState)
+        (@MemPropT_RAISE_ERROR InfMem.MMEP.MMSP.MemState)
+        ptr 0 ms (success_unERR_UB_OOM (ms', res)) ->
+      res = [].
+  Proof.
+    intros ms ms' ptr res GCP.
+    Transparent InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+    unfold InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs in GCP.
+    Opaque InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+
+    cbn in *.
+    destruct GCP as (?&?&(?&?)&?&?&?&?); subst.
+    cbn in *.
+    destruct H1; subst.
+    cbn in *.
+    destruct H2; subst.
+    auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma map_monad_MemPropT_length :
+    forall {S A B} {l} {f : A -> MemPropT S B} {s1 s2 res},
+      @map_monad (MemPropT S) (@MemPropT_Monad S)
+        A B f l s1 (success_unERR_UB_OOM (s2, res)) ->
+      length res = length l.
+  Proof.
+    intros S A B l.
+    induction l; intros f s1 s2 res HMAPM.
+    cbn in *.
+    destruct HMAPM; subst; auto.
+
+    rewrite map_monad_unfold in HMAPM.
+    cbn in HMAPM.
+    destruct HMAPM as (?&?&?&?&?&?&?&?).
+    subst.
+    apply IHl in H0.
+    cbn.
+    auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma zip_length :
+    forall {A B C D} {x : list A} {y : list B} {z : list C} {w : list D},
+      length x = length z ->
+      length y = length w ->
+      length (zip x y) = length (zip z w).
+  Proof.
+  Admitted.
+
+  (* TODO: Move this *)
+  Lemma zip_cons :
+    forall {X Y} (x : X) xs (y : Y) ys,
+      zip (x :: xs) (y :: ys) = (x, y) :: zip xs ys.
+  Proof.
+    intros X Y x xs y ys.
+    cbn.
+    auto.
   Qed.
 
   Lemma fin_inf_write_bytes_spec :
     forall a_fin a_inf ms_fin ms_inf ms_fin' bytes_fin,
       InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
-      MemState_refine ms_inf ms_fin ->
+      MemState_refine_prop ms_inf ms_fin ->
       Memory64BitIntptr.MMEP.MemSpec.write_bytes_spec a_fin bytes_fin ms_fin (success_unERR_UB_OOM (ms_fin', tt)) ->
       exists ms_inf',
         MemoryBigIntptr.MMEP.MemSpec.write_bytes_spec a_inf (map lift_SByte bytes_fin) ms_inf (success_unERR_UB_OOM (ms_inf', tt)) /\
-        MemState_refine ms_inf' ms_fin'.
+        MemState_refine_prop ms_inf' ms_fin'.
   Proof.
     intros a_fin a_inf ms_fin ms_inf ms_fin' bytes_fin ADDR_CONV MEM_REF WRITE_SPEC.
 
@@ -5637,63 +5702,39 @@ Module InfiniteToFinite.
     Opaque MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
 
     cbn in *.
-    destruct WRITE_SPEC as (ms_fin_gep & addrs_fin & CONSEC & WRITE_SPEC).
+    destruct WRITE_SPEC as (ms_fin_gcp & addrs_fin & CONSEC & WRITE_SPEC).
     destruct WRITE_SPEC as (ms_fin_writes & WRITE_RES & WRITE_SPEC & MS & _).
-    pose proof fin_inf_get_consecutive_ptrs_success_exists a_fin a_inf (Datatypes.length bytes_fin) ms_fin ms_fin_gep addrs_fin ms_inf ADDR_CONV CONSEC as (addrs_inf & GCP & ADDRS_CONV).
+    pose proof fin_inf_get_consecutive_ptrs_success_exists a_fin a_inf (Datatypes.length bytes_fin) ms_fin ms_fin_gcp addrs_fin ms_inf ADDR_CONV CONSEC as (addrs_inf & GCP & ADDRS_CONV).
     pose proof Memory64BitIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq _ _ _ _ _ CONSEC; subst.
 
     (* Not sure if induction is the right thing to do here *)
     generalize dependent a_fin.
     generalize dependent a_inf.
     generalize dependent bytes_fin.
-    revert WRITE_RES ms_inf ms_fin_gep MEM_REF ms_fin_writes.
-    induction ADDRS_CONV; intros WRITE_RES ms_inf ms_fin_gep MEM_REF ms_fin_writes bytes_fin WRITE_SPEC a_inf GCP a_fin ADDR_CONV CONSEC.
+    revert WRITE_RES ms_inf ms_fin_gcp MEM_REF ms_fin_writes.
+    induction ADDRS_CONV; intros WRITE_RES ms_inf ms_fin_gcp MEM_REF ms_fin_writes bytes_fin WRITE_SPEC a_inf GCP a_fin ADDR_CONV CONSEC.
 
     - cbn in *.
       destruct WRITE_SPEC; subst.
 
       (* Final MemState *)
-      exists (lift_MemState ms_fin_gep).
-      split; [| apply lift_MemState_refine].
+      exists ms_inf.
+      split; auto.
 
-      (* MemState after GEP *)
+      (* MemState after GCP *)
       exists ms_inf.
       exists [].
       split.
-      + (* GEP *)
+      + (* GCP *)
         rewrite map_length.
         auto.
-      + exists (lift_MemState ms_fin_gep).
+      + exists ms_inf.
         exists [].
         split; auto.
 
         cbn in *.
         split; auto.
-        red in MEM_REF.
-
-        apply lift_MemState_convert_MemState_inverse; auto.
-
     - (* Final MemState *)
-      (* May need to hold off on this until we can call induction hypothesis *)
-      exists (lift_MemState ms_fin_writes).
-      split; [| apply lift_MemState_refine].
-
-      (* MemState after GEP *)
-      exists ms_inf.
-
-      (* GCP results *)
-      exists (y :: l').
-      split.
-
-      { (* GCP *)
-        rewrite map_length.
-        auto.
-      }
-
-      exists (lift_MemState ms_fin_writes).
-      exists WRITE_RES.
-      split; auto.
-
       assert (exists (pre : MemoryBigIntptr.MMEP.MMSP.MemState) (post : MemoryBigIntptr.MMEP.MMSP.MemState),
                  Within.within (InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_inf (Datatypes.length bytes_fin)) pre
                    (ret (y::l')) post) as WITHIN.
@@ -5730,33 +5771,77 @@ Module InfiniteToFinite.
 
       pose proof fin_inf_write_byte_spec MEM_REF H WRITE_SPEC as [ms_inf_write [WRITE_SPEC_INF MEM_REF_WRITE]].
 
-      exists ms_inf_write. exists tt.
-      split; auto.
-
       (* Writing the rest of the bytes *)
       destruct GCP_CONS as [A_INF [[L LENGTH] | GCP_CONS]]. subst.
 
       { (* Only one byte being written *)
-        exists (lift_MemState ms_fin_writes').
-        exists writes_res'.
-        split; auto.
-        cbn.
-
+        destruct bytes_fin; cbn in LENGTH; inv LENGTH.
         inv ADDRS_CONV.
         cbn in WRITES_SPEC.
-        destruct WRITES_SPEC.
-        subst.
+        destruct WRITES_SPEC; subst.
+        
+        (* May need to hold off on this until we can call induction hypothesis *)
+        exists ms_inf_write.
         split; auto.
 
-        apply lift_MemState_convert_MemState_inverse; auto.
+        (* MemState after GCP *)
+        exists ms_inf.
+
+        (* GCP results *)
+        exists [a_inf].
+        split; auto.
+
+        exists ms_inf_write.
+        exists [tt].
+        split; auto.
+
+        exists ms_inf_write.
+        exists tt.
+        split; auto.
+
+        repeat red.
+        exists ms_inf_write.
+        exists [].
+        split; cbn; auto.
       }
 
-      (* More than one byte to write *)
-      destruct GCP_CONS as (ptr'&ip&len'&LENGTH'&IP&GEP&GCP_CONS).
-      subst.
-      inv LENGTH'.
+      (* Possibly more than one byte to write *)
+      destruct GCP_CONS as (ptr'&ip&len'&LENGTH'&IP&GCP'&GCP_CONS).
+      destruct bytes_fin; cbn in LENGTH'; inv LENGTH'.
+      { (* Just the one... *)
+        cbn in BYTES_LENGTH.
+        inv BYTES_LENGTH.
+        destruct l'; inv H1.
+        inv ADDRS_CONV.
+        cbn in WRITES_SPEC.
+        destruct WRITES_SPEC; subst.
+        
+        (* May need to hold off on this until we can call induction hypothesis *)
+        exists ms_inf_write.
+        split; auto.
 
-      cbn.
+        (* MemState after GCP *)
+        exists ms_inf.
+
+        (* GCP results *)
+        exists [a_inf].
+        split; auto.
+
+        exists ms_inf_write.
+        exists [tt].
+        split; auto.
+
+        exists ms_inf_write.
+        exists tt.
+        split; auto.
+
+        repeat red.
+        exists ms_inf_write.
+        exists [].
+        split; cbn; auto.
+      }
+
+      (* More than one byte written *)
       specialize (IHADDRS_CONV _ _ _ MEM_REF_WRITE _ _ WRITES_SPEC ptr').
       forward IHADDRS_CONV.
       {
@@ -5767,73 +5852,25 @@ Module InfiniteToFinite.
         apply GCP_CONS.
       }
 
-      destruct bytes_fin.
-      {
-        cbn in *.
-        red in GCP_CONS.
-        cbn in GCP_CONS.
-
-        (* TODO: Move this *)
-        Lemma get_consecutive_ptrs_0_is_nil :
-          forall ms ms' ptr res,
-            @InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs
-              (MemPropT InfMem.MMEP.MMSP.MemState)
-               (@MemPropT_Monad InfMem.MMEP.MMSP.MemState)
-               (@MemPropT_RAISE_OOM InfMem.MMEP.MMSP.MemState)
-               (@MemPropT_RAISE_ERROR InfMem.MMEP.MMSP.MemState)
-               ptr 0 ms (success_unERR_UB_OOM (ms', res)) ->
-            res = [].
-        Proof.
-          intros ms ms' ptr res GCP.
-          Transparent InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
-          unfold InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs in GCP.
-          Opaque InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
-
-          cbn in *.
-          destruct GCP as (?&?&(?&?)&?&?&?&?); subst.
-          cbn in *.
-          destruct H1; subst.
-          cbn in *.
-          destruct H2; subst.
-          auto.
-        Qed.
-
-        apply get_consecutive_ptrs_0_is_nil in GCP_CONS; subst.
-        cbn.
-        exists ms_inf_write. exists [].
-        split; auto.
-
-        inv ADDRS_CONV.
-        cbn in *.
-        destruct WRITES_SPEC; subst.
-        split; auto.
-
-        eapply lift_MemState_convert_MemState_inverse.
-        eauto.
-      }
-
-      inv BYTES_LENGTH.
-      destruct l'; inv H1.
+      destruct l'; cbn in BYTES_LENGTH; inv BYTES_LENGTH.
       inv ADDRS_CONV.
 
       rename a into ptr''.
       rename x0 into ptr'_fin.
 
       assert (ptr'' = ptr').
-      {
-        pose proof InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons' _ _ _ _ _ _ GCP_CONS as GCP_CONS'.
+      { pose proof InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons' _ _ _ _ _ _ GCP_CONS as GCP_CONS'.
 
         (* Single byte *)
         destruct GCP_CONS' as [A_INF [[L LENGTH] | GCP_CONS']]; subst; auto.
       }
-
       subst.
 
       specialize (IHADDRS_CONV ptr'_fin H4).
 
       forward IHADDRS_CONV.
       {
-        assert ((ret (x::ptr'_fin::l0)) {{ms_fin_gep}} ∈ {{ms_fin_gep}} (FinLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_fin (Datatypes.length (byte_fin :: s :: bytes_fin)))) as WITHIN_FIN.
+        assert ((ret (x::ptr'_fin::l0)) {{ms_fin_gcp}} ∈ {{ms_fin_gcp}} (FinLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_fin (Datatypes.length (byte_fin :: s :: bytes_fin)))) as WITHIN_FIN.
         {
           cbn. red. cbn.
           auto.
@@ -5841,7 +5878,7 @@ Module InfiniteToFinite.
 
         pose proof FinMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons' _ _ _ _ _ _ WITHIN_FIN.
         destruct H0; subst.
-        destruct H1.
+        destruct H2.
         - destruct H0; discriminate.
         - destruct H0 as (?&?&?&?&?&?&?).
           pose proof FinMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons' _ _ _ _ _ _ H6.
@@ -5858,14 +5895,14 @@ Module InfiniteToFinite.
       destruct H0.
       destruct H0.
       destruct H0.
-      rename H0 into GCP'.
+      rename H0 into GCP''.
       rename x1 into ptrs_res.
       rename x0 into ms_inf_write'.
 
       assert (ptrs_res = ptr' :: l') as PTRS_RES.
       {
         (* Should follow from GCP' and GCP_CONS *)
-        clear - GCP' GCP_CONS.
+        clear - GCP'' GCP_CONS.
 
         assert (ret (ptr' :: l') ∈
                   @InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs
@@ -5891,7 +5928,7 @@ Module InfiniteToFinite.
           do 2 eexists; cbn; red; cbn; eauto.
         }
 
-        clear GCP' GCP_CONS.
+        clear GCP'' GCP_CONS.
         rewrite map_length in GCP.
         pose proof InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_success_always_succeeds _ _ _ _ GCP GCP_CONS'.
         inv H.
@@ -5907,41 +5944,11 @@ Module InfiniteToFinite.
         clear - H5 HMAPM WRITES_SPEC.
         (* Should just need the length of writes_res and writes_res' to be the same *)
 
-        (* TODO: Move this *)
-        Lemma map_monad_MemPropT_length :
-          forall {S A B} {l} {f : A -> MemPropT S B} {s1 s2 res},
-            @map_monad (MemPropT S) (@MemPropT_Monad S)
-              A B f l s1 (success_unERR_UB_OOM (s2, res)) ->
-            length res = length l.
-        Proof.
-          intros S A B l.
-          induction l; intros f s1 s2 res HMAPM.
-          cbn in *.
-          destruct HMAPM; subst; auto.
-
-          rewrite map_monad_unfold in HMAPM.
-          cbn in HMAPM.
-          destruct HMAPM as (?&?&?&?&?&?&?&?).
-          subst.
-          apply IHl in H0.
-          cbn.
-          auto.
-        Qed.
-
         apply map_monad_MemPropT_length in WRITES_SPEC.
         apply map_monad_MemPropT_length in HMAPM.
 
         (* Need to know the length of l' and l0 ... From H5 *)
         apply Util.Forall2_length in H5.
-
-        (* TODO: Move this *)
-        Lemma zip_length :
-          forall {A B C D} {x : list A} {y : list B} {z : list C} {w : list D},
-            length x = length z ->
-            length y = length w ->
-            length (zip x y) = length (zip z w).
-        Proof.
-        Admitted.
 
         assert (length (ptr' :: l') = length (ptr'_fin :: l0)).
         cbn; auto.
@@ -5965,14 +5972,37 @@ Module InfiniteToFinite.
       subst.
 
       exists ms_inf''.
-      exists writes_res'.
-      split; auto.
-      apply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in GCP'.
-      subst.
-      apply HMAPM.
       split; auto.
 
-      apply lift_MemState_convert_MemState_inverse; auto.
+      exists ms_inf. exists (a_inf :: ptr' :: l').
+      split.
+      { rewrite map_length.
+        apply WITHIN'.
+      }
+
+      exists ms_inf''.
+      exists (tt :: writes_res').
+      split; auto.
+
+      rewrite zip_cons.
+      rewrite map_monad_unfold.
+
+      pose proof GCP''.
+      apply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in H0; subst.
+
+      repeat red.
+      exists ms_inf_write'. exists tt.
+      split.
+      {
+        cbn.
+        auto.
+      }
+
+      repeat red.
+      exists ms_inf''.
+      exists writes_res'.
+      split; auto.
+      cbn; split; auto.
   Qed.
 
   (* TODO: Move this to somewhere it can
