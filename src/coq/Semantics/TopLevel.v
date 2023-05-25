@@ -17,6 +17,8 @@ From ExtLib Require Import
 From Vellvm Require Import
      Utilities
      Syntax
+     Syntax.LLVMAst
+     Syntax.AstLib
      Semantics.LLVMEvents
      Semantics.Denotation
      Semantics.IntrinsicsDefinitions
@@ -90,19 +92,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     | DVALUE_I8 b => ret b
     | _ => raise "i8_str_index failed with non-DVALUE_I8"
     end.
-(* SAZ: tail recursive version of list reversal -- is this already in our libraries somehwere? -
- GC: I think so. It's defined in DList. Maybe we can mark this as resolved?
- *)
 
-
-Definition listrev {A : Type} (l : list A): list A := DList.rev_tail_rec l.
-
-  (* Definition listrev {A:Type} (l:list A) : list A := *)
-  (*   (fix rev_tail (l:list A) (acc:list A) : list A := *)
-  (*     match l with *)
-  (*     | [] => acc *)
-  (*     | x::xs => rev_tail xs (x::acc) *)
-  (*     end) l []. *)
   
   (** Semantic function that treats [u_strptr] as a C-style string pointer:
       - reads i8 values from memory until it encounters a null-terminator (i8 0)
@@ -125,7 +115,7 @@ Definition listrev {A : Type} (l : list A): list A := DList.rev_tail_rec l.
                    ret (inl (next_char, c::bytes, (offset + 1)%Z))
               )
               (char, [], 1%Z) ;;
-          v <- trigger (IO_stdout (listrev bytes)) ;;
+          v <- trigger (IO_stdout (DList.rev_tail_rec bytes)) ;;
           ret (UVALUE_I8 (DynamicValues.Int8.zero))
       | _ => raiseUB "puts got non-address argument"
       end
@@ -136,7 +126,6 @@ Definition listrev {A : Type} (l : list A): list A := DList.rev_tail_rec l.
       | strptr::[] => puts_body strptr
       | _ => raise "puts called with zero or more than one arguments"
       end.
-
 
   (** * [built_in_functions]
 
@@ -154,10 +143,98 @@ Definition listrev {A : Type} (l : list A): list A := DList.rev_tail_rec l.
       [declare i32 puts(i8* %str)] 
       See /tests/io for some examples.
    *)
-  Definition built_in_functions : list (function_id * function_denotation) := 
-    [(Name "puts", puts_denotation)]. 
 
+  Definition built_in_functions (decls : list (declaration dtyp)) : list (function_id * function_denotation) :=
+    match List.find (fun s => (Coqlib.proj_sumbool (Syntax.AstLib.RawIDOrd.eq_dec s (Name "puts"))))
+            (List.map (@dc_name dtyp) decls) with
+    | Some _ => [(Name "puts", puts_denotation)]
+    | None => []
+    end.
 
+  
+  (* SAZ: commenting this out for now, since it's trickier than we wanted *)
+  (* Command-line arguments----------------------------------------------------------------------- *)
+
+  (* To support command-line arguments we convert a list of Coq strings into a preamble of 
+     global declarations with a form illustrated in tests/io/args_vellvm.ll.  Given N strings
+     s_arg0, s_arg1, ..., s_argN.
+
+     Arguments are parsed from the command line as (list (list Z)) where each Z is an i8.
+     
+     Note:
+     - following C-style conventions, s_arg0 is the _name_ of the executable, so the 
+       (list (list Z)) should never be non-empty
+     - we name the array of arguments argv itself [arg_gid (N+1)]
+     Therefore, after initializing everything, we call main with 
+        UValue_r N) and whatever pointer we get from doing [u <- Load argv]
+   *)
+(*
+  Definition zi8_to_exp (z_i8 : Z) := @LLVMAst.EXP_Integer dtyp z_i8.
+  Definition zi8s_to_EXP_Cstring (zi8s:list Z) :=
+    EXP_Cstring (List.map (fun z => (DTYPE_I 8, zi8_to_exp z)) zi8s).
+
+  (* These assume that [arg] is a list _including_ the 0 null terminator. *) 
+  Definition cstring_typ (arg:list Z) := DTYPE_Array (N.of_nat(List.length arg)) (DTYPE_I 8).               
+  Definition arg_global gid (arg:list Z) :=
+      mk_global gid (cstring_typ arg) true (Some (zi8s_to_EXP_Cstring arg)) false [].
+
+  Definition mapi {A B} (f : N -> A -> B) (l:list A ) : list B :=
+    (fix h (n:N) l :=
+      match l with
+      | [] => []
+      | x::xs => (f n x)::h (1+n)%N xs
+      end) 0%N l.
+
+  (* SAZ: TODO: do we use "Raw" anywhere else in the semantics?  I chose to use them here
+     because the global declarations associated with these identifiers aren't really present
+     statically; they are allocated by the "runtime".  We need to be able to generate 
+     N+1 fresh global identifiers to hold the storage space for command-line arugments. 
+   *)
+  Definition arg_raw_id (n:N) := (Raw (Z.of_N n)).
+  Definition arg_gid (n:N) := ID_Global (arg_raw_id n).
+  Definition arg_tle (n:N) (arg:list Z) : toplevel_entity dtyp (CFG.cfg dtyp) :=
+    TLE_Global (arg_global (arg_raw_id n) arg).
+
+  Definition arg_gep_ref (n:N) (arg:list Z) : (dtyp * exp dtyp) :=
+    (DTYPE_Pointer,
+      OP_GetElementPtr (cstring_typ arg) (DTYPE_Pointer, EXP_Ident (arg_gid n))
+        [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, EXP_Integer 0%Z)]).
+
+  Definition argv_type (argc:N) := DTYPE_Array argc DTYPE_Pointer.
+  
+  Definition argv_array_global (args : list (list Z)) :=
+    let argc : N := N.of_nat (List.length args) in
+    mk_global
+      (arg_raw_id (1+argc))
+      (argv_type argc)
+      false
+      (Some (EXP_Array (mapi arg_gep_ref args)))
+      false
+      [].
+      
+    
+  Definition argc_array_tle (args : list (list Z)) : toplevel_entity dtyp (CFG.cfg dtyp) :=
+    TLE_Global (argv_array_global args).
+
+  (* TODO: 
+      The staging of these arguments is a bit tricky.  We want to inject these new TLEs into
+      the semantics, but we also need to "call" the main function with some arguments that
+      depend on them: i.e. 
+          argc = EXP_Integer N and 
+          argv = [bitcast ([3 x i8*]* @_RAW_argv to i8** )])
+
+     It is probably cleaner to maintain the syntactic/semantic phase distinction and 
+     just "close" the program at the syntax level and then treat the argv strings as
+     part of the global environment where we want to interpret main_args like:
+
+     main args (initialize_globals : itree) : itree :=
+         initialize_globals ;;
+         initialize_args args ;;
+         argv <- trigger (GlobalRead (g_ident (arg_raw_id (1+argc)))) ;;
+         trigger (Call "main" [UVALUE_I32 N; argv])
+   *)
+   *)  
+  
   (* TOPLEVEL Semantics  ------------------------------------------------------------------------- *)
   
   (** * Initialization
@@ -287,7 +364,7 @@ Definition listrev {A : Type} (l : list A): list A := DList.rev_tail_rec l.
              (mcfg : CFG.mcfg dtyp) : itree L0 dvalue :=
     build_global_environment mcfg ;;
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
-    'builtins <- map_monad address_one_builtin_function built_in_functions ;;
+    'builtins <- map_monad address_one_builtin_function (built_in_functions (m_declarations mcfg));;
     'addr <- trigger (GlobalRead (Name entry)) ;;
     'rv <- denote_mcfg (defns ++ builtins) ret_typ (dvalue_to_uvalue addr) args ;;
     dv_pred <- trigger (pick_uvalue (forall dt, ~concretize rv (DVALUE_Poison dt)) rv);;

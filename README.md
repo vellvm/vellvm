@@ -30,18 +30,14 @@ a verified front-end for the [Helix](https://github.com/vzaliva/helix) chain of 
  - architecture-specific floats
  - opaque types
 
- Vellvm does not yet provide support formany C standard library functions (such
- as `printf`), but does support `malloc`. From a semantics perspective, the main
+ Vellvm does not yet provide support for many C standard library functions (such
+ as `printf`), but does support `puts` and `malloc`. From a semantics perspective, the main
  limitations have to do with concurrency.
 
 ## See also:
  - [Vellvm](http://www.cis.upenn.edu/~stevez/vellvm/) (somewhat out of date)
  - [DeepSpec](http://deepspec.org)
  - [LLVM](http://llvm.org)
-
-### Related publication:
- - "Modular, Compositional, and Executable Formal Semantics for LLVM IR" ([ICFP'21](https://icfp21.sigplan.org/details/icfp-2021-papers/6/Modular-Compositional-and-Executable-Formal-Semantics-for-LLVM-IR)),
-    Yannick Zakowski, Calvin Beck, Irene Yoon, Ilia Zaichuk, Vadim Zaliva, Steve Zdancewic
 
 # Participants
 
@@ -50,23 +46,37 @@ a verified front-end for the [Helix](https://github.com/vzaliva/helix) chain of 
  - Calvin Beck
  - Irene Yoon
  - Gary (Hanxi) Chen
- - Eduardo Gonzalez
- - Zak Sines
- - Nathan Sobotka
  
 ## Past Contributors
  - Vivien Durey 
  - Dmitri Garbuzov 
+ - Eduardo Gonzalez
  - Olek Gierczak
  - William Mansky
  - Milo Martin
  - Santosh Nagarakatte 
  - Emmett Neyman 
  - Christine Rizkallah 
+ - Zak Sines
+ - Nathan Sobotka
  - Robert Zajac
+ - Ilia Zaichuk
+ - Vadim Zaliva
  - Richard Zhang 
  - Jianzhou Zhao 
-  
+
+### Recent Related Publications: 
+ - "Modular, Compositional, and Executable Formal Semantics for LLVM IR" ([ICFP'21](https://icfp21.sigplan.org/details/icfp-2021-papers/6/Modular-Compositional-and-Executable-Formal-Semantics-for-LLVM-IR)),
+    Yannick Zakowski, Calvin Beck, Irene Yoon, Ilia Zaichuk, Vadim Zaliva, Steve Zdancewic
+ - "Formal Reasoning About Layered Monadic Interpreters" ([ICFP'22](http://www.cis.upenn.edu/~stevez/papers/YZZ22.pdf)), Irene Yoon, Yannick Zakowski, and Steve Zdancewic.
+ - "Interaction Trees" ([POPL'20](http://www.cis.upenn.edu/~stevez/papers/XZHH+20.pdf))	Li-yao Xia, Yannick Zakowski, Paul He, Chung-Kil Hur, Gregory Malecha, Benjamin C. Pierce, and Steve Zdancewic. 
+
+### Older Vellvm-related papers:
+ - "A Formal C Memory Model Supporting Integer-Pointer Casts" ([PLDI'15](http://www.cis.upenn.edu/~stevez/papers/KHM+15.pdf)), Jeehoon Kang, Chung-Kil Hur, William Mansky, Dmitri Garbuzov, Steve Zdancewic, and Viktor Vafeiadis. 
+ - "Formal Verification of SSA-Based Optimizations for LLVM" ([PLDI'13](http://www.cis.upenn.edu/~stevez/papers/ZNMZ13.pdf)), Jianzhou Zhao, Santosh Nagarakatte, Milo M. K. Martin, and Steve Zdancewic. 
+ - "Formalizing the LLVM Intermediate Representation for Verified Program Transformations" ([POPL'12](http://www.cis.upenn.edu/~stevez/papers/ZNMZ12.pdf)), Jianzhou Zhao, Santosh Nagarakatte, Milo M. K. Martin, and Steve Zdancewic. 
+ - "Mechanized Verification of Computing Dominators for Formalizing Compilers" ([CPP'12](http://www.cis.upenn.edu/~stevez/papers/ZZ12.pdf)), Jianzhou Zhao and Steve Zdancewic. 
+ 
 ---
 
 # Structure of the development
