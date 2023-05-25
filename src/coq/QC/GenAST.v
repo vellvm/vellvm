@@ -28,8 +28,6 @@ Require Import List.
 
 Import ListNotations.
 
-
-
 Import ListNotations.
 Import MonadNotation.
 Import ApplicativeNotation.
@@ -172,12 +170,10 @@ Section GenerationState.
 
   Definition type_context := list (ident * typ).
   Definition var_context := list (ident * typ).
-  Definition d_var_context := DList (ident * typ).
   Definition ptr_to_int_context := list (typ * ident * typ).
   Definition all_local_var_contexts := (var_context * ptr_to_int_context)%type.
-  Definition d_all_local_var_contexts := (d_var_context * ptr_to_int_context)%type.
   Definition all_var_contexts := (var_context * var_context * ptr_to_int_context)%type.
-  Definition d_all_var_contexts := (d_var_context * d_var_context * ptr_to_int_context)%type.
+
 
   Record GenState :=
     mkGenState
@@ -186,11 +182,12 @@ Section GenerationState.
     ; num_global : N
     ; num_blocks : N
     (* Types of values *)
-    ; gen_local_ctx : d_var_context
-    ; gen_global_ctx : d_var_context
+    ; gen_local_ctx : var_context
+    ; gen_global_ctx : var_context
     (* Type aliases *)
     ; gen_typ_ctx : type_context
     ; gen_ptrtoint_ctx : ptr_to_int_context
+    ; global_memo : list (global typ)
     }.
 
   Definition init_GenState : GenState
@@ -198,10 +195,11 @@ Section GenerationState.
         ; num_raw    := 0
         ; num_global := 0
         ; num_blocks := 0
-        ; gen_local_ctx  := DList_empty
-        ; gen_global_ctx := DList_empty
+        ; gen_local_ctx  := [] 
+        ; gen_global_ctx := []
         ; gen_typ_ctx    := []
         ; gen_ptrtoint_ctx := []
+        ; global_memo := []
        |}.
 
   Definition increment_raw (gs : GenState) : GenState
@@ -213,6 +211,7 @@ Section GenerationState.
         ; gen_global_ctx := gs.(gen_global_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; global_memo := gs.(global_memo)
        |}.
 
   Definition increment_global (gs : GenState) : GenState
@@ -224,6 +223,7 @@ Section GenerationState.
         ; gen_global_ctx := gs.(gen_global_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; global_memo := gs.(global_memo)
        |}.
 
   Definition increment_void (gs : GenState) : GenState
@@ -235,6 +235,7 @@ Section GenerationState.
         ; gen_global_ctx := gs.(gen_global_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; global_memo := gs.(global_memo)
        |}.
 
   Definition increment_blocks (gs : GenState) : GenState
@@ -246,9 +247,10 @@ Section GenerationState.
         ; gen_global_ctx := gs.(gen_global_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; global_memo := gs.(global_memo)
        |}.
 
-  Definition replace_local_ctx (ctx : d_var_context) (gs : GenState) : GenState
+  Definition replace_local_ctx (ctx : var_context) (gs : GenState) : GenState
     := {| num_void    := gs.(num_void)
         ; num_raw     := gs.(num_raw)
         ; num_global  := gs.(num_global)
@@ -257,9 +259,10 @@ Section GenerationState.
         ; gen_global_ctx := gs.(gen_global_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; global_memo := gs.(global_memo)
        |}.
 
-  Definition replace_global_ctx (ctx : d_var_context) (gs : GenState) : GenState
+  Definition replace_global_ctx (ctx : var_context) (gs : GenState) : GenState
     := {| num_void    := gs.(num_void)
         ; num_raw     := gs.(num_raw)
         ; num_global  := gs.(num_global)
@@ -268,6 +271,7 @@ Section GenerationState.
         ; gen_global_ctx := ctx
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; global_memo := gs.(global_memo)
        |}.
 
   Definition replace_typ_ctx (typ_ctx : list (ident * typ)) (gs : GenState) : GenState
@@ -279,6 +283,7 @@ Section GenerationState.
         ; gen_global_ctx := gs.(gen_global_ctx)
         ; gen_typ_ctx := typ_ctx
         ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; global_memo := gs.(global_memo)
        |}.
 
   Definition replace_ptrtoint_ctx (ptrtoint_ctx : list (typ * ident * typ)) (gs: GenState) : GenState
@@ -290,6 +295,19 @@ Section GenerationState.
         ; gen_global_ctx := gs.(gen_global_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
         ; gen_ptrtoint_ctx := ptrtoint_ctx
+        ; global_memo := gs.(global_memo)
+       |}.
+
+  Definition replace_global_memo (global_memo : list (global typ)) (gs : GenState) : GenState
+    := {| num_void    := gs.(num_void)
+        ; num_raw     := gs.(num_raw)
+        ; num_global  := gs.(num_global)
+        ; num_blocks  := gs.(num_blocks)
+        ; gen_local_ctx     := gs.(gen_local_ctx)
+        ; gen_global_ctx := gs.(gen_global_ctx)
+        ; gen_typ_ctx := gs.(gen_typ_ctx)
+        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
+        ; global_memo := global_memo
        |}.
 
   Definition GenLLVM := (eitherT string (stateT (list string) (stateT GenState G))).
@@ -333,16 +351,16 @@ Section GenerationState.
        modify increment_blocks;;
        ret (Name ("b" ++ show n)).
 
-  Definition get_local_ctx : GenLLVM d_var_context
+  Definition get_local_ctx : GenLLVM var_context
     := gets (fun gs => gs.(gen_local_ctx)).
   
-  Definition get_global_ctx : GenLLVM d_var_context
+  Definition get_global_ctx : GenLLVM var_context
     := gets (fun gs => gs.(gen_global_ctx)).
 
-  Definition get_ctx : GenLLVM d_var_context
+  Definition get_ctx : GenLLVM var_context
     := lctx <- get_local_ctx;;
        gctx <- get_global_ctx;;
-       ret (DList_append lctx gctx).
+       ret (lctx ++ gctx).
 
   Definition get_typ_ctx : GenLLVM type_context
     := gets (fun gs => gs.(gen_typ_ctx)).
@@ -351,17 +369,20 @@ Section GenerationState.
     := gets (fun gs => gs.(gen_ptrtoint_ctx)).
 
   (* Get all variable contexts that might need to be saved *)
-  Definition get_variable_ctxs : GenLLVM d_all_var_contexts
+  Definition get_variable_ctxs : GenLLVM all_var_contexts
     := local_ctx <- get_local_ctx;;
        global_ctx <- get_global_ctx;;
        ptoi_ctx <- get_ptrtoint_ctx;;
        ret (local_ctx, global_ctx, ptoi_ctx).
 
-  Definition set_local_ctx (ctx : d_var_context) : GenLLVM unit
+  Definition get_global_memo : GenLLVM (list (global typ))
+    := gets (fun gs => gs.(global_memo)).
+
+  Definition set_local_ctx (ctx : var_context) : GenLLVM unit
     := modify (replace_local_ctx ctx);;
        ret tt.
 
-  Definition set_global_ctx (ctx : d_var_context) : GenLLVM unit
+  Definition set_global_ctx (ctx : var_context) : GenLLVM unit
     := modify (replace_global_ctx ctx);;
        ret tt.
 
@@ -369,7 +390,11 @@ Section GenerationState.
     := modify (replace_ptrtoint_ctx ptoi_ctx);;
        ret tt.
 
-  Definition restore_variable_ctxs (ctxs : d_all_var_contexts) : GenLLVM unit
+  Definition set_global_memo (memo : list (global typ)) : GenLLVM unit
+    := modify (replace_global_memo memo);;
+       ret tt.
+
+  Definition restore_variable_ctxs (ctxs : all_var_contexts) : GenLLVM unit
     := match ctxs with
        | (local_ctx, global_ctx, ptoi_ctx) =>
            set_local_ctx local_ctx;;
@@ -377,7 +402,7 @@ Section GenerationState.
            set_ptrtoint_ctx ptoi_ctx
        end.
 
-  Definition restore_local_variable_ctxs (ctxs : d_all_local_var_contexts) : GenLLVM unit
+  Definition restore_local_variable_ctxs (ctxs : all_local_var_contexts) : GenLLVM unit
     := match ctxs with
        | (local_ctx, ptoi_ctx) =>
            set_local_ctx local_ctx;;
@@ -468,11 +493,8 @@ Section GenerationState.
            ).
   Defined.
 
-  Definition gen_unit : GenLLVM unit :=
-    lift_GenLLVM (ret tt). 
-
   Definition annotate_debug (s : string) : GenLLVM unit :=
-    annotate s gen_unit.
+    annotate s (ret tt).
 
   (* Definition pre_annotate {A:Type} (s:string) (g : GenLLVM A) : GenLLVM A. *)
   (*   apply mkEitherT. *)
@@ -519,7 +541,7 @@ Section GenerationState.
   (*   refine (ret _). *)
 
   (* TODO: Do we need this? *)
-  Definition filter_global_from_variable_ctxs (ctxs : d_all_var_contexts) : (d_var_context * ptr_to_int_context)
+  Definition filter_global_from_variable_ctxs (ctxs : all_var_contexts) : (var_context * ptr_to_int_context)
     := let is_global_id (id: ident) :=
          match id with
          | ID_Global _ => true
@@ -533,13 +555,13 @@ Section GenerationState.
 
   Definition add_to_local_ctx (x : (ident * typ)) : GenLLVM unit
     := local_ctx <- get_local_ctx;;
-       let new_ctx := DList_cons x local_ctx in
+       let new_ctx := x :: local_ctx in
        modify (replace_local_ctx new_ctx);;
        ret tt.
 
   Definition add_to_global_ctx (x : (ident * typ)) : GenLLVM unit
     := global_ctx <- get_global_ctx;;
-       let new_ctx := DList_cons x global_ctx in
+       let new_ctx := x :: global_ctx in
        modify (replace_global_ctx new_ctx);;
        ret tt.
 
@@ -555,15 +577,21 @@ Section GenerationState.
        modify (replace_ptrtoint_ctx new_ctx);;
        ret tt.
 
-  Definition append_to_local_ctx (vars : DList (ident * typ)) : GenLLVM unit
+  Definition add_to_global_memo (x : (global typ)) : GenLLVM unit
+    := memo <- get_global_memo;;
+       let new_memo := x :: memo in
+       modify (replace_global_memo new_memo);;
+       ret tt.
+
+  Definition append_to_local_ctx (vars :list (ident * typ)) : GenLLVM unit
     := local_ctx <- get_local_ctx;;
-       let new_ctx := DList_append vars local_ctx in
+       let new_ctx := vars ++ local_ctx in
        modify (replace_local_ctx new_ctx);;
        ret tt.
 
-  Definition append_to_global_ctx (vars : DList (ident * typ)) : GenLLVM unit
+  Definition append_to_global_ctx (vars : list (ident * typ)) : GenLLVM unit
     := global_ctx <- get_global_ctx;;
-       let new_ctx := (vars ++ global_ctx in
+       let new_ctx := vars ++ global_ctx in
        modify (replace_global_ctx new_ctx);;
        ret tt.
 
@@ -577,6 +605,12 @@ Section GenerationState.
     := ctx <- get_ptrtoint_ctx;;
        let new_ctx := (aliases ++ ctx)%list in
        modify (replace_ptrtoint_ctx new_ctx);;
+       ret tt.
+
+  Definition append_to_global_memo (vars : list (global typ)) : GenLLVM unit
+    := memo <- get_global_memo;;
+       let new_memo := vars ++ memo in
+       modify (replace_global_memo new_memo);;
        ret tt.
 
   Definition reset_local_ctx : GenLLVM unit
@@ -595,6 +629,14 @@ Section GenerationState.
   Definition reset_ptrtoint_ctx : GenLLVM unit
     := modify (replace_ptrtoint_ctx []);; ret tt.
 
+  Definition reset_global_memo : GenLLVM unit
+    := modify (replace_global_memo []);; ret tt.
+
+  Definition rev_global_ctx : GenLLVM unit
+    := global_ctx <- get_global_ctx;;
+       modify (replace_global_ctx (rev global_ctx));;
+       ret tt.
+  
   Definition hide_local_ctx {A} (g : GenLLVM A) : GenLLVM A
     := saved_local_ctx <- get_local_ctx;;
        reset_local_ctx;;
@@ -645,10 +687,16 @@ Section GenerationState.
        set_ptrtoint_ctx saved_ctx;;
        ret a.
 
+  Definition flip_global_ctx {A} (g : GenLLVM A) : GenLLVM A
+    := rev_global_ctx;;
+       a <- g;;
+       rev_global_ctx;;
+       ret a.
+  
   (** Restore all variable contexts after running a generator. *)
   Definition backtrack_variable_ctxs {A} (g: GenLLVM A) : GenLLVM A
     := backtrack_ctx (backtrack_ptrtoint_ctx g).
-
+  
   (* Elems implemented with reservoir sampling *)
   Definition elems_res {A} (def : G A) (l : list A) : G A
     := fst
@@ -1637,6 +1685,7 @@ Variant exp_source :=
   | FULL_CTX
   | GLOBAL_CTX.
 
+
 Fixpoint gen_exp_size (sz : nat) (t : typ) (es : exp_source) {struct t} : GenLLVM (exp typ) :=
   global_ctx <- get_global_ctx;;
   let only_global_ctx := match es with
@@ -1648,7 +1697,7 @@ Fixpoint gen_exp_size (sz : nat) (t : typ) (es : exp_source) {struct t} : GenLLV
          else get_ctx);;
   match sz with
   | 0%nat =>
-      annotate_debug ("++++++++GenExpOT: " ++ show t);;
+      (* annotate_debug ("++++++++GenExpOT: " ++ show t);; *)
       let ts := filter_type t ctx in
       let gen_idents :=
         match ts with
@@ -1702,7 +1751,21 @@ Fixpoint gen_exp_size (sz : nat) (t : typ) (es : exp_source) {struct t} : GenLLV
         end in
       (* Hack to avoid failing way too much *)
       match t with
-      | TYPE_Pointer t => freq_LLVM ((* (1%nat, ret EXP_Undef) :: *) gen_idents)
+      | TYPE_Pointer t =>
+          if (seq.nilp gen_idents)
+          then
+            (* Generate Global Pointer retroactively *)
+            (* 0. Flip the global context if we are at the first level *)
+            (* 1. Generate a global id, *)
+            (* 2. recursively define the receiving types *)
+            in_exp <- gen_exp_size 0 t GLOBAL_CTX;;
+            name <- new_global_id;;
+            add_to_global_memo (mk_global name t false (Some in_exp) false []);;
+            add_to_global_ctx (ID_Global name, TYPE_Pointer t);;
+            ret (EXP_Ident (ID_Global name))
+          else freq_LLVM (gen_idents)
+
+          (* freq_LLVM ((* (1%nat, ret EXP_Undef) :: *) gen_idents) *)
                                    (* TODO: Add some retroactive global generation *)
       | _ => freq_LLVM
               ((1%nat, gen_size_0 t) :: gen_idents)
@@ -2568,11 +2631,11 @@ Section InstrGenerators.
     :=
     match t_instr with
     | (TYPE_Void, instr) =>
-        annotate_debug ("------GenInstr: " ++ show instr);;
+        (* annotate_debug ("------GenInstr: " ++ show instr);; *)
         vid <- new_void_id;;
         ret (vid, instr)
     | (t, instr) =>
-        annotate_debug ("------GenInstr: " ++ show instr);;
+        (* annotate_debug ("------GenInstr: " ++ show instr);; *)
         i <- new_raw_id;;
         match instr with
         | INSTR_Op (OP_Conversion Ptrtoint t_from v t_to) =>
@@ -2592,8 +2655,8 @@ Section InstrGenerators.
     := match iid with
        | (IId i, INSTR_Alloca t _) =>
            ctx <- get_ctx;;
-           annotate_debug ("*****Current Context: " ++ show ctx);;
-           annotate_debug ("-----Store to: " ++ show t);;
+           (* annotate_debug ("*****Current Context: " ++ show ctx);; *)
+           (* annotate_debug ("-----Store to: " ++ show t);; *)
          t_instr <- gen_store_to (TYPE_Pointer t, EXP_Ident (ID_Local i));;
          instr <- add_id_to_instr t_instr;;
          ret [instr]
@@ -2683,7 +2746,7 @@ Section InstrGenerators.
          (back_blocks : list block_id) (* Blocks that I'm allowed to jump back to *)
          {struct t} : GenLLVM (block typ * (block typ * list (block typ)))
        := bid <- new_block_id;;
-         annotate_debug ("----Genblock: " ++ show bid);;
+         (* annotate_debug ("----Genblock: " ++ show bid);; *)
          code <- gen_code;;
          '(term, bs) <- gen_terminator_sz (sz - 1) t back_blocks;;
          let b := {| blk_id   := bid
@@ -2805,7 +2868,7 @@ Section InstrGenerators.
 
       let args_t := map snd args in
       let f_type := TYPE_Function ret_t args_t false in
-      annotate_debug ("--Generate: @" ++ show name ++ " " ++ show f_type);;
+      (* annotate_debug ("--Generate: @" ++ show name ++ " " ++ show f_type);; *)
       
       let param_attr_slots := map (fun t => []) args in
       let prototype :=
@@ -2850,7 +2913,7 @@ Section InstrGenerators.
 
     name <- new_global_id;;
     t <- hide_ctx gen_sized_typ_ptrin_fctx;;
-    annotate_debug ("--Generate: Global: @" ++ show name ++ " " ++ show t);;
+    (* annotate_debug ("--Generate: Global: @" ++ show name ++ " " ++ show t);; *)
     opt_exp <- fmap Some (hide_ctx (gen_exp_size 0 t FULL_CTX));;
     add_to_global_ctx (ID_Global name, TYPE_Pointer t);;
     ctx <- get_ctx;;
@@ -2878,13 +2941,15 @@ Section InstrGenerators.
 
   Definition gen_list_high_level_tle : GenLLVM (list (toplevel_entity typ (block typ * list (block typ)))) :=
     ret (map TLE_Declaration list_high_level_dec).
-  
+
   Definition gen_llvm : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     :=
     high_levels <- gen_list_high_level_tle;;
     globals <- gen_global_tle_multiple;;
     functions <- gen_helper_function_tle_multiple;;
     main <- gen_main_tle;;
-    ret (high_levels ++ globals ++ functions ++ [main])%list.
+    res_globals <- get_global_memo;;
+    let new_globals := globals ++ map TLE_Global res_globals in
+    ret (high_levels ++ new_globals ++ functions ++ [main])%list.
 
 End InstrGenerators.
