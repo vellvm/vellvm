@@ -364,7 +364,43 @@ Section GenerationState.
             let ans := runStateT ann s in
             ans
            ).
-    Defined.
+  Defined.
+
+  (* Definition pre_annotate {A:Type} (s:string) (g : GenLLVM A) : GenLLVM A. *)
+  (*   apply mkEitherT. *)
+  (*   apply mkStateT. *)
+  (*   refine (fun stack => _). *)
+  (*   apply mkStateT. *)
+  (*   refine (fun s => _). *)
+  (*   (* refine (let opt := unEitherT g in _). *) *)
+  (*   (* refine (let ann := runStateT opt (s0::stack) in _). *) *)
+  (*   (* refine (let ans := runStateT ann s in _). *) *)
+  (*   (* refine ans. *) *)
+  (*   refine (let stack' := s0::stack in *)
+  (*           let opt := unEitherT g in *)
+  (*           let ann := runStateT opt (stack') in *)
+  (*           let ans := runStateT ann s in *)
+  (*           ans *)
+  (*          ). *)
+  (* Defined. *)
+
+  Definition dup_string_wrt_nat (s : string) (n : nat) :=
+    let fix dup_string_wrt_nat_tail_recur (acc : string) (n : nat):=
+      match n with
+      | 0%nat => acc
+      | S z => dup_string_wrt_nat_tail_recur (s ++ acc)%string z
+      end in dup_string_wrt_nat_tail_recur "" n.
+
+  (* Definition gen_annotate {A: Type} (placement s : string) (g : GenLLVM A) : GenLLVM A := *)
+  (*   _ <- annotate *)
+  (*     (placement ++ "Generate :" ++ s) *)
+  (*     ( *)
+  (*       ret nil *)
+  (*     );; *)
+  (*   annotate (placement ++ "FinishGN : " ++ s) *)
+  (*     (g) *)
+  (* . *)
+  
   
   (* Definition flush {A : Type} (g : GenLLVM A) : GenLLVM A. *)
   (*   unfold GenLLVM. *)
@@ -761,9 +797,14 @@ Section GenerationState.
   Definition run_GenLLVM {A} (g: GenLLVM A) : G (string + A) :=
     let ran := runStateT (runStateT (unEitherT g) []) init_GenState in
     '(err_a,stack) <- fmap fst ran;;
-    let debug : string := fold_right (fun d1 drest => (d1 ++ "\n" ++ drest)%string) "" stack in
+    let debug : string := fold_right (fun d1 drest => (d1 ++ "
+" ++ drest)%string) "" stack in
     let flushed_err := match err_a with
-                | inl err_str => inl (err_str ++ "\n\nDEBUG SECTION: \n" ++ debug ++ "\n")%string
+                       | inl err_str => inl (err_str ++ "
+
+DEBUG SECTION:
+" ++ debug ++ "
+")%string
                 | inr _ => err_a
                 end in
     ret flushed_err.
@@ -1510,18 +1551,18 @@ Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
 
         (* Generate literals for aggregate structures *)
         | TYPE_Array n t =>
-            es <- vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t);;
+            es <- hide_ctx (vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t));;
             ret (EXP_Array (map (fun e => (t, e)) es))
         | TYPE_Vector n t =>
-            es <- vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t);;
+            es <- hide_ctx (vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t));;
             ret (EXP_Vector (map (fun e => (t, e)) es))
         | TYPE_Struct fields =>
             (* Should we divide size evenly amongst components of struct? *)
-            tes <- map_monad (fun t => e <- gen_exp_size 0 t;; ret (t, e)) fields;;
+            tes <- map_monad (fun t => e <- hide_ctx (gen_exp_size 0 t);; ret (t, e)) fields;;
             ret (EXP_Struct tes)
         | TYPE_Packed_struct fields =>
             (* Should we divide size evenly amongst components of struct? *)
-            tes <- map_monad (fun t => e <- gen_exp_size 0 t;; ret (t, e)) fields;;
+            tes <- map_monad (fun t => e <- hide_ctx (gen_exp_size 0 t);; ret (t, e)) fields;;
             ret (EXP_Packed_struct tes)
 
         | TYPE_Identified id        =>
@@ -2229,9 +2270,11 @@ Section InstrGenerators.
     match t_instr with
     | (TYPE_Void, instr) =>
         vid <- new_void_id;;
-        ret (vid, instr)
+        annotate ("------Generate: " ++ show instr) (
+        ret (vid, instr))
     | (t, instr) =>
         i <- new_raw_id;;
+        annotate ("------Generate: " ++ show instr) (
         match instr with
         | INSTR_Op (OP_Conversion Ptrtoint t_from v t_to) =>
             add_to_ptrtoint_ctx (t_from, ID_Local i, t_to);; (* Register the local variable to ptrtoint_ctx*)
@@ -2239,7 +2282,7 @@ Section InstrGenerators.
         | _ =>
             add_to_ctx (ID_Local i, t);;
             ret (IId i, instr)
-        end
+        end)
     end.
 
   (* Generate a block of code, spitting out a new context. *)
@@ -2338,8 +2381,9 @@ Section InstrGenerators.
          (t : typ) (* Return type *)
          (back_blocks : list block_id) (* Blocks that I'm allowed to jump back to *)
          {struct t} : GenLLVM (block typ * (block typ * list (block typ)))
-         :=
-           bid <- new_block_id;;
+       :=
+         bid <- new_block_id;;
+         annotate ("----Generate: Block: " ++ show bid) (
            code <- gen_code;;
            '(term, bs) <- gen_terminator_sz (sz - 1) t back_blocks;;
            let b := {| blk_id   := bid
@@ -2348,7 +2392,7 @@ Section InstrGenerators.
                      ; blk_term := term
                      ; blk_comments := None
                     |} in
-           ret (b, (b, bs))
+           ret (b, (b, bs)))
   with gen_loop_sz
          (sz : nat)
          (t : typ)
@@ -2445,9 +2489,11 @@ Section InstrGenerators.
        end.
   (* Don't want to generate CFGs, actually. Want to generated TLEs *)
 
+
   Definition gen_definition (name : global_id) (ret_t : typ) (args : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
-      ctxs <- get_variable_ctxs;;
+    ctxs <- get_variable_ctxs;;
+
 
       (* Add arguments to context *)
       args <- map_monad
@@ -2458,7 +2504,7 @@ Section InstrGenerators.
       let args_ctx := map (fun '(i, t) => (ID_Local i, t)) args in
       append_to_ctx args_ctx;;
 
-      bs <- gen_blocks ret_t;;
+
 
       let args_t := map snd args in
       let f_type := TYPE_Function ret_t args_t false in
@@ -2469,10 +2515,16 @@ Section InstrGenerators.
                          []
                          []
       in
+
+      annotate
+        ("--Generate: " ++ show prototype)
+        (
+      bs <- gen_blocks ret_t;;
+      
       (* Reset context *)
       let '(ctx, ptoi_ctx) := ctxs in
       restore_variable_ctxs ((ID_Global name, TYPE_Pointer f_type)::ctx, ptoi_ctx);;
-      ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs).
+      ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs)).
 
   Definition gen_new_definition (ret_t : typ) (args : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
@@ -2517,11 +2569,22 @@ Section InstrGenerators.
   Definition gen_global_tle_multiple : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     := listOf_LLVM  gen_global_tle.
 
+  Definition list_high_level_dec : list (declaration typ) :=
+    [
+      let puts_id := Name "puts" in
+      let puts_typ := TYPE_Function (TYPE_I 32) [(TYPE_Pointer (TYPE_I 8))] false in
+      mk_declaration puts_id puts_typ ([], []) [] []
+    ].
+
+  Definition gen_list_high_level_tle : GenLLVM (list (toplevel_entity typ (block typ * list (block typ)))) :=
+    ret (map TLE_Declaration list_high_level_dec).
+  
   Definition gen_llvm : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     :=
+    high_levels <- gen_list_high_level_tle;;
     globals <- gen_global_tle_multiple;;
     functions <- gen_helper_function_tle_multiple;;
     main <- gen_main_tle;;
-    ret (globals ++ functions ++ [main])%list.
+    ret (high_levels ++ globals ++ functions ++ [main])%list.
 
 End InstrGenerators.

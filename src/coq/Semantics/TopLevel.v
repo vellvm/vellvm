@@ -93,13 +93,6 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     | _ => raise "i8_str_index failed with non-DVALUE_I8"
     end.
 
-  (* SAZ: tail recursive version of list reversal -- is this already in our libraries somehwere? *)
-  Definition listrev {A:Type} (l:list A) : list A :=
-    (fix rev_tail (l:list A) (acc:list A) : list A :=
-      match l with
-      | [] => acc
-      | x::xs => rev_tail xs (x::acc)
-      end) l [].
   
   (** Semantic function that treats [u_strptr] as a C-style string pointer:
       - reads i8 values from memory until it encounters a null-terminator (i8 0)
@@ -122,7 +115,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
                    ret (inl (next_char, c::bytes, (offset + 1)%Z))
               )
               (char, [], 1%Z) ;;
-          v <- trigger (IO_stdout (listrev bytes)) ;;
+          v <- trigger (IO_stdout (DList.rev_tail_rec bytes)) ;;
           ret (UVALUE_I8 (DynamicValues.Int8.zero))
       | _ => raiseUB "puts got non-address argument"
       end
@@ -134,10 +127,6 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       | _ => raise "puts called with zero or more than one arguments"
       end.
 
-
-
-
-  
   (** * [built_in_functions]
 
       This is a list of standard library functions whose semantics can/must be
@@ -154,6 +143,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       [declare i32 puts(i8* %str)] 
       See /tests/io for some examples.
    *)
+
   Definition built_in_functions (decls : list (declaration dtyp)) : list (function_id * function_denotation) :=
     match List.find (fun s => (Coqlib.proj_sumbool (Syntax.AstLib.RawIDOrd.eq_dec s (Name "puts"))))
             (List.map (@dc_name dtyp) decls) with
@@ -161,6 +151,8 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     | None => []
     end.
 
+  
+  (* SAZ: commenting this out for now, since it's trickier than we wanted *)
   (* Command-line arguments----------------------------------------------------------------------- *)
 
   (* To support command-line arguments we convert a list of Coq strings into a preamble of 
@@ -176,7 +168,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
      Therefore, after initializing everything, we call main with 
         UValue_r N) and whatever pointer we get from doing [u <- Load argv]
    *)
-
+(*
   Definition zi8_to_exp (z_i8 : Z) := @LLVMAst.EXP_Integer dtyp z_i8.
   Definition zi8s_to_EXP_Cstring (zi8s:list Z) :=
     EXP_Cstring (List.map (fun z => (DTYPE_I 8, zi8_to_exp z)) zi8s).
@@ -241,7 +233,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
          argv <- trigger (GlobalRead (g_ident (arg_raw_id (1+argc)))) ;;
          trigger (Call "main" [UVALUE_I32 N; argv])
    *)
-  
+   *)  
   
   (* TOPLEVEL Semantics  ------------------------------------------------------------------------- *)
   
