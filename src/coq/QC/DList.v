@@ -3,9 +3,7 @@ From Coq Require Import List String.
 Import ListNotations Ascii.
 Local Open Scope string_scope.
 
-
-Declare Scope DList.
-Module DList.
+Section DList.
   Definition DList (A : Type) := list A -> list A.
 
   Definition DList_to_list {A} (dl : DList A) : list A
@@ -25,7 +23,7 @@ Module DList.
 
   Definition DList_from_list {A} (l : list A) : DList A
     := fold_left (fun x s => DList_append x (DList_singleton s)) l DList_empty.
-
+  
   Definition DList_map {A B} (f : A -> B) (dl : DList A) : DList B
     := fold_right (fun a => DList_cons (f a)) (@DList_empty B) (DList_to_list dl).
 
@@ -36,16 +34,6 @@ Module DList.
     eapply DList_map; eauto.
   Defined.
 
-  Infix "d::" := (DList_cons) (at level 60, right associativity) : DList.
-  Notation "d[]" := DList_empty : DList.
-  Notation "d[ x ; .. ; y ]" := (DList_cons x .. (DList_cons y nil) ..) : DList.
-  Infix "d++" := (DList_append) (at level 60, right associativity) : DList.
-
-  Delimit Scope DList with DList.
-End DList.
-
-Import DList.
-Section DString.
   Definition DString := DList ascii.
 
   (* TODO: move this? *)
@@ -89,6 +77,6 @@ Section DString.
   Definition DList_join {A} (ls : list (DList A)) :=
     fold_left DList_append ls DList_empty.
 
-End DString.
+End DList.
 
-Definition example1 : DList nat := (1 d:: d[])%DList.
+Definition example1 : DList nat := DList_cons 1 DList_empty.
