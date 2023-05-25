@@ -1560,6 +1560,84 @@ Module InfiniteToFinite.
     auto.
   Qed.
 
+  (* TODO: Move this... *)
+  Lemma MemPropT_bind_ret_inv :
+    forall {S A B}
+      (ma : MemPropT S A)
+      (mab : A -> MemPropT S B)
+      {s1 s2 b}
+      (M :
+        (a <- ma;;
+         mab a) s1 (ret (s2, b))),
+    exists s' a, ma s1 (ret (s', a)) /\ mab a s' (ret (s2, b)).
+  Proof.
+    intros S A B ma mab s1 s2 b M.
+    auto.
+  Qed.
+
+  (* This might be a good idea, should make the proofs more modular... *)
+  (* TODO: Move this *)
+  Lemma MemPropT_fin_inf_bind :
+    forall {ms_inf_start : MemoryBigIntptr.MMEP.MMSP.MemState}
+      {ms_fin_start ms_fin_final : Memory64BitIntptr.MMEP.MMSP.MemState}
+      {A_FIN A_INF B_FIN B_INF}
+      (ma_fin : MemPropT Memory64BitIntptr.MMEP.MMSP.MemState A_FIN)
+      {ma_inf : MemPropT MemoryBigIntptr.MMEP.MMSP.MemState A_INF}
+      {mab_fin : A_FIN -> MemPropT Memory64BitIntptr.MMEP.MMSP.MemState B_FIN}
+      {mab_inf : A_INF -> MemPropT MemoryBigIntptr.MMEP.MMSP.MemState B_INF}
+      {res_fin}
+
+      (A_REF : A_INF -> A_FIN -> Prop)
+      (B_REF : B_INF -> B_FIN -> Prop)
+
+      (MEM_REF_START : MemState_refine_prop ms_inf_start ms_fin_start)
+
+      (* Not sure about quantification *)
+      (MA: forall a_fin ms_fin_ma,
+          ma_fin ms_fin_start (ret (ms_fin_ma, a_fin)) ->
+          exists a_inf ms_inf_ma,
+            ma_inf ms_inf_start (ret (ms_inf_ma, a_inf)) /\
+              A_REF a_inf a_fin /\
+              MemState_refine_prop ms_inf_ma ms_fin_ma)
+
+      (* Not sure about quantification *)
+      (K: forall ms_inf ms_fin ms_fin' a_fin a_inf b_fin,
+          A_REF a_inf a_fin ->
+          MemState_refine_prop ms_inf ms_fin ->
+          mab_fin a_fin ms_fin (ret (ms_fin', b_fin)) ->
+          exists b_inf ms_inf',
+            mab_inf a_inf ms_inf (ret (ms_inf', b_inf)) /\
+              B_REF b_inf b_fin /\
+              MemState_refine_prop ms_inf' ms_fin')
+
+      (FIN: (a <- ma_fin;;
+             mab_fin a) ms_fin_start (ret (ms_fin_final, res_fin))),
+
+    exists res_inf ms_inf_final,
+      (a <- ma_inf;;
+       mab_inf a) ms_inf_start (ret (ms_inf_final, res_inf)) /\
+        B_REF res_inf res_fin /\
+        MemState_refine_prop ms_inf_final ms_fin_final.
+  Proof.
+    intros ms_inf_start ms_fin_start ms_fin_final A_FIN A_INF B_FIN B_INF ma_fin ma_inf mab_fin mab_inf res_fin A_REF B_REF MEM_REF_START MA K FIN.
+
+    repeat red in FIN.
+    destruct FIN as (sab&a&FIN&FIN_AB).
+
+    apply MA in FIN as (a_inf&ms_inf''&INF&A&MSR).
+    eapply K in FIN_AB; eauto.
+
+    destruct FIN_AB as (res_inf & ms_inf_final & MAB_INF & RES_REF & MEM_RES_FINAL).
+
+    exists res_inf. exists ms_inf_final.
+    split; auto.
+
+    repeat red.
+    exists ms_inf''.
+    exists a_inf.
+    split; auto.
+  Qed.
+
   Lemma get_inf_tree_rutt :
     forall t,
       orutt (OOM:=OOME) L3_refine_strict L3_res_refine_strict
@@ -5574,51 +5652,39 @@ Module InfiniteToFinite.
   Qed.
 
   Lemma fin_inf_write_byte_spec_MemPropT :
-    forall {addr_fin addr_inf ms_fin ms_inf ms_fin' byte_fin},
+    forall {addr_fin addr_inf ms_fin ms_fin' ms_inf ms_inf' byte_fin},
       MemState_refine_prop ms_inf ms_fin ->
+      MemState_refine_prop ms_inf' ms_fin' ->
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
       Memory64BitIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_fin byte_fin
         ms_fin
         (ret (ms_fin', tt)) ->
-      exists ms_inf',
-        MemoryBigIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_inf (lift_SByte byte_fin)
-          ms_inf
-          (ret (ms_inf', tt)) /\
-          MemState_refine_prop ms_inf' ms_fin'.
+      MemoryBigIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_inf (lift_SByte byte_fin)
+        ms_inf
+        (ret (ms_inf', tt)).
   Proof.
-    intros addr_fin addr_inf ms_fin ms_inf ms_fin' byte_fin MSR ADDR_CONV WBP.
-    (* TODO: make things opaque? *)
+    intros addr_fin addr_inf ms_fin ms_fin' ms_inf ms_inf' byte_fin MSR1 MSR2 ADDR_CONV WBP.
     destruct WBP.
-    exists (lift_MemState ms_fin').
-    split; [| apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine ].
     split.
     - eapply fin_inf_write_byte_allowed; eauto.
     - eapply fin_inf_set_byte_memory; eauto.
-      apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
     - eapply fin_inf_write_byte_operation_invariants; eauto.
-      apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
   Qed.
 
   Lemma fin_inf_write_byte_spec :
-    forall {addr_fin addr_inf ms_fin ms_inf ms_fin' byte_fin},
+    forall {addr_fin addr_inf ms_fin ms_fin' ms_inf ms_inf' byte_fin},
       MemState_refine_prop ms_inf ms_fin ->
+      MemState_refine_prop ms_inf' ms_fin' ->
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
       Memory64BitIntptr.MMEP.MemSpec.write_byte_spec ms_fin addr_fin byte_fin ms_fin' ->
-      exists ms_inf',
-        MemoryBigIntptr.MMEP.MemSpec.write_byte_spec ms_inf addr_inf (lift_SByte byte_fin) ms_inf' /\
-          MemState_refine_prop ms_inf' ms_fin'.
+      MemoryBigIntptr.MMEP.MemSpec.write_byte_spec ms_inf addr_inf (lift_SByte byte_fin) ms_inf'.
   Proof.
-    intros addr_fin addr_inf ms_fin ms_inf ms_fin' byte_fin MSR ADDR_CONV WBP.
-    (* TODO: make things opaque? *)
+    intros addr_fin addr_inf ms_fin ms_fin' ms_inf ms_inf' byte_fin MSR1 MSR2 ADDR_CONV WBP.
     destruct WBP.
-    exists (lift_MemState ms_fin').
-    split; [| apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine ].
     split.
     - eapply fin_inf_write_byte_allowed; eauto.
     - eapply fin_inf_set_byte_memory; eauto.
-      apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
     - eapply fin_inf_write_byte_operation_invariants; eauto.
-      apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
   Qed.
 
   (* TODO: Move this *)
@@ -5687,25 +5753,29 @@ Module InfiniteToFinite.
   Qed.
 
   Lemma fin_inf_write_bytes_spec :
-    forall a_fin a_inf ms_fin ms_inf ms_fin' bytes_fin,
+    forall a_fin a_inf ms_fin ms_fin' ms_inf ms_inf'  bytes_fin,
       InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
       MemState_refine_prop ms_inf ms_fin ->
+      MemState_refine_prop ms_inf' ms_fin' ->
       Memory64BitIntptr.MMEP.MemSpec.write_bytes_spec a_fin bytes_fin ms_fin (success_unERR_UB_OOM (ms_fin', tt)) ->
-      exists ms_inf',
-        MemoryBigIntptr.MMEP.MemSpec.write_bytes_spec a_inf (map lift_SByte bytes_fin) ms_inf (success_unERR_UB_OOM (ms_inf', tt)) /\
-        MemState_refine_prop ms_inf' ms_fin'.
+      MemoryBigIntptr.MMEP.MemSpec.write_bytes_spec a_inf (map lift_SByte bytes_fin) ms_inf (success_unERR_UB_OOM (ms_inf', tt)).
   Proof.
-    intros a_fin a_inf ms_fin ms_inf ms_fin' bytes_fin ADDR_CONV MEM_REF WRITE_SPEC.
+    intros a_fin a_inf ms_fin ms_fin' ms_inf ms_inf' bytes_fin ADDR_CONV MEM_REF1 MEM_REF2 WRITE_SPEC.
 
     (* TODO: Make these opaque earlier *)
     Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
     Opaque MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
 
-    cbn in *.
-    destruct WRITE_SPEC as (ms_fin_gcp & addrs_fin & CONSEC & WRITE_SPEC).
-    destruct WRITE_SPEC as (ms_fin_writes & WRITE_RES & WRITE_SPEC & MS & _).
+    red; red in WRITE_SPEC.
+    apply MemPropT_bind_ret_inv in WRITE_SPEC as (ms_fin_gcp & addrs_fin & CONSEC & WRITE_SPEC).
+    apply MemPropT_bind_ret_inv in WRITE_SPEC as (ms_fin_writes & WRITE_RES & WRITE_SPEC & MS & _).
+    
     pose proof fin_inf_get_consecutive_ptrs_success_exists a_fin a_inf (Datatypes.length bytes_fin) ms_fin ms_fin_gcp addrs_fin ms_inf ADDR_CONV CONSEC as (addrs_inf & GCP & ADDRS_CONV).
     pose proof Memory64BitIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq _ _ _ _ _ CONSEC; subst.
+
+    eapply MemPropT_fin_inf_bind with
+      (A_REF:=Forall2 (fun a_inf a_fin => InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin))
+      (B_REF:=eq); eauto.
 
     (* Not sure if induction is the right thing to do here *)
     generalize dependent a_fin.
@@ -6034,29 +6104,49 @@ Module InfiniteToFinite.
   (* TODO: Lemma about lifting intrinsic handlers *)
   (* TODO: Move this *)
   Lemma handle_intrinsic_fin_inf :
-    forall t f args args0 ms ms' d
+    forall t f args args0 ms_fin ms_fin' ms_inf ms_inf' d
       (ARGS: Forall2 DVCInfFin.dvalue_refine_strict args0 args),
+      MemState_refine_prop ms_inf ms_fin'
       Memory64BitIntptr.MMEP.MemSpec.handle_intrinsic_prop
         LLVMParams64BitIntptr.Events.DV.dvalue
-        (LLVMParams64BitIntptr.Events.Intrinsic t f args) ms (ret (ms', d)) ->
-      MemoryBigIntptr.MMEP.MemSpec.handle_intrinsic_prop DVCInfFin.DV1.dvalue
+        (LLVMParams64BitIntptr.Events.Intrinsic t f args) ms_fin (ret (ms', d)) ->
+      exists ms_inf',
+        MemoryBigIntptr.MMEP.MemSpec.handle_intrinsic_prop DVCInfFin.DV1.dvalue
         (InterpreterStackBigIntptr.LP.Events.Intrinsic t f args0) (lift_MemState ms)
-        (ret (lift_MemState ms', fin_to_inf_dvalue d)).
+        (ret (ms_inf', fin_to_inf_dvalue d)) /\
+          MemState_refine_prop ms_inf' ms'.
   Proof.
     intros t f args args0 ms ms' d ARGS INTRINSIC.
 
     pose proof lift_MemState_refine ms as MS_REF.
     pose proof lift_MemState_refine ms' as MS'_REF.
+    apply MemState_refine_MemState_refine_prop in MS_REF, MS'_REF.
 
     red in INTRINSIC.
-    red.
     break_match.
     { (* Memcpy *)
-      cbn in *.
-      destruct INTRINSIC as [sab [[] [HANDLER [SAB D]]]].
+      apply MemPropT_bind_ret_inv in INTRINSIC as (sab & [] & HANDLER & SAB & D).
       subst.
       exists (lift_MemState sab).
-      exists tt.
+      split; auto.
+      red; rewrite Heqb.
+
+      eapply MemPropT_fin_inf_bind with
+        (A_REF:=eq)
+        (B_REF:=DVC1.dvalue_refine_strict)
+        (ma_fin:=Memory64BitIntptr.MMEP.MemSpec.handle_memcpy_prop args); eauto.
+
+      - apply fin_to_inf_dvalue_refine_strict.
+      - intros ms_fin' a_fin HANDLER'.
+        exists a_fin.
+        exists (lift_MemState sab).
+        split.
+        2: {
+          split; auto.
+        }
+        
+
+      
       repeat split; auto.
       - (* Handler *)
         repeat (destruct ARGS;
@@ -6123,7 +6213,6 @@ Module InfiniteToFinite.
 
           { (* Write bytes portion *)
             pose proof fin_inf_write_bytes_spec _ _ _ _ _ _ H MS_REF WRITE as [ms_inf' [WRITE_INF MS_REF_INF]].
-            erewrite lift_MemState_convert_MemState_inverse; eauto.
             eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in GCP.
             subst.
             apply WRITE_INF.
@@ -6805,74 +6894,6 @@ Module InfiniteToFinite.
     (* TODO: Do I even need ALLOCA with the bind lemma? It seems like
        I *should*... But I haven't had to use it? *)
     red; red in ALLOCA.
-
-    (* TODO: Move this... *)
-    Lemma MemPropT_bind_ret_inv :
-      forall {S A B}
-        (ma : MemPropT S A)
-        (mab : A -> MemPropT S B)
-        {s1 s2 b}
-        (M :
-          (a <- ma;;
-           mab a) s1 (ret (s2, b))),
-      exists s' a, ma s1 (ret (s', a)) /\ mab a s' (ret (s2, b)).
-    Proof.
-      intros S A B ma mab s1 s2 b M.
-      auto.
-    Qed.
-
-    (* This might be a good idea, should make the proofs more modular... *)
-    (* TODO: Move this *)
-    Lemma MemPropT_fin_inf_bind :
-      forall {ms_inf ms_inf' : MemoryBigIntptr.MMEP.MMSP.MemState}
-        {ms_fin ms_fin' : Memory64BitIntptr.MMEP.MMSP.MemState}
-        {A_FIN A_INF B_FIN B_INF}
-        (ma_fin : MemPropT Memory64BitIntptr.MMEP.MMSP.MemState A_FIN)
-        {ma_inf : MemPropT MemoryBigIntptr.MMEP.MMSP.MemState A_INF}
-        {mab_fin : A_FIN -> MemPropT Memory64BitIntptr.MMEP.MMSP.MemState B_FIN}
-        {mab_inf : A_INF -> MemPropT MemoryBigIntptr.MMEP.MMSP.MemState B_INF}
-        {res_fin res_inf}
-
-        (A_REF : A_INF -> A_FIN -> Prop)
-        (B_REF : B_INF -> B_FIN -> Prop)
-
-        (MEM_REF : MemState_refine_prop ms_inf ms_fin)
-        (MEM_REF' : MemState_refine_prop ms_inf' ms_fin')
-
-        (B : B_REF res_inf res_fin)
-
-        (* Not sure about quantification *)
-        (MA: forall ms_fin' a_fin,
-            ma_fin ms_fin (ret (ms_fin', a_fin)) ->
-            exists a_inf ms_inf', ma_inf ms_inf (ret (ms_inf', a_inf)) /\ A_REF a_inf a_fin /\ MemState_refine_prop ms_inf' ms_fin')
-
-        (* Not sure about quantification *)
-        (K: forall ms_inf ms_fin ms_inf' ms_fin' a_fin a_inf b_fin b_inf,
-            A_REF a_inf a_fin ->
-            B_REF b_inf b_fin ->
-            MemState_refine_prop ms_inf ms_fin ->
-            MemState_refine_prop ms_inf' ms_fin' ->
-            mab_fin a_fin ms_fin (ret (ms_fin', b_fin)) ->
-            mab_inf a_inf ms_inf (ret (ms_inf', b_inf)))
-
-        (FIN: (a <- ma_fin;;
-               mab_fin a) ms_fin (ret (ms_fin', res_fin))),
-
-        (a <- ma_inf;;
-         mab_inf a) ms_inf (ret (ms_inf', res_inf)).
-    Proof.
-      intros ms_inf ms_inf' ms_fin ms_fin' A_FIN A_INF B_FIN B_INF ma_fin ma_inf mab_fin mab_inf res_fin res_inf A_REF B_REF MEM_REF MEM_REF' B MA K FIN.
-      repeat red in FIN.
-      repeat red.
-
-      destruct FIN as (sab&a&FIN&FIN_AB).
-
-      apply MA in FIN as (a_inf&ms_inf''&INF&A&MSR).
-      exists ms_inf''. exists a_inf.
-      split; auto.
-
-      eapply K in FIN_AB; eauto.
-    Qed.
 
     eapply MemPropT_fin_inf_bind with
       (A_REF:=eq)
