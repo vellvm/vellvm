@@ -2582,6 +2582,7 @@ Section InstrGenerators.
      The type is sometimes void for instructions that don't really
      compute a value, like void function calls, stores, etc.
    *)
+  
   Definition gen_instr : GenLLVM (typ * instr typ) :=
     typ_ctx <- get_typ_ctx;;
     ctx <- get_ctx;;
@@ -2604,22 +2605,23 @@ Section InstrGenerators.
            (* align <- ret None;; *)
            ret (TYPE_Pointer t, INSTR_Alloca t [])
         ] (* TODO: Generate atomic operations and other instructions *)
-         (* ++ (if seq.nilp sized_ptr_typs_in_ctx then [] else [ *)
-         (*         (bind (get_typ_l sized_ptr_typs_in_ctx) gen_gep ) *)
-         (*         ; bind (get_typ_l sized_ptr_typs_in_ctx) gen_load *)
-         (*         ; bind (get_typ_l sized_ptr_typs_in_ctx) gen_store]) *)
-         (* ++ (if seq.nilp valid_ptr_vecptr_in_ctx then [] else [ *)
-         (*         bind (get_typ_l valid_ptr_vecptr_in_ctx) gen_ptrtoint]) *)
-         (* ++ (if seq.nilp ptrtoint_ctx then [] else [gen_inttoptr]) *)
-         (* ++ (if seq.nilp agg_typs_in_ctx then [] else [ *)
-         (*         bind (get_typ_l agg_typs_in_ctx) gen_extractvalue]) *)
-         (* ++ (if seq.nilp insertvalue_typs_in_ctx then [] else [ *)
-         (*         bind (get_typ_l insertvalue_typs_in_ctx) gen_insertvalue]) *)
-         (* ++ (if seq.nilp vec_typs_in_ctx then [] else [ *)
-         (*         bind (get_typ_l vec_typs_in_ctx) gen_extractelement *)
-         (*         ; bind (get_typ_l vec_typs_in_ctx) gen_insertelement]) *)
-         (* ++ (if seq.nilp fun_ptrs_in_ctx then [] else [ *)
-         (*         bind (get_typ_l fun_ptrs_in_ctx) gen_call]) *)).
+         ++ (if l_is_empty sized_ptr_typs_in_ctx then [] else
+               [
+                 (get_typ_l sized_ptr_typs_in_ctx) >>= gen_load
+                 ; (get_typ_l sized_ptr_typs_in_ctx) >>= gen_store
+                 ; (get_typ_l sized_ptr_typs_in_ctx) >>= gen_gep])
+         ++ (if l_is_empty valid_ptr_vecptr_in_ctx then [] else [
+                 (get_typ_l valid_ptr_vecptr_in_ctx) >>= gen_ptrtoint])
+         ++ (if l_is_empty ptrtoint_ctx then [] else [gen_inttoptr])
+         ++ (if l_is_empty agg_typs_in_ctx then [] else [
+                 (get_typ_l agg_typs_in_ctx) >>= gen_extractvalue])
+         ++ (if l_is_empty insertvalue_typs_in_ctx then [] else [
+                 (get_typ_l insertvalue_typs_in_ctx) >>= gen_insertvalue])
+         ++ (if l_is_empty vec_typs_in_ctx then [] else [
+                 (get_typ_l vec_typs_in_ctx) >>= gen_extractelement
+                 ; (get_typ_l vec_typs_in_ctx) >>= gen_insertelement])
+         ++ (if l_is_empty fun_ptrs_in_ctx then [] else [
+                 (get_typ_l fun_ptrs_in_ctx) >>= gen_call])).
 
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
