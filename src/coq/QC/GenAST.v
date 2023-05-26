@@ -22,7 +22,7 @@ Require Import List.
 
 Import ListNotations.
 
-From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils Handlers.Handlers.
+From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Generators QC.Utils Handlers.Handlers.
 Require Import Integers.
 
 
@@ -36,8 +36,6 @@ From Coq Require Import
 From QuickChick Require Import QuickChick.
 Import QcDefaultNotation. Open Scope qc_scope.
 Set Warnings "-extraction-opaque-accessed,-extraction".
-
-From FlocqQuickChick Require Import Generators.
 
 From ExtLib.Structures Require Export
      Functor.
@@ -403,19 +401,19 @@ Section GenerationState.
 
   Definition append_to_ctx (vars : list (ident * typ)) : GenLLVM unit
     := ctx <- get_ctx;;
-       let new_ctx := vars ++ ctx in
+       let new_ctx := (vars ++ ctx)%list in
        modify (replace_ctx new_ctx);;
        ret tt.
 
   Definition append_to_typ_ctx (aliases : list (ident * typ)) : GenLLVM unit
     := ctx <- get_typ_ctx;;
-       let new_ctx := aliases ++ ctx in
+       let new_ctx := (aliases ++ ctx)%list in
        modify (replace_typ_ctx new_ctx);;
        ret tt.
 
   Definition append_to_ptrtoint_ctx (aliases : list (typ * ident * typ)) : GenLLVM unit
     := ctx <- get_ptrtoint_ctx;;
-       let new_ctx := aliases ++ ctx in
+       let new_ctx := (aliases ++ ctx)%list in
        modify (replace_ptrtoint_ctx new_ctx);;
        ret tt.
 
@@ -1702,7 +1700,7 @@ Section InstrGenerators.
            ret [subtyp]
          else
            tl <- gen_typ_from_size_struct sz';;
-           ret ([subtyp] ++ tl).
+           ret ([subtyp] ++ tl)%list.
 
   (* A Helper function that will detect if  the type has pointer *)
   Fixpoint typ_contains_pointer (old_ptr: typ) : bool :=
@@ -1776,7 +1774,7 @@ Section InstrGenerators.
               let trivial_typs := [(1%N, TYPE_I 1); (8%N, TYPE_I 8); (32%N, TYPE_I 32); (32%N, TYPE_Float); (64%N, TYPE_I 64); (64%N, TYPE_Double)] in
               let size_of_vec := get_bit_size_from_typ t_from in
               let choices := fold_left (fun acc '(s,t) => let sz' := (size_of_vec / s)%N in
-                                                       if (sz' =? 0)%N then acc else acc ++ [TYPE_Vector sz' t]) trivial_typs [] in
+                                                       if (sz' =? 0)%N then acc else acc ++ [TYPE_Vector sz' t])%list trivial_typs [] in
               ret choices
           end
       | TYPE_Pointer subtyp =>
@@ -1799,7 +1797,7 @@ Section InstrGenerators.
         if dec hd t
         then prev ++ next
         else set_add_h dec t (prev ++ [hd]) tl
-    end.
+    end%list.
 
   Definition gen_bitcast : GenLLVM (typ * instr typ) :=
     ctx <- get_ctx;;
@@ -2021,7 +2019,7 @@ Section InstrGenerators.
 
                  '(b2, (bh2, bs2)) <- gen_blocks_sz (sz / 2) t back_blocks;;
 
-                 ret (TERM_Br (TYPE_I 1, c) (blk_id b1) (blk_id b2), (bh1::bs1) ++ (bh2::bs2)))
+                 ret (TERM_Br (TYPE_I 1, c) (blk_id b1) (blk_id b2), (bh1::bs1) ++ (bh2::bs2))%list)
             (* Sometimes generate a loop *)
             ; (min sz' 6%nat,
                 fun _ =>
@@ -2119,7 +2117,7 @@ Section InstrGenerators.
                           ; blk_comments := None
                           |} in
 
-      ret (TERM_Br_1 bid_entry, (entry_block, loop_blocks ++ [next_block] ++ end_blocks))
+      ret (TERM_Br_1 bid_entry, (entry_block, loop_blocks ++ [next_block] ++ end_blocks))%list
   with gen_loop_entry_sz
          (sz : nat)
          (t : typ)
@@ -2228,6 +2226,6 @@ Section InstrGenerators.
     globals <- gen_global_tle_multiple;;
     functions <- gen_helper_function_tle_multiple;;
     main <- gen_main_tle;;
-    ret (globals ++ functions ++ [main]).
+    ret (globals ++ functions ++ [main])%list.
 
 End InstrGenerators.
