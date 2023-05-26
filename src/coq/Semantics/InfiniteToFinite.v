@@ -6036,7 +6036,7 @@ Module InfiniteToFinite.
       { intros a_fin2 a_inf1 b_fin0 ms_fin1 ms_inf1 ms_fin_ma0 MSR' A_REF WRITE.
         destruct a_fin2, a_inf1.
         destruct A_REF.
-        eapply fin_inf_write_byte_spec_MemPropT; eauto.          
+        eapply fin_inf_write_byte_spec_MemPropT; eauto.
       }
 
       cbn in ADDRS.
@@ -6443,7 +6443,7 @@ Module InfiniteToFinite.
 
       destruct MSR1' as (?&?&?&?&?&?&?&?).
       inv H0.
-      
+
       apply frame_eqv_empty_r in H2; subst.
       apply inf_frame_eqv_empty_r in FNIL; subst.
       apply inf_frame_eqv_empty_l in new_frame; subst.
@@ -6610,7 +6610,7 @@ Module InfiniteToFinite.
     intros ms_inf ms_fin ptr_inf MSR PTR.
     destruct ms_inf as [[ms_inf fss_inf hs_inf] msprovs_inf].
 
-    apply MemState_refine_prop_frame_stack_preserved in MSR.    
+    apply MemState_refine_prop_frame_stack_preserved in MSR.
     red in PTR.
     red in MSR.
     unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop in *.
@@ -6626,7 +6626,7 @@ Module InfiniteToFinite.
       cbn in *.
       specialize (PTR f).
       forward PTR; [reflexivity|].
-      
+
       destruct ms_fin as [[ms_fin fss_fin hs_fin] msprovs_fin].
       cbn in *.
 
@@ -6665,7 +6665,7 @@ Module InfiniteToFinite.
       cbn in *.
       specialize (PTR f).
       forward PTR; [reflexivity|].
-      
+
       destruct ms_fin as [[ms_fin fss_fin hs_fin] msprovs_fin].
       cbn in *.
 
@@ -6712,9 +6712,9 @@ Module InfiniteToFinite.
   Proof.
     intros ms_inf ms_fin ptr_inf MSR PTR.
     destruct ms_inf as [[ms_inf fss_inf hs_inf] msprovs_inf].
-    destruct ms_fin as [[ms_fin fss_fin hs_fin] msprovs_fin]. 
+    destruct ms_fin as [[ms_fin fss_fin hs_fin] msprovs_fin].
 
-    apply MemState_refine_prop_frame_stack_preserved in MSR.    
+    apply MemState_refine_prop_frame_stack_preserved in MSR.
     red in PTR.
     red in MSR.
     unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop in *.
@@ -6730,7 +6730,7 @@ Module InfiniteToFinite.
       cbn in *.
       specialize (PTR f).
       forward PTR; [reflexivity|].
-      
+
       unfold MemoryBigIntptr.MMEP.MemSpec.ptr_in_current_frame, MemoryBigIntptr.MMEP.MMSP.memory_stack_frame_stack_prop.
       cbn.
 
@@ -6776,7 +6776,7 @@ Module InfiniteToFinite.
       apply in_map_iff.
       exists (Int64.unsigned i, p0).
       split; auto.
-      
+
       apply in_map_iff.
       exists (i0, p0).
       split; auto.
@@ -6801,7 +6801,7 @@ Module InfiniteToFinite.
     { (* Multiple frames *)
       specialize (PTR f).
       forward PTR; [cbn; reflexivity|].
-      
+
       unfold MemoryBigIntptr.MMEP.MemSpec.ptr_in_current_frame, MemoryBigIntptr.MMEP.MMSP.memory_stack_frame_stack_prop.
       cbn.
 
@@ -6847,7 +6847,7 @@ Module InfiniteToFinite.
       apply in_map_iff.
       exists (Int64.unsigned i, p0).
       split; auto.
-      
+
       apply in_map_iff.
       exists (i0, p0).
       split; auto.
@@ -6976,42 +6976,56 @@ Module InfiniteToFinite.
       red; red in FSP.
       cbn in *.
 
-      red in MSR1, MSR2.
-      cbn in MSR1, MSR2.
-
-      break_match_hyp; inv MSR2.
-      break_match_hyp; inv Heqo.
-      break_match_hyp; inv H0.
-      break_match_hyp; inv H1.
-      break_match_hyp; inv Heqo1.
-
-      break_match_hyp; inv MSR1.
-      break_match_hyp; inv Heqo1.
-      break_match_hyp; inv H0.
-      break_match_hyp; inv H1.
-      break_match_hyp; inv Heqo4.
-
       red in POP.
       destruct fs1; try contradiction.
       rewrite <- POP.
 
-      destruct fs1_inf.
+      destruct m_fin_start. destruct ms_memory_stack.
+      destruct m_inf_start. destruct ms_memory_stack.
+      cbn in *.
+      destruct memory_stack_frame_stack0.
       apply MemoryBigIntptrInfiniteSpec.MMSP.frame_stack_eqv_sing_snoc_inv in FSP; contradiction.
+      pose proof FSP as F.
+      apply MemoryBigIntptrInfiniteSpec.MMSP.frame_stack_snoc_inv_fs in FSP.
+      apply MemoryBigIntptrInfiniteSpec.MMSP.frame_stack_snoc_inv_f in F.
 
-      rewrite convert_FrameStack_Snoc_equation in Heqo1.
-      cbn in Heqo1.
-      break_match_hyp; inv Heqo1.
-      break_match_hyp; inv H0.
+      rewrite <- FSP.
+      apply MemState_refine_prop_frame_stack_preserved in MSR1, MSR2.
+      cbn in *. red in MSR1, MSR2.
+      cbn in MSR1, MSR2.
+      unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop in *.
+      cbn in *.
 
-      pose proof InfMemMMSP.frame_stack_snoc_inv_fs _ _ _ _ FSP.
-      rewrite <- H.
+      destruct m_inf_final. destruct ms_memory_stack.
+      destruct m_fin_final. destruct ms_memory_stack.
+      cbn in *.
 
-      eapply convert_FrameStack_eqv_rev; eauto.
+      specialize (MSR2 memory_stack_frame_stack1).
+      destruct MSR2 as [MSR2 _].
+      forward MSR2; [reflexivity|].
+      rewrite <- MSR2.
 
-      specialize (POP_FRAME (Memory64BitIntptr.MMEP.MMSP.Snoc f2 f1) f2).
+      specialize (MSR1 (InfMem.MMEP.MMSP.Snoc memory_stack_frame_stack0 f0)).
+      destruct MSR1 as [MSR1 _].
+      forward MSR1; [reflexivity|].
+
+      destruct memory_stack_frame_stack.
+      {
+        cbn in MSR1.
+        apply MemoryBigIntptrInfiniteSpec.MMSP.frame_stack_eqv_sing_snoc_inv in MSR1; contradiction.
+      }
+      rewrite lift_FrameStack_snoc in MSR1.
+      apply MemoryBigIntptrInfiniteSpec.MMSP.frame_stack_snoc_inv_fs in MSR1.
+      rewrite <- MSR1.
+
+      unfold Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *.
+      cbn in *.
+
+      specialize (POP_FRAME (FinMem.MMEP.MMSP.Snoc memory_stack_frame_stack f1) memory_stack_frame_stack).
       forward POP_FRAME; [red; cbn; reflexivity|].
       forward POP_FRAME; [red; cbn; reflexivity|].
       red in POP_FRAME; cbn in POP_FRAME.
+      eapply frame_stack_eqv_lift.
       auto.
     - (* mempop_operation_invariants *)
       destruct INVARIANTS.
