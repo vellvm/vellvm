@@ -5950,90 +5950,81 @@ Module InfiniteToFinite.
   Proof.
   Admitted.
 
+  (* TODO: Move this *)
+  Lemma sbytes_refine_length :
+    forall bytes_inf bytes_fin,
+      sbytes_refine bytes_inf bytes_fin ->
+      length bytes_inf = length bytes_fin.
+  Proof.
+    intros bytes_inf bytes_fin H.
+    red in H.
+    eapply Util.Forall2_length; eauto.
+  Qed.
+
   Lemma fin_inf_write_bytes_spec :
-    forall a_fin a_inf ms_fin ms_fin' ms_inf bytes_inf bytes_fin,
+    forall a_fin a_inf ms_fin ms_fin' ms_inf bytes_inf bytes_fin res_fin,
       InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
       MemState_refine_prop ms_inf ms_fin ->
       sbytes_refine bytes_inf bytes_fin ->
-      Memory64BitIntptr.MMEP.MemSpec.write_bytes_spec a_fin bytes_fin ms_fin (success_unERR_UB_OOM (ms_fin', tt)) ->
-      exists ms_inf',
-        MemoryBigIntptr.MMEP.MemSpec.write_bytes_spec a_inf bytes_inf ms_inf (success_unERR_UB_OOM (ms_inf', tt)) /\
+      Memory64BitIntptr.MMEP.MemSpec.write_bytes_spec a_fin bytes_fin ms_fin (success_unERR_UB_OOM (ms_fin', res_fin)) ->
+      exists res_inf ms_inf',
+        MemoryBigIntptr.MMEP.MemSpec.write_bytes_spec a_inf bytes_inf ms_inf (success_unERR_UB_OOM (ms_inf', res_inf)) /\
+          res_inf = res_fin /\
           MemState_refine_prop ms_inf' ms_fin'.
   Proof.
-    intros a_fin a_inf ms_fin ms_fin' ms_inf bytes_inf bytes_fin ADDR_CONV MEM_REF1 BYTES_REF WRITE_SPEC.
+    intros a_fin a_inf ms_fin ms_fin' ms_inf bytes_inf bytes_fin res_fin ADDR_CONV MEM_REF1 BYTES_REF WRITE_SPEC.
 
     (* TODO: Make these opaque earlier *)
     Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
     Opaque MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
 
-    (* TODO: Move this *)
-    Lemma sbytes_refine_length :
-      forall bytes_inf bytes_fin,
-        sbytes_refine bytes_inf bytes_fin ->
-        length bytes_inf = length bytes_fin.
-    Proof.
-      intros bytes_inf bytes_fin H.
-      red in H.
-      eapply Util.Forall2_length; eauto.
-    Qed.
+    eapply MemPropT_fin_inf_bind.
+    4: {
+      apply WRITE_SPEC.
+    }
+    all: eauto.
 
-    (* Get things in the right form for MemPropT_fin_inf_bind *)
-    (assert (exists res ms_inf',
-         MemoryBigIntptr.MMEP.MemSpec.write_bytes_spec a_inf bytes_inf ms_inf (success_unERR_UB_OOM (ms_inf', res)) /\
-           res = tt /\
-           MemState_refine_prop ms_inf' ms_fin')).
-    {
-      eapply MemPropT_fin_inf_bind.
-      4: {
-        apply WRITE_SPEC.
-      }
-      all: eauto.
-
-      { (* MA *)
-        intros a_fin0 ms_fin_ma H.
-        eapply fin_inf_get_consecutive_ptrs_success_exists; eauto.
-        erewrite sbytes_refine_length; eauto.
-        apply H.
-      }
-
-      intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf0 b_fin ADDRS MSR WRITES.
-      eapply MemPropT_fin_inf_bind with
-        (A_REF := Forall2 eq).
-      4: apply WRITES.
-      all: eauto.
-
-      { (* MA *)
-        intros a_fin1 ms_fin_ma MAP.
-        eapply MemPropT_fin_inf_map_monad with
-          (A_REF := (fun '(a_inf, byte_inf) '(a_fin, byte_fin) =>
-                       InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin /\
-                         sbyte_refine byte_inf byte_fin)).
-        4: apply MAP.
-        all: eauto.
-
-        { intros a_fin2 a_inf1 b_fin0 ms_fin1 ms_inf1 ms_fin_ma0 MSR' A_REF WRITE.
-          destruct a_fin2, a_inf1.
-          destruct A_REF.
-          eapply fin_inf_write_byte_spec_MemPropT; eauto.          
-        }
-
-        cbn in ADDRS.
-
-        apply Forall2_zip; eauto.
-        apply Forall2_flip in ADDRS.
-        apply ADDRS.        
-      }
-
-      intros ms_inf1 ms_fin1 ms_fin'1 a_fin1 a_inf1 b_fin0 H H0 H1.
-      cbn.
-      do 2 eexists; split; eauto.
-      destruct b_fin0; split; auto.
-      cbn in H1.
-      destruct H1; subst; auto.
+    { (* MA *)
+      intros a_fin0 ms_fin_ma H.
+      eapply fin_inf_get_consecutive_ptrs_success_exists; eauto.
+      erewrite sbytes_refine_length; eauto.
+      apply H.
     }
 
-    destruct H as (?&?&?&?&?); subst.
-    eexists; split; eauto.
+    intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf0 b_fin ADDRS MSR WRITES.
+    eapply MemPropT_fin_inf_bind with
+      (A_REF := Forall2 eq).
+    4: apply WRITES.
+    all: eauto.
+
+    { (* MA *)
+      intros a_fin1 ms_fin_ma MAP.
+      eapply MemPropT_fin_inf_map_monad with
+        (A_REF := (fun '(a_inf, byte_inf) '(a_fin, byte_fin) =>
+                     InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin /\
+                       sbyte_refine byte_inf byte_fin)).
+      4: apply MAP.
+      all: eauto.
+
+      { intros a_fin2 a_inf1 b_fin0 ms_fin1 ms_inf1 ms_fin_ma0 MSR' A_REF WRITE.
+        destruct a_fin2, a_inf1.
+        destruct A_REF.
+        eapply fin_inf_write_byte_spec_MemPropT; eauto.          
+      }
+
+      cbn in ADDRS.
+
+      apply Forall2_zip; eauto.
+      apply Forall2_flip in ADDRS.
+      apply ADDRS.
+    }
+
+    intros ms_inf1 ms_fin1 ms_fin'1 a_fin1 a_inf1 b_fin0 H H0 H1.
+    cbn.
+    do 2 eexists; split; eauto.
+    destruct b_fin0; split; auto.
+    cbn in H1.
+    destruct H1; subst; auto.
   Qed.
 
   (* TODO: Move this to somewhere it can
@@ -6062,253 +6053,233 @@ Module InfiniteToFinite.
       eapply HMAPM.
   Qed.
 
+  Lemma handle_memcpy_fin_inf :
+    forall {args args0 ms_fin ms_fin' ms_inf res_fin},
+      MemState_refine_prop ms_inf ms_fin ->
+      Forall2 DVCInfFin.dvalue_refine_strict args0 args ->
+      Memory64BitIntptr.MMEP.MemSpec.handle_memcpy_prop args ms_fin (ret (ms_fin', res_fin)) ->
+      exists (res_inf : unit) (ms_inf' : MemoryBigIntptr.MMEP.MMSP.MemState),
+        MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop args0 ms_inf (ret (ms_inf', res_inf)) /\
+          res_inf = res_fin /\
+          MemState_refine_prop ms_inf' ms_fin'.
+  Proof.
+    intros args args0 ms_fin ms_fin' ms_inf res_fin MSR ARGS HANDLER.
+
+    (* Handler *)
+    repeat (destruct ARGS;
+            [solve [ inversion HANDLER
+                   | red in HANDLER;
+                     repeat break_match_hyp; inversion HANDLER
+               ]
+            |
+           ]).
+    red in HANDLER.
+    repeat break_match_hyp; try inversion HANDLER; subst.
+    { (* 32 bit memcpy *)
+      inversion ARGS; subst.
+      clear ARGS.
+      rewrite DVCInfFin.dvalue_refine_strict_equation in H, H0, H1, H2, H3.
+
+      apply dvalue_convert_strict_addr_inv in H as (a' & H & X); subst.
+      apply dvalue_convert_strict_addr_inv in H0 as (a0' & H0 & X0); subst.
+      apply dvalue_convert_strict_i32_inv in H1.
+      apply dvalue_convert_strict_i32_inv in H2; subst.
+      apply dvalue_convert_strict_i1_inv in H3; subst.
+
+      unfold MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop.
+      unfold MemoryBigIntptr.MMEP.MemSpec.memcpy_spec.
+      red in HANDLER.
+
+      assert (LLVMParams64BitIntptr.Events.DV.unsigned x4 = LLVMParamsBigIntptr.Events.DV.unsigned x4) as X4.
+      { reflexivity.
+      }
+      rewrite <- X4; clear X4.
+
+      destruct res_fin.
+      break_match_hyp.
+      {
+        exists tt. exists (lift_MemState ms_fin').
+        split; auto.
+        split; auto.
+        apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
+      }
+
+      erewrite <- fin_inf_no_overlap; eauto.
+      repeat erewrite <- fin_inf_ptoi; eauto.
+      break_match_goal.
+      { eapply MemPropT_fin_inf_bind.
+        4: apply HANDLER.
+        all: eauto.
+
+        { (* MA *)
+          intros a_fin ms_fin_ma H1.
+          eapply fin_inf_read_bytes_spec; eauto.
+          apply H1.
+        }
+
+        intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin BYTES MSR' WRITE.
+        cbn in BYTES.
+        eapply fin_inf_write_bytes_spec; eauto.
+      }
+
+      exists tt. exists (lift_MemState ms_fin').
+      split; auto.
+      split; auto.
+      apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
+    }
+
+    { (* 64 bit memcpy *)
+      inversion ARGS; subst.
+      clear ARGS.
+      rewrite DVCInfFin.dvalue_refine_strict_equation in H, H0, H1, H2, H3.
+
+      apply dvalue_convert_strict_addr_inv in H as (a' & H & X); subst.
+      apply dvalue_convert_strict_addr_inv in H0 as (a0' & H0 & X0); subst.
+      apply dvalue_convert_strict_i64_inv in H1.
+      apply dvalue_convert_strict_i64_inv in H2; subst.
+      apply dvalue_convert_strict_i1_inv in H3; subst.
+
+      unfold MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop.
+      unfold MemoryBigIntptr.MMEP.MemSpec.memcpy_spec.
+      red in HANDLER.
+
+      assert (LLVMParams64BitIntptr.Events.DV.unsigned x4 = LLVMParamsBigIntptr.Events.DV.unsigned x4) as X4.
+      { reflexivity.
+      }
+      rewrite <- X4; clear X4.
+
+      destruct res_fin.
+      break_match_hyp.
+      {
+        exists tt. exists (lift_MemState ms_fin').
+        split; auto.
+        split; auto.
+        apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
+      }
+
+      erewrite <- fin_inf_no_overlap; eauto.
+      repeat erewrite <- fin_inf_ptoi; eauto.
+      break_match_goal.
+      { eapply MemPropT_fin_inf_bind.
+        4: apply HANDLER.
+        all: eauto.
+
+        { (* MA *)
+          intros a_fin ms_fin_ma H1.
+          eapply fin_inf_read_bytes_spec; eauto.
+          apply H1.
+        }
+
+        intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin BYTES MSR' WRITE.
+        cbn in BYTES.
+        eapply fin_inf_write_bytes_spec; eauto.
+      }
+
+      exists tt. exists (lift_MemState ms_fin').
+      split; auto.
+      split; auto.
+      apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
+    }
+
+    { (* iptr memcpy *)
+      inversion ARGS; subst.
+      clear ARGS.
+      rewrite DVCInfFin.dvalue_refine_strict_equation in H, H0, H1, H2, H3.
+
+      apply dvalue_convert_strict_addr_inv in H as (a' & H & X); subst.
+      apply dvalue_convert_strict_addr_inv in H0 as (a0' & H0 & X0); subst.
+      apply dvalue_convert_strict_iptr_inv in H1 as (x4' & H1 & X4); subst.
+      apply dvalue_convert_strict_iptr_inv in H2 as (x5' & H2 & X5); subst.
+      apply dvalue_convert_strict_i1_inv in H3; subst.
+
+      unfold MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop.
+      unfold MemoryBigIntptr.MMEP.MemSpec.memcpy_spec.
+      red in HANDLER.
+
+      assert (LLVMParams64BitIntptr.IP.to_Z x4 = LLVMParamsBigIntptr.IP.to_Z x4') as X4.
+      { unfold LLVMParams64BitIntptr.IP.to_Z, LLVMParamsBigIntptr.IP.to_Z.
+        unfold InterpreterStackBigIntptr.LP.IP.to_Z in *.
+        erewrite IP.from_Z_to_Z; eauto.
+      }
+      rewrite <- X4; clear X4.
+
+      destruct res_fin.
+      break_match_hyp.
+      {
+        exists tt. exists (lift_MemState ms_fin').
+        split; auto.
+        split; auto.
+        apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
+      }
+
+      erewrite <- fin_inf_no_overlap; eauto.
+      repeat erewrite <- fin_inf_ptoi; eauto.
+      break_match_goal.
+      { eapply MemPropT_fin_inf_bind.
+        4: apply HANDLER.
+        all: eauto.
+
+        { (* MA *)
+          intros a_fin ms_fin_ma H3.
+          eapply fin_inf_read_bytes_spec; eauto.
+          apply H3.
+        }
+
+        intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin BYTES MSR' WRITE.
+        cbn in BYTES.
+        eapply fin_inf_write_bytes_spec; eauto.
+      }
+
+      exists tt. exists (lift_MemState ms_fin').
+      split; auto.
+      split; auto.
+      apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
+    }
+  Qed.
+
   (* TODO: Lemma about lifting intrinsic handlers *)
   (* TODO: Move this *)
   Lemma handle_intrinsic_fin_inf :
-    forall t f args args0 ms_fin ms_fin' ms_inf ms_inf' d
+    forall t f args args0 ms_fin ms_fin' ms_inf d_fin
       (ARGS: Forall2 DVCInfFin.dvalue_refine_strict args0 args),
-      MemState_refine_prop ms_inf ms_fin'
+      MemState_refine_prop ms_inf ms_fin ->
       Memory64BitIntptr.MMEP.MemSpec.handle_intrinsic_prop
         LLVMParams64BitIntptr.Events.DV.dvalue
-        (LLVMParams64BitIntptr.Events.Intrinsic t f args) ms_fin (ret (ms', d)) ->
-      exists ms_inf',
+        (LLVMParams64BitIntptr.Events.Intrinsic t f args) ms_fin (ret (ms_fin', d_fin)) ->
+      exists d_inf ms_inf',
         MemoryBigIntptr.MMEP.MemSpec.handle_intrinsic_prop DVCInfFin.DV1.dvalue
-        (InterpreterStackBigIntptr.LP.Events.Intrinsic t f args0) (lift_MemState ms)
-        (ret (ms_inf', fin_to_inf_dvalue d)) /\
-          MemState_refine_prop ms_inf' ms'.
+          (InterpreterStackBigIntptr.LP.Events.Intrinsic t f args0) ms_inf
+          (ret (ms_inf', d_inf)) /\
+          DVC1.dvalue_refine_strict d_inf d_fin /\
+          MemState_refine_prop ms_inf' ms_fin'.
   Proof.
-    intros t f args args0 ms ms' d ARGS INTRINSIC.
-
-    pose proof lift_MemState_refine ms as MS_REF.
-    pose proof lift_MemState_refine ms' as MS'_REF.
-    apply MemState_refine_MemState_refine_prop in MS_REF, MS'_REF.
+    intros t f args args0 ms_fin ms_fin' ms_inf d_fin ARGS MSR INTRINSIC.
 
     red in INTRINSIC.
+    unfold MemoryBigIntptr.MMEP.MemSpec.handle_intrinsic_prop.
     break_match.
     { (* Memcpy *)
-      apply MemPropT_bind_ret_inv in INTRINSIC as (sab & [] & HANDLER & SAB & D).
-      subst.
-      exists (lift_MemState sab).
+      eapply MemPropT_fin_inf_bind.
+      4: apply INTRINSIC.
+      all: eauto.
+
+      { (* MA *)
+        intros a_fin ms_fin_ma MEMCPY.
+        eapply handle_memcpy_fin_inf; eauto.
+      }
+
+      intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin _ MSR' EQV.
+      cbn in EQV.
+      destruct EQV; subst.
+
+      cbn.
+      exists LLVMParamsBigIntptr.Events.DV.DVALUE_None.
+      exists ms_inf0.
       split; auto.
-      red; rewrite Heqb.
-
-      eapply MemPropT_fin_inf_bind with
-        (A_REF:=eq)
-        (B_REF:=DVC1.dvalue_refine_strict)
-        (ma_fin:=Memory64BitIntptr.MMEP.MemSpec.handle_memcpy_prop args); eauto.
-
-      - apply fin_to_inf_dvalue_refine_strict.
-      - intros ms_fin' a_fin HANDLER'.
-        exists a_fin.
-        exists (lift_MemState sab).
-        split.
-        2: {
-          split; auto.
-        }
-
-
-
-      repeat split; auto.
-      - (* Handler *)
-        repeat (destruct ARGS;
-                [solve [ inversion HANDLER
-                       | red in HANDLER;
-                         repeat break_match_hyp; inversion HANDLER
-                   ]
-                |
-               ]).
-        red in HANDLER.
-        repeat break_match_hyp; try inversion HANDLER; subst.
-        { (* 32 bit memcpy *)
-          inversion ARGS; subst.
-          clear ARGS.
-          rewrite DVCInfFin.dvalue_refine_strict_equation in H, H0, H1, H2, H3.
-
-          apply dvalue_convert_strict_addr_inv in H as (a' & H & X); subst.
-          apply dvalue_convert_strict_addr_inv in H0 as (a0' & H0 & X0); subst.
-          apply dvalue_convert_strict_i32_inv in H1.
-          apply dvalue_convert_strict_i32_inv in H2; subst.
-          apply dvalue_convert_strict_i1_inv in H3; subst.
-
-          red. red.
-          red in HANDLER.
-
-          assert (LLVMParams64BitIntptr.Events.DV.unsigned x4 = LLVMParamsBigIntptr.Events.DV.unsigned x4) as X4.
-          { reflexivity.
-          }
-          rewrite <- X4; clear X4.
-
-          break_match_hyp; auto.
-
-          erewrite <- fin_inf_no_overlap; eauto.
-          repeat erewrite <- fin_inf_ptoi; eauto.
-          break_match_goal; auto.
-
-          do 2 red in HANDLER.
-          destruct HANDLER as (ms_read&bytes_fin&READ&WRITE).
-          epose proof fin_inf_read_bytes_spec _ _ _ _ _ _ H0 MS_REF.
-
-          pose proof READ as READ'.
-          eapply read_bytes_spec_MemState_eq in READ'; subst.
-          forward H1.
-          { eapply READ.
-          }
-
-          destruct H1 as [ms [addrs [GCP READ']]].
-          red. red.
-          exists ms. exists (map lift_SByte bytes_fin).
-          split.
-          { (* Read portion *)
-            red.
-            cbn.
-            exists ms. exists addrs.
-            split; auto.
-
-            assert (ms = lift_MemState ms_read).
-            {
-              symmetry.
-              eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq; eauto.
-            }
-            subst; eauto.
-          }
-
-          { (* Write bytes portion *)
-            pose proof fin_inf_write_bytes_spec _ _ _ _ _ _ H MS_REF WRITE as [ms_inf' [WRITE_INF MS_REF_INF]].
-            eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in GCP.
-            subst.
-            apply WRITE_INF.
-          }
-        }
-
-        { (* 64 bit memcpy *)
-          inversion ARGS; subst.
-          clear ARGS.
-          rewrite DVCInfFin.dvalue_refine_strict_equation in H, H0, H1, H2, H3.
-
-          apply dvalue_convert_strict_addr_inv in H as (a' & H & X); subst.
-          apply dvalue_convert_strict_addr_inv in H0 as (a0' & H0 & X0); subst.
-          apply dvalue_convert_strict_i64_inv in H1.
-          apply dvalue_convert_strict_i64_inv in H2; subst.
-          apply dvalue_convert_strict_i1_inv in H3; subst.
-
-          red. red.
-          red in HANDLER.
-
-          assert (LLVMParams64BitIntptr.Events.DV.unsigned x4 = LLVMParamsBigIntptr.Events.DV.unsigned x4) as X4.
-          { reflexivity.
-          }
-          rewrite <- X4; clear X4.
-
-          break_match_hyp; auto.
-
-          erewrite <- fin_inf_no_overlap; eauto.
-          repeat erewrite <- fin_inf_ptoi; eauto.
-          break_match_goal; auto.
-
-          do 2 red in HANDLER.
-          destruct HANDLER as (ms_read&bytes_fin&READ&WRITE).
-          epose proof fin_inf_read_bytes_spec _ _ _ _ _ _ H0 MS_REF.
-
-          pose proof READ as READ'.
-          eapply read_bytes_spec_MemState_eq in READ'; subst.
-          forward H1.
-          { eapply READ.
-          }
-
-          destruct H1 as [ms [addrs [GCP READ']]].
-          red. red.
-          exists ms. exists (map lift_SByte bytes_fin).
-          split.
-          { (* Read portion *)
-            red.
-            cbn.
-            exists ms. exists addrs.
-            split; auto.
-
-            assert (ms = lift_MemState ms_read).
-            {
-              symmetry.
-              eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq; eauto.
-            }
-            subst; eauto.
-          }
-
-          { (* Write bytes portion *)
-            pose proof fin_inf_write_bytes_spec _ _ _ _ _ _ H MS_REF WRITE as [ms_inf' [WRITE_INF MS_REF_INF]].
-            erewrite lift_MemState_convert_MemState_inverse; eauto.
-            eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in GCP.
-            subst.
-            apply WRITE_INF.
-          }
-        }
-
-        { (* iptr memcpy *)
-          inversion ARGS; subst.
-          clear ARGS.
-          rewrite DVCInfFin.dvalue_refine_strict_equation in H, H0, H1, H2, H3.
-
-          apply dvalue_convert_strict_addr_inv in H as (a' & H & X); subst.
-          apply dvalue_convert_strict_addr_inv in H0 as (a0' & H0 & X0); subst.
-          apply dvalue_convert_strict_iptr_inv in H1 as (x4' & H1 & X4); subst.
-          apply dvalue_convert_strict_iptr_inv in H2 as (x5' & H2 & X5); subst.
-          apply dvalue_convert_strict_i1_inv in H3; subst.
-
-          red. red.
-          red in HANDLER.
-
-          assert (LLVMParams64BitIntptr.IP.to_Z x4 = LLVMParamsBigIntptr.IP.to_Z x4') as X4.
-          { unfold LLVMParams64BitIntptr.IP.to_Z, LLVMParamsBigIntptr.IP.to_Z.
-            unfold InterpreterStackBigIntptr.LP.IP.to_Z in *.
-            erewrite IP.from_Z_to_Z; eauto.
-          }
-          rewrite <- X4; clear X4.
-
-          break_match_hyp; auto.
-
-          erewrite <- fin_inf_no_overlap; eauto.
-          repeat erewrite <- fin_inf_ptoi; eauto.
-          break_match_goal; auto.
-
-          do 2 red in HANDLER.
-          destruct HANDLER as (ms_read&bytes_fin&READ&WRITE).
-          epose proof fin_inf_read_bytes_spec _ _ _ _ _ _ H0 MS_REF.
-
-          pose proof READ as READ'.
-          eapply read_bytes_spec_MemState_eq in READ'; subst.
-          forward H3.
-          { eapply READ.
-          }
-
-          destruct H3 as [ms [addrs [GCP READ']]].
-          red. red.
-          exists ms. exists (map lift_SByte bytes_fin).
-          split.
-          { (* Read portion *)
-            red.
-            cbn.
-            exists ms. exists addrs.
-            split; auto.
-
-            assert (ms = lift_MemState ms_read).
-            {
-              symmetry.
-              eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq; eauto.
-            }
-            subst; eauto.
-          }
-
-          { (* Write bytes portion *)
-            pose proof fin_inf_write_bytes_spec _ _ _ _ _ _ H MS_REF WRITE as [ms_inf' [WRITE_INF MS_REF_INF]].
-            erewrite lift_MemState_convert_MemState_inverse; eauto.
-            eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in GCP.
-            subst.
-            apply WRITE_INF.
-          }
-        }
-      - erewrite <- fin_to_inf_dvalue_refine_strict'; eauto.
-        rewrite DVC1.dvalue_refine_strict_equation.
-        rewrite DVC1.dvalue_convert_strict_equation.
-        reflexivity.
+      split; auto.
+      rewrite DVCInfFin.dvalue_refine_strict_equation.
+      rewrite DVC1.dvalue_convert_strict_equation.
+      reflexivity.
     }
 
     break_match.
@@ -6327,63 +6298,147 @@ Module InfiniteToFinite.
 
   (* TODO: Move this *)
   Lemma mem_push_spec_fin_inf :
-    forall {m1_fin m2_fin m1_inf m2_inf},
-      MemState_refine m1_inf m1_fin ->
-      MemState_refine m2_inf m2_fin ->
-      Memory64BitIntptr.MMEP.MemSpec.mempush_spec m1_fin m2_fin ->
-      MemoryBigIntptr.MMEP.MemSpec.mempush_spec m1_inf m2_inf.
+    forall {m_fin_start m_fin_final m_inf_start},
+      MemState_refine_prop m_inf_start m_fin_start ->
+      Memory64BitIntptr.MMEP.MemSpec.mempush_spec m_fin_start m_fin_final ->
+      exists m_inf_final,
+        MemoryBigIntptr.MMEP.MemSpec.mempush_spec m_inf_start m_inf_final /\
+          MemState_refine_prop m_inf_final m_fin_final.
   Proof.
-    intros m1_fin m2_fin m1_inf m2_inf MSR1 MSR2 [FRESH INVARIANTS].
+    intros m_fin_start m_fin_final m_inf_start MSR [FRESH INVARIANTS].
+    exists (lift_MemState m_fin_final).
+    (*
     destruct m1_fin as [[m1_fin fs1_fin h1_fin] msprov1_fin], m2_fin as [[m2_fin fs2_fin h2_fin] msprov2_fin].
-    destruct m1_inf as [[m1_inf fs1_inf h1_inf] msprov1_inf], m2_inf as [[m2_inf fs2_inf h2_inf] msprov2_inf].
+    destruct m1_inf as [[m1_inf fs1_inf h1_inf] msprov1_inf].
+     *)
+
+    pose proof (MemState_refine_MemState_refine_prop _ _ (lift_MemState_refine m_fin_final)) as MSR'.
+
     cbn in *.
+    split; auto.
+
     split; cbn in *.
     - (* Fresh frame *)
-      clear INVARIANTS.
-      intros fs1 fs2 f H H0 H1.
+      clear INVARIANTS MSR'.
+      intros fs1 fs2 f MSFSP EMPTY PUSH.
 
       (* When I pop, I get a framestack that's equivalent to fs2... *)
       unfold MemoryBigIntptr.MMEP.MMSP.memory_stack_frame_stack_prop, Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *.
       cbn in *.
 
-      red in MSR1.
-      cbn in MSR1.
-      break_match_hyp; inv MSR1.
-      break_match_hyp; inv Heqo.
-      break_match_hyp; inv H3.
-      break_match_hyp; inv H4.
-      break_match_hyp; inv Heqo1.
+      apply MemState_refine_prop_frame_stack_preserved in MSR.
 
-      red in MSR2.
-      cbn in MSR2.
-      break_match_hyp; inv MSR2.
-      break_match_hyp; inv Heqo1.
-      break_match_hyp; inv H3.
-      break_match_hyp; inv H4.
-      break_match_hyp; inv Heqo4.
-
-      destruct H1.
+      destruct PUSH.
       red in can_pop.
       destruct fs2; try contradiction.
       cbn in new_frame.
 
       rewrite <- new_frame.
       rewrite can_pop.
-      rewrite <- H.
-      pose proof InfMem.MMEP.empty_frame_eqv _ _ H0 MemoryBigIntptr.MMEP.empty_frame_nil as FNIL.
+      rewrite <- MSFSP.
+
+      pose proof InfMem.MMEP.empty_frame_eqv _ _ EMPTY MemoryBigIntptr.MMEP.empty_frame_nil as FNIL.
       rewrite FNIL.
 
-      eapply convert_FrameStack_eqv_rev; eauto.
-      {
-        eapply convert_FrameStack_snoc; eauto.
-        cbn. reflexivity.
+      (* TODO: Move this somewhere I can use it for both fin / inf *)
+      #[global] Instance inf_frame_stack_preserved_symmetric :
+        Symmetric InfMem.MMEP.MemSpec.frame_stack_preserved.
+      Proof.
+        intros x y FSP.
+        red; red in FSP.
+        intros fs. split; intros FS.
+        apply FSP; auto.
+        apply FSP; auto.
+      Qed.
+
+      assert (Memory64BitIntptr.MMEP.MemSpec.push_frame_stack_spec
+        (Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack
+           (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory m_fin_start)) []
+        (Memory64BitIntptr.MMEP.MMSP.Snoc
+           (Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack
+              (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory m_fin_start)) [])) as PUSH_FIN.
+      { split; cbn; reflexivity.
       }
 
-      eapply FRESH.
-      reflexivity.
+      specialize (FRESH
+                    (Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack
+                       (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory m_fin_start))
+                    (Memory64BitIntptr.MMEP.MMSP.Snoc
+                       (Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack
+                          (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory m_fin_start)) [])
+                    []
+                 ).
+      forward FRESH; try reflexivity.
+      forward FRESH.
       apply Memory64BitIntptr.MMEP.empty_frame_nil.
+      specialize (FRESH PUSH_FIN).
 
-      split; red; reflexivity.
+      apply FinMemMMSP.frame_stack_inv in FRESH.
+      destruct FRESH as [FRESH | FRESH].
+      2: {
+        destruct FRESH as (?&?&?&?&?).
+        discriminate.
+      }
+
+      destruct FRESH as (?&?&?&?&?&?&?&?).
+      inv H0.
+
+      destruct m_fin_final. destruct ms_memory_stack.
+      cbn in *; subst.
+      rewrite lift_FrameStack_snoc.
+
+      apply frame_stack_eqv_lift in H1.
+      rewrite H1.
+      apply frame_eqv_lift in H2.
+      rewrite H2.
+      clear H1 H2.
+
+      red in MSR.
+      pose proof MSFSP.
+      apply MSR in H.
+
+      (* TODO: Move this to where it can work for fin / inf *)
+      Lemma frame_stack_eqv_snoc :
+        forall fs1 fs2 f1 f2,
+          MemoryBigIntptr.MMEP.MMSP.frame_stack_eqv fs1 fs2 ->
+          MemoryBigIntptr.MMEP.MMSP.frame_eqv f1 f2 ->
+          MemoryBigIntptr.MMEP.MMSP.frame_stack_eqv
+            (InfMemMMSP.Snoc fs1 f1)
+            (InfMemMMSP.Snoc fs2 f2).
+      Proof.
+        intros fs1 fs2 f1 f2 H H0.
+        rewrite H.
+        rewrite H0.
+        reflexivity.
+      Qed.
+
+      apply frame_stack_eqv_snoc.
+      2: {
+        cbn; reflexivity.
+      }
+
+      destruct m_fin_start. destruct ms_memory_stack.
+      destruct m_inf_start. destruct ms_memory_stack.
+      cbn in H, PUSH_FIN, MSR.
+      red in H; cbn in H.
+
+      replace (Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack
+          (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory
+             {|
+               FinMemMMSP.ms_memory_stack :=
+                 {|
+                   FinMemMMSP.memory_stack_memory := memory_stack_memory0;
+                   FinMemMMSP.memory_stack_frame_stack := memory_stack_frame_stack;
+                   FinMemMMSP.memory_stack_heap := memory_stack_heap0
+                 |};
+               FinMemMMSP.ms_provenance := ms_provenance0
+             |})) with memory_stack_frame_stack by reflexivity.
+
+      cbn.
+
+      cbn in MSFSP.
+      rewrite H, <- MSFSP.
+      reflexivity.
     - (* mempush_operation_invariants *)
       destruct INVARIANTS.
       split; cbn in *.
