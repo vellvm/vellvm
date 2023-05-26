@@ -31,7 +31,6 @@
 ./coq/Handlers/MemoryModules/FiniteSpecPrimitives.v
 ./coq/Handlers/MemoryModules/InfiniteAddresses.v
 ./coq/Handlers/MemoryModules/Within.v
-./coq/Handlers/MemoryState.v
 ./coq/Handlers/OOM.v
 ./coq/Handlers/Pick.v
 ./coq/Handlers/SerializationTheory.v
@@ -44,6 +43,7 @@
 ./coq/Numeric/Integers.v
 ./coq/Numeric/Zbits.v
 ./coq/QC/GenAST.v
+./coq/QC/Generators.v
 ./coq/QC/QCVellvm.v
 ./coq/QC/ReprAST.v
 ./coq/QC/ShowAST.v
