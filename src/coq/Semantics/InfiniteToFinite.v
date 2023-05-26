@@ -1638,6 +1638,73 @@ Module InfiniteToFinite.
     split; auto.
   Qed.
 
+  Lemma MemPropT_fin_inf_map_monad :
+    forall {A_INF A_FIN B_INF B_FIN}
+      {l_inf : list A_INF} {l_fin : list A_FIN}
+      {f_fin : A_FIN -> MemPropT Memory64BitIntptr.MMEP.MMSP.MemState B_FIN} {f_inf : A_INF -> MemPropT MemoryBigIntptr.MMEP.MMSP.MemState B_INF}
+      {ms_fin_start ms_fin_final : Memory64BitIntptr.MMEP.MMSP.MemState}
+      {ms_inf_start : MemoryBigIntptr.MMEP.MMSP.MemState}
+      {res_fin : list B_FIN}
+
+      (A_REF : A_INF -> A_FIN -> Prop)
+      (B_REF : B_INF -> B_FIN -> Prop)
+
+      (MEM_REF_START : MemState_refine_prop ms_inf_start ms_fin_start)
+
+      (F : forall a_fin a_inf b_fin ms_fin ms_inf ms_fin_ma,
+          MemState_refine_prop ms_inf ms_fin ->
+          A_REF a_inf a_fin ->
+          f_fin a_fin ms_fin (ret (ms_fin_ma, b_fin)) ->
+          exists b_inf ms_inf_ma,
+            f_inf a_inf ms_inf (ret (ms_inf_ma, b_inf)) /\
+              B_REF b_inf b_fin /\
+              MemState_refine_prop ms_inf_ma ms_fin_ma)
+
+      (AS : Forall2 A_REF l_inf l_fin)
+      (FIN : map_monad f_fin l_fin ms_fin_start (ret (ms_fin_final, res_fin))),
+
+    exists res_inf ms_inf_final,
+      map_monad f_inf l_inf ms_inf_start (ret (ms_inf_final, res_inf)) /\
+        Forall2 B_REF res_inf res_fin /\
+        MemState_refine_prop ms_inf_final ms_fin_final.
+  Proof.
+    intros A_INF A_FIN B_INF B_FIN l_inf l_fin f_fin f_inf ms_fin_start ms_fin_final ms_inf_start res_fin A_REF
+      B_REF MEM_REF_START F AS FIN.
+
+    generalize dependent res_fin.
+    generalize dependent ms_fin_start.
+    generalize dependent ms_inf_start.
+    induction AS; intros ms_inf_start ms_fin_start MEM_REF_START res_fin FIN.
+    - cbn. exists []. exists ms_inf_start.
+      cbn in FIN.
+      destruct FIN; subst.
+
+      split; auto.
+    - rewrite map_monad_unfold in FIN.
+      apply MemPropT_bind_ret_inv in FIN as (ms_fin' & b_fin & F_Y & FIN).
+      apply MemPropT_bind_ret_inv in FIN as (ms_fin_final' & b_fin_rest & MAP_FIN & RET_FIN).
+      cbn in RET_FIN.
+      destruct RET_FIN; subst.
+
+      pose proof (F _ _ _ _ _ _ MEM_REF_START H F_Y) as (b_inf & ms_inf' & F_X & B & MSR).
+      specialize (IHAS ms_inf' ms_fin' MSR _ MAP_FIN) as (b_inf_rest & ms_inf_final' & MAP_INF & B_ALL & MSR_FINAL).
+
+      exists (b_inf :: b_inf_rest).
+      exists ms_inf_final'.
+      split; auto.
+
+      rewrite map_monad_unfold.
+
+      repeat red.
+      do 2 eexists.
+      split; eauto.
+      do 2 eexists.
+      split; eauto.
+
+      cbn.
+      auto.
+  Qed.
+
   Lemma get_inf_tree_rutt :
     forall t,
       orutt (OOM:=OOME) L3_refine_strict L3_res_refine_strict
@@ -2338,7 +2405,7 @@ Module InfiniteToFinite.
     auto.
   Qed.
 
-  Lemma fin_inf_get_consecutive_ptrs_success_exists :
+  Lemma fin_inf_get_consecutive_ptrs_success_exists' :
     forall a_fin a_inf n ms_fin ms_fin' addrs_fin ms_inf,
       (* TODO: ADDR probably not necessary, can conclude this from ADDRS...
        *)
@@ -2678,6 +2745,37 @@ Module InfiniteToFinite.
       cbn.
       apply ITOP.int_to_ptr_ptr_to_int.
       reflexivity.
+  Qed.
+
+  (* Form that better matches MemPropT_fin_inf_bind *)
+  Lemma fin_inf_get_consecutive_ptrs_success_exists :
+    forall a_fin a_inf n ms_fin ms_fin' addrs_fin ms_inf,
+      (* TODO: ADDR probably not necessary, can conclude this from ADDRS...
+       *)
+      InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
+      MemState_refine_prop ms_inf ms_fin ->
+      (@Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs
+         (MemPropT Memory64BitIntptr.MMEP.MMSP.MemState)
+         (@MemPropT_Monad Memory64BitIntptr.MMEP.MMSP.MemState)
+         (@MemPropT_RAISE_OOM Memory64BitIntptr.MMEP.MMSP.MemState)
+         (@MemPropT_RAISE_ERROR Memory64BitIntptr.MMEP.MMSP.MemState) a_fin n ms_fin (success_unERR_UB_OOM (ms_fin', addrs_fin))) ->
+      exists addrs_inf ms_inf',
+        (@MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs
+           (MemPropT MemoryBigIntptr.MMEP.MMSP.MemState)
+           (@MemPropT_Monad MemoryBigIntptr.MMEP.MMSP.MemState)
+           (@MemPropT_RAISE_OOM MemoryBigIntptr.MMEP.MMSP.MemState)
+           (@MemPropT_RAISE_ERROR MemoryBigIntptr.MMEP.MMSP.MemState) a_inf n ms_inf (success_unERR_UB_OOM (ms_inf', addrs_inf))) /\
+          Forall2 (fun x y => InfToFinAddrConvert.addr_convert y = NoOom x) addrs_fin addrs_inf /\
+          MemState_refine_prop ms_inf' ms_fin'.
+  Proof.
+    intros a_fin a_inf n ms_fin ms_fin' addrs_fin ms_inf ADDR_CONV MSR GCP.
+
+    pose proof fin_inf_get_consecutive_ptrs_success_exists' a_fin a_inf n ms_fin ms_fin' addrs_fin ms_inf ADDR_CONV GCP.
+    destruct H as (addrs_inf & GCP' & ADDRS).
+    exists addrs_inf. exists ms_inf.
+    split; auto.
+    split; auto.
+    apply FinMem.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in GCP; subst; auto.
   Qed.
 
   (* TODO: Maybe change MemState_refine to be propositional in terms of find *)
@@ -3953,7 +4051,7 @@ Module InfiniteToFinite.
     - eapply fin_inf_read_byte_prop; eauto.
   Qed.
 
-  Lemma fin_inf_read_byte_spec_MemPropT :
+  Lemma fin_inf_read_byte_spec_MemPropT' :
     forall addr_fin addr_inf ms_fin ms_inf byte_fin,
       MemState_refine_prop ms_inf ms_fin ->
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
@@ -3968,7 +4066,31 @@ Module InfiniteToFinite.
     eapply fin_inf_read_byte_spec; eauto.
   Qed.
 
-  Lemma fin_inf_read_bytes_spec :
+  (* Better form for MemPropT_fin_inf_bind *)
+  Lemma fin_inf_read_byte_spec_MemPropT :
+    forall {addr_fin addr_inf ms_fin ms_fin' ms_inf byte_fin},
+      MemState_refine_prop ms_inf ms_fin ->
+      InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.read_byte_spec_MemPropT addr_fin ms_fin (success_unERR_UB_OOM (ms_fin', byte_fin)) ->
+      exists byte_inf ms_inf',
+        MemoryBigIntptr.MMEP.MemSpec.read_byte_spec_MemPropT addr_inf ms_inf (success_unERR_UB_OOM (ms_inf', byte_inf)) /\
+          sbyte_refine byte_inf byte_fin /\
+          MemState_refine_prop ms_inf' ms_fin'.
+  Proof.
+    intros addr_fin addr_inf ms_fin ms_fin' ms_inf byte_fin MSR ADDR_CONV READ_SPEC.
+
+    repeat red in READ_SPEC.
+    destruct READ_SPEC; subst.
+
+    epose proof fin_inf_read_byte_spec _ _ _ _ _ MSR ADDR_CONV H0.
+    do 2 eexists; split.
+    repeat red.
+    split; eauto.
+    split; auto.
+    apply sbyte_refine_lifted.
+  Qed.
+
+  Lemma fin_inf_read_bytes_spec' :
     forall a_fin a_inf n ms_fin ms_inf bytes_fin,
       InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
       MemState_refine_prop ms_inf ms_fin ->
@@ -3984,7 +4106,7 @@ Module InfiniteToFinite.
     cbn in *.
     destruct READ_SPEC as (ms_fin' & addrs_fin & CONSEC & READ_SPEC).
     exists ms_inf.
-    pose proof fin_inf_get_consecutive_ptrs_success_exists a_fin a_inf n ms_fin ms_fin' addrs_fin ms_inf ADDR_CONV CONSEC as (addrs_inf & GCP & ADDRS_CONV).
+    pose proof fin_inf_get_consecutive_ptrs_success_exists' a_fin a_inf n ms_fin ms_fin' addrs_fin ms_inf ADDR_CONV CONSEC as (addrs_inf & GCP & ADDRS_CONV).
     exists addrs_inf.
     split; auto.
 
@@ -4242,6 +4364,44 @@ Module InfiniteToFinite.
         apply FinMem.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in H1; subst.
         eapply FinMem.MMEP.get_consecutive_ptrs_MemPropT_MemState; eauto.
         eapply WITHIN''.
+  Qed.
+
+  (* Form that's better suited to MemPropT_fin_inf_bind *)
+  Lemma fin_inf_read_bytes_spec :
+    forall a_fin a_inf n ms_fin ms_fin' ms_inf bytes_fin,
+      InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
+      MemState_refine_prop ms_inf ms_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.read_bytes_spec a_fin n ms_fin (success_unERR_UB_OOM (ms_fin', bytes_fin)) ->
+      exists bytes_inf ms_inf',
+        MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec a_inf n ms_inf (success_unERR_UB_OOM (ms_inf', bytes_inf)) /\
+          sbytes_refine bytes_inf bytes_fin /\
+          MemState_refine_prop ms_inf' ms_fin'.
+  Proof.
+    intros a_fin a_inf n ms_fin ms_fin' ms_inf bytes_fin ADDR_CONV MEM_REF READ_SPEC.
+
+    eapply MemPropT_fin_inf_bind.
+    4: apply READ_SPEC.
+    all: eauto.
+
+    { intros a_fin0 ms_fin_ma GCP.
+      eapply fin_inf_get_consecutive_ptrs_success_exists; eauto.
+      eapply GCP.
+    }
+
+    intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf0 b_fin ADDRS MSR READ.
+
+    eapply MemPropT_fin_inf_map_monad.
+    4: apply READ.
+    all: eauto.
+    2: {
+      apply Forall2_flip in ADDRS.
+      cbn in ADDRS.
+      apply ADDRS.
+    }
+
+    intros a_fin1 a_inf1 b_fin0 ms_fin1 ms_inf1 ms_fin_ma MSR' CONV RBS.
+    eapply fin_inf_read_byte_spec_MemPropT; eauto.
+    apply CONV.
   Qed.
 
   Lemma fin_inf_disjoint_ptr_byte :
@@ -4678,15 +4838,29 @@ Module InfiniteToFinite.
 
   (** Lemmas about writing bytes *)
   Lemma fin_inf_set_byte_memory :
-    forall addr_inf addr_fin byte_fin ms_fin ms_inf ms_fin' ms_inf',
+    forall {addr_inf addr_fin byte_inf byte_fin ms_fin ms_fin' ms_inf},
       MemState_refine_prop ms_inf ms_fin ->
-      MemState_refine_prop ms_inf' ms_fin' ->
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+      sbyte_refine byte_inf byte_fin ->
       Memory64BitIntptr.MMEP.MemSpec.set_byte_memory ms_fin addr_fin byte_fin ms_fin' ->
-      MemoryBigIntptr.MMEP.MemSpec.set_byte_memory ms_inf addr_inf (lift_SByte byte_fin) ms_inf'.
+      exists ms_inf',
+        MemoryBigIntptr.MMEP.MemSpec.set_byte_memory ms_inf addr_inf byte_inf ms_inf' /\
+          MemState_refine_prop ms_inf' ms_fin'.
   Proof.
-    intros addr_inf addr_fin byte_fin ms_fin ms_inf ms_fin' ms_inf' REF REF' CONV SET.
+    intros addr_inf addr_fin byte_inf byte_fin ms_fin ms_fin' ms_inf REF CONV BYTE_REF SET.
+
+    pose proof MemState_refine_MemState_refine_prop _ _ (lift_MemState_refine ms_fin') as REF'.
+    exists (lift_MemState ms_fin').
+
     destruct SET.
+    split.
+    2: {
+      apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
+    }
+
+    apply lift_SByte_convert_SByte_inverse in BYTE_REF.
+    subst.
+
     split.
     - eapply fin_inf_read_byte_spec; eauto.
     - intros ptr' DISJOINT byte'.
@@ -5652,38 +5826,53 @@ Module InfiniteToFinite.
   Qed.
 
   Lemma fin_inf_write_byte_spec_MemPropT :
-    forall {addr_fin addr_inf ms_fin ms_fin' ms_inf ms_inf' byte_fin},
+    forall {addr_fin addr_inf ms_fin ms_fin' ms_inf byte_inf byte_fin res_fin},
       MemState_refine_prop ms_inf ms_fin ->
-      MemState_refine_prop ms_inf' ms_fin' ->
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+      sbyte_refine byte_inf byte_fin ->
       Memory64BitIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_fin byte_fin
         ms_fin
-        (ret (ms_fin', tt)) ->
-      MemoryBigIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_inf (lift_SByte byte_fin)
-        ms_inf
-        (ret (ms_inf', tt)).
+        (ret (ms_fin', res_fin)) ->
+      exists res_inf ms_inf',
+        MemoryBigIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_inf byte_inf ms_inf (ret (ms_inf', res_inf)) /\
+          res_inf = res_fin /\
+          MemState_refine_prop ms_inf' ms_fin'.
   Proof.
-    intros addr_fin addr_inf ms_fin ms_fin' ms_inf ms_inf' byte_fin MSR1 MSR2 ADDR_CONV WBP.
+    intros addr_fin addr_inf ms_fin ms_fin' ms_inf byte_inf byte_fin [] MSR ADDR_CONV BYTE_REF WBP.
     destruct WBP.
-    split.
+
+    pose proof fin_inf_set_byte_memory MSR ADDR_CONV BYTE_REF byte_written as (ms_inf' & SET_INF & MSR').
+
+    exists tt. exists ms_inf'.
+    split; auto.
+
+    split; auto.
     - eapply fin_inf_write_byte_allowed; eauto.
-    - eapply fin_inf_set_byte_memory; eauto.
     - eapply fin_inf_write_byte_operation_invariants; eauto.
   Qed.
 
   Lemma fin_inf_write_byte_spec :
-    forall {addr_fin addr_inf ms_fin ms_fin' ms_inf ms_inf' byte_fin},
+    forall {addr_fin addr_inf ms_fin ms_fin' ms_inf byte_fin},
       MemState_refine_prop ms_inf ms_fin ->
-      MemState_refine_prop ms_inf' ms_fin' ->
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
       Memory64BitIntptr.MMEP.MemSpec.write_byte_spec ms_fin addr_fin byte_fin ms_fin' ->
-      MemoryBigIntptr.MMEP.MemSpec.write_byte_spec ms_inf addr_inf (lift_SByte byte_fin) ms_inf'.
+      exists byte_inf ms_inf',
+        MemoryBigIntptr.MMEP.MemSpec.write_byte_spec ms_inf addr_inf byte_inf ms_inf' /\
+          sbyte_refine byte_inf byte_fin /\
+          MemState_refine_prop ms_inf' ms_fin'.
   Proof.
-    intros addr_fin addr_inf ms_fin ms_fin' ms_inf ms_inf' byte_fin MSR1 MSR2 ADDR_CONV WBP.
+    intros addr_fin addr_inf ms_fin ms_fin' ms_inf byte_fin MSR ADDR_CONV WBP.
     destruct WBP.
-    split.
+
+    pose proof (sbyte_refine_lifted byte_fin) as BYTE_REF.
+    exists (lift_SByte byte_fin).
+    pose proof fin_inf_set_byte_memory MSR ADDR_CONV BYTE_REF byte_written as (ms_inf' & SET_INF & MSR').
+
+    exists ms_inf'.
+    split; auto.
+
+    split; auto.
     - eapply fin_inf_write_byte_allowed; eauto.
-    - eapply fin_inf_set_byte_memory; eauto.
     - eapply fin_inf_write_byte_operation_invariants; eauto.
   Qed.
 
@@ -5752,327 +5941,99 @@ Module InfiniteToFinite.
     auto.
   Qed.
 
+  (* TODO: Move this *)
+  Lemma Forall2_zip :
+    forall {X Y Z W} (xs : list X) (ys : list Y) (zs : list Z) (ws : list W) XY ZW,
+      Forall2 XY xs ys ->
+      Forall2 ZW zs ws ->
+      Forall2 (fun '(x, z) '(y, w) => XY x y /\ ZW z w) (zip xs zs) (zip ys ws).
+  Proof.
+  Admitted.
+
   Lemma fin_inf_write_bytes_spec :
-    forall a_fin a_inf ms_fin ms_fin' ms_inf ms_inf'  bytes_fin,
+    forall a_fin a_inf ms_fin ms_fin' ms_inf bytes_inf bytes_fin,
       InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
       MemState_refine_prop ms_inf ms_fin ->
-      MemState_refine_prop ms_inf' ms_fin' ->
+      sbytes_refine bytes_inf bytes_fin ->
       Memory64BitIntptr.MMEP.MemSpec.write_bytes_spec a_fin bytes_fin ms_fin (success_unERR_UB_OOM (ms_fin', tt)) ->
-      MemoryBigIntptr.MMEP.MemSpec.write_bytes_spec a_inf (map lift_SByte bytes_fin) ms_inf (success_unERR_UB_OOM (ms_inf', tt)).
+      exists ms_inf',
+        MemoryBigIntptr.MMEP.MemSpec.write_bytes_spec a_inf bytes_inf ms_inf (success_unERR_UB_OOM (ms_inf', tt)) /\
+          MemState_refine_prop ms_inf' ms_fin'.
   Proof.
-    intros a_fin a_inf ms_fin ms_fin' ms_inf ms_inf' bytes_fin ADDR_CONV MEM_REF1 MEM_REF2 WRITE_SPEC.
+    intros a_fin a_inf ms_fin ms_fin' ms_inf bytes_inf bytes_fin ADDR_CONV MEM_REF1 BYTES_REF WRITE_SPEC.
 
     (* TODO: Make these opaque earlier *)
     Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
     Opaque MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
 
-    red; red in WRITE_SPEC.
-    apply MemPropT_bind_ret_inv in WRITE_SPEC as (ms_fin_gcp & addrs_fin & CONSEC & WRITE_SPEC).
-    apply MemPropT_bind_ret_inv in WRITE_SPEC as (ms_fin_writes & WRITE_RES & WRITE_SPEC & MS & _).
-    
-    pose proof fin_inf_get_consecutive_ptrs_success_exists a_fin a_inf (Datatypes.length bytes_fin) ms_fin ms_fin_gcp addrs_fin ms_inf ADDR_CONV CONSEC as (addrs_inf & GCP & ADDRS_CONV).
-    pose proof Memory64BitIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq _ _ _ _ _ CONSEC; subst.
+    (* TODO: Move this *)
+    Lemma sbytes_refine_length :
+      forall bytes_inf bytes_fin,
+        sbytes_refine bytes_inf bytes_fin ->
+        length bytes_inf = length bytes_fin.
+    Proof.
+      intros bytes_inf bytes_fin H.
+      red in H.
+      eapply Util.Forall2_length; eauto.
+    Qed.
 
-    eapply MemPropT_fin_inf_bind with
-      (A_REF:=Forall2 (fun a_inf a_fin => InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin))
-      (B_REF:=eq); eauto.
+    (* Get things in the right form for MemPropT_fin_inf_bind *)
+    (assert (exists res ms_inf',
+         MemoryBigIntptr.MMEP.MemSpec.write_bytes_spec a_inf bytes_inf ms_inf (success_unERR_UB_OOM (ms_inf', res)) /\
+           res = tt /\
+           MemState_refine_prop ms_inf' ms_fin')).
+    {
+      eapply MemPropT_fin_inf_bind.
+      4: {
+        apply WRITE_SPEC.
+      }
+      all: eauto.
 
-    (* Not sure if induction is the right thing to do here *)
-    generalize dependent a_fin.
-    generalize dependent a_inf.
-    generalize dependent bytes_fin.
-    revert WRITE_RES ms_inf ms_fin_gcp MEM_REF ms_fin_writes.
-    induction ADDRS_CONV; intros WRITE_RES ms_inf ms_fin_gcp MEM_REF ms_fin_writes bytes_fin WRITE_SPEC a_inf GCP a_fin ADDR_CONV CONSEC.
-
-    - cbn in *.
-      destruct WRITE_SPEC; subst.
-
-      (* Final MemState *)
-      exists ms_inf.
-      split; auto.
-
-      (* MemState after GCP *)
-      exists ms_inf.
-      exists [].
-      split.
-      + (* GCP *)
-        rewrite map_length.
-        auto.
-      + exists ms_inf.
-        exists [].
-        split; auto.
-
-        cbn in *.
-        split; auto.
-    - (* Final MemState *)
-      assert (exists (pre : MemoryBigIntptr.MMEP.MMSP.MemState) (post : MemoryBigIntptr.MMEP.MMSP.MemState),
-                 Within.within (InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_inf (Datatypes.length bytes_fin)) pre
-                   (ret (y::l')) post) as WITHIN.
-      {
-        exists ms_inf. exists ms_inf.
-        cbn.
-        auto.
+      { (* MA *)
+        intros a_fin0 ms_fin_ma H.
+        eapply fin_inf_get_consecutive_ptrs_success_exists; eauto.
+        erewrite sbytes_refine_length; eauto.
+        apply H.
       }
 
-      (* TODO: Move this import *)
-      Import Within.
+      intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf0 b_fin ADDRS MSR WRITES.
+      eapply MemPropT_fin_inf_bind with
+        (A_REF := Forall2 eq).
+      4: apply WRITES.
+      all: eauto.
 
-      assert ((ret (y::l')) {{ms_inf}} ∈ {{ms_inf}} (InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_inf (Datatypes.length bytes_fin))) as WITHIN'.
-      {
-        cbn. red. cbn.
-        auto.
+      { (* MA *)
+        intros a_fin1 ms_fin_ma MAP.
+        eapply MemPropT_fin_inf_map_monad with
+          (A_REF := (fun '(a_inf, byte_inf) '(a_fin, byte_fin) =>
+                       InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin /\
+                         sbyte_refine byte_inf byte_fin)).
+        4: apply MAP.
+        all: eauto.
+
+        { intros a_fin2 a_inf1 b_fin0 ms_fin1 ms_inf1 ms_fin_ma0 MSR' A_REF WRITE.
+          destruct a_fin2, a_inf1.
+          destruct A_REF.
+          eapply fin_inf_write_byte_spec_MemPropT; eauto.          
+        }
+
+        cbn in ADDRS.
+
+        apply Forall2_zip; eauto.
+        apply Forall2_flip in ADDRS.
+        apply ADDRS.        
       }
 
-      pose proof InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons' _ _ _ _ _ _ WITHIN' as GCP_CONS.
-      pose proof InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_length _ _ _ WITHIN as BYTES_LENGTH.
-      clear WITHIN.
-      cbn in BYTES_LENGTH.
-      destruct bytes_fin.
-      inv BYTES_LENGTH.
-      rename s into byte_fin.
-
+      intros ms_inf1 ms_fin1 ms_fin'1 a_fin1 a_inf1 b_fin0 H H0 H1.
       cbn.
+      do 2 eexists; split; eauto.
+      destruct b_fin0; split; auto.
+      cbn in H1.
+      destruct H1; subst; auto.
+    }
 
-      (* After writing first byte *)
-      cbn in WRITE_SPEC.
-      destruct WRITE_SPEC as [ms_fin_write [[] WRITE_SPEC]].
-      destruct WRITE_SPEC as [WRITE_SPEC [ms_fin_writes' [writes_res' [WRITES_SPEC [MS RES]]]]].
-      subst.
-
-      pose proof fin_inf_write_byte_spec MEM_REF H WRITE_SPEC as [ms_inf_write [WRITE_SPEC_INF MEM_REF_WRITE]].
-
-      (* Writing the rest of the bytes *)
-      destruct GCP_CONS as [A_INF [[L LENGTH] | GCP_CONS]]. subst.
-
-      { (* Only one byte being written *)
-        destruct bytes_fin; cbn in LENGTH; inv LENGTH.
-        inv ADDRS_CONV.
-        cbn in WRITES_SPEC.
-        destruct WRITES_SPEC; subst.
-        
-        (* May need to hold off on this until we can call induction hypothesis *)
-        exists ms_inf_write.
-        split; auto.
-
-        (* MemState after GCP *)
-        exists ms_inf.
-
-        (* GCP results *)
-        exists [a_inf].
-        split; auto.
-
-        exists ms_inf_write.
-        exists [tt].
-        split; auto.
-
-        exists ms_inf_write.
-        exists tt.
-        split; auto.
-
-        repeat red.
-        exists ms_inf_write.
-        exists [].
-        split; cbn; auto.
-      }
-
-      (* Possibly more than one byte to write *)
-      destruct GCP_CONS as (ptr'&ip&len'&LENGTH'&IP&GCP'&GCP_CONS).
-      destruct bytes_fin; cbn in LENGTH'; inv LENGTH'.
-      { (* Just the one... *)
-        cbn in BYTES_LENGTH.
-        inv BYTES_LENGTH.
-        destruct l'; inv H1.
-        inv ADDRS_CONV.
-        cbn in WRITES_SPEC.
-        destruct WRITES_SPEC; subst.
-        
-        (* May need to hold off on this until we can call induction hypothesis *)
-        exists ms_inf_write.
-        split; auto.
-
-        (* MemState after GCP *)
-        exists ms_inf.
-
-        (* GCP results *)
-        exists [a_inf].
-        split; auto.
-
-        exists ms_inf_write.
-        exists [tt].
-        split; auto.
-
-        exists ms_inf_write.
-        exists tt.
-        split; auto.
-
-        repeat red.
-        exists ms_inf_write.
-        exists [].
-        split; cbn; auto.
-      }
-
-      (* More than one byte written *)
-      specialize (IHADDRS_CONV _ _ _ MEM_REF_WRITE _ _ WRITES_SPEC ptr').
-      forward IHADDRS_CONV.
-      {
-        cbn in GCP_CONS.
-        red in GCP_CONS.
-        cbn in *.
-        eapply InfMem.MMEP.get_consecutive_ptrs_MemPropT_MemState.
-        apply GCP_CONS.
-      }
-
-      destruct l'; cbn in BYTES_LENGTH; inv BYTES_LENGTH.
-      inv ADDRS_CONV.
-
-      rename a into ptr''.
-      rename x0 into ptr'_fin.
-
-      assert (ptr'' = ptr').
-      { pose proof InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons' _ _ _ _ _ _ GCP_CONS as GCP_CONS'.
-
-        (* Single byte *)
-        destruct GCP_CONS' as [A_INF [[L LENGTH] | GCP_CONS']]; subst; auto.
-      }
-      subst.
-
-      specialize (IHADDRS_CONV ptr'_fin H4).
-
-      forward IHADDRS_CONV.
-      {
-        assert ((ret (x::ptr'_fin::l0)) {{ms_fin_gcp}} ∈ {{ms_fin_gcp}} (FinLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_fin (Datatypes.length (byte_fin :: s :: bytes_fin)))) as WITHIN_FIN.
-        {
-          cbn. red. cbn.
-          auto.
-        }
-
-        pose proof FinMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons' _ _ _ _ _ _ WITHIN_FIN.
-        destruct H0; subst.
-        destruct H2.
-        - destruct H0; discriminate.
-        - destruct H0 as (?&?&?&?&?&?&?).
-          pose proof FinMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_cons' _ _ _ _ _ _ H6.
-          destruct H7.
-          cbn in *. subst.
-
-          inv H0.
-          eapply FinMem.MMEP.get_consecutive_ptrs_MemPropT_MemState.
-          eapply H6.
-      }
-
-      destruct IHADDRS_CONV as [ms_inf' IHADDRS_CONV].
-      destruct IHADDRS_CONV.
-      destruct H0.
-      destruct H0.
-      destruct H0.
-      rename H0 into GCP''.
-      rename x1 into ptrs_res.
-      rename x0 into ms_inf_write'.
-
-      assert (ptrs_res = ptr' :: l') as PTRS_RES.
-      {
-        (* Should follow from GCP' and GCP_CONS *)
-        clear - GCP'' GCP_CONS.
-
-        assert (ret (ptr' :: l') ∈
-                  @InfMem.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs
-                  (MemPropT InfMem.MMEP.MMSP.MemState)
-                  (@MemPropT_Monad InfMem.MMEP.MMSP.MemState)
-                  (@MemPropT_RAISE_OOM InfMem.MMEP.MMSP.MemState)
-                  (@MemPropT_RAISE_ERROR InfMem.MMEP.MMSP.MemState) ptr'
-                  (@Datatypes.length Memory64BitIntptr.MP.BYTE_IMPL.SByte (s :: bytes_fin)))
-          as GCP_CONS'.
-        {
-          do 2 eexists; eauto.
-        }
-
-        assert (ret ptrs_res ∈ @MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs
-                  (MemPropT MemoryBigIntptr.MMEP.MMSP.MemState)
-                  (@MemPropT_Monad MemoryBigIntptr.MMEP.MMSP.MemState)
-                  (@MemPropT_RAISE_OOM MemoryBigIntptr.MMEP.MMSP.MemState)
-                  (@MemPropT_RAISE_ERROR MemoryBigIntptr.MMEP.MMSP.MemState) ptr'
-                  (@Datatypes.length MemoryBigIntptr.MP.BYTE_IMPL.SByte
-                     (@map Memory64BitIntptr.MP.BYTE_IMPL.SByte MemoryBigIntptr.MP.BYTE_IMPL.SByte lift_SByte
-                        (s :: bytes_fin)))) as GCP.
-        {
-          do 2 eexists; cbn; red; cbn; eauto.
-        }
-
-        clear GCP'' GCP_CONS.
-        rewrite map_length in GCP.
-        pose proof InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_success_always_succeeds _ _ _ _ GCP GCP_CONS'.
-        inv H.
-        auto.
-      }
-
-      subst.
-
-      destruct H3 as [ms_inf'' [writes_res [HMAPM [MS _]]]].
-      subst.
-      assert (writes_res = writes_res').
-      {
-        clear - H5 HMAPM WRITES_SPEC.
-        (* Should just need the length of writes_res and writes_res' to be the same *)
-
-        apply map_monad_MemPropT_length in WRITES_SPEC.
-        apply map_monad_MemPropT_length in HMAPM.
-
-        (* Need to know the length of l' and l0 ... From H5 *)
-        apply Util.Forall2_length in H5.
-
-        assert (length (ptr' :: l') = length (ptr'_fin :: l0)).
-        cbn; auto.
-        assert (length (map lift_SByte (s :: bytes_fin)) = length (s :: bytes_fin)).
-        rewrite map_length; auto.
-
-        epose proof (zip_length H H0).
-        rewrite H1 in HMAPM.
-        unfold zip in HMAPM.
-        rewrite <- WRITES_SPEC in HMAPM.
-
-        clear - HMAPM.
-        revert writes_res' HMAPM.
-        induction writes_res; intros writes_res' HMAPM.
-        - destruct writes_res'; inv HMAPM; auto.
-        - destruct writes_res'; inv HMAPM; auto.
-          apply IHwrites_res in H0.
-          destruct a, u.
-          congruence.
-      }
-      subst.
-
-      exists ms_inf''.
-      split; auto.
-
-      exists ms_inf. exists (a_inf :: ptr' :: l').
-      split.
-      { rewrite map_length.
-        apply WITHIN'.
-      }
-
-      exists ms_inf''.
-      exists (tt :: writes_res').
-      split; auto.
-
-      rewrite zip_cons.
-      rewrite map_monad_unfold.
-
-      pose proof GCP''.
-      apply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq in H0; subst.
-
-      repeat red.
-      exists ms_inf_write'. exists tt.
-      split.
-      {
-        cbn.
-        auto.
-      }
-
-      repeat red.
-      exists ms_inf''.
-      exists writes_res'.
-      split; auto.
-      cbn; split; auto.
+    destruct H as (?&?&?&?&?); subst.
+    eexists; split; eauto.
   Qed.
 
   (* TODO: Move this to somewhere it can
@@ -6144,9 +6105,9 @@ Module InfiniteToFinite.
         2: {
           split; auto.
         }
-        
 
-      
+
+
       repeat split; auto.
       - (* Handler *)
         repeat (destruct ARGS;
