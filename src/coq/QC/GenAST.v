@@ -360,7 +360,7 @@ Section GenerationState.
   Definition get_ctx : GenLLVM var_context
     := lctx <- get_local_ctx;;
        gctx <- get_global_ctx;;
-       ret (lctx ++ gctx).
+       ret (gctx ++ lctx).
 
   Definition get_typ_ctx : GenLLVM type_context
     := gets (fun gs => gs.(gen_typ_ctx)).
@@ -772,8 +772,8 @@ Section GenerationState.
 
   Definition freq_LLVM {A} (gs : list (nat * GenLLVM A)) : GenLLVM A
     :=
-    ctx <- get_ctx;;
-    let is_empty := l_is_empty ctx in
+    (* ctx <- get_ctx;; *)
+    (* let is_empty := l_is_empty ctx in *)
     fst
          (fold_left
             (fun '(gacc, k) '(fk, a) =>
@@ -787,7 +787,7 @@ Section GenerationState.
                  else (* No swap *)
                    gacc
                in (gen', k'))
-            gs (failGen ("freq_LLVM" ++ newline ++ if (is_empty) then "Current context is empty" else "Current context: " ++ show ctx), 0%N)).
+            gs (failGen ("freq_LLVM" (* ++ newline ++ if (is_empty) then "Current context is empty" else "Current context: " ++ show ctx *)), 0%N)).
 
   (* SAZ: Where do we need this? *)
   (*
