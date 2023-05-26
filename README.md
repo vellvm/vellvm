@@ -5,53 +5,83 @@ Vellvm is an ongoing project aiming at the formal verification in the Coq proof
 assistant of a compilation infrastructure inspired by the LLVM compiler.
 
 The central piece of Vellvm is the Verified IR (VIR), a Coq formalization of the
-semantics of (a subset of) the LLVM IR that is intended for _formal
+semantics of (a subset of) the [LLVM IR](https://www.llvm.org/) that is intended for _formal
 verification_ of LLVM-based software.
-It is being developed at the University of Pennsylvania as part of the DeepSpec project.
+It is being developed at the University of Pennsylvania as part of the [DeepSpec](https://www.deepspec.org) project.
 
 After VIR, the second component whose development is reaching maturity is the verification of 
 a verified front-end for the [Helix](https://github.com/vzaliva/helix) chain of compilation.
 
-### See also:
+## LLVM Compatibility
+
+ Vellvm covers most features of the core *sequential* fragment of LLVM IR 14.0.0 as per its informal specification in [LangRef](https://llvm.org/docs/LangRef.html), including: 
+ - basic operations on 1-, 8-, 32-, and 64-bit integers
+ - doubles, floats, structs, arrays, pointers
+ - casts
+ - `undef` and `poison` 
+ - SSA-structured control-flow-graphs
+ - global data
+ - mutually-recursive functions
+ - some intrinsics (in a user-extensible)
+
+ The main features that are currently unsupported are: 
+ - some block terminators (`switch`, `resume`, indirect branching, `invoke`), 
+ - the `landing_pad` and `va_arg` instructions
+ - architecture-specific floats
+ - opaque types
+
+ Vellvm does not yet provide support for many C standard library functions (such
+ as `printf`), but does support `puts` and `malloc`. From a semantics perspective, the main
+ limitations have to do with concurrency.
+
+## See also:
  - [Vellvm](http://www.cis.upenn.edu/~stevez/vellvm/) (somewhat out of date)
  - [DeepSpec](http://deepspec.org)
  - [LLVM](http://llvm.org)
 
-### Related publication:
- - "Modular, Compositional, and Executable Formal Semantics for LLVM IR" ([ICFP'21](https://icfp21.sigplan.org/details/icfp-2021-papers/6/Modular-Compositional-and-Executable-Formal-Semantics-for-LLVM-IR)),
-    Yannick Zakowski, Calvin Beck, Irene Yoon, Ilia Zaichuk, Vadim Zaliva, Steve Zdancewic
-
 # Participants
+
  - Steve Zdancewic
  - Yannick Zakowski
  - Calvin Beck
  - Irene Yoon
+ - Gary (Hanxi) Chen
  
 ## Past Contributors
  - Vivien Durey 
  - Dmitri Garbuzov 
+ - Eduardo Gonzalez
  - Olek Gierczak
  - William Mansky
  - Milo Martin
  - Santosh Nagarakatte 
  - Emmett Neyman 
  - Christine Rizkallah 
+ - Zak Sines
+ - Nathan Sobotka
  - Robert Zajac
+ - Ilia Zaichuk
+ - Vadim Zaliva
  - Richard Zhang 
  - Jianzhou Zhao 
-  
+
+### Recent Related Publications: 
+ - "Modular, Compositional, and Executable Formal Semantics for LLVM IR" ([ICFP'21](https://icfp21.sigplan.org/details/icfp-2021-papers/6/Modular-Compositional-and-Executable-Formal-Semantics-for-LLVM-IR)),
+    Yannick Zakowski, Calvin Beck, Irene Yoon, Ilia Zaichuk, Vadim Zaliva, Steve Zdancewic
+ - "Formal Reasoning About Layered Monadic Interpreters" ([ICFP'22](http://www.cis.upenn.edu/~stevez/papers/YZZ22.pdf)), Irene Yoon, Yannick Zakowski, and Steve Zdancewic.
+ - "Interaction Trees" ([POPL'20](http://www.cis.upenn.edu/~stevez/papers/XZHH+20.pdf))	Li-yao Xia, Yannick Zakowski, Paul He, Chung-Kil Hur, Gregory Malecha, Benjamin C. Pierce, and Steve Zdancewic. 
+
+### Older Vellvm-related papers:
+ - "A Formal C Memory Model Supporting Integer-Pointer Casts" ([PLDI'15](http://www.cis.upenn.edu/~stevez/papers/KHM+15.pdf)), Jeehoon Kang, Chung-Kil Hur, William Mansky, Dmitri Garbuzov, Steve Zdancewic, and Viktor Vafeiadis. 
+ - "Formal Verification of SSA-Based Optimizations for LLVM" ([PLDI'13](http://www.cis.upenn.edu/~stevez/papers/ZNMZ13.pdf)), Jianzhou Zhao, Santosh Nagarakatte, Milo M. K. Martin, and Steve Zdancewic. 
+ - "Formalizing the LLVM Intermediate Representation for Verified Program Transformations" ([POPL'12](http://www.cis.upenn.edu/~stevez/papers/ZNMZ12.pdf)), Jianzhou Zhao, Santosh Nagarakatte, Milo M. K. Martin, and Steve Zdancewic. 
+ - "Mechanized Verification of Computing Dominators for Formalizing Compilers" ([CPP'12](http://www.cis.upenn.edu/~stevez/papers/ZZ12.pdf)), Jianzhou Zhao and Steve Zdancewic. 
+ 
 ---
 
 # Structure of the development
 
 The development is organized as follows.
-
-## Local libraries
-
-Stored in the `lib` folder. Currently, the only dependency that needs to be installed locally is the QuickChick one:
-- `lib/QuickChick` points to a branch of the QuickChick library that we have used in our testing
-
-The library will be built as the same time as the Vellvm development via the `Makefile`.
 
 ## Interaction Trees
 
@@ -105,25 +135,43 @@ Our current test-suite of LLVM programs for which we compare our semantics again
 
 # Installing / Compiling Vellvm
 
-### Using nix:
+## Assumes: 
+  - OCaml 4.14.0 (typically installed via `opam`, see below)
+  - Coq 8.15.2 
+  - opam  2.0.0+
+  - Clang 14.0.1+ (available for Mac OSX in XCode 4.2+, or installed via, e.g. `sudo apt-get install clang`)
+  - `gnu-sed` 
+     + `sed` defaults to `gnu-sed` on linux. 
+	 + for Mac OS X with [homebrew](https://brew.sh/), do `brew install gnu-sed` and then create a symlink from `sed` to the `gsed` executable in your path.)
 
-If you are a nix user the easiest way to install / compile vellvm is with nix. Instructions can be found [here](nix.org).
+## Compilation:
 
-### Assumes: 
-  - Coq: version 8.15 (installed via *opam*, see below)
-  - OCaml: version 4.12.0 (installed via *opam*, see below)
-  - opam: version 2.0.8.
-    It is available via [homebrew](https://brew.sh/) on Mac, and most system's package managers on Linux, e.g. `sudo apt-get install opam`.
-    If this is the first time you are using opam you need to initialize it: 
-    + On Linux: `opam init`
-    + On Mac:  `opam init --disable-sandboxing` (sandboxing needs to be disabled due to a known [issue](https://github.com/ocaml/opam-repository/issues/12973)).
-  - `gnu-sed` (`sed` defaults to `gnu-sed` on linux. For Mac OS X do: `brew install gnu-sed` and then create a symlink from `sed` to the `gsed` executable in your path.)
-- Add the Coq package repository:
+1. Clone the vellvm git repo with the `--recurse-submodule` option
+   - If you forgot to clone recursively, run `git submodule update --init --recursive` to fetch the extra libraries in `lib/`
+3. Install all external dependencies
+   - Note: you should be able to install all of the opam libraries  with `make opam` in the `src/` directory.
+4. Run `make` in the `src/` directory: it will produce the OCaml executable called `vellvm`
+
+## opam, Coq, and opam dependencies
+
+`opam` is available via [homebrew](https://brew.sh/) on Mac, and most system's package managers on Linux, e.g. `sudo apt-get install opam`.
+
+If this is the first time you are using opam you need to initialize it: 
+  - On Linux: `opam init`
+  - On Mac:  `opam init --disable-sandboxing` (sandboxing needs to be disabled due to a known [issue](https://github.com/ocaml/opam-repository/issues/12973)).
+
+Then:
+
+1. Add the Coq package repository:
     `opam repo add coq-released https://coq.inria.fr/opam/released`.
-- Finally, create an opam *switch* with:
-    `opam switch create vellvm ocaml-base-compiler.4.12.0`.
-  - Clang 7.0.1+ (available for Mac OSX in XCode 4.2+, or installed via, e.g. `sudo apt-get install clang`)
-  - External Coq libraries: 
+
+2. Create an opam vellvm development *switch* with:
+    `opam switch create vellvm ocaml-base-compiler.4.14.0`.
+
+3. Install Coq:
+   `opam pin add coq 8.15.2`
+
+4. Add External Coq libraries: 
     * ext-lib    (installed via, e.g. `opam install coq-ext-lib`)
     * paco       (installed via, e.g. `opam install coq-paco`)
     * itrees     (installed via, e.g. `opam install coq-itree`)
@@ -131,22 +179,23 @@ If you are a nix user the easiest way to install / compile vellvm is with nix. I
     * ceres      (installed via, e.g. `opam install coq-ceres`)
     * mathcomp   (installed via, e.g. `opam install coq-mathcomp-ssreflect`)
     * simple-io  (installed via, e.g. `opam install coq-simple-io`)
+	* quickchick (installed via, e.g. `opam install coq-quickchick`)
 
-  - Additional opam packages: 
+5. Add opam ocaml packages: 
     * ocamlbuild (installed via, e.g. `opam install ocamlbuild`)
     * dune       (installed via, e.g. `opam install dune`)
     * menhir     (installed via, e.g. `opam install menhir`)
     * qcheck     (installed via, e.g. `opam install qcheck`)
 
-Compilation:
+Steps 3-5 above can be achieved after cloning the Vellvm git repo by doing:
+    `cd src && make pin-coq && make opam`
 
-1. Clone the vellvm git repo with the `--recurse-submodule` option
-   - If you forgot to clone recursively, run `git submodule update --init --recursive` to fetch the extra libraries in `lib/`
-3. Install all external dependencies
-   - Note: you should be able to install all of the opam libraries  with `make opam` in the `src/` directory.
-4. Run `make` in the `src/` directory: it will first compile the quickchick library, then vir, and finally extract the OCaml executable
 
-# Running
+## Using nix:
+
+If you are a nix user, another way to install / compile Vellvm is with nix. Instructions can be found [here](nix.org).
+
+# Running Vellvm
 
 The executable `vellvm` will be found in `src/`.
 Do `src/vellvm -help` from the command line to see all available options.

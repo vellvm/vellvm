@@ -4,7 +4,6 @@ Import ListNotations Ascii.
 Local Open Scope string_scope.
 
 Section DList.
-
   Definition DList (A : Type) := list A -> list A.
 
   Definition DList_to_list {A} (dl : DList A) : list A
@@ -24,7 +23,7 @@ Section DList.
 
   Definition DList_from_list {A} (l : list A) : DList A
     := fold_left (fun x s => DList_append x (DList_singleton s)) l DList_empty.
-
+  
   Definition DList_map {A B} (f : A -> B) (dl : DList A) : DList B
     := fold_right (fun a => DList_cons (f a)) (@DList_empty B) (DList_to_list dl).
 
@@ -79,3 +78,5 @@ Section DList.
     fold_left DList_append ls DList_empty.
 
 End DList.
+
+Definition example1 : DList nat := DList_cons 1 DList_empty.

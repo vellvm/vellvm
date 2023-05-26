@@ -197,28 +197,43 @@ Definition vellvm_agrees_with_clang_parallel (p : PROG) : Checker
         whenFail ("Something else went wrong... Vellvm: " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
     end.
 
+#[global] Instance Show_sum {A B} `{Show A} `{Show B} : Show (A + B) :=
+  { show :=  (fun x =>
+    match x with
+    | inl a => ("inl " ++ show a)%string
+    | inr b => ("inr " ++ show b)%string 
+    end) }.
+
 (** Basic property to make sure that Vellvm and Clang agree when they
     both produce values *)
-Definition vellvm_agrees_with_clang (p : PROG) : Checker
+Definition vellvm_agrees_with_clang (p : string + PROG) : Checker
   :=
-  (* collect (show prog) *)
-  let '(Prog prog) := p in
-  let clang_res := run_llc prog in
-  let vellvm_res := interpret prog in
-  match clang_res, vellvm_res with
-  | DVALUE_I8 y, MlOk _ _ (DVALUE_I8 x) =>
-      if equ x y
-      then checker true
-      else whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false
-  | _, _ =>
-      whenFail ("Something else went wrong... Vellvm: " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
+  match p with
+  | inl msg => checker false
+  | inr p => 
+      (* collect (show prog) *)
+      let '(Prog prog) := p in
+      let clang_res := run_llc prog in
+      let vellvm_res := interpret prog in
+      match clang_res, vellvm_res with
+      | DVALUE_I8 y, MlOk _ _ (DVALUE_I8 x) =>
+          if equ x y
+          then checker true
+          else whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false
+      | _, _ =>
+          whenFail ("Something else went wrong... Vellvm: " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
+      end
   end.
 
 (* Definition agrees := (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang). *)
 
-Extract Constant defNumTests    => "5000".
-QCInclude "../../ml/*".
-QCInclude "../../ml/libvellvm/*".
+Extract Constant defNumTests    => "1000".
+
+(* SAZ: These paths are relative to where the coqc command that runs the extraction is executed. 
+   For invoking `make qc-tests` from the `/src` directory, we need these:
+*)
+QCInclude "ml/*".
+QCInclude "ml/libvellvm/*".
 
 
 (* QCInclude "../../ml/libvellvm/llvm_printer.ml". *)

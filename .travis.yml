@@ -18,9 +18,9 @@ addons:
 env:
   global:
   - NJOBS=1
-  - OCAML_VERSION="4.11.1+flambda"
+  - OCAML_VERSION="4.14.0"
   matrix:
-  - TEST_TARGET="8.13.2"
+  - TEST_TARGET="8.15.2"
 
 before_script:
   -  ./ci/keep_alive.sh &
@@ -31,23 +31,12 @@ install:
   - opam config var root
   # this somehow fails the second time...
   - opam repo add coq-released http://coq.inria.fr/opam/released || true
-  - opam install -y --verbose -j ${NJOBS} coq.${TEST_TARGET} && opam pin add coq ${TEST_TARGET} -y
-  - opam install -y --verbose -j ${NJOBS} ocamlfind camlp5 ${EXTRA_OPAM} 
-  - opam install -y --verbose -j ${NJOBS} ocamlbuild
-  - opam install -y --verbose -j ${NJOBS} coq-ext-lib
-  - opam pin -y --verbose -j ${NJOBS} add coq-flocq 3.2.1
-  - opam install -y --verbose -j ${NJOBS} coq-paco
-  - opam install -y --verbose -j ${NJOBS} coq-ceres
-  - opam install -y --verbose -j ${NJOBS} coq-simple-io
-  - opam install -y --verbose -j ${NJOBS} coq-mathcomp-ssreflect
-  - opam install -y --verbose -j ${NJOBS} coq-itree
-  - opam install -y --verbose -j ${NJOBS} dune
-  - opam install -y --verbose -j ${NJOBS} menhir
-  - opam install -y --verbose -j ${NJOBS} qcheck
-  - opam upgrade -y --verbose -j ${NJOBS}
-
+  # pin the coq version according to src/Makefile $(COQ_VERSION)
+  - make -C src/ pin-coq
+  - make -C src/ opam
+  
 script:
   - eval $(opam config env)
   - opam config var root
   - make -j${NJOBS} -C src/
-  - cd src && ./vellvm --test
+  - make -C src/ test
