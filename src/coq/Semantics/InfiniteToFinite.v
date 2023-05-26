@@ -6298,66 +6298,147 @@ Module InfiniteToFinite.
 
   (* TODO: Move this *)
   Lemma mem_push_spec_fin_inf :
-    forall {m1_fin m2_fin m1_inf},
-      MemState_refine_prop m1_inf m1_fin ->
-      Memory64BitIntptr.MMEP.MemSpec.mempush_spec m1_fin m2_fin ->
-      exists m2_inf,
-        MemoryBigIntptr.MMEP.MemSpec.mempush_spec m1_inf m2_inf /\
-          MemState_refine_prop m2_inf m2_fin.
+    forall {m_fin_start m_fin_final m_inf_start},
+      MemState_refine_prop m_inf_start m_fin_start ->
+      Memory64BitIntptr.MMEP.MemSpec.mempush_spec m_fin_start m_fin_final ->
+      exists m_inf_final,
+        MemoryBigIntptr.MMEP.MemSpec.mempush_spec m_inf_start m_inf_final /\
+          MemState_refine_prop m_inf_final m_fin_final.
   Proof.
-    intros m1_fin m2_fin m1_inf MSR [FRESH INVARIANTS].
-    exists (lift_MemState m2_fin).
+    intros m_fin_start m_fin_final m_inf_start MSR [FRESH INVARIANTS].
+    exists (lift_MemState m_fin_final).
+    (*
     destruct m1_fin as [[m1_fin fs1_fin h1_fin] msprov1_fin], m2_fin as [[m2_fin fs2_fin h2_fin] msprov2_fin].
     destruct m1_inf as [[m1_inf fs1_inf h1_inf] msprov1_inf].
+     *)
+
+    pose proof (MemState_refine_MemState_refine_prop _ _ (lift_MemState_refine m_fin_final)) as MSR'.
 
     cbn in *.
+    split; auto.
+
     split; cbn in *.
     - (* Fresh frame *)
-      clear INVARIANTS.
-      intros fs1 fs2 f H H0 H1.
+      clear INVARIANTS MSR'.
+      intros fs1 fs2 f MSFSP EMPTY PUSH.
 
       (* When I pop, I get a framestack that's equivalent to fs2... *)
       unfold MemoryBigIntptr.MMEP.MMSP.memory_stack_frame_stack_prop, Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *.
       cbn in *.
 
-      red in MSR1.
-      cbn in MSR1.
-      break_match_hyp; inv MSR1.
-      break_match_hyp; inv Heqo.
-      break_match_hyp; inv H3.
-      break_match_hyp; inv H4.
-      break_match_hyp; inv Heqo1.
+      apply MemState_refine_prop_frame_stack_preserved in MSR.
 
-      red in MSR2.
-      cbn in MSR2.
-      break_match_hyp; inv MSR2.
-      break_match_hyp; inv Heqo1.
-      break_match_hyp; inv H3.
-      break_match_hyp; inv H4.
-      break_match_hyp; inv Heqo4.
-
-      destruct H1.
+      destruct PUSH.
       red in can_pop.
       destruct fs2; try contradiction.
       cbn in new_frame.
 
       rewrite <- new_frame.
       rewrite can_pop.
-      rewrite <- H.
-      pose proof InfMem.MMEP.empty_frame_eqv _ _ H0 MemoryBigIntptr.MMEP.empty_frame_nil as FNIL.
+      rewrite <- MSFSP.
+
+      pose proof InfMem.MMEP.empty_frame_eqv _ _ EMPTY MemoryBigIntptr.MMEP.empty_frame_nil as FNIL.
       rewrite FNIL.
 
-      eapply convert_FrameStack_eqv_rev; eauto.
-      {
-        eapply convert_FrameStack_snoc; eauto.
-        cbn. reflexivity.
+      (* TODO: Move this somewhere I can use it for both fin / inf *)
+      #[global] Instance inf_frame_stack_preserved_symmetric :
+        Symmetric InfMem.MMEP.MemSpec.frame_stack_preserved.
+      Proof.
+        intros x y FSP.
+        red; red in FSP.
+        intros fs. split; intros FS.
+        apply FSP; auto.
+        apply FSP; auto.
+      Qed.
+
+      assert (Memory64BitIntptr.MMEP.MemSpec.push_frame_stack_spec
+        (Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack
+           (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory m_fin_start)) []
+        (Memory64BitIntptr.MMEP.MMSP.Snoc
+           (Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack
+              (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory m_fin_start)) [])) as PUSH_FIN.
+      { split; cbn; reflexivity.
       }
 
-      eapply FRESH.
-      reflexivity.
+      specialize (FRESH
+                    (Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack
+                       (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory m_fin_start))
+                    (Memory64BitIntptr.MMEP.MMSP.Snoc
+                       (Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack
+                          (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory m_fin_start)) [])
+                    []
+                 ).
+      forward FRESH; try reflexivity.
+      forward FRESH.
       apply Memory64BitIntptr.MMEP.empty_frame_nil.
+      specialize (FRESH PUSH_FIN).
 
-      split; red; reflexivity.
+      apply FinMemMMSP.frame_stack_inv in FRESH.
+      destruct FRESH as [FRESH | FRESH].
+      2: {
+        destruct FRESH as (?&?&?&?&?).
+        discriminate.
+      }
+
+      destruct FRESH as (?&?&?&?&?&?&?&?).
+      inv H0.
+
+      destruct m_fin_final. destruct ms_memory_stack.
+      cbn in *; subst.
+      rewrite lift_FrameStack_snoc.
+
+      apply frame_stack_eqv_lift in H1.
+      rewrite H1.
+      apply frame_eqv_lift in H2.
+      rewrite H2.
+      clear H1 H2.
+
+      red in MSR.
+      pose proof MSFSP.
+      apply MSR in H.
+
+      (* TODO: Move this to where it can work for fin / inf *)
+      Lemma frame_stack_eqv_snoc :
+        forall fs1 fs2 f1 f2,
+          MemoryBigIntptr.MMEP.MMSP.frame_stack_eqv fs1 fs2 ->
+          MemoryBigIntptr.MMEP.MMSP.frame_eqv f1 f2 ->
+          MemoryBigIntptr.MMEP.MMSP.frame_stack_eqv
+            (InfMemMMSP.Snoc fs1 f1)
+            (InfMemMMSP.Snoc fs2 f2).
+      Proof.
+        intros fs1 fs2 f1 f2 H H0.
+        rewrite H.
+        rewrite H0.
+        reflexivity.
+      Qed.
+
+      apply frame_stack_eqv_snoc.
+      2: {
+        cbn; reflexivity.
+      }
+
+      destruct m_fin_start. destruct ms_memory_stack.
+      destruct m_inf_start. destruct ms_memory_stack.
+      cbn in H, PUSH_FIN, MSR.
+      red in H; cbn in H.
+
+      replace (Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack
+          (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory
+             {|
+               FinMemMMSP.ms_memory_stack :=
+                 {|
+                   FinMemMMSP.memory_stack_memory := memory_stack_memory0;
+                   FinMemMMSP.memory_stack_frame_stack := memory_stack_frame_stack;
+                   FinMemMMSP.memory_stack_heap := memory_stack_heap0
+                 |};
+               FinMemMMSP.ms_provenance := ms_provenance0
+             |})) with memory_stack_frame_stack by reflexivity.
+
+      cbn.
+
+      cbn in MSFSP.
+      rewrite H, <- MSFSP.
+      reflexivity.
     - (* mempush_operation_invariants *)
       destruct INVARIANTS.
       split; cbn in *.
