@@ -12,6 +12,8 @@ Require Import List.
 
 Import ListNotations.
 
+Import DList.
+
 From Coq Require Import
      ZArith String Bool.Bool Numbers.HexadecimalString
      Strings.Ascii.
