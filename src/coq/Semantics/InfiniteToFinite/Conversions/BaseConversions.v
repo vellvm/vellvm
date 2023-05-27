@@ -90,6 +90,25 @@ Proof.
   reflexivity.
 Qed.
 
+
+(* SAZ: Move outside of this module? Replace Iptr with Z? *)
+Lemma Int64_mod_eq:
+  forall i i0 : Iptr,
+    ((i <? 0)%Z || (i >=? Int64.modulus)%Z)%bool = false ->
+    ((i0 <? 0)%Z || (i0 >=? Int64.modulus)%Z)%bool = false ->
+    Int64.Z_mod_modulus i = Int64.Z_mod_modulus i0 -> i = i0.
+Proof.
+  intros i i0 H1 H2 EQ.
+  apply Bool.orb_false_elim in H1.
+  apply Bool.orb_false_elim in H2.
+  destruct H1.
+  destruct H2.
+  assert (0 <= i < Integers.Int64.modulus)%Z by lia.
+  assert (0 <= i0 < Integers.Int64.modulus)%Z by lia.
+  do 2 rewrite Integers.Int64.Z_mod_modulus_eq in EQ.
+  do 2 rewrite Zmod_small in EQ; auto.
+Qed.
+
 Lemma addr_convert_injective :
   forall a b c,
     addr_convert a = NoOom c ->
@@ -100,34 +119,17 @@ Proof.
   unfold addr_convert in *.
   destruct a, b.
   unfold FinITOP.int_to_ptr in *.
+  destruct c.
   break_match_hyp; inv BC.
   break_match_hyp; inv AC.
-  induction i, i0;
-    cbn in *; auto; inv Heqb0.
-
-  {
-    break_match.
-    break_match.
-    subst.
-
-    pose proof proof_irrelevance _ intrange intrange0; subst.
-    rewrite <- Heqi in Heqi0.
-    exfalso.
-
-    inversion Heqi0.
-
-    inv Heqi0.
-    break_match.
-    break_match.
-    subst.
-    inv Heqi.
-    Transparent Int64.repr.
-    unfold Int64.repr in *.
-    Opaque Int64.repr.
-    admit.
-  }
-Admitted.
-
+  Transparent Int64.repr.
+  cbn in H0.
+  Opaque Int64.repr.
+  assert (i = i0) by (apply Int64_mod_eq; auto).
+  subst.
+  reflexivity.
+Qed.
+    
 End InfToFinAddrConvert.
 
 Module FinToInfAddrConvert : AddrConvert FinAddr InfAddr
@@ -207,7 +209,7 @@ Module FinToInfAddrConvertSafe : AddrConvertSafe FinAddr InfAddr FinToInfAddrCon
     destruct a1.
     cbn.
     eexists; reflexivity.
-  Qed.
+  Defined.
 
   Lemma addr_convert_safe :
     forall a1 a2,

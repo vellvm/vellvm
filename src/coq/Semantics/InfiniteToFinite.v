@@ -119,10 +119,51 @@ Module InfiniteToFinite.
 
   (* TODO: Should we move this? *)
   Definition fin_to_inf_addr (a : FinAddr.addr) : InfAddr.addr.
-    pose proof FinToInfAddrConvertSafe.addr_convert_succeeds a as [a' CONV].
-    apply a'.
+    unfold FinAddr.addr in a.
+    unfold FiniteAddresses.Iptr in a.
+    pose proof FinToInfAddrConvertSafe.addr_convert_succeeds a as [a' _].
+    exact a'.
   Defined.
 
+  Lemma lift_addr_Convert_addr_invers:
+    forall {a_inf a_fin},
+        InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
+        fin_to_inf_addr a_fin = a_inf.
+  Proof.
+    intros.
+    unfold InfToFinAddrConvert.addr_convert in H.
+    destruct a_inf.
+    unfold FinITOP.int_to_ptr in H.
+    unfold fin_to_inf_addr.    
+    destruct (((i <? 0)%Z || (i >=? Int64.modulus)%Z)%bool) eqn: HEQ.
+    - inversion H.
+    - inversion H.
+      unfold FiniteAddresses.Prov.
+      unfold Prov in *.
+      remember (FinToInfAddrConvertSafe.addr_convert_succeeds (Int64.repr i, p)) as X.
+
+      destruct X. destruct x.
+      unfold FinToInfAddrConvert.addr_convert in e.
+      cbn in e.
+      inversion e.
+      subst.
+      assert (Int64.unsigned (Int64.repr i) = i).
+      {   Transparent Int64.repr.
+          unfold Int64.repr.
+          unfold Int64.unsigned.
+          cbn.
+          Opaque Int64.repr.
+          apply Bool.orb_false_elim in HEQ.
+          destruct HEQ.
+          assert (0 <= i < Integers.Int64.modulus)%Z by lia.
+          rewrite Integers.Int64.Z_mod_modulus_eq.
+          rewrite Zmod_small; auto.
+      }
+      rewrite H0.
+      reflexivity.
+  Qed.
+    
+      
   (* TODO: Should we move this? *)
   Definition fin_to_inf_dvalue (dv : LLVMParams64BitIntptr.Events.DV.dvalue) : LLVMParamsBigIntptr.Events.DV.dvalue.
     pose proof dvalue_convert_strict_safe dv as [dvi [CONV RCONV]].
@@ -224,6 +265,14 @@ Module InfiniteToFinite.
   Definition lift_Block (b : FinMemMMSP.Block) : InfMemMMSP.Block
     := map fin_to_inf_addr b.
 
+  Lemma lift_Block_convert_Block_inverse :
+    forall {b_inf b_fin},
+      convert_Block b_inf = NoOom b_fin ->
+      lift_Block b_fin = b_inf.
+  Proof.
+  Admitted.
+    
+  
   Definition convert_Heap (h : InfMemMMSP.Heap) : OOM (FinMemMMSP.Heap).
     refine (blocks <- map_monad _ (IntMaps.IM.elements h);;
             ret (IntMaps.IP.of_list blocks)).
@@ -242,6 +291,14 @@ Module InfiniteToFinite.
               (ix, b')).
   Defined.
 
+  Lemma lift_Heap_convert_Heap_inverse :
+    forall {h_inf h_fin},
+      convert_Heap H_inf = NoOom H_fin ->
+      lift_Heap h_fin = h_inf.
+  Proof.
+  Admitted.    
+
+  
   Definition convert_memory_stack (ms1 : InfMemMMSP.memory_stack) : OOM (FinMemMMSP.memory_stack).
     destruct ms1 as [mem fs h].
     refine (mem' <- convert_memory mem;;
@@ -262,6 +319,15 @@ Module InfiniteToFinite.
     constructor; auto.
   Defined.
 
+  (* TODO: Move this *)
+  Lemma lift_memory_stack_convert_memory_stack_inverse :
+    forall {ms_inf ms_fin},
+      convert_memory_stack ms_inf = NoOom ms_fin ->
+      lift_memory_stack ms_fin = ms_inf.
+  Proof.
+  Admitted.    
+
+  
   Definition convert_MemState (m1 : InfMem.MMEP.MMSP.MemState) : OOM (FinMem.MMEP.MMSP.MemState).
     destruct m1 as [ms pr].
     refine (ms' <- convert_memory_stack ms;;
@@ -293,6 +359,12 @@ Module InfiniteToFinite.
       convert_MemState ms_inf = NoOom ms_fin ->
       lift_MemState ms_fin = ms_inf.
   Proof.
+    intros.
+    unfold lift_MemState.
+    destruct ms_fin. cbn in *.
+    destruct ms_inf.
+    cbn in *.
+    
   Admitted.
 
   (* TODO: Move this *)
@@ -5354,6 +5426,17 @@ Module InfiniteToFinite.
           fs2 = lift_FrameStack fs2_fin /\
           FinMem.MMEP.MMSP.frame_stack_eqv fs1_fin fs2_fin.
   Proof.
+    unfold InfMem.MMEP.MMSP.frame_stack_eqv.
+    induction fs1.
+    - destruct fs2; intros.
+      Print FinMemMMSP.Frame.
+      + specialize (H f).
+        
+      
+      
+      
+
+    
   Admitted.
 
   (* TODO: Move this *)
@@ -5407,6 +5490,32 @@ Module InfiniteToFinite.
     - admit.
   Admitted.
 
+
+  (* TODO: Move this *)
+  Lemma heap_preserved_lift_MemState :
+    forall ms_fin ms_fin',
+      FinMem.MMEP.MemSpec.heap_preserved ms_fin ms_fin' ->
+      InfMem.MMEP.MemSpec.heap_preserved (lift_MemState ms_fin) (lift_MemState ms_fin').
+  Proof.
+    intros ms_fin ms_fin' HP.
+    red in HP; red.
+    destruct ms_fin, ms_fin'; cbn in *.
+    intros h.
+    split; intros MSFSP.
+    - red.
+      apply memory_heap_prop_lift_inv in MSFSP.
+      destruct MSFSP as (?&?&?&?&?); subst.
+      apply memory_stack_frame_stack_prop_lift in H1.
+      rewrite <- H in H1.
+      apply memory_stack_frame_stack_prop_lift.
+      apply FSP.
+      apply memory_stack_frame_stack_prop_lift_inv in H1.
+      auto.
+      admit.
+    - admit.
+  Admitted.
+
+  
   (* TODO: Move this *)
   Lemma convert_Frame_cons :
     forall ptr f,
@@ -5743,6 +5852,18 @@ Module InfiniteToFinite.
     reflexivity.
   Qed.
 
+  (* TODO: Move this *)
+  Lemma MemState_refine_prop_heap_preserved :
+    forall ms_inf ms_fin,
+      MemState_refine_prop ms_inf ms_fin ->
+      InfMem.MMEP.MemSpec.heap_preserved ms_inf (lift_MemState ms_fin).
+  Proof.
+    intros ms_inf ms_fin MSR.
+    red in MSR.
+    tauto.
+  Qed.
+
+  
   Lemma fin_inf_heap_preserved :
     forall ms_fin ms_inf ms_fin' ms_inf',
       MemState_refine_prop ms_inf ms_fin ->
@@ -5752,7 +5873,22 @@ Module InfiniteToFinite.
   Proof.
     intros ms_fin ms_inf ms_fin' ms_inf' REF REF' HP.
     red.
+    apply MemState_refine_prop_heap_preserved in REF, REF'.
+    red in REF, REF', HP.
+    red.
+
+    intros h.
+    split; intros HP_INF.
+    - red. red in HP_INF.
+      rewrite <- HP_INF.
+      apply REF'.
+      red.
+      symmetry.
+      apply REF.
+
+      pose proof heap_preserved_lift_MemState ms_fin ms_fin'.
   Admitted.
+
 
   Lemma fin_inf_read_byte_allowed_all_preserved :
     forall ms_fin ms_inf ms_fin' ms_inf',
