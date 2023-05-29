@@ -125,7 +125,7 @@ Module InfiniteToFinite.
     exact a'.
   Defined.
 
-  Lemma lift_addr_Convert_addr_invers:
+  Lemma lift_addr_Convert_addr_inverse:
     forall {a_inf a_fin},
         InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
         fin_to_inf_addr a_fin = a_inf.
@@ -170,12 +170,46 @@ Module InfiniteToFinite.
     apply dvi.
   Defined.
 
+  (* SAZ: These seem like the basic inversion properties - but things are too opaque? *)
+  Lemma fin_to_inf_conbert_dvalue_inversion :
+    forall {dv_inf dv_fin},
+      DVC1.dvalue_convert_strict dv_inf = NoOom dv_fin ->
+      fin_to_inf_dvalue dv_fin = dv_inf.
+  Proof.
+    intros dv_inf dv_fin H.
+    unfold fin_to_inf_dvalue.
+  Admitted.
+            
+
   (* TODO: Should we move this? *)
   Definition fin_to_inf_uvalue (uv : LLVMParams64BitIntptr.Events.DV.uvalue) : LLVMParamsBigIntptr.Events.DV.uvalue.
     pose proof uvalue_convert_strict_safe uv as [uvi [CONV RCONV]].
     apply uvi.
   Defined.
 
+  Lemma convert_fin_to_inf_uvalue_succeeds :
+    forall {uv_fin},
+      DVC1.uvalue_convert_strict (fin_to_inf_uvalue uv_fin) = NoOom uv_fin.
+  Proof.
+    intros.
+    unfold fin_to_inf_uvalue.
+    destruct  (uvalue_convert_strict_safe uv_fin).
+    destruct p.
+    rewrite e0.
+    reflexivity.
+  Qed.
+  
+  (* SAZ: These seem like the basic inversion properties - but things are too opaque? *)
+  Lemma fin_to_inf_convert_uvalue_inversion :
+    forall {uv_inf uv_fin},
+      DVC1.uvalue_convert_strict uv_inf = NoOom uv_fin ->
+      fin_to_inf_uvalue uv_fin = uv_inf.
+  Proof.
+    intros uv_inf uv_fin H.
+    unfold fin_to_inf_uvalue.
+  Admitted.
+
+  
   (* Could not put with the other conversions, need to know what memory structures like MemState are *)
   Definition convert_SByte (sb1 : MemoryBigIntptr.MP.BYTE_IMPL.SByte) : OOM (Memory64BitIntptr.MP.BYTE_IMPL.SByte).
     destruct sb1.
@@ -189,6 +223,41 @@ Module InfiniteToFinite.
     remember (DVC2.uvalue_convert_strict uv).
     exact (FiniteSizeof.mkUByte DVC2.DV2.uvalue (fin_to_inf_uvalue uv) dt (fin_to_inf_uvalue idx) sid).
   Defined.
+
+  Lemma lift_SByte_convert_Sbyte_inverse :
+    forall {sb_inf sb_fin},
+      convert_SByte sb_inf = NoOom sb_fin ->
+      lift_SByte sb_fin = sb_inf.
+  Proof.
+    intros.
+    unfold convert_SByte in H.
+    unfold lift_SByte.
+    destruct sb_inf eqn: EQ1.
+    destruct (DVC1.uvalue_convert_strict uv) eqn: EQ2; [|inversion H].
+    cbn in H.
+    destruct (DVC1.uvalue_convert_strict idx) eqn: EQ3; [|inversion H].
+    inversion H.
+    apply fin_to_inf_convert_uvalue_inversion in EQ2.
+    apply fin_to_inf_convert_uvalue_inversion in EQ3.
+    rewrite EQ2.
+    rewrite EQ3.
+    reflexivity.
+  Qed.    
+
+  Definition sbyte_refine byte_inf byte_fin : Prop :=
+    convert_SByte byte_inf = NoOom byte_fin.
+
+  Lemma sbyte_refine_lifted :
+    forall byte,
+      sbyte_refine (lift_SByte byte) byte.
+  Proof.
+    intros.
+    unfold sbyte_refine, lift_SByte.
+    destruct byte.
+    cbn.
+    do 2 rewrite convert_fin_to_inf_uvalue_succeeds.
+    reflexivity.
+  Qed.
 
   Definition convert_mem_byte (mb1 : InfMemMMSP.mem_byte) : OOM (FinMemMMSP.mem_byte).
     destruct mb1.
@@ -207,6 +276,23 @@ Module InfiniteToFinite.
     - apply a.
   Defined.
 
+  Lemma lift_mem_byte_convert_mem_byte_inversion :
+    forall {mb_inf mb_fin},
+      convert_mem_byte mb_inf = NoOom mb_fin ->
+      lift_mem_byte mb_fin = mb_inf.
+  Proof.
+    intros.
+    unfold convert_mem_byte in H.
+    destruct mb_inf eqn : EQ1.
+    destruct (convert_SByte s) eqn: EQ2; [|inversion H].
+    cbn in H.
+    inversion H.
+    apply lift_SByte_convert_Sbyte_inverse in EQ2.
+    cbn.
+    rewrite EQ2.
+    reflexivity.
+  Qed.
+  
   (* Slightly tricky.
 
      Both the infinite and finite memory have the same underlying
@@ -230,6 +316,141 @@ Module InfiniteToFinite.
 
   Definition lift_memory (mem : FinMemMMSP.memory) : InfMemMMSP.memory :=
     IntMaps.IM.map lift_mem_byte mem.
+
+  Lemma IntMaps_map_list_map_Equal :
+    forall {A B} (f : A -> B) l,
+      IntMaps.IM.Equal (IntMaps.IM.map f (IntMaps.IP.of_list l)) (IntMaps.IP.of_list (List.map (fun '(i, x) => (i, f x)) l)).
+  Proof.
+  Admitted.
+
+  Lemma Forall2_cons_inversion :
+    forall {A B} f (x:A) (y:B) xs ys,
+      Forall2 f (x::xs) (y::ys) -> f x y /\ Forall2 f xs ys.
+  Proof.
+    intros.
+    inversion H; subst.
+    tauto.
+  Qed.
+  
+  Lemma lift_memory_convert_memory_inversion :
+    forall {mem_inf mem_fin},
+      convert_memory mem_inf = NoOom mem_fin ->
+      IntMaps.IM.Equal (lift_memory mem_fin) mem_inf.
+  Proof.
+    intros mem_inf mem_fin H.
+    unfold convert_memory in H.
+    unfold lift_memory.
+    unfold FinMemMMSP.memory in *.
+    unfold IntMaps.IM.key in *.
+    destruct (map_monad
+        (fun '(ix, mb) =>
+         _ <- LLVMParams64BitIntptr.ITOP.int_to_ptr ix PROV.nil_prov;;
+         mb' <- convert_mem_byte mb;; ret (ix, mb'))
+        (IntMaps.IM.elements (elt:=InfMemMMSP.mem_byte) mem_inf)) eqn: EQ1; [| inversion H].
+
+    cbn in H.
+    inversion H.
+    subst; clear H.
+    apply map_monad_oom_forall2 in EQ1.
+    
+    apply IntMaps.IP.F.Equal_mapsto_iff.
+    intros.
+    
+    rewrite IntMaps_map_list_map_Equal.
+    rewrite IntMaps.IP.of_list_1.
+    - rewrite (@IntMaps.IP.F.elements_mapsto_iff _ _ k e).
+      revert k e.
+      remember (fun (a : Z * InfMemMMSP.mem_byte) (b : Z * FinMemMMSP.mem_byte) =>
+             (let
+            '(ix, mb) := a in
+             _ <- LLVMParams64BitIntptr.ITOP.int_to_ptr ix PROV.nil_prov;;
+             mb' <- convert_mem_byte mb;;
+             ret (ix, mb')) = NoOom b) as body.
+      remember (IntMaps.IM.elements (elt:=InfMemMMSP.mem_byte) mem_inf) as l_inf.
+      clear mem_inf Heql_inf.
+      revert l_inf EQ1.
+      induction l; intros.
+      + destruct l_inf.
+        * intros. reflexivity.
+        * inversion EQ1.
+      + destruct l_inf.
+        * inversion EQ1.
+        * inversion EQ1; subst.
+          intros.
+          destruct p.
+          destruct (LLVMParams64BitIntptr.ITOP.int_to_ptr k0 PROV.nil_prov) eqn: EQ2; [|inversion H2].
+          cbn in H2.
+          destruct (convert_mem_byte m) eqn: EQ3; [|inversion H2].
+          inversion H2.
+          subst.
+          cbn.
+          split; intros.
+          -- apply SetoidList.InA_cons in H.
+             destruct H as [HEQ | HR].
+             ++ inversion HEQ.
+                cbn in H. cbn in H0.
+                subst.
+                apply lift_mem_byte_convert_mem_byte_inversion in EQ3.
+                rewrite EQ3.
+                apply SetoidList.InA_cons_hd. reflexivity.
+             ++ apply SetoidList.InA_cons_tl.
+                apply IHl.
+                apply Forall2_cons_inversion in EQ1.
+                destruct EQ1 as [_ H].
+                apply H.
+                assumption.
+          -- apply SetoidList.InA_cons in H.
+             destruct H as [HEQ | HR].
+             ++ inversion HEQ.
+                cbn in H. cbn in H0.
+                subst.
+                apply lift_mem_byte_convert_mem_byte_inversion in EQ3.
+                rewrite EQ3.
+                apply SetoidList.InA_cons_hd. reflexivity.
+             ++ apply SetoidList.InA_cons_tl.
+                apply (@IHl l_inf).
+                apply Forall2_cons_inversion in EQ1.
+                destruct EQ1 as [_ H].
+                apply H.
+                assumption.
+    - clear k. clear e.
+      assert (SetoidList.NoDupA (IntMaps.IM.eq_key (elt:=InfMemMMSP.mem_byte))
+                (IntMaps.IM.elements mem_inf)).
+      { apply IntMaps.IM.elements_3w. }
+      remember (IntMaps.IM.elements (elt:=InfMemMMSP.mem_byte) mem_inf) as l_inf.
+      clear mem_inf Heql_inf.
+      revert l EQ1.
+      induction H; intros.
+      + inversion EQ1. subst. cbn. auto.
+      + inversion EQ1. subst. cbn.
+        destruct x.
+        destruct (LLVMParams64BitIntptr.ITOP.int_to_ptr k PROV.nil_prov) eqn: EQ2; [|inversion H3].
+        cbn in H3.
+        destruct (convert_mem_byte m) eqn: EQ3; [|inversion H3].
+        inversion H3.
+        subst. clear H3.
+        constructor.
+        2 : { apply IHNoDupA. assumption. } 
+        intros X.
+        apply H.
+        clear H H0 IHNoDupA EQ1 a EQ2 EQ3.
+
+        induction H5.
+        * inversion X.
+        * destruct x.
+          destruct (LLVMParams64BitIntptr.ITOP.int_to_ptr z PROV.nil_prov) eqn: EQ2; [|inversion H].
+          cbn in H.
+          destruct (convert_mem_byte m1) eqn: EQ3; [|inversion H].
+          inversion H.
+          subst. clear H.
+          apply SetoidList.InA_cons in X.
+          destruct X as [HEQ | HR].
+          -- apply SetoidList.InA_cons_hd.
+             apply HEQ.
+          -- apply SetoidList.InA_cons_tl.
+             apply IHForall2.
+             apply HR.
+  Qed.
 
   Definition convert_Frame (f : InfMemMMSP.Frame) : OOM (FinMemMMSP.Frame).
     induction f.
@@ -403,22 +624,6 @@ Module InfiniteToFinite.
     split; red; reflexivity.
   Qed.
 
-  Definition sbyte_refine byte_inf byte_fin : Prop :=
-    convert_SByte byte_inf = NoOom byte_fin.
-
-  (* TODO: Move this *)
-  Lemma lift_SByte_convert_SByte_inverse :
-    forall {b1 b2},
-      convert_SByte b1 = NoOom b2 ->
-      lift_SByte b2 = b1.
-  Proof.
-  Admitted.
-
-  Lemma sbyte_refine_lifted :
-    forall byte,
-      sbyte_refine (lift_SByte byte) byte.
-  Proof.
-  Admitted.
 
   Definition sbytes_refine bytes_inf bytes_fin : Prop :=
     Forall2 sbyte_refine bytes_inf bytes_fin.
