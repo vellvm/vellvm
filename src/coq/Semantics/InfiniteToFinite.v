@@ -7149,6 +7149,7 @@ Module InfiniteToFinite.
               InfMem.MMEP.MemSpec.read_byte_prop ms_inf ptr_inf byte_inf ->
               exists ptr_fin byte_fin,
                 FinMem.MMEP.MemSpec.read_byte_prop ms_fin ptr_fin byte_fin /\
+                  addr_refine ptr_inf ptr_fin /\
                   sbyte_refine byte_inf byte_fin.
           Proof.
             intros ptr_inf byte_inf ms_inf ms_fin MSR RBP.
@@ -7796,68 +7797,49 @@ Module InfiniteToFinite.
       pose proof Util.Forall2_Nth_left NTH1 ADDRS as (ptr_fin & NTH_FIN & REF_ADDR).
       pose proof Util.Forall2_Nth_left NTH2 BYTES as (byte_fin & NTH_FIN_BYTE & REF_BYTE).
 
-      apply Util.Nth_In in NTH_FIN.
-
       eapply fin_inf_read_byte_prop; eauto.
     - (* Old reads preserved *)
-      intros ptr DISJOINT.
-      split; intros ALLOC.
-      { destruct (InfToFinAddrConvert.addr_convert ptr) eqn:CONV.
-        { (* ptr in finite range *)
-          specialize (extend_read_byte_allowed_old_reads a).
-          forward extend_read_byte_allowed_old_reads.
-          {
-            intros p IN.
-            apply In_Nth in IN as (i&IN).
-            pose proof Util.Forall2_Nth_right IN ADDRS as (ptr_inf & NTH_INF & REF).
-            
-            eapply fin_inf_disjoint_ptr_byte; eauto.
-            eapply DISJOINT.
-            apply Util.Nth_In in NTH_INF.
-            auto.
-          }
+      intros ptr byte DISJOINT.
+      split; intros READ.
+      { (* ptr in finite range *)
+        pose proof READ as READ'.
+        eapply inf_fin_read_byte_prop_exists in READ' as (ptr_fin&byte_fin&READ'&ADDR_REF&BYTE_REF); eauto.
+        specialize (extend_reads_old_reads ptr_fin byte_fin).
+        forward extend_reads_old_reads.
+        {
+          intros p IN.
+          apply In_Nth in IN as (i&IN).
+          pose proof Util.Forall2_Nth_right IN ADDRS as (ptr_inf & NTH_INF & REF).
 
-          eapply fin_inf_read_byte_allowed; eauto.
-          apply extend_read_byte_allowed_old_reads.
-          eapply inf_fin_read_byte_allowed; eauto.
+          eapply fin_inf_disjoint_ptr_byte; eauto.
+          eapply DISJOINT.
+          apply Util.Nth_In in NTH_INF.
+          auto.
         }
 
-        { (* Big pointer, shouldn't be allocated. *)
-          exfalso.
-          destruct ALLOC as (?&?&?).
-          eapply inf_fin_big_address_byte_not_allocated.
-          3: eauto.
-          all: eauto.
-        }
+        eapply fin_inf_read_byte_prop; eauto.
+        apply extend_reads_old_reads.
+        eapply inf_fin_read_byte_prop; eauto.
       }
+      { (* ptr in finite range *)
+        pose proof READ as READ'.
+        eapply inf_fin_read_byte_prop_exists in READ' as (ptr_fin&byte_fin&READ'&ADDR_REF&BYTE_REF); eauto.
+        specialize (extend_reads_old_reads ptr_fin byte_fin).
+        forward extend_reads_old_reads.
+        {
+          intros p IN.
+          apply In_Nth in IN as (i&IN).
+          pose proof Util.Forall2_Nth_right IN ADDRS as (ptr_inf & NTH_INF & REF).
 
-      { destruct (InfToFinAddrConvert.addr_convert ptr) eqn:CONV.
-        { (* ptr in finite range *)
-          specialize (extend_read_byte_allowed_old_reads a).
-          forward extend_read_byte_allowed_old_reads.
-          {
-            intros p IN.
-            apply In_Nth in IN as (i&IN).
-            pose proof Util.Forall2_Nth_right IN ADDRS as (ptr_inf & NTH_INF & REF).
-            
-            eapply fin_inf_disjoint_ptr_byte; eauto.
-            eapply DISJOINT.
-            apply Util.Nth_In in NTH_INF.
-            auto.
-          }
-
-          eapply fin_inf_read_byte_allowed; eauto.
-          apply extend_read_byte_allowed_old_reads.
-          eapply inf_fin_read_byte_allowed; eauto.
+          eapply fin_inf_disjoint_ptr_byte; eauto.
+          eapply DISJOINT.
+          apply Util.Nth_In in NTH_INF.
+          auto.
         }
 
-        { (* Big pointer, shouldn't be allocated. *)
-          exfalso.
-          destruct ALLOC as (?&?&?).
-          eapply inf_fin_big_address_byte_not_allocated.
-          3: eauto.
-          all: eauto.
-        }
+        eapply fin_inf_read_byte_prop; eauto.
+        apply extend_reads_old_reads.
+        eapply inf_fin_read_byte_prop; eauto.
       }
   Qed.
 
@@ -7904,7 +7886,9 @@ Module InfiniteToFinite.
       apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
     - eapply extend_read_byte_allowed_fin_inf; eauto.
       apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
-    -  cbn.
+    - eapply extend_reads_fin_inf; eauto.
+      apply MemState_refine_MemState_refine_prop; apply lift_MemState_refine.
+    -
   Qed.
 
   Lemma allocate_bytes_post_conditions_MemPropT_fin_inf :
