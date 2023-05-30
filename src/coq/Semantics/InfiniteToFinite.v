@@ -7496,18 +7496,69 @@ Module InfiniteToFinite.
   Qed.
 
   Lemma find_free_block_fin_inf :
-    forall {ms_fin ms_fin' ms_inf ms_inf' len addr_fin addrs_fin addr_inf addrs_inf pr},
-      MemState_refine_prop ms_inf ms_fin ->
-      MemState_refine_prop ms_inf' ms_fin' ->
-      InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
-      Forall2 (fun addr_inf addr_fin => InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin) addrs_inf addrs_fin ->
-      Memory64BitIntptr.MMEP.MemSpec.find_free_block len pr ms_fin (ret (ms_fin', (addr_fin, addrs_fin))) ->
-      MemoryBigIntptr.MMEP.MemSpec.find_free_block len pr ms_inf (ret (ms_inf', (addr_inf, addrs_inf))).
+    forall {ms_fin_start ms_fin_final ms_inf_start len addr_fin addrs_fin pr},
+      MemState_refine_prop ms_inf_start ms_fin_start ->
+      Memory64BitIntptr.MMEP.MemSpec.find_free_block len pr ms_fin_start (ret (ms_fin_final, (addr_fin, addrs_fin))) ->
+      exists '(addr_inf, addrs_inf) ms_inf_final,
+        MemoryBigIntptr.MMEP.MemSpec.find_free_block len pr ms_inf_start (ret (ms_inf_final, (addr_inf, addrs_inf))) /\
+          (fun '(addr_inf, addrs_inf) '(addr_fin, addrs_fin) =>
+             InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin /\
+               Forall2 (fun addr_inf addr_fin => InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin) addrs_inf addrs_fin) (addr_inf, addrs_inf) (addr_fin, addrs_fin) /\
+          MemState_refine_prop ms_inf_final ms_fin_final.
   Proof.
-    intros ms_fin ms_fin' ms_inf ms_inf' len addr_fin addrs_fin addr_inf addrs_inf pr MSR1 MSR2 CONV_ADDR CONV_ADDRS FIND_FREE_BLOCK.
+    intros ms_fin_start ms_fin_final ms_inf_start len addr_fin addrs_fin pr MSR FIND_FREE_BLOCK.
+
+
+    pose proof FinToInfAddrConvertSafe.addr_convert_succeeds addr_fin as (addr_inf & CONV_FIN).
+    apply FinToInfAddrConvertSafe.addr_convert_safe in CONV_FIN as CONV_INF.
+
     cbn in FIND_FREE_BLOCK.
     destruct FIND_FREE_BLOCK; subst.
 
+    (* TODO: Move to listutils *)
+    Lemma Forall2_map :
+      forall {A B} (R : B -> B -> Prop) (f : A -> B) l1 l2,
+        Forall2 (fun a b => R (f a) b) l1 l2 ->
+        Forall2 R (map f l1) l2.
+    Proof.
+      intros A B R f l1 l2 ALL.
+      induction ALL; cbn; auto.
+    Qed.
+
+    remember (map fin_to_inf_addr addrs_fin) as addrs_inf.
+    assert (Forall2
+              (fun (addr_inf0 : InfAddr.addr) (addr_fin0 : FinAddr.addr) =>
+                 InfToFinAddrConvert.addr_convert addr_inf0 = NoOom addr_fin0) addrs_inf addrs_fin) as ADDRS.
+    {
+      clear H0; subst.
+      induction addrs_fin; cbn; auto.
+
+      apply Forall2_cons.
+      { unfold fin_to_inf_addr.
+        break_match_goal.
+        clear Heqs.
+        apply FinToInfAddrConvertSafe.addr_convert_safe in e.
+        auto.
+      }
+
+      eapply IHaddrs_fin.
+    }
+
+    eapply @block_is_free_fin_inf with (addrs_inf:=map fin_to_inf_addr addrs_fin) in H0; eauto.
+    2: {
+      subst; apply ADDRS.
+    }
+
+
+    exists (addr_inf, addrs_inf).
+    exists ms_inf_start.
+    split.
+    2: {
+      split; auto.
+    }
+
+    red; cbn.
+    split; subst; auto.
   Qed.
 
   Lemma allocate_bytes_with_pr_spec_MemPropT_fin_inf :
