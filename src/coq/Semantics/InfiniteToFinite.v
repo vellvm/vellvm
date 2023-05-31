@@ -8273,7 +8273,7 @@ Module InfiniteToFinite.
 
   (* TODO: Move this *)
   Lemma handle_alloca_fin_inf :
-    forall t num_elements align ms_fin_start ms_fin_final ms_inf_start d,
+    forall {t num_elements align ms_fin_start ms_fin_final ms_inf_start d},
       MemState_refine_prop ms_inf_start ms_fin_start ->
       Memory64BitIntptr.MMEP.MemSpec.handle_memory_prop
         LLVMParams64BitIntptr.Events.DV.dvalue
@@ -8315,7 +8315,7 @@ Module InfiniteToFinite.
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
       L2_E1E2_orutt_strict t_inf t_fin ->
-      MemState_refine ms1 ms2 ->
+      MemState_refine_prop ms1 ms2 ->
       L3_E1E2_orutt_strict (InfMemInterp.interp_memory_prop TLR_INF.R.refine_res2 t_inf sid ms1) (FinMemInterp.interp_memory_prop TLR_FIN.R.refine_res2 t_fin sid ms2).
   Proof.
     intros t_inf t_fin sid ms1 ms2 REL MSR.
@@ -8858,35 +8858,26 @@ Module InfiniteToFinite.
                     }
 
                     (* Handler succeeds *)
-                    destruct H0 as (st1&ms'&d&H0&INTRINSIC).
-                    rewrite H0 in VIS_HANDLED.
+                    destruct H0 as (st1&ms'&d&TA&INTRINSIC).
+                    rewrite TA in VIS_HANDLED.
                     setoid_rewrite bind_ret_l in VIS_HANDLED.
 
-                    { 
-                        epose proof handle_intrinsic_fin_inf ARGS (lift_MemState_refine_prop s2).
-                        forward H. eauto.
-                        destruct H as (?&?&?&?&?).
+                    { epose proof handle_intrinsic_fin_inf ARGS (lift_MemState_refine_prop s2) INTRINSIC as (dv_inf&ms_inf'&INTRINSIC_INF&DV_REF&MSR_INTRINSIC).
 
-                        eapply Interp_Memory_PropT_Vis with
-                          (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
-                                  match DVCInfFin.dvalue_convert_strict dv_inf with
-                                  | NoOom dv_fin =>
-                                      match convert_MemState ms_inf with
-                                      | NoOom ms_fin =>
-                                          get_inf_tree (k2 (ms_fin, (st1, dv_fin)))
-                                      | Oom s => raiseOOM s
-                                      end
-                                  | Oom s => raiseOOM s
-                                  end)
-                          )
-                          (s1:=s1)
-                          (s2:=lift_MemState s2).
+                      eapply Interp_Memory_PropT_Vis with
+                        (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                                get_inf_tree (k2 (ms', (st1, d)))
+                             )
+                        )
+                        (s1:=s1)
+                        (s2:=lift_MemState s2).
 
                       2: {
                         cbn. red. red.
                         repeat right.
                         exists s1.
-                        do 2 eexists.
+                        exists ms_inf'.
+                        exists dv_inf.
                         split; eauto.
                         reflexivity.
                       }
@@ -8894,9 +8885,6 @@ Module InfiniteToFinite.
                       2: {
                         cbn.
                         rewrite bind_ret_l.
-                        rewrite DVCInfFin.dvalue_refine_strict_equation in H1.
-                        rewrite H1.
-                        rewrite MemState_fin_to_inf_to_fin.
                         rewrite VIS_HANDLED.
                         reflexivity.
                       }
@@ -8909,9 +8897,7 @@ Module InfiniteToFinite.
                       inv H1.
 
                       cbn.
-                      rewrite dvalue_fin_to_inf_to_fin.
-                      rewrite MemState_fin_to_inf_to_fin.
-                      rewrite (itree_eta_ (k0 (fin_to_inf_dvalue d))).
+                      rewrite (itree_eta_ (k0 dv_inf)).
                       rewrite (itree_eta_ (k2 (ms', (st1, d)))).
                       right.
                       eapply CIH.
@@ -8927,9 +8913,8 @@ Module InfiniteToFinite.
                           reflexivity.
                         }
                         forward HK.
-                        { rewrite H0.
-                          constructor.
-                          reflexivity.
+                        { constructor.
+                          auto.
                         }
 
                         forward HK; auto.
@@ -8939,7 +8924,7 @@ Module InfiniteToFinite.
                         apply HK.
                       }
 
-                      specialize (REL (fin_to_inf_dvalue d)).
+                      specialize (REL dv_inf).
                       red in REL.
                       pclearbot.
 
@@ -8947,7 +8932,6 @@ Module InfiniteToFinite.
                       rewrite REL.
                       eapply K_RUTT.
                       repeat (split; auto).
-                      apply fin_to_inf_dvalue_refine_strict.
                     }
                   }
 
@@ -8984,7 +8968,9 @@ Module InfiniteToFinite.
                     rewrite bind_ret_l in VIS_HANDLED.
 
 
-                    { eapply Interp_Memory_PropT_Vis with
+                    { epose proof mem_push_spec_fin_inf (lift_MemState_refine_prop m1) (lift_MemState_refine_prop ms_push) PUSH_HANDLER as PUSH_INF.
+
+                      eapply Interp_Memory_PropT_Vis with
                         (k2:=(fun '(ms_inf, (sid', _)) =>
                                 match convert_MemState ms_inf with
                                 | NoOom ms_fin =>
@@ -9002,9 +8988,7 @@ Module InfiniteToFinite.
                         exists (lift_MemState ms_push).
                         exists tt.
                         split; try reflexivity.
-                        cbn.
-
-                        eapply mem_push_spec_fin_inf; eauto; apply lift_MemState_refine.
+                        cbn; auto.
                       }
 
                       2: {
@@ -9106,7 +9090,7 @@ Module InfiniteToFinite.
                         split; try reflexivity.
                         cbn.
 
-                        eapply mem_pop_spec_fin_inf; eauto; apply lift_MemState_refine.
+                        eapply mem_pop_spec_fin_inf; eauto; apply lift_MemState_refine_prop.
                       }
 
                       2: {
@@ -9189,18 +9173,11 @@ Module InfiniteToFinite.
                     rewrite bind_ret_l in VIS_HANDLED.
                     destruct EV_REL as (?&?&?); subst.
 
-                    { eapply Interp_Memory_PropT_Vis with
+                    { epose proof handle_alloca_fin_inf (lift_MemState_refine_prop s2) ALLOCA_HANDLER as (dv_inf&ms_inf'&ALLOCA_INF&DV_REF&MSR_ALLOCA).
+
+                      eapply Interp_Memory_PropT_Vis with
                         (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
-                                match DVCInfFin.dvalue_convert_strict dv_inf with
-                                | NoOom dv_fin =>
-                                    match convert_MemState ms_inf with
-                                    | NoOom ms_fin =>
-                                        get_inf_tree (k2 (ms_fin, (st', dv_fin)))
-                                    | Oom s => raiseOOM s
-                                    end
-                                | Oom s => raiseOOM s
-                                end)
-                        )
+                                get_inf_tree (k2 (ms_alloca, (st', d)))))
                         (s1:=s1)
                         (s2:=lift_MemState s2).
 
@@ -9208,62 +9185,33 @@ Module InfiniteToFinite.
                         cbn. red. red.
                         repeat right.
                         exists s1.
-                        exists (lift_MemState ms_alloca).
-                        exists (fin_to_inf_dvalue d).
-                        split; try reflexivity.
-
-                        eapply handle_alloca_fin_inf; eauto.
-                      }
-
-                      (* Mess *)
-                    { eapply Interp_Memory_PropT_Vis with
-                        (k2:=(fun '(ms_inf, (sid', _)) =>
-                                match convert_MemState ms_inf with
-                                | NoOom ms_fin =>
-                                    get_inf_tree (k2 (ms_fin, (st', tt)))
-                                | Oom s => raiseOOM s
-                                end)
-                        )
-                        (s1:=s1)
-                        (s2:=lift_MemState s2).
-
-                      2: {
-                        cbn. red. red.
-                        repeat right.
-                        exists s1.
-                        exists (lift_MemState ms_pop).
-                        exists tt.
-                        split; try reflexivity.
-                        cbn.
-
-                        eapply mem_pop_spec_fin_inf; eauto; apply lift_MemState_refine.
+                        exists ms_inf'.
+                        exists dv_inf.
+                        split; auto; reflexivity.
                       }
 
                       2: {
                         cbn.
                         rewrite bind_ret_l.
-                        rewrite MemState_fin_to_inf_to_fin.
                         rewrite VIS_HANDLED.
                         reflexivity.
                       }
 
                       (* Continuation for vis node *)
-                      intros [] b H H1 H2.
+                      intros a b H H0 H1.
                       destruct b as [ms [sid' res]].
-                      cbn in H1.
-                      cbn in H2. inv H2.
-                      apply Returns_ret_inv in H1.
-                      inv H1.
+                      cbn in H1; subst.
+                      cbn in H0.
+                      apply Returns_ret_inv in H0.
+                      inv H0.
 
-                      cbn.
-                      rewrite MemState_fin_to_inf_to_fin.
-                      rewrite (itree_eta_ (k0 tt)).
-                      rewrite (itree_eta_ (k2 (ms_pop, (st', tt)))).
+                      rewrite (itree_eta_ (k0 dv_inf)).
+                      rewrite (itree_eta_ (k2 (ms_alloca, (st', d)))).
                       right.
                       eapply CIH.
                       2: {
                         repeat red.
-                        specialize (HK tt (ms_pop, (st', tt))).
+                        specialize (HK d (ms_alloca, (st', d))).
                         forward HK.
                         { eapply ReturnsVis.
                           unfold trigger.
@@ -9285,7 +9233,7 @@ Module InfiniteToFinite.
                         apply HK.
                       }
 
-                      specialize (REL tt).
+                      specialize (REL dv_inf).
                       red in REL.
                       pclearbot.
 
