@@ -730,7 +730,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation :=
         fun (args : list uvalue) =>
           (* We match the arguments variables to the inputs *)
-          bs <- lift_err ret (combine_lists_err (df_args df) args) ;;
+          bs <- ret (List.combine (df_args df) args) ;;
           (* generate the corresponding writes to the local stack frame *)
           trigger MemPush ;;
           trigger (StackPush bs) ;;
