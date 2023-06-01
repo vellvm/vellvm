@@ -3526,6 +3526,32 @@ Module InfiniteToFinite.
       auto.
   Qed.
 
+  Lemma addr_convert_fin_to_inf_addr :
+    forall addr_fin,
+      InfToFinAddrConvert.addr_convert (fin_to_inf_addr addr_fin) = NoOom addr_fin.
+  Proof.
+    intros addr_fin.
+    unfold fin_to_inf_addr in *.
+    destruct (FinToInfAddrConvertSafe.addr_convert_succeeds addr_fin).
+    apply FinToInfAddrConvertSafe.addr_convert_safe in e.
+    auto.
+  Qed.
+
+  Lemma fin_inf_byte_allocated_MemPropT_exists :
+    forall addr_fin ms_fin ms_inf aid,
+      MemState_refine_prop ms_inf ms_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.byte_allocated_MemPropT addr_fin aid ms_fin (ret (ms_fin, tt)) ->
+      exists addr_inf,
+        InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin /\
+          MemoryBigIntptr.MMEP.MemSpec.byte_allocated_MemPropT addr_inf aid ms_inf (ret (ms_inf, tt)).
+  Proof.
+    intros addr_fin ms_fin ms_inf aid MSR ALLOCATED.
+    pose proof addr_convert_fin_to_inf_addr addr_fin.
+    exists (fin_to_inf_addr addr_fin).
+    split; auto.
+    eapply fin_inf_byte_allocated_MemPropT; eauto.
+  Qed.
+
   Lemma inf_fin_byte_allocated_MemPropT :
     forall addr_fin addr_inf ms_fin ms_inf aid,
       MemState_refine_prop ms_inf ms_fin ->
@@ -3602,6 +3628,18 @@ Module InfiniteToFinite.
     intros addr_fin addr_inf ms_fin ms_inf aid MSR ADDR_CONV ALLOCATED.
     red; red in ALLOCATED.
     eapply fin_inf_byte_allocated_MemPropT; eauto.
+  Qed.
+
+  Lemma fin_inf_byte_allocated_exists :
+    forall addr_fin ms_fin ms_inf aid,
+      MemState_refine_prop ms_inf ms_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.byte_allocated ms_fin addr_fin aid ->
+      exists addr_inf,
+        InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin /\
+          MemoryBigIntptr.MMEP.MemSpec.byte_allocated ms_inf addr_inf aid.
+  Proof.
+    intros addr_fin ms_fin ms_inf aid MSR ALLOCATED.
+    eapply fin_inf_byte_allocated_MemPropT_exists; eauto.
   Qed.
 
   Lemma inf_fin_byte_allocated :
@@ -5603,7 +5641,7 @@ Module InfiniteToFinite.
 
   (*   - (* Pointers *) *)
 
-    
+
   (*   intros ptr. *)
   (*   split; intros IN. *)
   (*   - apply ptr_in_frame_prop_lift_inv in IN. *)
@@ -5957,6 +5995,17 @@ Module InfiniteToFinite.
     forall ms_inf ms_fin,
       MemState_refine_prop ms_inf ms_fin ->
       InfMem.MMEP.MemSpec.frame_stack_preserved ms_inf (lift_MemState ms_fin).
+  Proof.
+    intros ms_inf ms_fin MSR.
+    red in MSR.
+    tauto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma MemState_refine_prop_allocations_preserved :
+    forall {ms_inf ms_fin},
+      MemState_refine_prop ms_inf ms_fin ->
+      InfMem.MMEP.MemSpec.allocations_preserved ms_inf (lift_MemState ms_fin).
   Proof.
     intros ms_inf ms_fin MSR.
     red in MSR.
@@ -7841,7 +7890,7 @@ Module InfiniteToFinite.
             intros p IN.
             apply In_Nth in IN as (i&IN).
             pose proof Util.Forall2_Nth_right IN ADDRS as (ptr_inf & NTH_INF & REF).
-            
+
             eapply fin_inf_disjoint_ptr_byte; eauto.
             eapply DISJOINT.
             apply Util.Nth_In in NTH_INF.
@@ -7869,7 +7918,7 @@ Module InfiniteToFinite.
             intros p IN.
             apply In_Nth in IN as (i&IN).
             pose proof Util.Forall2_Nth_right IN ADDRS as (ptr_inf & NTH_INF & REF).
-            
+
             eapply fin_inf_disjoint_ptr_byte; eauto.
             eapply DISJOINT.
             apply Util.Nth_In in NTH_INF.
@@ -7921,7 +7970,7 @@ Module InfiniteToFinite.
             intros p IN.
             apply In_Nth in IN as (i&IN).
             pose proof Util.Forall2_Nth_right IN ADDRS as (ptr_inf & NTH_INF & REF).
-            
+
             eapply fin_inf_disjoint_ptr_byte; eauto.
             eapply DISJOINT.
             apply Util.Nth_In in NTH_INF.
@@ -7950,7 +7999,7 @@ Module InfiniteToFinite.
             intros p IN.
             apply In_Nth in IN as (i&IN).
             pose proof Util.Forall2_Nth_right IN ADDRS as (ptr_inf & NTH_INF & REF).
-            
+
             eapply fin_inf_disjoint_ptr_byte; eauto.
             eapply DISJOINT.
             apply Util.Nth_In in NTH_INF.
@@ -8067,7 +8116,7 @@ Module InfiniteToFinite.
             intros p IN.
             apply In_Nth in IN as (i&IN).
             pose proof Util.Forall2_Nth_right IN ADDRS as (ptr_inf & NTH_INF & REF).
-            
+
             eapply fin_inf_disjoint_ptr_byte; eauto.
             eapply DISJOINT.
             apply Util.Nth_In in NTH_INF.
@@ -8096,7 +8145,7 @@ Module InfiniteToFinite.
             intros p IN.
             apply In_Nth in IN as (i&IN).
             pose proof Util.Forall2_Nth_right IN ADDRS as (ptr_inf & NTH_INF & REF).
-            
+
             eapply fin_inf_disjoint_ptr_byte; eauto.
             eapply DISJOINT.
             apply Util.Nth_In in NTH_INF.
@@ -8149,7 +8198,7 @@ Module InfiniteToFinite.
             intros p IN.
             apply In_Nth in IN as (i&IN).
             pose proof Util.Forall2_Nth_right IN ADDRS as (ptr_inf & NTH_INF & REF).
-            
+
             eapply fin_inf_disjoint_ptr_byte; eauto.
             eapply DISJOINT.
             apply Util.Nth_In in NTH_INF.
@@ -8178,7 +8227,7 @@ Module InfiniteToFinite.
             intros p IN.
             apply In_Nth in IN as (i&IN).
             pose proof Util.Forall2_Nth_right IN ADDRS as (ptr_inf & NTH_INF & REF).
-            
+
             eapply fin_inf_disjoint_ptr_byte; eauto.
             eapply DISJOINT.
             apply Util.Nth_In in NTH_INF.
@@ -8704,7 +8753,7 @@ Module InfiniteToFinite.
        to use EXTEND...
 
        This may not hold right now because root_in_heap_prop only
-       cares about 
+       cares about
      *)
     apply MSR1 in MSFSP.
   Admitted.
@@ -9260,6 +9309,33 @@ Module InfiniteToFinite.
     - destruct free_was_allocated.
       eapply fin_inf_byte_allocated in H; eauto.
     - intros ptr H.
+      { destruct (InfToFinAddrConvert.addr_convert ptr) eqn:CONV.
+        { (* ptr in finite range *)
+          eapply ptr_in_memstate_heap_inf_fin in H; eauto.
+          apply free_block_allocated in H.
+          destruct H.
+          eapply fin_inf_byte_allocated in H; eauto.
+        }
+
+        { (* Big pointer, shouldn't be allocated. *)
+          exfalso.
+          eapply inf_fin_big_address_byte_not_allocated; eauto.
+          eapply MemState_refine_prop_allocations_preserved; eauto.
+          eapply fin_inf_byte_allocated.
+          apply lift_MemState_refine_prop.
+
+          pose proof MemState_refine_prop_allocations_preserved MSR as PRESERVED.
+
+          eapply
+          eapply fin_inf_byte_allocated; eauto.
+
+          3: eauto.
+          all: eauto.
+        }
+      }
+
+
+      eapply ptr_in_memstate_heap_inf_fin in H; eauto.
       eapply fin_inf_byte_allocated in H; eauto.
     - eapply extend_read_byte_allowed_fin_inf; eauto.
       apply lift_MemState_refine_prop.
@@ -9273,8 +9349,8 @@ Module InfiniteToFinite.
       apply lift_MemState_refine_prop.
     - admit.
 
-    - 
-    
+    -
+
   Qed.
 
   Lemma handle_free_fin_inf :
@@ -9301,7 +9377,7 @@ Module InfiniteToFinite.
       subst.
     cbn in *.
 
-    
+
   Qed.
 
   (* TODO: Lemma about lifting intrinsic handlers *)
