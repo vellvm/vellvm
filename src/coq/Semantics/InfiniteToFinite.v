@@ -8632,6 +8632,39 @@ Module InfiniteToFinite.
     symmetry; auto.
   Qed.
 
+  Lemma ptr_in_memstate_heap_inf_fin :
+    forall {ms_inf ms_fin root_inf root_fin ptr_inf ptr_fin},
+      MemState_refine_prop ms_inf ms_fin ->
+      addr_refine root_inf root_fin ->
+      addr_refine ptr_inf ptr_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.ptr_in_memstate_heap ms_inf root_inf ptr_inf ->
+      Memory64BitIntptr.MMEP.MemSpec.ptr_in_memstate_heap ms_fin root_fin ptr_fin.
+  Proof.
+    intros ms_inf ms_fin root_inf root_fin ptr_inf ptr_fin MSR ROOT_REF PTR_REF IN_HEAP.
+    destruct ms_inf; destruct ms_memory_stack.
+    destruct ms_fin; destruct ms_memory_stack.
+    apply MemState_refine_prop_heap_preserved in MSR.
+    red; red in MSR; red in IN_HEAP.
+    cbn in *.
+    unfold InfMem.MMEP.MMSP.memory_stack_heap_prop, Memory64BitIntptr.MMEP.MMSP.memory_stack_heap_prop in *; cbn in *.
+
+    intros h H.
+    specialize (IN_HEAP memory_stack_heap).
+    forward IN_HEAP; [reflexivity|].
+    rewrite <- H.
+
+    specialize (MSR memory_stack_heap).
+    destruct MSR as [MSR _].
+    forward MSR; [reflexivity|].
+    rewrite <- MSR in IN_HEAP.
+
+    pose proof ptr_in_heap_prop_lift_inv IN_HEAP ROOT_REF as (ptr_fin'&PTR_FIN_REF&IN_HEAP_FIN).
+    rewrite PTR_REF in PTR_FIN_REF.
+    inv PTR_FIN_REF.
+    rename ptr_fin' into ptr_fin.
+    eauto.
+  Qed.
+
   Lemma extend_heap_fin_inf :
     forall {ms_inf_start ms_fin_start ms_inf_final ms_fin_final addrs_fin addrs_inf},
       MemState_refine_prop ms_inf_start ms_fin_start ->
@@ -9224,10 +9257,10 @@ Module InfiniteToFinite.
 
     split.
     - eapply root_in_memstate_heap_fin_inf; eauto.
-    - eapply fin_inf_preserve_allocation_ids in H; eauto.
-      apply lift_MemState_refine_prop.
-    - eapply extend_allocations_fin_inf; eauto.
-      apply lift_MemState_refine_prop.
+    - destruct free_was_allocated.
+      eapply fin_inf_byte_allocated in H; eauto.
+    - intros ptr H.
+      eapply fin_inf_byte_allocated in H; eauto.
     - eapply extend_read_byte_allowed_fin_inf; eauto.
       apply lift_MemState_refine_prop.
     - eapply extend_reads_fin_inf; eauto.
