@@ -9428,6 +9428,51 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     symmetry; auto.
   Qed.
 
+  Lemma ptr_in_memstate_heap_fin_inf :
+    forall {ms_inf ms_fin root_inf root_fin ptr_inf ptr_fin},
+      MemState_refine_prop ms_inf ms_fin ->
+      addr_refine root_inf root_fin ->
+      addr_refine ptr_inf ptr_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.ptr_in_memstate_heap ms_fin root_fin ptr_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.ptr_in_memstate_heap ms_inf root_inf ptr_inf.
+  Proof.
+    intros ms_inf ms_fin root_inf root_fin ptr_inf ptr_fin MSR ROOT_REF PTR_REF IN_HEAP.
+    destruct ms_inf; destruct ms_memory_stack.
+    destruct ms_fin; destruct ms_memory_stack.
+    apply MemState_refine_prop_heap_preserved in MSR.
+    red; red in MSR; red in IN_HEAP.
+    cbn in *.
+    unfold InfMem.MMEP.MMSP.memory_stack_heap_prop, Memory64BitIntptr.MMEP.MMSP.memory_stack_heap_prop in *; cbn in *.
+
+    intros h H.
+    specialize (MSR memory_stack_heap).
+    destruct MSR as [MSR _].
+    forward MSR; [reflexivity|].
+    rewrite <- MSR in H.
+    rewrite <- H.
+
+    replace root_inf with (fin_to_inf_addr root_fin).
+    2: {
+      unfold fin_to_inf_addr.
+      break_match_goal.
+      clear Heqs.
+      apply FinToInfAddrConvertSafe.addr_convert_safe in e.
+      eapply InfToFinAddrConvert.addr_convert_injective; eauto.
+    }
+    replace ptr_inf with (fin_to_inf_addr ptr_fin).
+    2: {
+      unfold fin_to_inf_addr.
+      break_match_goal.
+      clear Heqs.
+      apply FinToInfAddrConvertSafe.addr_convert_safe in e.
+      eapply InfToFinAddrConvert.addr_convert_injective; eauto.
+    }
+
+    apply ptr_in_heap_prop_lift.
+    apply IN_HEAP.
+    reflexivity.
+  Qed.
+
   Lemma ptr_in_memstate_heap_inf_fin :
     forall {ms_inf ms_fin root_inf root_fin ptr_inf ptr_fin},
       MemState_refine_prop ms_inf ms_fin ->
@@ -10107,6 +10152,56 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           red in H.
           rewrite CONV in H.
           discriminate.
+        }
+      }
+    - intros ptr H.
+      { destruct (InfToFinAddrConvert.addr_convert ptr) eqn:CONV.
+        { (* ptr in finite range *)
+          eapply ptr_in_memstate_heap_inf_fin in H; eauto.
+          apply free_bytes_freed in H.
+          eapply fin_inf_byte_not_allocated in H; eauto.
+          apply lift_MemState_refine_prop.
+        }
+
+        { (* Big pointer, shouldn't be allocated. *)
+          exfalso.
+          eapply ptr_in_memstate_heap_inf_fin_exists in H; eauto.
+          destruct H as (?&?&?).
+          apply free_block_allocated in H0.
+          destruct H0 as (?&?).
+          epose proof fin_inf_byte_allocated_exists _ _ _ _ MSR H0 as (?&?&?).
+          red in H.
+          rewrite CONV in H.
+          discriminate.
+        }
+      }
+    - intros ptr aid H.
+      { destruct (InfToFinAddrConvert.addr_convert ptr) eqn:CONV.
+        { (* ptr in finite range *)
+          split; intros ALLOC.
+          - eapply fin_inf_byte_allocated; eauto.
+            apply lift_MemState_refine_prop.
+            apply free_non_block_bytes_preserved.
+            + intros CONTRA.
+              eapply ptr_in_memstate_heap_fin_inf in CONTRA; eauto.
+            + eapply inf_fin_byte_allocated; eauto.
+          - eapply fin_inf_byte_allocated; eauto.
+            apply free_non_block_bytes_preserved.
+            + intros CONTRA.
+              eapply ptr_in_memstate_heap_fin_inf in CONTRA; eauto.
+            + eapply inf_fin_byte_allocated; eauto.
+              apply lift_MemState_refine_prop.
+        }
+
+        { (* Big pointer, shouldn't be allocated. *)
+          split; intros ALLOC.
+          - eapply inf_fin_byte_allocated_exists in ALLOC; eauto.
+            destruct ALLOC as (?&?&?).
+            rewrite CONV in H0; discriminate.
+          - eapply inf_fin_byte_allocated_exists in ALLOC; eauto.
+            destruct ALLOC as (?&?&?).
+            rewrite CONV in H0; discriminate.
+            apply lift_MemState_refine_prop.
         }
       }
     - eapply extend_read_byte_allowed_fin_inf; eauto.
