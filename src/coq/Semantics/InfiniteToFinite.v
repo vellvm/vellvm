@@ -8705,6 +8705,62 @@ Module InfiniteToFinite.
   Qed.
 
   (* TODO: Move this *)
+  Lemma dvalue_refine_strict_i1_r_inv :
+    forall v_inf x_fin,
+      DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_I1 x_fin) ->
+      exists x_inf,
+        v_inf = DVC1.DV1.DVALUE_I1 x_inf /\
+          LLVMParamsBigIntptr.Events.DV.unsigned x_inf = LLVMParams64BitIntptr.Events.DV.unsigned x_fin.
+  Proof.
+    intros v_inf x_fin REF.
+    rewrite DVC1.dvalue_refine_strict_equation in REF.
+    apply dvalue_convert_strict_i1_inv in REF.
+    exists x_fin; tauto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma dvalue_refine_strict_i8_r_inv :
+    forall v_inf x_fin,
+      DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_I8 x_fin) ->
+      exists x_inf,
+        v_inf = DVC1.DV1.DVALUE_I8 x_inf /\
+          LLVMParamsBigIntptr.Events.DV.unsigned x_inf = LLVMParams64BitIntptr.Events.DV.unsigned x_fin.
+  Proof.
+    intros v_inf x_fin REF.
+    rewrite DVC1.dvalue_refine_strict_equation in REF.
+    apply dvalue_convert_strict_i8_inv in REF.
+    exists x_fin; tauto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma dvalue_refine_strict_i32_r_inv :
+    forall v_inf x_fin,
+      DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_I32 x_fin) ->
+      exists x_inf,
+        v_inf = DVC1.DV1.DVALUE_I32 x_inf /\
+          LLVMParamsBigIntptr.Events.DV.unsigned x_inf = LLVMParams64BitIntptr.Events.DV.unsigned x_fin.
+  Proof.
+    intros v_inf x_fin REF.
+    rewrite DVC1.dvalue_refine_strict_equation in REF.
+    apply dvalue_convert_strict_i32_inv in REF.
+    exists x_fin; tauto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma dvalue_refine_strict_i64_r_inv :
+    forall v_inf x_fin,
+      DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_I64 x_fin) ->
+      exists x_inf,
+        v_inf = DVC1.DV1.DVALUE_I64 x_inf /\
+          LLVMParamsBigIntptr.Events.DV.unsigned x_inf = LLVMParams64BitIntptr.Events.DV.unsigned x_fin.
+  Proof.
+    intros v_inf x_fin REF.
+    rewrite DVC1.dvalue_refine_strict_equation in REF.
+    apply dvalue_convert_strict_i64_inv in REF.
+    exists x_fin; tauto.
+  Qed.
+
+  (* TODO: Move this *)
   Lemma dvalue_refine_strict_iptr_r_inv :
     forall v_inf x_fin,
       DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_IPTR x_fin) ->
@@ -8810,19 +8866,219 @@ Module InfiniteToFinite.
     repeat (break_match_hyp; try contradiction).
 
     { (* I1 *)
-      admit.
+      inv ARGS.
+      inv H3.
+      rename x0 into x_inf.
+      rename x into x_fin.
+
+      apply dvalue_refine_strict_i1_r_inv in H2 as (?&?&?); subst.
+
+      eapply MemPropT_fin_inf_bind.
+      4: apply HANDLE.
+      all: eauto.
+
+      { (* MA: fresh_sid *)
+        intros a_fin ms_fin_ma FRESH.
+        eapply fresh_sid_fin_inf; eauto.
+      }
+
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID HANDLE'.
+      cbn in SID; subst.
+
+      eapply MemPropT_fin_inf_bind.
+      4: apply HANDLE'.
+      all: eauto.
+
+      { (* MA: generate_num_undef_bytes *)
+        intros a_fin0 ms_fin_ma GEN.
+        red in GEN.
+        break_match_hyp; inv GEN.
+        rename Heqo into GEN.
+        eapply generate_num_undef_bytes_fin_inf in GEN as (bytes_inf&GEN&BYTES_REF).
+        exists bytes_inf. exists ms_inf.
+        split; eauto.
+        red.
+        rewrite H0.
+        rewrite GEN.
+        cbn.
+        auto.
+      }
+
+      intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf b_fin0 BYTES_REF MSR_GEN HANDLE''.
+      eapply MemPropT_fin_inf_bind.
+      4: apply HANDLE''.
+      all: eauto.
+
+      { (* MA: fresh_provenance *)
+        intros a_fin1 ms_fin_ma FRESH_PR.
+        eapply fresh_provenance_fin_inf; eauto.
+      }
+
+      intros ms_inf1 ms_fin1 ms_fin'1 a_fin1 a_inf0 b_fin1 PR MSR_PR HANDLE'''.
+      cbn in PR; subst.
+      eapply malloc_bytes_with_pr_spec_MemPropT_fin_inf; eauto.
     }
 
     { (* I8 *)
-      admit.
+      inv ARGS.
+      inv H3.
+      rename x0 into x_inf.
+      rename x into x_fin.
+
+      apply dvalue_refine_strict_i8_r_inv in H2 as (?&?&?); subst.
+
+      eapply MemPropT_fin_inf_bind.
+      4: apply HANDLE.
+      all: eauto.
+
+      { (* MA: fresh_sid *)
+        intros a_fin ms_fin_ma FRESH.
+        eapply fresh_sid_fin_inf; eauto.
+      }
+
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID HANDLE'.
+      cbn in SID; subst.
+
+      eapply MemPropT_fin_inf_bind.
+      4: apply HANDLE'.
+      all: eauto.
+
+      { (* MA: generate_num_undef_bytes *)
+        intros a_fin0 ms_fin_ma GEN.
+        red in GEN.
+        break_match_hyp; inv GEN.
+        rename Heqo into GEN.
+        eapply generate_num_undef_bytes_fin_inf in GEN as (bytes_inf&GEN&BYTES_REF).
+        exists bytes_inf. exists ms_inf.
+        split; eauto.
+        red.
+        rewrite H0.
+        rewrite GEN.
+        cbn.
+        auto.
+      }
+
+      intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf b_fin0 BYTES_REF MSR_GEN HANDLE''.
+      eapply MemPropT_fin_inf_bind.
+      4: apply HANDLE''.
+      all: eauto.
+
+      { (* MA: fresh_provenance *)
+        intros a_fin1 ms_fin_ma FRESH_PR.
+        eapply fresh_provenance_fin_inf; eauto.
+      }
+
+      intros ms_inf1 ms_fin1 ms_fin'1 a_fin1 a_inf0 b_fin1 PR MSR_PR HANDLE'''.
+      cbn in PR; subst.
+      eapply malloc_bytes_with_pr_spec_MemPropT_fin_inf; eauto.
     }
 
     { (* I32 *)
-      admit.
+      inv ARGS.
+      inv H3.
+      rename x0 into x_inf.
+      rename x into x_fin.
+
+      apply dvalue_refine_strict_i32_r_inv in H2 as (?&?&?); subst.
+
+      eapply MemPropT_fin_inf_bind.
+      4: apply HANDLE.
+      all: eauto.
+
+      { (* MA: fresh_sid *)
+        intros a_fin ms_fin_ma FRESH.
+        eapply fresh_sid_fin_inf; eauto.
+      }
+
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID HANDLE'.
+      cbn in SID; subst.
+
+      eapply MemPropT_fin_inf_bind.
+      4: apply HANDLE'.
+      all: eauto.
+
+      { (* MA: generate_num_undef_bytes *)
+        intros a_fin0 ms_fin_ma GEN.
+        red in GEN.
+        break_match_hyp; inv GEN.
+        rename Heqo into GEN.
+        eapply generate_num_undef_bytes_fin_inf in GEN as (bytes_inf&GEN&BYTES_REF).
+        exists bytes_inf. exists ms_inf.
+        split; eauto.
+        red.
+        rewrite H0.
+        rewrite GEN.
+        cbn.
+        auto.
+      }
+
+      intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf b_fin0 BYTES_REF MSR_GEN HANDLE''.
+      eapply MemPropT_fin_inf_bind.
+      4: apply HANDLE''.
+      all: eauto.
+
+      { (* MA: fresh_provenance *)
+        intros a_fin1 ms_fin_ma FRESH_PR.
+        eapply fresh_provenance_fin_inf; eauto.
+      }
+
+      intros ms_inf1 ms_fin1 ms_fin'1 a_fin1 a_inf0 b_fin1 PR MSR_PR HANDLE'''.
+      cbn in PR; subst.
+      eapply malloc_bytes_with_pr_spec_MemPropT_fin_inf; eauto.
     }
 
     { (* I64 *)
-      admit.
+      inv ARGS.
+      inv H3.
+      rename x0 into x_inf.
+      rename x into x_fin.
+
+      apply dvalue_refine_strict_i64_r_inv in H2 as (?&?&?); subst.
+
+      eapply MemPropT_fin_inf_bind.
+      4: apply HANDLE.
+      all: eauto.
+
+      { (* MA: fresh_sid *)
+        intros a_fin ms_fin_ma FRESH.
+        eapply fresh_sid_fin_inf; eauto.
+      }
+
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID HANDLE'.
+      cbn in SID; subst.
+
+      eapply MemPropT_fin_inf_bind.
+      4: apply HANDLE'.
+      all: eauto.
+
+      { (* MA: generate_num_undef_bytes *)
+        intros a_fin0 ms_fin_ma GEN.
+        red in GEN.
+        break_match_hyp; inv GEN.
+        rename Heqo into GEN.
+        eapply generate_num_undef_bytes_fin_inf in GEN as (bytes_inf&GEN&BYTES_REF).
+        exists bytes_inf. exists ms_inf.
+        split; eauto.
+        red.
+        rewrite H0.
+        rewrite GEN.
+        cbn.
+        auto.
+      }
+
+      intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf b_fin0 BYTES_REF MSR_GEN HANDLE''.
+      eapply MemPropT_fin_inf_bind.
+      4: apply HANDLE''.
+      all: eauto.
+
+      { (* MA: fresh_provenance *)
+        intros a_fin1 ms_fin_ma FRESH_PR.
+        eapply fresh_provenance_fin_inf; eauto.
+      }
+
+      intros ms_inf1 ms_fin1 ms_fin'1 a_fin1 a_inf0 b_fin1 PR MSR_PR HANDLE'''.
+      cbn in PR; subst.
+      eapply malloc_bytes_with_pr_spec_MemPropT_fin_inf; eauto.
     }
 
     { (* IPTR *)
