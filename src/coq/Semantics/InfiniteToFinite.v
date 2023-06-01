@@ -8714,6 +8714,39 @@ Module InfiniteToFinite.
     eauto.
   Qed.
 
+  Lemma ptr_in_memstate_heap_inf_fin_exists :
+    forall {ms_inf ms_fin root_inf root_fin ptr_inf},
+      MemState_refine_prop ms_inf ms_fin ->
+      addr_refine root_inf root_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.ptr_in_memstate_heap ms_inf root_inf ptr_inf ->
+      exists ptr_fin,
+        addr_refine ptr_inf ptr_fin /\
+        Memory64BitIntptr.MMEP.MemSpec.ptr_in_memstate_heap ms_fin root_fin ptr_fin.
+  Proof.
+    intros ms_inf ms_fin root_inf root_fin ptr_inf MSR ROOT_REF IN_HEAP.
+    destruct ms_inf; destruct ms_memory_stack.
+    destruct ms_fin; destruct ms_memory_stack.
+    apply MemState_refine_prop_heap_preserved in MSR.
+    red in MSR; red in IN_HEAP.
+    cbn in *.
+    unfold Memory64BitIntptr.MMEP.MemSpec.ptr_in_memstate_heap, InfMem.MMEP.MMSP.memory_stack_heap_prop, Memory64BitIntptr.MMEP.MMSP.memory_stack_heap_prop in *; cbn in *.
+
+    specialize (MSR memory_stack_heap).
+    destruct MSR as [MSR _].
+    forward MSR; [reflexivity|].
+
+    specialize (IN_HEAP (lift_Heap memory_stack_heap0)).
+    forward IN_HEAP; [symmetry; auto|].
+
+    (* TODO: Probably could split some of this into a separate lemma *)
+    pose proof (ptr_in_heap_prop_lift_inv IN_HEAP ROOT_REF) as (?&?&?).
+    exists x.
+    split; auto.
+    intros h H1.
+    rewrite <- H1.
+    apply H0.
+  Qed.
+
   Lemma extend_heap_fin_inf :
     forall {ms_inf_start ms_fin_start ms_inf_final ms_fin_final addrs_fin addrs_inf},
       MemState_refine_prop ms_inf_start ms_fin_start ->
@@ -9319,24 +9352,16 @@ Module InfiniteToFinite.
 
         { (* Big pointer, shouldn't be allocated. *)
           exfalso.
-          eapply inf_fin_big_address_byte_not_allocated; eauto.
-          eapply MemState_refine_prop_allocations_preserved; eauto.
-          eapply fin_inf_byte_allocated.
-          apply lift_MemState_refine_prop.
-
-          pose proof MemState_refine_prop_allocations_preserved MSR as PRESERVED.
-
-          eapply
-          eapply fin_inf_byte_allocated; eauto.
-
-          3: eauto.
-          all: eauto.
+          eapply ptr_in_memstate_heap_inf_fin_exists in H; eauto.
+          destruct H as (?&?&?).
+          apply free_block_allocated in H0.
+          destruct H0 as (?&?).
+          epose proof fin_inf_byte_allocated_exists _ _ _ _ MSR H0 as (?&?&?).
+          red in H.
+          rewrite CONV in H.
+          discriminate.
         }
       }
-
-
-      eapply ptr_in_memstate_heap_inf_fin in H; eauto.
-      eapply fin_inf_byte_allocated in H; eauto.
     - eapply extend_read_byte_allowed_fin_inf; eauto.
       apply lift_MemState_refine_prop.
     - eapply extend_reads_fin_inf; eauto.
