@@ -8581,6 +8581,57 @@ Module InfiniteToFinite.
     tauto.
   Qed.
 
+  Lemma root_in_heap_prop_lifted_fin_inf :
+    forall {h_fin ptr_inf ptr_fin},
+      addr_refine ptr_inf ptr_fin ->
+      Memory64BitIntptr.MMEP.MMSP.root_in_heap_prop h_fin ptr_fin ->
+      MemoryBigIntptr.MMEP.MMSP.root_in_heap_prop (lift_Heap h_fin) ptr_inf.
+  Proof.
+    intros h_fin ptr_inf ptr_fin ADDR_REF ROOT.
+    red; red in ROOT.
+    unfold lift_Heap.
+    rewrite IntMaps.IP.F.map_b.
+    erewrite <- fin_inf_ptoi; eauto.
+  Qed.
+
+  Lemma root_in_heap_prop_lifted_fin_inf_transitive :
+    forall {h_fin h_inf ptr_inf ptr_fin},
+      InfMem.MMEP.MMSP.heap_eqv h_inf (lift_Heap h_fin) ->
+      addr_refine ptr_inf ptr_fin ->
+      Memory64BitIntptr.MMEP.MMSP.root_in_heap_prop h_fin ptr_fin ->
+      MemoryBigIntptr.MMEP.MMSP.root_in_heap_prop h_inf ptr_inf.
+  Proof.
+    intros h_fin h_inf ptr_inf ptr_fin EQV ADDR_REF ROOT.
+    rewrite EQV.
+    eapply root_in_heap_prop_lifted_fin_inf; eauto.
+  Qed.
+
+  Lemma root_in_memstate_heap_fin_inf :
+    forall {ms_inf ms_fin ptr_inf ptr_fin},
+      MemState_refine_prop ms_inf ms_fin ->
+      addr_refine ptr_inf ptr_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.root_in_memstate_heap ms_fin ptr_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.root_in_memstate_heap ms_inf ptr_inf.
+  Proof.
+    intros ms_inf ms_fin ptr_inf ptr_fin MSR ADDR_REF ROOT.
+    destruct ms_inf; destruct ms_memory_stack.
+    destruct ms_fin; destruct ms_memory_stack.
+    apply MemState_refine_prop_heap_preserved in MSR.
+    red; red in MSR; red in ROOT.
+    cbn in *.
+    unfold InfMem.MMEP.MMSP.memory_stack_heap_prop, Memory64BitIntptr.MMEP.MMSP.memory_stack_heap_prop in *; cbn in *.
+
+    intros h H.
+    eapply root_in_heap_prop_lifted_fin_inf_transitive; eauto.
+    2: {
+      eapply ROOT.
+      reflexivity.
+    }
+
+    apply MSR in H.
+    symmetry; auto.
+  Qed.
+
   Lemma extend_heap_fin_inf :
     forall {ms_inf_start ms_fin_start ms_inf_final ms_fin_final addrs_fin addrs_inf},
       MemState_refine_prop ms_inf_start ms_fin_start ->
@@ -9138,8 +9189,87 @@ Module InfiniteToFinite.
       cbn in PR; subst.
       eapply malloc_bytes_with_pr_spec_MemPropT_fin_inf; eauto.
     }
+  Qed.
+
+  Lemma dvalue_refine_strict_addr_r_inv:
+  forall (v_inf : DVC1.DV1.dvalue) ptr_fin,
+  DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_Addr ptr_fin) ->
+  exists ptr_inf,
+    v_inf = DVC1.DV1.DVALUE_Addr ptr_inf /\
+      addr_refine ptr_inf ptr_fin.
+  Proof.
+    intros v_inf ptr_fin REF.
+    rewrite DVC1.dvalue_refine_strict_equation in REF.
+    apply dvalue_convert_strict_addr_inv in REF.
+    destruct REF as (?&?&?).
+    exists x; tauto.
+  Qed.
+
+  Lemma handle_free_spec_fin_inf :
+    forall {ms_fin_start ms_fin_final ms_inf_start ptr_fin ptr_inf},
+      MemState_refine_prop ms_inf_start ms_fin_start ->
+      addr_refine ptr_inf ptr_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.free_spec ms_fin_start ptr_fin ms_fin_final ->
+      exists (ms_inf_final : MemoryBigIntptr.MMEP.MMSP.MemState),
+        MemoryBigIntptr.MMEP.MemSpec.free_spec ms_inf_start ptr_inf ms_inf_final /\
+          MemState_refine_prop ms_inf_final ms_fin_final.
+  Proof.
+    intros ms_fin_start ms_fin_final ms_inf_start ptr_fin ptr_inf MSR PTR_REF FREE.
+    destruct FREE.
+
+    exists (lift_MemState ms_fin_final).
+
+    split.
+    2: apply lift_MemState_refine_prop.
+
+    split.
+    - eapply root_in_memstate_heap_fin_inf; eauto.
+    - eapply fin_inf_preserve_allocation_ids in H; eauto.
+      apply lift_MemState_refine_prop.
+    - eapply extend_allocations_fin_inf; eauto.
+      apply lift_MemState_refine_prop.
+    - eapply extend_read_byte_allowed_fin_inf; eauto.
+      apply lift_MemState_refine_prop.
+    - eapply extend_reads_fin_inf; eauto.
+      apply lift_MemState_refine_prop.
+    - eapply extend_write_byte_allowed_fin_inf; eauto.
+      apply lift_MemState_refine_prop.
+    - eapply extend_free_byte_allowed_fin_inf; eauto.
+      apply lift_MemState_refine_prop.
+    - eapply fin_inf_frame_stack_preserved; eauto.
+      apply lift_MemState_refine_prop.
+    - admit.
+
+    - 
     
-  Admitted.
+  Qed.
+
+  Lemma handle_free_fin_inf :
+    forall {ms_fin_start ms_fin_final ms_inf_start res_fin args_fin args_inf},
+      MemState_refine_prop ms_inf_start ms_fin_start ->
+      Forall2 DVC1.dvalue_refine_strict args_inf args_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.handle_free_prop args_fin ms_fin_start (ret (ms_fin_final, res_fin)) ->
+      exists res_inf ms_inf_final,
+        MemoryBigIntptr.MMEP.MemSpec.handle_free_prop args_inf ms_inf_start (ret (ms_inf_final, res_inf)) /\
+          res_inf = res_fin /\
+          MemState_refine_prop ms_inf_final ms_fin_final.
+  Proof.
+    intros ms_fin_start ms_fin_final ms_inf_start res_fin args_fin args_inf MSR ARGS HANDLE.
+    red in HANDLE.
+    destruct args_fin; try contradiction; inv ARGS.
+    destruct d; try contradiction.
+    destruct args_fin; try contradiction.
+    inv H3.
+    rename H2 into ADDR.
+    rename x into inf_addr.
+    rename a into ptr_fin.
+
+    apply dvalue_refine_strict_addr_r_inv in ADDR as (ptr_inf&PTR&PTR_REF);
+      subst.
+    cbn in *.
+
+    
+  Qed.
 
   (* TODO: Lemma about lifting intrinsic handlers *)
   (* TODO: Move this *)
