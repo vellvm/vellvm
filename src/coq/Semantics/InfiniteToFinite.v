@@ -118,6 +118,9 @@ Module InfiniteToFinite.
   Import DVCS.
 
   (* TODO: Should we move this? *)
+  Definition addr_refine addr_inf addr_fin := InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin.
+
+  (* TODO: Should we move this? *)
   Definition fin_to_inf_addr (a : FinAddr.addr) : InfAddr.addr.
     pose proof FinToInfAddrConvertSafe.addr_convert_succeeds a as [a' CONV].
     apply a'.
@@ -4131,7 +4134,7 @@ Module InfiniteToFinite.
   (* Qed. *)
 
   Lemma fin_inf_read_byte_prop :
-    forall addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin,
+    forall {addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin},
       MemState_refine_prop ms_inf ms_fin ->
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
       sbyte_refine byte_inf byte_fin ->
@@ -4144,7 +4147,7 @@ Module InfiniteToFinite.
   Qed.
 
   Lemma inf_fin_read_byte_prop :
-    forall addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin,
+    forall {addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin},
       MemState_refine_prop ms_inf ms_fin ->
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
       sbyte_refine byte_inf byte_fin ->
@@ -4157,7 +4160,7 @@ Module InfiniteToFinite.
   Qed.
 
   Lemma fin_inf_read_byte_spec :
-    forall addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin,
+    forall {addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin},
       MemState_refine_prop ms_inf ms_fin ->
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
       sbyte_refine byte_inf byte_fin ->
@@ -4166,6 +4169,30 @@ Module InfiniteToFinite.
   Proof.
     intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF READ_SPEC.
     destruct READ_SPEC.
+    split.
+    - eapply fin_inf_read_byte_allowed; eauto.
+    - eapply fin_inf_read_byte_prop; eauto.
+  Qed.
+
+  Lemma fin_inf_read_byte_spec_exists :
+    forall {addr_fin ms_fin ms_inf byte_fin},
+      MemState_refine_prop ms_inf ms_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.read_byte_spec ms_fin addr_fin byte_fin ->
+      exists addr_inf byte_inf,
+        MemoryBigIntptr.MMEP.MemSpec.read_byte_spec ms_inf addr_inf byte_inf /\
+          addr_refine addr_inf addr_fin /\
+          sbyte_refine byte_inf byte_fin.
+  Proof.
+    intros addr_fin ms_fin ms_inf byte_fin MSR READ_SPEC.
+    destruct READ_SPEC.
+    exists (fin_to_inf_addr addr_fin).
+    exists (lift_SByte byte_fin).
+
+    pose proof (addr_convert_fin_to_inf_addr addr_fin).
+    pose proof (sbyte_refine_lifted byte_fin).
+
+    split; auto.
+
     split.
     - eapply fin_inf_read_byte_allowed; eauto.
     - eapply fin_inf_read_byte_prop; eauto.
@@ -4203,7 +4230,7 @@ Module InfiniteToFinite.
     repeat red in READ_SPEC.
     destruct READ_SPEC; subst.
 
-    epose proof fin_inf_read_byte_spec _ _ _ _ _ _ MSR ADDR_CONV _ H0.
+    epose proof fin_inf_read_byte_spec MSR ADDR_CONV _ H0.
     do 2 eexists; split.
     repeat red.
     split; eauto.
@@ -4881,6 +4908,92 @@ Module InfiniteToFinite.
   Qed.
 
   (* TODO: Move this *)
+  Lemma inf_fin_read_byte_prop_exists :
+    forall {ptr_inf byte_inf ms_inf ms_fin},
+      MemState_refine_prop ms_inf ms_fin ->
+      InfMem.MMEP.MemSpec.read_byte_prop ms_inf ptr_inf byte_inf ->
+      exists ptr_fin byte_fin,
+        FinMem.MMEP.MemSpec.read_byte_prop ms_fin ptr_fin byte_fin /\
+          addr_refine ptr_inf ptr_fin /\
+          sbyte_refine byte_inf byte_fin.
+  Proof.
+    intros ptr_inf byte_inf ms_inf ms_fin MSR RBP.
+  Admitted.
+
+  Lemma inf_fin_read_byte_spec_exists :
+    forall {ms_inf ms_fin ptr_inf byte_inf},
+      MemState_refine_prop ms_inf ms_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.read_byte_spec ms_inf ptr_inf byte_inf ->
+      exists ptr_fin byte_fin,
+        Memory64BitIntptr.MMEP.MemSpec.read_byte_spec ms_fin ptr_fin byte_fin /\
+          sbyte_refine byte_inf byte_fin /\
+          addr_refine ptr_inf ptr_fin.
+  Proof.
+    intros ms_inf ms_fin ptr_inf byte_inf MEM_REF RBS.
+    pose proof read_byte_spec_read_byte_raw RBS as [aid [READ_RAW_INF ALLOWED]].
+
+    cbn in READ_RAW_INF.
+
+    pose proof RBS.
+    destruct H.
+    epose proof inf_fin_read_byte_prop_exists MEM_REF read_byte_value as (ptr_fin&byte_fin&RBP_FIN&ADDR_REF&BYTE_REF).
+    exists ptr_fin. exists byte_fin.
+    split; auto.
+
+    epose proof inf_fin_read_byte_raw MEM_REF READ_RAW_INF as [byte_fin' [READ_BYTE_RAW_FIN BYTE_REF']].
+
+    assert (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr_fin = LLVMParamsBigIntptr.PTOI.ptr_to_int ptr_inf) as PTR.
+    { eapply fin_inf_ptoi; eauto.
+    }
+
+    { (* Read byte spec *)
+      split.
+      - red.
+        exists aid.
+        split.
+        + cbn. eexists. exists true.
+          split; auto.
+          cbn.
+          red.
+          split.
+          2: {
+            intros ms' x H.
+            cbn in *.
+            inv H.
+            cbn.
+            auto.
+          }
+
+          cbn.
+          exists (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin).
+          exists (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin).
+          split; auto.
+
+          rewrite PTR.
+          rewrite memory_stack_memory_mem_state_memory_fin.
+          rewrite READ_BYTE_RAW_FIN.
+          split; auto.
+          apply LLVMParams64BitIntptr.PROV.aid_eq_dec_refl.
+        + eapply inf_fin_access_allowed; eauto.
+      - repeat red.
+        do 2 eexists.
+        split; [split; auto|].
+        cbn.
+
+        rewrite PTR.
+        rewrite memory_stack_memory_mem_state_memory_fin.
+        rewrite READ_BYTE_RAW_FIN.
+        cbn.
+        erewrite inf_fin_access_allowed; eauto; cbn.
+        split; auto.
+
+        unfold sbyte_refine in *.
+        rewrite BYTE_REF in BYTE_REF'.
+        inv BYTE_REF'; auto.
+    }
+  Qed.
+
+  (* TODO: Move this *)
   (* TODO: Ask about in meeting? *)
   (* TODO: This may not currently be true
      because of how lift_memory works...
@@ -5024,7 +5137,7 @@ Module InfiniteToFinite.
 
           pose proof inf_fin_read_byte_spec REF CONVPTR READ as [byte_fin' [READ_FIN BYTE_REF']].
           apply old_lu in READ_FIN.
-          epose proof fin_inf_read_byte_spec _ _ _ _ _ _ REF' CONVPTR _ READ_FIN; eauto.
+          epose proof fin_inf_read_byte_spec REF' CONVPTR _ READ_FIN; eauto.
         }
 
         destruct READ.
@@ -5077,7 +5190,7 @@ Module InfiniteToFinite.
 
           pose proof inf_fin_read_byte_spec REF' CONVPTR READ as [byte_fin' [READ_FIN BYTE_REF']].
           apply old_lu in READ_FIN.
-          epose proof fin_inf_read_byte_spec _ _ _ _ _ _ REF CONVPTR _ READ_FIN; eauto.
+          epose proof fin_inf_read_byte_spec REF CONVPTR _ READ_FIN; eauto.
         }
 
         destruct READ.
@@ -7306,9 +7419,6 @@ Module InfiniteToFinite.
     auto.
   Qed.
 
-  (* TODO: Move this and use it elsewhere *)
-  Definition addr_refine addr_inf addr_fin := InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin.
-
   (* TODO: Factor out lemma about fresh_sid *)
   Lemma fresh_sid_fin_inf :
     forall (ms_inf : MemoryBigIntptr.MMEP.MMSP.MemState)
@@ -7371,19 +7481,6 @@ Module InfiniteToFinite.
           cbn in *.
           red; red in USED.
           destruct USED as [ptr [byte [READ BYTE]]].
-
-          (* TODO: Move this *)
-          Lemma inf_fin_read_byte_prop_exists :
-            forall {ptr_inf byte_inf ms_inf ms_fin},
-              MemState_refine_prop ms_inf ms_fin ->
-              InfMem.MMEP.MemSpec.read_byte_prop ms_inf ptr_inf byte_inf ->
-              exists ptr_fin byte_fin,
-                FinMem.MMEP.MemSpec.read_byte_prop ms_fin ptr_fin byte_fin /\
-                  addr_refine ptr_inf ptr_fin /\
-                  sbyte_refine byte_inf byte_fin.
-          Proof.
-            intros ptr_inf byte_inf ms_inf ms_fin MSR RBP.
-          Admitted.
 
           pose proof inf_fin_read_byte_prop_exists MSR READ as (ptr_fin&byte_fin&READ_FIN&BYTE_REFINE).
           exists ptr_fin. exists byte_fin.
@@ -9454,6 +9551,41 @@ Module InfiniteToFinite.
           - eapply inf_fin_byte_allocated_exists in ALLOC; eauto.
             destruct ALLOC as (?&?&?).
             rewrite CONV in H0; discriminate.
+            apply lift_MemState_refine_prop.
+        }
+      }
+    - intros ptr byte H.
+      { destruct (InfToFinAddrConvert.addr_convert ptr) eqn:CONV.
+        { (* ptr in finite range *)
+          split; intros RBS.
+          - pose proof inf_fin_read_byte_spec MSR CONV RBS as (byte_fin&RBS_FIN&BYTE_REF).
+            eapply free_non_frame_bytes_read in RBS_FIN.
+            2: {
+              intros CONTRA.
+              eapply ptr_in_memstate_heap_fin_inf in CONTRA; eauto.
+            }
+            eapply fin_inf_read_byte_spec; eauto.
+            apply lift_MemState_refine_prop.
+          - pose proof (lift_MemState_refine_prop ms_fin_final) as MSR'.
+            epose proof inf_fin_read_byte_spec MSR' CONV RBS as (byte_fin&RBS_FIN&BYTE_REF).
+            eapply free_non_frame_bytes_read in RBS_FIN.
+            2: {
+              intros CONTRA.
+              eapply ptr_in_memstate_heap_fin_inf in CONTRA; eauto.
+            }
+            eapply fin_inf_read_byte_spec; eauto.
+        }
+
+        { (* Big pointer, shouldn't be allocated. *)
+          split; intros ALLOC.
+          - eapply inf_fin_read_byte_spec_exists in ALLOC; eauto.
+            destruct ALLOC as (?&?&?&?&?).
+            red in H2.
+            rewrite CONV in H2; discriminate.
+          - eapply inf_fin_read_byte_spec_exists in ALLOC; eauto.
+            destruct ALLOC as (?&?&?&?&?).
+            red in H2.
+            rewrite CONV in H2; discriminate.
             apply lift_MemState_refine_prop.
         }
       }
