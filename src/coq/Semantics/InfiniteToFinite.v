@@ -2090,6 +2090,114 @@ Module InfiniteToFinite.
     auto.
   Qed.
 
+  Lemma dvalue_convert_strict_double_inv :
+    forall x v,
+      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_Double v) ->
+      x = DVCInfFin.DV1.DVALUE_Double v.
+  Proof.
+    intros x n H.
+    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    subst.
+    auto.
+  Qed.
+
+  Lemma dvalue_convert_strict_float_inv :
+    forall x v,
+      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_Float v) ->
+      x = DVCInfFin.DV1.DVALUE_Float v.
+  Proof.
+    intros x n H.
+    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    subst.
+    auto.
+  Qed.
+
+  Lemma dvalue_convert_strict_poison_inv :
+    forall x v,
+      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_Poison v) ->
+      x = DVCInfFin.DV1.DVALUE_Poison v.
+  Proof.
+    intros x n H.
+    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    subst.
+    auto.
+  Qed.
+
+  Lemma dvalue_convert_strict_oom_inv :
+    forall x v,
+      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_Oom v) ->
+      x = DVCInfFin.DV1.DVALUE_Oom v.
+  Proof.
+    intros x n H.
+    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    subst.
+    auto.
+  Qed.
+
+  Lemma dvalue_convert_strict_none_inv :
+    forall x,
+      DVCInfFin.dvalue_convert_strict x = NoOom DVCInfFin.DV2.DVALUE_None ->
+      x = DVCInfFin.DV1.DVALUE_None.
+  Proof.
+    intros x H.
+    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    subst.
+    auto.
+  Qed.
+
+  Lemma dvalue_convert_strict_struct_inv :
+    forall x fields,
+      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_Struct fields) ->
+      exists fields', x = DVCInfFin.DV1.DVALUE_Struct fields'.
+  Proof.
+    intros x fields H.
+    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    break_match_hyp; inv H1.
+    exists fields0. reflexivity.
+  Qed.
+
+  Lemma dvalue_convert_strict_packed_struct_inv :
+    forall x fields,
+      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_Packed_struct fields) ->
+      exists fields', x = DVCInfFin.DV1.DVALUE_Packed_struct fields'.
+  Proof.
+    intros x fields H.
+    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    break_match_hyp; inv H1.
+    exists fields0. reflexivity.
+  Qed.
+
+  Lemma dvalue_convert_strict_array_inv :
+    forall x elts,
+      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_Array elts) ->
+      exists elts', x = DVCInfFin.DV1.DVALUE_Array elts'.
+  Proof.
+    intros x elts H.
+    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    break_match_hyp; inv H1.
+    exists elts0. reflexivity.
+  Qed.
+
+  Lemma dvalue_convert_strict_vector_inv :
+    forall x elts,
+      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_Vector elts) ->
+      exists elts', x = DVCInfFin.DV1.DVALUE_Vector elts'.
+  Proof.
+    intros x elts H.
+    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    break_match_hyp; inv H1.
+    exists elts0. reflexivity.
+  Qed.
+
   Lemma fin_inf_no_overlap :
     forall a1 sz1 a2 sz2 a1' a2',
       InfToFinAddrConvert.addr_convert a1' = NoOom a1 ->
@@ -9844,7 +9952,7 @@ Module InfiniteToFinite.
     destruct res_fin.
     exists tt.
     destruct H as (ms_inf_final&?&?).
-    exists ms_inf_final; auto.    
+    exists ms_inf_final; auto.
   Qed.
 
   (* TODO: Lemma about lifting intrinsic handlers *)
@@ -9938,6 +10046,88 @@ Module InfiniteToFinite.
     (* Unknown intrinsic *)
     cbn in *; auto.
     contradiction.
+  Qed.
+
+  (* TODO: Prove this *)
+  Lemma serialize_sbytes_fin_inf :
+    forall {ms_fin_start ms_fin_final ms_inf_start uv_fin uv_inf t bytes_fin},
+      MemState_refine_prop ms_inf_start ms_fin_start ->
+      DVC1.uvalue_refine_strict uv_inf uv_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv_fin t ms_fin_start
+        (ret (ms_fin_final, bytes_fin)) ->
+      exists
+        (bytes_inf : list MemoryBigIntptr.MP.BYTE_IMPL.SByte) (ms_inf_final : MemoryBigIntptr.MMEP.MMSP.MemState),
+        MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) uv_inf t ms_inf_start
+          (ret (ms_inf_final, bytes_inf)) /\
+          sbytes_refine bytes_inf bytes_fin /\
+          MemState_refine_prop ms_inf_final ms_fin_final.
+  Proof.
+    intros ms_fin_start ms_fin_final ms_inf_start uv_fin uv_inf t bytes_fin MSR UV_REF SERIALIZE.
+  Admitted.
+
+  Lemma handle_store_fin_inf :
+    forall {t addr_fin addr_inf uv_fin uv_inf ms_fin_start ms_fin_final ms_inf_start res_fin},
+      MemState_refine_prop ms_inf_start ms_fin_start ->
+      DVC1.dvalue_refine_strict addr_inf addr_fin ->
+      DVC1.uvalue_refine_strict uv_inf uv_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.handle_memory_prop unit
+        (LLVMParams64BitIntptr.Events.Store t addr_fin uv_fin) ms_fin_start (ret (ms_fin_final, res_fin)) ->
+      exists res_inf ms_inf_final,
+        MemoryBigIntptr.MMEP.MemSpec.handle_memory_prop unit
+          (LLVMParamsBigIntptr.Events.Store t addr_inf uv_inf) ms_inf_start (ret (ms_inf_final, res_inf)) /\
+          res_inf = res_fin /\
+          MemState_refine_prop ms_inf_final ms_fin_final.
+  Proof.
+    intros t addr_fin addr_inf uv_fin uv_inf ms_fin_start ms_fin_final ms_inf_start res_fin MSR ADDR_REF VALUE_REF HANDLE.
+
+    red in HANDLE.
+    induction addr_fin;
+      try
+        solve
+        [ rewrite DVC1.dvalue_refine_strict_equation in ADDR_REF;
+          first
+            [ apply dvalue_convert_strict_i1_inv in ADDR_REF
+            | apply dvalue_convert_strict_i8_inv in ADDR_REF
+            | apply dvalue_convert_strict_i32_inv in ADDR_REF
+            | apply dvalue_convert_strict_i64_inv in ADDR_REF
+            | apply dvalue_convert_strict_iptr_inv in ADDR_REF
+            | apply dvalue_convert_strict_addr_inv in ADDR_REF
+            | apply dvalue_convert_strict_double_inv in ADDR_REF
+            | apply dvalue_convert_strict_float_inv in ADDR_REF
+            | apply dvalue_convert_strict_poison_inv in ADDR_REF
+            | apply dvalue_convert_strict_oom_inv in ADDR_REF
+            | apply dvalue_convert_strict_none_inv in ADDR_REF
+            | apply dvalue_convert_strict_struct_inv in ADDR_REF
+            | apply dvalue_convert_strict_packed_struct_inv in ADDR_REF
+            | apply dvalue_convert_strict_array_inv in ADDR_REF
+            | apply dvalue_convert_strict_vector_inv in ADDR_REF
+            ];
+          first
+            [ destruct ADDR_REF as (?&?&?); subst
+            | inv ADDR_REF
+            ];
+
+          exists tt; destruct res_fin;
+          exists (lift_MemState ms_fin_final);
+          cbn; repeat (split; auto)
+        ].
+
+    (* Main successful portion of the lemma *)
+    unfold MemoryBigIntptr.MMEP.MemSpec.handle_memory_prop.
+    eapply dvalue_refine_strict_addr_r_inv in ADDR_REF as (ptr_inf&PTR_INF&PTR_REF).
+    subst.
+
+    eapply MemPropT_fin_inf_bind.
+    4: apply HANDLE.
+    all: eauto.
+
+    { (* MA: serialize_sbytes *)
+      intros a_fin ms_fin_ma SERIALIZE.
+      eapply serialize_sbytes_fin_inf; eauto.
+    }
+
+    intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin H H0 H1.
+    eapply fin_inf_write_bytes_spec; eauto.
   Qed.
 
   Lemma model_E1E2_23_orutt_strict :
@@ -10892,7 +11082,84 @@ Module InfiniteToFinite.
                     }
 
                     (* Handler succeeds *)
-                    admit.
+                    destruct H0 as [st' [ms_store [[] [TA STORE_HANDLER]]]].
+
+                    rewrite TA in VIS_HANDLED.
+                    cbn in VIS_HANDLED.
+                    rewrite bind_ret_l in VIS_HANDLED.
+                    destruct EV_REL as (?&?&?); subst.
+
+                    { epose proof handle_store_fin_inf (lift_MemState_refine_prop s2) H0 H1 STORE_HANDLER as ([]&ms_inf'&STORE_INF&_&MSR_STORE).
+
+                      eapply Interp_Memory_PropT_Vis with
+                        (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                                get_inf_tree (k2 (ms_store, (st', tt)))))
+                        (s1:=s1)
+                        (s2:=lift_MemState s2).
+
+                      2: {
+                        cbn. red. red.
+                        repeat right.
+                        exists s1.
+                        exists ms_inf'.
+                        exists tt.
+                        split; auto; reflexivity.
+                      }
+
+                      2: {
+                        cbn.
+                        rewrite bind_ret_l.
+                        rewrite VIS_HANDLED.
+                        reflexivity.
+                      }
+
+                      (* Continuation for vis node *)
+                      intros a1 b H H2 H3.
+                      destruct b as [ms [sid' res]].
+                      cbn in H1; subst.
+                      cbn in H2.
+                      apply Returns_ret_inv in H2.
+                      inv H0.
+                      cbn.
+                      destruct res.
+
+                      rewrite (itree_eta_ (k0 tt)).
+                      rewrite (itree_eta_ (k2 (ms_store, (st', tt)))).
+                      right.
+                      eapply CIH.
+                      2: {
+                        repeat red.
+                        specialize (HK tt (ms_store, (st', tt))).
+                        forward HK.
+                        { eapply ReturnsVis.
+                          unfold trigger.
+                          reflexivity.
+                          cbn.
+                          constructor.
+                          reflexivity.
+                        }
+                        forward HK.
+                        { rewrite TA.
+                          constructor.
+                          reflexivity.
+                        }
+
+                        forward HK; auto.
+                        pclearbot.
+
+                        repeat rewrite <- itree_eta.
+                        apply HK.
+                      }
+
+                      specialize (REL tt).
+                      red in REL.
+                      pclearbot.
+
+                      repeat rewrite <- itree_eta.
+                      rewrite REL.
+                      eapply K_RUTT.
+                      repeat (split; auto).
+                    }
                   }
 
                   { (* Pick *)
@@ -10921,7 +11188,7 @@ Module InfiniteToFinite.
                   eapply IHM1; eauto.
               - (* TauL *)
                 exfalso; eapply EQ; eauto.
-              - 
+              -
               - (* TauL *)
                 pclearbot.
                 apply orutt_inv_Vis_r in H.
