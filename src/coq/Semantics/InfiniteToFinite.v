@@ -10130,6 +10130,108 @@ Module InfiniteToFinite.
     eapply fin_inf_write_bytes_spec; eauto.
   Qed.
 
+  (* TODO: Prove this *)
+  Lemma deserialize_sbytes_fin_inf :
+    forall {bytes_fin bytes_inf t res_fin},
+      sbytes_refine bytes_inf bytes_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_fin t = inr res_fin ->
+      exists res_inf,
+        MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_inf t = inr res_inf /\
+          DVC1.uvalue_refine_strict res_inf res_fin.
+  Proof.
+  Admitted.
+
+  (* TODO: Prove this *)
+  Lemma deserialize_sbytes_fail_fin_inf :
+    forall {bytes_fin bytes_inf t s},
+      sbytes_refine bytes_inf bytes_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_fin t = inl s ->
+      MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_inf t = inl s.
+  Proof.
+  Admitted.
+
+  Lemma handle_load_fin_inf :
+    forall {t addr_fin addr_inf ms_fin_start ms_fin_final ms_inf_start res_fin},
+      MemState_refine_prop ms_inf_start ms_fin_start ->
+      DVC1.dvalue_refine_strict addr_inf addr_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.handle_memory_prop _
+        (LLVMParams64BitIntptr.Events.Load t addr_fin) ms_fin_start (ret (ms_fin_final, res_fin)) ->
+      exists res_inf ms_inf_final,
+        MemoryBigIntptr.MMEP.MemSpec.handle_memory_prop _
+          (LLVMParamsBigIntptr.Events.Load t addr_inf) ms_inf_start (ret (ms_inf_final, res_inf)) /\
+          DVC1.uvalue_refine_strict res_inf res_fin /\
+          MemState_refine_prop ms_inf_final ms_fin_final.
+  Proof.
+    intros t addr_fin addr_inf ms_fin_start ms_fin_final ms_inf_start res_fin MSR ADDR_REF HANDLE.
+
+    red in HANDLE.
+    induction addr_fin;
+      try
+        solve
+        [ rewrite DVC1.dvalue_refine_strict_equation in ADDR_REF;
+          first
+            [ apply dvalue_convert_strict_i1_inv in ADDR_REF
+            | apply dvalue_convert_strict_i8_inv in ADDR_REF
+            | apply dvalue_convert_strict_i32_inv in ADDR_REF
+            | apply dvalue_convert_strict_i64_inv in ADDR_REF
+            | apply dvalue_convert_strict_iptr_inv in ADDR_REF
+            | apply dvalue_convert_strict_addr_inv in ADDR_REF
+            | apply dvalue_convert_strict_double_inv in ADDR_REF
+            | apply dvalue_convert_strict_float_inv in ADDR_REF
+            | apply dvalue_convert_strict_poison_inv in ADDR_REF
+            | apply dvalue_convert_strict_oom_inv in ADDR_REF
+            | apply dvalue_convert_strict_none_inv in ADDR_REF
+            | apply dvalue_convert_strict_struct_inv in ADDR_REF
+            | apply dvalue_convert_strict_packed_struct_inv in ADDR_REF
+            | apply dvalue_convert_strict_array_inv in ADDR_REF
+            | apply dvalue_convert_strict_vector_inv in ADDR_REF
+            ];
+          first
+            [ destruct ADDR_REF as (?&?&?); subst
+            | inv ADDR_REF
+            ];
+
+          exists (fin_to_inf_uvalue res_fin);
+          exists (lift_MemState ms_fin_final);
+          cbn; repeat (split; auto);
+          apply fin_to_inf_uvalue_refine_strict
+        ].
+
+    (* Main successful portion of the lemma *)
+    unfold MemoryBigIntptr.MMEP.MemSpec.handle_memory_prop.
+    eapply dvalue_refine_strict_addr_r_inv in ADDR_REF as (ptr_inf&PTR_INF&PTR_REF).
+    subst.
+
+    eapply MemPropT_fin_inf_bind.
+    4: apply HANDLE.
+    all: eauto.
+
+    { (* MA: read_bytes_spec *)
+      intros a_fin ms_fin_ma READ.
+      eapply fin_inf_read_bytes_spec; eauto.
+      apply READ.
+    }
+
+    intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTES_REF MSR_LOAD DESERIALIZE.
+    unfold lift_err_RAISE_ERROR in *.
+
+    break_match_hyp.
+    - eapply deserialize_sbytes_fail_fin_inf in Heqs; eauto.
+      rewrite Heqs.
+      do 2 eexists.
+      split; eauto.
+      split.
+      apply fin_to_inf_uvalue_refine_strict.
+      apply lift_MemState_refine_prop.
+    - eapply deserialize_sbytes_fin_inf in Heqs; eauto.
+      destruct Heqs as (?&?&?).
+      cbn in DESERIALIZE.
+      destruct DESERIALIZE; subst.
+      rewrite H.
+      exists x. exists ms_inf.
+      split; cbn; auto.
+  Qed.
+
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
       L2_E1E2_orutt_strict t_inf t_fin ->
@@ -11063,7 +11165,97 @@ Module InfiniteToFinite.
                   }
 
                   { (* Load *)
-                    admit.
+                    repeat red in H0.
+                    destruct H0 as [UB | [ERR | [OOM | H0]]].
+                    { (* Handler raises UB *)
+                      admit.
+                    }
+
+                    { (* Handler raises error *)
+                      admit.
+                    }
+
+                    { (* Handler raises OOM *)
+                      admit.
+                    }
+
+                    (* Handler succeeds *)
+                    destruct H0 as [st' [ms_load [uv_fin [TA LOAD_HANDLER]]]].
+
+                    rewrite TA in VIS_HANDLED.
+                    cbn in VIS_HANDLED.
+                    rewrite bind_ret_l in VIS_HANDLED.
+                    destruct EV_REL as (?&?); subst.
+
+                    { epose proof handle_load_fin_inf (lift_MemState_refine_prop s2) H0 LOAD_HANDLER as (uv_inf&ms_inf'&LOAD_INF&UV_REF&MSR_LOAD).
+
+                      eapply Interp_Memory_PropT_Vis with
+                        (k2:=(fun '(ms_inf, (sid', uv_inf)) =>
+                                get_inf_tree (k2 (ms_load, (st', uv_fin)))))
+                        (s1:=s1)
+                        (s2:=lift_MemState s2).
+
+                      2: {
+                        cbn. red. red.
+                        repeat right.
+                        exists s1.
+                        exists ms_inf'.
+                        exists uv_inf.
+                        split; auto; reflexivity.
+                      }
+
+                      2: {
+                        cbn.
+                        rewrite bind_ret_l.
+                        rewrite VIS_HANDLED.
+                        reflexivity.
+                      }
+
+                      (* Continuation for vis node *)
+                      intros a1 b H H2 H3.
+                      destruct b as [ms [sid' res]].
+                      cbn in H2; subst.
+                      apply Returns_ret_inv in H2.
+                      inv H2.
+                      cbn.
+
+                      rewrite (itree_eta_ (k0 uv_inf)).
+                      rewrite (itree_eta_ (k2 (ms_load, (st', uv_fin)))).
+                      right.
+                      eapply CIH.
+                      2: {
+                        repeat red.
+                        specialize (HK uv_fin (ms_load, (st', uv_fin))).
+                        forward HK.
+                        { eapply ReturnsVis.
+                          unfold trigger.
+                          reflexivity.
+                          cbn.
+                          constructor.
+                          reflexivity.
+                        }
+                        forward HK.
+                        { rewrite TA.
+                          constructor.
+                          reflexivity.
+                        }
+
+                        forward HK; auto.
+                        pclearbot.
+
+                        repeat rewrite <- itree_eta.
+                        apply HK.
+                      }
+
+                      specialize (REL uv_inf).
+                      red in REL.
+                      pclearbot.
+
+                      repeat rewrite <- itree_eta.
+                      rewrite REL.
+                      eapply K_RUTT.
+                      repeat (split; auto).
+                    }
                   }
 
                   { (* Store *)
