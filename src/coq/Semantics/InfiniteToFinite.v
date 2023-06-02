@@ -10896,21 +10896,6 @@ Module InfiniteToFinite.
                   }
 
                   { (* Pick *)
-                    repeat red in H0.
-                    destruct H0 as [UB | [ERR | [OOM | H0]]].
-                    { (* Handler raises UB *)
-                      admit.
-                    }
-
-                    { (* Handler raises error *)
-                      admit.
-                    }
-
-                    { (* Handler raises OOM *)
-                      admit.
-                    }
-
-                    (* Handler succeeds *)
                     admit.
                   }
 
@@ -10934,6 +10919,9 @@ Module InfiniteToFinite.
                   (* Tau on the left... *)
                   constructor; auto.
                   eapply IHM1; eauto.
+              - (* TauL *)
+                exfalso; eapply EQ; eauto.
+              - 
               - (* TauL *)
                 pclearbot.
                 apply orutt_inv_Vis_r in H.
