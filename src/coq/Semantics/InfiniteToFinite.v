@@ -9589,21 +9589,71 @@ Module InfiniteToFinite.
             apply lift_MemState_refine_prop.
         }
       }
-    - eapply extend_read_byte_allowed_fin_inf; eauto.
-      apply lift_MemState_refine_prop.
-    - eapply extend_reads_fin_inf; eauto.
-      apply lift_MemState_refine_prop.
-    - eapply extend_write_byte_allowed_fin_inf; eauto.
-      apply lift_MemState_refine_prop.
-    - eapply extend_free_byte_allowed_fin_inf; eauto.
-      apply lift_MemState_refine_prop.
-    - eapply fin_inf_frame_stack_preserved; eauto.
-      apply lift_MemState_refine_prop.
-    - admit.
+    - clear - PTR_REF MSR free_block.
+      intros h1 h2 H1 H2.
+      cbn.
 
-    -
 
-  Qed.
+      (* TODO: Move this *)
+      Definition heap_refine h_inf h_fin : Prop :=
+        InfMemMMSP.heap_eqv h_inf (lift_Heap h_fin).
+
+      (* TODO: Move this *)
+      (* Will probably need to know heap is in finite range. *)
+      Lemma free_block_prop_fin_inf :
+        forall {h_fin_start h_fin_final h_inf_start h_inf_final ptr_fin ptr_inf},
+          addr_refine ptr_inf ptr_fin ->
+          heap_refine h_inf_start h_fin_start ->
+          heap_refine h_inf_final h_fin_final ->
+          Memory64BitIntptr.MMEP.MemSpec.free_block_prop h_fin_start ptr_fin h_fin_final ->
+          MemoryBigIntptr.MMEP.MemSpec.free_block_prop h_inf_start ptr_inf h_inf_final.
+      Proof.
+        intros h_fin_start h_fin_final h_inf_start h_inf_final ptr_fin ptr_inf ADDR_REF HEAP_START_REF HEAP_FINAL_REF FREE_BLOCK.
+        destruct FREE_BLOCK.
+        split.
+        - admit.
+        - admit.
+        - admit.
+        - admit.
+      Admitted.
+
+      apply MemState_refine_prop_heap_preserved in MSR.
+      red in MSR.
+
+      destruct ms_fin_start. destruct ms_memory_stack.
+      rename memory_stack_heap into h_fin_start.
+      destruct ms_inf_start. destruct ms_memory_stack.
+      rename memory_stack_heap into h_inf_start.
+      destruct ms_fin_final. destruct ms_memory_stack.
+      rename memory_stack_heap into h_fin_final.
+      cbn in *.
+      unfold Memory64BitIntptr.MMEP.MMSP.memory_stack_heap_prop, MemoryBigIntptr.MMEP.MMSP.memory_stack_heap_prop in *.
+      cbn in *.
+      cbn in *.
+
+      eapply free_block_prop_fin_inf; eauto.
+      3: {
+        eapply free_block; reflexivity.
+      }
+
+      { red.
+        symmetry.
+        apply MSR; auto.
+      }
+
+      { red.
+        symmetry.
+        auto.
+      }
+    - (* Free operation invariants *)
+      clear - MSR free_invariants.
+      destruct free_invariants.
+      split.
+      + eapply fin_inf_preserve_allocation_ids; eauto.
+        apply lift_MemState_refine_prop.
+      + eapply fin_inf_frame_stack_preserved; eauto.
+        apply lift_MemState_refine_prop.
+  Admitted.
 
   Lemma handle_free_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start res_fin args_fin args_inf},
@@ -9628,7 +9678,6 @@ Module InfiniteToFinite.
     apply dvalue_refine_strict_addr_r_inv in ADDR as (ptr_inf&PTR&PTR_REF);
       subst.
     cbn in *.
-
 
   Qed.
 
