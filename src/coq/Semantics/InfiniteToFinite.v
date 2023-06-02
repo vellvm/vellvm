@@ -11387,7 +11387,23 @@ Module InfiniteToFinite.
                   }
 
                   { (* OOM *)
-                    admit.
+                    red in H0.
+                    rewrite H0 in VIS_HANDLED.
+                    setoid_rewrite bind_trigger in VIS_HANDLED.
+                    rewrite bind_vis in VIS_HANDLED.
+
+                    destruct t2; pinversion VIS_HANDLED; subst_existT.
+                    { exfalso; eapply EQ; eauto. }
+                    subst_existT.
+
+                    destruct o.
+                    eapply Interp_Memory_PropT_Vis_OOM.
+                    cbn.
+                    rewrite get_inf_tree_equation.
+                    cbn.
+                    unfold raiseOOM.
+                    rewrite bind_trigger.
+                    reflexivity.
                   }
 
                   { (* UBE *)
