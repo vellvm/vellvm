@@ -5709,24 +5709,25 @@ Module InfiniteToFinite.
   (* Definition heap_refine (h1 : InfMemMMSP.Heap) (h2 : FinMemMMSP.Heap) : Prop *)
   (*   := MemoryBigIntptr.MMEP.MemSpec.heap_preserved h1 (lift_Heap h2). *)
 
-  (* (* TODO: Move this *) *)
-  (* (* TODO: This may not be true... The roots are just keys in the map *)
+  (* TODO: Move this *)
+  (* TODO: This may not be true... The roots are just keys in the map *)
   (*    for the heap, so nothing is forcing them to be in bounds for *)
   (*    finite memory... May be able to use MemState_refine_prop's *)
   (*    heap_preserved component to ensure this, though? *)
-  (*  *) *)
-  (* Lemma root_in_heap_prop_lift_inv : *)
-  (*   forall {h root_inf}, *)
-  (*     InfMem.MMEP.MMSP.root_in_heap_prop (lift_Heap h) root_inf -> *)
-  (*     exists root_fin, *)
-  (*       InfToFinAddrConvert.addr_convert root_inf = NoOom root_fin /\ *)
-  (*       FinMem.MMEP.MMSP.root_in_heap_prop h root_fin. *)
-  (* Proof. *)
-  (*   intros h root_inf IN. *)
-  (*   red in IN. *)
-  (*   unfold lift_Heap, lift_Block in IN. *)
-  (*   rewrite IntMaps.IP.F.map_b in IN. *)
-  (* Abort. *)
+  (*  *)
+  (* TODO: Will need the heap in bounds predicate *)
+  Lemma root_in_heap_prop_lift_inv :
+    forall {h root_inf},
+      InfMem.MMEP.MMSP.root_in_heap_prop (lift_Heap h) root_inf ->
+      exists root_fin,
+        InfToFinAddrConvert.addr_convert root_inf = NoOom root_fin /\
+        FinMem.MMEP.MMSP.root_in_heap_prop h root_fin.
+  Proof.
+    intros h root_inf IN.
+    red in IN.
+    unfold lift_Heap, lift_Block in IN.
+    rewrite IntMaps.IP.F.map_b in IN.
+  Admitted.
 
   (* (* TODO: Move this *) *)
   (* Lemma heap_eqv_lift : *)
@@ -9462,6 +9463,190 @@ Module InfiniteToFinite.
     exists x; tauto.
   Qed.
 
+  (* TODO: Move this *)
+  Definition heap_refine h_inf h_fin : Prop :=
+    InfMemMMSP.heap_eqv h_inf (lift_Heap h_fin).
+
+  (* TODO: Finish this proof *)
+  (* Will probably need to know heap is in finite range. *)
+  Lemma free_block_prop_fin_inf :
+    forall {h_fin_start h_fin_final h_inf_start h_inf_final ptr_fin ptr_inf},
+      addr_refine ptr_inf ptr_fin ->
+      heap_refine h_inf_start h_fin_start ->
+      heap_refine h_inf_final h_fin_final ->
+      Memory64BitIntptr.MMEP.MemSpec.free_block_prop h_fin_start ptr_fin h_fin_final ->
+      MemoryBigIntptr.MMEP.MemSpec.free_block_prop h_inf_start ptr_inf h_inf_final.
+  Proof.
+    intros h_fin_start h_fin_final h_inf_start h_inf_final ptr_fin ptr_inf ADDR_REF HEAP_START_REF HEAP_FINAL_REF FREE_BLOCK.
+    destruct FREE_BLOCK.
+    split.
+    - clear - ADDR_REF HEAP_START_REF HEAP_FINAL_REF free_block_ptrs_freed.
+      intros ptr IN CONTRA.
+
+      red in HEAP_FINAL_REF, HEAP_START_REF.
+      rewrite HEAP_START_REF in IN.
+      rewrite HEAP_FINAL_REF in CONTRA.
+
+      eapply ptr_in_heap_prop_lift_inv in IN as (?&?&?); eauto.
+      eapply ptr_in_heap_prop_lift_inv in CONTRA as (?&?&?); eauto.
+      rewrite H in H1; inv H1.
+      eapply free_block_ptrs_freed; eauto.
+    - clear - ADDR_REF HEAP_START_REF HEAP_FINAL_REF free_block_root_freed.
+      intros CONTRA.
+      eapply free_block_root_freed.
+
+      red in HEAP_FINAL_REF, HEAP_START_REF.
+      rewrite HEAP_FINAL_REF in CONTRA.
+      eapply root_in_heap_prop_lift_inv in CONTRA.
+      destruct CONTRA as (?&?&?).
+      rewrite ADDR_REF in H.
+      inv H.
+      eauto.
+    - clear - ADDR_REF HEAP_START_REF HEAP_FINAL_REF free_block_disjoint_preserved.
+      intros ptr root' DISJOINT.
+      split; intros IN.
+      {
+        red in HEAP_FINAL_REF, HEAP_START_REF.
+        rewrite HEAP_START_REF in IN.
+        rewrite HEAP_FINAL_REF.
+
+        assert (exists root_fin, fin_to_inf_addr root_fin = root') as (root_fin&ROOT_FIN).
+        { (* TODO: Will need heap in bounds predicate *)
+          admit.
+        }
+        subst.
+
+        eapply ptr_in_heap_prop_lift_inv in IN as (?&?&?); eauto.
+        2: {
+          apply addr_refine_fin_to_inf_addr.
+        }
+
+        assert (fin_to_inf_addr x = ptr) as PTR_FIN.
+        {
+          unfold fin_to_inf_addr.
+          break_match_goal.
+          clear Heqs.
+          apply FinToInfAddrConvertSafe.addr_convert_safe in e.
+          eapply InfToFinAddrConvert.addr_convert_injective; eauto.
+        }
+
+        eapply fin_inf_disjoint_ptr_byte in DISJOINT; eauto.
+        2: apply addr_refine_fin_to_inf_addr.
+
+        subst.
+        eapply ptr_in_heap_prop_lift.
+        specialize (free_block_disjoint_preserved x root_fin DISJOINT).
+        destruct free_block_disjoint_preserved.
+        apply H1.
+        auto.
+      }
+
+      {
+        red in HEAP_FINAL_REF, HEAP_START_REF.
+        rewrite HEAP_FINAL_REF in IN.
+        rewrite HEAP_START_REF.
+
+        assert (exists root_fin, fin_to_inf_addr root_fin = root') as (root_fin&ROOT_FIN).
+        { (* TODO: Will need heap in bounds predicate *)
+          admit.
+        }
+        subst.
+
+        eapply ptr_in_heap_prop_lift_inv in IN as (?&?&?); eauto.
+        2: {
+          apply addr_refine_fin_to_inf_addr.
+        }
+
+        assert (fin_to_inf_addr x = ptr) as PTR_FIN.
+        {
+          unfold fin_to_inf_addr.
+          break_match_goal.
+          clear Heqs.
+          apply FinToInfAddrConvertSafe.addr_convert_safe in e.
+          eapply InfToFinAddrConvert.addr_convert_injective; eauto.
+        }
+
+        eapply fin_inf_disjoint_ptr_byte in DISJOINT; eauto.
+        2: apply addr_refine_fin_to_inf_addr.
+
+        subst.
+        eapply ptr_in_heap_prop_lift.
+        specialize (free_block_disjoint_preserved x root_fin DISJOINT).
+        destruct free_block_disjoint_preserved.
+        apply H2.
+        auto.
+      }
+    - clear - ADDR_REF HEAP_START_REF HEAP_FINAL_REF free_block_disjoint_roots.
+      intros root' DISJOINT.
+
+      split; intros IN.
+      {
+        red in HEAP_FINAL_REF, HEAP_START_REF.
+        rewrite HEAP_START_REF in IN.
+        rewrite HEAP_FINAL_REF.
+
+        assert (exists root_fin, fin_to_inf_addr root_fin = root') as (root_fin&ROOT_FIN).
+        { (* TODO: Will need heap in bounds predicate *)
+          admit.
+        }
+        subst.
+
+        eapply root_in_heap_prop_lifted_fin_inf.
+        apply addr_refine_fin_to_inf_addr.
+
+        eapply root_in_heap_prop_lift_inv in IN as (?&?&?).
+        assert (x = root_fin).
+        { apply fin_to_inf_addr_conv_inf in H.
+          unfold fin_to_inf_addr in H.
+          break_match_hyp.
+          break_match_hyp.
+          subst.
+          clear Heqs Heqs0.
+          eapply FinToInfAddrConvert.addr_convert_injective; eauto.
+        }
+
+        eapply fin_inf_disjoint_ptr_byte in DISJOINT; eauto.
+
+        subst.
+        specialize (free_block_disjoint_roots root_fin DISJOINT).
+        destruct free_block_disjoint_roots.
+        auto.
+      }
+
+      {
+        red in HEAP_FINAL_REF, HEAP_START_REF.
+        rewrite HEAP_FINAL_REF in IN.
+        rewrite HEAP_START_REF.
+
+        assert (exists root_fin, fin_to_inf_addr root_fin = root') as (root_fin&ROOT_FIN).
+        { (* TODO: Will need heap in bounds predicate *)
+          admit.
+        }
+        subst.
+
+        eapply root_in_heap_prop_lifted_fin_inf.
+        apply addr_refine_fin_to_inf_addr.
+
+        eapply root_in_heap_prop_lift_inv in IN as (?&?&?).
+        assert (x = root_fin).
+        { apply fin_to_inf_addr_conv_inf in H.
+          unfold fin_to_inf_addr in H.
+          break_match_hyp.
+          break_match_hyp.
+          subst.
+          clear Heqs Heqs0.
+          eapply FinToInfAddrConvert.addr_convert_injective; eauto.
+        }
+
+        eapply fin_inf_disjoint_ptr_byte in DISJOINT; eauto.
+
+        subst.
+        specialize (free_block_disjoint_roots root_fin DISJOINT).
+        destruct free_block_disjoint_roots.
+        auto.
+      }
+  Admitted.
+
   Lemma handle_free_spec_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start ptr_fin ptr_inf},
       MemState_refine_prop ms_inf_start ms_fin_start ->
@@ -9593,30 +9778,6 @@ Module InfiniteToFinite.
       intros h1 h2 H1 H2.
       cbn.
 
-
-      (* TODO: Move this *)
-      Definition heap_refine h_inf h_fin : Prop :=
-        InfMemMMSP.heap_eqv h_inf (lift_Heap h_fin).
-
-      (* TODO: Move this *)
-      (* Will probably need to know heap is in finite range. *)
-      Lemma free_block_prop_fin_inf :
-        forall {h_fin_start h_fin_final h_inf_start h_inf_final ptr_fin ptr_inf},
-          addr_refine ptr_inf ptr_fin ->
-          heap_refine h_inf_start h_fin_start ->
-          heap_refine h_inf_final h_fin_final ->
-          Memory64BitIntptr.MMEP.MemSpec.free_block_prop h_fin_start ptr_fin h_fin_final ->
-          MemoryBigIntptr.MMEP.MemSpec.free_block_prop h_inf_start ptr_inf h_inf_final.
-      Proof.
-        intros h_fin_start h_fin_final h_inf_start h_inf_final ptr_fin ptr_inf ADDR_REF HEAP_START_REF HEAP_FINAL_REF FREE_BLOCK.
-        destruct FREE_BLOCK.
-        split.
-        - admit.
-        - admit.
-        - admit.
-        - admit.
-      Admitted.
-
       apply MemState_refine_prop_heap_preserved in MSR.
       red in MSR.
 
@@ -9653,7 +9814,7 @@ Module InfiniteToFinite.
         apply lift_MemState_refine_prop.
       + eapply fin_inf_frame_stack_preserved; eauto.
         apply lift_MemState_refine_prop.
-  Admitted.
+  Qed.
 
   Lemma handle_free_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start res_fin args_fin args_inf},
@@ -9679,6 +9840,11 @@ Module InfiniteToFinite.
       subst.
     cbn in *.
 
+    epose proof handle_free_spec_fin_inf MSR PTR_REF HANDLE.
+    destruct res_fin.
+    exists tt.
+    destruct H as (ms_inf_final&?&?).
+    exists ms_inf_final; auto.    
   Qed.
 
   (* TODO: Lemma about lifting intrinsic handlers *)
@@ -9750,12 +9916,29 @@ Module InfiniteToFinite.
 
     break_match.
     { (* Free *)
-      admit.
+      eapply MemPropT_fin_inf_bind.
+      4: apply INTRINSIC.
+      all: eauto.
+
+      { (* MA: handle_free_prop *)
+        intros a_fin ms_fin_ma HANDLE_FREE.
+        eapply handle_free_fin_inf; eauto.
+      }
+
+      intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin H H0 H1.
+      cbn in H, H1.
+      destruct H1; subst.
+      do 2 eexists; cbn; split; auto.
+      split; auto.
+      rewrite DVC1.dvalue_refine_strict_equation, DVC1.dvalue_convert_strict_equation.
+      cbn.
+      auto.
     }
 
     (* Unknown intrinsic *)
     cbn in *; auto.
-  Admitted.
+    contradiction.
+  Qed.
 
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
