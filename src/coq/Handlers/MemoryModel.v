@@ -2842,6 +2842,82 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           inl "deserialize_sbytes: Attempt to deserialize void."%string
       end.
 
+    Lemma deserialize_sbytes_equation (bytes : list SByte) (dt : dtyp) :
+      deserialize_sbytes bytes dt =
+        match dt with
+        (* TODO: should we bother with this? *)
+        (* Array and vector types *)
+        | DTYPE_Array sz t =>
+            let elt_size := sizeof_dtyp t in
+            fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*elt_size) ((idx+1) * elt_size) bytes) t;; ret (uv::acc)) (Nseq 0 (N.to_nat sz)) [];;
+            ret (UVALUE_Array fields)
+
+        | DTYPE_Vector sz t =>
+            let elt_size := sizeof_dtyp t in
+            fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*elt_size) ((idx+1) * elt_size) bytes) t;; ret (uv::acc)) (Nseq 0 (N.to_nat sz)) [];;
+            ret (UVALUE_Vector fields)
+
+        (* Padded aggregate types *)
+        | DTYPE_Struct fields =>
+            (* TODO: Add padding *)
+            match fields with
+            | [] => ret (UVALUE_Struct []) (* TODO: Not 100% sure about this. *)
+            | (dt::dts) =>
+                let sz := sizeof_dtyp dt in
+                let init_bytes := take sz bytes in
+                let rest_bytes := drop sz bytes in
+                f <- deserialize_sbytes init_bytes dt;;
+                rest <- deserialize_sbytes rest_bytes (DTYPE_Struct dts);;
+                match rest with
+                | UVALUE_Struct fs =>
+                    ret (UVALUE_Struct (f::fs))
+                | _ =>
+                    inl "deserialize_sbytes: DTYPE_Struct recursive call did not return a struct."%string
+                end
+            end
+
+        (* Structures with no padding *)
+        | DTYPE_Packed_struct fields =>
+            match fields with
+            | [] => ret (UVALUE_Packed_struct []) (* TODO: Not 100% sure about this. *)
+            | (dt::dts) =>
+                let sz := sizeof_dtyp dt in
+                let init_bytes := take sz bytes in
+                let rest_bytes := drop sz bytes in
+                f <- deserialize_sbytes init_bytes dt;;
+                rest <- deserialize_sbytes rest_bytes (DTYPE_Packed_struct dts);;
+                match rest with
+                | UVALUE_Packed_struct fs =>
+                    ret (UVALUE_Packed_struct (f::fs))
+                | _ =>
+                    inl "deserialize_sbytes: DTYPE_Struct recursive call did not return a struct."%string
+                end
+            end
+
+        (* Base types *)
+        | DTYPE_I _
+        | DTYPE_IPTR
+        | DTYPE_Pointer
+        | DTYPE_Half
+        | DTYPE_Float
+        | DTYPE_Double
+        | DTYPE_X86_fp80
+        | DTYPE_Fp128
+        | DTYPE_Ppc_fp128
+        | DTYPE_X86_mmx
+        | DTYPE_Opaque
+        | DTYPE_Metadata =>
+            ret (from_ubytes bytes dt)
+
+        | DTYPE_Void =>
+            inl "deserialize_sbytes: Attempt to deserialize void."%string
+        end.
+    Proof.
+      intros.
+      unfold deserialize_sbytes at 1.
+      unfold deserialize_sbytes_func at 1.
+    Admitted.
+
     (* Serialize a uvalue into bytes and combine them into UVALUE_ConcatBytes. Useful for bitcasts.
 
        dt should be the type of the thing you are casting to in the case of bitcasts.

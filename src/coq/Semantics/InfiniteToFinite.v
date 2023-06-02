@@ -10148,6 +10148,34 @@ Module InfiniteToFinite.
       Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_fin t = inl s ->
       MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_inf t = inl s.
   Proof.
+    (* TODO: why is all of this so SLOW??? *)
+    (* intros bytes_fin bytes_inf t s BYTES. *)
+    (* induction BYTES; intros DESERIALIZE. *)
+    (* - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes_equation in DESERIALIZE. *)
+    (*   rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes_equation. *)
+    (*   generalize dependent s. *)
+    (*   induction t; intros s DESERIALIZE; *)
+    (*     inv DESERIALIZE; auto. *)
+
+    (*   + remember (LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp t) as sz_t. *)
+    (*     destruct (monad_fold_right *)
+    (*                 (fun (acc : list LLVMParams64BitIntptr.Events.DV.uvalue) (idx : N) => *)
+    (*                    match *)
+    (*                      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes *)
+    (*                        (between (idx * sz_t) ((idx + 1) * sz_t) []) t *)
+    (*                    with *)
+    (*                    | inl v => inl v *)
+    (*                    | inr v => inr (v :: acc) *)
+    (*                    end) (Nseq 0 (N.to_nat sz)) []) eqn:FOLD. *)
+
+    (*     unfold between in FOLD. *)
+    (*     unfold drop in FOLD. *)
+    (*     unfold take in FOLD. *)
+    (*     rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes_equation in FOLD. *)
+    (*     break_inner_match_hyp. *)
+    (*     erewrite IHt in FOLD. *)
+    (*     cbn in FOLD. *)
+    (*     break_match_hyp. *)
   Admitted.
 
   Lemma handle_load_fin_inf :
