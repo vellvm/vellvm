@@ -86,6 +86,16 @@ Defined.
 Next Obligation.
   exact (inr IN2).
 Defined.
+Next Obligation.
+  split. intros; intro C.
+  intuition. inversion H1.
+  intro C. intuition. inversion H2.
+Defined.
+Next Obligation.
+  split. intros; intro C.
+  intuition. inversion H2.
+  intro C. intuition. inversion H1.
+Defined.  
 
 Lemma map_monad_InT_oom_forall2 :
   forall {A B} l (f : forall (a : A), InT a l -> OOM B) res,

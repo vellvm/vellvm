@@ -44,7 +44,6 @@
 ./coq/Numeric/Zbits.v
 ./coq/QC/GenAST.v
 ./coq/QC/Generators.v
-./coq/QC/QCVellvm.v
 ./coq/QC/ReprAST.v
 ./coq/QC/ShowAST.v
 ./coq/QC/Utils.v

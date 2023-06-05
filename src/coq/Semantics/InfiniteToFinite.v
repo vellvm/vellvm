@@ -99,7 +99,7 @@ Module InfiniteToFinite.
   Module EC1 := ECInfFin.
   Module DVC1 := DVCInfFin.
   Module DVC2 := DVCFinInf.
-
+  Print Module DVC1. 
   Module InfMem := MemoryBigIntptr.
   Module FinMem := Memory64BitIntptr.
 
@@ -1861,7 +1861,6 @@ Module InfiniteToFinite.
     unfold InfMem.MMEP.MMSP.frame_stack_eqv.
     induction fs1.
     - destruct fs2; intros.
-      Print FinMemMMSP.Frame.
       + specialize (H f).
         
     

@@ -65,6 +65,41 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
   Module DV1 := Events1.DV.
   Module DV2 := Events2.DV.
 
+(* TODO: Move into Dvalue *)
+  Ltac solve_dvalue_measure :=
+    match goal with
+    | Hin : In ?e ?fields |- context [DV1.dvalue_measure _]
+      => pose proof list_sum_map DV1.dvalue_measure _ _ Hin;
+        cbn; lia
+    | Hin : InT ?e ?fields |- context [DV1.dvalue_measure _]
+      => pose proof list_sum_map_InT DV1.dvalue_measure _ _ Hin;
+        cbn; lia
+    | H: Some ?f = List.nth_error ?fields _ |- context [DV1.dvalue_measure ?f]
+      => symmetry in H; apply nth_error_In in H;
+        pose proof list_sum_map DV1.dvalue_measure _ _ H;
+        cbn; lia
+    end.
+
+  Ltac solve_uvalue_measure :=
+    cbn;
+    first [ lia
+          | match goal with
+            | _ : _ |- context [(DV1.uvalue_measure ?t + fold_right _ _ _)%nat]
+              => pose proof (DV1.uvalue_measure_gt_0 t); unfold list_sum; lia
+            end
+          | match goal with
+            | HIn : In ?x ?xs |- context [ list_sum (map ?f _)] =>
+                pose proof (list_sum_map f x xs HIn)
+            end;
+            cbn in *; lia
+          | match goal with
+            | HIn : InT ?x ?xs |- context [ list_sum (map ?f _)] =>
+                pose proof (list_sum_map_InT f x xs HIn)
+            end;
+            cbn in *; lia
+      ].
+
+  
   Parameter dvalue_convert_lazy : DV1.dvalue -> DV2.dvalue.
   Parameter uvalue_convert_lazy : DV1.uvalue -> DV2.uvalue.
 
@@ -570,6 +605,45 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
     forall dv1 dv2,
       dvalue_refine_strict dv1 dv2 ->
       uvalue_refine_strict (DV1.dvalue_to_uvalue dv1) (DV2.dvalue_to_uvalue dv2).
+
+  Hint Resolve dvalue_refine_strict_dvalue_to_uvalue : DVALUE_REFINE.
+
+  (* TODO: Move this? *)
+  Ltac unfold_dvalue_refine_strict :=
+    rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in *.
+
+  Ltac unfold_dvalue_refine_strict_goal :=
+    rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation.
+
+  Ltac unfold_dvalue_refine_strict_in H :=
+    rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H.
+
+  Ltac unfold_uvalue_refine_strict :=
+    rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in *.
+
+  Ltac unfold_uvalue_refine_strict_goal :=
+    rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
+
+  Ltac unfold_uvalue_refine_strict_in H :=
+    rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in H.
+
+  Ltac solve_uvalue_refine_strict :=
+    solve [unfold_uvalue_refine_strict;
+           cbn;
+           solve [ auto
+                 | rewrite addr_convert_null;
+                   reflexivity
+             ]
+      ].
+
+  Ltac solve_dvalue_refine_strict :=
+    solve [unfold_dvalue_refine_strict;
+           cbn;
+           solve [ auto
+                 | rewrite addr_convert_null;
+                   reflexivity
+             ]
+      ].
 
   (** Parameters about is_concrete *)
 
@@ -4104,7 +4178,7 @@ End DVConvertMake.
 
 Module DVCFinInf := DVConvertMake InterpreterStack64BitIntptr.LP InterpreterStackBigIntptr.LP FinToInfAddrConvert InterpreterStack64BitIntptr.LP.Events InterpreterStackBigIntptr.LP.Events.
 Module DVCInfFin := DVConvertMake InterpreterStackBigIntptr.LP InterpreterStack64BitIntptr.LP InfToFinAddrConvert InterpreterStackBigIntptr.LP.Events InterpreterStack64BitIntptr.LP.Events.
-Print DVCFinInf.
+
 Module DVConvertSafe
   (LP1 : LLVMParams) (LP2 : LLVMParams)
   (AC1 : AddrConvert LP1.ADDR LP2.ADDR) (AC2 : AddrConvert LP2.ADDR LP1.ADDR)
