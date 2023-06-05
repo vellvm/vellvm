@@ -1110,3 +1110,54 @@ Proof.
     intros i a b H H0.
     apply NTHEQ with (i:=S i); cbn; auto.
 Qed.
+
+(* TODO: Move this *)
+Theorem repeat_spec_InT {X} n (x : X) y:
+  InT y (repeat x n) -> y=x.
+Proof.
+  induction n as [|k Hrec]; simpl; destruct 1; auto.
+Qed.
+
+(* TODO: Move this *)
+Lemma nth_error_InT {X} l n (x : X) : nth_error l n = Some x -> InT x l.
+Proof.
+  revert n. induction l as [|a l IH]; intros [|n]; simpl; try easy.
+  - injection 1; auto.
+  - eauto.
+Qed.
+
+Lemma Nth_InT :
+  forall {X} (xs : list X) i (x : X),
+    Util.Nth xs i x ->
+    InT x xs.
+Proof.
+  intros X xs i x NTH.
+  unfold Util.Nth in *.
+  eapply nth_error_InT; eauto.
+Qed.
+
+(* TODO: Move this *)
+Lemma list_sum_map_InT :
+  forall {X} (f : X -> nat) x xs,
+    InT x xs ->
+    (list_sum (map f xs) >= f x)%nat.
+Proof.
+  induction xs; intros In; [contradiction|].
+  destruct In; subst.
+  - cbn. lia.
+  - cbn. specialize (IHxs i).
+    unfold list_sum in IHxs.
+    lia.
+Qed.
+
+(* TODO: Move this *)
+Lemma In_InT :
+  forall {X} (x : X) xs,
+    InT x xs -> In x xs.
+Proof.
+  intros X x xs X0.
+  induction xs.
+  - inversion X0.
+  - cbn in *.
+    destruct X0; subst; auto.
+Qed.

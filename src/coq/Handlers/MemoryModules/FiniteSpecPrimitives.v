@@ -71,7 +71,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Definition mem_byte := (SByte * AllocationId)%type.
 
     (** ** Memory
-        Memory is just a map of blocks.
+        Memory is just a map of mem_bytes.
      *)
     Definition memory := IntMap mem_byte.
 

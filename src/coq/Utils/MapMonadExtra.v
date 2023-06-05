@@ -1278,3 +1278,245 @@ Proof.
   split; auto.
   eapply Util.Nth_In; eauto.
 Qed.
+
+Lemma map_monad_InT {M : Type -> Type} `{HM : Monad M} {A B} (l : list A) (f: forall (x : A), InT x l -> M B) : M (list B).
+Proof.
+  induction l.
+  - exact (ret []).
+  - refine (b <- f a _;; bs <- IHl _;; ret (b::bs)).
+    + cbn; auto.
+    + intros x Hin.
+      apply (f x).
+      cbn; auto.
+Defined.
+
+Lemma map_monad_InT_unfold :
+  forall {M} `{HM : Monad M} {A B} (x : A) (xs : list A) (f : forall (elt:A), InT elt (x::xs) -> M B),
+    map_monad_InT (x::xs) f = b <- f x (inl eq_refl);;
+                             bs <- map_monad_InT xs (fun x HIn => f x (inr HIn));;
+                             ret (b :: bs).
+Proof.
+  intros M HM A B x xs f.
+  induction xs; cbn; auto.
+Qed.
+
+Lemma map_monad_InT_cons
+  {M} `{MM : Monad M}
+  {A B} l (x:A) (f: forall (a : A), InT a (x::l) -> M B) :
+  (map_monad_InT (x::l) f) =
+    (b <- f x (inl eq_refl);;
+     bs2 <- map_monad_InT l (fun x HIn => f x (inr HIn));;
+     ret (b :: bs2)).
+Proof.
+  reflexivity.
+Qed.
+
+Lemma map_monad_map_monad_InT :
+  forall {M} {A B} `{HM : Monad M} xs (f : A -> M B),
+    @map_monad M HM A B f xs = @map_monad_InT M HM A B xs (fun x HIn => f x).
+Proof.
+  intros M A B HM xs.
+  induction xs; intros f.
+  - cbn. reflexivity.
+  - rewrite map_monad_unfold, map_monad_InT_cons.
+    rewrite IHxs.
+    reflexivity.
+Qed.
+
+
+Lemma map_monad_InT_OOM_fail :
+  forall {A B} l (f : forall (a : A), InT a l -> OOM B) b,
+    map_monad_InT l f = Oom b ->
+    exists a (HIn : InT a l), f a HIn = Oom b.
+Proof.
+  intros A B l f b MAP.
+  generalize dependent b.
+  generalize dependent l.
+  induction l; intros f b MAP.
+  - cbn in MAP.
+    inv MAP.
+  - rewrite map_monad_InT_cons in MAP.
+    cbn in *.
+    destruct (f a (inl eq_refl)) eqn:Hfa; inv MAP;
+      setoid_rewrite Hfa in H0; inv H0.
+    + rename H1 into MAP.
+      destruct (map_monad_InT l (fun (x : A) (HIn : InT x l) => f x (inr HIn))) eqn:HMAP; inv MAP.
+      specialize (IHl (fun (x : A) (HIn : InT x l) => f x (inr HIn)) b HMAP) as [a' [IN FA]].
+      exists a'. exists (inr IN). auto.
+    + exists a. exists (inl eq_refl). auto.
+Qed.
+
+Lemma map_monad_InT_OOM_failT :
+  forall {A B} l (f : forall (a : A), InT a l -> OOM B) b,
+    map_monad_InT l f = Oom b ->
+    {a & {HIn : InT a l & f a HIn = Oom b}}.
+Proof.
+  intros A B l f b MAP.
+  generalize dependent b.
+  generalize dependent l.
+  induction l; intros f b MAP.
+  - cbn in MAP.
+    inv MAP.
+  - rewrite map_monad_InT_cons in MAP.
+    cbn in *.
+    destruct (f a (inl eq_refl)) eqn:Hfa; inv MAP;
+      setoid_rewrite Hfa in H0; inv H0.
+    + rename H1 into MAP.
+      destruct (map_monad_InT l (fun (x : A) (HIn : InT x l) => f x (inr HIn))) eqn:HMAP; inv MAP.
+      specialize (IHl (fun (x : A) (HIn : InT x l) => f x (inr HIn)) b HMAP) as [a' [IN FA]].
+      exists a'. exists (inr IN). auto.
+    + exists a. exists (inl eq_refl). auto.
+Qed.
+
+Lemma map_monad_InT_OOM_succeeds' :
+  forall {A B} l (f : forall (a : A), InT a l -> OOM B) res,
+    map_monad_InT l f = ret res ->
+    (forall a (HIn : InT a l), exists b, f a HIn = ret b).
+Proof.
+  intros A B.
+  induction l; intros f res MAP.
+  - intros _ [].
+  - rewrite map_monad_InT_cons in MAP.
+    cbn in *.
+    break_match_hyp; inv MAP.
+    rename H0 into MAP.
+    break_match_hyp; inv MAP.
+
+    intros a0 [HIn | HIn]; subst.
+    + exists b; auto.
+    + apply IHl with (a:=a0) (HIn:=HIn) in Heqo0.
+      auto.
+Qed.
+
+Lemma map_monad_InT_OOM_repeat_success :
+  forall {A B} sz x (f : forall (a : A), InT a (repeat x sz) -> OOM B) res y,
+    map_monad_InT (repeat x sz) f = ret res ->
+    (forall INx : InT x (repeat x sz), f x INx = NoOom y) ->
+    res = repeat y sz.
+Proof.
+  intros A B sz.
+  induction sz; intros x f res y MAP F.
+  - cbn in *.
+    inv MAP.
+    reflexivity.
+  - cbn.
+    unfold repeat in MAP.
+    rewrite map_monad_InT_cons in MAP.
+    cbn in MAP.
+    cbn in *.
+    break_match_hyp; inv MAP.
+    break_match_hyp; inv H0.
+
+    pose proof (F (inl eq_refl)).
+    setoid_rewrite Heqo in H.
+    inv H.
+
+    cbn.
+    erewrite <- IHsz; eauto.
+
+    intros INx.
+    cbn.
+    eauto.
+Qed.
+
+Lemma map_monad_InT_OOM_nil_inv :
+  forall {A B : Type} (l : list A) (f : forall a : A, InT a l -> OOM B),
+    map_monad_InT l f = ret [] -> l = [].
+Proof.
+  intros A B l f H.
+  induction l; auto.
+
+  rewrite map_monad_InT_cons in H.
+  cbn in H.
+  break_match_hyp; inv H.
+  break_match_hyp; inv H1.
+Qed.
+
+Lemma map_monad_err_InT :
+  forall {A B} (f : A -> err B) l res x,
+    map_monad f l = ret res ->
+    InT x res ->
+    {y & ((f y = ret x) * (InT y l))%type}.
+Proof.
+  intros A B f l res x MAP IN.
+  generalize dependent l.
+  induction res; intros l MAP.
+  - inversion IN.
+  - inversion IN; subst.
+    + destruct l as [_ | h ls].
+      * cbn in MAP.
+        inv MAP.
+      * exists h.
+        cbn in MAP.
+        break_match_hyp; [|break_match_hyp]; inv MAP.
+        split; cbn; auto.
+    + destruct l as [_ | h ls].
+      * cbn in MAP.
+        inv MAP.
+      * cbn in MAP.
+        break_match_hyp; [|break_match_hyp]; inv MAP.
+        epose proof (IHres X ls Heqs0) as [y [HF INy]].
+        exists y; split; cbn; eauto.
+Qed.
+
+Lemma InT_cons_right :
+  forall {A} {l : list A} {a x xs}
+    (EQ : l = x :: xs) (HIn : InT a xs),
+    InT a l.
+Proof.
+  intros A l x xs EQ a HIn.
+  subst.
+  cbn.
+  right.
+  auto.
+Defined.
+
+Lemma InT_map_impl : forall {X Y} (f : X -> Y) l {y : Y},
+    InT y (map f l) -> {x & ((f x = y) * (InT x l))%type}.
+Proof.
+  intros X Y f l.
+  induction l; firstorder (subst; auto).
+Qed.
+
+Lemma InT_map_flip : forall {X Y} (f : X -> Y) l {y : Y},
+    {x & ((f x = y) * (InT x l))%type} -> InT y (map f l).
+Proof.
+  intros X Y f l.
+  induction l; firstorder (subst; auto).
+Qed.
+
+Require Import FunctionalExtensionality.
+Lemma map_monad_InT_OOM_cons_inv :
+  forall {A B : Type} (l : list A) (f : forall a : A, InT a l -> OOM B) r res,
+    map_monad_InT l f = ret (r :: res) ->
+    exists x xs HInx (EQ : l = x :: xs),
+      f x HInx = ret r /\
+        map_monad_InT xs (fun a HIn => f a (InT_cons_right EQ HIn)) = ret res.
+Proof.
+  intros A B l.
+  induction l; intros f r res H.
+  - cbn in *.
+    inv H.
+  - rewrite map_monad_InT_cons in H.
+    cbn in H.
+    break_match_hyp; inv H.
+    break_match_hyp; inv H1.
+    exists a.
+    exists l.
+    exists (inl eq_refl).
+    exists eq_refl.
+    split; auto.
+Qed.
+
+Lemma InT_Nth :
+  forall {X} xs (x : X),
+    InT x xs -> exists i, Util.Nth xs i x.
+Proof.
+  induction xs; intros x IN.
+  - inversion IN.
+  - destruct IN; subst.
+    + exists (0%nat). cbn. auto.
+    + apply IHxs in i as [i H].
+      exists (S i).
+      cbn; auto.
+Qed.

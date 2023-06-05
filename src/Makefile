@@ -46,7 +46,7 @@ KNOWNTARGETS := CoqMakefile invoke-coqmakefile coq extracted $(EXTRACTDIR)/STAMP
 KNOWNFILES := Makefile _CoqProject
 
 CoqMakefile: _CoqProject
-	$(COQMAKEFILE) -docroot ../doc -f _CoqProject -o CoqMakefile
+	$(COQMAKEFILE) TIMED = true -docroot ../doc -f _CoqProject -o CoqMakefile
 
 ######## defer to CoqMakefile for anything not in $(KNOWNTARGETS)
 .PHONY: invoke-coqmakefile 

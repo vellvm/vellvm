@@ -8090,14 +8090,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     auto.
   Qed.
 
-  (* TODO: Move this and use it elsewhere *)
-  Definition addr_refine addr_inf addr_fin := InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin.
-
   Set Nested Proofs Allowed.
 
-
-    
-  
   Lemma Heap_in_bounds_fresh_sid :
     forall ms_fin ms_fin' sid_fin,
       Heap_in_bounds ms_fin ->
