@@ -100,9 +100,9 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       ].
 
   
-  Parameter dvalue_convert_lazy : DV1.dvalue -> DV2.dvalue.
-  Parameter uvalue_convert_lazy : DV1.uvalue -> DV2.uvalue.
-
+  (* Parameter dvalue_convert_lazy : DV1.dvalue -> DV2.dvalue. *)
+  (* Parameter uvalue_convert_lazy : DV1.uvalue -> DV2.uvalue. *)
+  (*
   Parameter dvalue_convert_lazy_equation :
     forall dv,
       dvalue_convert_lazy dv =
@@ -445,7 +445,8 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
     forall uv1 uv2,
       uvalue_converted_lazy uv1 uv2 ->
       uvalue_refine_lazy uv1 uv2.
-
+   *)
+  
   Parameter dvalue_convert_strict : DV1.dvalue -> OOM DV2.dvalue.
   Parameter dvalue_convert_strict_equation :
     forall dv,
@@ -590,6 +591,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       uvalue_refine_strict uv1 uv2 = (uvalue_convert_strict uv1 = NoOom uv2).
 
 
+  (*
   Parameter uvalue_convert_lazy_dv_to_uv_dvalue_convert_lazy :
     forall dv,
       uvalue_convert_lazy (DV1.dvalue_to_uvalue dv) = DV2.dvalue_to_uvalue (dvalue_convert_lazy dv).
@@ -598,7 +600,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
     forall dv1 dv2,
       dvalue_refine_lazy dv1 dv2 ->
       uvalue_refine_lazy (DV1.dvalue_to_uvalue dv1) (DV2.dvalue_to_uvalue dv2).
-
+   *)
   
   (* TODO: This seems better than lazy proof... Can probably do the same? *)
   Parameter dvalue_refine_strict_dvalue_to_uvalue :
@@ -647,11 +649,13 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
 
   (** Parameters about is_concrete *)
 
+  (*
   Parameter uvalue_convert_lazy_preserves_is_concrete :
     forall uv uvc b,
       uvalue_convert_lazy uv = uvc ->
       DV1.is_concrete uv = b ->
       DV2.is_concrete uvc = b.
+   *)
 
   Parameter uvalue_refine_strict_preserves_is_concrete :
     forall uv uvc b,
@@ -710,14 +714,17 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       DV1.default_dvalue_of_dtyp dt = inl s <->
         DV2.default_dvalue_of_dtyp dt = inl s.
 
+  (*
   Parameter dvalue_converted_lazy_R2_deterministic :
     R2_deterministic dvalue_converted_lazy.
+   *)
 
   Parameter dvalue_refine_strict_R2_injective :
     R2_injective dvalue_refine_strict.
 
   (** Lemmas about values with types... *)
 
+  (*
   Parameter dvalue_refine_lazy_oom :
     forall dv dt,
       DV1.dvalue_has_dtyp dv dt ->
@@ -727,7 +734,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
     forall uv dt,
       DV1.uvalue_has_dtyp uv dt ->
       uvalue_refine_lazy uv (DV2.UVALUE_Oom dt).
-
+   *)
 End DVConvert.
 
 Module DVConvertMake (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF) : DVConvert LP1 LP2 AC Events1 Events2
@@ -773,7 +780,7 @@ with Module DV2 := Events2.DV.
 
   Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia | solve_dvalue_measure | solve_uvalue_measure].
 
-
+(*
   Program Fixpoint dvalue_convert_lazy (dv1 : DV1.dvalue) {measure (DV1.dvalue_measure dv1)} : DV2.dvalue
     := match dv1 with
        | DV1.DVALUE_Addr a =>
@@ -1511,7 +1518,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
     intros uv1 uv2 CONV; inv CONV.
     apply uvalue_refine_lazy_uvalue_convert_lazy.
   Qed.
-
+*)
   Program Fixpoint dvalue_convert_strict (dv1 : DV1.dvalue) {measure (DV1.dvalue_measure dv1)} : OOM DV2.dvalue
     := match dv1 with
        | DV1.DVALUE_Addr a =>
@@ -1804,7 +1811,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
     reflexivity.
   Qed.
 
-
+(*
   Lemma uvalue_convert_lazy_dv_to_uv_dvalue_convert_lazy :
     forall dv,
       uvalue_convert_lazy (DV1.dvalue_to_uvalue dv) = DV2.dvalue_to_uvalue (dvalue_convert_lazy dv).
@@ -2299,12 +2306,70 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
   #[global] Opaque uvalue_convert_lazy.
   #[global] Opaque dvalue_refine_lazy.
   #[global] Opaque uvalue_refine_lazy.
+ *)
 
   #[global] Opaque dvalue_convert_strict.
   #[global] Opaque uvalue_convert_strict.
   #[global] Opaque dvalue_refine_strict.
   #[global] Opaque uvalue_refine_strict.
 
+  (* START AT A FASTER PROOF:
+    intros dv1 dv2 REF.
+    rewrite dvalue_refine_strict_equation in REF.
+    rewrite dvalue_convert_strict_equation in REF.
+    revert dv2 REF.
+    induction dv1; intros dv2 REF.
+
+    1-11:
+      cbn in REF;
+      rewrite uvalue_refine_strict_equation;
+      rewrite uvalue_convert_strict_equation.
+    1-11:
+      solve
+        [ cbn; break_match_hyp; inv REF; auto
+        | inv REF; auto
+        ].
+
+    { cbn.
+      rewrite uvalue_refine_strict_equation.
+      rewrite uvalue_convert_strict_equation.
+      induction fields; simpl in *.
+      - inversion REF; subst. 
+        Tactics.program_simpl.
+      - break_match_goal; break_match_hyp. simpl in *.
+      
+      break_match_goal; break_match_hyp; inv REF.
+      - Tactics.program_simpl.
+        revert l0 Heqo0 l Heqo. induction fields; intros l0 Heqo0 l Heqo.
+        + cbn in *.
+          inv Heqo0; inv Heqo.
+          reflexivity.
+        + rewrite map_cons, map_monad_InT_unfold in Heqo.
+          rewrite map_monad_InT_unfold in Heqo0.
+          cbn in *.
+
+          destruct (dvalue_convert_strict a) eqn:CONVA; inv Heqo0.
+          pose proof H as IH.
+          specialize (H a (or_introl eq_refl) d).
+          forward H.
+          rewrite dvalue_refine_strict_equation in *; auto.
+          rewrite uvalue_refine_strict_equation in *.
+          rewrite H in Heqo.
+
+          break_match_hyp; inv H1.
+          break_match_hyp; inv Heqo.
+
+          cbn.
+
+          forward IHfields.
+          { intros u H0 dv2 H1.
+            auto.
+          }
+          specialize (IHfields l1 eq_refl l0 eq_refl).
+
+          inv IHfields.
+          auto.
+*)
   
   (* TODO: This seems better than lazy proof... Can probably do the same? *)
   Lemma dvalue_refine_strict_dvalue_to_uvalue :
@@ -2312,7 +2377,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
       dvalue_refine_strict dv1 dv2 ->
       uvalue_refine_strict (DV1.dvalue_to_uvalue dv1) (DV2.dvalue_to_uvalue dv2).
   Proof.
-    induction dv1; intros dv2 REF;
+   induction dv1; intros dv2 REF;
       rewrite dvalue_refine_strict_equation in REF;
       rewrite dvalue_convert_strict_equation in REF;
       rewrite uvalue_refine_strict_equation;
@@ -2382,7 +2447,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
         rewrite H in Heqo.
         inv Heqo.
     }
-
+    
     { (* Packed Structures *)
       break_match_goal; break_match_hyp; inv REF.
       - revert l0 Heqo0 l Heqo. induction fields; intros l0 Heqo0 l Heqo.
@@ -2598,7 +2663,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
       ].
 
   (** Lemmas about is_concrete *)
-
+(*
   Lemma uvalue_convert_lazy_preserves_is_concrete :
     forall uv uvc b,
       uvalue_convert_lazy uv = uvc ->
@@ -2688,7 +2753,8 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
           forward H; auto.
       + rewrite IHuv with (b:=false); auto.
   Qed.
-
+ *)
+  
   Lemma uvalue_refine_strict_preserves_is_concrete :
     forall uv uvc b,
       uvalue_refine_strict uv uvc ->
@@ -3921,6 +3987,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
     }
   Qed.
 
+  (*
   Lemma dvalue_converted_lazy_R2_deterministic :
     R2_deterministic dvalue_converted_lazy.
   Proof.
@@ -3929,6 +3996,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
     unfold dvalue_converted_lazy in *.
     intros EQ; subst; auto.
   Qed.
+ *)
 
   Lemma dvalue_refine_strict_R2_injective :
     R2_injective dvalue_refine_strict.
@@ -4154,6 +4222,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
 
   (** Lemmas about values with types... *)
 
+  (*
   Lemma dvalue_refine_lazy_oom :
     forall dv dt,
       DV1.dvalue_has_dtyp dv dt ->
@@ -4173,6 +4242,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
     destruct uv;
     rewrite uvalue_refine_lazy_equation; right; auto.
   Qed.
+   *)
 
 End DVConvertMake.
 

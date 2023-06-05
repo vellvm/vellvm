@@ -69,6 +69,7 @@ Module Type TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
   (** Converting trees with events in language 1 to trees with events in language 2 *)
 
   (* TODO: move this? *)
+  (*
   Definition L0_convert_tree_lazy {T} (t : itree E1.L0 T) : itree E2.L0 T := interp L0_convert_lazy t.
   Definition L1_convert_tree_lazy {T} (t : itree E1.L1 T) : itree E2.L1 T := interp L1_convert_lazy t.
   Definition L2_convert_tree_lazy {T} (t : itree E1.L2 T) : itree E2.L2 T := interp L2_convert_lazy t.
@@ -76,6 +77,7 @@ Module Type TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
   Definition L4_convert_tree_lazy {T} (t : itree E1.L4 T) : itree E2.L4 T := interp L4_convert_lazy t.
   Definition L5_convert_tree_lazy {T} (t : itree E1.L5 T) : itree E2.L5 T := interp L5_convert_lazy t.
   Definition L6_convert_tree_lazy {T} (t : itree E1.L6 T) : itree E2.L6 T := interp L6_convert_lazy t.
+   *)
 
   Definition L0_convert_tree_strict {T} (t : itree E1.L0 T) : itree E2.L0 T := interp L0_convert_strict t.
   Definition L1_convert_tree_strict {T} (t : itree E1.L1 T) : itree E2.L1 T := interp L1_convert_strict t.
@@ -85,6 +87,7 @@ Module Type TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
   Definition L5_convert_tree_strict {T} (t : itree E1.L5 T) : itree E2.L5 T := interp L5_convert_strict t.
   Definition L6_convert_tree_strict {T} (t : itree E1.L6 T) : itree E2.L6 T := interp L6_convert_strict t.
 
+  (*
   #[global] Instance L0_convert_tree_lazy_eutt_proper {T} {RR : relation T} :
     Proper (eutt RR ==> eutt RR) L0_convert_tree_lazy.
   Proof.
@@ -142,7 +145,8 @@ Module Type TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
     intros x y EQ.
     eapply eutt_interp'; eauto.
   Defined.
-
+   *)
+  
   #[global] Instance L0_convert_tree_strict_eutt_proper {T} {RR : relation T} :
     Proper (eutt RR ==> eutt RR) L0_convert_tree_strict.
   Proof.
@@ -202,6 +206,7 @@ Module Type TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
   Defined.
 
   (* TODO: move this? *)
+  (*
   Definition L0_convert_tree_lazy' {A B} (f : A -> B) (t : itree E1.L0 A) : itree E2.L0 B
     := fmap f (L0_convert_tree_lazy t).
 
@@ -222,6 +227,7 @@ Module Type TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
 
   Definition L6_convert_tree_lazy' {A B} (f : A -> B) (t : itree E1.L6 A) : itree E2.L6 B
     := fmap f (L6_convert_tree_lazy t).
+   *)
 
   (* TODO: move this? *)
   Definition L0_convert_tree_strict' {A B} (f : A -> OOM B) (t : itree E1.L0 A) : itree E2.L0 B
@@ -252,6 +258,7 @@ Module Type TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
     := x <- L6_convert_tree_strict t;;
        lift_OOM (f x).
 
+  (*
   #[global] Instance L0_convert_tree_lazy'_eutt_proper {A B} {RA : relation A} {RB : relation B} f :
     (forall u1 u2, RA u1 u2 -> @eutt E2.L0 _ _ RB (ret (f u1)) (ret (f u2))) ->
     Proper (eutt RA ==> eutt RB) (L0_convert_tree_lazy' f).
@@ -335,7 +342,8 @@ Module Type TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
     eapply L6_convert_tree_lazy_eutt_proper; eauto. (* Ugh, why can't I just rewrite? *)
     eauto.
   Defined.
-
+   *)
+  
   #[global] Instance L0_convert_tree_strict'_eutt_proper {A B} {RA : relation A} {RB : relation B} f :
     (forall u1 u2, RA u1 u2 -> @eutt E2.L0 _ _ RB (lift_OOM (f u1)) (lift_OOM (f u2))) ->
     Proper (eutt RA ==> eutt RB) (L0_convert_tree_strict' f).
@@ -420,12 +428,14 @@ Module Type TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
     eauto.
   Defined.
 
+  (*
   Definition convert_uvalue_tree_lazy {E} `{OOME -< E} (t : itree E E1.DV.uvalue) : itree E E2.DV.uvalue
     := fmap uvalue_convert_lazy t.
 
   Definition convert_dvalue_tree_lazy {E} `{OOME -< E} (t : itree E E1.DV.dvalue) : itree E E2.DV.dvalue
     := fmap dvalue_convert_lazy t.
-
+   *)
+  
   Definition convert_uvalue_tree_strict {E} `{OOME -< E} (t : itree E E1.DV.uvalue) : itree E E2.DV.uvalue
     := x <- t;;
        lift_OOM (uvalue_convert_strict x).
@@ -434,6 +444,7 @@ Module Type TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
     := x <- t;;
        lift_OOM (dvalue_convert_strict x).
 
+  (*
   Definition L3_convert_PropT_lazy {A B} (RB : relation B) (f : A -> B) (ts : PropT E1.L3 A) : PropT E2.L3 B
     := fun t_e2 => exists t_e1,
            ts t_e1 /\
@@ -457,7 +468,8 @@ Module Type TreeConvert (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
     (RB : relation B) (f : A -> B) (ts : PropT IS1.LP.Events.L6 A)
     : PropT E2.L6 B
     := L4_convert_PropT_lazy RB f ts.
-
+   *)
+  
   Definition L3_convert_PropT_strict {A B} (RB : relation B) (f : A -> OOM B) (ts : PropT E1.L3 A) : PropT E2.L3 B
     := fun t_e2 => exists t_e1,
            ts t_e1 /\

@@ -151,11 +151,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   (**  Converting state between the two languages *)
 
+  (*
   Definition convert_global_env_lazy (g : IS1.LLVM.Global.global_env) : IS2.LLVM.Global.global_env
     := map (fun '(k, dv) => (k, dvalue_convert_lazy dv)) g.
 
   Definition convert_local_env_lazy (l : IS1.LLVM.Local.local_env) : IS2.LLVM.Local.local_env
     := map (fun '(k, uv) => (k, uvalue_convert_lazy uv)) l.
+   *)
 
   Definition convert_global_env_strict (g : IS1.LLVM.Global.global_env) : OOM IS2.LLVM.Global.global_env
     := map_monad (fun '(k, dv) => dv' <- dvalue_convert_strict dv;;
@@ -165,8 +167,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     := map_monad (fun '(k, uv) => uv' <- uvalue_convert_strict uv;;
                                ret (k, uv')) l.
 
+  (*
   Definition convert_stack_lazy (s : @stack IS1.LLVM.Local.local_env) : (@stack IS2.LLVM.Local.local_env)
     := map convert_local_env_lazy s.
+   *)
 
   Definition convert_stack_strict (s : @stack IS1.LLVM.Local.local_env) : OOM (@stack IS2.LLVM.Local.local_env)
     := map_monad convert_local_env_strict s.
@@ -177,6 +181,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
      Presumably if [g1] OOMs when converted, we wouldn't have a [g2]
      anyway?
    *)
+  (*
   Definition global_refine_lazy (g1 : IS1.LLVM.Global.global_env) (g2 : IS2.LLVM.Global.global_env) : Prop
     := alist_refine dvalue_refine_lazy g1 g2.
 
@@ -185,6 +190,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Proof.
     apply alist_refine_empty.
   Qed.
+   *)
 
   Definition global_refine_strict (g1 : IS1.LLVM.Global.global_env) (g2 : IS2.LLVM.Global.global_env) : Prop
     := alist_refine dvalue_refine_strict g1 g2.
@@ -205,6 +211,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     eapply alist_refine_add with (x:=(rid, dv1)) (y:=(rid, dv2)); cbn; eauto.
   Qed.
 
+  (*
   Definition local_refine_lazy (l1 : IS1.LLVM.Local.local_env) (l2 : IS2.LLVM.Local.local_env) : Prop
     := alist_refine uvalue_refine_lazy l1 l2.
 
@@ -213,6 +220,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Proof.
     apply alist_refine_empty.
   Qed.
+   *)
 
   Definition local_refine_strict (l1 : IS1.LLVM.Local.local_env) (l2 : IS2.LLVM.Local.local_env) : Prop
     := alist_refine uvalue_refine_strict l1 l2.
@@ -223,6 +231,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     apply alist_refine_empty.
   Qed.
 
+  (*
   Definition stack_refine_lazy (s1 : @stack IS1.LLVM.Local.local_env) (s2 : @stack IS2.LLVM.Local.local_env) : Prop
     := Forall2 local_refine_lazy s1 s2.
 
@@ -231,6 +240,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Proof.
     constructor.
   Qed.
+   *)
 
   Definition stack_refine_strict (s1 : @stack IS1.LLVM.Local.local_env) (s2 : @stack IS2.LLVM.Local.local_env) : Prop
     := Forall2 local_refine_strict s1 s2.
@@ -241,6 +251,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     constructor.
   Qed.
 
+  (*
   Definition local_stack_refine_lazy
     (ls1 : (IS1.LLVM.Local.local_env * @stack IS1.LLVM.Local.local_env)%type)
     (ls2 : (IS2.LLVM.Local.local_env * @stack IS2.LLVM.Local.local_env)%type)
@@ -258,6 +269,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     apply local_refine_lazy_empty.
     apply stack_refine_lazy_empty.
   Qed.
+   *)
 
   Definition local_stack_refine_strict
     (ls1 : (IS1.LLVM.Local.local_env * @stack IS1.LLVM.Local.local_env)%type)
@@ -1063,22 +1075,22 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Opaque FinPROV.initial_provenance.
   Opaque InfPROV.initial_provenance.
-  Opaque dvalue_convert_lazy.
-  Opaque uvalue_convert_lazy.
-  Opaque dvalue_refine_lazy.
-  Opaque uvalue_refine_lazy.
-  Opaque DVCrev.dvalue_convert_lazy.
-  Opaque DVCrev.uvalue_convert_lazy.
-  Opaque DVCrev.dvalue_refine_lazy.
-  Opaque DVCrev.uvalue_refine_lazy.
+  (* Opaque dvalue_convert_lazy. *)
+  (* Opaque uvalue_convert_lazy. *)
+  (* Opaque dvalue_refine_lazy. *)
+  (* Opaque uvalue_refine_lazy. *)
+  (* Opaque DVCrev.dvalue_convert_lazy. *)
+  (* Opaque DVCrev.uvalue_convert_lazy. *)
+  (* Opaque DVCrev.dvalue_refine_lazy. *)
+  (* Opaque DVCrev.uvalue_refine_lazy. *)
   Opaque dvalue_convert_strict.
   Opaque uvalue_convert_strict.
   Opaque dvalue_refine_strict.
   Opaque uvalue_refine_strict.
-  Opaque DVCrev.dvalue_convert_strict.
-  Opaque DVCrev.uvalue_convert_strict.
-  Opaque DVCrev.dvalue_refine_strict.
-  Opaque DVCrev.uvalue_refine_strict.
+  (* Opaque DVCrev.dvalue_convert_strict. *)
+  (* Opaque DVCrev.uvalue_convert_strict. *)
+  (* Opaque DVCrev.dvalue_refine_strict. *)
+  (* Opaque DVCrev.uvalue_refine_strict. *)
 
   Lemma refine_OOM_h_L4_convert_tree_strict :
     forall {T} x_inf y_inf (RR : relation T),
@@ -1382,6 +1394,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (** Model *)
   Import DynamicTypes TypToDtyp CFG.
 
+  (*
   Definition event_refine_lazy A B (e1 : IS1.LP.Events.L0 A) (e2 : IS2.LP.Events.L0 B) : Prop.
   Proof.
     refine (match e1, e2 with
@@ -1519,6 +1532,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { apply True.
     }
   Defined.
+   *)
 
   Definition event_refine_strict A B (e1 : IS1.LP.Events.L0 A) (e2 : IS2.LP.Events.L0 B) : Prop.
   Proof.
@@ -1927,6 +1941,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
+  (*
   Definition event_converted_lazy A B (e1 : IS1.LP.Events.L0 A) (e2 : IS2.LP.Events.L0 B) : Prop.
   Proof.
     refine (match e1, e2 with
@@ -2064,7 +2079,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { apply True.
     }
   Defined.
-
+   *)
+  (*
   Definition event_res_refine_lazy A B (e1 : IS1.LP.Events.L0 A) (res1 : A) (e2 : IS2.LP.Events.L0 B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
@@ -2218,6 +2234,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { apply True.
     }
   Defined.
+  *)
 
   Definition event_res_refine_strict A B (e1 : IS1.LP.Events.L0 A) (res1 : A) (e2 : IS2.LP.Events.L0 B) (res2 : B) : Prop.
   Proof.
@@ -2675,6 +2692,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
+  (*
   Definition L0'_refine_lazy A B (e1 : IS1.LP.Events.L0' A) (e2 : IS2.LP.Events.L0' B) : Prop.
   Proof.
     refine (match e1, e2 with
@@ -2705,6 +2723,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                Forall2 uvalue_refine_lazy args args0).
     }
   Defined.
+   *)
 
   Definition call_refine_strict (A B : Type) (c1 : IS1.LP.Events.CallE A) (c2 : CallE B) : Prop.
   Proof.
@@ -2718,6 +2737,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
+  (*
   Definition call_res_refine_lazy (A B : Type) (c1 : IS1.LP.Events.CallE A) (res1 : A) (c2 : CallE B) (res2 : B) : Prop.
   Proof.
     (* Calls *)
@@ -2729,6 +2749,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                uvalue_refine_lazy res1 res2).
     }
   Defined.
+   *)
 
   Definition call_res_refine_strict (A B : Type) (c1 : IS1.LP.Events.CallE A) (res1 : A) (c2 : CallE B) (res2 : B) : Prop.
   Proof.
@@ -2745,12 +2766,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Definition L0'_refine_strict A B (e1 : IS1.LP.Events.L0' A) (e2 : IS2.LP.Events.L0' B) : Prop
     := (sum_prerel call_refine_strict event_refine_strict) _ _ e1 e2.
 
+  (*
   Definition L0'_res_refine_lazy A B (e1 : IS1.LP.Events.L0' A) (res1 : A) (e2 : IS2.LP.Events.L0' B) (res2 : B) : Prop
     := (sum_postrel call_res_refine_lazy event_res_refine_lazy) _ _ e1 res1 e2 res2.
+   *)
 
   Definition L0'_res_refine_strict A B (e1 : IS1.LP.Events.L0' A) (res1 : A) (e2 : IS2.LP.Events.L0' B) (res2 : B) : Prop
     := (sum_postrel call_res_refine_strict event_res_refine_strict) _ _ e1 res1 e2 res2.
 
+  (*
   Definition exp_E_refine_lazy A B (e1 : IS1.LP.Events.exp_E A) (e2 : IS2.LP.Events.exp_E B) : Prop.
   Proof.
     refine (match e1, e2 with
@@ -2857,6 +2881,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { apply True.
     }
   Defined.
+   *)
 
   Definition exp_E_refine_strict A B (e1 : IS1.LP.Events.exp_E A) (e2 : IS2.LP.Events.exp_E B) : Prop.
   Proof.
@@ -2965,6 +2990,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
+  (*
   Definition exp_E_res_refine_lazy A B (e1 : IS1.LP.Events.exp_E A) (res1 : A) (e2 : IS2.LP.Events.exp_E B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
@@ -3079,7 +3105,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { apply True.
     }
   Defined.
-
+   *)
+  
   Definition exp_E_res_refine_strict A B (e1 : IS1.LP.Events.exp_E A) (res1 : A) (e2 : IS2.LP.Events.exp_E B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
@@ -3219,6 +3246,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
+  (*
   Definition instr_E_res_refine_lazy A B (e1 : IS1.LP.Events.instr_E A) (res1 : A) (e2 : IS2.LP.Events.instr_E B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
@@ -3242,7 +3270,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             ).
     }
   Defined.
-
+   *)
+  
   Definition instr_E_res_refine_strict A B (e1 : IS1.LP.Events.instr_E A) (res1 : A) (e2 : IS2.LP.Events.instr_E B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
@@ -3268,6 +3297,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
+  (*
   Definition L0_E1E2_rutt_lazy t1 t2
     : Prop :=
     rutt
@@ -3275,6 +3305,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       event_res_refine_lazy
       dvalue_refine_lazy
       t1 t2.
+  *)
 
   Definition L0_E1E2_orutt_strict t1 t2
     : Prop :=
@@ -4156,6 +4187,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     - rewrite tau_euttge, unfold_translate. eauto with itree.
   Qed.
 
+  (*
   Definition event_res_converted_lazy A B (e1 : IS1.LP.Events.L0 A) (res1 : A) (e2 : IS2.LP.Events.L0 B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
@@ -4309,7 +4341,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { apply True.
     }
   Defined.
-
+  *)
+  (*
   Definition L0'_converted_lazy A B (e1 : IS1.LP.Events.L0' A) (e2 : IS2.LP.Events.L0' B) : Prop.
   Proof.
     refine (match e1, e2 with
@@ -4328,7 +4361,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                Forall2 uvalue_refine_lazy args1 args2).
     }
   Defined.
-
+  *)
+  (*
   Definition L0'_res_converted_lazy A B (e1 : IS1.LP.Events.L0' A) (res1 : A) (e2 : IS2.LP.Events.L0' B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
@@ -4351,7 +4385,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             ).
     }
   Defined.
-
+   *)
+  (* 
   Definition call_converted_lazy (A B : Type) (c1 : IS1.LP.Events.CallE A) (c2 : CallE B) : Prop.
   Proof.
     (* Calls *)
@@ -4363,7 +4398,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                Forall2 uvalue_converted_lazy args args0).
     }
   Defined.
-
+   *)
+  (*
   Definition call_res_converted_lazy (A B : Type) (c1 : IS1.LP.Events.CallE A) (res1 : A) (c2 : CallE B) (res2 : B) : Prop.
   Proof.
     (* Calls *)
@@ -4674,7 +4710,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       destruct H.
       auto.
   Qed.
-
+   *)
+  
   Lemma translate_LU_to_exp_lookup_id_orutt :
     forall id : LLVMAst.ident,
       orutt exp_E_refine_strict exp_E_res_refine_strict uvalue_refine_strict
@@ -6526,6 +6563,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
            ).
   Defined.
 
+  (*
   Definition function_denotation_converted_lazy : IS1.LLVM.D.function_denotation -> IS2.LLVM.D.function_denotation -> Prop.
   Proof.
     intros d1 d2.
@@ -6539,6 +6577,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                  (d2 args2)
            ).
   Defined.
+   *)
 
   (* TODO: Move this to rutt library *)
   Lemma rutt_iter' {E1 E2 I1 I2 R1 R2}
