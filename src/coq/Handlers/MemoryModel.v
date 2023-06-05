@@ -3076,7 +3076,12 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     := forall fs,
       memory_stack_frame_stack_prop (MemState_get_memory m1) fs <-> memory_stack_frame_stack_prop (MemState_get_memory m2) fs.
 
+  (* Definition Heap_in_bounds (ms_fin:FinMem.MMEP.MMSP.MemState) : Prop := *)
+  (*   let h := Memory64BitIntptr.MMEP.MMSP.mem_state_heap ms_fin in *)
+  (*   forall i, is_true (IntMaps.member i h) -> exists ptr, FinPTOI.ptr_to_int ptr = i. *)
+  
   (** Heap *)
+  (* SAZ: Add Heap_in_bounds *)
   Definition heap_preserved (m1 m2 : MemState) : Prop
     := forall h,
       memory_stack_heap_prop (MemState_get_memory m1) h <-> memory_stack_heap_prop (MemState_get_memory m2) h.
@@ -3448,6 +3453,9 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       add_ptrs_to_frame_stack fs1 ptrs fs2 ->
       memory_stack_frame_stack_prop (MemState_get_memory m2) fs2.
 
+  (*
+    SAZ TODO: add Heap_in_bounds
+  *)
   Definition extend_heap (m1 : MemState) (ptrs : list addr) (m2 : MemState) : Prop :=
     forall h1 h2,
       memory_stack_heap_prop (MemState_get_memory m1) h1 ->
