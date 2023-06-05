@@ -128,6 +128,25 @@ Module InfiniteToFinite.
     exact a'.
   Defined.
 
+  Lemma unsigned_repr_eq:
+    forall i, ((0 <=? i)%Z && (i <? Int64.modulus)%Z)%bool = true ->
+         Int64.unsigned (Int64.repr i) = i.
+  Proof.
+    intros i H.
+    Transparent Int64.repr.
+    unfold Int64.repr.
+    unfold Int64.unsigned.
+    cbn.
+    Opaque Int64.repr.
+    symmetry in H.
+    apply Bool.andb_true_eq in H.
+    destruct H.
+    assert (0 <= i < Integers.Int64.modulus)%Z by lia.
+    rewrite Integers.Int64.Z_mod_modulus_eq.
+    rewrite Zmod_small; auto.
+  Qed.
+  
+  
   Lemma lift_addr_Convert_addr_inverse:
     forall {a_inf a_fin},
         InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
@@ -144,26 +163,15 @@ Module InfiniteToFinite.
       unfold FiniteAddresses.Prov.
       unfold Prov in *.
       remember (FinToInfAddrConvertSafe.addr_convert_succeeds (Int64.repr i, p)) as X.
-
       destruct X. destruct x.
       unfold FinToInfAddrConvert.addr_convert in e.
       cbn in e.
       inversion e.
       subst.
-      assert (Int64.unsigned (Int64.repr i) = i).
-      {   Transparent Int64.repr.
-          unfold Int64.repr.
-          unfold Int64.unsigned.
-          cbn.
-          Opaque Int64.repr.
-          apply Bool.orb_false_elim in HEQ.
-          destruct HEQ.
-          assert (0 <= i < Integers.Int64.modulus)%Z by lia.
-          rewrite Integers.Int64.Z_mod_modulus_eq.
-          rewrite Zmod_small; auto.
-      }
-      rewrite H0.
-      reflexivity.
+      rewrite unsigned_repr_eq; auto.
+      apply Bool.orb_false_elim in HEQ.      
+      apply andb_true_intro.
+      lia.
   Qed.
 
 
@@ -506,8 +514,240 @@ Module InfiniteToFinite.
               ret (ix, b')).
   Defined.
 
+  Definition in_bounds (z:Z) : bool :=
+    match LLVMParams64BitIntptr.ITOP.int_to_ptr z PROV.nil_prov with
+    | NoOom _ => true
+    | Oom _ => false
+    end.
+
+  Lemma in_bounds_Z : forall (z:Z), in_bounds z = ((0 <=? z)%Z && (z <? Int64.modulus)%Z)%bool.
+  Proof.
+    intros z.
+    unfold in_bounds.
+    unfold LLVMParams64BitIntptr.ITOP.int_to_ptr.
+    break_match; break_match_hyp; inversion Heqo; lia.
+  Qed.
+
+  Lemma in_bounds_exists_addr : forall z, in_bounds z = true <-> exists addr, LLVMParams64BitIntptr.PTOI.ptr_to_int addr = z.
+  Proof.
+    intros.
+    unfold in_bounds.
+    split; intros H.
+    - break_match_hyp. exists a.
+      unfold LLVMParams64BitIntptr.ITOP.int_to_ptr in Heqo.
+      break_match_hyp; inversion Heqo.
+      unfold LLVMParams64BitIntptr.PTOI.ptr_to_int. cbn.
+      apply unsigned_repr_eq. lia.
+      inversion H.
+    - destruct H as [ptr HP].
+      subst.
+      unfold LLVMParams64BitIntptr.ITOP.int_to_ptr.
+      unfold LLVMParams64BitIntptr.PTOI.ptr_to_int.
+      break_match.
+      break_match_hyp; inversion Heqo.
+      reflexivity.
+      break_match_hyp; inversion Heqo.
+      destruct ptr.
+      clear Heqo H0.
+      cbn in *.
+      rewrite <- Heqb.
+      unfold FiniteAddresses.Iptr in i.
+      destruct i.
+      cbn.
+      lia.
+  Qed.
+
+  Lemma filter_dom_map_eq :
+    forall {A B} (f : IntMaps.IM.key -> bool) (g : A -> B) (m : IntMaps.IntMap A) ,
+      forall k e,
+        IntMaps.IM.MapsTo k e (IntMaps.IM.map g (IntMaps.IP.filter_dom f m))
+        <->
+          IntMaps.IM.MapsTo k e (IntMaps.IP.filter_dom f (IntMaps.IM.map g m)).
+  Proof.
+    intros.
+    unfold IntMaps.IP.filter_dom.
+    split; intros H.
+    - rewrite IntMaps.IP.filter_iff.
+      apply IntMaps.IP.F.map_mapsto_iff in H.
+      destruct H as [a [EQ HM]].
+      apply IntMaps.IP.filter_iff in HM.
+      destruct HM.
+      split; auto.
+      apply IntMaps.IP.F.map_mapsto_iff.
+      exists a. tauto.
+      repeat red; intros; subst; auto.
+      repeat red; intros; subst; auto.
+    - rewrite IntMaps.IP.filter_iff in H.
+      destruct H.
+      apply IntMaps.IP.F.map_mapsto_iff in H.
+      destruct H as [a [EQ HM]].
+      apply IntMaps.IP.F.map_mapsto_iff.
+      exists a. split; auto.
+      apply IntMaps.IP.filter_iff; auto.
+      repeat red; intros; subst; auto.
+      repeat red; intros; subst; auto.
+  Qed.
+
+  Lemma MapsTo_filter_true :
+    forall {A} (f : IntMaps.IM.key -> A -> bool) m,
+    forall k e,
+      f k e = true ->
+      IntMaps.IM.MapsTo k e m <->
+        IntMaps.IM.MapsTo k e (IntMaps.IP.filter f m).
+  Proof.
+    intros.
+    split; intros.
+    - apply IntMaps.IP.filter_iff.
+      + repeat red; intros; subst; auto.
+      + tauto.
+    - apply IntMaps.IP.filter_iff in H0.
+      + tauto.
+      + repeat red; intros; subst; auto.
+  Qed.
+
+  Lemma MapsTo_filter_subset :
+    forall {A} (f : IntMaps.IM.key -> A -> bool) m,
+    forall k e,
+      IntMaps.IM.MapsTo k e (IntMaps.IP.filter f m) ->
+      IntMaps.IM.MapsTo k e m.
+  Proof.
+    intros.
+    apply IntMaps.IP.filter_iff in H.
+    + tauto.
+    + repeat red; intros; subst; auto.
+  Qed.
+
+  Lemma not_MapsTo_filter :
+    forall {A} (f : IntMaps.IM.key -> A -> bool) m,
+    forall k e,
+      ~ IntMaps.IM.MapsTo k e m ->
+      ~ IntMaps.IM.MapsTo k e (IntMaps.IP.filter f m).
+  Proof.
+    intros.
+    intro C.
+    apply H.
+    eapply MapsTo_filter_subset.
+    eauto.
+  Qed.
+  
+  Lemma MapsTo_filter_dom_true :
+    forall {A} (f : IntMaps.IM.key -> bool) (m : IntMaps.IntMap A),
+    forall k e,
+      f k = true ->
+      IntMaps.IM.MapsTo k e m <->
+        IntMaps.IM.MapsTo k e (IntMaps.IP.filter_dom f m).
+  Proof.
+    intros.
+    unfold IntMaps.IP.filter_dom.
+    apply MapsTo_filter_true.
+    assumption.
+  Qed.
+
+  Lemma MapsTo_filter_dom_subset :
+    forall {A} (f : IntMaps.IM.key -> bool) (m : IntMaps.IntMap A),
+    forall k e,
+      IntMaps.IM.MapsTo k e (IntMaps.IP.filter_dom f m) ->      
+      IntMaps.IM.MapsTo k e m.
+  Proof.
+    intros.
+    unfold IntMaps.IP.filter_dom.
+    eapply MapsTo_filter_subset.
+    eauto.
+  Qed.
+
+  Lemma not_MapsTo_filter_dom :
+    forall {A} (f : IntMaps.IM.key -> bool) (m : IntMaps.IntMap A),
+    forall k e,
+      ~ IntMaps.IM.MapsTo k e m ->
+      ~ IntMaps.IM.MapsTo k e (IntMaps.IP.filter_dom f m).
+  Proof.
+    intros.
+    intro C.
+    apply H.
+    eapply MapsTo_filter_dom_subset.
+    eauto.
+  Qed.
+  
+  Lemma find_filter_true :
+    forall {A} (f : IntMaps.IM.key -> A -> bool) (m : IntMaps.IntMap A),
+      forall k a,
+        IntMaps.IM.find k (IntMaps.IP.filter f m) = Some a <->
+          IntMaps.IM.find k m = Some a /\ (f k a = true).
+  Proof.
+    intros.
+    split; intros H.
+    - apply IntMaps.IP.F.find_mapsto_iff in H.
+      apply IntMaps.IP.filter_iff in H.
+      destruct H.
+      split; auto.
+      apply IntMaps.IP.F.find_mapsto_iff. assumption.
+      repeat red; intros; subst; auto.
+    - destruct H.
+      apply IntMaps.IP.F.find_mapsto_iff.
+      apply IntMaps.IP.filter_iff.
+      repeat red; intros; subst; auto.
+      apply IntMaps.IP.F.find_mapsto_iff in H.      
+      split; auto.
+  Qed.
+
+  Lemma find_filter_dom_true : 
+    forall {A} (f : IntMaps.IM.key -> bool) (m : IntMaps.IntMap A),
+      forall k a,
+        IntMaps.IM.find k (IntMaps.IP.filter_dom f m) = Some a <->
+          IntMaps.IM.find k m = Some a /\ (f k = true).
+  Proof.
+    intros.
+    unfold IntMaps.IP.filter_dom.
+    apply find_filter_true.
+  Qed.
+
+  Lemma IntMaps_find_None :
+    forall {A} (k : IntMaps.IM.key) (m:IntMaps.IntMap A),
+      IntMaps.IM.find k m = None <-> forall e, ~ IntMaps.IM.MapsTo k e m.
+  Proof.
+    intros.
+    split; intros H.
+    - intros. intro C.
+      apply IntMaps.IP.F.find_mapsto_iff in C.
+      rewrite H in C. inversion C.
+    - destruct (IntMaps.IM.find k m) eqn:EQ; auto.
+      apply IntMaps.IP.F.find_mapsto_iff in EQ.
+      apply H in EQ.
+      contradiction.
+  Qed.
+    
+  Lemma find_filter_None :
+    forall {A} (f : IntMaps.IM.key -> A -> bool) (m : IntMaps.IntMap A),
+    forall k,
+      IntMaps.IM.find k m = None ->
+        IntMaps.IM.find k (IntMaps.IP.filter f m) = None.
+  Proof.
+    intros.
+    rewrite IntMaps_find_None.
+    intros e C.
+    rewrite IntMaps_find_None in H.
+    specialize (H e).
+    apply H.
+    apply (MapsTo_filter_subset f m).
+    auto.
+  Qed.
+
+  Lemma find_filter_dom_None :
+    forall {A} (f : IntMaps.IM.key -> bool) (m : IntMaps.IntMap A),
+    forall k,
+      IntMaps.IM.find k m = None ->
+        IntMaps.IM.find k (IntMaps.IP.filter_dom f m) = None.
+  Proof.
+    intros.
+    unfold IntMaps.IP.filter_dom.
+    apply find_filter_None.
+    assumption.
+  Qed.
+
   Definition lift_Heap (h : FinMemMMSP.Heap) : InfMemMMSP.Heap
-    := IntMaps.IM.map lift_Block h.
+    :=
+    let h' := IntMaps.IP.filter_dom in_bounds h in
+    IntMaps.IM.map lift_Block h'.
 
   Lemma lift_Heap_convert_Heap_inverse :
     forall {h_inf h_fin},
@@ -6034,8 +6274,37 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     auto.
   Qed.
 
+  Lemma fin_ptr_to_int_in_bounds:
+    forall (ptr : FinAddr.addr),
+          in_bounds (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr) = true.
+  Proof.
+    intros.
+    apply in_bounds_exists_addr.
+    exists ptr; auto.
+  Qed.
 
-
+  Lemma find_ptr_to_int_lift_Heap :
+    forall h ptr,
+      IntMaps.IM.find (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr) (lift_Heap h) =
+        option_map lift_Block (IntMaps.IM.find (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr) h).
+  Proof.
+    intros.
+    unfold lift_Heap.
+    
+    unfold option_map.
+    break_match.
+    - apply IntMaps.IP.F.find_mapsto_iff in Heqo.
+      apply IntMaps.IP.F.find_mapsto_iff.
+      apply IntMaps.IP.F.map_mapsto_iff.
+      exists b. split; auto.
+      apply MapsTo_filter_dom_true; auto.
+      apply fin_ptr_to_int_in_bounds.
+    - rewrite IntMaps.IP.F.map_o.
+      apply (find_filter_dom_None in_bounds) in Heqo.
+      rewrite Heqo.
+      reflexivity.
+  Qed.
+      
   (* TODO: Move this *)
   Lemma ptr_in_heap_prop_lift :
     forall h root ptr,
@@ -6044,26 +6313,22 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Proof.
     intros h root ptr IN.
     red in *.
-    unfold lift_Heap.
     rewrite fin_to_inf_addr_ptr_to_int.
+    rewrite find_ptr_to_int_lift_Heap.
 
-    rewrite IntMaps.IP.F.map_o.
-    break_match_hyp; try contradiction.
-
-    cbn.
-    unfold lift_Block.
-    rewrite List.map_map.
-    replace (fun x : FinAddr.addr => LLVMParamsBigIntptr.PTOI.ptr_to_int (fin_to_inf_addr x)) with
-      (LLVMParams64BitIntptr.PTOI.ptr_to_int).
-    2: {
-      apply Axioms.functional_extensionality.
-      intros x.
+    destruct (IntMaps.IM.find (elt:=FinMem.MMEP.MMSP.Block) (LLVMParams64BitIntptr.PTOI.ptr_to_int root) h) eqn: EQ; simpl in *.
+    - unfold lift_Block.
+      apply in_map_iff in IN.
+      destruct IN as [addr [EQ' HI]].
+      apply in_map_iff.
+      exists (fin_to_inf_addr addr).
+      split.
       rewrite fin_to_inf_addr_ptr_to_int.
-      auto.
-    }
-
-    rewrite fin_to_inf_addr_ptr_to_int.
-    auto.
+      rewrite fin_to_inf_addr_ptr_to_int.
+      assumption.
+      apply in_map.
+      assumption.
+    - contradiction.
   Qed.
 
   (* TODO: Move this *)
@@ -6159,66 +6424,66 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     rewrite IntMaps.IP.F.map_b in IN.
   Admitted.
 
-  (* (* TODO: Move this *) *)
-  (* Lemma heap_eqv_lift : *)
-  (*   forall h1 h2, *)
-  (*     FinMem.MMEP.MMSP.heap_eqv h1 h2 -> *)
-  (*     InfMem.MMEP.MMSP.heap_eqv (lift_Heap h1) (lift_Heap h2). *)
-  (* Proof. *)
-  (*   intros h1 h2 EQV. *)
-  (*   destruct EQV. *)
+  (* TODO: Move this *)
+  Lemma heap_eqv_lift :
+    forall h1 h2,
+      FinMem.MMEP.MMSP.heap_eqv h1 h2 ->
+      InfMem.MMEP.MMSP.heap_eqv (lift_Heap h1) (lift_Heap h2).
+  Proof.
+    intros h1 h2 EQV.
+    destruct EQV.
 
-  (*   split. *)
-  (*   - (* Roots *) *)
-  (*     intros ptr. *)
-  (*     split; intros IN. *)
-  (*     + apply root_in_heap_prop_lift_inv in IN. *)
-  (*       destruct IN as (ptr_fin & CONV & IN). *)
-  (*       apply EQV in IN. *)
-  (*       apply ptr_in_heap_prop_lift in IN. *)
-  (*       erewrite fin_to_inf_addr_conv_inf in IN; eauto. *)
-  (*     + apply ptr_in_heap_prop_lift_inv in IN. *)
-  (*       destruct IN as (ptr_fin & CONV & IN). *)
-  (*       apply EQV in IN. *)
-  (*       apply ptr_in_heap_prop_lift in IN. *)
-  (*       erewrite fin_to_inf_addr_conv_inf in IN; eauto. *)
+    split.
+    - (* Roots *)
+      intros ptr.
+      split; intros IN.
+      + apply root_in_heap_prop_lift_inv in IN.
+        destruct IN as (ptr_fin & CONV & IN).
+        apply EQV in IN.
+        apply ptr_in_heap_prop_lift in IN.
+        erewrite fin_to_inf_addr_conv_inf in IN; eauto.
+      + apply ptr_in_heap_prop_lift_inv in IN.
+        destruct IN as (ptr_fin & CONV & IN).
+        apply EQV in IN.
+        apply ptr_in_heap_prop_lift in IN.
+        erewrite fin_to_inf_addr_conv_inf in IN; eauto.
 
-  (*   - (* Pointers *) *)
-
-
-  (*   intros ptr. *)
-  (*   split; intros IN. *)
-  (*   - apply ptr_in_frame_prop_lift_inv in IN. *)
-  (*     destruct IN as (ptr_fin & CONV & IN). *)
-  (*     apply EQV in IN. *)
-  (*     apply ptr_in_frame_prop_lift in IN. *)
-  (*     erewrite fin_to_inf_addr_conv_inf in IN; eauto. *)
-  (*   - apply ptr_in_frame_prop_lift_inv in IN. *)
-  (*     destruct IN as (ptr_fin & CONV & IN). *)
-  (*     apply EQV in IN. *)
-  (*     apply ptr_in_frame_prop_lift in IN. *)
-  (*     erewrite fin_to_inf_addr_conv_inf in IN; eauto. *)
+    - (* Pointers *)
 
 
-  (*   intros fs1 fs2 EQV. *)
-  (*   red in *. *)
-  (*   intros f n. *)
-  (*   split; intros FSE. *)
-  (*   - apply FSNth_eqv_lift_inv in FSE. *)
-  (*     destruct FSE as (f_fin & F & FSE). *)
+    intros ptr.
+    split; intros IN.
+    - apply ptr_in_frame_prop_lift_inv in IN.
+      destruct IN as (ptr_fin & CONV & IN).
+      apply EQV in IN.
+      apply ptr_in_frame_prop_lift in IN.
+      erewrite fin_to_inf_addr_conv_inf in IN; eauto.
+    - apply ptr_in_frame_prop_lift_inv in IN.
+      destruct IN as (ptr_fin & CONV & IN).
+      apply EQV in IN.
+      apply ptr_in_frame_prop_lift in IN.
+      erewrite fin_to_inf_addr_conv_inf in IN; eauto.
 
-  (*     rewrite <- F. *)
-  (*     apply FSNth_eqv_lift. *)
-  (*     apply EQV. *)
-  (*     auto. *)
-  (*   - apply FSNth_eqv_lift_inv in FSE. *)
-  (*     destruct FSE as (f_fin & F & FSE). *)
 
-  (*     rewrite <- F. *)
-  (*     apply FSNth_eqv_lift. *)
-  (*     apply EQV. *)
-  (*     auto. *)
-  (* Qed. *)
+    intros fs1 fs2 EQV.
+    red in *.
+    intros f n.
+    split; intros FSE.
+    - apply FSNth_eqv_lift_inv in FSE.
+      destruct FSE as (f_fin & F & FSE).
+
+      rewrite <- F.
+      apply FSNth_eqv_lift.
+      apply EQV.
+      auto.
+    - apply FSNth_eqv_lift_inv in FSE.
+      destruct FSE as (f_fin & F & FSE).
+
+      rewrite <- F.
+      apply FSNth_eqv_lift.
+      apply EQV.
+      auto.
+  Qed.
 
   (* (* TODO: Move this *) *)
   (* Lemma frame_stack_eqv_lift_inv : *)
