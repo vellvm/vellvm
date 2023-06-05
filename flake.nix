@@ -38,17 +38,6 @@
                     };
                     meta.broken = false;
                   });
-
-              flocq = super.flocq.overrideAttrs
-                (s : rec
-                  { version = "3.4.3";
-                    name = "coq8.15-flocq-${version}";
-                    src = fetchTarball {
-                      url = "https://gitlab.inria.fr/flocq/flocq/-/archive/flocq-3.4.3/flocq-flocq-3.4.3.tar.gz";
-                      sha256 = "sha256:1489kbqa2z5dpcw9d900g9ssmcc2iqsfwy293sf309l596a5cdv1";
-                    };
-                    meta.broken = false;
-                  });
             });
 
         version = "vellvm:master";
