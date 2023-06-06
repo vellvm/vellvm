@@ -849,8 +849,7 @@ Module InfiniteToFinite.
       InfMem.MMEP.MemSpec.free_byte_allowed_all_preserved ms_inf ms_fin_lifted /\
       InfMem.MMEP.MemSpec.allocations_preserved ms_inf ms_fin_lifted /\
       InfMem.MMEP.MemSpec.frame_stack_preserved ms_inf ms_fin_lifted /\
-      InfMem.MMEP.MemSpec.heap_preserved ms_inf ms_fin_lifted /\
-      Heap_in_bounds ms_fin.
+      InfMem.MMEP.MemSpec.heap_preserved ms_inf ms_fin_lifted.
 
 
   (* TODO: move this *)
@@ -2377,10 +2376,9 @@ Module InfiniteToFinite.
 
   Lemma lift_MemState_refine_prop :
     forall ms,
-      Heap_in_bounds ms ->
       MemState_refine_prop (lift_MemState ms) ms.
   Proof.
-    intros ms HIB.
+    intros ms.
     red.
     destruct ms.
     cbn.
@@ -6076,7 +6074,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   (** Lemmas about writing bytes *)
   Lemma fin_inf_set_byte_memory :
     forall {addr_inf addr_fin byte_inf byte_fin ms_fin ms_fin' ms_inf},
-      Heap_in_bounds ms_fin' ->
       MemState_refine_prop ms_inf ms_fin ->
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
       sbyte_refine byte_inf byte_fin ->
@@ -6085,15 +6082,15 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         MemoryBigIntptr.MMEP.MemSpec.set_byte_memory ms_inf addr_inf byte_inf ms_inf' /\
           MemState_refine_prop ms_inf' ms_fin'.
   Proof.
-    intros addr_inf addr_fin byte_inf byte_fin ms_fin ms_fin' ms_inf HIB REF CONV BYTE_REF SET.
+    intros addr_inf addr_fin byte_inf byte_fin ms_fin ms_fin' ms_inf REF CONV BYTE_REF SET.
 
-    pose proof (lift_MemState_refine_prop ms_fin' HIB) as REF'.
+    pose proof (lift_MemState_refine_prop ms_fin') as REF'.
     exists (lift_MemState ms_fin').
 
     destruct SET.
     split.
     2: {
-      apply lift_MemState_refine_prop. assumption.
+      apply lift_MemState_refine_prop. 
     }
 
     split.
@@ -6696,7 +6693,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     auto.
   Qed.
   
-  (* SAZ: need to update this *)
   (* TODO: Move this *)
   Lemma Heap_eqv_lift :
     forall h1 h2,
@@ -6734,6 +6730,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       assumption.
   Qed.
 
+  (* SAZ: Do these next *)
   (* TODO: Move this *)
   Lemma memory_stack_frame_stack_prop_lift_inv :
     forall ms_inf fs_inf,
@@ -6747,6 +6744,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     red in FSP.
   Admitted.
 
+  (* SAZ: Do these next *)
   (* TODO: Move this *)
   Lemma frame_stack_preserved_lift_MemState :
     forall ms_fin ms_fin',
@@ -6772,6 +6770,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Admitted.
 
 
+  (*
   Lemma IntMap_member_map_keys_eq :
     forall {A B} (f : A -> B) m x,
       is_true (IntMaps.member x m) <->
@@ -6789,65 +6788,45 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       is_true (IntMaps.member ptr (lift_Heap h)) <-> is_true (IntMaps.member ptr h).
   Proof.
   Admitted.
+   *)
+  (* (* TODO: add Heap_in_bounds predicate for MemState and add that here *) *)
+  (* Lemma fin_inf_root_in_heap_prop_lift : *)
+  (*   forall h root, *)
+  (*     (exists fin_root, (fin_to_inf_addr fin_root) = root /\ FinMem.MMEP.MMSP.root_in_heap_prop h fin_root) <-> *)
+  (*       InfMem.MMEP.MMSP.root_in_heap_prop (lift_Heap h) root. *)
+  (* Proof. *)
+  (*   intros h root. *)
+  (*   unfold FinMem.MMEP.MMSP.root_in_heap_prop. *)
+  (*   unfold InfMem.MMEP.MMSP.root_in_heap_prop. *)
+  (*   split; intros. *)
+  (*   - destruct H as [fin_root [HEQ H]]. *)
+  (*     rewrite member_lift_Heap. *)
+  (*     rewrite <- HEQ. *)
+  (*     rewrite fin_to_inf_addr_ptr_to_int. *)
+  (*     assumption. *)
+  (*   - apply member_lift_Heap in H. *)
+  (*     unfold FinMem.MMEP.MMSP.Heap in *. *)
 
-  (* TODO: add Heap_in_bounds predicate for MemState and add that here *)
-  Lemma fin_inf_root_in_heap_prop_lift :
-    forall h root,
-      (exists fin_root, (fin_to_inf_addr fin_root) = root /\ FinMem.MMEP.MMSP.root_in_heap_prop h fin_root) <->
-        InfMem.MMEP.MMSP.root_in_heap_prop (lift_Heap h) root.
-  Proof.
-    intros h root.
-    unfold FinMem.MMEP.MMSP.root_in_heap_prop.
-    unfold InfMem.MMEP.MMSP.root_in_heap_prop.
-    split; intros.
-    - destruct H as [fin_root [HEQ H]].
-      rewrite member_lift_Heap.
-      rewrite <- HEQ.
-      rewrite fin_to_inf_addr_ptr_to_int.
-      assumption.
-    - apply member_lift_Heap in H.
-      unfold FinMem.MMEP.MMSP.Heap in *.
+  (*     apply (IntMap_member_map_keys_eq id) in H. *)
+  (*     destruct root. *)
+  (*     unfold LLVMParamsBigIntptr.PTOI.ptr_to_int in *. *)
+  (*     cbn in H. *)
+  (*     unfold FinAddr.addr. *)
+  (*     unfold FiniteAddresses.Iptr. unfold Iptr in i. *)
+  (* Admitted. *)
 
-      apply (IntMap_member_map_keys_eq id) in H.
-      destruct root.
-      unfold LLVMParamsBigIntptr.PTOI.ptr_to_int in *.
-      cbn in H.
-      unfold FinAddr.addr.
-      unfold FiniteAddresses.Iptr. unfold Iptr in i.
-  Admitted.
+  (* Lemma memory_stack_heap_prop_lift : *)
+  (*   forall ms_fin h_fin, *)
+  (*     FinMem.MMEP.MMSP.memory_stack_heap_prop ms_fin h_fin -> *)
+  (*     InfMem.MMEP.MMSP.memory_stack_heap_prop (lift_memory_stack ms_fin) (lift_Heap h_fin). *)
+  (* Proof. *)
+  (*   intros ms_fin h_fin MSH. *)
+  (*   red in MSH; red. *)
+  (*   destruct ms_fin. *)
+  (*   cbn in *. *)
+  (* Admitted. *)
 
-  Lemma root_in_heap_prop_lift:
-    forall h1 h2 : FinMem.MMEP.MMSP.Heap,
-      (forall root : LLVMParams64BitIntptr.ADDR.addr,
-          FinMem.MMEP.MMSP.root_in_heap_prop h1 root <-> FinMem.MMEP.MMSP.root_in_heap_prop h2 root) ->
-      forall root : LLVMParamsBigIntptr.ADDR.addr,
-        InfMem.MMEP.MMSP.root_in_heap_prop (lift_Heap h1) root ->
-        InfMem.MMEP.MMSP.root_in_heap_prop (lift_Heap h2) root.
-  Proof.
-    intros h1 h2 heap_roots_eqv root HR.
-    unfold lift_Heap.
-    apply fin_inf_root_in_heap_prop_lift in HR.
-    destruct HR as (fin_root  & HEQ & HR).
-    subst.
-    apply heap_roots_eqv in HR.
-
-
-  Admitted.
-
-
-
-  Lemma memory_stack_heap_prop_lift :
-    forall ms_fin h_fin,
-      FinMem.MMEP.MMSP.memory_stack_heap_prop ms_fin h_fin ->
-      InfMem.MMEP.MMSP.memory_stack_heap_prop (lift_memory_stack ms_fin) (lift_Heap h_fin).
-  Proof.
-    intros ms_fin h_fin MSH.
-    red in MSH; red.
-    destruct ms_fin.
-    cbn in *.
-  Admitted.
-
-  (* SAZ: work on this *)
+  (* SAZ: work on this NEXT *)
   (* TODO: Move this *)
   Lemma heap_preserved_lift_MemState :
     forall ms_fin ms_fin',
@@ -6860,8 +6839,23 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     destruct ms_fin, ms_fin'; cbn in *.
     intros h.
     split; intros MSFSP.
-    -
-
+    - destruct ms_memory_stack, ms_memory_stack0.
+      unfold InfMem.MMEP.MMSP.memory_stack_heap_prop in *.
+      unfold FinMem.MMEP.MMSP.memory_stack_heap_prop in *.
+      cbn in *.
+      rewrite <- MSFSP.
+      eapply Heap_eqv_lift.
+      eapply HP.
+      reflexivity.
+    - destruct ms_memory_stack, ms_memory_stack0.
+      unfold InfMem.MMEP.MMSP.memory_stack_heap_prop in *.
+      unfold FinMem.MMEP.MMSP.memory_stack_heap_prop in *.
+      cbn in *.
+      rewrite <- MSFSP.
+      eapply Heap_eqv_lift.
+      eapply HP.
+      reflexivity.
+  Qed.
 
 (*
       apply memory_heap_prop_lift_inv in MSFSP.
@@ -6875,10 +6869,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       admit.
     - admit.
 *)
-  Admitted.
-
 
   (* TODO: Move this *)
+  (*
   Lemma convert_Frame_cons :
     forall ptr f,
       convert_Frame (ptr :: f) = a' <- InfToFinAddrConvert.addr_convert ptr;; f' <- convert_Frame f;; ret (a' :: f').
@@ -7129,6 +7122,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       break_match_hyp; inv FS2.
       inv H.
   Admitted.
+  *)
 
   (* TODO: Move this *)
   Lemma MemState_refine_prop_frame_stack_preserved :
@@ -7198,7 +7192,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       red. cbn.
       reflexivity.
   Qed.
-
+  
   (* TODO: Move this *)
   Lemma convert_FrameStack_Snoc_equation :
     forall fs f,
@@ -7235,7 +7229,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     red in MSR.
     tauto.
   Qed.
-
 
   (* SAZ TODO: try these *)
   Lemma fin_inf_heap_preserved :
@@ -7277,6 +7270,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       + assumption.
       + red. reflexivity.
   Qed.
+
 
   Lemma MemState_refine_prop_read_byte_allowed_all_preserved :
     forall ms_inf ms_fin,
@@ -7369,23 +7363,24 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     - eapply fin_inf_preserve_allocation_ids; eauto.
   Qed.
 
-  Lemma write_byte_spec_MemPropT_Heap_in_bounds :
-    forall ms_fin ms_fin' addr_fin byte_fin res_fin,
-      Heap_in_bounds ms_fin ->
-      Memory64BitIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_fin byte_fin
-        ms_fin
-        (ret (ms_fin', res_fin)) ->
-      Heap_in_bounds ms_fin'.
-  Proof.
-    intros ms_fin ms_fin' addr_fin byte_fin res_fin H H0.
-    unfold Heap_in_bounds in *.
-    intros.
-    specialize (H i).
-    apply H.
-    unfold Memory64BitIntptr.MMEP.MemSpec.write_byte_spec_MemPropT in H0.
-    red in H0. cbn in H0.
-    (* should follow from write_byte_spec ? *)
-  Admitted.
+  (* TODO: Delete *)
+  (* Lemma write_byte_spec_MemPropT_Heap_in_bounds : *)
+  (*   forall ms_fin ms_fin' addr_fin byte_fin res_fin, *)
+  (*     Heap_in_bounds ms_fin -> *)
+  (*     Memory64BitIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_fin byte_fin *)
+  (*       ms_fin *)
+  (*       (ret (ms_fin', res_fin)) -> *)
+  (*     Heap_in_bounds ms_fin'. *)
+  (* Proof. *)
+  (*   intros ms_fin ms_fin' addr_fin byte_fin res_fin H H0. *)
+  (*   unfold Heap_in_bounds in *. *)
+  (*   intros. *)
+  (*   specialize (H i). *)
+  (*   apply H. *)
+  (*   unfold Memory64BitIntptr.MMEP.MemSpec.write_byte_spec_MemPropT in H0. *)
+  (*   red in H0. cbn in H0. *)
+  (*   (* should follow from write_byte_spec ? *) *)
+  (* Admitted. *)
 
   Lemma fin_inf_write_byte_spec_MemPropT :
     forall {addr_fin addr_inf ms_fin ms_fin' ms_inf byte_inf byte_fin res_fin},
@@ -7405,11 +7400,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           MemState_refine_prop ms_inf' ms_fin'.
   Proof.
     intros addr_fin addr_inf ms_fin ms_fin' ms_inf byte_inf byte_fin [] MSR ADDR_CONV BYTE_REF WBP.
-    assert (Heap_in_bounds ms_fin') as HIB.
-    { eapply write_byte_spec_MemPropT_Heap_in_bounds.
-      apply MSR.
-      apply WBP.
-    }
     destruct WBP.
     pose proof fin_inf_set_byte_memory HIB MSR ADDR_CONV BYTE_REF byte_written as (ms_inf' & SET_INF & MSR').
 
@@ -7432,11 +7422,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           MemState_refine_prop ms_inf' ms_fin'.
   Proof.
     intros addr_fin addr_inf ms_fin ms_fin' ms_inf byte_fin MSR ADDR_CONV WBP.
-    assert (Heap_in_bounds ms_fin') as HIB.
-    { eapply write_byte_spec_MemPropT_Heap_in_bounds.
-      apply MSR.
-      apply WBP.
-    }
 
     destruct WBP.
 
@@ -7633,7 +7618,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
   Lemma handle_memcpy_fin_inf :
     forall {args args0 ms_fin ms_fin' ms_inf res_fin},
-      Heap_in_bounds ms_fin' ->
       MemState_refine_prop ms_inf ms_fin ->
       Forall2 DVCInfFin.dvalue_refine_strict args0 args ->
       Memory64BitIntptr.MMEP.MemSpec.handle_memcpy_prop args ms_fin (ret (ms_fin', res_fin)) ->
@@ -8557,17 +8541,18 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
   Set Nested Proofs Allowed.
 
-  Lemma Heap_in_bounds_fresh_sid :
-    forall ms_fin ms_fin' sid_fin,
-      Heap_in_bounds ms_fin ->
-      fresh_sid ms_fin (ret (ms_fin', sid_fin)) ->
-      Heap_in_bounds ms_fin'.
-  Proof.
-    intros ms_fin ms_fin' sid_fin H H0.
-    unfold fresh_sid in H0.
-    cbn in H0.
-    (* SAZ: It seems like we should add Heap_in_bounds_preserved in many places. *)
-  Admitted.
+  (* TODO: delete *)
+  (* Lemma Heap_in_bounds_fresh_sid : *)
+  (*   forall ms_fin ms_fin' sid_fin, *)
+  (*     Heap_in_bounds ms_fin -> *)
+  (*     fresh_sid ms_fin (ret (ms_fin', sid_fin)) -> *)
+  (*     Heap_in_bounds ms_fin'. *)
+  (* Proof. *)
+  (*   intros ms_fin ms_fin' sid_fin H H0. *)
+  (*   unfold fresh_sid in H0. *)
+  (*   cbn in H0. *)
+  (*   (* SAZ: It seems like we should add Heap_in_bounds_preserved in many places. *) *)
+  (* Admitted. *)
 
 
   (* TODO: Factor out lemma about fresh_sid *)
@@ -8582,8 +8567,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           MemState_refine_prop ms_inf' ms_fin'.
   Proof.
     intros ms_inf ms_fin ms_fin' sid_fin MSR FRESH.
-    assert (Heap_in_bounds ms_fin') as HIB'.
-    { eapply Heap_in_bounds_fresh_sid. 2 : { apply FRESH. }  apply MSR. }
     cbn in *.
     red in MSR.
     exists sid_fin.
@@ -8652,7 +8635,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       (* lift_MemState does not change which sids are used *)
       Lemma used_store_id_lift_MemState :
         forall ms_fin sid,
-          Heap_in_bounds ms_fin ->
           FinMem.MMEP.MemSpec.used_store_id_prop ms_fin sid <->
             InfMem.MMEP.MemSpec.used_store_id_prop (lift_MemState ms_fin) sid.
       Proof.
@@ -9500,6 +9482,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       }
   Qed.
 
+
+   (* SAZ: try this eventually *)
   Lemma extend_stack_frame_fin_inf :
     forall {ms_inf_start ms_fin_start ms_inf_final ms_fin_final addrs_fin addrs_inf},
       MemState_refine_prop ms_inf_start ms_fin_start ->
@@ -9558,23 +9542,23 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       (* cbn in *. *)
   Admitted.
 
+  (* TODO: DELETE *)
   (* TODO: Not currently true, but will be once heap_preserved is modified *)
-  Lemma heap_preserved_heap_in_bounds :
-    forall {ms_fin_start ms_fin_final},
-      Heap_in_bounds ms_fin_start ->
-      Memory64BitIntptr.MMEP.MemSpec.heap_preserved ms_fin_start ms_fin_final ->
-      Heap_in_bounds ms_fin_final.
-  Proof.
-  Admitted.
+  (* Lemma heap_preserved_heap_in_bounds : *)
+  (*   forall {ms_fin_start ms_fin_final}, *)
+  (*     Memory64BitIntptr.MMEP.MemSpec.heap_preserved ms_fin_start ms_fin_final -> *)
+  (*     Heap_in_bounds ms_fin_final. *)
+  (* Proof. *)
+  (* Admitted. *)
 
-  Lemma MemState_refine_prop_heap_in_bounds :
-    forall {ms_inf_start ms_fin_start},
-      MemState_refine_prop ms_inf_start ms_fin_start ->
-      Heap_in_bounds ms_fin_start.
-  Proof.
-    intros ms_inf_start ms_fin_start REF.
-    destruct REF; tauto.
-  Qed.
+  (* Lemma MemState_refine_prop_heap_in_bounds : *)
+  (*   forall {ms_inf_start ms_fin_start}, *)
+  (*     MemState_refine_prop ms_inf_start ms_fin_start -> *)
+  (*     Heap_in_bounds ms_fin_start. *)
+  (* Proof. *)
+  (*   intros ms_inf_start ms_fin_start REF. *)
+  (*   destruct REF; tauto. *)
+  (* Qed. *)
 
   Lemma allocate_bytes_post_conditions_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start t num_elements bytes_fin addr_fin addrs_fin bytes_inf pr},
@@ -9602,11 +9586,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       apply addr_refine_fin_to_inf_addr.
     }
 
-    assert (Heap_in_bounds ms_fin_final) as HIB_FINAL.
-    {
-      eapply heap_preserved_heap_in_bounds; eauto.
-      eapply MemState_refine_prop_heap_in_bounds; eauto.
-    }
+    (* assert (Heap_in_bounds ms_fin_final) as HIB_FINAL. *)
+    (* { *)
+    (*   eapply heap_preserved_heap_in_bounds; eauto. *)
+    (*   eapply MemState_refine_prop_heap_in_bounds; eauto. *)
+    (* } *)
 
     split.
     2: {
@@ -9675,8 +9659,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           MemState_refine_prop ms_inf_final ms_fin_final.
   Proof.
     intros ms_fin_start ms_fin_final ms_inf_start t num_elements bytes_fin addr_fin bytes_inf pr MSR BYTES ALLOC.
-    assert (Heap_in_bounds ms_fin_start) as HIB.
-    { apply MSR. }
+    (* assert (Heap_in_bounds ms_fin_start) as HIB. *)
+    (* { apply MSR. } *)
     unfold MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_with_pr_spec_MemPropT.
     eapply MemPropT_fin_inf_bind.
     4: {
@@ -10050,6 +10034,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     apply H0.
   Qed.
 
+  (* SAZ: Look at this one too *)
   Lemma extend_heap_fin_inf :
     forall {ms_inf_start ms_fin_start ms_inf_final ms_fin_final addrs_fin addrs_inf},
       MemState_refine_prop ms_inf_start ms_fin_start ->
@@ -10094,14 +10079,15 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     apply MSR1 in MSFSP.
   Admitted.
 
+  (* TODO: DELETE *)
   (* TODO: Not currently true, but will be once heap_preserved is modified *)
-  Lemma extend_heap_heap_in_bounds :
-    forall {ms_fin_start ms_fin_final ptrs_fin},
-      Heap_in_bounds ms_fin_start ->
-      Memory64BitIntptr.MMEP.MemSpec.extend_heap ms_fin_start ptrs_fin ms_fin_final ->
-      Heap_in_bounds ms_fin_final.
-  Proof.
-  Admitted.
+  (* Lemma extend_heap_heap_in_bounds : *)
+  (*   forall {ms_fin_start ms_fin_final ptrs_fin}, *)
+  (*     Heap_in_bounds ms_fin_start -> *)
+  (*     Memory64BitIntptr.MMEP.MemSpec.extend_heap ms_fin_start ptrs_fin ms_fin_final -> *)
+  (*     Heap_in_bounds ms_fin_final. *)
+  (* Proof. *)
+  (* Admitted. *)
 
   Lemma malloc_bytes_post_conditions_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start bytes_fin addr_fin addrs_fin bytes_inf pr},
@@ -10129,11 +10115,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       apply addr_refine_fin_to_inf_addr.
     }
 
-    assert (Heap_in_bounds ms_fin_final) as HIB_FINAL.
-    {
-      eapply extend_heap_heap_in_bounds; eauto.
-      eapply MemState_refine_prop_heap_in_bounds; eauto.
-    }
+    (* assert (Heap_in_bounds ms_fin_final) as HIB_FINAL. *)
+    (* { *)
+    (*   eapply extend_heap_heap_in_bounds; eauto. *)
+    (*   eapply MemState_refine_prop_heap_in_bounds; eauto. *)
+    (* } *)
 
     split.
     2: {
@@ -10837,10 +10823,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
     exists (lift_MemState ms_fin_final).
 
-    assert (Heap_in_bounds ms_fin_final) as HIB_FINAL.
-    {
-      admit. (* TODO: Heap_in_bounds *)
-    }
+    (* assert (Heap_in_bounds ms_fin_final) as HIB_FINAL. *)
+    (* { *)
+    (*   admit. (* TODO: Heap_in_bounds *) *)
+    (* } *)
 
     split.
     2: apply lift_MemState_refine_prop.
@@ -11057,7 +11043,6 @@ Admitted.
       { (* MA *)
         intros a_fin ms_fin_ma MEMCPY.
         eapply handle_memcpy_fin_inf; eauto.
-        admit. (* TODO: Heap_in_bounds *)
       }
 
       intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin _ MSR' EQV.
