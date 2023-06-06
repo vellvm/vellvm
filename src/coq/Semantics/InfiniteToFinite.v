@@ -593,8 +593,7 @@ Module InfiniteToFinite.
   Lemma MapsTo_filter_true :
     forall {A} (f : IntMaps.IM.key -> A -> bool) m,
     forall k e,
-      f k e = true ->
-      IntMaps.IM.MapsTo k e m <->
+       (f k e = true /\ IntMaps.IM.MapsTo k e m) <->
         IntMaps.IM.MapsTo k e (IntMaps.IP.filter f m).
   Proof.
     intros.
@@ -602,7 +601,7 @@ Module InfiniteToFinite.
     - apply IntMaps.IP.filter_iff.
       + repeat red; intros; subst; auto.
       + tauto.
-    - apply IntMaps.IP.filter_iff in H0.
+    - apply IntMaps.IP.filter_iff in H.
       + tauto.
       + repeat red; intros; subst; auto.
   Qed.
@@ -635,14 +634,13 @@ Module InfiniteToFinite.
   Lemma MapsTo_filter_dom_true :
     forall {A} (f : IntMaps.IM.key -> bool) (m : IntMaps.IntMap A),
     forall k e,
-      f k = true ->
-      IntMaps.IM.MapsTo k e m <->
+      (f k = true /\ IntMaps.IM.MapsTo k e m) <->
         IntMaps.IM.MapsTo k e (IntMaps.IP.filter_dom f m).
   Proof.
     intros.
     unfold IntMaps.IP.filter_dom.
-    apply MapsTo_filter_true.
-    assumption.
+    rewrite <- MapsTo_filter_true.
+    tauto.
   Qed.
 
   Lemma MapsTo_filter_dom_subset :
@@ -6321,8 +6319,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       apply IntMaps.IP.F.find_mapsto_iff.
       apply IntMaps.IP.F.map_mapsto_iff.
       exists b. split; auto.
-      apply MapsTo_filter_dom_true; auto.
+      apply MapsTo_filter_dom_true.
+      split.
       apply fin_ptr_to_int_in_bounds.
+      assumption.
     - rewrite IntMaps.IP.F.map_o.
       apply (find_filter_dom_None in_bounds) in Heqo.
       rewrite Heqo.
@@ -6355,8 +6355,39 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     - contradiction.
   Qed.
 
+  
+  Lemma ptr_in_heap_prop_addr_convert:
+    forall {h root_inf ptr_inf},
+      InfMem.MMEP.MMSP.ptr_in_heap_prop (lift_Heap h) root_inf ptr_inf ->
+      exists root_fin,
+      InfToFinAddrConvert.addr_convert root_inf = NoOom root_fin.
+  Proof.
+    intros h root_inf ptr_inf IN.
+    red in IN.
+    unfold lift_Heap, lift_Block in IN.
+    break_match_hyp; try contradiction.
+    apply IntMaps.IP.F.find_mapsto_iff in Heqo.
+    apply IntMaps.IP.F.map_mapsto_iff in Heqo.
+    destruct Heqo as [b_fin [EQ HB]].
+    apply MapsTo_filter_dom_true in HB.
+    destruct HB as [IB HB].
+    apply (in_bounds_exists_addr _ (snd root_inf)) in IB.
+    destruct IB as [root_fin [EQR HS]].
+    exists root_fin. 
+    rewrite <- fin_to_inf_addr_ptr_to_int in EQR.
+    destruct root_inf.
+    cbn in *. subst.
+    destruct root_fin. cbn.
+    erewrite <- fin_inf_ptoi.
+    rewrite ITOP.int_to_ptr_ptr_to_int. reflexivity.
+    auto.
+    rewrite addr_convert_fin_to_inf_addr.
+    reflexivity.
+  Qed.    
+
+  
   (* TODO: Move this *)
-  Lemma ptr_in_heap_prop_lift_inv :
+  Lemma ptr_in_heap_prop_lift_inv' :
     forall {h root_inf root_fin ptr_inf},
       InfMem.MMEP.MMSP.ptr_in_heap_prop (lift_Heap h) root_inf ptr_inf ->
       InfToFinAddrConvert.addr_convert root_inf = NoOom root_fin ->
@@ -6426,6 +6457,22 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         split; auto.
   Qed.
 
+  Lemma ptr_in_heap_prop_lift_inv :
+    forall {h root_inf ptr_inf},
+      InfMem.MMEP.MMSP.ptr_in_heap_prop (lift_Heap h) root_inf ptr_inf ->
+      exists root_fin, exists ptr_fin,
+        InfToFinAddrConvert.addr_convert root_inf = NoOom root_fin /\
+        InfToFinAddrConvert.addr_convert ptr_inf = NoOom ptr_fin /\
+          FinMem.MMEP.MMSP.ptr_in_heap_prop h root_fin ptr_fin.
+  Proof.
+    intros h root_inf ptr_inf H.
+    specialize (ptr_in_heap_prop_addr_convert H) as H1.
+    destruct H1 as [root_fin HC].
+    exists root_fin.
+    specialize  (ptr_in_heap_prop_lift_inv' H HC) as HX.
+    destruct HX as [ptr_fin [HP HH]].
+    exists ptr_fin; eauto.
+  Qed.
 
   Lemma MapsTo_filter_dom_subset_strong :
     forall {A} x v f (m : IntMaps.IntMap A),
@@ -6458,7 +6505,32 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       eapply IntMaps.lookup_member.
       apply HV.
   Qed.
-  
+
+  Lemma root_in_heap_prop_lift :
+    forall h root,
+      FinMem.MMEP.MMSP.root_in_heap_prop h root ->
+      InfMem.MMEP.MMSP.root_in_heap_prop (lift_Heap h) (fin_to_inf_addr root).
+  Proof.
+    intros h root H.
+    unfold FinMem.MMEP.MMSP.root_in_heap_prop in H.
+    unfold InfMem.MMEP.MMSP.root_in_heap_prop.
+    rewrite fin_to_inf_addr_ptr_to_int.
+    unfold lift_Heap.
+    unfold IntMaps.member in *.
+    apply IntMaps.IP.F.mem_in_iff.
+    apply IntMaps.IP.F.mem_in_iff in H.
+    apply In_MapsTo_exists.
+    rewrite In_MapsTo_exists in H.
+    destruct H as [b HM].
+    exists (lift_Block b).
+    rewrite filter_dom_map_eq.
+    apply MapsTo_filter_dom_true.
+    split.
+    - apply fin_ptr_to_int_in_bounds.
+    - apply IntMaps.IM.map_1.
+      assumption.
+  Qed.
+      
   (* (* TODO: Move this *) *)
   (* Definition heap_refine (h1 : InfMemMMSP.Heap) (h2 : FinMemMMSP.Heap) : Prop *)
   (*   := MemoryBigIntptr.MMEP.MemSpec.heap_preserved h1 (lift_Heap h2). *)
@@ -6509,66 +6581,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       assumption.
   Qed.
 
-  (* TODO: Move this *)
-  Lemma heap_eqv_lift :
-    forall h1 h2,
-      FinMem.MMEP.MMSP.heap_eqv h1 h2 ->
-      InfMem.MMEP.MMSP.heap_eqv (lift_Heap h1) (lift_Heap h2).
-  Proof.
-    intros h1 h2 EQV.
-    destruct EQV.
-
-    split.
-    - (* Roots *)
-      intros ptr.
-      split; intros IN.
-      + apply root_in_heap_prop_lift_inv in IN.
-        destruct IN as (ptr_fin & CONV & IN).
-        apply EQV in IN.
-        apply ptr_in_heap_prop_lift in IN.
-        erewrite fin_to_inf_addr_conv_inf in IN; eauto.
-      + apply ptr_in_heap_prop_lift_inv in IN.
-        destruct IN as (ptr_fin & CONV & IN).
-        apply EQV in IN.
-        apply ptr_in_heap_prop_lift in IN.
-        erewrite fin_to_inf_addr_conv_inf in IN; eauto.
-
-    - (* Pointers *)
-
-
-    intros ptr.
-    split; intros IN.
-    - apply ptr_in_frame_prop_lift_inv in IN.
-      destruct IN as (ptr_fin & CONV & IN).
-      apply EQV in IN.
-      apply ptr_in_frame_prop_lift in IN.
-      erewrite fin_to_inf_addr_conv_inf in IN; eauto.
-    - apply ptr_in_frame_prop_lift_inv in IN.
-      destruct IN as (ptr_fin & CONV & IN).
-      apply EQV in IN.
-      apply ptr_in_frame_prop_lift in IN.
-      erewrite fin_to_inf_addr_conv_inf in IN; eauto.
-
-
-    intros fs1 fs2 EQV.
-    red in *.
-    intros f n.
-    split; intros FSE.
-    - apply FSNth_eqv_lift_inv in FSE.
-      destruct FSE as (f_fin & F & FSE).
-
-      rewrite <- F.
-      apply FSNth_eqv_lift.
-      apply EQV.
-      auto.
-    - apply FSNth_eqv_lift_inv in FSE.
-      destruct FSE as (f_fin & F & FSE).
-
-      rewrite <- F.
-      apply FSNth_eqv_lift.
-      apply EQV.
-      auto.
-  Qed.
 
   (* (* TODO: Move this *) *)
   (* Lemma frame_stack_eqv_lift_inv : *)
@@ -6594,7 +6606,45 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     apply frame_stack_eqv_lift.
     auto.
   Qed.
+  
+  (* SAZ: need to update this *)
+  (* TODO: Move this *)
+  Lemma Heap_eqv_lift :
+    forall h1 h2,
+      FinMem.MMEP.MMSP.heap_eqv h1 h2 ->
+      InfMem.MMEP.MMSP.heap_eqv (lift_Heap h1) (lift_Heap h2).
+  Proof.
+    intros h1 h2 H.
+    inversion H.
+    constructor; intros; split; intros.
+    - apply root_in_heap_prop_lift_inv in H0.
+      destruct H0 as [root_fin [HEQ HF]].
+      apply heap_roots_eqv in HF.
+      eapply root_in_heap_prop_lift in HF.
+      erewrite lift_addr_Convert_addr_inverse in HF; eauto.
+    - apply root_in_heap_prop_lift_inv in H0.
+      destruct H0 as [root_fin [HEQ HF]].
+      apply heap_roots_eqv in HF.
+      eapply root_in_heap_prop_lift in HF.
+      erewrite lift_addr_Convert_addr_inverse in HF; eauto.
+    - specialize (ptr_in_heap_prop_lift_inv H0) as HL.
+      destruct HL as [root_fin [ptr_fin [HR [HP HIN]]]].
+      apply heap_ptrs_eqv in HIN.
+      apply ptr_in_heap_prop_lift in HIN.
 
+      rewrite (lift_addr_Convert_addr_inverse HR) in HIN.
+      rewrite (lift_addr_Convert_addr_inverse HP) in HIN.
+      assumption.
+    - specialize (ptr_in_heap_prop_lift_inv H0) as HL.
+      destruct HL as [root_fin [ptr_fin [HR [HP HIN]]]].
+      apply heap_ptrs_eqv in HIN.
+      apply ptr_in_heap_prop_lift in HIN.
+
+      rewrite (lift_addr_Convert_addr_inverse HR) in HIN.
+      rewrite (lift_addr_Convert_addr_inverse HP) in HIN.
+      assumption.
+  Qed.
+  
   (* TODO: Move this *)
   Lemma memory_stack_frame_stack_prop_lift_inv :
     forall ms_inf fs_inf,
@@ -6697,28 +6747,69 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
 
 
-  (* SAZ: need to update this *)
+
   (* TODO: Move this *)
-  Lemma Heap_eqv_lift :
+  Lemma heap_eqv_lift :
     forall h1 h2,
       FinMem.MMEP.MMSP.heap_eqv h1 h2 ->
       InfMem.MMEP.MMSP.heap_eqv (lift_Heap h1) (lift_Heap h2).
   Proof.
-    intros h1 h2 H.
-    inversion H.
-    constructor; intros; split; intros.
-    - eapply root_in_heap_prop_lift.
-      apply heap_roots_eqv.
-      assumption.
-    - eapply root_in_heap_prop_lift.
-      intros.
-      symmetry.
-      apply heap_roots_eqv.
-      assumption.
+    intros h1 h2 EQV.
+    destruct EQV.
 
-    - admit.
-  Admitted.
+    split.
+    - (* Roots *)
+      intros ptr.
+      split; intros IN.
+      + apply root_in_heap_prop_lift_inv in IN.
+        destruct IN as (ptr_fin & CONV & IN).
+        apply EQV in IN.
+        apply ptr_in_heap_prop_lift in IN.
+        erewrite fin_to_inf_addr_conv_inf in IN; eauto.
+      + apply ptr_in_heap_prop_lift_inv in IN.
+        destruct IN as (ptr_fin & CONV & IN).
+        apply EQV in IN.
+        apply ptr_in_heap_prop_lift in IN.
+        erewrite fin_to_inf_addr_conv_inf in IN; eauto.
 
+    - (* Pointers *)
+
+
+    intros ptr.
+    split; intros IN.
+    - apply ptr_in_frame_prop_lift_inv in IN.
+      destruct IN as (ptr_fin & CONV & IN).
+      apply EQV in IN.
+      apply ptr_in_frame_prop_lift in IN.
+      erewrite fin_to_inf_addr_conv_inf in IN; eauto.
+    - apply ptr_in_frame_prop_lift_inv in IN.
+      destruct IN as (ptr_fin & CONV & IN).
+      apply EQV in IN.
+      apply ptr_in_frame_prop_lift in IN.
+      erewrite fin_to_inf_addr_conv_inf in IN; eauto.
+
+
+    intros fs1 fs2 EQV.
+    red in *.
+    intros f n.
+    split; intros FSE.
+    - apply FSNth_eqv_lift_inv in FSE.
+      destruct FSE as (f_fin & F & FSE).
+
+      rewrite <- F.
+      apply FSNth_eqv_lift.
+      apply EQV.
+      auto.
+    - apply FSNth_eqv_lift_inv in FSE.
+      destruct FSE as (f_fin & F & FSE).
+
+      rewrite <- F.
+      apply FSNth_eqv_lift.
+      apply EQV.
+      auto.
+  Qed.
+
+  
 
   Lemma memory_stack_heap_prop_lift :
     forall ms_fin h_fin,
