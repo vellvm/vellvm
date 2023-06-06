@@ -836,21 +836,14 @@ Module InfiniteToFinite.
   Definition Heap_in_bounds (ms_fin:FinMem.MMEP.MMSP.MemState) : Prop :=
     let h := Memory64BitIntptr.MMEP.MMSP.mem_state_heap ms_fin in
     forall i, is_true (IntMaps.member i h) -> exists ptr, FinPTOI.ptr_to_int ptr = i.
-
+    
   (* TODO: Need a MemState_refine_prop that takes all of the predicates
       like write_byte_all_preserved and bundles them in one place
       between memories. Should use this for these lemmas... *)
   (* TODO: Confirm and move this *)
   Definition MemState_refine_prop ms_inf ms_fin :=
     let ms_fin_lifted := lift_MemState ms_fin in
-    InfMem.MMEP.MemSpec.preserve_allocation_ids ms_inf ms_fin_lifted /\
-      InfMem.MMEP.MemSpec.read_byte_preserved ms_inf ms_fin_lifted /\
-      InfMem.MMEP.MemSpec.write_byte_allowed_all_preserved ms_inf ms_fin_lifted /\
-      InfMem.MMEP.MemSpec.free_byte_allowed_all_preserved ms_inf ms_fin_lifted /\
-      InfMem.MMEP.MemSpec.allocations_preserved ms_inf ms_fin_lifted /\
-      InfMem.MMEP.MemSpec.frame_stack_preserved ms_inf ms_fin_lifted /\
-      InfMem.MMEP.MemSpec.heap_preserved ms_inf ms_fin_lifted.
-
+    InfMem.MMEP.MemSpec.MemState_eqv ms_inf ms_fin_lifted.
 
   (* TODO: move this *)
   (*
@@ -7131,7 +7124,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       InfMem.MMEP.MemSpec.frame_stack_preserved ms_inf (lift_MemState ms_fin).
   Proof.
     intros ms_inf ms_fin MSR.
-    red in MSR.
+    do 2 red in MSR.
     tauto.
   Qed.
 
@@ -7142,7 +7135,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       InfMem.MMEP.MemSpec.allocations_preserved ms_inf (lift_MemState ms_fin).
   Proof.
     intros ms_inf ms_fin MSR.
-    red in MSR.
+    do 2 red in MSR.
     tauto.
   Qed.
 
@@ -7226,7 +7219,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       InfMem.MMEP.MemSpec.heap_preserved ms_inf (lift_MemState ms_fin).
   Proof.
     intros ms_inf ms_fin MSR.
-    red in MSR.
+    do 2 red in MSR.
     tauto.
   Qed.
 
@@ -7278,7 +7271,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       InfMem.MMEP.MemSpec.read_byte_allowed_all_preserved ms_inf (lift_MemState ms_fin).
   Proof.
     intros ms_inf ms_fin MSR.
-    red in MSR.
+    do 2 red in MSR.
     tauto.
   Qed.
 
@@ -7342,6 +7335,30 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     intros ms_fin ms_inf ms_fin' ms_inf' REF REF' HP.
   Admitted.
 
+  Hint Resolve
+    lift_MemState_refine_prop
+    fin_inf_allocations_preserved
+    fin_inf_frame_stack_preserved
+    fin_inf_heap_preserved
+    fin_inf_read_byte_allowed_all_preserved
+    fin_inf_write_byte_allowed_all_preserved
+    fin_inf_free_byte_allowed_all_preserved
+    fin_inf_preserve_allocation_ids
+    fin_inf_read_byte_prop_all_preserved
+    : FinInf.
+
+  Lemma fin_inf_read_byte_preserved :
+    forall {ms_fin ms_inf ms_fin' ms_inf'},
+      MemState_refine_prop ms_inf ms_fin ->
+      MemState_refine_prop ms_inf' ms_fin' ->
+      Memory64BitIntptr.MMEP.MemSpec.read_byte_preserved ms_fin ms_fin' ->
+      MemoryBigIntptr.MMEP.MemSpec.read_byte_preserved ms_inf ms_inf'.
+  Proof.
+    intros ms_fin ms_inf ms_fin' ms_inf' MSR1 MSR2 READ.
+    destruct READ.
+    split; eauto with FinInf.
+  Qed.
+
   Lemma fin_inf_write_byte_operation_invariants :
     forall addr_inf addr_fin ms_fin ms_inf ms_fin' ms_inf',
       MemState_refine_prop ms_inf ms_fin ->
@@ -7352,16 +7369,13 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Proof.
     intros addr_inf addr_fin ms_fin ms_inf ms_fin' ms_inf' REF REF' CONV INV.
     destruct INV.
-    split.
-
-    - eapply fin_inf_allocations_preserved; eauto.
-    - eapply fin_inf_frame_stack_preserved; eauto.
-    - eapply fin_inf_heap_preserved; eauto.
-    - eapply fin_inf_read_byte_allowed_all_preserved; eauto.
-    - eapply fin_inf_write_byte_allowed_all_preserved; eauto.
-    - eapply fin_inf_free_byte_allowed_all_preserved; eauto.
-    - eapply fin_inf_preserve_allocation_ids; eauto.
+    split; eauto with FinInf.
   Qed.
+
+  Hint Resolve
+    fin_inf_read_byte_preserved
+    fin_inf_write_byte_operation_invariants
+    : FinInf.
 
   (* TODO: Delete *)
   (* Lemma write_byte_spec_MemPropT_Heap_in_bounds : *)
@@ -7401,7 +7415,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Proof.
     intros addr_fin addr_inf ms_fin ms_fin' ms_inf byte_inf byte_fin [] MSR ADDR_CONV BYTE_REF WBP.
     destruct WBP.
-    pose proof fin_inf_set_byte_memory HIB MSR ADDR_CONV BYTE_REF byte_written as (ms_inf' & SET_INF & MSR').
+    pose proof fin_inf_set_byte_memory MSR ADDR_CONV BYTE_REF byte_written as (ms_inf' & SET_INF & MSR').
 
     exists tt. exists ms_inf'.
     split; auto.
@@ -7427,7 +7441,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
     pose proof (sbyte_refine_lifted byte_fin) as BYTE_REF.
     exists (lift_SByte byte_fin).
-    pose proof fin_inf_set_byte_memory HIB MSR ADDR_CONV BYTE_REF byte_written as (ms_inf' & SET_INF & MSR').
+    pose proof fin_inf_set_byte_memory MSR ADDR_CONV BYTE_REF byte_written as (ms_inf' & SET_INF & MSR').
 
     exists ms_inf'.
     split; auto.
@@ -7435,8 +7449,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     split; auto.
     - eapply fin_inf_write_byte_allowed; eauto.
     - eapply fin_inf_write_byte_operation_invariants; eauto.
-      Unshelve.
-       tauto.
   Qed.
 
   (* TODO: Move this *)
@@ -7626,7 +7638,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           res_inf = res_fin /\
           MemState_refine_prop ms_inf' ms_fin'.
   Proof.
-    intros args args0 ms_fin ms_fin' ms_inf res_fin MIB MSR ARGS HANDLER.
+    intros args args0 ms_fin ms_fin' ms_inf res_fin MSR ARGS HANDLER.
 
     (* Handler *)
     repeat (destruct ARGS;
@@ -7665,7 +7677,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         split; auto.
         split; auto.
         apply lift_MemState_refine_prop.
-        assumption.
       }
 
       erewrite <- fin_inf_no_overlap; eauto.
@@ -7690,7 +7701,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       split; auto.
       split; auto.
       apply lift_MemState_refine_prop.
-      assumption.
     }
 
     { (* 64 bit memcpy *)
@@ -7720,7 +7730,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         split; auto.
         split; auto.
         apply lift_MemState_refine_prop.
-        assumption.
       }
 
       erewrite <- fin_inf_no_overlap; eauto.
@@ -7745,7 +7754,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       split; auto.
       split; auto.
       apply lift_MemState_refine_prop.
-      assumption.
     }
 
     { (* iptr memcpy *)
@@ -7777,7 +7785,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         split; auto.
         split; auto.
         apply lift_MemState_refine_prop.
-        assumption.
       }
 
       erewrite <- fin_inf_no_overlap; eauto.
@@ -7802,7 +7809,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       split; auto.
       split; auto.
       apply lift_MemState_refine_prop.
-      assumption.
     }
   Qed.
 
@@ -8567,6 +8573,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           MemState_refine_prop ms_inf' ms_fin'.
   Proof.
     intros ms_inf ms_fin ms_fin' sid_fin MSR FRESH.
+    pose proof MSR as MSR'.
     cbn in *.
     red in MSR.
     exists sid_fin.
@@ -8638,7 +8645,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           FinMem.MMEP.MemSpec.used_store_id_prop ms_fin sid <->
             InfMem.MMEP.MemSpec.used_store_id_prop (lift_MemState ms_fin) sid.
       Proof.
-        intros ms_fin sid HIB.
+        intros ms_fin sid.
         split; intros USED.
         {
           cbn in *.
@@ -8661,7 +8668,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           red; red in USED.
           destruct USED as [ptr [byte [READ BYTE]]].
 
-          pose proof (lift_MemState_refine_prop ms_fin HIB) as MSR.
+          pose proof (lift_MemState_refine_prop ms_fin) as MSR.
           pose proof inf_fin_read_byte_prop_exists MSR READ as (ptr_fin&byte_fin&READ_FIN&BYTE_REFINE).
           exists ptr_fin. exists byte_fin.
           split; auto.
@@ -8682,7 +8689,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
       intros USED.
       apply used_store_id_lift_MemState in USED.
-      apply H7.
+      apply f.
 
       (* TODO: Move this somewhere I can use it for both fin / inf *)
       Lemma used_store_id_read_byte_preserved_fin :
@@ -8738,8 +8745,17 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
       eapply used_store_id_read_byte_preserved_fin; eauto.
       symmetry; auto.
-      assumption.
+      eapply fin_inf_heap_preserved; eauto.
+
+      red.
+      red.
+      split; [|split; [|split; [|split; [|split; [|split]]]]];
+        eauto with FinInf.
     }
+
+    split; auto.
+    split; [|split; [|split; [|split; [|split; [|split]]]]];
+      eauto with FinInf.
   Admitted.
 
   (* TODO: Move this, prove this *)
@@ -11208,6 +11224,35 @@ Admitted.
     eapply to_ubytes_fin_inf_helper; eauto.
   Qed.
 
+  (* TODO: move this. Should hold for fin / inf *)
+  Lemma serialis_sbytes_MemState_eq :
+    forall {uv t ms ms' bytes},
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv t ms (success_unERR_UB_OOM (ms', bytes)) ->
+      MemState_eqv ms = ms'.
+  Proof.
+    intros uv t ms ms' bytes SERIALIZE.
+    rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+    revert uv t ms ms' bytes SERIALIZE.
+    induction uv; intros t_orig ms ms' bytes SERIALIZE.
+    - apply MemPropT_bind_ret_inv in SERIALIZE.
+      destruct SERIALIZE as (?&?&?&?).
+      red in H.
+      cbn in H.
+      cbn in H0.
+      red in H0.
+      break_match_hyp; inv H0.
+      cbn in fresh
+  Qed.
+
+  (* TODO: move this. Should hold for fin / inf *)
+  Lemma serialize_sbytes_deterministic :
+    forall {uv t ms ms' bytes bytes'},
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv t ms (success_unERR_UB_OOM (ms', bytes)) ->
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv t ms (success_unERR_UB_OOM (ms', bytes')) ->
+      bytes' = bytes.
+  Proof.
+  Admitted.
+  
   (* TODO: Prove this *)
   Lemma serialize_sbytes_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start uv_fin uv_inf t bytes_fin},
@@ -11247,7 +11292,9 @@ Admitted.
           cbn; auto
       end.
 
-    induction uv_inf;
+    generalize dependent t.
+    generalize dependent uv_fin.
+    induction uv_inf using LLVMParamsBigIntptr.Events.DV.uvalue_ind''; intros uv_fin UV_REF t' SERIALIZE;
       try solve
         [ pose proof UV_REF as UV_REF';
           rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
@@ -11257,6 +11304,76 @@ Admitted.
           break_match_hyp; inv UV_REF;
           solve_to_ubytes SERIALIZE
         ].
+    - (* Undef *)
+      pose proof UV_REF as UV_REF';
+        rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
+        rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
+        cbn in UV_REF;
+        move UV_REF after SERIALIZE;
+        break_match_hyp; inv UV_REF.
+        destruct t';
+        try (solve_to_ubytes SERIALIZE).
+
+        { (* Undef structures *)
+          eapply MemPropT_fin_inf_bind.
+          4: apply SERIALIZE.
+          all: eauto.
+
+          { (* MA: serialize fields *)
+            intros a_fin ms_fin_ma HMAPM.
+            eapply MemPropT_fin_inf_map_monad_In
+              with
+              (A_REF:=DVC1.uvalue_refine_strict)
+              (B_REF:=sbytes_refine); eauto.
+            2: {
+              eapply Forall2_repeatN.
+              rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+              cbn.
+              reflexivity.              
+            }
+
+            intros a_fin0 a_inf b_fin ms_fin ms_inf ms_fin_ma0 HIN_FIN HIN_INF MSR' UV_REF SER_ELEMENT.
+            cbn in SER_ELEMENT.
+            apply In_repeatN in HIN_FIN, HIN_INF.
+            subst.
+
+            specialize (IHuv_inf (LLVMParams64BitIntptr.Events.DV.UVALUE_Undef t)).
+            forward IHuv_inf.
+            { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+              cbn.
+              reflexivity.
+            }
+            specialize (IHuv_inf (DTYPE_Array sz0 t')).
+            cbn in IHuv_inf.
+            forward IHuv_inf.
+            { exists ms_fin_final. exists a_fin.
+              split; eauto.
+              rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SER_ELEMENT.
+              admit.
+              admit.
+            }
+
+            destruct IHuv_inf as (?&?&?&?&?).
+            destruct H as (?&?&?&?&?).
+            subst.
+            exists 
+            apply UV_REF.
+            
+            }
+            
+          }
+
+        intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin H H0 H1.
+        cbn.
+        cbn in *.
+        destruct H1; subst.
+        exists (concat a_inf). exists ms_inf.
+        split; auto.
+        split; auto.
+
+        apply H.
+      }
+
     - (* Undef *)
       pose proof UV_REF as UV_REF';
         rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
@@ -11274,7 +11391,14 @@ Admitted.
 
         { (* MA: serialize fields *)
           intros a_fin ms_fin_ma HMAPM.
+          eapply MemPropT_fin_inf_map_monad_In
+            with (A_REF:=DVC1.uvalue_refine_strict); eauto.
 
+          { intros a_fin0 a_inf b_fin ms_fin ms_inf ms_fin_ma0 HIN_FIN HIN_INF MSR' UV_REF SER.
+            cbn in SER.
+
+            
+          }
           
         }
 
