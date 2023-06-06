@@ -10011,10 +10011,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     forward MSR; [reflexivity|].
     rewrite <- MSR in IN_HEAP.
 
-    pose proof ptr_in_heap_prop_lift_inv IN_HEAP ROOT_REF as (ptr_fin'&PTR_FIN_REF&IN_HEAP_FIN).
+    pose proof ptr_in_heap_prop_lift_inv IN_HEAP as (root_fin'&ptr_fin'&ROOT_FIN_REF&PTR_FIN_REF&IN_HEAP_FIN).
     rewrite PTR_REF in PTR_FIN_REF.
     inv PTR_FIN_REF.
     rename ptr_fin' into ptr_fin.
+    rewrite ROOT_REF in ROOT_FIN_REF.
+    inv ROOT_FIN_REF.
     eauto.
   Qed.
 
