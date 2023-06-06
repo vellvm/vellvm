@@ -9895,10 +9895,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       MemoryBigIntptr.MMEP.MMSP.root_in_heap_prop (lift_Heap h_fin) ptr_inf.
   Proof.
     intros h_fin ptr_inf ptr_fin ADDR_REF ROOT.
-    red; red in ROOT.
-    unfold lift_Heap.
-    rewrite IntMaps.IP.F.map_b.
-    erewrite <- fin_inf_ptoi; eauto.
+    pose proof addr_refine_fin_to_inf_addr ptr_fin.
+    red in H, ADDR_REF.
+    pose proof InfToFinAddrConvert.addr_convert_injective _ _ _ ADDR_REF H.
+    subst.
+    apply root_in_heap_prop_lift; eauto.
   Qed.
 
   Lemma root_in_heap_prop_lifted_fin_inf_transitive :
