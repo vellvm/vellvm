@@ -1957,7 +1957,14 @@ Module InfiniteToFinite.
       InfToFinAddrConvert.addr_convert a' = NoOom a ->
       LLVMParams64BitIntptr.PTOI.ptr_to_int a = LLVMParamsBigIntptr.PTOI.ptr_to_int a'.
   Proof.
-  Admitted.
+    intros a a' H.
+    unfold InfToFinAddrConvert.addr_convert in H.
+    destruct a'.
+    apply ITOP.ptr_to_int_int_to_ptr in H.
+    rewrite H.
+    unfold LLVMParamsBigIntptr.PTOI.ptr_to_int.
+    reflexivity.
+  Qed.
 
   Lemma fin_inf_from_Z :
     forall ip_f z,
@@ -1965,6 +1972,12 @@ Module InfiniteToFinite.
       exists ip_i,
         LLVMParamsBigIntptr.IP.from_Z z = NoOom ip_i.
   Proof.
+    intros ip_f z H.
+    
+    unfold LLVMParams64BitIntptr.IP.from_Z in H.
+    pose proof (IP.from_Z_to_Z z ip_f H).
+    rewrite <- H0.
+
   Admitted.
 
   (* TODO: Move this and use it in picky intptr reasoning admits *)
@@ -6644,7 +6657,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       rewrite (lift_addr_Convert_addr_inverse HP) in HIN.
       assumption.
   Qed.
-  
+
   (* TODO: Move this *)
   Lemma memory_stack_frame_stack_prop_lift_inv :
     forall ms_inf fs_inf,
@@ -6746,70 +6759,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Admitted.
 
 
-
-
-  (* TODO: Move this *)
-  Lemma heap_eqv_lift :
-    forall h1 h2,
-      FinMem.MMEP.MMSP.heap_eqv h1 h2 ->
-      InfMem.MMEP.MMSP.heap_eqv (lift_Heap h1) (lift_Heap h2).
-  Proof.
-    intros h1 h2 EQV.
-    destruct EQV.
-
-    split.
-    - (* Roots *)
-      intros ptr.
-      split; intros IN.
-      + apply root_in_heap_prop_lift_inv in IN.
-        destruct IN as (ptr_fin & CONV & IN).
-        apply EQV in IN.
-        apply ptr_in_heap_prop_lift in IN.
-        erewrite fin_to_inf_addr_conv_inf in IN; eauto.
-      + apply ptr_in_heap_prop_lift_inv in IN.
-        destruct IN as (ptr_fin & CONV & IN).
-        apply EQV in IN.
-        apply ptr_in_heap_prop_lift in IN.
-        erewrite fin_to_inf_addr_conv_inf in IN; eauto.
-
-    - (* Pointers *)
-
-
-    intros ptr.
-    split; intros IN.
-    - apply ptr_in_frame_prop_lift_inv in IN.
-      destruct IN as (ptr_fin & CONV & IN).
-      apply EQV in IN.
-      apply ptr_in_frame_prop_lift in IN.
-      erewrite fin_to_inf_addr_conv_inf in IN; eauto.
-    - apply ptr_in_frame_prop_lift_inv in IN.
-      destruct IN as (ptr_fin & CONV & IN).
-      apply EQV in IN.
-      apply ptr_in_frame_prop_lift in IN.
-      erewrite fin_to_inf_addr_conv_inf in IN; eauto.
-
-
-    intros fs1 fs2 EQV.
-    red in *.
-    intros f n.
-    split; intros FSE.
-    - apply FSNth_eqv_lift_inv in FSE.
-      destruct FSE as (f_fin & F & FSE).
-
-      rewrite <- F.
-      apply FSNth_eqv_lift.
-      apply EQV.
-      auto.
-    - apply FSNth_eqv_lift_inv in FSE.
-      destruct FSE as (f_fin & F & FSE).
-
-      rewrite <- F.
-      apply FSNth_eqv_lift.
-      apply EQV.
-      auto.
-  Qed.
-
-  
 
   Lemma memory_stack_heap_prop_lift :
     forall ms_fin h_fin,
