@@ -2533,6 +2533,82 @@ Module InfiniteToFinite.
       auto.
   Qed.
 
+  Lemma MemPropT_fin_inf_map_monad_In :
+    forall {A_INF A_FIN B_INF B_FIN}
+      {l_inf : list A_INF} {l_fin : list A_FIN}
+      {f_fin : forall x, In x l_fin -> MemPropT Memory64BitIntptr.MMEP.MMSP.MemState B_FIN} {f_inf : forall x, In x l_inf -> MemPropT MemoryBigIntptr.MMEP.MMSP.MemState B_INF}
+      {ms_fin_start ms_fin_final : Memory64BitIntptr.MMEP.MMSP.MemState}
+      {ms_inf_start : MemoryBigIntptr.MMEP.MMSP.MemState}
+      {res_fin : list B_FIN}
+
+      (A_REF : A_INF -> A_FIN -> Prop)
+      (B_REF : B_INF -> B_FIN -> Prop)
+
+      (MEM_REF_START : MemState_refine_prop ms_inf_start ms_fin_start)
+
+      (F : forall a_fin a_inf b_fin ms_fin ms_inf ms_fin_ma (HIN_FIN : In a_fin l_fin) (HIN_INF : In a_inf l_inf),
+          MemState_refine_prop ms_inf ms_fin ->
+          A_REF a_inf a_fin ->
+          f_fin a_fin HIN_FIN ms_fin (ret (ms_fin_ma, b_fin)) ->
+          exists b_inf ms_inf_ma,
+            f_inf a_inf HIN_INF ms_inf (ret (ms_inf_ma, b_inf)) /\
+              B_REF b_inf b_fin /\
+              MemState_refine_prop ms_inf_ma ms_fin_ma)
+
+      (AS : Forall2 A_REF l_inf l_fin)
+      (FIN : map_monad_In l_fin f_fin ms_fin_start (ret (ms_fin_final, res_fin))),
+
+    exists res_inf ms_inf_final,
+      map_monad_In l_inf f_inf ms_inf_start (ret (ms_inf_final, res_inf)) /\
+        Forall2 B_REF res_inf res_fin /\
+        MemState_refine_prop ms_inf_final ms_fin_final.
+  Proof.
+    intros A_INF A_FIN B_INF B_FIN l_inf l_fin f_fin f_inf ms_fin_start ms_fin_final ms_inf_start res_fin A_REF
+      B_REF MEM_REF_START F AS FIN.
+
+    generalize dependent res_fin.
+    generalize dependent ms_fin_start.
+    generalize dependent ms_inf_start.
+    induction AS; intros ms_inf_start ms_fin_start MEM_REF_START res_fin FIN.
+    - cbn. exists []. exists ms_inf_start.
+      cbn in FIN.
+      destruct FIN; subst.
+
+      split; auto.
+    - rewrite map_monad_In_unfold in FIN.
+      apply MemPropT_bind_ret_inv in FIN as (ms_fin' & b_fin & F_Y & FIN).
+      apply MemPropT_bind_ret_inv in FIN as (ms_fin_final' & b_fin_rest & MAP_FIN & RET_FIN).
+      cbn in RET_FIN.
+      destruct RET_FIN; subst.
+
+      epose proof (F _ _ _ _ _ _ _ _ MEM_REF_START H F_Y) as (b_inf & ms_inf' & F_X & B & MSR).
+      
+      epose proof (IHAS
+                    (fun (x : A_FIN) (HIn : In x l') => f_fin x (or_intror HIn))
+                    (fun (x : A_INF) (HIn : In x l) => f_inf x (or_intror HIn))
+                    _ _ _ MSR _ MAP_FIN) as (b_inf_rest & ms_inf_final' & MAP_INF & B_ALL & MSR_FINAL).
+
+      exists (b_inf :: b_inf_rest).
+      exists ms_inf_final'.
+      split; auto.
+
+      rewrite map_monad_In_unfold.
+
+      repeat red.
+      do 2 eexists.
+      split; eauto.
+      do 2 eexists.
+      split; eauto.
+
+      cbn.
+      auto.
+
+      Unshelve.
+      intros a_fin a_inf b_fin0 ms_fin ms_inf ms_fin_ma HIN_FIN HIN_INF H0 H1 H2.
+      cbn in H2.
+      eapply F; eauto.
+  Qed.
+
   Lemma get_inf_tree_rutt :
     forall t,
       orutt (OOM:=OOME) L3_refine_strict L3_res_refine_strict
@@ -10761,6 +10837,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
     exists (lift_MemState ms_fin_final).
 
+    assert (Heap_in_bounds ms_fin_final) as HIB_FINAL.
+    {
+      admit. (* TODO: Heap_in_bounds *)
+    }
+
     split.
     2: apply lift_MemState_refine_prop.
 
@@ -10795,7 +10876,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           eapply ptr_in_memstate_heap_inf_fin in H; eauto.
           apply free_bytes_freed in H.
           eapply fin_inf_byte_not_allocated in H; eauto.
-          apply lift_MemState_refine_prop.
+          apply lift_MemState_refine_prop; auto.
         }
 
         { (* Big pointer, shouldn't be allocated. *)
@@ -10815,7 +10896,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         { (* ptr in finite range *)
           split; intros ALLOC.
           - eapply fin_inf_byte_allocated; eauto.
-            apply lift_MemState_refine_prop.
+            apply lift_MemState_refine_prop; auto.
             apply free_non_block_bytes_preserved.
             + intros CONTRA.
               eapply ptr_in_memstate_heap_fin_inf in CONTRA; eauto.
@@ -10825,7 +10906,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             + intros CONTRA.
               eapply ptr_in_memstate_heap_fin_inf in CONTRA; eauto.
             + eapply inf_fin_byte_allocated; eauto.
-              apply lift_MemState_refine_prop.
+              apply lift_MemState_refine_prop; auto.
         }
 
         { (* Big pointer, shouldn't be allocated. *)
@@ -10836,7 +10917,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           - eapply inf_fin_byte_allocated_exists in ALLOC; eauto.
             destruct ALLOC as (?&?&?).
             rewrite CONV in H0; discriminate.
-            apply lift_MemState_refine_prop.
+            apply lift_MemState_refine_prop; auto.
         }
       }
     - intros ptr byte H.
@@ -10850,8 +10931,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               eapply ptr_in_memstate_heap_fin_inf in CONTRA; eauto.
             }
             eapply fin_inf_read_byte_spec; eauto.
-            apply lift_MemState_refine_prop.
-          - pose proof (lift_MemState_refine_prop ms_fin_final) as MSR'.
+            apply lift_MemState_refine_prop; auto.
+          - pose proof (lift_MemState_refine_prop ms_fin_final HIB_FINAL) as MSR'.
             epose proof inf_fin_read_byte_spec MSR' CONV RBS as (byte_fin&RBS_FIN&BYTE_REF).
             eapply free_non_frame_bytes_read in RBS_FIN.
             2: {
@@ -10871,7 +10952,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             destruct ALLOC as (?&?&?&?&?).
             red in H2.
             rewrite CONV in H2; discriminate.
-            apply lift_MemState_refine_prop.
+            apply lift_MemState_refine_prop; auto.
         }
       }
     - clear - PTR_REF MSR free_block.
@@ -10907,14 +10988,14 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         auto.
       }
     - (* Free operation invariants *)
-      clear - MSR free_invariants.
+      clear - HIB_FINAL MSR free_invariants.
       destruct free_invariants.
       split.
       + eapply fin_inf_preserve_allocation_ids; eauto.
-        apply lift_MemState_refine_prop.
+        apply lift_MemState_refine_prop; auto.
       + eapply fin_inf_frame_stack_preserved; eauto.
-        apply lift_MemState_refine_prop.
-  Qed.
+        apply lift_MemState_refine_prop; auto.
+Admitted.
 
   Lemma handle_free_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start res_fin args_fin args_inf},
@@ -10976,6 +11057,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       { (* MA *)
         intros a_fin ms_fin_ma MEMCPY.
         eapply handle_memcpy_fin_inf; eauto.
+        admit. (* TODO: Heap_in_bounds *)
       }
 
       intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin _ MSR' EQV.
@@ -11038,6 +11120,107 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     (* Unknown intrinsic *)
     cbn in *; auto.
     contradiction.
+  Admitted.
+
+  Lemma to_ubytes_fin_inf_helper :
+    forall {uv_fin uv_inf t sid bytes_fin start},
+      DVC1.uvalue_refine_strict uv_inf uv_fin ->
+      map_monad
+        (fun n : N =>
+           n' <- LLVMParams64BitIntptr.IP.from_Z (Z.of_N n);;
+           ret
+             (Memory64BitIntptr.MP.BYTE_IMPL.uvalue_sbyte uv_fin t
+                (LLVMParams64BitIntptr.Events.DV.UVALUE_IPTR n') sid))
+        (Nseq start (N.to_nat (FiniteSizeof.FinSizeof.sizeof_dtyp t))) = 
+        NoOom bytes_fin ->
+      map_monad
+        (fun n : N =>
+           n' <- LLVMParamsBigIntptr.IP.from_Z (Z.of_N n);;
+           ret
+             (MemoryBigIntptr.MP.BYTE_IMPL.uvalue_sbyte uv_inf t
+                (LLVMParamsBigIntptr.Events.DV.UVALUE_IPTR n') sid))
+        (Nseq start (N.to_nat (FiniteSizeof.FinSizeof.sizeof_dtyp t))) = NoOom (map lift_SByte bytes_fin).
+  Proof.
+    intros uv_fin uv_inf t sid bytes_fin start UV_REF UBYTES.
+    generalize dependent bytes_fin.
+    generalize dependent start.
+    induction (N.to_nat (FiniteSizeof.FinSizeof.sizeof_dtyp t));
+      intros start bytes_fin UBYTES.
+    - cbn in *.
+      inv UBYTES.
+      cbn.
+      reflexivity.
+    - rewrite <- cons_Nseq.
+      rewrite <- cons_Nseq in UBYTES.
+
+      rewrite map_monad_unfold.
+      rewrite map_monad_unfold in UBYTES.
+
+      cbn.
+      cbn in UBYTES.
+
+      break_match_hyp; inv UBYTES.
+      break_match_hyp; inv H0.
+      break_match_hyp; inv Heqo.
+
+      apply IHn in Heqo0.
+      cbn in Heqo0.
+      rewrite Heqo0.
+      cbn.
+      unfold MemoryBigIntptr.MP.BYTE_IMPL.uvalue_sbyte.
+      erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+      erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+
+      rewrite DVC1.uvalue_refine_strict_equation.
+      rewrite DVC1.uvalue_convert_strict_equation.
+      cbn.
+
+      erewrite FinToInfIntptrConvertSafe.intptr_convert_safe; eauto.
+      cbn.
+      erewrite IP64Bit.from_Z_to_Z; eauto.
+  Qed.
+
+  (* TODO: move this *)
+  Definition lift_SBytes := map lift_SByte.
+
+  Lemma lift_SBytes_refine :
+    forall {bytes_fin},
+      sbytes_refine (lift_SBytes bytes_fin) bytes_fin.
+  Proof.
+    induction bytes_fin; cbn.
+    - constructor.
+    - constructor.
+      apply sbyte_refine_lifted.
+      apply IHbytes_fin.
+  Qed.
+
+  (* TODO: should we know that uv_inf / uv_fin has type t?
+
+     I think this would have to be an assumption, in theory the front
+     end would guarantee this for stores with a syntactic check.
+   *)
+  Lemma to_ubytes_fin_inf :
+    forall {uv_fin uv_inf t sid bytes_fin},
+      DVC1.uvalue_refine_strict uv_inf uv_fin ->
+      Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes uv_fin t sid = NoOom bytes_fin ->
+      exists bytes_inf,
+        MemoryBigIntptr.MMEP.MMSP.MemByte.to_ubytes uv_inf t sid = NoOom bytes_inf /\
+          sbytes_refine bytes_inf bytes_fin.
+  Proof.
+    intros uv_fin uv_inf t sid bytes_fin UV_REF UBYTES.
+    exists (map lift_SByte bytes_fin).
+    split.
+    2: {
+      apply lift_SBytes_refine.
+    }
+
+    unfold MemoryBigIntptr.MMEP.MMSP.MemByte.to_ubytes,
+      Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes in *.
+
+    unfold LLVMParams64BitIntptr.SIZEOF.sizeof_dtyp,
+      LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp in *.
+
+    eapply to_ubytes_fin_inf_helper; eauto.
   Qed.
 
   (* TODO: Prove this *)
@@ -11055,7 +11238,205 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           MemState_refine_prop ms_inf_final ms_fin_final.
   Proof.
     intros ms_fin_start ms_fin_final ms_inf_start uv_fin uv_inf t bytes_fin MSR UV_REF SERIALIZE.
-  Admitted.
+
+    rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+    rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
+
+    Ltac solve_to_ubytes SERIALIZE :=
+      eapply MemPropT_fin_inf_bind; [ | | | apply SERIALIZE]; eauto;
+      [ intros *; eapply fresh_sid_fin_inf; eauto |];
+
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID UBYTES;
+      cbn in SID, UBYTES; subst;
+
+      red in UBYTES;
+      break_match_hyp; inv UBYTES;
+      match goal with
+      | H: Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes _ _ _ = NoOom _ |- _ =>
+          eapply to_ubytes_fin_inf in H; eauto;
+          destruct H as (bytes_inf&UBYTES&BYTES_REF);
+          exists bytes_inf; exists ms_inf;
+          split; auto;
+          red;
+          rewrite UBYTES;
+          cbn; auto
+      end.
+
+    induction uv_inf;
+      try solve
+        [ pose proof UV_REF as UV_REF';
+          rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
+          rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
+          cbn in UV_REF;
+          move UV_REF after SERIALIZE;
+          break_match_hyp; inv UV_REF;
+          solve_to_ubytes SERIALIZE
+        ].
+    - (* Undef *)
+      pose proof UV_REF as UV_REF';
+        rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
+        rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
+        cbn in UV_REF;
+        move UV_REF after SERIALIZE;
+        break_match_hyp; inv UV_REF;
+        destruct t;
+        try (solve_to_ubytes SERIALIZE).
+
+      { (* Undef structures *)
+        eapply MemPropT_fin_inf_bind.
+        4: apply SERIALIZE.
+        all: eauto.
+
+        { (* MA: serialize fields *)
+          intros a_fin ms_fin_ma HMAPM.
+
+          
+        }
+
+        intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin H H0 H1.
+        cbn.
+        cbn in *.
+        destruct H1; subst.
+        exists (concat a_inf). exists ms_inf.
+        split; auto.
+        split; auto.
+
+        apply H.
+      }
+
+      
+
+pose proof UV_REF as UV_REF';
+          rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
+          rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
+          cbn in UV_REF;
+          move UV_REF after SERIALIZE;
+          break_match_hyp; inv UV_REF;
+
+          eapply MemPropT_fin_inf_bind; [ | | | apply SERIALIZE]; eauto;
+          [ intros *; eapply fresh_sid_fin_inf; eauto |];
+
+          intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID UBYTES;
+          cbn in SID, UBYTES; subst;
+
+          red in UBYTES;
+          break_match_hyp; inv UBYTES;
+          match goal with
+          | H: Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes _ _ _ = NoOom _ |- _ =>
+              eapply to_ubytes_fin_inf in H; eauto;
+              destruct H as (bytes_inf&UBYTES&BYTES_REF)
+          end;
+          exists bytes_inf; exists ms_inf;
+          split; auto;
+          red.
+          rewrite H;
+          cbn; auto.
+    - pose proof UV_REF as UV_REF';
+          rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
+          rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
+          cbn in UV_REF;
+          move UV_REF after SERIALIZE;
+          break_match_hyp; inv UV_REF;
+
+          eapply MemPropT_fin_inf_bind; [ | | | apply SERIALIZE]; eauto;
+          [ intros *; eapply fresh_sid_fin_inf; eauto |];
+
+          intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID UBYTES;
+          cbn in SID, UBYTES; subst;
+
+          red in UBYTES;
+          break_match_hyp; inv UBYTES.
+
+      match goal with
+      | H: Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes _ _ _ = NoOom _ |- _ =>
+          eapply to_ubytes_fin_inf in H; eauto;
+          destruct H as (bytes_inf&UBYTES&BYTES_REF)
+      end.
+      ; exists bytes_inf; exists ms_inf;
+          split; auto;
+          red;
+          rewrite H;
+          cbn; auto.
+
+
+    - pose proof UV_REF as UV_REF';
+      rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
+      rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
+      cbn in UV_REF;
+      move UV_REF after SERIALIZE;
+      break_match_hyp; inv UV_REF;
+
+        eapply MemPropT_fin_inf_bind; [ | | | apply SERIALIZE]; eauto;
+        [ intros *; eapply fresh_sid_fin_inf; eauto |];
+
+        intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID UBYTES;
+        cbn in SID, UBYTES; subst;
+
+      red in UBYTES;
+      break_match_hyp; inv UBYTES;
+
+
+      eapply to_ubytes_fin_inf in Heqo0; eauto;
+      destruct Heqo0 as (?&?&?); exists x; exists ms_inf;
+      split; auto;
+      red.
+      rewrite H;
+      cbn; auto.
+    - 
+      
+    
+      try
+        solve
+        [ rewrite DVC1.dvalue_refine_strict_equation in UV_REF;
+          first
+            [ apply dvalue_convert_strict_i1_inv in UV_REF
+            | apply dvalue_convert_strict_i8_inv in UV_REF
+            | apply dvalue_convert_strict_i32_inv in UV_REF
+            | apply dvalue_convert_strict_i64_inv in UV_REF
+            | apply dvalue_convert_strict_iptr_inv in UV_REF
+            | apply dvalue_convert_strict_addr_inv in UV_REF
+            | apply dvalue_convert_strict_double_inv in UV_REF
+            | apply dvalue_convert_strict_float_inv in UV_REF
+            | apply dvalue_convert_strict_poison_inv in UV_REF
+            | apply dvalue_convert_strict_oom_inv in UV_REF
+            | apply dvalue_convert_strict_none_inv in UV_REF
+            | apply dvalue_convert_strict_struct_inv in UV_REF
+            | apply dvalue_convert_strict_packed_struct_inv in UV_REF
+            | apply dvalue_convert_strict_array_inv in UV_REF
+            | apply dvalue_convert_strict_vector_inv in UV_REF
+            ];
+          first
+            [ destruct ADDR_REF as (?&?&?); subst
+            | inv ADDR_REF
+            ]
+        ].
+
+      rewrite DVC1.uvalue_refine_strict_equation in UV_REF.
+      apply uvalue_convert_strict_addr_inv in UV_REF.
+          first
+            [ apply uvalue_convert_strict_i1_inv in UV_REF
+            | apply uvalue_convert_strict_i8_inv in UV_REF
+            | apply uvalue_convert_strict_i32_inv in UV_REF
+            | apply uvalue_convert_strict_i64_inv in UV_REF
+            | apply uvalue_convert_strict_iptr_inv in UV_REF
+            | apply uvalue_convert_strict_addr_inv in UV_REF
+            | apply uvalue_convert_strict_double_inv in UV_REF
+            | apply uvalue_convert_strict_float_inv in UV_REF
+            | apply uvalue_convert_strict_poison_inv in UV_REF
+            | apply uvalue_convert_strict_oom_inv in UV_REF
+            | apply uvalue_convert_strict_none_inv in UV_REF
+            | apply uvalue_convert_strict_struct_inv in UV_REF
+            | apply uvalue_convert_strict_packed_struct_inv in UV_REF
+            | apply uvalue_convert_strict_array_inv in UV_REF
+            | apply uvalue_convert_strict_vector_inv in UV_REF
+            ];
+          first
+            [ destruct ADDR_REF as (?&?&?); subst
+            | inv ADDR_REF
+            ].
+
+
+  Qed.
 
   Lemma handle_store_fin_inf :
     forall {t addr_fin addr_inf uv_fin uv_inf ms_fin_start ms_fin_final ms_inf_start res_fin},
