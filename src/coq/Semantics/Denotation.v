@@ -753,19 +753,18 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          that life in the "right" injection of the [_CFG_INTERNAL] effect
        *)
 
-      Definition lookup_defn {B} := @assoc dvalue B _.
+      Definition lookup_defn {B} := @assoc uvalue B _.
 
       Definition denote_mcfg
-                 (fundefs:list (dvalue * function_denotation)) (dt : dtyp)
+                 (fundefs:list (uvalue * definition dtyp (cfg dtyp))) (dt : dtyp)
                  (f_value : uvalue) (args : list uvalue) : itree L0 uvalue :=
         @mrec CallE (ExternalCallE +' _)
               (fun T call =>
                  match call with
                  | Call dt fv args attr =>
-                   dfv <- concretize_or_pick fv True ;; 
-                   match (lookup_defn dfv fundefs) with
+                   match (lookup_defn fv fundefs) with
                    | Some f_den => (* If the call is internal *)
-                     f_den args
+                     denote_function (f_den) args
                    | None =>
                      dargs <- map_monad (fun uv => pickUnique uv) args ;;
                      fmap dvalue_to_uvalue (trigger (ExternalCall dt fv dargs attr))

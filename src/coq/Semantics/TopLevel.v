@@ -105,10 +105,10 @@ Definition function_env := FMapAList.alist dvalue D.function_denotation.
    Denotes a function and returns its pointer.
  *)
 
-Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)) : itree L0 (dvalue * D.function_denotation) :=
+Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)) : itree L0 (uvalue * definition dtyp (CFG.cfg dtyp)) :=
   let fid := (dc_name (df_prototype df)) in
   fv <- trigger (GlobalRead fid) ;;
-  ret (fv, ⟦ df ⟧f).
+  ret (dvalue_to_uvalue fv, df).
 
 (**
    We are now ready to define our semantics. Guided by the events and handlers,
