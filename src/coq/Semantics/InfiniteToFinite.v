@@ -528,18 +528,20 @@ Module InfiniteToFinite.
     break_match; break_match_hyp; inversion Heqo; lia.
   Qed.
 
-  Lemma in_bounds_exists_addr : forall z, in_bounds z = true <-> exists addr, LLVMParams64BitIntptr.PTOI.ptr_to_int addr = z.
+
+  Lemma in_bounds_exists_addr : forall z (p:Prov), in_bounds z = true <-> exists addr, LLVMParams64BitIntptr.PTOI.ptr_to_int addr = z /\ snd addr = p.
   Proof.
     intros.
     unfold in_bounds.
     split; intros H.
-    - break_match_hyp. exists a.
+    - break_match_hyp. exists (fst a, p).
+      split; auto.
       unfold LLVMParams64BitIntptr.ITOP.int_to_ptr in Heqo.
       break_match_hyp; inversion Heqo.
       unfold LLVMParams64BitIntptr.PTOI.ptr_to_int. cbn.
       apply unsigned_repr_eq. lia.
       inversion H.
-    - destruct H as [ptr HP].
+    - destruct H as [ptr [HP HPROV]].
       subst.
       unfold LLVMParams64BitIntptr.ITOP.int_to_ptr.
       unfold LLVMParams64BitIntptr.PTOI.ptr_to_int.
@@ -6279,10 +6281,32 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           in_bounds (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr) = true.
   Proof.
     intros.
-    apply in_bounds_exists_addr.
-    exists ptr; auto.
+    destruct ptr.
+    unfold LLVMParams64BitIntptr.PTOI.ptr_to_int. cbn.
+    eapply in_bounds_exists_addr.
+    exists (i,p); auto.
   Qed.
 
+    
+  (*
+    This version may not be true.
+   *)
+  (*
+  Lemma find_ptr_to_int_lift_Heap_gen :
+    forall h ptr b,
+      IntMaps.IM.find ptr (lift_Heap h) = Some (lift_Block b) ->
+        (IntMaps.IM.find ptr h) = Some b.
+  Proof.
+    intros.
+    unfold lift_Heap in H.
+    apply IntMaps.IP.F.find_mapsto_iff in H.
+    apply IntMaps.IP.F.find_mapsto_iff.
+    apply IntMaps.IP.F.map_mapsto_iff in H.
+    destruct H as [x [EQ HX]].
+    apply MapsTo_filter_dom_true in HX.
+  Qed.
+  *)
+  
   Lemma find_ptr_to_int_lift_Heap :
     forall h ptr,
       IntMaps.IM.find (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr) (lift_Heap h) =
@@ -6350,6 +6374,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     apply Util.option_map_some_inv in Heqo as (?&?&?).
 
     erewrite fin_inf_ptoi; eauto.
+    apply find_filter_dom_true in H.
+    destruct H as [H HB].
     rewrite H.
 
     generalize dependent b.
@@ -6400,6 +6426,39 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         split; auto.
   Qed.
 
+
+  Lemma MapsTo_filter_dom_subset_strong :
+    forall {A} x v f (m : IntMaps.IntMap A),
+    IntMaps.IM.MapsTo x v (IntMaps.IP.filter_dom f m) ->
+    IntMaps.IM.MapsTo x v m /\ f x = true.
+  Proof.
+    intros.
+    apply IntMaps.IP.filter_iff in H; auto.
+    repeat red; intros; subst; auto.
+  Qed.
+
+  Lemma In_MapsTo_exists :
+    forall {A} x (m : IntMaps.IntMap A),
+      IntMaps.IM.In x m <->
+        exists v, IntMaps.IM.MapsTo x v m.
+  Proof.
+    intros.
+    split; intros.
+    - rewrite IntMaps.IP.F.mem_in_iff in H.
+      assert (IntMaps.member x m = true).
+      unfold IntMaps.member. assumption.
+      apply IntMaps.member_lookup in H0.
+      destruct H0 as [v HV].
+      exists v. unfold IntMaps.lookup in HV.
+      apply IntMaps.IM.find_2 in HV.
+      assumption.
+    - destruct H as [v HV].
+      rewrite IntMaps.IP.F.mem_in_iff.
+      apply IntMaps.IM.find_1 in HV.
+      eapply IntMaps.lookup_member.
+      apply HV.
+  Qed.
+  
   (* (* TODO: Move this *) *)
   (* Definition heap_refine (h1 : InfMemMMSP.Heap) (h2 : FinMemMMSP.Heap) : Prop *)
   (*   := MemoryBigIntptr.MMEP.MemSpec.heap_preserved h1 (lift_Heap h2). *)
@@ -6420,9 +6479,35 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Proof.
     intros h root_inf IN.
     red in IN.
-    unfold lift_Heap, lift_Block in IN.
-    rewrite IntMaps.IP.F.map_b in IN.
-  Admitted.
+    apply IntMaps.member_lookup in IN.
+    destruct IN as [v HV].
+    unfold IntMaps.lookup in HV.
+    unfold InfMem.MMEP.MMSP.Block in HV.
+    unfold InfMemMMSP.Block in *.
+    unfold lift_Heap in HV.
+    apply IntMaps.IP.F.find_mapsto_iff in HV.
+    apply filter_dom_map_eq in HV.
+    apply MapsTo_filter_dom_subset_strong in HV.
+    destruct HV as [HV IN].
+    destruct root_inf.
+    cbn in *.
+    apply (in_bounds_exists_addr i p) in IN.
+    destruct IN as [root_fin [HF EQ]].
+    exists root_fin.
+    split.
+    - destruct root_fin. cbn in *.
+      subst.
+      apply LLVMParams64BitIntptr.ITOP.int_to_ptr_ptr_to_int. auto.
+    - unfold FinMem.MMEP.MMSP.root_in_heap_prop.
+      unfold IntMaps.member.
+      apply IntMaps.IP.F.mem_in_iff.
+      rewrite HF.
+      apply IntMaps.IP.F.map_mapsto_iff in HV.
+      destruct HV as [b [_ HIN]].
+      apply In_MapsTo_exists.
+      exists b.
+      assumption.
+  Qed.
 
   (* TODO: Move this *)
   Lemma heap_eqv_lift :
