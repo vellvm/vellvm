@@ -10827,11 +10827,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
     exists (lift_MemState ms_fin_final).
 
-    (* assert (Heap_in_bounds ms_fin_final) as HIB_FINAL. *)
-    (* { *)
-    (*   admit. (* TODO: Heap_in_bounds *) *)
-    (* } *)
-
     split.
     2: apply lift_MemState_refine_prop.
 
@@ -10922,7 +10917,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             }
             eapply fin_inf_read_byte_spec; eauto.
             apply lift_MemState_refine_prop; auto.
-          - pose proof (lift_MemState_refine_prop ms_fin_final HIB_FINAL) as MSR'.
+          - pose proof (lift_MemState_refine_prop ms_fin_final) as MSR'.
             epose proof inf_fin_read_byte_spec MSR' CONV RBS as (byte_fin&RBS_FIN&BYTE_REF).
             eapply free_non_frame_bytes_read in RBS_FIN.
             2: {
@@ -10978,14 +10973,14 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         auto.
       }
     - (* Free operation invariants *)
-      clear - HIB_FINAL MSR free_invariants.
+      clear - MSR free_invariants.
       destruct free_invariants.
       split.
       + eapply fin_inf_preserve_allocation_ids; eauto.
         apply lift_MemState_refine_prop; auto.
       + eapply fin_inf_frame_stack_preserved; eauto.
         apply lift_MemState_refine_prop; auto.
-Admitted.
+  Qed.
 
   Lemma handle_free_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start res_fin args_fin args_inf},
@@ -11213,23 +11208,37 @@ Admitted.
   Qed.
 
   (* TODO: move this. Should hold for fin / inf *)
-  Lemma serialis_sbytes_MemState_eq :
+  Lemma serialize_sbytes_MemState_eqv :
     forall {uv t ms ms' bytes},
       Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv t ms (success_unERR_UB_OOM (ms', bytes)) ->
-      MemState_eqv ms = ms'.
+      Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms ms'.
   Proof.
     intros uv t ms ms' bytes SERIALIZE.
     rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
     revert uv t ms ms' bytes SERIALIZE.
-    induction uv; intros t_orig ms ms' bytes SERIALIZE.
+    induction uv; intros t_orig ms ms' bytes SERIALIZE;
+      try solve
+        [ apply MemPropT_bind_ret_inv in SERIALIZE;
+          destruct SERIALIZE as (?&?&?&?);
+          red in H;
+          cbn in H;
+          cbn in H0;
+          red in H0;
+          red;
+          break_match_hyp; inv H0;
+          cbn in *;
+          split; [|split; [|split; [|split; [|split; [|split]]]]]; try tauto
+        ].
     - apply MemPropT_bind_ret_inv in SERIALIZE.
       destruct SERIALIZE as (?&?&?&?).
       red in H.
       cbn in H.
       cbn in H0.
       red in H0.
+      red.
       break_match_hyp; inv H0.
-      cbn in fresh
+      cbn in *.
+      split; [|split; [|split; [|split; [|split; [|split]]]]]; try tauto.
   Qed.
 
   (* TODO: move this. Should hold for fin / inf *)
