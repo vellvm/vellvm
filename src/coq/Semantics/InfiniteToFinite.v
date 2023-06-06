@@ -10045,12 +10045,13 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     forward IN_HEAP; [symmetry; auto|].
 
     (* TODO: Probably could split some of this into a separate lemma *)
-    pose proof (ptr_in_heap_prop_lift_inv IN_HEAP ROOT_REF) as (?&?&?).
-    exists x.
+    pose proof (ptr_in_heap_prop_lift_inv IN_HEAP) as (?&?&?&?&?).
+    rewrite ROOT_REF in H.
+    inv H.
+    exists x0.
     split; auto.
-    intros h H1.
-    rewrite <- H1.
-    apply H0.
+    intros h H2.
+    rewrite <- H2; auto.
   Qed.
 
   (* SAZ: Look at this one too *)
@@ -10668,9 +10669,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       rewrite HEAP_START_REF in IN.
       rewrite HEAP_FINAL_REF in CONTRA.
 
-      eapply ptr_in_heap_prop_lift_inv in IN as (?&?&?); eauto.
-      eapply ptr_in_heap_prop_lift_inv in CONTRA as (?&?&?); eauto.
-      rewrite H in H1; inv H1.
+      eapply ptr_in_heap_prop_lift_inv in IN as (?&?&?&?&?); eauto.
+      eapply ptr_in_heap_prop_lift_inv in CONTRA as (?&?&?&?&?); eauto.
+      rewrite ADDR_REF in H; inv H.
+      rewrite ADDR_REF in H2; inv H2.
+      rewrite H0 in H3; inv H3.
       eapply free_block_ptrs_freed; eauto.
     - clear - ADDR_REF HEAP_START_REF HEAP_FINAL_REF free_block_root_freed.
       intros CONTRA.
@@ -10691,16 +10694,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         rewrite HEAP_START_REF in IN.
         rewrite HEAP_FINAL_REF.
 
-        assert (exists root_fin, fin_to_inf_addr root_fin = root') as (root_fin&ROOT_FIN).
-        { (* TODO: Will need heap in bounds predicate *)
-          admit.
-        }
-        subst.
-
-        eapply ptr_in_heap_prop_lift_inv in IN as (?&?&?); eauto.
-        2: {
-          apply addr_refine_fin_to_inf_addr.
-        }
+        eapply ptr_in_heap_prop_lift_inv in IN as (root_fin&?&?&?&?); eauto.
 
         assert (fin_to_inf_addr x = ptr) as PTR_FIN.
         {
@@ -10711,15 +10705,21 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           eapply InfToFinAddrConvert.addr_convert_injective; eauto.
         }
 
-        eapply fin_inf_disjoint_ptr_byte in DISJOINT; eauto.
-        2: apply addr_refine_fin_to_inf_addr.
-
+        assert (fin_to_inf_addr root_fin = root') as ROOT_FIN.
+        {
+          unfold fin_to_inf_addr.
+          break_match_goal.
+          clear Heqs.
+          apply FinToInfAddrConvertSafe.addr_convert_safe in e.
+          eapply InfToFinAddrConvert.addr_convert_injective; eauto.
+        }
         subst.
+
+        eapply fin_inf_disjoint_ptr_byte in DISJOINT; eauto.        
         eapply ptr_in_heap_prop_lift.
         specialize (free_block_disjoint_preserved x root_fin DISJOINT).
         destruct free_block_disjoint_preserved.
-        apply H1.
-        auto.
+        eauto.
       }
 
       {
@@ -10727,16 +10727,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         rewrite HEAP_FINAL_REF in IN.
         rewrite HEAP_START_REF.
 
-        assert (exists root_fin, fin_to_inf_addr root_fin = root') as (root_fin&ROOT_FIN).
-        { (* TODO: Will need heap in bounds predicate *)
-          admit.
-        }
-        subst.
-
-        eapply ptr_in_heap_prop_lift_inv in IN as (?&?&?); eauto.
-        2: {
-          apply addr_refine_fin_to_inf_addr.
-        }
+        eapply ptr_in_heap_prop_lift_inv in IN as (root_fin&?&?&?&?); eauto.
 
         assert (fin_to_inf_addr x = ptr) as PTR_FIN.
         {
@@ -10747,15 +10738,21 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           eapply InfToFinAddrConvert.addr_convert_injective; eauto.
         }
 
-        eapply fin_inf_disjoint_ptr_byte in DISJOINT; eauto.
-        2: apply addr_refine_fin_to_inf_addr.
-
+        assert (fin_to_inf_addr root_fin = root') as ROOT_FIN.
+        {
+          unfold fin_to_inf_addr.
+          break_match_goal.
+          clear Heqs.
+          apply FinToInfAddrConvertSafe.addr_convert_safe in e.
+          eapply InfToFinAddrConvert.addr_convert_injective; eauto.
+        }
         subst.
+
+
+        eapply fin_inf_disjoint_ptr_byte in DISJOINT; eauto.
         eapply ptr_in_heap_prop_lift.
         specialize (free_block_disjoint_preserved x root_fin DISJOINT).
-        destruct free_block_disjoint_preserved.
-        apply H2.
-        auto.
+        destruct free_block_disjoint_preserved; eauto.
       }
     - clear - ADDR_REF HEAP_START_REF HEAP_FINAL_REF free_block_disjoint_roots.
       intros root' DISJOINT.
@@ -10766,25 +10763,19 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         rewrite HEAP_START_REF in IN.
         rewrite HEAP_FINAL_REF.
 
-        assert (exists root_fin, fin_to_inf_addr root_fin = root') as (root_fin&ROOT_FIN).
-        { (* TODO: Will need heap in bounds predicate *)
-          admit.
+        eapply root_in_heap_prop_lift_inv in IN as (root_fin&?&?).
+        assert (fin_to_inf_addr root_fin = root').
+        {
+          unfold fin_to_inf_addr.
+          break_match_goal.
+          clear Heqs.
+          apply FinToInfAddrConvertSafe.addr_convert_safe in e.
+          eapply InfToFinAddrConvert.addr_convert_injective; eauto.
         }
         subst.
 
         eapply root_in_heap_prop_lifted_fin_inf.
         apply addr_refine_fin_to_inf_addr.
-
-        eapply root_in_heap_prop_lift_inv in IN as (?&?&?).
-        assert (x = root_fin).
-        { apply fin_to_inf_addr_conv_inf in H.
-          unfold fin_to_inf_addr in H.
-          break_match_hyp.
-          break_match_hyp.
-          subst.
-          clear Heqs Heqs0.
-          eapply FinToInfAddrConvert.addr_convert_injective; eauto.
-        }
 
         eapply fin_inf_disjoint_ptr_byte in DISJOINT; eauto.
 
@@ -10799,25 +10790,19 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         rewrite HEAP_FINAL_REF in IN.
         rewrite HEAP_START_REF.
 
-        assert (exists root_fin, fin_to_inf_addr root_fin = root') as (root_fin&ROOT_FIN).
-        { (* TODO: Will need heap in bounds predicate *)
-          admit.
+        eapply root_in_heap_prop_lift_inv in IN as (root_fin&?&?).
+        assert (fin_to_inf_addr root_fin = root').
+        {
+          unfold fin_to_inf_addr.
+          break_match_goal.
+          clear Heqs.
+          apply FinToInfAddrConvertSafe.addr_convert_safe in e.
+          eapply InfToFinAddrConvert.addr_convert_injective; eauto.
         }
         subst.
 
         eapply root_in_heap_prop_lifted_fin_inf.
         apply addr_refine_fin_to_inf_addr.
-
-        eapply root_in_heap_prop_lift_inv in IN as (?&?&?).
-        assert (x = root_fin).
-        { apply fin_to_inf_addr_conv_inf in H.
-          unfold fin_to_inf_addr in H.
-          break_match_hyp.
-          break_match_hyp.
-          subst.
-          clear Heqs Heqs0.
-          eapply FinToInfAddrConvert.addr_convert_injective; eauto.
-        }
 
         eapply fin_inf_disjoint_ptr_byte in DISJOINT; eauto.
 
@@ -10826,7 +10811,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         destruct free_block_disjoint_roots.
         auto.
       }
-  Admitted.
+  Qed.
 
   Lemma handle_free_spec_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start ptr_fin ptr_inf},
