@@ -145,8 +145,8 @@ Module InfiniteToFinite.
     rewrite Integers.Int64.Z_mod_modulus_eq.
     rewrite Zmod_small; auto.
   Qed.
-  
-  
+
+
   Lemma lift_addr_Convert_addr_inverse:
     forall {a_inf a_fin},
         InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
@@ -169,7 +169,7 @@ Module InfiniteToFinite.
       inversion e.
       subst.
       rewrite unsigned_repr_eq; auto.
-      apply Bool.orb_false_elim in HEQ.      
+      apply Bool.orb_false_elim in HEQ.
       apply andb_true_intro.
       lia.
   Qed.
@@ -630,7 +630,7 @@ Module InfiniteToFinite.
     eapply MapsTo_filter_subset.
     eauto.
   Qed.
-  
+
   Lemma MapsTo_filter_dom_true :
     forall {A} (f : IntMaps.IM.key -> bool) (m : IntMaps.IntMap A),
     forall k e,
@@ -646,7 +646,7 @@ Module InfiniteToFinite.
   Lemma MapsTo_filter_dom_subset :
     forall {A} (f : IntMaps.IM.key -> bool) (m : IntMaps.IntMap A),
     forall k e,
-      IntMaps.IM.MapsTo k e (IntMaps.IP.filter_dom f m) ->      
+      IntMaps.IM.MapsTo k e (IntMaps.IP.filter_dom f m) ->
       IntMaps.IM.MapsTo k e m.
   Proof.
     intros.
@@ -667,7 +667,7 @@ Module InfiniteToFinite.
     eapply MapsTo_filter_dom_subset.
     eauto.
   Qed.
-  
+
   Lemma find_filter_true :
     forall {A} (f : IntMaps.IM.key -> A -> bool) (m : IntMaps.IntMap A),
       forall k a,
@@ -686,11 +686,11 @@ Module InfiniteToFinite.
       apply IntMaps.IP.F.find_mapsto_iff.
       apply IntMaps.IP.filter_iff.
       repeat red; intros; subst; auto.
-      apply IntMaps.IP.F.find_mapsto_iff in H.      
+      apply IntMaps.IP.F.find_mapsto_iff in H.
       split; auto.
   Qed.
 
-  Lemma find_filter_dom_true : 
+  Lemma find_filter_dom_true :
     forall {A} (f : IntMaps.IM.key -> bool) (m : IntMaps.IntMap A),
       forall k a,
         IntMaps.IM.find k (IntMaps.IP.filter_dom f m) = Some a <->
@@ -715,7 +715,7 @@ Module InfiniteToFinite.
       apply H in EQ.
       contradiction.
   Qed.
-    
+
   Lemma find_filter_None :
     forall {A} (f : IntMaps.IM.key -> A -> bool) (m : IntMaps.IntMap A),
     forall k,
@@ -836,7 +836,7 @@ Module InfiniteToFinite.
   Definition Heap_in_bounds (ms_fin:FinMem.MMEP.MMSP.MemState) : Prop :=
     let h := Memory64BitIntptr.MMEP.MMSP.mem_state_heap ms_fin in
     forall i, is_true (IntMaps.member i h) -> exists ptr, FinPTOI.ptr_to_int ptr = i.
-    
+
   (* TODO: Need a MemState_refine_prop that takes all of the predicates
       like write_byte_all_preserved and bundles them in one place
       between memories. Should use this for these lemmas... *)
@@ -1965,7 +1965,7 @@ Module InfiniteToFinite.
         LLVMParamsBigIntptr.IP.from_Z z = NoOom ip_i.
   Proof.
     intros ip_f z H.
-    
+
     unfold LLVMParams64BitIntptr.IP.from_Z in H.
     pose proof (IP.from_Z_to_Z z ip_f H).
     rewrite <- H0.
@@ -2573,7 +2573,7 @@ Module InfiniteToFinite.
       destruct RET_FIN; subst.
 
       epose proof (F _ _ _ _ _ _ _ _ MEM_REF_START H F_Y) as (b_inf & ms_inf' & F_X & B & MSR).
-      
+
       epose proof (IHAS
                     (fun (x : A_FIN) (HIn : In x l') => f_fin x (or_intror HIn))
                     (fun (x : A_INF) (HIn : In x l) => f_inf x (or_intror HIn))
@@ -6083,7 +6083,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     destruct SET.
     split.
     2: {
-      apply lift_MemState_refine_prop. 
+      apply lift_MemState_refine_prop.
     }
 
     split.
@@ -6364,7 +6364,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     exists (i,p); auto.
   Qed.
 
-    
+
   (*
     This version may not be true.
    *)
@@ -6383,7 +6383,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     apply MapsTo_filter_dom_true in HX.
   Qed.
   *)
-  
+
   Lemma find_ptr_to_int_lift_Heap :
     forall h ptr,
       IntMaps.IM.find (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr) (lift_Heap h) =
@@ -6391,7 +6391,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Proof.
     intros.
     unfold lift_Heap.
-    
+
     unfold option_map.
     break_match.
     - apply IntMaps.IP.F.find_mapsto_iff in Heqo.
@@ -6407,7 +6407,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       rewrite Heqo.
       reflexivity.
   Qed.
-      
+
   (* TODO: Move this *)
   Lemma ptr_in_heap_prop_lift :
     forall h root ptr,
@@ -6434,7 +6434,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     - contradiction.
   Qed.
 
-  
+
   Lemma ptr_in_heap_prop_addr_convert:
     forall {h root_inf ptr_inf},
       InfMem.MMEP.MMSP.ptr_in_heap_prop (lift_Heap h) root_inf ptr_inf ->
@@ -6452,7 +6452,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     destruct HB as [IB HB].
     apply (in_bounds_exists_addr _ (snd root_inf)) in IB.
     destruct IB as [root_fin [EQR HS]].
-    exists root_fin. 
+    exists root_fin.
     rewrite <- fin_to_inf_addr_ptr_to_int in EQR.
     destruct root_inf.
     cbn in *. subst.
@@ -6462,9 +6462,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     auto.
     rewrite addr_convert_fin_to_inf_addr.
     reflexivity.
-  Qed.    
+  Qed.
 
-  
+
   (* TODO: Move this *)
   Lemma ptr_in_heap_prop_lift_inv' :
     forall {h root_inf root_fin ptr_inf},
@@ -6609,7 +6609,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     - apply IntMaps.IM.map_1.
       assumption.
   Qed.
-      
+
   (* (* TODO: Move this *) *)
   (* Definition heap_refine (h1 : InfMemMMSP.Heap) (h2 : FinMemMMSP.Heap) : Prop *)
   (*   := MemoryBigIntptr.MMEP.MemSpec.heap_preserved h1 (lift_Heap h2). *)
@@ -6660,7 +6660,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       assumption.
   Qed.
 
-  
   (* TODO: Move this *)
   Lemma Heap_eqv_lift :
     forall h1 h2,
@@ -7170,7 +7169,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       red. cbn.
       reflexivity.
   Qed.
-  
+
   (* TODO: Move this *)
   Lemma convert_FrameStack_Snoc_equation :
     forall fs f,
@@ -10700,7 +10699,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         }
         subst.
 
-        eapply fin_inf_disjoint_ptr_byte in DISJOINT; eauto.        
+        eapply fin_inf_disjoint_ptr_byte in DISJOINT; eauto.
         eapply ptr_in_heap_prop_lift.
         specialize (free_block_disjoint_preserved x root_fin DISJOINT).
         destruct free_block_disjoint_preserved.
@@ -11100,7 +11099,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
            ret
              (Memory64BitIntptr.MP.BYTE_IMPL.uvalue_sbyte uv_fin t
                 (LLVMParams64BitIntptr.Events.DV.UVALUE_IPTR n') sid))
-        (Nseq start (N.to_nat (FiniteSizeof.FinSizeof.sizeof_dtyp t))) = 
+        (Nseq start (N.to_nat (FiniteSizeof.FinSizeof.sizeof_dtyp t))) =
         NoOom bytes_fin ->
       map_monad
         (fun n : N =>
@@ -11192,6 +11191,95 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     eapply to_ubytes_fin_inf_helper; eauto.
   Qed.
 
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance preserve_allocation_ids_Reflexive :
+    Reflexive Memory64BitIntptr.MMEP.MemSpec.preserve_allocation_ids.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance read_byte_allowed_all_preserved_Reflexive :
+    Reflexive Memory64BitIntptr.MMEP.MemSpec.read_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance read_byte_prop_all_preserved_Reflexive :
+    Reflexive Memory64BitIntptr.MMEP.MemSpec.read_byte_prop_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance read_byte_preserved_Reflexive :
+    Reflexive Memory64BitIntptr.MMEP.MemSpec.read_byte_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    split; reflexivity.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance write_byte_allowed_all_preserved_Reflexive :
+    Reflexive Memory64BitIntptr.MMEP.MemSpec.write_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance free_byte_allowed_all_preserved_Reflexive :
+    Reflexive Memory64BitIntptr.MMEP.MemSpec.free_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance allocations_preserved_Reflexive :
+    Reflexive Memory64BitIntptr.MMEP.MemSpec.allocations_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance frame_stack_preserved_Reflexive :
+    Reflexive Memory64BitIntptr.MMEP.MemSpec.frame_stack_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance heap_preserved_Reflexive :
+    Reflexive Memory64BitIntptr.MMEP.MemSpec.heap_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance MemState_eqv_Reflexive : Reflexive Memory64BitIntptr.MMEP.MemSpec.MemState_eqv.
+  Proof.
+    red.
+    intros ms.
+    repeat (split; [reflexivity|]); reflexivity.
+  Qed.
+
   (* TODO: move this. Should hold for fin / inf *)
   Lemma serialize_sbytes_MemState_eqv :
     forall {uv t ms ms' bytes},
@@ -11212,9 +11300,32 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           red;
           break_match_hyp; inv H0;
           cbn in *;
-          split; [|split; [|split; [|split; [|split; [|split]]]]]; try tauto
+          split; [|split; [|split; [|split; [|split; [|split]]]]];
+          try tauto
         ].
-    - apply MemPropT_bind_ret_inv in SERIALIZE.
+   (* The above may be too slow... *)
+   - induction t_orig;
+       try solve
+         [ apply MemPropT_bind_ret_inv in SERIALIZE;
+           destruct SERIALIZE as (?&?&?&?);
+           red in H;
+           cbn in H;
+           cbn in H0;
+           red in H0;
+           red;
+           break_match_hyp; inv H0;
+           cbn in *;
+           split; [|split; [|split; [|split; [|split; [|split]]]]]; try tauto
+         ].
+     { clear IHt_orig.
+       induction sz.
+       - cbn in *.
+         destruct SERIALIZE as (?&?&(?&?)&(?&?)); subst.
+         reflexivity.
+     }
+
+
+                                         admit.
       destruct SERIALIZE as (?&?&?&?).
       red in H.
       cbn in H.
@@ -11234,7 +11345,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       bytes' = bytes.
   Proof.
   Admitted.
-  
+
   (* TODO: Prove this *)
   Lemma serialize_sbytes_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start uv_fin uv_inf t bytes_fin},
@@ -11311,7 +11422,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               eapply Forall2_repeatN.
               rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
               cbn.
-              reflexivity.              
+              reflexivity.
             }
 
             intros a_fin0 a_inf b_fin ms_fin ms_inf ms_fin_ma0 HIN_FIN HIN_INF MSR' UV_REF SER_ELEMENT.
@@ -11338,11 +11449,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             destruct IHuv_inf as (?&?&?&?&?).
             destruct H as (?&?&?&?&?).
             subst.
-            exists 
+            exists
             apply UV_REF.
-            
+
             }
-            
+
           }
 
         intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin H H0 H1.
@@ -11379,9 +11490,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           { intros a_fin0 a_inf b_fin ms_fin ms_inf ms_fin_ma0 HIN_FIN HIN_INF MSR' UV_REF SER.
             cbn in SER.
 
-            
+
           }
-          
+
         }
 
         intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin H H0 H1.
@@ -11395,7 +11506,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         apply H.
       }
 
-      
+
 
 pose proof UV_REF as UV_REF';
           rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
@@ -11473,9 +11584,9 @@ pose proof UV_REF as UV_REF';
       red.
       rewrite H;
       cbn; auto.
-    - 
-      
-    
+    -
+
+
       try
         solve
         [ rewrite DVC1.dvalue_refine_strict_equation in UV_REF;
