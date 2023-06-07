@@ -11296,6 +11296,269 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     repeat (split; [reflexivity|]); reflexivity.
   Qed.
 
+  (* TODO: Move this into memory model files so it's available for fin / inf *)
+  Lemma fresh_sid_MemState_eqv :
+    forall ms ms' sid,
+      fresh_sid ms (ret (ms', sid)) ->
+      Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms ms'.
+  Proof.
+    intros ms ms' sid H.
+    destruct H.
+    split; [|split; [|split; [|split; [|split; [|split]]]]];
+      tauto.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance preserve_allocation_ids_Transitive :
+    Transitive Memory64BitIntptr.MMEP.MemSpec.preserve_allocation_ids.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 p.
+    split; intros USED.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance read_byte_allowed_all_preserved_Transitive :
+    Transitive Memory64BitIntptr.MMEP.MemSpec.read_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 ptr.
+    split; intros READ.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance read_byte_prop_all_preserved_Transitive :
+    Transitive Memory64BitIntptr.MMEP.MemSpec.read_byte_prop_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 ptr byte.
+    split; intros READ.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance read_byte_preserved_Transitive :
+    Transitive Memory64BitIntptr.MMEP.MemSpec.read_byte_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0.
+    destruct H, H0.
+    split.
+    - eapply read_byte_allowed_all_preserved_Transitive; eauto.
+    - eapply read_byte_prop_all_preserved_Transitive; eauto.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance write_byte_allowed_all_preserved_Transitive :
+    Transitive Memory64BitIntptr.MMEP.MemSpec.write_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 ptr.
+    split; intros WRITE.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance free_byte_allowed_all_preserved_Transitive :
+    Transitive Memory64BitIntptr.MMEP.MemSpec.free_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 ptr.
+    split; intros FREE.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance allocations_preserved_Transitive :
+    Transitive Memory64BitIntptr.MMEP.MemSpec.allocations_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 ptr aid.
+    split; intros BYTE.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance frame_stack_preserved_Transitive :
+    Transitive Memory64BitIntptr.MMEP.MemSpec.frame_stack_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 fs.
+    split; intros FSP.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance heap_preserved_Transitive :
+    Transitive Memory64BitIntptr.MMEP.MemSpec.heap_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 h.
+    split; intros HEAP.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  (* TODO: move this so it's available for fin / inf *)
+  #[global] Instance MemState_eqv_Transitive : Transitive Memory64BitIntptr.MMEP.MemSpec.MemState_eqv.
+  Proof.
+    red.
+    intros x y z H H0.
+    destruct H as (?&?&?&?&?&?&?).
+    destruct H0 as (?&?&?&?&?&?&?).
+    split; [|split; [|split; [|split; [|split; [|split]]]]].
+    - eapply preserve_allocation_ids_Transitive; eauto.
+    - eapply read_byte_preserved_Transitive; eauto.
+    - eapply write_byte_allowed_all_preserved_Transitive; eauto.
+    - eapply free_byte_allowed_all_preserved_Transitive; eauto.
+    - eapply allocations_preserved_Transitive; eauto.
+    - eapply frame_stack_preserved_Transitive; eauto.
+    - eapply heap_preserved_Transitive; eauto.    
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance preserve_allocation_ids_Symmetric :
+    Symmetric Memory64BitIntptr.MMEP.MemSpec.preserve_allocation_ids.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H p.
+    split; intros USED.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance read_byte_allowed_all_preserved_Symmetric :
+    Symmetric Memory64BitIntptr.MMEP.MemSpec.read_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H ptr.
+    split; intros READ.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance read_byte_prop_all_preserved_Symmetric :
+    Symmetric Memory64BitIntptr.MMEP.MemSpec.read_byte_prop_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H ptr byte.
+    split; intros READ.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance read_byte_preserved_Symmetric :
+    Symmetric Memory64BitIntptr.MMEP.MemSpec.read_byte_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H.
+    destruct H.
+    split.
+    - eapply read_byte_allowed_all_preserved_Symmetric; eauto.
+    - eapply read_byte_prop_all_preserved_Symmetric; eauto.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance write_byte_allowed_all_preserved_Symmetric :
+    Symmetric Memory64BitIntptr.MMEP.MemSpec.write_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H ptr.
+    split; intros WRITE.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance free_byte_allowed_all_preserved_Symmetric :
+    Symmetric Memory64BitIntptr.MMEP.MemSpec.free_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H ptr.
+    split; intros FREE.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance allocations_preserved_Symmetric :
+    Symmetric Memory64BitIntptr.MMEP.MemSpec.allocations_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H ptr aid.
+    split; intros BYTE.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance frame_stack_preserved_Symmetric :
+    Symmetric Memory64BitIntptr.MMEP.MemSpec.frame_stack_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H fs.
+    split; intros FSP.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  (* TODO: Move this into MemoryModel.v *)
+  #[global] Instance heap_preserved_Symmetric :
+    Symmetric Memory64BitIntptr.MMEP.MemSpec.heap_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H h.
+    split; intros HEAP.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  (* TODO: move this so it's available for fin / inf *)
+  #[global] Instance MemState_eqv_Symmetric : Symmetric Memory64BitIntptr.MMEP.MemSpec.MemState_eqv.
+  Proof.
+    red.
+    intros x y H.
+    destruct H as (?&?&?&?&?&?&?).
+    split; [|split; [|split; [|split; [|split; [|split]]]]].
+    - eapply preserve_allocation_ids_Symmetric; eauto.
+    - eapply read_byte_preserved_Symmetric; eauto.
+    - eapply write_byte_allowed_all_preserved_Symmetric; eauto.
+    - eapply free_byte_allowed_all_preserved_Symmetric; eauto.
+    - eapply allocations_preserved_Symmetric; eauto.
+    - eapply frame_stack_preserved_Symmetric; eauto.
+    - eapply heap_preserved_Symmetric; eauto.    
+  Qed.
+
   (* TODO: move this. Should hold for fin / inf *)
   Lemma serialize_sbytes_MemState_eqv :
     forall {uv t ms ms' bytes},
@@ -11305,7 +11568,48 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     intros uv t ms ms' bytes SERIALIZE.
     rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
     revert uv t ms ms' bytes SERIALIZE.
-    induction uv; intros t_orig ms ms' bytes SERIALIZE;
+    induction uv using uvalue_ind''; intros t_orig ms ms' bytes SERIALIZE.
+
+    {
+      apply MemPropT_bind_ret_inv in SERIALIZE.
+      destruct SERIALIZE as (?&?&?&?).
+      etransitivity.
+      eapply fresh_sid_MemState_eqv; eauto.
+        
+      assert (Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms x).
+      {
+        destruct H.
+        split; [|split; [|split; [|split; [|split; [|split]]]]];
+        tauto.
+      }
+      red in H.
+      cbn in H.
+      cbn in H0.
+      red in H0.
+      red.
+      break_match_hyp; inv H0.
+        cbn in *;
+        split; [|split; [|split; [|split; [|split; [|split]]]]];
+        tauto
+    }
+
+    1-8: apply MemPropT_bind_ret_inv in SERIALIZE;
+      destruct SERIALIZE as (?&?&?&?);
+      red in H;
+      cbn in H;
+      cbn in H0;
+      red in H0;
+      red;
+      break_match_hyp; inv H0;
+      cbn in *;
+      split; [|split; [|split; [|split; [|split; [|split]]]]];
+    tauto.
+
+    { induction t_orig.
+      - 
+
+    }
+
       try solve
         [ apply MemPropT_bind_ret_inv in SERIALIZE;
           destruct SERIALIZE as (?&?&?&?);
@@ -11317,10 +11621,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           break_match_hyp; inv H0;
           cbn in *;
           split; [|split; [|split; [|split; [|split; [|split]]]]];
-          try tauto
+          tauto
         ].
    (* The above may be too slow... *)
-   - induction t_orig;
+   - revert ms ms' bytes SERIALIZE.
+     induction t_orig; intros ms ms' bytes SERIALIZE;
        try solve
          [ apply MemPropT_bind_ret_inv in SERIALIZE;
            destruct SERIALIZE as (?&?&?&?);
@@ -11333,25 +11638,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
            cbn in *;
            split; [|split; [|split; [|split; [|split; [|split]]]]]; try tauto
          ].
-     { clear IHt_orig.
-       induction sz.
-       - cbn in *.
-         destruct SERIALIZE as (?&?&(?&?)&(?&?)); subst.
-         reflexivity.
-     }
-
-
-                                         admit.
-      destruct SERIALIZE as (?&?&?&?).
-      red in H.
-      cbn in H.
-      cbn in H0.
-      red in H0.
-      red.
-      break_match_hyp; inv H0.
-      cbn in *.
-      split; [|split; [|split; [|split; [|split; [|split]]]]]; try tauto.
-  Qed.
+  Admitted.
 
   (* TODO: move this. Should hold for fin / inf *)
   Lemma serialize_sbytes_deterministic :
