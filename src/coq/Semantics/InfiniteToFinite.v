@@ -836,21 +836,14 @@ Module InfiniteToFinite.
   Definition Heap_in_bounds (ms_fin:FinMem.MMEP.MMSP.MemState) : Prop :=
     let h := Memory64BitIntptr.MMEP.MMSP.mem_state_heap ms_fin in
     forall i, is_true (IntMaps.member i h) -> exists ptr, FinPTOI.ptr_to_int ptr = i.
-
+    
   (* TODO: Need a MemState_refine_prop that takes all of the predicates
       like write_byte_all_preserved and bundles them in one place
       between memories. Should use this for these lemmas... *)
   (* TODO: Confirm and move this *)
   Definition MemState_refine_prop ms_inf ms_fin :=
     let ms_fin_lifted := lift_MemState ms_fin in
-    InfMem.MMEP.MemSpec.preserve_allocation_ids ms_inf ms_fin_lifted /\
-      InfMem.MMEP.MemSpec.read_byte_preserved ms_inf ms_fin_lifted /\
-      InfMem.MMEP.MemSpec.write_byte_allowed_all_preserved ms_inf ms_fin_lifted /\
-      InfMem.MMEP.MemSpec.free_byte_allowed_all_preserved ms_inf ms_fin_lifted /\
-      InfMem.MMEP.MemSpec.allocations_preserved ms_inf ms_fin_lifted /\
-      InfMem.MMEP.MemSpec.frame_stack_preserved ms_inf ms_fin_lifted /\
-      InfMem.MMEP.MemSpec.heap_preserved ms_inf ms_fin_lifted.
-
+    InfMem.MMEP.MemSpec.MemState_eqv ms_inf ms_fin_lifted.
 
   (* TODO: move this *)
   (*
@@ -7116,7 +7109,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       InfMem.MMEP.MemSpec.frame_stack_preserved ms_inf (lift_MemState ms_fin).
   Proof.
     intros ms_inf ms_fin MSR.
-    red in MSR.
+    do 2 red in MSR.
     tauto.
   Qed.
 
@@ -7127,7 +7120,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       InfMem.MMEP.MemSpec.allocations_preserved ms_inf (lift_MemState ms_fin).
   Proof.
     intros ms_inf ms_fin MSR.
-    red in MSR.
+    do 2 red in MSR.
     tauto.
   Qed.
 
@@ -7211,7 +7204,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       InfMem.MMEP.MemSpec.heap_preserved ms_inf (lift_MemState ms_fin).
   Proof.
     intros ms_inf ms_fin MSR.
-    red in MSR.
+    do 2 red in MSR.
     tauto.
   Qed.
 
@@ -7263,7 +7256,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       InfMem.MMEP.MemSpec.read_byte_allowed_all_preserved ms_inf (lift_MemState ms_fin).
   Proof.
     intros ms_inf ms_fin MSR.
-    red in MSR.
+    do 2 red in MSR.
     tauto.
   Qed.
 
@@ -7327,6 +7320,30 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     intros ms_fin ms_inf ms_fin' ms_inf' REF REF' HP.
   Admitted.
 
+  Hint Resolve
+    lift_MemState_refine_prop
+    fin_inf_allocations_preserved
+    fin_inf_frame_stack_preserved
+    fin_inf_heap_preserved
+    fin_inf_read_byte_allowed_all_preserved
+    fin_inf_write_byte_allowed_all_preserved
+    fin_inf_free_byte_allowed_all_preserved
+    fin_inf_preserve_allocation_ids
+    fin_inf_read_byte_prop_all_preserved
+    : FinInf.
+
+  Lemma fin_inf_read_byte_preserved :
+    forall {ms_fin ms_inf ms_fin' ms_inf'},
+      MemState_refine_prop ms_inf ms_fin ->
+      MemState_refine_prop ms_inf' ms_fin' ->
+      Memory64BitIntptr.MMEP.MemSpec.read_byte_preserved ms_fin ms_fin' ->
+      MemoryBigIntptr.MMEP.MemSpec.read_byte_preserved ms_inf ms_inf'.
+  Proof.
+    intros ms_fin ms_inf ms_fin' ms_inf' MSR1 MSR2 READ.
+    destruct READ.
+    split; eauto with FinInf.
+  Qed.
+
   Lemma fin_inf_write_byte_operation_invariants :
     forall addr_inf addr_fin ms_fin ms_inf ms_fin' ms_inf',
       MemState_refine_prop ms_inf ms_fin ->
@@ -7337,16 +7354,13 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Proof.
     intros addr_inf addr_fin ms_fin ms_inf ms_fin' ms_inf' REF REF' CONV INV.
     destruct INV.
-    split.
-
-    - eapply fin_inf_allocations_preserved; eauto.
-    - eapply fin_inf_frame_stack_preserved; eauto.
-    - eapply fin_inf_heap_preserved; eauto.
-    - eapply fin_inf_read_byte_allowed_all_preserved; eauto.
-    - eapply fin_inf_write_byte_allowed_all_preserved; eauto.
-    - eapply fin_inf_free_byte_allowed_all_preserved; eauto.
-    - eapply fin_inf_preserve_allocation_ids; eauto.
+    split; eauto with FinInf.
   Qed.
+
+  Hint Resolve
+    fin_inf_read_byte_preserved
+    fin_inf_write_byte_operation_invariants
+    : FinInf.
 
   (* TODO: Delete *)
   (* Lemma write_byte_spec_MemPropT_Heap_in_bounds : *)
@@ -7386,7 +7400,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Proof.
     intros addr_fin addr_inf ms_fin ms_fin' ms_inf byte_inf byte_fin [] MSR ADDR_CONV BYTE_REF WBP.
     destruct WBP.
-    pose proof fin_inf_set_byte_memory HIB MSR ADDR_CONV BYTE_REF byte_written as (ms_inf' & SET_INF & MSR').
+    pose proof fin_inf_set_byte_memory MSR ADDR_CONV BYTE_REF byte_written as (ms_inf' & SET_INF & MSR').
 
     exists tt. exists ms_inf'.
     split; auto.
@@ -7412,7 +7426,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
     pose proof (sbyte_refine_lifted byte_fin) as BYTE_REF.
     exists (lift_SByte byte_fin).
-    pose proof fin_inf_set_byte_memory HIB MSR ADDR_CONV BYTE_REF byte_written as (ms_inf' & SET_INF & MSR').
+    pose proof fin_inf_set_byte_memory MSR ADDR_CONV BYTE_REF byte_written as (ms_inf' & SET_INF & MSR').
 
     exists ms_inf'.
     split; auto.
@@ -7420,8 +7434,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     split; auto.
     - eapply fin_inf_write_byte_allowed; eauto.
     - eapply fin_inf_write_byte_operation_invariants; eauto.
-      Unshelve.
-       tauto.
   Qed.
 
   (* TODO: Move this *)
@@ -7611,7 +7623,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           res_inf = res_fin /\
           MemState_refine_prop ms_inf' ms_fin'.
   Proof.
-    intros args args0 ms_fin ms_fin' ms_inf res_fin MIB MSR ARGS HANDLER.
+    intros args args0 ms_fin ms_fin' ms_inf res_fin MSR ARGS HANDLER.
 
     (* Handler *)
     repeat (destruct ARGS;
@@ -7650,7 +7662,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         split; auto.
         split; auto.
         apply lift_MemState_refine_prop.
-        assumption.
       }
 
       erewrite <- fin_inf_no_overlap; eauto.
@@ -7675,7 +7686,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       split; auto.
       split; auto.
       apply lift_MemState_refine_prop.
-      assumption.
     }
 
     { (* 64 bit memcpy *)
@@ -7705,7 +7715,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         split; auto.
         split; auto.
         apply lift_MemState_refine_prop.
-        assumption.
       }
 
       erewrite <- fin_inf_no_overlap; eauto.
@@ -7730,7 +7739,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       split; auto.
       split; auto.
       apply lift_MemState_refine_prop.
-      assumption.
     }
 
     { (* iptr memcpy *)
@@ -7762,7 +7770,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         split; auto.
         split; auto.
         apply lift_MemState_refine_prop.
-        assumption.
       }
 
       erewrite <- fin_inf_no_overlap; eauto.
@@ -7787,7 +7794,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       split; auto.
       split; auto.
       apply lift_MemState_refine_prop.
-      assumption.
     }
   Qed.
 
@@ -8552,6 +8558,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           MemState_refine_prop ms_inf' ms_fin'.
   Proof.
     intros ms_inf ms_fin ms_fin' sid_fin MSR FRESH.
+    pose proof MSR as MSR'.
     cbn in *.
     red in MSR.
     exists sid_fin.
@@ -8623,7 +8630,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           FinMem.MMEP.MemSpec.used_store_id_prop ms_fin sid <->
             InfMem.MMEP.MemSpec.used_store_id_prop (lift_MemState ms_fin) sid.
       Proof.
-        intros ms_fin sid HIB.
+        intros ms_fin sid.
         split; intros USED.
         {
           cbn in *.
@@ -8646,7 +8653,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           red; red in USED.
           destruct USED as [ptr [byte [READ BYTE]]].
 
-          pose proof (lift_MemState_refine_prop ms_fin HIB) as MSR.
+          pose proof (lift_MemState_refine_prop ms_fin) as MSR.
           pose proof inf_fin_read_byte_prop_exists MSR READ as (ptr_fin&byte_fin&READ_FIN&BYTE_REFINE).
           exists ptr_fin. exists byte_fin.
           split; auto.
@@ -8667,7 +8674,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
       intros USED.
       apply used_store_id_lift_MemState in USED.
-      apply H7.
+      apply f.
 
       (* TODO: Move this somewhere I can use it for both fin / inf *)
       Lemma used_store_id_read_byte_preserved_fin :
@@ -8723,8 +8730,17 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
       eapply used_store_id_read_byte_preserved_fin; eauto.
       symmetry; auto.
-      assumption.
+      eapply fin_inf_heap_preserved; eauto.
+
+      red.
+      red.
+      split; [|split; [|split; [|split; [|split; [|split]]]]];
+        eauto with FinInf.
     }
+
+    split; auto.
+    split; [|split; [|split; [|split; [|split; [|split]]]]];
+      eauto with FinInf.
   Admitted.
 
   (* TODO: Move this, prove this *)
@@ -9864,10 +9880,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       MemoryBigIntptr.MMEP.MMSP.root_in_heap_prop (lift_Heap h_fin) ptr_inf.
   Proof.
     intros h_fin ptr_inf ptr_fin ADDR_REF ROOT.
-    red; red in ROOT.
-    unfold lift_Heap.
-    rewrite IntMaps.IP.F.map_b.
-    erewrite <- fin_inf_ptoi; eauto.
+    pose proof addr_refine_fin_to_inf_addr ptr_fin.
+    red in H, ADDR_REF.
+    pose proof InfToFinAddrConvert.addr_convert_injective _ _ _ ADDR_REF H.
+    subst.
+    apply root_in_heap_prop_lift; eauto.
   Qed.
 
   Lemma root_in_heap_prop_lifted_fin_inf_transitive :
@@ -9979,10 +9996,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     forward MSR; [reflexivity|].
     rewrite <- MSR in IN_HEAP.
 
-    pose proof ptr_in_heap_prop_lift_inv IN_HEAP ROOT_REF as (ptr_fin'&PTR_FIN_REF&IN_HEAP_FIN).
+    pose proof ptr_in_heap_prop_lift_inv IN_HEAP as (root_fin'&ptr_fin'&ROOT_FIN_REF&PTR_FIN_REF&IN_HEAP_FIN).
     rewrite PTR_REF in PTR_FIN_REF.
     inv PTR_FIN_REF.
     rename ptr_fin' into ptr_fin.
+    rewrite ROOT_REF in ROOT_FIN_REF.
+    inv ROOT_FIN_REF.
     eauto.
   Qed.
 
@@ -10011,12 +10030,13 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     forward IN_HEAP; [symmetry; auto|].
 
     (* TODO: Probably could split some of this into a separate lemma *)
-    pose proof (ptr_in_heap_prop_lift_inv IN_HEAP ROOT_REF) as (?&?&?).
-    exists x.
+    pose proof (ptr_in_heap_prop_lift_inv IN_HEAP) as (?&?&?&?&?).
+    rewrite ROOT_REF in H.
+    inv H.
+    exists x0.
     split; auto.
-    intros h H1.
-    rewrite <- H1.
-    apply H0.
+    intros h H2.
+    rewrite <- H2; auto.
   Qed.
 
   (* SAZ: Look at this one too *)
@@ -10634,9 +10654,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       rewrite HEAP_START_REF in IN.
       rewrite HEAP_FINAL_REF in CONTRA.
 
-      eapply ptr_in_heap_prop_lift_inv in IN as (?&?&?); eauto.
-      eapply ptr_in_heap_prop_lift_inv in CONTRA as (?&?&?); eauto.
-      rewrite H in H1; inv H1.
+      eapply ptr_in_heap_prop_lift_inv in IN as (?&?&?&?&?); eauto.
+      eapply ptr_in_heap_prop_lift_inv in CONTRA as (?&?&?&?&?); eauto.
+      rewrite ADDR_REF in H; inv H.
+      rewrite ADDR_REF in H2; inv H2.
+      rewrite H0 in H3; inv H3.
       eapply free_block_ptrs_freed; eauto.
     - clear - ADDR_REF HEAP_START_REF HEAP_FINAL_REF free_block_root_freed.
       intros CONTRA.
@@ -10657,16 +10679,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         rewrite HEAP_START_REF in IN.
         rewrite HEAP_FINAL_REF.
 
-        assert (exists root_fin, fin_to_inf_addr root_fin = root') as (root_fin&ROOT_FIN).
-        { (* TODO: Will need heap in bounds predicate *)
-          admit.
-        }
-        subst.
-
-        eapply ptr_in_heap_prop_lift_inv in IN as (?&?&?); eauto.
-        2: {
-          apply addr_refine_fin_to_inf_addr.
-        }
+        eapply ptr_in_heap_prop_lift_inv in IN as (root_fin&?&?&?&?); eauto.
 
         assert (fin_to_inf_addr x = ptr) as PTR_FIN.
         {
@@ -10677,15 +10690,21 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           eapply InfToFinAddrConvert.addr_convert_injective; eauto.
         }
 
-        eapply fin_inf_disjoint_ptr_byte in DISJOINT; eauto.
-        2: apply addr_refine_fin_to_inf_addr.
-
+        assert (fin_to_inf_addr root_fin = root') as ROOT_FIN.
+        {
+          unfold fin_to_inf_addr.
+          break_match_goal.
+          clear Heqs.
+          apply FinToInfAddrConvertSafe.addr_convert_safe in e.
+          eapply InfToFinAddrConvert.addr_convert_injective; eauto.
+        }
         subst.
+
+        eapply fin_inf_disjoint_ptr_byte in DISJOINT; eauto.        
         eapply ptr_in_heap_prop_lift.
         specialize (free_block_disjoint_preserved x root_fin DISJOINT).
         destruct free_block_disjoint_preserved.
-        apply H1.
-        auto.
+        eauto.
       }
 
       {
@@ -10693,16 +10712,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         rewrite HEAP_FINAL_REF in IN.
         rewrite HEAP_START_REF.
 
-        assert (exists root_fin, fin_to_inf_addr root_fin = root') as (root_fin&ROOT_FIN).
-        { (* TODO: Will need heap in bounds predicate *)
-          admit.
-        }
-        subst.
-
-        eapply ptr_in_heap_prop_lift_inv in IN as (?&?&?); eauto.
-        2: {
-          apply addr_refine_fin_to_inf_addr.
-        }
+        eapply ptr_in_heap_prop_lift_inv in IN as (root_fin&?&?&?&?); eauto.
 
         assert (fin_to_inf_addr x = ptr) as PTR_FIN.
         {
@@ -10713,15 +10723,21 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           eapply InfToFinAddrConvert.addr_convert_injective; eauto.
         }
 
-        eapply fin_inf_disjoint_ptr_byte in DISJOINT; eauto.
-        2: apply addr_refine_fin_to_inf_addr.
-
+        assert (fin_to_inf_addr root_fin = root') as ROOT_FIN.
+        {
+          unfold fin_to_inf_addr.
+          break_match_goal.
+          clear Heqs.
+          apply FinToInfAddrConvertSafe.addr_convert_safe in e.
+          eapply InfToFinAddrConvert.addr_convert_injective; eauto.
+        }
         subst.
+
+
+        eapply fin_inf_disjoint_ptr_byte in DISJOINT; eauto.
         eapply ptr_in_heap_prop_lift.
         specialize (free_block_disjoint_preserved x root_fin DISJOINT).
-        destruct free_block_disjoint_preserved.
-        apply H2.
-        auto.
+        destruct free_block_disjoint_preserved; eauto.
       }
     - clear - ADDR_REF HEAP_START_REF HEAP_FINAL_REF free_block_disjoint_roots.
       intros root' DISJOINT.
@@ -10732,25 +10748,19 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         rewrite HEAP_START_REF in IN.
         rewrite HEAP_FINAL_REF.
 
-        assert (exists root_fin, fin_to_inf_addr root_fin = root') as (root_fin&ROOT_FIN).
-        { (* TODO: Will need heap in bounds predicate *)
-          admit.
+        eapply root_in_heap_prop_lift_inv in IN as (root_fin&?&?).
+        assert (fin_to_inf_addr root_fin = root').
+        {
+          unfold fin_to_inf_addr.
+          break_match_goal.
+          clear Heqs.
+          apply FinToInfAddrConvertSafe.addr_convert_safe in e.
+          eapply InfToFinAddrConvert.addr_convert_injective; eauto.
         }
         subst.
 
         eapply root_in_heap_prop_lifted_fin_inf.
         apply addr_refine_fin_to_inf_addr.
-
-        eapply root_in_heap_prop_lift_inv in IN as (?&?&?).
-        assert (x = root_fin).
-        { apply fin_to_inf_addr_conv_inf in H.
-          unfold fin_to_inf_addr in H.
-          break_match_hyp.
-          break_match_hyp.
-          subst.
-          clear Heqs Heqs0.
-          eapply FinToInfAddrConvert.addr_convert_injective; eauto.
-        }
 
         eapply fin_inf_disjoint_ptr_byte in DISJOINT; eauto.
 
@@ -10765,25 +10775,19 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         rewrite HEAP_FINAL_REF in IN.
         rewrite HEAP_START_REF.
 
-        assert (exists root_fin, fin_to_inf_addr root_fin = root') as (root_fin&ROOT_FIN).
-        { (* TODO: Will need heap in bounds predicate *)
-          admit.
+        eapply root_in_heap_prop_lift_inv in IN as (root_fin&?&?).
+        assert (fin_to_inf_addr root_fin = root').
+        {
+          unfold fin_to_inf_addr.
+          break_match_goal.
+          clear Heqs.
+          apply FinToInfAddrConvertSafe.addr_convert_safe in e.
+          eapply InfToFinAddrConvert.addr_convert_injective; eauto.
         }
         subst.
 
         eapply root_in_heap_prop_lifted_fin_inf.
         apply addr_refine_fin_to_inf_addr.
-
-        eapply root_in_heap_prop_lift_inv in IN as (?&?&?).
-        assert (x = root_fin).
-        { apply fin_to_inf_addr_conv_inf in H.
-          unfold fin_to_inf_addr in H.
-          break_match_hyp.
-          break_match_hyp.
-          subst.
-          clear Heqs Heqs0.
-          eapply FinToInfAddrConvert.addr_convert_injective; eauto.
-        }
 
         eapply fin_inf_disjoint_ptr_byte in DISJOINT; eauto.
 
@@ -10792,7 +10796,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         destruct free_block_disjoint_roots.
         auto.
       }
-  Admitted.
+  Qed.
 
   Lemma handle_free_spec_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start ptr_fin ptr_inf},
@@ -10807,11 +10811,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     destruct FREE.
 
     exists (lift_MemState ms_fin_final).
-
-    (* assert (Heap_in_bounds ms_fin_final) as HIB_FINAL. *)
-    (* { *)
-    (*   admit. (* TODO: Heap_in_bounds *) *)
-    (* } *)
 
     split.
     2: apply lift_MemState_refine_prop.
@@ -10903,7 +10902,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             }
             eapply fin_inf_read_byte_spec; eauto.
             apply lift_MemState_refine_prop; auto.
-          - pose proof (lift_MemState_refine_prop ms_fin_final HIB_FINAL) as MSR'.
+          - pose proof (lift_MemState_refine_prop ms_fin_final) as MSR'.
             epose proof inf_fin_read_byte_spec MSR' CONV RBS as (byte_fin&RBS_FIN&BYTE_REF).
             eapply free_non_frame_bytes_read in RBS_FIN.
             2: {
@@ -10959,14 +10958,14 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         auto.
       }
     - (* Free operation invariants *)
-      clear - HIB_FINAL MSR free_invariants.
+      clear - MSR free_invariants.
       destruct free_invariants.
       split.
       + eapply fin_inf_preserve_allocation_ids; eauto.
         apply lift_MemState_refine_prop; auto.
       + eapply fin_inf_frame_stack_preserved; eauto.
         apply lift_MemState_refine_prop; auto.
-Admitted.
+  Qed.
 
   Lemma handle_free_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start res_fin args_fin args_inf},
@@ -11193,6 +11192,49 @@ Admitted.
     eapply to_ubytes_fin_inf_helper; eauto.
   Qed.
 
+  (* TODO: move this. Should hold for fin / inf *)
+  Lemma serialize_sbytes_MemState_eqv :
+    forall {uv t ms ms' bytes},
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv t ms (success_unERR_UB_OOM (ms', bytes)) ->
+      Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms ms'.
+  Proof.
+    intros uv t ms ms' bytes SERIALIZE.
+    rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+    revert uv t ms ms' bytes SERIALIZE.
+    induction uv; intros t_orig ms ms' bytes SERIALIZE;
+      try solve
+        [ apply MemPropT_bind_ret_inv in SERIALIZE;
+          destruct SERIALIZE as (?&?&?&?);
+          red in H;
+          cbn in H;
+          cbn in H0;
+          red in H0;
+          red;
+          break_match_hyp; inv H0;
+          cbn in *;
+          split; [|split; [|split; [|split; [|split; [|split]]]]]; try tauto
+        ].
+    - apply MemPropT_bind_ret_inv in SERIALIZE.
+      destruct SERIALIZE as (?&?&?&?).
+      red in H.
+      cbn in H.
+      cbn in H0.
+      red in H0.
+      red.
+      break_match_hyp; inv H0.
+      cbn in *.
+      split; [|split; [|split; [|split; [|split; [|split]]]]]; try tauto.
+  Qed.
+
+  (* TODO: move this. Should hold for fin / inf *)
+  Lemma serialize_sbytes_deterministic :
+    forall {uv t ms ms' bytes bytes'},
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv t ms (success_unERR_UB_OOM (ms', bytes)) ->
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv t ms (success_unERR_UB_OOM (ms', bytes')) ->
+      bytes' = bytes.
+  Proof.
+  Admitted.
+  
   (* TODO: Prove this *)
   Lemma serialize_sbytes_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start uv_fin uv_inf t bytes_fin},
@@ -11232,7 +11274,9 @@ Admitted.
           cbn; auto
       end.
 
-    induction uv_inf;
+    generalize dependent t.
+    generalize dependent uv_fin.
+    induction uv_inf using LLVMParamsBigIntptr.Events.DV.uvalue_ind''; intros uv_fin UV_REF t' SERIALIZE;
       try solve
         [ pose proof UV_REF as UV_REF';
           rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
@@ -11242,6 +11286,76 @@ Admitted.
           break_match_hyp; inv UV_REF;
           solve_to_ubytes SERIALIZE
         ].
+    - (* Undef *)
+      pose proof UV_REF as UV_REF';
+        rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
+        rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
+        cbn in UV_REF;
+        move UV_REF after SERIALIZE;
+        break_match_hyp; inv UV_REF.
+        destruct t';
+        try (solve_to_ubytes SERIALIZE).
+
+        { (* Undef structures *)
+          eapply MemPropT_fin_inf_bind.
+          4: apply SERIALIZE.
+          all: eauto.
+
+          { (* MA: serialize fields *)
+            intros a_fin ms_fin_ma HMAPM.
+            eapply MemPropT_fin_inf_map_monad_In
+              with
+              (A_REF:=DVC1.uvalue_refine_strict)
+              (B_REF:=sbytes_refine); eauto.
+            2: {
+              eapply Forall2_repeatN.
+              rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+              cbn.
+              reflexivity.              
+            }
+
+            intros a_fin0 a_inf b_fin ms_fin ms_inf ms_fin_ma0 HIN_FIN HIN_INF MSR' UV_REF SER_ELEMENT.
+            cbn in SER_ELEMENT.
+            apply In_repeatN in HIN_FIN, HIN_INF.
+            subst.
+
+            specialize (IHuv_inf (LLVMParams64BitIntptr.Events.DV.UVALUE_Undef t)).
+            forward IHuv_inf.
+            { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+              cbn.
+              reflexivity.
+            }
+            specialize (IHuv_inf (DTYPE_Array sz0 t')).
+            cbn in IHuv_inf.
+            forward IHuv_inf.
+            { exists ms_fin_final. exists a_fin.
+              split; eauto.
+              rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SER_ELEMENT.
+              admit.
+              admit.
+            }
+
+            destruct IHuv_inf as (?&?&?&?&?).
+            destruct H as (?&?&?&?&?).
+            subst.
+            exists 
+            apply UV_REF.
+            
+            }
+            
+          }
+
+        intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin H H0 H1.
+        cbn.
+        cbn in *.
+        destruct H1; subst.
+        exists (concat a_inf). exists ms_inf.
+        split; auto.
+        split; auto.
+
+        apply H.
+      }
+
     - (* Undef *)
       pose proof UV_REF as UV_REF';
         rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
@@ -11259,7 +11373,14 @@ Admitted.
 
         { (* MA: serialize fields *)
           intros a_fin ms_fin_ma HMAPM.
+          eapply MemPropT_fin_inf_map_monad_In
+            with (A_REF:=DVC1.uvalue_refine_strict); eauto.
 
+          { intros a_fin0 a_inf b_fin ms_fin ms_inf ms_fin_ma0 HIN_FIN HIN_INF MSR' UV_REF SER.
+            cbn in SER.
+
+            
+          }
           
         }
 

@@ -3086,6 +3086,15 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     := forall h,
       memory_stack_heap_prop (MemState_get_memory m1) h <-> memory_stack_heap_prop (MemState_get_memory m2) h.
 
+  Definition MemState_eqv (ms1 ms2 : MemState) : Prop :=
+    preserve_allocation_ids ms1 ms2 /\
+      read_byte_preserved ms1 ms2 /\
+      write_byte_allowed_all_preserved ms1 ms2 /\
+      free_byte_allowed_all_preserved ms1 ms2 /\
+      allocations_preserved ms1 ms2 /\
+      frame_stack_preserved ms1 ms2 /\
+      heap_preserved ms1 ms2.
+
   (*** Provenance operations *)
   #[global] Instance MemPropT_MonadProvenance : MonadProvenance Provenance (MemPropT MemState).
   Proof.
