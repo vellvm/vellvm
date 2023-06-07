@@ -11569,12 +11569,30 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
     revert uv t ms ms' bytes SERIALIZE.
     induction uv using uvalue_ind''; intros t_orig ms ms' bytes SERIALIZE.
+    all:
+      try solve
+        [
+          apply MemPropT_bind_ret_inv in SERIALIZE;
+          destruct SERIALIZE as (?&?&?&?);
+          etransitivity;
+          [eapply fresh_sid_MemState_eqv; eauto|];
+          match goal with
+          | H: lift_OOM ?x _ _ |- _ =>
+              red in H; destruct x eqn:?HX; inv H
+          end; reflexivity
+        ].
 
     {
-      apply MemPropT_bind_ret_inv in SERIALIZE.
-      destruct SERIALIZE as (?&?&?&?).
-      etransitivity.
-      eapply fresh_sid_MemState_eqv; eauto.
+      apply MemPropT_bind_ret_inv in SERIALIZE;
+      destruct SERIALIZE as (?&?&?&?);
+      etransitivity;
+        [eapply fresh_sid_MemState_eqv; eauto|];
+      match goal with
+      | H: lift_OOM ?x _ _ |- _ =>
+          red in H; destruct x eqn:?HX; inv H
+      end; reflexivity.
+      red in H0.
+      
         
       assert (Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms x).
       {
