@@ -99,7 +99,7 @@ Module InfiniteToFinite.
   Module EC1 := ECInfFin.
   Module DVC1 := DVCInfFin.
   Module DVC2 := DVCFinInf.
-  Print Module DVC1.
+
   Module InfMem := MemoryBigIntptr.
   Module FinMem := Memory64BitIntptr.
 
@@ -1001,7 +1001,7 @@ Module InfiniteToFinite.
         exact (LLVMEvents.raise H).
       }
 
-      Show Proof.
+      (* Show Proof. *)
   Defined.
 
   Set Printing All.
@@ -6887,6 +6887,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     reflexivity.
   Qed.
 
+  (*
   Lemma convert_Frame_cons_rev :
     forall f_inf f_fin a_fin ,
       convert_Frame f_inf = NoOom (a_fin :: f_fin) ->
@@ -7089,12 +7090,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       destruct MSFSP as [fs_fin [EQ H]].
       apply memory_stack_frame_stack_prop_lift in H.
       unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop.
-
-      rewrite EQ.
-      apply memory_stack_frame_stack_prop_lift.
-      apply memory_stack_frame_stack_prop_lift_inv in H.
-      destruct H as [fs_fin' [HEQ' H]].
-      
       
       admit.
     - admit.
