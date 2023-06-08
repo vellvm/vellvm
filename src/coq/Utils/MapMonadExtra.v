@@ -1500,6 +1500,45 @@ Proof.
         exists y; exists (inr IN); split; cbn; eauto.
 Qed.
 
+Lemma map_monad_InT_OOM_Nth' :
+  forall {A B : Type}
+    (l : list A)
+    (f : forall (a : A), InT a l -> OOM B)
+    (res : list B) (x : A)
+    (n : nat),
+    map_monad_InT l f = ret res ->
+    Util.Nth l n x ->
+    exists (y : B) (HIN : InT x l), f x HIN = ret y /\ Util.Nth res n y.
+Proof.
+  intros A B l f res x n MAP NTH.
+  generalize dependent res. generalize dependent n. revert x.
+  induction l; intros x n NTH res MAP.
+  - cbn in *.
+    rewrite Util.nth_error_nil in NTH; discriminate.
+  - cbn in NTH.
+    induction n.
+    + cbn in NTH.
+      inv NTH.
+
+      destruct res.
+      * cbn in *.
+        repeat break_match_hyp_inv.
+      * rewrite map_monad_InT_unfold in MAP.
+        cbn in *.
+        repeat break_match_hyp_inv.
+        exists b. exists (inl eq_refl).
+        split; auto.
+    + cbn in NTH.
+      destruct res.
+      * cbn in MAP.
+        repeat break_match_hyp_inv.
+      * rewrite map_monad_InT_unfold in MAP.
+        cbn in MAP.
+        repeat break_match_hyp_inv.
+        epose proof (IHl _ _ _ NTH res Heqo0) as [y [IN [HF INy]]].
+        exists y; exists (inr IN); split; cbn; eauto.
+Qed.
+
 Lemma map_monad_InT_oom_In :
   forall {A B : Type}
     (l : list A)

@@ -11910,19 +11910,51 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           ]
         | rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
           cbn in UV_REF;
-          break_match_hyp; inv UV_REF;
-          break_match_hyp; first [inv H1 | inv H0];
+          repeat break_match_hyp_inv;
           eauto with UVALUE_DTYP
+        | rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
+          cbn in UV_REF;
+          repeat break_match_hyp_inv;
+          rewrite DVC1.uvalue_convert_strict_equation in Heqo;
+          cbn in Heqo;
+          break_match_hyp_inv;
+          eapply DVC1.DV2.UVALUE_ExtractValue_Struct_sing_typ; eauto;
+          eapply IHTYP;
+          rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation;
+          cbn;
+          rewrite Heqo0;
+          reflexivity
         ].
-    {
-      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
+    { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
         cbn in UV_REF;
-      break_match_hyp; inv UV_REF.
-      break_match_hyp; inv H0.
-      eapply UVALUE_ICmp_vector_typ_ptr; eauto.
-      eauto with UVALUE_DTYP.
-      eapply DVC1.DV2.UVALUE_ICmp_typ; eauto.
-      constructor.
+        repeat break_match_hyp_inv;
+        rewrite DVC1.uvalue_convert_strict_equation in Heqo;
+        cbn in Heqo;
+        break_match_hyp_inv.
+
+      eapply map_monad_InT_OOM_Nth' in Heqo0; eauto.
+      destruct Heqo0 as (?&?&?&?).
+      eapply DVC1.DV2.UVALUE_ExtractValue_Struct_cons_typ; eauto.
+      { eapply IHTYP1.
+        eauto.
+      }
+
+        
+      
+      2: {
+        constructor.
+        apply H3.
+        eauto.
+      }
+      3: eauto with UVALUE_DTYP.
+      
+        econstructor; eauto;
+        eapply IHTYP;
+          rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation;
+          cbn;
+          rewrite Heqo0;
+          reflexivity.
+
     }
   Qed.
 
