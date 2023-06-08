@@ -3086,8 +3086,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       uvalue_has_dtyp y (DTYPE_Vector vsz (DTYPE_I isz)) ->
       uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1))
   | UVALUE_ICmp_vector_typ_ptr :
-      forall x y vsz isz op,
-      IX_supported isz ->
+      forall x y vsz op,
       uvalue_has_dtyp x (DTYPE_Vector vsz DTYPE_IPTR) ->
       uvalue_has_dtyp y (DTYPE_Vector vsz DTYPE_IPTR) ->
       uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1))

@@ -11764,6 +11764,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       auto.
   Qed.
 
+  (* TODO: Move this hint? *)
+  Hint Constructors DVC1.DV2.uvalue_has_dtyp : UVALUE_DTYP.
+
   (* TODO: Probably a better spot for this too *)
   Lemma uvalue_refine_strict_has_dtyp :
     forall {uv_inf uv_fin t},
@@ -11893,19 +11896,34 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               cbn; rewrite HMAP; reflexivity|]
           end;
           constructor; eauto
+        | rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
+          cbn in UV_REF;
+          break_match_hyp; inv UV_REF;
+          constructor; eauto;
+          [ apply Forall_forall;
+            intros ? ?;
+              eapply map_monad_InT_oom_In in Heqo; eauto;
+            destruct Heqo as (?&?&?);
+            eapply IH; eauto;
+            apply In_InT; eauto
+          | symmetry; eapply map_monad_InT_length_noom; eauto
+          ]
+        | rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
+          cbn in UV_REF;
+          break_match_hyp; inv UV_REF;
+          break_match_hyp; first [inv H1 | inv H0];
+          eauto with UVALUE_DTYP
         ].
-
-    - rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF.
-      cbn in UV_REF;
-        break_match_hyp; inv UV_REF.
+    {
+      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
+        cbn in UV_REF;
+      break_match_hyp; inv UV_REF.
+      break_match_hyp; inv H0.
+      eapply UVALUE_ICmp_vector_typ_ptr; eauto.
+      eauto with UVALUE_DTYP.
+      eapply DVC1.DV2.UVALUE_ICmp_typ; eauto.
       constructor.
-      + apply Forall_forall; intros ? ?.
-        eapply map_monad_InT_oom_In in Heqo; eauto.
-        destruct Heqo as (?&?&?).
-        eapply IH; eauto.
-        apply In_InT; eauto.
-      + symmetry; eapply map_monad_InT_length_noom; eauto.
-    - 
+    }
   Qed.
 
   (* TODO: Prove this *)
