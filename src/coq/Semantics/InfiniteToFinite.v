@@ -11580,98 +11580,340 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           | H: lift_OOM ?x _ _ |- _ =>
               red in H; destruct x eqn:?HX; inv H
           end; reflexivity
+        | destruct t_orig;
+          try solve
+            [
+              apply MemPropT_bind_ret_inv in SERIALIZE;
+              destruct SERIALIZE as (?&?&?&?);
+              etransitivity;
+              [eapply fresh_sid_MemState_eqv; eauto|];
+              match goal with
+              | H: lift_OOM ?x _ _ |- _ =>
+                  red in H; destruct x eqn:?HX; inv H
+              end; reflexivity
+            ];
+          try
+            solve
+            [ (* Arrays *)
+              specialize (IHuv (DTYPE_Array sz0 t_orig) _ _ _ SERIALIZE); auto
+            | (* Vectors *)
+              specialize (IHuv (DTYPE_Vector sz0 t_orig) _ _ _ SERIALIZE); auto
+            | (* Structs *)
+              specialize (IHuv (DTYPE_Struct fields) _ _ _ SERIALIZE); auto
+            | (* Packed structs *)
+              specialize (IHuv (DTYPE_Packed_struct fields) _ _ _ SERIALIZE); auto
+            ]
         ].
 
-    {
-      apply MemPropT_bind_ret_inv in SERIALIZE;
-      destruct SERIALIZE as (?&?&?&?);
-      etransitivity;
-        [eapply fresh_sid_MemState_eqv; eauto|];
-      match goal with
-      | H: lift_OOM ?x _ _ |- _ =>
-          red in H; destruct x eqn:?HX; inv H
-      end; reflexivity.
-      red in H0.
-      
-        
-      assert (Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms x).
-      {
-        destruct H.
-        split; [|split; [|split; [|split; [|split; [|split]]]]];
-        tauto.
+    { (* Aggregates *)
+      induction t_orig;
+        try solve
+          [
+            apply MemPropT_bind_ret_inv in SERIALIZE;
+            destruct SERIALIZE as (?&?&?&?);
+            etransitivity;
+            [eapply fresh_sid_MemState_eqv; eauto|];
+            match goal with
+            | H: lift_OOM ?x _ _ |- _ =>
+                red in H; destruct x eqn:?HX; inv H
+            end; reflexivity
+          ];
+        try
+          solve
+          [ (* Arrays *)
+            specialize (IHuv (DTYPE_Array sz0 t_orig) _ _ _ SERIALIZE); auto
+          | (* Vectors *)
+            specialize (IHuv (DTYPE_Vector sz0 t_orig) _ _ _ SERIALIZE); auto
+          | (* Structs *)
+            specialize (IHuv (DTYPE_Struct fields) _ _ _ SERIALIZE); auto
+          | (* Packed structs *)
+            specialize (IHuv (DTYPE_Packed_struct fields) _ _ _ SERIALIZE); auto
+          ].
+
+      { apply MemPropT_bind_ret_inv in SERIALIZE;
+          destruct SERIALIZE as (?&?&?&?).
+
+        rename H into SERIALIZE.
+        cbn in H0.
+        destruct H0; subst.
+        eapply IHt_orig.
+        destruct t_orig.
+        { cbn.
+          exists ms.
+          eexists. (* Ehhh... *)
+          split.
+          {
+            split.
+            2: {
+              repeat (split; [reflexivity|]); reflexivity.
+            }
+            admit.
+          }
+
+          red.
+          break_match.
+          2: {
+            cbn.
+            unfold Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes in Heqo.
+            cbn in Heqo.
+            apply map_monad_OOM_fail in Heqo.
+            destruct Heqo as (?&?&?).
+            break_match_hyp; inv H0.
+            (* TODO: Should be able to conclude that sizeof is less than
+            64bit range using H... But it's a little weird because of
+            arbitrary iX's + may not work for big structures /
+            arrays... Should probably make sizeof use iptr type?*)
+            admit.
+          }
+
+          clear IHt_orig.
+          cbn.
+          unfold Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes in *.
+          cbn in *.
+          admit.
+        }
+        all: admit.
       }
-      red in H.
-      cbn in H.
-      cbn in H0.
-      red in H0.
-      red.
-      break_match_hyp; inv H0.
-        cbn in *;
-        split; [|split; [|split; [|split; [|split; [|split]]]]];
-        tauto
-    }
-
-    1-8: apply MemPropT_bind_ret_inv in SERIALIZE;
-      destruct SERIALIZE as (?&?&?&?);
-      red in H;
-      cbn in H;
-      cbn in H0;
-      red in H0;
-      red;
-      break_match_hyp; inv H0;
-      cbn in *;
-      split; [|split; [|split; [|split; [|split; [|split]]]]];
-    tauto.
-
-    { induction t_orig.
-      - 
-
-    }
-
-      try solve
-        [ apply MemPropT_bind_ret_inv in SERIALIZE;
-          destruct SERIALIZE as (?&?&?&?);
-          red in H;
-          cbn in H;
-          cbn in H0;
-          red in H0;
-          red;
-          break_match_hyp; inv H0;
-          cbn in *;
-          split; [|split; [|split; [|split; [|split; [|split]]]]];
-          tauto
-        ].
-   (* The above may be too slow... *)
-   - revert ms ms' bytes SERIALIZE.
-     induction t_orig; intros ms ms' bytes SERIALIZE;
-       try solve
-         [ apply MemPropT_bind_ret_inv in SERIALIZE;
-           destruct SERIALIZE as (?&?&?&?);
-           red in H;
-           cbn in H;
-           cbn in H0;
-           red in H0;
-           red;
-           break_match_hyp; inv H0;
-           cbn in *;
-           split; [|split; [|split; [|split; [|split; [|split]]]]]; try tauto
-         ].
   Admitted.
 
   (* TODO: move this. Should hold for fin / inf *)
+  (* TODO: This isn't true... The bytes can get different sids *)
   Lemma serialize_sbytes_deterministic :
     forall {uv t ms ms' bytes bytes'},
       Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv t ms (success_unERR_UB_OOM (ms', bytes)) ->
       Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv t ms (success_unERR_UB_OOM (ms', bytes')) ->
       bytes' = bytes.
   Proof.
+    (* intros uv t ms ms' bytes bytes' SER1 SER2. *)
+    (* rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SER1, SER2. *)
+    (* induction uv using uvalue_ind''. *)
+
+    (* { *)
+    (*   apply MemPropT_bind_ret_inv in SER1. *)
+    (*   destruct SER1 as (?&?&?&?). *)
+
+    (*   apply MemPropT_bind_ret_inv in SER2. *)
+    (*   destruct SER2 as (?&?&?&?). *)
+
+    (*   assert (Memory64BitIntptr.MMEP.MemSpec.MemState_eqv x x1) as EQV. *)
+    (*   { etransitivity. *)
+    (*     symmetry; eapply fresh_sid_MemState_eqv; eauto. *)
+    (*     eapply fresh_sid_MemState_eqv; eauto. *)
+    (*   } *)
+
+    (*   assert (Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms x) as EQV2. *)
+    (*   { etransitivity. *)
+    (*     eapply fresh_sid_MemState_eqv; eauto. *)
+    (*     symmetry; eauto. *)
+    (*   } *)
+
+    (*   red in H0. *)
+    (*   red in H2. *)
+      
+      
+    (*       etransitivity; *)
+    (*       [eapply fresh_sid_MemState_eqv; eauto|]; *)
+    (*       match goal with *)
+    (*       | H: lift_OOM ?x _ _ |- _ => *)
+    (*           red in H; destruct x eqn:?HX; inv H *)
+    (*       end; reflexivity. *)
+    (*     | destruct t_orig; *)
+    (*       try solve *)
+    (*         [ *)
+    (*           apply MemPropT_bind_ret_inv in SERIALIZE; *)
+    (*           destruct SERIALIZE as (?&?&?&?); *)
+    (*           etransitivity; *)
+    (*           [eapply fresh_sid_MemState_eqv; eauto|]; *)
+    (*           match goal with *)
+    (*           | H: lift_OOM ?x _ _ |- _ => *)
+    (*               red in H; destruct x eqn:?HX; inv H *)
+    (*           end; reflexivity *)
+    (*         ]; *)
+    (*       try *)
+    (*         solve *)
+    (*         [ (* Arrays *) *)
+    (*           specialize (IHuv (DTYPE_Array sz0 t_orig) _ _ _ SERIALIZE); auto *)
+    (*         | (* Vectors *) *)
+    (*           specialize (IHuv (DTYPE_Vector sz0 t_orig) _ _ _ SERIALIZE); auto *)
+    (*         | (* Structs *) *)
+    (*           specialize (IHuv (DTYPE_Struct fields) _ _ _ SERIALIZE); auto *)
+    (*         | (* Packed structs *) *)
+    (*           specialize (IHuv (DTYPE_Packed_struct fields) _ _ _ SERIALIZE); auto *)
+    (*         ] *)
+    (*     ]. *)
+
+    (* } *)
   Admitted.
+
+  (* TODO: Move this, and maybe generalize this *)
+  Lemma map_monad_InT_length_noom :
+    forall {X Y} {xs : list X} {ys : list Y} {f},
+      map_monad_InT xs f = NoOom ys ->
+      length xs = length ys.
+  Proof.
+    intros X Y.
+    induction xs; intros ys f H.
+    - cbn in *.
+      inv H; auto.
+    - rewrite map_monad_InT_unfold in H.
+      cbn in H.
+      break_match_hyp; inv H.
+      break_match_hyp; inv H1.
+      apply IHxs in Heqo0.
+      cbn.
+      auto.
+  Qed.
+
+  (* TODO: Probably a better spot for this too *)
+  Lemma uvalue_refine_strict_has_dtyp :
+    forall {uv_inf uv_fin t},
+      DVC1.uvalue_refine_strict uv_inf uv_fin ->
+      DVC1.DV1.uvalue_has_dtyp uv_inf t ->
+      DVC1.DV2.uvalue_has_dtyp uv_fin t.
+  Proof.
+    intros uv_inf uv_fin t UV_REF TYP.
+    generalize dependent uv_fin.
+    induction TYP; intros uv_fin UV_REF;
+      try solve
+        [ rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
+          cbn in UV_REF;
+          break_match_hyp; inv UV_REF;
+          constructor
+        | rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
+          cbn in UV_REF; inv UV_REF;
+          constructor
+        | rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
+          cbn in UV_REF; inv UV_REF;
+          constructor;
+          rewrite NO_VOID_equation; auto; constructor
+        | rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
+          cbn in UV_REF; inv UV_REF;
+          constructor;
+          repeat match goal with
+            | H :
+              forall uv_fin : DVC1.DV2.uvalue,
+                DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Poison ?dt) uv_fin ->
+                  DVC1.DV2.uvalue_has_dtyp uv_fin ?dt |- _ =>
+                specialize (H (DVC1.DV2.UVALUE_Poison dt));
+                forward H;
+                [rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation; reflexivity|];
+                inv H
+            | H :
+              forall uv_fin : DVC1.DV2.uvalue,
+                DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Undef ?dt) uv_fin ->
+                  DVC1.DV2.uvalue_has_dtyp uv_fin ?dt |- _ =>
+                specialize (H (DVC1.DV2.UVALUE_Undef dt));
+                forward H;
+                [rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation; reflexivity|];
+                inv H
+            | H :
+              forall uv_fin : DVC1.DV2.uvalue,
+                DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Oom ?dt) uv_fin ->
+                  DVC1.DV2.uvalue_has_dtyp uv_fin ?dt |- _ =>
+                specialize (H (DVC1.DV2.UVALUE_Oom dt));
+                forward H;
+                [rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation; reflexivity|];                inv H
+
+            end;
+          solve_no_void
+        | rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
+          rewrite map_monad_InT_unfold in UV_REF;
+          cbn in UV_REF;
+          break_match_hyp; inv UV_REF;
+          break_match_hyp; inv Heqo;
+          break_match_hyp; inv H0;
+
+          match goal with
+          | H :
+            forall uv_fin : DVC1.DV2.uvalue,
+              DVC1.uvalue_refine_strict
+                (DVC1.DV1.UVALUE_Struct ?fields) uv_fin ->
+                DVC1.DV2.uvalue_has_dtyp uv_fin
+                (DTYPE_Struct ?dts),
+            HMAP : map_monad_InT ?fields
+                     (fun (x : DVC1.DV1.uvalue) (_ : InT x ?fields)
+                      => DVC1.uvalue_convert_strict x) = 
+                     NoOom ?fields2
+            |- _ =>
+            specialize (IHTYP2 (DVC1.DV2.UVALUE_Struct fields2));
+            forward IHTYP2;
+            [ rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation;
+              cbn; rewrite HMAP; reflexivity|]
+          | H :
+            forall uv_fin : DVC1.DV2.uvalue,
+              DVC1.uvalue_refine_strict
+                (DVC1.DV1.UVALUE_Packed_struct ?fields) uv_fin ->
+                DVC1.DV2.uvalue_has_dtyp uv_fin
+                (DTYPE_Packed_struct ?dts),
+            HMAP : map_monad_InT ?fields
+                     (fun (x : DVC1.DV1.uvalue) (_ : InT x ?fields)
+                      => DVC1.uvalue_convert_strict x) = 
+                     NoOom ?fields2
+            |- _ =>
+            specialize (IHTYP2 (DVC1.DV2.UVALUE_Packed_struct fields2));
+            forward IHTYP2;
+            [ rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation;
+              cbn; rewrite HMAP; reflexivity|]
+          end;
+          constructor; eauto
+        | rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
+          cbn in UV_REF;
+          break_match_hyp; inv UV_REF;
+
+          match goal with
+          | H :
+            forall uv_fin : DVC1.DV2.uvalue,
+              DVC1.uvalue_refine_strict
+                (DVC1.DV1.UVALUE_Struct ?fields) uv_fin ->
+                DVC1.DV2.uvalue_has_dtyp uv_fin
+                (DTYPE_Struct ?dts),
+            HMAP : map_monad_InT ?fields
+                     (fun (x : DVC1.DV1.uvalue) (_ : InT x ?fields)
+                      => DVC1.uvalue_convert_strict x) = 
+                     NoOom ?fields2
+            |- _ =>
+            specialize (IHTYP2 (DVC1.DV2.UVALUE_Struct fields2));
+            forward IHTYP2;
+            [ rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation;
+              cbn; rewrite HMAP; reflexivity|]
+          | H :
+            forall uv_fin : DVC1.DV2.uvalue,
+              DVC1.uvalue_refine_strict
+                (DVC1.DV1.UVALUE_Packed_struct ?fields) uv_fin ->
+                DVC1.DV2.uvalue_has_dtyp uv_fin
+                (DTYPE_Packed_struct ?dts),
+            HMAP : map_monad_InT ?fields
+                     (fun (x : DVC1.DV1.uvalue) (_ : InT x ?fields)
+                      => DVC1.uvalue_convert_strict x) = 
+                     NoOom ?fields2
+            |- _ =>
+            specialize (IHTYP2 (DVC1.DV2.UVALUE_Packed_struct fields2));
+            forward IHTYP2;
+            [ rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation;
+              cbn; rewrite HMAP; reflexivity|]
+          end;
+          constructor; eauto
+        ].
+
+    - rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF.
+      cbn in UV_REF;
+        break_match_hyp; inv UV_REF.
+      constructor.
+      + apply Forall_forall; intros ? ?.
+        eapply map_monad_InT_oom_In in Heqo; eauto.
+        destruct Heqo as (?&?&?).
+        eapply IH; eauto.
+        apply In_InT; eauto.
+      + symmetry; eapply map_monad_InT_length_noom; eauto.
+    - 
+  Qed.
 
   (* TODO: Prove this *)
   Lemma serialize_sbytes_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start uv_fin uv_inf t bytes_fin},
       MemState_refine_prop ms_inf_start ms_fin_start ->
       DVC1.uvalue_refine_strict uv_inf uv_fin ->
+      DVC1.DV1.uvalue_has_dtyp uv_inf t ->
       Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv_fin t ms_fin_start
         (ret (ms_fin_final, bytes_fin)) ->
       exists

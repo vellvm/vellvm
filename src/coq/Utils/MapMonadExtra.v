@@ -12,7 +12,7 @@ From Vellvm Require Import
   Utils.ListUtil
   Utils.Error
   Utils.MonadReturnsLaws
-  
+
   Utils.MonadEq1Laws
   Utils.Tactics.
 
@@ -31,7 +31,7 @@ Section MonadContext.
   Context (M : Type -> Type).
   Context {HM: Monad M}.
   Context {EQM : Monad.Eq1 M}.
-  Context {EE : Eq1Equivalence M}.  
+  Context {EE : Eq1Equivalence M}.
   Context {LAWS : @Monad.MonadLawsE M EQM HM}.
   Context {MRET : @MonadReturns M HM EQM}.
   Context {MRETSTR : @MonadReturnsStrongBindInv M HM EQM MRET}.
@@ -46,7 +46,7 @@ Section MonadContext.
   Existing Instance LAWS.
   Existing Instance MRETPROPER.
   Existing Instance MRETPROPERFLIP.
-  
+
 
 Lemma map_monad_unfold :
   forall {A B : Type} (x : A) (xs : list A)
@@ -60,7 +60,7 @@ Proof.
   induction xs; cbn; auto.
 Qed.
 
-  
+
 Lemma map_monad_length :
   forall {A B}  (xs : list A) (f : A -> M B) res,
     MReturns res (map_monad f xs) ->
@@ -226,7 +226,7 @@ Proof.
 Qed.
 
 Lemma map_monad_map :
-  forall A B C 
+  forall A B C
     (f : B -> M C)
     (g : A -> B)
     (xs : list A),
@@ -234,14 +234,14 @@ Lemma map_monad_map :
 Proof.
   intros. induction xs.
   - simpl. reflexivity.
-  - simpl. 
+  - simpl.
     setoid_rewrite IHxs.
     reflexivity.
 Qed.
 
 
 Lemma bind_helper :
-  forall A B (m : M A) (f : A -> M B), 
+  forall A B (m : M A) (f : A -> M B),
     (bind m f) ≈ ((bind (bind m ret) f)).
 Proof.
   intros.
@@ -349,9 +349,9 @@ Lemma map_monad_cons
   bs2 <- map_monad f l;;
   ret (b :: bs2).
 Proof.
-  intros. reflexivity. Qed. 
+  intros. reflexivity. Qed.
 
-Lemma map_monad_nil 
+Lemma map_monad_nil
       {A B} (f:A -> M B) :
   (map_monad f []) ≈ ret [].
 Proof.
@@ -370,33 +370,33 @@ Lemma id_ret : forall A B (g: A -> B) (x: A),
     id (g x) = g x.
 Proof.
   intros. unfold id. reflexivity. Qed.
-  
+
 Lemma sequence : forall {A} (l : list A),
       sequence (map ret l) ≈ ret l.
 Proof. intros. induction l.
-       - simpl. reflexivity. 
+       - simpl. reflexivity.
        - rewrite map_cons. simpl. setoid_rewrite map_monad_map. rewrite id_ret.
          rewrite <- map_monad_cons. rewrite map_monad_ret_l. reflexivity. Qed.
 
 
-Lemma map_monad_ret_nil_inv_reverse {A B} (f : A -> M B) (l : list A) :  
-    (l = []) -> 
+Lemma map_monad_ret_nil_inv_reverse {A B} (f : A -> M B) (l : list A) :
+    (l = []) ->
     MReturns [] (map_monad f l).
 Proof.
   intros. induction l. unfold map_monad.
   - destruct MRET. apply MReturns_ret. reflexivity.
-  - rewrite H. inversion H. 
-Qed. 
-     
-  
+  - rewrite H. inversion H.
+Qed.
+
+
 Lemma map_monad_ret_nil_inv :
   forall {A B} (f : A -> M B) (l : list A)
   (HRet : MReturns [] (map_monad f l)),
   l = [].
 Proof.
-  intros. 
+  intros.
   apply map_monad_length in HRet.
-  simpl in HRet. 
+  simpl in HRet.
   assert (H: length l = 0 -> l = []). { intros. induction l. reflexivity. inversion HRet. }
   apply H in HRet. assumption.
 Qed.
@@ -416,7 +416,7 @@ Proof.
 Qed.
 
 (* what is the difference between this and
-map_monad_cons_ret? *) 
+map_monad_cons_ret? *)
 Lemma map_monad_ret_cons :
   forall {A B} (a : A) (b : B) (f : A -> M B) (l1 : list A) (l2 : list B)
     (H : map_monad f (a :: l1) ≈ ret (b :: l2)),
@@ -426,7 +426,7 @@ Proof.
   apply BINDRETINV in H0. repeat destruct H0. apply EQRET in H1.
   inversion H1.
   subst. apply H0.
-  Qed. 
+  Qed.
 
 Lemma map_monad_head :
   forall {A B} (a : A) (b : B) (f : A -> M B) (l1 : list A) (l2 : list B)
@@ -444,12 +444,12 @@ Lemma map_monad_MReturns_cons :
     (H : MReturns (b :: l1) (map_monad f (a2 :: l2))),
     MReturns l1 (map_monad f l2).
 Proof.
-  intros. 
+  intros.
   destruct MRETSTR. simpl in H. apply MReturns_strong_bind_inv in H.
   repeat destruct H. apply MReturns_strong_bind_inv in H0. repeat destruct H0.
   apply MReturns_ret_inv in H1. inversion H1. subst.
   apply H0.
-  Qed. 
+  Qed.
 
 
 Lemma map_monad_MReturns_head :
@@ -457,14 +457,14 @@ Lemma map_monad_MReturns_head :
     (H : MReturns (b :: l2) (map_monad f (a :: l1))),
     MReturns b (f a).
 Proof.
-  intros. 
+  intros.
   destruct MRETSTR. simpl in H. apply MReturns_strong_bind_inv in H.
   repeat destruct H. apply MReturns_strong_bind_inv in H0. repeat destruct H0.
   apply MReturns_ret_inv in H1. inversion H1. subst.
   apply H.
-  Qed. 
- 
-    
+  Qed.
+
+
 Lemma map_monad_In_inv_pure :
   forall {A B} (f : A -> M B) (x : A) (y : B) (l1 : list A) (l2 : list B)
     (HIn: In y l2)
@@ -481,13 +481,13 @@ Proof.
       destruct l1.
     + cbn in HIn. apply eq1_ret_ret in HEq. inversion HEq. auto.
     + apply map_monad_head in HEq. exists a. split. apply in_eq. apply HEq.
-    * specialize (IHl2 H). destruct l1. 
+    * specialize (IHl2 H). destruct l1.
     + apply eq1_ret_ret in HEq. inversion HEq. auto.
     + specialize (IHl2 l1). apply map_monad_ret_cons in HEq.
       apply IHl2 in HEq. repeat destruct HEq. exists x0. split.
       apply in_cons. apply H0. apply H0.
-Qed.      
-  
+Qed.
+
 Lemma map_monad_In_inv :
   forall {A B} (f : A -> M B) (x : A) (y : B) (l1 : list A) (l2 : list B)
     (HIn: In y l2)
@@ -502,7 +502,7 @@ Proof.
     inversion HIn.
     * destruct l1.
     + apply MReturns_ret_inv in HEq. inversion HEq.
-    + assert (HEq' := HEq). apply map_monad_MReturns_cons in HEq. 
+    + assert (HEq' := HEq). apply map_monad_MReturns_cons in HEq.
       apply map_monad_MReturns_head in HEq'. subst. exists a0.
       split. apply in_eq. assumption. assumption.
       * destruct l1.
@@ -516,11 +516,11 @@ Definition commutative_maps {A} (g f : A -> M A) :=
   forall {B} a b (k : A -> A -> M B),
     (y <- g a ;; z <- f b ;; k y z) ≈ (z <- f b ;; y <- g a ;; k y z).
 
-Lemma map_comm_lemma : forall {A B} (b : A) (xs : list A) (g : A -> M A) (f : A -> M A) (k : A -> list A -> M B) (HC : commutative_maps g f), 
+Lemma map_comm_lemma : forall {A B} (b : A) (xs : list A) (g : A -> M A) (f : A -> M A) (k : A -> list A -> M B) (HC : commutative_maps g f),
     (bs <- map_monad g xs ;; x <- f b ;; k x bs) ≈
       (x <- f b ;;  bs <- map_monad g xs ;; k x bs).
 Proof.
-  destruct LAWS. 
+  destruct LAWS.
   induction xs.
   + intros. simpl. rewrite bind_ret_l.
     setoid_rewrite bind_ret_l. reflexivity.
@@ -530,9 +530,9 @@ Proof.
     unfold commutative_maps in HC. rewrite <- HC.
     setoid_rewrite IHxs. reflexivity.
     assumption.
-Qed.      
+Qed.
 
-  
+
 Lemma map_monad_commutative_maps :
   forall A (xs : list A) (g : A -> M A) (f : A -> M A)
     (HC : commutative_maps g f),
@@ -564,14 +564,14 @@ Proof.
   induction al.
   destruct LAWS.
   - simpl. rewrite bind_ret_r. reflexivity.
-  - simpl. reflexivity. 
-Qed. 
+  - simpl. reflexivity.
+Qed.
 
 Lemma foldM_app :
-  forall {A B} (l1 l2 : list A) (b : B) (f : B -> A -> M B), 
-    foldM f b (l1 ++ l2) ≈ a1 <- foldM f b l1 ;; foldM f a1 l2. 
+  forall {A B} (l1 l2 : list A) (b : B) (f : B -> A -> M B),
+    foldM f b (l1 ++ l2) ≈ a1 <- foldM f b l1 ;; foldM f a1 l2.
 Proof.
-  intros. generalize dependent b. 
+  intros. generalize dependent b.
   induction l1.
   + intros. simpl. rewrite bind_ret_l. reflexivity.
   + intros. simpl. rewrite bind_bind.
@@ -580,7 +580,7 @@ Qed.
 
 Lemma foldM_nil :
   forall {A B} (l1 : list A) (b : B) (f : B -> A -> M B),
-    foldM f b [] ≈ ret b. 
+    foldM f b [] ≈ ret b.
 Proof.
   intros. reflexivity.
 Qed.
@@ -598,7 +598,7 @@ Proof. intros. rewrite <- Lists.List.app_assoc. reflexivity. Qed.
 Ltac rewrite_under_bind H :=
   repeat (apply Proper_bind; [reflexivity |]; repeat intro); rewrite H.
 
-Lemma foldM_implements_lemma : 
+Lemma foldM_implements_lemma :
   forall {A B} (l : list A) (k : list B) (f : A -> M B),
     l' <- map_monad f l ;; ret (k ++ l') ≈ foldM (fun x y => t <- f y ;; ret (x ++ [t])) k l.
 Proof. intros. generalize dependent k. induction l.
@@ -612,8 +612,8 @@ Proof. intros. generalize dependent k. induction l.
          Qed.
 
 Lemma foldM_implements_map_monad :
-  forall {A B} (l : list A) (f : A -> M B), 
-     map_monad f l ≈ foldM (fun x y => t <- f y ;; ret (x ++ [t])) [] l.  
+  forall {A B} (l : list A) (f : A -> M B),
+     map_monad f l ≈ foldM (fun x y => t <- f y ;; ret (x ++ [t])) [] l.
 Proof.
   intros. rewrite <- foldM_implements_lemma. simpl. rewrite bind_ret_r. reflexivity.
 Qed.
@@ -634,7 +634,7 @@ Arguments map_monad_length {_ _ _ _ _ _ _ _}.
 Arguments map_monad_app {_ _ _ _ _ _ _}.
 Arguments map_monad_err_In' {_ _ _ _ _ _ _ _ _}.
 Arguments map_monad_cons_ret {_ _ _ _ _ _ _}.
-Arguments map_monad_cons_ret {_ _ _ _ _ _ _}.          
+Arguments map_monad_cons_ret {_ _ _ _ _ _ _}.
 Arguments map_monad_map {_ _ _ _ _ _ _ _}.
 Arguments map_monad_g {_ _ _ _ _ _ _ _}.
 
@@ -1457,6 +1457,63 @@ Proof.
         break_match_hyp; [|break_match_hyp]; inv MAP.
         epose proof (IHres X ls Heqs0) as [y [HF INy]].
         exists y; split; cbn; eauto.
+Qed.
+
+Lemma map_monad_InT_OOM_Nth :
+  forall {A B : Type}
+    (l : list A)
+    (f : forall (a : A), InT a l -> OOM B)
+    (res : list B) (x : B)
+    (n : nat),
+    map_monad_InT l f = ret res ->
+    Util.Nth res n x ->
+    exists (y : A) (HIN: InT y l), f y HIN = ret x /\ Util.Nth l n y.
+Proof.
+  intros A B l f res x n MAP NTH.
+  generalize dependent l. generalize dependent n. revert x.
+  induction res; intros x n NTH l f MAP.
+  - inversion NTH.
+    rewrite nth_error_nil in *; inv H0.
+  - cbn in NTH.
+    induction n.
+    + cbn in NTH.
+      inv NTH.
+
+      destruct l as [_ | h ls].
+      * cbn in MAP.
+        inv MAP.
+      * exists h.
+        exists (inl eq_refl).
+        cbn in MAP.
+        break_match_hyp; inv MAP.
+        break_match_hyp; inv H0.
+        split; cbn; auto.
+    + cbn in NTH.
+      destruct l as [_ | h ls].
+      * cbn in MAP.
+        inv MAP.
+      * rewrite map_monad_InT_unfold in MAP.
+        cbn in MAP.
+        break_match_hyp; inv MAP.
+        break_match_hyp; inv H0.
+        epose proof (IHres _ _ NTH ls _ Heqo0) as [y [IN [HF INy]]].
+        exists y; exists (inr IN); split; cbn; eauto.
+Qed.
+
+Lemma map_monad_InT_oom_In :
+  forall {A B : Type}
+    (l : list A)
+    (f : forall (a : A), InT a l -> OOM B)
+    (res : list B) (x : B),
+    map_monad_InT l f = ret res ->
+    In x res -> exists (y : A) (HIN : InT y l), f y HIN = ret x.
+Proof.
+  intros A B f l res x HMAPM IN.
+  pose proof In_Nth _ _ IN as (n&NTH).
+  pose proof map_monad_InT_OOM_Nth _ _ _ _ _ HMAPM NTH as (y&IN'&FY&NTHy).
+  exists y.
+  exists IN'.
+  auto.
 Qed.
 
 Lemma InT_cons_right :
