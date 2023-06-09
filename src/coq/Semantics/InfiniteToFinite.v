@@ -11932,29 +11932,152 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         cbn in Heqo;
         break_match_hyp_inv.
 
-      eapply map_monad_InT_OOM_Nth' in Heqo0; eauto.
-      destruct Heqo0 as (?&?&?&?).
+      pose proof Heqo0.
+      eapply map_monad_InT_OOM_Nth' in H2; eauto.
+      destruct H2 as (?&?&?&?).
+
       eapply DVC1.DV2.UVALUE_ExtractValue_Struct_cons_typ; eauto.
       { eapply IHTYP1.
+        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+        cbn.
+        rewrite Heqo0.
+        reflexivity.
+      }
+
+      specialize (IHTYP3 (DVC1.DV2.UVALUE_ExtractValue ft x idxs)).
+      forward IHTYP3.
+      { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+        cbn.
+        rewrite H2.
+        cbn.
+        reflexivity.
+      }
+      eauto.
+    }
+
+    { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
+          cbn in UV_REF;
+        break_match_hyp; inv UV_REF.
+
+      rewrite DVC1.uvalue_convert_strict_equation in Heqo.
+      cbn in Heqo.
+      break_match_hyp_inv.
+      constructor; eauto.
+      eapply IHTYP.
+      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+      cbn.
+      rewrite Heqo0.
+      reflexivity.
+    }
+
+    { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
+        cbn in UV_REF;
+        repeat break_match_hyp_inv;
+        rewrite DVC1.uvalue_convert_strict_equation in Heqo;
+        cbn in Heqo;
+        break_match_hyp_inv.
+
+      pose proof Heqo0.
+      eapply map_monad_InT_OOM_Nth' in H2; eauto.
+      destruct H2 as (?&?&?&?).
+
+      eapply DVC1.DV2.UVALUE_ExtractValue_Packed_struct_cons_typ; eauto.
+      { eapply IHTYP1.
+        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+        cbn.
+        rewrite Heqo0.
+        reflexivity.
+      }
+
+      specialize (IHTYP3 (DVC1.DV2.UVALUE_ExtractValue ft x idxs)).
+      forward IHTYP3.
+      { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+        cbn.
+        rewrite H2.
+        cbn.
+        reflexivity.
+      }
+      eauto.
+    }
+
+    { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
+          cbn in UV_REF;
+        break_match_hyp; inv UV_REF.
+
+      rewrite DVC1.uvalue_convert_strict_equation in Heqo.
+      cbn in Heqo.
+      break_match_hyp_inv.
+      constructor; eauto.
+      eapply IHTYP.
+      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+      cbn.
+      rewrite Heqo0.
+      reflexivity.
+    }
+
+    { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
+        cbn in UV_REF;
+        repeat break_match_hyp_inv;
+        rewrite DVC1.uvalue_convert_strict_equation in Heqo;
+        cbn in Heqo;
+        break_match_hyp_inv.
+
+      pose proof Heqo0.
+      eapply map_monad_InT_OOM_Nth' in H1; eauto.
+      destruct H1 as (?&?&?&?).
+
+      eapply DVC1.DV2.UVALUE_ExtractValue_Array_cons_typ; eauto.
+      { eapply IHTYP1.
+        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+        cbn.
+        rewrite Heqo0.
+        reflexivity.
+      }
+
+      specialize (IHTYP3 (DVC1.DV2.UVALUE_ExtractValue et x idxs)).
+      forward IHTYP3.
+      { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+        cbn.
+        rewrite H1.
+        cbn.
+        reflexivity.
+      }
+      eauto.
+    }
+
+    { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
+        cbn in UV_REF;
+        repeat break_match_hyp_inv.
+
+      econstructor; eauto.
+      eapply IHTYP1.
+      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+      cbn.
+      rewrite Heqo.
+      reflexivity.
+    }
+
+    { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
+        cbn in UV_REF;
+        repeat break_match_hyp_inv.
+
+      econstructor; eauto.
+      { intros byte IN.
+        pose proof Heqo.
+        eapply map_monad_InT_oom_In in H1; eauto.
+        destruct H1 as (byte'&INBYTES&CONV_BYTE).
+        apply In_InT in INBYTES.
+        apply H in INBYTES.
+        destruct INBYTES as (?&?&?&?&?).
+        subst.
+        rewrite DVC1.uvalue_convert_strict_equation in CONV_BYTE.
+        cbn in CONV_BYTE.
+        repeat break_match_hyp_inv.
         eauto.
       }
 
-        
-      
-      2: {
-        constructor.
-        apply H3.
-        eauto.
-      }
-      3: eauto with UVALUE_DTYP.
-      
-        econstructor; eauto;
-        eapply IHTYP;
-          rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation;
-          cbn;
-          rewrite Heqo0;
-          reflexivity.
-
+      eapply map_monad_InT_length_noom in Heqo.
+      congruence.
     }
   Qed.
 
