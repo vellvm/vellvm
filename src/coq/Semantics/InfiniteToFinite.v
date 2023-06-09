@@ -11431,7 +11431,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     - eapply free_byte_allowed_all_preserved_Transitive; eauto.
     - eapply allocations_preserved_Transitive; eauto.
     - eapply frame_stack_preserved_Transitive; eauto.
-    - eapply heap_preserved_Transitive; eauto.    
+    - eapply heap_preserved_Transitive; eauto.
   Qed.
 
   (* TODO: Move this into MemoryModel.v *)
@@ -11556,125 +11556,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     - eapply free_byte_allowed_all_preserved_Symmetric; eauto.
     - eapply allocations_preserved_Symmetric; eauto.
     - eapply frame_stack_preserved_Symmetric; eauto.
-    - eapply heap_preserved_Symmetric; eauto.    
+    - eapply heap_preserved_Symmetric; eauto.
   Qed.
-
-  (* TODO: move this. Should hold for fin / inf *)
-  Lemma serialize_sbytes_MemState_eqv :
-    forall {uv t ms ms' bytes},
-      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv t ms (success_unERR_UB_OOM (ms', bytes)) ->
-      Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms ms'.
-  Proof.
-    intros uv t ms ms' bytes SERIALIZE.
-    rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-    revert uv t ms ms' bytes SERIALIZE.
-    induction uv using uvalue_ind''; intros t_orig ms ms' bytes SERIALIZE.
-    all:
-      try solve
-        [
-          apply MemPropT_bind_ret_inv in SERIALIZE;
-          destruct SERIALIZE as (?&?&?&?);
-          etransitivity;
-          [eapply fresh_sid_MemState_eqv; eauto|];
-          match goal with
-          | H: lift_OOM ?x _ _ |- _ =>
-              red in H; destruct x eqn:?HX; inv H
-          end; reflexivity
-        | destruct t_orig;
-          try solve
-            [
-              apply MemPropT_bind_ret_inv in SERIALIZE;
-              destruct SERIALIZE as (?&?&?&?);
-              etransitivity;
-              [eapply fresh_sid_MemState_eqv; eauto|];
-              match goal with
-              | H: lift_OOM ?x _ _ |- _ =>
-                  red in H; destruct x eqn:?HX; inv H
-              end; reflexivity
-            ];
-          try
-            solve
-            [ (* Arrays *)
-              specialize (IHuv (DTYPE_Array sz0 t_orig) _ _ _ SERIALIZE); auto
-            | (* Vectors *)
-              specialize (IHuv (DTYPE_Vector sz0 t_orig) _ _ _ SERIALIZE); auto
-            | (* Structs *)
-              specialize (IHuv (DTYPE_Struct fields) _ _ _ SERIALIZE); auto
-            | (* Packed structs *)
-              specialize (IHuv (DTYPE_Packed_struct fields) _ _ _ SERIALIZE); auto
-            ]
-        ].
-
-    { (* Aggregates *)
-      induction t_orig;
-        try solve
-          [
-            apply MemPropT_bind_ret_inv in SERIALIZE;
-            destruct SERIALIZE as (?&?&?&?);
-            etransitivity;
-            [eapply fresh_sid_MemState_eqv; eauto|];
-            match goal with
-            | H: lift_OOM ?x _ _ |- _ =>
-                red in H; destruct x eqn:?HX; inv H
-            end; reflexivity
-          ];
-        try
-          solve
-          [ (* Arrays *)
-            specialize (IHuv (DTYPE_Array sz0 t_orig) _ _ _ SERIALIZE); auto
-          | (* Vectors *)
-            specialize (IHuv (DTYPE_Vector sz0 t_orig) _ _ _ SERIALIZE); auto
-          | (* Structs *)
-            specialize (IHuv (DTYPE_Struct fields) _ _ _ SERIALIZE); auto
-          | (* Packed structs *)
-            specialize (IHuv (DTYPE_Packed_struct fields) _ _ _ SERIALIZE); auto
-          ].
-
-      { apply MemPropT_bind_ret_inv in SERIALIZE;
-          destruct SERIALIZE as (?&?&?&?).
-
-        rename H into SERIALIZE.
-        cbn in H0.
-        destruct H0; subst.
-        eapply IHt_orig.
-        destruct t_orig.
-        { cbn.
-          exists ms.
-          eexists. (* Ehhh... *)
-          split.
-          {
-            split.
-            2: {
-              repeat (split; [reflexivity|]); reflexivity.
-            }
-            admit.
-          }
-
-          red.
-          break_match.
-          2: {
-            cbn.
-            unfold Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes in Heqo.
-            cbn in Heqo.
-            apply map_monad_OOM_fail in Heqo.
-            destruct Heqo as (?&?&?).
-            break_match_hyp; inv H0.
-            (* TODO: Should be able to conclude that sizeof is less than
-            64bit range using H... But it's a little weird because of
-            arbitrary iX's + may not work for big structures /
-            arrays... Should probably make sizeof use iptr type?*)
-            admit.
-          }
-
-          clear IHt_orig.
-          cbn.
-          unfold Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes in *.
-          cbn in *.
-          admit.
-        }
-        all: admit.
-      }
-  Admitted.
 
   (* TODO: move this. Should hold for fin / inf *)
   (* TODO: This isn't true... The bytes can get different sids *)
@@ -11709,8 +11592,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
     (*   red in H0. *)
     (*   red in H2. *)
-      
-      
+
+
     (*       etransitivity; *)
     (*       [eapply fresh_sid_MemState_eqv; eauto|]; *)
     (*       match goal with *)
@@ -11743,7 +11626,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     (*     ]. *)
 
     (* } *)
-  Admitted.
+  Abort.
 
   (* TODO: Move this, and maybe generalize this *)
   Lemma map_monad_InT_length_noom :
@@ -11835,7 +11718,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 (DTYPE_Struct ?dts),
             HMAP : map_monad_InT ?fields
                      (fun (x : DVC1.DV1.uvalue) (_ : InT x ?fields)
-                      => DVC1.uvalue_convert_strict x) = 
+                      => DVC1.uvalue_convert_strict x) =
                      NoOom ?fields2
             |- _ =>
             specialize (IHTYP2 (DVC1.DV2.UVALUE_Struct fields2));
@@ -11850,7 +11733,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 (DTYPE_Packed_struct ?dts),
             HMAP : map_monad_InT ?fields
                      (fun (x : DVC1.DV1.uvalue) (_ : InT x ?fields)
-                      => DVC1.uvalue_convert_strict x) = 
+                      => DVC1.uvalue_convert_strict x) =
                      NoOom ?fields2
             |- _ =>
             specialize (IHTYP2 (DVC1.DV2.UVALUE_Packed_struct fields2));
@@ -11872,7 +11755,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 (DTYPE_Struct ?dts),
             HMAP : map_monad_InT ?fields
                      (fun (x : DVC1.DV1.uvalue) (_ : InT x ?fields)
-                      => DVC1.uvalue_convert_strict x) = 
+                      => DVC1.uvalue_convert_strict x) =
                      NoOom ?fields2
             |- _ =>
             specialize (IHTYP2 (DVC1.DV2.UVALUE_Struct fields2));
@@ -11887,7 +11770,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 (DTYPE_Packed_struct ?dts),
             HMAP : map_monad_InT ?fields
                      (fun (x : DVC1.DV1.uvalue) (_ : InT x ?fields)
-                      => DVC1.uvalue_convert_strict x) = 
+                      => DVC1.uvalue_convert_strict x) =
                      NoOom ?fields2
             |- _ =>
             specialize (IHTYP2 (DVC1.DV2.UVALUE_Packed_struct fields2));
@@ -12081,6 +11964,608 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     }
   Qed.
 
+  (* TODO: move this to where filter_sid_matches is defined *)
+  Lemma filter_sid_matches_length_r_le :
+    forall {ixbytes sid bytes_left bytes_right},
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.filter_sid_matches sid ixbytes = (bytes_left, bytes_right) ->
+      (length bytes_right <= length ixbytes)%nat.
+  Proof.
+    induction ixbytes; intros sid bytes_left bytes_right FILTER.
+    - cbn in *. inv FILTER.
+      cbn. lia.
+    - cbn in *.
+      break_match_hyp.
+      apply filter_split_out_length in Heqp.
+      destruct a.
+      break_match_hyp; cbn in *; inv FILTER; cbn in *; try lia.
+  Qed.
+
+  (* TODO: move this to where re_sid_ubytes is defined *)
+  Lemma re_sid_ubytes_helper_MemState_eqv :
+    forall ixbytes ms ms' init_map byte_map,
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.re_sid_ubytes_helper (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) ixbytes
+        init_map ms (ret (ms', byte_map)) ->
+      Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms ms'.
+  Proof.
+    induction ixbytes using length_strong_ind; intros ms ms' init_map byte_map RESID.
+    - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.re_sid_ubytes_helper_equation in RESID.
+      cbn in RESID.
+      destruct RESID; subst; reflexivity.
+    - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.re_sid_ubytes_helper_equation in RESID.
+      destruct ixbytes; inv H0.
+      destruct p.
+      break_match_hyp.
+      1-28,30: cbn in RESID; contradiction.
+      destruct (Memory64BitIntptr.MMEP.MemSpec.MemHelpers.filter_sid_matches s ixbytes) eqn:FILTER.
+      repeat red in RESID.
+      destruct RESID as (?&?&FRESH&RESID).
+      apply fresh_sid_MemState_eqv in FRESH.
+      etransitivity; eauto.
+      eapply H.
+      2: apply RESID.
+      eapply filter_sid_matches_length_r_le; eauto.
+  Qed.
+
+  (* TODO: move this to where re_sid_ubytes is defined *)
+  Lemma re_sid_ubytes_MemState_eqv :
+    forall ms ms' bytes bytes',
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.re_sid_ubytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) bytes ms (ret (ms', bytes')) ->
+      Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms ms'.
+  Proof.
+    intros ms ms' bytes bytes' RESID.
+    unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.re_sid_ubytes in RESID.
+    repeat red in RESID.
+    destruct RESID as (?&?&?&?).
+    cbn in H0.
+    red in H0.
+    break_match_hyp_inv.
+    eapply re_sid_ubytes_helper_MemState_eqv; eauto.
+  Qed.
+
+  (* TODO: move this. Should hold for fin / inf *)
+  Lemma serialize_sbytes_MemState_eqv :
+    forall {uv t ms ms' bytes},
+      uvalue_has_dtyp uv t ->
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv t ms (success_unERR_UB_OOM (ms', bytes)) ->
+      Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms ms'.
+  Proof.
+    intros uv t ms ms' bytes TYPE SERIALIZE.
+    revert ms ms' bytes SERIALIZE.
+    induction TYPE; intros ms ms' bytes' SERIALIZE.
+    all:
+      try solve [
+          rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE;
+          solve
+            [
+              apply MemPropT_bind_ret_inv in SERIALIZE;
+              destruct SERIALIZE as (?&?&?&?);
+              etransitivity;
+              [eapply fresh_sid_MemState_eqv; eauto|];
+              match goal with
+              | H: lift_OOM ?x _ _ |- _ =>
+                  red in H; destruct x eqn:?HX; inv H
+              end; reflexivity
+            | destruct t_orig;
+              try solve
+                [
+                  apply MemPropT_bind_ret_inv in SERIALIZE;
+                  destruct SERIALIZE as (?&?&?&?);
+                  etransitivity;
+                  [eapply fresh_sid_MemState_eqv; eauto|];
+                  match goal with
+                  | H: lift_OOM ?x _ _ |- _ =>
+                      red in H; destruct x eqn:?HX; inv H
+                  end; reflexivity
+                ];
+              try
+                solve
+                [ (* Arrays *)
+                  specialize (IHuv (DTYPE_Array sz0 t_orig) _ _ _ SERIALIZE); auto
+                | (* Vectors *)
+                  specialize (IHuv (DTYPE_Vector sz0 t_orig) _ _ _ SERIALIZE); auto
+                | (* Structs *)
+                  specialize (IHuv (DTYPE_Struct fields) _ _ _ SERIALIZE); auto
+                | (* Packed structs *)
+                  specialize (IHuv (DTYPE_Packed_struct fields) _ _ _ SERIALIZE); auto
+                ]
+            | cbn in SERIALIZE;
+              destruct SERIALIZE; subst; reflexivity
+            ]
+        ].
+
+    { (* Poison arrays *)
+      generalize dependent ms.
+      generalize dependent ms'.
+      generalize dependent bytes'.
+      induction sz using N.peano_ind; intros bytes' ms' ms SERIALIZE.
+      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+        cbn in SERIALIZE.
+        destruct SERIALIZE as (?&?&?&?&?).
+        subst.
+        destruct H; subst.
+        reflexivity.
+      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+        rewrite repeatN_succ in SERIALIZE.
+        rewrite map_monad_In_unfold in SERIALIZE.
+        repeat red in SERIALIZE.
+        destruct SERIALIZE as (?&?&?&?).
+        repeat red in H.
+        destruct H as (?&?&?&?).
+        repeat red in H1.
+        destruct H1 as (?&?&?&?).
+        cbn in H2, H0.
+        destruct H2; subst.
+        destruct H0; subst.
+
+        specialize (IHsz (concat x4) x3 x1).
+        forward IHsz.
+        { rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
+          repeat red.
+          exists x3. exists x4.
+          split; cbn; auto.
+        }
+
+        (* All I need now is to know that MemState_eqv ms x1 *)
+        specialize (IHTYPE ms x1 x2 H).
+        etransitivity; eauto.
+    }
+
+    { (* Poison vectors *)
+      generalize dependent ms.
+      generalize dependent ms'.
+      generalize dependent bytes'.
+      induction sz using N.peano_ind; intros bytes' ms' ms SERIALIZE.
+      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+        cbn in SERIALIZE.
+        destruct SERIALIZE as (?&?&?&?&?).
+        subst.
+        destruct H; subst.
+        reflexivity.
+      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+        rewrite repeatN_succ in SERIALIZE.
+        rewrite map_monad_In_unfold in SERIALIZE.
+        repeat red in SERIALIZE.
+        destruct SERIALIZE as (?&?&?&?).
+        repeat red in H.
+        destruct H as (?&?&?&?).
+        repeat red in H1.
+        destruct H1 as (?&?&?&?).
+        cbn in H2, H0.
+        destruct H2; subst.
+        destruct H0; subst.
+
+        specialize (IHsz (concat x4) x3 x1).
+        forward IHsz.
+        { rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
+          repeat red.
+          exists x3. exists x4.
+          split; cbn; auto.
+        }
+
+        (* All I need now is to know that MemState_eqv ms x1 *)
+        specialize (IHTYPE ms x1 x2 H).
+        etransitivity; eauto.
+    }
+
+    { (* Poison cons structs *)
+      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+      repeat red in SERIALIZE.
+      destruct SERIALIZE as (?&?&?&?).
+
+      specialize (IHTYPE ms x x0 H).
+
+      repeat red in H0.
+      destruct H0 as (?&?&?&?).
+      cbn in H1.
+      destruct H1; subst.
+      apply IHTYPE0 in H0.
+      etransitivity; eauto.
+    }
+
+    { (* Poison cons packed structs *)
+      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+      repeat red in SERIALIZE.
+      destruct SERIALIZE as (?&?&?&?).
+
+      specialize (IHTYPE ms x x0 H).
+
+      repeat red in H0.
+      destruct H0 as (?&?&?&?).
+      cbn in H1.
+      destruct H1; subst.
+      apply IHTYPE0 in H0.
+      etransitivity; eauto.
+    }
+
+    { (* Poison non-aggregate type *)
+      destruct H as (?&?&?&?&?).
+      destruct t; try contradiction;
+        try solve
+          [ rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE;
+            destruct SERIALIZE as (?&?&FRESH&SERIALIZE);
+            apply fresh_sid_MemState_eqv in FRESH as EQV1;
+            match goal with
+            | H: lift_OOM _ _ _ |- _ =>
+                red in H; break_match_hyp_inv
+            end; auto
+          ].
+
+      all: exfalso.
+      - eapply H2; eauto.
+      - eapply H0; eauto.
+      - eapply H1; eauto.
+      - eapply H3; eauto.
+    }
+
+    { (* Undef arrays *)
+      generalize dependent ms.
+      generalize dependent ms'.
+      generalize dependent bytes'.
+      induction sz using N.peano_ind; intros bytes' ms' ms SERIALIZE.
+      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+        cbn in SERIALIZE.
+        destruct SERIALIZE as (?&?&?&?&?).
+        subst.
+        destruct H; subst.
+        reflexivity.
+      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+        rewrite repeatN_succ in SERIALIZE.
+        rewrite map_monad_In_unfold in SERIALIZE.
+        repeat red in SERIALIZE.
+        destruct SERIALIZE as (?&?&?&?).
+        repeat red in H.
+        destruct H as (?&?&?&?).
+        repeat red in H1.
+        destruct H1 as (?&?&?&?).
+        cbn in H2, H0.
+        destruct H2; subst.
+        destruct H0; subst.
+
+        specialize (IHsz (concat x4) x3 x1).
+        forward IHsz.
+        { rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
+          repeat red.
+          exists x3. exists x4.
+          split; cbn; auto.
+        }
+
+        (* All I need now is to know that MemState_eqv ms x1 *)
+        specialize (IHTYPE ms x1 x2 H).
+        etransitivity; eauto.
+    }
+
+    { (* Undef vectors *)
+      generalize dependent ms.
+      generalize dependent ms'.
+      generalize dependent bytes'.
+      induction sz using N.peano_ind; intros bytes' ms' ms SERIALIZE.
+      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+        cbn in SERIALIZE.
+        destruct SERIALIZE as (?&?&?&?&?).
+        subst.
+        destruct H; subst.
+        reflexivity.
+      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+        rewrite repeatN_succ in SERIALIZE.
+        rewrite map_monad_In_unfold in SERIALIZE.
+        repeat red in SERIALIZE.
+        destruct SERIALIZE as (?&?&?&?).
+        repeat red in H.
+        destruct H as (?&?&?&?).
+        repeat red in H1.
+        destruct H1 as (?&?&?&?).
+        cbn in H2, H0.
+        destruct H2; subst.
+        destruct H0; subst.
+
+        specialize (IHsz (concat x4) x3 x1).
+        forward IHsz.
+        { rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
+          repeat red.
+          exists x3. exists x4.
+          split; cbn; auto.
+        }
+
+        (* All I need now is to know that MemState_eqv ms x1 *)
+        specialize (IHTYPE ms x1 x2 H).
+        etransitivity; eauto.
+    }
+
+    { (* Undef cons structs *)
+      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+      repeat red in SERIALIZE.
+      destruct SERIALIZE as (?&?&?&?).
+
+      specialize (IHTYPE ms x x0 H).
+
+      repeat red in H0.
+      destruct H0 as (?&?&?&?).
+      cbn in H1.
+      destruct H1; subst.
+      apply IHTYPE0 in H0.
+      etransitivity; eauto.
+    }
+
+    { (* Undef cons packed structs *)
+      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+      repeat red in SERIALIZE.
+      destruct SERIALIZE as (?&?&?&?).
+
+      specialize (IHTYPE ms x x0 H).
+
+      repeat red in H0.
+      destruct H0 as (?&?&?&?).
+      cbn in H1.
+      destruct H1; subst.
+      apply IHTYPE0 in H0.
+      etransitivity; eauto.
+    }
+
+    { (* Undef non-aggregate type *)
+      destruct H as (?&?&?&?&?).
+      destruct t; try contradiction;
+        try solve
+          [ rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE;
+            destruct SERIALIZE as (?&?&FRESH&SERIALIZE);
+            apply fresh_sid_MemState_eqv in FRESH as EQV1;
+            match goal with
+            | H: lift_OOM _ _ _ |- _ =>
+                red in H; break_match_hyp_inv
+            end; auto
+          ].
+
+      all: exfalso.
+      - eapply H2; eauto.
+      - eapply H0; eauto.
+      - eapply H1; eauto.
+      - eapply H3; eauto.
+    }
+
+    { (* Oom arrays *)
+      generalize dependent ms.
+      generalize dependent ms'.
+      generalize dependent bytes'.
+      induction sz using N.peano_ind; intros bytes' ms' ms SERIALIZE.
+      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+        cbn in SERIALIZE.
+        destruct SERIALIZE as (?&?&?&?&?).
+        subst.
+        destruct H; subst.
+        reflexivity.
+      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+        rewrite repeatN_succ in SERIALIZE.
+        rewrite map_monad_In_unfold in SERIALIZE.
+        repeat red in SERIALIZE.
+        destruct SERIALIZE as (?&?&?&?).
+        repeat red in H.
+        destruct H as (?&?&?&?).
+        repeat red in H1.
+        destruct H1 as (?&?&?&?).
+        cbn in H2, H0.
+        destruct H2; subst.
+        destruct H0; subst.
+
+        specialize (IHsz (concat x4) x3 x1).
+        forward IHsz.
+        { rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
+          repeat red.
+          exists x3. exists x4.
+          split; cbn; auto.
+        }
+
+        (* All I need now is to know that MemState_eqv ms x1 *)
+        specialize (IHTYPE ms x1 x2 H).
+        etransitivity; eauto.
+    }
+
+    { (* Oom vectors *)
+      generalize dependent ms.
+      generalize dependent ms'.
+      generalize dependent bytes'.
+      induction sz using N.peano_ind; intros bytes' ms' ms SERIALIZE.
+      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+        cbn in SERIALIZE.
+        destruct SERIALIZE as (?&?&?&?&?).
+        subst.
+        destruct H; subst.
+        reflexivity.
+      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+        rewrite repeatN_succ in SERIALIZE.
+        rewrite map_monad_In_unfold in SERIALIZE.
+        repeat red in SERIALIZE.
+        destruct SERIALIZE as (?&?&?&?).
+        repeat red in H.
+        destruct H as (?&?&?&?).
+        repeat red in H1.
+        destruct H1 as (?&?&?&?).
+        cbn in H2, H0.
+        destruct H2; subst.
+        destruct H0; subst.
+
+        specialize (IHsz (concat x4) x3 x1).
+        forward IHsz.
+        { rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
+          repeat red.
+          exists x3. exists x4.
+          split; cbn; auto.
+        }
+
+        (* All I need now is to know that MemState_eqv ms x1 *)
+        specialize (IHTYPE ms x1 x2 H).
+        etransitivity; eauto.
+    }
+
+    { (* Oom cons structs *)
+      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+      repeat red in SERIALIZE.
+      destruct SERIALIZE as (?&?&?&?).
+
+      specialize (IHTYPE ms x x0 H).
+
+      repeat red in H0.
+      destruct H0 as (?&?&?&?).
+      cbn in H1.
+      destruct H1; subst.
+      apply IHTYPE0 in H0.
+      etransitivity; eauto.
+    }
+
+    { (* Oom cons packed structs *)
+      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+      repeat red in SERIALIZE.
+      destruct SERIALIZE as (?&?&?&?).
+
+      specialize (IHTYPE ms x x0 H).
+
+      repeat red in H0.
+      destruct H0 as (?&?&?&?).
+      cbn in H1.
+      destruct H1; subst.
+      apply IHTYPE0 in H0.
+      etransitivity; eauto.
+    }
+
+    { (* Oom non-aggregate type *)
+      destruct H as (?&?&?&?&?).
+      destruct t; try contradiction;
+        try solve
+          [ rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE;
+            destruct SERIALIZE as (?&?&FRESH&SERIALIZE);
+            apply fresh_sid_MemState_eqv in FRESH as EQV1;
+            match goal with
+            | H: lift_OOM _ _ _ |- _ =>
+                red in H; break_match_hyp_inv
+            end; auto
+          ].
+
+      all: exfalso.
+      - eapply H2; eauto.
+      - eapply H0; eauto.
+      - eapply H1; eauto.
+      - eapply H3; eauto.
+    }
+
+    { (* Struct cons *)
+      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+      repeat red in SERIALIZE.
+      destruct SERIALIZE as (?&?&?&?).
+
+      specialize (IHTYPE1 ms x x0 H).
+
+      repeat red in H0.
+      destruct H0 as (?&?&?&?).
+      cbn in H1.
+      destruct H1; subst.
+      apply IHTYPE2 in H0.
+      etransitivity; eauto.
+    }
+
+    { (* Packed struct cons *)
+      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+      repeat red in SERIALIZE.
+      destruct SERIALIZE as (?&?&?&?).
+
+      specialize (IHTYPE1 ms x x0 H).
+
+      repeat red in H0.
+      destruct H0 as (?&?&?&?).
+      cbn in H1.
+      destruct H1; subst.
+      apply IHTYPE2 in H0.
+      etransitivity; eauto.
+    }
+
+    { (* Arrays *)
+      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+      repeat red in SERIALIZE.
+      destruct SERIALIZE as (?&?&?&?).
+      cbn in H1.
+      destruct H1; subst.
+      cbn in *.
+
+      generalize dependent ms.
+      generalize dependent x.
+      generalize dependent x0.
+      induction xs; intros x0 x ms H0.
+      - cbn in *.
+        destruct H0; subst; reflexivity.
+      - rewrite map_monad_In_cons in H0.
+        repeat red in H0.
+        destruct H0 as (?&?&?&?).
+        destruct H0 as (?&?&?&?).
+        cbn in H1.
+        destruct H1; subst.
+
+        pose proof (IH a (or_introl eq_refl) ms x1 x2 H) as MSX1.
+        forward IHxs.
+        {
+          intros x H1 ms0 ms' bytes SERIALIZE.
+          apply IH in SERIALIZE; eauto.
+          right; auto.
+        }
+        forward IHxs.
+        { intros x H1.
+          apply IHdtyp.
+          right; auto.
+        }
+
+        etransitivity.
+        eauto.
+        eapply IHxs; eauto.
+        apply H0.
+    }
+
+    { (* Vectors *)
+      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+      repeat red in SERIALIZE.
+      destruct SERIALIZE as (?&?&?&?).
+      cbn in H2.
+      destruct H2; subst.
+      cbn in *.
+
+      generalize dependent ms.
+      generalize dependent x.
+      generalize dependent x0.
+      induction xs; intros x0 x ms H1.
+      - cbn in *.
+        destruct H1; subst; reflexivity.
+      - rewrite map_monad_In_cons in H1.
+        repeat red in H1.
+        destruct H1 as (?&?&?&?).
+        destruct H1 as (?&?&?&?).
+        cbn in H1.
+        destruct H2; subst.
+
+        pose proof (IH a (or_introl eq_refl) ms x1 x2 H) as MSX1.
+        forward IHxs.
+        {
+          intros x H2 ms0 ms' bytes SERIALIZE.
+          apply IH in SERIALIZE; eauto.
+          right; auto.
+        }
+        forward IHxs.
+        { intros x H2.
+          apply IHdtyp.
+          right; auto.
+        }
+
+        etransitivity.
+        eauto.
+        eapply IHxs; eauto.
+    }
+
+    { (* Concat_bytes *)
+      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+      repeat red in SERIALIZE.
+      destruct SERIALIZE as (?&?&?&?).
+      red in H1.
+      break_match_hyp; try (destruct e; cbn in H1; contradiction).
+      cbn in H1.
+      destruct H1; subst.
+      eapply re_sid_ubytes_MemState_eqv; eauto.
+    }
+  Qed.
+
   (* TODO: Prove this *)
   Lemma serialize_sbytes_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start uv_fin uv_inf t bytes_fin},
@@ -12096,7 +12581,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           sbytes_refine bytes_inf bytes_fin /\
           MemState_refine_prop ms_inf_final ms_fin_final.
   Proof.
-    intros ms_fin_start ms_fin_final ms_inf_start uv_fin uv_inf t bytes_fin MSR UV_REF SERIALIZE.
+    intros ms_fin_start ms_fin_final ms_inf_start uv_fin uv_inf t bytes_fin MSR UV_REF TYPE_INF SERIALIZE.
+    pose proof uvalue_refine_strict_has_dtyp UV_REF TYPE_INF as TYPE_FIN.
+
 
     rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
     rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
@@ -12120,6 +12607,203 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           rewrite UBYTES;
           cbn; auto
       end.
+
+    generalize dependent uv_fin.
+    generalize dependent bytes_fin.
+    induction TYPE_INF; intros bytes_fin uv_fin UV_REF SERIALIZE TYPE_FIN;
+      try solve
+        [ pose proof UV_REF as UV_REF';
+          rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
+          rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
+          cbn in UV_REF;
+          move UV_REF after SERIALIZE;
+          break_match_hyp; inv UV_REF;
+          solve_to_ubytes SERIALIZE
+        ].
+
+    { (* uvalue poison of array type. *)
+      rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
+        rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
+        cbn in UV_REF;
+        move UV_REF after IHTYPE_INF;
+        inv UV_REF.
+      cbn in SERIALIZE.
+      destruct SERIALIZE as (?&?&?&?&?).
+      symmetry in H0.
+      subst.
+      rename x0 into byte_chunks_fin.
+      rename H into BYTES.
+
+
+      generalize dependent ms_fin_start.
+      generalize dependent byte_chunks_fin.
+      induction sz using N.peano_ind; intros byte_chunks_fin ms_fin_start MSR IHTYPE_INF BYTES.
+      { cbn in BYTES. destruct BYTES; subst.
+        cbn.
+        exists []. exists ms_inf_start.
+        split.
+        2: {
+          split; auto; constructor.
+        }
+
+        exists ms_inf_start. exists [].
+        auto.
+      }
+
+      { (* Size induction... *)
+        forward IHsz.
+        { constructor.
+          solve_no_void.
+        }
+
+        rewrite repeatN_succ in BYTES.
+        rewrite map_monad_In_unfold in BYTES.
+        destruct BYTES as (?&?&?&?&?&?&?&?); subst.
+        specialize (IHsz x2 x).
+        forward IHsz.
+        {
+          specialize (IHTYPE_INF x0 (DVC1.DV2.UVALUE_Poison t)).
+          forward IHTYPE_INF.
+          rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+          reflexivity.
+          cbn in IHTYPE_INF.
+          forward IHTYPE_INF.
+          { rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in H.
+            admit.
+          }
+
+          forward IHTYPE_INF.
+          { constructor.
+            auto.
+          }
+
+          destruct IHTYPE_INF as (?&?&?&?&?).
+          subst.
+        }
+
+        forward IHsz.
+        { cbn.
+        }
+      }
+    }
+
+    {
+      rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
+          rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
+        cbn in UV_REF;
+        move UV_REF after IHTYPE_INF;
+        inv UV_REF.
+
+      specialize (IHTYPE_INF bytes_fin (DVC1.DV2.UVALUE_Poison t)).
+      forward IHTYPE_INF.
+      {
+        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+        reflexivity.
+      }
+
+      forward IHTYPE_INF.
+      {
+        clear IHTYPE_INF.
+        destruct t.
+        - cbn.
+          exists ms_fin_start.
+          eexists. (* Fresh sid... *)
+          split.
+          {
+            split; auto.
+            2: {
+              repeat (split; [reflexivity|]).
+              reflexivity.
+            }
+            admit.
+          }
+
+          { red.
+            cbn in SERIALIZE.
+            destruct SERIALIZE as (?&?&?&?&?); subst.
+
+            induction sz.
+            { cbn in m.
+              destruct m; subst.
+              unfold Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes.
+              induction (N.to_nat (LLVMParams64BitIntptr.SIZEOF.sizeof_dtyp (DTYPE_I sz0))).
+              - cbn; split; auto.
+              - rewrite Nseq_S.
+                break_match_hyp_inv.
+                cbn in Heqo.
+                induction n.
+                + cbn in Heqo.
+                  break_match.
+                  * cbn in *.
+                    break_match_hyp_inv.
+                    break_match_hyp_inv.
+                    split; auto.
+
+
+                break_match.
+                + epose proof map_monad_app (M:=OOM) _ _ _.
+                  cbn in H0.
+                  red in H0.
+                  red in H0.
+                  cbn in *.
+                  rewrite Heqo0 in H0.
+                  break_match_hyp_inv.
+                  break_match_hyp_inv.
+                  break_match_hyp_inv.
+                  break_match_hyp_inv.
+                  break_match_hyp_inv.
+                  inv Heqo.
+                  split; auto.
+                  cbn.
+                  cbn in *.
+                  inv H1.
+
+                destruct H0.
+                specialize (H0 Heqo0).
+                Heqo.
+                rewrite map_monad_app.
+                cbn.
+              break_match.
+              cbn in Heqo.
+
+            }
+
+            break_match.
+            2: {
+              cbn in *.
+              admit.
+            }
+
+            cbn.
+          }
+          eapply MemPropT_fin_inf_bind.
+          cbn.
+          exists ms_fin_start.
+      }
+      cbn in IHTYPE_INF.
+
+
+      cbn in SERIALIZE.
+      destruct SERIALIZE as (?&?&?&?&?); subst.
+
+      induction sz using N.peano_ind.
+      { cbn in H.
+        destruct H; subst.
+        cbn.
+        exists []. exists ms_inf_start.
+        split.
+        2: {
+          split; auto.
+          constructor.
+        }
+        do 2 eexists; split; eauto.
+      }
+
+      { forward IHsz.
+        - intros UV_REF SERIALIZE TYPE_FIN0.
+
+      }
+    }
 
     generalize dependent t.
     generalize dependent uv_fin.
