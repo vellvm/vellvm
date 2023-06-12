@@ -13784,6 +13784,157 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       auto.
     }
 
+    { (* Regular packed struct serialization *)
+      pose proof UV_REF as UV_REF'.
+      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF'.
+      rewrite map_monad_InT_unfold in UV_REF'.
+      cbn in UV_REF'.
+      repeat break_match_hyp_inv.
+
+      rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
+      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+      eapply MemPropT_fin_inf_bind.
+      4: apply SERIALIZE.
+      all: eauto.
+
+      { (* MA: serialize first field *)
+        clear SERIALIZE IHTYPE_INF2.
+        intros a_fin ms_fin_ma SERIALIZE.
+        eapply IHTYPE_INF1; eauto.
+        inv TYPE_FIN; auto.
+      }
+
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin FLD_BYTE_REF MSR_FLD SERIALIZE_REST.
+      repeat red in SERIALIZE_REST.
+      destruct SERIALIZE_REST as (ms_fin_final'&rest_bytes_fin&SERIALIZE_REST&RET).
+      cbn in RET.
+      destruct RET; subst.
+      cbn in FLD_BYTE_REF.
+
+      eapply IHTYPE_INF2 in SERIALIZE_REST; eauto.
+      destruct SERIALIZE_REST as (rest_bytes_inf&ms_inf_final'&SERIALIZE_REST_INF&REST_REF_INF&MSR_FINAL).
+      exists (a_inf ++ rest_bytes_inf)%list.
+      exists ms_inf_final'.
+      split.
+      { cbn.
+        exists ms_inf_final'.
+        exists rest_bytes_inf.
+        split; auto.        
+      }
+      split; auto.
+      apply Forall2_app; auto.
+
+      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+      rewrite Heqo.
+      cbn.
+      reflexivity.
+
+      inv TYPE_FIN.
+      auto.
+    }
+
+    { (* Regular array serialization *)
+      pose proof UV_REF as UV_REF'.
+      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF'.
+      cbn in UV_REF'.
+      repeat break_match_hyp_inv.
+
+      rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
+      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+      eapply MemPropT_fin_inf_bind.
+      4: apply SERIALIZE.
+      all: eauto.
+
+      { (* MA: serialize elements *)
+        clear SERIALIZE.
+        intros a_fin ms_fin_ma SERIALIZE.
+        eapply MemPropT_fin_inf_map_monad_In
+          with (A_REF:=DVC1.uvalue_refine_strict).
+        4: apply SERIALIZE.
+        all: eauto.
+
+        { (* Serialize a single element *)
+          intros a_fin0 a_inf b_fin ms_fin ms_inf ms_fin_ma0 HIN_FIN HIN_INF MSR' UV_REF_ELT SERIALIZE_ELT.
+          cbn in SERIALIZE_ELT.
+          eapply IH; eauto.
+          apply SERIALIZE_ELT.
+
+          inv TYPE_FIN.
+          eapply Forall_forall in H2; eauto.
+        }
+
+        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF.
+        cbn in UV_REF.
+        break_match_hyp_inv.
+        rewrite <- map_monad_map_monad_InT in Heqo0.
+        apply map_monad_oom_forall2; auto.
+      }
+
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTE_BLOCKS_REF MSR_ELT RET.
+      cbn in RET.
+      destruct RET; subst.
+      cbn in BYTE_BLOCKS_REF.
+
+      exists (concat a_inf).
+      exists ms_inf.
+      cbn.
+      split; auto.
+      split; auto.
+      apply Forall2_concat.
+      auto.
+    }
+
+    { (* Regular vector serialization *)
+      pose proof UV_REF as UV_REF'.
+      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF'.
+      cbn in UV_REF'.
+      repeat break_match_hyp_inv.
+
+      rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
+      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+      eapply MemPropT_fin_inf_bind.
+      4: apply SERIALIZE.
+      all: eauto.
+
+      { (* MA: serialize elements *)
+        clear SERIALIZE.
+        intros a_fin ms_fin_ma SERIALIZE.
+        eapply MemPropT_fin_inf_map_monad_In
+          with (A_REF:=DVC1.uvalue_refine_strict).
+        4: apply SERIALIZE.
+        all: eauto.
+
+        { (* Serialize a single element *)
+          intros a_fin0 a_inf b_fin ms_fin ms_inf ms_fin_ma0 HIN_FIN HIN_INF MSR' UV_REF_ELT SERIALIZE_ELT.
+          cbn in SERIALIZE_ELT.
+          eapply IH; eauto.
+          apply SERIALIZE_ELT.
+
+          inv TYPE_FIN.
+          eapply Forall_forall in H3; eauto.
+        }
+
+        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF.
+        cbn in UV_REF.
+        break_match_hyp_inv.
+        rewrite <- map_monad_map_monad_InT in Heqo0.
+        apply map_monad_oom_forall2; auto.
+      }
+
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTE_BLOCKS_REF MSR_ELT RET.
+      cbn in RET.
+      destruct RET; subst.
+      cbn in BYTE_BLOCKS_REF.
+
+      exists (concat a_inf).
+      exists ms_inf.
+      cbn.
+      split; auto.
+      split; auto.
+      apply Forall2_concat.
+      auto.
+    }
+
     admit.
     admit.
     admit.
