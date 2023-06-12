@@ -13935,6 +13935,72 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       auto.
     }
 
+    (* Solve for binary operations *)
+    all:
+      try solve
+        [ pose proof UV_REF as UV_REF';
+          rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF';
+          cbn in UV_REF';
+          repeat break_match_hyp_inv;
+
+          rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation;
+          rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE;
+          eapply MemPropT_fin_inf_bind; [ | | | apply SERIALIZE]; eauto;
+          [intros *; eapply fresh_sid_fin_inf; eauto|];
+
+          intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH UBYTES;
+          cbn in SID; subst;
+
+          red in UBYTES;
+          break_match_hyp_inv;
+          match goal with
+          | H: Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes _ ?t _ = NoOom _ |- _ => 
+              eapply to_ubytes_fin_inf in H; eauto; destruct H as (bytes_inf&UBYTES_INF&?)
+          end;
+          exists bytes_inf; exists ms_inf;
+          split; auto;
+          rewrite UBYTES_INF;
+          cbn; auto
+        ].
+
+    (* Concat bytes *)
+    { (* ibinop *)
+      pose proof UV_REF as UV_REF';
+      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF';
+      cbn in UV_REF';
+      repeat break_match_hyp_inv;
+
+      rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation;
+      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE;
+      eapply MemPropT_fin_inf_bind; [ | | | apply SERIALIZE]; eauto;
+        [intros *; eapply fresh_sid_fin_inf; eauto|];
+
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH UBYTES;
+      cbn in SID; subst;
+
+      red in UBYTES;
+      break_match_hyp_inv;
+      match goal with
+      | H: Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes _ ?t _ = NoOom _ |- _ => 
+          eapply to_ubytes_fin_inf in H; eauto; destruct H as (bytes_inf&UBYTES_INF&?)
+      end;
+      exists bytes_inf; exists ms_inf;
+      split; auto;
+      rewrite UBYTES_INF;
+      cbn; auto.
+      reflexivity.
+
+      
+      destruct 
+
+            match goal with
+            | H: Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes (DVC1.DV2.UVALUE_Oom ?t) _ _ = NoOom _ |- _ =>
+                eapply @to_ubytes_fin_inf with (uv_inf:=DVC1.DV1.UVALUE_Oom t) in H
+            end;
+
+
+    }
+
     admit.
     admit.
     admit.
