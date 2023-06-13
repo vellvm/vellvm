@@ -2426,12 +2426,6 @@ Module InfiniteToFinite.
       apply fin_to_inf_dvalue_refine_strict.
   Qed.
 
-  Lemma convert_FrameStack_lift :
-    forall fs,
-      convert_FrameStack (lift_FrameStack fs) = NoOom fs.
-  Proof.
-  Admitted.
-
   Lemma convert_memory_lift :
     forall m,
       convert_memory (lift_memory m) = NoOom m.
@@ -2451,7 +2445,7 @@ Module InfiniteToFinite.
     induction ms.
     cbn.
     setoid_rewrite convert_memory_lift.
-    setoid_rewrite convert_FrameStack_lift.
+    setoid_rewrite convert_FrameStack_lift_FrameStack.
     setoid_rewrite convert_Heap_lift.
     reflexivity.
   Qed.
@@ -5164,19 +5158,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   (*       auto. *)
   (*     Qed. *)
 
-  (*     Lemma lift_SByte_injective : *)
-  (*       forall b1 b2, *)
-  (*         lift_SByte b1 = lift_SByte b2 -> *)
-  (*         b1 = b2. *)
-  (*     Proof. *)
-  (*       intros b1 b2 H. *)
-  (*       destruct b1, b2. *)
-  (*       cbn in *. *)
-  (*       inv H. *)
-  (*       apply fin_to_inf_uvalue_injective in H1, H3. *)
-  (*       subst. *)
-  (*       auto. *)
-  (*     Qed. *)
 
   (*     apply lift_SByte_convert_SByte_inverse in BYTE_REF. *)
   (*     rewrite <- H1 in BYTE_REF. *)
@@ -7137,12 +7118,276 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     auto.
   Qed. 
 
-  Definition OOM_frame_stack_eq (om1 om2 : OOM FinMemMMSP.FrameStack) :=
-    match om1, om2 with
-    | Oom _, Oom _ => True
-    | NoOom fs1, NoOom fs2 => FinMem.MMEP.MMSP.frame_stack_eqv fs1 fs2
-    | _, _ => False
-    end.
+  Definition OOM_eq2 {A} (eq : relation A) : relation (OOM A) :=
+    fun m n =>
+      match (m, n) with
+      | (NoOom a, NoOom b) => eq a b
+      | (Oom _, Oom _) => True
+      | (_, _) => False
+      end.
+
+
+  #[export]
+  Instance OOM_eq2_Reflexive : forall A (eq : relation A) `{Reflexive A eq}, Reflexive (OOM_eq2 eq).
+  Proof.
+    repeat red.
+    intros.
+    destruct x; auto.
+  Qed.
+
+  #[export]
+  Instance OOM_eq2_Symmetric : forall A (eq : relation A) `{Symmetric A eq}, Symmetric (OOM_eq2 eq).
+  Proof.
+    repeat red.
+    intros.
+    destruct x; destruct y; auto.
+  Qed.
+
+  #[export]
+  Instance OOM_eq2_Transitive : forall A (eq : relation A) `{Transitive A eq}, Transitive (OOM_eq2 eq).
+  Proof.
+    repeat red.
+    intros.
+    destruct x; destruct y; destruct z; eauto.
+    inversion H0.
+  Qed.
+        
+  From Coq Require Import Logic.FinFun.
+
+  Lemma injective_map_In : forall {A B} (f : A -> B),
+      Injective f -> forall  l x , In (f x) (map f l) -> In x l.
+  Proof.
+    intros A B F HI.
+    induction l; intros; simpl in *; auto.
+    destruct H.
+    - apply HI in H. subst. left; auto.
+    - right. apply IHl. assumption.
+  Qed.
+
+  (* This isn't injective due to provenance *)
+  Lemma Injective_FIN_ptr_to_int : Injective LLVMParams64BitIntptr.PTOI.ptr_to_int.
+  Proof.
+  Abort.
+  
+  Definition partial_Injection {A B} (f : A -> OOM B): Prop :=
+      forall a1 a2 b, f a1 = NoOom b -> f a2 = NoOom b -> a1 = a2.
+
+  Lemma Forall2_In_exists :
+    forall {A B} (f : A -> B -> Prop) l1 l2 x,
+      Forall2 f l1 l2 -> In x l1 -> exists y, In y l2 /\ f x y.
+  Proof.
+    intros A B f.
+    induction l1; intros; destruct l2; simpl in *; try contradiction.
+    - inversion H.
+    - destruct H0; inversion H; subst.
+      + exists b. split. left. reflexivity. assumption.
+      + specialize (IHl1 l2 x H6 H0).
+        destruct IHl1 as [c [HI HF]].
+        exists c. split; auto.
+  Qed.
+
+  Lemma addr_convert_NoOom_compat :
+    forall addr_inf addr_inf' addr_fin,
+      LLVMParamsBigIntptr.PTOI.ptr_to_int addr_inf = LLVMParamsBigIntptr.PTOI.ptr_to_int addr_inf' ->
+      InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
+      exists addr_fin', InfToFinAddrConvert.addr_convert addr_inf' = NoOom addr_fin'.
+  Proof.
+    intros.
+    destruct addr_inf, addr_inf'. cbn in *. subst.
+    exists (Int64.repr i0, p0).
+    unfold FinITOP.int_to_ptr in *.
+    destruct (((i0 <? 0)%Z || (i0 >=? Int64.modulus)%Z)%bool).
+    - inversion H0.
+    - reflexivity.
+  Qed.
+        
+  
+  #[export]
+    Instance convert_Frame_Proper : Proper (InfMem.MMEP.MMSP.frame_eqv ==> OOM_eq2 FinMem.MMEP.MMSP.frame_eqv) convert_Frame.
+  Proof.
+    do 3 red.
+    intros.
+    break_match_goal; break_match_goal; unfold InfMem.MMEP.MMSP.frame_eqv, InfMem.MMEP.MMSP.ptr_in_frame_prop in *; unfold FinMem.MMEP.MMSP.frame_eqv, FinMem.MMEP.MMSP.ptr_in_frame_prop.
+    - intros.
+      split; intros.
+      + apply in_map_iff in H0.
+        apply addr_convert_map_fin_to_inf_addr_inv in Heqo.
+        apply addr_convert_map_fin_to_inf_addr_inv in Heqo0.
+        subst.
+        destruct H0 as [addr [EQ IN]].
+        specialize (H (fin_to_inf_addr addr)).
+        do 2 rewrite List.map_map in H.
+        destruct H.
+        assert (
+        In (LLVMParams64BitIntptr.PTOI.ptr_to_int addr)
+          (map (fun x : FinAddr.addr => LLVMParamsBigIntptr.PTOI.ptr_to_int (fin_to_inf_addr x)) f)).
+        { apply in_map_iff.
+          exists addr. split; auto.
+          rewrite fin_to_inf_addr_ptr_to_int in *. reflexivity. }
+        rewrite fin_to_inf_addr_ptr_to_int in *.
+        apply H in H1.
+        apply in_map_iff in H1.
+        destruct H1 as [addr' [EQ' IN']].
+        apply in_map_iff.
+        exists addr'.
+        split; auto.
+        destruct addr', addr, ptr.
+        rewrite fin_to_inf_addr_ptr_to_int in EQ'.        
+        unfold LLVMParams64BitIntptr.PTOI.ptr_to_int in *.
+        cbn in *.
+        rewrite EQ'. assumption.
+      + apply in_map_iff in H0.
+        apply addr_convert_map_fin_to_inf_addr_inv in Heqo.
+        apply addr_convert_map_fin_to_inf_addr_inv in Heqo0.
+        subst.
+        destruct H0 as [addr [EQ IN]].
+        specialize (H (fin_to_inf_addr addr)).
+        do 2 rewrite List.map_map in H.
+        destruct H.
+        assert (
+        In (LLVMParams64BitIntptr.PTOI.ptr_to_int addr)
+          (map (fun x : FinAddr.addr => LLVMParamsBigIntptr.PTOI.ptr_to_int (fin_to_inf_addr x)) f0)).
+        { apply in_map_iff.
+          exists addr. split; auto.
+          rewrite fin_to_inf_addr_ptr_to_int in *. reflexivity. }
+        rewrite fin_to_inf_addr_ptr_to_int in *.
+        apply H0 in H1.
+        apply in_map_iff in H1.
+        destruct H1 as [addr' [EQ' IN']].
+        apply in_map_iff.
+        exists addr'.
+        split; auto.
+        destruct addr', addr, ptr.
+        rewrite fin_to_inf_addr_ptr_to_int in EQ'.        
+        unfold LLVMParams64BitIntptr.PTOI.ptr_to_int in *.
+        cbn in *.
+        rewrite EQ'. assumption.
+    - unfold convert_Frame in Heqo0.
+      apply map_monad_OOM_fail in Heqo0.
+      destruct Heqo0 as [addr [EQ IN]].
+      pose (H addr) as H'.
+      assert (
+          In (LLVMParamsBigIntptr.PTOI.ptr_to_int addr) (map LLVMParamsBigIntptr.PTOI.ptr_to_int y)
+        ).
+      { apply in_map_iff.
+        exists addr; auto.
+      }
+      apply H' in H0. clear H'.
+      apply in_map_iff in H0.
+      destruct H0 as [addr' [EQ' IN']].
+      subst.
+      unfold convert_Frame in Heqo.
+      apply map_monad_oom_forall2 in Heqo.
+      apply Forall2_In_exists with (x:=addr') in Heqo; auto.
+      destruct Heqo as [addr'' [HIN HEQ]].
+      specialize (addr_convert_NoOom_compat _ _ _ EQ' HEQ) as HX.
+      destruct HX as [addr_fin' HEQ'].
+      rewrite HEQ' in IN.
+      inversion IN.
+    - unfold convert_Frame in Heqo.
+      apply map_monad_OOM_fail in Heqo.
+      destruct Heqo as [addr [EQ IN]].
+      pose (H addr) as H'.
+      assert (
+          In (LLVMParamsBigIntptr.PTOI.ptr_to_int addr) (map LLVMParamsBigIntptr.PTOI.ptr_to_int x)
+        ).
+      { apply in_map_iff.
+        exists addr; auto.
+      }
+      apply H' in H0. clear H'.
+      apply in_map_iff in H0.
+      destruct H0 as [addr' [EQ' IN']].
+      subst.
+      unfold convert_Frame in Heqo0.
+      apply map_monad_oom_forall2 in Heqo0.
+      apply Forall2_In_exists with (x:=addr') in Heqo0; auto.
+      destruct Heqo0 as [addr'' [HIN HEQ]].
+      specialize (addr_convert_NoOom_compat _ _ _ EQ' HEQ) as HX.
+      destruct HX as [addr_fin' HEQ'].
+      rewrite HEQ' in IN.
+      inversion IN.
+    - auto.
+  Qed.
+      
+
+  #[global]
+    Instance Proper_frame_stack_Singleton : Proper (FinMem.MMEP.MMSP.frame_eqv ==> FinMem.MMEP.MMSP.frame_stack_eqv) (FinMemMMSP.Singleton).
+  Proof.
+    do 3 red.
+    intros x y H f n.
+    split; intros.
+    - destruct n.
+      cbn in *.
+      eapply transitivity. symmetry. apply H. assumption.
+      cbn in *. auto.
+    - destruct n.
+      cbn in *.
+      eapply transitivity. apply H. assumption.
+      cbn in *. auto.
+  Qed.
+  
+  
+  #[export]
+    Instance convert_FrameStack_Proper : Proper (InfMem.MMEP.MMSP.frame_stack_eqv ==> OOM_eq2 (FinMem.MMEP.MMSP.frame_stack_eqv)) convert_FrameStack.
+  Proof.
+    do 2 red.
+    intros.
+    revert y H.
+    induction x; intros; simpl in *.
+    - apply InfMem.MMEP.MMSP.frame_stack_inv in H.
+      destruct H.
+      + destruct H as (?&?&?&?&?&?). inversion H.
+      + destruct H as (?&?&?&?&?). inversion H.
+        subst.
+        simpl.
+        specialize (convert_Frame_Proper x x0 H1) as HP.
+        do 2 break_match_goal.
+        * unfold OOM_eq2 in HP.
+          cbn. rewrite HP. reflexivity.
+        * inversion HP.
+        * inversion HP.
+        * cbn. auto.
+    - apply InfMem.MMEP.MMSP.frame_stack_inv in H.
+      destruct H.
+      + destruct H as (?&?&?&?&?&?&?&?). inversion H.
+        subst.
+        simpl.
+        specialize (convert_Frame_Proper x2 x3 H2) as HP.
+        destruct (convert_Frame x2) eqn:HX2;
+        destruct (convert_Frame x3) eqn:HX3.
+        * specialize (IHx _ H1).
+          do 2 break_match_goal.
+          -- cbn in *.
+             rewrite HP. rewrite IHx. reflexivity.
+          -- inversion IHx.
+          -- inversion IHx.
+          -- auto.
+        * inversion HP.
+        * inversion HP.
+        * auto.
+      + destruct H as (?&?&H&_).
+        inversion H.
+  Qed.
+  
+  Lemma lift_FrameStack_convert_FrameStack_proper_proxy:
+    forall (ms : FinMemMMSP.FrameStack) (fs_inf : InfMem.MMEP.MMSP.FrameStack),
+      InfMem.MMEP.MMSP.frame_stack_eqv (lift_FrameStack ms) fs_inf ->
+      convert_FrameStack fs_inf = NoOom ms.
+  Proof.
+    induction ms; intros; simpl in *.
+    - apply InfMem.MMEP.MMSP.frame_stack_inv in H.
+      destruct H.
+      + destruct H as (?&?&?&?&?&?). inversion H.
+      + destruct H as (?&?&?&?&?).
+        subst.
+        inversion H.
+        subst.
+        simpl.
+        break_match_goal.
+        -- 
+        
+        
+    
 
   
   Lemma memory_stack_frame_stack_prop_lift_inv :
@@ -7158,19 +7403,34 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     cbn in *.
     exists memory_stack_frame_stack.
     split.
-    - admit.
+    -
+        
     - unfold FinMem.MMEP.MMSP.memory_stack_frame_stack_prop.
       cbn.  reflexivity.
   Admitted.
 
 
-  Lemma convert_FrameStack_lift_Framestack:
-    forall (fs : InfMem.MMEP.MMSP.FrameStack) (fs_fin : FinMemMMSP.FrameStack),
-      convert_FrameStack fs = NoOom fs_fin -> InfMem.MMEP.MMSP.frame_stack_eqv (lift_FrameStack fs_fin) fs.
+  Lemma lift_FrameStack_convert_FrameStack :
+    forall (fs_inf : InfMem.MMEP.MMSP.FrameStack) (fs_fin : FinMemMMSP.FrameStack),
+      convert_FrameStack fs_inf = NoOom fs_fin ->
+      InfMem.MMEP.MMSP.frame_stack_eqv (lift_FrameStack fs_fin) fs_inf.
   Proof.
-    induction fs; intros; cbn in *.
-    - break_match_hyp; inversion H; subst.
-      cbn. 
+    induction fs_inf; intros.
+    - simpl in H.
+      break_match_hyp; inversion H; subst.
+      cbn.
+      apply lift_Frame_convert_Frame_inv in Heqo.
+      subst.
+      reflexivity.
+    - simpl in H.
+      break_match_hyp; inversion H; subst.
+      apply lift_Frame_convert_Frame_inv in Heqo.
+      break_match_hyp; inversion H; subst.
+      simpl.
+      rewrite IHfs_inf; auto.
+      reflexivity.
+  Qed.
+      
   
   (* SAZ: Do these next *)
   Lemma frame_stack_preserved_lift_MemState :
@@ -7190,13 +7450,18 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       
       unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop in *.
       rewrite H.
-
-        
+      apply lift_FrameStack_convert_FrameStack.
+      assumption.
+    - apply memory_stack_frame_stack_prop_lift_inv in MSFSP.
+      destruct MSFSP as [fs_fin [EQ H]].
+      apply FSP in H.
+      apply memory_stack_frame_stack_prop_lift in H.
       
-      
-      admit.
-    - admit.
-  Admitted.
+      unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop in *.
+      rewrite H.
+      apply lift_FrameStack_convert_FrameStack.
+      assumption.
+  Qed.
 
   
   (* TODO: Move this *)
