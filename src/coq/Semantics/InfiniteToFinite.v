@@ -7368,7 +7368,15 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       + destruct H as (?&?&H&_).
         inversion H.
   Qed.
+
+  #[global]
+  Instance Proper_lift_FrameStack : Proper (FinMem.MMEP.MMSP.frame_stack_eqv ==> InfMem.MMEP.MMSP.frame_stack_eqv) lift_FrameStack.
+  Proof.
+    do 3 red.
+    apply frame_stack_eqv_lift.
+  Qed.
   
+  (*
   Lemma lift_FrameStack_convert_FrameStack_proper_proxy:
     forall (ms : FinMemMMSP.FrameStack) (fs_inf : InfMem.MMEP.MMSP.FrameStack),
       InfMem.MMEP.MMSP.frame_stack_eqv (lift_FrameStack ms) fs_inf ->
@@ -7387,8 +7395,45 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         -- 
         
         
-    
+   *)
 
+  Lemma fin_to_inf_addr_injective :  Injective fin_to_inf_addr.
+  Proof.
+    unfold Injective.
+    intros a1 a2 H.
+    destruct a1. destruct a2.
+    unfold fin_to_inf_addr in H.
+    destruct (FinToInfAddrConvertSafe.addr_convert_succeeds (i, p)).
+    destruct (FinToInfAddrConvertSafe.addr_convert_succeeds (i0, p0)).
+    subst.
+    specialize (FinToInfAddrConvert.addr_convert_injective _ _ _ e e0).
+    auto.
+  Qed.
+
+  Lemma map_injective : forall {A B} (f : A -> B) (IF : Injective f), Injective (map f).
+  Proof.
+    intros.
+    unfold Injective.
+    induction x; intros y EQ; destruct y; inversion EQ; auto.
+    apply IF in H0. subst. rewrite (IHx _ H1). reflexivity.
+  Qed.
+  
+  Lemma lift_frame_injective : Injective lift_Frame.
+  Proof.
+    intros f1 f2 H.
+    apply map_injective in H; auto.
+    apply fin_to_inf_addr_injective.
+  Qed.
+
+  Lemma lift_FrameStack_injective : Injective  lift_FrameStack.
+  Proof.
+    unfold Injective.
+    induction x; intros y EQ; destruct y; inversion EQ; subst.
+    - apply lift_frame_injective in H0. subst. reflexivity.
+    - apply lift_frame_injective in H1. apply IHx in H0.
+      subst.
+      reflexivity.
+  Qed.
   
   Lemma memory_stack_frame_stack_prop_lift_inv :
     forall ms_fin fs_inf,
@@ -7400,14 +7445,19 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     intros ms_fin fs_inf H.
     unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop in H.
     destruct ms_fin.
+    unfold FinMem.MMEP.MMSP.memory_stack_frame_stack_prop.
     cbn in *.
-    exists memory_stack_frame_stack.
+    specialize (frame_stack_eqv_lift_inv _ _ H) as HS.
+    destruct HS as [fs1 [fs2 [ EQ1 [EQ2 HF]]]].
+    subst.
+    exists fs2.
     split.
-    -
-        
-    - unfold FinMem.MMEP.MMSP.memory_stack_frame_stack_prop.
-      cbn.  reflexivity.
-  Admitted.
+    - apply convert_FrameStack_lift_FrameStack.
+    - rewrite EQ1 in H.
+      apply lift_FrameStack_injective in EQ1.
+      subst.
+      assumption.
+  Qed.
 
 
   Lemma lift_FrameStack_convert_FrameStack :
