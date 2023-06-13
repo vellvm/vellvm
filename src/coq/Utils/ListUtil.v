@@ -1161,3 +1161,13 @@ Proof.
   - cbn in *.
     destruct X0; subst; auto.
 Qed.
+
+Lemma Forall_HIn_eq : forall A (l:list A) (f g : forall (x:A), In x l -> Prop),
+    (forall x H1 H2, f x H1 = g x H2) ->
+    Forall_HIn l f = Forall_HIn l g.
+Proof.
+  induction l; intros; simpl; try reflexivity.
+  erewrite H. erewrite IHl. reflexivity.
+  intros.
+  erewrite H. reflexivity.
+Qed.

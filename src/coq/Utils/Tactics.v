@@ -103,6 +103,16 @@ Ltac break_match_hyp :=
       end
   end.
 
+Ltac break_match_hyp_inv :=
+  match goal with
+  | [ H : context [ match ?X with _ => _ end ] |- _] =>
+      match type of X with
+      | sumbool _ _ => destruct X
+      | _ => destruct X eqn:?
+      end;
+      inv H
+  end.
+
 (** [break_match_goal] looks for a [match] construct in your goal, and
     destructs the discriminee, while retaining the information about
     the discriminee's value leading to the branch being taken. *)
