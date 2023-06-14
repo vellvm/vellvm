@@ -1239,3 +1239,22 @@ Next Obligation.
   cbn.
   lia.
 Defined.
+
+Lemma forallb_cons :
+  forall {A} f x (xs : list A),
+    forallb f (x :: xs) = andb (f x) (forallb f xs).
+Proof.
+  intros A f x xs.
+  cbn.
+  reflexivity.
+Qed.
+
+Lemma forallb_map_In_eq : forall A (l:list A) (f g : forall (x:A), In x l -> bool),
+    (forall x H1 H2, f x H1 = g x H2) ->
+    forallb id (map_In l f) = forallb id (map_In l g).
+Proof.
+  induction l; intros; simpl; try reflexivity.
+  erewrite H. erewrite IHl. reflexivity.
+  intros.
+  erewrite H. reflexivity.
+Qed.
