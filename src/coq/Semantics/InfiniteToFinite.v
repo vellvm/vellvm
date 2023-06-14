@@ -14276,14 +14276,77 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
   (* TODO: Prove this *)
   Lemma deserialize_sbytes_fin_inf :
-    forall {bytes_fin bytes_inf t res_fin},
+    forall {t bytes_fin bytes_inf res_fin},
       sbytes_refine bytes_inf bytes_fin ->
       Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_fin t = inr res_fin ->
       exists res_inf,
         MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_inf t = inr res_inf /\
           DVC1.uvalue_refine_strict res_inf res_fin.
   Proof.
-  Admitted.
+    induction t; intros bytes_fin bytes_inf res_fin BYTES DESER.
+    { cbn in *.
+      inv DESER.
+      eexists; split; eauto.
+      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+
+      (* TODO: Move this *)
+      Lemma from_ubytes_dtyp :
+        forall {bytes t uv},
+          MemoryBigIntptr.MMEP.MMSP.MemByte.from_ubytes bytes t = uv ->
+          N.of_nat (Datatypes.length bytes) = LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp t ->
+          E1.DV.uvalue_has_dtyp uv t.
+      Proof.
+        intros bytes t uv UBYTES SIZE.
+        unfold MemoryBigIntptr.MMEP.MMSP.MemByte.from_ubytes in *.
+        rewrite SIZE in UBYTES.
+        rewrite N.eqb_refl in UBYTES.
+        break_match_hyp; subst.
+        - (* Not sure what happens if `uv` doesn't have the same type as `t`...
+
+             Technically I could construct a bunch of
+             `(UVALUE_ExtractByte uv dt idx sid)` values where `uv`
+             does not have type `dt`...
+
+             This `all_bytes_from_uvalue` function will just pull out
+             the uvalue as is... Is that a problem?
+
+             all_bytes_from_uvalue will make sure that `dt` agrees
+             across all of the ExtractByte values, but it doesn't care
+             about `uv` at all.
+           *)
+          (* TODO: Move this *)
+          Lemma all_bytes_from_uvalue_has_dtyp :
+            forall {bytes t uv},
+              MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue t bytes = Some uv ->
+              E1.DV.uvalue_has_dtyp uv t.
+          Proof.
+            induction bytes. intros t uv ALL.
+            - cbn in ALL. discriminate.
+            - intros t uv H.
+              unfold MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue in H.
+              repeat break_match_hyp_inv.
+              unfold OptionUtil.guard_opt in *.
+              repeat break_match_hyp_inv.
+              
+          Qed.
+
+          eapply all_bytes_from_uvalue_has_dtyp; eauto.
+        - constructor.
+          + intros byte MAP.
+            apply in_map_iff in MAP.
+            destruct MAP as (raw_byte & EXTRACT & IN).
+            subst.
+            induction bytes.
+            cbn in 
+            apply 
+
+      Qed.
+      
+      break_match.
+      admit.
+      rewrite 
+    }
+  Qed.
 
   (* TODO: Prove this *)
   Lemma deserialize_sbytes_fail_fin_inf :

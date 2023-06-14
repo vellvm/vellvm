@@ -8,7 +8,7 @@ From Coq Require Import
      Bool.Bool
      Lia
      Program.Wf.
-     
+
 Import BinInt.
 
 Require Import Ceres.Ceres.
@@ -3014,6 +3014,121 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   .
   Set Elimination Schemes.
 
+  Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia | solve_dvalue_measure | solve_uvalue_measure | repeat split; intros *; discriminate ].
+  Program Fixpoint dvalue_has_dtyp_bool (dv : dvalue) (dt : dtyp) {measure (dvalue_measure dv)} : bool :=
+    match dt with
+    | DTYPE_I sz =>
+        match dv with
+        | DVALUE_I1 _ => N.eqb sz 1
+        | DVALUE_I8 _ => N.eqb sz 8
+        | DVALUE_I32 _ => N.eqb sz 32
+        | DVALUE_I64 _ => N.eqb sz 64
+        | DVALUE_Poison t => dtyp_eqb t dt
+        | _ => false
+        end
+    | DTYPE_IPTR =>
+        match dv with
+        | DVALUE_IPTR _ => true
+        | DVALUE_Poison t => dtyp_eqb t dt
+        | _ => false
+        end
+    | DTYPE_Pointer =>
+        match dv with
+        | DVALUE_Addr _ => true
+        | DVALUE_Poison t => dtyp_eqb t dt
+        | _ => false
+        end
+    | DTYPE_Void =>
+        match dv with
+        | DVALUE_None => true
+        | DVALUE_Poison t => dtyp_eqb t dt
+        | _ => false
+        end
+    | DTYPE_Half =>
+        match dv with
+        | DVALUE_Poison t => dtyp_eqb t dt
+        | _ => false
+        end
+    | DTYPE_Float =>
+        match dv with
+        | DVALUE_Float _ => true
+        | DVALUE_Poison t => dtyp_eqb t dt
+        | _ => false
+        end
+    | DTYPE_Double =>
+        match dv with
+        | DVALUE_Double _ => true
+        | DVALUE_Poison t => dtyp_eqb t dt
+        | _ => false
+        end
+    | DTYPE_X86_fp80 =>
+        match dv with
+        | DVALUE_Poison t => dtyp_eqb t dt
+        | _ => false
+        end
+    | DTYPE_Fp128 =>
+        match dv with
+        | DVALUE_Poison t => dtyp_eqb t dt
+        | _ => false
+        end
+    | DTYPE_Ppc_fp128 =>
+        match dv with
+        | DVALUE_Poison t => dtyp_eqb t dt
+        | _ => false
+        end
+    | DTYPE_Metadata =>
+        match dv with
+        | DVALUE_Poison t => dtyp_eqb t dt
+        | _ => false
+        end
+    | DTYPE_X86_mmx =>
+        match dv with
+        | DVALUE_Poison t => dtyp_eqb t dt
+        | _ => false
+        end
+    | DTYPE_Array sz t =>
+        match dv with
+        | DVALUE_Array elts =>
+            (length elts =? N.to_nat sz)%nat && allb id (map_In elts (fun e HIn => dvalue_has_dtyp_bool e t))
+        | DVALUE_Poison t => dtyp_eqb t dt
+        | _ => false
+        end
+    | DTYPE_Struct dts =>
+        match dv with
+        | DVALUE_Struct fields =>
+            zipWith_In'
+              fields dts true
+              (fun f dt HIn_fields HIn_dts acc' =>
+                 acc' && dvalue_has_dtyp_bool f dt)
+              (fun _ HIn_left _ => false) (fun _ HIn_right _ => false)
+        | DVALUE_Poison t => dtyp_eqb t dt
+        | _ => false
+        end
+    | DTYPE_Packed_struct dts =>
+        match dv with
+        | DVALUE_Packed_struct fields =>
+            zipWith_In'
+              fields dts true
+              (fun f dt HIn_fields HIn_dts acc' =>
+                 acc' && dvalue_has_dtyp_bool f dt)
+              (fun _ HIn_left _ => false) (fun _ HIn_right _ => false)
+        | DVALUE_Poison t => dtyp_eqb t dt
+        | _ => false
+        end
+    | DTYPE_Opaque =>
+        match dv with
+        | DVALUE_Poison t => dtyp_eqb t dt
+        | _ => false
+        end
+    | DTYPE_Vector sz t =>
+        match dv with
+        | DVALUE_Vector elts =>
+            (length elts =? N.to_nat sz)%nat && allb id (map_In elts (fun e HIn => dvalue_has_dtyp_bool e t))
+        | DVALUE_Poison t => dtyp_eqb t dt
+        | _ => false
+        end
+    end.
+
   Unset Elimination Schemes.
   Inductive uvalue_has_dtyp : uvalue -> dtyp -> Prop :=
   | UVALUE_Addr_typ   : forall a, uvalue_has_dtyp (UVALUE_Addr a) DTYPE_Pointer
@@ -4561,7 +4676,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         rewrite map_monad_unfold in Heqs.
         cbn in Heqs.
         break_match_hyp; inv Heqs.
-        break_match_hyp; inv H0.        
+        break_match_hyp; inv H0.
 
         constructor; inv IHUT2; auto.
 
@@ -4584,7 +4699,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         rewrite map_monad_unfold in Heqs.
         cbn in Heqs.
         break_match_hyp; inv Heqs.
-        break_match_hyp; inv H0.        
+        break_match_hyp; inv H0.
 
         constructor; inv IHUT2; auto.
 
