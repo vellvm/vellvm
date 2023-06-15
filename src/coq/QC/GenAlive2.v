@@ -25,14 +25,14 @@ Import MonadNotation.
 Import ApplicativeNotation.
 
 From Coq Require Import
-  ZArith Lia Bool.Bool.
+  ZArith Bool.Bool.
 
 
 From QuickChick Require Import QuickChick.
 Import QcDefaultNotation.
 Open Scope qc_scope.
 Open Scope Z_scope.
-
+Set Warnings "-extraction-opaque-accessed,-extraction".
 (* Definition nat_gen_example : G nat := *)
 (*   choose (0, 10)%nat. *)
 
