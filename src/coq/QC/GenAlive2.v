@@ -33,19 +33,13 @@ Import QcDefaultNotation.
 Open Scope qc_scope.
 Open Scope Z_scope.
 
-Definition nat_gen_example : G nat :=
-  choose (0, 10)%nat.
+(* Definition nat_gen_example : G nat := *)
+(*   choose (0, 10)%nat. *)
 
 
 Module Type GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZEOF : Sizeof) (LLVMEvents:LLVM_INTERACTIONS(ADDR)(IP)(SIZEOF)).
   Import LLVMEvents.
   Import DV.
-
-  Search G.
-  Print failwith.
-  
-  Definition gen_uvalue_trivial `{MonadExc string G}: G uvalue :=
-    failwith "bla".
   
   Fixpoint gen_uvalue `{MonadExc string G} (t : typ): G uvalue :=
     match t with
