@@ -129,3 +129,4 @@
 ./coq/QC/Generators.v
 ./coq/QC/GenAST.v
 ./coq/QC/DList.v
+./coq/QC/GenAlive2.v
