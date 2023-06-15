@@ -6,8 +6,8 @@ From Vellvm Require Import
   Semantics.Memory.Sizeof
   LLVMEvents
   LLVMAst
-  GenAST
-  QC.Utils.
+  QC.Utils
+  QC.Generators.
 
 Require Import Integers.
 
@@ -37,33 +37,48 @@ Definition nat_gen_example : G nat :=
   choose (0, 10)%nat.
 
 
-Print failGen.
-
 Module Type GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZEOF : Sizeof) (LLVMEvents:LLVM_INTERACTIONS(ADDR)(IP)(SIZEOF)).
   Import LLVMEvents.
   Import DV.
 
   Search G.
+  Print failwith.
   
-  Fixpoint gen_uvalue (t : typ): G uvalue :=
+  Definition gen_uvalue_trivial `{MonadExc string G}: G uvalue :=
+    failwith "bla".
+  
+  Fixpoint gen_uvalue `{MonadExc string G} (t : typ): G uvalue :=
     match t with
     | TYPE_I i =>
         match i with
         | 1%N =>
-            x <- choose (0,1);;
-            returnGen (UVALUE_I1 (repr x)) 
+            returnGen UVALUE_I1 <*> (returnGen repr <*> (choose (0, 1)))            
+            (* x <- choose (0,1);; *)
+            (* returnGen (UVALUE_I1 (repr x))  *)
         | 8%N =>
-            x <- choose (0,2 ^ 8);;
-            returnGen (UVALUE_I8 (repr x))
+            returnGen UVALUE_I8 <*> (returnGen repr <*> (choose (0, 2^8)))
+            (* x <- choose (0,2 ^ 8);; *)
+            (* returnGen (UVALUE_I8 (repr x)) *)
         | 32%N =>
-            x <- choose (0, 2 ^ 32);;
-            returnGen (UVALUE_I32 (repr x))
+            returnGen UVALUE_I32 <*> (returnGen repr <*> (choose (0, 2^32)))
+            (* x <- choose (0, 2 ^ 32);; *)
+            (* returnGen (UVALUE_I32 (repr x)) *)
         | 64%N =>
-            x <- choose (0, 2 ^ 63);;
-            returnGen (UVALUE_I64 (repr x))
-        | _ => returnGen UVALUE_None
+            returnGen UVALUE_I64 <*> (returnGen repr <*> (choose (0, 2^64)))
+            (* x <- choose (0, 2 ^ 63);; *)
+            (* returnGen (UVALUE_I64 (repr x)) *)
+        | _ => failwith "Invalid size"
         end
-    | _ => returnGen UVALUE_None
+    | TYPE_Float =>
+        returnGen UVALUE_Float <*> fing32
+    | TYPE_Double =>
+        returnGen UVALUE_None (* FailGen *)
+    | TYPE_Void => returnGen UVALUE_None
+    | TYPE_Vector sz subtyp =>
+        returnGen UVALUE_Vector <*> vectorOf (N.to_nat sz) (gen_uvalue subtyp)
+    | TYPE_Array sz subtyp =>
+        returnGen UVALUE_Array <*> vectorOf (N.to_nat sz) (gen_uvalue subtyp)
+    | _ => failwith "Unimplemented uvalue generators"
     end.
   
 End GEN_ALIVE2.
