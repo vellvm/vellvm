@@ -26,7 +26,8 @@ From Vellvm Require
      Transformations.Transform
      Utils.ParserHelper
      QC.ShowAST
-     QC.ReprAST.
+     QC.ReprAST
+     QC.GenAlive2.
 
 Require ExtrOcamlBasic.
 Require ExtrOcamlString.
@@ -88,3 +89,4 @@ Extraction Library Transform.
 Extraction Library ParserHelper.
 Recursive Extraction Library ShowAST.
 Recursive Extraction Library ReprAST. 
+
