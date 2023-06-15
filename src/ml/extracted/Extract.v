@@ -27,7 +27,8 @@ From Vellvm Require
      Utils.ParserHelper
      QC.ShowAST
      QC.ReprAST
-     (* QC.GenAlive2 *).
+     QC.GenAlive2
+.
 
 Require ExtrOcamlBasic.
 Require ExtrOcamlString.
