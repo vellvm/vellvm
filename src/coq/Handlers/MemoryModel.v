@@ -2256,6 +2256,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
 
     (* TODO: should I move this? *)
     (* Assign fresh sids to ubytes while preserving entanglement *)
+    (* Could potentially turn this into map (+max_sid) *)
     Program Fixpoint re_sid_ubytes_helper {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M}
             (bytes : list (N * SByte)) (acc : NMap SByte) {measure (length bytes)} : M (NMap SByte)
       := match bytes with

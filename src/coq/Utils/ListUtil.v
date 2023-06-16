@@ -13,7 +13,8 @@ From Vellvm.Utils Require Import
   Tactics.
 
 From ExtLib Require Import
-  Structures.Monads.
+  Structures.Monads
+  Data.List.
 
 Import ListNotations.
 Import MonadNotation.
@@ -796,6 +797,26 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma double_list_ind :
+  forall {X Y}
+    (P: list X -> list Y -> Prop)
+    (NilNil : P nil nil)
+    (NilCons : forall y ys, P nil ys -> P nil (y :: ys))
+    (ConsNil : forall x xs, P xs nil -> P (x :: xs) nil)
+    (ConsCons : forall x xs y ys, P xs ys -> P (x :: xs) (y :: ys)),
+  forall xs ys, P xs ys.
+Proof.
+  intros X Y P NilNil NilCons ConsNil ConsCons xs.
+  induction xs; induction ys.
+  - apply NilNil.
+  - apply NilCons.
+    apply IHys.
+  - apply ConsNil.
+    apply IHxs.
+  - apply ConsCons.
+    apply IHxs.
+Qed.
+
 Definition repeatMN {A m} `{Monad m} (n : N) (ma : m A) : m (list A)
   := sequence (repeatN n ma).
 
@@ -1257,4 +1278,11 @@ Proof.
   erewrite H. erewrite IHl. reflexivity.
   intros.
   erewrite H. reflexivity.
+Qed.
+
+Lemma allb_forallb :
+  forall {A} (f : A -> bool) (xs : list A),
+    allb f xs = forallb f xs.
+Proof.
+  induction xs; auto.
 Qed.

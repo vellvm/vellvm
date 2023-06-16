@@ -125,8 +125,18 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma dtyp_eqb_eq :
+  forall t1 t2,
+    dtyp_eqb t1 t2 = true ->
+    t1 = t2.
+Proof.
+  intros t1 t2 TYPE.
+  unfold dtyp_eqb in TYPE.
+  destruct (dtyp_eq_dec t1 t2); auto; discriminate.
+Qed.
+
 Definition vector_dtyp dt :=
-  (exists n, dt = DTYPE_I n) \/ dt = DTYPE_Pointer \/ dt = DTYPE_Half \/ dt = DTYPE_Float \/
+  (exists n, dt = DTYPE_I n) \/ dt = DTYPE_IPTR \/ dt = DTYPE_Pointer \/ dt = DTYPE_Half \/ dt = DTYPE_Float \/
   dt = DTYPE_Double \/ dt = DTYPE_X86_fp80 \/ dt = DTYPE_Fp128 \/ dt = DTYPE_Ppc_fp128.
 
 Section DtypInd.
