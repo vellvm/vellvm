@@ -1,15 +1,12 @@
 From Vellvm Require Import
-  DList
   Utilities
   AstLib
-  Syntax
   Semantics.Memory.Sizeof
   LLVMEvents
   LLVMAst
   QC.Utils
-  QC.Generators.
-
-Require Import Integers.
+  QC.Generators
+  Handlers.
 
 From ExtLib.Structures Require Export
   Functor Applicative Monad Monoid.
@@ -25,19 +22,22 @@ Import MonadNotation.
 Import ApplicativeNotation.
 
 From Coq Require Import
-  ZArith Bool.Bool.
+  ZArith Bool.Bool String.
 
 
-From QuickChick Require Import QuickChick.
-Import QcDefaultNotation.
+Require Import QuickChick.GenLow.
+Require Import QuickChick.GenHigh.
+Import GenHigh.
+Import GenLow.
+(* Import QcDefaultNotation. *)
 Open Scope qc_scope.
 Open Scope Z_scope.
 Set Warnings "-extraction-opaque-accessed,-extraction".
-(* Definition nat_gen_example : G nat := *)
-(*   choose (0, 10)%nat. *)
+(* (* Definition nat_gen_example : G nat := *) *)
+(* (*   choose (0, 10)%nat. *) *)
 
 
-Module Type GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZEOF : Sizeof) (LLVMEvents:LLVM_INTERACTIONS(ADDR)(IP)(SIZEOF)).
+Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZEOF : Sizeof) (LLVMEvents:LLVM_INTERACTIONS(ADDR)(IP)(SIZEOF)).
   Import LLVMEvents.
   Import DV.
   
@@ -46,7 +46,7 @@ Module Type GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) 
     | TYPE_I i =>
         match i with
         | 1%N =>
-            returnGen UVALUE_I1 <*> (returnGen repr <*> (choose (0, 1)))            
+            returnGen UVALUE_I1 <*> (returnGen repr <*> (choose (0, 1)))
             (* x <- choose (0,1);; *)
             (* returnGen (UVALUE_I1 (repr x))  *)
         | 8%N =>
@@ -76,12 +76,14 @@ Module Type GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) 
     end.
   
 End GEN_ALIVE2.
- 
-(* Extract Inlined Constant fst => "fst". *)
-(* Extract Inlined Constant app => "append". *)
-(* Extract Inlined Constant rev => "rev". *)
-(* Extract Inlined Constant map => "map". *)
-(* Extract Inlined Constant combine => "combine". *)
-(* (* Extract Inlined Constant eqn => "( == )". *) *)
 
-(* Recursive Extraction nat_gen_example. *)
+Module G := GEN_ALIVE2 MemoryModelImplementation.FinAddr MemoryModelImplementation.IP64Bit MemoryModelImplementation.FinSizeof LLVMEvents64.
+ 
+(* (* Extract Inlined Constant fst => "fst". *) *)
+(* (* Extract Inlined Constant app => "append". *) *)
+(* (* Extract Inlined Constant rev => "rev". *) *)
+(* (* Extract Inlined Constant map => "map". *) *)
+(* (* Extract Inlined Constant combine => "combine". *) *)
+(* (* (* Extract Inlined Constant eqn => "( == )". *) *) *)
+
+(* (* Recursive Extraction nat_gen_example. *) *)

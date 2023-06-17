@@ -4,7 +4,10 @@ Require Import Basics RelationClasses.
 Require Import BinIntDef.
 Import ListNotations.
 
-From QuickChick Require Import QuickChick.
+(* From QuickChick Require Import QuickChick. *)
+From QuickChick Require Import GenLow GenHigh Show Sets.
+Import GenLow.
+Import GenHigh.
 Set Warnings "-extraction-opaque-accessed,-extraction".
 
 (** [subst_max] performs as many [subst] as possible, clearing all
@@ -37,16 +40,16 @@ Ltac tuple_inversion :=
   end.
 
 Open Scope string.
-
+(* Locate B754_zero. *)
 Instance show_binary : forall (prec emax : Z), Show (binary_float prec emax) := {
   show c := match c with
-              | B754_zero _ _ false => "+0"
-              | B754_zero _ _ true => "-0"
-              | B754_infinity _ _ false => "+inf"
-              | B754_infinity _ _ true => "-inf"
-              | B754_nan _ _ false _ _ => "+NaN"
-              | B754_nan _ _ true _ _ => "-NaN"
-              | B754_finite _ _ s m e _ => (if s then "" else "-")
+              | @B754_zero _ _ false => "+0"
+              | @B754_zero _ _ true => "-0"
+              | @B754_infinity _ _ false => "+inf"
+              | @B754_infinity _ _ true => "-inf"
+              | @B754_nan _ _ false _ _ => "+NaN"
+              | @B754_nan _ _ true _ _ => "-NaN"
+              | @B754_finite _ _ s m e _ => (if s then "" else "-")
                                         ++ (show_Z (Z.pos m * 2 ^ e))
             end
 }.
