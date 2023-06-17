@@ -27,8 +27,11 @@ From Vellvm Require
      Utils.ParserHelper
      QC.ShowAST
      QC.ReprAST
-     QC.GenAlive2
 .
+
+Set Extraction AccessOpaque.
+
+From Vellvm Require QC.GenAlive2.
 
 Require ExtrOcamlBasic.
 Require ExtrOcamlString.
@@ -37,6 +40,8 @@ Require ExtrOcamlIntConv.
 Extraction Language OCaml.
 Extraction Blacklist String List Char Core Z Format.
 
+Require Import mathcomp.ssreflect.ssreflect.
+From mathcomp Require Import ssreflect ssrnat ssrbool div eqtype.
 
 (* strings ------------------------------------------------------------------ *)
 (*
@@ -78,10 +83,13 @@ Extract Inlined Constant Reals.ClassicalDedekindReals.sig_forall_dec => "(fun _ 
 Extract Inlined Constant Reals.ClassicalDedekindReals.sig_not_dec => "false".
 
 Extract Inlined Constant Archi.ppc64 => "false".
+(* Extract Inlined Constant nat => "nat". *)
 Export TopLevelBigIntptr.
-Set Extraction AccessOpaque.
+
 (* NOTE: assumes that this file is compiled from /src *)
-Cd "ml/extracted".
+(* Cd "ml/extracted". *)
+
+
 
 
 Extraction Library ExtrOcamlIntConv.
@@ -89,5 +97,8 @@ Recursive Extraction Library TopLevel.
 Extraction Library Transform.
 Extraction Library ParserHelper.
 Recursive Extraction Library ShowAST.
-Recursive Extraction Library ReprAST. 
+Recursive Extraction Library ReprAST.
+
+Extraction "GenAlive2.ml" GenAlive2.G.
+(* Need a file to load this extraction *)
 
