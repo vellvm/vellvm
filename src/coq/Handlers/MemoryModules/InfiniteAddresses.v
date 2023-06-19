@@ -289,7 +289,7 @@ with Definition provenance_to_prov := fun (pr : Provenance) => Some [pr].
 End InfPROV.
 
 Module InfITOP : ITOP InfAddr InfPROV InfPTOI
-with Definition int_to_ptr := fun (i : Z) (pr : Prov) => ret (i, pr).
+with Definition int_to_ptr := fun (i : Z) (pr : Prov) => @ret OOM _ _ (i, pr).
 
   Import InfAddr.
   Import InfPROV.
