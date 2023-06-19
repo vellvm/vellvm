@@ -77,6 +77,7 @@ Module Type ByteModule(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_I
          match sbyte_to_extractbyte sbyte with
          | UVALUE_ExtractByte uv dt idx sid =>
            guard_opt (dtyp_eqb t dt);;
+           guard_opt (Coqlib.proj_sumbool (@uvalue_has_dtyp_dec uv dt));;
            all_bytes_from_uvalue_helper 0 sid uv bytes
          | _ => None
          end
