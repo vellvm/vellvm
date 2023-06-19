@@ -2988,268 +2988,268 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Definition dtyp_non_void_eqb (t dt : dtyp) :=
     Coqlib.proj_sumbool (NO_VOID_dec t) && dtyp_eqb t dt.
 
-  Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia | solve_dvalue_measure | solve_uvalue_measure | repeat split; intros *; discriminate ].
-  Program Fixpoint dvalue_has_dtyp_bool (dv : dvalue) (dt : dtyp) {measure (dvalue_measure dv)} : bool :=
-    match dt with
-    | DTYPE_I sz =>
-        match dv with
-        | DVALUE_I1 _ => N.eqb sz 1
-        | DVALUE_I8 _ => N.eqb sz 8
-        | DVALUE_I32 _ => N.eqb sz 32
-        | DVALUE_I64 _ => N.eqb sz 64
-        | DVALUE_Poison t => dtyp_non_void_eqb t dt
-        | DVALUE_Oom t => dtyp_non_void_eqb t dt
-        | _ => false
-        end
-    | DTYPE_IPTR =>
-        match dv with
-        | DVALUE_IPTR _ => true
-        | DVALUE_Poison t => dtyp_non_void_eqb t dt
-        | DVALUE_Oom t => dtyp_non_void_eqb t dt
-        | _ => false
-        end
-    | DTYPE_Pointer =>
-        match dv with
-        | DVALUE_Addr _ => true
-        | DVALUE_Poison t => dtyp_non_void_eqb t dt
-        | DVALUE_Oom t => dtyp_non_void_eqb t dt
-        | _ => false
-        end
-    | DTYPE_Void =>
-        match dv with
-        | DVALUE_None => true
-        | _ => false
-        end
-    | DTYPE_Half =>
-        match dv with
-        | DVALUE_Poison t => dtyp_non_void_eqb t dt
-        | DVALUE_Oom t => dtyp_non_void_eqb t dt
-        | _ => false
-        end
-    | DTYPE_Float =>
-        match dv with
-        | DVALUE_Float _ => true
-        | DVALUE_Poison t => dtyp_non_void_eqb t dt
-        | DVALUE_Oom t => dtyp_non_void_eqb t dt
-        | _ => false
-        end
-    | DTYPE_Double =>
-        match dv with
-        | DVALUE_Double _ => true
-        | DVALUE_Poison t => dtyp_non_void_eqb t dt
-        | DVALUE_Oom t => dtyp_non_void_eqb t dt
-        | _ => false
-        end
-    | DTYPE_X86_fp80 =>
-        match dv with
-        | DVALUE_Poison t => dtyp_non_void_eqb t dt
-        | DVALUE_Oom t => dtyp_non_void_eqb t dt
-        | _ => false
-        end
-    | DTYPE_Fp128 =>
-        match dv with
-        | DVALUE_Poison t => dtyp_non_void_eqb t dt
-        | DVALUE_Oom t => dtyp_non_void_eqb t dt
-        | _ => false
-        end
-    | DTYPE_Ppc_fp128 =>
-        match dv with
-        | DVALUE_Poison t => dtyp_non_void_eqb t dt
-        | DVALUE_Oom t => dtyp_non_void_eqb t dt
-        | _ => false
-        end
-    | DTYPE_Metadata =>
-        match dv with
-        | DVALUE_Poison t => dtyp_non_void_eqb t dt
-        | DVALUE_Oom t => dtyp_non_void_eqb t dt
-        | _ => false
-        end
-    | DTYPE_X86_mmx =>
-        match dv with
-        | DVALUE_Poison t => dtyp_non_void_eqb t dt
-        | DVALUE_Oom t => dtyp_non_void_eqb t dt
-        | _ => false
-        end
-    | DTYPE_Array sz t =>
-        match dv with
-        | DVALUE_Array elts =>
-            (length elts =? N.to_nat sz)%nat && allb id (map_In elts (fun e HIn => dvalue_has_dtyp_bool e t))
-        | DVALUE_Poison t => dtyp_non_void_eqb t dt
-        | DVALUE_Oom t => dtyp_non_void_eqb t dt
-        | _ => false
-        end
-    | DTYPE_Struct dts =>
-        match dv with
-        | DVALUE_Struct fields =>
-            zipWith_In'
-              fields dts true
-              (fun f dt HIn_fields HIn_dts acc' =>
-                 acc' && dvalue_has_dtyp_bool f dt)
-              (fun _ HIn_left _ => false) (fun _ HIn_right _ => false)
-        | DVALUE_Poison t => dtyp_non_void_eqb t dt
-        | DVALUE_Oom t => dtyp_non_void_eqb t dt
-        | _ => false
-        end
-    | DTYPE_Packed_struct dts =>
-        match dv with
-        | DVALUE_Packed_struct fields =>
-            zipWith_In'
-              fields dts true
-              (fun f dt HIn_fields HIn_dts acc' =>
-                 acc' && dvalue_has_dtyp_bool f dt)
-              (fun _ HIn_left _ => false) (fun _ HIn_right _ => false)
-        | DVALUE_Poison t => dtyp_non_void_eqb t dt
-        | DVALUE_Oom t => dtyp_non_void_eqb t dt
-        | _ => false
-        end
-    | DTYPE_Opaque =>
-        match dv with
-        | DVALUE_Poison t => dtyp_non_void_eqb t dt
-        | DVALUE_Oom t => dtyp_non_void_eqb t dt
-        | _ => false
-        end
-    | DTYPE_Vector sz t =>
-        match dv with
-        | DVALUE_Vector elts =>
-            (length elts =? N.to_nat sz)%nat && allb id (map_In elts (fun e HIn => dvalue_has_dtyp_bool e t))
-        | DVALUE_Poison t => dtyp_non_void_eqb t dt
-        | DVALUE_Oom t => dtyp_non_void_eqb t dt
-        | _ => false
-        end
-    end.
+  (* Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia | solve_dvalue_measure | solve_uvalue_measure | repeat split; intros *; discriminate ]. *)
+  (* Program Fixpoint dvalue_has_dtyp_bool (dv : dvalue) (dt : dtyp) {measure (dvalue_measure dv)} : bool := *)
+  (*   match dt with *)
+  (*   | DTYPE_I sz => *)
+  (*       match dv with *)
+  (*       | DVALUE_I1 _ => N.eqb sz 1 *)
+  (*       | DVALUE_I8 _ => N.eqb sz 8 *)
+  (*       | DVALUE_I32 _ => N.eqb sz 32 *)
+  (*       | DVALUE_I64 _ => N.eqb sz 64 *)
+  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*       | _ => false *)
+  (*       end *)
+  (*   | DTYPE_IPTR => *)
+  (*       match dv with *)
+  (*       | DVALUE_IPTR _ => true *)
+  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*       | _ => false *)
+  (*       end *)
+  (*   | DTYPE_Pointer => *)
+  (*       match dv with *)
+  (*       | DVALUE_Addr _ => true *)
+  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*       | _ => false *)
+  (*       end *)
+  (*   | DTYPE_Void => *)
+  (*       match dv with *)
+  (*       | DVALUE_None => true *)
+  (*       | _ => false *)
+  (*       end *)
+  (*   | DTYPE_Half => *)
+  (*       match dv with *)
+  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*       | _ => false *)
+  (*       end *)
+  (*   | DTYPE_Float => *)
+  (*       match dv with *)
+  (*       | DVALUE_Float _ => true *)
+  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*       | _ => false *)
+  (*       end *)
+  (*   | DTYPE_Double => *)
+  (*       match dv with *)
+  (*       | DVALUE_Double _ => true *)
+  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*       | _ => false *)
+  (*       end *)
+  (*   | DTYPE_X86_fp80 => *)
+  (*       match dv with *)
+  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*       | _ => false *)
+  (*       end *)
+  (*   | DTYPE_Fp128 => *)
+  (*       match dv with *)
+  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*       | _ => false *)
+  (*       end *)
+  (*   | DTYPE_Ppc_fp128 => *)
+  (*       match dv with *)
+  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*       | _ => false *)
+  (*       end *)
+  (*   | DTYPE_Metadata => *)
+  (*       match dv with *)
+  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*       | _ => false *)
+  (*       end *)
+  (*   | DTYPE_X86_mmx => *)
+  (*       match dv with *)
+  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*       | _ => false *)
+  (*       end *)
+  (*   | DTYPE_Array sz t => *)
+  (*       match dv with *)
+  (*       | DVALUE_Array elts => *)
+  (*           (length elts =? N.to_nat sz)%nat && allb id (map_In elts (fun e HIn => dvalue_has_dtyp_bool e t)) *)
+  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*       | _ => false *)
+  (*       end *)
+  (*   | DTYPE_Struct dts => *)
+  (*       match dv with *)
+  (*       | DVALUE_Struct fields => *)
+  (*           zipWith_In' *)
+  (*             fields dts true *)
+  (*             (fun f dt HIn_fields HIn_dts acc' => *)
+  (*                acc' && dvalue_has_dtyp_bool f dt) *)
+  (*             (fun _ HIn_left _ => false) (fun _ HIn_right _ => false) *)
+  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*       | _ => false *)
+  (*       end *)
+  (*   | DTYPE_Packed_struct dts => *)
+  (*       match dv with *)
+  (*       | DVALUE_Packed_struct fields => *)
+  (*           zipWith_In' *)
+  (*             fields dts true *)
+  (*             (fun f dt HIn_fields HIn_dts acc' => *)
+  (*                acc' && dvalue_has_dtyp_bool f dt) *)
+  (*             (fun _ HIn_left _ => false) (fun _ HIn_right _ => false) *)
+  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*       | _ => false *)
+  (*       end *)
+  (*   | DTYPE_Opaque => *)
+  (*       match dv with *)
+  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*       | _ => false *)
+  (*       end *)
+  (*   | DTYPE_Vector sz t => *)
+  (*       match dv with *)
+  (*       | DVALUE_Vector elts => *)
+  (*           (length elts =? N.to_nat sz)%nat && allb id (map_In elts (fun e HIn => dvalue_has_dtyp_bool e t)) *)
+  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*       | _ => false *)
+  (*       end *)
+  (*   end. *)
 
-  Lemma dvalue_has_dtyp_bool_equation :
-    forall {dv dt},
-      dvalue_has_dtyp_bool dv dt =
-        match dt with
-        | DTYPE_I sz =>
-            match dv with
-            | DVALUE_I1 _ => N.eqb sz 1
-            | DVALUE_I8 _ => N.eqb sz 8
-            | DVALUE_I32 _ => N.eqb sz 32
-            | DVALUE_I64 _ => N.eqb sz 64
-            | DVALUE_Poison t => dtyp_non_void_eqb t dt
-            | DVALUE_Oom t => dtyp_non_void_eqb t dt
-            | _ => false
-            end
-        | DTYPE_IPTR =>
-            match dv with
-            | DVALUE_IPTR _ => true
-            | DVALUE_Poison t => dtyp_non_void_eqb t dt
-            | DVALUE_Oom t => dtyp_non_void_eqb t dt
-            | _ => false
-            end
-        | DTYPE_Pointer =>
-            match dv with
-            | DVALUE_Addr _ => true
-            | DVALUE_Poison t => dtyp_non_void_eqb t dt
-            | DVALUE_Oom t => dtyp_non_void_eqb t dt
-            | _ => false
-            end
-        | DTYPE_Void =>
-            match dv with
-            | DVALUE_None => true
-            | _ => false
-            end
-        | DTYPE_Half =>
-            match dv with
-            | DVALUE_Poison t => dtyp_non_void_eqb t dt
-            | DVALUE_Oom t => dtyp_non_void_eqb t dt
-            | _ => false
-            end
-        | DTYPE_Float =>
-            match dv with
-            | DVALUE_Float _ => true
-            | DVALUE_Poison t => dtyp_non_void_eqb t dt
-            | DVALUE_Oom t => dtyp_non_void_eqb t dt
-            | _ => false
-            end
-        | DTYPE_Double =>
-            match dv with
-            | DVALUE_Double _ => true
-            | DVALUE_Poison t => dtyp_non_void_eqb t dt
-            | DVALUE_Oom t => dtyp_non_void_eqb t dt
-            | _ => false
-            end
-        | DTYPE_X86_fp80 =>
-            match dv with
-            | DVALUE_Poison t => dtyp_non_void_eqb t dt
-            | DVALUE_Oom t => dtyp_non_void_eqb t dt
-            | _ => false
-            end
-        | DTYPE_Fp128 =>
-            match dv with
-            | DVALUE_Poison t => dtyp_non_void_eqb t dt
-            | DVALUE_Oom t => dtyp_non_void_eqb t dt
-            | _ => false
-            end
-        | DTYPE_Ppc_fp128 =>
-            match dv with
-            | DVALUE_Poison t => dtyp_non_void_eqb t dt
-            | DVALUE_Oom t => dtyp_non_void_eqb t dt
-            | _ => false
-            end
-        | DTYPE_Metadata =>
-            match dv with
-            | DVALUE_Poison t => dtyp_non_void_eqb t dt
-            | DVALUE_Oom t => dtyp_non_void_eqb t dt
-            | _ => false
-            end
-        | DTYPE_X86_mmx =>
-            match dv with
-            | DVALUE_Poison t => dtyp_non_void_eqb t dt
-            | DVALUE_Oom t => dtyp_non_void_eqb t dt
-            | _ => false
-            end
-        | DTYPE_Array sz t =>
-            match dv with
-            | DVALUE_Array elts =>
-                (length elts =? N.to_nat sz)%nat && allb id (map_In elts (fun e HIn => dvalue_has_dtyp_bool e t))
-            | DVALUE_Poison t => dtyp_non_void_eqb t dt
-            | DVALUE_Oom t => dtyp_non_void_eqb t dt
-            | _ => false
-            end
-        | DTYPE_Struct dts =>
-            match dv with
-            | DVALUE_Struct fields =>
-                zipWith_In'
-                  fields dts true
-                  (fun f dt HIn_fields HIn_dts acc' =>
-                     acc' && dvalue_has_dtyp_bool f dt)
-                  (fun _ HIn_left _ => false) (fun _ HIn_right _ => false)
-            | DVALUE_Poison t => dtyp_non_void_eqb t dt
-            | DVALUE_Oom t => dtyp_non_void_eqb t dt
-            | _ => false
-            end
-        | DTYPE_Packed_struct dts =>
-            match dv with
-            | DVALUE_Packed_struct fields =>
-                zipWith_In'
-                  fields dts true
-                  (fun f dt HIn_fields HIn_dts acc' =>
-                     acc' && dvalue_has_dtyp_bool f dt)
-                  (fun _ HIn_left _ => false) (fun _ HIn_right _ => false)
-            | DVALUE_Poison t => dtyp_non_void_eqb t dt
-            | DVALUE_Oom t => dtyp_non_void_eqb t dt
-            | _ => false
-            end
-        | DTYPE_Opaque =>
-            match dv with
-            | DVALUE_Poison t => dtyp_non_void_eqb t dt
-            | DVALUE_Oom t => dtyp_non_void_eqb t dt
-            | _ => false
-            end
-        | DTYPE_Vector sz t =>
-            match dv with
-            | DVALUE_Vector elts =>
-                (length elts =? N.to_nat sz)%nat && allb id (map_In elts (fun e HIn => dvalue_has_dtyp_bool e t))
-            | DVALUE_Poison t => dtyp_non_void_eqb t dt
-            | DVALUE_Oom t => dtyp_non_void_eqb t dt
-            | _ => false
-            end
-        end.
-  Proof.
-  Admitted.
+  (* Lemma dvalue_has_dtyp_bool_equation : *)
+  (*   forall {dv dt}, *)
+  (*     dvalue_has_dtyp_bool dv dt = *)
+  (*       match dt with *)
+  (*       | DTYPE_I sz => *)
+  (*           match dv with *)
+  (*           | DVALUE_I1 _ => N.eqb sz 1 *)
+  (*           | DVALUE_I8 _ => N.eqb sz 8 *)
+  (*           | DVALUE_I32 _ => N.eqb sz 32 *)
+  (*           | DVALUE_I64 _ => N.eqb sz 64 *)
+  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*           | _ => false *)
+  (*           end *)
+  (*       | DTYPE_IPTR => *)
+  (*           match dv with *)
+  (*           | DVALUE_IPTR _ => true *)
+  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*           | _ => false *)
+  (*           end *)
+  (*       | DTYPE_Pointer => *)
+  (*           match dv with *)
+  (*           | DVALUE_Addr _ => true *)
+  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*           | _ => false *)
+  (*           end *)
+  (*       | DTYPE_Void => *)
+  (*           match dv with *)
+  (*           | DVALUE_None => true *)
+  (*           | _ => false *)
+  (*           end *)
+  (*       | DTYPE_Half => *)
+  (*           match dv with *)
+  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*           | _ => false *)
+  (*           end *)
+  (*       | DTYPE_Float => *)
+  (*           match dv with *)
+  (*           | DVALUE_Float _ => true *)
+  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*           | _ => false *)
+  (*           end *)
+  (*       | DTYPE_Double => *)
+  (*           match dv with *)
+  (*           | DVALUE_Double _ => true *)
+  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*           | _ => false *)
+  (*           end *)
+  (*       | DTYPE_X86_fp80 => *)
+  (*           match dv with *)
+  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*           | _ => false *)
+  (*           end *)
+  (*       | DTYPE_Fp128 => *)
+  (*           match dv with *)
+  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*           | _ => false *)
+  (*           end *)
+  (*       | DTYPE_Ppc_fp128 => *)
+  (*           match dv with *)
+  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*           | _ => false *)
+  (*           end *)
+  (*       | DTYPE_Metadata => *)
+  (*           match dv with *)
+  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*           | _ => false *)
+  (*           end *)
+  (*       | DTYPE_X86_mmx => *)
+  (*           match dv with *)
+  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*           | _ => false *)
+  (*           end *)
+  (*       | DTYPE_Array sz t => *)
+  (*           match dv with *)
+  (*           | DVALUE_Array elts => *)
+  (*               (length elts =? N.to_nat sz)%nat && allb id (map_In elts (fun e HIn => dvalue_has_dtyp_bool e t)) *)
+  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*           | _ => false *)
+  (*           end *)
+  (*       | DTYPE_Struct dts => *)
+  (*           match dv with *)
+  (*           | DVALUE_Struct fields => *)
+  (*               zipWith_In' *)
+  (*                 fields dts true *)
+  (*                 (fun f dt HIn_fields HIn_dts acc' => *)
+  (*                    acc' && dvalue_has_dtyp_bool f dt) *)
+  (*                 (fun _ HIn_left _ => false) (fun _ HIn_right _ => false) *)
+  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*           | _ => false *)
+  (*           end *)
+  (*       | DTYPE_Packed_struct dts => *)
+  (*           match dv with *)
+  (*           | DVALUE_Packed_struct fields => *)
+  (*               zipWith_In' *)
+  (*                 fields dts true *)
+  (*                 (fun f dt HIn_fields HIn_dts acc' => *)
+  (*                    acc' && dvalue_has_dtyp_bool f dt) *)
+  (*                 (fun _ HIn_left _ => false) (fun _ HIn_right _ => false) *)
+  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*           | _ => false *)
+  (*           end *)
+  (*       | DTYPE_Opaque => *)
+  (*           match dv with *)
+  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*           | _ => false *)
+  (*           end *)
+  (*       | DTYPE_Vector sz t => *)
+  (*           match dv with *)
+  (*           | DVALUE_Vector elts => *)
+  (*               (length elts =? N.to_nat sz)%nat && allb id (map_In elts (fun e HIn => dvalue_has_dtyp_bool e t)) *)
+  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
+  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
+  (*           | _ => false *)
+  (*           end *)
+  (*       end. *)
+  (* Proof. *)
+  (* Admitted. *)
 
   Unset Elimination Schemes.
   Inductive uvalue_has_dtyp : uvalue -> dtyp -> Prop :=
@@ -4361,73 +4361,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Qed.
   End uvalue_has_dtyp_ind.
 
-  (* TODO: Move this *)
-  Lemma zipWith_In'_equation
-    {A B ACC : Type}
-    (xs : list A) (ys : list B) (acc : ACC)
-    (f : forall x y, In x xs -> In y ys -> ACC -> ACC)
-    (f_left : forall x, In x xs -> ACC -> ACC)
-    (f_right : forall y, In y ys -> ACC -> ACC) :
-    @zipWith_In' A B ACC xs ys acc f f_left f_right =
-      match xs as xs' return (xs = xs' -> ACC) with
-      | [] =>
-          fun Heq_xs =>
-            (match ys as ys' return (ys = ys' -> ACC) with
-             | [] =>
-                 fun Heq_ys =>
-                   acc
-             | (y::ys') =>
-                 fun Heq_ys =>
-                   let acc' := f_right y (@eq_ind (list B) (y :: ys') (fun l => In y l) (or_introl eq_refl) ys (eq_sym Heq_ys)) acc in
-                   let f' : forall (x : A) y', In x [] -> In y' ys' -> ACC -> ACC  :=
-                     fun x y INx INy acc' =>
-                       match INx with
-                       end in
-                   let f_left' : forall x, In x [] -> ACC -> ACC :=
-                     fun x INx acc' =>
-                       match INx with
-                       end in
-                   let f_right' : forall y', In y' ys' -> ACC -> ACC :=
-                     fun y' INy acc' =>
-                       f_right y' (@eq_ind (list B) (y :: ys') (fun l => In y' l) (or_intror INy) ys (eq_sym Heq_ys)) acc' in
-                   zipWith_In' [] ys' acc' f' f_left' f_right'
-             end eq_refl)
-      | (x::xs') =>
-          fun Heq_xs =>
-            (match ys as ys' return (ys = ys' -> ACC) with
-             | [] =>
-                 fun Heq_ys =>
-                   let acc' := f_left x (@eq_ind (list A) (x :: xs') (fun l => In x l) (or_introl eq_refl) xs (eq_sym Heq_xs)) acc in
-                   let f' : forall x (y : B), In x xs' -> In y [] -> ACC -> ACC  :=
-                     fun x y INx INy acc' =>
-                       match INy with
-                       end in
-                   let f_left' : forall x', In x' xs' -> ACC -> ACC :=
-                     fun x' INx acc' =>
-                       f_left x' (@eq_ind (list A) (x :: xs') (fun l => In x' l) (or_intror INx) xs (eq_sym Heq_xs)) acc' in
-                   let f_right' : forall y, In y [] -> ACC -> ACC :=
-                     fun y INy acc' =>
-                       match INy with
-                       end in
-                   zipWith_In' xs' [] acc' f' f_left' f_right'
-             | (y::ys') =>
-                 fun Heq_ys =>
-                   let acc' := f x y (@eq_ind (list A) (x :: xs') (fun l => In x l) (or_introl eq_refl) xs (eq_sym Heq_xs)) (@eq_ind (list B) (y :: ys') (fun l => In y l) (or_introl eq_refl) ys (eq_sym Heq_ys)) acc in
-                   let f' : forall x (y : B), In x xs' -> In y ys' -> ACC -> ACC  :=
-                     fun x' y' INx INy acc' =>
-                       f x' y' (@eq_ind (list A) (x :: xs') (fun l => In x' l) (or_intror INx) xs (eq_sym Heq_xs)) (@eq_ind (list B) (y :: ys') (fun l => In y' l) (or_intror INy) ys (eq_sym Heq_ys)) acc' in
-                   let f_left' : forall x', In x' xs' -> ACC -> ACC :=
-                     fun x' INx acc' =>
-                       f_left x' (@eq_ind (list A) (x :: xs') (fun l => In x' l) (or_intror INx) xs (eq_sym Heq_xs)) acc' in
-                   let f_right' : forall y', In y' ys' -> ACC -> ACC :=
-                     fun y' INy acc' =>
-                       f_right y' (@eq_ind (list B) (y :: ys') (fun l => In y' l) (or_intror INy) ys (eq_sym Heq_ys)) acc' in
-                   zipWith_In' xs' ys' acc' f' f_left' f_right'
-             end eq_refl)
-      end eq_refl.
-  Proof.
-  Admitted.
-
   Ltac solve_dvalue_has_dtyp_dec_int_helper' :=
     match goal with
     | p: positive |- _ =>
@@ -4782,274 +4715,458 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     - inv H.
   Qed.
 
+  Definition conflatible (dt1 dt2 : dtyp) : Prop :=
+    dt1 = dt2 \/
+      exists dt1' dt2',
+        dt1 = DTYPE_Array 0 dt1' /\ dt2 = DTYPE_Array 0 dt2' \/
+          dt1 = DTYPE_Vector 0 dt1' /\ dt2 = DTYPE_Vector 0 dt2'.
+
+  Lemma conflatible_dec :
+    forall dt1 dt2,
+      {conflatible dt1 dt2} + {~ conflatible dt1 dt2}.
+  Proof.
+  Admitted.                 
+
+  Lemma uvalue_has_dtyp_exists :
+    forall uv,
+      ({dt | uvalue_has_dtyp uv dt /\ forall dt', conflatible dt dt' <-> uvalue_has_dtyp uv dt'}) + (forall dt, ~ uvalue_has_dtyp uv dt).
+  Proof.
+    intros uv.
+    induction uv;
+      try solve
+        [ left;
+          eexists;
+            split; [constructor; auto | ];
+            intros dt';
+            split;
+            [ intros CONF;
+              inv CONF;
+              [ constructor; auto
+              | destruct H as (dt1'&dt2'&CONTRA);
+                destruct CONTRA;
+                destruct H; inv H
+              ]
+            | intros H;
+              inv H;
+              constructor; auto
+            ]
+        ].
+
+    { - pose proof (@ALL_IX_SUPPORTED_dec t) as [IX_SUP | NIX_SUP].
+      + pose proof (@NO_VOID_dec t) as [NVOID | VOID].
+        * left.
+          exists t.
+          split.
+          constructor; auto.
+          intros dt'.
+          split.
+          -- intros CONF.
+             inv CONF.
+             constructor; auto.
+             admit.
+          -- admit.
+        * admit.
+      + admit.
+    }
+
+   (** This is from the old proof attempt for uvalue_has_dtyp_dec, it may be useful. *)
+ 
+  (*   induction uv; intros dt_orig; *)
+  (*     try solve *)
+  (*       [ destruct dt_orig; *)
+  (*         try *)
+  (*           solve *)
+  (*           [ right; intros CONTRA; inv CONTRA *)
+  (*           | left; constructor *)
+  (*           ] *)
+  (*       ]. *)
+
+  (*   1-4: solve_dvalue_has_dtyp_dec_int_helper. *)
+
+  (*   { (* Undef *) *)
+  (*     pose proof (dtyp_eq_dec t dt_orig) as [EQ | NEQ]; subst. *)
+  (*     + pose proof (NO_VOID_dec dt_orig) as [NVOID | VOID]; *)
+  (*         pose proof (ALL_IX_SUPPORTED_dec dt_orig) as [IX | NIX]. *)
+  (*       left; constructor; auto. *)
+  (*       all: right; intros CONTRA; inv CONTRA; contradiction. *)
+  (*     + right; intros CONTRA; inv CONTRA; contradiction. *)
+  (*   } *)
+
+  (*   { (* Poison *) *)
+  (*     pose proof (dtyp_eq_dec t dt_orig) as [EQ | NEQ]; subst. *)
+  (*     + pose proof (NO_VOID_dec dt_orig) as [NVOID | VOID]; *)
+  (*         pose proof (ALL_IX_SUPPORTED_dec dt_orig) as [IX | NIX]. *)
+  (*       left; constructor; auto. *)
+  (*       all: right; intros CONTRA; inv CONTRA; contradiction. *)
+  (*     + right; intros CONTRA; inv CONTRA; contradiction. *)
+  (*   } *)
+
+  (*   { (* Oom *) *)
+  (*     pose proof (dtyp_eq_dec t dt_orig) as [EQ | NEQ]; subst. *)
+  (*     + pose proof (NO_VOID_dec dt_orig) as [NVOID | VOID]; *)
+  (*         pose proof (ALL_IX_SUPPORTED_dec dt_orig) as [IX | NIX]. *)
+  (*       left; constructor; auto. *)
+  (*       all: right; intros CONTRA; inv CONTRA; contradiction. *)
+  (*     + right; intros CONTRA; inv CONTRA; contradiction. *)
+  (*   } *)
+
+  (*   { (* Structs *) *)
+  (*     - destruct dt_orig; *)
+  (*         try *)
+  (*           solve *)
+  (*           [ right; intros CONTRA; inv CONTRA *)
+  (*           | left; constructor *)
+  (*           ]. *)
+
+  (*       remember (fields, fields0) as FIELDS. *)
+  (*       replace fields with (fst FIELDS) in * by (subst; auto). *)
+  (*       replace fields0 with (snd FIELDS) in * by (inv HeqFIELDS; cbn; auto). *)
+  (*       clear fields fields0 HeqFIELDS. *)
+  (*       induction FIELDS using double_list_rect. *)
+  (*       + left; constructor. *)
+  (*       + right; intros CONTRA; inv CONTRA. *)
+  (*       + right; intros CONTRA; inv CONTRA. *)
+  (*       + forward IHFIELDS. *)
+  (*         { intros u X0 dt. *)
+  (*           apply X. *)
+  (*           right; auto. *)
+  (*         } *)
+  (*         cbn in IHFIELDS. *)
+  (*         specialize (X x (inl eq_refl) y). *)
+  (*         cbn. *)
+  (*         destruct X. *)
+  (*         * destruct IHFIELDS. *)
+  (*           -- left; constructor; auto. *)
+  (*           -- right. *)
+  (*              intros CONTRA. *)
+  (*              inv CONTRA. *)
+  (*              contradiction. *)
+  (*         * right. *)
+  (*           intros CONTRA. *)
+  (*           inv CONTRA. *)
+  (*           contradiction. *)
+  (*   } *)
+
+  (*   { (* Packed structs *) *)
+  (*     - destruct dt_orig; *)
+  (*         try *)
+  (*           solve *)
+  (*           [ right; intros CONTRA; inv CONTRA *)
+  (*           | left; constructor *)
+  (*           ]. *)
+
+  (*       remember (fields, fields0) as FIELDS. *)
+  (*       replace fields with (fst FIELDS) in * by (subst; auto). *)
+  (*       replace fields0 with (snd FIELDS) in * by (inv HeqFIELDS; cbn; auto). *)
+  (*       clear fields fields0 HeqFIELDS. *)
+  (*       induction FIELDS using double_list_rect. *)
+  (*       + left; constructor. *)
+  (*       + right; intros CONTRA; inv CONTRA. *)
+  (*       + right; intros CONTRA; inv CONTRA. *)
+  (*       + forward IHFIELDS. *)
+  (*         { intros u X0 dt. *)
+  (*           apply X. *)
+  (*           right; auto. *)
+  (*         } *)
+  (*         cbn in IHFIELDS. *)
+  (*         specialize (X x (inl eq_refl) y). *)
+  (*         cbn. *)
+  (*         destruct X. *)
+  (*         * destruct IHFIELDS. *)
+  (*           -- left; constructor; auto. *)
+  (*           -- right. *)
+  (*              intros CONTRA. *)
+  (*              inv CONTRA. *)
+  (*              contradiction. *)
+  (*         * right. *)
+  (*           intros CONTRA. *)
+  (*           inv CONTRA. *)
+  (*           contradiction. *)
+  (*   } *)
+
+  (*   { (* Arrays *) *)
+  (*     - destruct dt_orig; *)
+  (*         try *)
+  (*           solve *)
+  (*           [ right; intros CONTRA; inv CONTRA *)
+  (*           | left; constructor *)
+  (*           ]. *)
+
+  (*       cbn. *)
+  (*       assert ({N.to_nat sz = length elts} + {N.to_nat sz <> length elts}) as [SZ | SZ] by apply Nat.eq_dec. *)
+  (*       + generalize dependent sz. *)
+  (*         induction elts; intros sz SZ. *)
+  (*         * cbn in *. *)
+  (*           assert (sz = 0) by lia; subst. *)
+  (*           left. *)
+  (*           replace 0 with (N.of_nat 0%nat) by lia. *)
+  (*           constructor; auto. *)
+  (*         * cbn in SZ. *)
+
+  (*           forward IHelts. *)
+  (*           intros e X0 dt0. *)
+  (*           apply X; right; eauto. *)
+
+  (*           destruct sz; [lia|]. *)
+  (*           rewrite <- N.succ_pos_pred in SZ. *)
+
+  (*           specialize (IHelts (Pos.pred_N p)). *)
+  (*           forward IHelts. *)
+  (*           lia. *)
+
+  (*           specialize (X a (inl eq_refl) dt_orig). *)
+  (*           destruct X. *)
+  (*           -- destruct IHelts. *)
+  (*              ++ left. *)
+  (*                 inv u0. *)
+  (*                 rewrite <- positive_nat_N. *)
+  (*                 constructor; auto. *)
+  (*                 cbn; lia. *)
+  (*              ++ right. *)
+  (*                 intros CONTRA. *)
+  (*                 inv CONTRA. *)
+  (*                 apply n. *)
+  (*                 setoid_rewrite <- Nnat.N2Nat.id. *)
+  (*                 constructor. *)
+  (*                 eapply Forall_inv_tail; eauto. *)
+  (*                 lia. *)
+  (*           -- right. *)
+  (*              intros CONTRA. *)
+  (*              inv CONTRA. *)
+  (*              apply Forall_cons_iff in H2. *)
+  (*              destruct H2. *)
+  (*              contradiction. *)
+  (*       + right. *)
+  (*         intros CONTRA. *)
+  (*         inv CONTRA. *)
+  (*         lia. *)
+  (*   } *)
+
+  (*   { (* Vectors *) *)
+  (*     - destruct dt_orig; *)
+  (*         try *)
+  (*           solve *)
+  (*           [ right; intros CONTRA; inv CONTRA *)
+  (*           | left; constructor *)
+  (*           ]. *)
+
+  (*       destruct (@vector_dtyp_dec dt_orig) as [VEC | NVEC]. *)
+  (*       2: { *)
+  (*         right. *)
+  (*         intros CONTRA. *)
+  (*         inv CONTRA. *)
+  (*         contradiction. *)
+  (*       } *)
+
+  (*       cbn. *)
+  (*       assert ({N.to_nat sz = length elts} + {N.to_nat sz <> length elts}) as [SZ | SZ] by apply Nat.eq_dec. *)
+  (*       + generalize dependent sz. *)
+  (*         induction elts; intros sz SZ. *)
+  (*         * cbn in *. *)
+  (*           assert (sz = 0) by lia; subst. *)
+  (*           left. *)
+  (*           replace 0 with (N.of_nat 0%nat) by lia. *)
+  (*           constructor; auto. *)
+  (*         * cbn in SZ. *)
+
+  (*           forward IHelts. *)
+  (*           intros e X0 dt0. *)
+  (*           apply X; right; eauto. *)
+
+  (*           destruct sz; [lia|]. *)
+  (*           rewrite <- N.succ_pos_pred in SZ. *)
+
+  (*           specialize (IHelts (Pos.pred_N p)). *)
+  (*           forward IHelts. *)
+  (*           lia. *)
+
+  (*           specialize (X a (inl eq_refl) dt_orig). *)
+  (*           destruct X. *)
+  (*           -- destruct IHelts. *)
+  (*              ++ left. *)
+  (*                 inv u0. *)
+  (*                 rewrite <- positive_nat_N. *)
+  (*                 constructor; auto. *)
+  (*                 cbn; lia. *)
+  (*              ++ right. *)
+  (*                 intros CONTRA. *)
+  (*                 inv CONTRA. *)
+  (*                 apply n. *)
+  (*                 setoid_rewrite <- Nnat.N2Nat.id. *)
+  (*                 constructor. *)
+  (*                 eapply Forall_inv_tail; eauto. *)
+  (*                 lia. *)
+  (*                 auto. *)
+  (*           -- right. *)
+  (*              intros CONTRA. *)
+  (*              inv CONTRA. *)
+  (*              apply Forall_cons_iff in H2. *)
+  (*              destruct H2. *)
+  (*              contradiction. *)
+  (*       + right. *)
+  (*         intros CONTRA. *)
+  (*         inv CONTRA. *)
+  (*         lia. *)
+  (*   } *)
+
+  (*   { (* Binops *) *)
+  (*     specialize (IHuv1 dt_orig). *)
+  (*     specialize (IHuv2 dt_orig). *)
+
+  (*     destruct dt_orig; *)
+  (*       try *)
+  (*         solve *)
+  (*         [ right; intros CONTRA; inv CONTRA *)
+  (*         | left; constructor *)
+  (*         ]; *)
+  (*       destruct IHuv1, IHuv2; *)
+  (*       try solve *)
+  (*         [ right; intros CONTRA; inv CONTRA; contradiction *)
+  (*         | left; constructor; auto; *)
+  (*           eapply uvalue_has_dtyp_IX_supported; eauto *)
+  (*         ]. *)
+  (*   } *)
+
+  (*   { (* icmp *) *)
+  (*     destruct dt_orig; *)
+  (*       try *)
+  (*         solve *)
+  (*         [ right; intros CONTRA; inv CONTRA *)
+  (*         | left; constructor *)
+  (*         ]. *)
+  (*     - (* Non-vector case *) *)
+  (*       pose proof N.eq_dec sz 1 as [EQ | NEQ]. *)
+  (*       + (* I1 case *)                     *)
+        
+
+      
+  (*     - pose proof N.eq_dec sz 1 as [EQ | NEQ]. *)
+  (*       + subst. *)
+  (*         destruct IHuv1, IHuv2. *)
+  (*         * left. eapply UVALUE_ICmp_typ; eauto. *)
+  (*           constructor. *)
+  (*         * right; intros CONTRA. *)
+  (*           inv CONTRA. *)
+  (*           -- (* sz = 1 because u and H3... *) *)
+  (*             Set Nested Proofs Allowed. *)
+  (*             Lemma uvalue_has_dtyp_i_eq : *)
+  (*               forall uv dt1 dt2, *)
+  (*                 uvalue_has_dtyp uv dt1 -> *)
+  (*                 uvalue_has_dtyp uv dt2 -> *)
+  (*                 dt1 = dt2. *)
+  (*             Proof. *)
+  (*               uvalue_has_dtyp (UVALUE_Array []) (DTYPE_Array 0 DTYPE_POINTER) *)
+  (*               uvalue_has_dtyp (UVALUE_Array []) (DTYPE_Array 0 DTYPE_POINTER) *)
+
+
+
+  (*             (* General form may not be true because of empty array / *)
+  (*                struct values having multiple types... *) *)
+  (*             Lemma uvalue_has_dtyp_i_eq : *)
+  (*               forall uv sz1 sz2, *)
+  (*                 uvalue_has_dtyp uv (DTYPE_I sz1) -> *)
+  (*                 uvalue_has_dtyp uv (DTYPE_I sz2) -> *)
+  (*                 sz1 = sz2. *)
+  (*             Proof. *)
+  (*               intros uv. *)
+  (*               induction uv; intros sz1 sz2 TYP1 TYP2; *)
+  (*                 try solve [ inv TYP1; inv TYP2; auto ]. *)
+
+  (*               - inv TYP1. *)
+  (*                 + inv TYP2. *)
+  (*                   * red in H6. red in H10. *)
+  (*                     rewrite H6 in H10. *)
+  (*                     inv H10; auto. *)
+  (*                   * inv H14. *)
+  (*                 + inv TYP2. *)
+  (*                   * inv H9. *)
+  (*                   * admit. *)
+  (*             Admitted. *)
+
+  (*             pose proof (uvalue_has_dtyp_i_eq u H3); subst. *)
+  (*             contradiction. *)
+  (*           -- Lemma uvalue_has_dtyp_ptr_eq : *)
+  (*                forall uv dt, *)
+  (*                  uvalue_has_dtyp uv DTYPE_Pointer -> *)
+  (*                  uvalue_has_dtyp uv dt -> *)
+  (*                  dt = DTYPE_Pointer. *)
+  (*              Proof. *)
+  (*                intros uv dt H H0. *)
+  (*              Admitted. *)
+
+  (*              pose proof (uvalue_has_dtyp_ptr_eq H1 u) as CONTRA. *)
+  (*              inv CONTRA. *)
+  (*         * right; intros CONTRA. *)
+  (*           inv CONTRA. *)
+  (*           -- pose proof (uvalue_has_dtyp_i_eq u H4); subst. *)
+  (*              contradiction. *)
+  (*           -- pose proof (uvalue_has_dtyp_ptr_eq H3 u) as CONTRA. *)
+  (*              inv CONTRA. *)
+  (*         * right; intros CONTRA. *)
+  (*           (* This could hold... Ugh *) *)
+  (*           admit. *)
+  (*       + admit. *)
+  (*     - admit. *)
+  (*   } *)
+
+  (*   { (* fbinop *) *)
+  (*     specialize (IHuv1 dt_orig). *)
+  (*     specialize (IHuv2 dt_orig). *)
+
+  (*     destruct dt_orig; *)
+  (*       try *)
+  (*         solve *)
+  (*         [ right; intros CONTRA; inv CONTRA *)
+  (*         | left; constructor *)
+  (*         ]; *)
+  (*       destruct IHuv1, IHuv2; *)
+  (*       try solve *)
+  (*         [ right; intros CONTRA; inv CONTRA; contradiction *)
+  (*         | left; constructor; auto; *)
+  (*           eapply uvalue_has_dtyp_IX_supported; eauto *)
+  (*         ]. *)
+  (*   } *)
+
+  (*   { (* fcmp *) *)
+  (*     specialize (IHuv1 dt_orig). *)
+  (*     specialize (IHuv2 dt_orig). *)
+
+  (*     destruct dt_orig; *)
+  (*       try *)
+  (*         solve *)
+  (*         [ right; intros CONTRA; inv CONTRA *)
+  (*         | left; constructor *)
+  (*         ]; *)
+  (*       destruct IHuv1, IHuv2; *)
+  (*       try solve *)
+  (*         [ right; intros CONTRA; inv CONTRA; contradiction *)
+  (*         | left; constructor; auto; *)
+  (*           eapply uvalue_has_dtyp_IX_supported; eauto *)
+  (*         ]. *)
+
+  (*     admit. *)
+  (*   } *)
+
+  Admitted.
+
   Lemma uvalue_has_dtyp_dec :
     forall {uv dt},
       {uvalue_has_dtyp uv dt} + {~ uvalue_has_dtyp uv dt}.
   Proof.
-    induction uv; intros dt_orig;
-      try solve
-        [ destruct dt_orig;
-          try
-            solve
-            [ right; intros CONTRA; inv CONTRA
-            | left; constructor
-            ]
-        ].
-
-    1-4: solve_dvalue_has_dtyp_dec_int_helper.
-
-    { (* Undef *)
-      pose proof (dtyp_eq_dec t dt_orig) as [EQ | NEQ]; subst.
-      + pose proof (NO_VOID_dec dt_orig) as [NVOID | VOID];
-          pose proof (ALL_IX_SUPPORTED_dec dt_orig) as [IX | NIX].
-        left; constructor; auto.
-        all: right; intros CONTRA; inv CONTRA; contradiction.
-      + right; intros CONTRA; inv CONTRA; contradiction.
-    }
-
-    { (* Poison *)
-      pose proof (dtyp_eq_dec t dt_orig) as [EQ | NEQ]; subst.
-      + pose proof (NO_VOID_dec dt_orig) as [NVOID | VOID];
-          pose proof (ALL_IX_SUPPORTED_dec dt_orig) as [IX | NIX].
-        left; constructor; auto.
-        all: right; intros CONTRA; inv CONTRA; contradiction.
-      + right; intros CONTRA; inv CONTRA; contradiction.
-    }
-
-    { (* Oom *)
-      pose proof (dtyp_eq_dec t dt_orig) as [EQ | NEQ]; subst.
-      + pose proof (NO_VOID_dec dt_orig) as [NVOID | VOID];
-          pose proof (ALL_IX_SUPPORTED_dec dt_orig) as [IX | NIX].
-        left; constructor; auto.
-        all: right; intros CONTRA; inv CONTRA; contradiction.
-      + right; intros CONTRA; inv CONTRA; contradiction.
-    }
-
-    { (* Structs *)
-      - destruct dt_orig;
-          try
-            solve
-            [ right; intros CONTRA; inv CONTRA
-            | left; constructor
-            ].
-
-        remember (fields, fields0) as FIELDS.
-        replace fields with (fst FIELDS) in * by (subst; auto).
-        replace fields0 with (snd FIELDS) in * by (inv HeqFIELDS; cbn; auto).
-        clear fields fields0 HeqFIELDS.
-        induction FIELDS using double_list_rect.
-        + left; constructor.
-        + right; intros CONTRA; inv CONTRA.
-        + right; intros CONTRA; inv CONTRA.
-        + forward IHFIELDS.
-          { intros u X0 dt.
-            apply X.
-            right; auto.
-          }
-          cbn in IHFIELDS.
-          specialize (X x (inl eq_refl) y).
-          cbn.
-          destruct X.
-          * destruct IHFIELDS.
-            -- left; constructor; auto.
-            -- right.
-               intros CONTRA.
-               inv CONTRA.
-               contradiction.
-          * right.
-            intros CONTRA.
-            inv CONTRA.
-            contradiction.
-    }
-
-    { (* Packed structs *)
-      - destruct dt_orig;
-          try
-            solve
-            [ right; intros CONTRA; inv CONTRA
-            | left; constructor
-            ].
-
-        remember (fields, fields0) as FIELDS.
-        replace fields with (fst FIELDS) in * by (subst; auto).
-        replace fields0 with (snd FIELDS) in * by (inv HeqFIELDS; cbn; auto).
-        clear fields fields0 HeqFIELDS.
-        induction FIELDS using double_list_rect.
-        + left; constructor.
-        + right; intros CONTRA; inv CONTRA.
-        + right; intros CONTRA; inv CONTRA.
-        + forward IHFIELDS.
-          { intros u X0 dt.
-            apply X.
-            right; auto.
-          }
-          cbn in IHFIELDS.
-          specialize (X x (inl eq_refl) y).
-          cbn.
-          destruct X.
-          * destruct IHFIELDS.
-            -- left; constructor; auto.
-            -- right.
-               intros CONTRA.
-               inv CONTRA.
-               contradiction.
-          * right.
-            intros CONTRA.
-            inv CONTRA.
-            contradiction.
-    }
-
-    { (* Arrays *)
-      - destruct dt_orig;
-          try
-            solve
-            [ right; intros CONTRA; inv CONTRA
-            | left; constructor
-            ].
-
-        cbn.
-        assert ({N.to_nat sz = length elts} + {N.to_nat sz <> length elts}) as [SZ | SZ] by apply Nat.eq_dec.
-        + generalize dependent sz.
-          induction elts; intros sz SZ.
-          * cbn in *.
-            assert (sz = 0) by lia; subst.
-            left.
-            replace 0 with (N.of_nat 0%nat) by lia.
-            constructor; auto.
-          * cbn in SZ.
-
-            forward IHelts.
-            intros e X0 dt0.
-            apply X; right; eauto.
-
-            destruct sz; [lia|].
-            rewrite <- N.succ_pos_pred in SZ.
-
-            specialize (IHelts (Pos.pred_N p)).
-            forward IHelts.
-            lia.
-
-            specialize (X a (inl eq_refl) dt_orig).
-            destruct X.
-            -- destruct IHelts.
-               ++ left.
-                  inv u0.
-                  rewrite <- positive_nat_N.
-                  constructor; auto.
-                  cbn; lia.
-               ++ right.
-                  intros CONTRA.
-                  inv CONTRA.
-                  apply n.
-                  setoid_rewrite <- Nnat.N2Nat.id.
-                  constructor.
-                  eapply Forall_inv_tail; eauto.
-                  lia.
-            -- right.
-               intros CONTRA.
-               inv CONTRA.
-               apply Forall_cons_iff in H2.
-               destruct H2.
-               contradiction.
-        + right.
-          intros CONTRA.
-          inv CONTRA.
-          lia.
-    }
-
-    { (* Vectors *)
-      - destruct dt_orig;
-          try
-            solve
-            [ right; intros CONTRA; inv CONTRA
-            | left; constructor
-            ].
-
-        destruct (@vector_dtyp_dec dt_orig) as [VEC | NVEC].
-        2: {
-          right.
-          intros CONTRA.
-          inv CONTRA.
-          contradiction.
-        }
-
-        cbn.
-        assert ({N.to_nat sz = length elts} + {N.to_nat sz <> length elts}) as [SZ | SZ] by apply Nat.eq_dec.
-        + generalize dependent sz.
-          induction elts; intros sz SZ.
-          * cbn in *.
-            assert (sz = 0) by lia; subst.
-            left.
-            replace 0 with (N.of_nat 0%nat) by lia.
-            constructor; auto.
-          * cbn in SZ.
-
-            forward IHelts.
-            intros e X0 dt0.
-            apply X; right; eauto.
-
-            destruct sz; [lia|].
-            rewrite <- N.succ_pos_pred in SZ.
-
-            specialize (IHelts (Pos.pred_N p)).
-            forward IHelts.
-            lia.
-
-            specialize (X a (inl eq_refl) dt_orig).
-            destruct X.
-            -- destruct IHelts.
-               ++ left.
-                  inv u0.
-                  rewrite <- positive_nat_N.
-                  constructor; auto.
-                  cbn; lia.
-               ++ right.
-                  intros CONTRA.
-                  inv CONTRA.
-                  apply n.
-                  setoid_rewrite <- Nnat.N2Nat.id.
-                  constructor.
-                  eapply Forall_inv_tail; eauto.
-                  lia.
-                  auto.
-            -- right.
-               intros CONTRA.
-               inv CONTRA.
-               apply Forall_cons_iff in H2.
-               destruct H2.
-               contradiction.
-        + right.
-          intros CONTRA.
-          inv CONTRA.
-          lia.
-    }
-
-    { (* Binops *)
-      specialize (IHuv1 dt_orig).
-      specialize (IHuv2 dt_orig).
-
-      destruct dt_orig;
-        try
-          solve
-          [ right; intros CONTRA; inv CONTRA
-          | left; constructor
-          ].
-
-      - destruct IHuv1, IHuv2.
-        + left. constructor; auto.
-          solve_dvalue_has_dtyp_dec_int_helper.
-
-      
-                try
-          solve
-          [ right; intros CONTRA; inv CONTRA
-          | left; constructor
-          ].
-
-      
-      left.
-      constructor.
-    }
+    intros uv dt.
+    pose proof (@uvalue_has_dtyp_exists uv).
+    destruct H.
+    - destruct s.
+      destruct a.
+      pose proof (@conflatible_dec x dt) as [CONF | NCONF].
+      + specialize (@H0 dt).
+        destruct H0.
+        left; auto.
+      + right.
+        intros CONTRA.
+        apply NCONF.
+        apply H0; auto.
+    - right; auto.
   Qed.
 
   Ltac solve_no_void_dec :=
@@ -5070,416 +5187,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         split; [solve_no_void_dec | solve_dtyp_eqb]
       | solve_no_void
       ].
-
-  Lemma dvalue_has_dtyp_dvalue_has_dtyp_bool :
-    forall {dv dt},
-      dvalue_has_dtyp dv dt <-> is_true (dvalue_has_dtyp_bool dv dt).
-  Proof.
-    intros dv dt.
-    split; intros TYPE.
-    - induction TYPE.
-      1-11: cbn; auto;
-      destruct t; solve_dtyp_non_void_eqb.
-
-      1, 3: try solve [rewrite dvalue_has_dtyp_bool_equation;
-                       rewrite zipWith_In'_equation; auto].
-
-      { (* Struct cons *)
-        rewrite dvalue_has_dtyp_bool_equation.
-        rewrite zipWith_In'_equation.
-
-        rewrite dvalue_has_dtyp_bool_equation in IHTYPE2.
-
-        red in IHTYPE1.
-        rewrite IHTYPE1.
-        replace (true && true) with true by auto.
-        red.
-        apply IHTYPE2.
-      }
-
-      { (* Packed struct cons *)
-        rewrite dvalue_has_dtyp_bool_equation.
-        rewrite zipWith_In'_equation.
-
-        rewrite dvalue_has_dtyp_bool_equation in IHTYPE2.
-
-        red in IHTYPE1.
-        rewrite IHTYPE1.
-        replace (true && true) with true by auto.
-        red.
-        apply IHTYPE2.
-      }
-
-      { (* Arrays *)
-        rewrite dvalue_has_dtyp_bool_equation.
-        rewrite Nnat.Nat2N.id.
-        rewrite H.
-        rewrite Nat.eqb_refl.
-        red.
-        rewrite andb_true_l.
-        setoid_rewrite allb_forallb.
-        apply forallb_forall.
-        intros x IN.
-        unfold id.
-
-        generalize dependent sz.
-        induction xs; intros sz H.
-        - cbn in IN; contradiction.
-        - cbn in H. subst.
-          rewrite map_In_cons in IN.
-          destruct IN as [IN | IN].
-          + specialize (IH a (or_introl eq_refl)).
-            red in IH.
-            rewrite IH in IN; auto.
-          + forward IHxs.
-            intros x0 H.
-            apply IH; right; auto.
-
-            forward IHxs.
-            intros x0 H.
-            apply IHdtyp; right; auto.
-
-            forward IHxs.
-            auto.
-            specialize (IHxs _ eq_refl).
-            auto.
-      }
-
-      { (* Vectors *)
-        rewrite dvalue_has_dtyp_bool_equation.
-        rewrite Nnat.Nat2N.id.
-        rewrite H.
-        rewrite Nat.eqb_refl.
-        red.
-        rewrite andb_true_l.
-        setoid_rewrite allb_forallb.
-        apply forallb_forall.
-        intros x IN.
-        unfold id.
-
-        generalize dependent sz.
-        induction xs; intros sz H.
-        - cbn in IN; contradiction.
-        - cbn in H. subst.
-          rewrite map_In_cons in IN.
-          destruct IN as [IN | IN].
-          + specialize (IH a (or_introl eq_refl)).
-            red in IH.
-            rewrite IH in IN; auto.
-          + forward IHxs.
-            intros x0 H.
-            apply IH; right; auto.
-
-            forward IHxs.
-            intros x0 H.
-            apply IHdtyp; right; auto.
-
-            forward IHxs.
-            auto.
-            specialize (IHxs _ eq_refl).
-            auto.
-      }
-    - red in TYPE.
-      induction dv.
-      1-8,11:
-        try
-          solve
-          [ rewrite dvalue_has_dtyp_bool_equation in TYPE; destruct dt; try discriminate;
-            try apply N.eqb_eq in TYPE; subst; constructor
-          ].
-
-      Set Nested Proofs Allowed.
-
-      { (* UVALUE_Poison *)
-        rewrite dvalue_has_dtyp_bool_equation in TYPE; destruct dt; try discriminate;
-          try (apply dtyp_eqb_eq in TYPE; subst; constructor; solve_no_void);
-        unfold dtyp_non_void_eqb in TYPE;
-        apply andb_true_iff in TYPE as [NV TYPE];
-        apply dtyp_eqb_eq in TYPE; subst;
-        unfold Coqlib.proj_sumbool in NV;
-          break_match_hyp_inv;
-        constructor; auto.
-      }
-
-      { (* UVALUE_Oom *)
-        rewrite dvalue_has_dtyp_bool_equation in TYPE; destruct dt; try discriminate;
-          try (apply dtyp_eqb_eq in TYPE; subst; constructor; solve_no_void);
-        unfold dtyp_non_void_eqb in TYPE;
-        apply andb_true_iff in TYPE as [NV TYPE];
-        apply dtyp_eqb_eq in TYPE; subst;
-        unfold Coqlib.proj_sumbool in NV;
-          break_match_hyp_inv;
-        constructor; auto.
-      }
-
-      { (* Struct *)
-        rewrite dvalue_has_dtyp_bool_equation in TYPE; destruct dt.
-        1-13,15-17: discriminate.
-
-        generalize dependent fields0.
-        induction fields; intros fields0 H TYPE;
-          rewrite zipWith_In'_equation in TYPE.
-        - induction fields0.
-          + constructor.
-          + forward IHfields0.
-            intros u [] TYPE0.
-
-            forward IHfields0.
-            destruct fields0.
-            auto.
-            rewrite zipWith_In'_equation in TYPE.
-            apply TYPE.
-
-            inv IHfields0.
-            rewrite zipWith_In'_equation in TYPE.
-            discriminate.
-        - destruct fields0.
-          + (* Contradiction *)
-            specialize (IHfields []).
-            forward IHfields.
-            { intros u H0 TYPE0.
-              apply H.
-              right; auto.
-              auto.
-            }
-
-            rewrite zipWith_In'_equation in TYPE.
-            rewrite zipWith_In'_equation in IHfields.
-            forward IHfields.
-            { destruct fields; auto.
-            }
-
-            inv IHfields.
-            discriminate.
-          + constructor.
-            2: {
-              apply IHfields.
-              - intros u H0 TYPE0.
-                rewrite dvalue_has_dtyp_bool_equation in TYPE0.
-                destruct u.
-                1-8,11: discriminate.
-                + unfold dtyp_non_void_eqb in *.
-                  apply andb_true_iff in TYPE0 as (?&?).
-                  destruct (NO_VOID_dec t); inv H1.
-                  apply dtyp_eqb_eq in H2; subst.
-                  constructor; solve_no_void.
-                + unfold dtyp_non_void_eqb in *.
-                  apply andb_true_iff in TYPE0 as (?&?).
-                  destruct (NO_VOID_dec t); inv H1.
-                  apply dtyp_eqb_eq in H2; subst.
-                  constructor; solve_no_void.
-                +
-                  Lemma zipWith_In'_false :
-                    forall {A B : Type}
-                      (xs : list A) (ys : list B)
-                      (f : forall x y, In x xs -> In y ys -> bool -> bool),
-                      (forall x y INx INy, f x y INx INy false = false) ->
-                      zipWith_In' xs ys false f (fun _ _ _ => false) (fun _ _ _ => false) = false.
-                  Proof.
-                    induction xs;
-                    induction ys; intros f F.
-                    - rewrite zipWith_In'_equation; auto.
-                    - specialize (IHys
-                                    (fun (x : A) (y : B) (INx : In x []) (_ : In y ys) (_ : bool) =>
-                                       match INx return bool with
-                                       end)).
-                      rewrite zipWith_In'_equation.
-                      Opaque zipWith_In'.
-                      cbn.
-                      cbn in IHys.
-                      forward IHys.
-                      { intros _ _ []. }
-                      replace (fun (_ : A) (INx : False) (_ : bool) => match INx return bool with
-                                                             end) with (fun (_ : A) (INx : False) (_ : bool) => false).
-                      2: {
-                        apply Axioms.functional_extensionality.
-                        intros x.
-                        apply Axioms.functional_extensionality.
-                        intros [].
-                      }
-                      exact IHys.
-                    - rewrite zipWith_In'_equation.
-                      cbn.
-                      specialize (IHxs []
-                                    (fun (x : A) (_ : B) (_ : In x xs) (INy : False) (_ : bool) =>
-                                       match INy return bool with
-                                       end)).
-                      cbn in *.
-                      forward IHxs.
-                      { intros _ _ _ []. }
-                      replace ((fun (_ : B) (INy : False) (_ : bool) => match INy return bool with
-                                                              end)) with (fun (_ : B) (_ : False) (_ : bool) => false).
-                      2: {
-                        apply Axioms.functional_extensionality.
-                        intros x.
-                        apply Axioms.functional_extensionality.
-                        intros [].
-                      }
-                      exact IHxs.
-                    - rewrite zipWith_In'_equation.
-                      cbn.
-                      setoid_rewrite zipWith_In'_equation in IHys.
-                      specialize (IHys
-                                    (fun (x' : A) (y' : B) (INx : In x' (a :: xs)) (INy : In y' ys) (acc' : bool) =>
-                                       f x' y' INx (or_intror INy) acc')).
-                      forward IHys.
-                      { intros x y INx INy.
-                        apply F.
-                      }
-
-                      destruct ys.
-                      + rewrite zipWith_In'_equation in IHys.
-                        rewrite zipWith_In'_equation.
-                        destruct xs; auto.
-                      + cbn in *.
-                        specialize (IHxs (b::ys) (fun (x' : A) (y' : B) (INx : In x' xs) (INy : b = y' \/ In y' ys) (acc' : bool) =>
-                                                   f x' y' (or_intror INx) (or_intror INy) acc')).
-                        forward IHxs.
-                        { intros x y INx INy.
-                          auto.
-                        }
-
-                        rewrite zipWith_In'_equation in IHxs.
-                        destruct xs.
-                        * rewrite zipWith_In'_equation.
-                          exact IHxs.
-                        * rewrite zipWith_In'_equation.
-                          cbn in *.
-                          rewrite F.
-                          exact IHxs.
-                  Qed.
-
-                  Lemma zipWith_In'_length :
-                    forall {A B : Type}
-                      (xs : list A) (ys : list B) (acc : bool)
-                      (f : forall x y, In x xs -> In y ys -> bool -> bool),
-                      zipWith_In' xs ys acc f (fun _ _ _ => false) (fun _ _ _ => false) = true ->
-                      length xs = length ys.
-                  Proof.
-                    intros A B xs.
-                    induction xs; intros ys acc f ZIP.
-                    - rewrite zipWith_In'_equation in ZIP.
-                      induction ys.
-                      + reflexivity.
-                      + destruct ys.
-                        * exfalso.
-                          rewrite zipWith_In'_equation in ZIP; discriminate.
-                        * rewrite zipWith_In'_equation in ZIP.
-                          forward IHys.
-                          { intros _ _ []. }
-                          forward IHys; auto.
-                          inv IHys.
-                    - destruct ys.
-                      + destruct xs.
-                        rewrite zipWith_In'_equation in ZIP.
-                        rewrite zipWith_In'_equation in ZIP.
-                        discriminate.
-
-                        rewrite zipWith_In'_equation in ZIP.
-                        cbn in ZIP.
-                        rewrite zipWith_In'_equation in ZIP.
-                        cbn in ZIP.
-                        replace (fun (_ : B) (INy : False) (_ : bool) => match INy return bool with
-                                                               end)
-                          with
-                          (fun (_ : B) (INy : False) (_ : bool) => false) in ZIP.
-                        2: {
-                          apply Axioms.functional_extensionality.
-                          intros x.
-                          apply Axioms.functional_extensionality.
-                          intros [].
-                        }
-                        rewrite zipWith_In'_false in ZIP.
-                        discriminate.
-                        intros _ _ _ [].
-                      + cbn.
-                        erewrite IHxs.
-                        reflexivity.
-                        rewrite zipWith_In'_equation in ZIP.
-                        cbn in *.
-                        apply ZIP.
-                  Qed.
-
-                  apply andb_true_iff in TYPE0 as (?&?).
-                  destruct (NO_VOID_dec t); inv H1.
-                  apply dtyp_eqb_eq in H2; subst.
-                  constructor; solve_no_void.
-            }
-            rewrite andb_true_l in TYPE.
-            destruct (dvalue_has_dtyp_bool a a0).
-            2: {
-              (* Contradiction in TYPE *)
-              rewrite zipWith_In'_equation in TYPE.
-              break_match_hyp; subst.
-              break_match_hyp; subst; [discriminate|].
-
-              eapply IHfields in TYPE.
-              admit.
-              break_match_hyp; subst.
-              discriminate.
-              rewrite zipWith_In'_equation in TYPE.
-              break_match_hyp; subst.
-              discriminate.
-              rewrite zipWith_In'_equation in TYPE.
-              break_match_hyp; subst.
-              discriminate.
-              rewrite zipWith_In'_equation in TYPE.
-              break_match_hyp; subst.
-              discriminate.
-              rewrite zipWith_In'_equation in TYPE.
-              break_match_hyp; subst.
-              discriminate.
-              rewrite zipWith_In'_equation in TYPE.
-              break_match_hyp; subst.
-              discriminate.
-              rewrite zipWith_In'_equation in TYPE.
-              break_match_hyp; subst.
-              discriminate.
-              rewrite zipWith_In'_equation in TYPE.
-              break_match_hyp; subst.
-              discriminate.
-
-              break_match_hyp_inv.
-            }
-
-            { move TYPE after IHfields0.
-              rewrite andb_true_l in TYPE.
-              specialize (IHfields fields0).
-              forward IHfields.
-              { intros u H0 TYPE0.
-
-              }
-              specialize (IHfields0 H).
-              destruct (dvalue_has_dtyp_bool a a0).
-              -
-
-                rewrite zipWith_In'_equation in TYPE.
-                break_match_hyp_inv.
-                break_match_hyp_inv.
-              destruct
-              break_match_hyp; subst.
-              admit.
-
-
-            }
-
-      }
-          try apply N.eqb_eq in TYPE; subst; constructor.
-
-        constructor.
-
-      rewrite zipWith_In'_equation.
-      induction TYPE
-      1-11: cbn; auto;
-
-
-
-      red.
-      unfold dvalue_has_dtyp_bool.
-      (* Need equation... *)
-      cbn.
-    -
-  Qed.
 
   Lemma uvalue_has_dtyp_struct_length :
     forall fields dts,
@@ -5516,6 +5223,42 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     induction fields;
       intros dts H; inversion H; cbn; auto.
   Qed.
+
+  (** Tactics... Maybe move these *)
+  Ltac normalize_array_vector_dtyp :=
+    match goal with
+    | H : _ |- dvalue_has_dtyp _ (DTYPE_Array (BinNat.N.of_nat) _) =>
+        idtac
+    | H : _ |- dvalue_has_dtyp _ (DTYPE_Array ?sz _) =>
+        rewrite <- (Nnat.N2Nat.id sz)
+    | H : _ |- dvalue_has_dtyp _ (DTYPE_Vector (BinNat.N.of_nat) _) =>
+        idtac
+    | H : _ |- dvalue_has_dtyp _ (DTYPE_Vector ?sz _) =>
+        rewrite <- (Nnat.N2Nat.id sz)
+    end.
+
+  #[global] Hint Resolve forall_repeat_true : DVALUE_HAS_DTYP.
+  #[global] Hint Constructors dvalue_has_dtyp : DVALUE_HAS_DTYP.
+  #[global] Hint Rewrite Nnat.Nat2N.id : DVALUE_HAS_DTYP.
+  #[global] Hint Resolve List.repeat_length : DVALUE_HAS_DTYP.
+  #[global] Hint Extern 1 (ALL_IX_SUPPORTED _) => solve_ALL_IX_SUPPORTED : DVALUE_HAS_DTYP.
+  #[global] Hint Extern 1 (NO_VOID _) => solve_no_void : DVALUE_HAS_DTYP.
+
+  Ltac solve_dvalue_has_dtyp :=
+    try normalize_array_vector_dtyp;
+    solve [autorewrite with DVALUE_HAS_DTYP; auto with DVALUE_HAS_DTYP].
+
+  #[global] Hint Resolve forall_repeat_true : UVALUE_HAS_DTYP.
+  #[global] Hint Constructors uvalue_has_dtyp : UVALUE_HAS_DTYP.
+  #[global] Hint Rewrite Nnat.Nat2N.id : UVALUE_HAS_DTYP.
+  #[global] Hint Resolve List.repeat_length : UVALUE_HAS_DTYP.
+  #[global] Hint Extern 1 (ALL_IX_SUPPORTED _) => solve_ALL_IX_SUPPORTED : UVALUE_HAS_DTYP.
+  #[global] Hint Extern 1 (NO_VOID _) => solve_no_void : UVALUE_HAS_DTYP.
+
+  Ltac solve_uvalue_has_dtyp :=
+    try normalize_array_vector_dtyp;
+    solve [autorewrite with UVALUE_HAS_DTYP; auto with UVALUE_HAS_DTYP].
+
 
   Section EvalIopLemmas.
     Context (M : Type -> Type).
@@ -5567,17 +5310,17 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                        ]
                      ]
                    ]
-               ]; subst; constructor; solve_no_void].
+               ]; subst; solve_dvalue_has_dtyp].
 
       all:
         try solve [eapply EqRet_NoFail in EVAL; eauto;
         exfalso; apply EVAL;
         first [apply mfails_ub | apply mfails_error | apply mfails_oom]; eauto].
-      all : apply MReturns_ret in EVAL;
-              apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
-                          [ cbn in FAILS; apply MFails_ret in FAILS; contradiction |];
-                          apply MReturns_ret_inv in RET; subst; constructor.
-      all : constructor.
+
+      all: try solve [apply MReturns_ret in EVAL;
+                      apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
+                      [ cbn in FAILS; apply MFails_ret in FAILS; contradiction |];
+                      apply MReturns_ret_inv in RET; subst; solve_dvalue_has_dtyp].
     Qed.
 
     Lemma eval_iop_dtyp_i :
@@ -5675,7 +5418,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                 ]; subst;
              try (unfold VMemInt_intptr';
                   rewrite VMemInt_intptr_dtyp);
-             constructor; solve_no_void].
+             solve_dvalue_has_dtyp].
 
       all:
         try solve [eapply EqRet_NoFail in EVAL; eauto;
@@ -5954,9 +5697,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     intros uv dv dt UT; revert dv;
     induction UT; intros dv U2D;
       try solve
-        [ cbn in U2D; inv U2D; cbn; constructor; solve [auto | solve_no_void ] ].
-
-    1,3,5,7: cbn in U2D; inv U2D; constructor; cbn; auto.
+        [ cbn in U2D; inv U2D; cbn; solve_dvalue_has_dtyp ].
+    
     all:
       try solve
         [ cbn in U2D; inv U2D;
@@ -5965,10 +5707,16 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           specialize (IHUT0 _ eq_refl);
           inv IHUT;
           inv IHUT0;
-          rewrite NO_VOID_equation in H2;
-          constructor;
-          rewrite NO_VOID_equation;
-          apply Forall_HIn_cons_inv; auto
+          rewrite NO_VOID_equation in H4;
+          rewrite ALL_IX_SUPPORTED_equation in H3;
+          solve_dvalue_has_dtyp
+        ].
+
+    all:
+      try solve
+        [ cbn in U2D; inv U2D;
+          destruct H as (?&?&?&?&?&?);
+          solve_dvalue_has_dtyp
         ].
 
     - cbn in U2D; inv U2D.

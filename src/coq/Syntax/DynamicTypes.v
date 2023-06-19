@@ -727,9 +727,14 @@ Proof.
   apply Forall_HIn_cons_inv; auto.
 Qed.
 
+Ltac solve_Forall_HIn :=
+  solve [ constructor; auto].
+
 #[global] Hint Rewrite NO_VOID_equation : NO_VOID.
 #[global] Hint Resolve NO_VOID_Struct_cons_inv : NO_VOID.
 #[global] Hint Resolve NO_VOID_Packed_struct_cons_inv : NO_VOID.
+#[global] Hint Extern 1 (Forall_HIn _ _) => solve_Forall_HIn : NO_VOID.
+
 Ltac solve_no_void :=
   solve
     [ auto with NO_VOID
@@ -739,3 +744,9 @@ Ltac solve_no_void :=
       end
     | rewrite NO_VOID_equation; solve_no_void
     ].
+
+#[global] Hint Constructors IX_supported : IX_SUPPORTED.
+#[global] Hint Extern 1 (Forall_HIn _ _) => solve_Forall_HIn : IX_SUPPORTED.
+
+Ltac solve_ALL_IX_SUPPORTED :=
+  solve [ rewrite ALL_IX_SUPPORTED_equation; auto with IX_SUPPORTED].
