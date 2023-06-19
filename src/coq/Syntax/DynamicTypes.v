@@ -6,6 +6,7 @@ From Coq Require Import
      Setoid
      Morphisms
      Lia
+     DecidableClass
      Classes.RelationClasses
      Program.Wf.
 
@@ -325,6 +326,215 @@ Section hiding_notation.
 
   #[global] Instance serialize_dtyp : Serialize dtyp := serialize_dtyp'.
 End hiding_notation.
+
+Inductive IX_supported : N -> Prop :=
+| I1_Supported : IX_supported 1
+| I8_Supported : IX_supported 8
+| I32_Supported : IX_supported 32
+| I64_Supported : IX_supported 64
+.
+
+(* TODO: This probably should live somewhere else... *)
+#[refine]#[local] Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
+    Decidable_witness := N.eqb x y
+  }.
+apply N.eqb_eq.
+Qed.
+
+Lemma IX_supported_dec : forall (sz:N), {IX_supported sz} + {~IX_supported sz}.
+Proof.
+  intros sz.
+  - decide (sz = 1)%N.
+    + left. subst. constructor.
+    + decide (sz = 8)%N.
+      * left. subst. constructor.
+      * decide (sz = 32)%N.
+        -- left. subst. constructor.
+        -- decide (sz = 64)%N.
+           ++ left. subst. constructor.
+           ++ right. intro X.
+              inversion X; subst; contradiction.
+Qed.
+
+Program Fixpoint ALL_IX_SUPPORTED (dt : dtyp) {measure (dtyp_measure dt)} : Prop
+  := match dt with
+     | DTYPE_I sz =>
+         IX_supported sz
+     | DTYPE_IPTR
+     | DTYPE_Pointer
+     | DTYPE_Half
+     | DTYPE_Float
+     | DTYPE_Double
+     | DTYPE_X86_fp80
+     | DTYPE_Fp128
+     | DTYPE_Ppc_fp128
+     | DTYPE_Metadata
+     | DTYPE_X86_mmx
+     | DTYPE_Void
+     | DTYPE_Opaque =>
+         True
+     | DTYPE_Vector sz t
+     | DTYPE_Array sz t =>
+         ALL_IX_SUPPORTED t
+     | DTYPE_Struct dts
+     | DTYPE_Packed_struct dts =>
+         Forall_HIn dts (fun dt HIn => @ALL_IX_SUPPORTED dt _)
+     end.
+Next Obligation.
+  cbn.
+  lia.
+Defined.
+Next Obligation.
+  cbn.
+  lia.
+Defined.
+Next Obligation.
+  cbn.
+  pose proof (list_sum_map dtyp_measure dt dts HIn).
+  lia.
+Defined.
+Next Obligation.
+  cbn.
+  pose proof (list_sum_map dtyp_measure dt dts HIn).
+  lia.
+Defined.
+
+Lemma ALL_IX_SUPPORTED_equation :
+  forall (dt : dtyp),
+    ALL_IX_SUPPORTED dt =
+      match dt with
+      | DTYPE_I sz =>
+          IX_supported sz
+      | DTYPE_IPTR
+      | DTYPE_Pointer
+      | DTYPE_Half
+      | DTYPE_Float
+      | DTYPE_Double
+      | DTYPE_X86_fp80
+      | DTYPE_Fp128
+      | DTYPE_Ppc_fp128
+      | DTYPE_Metadata
+      | DTYPE_X86_mmx
+      | DTYPE_Void
+      | DTYPE_Opaque =>
+          True
+      | DTYPE_Vector sz t
+      | DTYPE_Array sz t =>
+          ALL_IX_SUPPORTED t
+      | DTYPE_Struct dts
+      | DTYPE_Packed_struct dts =>
+          Forall_HIn dts (fun dt HIn => ALL_IX_SUPPORTED dt)
+      end.
+Proof.
+  unfold ALL_IX_SUPPORTED at 1.
+  intros td.
+  apply Fix_sub_rect.
+  - intros. 
+    destruct x0; try reflexivity.
+    + erewrite H. reflexivity.
+    + apply Forall_HIn_eq. intros. erewrite H. reflexivity.
+    + apply Forall_HIn_eq. intros. erewrite H. reflexivity.
+    + erewrite H. reflexivity.
+  - intros.
+    destruct x; try reflexivity.
+Qed.
+
+Lemma ALL_IX_SUPPORTED_dec :
+  forall dt,
+    {ALL_IX_SUPPORTED dt} + {~ ALL_IX_SUPPORTED dt}.
+Proof.
+  intros dt.
+  induction dt.
+  all:
+    try match goal with
+      | IX : {ALL_IX_SUPPORTED _} + {~ ALL_IX_SUPPORTED _} |- _ =>
+          destruct IX
+      end;
+    try rewrite ALL_IX_SUPPORTED_equation;
+    try solve [left; cbn; auto | right; cbn; auto].
+
+  apply IX_supported_dec.
+
+  all: try apply Forall_HIn_dec; auto.
+Qed.
+
+Lemma ALL_IX_SUPPORTED_Struct_fields :
+  forall dts,
+    ALL_IX_SUPPORTED (DTYPE_Struct dts) ->
+    (forall dt, In dt dts -> ALL_IX_SUPPORTED dt).
+Proof.
+  intros dts NV dt IN.
+  rewrite ALL_IX_SUPPORTED_equation in NV.
+  induction dts.
+  - contradiction.
+  - inversion IN; subst.
+    + apply NV.
+    + apply IHdts; auto.
+      eapply Forall_HIn_cons; eauto.
+Qed.
+
+Lemma ALL_IX_SUPPORTED_Packed_struct_fields :
+  forall dts,
+    ALL_IX_SUPPORTED (DTYPE_Packed_struct dts) ->
+    (forall dt, In dt dts -> ALL_IX_SUPPORTED dt).
+Proof.
+  intros dts NV dt IN.
+  rewrite ALL_IX_SUPPORTED_equation in NV.
+  induction dts.
+  - contradiction.
+  - inversion IN; subst.
+    + apply NV.
+    + apply IHdts; auto.
+      eapply Forall_HIn_cons; eauto.
+Qed.
+
+Lemma ALL_IX_SUPPORTED_Struct_cons :
+  forall dt dts,
+    ALL_IX_SUPPORTED (DTYPE_Struct (dt :: dts)) ->
+    ALL_IX_SUPPORTED (DTYPE_Struct dts).
+Proof.
+  intros dt dts H.
+  rewrite ALL_IX_SUPPORTED_equation.
+  rewrite ALL_IX_SUPPORTED_equation in H.
+  eapply Forall_HIn_cons; eauto.
+Qed.
+
+Lemma ALL_IX_SUPPORTED_Packed_struct_cons :
+  forall dt dts,
+    ALL_IX_SUPPORTED (DTYPE_Packed_struct (dt :: dts)) ->
+    ALL_IX_SUPPORTED (DTYPE_Packed_struct dts).
+Proof.
+  intros dt dts H.
+  rewrite ALL_IX_SUPPORTED_equation.
+  rewrite ALL_IX_SUPPORTED_equation in H.
+  eapply Forall_HIn_cons; eauto.
+Qed.
+
+Lemma ALL_IX_SUPPORTED_Struct_cons_inv :
+  forall dt dts,
+    ALL_IX_SUPPORTED dt ->
+    ALL_IX_SUPPORTED (DTYPE_Struct dts) ->
+    ALL_IX_SUPPORTED (DTYPE_Struct (dt :: dts)).
+Proof.
+  intros dt dts NVdt NVdts.
+  rewrite ALL_IX_SUPPORTED_equation in NVdts.
+  rewrite ALL_IX_SUPPORTED_equation.
+
+  apply Forall_HIn_cons_inv; auto.
+Qed.
+
+Lemma ALL_IX_SUPPORTED_Packed_struct_cons_inv :
+  forall dt dts,
+    ALL_IX_SUPPORTED dt ->
+    ALL_IX_SUPPORTED (DTYPE_Packed_struct dts) ->
+    ALL_IX_SUPPORTED (DTYPE_Packed_struct (dt :: dts)).
+Proof.
+  intros dt dts NVdt NVdts.
+  rewrite ALL_IX_SUPPORTED_equation in NVdts.
+  rewrite ALL_IX_SUPPORTED_equation.
+
+  apply Forall_HIn_cons_inv; auto.
+Qed.
 
 Program Fixpoint NO_VOID (dt : dtyp) {measure (dtyp_measure dt)} : Prop
   := match dt with

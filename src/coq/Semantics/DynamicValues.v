@@ -102,35 +102,6 @@ Definition inttyp (x:N) : Type :=
   | _ => False
   end.
 
-Inductive IX_supported : N -> Prop :=
-| I1_Supported : IX_supported 1
-| I8_Supported : IX_supported 8
-| I32_Supported : IX_supported 32
-| I64_Supported : IX_supported 64
-.
-
-(* TODO: This probably should live somewhere else... *)
-#[refine]#[local] Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
-    Decidable_witness := N.eqb x y
-  }.
-apply N.eqb_eq.
-Qed.
-
-Lemma IX_supported_dec : forall (sz:N), {IX_supported sz} + {~IX_supported sz}.
-Proof.
-  intros sz.
-  - decide (sz = 1)%N.
-    + left. subst. constructor.
-    + decide (sz = 8)%N.
-      * left. subst. constructor.
-      * decide (sz = 32).
-        -- left. subst. constructor.
-        -- decide (sz = 64).
-           ++ left. subst. constructor.
-           ++ right. intro X.
-              inversion X; subst; contradiction.
-Qed.
-
 Lemma unsupported_cases : forall {X} (sz : N) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X),
     (if (sz =? 64) then x64
      else if (sz =? 32) then x32
@@ -2981,8 +2952,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) DTYPE_Double
   | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Float
   | DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
-  | DVALUE_Poison_typ  : forall τ, NO_VOID τ -> dvalue_has_dtyp (DVALUE_Poison τ) τ
-  | DVALUE_Oom_typ  : forall τ, NO_VOID τ -> dvalue_has_dtyp (DVALUE_Oom τ) τ
+  | DVALUE_Poison_typ  : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> dvalue_has_dtyp (DVALUE_Poison τ) τ
+  | DVALUE_Oom_typ  : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> dvalue_has_dtyp (DVALUE_Oom τ) τ
 
   | DVALUE_Struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Struct []) (DTYPE_Struct [])
   | DVALUE_Struct_Cons_typ :
@@ -3291,9 +3262,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | UVALUE_Double_typ : forall x, uvalue_has_dtyp (UVALUE_Double x) DTYPE_Double
   | UVALUE_Float_typ  : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Float
   | UVALUE_None_typ   : uvalue_has_dtyp UVALUE_None DTYPE_Void
-  | UVALUE_Poison_typ  : forall τ, NO_VOID τ -> uvalue_has_dtyp (UVALUE_Poison τ) τ
-  | UVALUE_Oom_typ  : forall τ, NO_VOID τ -> uvalue_has_dtyp (UVALUE_Oom τ) τ
-  | UVALUE_Undef_typ  : forall τ, NO_VOID τ -> uvalue_has_dtyp (UVALUE_Undef τ) τ
+  | UVALUE_Poison_typ  : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> uvalue_has_dtyp (UVALUE_Poison τ) τ
+  | UVALUE_Oom_typ  : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> uvalue_has_dtyp (UVALUE_Oom τ) τ
+  | UVALUE_Undef_typ  : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> uvalue_has_dtyp (UVALUE_Undef τ) τ
 
   | UVALUE_Struct_Nil_typ  : uvalue_has_dtyp (UVALUE_Struct []) (DTYPE_Struct [])
   | UVALUE_Struct_Cons_typ :
@@ -3383,59 +3354,77 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         uvalue_has_dtyp (UVALUE_FCmp op x y) (DTYPE_I 1)
   | UVALUE_Conversion_trunc_int_typ :
       forall from_sz to_sz value,
+        IX_supported from_sz ->
+        IX_supported to_sz ->
         from_sz > to_sz ->
         uvalue_has_dtyp value (DTYPE_I from_sz) ->
         uvalue_has_dtyp (UVALUE_Conversion Trunc (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz)
   | UVALUE_Conversion_trunc_int_ptr_typ :
       forall to_sz value,
+        IX_supported to_sz ->
         uvalue_has_dtyp value (DTYPE_IPTR) ->
         uvalue_has_dtyp (UVALUE_Conversion Trunc DTYPE_IPTR value (DTYPE_I to_sz)) (DTYPE_I to_sz)
   | UVALUE_Conversion_trunc_vec_typ :
       forall from_sz to_sz n value,
+        IX_supported from_sz ->
+        IX_supported to_sz ->
         from_sz > to_sz ->
         uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
         uvalue_has_dtyp (UVALUE_Conversion Trunc (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
   | UVALUE_Conversion_trunc_vec_ptr_typ :
       forall to_sz n value,
+        IX_supported to_sz ->
         uvalue_has_dtyp value (DTYPE_Vector n DTYPE_IPTR) ->
         uvalue_has_dtyp (UVALUE_Conversion Trunc (DTYPE_Vector n DTYPE_IPTR) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
 
   | UVALUE_Conversion_zext_int_typ :
       forall from_sz to_sz value,
+        IX_supported from_sz ->
+        IX_supported to_sz ->
         from_sz < to_sz ->
         uvalue_has_dtyp value (DTYPE_I from_sz) ->
         uvalue_has_dtyp (UVALUE_Conversion Zext (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz)
   | UVALUE_Conversion_zext_int_ptr_typ :
       forall from_sz value,
+        IX_supported from_sz ->
         uvalue_has_dtyp value (DTYPE_I from_sz) ->
         uvalue_has_dtyp (UVALUE_Conversion Zext (DTYPE_I from_sz) value DTYPE_IPTR) DTYPE_IPTR
   | UVALUE_Conversion_zext_vec_typ :
       forall from_sz to_sz n value,
+        IX_supported from_sz ->
+        IX_supported to_sz ->
         from_sz < to_sz ->
         uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
         uvalue_has_dtyp (UVALUE_Conversion Zext (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
   | UVALUE_Conversion_zext_vec_ptr_typ :
       forall from_sz n value,
+        IX_supported from_sz ->
         uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
         uvalue_has_dtyp (UVALUE_Conversion Zext (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n DTYPE_IPTR)) (DTYPE_Vector n DTYPE_IPTR)
 
 
   | UVALUE_Conversion_sext_int_typ :
       forall from_sz to_sz value,
+        IX_supported from_sz ->
+        IX_supported to_sz ->
         from_sz < to_sz ->
         uvalue_has_dtyp value (DTYPE_I from_sz) ->
         uvalue_has_dtyp (UVALUE_Conversion Sext (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz)
   | UVALUE_Conversion_sext_int_ptr_typ :
       forall from_sz value,
+        IX_supported from_sz ->
         uvalue_has_dtyp value (DTYPE_I from_sz) ->
         uvalue_has_dtyp (UVALUE_Conversion Sext (DTYPE_I from_sz) value DTYPE_IPTR) DTYPE_IPTR
   | UVALUE_Conversion_sext_vec_typ :
       forall from_sz to_sz n value,
+        IX_supported from_sz ->
+        IX_supported to_sz ->
         from_sz < to_sz ->
         uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
         uvalue_has_dtyp (UVALUE_Conversion Sext (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
   | UVALUE_Conversion_sext_vec_ptr_typ :
       forall from_sz n value,
+        IX_supported from_sz ->
         uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
         uvalue_has_dtyp (UVALUE_Conversion Sext (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n DTYPE_IPTR)) (DTYPE_Vector n DTYPE_IPTR)
 
@@ -3445,11 +3434,13 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | UVALUE_ExtractElement_typ :
       forall n vect idx t sz,
         IX_supported sz ->
+        ALL_IX_SUPPORTED t ->
         uvalue_has_dtyp idx (DTYPE_I sz) ->
         uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
         uvalue_has_dtyp (UVALUE_ExtractElement (DTYPE_Vector (N.of_nat n) t) vect idx) t
   | UVALUE_ExtractElement_ptr_typ :
       forall n vect idx t,
+        ALL_IX_SUPPORTED t ->
         uvalue_has_dtyp idx DTYPE_IPTR ->
         uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
         uvalue_has_dtyp (UVALUE_ExtractElement (DTYPE_Vector (N.of_nat n) t) vect idx) t
@@ -3474,12 +3465,14 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         uvalue_has_dtyp (UVALUE_ShuffleVector v1 v2 idxs) (DTYPE_Vector (N.of_nat m) t)
   | UVALUE_ExtractValue_Struct_sing_typ :
       forall fields fts dt (idx : LLVMAst.int),
+        ALL_IX_SUPPORTED dt ->
         uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
         (0 <= idx)%Z ->
         Nth fts (Z.to_nat idx) dt ->
         uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Struct fts) (UVALUE_Struct fields) [idx]) dt
   | UVALUE_ExtractValue_Struct_cons_typ :
       forall fields fts fld ft dt idx idxs,
+        ALL_IX_SUPPORTED dt ->
         uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
         (0 <= idx)%Z ->
         Nth fts (Z.to_nat idx) ft ->
@@ -3489,12 +3482,14 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Struct fts) (UVALUE_Struct fields) (idx :: idxs)) dt
   | UVALUE_ExtractValue_Packed_struct_sing_typ :
       forall fields fts dt idx,
+        ALL_IX_SUPPORTED dt ->
         uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct fts) ->
         (0 <= idx)%Z ->
         Nth fts (Z.to_nat idx) dt ->
         uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Packed_struct fts) (UVALUE_Packed_struct fields) [idx]) dt
   | UVALUE_ExtractValue_Packed_struct_cons_typ :
       forall fields fts fld ft dt idx idxs,
+        ALL_IX_SUPPORTED dt ->
         uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct fts) ->
         (0 <= idx)%Z ->
         Nth fts (Z.to_nat idx) ft ->
@@ -3504,11 +3499,13 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Packed_struct fts) (UVALUE_Packed_struct fields) (idx :: idxs)) dt
   | UVALUE_ExtractValue_Array_sing_typ :
       forall elements dt idx n,
+        ALL_IX_SUPPORTED dt ->
         uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n dt) ->
         (0 <= idx <= Z.of_N n)%Z ->
         uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Array n dt) (UVALUE_Array elements) [idx]) dt
   | UVALUE_ExtractValue_Array_cons_typ :
       forall elements elem et dt n idx idxs,
+        ALL_IX_SUPPORTED dt ->
         uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n et) ->
         (0 <= idx <= Z.of_N n)%Z ->
         Nth elements (Z.to_nat idx) elem ->
@@ -3522,11 +3519,12 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         uvalue_has_dtyp struc st ->
         uvalue_has_dtyp (UVALUE_InsertValue st struc uv idxs) st
   | UVALUE_Select_i1 :
-      forall cond x y t,
-        uvalue_has_dtyp cond (DTYPE_I 1) ->
-        uvalue_has_dtyp x t ->
-        uvalue_has_dtyp y t ->
-        uvalue_has_dtyp (UVALUE_Select cond x y) t
+    forall cond x y t,
+      ALL_IX_SUPPORTED t ->
+      uvalue_has_dtyp cond (DTYPE_I 1) ->
+      uvalue_has_dtyp x t ->
+      uvalue_has_dtyp y t ->
+      uvalue_has_dtyp (UVALUE_Select cond x y) t
   | UVALUE_Select_vect :
       forall cond x y t sz,
         uvalue_has_dtyp cond (DTYPE_Vector (N.of_nat sz) (DTYPE_I 1)) ->
@@ -3538,10 +3536,11 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   (*     forall uv dt idx sid, *)
   (*       uvalue_has_dtyp (UVALUE_ExtractByte uv dt idx sid) (DTYPE_I 8) *)
   | UVALUE_ConcatBytes_typ :
-      forall bytes dt,
-        (forall byte, In byte bytes -> exists uv dt idx sid, byte = UVALUE_ExtractByte uv dt idx sid) ->
-        N.of_nat (length bytes) = sizeof_dtyp dt ->
-        uvalue_has_dtyp (UVALUE_ConcatBytes bytes dt) dt.
+    forall bytes dt,
+      ALL_IX_SUPPORTED dt ->
+      (forall byte, In byte bytes -> exists uv dt idx sid, byte = UVALUE_ExtractByte uv dt idx sid) ->
+      N.of_nat (length bytes) = sizeof_dtyp dt ->
+      uvalue_has_dtyp (UVALUE_ConcatBytes bytes dt) dt.
   Set Elimination Schemes.
 
   Section dvalue_has_dtyp_ind.
@@ -3552,8 +3551,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_I32            : forall x, P (DVALUE_I32 x) (DTYPE_I 32).
     Hypothesis IH_I64            : forall x, P (DVALUE_I64 x) (DTYPE_I 64).
     Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x) DTYPE_IPTR.
-    Hypothesis IH_Poison         : forall t (NV: NO_VOID t), P (DVALUE_Poison t) t.
-    Hypothesis IH_Oom            : forall t (NV: NO_VOID t), P (DVALUE_Oom t) t.
+    Hypothesis IH_Poison         : forall t (IX : ALL_IX_SUPPORTED t) (NV: NO_VOID t), P (DVALUE_Poison t) t.
+    Hypothesis IH_Oom            : forall t (IX : ALL_IX_SUPPORTED t) (NV: NO_VOID t), P (DVALUE_Oom t) t.
     Hypothesis IH_Double         : forall x, P (DVALUE_Double x) DTYPE_Double.
     Hypothesis IH_Float          : forall x, P (DVALUE_Float x) DTYPE_Float.
     Hypothesis IH_None           : P DVALUE_None DTYPE_Void.
@@ -3641,12 +3640,14 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
     (* Poison *)
     Hypothesis IH_Poison_Array    : forall sz t
-                                     (NV: NO_VOID t)
-                                     (IH: P (UVALUE_Poison t) t),
+                                      (IX : ALL_IX_SUPPORTED t)
+                                      (NV: NO_VOID t)
+                                      (IH: P (UVALUE_Poison t) t),
         P (UVALUE_Poison (DTYPE_Array sz t)) (DTYPE_Array sz t).
     Hypothesis IH_Poison_Vector    : forall sz t
-                                     (NV: NO_VOID t)
-                                     (IH: P (UVALUE_Poison t) t),
+                                       (IX : ALL_IX_SUPPORTED t)
+                                       (NV: NO_VOID t)
+                                       (IH: P (UVALUE_Poison t) t),
         P (UVALUE_Poison (DTYPE_Vector sz t)) (DTYPE_Vector sz t).
 
     Hypothesis IH_Poison_Struct_nil    :
@@ -3665,16 +3666,18 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         P (UVALUE_Poison (DTYPE_Packed_struct dts)) (DTYPE_Packed_struct dts) ->
         P (UVALUE_Poison (DTYPE_Packed_struct (dt :: dts))) (DTYPE_Packed_struct (dt :: dts)).
 
-    Hypothesis IH_Poison          : forall t, (NO_VOID t /\ (forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) -> P (UVALUE_Poison t) t.
+    Hypothesis IH_Poison          : forall t, (ALL_IX_SUPPORTED t /\ NO_VOID t /\ (forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) -> P (UVALUE_Poison t) t.
 
     (* Undef *)
     Hypothesis IH_Undef_Array    : forall sz t
+                                     (IX : ALL_IX_SUPPORTED t)
                                      (NV: NO_VOID t)
                                      (IH: P (UVALUE_Undef t) t),
         P (UVALUE_Undef (DTYPE_Array sz t)) (DTYPE_Array sz t).
     Hypothesis IH_Undef_Vector    : forall sz t
-                                     (NV: NO_VOID t)
-                                     (IH: P (UVALUE_Undef t) t),
+                                      (IX : ALL_IX_SUPPORTED t)
+                                      (NV: NO_VOID t)
+                                      (IH: P (UVALUE_Undef t) t),
         P (UVALUE_Undef (DTYPE_Vector sz t)) (DTYPE_Vector sz t).
 
     Hypothesis IH_Undef_Struct_nil    :
@@ -3693,16 +3696,18 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         P (UVALUE_Undef (DTYPE_Packed_struct dts)) (DTYPE_Packed_struct dts) ->
         P (UVALUE_Undef (DTYPE_Packed_struct (dt :: dts))) (DTYPE_Packed_struct (dt :: dts)).
 
-    Hypothesis IH_Undef          : forall t, (NO_VOID t /\ (forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) -> P (UVALUE_Undef t) t.
+    Hypothesis IH_Undef          : forall t, (ALL_IX_SUPPORTED t /\ NO_VOID t /\ (forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) -> P (UVALUE_Undef t) t.
 
     (* Oom *)
     Hypothesis IH_Oom_Array    : forall sz t
-                                     (NV: NO_VOID t)
-                                     (IH: P (UVALUE_Oom t) t),
+                                   (IX : ALL_IX_SUPPORTED t)
+                                   (NV: NO_VOID t)
+                                   (IH: P (UVALUE_Oom t) t),
         P (UVALUE_Oom (DTYPE_Array sz t)) (DTYPE_Array sz t).
     Hypothesis IH_Oom_Vector    : forall sz t
-                                     (NV: NO_VOID t)
-                                     (IH: P (UVALUE_Oom t) t),
+                                    (IX : ALL_IX_SUPPORTED t)
+                                    (NV: NO_VOID t)
+                                    (IH: P (UVALUE_Oom t) t),
         P (UVALUE_Oom (DTYPE_Vector sz t)) (DTYPE_Vector sz t).
 
     Hypothesis IH_Oom_Struct_nil    :
@@ -3721,7 +3726,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         P (UVALUE_Oom (DTYPE_Packed_struct dts)) (DTYPE_Packed_struct dts) ->
         P (UVALUE_Oom (DTYPE_Packed_struct (dt :: dts))) (DTYPE_Packed_struct (dt :: dts)).
 
-    Hypothesis IH_Oom          : forall t, (NO_VOID t /\ (forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) -> P (UVALUE_Oom t) t.
+    Hypothesis IH_Oom          : forall t, (ALL_IX_SUPPORTED t /\ NO_VOID t /\ (forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) -> P (UVALUE_Oom t) t.
 
     Hypothesis IH_Double         : forall x, P (UVALUE_Double x) DTYPE_Double.
     Hypothesis IH_Float          : forall x, P (UVALUE_Float x) DTYPE_Float.
@@ -4108,55 +4113,67 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                     end]).
       - generalize dependent τ.
         fix IHτ 1.
-        intros τ NV.
+        intros τ IX NV.
         destruct τ eqn:Hτ; try contradiction;
           try solve [eapply IH_Poison;
-                     repeat split; solve [intros * CONTRA; inversion CONTRA]].
-
+                     repeat split; auto; solve [intros * CONTRA; inversion CONTRA]].
+        
         (* Poison Arrays *)
         { pose proof NV as NVd.
           rewrite NO_VOID_equation in NVd.
+          rewrite ALL_IX_SUPPORTED_equation in IX.
           apply IH_Poison_Array; auto.
         }
 
         (* Poison Structs *)
         { pose proof NV as NVfs.
           rewrite NO_VOID_equation in NVfs.
+          pose proof IX as IXfs.
+          rewrite ALL_IX_SUPPORTED_equation in IXfs.
           clear Hτ.
           generalize dependent fields.
-          induction fields; intros NV NVfs.
+          induction fields; intros IX NV NVfs IXfs.
           - apply IH_Poison_Struct_nil.
           - apply IH_Poison_Struct_cons.
             apply IHτ.
-            eapply NO_VOID_Struct_fields in NV.
+            eapply ALL_IX_SUPPORTED_Struct_fields in IX; cbn; auto.
+            apply IX.
+            eapply NO_VOID_Struct_fields in NV; cbn; auto.
             apply NV.
-            left; auto.
             apply IHfields.
 
+            eapply ALL_IX_SUPPORTED_Struct_cons; eauto.
             eapply NO_VOID_Struct_cons; eauto.
+            eapply Forall_HIn_cons; eauto.
             eapply Forall_HIn_cons; eauto.
         }
 
         (* Poison Packed structs *)
         { pose proof NV as NVfs.
           rewrite NO_VOID_equation in NVfs.
+          pose proof IX as IXfs.
+          rewrite ALL_IX_SUPPORTED_equation in IXfs.
           clear Hτ.
           generalize dependent fields.
-          induction fields; intros NV NVfs.
+          induction fields; intros IX NV NVfs IXfs.
           - apply IH_Poison_Packed_struct_nil.
           - apply IH_Poison_Packed_struct_cons.
             apply IHτ.
-            eapply NO_VOID_Packed_struct_fields in NV.
+            eapply ALL_IX_SUPPORTED_Packed_struct_fields in IX; cbn; auto.
+            apply IX.
+            eapply NO_VOID_Packed_struct_fields in NV; cbn; auto.
             apply NV.
-            left; auto.
             apply IHfields.
 
+            eapply ALL_IX_SUPPORTED_Packed_struct_cons; eauto.
             eapply NO_VOID_Packed_struct_cons; eauto.
+            eapply Forall_HIn_cons; eauto.
             eapply Forall_HIn_cons; eauto.
         }
 
         (* Poison Vectors *)
         { pose proof NV as NVd.
+          rewrite ALL_IX_SUPPORTED_equation in IX.
           rewrite NO_VOID_equation in NVd.
           apply IH_Poison_Vector; auto.
         }
@@ -4166,54 +4183,67 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
       - generalize dependent τ.
         fix IHτ 1.
-        intros τ NV.
+        intros τ IX NV.
         destruct τ eqn:Hτ; try contradiction;
           try solve [eapply IH_Oom;
-                     repeat split; solve [intros * CONTRA; inversion CONTRA]].
+                     repeat split; auto; solve [intros * CONTRA; inversion CONTRA]].
 
-        (* Oom Arrays *)
+        (* OOM Arrays *)
         { pose proof NV as NVd.
           rewrite NO_VOID_equation in NVd.
+          rewrite ALL_IX_SUPPORTED_equation in IX.
           apply IH_Oom_Array; auto.
         }
 
-        (* Oom Structs *)
+        (* OOM Structs *)
         { pose proof NV as NVfs.
           rewrite NO_VOID_equation in NVfs.
+          pose proof IX as IXfs.
+          rewrite ALL_IX_SUPPORTED_equation in IXfs.
           clear Hτ.
           generalize dependent fields.
-          induction fields; intros NV NVfs.
+          induction fields; intros IX NV NVfs IXfs.
           - apply IH_Oom_Struct_nil.
           - apply IH_Oom_Struct_cons.
             apply IHτ.
-            eapply NO_VOID_Struct_fields in NV.
+            eapply ALL_IX_SUPPORTED_Struct_fields in IX; cbn; auto.
+            apply IX.
+            eapply NO_VOID_Struct_fields in NV; cbn; auto.
             apply NV.
-            left; auto.
             apply IHfields.
+
+            eapply ALL_IX_SUPPORTED_Struct_cons; eauto.
             eapply NO_VOID_Struct_cons; eauto.
+            eapply Forall_HIn_cons; eauto.
             eapply Forall_HIn_cons; eauto.
         }
 
-        (* Oom Packed structs *)
+        (* OOM Packed structs *)
         { pose proof NV as NVfs.
           rewrite NO_VOID_equation in NVfs.
+          pose proof IX as IXfs.
+          rewrite ALL_IX_SUPPORTED_equation in IXfs.
           clear Hτ.
           generalize dependent fields.
-          induction fields; intros NV NVfs.
+          induction fields; intros IX NV NVfs IXfs.
           - apply IH_Oom_Packed_struct_nil.
           - apply IH_Oom_Packed_struct_cons.
             apply IHτ.
-            eapply NO_VOID_Packed_struct_fields in NV.
+            eapply ALL_IX_SUPPORTED_Packed_struct_fields in IX; cbn; auto.
+            apply IX.
+            eapply NO_VOID_Packed_struct_fields in NV; cbn; auto.
             apply NV.
-            left; auto.
             apply IHfields.
 
+            eapply ALL_IX_SUPPORTED_Packed_struct_cons; eauto.
             eapply NO_VOID_Packed_struct_cons; eauto.
+            eapply Forall_HIn_cons; eauto.
             eapply Forall_HIn_cons; eauto.
         }
 
-        (* Oom Vectors *)
+        (* OOM Vectors *)
         { pose proof NV as NVd.
+          rewrite ALL_IX_SUPPORTED_equation in IX.
           rewrite NO_VOID_equation in NVd.
           apply IH_Oom_Vector; auto.
         }
@@ -4223,54 +4253,67 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
       - generalize dependent τ.
         fix IHτ 1.
-        intros τ NV.
+        intros τ IX NV.
         destruct τ eqn:Hτ; try contradiction;
           try solve [eapply IH_Undef;
-                     repeat split; solve [intros * CONTRA; inversion CONTRA]].
+                     repeat split; auto; solve [intros * CONTRA; inversion CONTRA]].
 
         (* Undef Arrays *)
         { pose proof NV as NVd.
           rewrite NO_VOID_equation in NVd.
+          rewrite ALL_IX_SUPPORTED_equation in IX.
           apply IH_Undef_Array; auto.
         }
 
         (* Undef Structs *)
         { pose proof NV as NVfs.
           rewrite NO_VOID_equation in NVfs.
+          pose proof IX as IXfs.
+          rewrite ALL_IX_SUPPORTED_equation in IXfs.
           clear Hτ.
           generalize dependent fields.
-          induction fields; intros NV NVfs.
+          induction fields; intros IX NV NVfs IXfs.
           - apply IH_Undef_Struct_nil.
           - apply IH_Undef_Struct_cons.
             apply IHτ.
-            eapply NO_VOID_Struct_fields in NV.
+            eapply ALL_IX_SUPPORTED_Struct_fields in IX; cbn; auto.
+            apply IX.
+            eapply NO_VOID_Struct_fields in NV; cbn; auto.
             apply NV.
-            left; auto.
             apply IHfields.
+
+            eapply ALL_IX_SUPPORTED_Struct_cons; eauto.
             eapply NO_VOID_Struct_cons; eauto.
+            eapply Forall_HIn_cons; eauto.
             eapply Forall_HIn_cons; eauto.
         }
 
         (* Undef Packed structs *)
         { pose proof NV as NVfs.
           rewrite NO_VOID_equation in NVfs.
+          pose proof IX as IXfs.
+          rewrite ALL_IX_SUPPORTED_equation in IXfs.
           clear Hτ.
           generalize dependent fields.
-          induction fields; intros NV NVfs.
+          induction fields; intros IX NV NVfs IXfs.
           - apply IH_Undef_Packed_struct_nil.
           - apply IH_Undef_Packed_struct_cons.
             apply IHτ.
-            eapply NO_VOID_Packed_struct_fields in NV.
+            eapply ALL_IX_SUPPORTED_Packed_struct_fields in IX; cbn; auto.
+            apply IX.
+            eapply NO_VOID_Packed_struct_fields in NV; cbn; auto.
             apply NV.
-            left; auto.
             apply IHfields.
 
+            eapply ALL_IX_SUPPORTED_Packed_struct_cons; eauto.
             eapply NO_VOID_Packed_struct_cons; eauto.
+            eapply Forall_HIn_cons; eauto.
             eapply Forall_HIn_cons; eauto.
         }
 
         (* Undef Vectors *)
         { pose proof NV as NVd.
+          rewrite ALL_IX_SUPPORTED_equation in IX.
           rewrite NO_VOID_equation in NVd.
           apply IH_Undef_Vector; auto.
         }
@@ -4518,14 +4561,16 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     1-4: solve_dvalue_has_dtyp_dec_int_helper.
 
     - pose proof (dtyp_eq_dec t dt) as [EQ | NEQ]; subst.
-      + pose proof (NO_VOID_dec dt) as [NVOID | VOID].
+      + pose proof (NO_VOID_dec dt) as [NVOID | VOID];
+          pose proof (ALL_IX_SUPPORTED_dec dt) as [IX | NIX].
         left; constructor; auto.
-        right; intros CONTRA; inv CONTRA; contradiction.
+        all: right; intros CONTRA; inv CONTRA; contradiction.
       + right; intros CONTRA; inv CONTRA; contradiction.
     - pose proof (dtyp_eq_dec t dt) as [EQ | NEQ]; subst.
-      + pose proof (NO_VOID_dec dt) as [NVOID | VOID].
+      + pose proof (NO_VOID_dec dt) as [NVOID | VOID];
+          pose proof (ALL_IX_SUPPORTED_dec dt) as [IX | NIX].
         left; constructor; auto.
-        right; intros CONTRA; inv CONTRA; contradiction.
+        all: right; intros CONTRA; inv CONTRA; contradiction.
       + right; intros CONTRA; inv CONTRA; contradiction.
     - destruct dt;
         try
@@ -4714,6 +4759,297 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         intros CONTRA.
         inv CONTRA.
         lia.
+  Qed.
+
+  Lemma uvalue_has_dtyp_IX_supported :
+    forall uv sz,
+      uvalue_has_dtyp uv (DTYPE_I sz) ->
+      IX_supported sz.
+  Proof.
+    intros uv sz TYPE.
+    inv TYPE;
+      try solve
+        [ solve [ constructor
+                | match goal with
+                  | H: ALL_IX_SUPPORTED _ |- _ =>
+                      rewrite ALL_IX_SUPPORTED_equation in H; auto
+                  | H: (ALL_IX_SUPPORTED _) /\ _ |- _ =>
+                      destruct H; rewrite ALL_IX_SUPPORTED_equation in H; auto
+                  end
+                | auto
+            ]
+        ].
+    - inv H.
+  Qed.
+
+  Lemma uvalue_has_dtyp_dec :
+    forall {uv dt},
+      {uvalue_has_dtyp uv dt} + {~ uvalue_has_dtyp uv dt}.
+  Proof.
+    induction uv; intros dt_orig;
+      try solve
+        [ destruct dt_orig;
+          try
+            solve
+            [ right; intros CONTRA; inv CONTRA
+            | left; constructor
+            ]
+        ].
+
+    1-4: solve_dvalue_has_dtyp_dec_int_helper.
+
+    { (* Undef *)
+      pose proof (dtyp_eq_dec t dt_orig) as [EQ | NEQ]; subst.
+      + pose proof (NO_VOID_dec dt_orig) as [NVOID | VOID];
+          pose proof (ALL_IX_SUPPORTED_dec dt_orig) as [IX | NIX].
+        left; constructor; auto.
+        all: right; intros CONTRA; inv CONTRA; contradiction.
+      + right; intros CONTRA; inv CONTRA; contradiction.
+    }
+
+    { (* Poison *)
+      pose proof (dtyp_eq_dec t dt_orig) as [EQ | NEQ]; subst.
+      + pose proof (NO_VOID_dec dt_orig) as [NVOID | VOID];
+          pose proof (ALL_IX_SUPPORTED_dec dt_orig) as [IX | NIX].
+        left; constructor; auto.
+        all: right; intros CONTRA; inv CONTRA; contradiction.
+      + right; intros CONTRA; inv CONTRA; contradiction.
+    }
+
+    { (* Oom *)
+      pose proof (dtyp_eq_dec t dt_orig) as [EQ | NEQ]; subst.
+      + pose proof (NO_VOID_dec dt_orig) as [NVOID | VOID];
+          pose proof (ALL_IX_SUPPORTED_dec dt_orig) as [IX | NIX].
+        left; constructor; auto.
+        all: right; intros CONTRA; inv CONTRA; contradiction.
+      + right; intros CONTRA; inv CONTRA; contradiction.
+    }
+
+    { (* Structs *)
+      - destruct dt_orig;
+          try
+            solve
+            [ right; intros CONTRA; inv CONTRA
+            | left; constructor
+            ].
+
+        remember (fields, fields0) as FIELDS.
+        replace fields with (fst FIELDS) in * by (subst; auto).
+        replace fields0 with (snd FIELDS) in * by (inv HeqFIELDS; cbn; auto).
+        clear fields fields0 HeqFIELDS.
+        induction FIELDS using double_list_rect.
+        + left; constructor.
+        + right; intros CONTRA; inv CONTRA.
+        + right; intros CONTRA; inv CONTRA.
+        + forward IHFIELDS.
+          { intros u X0 dt.
+            apply X.
+            right; auto.
+          }
+          cbn in IHFIELDS.
+          specialize (X x (inl eq_refl) y).
+          cbn.
+          destruct X.
+          * destruct IHFIELDS.
+            -- left; constructor; auto.
+            -- right.
+               intros CONTRA.
+               inv CONTRA.
+               contradiction.
+          * right.
+            intros CONTRA.
+            inv CONTRA.
+            contradiction.
+    }
+
+    { (* Packed structs *)
+      - destruct dt_orig;
+          try
+            solve
+            [ right; intros CONTRA; inv CONTRA
+            | left; constructor
+            ].
+
+        remember (fields, fields0) as FIELDS.
+        replace fields with (fst FIELDS) in * by (subst; auto).
+        replace fields0 with (snd FIELDS) in * by (inv HeqFIELDS; cbn; auto).
+        clear fields fields0 HeqFIELDS.
+        induction FIELDS using double_list_rect.
+        + left; constructor.
+        + right; intros CONTRA; inv CONTRA.
+        + right; intros CONTRA; inv CONTRA.
+        + forward IHFIELDS.
+          { intros u X0 dt.
+            apply X.
+            right; auto.
+          }
+          cbn in IHFIELDS.
+          specialize (X x (inl eq_refl) y).
+          cbn.
+          destruct X.
+          * destruct IHFIELDS.
+            -- left; constructor; auto.
+            -- right.
+               intros CONTRA.
+               inv CONTRA.
+               contradiction.
+          * right.
+            intros CONTRA.
+            inv CONTRA.
+            contradiction.
+    }
+
+    { (* Arrays *)
+      - destruct dt_orig;
+          try
+            solve
+            [ right; intros CONTRA; inv CONTRA
+            | left; constructor
+            ].
+
+        cbn.
+        assert ({N.to_nat sz = length elts} + {N.to_nat sz <> length elts}) as [SZ | SZ] by apply Nat.eq_dec.
+        + generalize dependent sz.
+          induction elts; intros sz SZ.
+          * cbn in *.
+            assert (sz = 0) by lia; subst.
+            left.
+            replace 0 with (N.of_nat 0%nat) by lia.
+            constructor; auto.
+          * cbn in SZ.
+
+            forward IHelts.
+            intros e X0 dt0.
+            apply X; right; eauto.
+
+            destruct sz; [lia|].
+            rewrite <- N.succ_pos_pred in SZ.
+
+            specialize (IHelts (Pos.pred_N p)).
+            forward IHelts.
+            lia.
+
+            specialize (X a (inl eq_refl) dt_orig).
+            destruct X.
+            -- destruct IHelts.
+               ++ left.
+                  inv u0.
+                  rewrite <- positive_nat_N.
+                  constructor; auto.
+                  cbn; lia.
+               ++ right.
+                  intros CONTRA.
+                  inv CONTRA.
+                  apply n.
+                  setoid_rewrite <- Nnat.N2Nat.id.
+                  constructor.
+                  eapply Forall_inv_tail; eauto.
+                  lia.
+            -- right.
+               intros CONTRA.
+               inv CONTRA.
+               apply Forall_cons_iff in H2.
+               destruct H2.
+               contradiction.
+        + right.
+          intros CONTRA.
+          inv CONTRA.
+          lia.
+    }
+
+    { (* Vectors *)
+      - destruct dt_orig;
+          try
+            solve
+            [ right; intros CONTRA; inv CONTRA
+            | left; constructor
+            ].
+
+        destruct (@vector_dtyp_dec dt_orig) as [VEC | NVEC].
+        2: {
+          right.
+          intros CONTRA.
+          inv CONTRA.
+          contradiction.
+        }
+
+        cbn.
+        assert ({N.to_nat sz = length elts} + {N.to_nat sz <> length elts}) as [SZ | SZ] by apply Nat.eq_dec.
+        + generalize dependent sz.
+          induction elts; intros sz SZ.
+          * cbn in *.
+            assert (sz = 0) by lia; subst.
+            left.
+            replace 0 with (N.of_nat 0%nat) by lia.
+            constructor; auto.
+          * cbn in SZ.
+
+            forward IHelts.
+            intros e X0 dt0.
+            apply X; right; eauto.
+
+            destruct sz; [lia|].
+            rewrite <- N.succ_pos_pred in SZ.
+
+            specialize (IHelts (Pos.pred_N p)).
+            forward IHelts.
+            lia.
+
+            specialize (X a (inl eq_refl) dt_orig).
+            destruct X.
+            -- destruct IHelts.
+               ++ left.
+                  inv u0.
+                  rewrite <- positive_nat_N.
+                  constructor; auto.
+                  cbn; lia.
+               ++ right.
+                  intros CONTRA.
+                  inv CONTRA.
+                  apply n.
+                  setoid_rewrite <- Nnat.N2Nat.id.
+                  constructor.
+                  eapply Forall_inv_tail; eauto.
+                  lia.
+                  auto.
+            -- right.
+               intros CONTRA.
+               inv CONTRA.
+               apply Forall_cons_iff in H2.
+               destruct H2.
+               contradiction.
+        + right.
+          intros CONTRA.
+          inv CONTRA.
+          lia.
+    }
+
+    { (* Binops *)
+      specialize (IHuv1 dt_orig).
+      specialize (IHuv2 dt_orig).
+
+      destruct dt_orig;
+        try
+          solve
+          [ right; intros CONTRA; inv CONTRA
+          | left; constructor
+          ].
+
+      - destruct IHuv1, IHuv2.
+        + left. constructor; auto.
+          solve_dvalue_has_dtyp_dec_int_helper.
+
+      
+                try
+          solve
+          [ right; intros CONTRA; inv CONTRA
+          | left; constructor
+          ].
+
+      
+      left.
+      constructor.
+    }
   Qed.
 
   Ltac solve_no_void_dec :=
