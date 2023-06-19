@@ -5150,7 +5150,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Admitted.
 
   Lemma uvalue_has_dtyp_dec :
-    forall {uv dt},
+    forall uv dt,
       {uvalue_has_dtyp uv dt} + {~ uvalue_has_dtyp uv dt}.
   Proof.
     intros uv dt.
