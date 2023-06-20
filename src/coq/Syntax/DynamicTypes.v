@@ -747,6 +747,9 @@ Ltac solve_no_void :=
 
 #[global] Hint Constructors IX_supported : IX_SUPPORTED.
 #[global] Hint Extern 1 (Forall_HIn _ _) => solve_Forall_HIn : IX_SUPPORTED.
+#[global] Hint Resolve ALL_IX_SUPPORTED_Packed_struct_cons_inv : IX_SUPPORTED.
+#[global] Hint Resolve ALL_IX_SUPPORTED_Struct_cons_inv : IX_SUPPORTED.
 
 Ltac solve_ALL_IX_SUPPORTED :=
-  solve [ rewrite ALL_IX_SUPPORTED_equation; auto with IX_SUPPORTED].
+  solve [ auto with IX_SUPPORTED
+        | rewrite ALL_IX_SUPPORTED_equation; auto with IX_SUPPORTED].

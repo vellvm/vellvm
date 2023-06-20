@@ -11662,6 +11662,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   (* TODO: Move this hint? *)
   Hint Constructors DVC1.DV2.uvalue_has_dtyp : UVALUE_DTYP.
 
+  (* TODO: Move this *)
+  Ltac solve_uvalue_refine_strict :=
+    solve [rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation; auto].
+
   (* TODO: Probably a better spot for this too *)
   Lemma uvalue_refine_strict_has_dtyp :
     forall {uv_inf uv_fin t},
@@ -11675,15 +11679,77 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       try solve
         [ rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
           cbn in UV_REF;
-          break_match_hyp; inv UV_REF;
-          constructor
+          repeat break_match_hyp_inv; inv UV_REF;
+          solve_uvalue_has_dtyp
         | rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
           cbn in UV_REF; inv UV_REF;
-          constructor
+          solve_uvalue_has_dtyp
         | rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
           cbn in UV_REF; inv UV_REF;
           constructor;
           rewrite NO_VOID_equation; auto; constructor
+        | (* Poison / undef / oom aggregates *)
+          rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
+          cbn in UV_REF;
+          repeat break_match_hyp_inv; inv UV_REF;
+
+          repeat
+            match goal with
+            (* Poison *)
+            | IH :
+              (forall uv_fin : DVC1.DV2.uvalue,
+                  DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Poison (DTYPE_Struct ?dts)) uv_fin -> DVC1.DV2.uvalue_has_dtyp uv_fin (DTYPE_Struct ?dts)) |- _ =>
+                specialize (IH (DVC1.DV2.UVALUE_Poison (DTYPE_Struct dts))); forward IH; [solve_uvalue_refine_strict|];
+                inv IH
+            | IH :
+              (forall uv_fin : DVC1.DV2.uvalue,
+                  DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Poison (DTYPE_Packed_struct ?dts)) uv_fin -> DVC1.DV2.uvalue_has_dtyp uv_fin (DTYPE_Packed_struct ?dts)) |- _ =>
+                specialize (IH (DVC1.DV2.UVALUE_Poison (DTYPE_Packed_struct dts))); forward IH; [solve_uvalue_refine_strict|];
+                inv IH
+
+            (* Undef *)
+            | IH :
+              (forall uv_fin : DVC1.DV2.uvalue,
+                  DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Undef (DTYPE_Struct ?dts)) uv_fin -> DVC1.DV2.uvalue_has_dtyp uv_fin (DTYPE_Struct ?dts)) |- _ =>
+                specialize (IH (DVC1.DV2.UVALUE_Undef (DTYPE_Struct dts))); forward IH; [solve_uvalue_refine_strict|];
+                inv IH
+            | IH :
+              (forall uv_fin : DVC1.DV2.uvalue,
+                  DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Undef (DTYPE_Packed_struct ?dts)) uv_fin -> DVC1.DV2.uvalue_has_dtyp uv_fin (DTYPE_Packed_struct ?dts)) |- _ =>
+                specialize (IH (DVC1.DV2.UVALUE_Undef (DTYPE_Packed_struct dts))); forward IH; [solve_uvalue_refine_strict|];
+                inv IH
+
+            (* Oom *)
+            | IH :
+              (forall uv_fin : DVC1.DV2.uvalue,
+                  DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Oom (DTYPE_Struct ?dts)) uv_fin -> DVC1.DV2.uvalue_has_dtyp uv_fin (DTYPE_Struct ?dts)) |- _ =>
+                specialize (IH (DVC1.DV2.UVALUE_Oom (DTYPE_Struct dts))); forward IH; [solve_uvalue_refine_strict|];
+                inv IH
+            | IH :
+              (forall uv_fin : DVC1.DV2.uvalue,
+                  DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Oom (DTYPE_Packed_struct ?dts)) uv_fin -> DVC1.DV2.uvalue_has_dtyp uv_fin (DTYPE_Packed_struct ?dts)) |- _ =>
+                specialize (IH (DVC1.DV2.UVALUE_Oom (DTYPE_Packed_struct dts))); forward IH; [solve_uvalue_refine_strict|];
+                inv IH
+
+            (* Non-aggregates *)
+            | IHPoison :
+              (forall uv_fin : DVC1.DV2.uvalue, DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Poison ?dt) uv_fin -> DVC1.DV2.uvalue_has_dtyp uv_fin ?dt) |- _ =>
+                specialize (IHPoison (DVC1.DV2.UVALUE_Poison dt)); forward IHPoison; [solve_uvalue_refine_strict|];
+                inv IHPoison
+            | IHUndef :
+              (forall uv_fin : DVC1.DV2.uvalue, DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Undef ?dt) uv_fin -> DVC1.DV2.uvalue_has_dtyp uv_fin ?dt) |- _ =>
+                specialize (IHUndef (DVC1.DV2.UVALUE_Undef dt)); forward IHUndef; [solve_uvalue_refine_strict|];
+                inv IHUndef
+            | IHOom :
+              (forall uv_fin : DVC1.DV2.uvalue, DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Oom ?dt) uv_fin -> DVC1.DV2.uvalue_has_dtyp uv_fin ?dt) |- _ =>
+                specialize (IHOom (DVC1.DV2.UVALUE_Oom dt)); forward IHOom; [solve_uvalue_refine_strict|];
+                inv IHOom
+            end;
+          solve_uvalue_has_dtyp
+        | destruct H as (?&?&?&?&?&?);
+          rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF; auto; inv UV_REF;
+          solve_uvalue_has_dtyp
+
         | rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
           cbn in UV_REF; inv UV_REF;
           constructor;
@@ -11820,161 +11886,168 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           rewrite Heqo0;
           reflexivity
         ].
-    { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
-        repeat break_match_hyp_inv;
-        rewrite DVC1.uvalue_convert_strict_equation in Heqo;
-        cbn in Heqo;
-        break_match_hyp_inv.
 
-      pose proof Heqo0.
-      eapply map_monad_InT_OOM_Nth' in H2; eauto.
-      destruct H2 as (?&?&?&?).
-
-      eapply DVC1.DV2.UVALUE_ExtractValue_Struct_cons_typ; eauto.
-      { eapply IHTYP1.
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        cbn.
-        rewrite Heqo0.
-        reflexivity.
-      }
-
-      specialize (IHTYP3 (DVC1.DV2.UVALUE_ExtractValue ft x idxs)).
-      forward IHTYP3.
-      { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        cbn.
-        rewrite H2.
-        cbn.
-        reflexivity.
-      }
-      eauto.
+    { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF; auto; inv UV_REF.
+      admit.
     }
 
-    { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
-          cbn in UV_REF;
-        break_match_hyp; inv UV_REF.
+    
+    (* { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF; *)
+    (*     cbn in UV_REF; *)
+    (*     repeat break_match_hyp_inv; *)
+    (*     rewrite DVC1.uvalue_convert_strict_equation in Heqo; *)
+    (*     cbn in Heqo; *)
+    (*     break_match_hyp_inv. *)
 
-      rewrite DVC1.uvalue_convert_strict_equation in Heqo.
-      cbn in Heqo.
-      break_match_hyp_inv.
-      constructor; eauto.
-      eapply IHTYP.
-      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-      cbn.
-      rewrite Heqo0.
-      reflexivity.
-    }
+    (*   pose proof Heqo0. *)
+    (*   eapply map_monad_InT_OOM_Nth' in H2; eauto. *)
+    (*   destruct H2 as (?&?&?&?). *)
 
-    { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
-        repeat break_match_hyp_inv;
-        rewrite DVC1.uvalue_convert_strict_equation in Heqo;
-        cbn in Heqo;
-        break_match_hyp_inv.
+    (*   eapply DVC1.DV2.UVALUE_ExtractValue_Struct_cons_typ; eauto. *)
+    (*   { eapply IHTYP1. *)
+    (*     rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation. *)
+    (*     cbn. *)
+    (*     rewrite Heqo0. *)
+    (*     reflexivity. *)
+    (*   } *)
 
-      pose proof Heqo0.
-      eapply map_monad_InT_OOM_Nth' in H2; eauto.
-      destruct H2 as (?&?&?&?).
+    (*   specialize (IHTYP3 (DVC1.DV2.UVALUE_ExtractValue ft x idxs)). *)
+    (*   forward IHTYP3. *)
+    (*   { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation. *)
+    (*     cbn. *)
+    (*     rewrite H2. *)
+    (*     cbn. *)
+    (*     reflexivity. *)
+    (*   } *)
+    (*   eauto. *)
+    (* } *)
 
-      eapply DVC1.DV2.UVALUE_ExtractValue_Packed_struct_cons_typ; eauto.
-      { eapply IHTYP1.
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        cbn.
-        rewrite Heqo0.
-        reflexivity.
-      }
+    (* { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF; *)
+    (*       cbn in UV_REF; *)
+    (*     break_match_hyp; inv UV_REF. *)
 
-      specialize (IHTYP3 (DVC1.DV2.UVALUE_ExtractValue ft x idxs)).
-      forward IHTYP3.
-      { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        cbn.
-        rewrite H2.
-        cbn.
-        reflexivity.
-      }
-      eauto.
-    }
+    (*   rewrite DVC1.uvalue_convert_strict_equation in Heqo. *)
+    (*   cbn in Heqo. *)
+    (*   break_match_hyp_inv. *)
+    (*   constructor; eauto. *)
+    (*   eapply IHTYP. *)
+    (*   rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation. *)
+    (*   cbn. *)
+    (*   rewrite Heqo0. *)
+    (*   reflexivity. *)
+    (* } *)
 
-    { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
-          cbn in UV_REF;
-        break_match_hyp; inv UV_REF.
+    (* { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF; *)
+    (*     cbn in UV_REF; *)
+    (*     repeat break_match_hyp_inv; *)
+    (*     rewrite DVC1.uvalue_convert_strict_equation in Heqo; *)
+    (*     cbn in Heqo; *)
+    (*     break_match_hyp_inv. *)
 
-      rewrite DVC1.uvalue_convert_strict_equation in Heqo.
-      cbn in Heqo.
-      break_match_hyp_inv.
-      constructor; eauto.
-      eapply IHTYP.
-      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-      cbn.
-      rewrite Heqo0.
-      reflexivity.
-    }
+    (*   pose proof Heqo0. *)
+    (*   eapply map_monad_InT_OOM_Nth' in H2; eauto. *)
+    (*   destruct H2 as (?&?&?&?). *)
 
-    { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
-        repeat break_match_hyp_inv;
-        rewrite DVC1.uvalue_convert_strict_equation in Heqo;
-        cbn in Heqo;
-        break_match_hyp_inv.
+    (*   eapply DVC1.DV2.UVALUE_ExtractValue_Packed_struct_cons_typ; eauto. *)
+    (*   { eapply IHTYP1. *)
+    (*     rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation. *)
+    (*     cbn. *)
+    (*     rewrite Heqo0. *)
+    (*     reflexivity. *)
+    (*   } *)
 
-      pose proof Heqo0.
-      eapply map_monad_InT_OOM_Nth' in H1; eauto.
-      destruct H1 as (?&?&?&?).
+    (*   specialize (IHTYP3 (DVC1.DV2.UVALUE_ExtractValue ft x idxs)). *)
+    (*   forward IHTYP3. *)
+    (*   { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation. *)
+    (*     cbn. *)
+    (*     rewrite H2. *)
+    (*     cbn. *)
+    (*     reflexivity. *)
+    (*   } *)
+    (*   eauto. *)
+    (* } *)
 
-      eapply DVC1.DV2.UVALUE_ExtractValue_Array_cons_typ; eauto.
-      { eapply IHTYP1.
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        cbn.
-        rewrite Heqo0.
-        reflexivity.
-      }
+    (* { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF; *)
+    (*       cbn in UV_REF; *)
+    (*     break_match_hyp; inv UV_REF. *)
 
-      specialize (IHTYP3 (DVC1.DV2.UVALUE_ExtractValue et x idxs)).
-      forward IHTYP3.
-      { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        cbn.
-        rewrite H1.
-        cbn.
-        reflexivity.
-      }
-      eauto.
-    }
+    (*   rewrite DVC1.uvalue_convert_strict_equation in Heqo. *)
+    (*   cbn in Heqo. *)
+    (*   break_match_hyp_inv. *)
+    (*   constructor; eauto. *)
+    (*   eapply IHTYP. *)
+    (*   rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation. *)
+    (*   cbn. *)
+    (*   rewrite Heqo0. *)
+    (*   reflexivity. *)
+    (* } *)
 
-    { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
-        repeat break_match_hyp_inv.
+    (* { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF; *)
+    (*     cbn in UV_REF; *)
+    (*     repeat break_match_hyp_inv; *)
+    (*     rewrite DVC1.uvalue_convert_strict_equation in Heqo; *)
+    (*     cbn in Heqo; *)
+    (*     break_match_hyp_inv. *)
 
-      econstructor; eauto.
-      eapply IHTYP1.
-      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-      cbn.
-      rewrite Heqo.
-      reflexivity.
-    }
+    (*   pose proof Heqo0. *)
+    (*   eapply map_monad_InT_OOM_Nth' in H1; eauto. *)
+    (*   destruct H1 as (?&?&?&?). *)
 
-    { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
-        repeat break_match_hyp_inv.
+    (*   eapply DVC1.DV2.UVALUE_ExtractValue_Array_cons_typ; eauto. *)
+    (*   { eapply IHTYP1. *)
+    (*     rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation. *)
+    (*     cbn. *)
+    (*     rewrite Heqo0. *)
+    (*     reflexivity. *)
+    (*   } *)
 
-      econstructor; eauto.
-      { intros byte IN.
-        pose proof Heqo.
-        eapply map_monad_InT_oom_In in H1; eauto.
-        destruct H1 as (byte'&INBYTES&CONV_BYTE).
-        apply In_InT in INBYTES.
-        apply H in INBYTES.
-        destruct INBYTES as (?&?&?&?&?).
-        subst.
-        rewrite DVC1.uvalue_convert_strict_equation in CONV_BYTE.
-        cbn in CONV_BYTE.
-        repeat break_match_hyp_inv.
-        eauto.
-      }
+    (*   specialize (IHTYP3 (DVC1.DV2.UVALUE_ExtractValue et x idxs)). *)
+    (*   forward IHTYP3. *)
+    (*   { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation. *)
+    (*     cbn. *)
+    (*     rewrite H1. *)
+    (*     cbn. *)
+    (*     reflexivity. *)
+    (*   } *)
+    (*   eauto. *)
+    (* } *)
 
-      eapply map_monad_InT_length_noom in Heqo.
-      congruence.
-    }
-  Qed.
+    (* { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF; *)
+    (*     cbn in UV_REF; *)
+    (*     repeat break_match_hyp_inv. *)
+
+    (*   econstructor; eauto. *)
+    (*   eapply IHTYP1. *)
+    (*   rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation. *)
+    (*   cbn. *)
+    (*   rewrite Heqo. *)
+    (*   reflexivity. *)
+    (* } *)
+
+    (* { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF; *)
+    (*     cbn in UV_REF; *)
+    (*     repeat break_match_hyp_inv. *)
+
+    (*   econstructor; eauto. *)
+    (*   { intros byte IN. *)
+    (*     pose proof Heqo. *)
+    (*     eapply map_monad_InT_oom_In in H1; eauto. *)
+    (*     destruct H1 as (byte'&INBYTES&CONV_BYTE). *)
+    (*     apply In_InT in INBYTES. *)
+    (*     apply H in INBYTES. *)
+    (*     destruct INBYTES as (?&?&?&?&?). *)
+    (*     subst. *)
+    (*     rewrite DVC1.uvalue_convert_strict_equation in CONV_BYTE. *)
+    (*     cbn in CONV_BYTE. *)
+    (*     repeat break_match_hyp_inv. *)
+    (*     eauto. *)
+    (*   } *)
+
+    (*   eapply map_monad_InT_length_noom in Heqo. *)
+    (*   congruence. *)
+    (* } *)
+    all: admit.
+  Admitted.
 
   (* TODO: move this to where filter_sid_matches is defined *)
   Lemma filter_sid_matches_length_r_le :
@@ -12323,7 +12396,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     }
 
     { (* Poison non-aggregate type *)
-      destruct H as (?&?&?&?&?).
+      destruct H as (?&?&?&?&?&?).
       destruct t; try contradiction;
         try solve
           [ rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE;
@@ -12336,10 +12409,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           ].
 
       all: exfalso.
-      - eapply H2; eauto.
-      - eapply H0; eauto.
-      - eapply H1; eauto.
       - eapply H3; eauto.
+      - eapply H1; eauto.
+      - eapply H2; eauto.
+      - eapply H4; eauto.
     }
 
     { (* Undef arrays *)
@@ -12447,7 +12520,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     }
 
     { (* Undef non-aggregate type *)
-      destruct H as (?&?&?&?&?).
+      destruct H as (?&?&?&?&?&?).
       destruct t; try contradiction;
         try solve
           [ rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE;
@@ -12460,10 +12533,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           ].
 
       all: exfalso.
-      - eapply H2; eauto.
-      - eapply H0; eauto.
-      - eapply H1; eauto.
       - eapply H3; eauto.
+      - eapply H1; eauto.
+      - eapply H2; eauto.
+      - eapply H4; eauto.
     }
 
     { (* Oom arrays *)
@@ -12571,7 +12644,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     }
 
     { (* Oom non-aggregate type *)
-      destruct H as (?&?&?&?&?).
+      destruct H as (?&?&?&?&?&?).
       destruct t; try contradiction;
         try solve
           [ rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE;
@@ -12584,10 +12657,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           ].
 
       all: exfalso.
-      - eapply H2; eauto.
-      - eapply H0; eauto.
-      - eapply H1; eauto.
       - eapply H3; eauto.
+      - eapply H1; eauto.
+      - eapply H2; eauto.
+      - eapply H4; eauto.
     }
 
     { (* Struct cons *)
@@ -12754,8 +12827,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     generalize dependent ms_inf_start.
     generalize dependent ms_fin_start.
     generalize dependent ms_fin_final.
-    induction TYPE_INF; intros ms_fin_final ms_fin_start ms_inf_start MSR bytes_fin uv_fin UV_REF SERIALIZE TYPE_FIN;
-      try solve
+    induction TYPE_INF; intros ms_fin_final ms_fin_start ms_inf_start MSR bytes_fin uv_fin UV_REF SERIALIZE TYPE_FIN.
+    all: try solve
         [ rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE;
           rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation;
           solve
@@ -12827,9 +12900,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         forward IHTYPE_INF; [constructor; solve_no_void|].
         destruct IHTYPE_INF as (bytes_inf_elt&ms_inf_final_elt&SERIALIZE_ELT&BYTE_REF_ELT&MSR_ELT).
 
-        forward IHsz.
-        { constructor; solve_no_void.
-        }
+        forward IHsz; [solve_uvalue_has_dtyp|].
 
         specialize (IHsz (concat x4) x3 x1).
         forward IHsz.
@@ -12924,9 +12995,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         forward IHTYPE_INF; [constructor; solve_no_void|].
         destruct IHTYPE_INF as (bytes_inf_elt&ms_inf_final_elt&SERIALIZE_ELT&BYTE_REF_ELT&MSR_ELT).
 
-        forward IHsz.
-        { constructor; solve_no_void.
-        }
+        forward IHsz; [solve_uvalue_has_dtyp|].
 
         specialize (IHsz (concat x4) x3 x1).
         forward IHsz.
@@ -12990,8 +13059,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       }
       2: {
         inv TYPE_FIN.
-        eapply NO_VOID_Struct_fields in H0.
-        constructor. apply H0.
+        eapply NO_VOID_Struct_fields in H1.
+        eapply ALL_IX_SUPPORTED_Struct_fields in H0.
+        constructor; eauto.
+        left; auto.
         left; auto.
       }
 
@@ -13012,8 +13083,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       forward IHTYPE_INF0; auto.
       forward IHTYPE_INF0.
       { inv TYPE_FIN.
-        eapply NO_VOID_Struct_cons in H0.
-        constructor; auto.
+        eapply ALL_IX_SUPPORTED_Struct_cons in H0.
+        eapply NO_VOID_Struct_cons in H1.
+        solve_uvalue_has_dtyp.
       }
 
       destruct IHTYPE_INF0 as (rest_bytes_inf & ms_inf_final' & SERIALIZE_REST_INF & REST_BYTES_REF & MSR_FINAL).
@@ -13055,8 +13127,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       }
       2: {
         inv TYPE_FIN.
-        eapply NO_VOID_Struct_fields in H0.
-        constructor. apply H0.
+        eapply ALL_IX_SUPPORTED_Struct_fields in H0.
+        eapply NO_VOID_Struct_fields in H1.
+        constructor; eauto.
+        left; auto.
         left; auto.
       }
 
@@ -13077,8 +13151,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       forward IHTYPE_INF0; auto.
       forward IHTYPE_INF0.
       { inv TYPE_FIN.
-        eapply NO_VOID_Packed_struct_cons in H0.
-        constructor; auto.
+        eapply ALL_IX_SUPPORTED_Packed_struct_cons in H0.
+        eapply NO_VOID_Packed_struct_cons in H1.
+        solve_uvalue_has_dtyp.
       }
 
       destruct IHTYPE_INF0 as (rest_bytes_inf & ms_inf_final' & SERIALIZE_REST_INF & REST_BYTES_REF & MSR_FINAL).
@@ -13109,7 +13184,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         cbn in UV_REF;
         inv UV_REF.
 
-      destruct H as (?&?&?&?&?).
+      destruct H as (?&?&?&?&?&?).
 
       destruct t;
         try solve
@@ -13140,10 +13215,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           ].
 
       all: exfalso.
-      - eapply H2; eauto.
-      - eapply H0; eauto.
-      - eapply H1; eauto.
       - eapply H3; eauto.
+      - eapply H1; eauto.
+      - eapply H2; eauto.
+      - eapply H4; eauto.
     }
 
     { (* Undef arrays *)
@@ -13194,9 +13269,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         forward IHTYPE_INF; [constructor; solve_no_void|].
         destruct IHTYPE_INF as (bytes_inf_elt&ms_inf_final_elt&SERIALIZE_ELT&BYTE_REF_ELT&MSR_ELT).
 
-        forward IHsz.
-        { constructor; solve_no_void.
-        }
+        forward IHsz; [solve_uvalue_has_dtyp|].
 
         specialize (IHsz (concat x4) x3 x1).
         forward IHsz.
@@ -13291,9 +13364,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         forward IHTYPE_INF; [constructor; solve_no_void|].
         destruct IHTYPE_INF as (bytes_inf_elt&ms_inf_final_elt&SERIALIZE_ELT&BYTE_REF_ELT&MSR_ELT).
 
-        forward IHsz.
-        { constructor; solve_no_void.
-        }
+        forward IHsz; [solve_uvalue_has_dtyp|].
 
         specialize (IHsz (concat x4) x3 x1).
         forward IHsz.
@@ -13357,8 +13428,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       }
       2: {
         inv TYPE_FIN.
-        eapply NO_VOID_Struct_fields in H0.
-        constructor. apply H0.
+        eapply ALL_IX_SUPPORTED_Struct_fields in H0.
+        eapply NO_VOID_Struct_fields in H1.
+        constructor; eauto.
+        left; auto.
         left; auto.
       }
 
@@ -13379,7 +13452,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       forward IHTYPE_INF0; auto.
       forward IHTYPE_INF0.
       { inv TYPE_FIN.
-        eapply NO_VOID_Struct_cons in H0.
+        eapply ALL_IX_SUPPORTED_Struct_cons in H0.
+        eapply NO_VOID_Struct_cons in H1.
         constructor; auto.
       }
 
@@ -13422,8 +13496,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       }
       2: {
         inv TYPE_FIN.
-        eapply NO_VOID_Struct_fields in H0.
-        constructor. apply H0.
+        eapply ALL_IX_SUPPORTED_Struct_fields in H0.
+        eapply NO_VOID_Struct_fields in H1.
+        constructor; eauto.
+        left; auto.
         left; auto.
       }
 
@@ -13444,8 +13520,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       forward IHTYPE_INF0; auto.
       forward IHTYPE_INF0.
       { inv TYPE_FIN.
-        eapply NO_VOID_Packed_struct_cons in H0.
-        constructor; auto.
+        eapply ALL_IX_SUPPORTED_Packed_struct_cons in H0.
+        eapply NO_VOID_Packed_struct_cons in H1.
+        constructor; eauto.
       }
 
       destruct IHTYPE_INF0 as (rest_bytes_inf & ms_inf_final' & SERIALIZE_REST_INF & REST_BYTES_REF & MSR_FINAL).
@@ -13476,7 +13553,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         cbn in UV_REF;
         inv UV_REF.
 
-      destruct H as (?&?&?&?&?).
+      destruct H as (?&?&?&?&?&?).
 
       destruct t;
         try solve
@@ -13507,10 +13584,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           ].
 
       all: exfalso.
-      - eapply H2; eauto.
-      - eapply H0; eauto.
-      - eapply H1; eauto.
       - eapply H3; eauto.
+      - eapply H1; eauto.
+      - eapply H2; eauto.
+      - eapply H4; eauto.
     }
 
     { (* Oom arrays *)
@@ -13561,9 +13638,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         forward IHTYPE_INF; [constructor; solve_no_void|].
         destruct IHTYPE_INF as (bytes_inf_elt&ms_inf_final_elt&SERIALIZE_ELT&BYTE_REF_ELT&MSR_ELT).
 
-        forward IHsz.
-        { constructor; solve_no_void.
-        }
+        forward IHsz; [solve_uvalue_has_dtyp|].
 
         specialize (IHsz (concat x4) x3 x1).
         forward IHsz.
@@ -13658,9 +13733,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         forward IHTYPE_INF; [constructor; solve_no_void|].
         destruct IHTYPE_INF as (bytes_inf_elt&ms_inf_final_elt&SERIALIZE_ELT&BYTE_REF_ELT&MSR_ELT).
 
-        forward IHsz.
-        { constructor; solve_no_void.
-        }
+        forward IHsz; [solve_uvalue_has_dtyp|].
 
         specialize (IHsz (concat x4) x3 x1).
         forward IHsz.
@@ -13724,8 +13797,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       }
       2: {
         inv TYPE_FIN.
-        eapply NO_VOID_Struct_fields in H0.
-        constructor. apply H0.
+        eapply ALL_IX_SUPPORTED_Struct_fields in H0.
+        eapply NO_VOID_Struct_fields in H1.
+        constructor; eauto.
+        left; auto.
         left; auto.
       }
 
@@ -13746,8 +13821,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       forward IHTYPE_INF0; auto.
       forward IHTYPE_INF0.
       { inv TYPE_FIN.
-        eapply NO_VOID_Struct_cons in H0.
-        constructor; auto.
+        eapply ALL_IX_SUPPORTED_Struct_cons in H0.
+        eapply NO_VOID_Struct_cons in H1.
+        constructor; eauto.
       }
 
       destruct IHTYPE_INF0 as (rest_bytes_inf & ms_inf_final' & SERIALIZE_REST_INF & REST_BYTES_REF & MSR_FINAL).
@@ -13789,8 +13865,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       }
       2: {
         inv TYPE_FIN.
-        eapply NO_VOID_Struct_fields in H0.
-        constructor. apply H0.
+        eapply ALL_IX_SUPPORTED_Struct_fields in H0.
+        eapply NO_VOID_Struct_fields in H1.
+        constructor; eauto.
+        left; auto.
         left; auto.
       }
 
@@ -13811,8 +13889,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       forward IHTYPE_INF0; auto.
       forward IHTYPE_INF0.
       { inv TYPE_FIN.
-        eapply NO_VOID_Packed_struct_cons in H0.
-        constructor; auto.
+        eapply ALL_IX_SUPPORTED_Packed_struct_cons in H0.
+        eapply NO_VOID_Packed_struct_cons in H1.
+        constructor; eauto.
       }
 
       destruct IHTYPE_INF0 as (rest_bytes_inf & ms_inf_final' & SERIALIZE_REST_INF & REST_BYTES_REF & MSR_FINAL).
@@ -13843,7 +13922,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         cbn in UV_REF;
         inv UV_REF.
 
-      destruct H as (?&?&?&?&?).
+      destruct H as (?&?&?&?&?&?).
 
       destruct t;
         try solve
@@ -13874,10 +13953,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           ].
 
       all: exfalso.
-      - eapply H2; eauto.
-      - eapply H0; eauto.
-      - eapply H1; eauto.
       - eapply H3; eauto.
+      - eapply H1; eauto.
+      - eapply H2; eauto.
+      - eapply H4; eauto.
     }
 
     { (* Regular struct serialization *)
