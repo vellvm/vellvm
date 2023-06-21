@@ -14665,7 +14665,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     1-12,16:
       try
         solve
-        [ cbn in *;
+        [ rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes_equation in DESER;
+          rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes_equation;
+          cbn in *;
           inv DESER;
           eexists; split; eauto;
           apply from_ubytes_inf_fin; auto
@@ -14700,6 +14702,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       rewrite REF.
       cbn.
       reflexivity.
+
+      rewrite FinLP.SIZEOF.sizeof_dtyp_array in BYTE_LENGTH.
+      lia.
     }
 
     { (* Structs *)
@@ -14739,6 +14744,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       rewrite REF.
       cbn.
       reflexivity.
+
+      rewrite FinLP.SIZEOF.sizeof_dtyp_vector in BYTE_LENGTH.
+      lia.
     }
   Qed.
 
