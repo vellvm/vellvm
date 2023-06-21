@@ -14708,11 +14708,133 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     }
 
     { (* Structs *)
-      admit.
+      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes_equation in DESER.
+      rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes_equation.
+      unfold LLVMParams64BitIntptr.SIZEOF.sizeof_dtyp in *.
+      unfold LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp.
+
+      generalize dependent bytes_fin.
+      generalize dependent bytes_inf.
+      generalize dependent res_fin.
+      generalize dependent H.
+      induction fields; intros H res_fin bytes_inf bytes_fin BYTES BYTE_LENGTH DESER.
+      - inv DESER.
+        exists (DVC1.DV1.UVALUE_Struct []).
+        split; auto.
+        solve_uvalue_refine_strict.
+      - cbn in DESER.
+        repeat break_match_hyp_inv.
+
+        forward IHfields.
+        { intros u0 H0 bytes_fin0 bytes_inf0 res_fin H1 H2 H3.
+          eapply H.
+          right; auto.
+          eauto.
+          lia.
+          auto.
+        }
+
+        rewrite FinSizeof.sizeof_dtyp_struct_cons in BYTE_LENGTH.
+        rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes_equation in Heqs0.
+        eapply IHfields in Heqs0.
+        2: {
+          apply Forall2_drop; eauto.
+        }
+        2: {
+          rewrite drop_length; lia.
+        }
+        destruct Heqs0 as (uv_infs&FIELDS&REFS).
+        
+        eapply H in Heqs.
+        2: left; auto.
+        2: apply Forall2_take; eauto.
+        2: {
+          rewrite take_length; lia.
+        }
+
+        destruct Heqs as (uv_inf&DESA&REF).
+        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in REFS.
+        break_match_hyp_inv; try solve [clear FIELDS; break_match_hyp_inv; break_match_hyp_inv; break_match_hyp_inv].
+        break_match_hyp_inv.
+        exists (DVC1.DV1.UVALUE_Struct (uv_inf :: fields1)).
+
+        rewrite DESA.
+        rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes_equation.
+        cbn.
+        setoid_rewrite FIELDS.
+        split; auto.
+
+        (* TODO: Add this to solve_uvalue_refine_strict *)
+        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+        rewrite map_monad_InT_cons.
+        cbn.
+        rewrite REF, Heqo.
+        reflexivity.
     }
 
     { (* Packed structs *)
-      admit.
+      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes_equation in DESER.
+      rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes_equation.
+      unfold LLVMParams64BitIntptr.SIZEOF.sizeof_dtyp in *.
+      unfold LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp.
+
+      generalize dependent bytes_fin.
+      generalize dependent bytes_inf.
+      generalize dependent res_fin.
+      generalize dependent H.
+      induction fields; intros H res_fin bytes_inf bytes_fin BYTES BYTE_LENGTH DESER.
+      - inv DESER.
+        exists (DVC1.DV1.UVALUE_Packed_struct []).
+        split; auto.
+        solve_uvalue_refine_strict.
+      - cbn in DESER.
+        repeat break_match_hyp_inv.
+
+        forward IHfields.
+        { intros u0 H0 bytes_fin0 bytes_inf0 res_fin H1 H2 H3.
+          eapply H.
+          right; auto.
+          eauto.
+          lia.
+          auto.
+        }
+
+        rewrite FinSizeof.sizeof_dtyp_packed_struct_cons in BYTE_LENGTH.
+        rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes_equation in Heqs0.
+        eapply IHfields in Heqs0.
+        2: {
+          apply Forall2_drop; eauto.
+        }
+        2: {
+          rewrite drop_length; lia.
+        }
+        destruct Heqs0 as (uv_infs&FIELDS&REFS).
+        
+        eapply H in Heqs.
+        2: left; auto.
+        2: apply Forall2_take; eauto.
+        2: {
+          rewrite take_length; lia.
+        }
+
+        destruct Heqs as (uv_inf&DESA&REF).
+        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in REFS.
+        break_match_hyp_inv; try solve [clear FIELDS; break_match_hyp_inv; break_match_hyp_inv; break_match_hyp_inv].
+        break_match_hyp_inv.
+        exists (DVC1.DV1.UVALUE_Packed_struct (uv_inf :: fields1)).
+
+        rewrite DESA.
+        rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes_equation.
+        cbn.
+        setoid_rewrite FIELDS.
+        split; auto.
+
+        (* TODO: Add this to solve_uvalue_refine_strict *)
+        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+        rewrite map_monad_InT_cons.
+        cbn.
+        rewrite REF, Heqo.
+        reflexivity.
     }
 
     { (* Vectors *)
