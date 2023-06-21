@@ -14454,6 +14454,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           repeat break_match_hyp_inv.
   Admitted.
 
+  #[global] Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes.
+  #[global] Opaque MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes.
   #[global] Opaque monad_fold_right.
   (* TODO: Move this *)
   Lemma monad_fold_right_equation :
@@ -14470,9 +14472,106 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     induction l; auto.
   Qed.
 
+  (* TODO: Move this to listutils or something *)
+  Lemma Forall2_take :
+    forall {X Y} amount (xs : list X) (ys : list Y) P,
+      Forall2 P xs ys ->
+      Forall2 P (take amount xs) (take amount ys).
+  Proof.
+    intros X Y amount xs ys P ALL.
+    generalize dependent amount.
+    induction ALL; intros amount.
+    - cbn; auto.
+    - destruct amount; cbn; auto.
+  Qed.
+
+  (* TODO: Move this to listutils or something *)
+  Lemma Forall2_drop :
+    forall {X Y} amount (xs : list X) (ys : list Y) P,
+      Forall2 P xs ys ->
+      Forall2 P (drop amount xs) (drop amount ys).
+  Proof.
+    intros X Y amount xs ys P ALL.
+    generalize dependent amount.
+    induction ALL; intros amount.
+    - cbn; auto.
+    - destruct amount; cbn; auto.
+  Qed.
+
+  (* TODO: Move this to listutils or something *)
+  Lemma Forall2_between :
+    forall {X Y} (xs : list X) (ys : list Y) P start finish,
+      Forall2 P xs ys ->
+      Forall2 P (between start finish xs) (between start finish ys).
+  Proof.
+    unfold between.
+    intros X Y xs ys P start finish ALL.
+    apply Forall2_take.
+    apply Forall2_drop.
+    auto.
+  Qed.
+
+  (* TODO: Move this to listutils or something *)
+  Lemma take_length :
+    forall {X} (xs : list X) amount,
+      amount <= N.of_nat (length xs) ->
+      length (take amount xs) = N.to_nat amount.
+  Proof.
+    intros X xs.
+    induction xs; intros amount LE.
+    - destruct amount; cbn in *; auto.
+      lia.
+    - induction amount using N.peano_ind.
+      + cbn in *; auto.
+      + cbn.
+        break_match_goal;
+        break_match_hyp_inv; auto.
+
+        cbn in *.
+        rewrite IHxs;
+        lia.
+  Qed.
+
+  (* TODO: Move this to listutils or something *)
+  Lemma drop_length :
+    forall {X} (xs : list X) amount,
+      amount <= N.of_nat (length xs) ->
+      length (drop amount xs) = (length xs - N.to_nat amount)%nat.
+  Proof.
+    intros X xs.
+    induction xs; intros amount LE.
+    - destruct amount; cbn in *; auto.
+    - induction amount using N.peano_ind.
+      + cbn in *; auto.
+      + cbn.
+        break_match_goal;
+        break_match_hyp_inv; auto.
+        break_match_goal.
+        lia.
+        cbn in *.
+        rewrite IHxs;
+        lia.
+  Qed.
+  
+  (* TODO: Move this to listutils or something *)
+  Lemma between_length :
+    forall {X} (xs : list X) start finish,
+      start <= finish ->
+      finish <= N.of_nat (length xs) ->
+      length (between start finish xs) = N.to_nat (finish - start).
+  Proof.
+    intros X xs start finish START_LE FINISH_LE.
+    unfold between.
+    apply take_length.
+    pose proof drop_length xs start as DROP.
+    forward DROP; lia.
+  Qed.
+
   Lemma monad_fold_right_deserialize_sbytes_fin_inf :
     forall {t : dtyp} {bytes_fin bytes_inf}
+      (start seq_len : N)
       (BYTES_REF : sbytes_refine bytes_inf bytes_fin)
+      (BYTES_LEN : N.of_nat (length bytes_fin) >= seq_len * FiniteSizeof.FinSizeof.sizeof_dtyp t + start * FiniteSizeof.FinSizeof.sizeof_dtyp t)
       (IHt :
         forall (bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte)
           (bytes_inf : list MemoryBigIntptr.MP.BYTE_IMPL.SByte)
@@ -14483,14 +14582,14 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           exists res_inf : LLVMParamsBigIntptr.Events.DV.uvalue,
             MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_inf t = inr res_inf /\
               DVC1.uvalue_refine_strict res_inf res_fin)
-      start finish (uv_fins : list LLVMParams64BitIntptr.Events.DV.uvalue),
+      (uv_fins : list LLVMParams64BitIntptr.Events.DV.uvalue),
       monad_fold_right
         (fun (acc : list LLVMParams64BitIntptr.Events.DV.uvalue) (idx : N) =>
            uv <-
              Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
                (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
                   ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;; 
-           @ret err _ _ (uv :: acc)) (Nseq start finish) [] = inr uv_fins ->
+           @ret err _ _ (uv :: acc)) (Nseq start (N.to_nat seq_len)) [] = inr uv_fins ->
       exists (uv_infs : list LLVMParamsBigIntptr.Events.DV.uvalue),
         (monad_fold_right
            (fun (acc : list LLVMParamsBigIntptr.Events.DV.uvalue) (idx : N) =>
@@ -14498,10 +14597,59 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
                   (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
                      ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_inf) t;; 
-              @ret err _ _ (uv :: acc)) (Nseq start finish) [] = inr uv_infs) /\
+              @ret err _ _ (uv :: acc)) (Nseq start (N.to_nat seq_len)) [] = inr uv_infs) /\
           Forall2 DVC1.uvalue_refine_strict uv_infs uv_fins.
   Proof.
-  Admitted.
+    intros t bytes_fin bytes_inf start seq_len BYTES_REF BYTES_LEN IHt uv_fins HFOLDR.
+    generalize dependent start.
+    generalize dependent uv_fins.
+    induction seq_len using N.peano_ind; intros uv_fins start BYTES_LEN HFOLDR.
+    - rewrite monad_fold_right_equation.
+      rewrite monad_fold_right_equation in HFOLDR.
+      cbn in HFOLDR; inv HFOLDR.
+      cbn.
+      exists [].
+      split; auto.
+    - rewrite monad_fold_right_equation.
+      rewrite monad_fold_right_equation in HFOLDR.
+      rewrite Nnat.N2Nat.inj_succ in *.
+      rewrite <- cons_Nseq.
+      rewrite <- cons_Nseq in HFOLDR.
+      destruct
+        (monad_fold_right
+           (fun (acc : list LLVMParams64BitIntptr.Events.DV.uvalue) (idx : N) =>
+              uv <-
+                Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
+                  (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t) ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;; 
+              ret (uv :: acc)) (Nseq (N.succ start) (N.to_nat seq_len)) []) eqn:HFOLDR'; [cbn in HFOLDR; inv HFOLDR|].
+
+      cbn in HFOLDR.
+      break_match_hyp_inv.
+      eapply IHt with
+        (bytes_inf:=(between (start * FiniteSizeof.FinSizeof.sizeof_dtyp t) ((start + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_inf)) in Heqs.
+
+      2: {
+        apply Forall2_between; auto.
+      }
+
+      2: {
+        pose proof between_length bytes_fin (start * FiniteSizeof.FinSizeof.sizeof_dtyp t) ((start + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t).
+        forward H; [lia|].
+        forward H; lia.
+      }
+
+      destruct Heqs as (uv_inf&DESER_INFS&REF).
+      
+      apply IHseq_len in HFOLDR' as (uv_infs&HFOLDR'&REFS); [|lia].
+
+      exists (uv_inf :: uv_infs).
+      split; auto.
+
+      rewrite HFOLDR'.
+      rewrite DESER_INFS.
+      cbn.
+      reflexivity.
+  Qed.
 
   (* TODO: Prove this *)
   Lemma deserialize_sbytes_fin_inf :
