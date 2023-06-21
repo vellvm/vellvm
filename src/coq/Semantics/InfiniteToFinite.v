@@ -14353,34 +14353,19 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     eapply fin_inf_write_bytes_spec; eauto.
   Qed.
 
-  (* TODO: Prove this *)
-  Lemma deserialize_sbytes_fin_inf :
-    forall {t bytes_fin bytes_inf res_fin},
-      sbytes_refine bytes_inf bytes_fin ->
-      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_fin t = inr res_fin ->
-      exists res_inf,
-        MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_inf t = inr res_inf /\
-          DVC1.uvalue_refine_strict res_inf res_fin.
+  (* TODO: Move this *)
+  Lemma from_ubytes_dtyp :
+    forall {bytes t uv},
+      MemoryBigIntptr.MMEP.MMSP.MemByte.from_ubytes bytes t = uv ->
+      N.of_nat (Datatypes.length bytes) = LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp t ->
+      E1.DV.uvalue_has_dtyp uv t.
   Proof.
-    induction t; intros bytes_fin bytes_inf res_fin BYTES DESER.
-    { cbn in *.
-      inv DESER.
-      eexists; split; eauto.
-      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-
-      (* TODO: Move this *)
-      Lemma from_ubytes_dtyp :
-        forall {bytes t uv},
-          MemoryBigIntptr.MMEP.MMSP.MemByte.from_ubytes bytes t = uv ->
-          N.of_nat (Datatypes.length bytes) = LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp t ->
-          E1.DV.uvalue_has_dtyp uv t.
-      Proof.
-        intros bytes t uv UBYTES SIZE.
-        unfold MemoryBigIntptr.MMEP.MMSP.MemByte.from_ubytes in *.
-        rewrite SIZE in UBYTES.
-        rewrite N.eqb_refl in UBYTES.
-        break_match_hyp; subst.
-        - (* Not sure what happens if `uv` doesn't have the same type as `t`...
+    intros bytes t uv UBYTES SIZE.
+    unfold MemoryBigIntptr.MMEP.MMSP.MemByte.from_ubytes in *.
+    rewrite SIZE in UBYTES.
+    rewrite N.eqb_refl in UBYTES.
+    break_match_hyp; subst.
+    - (* Not sure what happens if `uv` doesn't have the same type as `t`...
 
              Technically I could construct a bunch of
              `(UVALUE_ExtractByte uv dt idx sid)` values where `uv`
@@ -14392,38 +14377,220 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
              all_bytes_from_uvalue will make sure that `dt` agrees
              across all of the ExtractByte values, but it doesn't care
              about `uv` at all.
-           *)
-          (* TODO: Move this *)
-          Lemma all_bytes_from_uvalue_has_dtyp :
-            forall {bytes t uv},
-              MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue t bytes = Some uv ->
-              E1.DV.uvalue_has_dtyp uv t.
-          Proof.
-            induction bytes. intros t uv ALL.
-            - cbn in ALL. discriminate.
-            - intros t uv H.
-              unfold MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue in H.
-              repeat break_match_hyp_inv.
-              unfold OptionUtil.guard_opt in *.
-              repeat break_match_hyp_inv.
-              
-          Qed.
+       *)
+      (* TODO: Move this *)
+      Lemma all_bytes_from_uvalue_has_dtyp :
+        forall {bytes t uv},
+          MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue t bytes = Some uv ->
+          E1.DV.uvalue_has_dtyp uv t.
+      Proof.
+        induction bytes. intros t uv ALL.
+        - cbn in ALL. discriminate.
+        - intros t uv H.
+          unfold MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue in H.
+          repeat break_match_hyp_inv.
+          unfold OptionUtil.guard_opt in *.
+          repeat break_match_hyp_inv.
+          assert (u3_1 = u1).
+          apply RelDec.rel_dec_correct; auto.
+          subst.
+          apply dtyp_eqb_eq in Heqb3; subst.
+          apply N.eqb_eq in Heqb; subst.
+      Admitted.
 
-          eapply all_bytes_from_uvalue_has_dtyp; eauto.
-        - constructor.
-          + intros byte MAP.
-            apply in_map_iff in MAP.
-            destruct MAP as (raw_byte & EXTRACT & IN).
-            subst.
-            induction bytes.
-            cbn in 
-            apply 
-
-      Qed.
-      
-      break_match.
+      eapply all_bytes_from_uvalue_has_dtyp; eauto.
+    - constructor; auto.
       admit.
-      rewrite 
+      + intros byte MAP.
+        apply in_map_iff in MAP.
+        destruct MAP as (raw_byte & EXTRACT & IN).
+        subst.
+        induction bytes.
+  Admitted.
+
+  Lemma all_bytes_from_uvalue_fin_inf :
+    forall {bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte}
+      {bytes_inf : list MemoryBigIntptr.MP.BYTE_IMPL.SByte}
+      {dt uv_fin}
+      (BYTES : sbytes_refine bytes_inf bytes_fin),
+      Memory64BitIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue dt bytes_fin = Some uv_fin ->
+      exists uv_inf,
+        MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue dt bytes_inf = Some uv_inf /\
+          DVC1.uvalue_refine_strict uv_inf uv_fin.
+  Proof.
+  Admitted.
+
+  Lemma from_ubytes_inf_fin :
+    forall {bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte}
+      {bytes_inf : list MemoryBigIntptr.MP.BYTE_IMPL.SByte}
+      {dt}
+      (BYTES : sbytes_refine bytes_inf bytes_fin),
+      DVC1.uvalue_refine_strict (MemoryBigIntptr.MMEP.MMSP.MemByte.from_ubytes bytes_inf dt)
+        (Memory64BitIntptr.MMEP.MMSP.MemByte.from_ubytes bytes_fin dt).
+  Proof.
+    intros bytes_fin bytes_inf dt BYTES.
+
+    assert (length bytes_inf = length bytes_fin) as BYTE_LENGTH.
+    { eapply sbytes_refine_length; eauto.
+    }
+
+    induction dt.
+    { unfold Memory64BitIntptr.MMEP.MMSP.MemByte.from_ubytes, MemoryBigIntptr.MMEP.MMSP.MemByte.from_ubytes.
+      setoid_rewrite BYTE_LENGTH.
+      break_match_goal.
+      - admit.
+      - rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+        cbn.
+        break_match_goal; cbn in *.
+        + admit.
+        + apply map_monad_InT_OOM_fail in Heqo as (?&?&?).
+          apply InT_map_impl in x0.
+          destruct x0 as (?&?&?).
+          pose proof (@MemoryBigIntptr.Byte.sbyte_to_extractbyte_inv x0) as (?&?&?&?&?).
+          subst.
+          rewrite H0 in H.
+          rewrite DVC1.uvalue_convert_strict_equation in H.
+          cbn in *.
+          repeat break_match_hyp_inv.
+  Admitted.
+
+  #[global] Opaque monad_fold_right.
+  (* TODO: Move this *)
+  Lemma monad_fold_right_equation :
+    forall {A B m} `{HM : Monad m} (f : B -> A -> m B) (l : list A) (b : B),
+      monad_fold_right f l b =
+        match l with
+        | [] => ret b
+        | x::xs => 
+            r <- monad_fold_right f xs b ;;
+            f r x
+        end.
+  Proof.
+    intros A B m HM f l b.
+    induction l; auto.
+  Qed.
+
+  Lemma monad_fold_right_deserialize_sbytes_fin_inf :
+    forall {t : dtyp} {bytes_fin bytes_inf}
+      (BYTES_REF : sbytes_refine bytes_inf bytes_fin)
+      (IHt :
+        forall (bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte)
+          (bytes_inf : list MemoryBigIntptr.MP.BYTE_IMPL.SByte)
+          (res_fin : LLVMParams64BitIntptr.Events.DV.uvalue),
+          sbytes_refine bytes_inf bytes_fin ->
+          N.of_nat (Datatypes.length bytes_fin) = FiniteSizeof.FinSizeof.sizeof_dtyp t ->
+          Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_fin t = inr res_fin ->
+          exists res_inf : LLVMParamsBigIntptr.Events.DV.uvalue,
+            MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_inf t = inr res_inf /\
+              DVC1.uvalue_refine_strict res_inf res_fin)
+      start finish (uv_fins : list LLVMParams64BitIntptr.Events.DV.uvalue),
+      monad_fold_right
+        (fun (acc : list LLVMParams64BitIntptr.Events.DV.uvalue) (idx : N) =>
+           uv <-
+             Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
+               (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
+                  ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;; 
+           @ret err _ _ (uv :: acc)) (Nseq start finish) [] = inr uv_fins ->
+      exists (uv_infs : list LLVMParamsBigIntptr.Events.DV.uvalue),
+        (monad_fold_right
+           (fun (acc : list LLVMParamsBigIntptr.Events.DV.uvalue) (idx : N) =>
+              uv <-
+                MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
+                  (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
+                     ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_inf) t;; 
+              @ret err _ _ (uv :: acc)) (Nseq start finish) [] = inr uv_infs) /\
+          Forall2 DVC1.uvalue_refine_strict uv_infs uv_fins.
+  Proof.
+  Admitted.
+
+  (* TODO: Prove this *)
+  Lemma deserialize_sbytes_fin_inf :
+    forall {t bytes_fin bytes_inf res_fin},
+      sbytes_refine bytes_inf bytes_fin ->
+      N.of_nat (length bytes_fin) = LLVMParams64BitIntptr.SIZEOF.sizeof_dtyp t ->
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_fin t = inr res_fin ->
+      exists res_inf,
+        MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_inf t = inr res_inf /\
+          DVC1.uvalue_refine_strict res_inf res_fin.
+  Proof.
+    induction t; intros bytes_fin bytes_inf res_fin BYTES BYTE_LENGTH DESER.
+    1-12,16:
+      try
+        solve
+        [ cbn in *;
+          inv DESER;
+          eexists; split; eauto;
+          apply from_ubytes_inf_fin; auto
+        ].
+
+    { (* Arrays *)
+      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes_equation in DESER.
+      rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes_equation.
+      unfold LLVMParams64BitIntptr.SIZEOF.sizeof_dtyp in *.
+      unfold LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp.
+
+      destruct (monad_fold_right
+            (fun (acc : list LLVMParams64BitIntptr.Events.DV.uvalue) (idx : N) =>
+             uv <-
+             Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
+               (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
+                  ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;; 
+             ret (uv :: acc)) (Nseq 0 (N.to_nat sz)) []) eqn:HFOLDR; cbn in DESER; inv DESER.
+
+      eapply monad_fold_right_deserialize_sbytes_fin_inf in HFOLDR; eauto.
+      destruct HFOLDR as (uv_infs&HFOLDR&REF).
+      exists (LLVMParamsBigIntptr.Events.DV.UVALUE_Array uv_infs).
+      rewrite HFOLDR.
+      cbn.
+      split; auto.
+
+      (* TODO: Incorporate into solve_uvalue_refine_strict? *)
+      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation; auto.
+      rewrite <- map_monad_map_monad_InT.
+      unfold DVC1.uvalue_refine_strict in REF.
+      apply map_monad_oom_forall2 in REF.
+      rewrite REF.
+      cbn.
+      reflexivity.
+    }
+
+    { (* Structs *)
+      admit.
+    }
+
+    { (* Packed structs *)
+      admit.
+    }
+
+    { (* Vectors *)
+      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes_equation in DESER.
+      rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes_equation.
+      unfold LLVMParams64BitIntptr.SIZEOF.sizeof_dtyp in *.
+      unfold LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp.
+
+      destruct (monad_fold_right
+            (fun (acc : list LLVMParams64BitIntptr.Events.DV.uvalue) (idx : N) =>
+             uv <-
+             Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
+               (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
+                  ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;; 
+             ret (uv :: acc)) (Nseq 0 (N.to_nat sz)) []) eqn:HFOLDR; cbn in DESER; inv DESER.
+
+      eapply monad_fold_right_deserialize_sbytes_fin_inf in HFOLDR; eauto.
+      destruct HFOLDR as (uv_infs&HFOLDR&REF).
+      exists (LLVMParamsBigIntptr.Events.DV.UVALUE_Vector uv_infs).
+      rewrite HFOLDR.
+      cbn.
+      split; auto.
+
+      (* TODO: Incorporate into solve_uvalue_refine_strict? *)
+      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation; auto.
+      rewrite <- map_monad_map_monad_InT.
+      unfold DVC1.uvalue_refine_strict in REF.
+      apply map_monad_oom_forall2 in REF.
+      rewrite REF.
+      cbn.
+      reflexivity.
     }
   Qed.
 
