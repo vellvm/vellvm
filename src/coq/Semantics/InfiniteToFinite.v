@@ -2426,41 +2426,47 @@ Module InfiniteToFinite.
       apply fin_to_inf_dvalue_refine_strict.
   Qed.
 
-  Lemma convert_memory_lift :
-    forall m,
-      convert_memory (lift_memory m) = NoOom m.
-  Proof.
-  Admitted.
+  (* Lemma convert_memory_lift : *)
+  (*   forall m1 m2, *)
+  (*     convert_memory (lift_memory m1) = NoOom m2 -> True. *)
+  (* Proof. *)
+  (*   intros m. *)
+  (*   unfold convert_memory. *)
+  (*   unfold lift_memory. *)
+    
+    
+    
+  (* Admitted. *)
 
-  Lemma convert_Heap_lift :
-    forall h,
-      convert_Heap (lift_Heap h) = NoOom h.
-  Proof.
-  Admitted.
+  (* Lemma convert_Heap_lift : *)
+  (*   forall h, *)
+  (*     convert_Heap (lift_Heap h) = NoOom h. *)
+  (* Proof. *)
+  (* Admitted. *)
 
-  Lemma convert_memory_stack_lift :
-    forall ms,
-      convert_memory_stack (lift_memory_stack ms) = NoOom ms.
-  Proof.
-    induction ms.
-    cbn.
-    setoid_rewrite convert_memory_lift.
-    setoid_rewrite convert_FrameStack_lift_FrameStack.
-    setoid_rewrite convert_Heap_lift.
-    reflexivity.
-  Qed.
+  (* Lemma convert_memory_stack_lift : *)
+  (*   forall ms, *)
+  (*     convert_memory_stack (lift_memory_stack ms) = NoOom ms. *)
+  (* Proof. *)
+  (*   induction ms. *)
+  (*   cbn. *)
+  (*   setoid_rewrite convert_memory_lift. *)
+  (*   setoid_rewrite convert_FrameStack_lift_FrameStack. *)
+  (*   setoid_rewrite convert_Heap_lift. *)
+  (*   reflexivity. *)
+  (* Qed. *)
 
-  Lemma lift_MemState_refine :
-    forall ms,
-      MemState_refine (lift_MemState ms) ms.
-  Proof.
-    intros ms.
-    red.
-    destruct ms.
-    cbn.
-    rewrite convert_memory_stack_lift.
-    auto.
-  Qed.
+  (* Lemma lift_MemState_refine : *)
+  (*   forall ms, *)
+  (*     MemState_refine (lift_MemState ms) ms. *)
+  (* Proof. *)
+  (*   intros ms. *)
+  (*   red. *)
+  (*   destruct ms. *)
+  (*   cbn. *)
+  (*   rewrite convert_memory_stack_lift. *)
+  (*   auto. *)
+  (* Qed. *)
 
 
   Lemma lift_MemState_refine_prop :
@@ -2696,6 +2702,7 @@ Module InfiniteToFinite.
       eapply F; eauto.
   Qed.
 
+  (*
   Lemma get_inf_tree_rutt :
     forall t,
       orutt (OOM:=OOME) L3_refine_strict L3_res_refine_strict
@@ -2854,6 +2861,7 @@ Module InfiniteToFinite.
         }
       }
   Qed.
+*)
 
   Import InterpMemoryProp.
 
@@ -6397,7 +6405,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         apply REF'.
         all: eauto.
   Qed.
-
+Print Assumptions fin_inf_allocations_preserved.
 
   Lemma inf_frame_eqv_empty_l :
     forall f,

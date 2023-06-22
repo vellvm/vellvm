@@ -4718,15 +4718,92 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Definition conflatible (dt1 dt2 : dtyp) : Prop :=
     dt1 = dt2 \/
       exists dt1' dt2',
-        dt1 = DTYPE_Array 0 dt1' /\ dt2 = DTYPE_Array 0 dt2' \/
-          dt1 = DTYPE_Vector 0 dt1' /\ dt2 = DTYPE_Vector 0 dt2'.
+        (dt1 = DTYPE_Array 0 dt1' /\ dt2 = DTYPE_Array 0 dt2') \/
+        (dt1 = DTYPE_Vector 0 dt1' /\ dt2 = DTYPE_Vector 0 dt2').
+
+  Lemma conflatible_Symmetric :
+    forall dt1 dt2, conflatible dt1 dt2 -> conflatible dt2 dt1.
+  Proof.
+    intros dt1 dt2 HC.
+    destruct HC.
+    - left. auto.
+    - destruct H as [dt1' [dt2' [[EQ1 EQ2]|[EQ1 EQ2]]]].
+      right. eexists. eexists. left; eauto.
+      right. eexists. eexists. right; eauto.
+  Qed.
+
+  Ltac dtyp_case :=
+    let C := fresh "C" in
+    right; intro C; destruct C as [d EQ]; inversion EQ.
+  
+  Lemma dtyp_is_DTYPE_Array0_dec : forall dt,
+      {dt'& dt = DTYPE_Array 0 dt'} + {~ exists dt', dt = DTYPE_Array 0 dt'}.
+  Proof.
+    intro dt.
+    destruct dt; try (solve [dtyp_case]).
+    destruct (N.eq_dec sz 0).
+    - left. exists dt. subst. reflexivity.
+    - dtyp_case.
+      contradiction.
+  Qed.  
+  
+  Lemma dtyp_is_DTYPE_Vector0_dec : forall dt,
+      {dt' & dt = DTYPE_Vector 0 dt'} + {~ exists dt', dt = DTYPE_Vector 0 dt'}.
+  Proof.
+    intro dt.
+    destruct dt; try (solve [dtyp_case]).
+    destruct (N.eq_dec sz 0).
+    - left. exists dt. subst. reflexivity.
+    - dtyp_case.
+      contradiction.
+  Qed.  
 
   Lemma conflatible_dec :
     forall dt1 dt2,
       {conflatible dt1 dt2} + {~ conflatible dt1 dt2}.
   Proof.
-  Admitted.                 
-
+    intros.
+    destruct (dtyp_eq_dec dt1 dt2).
+    - subst. left. left. reflexivity.
+    - destruct (@dtyp_is_DTYPE_Array0_dec dt1); destruct (@dtyp_is_DTYPE_Array0_dec dt2).
+      + destruct s. destruct s0.
+        left. right. eexists. eexists. left. eauto.
+      + right. intro C.
+          destruct C.
+          -- contradiction.
+          -- destruct H as [dt1' [dt2' [[EQ1 EQ2]|[EQ1 EQ2]]]].
+             ++ apply n0. eexists. eauto.
+             ++ destruct s. subst. inversion EQ1.
+      + right. intro C.
+        destruct C.
+        -- contradiction.
+        -- destruct H as [dt1' [dt2' [[EQ1 EQ2]|[EQ1 EQ2]]]].
+           ++ apply n0. eexists. eauto.
+           ++ destruct s. subst. inversion EQ2.
+      + destruct (@dtyp_is_DTYPE_Vector0_dec dt1); destruct (@dtyp_is_DTYPE_Vector0_dec dt2).
+        * destruct s. destruct s0.
+          left.
+          right. eexists. eexists. right. eauto.
+        * right. intro C.
+          destruct C.
+          -- contradiction.
+          -- destruct H as [dt1' [dt2' [[EQ1 EQ2]|[EQ1 EQ2]]]].
+             ++ destruct s. subst. inversion EQ1.
+             ++ apply n2. eexists. eauto.
+        * right. intro C.
+          destruct C.
+          -- contradiction.
+          -- destruct H as [dt1' [dt2' [[EQ1 EQ2]|[EQ1 EQ2]]]].
+             ++ destruct s. subst. inversion EQ2.
+             ++ apply n2. eexists. eauto.
+        * right. intro C.
+          destruct C.
+          -- contradiction.
+          -- destruct H as [dt1' [dt2' [[EQ1 EQ2]|[EQ1 EQ2]]]].
+             ++ apply n0. eexists. eauto.
+             ++ apply n2. eexists. eauto.
+  Qed.
+          
   Lemma uvalue_has_dtyp_exists :
     forall uv,
       ({dt | uvalue_has_dtyp uv dt /\ forall dt', conflatible dt dt' <-> uvalue_has_dtyp uv dt'}) + (forall dt, ~ uvalue_has_dtyp uv dt).
