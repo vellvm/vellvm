@@ -7482,7 +7482,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Qed.
       
   
-  (* SAZ: Do these next *)
   Lemma frame_stack_preserved_lift_MemState :
     forall ms_fin ms_fin',
       FinMem.MMEP.MemSpec.frame_stack_preserved ms_fin ms_fin' ->
@@ -7620,7 +7619,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     tauto.
   Qed.
 
-  (* SAZ TODO: try these *)
   Lemma fin_inf_heap_preserved :
     forall ms_fin ms_inf ms_fin' ms_inf',
       MemState_refine_prop ms_inf ms_fin ->
@@ -9896,8 +9894,330 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Qed.
 
 
-   (* SAZ: try this eventually *)
+  Lemma add_ptr_to_frame_stack_exists :
+    forall fs1 addr_fin, exists fs2,
+      Memory64BitIntptr.MMEP.MemSpec.add_ptr_to_frame_stack fs1 addr_fin fs2.
+  Proof.
+    intros.
+    unfold Memory64BitIntptr.MMEP.MemSpec.add_ptr_to_frame_stack.
+    destruct fs1.
+    - exists (Memory64BitIntptr.MMEP.MMSP.Singleton (addr_fin::f)).
+      intros.
+      simpl in H.
+          exists (addr_fin :: f0).
+          split.
+          -- constructor.
+             ++ intros.
+                split; intros HP.
+                ** red in H0.
+                   red in HP.
+                   red.
+                   simpl.
+                   right.
+                   apply HP.
+                ** cbn in HP.
+                   destruct HP.
+                   apply H0 in H1. contradiction.
+                   apply H1.
+             ++ cbn. left. reflexivity.
+          -- split.
+             ++ simpl. constructor; intros; red.
+                ** red in H0.
+                   destruct H0 as [H0|H0].
+                   --- left. assumption.
+                   --- right.
+                       apply H. apply H0.
+                ** red in H0.
+                   destruct H0 as [H0|H0].
+                   --- left. assumption.
+                   --- right.
+                       apply H. apply H0.
+             ++ intros.
+                simpl. tauto.
+    - exists (Memory64BitIntptr.MMEP.MMSP.Snoc fs1 (addr_fin::f)).
+      intros.
+      simpl in H.
+      exists (addr_fin :: f0).
+      split.
+      -- constructor.
+         ++ intros.
+            split; intros HP.
+            ** red in H0.
+               red in HP.
+               red.
+               simpl.
+               right.
+               apply HP.
+            ** cbn in HP.
+               destruct HP.
+               apply H0 in H1. contradiction.
+               apply H1.
+         ++ cbn. left. reflexivity.
+      -- split.
+         ++ simpl. constructor; intros; red.
+            ** red in H0.
+               destruct H0 as [H0|H0].
+               --- left. assumption.
+               --- right.
+                   apply H. apply H0.
+            ** red in H0.
+               destruct H0 as [H0|H0].
+               --- left. assumption.
+               --- right.
+                   apply H. apply H0.
+         ++ intros.
+            simpl. tauto.
+  Qed.
+            
+  Lemma add_ptrs_exists :
+    forall fs1 addrs_fin, exists fs2,
+      Memory64BitIntptr.MMEP.MemSpec.add_ptrs_to_frame_stack fs1 addrs_fin fs2.
+  Proof.
+    intros.
+    induction addrs_fin.
+    - exists fs1. simpl. reflexivity.
+    - destruct IHaddrs_fin as [fs2' HF].
+      simpl.
+      specialize (add_ptr_to_frame_stack_exists fs2' a) as [fs2_fin HF2].
+      exists fs2_fin. exists fs2'. tauto.
+  Qed.
+
+
+  (* In (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr_fin) *)
+  (*   (map LLVMParamsBigIntptr.PTOI.ptr_to_int (lift_Frame f')) -> *)
+  (*    In ptr_fin (lift_Frame f') *)
+       
+  Lemma add_ptr_to_frame_lift : 
+    forall x y (H : addr_refine x y) f f' if',
+      Memory64BitIntptr.MMEP.MemSpec.add_ptr_to_frame f y f' ->
+      MemoryBigIntptr.MMEP.MemSpec.add_ptr_to_frame (lift_Frame f) x if' ->
+      MemoryBigIntptr.MMEP.MMSP.frame_eqv (lift_Frame f') if'.
+  Proof.
+    intros x y H f.
+    apply fin_to_inf_addr_conv_inf in H.
+    rewrite <- H. clear x H.
+
+    red.
+    intros.
+    split; intros.
+    - apply ptr_in_frame_prop_lift_inv in H1.
+      destruct H1 as [ptr_fin [EQ HI]].
+      apply fin_to_inf_addr_conv_inf in EQ.
+      subst.
+      destruct H0.
+      
+      specialize (Memory64BitIntptr.MMEP.add_ptr_to_frame_inv y ptr_fin _ _ H HI) as [[HL HD]| HR].
+      + apply old_frame_lu.
+        * red. intro.
+          do 2 rewrite fin_to_inf_addr_ptr_to_int in H0.
+          apply HD.
+          assumption.
+        * apply ptr_in_frame_prop_lift.
+          assumption.
+      + red.
+        red in new_frame_lu.
+        rewrite fin_to_inf_addr_ptr_to_int in *.
+        rewrite <- HR.
+        assumption.
+        
+    - destruct H.
+      specialize (MemoryBigIntptr.MMEP.add_ptr_to_frame_inv _ _ _ _ H0 H1) as [[HL HD]| HR].
+      + apply ptr_in_frame_prop_lift_inv in HL.
+        destruct HL as [ptr_fin [EQ HF]].
+        apply fin_to_inf_addr_conv_inf in EQ. subst.
+        red.
+        rewrite fin_to_inf_addr_ptr_to_int.
+        apply old_frame_lu in HF.
+        * apply ptr_in_frame_prop_lift in HF.
+          red in HF.
+          rewrite fin_to_inf_addr_ptr_to_int in HF.
+          assumption.
+        * red in HD.
+          red. intro C.
+          apply HD.
+          rewrite fin_to_inf_addr_ptr_to_int.
+          rewrite fin_to_inf_addr_ptr_to_int.
+          assumption.
+      + rewrite fin_to_inf_addr_ptr_to_int in HR.
+        apply ptr_in_frame_prop_lift in new_frame_lu.
+        red in new_frame_lu.
+        rewrite fin_to_inf_addr_ptr_to_int in new_frame_lu.
+        rewrite HR in new_frame_lu.
+        red.
+        assumption.
+  Qed.
+            
+  #[global]
+    Instance Proper_frame_stack_Singleton_Inf : Proper (InfMem.MMEP.MMSP.frame_eqv ==> InfMem.MMEP.MMSP.frame_stack_eqv) (InfMemMMSP.Singleton).
+  Proof.
+    do 3 red.
+    intros x y H f n.
+    split; intros.
+    - destruct n.
+      cbn in *.
+      eapply transitivity. symmetry. apply H. assumption.
+      cbn in *. auto.
+    - destruct n.
+      cbn in *.
+      eapply transitivity. apply H. assumption.
+      cbn in *. auto.
+  Qed.
+
+  #[global]
+    Instance Proper_lift_Frame : Proper (FinMem.MMEP.MMSP.frame_eqv ==> InfMem.MMEP.MMSP.frame_eqv) lift_Frame.
+  Proof.
+    do 3 red.
+    intros.
+    apply frame_eqv_lift. assumption.
+  Qed.      
+
+  (* SAZ: This one and the next one could be combined earlier in the development *)
+  Lemma add_ptr_to_frame_stack_Snoc_Singleton_contra :
+    forall fs1 f1 f2 x,
+  MemoryBigIntptr.MMEP.MemSpec.add_ptr_to_frame_stack
+    (InfMemMMSP.Snoc fs1 f1) x (MemoryBigIntptr.MMEP.MMSP.Singleton f2) -> False.
+  Proof.
+    intros.
+    assert (MemoryBigIntptr.MMEP.MMSP.peek_frame_stack_prop (InfMemMMSP.Snoc fs1 f1) f1) as EQ.
+    { red. reflexivity. }
+    apply H in EQ.
+    destruct EQ as [if' [HI1' [HI2' HI3']]].
+    specialize (HI3' fs1).
+    assert (MemoryBigIntptr.MMEP.MMSP.pop_frame_stack_prop (InfMemMMSP.Snoc fs1 f1) fs1).
+    { red. reflexivity. }
+    apply HI3' in H0.
+    inversion H0.
+  Qed.
+
+
+  Lemma fin_add_ptr_to_frame_stack_Snoc_Singleton_contra :
+    forall fs1 f1 f2 x,
+  Memory64BitIntptr.MMEP.MemSpec.add_ptr_to_frame_stack
+    (FinMemMMSP.Snoc fs1 f1) x (Memory64BitIntptr.MMEP.MMSP.Singleton f2) -> False.
+  Proof.
+    intros.
+    assert (Memory64BitIntptr.MMEP.MMSP.peek_frame_stack_prop (FinMemMMSP.Snoc fs1 f1) f1) as EQ.
+    { red. reflexivity. }
+    apply H in EQ.
+    destruct EQ as [if' [HI1' [HI2' HI3']]].
+    specialize (HI3' fs1).
+    assert (Memory64BitIntptr.MMEP.MMSP.pop_frame_stack_prop (FinMemMMSP.Snoc fs1 f1) fs1).
+    { red. reflexivity. }
+    apply HI3' in H0.
+    inversion H0.
+  Qed.
+
+  
+  Lemma frame_stack_lift_add_ptr:
+    forall (x : InfAddr.addr) (y : FinAddr.addr),
+      addr_refine x y ->
+      forall (fs1 fs2 : Memory64BitIntptr.MMEP.MMSP.FrameStack) (ifs : MemoryBigIntptr.MMEP.MMSP.FrameStack),
+        MemoryBigIntptr.MMEP.MemSpec.add_ptr_to_frame_stack (lift_FrameStack fs1) x ifs ->
+        Memory64BitIntptr.MMEP.MemSpec.add_ptr_to_frame_stack fs1 y fs2 ->
+        MemoryBigIntptr.MMEP.MMSP.frame_stack_eqv (lift_FrameStack fs2) ifs.
+  Proof.
+    intros x y H fs1 fs2 ifs HI2 HF2.
+    destruct fs1.
+    - simpl in *.
+      forward (HI2 (lift_Frame f)). simpl.  reflexivity.
+      forward (HF2 f). simpl. reflexivity.
+      destruct fs2; simpl in *.
+      + destruct ifs; simpl in *.
+        * destruct HI2 as [if' [HI1' [HI2' HI3']]].
+          destruct HF2 as [f' [HF1' [HF2' HF3']]].
+          specialize (add_ptr_to_frame_lift x y H _ _ _ HF1' HI1') as EQ.
+          rewrite <- HI2'.
+          rewrite <- EQ.
+          rewrite HF2'.
+          reflexivity.
+        * destruct HI2 as [if' [HI1' [HI2' HI3']]].
+          destruct HF2 as [f' [HF1' [HF2' HF3']]].
+          specialize (HI3' ifs).
+          assert (MemoryBigIntptr.MMEP.MMSP.frame_stack_eqv ifs ifs) as IF by reflexivity.
+          apply HI3' in IF.
+          inversion IF.
+      + destruct HF2 as [f' [HF1' [HF2' HF3']]].
+        specialize (HF3' fs2).
+        assert (Memory64BitIntptr.MMEP.MMSP.frame_stack_eqv fs2 fs2) as IF by reflexivity.
+        apply HF3' in IF.
+        inversion IF.
+    - simpl in *.
+      destruct ifs; simpl in *.
+      + apply add_ptr_to_frame_stack_Snoc_Singleton_contra in HI2.
+        inversion HI2.
+      + apply InfMem.MMEP.add_ptr_to_frame_stack_eqv_S in HI2.
+        destruct HI2.
+        destruct fs2.
+        * apply fin_add_ptr_to_frame_stack_Snoc_Singleton_contra in HF2.
+          inversion HF2.
+        * simpl. 
+          apply FinMem.MMEP.add_ptr_to_frame_stack_eqv_S in HF2.
+          destruct HF2.
+          specialize (add_ptr_to_frame_lift x y H _ _ _ H2 H0) as EQ.
+          rewrite <- H1.
+          rewrite <- H3.
+          rewrite <- EQ.
+          reflexivity.
+  Qed.
+          
+  Lemma frame_stack_lift_add_ptrs:
+    forall (addrs_fin : list FinAddr.addr) (addrs_inf : list InfAddr.addr),
+      Forall2 addr_refine addrs_inf addrs_fin ->
+      forall fs1 fs2 : Memory64BitIntptr.MMEP.MMSP.FrameStack,
+        forall ifs2 : MemoryBigIntptr.MMEP.MMSP.FrameStack,
+          MemoryBigIntptr.MMEP.MemSpec.add_ptrs_to_frame_stack (lift_FrameStack fs1) addrs_inf ifs2 ->
+          Memory64BitIntptr.MMEP.MemSpec.add_ptrs_to_frame_stack fs1 addrs_fin fs2 ->
+          MemoryBigIntptr.MMEP.MMSP.frame_stack_eqv (lift_FrameStack fs2) ifs2.
+  Proof.
+    intros addrs_fin addrs_inf HA.
+    induction HA.
+    - intros fs1 fs2 ifs2 H1 H2.  simpl in *. rewrite <- H1. apply frame_stack_eqv_lift. symmetry. assumption.
+    - intros fs1 fs2 ifs2 H1 H2. simpl in *.
+      destruct H1 as [ifs [HI1 HI2]].
+      destruct H2 as [fs [HF1 HF2]].
+      specialize (IHHA _ _ _ HI1 HF1).
+      rewrite <- IHHA in HI2.
+      eapply frame_stack_lift_add_ptr; eauto.
+  Qed.
+
+  
+  (* SAZ: try this eventually *)
   Lemma extend_stack_frame_fin_inf :
+    forall {ms_inf_start ms_fin_start ms_fin_final addrs_fin addrs_inf},
+      MemState_refine_prop ms_inf_start ms_fin_start ->
+      Forall2 addr_refine addrs_inf addrs_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.extend_stack_frame ms_fin_start addrs_fin ms_fin_final ->
+      MemoryBigIntptr.MMEP.MemSpec.extend_stack_frame ms_inf_start addrs_inf (lift_MemState ms_fin_final).
+  Proof.
+    intros ms_inf_start ms_fin_start ms_fin_final addrs_fin addrs_inf MSR1 ADDRS EXTEND.
+    red in EXTEND.
+    red.
+    intros fs1 fs2 MSFSP ADD_PTRS.
+    red.
+    apply MSR1 in MSFSP. clear MSR1.
+    destruct ms_fin_start, ms_memory_stack.
+    cbn in *.
+    specialize (EXTEND memory_stack_frame_stack).
+    unfold Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *.
+    unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop in *.
+    cbn in *.
+    destruct ms_fin_final. destruct ms_memory_stack. cbn in *.
+    clear ms_inf_start memory_stack_memory memory_stack_heap ms_provenance memory_stack_memory0 memory_stack_heap0 ms_provenance0.
+    specialize (add_ptrs_exists memory_stack_frame_stack addrs_fin) as [ms2 HM].
+    rename memory_stack_frame_stack into ms1.
+    forward (EXTEND ms2). reflexivity.
+    specialize (EXTEND HM).
+    rewrite EXTEND.
+    clear EXTEND.
+    clear memory_stack_frame_stack0.
+    rewrite <- MSFSP in ADD_PTRS.
+    clear MSFSP.
+    eapply frame_stack_lift_add_ptrs; eauto.
+  Qed.    
+
+  (*
+   (* SAZ: try this eventually *)
+  Lemma extend_stack_frame_fin_inf' :
     forall {ms_inf_start ms_fin_start ms_inf_final ms_fin_final addrs_fin addrs_inf},
       MemState_refine_prop ms_inf_start ms_fin_start ->
       MemState_refine_prop ms_inf_final ms_fin_final ->
@@ -9943,17 +10263,17 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       eapply EXTEND.
       reflexivity.
       reflexivity.
-    - admit.
-
-      (* cbn in *. *)
-      (* inv ADDRS. *)
-      (* destruct ADD_PTRS as (fs'&ADD1&ADD2). *)
-      (* red in ADD2. *)
-      (* eapply IHaddrs_inf; eauto. *)
-      (* rewrite <- ADD_PTRS. *)
-      (* inv ADDRS. *)
-      (* cbn in *. *)
+    - cbn in *.
+      inv ADDRS.
+      destruct ADD_PTRS as (fs'&ADD1&ADD2).
+      specialize (EXTEND memory_stack_frame_stack).
+      cbn in EXTEND.
+      
+      specialize (IHaddrs_inf _ MSFSP _ ADD1 _ H3).
+      
+      
   Admitted.
+*)
 
   (* TODO: DELETE *)
   (* TODO: Not currently true, but will be once heap_preserved is modified *)
@@ -10027,7 +10347,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     - eapply extend_write_byte_allowed_fin_inf; eauto.
       apply lift_MemState_refine_prop; auto.
     - eapply extend_stack_frame_fin_inf; eauto.
-      apply lift_MemState_refine_prop; auto.
     - eapply fin_inf_heap_preserved; eauto.
       apply lift_MemState_refine_prop; auto.
     - apply Util.Forall2_length in BYTES.

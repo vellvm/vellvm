@@ -805,13 +805,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall ptr ptr' f f',
         add_ptr_to_frame f ptr f' ->
         ptr_in_frame_prop f' ptr' ->
-        ptr_in_frame_prop f ptr' \/ ptr_to_int ptr = ptr_to_int ptr'.
+        (ptr_in_frame_prop f ptr' /\ disjoint_ptr_byte ptr ptr') \/ ptr_to_int ptr = ptr_to_int ptr'.
     Proof.
       intros ptr ptr' f f' F F'.
       inv F.
       pose proof disjoint_ptr_byte_dec ptr ptr' as [DISJOINT | NDISJOINT].
-      - specialize (old_frame_lu0 _ DISJOINT).
-        left.
+      - left.
+        split; auto.
+        specialize (old_frame_lu0 _ DISJOINT).
         apply old_frame_lu0; auto.
       - unfold disjoint_ptr_byte in NDISJOINT.
         assert (ptr_to_int ptr = ptr_to_int ptr') as EQ by lia.
@@ -822,22 +823,28 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall ptr ptr' root root' f f',
         add_ptr_to_heap f root ptr f' ->
         ptr_in_heap_prop f' root' ptr' ->
-        ptr_in_heap_prop f root' ptr' \/ (ptr_to_int ptr = ptr_to_int ptr' /\ ptr_to_int root = ptr_to_int root').
+        (ptr_in_heap_prop f root' ptr' /\ disjoint_ptr_byte ptr ptr') \/
+          (ptr_in_heap_prop f root' ptr' /\ ptr_to_int ptr = ptr_to_int ptr' /\ disjoint_ptr_byte root root') \/
+          (ptr_to_int ptr = ptr_to_int ptr' /\ ptr_to_int root = ptr_to_int root').
     Proof.
       intros ptr ptr' root root' f f' F F'.
       inv F.
       pose proof disjoint_ptr_byte_dec ptr ptr' as [DISJOINT | NDISJOINT].
-      - specialize (old_heap_lu0 _ DISJOINT).
-        left.
+      - left.
+        split; auto.
+        specialize (old_heap_lu0 _ DISJOINT).
         apply old_heap_lu0; auto.
       - unfold disjoint_ptr_byte in NDISJOINT.
         assert (ptr_to_int ptr = ptr_to_int ptr') as EQ by lia.
+        right.
         pose proof disjoint_ptr_byte_dec root root' as [DISJOINT' | NDISJOINT'].
         + left.
+          split; auto.
           apply old_heap_lu_different_root0; auto.
-        + unfold disjoint_ptr_byte in NDISJOINT'.
+        + right.
+          unfold disjoint_ptr_byte in NDISJOINT'.
           assert (ptr_to_int root = ptr_to_int root') as EQR by lia.
-          right; firstorder.
+          split; auto. 
     Qed.
 
     Lemma add_ptr_to_frame_eqv :
@@ -851,7 +858,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       intros ptr0.
       split; intros IN.
       - eapply add_ptr_to_frame_inv in IN; eauto.
-        destruct IN as [IN | IN].
+        destruct IN as [[IN _]| IN].
         + destruct F2.
           pose proof disjoint_ptr_byte_dec ptr ptr0 as [DISJOINT | NDISJOINT].
           * eapply old_frame_lu0; eauto.
@@ -865,7 +872,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           rewrite <- IN.
           auto.
       - eapply add_ptr_to_frame_inv in IN; eauto.
-        destruct IN as [IN | IN].
+        destruct IN as [[IN _] | IN].
         + destruct F1.
           pose proof disjoint_ptr_byte_dec ptr ptr0 as [DISJOINT | NDISJOINT].
           * eapply old_frame_lu0; eauto.
@@ -1055,7 +1062,21 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       - eapply add_ptr_to_heap_inv with (f := h) (ptr := ptr) (root := root) in IN.
         + inv H1.
           inv H2.
-          destruct IN as [IN | [IN1 IN2]].
+          destruct IN as [[IN _]| [[IN1 _] | [IN1 IN2]]].
+          * pose proof disjoint_ptr_byte_dec root root0 as [DISJOINT | NDISJOINT].
+            -- eapply old_heap_lu_different_root1; eauto.
+            -- pose proof disjoint_ptr_byte_dec ptr ptr0 as [DISJOINT' | NDISJOINT'].
+               ++ eapply old_heap_lu1; eauto.
+               ++ unfold disjoint_ptr_byte in NDISJOINT'.
+                  assert (ptr_to_int ptr = ptr_to_int ptr0) as EQ by lia.
+
+                  unfold disjoint_ptr_byte in NDISJOINT.
+                  assert (ptr_to_int root = ptr_to_int root0) as EQR by lia.
+
+                  unfold ptr_in_heap_prop in *.
+                  rewrite EQ in *.
+                  rewrite EQR in *.
+                  auto.
           * pose proof disjoint_ptr_byte_dec root root0 as [DISJOINT | NDISJOINT].
             -- eapply old_heap_lu_different_root1; eauto.
             -- pose proof disjoint_ptr_byte_dec ptr ptr0 as [DISJOINT' | NDISJOINT'].
@@ -1078,7 +1099,21 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       - eapply add_ptr_to_heap_inv with (f := h) (ptr := ptr) (root := root) in IN.
         + inv H1.
           inv H2.
-          destruct IN as [IN | [IN1 IN2]].
+          destruct IN as [[IN _]| [[IN1 _] | [IN1 IN2]]].
+          * pose proof disjoint_ptr_byte_dec root root0 as [DISJOINT | NDISJOINT].
+            -- eapply old_heap_lu_different_root0; eauto.
+            -- pose proof disjoint_ptr_byte_dec ptr ptr0 as [DISJOINT' | NDISJOINT'].
+               ++ eapply old_heap_lu0; eauto.
+               ++ unfold disjoint_ptr_byte in NDISJOINT'.
+                  assert (ptr_to_int ptr = ptr_to_int ptr0) as EQ by lia.
+
+                  unfold disjoint_ptr_byte in NDISJOINT.
+                  assert (ptr_to_int root = ptr_to_int root0) as EQR by lia.
+
+                  unfold ptr_in_heap_prop in *.
+                  rewrite EQ in *.
+                  rewrite EQR in *.
+                  auto.
           * pose proof disjoint_ptr_byte_dec root root0 as [DISJOINT | NDISJOINT].
             -- eapply old_heap_lu_different_root0; eauto.
             -- pose proof disjoint_ptr_byte_dec ptr ptr0 as [DISJOINT' | NDISJOINT'].
