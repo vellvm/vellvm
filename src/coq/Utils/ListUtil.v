@@ -13,7 +13,8 @@ From Vellvm.Utils Require Import
   Tactics.
 
 From ExtLib Require Import
-  Structures.Monads.
+  Structures.Monads
+  Data.List.
 
 Import ListNotations.
 Import MonadNotation.
@@ -796,6 +797,26 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma double_list_ind :
+  forall {X Y}
+    (P: list X -> list Y -> Prop)
+    (NilNil : P nil nil)
+    (NilCons : forall y ys, P nil ys -> P nil (y :: ys))
+    (ConsNil : forall x xs, P xs nil -> P (x :: xs) nil)
+    (ConsCons : forall x xs y ys, P xs ys -> P (x :: xs) (y :: ys)),
+  forall xs ys, P xs ys.
+Proof.
+  intros X Y P NilNil NilCons ConsNil ConsCons xs.
+  induction xs; induction ys.
+  - apply NilNil.
+  - apply NilCons.
+    apply IHys.
+  - apply ConsNil.
+    apply IHxs.
+  - apply ConsCons.
+    apply IHxs.
+Qed.
+
 Definition repeatMN {A m} `{Monad m} (n : N) (ma : m A) : m (list A)
   := sequence (repeatN n ma).
 
@@ -1170,4 +1191,164 @@ Proof.
   erewrite H. erewrite IHl. reflexivity.
   intros.
   erewrite H. reflexivity.
+Qed.
+
+(* Program Fixpoint zipWith_In' {A B ACC : Type} *)
+(*   (xs : list A) (ys : list B) (acc : ACC) *)
+(*   (f : forall x y, In x xs -> In y ys -> ACC -> ACC) *)
+(*   (f_left : forall x, In x xs -> ACC -> ACC) *)
+(*   (f_right : forall y, In y ys -> ACC -> ACC) *)
+(*   {measure (length xs + length ys)} *)
+(*   : ACC := *)
+(*   match xs as xs' return (xs = xs' -> ACC) with *)
+(*   | [] => *)
+(*       fun Heq_xs => *)
+(*         (match ys as ys' return (ys = ys' -> ACC) with *)
+(*          | [] => *)
+(*              fun Heq_ys => *)
+(*                acc *)
+(*          | (y::ys') => *)
+(*              fun Heq_ys => *)
+(*                let acc' := f_right y (@eq_ind (list B) (y :: ys') (fun l => In y l) (or_introl eq_refl) ys (eq_sym Heq_ys)) acc in *)
+(*                let f' : forall (x : A) y', In x [] -> In y' ys' -> ACC -> ACC  := *)
+(*                  fun x y INx INy acc' => *)
+(*                    match INx with *)
+(*                    end in *)
+(*                let f_left' : forall x, In x [] -> ACC -> ACC := *)
+(*                  fun x INx acc' => *)
+(*                    match INx with *)
+(*                    end in *)
+(*                let f_right' : forall y', In y' ys' -> ACC -> ACC := *)
+(*                  fun y' INy acc' => *)
+(*                    f_right y' (@eq_ind (list B) (y :: ys') (fun l => In y' l) (or_intror INy) ys (eq_sym Heq_ys)) acc' in *)
+(*                zipWith_In' [] ys' acc' f' f_left' f_right' *)
+(*          end eq_refl) *)
+(*   | (x::xs') => *)
+(*       fun Heq_xs => *)
+(*         (match ys as ys' return (ys = ys' -> ACC) with *)
+(*          | [] => *)
+(*              fun Heq_ys => *)
+(*                let acc' := f_left x (@eq_ind (list A) (x :: xs') (fun l => In x l) (or_introl eq_refl) xs (eq_sym Heq_xs)) acc in *)
+(*                let f' : forall x (y : B), In x xs' -> In y [] -> ACC -> ACC  := *)
+(*                  fun x y INx INy acc' => *)
+(*                    match INy with *)
+(*                    end in *)
+(*                let f_left' : forall x', In x' xs' -> ACC -> ACC := *)
+(*                  fun x' INx acc' => *)
+(*                    f_left x' (@eq_ind (list A) (x :: xs') (fun l => In x' l) (or_intror INx) xs (eq_sym Heq_xs)) acc' in *)
+(*                let f_right' : forall y, In y [] -> ACC -> ACC := *)
+(*                  fun y INy acc' => *)
+(*                    match INy with *)
+(*                    end in *)
+(*                zipWith_In' xs' [] acc' f' f_left' f_right' *)
+(*          | (y::ys') => *)
+(*              fun Heq_ys => *)
+(*                let acc' := f x y (@eq_ind (list A) (x :: xs') (fun l => In x l) (or_introl eq_refl) xs (eq_sym Heq_xs)) (@eq_ind (list B) (y :: ys') (fun l => In y l) (or_introl eq_refl) ys (eq_sym Heq_ys)) acc in *)
+(*                let f' : forall x (y : B), In x xs' -> In y ys' -> ACC -> ACC  := *)
+(*                  fun x' y' INx INy acc' => *)
+(*                    f x' y' (@eq_ind (list A) (x :: xs') (fun l => In x' l) (or_intror INx) xs (eq_sym Heq_xs)) (@eq_ind (list B) (y :: ys') (fun l => In y' l) (or_intror INy) ys (eq_sym Heq_ys)) acc' in *)
+(*                let f_left' : forall x', In x' xs' -> ACC -> ACC := *)
+(*                  fun x' INx acc' => *)
+(*                    f_left x' (@eq_ind (list A) (x :: xs') (fun l => In x' l) (or_intror INx) xs (eq_sym Heq_xs)) acc' in *)
+(*                let f_right' : forall y', In y' ys' -> ACC -> ACC := *)
+(*                  fun y' INy acc' => *)
+(*                    f_right y' (@eq_ind (list B) (y :: ys') (fun l => In y' l) (or_intror INy) ys (eq_sym Heq_ys)) acc' in *)
+(*                zipWith_In' xs' ys' acc' f' f_left' f_right' *)
+(*          end eq_refl) *)
+(*   end eq_refl. *)
+(* Next Obligation. *)
+(*   cbn. *)
+(*   lia. *)
+(* Defined. *)
+
+(* Lemma zipWith_In'_equation *)
+(*   {A B ACC : Type} *)
+(*   (xs : list A) (ys : list B) (acc : ACC) *)
+(*   (f : forall x y, In x xs -> In y ys -> ACC -> ACC) *)
+(*   (f_left : forall x, In x xs -> ACC -> ACC) *)
+(*   (f_right : forall y, In y ys -> ACC -> ACC) : *)
+(*   @zipWith_In' A B ACC xs ys acc f f_left f_right = *)
+(*     match xs as xs' return (xs = xs' -> ACC) with *)
+(*     | [] => *)
+(*         fun Heq_xs => *)
+(*           (match ys as ys' return (ys = ys' -> ACC) with *)
+(*            | [] => *)
+(*                fun Heq_ys => *)
+(*                  acc *)
+(*            | (y::ys') => *)
+(*                fun Heq_ys => *)
+(*                  let acc' := f_right y (@eq_ind (list B) (y :: ys') (fun l => In y l) (or_introl eq_refl) ys (eq_sym Heq_ys)) acc in *)
+(*                  let f' : forall (x : A) y', In x [] -> In y' ys' -> ACC -> ACC  := *)
+(*                    fun x y INx INy acc' => *)
+(*                      match INx with *)
+(*                      end in *)
+(*                  let f_left' : forall x, In x [] -> ACC -> ACC := *)
+(*                    fun x INx acc' => *)
+(*                      match INx with *)
+(*                      end in *)
+(*                  let f_right' : forall y', In y' ys' -> ACC -> ACC := *)
+(*                    fun y' INy acc' => *)
+(*                      f_right y' (@eq_ind (list B) (y :: ys') (fun l => In y' l) (or_intror INy) ys (eq_sym Heq_ys)) acc' in *)
+(*                  zipWith_In' [] ys' acc' f' f_left' f_right' *)
+(*            end eq_refl) *)
+(*     | (x::xs') => *)
+(*         fun Heq_xs => *)
+(*           (match ys as ys' return (ys = ys' -> ACC) with *)
+(*            | [] => *)
+(*                fun Heq_ys => *)
+(*                  let acc' := f_left x (@eq_ind (list A) (x :: xs') (fun l => In x l) (or_introl eq_refl) xs (eq_sym Heq_xs)) acc in *)
+(*                  let f' : forall x (y : B), In x xs' -> In y [] -> ACC -> ACC  := *)
+(*                    fun x y INx INy acc' => *)
+(*                      match INy with *)
+(*                      end in *)
+(*                  let f_left' : forall x', In x' xs' -> ACC -> ACC := *)
+(*                    fun x' INx acc' => *)
+(*                      f_left x' (@eq_ind (list A) (x :: xs') (fun l => In x' l) (or_intror INx) xs (eq_sym Heq_xs)) acc' in *)
+(*                  let f_right' : forall y, In y [] -> ACC -> ACC := *)
+(*                    fun y INy acc' => *)
+(*                      match INy with *)
+(*                      end in *)
+(*                  zipWith_In' xs' [] acc' f' f_left' f_right' *)
+(*            | (y::ys') => *)
+(*                fun Heq_ys => *)
+(*                  let acc' := f x y (@eq_ind (list A) (x :: xs') (fun l => In x l) (or_introl eq_refl) xs (eq_sym Heq_xs)) (@eq_ind (list B) (y :: ys') (fun l => In y l) (or_introl eq_refl) ys (eq_sym Heq_ys)) acc in *)
+(*                  let f' : forall x (y : B), In x xs' -> In y ys' -> ACC -> ACC  := *)
+(*                    fun x' y' INx INy acc' => *)
+(*                      f x' y' (@eq_ind (list A) (x :: xs') (fun l => In x' l) (or_intror INx) xs (eq_sym Heq_xs)) (@eq_ind (list B) (y :: ys') (fun l => In y' l) (or_intror INy) ys (eq_sym Heq_ys)) acc' in *)
+(*                  let f_left' : forall x', In x' xs' -> ACC -> ACC := *)
+(*                    fun x' INx acc' => *)
+(*                      f_left x' (@eq_ind (list A) (x :: xs') (fun l => In x' l) (or_intror INx) xs (eq_sym Heq_xs)) acc' in *)
+(*                  let f_right' : forall y', In y' ys' -> ACC -> ACC := *)
+(*                    fun y' INy acc' => *)
+(*                      f_right y' (@eq_ind (list B) (y :: ys') (fun l => In y' l) (or_intror INy) ys (eq_sym Heq_ys)) acc' in *)
+(*                  zipWith_In' xs' ys' acc' f' f_left' f_right' *)
+(*            end eq_refl) *)
+(*     end eq_refl. *)
+(* Proof. *)
+(* Admitted. *)
+
+Lemma forallb_cons :
+  forall {A} f x (xs : list A),
+    forallb f (x :: xs) = andb (f x) (forallb f xs).
+Proof.
+  intros A f x xs.
+  cbn.
+  reflexivity.
+Qed.
+
+Lemma forallb_map_In_eq : forall A (l:list A) (f g : forall (x:A), In x l -> bool),
+    (forall x H1 H2, f x H1 = g x H2) ->
+    forallb id (map_In l f) = forallb id (map_In l g).
+Proof.
+  induction l; intros; simpl; try reflexivity.
+  erewrite H. erewrite IHl. reflexivity.
+  intros.
+  erewrite H. reflexivity.
+Qed.
+
+Lemma allb_forallb :
+  forall {A} (f : A -> bool) (xs : list A),
+    allb f xs = forallb f xs.
+Proof.
+  induction xs; auto.
 Qed.

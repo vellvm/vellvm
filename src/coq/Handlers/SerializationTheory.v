@@ -211,10 +211,11 @@ Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModul
     forall uv dt sid sbytes,
       is_supported dt ->
       sizeof_dtyp dt > 0 ->
+      uvalue_has_dtyp uv dt ->
       to_ubytes uv dt sid = NoOom sbytes ->
       from_ubytes sbytes dt = uv.
   Proof.
-    intros uv dt sid sbytes SUP SIZE TOUBYTES.
+    intros uv dt sid sbytes SUP SIZE TYPE TOUBYTES.
 
     unfold from_ubytes.
     unfold all_bytes_from_uvalue.
@@ -237,6 +238,12 @@ Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModul
 
       rewrite DynamicTypes.dtyp_eqb_refl.
       cbn; eauto.
+      break_inner_match; auto.
+      unfold OptionUtil.guard_opt in Heqo.
+      break_match_hyp_inv.
+      unfold Coqlib.proj_sumbool in Heqb.
+      break_match_hyp_inv.
+      contradiction.
   Qed.
 End MemBytesTheory.
 
