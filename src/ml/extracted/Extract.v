@@ -100,13 +100,20 @@ Recursive Extraction Library ReprAST.
 
 From QuickChick Require Import ExtractionQC.
 
+Extract Inlined Constant add => "( + )".
+(* Extract Inlined Constant sub => "sub". *)
+(* Extract Inlined Constant eqb =  *)
+
 Extract Constant randomRNat  =>
   "(fun (x,y) r -> if y < x then failwith (Obj.magic monad_either) (Obj.magic exception_either) ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))".
 (* Extract Constant randomRBool => "(fun _ r -> Random.State.bool r, r)". *)
-Extract Constant randomRInt  =>
-  "(fun (x,y) r -> if y < x then failwith (Obj.magic monad_either) (Obj.magic exception_either) ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))".
+(* Extract Constant randomRInt  => *)
+(*   "(fun (x,y) r -> if y < x then failwith (Obj.magic monad_either) (Obj.magic exception_either) ""choose called with unordered arguments"" else  (Big_int_Z.add_big_int x + Big_int_Z.big_int_of_int (Random.State.int r (y - x + 1)), r))". *)
+
+Extract Constant randomRInt =>
+          "(fun (x,y) r -> if Big_int_Z.lt_big_int y x then failwith (Obj.magic monad_either) (Obj.magic exception_either) ""choose called with unordered arguments"" else let range_Z = Big_int_Z.succ_big_int (Big_int_Z.sub_big_int y x) in let range_int = Big_int_Z.int_of_big_int range_Z in (Big_int_Z.add_big_int x (Big_int_Z.big_int_of_int (Random.State.int r range_int)), r))".
 Extract Constant randomRN =>
-  "(fun (x,y) r -> if y < x then failwith (Obj.magic monad_either) (Obj.magic exception_either) ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))".
+          "(fun (x,y) r -> if y < x then failwith (Obj.magic monad_either) (Obj.magic exception_either) ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))".
 
 Extraction "GenAlive2.ml" GenAlive2.G.
 (* Need a file to load this extraction *)
