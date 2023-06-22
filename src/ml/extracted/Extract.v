@@ -31,6 +31,8 @@ From Vellvm Require
 
 Set Extraction AccessOpaque.
 
+From QuickChick Require Import RandomQC.
+                           
 From Vellvm Require QC.GenAlive2.
 
 Require ExtrOcamlBasic.
@@ -87,10 +89,7 @@ Extract Inlined Constant Archi.ppc64 => "false".
 Export TopLevelBigIntptr.
 
 (* NOTE: assumes that this file is compiled from /src *)
-(* Cd "ml/extracted". *)
-
-
-
+Cd "ml/extracted".
 
 Extraction Library ExtrOcamlIntConv.
 Recursive Extraction Library TopLevel.
@@ -98,6 +97,16 @@ Extraction Library Transform.
 Extraction Library ParserHelper.
 Recursive Extraction Library ShowAST.
 Recursive Extraction Library ReprAST.
+
+From QuickChick Require Import ExtractionQC.
+
+Extract Constant randomRNat  =>
+  "(fun (x,y) r -> if y < x then failwith (Obj.magic monad_either) (Obj.magic exception_either) ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))".
+(* Extract Constant randomRBool => "(fun _ r -> Random.State.bool r, r)". *)
+Extract Constant randomRInt  =>
+  "(fun (x,y) r -> if y < x then failwith (Obj.magic monad_either) (Obj.magic exception_either) ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))".
+Extract Constant randomRN =>
+  "(fun (x,y) r -> if y < x then failwith (Obj.magic monad_either) (Obj.magic exception_either) ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))".
 
 Extraction "GenAlive2.ml" GenAlive2.G.
 (* Need a file to load this extraction *)
