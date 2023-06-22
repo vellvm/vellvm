@@ -74,6 +74,8 @@ $(EXTRACTDIR)/STAMP: $(VFILES) $(EXTRACTDIR)/Extract.v
 	$(COQEXEC) $(EXTRACTDIR)/Extract.v
 	@echo "Patching extraction"
 	patch -p0 < CRelationClasses.mli.patch
+	patch -u $(EXTRACTDIR)/GenAlive2.ml -i GenAlive2.ml.patch
+	@echo "Fixing Extraction"
 	bash fix-extraction.sh
 	touch $(EXTRACTDIR)/STAMP
 
@@ -147,6 +149,7 @@ $(EXTRACTDIR)/FRONTEND_STAMP: $(FRONTEND_VOFILES) $(EXTRACTDIR)/ExtractFrontend.
 	rm -f $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
 	$(COQEXEC) $(EXTRACTDIR)/ExtractFrontend.v
 	patch -p0 < CRelationClasses.mli.patch
+	patch -p0 < GenAlive2.ml.patch
 	touch $(EXTRACTDIR)/FRONTEND_STAMP
 	rm -f $(EXTRACTDIR)/STAMP   # invalidate "normal" extraction
 

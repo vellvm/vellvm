@@ -1,0 +1,109 @@
+--- ml/extracted/GenAlive2.ml	2023-06-22 11:53:08.595450539 -0400
++++ ml/extracted/Patching-generator/GenAlive2-compiled	2023-06-22 11:42:16.847714876 -0400
+@@ -2275,8 +2275,8 @@
+ 
+   (** val coq_P_mod_two_p : Big_int_Z.big_int -> int -> Big_int_Z.big_int **)
+ 
+-  let rec coq_P_mod_two_p p n0 =
+-    (fun fO fS n -> if n=0 then fO () else fS (n-1))
++  let rec coq_P_mod_two_p p (n0: Big_int_Z.big_int) =
++    (fun fO fS n -> if Big_int_Z.eq_big_int (n) Big_int_Z.zero_big_int then fO () else fS (Big_int_Z.pred_big_int n))
+       (fun _ -> Big_int_Z.zero_big_int)
+       (fun m ->
+       (fun f2p1 f2p f1 p ->
+@@ -2296,9 +2296,9 @@
+   if s = 0 then fO () else if s > 0 then fp z
+   else fn (Big_int_Z.minus_big_int z))
+       (fun _ -> Big_int_Z.zero_big_int)
+-      (fun p -> coq_P_mod_two_p p wordsize)
++      (fun p -> coq_P_mod_two_p p (Big_int_Z.big_int_of_int wordsize))
+       (fun p ->
+-      let r = coq_P_mod_two_p p wordsize in
++      let r = coq_P_mod_two_p p (Big_int_Z.big_int_of_int wordsize) in
+       if zeq r Big_int_Z.zero_big_int
+       then Big_int_Z.zero_big_int
+       else Coq_Z.sub modulus r)
+@@ -2554,7 +2554,7 @@
+       int -> Big_int_Z.big_int -> Big_int_Z.big_int -> Big_int_Z.big_int list **)
+ 
+   let rec coq_Z_one_bits n0 x i =
+-    (fun fO fS n -> if n=0 then fO () else fS (n-1))
++    (fun fO fS n -> if Big_int_Z.eq_big_int n Big_int_Z.zero_big_int then fO () else fS (Big_int_Z.pred_big_int n))
+       (fun _ -> [])
+       (fun m ->
+       if Coq_Z.odd x
+@@ -2567,12 +2567,12 @@
+   (** val one_bits : int -> int list **)
+ 
+   let one_bits x =
+-    map repr (coq_Z_one_bits wordsize (unsigned x) Big_int_Z.zero_big_int)
++    map repr (coq_Z_one_bits (Big_int_Z.big_int_of_int wordsize) (unsigned x) Big_int_Z.zero_big_int)
+ 
+   (** val is_power2 : int -> int option **)
+ 
+   let is_power2 x =
+-    match coq_Z_one_bits wordsize (unsigned x) Big_int_Z.zero_big_int with
++    match coq_Z_one_bits (Big_int_Z.big_int_of_int wordsize) (unsigned x) Big_int_Z.zero_big_int with
+     | [] -> None
+     | i :: l -> (match l with
+                  | [] -> Some (repr i)
+@@ -2769,7 +2769,7 @@
+   (** val coq_P_mod_two_p : Big_int_Z.big_int -> int -> Big_int_Z.big_int **)
+ 
+   let rec coq_P_mod_two_p p n0 =
+-    (fun fO fS n -> if n=0 then fO () else fS (n-1))
++    (fun fO fS n -> if Big_int_Z.eq_big_int n Big_int_Z.zero_big_int then fO () else fS (Big_int_Z.pred_big_int n))
+       (fun _ -> Big_int_Z.zero_big_int)
+       (fun m ->
+       (fun f2p1 f2p f1 p ->
+@@ -2789,9 +2789,9 @@
+   if s = 0 then fO () else if s > 0 then fp z
+   else fn (Big_int_Z.minus_big_int z))
+       (fun _ -> Big_int_Z.zero_big_int)
+-      (fun p -> coq_P_mod_two_p p wordsize)
++      (fun p -> coq_P_mod_two_p p (Big_int_Z.big_int_of_int wordsize))
+       (fun p ->
+-      let r = coq_P_mod_two_p p wordsize in
++      let r = coq_P_mod_two_p p (Big_int_Z.big_int_of_int wordsize) in
+       if zeq r Big_int_Z.zero_big_int
+       then Big_int_Z.zero_big_int
+       else Coq_Z.sub modulus r)
+@@ -3047,7 +3047,7 @@
+       int -> Big_int_Z.big_int -> Big_int_Z.big_int -> Big_int_Z.big_int list **)
+ 
+   let rec coq_Z_one_bits n0 x i =
+-    (fun fO fS n -> if n=0 then fO () else fS (n-1))
++    (fun fO fS n -> if Big_int_Z.eq_big_int n Big_int_Z.zero_big_int then fO () else fS (Big_int_Z.pred_big_int n))
+       (fun _ -> [])
+       (fun m ->
+       if Coq_Z.odd x
+@@ -3060,12 +3060,12 @@
+   (** val one_bits : int -> int list **)
+ 
+   let one_bits x =
+-    map repr (coq_Z_one_bits wordsize (unsigned x) Big_int_Z.zero_big_int)
++    map repr (coq_Z_one_bits (Big_int_Z.big_int_of_int wordsize) (unsigned x) Big_int_Z.zero_big_int)
+ 
+   (** val is_power2 : int -> int option **)
+ 
+   let is_power2 x =
+-    match coq_Z_one_bits wordsize (unsigned x) Big_int_Z.zero_big_int with
++    match coq_Z_one_bits (Big_int_Z.big_int_of_int wordsize) (unsigned x) Big_int_Z.zero_big_int with
+     | [] -> None
+     | i :: l -> (match l with
+                  | [] -> Some (repr i)
+@@ -3210,12 +3210,12 @@
+   (** val one_bits' : int -> Int.int list **)
+ 
+   let one_bits' x =
+-    map Int.repr (coq_Z_one_bits wordsize (unsigned x) Big_int_Z.zero_big_int)
++    map Int.repr (coq_Z_one_bits (Big_int_Z.big_int_of_int wordsize) (unsigned x) Big_int_Z.zero_big_int)
+ 
+   (** val is_power2' : int -> Int.int option **)
+ 
+   let is_power2' x =
+-    match coq_Z_one_bits wordsize (unsigned x) Big_int_Z.zero_big_int with
++    match coq_Z_one_bits (Big_int_Z.big_int_of_int wordsize) (unsigned x) Big_int_Z.zero_big_int with
+     | [] -> None
+     | i :: l -> (match l with
+                  | [] -> Some (Int.repr i)
