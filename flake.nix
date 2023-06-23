@@ -104,7 +104,7 @@
           # Include a fixed version of clang in the development environment for testing.
           default = pkgs.mkShell {
             inputsFrom = [ packages.default ];
-            buildInputs = [ pkgs.clang_13 ocamlPkgs.utop ];
+            buildInputs = [ pkgs.clang_13 ocamlPkgs.utop ocamlPkgs.merlin ocamlPkgs.ocp-indent];
           };
         };
 
