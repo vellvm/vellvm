@@ -15096,6 +15096,71 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     }
   Qed.
 
+  (* TODO: Move this into memory model. Should be applicable to both fin / inf *)
+  Lemma read_bytes_spec_length :
+    forall ptr sz ms_start ms_final res,
+      MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec ptr sz ms_start (ret (ms_final, res)) ->
+      length res = sz.
+  Proof.
+    intros ptr sz ms_start ms_final res RBS.
+    unfold MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec in RBS.
+    apply MemPropT_bind_ret_inv in RBS as (ms_gcp&ptrs&GCP&MAPREAD).
+
+    assert (ms_start = ms_gcp) as MSEQ.
+    { eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq.
+      eapply GCP.
+    }
+    subst.
+
+    destruct GCP as (ms_ipseq&ips&SEQ&GCP).
+    red in SEQ.
+    break_match_hyp_inv.
+
+
+    assert (exists (pre : MemoryBigIntptr.MMEP.MMSP.MemState) (post : MemoryBigIntptr.MMEP.MMSP.MemState),
+               Within.within (InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs ptr sz) pre
+                 (ret ptrs) post).
+    {
+      exists ms_gcp.
+      cbn.
+      exists ms_gcp.
+      Transparent MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+      unfold MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs in GCP.
+      unfold InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+      Opaque MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+      red.
+      cbn.
+
+      exists ms_gcp. exists l.
+      split.
+      { red. rewrite Heqo.
+        cbn.
+        auto.
+      }
+
+      cbn in GCP.
+      destruct GCP as (?&?&?&?).
+      red in H.
+
+      exists x. exists x0.
+      split.
+      { cbn.
+        red.
+        break_match_goal; cbn in *; try contradiction.
+        auto.
+      }
+
+      red. red in H0.
+      break_match_hyp_inv.
+      cbn.
+      auto.
+    }
+
+    pose proof InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_length _ _ _ H; eauto.
+    apply map_monad_MemPropT_length in MAPREAD.
+    lia.
+  Qed.
+
   Lemma handle_load_fin_inf :
     forall {t addr_fin addr_inf ms_fin_start ms_fin_final ms_inf_start res_fin},
       MemState_refine_prop ms_inf_start ms_fin_start ->
@@ -15171,7 +15236,13 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       rewrite H.
       exists x. exists ms_inf.
       split; cbn; auto.
-      admit.
+
+      assert (length a_inf = length a_fin) as LEN.
+      { eapply Util.Forall2_length; eauto.
+      }
+
+      apply read_bytes_spec_length in RBS.
+      lia.
   Qed.
 
   Lemma model_E1E2_23_orutt_strict :
