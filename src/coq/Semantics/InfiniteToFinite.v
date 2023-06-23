@@ -2420,9 +2420,11 @@ Module InfiniteToFinite.
               MemState_refine_prop ms_inf_ma ms_fin_ma)
 
       (* Not sure about quantification *)
+      (* ma >>= k *)
       (K: forall ms_inf ms_fin ms_fin' a_fin a_inf b_fin,
           A_REF a_inf a_fin ->
           MemState_refine_prop ms_inf ms_fin ->
+          ma_inf ms_inf_start (ret (ms_inf, a_inf)) ->
           mab_fin a_fin ms_fin (ret (ms_fin', b_fin)) ->
           exists b_inf ms_inf',
             mab_inf a_inf ms_inf (ret (ms_inf', b_inf)) /\
@@ -5533,7 +5535,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf0 b_fin ADDRS MSR READ.
 
     eapply MemPropT_fin_inf_map_monad.
-    4: apply READ.
     all: eauto.
     2: {
       apply Forall2_flip in ADDRS.
@@ -7569,7 +7570,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf0 b_fin ADDRS MSR WRITES.
     eapply MemPropT_fin_inf_bind with
       (A_REF := Forall2 eq).
-    4: apply WRITES.
     all: eauto.
 
     { (* MA *)
@@ -7599,7 +7599,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     do 2 eexists; split; eauto.
     destruct b_fin0; split; auto.
     cbn in H1.
-    destruct H1; subst; auto.
+    destruct H2; subst; auto.
   Qed.
 
   (* TODO: Move this to somewhere it can
@@ -9696,7 +9696,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     intros ms_inf ms_fin ms_fin' [addr_fin' addrs_fin] [addr_inf addrs_inf] b_fin [ADDR_CONV ADDRS_CONV] MSR' ALLOC_POST.
 
     eapply MemPropT_fin_inf_bind.
-    4: apply ALLOC_POST.
     all: eauto.
 
     { (* allocate_bytes_post_conditions_MemPropT *)
@@ -9738,8 +9737,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       split; auto.
     }
 
-    intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin0 ADDRS_REF MSR'' H1.
-    destruct H1; subst.
+    intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin0 H H0 H1 H2.
+    destruct H2; subst.
     do 2 eexists.
     split; cbn; eauto.
   Qed.
@@ -9796,7 +9795,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     cbn in SID; subst.
 
     eapply MemPropT_fin_inf_bind with (A_REF:=Forall2 sbytes_refine).
-    4: apply K.
     all: eauto.
 
     { (* MA: generating undef bytes *)
@@ -9838,12 +9836,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       auto.
     }
 
-    intros ms_inf ms_fin ms_fin'0 a_fin a_inf b_fin0 BYTE_BLOCKS_REF MSR_GEN ALLOCA_BYTES.
+    intros ms_inf ms_fin ms_fin'0 a_fin a_inf b_fin0 BYTE_BLOCKS_REF MSR_GEN GEN_UNDEF ALLOCA_BYTES.
     eapply allocate_bytes_spec_MemPropT_fin_inf; eauto.
-    2: {
-      apply ALLOCA_BYTES.
-    }
-
     apply Forall2_concat; auto.
   Qed.
 
@@ -9872,9 +9866,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       eapply allocate_dtyp_spec_fin_inf; eauto.
     }
 
-    intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin ADDR_REF MSR' H.
-    cbn in H.
-    destruct H; subst.
+    intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin ADDR_REF MSR' H H0.
+    cbn in H0.
+    destruct H0; subst.
     cbn in ADDR_REF.
 
     cbn.
@@ -10293,7 +10287,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     intros ms_inf ms_fin ms_fin' [addr_fin' addrs_fin] [addr_inf addrs_inf] b_fin [ADDR_CONV ADDRS_CONV] MSR' ALLOC_POST.
 
     eapply MemPropT_fin_inf_bind.
-    4: apply ALLOC_POST.
     all: eauto.
 
     { (* allocate_bytes_post_conditions_MemPropT *)
@@ -10335,8 +10328,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       split; auto.
     }
 
-    intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin0 ADDRS_REF MSR'' H1.
-    destruct H1; subst.
+    intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin0 ADDRS_REF MSR'' H1 H2.
+    destruct H2; subst.
     do 2 eexists.
     split; cbn; eauto.
   Qed.
@@ -10377,7 +10370,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       cbn in SID; subst.
 
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE'.
       all: eauto.
 
       { (* MA: generate_num_undef_bytes *)
@@ -10397,7 +10389,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
       intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf b_fin0 BYTES_REF MSR_GEN HANDLE''.
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE''.
       all: eauto.
 
       { (* MA: fresh_provenance *)
@@ -10431,7 +10422,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       cbn in SID; subst.
 
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE'.
       all: eauto.
 
       { (* MA: generate_num_undef_bytes *)
@@ -10451,7 +10441,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
       intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf b_fin0 BYTES_REF MSR_GEN HANDLE''.
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE''.
       all: eauto.
 
       { (* MA: fresh_provenance *)
@@ -10485,7 +10474,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       cbn in SID; subst.
 
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE'.
       all: eauto.
 
       { (* MA: generate_num_undef_bytes *)
@@ -10505,7 +10493,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
       intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf b_fin0 BYTES_REF MSR_GEN HANDLE''.
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE''.
       all: eauto.
 
       { (* MA: fresh_provenance *)
@@ -10539,7 +10526,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       cbn in SID; subst.
 
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE'.
       all: eauto.
 
       { (* MA: generate_num_undef_bytes *)
@@ -10559,7 +10545,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
       intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf b_fin0 BYTES_REF MSR_GEN HANDLE''.
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE''.
       all: eauto.
 
       { (* MA: fresh_provenance *)
@@ -10593,7 +10578,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       cbn in SID; subst.
 
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE'.
       all: eauto.
 
       { (* MA: generate_num_undef_bytes *)
@@ -10617,7 +10601,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
       intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf b_fin0 BYTES_REF MSR_GEN HANDLE''.
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE''.
       all: eauto.
 
       { (* MA: fresh_provenance *)
@@ -11044,7 +11027,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         eapply handle_memcpy_fin_inf; eauto.
       }
 
-      intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin _ MSR' EQV.
+      intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin _ MSR' HANDLE EQV.
       cbn in EQV.
       destruct EQV; subst.
 
@@ -11069,9 +11052,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         eapply handle_malloc_fin_inf; eauto.
       }
 
-      intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin H H0 H1.
-      cbn in H, H1.
-      destruct H1; subst.
+      intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin H H0 H1 H2.
+      cbn in H, H2.
+      destruct H2; subst.
       do 2 eexists; cbn; split; auto.
       split; auto.
       rewrite DVC1.dvalue_refine_strict_equation, DVC1.dvalue_convert_strict_equation.
@@ -11091,9 +11074,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         eapply handle_free_fin_inf; eauto.
       }
 
-      intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin H H0 H1.
-      cbn in H, H1.
-      destruct H1; subst.
+      intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin H H0 H1 H2.
+      cbn in H, H2.
+      destruct H2; subst.
       do 2 eexists; cbn; split; auto.
       split; auto.
       rewrite DVC1.dvalue_refine_strict_equation, DVC1.dvalue_convert_strict_equation.
@@ -11104,7 +11087,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     (* Unknown intrinsic *)
     cbn in *; auto.
     contradiction.
-  Admitted.
+  Qed.
 
   Lemma to_ubytes_fin_inf_helper :
     forall {uv_fin uv_inf t sid bytes_fin start},
@@ -12805,7 +12788,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       eapply MemPropT_fin_inf_bind; [ | | | apply SERIALIZE]; eauto;
       [ intros *; eapply fresh_sid_fin_inf; eauto |];
 
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID UBYTES;
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID FRESH UBYTES;
       cbn in SID, UBYTES; subst;
 
       red in UBYTES;
@@ -12854,7 +12837,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     { (* Poison arrays *)
       rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
         rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
+        cbn in UV_REF.
         move UV_REF after IHTYPE_INF;
         inv UV_REF.
 
@@ -13196,7 +13179,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             |];
 
             clear SERIALIZE;
-            intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH SERIALIZE;
+            intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH FRESH SERIALIZE;
             cbn in SID; subst;
             red in SERIALIZE;
             break_match_hyp_inv; rename Heqo into SERIALIZE;
@@ -13565,7 +13548,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             |];
 
             clear SERIALIZE;
-            intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH SERIALIZE;
+            intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH FRESH SERIALIZE;
             cbn in SID; subst;
             red in SERIALIZE;
             break_match_hyp_inv; rename Heqo into SERIALIZE;
@@ -13934,7 +13917,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             |];
 
             clear SERIALIZE;
-            intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH SERIALIZE;
+            intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH FRESH SERIALIZE;
             cbn in SID; subst;
             red in SERIALIZE;
             break_match_hyp_inv; rename Heqo into SERIALIZE;
@@ -13978,7 +13961,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         inv TYPE_FIN; auto.
       }
 
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin FLD_BYTE_REF MSR_FLD SERIALIZE_REST.
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin FLD_BYTE_REF MSR_FLD FRESH SERIALIZE_REST.
       repeat red in SERIALIZE_REST.
       destruct SERIALIZE_REST as (ms_fin_final'&rest_bytes_fin&SERIALIZE_REST&RET).
       cbn in RET.
@@ -14027,7 +14010,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         inv TYPE_FIN; auto.
       }
 
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin FLD_BYTE_REF MSR_FLD SERIALIZE_REST.
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin FLD_BYTE_REF MSR_FLD FRESH SERIALIZE_REST.
       repeat red in SERIALIZE_REST.
       destruct SERIALIZE_REST as (ms_fin_final'&rest_bytes_fin&SERIALIZE_REST&RET).
       cbn in RET.
@@ -14093,7 +14076,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         apply map_monad_oom_forall2; auto.
       }
 
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTE_BLOCKS_REF MSR_ELT RET.
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTE_BLOCKS_REF MSR_ELT HMAPM RET.
       cbn in RET.
       destruct RET; subst.
       cbn in BYTE_BLOCKS_REF.
@@ -14144,7 +14127,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         apply map_monad_oom_forall2; auto.
       }
 
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTE_BLOCKS_REF MSR_ELT RET.
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTE_BLOCKS_REF MSR_ELT HMAPM RET.
       cbn in RET.
       destruct RET; subst.
       cbn in BYTE_BLOCKS_REF.
@@ -14171,7 +14154,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           eapply MemPropT_fin_inf_bind; [ | | | apply SERIALIZE]; eauto;
           [intros *; eapply fresh_sid_fin_inf; eauto|];
 
-          intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH UBYTES;
+          intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH FRESH UBYTES;
           cbn in SID; subst;
 
           red in UBYTES;
@@ -15175,17 +15158,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       apply READ.
     }
 
-    intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTES_REF MSR_LOAD DESERIALIZE.
+    intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTES_REF MSR_LOAD RBS DESERIALIZE.
     unfold lift_err_RAISE_ERROR in *.
 
     break_match_hyp.
-    - eapply deserialize_sbytes_fail_fin_inf in Heqs; eauto.
-      rewrite Heqs.
-      do 2 eexists.
-      split; eauto.
-      split.
-      apply fin_to_inf_uvalue_refine_strict.
-      apply lift_MemState_refine_prop.
+    - cbn in DESERIALIZE.
+      contradiction.
     - eapply deserialize_sbytes_fin_inf in Heqs; eauto.
       destruct Heqs as (?&?&?).
       cbn in DESERIALIZE.
@@ -15193,10 +15171,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       rewrite H.
       exists x. exists ms_inf.
       split; cbn; auto.
-      (* should the length be part of fin_inf_read_bytes_spec? *)
-      Print Assumptions deserialize_sbytes_fin_inf.
-      assert (length a_fin
-      lia.
+      admit.
   Qed.
 
   Lemma model_E1E2_23_orutt_strict :
