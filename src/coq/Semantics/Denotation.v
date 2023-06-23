@@ -767,7 +767,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                      denote_function (f_den) args
                    | None =>
                      dargs <- map_monad (fun uv => pickUnique uv) args ;;
-                     fmap dvalue_to_uvalue (trigger (ExternalCall dt fv dargs attr))
+                     trigger (ExternalCall dt fv dargs attr)
                    end
                  end)
               _ (Call dt f_value args []).
