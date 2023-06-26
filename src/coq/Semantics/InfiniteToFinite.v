@@ -7678,7 +7678,7 @@ Print Assumptions fin_inf_allocations_preserved.
     tauto.
   Qed.
 
-
+  (* SAZ: TODO - look at this one next *)
   Lemma fin_inf_read_byte_allowed_all_preserved :
     forall ms_fin ms_inf ms_fin' ms_inf',
       MemState_refine_prop ms_inf ms_fin ->
@@ -7698,6 +7698,7 @@ Print Assumptions fin_inf_allocations_preserved.
 
   Admitted.
 
+    (* SAZ: TODO - look at this one next *)
   Lemma fin_inf_read_byte_prop_all_preserved :
     forall ms_fin ms_inf ms_fin' ms_inf',
       MemState_refine_prop ms_inf ms_fin ->
@@ -7708,6 +7709,7 @@ Print Assumptions fin_inf_allocations_preserved.
     intros ms_fin ms_inf ms_fin' ms_inf' REF REF' RBP.
   Admitted.
 
+    (* SAZ: TODO - look at this one next *)
   Lemma fin_inf_write_byte_allowed_all_preserved :
     forall ms_fin ms_inf ms_fin' ms_inf',
       MemState_refine_prop ms_inf ms_fin ->
@@ -7718,6 +7720,7 @@ Print Assumptions fin_inf_allocations_preserved.
     intros ms_fin ms_inf ms_fin' ms_inf' REF REF' HP.
   Admitted.
 
+    (* SAZ: TODO - look at this one next *)
   Lemma fin_inf_free_byte_allowed_all_preserved :
     forall ms_fin ms_inf ms_fin' ms_inf',
       MemState_refine_prop ms_inf ms_fin ->
@@ -7728,6 +7731,7 @@ Print Assumptions fin_inf_allocations_preserved.
     intros ms_fin ms_inf ms_fin' ms_inf' REF REF' HP.
   Admitted.
 
+    (* SAZ: TODO - look at this one next *)
   Lemma fin_inf_preserve_allocation_ids :
     forall ms_fin ms_inf ms_fin' ms_inf',
       MemState_refine_prop ms_inf ms_fin ->

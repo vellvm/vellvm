@@ -359,9 +359,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | UVALUE_GetElementPtr    (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)) (* TODO: do we ever need this? GEP raises an event? *)
   | UVALUE_ExtractElement   (vec_typ : dtyp) (vec: uvalue) (idx: uvalue)
   | UVALUE_InsertElement    (vec_typ : dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue)
-  | UVALUE_ShuffleVector    (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue)
+  | UVALUE_ShuffleVector    (vec_typ : dtyp) (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue)
   | UVALUE_ExtractValue     (vec_typ : dtyp) (vec:uvalue) (idxs:list LLVMAst.int)
-  | UVALUE_InsertValue      (vec_typ : dtyp) (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int)
+  | UVALUE_InsertValue      (vec_typ : dtyp) (vec:uvalue) (elt_typ : dtyp) (elt:uvalue) (idxs:list LLVMAst.int)
   | UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue)
   (* Extract the `idx` byte from a uvalue `uv`, which was stored with
    type `dt`. `idx` 0 is the least significant byte. `sid` is the "store
@@ -402,11 +402,11 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         S (uvalue_measure vec + uvalue_measure idx)
     | UVALUE_InsertElement t vec elt idx =>
         S (uvalue_measure vec + uvalue_measure elt + uvalue_measure idx)
-    | UVALUE_ShuffleVector vec1 vec2 idxmask =>
+    | UVALUE_ShuffleVector t vec1 vec2 idxmask =>
         S (uvalue_measure vec1 + uvalue_measure vec2 + uvalue_measure idxmask)
     | UVALUE_ExtractValue t vec idxs =>
         S (uvalue_measure vec)
-    | UVALUE_InsertValue t vec elt idxs =>
+    | UVALUE_InsertValue t vec u elt idxs =>
         S (uvalue_measure vec + uvalue_measure elt)
     | UVALUE_Select cnd v1 v2 =>
         S (uvalue_measure cnd + uvalue_measure v1 + uvalue_measure v2)
@@ -501,9 +501,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_GetElementPtr  : forall (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)), P ptrval -> (forall idx, In idx idxs -> P idx) -> P (UVALUE_GetElementPtr t ptrval idxs).
     Hypothesis IH_ExtractElement : forall (t:dtyp) (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement t vec idx).
     Hypothesis IH_InsertElement  : forall (t:dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement t vec elt idx).
-    Hypothesis IH_ShuffleVector  : forall (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector vec1 vec2 idxmask).
+    Hypothesis IH_ShuffleVector  : forall (t:dtyp) (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector t vec1 vec2 idxmask).
     Hypothesis IH_ExtractValue   : forall (t:dtyp) (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue t vec idxs).
-    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec elt idxs).
+    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (et:dtyp) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec et elt idxs).
     Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
     Hypothesis IH_ExtractByte : forall (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : N), P uv -> P idx -> P (UVALUE_ExtractByte uv dt idx sid).
     Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue),
@@ -585,9 +585,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_GetElementPtr  : forall (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)), P ptrval -> (forall idx, InT idx idxs -> P idx) -> P (UVALUE_GetElementPtr t ptrval idxs).
     Hypothesis IH_ExtractElement : forall (t:dtyp) (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement t vec idx).
     Hypothesis IH_InsertElement  : forall (t:dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement t vec elt idx).
-    Hypothesis IH_ShuffleVector  : forall (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector vec1 vec2 idxmask).
+    Hypothesis IH_ShuffleVector  : forall (t:dtyp) (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector t vec1 vec2 idxmask).
     Hypothesis IH_ExtractValue   : forall (t:dtyp) (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue t vec idxs).
-    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec elt idxs).
+    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (et:dtyp) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec et elt idxs).
     Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
     Hypothesis IH_ExtractByte : forall (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : N), P uv -> P idx -> P (UVALUE_ExtractByte uv dt idx sid).
     Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue),
@@ -673,9 +673,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_GetElementPtr  : forall (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)), P ptrval -> (forall idx, In idx idxs -> P idx) -> P (UVALUE_GetElementPtr t ptrval idxs).
     Hypothesis IH_ExtractElement : forall (t:dtyp) (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement t vec idx).
     Hypothesis IH_InsertElement  : forall (t:dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement t vec elt idx).
-    Hypothesis IH_ShuffleVector  : forall (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector vec1 vec2 idxmask).
+    Hypothesis IH_ShuffleVector  : forall (t:dtyp) (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector t vec1 vec2 idxmask).
     Hypothesis IH_ExtractValue   : forall (t:dtyp) (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue t vec idxs).
-    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec elt idxs).
+    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (et:dtyp) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec et elt idxs).
     Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
     Hypothesis IH_ExtractByte : forall (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : N), P uv -> P idx -> P (UVALUE_ExtractByte uv dt idx sid).
     Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue),
@@ -761,9 +761,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_GetElementPtr  : forall (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)), P ptrval -> (forall idx, InT idx idxs -> P idx) -> P (UVALUE_GetElementPtr t ptrval idxs).
     Hypothesis IH_ExtractElement : forall (t:dtyp) (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement t vec idx).
     Hypothesis IH_InsertElement  : forall (t:dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement t vec elt idx).
-    Hypothesis IH_ShuffleVector  : forall (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector vec1 vec2 idxmask).
+    Hypothesis IH_ShuffleVector  : forall (t:dtyp) (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector t vec1 vec2 idxmask).
     Hypothesis IH_ExtractValue   : forall (t:dtyp) (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue t vec idxs).
-    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec elt idxs).
+    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (et:dtyp) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec et elt idxs).
     Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
     Hypothesis IH_ExtractByte : forall (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : N), P uv -> P idx -> P (UVALUE_ExtractByte uv dt idx sid).
     Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue),
@@ -938,9 +938,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_GetElementPtr  : forall (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)), P ptrval -> (forall idx, In idx idxs -> P idx) -> P (UVALUE_GetElementPtr t ptrval idxs).
     Hypothesis IH_ExtractElement : forall (t:dtyp) (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement t vec idx).
     Hypothesis IH_InsertElement  : forall (t:dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement t vec elt idx).
-    Hypothesis IH_ShuffleVector  : forall (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector vec1 vec2 idxmask).
+    Hypothesis IH_ShuffleVector  : forall (t:dtyp) (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector t vec1 vec2 idxmask).
     Hypothesis IH_ExtractValue   : forall (t:dtyp) (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue t vec idxs).
-    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec elt idxs).
+    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (et:dtyp) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec et elt idxs).
     Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
     Hypothesis IH_ExtractByte : forall (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : N), P uv -> P idx -> P (UVALUE_ExtractByte uv dt idx sid).
     Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue),
@@ -1225,9 +1225,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_GetElementPtr  : forall (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)), P ptrval -> (forall idx, InT idx idxs -> P idx) -> P (UVALUE_GetElementPtr t ptrval idxs).
     Hypothesis IH_ExtractElement : forall (t:dtyp) (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement t vec idx).
     Hypothesis IH_InsertElement  : forall (t:dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement t vec elt idx).
-    Hypothesis IH_ShuffleVector  : forall (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector vec1 vec2 idxmask).
+    Hypothesis IH_ShuffleVector  : forall (t:dtyp) (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector t vec1 vec2 idxmask).
     Hypothesis IH_ExtractValue   : forall (t:dtyp) (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue t vec idxs).
-    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec elt idxs).
+    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (et:dtyp) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec et elt idxs).
     Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
     Hypothesis IH_ExtractByte : forall (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : N), P uv -> P idx -> P (UVALUE_ExtractByte uv dt idx sid).
     Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue),
@@ -1909,9 +1909,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                 | UVALUE_GetElementPtr t u l, UVALUE_GetElementPtr t' u' l' => _
                 | UVALUE_ExtractElement t u v, UVALUE_ExtractElement t' u' v' => _
                 | UVALUE_InsertElement t u v x, UVALUE_InsertElement t' u' v' x' => _
-                | UVALUE_ShuffleVector u v x, UVALUE_ShuffleVector u' v' x' => _
+                | UVALUE_ShuffleVector t u v x, UVALUE_ShuffleVector t' u' v' x' => _
                 | UVALUE_ExtractValue t u l, UVALUE_ExtractValue t' u' l' => _
-                | UVALUE_InsertValue t u v l, UVALUE_InsertValue t' u' v' l' => _
+                | UVALUE_InsertValue t u et v l, UVALUE_InsertValue t' u' et' v' l' => _
                 | UVALUE_Select u v w, UVALUE_Select u' v' w' => _
                 | UVALUE_ExtractByte uv dt idx sid, UVALUE_ExtractByte uv' dt' idx' sid' => _
                 | UVALUE_ConcatBytes uvs dt, UVALUE_ConcatBytes uvs' dt' => _
@@ -1962,11 +1962,13 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       - destruct (f u u')...
         destruct (f v v')...
         destruct (f x x')...
+        destruct (dtyp_eq_dec t t')...
       - destruct (dtyp_eq_dec t t')...
         destruct (f u u')...
         destruct (list_eq_dec Z.eq_dec l l')...
       - destruct (dtyp_eq_dec t t')...
         destruct (f u u')...
+        destruct (dtyp_eq_dec et et')...
         destruct (f v v')...
         destruct (list_eq_dec Z.eq_dec l l')...
       - destruct (f u u')...
@@ -3251,6 +3253,99 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   (* Proof. *)
   (* Admitted. *)
 
+  Definition IX_supported_ltb x y : bool :=
+    if @IX_supported_dec x then
+      if @IX_supported_dec y then
+        if N.ltb x y then true else false 
+      else
+        false
+    else false.
+
+  Definition trunc_base_okb from_dt to_dt :=
+    match from_dt with
+    | DTYPE_I from_sz =>
+        match to_dt with
+        | DTYPE_I to_sz => IX_supported_ltb to_sz from_sz
+        | _ => false 
+        end 
+    | DTYPE_IPTR =>
+        match to_dt with
+        | DTYPE_I to_sz =>
+            if @IX_supported_dec to_sz then true else false 
+        | _ => false 
+        end
+    | _ => false 
+    end.
+
+  Definition lift_conv_okb conv_base_okb from_dt to_dt :=
+    match from_dt with
+    | DTYPE_Vector from_n from_vdt =>
+        match to_dt with
+        | DTYPE_Vector to_n to_vdt =>
+            conv_base_okb from_vdt to_vdt
+        | _ => false
+        end
+    | _ => conv_base_okb from_dt to_dt
+    end.
+
+  Definition ext_base_okb from_dt to_dt :=
+    match from_dt with
+    | DTYPE_I from_sz =>
+        match to_dt with
+        | DTYPE_I to_sz => IX_supported_ltb from_sz to_sz
+        | DTYPE_IPTR =>
+            if @IX_supported_dec from_sz then true else false 
+        | _ => false 
+        end 
+    | _ => false 
+    end.
+
+  (* SAZ: TODO - add the other conversion operations *)
+  Definition conversion_okb (conv : LLVMAst.conversion_type) (from_dt to_dt : dtyp)  : bool :=
+    match conv with
+    | Trunc => lift_conv_okb trunc_base_okb from_dt to_dt
+    | Zext  
+    | Sext => lift_conv_okb ext_base_okb from_dt to_dt
+    | _ => false 
+    end.
+    
+  (* Assumes:
+     [l] is a list of indices treated as a path into the nested structure.
+     The function returns true iff the type at the index is equal to [dt]
+
+  *)
+  Fixpoint check_extract_path l dt_src dt_tgt :=
+    match l with
+    | [] => false
+    | [idx] =>
+        if (Z.ltb idx 0) then false (* negative index *)
+        else
+          match dt_src with
+          | DTYPE_Array len t =>
+              if (N.ltb (Z.to_N idx) len) then
+                if dtyp_eq_dec t dt_tgt then true else false 
+              else false 
+          | DTYPE_Struct fts
+          | DTYPE_Packed_struct fts =>
+              if dtyp_eq_dec (List.nth (Z.to_nat idx) fts DTYPE_Void) dt_tgt then true
+              else false
+          | _ => false 
+          end
+    | idx::idxs =>
+        if (Z.ltb idx 0) then false (* negative index *)
+        else
+          match dt_src with
+          | DTYPE_Array len t =>
+              if (N.ltb (Z.to_N idx) len) then check_extract_path idxs t dt_tgt else false 
+          | DTYPE_Struct fts
+          | DTYPE_Packed_struct fts =>
+              let nth_ft := List.nth (Z.to_nat idx) fts DTYPE_Void in
+              check_extract_path idxs nth_ft dt_tgt
+          | _ => false 
+          end
+    end.
+
+  
   Unset Elimination Schemes.
   Inductive uvalue_has_dtyp : uvalue -> dtyp -> Prop :=
   | UVALUE_Addr_typ   : forall a, uvalue_has_dtyp (UVALUE_Addr a) DTYPE_Pointer
@@ -3266,19 +3361,15 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | UVALUE_Oom_typ  : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> uvalue_has_dtyp (UVALUE_Oom τ) τ
   | UVALUE_Undef_typ  : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> uvalue_has_dtyp (UVALUE_Undef τ) τ
 
-  | UVALUE_Struct_Nil_typ  : uvalue_has_dtyp (UVALUE_Struct []) (DTYPE_Struct [])
-  | UVALUE_Struct_Cons_typ :
-      forall f dt fields dts,
-        uvalue_has_dtyp f dt ->
-        uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct dts) ->
-        uvalue_has_dtyp (UVALUE_Struct (f :: fields)) (DTYPE_Struct (dt :: dts))
+  | UVALUE_Struct_typ :
+    forall fields dts,
+      List.Forall2 uvalue_has_dtyp fields dts ->
+      uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct dts)
 
-  | UVALUE_Packed_struct_Nil_typ  : uvalue_has_dtyp (UVALUE_Packed_struct []) (DTYPE_Packed_struct [])
-  | UVALUE_Packed_struct_Cons_typ :
-      forall f dt fields dts,
-        uvalue_has_dtyp f dt ->
-        uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
-        uvalue_has_dtyp (UVALUE_Packed_struct (f :: fields)) (DTYPE_Packed_struct (dt :: dts))
+  | UVALUE_Pacted_struct_typ :
+    forall fields dts,
+      List.Forall2 uvalue_has_dtyp fields dts ->
+      uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct dts)
 
   (* Do we have to exclude mmx? "There are no arrays, vectors or constants of this type" *)
   | UVALUE_Array_typ :
@@ -3295,242 +3386,113 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         uvalue_has_dtyp (UVALUE_Vector xs) (DTYPE_Vector (N.of_nat sz) dt)
 
   | UVALUE_IBinop_typ :
-      forall x y sz op,
-      IX_supported sz ->
-      uvalue_has_dtyp x (DTYPE_I sz) ->
-      uvalue_has_dtyp y (DTYPE_I sz) ->
-      uvalue_has_dtyp (UVALUE_IBinop op x y) (DTYPE_I sz)
-  | UVALUE_IBinop_ptr_typ :
-      forall x y op,
-      uvalue_has_dtyp x DTYPE_IPTR ->
-      uvalue_has_dtyp y DTYPE_IPTR ->
-      uvalue_has_dtyp (UVALUE_IBinop op x y) DTYPE_IPTR
+      forall x y sz op dt,
+      ((IX_supported sz /\ dt = (DTYPE_I sz)) \/ (dt = DTYPE_IPTR)) ->
+      uvalue_has_dtyp x dt ->
+      uvalue_has_dtyp y dt ->
+      uvalue_has_dtyp (UVALUE_IBinop op x y) dt
+
   | UVALUE_ICmp_typ :
-      forall x y sz op,
-      IX_supported sz ->
-      uvalue_has_dtyp x (DTYPE_I sz) ->
-      uvalue_has_dtyp y (DTYPE_I sz) ->
-      uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_I 1)
-  | UVALUE_ICmp_pointer_typ :
-      forall x y op,
-      uvalue_has_dtyp x DTYPE_Pointer ->
-      uvalue_has_dtyp y DTYPE_Pointer ->
-      uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_I 1)
+      forall x y op sz,
+        ((IX_supported sz /\ uvalue_has_dtyp x (DTYPE_I sz) /\ uvalue_has_dtyp y (DTYPE_I sz))
+         \/
+           (uvalue_has_dtyp x DTYPE_IPTR /\ uvalue_has_dtyp y DTYPE_IPTR) 
+         \/
+         (uvalue_has_dtyp x DTYPE_Pointer /\ uvalue_has_dtyp y DTYPE_Pointer)) ->
+        uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_I 1)
+
   | UVALUE_ICmp_vector_typ :
       forall x y vsz isz op,
-      IX_supported isz ->
-      uvalue_has_dtyp x (DTYPE_Vector vsz (DTYPE_I isz)) ->
-      uvalue_has_dtyp y (DTYPE_Vector vsz (DTYPE_I isz)) ->
+        ((IX_supported isz /\ uvalue_has_dtyp x (DTYPE_Vector vsz (DTYPE_I isz)) /\
+            uvalue_has_dtyp y (DTYPE_Vector vsz (DTYPE_I isz)))
+         \/
+           (uvalue_has_dtyp x (DTYPE_Vector vsz DTYPE_IPTR) /\
+              uvalue_has_dtyp y (DTYPE_Vector vsz DTYPE_IPTR))
+         \/
+           (uvalue_has_dtyp x (DTYPE_Vector vsz DTYPE_Pointer) /\
+              uvalue_has_dtyp y (DTYPE_Vector vsz DTYPE_Pointer))
+        ) ->
       uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1))
-  | UVALUE_ICmp_vector_typ_ptr :
-      forall x y vsz op,
-      uvalue_has_dtyp x (DTYPE_Vector vsz DTYPE_IPTR) ->
-      uvalue_has_dtyp y (DTYPE_Vector vsz DTYPE_IPTR) ->
-      uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1))
-  | UVALUE_ICmp_vector_pointer_typ :
-      forall x y vsz op,
-      uvalue_has_dtyp x (DTYPE_Vector vsz DTYPE_Pointer) ->
-      uvalue_has_dtyp y (DTYPE_Vector vsz DTYPE_Pointer) ->
-      uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1))
-  | UVALUE_FBinop_Float_typ :
-      forall x y op fms,
-      uvalue_has_dtyp x DTYPE_Float ->
-      uvalue_has_dtyp y DTYPE_Float ->
-      uvalue_has_dtyp (UVALUE_FBinop op fms x y) DTYPE_Float
-  | UVALUE_FBinop_Double_typ :
-      forall x y op fms,
-      uvalue_has_dtyp x DTYPE_Double ->
-      uvalue_has_dtyp y DTYPE_Double ->
-      uvalue_has_dtyp (UVALUE_FBinop op fms x y) DTYPE_Double
-  | UVALUE_FCmp_Float_typ :
-      forall x y op,
-        uvalue_has_dtyp x DTYPE_Float ->
-        uvalue_has_dtyp y DTYPE_Float ->
-        uvalue_has_dtyp (UVALUE_FCmp op x y) (DTYPE_I 1)
-  | UVALUE_FCmp_Double_typ :
-      forall x y op,
-        uvalue_has_dtyp x DTYPE_Double ->
-        uvalue_has_dtyp y DTYPE_Double ->
-        uvalue_has_dtyp (UVALUE_FCmp op x y) (DTYPE_I 1)
-  | UVALUE_Conversion_trunc_int_typ :
-      forall from_sz to_sz value,
-        IX_supported from_sz ->
-        IX_supported to_sz ->
-        from_sz > to_sz ->
-        uvalue_has_dtyp value (DTYPE_I from_sz) ->
-        uvalue_has_dtyp (UVALUE_Conversion Trunc (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz)
-  | UVALUE_Conversion_trunc_int_ptr_typ :
-      forall to_sz value,
-        IX_supported to_sz ->
-        uvalue_has_dtyp value (DTYPE_IPTR) ->
-        uvalue_has_dtyp (UVALUE_Conversion Trunc DTYPE_IPTR value (DTYPE_I to_sz)) (DTYPE_I to_sz)
-  | UVALUE_Conversion_trunc_vec_typ :
-      forall from_sz to_sz n value,
-        IX_supported from_sz ->
-        IX_supported to_sz ->
-        from_sz > to_sz ->
-        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        uvalue_has_dtyp (UVALUE_Conversion Trunc (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
-  | UVALUE_Conversion_trunc_vec_ptr_typ :
-      forall to_sz n value,
-        IX_supported to_sz ->
-        uvalue_has_dtyp value (DTYPE_Vector n DTYPE_IPTR) ->
-        uvalue_has_dtyp (UVALUE_Conversion Trunc (DTYPE_Vector n DTYPE_IPTR) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
 
-  | UVALUE_Conversion_zext_int_typ :
-      forall from_sz to_sz value,
-        IX_supported from_sz ->
-        IX_supported to_sz ->
-        from_sz < to_sz ->
-        uvalue_has_dtyp value (DTYPE_I from_sz) ->
-        uvalue_has_dtyp (UVALUE_Conversion Zext (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz)
-  | UVALUE_Conversion_zext_int_ptr_typ :
-      forall from_sz value,
-        IX_supported from_sz ->
-        uvalue_has_dtyp value (DTYPE_I from_sz) ->
-        uvalue_has_dtyp (UVALUE_Conversion Zext (DTYPE_I from_sz) value DTYPE_IPTR) DTYPE_IPTR
-  | UVALUE_Conversion_zext_vec_typ :
-      forall from_sz to_sz n value,
-        IX_supported from_sz ->
-        IX_supported to_sz ->
-        from_sz < to_sz ->
-        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        uvalue_has_dtyp (UVALUE_Conversion Zext (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
-  | UVALUE_Conversion_zext_vec_ptr_typ :
-      forall from_sz n value,
-        IX_supported from_sz ->
-        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        uvalue_has_dtyp (UVALUE_Conversion Zext (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n DTYPE_IPTR)) (DTYPE_Vector n DTYPE_IPTR)
+  | UVALUE_FBinop_typ :
+    forall x y op fms dt,
+      (dt = DTYPE_Double \/ dt = DTYPE_Float) ->
+      uvalue_has_dtyp x dt ->
+      uvalue_has_dtyp y dt ->
+      uvalue_has_dtyp (UVALUE_FBinop op fms x y) dt
 
+  | UVALUE_FCmp_typ :
+    forall x y op dt,
+      (dt = DTYPE_Double \/ dt = DTYPE_Float) ->      
+      uvalue_has_dtyp x dt ->
+      uvalue_has_dtyp y dt ->
+      uvalue_has_dtyp (UVALUE_FCmp op x y) (DTYPE_I 1)
 
-  | UVALUE_Conversion_sext_int_typ :
-      forall from_sz to_sz value,
-        IX_supported from_sz ->
-        IX_supported to_sz ->
-        from_sz < to_sz ->
-        uvalue_has_dtyp value (DTYPE_I from_sz) ->
-        uvalue_has_dtyp (UVALUE_Conversion Sext (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz)
-  | UVALUE_Conversion_sext_int_ptr_typ :
-      forall from_sz value,
-        IX_supported from_sz ->
-        uvalue_has_dtyp value (DTYPE_I from_sz) ->
-        uvalue_has_dtyp (UVALUE_Conversion Sext (DTYPE_I from_sz) value DTYPE_IPTR) DTYPE_IPTR
-  | UVALUE_Conversion_sext_vec_typ :
-      forall from_sz to_sz n value,
-        IX_supported from_sz ->
-        IX_supported to_sz ->
-        from_sz < to_sz ->
-        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        uvalue_has_dtyp (UVALUE_Conversion Sext (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
-  | UVALUE_Conversion_sext_vec_ptr_typ :
-      forall from_sz n value,
-        IX_supported from_sz ->
-        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        uvalue_has_dtyp (UVALUE_Conversion Sext (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n DTYPE_IPTR)) (DTYPE_Vector n DTYPE_IPTR)
+  | UVALUE_Conversion_typ :
+    forall conv from_typ value to_typ,
+      uvalue_has_dtyp value from_typ ->
+      conversion_okb conv from_typ to_typ = true ->
+      uvalue_has_dtyp (UVALUE_Conversion conv from_typ value to_typ) to_typ 
 
   | UVALUE_GetElementPtr_typ :
-      forall dt uv idxs,
-        uvalue_has_dtyp (UVALUE_GetElementPtr dt uv idxs) DTYPE_Pointer
+    forall dt uv idxs,
+      uvalue_has_dtyp (UVALUE_GetElementPtr dt uv idxs) DTYPE_Pointer
+                      
   | UVALUE_ExtractElement_typ :
       forall n vect idx t sz,
-        IX_supported sz ->
         ALL_IX_SUPPORTED t ->
-        uvalue_has_dtyp idx (DTYPE_I sz) ->
-        uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
-        uvalue_has_dtyp (UVALUE_ExtractElement (DTYPE_Vector (N.of_nat n) t) vect idx) t
-  | UVALUE_ExtractElement_ptr_typ :
-      forall n vect idx t,
-        ALL_IX_SUPPORTED t ->
-        uvalue_has_dtyp idx DTYPE_IPTR ->
-        uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
-        uvalue_has_dtyp (UVALUE_ExtractElement (DTYPE_Vector (N.of_nat n) t) vect idx) t
+        ((IX_supported sz /\ uvalue_has_dtyp idx (DTYPE_I sz))
+         \/
+           uvalue_has_dtyp idx DTYPE_IPTR
+         ) -> 
+        uvalue_has_dtyp vect (DTYPE_Vector n t) ->
+        uvalue_has_dtyp (UVALUE_ExtractElement (DTYPE_Vector n t) vect idx) t
+
   | UVALUE_InsertElement_typ :
       forall n vect val idx t sz,
-        IX_supported sz ->
-        uvalue_has_dtyp idx (DTYPE_I sz) ->
-        uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
+        ALL_IX_SUPPORTED t ->
+        ((IX_supported sz /\ uvalue_has_dtyp idx (DTYPE_I sz))
+         \/
+           uvalue_has_dtyp idx DTYPE_IPTR
+         ) -> 
+        uvalue_has_dtyp vect (DTYPE_Vector n t) ->
         uvalue_has_dtyp val t ->
-        uvalue_has_dtyp (UVALUE_InsertElement (DTYPE_Vector (N.of_nat n) t) vect val idx) (DTYPE_Vector (N.of_nat n) t)
-  | UVALUE_InsertElement_ptr_typ :
-      forall n vect val idx t,
-        uvalue_has_dtyp idx DTYPE_IPTR ->
-        uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
-        uvalue_has_dtyp val t ->
-        uvalue_has_dtyp (UVALUE_InsertElement (DTYPE_Vector (N.of_nat n) t) vect val idx) (DTYPE_Vector (N.of_nat n) t)
+        uvalue_has_dtyp (UVALUE_InsertElement (DTYPE_Vector n t) vect val idx) (DTYPE_Vector n t)
+
   | UVALUE_ShuffleVector_typ :
-      forall n m v1 v2 idxs t,
-        uvalue_has_dtyp idxs (DTYPE_Vector (N.of_nat m) (DTYPE_I 32)) ->
-        uvalue_has_dtyp v1 (DTYPE_Vector (N.of_nat n) t) ->
-        uvalue_has_dtyp v2 (DTYPE_Vector (N.of_nat n) t) ->
-        uvalue_has_dtyp (UVALUE_ShuffleVector v1 v2 idxs) (DTYPE_Vector (N.of_nat m) t)
-  | UVALUE_ExtractValue_Struct_sing_typ :
-      forall fields fts dt (idx : LLVMAst.int),
-        ALL_IX_SUPPORTED dt ->
-        uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
-        (0 <= idx)%Z ->
-        Nth fts (Z.to_nat idx) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Struct fts) (UVALUE_Struct fields) [idx]) dt
-  | UVALUE_ExtractValue_Struct_cons_typ :
-      forall fields fts fld ft dt idx idxs,
-        ALL_IX_SUPPORTED dt ->
-        uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
-        (0 <= idx)%Z ->
-        Nth fts (Z.to_nat idx) ft ->
-        Nth fields (Z.to_nat idx) fld ->
-        uvalue_has_dtyp fld ft ->
-        uvalue_has_dtyp (UVALUE_ExtractValue ft fld idxs) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Struct fts) (UVALUE_Struct fields) (idx :: idxs)) dt
-  | UVALUE_ExtractValue_Packed_struct_sing_typ :
-      forall fields fts dt idx,
-        ALL_IX_SUPPORTED dt ->
-        uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct fts) ->
-        (0 <= idx)%Z ->
-        Nth fts (Z.to_nat idx) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Packed_struct fts) (UVALUE_Packed_struct fields) [idx]) dt
-  | UVALUE_ExtractValue_Packed_struct_cons_typ :
-      forall fields fts fld ft dt idx idxs,
-        ALL_IX_SUPPORTED dt ->
-        uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct fts) ->
-        (0 <= idx)%Z ->
-        Nth fts (Z.to_nat idx) ft ->
-        Nth fields (Z.to_nat idx) fld ->
-        uvalue_has_dtyp fld ft ->
-        uvalue_has_dtyp (UVALUE_ExtractValue ft fld idxs) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Packed_struct fts) (UVALUE_Packed_struct fields) (idx :: idxs)) dt
-  | UVALUE_ExtractValue_Array_sing_typ :
-      forall elements dt idx n,
-        ALL_IX_SUPPORTED dt ->
-        uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n dt) ->
-        (0 <= idx <= Z.of_N n)%Z ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Array n dt) (UVALUE_Array elements) [idx]) dt
-  | UVALUE_ExtractValue_Array_cons_typ :
-      forall elements elem et dt n idx idxs,
-        ALL_IX_SUPPORTED dt ->
-        uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n et) ->
-        (0 <= idx <= Z.of_N n)%Z ->
-        Nth elements (Z.to_nat idx) elem ->
-        uvalue_has_dtyp elem et ->
-        uvalue_has_dtyp (UVALUE_ExtractValue et elem idxs) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Array n et) (UVALUE_Array elements) (idx :: idxs)) dt
+    forall n m v1 v2 idxs t,
+      uvalue_has_dtyp idxs (DTYPE_Vector m (DTYPE_I 32)) ->
+      uvalue_has_dtyp v1 (DTYPE_Vector n t) ->
+      uvalue_has_dtyp v2 (DTYPE_Vector n t) ->
+      uvalue_has_dtyp (UVALUE_ShuffleVector (DTYPE_Vector n t) v1 v2 idxs) (DTYPE_Vector m t)
+                      
+  | UVALUE_ExtractValue_typ :
+    forall dt_agg uv path dt,
+      uvalue_has_dtyp uv dt_agg ->
+      check_extract_path path dt_agg dt = true -> 
+      uvalue_has_dtyp (UVALUE_ExtractValue dt_agg uv path) dt
+
   | UVALUE_InsertValue_typ :
-      forall struc idxs uv st dt,
-        uvalue_has_dtyp (UVALUE_ExtractValue st struc idxs) dt ->
-        uvalue_has_dtyp uv dt ->
-        uvalue_has_dtyp struc st ->
-        uvalue_has_dtyp (UVALUE_InsertValue st struc uv idxs) st
+      forall dt_agg uv dt_elt elt path,
+        uvalue_has_dtyp elt dt_elt ->
+        uvalue_has_dtyp uv dt_agg ->
+        check_extract_path path dt_agg dt_elt = true ->         
+        uvalue_has_dtyp (UVALUE_InsertValue dt_agg uv dt_elt elt path) dt_agg
+
   | UVALUE_Select_i1 :
     forall cond x y t,
-      ALL_IX_SUPPORTED t ->
       uvalue_has_dtyp cond (DTYPE_I 1) ->
       uvalue_has_dtyp x t ->
       uvalue_has_dtyp y t ->
       uvalue_has_dtyp (UVALUE_Select cond x y) t
+
   | UVALUE_Select_vect :
       forall cond x y t sz,
-        uvalue_has_dtyp cond (DTYPE_Vector (N.of_nat sz) (DTYPE_I 1)) ->
-        uvalue_has_dtyp x (DTYPE_Vector (N.of_nat sz) t) ->
-        uvalue_has_dtyp y (DTYPE_Vector (N.of_nat sz) t) ->
-        uvalue_has_dtyp (UVALUE_Select cond x y) (DTYPE_Vector (N.of_nat sz) t)
+        uvalue_has_dtyp cond (DTYPE_Vector sz (DTYPE_I 1)) ->
+        uvalue_has_dtyp x (DTYPE_Vector sz t) ->
+        uvalue_has_dtyp y (DTYPE_Vector sz t) ->
+        uvalue_has_dtyp (UVALUE_Select cond x y) (DTYPE_Vector sz t)
+                        
   (* Maybe ExtractByte just doesn't have a type because no values should be raw ExtractByte values... *)
   (* | UVALUE_ExtractByte_typ : *)
   (*     forall uv dt idx sid, *)
@@ -3541,7 +3503,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       (forall byte, In byte bytes -> exists uv dt idx sid, byte = UVALUE_ExtractByte uv dt idx sid) ->
       N.of_nat (length bytes) = sizeof_dtyp dt ->
       uvalue_has_dtyp (UVALUE_ConcatBytes bytes dt) dt.
-  Set Elimination Schemes.
+
+
+
 
   Section dvalue_has_dtyp_ind.
     Variable P : dvalue -> dtyp -> Prop.
@@ -3637,463 +3601,135 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_I32            : forall x, P (UVALUE_I32 x) (DTYPE_I 32).
     Hypothesis IH_I64            : forall x, P (UVALUE_I64 x) (DTYPE_I 64).
     Hypothesis IH_IPTR           : forall x, P (UVALUE_IPTR x) DTYPE_IPTR.
-
-    (* Poison *)
-    Hypothesis IH_Poison_Array    : forall sz t
-                                      (IX : ALL_IX_SUPPORTED t)
-                                      (NV: NO_VOID t)
-                                      (IH: P (UVALUE_Poison t) t),
-        P (UVALUE_Poison (DTYPE_Array sz t)) (DTYPE_Array sz t).
-    Hypothesis IH_Poison_Vector    : forall sz t
-                                       (IX : ALL_IX_SUPPORTED t)
-                                       (NV: NO_VOID t)
-                                       (IH: P (UVALUE_Poison t) t),
-        P (UVALUE_Poison (DTYPE_Vector sz t)) (DTYPE_Vector sz t).
-
-    Hypothesis IH_Poison_Struct_nil    :
-        P (UVALUE_Poison (DTYPE_Struct [])) (DTYPE_Struct []).
-
-    Hypothesis IH_Poison_Struct_cons    : forall dt dts,
-        P (UVALUE_Poison dt) dt ->
-        P (UVALUE_Poison (DTYPE_Struct dts)) (DTYPE_Struct dts) ->
-        P (UVALUE_Poison (DTYPE_Struct (dt :: dts))) (DTYPE_Struct (dt :: dts)).
-
-    Hypothesis IH_Poison_Packed_struct_nil    :
-        P (UVALUE_Poison (DTYPE_Packed_struct [])) (DTYPE_Packed_struct []).
-
-    Hypothesis IH_Poison_Packed_struct_cons    : forall dt dts,
-        P (UVALUE_Poison dt) dt ->
-        P (UVALUE_Poison (DTYPE_Packed_struct dts)) (DTYPE_Packed_struct dts) ->
-        P (UVALUE_Poison (DTYPE_Packed_struct (dt :: dts))) (DTYPE_Packed_struct (dt :: dts)).
-
-    Hypothesis IH_Poison          : forall t, (ALL_IX_SUPPORTED t /\ NO_VOID t /\ (forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) -> P (UVALUE_Poison t) t.
-
-    (* Undef *)
-    Hypothesis IH_Undef_Array    : forall sz t
-                                     (IX : ALL_IX_SUPPORTED t)
-                                     (NV: NO_VOID t)
-                                     (IH: P (UVALUE_Undef t) t),
-        P (UVALUE_Undef (DTYPE_Array sz t)) (DTYPE_Array sz t).
-    Hypothesis IH_Undef_Vector    : forall sz t
-                                      (IX : ALL_IX_SUPPORTED t)
-                                      (NV: NO_VOID t)
-                                      (IH: P (UVALUE_Undef t) t),
-        P (UVALUE_Undef (DTYPE_Vector sz t)) (DTYPE_Vector sz t).
-
-    Hypothesis IH_Undef_Struct_nil    :
-        P (UVALUE_Undef (DTYPE_Struct [])) (DTYPE_Struct []).
-
-    Hypothesis IH_Undef_Struct_cons    : forall dt dts,
-        P (UVALUE_Undef dt) dt ->
-        P (UVALUE_Undef (DTYPE_Struct dts)) (DTYPE_Struct dts) ->
-        P (UVALUE_Undef (DTYPE_Struct (dt :: dts))) (DTYPE_Struct (dt :: dts)).
-
-    Hypothesis IH_Undef_Packed_struct_nil    :
-        P (UVALUE_Undef (DTYPE_Packed_struct [])) (DTYPE_Packed_struct []).
-
-    Hypothesis IH_Undef_Packed_struct_cons    : forall dt dts,
-        P (UVALUE_Undef dt) dt ->
-        P (UVALUE_Undef (DTYPE_Packed_struct dts)) (DTYPE_Packed_struct dts) ->
-        P (UVALUE_Undef (DTYPE_Packed_struct (dt :: dts))) (DTYPE_Packed_struct (dt :: dts)).
-
-    Hypothesis IH_Undef          : forall t, (ALL_IX_SUPPORTED t /\ NO_VOID t /\ (forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) -> P (UVALUE_Undef t) t.
-
-    (* Oom *)
-    Hypothesis IH_Oom_Array    : forall sz t
-                                   (IX : ALL_IX_SUPPORTED t)
-                                   (NV: NO_VOID t)
-                                   (IH: P (UVALUE_Oom t) t),
-        P (UVALUE_Oom (DTYPE_Array sz t)) (DTYPE_Array sz t).
-    Hypothesis IH_Oom_Vector    : forall sz t
-                                    (IX : ALL_IX_SUPPORTED t)
-                                    (NV: NO_VOID t)
-                                    (IH: P (UVALUE_Oom t) t),
-        P (UVALUE_Oom (DTYPE_Vector sz t)) (DTYPE_Vector sz t).
-
-    Hypothesis IH_Oom_Struct_nil    :
-        P (UVALUE_Oom (DTYPE_Struct [])) (DTYPE_Struct []).
-
-    Hypothesis IH_Oom_Struct_cons    : forall dt dts,
-        P (UVALUE_Oom dt) dt ->
-        P (UVALUE_Oom (DTYPE_Struct dts)) (DTYPE_Struct dts) ->
-        P (UVALUE_Oom (DTYPE_Struct (dt :: dts))) (DTYPE_Struct (dt :: dts)).
-
-    Hypothesis IH_Oom_Packed_struct_nil    :
-        P (UVALUE_Oom (DTYPE_Packed_struct [])) (DTYPE_Packed_struct []).
-
-    Hypothesis IH_Oom_Packed_struct_cons    : forall dt dts,
-        P (UVALUE_Oom dt) dt ->
-        P (UVALUE_Oom (DTYPE_Packed_struct dts)) (DTYPE_Packed_struct dts) ->
-        P (UVALUE_Oom (DTYPE_Packed_struct (dt :: dts))) (DTYPE_Packed_struct (dt :: dts)).
-
-    Hypothesis IH_Oom          : forall t, (ALL_IX_SUPPORTED t /\ NO_VOID t /\ (forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) -> P (UVALUE_Oom t) t.
-
     Hypothesis IH_Double         : forall x, P (UVALUE_Double x) DTYPE_Double.
     Hypothesis IH_Float          : forall x, P (UVALUE_Float x) DTYPE_Float.
     Hypothesis IH_None           : P UVALUE_None DTYPE_Void.
-    Hypothesis IH_Struct_nil     : P (UVALUE_Struct []) (DTYPE_Struct []).
-    Hypothesis IH_Struct_cons    : forall (f : uvalue) (dt : dtyp) (fields : list uvalue) (dts : list dtyp),
-        uvalue_has_dtyp f dt ->
-        P f dt ->
-        uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct dts) ->
-        P (UVALUE_Struct fields) (DTYPE_Struct dts) ->
-        P (UVALUE_Struct (f :: fields)) (DTYPE_Struct (dt :: dts)).
-    Hypothesis IH_Packed_Struct_nil     : P (UVALUE_Packed_struct []) (DTYPE_Packed_struct []).
-    Hypothesis IH_Packed_Struct_cons    : forall (f : uvalue) (dt : dtyp) (fields : list uvalue) (dts : list dtyp),
-        uvalue_has_dtyp f dt ->
-        P f dt ->
-        uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
-        P (UVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
-        P (UVALUE_Packed_struct (f :: fields)) (DTYPE_Packed_struct (dt :: dts)).
-    Hypothesis IH_Array : forall (xs : list uvalue) (sz : nat) (dt : dtyp)
-                            (IH : forall x, In x xs -> P x dt)
-                            (IHdtyp : forall x, In x xs -> uvalue_has_dtyp x dt),
-        Datatypes.length xs = sz -> P (UVALUE_Array xs) (DTYPE_Array (N.of_nat sz) dt).
+    Hypothesis IH_Poison         : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> P (UVALUE_Poison τ) τ.
+    Hypothesis IH_Oom            : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> P (UVALUE_Oom τ) τ.
+    Hypothesis IH_Undef          : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> P (UVALUE_Undef τ) τ.
+
+    Hypothesis IH_Struct :
+      forall fields fts,
+        List.Forall2 P fields fts ->
+        P (UVALUE_Struct fields) (DTYPE_Struct fts).
+
+    Hypothesis IH_Packed_struct :
+      forall fields fts,
+        List.Forall2 P fields fts ->
+        P (UVALUE_Packed_struct fields) (DTYPE_Packed_struct fts).
+
+    Hypothesis IH_Array : forall (xs : list uvalue)
+                            (sz : nat)
+                            (dt : dtyp)
+                            (IH : forall x, In x xs -> P x dt),
+        Datatypes.length xs = sz ->
+        P (UVALUE_Array xs) (DTYPE_Array (N.of_nat sz) dt).
 
     Hypothesis IH_Vector : forall (xs : list uvalue) (sz : nat) (dt : dtyp)
-                             (IH : forall x, In x xs -> P x dt)
-                             (IHdtyp : forall x, In x xs -> uvalue_has_dtyp x dt),
+                             (IH : forall x, In x xs -> P x dt),
         Datatypes.length xs = sz ->
         vector_dtyp dt -> P (UVALUE_Vector xs) (DTYPE_Vector (N.of_nat sz) dt).
 
-    Hypothesis IH_IBinop : forall (x y : uvalue) (sz : N) (op : ibinop),
-        IX_supported sz ->
-        uvalue_has_dtyp x (DTYPE_I sz) ->
-        P x (DTYPE_I sz) ->
-        uvalue_has_dtyp y (DTYPE_I sz) ->
-        P y (DTYPE_I sz) ->
-        P (UVALUE_IBinop op x y) (DTYPE_I sz).
+    Hypothesis IH_IBinop : forall (x y : uvalue) (sz : N) (op : ibinop) dt,
+        ((IX_supported sz /\ dt = (DTYPE_I sz)) \/ (dt = DTYPE_IPTR)) ->
+        P x dt ->
+        P y dt ->
+        P (UVALUE_IBinop op x y) dt.
 
-    Hypothesis IH_IBinop_ptr : forall (x y : uvalue) (op : ibinop),
-        uvalue_has_dtyp x DTYPE_IPTR ->
-        P x DTYPE_IPTR ->
-        uvalue_has_dtyp y DTYPE_IPTR ->
-        P y DTYPE_IPTR ->
-        P (UVALUE_IBinop op x y) DTYPE_IPTR.
-
-    Hypothesis IH_ICmp : forall (x y : uvalue) (sz : N) (op : icmp),
-        IX_supported sz ->
-        uvalue_has_dtyp x (DTYPE_I sz) ->
-        P x (DTYPE_I sz) ->
-        uvalue_has_dtyp y (DTYPE_I sz) ->
-        P y (DTYPE_I sz) ->
+    Hypothesis IH_ICmp : 
+          forall x y op sz,
+        ((IX_supported sz /\ P x (DTYPE_I sz) /\ P y (DTYPE_I sz))
+         \/
+           (P x DTYPE_IPTR /\ P y DTYPE_IPTR) 
+         \/
+         (P x DTYPE_Pointer /\ P y DTYPE_Pointer)) ->
         P (UVALUE_ICmp op x y) (DTYPE_I 1).
 
-    Hypothesis IH_ICmp_ptr : forall (x y : uvalue) (op : icmp),
-        uvalue_has_dtyp x DTYPE_IPTR ->
-        P x DTYPE_IPTR ->
-        uvalue_has_dtyp y DTYPE_IPTR ->
-        P y DTYPE_IPTR ->
-        P (UVALUE_ICmp op x y) (DTYPE_I 1).
+    Hypothesis IH_ICmp_vector : forall x y vsz isz op,
+        ((IX_supported isz /\ P x (DTYPE_Vector vsz (DTYPE_I isz)) /\
+            P y (DTYPE_Vector vsz (DTYPE_I isz)))
+         \/
+           (P x (DTYPE_Vector vsz DTYPE_IPTR) /\
+              P y (DTYPE_Vector vsz DTYPE_IPTR))
+         \/
+           (P x (DTYPE_Vector vsz DTYPE_Pointer) /\
+              P y (DTYPE_Vector vsz DTYPE_Pointer))
+        ) ->
+      P (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1)).
 
-    Hypothesis IH_ICmp_pointer : forall (x y : uvalue) (op : icmp),
-        uvalue_has_dtyp x DTYPE_Pointer ->
-        P x DTYPE_Pointer ->
-        uvalue_has_dtyp y DTYPE_Pointer ->
-        P y DTYPE_Pointer ->
-        P (UVALUE_ICmp op x y) (DTYPE_I 1).
+    Hypothesis IH_FBinop : forall (x y : uvalue) (op : fbinop) (fms : list fast_math) dt,
+        (dt = DTYPE_Double \/ dt = DTYPE_Float) ->        
+        P x dt ->
+        P y dt ->
+        P (UVALUE_FBinop op fms x y) dt.
 
-    Hypothesis IH_ICmp_vector : forall (x y : uvalue) (vsz isz : N) (op : icmp),
-        IX_supported isz ->
-        uvalue_has_dtyp x (DTYPE_Vector vsz (DTYPE_I isz)) ->
-        P x (DTYPE_Vector vsz (DTYPE_I isz)) ->
-        uvalue_has_dtyp y (DTYPE_Vector vsz (DTYPE_I isz)) ->
-        P y (DTYPE_Vector vsz (DTYPE_I isz)) ->
-        P (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1)).
-
-    Hypothesis IH_ICmp_vector_ptr : forall (x y : uvalue) (vsz : N) (op : icmp),
-        uvalue_has_dtyp x (DTYPE_Vector vsz DTYPE_IPTR) ->
-        P x (DTYPE_Vector vsz DTYPE_IPTR) ->
-        uvalue_has_dtyp y (DTYPE_Vector vsz DTYPE_IPTR) ->
-        P y (DTYPE_Vector vsz DTYPE_IPTR) ->
-        P (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1)).
-
-    Hypothesis IH_ICmp_vector_pointer : forall (x y : uvalue) (vsz : N) (op : icmp),
-        uvalue_has_dtyp x (DTYPE_Vector vsz DTYPE_Pointer) ->
-        P x (DTYPE_Vector vsz DTYPE_Pointer) ->
-        uvalue_has_dtyp y (DTYPE_Vector vsz DTYPE_Pointer) ->
-        P y (DTYPE_Vector vsz DTYPE_Pointer) ->
-        P (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1)).
-
-    Hypothesis IH_FBinop_Float : forall (x y : uvalue) (op : fbinop) (fms : list fast_math),
-        uvalue_has_dtyp x DTYPE_Float ->
-        P x DTYPE_Float ->
-        uvalue_has_dtyp y DTYPE_Float ->
-        P y DTYPE_Float ->
-        P (UVALUE_FBinop op fms x y) DTYPE_Float.
-
-    Hypothesis IH_FBinop_Double : forall (x y : uvalue) (op : fbinop) (fms : list fast_math),
-        uvalue_has_dtyp x DTYPE_Double ->
-        P x DTYPE_Double ->
-        uvalue_has_dtyp y DTYPE_Double ->
-        P y DTYPE_Double ->
-        P (UVALUE_FBinop op fms x y) DTYPE_Double.
-
-    Hypothesis IH_FCmp_Float : forall (x y : uvalue) (op : fcmp),
-        uvalue_has_dtyp x DTYPE_Float ->
-        P x DTYPE_Float ->
-        uvalue_has_dtyp y DTYPE_Float ->
-        P y DTYPE_Float ->
+    Hypothesis IH_FCmp : forall (x y : uvalue) (op : fcmp) dt,
+        (dt = DTYPE_Double \/ dt = DTYPE_Float) ->        
+        P x dt ->
+        P y dt ->
         P (UVALUE_FCmp op x y) (DTYPE_I 1).
 
-    Hypothesis IH_FCmp_Double : forall (x y : uvalue) (op : fcmp),
-        uvalue_has_dtyp x DTYPE_Double ->
-        P x DTYPE_Double ->
-        uvalue_has_dtyp y DTYPE_Double ->
-        P y DTYPE_Double ->
-        P (UVALUE_FCmp op x y) (DTYPE_I 1).
-
-    Hypothesis IH_Conversion_trunc_int : forall (from_sz to_sz : N) (value : uvalue),
-        from_sz > to_sz ->
-        uvalue_has_dtyp value (DTYPE_I from_sz) ->
-        P value (DTYPE_I from_sz)  ->
-        P (UVALUE_Conversion Trunc (DTYPE_I from_sz) value
-                             (DTYPE_I to_sz)) (DTYPE_I to_sz).
-
-    Hypothesis IH_Conversion_trunc_int_ptr : forall (to_sz : N) (value : uvalue),
-        uvalue_has_dtyp value DTYPE_IPTR ->
-        P value DTYPE_IPTR  ->
-        P (UVALUE_Conversion Trunc DTYPE_IPTR value
-                             (DTYPE_I to_sz)) (DTYPE_I to_sz).
-
-    Hypothesis IH_Conversion_trunc_vec : forall (from_sz to_sz n : N) (value : uvalue),
-        from_sz > to_sz ->
-        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        P value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        P
-          (UVALUE_Conversion Trunc (DTYPE_Vector n (DTYPE_I from_sz))
-                             value (DTYPE_Vector n (DTYPE_I to_sz)))
-          (DTYPE_Vector n (DTYPE_I to_sz)).
-
-    Hypothesis IH_Conversion_trunc_vec_ptr : forall (to_sz n : N) (value : uvalue),
-        uvalue_has_dtyp value (DTYPE_Vector n DTYPE_IPTR) ->
-        P value (DTYPE_Vector n DTYPE_IPTR) ->
-        P
-          (UVALUE_Conversion Trunc (DTYPE_Vector n DTYPE_IPTR)
-                             value (DTYPE_Vector n (DTYPE_I to_sz)))
-          (DTYPE_Vector n (DTYPE_I to_sz)).
-
-    Hypothesis IH_Conversion_zext_int : forall from_sz to_sz value,
-          from_sz < to_sz ->
-          uvalue_has_dtyp value (DTYPE_I from_sz) ->
-          P value (DTYPE_I from_sz) ->
-          P (UVALUE_Conversion Zext (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz).
-
-    Hypothesis IH_Conversion_zext_int_ptr : forall (from_sz : N) (value : uvalue),
-        uvalue_has_dtyp value (DTYPE_I from_sz) ->
-        P value (DTYPE_I from_sz) ->
-        P
-          (UVALUE_Conversion Zext (DTYPE_I from_sz) value DTYPE_IPTR)
-          DTYPE_IPTR.
-
-    Hypothesis IH_Conversion_zext_vec : forall (from_sz to_sz n : N) (value : uvalue),
-        from_sz < to_sz ->
-        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        P value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        P
-          (UVALUE_Conversion Zext (DTYPE_Vector n (DTYPE_I from_sz)) value
-                             (DTYPE_Vector n (DTYPE_I to_sz)))
-          (DTYPE_Vector n (DTYPE_I to_sz)).
-
-    Hypothesis IH_Conversion_zext_vec_ptr : forall (from_sz n : N) (value : uvalue),
-        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        P value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        P
-          (UVALUE_Conversion Zext (DTYPE_Vector n (DTYPE_I from_sz))
-                             value (DTYPE_Vector n DTYPE_IPTR))
-          (DTYPE_Vector n DTYPE_IPTR).
-
-    Hypothesis IH_Conversion_sext_int : forall (from_sz to_sz : N) (value : uvalue),
-        from_sz < to_sz ->
-        uvalue_has_dtyp value (DTYPE_I from_sz) ->
-        P value (DTYPE_I from_sz) ->
-        P
-          (UVALUE_Conversion Sext (DTYPE_I from_sz) value (DTYPE_I to_sz))
-          (DTYPE_I to_sz).
-
-    Hypothesis IH_Conversion_sext_int_ptr : forall (from_sz : N) (value : uvalue),
-        uvalue_has_dtyp value (DTYPE_I from_sz) ->
-        P value (DTYPE_I from_sz) ->
-        P
-          (UVALUE_Conversion Sext (DTYPE_I from_sz) value DTYPE_IPTR)
-          DTYPE_IPTR.
-
-    Hypothesis IH_Conversion_sext_vec : forall (from_sz to_sz n : N) (value : uvalue),
-        from_sz < to_sz ->
-        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        P value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        P
-          (UVALUE_Conversion Sext (DTYPE_Vector n (DTYPE_I from_sz)) value
-                             (DTYPE_Vector n (DTYPE_I to_sz)))
-          (DTYPE_Vector n (DTYPE_I to_sz)).
-
-    Hypothesis IH_Conversion_sext_vec_ptr : forall (from_sz n : N) (value : uvalue),
-        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        P value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        P
-          (UVALUE_Conversion Sext (DTYPE_Vector n (DTYPE_I from_sz))
-                             value (DTYPE_Vector n DTYPE_IPTR))
-          (DTYPE_Vector n DTYPE_IPTR).
-
+    Hypothesis IH_Conversion : forall conv from_typ value to_typ,
+        P value from_typ ->
+        conversion_okb conv from_typ to_typ = true ->
+        P (UVALUE_Conversion conv from_typ value to_typ) to_typ. 
+    
     Hypothesis IH_GetElementPtr : forall (dt : dtyp) (uv : uvalue) (idxs : list uvalue),
         P (UVALUE_GetElementPtr dt uv idxs) DTYPE_Pointer.
 
-    Hypothesis IH_ExtractElement : forall (n : nat) (vect idx : uvalue) (t : dtyp) (sz : N),
-        IX_supported sz ->
-        uvalue_has_dtyp idx (DTYPE_I sz) ->
-        P idx (DTYPE_I sz) ->
-        uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
-        P vect (DTYPE_Vector (N.of_nat n) t) ->
-        P (UVALUE_ExtractElement (DTYPE_Vector (N.of_nat n) t) vect idx) t.
+    Hypothesis IH_ExtractElement : forall n (vect idx : uvalue) (t : dtyp) (sz : N),
+        ALL_IX_SUPPORTED t ->
+        ((IX_supported sz /\ P idx (DTYPE_I sz))
+         \/
+           P idx DTYPE_IPTR
+         ) -> 
+        P vect (DTYPE_Vector n t) ->
+        P (UVALUE_ExtractElement (DTYPE_Vector n t) vect idx) t.
 
-    Hypothesis IH_ExtractElement_ptr : forall (n : nat) (vect idx : uvalue) (t : dtyp),
-        uvalue_has_dtyp idx DTYPE_IPTR ->
-        P idx DTYPE_IPTR ->
-        uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
-        P vect (DTYPE_Vector (N.of_nat n) t) ->
-        P (UVALUE_ExtractElement (DTYPE_Vector (N.of_nat n) t) vect idx) t.
-
-    Hypothesis IH_InsertElement : forall (n : nat) (vect val idx : uvalue) (t : dtyp) (sz : N),
-        IX_supported sz ->
-        uvalue_has_dtyp idx (DTYPE_I sz) ->
-        P idx (DTYPE_I sz) ->
-        uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
-        P vect (DTYPE_Vector (N.of_nat n) t) ->
-        uvalue_has_dtyp val t ->
+    Hypothesis IH_InsertElement : forall n (vect val idx : uvalue) (t : dtyp) (sz : N),
+        ALL_IX_SUPPORTED t ->
+        ((IX_supported sz /\ P idx (DTYPE_I sz))
+         \/
+           P idx DTYPE_IPTR
+         ) -> 
+        P vect (DTYPE_Vector n t) ->
         P val t ->
-        P (UVALUE_InsertElement (DTYPE_Vector (N.of_nat n) t) vect val idx)
-          (DTYPE_Vector (N.of_nat n) t).
+        P (UVALUE_InsertElement (DTYPE_Vector n t) vect val idx) (DTYPE_Vector n t).
 
-    Hypothesis IH_InsertElement_ptr : forall (n : nat) (vect val idx : uvalue) (t : dtyp),
-        uvalue_has_dtyp idx DTYPE_IPTR ->
-        P idx DTYPE_IPTR ->
-        uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
-        P vect (DTYPE_Vector (N.of_nat n) t) ->
-        uvalue_has_dtyp val t ->
-        P val t ->
-        P (UVALUE_InsertElement (DTYPE_Vector (N.of_nat n) t) vect val idx)
-          (DTYPE_Vector (N.of_nat n) t).
+    Hypothesis IH_ShuffleVector : forall n m (v1 v2 idxs : uvalue) (t : dtyp),
+        P idxs (DTYPE_Vector m (DTYPE_I 32)) ->
+        P v1 (DTYPE_Vector n t) ->
+        P v2 (DTYPE_Vector n t) ->
+        P (UVALUE_ShuffleVector (DTYPE_Vector n t) v1 v2 idxs) (DTYPE_Vector m t).
 
-    Hypothesis IH_ShuffleVector : forall (n m : nat) (v1 v2 idxs : uvalue) (t : dtyp),
-        uvalue_has_dtyp idxs (DTYPE_Vector (N.of_nat m) (DTYPE_I 32)) ->
-        P idxs (DTYPE_Vector (N.of_nat m) (DTYPE_I 32)) ->
-        uvalue_has_dtyp v1 (DTYPE_Vector (N.of_nat n) t) ->
-        P v1 (DTYPE_Vector (N.of_nat n) t) ->
-        uvalue_has_dtyp v2 (DTYPE_Vector (N.of_nat n) t) ->
-        P v2 (DTYPE_Vector (N.of_nat n) t) ->
-        P (UVALUE_ShuffleVector v1 v2 idxs)
-                        (DTYPE_Vector (N.of_nat m) t).
+    Hypothesis IH_ExtractValue :
+    forall dt_agg uv path dt,
+      P uv dt_agg ->
+      check_extract_path path dt_agg dt = true -> 
+      P (UVALUE_ExtractValue dt_agg uv path) dt.
 
-    Hypothesis IH_ExtractValue_Struct_sing : forall (fields : list uvalue) (fts : list dtyp)
-                                               (dt : dtyp) (idx : LLVMAst.int),
-        uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
-        P (UVALUE_Struct fields) (DTYPE_Struct fts) ->
-        (0 <= idx)%Z ->
-        Nth fts (Z.to_nat idx) dt ->
-        P
-          (UVALUE_ExtractValue (DTYPE_Struct fts) (UVALUE_Struct fields) [idx]) dt.
-
-    Hypothesis IH_ExtractValue_Struct_cons : forall (fields : list uvalue) (fts : list dtyp)
-                                               (fld : uvalue) (ft dt : dtyp) (idx : Z)
-                                               (idxs : list LLVMAst.int),
-        uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
-        P (UVALUE_Struct fields) (DTYPE_Struct fts) ->
-        (0 <= idx)%Z ->
-        Nth fts (Z.to_nat idx) ft ->
-        Nth fields (Z.to_nat idx) fld ->
-        uvalue_has_dtyp fld ft ->
-        P fld ft ->
-        uvalue_has_dtyp (UVALUE_ExtractValue ft fld idxs) dt ->
-        P (UVALUE_ExtractValue ft fld idxs) dt ->
-        P
-          (UVALUE_ExtractValue (DTYPE_Struct fts) (UVALUE_Struct fields) (idx :: idxs))
-          dt.
-
-    Hypothesis IH_ExtractValue_Packed_struct_sing : forall (fields : list uvalue)
-                                                      (fts : list dtyp) (dt : dtyp)
-                                                      (idx : Z),
-        uvalue_has_dtyp (UVALUE_Packed_struct fields)
-                        (DTYPE_Packed_struct fts) ->
-        P (UVALUE_Packed_struct fields)
-          (DTYPE_Packed_struct fts) ->
-        (0 <= idx)%Z ->
-        Nth fts (Z.to_nat idx) dt ->
-        P
-          (UVALUE_ExtractValue (DTYPE_Packed_struct fts) (UVALUE_Packed_struct fields)
-                               [idx]) dt.
-
-    Hypothesis IH_ExtractValue_Packed_struct_cons : forall (fields : list uvalue)
-                                                      (fts : list dtyp) (fld : uvalue)
-                                                      (ft dt : dtyp) (idx : Z)
-                                                      (idxs : list LLVMAst.int),
-        uvalue_has_dtyp (UVALUE_Packed_struct fields)
-                        (DTYPE_Packed_struct fts) ->
-        P (UVALUE_Packed_struct fields)
-                        (DTYPE_Packed_struct fts) ->
-        (0 <= idx)%Z ->
-        Nth fts (Z.to_nat idx) ft ->
-        Nth fields (Z.to_nat idx) fld ->
-        uvalue_has_dtyp fld ft ->
-        P fld ft ->
-        uvalue_has_dtyp (UVALUE_ExtractValue ft fld idxs) dt ->
-        P (UVALUE_ExtractValue ft fld idxs) dt ->
-        P
-          (UVALUE_ExtractValue (DTYPE_Packed_struct fts) (UVALUE_Packed_struct fields)
-                               (idx :: idxs)) dt.
-
-    Hypothesis IH_ExtractValue_Array_sing : forall (elements : list uvalue) (dt : dtyp) (idx : Z) (n : N),
-        uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n dt) ->
-        P (UVALUE_Array elements) (DTYPE_Array n dt) ->
-        (0 <= idx <= Z.of_N n)%Z ->
-        P
-          (UVALUE_ExtractValue (DTYPE_Array n dt) (UVALUE_Array elements) [idx]) dt.
-
-    Hypothesis IH_ExtractValue_Array_cons : forall (elements : list uvalue) (elem : uvalue)
-                                              (et dt : dtyp) (n : N) (idx : Z)
-                                              (idxs : list LLVMAst.int),
-        uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n et) ->
-        P (UVALUE_Array elements) (DTYPE_Array n et) ->
-        (0 <= idx <= Z.of_N n)%Z ->
-        Nth elements (Z.to_nat idx) elem ->
-        uvalue_has_dtyp elem et ->
-        P elem et ->
-        uvalue_has_dtyp (UVALUE_ExtractValue et elem idxs) dt ->
-        P (UVALUE_ExtractValue et elem idxs) dt ->
-        P
-          (UVALUE_ExtractValue (DTYPE_Array n et) (UVALUE_Array elements) (idx :: idxs))
-          dt.
-
-    Hypothesis IH_InsertValue : forall (struc : uvalue) (idxs : list LLVMAst.int)
-                                  (uv : uvalue) (st dt : dtyp),
-        uvalue_has_dtyp (UVALUE_ExtractValue st struc idxs) dt ->
-        P (UVALUE_ExtractValue st struc idxs) dt ->
-        uvalue_has_dtyp uv dt ->
-        P uv dt ->
-        uvalue_has_dtyp struc st ->
-        P struc st ->
-        P (UVALUE_InsertValue st struc uv idxs) st.
+    Hypothesis IH_InsertValue :
+      forall dt_agg uv dt_elt elt path,
+        P elt dt_elt ->
+        P uv dt_agg ->
+        check_extract_path path dt_agg dt_elt = true ->         
+        P (UVALUE_InsertValue dt_agg uv dt_elt elt path) dt_agg.
 
     Hypothesis IH_Select_i1 : forall (cond x y : uvalue) (t : dtyp),
-        uvalue_has_dtyp cond (DTYPE_I 1) ->
         P cond (DTYPE_I 1) ->
-        uvalue_has_dtyp x t ->
         P x t ->
-        uvalue_has_dtyp y t ->
         P y t ->
         P (UVALUE_Select cond x y) t.
 
-    Hypothesis IH_Select_vect : forall (cond x y : uvalue) (t : dtyp) (sz : nat),
-        uvalue_has_dtyp cond (DTYPE_Vector (N.of_nat sz) (DTYPE_I 1)) ->
-        P cond (DTYPE_Vector (N.of_nat sz) (DTYPE_I 1)) ->
-        uvalue_has_dtyp x (DTYPE_Vector (N.of_nat sz) t) ->
-        P x (DTYPE_Vector (N.of_nat sz) t) ->
-        uvalue_has_dtyp y (DTYPE_Vector (N.of_nat sz) t) ->
-        P y (DTYPE_Vector (N.of_nat sz) t) ->
-        P (UVALUE_Select cond x y) (DTYPE_Vector (N.of_nat sz) t).
+    Hypothesis IH_Select_vect : forall (cond x y : uvalue) (t : dtyp) sz,
+        P cond (DTYPE_Vector sz (DTYPE_I 1)) ->
+        P x (DTYPE_Vector sz t) ->
+        P y (DTYPE_Vector sz t) ->
+        P (UVALUE_Select cond x y) (DTYPE_Vector sz t).
 
-    Hypothesis IH_UVALUE_ExtractByte :
-      forall uv dt idx sid,
-        P (UVALUE_ExtractByte uv dt idx sid) (DTYPE_I 8).
+    (* Hypothesis IH_UVALUE_ExtractByte : *)
+    (*   forall uv dt idx sid, *)
+    (*     P (UVALUE_ExtractByte uv dt idx sid) (DTYPE_I 8). *)
 
     Hypothesis IH_UVALUE_ConcatBytes :
       forall bytes dt,
@@ -4101,8 +3737,848 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         N.of_nat (length bytes) = sizeof_dtyp dt ->
         P (UVALUE_ConcatBytes bytes dt) dt.
 
-    Lemma uvalue_has_dtyp_ind : forall (uv:uvalue) (dt:dtyp) (TYP: uvalue_has_dtyp uv dt), P uv dt.
-      fix IH 3.
+    (*
+
+    Definition uvalue_has_dtyp :=
+      (fix IHQ
+   (uv : uvalue) (dt : dtyp) (TYP : uvalue_has_dtyp uv dt) (uv' : uvalue) (dt' : dtyp) 
+   (EQU : uv = uv') (EQV : dt = dt') {struct TYP} : P uv' dt' :=
+   eq_ind_r (fun uv0 : uvalue => uvalue_has_dtyp uv0 dt -> P uv' dt')
+     (fun TYP0 : uvalue_has_dtyp uv' dt =>
+      eq_ind_r (fun dt0 : dtyp => uvalue_has_dtyp uv' dt0 -> P uv' dt')
+        (fun TYP1 : uvalue_has_dtyp uv' dt' =>
+         match TYP1 in (uvalue_has_dtyp u d) return (P u d) with
+         | @UVALUE_Addr_typ a =>
+             (fun a0 : A.addr =>
+              let H := forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0 in
+              let HeqH : H = (forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0) :=
+                eq_refl in
+              IH_Addr (a:=a0)) a
+         | @UVALUE_I1_typ x =>
+             (fun x0 : int1 =>
+              let H := forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0 in
+              let HeqH : H = (forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0) :=
+                eq_refl in
+              IH_I1 (x:=x0)) x
+         | @UVALUE_I8_typ x =>
+             (fun x0 : int8 =>
+              let H := forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0 in
+              let HeqH : H = (forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0) :=
+                eq_refl in
+              IH_I8 (x:=x0)) x
+         | @UVALUE_I32_typ x =>
+             (fun x0 : int32 =>
+              let H := forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0 in
+              let HeqH : H = (forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0) :=
+                eq_refl in
+              IH_I32 (x:=x0)) x
+         | @UVALUE_I64_typ x =>
+             (fun x0 : int64 =>
+              let H := forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0 in
+              let HeqH : H = (forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0) :=
+                eq_refl in
+              IH_I64 (x:=x0)) x
+         | @UVALUE_IPTR_typ x =>
+             (fun x0 : intptr =>
+              let H := forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0 in
+              let HeqH : H = (forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0) :=
+                eq_refl in
+              IH_IPTR (x:=x0)) x
+         | @UVALUE_Double_typ x =>
+             (fun x0 : ll_double =>
+              let H := forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0 in
+              let HeqH : H = (forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0) :=
+                eq_refl in
+              IH_Double (x:=x0)) x
+         | @UVALUE_Float_typ x =>
+             (fun x0 : ll_float =>
+              let H := forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0 in
+              let HeqH : H = (forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0) :=
+                eq_refl in
+              IH_Float (x:=x0)) x
+         | UVALUE_None_typ =>
+             let H := forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0 in
+             let HeqH : H = (forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0) := eq_refl
+               in
+             IH_None
+         | @UVALUE_Poison_typ τ x x0 =>
+             (fun (τ0 : dtyp) (H : ALL_IX_SUPPORTED τ0) (H0 : NO_VOID τ0) =>
+              let H1 := forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0 in
+              let HeqH1 : H1 = (forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0) :=
+                eq_refl in
+              IH_Poison (τ:=τ0) H H0) τ x x0
+         | @UVALUE_Oom_typ τ x x0 =>
+             (fun (τ0 : dtyp) (H : ALL_IX_SUPPORTED τ0) (H0 : NO_VOID τ0) =>
+              let H1 := forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0 in
+              let HeqH1 : H1 = (forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0) :=
+                eq_refl in
+              IH_Oom (τ:=τ0) H H0) τ x x0
+         | @UVALUE_Undef_typ τ x x0 =>
+             (fun (τ0 : dtyp) (H : ALL_IX_SUPPORTED τ0) (H0 : NO_VOID τ0) =>
+              let H1 := forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0 in
+              let HeqH1 : H1 = (forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0) :=
+                eq_refl in
+              IH_Undef (τ:=τ0) H H0) τ x x0
+         | @UVALUE_Struct_typ fields dts x =>
+             (fun (fields0 : list uvalue) (dts0 : list dtyp) (H : Forall2 uvalue_has_dtyp fields0 dts0) =>
+              IH_Struct
+                ((fix IHL_A (fields1 : list uvalue) :
+                      forall dts1 : list dtyp, Forall2 uvalue_has_dtyp fields1 dts1 -> Forall2 P fields1 dts1 :=
+                    match
+                      fields1 as l
+                      return (forall dts1 : list dtyp, Forall2 uvalue_has_dtyp l dts1 -> Forall2 P l dts1)
+                    with
+                    | [] =>
+                        fun (dts1 : list dtyp) (H0 : Forall2 uvalue_has_dtyp [] dts1) =>
+                        let H1 : [] = [] -> dts1 = dts1 -> Forall2 P [] dts1 :=
+                          match H0 in (Forall2 _ l l0) return (l = [] -> l0 = dts1 -> Forall2 P [] dts1) with
+                          | @Forall2_nil _ _ _ =>
+                              fun (H1 : [] = []) (H2 : [] = dts1) =>
+                              (fun (_ : [] = []) (H4 : [] = dts1) =>
+                               let H5 : [] = dts1 := H4 in
+                               eq_ind [] (fun l : list dtyp => Forall2 P [] l) (Forall2_nil P) dts1 H5) H1 H2
+                          | @Forall2_cons _ _ _ x0 y l l' x1 x2 =>
+                              (fun (x3 : uvalue) (y0 : dtyp) (l0 : list uvalue) (l'0 : list dtyp)
+                                 (H1 : uvalue_has_dtyp x3 y0) (H2 : Forall2 uvalue_has_dtyp l0 l'0)
+                                 (H3 : x3 :: l0 = []) (H4 : y0 :: l'0 = dts1) =>
+                               (fun H5 : x3 :: l0 = [] =>
+                                let H6 : False :=
+                                  eq_ind (x3 :: l0)
+                                    (fun e : list uvalue => match e with
+                                                            | [] => False
+                                                            | _ :: _ => True
+                                                            end) I [] H5 in
+                                False_ind
+                                  (y0 :: l'0 = dts1 ->
+                                   uvalue_has_dtyp x3 y0 -> Forall2 uvalue_has_dtyp l0 l'0 -> Forall2 P [] dts1)
+                                  H6) H3 H4 H1 H2) x0 y l l' x1 x2
+                          end in
+                        H1 eq_refl eq_refl
+                    | a :: l =>
+                        (fun (f : uvalue) (fs : list uvalue) (dts1 : list dtyp)
+                           (H0 : Forall2 uvalue_has_dtyp (f :: fs) dts1) =>
+                         let H1 : f :: fs = f :: fs -> dts1 = dts1 -> Forall2 P (f :: fs) dts1 :=
+                           match
+                             H0 in (Forall2 _ l0 l1)
+                             return (l0 = f :: fs -> l1 = dts1 -> Forall2 P (f :: fs) dts1)
+                           with
+                           | @Forall2_nil _ _ _ =>
+                               fun (H1 : [] = f :: fs) (H2 : [] = dts1) =>
+                               (fun H3 : [] = f :: fs =>
+                                let H4 : False :=
+                                  eq_ind []
+                                    (fun e : list uvalue => match e with
+                                                            | [] => True
+                                                            | _ :: _ => False
+                                                            end) I (f :: fs) H3 in
+                                False_ind ([] = dts1 -> Forall2 P (f :: fs) dts1) H4) H1 H2
+                           | @Forall2_cons _ _ _ x0 y l0 l' x1 x2 =>
+                               (fun (x3 : uvalue) (y0 : dtyp) (l1 : list uvalue) (l'0 : list dtyp)
+                                  (H1 : uvalue_has_dtyp x3 y0) (H2 : Forall2 uvalue_has_dtyp l1 l'0)
+                                  (H3 : x3 :: l1 = f :: fs) (H4 : y0 :: l'0 = dts1) =>
+                                (fun H5 : x3 :: l1 = f :: fs =>
+                                 let H6 : l1 = fs :=
+                                   f_equal (fun e : list uvalue => match e with
+                                                                   | [] => l1
+                                                                   | _ :: l2 => l2
+                                                                   end) H5 in
+                                 (let H7 : x3 = f :=
+                                    f_equal (fun e : list uvalue => match e with
+                                                                    | [] => x3
+                                                                    | u :: _ => u
+                                                                    end) H5 in
+                                  (fun H8 : x3 = f =>
+                                   let H9 : x3 = f := H8 in
+                                   eq_ind_r
+                                     (fun u : uvalue =>
+                                      l1 = fs ->
+                                      y0 :: l'0 = dts1 ->
+                                      uvalue_has_dtyp u y0 ->
+                                      Forall2 uvalue_has_dtyp l1 l'0 -> Forall2 P (f :: fs) dts1)
+                                     (fun H10 : l1 = fs =>
+                                      let H11 : l1 = fs := H10 in
+                                      eq_ind_r
+                                        (fun l2 : list uvalue =>
+                                         y0 :: l'0 = dts1 ->
+                                         uvalue_has_dtyp f y0 ->
+                                         Forall2 uvalue_has_dtyp l2 l'0 -> Forall2 P (f :: fs) dts1)
+                                        (fun H12 : y0 :: l'0 = dts1 =>
+                                         let H13 : y0 :: l'0 = dts1 := H12 in
+                                         eq_ind (y0 :: l'0)
+                                           (fun l2 : list dtyp =>
+                                            uvalue_has_dtyp f y0 ->
+                                            Forall2 uvalue_has_dtyp fs l'0 -> Forall2 P (f :: fs) l2)
+                                           (fun (H14 : uvalue_has_dtyp f y0)
+                                              (H15 : Forall2 uvalue_has_dtyp fs l'0) =>
+                                            Forall2_cons f y0
+                                              (eq_ind x3 (fun f0 : uvalue => P f0 y0)
+                                                 (IHQ f y0 _ x3 y0 (eq_sym H8) eq_refl) f H8)
+                                              (IHL_A fs l'0 H15)) dts1 H13) H11) H9) H7) H6) H3 H4 H1 H2) x0 y l0
+                                 l' x1 x2
+                           end in
+                         H1 eq_refl eq_refl) a l
+                    end) fields0 dts0 H)) fields dts x
+         | @UVALUE_Pacted_struct_typ fields dts x =>
+             (fun (fields0 : list uvalue) (dts0 : list dtyp) (H : Forall2 uvalue_has_dtyp fields0 dts0) =>
+              IH_Packed_struct
+                ((fix IHL_B (fields1 : list uvalue) :
+                      forall dts1 : list dtyp, Forall2 uvalue_has_dtyp fields1 dts1 -> Forall2 P fields1 dts1 :=
+                    match
+                      fields1 as l
+                      return (forall dts1 : list dtyp, Forall2 uvalue_has_dtyp l dts1 -> Forall2 P l dts1)
+                    with
+                    | [] =>
+                        fun (dts1 : list dtyp) (H0 : Forall2 uvalue_has_dtyp [] dts1) =>
+                        let H1 : [] = [] -> dts1 = dts1 -> Forall2 P [] dts1 :=
+                          match H0 in (Forall2 _ l l0) return (l = [] -> l0 = dts1 -> Forall2 P [] dts1) with
+                          | @Forall2_nil _ _ _ =>
+                              fun (H1 : [] = []) (H2 : [] = dts1) =>
+                              (fun (_ : [] = []) (H4 : [] = dts1) =>
+                               let H5 : [] = dts1 := H4 in
+                               eq_ind [] (fun l : list dtyp => Forall2 P [] l) (Forall2_nil P) dts1 H5) H1 H2
+                          | @Forall2_cons _ _ _ x0 y l l' x1 x2 =>
+                              (fun (x3 : uvalue) (y0 : dtyp) (l0 : list uvalue) (l'0 : list dtyp)
+                                 (H1 : uvalue_has_dtyp x3 y0) (H2 : Forall2 uvalue_has_dtyp l0 l'0)
+                                 (H3 : x3 :: l0 = []) (H4 : y0 :: l'0 = dts1) =>
+                               (fun H5 : x3 :: l0 = [] =>
+                                let H6 : False :=
+                                  eq_ind (x3 :: l0)
+                                    (fun e : list uvalue => match e with
+                                                            | [] => False
+                                                            | _ :: _ => True
+                                                            end) I [] H5 in
+                                False_ind
+                                  (y0 :: l'0 = dts1 ->
+                                   uvalue_has_dtyp x3 y0 -> Forall2 uvalue_has_dtyp l0 l'0 -> Forall2 P [] dts1)
+                                  H6) H3 H4 H1 H2) x0 y l l' x1 x2
+                          end in
+                        H1 eq_refl eq_refl
+                    | a :: l =>
+                        (fun (f : uvalue) (fs : list uvalue) (dts1 : list dtyp)
+                           (H0 : Forall2 uvalue_has_dtyp (f :: fs) dts1) =>
+                         let H1 : f :: fs = f :: fs -> dts1 = dts1 -> Forall2 P (f :: fs) dts1 :=
+                           match
+                             H0 in (Forall2 _ l0 l1)
+                             return (l0 = f :: fs -> l1 = dts1 -> Forall2 P (f :: fs) dts1)
+                           with
+                           | @Forall2_nil _ _ _ =>
+                               fun (H1 : [] = f :: fs) (H2 : [] = dts1) =>
+                               (fun H3 : [] = f :: fs =>
+                                let H4 : False :=
+                                  eq_ind []
+                                    (fun e : list uvalue => match e with
+                                                            | [] => True
+                                                            | _ :: _ => False
+                                                            end) I (f :: fs) H3 in
+                                False_ind ([] = dts1 -> Forall2 P (f :: fs) dts1) H4) H1 H2
+                           | @Forall2_cons _ _ _ x0 y l0 l' x1 x2 =>
+                               (fun (x3 : uvalue) (y0 : dtyp) (l1 : list uvalue) (l'0 : list dtyp)
+                                  (H1 : uvalue_has_dtyp x3 y0) (H2 : Forall2 uvalue_has_dtyp l1 l'0)
+                                  (H3 : x3 :: l1 = f :: fs) (H4 : y0 :: l'0 = dts1) =>
+                                (fun H5 : x3 :: l1 = f :: fs =>
+                                 let H6 : l1 = fs :=
+                                   f_equal (fun e : list uvalue => match e with
+                                                                   | [] => l1
+                                                                   | _ :: l2 => l2
+                                                                   end) H5 in
+                                 (let H7 : x3 = f :=
+                                    f_equal (fun e : list uvalue => match e with
+                                                                    | [] => x3
+                                                                    | u :: _ => u
+                                                                    end) H5 in
+                                  (fun H8 : x3 = f =>
+                                   let H9 : x3 = f := H8 in
+                                   eq_ind_r
+                                     (fun u : uvalue =>
+                                      l1 = fs ->
+                                      y0 :: l'0 = dts1 ->
+                                      uvalue_has_dtyp u y0 ->
+                                      Forall2 uvalue_has_dtyp l1 l'0 -> Forall2 P (f :: fs) dts1)
+                                     (fun H10 : l1 = fs =>
+                                      let H11 : l1 = fs := H10 in
+                                      eq_ind_r
+                                        (fun l2 : list uvalue =>
+                                         y0 :: l'0 = dts1 ->
+                                         uvalue_has_dtyp f y0 ->
+                                         Forall2 uvalue_has_dtyp l2 l'0 -> Forall2 P (f :: fs) dts1)
+                                        (fun H12 : y0 :: l'0 = dts1 =>
+                                         let H13 : y0 :: l'0 = dts1 := H12 in
+                                         eq_ind (y0 :: l'0)
+                                           (fun l2 : list dtyp =>
+                                            uvalue_has_dtyp f y0 ->
+                                            Forall2 uvalue_has_dtyp fs l'0 -> Forall2 P (f :: fs) l2)
+                                           (fun (H14 : uvalue_has_dtyp f y0)
+                                              (H15 : Forall2 uvalue_has_dtyp fs l'0) =>
+                                            Forall2_cons f y0
+                                              (eq_ind x3 (fun f0 : uvalue => P f0 y0)
+                                                 (IHQ f y0 H14 x3 y0 (eq_sym H8) eq_refl) f H8)
+                                              (IHL_B fs l'0 H15)) dts1 H13) H11) H9) H7) H6) H3 H4 H1 H2) x0 y l0
+                                 l' x1 x2
+                           end in
+                         H1 eq_refl eq_refl) a l
+                    end) fields0 dts0 H)) fields dts x
+         | @UVALUE_Array_typ xs sz dt0 x x0 =>
+             (fun (xs0 : list uvalue) (sz0 : nat) (dt1 : dtyp)
+                (H : Forall (fun x1 : uvalue => uvalue_has_dtyp x1 dt1) xs0) (H0 : Datatypes.length xs0 = sz0) =>
+              IH_Array (xs:=xs0)
+                ((fix IHL_C (xs1 : list uvalue) :
+                      forall (sz1 : nat) (dt2 : dtyp),
+                      Datatypes.length xs1 = sz1 ->
+                      Forall (fun x1 : uvalue => uvalue_has_dtyp x1 dt2) xs1 ->
+                      forall x1 : uvalue, In x1 xs1 -> P x1 dt2 :=
+                    match
+                      xs1 as l
+                      return
+                        (forall (sz1 : nat) (dt2 : dtyp),
+                         Datatypes.length l = sz1 ->
+                         Forall (fun x1 : uvalue => uvalue_has_dtyp x1 dt2) l ->
+                         forall x1 : uvalue, In x1 l -> P x1 dt2)
+                    with
+                    | [] =>
+                        fun (sz1 : nat) (dt'0 : dtyp) (_ : Datatypes.length [] = sz1)
+                          (_ : Forall (fun x1 : uvalue => uvalue_has_dtyp x1 dt'0) []) 
+                          (x1 : uvalue) (HIN : In x1 []) =>
+                        let H2 : P x1 dt'0 := match HIN return (P x1 dt'0) with
+                                              end in H2
+                    | a :: l =>
+                        (fun (x' : uvalue) (xs' : list uvalue) (sz1 : nat) (dt'0 : dtyp)
+                           (_ : Datatypes.length (x' :: xs') = sz1)
+                           (H1 : Forall (fun x1 : uvalue => uvalue_has_dtyp x1 dt'0) (x' :: xs')) 
+                           (x1 : uvalue) (HIN : In x1 (x' :: xs')) =>
+                         let H2 : P x1 dt'0 :=
+                           match HIN with
+                           | or_introl x2 =>
+                               (fun H2 : x' = x1 =>
+                                (fun H3 : x' = x1 =>
+                                 let H4 : x' :: xs' = x' :: xs' -> P x1 dt'0 :=
+                                   match H1 in (Forall _ l0) return (l0 = x' :: xs' -> P x1 dt'0) with
+                                   | @Forall_nil _ _ =>
+                                       fun H4 : [] = x' :: xs' =>
+                                       (fun H5 : [] = x' :: xs' =>
+                                        let H6 : False :=
+                                          eq_ind []
+                                            (fun e : list uvalue =>
+                                             match e with
+                                             | [] => True
+                                             | _ :: _ => False
+                                             end) I (x' :: xs') H5 in
+                                        False_ind (P x1 dt'0) H6) H4
+                                   | @Forall_cons _ _ x3 l0 x4 x5 =>
+                                       (fun (x6 : uvalue) (l1 : list uvalue) (H4 : uvalue_has_dtyp x6 dt'0)
+                                          (H5 : Forall (fun x7 : uvalue => uvalue_has_dtyp x7 dt'0) l1)
+                                          (H6 : x6 :: l1 = x' :: xs') =>
+                                        (fun H7 : x6 :: l1 = x' :: xs' =>
+                                         let H8 : l1 = xs' :=
+                                           f_equal
+                                             (fun e : list uvalue => match e with
+                                                                     | [] => l1
+                                                                     | _ :: l2 => l2
+                                                                     end) H7 in
+                                         (let H9 : x6 = x' :=
+                                            f_equal
+                                              (fun e : list uvalue => match e with
+                                                                      | [] => x6
+                                                                      | u :: _ => u
+                                                                      end) H7 in
+                                          (fun H10 : x6 = x' =>
+                                           let H11 : x6 = x' := H10 in
+                                           eq_ind_r
+                                             (fun u : uvalue =>
+                                              l1 = xs' ->
+                                              uvalue_has_dtyp u dt'0 ->
+                                              Forall (fun x7 : uvalue => uvalue_has_dtyp x7 dt'0) l1 -> P x1 dt'0)
+                                             (fun H12 : l1 = xs' =>
+                                              let H13 : l1 = xs' := H12 in
+                                              eq_ind_r
+                                                (fun l2 : list uvalue =>
+                                                 uvalue_has_dtyp x' dt'0 ->
+                                                 Forall (fun x7 : uvalue => uvalue_has_dtyp x7 dt'0) l2 ->
+                                                 P x1 dt'0)
+                                                (fun (H14 : uvalue_has_dtyp x' dt'0)
+                                                   (_ : Forall (fun x7 : uvalue => uvalue_has_dtyp x7 dt'0) xs')
+                                                 => IHQ x' dt'0 H14 x1 dt'0 H3 eq_refl) H13) H11) H9) H8) H6 H4
+                                          H5) x3 l0 x4 x5
+                                   end in
+                                 H4 eq_refl) H2) x2
+                           | or_intror x2 =>
+                               (fun H2 : In x1 xs' =>
+                                (fun H3 : In x1 xs' =>
+                                 let H4 : x' :: xs' = x' :: xs' -> P x1 dt'0 :=
+                                   match H1 in (Forall _ l0) return (l0 = x' :: xs' -> P x1 dt'0) with
+                                   | @Forall_nil _ _ =>
+                                       fun H4 : [] = x' :: xs' =>
+                                       (fun H5 : [] = x' :: xs' =>
+                                        let H6 : False :=
+                                          eq_ind []
+                                            (fun e : list uvalue =>
+                                             match e with
+                                             | [] => True
+                                             | _ :: _ => False
+                                             end) I (x' :: xs') H5 in
+                                        False_ind (P x1 dt'0) H6) H4
+                                   | @Forall_cons _ _ x3 l0 x4 x5 =>
+                                       (fun (x6 : uvalue) (l1 : list uvalue) (H4 : uvalue_has_dtyp x6 dt'0)
+                                          (H5 : Forall (fun x7 : uvalue => uvalue_has_dtyp x7 dt'0) l1)
+                                          (H6 : x6 :: l1 = x' :: xs') =>
+                                        (fun H7 : x6 :: l1 = x' :: xs' =>
+                                         let H8 : l1 = xs' :=
+                                           f_equal
+                                             (fun e : list uvalue => match e with
+                                                                     | [] => l1
+                                                                     | _ :: l2 => l2
+                                                                     end) H7 in
+                                         (let H9 : x6 = x' :=
+                                            f_equal
+                                              (fun e : list uvalue => match e with
+                                                                      | [] => x6
+                                                                      | u :: _ => u
+                                                                      end) H7 in
+                                          (fun H10 : x6 = x' =>
+                                           let H11 : x6 = x' := H10 in
+                                           eq_ind_r
+                                             (fun u : uvalue =>
+                                              l1 = xs' ->
+                                              uvalue_has_dtyp u dt'0 ->
+                                              Forall (fun x7 : uvalue => uvalue_has_dtyp x7 dt'0) l1 -> P x1 dt'0)
+                                             (fun H12 : l1 = xs' =>
+                                              let H13 : l1 = xs' := H12 in
+                                              eq_ind_r
+                                                (fun l2 : list uvalue =>
+                                                 uvalue_has_dtyp x' dt'0 ->
+                                                 Forall (fun x7 : uvalue => uvalue_has_dtyp x7 dt'0) l2 ->
+                                                 P x1 dt'0)
+                                                (fun (_ : uvalue_has_dtyp x' dt'0)
+                                                   (H15 : Forall (fun x7 : uvalue => uvalue_has_dtyp x7 dt'0) xs')
+                                                 => IHL_C xs' (Datatypes.length xs') dt'0 eq_refl H15 x1 H3) H13)
+                                             H11) H9) H8) H6 H4 H5) x3 l0 x4 x5
+                                   end in
+                                 H4 eq_refl) H2) x2
+                           end in
+                         H2) a l
+                    end) xs0 sz0 dt1 H0 H) H0) xs sz dt0 x x0
+         | @UVALUE_Vector_typ xs sz dt0 x x0 x1 =>
+             (fun (xs0 : list uvalue) (sz0 : nat) (dt1 : dtyp)
+                (H : Forall (fun x2 : uvalue => uvalue_has_dtyp x2 dt1) xs0) (H0 : Datatypes.length xs0 = sz0)
+                (H1 : vector_dtyp dt1) =>
+              IH_Vector (xs:=xs0)
+                ((fix IHL_D (xs1 : list uvalue) :
+                      forall (sz1 : nat) (dt2 : dtyp),
+                      Datatypes.length xs1 = sz1 ->
+                      Forall (fun x2 : uvalue => uvalue_has_dtyp x2 dt2) xs1 ->
+                      vector_dtyp dt2 -> forall x2 : uvalue, In x2 xs1 -> P x2 dt2 :=
+                    match
+                      xs1 as l
+                      return
+                        (forall (sz1 : nat) (dt2 : dtyp),
+                         Datatypes.length l = sz1 ->
+                         Forall (fun x2 : uvalue => uvalue_has_dtyp x2 dt2) l ->
+                         vector_dtyp dt2 -> forall x2 : uvalue, In x2 l -> P x2 dt2)
+                    with
+                    | [] =>
+                        fun (sz1 : nat) (dt'0 : dtyp) (_ : Datatypes.length [] = sz1)
+                          (_ : Forall (fun x2 : uvalue => uvalue_has_dtyp x2 dt'0) []) 
+                          (_ : vector_dtyp dt'0) (x2 : uvalue) (HIN : In x2 []) =>
+                        let H4 : P x2 dt'0 := match HIN return (P x2 dt'0) with
+                                              end in H4
+                    | a :: l =>
+                        (fun (x' : uvalue) (xs' : list uvalue) (sz1 : nat) (dt'0 : dtyp)
+                           (_ : Datatypes.length (x' :: xs') = sz1)
+                           (H2 : Forall (fun x2 : uvalue => uvalue_has_dtyp x2 dt'0) (x' :: xs'))
+                           (H3 : vector_dtyp dt'0) (x2 : uvalue) (HIN : In x2 (x' :: xs')) =>
+                         let H4 : P x2 dt'0 :=
+                           match HIN with
+                           | or_introl x3 =>
+                               (fun H4 : x' = x2 =>
+                                (fun H5 : x' = x2 =>
+                                 let H6 : x' :: xs' = x' :: xs' -> P x2 dt'0 :=
+                                   match H2 in (Forall _ l0) return (l0 = x' :: xs' -> P x2 dt'0) with
+                                   | @Forall_nil _ _ =>
+                                       fun H6 : [] = x' :: xs' =>
+                                       (fun H7 : [] = x' :: xs' =>
+                                        let H8 : False :=
+                                          eq_ind []
+                                            (fun e : list uvalue =>
+                                             match e with
+                                             | [] => True
+                                             | _ :: _ => False
+                                             end) I (x' :: xs') H7 in
+                                        False_ind (P x2 dt'0) H8) H6
+                                   | @Forall_cons _ _ x4 l0 x5 x6 =>
+                                       (fun (x7 : uvalue) (l1 : list uvalue) (H6 : uvalue_has_dtyp x7 dt'0)
+                                          (H7 : Forall (fun x8 : uvalue => uvalue_has_dtyp x8 dt'0) l1)
+                                          (H8 : x7 :: l1 = x' :: xs') =>
+                                        (fun H9 : x7 :: l1 = x' :: xs' =>
+                                         let H10 : l1 = xs' :=
+                                           f_equal
+                                             (fun e : list uvalue => match e with
+                                                                     | [] => l1
+                                                                     | _ :: l2 => l2
+                                                                     end) H9 in
+                                         (let H11 : x7 = x' :=
+                                            f_equal
+                                              (fun e : list uvalue => match e with
+                                                                      | [] => x7
+                                                                      | u :: _ => u
+                                                                      end) H9 in
+                                          (fun H12 : x7 = x' =>
+                                           let H13 : x7 = x' := H12 in
+                                           eq_ind_r
+                                             (fun u : uvalue =>
+                                              l1 = xs' ->
+                                              uvalue_has_dtyp u dt'0 ->
+                                              Forall (fun x8 : uvalue => uvalue_has_dtyp x8 dt'0) l1 -> P x2 dt'0)
+                                             (fun H14 : l1 = xs' =>
+                                              let H15 : l1 = xs' := H14 in
+                                              eq_ind_r
+                                                (fun l2 : list uvalue =>
+                                                 uvalue_has_dtyp x' dt'0 ->
+                                                 Forall (fun x8 : uvalue => uvalue_has_dtyp x8 dt'0) l2 ->
+                                                 P x2 dt'0)
+                                                (fun (H16 : uvalue_has_dtyp x' dt'0)
+                                                   (_ : Forall (fun x8 : uvalue => uvalue_has_dtyp x8 dt'0) xs')
+                                                 =>
+                                                 eq_ind x' (fun x8 : uvalue => P x8 dt'0)
+                                                   (IHQ x' dt'0 H16 x' dt'0 eq_refl eq_refl) x2 H5) H15) H13) H11)
+                                           H10) H8 H6 H7) x4 l0 x5 x6
+                                   end in
+                                 H6 eq_refl) H4) x3
+                           | or_intror x3 =>
+                               (fun H4 : In x2 xs' =>
+                                (fun H5 : In x2 xs' =>
+                                 let H6 : x' :: xs' = x' :: xs' -> P x2 dt'0 :=
+                                   match H2 in (Forall _ l0) return (l0 = x' :: xs' -> P x2 dt'0) with
+                                   | @Forall_nil _ _ =>
+                                       fun H6 : [] = x' :: xs' =>
+                                       (fun H7 : [] = x' :: xs' =>
+                                        let H8 : False :=
+                                          eq_ind []
+                                            (fun e : list uvalue =>
+                                             match e with
+                                             | [] => True
+                                             | _ :: _ => False
+                                             end) I (x' :: xs') H7 in
+                                        False_ind (P x2 dt'0) H8) H6
+                                   | @Forall_cons _ _ x4 l0 x5 x6 =>
+                                       (fun (x7 : uvalue) (l1 : list uvalue) (H6 : uvalue_has_dtyp x7 dt'0)
+                                          (H7 : Forall (fun x8 : uvalue => uvalue_has_dtyp x8 dt'0) l1)
+                                          (H8 : x7 :: l1 = x' :: xs') =>
+                                        (fun H9 : x7 :: l1 = x' :: xs' =>
+                                         let H10 : l1 = xs' :=
+                                           f_equal
+                                             (fun e : list uvalue => match e with
+                                                                     | [] => l1
+                                                                     | _ :: l2 => l2
+                                                                     end) H9 in
+                                         (let H11 : x7 = x' :=
+                                            f_equal
+                                              (fun e : list uvalue => match e with
+                                                                      | [] => x7
+                                                                      | u :: _ => u
+                                                                      end) H9 in
+                                          (fun H12 : x7 = x' =>
+                                           let H13 : x7 = x' := H12 in
+                                           eq_ind_r
+                                             (fun u : uvalue =>
+                                              l1 = xs' ->
+                                              uvalue_has_dtyp u dt'0 ->
+                                              Forall (fun x8 : uvalue => uvalue_has_dtyp x8 dt'0) l1 -> P x2 dt'0)
+                                             (fun H14 : l1 = xs' =>
+                                              let H15 : l1 = xs' := H14 in
+                                              eq_ind_r
+                                                (fun l2 : list uvalue =>
+                                                 uvalue_has_dtyp x' dt'0 ->
+                                                 Forall (fun x8 : uvalue => uvalue_has_dtyp x8 dt'0) l2 ->
+                                                 P x2 dt'0)
+                                                (fun (_ : uvalue_has_dtyp x' dt'0)
+                                                   (H17 : Forall (fun x8 : uvalue => uvalue_has_dtyp x8 dt'0) xs')
+                                                 => IHL_D xs' (Datatypes.length xs') dt'0 eq_refl H17 H3 x2 H5)
+                                                H15) H13) H11) H10) H8 H6 H7) x4 l0 x5 x6
+                                   end in
+                                 H6 eq_refl) H4) x3
+                           end in
+                         H4) a l
+                    end) xs0 sz0 dt1 H0 H H1) H0 H1) xs sz dt0 x x0 x1
+         | @UVALUE_IBinop_typ x y sz op dt0 x0 x1 x2 =>
+             (fun (x3 y0 : uvalue) (sz0 : N) (op0 : ibinop) (dt1 : dtyp)
+                (H : IX_supported sz0 /\ dt1 = DTYPE_I sz0 \/ dt1 = DTYPE_IPTR) (TYP2 : uvalue_has_dtyp x3 dt1)
+                (TYP3 : uvalue_has_dtyp y0 dt1) =>
+              let H0 := forall (uv0 : uvalue) (dt2 : dtyp), uvalue_has_dtyp uv0 dt2 -> P uv0 dt2 in
+              let HeqH0 : H0 = (forall (uv0 : uvalue) (dt2 : dtyp), uvalue_has_dtyp uv0 dt2 -> P uv0 dt2) :=
+                eq_refl in
+              IH_IBinop (op:=op0)
+                (eq_ind_r (fun _ : Prop => IX_supported sz0 /\ dt1 = DTYPE_I sz0 \/ dt1 = DTYPE_IPTR) H HeqH0)
+                (IHQ x3 dt1 TYP2 x3 dt1 eq_refl eq_refl) (IHQ y0 dt1 TYP3 y0 dt1 eq_refl eq_refl)) x y sz op dt0
+               x0 x1 x2
+         | @UVALUE_ICmp_typ x y op sz x0 =>
+             (fun (x1 y0 : uvalue) (op0 : icmp) (sz0 : N)
+                (H : IX_supported sz0 /\ uvalue_has_dtyp x1 (DTYPE_I sz0) /\ uvalue_has_dtyp y0 (DTYPE_I sz0) \/
+                     uvalue_has_dtyp x1 DTYPE_IPTR /\ uvalue_has_dtyp y0 DTYPE_IPTR \/
+                     uvalue_has_dtyp x1 DTYPE_Pointer /\ uvalue_has_dtyp y0 DTYPE_Pointer) =>
+              match H with
+              | or_introl x2 =>
+                  (fun
+                     H0 : IX_supported sz0 /\
+                          uvalue_has_dtyp x1 (DTYPE_I sz0) /\ uvalue_has_dtyp y0 (DTYPE_I sz0) =>
+                   match H0 with
+                   | conj x3 x4 =>
+                       (fun (HS : IX_supported sz0)
+                          (H1 : uvalue_has_dtyp x1 (DTYPE_I sz0) /\ uvalue_has_dtyp y0 (DTYPE_I sz0)) =>
+                        match H1 with
+                        | conj x5 x6 =>
+                            (fun (HX : uvalue_has_dtyp x1 (DTYPE_I sz0)) (HY : uvalue_has_dtyp y0 (DTYPE_I sz0))
+                             =>
+                             IH_ICmp (op:=op0)
+                               (or_introl
+                                  (conj HS
+                                     (conj (IHQ x1 (DTYPE_I sz0) HX x1 (DTYPE_I sz0) eq_refl eq_refl)
+                                        (IHQ y0 (DTYPE_I sz0) HY y0 (DTYPE_I sz0) eq_refl eq_refl))))) x5 x6
+                        end) x3 x4
+                   end) x2
+              | or_intror x2 =>
+                  (fun
+                     H0 : uvalue_has_dtyp x1 DTYPE_IPTR /\ uvalue_has_dtyp y0 DTYPE_IPTR \/
+                          uvalue_has_dtyp x1 DTYPE_Pointer /\ uvalue_has_dtyp y0 DTYPE_Pointer =>
+                   match H0 with
+                   | or_introl x3 =>
+                       (fun H1 : uvalue_has_dtyp x1 DTYPE_IPTR /\ uvalue_has_dtyp y0 DTYPE_IPTR =>
+                        match H1 with
+                        | conj x4 x5 =>
+                            (fun (HX : uvalue_has_dtyp x1 DTYPE_IPTR) (HY : uvalue_has_dtyp y0 DTYPE_IPTR) =>
+                             IH_ICmp (op:=op0)
+                               (or_intror
+                                  (or_introl
+                                     (conj (IHQ x1 DTYPE_IPTR HX x1 DTYPE_IPTR eq_refl eq_refl)
+                                        (IHQ y0 DTYPE_IPTR HY y0 DTYPE_IPTR eq_refl eq_refl))))) x4 x5
+                        end) x3
+                   | or_intror x3 =>
+                       (fun H1 : uvalue_has_dtyp x1 DTYPE_Pointer /\ uvalue_has_dtyp y0 DTYPE_Pointer =>
+                        match H1 with
+                        | conj x4 x5 =>
+                            (fun (HX : uvalue_has_dtyp x1 DTYPE_Pointer) (HY : uvalue_has_dtyp y0 DTYPE_Pointer)
+                             =>
+                             IH_ICmp (op:=op0)
+                               (or_intror
+                                  (or_intror
+                                     (conj (IHQ x1 DTYPE_Pointer HX x1 DTYPE_Pointer eq_refl eq_refl)
+                                        (IHQ y0 DTYPE_Pointer HY y0 DTYPE_Pointer eq_refl eq_refl))))) x4 x5
+                        end) x3
+                   end) x2
+              end) x y op sz x0
+         | @UVALUE_ICmp_vector_typ x y vsz isz op x0 =>
+             (fun (x1 y0 : uvalue) (vsz0 isz0 : N) (op0 : icmp)
+                (H : IX_supported isz0 /\
+                     uvalue_has_dtyp x1 (DTYPE_Vector vsz0 (DTYPE_I isz0)) /\
+                     uvalue_has_dtyp y0 (DTYPE_Vector vsz0 (DTYPE_I isz0)) \/
+                     uvalue_has_dtyp x1 (DTYPE_Vector vsz0 DTYPE_IPTR) /\
+                     uvalue_has_dtyp y0 (DTYPE_Vector vsz0 DTYPE_IPTR) \/
+                     uvalue_has_dtyp x1 (DTYPE_Vector vsz0 DTYPE_Pointer) /\
+                     uvalue_has_dtyp y0 (DTYPE_Vector vsz0 DTYPE_Pointer)) =>
+              IH_ICmp_vector (op:=op0)
+                match H with
+                | or_introl a =>
+                    (fun
+                       a0 : IX_supported isz0 /\
+                            uvalue_has_dtyp x1 (DTYPE_Vector vsz0 (DTYPE_I isz0)) /\
+                            uvalue_has_dtyp y0 (DTYPE_Vector vsz0 (DTYPE_I isz0)) =>
+                     match a0 with
+                     | conj a1 b =>
+                         (fun (HS : IX_supported isz0)
+                            (a2 : uvalue_has_dtyp x1 (DTYPE_Vector vsz0 (DTYPE_I isz0)) /\
+                                  uvalue_has_dtyp y0 (DTYPE_Vector vsz0 (DTYPE_I isz0))) =>
+                          match a2 with
+                          | conj a3 b0 =>
+                              (fun (HX : uvalue_has_dtyp x1 (DTYPE_Vector vsz0 (DTYPE_I isz0)))
+                                 (HY : uvalue_has_dtyp y0 (DTYPE_Vector vsz0 (DTYPE_I isz0))) =>
+                               or_introl
+                                 (conj HS
+                                    (conj
+                                       (IHQ x1 (DTYPE_Vector vsz0 (DTYPE_I isz0)) HX x1
+                                          (DTYPE_Vector vsz0 (DTYPE_I isz0)) eq_refl eq_refl)
+                                       (IHQ y0 (DTYPE_Vector vsz0 (DTYPE_I isz0)) HY y0
+                                          (DTYPE_Vector vsz0 (DTYPE_I isz0)) eq_refl eq_refl)))) a3 b0
+                          end) a1 b
+                     end) a
+                | or_intror b =>
+                    (fun
+                       o : uvalue_has_dtyp x1 (DTYPE_Vector vsz0 DTYPE_IPTR) /\
+                           uvalue_has_dtyp y0 (DTYPE_Vector vsz0 DTYPE_IPTR) \/
+                           uvalue_has_dtyp x1 (DTYPE_Vector vsz0 DTYPE_Pointer) /\
+                           uvalue_has_dtyp y0 (DTYPE_Vector vsz0 DTYPE_Pointer) =>
+                     match o with
+                     | or_introl a =>
+                         (fun
+                            a0 : uvalue_has_dtyp x1 (DTYPE_Vector vsz0 DTYPE_IPTR) /\
+                                 uvalue_has_dtyp y0 (DTYPE_Vector vsz0 DTYPE_IPTR) =>
+                          match a0 with
+                          | conj a1 b0 =>
+                              (fun (HX : uvalue_has_dtyp x1 (DTYPE_Vector vsz0 DTYPE_IPTR))
+                                 (HY : uvalue_has_dtyp y0 (DTYPE_Vector vsz0 DTYPE_IPTR)) =>
+                               or_intror
+                                 (or_introl
+                                    (conj
+                                       (IHQ x1 (DTYPE_Vector vsz0 DTYPE_IPTR) HX x1
+                                          (DTYPE_Vector vsz0 DTYPE_IPTR) eq_refl eq_refl)
+                                       (IHQ y0 (DTYPE_Vector vsz0 DTYPE_IPTR) HY y0
+                                          (DTYPE_Vector vsz0 DTYPE_IPTR) eq_refl eq_refl)))) a1 b0
+                          end) a
+                     | or_intror b0 =>
+                         (fun
+                            a : uvalue_has_dtyp x1 (DTYPE_Vector vsz0 DTYPE_Pointer) /\
+                                uvalue_has_dtyp y0 (DTYPE_Vector vsz0 DTYPE_Pointer) =>
+                          match a with
+                          | conj a0 b1 =>
+                              (fun (HX : uvalue_has_dtyp x1 (DTYPE_Vector vsz0 DTYPE_Pointer))
+                                 (HY : uvalue_has_dtyp y0 (DTYPE_Vector vsz0 DTYPE_Pointer)) =>
+                               or_intror
+                                 (or_intror
+                                    (conj
+                                       (IHQ x1 (DTYPE_Vector vsz0 DTYPE_Pointer) HX x1
+                                          (DTYPE_Vector vsz0 DTYPE_Pointer) eq_refl eq_refl)
+                                       (IHQ y0 (DTYPE_Vector vsz0 DTYPE_Pointer) HY y0
+                                          (DTYPE_Vector vsz0 DTYPE_Pointer) eq_refl eq_refl)))) a0 b1
+                          end) b0
+                     end) b
+                end) x y vsz isz op x0
+         | @UVALUE_FBinop_typ x y op fms dt0 x0 x1 x2 =>
+             (fun (x3 y0 : uvalue) (op0 : fbinop) (fms0 : list fast_math) (dt1 : dtyp)
+                (H : dt1 = DTYPE_Double \/ dt1 = DTYPE_Float) (TYP2 : uvalue_has_dtyp x3 dt1)
+                (TYP3 : uvalue_has_dtyp y0 dt1) =>
+              let H0 := forall (uv0 : uvalue) (dt2 : dtyp), uvalue_has_dtyp uv0 dt2 -> P uv0 dt2 in
+              let HeqH0 : H0 = (forall (uv0 : uvalue) (dt2 : dtyp), uvalue_has_dtyp uv0 dt2 -> P uv0 dt2) :=
+                eq_refl in
+              IH_FBinop (op:=op0) (fms:=fms0) H (IHQ x3 dt1 TYP2 x3 dt1 eq_refl eq_refl)
+                (IHQ y0 dt1 TYP3 y0 dt1 eq_refl eq_refl)) x y op fms dt0 x0 x1 x2
+         | @UVALUE_FCmp_typ x y op dt0 x0 x1 x2 =>
+             (fun (x3 y0 : uvalue) (op0 : fcmp) (dt1 : dtyp) (H : dt1 = DTYPE_Double \/ dt1 = DTYPE_Float)
+                (TYP2 : uvalue_has_dtyp x3 dt1) (TYP3 : uvalue_has_dtyp y0 dt1) =>
+              let H0 := forall (uv0 : uvalue) (dt2 : dtyp), uvalue_has_dtyp uv0 dt2 -> P uv0 dt2 in
+              let HeqH0 : H0 = (forall (uv0 : uvalue) (dt2 : dtyp), uvalue_has_dtyp uv0 dt2 -> P uv0 dt2) :=
+                eq_refl in
+              IH_FCmp (op:=op0) (eq_ind_r (fun _ : Prop => dt1 = DTYPE_Double \/ dt1 = DTYPE_Float) H HeqH0)
+                (eq_ind_r (fun _ : Prop => P x3 dt1) (IHQ x3 dt1 TYP2 x3 dt1 eq_refl eq_refl) HeqH0)
+                (eq_ind_r (fun _ : Prop => P y0 dt1) (IHQ y0 dt1 TYP3 y0 dt1 eq_refl eq_refl) HeqH0)) x y op dt0
+               x0 x1 x2
+         | @UVALUE_Conversion_typ conv from_typ value to_typ x x0 =>
+             (fun (conv0 : conversion_type) (from_typ0 : dtyp) (value0 : uvalue) (to_typ0 : dtyp)
+                (TYP2 : uvalue_has_dtyp value0 from_typ0) (H : conversion_okb conv0 from_typ0 to_typ0 = true) =>
+              let H0 := forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0 in
+              let HeqH0 : H0 = (forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0) :=
+                eq_refl in
+              IH_Conversion (conv:=conv0) (to_typ:=to_typ0)
+                (IHQ value0 from_typ0 TYP2 value0 from_typ0 eq_refl eq_refl) H) conv from_typ value to_typ x x0
+         | @UVALUE_GetElementPtr_typ dt0 uv0 idxs =>
+             (fun (dt1 : dtyp) (uv1 : uvalue) (idxs0 : list uvalue) =>
+              let H := forall (uv2 : uvalue) (dt2 : dtyp), uvalue_has_dtyp uv2 dt2 -> P uv2 dt2 in
+              let HeqH : H = (forall (uv2 : uvalue) (dt2 : dtyp), uvalue_has_dtyp uv2 dt2 -> P uv2 dt2) :=
+                eq_refl in
+              IH_GetElementPtr (dt:=dt1) (uv:=uv1) (idxs:=idxs0)) dt0 uv0 idxs
+         | @UVALUE_ExtractElement_typ n vect idx t sz x x0 x1 =>
+             (fun (n0 : N) (vect0 idx0 : uvalue) (t0 : dtyp) (sz0 : N) (H : ALL_IX_SUPPORTED t0)
+                (H0 : IX_supported sz0 /\ uvalue_has_dtyp idx0 (DTYPE_I sz0) \/ uvalue_has_dtyp idx0 DTYPE_IPTR)
+                (TYP2 : uvalue_has_dtyp vect0 (DTYPE_Vector n0 t0)) =>
+              IH_ExtractElement H
+                match H0 with
+                | or_introl a =>
+                    (fun a0 : IX_supported sz0 /\ uvalue_has_dtyp idx0 (DTYPE_I sz0) =>
+                     match a0 with
+                     | conj a1 b =>
+                         (fun (HS : IX_supported sz0) (HI : uvalue_has_dtyp idx0 (DTYPE_I sz0)) =>
+                          or_introl (conj HS (IHQ idx0 (DTYPE_I sz0) HI idx0 (DTYPE_I sz0) eq_refl eq_refl))) a1
+                           b
+                     end) a
+                | or_intror b =>
+                    (fun HI : uvalue_has_dtyp idx0 DTYPE_IPTR =>
+                     or_intror (IHQ idx0 DTYPE_IPTR HI idx0 DTYPE_IPTR eq_refl eq_refl)) b
+                end (IHQ vect0 (DTYPE_Vector n0 t0) TYP2 vect0 (DTYPE_Vector n0 t0) eq_refl eq_refl)) n vect idx
+               t sz x x0 x1
+         | @UVALUE_InsertElement_typ n vect val idx t sz x x0 x1 x2 =>
+             (fun (n0 : N) (vect0 val0 idx0 : uvalue) (t0 : dtyp) (sz0 : N) (H : ALL_IX_SUPPORTED t0)
+                (H0 : IX_supported sz0 /\ uvalue_has_dtyp idx0 (DTYPE_I sz0) \/ uvalue_has_dtyp idx0 DTYPE_IPTR)
+                (TYP2 : uvalue_has_dtyp vect0 (DTYPE_Vector n0 t0)) (TYP3 : uvalue_has_dtyp val0 t0) =>
+              IH_InsertElement H
+                match H0 with
+                | or_introl a =>
+                    (fun a0 : IX_supported sz0 /\ uvalue_has_dtyp idx0 (DTYPE_I sz0) =>
+                     match a0 with
+                     | conj a1 b =>
+                         (fun (HS : IX_supported sz0) (HI : uvalue_has_dtyp idx0 (DTYPE_I sz0)) =>
+                          or_introl (conj HS (IHQ idx0 (DTYPE_I sz0) HI idx0 (DTYPE_I sz0) eq_refl eq_refl))) a1
+                           b
+                     end) a
+                | or_intror b =>
+                    (fun HI : uvalue_has_dtyp idx0 DTYPE_IPTR =>
+                     or_intror (IHQ idx0 DTYPE_IPTR HI idx0 DTYPE_IPTR eq_refl eq_refl)) b
+                end (IHQ vect0 (DTYPE_Vector n0 t0) TYP2 vect0 (DTYPE_Vector n0 t0) eq_refl eq_refl)
+                (IHQ val0 t0 TYP3 val0 t0 eq_refl eq_refl)) n vect val idx t sz x x0 x1 x2
+         | @UVALUE_ShuffleVector_typ n m v1 v2 idxs t x x0 x1 =>
+             (fun (n0 m0 : N) (v3 v4 idxs0 : uvalue) (t0 : dtyp)
+                (TYP2 : uvalue_has_dtyp idxs0 (DTYPE_Vector m0 (DTYPE_I 32)))
+                (TYP3 : uvalue_has_dtyp v3 (DTYPE_Vector n0 t0)) (TYP4 : uvalue_has_dtyp v4 (DTYPE_Vector n0 t0))
+              =>
+              let H := forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0 in
+              let HeqH : H = (forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0) :=
+                eq_refl in
+              IH_ShuffleVector
+                (IHQ idxs0 (DTYPE_Vector m0 (DTYPE_I 32)) TYP2 idxs0 (DTYPE_Vector m0 (DTYPE_I 32)) eq_refl
+                   eq_refl) (IHQ v3 (DTYPE_Vector n0 t0) TYP3 v3 (DTYPE_Vector n0 t0) eq_refl eq_refl)
+                (IHQ v4 (DTYPE_Vector n0 t0) TYP4 v4 (DTYPE_Vector n0 t0) eq_refl eq_refl)) n m v1 v2 idxs t x x0
+               x1
+         | @UVALUE_ExtractValue_typ dt_agg uv0 path dt0 x x0 =>
+             (fun (dt_agg0 : dtyp) (uv1 : uvalue) (path0 : list Z) (dt1 : dtyp)
+                (TYP2 : uvalue_has_dtyp uv1 dt_agg0) (H : check_extract_path path0 dt_agg0 dt1 = true) =>
+              let H0 := forall (uv2 : uvalue) (dt2 : dtyp), uvalue_has_dtyp uv2 dt2 -> P uv2 dt2 in
+              let HeqH0 : H0 = (forall (uv2 : uvalue) (dt2 : dtyp), uvalue_has_dtyp uv2 dt2 -> P uv2 dt2) :=
+                eq_refl in
+              IH_ExtractValue (path:=path0) (dt:=dt1) (IHQ uv1 dt_agg0 TYP2 uv1 dt_agg0 eq_refl eq_refl) H)
+               dt_agg uv0 path dt0 x x0
+         | @UVALUE_InsertValue_typ dt_agg uv0 dt_elt elt path x x0 x1 =>
+             (fun (dt_agg0 : dtyp) (uv1 : uvalue) (dt_elt0 : dtyp) (elt0 : uvalue) (path0 : list Z)
+                (TYP2 : uvalue_has_dtyp elt0 dt_elt0) (TYP3 : uvalue_has_dtyp uv1 dt_agg0)
+                (H : check_extract_path path0 dt_agg0 dt_elt0 = true) =>
+              let H0 := forall (uv2 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv2 dt0 -> P uv2 dt0 in
+              let HeqH0 : H0 = (forall (uv2 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv2 dt0 -> P uv2 dt0) :=
+                eq_refl in
+              IH_InsertValue (path:=path0) (IHQ elt0 dt_elt0 TYP2 elt0 dt_elt0 eq_refl eq_refl)
+                (IHQ uv1 dt_agg0 TYP3 uv1 dt_agg0 eq_refl eq_refl) H) dt_agg uv0 dt_elt elt path x x0 x1
+         | @UVALUE_Select_i1 cond x y t x0 x1 x2 =>
+             (fun (cond0 x3 y0 : uvalue) (t0 : dtyp) (TYP2 : uvalue_has_dtyp cond0 (DTYPE_I 1))
+                (TYP3 : uvalue_has_dtyp x3 t0) (TYP4 : uvalue_has_dtyp y0 t0) =>
+              let H := forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0 in
+              let HeqH : H = (forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0) :=
+                eq_refl in
+              IH_Select_i1 (IHQ cond0 (DTYPE_I 1) TYP2 cond0 (DTYPE_I 1) eq_refl eq_refl)
+                (IHQ x3 t0 TYP3 x3 t0 eq_refl eq_refl) (IHQ y0 t0 TYP4 y0 t0 eq_refl eq_refl)) cond x y t x0 x1
+               x2
+         | @UVALUE_Select_vect cond x y t sz x0 x1 x2 =>
+             (fun (cond0 x3 y0 : uvalue) (t0 : dtyp) (sz0 : N)
+                (TYP2 : uvalue_has_dtyp cond0 (DTYPE_Vector sz0 (DTYPE_I 1)))
+                (TYP3 : uvalue_has_dtyp x3 (DTYPE_Vector sz0 t0))
+                (TYP4 : uvalue_has_dtyp y0 (DTYPE_Vector sz0 t0)) =>
+              let H := forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0 in
+              let HeqH : H = (forall (uv0 : uvalue) (dt0 : dtyp), uvalue_has_dtyp uv0 dt0 -> P uv0 dt0) :=
+                eq_refl in
+              IH_Select_vect
+                (IHQ cond0 (DTYPE_Vector sz0 (DTYPE_I 1)) TYP2 cond0 (DTYPE_Vector sz0 (DTYPE_I 1)) eq_refl
+                   eq_refl) (IHQ x3 (DTYPE_Vector sz0 t0) TYP3 x3 (DTYPE_Vector sz0 t0) eq_refl eq_refl)
+                (IHQ y0 (DTYPE_Vector sz0 t0) TYP4 y0 (DTYPE_Vector sz0 t0) eq_refl eq_refl)) cond x y t sz x0 x1
+               x2
+         | @UVALUE_ConcatBytes_typ bytes dt0 x x0 x1 =>
+             (fun (bytes0 : list uvalue) (dt1 : dtyp) (_ : ALL_IX_SUPPORTED dt1)
+                (H0 : forall byte : uvalue,
+                      In byte bytes0 ->
+                      exists (uv0 : uvalue) (dt2 : dtyp) (idx : uvalue) (sid : store_id),
+                        byte = UVALUE_ExtractByte uv0 dt2 idx sid)
+                (H1 : N.of_nat (Datatypes.length bytes0) = sizeof_dtyp dt1) =>
+              let H2 := forall (uv0 : uvalue) (dt2 : dtyp), uvalue_has_dtyp uv0 dt2 -> P uv0 dt2 in
+              let HeqH2 : H2 = (forall (uv0 : uvalue) (dt2 : dtyp), uvalue_has_dtyp uv0 dt2 -> P uv0 dt2) :=
+                eq_refl in
+              IH_UVALUE_ConcatBytes (bytes:=bytes0) H0 H1) bytes dt0 x x0 x1
+         end) EQV TYP0) EQU TYP).
+
+     *)
+    
+    Lemma uvalue_has_dtyp_ind' : forall (uv:uvalue) (dt:dtyp) (TYP: uvalue_has_dtyp uv dt),  P uv dt.
+      fix IHQ 3.
       intros uv dt TYP.
       destruct TYP;
         try (solve [let IH := fresh in
@@ -4111,6 +4587,95 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                     | H: _ |- _ =>
                       solve [eapply H; subst IH; eauto]
                     end]).
+
+      - apply IH_Struct.
+        revert fields dts H.
+        fix IHL_A 1.
+        intros fields dts H.
+        destruct H.
+        + constructor.
+        + constructor.
+          eauto.
+          eauto.
+
+      - apply IH_Packed_struct.
+        revert fields dts H.
+        fix IHL_B 1.
+        intros [|f fs]; intros dts H.
+        + inversion H.
+          constructor.
+        + destruct dts.
+          * inversion H.
+          * inversion H.
+            specialize (IHQ f d H3).
+            constructor.
+            assumption.
+            specialize (IHL_B fs dts H5).
+            apply IHL_B.
+        
+      - apply IH_Array.
+        + revert xs sz dt H0 H.
+          fix IHL_C 1.
+          intros [|x' xs']; intros sz dt' EQ H x HIN.
+          * inversion HIN. 
+          * inversion HIN.
+            -- inversion H.
+               eapply IHQ.
+               subst. assumption.
+               
+            -- simpl in EQ.
+               inversion H.
+               apply (IHL_C _ _ _ eq_refl H4 x H0).
+        + assumption.
+
+      - apply IH_Vector.
+        + revert xs sz dt H0 H H1.
+          fix IHL_D 1.
+          intros [|x' xs']; intros sz dt' EQ H H1 x HIN.
+          * inversion HIN. 
+          * inversion HIN.
+            -- inversion H.
+               eapply IHQ.
+               subst.
+               assumption.
+            -- simpl in EQ.
+               inversion H.
+               apply (IHL_D _ _ _ eq_refl H5 H1 x H0).            
+        + assumption.
+        + assumption.
+
+      - destruct H as [[HS [HX HY]]|[[HX HY]|[HX HY]]].
+        + eapply IH_ICmp.
+          left. split; eauto.
+        + eapply IH_ICmp.
+          right. left; split; eauto.
+        + eapply IH_ICmp.
+          right. right; split; eauto.
+
+      - eapply IH_ICmp_vector.
+        destruct H as [[HS [HX HY]]|[[HX HY]|[HX HY]]].
+        + left; split; eauto.
+        + right. left; split; eauto.
+        + right. right; split; eauto.
+
+      - eapply IH_ExtractElement; auto.
+        destruct H0 as [[HS HI] | HI].
+        + left; split; eauto.
+        + right. eapply IHQ. apply HI. 
+
+      - eapply IH_InsertElement; auto.
+        destruct H0 as [[HS HI] | HI].
+        + left; split; eauto.
+        + right; eauto.
+
+          Unshelve.
+           eauto. eauto.
+          
+    Qed.
+
+          
+      4: { 
+      
       - generalize dependent τ.
         fix IHτ 1.
         intros τ IX NV.
@@ -4321,6 +4886,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         Unshelve.
         all: try solve [exact 0%N | exact DTYPE_Void | exact ([] : list dtyp)].
 
+      -
+        
       - (* Arrays *)
         rename H into Hforall.
         rename H0 into Hlen.
@@ -4803,48 +5370,351 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
              ++ apply n0. eexists. eauto.
              ++ apply n2. eexists. eauto.
   Qed.
+
+  (* Assumes:
+
+     - 
+
+     Invariant:
+       - if [t] is a [DTYPE_Array] then [fts] is a singleton list
+         and [fields] is actually the sequence of array elements
+           such that [field_i : fts]
+
+       - if [t] is a [DTYPE_Struct] then [fts] is the list of types of fields 
+         and [fields] is the sequence of field values such that
+            [field_i : fts_i]
+
+       - l is a list of indices treated as a path into the nested structure
+
+     The function returns 
+  *)
+  Fixpoint check_extract_path l (is_array_path:bool) fields fts dt:=
+        match l with
+        | [] => false
+        | [idx] =>
+            if (Z.ltb idx 0) then false (* negative index *)
+            else
+              if dtyp_eq_dec (List.nth (Z.to_nat idx) fts DTYPE_Void) dt then true
+              else false
+        | idx::idxs =>
+            if (Z.ltb idx 0) then false (* negative index *)
+            else 
+              let nth_fld := List.nth (Z.to_nat idx) fields UVALUE_None in
+              let nth_ft := List.nth (Z.to_nat idx) fts DTYPE_Void in
+                match nth_fld, nth_ft with
+                | UVALUE_Struct fields', DTYPE_Struct fts' 
+                | UVALUE_Packed_struct fields', DTYPE_Packed_struct fts' => go dt fields' fts' idxs
+                | _,_ => false 
+                end
+        end
+    in
+
+  
+  Fixpoint uvalue_has_dtyp_fun (uv:uvalue) (dt:dtyp) : bool :=
+    let list_forallb2 :=
+      fix go uvs dts :=
+      match uvs, dts with
+      | [], [] => true
+      | uv::utl, dt::dttl => uvalue_has_dtyp_fun uv dt && go utl dttl
+      | _,_ => false
+      end
+    in
+
+    match uv with
+    | UVALUE_Addr a =>
+        if dtyp_eq_dec dt DTYPE_Pointer then true else false 
+        
+    | UVALUE_I1 x =>
+        if dtyp_eq_dec dt (DTYPE_I 1) then true else false 
+        
+    | UVALUE_I8 x =>
+        if dtyp_eq_dec dt (DTYPE_I 8) then true else false
+                                                       
+    | UVALUE_I32 x => 
+        if dtyp_eq_dec dt (DTYPE_I 32) then true else false
+                       
+    | UVALUE_I64 x => 
+        if dtyp_eq_dec dt (DTYPE_I 64) then true else false
+                       
+    | UVALUE_IPTR x => 
+        if dtyp_eq_dec dt (DTYPE_IPTR) then true else false
+                        
+    | UVALUE_Double x => 
+        if dtyp_eq_dec dt (DTYPE_Double) then true else false
+                                                        
+    | UVALUE_Float x =>
+        if dtyp_eq_dec dt (DTYPE_Float) then true else false        
+
+    | UVALUE_Undef t 
+    | UVALUE_Poison t 
+    | UVALUE_Oom t =>
+        if @ALL_IX_SUPPORTED_dec t then
+          if @NO_VOID_dec t then
+            if dtyp_eq_dec dt t then true else false
+          else false
+        else false
+               
+    | UVALUE_None =>
+        if dtyp_eq_dec dt (DTYPE_Void) then true else false        
+                      
+    | UVALUE_Struct fields =>
+        match dt with
+        | DTYPE_Struct field_dts =>
+            list_forallb2 fields field_dts
+        | _ => false
+        end
+
+    | UVALUE_Packed_struct fields =>
+        match dt with
+        | DTYPE_Packed_struct field_dts =>
+            list_forallb2 fields field_dts
+        | _ => false
+        end
+
+    | UVALUE_Array elts =>
+        match dt with
+        | DTYPE_Array sz dtt =>
+            List.forallb (fun u => uvalue_has_dtyp_fun u dtt) elts &&
+              (Nat.eqb (List.length elts) (N.to_nat sz))
+        | _ => false
+        end
           
+    | UVALUE_Vector elts =>
+        match dt with
+        | DTYPE_Vector sz dtt =>
+            List.forallb (fun u => uvalue_has_dtyp_fun u dtt) elts &&
+              (Nat.eqb (List.length elts) (N.to_nat sz))
+        | _ => false
+        end
+
+    | UVALUE_IBinop iop x y =>
+        match dt with
+        | DTYPE_I sz =>
+            if @IX_supported_dec sz then
+              uvalue_has_dtyp_fun x dt && uvalue_has_dtyp_fun y dt
+            else false
+        | DTYPE_IPTR =>
+            uvalue_has_dtyp_fun x dt && uvalue_has_dtyp_fun y dt
+        | _ => false 
+        end
+
+    | UVALUE_ICmp op x y =>
+        (* SAZ: TODO - is uvalue_has_dtyp missing an ICmp DTYPE_IPTR case? *)
+        match dt with
+        | DTYPE_I 1 =>
+            (List.existsb
+               (fun sz => uvalue_has_dtyp_fun x (DTYPE_I sz) &&
+                         uvalue_has_dtyp_fun y (DTYPE_I sz)) [1; 8; 32; 64])
+            ||
+            (uvalue_has_dtyp_fun x (DTYPE_IPTR) && uvalue_has_dtyp_fun y (DTYPE_IPTR))
+            ||
+            (uvalue_has_dtyp_fun x (DTYPE_Pointer) && uvalue_has_dtyp_fun y (DTYPE_Pointer)
+            )
+
+        | DTYPE_Vector vsz (DTYPE_I 1) =>
+            if @IX_supported_dec sz then
+                
+              (List.existsb
+                 (fun isz => uvalue_has_dtyp_fun x (DTYPE_Vector vsz (DTYPE_I isz)) &&
+                          uvalue_has_dtyp_fun y (DTYPE_Vector vsz (DTYPE_I isz))) [1; 8; 32; 64])
+              ||
+              uvalue_has_dtyp_fun x (DTYPE_Vector vsz (DTYPE_IPTR)) &&
+                uvalue_has_dtyp_fun y (DTYPE_Vector vsz (DTYPE_IPTR))
+              ||
+              uvalue_has_dtyp_fun x (DTYPE_Vector vsz (DTYPE_Pointer)) &&
+                uvalue_has_dtyp_fun y (DTYPE_Vector vsz (DTYPE_Pointer))
+            else
+              false 
+        | _ => false 
+        end
+
+    | UVALUE_FBinop op fms x y =>
+        match dt with
+        | DTYPE_Float => 
+            (uvalue_has_dtyp_fun x (DTYPE_Float) &&
+               uvalue_has_dtyp_fun y (DTYPE_Float))
+
+        | DTYPE_Double =>
+            (uvalue_has_dtyp_fun x (DTYPE_Double) &&
+               uvalue_has_dtyp_fun y (DTYPE_Double))
+        | _ => false
+        end
+
+    | UVALUE_FCmp op x y =>
+        match dt with
+        | DTYPE_I 1 =>
+            (uvalue_has_dtyp_fun x (DTYPE_Float) &&
+               uvalue_has_dtyp_fun y (DTYPE_Float))
+            ||
+            (uvalue_has_dtyp_fun x (DTYPE_Double) &&
+               uvalue_has_dtyp_fun y (DTYPE_Double))
+        | _ => false 
+        end            
+
+    | UVALUE_Conversion conv from_dt value to_dt =>
+        if dtyp_eq_dec dt to_dt then 
+          uvalue_has_dtyp_fun value from_dt && conversion_okb conv from_dt to_dt 
+        else
+          false 
+
+    | UVALUE_GetElementPtr dt uv idxs =>
+        match dt with
+        | DTYPE_Pointer => true
+        | _ => false
+        end
+
+    | UVALUE_ExtractElement (DTYPE_Vector n t) vect idx =>
+        if dtyp_eq_dec t dt then
+          if (@ALL_IX_SUPPORTED_dec t) then
+            ((List.existsb
+                (fun sz => uvalue_has_dtyp_fun idx (DTYPE_I sz)) [1; 8; 32; 64])
+             ||
+               uvalue_has_dtyp_fun idx DTYPE_IPTR
+            )
+            &&
+              uvalue_has_dtyp_fun vect (DTYPE_Vector n t)
+          else
+            false
+        else
+          false
+
+    | UVALUE_InsertElement (DTYPE_Vector n t) vect val idx =>
+        if dtyp_eq_dec (DTYPE_Vector n t) dt then
+          if (@ALL_IX_SUPPORTED_dec t) then
+            ((List.existsb
+                (fun sz => uvalue_has_dtyp_fun idx (DTYPE_I sz)) [1; 8; 32; 64])
+             ||
+               uvalue_has_dtyp_fun idx DTYPE_IPTR
+            )
+            &&
+              uvalue_has_dtyp_fun vect (DTYPE_Vector n t)
+            &&
+              uvalue_has_dtyp_fun val t
+          else
+            false
+        else
+          false
+
+    (* SAZ: ShuffleVector isn't typeable because we need to guess the sizes for v1 and v2.
+       For now, I've hard-coded them to be the same length as the output, which is a
+       pretty common use case.
+     *)
+    | UVALUE_ShuffleVector v1 v2 idxs =>
+        match dt with
+        | DTYPE_Vector m t =>
+            uvalue_has_dtyp_fun idxs (DTYPE_Vector m (DTYPE_I 32))
+            &&
+              uvalue_has_dtyp_fun v1 (DTYPE_Vector m t)
+            &&
+              uvalue_has_dtyp_fun v2 (DTYPE_Vector m t)
+        | _ => false
+        end
+
+                                          
+    | UVALUE_ExtractValue (DTYPE_Struct fts) uv l =>
+        if (@ALL_IX_SUPPORTED_dec dt) then
+          if (dtyp_eq_dec dt DTYPE_Void) then false
+          else
+            uvalue_has_dtyp_fun uv (DTYPE_Struct fts)
+            &&
+              extract_path false fts l dt
+        else
+          false 
+          
+    (* SAZ TODO: we don't cover many of the conversions *)
+    | _ => false 
+    end.
+          
+    | UVALUE_Vector elts => S (S (list_sum (map uvalue_measure elts)))
+    | UVALUE_IBinop _ v1 v2
+    | UVALUE_ICmp _ v1 v2
+    | UVALUE_FBinop _ _ v1 v2
+    | UVALUE_FCmp _ v1 v2 =>
+        S (uvalue_measure v1 + uvalue_measure v2)
+    | UVALUE_Conversion conv t_from v t_to =>
+        S (uvalue_measure v)
+    | UVALUE_GetElementPtr t ptrval idxs =>
+        S (uvalue_measure ptrval + list_sum (map uvalue_measure idxs))
+    | UVALUE_ExtractElement t vec idx =>
+        S (uvalue_measure vec + uvalue_measure idx)
+    | UVALUE_InsertElement t vec elt idx =>
+        S (uvalue_measure vec + uvalue_measure elt + uvalue_measure idx)
+    | UVALUE_ShuffleVector vec1 vec2 idxmask =>
+        S (uvalue_measure vec1 + uvalue_measure vec2 + uvalue_measure idxmask)
+    | UVALUE_ExtractValue t vec idxs =>
+        S (uvalue_measure vec)
+    | UVALUE_InsertValue t vec elt idxs =>
+        S (uvalue_measure vec + uvalue_measure elt)
+    | UVALUE_Select cnd v1 v2 =>
+        S (uvalue_measure cnd + uvalue_measure v1 + uvalue_measure v2)
+    | UVALUE_ExtractByte uv dt idx sid =>
+        S (uvalue_measure uv + uvalue_measure idx)
+    | UVALUE_ConcatBytes uvs dt =>
+        S (list_sum (map uvalue_measure uvs))
+    end.
+  *)
+  
+  Ltac contradict_SUP :=
+    let C := fresh "C" in
+    right; intros; intro C; inversion C; subst; contradiction.
+  
+  Ltac case_of_uvalue_has_dtyp_exists2 t :=
+    let IX_SUP := fresh "IX_SUP" in
+    let NIX_SUP := fresh "NIX_SUP" in
+    let dt' := fresh "dt" in
+    let H := fresh "H" in
+    pose proof (@ALL_IX_SUPPORTED_dec t) as [IX_SUP | NIX_SUP];
+    [
+      pose proof (@NO_VOID_dec t) as [NVOID | VOID];
+      [
+        left;
+        exists t;
+        split; [ constructor; auto | 
+                 intros dt' H;
+                 inversion H; 
+                 subst; left; reflexivity ]
+      | contradict_SUP 
+      ]                 
+    | contradict_SUP
+    ].
+        
+  Ltac case_of_uvalue_has_dtyp_exists1 :=
+    let dt' := fresh "dt" in
+    let H := fresh "H" in
+    left;
+    eexists;
+    split; [constructor; auto | ];
+    intros dt' H;
+    inv H;
+    constructor; auto.
+  
   Lemma uvalue_has_dtyp_exists :
     forall uv,
-      ({dt | uvalue_has_dtyp uv dt /\ forall dt', conflatible dt dt' <-> uvalue_has_dtyp uv dt'}) + (forall dt, ~ uvalue_has_dtyp uv dt).
+      ({dt | uvalue_has_dtyp uv dt /\ forall dt', uvalue_has_dtyp uv dt' -> conflatible dt dt'}) + (forall dt, ~ uvalue_has_dtyp uv dt).
   Proof.
     intros uv.
-    induction uv;
-      try solve
-        [ left;
-          eexists;
-            split; [constructor; auto | ];
-            intros dt';
-            split;
-            [ intros CONF;
-              inv CONF;
-              [ constructor; auto
-              | destruct H as (dt1'&dt2'&CONTRA);
-                destruct CONTRA;
-                destruct H; inv H
-              ]
-            | intros H;
-              inv H;
-              constructor; auto
-            ]
+    induction uv; 
+      try solve [
+          case_of_uvalue_has_dtyp_exists1
+        | case_of_uvalue_has_dtyp_exists2 t
         ].
 
-    { - pose proof (@ALL_IX_SUPPORTED_dec t) as [IX_SUP | NIX_SUP].
-      + pose proof (@NO_VOID_dec t) as [NVOID | VOID].
-        * left.
-          exists t.
-          split.
-          constructor; auto.
-          intros dt'.
-          split.
-          -- intros CONF.
-             inv CONF.
-             constructor; auto.
-             admit.
-          -- admit.
-        * admit.
-      + admit.
-    }
+    - generalize dependent X. induction fields; intros.
+      + left. exists (DTYPE_Struct []).
+        split.
+        * constructor.
+        * intros. inversion H. subst. left. reflexivity.
+      + pose proof  (X a (inl eq_refl)).
+        destruct H as [[dt1 [HDT HC]] | HC].
+        * forward IHfields.
+          { intros. apply X. right. assumption. }
+          destruct IHfields as [[du [HUT HXU]] | HC2].
+          -- inversion HUT.
+             
+
+      destruct IHuv as [[dt1 [HDT HC]] | HC];
+        destruct IHuv0 as [[du [HUT HXU]] | HC2].
+      + inversion HUT.
 
    (** This is from the old proof attempt for uvalue_has_dtyp_dec, it may be useful. *)
  
