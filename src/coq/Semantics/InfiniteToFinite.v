@@ -15652,6 +15652,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                           red in HANDLER.
                           break_match_hyp.
                           { (* Negative length UB *)
+                            econstructor.
                             admit.
                           }
 
@@ -15992,7 +15993,20 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     }
 
                     { (* Handler raises OOM *)
-                      admit.
+                      destruct OOM as (oom_msg&TA_OOM&(oom_spec_msg&HANDLE_OOM)).
+                      rewrite TA_OOM in VIS_HANDLED.
+                      pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
+                                                                                 LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k2 oom_msg) as RAISE.
+                      rewrite RAISE in VIS_HANDLED.
+                      punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
+                      dependent induction VIS_HANDLED.
+                      - eapply Interp_Memory_PropT_Vis_OOM.
+                        rewrite get_inf_tree_equation.
+                        cbn.
+                        unfold raiseOOM.
+                        rewrite bind_trigger.
+                        reflexivity.
+                      - specialize (EQ t1); contradiction.
                     }
 
                     (* Handler succeeds *)
