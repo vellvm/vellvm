@@ -1651,7 +1651,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { (* TODO: confirm whether this is sane... *)
       inversion e1.
       destruct e2 eqn:HE2.
-      apply ((Pre <-> Pre0) /\
+      apply ((Pre -> Pre0) /\
                uvalue_refine_strict x x0).
     }
 
@@ -1774,7 +1774,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { (* TODO: confirm whether this is sane... *)
       inversion e1.
       destruct e2 eqn:HE2.
-      apply ((Pre <-> Pre0) /\
+      apply ((Pre -> Pre0) /\
                uvalue_refine_strict x x0).
     }
 
@@ -1868,7 +1868,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { (* TODO: confirm whether this is sane... *)
       inversion e1.
       destruct e2 eqn:HE2.
-      apply ((Pre <-> Pre0) /\
+      apply ((Pre -> Pre0) /\
                uvalue_refine_strict x x0).
     }
 
@@ -1920,7 +1920,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { (* TODO: confirm whether this is sane... *)
       inversion e1.
       destruct e2 eqn:HE2.
-      apply ((Pre <-> Pre0) /\
+      apply ((Pre -> Pre0) /\
                uvalue_refine_strict x x0).
     }
 
@@ -2368,7 +2368,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       destruct e2 eqn:HE2.
       destruct res1 as [r1 P1].
       destruct res2 as [r2 P2].
-      apply ((Pre <-> Pre0) /\
+      apply ((Pre -> Pre0) /\
                uvalue_refine_strict x x0 /\
                dvalue_refine_strict r1 r2).
     }
@@ -2505,7 +2505,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       destruct e2 eqn:HE2.
       destruct res1 as [r1 P1].
       destruct res2 as [r2 P2].
-      apply ((Pre <-> Pre0) /\
+      apply ((Pre -> Pre0) /\
                uvalue_refine_strict x x0 /\
                dvalue_refine_strict r1 r2).
     }
@@ -2611,7 +2611,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       destruct e2 eqn:HE2.
       destruct res1 as [r1 P1].
       destruct res2 as [r2 P2].
-      apply ((Pre <-> Pre0) /\
+      apply ((Pre -> Pre0) /\
                uvalue_refine_strict x x0 /\
                dvalue_refine_strict r1 r2).
     }
@@ -2969,7 +2969,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { (* TODO: confirm whether this is sane... *)
       inversion e1.
       destruct e2 eqn:HE2.
-      apply ((Pre <-> Pre0) /\
+      apply ((Pre -> Pre0) /\
                uvalue_refine_strict x x0).
     }
 
@@ -3200,7 +3200,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       destruct e2 eqn:HE2.
       destruct res1 as [r1 P1].
       destruct res2 as [r2 P2].
-      apply ((Pre <-> Pre0) /\
+      apply ((Pre -> Pre0) /\
                uvalue_refine_strict x x0 /\
             dvalue_refine_strict r1 r2).
     }
@@ -7891,9 +7891,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { constructor.
       cbn.
       split; auto.
-      split.
       - apply uvalue_refine_strict_unique_prop; auto.
-      - admit. (* apply uvalue_refine_strict_unique_prop_rev; auto. *) (* This rev lemma may not hold... *)
     }
 
     intros t1 t2 H.
@@ -7903,7 +7901,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     cbn in *.
     inv H; subst_existT; cbn in *.
     tauto.
-  Admitted.
+  Qed.
 
   Lemma pickUnique_orutt_strict :
     forall uv1 uv2,
@@ -7929,9 +7927,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { constructor.
       cbn.
       split; auto.
-      split.
       - apply uvalue_refine_strict_unique_prop; auto.
-      - admit. (* apply uvalue_refine_strict_unique_prop_rev; auto. *) (* This rev lemma may not actually hold *)
     }
 
     intros t1 t2 H.
@@ -7943,7 +7939,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     tauto.
 
     intros o CONTRA; inv CONTRA.
-  Admitted.
+  Qed.
 
   (* TODO: can these pickUnique lemmas be generalized? Different
   prerel / postrel, but fundamentally the same lemma... *)
