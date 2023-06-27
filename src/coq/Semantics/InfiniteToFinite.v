@@ -15245,6 +15245,47 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       lia.
   Qed.
 
+  (* TODO: Move to where the other frame stack lemmas are *)
+  Lemma cannot_pop_fin_inf :
+    forall {ms_fin ms_inf},
+      MemState_refine_prop ms_inf ms_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.cannot_pop ms_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.cannot_pop ms_inf.
+  Proof.
+    intros ms_fin ms_inf MSR NPOP.
+    red.
+    red in NPOP.
+    intros fs1 fs2 MSFP POP.
+    red in POP.
+    break_match_hyp; auto.
+    pose proof MemState_refine_prop_frame_stack_preserved _ _ MSR as FSP.
+    red in FSP.
+    pose proof MSFP as MSFP_FIN.
+    apply FSP in MSFP_FIN.
+    red in MSFP_FIN.
+    destruct ms_inf as [[ms_inf fss_inf hs_inf] msprovs_inf].
+    destruct ms_fin as [[ms_fin fss_fin hs_fin] msprovs_fin].
+    cbn in *.
+    subst.
+    cbn in *.
+    red in MSFP.
+    cbn in *.
+
+    specialize (NPOP fss_fin).
+    destruct fss_fin.
+    { cbn in *.
+      apply MemoryBigIntptrInfiniteSpec.MMSP.frame_stack_eqv_sing_snoc_inv in MSFP_FIN.
+      auto.
+    }
+
+    specialize (NPOP fss_fin).
+    forward NPOP.
+    { red; cbn. reflexivity. }
+    eapply NPOP.
+    red.
+    reflexivity.
+  Qed.
+
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
       L2_E1E2_orutt_strict t_inf t_fin ->
@@ -16005,7 +16046,60 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     }
 
                     { (* Handler raises error *)
-                      admit.
+                      destruct ERR as (msg&TA&msg_spec&ERR).
+                      cbn in ERR.
+
+                      (* There's an error if I cannot pop a stack frame...
+
+                         This shouldn't happen, but I should hopefully
+                         be able to show that if I cannot pop in the
+                         finite world, then I cannot pop in the
+                         infinite world either, so we should get an
+                         error in both places.
+                       *)
+
+                      rewrite TA in VIS_HANDLED.
+                      pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
+                                                                                 LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_error _ _) _ _ _ k2 msg) as RAISE.
+                      rewrite RAISE in VIS_HANDLED.
+                      punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
+                      dependent induction VIS_HANDLED.
+                      2: {
+                        specialize (EQ t1); contradiction.
+                      }
+
+                      eapply Interp_Memory_PropT_Vis with
+                        (k2:=(fun '(ms_inf, (sid', _)) =>
+                                get_inf_tree (k2 (s2, (s1, tt)))
+                        ))
+                        (s1:=s1)
+                        (s2:=lift_MemState s2).
+                      2: {
+                        pose proof cannot_pop_fin_inf (lift_MemState_refine_prop s2) ERR as ERR_INF.
+                        cbn.
+                        repeat red.
+                        right.
+                        left.
+                        cbn.
+                        exists msg.
+                        split; [reflexivity|].
+                        exists msg_spec.
+                        auto.
+                      }
+
+                      2: {
+                        rewrite get_inf_tree_equation.
+                        cbn.
+                        setoid_rewrite Raise.raise_bind_itree.
+                        reflexivity.
+                      }
+
+                      intros a b H H0 H1.
+                      (* H0 might be a contradiction... *)
+                      unfold LLVMEvents.raise in H0.
+                      rewrite bind_trigger in H0.
+                      apply Returns_vis_inversion in H0.
+                      destruct H0 as [[] _].
                     }
 
                     { (* Handler raises OOM *)
