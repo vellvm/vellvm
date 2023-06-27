@@ -3308,6 +3308,102 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | Sext => lift_conv_okb ext_base_okb from_dt to_dt
     | _ => false 
     end.
+
+  Lemma lift_conv_okb_supported :
+    forall conv_base_okb from_dt sz,
+      (conv_base_okb from_dt (DTYPE_I sz) = true -> IX_supported sz) ->
+      lift_conv_okb conv_base_okb from_dt (DTYPE_I sz) = true ->
+      IX_supported sz.
+  Proof.
+    intros f from_dt sz H EQ.
+    destruct from_dt; simpl in *; inversion EQ; eauto.
+  Qed.
+
+  Lemma lift_conv_okb_ALL_IX_SUPPORTED:
+    forall conv_base_okb from_dt to_dt,
+      (forall ft dt, conv_base_okb ft dt = true -> ALL_IX_SUPPORTED dt) ->
+      lift_conv_okb conv_base_okb from_dt to_dt = true ->
+      ALL_IX_SUPPORTED to_dt.
+  Proof.
+    intros f from_dt to_dt H EQ.
+    destruct from_dt; simpl in *; inversion EQ; eauto.
+    destruct to_dt eqn: HEQ; inversion EQ.
+    rewrite ALL_IX_SUPPORTED_equation.
+    subst.
+    eapply H; eauto.
+  Qed.
+  
+  Lemma IX_supported_ltb_supported : forall sz1 sz2,
+      IX_supported_ltb sz1 sz2 = true -> IX_supported sz1 /\ IX_supported sz2.
+  Proof.
+    intros.
+    unfold IX_supported_ltb in H.
+    break_match_hyp; [|inversion H].
+    break_match_hyp; [|inversion H].
+    auto.
+  Qed.
+  
+  Lemma trunc_base_okb_supported:
+    forall from_dt sz, trunc_base_okb from_dt (DTYPE_I sz) = true -> IX_supported sz.
+  Proof.
+    intros.
+    destruct from_dt; simpl in *; try inversion H.
+    - apply IX_supported_ltb_supported in H. intuition.
+    - break_match_hyp; [auto|inversion H].
+  Qed.
+
+  Lemma trunc_base_okb_ALL_IX_SUPPORTED : 
+    forall from_dt to_dt, trunc_base_okb from_dt to_dt = true -> ALL_IX_SUPPORTED to_dt.
+  Proof.
+    intros.
+    destruct from_dt; simpl in *; try inversion H.
+    - break_match_hyp; rewrite ALL_IX_SUPPORTED_equation; auto; try solve [inversion H1].
+      apply IX_supported_ltb_supported in H. intuition.
+    - break_match_hyp; rewrite ALL_IX_SUPPORTED_equation; auto; try solve [inversion H1].
+      break_match_hyp; auto. inversion H.
+  Qed.
+
+  Lemma ext_base_okb_supported :
+    forall from_dt sz, ext_base_okb from_dt (DTYPE_I sz) = true -> IX_supported sz.
+  Proof.
+    intros.
+    destruct from_dt; simpl in *; try inversion H.
+    apply IX_supported_ltb_supported in H. intuition.
+  Qed.
+
+  Lemma ext_base_okb_ALL_IX_SUPPORTED : 
+    forall from_dt to_dt, ext_base_okb from_dt to_dt = true -> ALL_IX_SUPPORTED to_dt.
+  Proof.
+    intros.
+    destruct from_dt; simpl in *; try inversion H.
+    - break_match_hyp; rewrite ALL_IX_SUPPORTED_equation; auto; try solve [inversion H1].
+      apply IX_supported_ltb_supported in H. intuition.
+  Qed.
+  
+  Lemma conversion_okb_supported :
+    forall conv from_dt sz, conversion_okb conv from_dt (DTYPE_I sz) = true -> IX_supported sz.
+  Proof.
+    destruct conv; intros from_dt sz H; try inversion H.
+    - simpl in H. apply lift_conv_okb_supported in H; auto.
+      apply trunc_base_okb_supported.
+    - simpl in H. apply lift_conv_okb_supported in H; auto.
+      apply ext_base_okb_supported.
+    - simpl in H. apply lift_conv_okb_supported in H; auto.
+      apply ext_base_okb_supported.
+  Qed.
+
+  Lemma conversion_okb_ALL_IX_SUPPORTED :
+    forall (conv : conversion_type) (from_typ to_typ : dtyp),
+      conversion_okb conv from_typ to_typ = true -> ALL_IX_SUPPORTED from_typ -> ALL_IX_SUPPORTED to_typ.
+  Proof.
+    destruct conv; intros from_dt to_dt H HSUP; try inversion H.
+    - apply lift_conv_okb_ALL_IX_SUPPORTED in H1; auto.
+      apply trunc_base_okb_ALL_IX_SUPPORTED.
+    - apply lift_conv_okb_ALL_IX_SUPPORTED in H1; auto.
+      apply ext_base_okb_ALL_IX_SUPPORTED.
+    - apply lift_conv_okb_ALL_IX_SUPPORTED in H1; auto.
+      apply ext_base_okb_ALL_IX_SUPPORTED.
+  Qed.
     
   (* Assumes:
      [l] is a list of indices treated as a path into the nested structure.
@@ -3373,13 +3469,17 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
   (* Do we have to exclude mmx? "There are no arrays, vectors or constants of this type" *)
   | UVALUE_Array_typ :
-      forall xs sz dt,
-        Forall (fun x => uvalue_has_dtyp x dt) xs ->
-        length xs = sz ->
-        uvalue_has_dtyp (UVALUE_Array xs) (DTYPE_Array (N.of_nat sz) dt)
+    forall xs sz dt,
+      ALL_IX_SUPPORTED dt ->
+      NO_VOID dt ->
+      Forall (fun x => uvalue_has_dtyp x dt) xs ->
+      length xs = sz ->
+      uvalue_has_dtyp (UVALUE_Array xs) (DTYPE_Array (N.of_nat sz) dt)
 
   | UVALUE_Vector_typ :
       forall xs sz dt,
+        ALL_IX_SUPPORTED dt ->
+        NO_VOID dt ->
         Forall (fun x => uvalue_has_dtyp x dt) xs ->
         length xs = sz ->
         vector_dtyp dt ->
@@ -3622,11 +3722,15 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                             (sz : nat)
                             (dt : dtyp)
                             (IH : forall x, In x xs -> P x dt),
+        ALL_IX_SUPPORTED dt ->
+        NO_VOID dt ->
         Datatypes.length xs = sz ->
         P (UVALUE_Array xs) (DTYPE_Array (N.of_nat sz) dt).
 
     Hypothesis IH_Vector : forall (xs : list uvalue) (sz : nat) (dt : dtyp)
                              (IH : forall x, In x xs -> P x dt),
+        ALL_IX_SUPPORTED dt ->
+        NO_VOID dt ->
         Datatypes.length xs = sz ->
         vector_dtyp dt -> P (UVALUE_Vector xs) (DTYPE_Vector (N.of_nat sz) dt).
 
@@ -3705,6 +3809,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_ExtractValue :
     forall dt_agg uv path dt,
       P uv dt_agg ->
+      uvalue_has_dtyp uv dt_agg ->  (* not strictly necessary, but useful *)
       check_extract_path path dt_agg dt = true -> 
       P (UVALUE_ExtractValue dt_agg uv path) dt.
 
@@ -3712,6 +3817,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       forall dt_agg uv dt_elt elt path,
         P elt dt_elt ->
         P uv dt_agg ->
+        uvalue_has_dtyp uv dt_agg -> (* not strictly necessary, but useful *)
         check_extract_path path dt_agg dt_elt = true ->         
         P (UVALUE_InsertValue dt_agg uv dt_elt elt path) dt_agg.
 
@@ -3733,6 +3839,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
     Hypothesis IH_UVALUE_ConcatBytes :
       forall bytes dt,
+        ALL_IX_SUPPORTED dt ->        
         (forall byte, In byte bytes -> exists uv dt idx sid, byte = UVALUE_ExtractByte uv dt idx sid) ->
         N.of_nat (length bytes) = sizeof_dtyp dt ->
         P (UVALUE_ConcatBytes bytes dt) dt.
@@ -3768,37 +3875,35 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           eauto.
           eauto.
 
-      - apply IH_Array.
-        + revert xs sz dt H0 H.
-          fix IHL_C 5.
-          intros xs sz dt EQ H.
-          destruct H.
-          * intros x HIN. inversion HIN.
-          * intros x' HIN. inversion HIN.
-            -- rewrite <- H1.
-               eapply IHQ.
-               assumption.
-               
-            -- simpl in EQ.
-               destruct sz; inversion EQ.
-               apply (IHL_C _ _ _ H3 H0 x' H1).
-        + assumption.
+      - apply IH_Array; auto.
+        revert xs sz dt H H0 H1 H2.
+        fix IHL_C 6.
+        intros xs sz dt HALL HNV H EQ .
+        destruct H.
+        * intros x HIN. inversion HIN.
+        * intros x' HIN. inversion HIN.
+          -- rewrite <- H1.
+             eapply IHQ.
+             assumption.
+             
+          -- simpl in EQ.
+             destruct sz; inversion EQ.
+             apply (IHL_C _ _ _ HALL HNV H0 H3 x' H1).
 
-      - apply IH_Vector.
-        + revert xs sz dt H0 H H1.
-          fix IHL_D 5.
-          intros xs sz dt EQ H H1 x HIN.
-          destruct H.
-          * inversion HIN. 
-          * inversion HIN.
-            -- rewrite <- H2.
-               eapply IHQ.
-               assumption.
-            -- simpl in EQ.
-               destruct sz; inversion EQ.
-               apply (IHL_D _ _ _ H4 H0 H1 x H2).            
-        + assumption.
-        + assumption.
+      - apply IH_Vector; auto.
+        revert xs sz dt H H0 H1 H2 H3.        
+        fix IHL_C 6.
+        intros xs sz dt HALL HNV H EQ HX.
+        destruct H.
+        * intros x HIN. inversion HIN.
+        * intros x' HIN. inversion HIN.
+          -- rewrite <- H1.
+             eapply IHQ.
+             assumption.
+             
+          -- simpl in EQ.
+             destruct sz; inversion EQ.
+             apply (IHL_C _ _ _ HALL HNV H0 H3 HX x' H1).
 
       - destruct H as [[HS [HX HY]]|[[HX HY]|[HX HY]]].
         + eapply IH_ICmp.
@@ -3830,6 +3935,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Qed.
 
   End uvalue_has_dtyp_ind.
+
+  
 
   Ltac solve_dvalue_has_dtyp_dec_int_helper' :=
     match goal with
@@ -4164,25 +4271,90 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         lia.
   Qed.
 
+  Lemma ALL_IX_SUPPORTED_path_strong :
+    forall (τ : dtyp)
+      (dt : dtyp)
+      (HA : ALL_IX_SUPPORTED τ),
+    forall path : list Z, check_extract_path path τ dt = true -> ALL_IX_SUPPORTED dt.
+  Proof.
+    intros.
+    revert τ dt HA H.
+    induction path; intros τ dt HA H.
+    - simpl in H. inversion H.
+    - destruct path.
+      + destruct τ; simpl in H; repeat break_match_hyp; try solve [inversion H].
+        * subst.
+          rewrite ALL_IX_SUPPORTED_equation in HA. auto.
+        * destruct (nth_in_or_default (Z.to_nat a) fields DTYPE_Void).
+          specialize (ALL_IX_SUPPORTED_Struct_fields _ HA _ i).
+          intros HX. rewrite e in HX.
+          assumption.
+          rewrite e in e0. inversion  e0.
+          constructor.
+
+        * destruct (nth_in_or_default (Z.to_nat a) fields DTYPE_Void).
+          specialize (ALL_IX_SUPPORTED_Packed_struct_fields _ HA _ i).
+          intros HX. rewrite e in HX.
+          assumption.
+          rewrite e in e0. inversion  e0.
+          constructor.
+          
+      + cbn in H.
+        break_match_hyp.
+        * inversion H.
+        * break_match_hyp; try solve [inversion H].
+          -- rewrite ALL_IX_SUPPORTED_equation in HA.
+             break_match_hyp.
+             ++ apply IHpath in H; auto.
+             ++ inversion H.
+          -- apply IHpath in H; auto.
+             ++ destruct (nth_in_or_default (Z.to_nat a) fields DTYPE_Void).
+                specialize (ALL_IX_SUPPORTED_Struct_fields _ HA _ i); auto.
+                rewrite e in H.
+                rewrite e.
+                constructor.
+          -- apply IHpath in H; auto.
+             ++ destruct (nth_in_or_default (Z.to_nat a) fields DTYPE_Void).
+                specialize (ALL_IX_SUPPORTED_Packed_struct_fields _ HA _ i); auto.
+                rewrite e in H.
+                repeat break_match_hyp; inversion H.
+  Qed.
+
+  Lemma ALL_IX_SUPPORTED_path :
+    forall 
+      (sz : N)
+      (τ : dtyp)
+      (HA : ALL_IX_SUPPORTED τ),
+    forall path : list Z, check_extract_path path τ (DTYPE_I sz) = true -> IX_supported sz.
+  Proof.
+    intros.
+    apply ALL_IX_SUPPORTED_path_strong in H; auto.
+  Qed.
+
+  Lemma uvalue_has_dtyp_ALL_IX_SUPPORTED :
+    forall uv dt,
+      uvalue_has_dtyp uv dt ->
+      ALL_IX_SUPPORTED dt.
+  Proof.
+    intros uv dt TYPE.
+    induction TYPE; try solve [ auto
+                              | rewrite ALL_IX_SUPPORTED_equation; auto; try constructor; auto].
+    - rewrite ALL_IX_SUPPORTED_equation.
+      induction H; constructor; auto.
+    - rewrite ALL_IX_SUPPORTED_equation.
+      induction H; constructor; auto.
+    - eapply conversion_okb_ALL_IX_SUPPORTED; eauto.
+    - eapply ALL_IX_SUPPORTED_path_strong; eauto.
+  Qed.
+  
   Lemma uvalue_has_dtyp_IX_supported :
     forall uv sz,
-      uvalue_has_dtyp uv (DTYPE_I sz) ->
-      IX_supported sz.
+      uvalue_has_dtyp uv (DTYPE_I sz) -> IX_supported sz.
   Proof.
-    intros uv sz TYPE.
-    inv TYPE;
-      try solve
-        [ solve [ constructor
-                | match goal with
-                  | H: ALL_IX_SUPPORTED _ |- _ =>
-                      rewrite ALL_IX_SUPPORTED_equation in H; auto
-                  | H: (ALL_IX_SUPPORTED _) /\ _ |- _ =>
-                      destruct H; rewrite ALL_IX_SUPPORTED_equation in H; auto
-                  end
-                | auto
-            ]
-        ].
-    - inv H.
+    intros.
+    apply uvalue_has_dtyp_ALL_IX_SUPPORTED in H.
+    rewrite ALL_IX_SUPPORTED_equation in H.
+    assumption.
   Qed.
 
   Definition conflatible (dt1 dt2 : dtyp) : Prop :=
@@ -4274,44 +4446,12 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
              ++ apply n2. eexists. eauto.
   Qed.
 
-  (* Assumes:
-
-     - 
-
-     Invariant:
-       - if [t] is a [DTYPE_Array] then [fts] is a singleton list
-         and [fields] is actually the sequence of array elements
-           such that [field_i : fts]
-
-       - if [t] is a [DTYPE_Struct] then [fts] is the list of types of fields 
-         and [fields] is the sequence of field values such that
-            [field_i : fts_i]
-
-       - l is a list of indices treated as a path into the nested structure
-
-     The function returns 
-  *)
-  Fixpoint check_extract_path l (is_array_path:bool) fields fts dt:=
-        match l with
-        | [] => false
-        | [idx] =>
-            if (Z.ltb idx 0) then false (* negative index *)
-            else
-              if dtyp_eq_dec (List.nth (Z.to_nat idx) fts DTYPE_Void) dt then true
-              else false
-        | idx::idxs =>
-            if (Z.ltb idx 0) then false (* negative index *)
-            else 
-              let nth_fld := List.nth (Z.to_nat idx) fields UVALUE_None in
-              let nth_ft := List.nth (Z.to_nat idx) fts DTYPE_Void in
-                match nth_fld, nth_ft with
-                | UVALUE_Struct fields', DTYPE_Struct fts' 
-                | UVALUE_Packed_struct fields', DTYPE_Packed_struct fts' => go dt fields' fts' idxs
-                | _,_ => false 
-                end
-        end
-    in
-
+  Lemma uvalue_has_dtyp_dec :
+    forall uv dt,
+      {uvalue_has_dtyp uv dt} + {~ uvalue_has_dtyp uv dt}.
+  Proof.
+  Admitted.
+  
   
   Fixpoint uvalue_has_dtyp_fun (uv:uvalue) (dt:dtyp) : bool :=
     let list_forallb2 :=
