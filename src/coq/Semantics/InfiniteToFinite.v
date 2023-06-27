@@ -15886,7 +15886,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     }
 
                     { (* Handler raises error *)
-                      admit.
+                      (* Probably not possible to have an error for MemPush... *)
+                      destruct ERR as (msg&TA&msg_spec&ERR).
+                      cbn in ERR.
+                      contradiction.
                     }
 
                     { (* Handler raises OOM *)
