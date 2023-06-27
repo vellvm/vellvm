@@ -3082,8 +3082,8 @@ Section PARAMS.
       intros ?; tau_steps; reflexivity.
     Qed.
 
-    #[global] Instance eutt_interp_memory {R} :
-      Proper (eutt Logic.eq ==> Logic.eq ==> eutt Logic.eq) (@interp_memory R).
+    #[global] Instance eutt_interp_memory {R}:
+      Proper (eutt (R2 := R) Logic.eq ==> Logic.eq ==> eutt Logic.eq) interp_memory.
     Proof.
       repeat intro.
       unfold interp_memory.

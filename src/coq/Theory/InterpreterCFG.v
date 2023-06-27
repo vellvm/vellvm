@@ -327,7 +327,7 @@ Lemma interp_cfg3_GEP_array' : forall t a size g l m val i,
       read m ptr t = inr val.
 Proof.
   intros * GET.
-  epose proof @interp_memory_GEP_array' _ (PickE +' UBE +' DebugE +' FailureE) _ _ _ t _ size _ _ _ GET as [ptr [INTERP READ]].
+  epose proof @interp_memory_GEP_array' _ (PickE +' UBE +' DebugE +' FailureE) _ _ t _ size _ _ _ GET as [ptr [INTERP READ]].
   exists ptr.
   split; auto.
 
@@ -348,7 +348,7 @@ Lemma interp_cfg3_GEP_array_no_read_addr : forall t a size g l m i ptr,
        ≈ Ret3 g l m (DVALUE_Addr ptr).
 Proof.
   intros * FITS GEP.
-  epose proof @interp_memory_GEP_array_no_read_addr _ (PickE +' UBE +' DebugE +' FailureE) _ _ _ t _ size _ _ ptr FITS as EQ.
+  epose proof @interp_memory_GEP_array_no_read_addr _ (PickE +' UBE +' DebugE +' FailureE) _ _ t _ size _ _ ptr FITS as EQ.
   unfold ℑ3.
   go.
   rewrite EQ; eauto.
@@ -367,7 +367,7 @@ Lemma interp_cfg3_GEP_array_no_read : forall t a size g l m i,
       handle_gep_addr (DTYPE_Array size t) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))] = inr ptr.
 Proof.
   intros * FITS.
-  epose proof @interp_memory_GEP_array_no_read _ (PickE +' UBE +' DebugE +' FailureE) _ _ _ t _ size _ _ FITS as [ptr [INTERP GEP]]. 
+  epose proof @interp_memory_GEP_array_no_read _ (PickE +' UBE +' DebugE +' FailureE) _ _ t _ size _ _ FITS as [ptr [INTERP GEP]]. 
   exists ptr.
   split; auto.
 
@@ -390,7 +390,7 @@ Lemma interp_cfg3_GEP_array : forall t a size g l m val i,
       read m ptr t = inr val.
 Proof.
   intros * GET.
-  epose proof @interp_memory_GEP_array _ (PickE +' UBE +' DebugE +' FailureE) _ _ _ t _ size _ _ _ GET as [ptr [INTERP READ]].
+  epose proof @interp_memory_GEP_array _ (PickE +' UBE +' DebugE +' FailureE) _ _ t _ size _ _ _ GET as [ptr [INTERP READ]].
   exists ptr.
   split; auto.
 

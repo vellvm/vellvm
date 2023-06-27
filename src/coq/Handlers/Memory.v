@@ -1175,7 +1175,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
       end.
 
-  Definition handle_intrinsic {E} `{FailureE -< E} `{PickE -< E}: IntrinsicE ~> stateT memory_stack (itree E) :=
+  Definition handle_intrinsic {E} `{FailureE -< E}: IntrinsicE ~> stateT memory_stack (itree E) :=
     fun _ e '(m, s) =>
       match e with
       | Intrinsic t name args =>
@@ -1191,7 +1191,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
   Section PARAMS.
     Variable (E F G : Type -> Type).
-    Context `{FailureE -< F} `{UBE -< F} `{PickE -< F}.
+    Context `{FailureE -< F} `{UBE -< F}.
     Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
     Notation Effout := (E +' F).
 
