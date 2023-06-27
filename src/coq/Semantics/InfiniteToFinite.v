@@ -16215,7 +16215,46 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     }
 
                     { (* Handler raises error *)
-                      admit.
+                      destruct ERR as (msg&TA&msg_spec&ERR).
+                      destruct EV_REL as (?&?&?); subst.
+
+                      (* Can Alloca raise an error? *)
+                      (* We have:
+                         MEM_EXEC_INTERP.MemTheory.allocate_bytes_spec_MemPropT_no_err
+                       *)
+                      Lemma allocate_dtyp_spec_no_error :
+                        forall t num_elements ms msg,
+                          Memory64BitIntptr.MMEP.MemSpec.allocate_dtyp_spec t num_elements ms (raise_error msg) -> False.
+                      Proof.
+                        intros t num_elements ms msg HANDLE.
+                        repeat red in HANDLE.
+                        destruct HANDLE as [FRESH | HANDLE].
+                        - cbn in FRESH; auto.
+                        - destruct HANDLE as (?&?&?&?).
+                          repeat red in H0.
+                          destruct H0.
+                          + admit. (* TODO: need a lemma about repeatMN. *)
+                          + destruct H0 as (?&?&?&?).
+                            apply MEM_EXEC_INTERP.MemTheory.allocate_bytes_spec_MemPropT_no_err in H1; auto.                            
+                      Admitted.
+
+                      Lemma handle_alloca_no_error :
+                        forall t num_elements align ms msg,
+                          Memory64BitIntptr.MMEP.MemSpec.handle_memory_prop LLVMParams64BitIntptr.Events.DV.dvalue
+                            (LLVMParams64BitIntptr.Events.Alloca t num_elements align) ms (raise_error msg) ->
+                      False.
+                      Proof.
+                        intros t num_elements align ms msg HANDLE.
+                        repeat red in HANDLE.
+                        destruct HANDLE as [HANDLE | HANDLE].
+                        - apply allocate_dtyp_spec_no_error in HANDLE; auto.
+                        - destruct HANDLE as (?&?&?&?).
+                          cbn in H0.
+                          auto.
+                      Qed.
+
+                      apply handle_alloca_no_error in ERR.
+                      contradiction.
                     }
 
                     { (* Handler raises OOM *)
