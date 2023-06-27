@@ -16439,7 +16439,154 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                   }
 
                   { (* Pick *)
-                    admit.
+                    destruct p0.
+                    cbn in EV_REL.
+                    destruct p.
+                    cbn in *.
+                    destruct EV_REL as [EV_PRE UV_REF].
+                    unfold FinMemInterp.F_trigger in H0.
+                    setoid_rewrite bind_trigger in H0.
+                    cbn in H0.
+                    rewrite H0 in VIS_HANDLED.
+                    rewrite bind_vis in VIS_HANDLED.
+                    setoid_rewrite bind_ret_l in VIS_HANDLED.
+                    punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
+                    dependent induction VIS_HANDLED.
+                    2: { (* Tau *)
+                      specialize (EQ t1). contradiction.
+                    }
+
+                    rename Pre into Pre_inf.
+                    rename Pre0 into Pre_fin.
+
+                    eapply Interp_Memory_PropT_Vis
+                      with (k2:=
+                              fun (x : {_ : InterpreterStackBigIntptr.LP.Events.DV.dvalue | True}) =>
+                                (let (x4, p) := x in
+                                 get_inf_tree
+                                   match DVCInfFin.dvalue_convert_strict x4 with
+                                   | NoOom a => k5 (exist (fun _ : dvalue => True) a p)
+                                   | Oom s => raiseOOM s
+                                   end)).
+
+                    2: {
+                      cbn.
+                      red.
+                      reflexivity.
+                    }
+                    2: {
+                      rewrite get_inf_tree_equation.
+                      cbn.
+                      rewrite bind_bind.
+                      rewrite bind_trigger.
+                      setoid_rewrite bind_ret_l.
+                      erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+                      assert (Pre_inf = Pre_fin).
+                      { admit. (* TODO: Not provable? *)
+                      }
+                      subst.
+                      
+                      cbn.
+                      pstep. red. cbn.
+                      eapply EqVis.
+                      intros v.
+
+                      with (k2:=
+                              fun (v : {_ : InterpreterStackBigIntptr.LP.Events.DV.dvalue | True}) =>
+                              (let (x4, p) := v in
+                               get_inf_tree
+                                 match DVCInfFin.dvalue_convert_strict x4 with
+                                 | NoOom a => k5 (exist (fun _ : dvalue => True) a p)
+                                 | Oom s => raiseOOM s
+                                 end)).
+
+
+                      red. left.
+                      destruct v.
+                      
+                    }
+                      { intros a b H H1 H2.
+                        destruct b. destruct p.
+                        cbn in *; subst.
+                        right.
+
+                        left.
+                        
+                      }
+
+                        with
+                        (k2:=(fun '(ms_inf, (sid', uv_inf)) =>
+                                get_inf_tree (k2 (s2, (s1, x))))).
+
+                      eapply Interp_Memory_PropT_Vis.
+                      3: {
+                        rewrite get_inf_tree_equation.
+                        cbn.
+                      }
+                    - specialize (EQ t1); contradiction.
+
+                    
+
+
+                              get_inf_tree (k2 (s2, (s2, r))))).
+                    eapply Interp_Memory_PropT_Vis with
+                      (ta:=trigger (E1.pick Pre0 (fin_to_inf_uvalue x0))).
+                    3: {
+                      rewrite VIS_HANDLED.
+                      rewrite get_inf_tree_equation.
+                      red.
+                      cbn.
+                      
+                    }
+                    
+                    destruct t2; pinversion VIS_HANDLED; subst_existT.
+                    { exfalso; eapply EQ; eauto. }
+                    subst_existT.
+
+                    eapply Interp_Memory_PropT_Vis.
+                    3: {
+                      rewrite get_inf_tree_equation.
+                      cbn.
+                      
+                    }
+                    - intros a b H H1 H2.
+                      left.
+                      setoid_rewrite REL.
+                      apply REL.
+
+                    rewrite get_inf_tree_equation.
+                    cbn.
+                    pfold. red.
+                    cbn.
+
+                    eapply Interp_Memory_PropT_Vis with
+                      (k2:=(fun res : {_ : InfLP.Events.DV.dvalue | True} =>
+                              let (x4, p) := res in
+                              get_inf_tree
+                                match DVCInfFin.dvalue_convert_strict x4 with
+                                | NoOom a => k (exist (fun _ : dvalue => True) a p)
+                                | Oom s => raiseOOM s
+                                end)).
+
+
+
+                      (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                              get_inf_tree (k2 (ms_store, (st', tt)))))
+                      (s1:=s1)
+                      (s2:=lift_MemState s2).
+
+                    constructor.
+
+                    cbn
+
+                    epose proof (@itree_eta _ _ t2).
+
+                    punfold VIS_HANDLED.
+                    cbn in VIS_HANDLED.
+                    red in VIS_HANDLED.
+                    dependent induction VIS_HANDLED.
+                    - admit.
+                    - specialize (EQ
                   }
 
                   { (* OOM *)
