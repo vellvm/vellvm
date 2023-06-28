@@ -14553,13 +14553,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     forall {t : dtyp} {bytes_fin bytes_inf}
       (start seq_len : N)
       (BYTES_REF : sbytes_refine bytes_inf bytes_fin)
-      (BYTES_LEN : N.of_nat (length bytes_fin) >= seq_len * FiniteSizeof.FinSizeof.sizeof_dtyp t + start * FiniteSizeof.FinSizeof.sizeof_dtyp t)
       (IHt :
         forall (bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte)
           (bytes_inf : list MemoryBigIntptr.MP.BYTE_IMPL.SByte)
           (res_fin : LLVMParams64BitIntptr.Events.DV.uvalue),
           sbytes_refine bytes_inf bytes_fin ->
-          N.of_nat (Datatypes.length bytes_fin) = FiniteSizeof.FinSizeof.sizeof_dtyp t ->
           Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_fin t = inr res_fin ->
           exists res_inf : LLVMParamsBigIntptr.Events.DV.uvalue,
             MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_inf t = inr res_inf /\
@@ -14582,10 +14580,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               @ret err _ _ (uv :: acc)) (Nseq start (N.to_nat seq_len)) [] = inr uv_infs) /\
           Forall2 DVC1.uvalue_refine_strict uv_infs uv_fins.
   Proof.
-    intros t bytes_fin bytes_inf start seq_len BYTES_REF BYTES_LEN IHt uv_fins HFOLDR.
+    intros t bytes_fin bytes_inf start seq_len BYTES_REF IHt uv_fins HFOLDR.
     generalize dependent start.
     generalize dependent uv_fins.
-    induction seq_len using N.peano_ind; intros uv_fins start BYTES_LEN HFOLDR.
+    induction seq_len using N.peano_ind; intros uv_fins start HFOLDR.
     - rewrite monad_fold_right_equation.
       rewrite monad_fold_right_equation in HFOLDR.
       cbn in HFOLDR; inv HFOLDR.
@@ -14614,15 +14612,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         apply Forall2_between; auto.
       }
 
-      2: {
-        pose proof between_length bytes_fin (start * FiniteSizeof.FinSizeof.sizeof_dtyp t) ((start + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t).
-        forward H; [lia|].
-        forward H; lia.
-      }
-
       destruct Heqs as (uv_inf&DESER_INFS&REF).
       
-      apply IHseq_len in HFOLDR' as (uv_infs&HFOLDR'&REFS); [|lia].
+      apply IHseq_len in HFOLDR' as (uv_infs&HFOLDR'&REFS).
 
       exists (uv_inf :: uv_infs).
       split; auto.
@@ -14636,13 +14628,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Lemma deserialize_sbytes_fin_inf :
     forall {t bytes_fin bytes_inf res_fin},
       sbytes_refine bytes_inf bytes_fin ->
-      N.of_nat (length bytes_fin) = LLVMParams64BitIntptr.SIZEOF.sizeof_dtyp t ->
       Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_fin t = inr res_fin ->
       exists res_inf,
         MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_inf t = inr res_inf /\
           DVC1.uvalue_refine_strict res_inf res_fin.
   Proof.
-    induction t; intros bytes_fin bytes_inf res_fin BYTES BYTE_LENGTH DESER.
+    induction t; intros bytes_fin bytes_inf res_fin BYTES DESER.
     1-12,16:
       try
         solve
@@ -14683,9 +14674,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       rewrite REF.
       cbn.
       reflexivity.
-
-      rewrite FinLP.SIZEOF.sizeof_dtyp_array in BYTE_LENGTH.
-      lia.
     }
 
     { (* Structs *)
@@ -14698,7 +14686,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       generalize dependent bytes_inf.
       generalize dependent res_fin.
       generalize dependent H.
-      induction fields; intros H res_fin bytes_inf bytes_fin BYTES BYTE_LENGTH DESER.
+      induction fields; intros H res_fin bytes_inf bytes_fin BYTES DESER.
       - inv DESER.
         exists (DVC1.DV1.UVALUE_Struct []).
         split; auto.
@@ -14707,31 +14695,23 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         repeat break_match_hyp_inv.
 
         forward IHfields.
-        { intros u0 H0 bytes_fin0 bytes_inf0 res_fin H1 H2 H3.
+        { intros u0 H0 bytes_fin0 bytes_inf0 res_fin H1 H2.
           eapply H.
           right; auto.
           eauto.
-          lia.
           auto.
         }
 
-        rewrite FinSizeof.sizeof_dtyp_struct_cons in BYTE_LENGTH.
         rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes_equation in Heqs0.
         eapply IHfields in Heqs0.
         2: {
           apply Forall2_drop; eauto.
-        }
-        2: {
-          rewrite drop_length; lia.
         }
         destruct Heqs0 as (uv_infs&FIELDS&REFS).
         
         eapply H in Heqs.
         2: left; auto.
         2: apply Forall2_take; eauto.
-        2: {
-          rewrite take_length; lia.
-        }
 
         destruct Heqs as (uv_inf&DESA&REF).
         rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in REFS.
@@ -14763,7 +14743,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       generalize dependent bytes_inf.
       generalize dependent res_fin.
       generalize dependent H.
-      induction fields; intros H res_fin bytes_inf bytes_fin BYTES BYTE_LENGTH DESER.
+      induction fields; intros H res_fin bytes_inf bytes_fin BYTES DESER.
       - inv DESER.
         exists (DVC1.DV1.UVALUE_Packed_struct []).
         split; auto.
@@ -14772,31 +14752,24 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         repeat break_match_hyp_inv.
 
         forward IHfields.
-        { intros u0 H0 bytes_fin0 bytes_inf0 res_fin H1 H2 H3.
+        { intros u0 H0 bytes_fin0 bytes_inf0 res_fin H1 H2.
           eapply H.
           right; auto.
           eauto.
-          lia.
           auto.
         }
 
-        rewrite FinSizeof.sizeof_dtyp_packed_struct_cons in BYTE_LENGTH.
         rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes_equation in Heqs0.
         eapply IHfields in Heqs0.
         2: {
           apply Forall2_drop; eauto.
         }
-        2: {
-          rewrite drop_length; lia.
-        }
+
         destruct Heqs0 as (uv_infs&FIELDS&REFS).
         
         eapply H in Heqs.
         2: left; auto.
         2: apply Forall2_take; eauto.
-        2: {
-          rewrite take_length; lia.
-        }
 
         destruct Heqs as (uv_inf&DESA&REF).
         rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in REFS.
@@ -14847,9 +14820,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       rewrite REF.
       cbn.
       reflexivity.
-
-      rewrite FinLP.SIZEOF.sizeof_dtyp_vector in BYTE_LENGTH.
-      lia.
     }
   Qed.
 
@@ -14857,11 +14827,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     forall {t : dtyp} {bytes_fin bytes_inf}
       (start seq_len : N) (s : string)
       (BYTES_REF : sbytes_refine bytes_inf bytes_fin)
-      (BYTES_LEN : N.of_nat (length bytes_fin) >= seq_len * FiniteSizeof.FinSizeof.sizeof_dtyp t + start * FiniteSizeof.FinSizeof.sizeof_dtyp t)
       (IHt : forall (bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte)
                (bytes_inf : list MemoryBigIntptr.MP.BYTE_IMPL.SByte) (s : string),
           sbytes_refine bytes_inf bytes_fin ->
-          N.of_nat (Datatypes.length bytes_fin) = FiniteSizeof.FinSizeof.sizeof_dtyp t ->
           Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_fin t = inl s ->
           MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_inf t = inl s),
       monad_fold_right
@@ -14879,10 +14847,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                    ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_inf) t;; 
             @ret err _ _ (uv :: acc)) (Nseq start (N.to_nat seq_len)) [] = inl s).
   Proof.
-    intros t bytes_fin bytes_inf start seq_len s BYTES_REF BYTES_LEN IHt HFOLDR.
+    intros t bytes_fin bytes_inf start seq_len s BYTES_REF IHt HFOLDR.
     generalize dependent start.
     generalize dependent s.
-    induction seq_len using N.peano_ind; intros s start BYTES_LEN HFOLDR.
+    induction seq_len using N.peano_ind; intros s start HFOLDR.
     - rewrite monad_fold_right_equation in HFOLDR.
       cbn in HFOLDR.
       inv HFOLDR.
@@ -14898,22 +14866,17 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                          (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
                             ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;; 
                      ret (uv :: acc)) (Nseq (N.succ start) (N.to_nat seq_len)) []) eqn:HFOLDR'.
-      + eapply IHseq_len in HFOLDR'; [|lia].
+      + eapply IHseq_len in HFOLDR'.
         cbn in HFOLDR; inv HFOLDR.
         rewrite HFOLDR'.
         cbn; auto.
       + cbn in HFOLDR; inv HFOLDR.
         break_match_hyp_inv.
-        eapply IHt in Heqs0; [|apply Forall2_between; eauto|].
-        2: {
-          pose proof between_length bytes_fin (start * FiniteSizeof.FinSizeof.sizeof_dtyp t) ((start + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t).
-          forward H; [lia|].
-          forward H; lia.  
-        }
+        eapply IHt in Heqs0; [|apply Forall2_between; eauto].
 
-        eapply monad_fold_right_deserialize_sbytes_fin_inf in HFOLDR'; eauto; [|lia|].
+        eapply monad_fold_right_deserialize_sbytes_fin_inf in HFOLDR'; eauto.
         2: {
-          intros bytes_fin0 bytes_inf0 res_fin H H0 H1.
+          intros bytes_fin0 bytes_inf0 res_fin H H0.
           eapply deserialize_sbytes_fin_inf; eauto.
         }
         destruct HFOLDR' as (uv_infs&HFOLDR'&REF).
@@ -14925,11 +14888,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Lemma deserialize_sbytes_fail_fin_inf :
     forall {t bytes_fin bytes_inf s},
       sbytes_refine bytes_inf bytes_fin ->
-      N.of_nat (length bytes_fin) = LLVMParams64BitIntptr.SIZEOF.sizeof_dtyp t ->
       Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_fin t = inl s ->
       MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_inf t = inl s.
   Proof.
-    induction t; intros bytes_fin bytes_inf s BYTES BYTES_LENGTH DESER.
+    induction t; intros bytes_fin bytes_inf s BYTES DESER.
     1-12,16:
       try
         solve
@@ -14955,10 +14917,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                   ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;; 
              ret (uv :: acc)) (Nseq 0 (N.to_nat sz)) []) eqn:HFOLDR; cbn in DESER; inv DESER.
 
-      rewrite FinLP.SIZEOF.sizeof_dtyp_array in BYTES_LENGTH.
+      (* rewrite FinLP.SIZEOF.sizeof_dtyp_array in BYTES_LENGTH. *)
       eapply monad_fold_right_deserialize_sbytes_fail_fin_inf in HFOLDR; eauto.
-      2: lia.
-
       rewrite HFOLDR; cbn; auto.
     }
 
@@ -14972,21 +14932,18 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       generalize dependent bytes_inf.
       generalize dependent s.
       generalize dependent H.
-      induction fields; intros H s bytes_inf bytes_fin BYTES BYTES_LENGTH DESER.
+      induction fields; intros H s bytes_inf bytes_fin BYTES DESER.
       - inv DESER.
       - cbn in DESER.
-        rewrite FinLP.SIZEOF.sizeof_dtyp_struct_cons in BYTES_LENGTH.
         break_match_hyp_inv.
         + eapply H in Heqs0.
           2: left; auto.
           2: apply Forall2_take; eauto.
-          2: rewrite take_length; lia.
 
           rewrite Heqs0.
           cbn; auto.
         + eapply deserialize_sbytes_fin_inf in Heqs0.
           2: apply Forall2_take; eauto.
-          2: rewrite take_length; lia.
 
           destruct Heqs0 as (?&?&?).
           rewrite H0.
@@ -14998,14 +14955,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             eapply IHfields in Heqs0.
             rewrite Heqs0; auto.
             2: apply Forall2_drop; auto.
-            2: rewrite drop_length; lia.
 
-            intros u0 H1 bytes_fin0 bytes_inf0 s0 H3 H4 H5.
+            intros u0 H1 bytes_fin0 bytes_inf0 s0 H3 H4.
             eapply H; eauto.
             right; auto.
           * eapply deserialize_sbytes_fin_inf in Heqs0.
             2: apply Forall2_drop; eauto.
-            2: rewrite drop_length; lia.
             destruct Heqs0 as (?&?&?).
 
             rewrite H1.
@@ -15028,21 +14983,18 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       generalize dependent bytes_inf.
       generalize dependent s.
       generalize dependent H.
-      induction fields; intros H s bytes_inf bytes_fin BYTES BYTES_LENGTH DESER.
+      induction fields; intros H s bytes_inf bytes_fin BYTES DESER.
       - inv DESER.
       - cbn in DESER.
-        rewrite FinLP.SIZEOF.sizeof_dtyp_packed_struct_cons in BYTES_LENGTH.
         break_match_hyp_inv.
         + eapply H in Heqs0.
           2: left; auto.
           2: apply Forall2_take; eauto.
-          2: rewrite take_length; lia.
 
           rewrite Heqs0.
           cbn; auto.
         + eapply deserialize_sbytes_fin_inf in Heqs0.
           2: apply Forall2_take; eauto.
-          2: rewrite take_length; lia.
 
           destruct Heqs0 as (?&?&?).
           rewrite H0.
@@ -15054,14 +15006,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             eapply IHfields in Heqs0.
             rewrite Heqs0; auto.
             2: apply Forall2_drop; auto.
-            2: rewrite drop_length; lia.
 
-            intros u0 H1 bytes_fin0 bytes_inf0 s0 H3 H4 H5.
+            intros u0 H1 bytes_fin0 bytes_inf0 s0 H3 H4.
             eapply H; eauto.
             right; auto.
           * eapply deserialize_sbytes_fin_inf in Heqs0.
             2: apply Forall2_drop; eauto.
-            2: rewrite drop_length; lia.
             destruct Heqs0 as (?&?&?).
 
             rewrite H1.
@@ -15088,10 +15038,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                   ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;; 
              ret (uv :: acc)) (Nseq 0 (N.to_nat sz)) []) eqn:HFOLDR; cbn in DESER; inv DESER.
 
-      rewrite FinLP.SIZEOF.sizeof_dtyp_vector in BYTES_LENGTH.
       eapply monad_fold_right_deserialize_sbytes_fail_fin_inf in HFOLDR; eauto.
-      2: lia.
-
       rewrite HFOLDR; cbn; auto.
     }
   Qed.
@@ -15284,6 +15231,60 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     eapply NPOP.
     red.
     reflexivity.
+  Qed.
+
+  (* TODO: Move into memory model. Likely near MEM_EXEC_INTERP.MemTheory.allocate_bytes_spec_MemPropT_no_err *)
+  Lemma allocate_dtyp_spec_no_error :
+    forall t num_elements ms msg,
+      Memory64BitIntptr.MMEP.MemSpec.allocate_dtyp_spec t num_elements ms (raise_error msg) -> False.
+  Proof.
+    intros t num_elements ms msg HANDLE.
+    repeat red in HANDLE.
+    destruct HANDLE as [FRESH | HANDLE].
+    - cbn in FRESH; auto.
+    - destruct HANDLE as (?&?&?&?).
+      repeat red in H0.
+      destruct H0.
+      + (* TODO: Could probably make this a more general lemma about repeatMN / map_monad *)
+        red in H0.
+        red in H0.
+
+        clear H.
+        generalize dependent x.
+        generalize dependent x0.                            
+        induction num_elements using N.peano_ind; intros x0 x H0.
+        * cbn in H0; auto.
+        * rewrite repeatN_succ in H0.
+          rewrite map_monad_unfold in H0.
+          repeat red in H0.
+          destruct H0.
+          -- red in H. cbn in H. red in H.
+             break_match_hyp_inv.
+          -- destruct H as (?&?&?&?).
+             repeat red in H0.
+             destruct H0.
+             ++ apply IHnum_elements in H0; auto.
+             ++ destruct H0 as (?&?&?&?).
+                cbn in H1.
+                auto.
+      + destruct H0 as (?&?&?&?).
+        apply MEM_EXEC_INTERP.MemTheory.allocate_bytes_spec_MemPropT_no_err in H1; auto.
+  Qed.
+
+  (* TODO: Move into memory model. Likely near MEM_EXEC_INTERP.MemTheory.allocate_bytes_spec_MemPropT_no_err *)
+  Lemma handle_alloca_no_error :
+    forall t num_elements align ms msg,
+      Memory64BitIntptr.MMEP.MemSpec.handle_memory_prop LLVMParams64BitIntptr.Events.DV.dvalue
+        (LLVMParams64BitIntptr.Events.Alloca t num_elements align) ms (raise_error msg) ->
+      False.
+  Proof.
+    intros t num_elements align ms msg HANDLE.
+    repeat red in HANDLE.
+    destruct HANDLE as [HANDLE | HANDLE].
+    - apply allocate_dtyp_spec_no_error in HANDLE; auto.
+    - destruct HANDLE as (?&?&?&?).
+      cbn in H0.
+      auto.
   Qed.
 
   Lemma model_E1E2_23_orutt_strict :
@@ -16218,41 +16219,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       destruct ERR as (msg&TA&msg_spec&ERR).
                       destruct EV_REL as (?&?&?); subst.
 
-                      (* Can Alloca raise an error? *)
-                      (* We have:
-                         MEM_EXEC_INTERP.MemTheory.allocate_bytes_spec_MemPropT_no_err
-                       *)
-                      Lemma allocate_dtyp_spec_no_error :
-                        forall t num_elements ms msg,
-                          Memory64BitIntptr.MMEP.MemSpec.allocate_dtyp_spec t num_elements ms (raise_error msg) -> False.
-                      Proof.
-                        intros t num_elements ms msg HANDLE.
-                        repeat red in HANDLE.
-                        destruct HANDLE as [FRESH | HANDLE].
-                        - cbn in FRESH; auto.
-                        - destruct HANDLE as (?&?&?&?).
-                          repeat red in H0.
-                          destruct H0.
-                          + admit. (* TODO: need a lemma about repeatMN. *)
-                          + destruct H0 as (?&?&?&?).
-                            apply MEM_EXEC_INTERP.MemTheory.allocate_bytes_spec_MemPropT_no_err in H1; auto.                            
-                      Admitted.
-
-                      Lemma handle_alloca_no_error :
-                        forall t num_elements align ms msg,
-                          Memory64BitIntptr.MMEP.MemSpec.handle_memory_prop LLVMParams64BitIntptr.Events.DV.dvalue
-                            (LLVMParams64BitIntptr.Events.Alloca t num_elements align) ms (raise_error msg) ->
-                      False.
-                      Proof.
-                        intros t num_elements align ms msg HANDLE.
-                        repeat red in HANDLE.
-                        destruct HANDLE as [HANDLE | HANDLE].
-                        - apply allocate_dtyp_spec_no_error in HANDLE; auto.
-                        - destruct HANDLE as (?&?&?&?).
-                          cbn in H0.
-                          auto.
-                      Qed.
-
                       apply handle_alloca_no_error in ERR.
                       contradiction.
                     }
@@ -16361,7 +16327,178 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     }
 
                     { (* Handler raises error *)
-                      admit.
+                      destruct ERR as (msg&TA&msg_spec&ERR).
+                      destruct EV_REL as (?&?); subst.
+
+                      rewrite TA in VIS_HANDLED.
+                      pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
+                                                                                 LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_error _ _) _ _ _ k2 msg) as RAISE.
+                      rewrite RAISE in VIS_HANDLED.
+                      punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
+                      dependent induction VIS_HANDLED.
+                      2: {
+                        specialize (EQ t1); contradiction.
+                      }
+
+                      eapply Interp_Memory_PropT_Vis with
+                        (k2:=(fun '(ms_inf, (sid', uv_inf)) =>
+                                match DVCInfFin.uvalue_convert_strict uv_inf with
+                                | NoOom uv_fin => get_inf_tree (k2 (s2, (s1, uv_fin)))
+                                | Oom s => raiseOOM s
+                                end)
+                        )
+                        (s1:=s1)
+                        (s2:=lift_MemState s2)
+                        (ta:= raise_error msg).
+                      3: {
+                        rewrite get_inf_tree_equation.
+                        cbn.
+                        setoid_rewrite Raise.raise_bind_itree.
+                        reflexivity.
+                      }
+
+                      2: {
+                        (* raise_ub includes raise_error... *)
+                        red in ERR.
+                        break_match_hyp;
+                          try solve
+                            [ repeat red;
+                              left;
+                              exists "Loading from something that isn't an address.";
+                              rewrite DVCInfFin.dvalue_refine_strict_equation, DVCInfFin.dvalue_convert_strict_equation in H0;
+                              destruct a0; cbn in H0; try break_match_hyp_inv; cbn; auto
+                            ].
+
+                        apply dvalue_refine_strict_addr_r_inv in H0 as (ptr_inf&ADDR&ADDR_REF).
+                        subst.
+
+                        repeat red.
+                        right.
+                        left.
+
+                        (* TODO: read_uvalue_spec_fin_inf_error lemma *)
+                        (* Figure out where error came from in read_uvalue_spec *)
+                        red in ERR.
+                        repeat red in ERR.
+
+                        destruct ERR as [ERR | ERR].
+                        { (* TODO: read_bytes_spec_fin_inf_error lemma *)
+                          repeat red in ERR.
+                          destruct ERR as [ERR | ERR].
+                          { (* TODO: this should be a separate lemma about gcp *)
+                            Transparent Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+                            unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs in ERR.
+                            Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+                            repeat red in ERR.
+                            destruct ERR as [ERR | ERR].
+                            - red in ERR.
+                              break_match_hyp_inv.
+                            - destruct ERR as (?&?&?&ERR).
+                              repeat red in ERR.
+                              destruct ERR as [ERR | ERR].
+                              { red in ERR.
+                                break_match_hyp_inv.
+                                exfalso.
+                                apply map_monad_err_fail in Heqs.
+                                destruct Heqs as (?&?&GEP).
+                                cbn in GEP.
+                                inv GEP.
+                              }
+
+                              destruct ERR as (?&?&GCP&ERR).
+                              red in ERR.
+                              break_match_hyp_inv.
+                          }
+
+                          destruct ERR as (?&?&GCP&ERR).
+                          exists msg.
+                          split; [reflexivity|].
+                          exists msg_spec.
+
+                          cbn.
+                          left.
+                          right.
+
+                          pose proof GCP as GCP_INF.
+                          eapply fin_inf_get_consecutive_ptrs_success_exists in GCP_INF; eauto.
+                          2: apply lift_MemState_refine_prop.
+
+                          destruct GCP_INF as(?&?&GCP_INF&FORALL_INF&MSR').
+                          exists x2. exists x1.
+                          split; auto.
+
+                          clear - FORALL_INF ERR MSR'.
+                          generalize dependent x.
+                          generalize dependent x2.
+                          induction FORALL_INF; intros x2 x' ERR MSR'.
+                          - cbn in ERR; contradiction.
+                          - rewrite map_monad_unfold.
+                            rewrite map_monad_unfold in ERR.
+                            destruct ERR as [ERR | ERR].
+                            cbn in ERR; contradiction.
+
+                            destruct ERR as (?&?&?&ERR).
+                            cbn in ERR.
+                            destruct ERR as [ERR | ERR].
+                            + right.
+
+                              pose proof H0 as READ_INF.
+                              eapply fin_inf_read_byte_spec_MemPropT in READ_INF; eauto.
+                              destruct READ_INF as (byte_inf & ms_inf' & READ_INF & BYTES_REF & MSR'').
+                              exists ms_inf'. exists byte_inf.
+                              split; auto.
+
+                              cbn.
+                              left.
+                              eapply IHFORALL_INF; eauto.
+                            + destruct ERR as (?&?&?&?).
+                              contradiction.
+                        }
+
+                        destruct ERR as (?&?&?&ERR).
+                        red in ERR.
+                        break_match_hyp_inv.
+
+                        eapply fin_inf_read_bytes_spec in H; eauto.
+                        2: apply lift_MemState_refine_prop.
+                        destruct H as (?&?&?&?&?).
+
+                        pose proof Heqs as DESER_INF.
+                        eapply deserialize_sbytes_fail_fin_inf in DESER_INF.
+                        2: apply H0.
+                        2: {
+                          admit. (* Length / sizeof stuff... *)
+                        }
+
+                        exists msg.
+                        split; [reflexivity|].
+
+                        exists s.
+                        cbn.
+                        right.
+
+                        cbn in H.
+                        destruct H as (?&?&?&?).
+                        exists x2. exists x1.
+                        split.
+                        2: {
+                          red.
+                          rewrite DESER_INF.
+                          cbn; auto.
+                        }
+
+                        exists x3. exists x4.
+                        split; auto.
+                      }
+
+                      intros a1 b H H1 H2.
+                      (* H0 might be a contradiction... *)
+                      unfold raise_error in H1.
+                      cbn in H1.
+                      unfold LLVMEvents.raise in H1.
+                      rewrite bind_trigger in H1.
+                      apply Returns_vis_inversion in H1.
+                      destruct H1 as [[] _].
                     }
 
                     { (* Handler raises OOM *)
