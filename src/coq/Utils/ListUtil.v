@@ -1352,3 +1352,132 @@ Lemma allb_forallb :
 Proof.
   induction xs; auto.
 Qed.
+
+  (* TODO: move this / does this exist somewhere else? *)
+  Lemma nat_strong_rect :
+    forall (P: nat -> Type)
+      (BASE: P 0%nat)
+      (IH: forall (n : nat), (forall (m : nat), m <= n -> P m)%nat -> P (S n)),
+    forall n, P n.
+  Proof.
+    intros P BASE IH n.
+    destruct n.
+    - apply BASE.
+    - apply IH.
+      induction n; intros m LE.
+      + assert (m=0)%nat by lia; subst; auto.
+      + assert (m <= n \/ m = S n)%nat by lia.
+        pose proof NPeano.Nat.leb_spec0 m n.
+        inv H0; subst; auto.
+        pose proof NPeano.Nat.eqb_spec m (S n).
+        inv H0; subst; auto.
+        exfalso.
+        lia.
+  Qed.
+
+
+Lemma length_strong_rect:
+    forall (X : Type) (P : list X -> Type)
+      (BASE: P nil)
+      (IH: forall (n : nat) (xs: list X), (forall (xs : list X), length xs <= n -> P xs)%nat -> length xs = S n -> P xs),
+    forall l, P l.
+  Proof.
+    intros X P BASE IH.
+    assert (forall n l, length l <= n -> P l)%nat as IHLEN.
+    { induction n using nat_strong_rect; intros l LEN; auto.
+      assert (length l = 0)%nat as LEN' by lia.
+      apply length_zero_iff_nil in LEN'; subst; auto.
+
+      assert (length l <= n \/ length l = S n)%nat by lia.
+      pose proof NPeano.Nat.leb_spec0 (length l) n.
+      inv H0; subst; eauto.
+      pose proof NPeano.Nat.eqb_spec (length l) (S n).
+      inv H0; subst; eauto.
+      lia.
+    }
+
+    intros l.
+    eapply IHLEN.
+    reflexivity.
+  Qed.
+
+
+Lemma fold_right_forall : forall {A} (P : A -> Prop) (l:list A),
+    List.fold_right (fun x b => P x /\ b) True l <-> Forall P l.
+Proof.
+  intros A P l.
+  induction l; split; intros; simpl in *; auto.
+  - simpl in H.
+    destruct H as [PA H].
+    constructor; auto.
+    apply IHl; auto.
+  - inversion H. subst.
+    split; auto.
+    apply IHl; auto.
+Qed.      
+
+(* Some facts missing from the list library.  Used in my example below. *)
+Lemma Exists_In : forall {A} P (l : list A),
+    Exists P l <-> exists a, In a l /\ P a.
+Proof.
+  intros.
+  split; intros H. 
+  - induction H.
+    + exists x. split; auto. left; auto.
+    +  destruct IHExists as [a [HI HP]].
+       exists a. split; auto. right. assumption.
+  - destruct H as [x [HI HP]].
+    induction l.
+    + inversion HI.
+    + destruct HI.
+      * subst. left. assumption.
+      * right. apply IHl. assumption.
+Qed.
+
+Lemma Forall2_In : forall {A B} P (a:A) l1 (l2 : list B),
+    In a l1 ->
+    Forall2 P l1 l2 ->
+    exists b, In b l2 /\ P a b.
+Proof.
+  induction l1; intros.
+  - inversion H.
+  - inversion H0; subst.
+    inversion H; subst.
+    + exists y. split; auto. left. auto.
+    + specialize (IHl1 _ H1 H5).
+      destruct IHl1 as [b [HI HP]].
+      exists b.
+      split; auto.
+      right. assumption.
+Qed.
+
+(* Better behaved version of Forall that can be used in recursive functions *)
+Definition FORALL {A} (P : A -> Prop) (l : list A) :=
+  List.fold_right (fun x b => P x /\ b) True l.
+
+
+Lemma FORALL_forall : forall {A} (P : A -> Prop) (l:list A),
+    FORALL P l <-> Forall P l.
+Proof.
+  intros. rewrite <- fold_right_forall. reflexivity.
+Qed.
+
+Lemma FORALL_dec : forall {A} (P : A -> Prop) (l:list A)
+                     (H : forall a, In a l -> {P a} + {~ P a}),
+    {FORALL P l} + {~ FORALL P l}.
+Proof.
+  intros A P l.
+  induction l; intros HD.
+  - simpl. auto.
+  - simpl.
+    assert (In a (a::l)). {  constructor; reflexivity. }
+    apply HD in H.
+    assert (forall a, In a l -> {P a} + {~ P a}) as HX.
+    { intros a0 HI. apply HD. right. assumption. }
+    destruct H.
+    destruct (IHl HX).
+    + left; auto.
+    + right. intros C. apply n. intuition.
+    + right. intros C. apply n. intuition.
+Qed.
+

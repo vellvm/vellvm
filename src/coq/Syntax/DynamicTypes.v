@@ -106,11 +106,6 @@ Lemma dtyp_eq_dec : forall (t1 t2:dtyp), {t1 = t2} + {t1 <> t2}.
 Defined.
 Arguments dtyp_eq_dec: clear implicits.
 
-Lemma dtyp_eq_dec_refl :
-  forall dt, dtyp_eq_dec dt dt = left eq_refl.
-Proof.
-Admitted.
-
 Definition dtyp_eqb (dt1 dt2 : dtyp) : bool
   := match @dtyp_eq_dec dt1 dt2 with
      | left x => true
@@ -122,8 +117,9 @@ Lemma dtyp_eqb_refl :
 Proof.
   intros dt.
   unfold dtyp_eqb.
-  rewrite dtyp_eq_dec_refl.
-  reflexivity.
+  destruct (dtyp_eq_dec dt dt) eqn: H.
+  - reflexivity.
+  - contradiction.
 Qed.
 
 Lemma dtyp_eqb_eq :
@@ -356,106 +352,48 @@ Proof.
               inversion X; subst; contradiction.
 Qed.
 
-Program Fixpoint ALL_IX_SUPPORTED (dt : dtyp) {measure (dtyp_measure dt)} : Prop
-  := match dt with
-     | DTYPE_I sz =>
-         IX_supported sz
-     | DTYPE_IPTR
-     | DTYPE_Pointer
-     | DTYPE_Half
-     | DTYPE_Float
-     | DTYPE_Double
-     | DTYPE_X86_fp80
-     | DTYPE_Fp128
-     | DTYPE_Ppc_fp128
-     | DTYPE_Metadata
-     | DTYPE_X86_mmx
-     | DTYPE_Void
-     | DTYPE_Opaque =>
-         True
-     | DTYPE_Vector sz t
-     | DTYPE_Array sz t =>
-         ALL_IX_SUPPORTED t
-     | DTYPE_Struct dts
-     | DTYPE_Packed_struct dts =>
-         Forall_HIn dts (fun dt HIn => @ALL_IX_SUPPORTED dt _)
-     end.
-Next Obligation.
-  cbn.
-  lia.
-Defined.
-Next Obligation.
-  cbn.
-  lia.
-Defined.
-Next Obligation.
-  cbn.
-  pose proof (list_sum_map dtyp_measure dt dts HIn).
-  lia.
-Defined.
-Next Obligation.
-  cbn.
-  pose proof (list_sum_map dtyp_measure dt dts HIn).
-  lia.
-Defined.
-
-Lemma ALL_IX_SUPPORTED_equation :
-  forall (dt : dtyp),
-    ALL_IX_SUPPORTED dt =
-      match dt with
-      | DTYPE_I sz =>
-          IX_supported sz
-      | DTYPE_IPTR
-      | DTYPE_Pointer
-      | DTYPE_Half
-      | DTYPE_Float
-      | DTYPE_Double
-      | DTYPE_X86_fp80
-      | DTYPE_Fp128
-      | DTYPE_Ppc_fp128
-      | DTYPE_Metadata
-      | DTYPE_X86_mmx
-      | DTYPE_Void
-      | DTYPE_Opaque =>
-          True
-      | DTYPE_Vector sz t
-      | DTYPE_Array sz t =>
-          ALL_IX_SUPPORTED t
-      | DTYPE_Struct dts
-      | DTYPE_Packed_struct dts =>
-          Forall_HIn dts (fun dt HIn => ALL_IX_SUPPORTED dt)
-      end.
-Proof.
-  unfold ALL_IX_SUPPORTED at 1.
-  intros td.
-  apply Fix_sub_rect.
-  - intros. 
-    destruct x0; try reflexivity.
-    + erewrite H. reflexivity.
-    + apply Forall_HIn_eq. intros. erewrite H. reflexivity.
-    + apply Forall_HIn_eq. intros. erewrite H. reflexivity.
-    + erewrite H. reflexivity.
-  - intros.
-    destruct x; try reflexivity.
-Qed.
+Fixpoint ALL_IX_SUPPORTED (dt : dtyp) : Prop := 
+  match dt with
+  | DTYPE_I sz =>
+      IX_supported sz
+  | DTYPE_IPTR
+  | DTYPE_Pointer
+  | DTYPE_Half
+  | DTYPE_Float
+  | DTYPE_Double
+  | DTYPE_X86_fp80
+  | DTYPE_Fp128
+  | DTYPE_Ppc_fp128
+  | DTYPE_Metadata
+  | DTYPE_X86_mmx
+  | DTYPE_Void
+  | DTYPE_Opaque =>
+      True
+  | DTYPE_Vector sz t
+  | DTYPE_Array sz t =>
+      ALL_IX_SUPPORTED t
+  | DTYPE_Struct dts 
+  | DTYPE_Packed_struct dts => FORALL ALL_IX_SUPPORTED dts
+  end.
 
 Lemma ALL_IX_SUPPORTED_dec :
   forall dt,
     {ALL_IX_SUPPORTED dt} + {~ ALL_IX_SUPPORTED dt}.
 Proof.
   intros dt.
-  induction dt.
-  all:
+  induction dt;
     try match goal with
       | IX : {ALL_IX_SUPPORTED _} + {~ ALL_IX_SUPPORTED _} |- _ =>
           destruct IX
       end;
-    try rewrite ALL_IX_SUPPORTED_equation;
     try solve [left; cbn; auto | right; cbn; auto].
 
-  apply IX_supported_dec.
-
-  all: try apply Forall_HIn_dec; auto.
+  - apply IX_supported_dec.
+  
+  - cbn.
+    apply FORALL_dec. assumption.
+  - cbn.
+    apply FORALL_dec. assumption.
 Qed.
 
 Lemma ALL_IX_SUPPORTED_Struct_fields :
@@ -464,13 +402,10 @@ Lemma ALL_IX_SUPPORTED_Struct_fields :
     (forall dt, In dt dts -> ALL_IX_SUPPORTED dt).
 Proof.
   intros dts NV dt IN.
-  rewrite ALL_IX_SUPPORTED_equation in NV.
-  induction dts.
-  - contradiction.
-  - inversion IN; subst.
-    + apply NV.
-    + apply IHdts; auto.
-      eapply Forall_HIn_cons; eauto.
+  cbn in NV.
+  rewrite FORALL_forall in NV.
+  rewrite Forall_forall in NV.
+  apply NV; auto.
 Qed.
 
 Lemma ALL_IX_SUPPORTED_Packed_struct_fields :
@@ -479,13 +414,10 @@ Lemma ALL_IX_SUPPORTED_Packed_struct_fields :
     (forall dt, In dt dts -> ALL_IX_SUPPORTED dt).
 Proof.
   intros dts NV dt IN.
-  rewrite ALL_IX_SUPPORTED_equation in NV.
-  induction dts.
-  - contradiction.
-  - inversion IN; subst.
-    + apply NV.
-    + apply IHdts; auto.
-      eapply Forall_HIn_cons; eauto.
+  cbn in NV.
+  rewrite FORALL_forall in NV.
+  rewrite Forall_forall in NV.
+  apply NV; auto.
 Qed.
 
 Lemma ALL_IX_SUPPORTED_Struct_cons :
@@ -494,9 +426,8 @@ Lemma ALL_IX_SUPPORTED_Struct_cons :
     ALL_IX_SUPPORTED (DTYPE_Struct dts).
 Proof.
   intros dt dts H.
-  rewrite ALL_IX_SUPPORTED_equation.
-  rewrite ALL_IX_SUPPORTED_equation in H.
-  eapply Forall_HIn_cons; eauto.
+  cbn in *.
+  intuition.
 Qed.
 
 Lemma ALL_IX_SUPPORTED_Packed_struct_cons :
@@ -505,9 +436,8 @@ Lemma ALL_IX_SUPPORTED_Packed_struct_cons :
     ALL_IX_SUPPORTED (DTYPE_Packed_struct dts).
 Proof.
   intros dt dts H.
-  rewrite ALL_IX_SUPPORTED_equation.
-  rewrite ALL_IX_SUPPORTED_equation in H.
-  eapply Forall_HIn_cons; eauto.
+  cbn in *.  
+  intuition.
 Qed.
 
 Lemma ALL_IX_SUPPORTED_Struct_cons_inv :
@@ -517,10 +447,8 @@ Lemma ALL_IX_SUPPORTED_Struct_cons_inv :
     ALL_IX_SUPPORTED (DTYPE_Struct (dt :: dts)).
 Proof.
   intros dt dts NVdt NVdts.
-  rewrite ALL_IX_SUPPORTED_equation in NVdts.
-  rewrite ALL_IX_SUPPORTED_equation.
-
-  apply Forall_HIn_cons_inv; auto.
+  cbn in *.
+  intuition.
 Qed.
 
 Lemma ALL_IX_SUPPORTED_Packed_struct_cons_inv :
@@ -530,13 +458,11 @@ Lemma ALL_IX_SUPPORTED_Packed_struct_cons_inv :
     ALL_IX_SUPPORTED (DTYPE_Packed_struct (dt :: dts)).
 Proof.
   intros dt dts NVdt NVdts.
-  rewrite ALL_IX_SUPPORTED_equation in NVdts.
-  rewrite ALL_IX_SUPPORTED_equation.
-
-  apply Forall_HIn_cons_inv; auto.
+  cbn in *.
+  intuition.
 Qed.
 
-Program Fixpoint NO_VOID (dt : dtyp) {measure (dtyp_measure dt)} : Prop
+Fixpoint NO_VOID (dt : dtyp) : Prop
   := match dt with
      | DTYPE_I _
      | DTYPE_IPTR
@@ -556,65 +482,8 @@ Program Fixpoint NO_VOID (dt : dtyp) {measure (dtyp_measure dt)} : Prop
      | DTYPE_Array sz t =>
          NO_VOID t
      | DTYPE_Struct dts
-     | DTYPE_Packed_struct dts =>
-         Forall_HIn dts (fun dt HIn => @NO_VOID dt _)
+     | DTYPE_Packed_struct dts => FORALL NO_VOID dts
      end.
-Next Obligation.
-  cbn.
-  lia.
-Defined.
-Next Obligation.
-  cbn.
-  lia.
-Defined.
-Next Obligation.
-  cbn.
-  pose proof (list_sum_map dtyp_measure dt dts HIn).
-  lia.
-Defined.
-Next Obligation.
-  cbn.
-  pose proof (list_sum_map dtyp_measure dt dts HIn).
-  lia.
-Defined.
-
-Lemma NO_VOID_equation :
-  forall (dt : dtyp),
-    NO_VOID dt = match dt with
-                 | DTYPE_I _
-                 | DTYPE_IPTR
-                 | DTYPE_Pointer
-                 | DTYPE_Half
-                 | DTYPE_Float
-                 | DTYPE_Double
-                 | DTYPE_X86_fp80
-                 | DTYPE_Fp128
-                 | DTYPE_Ppc_fp128
-                 | DTYPE_Metadata
-                 | DTYPE_X86_mmx
-                 | DTYPE_Opaque =>
-                     True
-                 | DTYPE_Void => False
-                 | DTYPE_Vector sz t
-                 | DTYPE_Array sz t =>
-                     NO_VOID t
-                 | DTYPE_Struct dts
-                 | DTYPE_Packed_struct dts =>
-                     Forall_HIn dts (fun dt HIn => NO_VOID dt)
-                 end.
-Proof.
-  unfold NO_VOID at 1.
-  intros td.
-  apply Fix_sub_rect.
-  - intros. 
-    destruct x0; try reflexivity.
-    + erewrite H. reflexivity.
-    + apply Forall_HIn_eq. intros. erewrite H. reflexivity.
-    + apply Forall_HIn_eq. intros. erewrite H. reflexivity.
-    + erewrite H. reflexivity.
-  - intros.
-    destruct x; try reflexivity.
-Qed.
 
 Lemma NO_VOID_Struct_fields :
   forall dts,
@@ -622,13 +491,10 @@ Lemma NO_VOID_Struct_fields :
     (forall dt, In dt dts -> NO_VOID dt).
 Proof.
   intros dts NV dt IN.
-  rewrite NO_VOID_equation in NV.
-  induction dts.
-  - contradiction.
-  - inversion IN; subst.
-    + apply NV.
-    + apply IHdts; auto.
-      eapply Forall_HIn_cons; eauto.
+  cbn in NV.
+  rewrite FORALL_forall in NV.
+  rewrite Forall_forall in NV.
+  apply NV; auto.
 Qed.
 
 Lemma NO_VOID_Packed_struct_fields :
@@ -637,13 +503,10 @@ Lemma NO_VOID_Packed_struct_fields :
     (forall dt, In dt dts -> NO_VOID dt).
 Proof.
   intros dts NV dt IN.
-  rewrite NO_VOID_equation in NV.
-  induction dts.
-  - contradiction.
-  - inversion IN; subst.
-    + apply NV.
-    + apply IHdts; auto.
-      eapply Forall_HIn_cons; eauto.
+  cbn in NV.
+  rewrite FORALL_forall in NV.
+  rewrite Forall_forall in NV.
+  apply NV; auto.
 Qed.
 
 Lemma NO_VOID_Struct_cons :
@@ -652,20 +515,18 @@ Lemma NO_VOID_Struct_cons :
     NO_VOID (DTYPE_Struct dts).
 Proof.
   intros dt dts H.
-  rewrite NO_VOID_equation.
-  rewrite NO_VOID_equation in H.
-  eapply Forall_HIn_cons; eauto.
+  cbn in *.
+  intuition.
 Qed.
-
+  
 Lemma NO_VOID_Packed_struct_cons :
   forall dt dts,
     NO_VOID (DTYPE_Packed_struct (dt :: dts)) ->
     NO_VOID (DTYPE_Packed_struct dts).
 Proof.
   intros dt dts H.
-  rewrite NO_VOID_equation.
-  rewrite NO_VOID_equation in H.
-  eapply Forall_HIn_cons; eauto.
+  cbn in *.
+  intuition.
 Qed.
 
 Lemma NO_VOID_dec :
@@ -682,7 +543,7 @@ Proof.
     try rewrite NO_VOID_equation;
     try solve [left; cbn; auto | right; cbn; auto].
 
-  all: apply Forall_HIn_dec; auto.
+  all: cbn; apply FORALL_dec; assumption.  
 Qed.
 
 Lemma NO_VOID_neq_dtyp :
@@ -694,10 +555,10 @@ Proof.
   intros dt1 dt2 NV NNV.
   intros EQ.
   induction dt1, dt2; inversion EQ.
-  all: rewrite NO_VOID_equation in NNV; try contradiction.
+  all: cbn in NNV; try contradiction.
 
   all: inversion EQ; subst;
-    rewrite NO_VOID_equation in NV;
+    cbn in NV;
     contradiction.
 Qed.
 
@@ -708,10 +569,8 @@ Lemma NO_VOID_Struct_cons_inv :
     NO_VOID (DTYPE_Struct (dt :: dts)).
 Proof.
   intros dt dts NVdt NVdts.
-  rewrite NO_VOID_equation in NVdts.
-  rewrite NO_VOID_equation.
-
-  apply Forall_HIn_cons_inv; auto.
+  cbn in *.
+  intuition.
 Qed.
 
 Lemma NO_VOID_Packed_struct_cons_inv :
@@ -721,19 +580,15 @@ Lemma NO_VOID_Packed_struct_cons_inv :
     NO_VOID (DTYPE_Packed_struct (dt :: dts)).
 Proof.
   intros dt dts NVdt NVdts.
-  rewrite NO_VOID_equation in NVdts.
-  rewrite NO_VOID_equation.
-
-  apply Forall_HIn_cons_inv; auto.
+  cbn in *.
+  intuition.
 Qed.
 
 Ltac solve_Forall_HIn :=
   solve [ constructor; auto].
 
-#[global] Hint Rewrite NO_VOID_equation : NO_VOID.
 #[global] Hint Resolve NO_VOID_Struct_cons_inv : NO_VOID.
 #[global] Hint Resolve NO_VOID_Packed_struct_cons_inv : NO_VOID.
-#[global] Hint Extern 1 (Forall_HIn _ _) => solve_Forall_HIn : NO_VOID.
 
 Ltac solve_no_void :=
   solve
@@ -742,14 +597,13 @@ Ltac solve_no_void :=
       | H: NO_VOID _ /\ _ |- _
         => destruct H; solve_no_void
       end
-    | rewrite NO_VOID_equation; solve_no_void
+    | cbn; solve_no_void
     ].
 
 #[global] Hint Constructors IX_supported : IX_SUPPORTED.
-#[global] Hint Extern 1 (Forall_HIn _ _) => solve_Forall_HIn : IX_SUPPORTED.
 #[global] Hint Resolve ALL_IX_SUPPORTED_Packed_struct_cons_inv : IX_SUPPORTED.
 #[global] Hint Resolve ALL_IX_SUPPORTED_Struct_cons_inv : IX_SUPPORTED.
 
 Ltac solve_ALL_IX_SUPPORTED :=
   solve [ auto with IX_SUPPORTED
-        | rewrite ALL_IX_SUPPORTED_equation; auto with IX_SUPPORTED].
+        | cbn; auto with IX_SUPPORTED].

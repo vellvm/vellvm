@@ -158,7 +158,27 @@ Qed.
 Definition ll_float  := Floats.float32.
 Definition ll_double := Floats.float.
 
-(* Sizeof is needed for uvalue_has_dtyp for ConcatBytes case *)
+  (* TODO: Move this *)
+  Lemma vector_dtyp_dec :
+    forall t,
+      {vector_dtyp t} + {~ vector_dtyp t}.
+  Proof.
+    intros t.
+    induction t;
+      try
+        solve
+        [ left; constructor; eauto
+        | left; firstorder
+        | right;
+          intros CONTRA;
+          red in CONTRA;
+          destruct CONTRA as [[n CONTRA] | CONTRA]; try discriminate;
+          repeat (destruct CONTRA as [CONTRA | CONTRA]; try discriminate)
+        ].
+  Qed.
+
+
+(* Sizeof is needed for for ConcatBytes case *)
 Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.MemoryAddress.INTPTR)(SIZEOF:Sizeof).
 
   Import SIZEOF.
@@ -2653,13 +2673,12 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_Poison t, _             =>
         ret (DVALUE_Poison t)
     | _, DVALUE_Poison t             =>
-      if iop_is_div iop
-      then raise_ub "Division by poison."
-      else ret (DVALUE_Poison t)
+        if iop_is_div iop
+        then raise_ub "Division by poison."
+        else ret (DVALUE_Poison t)
     | _, _                           => raise_error "ill_typed-iop"
     end.
-  Arguments eval_iop_integer_h _ _ _ : simpl nomatch.
-
+  
   (* I split the definition between the vector and other evaluations because
      otherwise eval_iop should be recursive to allow for vector calculations,
      but coq can't find a fixpoint. *)
@@ -2722,12 +2741,12 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_Double d1, DVALUE_Double d2 => double_op fop d1 d2
     | DVALUE_Poison t, _                 => ret (DVALUE_Poison t)
     | _, DVALUE_Poison t                 =>
-      if fop_is_div fop
-      then raise_ub "Division by poison."
-      else ret (DVALUE_Poison t)
+        if fop_is_div fop
+        then raise_ub "Division by poison."
+        else ret (DVALUE_Poison t)
     | _, _                               => raise_error ("ill_typed-fop: " ++ (to_string fop) ++ " " ++ (to_string v1) ++ " " ++ (to_string v2))
     end.
-
+  
   Definition not_nan32 (f:ll_float) : bool :=
     negb (Flocq.IEEE754.Binary.is_nan _ _ f).
 
@@ -2957,302 +2976,378 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | DVALUE_Poison_typ  : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> dvalue_has_dtyp (DVALUE_Poison τ) τ
   | DVALUE_Oom_typ  : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> dvalue_has_dtyp (DVALUE_Oom τ) τ
 
-  | DVALUE_Struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Struct []) (DTYPE_Struct [])
-  | DVALUE_Struct_Cons_typ :
-      forall f dt fields dts,
-        dvalue_has_dtyp f dt ->
-        dvalue_has_dtyp (DVALUE_Struct fields) (DTYPE_Struct dts) ->
-        dvalue_has_dtyp (DVALUE_Struct (f :: fields)) (DTYPE_Struct (dt :: dts))
+  | DVALUE_Struct_typ :
+    forall fields dts,
+      List.Forall2 dvalue_has_dtyp fields dts ->
+      dvalue_has_dtyp (DVALUE_Struct fields) (DTYPE_Struct dts)
 
-  | DVALUE_Packed_struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Packed_struct []) (DTYPE_Packed_struct [])
-  | DVALUE_Packed_struct_Cons_typ :
-      forall f dt fields dts,
-        dvalue_has_dtyp f dt ->
-        dvalue_has_dtyp (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
-        dvalue_has_dtyp (DVALUE_Packed_struct (f :: fields)) (DTYPE_Packed_struct (dt :: dts))
+  | DVALUE_Packed_struct_typ :
+    forall fields dts,
+      List.Forall2 dvalue_has_dtyp fields dts ->
+      dvalue_has_dtyp (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts)
 
   (* Do we have to exclude mmx? "There are no arrays, vectors or constants of this type" *)
   | DVALUE_Array_typ :
-      forall xs sz dt,
-        Forall (fun x => dvalue_has_dtyp x dt) xs ->
-        length xs = sz ->
-        dvalue_has_dtyp (DVALUE_Array xs) (DTYPE_Array (N.of_nat sz) dt)
+    forall xs sz dt,
+      ALL_IX_SUPPORTED dt ->
+      NO_VOID dt ->
+      Forall (fun x => dvalue_has_dtyp x dt) xs ->
+      length xs = (N.to_nat sz) ->
+      dvalue_has_dtyp (DVALUE_Array xs) (DTYPE_Array sz dt)
 
   | DVALUE_Vector_typ :
       forall xs sz dt,
-        Forall (fun x => dvalue_has_dtyp x dt) xs ->
-        length xs = sz ->
-        vector_dtyp dt ->
-        dvalue_has_dtyp (DVALUE_Vector xs) (DTYPE_Vector (N.of_nat sz) dt)
+      ALL_IX_SUPPORTED dt ->
+      NO_VOID dt ->
+      Forall (fun x => dvalue_has_dtyp x dt) xs ->
+      length xs = (N.to_nat sz) ->
+      vector_dtyp dt ->
+      dvalue_has_dtyp (DVALUE_Vector xs) (DTYPE_Vector sz dt)
   .
   Set Elimination Schemes.
 
+  #[global]
+  Hint Constructors dvalue_has_dtyp : dvalue.
+  
+  Section dvalue_has_dtyp_ind.
+    Variable P : dvalue -> dtyp -> Prop.
+    Hypothesis IH_Addr           : forall a, P (DVALUE_Addr a) DTYPE_Pointer.
+    Hypothesis IH_I1             : forall x, P (DVALUE_I1 x) (DTYPE_I 1).
+    Hypothesis IH_I8             : forall x, P (DVALUE_I8 x) (DTYPE_I 8).
+    Hypothesis IH_I32            : forall x, P (DVALUE_I32 x) (DTYPE_I 32).
+    Hypothesis IH_I64            : forall x, P (DVALUE_I64 x) (DTYPE_I 64).
+    Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x) DTYPE_IPTR.
+    Hypothesis IH_Poison         : forall t (IX : ALL_IX_SUPPORTED t) (NV: NO_VOID t), P (DVALUE_Poison t) t.
+    Hypothesis IH_Oom            : forall t (IX : ALL_IX_SUPPORTED t) (NV: NO_VOID t), P (DVALUE_Oom t) t.
+    Hypothesis IH_Double         : forall x, P (DVALUE_Double x) DTYPE_Double.
+    Hypothesis IH_Float          : forall x, P (DVALUE_Float x) DTYPE_Float.
+    Hypothesis IH_None           : P DVALUE_None DTYPE_Void.
+
+    Hypothesis IH_Struct :
+      forall fields fts,
+        List.Forall2 P fields fts ->
+        P (DVALUE_Struct fields) (DTYPE_Struct fts).
+
+    Hypothesis IH_Packed_struct :
+      forall fields fts,
+        List.Forall2 P fields fts ->
+        P (DVALUE_Packed_struct fields) (DTYPE_Packed_struct fts).
+
+    Hypothesis IH_Array : forall (xs : list dvalue)
+                             sz 
+                            (dt : dtyp)
+                            (IH : forall x, In x xs -> P x dt),
+        ALL_IX_SUPPORTED dt ->
+        NO_VOID dt ->
+        Datatypes.length xs = (N.to_nat sz) ->
+        P (DVALUE_Array xs) (DTYPE_Array sz dt).
+
+    Hypothesis IH_Vector : forall (xs : list dvalue) sz (dt : dtyp)
+                             (IH : forall x, In x xs -> P x dt),
+        ALL_IX_SUPPORTED dt ->
+        NO_VOID dt ->
+        Datatypes.length xs = (N.to_nat sz) ->
+        vector_dtyp dt -> P (DVALUE_Vector xs) (DTYPE_Vector sz dt).
+
+    Lemma dvalue_has_dtyp_ind : forall (dv:dvalue) (dt:dtyp) (TYP: dvalue_has_dtyp dv dt), P dv dt.
+      fix IHQ 3.
+      intros dv dt TYP.
+      destruct TYP; eauto.
+
+      - apply IH_Struct.
+        revert fields dts H.
+        fix IHL_A 3.
+        intros fields dts H.
+        destruct H.
+        + constructor.
+        + constructor.
+          eauto.
+          eauto.
+
+      - apply IH_Packed_struct.
+        revert fields dts H.
+        fix IHL_A 3.
+        intros fields dts H.
+        destruct H.
+        + constructor.
+        + constructor.
+          eauto.
+          eauto.
+
+      - apply IH_Array; auto.
+        revert xs sz dt H H0 H1 H2.
+        fix IHL_C 6.
+        intros xs sz dt HALL HNV H EQ .
+        destruct H.
+        * intros x HIN. inversion HIN.
+        * intros x' HIN. inversion HIN.
+          -- rewrite <- H1.
+             eapply IHQ.
+             assumption.
+             
+          -- simpl in EQ.
+             destruct (N.to_nat sz); inversion EQ.
+             rewrite <- Nnat.Nat2N.id in H3.
+             apply (IHL_C _ _ _ HALL HNV H0 H3 x' H1).
+
+      - apply IH_Vector; auto.
+        revert xs sz dt H H0 H1 H2 H3.        
+        fix IHL_C 6.
+        intros xs sz dt HALL HNV H EQ HX.
+        destruct H.
+        * intros x HIN. inversion HIN.
+        * intros x' HIN. inversion HIN.
+          -- rewrite <- H1.
+             eapply IHQ.
+             assumption.
+             
+          -- simpl in EQ.
+             destruct (N.to_nat sz); inversion EQ.
+             rewrite <- Nnat.Nat2N.id in H3.
+             apply (IHL_C _ _ _ HALL HNV H0 H3 HX x' H1).
+    Qed.
+
+  End dvalue_has_dtyp_ind.
+  
   Definition dtyp_non_void_eqb (t dt : dtyp) :=
     Coqlib.proj_sumbool (NO_VOID_dec t) && dtyp_eqb t dt.
 
-  (* Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia | solve_dvalue_measure | solve_uvalue_measure | repeat split; intros *; discriminate ]. *)
-  (* Program Fixpoint dvalue_has_dtyp_bool (dv : dvalue) (dt : dtyp) {measure (dvalue_measure dv)} : bool := *)
-  (*   match dt with *)
-  (*   | DTYPE_I sz => *)
-  (*       match dv with *)
-  (*       | DVALUE_I1 _ => N.eqb sz 1 *)
-  (*       | DVALUE_I8 _ => N.eqb sz 8 *)
-  (*       | DVALUE_I32 _ => N.eqb sz 32 *)
-  (*       | DVALUE_I64 _ => N.eqb sz 64 *)
-  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*       | _ => false *)
-  (*       end *)
-  (*   | DTYPE_IPTR => *)
-  (*       match dv with *)
-  (*       | DVALUE_IPTR _ => true *)
-  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*       | _ => false *)
-  (*       end *)
-  (*   | DTYPE_Pointer => *)
-  (*       match dv with *)
-  (*       | DVALUE_Addr _ => true *)
-  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*       | _ => false *)
-  (*       end *)
-  (*   | DTYPE_Void => *)
-  (*       match dv with *)
-  (*       | DVALUE_None => true *)
-  (*       | _ => false *)
-  (*       end *)
-  (*   | DTYPE_Half => *)
-  (*       match dv with *)
-  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*       | _ => false *)
-  (*       end *)
-  (*   | DTYPE_Float => *)
-  (*       match dv with *)
-  (*       | DVALUE_Float _ => true *)
-  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*       | _ => false *)
-  (*       end *)
-  (*   | DTYPE_Double => *)
-  (*       match dv with *)
-  (*       | DVALUE_Double _ => true *)
-  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*       | _ => false *)
-  (*       end *)
-  (*   | DTYPE_X86_fp80 => *)
-  (*       match dv with *)
-  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*       | _ => false *)
-  (*       end *)
-  (*   | DTYPE_Fp128 => *)
-  (*       match dv with *)
-  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*       | _ => false *)
-  (*       end *)
-  (*   | DTYPE_Ppc_fp128 => *)
-  (*       match dv with *)
-  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*       | _ => false *)
-  (*       end *)
-  (*   | DTYPE_Metadata => *)
-  (*       match dv with *)
-  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*       | _ => false *)
-  (*       end *)
-  (*   | DTYPE_X86_mmx => *)
-  (*       match dv with *)
-  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*       | _ => false *)
-  (*       end *)
-  (*   | DTYPE_Array sz t => *)
-  (*       match dv with *)
-  (*       | DVALUE_Array elts => *)
-  (*           (length elts =? N.to_nat sz)%nat && allb id (map_In elts (fun e HIn => dvalue_has_dtyp_bool e t)) *)
-  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*       | _ => false *)
-  (*       end *)
-  (*   | DTYPE_Struct dts => *)
-  (*       match dv with *)
-  (*       | DVALUE_Struct fields => *)
-  (*           zipWith_In' *)
-  (*             fields dts true *)
-  (*             (fun f dt HIn_fields HIn_dts acc' => *)
-  (*                acc' && dvalue_has_dtyp_bool f dt) *)
-  (*             (fun _ HIn_left _ => false) (fun _ HIn_right _ => false) *)
-  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*       | _ => false *)
-  (*       end *)
-  (*   | DTYPE_Packed_struct dts => *)
-  (*       match dv with *)
-  (*       | DVALUE_Packed_struct fields => *)
-  (*           zipWith_In' *)
-  (*             fields dts true *)
-  (*             (fun f dt HIn_fields HIn_dts acc' => *)
-  (*                acc' && dvalue_has_dtyp_bool f dt) *)
-  (*             (fun _ HIn_left _ => false) (fun _ HIn_right _ => false) *)
-  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*       | _ => false *)
-  (*       end *)
-  (*   | DTYPE_Opaque => *)
-  (*       match dv with *)
-  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*       | _ => false *)
-  (*       end *)
-  (*   | DTYPE_Vector sz t => *)
-  (*       match dv with *)
-  (*       | DVALUE_Vector elts => *)
-  (*           (length elts =? N.to_nat sz)%nat && allb id (map_In elts (fun e HIn => dvalue_has_dtyp_bool e t)) *)
-  (*       | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*       | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*       | _ => false *)
-  (*       end *)
-  (*   end. *)
 
-  (* Lemma dvalue_has_dtyp_bool_equation : *)
-  (*   forall {dv dt}, *)
-  (*     dvalue_has_dtyp_bool dv dt = *)
-  (*       match dt with *)
-  (*       | DTYPE_I sz => *)
-  (*           match dv with *)
-  (*           | DVALUE_I1 _ => N.eqb sz 1 *)
-  (*           | DVALUE_I8 _ => N.eqb sz 8 *)
-  (*           | DVALUE_I32 _ => N.eqb sz 32 *)
-  (*           | DVALUE_I64 _ => N.eqb sz 64 *)
-  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*           | _ => false *)
-  (*           end *)
-  (*       | DTYPE_IPTR => *)
-  (*           match dv with *)
-  (*           | DVALUE_IPTR _ => true *)
-  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*           | _ => false *)
-  (*           end *)
-  (*       | DTYPE_Pointer => *)
-  (*           match dv with *)
-  (*           | DVALUE_Addr _ => true *)
-  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*           | _ => false *)
-  (*           end *)
-  (*       | DTYPE_Void => *)
-  (*           match dv with *)
-  (*           | DVALUE_None => true *)
-  (*           | _ => false *)
-  (*           end *)
-  (*       | DTYPE_Half => *)
-  (*           match dv with *)
-  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*           | _ => false *)
-  (*           end *)
-  (*       | DTYPE_Float => *)
-  (*           match dv with *)
-  (*           | DVALUE_Float _ => true *)
-  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*           | _ => false *)
-  (*           end *)
-  (*       | DTYPE_Double => *)
-  (*           match dv with *)
-  (*           | DVALUE_Double _ => true *)
-  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*           | _ => false *)
-  (*           end *)
-  (*       | DTYPE_X86_fp80 => *)
-  (*           match dv with *)
-  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*           | _ => false *)
-  (*           end *)
-  (*       | DTYPE_Fp128 => *)
-  (*           match dv with *)
-  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*           | _ => false *)
-  (*           end *)
-  (*       | DTYPE_Ppc_fp128 => *)
-  (*           match dv with *)
-  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*           | _ => false *)
-  (*           end *)
-  (*       | DTYPE_Metadata => *)
-  (*           match dv with *)
-  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*           | _ => false *)
-  (*           end *)
-  (*       | DTYPE_X86_mmx => *)
-  (*           match dv with *)
-  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*           | _ => false *)
-  (*           end *)
-  (*       | DTYPE_Array sz t => *)
-  (*           match dv with *)
-  (*           | DVALUE_Array elts => *)
-  (*               (length elts =? N.to_nat sz)%nat && allb id (map_In elts (fun e HIn => dvalue_has_dtyp_bool e t)) *)
-  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*           | _ => false *)
-  (*           end *)
-  (*       | DTYPE_Struct dts => *)
-  (*           match dv with *)
-  (*           | DVALUE_Struct fields => *)
-  (*               zipWith_In' *)
-  (*                 fields dts true *)
-  (*                 (fun f dt HIn_fields HIn_dts acc' => *)
-  (*                    acc' && dvalue_has_dtyp_bool f dt) *)
-  (*                 (fun _ HIn_left _ => false) (fun _ HIn_right _ => false) *)
-  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*           | _ => false *)
-  (*           end *)
-  (*       | DTYPE_Packed_struct dts => *)
-  (*           match dv with *)
-  (*           | DVALUE_Packed_struct fields => *)
-  (*               zipWith_In' *)
-  (*                 fields dts true *)
-  (*                 (fun f dt HIn_fields HIn_dts acc' => *)
-  (*                    acc' && dvalue_has_dtyp_bool f dt) *)
-  (*                 (fun _ HIn_left _ => false) (fun _ HIn_right _ => false) *)
-  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*           | _ => false *)
-  (*           end *)
-  (*       | DTYPE_Opaque => *)
-  (*           match dv with *)
-  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*           | _ => false *)
-  (*           end *)
-  (*       | DTYPE_Vector sz t => *)
-  (*           match dv with *)
-  (*           | DVALUE_Vector elts => *)
-  (*               (length elts =? N.to_nat sz)%nat && allb id (map_In elts (fun e HIn => dvalue_has_dtyp_bool e t)) *)
-  (*           | DVALUE_Poison t => dtyp_non_void_eqb t dt *)
-  (*           | DVALUE_Oom t => dtyp_non_void_eqb t dt *)
-  (*           | _ => false *)
-  (*           end *)
-  (*       end. *)
-  (* Proof. *)
-  (* Admitted. *)
 
+
+  Fixpoint dvalue_has_dtyp_fun (dv:dvalue) (dt:dtyp) : bool :=
+    let list_forallb2 :=
+      fix go dvs dts :=
+      match dvs, dts with
+      | [], [] => true
+      | dv::utl, dt::dttl => dvalue_has_dtyp_fun dv dt && go utl dttl
+      | _,_ => false
+      end
+    in
+
+    match dv with
+    | DVALUE_Addr a =>
+        if dtyp_eq_dec dt DTYPE_Pointer then true else false 
+        
+    | DVALUE_I1 x =>
+        if dtyp_eq_dec dt (DTYPE_I 1) then true else false 
+        
+    | DVALUE_I8 x =>
+        if dtyp_eq_dec dt (DTYPE_I 8) then true else false
+                                                       
+    | DVALUE_I32 x => 
+        if dtyp_eq_dec dt (DTYPE_I 32) then true else false
+                       
+    | DVALUE_I64 x => 
+        if dtyp_eq_dec dt (DTYPE_I 64) then true else false
+                       
+    | DVALUE_IPTR x => 
+        if dtyp_eq_dec dt (DTYPE_IPTR) then true else false
+                        
+    | DVALUE_Double x => 
+        if dtyp_eq_dec dt (DTYPE_Double) then true else false
+                                                        
+    | DVALUE_Float x =>
+        if dtyp_eq_dec dt (DTYPE_Float) then true else false        
+
+    | DVALUE_Poison t 
+    | DVALUE_Oom t =>
+        if @ALL_IX_SUPPORTED_dec t then
+          if @NO_VOID_dec t then
+            if dtyp_eq_dec dt t then true else false
+          else false
+        else false
+               
+    | DVALUE_None =>
+        if dtyp_eq_dec dt (DTYPE_Void) then true else false        
+                      
+    | DVALUE_Struct fields =>
+        match dt with
+        | DTYPE_Struct field_dts =>
+            list_forallb2 fields field_dts
+        | _ => false
+        end
+
+    | DVALUE_Packed_struct fields =>
+        match dt with
+        | DTYPE_Packed_struct field_dts =>
+            list_forallb2 fields field_dts
+        | _ => false
+        end
+
+    | DVALUE_Array elts =>
+        match dt with
+        | DTYPE_Array sz dtt =>
+          if (@ALL_IX_SUPPORTED_dec dtt) then
+            if (@NO_VOID_dec dtt) then 
+              List.forallb (fun u => dvalue_has_dtyp_fun u dtt) elts &&
+                (Nat.eqb (List.length elts) (N.to_nat sz))
+            else false
+          else false 
+        | _ => false
+        end
+          
+    | DVALUE_Vector elts =>
+        match dt with
+        | DTYPE_Vector sz dtt =>
+          if (@ALL_IX_SUPPORTED_dec dtt) then
+            if (@NO_VOID_dec dtt) then
+              if (@vector_dtyp_dec dtt) then 
+                List.forallb (fun u => dvalue_has_dtyp_fun u dtt) elts &&
+                  (Nat.eqb (List.length elts) (N.to_nat sz))
+              else false
+            else false
+          else false 
+        | _ => false
+        end
+    end.
+          
+
+  Ltac invert_bools :=
+    repeat match goal with
+      | [ H : false = true |- _ ] => inversion H
+      | [ H : ((?X && ?Y) = true) |- _ ] => apply andb_true_iff in H; destruct H
+      | [ H : ((?X || ?Y) = true) |- _ ] => apply orb_true_iff in H; destruct H
+    end.
+
+  
+  Lemma dvalue_has_dtyp_fun_sound :
+    forall dv dt,
+      dvalue_has_dtyp_fun dv dt = true -> dvalue_has_dtyp dv dt.
+  Proof.
+    induction dv; intros dtx HX;
+      try solve [
+          cbn in HX; 
+          repeat break_match_hyp_inv;
+          invert_bools;
+          econstructor; eauto with dvalue
+        ].
+
+    - cbn in HX.
+      repeat break_match_hyp_inv.
+      constructor.
+      revert fields0 H1.
+      induction fields; intros fields0 H1.
+      + subst. break_match_hyp_inv. 
+        constructor. 
+      + subst. break_match_hyp_inv.
+        invert_bools.
+        constructor.
+        eapply H; eauto. constructor. reflexivity.
+        eapply IHfields; auto.
+        intros.
+        eapply H.
+        right.  assumption. assumption.
+
+    - cbn in HX.
+      repeat break_match_hyp_inv.
+      constructor.
+      revert fields0 H1.
+      induction fields; intros fields0 H1.
+      + subst. break_match_hyp_inv. 
+        constructor. 
+      + subst. break_match_hyp_inv.
+        invert_bools.
+        constructor.
+        eapply H; eauto. constructor. reflexivity.
+        eapply IHfields; auto.
+        intros.
+        eapply H.
+        right.  assumption. assumption.
+        
+    - cbn in HX.
+      repeat break_match_hyp_inv.
+      invert_bools.
+      apply DVALUE_Array_typ; auto.
+      clear H1.
+      induction elts.
+      + constructor.
+      + cbn in H0.
+        invert_bools.
+        constructor.
+        eapply H; auto. left; auto.
+        apply IHelts; auto.
+        intros.
+        eapply H. right; auto.
+        assumption.
+      + apply Nat.eqb_eq in H1.
+        assumption.
+
+    - cbn in HX.
+      repeat break_match_hyp_inv.
+      invert_bools.
+      apply DVALUE_Vector_typ; auto.
+      clear H1.
+      induction elts.
+      + constructor.
+      + cbn in H0.
+        invert_bools.
+        constructor.
+        eapply H; auto. left; auto.
+        apply IHelts; auto.
+        intros.
+        eapply H. right; auto.
+        assumption.
+      + apply Nat.eqb_eq in H1.
+        assumption.
+  Qed.
+
+  Ltac forward_bools :=
+    repeat match goal with
+        [ |- ((?X && ?Y) = true) ] => apply andb_true_iff; split 
+      | [ |- ((?X || ?Y) = true)  ] => apply orb_true_iff
+      end.
+
+  Ltac invert_hyps :=
+    repeat match goal with
+        [ H : (?P /\ ?Q) |- _ ] => destruct H
+      | [ H : (?P \/ ?Q) |- _ ] => destruct H
+      end.
+
+  Ltac search_supported :=
+    forward_bools;          
+    match goal with
+      [ H : ?X |- ?X ] => apply H
+    | [ |- ?X \/ ?Y  ] => try solve [left; search_supported]; right; search_supported
+    | [ H : ALL_IX_SUPPORTED DTYPE_IPTR -> ?Y |- _ ] =>
+        cbn in H; specialize (H I); search_supported
+    | [ H : ALL_IX_SUPPORTED DTYPE_Pointer -> ?Y |- _ ] =>
+        cbn in H; specialize (H I); search_supported
+    | [ H1 : ?X -> ?Y , H2 : ?X |- _] => apply H1 in H2; search_supported
+    end.
+
+  Lemma dvalue_has_dtyp_fun_complete :
+    forall dv dt,
+      dvalue_has_dtyp dv dt -> dvalue_has_dtyp_fun dv dt = true.
+  Proof.
+    intros dv dt TYPE.
+    induction TYPE; auto;
+      try solve [
+          cbn; induction H; forward_bools; auto
+        | cbn; repeat break_match_goal; auto; try contradiction;
+          forward_bools; [rewrite forallb_forall; auto | apply Nat.eqb_eq; auto]
+        | cbn; repeat break_match_goal; auto
+        | cbn;
+          repeat break_match_goal; invert_hyps; subst;
+          try (inversion H0; subst; try contradiction);
+          try (solve [inversion H]);
+          forward_bools; auto
+        ].
+  Qed.
+
+
+  Lemma dvalue_has_dtyp_dec :
+    forall dv dt,
+      {dvalue_has_dtyp dv dt} + {~ dvalue_has_dtyp dv dt}.
+  Proof.
+    intros.
+    destruct (dvalue_has_dtyp_fun dv dt) eqn:H.
+    left. apply dvalue_has_dtyp_fun_sound; auto.
+    right. intros C. apply dvalue_has_dtyp_fun_complete in C.
+    rewrite H in C. inversion C.
+  Qed.
+
+  
   Definition IX_supported_ltb x y : bool :=
     if @IX_supported_dec x then
       if @IX_supported_dec y then
@@ -3328,7 +3423,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     intros f from_dt to_dt H EQ.
     destruct from_dt; simpl in *; inversion EQ; eauto.
     destruct to_dt eqn: HEQ; inversion EQ.
-    rewrite ALL_IX_SUPPORTED_equation.
+    cbn.
     subst.
     eapply H; eauto.
   Qed.
@@ -3357,9 +3452,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Proof.
     intros.
     destruct from_dt; simpl in *; try inversion H.
-    - break_match_hyp; rewrite ALL_IX_SUPPORTED_equation; auto; try solve [inversion H1].
+    - break_match_hyp; auto; try solve [inversion H1].
       apply IX_supported_ltb_supported in H. intuition.
-    - break_match_hyp; rewrite ALL_IX_SUPPORTED_equation; auto; try solve [inversion H1].
+    - break_match_hyp; auto; try solve [inversion H1].
       break_match_hyp; auto. inversion H.
   Qed.
 
@@ -3376,7 +3471,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Proof.
     intros.
     destruct from_dt; simpl in *; try inversion H.
-    - break_match_hyp; rewrite ALL_IX_SUPPORTED_equation; auto; try solve [inversion H1].
+    - break_match_hyp; cbn; try solve [inversion H1]; auto.
       apply IX_supported_ltb_supported in H. intuition.
   Qed.
   
@@ -3607,91 +3702,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 #[global]
 Hint Constructors uvalue_has_dtyp : uvalue.
 
-  Section dvalue_has_dtyp_ind.
-    Variable P : dvalue -> dtyp -> Prop.
-    Hypothesis IH_Addr           : forall a, P (DVALUE_Addr a) DTYPE_Pointer.
-    Hypothesis IH_I1             : forall x, P (DVALUE_I1 x) (DTYPE_I 1).
-    Hypothesis IH_I8             : forall x, P (DVALUE_I8 x) (DTYPE_I 8).
-    Hypothesis IH_I32            : forall x, P (DVALUE_I32 x) (DTYPE_I 32).
-    Hypothesis IH_I64            : forall x, P (DVALUE_I64 x) (DTYPE_I 64).
-    Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x) DTYPE_IPTR.
-    Hypothesis IH_Poison         : forall t (IX : ALL_IX_SUPPORTED t) (NV: NO_VOID t), P (DVALUE_Poison t) t.
-    Hypothesis IH_Oom            : forall t (IX : ALL_IX_SUPPORTED t) (NV: NO_VOID t), P (DVALUE_Oom t) t.
-    Hypothesis IH_Double         : forall x, P (DVALUE_Double x) DTYPE_Double.
-    Hypothesis IH_Float          : forall x, P (DVALUE_Float x) DTYPE_Float.
-    Hypothesis IH_None           : P DVALUE_None DTYPE_Void.
-    Hypothesis IH_Struct_nil     : P (DVALUE_Struct []) (DTYPE_Struct []).
-    Hypothesis IH_Struct_cons    : forall (f : dvalue) (dt : dtyp) (fields : list dvalue) (dts : list dtyp),
-        dvalue_has_dtyp f dt ->
-        P f dt ->
-        dvalue_has_dtyp (DVALUE_Struct fields) (DTYPE_Struct dts) ->
-        P (DVALUE_Struct fields) (DTYPE_Struct dts) ->
-        P (DVALUE_Struct (f :: fields)) (DTYPE_Struct (dt :: dts)).
-    Hypothesis IH_Packed_Struct_nil     : P (DVALUE_Packed_struct []) (DTYPE_Packed_struct []).
-    Hypothesis IH_Packed_Struct_cons    : forall (f : dvalue) (dt : dtyp) (fields : list dvalue) (dts : list dtyp),
-        dvalue_has_dtyp f dt ->
-        P f dt ->
-        dvalue_has_dtyp (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
-        P (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
-        P (DVALUE_Packed_struct (f :: fields)) (DTYPE_Packed_struct (dt :: dts)).
-    Hypothesis IH_Array : forall (xs : list dvalue) (sz : nat) (dt : dtyp)
-                            (IH : forall x, In x xs -> P x dt)
-                            (IHdtyp : forall x, In x xs -> dvalue_has_dtyp x dt),
-        Datatypes.length xs = sz -> P (DVALUE_Array xs) (DTYPE_Array (N.of_nat sz) dt).
-
-    Hypothesis IH_Vector : forall (xs : list dvalue) (sz : nat) (dt : dtyp)
-                             (IH : forall x, In x xs -> P x dt)
-                             (IHdtyp : forall x, In x xs -> dvalue_has_dtyp x dt),
-        Datatypes.length xs = sz ->
-        vector_dtyp dt -> P (DVALUE_Vector xs) (DTYPE_Vector (N.of_nat sz) dt).
-
-    Lemma dvalue_has_dtyp_ind : forall (dv:dvalue) (dt:dtyp) (TYP: dvalue_has_dtyp dv dt), P dv dt.
-      fix IH 3.
-      intros dv dt TYP.
-      destruct TYP;
-        try (solve [let IH := fresh in
-                    remember (forall (dv : dvalue) (dt : dtyp), dvalue_has_dtyp dv dt -> P dv dt) as IH;
-                    match goal with
-                    | H: _ |- _ =>
-                      solve [eapply H; subst IH; eauto]
-                    end]).
-      - rename H into Hforall.
-        rename H0 into Hlen.
-        refine (IH_Array _ _ Hlen).
-
-        { generalize dependent sz.
-          generalize dependent xs.
-          fix IHxs 2.
-          intros xs Hforall sz Hlen x H.
-          destruct xs.
-          + inversion H.
-          + inversion H; subst.
-            * inversion Hforall; subst; auto.
-            * eapply IHxs. inversion Hforall; subst.
-              all: try eassumption. reflexivity.
-        }
-
-        apply Forall_forall; auto.
-      - rename H into Hforall.
-        rename H0 into Hlen.
-        rename H1 into Hvect.
-        refine (IH_Vector _ _ Hlen Hvect).
-
-        { generalize dependent sz.
-          generalize dependent xs.
-          fix IHxs 2.
-          intros xs Hforall sz Hlen x H.
-          destruct xs.
-          + inversion H.
-          + inversion H; subst.
-            * inversion Hforall; subst; auto.
-            * eapply IHxs. inversion Hforall; subst.
-              all: try eassumption. reflexivity.
-        }
-
-        apply Forall_forall; auto.
-    Qed.
-  End dvalue_has_dtyp_ind.
 
   Section uvalue_has_dtyp_ind.
     Variable P : uvalue -> dtyp -> Prop.
@@ -3937,338 +3947,18 @@ Hint Constructors uvalue_has_dtyp : uvalue.
 
   End uvalue_has_dtyp_ind.
 
-  
-  Ltac solve_dvalue_has_dtyp_dec_int_helper' :=
-    match goal with
-    | p: positive |- _ =>
-        destruct p;
-        try solve
-          [ right; intros CONTRA; inv CONTRA
-          | left; constructor
-          ]
-    end.
-
-  Ltac solve_dvalue_has_dtyp_dec_int_helper :=
-    match goal with
-    | dt: dtyp |- _ =>
-        destruct dt;
-        try
-          solve
-          [ right; intros CONTRA; inv CONTRA
-          | left; constructor
-          ];
-        match goal with
-        | sz: N |- _ =>
-            destruct sz; [right; intros CONTRA; inv CONTRA|];
-            repeat solve_dvalue_has_dtyp_dec_int_helper'
-        end
-    end.
-
-  (* TODO: Move to listutils *)
-  Lemma double_list_rect :
-    forall {X Y}
-      (P: (list X * list Y) -> Type)
-      (NilNil : P (nil, nil))
-      (NilCons : forall y ys, P (nil, ys) -> P (nil, (y :: ys)))
-      (ConsNil : forall x xs, P (xs, nil) -> P ((x :: xs), nil))
-      (ConsCons : forall x xs y ys, P (xs, ys) -> P ((x :: xs), (y :: ys))),
-    forall l, P l.
+  Lemma dvalue_has_dtyp_ALL_IX_SUPPORTED :
+    forall dv dt,
+      dvalue_has_dtyp dv dt ->
+      ALL_IX_SUPPORTED dt.
   Proof.
-    intros X Y P NilNil NilCons ConsNil ConsCons l.
-    destruct l as [xs ys].
-    revert ys.
-    induction xs; induction ys.
-    - apply NilNil.
-    - apply NilCons.
-      apply IHys.
-    - apply ConsNil.
-      apply IHxs.
-    - apply ConsCons.
-      apply IHxs.
-  Qed.
-
-  (* TODO: move this / does this exist somewhere else? *)
-  Lemma nat_strong_rect :
-    forall (P: nat -> Type)
-      (BASE: P 0%nat)
-      (IH: forall (n : nat), (forall (m : nat), m <= n -> P m)%nat -> P (S n)),
-    forall n, P n.
-  Proof.
-    intros P BASE IH n.
-    destruct n.
-    - apply BASE.
-    - apply IH.
-      induction n; intros m LE.
-      + assert (m=0)%nat by lia; subst; auto.
-      + assert (m <= n \/ m = S n)%nat by lia.
-        pose proof NPeano.Nat.leb_spec0 m n.
-        inv H0; subst; auto.
-        pose proof NPeano.Nat.eqb_spec m (S n).
-        inv H0; subst; auto.
-        exfalso.
-        lia.
-  Qed.
-
-  (* TODO: Move to listutils *)
-  Lemma length_strong_rect:
-    forall (X : Type) (P : list X -> Type)
-      (BASE: P nil)
-      (IH: forall (n : nat) (xs: list X), (forall (xs : list X), length xs <= n -> P xs)%nat -> length xs = S n -> P xs),
-    forall l, P l.
-  Proof.
-    intros X P BASE IH.
-    assert (forall n l, length l <= n -> P l)%nat as IHLEN.
-    { induction n using nat_strong_rect; intros l LEN; auto.
-      assert (length l = 0)%nat as LEN' by lia.
-      apply length_zero_iff_nil in LEN'; subst; auto.
-
-      assert (length l <= n \/ length l = S n)%nat by lia.
-      pose proof NPeano.Nat.leb_spec0 (length l) n.
-      inv H0; subst; eauto.
-      pose proof NPeano.Nat.eqb_spec (length l) (S n).
-      inv H0; subst; eauto.
-      lia.
-    }
-
-    intros l.
-    eapply IHLEN.
-    reflexivity.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma vector_dtyp_dec :
-    forall t,
-      {vector_dtyp t} + {~ vector_dtyp t}.
-  Proof.
-    intros t.
-    induction t;
-      try
-        solve
-        [ left; constructor; eauto
-        | left; firstorder
-        | right;
-          intros CONTRA;
-          red in CONTRA;
-          destruct CONTRA as [[n CONTRA] | CONTRA]; try discriminate;
-          repeat (destruct CONTRA as [CONTRA | CONTRA]; try discriminate)
-        ].
-  Qed.
-
-  Lemma dvalue_has_dtyp_dec :
-    forall {dv dt},
-      {dvalue_has_dtyp dv dt} + {~ dvalue_has_dtyp dv dt}.
-  Proof.
-    induction dv; intros dt;
-      try solve
-        [ destruct dt;
-          try
-            solve
-            [ right; intros CONTRA; inv CONTRA
-            | left; constructor
-            ]
-        ].
-
-    1-4: solve_dvalue_has_dtyp_dec_int_helper.
-
-    - pose proof (dtyp_eq_dec t dt) as [EQ | NEQ]; subst.
-      + pose proof (NO_VOID_dec dt) as [NVOID | VOID];
-          pose proof (ALL_IX_SUPPORTED_dec dt) as [IX | NIX].
-        left; constructor; auto.
-        all: right; intros CONTRA; inv CONTRA; contradiction.
-      + right; intros CONTRA; inv CONTRA; contradiction.
-    - pose proof (dtyp_eq_dec t dt) as [EQ | NEQ]; subst.
-      + pose proof (NO_VOID_dec dt) as [NVOID | VOID];
-          pose proof (ALL_IX_SUPPORTED_dec dt) as [IX | NIX].
-        left; constructor; auto.
-        all: right; intros CONTRA; inv CONTRA; contradiction.
-      + right; intros CONTRA; inv CONTRA; contradiction.
-    - destruct dt;
-        try
-          solve
-          [ right; intros CONTRA; inv CONTRA
-          | left; constructor
-          ].
-
-      remember (fields, fields0) as FIELDS.
-      replace fields with (fst FIELDS) in * by (subst; auto).
-      replace fields0 with (snd FIELDS) in * by (inv HeqFIELDS; cbn; auto).
-      clear fields fields0 HeqFIELDS.
-      induction FIELDS using double_list_rect.
-      + left; constructor.
-      + right; intros CONTRA; inv CONTRA.
-      + right; intros CONTRA; inv CONTRA.
-      + forward IHFIELDS.
-        { intros u X0 dt.
-          apply X.
-          right; auto.
-        }
-        cbn in IHFIELDS.
-        specialize (X x (inl eq_refl) y).
-        cbn.
-        destruct X.
-        * destruct IHFIELDS.
-          -- left; constructor; auto.
-          -- right.
-             intros CONTRA.
-             inv CONTRA.
-             contradiction.
-        * right.
-          intros CONTRA.
-          inv CONTRA.
-          contradiction.
-    - destruct dt;
-        try
-          solve
-          [ right; intros CONTRA; inv CONTRA
-          | left; constructor
-          ].
-
-      remember (fields, fields0) as FIELDS.
-      replace fields with (fst FIELDS) in * by (subst; auto).
-      replace fields0 with (snd FIELDS) in * by (inv HeqFIELDS; cbn; auto).
-      clear fields fields0 HeqFIELDS.
-      induction FIELDS using double_list_rect.
-      + left; constructor.
-      + right; intros CONTRA; inv CONTRA.
-      + right; intros CONTRA; inv CONTRA.
-      + forward IHFIELDS.
-        { intros u X0 dt.
-          apply X.
-          right; auto.
-        }
-        cbn in IHFIELDS.
-        specialize (X x (inl eq_refl) y).
-        cbn.
-        destruct X.
-        * destruct IHFIELDS.
-          -- left; constructor; auto.
-          -- right.
-             intros CONTRA.
-             inv CONTRA.
-             contradiction.
-        * right.
-          intros CONTRA.
-          inv CONTRA.
-          contradiction.
-    - destruct dt;
-        try
-          solve
-          [ right; intros CONTRA; inv CONTRA
-          | left; constructor
-          ].
-
-      cbn.
-      assert ({N.to_nat sz = length elts} + {N.to_nat sz <> length elts}) as [SZ | SZ] by apply Nat.eq_dec.
-      + generalize dependent sz.
-        induction elts; intros sz SZ.
-        * cbn in *.
-          assert (sz = 0) by lia; subst.
-          left.
-          replace 0 with (N.of_nat 0%nat) by lia.
-          constructor; auto.
-        * cbn in SZ.
-
-          forward IHelts.
-          intros e X0 dt0.
-          apply X; right; eauto.
-
-          destruct sz; [lia|].
-          rewrite <- N.succ_pos_pred in SZ.
-
-          specialize (IHelts (Pos.pred_N p)).
-          forward IHelts.
-          lia.
-
-          specialize (X a (inl eq_refl) dt).
-          destruct X.
-          -- destruct IHelts.
-             ++ left.
-                inv d0.
-                rewrite <- positive_nat_N.
-                constructor; auto.
-                cbn; lia.
-             ++ right.
-                intros CONTRA.
-                inv CONTRA.
-                apply n.
-                setoid_rewrite <- Nnat.N2Nat.id.
-                constructor.
-                eapply Forall_inv_tail; eauto.
-                lia.
-          -- right.
-             intros CONTRA.
-             inv CONTRA.
-             apply Forall_cons_iff in H2.
-             destruct H2.
-             contradiction.
-      + right.
-        intros CONTRA.
-        inv CONTRA.
-        lia.
-    - destruct dt;
-        try
-          solve
-          [ right; intros CONTRA; inv CONTRA
-          | left; constructor
-          ].
-
-      destruct (@vector_dtyp_dec dt) as [VEC | NVEC].
-      2: {
-        right.
-        intros CONTRA.
-        inv CONTRA.
-        contradiction.
-      }
-
-      cbn.
-      assert ({N.to_nat sz = length elts} + {N.to_nat sz <> length elts}) as [SZ | SZ] by apply Nat.eq_dec.
-      + generalize dependent sz.
-        induction elts; intros sz SZ.
-        * cbn in *.
-          assert (sz = 0) by lia; subst.
-          left.
-          replace 0 with (N.of_nat 0%nat) by lia.
-          constructor; auto.
-        * cbn in SZ.
-
-          forward IHelts.
-          intros e X0 dt0.
-          apply X; right; eauto.
-
-          destruct sz; [lia|].
-          rewrite <- N.succ_pos_pred in SZ.
-
-          specialize (IHelts (Pos.pred_N p)).
-          forward IHelts.
-          lia.
-
-          specialize (X a (inl eq_refl) dt).
-          destruct X.
-          -- destruct IHelts.
-             ++ left.
-                inv d0.
-                rewrite <- positive_nat_N.
-                constructor; auto.
-                cbn; lia.
-             ++ right.
-                intros CONTRA.
-                inv CONTRA.
-                apply n.
-                setoid_rewrite <- Nnat.N2Nat.id.
-                constructor.
-                eapply Forall_inv_tail; eauto.
-                lia.
-                auto.
-          -- right.
-             intros CONTRA.
-             inv CONTRA.
-             apply Forall_cons_iff in H2.
-             destruct H2.
-             contradiction.
-      + right.
-        intros CONTRA.
-        inv CONTRA.
-        lia.
+    intros dv dt TYPE.
+    induction TYPE; try solve [ auto
+                              | cbn; auto; try constructor; auto].
+    - cbn;
+      induction H; constructor; auto.
+    - cbn;
+      induction H; constructor; auto.
   Qed.
 
   Lemma ALL_IX_SUPPORTED_path_strong :
@@ -4284,7 +3974,7 @@ Hint Constructors uvalue_has_dtyp : uvalue.
     - destruct path.
       + destruct τ; simpl in H; repeat break_match_hyp; try solve [inversion H].
         * subst.
-          rewrite ALL_IX_SUPPORTED_equation in HA. auto.
+          cbn in HA. auto.
         * destruct (nth_in_or_default (Z.to_nat a) fields DTYPE_Void).
           specialize (ALL_IX_SUPPORTED_Struct_fields _ HA _ i).
           intros HX. rewrite e in HX.
@@ -4303,7 +3993,7 @@ Hint Constructors uvalue_has_dtyp : uvalue.
         break_match_hyp.
         * inversion H.
         * break_match_hyp; try solve [inversion H].
-          -- rewrite ALL_IX_SUPPORTED_equation in HA.
+          -- cbn in HA.
              break_match_hyp.
              ++ apply IHpath in H; auto.
              ++ inversion H.
@@ -4338,10 +4028,10 @@ Hint Constructors uvalue_has_dtyp : uvalue.
   Proof.
     intros uv dt TYPE.
     induction TYPE; try solve [ auto
-                              | rewrite ALL_IX_SUPPORTED_equation; auto; try constructor; auto].
-    - rewrite ALL_IX_SUPPORTED_equation.
+                              | cbn; auto; try constructor; auto].
+    - cbn;
       induction H; constructor; auto.
-    - rewrite ALL_IX_SUPPORTED_equation.
+    - cbn;
       induction H; constructor; auto.
     - eapply conversion_okb_ALL_IX_SUPPORTED; eauto.
     - eapply ALL_IX_SUPPORTED_path_strong; eauto.
@@ -4353,100 +4043,9 @@ Hint Constructors uvalue_has_dtyp : uvalue.
   Proof.
     intros.
     apply uvalue_has_dtyp_ALL_IX_SUPPORTED in H.
-    rewrite ALL_IX_SUPPORTED_equation in H.
+    cbn in H.
     assumption.
   Qed.
-
-  Definition conflatible (dt1 dt2 : dtyp) : Prop :=
-    dt1 = dt2 \/
-      exists dt1' dt2',
-        (dt1 = DTYPE_Array 0 dt1' /\ dt2 = DTYPE_Array 0 dt2') \/
-        (dt1 = DTYPE_Vector 0 dt1' /\ dt2 = DTYPE_Vector 0 dt2').
-
-  Lemma conflatible_Symmetric :
-    forall dt1 dt2, conflatible dt1 dt2 -> conflatible dt2 dt1.
-  Proof.
-    intros dt1 dt2 HC.
-    destruct HC.
-    - left. auto.
-    - destruct H as [dt1' [dt2' [[EQ1 EQ2]|[EQ1 EQ2]]]].
-      right. eexists. eexists. left; eauto.
-      right. eexists. eexists. right; eauto.
-  Qed.
-
-  Ltac dtyp_case :=
-    let C := fresh "C" in
-    right; intro C; destruct C as [d EQ]; inversion EQ.
-  
-  Lemma dtyp_is_DTYPE_Array0_dec : forall dt,
-      {dt'& dt = DTYPE_Array 0 dt'} + {~ exists dt', dt = DTYPE_Array 0 dt'}.
-  Proof.
-    intro dt.
-    destruct dt; try (solve [dtyp_case]).
-    destruct (N.eq_dec sz 0).
-    - left. exists dt. subst. reflexivity.
-    - dtyp_case.
-      contradiction.
-  Qed.  
-  
-  Lemma dtyp_is_DTYPE_Vector0_dec : forall dt,
-      {dt' & dt = DTYPE_Vector 0 dt'} + {~ exists dt', dt = DTYPE_Vector 0 dt'}.
-  Proof.
-    intro dt.
-    destruct dt; try (solve [dtyp_case]).
-    destruct (N.eq_dec sz 0).
-    - left. exists dt. subst. reflexivity.
-    - dtyp_case.
-      contradiction.
-  Qed.  
-
-  Lemma conflatible_dec :
-    forall dt1 dt2,
-      {conflatible dt1 dt2} + {~ conflatible dt1 dt2}.
-  Proof.
-    intros.
-    destruct (dtyp_eq_dec dt1 dt2).
-    - subst. left. left. reflexivity.
-    - destruct (@dtyp_is_DTYPE_Array0_dec dt1); destruct (@dtyp_is_DTYPE_Array0_dec dt2).
-      + destruct s. destruct s0.
-        left. right. eexists. eexists. left. eauto.
-      + right. intro C.
-          destruct C.
-          -- contradiction.
-          -- destruct H as [dt1' [dt2' [[EQ1 EQ2]|[EQ1 EQ2]]]].
-             ++ apply n0. eexists. eauto.
-             ++ destruct s. subst. inversion EQ1.
-      + right. intro C.
-        destruct C.
-        -- contradiction.
-        -- destruct H as [dt1' [dt2' [[EQ1 EQ2]|[EQ1 EQ2]]]].
-           ++ apply n0. eexists. eauto.
-           ++ destruct s. subst. inversion EQ2.
-      + destruct (@dtyp_is_DTYPE_Vector0_dec dt1); destruct (@dtyp_is_DTYPE_Vector0_dec dt2).
-        * destruct s. destruct s0.
-          left.
-          right. eexists. eexists. right. eauto.
-        * right. intro C.
-          destruct C.
-          -- contradiction.
-          -- destruct H as [dt1' [dt2' [[EQ1 EQ2]|[EQ1 EQ2]]]].
-             ++ destruct s. subst. inversion EQ1.
-             ++ apply n2. eexists. eauto.
-        * right. intro C.
-          destruct C.
-          -- contradiction.
-          -- destruct H as [dt1' [dt2' [[EQ1 EQ2]|[EQ1 EQ2]]]].
-             ++ destruct s. subst. inversion EQ2.
-             ++ apply n2. eexists. eauto.
-        * right. intro C.
-          destruct C.
-          -- contradiction.
-          -- destruct H as [dt1' [dt2' [[EQ1 EQ2]|[EQ1 EQ2]]]].
-             ++ apply n0. eexists. eauto.
-             ++ apply n2. eexists. eauto.
-  Qed.
-
-  
   
   Fixpoint uvalue_has_dtyp_fun (uv:uvalue) (dt:dtyp) : bool :=
     let list_forallb2 :=
@@ -4694,12 +4293,6 @@ Hint Constructors uvalue_has_dtyp : uvalue.
     | _ => false 
     end.
 
-  Ltac invert_bools :=
-    repeat match goal with
-      | [ H : false = true |- _ ] => inversion H
-      | [ H : ((?X && ?Y) = true) |- _ ] => apply andb_true_iff in H; destruct H
-      | [ H : ((?X || ?Y) = true) |- _ ] => apply orb_true_iff in H; destruct H
-    end.
   
   Lemma uvalue_has_dtyp_fun_sound :
     forall uv dt,
@@ -4842,38 +4435,6 @@ Hint Constructors uvalue_has_dtyp : uvalue.
       all : constructor.
   Qed.
 
-
-  Ltac forward_bools :=
-    repeat match goal with
-        [ |- ((?X && ?Y) = true) ] => apply andb_true_iff; split 
-      | [ |- ((?X || ?Y) = true)  ] => apply orb_true_iff
-    end.
-
-  Ltac invert_hyps :=
-    repeat match goal with
-        [ H : (?P /\ ?Q) |- _ ] => destruct H
-      | [ H : (?P \/ ?Q) |- _ ] => destruct H
-      end.
-
-  Ltac search_supported :=
-    forward_bools;          
-    match goal with
-      [ H : ?X |- ?X ] => apply H
-    | [ |- ?X \/ ?Y  ] => try solve [left; search_supported]; right; search_supported
-    | [ H : ALL_IX_SUPPORTED DTYPE_IPTR -> ?Y |- _ ] =>
-        rewrite ALL_IX_SUPPORTED_equation in H; specialize (H I); search_supported
-    | [ H : ALL_IX_SUPPORTED DTYPE_Pointer -> ?Y |- _ ] =>
-        rewrite ALL_IX_SUPPORTED_equation in H; specialize (H I); search_supported
-    | [ H1 : ?X -> ?Y , H2 : ?X |- _] => apply H1 in H2; search_supported
-    end.
-
-  (*     specialize (uvalue_has_dtyp_ALL_IX_SUPPORTED TYPE) as SUPP.
-
-
-             rewrite ALL_IX_SUPPORTED_equation; assumption
-   *)
- 
-  
   Lemma uvalue_has_dtyp_fun_complete :
     forall uv dt,
       uvalue_has_dtyp uv dt -> uvalue_has_dtyp_fun uv dt = true.
@@ -4982,8 +4543,11 @@ Hint Constructors uvalue_has_dtyp : uvalue.
       dvalue_has_dtyp (DVALUE_Struct fields) (DTYPE_Struct dts) ->
       length fields = length dts.
   Proof.
-    induction fields;
-      intros dts H; inversion H; cbn; auto.
+    intros fields dts H.
+    inversion H; subst.
+    clear H.
+    induction H2; subst; auto.
+    cbn. rewrite IHForall2; auto.
   Qed.
 
   Lemma dvalue_has_dtyp_packed_struct_length :
@@ -4991,9 +4555,13 @@ Hint Constructors uvalue_has_dtyp : uvalue.
       dvalue_has_dtyp (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
       length fields = length dts.
   Proof.
-    induction fields;
-      intros dts H; inversion H; cbn; auto.
+    intros fields dts H.
+    inversion H; subst.
+    clear H.
+    induction H2; subst; auto.
+    cbn. rewrite IHForall2; auto.
   Qed.
+
 
   (** Tactics... Maybe move these *)
   Ltac normalize_array_vector_dtyp :=
@@ -5228,7 +4796,7 @@ Hint Constructors uvalue_has_dtyp : uvalue.
     | DTYPE_I sz => default_dvalue_of_dtyp_i sz
     | DTYPE_IPTR => ret (DVALUE_IPTR IP.zero)
     | DTYPE_Pointer => ret (DVALUE_Addr A.null)
-    | DTYPE_Void => ret DVALUE_None
+    | DTYPE_Void => failwith "DTYPE_Void is not a true LLVM value"
     | DTYPE_Half => failwith "Unimplemented default type: half"
     | DTYPE_Float => ret (DVALUE_Float Float32.zero)
     | DTYPE_Double => ret (DVALUE_Double (Float32.to_double Float32.zero))
@@ -5290,8 +4858,97 @@ Hint Constructors uvalue_has_dtyp : uvalue.
 
   Ltac do_it := constructor; cbn; auto; fail.
 
+  Lemma map_monad_ret_exists :
+    forall {A B} (f : A -> err B) l v,
+      map_monad f l = ret v -> forall a, In a l -> exists b, f a = ret b.
+  Proof.
+    intros A B f.
+    induction l; intros.
+    - inversion H0.
+    - inversion H0; subst.
+      + simpl in H.
+        destruct (f a0); inversion H.
+        exists b. reflexivity.
+      + simpl in H.
+        destruct (f a); inversion H; subst; clear H.
+        destruct (map_monad f l) eqn: EQ.
+        inversion H3; subst.
+        eapply IHl. reflexivity. assumption.
+  Qed.        
+  
+  Lemma dvalue_default_ALL_IX_SUPPORTED :
+    forall t v, (default_dvalue_of_dtyp t) = inr v -> ALL_IX_SUPPORTED t.
+  Proof.
+    induction t; intros;
+      try solve [
+          constructor
+        ].
+    - cbn in H.
+      unfold default_dvalue_of_dtyp_i in H.
+      repeat break_match_hyp_inv; auto;
+        match goal with
+        | [ H : (?X =? ?Y) = true |- _ ] => rewrite N.eqb_eq in H; subst
+        end; constructor.
+
+    - cbn in H.
+      repeat break_match_hyp_inv.
+      cbn.  eapply IHt; eauto.
+    - cbn in *.
+      break_match_hyp_inv.
+      rewrite FORALL_forall.
+      rewrite Forall_forall.
+      intros.
+      specialize (map_monad_ret_exists _ _ Heqs _ H0) as HX.
+      destruct HX as [b EQ].
+      eapply H; eauto.
+
+    - cbn in *.
+      break_match_hyp_inv.
+      rewrite FORALL_forall.
+      rewrite Forall_forall.
+      intros.
+      specialize (map_monad_ret_exists _ _ Heqs _ H0) as HX.
+      destruct HX as [b EQ].
+      eapply H; eauto.
+
+    - cbn in H.
+      repeat break_match_hyp_inv; cbn; auto.
+      eapply IHt. eassumption.
+  Qed.
+
+
+  Lemma dvalue_default_NO_VOID :
+    forall t v, (default_dvalue_of_dtyp t) = inr v -> NO_VOID t.
+  Proof.
+    induction t; intros; cbn; auto.
+    - inversion H.
+      
+    - cbn in H.
+      repeat break_match_hyp_inv; auto.
+      eapply IHt; eauto.
+    - cbn in *.
+      break_match_hyp_inv.
+      rewrite FORALL_forall.
+      rewrite Forall_forall.
+      intros.
+      specialize (map_monad_ret_exists _ _ Heqs _ H0) as HX.
+      destruct HX as [b EQ].
+      eapply H; eauto.
+    - cbn in *.
+      break_match_hyp_inv.
+      rewrite FORALL_forall.
+      rewrite Forall_forall.
+      intros.
+      specialize (map_monad_ret_exists _ _ Heqs _ H0) as HX.
+      destruct HX as [b EQ].
+      eapply H; eauto.
+
+    - cbn in H.
+      repeat break_match_hyp_inv; cbn; auto.
+  Qed.
+      
   Lemma dvalue_default : forall t v,
-      inr v = (default_dvalue_of_dtyp t) ->
+      (default_dvalue_of_dtyp t) = inr v ->
       dvalue_has_dtyp v t.
   Proof.
     intros t v. revert v.
@@ -5303,99 +4960,48 @@ Hint Constructors uvalue_has_dtyp : uvalue.
       * inversion i; subst; cbn in H; inversion H; constructor; auto.
       * rewrite unsupported_cases in H; auto. inversion H.
     - intros. subst. inversion H. clear H.
-      induction sz.
-      + cbn in H1.
-        destruct (default_dvalue_of_dtyp t) eqn: HT. inv H1. inv H1.
-        pose proof DVALUE_Array_typ.
-        specialize (H nil (N.to_nat 0) t).
-        rewrite Nnat.N2Nat.id in H.
-        apply H. auto. auto.
-      + cbn in H1.
-        destruct (default_dvalue_of_dtyp t) eqn: HT. inv H1. inv H1.
-        pose proof DVALUE_Array_typ as ARR.
-        specialize (ARR (repeat d (Pos.to_nat p)) (N.to_nat (N.pos p)) t).
-        rewrite Nnat.N2Nat.id in ARR.
-        cbn in *.
-        apply ARR.
-        * apply forall_repeat_true.
-          apply IHt. reflexivity.
-        * apply repeat_length.
-    - revert H. induction fields.
-      + intros. inv H0. constructor.
-      + intros.
-        assert (forall u : dtyp,
-                   In u fields ->
-                   forall v : dvalue,
-                     inr v = default_dvalue_of_dtyp u -> dvalue_has_dtyp v u).
-        { intros. apply H. apply in_cons. auto. auto. }
-        specialize (IHfields H1). clear H1.
-        Opaque map_monad.
-        (* Reduce H0 *)
-        cbn in H0.
-        rewrite list_cons_app in H0.
-        rewrite map_monad_app in H0. cbn in H0.
-        Transparent map_monad.
-        unfold map_monad at 1 in H0.
-        Opaque map_monad. cbn in H0.
-        destruct (default_dvalue_of_dtyp a) eqn: A_DEFAULT.
-        inv H0.
-        destruct (map_monad default_dvalue_of_dtyp fields) eqn: FIELDS.
-        inv H0.
-        inv H0. constructor. apply H. apply in_eq.
-        symmetry. auto.
-        apply IHfields. cbn. rewrite FIELDS. reflexivity.
-    - revert H. induction fields.
-      + intros. inv H0. constructor.
-      + intros.
-        assert (forall u : dtyp,
-                   In u fields ->
-                   forall v : dvalue,
-                     inr v = default_dvalue_of_dtyp u -> dvalue_has_dtyp v u).
-        { intros. apply H. apply in_cons. auto. auto. }
-        specialize (IHfields H1). clear H1.
-        Opaque map_monad.
-        (* Reduce H0 *)
-        cbn in H0.
-        rewrite list_cons_app in H0.
-        rewrite map_monad_app in H0. cbn in H0.
-        Transparent map_monad.
-        unfold map_monad at 1 in H0.
-        Opaque map_monad. cbn in H0.
-        destruct (default_dvalue_of_dtyp a) eqn: A_DEFAULT.
-        inv H0.
-        destruct (map_monad default_dvalue_of_dtyp fields) eqn: FIELDS.
-        inv H0.
-        inv H0. constructor. apply H. apply in_eq.
-        symmetry. auto.
-        apply IHfields. cbn. rewrite FIELDS. reflexivity.
-    - intros. subst. inversion H. clear H.
-      revert H1. revert v. revert IHt. revert t.
-      induction sz.
-      + intros. cbn in H1.
-        pose proof DVALUE_Vector_typ.
-        specialize (H nil (N.to_nat 0)).
-        rewrite Nnat.N2Nat.id in H.
-        destruct t; inv H1;
-          try
-            (apply H;
-             [constructor | constructor |
-               unfold vector_dtyp; intuition]).
-        destruct (default_dvalue_of_dtyp_i sz) eqn: HI; inv H2.
-        apply H. constructor. auto. unfold vector_dtyp. left.
-        exists sz. reflexivity.
-      + intros. cbn in H1.
-        destruct t; inv H1;
-          try (
-              rewrite <- positive_nat_N;
-              constructor; [apply forall_repeat_true ; constructor |
-                             apply repeat_length |
-                             unfold vector_dtyp ; intuition ]).
-        destruct (default_dvalue_of_dtyp_i sz) eqn: SZ; inv H0.
-        pose proof DVALUE_Vector_typ.
-        rewrite <- positive_nat_N. apply H.
-        apply forall_repeat_true. apply IHt. symmetry. auto.
-        apply repeat_length.
-        left. exists sz. reflexivity.
+      break_match_hyp_inv.
+      constructor.
+      eapply dvalue_default_ALL_IX_SUPPORTED; eauto.
+      + eapply dvalue_default_NO_VOID. apply Heqs.
+      + apply forall_repeat_true. eapply IHt. reflexivity.
+      + rewrite repeat_length. reflexivity.
+    - intros.
+      cbn in H0.
+      repeat break_match_hyp_inv.
+      constructor.
+      apply map_monad_err_forall2 in Heqs.
+      (* could be prettier *)
+      induction Heqs; auto.
+      constructor.
+      eapply H; auto. left; reflexivity.
+      eapply IHHeqs; auto.
+      intros.
+      eapply H. right; auto. assumption.
+    - intros.
+      cbn in H0.
+      repeat break_match_hyp_inv.
+      constructor.
+      apply map_monad_err_forall2 in Heqs.
+      (* could be prettier *)
+      induction Heqs; auto.
+      constructor.
+      eapply H; auto. left; reflexivity.
+      eapply IHHeqs; auto.
+      intros.
+      eapply H. right; auto. assumption.
+    - intros.
+      cbn in H.
+      repeat break_match_hyp_inv; cbn; constructor; cbn; auto;
+        try solve [
+            apply forall_repeat_true;eapply IHt; eauto
+          | rewrite repeat_length; auto
+          | unfold vector_dtyp; intuition
+          ].
+      + apply IHt in Heqs. apply dvalue_has_dtyp_ALL_IX_SUPPORTED in Heqs.
+        cbn in Heqs. assumption.
+      + unfold vector_dtyp.
+        left. exists sz0; auto.
   Qed.
 
   Definition uvalue_constructor_string (u : uvalue) : string
@@ -5432,6 +5038,14 @@ Hint Constructors uvalue_has_dtyp : uvalue.
        | UVALUE_ConcatBytes uvs dt => "UVALUE_ConcatBytes"
        end.
 
+  Lemma Forall2_map_impl {A B C} : forall (P:A -> C -> Prop) (Q:B -> C -> Prop) (f:A -> B),
+      (forall a c, P a c -> Q (f a) c) ->
+      forall (l1 : list A) (l2 : list C) , Forall2 P l1 l2 -> Forall2 Q (map f l1) l2.
+  Proof.
+    intros ? ? ? Himpl ? ? Hforall.
+    induction Hforall; cbn; constructor; eauto.
+  Qed.
+
   Lemma dvalue_to_uvalue_preserves_dtyp :
     forall dv dt,
       dvalue_has_dtyp dv dt ->
@@ -5442,41 +5056,33 @@ Hint Constructors uvalue_has_dtyp : uvalue.
       try solve [cbn; constructor; auto].
     - cbn.
       constructor.
-      + constructor; auto.
-        inversion IHDT2; subst. assumption.
+      eapply Forall2_map_impl; eauto.
+      auto.
     - cbn.
       constructor.
-      + constructor; auto.
-        inversion IHDT2; subst. assumption.
-    - constructor.
-      admit. admit.  (* SAZ: These admits are because dvalue_has_dtyp is not quite right *)
-      rewrite Forall_forall.
-      intros.
-      apply Coqlib.list_in_map_inv in H0.
-      destruct H0 as [dv [EQ]].
-      specialize (IH dv H0).
-      specialize (IHdtyp dv H0).
-      subst. apply IH.
-      rewrite map_length.
-      rewrite Nnat.Nat2N.id.
-      assumption.
-    - constructor.
-      admit. admit.
-      rewrite Forall_forall.
-      intros.
-      apply Coqlib.list_in_map_inv in H1.
-      destruct H1 as [dv [EQ]].
-      specialize (IH dv H1).
-      specialize (IHdtyp dv H1).
-      subst. apply IH.
-      rewrite map_length.
-      rewrite Nnat.Nat2N.id.
-      assumption.
-      assumption.
-  Admitted. 
+      eapply Forall2_map_impl; eauto.
+      auto.
+    - constructor; auto.
+      + rewrite Forall_forall.
+        intros.
+        apply Coqlib.list_in_map_inv in H2.
+        destruct H2 as [dv [EQ]].
+        specialize (IH dv H2).
+        subst.
+        assumption.
+      + rewrite map_length; auto.
 
-  Transparent map_monad.
-  
+    - constructor; auto.
+      + rewrite Forall_forall.
+        intros.
+        apply Coqlib.list_in_map_inv in H3.
+        destruct H3 as [dv [EQ]].
+        specialize (IH dv H3).
+        subst.
+        assumption.
+      + rewrite map_length; auto.
+  Qed.
+
   Lemma uvalue_to_dvalue_preserves_dtyp :
     forall uv dv dt,
       uvalue_has_dtyp uv dt ->
@@ -5488,66 +5094,47 @@ Hint Constructors uvalue_has_dtyp : uvalue.
       try solve
         [ cbn in U2D; inv U2D; cbn; solve_dvalue_has_dtyp ].
 
-    - revert dv U2D.
-      induction H; intros.
-      + cbn in U2D.
-        inversion U2D.
-        constructor.
-      + cbn in U2D.
-        repeat break_match_hyp_inv.
-        constructor; auto.
-        apply IHForall2.
-        cbn. rewrite Heqs. reflexivity.
-
-    - revert dv U2D.
-      induction H; intros.
-      + cbn in U2D.
-        inversion U2D.
-        constructor.
-      + cbn in U2D.
-        repeat break_match_hyp_inv.
-        constructor; auto.
-        apply IHForall2.
-        cbn. rewrite Heqs. reflexivity.
-
     - cbn in U2D.
-      break_match_hyp_inv.
-      rewrite <- (Nnat.N2Nat.id sz).
+      repeat break_match_hyp_inv.
+      apply map_monad_err_forall2 in Heqs.
       constructor.
-      rewrite <- Forall_forall in IH.
-      revert sz H1 l Heqs.
-      induction IH; intros.
-      + cbn in Heqs. inversion Heqs. subst. constructor.
-      + cbn in Heqs.
-        repeat break_match_hyp_inv.
+      revert fts H.
+      induction Heqs; intros; inversion H; auto.
+      inversion H0; subst.
+      constructor; auto.
+    - cbn in U2D.
+      repeat break_match_hyp_inv.
+      apply map_monad_err_forall2 in Heqs.
+      constructor.
+      revert fts H.
+      induction Heqs; intros; inversion H; auto.
+      inversion H0; subst.
+      constructor; auto.
+    - cbn in U2D.
+      repeat break_match_hyp_inv.
+      apply map_monad_err_forall2 in Heqs.
+      constructor; auto.
+      + clear H1. 
+        induction Heqs; intros; auto.
         constructor.
-        * apply H1. reflexivity.
-        * destruct (N.to_nat sz); inversion H2.
-          rewrite <- Nnat.Nat2N.id in H4.
-          eapply IHIH; auto.
-          apply H4.
-      + apply map_monad_err_length in Heqs.
+        eapply IH; eauto. left; auto.
+        apply IHHeqs.
+        intros. eapply IH; eauto. right; auto.
+      + apply Forall2_length in Heqs.
         rewrite <- Heqs. assumption.
 
     - cbn in U2D.
-      break_match_hyp_inv.
-      rewrite <- (Nnat.N2Nat.id sz).
-      constructor.
-      rewrite <- Forall_forall in IH.
-      revert sz H1 l Heqs.
-      induction IH; intros.
-      + cbn in Heqs. inversion Heqs. subst. constructor.
-      + cbn in Heqs.
-        repeat break_match_hyp_inv.
+      repeat break_match_hyp_inv.
+      apply map_monad_err_forall2 in Heqs.
+      constructor; auto.
+      + clear H1. 
+        induction Heqs; intros; auto.
         constructor.
-        * apply H1. reflexivity.
-        * destruct (N.to_nat sz); inversion H3.
-          rewrite <- Nnat.Nat2N.id in H5.
-          eapply IHIH; auto.
-          apply H5.
-      + apply map_monad_err_length in Heqs.
+        eapply IH; eauto. left; auto.
+        apply IHHeqs.
+        intros. eapply IH; eauto. right; auto.
+      + apply Forall2_length in Heqs.
         rewrite <- Heqs. assumption.
-      + auto.
   Qed.
 
   Lemma dvalue_to_uvalue_inj :
