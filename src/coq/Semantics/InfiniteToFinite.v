@@ -15183,13 +15183,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       rewrite H.
       exists x. exists ms_inf.
       split; cbn; auto.
-
-      assert (length a_inf = length a_fin) as LEN.
-      { eapply Util.Forall2_length; eauto.
-      }
-
-      apply read_bytes_spec_length in RBS.
-      lia.
   Qed.
 
   (* TODO: Move to where the other frame stack lemmas are *)
@@ -16466,9 +16459,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         pose proof Heqs as DESER_INF.
                         eapply deserialize_sbytes_fail_fin_inf in DESER_INF.
                         2: apply H0.
-                        2: {
-                          admit. (* Length / sizeof stuff... *)
-                        }
 
                         exists msg.
                         split; [reflexivity|].
