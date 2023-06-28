@@ -2406,9 +2406,9 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       | UVALUE_GetElementPtr _ _ _
       | UVALUE_ExtractElement _ _ _
       | UVALUE_InsertElement _ _ _ _
-      | UVALUE_ShuffleVector _ _ _
+      | UVALUE_ShuffleVector _ _ _ _
       | UVALUE_ExtractValue _ _ _
-      | UVALUE_InsertValue _ _ _ _
+      | UVALUE_InsertValue _ _ _ _ _
       | UVALUE_Select _ _ _ =>
           sid <- fresh_sid;;
           lift_OOM (to_ubytes uv dt sid)
@@ -2587,9 +2587,9 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           | UVALUE_GetElementPtr _ _ _
           | UVALUE_ExtractElement _ _ _
           | UVALUE_InsertElement _ _ _ _
-          | UVALUE_ShuffleVector _ _ _
+          | UVALUE_ShuffleVector _ _ _ _
           | UVALUE_ExtractValue _ _ _
-          | UVALUE_InsertValue _ _ _ _
+          | UVALUE_InsertValue _ _ _ _ _
           | UVALUE_Select _ _ _ =>
               sid <- fresh_sid;;
               lift_OOM (to_ubytes uv dt sid)

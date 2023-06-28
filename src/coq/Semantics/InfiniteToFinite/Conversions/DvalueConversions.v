@@ -550,18 +550,18 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
             elt' <- uvalue_convert_strict elt;;
             idx' <- uvalue_convert_strict idx;;
             ret (DV2.UVALUE_InsertElement t vec' elt' idx')
-        | DV1.UVALUE_ShuffleVector vec1 vec2 idxmask =>
+        | DV1.UVALUE_ShuffleVector dt vec1 vec2 idxmask =>
             vec1' <- uvalue_convert_strict vec1;;
             vec2' <- uvalue_convert_strict vec2;;
             idxmask' <- uvalue_convert_strict idxmask;;
-            ret (DV2.UVALUE_ShuffleVector vec1' vec2' idxmask')
+            ret (DV2.UVALUE_ShuffleVector dt vec1' vec2' idxmask')
         | DV1.UVALUE_ExtractValue t vec idxs =>
             vec' <- uvalue_convert_strict vec;;
             ret (DV2.UVALUE_ExtractValue t vec' idxs)
-        | DV1.UVALUE_InsertValue t vec elt idxs =>
+        | DV1.UVALUE_InsertValue t vec et elt idxs =>
             vec' <- uvalue_convert_strict vec;;
             elt' <- uvalue_convert_strict elt;;
-            ret (DV2.UVALUE_InsertValue t vec' elt' idxs)
+            ret (DV2.UVALUE_InsertValue t vec' et elt' idxs)
         | DV1.UVALUE_Select cnd v1 v2 =>
             cnd' <- uvalue_convert_strict cnd;;
             v1' <- uvalue_convert_strict v1;;
@@ -1617,18 +1617,18 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
            elt' <- uvalue_convert_strict elt;;
            idx' <- uvalue_convert_strict idx;;
            ret (DV2.UVALUE_InsertElement t vec' elt' idx')
-       | DV1.UVALUE_ShuffleVector vec1 vec2 idxmask =>
+       | DV1.UVALUE_ShuffleVector dt vec1 vec2 idxmask =>
            vec1' <- uvalue_convert_strict vec1;;
            vec2' <- uvalue_convert_strict vec2;;
            idxmask' <- uvalue_convert_strict idxmask;;
-           ret (DV2.UVALUE_ShuffleVector vec1' vec2' idxmask')
+           ret (DV2.UVALUE_ShuffleVector dt vec1' vec2' idxmask')
        | DV1.UVALUE_ExtractValue t vec idxs =>
            vec' <- uvalue_convert_strict vec;;
            ret (DV2.UVALUE_ExtractValue t vec' idxs)
-       | DV1.UVALUE_InsertValue t vec elt idxs =>
+       | DV1.UVALUE_InsertValue t vec et elt idxs =>
            vec' <- uvalue_convert_strict vec;;
            elt' <- uvalue_convert_strict elt;;
-           ret (DV2.UVALUE_InsertValue t vec' elt' idxs)
+           ret (DV2.UVALUE_InsertValue t vec' et elt' idxs)
        | DV1.UVALUE_Select cnd v1 v2 =>
            cnd' <- uvalue_convert_strict cnd;;
            v1' <- uvalue_convert_strict v1;;
@@ -1753,18 +1753,18 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
             elt' <- uvalue_convert_strict elt;;
             idx' <- uvalue_convert_strict idx;;
             ret (DV2.UVALUE_InsertElement t vec' elt' idx')
-        | DV1.UVALUE_ShuffleVector vec1 vec2 idxmask =>
+        | DV1.UVALUE_ShuffleVector dt vec1 vec2 idxmask =>
             vec1' <- uvalue_convert_strict vec1;;
             vec2' <- uvalue_convert_strict vec2;;
             idxmask' <- uvalue_convert_strict idxmask;;
-            ret (DV2.UVALUE_ShuffleVector vec1' vec2' idxmask')
+            ret (DV2.UVALUE_ShuffleVector dt vec1' vec2' idxmask')
         | DV1.UVALUE_ExtractValue t vec idxs =>
             vec' <- uvalue_convert_strict vec;;
             ret (DV2.UVALUE_ExtractValue t vec' idxs)
-        | DV1.UVALUE_InsertValue t vec elt idxs =>
+        | DV1.UVALUE_InsertValue t vec et elt idxs =>
             vec' <- uvalue_convert_strict vec;;
             elt' <- uvalue_convert_strict elt;;
-            ret (DV2.UVALUE_InsertValue t vec' elt' idxs)
+            ret (DV2.UVALUE_InsertValue t vec' et elt' idxs)
         | DV1.UVALUE_Select cnd v1 v2 =>
             cnd' <- uvalue_convert_strict cnd;;
             v1' <- uvalue_convert_strict v1;;

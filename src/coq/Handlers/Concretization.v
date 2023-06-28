@@ -385,7 +385,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
               | None => extractbytes_to_dvalue M undef_handler ERR_M lift_ue bytes dt
               end
             else extractbytes_to_dvalue M undef_handler ERR_M lift_ue bytes dt
-        | UVALUE_InsertValue t uv elt idxs =>
+        | UVALUE_InsertValue t uv et elt idxs =>
             str <- concretize_uvalueM M undef_handler ERR_M lift_ue uv;;
             elt <- concretize_uvalueM M undef_handler ERR_M lift_ue elt;;
             let fix loop str idxs : ERR_M dvalue :=
@@ -1440,7 +1440,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
         | UVALUE_ExtractByte byte dt idx sid =>
             (* TODO: maybe this is just an error? ExtractByte should be guarded by ConcatBytes? *)
             lift_ue (raise_error "Attempting to concretize UVALUE_ExtractByte, should not happen.")
-        | UVALUE_InsertValue t uv elt idxs =>
+        | UVALUE_InsertValue t uv et elt idxs =>
             str <- concretize_uvalueM uv;;
             elt <- concretize_uvalueM elt;;
             let fix loop str idxs : ERR_M dvalue :=
@@ -1695,7 +1695,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
             | UVALUE_ExtractByte byte dt idx sid =>
                 (* TODO: maybe this is just an error? ExtractByte should be guarded by ConcatBytes? *)
                 lift_ue (raise_error "Attempting to concretize UVALUE_ExtractByte, should not happen.")
-            | UVALUE_InsertValue t uv elt idxs =>
+            | UVALUE_InsertValue t uv et elt idxs =>
                 str <- concretize_uvalueM uv;;
                 elt <- concretize_uvalueM elt;;
                 let fix loop str idxs : ERR_M dvalue :=

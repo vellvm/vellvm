@@ -313,7 +313,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
         vec1 <- denote_exp (Some dt_vec1) vecop1 ;;
         vec2 <- denote_exp (Some dt_vec2) vecop2 ;;
         idxmask <- denote_exp (Some dt_mask) idxmask;;
-        ret (UVALUE_ShuffleVector vec1 vec2 idxmask)
+        ret (UVALUE_ShuffleVector dt_vec1 vec1 vec2 idxmask)
 
     | OP_ExtractValue (dt, str) idxs =>
         str <- denote_exp (Some dt) str ;;
@@ -322,7 +322,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | OP_InsertValue (dt_str, strop) (dt_elt, eltop) idxs =>
         str <- denote_exp (Some dt_str) strop ;;
         elt <- denote_exp (Some dt_elt) eltop ;;
-        ret (UVALUE_InsertValue dt_str str elt idxs)
+        ret (UVALUE_InsertValue dt_str str dt_elt elt idxs)
 
     | OP_Select (dt, cnd) (dt1, op1) (dt2, op2) =>
         cnd <- denote_exp (Some dt) cnd ;;
