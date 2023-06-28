@@ -5791,12 +5791,10 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
   Lemma allocate_bytes_spec_MemPropT_no_err :
     forall (ms_init : MemState)
       dt num_elements bytes
-      (BYTES_SIZE : (sizeof_dtyp dt * num_elements)%N = N.of_nat (length bytes))
-      (NON_VOID : dt <> DTYPE_Void)
       (err_msg : string),
       ~ allocate_bytes_spec_MemPropT dt num_elements bytes ms_init (raise_error err_msg).
   Proof.
-    intros ms_init dt num_elements bytes BYTES_SIZE NON_VOID err_msg CONTRA.
+    intros ms_init dt num_elements bytes err_msg CONTRA.
 
     unfold allocate_bytes_spec_MemPropT in CONTRA.
     cbn in CONTRA.

@@ -2522,9 +2522,11 @@ Module InfiniteToFinite.
               MemState_refine_prop ms_inf_ma ms_fin_ma)
 
       (* Not sure about quantification *)
+      (* ma >>= k *)
       (K: forall ms_inf ms_fin ms_fin' a_fin a_inf b_fin,
           A_REF a_inf a_fin ->
           MemState_refine_prop ms_inf ms_fin ->
+          ma_inf ms_inf_start (ret (ms_inf, a_inf)) ->
           mab_fin a_fin ms_fin (ret (ms_fin', b_fin)) ->
           exists b_inf ms_inf',
             mab_inf a_inf ms_inf (ret (ms_inf', b_inf)) /\
@@ -5614,7 +5616,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf0 b_fin ADDRS MSR READ.
 
     eapply MemPropT_fin_inf_map_monad.
-    4: apply READ.
     all: eauto.
     2: {
       apply Forall2_flip in ADDRS.
@@ -7976,7 +7977,6 @@ Print Assumptions fin_inf_allocations_preserved.
     intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf0 b_fin ADDRS MSR WRITES.
     eapply MemPropT_fin_inf_bind with
       (A_REF := Forall2 eq).
-    4: apply WRITES.
     all: eauto.
 
     { (* MA *)
@@ -8006,7 +8006,7 @@ Print Assumptions fin_inf_allocations_preserved.
     do 2 eexists; split; eauto.
     destruct b_fin0; split; auto.
     cbn in H1.
-    destruct H1; subst; auto.
+    destruct H2; subst; auto.
   Qed.
 
   (* TODO: Move this to somewhere it can
@@ -10424,7 +10424,6 @@ Print Assumptions fin_inf_allocations_preserved.
     intros ms_inf ms_fin ms_fin' [addr_fin' addrs_fin] [addr_inf addrs_inf] b_fin [ADDR_CONV ADDRS_CONV] MSR' ALLOC_POST.
 
     eapply MemPropT_fin_inf_bind.
-    4: apply ALLOC_POST.
     all: eauto.
 
     { (* allocate_bytes_post_conditions_MemPropT *)
@@ -10466,8 +10465,8 @@ Print Assumptions fin_inf_allocations_preserved.
       split; auto.
     }
 
-    intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin0 ADDRS_REF MSR'' H1.
-    destruct H1; subst.
+    intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin0 H H0 H1 H2.
+    destruct H2; subst.
     do 2 eexists.
     split; cbn; eauto.
   Qed.
@@ -10524,7 +10523,6 @@ Print Assumptions fin_inf_allocations_preserved.
     cbn in SID; subst.
 
     eapply MemPropT_fin_inf_bind with (A_REF:=Forall2 sbytes_refine).
-    4: apply K.
     all: eauto.
 
     { (* MA: generating undef bytes *)
@@ -10566,12 +10564,8 @@ Print Assumptions fin_inf_allocations_preserved.
       auto.
     }
 
-    intros ms_inf ms_fin ms_fin'0 a_fin a_inf b_fin0 BYTE_BLOCKS_REF MSR_GEN ALLOCA_BYTES.
+    intros ms_inf ms_fin ms_fin'0 a_fin a_inf b_fin0 BYTE_BLOCKS_REF MSR_GEN GEN_UNDEF ALLOCA_BYTES.
     eapply allocate_bytes_spec_MemPropT_fin_inf; eauto.
-    2: {
-      apply ALLOCA_BYTES.
-    }
-
     apply Forall2_concat; auto.
   Qed.
 
@@ -10600,9 +10594,9 @@ Print Assumptions fin_inf_allocations_preserved.
       eapply allocate_dtyp_spec_fin_inf; eauto.
     }
 
-    intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin ADDR_REF MSR' H.
-    cbn in H.
-    destruct H; subst.
+    intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin ADDR_REF MSR' H H0.
+    cbn in H0.
+    destruct H0; subst.
     cbn in ADDR_REF.
 
     cbn.
@@ -11021,7 +11015,6 @@ Print Assumptions fin_inf_allocations_preserved.
     intros ms_inf ms_fin ms_fin' [addr_fin' addrs_fin] [addr_inf addrs_inf] b_fin [ADDR_CONV ADDRS_CONV] MSR' ALLOC_POST.
 
     eapply MemPropT_fin_inf_bind.
-    4: apply ALLOC_POST.
     all: eauto.
 
     { (* allocate_bytes_post_conditions_MemPropT *)
@@ -11063,8 +11056,8 @@ Print Assumptions fin_inf_allocations_preserved.
       split; auto.
     }
 
-    intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin0 ADDRS_REF MSR'' H1.
-    destruct H1; subst.
+    intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin0 ADDRS_REF MSR'' H1 H2.
+    destruct H2; subst.
     do 2 eexists.
     split; cbn; eauto.
   Qed.
@@ -11105,7 +11098,6 @@ Print Assumptions fin_inf_allocations_preserved.
       cbn in SID; subst.
 
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE'.
       all: eauto.
 
       { (* MA: generate_num_undef_bytes *)
@@ -11125,7 +11117,6 @@ Print Assumptions fin_inf_allocations_preserved.
 
       intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf b_fin0 BYTES_REF MSR_GEN HANDLE''.
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE''.
       all: eauto.
 
       { (* MA: fresh_provenance *)
@@ -11159,7 +11150,6 @@ Print Assumptions fin_inf_allocations_preserved.
       cbn in SID; subst.
 
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE'.
       all: eauto.
 
       { (* MA: generate_num_undef_bytes *)
@@ -11179,7 +11169,6 @@ Print Assumptions fin_inf_allocations_preserved.
 
       intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf b_fin0 BYTES_REF MSR_GEN HANDLE''.
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE''.
       all: eauto.
 
       { (* MA: fresh_provenance *)
@@ -11213,7 +11202,6 @@ Print Assumptions fin_inf_allocations_preserved.
       cbn in SID; subst.
 
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE'.
       all: eauto.
 
       { (* MA: generate_num_undef_bytes *)
@@ -11233,7 +11221,6 @@ Print Assumptions fin_inf_allocations_preserved.
 
       intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf b_fin0 BYTES_REF MSR_GEN HANDLE''.
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE''.
       all: eauto.
 
       { (* MA: fresh_provenance *)
@@ -11267,7 +11254,6 @@ Print Assumptions fin_inf_allocations_preserved.
       cbn in SID; subst.
 
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE'.
       all: eauto.
 
       { (* MA: generate_num_undef_bytes *)
@@ -11287,7 +11273,6 @@ Print Assumptions fin_inf_allocations_preserved.
 
       intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf b_fin0 BYTES_REF MSR_GEN HANDLE''.
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE''.
       all: eauto.
 
       { (* MA: fresh_provenance *)
@@ -11321,7 +11306,6 @@ Print Assumptions fin_inf_allocations_preserved.
       cbn in SID; subst.
 
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE'.
       all: eauto.
 
       { (* MA: generate_num_undef_bytes *)
@@ -11345,7 +11329,6 @@ Print Assumptions fin_inf_allocations_preserved.
 
       intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf b_fin0 BYTES_REF MSR_GEN HANDLE''.
       eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE''.
       all: eauto.
 
       { (* MA: fresh_provenance *)
@@ -11772,7 +11755,7 @@ Print Assumptions fin_inf_allocations_preserved.
         eapply handle_memcpy_fin_inf; eauto.
       }
 
-      intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin _ MSR' EQV.
+      intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin _ MSR' HANDLE EQV.
       cbn in EQV.
       destruct EQV; subst.
 
@@ -11797,9 +11780,9 @@ Print Assumptions fin_inf_allocations_preserved.
         eapply handle_malloc_fin_inf; eauto.
       }
 
-      intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin H H0 H1.
-      cbn in H, H1.
-      destruct H1; subst.
+      intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin H H0 H1 H2.
+      cbn in H, H2.
+      destruct H2; subst.
       do 2 eexists; cbn; split; auto.
       split; auto.
       rewrite DVC1.dvalue_refine_strict_equation, DVC1.dvalue_convert_strict_equation.
@@ -11819,9 +11802,9 @@ Print Assumptions fin_inf_allocations_preserved.
         eapply handle_free_fin_inf; eauto.
       }
 
-      intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin H H0 H1.
-      cbn in H, H1.
-      destruct H1; subst.
+      intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin H H0 H1 H2.
+      cbn in H, H2.
+      destruct H2; subst.
       do 2 eexists; cbn; split; auto.
       split; auto.
       rewrite DVC1.dvalue_refine_strict_equation, DVC1.dvalue_convert_strict_equation.
@@ -11832,7 +11815,7 @@ Print Assumptions fin_inf_allocations_preserved.
     (* Unknown intrinsic *)
     cbn in *; auto.
     contradiction.
-  Admitted.
+  Qed.
 
   Lemma to_ubytes_fin_inf_helper :
     forall {uv_fin uv_inf t sid bytes_fin start},
@@ -13533,7 +13516,7 @@ Print Assumptions fin_inf_allocations_preserved.
       eapply MemPropT_fin_inf_bind; [ | | | apply SERIALIZE]; eauto;
       [ intros *; eapply fresh_sid_fin_inf; eauto |];
 
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID UBYTES;
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID FRESH UBYTES;
       cbn in SID, UBYTES; subst;
 
       red in UBYTES;
@@ -13582,7 +13565,7 @@ Print Assumptions fin_inf_allocations_preserved.
     { (* Poison arrays *)
       rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
         rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
+        cbn in UV_REF.
         move UV_REF after IHTYPE_INF;
         inv UV_REF.
 
@@ -13924,7 +13907,7 @@ Print Assumptions fin_inf_allocations_preserved.
             |];
 
             clear SERIALIZE;
-            intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH SERIALIZE;
+            intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH FRESH SERIALIZE;
             cbn in SID; subst;
             red in SERIALIZE;
             break_match_hyp_inv; rename Heqo into SERIALIZE;
@@ -14293,7 +14276,7 @@ Print Assumptions fin_inf_allocations_preserved.
             |];
 
             clear SERIALIZE;
-            intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH SERIALIZE;
+            intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH FRESH SERIALIZE;
             cbn in SID; subst;
             red in SERIALIZE;
             break_match_hyp_inv; rename Heqo into SERIALIZE;
@@ -14662,7 +14645,7 @@ Print Assumptions fin_inf_allocations_preserved.
             |];
 
             clear SERIALIZE;
-            intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH SERIALIZE;
+            intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH FRESH SERIALIZE;
             cbn in SID; subst;
             red in SERIALIZE;
             break_match_hyp_inv; rename Heqo into SERIALIZE;
@@ -14706,7 +14689,7 @@ Print Assumptions fin_inf_allocations_preserved.
         inv TYPE_FIN; auto.
       }
 
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin FLD_BYTE_REF MSR_FLD SERIALIZE_REST.
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin FLD_BYTE_REF MSR_FLD FRESH SERIALIZE_REST.
       repeat red in SERIALIZE_REST.
       destruct SERIALIZE_REST as (ms_fin_final'&rest_bytes_fin&SERIALIZE_REST&RET).
       cbn in RET.
@@ -14755,7 +14738,7 @@ Print Assumptions fin_inf_allocations_preserved.
         inv TYPE_FIN; auto.
       }
 
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin FLD_BYTE_REF MSR_FLD SERIALIZE_REST.
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin FLD_BYTE_REF MSR_FLD FRESH SERIALIZE_REST.
       repeat red in SERIALIZE_REST.
       destruct SERIALIZE_REST as (ms_fin_final'&rest_bytes_fin&SERIALIZE_REST&RET).
       cbn in RET.
@@ -14821,7 +14804,7 @@ Print Assumptions fin_inf_allocations_preserved.
         apply map_monad_oom_forall2; auto.
       }
 
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTE_BLOCKS_REF MSR_ELT RET.
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTE_BLOCKS_REF MSR_ELT HMAPM RET.
       cbn in RET.
       destruct RET; subst.
       cbn in BYTE_BLOCKS_REF.
@@ -14872,7 +14855,7 @@ Print Assumptions fin_inf_allocations_preserved.
         apply map_monad_oom_forall2; auto.
       }
 
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTE_BLOCKS_REF MSR_ELT RET.
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTE_BLOCKS_REF MSR_ELT HMAPM RET.
       cbn in RET.
       destruct RET; subst.
       cbn in BYTE_BLOCKS_REF.
@@ -14899,7 +14882,7 @@ Print Assumptions fin_inf_allocations_preserved.
           eapply MemPropT_fin_inf_bind; [ | | | apply SERIALIZE]; eauto;
           [intros *; eapply fresh_sid_fin_inf; eauto|];
 
-          intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH UBYTES;
+          intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH FRESH UBYTES;
           cbn in SID; subst;
 
           red in UBYTES;
@@ -15841,6 +15824,71 @@ Print Assumptions fin_inf_allocations_preserved.
     }
   Qed.
 
+  (* TODO: Move this into memory model. Should be applicable to both fin / inf *)
+  Lemma read_bytes_spec_length :
+    forall ptr sz ms_start ms_final res,
+      MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec ptr sz ms_start (ret (ms_final, res)) ->
+      length res = sz.
+  Proof.
+    intros ptr sz ms_start ms_final res RBS.
+    unfold MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec in RBS.
+    apply MemPropT_bind_ret_inv in RBS as (ms_gcp&ptrs&GCP&MAPREAD).
+
+    assert (ms_start = ms_gcp) as MSEQ.
+    { eapply MemoryBigIntptr.MMEP.get_consecutive_ptrs_MemPropT_MemState_eq.
+      eapply GCP.
+    }
+    subst.
+
+    destruct GCP as (ms_ipseq&ips&SEQ&GCP).
+    red in SEQ.
+    break_match_hyp_inv.
+
+
+    assert (exists (pre : MemoryBigIntptr.MMEP.MMSP.MemState) (post : MemoryBigIntptr.MMEP.MMSP.MemState),
+               Within.within (InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs ptr sz) pre
+                 (ret ptrs) post).
+    {
+      exists ms_gcp.
+      cbn.
+      exists ms_gcp.
+      Transparent MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+      unfold MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs in GCP.
+      unfold InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+      Opaque MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+      red.
+      cbn.
+
+      exists ms_gcp. exists l.
+      split.
+      { red. rewrite Heqo.
+        cbn.
+        auto.
+      }
+
+      cbn in GCP.
+      destruct GCP as (?&?&?&?).
+      red in H.
+
+      exists x. exists x0.
+      split.
+      { cbn.
+        red.
+        break_match_goal; cbn in *; try contradiction.
+        auto.
+      }
+
+      red. red in H0.
+      break_match_hyp_inv.
+      cbn.
+      auto.
+    }
+
+    pose proof InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_length _ _ _ H; eauto.
+    apply map_monad_MemPropT_length in MAPREAD.
+    lia.
+  Qed.
+
   Lemma handle_load_fin_inf :
     forall {t addr_fin addr_inf ms_fin_start ms_fin_final ms_inf_start res_fin},
       MemState_refine_prop ms_inf_start ms_fin_start ->
@@ -15903,17 +15951,12 @@ Print Assumptions fin_inf_allocations_preserved.
       apply READ.
     }
 
-    intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTES_REF MSR_LOAD DESERIALIZE.
+    intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTES_REF MSR_LOAD RBS DESERIALIZE.
     unfold lift_err_RAISE_ERROR in *.
 
     break_match_hyp.
-    - eapply deserialize_sbytes_fail_fin_inf in Heqs; eauto.
-      rewrite Heqs.
-      do 2 eexists.
-      split; eauto.
-      split.
-      apply fin_to_inf_uvalue_refine_strict.
-      apply lift_MemState_refine_prop.
+    - cbn in DESERIALIZE.
+      contradiction.
     - eapply deserialize_sbytes_fin_inf in Heqs; eauto.
       destruct Heqs as (?&?&?).
       cbn in DESERIALIZE.
@@ -15921,10 +15964,54 @@ Print Assumptions fin_inf_allocations_preserved.
       rewrite H.
       exists x. exists ms_inf.
       split; cbn; auto.
-      (* should the length be part of fin_inf_read_bytes_spec? *)
-      Print Assumptions deserialize_sbytes_fin_inf.
-      assert (length a_fin
+
+      assert (length a_inf = length a_fin) as LEN.
+      { eapply Util.Forall2_length; eauto.
+      }
+
+      apply read_bytes_spec_length in RBS.
       lia.
+  Qed.
+
+  (* TODO: Move to where the other frame stack lemmas are *)
+  Lemma cannot_pop_fin_inf :
+    forall {ms_fin ms_inf},
+      MemState_refine_prop ms_inf ms_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.cannot_pop ms_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.cannot_pop ms_inf.
+  Proof.
+    intros ms_fin ms_inf MSR NPOP.
+    red.
+    red in NPOP.
+    intros fs1 fs2 MSFP POP.
+    red in POP.
+    break_match_hyp; auto.
+    pose proof MemState_refine_prop_frame_stack_preserved _ _ MSR as FSP.
+    red in FSP.
+    pose proof MSFP as MSFP_FIN.
+    apply FSP in MSFP_FIN.
+    red in MSFP_FIN.
+    destruct ms_inf as [[ms_inf fss_inf hs_inf] msprovs_inf].
+    destruct ms_fin as [[ms_fin fss_fin hs_fin] msprovs_fin].
+    cbn in *.
+    subst.
+    cbn in *.
+    red in MSFP.
+    cbn in *.
+
+    specialize (NPOP fss_fin).
+    destruct fss_fin.
+    { cbn in *.
+      apply MemoryBigIntptrInfiniteSpec.MMSP.frame_stack_eqv_sing_snoc_inv in MSFP_FIN.
+      auto.
+    }
+
+    specialize (NPOP fss_fin).
+    forward NPOP.
+    { red; cbn. reflexivity. }
+    eapply NPOP.
+    red.
+    reflexivity.
   Qed.
 
   Lemma model_E1E2_23_orutt_strict :
@@ -16334,6 +16421,7 @@ Print Assumptions fin_inf_allocations_preserved.
                           red in HANDLER.
                           break_match_hyp.
                           { (* Negative length UB *)
+                            econstructor.
                             admit.
                           }
 
@@ -16567,11 +16655,27 @@ Print Assumptions fin_inf_allocations_preserved.
                     }
 
                     { (* Handler raises error *)
-                      admit.
+                      (* Probably not possible to have an error for MemPush... *)
+                      destruct ERR as (msg&TA&msg_spec&ERR).
+                      cbn in ERR.
+                      contradiction.
                     }
 
                     { (* Handler raises OOM *)
-                      admit.
+                      destruct OOM as (oom_msg&TA_OOM&(oom_spec_msg&HANDLE_OOM)).
+                      rewrite TA_OOM in VIS_HANDLED.
+                      pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
+                                                                                 LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k2 oom_msg) as RAISE.
+                      rewrite RAISE in VIS_HANDLED.
+                      punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
+                      dependent induction VIS_HANDLED.
+                      - eapply Interp_Memory_PropT_Vis_OOM.
+                        rewrite get_inf_tree_equation.
+                        cbn.
+                        unfold raiseOOM.
+                        rewrite bind_trigger.
+                        reflexivity.
+                      - specialize (EQ t1); contradiction.
                     }
 
                     (* Handler succeeds *)
@@ -16670,11 +16774,77 @@ Print Assumptions fin_inf_allocations_preserved.
                     }
 
                     { (* Handler raises error *)
-                      admit.
+                      destruct ERR as (msg&TA&msg_spec&ERR).
+                      cbn in ERR.
+
+                      (* There's an error if I cannot pop a stack frame...
+
+                         This shouldn't happen, but I should hopefully
+                         be able to show that if I cannot pop in the
+                         finite world, then I cannot pop in the
+                         infinite world either, so we should get an
+                         error in both places.
+                       *)
+
+                      rewrite TA in VIS_HANDLED.
+                      pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
+                                                                                 LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_error _ _) _ _ _ k2 msg) as RAISE.
+                      rewrite RAISE in VIS_HANDLED.
+                      punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
+                      dependent induction VIS_HANDLED.
+                      2: {
+                        specialize (EQ t1); contradiction.
+                      }
+
+                      eapply Interp_Memory_PropT_Vis with
+                        (k2:=(fun '(ms_inf, (sid', _)) =>
+                                get_inf_tree (k2 (s2, (s1, tt)))
+                        ))
+                        (s1:=s1)
+                        (s2:=lift_MemState s2).
+                      2: {
+                        pose proof cannot_pop_fin_inf (lift_MemState_refine_prop s2) ERR as ERR_INF.
+                        cbn.
+                        repeat red.
+                        right.
+                        left.
+                        cbn.
+                        exists msg.
+                        split; [reflexivity|].
+                        exists msg_spec.
+                        auto.
+                      }
+
+                      2: {
+                        rewrite get_inf_tree_equation.
+                        cbn.
+                        setoid_rewrite Raise.raise_bind_itree.
+                        reflexivity.
+                      }
+
+                      intros a b H H0 H1.
+                      (* H0 might be a contradiction... *)
+                      unfold LLVMEvents.raise in H0.
+                      rewrite bind_trigger in H0.
+                      apply Returns_vis_inversion in H0.
+                      destruct H0 as [[] _].
                     }
 
                     { (* Handler raises OOM *)
-                      admit.
+                      destruct OOM as (oom_msg&TA_OOM&(oom_spec_msg&HANDLE_OOM)).
+                      rewrite TA_OOM in VIS_HANDLED.
+                      pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
+                                                                                 LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k2 oom_msg) as RAISE.
+                      rewrite RAISE in VIS_HANDLED.
+                      punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
+                      dependent induction VIS_HANDLED.
+                      - eapply Interp_Memory_PropT_Vis_OOM.
+                        rewrite get_inf_tree_equation.
+                        cbn.
+                        unfold raiseOOM.
+                        rewrite bind_trigger.
+                        reflexivity.
+                      - specialize (EQ t1); contradiction.
                     }
 
                     (* Handler succeeds *)
@@ -16773,11 +16943,63 @@ Print Assumptions fin_inf_allocations_preserved.
                     }
 
                     { (* Handler raises error *)
-                      admit.
+                      destruct ERR as (msg&TA&msg_spec&ERR).
+                      destruct EV_REL as (?&?&?); subst.
+
+                      (* Can Alloca raise an error? *)
+                      (* We have:
+                         MEM_EXEC_INTERP.MemTheory.allocate_bytes_spec_MemPropT_no_err
+                       *)
+                      Lemma allocate_dtyp_spec_no_error :
+                        forall t num_elements ms msg,
+                          Memory64BitIntptr.MMEP.MemSpec.allocate_dtyp_spec t num_elements ms (raise_error msg) -> False.
+                      Proof.
+                        intros t num_elements ms msg HANDLE.
+                        repeat red in HANDLE.
+                        destruct HANDLE as [FRESH | HANDLE].
+                        - cbn in FRESH; auto.
+                        - destruct HANDLE as (?&?&?&?).
+                          repeat red in H0.
+                          destruct H0.
+                          + admit. (* TODO: need a lemma about repeatMN. *)
+                          + destruct H0 as (?&?&?&?).
+                            apply MEM_EXEC_INTERP.MemTheory.allocate_bytes_spec_MemPropT_no_err in H1; auto.                            
+                      Admitted.
+
+                      Lemma handle_alloca_no_error :
+                        forall t num_elements align ms msg,
+                          Memory64BitIntptr.MMEP.MemSpec.handle_memory_prop LLVMParams64BitIntptr.Events.DV.dvalue
+                            (LLVMParams64BitIntptr.Events.Alloca t num_elements align) ms (raise_error msg) ->
+                      False.
+                      Proof.
+                        intros t num_elements align ms msg HANDLE.
+                        repeat red in HANDLE.
+                        destruct HANDLE as [HANDLE | HANDLE].
+                        - apply allocate_dtyp_spec_no_error in HANDLE; auto.
+                        - destruct HANDLE as (?&?&?&?).
+                          cbn in H0.
+                          auto.
+                      Qed.
+
+                      apply handle_alloca_no_error in ERR.
+                      contradiction.
                     }
 
                     { (* Handler raises OOM *)
-                      admit.
+                      destruct OOM as (oom_msg&TA_OOM&(oom_spec_msg&HANDLE_OOM)).
+                      rewrite TA_OOM in VIS_HANDLED.
+                      pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
+                                                                                 LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k2 oom_msg) as RAISE.
+                      rewrite RAISE in VIS_HANDLED.
+                      punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
+                      dependent induction VIS_HANDLED.
+                      - eapply Interp_Memory_PropT_Vis_OOM.
+                        rewrite get_inf_tree_equation.
+                        cbn.
+                        unfold raiseOOM.
+                        rewrite bind_trigger.
+                        reflexivity.
+                      - specialize (EQ t1); contradiction.
                     }
 
                     (* Handler succeeds *)
@@ -16871,7 +17093,20 @@ Print Assumptions fin_inf_allocations_preserved.
                     }
 
                     { (* Handler raises OOM *)
-                      admit.
+                      destruct OOM as (oom_msg&TA_OOM&(oom_spec_msg&HANDLE_OOM)).
+                      rewrite TA_OOM in VIS_HANDLED.
+                      pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
+                                                                                 LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k2 oom_msg) as RAISE.
+                      rewrite RAISE in VIS_HANDLED.
+                      punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
+                      dependent induction VIS_HANDLED.
+                      - eapply Interp_Memory_PropT_Vis_OOM.
+                        rewrite get_inf_tree_equation.
+                        cbn.
+                        unfold raiseOOM.
+                        rewrite bind_trigger.
+                        reflexivity.
+                      - specialize (EQ t1); contradiction.
                     }
 
                     (* Handler succeeds *)
@@ -16965,7 +17200,20 @@ Print Assumptions fin_inf_allocations_preserved.
                     }
 
                     { (* Handler raises OOM *)
-                      admit.
+                      destruct OOM as (oom_msg&TA_OOM&(oom_spec_msg&HANDLE_OOM)).
+                      rewrite TA_OOM in VIS_HANDLED.
+                      pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
+                                                                                 LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k2 oom_msg) as RAISE.
+                      rewrite RAISE in VIS_HANDLED.
+                      punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
+                      dependent induction VIS_HANDLED.
+                      - eapply Interp_Memory_PropT_Vis_OOM.
+                        rewrite get_inf_tree_equation.
+                        cbn.
+                        unfold raiseOOM.
+                        rewrite bind_trigger.
+                        reflexivity.
+                      - specialize (EQ t1); contradiction.
                     }
 
                     (* Handler succeeds *)
@@ -17055,7 +17303,154 @@ Print Assumptions fin_inf_allocations_preserved.
                   }
 
                   { (* Pick *)
-                    admit.
+                    destruct p0.
+                    cbn in EV_REL.
+                    destruct p.
+                    cbn in *.
+                    destruct EV_REL as [EV_PRE UV_REF].
+                    unfold FinMemInterp.F_trigger in H0.
+                    setoid_rewrite bind_trigger in H0.
+                    cbn in H0.
+                    rewrite H0 in VIS_HANDLED.
+                    rewrite bind_vis in VIS_HANDLED.
+                    setoid_rewrite bind_ret_l in VIS_HANDLED.
+                    punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
+                    dependent induction VIS_HANDLED.
+                    2: { (* Tau *)
+                      specialize (EQ t1). contradiction.
+                    }
+
+                    rename Pre into Pre_inf.
+                    rename Pre0 into Pre_fin.
+
+                    eapply Interp_Memory_PropT_Vis
+                      with (k2:=
+                              fun (x : {_ : InterpreterStackBigIntptr.LP.Events.DV.dvalue | True}) =>
+                                (let (x4, p) := x in
+                                 get_inf_tree
+                                   match DVCInfFin.dvalue_convert_strict x4 with
+                                   | NoOom a => k5 (exist (fun _ : dvalue => True) a p)
+                                   | Oom s => raiseOOM s
+                                   end)).
+
+                    2: {
+                      cbn.
+                      red.
+                      reflexivity.
+                    }
+                    2: {
+                      rewrite get_inf_tree_equation.
+                      cbn.
+                      rewrite bind_bind.
+                      rewrite bind_trigger.
+                      setoid_rewrite bind_ret_l.
+                      erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+                      assert (Pre_inf = Pre_fin).
+                      { admit. (* TODO: Not provable? *)
+                      }
+                      subst.
+                      
+                      cbn.
+                      pstep. red. cbn.
+                      eapply EqVis.
+                      intros v.
+
+                      with (k2:=
+                              fun (v : {_ : InterpreterStackBigIntptr.LP.Events.DV.dvalue | True}) =>
+                              (let (x4, p) := v in
+                               get_inf_tree
+                                 match DVCInfFin.dvalue_convert_strict x4 with
+                                 | NoOom a => k5 (exist (fun _ : dvalue => True) a p)
+                                 | Oom s => raiseOOM s
+                                 end)).
+
+
+                      red. left.
+                      destruct v.
+                      
+                    }
+                      { intros a b H H1 H2.
+                        destruct b. destruct p.
+                        cbn in *; subst.
+                        right.
+
+                        left.
+                        
+                      }
+
+                        with
+                        (k2:=(fun '(ms_inf, (sid', uv_inf)) =>
+                                get_inf_tree (k2 (s2, (s1, x))))).
+
+                      eapply Interp_Memory_PropT_Vis.
+                      3: {
+                        rewrite get_inf_tree_equation.
+                        cbn.
+                      }
+                    - specialize (EQ t1); contradiction.
+
+                    
+
+
+                              get_inf_tree (k2 (s2, (s2, r))))).
+                    eapply Interp_Memory_PropT_Vis with
+                      (ta:=trigger (E1.pick Pre0 (fin_to_inf_uvalue x0))).
+                    3: {
+                      rewrite VIS_HANDLED.
+                      rewrite get_inf_tree_equation.
+                      red.
+                      cbn.
+                      
+                    }
+                    
+                    destruct t2; pinversion VIS_HANDLED; subst_existT.
+                    { exfalso; eapply EQ; eauto. }
+                    subst_existT.
+
+                    eapply Interp_Memory_PropT_Vis.
+                    3: {
+                      rewrite get_inf_tree_equation.
+                      cbn.
+                      
+                    }
+                    - intros a b H H1 H2.
+                      left.
+                      setoid_rewrite REL.
+                      apply REL.
+
+                    rewrite get_inf_tree_equation.
+                    cbn.
+                    pfold. red.
+                    cbn.
+
+                    eapply Interp_Memory_PropT_Vis with
+                      (k2:=(fun res : {_ : InfLP.Events.DV.dvalue | True} =>
+                              let (x4, p) := res in
+                              get_inf_tree
+                                match DVCInfFin.dvalue_convert_strict x4 with
+                                | NoOom a => k (exist (fun _ : dvalue => True) a p)
+                                | Oom s => raiseOOM s
+                                end)).
+
+
+
+                      (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                              get_inf_tree (k2 (ms_store, (st', tt)))))
+                      (s1:=s1)
+                      (s2:=lift_MemState s2).
+
+                    constructor.
+
+                    cbn
+
+                    epose proof (@itree_eta _ _ t2).
+
+                    punfold VIS_HANDLED.
+                    cbn in VIS_HANDLED.
+                    red in VIS_HANDLED.
+                    dependent induction VIS_HANDLED.
+                    - admit.
+                    - specialize (EQ
                   }
 
                   { (* OOM *)
