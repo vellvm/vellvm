@@ -5475,6 +5475,8 @@ Hint Constructors uvalue_has_dtyp : uvalue.
       assumption.
   Admitted. 
 
+  Transparent map_monad.
+  
   Lemma uvalue_to_dvalue_preserves_dtyp :
     forall uv dv dt,
       uvalue_has_dtyp uv dt ->
@@ -5486,97 +5488,65 @@ Hint Constructors uvalue_has_dtyp : uvalue.
       try solve
         [ cbn in U2D; inv U2D; cbn; solve_dvalue_has_dtyp ].
 
-    induction H. cbn in U2D. break_match_hyp_inv. inv Heqs.
-    break_match_goal. 
-    
-    all:
-      try solve
-        [ cbn in U2D; inv U2D;
-          cbn in *;
-          specialize (IHUT _ eq_refl);
-          specialize (IHUT0 _ eq_refl);
-          inv IHUT;
-          inv IHUT0;
-          rewrite NO_VOID_equation in H4;
-          rewrite ALL_IX_SUPPORTED_equation in H3;
-          solve_dvalue_has_dtyp
-        ].
-
-    all:
-      try solve
-        [ cbn in U2D; inv U2D;
-          destruct H as (?&?&?&?&?&?);
-          solve_dvalue_has_dtyp
-        ].
-
-    - cbn in U2D; inv U2D.
-      break_match_hyp; inv H0.
-      rewrite map_monad_unfold in Heqs.
-      cbn in Heqs.
-      break_match_hyp; inv Heqs.
-      break_match_hyp; inv H0.
-
-      constructor; auto.
-
-      inv UT2.
-      + rewrite map_monad_err_nil in Heqs; subst.
+    - revert dv U2D.
+      induction H; intros.
+      + cbn in U2D.
+        inversion U2D.
         constructor.
-      + specialize (IHUT1 _ eq_refl).
-        cbn in IHUT2.
-        setoid_rewrite Heqs in IHUT2.
-        specialize (IHUT2 _ eq_refl).
+      + cbn in U2D.
+        repeat break_match_hyp_inv.
+        constructor; auto.
+        apply IHForall2.
+        cbn. rewrite Heqs. reflexivity.
 
-        rewrite map_monad_unfold in Heqs.
-        cbn in Heqs.
-        break_match_hyp; inv Heqs.
-        break_match_hyp; inv H0.
-
-        constructor; inv IHUT2; auto.
-
-    - cbn in U2D; inv U2D.
-      break_match_hyp; inv H0.
-      rewrite map_monad_unfold in Heqs.
-      cbn in Heqs.
-      break_match_hyp; inv Heqs.
-      break_match_hyp; inv H0.
-
-      constructor; auto.
-      inv UT2.
-      + rewrite map_monad_err_nil in Heqs; subst.
+    - revert dv U2D.
+      induction H; intros.
+      + cbn in U2D.
+        inversion U2D.
         constructor.
-      + specialize (IHUT1 _ eq_refl).
-        cbn in IHUT2.
-        setoid_rewrite Heqs in IHUT2.
-        specialize (IHUT2 _ eq_refl).
+      + cbn in U2D.
+        repeat break_match_hyp_inv.
+        constructor; auto.
+        apply IHForall2.
+        cbn. rewrite Heqs. reflexivity.
 
-        rewrite map_monad_unfold in Heqs.
-        cbn in Heqs.
-        break_match_hyp; inv Heqs.
-        break_match_hyp; inv H0.
-
-        constructor; inv IHUT2; auto.
-
-    - cbn in U2D; inv U2D.
-      break_match_hyp; inv H1.
+    - cbn in U2D.
+      break_match_hyp_inv.
+      rewrite <- (Nnat.N2Nat.id sz).
       constructor.
-      + apply Forall_forall.
-        intros x H.
-        eapply map_monad_err_In with (x:=x) in Heqs; auto.
-        destruct Heqs as [y [U2D INY]]; eauto.
-      + apply map_monad_err_forall2 in Heqs.
-        apply Forall2_length in Heqs.
-        auto.
+      rewrite <- Forall_forall in IH.
+      revert sz H1 l Heqs.
+      induction IH; intros.
+      + cbn in Heqs. inversion Heqs. subst. constructor.
+      + cbn in Heqs.
+        repeat break_match_hyp_inv.
+        constructor.
+        * apply H1. reflexivity.
+        * destruct (N.to_nat sz); inversion H2.
+          rewrite <- Nnat.Nat2N.id in H4.
+          eapply IHIH; auto.
+          apply H4.
+      + apply map_monad_err_length in Heqs.
+        rewrite <- Heqs. assumption.
 
-    - cbn in U2D; inv U2D.
-      break_match_hyp; inv H2.
+    - cbn in U2D.
+      break_match_hyp_inv.
+      rewrite <- (Nnat.N2Nat.id sz).
       constructor.
-      + apply Forall_forall.
-        intros x H.
-        eapply map_monad_err_In with (x:=x) in Heqs; auto.
-        destruct Heqs as [y [U2D INY]]; eauto.
-      + apply map_monad_err_forall2 in Heqs.
-        apply Forall2_length in Heqs.
-        auto.
+      rewrite <- Forall_forall in IH.
+      revert sz H1 l Heqs.
+      induction IH; intros.
+      + cbn in Heqs. inversion Heqs. subst. constructor.
+      + cbn in Heqs.
+        repeat break_match_hyp_inv.
+        constructor.
+        * apply H1. reflexivity.
+        * destruct (N.to_nat sz); inversion H3.
+          rewrite <- Nnat.Nat2N.id in H5.
+          eapply IHIH; auto.
+          apply H5.
+      + apply map_monad_err_length in Heqs.
+        rewrite <- Heqs. assumption.
       + auto.
   Qed.
 
