@@ -15280,6 +15280,36 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       auto.
   Qed.
 
+  (* TODO: Move near gcp in memory model... Maybe near get_consecutive_ptrs_no_ub *)
+  Lemma get_consecutive_ptrs_never_fails :
+    forall ptr sz ms msg,
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs (M:=(MemPropT Memory64BitIntptr.MMEP.MMSP.MemState)) ptr sz ms (raise_error msg) -> False.
+  Proof.
+    intros ptr sz ms msg ERR.
+    Transparent Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+    unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs in ERR.
+    Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+    repeat red in ERR.
+    destruct ERR as [ERR | ERR].
+    - red in ERR.
+      break_match_hyp_inv.
+    - destruct ERR as (?&?&?&ERR).
+      repeat red in ERR.
+      destruct ERR as [ERR | ERR].
+      { red in ERR.
+        break_match_hyp_inv.
+        exfalso.
+        apply map_monad_err_fail in Heqs.
+        destruct Heqs as (?&?&GEP).
+        cbn in GEP.
+        inv GEP.
+      }
+
+      destruct ERR as (?&?&GCP&ERR).
+      red in ERR.
+      break_match_hyp_inv.
+  Qed.
+
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
       L2_E1E2_orutt_strict t_inf t_fin ->
@@ -16378,29 +16408,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         { (* TODO: read_bytes_spec_fin_inf_error lemma *)
                           repeat red in ERR.
                           destruct ERR as [ERR | ERR].
-                          { (* TODO: this should be a separate lemma about gcp *)
-                            Transparent Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
-                            unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs in ERR.
-                            Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
-                            repeat red in ERR.
-                            destruct ERR as [ERR | ERR].
-                            - red in ERR.
-                              break_match_hyp_inv.
-                            - destruct ERR as (?&?&?&ERR).
-                              repeat red in ERR.
-                              destruct ERR as [ERR | ERR].
-                              { red in ERR.
-                                break_match_hyp_inv.
-                                exfalso.
-                                apply map_monad_err_fail in Heqs.
-                                destruct Heqs as (?&?&GEP).
-                                cbn in GEP.
-                                inv GEP.
-                              }
-
-                              destruct ERR as (?&?&GCP&ERR).
-                              red in ERR.
-                              break_match_hyp_inv.
+                          { exfalso.
+                            apply get_consecutive_ptrs_never_fails in ERR.
+                            auto.
                           }
 
                           destruct ERR as (?&?&GCP&ERR).
@@ -16595,7 +16605,107 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     }
 
                     { (* Handler raises error *)
-                      admit.
+                      destruct ERR as (msg&TA&msg_spec&ERR).
+                      destruct EV_REL as (?&?&?); subst.
+
+                      rewrite TA in VIS_HANDLED.
+                      pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
+                                                                                 LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_error _ _) _ _ _ k2 msg) as RAISE.
+                      rewrite RAISE in VIS_HANDLED.
+                      punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
+                      dependent induction VIS_HANDLED.
+                      2: {
+                        specialize (EQ t1); contradiction.
+                      }
+
+                      eapply Interp_Memory_PropT_Vis with
+                        (k2:=(fun '(ms_inf, (sid', _)) =>
+                                get_inf_tree (k2 (s2, (s1, tt))))
+                        )
+                        (s1:=s1)
+                        (s2:=lift_MemState s2)
+                        (ta:= raise_error msg).
+                      3: {
+                        rewrite get_inf_tree_equation.
+                        cbn.
+                        setoid_rewrite Raise.raise_bind_itree.
+                        reflexivity.
+                      }
+
+                      2: {
+                        (* raise_ub includes raise_error... *)
+                        red in ERR.
+                        break_match_hyp;
+                          try solve
+                            [ repeat red;
+                              left;
+                              exists "Writing something to somewhere that isn't an address.";
+                              rewrite DVCInfFin.dvalue_refine_strict_equation, DVCInfFin.dvalue_convert_strict_equation in H0;
+                              destruct a0; cbn in H0; try break_match_hyp_inv; cbn; auto
+                            ].
+
+                        apply dvalue_refine_strict_addr_r_inv in H0 as (ptr_inf&ADDR&ADDR_REF).
+                        subst.
+
+                        red in ERR.
+                        repeat red in ERR.
+                        destruct ERR as [ERR | ERR].
+                        { (* TODO: Split into a lemma about serialize_sbytes and error? *)
+                          (* Errors in serialize_sbytes generally seem
+                          to happen when there's a type
+                          mismatch... May want new uvalue_has_dtyp_ind
+                          to be able to do this proof?
+                           *)
+                          cbn in ERR.
+                          admit.
+                        }
+
+                        destruct ERR as (?&?&?&ERR).
+                        destruct ERR as [ERR | ERR].
+                        { exfalso.
+                          apply get_consecutive_ptrs_never_fails in ERR.
+                          auto.
+                        }
+
+                        destruct ERR as (?&?&GCP&ERR).
+                        { (* ERR should be a contradiction as
+                             write_byte_spec_MemPropT doesn't contain
+                             error... Except in UB cases *)
+                          remember (zip x2 x0) as z.
+                          cbn in ERR.
+                          destruct ERR as [ERR | ERR].
+                          2: destruct ERR as (?&?&?&?); contradiction.
+
+                          clear Heqz GCP.
+                          generalize dependent x.
+                          generalize dependent x1.
+                          generalize dependent x2.
+                          induction z; intros x2 x1 ERR x H.
+                          - cbn in ERR; contradiction.
+                          - rewrite map_monad_unfold in ERR.
+                            destruct ERR as [ERR | ERR].
+                            + destruct a.
+                              cbn in ERR.
+                              contradiction.
+                            + destruct ERR as (?&?&?&ERR).
+                              repeat red in ERR.
+                              destruct ERR as [ERR | ERR].
+                              2: {
+                                destruct ERR as (?&?&?&ERR).
+                                cbn in ERR; contradiction.
+                              }
+
+                              eapply IHz in ERR; eauto.
+                        }
+                      }
+
+                      intros a1 b H H2 H3.
+                      unfold raise_error in H2.
+                      cbn in H2.
+                      unfold LLVMEvents.raise in H2.
+                      rewrite bind_trigger in H2.
+                      apply Returns_vis_inversion in H2.
+                      destruct H2 as [[] _].
                     }
 
                     { (* Handler raises OOM *)
