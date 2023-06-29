@@ -6,4 +6,3 @@ define i8 @foo() #0 {
 }
 
 ; ASSERT POISON: call i8 @foo()
-; ASSERT EQ: i8 2 = call i8 @foo()

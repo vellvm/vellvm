@@ -5,3 +5,5 @@ define i32 @main() #0 {
   %c = zext i8 %b to i32
   ret i32 %c
 }
+
+; ASSERT EQ: i32 3 = call i32 @foo()
