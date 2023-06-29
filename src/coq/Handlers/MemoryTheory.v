@@ -872,7 +872,6 @@ Section Serialization_Theory.
       + reflexivity.
       + cbn. apply forallb_forall.
         intros x Hin.
-        apply list_in_map_inv in Hin as [b [Hxb Hin]]; subst.
         apply in_app_or in Hin as [Hin | Hin].
         * assert (In a (a :: fields)) as Hina by intuition.
           specialize (H a Hina).
@@ -888,7 +887,6 @@ Section Serialization_Theory.
       + reflexivity.
       + cbn. apply forallb_forall.
         intros x Hin.
-        apply list_in_map_inv in Hin as [b [Hxb Hin]]; subst.
         apply in_app_or in Hin as [Hin | Hin].
         * assert (In a (a :: fields)) as Hina by intuition.
           specialize (H a Hina).
@@ -903,7 +901,6 @@ Section Serialization_Theory.
     - induction elts.
       + reflexivity.
       + cbn in *.
-        rewrite map_app.
         rewrite forallb_app.
         apply andb_true_iff.
         split.
@@ -913,7 +910,6 @@ Section Serialization_Theory.
     - induction elts.
       + reflexivity.
       + cbn in *.
-        rewrite map_app.
         rewrite forallb_app.
         apply andb_true_iff.
         split.

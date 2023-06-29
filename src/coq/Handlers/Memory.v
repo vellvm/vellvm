@@ -404,7 +404,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       This predicate checks that they are all well-defined.
      *)
     Definition all_not_sundef (bytes : list SByte) : bool :=
-      forallb id (map Sbyte_defined bytes).
+      forallb Sbyte_defined bytes.
 
     (** ** Size of a dynamic type
       Computes the byte size of a [dtyp]. *)
