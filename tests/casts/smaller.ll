@@ -5,4 +5,4 @@ define i8 @foo() #0 {
   ret i8 %b
 }
 
-; ASSERT POISON: call i8 @foo()
+; ASSERT EQ : undef i8 = call i8 @foo()
