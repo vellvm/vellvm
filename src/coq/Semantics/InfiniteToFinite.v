@@ -6406,7 +6406,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         apply REF'.
         all: eauto.
   Qed.
-Print Assumptions fin_inf_allocations_preserved.
 
   Lemma inf_frame_eqv_empty_l :
     forall f,

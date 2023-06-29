@@ -64,6 +64,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     split; reflexivity.
   Qed.
 
+  (* SAZ: THIS LOOKS IMPORTANT - is it needed? *)
   Lemma refine_uvalue_dtyp :
     forall uv1 uv2 dt,
       uvalue_has_dtyp uv1 dt ->
@@ -148,6 +149,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Ltac invert_concretize H :=
     red_concretize_in H; cbn in H; subst; inversion H; subst; auto.
 
+  (*
   Lemma is_supported_has_default_dvalue :
     forall dt,
       is_supported dt ->
@@ -218,7 +220,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
       Unshelve.
       all: eapply DVALUE_None.
   Qed.
-
+   *)
   (*
   Lemma refine_uvalue_concrete :
     forall dt uv uvr,
