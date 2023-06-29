@@ -5,4 +5,4 @@ define i8 @foo() #0 {
   ret i8 %b
 }
 
-; ASSERT EQ : undef i8 = call i8 @foo()
+; ASSERT EQ : i8 2 = call i8 @foo()
