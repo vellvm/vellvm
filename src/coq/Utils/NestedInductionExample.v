@@ -125,7 +125,6 @@ Fixpoint sum_rosetree (e:rosetree nat) : nat :=
   | CList l => List.fold_right (fun e acc => acc + sum_rosetree e) 0 l
   end.
 
-
 Inductive rel : rosetree nat -> rosetree nat -> Prop := 
 | RB :
   forall x,

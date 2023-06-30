@@ -517,7 +517,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
 
       pose proof MAP_SHIFTED as ALL_SHIFTED.
       symmetry in ALL_SHIFTED.
-      eapply map_monad_oom_forall2 in ALL_SHIFTED.
+      eapply map_monad_oom_Forall2 in ALL_SHIFTED.
 
       pose proof ALL_SHIFTED as NTH_SHIFTED.
       eapply Forall2_forall in NTH_SHIFTED as [LEN_SHIFTED NTH_SHIFTED].
@@ -1757,7 +1757,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     inv CONSEC.
 
     pose proof MAP as PTRS.
-    eapply map_monad_err_forall2 in PTRS.
+    eapply map_monad_err_Forall2 in PTRS.
     eapply Forall2_forall in PTRS.
     destruct PTRS as [PTRSLEN PTRS].
 

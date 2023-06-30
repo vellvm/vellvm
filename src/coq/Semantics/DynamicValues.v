@@ -4858,24 +4858,6 @@ Hint Constructors uvalue_has_dtyp : uvalue.
 
   Ltac do_it := constructor; cbn; auto; fail.
 
-  Lemma map_monad_ret_exists :
-    forall {A B} (f : A -> err B) l v,
-      map_monad f l = ret v -> forall a, In a l -> exists b, f a = ret b.
-  Proof.
-    intros A B f.
-    induction l; intros.
-    - inversion H0.
-    - inversion H0; subst.
-      + simpl in H.
-        destruct (f a0); inversion H.
-        exists b. reflexivity.
-      + simpl in H.
-        destruct (f a); inversion H; subst; clear H.
-        destruct (map_monad f l) eqn: EQ.
-        inversion H3; subst.
-        eapply IHl. reflexivity. assumption.
-  Qed.        
-  
   Lemma dvalue_default_ALL_IX_SUPPORTED :
     forall t v, (default_dvalue_of_dtyp t) = inr v -> ALL_IX_SUPPORTED t.
   Proof.
@@ -4898,8 +4880,8 @@ Hint Constructors uvalue_has_dtyp : uvalue.
       rewrite FORALL_forall.
       rewrite Forall_forall.
       intros.
-      specialize (map_monad_ret_exists _ _ Heqs _ H0) as HX.
-      destruct HX as [b EQ].
+      specialize (@map_monad_err_In' err _ _ _ _ _ _ _ _ _ _ default_dvalue_of_dtyp fields l _ H0 Heqs) as HX.
+      destruct HX as [b [EQ _]].
       eapply H; eauto.
 
     - cbn in *.
@@ -4907,8 +4889,8 @@ Hint Constructors uvalue_has_dtyp : uvalue.
       rewrite FORALL_forall.
       rewrite Forall_forall.
       intros.
-      specialize (map_monad_ret_exists _ _ Heqs _ H0) as HX.
-      destruct HX as [b EQ].
+      specialize (@map_monad_err_In' err _ _ _ _ _ _ _ _ _ _ default_dvalue_of_dtyp fields l _ H0 Heqs) as HX.
+      destruct HX as [b [EQ _]].
       eapply H; eauto.
 
     - cbn in H.
@@ -4931,18 +4913,17 @@ Hint Constructors uvalue_has_dtyp : uvalue.
       rewrite FORALL_forall.
       rewrite Forall_forall.
       intros.
-      specialize (map_monad_ret_exists _ _ Heqs _ H0) as HX.
-      destruct HX as [b EQ].
+      specialize (@map_monad_err_In' err _ _ _ _ _ _ _ _ _ _ default_dvalue_of_dtyp fields l _ H0 Heqs) as HX.
+      destruct HX as [b [EQ _]].
       eapply H; eauto.
     - cbn in *.
       break_match_hyp_inv.
       rewrite FORALL_forall.
       rewrite Forall_forall.
       intros.
-      specialize (map_monad_ret_exists _ _ Heqs _ H0) as HX.
-      destruct HX as [b EQ].
+      specialize (@map_monad_err_In' err _ _ _ _ _ _ _ _ _ _ default_dvalue_of_dtyp fields l _ H0 Heqs) as HX.
+      destruct HX as [b [EQ _]].
       eapply H; eauto.
-
     - cbn in H.
       repeat break_match_hyp_inv; cbn; auto.
   Qed.
@@ -4970,7 +4951,7 @@ Hint Constructors uvalue_has_dtyp : uvalue.
       cbn in H0.
       repeat break_match_hyp_inv.
       constructor.
-      apply map_monad_err_forall2 in Heqs.
+      apply map_monad_err_Forall2 in Heqs.
       (* could be prettier *)
       induction Heqs; auto.
       constructor.
@@ -4982,7 +4963,7 @@ Hint Constructors uvalue_has_dtyp : uvalue.
       cbn in H0.
       repeat break_match_hyp_inv.
       constructor.
-      apply map_monad_err_forall2 in Heqs.
+      apply map_monad_err_Forall2 in Heqs.
       (* could be prettier *)
       induction Heqs; auto.
       constructor.
@@ -5038,14 +5019,6 @@ Hint Constructors uvalue_has_dtyp : uvalue.
        | UVALUE_ConcatBytes uvs dt => "UVALUE_ConcatBytes"
        end.
 
-  Lemma Forall2_map_impl {A B C} : forall (P:A -> C -> Prop) (Q:B -> C -> Prop) (f:A -> B),
-      (forall a c, P a c -> Q (f a) c) ->
-      forall (l1 : list A) (l2 : list C) , Forall2 P l1 l2 -> Forall2 Q (map f l1) l2.
-  Proof.
-    intros ? ? ? Himpl ? ? Hforall.
-    induction Hforall; cbn; constructor; eauto.
-  Qed.
-
   Lemma dvalue_to_uvalue_preserves_dtyp :
     forall dv dt,
       dvalue_has_dtyp dv dt ->
@@ -5096,7 +5069,7 @@ Hint Constructors uvalue_has_dtyp : uvalue.
 
     - cbn in U2D.
       repeat break_match_hyp_inv.
-      apply map_monad_err_forall2 in Heqs.
+      apply map_monad_err_Forall2 in Heqs.
       constructor.
       revert fts H.
       induction Heqs; intros; inversion H; auto.
@@ -5104,7 +5077,7 @@ Hint Constructors uvalue_has_dtyp : uvalue.
       constructor; auto.
     - cbn in U2D.
       repeat break_match_hyp_inv.
-      apply map_monad_err_forall2 in Heqs.
+      apply map_monad_err_Forall2 in Heqs.
       constructor.
       revert fts H.
       induction Heqs; intros; inversion H; auto.
@@ -5112,7 +5085,7 @@ Hint Constructors uvalue_has_dtyp : uvalue.
       constructor; auto.
     - cbn in U2D.
       repeat break_match_hyp_inv.
-      apply map_monad_err_forall2 in Heqs.
+      apply map_monad_err_Forall2 in Heqs.
       constructor; auto.
       + clear H1. 
         induction Heqs; intros; auto.
@@ -5125,7 +5098,7 @@ Hint Constructors uvalue_has_dtyp : uvalue.
 
     - cbn in U2D.
       repeat break_match_hyp_inv.
-      apply map_monad_err_forall2 in Heqs.
+      apply map_monad_err_Forall2 in Heqs.
       constructor; auto.
       + clear H1. 
         induction Heqs; intros; auto.

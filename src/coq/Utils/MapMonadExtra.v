@@ -87,7 +87,6 @@ Proof.
 Qed.
 
 
-
 (* TODO: can I generalize this? *)
 Lemma map_monad_err_In :
   forall {A B} (f : A -> err B) l res x,
@@ -664,7 +663,7 @@ Proof.
 Qed.
 
 (* TODO: move / generalize these *)
-Lemma map_monad_err_forall2 :
+Lemma map_monad_err_Forall2 :
   forall {A B} (f : A -> err B) l res,
     map_monad f l = inr res <->
       Forall2 (fun a b => f a = inr b) l res.
@@ -694,7 +693,7 @@ Proof.
 Qed.
 
 (* TODO: move / generalize these *)
-Lemma map_monad_oom_forall2 :
+Lemma map_monad_oom_Forall2 :
   forall {A B} (f : A -> OOM B) l res,
     map_monad f l = NoOom res <->
       Forall2 (fun a b => f a = NoOom b) l res.
@@ -1157,6 +1156,7 @@ Proof.
     auto.
 Qed.
 
+
 Lemma map_monad_err_forall2_HIn:
   forall {A B : Type} (f : A -> err B) (l : list A) (res : list B),
     map_monad f l = inr res <->
@@ -1267,11 +1267,11 @@ Proof.
 Qed.
 
 Lemma map_monad_oom_In :
-  forall {A B : Type} (f : A -> OOM B) (l : list A) (res : list B) (x : B),
-    map_monad f l = ret res ->
+  forall {A B : Type} (f : A -> OOM B) (l : list A) (res : list B),
+    map_monad f l = ret res -> forall (x : B),
     In x res -> exists y : A, f y = ret x /\ In y l.
 Proof.
-  intros A B f l res x HMAPM IN.
+  intros A B f l res HMAPM x IN.
   pose proof In_Nth _ _ IN as (n&NTH).
   pose proof map_monad_OOM_Nth _ _ _ _ _ HMAPM NTH as (y&FY&NTHy).
   exists y.
@@ -1616,3 +1616,4 @@ Proof.
       exists (S i).
       cbn; auto.
 Qed.
+

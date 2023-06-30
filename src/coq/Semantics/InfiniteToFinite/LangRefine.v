@@ -5661,7 +5661,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         repeat break_match; cbn; inv Heqs0; inv Heqs; try solve_orutt_raise.
         * apply map_monad_err_fail in Heqs2.
           destruct Heqs2 as [a [IN Heqs2]].
-          apply map_monad_err_forall2 in Heqs1.
+          apply map_monad_err_Forall2 in Heqs1.
           apply Util.Forall2_forall in Heqs1 as [LEN Heqs1].
           apply In_Nth in IN as [i NTH].
           pose proof Nth_exists l i as NTHl.
@@ -5673,7 +5673,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           rewrite Heqs2 in Heqs1; inv Heqs1.
         * apply map_monad_err_fail in Heqs1.
           destruct Heqs1 as [a [IN Heqs1]].
-          apply map_monad_err_forall2 in Heqs2.
+          apply map_monad_err_Forall2 in Heqs2.
           apply Util.Forall2_forall in Heqs2 as [LEN Heqs2].
           apply In_Nth in IN as [i NTH].
           pose proof Nth_exists l i as NTHl.
@@ -5737,7 +5737,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         repeat break_match; cbn; inv Heqs0; inv Heqs; try solve_orutt_raise.
         * apply map_monad_err_fail in Heqs2.
           destruct Heqs2 as [a [IN Heqs2]].
-          apply map_monad_err_forall2 in Heqs1.
+          apply map_monad_err_Forall2 in Heqs1.
           apply Util.Forall2_forall in Heqs1 as [LEN Heqs1].
           apply In_Nth in IN as [i NTH].
           pose proof Nth_exists l i as NTHl.
@@ -5749,7 +5749,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           rewrite Heqs2 in Heqs1; inv Heqs1.
         * apply map_monad_err_fail in Heqs1.
           destruct Heqs1 as [a [IN Heqs1]].
-          apply map_monad_err_forall2 in Heqs2.
+          apply map_monad_err_Forall2 in Heqs2.
           apply Util.Forall2_forall in Heqs2 as [LEN Heqs2].
           apply In_Nth in IN as [i NTH].
           pose proof Nth_exists l i as NTHl.
