@@ -3124,7 +3124,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
     forall uv1 uv2 s,
       uvalue_refine_strict uv1 uv2 ->
       DV1.uvalue_to_dvalue uv1 = inl s ->
-      exists s', DV2.uvalue_to_dvalue uv2 = inl s'.
+      DV2.uvalue_to_dvalue uv2 = inl s.
   Proof.
     induction uv1 using DV1.uvalue_ind';
       intros uv2 dv1 CONV UV1;
@@ -3137,7 +3137,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
              [ cbn in *;
                inv UV1;
                try (break_match_hyp; inv CONV);
-               eexists; cbn; split; eauto;
+               cbn; split; eauto;
                unfold_dvalue_refine_strict; cbn; try rewrite Heqo; auto
           ])
         | unfold_uvalue_refine_strict;
@@ -3145,21 +3145,22 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
           break_match_hyp; inv CONV;
           break_match_hyp; inv H0;
           cbn;
-          eexists; eauto
+          eauto
         | cbn in *;
           unfold_uvalue_refine_strict;
           cbn in *;
           break_match_hyp; inv CONV;
           break_match_hyp; inv H1;
-          cbn; eexists; eauto
+          cbn; eauto
         | cbn in *;
           unfold_uvalue_refine_strict;
           cbn in *;
           break_match_hyp; inv CONV;
           break_match_hyp; inv H0;
           break_match_hyp; inv H1;
-          cbn; eexists; eauto
+          cbn; eauto
         ].
+
     - (* Structures *)
       unfold_uvalue_refine_strict.
       rewrite map_monad_InT_cons in CONV.
@@ -3181,18 +3182,27 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
 
         cbn in *.
         specialize (IHuv1 u dv1 Heqo0 eq_refl).
-        destruct IHuv1.
-        exists x. rewrite H.
+        rewrite IHuv1.
         reflexivity.
       + break_match_hyp; inv H0.
         break_match_hyp; inv CONV.
         break_match_hyp; inv Heqo.
         break_match_hyp; inv H0.
         cbn.
-        destruct (DV2.uvalue_to_dvalue u) eqn:HU.
-        eexists; reflexivity.
+        eapply uvalue_to_dvalue_dvalue_refine_strict in Heqs0.
+        2: unfold_uvalue_refine_strict; eauto.
+        destruct Heqs0 as (?&?&?).
+        rewrite H.
 
         destruct (map_monad DV2.uvalue_to_dvalue l0) eqn:Hl0.
+        2: {
+          exfalso.
+          eapply map_monad_err_forall2 in Hl0.
+          pose proof uvalue_to_dvalue_dvalue_refine_strict.
+        }
+
+        rewrite (map_monad_err_twin_fail' Heqs Hl0); eauto.
+        rewrite 
         eexists; reflexivity.
 
         exfalso.
@@ -3211,6 +3221,68 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
         rewrite Hl0 in H.
         destruct H.
         inv H.
+
+
+
+    admit.
+    admit.
+    admit.
+    admit.
+    { 
+
+    }
+    admit.
+    admit.
+    admit.
+
+
+    
+    admit.
+    admit.
+    admit.
+    - unfold_uvalue_refine_strict.
+      rewrite map_monad_InT_cons in CONV.
+      cbn in *.
+      repeat break_match_hyp_inv.
+      + cbn.
+        erewrite IHuv1; eauto.
+      + cbn.
+        clear IHuv1.
+        eapply uvalue_to_dvalue_dvalue_refine_strict in Heqs0.
+        2: unfold_uvalue_refine_strict; eauto.
+        destruct Heqs0 as (?&?&?).
+        rewrite H.
+        specialize (IHuv0 (DV2.UVALUE_Struct l0) dv1).
+        forward IHuv0.
+        { unfold_uvalue_refine_strict. cbn.
+          rewrite Heqo; auto.
+        }
+        specialize (IHuv0 eq_refl).
+
+        break_inner_match.
+        2: {
+          exfalso.
+          apply map_monad_err_forall2 in Heqs0.
+          
+        }
+        
+        cbn.
+        erewrite IHuv0.
+        
+      cbn.
+      rewrite Heqs0.
+      cbn.
+      erewrite IHuv1; eauto.
+
+      cbn.
+      solve_uvalue_refine_strict.
+      cbn.
+      cbn in *.
+      repeat break_match_hyp_inv.
+      break_match_hyp_inv.
+      repeat break_match_hyp_inv.
+      
+
     - (* Packed structures *)
       unfold_uvalue_refine_strict.
       rewrite map_monad_InT_cons in CONV.
