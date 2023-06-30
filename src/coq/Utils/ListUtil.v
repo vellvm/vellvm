@@ -1352,3 +1352,81 @@ Lemma allb_forallb :
 Proof.
   induction xs; auto.
 Qed.
+
+Lemma nth_error_cons :
+  forall {X} (x : X) xs n res,
+    nth_error xs n = res ->
+    nth_error (x::xs) (S n) = res.
+Proof.
+  intros X x xs n res H.
+  cbn; auto.
+Qed.
+
+Lemma double_list_rect :
+  forall {X Y}
+    (P: (list X * list Y) -> Type)
+    (NilNil : P (nil, nil))
+    (NilCons : forall y ys, P (nil, ys) -> P (nil, (y :: ys)))
+    (ConsNil : forall x xs, P (xs, nil) -> P ((x :: xs), nil))
+    (ConsCons : forall x xs y ys, P (xs, ys) -> P ((x :: xs), (y :: ys))),
+  forall l, P l.
+Proof.
+  intros X Y P NilNil NilCons ConsNil ConsCons l.
+  destruct l as [xs ys].
+  revert ys.
+  induction xs; induction ys.
+  - apply NilNil.
+  - apply NilCons.
+    apply IHys.
+  - apply ConsNil.
+    apply IHxs.
+  - apply ConsCons.
+    apply IHxs.
+Qed.
+
+(* TODO: move this / does this exist somewhere else? *)
+Lemma nat_strong_rect :
+  forall (P: nat -> Type)
+    (BASE: P 0%nat)
+    (IH: forall (n : nat), (forall (m : nat), m <= n -> P m)%nat -> P (S n)),
+  forall n, P n.
+Proof.
+  intros P BASE IH n.
+  destruct n.
+  - apply BASE.
+  - apply IH.
+    induction n; intros m LE.
+    + assert (m=0)%nat by lia; subst; auto.
+    + assert (m <= n \/ m = S n)%nat by lia.
+      pose proof NPeano.Nat.leb_spec0 m n.
+      inv H0; subst; auto.
+      pose proof NPeano.Nat.eqb_spec m (S n).
+      inv H0; subst; auto.
+      exfalso.
+      lia.
+Qed.
+
+Lemma length_strong_rect:
+  forall (X : Type) (P : list X -> Type)
+    (BASE: P nil)
+    (IH: forall (n : nat) (xs: list X), (forall (xs : list X), length xs <= n -> P xs)%nat -> length xs = S n -> P xs),
+  forall l, P l.
+Proof.
+  intros X P BASE IH.
+  assert (forall n l, length l <= n -> P l)%nat as IHLEN.
+  { induction n using nat_strong_rect; intros l LEN; auto.
+    assert (length l = 0)%nat as LEN' by lia.
+    apply length_zero_iff_nil in LEN'; subst; auto.
+
+    assert (length l <= n \/ length l = S n)%nat by lia.
+    pose proof NPeano.Nat.leb_spec0 (length l) n.
+    inv H0; subst; eauto.
+    pose proof NPeano.Nat.eqb_spec (length l) (S n).
+    inv H0; subst; eauto.
+    lia.
+  }
+
+  intros l.
+  eapply IHLEN.
+  reflexivity.
+Qed.
