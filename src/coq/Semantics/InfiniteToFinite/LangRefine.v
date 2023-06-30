@@ -1664,11 +1664,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -1787,11 +1791,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -1881,11 +1889,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -1933,11 +1945,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -2382,11 +2398,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -2519,11 +2539,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -2625,11 +2649,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -2684,11 +2712,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -2982,11 +3014,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -3214,11 +3250,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -3635,7 +3675,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                 (repeat break_match_hyp; try contradiction)).
 
           { destruct o, o0; cbn; constructor; cbn; auto. }
-          { destruct s, s0; cbn; constructor; cbn; auto. }
+          { destruct s, s0; cbn; constructor; auto.
+            destruct s, s0; try solve [ cbn in H; contradiction ].
+            - (* Debug *)
+              destruct d, d0; cbn in *; auto.
+            - (* Failure *)
+              destruct f, f0.
+              cbn in *; auto.
+          }
         }
   Qed.
 
@@ -5659,6 +5706,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         unfold denote_exp, IS1.LLVM.D.denote_exp.
         cbn.
         repeat break_match; cbn; inv Heqs0; inv Heqs; try solve_orutt_raise.
+        * pose proof default_dvalue_of_dtyp_dv1_dv2_same_error.
+          pose proof map_monad_err_twin_fail Heqs2 Heqs1 H; subst.
+          solve_orutt_raise.
         * apply map_monad_err_fail in Heqs2.
           destruct Heqs2 as [a [IN Heqs2]].
           apply map_monad_err_forall2 in Heqs1.
@@ -5735,6 +5785,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         unfold denote_exp, IS1.LLVM.D.denote_exp.
         cbn.
         repeat break_match; cbn; inv Heqs0; inv Heqs; try solve_orutt_raise.
+        * pose proof default_dvalue_of_dtyp_dv1_dv2_same_error.
+          pose proof map_monad_err_twin_fail Heqs2 Heqs1 H; subst.
+          solve_orutt_raise.
         * apply map_monad_err_fail in Heqs2.
           destruct Heqs2 as [a [IN Heqs2]].
           apply map_monad_err_forall2 in Heqs1.
@@ -5811,6 +5864,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         unfold denote_exp, IS1.LLVM.D.denote_exp.
         cbn.
         repeat break_match; cbn; inv Heqs0; inv Heqs; try solve_orutt_raise.
+        * pose proof default_dvalue_of_dtyp_dv1_dv2_same_error (DTYPE_I sz0) s.
+          cbn in H.
+          apply H in Heqs2.
+          rewrite Heqs2 in Heqs1; inv Heqs1.
+          solve_orutt_raise.
         * apply default_dvalue_of_dtyp_i_dv1_dv2_same_error in Heqs2.
           rewrite Heqs2 in Heqs1; inv Heqs1.
         * apply default_dvalue_of_dtyp_i_dv1_dv2_same_error in Heqs1.
@@ -7301,6 +7359,22 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         forward H. reflexivity.
         destruct H as [s' H].
         break_match_hyp; inv H.
+
+        assert (s = s') as S.
+        { pose proof map_monad_err_twin_fail' Heqs Heqs0.
+          eapply H.
+          intros n x y s0 H0 H1.
+          eapply map_monad_InT_OOM_Nth in Heqo; eauto.
+          destruct Heqo as (?&?&?&?).
+          cbn in *.
+          rewrite H0 in H3.
+          symmetry in H3; inv H3.
+          split; intros UVDV.
+          - eapply DVC.uvalue_to_dvalue_dvalue_refine_strict_error in UVDV.
+            2: rewrite uvalue_refine_strict_equation; eauto.
+            destruct UVDV as (s''&UVDV).
+        }
+        subst.
 
         cbn.
         apply rutt_raise.
