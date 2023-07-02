@@ -3088,7 +3088,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           -- simpl in EQ.
              destruct (N.to_nat sz); inversion EQ.
              rewrite <- Nnat.Nat2N.id in H3.
-             apply (IHL_C _ _ _ HALL HNV H0 H3 x' H1).
+             apply (IHL_C _ _ _ HALL HNV H0 H3 x' H1). 
 
       - apply IH_Vector; auto.
         revert xs sz dt H H0 H1 H2 H3.        

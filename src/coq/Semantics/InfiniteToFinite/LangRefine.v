@@ -5285,7 +5285,80 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       apply orutt_Ret; auto.
 
   Qed.   
-      
+
+
+
+Ltac solve_uvalue_refine_strict :=
+    solve [unfold uvalue_refine_strict;
+           cbn;
+           solve [ auto
+                 | cbn;
+                   reflexivity
+             ]
+      ].  
+
+Ltac simplify_expr odt :=
+  destruct odt as [dt | ];
+        cbn; 
+        try solve [
+            solve_orutt_raise
+          ];
+        try (destruct dt; cbn; 
+             try solve [
+                solve_orutt_raise
+          ]).
+
+
+Lemma orutt_denote_exp_Zero_initializer:
+  forall odt : option dtyp,
+    orutt exp_E_refine_strict exp_E_res_refine_strict uvalue_refine_strict
+      (IS1.LLVM.D.denote_exp odt LLVMAst.EXP_Zero_initializer)
+      (denote_exp odt LLVMAst.EXP_Zero_initializer) (OOM := OOME).
+Proof.
+  intros odt.
+  destruct odt as [dt | ];
+    cbn;
+    try solve [
+        solve_orutt_raise
+      ].
+
+  unfold denote_exp, IS1.LLVM.D.denote_exp.
+  unfold LLVMEvents.lift_err.
+
+  repeat break_match_goal.
+  - cbn in *.
+    repeat break_match_hyp_inv.
+    unfold IS1.LLVM.D.dv_zero_initializer in Heqs0.
+    unfold dv_zero_initializer in *.
+    apply default_dvalue_of_dtyp_dv1_dv2_same_error in Heqs0.
+    rewrite Heqs0 in Heqs1. inversion Heqs1. subst.
+    solve_orutt_raise.
+  - cbn in *.
+    repeat break_match_hyp_inv.
+    unfold IS1.LLVM.D.dv_zero_initializer in Heqs0.
+    unfold dv_zero_initializer in *.
+    apply default_dvalue_of_dtyp_dv1_dv2_same_error in Heqs0.
+    rewrite Heqs0 in Heqs1. inversion Heqs1. 
+  - cbn in *.
+    repeat break_match_hyp_inv.
+    unfold IS1.LLVM.D.dv_zero_initializer in Heqs0.
+    unfold dv_zero_initializer in *.
+    apply DVCrev.default_dvalue_of_dtyp_dv1_dv2_equiv' in Heqs0.
+    destruct Heqs0 as [y [Hy _]].
+    rewrite Hy in Heqs1. inversion Heqs1.
+  - cbn in *.
+    repeat break_match_hyp_inv.
+    unfold IS1.LLVM.D.dv_zero_initializer in Heqs0.
+    unfold dv_zero_initializer in *.
+    eapply orutt_Ret.
+    apply default_dvalue_of_dtyp_dv1_dv2_equiv in Heqs0.
+    destruct Heqs0 as [y [Hy HR]].
+    rewrite Hy in Heqs1. inversion Heqs1; subst.
+    apply dvalue_refine_strict_dvalue_to_uvalue.
+    assumption.
+Qed.    
+    
+  
 
   Lemma denote_exp_E1E2_orutt :
     forall e odt,
@@ -5296,48 +5369,39 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (OOM:=OOME).
   Proof.
     intros e.
-    induction e using AstLib.exp_ind; intros odt;
-      try solve
-        [ destruct odt as [dt | ];
-          [
-            cbn;
-            destruct dt; cbn;
-            try solve [
-                apply orutt_raise;
-                [intros * CONTRA; dependent destruction CONTRA | cbn; auto]
-              | apply orutt_Ret; solve_uvalue_refine_strict
-              ]
-          | cbn;
-            solve_orutt_raise
-          ]
-        ].
+    induction e using AstLib.exp_ind; intros odt; cbn;
+      match goal with
+        [ b : bool |- _ ] => destruct b; cbn; apply orutt_Ret; solve_uvalue_refine_strict
+      | _ => try solve [
+                simplify_expr odt; apply orutt_Ret; solve_uvalue_refine_strict
+              | cbn;
+                eapply orutt_bind; eauto;
+                intros r1 r2 H;
+                eapply orutt_bind; eauto;
+                intros r0 r3 H0;
+                apply orutt_Ret;
+                
+                rewrite uvalue_refine_strict_equation; cbn;
+                rewrite uvalue_refine_strict_equation in H, H0;
+                rewrite H, H0;
+                reflexivity]
+      end.
 
     - apply translate_LU_to_exp_lookup_id_orutt.
-    - destruct odt as [dt | ].
-      { destruct dt; cbn;
-          try solve [
-              apply orutt_raise;
-              [intros * CONTRA; dependent destruction CONTRA | cbn; auto]
-            ].
 
-        { (* Normal integers *)
-          pose proof (@IX_supported_dec sz)
+    - simplify_expr odt.
+      + pose proof (@IX_supported_dec sz)
             as [SUPPORTED | UNSUPPORTED].
-          - inv SUPPORTED;
-              repeat rewrite map_ret;
-              apply orutt_Ret;
-              rewrite uvalue_refine_strict_equation;
-              rewrite uvalue_convert_strict_equation;
-              cbn;
-              reflexivity.
-          - repeat rewrite unsupported_cases_match; auto;
-              repeat rewrite Raise.raise_map_itree;
-              apply orutt_raise;
-              [intros * CONTRA; dependent destruction CONTRA | cbn; auto].
-        }
-
-        { (* Intptrs *)
-          repeat rewrite map_bind.
+        * inv SUPPORTED;
+            repeat rewrite map_ret;
+            apply orutt_Ret;
+            rewrite uvalue_refine_strict_equation;
+            reflexivity.
+        *  repeat rewrite unsupported_cases_match; auto;
+             repeat rewrite Raise.raise_map_itree;
+             apply orutt_raise;
+             [intros * CONTRA; dependent destruction CONTRA | cbn; auto].
+      + repeat rewrite map_bind.
           eapply orutt_bind with
             (RR:=(fun (ip1 : IS1.LP.IP.intptr) (ip2 : IS2.LP.IP.intptr) => IS1.LP.IP.to_Z ip1 = IS2.LP.IP.to_Z ip2)).
           unfold lift_OOM.
@@ -5362,673 +5426,258 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           do 2 rewrite map_ret.
           apply orutt_Ret.
           cbn.
-          rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
+          rewrite uvalue_refine_strict_equation.
           cbn.
           rewrite H.
           rewrite IP.to_Z_from_Z; auto.
-        }
-      }
 
-      cbn.
-      solve_orutt_raise.
-    - destruct b; cbn;
-        apply orutt_Ret; solve_uvalue_refine_strict.
-    - cbn; apply orutt_Ret.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
-      cbn.
-      rewrite AC1.addr_convert_null.
-      reflexivity.
-    - destruct odt as [dt | ];
-          [
-          | solve_orutt_raise
-          ].
+    - apply orutt_Ret.
+      unfold uvalue_refine_strict. cbn.
+      rewrite AC1.addr_convert_null; auto.
 
-      destruct dt; cbn;
-        try solve [ apply orutt_Ret; solve_uvalue_refine_strict
-                  | cbn; solve_orutt_raise
-          ].
+    - apply orutt_denote_exp_Zero_initializer.
 
-      + unfold denote_exp, IS1.LLVM.D.denote_exp.
-        cbn.
-        break_match.
-        * apply default_dvalue_of_dtyp_i_dv1_dv2_same_error in Heqs.
-          rewrite Heqs.
-          solve_orutt_raise.
-        * apply default_dvalue_of_dtyp_i_dv1_dv2_equiv in Heqs as [v2 [V2 REF]].
-          rewrite V2.
-          cbn; apply orutt_Ret.
-          apply dvalue_refine_strict_dvalue_to_uvalue; auto.
-
-      + apply orutt_Ret.
-        unfold_uvalue_refine_strict.
-        cbn.
-
-        rewrite IS1.LP.IP.to_Z_0.
-        rewrite IP.from_Z_0.
-        reflexivity.
-      + unfold denote_exp, IS1.LLVM.D.denote_exp.
-        cbn.
-        repeat break_match; cbn; inv Heqs0; inv Heqs.
-        * assert (s = s0).
-          {
-            apply default_dvalue_of_dtyp_dv1_dv2_same_error in Heqs1.
-            rewrite Heqs1 in Heqs2; inv Heqs2.
-            auto.
-          }
-          subst.
-          solve_orutt_raise.
-
-        * apply default_dvalue_of_dtyp_dv1_dv2_same_error in Heqs2.
-          rewrite Heqs2 in Heqs1; inv Heqs1.
-        * apply default_dvalue_of_dtyp_dv1_dv2_same_error in Heqs1.
-          rewrite Heqs2 in Heqs1; inv Heqs1.
-        * apply default_dvalue_of_dtyp_dv1_dv2_equiv in Heqs2 as [dv2 [DEFdv2 REFdv2]].
-          rewrite DEFdv2 in Heqs1; inv Heqs1.
-
-          apply orutt_Ret.
-          unfold_uvalue_refine_strict_goal.
-          cbn in *.
-          break_match.
-          { destruct (N.to_nat sz).
-            - cbn in *; inv Heqo.
-              reflexivity.
-            - rewrite map_repeat in Heqo.
-              rewrite map_repeat.
-              eapply map_monad_InT_OOM_repeat_success in Heqo; subst; cbn; auto.
-              rewrite Heqo. reflexivity.
-              rewrite <- uvalue_refine_strict_equation.
-              intros INx.
-              apply dvalue_refine_strict_dvalue_to_uvalue; auto.
-          }
-
-          apply map_monad_InT_OOM_failT in Heqo as [a [IN FAIL]].
-          rewrite map_repeat in IN.
-          apply repeat_spec_InT in IN; subst.
-          apply dvalue_refine_strict_dvalue_to_uvalue in REFdv2.
-          rewrite REFdv2 in FAIL.
-          inv FAIL.
-      + (* Struct zero initialization *)
-        unfold denote_exp, IS1.LLVM.D.denote_exp.
-        cbn.
-        repeat break_match; cbn; inv Heqs0; inv Heqs; try solve_orutt_raise.
-        * apply map_monad_err_fail in Heqs2.
-          destruct Heqs2 as [a [IN Heqs2]].
-          apply map_monad_err_Forall2 in Heqs1.
-          apply Util.Forall2_forall in Heqs1 as [LEN Heqs1].
-          apply In_Nth in IN as [i NTH].
-          pose proof Nth_exists l i as NTHl.
-          forward NTHl.
-          { apply Nth_ix_lt_length in NTH. lia. }
-          destruct NTHl as [x NTHl].
-          specialize (Heqs1 _ _ _ NTH NTHl).
-          apply default_dvalue_of_dtyp_dv1_dv2_same_error in Heqs2.
-          rewrite Heqs2 in Heqs1; inv Heqs1.
-        * apply map_monad_err_fail in Heqs1.
-          destruct Heqs1 as [a [IN Heqs1]].
-          apply map_monad_err_Forall2 in Heqs2.
-          apply Util.Forall2_forall in Heqs2 as [LEN Heqs2].
-          apply In_Nth in IN as [i NTH].
-          pose proof Nth_exists l i as NTHl.
-          forward NTHl.
-          { apply Nth_ix_lt_length in NTH. lia. }
-          destruct NTHl as [x NTHl].
-          specialize (Heqs2 _ _ _ NTH NTHl).
-          apply default_dvalue_of_dtyp_dv1_dv2_same_error in Heqs1.
-          rewrite Heqs2 in Heqs1; inv Heqs1.
+    - (* CStrings *) 
+      eapply orutt_bind with
+        (RR:=(fun uvs1 uvs2 =>
+                Forall2 uvalue_refine_strict uvs1 uvs2)
+        ).
+      + unfold uvalue_refine_strict. cbn.
+        revert H.
+        induction elts; intros; cbn in *.
         * apply orutt_Ret.
-          unfold_uvalue_refine_strict_goal.
-          cbn in *.
-
-          break_match.
-          { generalize dependent l0.
-            generalize dependent l1.
-            generalize dependent l.
-            induction fields; intros defs2 DEFS2 conv defs1 DEFS1 CONV.
-            - cbn in *.
-              inv DEFS1; inv DEFS2.
-              cbn in *.
-              inv CONV; auto.
-            - cbn in *.
-              break_match_hyp; inv DEFS1.
-              break_match_hyp; inv H0.
-              break_match_hyp; inv DEFS2.
-              break_match_hyp; inv H0.
-
-              apply default_dvalue_of_dtyp_dv1_dv2_equiv in Heqs as [dv2 [DEFdv2 REFdv2]].
-              rewrite DEFdv2 in Heqs1. inv Heqs1.
-              rewrite map_cons in CONV.
-              rewrite map_monad_InT_cons in CONV.
-              cbn in *.
-              break_match_hyp; inv CONV.
-              break_match_hyp; inv H0.
-              specialize (IHfields l0 eq_refl l1 l eq_refl Heqo0).
-              inv IHfields.
-              pose proof dvalue_refine_strict_dvalue_to_uvalue _ _ REFdv2.
-              rewrite uvalue_refine_strict_equation in H.
-              rewrite Heqo in H.
-              inv H.
-              reflexivity.
-          }
-
-          apply map_monad_InT_OOM_failT in Heqo as [a [IN FAIL]].
-          apply InT_map_impl in IN.
-          destruct IN as [a' [EQ IN]].
-          subst.
-
-          pose proof Heqs2.
-          eapply map_monad_err_InT in H; eauto.
-          destruct H as [y [DEFy INy]].
-          pose proof DEFy as A'.
-          apply default_dvalue_of_dtyp_dv1_dv2_equiv in DEFy as [dv2 [DEFdv2 REFdv2]].
-          pose proof dvalue_refine_strict_dvalue_to_uvalue _ _ REFdv2.
-          rewrite H in FAIL.
-          inv FAIL.
-      + (* Packed struct zero initialization *)
-        unfold denote_exp, IS1.LLVM.D.denote_exp.
+          cbn.  constructor.
+        * destruct a. 
+          eapply orutt_bind with (RR:=(fun uvs1 uvs2 => uvalue_refine_strict uvs1 uvs2)).
+          -- eapply (H (d,e)). left; auto.
+          -- intros.
+             eapply orutt_bind with (RR:=(fun uvs1 uvs2 => Forall2 uvalue_refine_strict uvs1 uvs2)).
+             ++ apply IHelts.
+                intros.
+                apply H.
+                right. assumption.
+             ++ intros.
+                apply orutt_Ret.
+                constructor; auto.
+      + intros.
+        apply orutt_Ret.
+        unfold uvalue_refine_strict.
         cbn.
-        repeat break_match; cbn; inv Heqs0; inv Heqs; try solve_orutt_raise.
-        * apply map_monad_err_fail in Heqs2.
-          destruct Heqs2 as [a [IN Heqs2]].
-          apply map_monad_err_Forall2 in Heqs1.
-          apply Util.Forall2_forall in Heqs1 as [LEN Heqs1].
-          apply In_Nth in IN as [i NTH].
-          pose proof Nth_exists l i as NTHl.
-          forward NTHl.
-          { apply Nth_ix_lt_length in NTH. lia. }
-          destruct NTHl as [x NTHl].
-          specialize (Heqs1 _ _ _ NTH NTHl).
-          apply default_dvalue_of_dtyp_dv1_dv2_same_error in Heqs2.
-          rewrite Heqs2 in Heqs1; inv Heqs1.
-        * apply map_monad_err_fail in Heqs1.
-          destruct Heqs1 as [a [IN Heqs1]].
-          apply map_monad_err_Forall2 in Heqs2.
-          apply Util.Forall2_forall in Heqs2 as [LEN Heqs2].
-          apply In_Nth in IN as [i NTH].
-          pose proof Nth_exists l i as NTHl.
-          forward NTHl.
-          { apply Nth_ix_lt_length in NTH. lia. }
-          destruct NTHl as [x NTHl].
-          specialize (Heqs2 _ _ _ NTH NTHl).
-          apply default_dvalue_of_dtyp_dv1_dv2_same_error in Heqs1.
-          rewrite Heqs2 in Heqs1; inv Heqs1.
+        unfold uvalue_refine_strict in H0.
+        break_match_goal.
+        * rewrite map_monad_oom_Forall2 in Heqo.
+          rewrite (Forall2_ext_m _ _ _ _ H0 Heqo).
+          reflexivity.
+        * apply map_monad_OOM_fail in Heqo.
+          destruct Heqo as [v [HI HC]].
+          destruct (Forall2_In _ _ _ _ HI H0) as [x [HJ HX]].
+          rewrite HC in HX.
+          inversion HX.
+
+    - (* Structs *) 
+      eapply orutt_bind with
+        (RR:=(fun uvs1 uvs2 =>
+                Forall2 uvalue_refine_strict uvs1 uvs2)
+        ).
+      + unfold uvalue_refine_strict. cbn.
+        revert H.
+        induction fields; intros; cbn in *.
         * apply orutt_Ret.
-          unfold_uvalue_refine_strict_goal.
-          cbn in *.
-
-          break_match.
-          { generalize dependent l0.
-            generalize dependent l1.
-            generalize dependent l.
-            induction fields; intros defs2 DEFS2 conv defs1 DEFS1 CONV.
-            - cbn in *.
-              inv DEFS1; inv DEFS2.
-              cbn in *.
-              inv CONV; auto.
-            - cbn in *.
-              break_match_hyp; inv DEFS1.
-              break_match_hyp; inv H0.
-              break_match_hyp; inv DEFS2.
-              break_match_hyp; inv H0.
-
-              apply default_dvalue_of_dtyp_dv1_dv2_equiv in Heqs as [dv2 [DEFdv2 REFdv2]].
-              rewrite DEFdv2 in Heqs1. inv Heqs1.
-              rewrite map_cons in CONV.
-              rewrite map_monad_InT_cons in CONV.
-              cbn in *.
-              break_match_hyp; inv CONV.
-              break_match_hyp; inv H0.
-              specialize (IHfields l0 eq_refl l1 l eq_refl Heqo0).
-              inv IHfields.
-              pose proof dvalue_refine_strict_dvalue_to_uvalue _ _ REFdv2.
-              rewrite uvalue_refine_strict_equation in H.
-              rewrite Heqo in H.
-              inv H.
-              reflexivity.
-          }
-
-          apply map_monad_InT_OOM_fail in Heqo as [a [IN FAIL]].
-          apply InT_map_impl in IN.
-          destruct IN as [a' [EQ IN]].
-          subst.
-
-          pose proof Heqs2.
-          eapply map_monad_err_InT in H; eauto.
-          destruct H as [y [DEFy INy]].
-          pose proof DEFy as A'.
-          apply default_dvalue_of_dtyp_dv1_dv2_equiv in DEFy as [dv2 [DEFdv2 REFdv2]].
-          pose proof dvalue_refine_strict_dvalue_to_uvalue _ _ REFdv2.
-          rewrite H in FAIL.
-          inv FAIL.
-      + (* Vector zero initialization *)
-        unfold denote_exp, IS1.LLVM.D.denote_exp.
+          cbn.  constructor.
+        * destruct a. 
+          eapply orutt_bind with (RR:=(fun uvs1 uvs2 => uvalue_refine_strict uvs1 uvs2)).
+          -- eapply (H (d,e)). left; auto.
+          -- intros.
+             eapply orutt_bind with (RR:=(fun uvs1 uvs2 => Forall2 uvalue_refine_strict uvs1 uvs2)).
+             ++ apply IHfields.
+                intros.
+                apply H.
+                right. assumption.
+             ++ intros.
+                apply orutt_Ret.
+                constructor; auto.
+      + intros.
+        apply orutt_Ret.
+        unfold uvalue_refine_strict.
         cbn.
-        repeat break_match; cbn; inv Heqs0; inv Heqs; try solve_orutt_raise.
-        * apply default_dvalue_of_dtyp_i_dv1_dv2_same_error in Heqs2.
-          rewrite Heqs2 in Heqs1; inv Heqs1.
-        * apply default_dvalue_of_dtyp_i_dv1_dv2_same_error in Heqs1.
-          rewrite Heqs2 in Heqs1; inv Heqs1.
-        * apply default_dvalue_of_dtyp_i_dv1_dv2_equiv in Heqs2 as [dv2 [DEFdv2 REFdv2]].
-          rewrite DEFdv2 in Heqs1; inv Heqs1.
+        unfold uvalue_refine_strict in H0.
+        break_match_goal.
+        * rewrite map_monad_oom_Forall2 in Heqo.
+          rewrite (Forall2_ext_m _ _ _ _ H0 Heqo).
+          reflexivity.
+        * apply map_monad_OOM_fail in Heqo.
+          destruct Heqo as [v [HI HC]].
+          destruct (Forall2_In _ _ _ _ HI H0) as [x [HJ HX]].
+          rewrite HC in HX.
+          inversion HX.
 
-          apply orutt_Ret.
-          unfold_uvalue_refine_strict_goal.
-          cbn in *.
-          break_match.
-          { destruct (N.to_nat sz).
-            - cbn in *; inv Heqo.
-              reflexivity.
-            - rewrite map_repeat in Heqo.
-              rewrite map_repeat.
-              eapply map_monad_InT_OOM_repeat_success in Heqo; subst; cbn; auto.
-              rewrite Heqo. reflexivity.
-              rewrite <- uvalue_refine_strict_equation.
-              intros INx.
-              apply dvalue_refine_strict_dvalue_to_uvalue; auto.
-          }
-
-          apply map_monad_InT_OOM_fail in Heqo as [a [IN FAIL]].
-          rewrite map_repeat in IN.
-          apply repeat_spec_InT in IN; subst.
-          apply dvalue_refine_strict_dvalue_to_uvalue in REFdv2.
-          rewrite REFdv2 in FAIL.
-          inv FAIL.
+    - (* Packed_structs *)
+      simplify_expr odt. 
+      eapply orutt_bind with
+        (RR:=(fun uvs1 uvs2 =>
+                Forall2 uvalue_refine_strict uvs1 uvs2)
+        ).
+      + unfold uvalue_refine_strict. cbn.
+        revert H.
+        induction fields; intros; cbn in *.
         * apply orutt_Ret.
-          unfold_uvalue_refine_strict_goal.
-          cbn in *.
-          break_match.
-          { destruct (N.to_nat sz).
-            - cbn in *; inv Heqo.
-              reflexivity.
-            - rewrite map_repeat in Heqo.
-              rewrite map_repeat.
-              eapply map_monad_InT_OOM_repeat_success in Heqo; subst; cbn; auto.
-              rewrite Heqo. reflexivity.
-              rewrite <- uvalue_refine_strict_equation.
-              solve_uvalue_refine_strict.
-          }
-
-          apply map_monad_InT_OOM_fail in Heqo as [a [IN FAIL]].
-          rewrite map_repeat in IN.
-          apply repeat_spec_InT in IN; subst.
-          cbn in FAIL.
-          rewrite uvalue_convert_strict_equation in FAIL.
-          cbn in *.
-          rewrite AC1.addr_convert_null in FAIL.
-          inv FAIL.
+          cbn.  constructor.
+        * destruct a. 
+          eapply orutt_bind with (RR:=(fun uvs1 uvs2 => uvalue_refine_strict uvs1 uvs2)).
+          -- eapply (H (d,e)). left; auto.
+          -- intros.
+             eapply orutt_bind with (RR:=(fun uvs1 uvs2 => Forall2 uvalue_refine_strict uvs1 uvs2)).
+             ++ apply IHfields.
+                intros.
+                apply H.
+                right. assumption.
+             ++ intros.
+                apply orutt_Ret.
+                constructor; auto.
+      + intros.
+        apply orutt_Ret.
+        unfold uvalue_refine_strict.
+        cbn.
+        unfold uvalue_refine_strict in H0.
+        break_match_goal.
+        * rewrite map_monad_oom_Forall2 in Heqo.
+          rewrite (Forall2_ext_m _ _ _ _ H0 Heqo).
+          reflexivity.
+        * apply map_monad_OOM_fail in Heqo.
+          destruct Heqo as [v [HI HC]].
+          destruct (Forall2_In _ _ _ _ HI H0) as [x [HJ HX]].
+          rewrite HC in HX.
+          inversion HX.
+    
+    - (* Arrays *) 
+      eapply orutt_bind with
+        (RR:=(fun uvs1 uvs2 =>
+                Forall2 uvalue_refine_strict uvs1 uvs2)
+        ).
+      + unfold uvalue_refine_strict. cbn.
+        revert H.
+        induction elts; intros; cbn in *.
         * apply orutt_Ret.
-          unfold_uvalue_refine_strict_goal.
-          cbn in *.
-          break_match.
-          { destruct (N.to_nat sz).
-            - cbn in *; inv Heqo.
-              reflexivity.
-            - rewrite map_repeat in Heqo.
-              rewrite map_repeat.
-              eapply map_monad_InT_OOM_repeat_success in Heqo; subst; cbn; auto.
-              rewrite Heqo. reflexivity.
-              rewrite <- uvalue_refine_strict_equation.
-              solve_uvalue_refine_strict.
-          }
+          cbn.  constructor.
+        * destruct a. 
+          eapply orutt_bind with (RR:=(fun uvs1 uvs2 => uvalue_refine_strict uvs1 uvs2)).
+          -- eapply (H (d,e)). left; auto.
+          -- intros.
+             eapply orutt_bind with (RR:=(fun uvs1 uvs2 => Forall2 uvalue_refine_strict uvs1 uvs2)).
+             ++ apply IHelts.
+                intros.
+                apply H.
+                right. assumption.
+             ++ intros.
+                apply orutt_Ret.
+                constructor; auto.
+      + intros.
+        apply orutt_Ret.
+        unfold uvalue_refine_strict.
+        cbn.
+        unfold uvalue_refine_strict in H0.
+        break_match_goal.
+        * rewrite map_monad_oom_Forall2 in Heqo.
+          rewrite (Forall2_ext_m _ _ _ _ H0 Heqo).
+          reflexivity.
+        * apply map_monad_OOM_fail in Heqo.
+          destruct Heqo as [v [HI HC]].
+          destruct (Forall2_In _ _ _ _ HI H0) as [x [HJ HX]].
+          rewrite HC in HX.
+          inversion HX.
 
-          apply map_monad_InT_OOM_fail in Heqo as [a [IN FAIL]].
-          rewrite map_repeat in IN.
-          apply repeat_spec_InT in IN; subst.
-          cbn in FAIL.
-          rewrite uvalue_convert_strict_equation in FAIL.
-          cbn in *.
-          inv FAIL.
+    - (* Vectors *) 
+      eapply orutt_bind with
+        (RR:=(fun uvs1 uvs2 =>
+                Forall2 uvalue_refine_strict uvs1 uvs2)
+        ).
+      + unfold uvalue_refine_strict. cbn.
+        revert H.
+        induction elts; intros; cbn in *.
         * apply orutt_Ret.
-          unfold_uvalue_refine_strict_goal.
-          cbn in *.
-          break_match.
-          { destruct (N.to_nat sz).
-            - cbn in *; inv Heqo.
-              reflexivity.
-            - rewrite map_repeat in Heqo.
-              rewrite map_repeat.
-              eapply map_monad_InT_OOM_repeat_success in Heqo; subst; cbn; auto.
-              rewrite Heqo. reflexivity.
-              rewrite <- uvalue_refine_strict_equation.
-              solve_uvalue_refine_strict.
-          }
-
-          apply map_monad_InT_OOM_fail in Heqo as [a [IN FAIL]].
-          rewrite map_repeat in IN.
-          apply repeat_spec_InT in IN; subst.
-          cbn in FAIL.
-          rewrite uvalue_convert_strict_equation in FAIL.
-          cbn in *.
-          inv FAIL.
-    - (* Cstrings *)
-      cbn.
-      eapply orutt_bind with (RR:=(fun uvs1 uvs2 => uvalue_refine_strict (DV1.UVALUE_Array uvs1) (UVALUE_Array uvs2))).
-      { induction elts.
-        - cbn.
-          apply orutt_Ret; solve_uvalue_refine_strict.
-        - repeat rewrite map_monad_unfold.
-          cbn.
-          destruct a.
-          eapply orutt_bind.
-          { specialize (H (d, e) (or_introl eq_refl)).
-            cbn in H.
-            apply H.
-          }
-
-          intros r1 r2 H0.
-          forward IHelts.
-          { intros p H1 odt0.
-            eapply H.
-            right; auto.
-          }
-
-          eapply orutt_bind; eauto.
-
-          intros r0 r3 H1.
-          cbn in H1.
-          apply orutt_Ret.
-          rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in H1.
-          rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
-          rewrite map_monad_InT_cons.
-          cbn.
-          cbn in H1.
-          break_match_hyp; inv H1.
-          rewrite uvalue_refine_strict_equation in H0.
-          rewrite H0.
+          cbn.  constructor.
+        * destruct a. 
+          eapply orutt_bind with (RR:=(fun uvs1 uvs2 => uvalue_refine_strict uvs1 uvs2)).
+          -- eapply (H (d,e)). left; auto.
+          -- intros.
+             eapply orutt_bind with (RR:=(fun uvs1 uvs2 => Forall2 uvalue_refine_strict uvs1 uvs2)).
+             ++ apply IHelts.
+                intros.
+                apply H.
+                right. assumption.
+             ++ intros.
+                apply orutt_Ret.
+                constructor; auto.
+      + intros.
+        apply orutt_Ret.
+        unfold uvalue_refine_strict.
+        cbn.
+        unfold uvalue_refine_strict in H0.
+        break_match_goal.
+        * rewrite map_monad_oom_Forall2 in Heqo.
+          rewrite (Forall2_ext_m _ _ _ _ H0 Heqo).
           reflexivity.
-      }
-
-      intros r1 r2 H0.
-      apply orutt_Ret; auto.
-    - (* Structs *)
-      cbn.
-      eapply orutt_bind with (RR:=(fun uvs1 uvs2 => uvalue_refine_strict (DV1.UVALUE_Struct uvs1) (UVALUE_Struct uvs2))).
-      { induction fields.
-        - cbn.
-          apply orutt_Ret; solve_uvalue_refine_strict.
-        - repeat rewrite map_monad_unfold.
-          cbn.
-          destruct a.
-          eapply orutt_bind.
-          { specialize (H (d, e) (or_introl eq_refl)).
-            cbn in H.
-            apply H.
-          }
-
-          intros r1 r2 H0.
-          forward IHfields.
-          { intros p H1 odt0.
-            eapply H.
-            right; auto.
-          }
-
-          eapply orutt_bind; eauto.
-
-          intros r0 r3 H1.
-          cbn in H1.
-          apply orutt_Ret.
-          rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in H1.
-          rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
-          rewrite map_monad_InT_cons.
-          cbn.
-          cbn in H1.
-          break_match_hyp; inv H1.
-          rewrite uvalue_refine_strict_equation in H0.
-          rewrite H0.
-          reflexivity.
-      }
-
-      intros r1 r2 H0.
-      apply orutt_Ret; auto.
-    - (* Packed Structs *)
-      destruct odt as [dt | ];
-        [
-        | cbn;
-          apply orutt_raise; cbn; auto;
-          intros msg o CONTRA;
-          inv CONTRA
-        ].
-
-      destruct dt; cbn;
-        try solve [ apply orutt_Ret; solve_uvalue_refine_strict
-                  | cbn;
-                    apply orutt_raise; cbn; auto;
-                    intros msg o CONTRA;
-                    inv CONTRA
-          ].
-
-      cbn.
-      eapply orutt_bind with (RR:=(fun uvs1 uvs2 => uvalue_refine_strict (DV1.UVALUE_Packed_struct uvs1) (UVALUE_Packed_struct uvs2))).
-      { induction fields.
-        - cbn.
-          apply orutt_Ret; solve_uvalue_refine_strict.
-        - repeat rewrite map_monad_unfold.
-          cbn.
-          destruct a.
-          eapply orutt_bind.
-          { specialize (H (d, e) (or_introl eq_refl)).
-            cbn in H.
-            apply H.
-          }
-
-          intros r1 r2 H0.
-          forward IHfields.
-          { intros p H1 odt0.
-            eapply H.
-            right; auto.
-          }
-
-          eapply orutt_bind; eauto.
-
-          intros r0 r3 H1.
-          cbn in H1.
-          apply orutt_Ret.
-          rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in H1.
-          rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
-          rewrite map_monad_InT_cons.
-          cbn.
-          cbn in H1.
-          break_match_hyp; inv H1.
-          rewrite uvalue_refine_strict_equation in H0.
-          rewrite H0.
-          reflexivity.
-      }
-
-      intros r1 r2 H0.
-      apply orutt_Ret; auto.
-    - (* Arrays *)
-      cbn.
-      eapply orutt_bind with (RR:=(fun uvs1 uvs2 => uvalue_refine_strict (DV1.UVALUE_Array uvs1) (UVALUE_Array uvs2))).
-      { induction elts.
-        - cbn.
-          apply orutt_Ret; solve_uvalue_refine_strict.
-        - repeat rewrite map_monad_unfold.
-          cbn.
-          destruct a.
-          eapply orutt_bind.
-          { specialize (H (d, e) (or_introl eq_refl)).
-            cbn in H.
-            apply H.
-          }
-
-          intros r1 r2 H0.
-          forward IHelts.
-          { intros p H1 odt0.
-            eapply H.
-            right; auto.
-          }
-
-          eapply orutt_bind; eauto.
-
-          intros r0 r3 H1.
-          cbn in H1.
-          apply orutt_Ret.
-          rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in H1.
-          rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
-          rewrite map_monad_InT_cons.
-          cbn.
-          cbn in H1.
-          break_match_hyp; inv H1.
-          rewrite uvalue_refine_strict_equation in H0.
-          rewrite H0.
-          reflexivity.
-      }
-
-      intros r1 r2 H0.
-      apply orutt_Ret; auto.
-    - (* Vectors *)
-      cbn.
-      eapply orutt_bind with (RR:=(fun uvs1 uvs2 => uvalue_refine_strict (DV1.UVALUE_Vector uvs1) (UVALUE_Vector uvs2))).
-      { induction elts.
-        - cbn.
-          apply orutt_Ret; solve_uvalue_refine_strict.
-        - repeat rewrite map_monad_unfold.
-          cbn.
-          destruct a.
-          eapply orutt_bind.
-          { specialize (H (d, e) (or_introl eq_refl)).
-            cbn in H.
-            apply H.
-          }
-
-          intros r1 r2 H0.
-          forward IHelts.
-          { intros p H1 odt0.
-            eapply H.
-            right; auto.
-          }
-
-          eapply orutt_bind; eauto.
-
-          intros r0 r3 H1.
-          cbn in H1.
-          apply orutt_Ret.
-          rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in H1.
-          rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
-          rewrite map_monad_InT_cons.
-          cbn.
-          cbn in H1.
-          break_match_hyp; inv H1.
-          rewrite uvalue_refine_strict_equation in H0.
-          rewrite H0.
-          reflexivity.
-      }
-
-      intros r1 r2 H0.
-      apply orutt_Ret; auto.
-    - (* IBinops *)
-      cbn.
-      eapply orutt_bind; eauto.
-      intros r1 r2 H.
-      eapply orutt_bind; eauto.
-      intros r0 r3 H0.
-      apply orutt_Ret.
-
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
-      rewrite uvalue_refine_strict_equation in H, H0.
-      rewrite H, H0.
-      cbn.
-      reflexivity.
-    - (* ICmps *)
-      cbn.
-      eapply orutt_bind; eauto.
-      intros r1 r2 H.
-      eapply orutt_bind; eauto.
-      intros r0 r3 H0.
-      apply orutt_Ret.
-
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
-      rewrite uvalue_refine_strict_equation in H, H0.
-      rewrite H, H0.
-      cbn.
-      reflexivity.
-    - (* FBinops *)
-      cbn.
-      eapply orutt_bind; eauto.
-      intros r1 r2 H.
-      eapply orutt_bind; eauto.
-      intros r0 r3 H0.
-      apply orutt_Ret.
-
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
-      rewrite uvalue_refine_strict_equation in H, H0.
-      rewrite H, H0.
-      cbn.
-      reflexivity.
-    - (* FCmp *)
-      cbn.
-      eapply orutt_bind; eauto.
-      intros r1 r2 H.
-      eapply orutt_bind; eauto.
-      intros r0 r3 H0.
-      apply orutt_Ret.
-
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
-      rewrite uvalue_refine_strict_equation in H, H0.
-      rewrite H, H0.
-      cbn.
-      reflexivity.
+        * apply map_monad_OOM_fail in Heqo.
+          destruct Heqo as [v [HI HC]].
+          destruct (Forall2_In _ _ _ _ HI H0) as [x [HJ HX]].
+          rewrite HC in HX.
+          inversion HX.
+          
     - (* Conversion *)
       cbn.
       eapply orutt_bind; eauto.
       intros r1 r2 H.
       apply orutt_Ret.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
+      rewrite uvalue_refine_strict_equation; cbn;
       rewrite uvalue_refine_strict_equation in H.
       rewrite H.
       cbn.
       reflexivity.
+      
     - (* GetElementPtr *)
       destruct ptrval as [ptr_t ptrval].
       cbn.
       eapply orutt_bind; eauto.
       intros r1 r2 H0.
-      eapply orutt_bind with (RR:=(fun uvs1 uvs2 => uvalue_refine_strict (DV1.UVALUE_Array uvs1) (UVALUE_Array uvs2))).
-      { induction idxs.
-        - cbn.
-          apply orutt_Ret; solve_uvalue_refine_strict.
-        - repeat rewrite map_monad_unfold.
-          cbn.
-          destruct a.
-          eapply orutt_bind.
-          { specialize (H (d, e) (or_introl eq_refl)).
-            cbn in H.
-            apply H.
-          }
 
-          intros r0 r3 H1.
-          forward IHidxs.
-          { intros p H2 odt0.
-            eapply H.
-            right; auto.
-          }
-
-          eapply orutt_bind; eauto.
-
-          intros r4 r5 H2.
-          cbn in H2.
-          apply orutt_Ret.
-          rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in H2.
-          rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
-          rewrite map_monad_InT_cons.
-          cbn.
-          cbn in H2.
-          break_match_hyp; inv H2.
-          rewrite uvalue_refine_strict_equation in H1.
-          rewrite H1.
+      eapply orutt_bind with
+        (RR:=(fun uvs1 uvs2 =>
+                Forall2 uvalue_refine_strict uvs1 uvs2)
+        ).
+      + unfold uvalue_refine_strict. cbn.
+        revert H.
+        induction idxs; intros; cbn in *.
+        * apply orutt_Ret.
+          cbn.  constructor.
+        * destruct a. 
+          eapply orutt_bind with (RR:=(fun uvs1 uvs2 => uvalue_refine_strict uvs1 uvs2)).
+          -- eapply (H (d,e)). left; auto.
+          -- intros.
+             eapply orutt_bind with (RR:=(fun uvs1 uvs2 => Forall2 uvalue_refine_strict uvs1 uvs2)).
+             ++ apply IHidxs.
+                intros.
+                apply H.
+                right. assumption.
+             ++ intros.
+                apply orutt_Ret.
+                constructor; auto.
+      + intros.
+        apply orutt_Ret.
+        unfold uvalue_refine_strict.
+        cbn.
+        unfold uvalue_refine_strict in H0.
+        rewrite H0.
+        break_match_goal.
+        * rewrite map_monad_oom_Forall2 in Heqo.
+          rewrite (Forall2_ext_m _ _ _ _ H1 Heqo).
           reflexivity.
-      }
+        * apply map_monad_OOM_fail in Heqo.
+          destruct Heqo as [v [HI HC]].
+          destruct (Forall2_In _ _ _ _ HI H1) as [x [HJ HX]].
+          unfold uvalue_refine_strict in HX.
+          rewrite HC in HX.
+          inversion HX.
 
-      intros r0 r3 H1.
-      apply orutt_Ret.
-
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
-      rewrite uvalue_refine_strict_equation in H0, H1.
-      cbn.
-      rewrite H0.
-      rewrite uvalue_convert_strict_equation in H1.
-      cbn in H1.
-      break_match_hyp; inv H1.
-      reflexivity.
     - (* ExtractElement *)
       destruct vec as [vec_t vec].
       destruct idx as [idx_t idx].
@@ -6036,18 +5685,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       eapply orutt_bind; eauto.
       intros r1 r2 H.
-
       eapply orutt_bind; eauto.
       intros r0 r3 H0.
-
       apply orutt_Ret.
 
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
+      rewrite uvalue_refine_strict_equation; cbn.
       rewrite uvalue_refine_strict_equation in H0, H.
       cbn.
-
       rewrite H, H0.
       reflexivity.
+      
     - (* InsertElement *)
       destruct vec as [vec_t vec].
       destruct idx as [idx_t idx].
@@ -6065,12 +5712,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       apply orutt_Ret.
 
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
+      rewrite uvalue_refine_strict_equation; cbn. 
       rewrite uvalue_refine_strict_equation in H, H0, H1.
       cbn.
 
       rewrite H, H0, H1.
       reflexivity.
+      
     - (* ShuffleVector *)
       destruct vec1 as [vec1_t vec1].
       destruct vec2 as [vec2_t vec2].
@@ -6088,12 +5736,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       apply orutt_Ret.
 
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
+      rewrite uvalue_refine_strict_equation; cbn.
       rewrite uvalue_refine_strict_equation in H, H0, H1.
       cbn.
 
       rewrite H, H0, H1.
       reflexivity.
+      
     - (* ExtractValue *)
       destruct vec as [vec_t vec].
       cbn.
@@ -6103,12 +5752,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       apply orutt_Ret.
 
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
+      rewrite uvalue_refine_strict_equation; cbn.
       rewrite uvalue_refine_strict_equation in H.
       cbn.
 
       rewrite H.
       reflexivity.
+      
     - (* InsertValue *)
       destruct vec as [vec_t vec].
       destruct elt as [elt_t elt].
@@ -6122,12 +5772,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       apply orutt_Ret.
 
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
+      rewrite uvalue_refine_strict_equation; cbn.
       rewrite uvalue_refine_strict_equation in H, H0.
       cbn.
 
       rewrite H, H0.
       reflexivity.
+      
     - (* Select *)
       destruct cnd, v1, v2.
       cbn.
@@ -6143,12 +5794,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       apply orutt_Ret.
 
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
+      rewrite uvalue_refine_strict_equation; cbn.
       rewrite uvalue_refine_strict_equation in H, H0, H1.
       cbn.
 
       rewrite H, H0, H1.
       reflexivity.
+      
     - (* Freeze *)
       destruct v; cbn.
       eapply orutt_bind; eauto.
