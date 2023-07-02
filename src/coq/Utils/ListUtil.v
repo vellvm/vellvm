@@ -1604,20 +1604,6 @@ Proof.
     + right. intros C. apply n. intuition.
 Qed.
 
-  Lemma Forall2_repeat_OOM : forall {A B} (f : A -> OOM B) (a:A) (b:B) n (l:list B),
-      f a = ret b ->
-      Forall2 (fun a b => f a = ret b) (repeat a n) l ->
-      l = repeat b n.
-  Proof.
-    intros A B f a b n l EQ F. 
-    revert l EQ F.
-    induction n; intros; cbn in *.
-    - inversion F. reflexivity.
-    - inversion F; subst.
-      rewrite EQ in H1. inversion H1; subst.
-      rewrite (IHn l'); auto.
-  Qed.
-
 
 Inductive Forall2T {A B : Type} (f : A -> B -> Type) : list A -> list B -> Type :=
 | Forall2T_nil : Forall2T f [] []

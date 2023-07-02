@@ -1083,10 +1083,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (* Opaque DVCrev.uvalue_convert_lazy. *)
   (* Opaque DVCrev.dvalue_refine_lazy. *)
   (* Opaque DVCrev.uvalue_refine_lazy. *)
-  Opaque dvalue_convert_strict.
-  Opaque uvalue_convert_strict.
-  Opaque dvalue_refine_strict.
-  Opaque uvalue_refine_strict.
+  (* Opaque dvalue_convert_strict. *)
+  (* Opaque uvalue_convert_strict. *)
+  (* Opaque dvalue_refine_strict. *)
+  (* Opaque uvalue_refine_strict. *)
   (* Opaque DVCrev.dvalue_convert_strict. *)
   (* Opaque DVCrev.uvalue_convert_strict. *)
   (* Opaque DVCrev.dvalue_refine_strict. *)
@@ -4761,17 +4761,17 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     repeat
       match goal with
       | H: uvalue_convert_strict _ = _ |- _ =>
-          rewrite H
+          rewrite H; clear H
       end.
+
 
   Ltac solve_pick_uvalue_orutt :=
     apply orutt_trigger; cbn;
     [ split;
       [ tauto
-      | unfold_uvalue_refine_strict_goal;
-        rewrite_uvalue_convert_strict;
-        cbn;
-        reflexivity
+      | cbn;
+        unfold uvalue_refine_strict; cbn;
+        repeat rewrite_uvalue_convert_strict; auto
       ]
     | intros [t1] [t2] [_ [REF1 REF2]];
       cbn; auto
@@ -4779,6 +4779,71 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inv CONTRA
     ].
 
+
+  Lemma is_concrete_l:
+    forall (l : list DV1.uvalue) (l' : list DV2.uvalue),
+      Forall2 (fun (a : DV1.uvalue) (b : DV2.uvalue) => uvalue_convert_strict a = NoOom b) l l' ->
+      forallb IS1.LP.Events.DV.is_concrete l = true ->
+      forallb is_concrete l' = true.
+  Proof.
+    intros l l' H.
+    induction H; intros HL.
+    - reflexivity.
+    - cbn in *.
+      apply andb_prop in HL.
+      destruct HL as [HX HL].
+      specialize (uvalue_refine_strict_preserves_is_concrete x y _ H HX) as HY.
+      rewrite HY. clear H HX HY.
+      rewrite IHForall2; auto.
+  Qed.
+
+
+  Lemma is_concrete_l_false:
+    forall (fields : list DV1.uvalue) (l : list DV2.uvalue),
+      Forall2 (fun (a : DV1.uvalue) (b : DV2.uvalue) => uvalue_convert_strict a = NoOom b) fields l ->
+      forallb IS1.LP.Events.DV.is_concrete fields = false -> 
+      forallb is_concrete l = true
+      -> False.
+  Proof.
+    intros fields l H.
+    induction H; intros HF HL.
+    - inversion HF.
+    - simpl in *.
+      apply Bool.andb_false_elim in HF.
+      apply andb_prop in HL.
+      destruct HL as [HY HL].
+      destruct HF as [HF | HF].
+      + rewrite (uvalue_refine_strict_preserves_is_concrete _ _ false H HF) in HY.
+        inversion HY.
+      + eapply IHForall2; eauto.
+  Qed.
+  
+  (* SAZ: This could be significantly generalized. *)
+  Lemma map_dvalue_convert_strict_succeeds:
+    forall (fields : list DV1.uvalue) (l : list DV2.uvalue),
+      Forall2 (fun (a : DV1.uvalue) (b : DV2.uvalue) => uvalue_convert_strict a = NoOom b) fields l ->
+      forall l0 : list IS1.LP.Events.DV.dvalue,
+        Forall2
+          (fun (a : IS1.LP.Events.DV.uvalue) (b : IS1.LP.Events.DV.dvalue) =>
+             IS1.LP.Events.DV.uvalue_to_dvalue a = inr b) fields l0 ->
+        forall l1 : list dvalue,
+          map_monad uvalue_to_dvalue l = inr l1 -> map_monad dvalue_convert_strict l0 = NoOom l1.
+  Proof.
+    intros fields l Heqo l0 Heqs l1 Heqs0.
+    rewrite map_monad_err_Forall2 in Heqs0.
+    rewrite map_monad_oom_Forall2.
+    revert l0 Heqs l1 Heqs0.
+    induction Heqo; intros; inversion Heqs; inversion Heqs0; subst.
+    - constructor.
+    - constructor; eauto.
+      clear Heqo IHHeqo Heqs Heqs0 H4 H9 l l' l'0 l'1.
+      destruct (uvalue_to_dvalue_dvalue_refine_strict _ _ _ H H2) as [z [HZ HRZ]].
+      unfold dvalue_refine_strict in HRZ.
+      rewrite H7 in HZ. inversion HZ.
+      auto.
+  Qed.
+      
+  
   (* TODO: Should I move this out of LangRefine and into some kind of
      utility module based on DvalueConversions.v? *)
   Lemma pick_your_poison_orutt :
@@ -4789,66 +4854,39 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (pick_your_poison r2)
         (OOM:=OOME).
   Proof.
-    intros r1 r2 H.
-
+    intros r1.
     unfold pick_your_poison, IS1.LLVM.D.pick_your_poison.
-    rewrite uvalue_refine_strict_equation in H.
-    destruct r1; rewrite uvalue_convert_strict_equation in H; cbn in *;
+    destruct r1; intros r2 HRS;
+    rewrite uvalue_refine_strict_equation in HRS; cbn in HRS;
       try solve
         [
-          inv H; cbn;
+          inv HRS; cbn;
           apply orutt_Ret;
-          rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation; auto
-        | break_match_hyp; inv H;
-          try (break_match_hyp; inv H1);
-          unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick in *;
+          rewrite dvalue_refine_strict_equation; cbn; auto
+        | break_match_hyp_inv;
           cbn;
-
+          apply orutt_Ret;
+          rewrite dvalue_refine_strict_equation;
+          cbn;
+          rewrite Heqo;
+          reflexivity
+        | repeat break_match_hyp_inv;
+          cbn in *;
           eapply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2));
+            cbn;
           [ solve_pick_uvalue_orutt
           | intros [?r1] [?r2] ?H0;
             cbn in *;
             apply orutt_Ret; auto
           ]
         ].
-    - break_match_hyp; inv H; cbn.
-      apply orutt_Ret.
-      rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation.
-      cbn.
-      rewrite Heqo.
-      reflexivity.
-    - (* iptr *)
-      break_match_hyp; inv H.
-      cbn.
-      apply orutt_Ret.
-      unfold_dvalue_refine_strict.
-      cbn.
-      rewrite Heqo.
-      reflexivity.
-    - (* undef *)
-      inv H.
-      cbn.
-      eapply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)); eauto.
-      { (* pick_uvalue *)
-        (* TODO: make this a lemma? *)
-        apply orutt_trigger; cbn.
-        split; [tauto | solve_uvalue_refine_strict].
-        intros [t1] [t2] [_ [REF1 REF2]].
-        cbn; auto.
-        intros o CONTRA.
-        inv CONTRA.
-      }
 
-      intros r1 r2 H.
-      destruct r1, r2.
-      cbn in *.
-      apply orutt_Ret; auto.
     - (* Poison *)
-      inv H; cbn.
+      inv HRS; cbn.
       eapply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)); eauto.
       { (* pick_uvalue *)
         apply orutt_trigger; cbn.
-        split; [tauto | solve_uvalue_refine_strict].
+        split; [tauto | unfold uvalue_refine_strict; cbn; reflexivity].
         intros [t1] [t2] [_ [REF1 REF2]].
         cbn; auto.
         intros o CONTRA.
@@ -4859,629 +4897,381 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       destruct r1, r2.
       cbn in *.
       apply orutt_Ret; auto.
+
+    - (* Undef *)
+      inv HRS; cbn.
+      eapply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)); eauto.
+      { (* pick_uvalue *)
+        apply orutt_trigger; cbn.
+        split; [tauto | unfold uvalue_refine_strict; cbn; reflexivity].
+        intros [t1] [t2] [_ [REF1 REF2]].
+        cbn; auto.
+        intros o CONTRA.
+        inv CONTRA.
+      }
+
+      intros r1 r2 H.
+      destruct r1, r2.
+      cbn in *.
+      apply orutt_Ret; auto.
+      
     - (* Structs *)
-      break_match_hyp; inv H; cbn.
-      generalize dependent l.
-      induction fields; intros l Heqo.
-      + cbn in *. inv Heqo.
-        cbn.
-        apply orutt_Ret; auto.
-        solve_dvalue_refine_strict.
-      + rewrite map_monad_InT_cons in Heqo.
-        cbn in Heqo.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
-
-        specialize (IHfields l0 eq_refl).
-        unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick.
-        cbn.
-
-        pose proof uvalue_refine_strict_preserves_is_concrete a u (IS1.LP.Events.DV.is_concrete a) Heqo0 eq_refl.
-        rewrite H.
-        clear H.
-
-        assert (forallb IS1.LP.Events.DV.is_concrete fields = forallb is_concrete l0).
-        { (* Should follow from Heqo *)
-          clear IHfields.
-          generalize dependent l0.
-          induction fields; intros l0 Heqo.
-          - cbn in *; inv Heqo.
-            cbn. auto.
-          - rewrite map_monad_InT_cons in Heqo.
-            cbn in *.
-            break_match_hyp; inv Heqo.
-            break_match_hyp; inv H0.
-            cbn.
-            specialize (IHfields l eq_refl).
-            rewrite IHfields.
-            erewrite uvalue_refine_strict_preserves_is_concrete; eauto.
-            solve_uvalue_refine_strict.
-        }
-
-        cbn. rewrite H.
+      break_match_hyp; inv HRS; cbn.
+      rewrite map_monad_oom_Forall2 in Heqo.
+      unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick.
+      cbn.
+      break_match_goal.
+      + specialize (is_concrete_l fields l Heqo Heqb) as HL.
+        rewrite HL.
+        clear Heqb HL.
         break_match_goal.
-        { apply andb_prop in Heqb as [CONCa CONCl0].
-          apply IS1.LP.Events.DV.is_concrete_uvalue_to_dvalue in CONCa as [dva CONCa].
-          rewrite CONCa.
-          pose proof (uvalue_to_dvalue_dvalue_refine_strict _ _ _ Heqo0 CONCa) as [dvu [UV2DVdvu REFdvu]].
-          rewrite UV2DVdvu.
-
-          rewrite CONCl0 in H.
-
-          (* I should know from H and CONCl0 that uvalue_to_dvalue
-              succeeds for each element in the map_monads... *)
-          break_inner_match_goal.
-          { apply map_monad_err_fail in Heqs.
-            destruct Heqs as [a' [INa' UV2DVa']].
-            apply forallb_forall with (x:=a') in H; auto.
-
-            apply IS1.LP.Events.DV.is_concrete_uvalue_to_dvalue in H as [dva' CONCa'].
-            rewrite CONCa' in UV2DVa'. inv UV2DVa'.
+        * assert (exists v, map_monad uvalue_to_dvalue l = inl v).
+          { revert s Heqs.
+            induction Heqo; intros; [inversion Heqs|].
+            cbn in Heqs.
+            cbn. 
+            repeat break_match_hyp_inv.
+            -- destruct (uvalue_to_dvalue_dvalue_refine_strict_error _ _ _ H Heqs0).
+               exists x0. rewrite H0. reflexivity.
+            -- break_match_goal; [eexists; eauto|].
+               destruct (IHHeqo s eq_refl) as [s' EQ].
+               exists s'. rewrite EQ. reflexivity.
           }
-
-          break_inner_match_goal.
-          { apply map_monad_err_fail in Heqs0.
-            destruct Heqs0 as [a' [INa' UV2DVa']].
-            apply forallb_forall with (x:=a') in CONCl0; auto.
-
-            apply is_concrete_uvalue_to_dvalue in CONCl0 as [dva' CONCa'].
-            rewrite CONCa' in UV2DVa'. inv UV2DVa'.
-          }
-
+          destruct H as [s' EQ].
+          rewrite EQ.
           cbn.
-          apply orutt_Ret.
-
-          unfold_dvalue_refine_strict_goal.
-          rewrite map_monad_InT_cons.
-          cbn.
-          rewrite REFdvu.
-
-          break_inner_match_goal.
-          2: {
-            apply map_monad_InT_OOM_failT in Heqo1.
-            destruct Heqo1 as [a' [INa' CONVa']].
-            apply map_monad_err_InT with (x:=a') in Heqs; auto.
-            destruct Heqs as [y [UV2DVy INy]].
-
-            eapply map_monad_InT_OOM_succeeds' in Heqo; eauto.
-            destruct Heqo as [b UVCyb].
-            pose proof (uvalue_to_dvalue_dvalue_refine_strict _ _ _ UVCyb UV2DVy) as [dva' [UV2DVa' REFa']].
-            rewrite REFa' in CONVa'.
-            inv CONVa'.
-          }
-
-          (* l2 is (dvalue_convert_strict (IS1.uvalue_to_dvalue f))
-                 l1 is (uvalue_to_dvalue (uvalue_convert_strict f))
-           *)
-          unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick in IHfields.
-          cbn in IHfields.
-          setoid_rewrite CONCl0 in IHfields.
-          setoid_rewrite H in IHfields.
-          rewrite Heqs in IHfields.
-          rewrite Heqs0 in IHfields.
-          cbn in IHfields.
-          apply orutt_inv_Ret in IHfields.
-          unfold_dvalue_refine_strict_in IHfields.
-          rewrite Heqo1 in IHfields.
-          cbn in IHfields.
-          inv IHfields.
-          auto.
-        }
-        { eapply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
+          apply orutt_raise; [intros; intro C; inversion C | cbn; auto].
+        * cbn.
+          rewrite map_monad_err_Forall2 in Heqs.
+          break_match_goal; cbn.
+          -- assert False.
+             { revert s l0 Heqs Heqs0.
+               induction Heqo; intros; [inversion Heqs0|].
+               cbn in Heqs0.
+               inversion Heqs; subst.
+               repeat break_match_hyp_inv.
+               ++ destruct (uvalue_to_dvalue_dvalue_refine_strict _ _ _ H H2) as [v [C _]].
+                  rewrite Heqs1 in C.
+                  inversion C.
+               ++ eapply IHHeqo; eauto.
+             }
+             inversion H.
+          -- apply orutt_Ret.
+             unfold dvalue_refine_strict.
+             cbn.
+             erewrite map_dvalue_convert_strict_succeeds; eauto.
+      + break_match_goal.
+        * assert False by (eapply is_concrete_l_false; eauto).
+          inversion H.
+        * apply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
           { (* Pick uvalue *)
             apply orutt_trigger; cbn.
-            split; [tauto | ].
-            { unfold_uvalue_refine_strict_goal.
-              rewrite map_monad_InT_cons.
-              cbn.
-              rewrite Heqo0.
-              rewrite Heqo.
-              reflexivity.
-            }
-            intros [t1] [t2] [_ [REF1 REF2]].
-            cbn; auto.
-            intros o CONTRA.
-            inv CONTRA.
+            -- split; [tauto | ].
+               unfold uvalue_refine_strict. cbn.
+               
+               break_match_goal.
+               ++ rewrite map_monad_oom_Forall2 in Heqo0.
+                  clear Heqb Heqb0.
+                  assert (l0 = l).
+                  { revert l0 Heqo0.
+                    induction Heqo; intros; inversion Heqo0; subst; auto.
+                    specialize (uvalue_refine_strict_R2_injective _ _ _ _ H H2) as [EQ _].
+                    rewrite (EQ eq_refl) in *; clear EQ.
+                    erewrite (IHHeqo l'0); eauto.
+                  }
+                  rewrite H; auto.
+               ++  apply map_monad_OOM_fail in Heqo0.
+                   destruct Heqo0 as [dv [HI HS]].
+                   destruct (Forall2_In _ _ _ _ HI Heqo) as [dv' [_ C]].
+                   rewrite HS in C. inversion C.
+            -- intros [t1] [t2] [_ [REF1 REF2]].
+               cbn; auto.
+            --  intros o.
+                intro C.
+                inv C.
           }
 
           intros [r1] [r2] H0.
           cbn in *.
           apply orutt_Ret; auto.
-        }
-    - (* Packed structs *)
-      break_match_hyp; inv H; cbn.
-      generalize dependent l.
-      induction fields; intros l Heqo.
-      + cbn in *. inv Heqo.
-        cbn.
-        apply orutt_Ret; auto.
-        solve_dvalue_refine_strict.
-      + rewrite map_monad_InT_cons in Heqo.
-        cbn in Heqo.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
 
-        specialize (IHfields l0 eq_refl).
-        unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick.
-        cbn.
-
-        pose proof uvalue_refine_strict_preserves_is_concrete a u (IS1.LP.Events.DV.is_concrete a) Heqo0 eq_refl.
-        rewrite H.
-        clear H.
-
-        assert (forallb IS1.LP.Events.DV.is_concrete fields = forallb is_concrete l0).
-        { (* Should follow from Heqo *)
-          clear IHfields.
-          generalize dependent l0.
-          induction fields; intros l0 Heqo.
-          - cbn in *; inv Heqo.
-            cbn. auto.
-          - rewrite map_monad_InT_cons in Heqo.
-            cbn in *.
-            break_match_hyp; inv Heqo.
-            break_match_hyp; inv H0.
-            cbn.
-            specialize (IHfields l eq_refl).
-            rewrite IHfields.
-            erewrite uvalue_refine_strict_preserves_is_concrete; eauto.
-            solve_uvalue_refine_strict.
-        }
-
-        cbn. rewrite H.
+    - (* Packed Structs *)
+      break_match_hyp; inv HRS; cbn.
+      rewrite map_monad_oom_Forall2 in Heqo.
+      unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick.
+      cbn.
+      break_match_goal.
+      + specialize (is_concrete_l fields l Heqo Heqb) as HL.
+        rewrite HL.
+        clear Heqb HL.
         break_match_goal.
-        { apply andb_prop in Heqb as [CONCa CONCl0].
-          apply IS1.LP.Events.DV.is_concrete_uvalue_to_dvalue in CONCa as [dva CONCa].
-          rewrite CONCa.
-          pose proof (uvalue_to_dvalue_dvalue_refine_strict _ _ _ Heqo0 CONCa) as [dvu [UV2DVdvu REFdvu]].
-          rewrite UV2DVdvu.
-
-          rewrite CONCl0 in H.
-
-          (* I should know from H and CONCl0 that uvalue_to_dvalue
-              succeeds for each element in the map_monads... *)
-          break_inner_match_goal.
-          { apply map_monad_err_fail in Heqs.
-            destruct Heqs as [a' [INa' UV2DVa']].
-            apply forallb_forall with (x:=a') in H; auto.
-
-            apply IS1.LP.Events.DV.is_concrete_uvalue_to_dvalue in H as [dva' CONCa'].
-            rewrite CONCa' in UV2DVa'. inv UV2DVa'.
+        * assert (exists v, map_monad uvalue_to_dvalue l = inl v).
+          { revert s Heqs.
+            induction Heqo; intros; [inversion Heqs|].
+            cbn in Heqs.
+            cbn. 
+            repeat break_match_hyp_inv.
+            -- destruct (uvalue_to_dvalue_dvalue_refine_strict_error _ _ _ H Heqs0).
+               exists x0. rewrite H0. reflexivity.
+            -- break_match_goal; [eexists; eauto|].
+               destruct (IHHeqo s eq_refl) as [s' EQ].
+               exists s'. rewrite EQ. reflexivity.
           }
-
-          break_inner_match_goal.
-          { apply map_monad_err_fail in Heqs0.
-            destruct Heqs0 as [a' [INa' UV2DVa']].
-            apply forallb_forall with (x:=a') in CONCl0; auto.
-
-            apply is_concrete_uvalue_to_dvalue in CONCl0 as [dva' CONCa'].
-            rewrite CONCa' in UV2DVa'. inv UV2DVa'.
-          }
-
+          destruct H as [s' EQ].
+          rewrite EQ.
           cbn.
-          apply orutt_Ret.
-
-          unfold_dvalue_refine_strict_goal.
-          rewrite map_monad_InT_cons.
-          cbn.
-          rewrite REFdvu.
-
-          break_inner_match_goal.
-          2: {
-            apply map_monad_InT_OOM_failT in Heqo1.
-            destruct Heqo1 as [a' [INa' CONVa']].
-            apply map_monad_err_InT with (x:=a') in Heqs; auto.
-            destruct Heqs as [y [UV2DVy INy]].
-
-            eapply map_monad_InT_OOM_succeeds' in Heqo; eauto.
-            destruct Heqo as [b UVCyb].
-            pose proof (uvalue_to_dvalue_dvalue_refine_strict _ _ _ UVCyb UV2DVy) as [dva' [UV2DVa' REFa']].
-            rewrite REFa' in CONVa'.
-            inv CONVa'.
-          }
-
-          (* l2 is (dvalue_convert_strict (IS1.uvalue_to_dvalue f))
-                 l1 is (uvalue_to_dvalue (uvalue_convert_strict f))
-           *)
-          unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick in IHfields.
-          cbn in IHfields.
-          setoid_rewrite CONCl0 in IHfields.
-          setoid_rewrite H in IHfields.
-          rewrite Heqs in IHfields.
-          rewrite Heqs0 in IHfields.
-          cbn in IHfields.
-          apply orutt_inv_Ret in IHfields.
-          unfold_dvalue_refine_strict_in IHfields.
-          rewrite Heqo1 in IHfields.
-          cbn in IHfields.
-          inv IHfields.
-          auto.
-        }
-        { eapply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
+          apply orutt_raise; [intros; intro C; inversion C | cbn; auto].
+        * cbn.
+          rewrite map_monad_err_Forall2 in Heqs.
+          break_match_goal; cbn.
+          -- assert False.
+             { revert s l0 Heqs Heqs0.
+               induction Heqo; intros; [inversion Heqs0|].
+               cbn in Heqs0.
+               inversion Heqs; subst.
+               repeat break_match_hyp_inv.
+               ++ destruct (uvalue_to_dvalue_dvalue_refine_strict _ _ _ H H2) as [v [C _]].
+                  rewrite Heqs1 in C.
+                  inversion C.
+               ++ eapply IHHeqo; eauto.
+             }
+             inversion H.
+          -- apply orutt_Ret.
+             unfold dvalue_refine_strict.
+             cbn.
+             erewrite map_dvalue_convert_strict_succeeds; eauto.
+      + break_match_goal.
+        * assert False by (eapply is_concrete_l_false; eauto).
+          inversion H.
+        * apply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
           { (* Pick uvalue *)
             apply orutt_trigger; cbn.
-            split; [tauto | ].
-            { unfold_uvalue_refine_strict_goal.
-              rewrite map_monad_InT_cons.
-              cbn.
-              rewrite Heqo0.
-              rewrite Heqo.
-              reflexivity.
-            }
-            intros [t1] [t2] [_ [REF1 REF2]].
-            cbn; auto.
-            intros o CONTRA.
-            inv CONTRA.
+            -- split; [tauto | ].
+               unfold uvalue_refine_strict. cbn.
+               
+               break_match_goal.
+               ++ rewrite map_monad_oom_Forall2 in Heqo0.
+                  clear Heqb Heqb0.
+                  assert (l0 = l).
+                  { revert l0 Heqo0.
+                    induction Heqo; intros; inversion Heqo0; subst; auto.
+                    specialize (uvalue_refine_strict_R2_injective _ _ _ _ H H2) as [EQ _].
+                    rewrite (EQ eq_refl) in *; clear EQ.
+                    erewrite (IHHeqo l'0); eauto.
+                  }
+                  rewrite H; auto.
+               ++  apply map_monad_OOM_fail in Heqo0.
+                   destruct Heqo0 as [dv [HI HS]].
+                   destruct (Forall2_In _ _ _ _ HI Heqo) as [dv' [_ C]].
+                   rewrite HS in C. inversion C.
+            -- intros [t1] [t2] [_ [REF1 REF2]].
+               cbn; auto.
+            --  intros o.
+                intro C.
+                inv C.
           }
 
           intros [r1] [r2] H0.
           cbn in *.
           apply orutt_Ret; auto.
-        }
+
     - (* Arrays *)
-      break_match_hyp; inv H.
-      generalize dependent l.
-      induction elts; intros l Heqo.
-      + cbn in *; inv Heqo.
-        cbn.
-        apply orutt_Ret.
-        solve_dvalue_refine_strict.
-      + rewrite map_monad_InT_cons in Heqo.
-        cbn in *.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
-        unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick in *.
-        cbn.
-
-        specialize (IHelts l0 eq_refl).
-        pose proof uvalue_refine_strict_preserves_is_concrete a u (IS1.LP.Events.DV.is_concrete a) Heqo0 eq_refl.
-        rewrite H.
-        clear H.
-
-        assert (forallb IS1.LP.Events.DV.is_concrete elts = forallb is_concrete l0).
-        { clear IHelts.
-          generalize dependent l0.
-          induction elts; intros l0 Heqo.
-          - cbn in *; inv Heqo.
-            cbn. auto.
-          - rewrite map_monad_InT_cons in Heqo.
-            cbn in *.
-            break_match_hyp; inv Heqo.
-            break_match_hyp; inv H0.
-            cbn.
-            specialize (IHelts l eq_refl).
-            rewrite IHelts.
-            erewrite uvalue_refine_strict_preserves_is_concrete; eauto.
-            solve_uvalue_refine_strict.
-        }
-
-        cbn. rewrite H.
+      break_match_hyp; inv HRS; cbn.
+      rewrite map_monad_oom_Forall2 in Heqo.
+      unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick.
+      cbn.
+      break_match_goal.
+      + specialize (is_concrete_l elts l Heqo Heqb) as HL.
+        rewrite HL.
+        clear Heqb HL.
         break_match_goal.
-        { apply andb_prop in Heqb as [CONCa CONCl0].
-          apply IS1.LP.Events.DV.is_concrete_uvalue_to_dvalue in CONCa as [dva CONCa].
-          rewrite CONCa.
-          pose proof (uvalue_to_dvalue_dvalue_refine_strict _ _ _ Heqo0 CONCa) as [dvu [UV2DVdvu REFdvu]].
-          rewrite UV2DVdvu.
-
-          rewrite CONCl0 in H.
-
-          (* I should know from H and CONCl0 that uvalue_to_dvalue
-              succeeds for each element in the map_monads... *)
-          break_inner_match_goal.
-          { apply map_monad_err_fail in Heqs.
-            destruct Heqs as [a' [INa' UV2DVa']].
-            apply forallb_forall with (x:=a') in H; auto.
-
-            apply IS1.LP.Events.DV.is_concrete_uvalue_to_dvalue in H as [dva' CONCa'].
-            rewrite CONCa' in UV2DVa'. inv UV2DVa'.
+        * assert (exists v, map_monad uvalue_to_dvalue l = inl v).
+          { revert s Heqs.
+            induction Heqo; intros; [inversion Heqs|].
+            cbn in Heqs.
+            cbn. 
+            repeat break_match_hyp_inv.
+            -- destruct (uvalue_to_dvalue_dvalue_refine_strict_error _ _ _ H Heqs0).
+               exists x0. rewrite H0. reflexivity.
+            -- break_match_goal; [eexists; eauto|].
+               destruct (IHHeqo s eq_refl) as [s' EQ].
+               exists s'. rewrite EQ. reflexivity.
           }
-
-          break_inner_match_goal.
-          { apply map_monad_err_fail in Heqs0.
-            destruct Heqs0 as [a' [INa' UV2DVa']].
-            apply forallb_forall with (x:=a') in CONCl0; auto.
-
-            apply is_concrete_uvalue_to_dvalue in CONCl0 as [dva' CONCa'].
-            rewrite CONCa' in UV2DVa'. inv UV2DVa'.
-          }
-
+          destruct H as [s' EQ].
+          rewrite EQ.
           cbn.
-          apply orutt_Ret.
-
-          unfold_dvalue_refine_strict_goal.
-          rewrite map_monad_InT_cons.
-          cbn.
-          rewrite REFdvu.
-
-          break_inner_match_goal.
-          2: {
-            apply map_monad_InT_OOM_fail in Heqo1.
-            destruct Heqo1 as [a' [INa' CONVa']].
-            apply map_monad_err_InT with (x:=a') in Heqs; auto.
-            destruct Heqs as [y [UV2DVy INy]].
-
-            eapply map_monad_InT_OOM_succeeds' in Heqo; eauto.
-            destruct Heqo as [b UVCyb].
-            pose proof (uvalue_to_dvalue_dvalue_refine_strict _ _ _ UVCyb UV2DVy) as [dva' [UV2DVa' REFa']].
-            rewrite REFa' in CONVa'.
-            inv CONVa'.
-          }
-
-          (* l2 is (dvalue_convert_strict (IS1.uvalue_to_dvalue f))
-                 l1 is (uvalue_to_dvalue (uvalue_convert_strict f))
-           *)
-          cbn in IHelts.
-          setoid_rewrite CONCl0 in IHelts.
-          setoid_rewrite H in IHelts.
-          rewrite Heqs in IHelts.
-          rewrite Heqs0 in IHelts.
-          cbn in IHelts.
-          apply orutt_inv_Ret in IHelts.
-          unfold_dvalue_refine_strict_in IHelts.
-          rewrite Heqo1 in IHelts.
-          cbn in IHelts.
-          inv IHelts.
-          auto.
-        }
-        { eapply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
+          apply orutt_raise; [intros; intro C; inversion C | cbn; auto].
+        * cbn.
+          rewrite map_monad_err_Forall2 in Heqs.
+          break_match_goal; cbn.
+          -- assert False.
+             { revert s l0 Heqs Heqs0.
+               induction Heqo; intros; [inversion Heqs0|].
+               cbn in Heqs0.
+               inversion Heqs; subst.
+               repeat break_match_hyp_inv.
+               ++ destruct (uvalue_to_dvalue_dvalue_refine_strict _ _ _ H H2) as [v [C _]].
+                  rewrite Heqs1 in C.
+                  inversion C.
+               ++ eapply IHHeqo; eauto.
+             }
+             inversion H.
+          -- apply orutt_Ret.
+             unfold dvalue_refine_strict.
+             cbn.
+             erewrite map_dvalue_convert_strict_succeeds; eauto.
+      + break_match_goal.
+        * assert False by (eapply is_concrete_l_false; eauto).
+          inversion H.
+        * apply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
           { (* Pick uvalue *)
             apply orutt_trigger; cbn.
-            split; [tauto | ].
-            { unfold_uvalue_refine_strict_goal.
-              rewrite map_monad_InT_cons.
-              cbn.
-              rewrite Heqo0.
-              rewrite Heqo.
-              reflexivity.
-            }
-            intros [t1] [t2] [_ [REF1 REF2]].
-            cbn; auto.
-            intros o CONTRA.
-            inv CONTRA.
+            -- split; [tauto | ].
+               unfold uvalue_refine_strict. cbn.
+               
+               break_match_goal.
+               ++ rewrite map_monad_oom_Forall2 in Heqo0.
+                  clear Heqb Heqb0.
+                  assert (l0 = l).
+                  { revert l0 Heqo0.
+                    induction Heqo; intros; inversion Heqo0; subst; auto.
+                    specialize (uvalue_refine_strict_R2_injective _ _ _ _ H H2) as [EQ _].
+                    rewrite (EQ eq_refl) in *; clear EQ.
+                    erewrite (IHHeqo l'0); eauto.
+                  }
+                  rewrite H; auto.
+               ++  apply map_monad_OOM_fail in Heqo0.
+                   destruct Heqo0 as [dv [HI HS]].
+                   destruct (Forall2_In _ _ _ _ HI Heqo) as [dv' [_ C]].
+                   rewrite HS in C. inversion C.
+            -- intros [t1] [t2] [_ [REF1 REF2]].
+               cbn; auto.
+            --  intros o.
+                intro C.
+                inv C.
           }
 
           intros [r1] [r2] H0.
           cbn in *.
           apply orutt_Ret; auto.
-        }
-    - (* Vectors *)
-      break_match_hyp; inv H.
-      generalize dependent l.
-      induction elts; intros l Heqo.
-      + cbn in *; inv Heqo.
-        cbn.
-        apply orutt_Ret.
-        solve_dvalue_refine_strict.
-      + rewrite map_monad_InT_cons in Heqo.
-        cbn in *.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
-        unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick in *.
-        cbn.
-
-        specialize (IHelts l0 eq_refl).
-        pose proof uvalue_refine_strict_preserves_is_concrete a u (IS1.LP.Events.DV.is_concrete a) Heqo0 eq_refl.
-        rewrite H.
-        clear H.
-
-        assert (forallb IS1.LP.Events.DV.is_concrete elts = forallb is_concrete l0).
-        { clear IHelts.
-          generalize dependent l0.
-          induction elts; intros l0 Heqo.
-          - cbn in *; inv Heqo.
-            cbn. auto.
-          - rewrite map_monad_InT_cons in Heqo.
-            cbn in *.
-            break_match_hyp; inv Heqo.
-            break_match_hyp; inv H0.
-            cbn.
-            specialize (IHelts l eq_refl).
-            rewrite IHelts.
-            erewrite uvalue_refine_strict_preserves_is_concrete; eauto.
-            solve_uvalue_refine_strict.
-        }
-
-        cbn. rewrite H.
+          
+    - (* Arrays *)
+      break_match_hyp; inv HRS; cbn.
+      rewrite map_monad_oom_Forall2 in Heqo.
+      unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick.
+      cbn.
+      break_match_goal.
+      + specialize (is_concrete_l elts l Heqo Heqb) as HL.
+        rewrite HL.
+        clear Heqb HL.
         break_match_goal.
-        { apply andb_prop in Heqb as [CONCa CONCl0].
-          apply IS1.LP.Events.DV.is_concrete_uvalue_to_dvalue in CONCa as [dva CONCa].
-          rewrite CONCa.
-          pose proof (uvalue_to_dvalue_dvalue_refine_strict _ _ _ Heqo0 CONCa) as [dvu [UV2DVdvu REFdvu]].
-          rewrite UV2DVdvu.
-
-          rewrite CONCl0 in H.
-
-          (* I should know from H and CONCl0 that uvalue_to_dvalue
-              succeeds for each element in the map_monads... *)
-          break_inner_match_goal.
-          { apply map_monad_err_fail in Heqs.
-            destruct Heqs as [a' [INa' UV2DVa']].
-            apply forallb_forall with (x:=a') in H; auto.
-
-            apply IS1.LP.Events.DV.is_concrete_uvalue_to_dvalue in H as [dva' CONCa'].
-            rewrite CONCa' in UV2DVa'. inv UV2DVa'.
+        * assert (exists v, map_monad uvalue_to_dvalue l = inl v).
+          { revert s Heqs.
+            induction Heqo; intros; [inversion Heqs|].
+            cbn in Heqs.
+            cbn. 
+            repeat break_match_hyp_inv.
+            -- destruct (uvalue_to_dvalue_dvalue_refine_strict_error _ _ _ H Heqs0).
+               exists x0. rewrite H0. reflexivity.
+            -- break_match_goal; [eexists; eauto|].
+               destruct (IHHeqo s eq_refl) as [s' EQ].
+               exists s'. rewrite EQ. reflexivity.
           }
-
-          break_inner_match_goal.
-          { apply map_monad_err_fail in Heqs0.
-            destruct Heqs0 as [a' [INa' UV2DVa']].
-            apply forallb_forall with (x:=a') in CONCl0; auto.
-
-            apply is_concrete_uvalue_to_dvalue in CONCl0 as [dva' CONCa'].
-            rewrite CONCa' in UV2DVa'. inv UV2DVa'.
-          }
-
+          destruct H as [s' EQ].
+          rewrite EQ.
           cbn.
-          apply orutt_Ret.
-
-          unfold_dvalue_refine_strict_goal.
-          rewrite map_monad_InT_cons.
-          cbn.
-          rewrite REFdvu.
-
-          break_inner_match_goal.
-          2: {
-            apply map_monad_InT_OOM_fail in Heqo1.
-            destruct Heqo1 as [a' [INa' CONVa']].
-            apply map_monad_err_InT with (x:=a') in Heqs; auto.
-            destruct Heqs as [y [UV2DVy INy]].
-
-            eapply map_monad_InT_OOM_succeeds' in Heqo; eauto.
-            destruct Heqo as [b UVCyb].
-            pose proof (uvalue_to_dvalue_dvalue_refine_strict _ _ _ UVCyb UV2DVy) as [dva' [UV2DVa' REFa']].
-            rewrite REFa' in CONVa'.
-            inv CONVa'.
-          }
-
-          (* l2 is (dvalue_convert_strict (IS1.uvalue_to_dvalue f))
-                 l1 is (uvalue_to_dvalue (uvalue_convert_strict f))
-           *)
-          cbn in IHelts.
-          setoid_rewrite CONCl0 in IHelts.
-          setoid_rewrite H in IHelts.
-          rewrite Heqs in IHelts.
-          rewrite Heqs0 in IHelts.
-          cbn in IHelts.
-          apply orutt_inv_Ret in IHelts.
-          unfold_dvalue_refine_strict_in IHelts.
-          rewrite Heqo1 in IHelts.
-          cbn in IHelts.
-          inv IHelts.
-          auto.
-        }
-        { eapply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
+          apply orutt_raise; [intros; intro C; inversion C | cbn; auto].
+        * cbn.
+          rewrite map_monad_err_Forall2 in Heqs.
+          break_match_goal; cbn.
+          -- assert False.
+             { revert s l0 Heqs Heqs0.
+               induction Heqo; intros; [inversion Heqs0|].
+               cbn in Heqs0.
+               inversion Heqs; subst.
+               repeat break_match_hyp_inv.
+               ++ destruct (uvalue_to_dvalue_dvalue_refine_strict _ _ _ H H2) as [v [C _]].
+                  rewrite Heqs1 in C.
+                  inversion C.
+               ++ eapply IHHeqo; eauto.
+             }
+             inversion H.
+          -- apply orutt_Ret.
+             unfold dvalue_refine_strict.
+             cbn.
+             erewrite map_dvalue_convert_strict_succeeds; eauto.
+      + break_match_goal.
+        * assert False by (eapply is_concrete_l_false; eauto).
+          inversion H.
+        * apply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
           { (* Pick uvalue *)
             apply orutt_trigger; cbn.
-            split; [tauto | ].
-            { unfold_uvalue_refine_strict_goal.
-              rewrite map_monad_InT_cons.
-              cbn.
-              rewrite Heqo0.
-              rewrite Heqo.
-              reflexivity.
-            }
-            intros [t1] [t2] [_ [REF1 REF2]].
-            cbn; auto.
-            intros o CONTRA.
-            inv CONTRA.
+            -- split; [tauto | ].
+               unfold uvalue_refine_strict. cbn.
+               
+               break_match_goal.
+               ++ rewrite map_monad_oom_Forall2 in Heqo0.
+                  clear Heqb Heqb0.
+                  assert (l0 = l).
+                  { revert l0 Heqo0.
+                    induction Heqo; intros; inversion Heqo0; subst; auto.
+                    specialize (uvalue_refine_strict_R2_injective _ _ _ _ H H2) as [EQ _].
+                    rewrite (EQ eq_refl) in *; clear EQ.
+                    erewrite (IHHeqo l'0); eauto.
+                  }
+                  rewrite H; auto.
+               ++  apply map_monad_OOM_fail in Heqo0.
+                   destruct Heqo0 as [dv [HI HS]].
+                   destruct (Forall2_In _ _ _ _ HI Heqo) as [dv' [_ C]].
+                   rewrite HS in C. inversion C.
+            -- intros [t1] [t2] [_ [REF1 REF2]].
+               cbn; auto.
+            --  intros o.
+                intro C.
+                inv C.
           }
 
           intros [r1] [r2] H0.
           cbn in *.
           apply orutt_Ret; auto.
-        }
+
     - (* GEP *)
-      break_match_hyp; inv H;
-        break_match_hyp; inv H1;
-        unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick in *;
-        cbn;
-
-        eapply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
+      repeat break_match_hyp_inv.
+      unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick in *;
+      cbn;
+      eapply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
       {
         apply orutt_trigger; cbn;
           [ split;
             [ tauto
-            | unfold_uvalue_refine_strict_goal;
-              rewrite_uvalue_convert_strict;
-              cbn; rewrite Heqo0;
-              auto
+            | idtac
             ]
           | intros [t1] [t2] [_ [REF1 REF2]];
             cbn; auto
           | intros o CONTRA;
             inv CONTRA
           ].
+        unfold uvalue_refine_strict.
+        cbn.  rewrite Heqo.
+        rewrite Heqo0.
+        reflexivity.
       }
 
       intros [?r1] [?r2] H0;
         cbn in *;
         apply orutt_Ret; auto.
+      
     - (* InsertElement *)
-      break_match_hyp; inv H.
-      break_match_hyp; inv H1.
-      break_match_hyp; inv H0.
-      unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick in *.
+      repeat break_match_hyp_inv;
+      unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick in *;
       cbn.
 
       eapply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
       { (* Pick uvalue *)
         apply orutt_trigger; cbn.
         split; [tauto | ].
-        { unfold_uvalue_refine_strict_goal.
-          rewrite Heqo, Heqo0, Heqo1.
-          cbn.
-          reflexivity.
-        }
-        intros [t1] [t2] [_ [REF1 REF2]].
-        cbn; auto.
-        intros o CONTRA.
-        inv CONTRA.
-      }
-
-      intros [r1] [r2] H0.
-      cbn in *.
-      apply orutt_Ret; auto.
-    - (* ShuffleVector *)
-      break_match_hyp; inv H.
-      break_match_hyp; inv H1.
-      break_match_hyp; inv H0.
-      unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick in *.
-      cbn.
-
-      eapply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
-      { (* Pick uvalue *)
-        apply orutt_trigger; cbn.
-        split; [tauto | ].
-        { unfold_uvalue_refine_strict_goal.
-          rewrite Heqo, Heqo0, Heqo1.
-          cbn.
-          reflexivity.
-        }
-        intros [t1] [t2] [_ [REF1 REF2]].
-        cbn; auto.
-        intros o CONTRA.
-        inv CONTRA.
-      }
-
-      intros [r1] [r2] H0.
-      cbn in *.
-      apply orutt_Ret; auto.
-    - (* Select *)
-      break_match_hyp; inv H.
-      break_match_hyp; inv H1.
-      break_match_hyp; inv H0.
-      unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick in *.
-      cbn.
-
-      eapply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
-      { (* Pick uvalue *)
-        apply orutt_trigger; cbn.
-        split; [tauto | ].
-        { unfold_uvalue_refine_strict_goal.
-          rewrite Heqo, Heqo0, Heqo1.
-          cbn.
-          reflexivity.
-        }
-        intros [t1] [t2] [_ [REF1 REF2]].
-        cbn; auto.
-        intros o CONTRA.
-        inv CONTRA.
-      }
-
-      intros [r1] [r2] H0.
-      cbn in *.
-      apply orutt_Ret; auto.
-    - (* ConcatBytes *)
-      break_match_hyp; inv H.
-      unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick in *.
-      cbn.
-
-      eapply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
-      { (* Pick uvalue *)
-        apply orutt_trigger; cbn.
-        split; [tauto | ].
-        { unfold_uvalue_refine_strict_goal.
+        { unfold uvalue_refine_strict. cbn. 
           rewrite Heqo.
-          cbn.
           reflexivity.
         }
         intros [t1] [t2] [_ [REF1 REF2]].
@@ -5493,7 +5283,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       intros [r1] [r2] H0.
       cbn in *.
       apply orutt_Ret; auto.
-  Qed.
+
+  Qed.   
+      
 
   Lemma denote_exp_E1E2_orutt :
     forall e odt,
