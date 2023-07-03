@@ -7590,7 +7590,7 @@ Qed.
 
       - clear o.
         solve_orutt_raise.
-    }}
+    }
   Qed.
 
   Lemma denote_terminator_orutt_strict :
