@@ -371,7 +371,7 @@ Module InfiniteToFinite.
     cbn in H.
     inversion H.
     subst; clear H.
-    apply map_monad_oom_forall2 in EQ1.
+    apply map_monad_oom_Forall2 in EQ1.
 
     apply IntMaps.IP.F.Equal_mapsto_iff.
     intros.
@@ -3026,7 +3026,6 @@ Module InfiniteToFinite.
           x = DVCInfFin.DV1.DVALUE_Addr a'.
   Proof.
     intros x a H.
-    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     break_match_hyp; inv H1.
     exists a0; auto.
@@ -3040,7 +3039,6 @@ Module InfiniteToFinite.
           x = DVCInfFin.DV1.DVALUE_IPTR n'.
   Proof.
     intros x n H.
-    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     break_match_hyp; inv H1.
     exists x; auto.
@@ -3052,7 +3050,6 @@ Module InfiniteToFinite.
       x = DVCInfFin.DV1.DVALUE_I1 n.
   Proof.
     intros x n H.
-    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     subst.
     auto.
@@ -3064,7 +3061,6 @@ Module InfiniteToFinite.
       x = DVCInfFin.DV1.DVALUE_I8 n.
   Proof.
     intros x n H.
-    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     subst.
     auto.
@@ -3076,7 +3072,6 @@ Module InfiniteToFinite.
       x = DVCInfFin.DV1.DVALUE_I32 n.
   Proof.
     intros x n H.
-    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     subst.
     auto.
@@ -3088,7 +3083,6 @@ Module InfiniteToFinite.
       x = DVCInfFin.DV1.DVALUE_I64 n.
   Proof.
     intros x n H.
-    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     subst.
     auto.
@@ -3100,7 +3094,6 @@ Module InfiniteToFinite.
       x = DVCInfFin.DV1.DVALUE_Double v.
   Proof.
     intros x n H.
-    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     subst.
     auto.
@@ -3112,7 +3105,6 @@ Module InfiniteToFinite.
       x = DVCInfFin.DV1.DVALUE_Float v.
   Proof.
     intros x n H.
-    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     subst.
     auto.
@@ -3124,7 +3116,6 @@ Module InfiniteToFinite.
       x = DVCInfFin.DV1.DVALUE_Poison v.
   Proof.
     intros x n H.
-    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     subst.
     auto.
@@ -3136,7 +3127,6 @@ Module InfiniteToFinite.
       x = DVCInfFin.DV1.DVALUE_Oom v.
   Proof.
     intros x n H.
-    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     subst.
     auto.
@@ -3148,7 +3138,6 @@ Module InfiniteToFinite.
       x = DVCInfFin.DV1.DVALUE_None.
   Proof.
     intros x H.
-    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     subst.
     auto.
@@ -3160,7 +3149,6 @@ Module InfiniteToFinite.
       exists fields', x = DVCInfFin.DV1.DVALUE_Struct fields'.
   Proof.
     intros x fields H.
-    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     break_match_hyp; inv H1.
     exists fields0. reflexivity.
@@ -3172,7 +3160,6 @@ Module InfiniteToFinite.
       exists fields', x = DVCInfFin.DV1.DVALUE_Packed_struct fields'.
   Proof.
     intros x fields H.
-    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     break_match_hyp; inv H1.
     exists fields0. reflexivity.
@@ -3184,7 +3171,6 @@ Module InfiniteToFinite.
       exists elts', x = DVCInfFin.DV1.DVALUE_Array elts'.
   Proof.
     intros x elts H.
-    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     break_match_hyp; inv H1.
     exists elts0. reflexivity.
@@ -3196,7 +3182,6 @@ Module InfiniteToFinite.
       exists elts', x = DVCInfFin.DV1.DVALUE_Vector elts'.
   Proof.
     intros x elts H.
-    rewrite DVCInfFin.dvalue_convert_strict_equation in H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     break_match_hyp; inv H1.
     exists elts0. reflexivity.
@@ -3338,7 +3323,7 @@ Module InfiniteToFinite.
       unfold id in OOMx.
       inv OOMx.
 
-      apply map_monad_err_forall2 in HMAPM'.
+      apply map_monad_err_Forall2 in HMAPM'.
       apply Util.Forall2_forall in HMAPM' as [LEN HMAPM'].
       apply In_Nth in INx. destruct INx as [i NTHl1].
 
@@ -3923,56 +3908,34 @@ Module InfiniteToFinite.
 
     induction d_inf;
       try solve
-        [ rewrite DVC1.uvalue_convert_strict_equation in H;
-          cbn in *; inv H;
-          rewrite DVC2.uvalue_convert_strict_equation in e;
+        [ cbn in *; inv H;
           cbn in *; inv e;
           auto
         ].
-    - rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *.
-      break_match_hyp; inv H.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
+    - cbn in *.
+      repeat break_match_hyp_inv.
       cbn in *.
       break_match_hyp; inv e.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
       cbn in *.
       break_match_hyp; inv e0.
 
       pose proof InfToFinAddrConvert.addr_convert_injective a a1 a0 Heqo Heqo1.
       subst.
       auto.
-    - rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
+    - cbn in *; break_match_hyp; inv H.
       cbn in *; inv e.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
       cbn in *; break_match_hyp; inv e0.
       admit. (* Some painful IP / BigIP reasoning *)
-    - rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
+    - cbn in *; break_match_hyp; inv H.
       cbn in *; break_match_hyp; inv e.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
       cbn in *; break_match_hyp; inv e0.
 
       induction fields.
       + cbn in *. inv Heqo.
         cbn in *. inv Heqo0.
         reflexivity.
-      + rewrite map_monad_InT_unfold in Heqo.
-        cbn in *.
+      + cbn in *.
         break_match_hyp; inv Heqo.
-        break_match_hyp; inv H1.
-
-        rewrite map_monad_InT_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H1.
-
-        rewrite map_monad_InT_unfold in Heqo1.
-        cbn in *.
-        break_match_hyp; inv Heqo1.
         break_match_hyp; inv H1.
         admit.
     - admit.
@@ -6089,62 +6052,80 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
     induction d_inf;
       try solve
-        [ rewrite DVC1.dvalue_convert_strict_equation in H;
-          cbn in *; inv H;
-          rewrite DVC2.dvalue_convert_strict_equation in e;
+        [ cbn in *; inv H;
           cbn in *; inv e;
           auto
         ].
-    - rewrite DVC1.dvalue_convert_strict_equation in H.
-      cbn in *.
+    - cbn in *.
       break_match_hyp; inv H.
-      rewrite DVC2.dvalue_convert_strict_equation in e.
       cbn in *.
       break_match_hyp; inv e.
-      rewrite DVC1.dvalue_convert_strict_equation in e0.
       cbn in *.
       break_match_hyp; inv e0.
 
       pose proof InfToFinAddrConvert.addr_convert_injective a a1 a0 Heqo Heqo1.
       subst.
       auto.
-    - rewrite DVC1.dvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      rewrite DVC2.dvalue_convert_strict_equation in e.
+    - cbn in *; break_match_hyp; inv H.
       cbn in *; inv e.
-      rewrite DVC1.dvalue_convert_strict_equation in e0.
       cbn in *; break_match_hyp; inv e0.
-      admit. (* Some painful IP / BigIP reasoning *)
-    - rewrite DVC1.dvalue_convert_strict_equation in H.
+      apply IP.from_Z_to_Z in Heqo.
+      apply IP.from_Z_to_Z in Heqo0.
+      rewrite Heqo in Heqo0.
+      apply InterpreterStackBigIntptr.LP.IP.to_Z_inj in Heqo0.
+      rewrite Heqo.
+      rewrite <- Heqo0.
+      reflexivity.
+    - (* SAZ: This case and similar ones follow from  Forall2_inj_OOM_l  *)
       cbn in *; break_match_hyp; inv H.
-      rewrite DVC2.dvalue_convert_strict_equation in e.
       cbn in *; break_match_hyp; inv e.
-      rewrite DVC1.dvalue_convert_strict_equation in e0.
       cbn in *; break_match_hyp; inv e0.
-
-      induction fields.
-      + cbn in *. inv Heqo.
-        cbn in *. inv Heqo0.
-        reflexivity.
-      + rewrite map_monad_InT_unfold in Heqo.
-        cbn in *.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H1.
-
-        rewrite map_monad_InT_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H1.
-
-        rewrite map_monad_InT_unfold in Heqo1.
-        cbn in *.
-        break_match_hyp; inv Heqo1.
-        break_match_hyp; inv H1.
-        admit.
-    - admit.
-    - admit.
-    - admit.
-  Admitted.
+      apply map_monad_oom_Forall2 in Heqo.
+      apply map_monad_oom_Forall2 in Heqo1.
+      specialize DVC1.dvalue_refine_strict_R2_injective  as INJ.
+      red in INJ. unfold DVC1.dvalue_refine_strict in INJ.
+      erewrite (Forall2_inj_OOM_l _ _ _ _ _ _ _ _ Heqo Heqo1).
+      reflexivity.
+      Unshelve.
+      intros.
+      specialize (INJ _ _ _ _ H1 H2). tauto.
+    - cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv e0.
+      apply map_monad_oom_Forall2 in Heqo.
+      apply map_monad_oom_Forall2 in Heqo1.
+      specialize DVC1.dvalue_refine_strict_R2_injective  as INJ.
+      red in INJ. unfold DVC1.dvalue_refine_strict in INJ.
+      erewrite (Forall2_inj_OOM_l _ _ _ _ _ _ _ _ Heqo Heqo1).
+      reflexivity.
+      Unshelve.
+      intros.
+      specialize (INJ _ _ _ _ H1 H2). tauto.
+    - cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv e0.
+      apply map_monad_oom_Forall2 in Heqo.
+      apply map_monad_oom_Forall2 in Heqo1.
+      specialize DVC1.dvalue_refine_strict_R2_injective  as INJ.
+      red in INJ. unfold DVC1.dvalue_refine_strict in INJ.
+      erewrite (Forall2_inj_OOM_l _ _ _ _ _ _ _ _ Heqo Heqo1).
+      reflexivity.
+      Unshelve.
+      intros.
+      specialize (INJ _ _ _ _ H1 H2). tauto.
+    - cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv e0.
+      apply map_monad_oom_Forall2 in Heqo.
+      apply map_monad_oom_Forall2 in Heqo1.
+      specialize DVC1.dvalue_refine_strict_R2_injective  as INJ.
+      red in INJ. unfold DVC1.dvalue_refine_strict in INJ.
+      erewrite (Forall2_inj_OOM_l _ _ _ _ _ _ _ _ Heqo Heqo1).
+      reflexivity.
+      Unshelve.
+      intros.
+      specialize (INJ _ _ _ _ H1 H2). tauto.
+  Qed.
 
   (** Lemmas about writing bytes *)
   Lemma fin_inf_set_byte_memory :
