@@ -668,11 +668,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                 rewrite H0. cbn. rewrite interp_bind.
                 rewrite interp_trigger. cbn. unfold LLVMEvents.raise.
                 do 2 rewrite bind_trigger. rewrite bind_vis.
-                apply eqit_Vis; intros; inv u.
-
+                apply eqit_Vis.
+                intros [].
                 Unshelve.
                 all : eauto.
-                all : inv x.
   Admitted.
 
   Lemma refine_OOM_h_L1_convert_tree_strict :
@@ -1366,7 +1365,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                 rewrite H0. cbn. rewrite interp_bind.
                 rewrite interp_trigger. cbn. unfold LLVMEvents.raise.
                 do 2 rewrite bind_trigger. rewrite bind_vis.
-                apply eqit_Vis; intros; inv u.
+                apply eqit_Vis.
+                intros [].
 
                 Unshelve.
                 all : eauto.
@@ -5706,9 +5706,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         unfold denote_exp, IS1.LLVM.D.denote_exp.
         cbn.
         repeat break_match; cbn; inv Heqs0; inv Heqs; try solve_orutt_raise.
-        * pose proof default_dvalue_of_dtyp_dv1_dv2_same_error.
-          pose proof map_monad_err_twin_fail Heqs2 Heqs1 H; subst.
-          solve_orutt_raise.
         * apply map_monad_err_fail in Heqs2.
           destruct Heqs2 as [a [IN Heqs2]].
           apply map_monad_err_forall2 in Heqs1.
@@ -5785,9 +5782,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         unfold denote_exp, IS1.LLVM.D.denote_exp.
         cbn.
         repeat break_match; cbn; inv Heqs0; inv Heqs; try solve_orutt_raise.
-        * pose proof default_dvalue_of_dtyp_dv1_dv2_same_error.
-          pose proof map_monad_err_twin_fail Heqs2 Heqs1 H; subst.
-          solve_orutt_raise.
         * apply map_monad_err_fail in Heqs2.
           destruct Heqs2 as [a [IN Heqs2]].
           apply map_monad_err_forall2 in Heqs1.
@@ -5864,11 +5858,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         unfold denote_exp, IS1.LLVM.D.denote_exp.
         cbn.
         repeat break_match; cbn; inv Heqs0; inv Heqs; try solve_orutt_raise.
-        * pose proof default_dvalue_of_dtyp_dv1_dv2_same_error (DTYPE_I sz0) s.
-          cbn in H.
-          apply H in Heqs2.
-          rewrite Heqs2 in Heqs1; inv Heqs1.
-          solve_orutt_raise.
         * apply default_dvalue_of_dtyp_i_dv1_dv2_same_error in Heqs2.
           rewrite Heqs2 in Heqs1; inv Heqs1.
         * apply default_dvalue_of_dtyp_i_dv1_dv2_same_error in Heqs1.
@@ -7359,22 +7348,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         forward H. reflexivity.
         destruct H as [s' H].
         break_match_hyp; inv H.
-
-        assert (s = s') as S.
-        { pose proof map_monad_err_twin_fail' Heqs Heqs0.
-          eapply H.
-          intros n x y s0 H0 H1.
-          eapply map_monad_InT_OOM_Nth in Heqo; eauto.
-          destruct Heqo as (?&?&?&?).
-          cbn in *.
-          rewrite H0 in H3.
-          symmetry in H3; inv H3.
-          split; intros UVDV.
-          - eapply DVC.uvalue_to_dvalue_dvalue_refine_strict_error in UVDV.
-            2: rewrite uvalue_refine_strict_equation; eauto.
-            destruct UVDV as (s''&UVDV).
-        }
-        subst.
 
         cbn.
         apply rutt_raise.
@@ -10015,6 +9988,35 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       pstep; red; cbn.
       rewrite subevent_subevent.
       eapply EqVisOOM.
+    - cbn in REF; 
+       destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF).
+      cbn.
+      repeat rewrite bind_trigger.
+      pfold. red.
+      cbn.
+      constructor; cbn; auto.
+      intros [] [] _.
+      left.
+      pstep; red; cbn.
+      constructor.
+      split; auto.
+      red in LSR.
+      destruct ls1, ls2.
+      constructor; tauto.
+      intros o CONTRA.
+      inv CONTRA.
+    - cbn in REF; 
+       destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF).
+      cbn.
+      repeat rewrite bind_trigger.
+      pfold. red.
+      cbn.
+      constructor; cbn; auto.
+      intros [].
+      intros o CONTRA.
+      inv CONTRA.
   Qed.
 
   Lemma model_E1E2_12_orutt_strict :

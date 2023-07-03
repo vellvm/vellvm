@@ -193,7 +193,7 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
 
     (* FailureE *)
     { inversion e0.
-      apply (raise_error H).
+      apply (raise_error "").
     }
   Defined.
 
@@ -317,7 +317,7 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
 
     (* FailureE *)
     { inversion e0.
-      apply (raise_error H).
+      apply (raise_error "").
     }
   Defined.
 
@@ -413,7 +413,7 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
 
     (* FailureE *)
     { inversion e0.
-      apply (raise_error H).
+      apply (raise_error "").
     }
   Defined.
 
@@ -479,7 +479,7 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
 
     (* FailureE *)
     { inversion e0.
-      apply (raise_error H).
+      apply (raise_error "").
     }
   Defined.
 
@@ -531,7 +531,7 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
 
     (* FailureE *)
     { inversion e0.
-      apply (raise_error H).
+      apply (raise_error "").
     }
   Defined.
 

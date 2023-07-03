@@ -49,7 +49,7 @@ Lemma rutt_raise :
   forall {E1 E2 : Type -> Type} {R1 R2 : Type} `{FailureE -< E1} `{FailureE -< E2}
     {PRE : prerel E1 E2} {POST : postrel E1 E2} {R1R2 : R1 -> R2 -> Prop}
     msg1 msg2,
-    PRE void void (subevent void (Throw msg1)) (subevent void (Throw msg2)) ->
+    PRE void void (subevent void (Throw tt)) (subevent void (Throw tt)) ->
     rutt PRE POST R1R2 (LLVMEvents.raise msg1) (LLVMEvents.raise msg2).
 Proof.
   intros E1 E2 R1 R2 FAIL1 FAIL2 PRE POST R1R2 msg1 msg2 PRETHROW.

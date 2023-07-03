@@ -566,7 +566,7 @@ Lemma orutt_raise :
     {PRE : prerel E1 E2} {POST : postrel E1 E2} {R1R2 : R1 -> R2 -> Prop}
     msg1 msg2,
     (forall msg (o : OOM _), @subevent FailureE E2 FAIL2 void (Throw msg) <> @subevent OOM E2 OOME void o) ->
-    PRE void void (subevent void (Throw msg1)) (subevent void (Throw msg2)) ->
+    PRE void void (subevent void (Throw tt)) (subevent void (Throw tt)) ->
     orutt PRE POST R1R2 (LLVMEvents.raise msg1) (LLVMEvents.raise msg2) (OOM:=OOM) (OOME:=OOME).
 Proof.
   intros E1 E2 OOM OOME R1 R2 FAIL1 FAIL2 PRE POST R1R2 msg1 msg2 OOM_NOT_FAIL PRETHROW.

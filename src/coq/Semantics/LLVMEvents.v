@@ -92,6 +92,10 @@ Set Contextual Implicit.
   { raise_ub := fun A e => raiseUB e
   }.
 
+  (* This function can be replaced with print_string during extraction
+     to print the error messages of Throw and (indirectly) ThrowUB. *)
+  Definition print_msg (msg : string) : unit := tt.
+
   (* Out of memory / abort. Carries a string for a message. *)
   Variant OOME : Type -> Type :=
   | ThrowOOM : string -> OOME void.
@@ -117,14 +121,10 @@ Set Contextual Implicit.
 
   (* Failure. Carries a string for a message. *)
   Variant FailureE : Type -> Type :=
-  | Throw : string -> FailureE void.
-
-  (* This function can be replaced with print_string during extraction
-     to print the error messages of Throw and (indirectly) ThrowUB. *)
-  Definition print_msg (msg : string) : unit := tt.
+  | Throw : unit -> FailureE void.
 
   Definition raise {E} {A} `{FailureE -< E} (msg : string) : itree E A :=
-    v <- trigger (Throw msg);; match v: void with end.
+    v <- trigger (Throw (print_msg msg));; match v: void with end.
 
   #[global] Instance RAISE_ERR_ITREE_FAILUREE {E : Type -> Type} `{FailureE -< E} : RAISE_ERROR (itree E) :=
   { raise_error := fun A e => raise e
