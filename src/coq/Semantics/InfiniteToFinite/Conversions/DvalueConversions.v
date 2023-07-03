@@ -606,28 +606,8 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
 
   Hint Resolve dvalue_refine_strict_dvalue_to_uvalue : DVALUE_REFINE.
 
-  (* TODO: Move this? *)
-  (*
-  Ltac unfold_dvalue_refine_strict :=
-    rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in *.
-
-  Ltac unfold_dvalue_refine_strict_goal :=
-    rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation.
-
-  Ltac unfold_dvalue_refine_strict_in H :=
-    rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H.
-
-  Ltac unfold_uvalue_refine_strict :=
-    rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in *.
-
-  Ltac unfold_uvalue_refine_strict_goal :=
-    rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation.
-
-  Ltac unfold_uvalue_refine_strict_in H :=
-    rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in H.
-
   Ltac solve_uvalue_refine_strict :=
-    solve [unfold_uvalue_refine_strict;
+    solve [unfold uvalue_refine_strict;
            cbn;
            solve [ auto
                  | rewrite addr_convert_null;
@@ -636,14 +616,14 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       ].
 
   Ltac solve_dvalue_refine_strict :=
-    solve [unfold_dvalue_refine_strict;
+    solve [unfold dvalue_refine_strict;
            cbn;
            solve [ auto
                  | rewrite addr_convert_null;
                    reflexivity
              ]
       ].
-   *)
+
   (** Parameters about is_concrete *)
 
   (*
@@ -2881,20 +2861,6 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
       inv V2.
   Qed.
 
-  Lemma Forall2_repeat_OOM : forall {A B} (f : A -> OOM B) (a:A) (b:B) n (l:list B),
-      f a = ret b ->
-      Forall2 (fun a b => f a = ret b) (repeat a n) l ->
-      l = repeat b n.
-  Proof.
-    intros A B f a b n l EQ F. 
-    revert l EQ F.
-    induction n; intros; cbn in *.
-    - inversion F. reflexivity.
-    - inversion F; subst.
-      rewrite EQ in H1. inversion H1; subst.
-      rewrite (IHn l'); auto.
-  Qed.
-  
   Lemma default_dvalue_of_dtyp_dv1_dv2_equiv :
     forall dt v1,
       DV1.default_dvalue_of_dtyp dt = inr v1 ->
@@ -3590,22 +3556,22 @@ Module DVConvertSafe
   Import ACSafe.
   Import IPSafe.
 
-  Lemma Forall2T_InT_r :
-    forall {A B} (f : A -> B -> Type) (l1 : list A) (l2 : list B),
-      Forall2T f l1 l2 -> forall b,
-        InT b l2 -> { a : A & f a b * InT a l1}%type.
-  Proof.
-    intros A B.
-    fix IH 4.
-    intros f l1 l2 H; inversion H; subst; clear H; intros x HX.
-    - inversion HX.
-    - inversion HX; subst.
-      + destruct X as [HF HL].
-        exists a. split; auto. left. auto.
-      + destruct X as [_ HL].
-        destruct (IH _ _ _ HL x X0) as [c [HFC HR]].
-        exists c. split; auto. right. assumption.
-  Qed.
+  (* Lemma Forall2T_InT_r : *)
+  (*   forall {A B} (f : A -> B -> Type) (l1 : list A) (l2 : list B), *)
+  (*     Forall2T f l1 l2 -> forall b, *)
+  (*       InT b l2 -> { a : A & f a b * InT a l1}%type. *)
+  (* Proof. *)
+  (*   intros A B. *)
+  (*   fix IH 4. *)
+  (*   intros f l1 l2 H; inversion H; subst; clear H; intros x HX. *)
+  (*   - inversion HX. *)
+  (*   - inversion HX; subst. *)
+  (*     + destruct X as [HF HL]. *)
+  (*       exists a. split; auto. left. auto. *)
+  (*     + destruct X as [_ HL]. *)
+  (*       destruct (IH _ _ _ HL x X0) as [c [HFC HR]]. *)
+  (*       exists c. split; auto. right. assumption. *)
+  (* Qed. *)
   
   Lemma dvalue_convert_strict_safe :
     forall dv_f,

@@ -1574,7 +1574,6 @@ Qed.
       rewrite (IHn l'); auto.
   Qed.
 
-
 (* Better behaved version of Forall that can be used in recursive functions *)
 Definition FORALL {A} (P : A -> Prop) (l : list A) :=
   List.fold_right (fun x b => P x /\ b) True l.
