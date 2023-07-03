@@ -604,7 +604,7 @@ Lemma orutt_raiseUB :
     {PRE : prerel E1 E2} {POST : postrel E1 E2} {R1R2 : R1 -> R2 -> Prop}
     msg1 msg2,
     (forall msg (o : OOM _), @subevent UBE E2 UB2 void (ThrowUB msg) <> @subevent OOM E2 OOME void o) ->
-    PRE void void (subevent void (ThrowUB msg1)) (subevent void (ThrowUB msg2)) ->
+    PRE void void (subevent void (ThrowUB tt)) (subevent void (ThrowUB tt)) ->
     orutt PRE POST R1R2 (raiseUB msg1) (raiseUB msg2) (OOM:=OOM) (OOME:=OOME).
 Proof.
   intros E1 E2 OOM OOME R1 R2 UB1 UB2 PRE POST R1R2 msg1 msg2 H H0.

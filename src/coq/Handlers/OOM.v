@@ -300,7 +300,7 @@ Section PARAMS_INTERP.
   Notation Effout := (E +' OOME +' F).
 
   Definition OOM_exec_fail {E} `{FailureE -< E}: OOME ~> itree E :=
-    fun _ e => match e with | ThrowOOM s => raise ("Abort (OOM): " ++ s) end.
+    fun _ e => match e with | ThrowOOM tt => raise ("Abort (OOM)") end.
 
   Definition OOM_exec {E} `{OOME -< E} : OOME ~> itree E :=
     fun R e => trigger e.

@@ -432,7 +432,7 @@ Section bind_lemmas.
       + rewrite H.
         rewrite bind_vis.
         destruct ube.
-        eapply FindUB with (s:=s) (k:=(fun x0 : void => ITree.bind (k0 x0) k)).
+        eapply FindUB with (s:=u) (k:=(fun x0 : void => ITree.bind (k0 x0) k)).
         reflexivity.
       + rewrite H.
         rewrite bind_vis.

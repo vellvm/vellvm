@@ -460,6 +460,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       apply bisimulation_is_eq in H1. rewrite H1.
       econstructor; eauto.
       eapply eqit_Vis; intros; inv u.
+      destruct u0.
     - discriminate.
     - pstep. cbn in H2, H3. red in H.
       rewrite H in H0.
@@ -615,7 +616,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               rewrite interp_vis.
               cbn.
               setoid_rewrite bind_trigger. rewrite bind_vis. cbn in *; subst. eapply eqit_Vis.
-              intros. inv u.
+              intros [].
           -- destruct s; try destruct u; cbn in H1.
              ++ destruct d. cbn in H1.
                 rewrite <- unfold_interp in H2.
@@ -1166,6 +1167,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       apply bisimulation_is_eq in H1. rewrite H1.
       econstructor; eauto.
       eapply eqit_Vis; intros; inv u.
+      inv u0.
     - discriminate.
     - pstep. cbn in H2, H3. red in H.
       rewrite H in H0.
@@ -1313,7 +1315,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               rewrite interp_vis.
               cbn.
               setoid_rewrite bind_trigger. rewrite bind_vis. cbn in *; subst. eapply eqit_Vis.
-              intros. inv u.
+              intros [].
           -- destruct s; try destruct u; cbn in H1.
              ++ destruct d. cbn in H1.
                 rewrite <- unfold_interp in H2.

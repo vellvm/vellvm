@@ -178,17 +178,17 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
 
     (* OOME *)
     { inversion e0.
-      apply (raise_oom H).
+      apply (raise_oom "").
     }
 
     (* UBE *)
     { inversion e0.
-      apply (raise_ub H).
+      apply (raise_ub "").
     }
 
     (* DebugE *)
     { inversion e0.
-      apply (debug H).
+      apply (debug "").
     }
 
     (* FailureE *)
@@ -302,17 +302,17 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
 
     (* OOME *)
     { inversion e0.
-      apply (raise_oom H).
+      apply (raise_oom "").
     }
 
     (* UBE *)
     { inversion e0.
-      apply (raise_ub H).
+      apply (raise_ub "").
     }
 
     (* DebugE *)
     { inversion e0.
-      apply (debug H).
+      apply (debug "").
     }
 
     (* FailureE *)
@@ -398,17 +398,17 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
 
     (* OOME *)
     { inversion e0.
-      apply (raise_oom H).
+      apply (raise_oom "").
     }
 
     (* UBE *)
     { inversion e0.
-      apply (raise_ub H).
+      apply (raise_ub "").
     }
 
     (* DebugE *)
     { inversion e0.
-      apply (debug H).
+      apply (debug "").
     }
 
     (* FailureE *)
@@ -464,17 +464,17 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
 
     (* OOME *)
     { inversion e0.
-      apply (raise_oom H).
+      apply (raise_oom "").
     }
 
     (* UBE *)
     { inversion e0.
-      apply (raise_ub H).
+      apply (raise_ub "").
     }
 
     (* DebugE *)
     { inversion e0.
-      apply (debug H).
+      apply (debug "").
     }
 
     (* FailureE *)
@@ -516,17 +516,17 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
 
     (* OOME *)
     { inversion e0.
-      apply (raise_oom H).
+      apply (raise_oom "").
     }
 
     (* UBE *)
     { inversion e0.
-      apply (raise_ub H).
+      apply (raise_ub "").
     }
 
     (* DebugE *)
     { inversion e0.
-      apply (debug H).
+      apply (debug "").
     }
 
     (* FailureE *)
