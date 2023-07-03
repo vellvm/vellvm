@@ -19408,7 +19408,22 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                   eapply IHM1; eauto.
               - (* TauL *)
                 exfalso; eapply EQ; eauto.
-              -
+              - (* OOM *)
+                eapply Interp_Memory_PropT_Vis_OOM.
+                rewrite get_inf_tree_equation.
+                cbn.
+                pinversion HT1; subst_existT; subst.
+                2: {
+                  exfalso; eapply EQ; eauto.
+                }
+
+                cbn.
+                destruct e0.
+                cbn.
+                unfold raiseOOM.
+                rewrite bind_trigger.
+                reflexivity.
+
               - (* TauL *)
                 pclearbot.
                 apply orutt_inv_Vis_r in H.
