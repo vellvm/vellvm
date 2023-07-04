@@ -2462,7 +2462,6 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
       DV1.is_concrete uv = b ->
       DV2.is_concrete uvc = b.
   Proof.
-
     induction uv; intros uvc b UVC CONC; unfold uvalue_refine_strict, uvalue_convert_strict in UVC;
       try solve
         [ cbn in *; subst; try break_match; inv UVC; cbn; auto

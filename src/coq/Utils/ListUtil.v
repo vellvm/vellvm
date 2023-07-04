@@ -366,6 +366,90 @@ Proof.
     auto.
 Qed.
 
+Fixpoint split_n {A} (n:nat) (l : list A) : err (list A * list A) :=
+  match n with
+  | 0 => ret ([], l)
+  | S n =>
+      match l with
+      | [] => raise "split_n: list too short"%string
+      | x::xs =>
+          '(l1, l2) <- split_n n xs ;;
+          ret (x::l1, l2)
+      end
+  end.
+
+Lemma split_n_app : forall {A} (l1 l2: list A),
+    split_n (length l1) (l1 ++ l2) = ret (l1, l2).
+Proof.
+  induction l1; intros; simpl; auto.
+  break_match_goal.
+  rewrite IHl1 in Heqs. inversion Heqs.
+  destruct p.
+  rewrite IHl1 in Heqs.
+  inversion Heqs; subst.
+  auto.
+Qed.
+
+Lemma split_n_correct : forall {A} n (l1 l2 l3 : list A),
+    split_n n l1 = inr (l2, l3) <-> length l2 = n /\ l1 = l2 ++ l3.
+Proof.
+  intros A n l1 l2 l3.
+  split; intros H.
+  - revert l1 l2 l3 H.
+    induction n; intros l1 l2 l3 H; inversion H; subst; simpl in *; auto.
+    repeat break_match_hyp_inv.
+    cbn.
+    destruct (IHn _ _ _ Heqs) as [EQ1 EQ2].
+    rewrite EQ1. rewrite EQ2. auto.
+  - destruct H as [EQ1 EQ2].
+    revert n l1 l3 EQ1 EQ2.
+    induction l2; intros n l1 l3 EQ1 EQ2; simpl in *; subst.
+    + reflexivity.
+    + cbn.
+      break_match_goal.
+      * rewrite split_n_app in Heqs. inversion Heqs.
+      * destruct p.
+        rewrite split_n_app in Heqs. inversion Heqs.
+        subst.
+        reflexivity.
+Qed.
+
+Lemma split_n_err : forall {A} n (l:list A),
+    (exists s, split_n n l = inl s) <->
+    length l < n.
+Proof.
+  intros. split.
+  - revert l.
+    induction n; intros.
+    + destruct H as [s EQ].
+      inversion EQ.
+    + destruct H as [s EQ].
+      destruct l.
+      * cbn. lia.
+      * cbn in *.
+        break_match_hyp_inv.
+        -- assert (exists s, split_n n l = inl s).
+           { eexists; eauto. } 
+          apply IHn in H. lia.
+        -- destruct p. inversion H0.
+  - revert n.
+    induction l; intros.
+    + destruct n; cbn in *.
+      * lia.
+      * eexists. reflexivity.
+    + cbn in H.
+      destruct n.
+      -- lia.
+      -- cbn.
+         break_match_goal.
+      * eexists. reflexivity.
+      * destruct p. 
+        assert (length l < n) by lia.
+        destruct (IHl _ H0) as [s HS].
+        rewrite HS in Heqs. inversion Heqs.
+Qed.
+
+
 Fixpoint drop {A} (n : N) (l : list A) : list A
   := match l with
      | [] => []

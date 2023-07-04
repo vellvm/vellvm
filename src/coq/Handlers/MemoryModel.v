@@ -37,13 +37,6 @@ From ExtLib Require Import
      Structures.Monads
      Structures.Functor.
 
-From ITree Require Import
-     ITree
-     Basics.Basics
-     Events.Exception
-     Eq.Eqit
-     Events.StateFacts
-     Events.State.
 
 From Coq Require Import
      ZArith
@@ -62,7 +55,7 @@ Import Utils.Monads.
 
 Import Basics.Basics.Monads.
 Import MonadNotation.
-Open Scope monad_scope.
+
 
 
 Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
@@ -2326,6 +2319,22 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         reflexivity.
     Qed.
 
+    (* Much easier to reason about this version. *)
+    (* 
+    Definition re_sid_ubytes {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M}
+               (bytes : list SByte) : M (list SByte)
+      :=
+      match bytes with
+      | [] => ret []
+      | b::bs =>
+          n <- fresh_sid ;;   (* n > max > min *)
+          (min,max) <- get_min_max_fresh_sid b bs ;;  (* forall b, In b bytes -> min <= sid b  /\ sid b <= max *)
+          bytes' <- map_monad (bump_sid_by (n - min)) bytes ;;
+          set_fresh (1 + (max + (n - min))) ;;  (* n < 1 + (max + (n - min)) *)
+          ret bytes'
+      end.
+     *)                                 
+    
     Definition re_sid_ubytes {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M}
                (bytes : list SByte) : M (list SByte)
       := let len := length bytes in
@@ -2382,9 +2391,52 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
                                                                end
                                                     ].
 
-    Program Fixpoint serialize_sbytes
-            {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M} `{RAISE_OOM M}
-            (uv : uvalue) (dt : dtyp) {measure (uvalue_measure uv, dtyp_measure dt) lex_nats} : M (list SByte)
+
+    Fixpoint serialize_by_dtyp {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M} `{RAISE_OOM M}
+      (CTR : dtyp -> uvalue)  (dt : dtyp) {struct dt} : M (list SByte) :=
+      match dt with
+      | DTYPE_Struct ts =>
+          l <- map_monad (serialize_by_dtyp CTR) ts ;;
+          ret (concat l)
+              
+      | DTYPE_Packed_struct (ts) =>
+          l <- map_monad (serialize_by_dtyp CTR) ts ;;
+          ret (concat l)
+              
+      | DTYPE_Array sz t =>
+          bs <- serialize_by_dtyp CTR t ;;
+          ret (concat (repeatN sz bs))
+
+      | DTYPE_Vector sz t =>
+          bs <- serialize_by_dtyp CTR t ;;
+          ret (concat (repeatN sz bs))
+
+      | _ =>
+          sid <- fresh_sid;;
+          lift_OOM (to_ubytes (CTR dt) dt sid)
+      end.
+
+
+    Definition map_monad2  {M} `{Monad M} `{RAISE_ERROR M} {A B C} (f : A -> B -> M C) : list A -> list B -> M (list C) :=
+      fix go l1 l2 :=
+        match l1 with
+        | [] =>
+            match l2 with
+            | [] => ret []
+            | _ => raise_error "map_monad2: length mismatch"
+            end
+        | x::xs =>
+            match l2 with
+            | [] => raise_error "map_monad2: length mismatch"
+            | y::ys =>
+                z <- f x y ;;
+                zs <- go xs ys ;;
+                ret (z::zs)
+            end
+        end.
+
+    Fixpoint serialize_sbytes {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M} `{RAISE_OOM M}
+      (uv : uvalue) (dt : dtyp) {struct uv} : M (list SByte) 
       :=
       match uv with
       (* Base types *)
@@ -2413,355 +2465,56 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           sid <- fresh_sid;;
           lift_OOM (to_ubytes uv dt sid)
 
-      (* Undef values, these can possibly be aggregates *)
-      | UVALUE_Undef _ =>
+      | UVALUE_Undef _ => serialize_by_dtyp UVALUE_Undef dt
+      | UVALUE_Poison _ => serialize_by_dtyp UVALUE_Poison dt
+      | UVALUE_Oom _ => serialize_by_dtyp UVALUE_Oom dt
+      | UVALUE_Struct fields =>
           match dt with
-          | DTYPE_Struct [] =>
-              ret []
-          | DTYPE_Struct (t::ts) =>
-              f_bytes <- serialize_sbytes (UVALUE_Undef t) t;; (* How do I know this is smaller? *)
-              fields_bytes <- serialize_sbytes (UVALUE_Undef (DTYPE_Struct ts)) (DTYPE_Struct ts);;
-              ret (f_bytes ++ fields_bytes)
-
-          | DTYPE_Packed_struct [] =>
-              ret []
-          | DTYPE_Packed_struct (t::ts) =>
-              f_bytes <- serialize_sbytes (UVALUE_Undef t) t;; (* How do I know this is smaller? *)
-              fields_bytes <- serialize_sbytes (UVALUE_Undef (DTYPE_Packed_struct ts)) (DTYPE_Packed_struct ts);;
-              ret (f_bytes ++ fields_bytes)
-
-          | DTYPE_Array sz t =>
-              field_bytes <- map_monad_In (repeatN sz (UVALUE_Undef t)) (fun elt Hin => serialize_sbytes elt t);;
-              ret (concat field_bytes)
-
-          | DTYPE_Vector sz t =>
-              field_bytes <- map_monad_In (repeatN sz (UVALUE_Undef t)) (fun elt Hin => serialize_sbytes elt t);;
-              ret (concat field_bytes)
-          | _ =>
-              sid <- fresh_sid;;
-              lift_OOM (to_ubytes uv dt sid)
-          end
-
-      (* Poison values, possibly aggregates *)
-      | UVALUE_Poison _ =>
-          match dt with
-          | DTYPE_Struct [] =>
-              ret []
-          | DTYPE_Struct (t::ts) =>
-              f_bytes <- serialize_sbytes (UVALUE_Poison t) t;; (* How do I know this is smaller? *)
-              fields_bytes <- serialize_sbytes (UVALUE_Poison (DTYPE_Struct ts)) (DTYPE_Struct ts);;
-              ret (f_bytes ++ fields_bytes)
-
-          | DTYPE_Packed_struct [] =>
-              ret []
-          | DTYPE_Packed_struct (t::ts) =>
-              f_bytes <- serialize_sbytes (UVALUE_Poison t) t;; (* How do I know this is smaller? *)
-              fields_bytes <- serialize_sbytes (UVALUE_Poison (DTYPE_Packed_struct ts)) (DTYPE_Packed_struct ts);;
-              ret (f_bytes ++ fields_bytes)
-
-          | DTYPE_Array sz t =>
-              field_bytes <- map_monad_In (repeatN sz (UVALUE_Poison t)) (fun elt Hin => serialize_sbytes elt t);;
-              ret (concat field_bytes)
-
-          | DTYPE_Vector sz t =>
-              field_bytes <- map_monad_In (repeatN sz (UVALUE_Poison t)) (fun elt Hin => serialize_sbytes elt t);;
-              ret (concat field_bytes)
-          | _ =>
-              sid <- fresh_sid;;
-              lift_OOM (to_ubytes uv dt sid)
-          end
-
-      (* Oom values, possibly aggregates *)
-      | UVALUE_Oom _ =>
-          match dt with
-          | DTYPE_Struct [] =>
-              ret []
-          | DTYPE_Struct (t::ts) =>
-              f_bytes <- serialize_sbytes (UVALUE_Oom t) t;; (* How do I know this is smaller? *)
-              fields_bytes <- serialize_sbytes (UVALUE_Oom (DTYPE_Struct ts)) (DTYPE_Struct ts);;
-              ret (f_bytes ++ fields_bytes)
-
-          | DTYPE_Packed_struct [] =>
-              ret []
-          | DTYPE_Packed_struct (t::ts) =>
-              f_bytes <- serialize_sbytes (UVALUE_Oom t) t;; (* How do I know this is smaller? *)
-              fields_bytes <- serialize_sbytes (UVALUE_Oom (DTYPE_Packed_struct ts)) (DTYPE_Packed_struct ts);;
-              ret (f_bytes ++ fields_bytes)
-
-          | DTYPE_Array sz t =>
-              field_bytes <- map_monad_In (repeatN sz (UVALUE_Oom t)) (fun elt Hin => serialize_sbytes elt t);;
-              ret (concat field_bytes)
-
-          | DTYPE_Vector sz t =>
-              field_bytes <- map_monad_In (repeatN sz (UVALUE_Oom t)) (fun elt Hin => serialize_sbytes elt t);;
-              ret (concat field_bytes)
-          | _ =>
-              sid <- fresh_sid;;
-              lift_OOM (to_ubytes uv dt sid)
-          end
-
-      (* TODO: each field gets a separate store id... Is that sensible? *)
-      (* Padded aggregate types *)
-      | UVALUE_Struct [] =>
-          ret []
-      | UVALUE_Struct (f::fields) =>
-          (* TODO: take padding into account *)
-          match dt with
-          | DTYPE_Struct (t::ts) =>
-              f_bytes <- serialize_sbytes f t;;
-              fields_bytes <- serialize_sbytes (UVALUE_Struct fields) (DTYPE_Struct ts);;
-              ret (f_bytes ++ fields_bytes)
+          | DTYPE_Struct ts =>
+              l <- map_monad2 serialize_sbytes fields ts ;;
+              ret (concat l)
           | _ =>
               raise_error "serialize_sbytes: UVALUE_Struct field / type mismatch."
           end
-
-      (* Packed aggregate types *)
-      | UVALUE_Packed_struct [] =>
-          ret []
-      | UVALUE_Packed_struct (f::fields) =>
-          (* TODO: take padding into account *)
+      | UVALUE_Packed_struct fields =>
           match dt with
-          | DTYPE_Packed_struct (t::ts) =>
-              f_bytes <- serialize_sbytes f t;;
-              fields_bytes <- serialize_sbytes (UVALUE_Packed_struct fields) (DTYPE_Packed_struct ts);;
-              ret (f_bytes ++ fields_bytes)
+          | DTYPE_Packed_struct ts =>
+              l <- map_monad2 serialize_sbytes fields ts ;;
+              ret (concat l)
           | _ =>
               raise_error "serialize_sbytes: UVALUE_Packed_struct field / type mismatch."
           end
 
       | UVALUE_Array elts =>
           match dt with
-          | DTYPE_Array sz t =>
-              field_bytes <- map_monad_In elts (fun elt Hin => serialize_sbytes elt t);;
-              ret (concat field_bytes)
+          | DTYPE_Array _ t =>
+              l <- map_monad (fun elt => serialize_sbytes elt t) elts;;
+              ret (concat l)
           | _ =>
               raise_error "serialize_sbytes: UVALUE_Array with incorrect type."
           end
+
       | UVALUE_Vector elts =>
           match dt with
-          | DTYPE_Vector sz t =>
-              field_bytes <- map_monad_In elts (fun elt Hin => serialize_sbytes elt t);;
-              ret (concat field_bytes)
+          | DTYPE_Vector _ t =>
+              l <- map_monad (fun elt => serialize_sbytes elt t) elts;;
+              ret (concat l)
           | _ =>
-              raise_error "serialize_sbytes: UVALUE_Array with incorrect type."
+              raise_error "serialize_sbytes: UVALUE_Vector with incorrect type."
           end
 
       | UVALUE_None => ret nil
 
-      (* Byte manipulation. *)
       | UVALUE_ExtractByte uv dt' idx sid =>
           raise_error "serialize_sbytes: UVALUE_ExtractByte not guarded by UVALUE_ConcatBytes."
-
+            
       | UVALUE_ConcatBytes bytes t =>
-          (* TODO: should provide *new* sids... May need to make this function in a fresh sid monad *)
           bytes' <- lift_ERR_RAISE_ERROR (map_monad extract_byte_to_sbyte bytes);;
           re_sid_ubytes bytes'
       end.
-    Next Obligation.
-      unfold Wf.MR.
-      unfold lex_nats.
-      apply wf_inverse_image.
-      apply wf_lexprod; intros;
-        apply Wf_nat.lt_wf.
-    Qed.
 
-    Lemma serialize_sbytes_equation {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M} `{RAISE_OOM M} : forall (uv : uvalue) (dt : dtyp),
-        @serialize_sbytes M _ _ _ _ uv dt =
-          match uv with
-          (* Base types *)
-          | UVALUE_Addr _
-          | UVALUE_I1 _
-          | UVALUE_I8 _
-          | UVALUE_I32 _
-          | UVALUE_I64 _
-          | UVALUE_IPTR _
-          | UVALUE_Float _
-          | UVALUE_Double _
 
-          (* Expressions *)
-          | UVALUE_IBinop _ _ _
-          | UVALUE_ICmp _ _ _
-          | UVALUE_FBinop _ _ _ _
-          | UVALUE_FCmp _ _ _
-          | UVALUE_Conversion _ _ _ _
-          | UVALUE_GetElementPtr _ _ _
-          | UVALUE_ExtractElement _ _ _
-          | UVALUE_InsertElement _ _ _ _
-          | UVALUE_ShuffleVector _ _ _ _
-          | UVALUE_ExtractValue _ _ _
-          | UVALUE_InsertValue _ _ _ _ _
-          | UVALUE_Select _ _ _ =>
-              sid <- fresh_sid;;
-              lift_OOM (to_ubytes uv dt sid)
-
-          (* Undef values, these can possibly be aggregates *)
-          | UVALUE_Undef _ =>
-              match dt with
-              | DTYPE_Struct [] =>
-                  ret []
-              | DTYPE_Struct (t::ts) =>
-                  f_bytes <- serialize_sbytes (UVALUE_Undef t) t;; (* How do I know this is smaller? *)
-                  fields_bytes <- serialize_sbytes (UVALUE_Undef (DTYPE_Struct ts)) (DTYPE_Struct ts);;
-                  ret (f_bytes ++ fields_bytes)
-
-              | DTYPE_Packed_struct [] =>
-                  ret []
-              | DTYPE_Packed_struct (t::ts) =>
-                  f_bytes <- serialize_sbytes (UVALUE_Undef t) t;; (* How do I know this is smaller? *)
-                  fields_bytes <- serialize_sbytes (UVALUE_Undef (DTYPE_Packed_struct ts)) (DTYPE_Packed_struct ts);;
-                  ret (f_bytes ++ fields_bytes)
-
-              | DTYPE_Array sz t =>
-                  field_bytes <- map_monad_In (repeatN sz (UVALUE_Undef t)) (fun elt Hin => serialize_sbytes elt t);;
-                  ret (concat field_bytes)
-
-              | DTYPE_Vector sz t =>
-                  field_bytes <- map_monad_In (repeatN sz (UVALUE_Undef t)) (fun elt Hin => serialize_sbytes elt t);;
-                  ret (concat field_bytes)
-              | _ =>
-                  sid <- fresh_sid;;
-                  lift_OOM (to_ubytes uv dt sid)
-              end
-
-          (* Poison values, possibly aggregates *)
-          | UVALUE_Poison _ =>
-              match dt with
-              | DTYPE_Struct [] =>
-                  ret []
-              | DTYPE_Struct (t::ts) =>
-                  f_bytes <- serialize_sbytes (UVALUE_Poison t) t;; (* How do I know this is smaller? *)
-                  fields_bytes <- serialize_sbytes (UVALUE_Poison (DTYPE_Struct ts)) (DTYPE_Struct ts);;
-                  ret (f_bytes ++ fields_bytes)
-
-              | DTYPE_Packed_struct [] =>
-                  ret []
-              | DTYPE_Packed_struct (t::ts) =>
-                  f_bytes <- serialize_sbytes (UVALUE_Poison t) t;; (* How do I know this is smaller? *)
-                  fields_bytes <- serialize_sbytes (UVALUE_Poison (DTYPE_Packed_struct ts)) (DTYPE_Packed_struct ts);;
-                  ret (f_bytes ++ fields_bytes)
-
-              | DTYPE_Array sz t =>
-                  field_bytes <- map_monad_In (repeatN sz (UVALUE_Poison t)) (fun elt Hin => serialize_sbytes elt t);;
-                  ret (concat field_bytes)
-
-              | DTYPE_Vector sz t =>
-                  field_bytes <- map_monad_In (repeatN sz (UVALUE_Poison t)) (fun elt Hin => serialize_sbytes elt t);;
-                  ret (concat field_bytes)
-              | _ =>
-                  sid <- fresh_sid;;
-                  lift_OOM (to_ubytes uv dt sid)
-              end
-
-          (* Oom values, possibly aggregates *)
-          | UVALUE_Oom _ =>
-              match dt with
-              | DTYPE_Struct [] =>
-                  ret []
-              | DTYPE_Struct (t::ts) =>
-                  f_bytes <- serialize_sbytes (UVALUE_Oom t) t;; (* How do I know this is smaller? *)
-                  fields_bytes <- serialize_sbytes (UVALUE_Oom (DTYPE_Struct ts)) (DTYPE_Struct ts);;
-                  ret (f_bytes ++ fields_bytes)
-
-              | DTYPE_Packed_struct [] =>
-                  ret []
-              | DTYPE_Packed_struct (t::ts) =>
-                  f_bytes <- serialize_sbytes (UVALUE_Oom t) t;; (* How do I know this is smaller? *)
-                  fields_bytes <- serialize_sbytes (UVALUE_Oom (DTYPE_Packed_struct ts)) (DTYPE_Packed_struct ts);;
-                  ret (f_bytes ++ fields_bytes)
-
-              | DTYPE_Array sz t =>
-                  field_bytes <- map_monad_In (repeatN sz (UVALUE_Oom t)) (fun elt Hin => serialize_sbytes elt t);;
-                  ret (concat field_bytes)
-
-              | DTYPE_Vector sz t =>
-                  field_bytes <- map_monad_In (repeatN sz (UVALUE_Oom t)) (fun elt Hin => serialize_sbytes elt t);;
-                  ret (concat field_bytes)
-              | _ =>
-                  sid <- fresh_sid;;
-                  lift_OOM (to_ubytes uv dt sid)
-              end
-
-          (* TODO: each field gets a separate store id... Is that sensible? *)
-          (* Padded aggregate types *)
-          | UVALUE_Struct [] =>
-              ret []
-          | UVALUE_Struct (f::fields) =>
-              (* TODO: take padding into account *)
-              match dt with
-              | DTYPE_Struct (t::ts) =>
-                  f_bytes <- serialize_sbytes f t;;
-                  fields_bytes <- serialize_sbytes (UVALUE_Struct fields) (DTYPE_Struct ts);;
-                  ret (f_bytes ++ fields_bytes)
-              | _ =>
-                  raise_error "serialize_sbytes: UVALUE_Struct field / type mismatch."
-              end
-
-          (* Packed aggregate types *)
-          | UVALUE_Packed_struct [] =>
-              ret []
-          | UVALUE_Packed_struct (f::fields) =>
-              (* TODO: take padding into account *)
-              match dt with
-              | DTYPE_Packed_struct (t::ts) =>
-                  f_bytes <- serialize_sbytes f t;;
-                  fields_bytes <- serialize_sbytes (UVALUE_Packed_struct fields) (DTYPE_Packed_struct ts);;
-                  ret (f_bytes ++ fields_bytes)
-              | _ =>
-                  raise_error "serialize_sbytes: UVALUE_Packed_struct field / type mismatch."
-              end
-
-          | UVALUE_Array elts =>
-              match dt with
-              | DTYPE_Array sz t =>
-                  field_bytes <- map_monad_In elts (fun elt Hin => serialize_sbytes elt t);;
-                  ret (concat field_bytes)
-              | _ =>
-                  raise_error "serialize_sbytes: UVALUE_Array with incorrect type."
-              end
-          | UVALUE_Vector elts =>
-              match dt with
-              | DTYPE_Vector sz t =>
-                  field_bytes <- map_monad_In elts (fun elt Hin => serialize_sbytes elt t);;
-                  ret (concat field_bytes)
-              | _ =>
-                  raise_error "serialize_sbytes: UVALUE_Array with incorrect type."
-              end
-
-          | UVALUE_None => ret nil
-
-          (* Byte manipulation. *)
-          | UVALUE_ExtractByte uv dt' idx sid =>
-              raise_error "serialize_sbytes: UVALUE_ExtractByte not guarded by UVALUE_ConcatBytes."
-
-          | UVALUE_ConcatBytes bytes t =>
-              (* TODO: should provide *new* sids... May need to make this function in a fresh sid monad *)
-              bytes' <- lift_ERR_RAISE_ERROR (map_monad extract_byte_to_sbyte bytes);;
-              re_sid_ubytes bytes'
-          end.
-    Proof.
-      intros.
-      unfold serialize_sbytes at 1.
-      unfold serialize_sbytes_func at 1.
-      (* rewrite Wf.WfExtensionality.fix_sub_eq_ext.  (* <<=== THIS STEP TAKES A LONG TIME *) *)
-      (* simpl. (* <<=== my *goals* buffer goes from 4.5M to 37130 lines (2.5M) of text *) *)
-      (* destruct uv; simpl; try reflexivity. *)
-      (* - destruct dt; try reflexivity. *)
-      (*   + destruct fields; try reflexivity. *)
-      (*   + destruct fields; try reflexivity. *)
-      (* - destruct dt; try reflexivity. *)
-      (*   + destruct fields; try reflexivity. *)
-      (*   + destruct fields; try reflexivity. *)
-      (* - destruct fields; try reflexivity. *)
-      (*   destruct dt; try reflexivity. *)
-      (*   destruct fields0; try reflexivity. *)
-      (* - destruct fields; try reflexivity. *)
-      (*   destruct dt; try reflexivity. *)
-      (*   destruct fields0; try reflexivity. *)
-      (* - destruct dt; try reflexivity. *)
-      (* - destruct dt; try reflexivity. *)
-    Admitted.
-          
-    (* deserialize_sbytes takes a list of SBytes and turns them into a uvalue. *)
+  (* deserialize_sbytes takes a list of SBytes and turns them into a uvalue. *)
 
   (*    This relies on the similar, but different, from_ubytes function *)
   (*    which given a set of bytes checks if all of the bytes are from *)
@@ -2770,60 +2523,91 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
 
   (*    The reason we also have deserialize_sbytes is in order to deal *)
   (*    with aggregate data types. *)
-  (*    *)
-    Obligation Tactic := try Tactics.program_simpl; try solve [solve_dtyp_measure].
-    Program Fixpoint deserialize_sbytes (bytes : list SByte) (dt : dtyp) {measure (dtyp_measure dt)} : err uvalue
-      :=
+    Definition from_ubytes_extra := 
+      fun (bytes : list SByte) (dt : dtyp) =>
+        match split_n (N.to_nat (sizeof_dtyp dt)) bytes with
+        | inr (bs1, bs2) =>
+            (match all_bytes_from_uvalue dt bs1 with
+             | Some uv => uv
+             | None => UVALUE_ConcatBytes (map sbyte_to_extractbyte bytes) dt
+             end, bs2)
+        | inl _ => 
+            (UVALUE_ConcatBytes (map sbyte_to_extractbyte bytes) dt, [])
+        end.
+
+    Lemma from_ubytes_extra_from_ubytes :
+      forall bs dt uv,
+        from_ubytes_extra bs dt = (uv, []) ->
+          from_ubytes bs dt = uv.
+    Proof.
+      unfold from_ubytes_extra.
+      unfold from_ubytes.
+      intros.
+      break_inner_match_goal.
+        + break_match_hyp.
+          * assert (exists s, split_n (N.to_nat (sizeof_dtyp dt)) bs = inl s) by (eexists; eauto).
+            apply split_n_err in H0.
+            apply Neqb_ok in Heqb.
+            lia.
+          * destruct p.
+            apply split_n_correct in Heqs.
+            destruct Heqs as [_ EQ].
+            inversion H.
+            subst.
+            rewrite app_nil_r.
+            reflexivity.
+        + break_match_hyp.
+          * inversion H.
+            reflexivity.
+          * destruct p.
+            inversion H.
+            subst.
+            apply split_n_correct in Heqs.
+            destruct Heqs as [EQ1 EQ2].
+            rewrite app_nil_r in EQ2. subst.
+            rewrite EQ1 in Heqb.
+            rewrite Nnat.N2Nat.id in Heqb.
+            rewrite N.eqb_refl in Heqb.
+            inversion Heqb.
+    Qed.
+
+    (* Tries to deserialize a list of SBytes into a uvalue.
+       - if [length bytes = size_of dt] then this always succeeds
+
+       - if [length bytes < size_of dt] then
+             + if [dt] is an aggregate type, it will fail
+             + if [dt] is not aggregate, return a UVALUE_ConcatBytes with too few bytes
+
+       - if [length bytes > size_of dt] then
+            this operation succeeds, but:
+            + if [dt] is an aggregate type, the extra bytes are discarded
+            + if [dt] is not aggregate, return a UVALUE_ConcatBytes with too many bytes 
+     *)
+
+    Fixpoint deserialize_sbytes (bytes : list SByte) (dt : dtyp) : err uvalue :=
+      let dsb_list : list SByte -> list dtyp -> err (list uvalue * list SByte) :=
+        fix go (bytes : list SByte) (fields : list dtyp) : err (list uvalue * list SByte) := 
+          match fields with
+          | [] => ret ([], bytes)
+          | t::ts => 
+              '(bs1, bs2) <- split_n (N.to_nat (sizeof_dtyp dt)) bytes ;;
+              u <- deserialize_sbytes bs1 t ;;
+              '(us, rest) <- go bs2 ts ;;
+              ret (u::us, rest)
+          end
+      in
+      let dsb_loop (dt:dtyp) : nat  -> list SByte -> err (list uvalue * list SByte) :=
+        fix go n bytes :=
+          match n with
+          | 0 => ret ([], bytes)
+          | S n =>
+              '(bs1, bs2) <- split_n (N.to_nat (sizeof_dtyp dt)) bytes ;;
+              u <- deserialize_sbytes bs1 dt ;;
+              '(us, rest) <- go n bs2;;
+              ret (u::us, rest)
+          end 
+      in 
       match dt with
-      (* TODO: should we bother with this? *)
-      (* Array and vector types *)
-      | DTYPE_Array sz t =>
-          let elt_size := sizeof_dtyp t in
-          fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*elt_size) ((idx+1) * elt_size) bytes) t;; ret (uv::acc)) (Nseq 0 (N.to_nat sz)) [];;
-          ret (UVALUE_Array fields)
-
-      | DTYPE_Vector sz t =>
-          let elt_size := sizeof_dtyp t in
-          fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*elt_size) ((idx+1) * elt_size) bytes) t;; ret (uv::acc)) (Nseq 0 (N.to_nat sz)) [];;
-          ret (UVALUE_Vector fields)
-
-      (* Padded aggregate types *)
-      | DTYPE_Struct fields =>
-          (* TODO: Add padding *)
-          match fields with
-          | [] => ret (UVALUE_Struct []) (* TODO: Not 100% sure about this. *)
-          | (dt::dts) =>
-              let sz := sizeof_dtyp dt in
-              let init_bytes := take sz bytes in
-              let rest_bytes := drop sz bytes in
-              f <- deserialize_sbytes init_bytes dt;;
-              rest <- deserialize_sbytes rest_bytes (DTYPE_Struct dts);;
-              match rest with
-              | UVALUE_Struct fs =>
-                  ret (UVALUE_Struct (f::fs))
-              | _ =>
-                  inl "deserialize_sbytes: DTYPE_Struct recursive call did not return a struct."%string
-              end
-          end
-
-      (* Structures with no padding *)
-      | DTYPE_Packed_struct fields =>
-          match fields with
-          | [] => ret (UVALUE_Packed_struct []) (* TODO: Not 100% sure about this. *)
-          | (dt::dts) =>
-              let sz := sizeof_dtyp dt in
-              let init_bytes := take sz bytes in
-              let rest_bytes := drop sz bytes in
-              f <- deserialize_sbytes init_bytes dt;;
-              rest <- deserialize_sbytes rest_bytes (DTYPE_Packed_struct dts);;
-              match rest with
-              | UVALUE_Packed_struct fs =>
-                  ret (UVALUE_Packed_struct (f::fs))
-              | _ =>
-                  inl "deserialize_sbytes: DTYPE_Struct recursive call did not return a struct."%string
-              end
-          end
-
       (* Base types *)
       | DTYPE_I _
       | DTYPE_IPTR
@@ -2840,84 +2624,25 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           ret (from_ubytes bytes dt)
 
       | DTYPE_Void =>
-          inl "deserialize_sbytes: Attempt to deserialize void."%string
+          raise "deserialize_sbytes: Attempt to deserialize void."%string
+
+      | DTYPE_Struct fields =>
+          '(uvs, _) <- dsb_list bytes fields ;;
+          ret (UVALUE_Struct uvs)
+
+      | DTYPE_Packed_struct fields =>
+          '(uvs, _) <- dsb_list bytes fields ;;
+          ret (UVALUE_Packed_struct uvs)
+
+      | DTYPE_Array sz t =>
+          '(uvs, _) <- dsb_loop t (N.to_nat sz) bytes ;;
+          ret (UVALUE_Array uvs)
+
+      | DTYPE_Vector sz t =>
+          '(uvs, _) <- dsb_loop t (N.to_nat sz) bytes ;;
+          ret (UVALUE_Vector uvs)
       end.
 
-    Lemma deserialize_sbytes_equation (bytes : list SByte) (dt : dtyp) :
-      deserialize_sbytes bytes dt =
-        match dt with
-        (* TODO: should we bother with this? *)
-        (* Array and vector types *)
-        | DTYPE_Array sz t =>
-            let elt_size := sizeof_dtyp t in
-            fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*elt_size) ((idx+1) * elt_size) bytes) t;; ret (uv::acc)) (Nseq 0 (N.to_nat sz)) [];;
-            ret (UVALUE_Array fields)
-
-        | DTYPE_Vector sz t =>
-            let elt_size := sizeof_dtyp t in
-            fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*elt_size) ((idx+1) * elt_size) bytes) t;; ret (uv::acc)) (Nseq 0 (N.to_nat sz)) [];;
-            ret (UVALUE_Vector fields)
-
-        (* Padded aggregate types *)
-        | DTYPE_Struct fields =>
-            (* TODO: Add padding *)
-            match fields with
-            | [] => ret (UVALUE_Struct []) (* TODO: Not 100% sure about this. *)
-            | (dt::dts) =>
-                let sz := sizeof_dtyp dt in
-                let init_bytes := take sz bytes in
-                let rest_bytes := drop sz bytes in
-                f <- deserialize_sbytes init_bytes dt;;
-                rest <- deserialize_sbytes rest_bytes (DTYPE_Struct dts);;
-                match rest with
-                | UVALUE_Struct fs =>
-                    ret (UVALUE_Struct (f::fs))
-                | _ =>
-                    inl "deserialize_sbytes: DTYPE_Struct recursive call did not return a struct."%string
-                end
-            end
-
-        (* Structures with no padding *)
-        | DTYPE_Packed_struct fields =>
-            match fields with
-            | [] => ret (UVALUE_Packed_struct []) (* TODO: Not 100% sure about this. *)
-            | (dt::dts) =>
-                let sz := sizeof_dtyp dt in
-                let init_bytes := take sz bytes in
-                let rest_bytes := drop sz bytes in
-                f <- deserialize_sbytes init_bytes dt;;
-                rest <- deserialize_sbytes rest_bytes (DTYPE_Packed_struct dts);;
-                match rest with
-                | UVALUE_Packed_struct fs =>
-                    ret (UVALUE_Packed_struct (f::fs))
-                | _ =>
-                    inl "deserialize_sbytes: DTYPE_Struct recursive call did not return a struct."%string
-                end
-            end
-
-        (* Base types *)
-        | DTYPE_I _
-        | DTYPE_IPTR
-        | DTYPE_Pointer
-        | DTYPE_Half
-        | DTYPE_Float
-        | DTYPE_Double
-        | DTYPE_X86_fp80
-        | DTYPE_Fp128
-        | DTYPE_Ppc_fp128
-        | DTYPE_X86_mmx
-        | DTYPE_Opaque
-        | DTYPE_Metadata =>
-            ret (from_ubytes bytes dt)
-
-        | DTYPE_Void =>
-            inl "deserialize_sbytes: Attempt to deserialize void."%string
-        end.
-    Proof.
-      intros.
-      unfold deserialize_sbytes at 1.
-      unfold deserialize_sbytes_func at 1.
-    Admitted.
 
     (* Serialize a uvalue into bytes and combine them into UVALUE_ConcatBytes. Useful for bitcasts.
 
@@ -2953,6 +2678,16 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
 
   End Serialization.
 End MemoryHelpers.
+
+
+From ITree Require Import
+     ITree
+     Basics.Basics
+     Events.Exception
+     Eq.Eqit
+     Events.StateFacts
+     Events.State.
+
 
 Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP).
   Import LP.
@@ -5270,71 +5005,38 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       reflexivity.
     Qed.
 
+
+    Lemma exec_correct_serialize_by_dtyp_undef :
+      forall dt CTR pre,
+        exec_correct pre (serialize_by_dtyp CTR dt) (serialize_by_dtyp CTR dt).
+    Proof.
+      induction dt; intros;
+        try solve [
+            eapply exec_correct_bind; auto with EXEC_CORRECT
+          ].
+
+      - eapply exec_correct_bind; auto with EXEC_CORRECT.
+        do 2 rewrite map_monad_map_monad_In.
+        apply exec_correct_map_monad_In.
+        intros.
+        apply H.
+        assumption.
+
+      - eapply exec_correct_bind; auto with EXEC_CORRECT.
+        do 2 rewrite map_monad_map_monad_In.
+        apply exec_correct_map_monad_In.
+        intros.
+        apply H.
+        assumption.
+    Qed.
+        
+    
     Lemma exec_correct_serialize_sbytes_undef :
       forall dt t pre,
         exec_correct pre (serialize_sbytes (UVALUE_Undef t) dt) (serialize_sbytes (UVALUE_Undef t) dt).
     Proof.
-      induction dt using dtyp_measure_strong_ind; intros t pre;
-        do 2 rewrite serialize_sbytes_equation;
-        auto with EXEC_CORRECT.
-
-      { (* Size 1 *)
-        destruct dt; inversion H; auto with EXEC_CORRECT.
-      }
-
-      { (* Larger sizes *)
-        revert t pre.
-        induction dt; intros t pre; try apply exec_correct_bind; auto with EXEC_CORRECT.
-
-        { (* Arrays *)
-          apply exec_correct_map_monad_In.
-          intros a pre0 IN.
-          apply In_repeatN in IN; subst.
-          eapply H.
-          cbn in H0.
-          lia.
-        }
-
-        { (* Structs *)
-          break_match_goal; auto with EXEC_CORRECT.
-          apply exec_correct_bind; auto with EXEC_CORRECT.
-          eapply H; cbn in *; auto; lia.
-
-          intros a ms_init ms_after_m st_init st_after_m RUN.
-
-          apply exec_correct_bind; auto with EXEC_CORRECT.
-
-          eapply H; cbn in *; auto.
-          unfold list_sum.
-          assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
-          lia.
-        }
-
-        { (* Packed Structs *)
-          break_match_goal; auto with EXEC_CORRECT.
-          apply exec_correct_bind; auto with EXEC_CORRECT.
-          eapply H; cbn in *; auto; lia.
-
-          intros a ms_init ms_after_m st_init st_after_m RUN.
-
-          apply exec_correct_bind; auto with EXEC_CORRECT.
-
-          eapply H; cbn in *; auto.
-          unfold list_sum.
-          assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
-          lia.
-        }
-
-        { (* Vectors *)
-          apply exec_correct_map_monad_In.
-          intros a pre0 IN.
-          apply In_repeatN in IN; subst.
-          eapply H.
-          cbn in H0.
-          lia.
-        }
-
-      }
+      intros.
+      apply exec_correct_serialize_by_dtyp_undef.
     Qed.
 
     Hint Resolve exec_correct_serialize_sbytes_undef : EXEC_CORRECT.
@@ -5343,67 +5045,8 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       forall dt t pre,
         exec_correct pre (serialize_sbytes (UVALUE_Poison t) dt) (serialize_sbytes (UVALUE_Poison t) dt).
     Proof.
-      induction dt using dtyp_measure_strong_ind; intros t pre;
-        do 2 rewrite serialize_sbytes_equation;
-        auto with EXEC_CORRECT.
-
-      { (* Size 1 *)
-        destruct dt; inversion H; auto with EXEC_CORRECT.
-      }
-
-      { (* Larger sizes *)
-        revert t pre.
-        induction dt; intros t pre; try apply exec_correct_bind; auto with EXEC_CORRECT.
-
-        { (* Arrays *)
-          apply exec_correct_map_monad_In.
-          intros a pre0 IN.
-          apply In_repeatN in IN; subst.
-          eapply H.
-          cbn in H0.
-          lia.
-        }
-
-        { (* Structs *)
-          break_match_goal; auto with EXEC_CORRECT.
-          apply exec_correct_bind; auto with EXEC_CORRECT.
-          eapply H; cbn in *; auto; lia.
-
-          intros a ms_init ms_after_m st_init st_after_m RUN.
-
-          apply exec_correct_bind; auto with EXEC_CORRECT.
-
-          eapply H; cbn in *; auto.
-          unfold list_sum.
-          assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
-          lia.
-        }
-
-        { (* Packed Structs *)
-          break_match_goal; auto with EXEC_CORRECT.
-          apply exec_correct_bind; auto with EXEC_CORRECT.
-          eapply H; cbn in *; auto; lia.
-
-          intros a ms_init ms_after_m st_init st_after_m RUN.
-
-          apply exec_correct_bind; auto with EXEC_CORRECT.
-
-          eapply H; cbn in *; auto.
-          unfold list_sum.
-          assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
-          lia.
-        }
-
-        { (* Vectors *)
-          apply exec_correct_map_monad_In.
-          intros a pre0 IN.
-          apply In_repeatN in IN; subst.
-          eapply H.
-          cbn in H0.
-          lia.
-        }
-
-      }
+      intros.
+      apply exec_correct_serialize_by_dtyp_undef.
     Qed.
 
     Hint Resolve exec_correct_serialize_sbytes_poison : EXEC_CORRECT.
@@ -5412,105 +5055,92 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       forall dt t pre,
         exec_correct pre (serialize_sbytes (UVALUE_Oom t) dt) (serialize_sbytes (UVALUE_Oom t) dt).
     Proof.
-      induction dt using dtyp_measure_strong_ind; intros t pre;
-        do 2 rewrite serialize_sbytes_equation;
-        auto with EXEC_CORRECT.
-
-      { (* Size 1 *)
-        destruct dt; inversion H; auto with EXEC_CORRECT.
-      }
-
-      { (* Larger sizes *)
-        revert t pre.
-        induction dt; intros t pre; try apply exec_correct_bind; auto with EXEC_CORRECT.
-
-        { (* Arrays *)
-          apply exec_correct_map_monad_In.
-          intros a pre0 IN.
-          apply In_repeatN in IN; subst.
-          eapply H.
-          cbn in H0.
-          lia.
-        }
-
-        { (* Structs *)
-          break_match_goal; auto with EXEC_CORRECT.
-          apply exec_correct_bind; auto with EXEC_CORRECT.
-          eapply H; cbn in *; auto; lia.
-
-          intros a ms_init ms_after_m st_init st_after_m RUN.
-
-          apply exec_correct_bind; auto with EXEC_CORRECT.
-
-          eapply H; cbn in *; auto.
-          unfold list_sum.
-          assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
-          lia.
-        }
-
-        { (* Packed Structs *)
-          break_match_goal; auto with EXEC_CORRECT.
-          apply exec_correct_bind; auto with EXEC_CORRECT.
-          eapply H; cbn in *; auto; lia.
-
-          intros a ms_init ms_after_m st_init st_after_m RUN.
-
-          apply exec_correct_bind; auto with EXEC_CORRECT.
-
-          eapply H; cbn in *; auto.
-          unfold list_sum.
-          assert (dtyp_measure d > 0) by (destruct d; cbn; lia).
-          lia.
-        }
-
-        { (* Vectors *)
-          apply exec_correct_map_monad_In.
-          intros a pre0 IN.
-          apply In_repeatN in IN; subst.
-          eapply H.
-          cbn in H0.
-          lia.
-        }
-
-      }
+      intros.
+      apply exec_correct_serialize_by_dtyp_undef.
     Qed.
 
     Hint Resolve exec_correct_serialize_sbytes_oom : EXEC_CORRECT.
 
+
+    Lemma exec_correct_pre_map_monad2 :
+      forall {A B C}
+        (f : forall {M : Type -> Type} {HM: Monad M} {HS:MonadStoreId M} {HR: RAISE_ERROR M} {HO: RAISE_OOM M}, A -> B -> M C)
+        (pre : MemState -> ExtraState -> Prop) (l1 : list A) (l2: list B)
+        (H : forall a, In a l1 -> forall b (pre : MemState -> ExtraState -> Prop), exec_correct pre (f a b) (f a b)),
+        exec_correct pre (map_monad2 f l1 l2) (map_monad2 f l1 l2).
+    Proof.
+      intros.
+      revert pre l2 H.
+      induction l1.
+      - intros.
+        destruct l2.
+        + apply exec_correct_ret.
+        + apply exec_correct_raise_error.
+      - intros.
+        destruct l2.
+        + apply exec_correct_raise_error.
+        + apply exec_correct_bind.
+          * apply H. left. auto.
+          * intros.
+            apply exec_correct_bind.
+            -- apply IHl1.
+               intros.
+               apply H. right.  auto.
+            -- intros.
+               apply exec_correct_ret.
+    Qed.
+            
     Lemma exec_correct_serialize_sbytes :
       forall uv dt pre,
         exec_correct pre (serialize_sbytes uv dt) (serialize_sbytes uv dt).
     Proof.
-      induction uv using uvalue_ind''; intros dt' pre;
-        do 2 rewrite serialize_sbytes_equation;
-        auto with EXEC_CORRECT.
+      induction uv; intros dt' pre;
+        try solve [
+            auto with EXEC_CORRECT 
+          | apply exec_correct_bind; auto with EXEC_CORRECT
+          ].
 
+      - apply exec_correct_ret.
 
-      all: try solve
-             [break_match; auto with EXEC_CORRECT;
-              [
-                (* Arrays *)
-                apply exec_correct_bind; auto with EXEC_CORRECT;
-                apply exec_correct_map_monad_In;
-                intros a pre0 IN;
-                apply In_repeatN in IN; subst;
-                auto with EXEC_CORRECT
-              |
-                break_match_goal; auto with EXEC_CORRECT
-              |
-                break_match_goal; auto with EXEC_CORRECT
-              |
-                apply exec_correct_bind; auto with EXEC_CORRECT;
-                apply exec_correct_map_monad_In;
-                intros a pre0 IN;
-                apply In_repeatN in IN; subst;
-                auto with EXEC_CORRECT
-              ]
-             |
-               break_match_goal; auto with EXEC_CORRECT;
-               break_match_goal; auto with EXEC_CORRECT
-             ].
+      - unfold serialize_sbytes.
+        break_match_goal; auto with EXEC_CORRECT.
+        apply exec_correct_bind.
+        + apply exec_correct_pre_map_monad2.
+          assumption.
+        + intros.
+          apply exec_correct_ret.
+
+      - unfold serialize_sbytes.
+        break_match_goal; auto with EXEC_CORRECT.
+        apply exec_correct_bind.
+        + apply exec_correct_pre_map_monad2.
+          assumption.
+        + intros.
+          apply exec_correct_ret.
+
+      - unfold serialize_sbytes.
+        break_match_goal; auto with EXEC_CORRECT.
+        apply exec_correct_bind.
+        + do 2 rewrite map_monad_map_monad_In.
+          apply exec_correct_map_monad_In.        
+          intros.
+          apply H; auto.
+        + intros.
+          apply exec_correct_ret.
+
+      - unfold serialize_sbytes.
+        break_match_goal; auto with EXEC_CORRECT.
+        apply exec_correct_bind.
+        + do 2 rewrite map_monad_map_monad_In.
+          apply exec_correct_map_monad_In.        
+          intros.
+          apply H; auto.
+        + intros.
+          apply exec_correct_ret.
+
+      - apply exec_correct_raise_error.
     Qed.
+        
 
     Lemma read_bytes_correct :
       forall len ptr pre,
