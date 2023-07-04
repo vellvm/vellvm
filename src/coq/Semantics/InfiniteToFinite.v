@@ -19619,7 +19619,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       revert Heqr'.
 
       dependent induction REL; intros Heqr'.
-      - subst.
+      - (* oruttF's EqRet *)
+        subst.
         apply interp_memory_prop_ret_inv in RUN.
         destruct RUN as [[r3 [REQ EQ]] | [A [e [k EUTT]]]]; subst.
         2: {
@@ -19661,7 +19662,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         pose proof (fin_to_inf_dvalue_refine_strict d).
 
         apply fin_to_inf_dvalue_refine_strict'; auto.
-      - punfold RUN.
+      - (* oruttF's EqTau *)
+        punfold RUN.
         red in RUN.
         cbn in RUN.
 
@@ -21320,6 +21322,56 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 unfold raiseOOM.
                 rewrite bind_trigger.
                 reflexivity.
+            }
+
+        + specialize (EQ t2); contradiction.
+        + (* OOM *)
+          destruct e.
+          punfold HT1; red in HT1; cbn in HT1.
+          dependent induction HT1.
+          rewrite <- x.
+          pstep.
+          red.
+          eapply Interp_Memory_PropT_Vis_OOM.
+          rewrite get_inf_tree_equation.
+          cbn.
+          unfold raiseOOM.
+          rewrite bind_trigger.
+          reflexivity.
+      - (* oruttF's EqVis case *)
+        red in RUN.
+        cbn in RUN.
+        admit.
+      - (* oruttF's EqVisOOM *)
+        destruct e.
+        repeat red in RUN.
+        punfold RUN. red in RUN. cbn in RUN.
+        admit.
+      - (* oruttF's EqTauL *)
+        forward IHREL; [exact RUN|].
+        forward IHREL; auto.
+        pfold. red. constructor; auto.
+        punfold IHREL.
+      - (* oruttF's EqTauR *)
+        forward IHREL.
+        { repeat red.
+          repeat red in RUN.
+          cbn in *.
+          rewrite tau_eutt in RUN.
+          rewrite <- itree_eta.
+          exact RUN.
+        }
+
+        forward IHREL; auto.
+  Qed.
+
+        
+          
+          destruct e.
+
+          
+          rewrite HT1.
+          eapply Interp_Memory_PropT_Vis_OOM.
 
               - (* TauL *)
                 pclearbot.
