@@ -21341,7 +21341,152 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       - (* oruttF's EqVis case *)
         red in RUN.
         cbn in RUN.
-        admit.
+        repeat red in RUN.
+        punfold RUN; red in RUN; cbn in RUN.
+        dependent induction RUN.
+        + (* TauR *)
+          pstep; red; cbn.
+          constructor; auto.
+
+          specialize (IHRUN k1 e1 _ e2 k2 H H0 H1 (observe t2) CIH MSR).
+          repeat (forward IHRUN; auto).
+          punfold IHRUN.
+        + (* VisOOM *)
+          eapply paco2_mon_bot; eauto.
+          rewrite HT1.
+          cbn.
+          rewrite get_inf_tree_equation.
+          destruct e.
+          cbn.
+          pstep; red; cbn.
+          unfold print_msg.
+          change (VisF (subevent void (ThrowOOM tt))
+                    (fun x : void =>
+                       ITree.subst
+                         (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                       end) (Ret x)))
+            with
+            (observe (Vis (subevent void (ThrowOOM tt))
+                        (fun x : void =>
+                           ITree.subst
+                             (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                           end) (Ret x)))).
+          eapply Interp_Memory_PropT_Vis_OOM.
+          reflexivity.
+        + (* Vis *)
+          repeat red in H3.
+          destruct e2.
+          { red in H3. cbn in H3.
+            rewrite bind_trigger in H3.
+            rewrite H3 in H2.
+            eapply paco2_mon_bot; eauto.
+            rewrite H2.
+            cbn.
+            rewrite get_inf_tree_equation.
+            cbn.
+            break_match.
+            cbn.
+            pstep; red; cbn.
+            change (VisF
+                      (subevent E1.DV.dvalue (E1.ExternalCall t (fin_to_inf_uvalue f) (map fin_to_inf_dvalue args)))
+                      (fun x0 : E1.DV.dvalue =>
+                         get_inf_tree
+                           match DVCInfFin.dvalue_convert_strict x0 with
+                           | NoOom a => ITree.subst k3 (SemNotations.Ret2 s1 s2 a)
+                           | Oom s => raiseOOM s
+                           end))
+              with
+              (observe (Vis
+                          (subevent E1.DV.dvalue (E1.ExternalCall t (fin_to_inf_uvalue f) (map fin_to_inf_dvalue args)))
+                          (fun x0 : E1.DV.dvalue =>
+                             get_inf_tree
+                               match DVCInfFin.dvalue_convert_strict x0 with
+                               | NoOom a => ITree.subst k3 (SemNotations.Ret2 s1 s2 a)
+                               | Oom s => raiseOOM s
+                               end))).
+
+            repeat red in H.
+            destruct e1;
+              try
+                solve
+                [ contradiction
+                | repeat (first [destruct s | destruct i]; try contradiction)
+                ].
+
+            destruct e0.
+            unfold resum in Heqe0.
+            cbn in Heqe0.
+            unfold ReSum_id in Heqe0.
+            unfold id_ in Heqe0.
+            unfold Id_IFun in *.
+            subst.
+            destruct H as (?&F_REF&ARGS_REF).
+            subst.
+
+            (* External calls *)
+
+            eapply Interp_Memory_PropT_Vis with
+              (s1:=s1)
+              (s2:=lift_MemState s2)
+              (ta:=(vis (InterpreterStackBigIntptr.LP.Events.ExternalCall t f0 args0)
+                      (fun x : InterpreterStackBigIntptr.LP.Events.DV.dvalue =>
+                         ITree.subst
+                           (fun r0 : InterpreterStackBigIntptr.LP.Events.DV.dvalue =>
+                              SemNotations.Ret2 s1 (lift_MemState s2) r0) (Ret x))))
+            ; eauto.
+            2: {
+              repeat red.
+              cbn.
+              pstep; red; cbn.
+              observe_vis.
+              constructor.
+              intros v.
+              red.
+              left.
+              pstep; red; cbn.
+              constructor.
+              reflexivity.
+            }
+
+            2: {
+              cbn.
+              rewrite bind_vis.
+              cbn.
+              erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+              rewrite Forall2_map_eq with (l2:=args0).
+              2: {
+                eapply Forall2_flip.
+                eapply Util.Forall2_impl; [| apply ARGS_REF].
+                intros a b ?.
+                red.
+                symmetry.
+                apply fin_to_inf_dvalue_refine_strict'.
+                auto.
+              }
+
+              pstep; red; cbn.
+              constructor.              
+
+              intros v.
+              red.
+
+              left.
+              cbn.
+            }
+
+            intros a b H4 H5 H6.
+            destruct b, p.
+            cbn in *; subst.
+            dependent destruct e.
+            eapply H0.
+            left.
+            cbn in *.
+
+            reflexivity.
+
+            repeat red in H3.
+
+          admit.
       - (* oruttF's EqVisOOM *)
         destruct e.
         repeat red in RUN.
