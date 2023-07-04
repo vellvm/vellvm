@@ -21345,8 +21345,44 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       - (* oruttF's EqVisOOM *)
         destruct e.
         repeat red in RUN.
-        punfold RUN. red in RUN. cbn in RUN.
-        admit.
+        punfold RUN; red in RUN; cbn in RUN.
+
+        clear CIH MSR.
+        dependent induction RUN.
+        + (* TauR *)
+          pstep; red; cbn.
+          constructor; auto.
+
+          specialize (IHRUN (observe t2) u k2).
+          repeat (forward IHRUN; auto).
+
+          punfold IHRUN.
+        + (* VisOOM *)
+          eapply paco2_mon_bot; eauto.
+          rewrite HT1.
+          cbn.
+          rewrite get_inf_tree_equation.
+          destruct e.
+          cbn.
+          pstep; red; cbn.
+          observe_vis.
+          eapply Interp_Memory_PropT_Vis_OOM.
+          reflexivity.
+        + (* Vis *)
+          cbn in H.
+          red in H.
+          cbn in H.
+          rewrite bind_trigger in H.
+          rewrite H in H0.
+          eapply paco2_mon_bot; eauto.
+          rewrite H0.
+          cbn.
+          rewrite get_inf_tree_equation.
+          cbn.
+          pstep; red; cbn.
+          observe_vis.
+          eapply Interp_Memory_PropT_Vis_OOM.
+          reflexivity.
       - (* oruttF's EqTauL *)
         forward IHREL; [exact RUN|].
         forward IHREL; auto.
@@ -21363,6 +21399,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         }
 
         forward IHREL; auto.
+    }
+
+    apply get_inf_tree_rutt.
   Qed.
 
         
