@@ -21379,31 +21379,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           { red in H3. cbn in H3.
             rewrite bind_trigger in H3.
             rewrite H3 in H2.
-            eapply paco2_mon_bot; eauto.
-            rewrite H2.
-            cbn.
-            rewrite get_inf_tree_equation.
-            cbn.
-            break_match.
-            cbn.
             pstep; red; cbn.
-            change (VisF
-                      (subevent E1.DV.dvalue (E1.ExternalCall t (fin_to_inf_uvalue f) (map fin_to_inf_dvalue args)))
-                      (fun x0 : E1.DV.dvalue =>
-                         get_inf_tree
-                           match DVCInfFin.dvalue_convert_strict x0 with
-                           | NoOom a => ITree.subst k3 (SemNotations.Ret2 s1 s2 a)
-                           | Oom s => raiseOOM s
-                           end))
-              with
-              (observe (Vis
-                          (subevent E1.DV.dvalue (E1.ExternalCall t (fin_to_inf_uvalue f) (map fin_to_inf_dvalue args)))
-                          (fun x0 : E1.DV.dvalue =>
-                             get_inf_tree
-                               match DVCInfFin.dvalue_convert_strict x0 with
-                               | NoOom a => ITree.subst k3 (SemNotations.Ret2 s1 s2 a)
-                               | Oom s => raiseOOM s
-                               end))).
 
             repeat red in H.
             destruct e1;
@@ -21414,12 +21390,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 ].
 
             destruct e0.
-            unfold resum in Heqe0.
-            cbn in Heqe0.
-            unfold ReSum_id in Heqe0.
-            unfold id_ in Heqe0.
-            unfold Id_IFun in *.
-            subst.
+            destruct e.
             destruct H as (?&F_REF&ARGS_REF).
             subst.
 
@@ -21428,12 +21399,17 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             eapply Interp_Memory_PropT_Vis with
               (s1:=s1)
               (s2:=lift_MemState s2)
-              (ta:=(vis (InterpreterStackBigIntptr.LP.Events.ExternalCall t f0 args0)
+              (ta:=(vis (InterpreterStackBigIntptr.LP.Events.ExternalCall t0 f args)
                       (fun x : InterpreterStackBigIntptr.LP.Events.DV.dvalue =>
                          ITree.subst
                            (fun r0 : InterpreterStackBigIntptr.LP.Events.DV.dvalue =>
                               SemNotations.Ret2 s1 (lift_MemState s2) r0) (Ret x))))
-            ; eauto.
+              (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                      match DVCInfFin.dvalue_convert_strict dv_inf with
+                      | NoOom dv_fin => get_inf_tree (ITree.subst k3 (SemNotations.Ret2 s1 s2 dv_fin)) (* ITree.subst k3 (SemNotations.Ret2 s1 s2 dv_fin) *)
+                      | Oom s => raiseOOM s
+                      end)
+              ); eauto.
             2: {
               repeat red.
               cbn.
@@ -21452,8 +21428,13 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               cbn.
               rewrite bind_vis.
               cbn.
+              rewrite H2.
+              cbn.
+              rewrite get_inf_tree_equation.
+              cbn.
+
               erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
-              rewrite Forall2_map_eq with (l2:=args0).
+              rewrite Forall2_map_eq with (l2:=args).
               2: {
                 eapply Forall2_flip.
                 eapply Util.Forall2_impl; [| apply ARGS_REF].
@@ -21471,21 +21452,67 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               red.
 
               left.
-              cbn.
+              setoid_rewrite bind_ret_l.
+              setoid_rewrite bind_ret_l.
+
+              break_match_goal.
+              - apply paco2_eqit_refl.
+              - rewrite get_inf_tree_equation.
+                cbn.
+                pstep; red; cbn.
+                unfold print_msg.
+                constructor.
+                intros [].
             }
 
-            intros a b H4 H5 H6.
+            intros a b H H4 H5.
             destruct b, p.
             cbn in *; subst.
-            dependent destruct e.
-            eapply H0.
-            left.
-            cbn in *.
+            break_match.
+            + (* NoOom for external call result *)
+              specialize (H0 d d0).
+              forward H0; auto.
 
-            reflexivity.
+              rewrite (itree_eta_ (ITree.subst k3 (SemNotations.Ret2 s1 s2 d0))).
+              rewrite (itree_eta_ (k1 d)).
+              right.
+              eapply CIH.
+              do 2 rewrite <- itree_eta.
 
-            repeat red in H3.
+              pclearbot. apply H0.
 
+              repeat red.
+              repeat rewrite <- itree_eta.
+              setoid_rewrite bind_ret_l.
+
+              specialize (HK d0 (s2, (s1, d0))).
+              forward HK.
+              { eapply ReturnsVis.
+                unfold ITree.trigger.
+                cbn.
+                reflexivity.
+                cbn.
+                constructor; reflexivity.
+              }
+              forward HK.
+              { rewrite H3.
+                eapply ReturnsVis.
+                reflexivity.
+                constructor; reflexivity.
+              }
+
+              forward HK; cbn; auto.
+              pclearbot.
+              apply HK.
+            + (* External call result OOMs *)
+              left.
+              pstep; red; cbn.
+              observe_vis.
+              eapply Interp_Memory_PropT_Vis_OOM.
+              reflexivity.
+          }
+
+          (* Probably should mostly be a copy of Vis cases above *)
           admit.
       - (* oruttF's EqVisOOM *)
         destruct e.
