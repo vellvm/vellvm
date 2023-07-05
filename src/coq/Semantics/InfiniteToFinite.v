@@ -21228,12 +21228,146 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                   }
 
                   { (* UBE *)
-                    admit.
+                    rename H0 into HANDLER.
+                    subst.
+                    destruct u, u0.
+                    red in HANDLER.
+                    cbn in HANDLER.
+                    rewrite bind_trigger in HANDLER.
+                    rewrite HANDLER in VIS_HANDLED.
+                    rewrite bind_vis in VIS_HANDLED.
+
+                    destruct t2; pinversion VIS_HANDLED; subst_existT.
+                    { exfalso; eapply EQ; eauto. }
+                    subst_existT.
+
+                    eapply Interp_Memory_PropT_Vis with
+                      (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                              get_inf_tree (k7 _)))
+                      (s1:=s1)
+                      (s2:=lift_MemState s2).
+
+                    2: {
+                      cbn. red.
+                      cbn.
+                      rewrite bind_trigger.
+                      reflexivity.
+                    }
+
+                    2: {
+                      rewrite get_inf_tree_equation.
+                      cbn.
+                      unfold raiseUB.
+                      rewrite bind_trigger.
+                      rewrite bind_vis.
+                      unfold print_msg.
+                      destruct u0.
+                      pstep; red; cbn.
+                      constructor.
+                      intros [].
+                    }
+
+                    intros [].
                   }
 
                   { (* DebugE *)
-                    
-                    admit.
+                    rename H0 into HANDLER.
+                    red in HANDLER.
+                    destruct d, d0.
+                    subst.
+                    destruct u.
+                    cbn in HANDLER.
+                    rewrite bind_trigger in HANDLER.
+                    rewrite HANDLER in VIS_HANDLED.
+                    rewrite bind_vis in VIS_HANDLED.
+
+                    destruct t2; pinversion VIS_HANDLED; subst_existT.
+                    { exfalso; eapply EQ; eauto. }
+                    subst_existT.
+
+                    eapply Interp_Memory_PropT_Vis with
+                      (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                              get_inf_tree (k2 (s2, (s1, tt)))))
+                      (s1:=s1)
+                      (s2:=lift_MemState s2).
+
+                    2: {
+                      cbn.
+                      red.
+                      cbn.
+                      rewrite bind_trigger.
+                      reflexivity.
+                    }
+
+                    2: {
+                      cbn.
+                      rewrite bind_vis.
+                      setoid_rewrite bind_ret_l.
+                      pstep; red; cbn.
+                      constructor.
+                      intros [].
+                      red.
+                      left.
+                      red in VIS_HANDLED.
+                      cbn in VIS_HANDLED.
+                      inversion VIS_HANDLED.
+                      subst_existT.
+                      specialize (REL1 tt).
+                      red in REL1.
+                      pclearbot.
+                      rewrite REL1.
+                      setoid_rewrite bind_ret_l.
+                      eapply paco2_eqit_refl.
+                    }
+
+                    intros a b RETa RETb AB.
+                    apply Returns_vis_inversion in RETb as [[] RETb].
+                    destruct b as [ms' [sid' []]].
+                    cbn in AB; subst.
+
+                    apply Returns_ret_inv in RETb.
+                    inv RETb.
+                    cbn.
+
+                    specialize (REL0 tt).
+                    specialize (REL tt).
+                    pclearbot.
+
+                    specialize (HK tt (s2, (s1, tt))).
+                    forward HK.
+                    { eapply ReturnsVis.
+                      unfold trigger.
+                      reflexivity.
+                      cbn.
+                      constructor.
+                      reflexivity.
+                    }
+                    forward HK.
+                    { rewrite HANDLER.
+                      eapply ReturnsVis.
+                      reflexivity.
+                      constructor.
+                      reflexivity.
+                    }
+                    specialize (HK eq_refl).
+                    pclearbot.
+
+                    right.
+
+                    rewrite (itree_eta_ (k0 tt)).
+                    rewrite (itree_eta_ (k2 (s2, (s1, tt)))).
+
+                    eapply CIH.
+                    2: {
+                      repeat red.
+                      repeat rewrite <- itree_eta.
+                      apply HK.
+                    }
+
+                    repeat rewrite <- itree_eta.
+                    rewrite REL.
+                    specialize (K_RUTT tt tt eq_refl).
+                    exact K_RUTT.
                   }
 
                   { (* FailureE *)
@@ -22825,12 +22959,137 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           }
 
           { (* UBE *)
-            admit.
+            subst.
+            destruct u, u0.
+            red in HANDLER.
+            cbn in HANDLER.
+            rewrite bind_trigger in HANDLER.
+            rewrite HANDLER in VIS_HANDLED.
+            rewrite bind_vis in VIS_HANDLED.
+
+            pstep; red; cbn.
+            eapply Interp_Memory_PropT_Vis with
+              (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                      get_inf_tree (k3 (s2, (s1, _)))))
+              (s1:=s1)
+              (s2:=lift_MemState s2).
+
+            2: {
+              cbn. red.
+              cbn.
+              rewrite bind_trigger.
+              reflexivity.
+            }
+
+            2: {
+              rewrite VIS_HANDLED.
+              rewrite get_inf_tree_equation.
+              cbn.
+              unfold raiseUB.
+              rewrite bind_trigger.
+              rewrite bind_vis.
+              unfold print_msg.
+              destruct u.
+              pstep; red; cbn.
+              constructor.
+              intros [].
+            }
+
+            intros [].
           }
 
           { (* DebugE *)
-            
-            admit.
+            red in HANDLER.
+            destruct d, d0.
+            subst.
+            destruct u0.
+            cbn in HANDLER.
+            rewrite bind_trigger in HANDLER.
+            rewrite HANDLER in VIS_HANDLED.
+            rewrite bind_vis in VIS_HANDLED.
+
+            pstep; red; cbn.
+
+            change
+              (VisF (subevent unit (Debug tt))
+                 (fun H13 : unit => get_inf_tree (ITree.bind (SemNotations.Ret2 s1 s2 H13) k3)))
+              with
+              (observe
+                 (Vis (subevent unit (Debug tt))
+                    (fun H13 : unit => get_inf_tree (ITree.bind (SemNotations.Ret2 s1 s2 H13) k3)))).
+
+            eapply Interp_Memory_PropT_Vis with
+              (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                      get_inf_tree (k3 (s2, (s1, tt)))))
+              (s1:=s1)
+              (s2:=lift_MemState s2).
+
+            2: {
+              cbn.
+              red.
+              cbn.
+              rewrite bind_trigger.
+              reflexivity.
+            }
+
+            2: {
+              cbn.
+              rewrite VIS_HANDLED.
+              rewrite bind_vis.
+              setoid_rewrite bind_ret_l.
+              pstep; red; cbn.
+              constructor.
+              intros [].
+              red.
+              left.
+              eapply paco2_eqit_refl.
+            }
+
+            intros a b RETa RETb AB.
+            apply Returns_vis_inversion in RETb as [[] RETb].
+            destruct b as [ms' [sid' []]].
+            cbn in AB; subst.
+
+            apply Returns_ret_inv in RETb.
+            inv RETb.
+            cbn.
+
+            specialize (REL tt tt eq_refl).
+            pclearbot.
+
+            specialize (HK tt (s2, (s1, tt))).
+            forward HK.
+            { eapply ReturnsVis.
+              unfold trigger.
+              reflexivity.
+              cbn.
+              constructor.
+              reflexivity.
+            }
+            forward HK.
+            { rewrite HANDLER.
+              eapply ReturnsVis.
+              reflexivity.
+              constructor.
+              reflexivity.
+            }
+            specialize (HK eq_refl).
+            pclearbot.
+
+            right.
+
+            rewrite (itree_eta_ (k1 tt)).
+            rewrite (itree_eta_ (k3 (s2, (s1, tt)))).
+
+            eapply CIH.
+            2: {
+              repeat red.
+              repeat rewrite <- itree_eta.
+              apply HK.
+            }
+
+            repeat rewrite <- itree_eta.
+            exact REL.
           }
 
           { (* FailureE *)
@@ -22943,7 +23202,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     apply get_inf_tree_rutt.
   Qed.
 
-  (*
+  (* Extra stuff from the proof of the above lemma that needs to get cleaned up... But there's some other stuff in here that I need to not accidentally delete *)
         
           
           destruct e.
