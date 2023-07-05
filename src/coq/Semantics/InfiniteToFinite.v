@@ -21343,6 +21343,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         cbn in RUN.
         repeat red in RUN.
         punfold RUN; red in RUN; cbn in RUN.
+
         dependent induction RUN.
         + (* TauR *)
           pstep; red; cbn.
@@ -21378,6 +21379,143 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           rename H2 into VIS_HANDLED.
           rename H3 into HANDLER.
 
+          repeat red in HANDLER.
+          (* Need to break apart events e / e1 to figure out
+                what event we're dealing with. *)
+          red in EV_REL.
+          destruct e1, e2; try destruct e, e0; cbn in EV_REL;
+            move EV_REL after VIS_HANDLED;
+            repeat (first [destruct s | destruct i | destruct e | destruct s0 | destruct m | destruct m0]; try contradiction); cbn in *.
+
+          { (* ExternalCallE *)
+            red in HANDLER. cbn in HANDLER.
+            rewrite bind_trigger in HANDLER.
+            rewrite HANDLER in VIS_HANDLED.
+            pstep; red; cbn.
+
+            destruct EV_REL as (?&F_REF&ARGS_REF).
+            subst.
+
+            (* External calls *)
+
+            eapply Interp_Memory_PropT_Vis with
+              (s1:=s1)
+              (s2:=lift_MemState s2)
+              (ta:=(vis (InterpreterStackBigIntptr.LP.Events.ExternalCall t0 f args)
+                      (fun x : InterpreterStackBigIntptr.LP.Events.DV.dvalue =>
+                         ITree.subst
+                           (fun r0 : InterpreterStackBigIntptr.LP.Events.DV.dvalue =>
+                              SemNotations.Ret2 s1 (lift_MemState s2) r0) (Ret x))))
+              (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                      match DVCInfFin.dvalue_convert_strict dv_inf with
+                      | NoOom dv_fin => get_inf_tree (ITree.subst k3 (SemNotations.Ret2 s1 s2 dv_fin)) (* ITree.subst k3 (SemNotations.Ret2 s1 s2 dv_fin) *)
+                      | Oom s => raiseOOM s
+                      end)
+              ); eauto.
+            2: {
+              repeat red.
+              cbn.
+              pstep; red; cbn.
+              observe_vis.
+              constructor.
+              intros v.
+              red.
+              left.
+              pstep; red; cbn.
+              constructor.
+              reflexivity.
+            }
+
+            2: {
+              cbn.
+              rewrite bind_vis.
+              cbn.
+              rewrite VIS_HANDLED.
+              cbn.
+              rewrite get_inf_tree_equation.
+              cbn.
+
+              erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+              rewrite Forall2_map_eq with (l2:=args).
+              2: {
+                eapply Forall2_flip.
+                eapply Util.Forall2_impl; [| apply ARGS_REF].
+                intros a b ?.
+                red.
+                symmetry.
+                apply fin_to_inf_dvalue_refine_strict'.
+                auto.
+              }
+
+              pstep; red; cbn.
+              constructor.              
+
+              intros v.
+              red.
+
+              left.
+              setoid_rewrite bind_ret_l.
+              setoid_rewrite bind_ret_l.
+
+              break_match_goal.
+              - apply paco2_eqit_refl.
+              - rewrite get_inf_tree_equation.
+                cbn.
+                pstep; red; cbn.
+                unfold print_msg.
+                constructor.
+                intros [].
+            }
+
+            intros a b H H4 H5.
+            destruct b, p.
+            cbn in *; subst.
+            break_match.
+            + (* NoOom for external call result *)
+              specialize (H0 d d0).
+              forward H0; auto.
+
+              rewrite (itree_eta_ (ITree.subst k3 (SemNotations.Ret2 s1 s2 d0))).
+              rewrite (itree_eta_ (k1 d)).
+              right.
+              eapply CIH.
+              do 2 rewrite <- itree_eta.
+
+              pclearbot. apply H0.
+
+              repeat red.
+              repeat rewrite <- itree_eta.
+              setoid_rewrite bind_ret_l.
+
+              specialize (HK d0 (s2, (s1, d0))).
+              forward HK.
+              { eapply ReturnsVis.
+                unfold ITree.trigger.
+                cbn.
+                reflexivity.
+                cbn.
+                constructor; reflexivity.
+              }
+              forward HK.
+              { rewrite HANDLER.
+                eapply ReturnsVis.
+                reflexivity.
+                constructor; reflexivity.
+              }
+
+              forward HK; cbn; auto.
+              pclearbot.
+              apply HK.
+            + (* External call result OOMs *)
+              left.
+              pstep; red; cbn.
+              observe_vis.
+              eapply Interp_Memory_PropT_Vis_OOM.
+              reflexivity.
+          }
+
+
+
           (* Need to break apart events e / e1 to figure out
                 what event we're dealing with. *)
           red in EV_REL.
@@ -21388,13 +21526,15 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           { (* ExternalCallE *)
             destruct EV_REL as (T&F&ARGS); subst.
             red in HANDLER.
+            setoid_rewrite bind_trigger in HANDLER.
+            pstep; red; cbn.
+
             rewrite HANDLER in VIS_HANDLED.
 
-            setoid_rewrite bind_trigger in VIS_HANDLED.
             setoid_rewrite bind_vis in VIS_HANDLED.
             setoid_rewrite bind_ret_l in VIS_HANDLED.
             punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
-            pstep; red; cbn.
+
             dependent induction VIS_HANDLED.
             { eapply Interp_Memory_PropT_Vis with
               (s1:=s1)
@@ -21502,7 +21642,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               forward HK.
               { rewrite HANDLER.
                 eapply ReturnsVis.
-                rewrite bind_trigger.
                 reflexivity.
                 constructor; reflexivity.
               }
