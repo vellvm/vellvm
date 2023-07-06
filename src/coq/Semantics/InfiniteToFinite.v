@@ -14048,11 +14048,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       setoid_rewrite BYTE_LENGTH.
       break_match_goal.
       - admit.
-      - rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
+      - rewrite DVC1.uvalue_refine_strict_equation.
         cbn.
         break_match_goal; cbn in *.
         + admit.
-        + apply map_monad_InT_OOM_fail in Heqo as (?&?&?).
+        + (* 
+          apply map_monad_InT_OOM_fail in Heqo as (?&?&?).
           apply InT_map_impl in x0.
           destruct x0 as (?&?&?).
           pose proof (@MemoryBigIntptr.Byte.sbyte_to_extractbyte_inv x0) as (?&?&?&?&?).
@@ -14060,7 +14061,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           rewrite H0 in H.
           rewrite DVC1.uvalue_convert_strict_equation in H.
           cbn in *.
-          repeat break_match_hyp_inv.
+          repeat break_match_hyp_inv. *)
   Admitted.
 
   #[global] Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes.
