@@ -2416,25 +2416,6 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           lift_OOM (to_ubytes (CTR dt) dt sid)
       end.
 
-
-    Definition map_monad2  {M} `{Monad M} `{RAISE_ERROR M} {A B C} (f : A -> B -> M C) : list A -> list B -> M (list C) :=
-      fix go l1 l2 :=
-        match l1 with
-        | [] =>
-            match l2 with
-            | [] => ret []
-            | _ => raise_error "map_monad2: length mismatch"
-            end
-        | x::xs =>
-            match l2 with
-            | [] => raise_error "map_monad2: length mismatch"
-            | y::ys =>
-                z <- f x y ;;
-                zs <- go xs ys ;;
-                ret (z::zs)
-            end
-        end.
-
     Fixpoint serialize_sbytes {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M} `{RAISE_OOM M}
       (uv : uvalue) (dt : dtyp) {struct uv} : M (list SByte) 
       :=

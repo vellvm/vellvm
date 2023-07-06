@@ -2631,7 +2631,8 @@ Module InfiniteToFinite.
   Lemma MemPropT_fin_inf_map_monad_In :
     forall {A_INF A_FIN B_INF B_FIN}
       {l_inf : list A_INF} {l_fin : list A_FIN}
-      {f_fin : forall x, In x l_fin -> MemPropT Memory64BitIntptr.MMEP.MMSP.MemState B_FIN} {f_inf : forall x, In x l_inf -> MemPropT MemoryBigIntptr.MMEP.MMSP.MemState B_INF}
+      {f_fin : forall x, In x l_fin -> MemPropT Memory64BitIntptr.MMEP.MMSP.MemState B_FIN}
+      {f_inf : forall x, In x l_inf -> MemPropT MemoryBigIntptr.MMEP.MMSP.MemState B_INF}
       {ms_fin_start ms_fin_final : Memory64BitIntptr.MMEP.MMSP.MemState}
       {ms_inf_start : MemoryBigIntptr.MMEP.MMSP.MemState}
       {res_fin : list B_FIN}
@@ -2704,6 +2705,72 @@ Module InfiniteToFinite.
       eapply F; eauto.
   Qed.
 
+  Lemma MemPropT_fin_inf_map_monad2 :
+    forall {A_INF A_FIN B_INF B_FIN C_INF C_FIN}
+      {la_inf : list A_INF} {lb_inf : list B_INF} {la_fin : list A_FIN} {lb_fin : list B_FIN}
+      {f_fin : A_FIN -> B_FIN -> MemPropT Memory64BitIntptr.MMEP.MMSP.MemState C_FIN}
+      {f_inf : A_INF -> B_INF -> MemPropT MemoryBigIntptr.MMEP.MMSP.MemState C_INF}
+      {ms_fin_start ms_fin_final : Memory64BitIntptr.MMEP.MMSP.MemState}
+      {ms_inf_start : MemoryBigIntptr.MMEP.MMSP.MemState}
+      {res_fin : list C_FIN}
+
+      (A_REF : A_INF -> A_FIN -> Prop)
+      (B_REF : B_INF -> B_FIN -> Prop)
+      (C_REF : C_INF -> C_FIN -> Prop)
+      
+      (MEM_REF_START : MemState_refine_prop ms_inf_start ms_fin_start)
+
+      (F : forall a_fin a_inf b_fin b_inf c_fin ms_fin ms_inf ms_fin_ma,
+          A_REF a_inf a_fin ->
+          B_REF b_inf b_fin ->
+          MemState_refine_prop ms_inf ms_fin ->
+          f_fin a_fin b_fin ms_fin (ret (ms_fin_ma, c_fin)) ->
+          exists c_inf ms_inf_ma,
+            f_inf a_inf b_inf ms_inf (ret (ms_inf_ma, c_inf)) /\
+              C_REF c_inf c_fin /\
+              MemState_refine_prop ms_inf_ma ms_fin_ma)
+
+      (AS : Forall2 A_REF la_inf la_fin)
+      (BS : Forall2 B_REF lb_inf lb_fin)      
+      (FIN : map_monad2 f_fin la_fin lb_fin ms_fin_start (ret (ms_fin_final, res_fin))),
+
+    exists res_inf ms_inf_final,
+      map_monad2 f_inf la_inf lb_inf ms_inf_start (ret (ms_inf_final, res_inf)) /\
+        Forall2 C_REF res_inf res_fin /\
+        MemState_refine_prop ms_inf_final ms_fin_final.
+  Proof.
+    intros A_INF A_FIN B_INF B_FIN C_INF C_FIN la_inf lb_inf la_fin lb_fin f_fin f_inf ms_fin_start ms_fin_final
+      ms_inf_start res_fin A_REF B_REF C_REF MEM_REF_START F AS BS FIN.
+
+    generalize dependent res_fin.
+    generalize dependent ms_fin_start.
+    generalize dependent ms_inf_start.
+    revert lb_inf lb_fin BS.
+    induction AS; intros lb_inf lb_fin BS ms_inf_start ms_fin_start MEM_REF_START res_fin FIN.
+    - exists []. exists ms_inf_start.
+      inversion BS; subst.
+      + destruct FIN; subst.
+        split; cbn; auto.
+      + inversion FIN.
+    - inversion BS; subst.
+      + inversion FIN.
+      + cbn in FIN.
+        destruct FIN as (ms_fin' & b_fin & F_Y & FIN).
+        destruct FIN as (ms_fin_final' & b_fin_rest & MAP_FIN & EQ1 & EQ2).
+        subst.
+        pose proof (F _ _ _ _ _ _ _ _ H H0 MEM_REF_START F_Y) as (c_inf & ms_inf' & F_X & B & MSR).
+        specialize (IHAS _ _ H1 ms_inf' ms_fin' MSR _ MAP_FIN) as (c_inf_rest & ms_inf_final' & MAP_INF & B_ALL & MSR_FINAL).
+        exists (c_inf :: c_inf_rest).
+        exists ms_inf_final'.
+        split; auto.
+
+        cbn in *.
+        do 2 eexists.
+        split; eauto.
+  Qed.
+
+
+  
   (*
   Lemma get_inf_tree_rutt :
     forall t,
@@ -13176,7 +13243,144 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   (*    *) *)
   (* Admitted.     *)
 
+  Ltac solve_to_ubytes SERIALIZE :=
+    eapply MemPropT_fin_inf_bind; [ | | | apply SERIALIZE]; eauto;
+    [ intros *; eapply fresh_sid_fin_inf; eauto |];
+    
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID FRESH UBYTES;
+      cbn in SID, UBYTES; subst;
 
+      red in UBYTES;
+      break_match_hyp_inv;
+      match goal with
+      | H: Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes _ _ _ = NoOom _ |- _ =>
+          eapply to_ubytes_fin_inf in H; auto; [
+            destruct H as (bytes_inf & UBYTES & BYTES_REF);
+            exists bytes_inf; exists ms_inf; split; auto;
+            red; erewrite UBYTES; cbn;  auto
+          | idtac]
+      end.
+
+  (*
+    (* SAZ: Can't prove this easily, unfortunately, because we'd need "generic" inversion principles
+       for CTR1 and CTR2 *)
+  Lemma serialize_by_dtyp_fin_fin :
+    forall (CTR1 : dtyp -> DVC1.DV1.uvalue)
+      (CTR2 : dtyp -> DVC1.DV2.uvalue)
+      τ
+      (ms_fin_final : Memory64BitIntptr.MMEP.MMSP.MemState) (ms_fin_start : FinMem.MMEP.MMSP.MemState)
+      (ms_inf_start : InfMem.MMEP.MMSP.MemState),
+      MemState_refine_prop ms_inf_start ms_fin_start ->
+      forall bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte,
+        DVC1.DV2.uvalue_has_dtyp (CTR2 τ) τ ->
+        Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_by_dtyp
+          (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState)
+          CTR2 τ ms_fin_start
+          (success_unERR_UB_OOM (ms_fin_final, bytes_fin)) ->
+        DVC1.uvalue_refine_strict (CTR1 τ) (CTR2 τ) ->
+        exists
+          (bytes_inf : list MemoryBigIntptr.MP.BYTE_IMPL.SByte) (ms_inf_final : MemoryBigIntptr.MMEP.MMSP.MemState),
+          MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_by_dtyp
+            (M:=MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) CTR1
+            τ ms_inf_start (success_unERR_UB_OOM (ms_inf_final, bytes_inf)) /\
+            sbytes_refine bytes_inf bytes_fin /\ MemState_refine_prop ms_inf_final ms_fin_final.
+  Proof.
+    intros CTR1 CTR2 dt.
+    induction dt; intros ms_fin_final ms_fin_start ms_inf_start MSR bytes_fin TYP_INF SERIALIZE HRS;
+      try solve [
+          solve_to_ubytes SERIALIZE; auto
+        ].
+
+    - (* Array *) 
+      eapply MemPropT_fin_inf_bind.
+      + apply MSR.
+      + intros.
+        eapply MemPropT_bind_ret_inv
+      
+      cbn in SERIALIZE.
+      destruct SERIALIZE as (MS & SID & HM & REF).
+      red in REF.
+      break_match_hyp_inv.
+      
+      *)
+
+  Lemma sbytes_refine_concat_repeatN : forall sz BS1 BS2,
+      sbytes_refine BS1 BS2 ->
+      sbytes_refine (concat (repeatN sz BS1)) (concat (repeatN sz BS2)).
+  Proof.
+    induction sz using N.peano_ind; intros; cbn.
+    - constructor.
+    - do 2 rewrite repeatN_succ.
+      cbn.
+      apply Forall2_app; auto.
+      apply IHsz.
+      assumption.
+  Qed.
+
+  Lemma sbytes_refine_concat : forall BS1 BS2,
+      Forall2 sbytes_refine BS1 BS2 ->
+      sbytes_refine (concat BS1) (concat BS2).
+  Proof.
+    intros.
+    induction H.
+    - constructor.
+    - cbn.
+      apply Forall2_app; auto.
+  Qed.
+
+
+  Lemma Forall2_In_exists2:
+    forall {A B : Type} (f : A -> B -> Prop) (l1 : list A) (l2 : list B) (y : B),
+      Forall2 f l1 l2 -> In y l2 -> exists x : A, In x l1 /\ f x y.
+  Proof.
+    intros.
+    induction H.
+    - inversion H0.
+    - inversion H0.
+      + subst. exists x. split; auto. left; auto.
+      + subst. destruct (IHForall2 H2) as [z [HI Hz]].
+        exists z. split; auto. right; auto.
+  Qed.
+
+  Check @Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes.
+  Check @lift_ERR_RAISE_ERROR.
+
+
+  Lemma MemPropT_fin_inf_lift_ERR_RAISE_ERROR_ret : 
+    forall (A_INF A_FIN : Type)
+      a_fin ms_fin_start ms_inf_start ms_fin_ma 
+      m_fin
+      m_inf
+      (A_REF : A_INF -> A_FIN -> Prop)
+      (MSR : MemState_refine_prop ms_inf_start ms_fin_start)
+      (HM : forall a_fin, m_fin = inr a_fin ->
+                     exists a_inf,
+                       m_inf = inr a_inf /\
+                         A_REF a_inf a_fin)
+      (HLIFT :
+        @lift_ERR_RAISE_ERROR _
+             (MemPropT Memory64BitIntptr.MMEP.MMSP.MemState)
+             (@MemPropT_Monad Memory64BitIntptr.MMEP.MMSP.MemState)
+             (@MemPropT_RAISE_ERROR Memory64BitIntptr.MMEP.MMSP.MemState) m_fin ms_fin_start (ret (ms_fin_ma, a_fin))),
+    exists a_inf, exists ms_inf_ma,
+      @lift_ERR_RAISE_ERROR _
+             (MemPropT MemoryBigIntptr.MMEP.MMSP.MemState)
+             (@MemPropT_Monad MemoryBigIntptr.MMEP.MMSP.MemState)
+             (@MemPropT_RAISE_ERROR MemoryBigIntptr.MMEP.MMSP.MemState)
+             m_inf ms_inf_start (ret (ms_inf_ma, a_inf)) /\
+        A_REF a_inf a_fin /\ MemState_refine_prop ms_inf_ma ms_fin_ma.
+  Proof.
+    intros.
+    red in HLIFT.
+    break_match_hyp.
+    - destruct e; inversion HLIFT.
+    - cbn in HLIFT. destruct HLIFT; subst.
+      destruct (HM a eq_refl) as [a_inf [EQ1 HINF]].
+      exists a_inf. exists ms_inf_start. split.
+      red.  rewrite EQ1. cbn.  auto.
+      split; auto.
+  Qed.
+  
   Lemma serialize_sbytes_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start uv_fin uv_inf t bytes_fin},
       MemState_refine_prop ms_inf_start ms_fin_start ->
@@ -13194,26 +13398,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     intros ms_fin_start ms_fin_final ms_inf_start uv_fin uv_inf t bytes_fin MSR UV_REF TYPE_INF SERIALIZE.
     pose proof uvalue_refine_strict_has_dtyp UV_REF TYPE_INF as TYPE_FIN.
 
-    Ltac solve_to_ubytes SERIALIZE :=
-      eapply MemPropT_fin_inf_bind; [ | | | apply SERIALIZE]; eauto;
-      [ intros *; eapply fresh_sid_fin_inf; eauto |];
-
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID FRESH UBYTES;
-      cbn in SID, UBYTES; subst;
-
-      red in UBYTES;
-      break_match_hyp; inv UBYTES;
-      match goal with
-      | H: Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes _ _ _ = NoOom _ |- _ =>
-          eapply to_ubytes_fin_inf in H; eauto;
-          destruct H as (bytes_inf&UBYTES&BYTES_REF);
-          exists bytes_inf; exists ms_inf;
-          split; auto;
-          red;
-          rewrite UBYTES;
-          cbn; auto
-      end.
-
     generalize dependent uv_fin.
     generalize dependent bytes_fin.
     generalize dependent ms_inf_start.
@@ -13221,1349 +13405,19 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     generalize dependent ms_fin_final.
     induction TYPE_INF; intros ms_fin_final ms_fin_start ms_inf_start MSR bytes_fin uv_fin UV_REF SERIALIZE TYPE_FIN.
 
-    all: try solve
-        [ rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE;
-          rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation;
-          solve
-            [ pose proof UV_REF as UV_REF';
-              rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
-              cbn in UV_REF;
-              move UV_REF after SERIALIZE;
-              break_match_hyp; inv UV_REF;
-              solve_to_ubytes SERIALIZE
-            | rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
-              cbn in UV_REF;
-              inv UV_REF;
 
-              cbn in SERIALIZE; destruct SERIALIZE; subst;
-
-              exists []; exists ms_inf_start;
-              split; [|split; auto; constructor];
-              cbn; auto
-            ]
-        ].
-
-    { (* Poison arrays *)
-      rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
-        cbn in UV_REF.
-        inv UV_REF.
-
-      generalize dependent ms_inf_start.
-      generalize dependent ms_fin_start.
-      generalize dependent ms_fin_final.
-      generalize dependent bytes_fin.
-      induction sz using N.peano_ind; intros bytes_fin ms_fin_final ms_fin_start SERIALIZE ms_inf_start MSR.
-      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-        cbn in SERIALIZE.
-        destruct SERIALIZE as (?&?&?&?&?).
-        subst.
-        destruct H; subst.
-        exists []. exists ms_inf_start.
-        cbn.
-        split; auto.
-        rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-        cbn.
-        exists ms_inf_start. exists [].
-        tauto.
-        split; auto.
-        constructor.
-      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-        rewrite repeatN_succ in SERIALIZE.
-        rewrite map_monad_In_unfold in SERIALIZE.
-        repeat red in SERIALIZE.
-        destruct SERIALIZE as (?&?&?&?).
-        repeat red in H.
-        destruct H as (?&?&?&?).
-        repeat red in H1.
-        destruct H1 as (?&?&?&?).
-        cbn in H2, H0.
-        destruct H2; subst.
-        destruct H0; subst.
-
-        specialize (IHTYPE_INF x1 ms_fin_start ms_inf_start MSR x2 (DVC1.DV2.UVALUE_Poison t)).
-        forward IHTYPE_INF.
-        { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-          reflexivity.
-        }
-        specialize (IHTYPE_INF H).
-        forward IHTYPE_INF; [constructor; solve_no_void|].
-        destruct IHTYPE_INF as (bytes_inf_elt&ms_inf_final_elt&SERIALIZE_ELT&BYTE_REF_ELT&MSR_ELT).
-
-        forward IHsz; [solve_uvalue_has_dtyp|].
-
-        specialize (IHsz (concat x4) x3 x1).
-        forward IHsz.
-        { rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-          repeat red.
-          exists x3. exists x4.
-          split; cbn; auto.
-        }
-
-        specialize (IHsz ms_inf_final_elt).
-        forward IHsz; auto.
-
-        destruct IHsz as (bytes_inf&ms_inf_final&SERIALIZE&BYTE_REF&MSR').
-
-        exists (bytes_inf_elt ++ bytes_inf)%list.
-        exists ms_inf_final.
-        split.
-        { rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-          rewrite repeatN_succ.
-          rewrite map_monad_In_unfold.
-          cbn.
-
-          rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-          repeat red in SERIALIZE.
-          destruct SERIALIZE as (?&?&?&?&?).
-          symmetry in H2.
-          subst.
-
-          exists ms_inf_final.
-          exists (bytes_inf_elt :: x0)%list.
-          split; auto.
-
-          exists ms_inf_final_elt.
-          exists bytes_inf_elt.
-          split; auto.
-
-          exists ms_inf_final.
-          exists x0.
-          split; auto.
-        }
-
-        split; auto.
-        cbn.
-        apply Forall2_app; auto.
-    }
-
-    { (* Poison vectors *)
-      rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
-        rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
-        move UV_REF after IHTYPE_INF;
-        inv UV_REF.
-
-      generalize dependent ms_inf_start.
-      generalize dependent ms_fin_start.
-      generalize dependent ms_fin_final.
-      generalize dependent bytes_fin.
-      induction sz using N.peano_ind; intros bytes_fin ms_fin_final ms_fin_start SERIALIZE ms_inf_start MSR.
-      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-        cbn in SERIALIZE.
-        destruct SERIALIZE as (?&?&?&?&?).
-        subst.
-        destruct H; subst.
-        exists []. exists ms_inf_start.
-        cbn.
-        split; auto.
-        rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-        cbn.
-        exists ms_inf_start. exists [].
-        tauto.
-        split; auto.
-        constructor.
-      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-        rewrite repeatN_succ in SERIALIZE.
-        rewrite map_monad_In_unfold in SERIALIZE.
-        repeat red in SERIALIZE.
-        destruct SERIALIZE as (?&?&?&?).
-        repeat red in H.
-        destruct H as (?&?&?&?).
-        repeat red in H1.
-        destruct H1 as (?&?&?&?).
-        cbn in H2, H0.
-        destruct H2; subst.
-        destruct H0; subst.
-
-        specialize (IHTYPE_INF x1 ms_fin_start ms_inf_start MSR x2 (DVC1.DV2.UVALUE_Poison t)).
-        forward IHTYPE_INF.
-        { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-          reflexivity.
-        }
-        specialize (IHTYPE_INF H).
-        forward IHTYPE_INF; [constructor; solve_no_void|].
-        destruct IHTYPE_INF as (bytes_inf_elt&ms_inf_final_elt&SERIALIZE_ELT&BYTE_REF_ELT&MSR_ELT).
-
-        forward IHsz; [solve_uvalue_has_dtyp|].
-
-        specialize (IHsz (concat x4) x3 x1).
-        forward IHsz.
-        { rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-          repeat red.
-          exists x3. exists x4.
-          split; cbn; auto.
-        }
-
-        specialize (IHsz ms_inf_final_elt).
-        forward IHsz; auto.
-
-        destruct IHsz as (bytes_inf&ms_inf_final&SERIALIZE&BYTE_REF&MSR').
-
-        exists (bytes_inf_elt ++ bytes_inf)%list.
-        exists ms_inf_final.
-        split.
-        { rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-          rewrite repeatN_succ.
-          rewrite map_monad_In_unfold.
-          cbn.
-
-          rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-          repeat red in SERIALIZE.
-          destruct SERIALIZE as (?&?&?&?&?).
-          symmetry in H2.
-          subst.
-
-          exists ms_inf_final.
-          exists (bytes_inf_elt :: x0)%list.
-          split; auto.
-
-          exists ms_inf_final_elt.
-          exists bytes_inf_elt.
-          split; auto.
-
-          exists ms_inf_final.
-          exists x0.
-          split; auto.
-        }
-
-        split; auto.
-        cbn.
-        apply Forall2_app; auto.
-    }
-
-    { (* Poison structs *)
-      rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
-        rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
-        move UV_REF after IHTYPE_INF;
-        inv UV_REF.
-
-      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-      repeat red in SERIALIZE.
-      destruct SERIALIZE as (ms_fin_fld&fld_bytes_fin&SERIALIZE_FLD&SERIALIZE_REST).
-      eapply IHTYPE_INF in SERIALIZE_FLD; eauto.
-      2: {
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        reflexivity.
-      }
-      2: {
-        inv TYPE_FIN.
-        eapply NO_VOID_Struct_fields in H1.
-        eapply ALL_IX_SUPPORTED_Struct_fields in H0.
-        constructor; eauto.
-        left; auto.
-        left; auto.
-      }
-
-      destruct SERIALIZE_FLD as (fld_bytes_inf&ms_inf_fld&SERALIZE_FLD&FLD_BYTE_REF&MSR_FLD).
-
-      apply MemPropT_bind_ret_inv in SERIALIZE_REST.
-      destruct SERIALIZE_REST as (ms_fin_final'&rest_bytes_fin&SERIALIZE_REST&RET).
-      cbn in RET.
-      destruct RET; subst.
-      rename ms_fin_final' into ms_fin_final.
-
-      specialize (IHTYPE_INF0 ms_fin_final ms_fin_fld ms_inf_fld MSR_FLD rest_bytes_fin (DVC1.DV2.UVALUE_Poison (DTYPE_Struct dts))).
-      forward IHTYPE_INF0.
-      {
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        reflexivity.
-      }
-      forward IHTYPE_INF0; auto.
-      forward IHTYPE_INF0.
-      { inv TYPE_FIN.
-        eapply ALL_IX_SUPPORTED_Struct_cons in H0.
-        eapply NO_VOID_Struct_cons in H1.
-        solve_uvalue_has_dtyp.
-      }
-
-      destruct IHTYPE_INF0 as (rest_bytes_inf & ms_inf_final' & SERIALIZE_REST_INF & REST_BYTES_REF & MSR_FINAL).
-
-      exists (fld_bytes_inf ++ rest_bytes_inf)%list.
-      exists ms_inf_final'.
-      split.
-      { rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-        repeat red.
-        exists ms_inf_fld. exists fld_bytes_inf.
-        split; eauto.
-
-        repeat red.
-        exists ms_inf_final'. exists rest_bytes_inf.
-        split; auto.
-
-        cbn.
-        split; auto.
-      }
-
-      split; auto.
-      apply Forall2_app; auto.
-    }
-
-    { (* Poison packed structs *)
-      rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
-        rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
-        move UV_REF after IHTYPE_INF;
-        inv UV_REF.
-
-      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-      repeat red in SERIALIZE.
-      destruct SERIALIZE as (ms_fin_fld&fld_bytes_fin&SERIALIZE_FLD&SERIALIZE_REST).
-      eapply IHTYPE_INF in SERIALIZE_FLD; eauto.
-      2: {
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        reflexivity.
-      }
-      2: {
-        inv TYPE_FIN.
-        eapply ALL_IX_SUPPORTED_Struct_fields in H0.
-        eapply NO_VOID_Struct_fields in H1.
-        constructor; eauto.
-        left; auto.
-        left; auto.
-      }
-
-      destruct SERIALIZE_FLD as (fld_bytes_inf&ms_inf_fld&SERALIZE_FLD&FLD_BYTE_REF&MSR_FLD).
-
-      apply MemPropT_bind_ret_inv in SERIALIZE_REST.
-      destruct SERIALIZE_REST as (ms_fin_final'&rest_bytes_fin&SERIALIZE_REST&RET).
-      cbn in RET.
-      destruct RET; subst.
-      rename ms_fin_final' into ms_fin_final.
-
-      specialize (IHTYPE_INF0 ms_fin_final ms_fin_fld ms_inf_fld MSR_FLD rest_bytes_fin (DVC1.DV2.UVALUE_Poison (DTYPE_Packed_struct dts))).
-      forward IHTYPE_INF0.
-      {
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        reflexivity.
-      }
-      forward IHTYPE_INF0; auto.
-      forward IHTYPE_INF0.
-      { inv TYPE_FIN.
-        eapply ALL_IX_SUPPORTED_Packed_struct_cons in H0.
-        eapply NO_VOID_Packed_struct_cons in H1.
-        solve_uvalue_has_dtyp.
-      }
-
-      destruct IHTYPE_INF0 as (rest_bytes_inf & ms_inf_final' & SERIALIZE_REST_INF & REST_BYTES_REF & MSR_FINAL).
-
-      exists (fld_bytes_inf ++ rest_bytes_inf)%list.
-      exists ms_inf_final'.
-      split.
-      { rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-        repeat red.
-        exists ms_inf_fld. exists fld_bytes_inf.
-        split; eauto.
-
-        repeat red.
-        exists ms_inf_final'. exists rest_bytes_inf.
-        split; auto.
-
-        cbn.
-        split; auto.
-      }
-
-      split; auto.
-      apply Forall2_app; auto.
-    }
-
-    { (* Non-aggregate poison *)
-      rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
-        rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
-        inv UV_REF.
-
-      destruct H as (?&?&?&?&?&?).
-
-      destruct t;
-        try solve
-          [ rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE;
-            rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation;
-
-            eapply MemPropT_fin_inf_bind; [| | | apply SERIALIZE]; eauto;
-            [ intros *;
-              eapply fresh_sid_fin_inf; eauto
-            |];
-
-            clear SERIALIZE;
-            intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH FRESH SERIALIZE;
-            cbn in SID; subst;
-            red in SERIALIZE;
-            break_match_hyp_inv; rename Heqo into SERIALIZE;
-            match goal with
-            | H: Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes (DVC1.DV2.UVALUE_Poison ?t) _ _ = NoOom _ |- _ =>
-                eapply @to_ubytes_fin_inf with (uv_inf:=DVC1.DV1.UVALUE_Poison t) in H
-            end;
-            [|rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation;
-              reflexivity];
-            destruct SERIALIZE as (bytes_inf&SERIALIZE&REF);
-            do 2 eexists;
-            split; eauto;
-            rewrite SERIALIZE;
-            cbn; auto
-          ].
-
-      all: exfalso.
-      - eapply H3; eauto.
-      - eapply H1; eauto.
-      - eapply H2; eauto.
-      - eapply H4; eauto.
-    }
-
-    { (* Undef arrays *)
-      rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
-        rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
-        move UV_REF after IHTYPE_INF;
-        inv UV_REF.
-
-      generalize dependent ms_inf_start.
-      generalize dependent ms_fin_start.
-      generalize dependent ms_fin_final.
-      generalize dependent bytes_fin.
-      induction sz using N.peano_ind; intros bytes_fin ms_fin_final ms_fin_start SERIALIZE ms_inf_start MSR.
-      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-        cbn in SERIALIZE.
-        destruct SERIALIZE as (?&?&?&?&?).
-        subst.
-        destruct H; subst.
-        exists []. exists ms_inf_start.
-        cbn.
-        split; auto.
-        rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-        cbn.
-        exists ms_inf_start. exists [].
-        tauto.
-        split; auto.
-        constructor.
-      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-        rewrite repeatN_succ in SERIALIZE.
-        rewrite map_monad_In_unfold in SERIALIZE.
-        repeat red in SERIALIZE.
-        destruct SERIALIZE as (?&?&?&?).
-        repeat red in H.
-        destruct H as (?&?&?&?).
-        repeat red in H1.
-        destruct H1 as (?&?&?&?).
-        cbn in H2, H0.
-        destruct H2; subst.
-        destruct H0; subst.
-
-        specialize (IHTYPE_INF x1 ms_fin_start ms_inf_start MSR x2 (DVC1.DV2.UVALUE_Undef t)).
-        forward IHTYPE_INF.
-        { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-          reflexivity.
-        }
-        specialize (IHTYPE_INF H).
-        forward IHTYPE_INF; [constructor; solve_no_void|].
-        destruct IHTYPE_INF as (bytes_inf_elt&ms_inf_final_elt&SERIALIZE_ELT&BYTE_REF_ELT&MSR_ELT).
-
-        forward IHsz; [solve_uvalue_has_dtyp|].
-
-        specialize (IHsz (concat x4) x3 x1).
-        forward IHsz.
-        { rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-          repeat red.
-          exists x3. exists x4.
-          split; cbn; auto.
-        }
-
-        specialize (IHsz ms_inf_final_elt).
-        forward IHsz; auto.
-
-        destruct IHsz as (bytes_inf&ms_inf_final&SERIALIZE&BYTE_REF&MSR').
-
-        exists (bytes_inf_elt ++ bytes_inf)%list.
-        exists ms_inf_final.
-        split.
-        { rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-          rewrite repeatN_succ.
-          rewrite map_monad_In_unfold.
-          cbn.
-
-          rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-          repeat red in SERIALIZE.
-          destruct SERIALIZE as (?&?&?&?&?).
-          symmetry in H2.
-          subst.
-
-          exists ms_inf_final.
-          exists (bytes_inf_elt :: x0)%list.
-          split; auto.
-
-          exists ms_inf_final_elt.
-          exists bytes_inf_elt.
-          split; auto.
-
-          exists ms_inf_final.
-          exists x0.
-          split; auto.
-        }
-
-        split; auto.
-        cbn.
-        apply Forall2_app; auto.
-    }
-
-    { (* Undef vectors *)
-      rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
-        rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
-        move UV_REF after IHTYPE_INF;
-        inv UV_REF.
-
-      generalize dependent ms_inf_start.
-      generalize dependent ms_fin_start.
-      generalize dependent ms_fin_final.
-      generalize dependent bytes_fin.
-      induction sz using N.peano_ind; intros bytes_fin ms_fin_final ms_fin_start SERIALIZE ms_inf_start MSR.
-      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-        cbn in SERIALIZE.
-        destruct SERIALIZE as (?&?&?&?&?).
-        subst.
-        destruct H; subst.
-        exists []. exists ms_inf_start.
-        cbn.
-        split; auto.
-        rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-        cbn.
-        exists ms_inf_start. exists [].
-        tauto.
-        split; auto.
-        constructor.
-      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-        rewrite repeatN_succ in SERIALIZE.
-        rewrite map_monad_In_unfold in SERIALIZE.
-        repeat red in SERIALIZE.
-        destruct SERIALIZE as (?&?&?&?).
-        repeat red in H.
-        destruct H as (?&?&?&?).
-        repeat red in H1.
-        destruct H1 as (?&?&?&?).
-        cbn in H2, H0.
-        destruct H2; subst.
-        destruct H0; subst.
-
-        specialize (IHTYPE_INF x1 ms_fin_start ms_inf_start MSR x2 (DVC1.DV2.UVALUE_Undef t)).
-        forward IHTYPE_INF.
-        { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-          reflexivity.
-        }
-        specialize (IHTYPE_INF H).
-        forward IHTYPE_INF; [constructor; solve_no_void|].
-        destruct IHTYPE_INF as (bytes_inf_elt&ms_inf_final_elt&SERIALIZE_ELT&BYTE_REF_ELT&MSR_ELT).
-
-        forward IHsz; [solve_uvalue_has_dtyp|].
-
-        specialize (IHsz (concat x4) x3 x1).
-        forward IHsz.
-        { rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-          repeat red.
-          exists x3. exists x4.
-          split; cbn; auto.
-        }
-
-        specialize (IHsz ms_inf_final_elt).
-        forward IHsz; auto.
-
-        destruct IHsz as (bytes_inf&ms_inf_final&SERIALIZE&BYTE_REF&MSR').
-
-        exists (bytes_inf_elt ++ bytes_inf)%list.
-        exists ms_inf_final.
-        split.
-        { rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-          rewrite repeatN_succ.
-          rewrite map_monad_In_unfold.
-          cbn.
-
-          rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-          repeat red in SERIALIZE.
-          destruct SERIALIZE as (?&?&?&?&?).
-          symmetry in H2.
-          subst.
-
-          exists ms_inf_final.
-          exists (bytes_inf_elt :: x0)%list.
-          split; auto.
-
-          exists ms_inf_final_elt.
-          exists bytes_inf_elt.
-          split; auto.
-
-          exists ms_inf_final.
-          exists x0.
-          split; auto.
-        }
-
-        split; auto.
-        cbn.
-        apply Forall2_app; auto.
-    }
-
-    { (* Undef structs *)
-      rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
-        rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
-        move UV_REF after IHTYPE_INF;
-        inv UV_REF.
-
-      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-      repeat red in SERIALIZE.
-      destruct SERIALIZE as (ms_fin_fld&fld_bytes_fin&SERIALIZE_FLD&SERIALIZE_REST).
-      eapply IHTYPE_INF in SERIALIZE_FLD; eauto.
-      2: {
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        reflexivity.
-      }
-      2: {
-        inv TYPE_FIN.
-        eapply ALL_IX_SUPPORTED_Struct_fields in H0.
-        eapply NO_VOID_Struct_fields in H1.
-        constructor; eauto.
-        left; auto.
-        left; auto.
-      }
-
-      destruct SERIALIZE_FLD as (fld_bytes_inf&ms_inf_fld&SERALIZE_FLD&FLD_BYTE_REF&MSR_FLD).
-
-      apply MemPropT_bind_ret_inv in SERIALIZE_REST.
-      destruct SERIALIZE_REST as (ms_fin_final'&rest_bytes_fin&SERIALIZE_REST&RET).
-      cbn in RET.
-      destruct RET; subst.
-      rename ms_fin_final' into ms_fin_final.
-
-      specialize (IHTYPE_INF0 ms_fin_final ms_fin_fld ms_inf_fld MSR_FLD rest_bytes_fin (DVC1.DV2.UVALUE_Undef (DTYPE_Struct dts))).
-      forward IHTYPE_INF0.
-      {
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        reflexivity.
-      }
-      forward IHTYPE_INF0; auto.
-      forward IHTYPE_INF0.
-      { inv TYPE_FIN.
-        eapply ALL_IX_SUPPORTED_Struct_cons in H0.
-        eapply NO_VOID_Struct_cons in H1.
-        constructor; auto.
-      }
-
-      destruct IHTYPE_INF0 as (rest_bytes_inf & ms_inf_final' & SERIALIZE_REST_INF & REST_BYTES_REF & MSR_FINAL).
-
-      exists (fld_bytes_inf ++ rest_bytes_inf)%list.
-      exists ms_inf_final'.
-      split.
-      { rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-        repeat red.
-        exists ms_inf_fld. exists fld_bytes_inf.
-        split; eauto.
-
-        repeat red.
-        exists ms_inf_final'. exists rest_bytes_inf.
-        split; auto.
-
-        cbn.
-        split; auto.
-      }
-
-      split; auto.
-      apply Forall2_app; auto.
-    }
-
-    { (* Undef packed structs *)
-      rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
-        rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
-        move UV_REF after IHTYPE_INF;
-        inv UV_REF.
-
-      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-      repeat red in SERIALIZE.
-      destruct SERIALIZE as (ms_fin_fld&fld_bytes_fin&SERIALIZE_FLD&SERIALIZE_REST).
-      eapply IHTYPE_INF in SERIALIZE_FLD; eauto.
-      2: {
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        reflexivity.
-      }
-      2: {
-        inv TYPE_FIN.
-        eapply ALL_IX_SUPPORTED_Struct_fields in H0.
-        eapply NO_VOID_Struct_fields in H1.
-        constructor; eauto.
-        left; auto.
-        left; auto.
-      }
-
-      destruct SERIALIZE_FLD as (fld_bytes_inf&ms_inf_fld&SERALIZE_FLD&FLD_BYTE_REF&MSR_FLD).
-
-      apply MemPropT_bind_ret_inv in SERIALIZE_REST.
-      destruct SERIALIZE_REST as (ms_fin_final'&rest_bytes_fin&SERIALIZE_REST&RET).
-      cbn in RET.
-      destruct RET; subst.
-      rename ms_fin_final' into ms_fin_final.
-
-      specialize (IHTYPE_INF0 ms_fin_final ms_fin_fld ms_inf_fld MSR_FLD rest_bytes_fin (DVC1.DV2.UVALUE_Undef (DTYPE_Packed_struct dts))).
-      forward IHTYPE_INF0.
-      {
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        reflexivity.
-      }
-      forward IHTYPE_INF0; auto.
-      forward IHTYPE_INF0.
-      { inv TYPE_FIN.
-        eapply ALL_IX_SUPPORTED_Packed_struct_cons in H0.
-        eapply NO_VOID_Packed_struct_cons in H1.
-        constructor; eauto.
-      }
-
-      destruct IHTYPE_INF0 as (rest_bytes_inf & ms_inf_final' & SERIALIZE_REST_INF & REST_BYTES_REF & MSR_FINAL).
-
-      exists (fld_bytes_inf ++ rest_bytes_inf)%list.
-      exists ms_inf_final'.
-      split.
-      { rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-        repeat red.
-        exists ms_inf_fld. exists fld_bytes_inf.
-        split; eauto.
-
-        repeat red.
-        exists ms_inf_final'. exists rest_bytes_inf.
-        split; auto.
-
-        cbn.
-        split; auto.
-      }
-
-      split; auto.
-      apply Forall2_app; auto.
-    }
-
-    { (* Non-aggregate undef *)
-      rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
-        rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
-        inv UV_REF.
-
-      destruct H as (?&?&?&?&?&?).
-
-      destruct t;
-        try solve
-          [ rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE;
-            rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation;
-
-            eapply MemPropT_fin_inf_bind; [| | | apply SERIALIZE]; eauto;
-            [ intros *;
-              eapply fresh_sid_fin_inf; eauto
-            |];
-
-            clear SERIALIZE;
-            intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH FRESH SERIALIZE;
-            cbn in SID; subst;
-            red in SERIALIZE;
-            break_match_hyp_inv; rename Heqo into SERIALIZE;
-            match goal with
-            | H: Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes (DVC1.DV2.UVALUE_Undef ?t) _ _ = NoOom _ |- _ =>
-                eapply @to_ubytes_fin_inf with (uv_inf:=DVC1.DV1.UVALUE_Undef t) in H
-            end;
-            [|rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation;
-              reflexivity];
-            destruct SERIALIZE as (bytes_inf&SERIALIZE&REF);
-            do 2 eexists;
-            split; eauto;
-            rewrite SERIALIZE;
-            cbn; auto
-          ].
-
-      all: exfalso.
-      - eapply H3; eauto.
-      - eapply H1; eauto.
-      - eapply H2; eauto.
-      - eapply H4; eauto.
-    }
-
-    { (* Oom arrays *)
-      rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
-        rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
-        move UV_REF after IHTYPE_INF;
-        inv UV_REF.
-
-      generalize dependent ms_inf_start.
-      generalize dependent ms_fin_start.
-      generalize dependent ms_fin_final.
-      generalize dependent bytes_fin.
-      induction sz using N.peano_ind; intros bytes_fin ms_fin_final ms_fin_start SERIALIZE ms_inf_start MSR.
-      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-        cbn in SERIALIZE.
-        destruct SERIALIZE as (?&?&?&?&?).
-        subst.
-        destruct H; subst.
-        exists []. exists ms_inf_start.
-        cbn.
-        split; auto.
-        rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-        cbn.
-        exists ms_inf_start. exists [].
-        tauto.
-        split; auto.
-        constructor.
-      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-        rewrite repeatN_succ in SERIALIZE.
-        rewrite map_monad_In_unfold in SERIALIZE.
-        repeat red in SERIALIZE.
-        destruct SERIALIZE as (?&?&?&?).
-        repeat red in H.
-        destruct H as (?&?&?&?).
-        repeat red in H1.
-        destruct H1 as (?&?&?&?).
-        cbn in H2, H0.
-        destruct H2; subst.
-        destruct H0; subst.
-
-        specialize (IHTYPE_INF x1 ms_fin_start ms_inf_start MSR x2 (DVC1.DV2.UVALUE_Oom t)).
-        forward IHTYPE_INF.
-        { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-          reflexivity.
-        }
-        specialize (IHTYPE_INF H).
-        forward IHTYPE_INF; [constructor; solve_no_void|].
-        destruct IHTYPE_INF as (bytes_inf_elt&ms_inf_final_elt&SERIALIZE_ELT&BYTE_REF_ELT&MSR_ELT).
-
-        forward IHsz; [solve_uvalue_has_dtyp|].
-
-        specialize (IHsz (concat x4) x3 x1).
-        forward IHsz.
-        { rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-          repeat red.
-          exists x3. exists x4.
-          split; cbn; auto.
-        }
-
-        specialize (IHsz ms_inf_final_elt).
-        forward IHsz; auto.
-
-        destruct IHsz as (bytes_inf&ms_inf_final&SERIALIZE&BYTE_REF&MSR').
-
-        exists (bytes_inf_elt ++ bytes_inf)%list.
-        exists ms_inf_final.
-        split.
-        { rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-          rewrite repeatN_succ.
-          rewrite map_monad_In_unfold.
-          cbn.
-
-          rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-          repeat red in SERIALIZE.
-          destruct SERIALIZE as (?&?&?&?&?).
-          symmetry in H2.
-          subst.
-
-          exists ms_inf_final.
-          exists (bytes_inf_elt :: x0)%list.
-          split; auto.
-
-          exists ms_inf_final_elt.
-          exists bytes_inf_elt.
-          split; auto.
-
-          exists ms_inf_final.
-          exists x0.
-          split; auto.
-        }
-
-        split; auto.
-        cbn.
-        apply Forall2_app; auto.
-    }
-
-    { (* Oom vectors *)
-      rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
-        rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
-        move UV_REF after IHTYPE_INF;
-        inv UV_REF.
-
-      generalize dependent ms_inf_start.
-      generalize dependent ms_fin_start.
-      generalize dependent ms_fin_final.
-      generalize dependent bytes_fin.
-      induction sz using N.peano_ind; intros bytes_fin ms_fin_final ms_fin_start SERIALIZE ms_inf_start MSR.
-      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-        cbn in SERIALIZE.
-        destruct SERIALIZE as (?&?&?&?&?).
-        subst.
-        destruct H; subst.
-        exists []. exists ms_inf_start.
-        cbn.
-        split; auto.
-        rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-        cbn.
-        exists ms_inf_start. exists [].
-        tauto.
-        split; auto.
-        constructor.
-      - rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-        rewrite repeatN_succ in SERIALIZE.
-        rewrite map_monad_In_unfold in SERIALIZE.
-        repeat red in SERIALIZE.
-        destruct SERIALIZE as (?&?&?&?).
-        repeat red in H.
-        destruct H as (?&?&?&?).
-        repeat red in H1.
-        destruct H1 as (?&?&?&?).
-        cbn in H2, H0.
-        destruct H2; subst.
-        destruct H0; subst.
-
-        specialize (IHTYPE_INF x1 ms_fin_start ms_inf_start MSR x2 (DVC1.DV2.UVALUE_Oom t)).
-        forward IHTYPE_INF.
-        { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-          reflexivity.
-        }
-        specialize (IHTYPE_INF H).
-        forward IHTYPE_INF; [constructor; solve_no_void|].
-        destruct IHTYPE_INF as (bytes_inf_elt&ms_inf_final_elt&SERIALIZE_ELT&BYTE_REF_ELT&MSR_ELT).
-
-        forward IHsz; [solve_uvalue_has_dtyp|].
-
-        specialize (IHsz (concat x4) x3 x1).
-        forward IHsz.
-        { rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-          repeat red.
-          exists x3. exists x4.
-          split; cbn; auto.
-        }
-
-        specialize (IHsz ms_inf_final_elt).
-        forward IHsz; auto.
-
-        destruct IHsz as (bytes_inf&ms_inf_final&SERIALIZE&BYTE_REF&MSR').
-
-        exists (bytes_inf_elt ++ bytes_inf)%list.
-        exists ms_inf_final.
-        split.
-        { rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-          rewrite repeatN_succ.
-          rewrite map_monad_In_unfold.
-          cbn.
-
-          rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-          repeat red in SERIALIZE.
-          destruct SERIALIZE as (?&?&?&?&?).
-          symmetry in H2.
-          subst.
-
-          exists ms_inf_final.
-          exists (bytes_inf_elt :: x0)%list.
-          split; auto.
-
-          exists ms_inf_final_elt.
-          exists bytes_inf_elt.
-          split; auto.
-
-          exists ms_inf_final.
-          exists x0.
-          split; auto.
-        }
-
-        split; auto.
-        cbn.
-        apply Forall2_app; auto.
-    }
-
-    { (* Oom structs *)
-      rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
-        rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
-        move UV_REF after IHTYPE_INF;
-        inv UV_REF.
-
-      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-      repeat red in SERIALIZE.
-      destruct SERIALIZE as (ms_fin_fld&fld_bytes_fin&SERIALIZE_FLD&SERIALIZE_REST).
-      eapply IHTYPE_INF in SERIALIZE_FLD; eauto.
-      2: {
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        reflexivity.
-      }
-      2: {
-        inv TYPE_FIN.
-        eapply ALL_IX_SUPPORTED_Struct_fields in H0.
-        eapply NO_VOID_Struct_fields in H1.
-        constructor; eauto.
-        left; auto.
-        left; auto.
-      }
-
-      destruct SERIALIZE_FLD as (fld_bytes_inf&ms_inf_fld&SERALIZE_FLD&FLD_BYTE_REF&MSR_FLD).
-
-      apply MemPropT_bind_ret_inv in SERIALIZE_REST.
-      destruct SERIALIZE_REST as (ms_fin_final'&rest_bytes_fin&SERIALIZE_REST&RET).
-      cbn in RET.
-      destruct RET; subst.
-      rename ms_fin_final' into ms_fin_final.
-
-      specialize (IHTYPE_INF0 ms_fin_final ms_fin_fld ms_inf_fld MSR_FLD rest_bytes_fin (DVC1.DV2.UVALUE_Oom (DTYPE_Struct dts))).
-      forward IHTYPE_INF0.
-      {
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        reflexivity.
-      }
-      forward IHTYPE_INF0; auto.
-      forward IHTYPE_INF0.
-      { inv TYPE_FIN.
-        eapply ALL_IX_SUPPORTED_Struct_cons in H0.
-        eapply NO_VOID_Struct_cons in H1.
-        constructor; eauto.
-      }
-
-      destruct IHTYPE_INF0 as (rest_bytes_inf & ms_inf_final' & SERIALIZE_REST_INF & REST_BYTES_REF & MSR_FINAL).
-
-      exists (fld_bytes_inf ++ rest_bytes_inf)%list.
-      exists ms_inf_final'.
-      split.
-      { rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-        repeat red.
-        exists ms_inf_fld. exists fld_bytes_inf.
-        split; eauto.
-
-        repeat red.
-        exists ms_inf_final'. exists rest_bytes_inf.
-        split; auto.
-
-        cbn.
-        split; auto.
-      }
-
-      split; auto.
-      apply Forall2_app; auto.
-    }
-
-    { (* Oom packed structs *)
-      rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
-        rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
-        move UV_REF after IHTYPE_INF;
-        inv UV_REF.
-
-      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-      repeat red in SERIALIZE.
-      destruct SERIALIZE as (ms_fin_fld&fld_bytes_fin&SERIALIZE_FLD&SERIALIZE_REST).
-      eapply IHTYPE_INF in SERIALIZE_FLD; eauto.
-      2: {
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        reflexivity.
-      }
-      2: {
-        inv TYPE_FIN.
-        eapply ALL_IX_SUPPORTED_Struct_fields in H0.
-        eapply NO_VOID_Struct_fields in H1.
-        constructor; eauto.
-        left; auto.
-        left; auto.
-      }
-
-      destruct SERIALIZE_FLD as (fld_bytes_inf&ms_inf_fld&SERALIZE_FLD&FLD_BYTE_REF&MSR_FLD).
-
-      apply MemPropT_bind_ret_inv in SERIALIZE_REST.
-      destruct SERIALIZE_REST as (ms_fin_final'&rest_bytes_fin&SERIALIZE_REST&RET).
-      cbn in RET.
-      destruct RET; subst.
-      rename ms_fin_final' into ms_fin_final.
-
-      specialize (IHTYPE_INF0 ms_fin_final ms_fin_fld ms_inf_fld MSR_FLD rest_bytes_fin (DVC1.DV2.UVALUE_Oom (DTYPE_Packed_struct dts))).
-      forward IHTYPE_INF0.
-      {
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        reflexivity.
-      }
-      forward IHTYPE_INF0; auto.
-      forward IHTYPE_INF0.
-      { inv TYPE_FIN.
-        eapply ALL_IX_SUPPORTED_Packed_struct_cons in H0.
-        eapply NO_VOID_Packed_struct_cons in H1.
-        constructor; eauto.
-      }
-
-      destruct IHTYPE_INF0 as (rest_bytes_inf & ms_inf_final' & SERIALIZE_REST_INF & REST_BYTES_REF & MSR_FINAL).
-
-      exists (fld_bytes_inf ++ rest_bytes_inf)%list.
-      exists ms_inf_final'.
-      split.
-      { rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-        repeat red.
-        exists ms_inf_fld. exists fld_bytes_inf.
-        split; eauto.
-
-        repeat red.
-        exists ms_inf_final'. exists rest_bytes_inf.
-        split; auto.
-
-        cbn.
-        split; auto.
-      }
-
-      split; auto.
-      apply Forall2_app; auto.
-    }
-
-    { (* Non-aggregate oom *)
-      rewrite DVC1.uvalue_refine_strict_equation in UV_REF;
-        rewrite DVC1.uvalue_convert_strict_equation in UV_REF;
-        cbn in UV_REF;
-        inv UV_REF.
-
-      destruct H as (?&?&?&?&?&?).
-
-      destruct t;
-        try solve
-          [ rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE;
-            rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation;
-
-            eapply MemPropT_fin_inf_bind; [| | | apply SERIALIZE]; eauto;
-            [ intros *;
-              eapply fresh_sid_fin_inf; eauto
-            |];
-
-            clear SERIALIZE;
-            intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH FRESH SERIALIZE;
-            cbn in SID; subst;
-            red in SERIALIZE;
-            break_match_hyp_inv; rename Heqo into SERIALIZE;
-            match goal with
-            | H: Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes (DVC1.DV2.UVALUE_Oom ?t) _ _ = NoOom _ |- _ =>
-                eapply @to_ubytes_fin_inf with (uv_inf:=DVC1.DV1.UVALUE_Oom t) in H
-            end;
-            [|rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation;
-              reflexivity];
-            destruct SERIALIZE as (bytes_inf&SERIALIZE&REF);
-            do 2 eexists;
-            split; eauto;
-            rewrite SERIALIZE;
-            cbn; auto
-          ].
-
-      all: exfalso.
-      - eapply H3; eauto.
-      - eapply H1; eauto.
-      - eapply H2; eauto.
-      - eapply H4; eauto.
-    }
-
-    { (* Regular struct serialization *)
-      pose proof UV_REF as UV_REF'.
-      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF'.
-      rewrite map_monad_InT_unfold in UV_REF'.
-      cbn in UV_REF'.
-      repeat break_match_hyp_inv.
-
-      rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-      eapply MemPropT_fin_inf_bind.
-      4: apply SERIALIZE.
-      all: eauto.
-
-      { (* MA: serialize first field *)
-        clear SERIALIZE IHTYPE_INF2.
-        intros a_fin ms_fin_ma SERIALIZE.
-        eapply IHTYPE_INF1; eauto.
-        inv TYPE_FIN; auto.
-      }
-
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin FLD_BYTE_REF MSR_FLD FRESH SERIALIZE_REST.
-      repeat red in SERIALIZE_REST.
-      destruct SERIALIZE_REST as (ms_fin_final'&rest_bytes_fin&SERIALIZE_REST&RET).
-      cbn in RET.
-      destruct RET; subst.
-      cbn in FLD_BYTE_REF.
-
-      eapply IHTYPE_INF2 in SERIALIZE_REST; eauto.
-      destruct SERIALIZE_REST as (rest_bytes_inf&ms_inf_final'&SERIALIZE_REST_INF&REST_REF_INF&MSR_FINAL).
-      exists (a_inf ++ rest_bytes_inf)%list.
-      exists ms_inf_final'.
-      split.
-      { cbn.
-        exists ms_inf_final'.
-        exists rest_bytes_inf.
-        split; auto.        
-      }
-      split; auto.
-      apply Forall2_app; auto.
-
-      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-      rewrite Heqo.
-      cbn.
-      reflexivity.
-
-      inv TYPE_FIN.
-      auto.
-    }
-
-    { (* Regular packed struct serialization *)
-      pose proof UV_REF as UV_REF'.
-      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF'.
-      rewrite map_monad_InT_unfold in UV_REF'.
-      cbn in UV_REF'.
-      repeat break_match_hyp_inv.
-
-      rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-      eapply MemPropT_fin_inf_bind.
-      4: apply SERIALIZE.
-      all: eauto.
-
-      { (* MA: serialize first field *)
-        clear SERIALIZE IHTYPE_INF2.
-        intros a_fin ms_fin_ma SERIALIZE.
-        eapply IHTYPE_INF1; eauto.
-        inv TYPE_FIN; auto.
-      }
-
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin FLD_BYTE_REF MSR_FLD FRESH SERIALIZE_REST.
-      repeat red in SERIALIZE_REST.
-      destruct SERIALIZE_REST as (ms_fin_final'&rest_bytes_fin&SERIALIZE_REST&RET).
-      cbn in RET.
-      destruct RET; subst.
-      cbn in FLD_BYTE_REF.
-
-      eapply IHTYPE_INF2 in SERIALIZE_REST; eauto.
-      destruct SERIALIZE_REST as (rest_bytes_inf&ms_inf_final'&SERIALIZE_REST_INF&REST_REF_INF&MSR_FINAL).
-      exists (a_inf ++ rest_bytes_inf)%list.
-      exists ms_inf_final'.
-      split.
-      { cbn.
-        exists ms_inf_final'.
-        exists rest_bytes_inf.
-        split; auto.        
-      }
-      split; auto.
-      apply Forall2_app; auto.
-
-      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-      rewrite Heqo.
-      cbn.
-      reflexivity.
-
-      inv TYPE_FIN.
-      auto.
-    }
-
-    { (* Regular array serialization *)
-      pose proof UV_REF as UV_REF'.
-      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF'.
-      cbn in UV_REF'.
-      repeat break_match_hyp_inv.
-
-      rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-      eapply MemPropT_fin_inf_bind.
-      4: apply SERIALIZE.
-      all: eauto.
-
-      { (* MA: serialize elements *)
-        clear SERIALIZE.
-        intros a_fin ms_fin_ma SERIALIZE.
-        eapply MemPropT_fin_inf_map_monad_In
-          with (A_REF:=DVC1.uvalue_refine_strict).
-        4: apply SERIALIZE.
-        all: eauto.
-
-        { (* Serialize a single element *)
-          intros a_fin0 a_inf b_fin ms_fin ms_inf ms_fin_ma0 HIN_FIN HIN_INF MSR' UV_REF_ELT SERIALIZE_ELT.
-          cbn in SERIALIZE_ELT.
-          eapply IH; eauto.
-          apply SERIALIZE_ELT.
-
-          inv TYPE_FIN.
-          eapply Forall_forall in H2; eauto.
-        }
-
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF.
-        cbn in UV_REF.
-        break_match_hyp_inv.
-        rewrite <- map_monad_map_monad_InT in Heqo0.
-        apply map_monad_oom_Forall2; auto.
-      }
-
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTE_BLOCKS_REF MSR_ELT HMAPM RET.
-      cbn in RET.
-      destruct RET; subst.
-      cbn in BYTE_BLOCKS_REF.
-
-      exists (concat a_inf).
-      exists ms_inf.
-      cbn.
-      split; auto.
-      split; auto.
-      apply Forall2_concat.
-      auto.
-    }
-
-    { (* Regular vector serialization *)
-      pose proof UV_REF as UV_REF'.
-      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF'.
-      cbn in UV_REF'.
-      repeat break_match_hyp_inv.
-
-      rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
-      eapply MemPropT_fin_inf_bind.
-      4: apply SERIALIZE.
-      all: eauto.
-
-      { (* MA: serialize elements *)
-        clear SERIALIZE.
-        intros a_fin ms_fin_ma SERIALIZE.
-        eapply MemPropT_fin_inf_map_monad_In
-          with (A_REF:=DVC1.uvalue_refine_strict).
-        4: apply SERIALIZE.
-        all: eauto.
-
-        { (* Serialize a single element *)
-          intros a_fin0 a_inf b_fin ms_fin ms_inf ms_fin_ma0 HIN_FIN HIN_INF MSR' UV_REF_ELT SERIALIZE_ELT.
-          cbn in SERIALIZE_ELT.
-          eapply IH; eauto.
-          apply SERIALIZE_ELT.
-
-          inv TYPE_FIN.
-          eapply Forall_forall in H3; eauto.
-        }
-
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF.
-        cbn in UV_REF.
-        break_match_hyp_inv.
-        rewrite <- map_monad_map_monad_InT in Heqo0.
-        apply map_monad_oom_Forall2; auto.
-      }
-
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTE_BLOCKS_REF MSR_ELT HMAPM RET.
-      cbn in RET.
-      destruct RET; subst.
-      cbn in BYTE_BLOCKS_REF.
-
-      exists (concat a_inf).
-      exists ms_inf.
-      cbn.
-      split; auto.
-      split; auto.
-      apply Forall2_concat.
-      auto.
-    }
-
-    (* Solve for binary operations *)
-    all:
-      try solve
-        [ pose proof UV_REF as UV_REF';
-          rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF';
+    all :
+      try solve [
+          pose proof UV_REF as UV_REF';
           cbn in UV_REF';
+          inversion UV_REF;
           repeat break_match_hyp_inv;
-
-          rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation;
-          rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE;
           eapply MemPropT_fin_inf_bind; [ | | | apply SERIALIZE]; eauto;
           [intros *; eapply fresh_sid_fin_inf; eauto|];
-
+          
           intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH FRESH UBYTES;
           cbn in SID; subst;
-
+          
           red in UBYTES;
           break_match_hyp_inv;
           match goal with
@@ -14573,108 +13427,474 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           exists bytes_inf; exists ms_inf;
           split; auto;
           rewrite UBYTES_INF;
-          cbn; auto
+          cbn; auto].
+    
+    all : try solve
+            [cbn in SERIALIZE;
+             unfold DVC1.uvalue_refine_strict in UV_REF;
+             cbn in UV_REF;
+             try solve [
+                 inversion UV_REF; subst;
+                 solve_to_ubytes SERIALIZE;
+                 red; cbn; auto
+               | break_match_hyp_inv;
+                 solve_to_ubytes SERIALIZE;
+                 red; cbn; rewrite Heqo; auto
+               ]
+            ].
+    
+    - cbn in SERIALIZE.
+      inversion UV_REF; subst.
+      cbn. cbn in SERIALIZE. destruct SERIALIZE. subst.
+      eexists. eexists.  split; split; eauto.
+      constructor.
+
+    - (* Poison *)
+      inversion UV_REF; subst.
+      clear H H0.
+      (* SAZ: the lack of inversion principles means we have to do a nested induction here :-( *)
+      revert ms_fin_final ms_fin_start ms_inf_start MSR bytes_fin TYPE_FIN SERIALIZE UV_REF.
+      induction τ; intros ms_fin_final ms_fin_start ms_inf_start MSR bytes_fin TYP_FIN SERIALIZE HRS;
+      try solve [
+          solve_to_ubytes SERIALIZE; auto
         ].
 
-    { (* Concat bytes *)
-      pose proof UV_REF as UV_REF';
-      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF';
-      cbn in UV_REF';
-      repeat break_match_hyp_inv.
+      + (* Poison Array *) 
+        cbn in *.
+        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
+        subst.
+        inversion TYP_FIN. subst.  cbn in H0. cbn in H1.
+        assert (DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Poison τ) (DVC1.DV2.UVALUE_Poison τ)) as HRA.
+        { red. cbn.  reflexivity. } 
+        assert (DVC1.DV2.uvalue_has_dtyp (DVC1.DV2.UVALUE_Poison τ) τ) as UVT.
+        { constructor; auto. }
+        specialize (IHτ _ _ _ MSR BS UVT HS HRA).
+        destruct IHτ as [BI [MIF [HMS [HR M]]]].
+        exists (concat (repeatN sz BI)). exists MIF.
+        eexists. eexists.  eexists; eauto.
+        split; eauto.
+        apply sbytes_refine_concat_repeatN.
+        auto.
 
-      rewrite MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation.
-      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE.
+      + (* Poison Struct *)
+        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
+        subst.
+        inversion TYP_FIN; subst; clear TYP_FIN.
+        rewrite map_monad_map_monad_In in HS.
+        eapply MemPropT_fin_inf_map_monad_In in HS.
+
+        * destruct HS as  [BI [MIF [HMS [HR M]]]].
+          exists (concat BI). exists MIF.
+          split.  cbn. exists MIF. exists BI.
+          split; auto.
+          rewrite map_monad_map_monad_In.
+          apply HMS. split; auto.
+          apply sbytes_refine_concat. apply HR.
+        * assumption.
+        * intros.
+          eapply H; auto.
+          -- apply H0.
+          -- assert (a_inf = a_fin). apply H3. subst.
+             constructor.
+             eapply ALL_IX_SUPPORTED_Struct_fields; eauto.
+             eapply NO_VOID_Struct_fields; eauto.
+          -- subst. apply H4.
+          -- red. reflexivity.
+        * rewrite Forall2_eq. reflexivity.
+
+      + (* Poison Packed_struct *)
+        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
+        subst.
+        inversion TYP_FIN; subst; clear TYP_FIN.
+        rewrite map_monad_map_monad_In in HS.
+        eapply MemPropT_fin_inf_map_monad_In in HS.
+
+        * destruct HS as  [BI [MIF [HMS [HR M]]]].
+          exists (concat BI). exists MIF.
+          split.  cbn. exists MIF. exists BI.
+          split; auto.
+          rewrite map_monad_map_monad_In.
+          apply HMS. split; auto.
+          apply sbytes_refine_concat. apply HR.
+        * assumption.
+        * intros.
+          eapply H; auto.
+          -- apply H0.
+          -- assert (a_inf = a_fin). apply H3. subst.
+             constructor.
+             eapply ALL_IX_SUPPORTED_Struct_fields; eauto.
+             eapply NO_VOID_Struct_fields; eauto.
+          -- subst. apply H4.
+          -- red. reflexivity.
+        * rewrite Forall2_eq. reflexivity.
+
+      + (* Poison Vector *)
+        cbn in *.
+        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
+        subst.
+        inversion TYP_FIN. subst.  cbn in H0. cbn in H1.
+        assert (DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Poison τ) (DVC1.DV2.UVALUE_Poison τ)) as HRA.
+        { red. cbn.  reflexivity. } 
+        assert (DVC1.DV2.uvalue_has_dtyp (DVC1.DV2.UVALUE_Poison τ) τ) as UVT.
+        { constructor; auto. }
+        specialize (IHτ _ _ _ MSR BS UVT HS HRA).
+        destruct IHτ as [BI [MIF [HMS [HR M]]]].
+        exists (concat (repeatN sz BI)). exists MIF.
+        eexists. eexists.  eexists; eauto.
+        split; eauto.
+        apply sbytes_refine_concat_repeatN.
+        auto.
+
+    - (* OOM *)
+      inversion UV_REF; subst.
+      clear H H0.
+      (* SAZ: the lack of inversion principles means we have to do a nested induction here :-( *)
+      revert ms_fin_final ms_fin_start ms_inf_start MSR bytes_fin TYPE_FIN SERIALIZE UV_REF.
+      induction τ; intros ms_fin_final ms_fin_start ms_inf_start MSR bytes_fin TYP_FIN SERIALIZE HRS;
+      try solve [
+          solve_to_ubytes SERIALIZE; auto
+        ].
+
+      + (* OOM Array *) 
+        cbn in *.
+        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
+        subst.
+        inversion TYP_FIN. subst.  cbn in H0. cbn in H1.
+        assert (DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Oom τ) (DVC1.DV2.UVALUE_Oom τ)) as HRA.
+        { red. cbn.  reflexivity. } 
+        assert (DVC1.DV2.uvalue_has_dtyp (DVC1.DV2.UVALUE_Oom τ) τ) as UVT.
+        { constructor; auto. }
+        specialize (IHτ _ _ _ MSR BS UVT HS HRA).
+        destruct IHτ as [BI [MIF [HMS [HR M]]]].
+        exists (concat (repeatN sz BI)). exists MIF.
+        eexists. eexists.  eexists; eauto.
+        split; eauto.
+        apply sbytes_refine_concat_repeatN.
+        auto.
+
+      + (* OOM Struct *)
+        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
+        subst.
+        inversion TYP_FIN; subst; clear TYP_FIN.
+        rewrite map_monad_map_monad_In in HS.
+        eapply MemPropT_fin_inf_map_monad_In in HS.
+
+        * destruct HS as  [BI [MIF [HMS [HR M]]]].
+          exists (concat BI). exists MIF.
+          split.  cbn. exists MIF. exists BI.
+          split; auto.
+          rewrite map_monad_map_monad_In.
+          apply HMS. split; auto.
+          apply sbytes_refine_concat. apply HR.
+        * assumption.
+        * intros.
+          eapply H; auto.
+          -- apply H0.
+          -- assert (a_inf = a_fin). apply H3. subst.
+             constructor.
+             eapply ALL_IX_SUPPORTED_Struct_fields; eauto.
+             eapply NO_VOID_Struct_fields; eauto.
+          -- subst. apply H4.
+          -- red. reflexivity.
+        * rewrite Forall2_eq. reflexivity.
+
+      + (* OOM Packed_struct *)
+        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
+        subst.
+        inversion TYP_FIN; subst; clear TYP_FIN.
+        rewrite map_monad_map_monad_In in HS.
+        eapply MemPropT_fin_inf_map_monad_In in HS.
+
+        * destruct HS as  [BI [MIF [HMS [HR M]]]].
+          exists (concat BI). exists MIF.
+          split.  cbn. exists MIF. exists BI.
+          split; auto.
+          rewrite map_monad_map_monad_In.
+          apply HMS. split; auto.
+          apply sbytes_refine_concat. apply HR.
+        * assumption.
+        * intros.
+          eapply H; auto.
+          -- apply H0.
+          -- assert (a_inf = a_fin). apply H3. subst.
+             constructor.
+             eapply ALL_IX_SUPPORTED_Struct_fields; eauto.
+             eapply NO_VOID_Struct_fields; eauto.
+          -- subst. apply H4.
+          -- red. reflexivity.
+        * rewrite Forall2_eq. reflexivity.
+
+      + (* OOM Vector *)
+        cbn in *.
+        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
+        subst.
+        inversion TYP_FIN. subst.  cbn in H0. cbn in H1.
+        assert (DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Oom τ) (DVC1.DV2.UVALUE_Oom τ)) as HRA.
+        { red. cbn.  reflexivity. } 
+        assert (DVC1.DV2.uvalue_has_dtyp (DVC1.DV2.UVALUE_Oom τ) τ) as UVT.
+        { constructor; auto. }
+        specialize (IHτ _ _ _ MSR BS UVT HS HRA).
+        destruct IHτ as [BI [MIF [HMS [HR M]]]].
+        exists (concat (repeatN sz BI)). exists MIF.
+        eexists. eexists.  eexists; eauto.
+        split; eauto.
+        apply sbytes_refine_concat_repeatN.
+        auto.
+
+    - (* UNDEF *)
+      inversion UV_REF; subst.
+      clear H H0.
+      (* SAZ: the lack of inversion principles means we have to do a nested induction here :-( *)
+      revert ms_fin_final ms_fin_start ms_inf_start MSR bytes_fin TYPE_FIN SERIALIZE UV_REF.
+      induction τ; intros ms_fin_final ms_fin_start ms_inf_start MSR bytes_fin TYP_FIN SERIALIZE HRS;
+      try solve [
+          solve_to_ubytes SERIALIZE; auto
+        ].
+
+      + (* Undef Array *) 
+        cbn in *.
+        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
+        subst.
+        inversion TYP_FIN. subst.  cbn in H0. cbn in H1.
+        assert (DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Undef τ) (DVC1.DV2.UVALUE_Undef τ)) as HRA.
+        { red. cbn.  reflexivity. } 
+        assert (DVC1.DV2.uvalue_has_dtyp (DVC1.DV2.UVALUE_Undef τ) τ) as UVT.
+        { constructor; auto. }
+        specialize (IHτ _ _ _ MSR BS UVT HS HRA).
+        destruct IHτ as [BI [MIF [HMS [HR M]]]].
+        exists (concat (repeatN sz BI)). exists MIF.
+        eexists. eexists.  eexists; eauto.
+        split; eauto.
+        apply sbytes_refine_concat_repeatN.
+        auto.
+
+      + (* UNDEF Struct *)
+        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
+        subst.
+        inversion TYP_FIN; subst; clear TYP_FIN.
+        rewrite map_monad_map_monad_In in HS.
+        eapply MemPropT_fin_inf_map_monad_In in HS.
+
+        * destruct HS as  [BI [MIF [HMS [HR M]]]].
+          exists (concat BI). exists MIF.
+          split.  cbn. exists MIF. exists BI.
+          split; auto.
+          rewrite map_monad_map_monad_In.
+          apply HMS. split; auto.
+          apply sbytes_refine_concat. apply HR.
+        * assumption.
+        * intros.
+          eapply H; auto.
+          -- apply H0.
+          -- assert (a_inf = a_fin). apply H3. subst.
+             constructor.
+             eapply ALL_IX_SUPPORTED_Struct_fields; eauto.
+             eapply NO_VOID_Struct_fields; eauto.
+          -- subst. apply H4.
+          -- red. reflexivity.
+        * rewrite Forall2_eq. reflexivity.
+
+      + (* UNDEF Packed_struct *)
+        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
+        subst.
+        inversion TYP_FIN; subst; clear TYP_FIN.
+        rewrite map_monad_map_monad_In in HS.
+        eapply MemPropT_fin_inf_map_monad_In in HS.
+
+        * destruct HS as  [BI [MIF [HMS [HR M]]]].
+          exists (concat BI). exists MIF.
+          split.  cbn. exists MIF. exists BI.
+          split; auto.
+          rewrite map_monad_map_monad_In.
+          apply HMS. split; auto.
+          apply sbytes_refine_concat. apply HR.
+        * assumption.
+        * intros.
+          eapply H; auto.
+          -- apply H0.
+          -- assert (a_inf = a_fin). apply H3. subst.
+             constructor.
+             eapply ALL_IX_SUPPORTED_Struct_fields; eauto.
+             eapply NO_VOID_Struct_fields; eauto.
+          -- subst. apply H4.
+          -- red. reflexivity.
+        * rewrite Forall2_eq. reflexivity.
+
+      + (* UNDEF Vector *)
+        cbn in *.
+        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
+        subst.
+        inversion TYP_FIN. subst.  cbn in H0. cbn in H1.
+        assert (DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Undef τ) (DVC1.DV2.UVALUE_Undef τ)) as HRA.
+        { red. cbn.  reflexivity. } 
+        assert (DVC1.DV2.uvalue_has_dtyp (DVC1.DV2.UVALUE_Undef τ) τ) as UVT.
+        { constructor; auto. }
+        specialize (IHτ _ _ _ MSR BS UVT HS HRA).
+        destruct IHτ as [BI [MIF [HMS [HR M]]]].
+        exists (concat (repeatN sz BI)). exists MIF.
+        eexists. eexists.  eexists; eauto.
+        split; eauto.
+        apply sbytes_refine_concat_repeatN.
+        auto.
+
+    - (* Structs *)
+      inversion UV_REF; clear UV_REF.
+      break_match_hyp_inv.
+      cbn in SERIALIZE.
+      destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
+      subst.
+      inversion TYPE_FIN. subst. cbn in *. clear TYPE_FIN.
+      rewrite map_monad_oom_Forall2 in Heqo.
+      revert ms_fin_start ms_inf_start MSR l MS BS HS Heqo H2.
+      induction H; intros ms_fin_start ms_inf_start MSR L MS BS HS HCONV HTYP;
+        inversion HCONV; inversion HTYP; subst.
+      + cbn in HS.
+        destruct HS as [EQ1 EQ2]; subst.
+        exists []. exists ms_inf_start. split; intuition.
+        exists ms_inf_start. exists []. cbn. tauto. cbn. constructor.
+      + inversion H8; subst. clear H8.
+        cbn in HS.
+        destruct HS as [MS2 [A [HSA [HR [AS [HAS [EQ1 EQ2]]]]]]].
+        subst.
+        specialize (H _ _ _ MSR A _ H3 HSA H9).
+        destruct H as (AINF & MS2INF & MSER & AREF & MREF).
+        specialize (IHForall2 _ _ MREF _ _ _ HAS H5 H10).
+        destruct IHForall2 as (ASINF & MFININF & (MS & (CS & MLL & EQ1 & EQ2)) & (ASREF & MREFF) ).
+        subst.
+        cbn. 
+        repeat match goal with
+          [ |- exists _ , _ ] => eexists 
+        | [ |- ?P /\ ?Q ]=> split 
+               end; eauto.
+        cbn.
+        apply Forall2_app; auto.
+
+    - (* Packed_structs *)
+      inversion UV_REF; clear UV_REF.
+      break_match_hyp_inv.
+      cbn in SERIALIZE.
+      destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
+      subst.
+      inversion TYPE_FIN. subst. cbn in *. clear TYPE_FIN.
+      rewrite map_monad_oom_Forall2 in Heqo.
+      revert ms_fin_start ms_inf_start MSR l MS BS HS Heqo H2.
+      induction H; intros ms_fin_start ms_inf_start MSR L MS BS HS HCONV HTYP;
+        inversion HCONV; inversion HTYP; subst.
+      + cbn in HS.
+        destruct HS as [EQ1 EQ2]; subst.
+        exists []. exists ms_inf_start. split; intuition.
+        exists ms_inf_start. exists []. cbn. tauto. cbn. constructor.
+      + inversion H8; subst. clear H8.
+        cbn in HS.
+        destruct HS as [MS2 [A [HSA [HR [AS [HAS [EQ1 EQ2]]]]]]].
+        subst.
+        specialize (H _ _ _ MSR A _ H3 HSA H9).
+        destruct H as (AINF & MS2INF & MSER & AREF & MREF).
+        specialize (IHForall2 _ _ MREF _ _ _ HAS H5 H10).
+        destruct IHForall2 as (ASINF & MFININF & (MS & (CS & MLL & EQ1 & EQ2)) & (ASREF & MREFF) ).
+        subst.
+        cbn. 
+        repeat match goal with
+          [ |- exists _ , _ ] => eexists 
+        | [ |- ?P /\ ?Q ]=> split 
+               end; eauto.
+        cbn.
+        apply Forall2_app; auto.
+
+    - (* Arrays *)
+      inversion UV_REF; clear UV_REF.
+      break_match_hyp_inv.
+      cbn in SERIALIZE.
+      destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
+      subst.
+      inversion TYPE_FIN. subst. cbn in *. clear TYPE_FIN.
+      rewrite map_monad_oom_Forall2 in Heqo.
+      rewrite map_monad_map_monad_In in HS.
+      eapply MemPropT_fin_inf_map_monad_In in HS.
+
+     + destruct HS as  [BI [MIF [HMS [HR M]]]].
+       exists (concat BI). exists MIF.
+       split.  cbn. exists MIF. exists BI.
+       split; auto.
+       rewrite map_monad_map_monad_In.
+       apply HMS. split; auto.
+       apply sbytes_refine_concat. apply HR.
+     + assumption.
+     + intros.
+       eapply IH; auto.
+       -- apply H2.
+       -- apply H3.
+       -- cbn in H4. apply H4.
+       -- rewrite Forall_forall in H7. eapply H7. auto.
+     + apply Heqo.
+
+    - (* Vectors *)
+      inversion UV_REF; clear UV_REF.
+      break_match_hyp_inv.
+      cbn in SERIALIZE.
+      destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
+      subst.
+      inversion TYPE_FIN. subst. cbn in *. clear TYPE_FIN.
+      rewrite map_monad_oom_Forall2 in Heqo.
+      rewrite map_monad_map_monad_In in HS.
+      eapply MemPropT_fin_inf_map_monad_In in HS.
+
+     + destruct HS as  [BI [MIF [HMS [HR M]]]].
+       exists (concat BI). exists MIF.
+       split.  cbn. exists MIF. exists BI.
+       split; auto.
+       rewrite map_monad_map_monad_In.
+       apply HMS. split; auto.
+       apply sbytes_refine_concat. apply HR.
+     + assumption.
+     + intros.
+       eapply IH; auto.
+       -- apply H3.
+       -- apply H4.
+       -- cbn in H5. apply H5.
+       -- rewrite Forall_forall in H8. eapply H8. auto.
+     + apply Heqo.
+
+    - (* Concatbytes *)
+      inversion UV_REF; clear UV_REF.
+      break_match_hyp_inv.
+
       eapply MemPropT_fin_inf_bind
-        with (A_REF:=sbytes_refine).
-      4: apply SERIALIZE.
-      all: eauto.
-
-      { (* MA: extract_byte_to_sbyte *)
-        intros a_fin ms_fin_ma SBYTES.
-        red in SBYTES.
-        break_match_hyp; try (destruct e; cbn in SBYTES; contradiction).
-        cbn in SBYTES.
-        destruct SBYTES; subst.
-
-        clear SERIALIZE.
-        clear H0.
-        clear TYPE_FIN.
-        generalize dependent l.
-        intros l.
-        generalize dependent l0.
-        generalize dependent bytes.
-        generalize dependent dt.
-        induction l; intros dt bytes H l0 Heqs UV_REF Heqo.
-        - cbn in Heqs. inv Heqs.
-          apply map_monad_InT_OOM_nil_inv in Heqo.
-          subst.
-          cbn.
-          exists []. exists ms_inf_start.
-          split; auto.
-          split; auto.
-          constructor.
-        - rewrite map_monad_unfold in Heqs.
-          cbn in Heqs.
+               with (A_REF:=sbytes_refine)
+      ; [apply MSR | | | apply SERIALIZE].
+      + clear SERIALIZE.
+        intros.
+        eapply MemPropT_fin_inf_lift_ERR_RAISE_ERROR_ret; eauto.
+        intros.
+        rewrite H3 in H2.
+        cbn in H2. destruct H2; subst.
+        clear ms_fin_final ms_fin_start ms_inf_start MSR TYPE_FIN H1 H bytes_fin.
+        rewrite map_monad_oom_Forall2 in Heqo.
+        revert dt H0 a_fin0 H3.
+        induction Heqo; intros dt HIN BFIN MM.
+        * inversion MM.
+          exists []. cbn; split; auto. constructor.
+        * cbn in MM.
           repeat break_match_hyp_inv.
-
-          apply map_monad_InT_OOM_cons_inv in Heqo as (?&?&?&?&?&?); subst.
-          eapply extract_byte_to_sbyte_fin_inf in Heqs0; eauto.
-          destruct Heqs0 as (byte_inf&EXTRACT&BYTE_REF).
-
-          specialize (IHl dt x0).
-          forward IHl.
-          { intros byte H3.
-            eapply H.
-            right; auto.
-          }
-
-          pose proof UV_REF as UV_REF';
-            rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF'.
-          rewrite map_monad_InT_unfold in UV_REF'.
-          cbn in UV_REF'.
-          repeat break_match_hyp_inv.
-
-          specialize (IHl l1 eq_refl).
-          forward IHl.
-          { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-            rewrite Heqo.
-            cbn.
-            reflexivity.
-          }
-          forward IHl; auto.
-
-          destruct IHl as (bytes_rest&ms_inf_final&BYTES_REST&BYTES_REST_REF&MSR_FINAL).
-          red in BYTES_REST.
-          break_match_hyp; try (destruct e; cbn in BYTES_REST; contradiction).
-          cbn in BYTES_REST.
-          destruct BYTES_REST; subst.
-          rename l0 into bytes_rest.
-
-          exists (byte_inf :: bytes_rest).
-          exists ms_inf_start.
+          assert (In x (x::l)) as IN by (left; auto).
+          destruct (HIN _ IN) as (UV & IDX & SID & EQ).
+          eapply extract_byte_to_sbyte_fin_inf in Heqs; eauto.
+          destruct Heqs as (BI & HBI & SBR).
+          assert (forall byte : DVC1.DV1.uvalue,
+            In byte l ->
+            exists (uv idx : DVC1.DV1.uvalue) (sid : store_id),
+              byte = DVC1.DV1.UVALUE_ExtractByte uv dt idx sid).
+          { intros. apply HIN. right.  assumption. }
+          destruct (IHHeqo dt H0 l0 eq_refl) as (BS & MM & BSR).
+          exists (BI::BS).
           split.
-          { rewrite map_monad_unfold.
-            rewrite EXTRACT.
-            cbn.
+          -- cbn. rewrite HBI. rewrite MM. reflexivity.
+          -- constructor; auto.
 
-            replace (@map_monad ERR (EitherMonad.Monad_either ERR_MESSAGE) DVC1.DV1.uvalue
-                       MemoryBigIntptr.MP.BYTE_IMPL.SByte
-                       (fun x2 : DVC1.DV1.uvalue => MemoryBigIntptr.MMEP.MemSpec.MemHelpers.extract_byte_to_sbyte x2)
-                       x0) with (@inr ERR_MESSAGE _ bytes_rest); auto.
-            cbn.
-            auto.
-          }
-
-          split.
-          apply Forall2_cons; auto.
-          auto.
-      }
-
-
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTES_REF MSR_FINAL RESID.
-      eapply re_sid_ubytes_fin_inf; eauto.
-    }
-  Qed.
+      + intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTES_REF MSR_FINAL RESID.
+        eapply re_sid_ubytes_fin_inf; eauto.
+  Qed. 
+        
 
   Lemma handle_store_fin_inf :
     forall {t addr_fin addr_inf uv_fin uv_inf ms_fin_start ms_fin_final ms_inf_start res_fin},

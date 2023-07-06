@@ -1,6 +1,7 @@
 From Coq Require Import
-     List
-     Morphisms.
+  String
+  List
+  Morphisms.
 
 Require Import Coq.Logic.ProofIrrelevance.
 
@@ -26,6 +27,25 @@ Import ListNotations.
 
 Open Scope monad.
 Open Scope monad_scope.
+
+Definition map_monad2  {M} `{Monad M} `{RAISE_ERROR M} {A B C} (f : A -> B -> M C) : list A -> list B -> M (list C) :=
+      fix go l1 l2 :=
+        match l1 with
+        | [] =>
+            match l2 with
+            | [] => ret []
+            | _ => raise_error "map_monad2: length mismatch"%string
+            end
+        | x::xs =>
+            match l2 with
+            | [] => raise_error "map_monad2: length mismatch"%string 
+            | y::ys =>
+                z <- f x y ;;
+                zs <- go xs ys ;;
+                ret (z::zs)
+            end
+        end.
+
 
 Section MonadContext.
   Context (M : Type -> Type).
@@ -99,14 +119,14 @@ Proof.
   induction res; intros l MAP.
   - inversion IN.
   - inversion IN; subst.
-    + destruct l as [_ | h ls].
+    + destruct l as [| h ls].
       * cbn in MAP.
         inv MAP.
       * exists h.
         cbn in MAP.
         break_match_hyp; [|break_match_hyp]; inv MAP.
         split; cbn; auto.
-    + destruct l as [_ | h ls].
+    + destruct l as [| h ls].
       * cbn in MAP.
         inv MAP.
       * cbn in MAP.
@@ -155,7 +175,7 @@ Proof.
     + cbn in NTH.
       inv NTH.
 
-      destruct l as [_ | h ls].
+      destruct l as [| h ls].
       * cbn in MAP.
         inv MAP.
       * exists h.
@@ -164,7 +184,7 @@ Proof.
         split; cbn; auto.
 
     + cbn in NTH.
-      destruct l as [_ | h ls].
+      destruct l as [| h ls].
       * cbn in MAP.
         inv MAP.
       * cbn in MAP.
@@ -512,7 +532,7 @@ Proof.
 Qed.
 
 Definition commutative_maps {A} (g f : A -> M A) :=
-  forall {B} a b (k : A -> A -> M B),
+  forall B a b (k : A -> A -> M B),
     (y <- g a ;; z <- f b ;; k y z) ≈ (z <- f b ;; y <- g a ;; k y z).
 
 Lemma map_comm_lemma : forall {A B} (b : A) (xs : list A) (g : A -> M A) (f : A -> M A) (k : A -> list A -> M B) (HC : commutative_maps g f),
@@ -754,7 +774,7 @@ Proof.
     + cbn in NTH.
       inv NTH.
 
-      destruct l as [_ | h ls].
+      destruct l as [| h ls].
       * cbn in MAP.
         inv MAP.
       * exists h.
@@ -764,7 +784,7 @@ Proof.
         split; cbn; auto.
 
     + cbn in NTH.
-      destruct l as [_ | h ls].
+      destruct l as [| h ls].
       * cbn in MAP.
         inv MAP.
       * cbn in MAP.
@@ -1443,14 +1463,14 @@ Proof.
   induction res; intros l MAP.
   - inversion IN.
   - inversion IN; subst.
-    + destruct l as [_ | h ls].
+    + destruct l as [| h ls].
       * cbn in MAP.
         inv MAP.
       * exists h.
         cbn in MAP.
         break_match_hyp; [|break_match_hyp]; inv MAP.
         split; cbn; auto.
-    + destruct l as [_ | h ls].
+    + destruct l as [| h ls].
       * cbn in MAP.
         inv MAP.
       * cbn in MAP.
@@ -1479,7 +1499,7 @@ Proof.
     + cbn in NTH.
       inv NTH.
 
-      destruct l as [_ | h ls].
+      destruct l as [| h ls].
       * cbn in MAP.
         inv MAP.
       * exists h.
@@ -1489,7 +1509,7 @@ Proof.
         break_match_hyp; inv H0.
         split; cbn; auto.
     + cbn in NTH.
-      destruct l as [_ | h ls].
+      destruct l as [| h ls].
       * cbn in MAP.
         inv MAP.
       * rewrite map_monad_InT_unfold in MAP.
