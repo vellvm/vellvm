@@ -7026,6 +7026,139 @@ cofix CIH
 
   Import InterpMemoryProp.
 
+  #[global] Instance get_inf_tree_eq_itree_Proper :
+    Proper (eq_itree eq ==> eq_itree eq) get_inf_tree.
+  Proof.
+    unfold Proper, respectful.
+    intros x y EQ.
+    rewrite (itree_eta_ x) in *.
+    rewrite (itree_eta_ y) in *.
+    genobs x ox.
+    genobs y oy.
+    clear x Heqox y Heqoy.
+    revert ox oy EQ.
+    pcofix CIH.
+    intros ox oy EQ.
+    punfold EQ. red in EQ. cbn in EQ.
+    dependent induction EQ.
+    - (* Ret Ret *)
+      subst.
+      pstep; red; cbn.
+      constructor; auto.
+    - (* Tau Tau *)
+      pstep; red; cbn.
+      constructor.
+      right.
+      rewrite (itree_eta_ m1).
+      rewrite (itree_eta_ m2).
+      eapply CIH.
+      pclearbot.
+      repeat rewrite <- itree_eta_.
+      apply REL.
+    - (* Vis Vis *)
+      destruct e.
+
+      { (* ExternalCallE *)
+        destruct e.
+        pstep; red; cbn.
+        constructor.
+        intros v.
+        red.
+        right.
+        rewrite (itree_eta_
+                   match DVCInfFin.dvalue_convert_strict v with
+                   | NoOom a => k1 a
+                   | Oom s => raiseOOM s
+                   end).
+        rewrite (itree_eta_
+                   match DVCInfFin.dvalue_convert_strict v with
+                   | NoOom a => k2 a
+                   | Oom s => raiseOOM s
+                   end).
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        break_match; [|reflexivity].
+        specialize (REL d).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      destruct s.
+      { (* PickUvalueE *)
+        destruct p.
+        pstep; red; cbn.
+        constructor.
+        intros [v []].
+        red.
+        right.
+        match goal with
+        | H: _ |- r (get_inf_tree ?t1) (get_inf_tree ?t2) =>
+            rewrite (itree_eta_ t1);
+            rewrite (itree_eta_ t2)
+        end.
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        break_match; [|reflexivity].
+        specialize (REL (exist _ d I)).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      destruct s.
+      { (* OOME *)
+        destruct o.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+
+      destruct s.
+      { (* UBE *)
+        destruct u0.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+
+      destruct s.
+      { (* DebugE *)
+        destruct d.
+        pstep; red; cbn.
+        constructor.
+        intros [].
+        red.
+        right.
+        match goal with
+        | H: _ |- r (get_inf_tree ?t1) (get_inf_tree ?t2) =>
+            rewrite (itree_eta_ t1);
+            rewrite (itree_eta_ t2)
+        end.
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        specialize (REL tt).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      { (* FailureE *)
+        destruct f.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+    - (* TauL *)
+      pstep; red; cbn.
+      constructor; auto.
+      punfold IHEQ.
+    - (* TauR *)
+      pstep; red; cbn.
+      constructor; auto.
+      punfold IHEQ.
+  Qed.
+
   #[global] Instance get_inf_tree_Proper :
     Proper (eutt eq ==> eutt eq) get_inf_tree.
   Proof.
@@ -19573,6 +19706,74 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       break_match_hyp_inv.
   Qed.
 
+  (* TODO: Move this, should apply for fin / inf *)
+  Lemma mempush_spec_always_succeeds :
+    forall m1,
+    exists m2,
+      Memory64BitIntptr.MMEP.MemSpec.mempush_spec m1 m2.
+  Proof.
+    (* Should I just use mempush? *)
+    intros m1.
+    remember m1.
+    destruct m as [m1_stack m1_prov].
+    destruct m1_stack as [m1_memory m1_fs m1_heap].
+    remember (Memory64BitIntptr.MMEP.push_frame_stack m1_fs Memory64BitIntptr.MMEP.initial_frame) as m2_fs.
+    exists (Memory64BitIntptr.MMEP.mem_state_set_frame_stack m1 m2_fs).
+
+    split.
+    - intros fs1 fs2 f H H0 H1.
+      cbn in *.
+      red in H.
+      cbn in *.
+      red.
+      unfold Memory64BitIntptr.MMEP.mem_state_set_frame_stack.
+      subst.
+      cbn.
+      destruct H1.
+      red in can_pop.
+      red in new_frame.
+      break_match_hyp; try contradiction.
+      unfold Memory64BitIntptr.MMEP.push_frame_stack.
+      subst.
+      rewrite H.
+      rewrite can_pop.
+      unfold Memory64BitIntptr.MMEP.initial_frame in *.
+      rewrite FinMem.MMEP.empty_frame_eqv; eauto.
+      2: apply Memory64BitIntptr.MMEP.empty_frame_nil.
+      rewrite new_frame.
+      reflexivity.
+    - subst.
+      split.
+      ++ (* read_byte_preserved *)
+        (* TODO: solve_read_byte_preserved. *)
+        split.
+        ** (* solve_read_byte_allowed_all_preserved. *)
+          intros ?ptr; split; intros ?READ.
+          --- (* read_byte_allowed *)
+            apply Memory64BitIntptr.MMEP.read_byte_allowed_set_frame_stack; eauto.
+          --- (* read_byte_allowed *)
+            (* TODO: solve_read_byte_allowed *)
+            eapply Memory64BitIntptr.MMEP.read_byte_allowed_set_frame_stack; eauto.
+        ** (* solve_read_byte_prop_all_preserved. *)
+          apply Memory64BitIntptr.MMEP.read_byte_prop_set_frame_stack.
+      ++ (* write_byte_allowed_all_preserved *)
+        apply Memory64BitIntptr.MMEP.write_byte_allowed_all_preserved_set_frame_stack.
+      ++ (* free_byte_allowed_all_preserved *)
+        apply Memory64BitIntptr.MMEP.free_byte_allowed_all_preserved_set_frame_stack.
+      ++ (* allocations_preserved *)
+        (* TODO: move to solve_allocations_preserved *)
+        apply Memory64BitIntptr.MMEP.allocations_preserved_set_frame_stack.
+      ++ (* preserve_allocation_ids *)
+        (* TODO: solve_preserve_allocation_ids *)
+        apply Memory64BitIntptr.MMEP.preserve_allocation_ids_set_frame_stack.
+      ++ (* TODO: solve_heap_preserved. *)
+        unfold Memory64BitIntptr.MMEP.mem_state_set_frame_stack.
+        red.
+        unfold Memory64BitIntptr.MMEP.MMSP.memory_stack_heap_prop. cbn.
+        unfold Memory64BitIntptr.MMEP.MMSP.memory_stack_heap.
+        reflexivity.
+  Qed.
+
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
       L2_E1E2_orutt_strict t_inf t_fin ->
@@ -19962,6 +20163,16 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     red in H0.
                     destruct H0 as [UB | [ERR | [OOM | H0]]].
                     { (* Handler raises UB *)
+                      (* ta is completely unconstrained in the UB handler...
+
+                         Should UB actually be handled this way by
+                         handle_intrinsic_prop / MemPropT?
+
+                         Alternatively it might make sense to handle
+                         this more like error, and then handle UB
+                         later?
+                       *)
+
                       destruct UB as [ub_msg INTRINSIC].
                       red in INTRINSIC.
                       break_match_hyp.
@@ -19982,7 +20193,31 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                           red in HANDLER.
                           break_match_hyp.
                           { (* Negative length UB *)
+                            subst.
+                            inversion ARGS; subst.
+                            inversion H4; subst.
+                            inversion H6; subst.
+                            inversion H8; subst.
+                            inversion H10; subst.
+
                             econstructor.
+                            inversion RUN; subst.
+                            { exfalso; eapply EQ; eauto. }
+
+                            { (* OOM *)
+                              destruct e.
+
+                              rewrite HT1.
+                              cbn.
+                              rewrite get_inf_tree_equation.
+                              cbn.
+                              unfold raiseOOM.
+                              rewrite bind_trigger.
+                              unfold print_msg.
+                              reflexivity.
+                            }
+
+                            subst_existT.
                             admit.
                           }
 
@@ -20186,12 +20421,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       destruct UB as [ub_msg UB].
                       cbn in UB.
 
-                      (* TODO: look into lemmas like:
-
-                         - get_consecutive_ptrs_no_ub
-                         - allocate_bytes_spec_MemPropT_no_ub
-                       *)
-                      admit.
+                      pose proof mempush_spec_always_succeeds m1 as [m2 ?].
+                      specialize (UB m2); contradiction.
                     }
 
                     { (* Handler raises error *)
@@ -20479,6 +20710,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     repeat red in H0.
                     destruct H0 as [UB | [ERR | [OOM | H0]]].
                     { (* Handler raises UB *)
+
+                      (* TODO: look into lemmas like:
+
+                         - get_consecutive_ptrs_no_ub
+                         - allocate_bytes_spec_MemPropT_no_ub
+                       *)
                       admit.
                     }
 
