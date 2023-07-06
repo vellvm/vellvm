@@ -20200,6 +20200,46 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                             inversion H8; subst.
                             inversion H10; subst.
 
+                            apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
+                            apply dvalue_refine_strict_addr_r_inv in H3 as (?&?&?); subst.
+                            apply dvalue_refine_strict_i32_r_inv in H5 as (?&?&?); subst.
+                            apply dvalue_refine_strict_i32_r_inv in H7 as (?&?&?); subst.
+                            apply dvalue_refine_strict_i1_r_inv in H9 as (?&?&?); subst.
+
+                            eapply Interp_Memory_PropT_Vis with
+                              (ta:=
+                                 vis (ThrowUB tt)
+                                   (fun x : void =>
+                                      match
+                                        x
+                                        return
+                                        (itree
+                                           (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
+                                                                                                 LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                                           (MemoryBigIntptr.MMEP.MMSP.MemState *
+                                              (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                      with
+                                      end)).
+                                     
+                            2: {
+                              cbn.
+                              repeat red.
+                              left.
+                              exists "memcpy given negative length.".
+                              red.
+                              rewrite Heqb.
+                              cbn.
+                              left.
+                              red.
+                              cbn in H2.                              
+                              rewrite H2.
+                              rewrite Heqb0.
+                              cbn; auto.
+                            }
+
+                            intros a1 b RETa RETb AB.
+
+
                             econstructor.
                             inversion RUN; subst.
                             { exfalso; eapply EQ; eauto. }
@@ -20541,6 +20581,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     repeat red in H0.
                     destruct H0 as [UB | [ERR | [OOM | H0]]].
                     { (* Handler raises UB *)
+                      cbn in UB.
+                      destruct UB as [_ [NPOP NPOPSPEC]].
+                      unfold Memory64BitIntptr.MMEP.MemSpec.cannot_pop in *.
+
+                      (* If we cannot pop we should have an empty frame stack *)
                       admit.
                     }
 
