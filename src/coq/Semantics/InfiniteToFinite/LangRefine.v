@@ -460,6 +460,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       apply bisimulation_is_eq in H1. rewrite H1.
       econstructor; eauto.
       eapply eqit_Vis; intros; inv u.
+      destruct u0.
     - discriminate.
     - pstep. cbn in H2, H3. red in H.
       rewrite H in H0.
@@ -615,7 +616,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               rewrite interp_vis.
               cbn.
               setoid_rewrite bind_trigger. rewrite bind_vis. cbn in *; subst. eapply eqit_Vis.
-              intros. inv u.
+              intros [].
           -- destruct s; try destruct u; cbn in H1.
              ++ destruct d. cbn in H1.
                 rewrite <- unfold_interp in H2.
@@ -668,11 +669,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                 rewrite H0. cbn. rewrite interp_bind.
                 rewrite interp_trigger. cbn. unfold LLVMEvents.raise.
                 do 2 rewrite bind_trigger. rewrite bind_vis.
-                apply eqit_Vis; intros; inv u.
-
+                apply eqit_Vis.
+                intros [].
                 Unshelve.
                 all : eauto.
-                all : inv x.
   Admitted.
 
   Lemma refine_OOM_h_L1_convert_tree_strict :
@@ -1167,6 +1167,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       apply bisimulation_is_eq in H1. rewrite H1.
       econstructor; eauto.
       eapply eqit_Vis; intros; inv u.
+      inv u0.
     - discriminate.
     - pstep. cbn in H2, H3. red in H.
       rewrite H in H0.
@@ -1314,7 +1315,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               rewrite interp_vis.
               cbn.
               setoid_rewrite bind_trigger. rewrite bind_vis. cbn in *; subst. eapply eqit_Vis.
-              intros. inv u.
+              intros [].
           -- destruct s; try destruct u; cbn in H1.
              ++ destruct d. cbn in H1.
                 rewrite <- unfold_interp in H2.
@@ -1366,7 +1367,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                 rewrite H0. cbn. rewrite interp_bind.
                 rewrite interp_trigger. cbn. unfold LLVMEvents.raise.
                 do 2 rewrite bind_trigger. rewrite bind_vis.
-                apply eqit_Vis; intros; inv u.
+                apply eqit_Vis.
+                intros [].
 
                 Unshelve.
                 all : eauto.
@@ -1664,11 +1666,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -1787,11 +1793,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -1881,11 +1891,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -1933,11 +1947,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -2382,11 +2400,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -2519,11 +2541,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -2625,11 +2651,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -2684,11 +2714,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -2982,11 +3016,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -3214,11 +3252,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { apply True.
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
+      exact (e1_msg = e2_msg).
     }
   Defined.
 
@@ -3635,7 +3677,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                 (repeat break_match_hyp; try contradiction)).
 
           { destruct o, o0; cbn; constructor; cbn; auto. }
-          { destruct s, s0; cbn; constructor; cbn; auto. }
+          { destruct s, s0; cbn; constructor; auto.
+            destruct s, s0; try solve [ cbn in H; contradiction ].
+            - (* Debug *)
+              destruct d, d0; cbn in *; auto.
+            - (* Failure *)
+              destruct f, f0.
+              cbn in *; auto.
+          }
         }
   Qed.
 
@@ -9249,6 +9298,35 @@ Qed.
       pstep; red; cbn.
       rewrite subevent_subevent.
       eapply EqVisOOM.
+    - cbn in REF; 
+       destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF).
+      cbn.
+      repeat rewrite bind_trigger.
+      pfold. red.
+      cbn.
+      constructor; cbn; auto.
+      intros [] [] _.
+      left.
+      pstep; red; cbn.
+      constructor.
+      split; auto.
+      red in LSR.
+      destruct ls1, ls2.
+      constructor; tauto.
+      intros o CONTRA.
+      inv CONTRA.
+    - cbn in REF; 
+       destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF).
+      cbn.
+      repeat rewrite bind_trigger.
+      pfold. red.
+      cbn.
+      constructor; cbn; auto.
+      intros [].
+      intros o CONTRA.
+      inv CONTRA.
   Qed.
 
   Lemma model_E1E2_12_orutt_strict :

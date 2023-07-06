@@ -153,7 +153,7 @@ Module Infinite.
     force_rewrite @bind_trigger.
 
     remember (observe
-                (vis (ThrowOOM oom_msg) (fun x : void => match x return (itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) R) with
+                (vis (ThrowOOM (print_msg oom_msg)) (fun x : void => match x return (itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) R) with
                                                          end))).
 
     hinduction Hmodel before CIH; cbn; intros; inv Heqi; eauto; [solve [cbn in *; eapply EqTauL; auto] |]; try discriminate.
@@ -168,7 +168,7 @@ Module Infinite.
     punfold H0.
     red in H0.
     cbn in *.
-    remember (VisF (subevent void (resum IFun void (ThrowOOM oom_msg))) (fun x : void => k2 x)).
+    remember (VisF (subevent void (resum IFun void (ThrowOOM (print_msg oom_msg)))) (fun x : void => k2 x)).
     hinduction H0 before i; intros; inv Heqi.
     - dependent destruction H1.
       econstructor; intros; contradiction.
@@ -524,7 +524,7 @@ Module Infinite.
       - unfold interp_mcfg4.
         red.
         destruct e.
-        exists (raiseOOM s).
+        exists (raiseOOM "").
         split.
         + unfold raiseOOM.
           eapply interp_mem_prop_Proper3.
@@ -536,8 +536,9 @@ Module Infinite.
           all: eauto.
           * reflexivity.
           * pstep; red; cbn.
+
             change
-              (VisF (subevent void (ThrowOOM s))
+              (VisF (subevent void (ThrowOOM (print_msg "")))
                  (fun x : void =>
                     match
                       x
@@ -546,7 +547,7 @@ Module Infinite.
                          (MMEP.MMSP.MemState * (store_id * (local_env * Stack.stack * res_L1))))
                     with
                     end)) with
-              (observe (Vis (subevent void (ThrowOOM s))
+              (observe (Vis (subevent void (ThrowOOM (print_msg "")))
                           (fun x : void =>
                              match
                                x
@@ -560,13 +561,14 @@ Module Infinite.
         + rewrite EUTT.
           red.
           pstep; red; cbn.
-          change (VisF (subevent void (ThrowOOM s)) k) with (observe (Vis (subevent void (ThrowOOM s)) k)).
+          change (VisF (subevent void (ThrowOOM u)) k) with (observe (Vis (subevent void (ThrowOOM u)) k)).
           econstructor.
           * intros [] _.
           * cbn. red.
             setoid_rewrite bind_ret_r.
             reflexivity.
           * setoid_rewrite bind_trigger.
+            unfold print_msg. destruct u.
             reflexivity.
       - reflexivity.
     }
@@ -652,7 +654,7 @@ Module Infinite.
       - unfold interp_mcfg4.
         red.
         destruct e.
-        exists (raiseOOM s).
+        exists (raiseOOM "").
         split.
         + unfold raiseOOM.
           eapply interp_mem_prop_Proper3.
@@ -665,7 +667,7 @@ Module Infinite.
           * reflexivity.
           * pstep; red; cbn.
             change
-              (VisF (subevent void (ThrowOOM s))
+              (VisF (subevent void (ThrowOOM (print_msg "")))
                  (fun x : void =>
                     match
                       x
@@ -674,7 +676,7 @@ Module Infinite.
                          (MMEP.MMSP.MemState * (store_id * (local_env * Stack.stack * res_L1))))
                     with
                     end)) with
-              (observe (Vis (subevent void (ThrowOOM s))
+              (observe (Vis (subevent void (ThrowOOM (print_msg "")))
                           (fun x : void =>
                              match
                                x
@@ -688,13 +690,14 @@ Module Infinite.
         + rewrite EUTT.
           red.
           pstep; red; cbn.
-          change (VisF (subevent void (ThrowOOM s)) k) with (observe (Vis (subevent void (ThrowOOM s)) k)).
+          change (VisF (subevent void (ThrowOOM u)) k) with (observe (Vis (subevent void (ThrowOOM u)) k)).
           econstructor.
           * intros [] _.
           * cbn. red.
             setoid_rewrite bind_ret_r.
             reflexivity.
           * setoid_rewrite bind_trigger.
+            unfold print_msg. destruct u.
             reflexivity.
       - reflexivity.
     }
@@ -821,11 +824,11 @@ Module Infinite.
     red in H0. cbn in *. rewrite itree_eta, (itree_eta t3).
     do 2 red.
     punfold H0. red in H0; cbn in H0.
-    remember (VisF (subevent void (ThrowOOM oom_msg))
+    remember (VisF (subevent void (ThrowOOM (print_msg oom_msg)))
             (fun x : void =>
              ITree.bind match x return (itree _ R) with
                         end (fun x0 : R => k1 x0))).
-    remember (VisF (subevent void (ThrowOOM oom_msg))
+    remember (VisF (subevent void (ThrowOOM (print_msg oom_msg)))
            (fun x : void =>
             match
               x
@@ -889,7 +892,7 @@ Module Infinite.
       - unfold interp_mcfg4.
         red.
         destruct e.
-        exists (raiseOOM s).
+        exists (raiseOOM "").
         split.
         + unfold raiseOOM.
           eapply interp_mem_prop_Proper3.
@@ -902,7 +905,7 @@ Module Infinite.
           * reflexivity.
           * pstep; red; cbn.
             change
-              (VisF (subevent void (ThrowOOM s))
+              (VisF (subevent void (ThrowOOM (print_msg "")))
                  (fun x : void =>
                     match
                       x
@@ -911,7 +914,7 @@ Module Infinite.
                          (MMEP.MMSP.MemState * (store_id * (local_env * Stack.stack * res_L1))))
                     with
                     end)) with
-              (observe (Vis (subevent void (ThrowOOM s))
+              (observe (Vis (subevent void (ThrowOOM (print_msg "")))
                           (fun x : void =>
                              match
                                x
@@ -955,7 +958,7 @@ Module Infinite.
                   (@resum (Type -> Type) IFun OOME (OOME +' UBE +' DebugE +' FailureE)
                      (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME
                         (UBE +' DebugE +' FailureE) (@ReSum_id (Type -> Type) IFun Id_IFun OOME)) void
-                     (ThrowOOM s))) (fun x1 : void => k2 x1)) with
+                     (ThrowOOM u))) (fun x1 : void => k2 x1)) with
             (observe (Vis
                (@subevent (OOME +' UBE +' DebugE +' FailureE)
                   (ExternalCallE +' OOME +' UBE +' DebugE +' FailureE)
@@ -965,13 +968,14 @@ Module Infinite.
                   (@resum (Type -> Type) IFun OOME (OOME +' UBE +' DebugE +' FailureE)
                      (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME
                         (UBE +' DebugE +' FailureE) (@ReSum_id (Type -> Type) IFun Id_IFun OOME)) void
-                     (ThrowOOM s))) (fun x1 : void => k2 x1))).
+                     (ThrowOOM u))) (fun x1 : void => k2 x1))).
           eapply Interp_PropT_Vis.
           * intros [] _.
           * cbn. red.
             setoid_rewrite bind_ret_r.
             reflexivity.
           * setoid_rewrite bind_trigger.
+            unfold print_msg. destruct u.
             reflexivity.
       - reflexivity.
     }
@@ -1247,11 +1251,11 @@ Module Finite.
     red in H0. cbn in *. rewrite itree_eta, (itree_eta t3).
     do 2 red.
     punfold H0. red in H0; cbn in H0.
-    remember (VisF (subevent void (ThrowOOM oom_msg))
+    remember (VisF (subevent void (ThrowOOM (print_msg oom_msg)))
             (fun x : void =>
              ITree.bind match x return (itree _ R) with
                         end (fun x0 : R => k1 x0))).
-    remember (VisF (subevent void (ThrowOOM oom_msg))
+    remember (VisF (subevent void (ThrowOOM (print_msg oom_msg)))
            (fun x : void =>
             match
               x
@@ -1553,7 +1557,7 @@ Module Finite.
       - unfold interp_mcfg4.
         red.
         destruct e.
-        exists (raiseOOM s).
+        exists (raiseOOM "").
         split.
         + unfold raiseOOM.
           eapply interp_mem_prop_Proper3.
@@ -1566,7 +1570,7 @@ Module Finite.
           * reflexivity.
           * pstep; red; cbn.
             change
-              (VisF (subevent void (ThrowOOM s))
+              (VisF (subevent void (ThrowOOM (print_msg "")))
                  (fun x : void =>
                     match
                       x
@@ -1575,7 +1579,7 @@ Module Finite.
                          (MMEP.MMSP.MemState * (store_id * (local_env * Stack.stack * res_L1))))
                     with
                     end)) with
-              (observe (Vis (subevent void (ThrowOOM s))
+              (observe (Vis (subevent void (ThrowOOM (print_msg "")))
                           (fun x : void =>
                              match
                                x
@@ -1619,7 +1623,7 @@ Module Finite.
                   (@resum (Type -> Type) IFun OOME (OOME +' UBE +' DebugE +' FailureE)
                      (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME
                         (UBE +' DebugE +' FailureE) (@ReSum_id (Type -> Type) IFun Id_IFun OOME)) void
-                     (ThrowOOM s))) (fun x1 : void => k2 x1)) with
+                     (ThrowOOM u))) (fun x1 : void => k2 x1)) with
             (observe (Vis
                (@subevent (OOME +' UBE +' DebugE +' FailureE)
                   (ExternalCallE +' OOME +' UBE +' DebugE +' FailureE)
@@ -1629,13 +1633,14 @@ Module Finite.
                   (@resum (Type -> Type) IFun OOME (OOME +' UBE +' DebugE +' FailureE)
                      (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME
                         (UBE +' DebugE +' FailureE) (@ReSum_id (Type -> Type) IFun Id_IFun OOME)) void
-                     (ThrowOOM s))) (fun x1 : void => k2 x1))).
+                     (ThrowOOM u))) (fun x1 : void => k2 x1))).
           eapply Interp_PropT_Vis.
           * intros [] _.
           * cbn. red.
             setoid_rewrite bind_ret_r.
             reflexivity.
           * setoid_rewrite bind_trigger.
+            unfold print_msg. destruct u.
             reflexivity.
       - reflexivity.
     }

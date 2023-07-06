@@ -1079,13 +1079,13 @@ Module InfiniteToFinite.
       inversion H; clear H; subst.
       { (* OOM *)
         inversion H0; subst.
-        exact (raiseOOM H).
+        exact (raiseOOM "").
       }
 
       inversion H0; clear H0; subst.
       { (* UBE *)
         inversion H; subst.
-        exact (raiseUB H0).
+        exact (raiseUB "").
       }
 
       inversion H; clear H; subst.
@@ -1100,7 +1100,7 @@ Module InfiniteToFinite.
 
       { (* FailureE *)
         inversion H0; subst.
-        exact (LLVMEvents.raise H).
+        exact (LLVMEvents.raise "").
       }
 
       (* Show Proof. *)
@@ -1109,933 +1109,5193 @@ Module InfiniteToFinite.
   Set Printing All.
   Set Printing Implicit.
   Set Printing Depth 1000.
+  Print get_inf_tree'.
 
 
   Unset Printing All.
   Unset Printing Implicit.
   Definition get_inf_tree :
     forall (t_fin2 : itree L3 (FinMem.MMEP.MMSP.MemState * (MemPropT.store_id * (local_env * @stack local_env * res_L1)))), itree InfLP.Events.L3 TopLevelBigIntptr.res_L6 :=
-    cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) :
-      itree InfLP.Events.L3
-        (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-      (fun _observe : itreeF L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue)))) (itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) =>
+cofix CIH
+  (t_fin2 : 
+   itree L3
+     (prod
+        FinMem.MMEP.MMSP.MemState
+        (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue))))) :
+    itree
+      InfLP.Events.L3
+      (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+  (fun
+     _observe : 
+      itreeF
+        L3
+        (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue))))
+        (itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+   =>
+   match
+     _observe
+     return
+       (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+   with
+   | RetF r =>
+       (fun
+         r0 : 
+         prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))
+        =>
+        @ret
+         (itree
+         InfLP.Events.L3)
+         (@Monad_itree
+         InfLP.Events.L3)
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
          match
-           _observe
-           return
-           (itree InfLP.Events.L3
-              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         r0
+         return
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
          with
-         | RetF r =>
-             (fun r0 : prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))) =>
-                @ret (itree InfLP.Events.L3) (@Monad_itree InfLP.Events.L3)
-                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                  match
-                    r0 return (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                  with
-                  | pair a b =>
-                      (fun (ms : FinMem.MMEP.MMSP.MemState) (p : prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))) =>
-                         match
-                           p
-                           return
-                           (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                         with
-                         | pair a0 b0 =>
-                             (fun (sid : MemPropT.store_id) (p0 : prod (prod local_env (@stack local_env)) (prod global_env dvalue)) =>
-                                match
-                                  p0
-                                  return
-                                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                                with
-                                | pair a1 b1 =>
-                                    (fun p1 : prod local_env (@stack local_env) =>
-                                       match
-                                         p1
-                                         return
-                                         (forall _ : prod global_env dvalue,
-                                             prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                               (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                                       with
-                                       | pair a2 b2 =>
-                                           (fun (lenv : local_env) (s : @stack local_env) (p2 : prod global_env dvalue) =>
-                                              match
-                                                p2
-                                                return
-                                                (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                   (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                                              with
-                                              | pair a3 b3 =>
-                                                  (fun (genv : global_env) (res : dvalue) =>
-                                                     @pair InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                       (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))) (lift_MemState ms)
-                                                       (@pair MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)) sid
-                                                          (@pair (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)
-                                                             (@pair InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack (lift_local_env lenv) (lift_stack s))
-                                                             (@pair InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue (lift_global_env genv) (fin_to_inf_dvalue res))))) a3 b3
-                                              end) a2 b2
-                                       end) a1 b1
-                                end) a0 b0
-                         end) a b
-                  end) r
-         | TauF t =>
-             (fun t0 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue)))) =>
-                @go InfLP.Events.L3
-                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                  (@TauF InfLP.Events.L3
-                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                     (itree InfLP.Events.L3
-                        (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                     (CIH t0))) t
-         | @VisF _ _ _ X e k =>
-             (fun (X0 : Type) (e0 : L3 X0) (k0 : forall _ : X0, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) =>
-                let X1 :
-                  itree InfLP.Events.L3
-                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                  match
-                    e0
-                    return
-                    (itree InfLP.Events.L3
-                       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                  with
-                  | inl1 x =>
-                      (fun H : ExternalCallE X0 =>
-                         (fun H0 : ExternalCallE X0 =>
-                            let X1 :
-                              forall _ : @eq Type X0 X0,
-                                itree InfLP.Events.L3
-                                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                              match
-                                H0 in (ExternalCallE T)
-                                return
-                                (forall _ : @eq Type T X0,
-                                    itree InfLP.Events.L3
-                                      (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                         (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                              with
-                              | ExternalCall t f args =>
-                                  (fun (t0 : dtyp) (f0 : uvalue) (args0 : list dvalue) (H1 : @eq Type dvalue X0) =>
-                                     (fun H2 : @eq Type dvalue X0 =>
-                                        let H3 : @eq Type dvalue X0 := H2 in
-                                        @eq_rect Type dvalue
-                                          (fun _ : Type =>
-                                             forall (_ : dtyp) (_ : uvalue) (_ : list dvalue),
-                                               itree InfLP.Events.L3
-                                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                    (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                          (fun (t1 : dtyp) (f1 : uvalue) (args1 : list dvalue) =>
-                                             @eq_rect Type dvalue
-                                               (fun X1 : Type =>
-                                                  forall (_ : forall _ : X1, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : ExternalCallE X1),
-                                                    itree InfLP.Events.L3
-                                                      (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                         (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                               (fun (k1 : forall _ : dvalue, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : ExternalCallE dvalue) =>
-                                                  @go InfLP.Events.L3
-                                                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                       (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                                                    (@VisF InfLP.Events.L3
-                                                       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                          (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                                                       (itree InfLP.Events.L3
-                                                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                             (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))) E1.DV.dvalue
-                                                       (@subevent E1.ExternalCallE InfLP.Events.L3
-                                                          (@ReSum_inl (forall _ : Type, Type) IFun sum1 Cat_IFun Inl_sum1 E1.ExternalCallE InfLP.Events.ExternalCallE (sum1 InfLP.Events.PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))) (@ReSum_id (forall _ : Type, Type) IFun Id_IFun InfLP.Events.ExternalCallE)) E1.DV.dvalue
-                                                          (E1.ExternalCall t1 (fin_to_inf_uvalue f1) (@map LLVMParams64BitIntptr.Events.DV.dvalue LLVMParamsBigIntptr.Events.DV.dvalue fin_to_inf_dvalue args1)))
-                                                       (fun x0 : E1.DV.dvalue =>
-                                                          CIH
-                                                            (let H5 : OOM DVCInfFin.DV2.dvalue := DVCInfFin.dvalue_convert_strict x0 in
-                                                             match H5 return (itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) with
-                                                             | NoOom a => (fun d : DVCInfFin.DV2.dvalue => k1 d) a
-                                                             | Oom s =>
-                                                                 (fun s0 : string =>
-                                                                    @raiseOOM L3
-                                                                      (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 OOME (sum1 PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))) ExternalCallE
-                                                                         (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 OOME (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) PickUvalueE
-                                                                            (@ReSum_inl (forall _ : Type, Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME (sum1 UBE (sum1 DebugE FailureE)) (@ReSum_id (forall _ : Type, Type) IFun Id_IFun OOME))))
-                                                                      (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue)))) s0) s
-                                                             end)))) X0 H2 k0 H0) X0 H3) H1 t0 f0 args0) t f args
-                              end in
-                                X1 (@eq_refl Type X0)) H) x
-                  | inr1 x =>
-                      (fun X1 : sum1 PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) X0 =>
-                         (fun X2 : sum1 PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) X0 =>
-                            let X3 :
-                              itree InfLP.Events.L3
-                                (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                              match
-                                X2
-                                return
-                                (itree InfLP.Events.L3
-                                   (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                      (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                              with
-                              | inl1 x0 =>
-                                  (fun X3 : PickUvalueE X0 =>
-                                     (fun X4 : PickUvalueE X0 =>
-                                        let X5 :
-                                          forall _ : @eq Type X0 X0,
-                                            itree InfLP.Events.L3
-                                              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                 (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                                          match
-                                            X4 in (PickE T)
-                                            return
-                                            (forall _ : @eq Type T X0,
-                                                itree InfLP.Events.L3
-                                                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                     (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                          with
-                                          | pick Pre x1 =>
-                                              (fun (Pre0 : Prop) (x2 : uvalue) (H : @eq Type (@sig dvalue (fun _ : dvalue => True)) X0) =>
-                                                 (fun H0 : @eq Type (@sig dvalue (fun _ : dvalue => True)) X0 =>
-                                                    let H1 : @eq Type (@sig dvalue (fun _ : dvalue => True)) X0 := H0 in
-                                                    @eq_rect Type (@sig dvalue (fun _ : dvalue => True))
-                                                      (fun _ : Type =>
-                                                         forall (_ : Prop) (_ : uvalue),
-                                                           itree InfLP.Events.L3
-                                                             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                      (fun (Pre1 : Prop) (x3 : uvalue) =>
-                                                         @eq_rect Type (@sig dvalue (fun _ : dvalue => True))
-                                                           (fun X5 : Type =>
-                                                              forall (_ : forall _ : X5, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : PickUvalueE X5),
-                                                                itree InfLP.Events.L3
-                                                                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                     (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                           (fun (k1 : forall _ : @sig dvalue (fun _ : dvalue => True), itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : PickUvalueE (@sig dvalue (fun _ : dvalue => True))) =>
-                                                              @go InfLP.Events.L3
-                                                                (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                   (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                                                                (@VisF InfLP.Events.L3
-                                                                   (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                      (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                                                                   (itree InfLP.Events.L3
-                                                                      (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                         (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                   (@sig InfLP.Events.DV.dvalue (fun _ : InfLP.Events.DV.dvalue => True))
-                                                                   (@subevent (@E1.PickE LLVMParamsBigIntptr.Events.DV.uvalue InfLP.Events.DV.dvalue (fun (_ : InfLP.Events.DV.uvalue) (_ : InfLP.Events.DV.dvalue) => True)) InfLP.Events.L3
-                                                                      (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 (@E1.PickE LLVMParamsBigIntptr.Events.DV.uvalue InfLP.Events.DV.dvalue (fun (_ : InfLP.Events.DV.uvalue) (_ : InfLP.Events.DV.dvalue) => True))
-                                                                         (sum1 InfLP.Events.PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))) InfLP.Events.ExternalCallE
-                                                                         (@ReSum_inl (forall _ : Type, Type) IFun sum1 Cat_IFun Inl_sum1 (@E1.PickE LLVMParamsBigIntptr.Events.DV.uvalue InfLP.Events.DV.dvalue (fun (_ : InfLP.Events.DV.uvalue) (_ : InfLP.Events.DV.dvalue) => True)) InfLP.Events.PickUvalueE
-                                                                            (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) (@ReSum_id (forall _ : Type, Type) IFun Id_IFun InfLP.Events.PickUvalueE))) (@sig InfLP.Events.DV.dvalue (fun _ : InfLP.Events.DV.dvalue => True))
-                                                                      (@E1.pick LLVMParamsBigIntptr.Events.DV.uvalue InfLP.Events.DV.dvalue (fun (_ : InfLP.Events.DV.uvalue) (_ : InfLP.Events.DV.dvalue) => True) Pre1 (fin_to_inf_uvalue x3)))
-                                                                   (fun res : @sig InfLP.Events.DV.dvalue (fun _ : InfLP.Events.DV.dvalue => True) =>
-                                                                      match
-                                                                        res
-                                                                        return
-                                                                        (itree InfLP.Events.L3
-                                                                           (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                              (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                      with
-                                                                      | @exist _ _ x4 p =>
-                                                                          (fun (x5 : InfLP.Events.DV.dvalue) (t : True) =>
-                                                                             CIH
-                                                                               (let H2 : OOM DVCInfFin.DV2.dvalue := DVCInfFin.dvalue_convert_strict x5 in
-                                                                                match H2 return (itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) with
-                                                                                | NoOom a => (fun d : DVCInfFin.DV2.dvalue => k1 (@exist dvalue (fun _ : dvalue => True) d t)) a
-                                                                                | Oom s =>
-                                                                                    (fun s0 : string =>
-                                                                                       @raiseOOM L3
-                                                                                         (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 OOME (sum1 PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))) ExternalCallE
-                                                                                            (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 OOME (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) PickUvalueE
-                                                                                               (@ReSum_inl (forall _ : Type, Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME (sum1 UBE (sum1 DebugE FailureE)) (@ReSum_id (forall _ : Type, Type) IFun Id_IFun OOME))))
-                                                                                         (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue)))) s0) s
-                                                                                end)) x4 p
-                                                                      end))) X0 H0 k0 X4) X0 H1) H Pre0 x2) Pre x1
-                                          end in
-                                            X5 (@eq_refl Type X0)) X3) x0
-                              | inr1 x0 =>
-                                  (fun H : sum1 OOME (sum1 UBE (sum1 DebugE FailureE)) X0 =>
-                                     (fun H0 : sum1 OOME (sum1 UBE (sum1 DebugE FailureE)) X0 =>
-                                        let X3 :
-                                          itree InfLP.Events.L3
-                                            (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                               (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                                          match
-                                            H0
-                                            return
-                                            (itree InfLP.Events.L3
-                                               (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                  (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                          with
-                                          | inl1 x1 =>
-                                              (fun H1 : OOME X0 =>
-                                                 (fun H2 : OOME X0 =>
-                                                    let X3 :
-                                                      forall _ : @eq Type X0 X0,
-                                                        itree InfLP.Events.L3
-                                                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                             (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                                                      match
-                                                        H2 in (OOME T)
-                                                        return
-                                                        (forall _ : @eq Type T X0,
-                                                            itree InfLP.Events.L3
-                                                              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                 (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                      with
-                                                      | ThrowOOM x2 =>
-                                                          (fun (H3 : string) (H4 : @eq Type Empty_set X0) =>
-                                                             (fun H5 : @eq Type Empty_set X0 =>
-                                                                let H6 : @eq Type Empty_set X0 := H5 in
-                                                                @eq_rect Type Empty_set
-                                                                  (fun _ : Type =>
-                                                                     forall _ : string,
-                                                                       itree InfLP.Events.L3
-                                                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                            (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                  (fun H7 : string =>
-                                                                     @eq_rect Type Empty_set
-                                                                       (fun X3 : Type =>
-                                                                          forall (_ : forall _ : X3, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : OOME X3),
-                                                                            itree InfLP.Events.L3
-                                                                              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                 (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                       (fun (_ : forall _ : Empty_set, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : OOME Empty_set) =>
-                                                                          @raiseOOM InfLP.Events.L3
-                                                                            (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 OOME (sum1 InfLP.Events.PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))) InfLP.Events.ExternalCallE
-                                                                               (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 OOME (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) InfLP.Events.PickUvalueE
-                                                                                  (@ReSum_inl (forall _ : Type, Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME (sum1 UBE (sum1 DebugE FailureE)) (@ReSum_id (forall _ : Type, Type) IFun Id_IFun OOME))))
-                                                                            (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                               (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) H7) X0 H5 k0 H2) X0 H6) H4 H3)
-                                                            x2
-                                                      end in
-                                                        X3 (@eq_refl Type X0)) H1) x1
-                                          | inr1 x1 =>
-                                              (fun H1 : sum1 UBE (sum1 DebugE FailureE) X0 =>
-                                                 (fun H2 : sum1 UBE (sum1 DebugE FailureE) X0 =>
-                                                    let X3 :
-                                                      itree InfLP.Events.L3
-                                                        (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                           (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                                                      match
-                                                        H2
-                                                        return
-                                                        (itree InfLP.Events.L3
-                                                           (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                              (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                      with
-                                                      | inl1 x2 =>
-                                                          (fun H3 : UBE X0 =>
-                                                             (fun H4 : UBE X0 =>
-                                                                let X3 :
-                                                                  forall _ : @eq Type X0 X0,
-                                                                    itree InfLP.Events.L3
-                                                                      (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                         (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                                                                  match
-                                                                    H4 in (UBE T)
-                                                                    return
-                                                                    (forall _ : @eq Type T X0,
-                                                                        itree InfLP.Events.L3
-                                                                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                             (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                  with
-                                                                  | ThrowUB x3 =>
-                                                                      (fun (H5 : string) (H6 : @eq Type Empty_set X0) =>
-                                                                         (fun H7 : @eq Type Empty_set X0 =>
-                                                                            let H8 : @eq Type Empty_set X0 := H7 in
-                                                                            @eq_rect Type Empty_set
-                                                                              (fun _ : Type =>
-                                                                                 forall _ : string,
-                                                                                   itree InfLP.Events.L3
-                                                                                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                        (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                              (fun H9 : string =>
-                                                                                 @eq_rect Type Empty_set
-                                                                                   (fun X3 : Type =>
-                                                                                      forall (_ : forall _ : X3, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : UBE X3),
-                                                                                        itree InfLP.Events.L3
-                                                                                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                             (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                                   (fun (_ : forall _ : Empty_set, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : UBE Empty_set) =>
-                                                                                      @raiseUB InfLP.Events.L3
-                                                                                        (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 UBE (sum1 InfLP.Events.PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))) InfLP.Events.ExternalCallE
-                                                                                           (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 UBE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) InfLP.Events.PickUvalueE
-                                                                                              (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 UBE (sum1 UBE (sum1 DebugE FailureE)) OOME
-                                                                                                 (@ReSum_inl (forall _ : Type, Type) IFun sum1 Cat_IFun Inl_sum1 UBE UBE (sum1 DebugE FailureE) (@ReSum_id (forall _ : Type, Type) IFun Id_IFun UBE)))))
-                                                                                        (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                           (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) H9) X0 H7 k0 H4) X0 H8)
-                                                                           H6 H5) x3
-                                                                  end in
-                                                                    X3 (@eq_refl Type X0)) H3) x2
-                                                      | inr1 x2 =>
-                                                          (fun H3 : sum1 DebugE FailureE X0 =>
-                                                             (fun H4 : sum1 DebugE FailureE X0 =>
-                                                                let X3 :
-                                                                  itree InfLP.Events.L3
-                                                                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                       (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                                                                  match
-                                                                    H4
-                                                                    return
-                                                                    (itree InfLP.Events.L3
-                                                                       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                          (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                  with
-                                                                  | inl1 x3 =>
-                                                                      (fun H5 : DebugE X0 =>
-                                                                         (fun H6 : DebugE X0 =>
-                                                                            let X3 :
-                                                                              forall _ : @eq Type X0 X0,
-                                                                                itree InfLP.Events.L3
-                                                                                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                     (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                                                                              match
-                                                                                H6 in (DebugE T)
-                                                                                return
-                                                                                (forall _ : @eq Type T X0,
-                                                                                    itree InfLP.Events.L3
-                                                                                      (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                         (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                              with
-                                                                              | Debug x4 =>
-                                                                                  (fun (H7 : string) (H8 : @eq Type unit X0) =>
-                                                                                     (fun H9 : @eq Type unit X0 =>
-                                                                                        let H10 : @eq Type unit X0 := H9 in
-                                                                                        @eq_rect Type unit
-                                                                                          (fun _ : Type =>
-                                                                                             forall _ : string,
-                                                                                               itree InfLP.Events.L3
-                                                                                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                                    (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                                          (fun H11 : string =>
-                                                                                             @eq_rect Type unit
-                                                                                               (fun X3 : Type =>
-                                                                                                  forall (_ : forall _ : X3, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : DebugE X3),
-                                                                                                    itree InfLP.Events.L3
-                                                                                                      (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                                         (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                                               (fun (k1 : forall _ : unit, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : DebugE unit) =>
-                                                                                                  @go InfLP.Events.L3
-                                                                                                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                                       (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                                                                                                    (@VisF InfLP.Events.L3
-                                                                                                       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                                          (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                                                                                                       (itree InfLP.Events.L3
-                                                                                                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                                             (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))) unit
-                                                                                                       (@subevent DebugE InfLP.Events.L3
-                                                                                                          (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 DebugE (sum1 InfLP.Events.PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))) InfLP.Events.ExternalCallE
-                                                                                                             (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 DebugE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) InfLP.Events.PickUvalueE
-                                                                                                                (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 DebugE (sum1 UBE (sum1 DebugE FailureE)) OOME
-                                                                                                                   (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 DebugE (sum1 DebugE FailureE) UBE
-                                                                                                                      (@ReSum_inl (forall _ : Type, Type) IFun sum1 Cat_IFun Inl_sum1 DebugE DebugE FailureE (@ReSum_id (forall _ : Type, Type) IFun Id_IFun DebugE)))))) unit (Debug H11)) (fun H13 : unit => CIH (k1 H13)))) X0 H9 k0 H6) X0 H10) H8 H7) x4
-                                                                              end in
-                                                                                X3 (@eq_refl Type X0)) H5) x3
-                                                                  | inr1 x3 =>
-                                                                      (fun H5 : FailureE X0 =>
-                                                                         (fun H6 : FailureE X0 =>
-                                                                            let X3 :
-                                                                              forall _ : @eq Type X0 X0,
-                                                                                itree InfLP.Events.L3
-                                                                                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                     (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                                                                              match
-                                                                                H6 in (FailureE T)
-                                                                                return
-                                                                                (forall _ : @eq Type T X0,
-                                                                                    itree InfLP.Events.L3
-                                                                                      (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                         (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                              with
-                                                                              | Throw x4 =>
-                                                                                  (fun (H7 : string) (H8 : @eq Type Empty_set X0) =>
-                                                                                     (fun H9 : @eq Type Empty_set X0 =>
-                                                                                        let H10 : @eq Type Empty_set X0 := H9 in
-                                                                                        @eq_rect Type Empty_set
-                                                                                          (fun _ : Type =>
-                                                                                             forall _ : string,
-                                                                                               itree InfLP.Events.L3
-                                                                                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                                    (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                                          (fun H11 : string =>
-                                                                                             @eq_rect Type Empty_set
-                                                                                               (fun X3 : Type =>
-                                                                                                  forall (_ : forall _ : X3, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : FailureE X3),
-                                                                                                    itree InfLP.Events.L3
-                                                                                                      (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                                         (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                                               (fun (_ : forall _ : Empty_set, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : FailureE Empty_set) =>
-                                                                                                  @LLVMEvents.raise InfLP.Events.L3
-                                                                                                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                                       (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                                                                                                    (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 FailureE (sum1 InfLP.Events.PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))) InfLP.Events.ExternalCallE
-                                                                                                       (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 FailureE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) InfLP.Events.PickUvalueE
-                                                                                                          (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 FailureE (sum1 UBE (sum1 DebugE FailureE)) OOME
-                                                                                                             (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 FailureE (sum1 DebugE FailureE) UBE
-                                                                                                                (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 FailureE FailureE DebugE (@ReSum_id (forall _ : Type, Type) IFun Id_IFun FailureE)))))) H11) X0 H9 k0 H6) X0 H10) H8 H7) x4
-                                                                              end in
-                                                                                X3 (@eq_refl Type X0)) H5) x3
-                                                                  end in
-                                                                X3) H3) x2
-                                                      end in
-                                                    X3) H1) x1
-                                          end in
-                                        X3) H) x0
-                              end in
-                            X3) X1) x
-                  end in
-                X1) X e k
-         end) (@_observe _ _ t_fin2).
+         | pair
+         a b =>
+         (fun
+         (ms : FinMem.MMEP.MMSP.MemState)
+         (p : 
+         prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))
+         =>
+         match
+         p
+         return
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         with
+         | pair
+         a0 b0 =>
+         (fun
+         (sid : MemPropT.store_id)
+         (p0 : 
+         prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue))
+         =>
+         match
+         p0
+         return
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         with
+         | pair
+         a1 b1 =>
+         (fun
+         p1 : 
+         prod
+         local_env
+         (@stack
+         local_env)
+         =>
+         match
+         p1
+         return
+         (forall
+         _ : 
+         prod
+         global_env
+         dvalue,
+         prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         with
+         | pair
+         a2 b2 =>
+         (fun
+         (lenv : local_env)
+         (s : 
+         @stack
+         local_env)
+         (p2 : 
+         prod
+         global_env
+         dvalue)
+         =>
+         match
+         p2
+         return
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         with
+         | pair
+         a3 b3 =>
+         (fun
+         (genv : global_env)
+         (res : dvalue)
+         =>
+         @pair
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))
+         (lift_MemState
+         ms)
+         (@pair
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))
+         sid
+         (@pair
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)
+         (@pair
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack
+         (lift_local_env
+         lenv)
+         (lift_stack
+         s))
+         (@pair
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue
+         (lift_global_env
+         genv)
+         (fin_to_inf_dvalue
+         res)))))
+         a3 b3
+         end)
+         a2 b2
+         end)
+         a1 b1
+         end)
+         a0 b0
+         end)
+         a b
+         end)
+         r
+   | TauF t =>
+       (fun
+         t0 : 
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue))))
+        =>
+        @go
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         (@TauF
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (CIH
+         t0)))
+         t
+   | @VisF _ _
+     _ X e k =>
+       (fun
+         (X0 : Type)
+         (e0 : 
+         L3 X0)
+         (k0 : 
+         forall
+         _ : X0,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+        =>
+        let
+         X1 :
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         e0
+         return
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | inl1
+         x =>
+         (fun
+         H : 
+         ExternalCallE
+         X0 =>
+         (fun
+         H0 : 
+         ExternalCallE
+         X0 =>
+         let
+         X1 :
+         forall
+         _ : 
+         @eq
+         Type
+         X0 X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         H0 in
+         (ExternalCallE
+         T)
+         return
+         (forall
+         _ : 
+         @eq
+         Type
+         T X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | ExternalCall
+         t f
+         args =>
+         (fun
+         (t0 : dtyp)
+         (f0 : uvalue)
+         (args0 : 
+         list
+         dvalue)
+         (H1 : 
+         @eq
+         Type
+         dvalue
+         X0)
+         =>
+         (fun
+         H2 : 
+         @eq
+         Type
+         dvalue
+         X0 =>
+         let
+         H3 :
+         @eq
+         Type
+         dvalue
+         X0 :=
+         H2 in
+         @eq_rect
+         Type
+         dvalue
+         (fun
+         _ : Type
+         =>
+         forall
+         (_ : dtyp)
+         (_ : uvalue)
+         (_ : 
+         list
+         dvalue),
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         (t1 : dtyp)
+         (f1 : uvalue)
+         (args1 : 
+         list
+         dvalue)
+         =>
+         @eq_rect
+         Type
+         dvalue
+         (fun
+         X1 : Type
+         =>
+         forall
+         (_ : 
+         forall
+         _ : X1,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         ExternalCallE
+         X1),
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         (k1 : 
+         forall
+         _ : dvalue,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         ExternalCallE
+         dvalue)
+         =>
+         @go
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         (@VisF
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         E1.DV.dvalue
+         (@subevent
+         E1.ExternalCallE
+         InfLP.Events.L3
+         (@ReSum_inl
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inl_sum1
+         E1.ExternalCallE
+         InfLP.Events.ExternalCallE
+         (sum1
+         InfLP.Events.PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))))
+         (@ReSum_id
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         Id_IFun
+         InfLP.Events.ExternalCallE))
+         E1.DV.dvalue
+         (E1.ExternalCall
+         t1
+         (fin_to_inf_uvalue
+         f1)
+         (@map
+         LLVMParams64BitIntptr.Events.DV.dvalue
+         LLVMParamsBigIntptr.Events.DV.dvalue
+         fin_to_inf_dvalue
+         args1)))
+         (fun
+         x0 : E1.DV.dvalue
+         =>
+         CIH
+         (let
+         H5 :
+         OOM
+         DVCInfFin.DV2.dvalue :=
+         DVCInfFin.dvalue_convert_strict
+         x0 in
+         match
+         H5
+         return
+         (itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         with
+         | NoOom
+         a =>
+         (fun
+         d : DVCInfFin.DV2.dvalue
+         =>
+         k1 d)
+         a
+         | Oom
+         s =>
+         (fun
+         s0 : string
+         =>
+         @raiseOOM
+         L3
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         OOME
+         (sum1
+         PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))))
+         ExternalCallE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         OOME
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)))
+         PickUvalueE
+         (@ReSum_inl
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inl_sum1
+         OOME
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))
+         (@ReSum_id
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         Id_IFun
+         OOME))))
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue))))
+         s0) s
+         end))))
+         X0 H2
+         k0 H0)
+         X0 H3)
+         H1 t0
+         f0
+         args0)
+         t f
+         args
+         end
+         in
+         X1
+         (@eq_refl
+         Type
+         X0))
+         H) x
+         | inr1
+         x =>
+         (fun
+         X1 : 
+         sum1
+         PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)))
+         X0 =>
+         (fun
+         X2 : 
+         sum1
+         PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)))
+         X0 =>
+         let
+         X3 :
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         X2
+         return
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | inl1
+         x0 =>
+         (fun
+         X3 : 
+         PickUvalueE
+         X0 =>
+         (fun
+         X4 : 
+         PickUvalueE
+         X0 =>
+         let
+         X5 :
+         forall
+         _ : 
+         @eq
+         Type
+         X0 X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         X4 in
+         (PickE
+         T)
+         return
+         (forall
+         _ : 
+         @eq
+         Type
+         T X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | pick
+         Pre
+         x1 =>
+         (fun
+         (Pre0 : Prop)
+         (x2 : uvalue)
+         (H : 
+         @eq
+         Type
+         (@sig
+         dvalue
+         (fun
+         _ : dvalue
+         =>
+         True))
+         X0)
+         =>
+         (fun
+         H0 : 
+         @eq
+         Type
+         (@sig
+         dvalue
+         (fun
+         _ : dvalue
+         =>
+         True))
+         X0 =>
+         let
+         H1 :
+         @eq
+         Type
+         (@sig
+         dvalue
+         (fun
+         _ : dvalue
+         =>
+         True))
+         X0 :=
+         H0 in
+         @eq_rect
+         Type
+         (@sig
+         dvalue
+         (fun
+         _ : dvalue
+         =>
+         True))
+         (fun
+         _ : Type
+         =>
+         forall
+         (_ : Prop)
+         (_ : uvalue),
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         (Pre1 : Prop)
+         (x3 : uvalue)
+         =>
+         @eq_rect
+         Type
+         (@sig
+         dvalue
+         (fun
+         _ : dvalue
+         =>
+         True))
+         (fun
+         X5 : Type
+         =>
+         forall
+         (_ : 
+         forall
+         _ : X5,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         PickUvalueE
+         X5),
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         (k1 : 
+         forall
+         _ : 
+         @sig
+         dvalue
+         (fun
+         _ : dvalue
+         =>
+         True),
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         PickUvalueE
+         (@sig
+         dvalue
+         (fun
+         _ : dvalue
+         =>
+         True)))
+         =>
+         @go
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         (@VisF
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (@sig
+         InfLP.Events.DV.dvalue
+         (fun
+         _ : InfLP.Events.DV.dvalue
+         =>
+         True))
+         (@subevent
+         (@E1.PickE
+         LLVMParamsBigIntptr.Events.DV.uvalue
+         InfLP.Events.DV.dvalue
+         (fun
+         (_ : InfLP.Events.DV.uvalue)
+         (_ : InfLP.Events.DV.dvalue)
+         =>
+         True))
+         InfLP.Events.L3
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         (@E1.PickE
+         LLVMParamsBigIntptr.Events.DV.uvalue
+         InfLP.Events.DV.dvalue
+         (fun
+         (_ : InfLP.Events.DV.uvalue)
+         (_ : InfLP.Events.DV.dvalue)
+         =>
+         True))
+         (sum1
+         InfLP.Events.PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))))
+         InfLP.Events.ExternalCallE
+         (@ReSum_inl
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inl_sum1
+         (@E1.PickE
+         LLVMParamsBigIntptr.Events.DV.uvalue
+         InfLP.Events.DV.dvalue
+         (fun
+         (_ : InfLP.Events.DV.uvalue)
+         (_ : InfLP.Events.DV.dvalue)
+         =>
+         True))
+         InfLP.Events.PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)))
+         (@ReSum_id
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         Id_IFun
+         InfLP.Events.PickUvalueE)))
+         (@sig
+         InfLP.Events.DV.dvalue
+         (fun
+         _ : InfLP.Events.DV.dvalue
+         =>
+         True))
+         (@E1.pick
+         LLVMParamsBigIntptr.Events.DV.uvalue
+         InfLP.Events.DV.dvalue
+         (fun
+         (_ : InfLP.Events.DV.uvalue)
+         (_ : InfLP.Events.DV.dvalue)
+         =>
+         True)
+         Pre1
+         (fin_to_inf_uvalue
+         x3)))
+         (fun
+         res : 
+         @sig
+         InfLP.Events.DV.dvalue
+         (fun
+         _ : InfLP.Events.DV.dvalue
+         =>
+         True)
+         =>
+         match
+         res
+         return
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | @exist
+         _ _
+         x4 p =>
+         (fun
+         (x5 : InfLP.Events.DV.dvalue)
+         (t : True)
+         =>
+         CIH
+         (let
+         H2 :
+         OOM
+         DVCInfFin.DV2.dvalue :=
+         DVCInfFin.dvalue_convert_strict
+         x5 in
+         match
+         H2
+         return
+         (itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         with
+         | NoOom
+         a =>
+         (fun
+         d : DVCInfFin.DV2.dvalue
+         =>
+         k1
+         (@exist
+         dvalue
+         (fun
+         _ : dvalue
+         =>
+         True)
+         d t))
+         a
+         | Oom
+         s =>
+         (fun
+         s0 : string
+         =>
+         @raiseOOM
+         L3
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         OOME
+         (sum1
+         PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))))
+         ExternalCallE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         OOME
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)))
+         PickUvalueE
+         (@ReSum_inl
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inl_sum1
+         OOME
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))
+         (@ReSum_id
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         Id_IFun
+         OOME))))
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue))))
+         s0) s
+         end))
+         x4 p
+         end)))
+         X0 H0
+         k0 X4)
+         X0 H1)
+         H
+         Pre0
+         x2)
+         Pre
+         x1
+         end
+         in
+         X5
+         (@eq_refl
+         Type
+         X0))
+         X3)
+         x0
+         | inr1
+         x0 =>
+         (fun
+         H : 
+         sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))
+         X0 =>
+         (fun
+         H0 : 
+         sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))
+         X0 =>
+         let
+         X3 :
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         H0
+         return
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | inl1
+         x1 =>
+         (fun
+         H1 : 
+         OOME
+         X0 =>
+         (fun
+         H2 : 
+         OOME
+         X0 =>
+         let
+         X3 :
+         forall
+         _ : 
+         @eq
+         Type
+         X0 X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         H2 in
+         (OOME
+         T)
+         return
+         (forall
+         _ : 
+         @eq
+         Type
+         T X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | ThrowOOM
+         x2 =>
+         (fun
+         (H3 : unit)
+         (H4 : 
+         @eq
+         Type
+         Empty_set
+         X0)
+         =>
+         (fun
+         H5 : 
+         @eq
+         Type
+         Empty_set
+         X0 =>
+         let
+         H6 :
+         @eq
+         Type
+         Empty_set
+         X0 :=
+         H5 in
+         @eq_rect
+         Type
+         Empty_set
+         (fun
+         _ : Type
+         =>
+         forall
+         _ : unit,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         _ : unit
+         =>
+         @eq_rect
+         Type
+         Empty_set
+         (fun
+         X3 : Type
+         =>
+         forall
+         (_ : 
+         forall
+         _ : X3,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         OOME
+         X3),
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         (_ : 
+         forall
+         _ : Empty_set,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         OOME
+         Empty_set)
+         =>
+         @raiseOOM
+         InfLP.Events.L3
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         OOME
+         (sum1
+         InfLP.Events.PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))))
+         InfLP.Events.ExternalCallE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         OOME
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)))
+         InfLP.Events.PickUvalueE
+         (@ReSum_inl
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inl_sum1
+         OOME
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))
+         (@ReSum_id
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         Id_IFun
+         OOME))))
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         EmptyString)
+         X0 H5
+         k0 H2)
+         X0 H6)
+         H4 H3)
+         x2
+         end
+         in
+         X3
+         (@eq_refl
+         Type
+         X0))
+         H1)
+         x1
+         | inr1
+         x1 =>
+         (fun
+         H1 : 
+         sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)
+         X0 =>
+         (fun
+         H2 : 
+         sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)
+         X0 =>
+         let
+         X3 :
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         H2
+         return
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | inl1
+         x2 =>
+         (fun
+         H3 : 
+         UBE
+         X0 =>
+         (fun
+         H4 : 
+         UBE
+         X0 =>
+         let
+         X3 :
+         forall
+         _ : 
+         @eq
+         Type
+         X0 X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         H4 in
+         (UBE
+         T)
+         return
+         (forall
+         _ : 
+         @eq
+         Type
+         T X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | ThrowUB
+         x3 =>
+         (fun
+         (H5 : unit)
+         (H6 : 
+         @eq
+         Type
+         Empty_set
+         X0)
+         =>
+         (fun
+         H7 : 
+         @eq
+         Type
+         Empty_set
+         X0 =>
+         let
+         H8 :
+         @eq
+         Type
+         Empty_set
+         X0 :=
+         H7 in
+         @eq_rect
+         Type
+         Empty_set
+         (fun
+         _ : Type
+         =>
+         forall
+         _ : unit,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         _ : unit
+         =>
+         @eq_rect
+         Type
+         Empty_set
+         (fun
+         X3 : Type
+         =>
+         forall
+         (_ : 
+         forall
+         _ : X3,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         UBE
+         X3),
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         (_ : 
+         forall
+         _ : Empty_set,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         UBE
+         Empty_set)
+         =>
+         @raiseUB
+         InfLP.Events.L3
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         UBE
+         (sum1
+         InfLP.Events.PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))))
+         InfLP.Events.ExternalCallE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         UBE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)))
+         InfLP.Events.PickUvalueE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         UBE
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))
+         OOME
+         (@ReSum_inl
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inl_sum1
+         UBE
+         UBE
+         (sum1
+         DebugE
+         FailureE)
+         (@ReSum_id
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         Id_IFun
+         UBE)))))
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         EmptyString)
+         X0 H7
+         k0 H4)
+         X0 H8)
+         H6 H5)
+         x3
+         end
+         in
+         X3
+         (@eq_refl
+         Type
+         X0))
+         H3)
+         x2
+         | inr1
+         x2 =>
+         (fun
+         H3 : 
+         sum1
+         DebugE
+         FailureE
+         X0 =>
+         (fun
+         H4 : 
+         sum1
+         DebugE
+         FailureE
+         X0 =>
+         let
+         X3 :
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         H4
+         return
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | inl1
+         x3 =>
+         (fun
+         H5 : 
+         DebugE
+         X0 =>
+         (fun
+         H6 : 
+         DebugE
+         X0 =>
+         let
+         X3 :
+         forall
+         _ : 
+         @eq
+         Type
+         X0 X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         H6 in
+         (DebugE
+         T)
+         return
+         (forall
+         _ : 
+         @eq
+         Type
+         T X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | Debug
+         x4 =>
+         (fun
+         (H7 : unit)
+         (H8 : 
+         @eq
+         Type
+         unit
+         X0)
+         =>
+         (fun
+         H9 : 
+         @eq
+         Type
+         unit
+         X0 =>
+         let
+         H10 :
+         @eq
+         Type
+         unit
+         X0 :=
+         H9 in
+         @eq_rect
+         Type
+         unit
+         (fun
+         _ : Type
+         =>
+         forall
+         _ : unit,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         H11 : unit
+         =>
+         @eq_rect
+         Type
+         unit
+         (fun
+         X3 : Type
+         =>
+         forall
+         (_ : 
+         forall
+         _ : X3,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         DebugE
+         X3),
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         (k1 : 
+         forall
+         _ : unit,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         DebugE
+         unit)
+         =>
+         @go
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         (@VisF
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         unit
+         (@subevent
+         DebugE
+         InfLP.Events.L3
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         DebugE
+         (sum1
+         InfLP.Events.PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))))
+         InfLP.Events.ExternalCallE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         DebugE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)))
+         InfLP.Events.PickUvalueE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         DebugE
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))
+         OOME
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         DebugE
+         (sum1
+         DebugE
+         FailureE)
+         UBE
+         (@ReSum_inl
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inl_sum1
+         DebugE
+         DebugE
+         FailureE
+         (@ReSum_id
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         Id_IFun
+         DebugE))))))
+         unit
+         (Debug
+         H11))
+         (fun
+         H13 : unit
+         =>
+         CIH
+         (k1
+         H13))))
+         X0 H9
+         k0 H6)
+         X0
+         H10)
+         H8 H7)
+         x4
+         end
+         in
+         X3
+         (@eq_refl
+         Type
+         X0))
+         H5)
+         x3
+         | inr1
+         x3 =>
+         (fun
+         H5 : 
+         FailureE
+         X0 =>
+         (fun
+         H6 : 
+         FailureE
+         X0 =>
+         let
+         X3 :
+         forall
+         _ : 
+         @eq
+         Type
+         X0 X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         H6 in
+         (FailureE
+         T)
+         return
+         (forall
+         _ : 
+         @eq
+         Type
+         T X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | Throw
+         x4 =>
+         (fun
+         (H7 : unit)
+         (H8 : 
+         @eq
+         Type
+         Empty_set
+         X0)
+         =>
+         (fun
+         H9 : 
+         @eq
+         Type
+         Empty_set
+         X0 =>
+         let
+         H10 :
+         @eq
+         Type
+         Empty_set
+         X0 :=
+         H9 in
+         @eq_rect
+         Type
+         Empty_set
+         (fun
+         _ : Type
+         =>
+         forall
+         _ : unit,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         _ : unit
+         =>
+         @eq_rect
+         Type
+         Empty_set
+         (fun
+         X3 : Type
+         =>
+         forall
+         (_ : 
+         forall
+         _ : X3,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         FailureE
+         X3),
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         (_ : 
+         forall
+         _ : Empty_set,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         FailureE
+         Empty_set)
+         =>
+         @LLVMEvents.raise
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         FailureE
+         (sum1
+         InfLP.Events.PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))))
+         InfLP.Events.ExternalCallE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         FailureE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)))
+         InfLP.Events.PickUvalueE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         FailureE
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))
+         OOME
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         FailureE
+         (sum1
+         DebugE
+         FailureE)
+         UBE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         FailureE
+         FailureE
+         DebugE
+         (@ReSum_id
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         Id_IFun
+         FailureE))))))
+         EmptyString)
+         X0 H9
+         k0 H6)
+         X0
+         H10)
+         H8 H7)
+         x4
+         end
+         in
+         X3
+         (@eq_refl
+         Type
+         X0))
+         H5)
+         x3
+         end
+         in
+         X3)
+         H3)
+         x2
+         end
+         in
+         X3)
+         H1)
+         x1
+         end
+         in
+         X3) H)
+         x0
+         end
+         in
+         X3)
+         X1) x
+         end
+         in
+        X1) X
+         e k
+   end)
+    (@_observe
+       _ _
+       t_fin2).
 
   Definition _get_inf_tree (t_fin2 : itree' L3 (FinMem.MMEP.MMSP.MemState * (MemPropT.store_id * (local_env * @stack local_env * res_L1)))) : itree InfLP.Events.L3 TopLevelBigIntptr.res_L6 :=
-    match t_fin2 with
-    | RetF r =>
-        (fun r0 : prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))) =>
-           @ret (itree InfLP.Events.L3) (@Monad_itree InfLP.Events.L3)
-             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-             match
-               r0 return (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-             with
-             | pair a b =>
-                 (fun (ms : FinMem.MMEP.MMSP.MemState) (p : prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))) =>
-                    match
-                      p
-                      return
-                      (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                    with
-                    | pair a0 b0 =>
-                        (fun (sid : MemPropT.store_id) (p0 : prod (prod local_env (@stack local_env)) (prod global_env dvalue)) =>
-                           match
-                             p0
-                             return
-                             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                           with
-                           | pair a1 b1 =>
-                               (fun p1 : prod local_env (@stack local_env) =>
-                                  match
-                                    p1
-                                    return
-                                    (forall _ : prod global_env dvalue,
-                                        prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                          (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                                  with
-                                  | pair a2 b2 =>
-                                      (fun (lenv : local_env) (s : @stack local_env) (p2 : prod global_env dvalue) =>
-                                         match
-                                           p2
-                                           return
-                                           (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                              (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                                         with
-                                         | pair a3 b3 =>
-                                             (fun (genv : global_env) (res : dvalue) =>
-                                                @pair InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                  (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))) (lift_MemState ms)
-                                                  (@pair MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)) sid
-                                                     (@pair (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)
-                                                        (@pair InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack (lift_local_env lenv) (lift_stack s))
-                                                        (@pair InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue (lift_global_env genv) (fin_to_inf_dvalue res))))) a3 b3
-                                         end) a2 b2
-                                  end) a1 b1
-                           end) a0 b0
-                    end) a b
-             end) r
-    | TauF t =>
-        (fun t0 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue)))) =>
-           @go InfLP.Events.L3
-             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-             (@TauF InfLP.Events.L3
-                (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                (itree InfLP.Events.L3
-                   (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                (get_inf_tree t0))) t
-    | VisF X e k =>
-        (fun (X0 : Type) (e0 : L3 X0) (k0 : forall _ : X0, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) =>
-           let X1 :
-             itree InfLP.Events.L3
-               (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-             match
-               e0
-               return
-               (itree InfLP.Events.L3
-                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-             with
-             | inl1 x =>
-                 (fun H : ExternalCallE X0 =>
-                    (fun H0 : ExternalCallE X0 =>
-                       let X1 :
-                         forall _ : @eq Type X0 X0,
-                           itree InfLP.Events.L3
-                             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                         match
-                           H0 in (ExternalCallE T)
-                           return
-                           (forall _ : @eq Type T X0,
-                               itree InfLP.Events.L3
-                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                    (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                         with
-                         | ExternalCall t f args =>
-                             (fun (t0 : dtyp) (f0 : uvalue) (args0 : list dvalue) (H1 : @eq Type dvalue X0) =>
-                                (fun H2 : @eq Type dvalue X0 =>
-                                   let H3 : @eq Type dvalue X0 := H2 in
-                                   @eq_rect Type dvalue
-                                     (fun _ : Type =>
-                                        forall (_ : dtyp) (_ : uvalue) (_ : list dvalue),
-                                          itree InfLP.Events.L3
-                                            (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                               (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                     (fun (t1 : dtyp) (f1 : uvalue) (args1 : list dvalue) =>
-                                        @eq_rect Type dvalue
-                                          (fun X1 : Type =>
-                                             forall (_ : forall _ : X1, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : ExternalCallE X1),
-                                               itree InfLP.Events.L3
-                                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                    (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                          (fun (k1 : forall _ : dvalue, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : ExternalCallE dvalue) =>
-                                             @go InfLP.Events.L3
-                                               (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                  (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                                               (@VisF InfLP.Events.L3
-                                                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                     (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                                                  (itree InfLP.Events.L3
-                                                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                        (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))) E1.DV.dvalue
-                                                  (@subevent E1.ExternalCallE InfLP.Events.L3
-                                                     (@ReSum_inl (forall _ : Type, Type) IFun sum1 Cat_IFun Inl_sum1 E1.ExternalCallE InfLP.Events.ExternalCallE (sum1 InfLP.Events.PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))) (@ReSum_id (forall _ : Type, Type) IFun Id_IFun InfLP.Events.ExternalCallE)) E1.DV.dvalue
-                                                     (E1.ExternalCall t1 (fin_to_inf_uvalue f1) (@map LLVMParams64BitIntptr.Events.DV.dvalue LLVMParamsBigIntptr.Events.DV.dvalue fin_to_inf_dvalue args1)))
-                                                  (fun x0 : E1.DV.dvalue =>
-                                                     get_inf_tree
-                                                       (let H5 : OOM DVCInfFin.DV2.dvalue := DVCInfFin.dvalue_convert_strict x0 in
-                                                        match H5 return (itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) with
-                                                        | NoOom a => (fun d : DVCInfFin.DV2.dvalue => k1 d) a
-                                                        | Oom s =>
-                                                            (fun s0 : string =>
-                                                               @raiseOOM L3
-                                                                 (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 OOME (sum1 PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))) ExternalCallE
-                                                                    (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 OOME (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) PickUvalueE
-                                                                       (@ReSum_inl (forall _ : Type, Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME (sum1 UBE (sum1 DebugE FailureE)) (@ReSum_id (forall _ : Type, Type) IFun Id_IFun OOME))))
-                                                                 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue)))) s0) s
-                                                        end)))) X0 H2 k0 H0) X0 H3) H1 t0 f0 args0) t f args
-                         end in
-                           X1 (@eq_refl Type X0)) H) x
-             | inr1 x =>
-                 (fun X1 : sum1 PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) X0 =>
-                    (fun X2 : sum1 PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) X0 =>
-                       let X3 :
-                         itree InfLP.Events.L3
-                           (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                         match
-                           X2
-                           return
-                           (itree InfLP.Events.L3
-                              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                 (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                         with
-                         | inl1 x0 =>
-                             (fun X3 : PickUvalueE X0 =>
-                                (fun X4 : PickUvalueE X0 =>
-                                   let X5 :
-                                     forall _ : @eq Type X0 X0,
-                                       itree InfLP.Events.L3
-                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                            (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                                     match
-                                       X4 in (PickE T)
-                                       return
-                                       (forall _ : @eq Type T X0,
-                                           itree InfLP.Events.L3
-                                             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                     with
-                                     | pick Pre x1 =>
-                                         (fun (Pre0 : Prop) (x2 : uvalue) (H : @eq Type (@sig dvalue (fun _ : dvalue => True)) X0) =>
-                                            (fun H0 : @eq Type (@sig dvalue (fun _ : dvalue => True)) X0 =>
-                                               let H1 : @eq Type (@sig dvalue (fun _ : dvalue => True)) X0 := H0 in
-                                               @eq_rect Type (@sig dvalue (fun _ : dvalue => True))
-                                                 (fun _ : Type =>
-                                                    forall (_ : Prop) (_ : uvalue),
-                                                      itree InfLP.Events.L3
-                                                        (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                           (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                 (fun (Pre1 : Prop) (x3 : uvalue) =>
-                                                    @eq_rect Type (@sig dvalue (fun _ : dvalue => True))
-                                                      (fun X5 : Type =>
-                                                         forall (_ : forall _ : X5, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : PickUvalueE X5),
-                                                           itree InfLP.Events.L3
-                                                             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                      (fun (k1 : forall _ : @sig dvalue (fun _ : dvalue => True), itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : PickUvalueE (@sig dvalue (fun _ : dvalue => True))) =>
-                                                         @go InfLP.Events.L3
-                                                           (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                              (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                                                           (@VisF InfLP.Events.L3
-                                                              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                 (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                                                              (itree InfLP.Events.L3
-                                                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                    (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                              (@sig InfLP.Events.DV.dvalue (fun _ : InfLP.Events.DV.dvalue => True))
-                                                              (@subevent (@E1.PickE LLVMParamsBigIntptr.Events.DV.uvalue InfLP.Events.DV.dvalue (fun (_ : InfLP.Events.DV.uvalue) (_ : InfLP.Events.DV.dvalue) => True)) InfLP.Events.L3
-                                                                 (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 (@E1.PickE LLVMParamsBigIntptr.Events.DV.uvalue InfLP.Events.DV.dvalue (fun (_ : InfLP.Events.DV.uvalue) (_ : InfLP.Events.DV.dvalue) => True))
-                                                                    (sum1 InfLP.Events.PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))) InfLP.Events.ExternalCallE
-                                                                    (@ReSum_inl (forall _ : Type, Type) IFun sum1 Cat_IFun Inl_sum1 (@E1.PickE LLVMParamsBigIntptr.Events.DV.uvalue InfLP.Events.DV.dvalue (fun (_ : InfLP.Events.DV.uvalue) (_ : InfLP.Events.DV.dvalue) => True)) InfLP.Events.PickUvalueE
-                                                                       (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) (@ReSum_id (forall _ : Type, Type) IFun Id_IFun InfLP.Events.PickUvalueE))) (@sig InfLP.Events.DV.dvalue (fun _ : InfLP.Events.DV.dvalue => True))
-                                                                 (@E1.pick LLVMParamsBigIntptr.Events.DV.uvalue InfLP.Events.DV.dvalue (fun (_ : InfLP.Events.DV.uvalue) (_ : InfLP.Events.DV.dvalue) => True) Pre1 (fin_to_inf_uvalue x3)))
-                                                              (fun res : @sig InfLP.Events.DV.dvalue (fun _ : InfLP.Events.DV.dvalue => True) =>
-                                                                 match
-                                                                   res
-                                                                   return
-                                                                   (itree InfLP.Events.L3
-                                                                      (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                         (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                 with
-                                                                 | @exist _ _ x4 p =>
-                                                                     (fun (x5 : InfLP.Events.DV.dvalue) (t : True) =>
-                                                                        get_inf_tree
-                                                                          (let H2 : OOM DVCInfFin.DV2.dvalue := DVCInfFin.dvalue_convert_strict x5 in
-                                                                           match H2 return (itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) with
-                                                                           | NoOom a => (fun d : DVCInfFin.DV2.dvalue => k1 (@exist dvalue (fun _ : dvalue => True) d t)) a
-                                                                           | Oom s =>
-                                                                               (fun s0 : string =>
-                                                                                  @raiseOOM L3
-                                                                                    (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 OOME (sum1 PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))) ExternalCallE
-                                                                                       (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 OOME (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) PickUvalueE
-                                                                                          (@ReSum_inl (forall _ : Type, Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME (sum1 UBE (sum1 DebugE FailureE)) (@ReSum_id (forall _ : Type, Type) IFun Id_IFun OOME))))
-                                                                                    (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue)))) s0) s
-                                                                           end)) x4 p
-                                                                 end))) X0 H0 k0 X4) X0 H1) H Pre0 x2) Pre x1
-                                     end in
-                                       X5 (@eq_refl Type X0)) X3) x0
-                         | inr1 x0 =>
-                             (fun H : sum1 OOME (sum1 UBE (sum1 DebugE FailureE)) X0 =>
-                                (fun H0 : sum1 OOME (sum1 UBE (sum1 DebugE FailureE)) X0 =>
-                                   let X3 :
-                                     itree InfLP.Events.L3
-                                       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                          (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                                     match
-                                       H0
-                                       return
-                                       (itree InfLP.Events.L3
-                                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                             (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                     with
-                                     | inl1 x1 =>
-                                         (fun H1 : OOME X0 =>
-                                            (fun H2 : OOME X0 =>
-                                               let X3 :
-                                                 forall _ : @eq Type X0 X0,
-                                                   itree InfLP.Events.L3
-                                                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                        (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                                                 match
-                                                   H2 in (OOME T)
-                                                   return
-                                                   (forall _ : @eq Type T X0,
-                                                       itree InfLP.Events.L3
-                                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                            (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                 with
-                                                 | ThrowOOM x2 =>
-                                                     (fun (H3 : string) (H4 : @eq Type Empty_set X0) =>
-                                                        (fun H5 : @eq Type Empty_set X0 =>
-                                                           let H6 : @eq Type Empty_set X0 := H5 in
-                                                           @eq_rect Type Empty_set
-                                                             (fun _ : Type =>
-                                                                forall _ : string,
-                                                                  itree InfLP.Events.L3
-                                                                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                       (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                             (fun H7 : string =>
-                                                                @eq_rect Type Empty_set
-                                                                  (fun X3 : Type =>
-                                                                     forall (_ : forall _ : X3, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : OOME X3),
-                                                                       itree InfLP.Events.L3
-                                                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                            (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                  (fun (_ : forall _ : Empty_set, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : OOME Empty_set) =>
-                                                                     @raiseOOM InfLP.Events.L3
-                                                                       (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 OOME (sum1 InfLP.Events.PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))) InfLP.Events.ExternalCallE
-                                                                          (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 OOME (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) InfLP.Events.PickUvalueE
-                                                                             (@ReSum_inl (forall _ : Type, Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME (sum1 UBE (sum1 DebugE FailureE)) (@ReSum_id (forall _ : Type, Type) IFun Id_IFun OOME))))
-                                                                       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                          (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) H7) X0 H5 k0 H2) X0 H6) H4 H3)
-                                                       x2
-                                                 end in
-                                                   X3 (@eq_refl Type X0)) H1) x1
-                                     | inr1 x1 =>
-                                         (fun H1 : sum1 UBE (sum1 DebugE FailureE) X0 =>
-                                            (fun H2 : sum1 UBE (sum1 DebugE FailureE) X0 =>
-                                               let X3 :
-                                                 itree InfLP.Events.L3
-                                                   (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                      (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                                                 match
-                                                   H2
-                                                   return
-                                                   (itree InfLP.Events.L3
-                                                      (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                         (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                 with
-                                                 | inl1 x2 =>
-                                                     (fun H3 : UBE X0 =>
-                                                        (fun H4 : UBE X0 =>
-                                                           let X3 :
-                                                             forall _ : @eq Type X0 X0,
-                                                               itree InfLP.Events.L3
-                                                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                    (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                                                             match
-                                                               H4 in (UBE T)
-                                                               return
-                                                               (forall _ : @eq Type T X0,
-                                                                   itree InfLP.Events.L3
-                                                                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                        (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                             with
-                                                             | ThrowUB x3 =>
-                                                                 (fun (H5 : string) (H6 : @eq Type Empty_set X0) =>
-                                                                    (fun H7 : @eq Type Empty_set X0 =>
-                                                                       let H8 : @eq Type Empty_set X0 := H7 in
-                                                                       @eq_rect Type Empty_set
-                                                                         (fun _ : Type =>
-                                                                            forall _ : string,
-                                                                              itree InfLP.Events.L3
-                                                                                (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                   (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                         (fun H9 : string =>
-                                                                            @eq_rect Type Empty_set
-                                                                              (fun X3 : Type =>
-                                                                                 forall (_ : forall _ : X3, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : UBE X3),
-                                                                                   itree InfLP.Events.L3
-                                                                                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                        (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                              (fun (_ : forall _ : Empty_set, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : UBE Empty_set) =>
-                                                                                 @raiseUB InfLP.Events.L3
-                                                                                   (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 UBE (sum1 InfLP.Events.PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))) InfLP.Events.ExternalCallE
-                                                                                      (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 UBE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) InfLP.Events.PickUvalueE
-                                                                                         (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 UBE (sum1 UBE (sum1 DebugE FailureE)) OOME
-                                                                                            (@ReSum_inl (forall _ : Type, Type) IFun sum1 Cat_IFun Inl_sum1 UBE UBE (sum1 DebugE FailureE) (@ReSum_id (forall _ : Type, Type) IFun Id_IFun UBE)))))
-                                                                                   (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                      (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) H9) X0 H7 k0 H4) X0 H8)
-                                                                      H6 H5) x3
-                                                             end in
-                                                               X3 (@eq_refl Type X0)) H3) x2
-                                                 | inr1 x2 =>
-                                                     (fun H3 : sum1 DebugE FailureE X0 =>
-                                                        (fun H4 : sum1 DebugE FailureE X0 =>
-                                                           let X3 :
-                                                             itree InfLP.Events.L3
-                                                               (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                  (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                                                             match
-                                                               H4
-                                                               return
-                                                               (itree InfLP.Events.L3
-                                                                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                     (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                             with
-                                                             | inl1 x3 =>
-                                                                 (fun H5 : DebugE X0 =>
-                                                                    (fun H6 : DebugE X0 =>
-                                                                       let X3 :
-                                                                         forall _ : @eq Type X0 X0,
-                                                                           itree InfLP.Events.L3
-                                                                             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                                                                         match
-                                                                           H6 in (DebugE T)
-                                                                           return
-                                                                           (forall _ : @eq Type T X0,
-                                                                               itree InfLP.Events.L3
-                                                                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                    (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                         with
-                                                                         | Debug x4 =>
-                                                                             (fun (H7 : string) (H8 : @eq Type unit X0) =>
-                                                                                (fun H9 : @eq Type unit X0 =>
-                                                                                   let H10 : @eq Type unit X0 := H9 in
-                                                                                   @eq_rect Type unit
-                                                                                     (fun _ : Type =>
-                                                                                        forall _ : string,
-                                                                                          itree InfLP.Events.L3
-                                                                                            (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                               (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                                     (fun H11 : string =>
-                                                                                        @eq_rect Type unit
-                                                                                          (fun X3 : Type =>
-                                                                                             forall (_ : forall _ : X3, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : DebugE X3),
-                                                                                               itree InfLP.Events.L3
-                                                                                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                                    (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                                          (fun (k1 : forall _ : unit, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : DebugE unit) =>
-                                                                                             @go InfLP.Events.L3
-                                                                                               (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                                  (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                                                                                               (@VisF InfLP.Events.L3
-                                                                                                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                                     (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                                                                                                  (itree InfLP.Events.L3
-                                                                                                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                                        (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))) unit
-                                                                                                  (@subevent DebugE InfLP.Events.L3
-                                                                                                     (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 DebugE (sum1 InfLP.Events.PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))) InfLP.Events.ExternalCallE
-                                                                                                        (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 DebugE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) InfLP.Events.PickUvalueE
-                                                                                                           (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 DebugE (sum1 UBE (sum1 DebugE FailureE)) OOME
-                                                                                                              (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 DebugE (sum1 DebugE FailureE) UBE
-                                                                                                                 (@ReSum_inl (forall _ : Type, Type) IFun sum1 Cat_IFun Inl_sum1 DebugE DebugE FailureE (@ReSum_id (forall _ : Type, Type) IFun Id_IFun DebugE)))))) unit (Debug H11)) (fun H13 : unit => get_inf_tree (k1 H13)))) X0 H9 k0 H6) X0 H10) H8 H7) x4
-                                                                         end in
-                                                                           X3 (@eq_refl Type X0)) H5) x3
-                                                             | inr1 x3 =>
-                                                                 (fun H5 : FailureE X0 =>
-                                                                    (fun H6 : FailureE X0 =>
-                                                                       let X3 :
-                                                                         forall _ : @eq Type X0 X0,
-                                                                           itree InfLP.Events.L3
-                                                                             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
-                                                                         match
-                                                                           H6 in (FailureE T)
-                                                                           return
-                                                                           (forall _ : @eq Type T X0,
-                                                                               itree InfLP.Events.L3
-                                                                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                    (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                         with
-                                                                         | Throw x4 =>
-                                                                             (fun (H7 : string) (H8 : @eq Type Empty_set X0) =>
-                                                                                (fun H9 : @eq Type Empty_set X0 =>
-                                                                                   let H10 : @eq Type Empty_set X0 := H9 in
-                                                                                   @eq_rect Type Empty_set
-                                                                                     (fun _ : Type =>
-                                                                                        forall _ : string,
-                                                                                          itree InfLP.Events.L3
-                                                                                            (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                               (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                                     (fun H11 : string =>
-                                                                                        @eq_rect Type Empty_set
-                                                                                          (fun X3 : Type =>
-                                                                                             forall (_ : forall _ : X3, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : FailureE X3),
-                                                                                               itree InfLP.Events.L3
-                                                                                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                                    (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
-                                                                                          (fun (_ : forall _ : Empty_set, itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.store_id (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) (_ : FailureE Empty_set) =>
-                                                                                             @LLVMEvents.raise InfLP.Events.L3
-                                                                                               (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                                                  (prod MemPropT.store_id (prod (prod InterpreterStackBigIntptr.LLVM.Local.local_env InterpreterStackBigIntptr.LLVM.Stack.lstack) (prod InterpreterStackBigIntptr.LLVM.Global.global_env InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
-                                                                                               (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 FailureE (sum1 InfLP.Events.PickUvalueE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE)))) InfLP.Events.ExternalCallE
-                                                                                                  (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 FailureE (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) InfLP.Events.PickUvalueE
-                                                                                                     (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 FailureE (sum1 UBE (sum1 DebugE FailureE)) OOME
-                                                                                                        (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 FailureE (sum1 DebugE FailureE) UBE
-                                                                                                           (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 FailureE FailureE DebugE (@ReSum_id (forall _ : Type, Type) IFun Id_IFun FailureE)))))) H11) X0 H9 k0 H6) X0 H10) H8 H7) x4
-                                                                         end in
-                                                                           X3 (@eq_refl Type X0)) H5) x3
-                                                             end in
-                                                           X3) H3) x2
-                                                 end in
-                                               X3) H1) x1
-                                     end in
-                                   X3) H) x0
-                         end in
-                       X3) X1) x
-             end in
-           X1) X e k
-    end.
+   match t_fin2 with
+   | RetF r =>
+       (fun
+         r0 : 
+         prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))
+        =>
+        @ret
+         (itree
+         InfLP.Events.L3)
+         (@Monad_itree
+         InfLP.Events.L3)
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         match
+         r0
+         return
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         with
+         | pair
+         a b =>
+         (fun
+         (ms : FinMem.MMEP.MMSP.MemState)
+         (p : 
+         prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))
+         =>
+         match
+         p
+         return
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         with
+         | pair
+         a0 b0 =>
+         (fun
+         (sid : MemPropT.store_id)
+         (p0 : 
+         prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue))
+         =>
+         match
+         p0
+         return
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         with
+         | pair
+         a1 b1 =>
+         (fun
+         p1 : 
+         prod
+         local_env
+         (@stack
+         local_env)
+         =>
+         match
+         p1
+         return
+         (forall
+         _ : 
+         prod
+         global_env
+         dvalue,
+         prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         with
+         | pair
+         a2 b2 =>
+         (fun
+         (lenv : local_env)
+         (s : 
+         @stack
+         local_env)
+         (p2 : 
+         prod
+         global_env
+         dvalue)
+         =>
+         match
+         p2
+         return
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         with
+         | pair
+         a3 b3 =>
+         (fun
+         (genv : global_env)
+         (res : dvalue)
+         =>
+         @pair
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))
+         (lift_MemState
+         ms)
+         (@pair
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))
+         sid
+         (@pair
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)
+         (@pair
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack
+         (lift_local_env
+         lenv)
+         (lift_stack
+         s))
+         (@pair
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue
+         (lift_global_env
+         genv)
+         (fin_to_inf_dvalue
+         res)))))
+         a3 b3
+         end)
+         a2 b2
+         end)
+         a1 b1
+         end)
+         a0 b0
+         end)
+         a b
+         end)
+         r
+   | TauF t =>
+       (fun
+         t0 : 
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue))))
+        =>
+        @go
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         (@TauF
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (get_inf_tree
+         t0)))
+         t
+   | @VisF _ _
+     _ X e k =>
+       (fun
+         (X0 : Type)
+         (e0 : 
+         L3 X0)
+         (k0 : 
+         forall
+         _ : X0,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+        =>
+        let
+         X1 :
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         e0
+         return
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | inl1
+         x =>
+         (fun
+         H : 
+         ExternalCallE
+         X0 =>
+         (fun
+         H0 : 
+         ExternalCallE
+         X0 =>
+         let
+         X1 :
+         forall
+         _ : 
+         @eq
+         Type
+         X0 X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         H0 in
+         (ExternalCallE
+         T)
+         return
+         (forall
+         _ : 
+         @eq
+         Type
+         T X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | ExternalCall
+         t f
+         args =>
+         (fun
+         (t0 : dtyp)
+         (f0 : uvalue)
+         (args0 : 
+         list
+         dvalue)
+         (H1 : 
+         @eq
+         Type
+         dvalue
+         X0)
+         =>
+         (fun
+         H2 : 
+         @eq
+         Type
+         dvalue
+         X0 =>
+         let
+         H3 :
+         @eq
+         Type
+         dvalue
+         X0 :=
+         H2 in
+         @eq_rect
+         Type
+         dvalue
+         (fun
+         _ : Type
+         =>
+         forall
+         (_ : dtyp)
+         (_ : uvalue)
+         (_ : 
+         list
+         dvalue),
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         (t1 : dtyp)
+         (f1 : uvalue)
+         (args1 : 
+         list
+         dvalue)
+         =>
+         @eq_rect
+         Type
+         dvalue
+         (fun
+         X1 : Type
+         =>
+         forall
+         (_ : 
+         forall
+         _ : X1,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         ExternalCallE
+         X1),
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         (k1 : 
+         forall
+         _ : dvalue,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         ExternalCallE
+         dvalue)
+         =>
+         @go
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         (@VisF
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         E1.DV.dvalue
+         (@subevent
+         E1.ExternalCallE
+         InfLP.Events.L3
+         (@ReSum_inl
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inl_sum1
+         E1.ExternalCallE
+         InfLP.Events.ExternalCallE
+         (sum1
+         InfLP.Events.PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))))
+         (@ReSum_id
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         Id_IFun
+         InfLP.Events.ExternalCallE))
+         E1.DV.dvalue
+         (E1.ExternalCall
+         t1
+         (fin_to_inf_uvalue
+         f1)
+         (@map
+         LLVMParams64BitIntptr.Events.DV.dvalue
+         LLVMParamsBigIntptr.Events.DV.dvalue
+         fin_to_inf_dvalue
+         args1)))
+         (fun
+         x0 : E1.DV.dvalue
+         =>
+         get_inf_tree
+         (let
+         H5 :
+         OOM
+         DVCInfFin.DV2.dvalue :=
+         DVCInfFin.dvalue_convert_strict
+         x0 in
+         match
+         H5
+         return
+         (itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         with
+         | NoOom
+         a =>
+         (fun
+         d : DVCInfFin.DV2.dvalue
+         =>
+         k1 d)
+         a
+         | Oom
+         s =>
+         (fun
+         s0 : string
+         =>
+         @raiseOOM
+         L3
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         OOME
+         (sum1
+         PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))))
+         ExternalCallE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         OOME
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)))
+         PickUvalueE
+         (@ReSum_inl
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inl_sum1
+         OOME
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))
+         (@ReSum_id
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         Id_IFun
+         OOME))))
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue))))
+         s0) s
+         end))))
+         X0 H2
+         k0 H0)
+         X0 H3)
+         H1 t0
+         f0
+         args0)
+         t f
+         args
+         end
+         in
+         X1
+         (@eq_refl
+         Type
+         X0))
+         H) x
+         | inr1
+         x =>
+         (fun
+         X1 : 
+         sum1
+         PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)))
+         X0 =>
+         (fun
+         X2 : 
+         sum1
+         PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)))
+         X0 =>
+         let
+         X3 :
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         X2
+         return
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | inl1
+         x0 =>
+         (fun
+         X3 : 
+         PickUvalueE
+         X0 =>
+         (fun
+         X4 : 
+         PickUvalueE
+         X0 =>
+         let
+         X5 :
+         forall
+         _ : 
+         @eq
+         Type
+         X0 X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         X4 in
+         (PickE
+         T)
+         return
+         (forall
+         _ : 
+         @eq
+         Type
+         T X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | pick
+         Pre
+         x1 =>
+         (fun
+         (Pre0 : Prop)
+         (x2 : uvalue)
+         (H : 
+         @eq
+         Type
+         (@sig
+         dvalue
+         (fun
+         _ : dvalue
+         =>
+         True))
+         X0)
+         =>
+         (fun
+         H0 : 
+         @eq
+         Type
+         (@sig
+         dvalue
+         (fun
+         _ : dvalue
+         =>
+         True))
+         X0 =>
+         let
+         H1 :
+         @eq
+         Type
+         (@sig
+         dvalue
+         (fun
+         _ : dvalue
+         =>
+         True))
+         X0 :=
+         H0 in
+         @eq_rect
+         Type
+         (@sig
+         dvalue
+         (fun
+         _ : dvalue
+         =>
+         True))
+         (fun
+         _ : Type
+         =>
+         forall
+         (_ : Prop)
+         (_ : uvalue),
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         (Pre1 : Prop)
+         (x3 : uvalue)
+         =>
+         @eq_rect
+         Type
+         (@sig
+         dvalue
+         (fun
+         _ : dvalue
+         =>
+         True))
+         (fun
+         X5 : Type
+         =>
+         forall
+         (_ : 
+         forall
+         _ : X5,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         PickUvalueE
+         X5),
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         (k1 : 
+         forall
+         _ : 
+         @sig
+         dvalue
+         (fun
+         _ : dvalue
+         =>
+         True),
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         PickUvalueE
+         (@sig
+         dvalue
+         (fun
+         _ : dvalue
+         =>
+         True)))
+         =>
+         @go
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         (@VisF
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (@sig
+         InfLP.Events.DV.dvalue
+         (fun
+         _ : InfLP.Events.DV.dvalue
+         =>
+         True))
+         (@subevent
+         (@E1.PickE
+         LLVMParamsBigIntptr.Events.DV.uvalue
+         InfLP.Events.DV.dvalue
+         (fun
+         (_ : InfLP.Events.DV.uvalue)
+         (_ : InfLP.Events.DV.dvalue)
+         =>
+         True))
+         InfLP.Events.L3
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         (@E1.PickE
+         LLVMParamsBigIntptr.Events.DV.uvalue
+         InfLP.Events.DV.dvalue
+         (fun
+         (_ : InfLP.Events.DV.uvalue)
+         (_ : InfLP.Events.DV.dvalue)
+         =>
+         True))
+         (sum1
+         InfLP.Events.PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))))
+         InfLP.Events.ExternalCallE
+         (@ReSum_inl
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inl_sum1
+         (@E1.PickE
+         LLVMParamsBigIntptr.Events.DV.uvalue
+         InfLP.Events.DV.dvalue
+         (fun
+         (_ : InfLP.Events.DV.uvalue)
+         (_ : InfLP.Events.DV.dvalue)
+         =>
+         True))
+         InfLP.Events.PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)))
+         (@ReSum_id
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         Id_IFun
+         InfLP.Events.PickUvalueE)))
+         (@sig
+         InfLP.Events.DV.dvalue
+         (fun
+         _ : InfLP.Events.DV.dvalue
+         =>
+         True))
+         (@E1.pick
+         LLVMParamsBigIntptr.Events.DV.uvalue
+         InfLP.Events.DV.dvalue
+         (fun
+         (_ : InfLP.Events.DV.uvalue)
+         (_ : InfLP.Events.DV.dvalue)
+         =>
+         True)
+         Pre1
+         (fin_to_inf_uvalue
+         x3)))
+         (fun
+         res : 
+         @sig
+         InfLP.Events.DV.dvalue
+         (fun
+         _ : InfLP.Events.DV.dvalue
+         =>
+         True)
+         =>
+         match
+         res
+         return
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | @exist
+         _ _
+         x4 p =>
+         (fun
+         (x5 : InfLP.Events.DV.dvalue)
+         (t : True)
+         =>
+         get_inf_tree
+         (let
+         H2 :
+         OOM
+         DVCInfFin.DV2.dvalue :=
+         DVCInfFin.dvalue_convert_strict
+         x5 in
+         match
+         H2
+         return
+         (itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         with
+         | NoOom
+         a =>
+         (fun
+         d : DVCInfFin.DV2.dvalue
+         =>
+         k1
+         (@exist
+         dvalue
+         (fun
+         _ : dvalue
+         =>
+         True)
+         d t))
+         a
+         | Oom
+         s =>
+         (fun
+         s0 : string
+         =>
+         @raiseOOM
+         L3
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         OOME
+         (sum1
+         PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))))
+         ExternalCallE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         OOME
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)))
+         PickUvalueE
+         (@ReSum_inl
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inl_sum1
+         OOME
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))
+         (@ReSum_id
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         Id_IFun
+         OOME))))
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue))))
+         s0) s
+         end))
+         x4 p
+         end)))
+         X0 H0
+         k0 X4)
+         X0 H1)
+         H
+         Pre0
+         x2)
+         Pre
+         x1
+         end
+         in
+         X5
+         (@eq_refl
+         Type
+         X0))
+         X3)
+         x0
+         | inr1
+         x0 =>
+         (fun
+         H : 
+         sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))
+         X0 =>
+         (fun
+         H0 : 
+         sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))
+         X0 =>
+         let
+         X3 :
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         H0
+         return
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | inl1
+         x1 =>
+         (fun
+         H1 : 
+         OOME
+         X0 =>
+         (fun
+         H2 : 
+         OOME
+         X0 =>
+         let
+         X3 :
+         forall
+         _ : 
+         @eq
+         Type
+         X0 X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         H2 in
+         (OOME
+         T)
+         return
+         (forall
+         _ : 
+         @eq
+         Type
+         T X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | ThrowOOM
+         x2 =>
+         (fun
+         (H3 : unit)
+         (H4 : 
+         @eq
+         Type
+         Empty_set
+         X0)
+         =>
+         (fun
+         H5 : 
+         @eq
+         Type
+         Empty_set
+         X0 =>
+         let
+         H6 :
+         @eq
+         Type
+         Empty_set
+         X0 :=
+         H5 in
+         @eq_rect
+         Type
+         Empty_set
+         (fun
+         _ : Type
+         =>
+         forall
+         _ : unit,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         _ : unit
+         =>
+         @eq_rect
+         Type
+         Empty_set
+         (fun
+         X3 : Type
+         =>
+         forall
+         (_ : 
+         forall
+         _ : X3,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         OOME
+         X3),
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         (_ : 
+         forall
+         _ : Empty_set,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         OOME
+         Empty_set)
+         =>
+         @raiseOOM
+         InfLP.Events.L3
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         OOME
+         (sum1
+         InfLP.Events.PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))))
+         InfLP.Events.ExternalCallE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         OOME
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)))
+         InfLP.Events.PickUvalueE
+         (@ReSum_inl
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inl_sum1
+         OOME
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))
+         (@ReSum_id
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         Id_IFun
+         OOME))))
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         EmptyString)
+         X0 H5
+         k0 H2)
+         X0 H6)
+         H4 H3)
+         x2
+         end
+         in
+         X3
+         (@eq_refl
+         Type
+         X0))
+         H1)
+         x1
+         | inr1
+         x1 =>
+         (fun
+         H1 : 
+         sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)
+         X0 =>
+         (fun
+         H2 : 
+         sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)
+         X0 =>
+         let
+         X3 :
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         H2
+         return
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | inl1
+         x2 =>
+         (fun
+         H3 : 
+         UBE
+         X0 =>
+         (fun
+         H4 : 
+         UBE
+         X0 =>
+         let
+         X3 :
+         forall
+         _ : 
+         @eq
+         Type
+         X0 X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         H4 in
+         (UBE
+         T)
+         return
+         (forall
+         _ : 
+         @eq
+         Type
+         T X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | ThrowUB
+         x3 =>
+         (fun
+         (H5 : unit)
+         (H6 : 
+         @eq
+         Type
+         Empty_set
+         X0)
+         =>
+         (fun
+         H7 : 
+         @eq
+         Type
+         Empty_set
+         X0 =>
+         let
+         H8 :
+         @eq
+         Type
+         Empty_set
+         X0 :=
+         H7 in
+         @eq_rect
+         Type
+         Empty_set
+         (fun
+         _ : Type
+         =>
+         forall
+         _ : unit,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         _ : unit
+         =>
+         @eq_rect
+         Type
+         Empty_set
+         (fun
+         X3 : Type
+         =>
+         forall
+         (_ : 
+         forall
+         _ : X3,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         UBE
+         X3),
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         (_ : 
+         forall
+         _ : Empty_set,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         UBE
+         Empty_set)
+         =>
+         @raiseUB
+         InfLP.Events.L3
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         UBE
+         (sum1
+         InfLP.Events.PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))))
+         InfLP.Events.ExternalCallE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         UBE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)))
+         InfLP.Events.PickUvalueE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         UBE
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))
+         OOME
+         (@ReSum_inl
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inl_sum1
+         UBE
+         UBE
+         (sum1
+         DebugE
+         FailureE)
+         (@ReSum_id
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         Id_IFun
+         UBE)))))
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         EmptyString)
+         X0 H7
+         k0 H4)
+         X0 H8)
+         H6 H5)
+         x3
+         end
+         in
+         X3
+         (@eq_refl
+         Type
+         X0))
+         H3)
+         x2
+         | inr1
+         x2 =>
+         (fun
+         H3 : 
+         sum1
+         DebugE
+         FailureE
+         X0 =>
+         (fun
+         H4 : 
+         sum1
+         DebugE
+         FailureE
+         X0 =>
+         let
+         X3 :
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         H4
+         return
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | inl1
+         x3 =>
+         (fun
+         H5 : 
+         DebugE
+         X0 =>
+         (fun
+         H6 : 
+         DebugE
+         X0 =>
+         let
+         X3 :
+         forall
+         _ : 
+         @eq
+         Type
+         X0 X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         H6 in
+         (DebugE
+         T)
+         return
+         (forall
+         _ : 
+         @eq
+         Type
+         T X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | Debug
+         x4 =>
+         (fun
+         (H7 : unit)
+         (H8 : 
+         @eq
+         Type
+         unit
+         X0)
+         =>
+         (fun
+         H9 : 
+         @eq
+         Type
+         unit
+         X0 =>
+         let
+         H10 :
+         @eq
+         Type
+         unit
+         X0 :=
+         H9 in
+         @eq_rect
+         Type
+         unit
+         (fun
+         _ : Type
+         =>
+         forall
+         _ : unit,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         H11 : unit
+         =>
+         @eq_rect
+         Type
+         unit
+         (fun
+         X3 : Type
+         =>
+         forall
+         (_ : 
+         forall
+         _ : X3,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         DebugE
+         X3),
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         (k1 : 
+         forall
+         _ : unit,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         DebugE
+         unit)
+         =>
+         @go
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         (@VisF
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         (itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         unit
+         (@subevent
+         DebugE
+         InfLP.Events.L3
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         DebugE
+         (sum1
+         InfLP.Events.PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))))
+         InfLP.Events.ExternalCallE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         DebugE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)))
+         InfLP.Events.PickUvalueE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         DebugE
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))
+         OOME
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         DebugE
+         (sum1
+         DebugE
+         FailureE)
+         UBE
+         (@ReSum_inl
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inl_sum1
+         DebugE
+         DebugE
+         FailureE
+         (@ReSum_id
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         Id_IFun
+         DebugE))))))
+         unit
+         (Debug
+         H11))
+         (fun
+         H13 : unit
+         =>
+         get_inf_tree
+         (k1
+         H13))))
+         X0 H9
+         k0 H6)
+         X0
+         H10)
+         H8 H7)
+         x4
+         end
+         in
+         X3
+         (@eq_refl
+         Type
+         X0))
+         H5)
+         x3
+         | inr1
+         x3 =>
+         (fun
+         H5 : 
+         FailureE
+         X0 =>
+         (fun
+         H6 : 
+         FailureE
+         X0 =>
+         let
+         X3 :
+         forall
+         _ : 
+         @eq
+         Type
+         X0 X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
+         match
+         H6 in
+         (FailureE
+         T)
+         return
+         (forall
+         _ : 
+         @eq
+         Type
+         T X0,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         with
+         | Throw
+         x4 =>
+         (fun
+         (H7 : unit)
+         (H8 : 
+         @eq
+         Type
+         Empty_set
+         X0)
+         =>
+         (fun
+         H9 : 
+         @eq
+         Type
+         Empty_set
+         X0 =>
+         let
+         H10 :
+         @eq
+         Type
+         Empty_set
+         X0 :=
+         H9 in
+         @eq_rect
+         Type
+         Empty_set
+         (fun
+         _ : Type
+         =>
+         forall
+         _ : unit,
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         _ : unit
+         =>
+         @eq_rect
+         Type
+         Empty_set
+         (fun
+         X3 : Type
+         =>
+         forall
+         (_ : 
+         forall
+         _ : X3,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         FailureE
+         X3),
+         itree
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
+         (fun
+         (_ : 
+         forall
+         _ : Empty_set,
+         itree
+         L3
+         (prod
+         FinMem.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         local_env
+         (@stack
+         local_env))
+         (prod
+         global_env
+         dvalue)))))
+         (_ : 
+         FailureE
+         Empty_set)
+         =>
+         @LLVMEvents.raise
+         InfLP.Events.L3
+         (prod
+         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
+         (prod
+         MemPropT.store_id
+         (prod
+         (prod
+         InterpreterStackBigIntptr.LLVM.Local.local_env
+         InterpreterStackBigIntptr.LLVM.Stack.lstack)
+         (prod
+         InterpreterStackBigIntptr.LLVM.Global.global_env
+         InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         FailureE
+         (sum1
+         InfLP.Events.PickUvalueE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))))
+         InfLP.Events.ExternalCallE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         FailureE
+         (sum1
+         OOME
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE)))
+         InfLP.Events.PickUvalueE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         FailureE
+         (sum1
+         UBE
+         (sum1
+         DebugE
+         FailureE))
+         OOME
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         FailureE
+         (sum1
+         DebugE
+         FailureE)
+         UBE
+         (@ReSum_inr
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         sum1
+         Cat_IFun
+         Inr_sum1
+         FailureE
+         FailureE
+         DebugE
+         (@ReSum_id
+         (forall
+         _ : Type,
+         Type)
+         IFun
+         Id_IFun
+         FailureE))))))
+         EmptyString)
+         X0 H9
+         k0 H6)
+         X0
+         H10)
+         H8 H7)
+         x4
+         end
+         in
+         X3
+         (@eq_refl
+         Type
+         X0))
+         H5)
+         x3
+         end
+         in
+         X3)
+         H3)
+         x2
+         end
+         in
+         X3)
+         H1)
+         x1
+         end
+         in
+         X3) H)
+         x0
+         end
+         in
+         X3)
+         X1) x
+         end
+         in
+        X1) X
+         e k
+   end.
 
   Require Import ITree.Eq.EuttExtras.
 
@@ -2873,9 +7133,9 @@ Module InfiniteToFinite.
         destruct o.
         pstep; red; cbn.
 
-        change (inr1 (inr1 (inl1 (ThrowOOM s)))) with (@subevent _ _ (ReSum_inr IFun sum1 OOME
+        change (inr1 (inr1 (inl1 (ThrowOOM u)))) with (@subevent _ _ (ReSum_inr IFun sum1 OOME
                                                                         (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
-                                                                        ExternalCallE) _ (ThrowOOM s)).
+                                                                        ExternalCallE) _ (ThrowOOM u)).
 
         apply EqVisOOM.
       }
@@ -2921,6 +7181,9 @@ Module InfiniteToFinite.
 
         constructor.
         { cbn; auto.
+          destruct u.
+          unfold print_msg.
+          reflexivity.
         }
 
         { intros [] [] _.
@@ -2933,6 +7196,139 @@ Module InfiniteToFinite.
 *)
 
   Import InterpMemoryProp.
+
+  #[global] Instance get_inf_tree_eq_itree_Proper :
+    Proper (eq_itree eq ==> eq_itree eq) get_inf_tree.
+  Proof.
+    unfold Proper, respectful.
+    intros x y EQ.
+    rewrite (itree_eta_ x) in *.
+    rewrite (itree_eta_ y) in *.
+    genobs x ox.
+    genobs y oy.
+    clear x Heqox y Heqoy.
+    revert ox oy EQ.
+    pcofix CIH.
+    intros ox oy EQ.
+    punfold EQ. red in EQ. cbn in EQ.
+    dependent induction EQ.
+    - (* Ret Ret *)
+      subst.
+      pstep; red; cbn.
+      constructor; auto.
+    - (* Tau Tau *)
+      pstep; red; cbn.
+      constructor.
+      right.
+      rewrite (itree_eta_ m1).
+      rewrite (itree_eta_ m2).
+      eapply CIH.
+      pclearbot.
+      repeat rewrite <- itree_eta_.
+      apply REL.
+    - (* Vis Vis *)
+      destruct e.
+
+      { (* ExternalCallE *)
+        destruct e.
+        pstep; red; cbn.
+        constructor.
+        intros v.
+        red.
+        right.
+        rewrite (itree_eta_
+                   match DVCInfFin.dvalue_convert_strict v with
+                   | NoOom a => k1 a
+                   | Oom s => raiseOOM s
+                   end).
+        rewrite (itree_eta_
+                   match DVCInfFin.dvalue_convert_strict v with
+                   | NoOom a => k2 a
+                   | Oom s => raiseOOM s
+                   end).
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        break_match; [|reflexivity].
+        specialize (REL d).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      destruct s.
+      { (* PickUvalueE *)
+        destruct p.
+        pstep; red; cbn.
+        constructor.
+        intros [v []].
+        red.
+        right.
+        match goal with
+        | H: _ |- r (get_inf_tree ?t1) (get_inf_tree ?t2) =>
+            rewrite (itree_eta_ t1);
+            rewrite (itree_eta_ t2)
+        end.
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        break_match; [|reflexivity].
+        specialize (REL (exist _ d I)).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      destruct s.
+      { (* OOME *)
+        destruct o.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+
+      destruct s.
+      { (* UBE *)
+        destruct u0.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+
+      destruct s.
+      { (* DebugE *)
+        destruct d.
+        pstep; red; cbn.
+        constructor.
+        intros [].
+        red.
+        right.
+        match goal with
+        | H: _ |- r (get_inf_tree ?t1) (get_inf_tree ?t2) =>
+            rewrite (itree_eta_ t1);
+            rewrite (itree_eta_ t2)
+        end.
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        specialize (REL tt).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      { (* FailureE *)
+        destruct f.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+    - (* TauL *)
+      pstep; red; cbn.
+      constructor; auto.
+      punfold IHEQ.
+    - (* TauR *)
+      pstep; red; cbn.
+      constructor; auto.
+      punfold IHEQ.
+  Qed.
 
   #[global] Instance get_inf_tree_Proper :
     Proper (eutt eq ==> eutt eq) get_inf_tree.
@@ -13342,10 +17738,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         exists z. split; auto. right; auto.
   Qed.
 
-  Check @Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes.
-  Check @lift_ERR_RAISE_ERROR.
-
-
   Lemma MemPropT_fin_inf_lift_ERR_RAISE_ERROR_ret : 
     forall (A_INF A_FIN : Type)
       a_fin ms_fin_start ms_inf_start ms_fin_ma 
@@ -14908,6 +19300,104 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       auto.
   Qed.
 
+  (* TODO: Move near gcp in memory model... Maybe near get_consecutive_ptrs_no_ub *)
+  Lemma get_consecutive_ptrs_never_fails :
+    forall ptr sz ms msg,
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs (M:=(MemPropT Memory64BitIntptr.MMEP.MMSP.MemState)) ptr sz ms (raise_error msg) -> False.
+  Proof.
+    intros ptr sz ms msg ERR.
+    Transparent Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+    unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs in ERR.
+    Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+    repeat red in ERR.
+    destruct ERR as [ERR | ERR].
+    - red in ERR.
+      break_match_hyp_inv.
+    - destruct ERR as (?&?&?&ERR).
+      repeat red in ERR.
+      destruct ERR as [ERR | ERR].
+      { red in ERR.
+        break_match_hyp_inv.
+        exfalso.
+        apply map_monad_err_fail in Heqs.
+        destruct Heqs as (?&?&GEP).
+        cbn in GEP.
+        inv GEP.
+      }
+
+      destruct ERR as (?&?&GCP&ERR).
+      red in ERR.
+      break_match_hyp_inv.
+  Qed.
+
+  (* TODO: Move this, should apply for fin / inf *)
+  Lemma mempush_spec_always_succeeds :
+    forall m1,
+    exists m2,
+      Memory64BitIntptr.MMEP.MemSpec.mempush_spec m1 m2.
+  Proof.
+    (* Should I just use mempush? *)
+    intros m1.
+    remember m1.
+    destruct m as [m1_stack m1_prov].
+    destruct m1_stack as [m1_memory m1_fs m1_heap].
+    remember (Memory64BitIntptr.MMEP.push_frame_stack m1_fs Memory64BitIntptr.MMEP.initial_frame) as m2_fs.
+    exists (Memory64BitIntptr.MMEP.mem_state_set_frame_stack m1 m2_fs).
+
+    split.
+    - intros fs1 fs2 f H H0 H1.
+      cbn in *.
+      red in H.
+      cbn in *.
+      red.
+      unfold Memory64BitIntptr.MMEP.mem_state_set_frame_stack.
+      subst.
+      cbn.
+      destruct H1.
+      red in can_pop.
+      red in new_frame.
+      break_match_hyp; try contradiction.
+      unfold Memory64BitIntptr.MMEP.push_frame_stack.
+      subst.
+      rewrite H.
+      rewrite can_pop.
+      unfold Memory64BitIntptr.MMEP.initial_frame in *.
+      rewrite FinMem.MMEP.empty_frame_eqv; eauto.
+      2: apply Memory64BitIntptr.MMEP.empty_frame_nil.
+      rewrite new_frame.
+      reflexivity.
+    - subst.
+      split.
+      ++ (* read_byte_preserved *)
+        (* TODO: solve_read_byte_preserved. *)
+        split.
+        ** (* solve_read_byte_allowed_all_preserved. *)
+          intros ?ptr; split; intros ?READ.
+          --- (* read_byte_allowed *)
+            apply Memory64BitIntptr.MMEP.read_byte_allowed_set_frame_stack; eauto.
+          --- (* read_byte_allowed *)
+            (* TODO: solve_read_byte_allowed *)
+            eapply Memory64BitIntptr.MMEP.read_byte_allowed_set_frame_stack; eauto.
+        ** (* solve_read_byte_prop_all_preserved. *)
+          apply Memory64BitIntptr.MMEP.read_byte_prop_set_frame_stack.
+      ++ (* write_byte_allowed_all_preserved *)
+        apply Memory64BitIntptr.MMEP.write_byte_allowed_all_preserved_set_frame_stack.
+      ++ (* free_byte_allowed_all_preserved *)
+        apply Memory64BitIntptr.MMEP.free_byte_allowed_all_preserved_set_frame_stack.
+      ++ (* allocations_preserved *)
+        (* TODO: move to solve_allocations_preserved *)
+        apply Memory64BitIntptr.MMEP.allocations_preserved_set_frame_stack.
+      ++ (* preserve_allocation_ids *)
+        (* TODO: solve_preserve_allocation_ids *)
+        apply Memory64BitIntptr.MMEP.preserve_allocation_ids_set_frame_stack.
+      ++ (* TODO: solve_heap_preserved. *)
+        unfold Memory64BitIntptr.MMEP.mem_state_set_frame_stack.
+        red.
+        unfold Memory64BitIntptr.MMEP.MMSP.memory_stack_heap_prop. cbn.
+        unfold Memory64BitIntptr.MMEP.MMSP.memory_stack_heap.
+        reflexivity.
+  Qed.
+
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
       L2_E1E2_orutt_strict t_inf t_fin ->
@@ -14954,7 +19444,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       revert Heqr'.
 
       dependent induction REL; intros Heqr'.
-      - subst.
+      - (* oruttF's EqRet *)
+        subst.
         apply interp_memory_prop_ret_inv in RUN.
         destruct RUN as [[r3 [REQ EQ]] | [A [e [k EUTT]]]]; subst.
         2: {
@@ -14996,7 +19487,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         pose proof (fin_to_inf_dvalue_refine_strict d).
 
         apply fin_to_inf_dvalue_refine_strict'; auto.
-      - punfold RUN.
+      - (* oruttF's EqTau *)
+        punfold RUN.
         red in RUN.
         cbn in RUN.
 
@@ -15295,6 +19787,16 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     red in H0.
                     destruct H0 as [UB | [ERR | [OOM | H0]]].
                     { (* Handler raises UB *)
+                      (* ta is completely unconstrained in the UB handler...
+
+                         Should UB actually be handled this way by
+                         handle_intrinsic_prop / MemPropT?
+
+                         Alternatively it might make sense to handle
+                         this more like error, and then handle UB
+                         later?
+                       *)
+
                       destruct UB as [ub_msg INTRINSIC].
                       red in INTRINSIC.
                       break_match_hyp.
@@ -15315,7 +19817,31 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                           red in HANDLER.
                           break_match_hyp.
                           { (* Negative length UB *)
+                            subst.
+                            inversion ARGS; subst.
+                            inversion H4; subst.
+                            inversion H6; subst.
+                            inversion H8; subst.
+                            inversion H10; subst.
+
                             econstructor.
+                            inversion RUN; subst.
+                            { exfalso; eapply EQ; eauto. }
+
+                            { (* OOM *)
+                              destruct e.
+
+                              rewrite HT1.
+                              cbn.
+                              rewrite get_inf_tree_equation.
+                              cbn.
+                              unfold raiseOOM.
+                              rewrite bind_trigger.
+                              unfold print_msg.
+                              reflexivity.
+                            }
+
+                            subst_existT.
                             admit.
                           }
 
@@ -15351,17 +19877,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       unfold LLVMEvents.raise in TA.
                       rewrite bind_trigger in TA.
 
-                      rewrite TA in VIS_HANDLED.
-                      rewrite bind_vis in VIS_HANDLED.
-
-                      punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
-                      dependent induction VIS_HANDLED.
-                      2: {
-                        specialize (EQ t1); contradiction.
-                      }
-
                       eapply Interp_Memory_PropT_Vis with (ta:=
-                                                             vis (Throw err_msg)
+                                                             vis (Throw (print_msg err_msg))
                                                                (fun x : void =>
                                                                   match
                                                                     x
@@ -15372,11 +19889,16 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                                                                        (MemoryBigIntptr.MMEP.MMSP.MemState *
                                                                           (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
                                                                   with
-                                                                  end)).
+                                                                  end))
+                      .
 
                       3: {
+                        rewrite VIS_HANDLED.
+                        rewrite TA.
+                        rewrite bind_vis.
                         rewrite get_inf_tree_equation.
                         cbn. unfold LLVMEvents.raise.
+
                         rewrite bind_trigger.
                         rewrite bind_vis.
                         pstep; red; cbn.
@@ -15387,46 +19909,29 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       { intros a (ms_b, (sid_b, b)) RET1 RET2 AB.
                         cbn in AB; subst.
 
-                        pclearbot.
-                        right.
-                        rewrite (itree_eta_ (k0 _)).
-                        rewrite (itree_eta_).
-
-                      (*   eapply CIH; *)
-                      (*     repeat rewrite <- itree_eta_. *)
-
-                      (*   2: { *)
-                      (*     red. *)
-                      (*     specialize (HK d (ms', (st1, d))). *)
-                      (*     forward HK. *)
-                      (*     { eapply ReturnsVis. *)
-                      (*       pstep; red; cbn. *)
-                      (*       constructor. *)
-                      (*       intros v. red. *)
-                      (*       left; apply paco2_eqit_refl. *)
-                      (*       constructor. *)
-                      (*       reflexivity. *)
-                      (*     } *)
-                      (*     forward HK. *)
-                      (*     { rewrite H0. *)
-                      (*       constructor. *)
-                      (*       reflexivity. *)
-                      (*     } *)
-                      (*     forward HK; cbn; auto. *)
-                      (*     pclearbot. *)
-                      (*     rewrite MemState_fin_to_inf_to_fin in Heqo0; inv Heqo0. *)
-                      (*     rewrite dvalue_fin_to_inf_to_fin in Heqo; inv Heqo. *)
-                      (*     apply HK. *)
-                      (*   } *)
-
-                      (*   rewrite REL. *)
-                      (*   eapply K_RUTT; split; auto. *)
-                      (* } *)
-
-                        (* eapply CIH. *)
-                        admit.
-
+                        eapply Returns_vis_inversion in RET2.
+                        destruct RET2 as [[] _].
                       }
+
+                      repeat red.
+                      right.
+                      left.
+                      exists err_msg.
+                      split.
+                      cbn.
+                      unfold LLVMEvents.raise.
+                      rewrite bind_trigger.
+                      reflexivity.
+
+                      (* This seems related to HANDLER... *)
+                      (* TODO: Prove this. Maybe separate into a
+                      separate lemma, running into massive problems
+                      with Coq slowness... May need to restart emacs
+                      or something? *)
+                      destruct HANDLER as [msg_spec HANDLER].
+                      cbn in HANDLER.
+                      break_match_hyp.
+                      admit.
                       admit.
                     }
 
@@ -15540,12 +20045,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       destruct UB as [ub_msg UB].
                       cbn in UB.
 
-                      (* TODO: look into lemmas like:
-
-                         - get_consecutive_ptrs_no_ub
-                         - allocate_bytes_spec_MemPropT_no_ub
-                       *)
-                      admit.
+                      pose proof mempush_spec_always_succeeds m1 as [m2 ?].
+                      specialize (UB m2); contradiction.
                     }
 
                     { (* Handler raises error *)
@@ -15833,6 +20334,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     repeat red in H0.
                     destruct H0 as [UB | [ERR | [OOM | H0]]].
                     { (* Handler raises UB *)
+
+                      (* TODO: look into lemmas like:
+
+                         - get_consecutive_ptrs_no_ub
+                         - allocate_bytes_spec_MemPropT_no_ub
+                       *)
                       admit.
                     }
 
@@ -16006,29 +20513,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         { (* TODO: read_bytes_spec_fin_inf_error lemma *)
                           repeat red in ERR.
                           destruct ERR as [ERR | ERR].
-                          { (* TODO: this should be a separate lemma about gcp *)
-                            Transparent Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
-                            unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs in ERR.
-                            Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
-                            repeat red in ERR.
-                            destruct ERR as [ERR | ERR].
-                            - red in ERR.
-                              break_match_hyp_inv.
-                            - destruct ERR as (?&?&?&ERR).
-                              repeat red in ERR.
-                              destruct ERR as [ERR | ERR].
-                              { red in ERR.
-                                break_match_hyp_inv.
-                                exfalso.
-                                apply map_monad_err_fail in Heqs.
-                                destruct Heqs as (?&?&GEP).
-                                cbn in GEP.
-                                inv GEP.
-                              }
-
-                              destruct ERR as (?&?&GCP&ERR).
-                              red in ERR.
-                              break_match_hyp_inv.
+                          { exfalso.
+                            apply get_consecutive_ptrs_never_fails in ERR.
+                            auto.
                           }
 
                           destruct ERR as (?&?&GCP&ERR).
@@ -16223,7 +20710,107 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     }
 
                     { (* Handler raises error *)
-                      admit.
+                      destruct ERR as (msg&TA&msg_spec&ERR).
+                      destruct EV_REL as (?&?&?); subst.
+
+                      rewrite TA in VIS_HANDLED.
+                      pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
+                                                                                 LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_error _ _) _ _ _ k2 msg) as RAISE.
+                      rewrite RAISE in VIS_HANDLED.
+                      punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
+                      dependent induction VIS_HANDLED.
+                      2: {
+                        specialize (EQ t1); contradiction.
+                      }
+
+                      eapply Interp_Memory_PropT_Vis with
+                        (k2:=(fun '(ms_inf, (sid', _)) =>
+                                get_inf_tree (k2 (s2, (s1, tt))))
+                        )
+                        (s1:=s1)
+                        (s2:=lift_MemState s2)
+                        (ta:= raise_error msg).
+                      3: {
+                        rewrite get_inf_tree_equation.
+                        cbn.
+                        setoid_rewrite Raise.raise_bind_itree.
+                        reflexivity.
+                      }
+
+                      2: {
+                        (* raise_ub includes raise_error... *)
+                        red in ERR.
+                        break_match_hyp;
+                          try solve
+                            [ repeat red;
+                              left;
+                              exists "Writing something to somewhere that isn't an address.";
+                              rewrite DVCInfFin.dvalue_refine_strict_equation, DVCInfFin.dvalue_convert_strict_equation in H0;
+                              destruct a0; cbn in H0; try break_match_hyp_inv; cbn; auto
+                            ].
+
+                        apply dvalue_refine_strict_addr_r_inv in H0 as (ptr_inf&ADDR&ADDR_REF).
+                        subst.
+
+                        red in ERR.
+                        repeat red in ERR.
+                        destruct ERR as [ERR | ERR].
+                        { (* TODO: Split into a lemma about serialize_sbytes and error? *)
+                          (* Errors in serialize_sbytes generally seem
+                          to happen when there's a type
+                          mismatch... May want new uvalue_has_dtyp_ind
+                          to be able to do this proof?
+                           *)
+                          cbn in ERR.
+                          admit.
+                        }
+
+                        destruct ERR as (?&?&?&ERR).
+                        destruct ERR as [ERR | ERR].
+                        { exfalso.
+                          apply get_consecutive_ptrs_never_fails in ERR.
+                          auto.
+                        }
+
+                        destruct ERR as (?&?&GCP&ERR).
+                        { (* ERR should be a contradiction as
+                             write_byte_spec_MemPropT doesn't contain
+                             error... Except in UB cases *)
+                          remember (zip x2 x0) as z.
+                          cbn in ERR.
+                          destruct ERR as [ERR | ERR].
+                          2: destruct ERR as (?&?&?&?); contradiction.
+
+                          clear Heqz GCP.
+                          generalize dependent x.
+                          generalize dependent x1.
+                          generalize dependent x2.
+                          induction z; intros x2 x1 ERR x H.
+                          - cbn in ERR; contradiction.
+                          - rewrite map_monad_unfold in ERR.
+                            destruct ERR as [ERR | ERR].
+                            + destruct a.
+                              cbn in ERR.
+                              contradiction.
+                            + destruct ERR as (?&?&?&ERR).
+                              repeat red in ERR.
+                              destruct ERR as [ERR | ERR].
+                              2: {
+                                destruct ERR as (?&?&?&ERR).
+                                cbn in ERR; contradiction.
+                              }
+
+                              eapply IHz in ERR; eauto.
+                        }
+                      }
+
+                      intros a1 b H H2 H3.
+                      unfold raise_error in H2.
+                      cbn in H2.
+                      unfold LLVMEvents.raise in H2.
+                      rewrite bind_trigger in H2.
+                      apply Returns_vis_inversion in H2.
+                      destruct H2 as [[] _].
                     }
 
                     { (* Handler raises OOM *)
@@ -16350,134 +20937,135 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     rename Pre into Pre_inf.
                     rename Pre0 into Pre_fin.
 
-                    eapply Interp_Memory_PropT_Vis
-                      with (k2:=
-                              fun (x : {_ : InterpreterStackBigIntptr.LP.Events.DV.dvalue | True}) =>
-                                (let (x4, p) := x in
-                                 get_inf_tree
-                                   match DVCInfFin.dvalue_convert_strict x4 with
-                                   | NoOom a => k5 (exist (fun _ : dvalue => True) a p)
-                                   | Oom s => raiseOOM s
-                                   end)).
+                    (* eapply Interp_Memory_PropT_Vis *)
+                    (*   with (k2:= *)
+                    (*           fun (x : {_ : InterpreterStackBigIntptr.LP.Events.DV.dvalue | True}) => *)
+                    (*             (let (x4, p) := x in *)
+                    (*              get_inf_tree *)
+                    (*                match DVCInfFin.dvalue_convert_strict x4 with *)
+                    (*                | NoOom a => k5 (exist (fun _ : dvalue => True) a p) *)
+                    (*                | Oom s => raiseOOM s *)
+                    (*                end)). *)
 
-                    2: {
-                      cbn.
-                      red.
-                      reflexivity.
-                    }
-                    2: {
-                      rewrite get_inf_tree_equation.
-                      cbn.
-                      rewrite bind_bind.
-                      rewrite bind_trigger.
-                      setoid_rewrite bind_ret_l.
-                      erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
-                      assert (Pre_inf = Pre_fin).
-                      { admit. (* TODO: Not provable? *)
-                      }
-                      subst.
+                    (* 2: { *)
+                    (*   cbn. *)
+                    (*   red. *)
+                    (*   reflexivity. *)
+                    (* } *)
+                    (* 2: { *)
+                    (*   rewrite get_inf_tree_equation. *)
+                    (*   cbn. *)
+                    (*   rewrite bind_bind. *)
+                    (*   rewrite bind_trigger. *)
+                    (*   setoid_rewrite bind_ret_l. *)
+                    (*   erewrite <- fin_to_inf_uvalue_refine_strict'; eauto. *)
+                    (*   assert (Pre_inf = Pre_fin). *)
+                    (*   { admit. (* TODO: Not provable? *) *)
+                    (*   } *)
+                    (*   subst. *)
                       
-                      cbn.
-                      pstep. red. cbn.
-                      eapply EqVis.
-                      intros v.
+                    (*   cbn. *)
+                    (*   pstep. red. cbn. *)
+                    (*   eapply EqVis. *)
+                    (*   intros v. *)
 
-                      with (k2:=
-                              fun (v : {_ : InterpreterStackBigIntptr.LP.Events.DV.dvalue | True}) =>
-                              (let (x4, p) := v in
-                               get_inf_tree
-                                 match DVCInfFin.dvalue_convert_strict x4 with
-                                 | NoOom a => k5 (exist (fun _ : dvalue => True) a p)
-                                 | Oom s => raiseOOM s
-                                 end)).
+                    (*   with (k2:= *)
+                    (*           fun (v : {_ : InterpreterStackBigIntptr.LP.Events.DV.dvalue | True}) => *)
+                    (*           (let (x4, p) := v in *)
+                    (*            get_inf_tree *)
+                    (*              match DVCInfFin.dvalue_convert_strict x4 with *)
+                    (*              | NoOom a => k5 (exist (fun _ : dvalue => True) a p) *)
+                    (*              | Oom s => raiseOOM s *)
+                    (*              end)). *)
 
 
-                      red. left.
-                      destruct v.
+                    (*   red. left. *)
+                    (*   destruct v. *)
                       
-                    }
-                      { intros a b H H1 H2.
-                        destruct b. destruct p.
-                        cbn in *; subst.
-                        right.
+                    (* } *)
+                    (*   { intros a b H H1 H2. *)
+                    (*     destruct b. destruct p. *)
+                    (*     cbn in *; subst. *)
+                    (*     right. *)
 
-                        left.
+                    (*     left. *)
                         
-                      }
+                    (*   } *)
 
-                        with
-                        (k2:=(fun '(ms_inf, (sid', uv_inf)) =>
-                                get_inf_tree (k2 (s2, (s1, x))))).
+                    (*     with *)
+                    (*     (k2:=(fun '(ms_inf, (sid', uv_inf)) => *)
+                    (*             get_inf_tree (k2 (s2, (s1, x))))). *)
 
-                      eapply Interp_Memory_PropT_Vis.
-                      3: {
-                        rewrite get_inf_tree_equation.
-                        cbn.
-                      }
-                    - specialize (EQ t1); contradiction.
+                    (*   eapply Interp_Memory_PropT_Vis. *)
+                    (*   3: { *)
+                    (*     rewrite get_inf_tree_equation. *)
+                    (*     cbn. *)
+                    (*   } *)
+                    (* - specialize (EQ t1); contradiction. *)
 
                     
 
 
-                              get_inf_tree (k2 (s2, (s2, r))))).
-                    eapply Interp_Memory_PropT_Vis with
-                      (ta:=trigger (E1.pick Pre0 (fin_to_inf_uvalue x0))).
-                    3: {
-                      rewrite VIS_HANDLED.
-                      rewrite get_inf_tree_equation.
-                      red.
-                      cbn.
+                    (*           get_inf_tree (k2 (s2, (s2, r))))). *)
+                    (* eapply Interp_Memory_PropT_Vis with *)
+                    (*   (ta:=trigger (E1.pick Pre0 (fin_to_inf_uvalue x0))). *)
+                    (* 3: { *)
+                    (*   rewrite VIS_HANDLED. *)
+                    (*   rewrite get_inf_tree_equation. *)
+                    (*   red. *)
+                    (*   cbn. *)
                       
-                    }
+                    (* } *)
                     
-                    destruct t2; pinversion VIS_HANDLED; subst_existT.
-                    { exfalso; eapply EQ; eauto. }
-                    subst_existT.
+                    (* destruct t2; pinversion VIS_HANDLED; subst_existT. *)
+                    (* { exfalso; eapply EQ; eauto. } *)
+                    (* subst_existT. *)
 
-                    eapply Interp_Memory_PropT_Vis.
-                    3: {
-                      rewrite get_inf_tree_equation.
-                      cbn.
+                    (* eapply Interp_Memory_PropT_Vis. *)
+                    (* 3: { *)
+                    (*   rewrite get_inf_tree_equation. *)
+                    (*   cbn. *)
                       
-                    }
-                    - intros a b H H1 H2.
-                      left.
-                      setoid_rewrite REL.
-                      apply REL.
+                    (* } *)
+                    (* - intros a b H H1 H2. *)
+                    (*   left. *)
+                    (*   setoid_rewrite REL. *)
+                    (*   apply REL. *)
 
-                    rewrite get_inf_tree_equation.
-                    cbn.
-                    pfold. red.
-                    cbn.
+                    (* rewrite get_inf_tree_equation. *)
+                    (* cbn. *)
+                    (* pfold. red. *)
+                    (* cbn. *)
 
-                    eapply Interp_Memory_PropT_Vis with
-                      (k2:=(fun res : {_ : InfLP.Events.DV.dvalue | True} =>
-                              let (x4, p) := res in
-                              get_inf_tree
-                                match DVCInfFin.dvalue_convert_strict x4 with
-                                | NoOom a => k (exist (fun _ : dvalue => True) a p)
-                                | Oom s => raiseOOM s
-                                end)).
+                    (* eapply Interp_Memory_PropT_Vis with *)
+                    (*   (k2:=(fun res : {_ : InfLP.Events.DV.dvalue | True} => *)
+                    (*           let (x4, p) := res in *)
+                    (*           get_inf_tree *)
+                    (*             match DVCInfFin.dvalue_convert_strict x4 with *)
+                    (*             | NoOom a => k (exist (fun _ : dvalue => True) a p) *)
+                    (*             | Oom s => raiseOOM s *)
+                    (*             end)). *)
 
 
 
-                      (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
-                              get_inf_tree (k2 (ms_store, (st', tt)))))
-                      (s1:=s1)
-                      (s2:=lift_MemState s2).
+                    (*   (k2:=(fun '(ms_inf, (sid', dv_inf)) => *)
+                    (*           get_inf_tree (k2 (ms_store, (st', tt))))) *)
+                    (*   (s1:=s1) *)
+                    (*   (s2:=lift_MemState s2). *)
 
-                    constructor.
+                    (* constructor. *)
 
-                    cbn
+                    (* cbn *)
 
-                    epose proof (@itree_eta _ _ t2).
+                    (* epose proof (@itree_eta _ _ t2). *)
 
-                    punfold VIS_HANDLED.
-                    cbn in VIS_HANDLED.
-                    red in VIS_HANDLED.
-                    dependent induction VIS_HANDLED.
-                    - admit.
-                    - specialize (EQ
+                    (* punfold VIS_HANDLED. *)
+                    (* cbn in VIS_HANDLED. *)
+                    (* red in VIS_HANDLED. *)
+                    (* dependent induction VIS_HANDLED. *)
+                    (* - admit. *)
+                    (* - specialize (EQ *)
+                    admit.
                   }
 
                   { (* OOM *)
@@ -16501,15 +21089,190 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                   }
 
                   { (* UBE *)
-                    admit.
+                    rename H0 into HANDLER.
+                    subst.
+                    destruct u, u0.
+                    red in HANDLER.
+                    cbn in HANDLER.
+                    rewrite bind_trigger in HANDLER.
+                    rewrite HANDLER in VIS_HANDLED.
+                    rewrite bind_vis in VIS_HANDLED.
+
+                    destruct t2; pinversion VIS_HANDLED; subst_existT.
+                    { exfalso; eapply EQ; eauto. }
+                    subst_existT.
+
+                    eapply Interp_Memory_PropT_Vis with
+                      (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                              get_inf_tree (k7 _)))
+                      (s1:=s1)
+                      (s2:=lift_MemState s2).
+
+                    2: {
+                      cbn. red.
+                      cbn.
+                      rewrite bind_trigger.
+                      reflexivity.
+                    }
+
+                    2: {
+                      rewrite get_inf_tree_equation.
+                      cbn.
+                      unfold raiseUB.
+                      rewrite bind_trigger.
+                      rewrite bind_vis.
+                      unfold print_msg.
+                      destruct u0.
+                      pstep; red; cbn.
+                      constructor.
+                      intros [].
+                    }
+
+                    intros [].
                   }
 
                   { (* DebugE *)
-                    admit.
+                    rename H0 into HANDLER.
+                    red in HANDLER.
+                    destruct d, d0.
+                    subst.
+                    destruct u.
+                    cbn in HANDLER.
+                    rewrite bind_trigger in HANDLER.
+                    rewrite HANDLER in VIS_HANDLED.
+                    rewrite bind_vis in VIS_HANDLED.
+
+                    destruct t2; pinversion VIS_HANDLED; subst_existT.
+                    { exfalso; eapply EQ; eauto. }
+                    subst_existT.
+
+                    eapply Interp_Memory_PropT_Vis with
+                      (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                              get_inf_tree (k2 (s2, (s1, tt)))))
+                      (s1:=s1)
+                      (s2:=lift_MemState s2).
+
+                    2: {
+                      cbn.
+                      red.
+                      cbn.
+                      rewrite bind_trigger.
+                      reflexivity.
+                    }
+
+                    2: {
+                      cbn.
+                      rewrite bind_vis.
+                      setoid_rewrite bind_ret_l.
+                      pstep; red; cbn.
+                      constructor.
+                      intros [].
+                      red.
+                      left.
+                      red in VIS_HANDLED.
+                      cbn in VIS_HANDLED.
+                      inversion VIS_HANDLED.
+                      subst_existT.
+                      specialize (REL1 tt).
+                      red in REL1.
+                      pclearbot.
+                      rewrite REL1.
+                      setoid_rewrite bind_ret_l.
+                      eapply paco2_eqit_refl.
+                    }
+
+                    intros a b RETa RETb AB.
+                    apply Returns_vis_inversion in RETb as [[] RETb].
+                    destruct b as [ms' [sid' []]].
+                    cbn in AB; subst.
+
+                    apply Returns_ret_inv in RETb.
+                    inv RETb.
+                    cbn.
+
+                    specialize (REL0 tt).
+                    specialize (REL tt).
+                    pclearbot.
+
+                    specialize (HK tt (s2, (s1, tt))).
+                    forward HK.
+                    { eapply ReturnsVis.
+                      unfold trigger.
+                      reflexivity.
+                      cbn.
+                      constructor.
+                      reflexivity.
+                    }
+                    forward HK.
+                    { rewrite HANDLER.
+                      eapply ReturnsVis.
+                      reflexivity.
+                      constructor.
+                      reflexivity.
+                    }
+                    specialize (HK eq_refl).
+                    pclearbot.
+
+                    right.
+
+                    rewrite (itree_eta_ (k0 tt)).
+                    rewrite (itree_eta_ (k2 (s2, (s1, tt)))).
+
+                    eapply CIH.
+                    2: {
+                      repeat red.
+                      repeat rewrite <- itree_eta.
+                      apply HK.
+                    }
+
+                    repeat rewrite <- itree_eta.
+                    rewrite REL.
+                    specialize (K_RUTT tt tt eq_refl).
+                    exact K_RUTT.
                   }
 
                   { (* FailureE *)
-                    admit.
+                    red in H0.
+                    destruct f, f0.
+                    cbn in H0.
+                    rewrite bind_trigger in H0.
+                    rewrite H0 in VIS_HANDLED.
+                    rewrite bind_vis in VIS_HANDLED.
+                    punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
+                    dependent induction VIS_HANDLED.
+                    2: {
+                      specialize (EQ t1); contradiction.
+                    }
+
+                    eapply Interp_Memory_PropT_Vis with
+                      (s1:=s1)
+                      (s2:=lift_MemState s2).
+
+                    2: {
+                      cbn.
+                      red.
+                      cbn.
+                      rewrite bind_trigger.
+                      reflexivity.
+                    }
+
+                    2: {
+                      rewrite get_inf_tree_equation.
+                      cbn.
+                      unfold LLVMEvents.raise.
+                      rewrite bind_trigger.
+                      rewrite bind_vis.
+                      cbn.
+                      pfold. red.
+                      cbn.
+                      subst.
+                      unfold print_msg.
+                      destruct u.
+                      constructor.
+                      intros [].
+                    }
+
+                    intros [].
                   }
 
                 + (* om1 = Tau *)
@@ -16518,7 +21281,1797 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                   eapply IHM1; eauto.
               - (* TauL *)
                 exfalso; eapply EQ; eauto.
-              -
+              - (* OOM *)
+                eapply Interp_Memory_PropT_Vis_OOM.
+                rewrite get_inf_tree_equation.
+                cbn.
+                pinversion HT1; subst_existT; subst.
+                2: {
+                  exfalso; eapply EQ; eauto.
+                }
+
+                cbn.
+                destruct e0.
+                cbn.
+                unfold raiseOOM.
+                rewrite bind_trigger.
+                reflexivity.
+            }
+
+        + specialize (EQ t2); contradiction.
+        + (* OOM *)
+          destruct e.
+          punfold HT1; red in HT1; cbn in HT1.
+          dependent induction HT1.
+          rewrite <- x.
+          pstep.
+          red.
+          eapply Interp_Memory_PropT_Vis_OOM.
+          rewrite get_inf_tree_equation.
+          cbn.
+          unfold raiseOOM.
+          rewrite bind_trigger.
+          reflexivity.
+      - (* oruttF's EqVis case *)
+        red in RUN.
+        cbn in RUN.
+        repeat red in RUN.
+        punfold RUN; red in RUN; cbn in RUN.
+
+        dependent induction RUN.
+        + (* TauR *)
+          pstep; red; cbn.
+          constructor; auto.
+
+          specialize (IHRUN k1 e1 _ e2 k2 H H0 H1 (observe t2) CIH MSR).
+          repeat (forward IHRUN; auto).
+          punfold IHRUN.
+        + (* VisOOM *)
+          eapply paco2_mon_bot; eauto.
+          rewrite HT1.
+          cbn.
+          rewrite get_inf_tree_equation.
+          destruct e.
+          cbn.
+          pstep; red; cbn.
+          unfold print_msg.
+          change (VisF (subevent void (ThrowOOM tt))
+                    (fun x : void =>
+                       ITree.subst
+                         (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                       end) (Ret x)))
+            with
+            (observe (Vis (subevent void (ThrowOOM tt))
+                        (fun x : void =>
+                           ITree.subst
+                             (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                           end) (Ret x)))).
+          eapply Interp_Memory_PropT_Vis_OOM.
+          reflexivity.
+        + (* Vis *)
+          rename H0 into REL.
+          rename H into EV_REL.
+          rename H2 into VIS_HANDLED.
+          rename H3 into HANDLER.
+
+          repeat red in HANDLER.
+          (* Need to break apart events e / e1 to figure out
+                what event we're dealing with. *)
+          red in EV_REL.
+          destruct e1, e2; try destruct e, e0; cbn in EV_REL;
+            move EV_REL after VIS_HANDLED;
+            repeat (first [destruct s | destruct i | destruct e | destruct s0 | destruct m | destruct m0]; try contradiction); cbn in *.
+
+          { (* ExternalCallE *)
+            red in HANDLER. cbn in HANDLER.
+            rewrite bind_trigger in HANDLER.
+            rewrite HANDLER in VIS_HANDLED.
+            pstep; red; cbn.
+
+            destruct EV_REL as (?&F_REF&ARGS_REF).
+            subst.
+
+            (* External calls *)
+
+            eapply Interp_Memory_PropT_Vis with
+              (s1:=s1)
+              (s2:=lift_MemState s2)
+              (ta:=(vis (InterpreterStackBigIntptr.LP.Events.ExternalCall t0 f args)
+                      (fun x : InterpreterStackBigIntptr.LP.Events.DV.dvalue =>
+                         ITree.subst
+                           (fun r0 : InterpreterStackBigIntptr.LP.Events.DV.dvalue =>
+                              SemNotations.Ret2 s1 (lift_MemState s2) r0) (Ret x))))
+              (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                      match DVCInfFin.dvalue_convert_strict dv_inf with
+                      | NoOom dv_fin => get_inf_tree (ITree.subst k3 (SemNotations.Ret2 s1 s2 dv_fin)) (* ITree.subst k3 (SemNotations.Ret2 s1 s2 dv_fin) *)
+                      | Oom s => raiseOOM s
+                      end)
+              ); eauto.
+            2: {
+              repeat red.
+              cbn.
+              pstep; red; cbn.
+              observe_vis.
+              constructor.
+              intros v.
+              red.
+              left.
+              pstep; red; cbn.
+              constructor.
+              reflexivity.
+            }
+
+            2: {
+              cbn.
+              rewrite bind_vis.
+              cbn.
+              rewrite VIS_HANDLED.
+              cbn.
+              rewrite get_inf_tree_equation.
+              cbn.
+
+              erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+              rewrite Forall2_map_eq with (l2:=args).
+              2: {
+                eapply Forall2_flip.
+                eapply Util.Forall2_impl; [| apply ARGS_REF].
+                intros a b ?.
+                red.
+                symmetry.
+                apply fin_to_inf_dvalue_refine_strict'.
+                auto.
+              }
+
+              pstep; red; cbn.
+              constructor.              
+
+              intros v.
+              red.
+
+              left.
+              setoid_rewrite bind_ret_l.
+              setoid_rewrite bind_ret_l.
+
+              break_match_goal.
+              - apply paco2_eqit_refl.
+              - rewrite get_inf_tree_equation.
+                cbn.
+                pstep; red; cbn.
+                unfold print_msg.
+                constructor.
+                intros [].
+            }
+
+            intros a b H H4 H5.
+            destruct b, p.
+            cbn in *; subst.
+            break_match.
+            + (* NoOom for external call result *)
+              specialize (REL d d0).
+              forward REL; auto.
+
+              rewrite (itree_eta_ (ITree.subst k3 (SemNotations.Ret2 s1 s2 d0))).
+              rewrite (itree_eta_ (k1 d)).
+              right.
+              eapply CIH.
+              do 2 rewrite <- itree_eta.
+
+              pclearbot. apply REL.
+
+              repeat red.
+              repeat rewrite <- itree_eta.
+              setoid_rewrite bind_ret_l.
+
+              specialize (HK d0 (s2, (s1, d0))).
+              forward HK.
+              { eapply ReturnsVis.
+                unfold ITree.trigger.
+                cbn.
+                reflexivity.
+                cbn.
+                constructor; reflexivity.
+              }
+              forward HK.
+              { rewrite HANDLER.
+                eapply ReturnsVis.
+                reflexivity.
+                constructor; reflexivity.
+              }
+
+              forward HK; cbn; auto.
+              pclearbot.
+              apply HK.
+            + (* External call result OOMs *)
+              left.
+              pstep; red; cbn.
+              observe_vis.
+              eapply Interp_Memory_PropT_Vis_OOM.
+              reflexivity.
+          }
+
+          { (* Intrinsic *)
+            destruct EV_REL as (T&F&ARGS); subst.
+            red in HANDLER.
+            red in HANDLER.
+            destruct HANDLER as [UB | [ERR | [OOM | HANDLER]]].
+            { (* Handler raises UB *)
+              destruct UB as [ub_msg INTRINSIC].
+              red in INTRINSIC.
+              break_match_hyp.
+              { (* memcpy *)
+                cbn in *.
+                destruct INTRINSIC as [HANDLER | [sab [[] [HANDLER []]]]].
+                red in HANDLER.
+                repeat (destruct ARGS;
+                        [solve [ inversion HANDLER
+                               | red in HANDLER;
+                                 repeat break_match_hyp; cbn in HANDLER; inversion HANDLER
+                           ]
+                        |
+                       ]).
+                repeat break_match_hyp; cbn in HANDLER; try contradiction.
+
+                { (* 32 bit *)
+                  red in HANDLER.
+                  break_match_hyp.
+                  { (* Negative length UB *)
+                    econstructor.
+                    admit.
+                  }
+
+                  break_match_hyp.
+                  2: {
+                    (* Overlapping UB *)
+                    admit.
+                  }
+
+                  (* No UB *)
+                  (* May be UB in read / write... *)
+                  cbn in HANDLER.
+                  admit.
+                }
+
+                { (* 64 bit *)
+                  admit.
+                }
+
+                { (* iptr *)
+                  admit.
+                }
+              }
+
+              (* Not memcpy... *)
+              admit.
+            }
+
+            { (* Handler raises Error *)
+              destruct ERR as [err_msg [TA HANDLER]].
+              unfold raise_error in TA.
+              cbn in TA.
+              unfold LLVMEvents.raise in TA.
+              rewrite bind_trigger in TA.
+
+              rewrite TA in VIS_HANDLED.
+              rewrite bind_vis in VIS_HANDLED.
+
+              pstep; red; cbn.
+              eapply Interp_Memory_PropT_Vis with (ta:=
+                                                     vis (Throw (print_msg err_msg))
+                                                       (fun x : void =>
+                                                          match
+                                                            x
+                                                            return
+                                                            (itree
+                                                               (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
+                                                                                                                     LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                                                               (MemoryBigIntptr.MMEP.MMSP.MemState *
+                                                                  (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                                          with
+                                                          end))
+              .
+
+              3: {
+                rewrite VIS_HANDLED.
+                rewrite get_inf_tree_equation.
+                cbn. unfold LLVMEvents.raise.
+
+                rewrite bind_trigger.
+                rewrite bind_vis.
+                pstep; red; cbn.
+                constructor.
+                intros [].
+              }
+
+              { intros a (ms_b, (sid_b, b)) RET1 RET2 AB.
+                cbn in AB; subst.
+
+                eapply Returns_vis_inversion in RET2.
+                destruct RET2 as [[] _].
+              }
+
+              repeat red.
+              right.
+              left.
+              exists err_msg.
+              split.
+              cbn.
+              unfold LLVMEvents.raise.
+              rewrite bind_trigger.
+              reflexivity.
+
+
+              (* This seems related to HANDLER... *)
+              (* TODO: proof should be same (or similar) to above *)
+              admit.
+            }
+
+            { (* Handler raises OOM *)
+              destruct OOM as [oom_msg [TA HANDLER]].
+              unfold raise_oom in TA.
+              cbn in TA.
+              unfold raiseOOM in TA.
+              rewrite bind_trigger in TA.
+
+              rewrite TA in VIS_HANDLED.
+              rewrite bind_vis in VIS_HANDLED.
+
+              eapply paco2_mon_bot; eauto.
+              rewrite VIS_HANDLED.
+
+              pstep; red; cbn.
+              change (VisF (subevent void (ThrowOOM (print_msg "")))
+                        (fun x : void =>
+                           ITree.subst
+                             (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                           end) (Ret x)))
+                with (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                                 (fun x : void =>
+                                    ITree.subst
+                                      (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                                    end) (Ret x)))).
+
+              eapply Interp_Memory_PropT_Vis_OOM.
+              reflexivity.
+            }
+
+            (* Handler succeeds *)
+            destruct HANDLER as (st1&ms'&d&TA&INTRINSIC).
+            rewrite TA in VIS_HANDLED.
+            setoid_rewrite bind_ret_l in VIS_HANDLED.
+
+            { epose proof handle_intrinsic_fin_inf ARGS (lift_MemState_refine_prop s2) INTRINSIC as (dv_inf&ms_inf'&INTRINSIC_INF&DV_REF&MSR_INTRINSIC).
+
+              pstep; red; cbn.
+              eapply Interp_Memory_PropT_Vis with
+                (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                        get_inf_tree (k3 (ms', (st1, d)))
+                     )
+                )
+                (s1:=s1)
+                (s2:=lift_MemState s2).
+
+              2: {
+                cbn. red. red.
+                repeat right.
+                exists s1.
+                exists ms_inf'.
+                exists dv_inf.
+                split; eauto.
+                reflexivity.
+              }
+
+              2: {
+                cbn.
+                rewrite bind_ret_l.
+                rewrite VIS_HANDLED.
+                rewrite <- itree_eta.
+                reflexivity.
+              }
+
+              (* Continuation for vis node *)
+              intros a b H H2 H3.
+              destruct b as [ms [sid' res]].
+              cbn in H2.
+              apply Returns_ret_inv in H2.
+              inv H2.
+
+              cbn.
+              rewrite (itree_eta_ (k1 dv_inf)).
+              rewrite (itree_eta_ (k3 (ms', (st1, d)))).
+              right.
+              eapply CIH.
+              2: {
+                repeat red.
+                specialize (HK d (ms', (st1, d))).
+                forward HK.
+                { eapply ReturnsVis.
+                  unfold trigger.
+                  reflexivity.
+                  cbn.
+                  constructor.
+                  reflexivity.
+                }
+                forward HK.
+                { constructor.
+                  auto.
+                }
+
+                forward HK; auto.
+                pclearbot.
+
+                repeat rewrite <- itree_eta.
+                apply HK.
+              }
+
+              specialize (REL dv_inf d).
+              forward REL; auto.
+              pclearbot.
+
+              repeat rewrite <- itree_eta.
+              exact REL.
+            }
+          }
+
+          { (* MemPush *)
+            repeat red in HANDLER.
+            rename s2 into m1.
+            destruct HANDLER as [UB | [ERR | [OOM | HANDLER]]].
+            { (* Handler raises UB *)
+              destruct UB as [ub_msg UB].
+              cbn in UB.
+
+              (* TODO: look into lemmas like:
+
+                         - get_consecutive_ptrs_no_ub
+                         - allocate_bytes_spec_MemPropT_no_ub
+               *)
+              admit.
+            }
+
+            { (* Handler raises error *)
+              (* Probably not possible to have an error for MemPush... *)
+              destruct ERR as (msg&TA&msg_spec&ERR).
+              cbn in ERR.
+              contradiction.
+            }
+
+            { (* Handler raises OOM *)
+              destruct OOM as (oom_msg&TA_OOM&(oom_spec_msg&HANDLE_OOM)).
+              rewrite TA_OOM in VIS_HANDLED.
+              pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
+                                                                         LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k3 oom_msg) as RAISE.
+              rewrite RAISE in VIS_HANDLED.
+              eapply paco2_mon_bot; eauto.
+              rewrite VIS_HANDLED.
+              cbn.
+              pstep; red; cbn.
+              change ((VisF (subevent void (ThrowOOM (print_msg "")))
+                         (fun x : void =>
+                            ITree.subst
+                              (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                            end) (Ret x)))) with
+                (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                            (fun x : void =>
+                               ITree.subst
+                                 (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                               end) (Ret x)))).
+              eapply Interp_Memory_PropT_Vis_OOM.
+              reflexivity.
+            }
+
+            (* Handler succeeds *)
+            destruct HANDLER as [st' [ms_push [[] [TA PUSH_HANDLER]]]].
+            cbn in PUSH_HANDLER.
+
+            rewrite TA in VIS_HANDLED.
+            cbn in VIS_HANDLED.
+            rewrite bind_ret_l in VIS_HANDLED.
+
+
+            { epose proof mem_push_spec_fin_inf (lift_MemState_refine_prop m1) (lift_MemState_refine_prop ms_push) PUSH_HANDLER as PUSH_INF.
+
+              pstep; red; cbn.
+
+              eapply Interp_Memory_PropT_Vis with
+                (k2:=(fun '(ms_inf, (sid', _)) =>
+                        match convert_MemState ms_inf with
+                        | NoOom ms_fin =>
+                            get_inf_tree (k3 (ms_fin, (st', tt)))
+                        | Oom s => raiseOOM s
+                        end)
+                )
+                (s1:=s1)
+                (s2:=lift_MemState m1).
+
+              2: {
+                cbn. red. red.
+                repeat right.
+                exists s1.
+                exists (lift_MemState ms_push).
+                exists tt.
+                split; try reflexivity.
+                cbn; auto.
+              }
+
+              2: {
+                cbn.
+                rewrite bind_ret_l.
+                rewrite MemState_fin_to_inf_to_fin.
+                rewrite VIS_HANDLED.
+                rewrite <- itree_eta.
+                reflexivity.
+              }
+
+              (* Continuation for vis node *)
+              intros a b RETa RETb AB.
+              destruct b as [ms [sid' res]].
+              cbn in AB; subst; cbn in RETb.
+              apply Returns_ret_inv in RETb.
+              inv RETb.
+
+              cbn.
+              rewrite MemState_fin_to_inf_to_fin.
+              rewrite (itree_eta_ (k1 tt)).
+              rewrite (itree_eta_ (k3 (ms_push, (st', tt)))).
+              right.
+              eapply CIH.
+              2: {
+                repeat red.
+                specialize (HK tt (ms_push, (st', tt))).
+                forward HK.
+                { eapply ReturnsVis.
+                  unfold trigger.
+                  reflexivity.
+                  cbn.
+                  constructor.
+                  reflexivity.
+                }
+                forward HK.
+                { rewrite TA.
+                  constructor.
+                  reflexivity.
+                }
+
+                forward HK; auto.
+                pclearbot.
+
+                repeat rewrite <- itree_eta.
+                apply HK.
+              }
+
+              specialize (REL tt tt I).
+              pclearbot.
+
+              repeat rewrite <- itree_eta.
+              exact REL.
+            }
+          }
+
+          { (* MemPop *)
+            repeat red in HANDLER.
+            destruct HANDLER as [UB | [ERR | [OOM | HANDLER]]].
+            { (* Handler raises UB *)
+              admit.
+            }
+
+            { (* Handler raises error *)
+              destruct ERR as (msg&TA&msg_spec&ERR).
+              cbn in ERR.
+
+              (* There's an error if I cannot pop a stack frame...
+
+                         This shouldn't happen, but I should hopefully
+                         be able to show that if I cannot pop in the
+                         finite world, then I cannot pop in the
+                         infinite world either, so we should get an
+                         error in both places.
+               *)
+
+              rewrite TA in VIS_HANDLED.
+              pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
+                                                                         LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_error _ _) _ _ _ k3 msg) as RAISE.
+              rewrite RAISE in VIS_HANDLED.
+
+              pstep; red; cbn.
+
+              eapply Interp_Memory_PropT_Vis with
+                (k2:=(fun '(ms_inf, (sid', _)) =>
+                        get_inf_tree (k3 (s2, (s1, tt)))
+                ))
+                (s1:=s1)
+                (s2:=lift_MemState s2).
+              2: {
+                pose proof cannot_pop_fin_inf (lift_MemState_refine_prop s2) ERR as ERR_INF.
+                cbn.
+                repeat red.
+                right.
+                left.
+                cbn.
+                exists msg.
+                split; [reflexivity|].
+                exists msg_spec.
+                auto.
+              }
+
+              2: {
+                rewrite VIS_HANDLED.
+                rewrite get_inf_tree_equation.
+                cbn.
+                setoid_rewrite Raise.raise_bind_itree.
+                reflexivity.
+              }
+
+              intros a b RETa RETb AB.
+
+              unfold LLVMEvents.raise in RETb.
+              rewrite bind_trigger in RETb.
+              apply Returns_vis_inversion in RETb.
+              destruct RETb as [[] _].
+            }
+
+            { (* Handler raises OOM *)
+              destruct OOM as (oom_msg&TA_OOM&(oom_spec_msg&HANDLE_OOM)).
+              rewrite TA_OOM in VIS_HANDLED.
+              pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
+                                                                         LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k3 oom_msg) as RAISE.
+              rewrite RAISE in VIS_HANDLED.
+
+              eapply paco2_mon_bot; eauto.
+              rewrite VIS_HANDLED.
+              pstep; red; cbn.
+
+              change (VisF (subevent void (ThrowOOM (print_msg "")))
+                        (fun x : void =>
+                           ITree.subst
+                             (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                           end) (Ret x))) with
+                (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                            (fun x : void =>
+                               ITree.subst
+                                 (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                               end) (Ret x)))).
+
+              eapply Interp_Memory_PropT_Vis_OOM.
+              reflexivity.
+            }
+
+            (* Handler succeeds *)
+            destruct HANDLER as [st' [ms_pop [[] [TA POP_HANDLER]]]].
+            cbn in POP_HANDLER.
+
+            rewrite TA in VIS_HANDLED.
+            cbn in VIS_HANDLED.
+            rewrite bind_ret_l in VIS_HANDLED.
+
+            { pstep; red; cbn.
+              eapply Interp_Memory_PropT_Vis with
+                (k2:=(fun '(ms_inf, (sid', _)) =>
+                        match convert_MemState ms_inf with
+                        | NoOom ms_fin =>
+                            get_inf_tree (k3 (ms_fin, (st', tt)))
+                        | Oom s => raiseOOM s
+                        end)
+                )
+                (s1:=s1)
+                (s2:=lift_MemState s2).
+
+              2: {
+                cbn. red. red.
+                repeat right.
+                exists s1.
+                exists (lift_MemState ms_pop).
+                exists tt.
+                split; try reflexivity.
+                cbn.
+
+                eapply mem_pop_spec_fin_inf; eauto; apply lift_MemState_refine_prop.
+              }
+
+              2: {
+                cbn.
+                rewrite bind_ret_l.
+                rewrite MemState_fin_to_inf_to_fin.
+                rewrite VIS_HANDLED.
+                rewrite <- itree_eta.
+                reflexivity.
+              }
+
+              (* Continuation for vis node *)
+              intros [] b RETa RETb AB.
+              destruct b as [ms [sid' res]].
+              cbn in RETb.
+              cbn in AB. inv AB.
+              apply Returns_ret_inv in RETb.
+              inv RETb.
+
+              cbn.
+              rewrite MemState_fin_to_inf_to_fin.
+              rewrite (itree_eta_ (k1 tt)).
+              rewrite (itree_eta_ (k3 (ms_pop, (st', tt)))).
+              right.
+              eapply CIH.
+              2: {
+                repeat red.
+                specialize (HK tt (ms_pop, (st', tt))).
+                forward HK.
+                { eapply ReturnsVis.
+                  unfold trigger.
+                  reflexivity.
+                  cbn.
+                  constructor.
+                  reflexivity.
+                }
+                forward HK.
+                { rewrite TA.
+                  constructor.
+                  reflexivity.
+                }
+
+                forward HK; auto.
+                pclearbot.
+
+                repeat rewrite <- itree_eta.
+                apply HK.
+              }
+
+              specialize (REL tt tt I).
+              red in REL.
+              pclearbot.
+
+              repeat rewrite <- itree_eta.
+              exact REL.
+            }
+          }
+
+          { (* Alloca *)
+            repeat red in HANDLER.
+            destruct HANDLER as [UB | [ERR | [OOM | HANDLER]]].
+            { (* Handler raises UB *)
+              admit.
+            }
+
+            { (* Handler raises error *)
+              destruct ERR as (msg&TA&msg_spec&ERR).
+              destruct EV_REL as (?&?&?); subst.
+
+              apply handle_alloca_no_error in ERR.
+              contradiction.
+            }
+
+            { (* Handler raises OOM *)
+              destruct OOM as (oom_msg&TA_OOM&(oom_spec_msg&HANDLE_OOM)).
+              rewrite TA_OOM in VIS_HANDLED.
+              pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
+                                                                         LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k3 oom_msg) as RAISE.
+              rewrite RAISE in VIS_HANDLED.
+
+              eapply paco2_mon_bot; eauto.
+              rewrite VIS_HANDLED.
+              pstep; red; cbn.
+              change ((VisF (subevent void (ThrowOOM (print_msg "")))
+                         (fun x : void =>
+                            ITree.subst
+                              (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                            end) (Ret x))))
+                with
+                (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                            (fun x : void =>
+                               ITree.subst
+                                 (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                               end) (Ret x)))).
+
+              eapply Interp_Memory_PropT_Vis_OOM.
+              reflexivity.
+            }
+
+            (* Handler succeeds *)
+            destruct HANDLER as [st' [ms_alloca [d [TA ALLOCA_HANDLER]]]].
+
+            rewrite TA in VIS_HANDLED.
+            cbn in VIS_HANDLED.
+            rewrite bind_ret_l in VIS_HANDLED.
+            destruct EV_REL as (?&?&?); subst.
+
+            { epose proof handle_alloca_fin_inf (lift_MemState_refine_prop s2) ALLOCA_HANDLER as (dv_inf&ms_inf'&ALLOCA_INF&DV_REF&MSR_ALLOCA).
+
+              pstep; red; cbn.
+
+              eapply Interp_Memory_PropT_Vis with
+                (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                        get_inf_tree (k3 (ms_alloca, (st', d)))))
+                (s1:=s1)
+                (s2:=lift_MemState s2).
+
+              2: {
+                cbn. red. red.
+                repeat right.
+                exists s1.
+                exists ms_inf'.
+                exists dv_inf.
+                split; auto; reflexivity.
+              }
+
+              2: {
+                cbn.
+                rewrite bind_ret_l.
+                rewrite VIS_HANDLED.
+                rewrite <- itree_eta.
+                reflexivity.
+              }
+
+              (* Continuation for vis node *)
+              intros a b RETa RETb AB.
+              destruct b as [ms [sid' res]].
+              cbn in RETb; subst.
+              apply Returns_ret_inv in RETb.
+              inv RETb.
+
+              cbn.
+              rewrite (itree_eta_ (k1 dv_inf)).
+              rewrite (itree_eta_ (k3 (ms_alloca, (st', d)))).
+              right.
+              eapply CIH.
+              2: {
+                repeat red.
+                specialize (HK d (ms_alloca, (st', d))).
+                forward HK.
+                { eapply ReturnsVis.
+                  unfold trigger.
+                  reflexivity.
+                  cbn.
+                  constructor.
+                  reflexivity.
+                }
+                forward HK.
+                { rewrite TA.
+                  constructor.
+                  reflexivity.
+                }
+
+                forward HK; auto.
+                pclearbot.
+
+                repeat rewrite <- itree_eta.
+                apply HK.
+              }
+
+              specialize (REL dv_inf d).
+              forward REL; auto.
+              pclearbot.
+
+              repeat rewrite <- itree_eta.              
+              exact REL.
+            }
+          }
+
+          { (* Load *)
+            repeat red in HANDLER.
+            destruct HANDLER as [UB | [ERR | [OOM | HANDLER]]].
+            { (* Handler raises UB *)
+              admit.
+            }
+
+            { (* Handler raises error *)
+              destruct ERR as (msg&TA&msg_spec&ERR).
+              destruct EV_REL as (?&?); subst.
+
+              rewrite TA in VIS_HANDLED.
+              pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
+                                                                         LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_error _ _) _ _ _ k3 msg) as RAISE.
+              rewrite RAISE in VIS_HANDLED.
+
+              pstep; red; cbn.
+
+              eapply Interp_Memory_PropT_Vis with
+                (k2:=(fun '(ms_inf, (sid', uv_inf)) =>
+                        match DVCInfFin.uvalue_convert_strict uv_inf with
+                        | NoOom uv_fin => get_inf_tree (k3 (s2, (s1, uv_fin)))
+                        | Oom s => raiseOOM s
+                        end)
+                )
+                (s1:=s1)
+                (s2:=lift_MemState s2)
+                (ta:= raise_error msg).
+              3: {
+                rewrite VIS_HANDLED.
+                rewrite get_inf_tree_equation.
+                cbn.
+                setoid_rewrite Raise.raise_bind_itree.
+                reflexivity.
+              }
+
+              2: {
+                (* raise_ub includes raise_error... *)
+                red in ERR.
+                cbn.
+                break_match_hyp;
+                  try solve
+                    [ repeat red;
+                      left;
+                      exists "Loading from something that isn't an address.";
+                      rewrite DVCInfFin.dvalue_refine_strict_equation, DVCInfFin.dvalue_convert_strict_equation in H0;
+                      destruct a; cbn in H0; try break_match_hyp_inv; cbn; auto
+                    ].
+
+                apply dvalue_refine_strict_addr_r_inv in H0 as (ptr_inf&ADDR&ADDR_REF).
+                subst.
+
+                repeat red.
+                right.
+                left.
+
+                (* TODO: read_uvalue_spec_fin_inf_error lemma *)
+                (* Figure out where error came from in read_uvalue_spec *)
+                red in ERR.
+                repeat red in ERR.
+
+                destruct ERR as [ERR | ERR].
+                { (* TODO: read_bytes_spec_fin_inf_error lemma *)
+                  repeat red in ERR.
+                  destruct ERR as [ERR | ERR].
+                  { exfalso.
+                    apply get_consecutive_ptrs_never_fails in ERR.
+                    auto.
+                  }
+
+                  destruct ERR as (?&?&GCP&ERR).
+                  exists msg.
+                  split; [reflexivity|].
+                  exists msg_spec.
+
+                  cbn.
+                  left.
+                  right.
+
+                  pose proof GCP as GCP_INF.
+                  eapply fin_inf_get_consecutive_ptrs_success_exists in GCP_INF; eauto.
+                  2: apply lift_MemState_refine_prop.
+
+                  destruct GCP_INF as(?&?&GCP_INF&FORALL_INF&MSR').
+                  exists x2. exists x1.
+                  split; auto.
+
+                  clear - FORALL_INF ERR MSR'.
+                  generalize dependent x.
+                  generalize dependent x2.
+                  induction FORALL_INF; intros x2 x' ERR MSR'.
+                  - cbn in ERR; contradiction.
+                  - rewrite map_monad_unfold.
+                    rewrite map_monad_unfold in ERR.
+                    destruct ERR as [ERR | ERR].
+                    cbn in ERR; contradiction.
+
+                    destruct ERR as (?&?&?&ERR).
+                    cbn in ERR.
+                    destruct ERR as [ERR | ERR].
+                    + right.
+
+                      pose proof H0 as READ_INF.
+                      eapply fin_inf_read_byte_spec_MemPropT in READ_INF; eauto.
+                      destruct READ_INF as (byte_inf & ms_inf' & READ_INF & BYTES_REF & MSR'').
+                      exists ms_inf'. exists byte_inf.
+                      split; auto.
+
+                      cbn.
+                      left.
+                      eapply IHFORALL_INF; eauto.
+                    + destruct ERR as (?&?&?&?).
+                      contradiction.
+                }
+
+                destruct ERR as (?&?&?&ERR).
+                red in ERR.
+                break_match_hyp_inv.
+
+                eapply fin_inf_read_bytes_spec in H; eauto.
+                2: apply lift_MemState_refine_prop.
+                destruct H as (?&?&?&?&?).
+
+                pose proof Heqs as DESER_INF.
+                eapply deserialize_sbytes_fail_fin_inf in DESER_INF.
+                2: apply H0.
+
+                exists msg.
+                split; [reflexivity|].
+
+                exists s.
+                cbn.
+                right.
+
+                cbn in H.
+                destruct H as (?&?&?&?).
+                exists x2. exists x1.
+                split.
+                2: {
+                  red.
+                  rewrite DESER_INF.
+                  cbn; auto.
+                }
+
+                exists x3. exists x4.
+                split; auto.
+              }
+
+              intros a1 b RETa RETb AB.
+
+              (* H0 might be a contradiction... *)
+              unfold raise_error in RETb.
+              cbn in RETb.
+              unfold LLVMEvents.raise in RETb.
+              rewrite bind_trigger in RETb.
+              apply Returns_vis_inversion in RETb.
+              destruct RETb as [[] _].
+            }
+
+            { (* Handler raises OOM *)
+              destruct OOM as (oom_msg&TA_OOM&(oom_spec_msg&HANDLE_OOM)).
+              rewrite TA_OOM in VIS_HANDLED.
+              pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
+                                                                         LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k3 oom_msg) as RAISE.
+              rewrite RAISE in VIS_HANDLED.
+
+              eapply paco2_mon_bot; eauto.
+              rewrite VIS_HANDLED.
+
+              pstep; red; cbn.
+              change (VisF (subevent void (ThrowOOM (print_msg "")))
+                        (fun x : void =>
+                           ITree.subst
+                             (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                           end) (Ret x)))
+                with
+                (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+       (fun x : void =>
+        ITree.subst
+          (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                           end) (Ret x)))).
+              
+              eapply Interp_Memory_PropT_Vis_OOM.
+              reflexivity.
+            }
+
+            (* Handler succeeds *)
+            destruct HANDLER as [st' [ms_load [uv_fin [TA LOAD_HANDLER]]]].
+
+            rewrite TA in VIS_HANDLED.
+            cbn in VIS_HANDLED.
+            rewrite bind_ret_l in VIS_HANDLED.
+            destruct EV_REL as (?&?); subst.
+
+            { epose proof handle_load_fin_inf (lift_MemState_refine_prop s2) H0 LOAD_HANDLER as (uv_inf&ms_inf'&LOAD_INF&UV_REF&MSR_LOAD).
+
+              pstep; red; cbn.
+
+              eapply Interp_Memory_PropT_Vis with
+                (k2:=(fun '(ms_inf, (sid', uv_inf)) =>
+                        get_inf_tree (k3 (ms_load, (st', uv_fin)))))
+                (s1:=s1)
+                (s2:=lift_MemState s2).
+
+              2: {
+                cbn. red. red.
+                repeat right.
+                exists s1.
+                exists ms_inf'.
+                exists uv_inf.
+                split; auto; reflexivity.
+              }
+
+              2: {
+                cbn.
+                rewrite bind_ret_l.
+                rewrite VIS_HANDLED.
+                rewrite <- itree_eta.
+                reflexivity.
+              }
+
+              (* Continuation for vis node *)
+              intros a1 b RETa RETb AB.
+              destruct b as [ms [sid' res]].
+              cbn in AB; subst.
+              apply Returns_ret_inv in RETb.
+              inv RETb.
+              cbn.
+
+              rewrite (itree_eta_ (k1 uv_inf)).
+              rewrite (itree_eta_ (k3 (ms_load, (st', uv_fin)))).
+              right.
+              eapply CIH.
+              2: {
+                repeat red.
+                specialize (HK uv_fin (ms_load, (st', uv_fin))).
+                forward HK.
+                { eapply ReturnsVis.
+                  unfold trigger.
+                  reflexivity.
+                  cbn.
+                  constructor.
+                  reflexivity.
+                }
+                forward HK.
+                { rewrite TA.
+                  constructor.
+                  reflexivity.
+                }
+
+                forward HK; auto.
+                pclearbot.
+
+                repeat rewrite <- itree_eta.
+                apply HK.
+              }
+
+              specialize (REL uv_inf uv_fin).
+              forward REL; auto.
+              pclearbot.
+
+              repeat rewrite <- itree_eta.
+              exact REL.
+            }
+          }
+
+          { (* Store *)
+            repeat red in HANDLER.
+            destruct HANDLER as [UB | [ERR | [OOM | HANDLER]]].
+            { (* Handler raises UB *)
+              admit.
+            }
+
+            { (* Handler raises error *)
+              destruct ERR as (msg&TA&msg_spec&ERR).
+              destruct EV_REL as (?&?&?); subst.
+
+              rewrite TA in VIS_HANDLED.
+              pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
+                                                                         LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_error _ _) _ _ _ k3 msg) as RAISE.
+              rewrite RAISE in VIS_HANDLED.
+
+              eapply paco2_mon_bot; eauto.
+              rewrite VIS_HANDLED.
+              pstep; red; cbn.
+
+              change (VisF (subevent void (Throw (print_msg "")))
+       (fun x : void =>
+        ITree.subst
+          (fun v1 : void => match v1 return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                         end) (Ret x)))
+                with
+                (observe (Vis (subevent void (Throw (print_msg "")))
+       (fun x : void =>
+        ITree.subst
+          (fun v1 : void => match v1 return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                            end) (Ret x)))).
+
+              eapply Interp_Memory_PropT_Vis with
+                (k2:=(fun '(ms_inf, (sid', _)) =>
+                        get_inf_tree (k3 (s2, (s1, tt))))
+                )
+                (s1:=s1)
+                (s2:=lift_MemState s2)
+                (ta:= raise_error msg).
+              3: {
+                cbn.
+                setoid_rewrite Raise.raise_bind_itree.
+                unfold LLVMEvents.raise.
+                rewrite bind_trigger.
+                unfold print_msg.
+                cbn.
+                setoid_rewrite bind_ret_l.
+                reflexivity.
+              }
+
+              2: {
+                (* raise_ub includes raise_error... *)
+                red in ERR.
+                break_match_hyp;
+                  try solve
+                    [ repeat red;
+                      left;
+                      exists "Writing something to somewhere that isn't an address.";
+                      rewrite DVCInfFin.dvalue_refine_strict_equation, DVCInfFin.dvalue_convert_strict_equation in H0;
+                      destruct a; cbn in H0; try break_match_hyp_inv; cbn; auto
+                    ].
+
+                apply dvalue_refine_strict_addr_r_inv in H0 as (ptr_inf&ADDR&ADDR_REF).
+                subst.
+
+                red in ERR.
+                repeat red in ERR.
+                destruct ERR as [ERR | ERR].
+                { (* TODO: Split into a lemma about serialize_sbytes and error? *)
+                  (* Errors in serialize_sbytes generally seem
+                          to happen when there's a type
+                          mismatch... May want new uvalue_has_dtyp_ind
+                          to be able to do this proof?
+                   *)
+                  cbn in ERR.
+                  admit.
+                }
+
+                destruct ERR as (?&?&?&ERR).
+                destruct ERR as [ERR | ERR].
+                { exfalso.
+                  apply get_consecutive_ptrs_never_fails in ERR.
+                  auto.
+                }
+
+                destruct ERR as (?&?&GCP&ERR).
+                { (* ERR should be a contradiction as
+                             write_byte_spec_MemPropT doesn't contain
+                             error... Except in UB cases *)
+                  remember (zip x2 x0) as z.
+                  cbn in ERR.
+                  destruct ERR as [ERR | ERR].
+                  2: destruct ERR as (?&?&?&?); contradiction.
+
+                  clear Heqz GCP.
+                  generalize dependent x.
+                  generalize dependent x1.
+                  generalize dependent x2.
+                  induction z; intros x2 x1 ERR x H.
+                  - cbn in ERR; contradiction.
+                  - rewrite map_monad_unfold in ERR.
+                    destruct ERR as [ERR | ERR].
+                    + destruct a.
+                      cbn in ERR.
+                      contradiction.
+                    + destruct ERR as (?&?&?&ERR).
+                      repeat red in ERR.
+                      destruct ERR as [ERR | ERR].
+                      2: {
+                        destruct ERR as (?&?&?&ERR).
+                        cbn in ERR; contradiction.
+                      }
+
+                      eapply IHz in ERR; eauto.
+                }
+              }
+
+              intros a1 b RETa RETb AB.
+              unfold raise_error in RETb.
+              cbn in RETb.
+              unfold LLVMEvents.raise in RETb.
+              rewrite bind_trigger in RETb.
+              apply Returns_vis_inversion in RETb.
+              destruct RETb as [[] _].
+            }
+
+            { (* Handler raises OOM *)
+              destruct OOM as (oom_msg&TA_OOM&(oom_spec_msg&HANDLE_OOM)).
+              rewrite TA_OOM in VIS_HANDLED.
+              pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
+                                                                         LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k3 oom_msg) as RAISE.
+              rewrite RAISE in VIS_HANDLED.
+
+              eapply paco2_mon_bot; eauto.
+              rewrite VIS_HANDLED.
+              pstep; red; cbn.
+
+              change (VisF (subevent void (ThrowOOM (print_msg "")))
+       (fun x : void =>
+        ITree.subst
+          (fun v1 : void => match v1 return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                         end) (Ret x)))
+                with
+                (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+       (fun x : void =>
+        ITree.subst
+          (fun v1 : void => match v1 return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                         end) (Ret x)))).
+
+              eapply Interp_Memory_PropT_Vis_OOM.
+              reflexivity.
+            }
+
+            (* Handler succeeds *)
+            destruct HANDLER as [st' [ms_store [[] [TA STORE_HANDLER]]]].
+
+            rewrite TA in VIS_HANDLED.
+            cbn in VIS_HANDLED.
+            rewrite bind_ret_l in VIS_HANDLED.
+            destruct EV_REL as (?&?&?); subst.
+
+            { assert (LLVMParamsBigIntptr.Events.DV.uvalue_has_dtyp v t0) as TYPE.
+              { (* TODO: Will need a well-typed predicate to prove this *)
+                admit.
+              }
+
+              epose proof handle_store_fin_inf (lift_MemState_refine_prop s2) H0 H2 TYPE STORE_HANDLER as ([]&ms_inf'&STORE_INF&_&MSR_STORE).
+
+              pstep; red; cbn.
+              eapply Interp_Memory_PropT_Vis with
+                (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                        get_inf_tree (k3 (ms_store, (st', tt)))))
+                (s1:=s1)
+                (s2:=lift_MemState s2).
+
+              2: {
+                cbn. red. red.
+                repeat right.
+                exists s1.
+                exists ms_inf'.
+                exists tt.
+                split; auto; reflexivity.
+              }
+
+              2: {
+                cbn.
+                rewrite bind_ret_l.
+                rewrite VIS_HANDLED.
+                rewrite <- itree_eta.
+                reflexivity.
+              }
+
+              (* Continuation for vis node *)
+              intros a1 b RETa RETb AB.
+              destruct b as [ms [sid' res]].
+              cbn in AB; subst.
+              cbn in RETb.
+              apply Returns_ret_inv in RETb.
+              inv RETb.
+              cbn.
+
+              rewrite (itree_eta_ (k1 tt)).
+              rewrite (itree_eta_ (k3 (ms_store, (st', tt)))).
+              right.
+              eapply CIH.
+              2: {
+                repeat red.
+                specialize (HK tt (ms_store, (st', tt))).
+                forward HK.
+                { eapply ReturnsVis.
+                  unfold trigger.
+                  reflexivity.
+                  cbn.
+                  constructor.
+                  reflexivity.
+                }
+                forward HK.
+                { rewrite TA.
+                  constructor.
+                  reflexivity.
+                }
+
+                forward HK; auto.
+                pclearbot.
+
+                repeat rewrite <- itree_eta.
+                apply HK.
+              }
+
+              specialize (REL tt tt).
+              forward REL; auto.
+              pclearbot.
+
+              repeat rewrite <- itree_eta.
+              exact REL.
+            }
+          }
+
+          { (* Pick *)
+            destruct p0.
+            cbn in EV_REL.
+            destruct p.
+            cbn in *.
+            destruct EV_REL as [EV_PRE UV_REF].
+            unfold FinMemInterp.F_trigger in HANDLER.
+            setoid_rewrite bind_trigger in HANDLER.
+            cbn in HANDLER.
+            rewrite HANDLER in VIS_HANDLED.
+            rewrite bind_vis in VIS_HANDLED.
+            setoid_rewrite bind_ret_l in VIS_HANDLED.
+
+            eapply paco2_mon_bot; eauto.
+            rewrite VIS_HANDLED.
+            pstep; red; cbn.
+
+            rename Pre into Pre_inf.
+            rename Pre0 into Pre_fin.
+
+            (* eapply Interp_Memory_PropT_Vis *)
+            (*   with (k2:= *)
+            (*           fun (x : {_ : InterpreterStackBigIntptr.LP.Events.DV.dvalue | True}) => *)
+            (*             (let (x4, p) := x in *)
+            (*              get_inf_tree *)
+            (*                match DVCInfFin.dvalue_convert_strict x4 with *)
+            (*                | NoOom a => k5 (exist (fun _ : dvalue => True) a p) *)
+            (*                | Oom s => raiseOOM s *)
+            (*                end)). *)
+
+            (* 2: { *)
+            (*   cbn. *)
+            (*   red. *)
+            (*   reflexivity. *)
+            (* } *)
+            (* 2: { *)
+            (*   rewrite get_inf_tree_equation. *)
+            (*   cbn. *)
+            (*   rewrite bind_bind. *)
+            (*   rewrite bind_trigger. *)
+            (*   setoid_rewrite bind_ret_l. *)
+            (*   erewrite <- fin_to_inf_uvalue_refine_strict'; eauto. *)
+            (*   assert (Pre_inf = Pre_fin). *)
+            (*   { admit. (* TODO: Not provable? *) *)
+            (*   } *)
+            (*   subst. *)
+            
+            (*   cbn. *)
+            (*   pstep. red. cbn. *)
+            (*   eapply EqVis. *)
+            (*   intros v. *)
+
+            (*   with (k2:= *)
+            (*           fun (v : {_ : InterpreterStackBigIntptr.LP.Events.DV.dvalue | True}) => *)
+            (*           (let (x4, p) := v in *)
+            (*            get_inf_tree *)
+            (*              match DVCInfFin.dvalue_convert_strict x4 with *)
+            (*              | NoOom a => k5 (exist (fun _ : dvalue => True) a p) *)
+            (*              | Oom s => raiseOOM s *)
+            (*              end)). *)
+
+
+            (*   red. left. *)
+            (*   destruct v. *)
+            
+            (* } *)
+            (*   { intros a b H H1 H2. *)
+            (*     destruct b. destruct p. *)
+            (*     cbn in *; subst. *)
+            (*     right. *)
+
+            (*     left. *)
+            
+            (*   } *)
+
+            (*     with *)
+            (*     (k2:=(fun '(ms_inf, (sid', uv_inf)) => *)
+            (*             get_inf_tree (k2 (s2, (s1, x))))). *)
+
+            (*   eapply Interp_Memory_PropT_Vis. *)
+            (*   3: { *)
+            (*     rewrite get_inf_tree_equation. *)
+            (*     cbn. *)
+            (*   } *)
+            (* - specialize (EQ t1); contradiction. *)
+
+            
+
+
+            (*           get_inf_tree (k2 (s2, (s2, r))))). *)
+            (* eapply Interp_Memory_PropT_Vis with *)
+            (*   (ta:=trigger (E1.pick Pre0 (fin_to_inf_uvalue x0))). *)
+            (* 3: { *)
+            (*   rewrite VIS_HANDLED. *)
+            (*   rewrite get_inf_tree_equation. *)
+            (*   red. *)
+            (*   cbn. *)
+            
+            (* } *)
+            
+            (* destruct t2; pinversion VIS_HANDLED; subst_existT. *)
+            (* { exfalso; eapply EQ; eauto. } *)
+            (* subst_existT. *)
+
+            (* eapply Interp_Memory_PropT_Vis. *)
+            (* 3: { *)
+            (*   rewrite get_inf_tree_equation. *)
+            (*   cbn. *)
+            
+            (* } *)
+            (* - intros a b H H1 H2. *)
+            (*   left. *)
+            (*   setoid_rewrite REL. *)
+            (*   apply REL. *)
+
+            (* rewrite get_inf_tree_equation. *)
+            (* cbn. *)
+            (* pfold. red. *)
+            (* cbn. *)
+
+            (* eapply Interp_Memory_PropT_Vis with *)
+            (*   (k2:=(fun res : {_ : InfLP.Events.DV.dvalue | True} => *)
+            (*           let (x4, p) := res in *)
+            (*           get_inf_tree *)
+            (*             match DVCInfFin.dvalue_convert_strict x4 with *)
+            (*             | NoOom a => k (exist (fun _ : dvalue => True) a p) *)
+            (*             | Oom s => raiseOOM s *)
+            (*             end)). *)
+
+
+
+            (*   (k2:=(fun '(ms_inf, (sid', dv_inf)) => *)
+            (*           get_inf_tree (k2 (ms_store, (st', tt))))) *)
+            (*   (s1:=s1) *)
+            (*   (s2:=lift_MemState s2). *)
+
+            (* constructor. *)
+
+            (* cbn *)
+
+            (* epose proof (@itree_eta _ _ t2). *)
+
+            (* punfold VIS_HANDLED. *)
+            (* cbn in VIS_HANDLED. *)
+            (* red in VIS_HANDLED. *)
+            (* dependent induction VIS_HANDLED. *)
+            (* - admit. *)
+            (* - specialize (EQ *)
+            admit.
+          }
+
+          { (* OOM *)
+            red in HANDLER.
+            rewrite HANDLER in VIS_HANDLED.
+            setoid_rewrite bind_trigger in VIS_HANDLED.
+            rewrite bind_vis in VIS_HANDLED.
+
+            eapply paco2_mon_bot; eauto.
+            rewrite VIS_HANDLED.
+            pstep; red; cbn.
+
+            destruct o, o0.
+            eapply Interp_Memory_PropT_Vis_OOM.
+            cbn.
+            rewrite get_inf_tree_equation.
+            cbn.
+            unfold raiseOOM.
+            rewrite bind_trigger.
+            reflexivity.
+          }
+
+          { (* UBE *)
+            subst.
+            destruct u, u0.
+            red in HANDLER.
+            cbn in HANDLER.
+            rewrite bind_trigger in HANDLER.
+            rewrite HANDLER in VIS_HANDLED.
+            rewrite bind_vis in VIS_HANDLED.
+
+            pstep; red; cbn.
+            eapply Interp_Memory_PropT_Vis with
+              (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                      get_inf_tree (k3 (s2, (s1, _)))))
+              (s1:=s1)
+              (s2:=lift_MemState s2).
+
+            2: {
+              cbn. red.
+              cbn.
+              rewrite bind_trigger.
+              reflexivity.
+            }
+
+            2: {
+              rewrite VIS_HANDLED.
+              rewrite get_inf_tree_equation.
+              cbn.
+              unfold raiseUB.
+              rewrite bind_trigger.
+              rewrite bind_vis.
+              unfold print_msg.
+              destruct u.
+              pstep; red; cbn.
+              constructor.
+              intros [].
+            }
+
+            intros [].
+          }
+
+          { (* DebugE *)
+            red in HANDLER.
+            destruct d, d0.
+            subst.
+            destruct u0.
+            cbn in HANDLER.
+            rewrite bind_trigger in HANDLER.
+            rewrite HANDLER in VIS_HANDLED.
+            rewrite bind_vis in VIS_HANDLED.
+
+            pstep; red; cbn.
+
+            change
+              (VisF (subevent unit (Debug tt))
+                 (fun H13 : unit => get_inf_tree (ITree.bind (SemNotations.Ret2 s1 s2 H13) k3)))
+              with
+              (observe
+                 (Vis (subevent unit (Debug tt))
+                    (fun H13 : unit => get_inf_tree (ITree.bind (SemNotations.Ret2 s1 s2 H13) k3)))).
+
+            eapply Interp_Memory_PropT_Vis with
+              (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                      get_inf_tree (k3 (s2, (s1, tt)))))
+              (s1:=s1)
+              (s2:=lift_MemState s2).
+
+            2: {
+              cbn.
+              red.
+              cbn.
+              rewrite bind_trigger.
+              reflexivity.
+            }
+
+            2: {
+              cbn.
+              rewrite VIS_HANDLED.
+              rewrite bind_vis.
+              setoid_rewrite bind_ret_l.
+              pstep; red; cbn.
+              constructor.
+              intros [].
+              red.
+              left.
+              eapply paco2_eqit_refl.
+            }
+
+            intros a b RETa RETb AB.
+            apply Returns_vis_inversion in RETb as [[] RETb].
+            destruct b as [ms' [sid' []]].
+            cbn in AB; subst.
+
+            apply Returns_ret_inv in RETb.
+            inv RETb.
+            cbn.
+
+            specialize (REL tt tt eq_refl).
+            pclearbot.
+
+            specialize (HK tt (s2, (s1, tt))).
+            forward HK.
+            { eapply ReturnsVis.
+              unfold trigger.
+              reflexivity.
+              cbn.
+              constructor.
+              reflexivity.
+            }
+            forward HK.
+            { rewrite HANDLER.
+              eapply ReturnsVis.
+              reflexivity.
+              constructor.
+              reflexivity.
+            }
+            specialize (HK eq_refl).
+            pclearbot.
+
+            right.
+
+            rewrite (itree_eta_ (k1 tt)).
+            rewrite (itree_eta_ (k3 (s2, (s1, tt)))).
+
+            eapply CIH.
+            2: {
+              repeat red.
+              repeat rewrite <- itree_eta.
+              apply HK.
+            }
+
+            repeat rewrite <- itree_eta.
+            exact REL.
+          }
+
+          { (* FailureE *)
+            red in HANDLER.
+            destruct f, f0.
+            cbn in HANDLER.
+            rewrite bind_trigger in HANDLER.
+            rewrite HANDLER in VIS_HANDLED.
+            rewrite bind_vis in VIS_HANDLED.
+
+            eapply paco2_mon_bot; eauto.
+            rewrite VIS_HANDLED.
+            pstep; red; cbn.
+
+            change (VisF (subevent void (Throw (print_msg "")))
+       (fun x : void =>
+        ITree.subst
+          (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                        end) (Ret x)))
+              with
+              (observe (Vis (subevent void (Throw (print_msg "")))
+       (fun x : void =>
+        ITree.subst
+          (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                        end) (Ret x)))).
+
+            eapply Interp_Memory_PropT_Vis with
+              (s1:=s1)
+              (s2:=lift_MemState s2).
+
+            2: {
+              cbn.
+              red.
+              cbn.
+              rewrite bind_trigger.
+              reflexivity.
+            }
+
+            2: {
+              cbn.
+              rewrite bind_vis.
+              destruct u; unfold print_msg; cbn.
+              setoid_rewrite bind_ret_l.
+              pstep; red; cbn.
+              constructor.
+              intros [].
+            }
+
+            intros [].
+          }
+      - (* oruttF's EqVisOOM *)
+        destruct e.
+        repeat red in RUN.
+        punfold RUN; red in RUN; cbn in RUN.
+
+        clear CIH MSR.
+        dependent induction RUN.
+        + (* TauR *)
+          pstep; red; cbn.
+          constructor; auto.
+
+          specialize (IHRUN (observe t2) u k2).
+          repeat (forward IHRUN; auto).
+
+          punfold IHRUN.
+        + (* VisOOM *)
+          eapply paco2_mon_bot; eauto.
+          rewrite HT1.
+          cbn.
+          rewrite get_inf_tree_equation.
+          destruct e.
+          cbn.
+          pstep; red; cbn.
+          observe_vis.
+          eapply Interp_Memory_PropT_Vis_OOM.
+          reflexivity.
+        + (* Vis *)
+          cbn in H.
+          red in H.
+          cbn in H.
+          rewrite bind_trigger in H.
+          rewrite H in H0.
+          eapply paco2_mon_bot; eauto.
+          rewrite H0.
+          cbn.
+          rewrite get_inf_tree_equation.
+          cbn.
+          pstep; red; cbn.
+          observe_vis.
+          eapply Interp_Memory_PropT_Vis_OOM.
+          reflexivity.
+      - (* oruttF's EqTauL *)
+        forward IHREL; [exact RUN|].
+        forward IHREL; auto.
+        pfold. red. constructor; auto.
+        punfold IHREL.
+      - (* oruttF's EqTauR *)
+        forward IHREL.
+        { repeat red.
+          repeat red in RUN.
+          cbn in *.
+          rewrite tau_eutt in RUN.
+          rewrite <- itree_eta.
+          exact RUN.
+        }
+
+        forward IHREL; auto.
+    }
+
+    apply get_inf_tree_rutt.
+  Qed.
+
+  (* Extra stuff from the proof of the above lemma that needs to get cleaned up... But there's some other stuff in here that I need to not accidentally delete *)
+        
+          
+          destruct e.
+
+          
+          rewrite HT1.
+          eapply Interp_Memory_PropT_Vis_OOM.
+
               - (* TauL *)
                 pclearbot.
                 apply orutt_inv_Vis_r in H.

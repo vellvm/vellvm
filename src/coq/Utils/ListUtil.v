@@ -1437,6 +1437,7 @@ Proof.
   induction xs; auto.
 Qed.
 
+
   (* TODO: move this / does this exist somewhere else? *)
   Lemma nat_strong_rect :
     forall (P: nat -> Type)
@@ -1792,3 +1793,37 @@ Inductive Forall2T {A B : Type} (f : A -> B -> Type) : list A -> list B -> Type 
     reflexivity.
   Qed.
 *)
+
+Lemma nth_error_cons :
+  forall {X} (x : X) xs n res,
+    nth_error xs n = res ->
+    nth_error (x::xs) (S n) = res.
+Proof.
+  intros X x xs n res H.
+  cbn; auto.
+Qed.
+
+Lemma double_list_rect :
+  forall {X Y}
+    (P: (list X * list Y) -> Type)
+    (NilNil : P (nil, nil))
+    (NilCons : forall y ys, P (nil, ys) -> P (nil, (y :: ys)))
+    (ConsNil : forall x xs, P (xs, nil) -> P ((x :: xs), nil))
+    (ConsCons : forall x xs y ys, P (xs, ys) -> P ((x :: xs), (y :: ys))),
+  forall l, P l.
+Proof.
+  intros X Y P NilNil NilCons ConsNil ConsCons l.
+  destruct l as [xs ys].
+  revert ys.
+  induction xs; induction ys.
+  - apply NilNil.
+  - apply NilCons.
+    apply IHys.
+  - apply ConsNil.
+    apply IHxs.
+  - apply ConsCons.
+    apply IHxs.
+Qed.
+
+
+

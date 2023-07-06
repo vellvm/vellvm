@@ -77,16 +77,20 @@ Set Contextual Implicit.
   | StackPush (args: list (k * v)) : StackE k v unit (* Pushes a fresh environment during a call *)
   | StackPop : StackE k v unit. (* Pops it back during a ret *)
 
+  (* This function can be replaced with print_string during extraction
+     to print the error messages of Throw and (indirectly) ThrowUB. *)
+  Definition print_msg (msg : string) : unit := tt.
+
   (* Undefined behaviour carries a string. *)
   Variant UBE : Type -> Type :=
-  | ThrowUB : string -> UBE void.
+  | ThrowUB : unit -> UBE void.
 
   (** Since the output type of [ThrowUB] is [void], we can make it an action
     with any return type. *)
   Definition raiseUB {E : Type -> Type} `{UBE -< E} {X}
              (e : string)
     : itree E X
-    := v <- trigger (ThrowUB e);; match v: void with end.
+    := v <- trigger (ThrowUB (print_msg e));; match v: void with end.
 
   #[global] Instance RAISE_UB_ITREE_UB {E : Type -> Type} `{UBE -< E} : RAISE_UB (itree E) :=
   { raise_ub := fun A e => raiseUB e
@@ -94,14 +98,14 @@ Set Contextual Implicit.
 
   (* Out of memory / abort. Carries a string for a message. *)
   Variant OOME : Type -> Type :=
-  | ThrowOOM : string -> OOME void.
+  | ThrowOOM : unit -> OOME void.
 
   (** Since the output type of [ThrowUB] is [void], we can make it an action
     with any return type. *)
   Definition raiseOOM {E : Type -> Type} `{OOME -< E} {X}
              (e : string)
     : itree E X
-    := v <- trigger (ThrowOOM e);; match v: void with end.
+    := v <- trigger (ThrowOOM (print_msg e));; match v: void with end.
 
   #[global] Instance RAISE_OOM_ITREE_OOME {E : Type -> Type} `{OOME -< E} : RAISE_OOM (itree E) :=
   { raise_oom := fun A => raiseOOM
@@ -110,21 +114,18 @@ Set Contextual Implicit.
   (* Debug is identical to the "Trace" effect from the itrees library,
    but debug is probably a less confusing name for us. *)
   Variant DebugE : Type -> Type :=
-  | Debug : string -> DebugE unit.
+  | Debug : unit -> DebugE unit.
+
   (* Utilities to conveniently trigger debug events *)
   Definition debug {E} `{DebugE -< E} (msg : string) : itree E unit :=
-    trigger (Debug msg).
+    trigger (Debug (print_msg msg)).
 
   (* Failure. Carries a string for a message. *)
   Variant FailureE : Type -> Type :=
-  | Throw : string -> FailureE void.
-
-  (* This function can be replaced with print_string during extraction
-     to print the error messages of Throw and (indirectly) ThrowUB. *)
-  Definition print_msg (msg : string) : unit := tt.
+  | Throw : unit -> FailureE void.
 
   Definition raise {E} {A} `{FailureE -< E} (msg : string) : itree E A :=
-    v <- trigger (Throw msg);; match v: void with end.
+    v <- trigger (Throw (print_msg msg));; match v: void with end.
 
   #[global] Instance RAISE_ERR_ITREE_FAILUREE {E : Type -> Type} `{FailureE -< E} : RAISE_ERROR (itree E) :=
   { raise_error := fun A e => raise e

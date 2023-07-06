@@ -3947,6 +3947,7 @@ Hint Constructors uvalue_has_dtyp : uvalue.
 
   End uvalue_has_dtyp_ind.
 
+
   Lemma dvalue_has_dtyp_ALL_IX_SUPPORTED :
     forall dv dt,
       dvalue_has_dtyp dv dt ->

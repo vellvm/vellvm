@@ -67,7 +67,6 @@ Section MonadContext.
   Existing Instance MRETPROPER.
   Existing Instance MRETPROPERFLIP.
 
-
 Lemma map_monad_unfold :
   forall {A B : Type} (x : A) (xs : list A)
     (f : A -> M B),
@@ -79,7 +78,6 @@ Proof.
   intros A B x xs f.
   induction xs; cbn; auto.
 Qed.
-
 
 Lemma map_monad_length :
   forall {A B}  (xs : list A) (f : A -> M B) res,
@@ -105,7 +103,6 @@ Proof.
     cbn.
     lia.
 Qed.
-
 
 (* TODO: can I generalize this? *)
 Lemma map_monad_err_In :
@@ -242,6 +239,75 @@ Proof.
       destruct (map_monad f l) eqn:HMAP; inv MAP.
       specialize (IHl b eq_refl) as [a' [IN FA]].
       exists a'. tauto.
+Qed.
+
+Lemma map_monad_err_twin_fail :
+  forall {s1 s2 : string}
+    {X Y Z} {xs : list X} {f : X -> err Y} {g : X -> err Z}
+    (MAPM1 : map_monad f xs = inl s1)
+    (MAPM2 : map_monad g xs = inl s2)
+    (SAME_ERROR : forall x s, f x = inl s <-> g x = inl s),
+    s1 = s2.
+Proof.
+  intros s1 s2 X Y Z xs.
+  induction xs; intros f g MAPM1 MAPM2 SAME_ERROR.
+  - cbn in *.
+    inv MAPM1.
+  - cbn in *.
+    break_match_hyp_inv; break_match_hyp_inv.
+    + apply SAME_ERROR in Heqs0.
+      rewrite Heqs0 in Heqs; inv Heqs; auto.
+    + clear H0.
+      apply SAME_ERROR in Heqs.
+      rewrite Heqs0 in Heqs; inv Heqs; auto.
+    + break_match_hyp_inv.
+      * apply SAME_ERROR in Heqs1.
+        rewrite Heqs1 in Heqs; inv Heqs; auto.
+      * break_match_hyp_inv.
+        eapply IHxs; eauto.
+Qed.
+
+Lemma map_monad_err_twin_fail' :
+  forall {s1 s2 : string}
+    {X Y Z W} {xs : list X} {ys : list Y} {f : X -> err Z} {g : Y -> err W}
+    (MAPM1 : map_monad f xs = inl s1)
+    (MAPM2 : map_monad g ys = inl s2)
+    (SAME_ERROR : forall n x y s,
+        Util.Nth xs n x ->
+        Util.Nth ys n y ->
+        f x = inl s <-> g y = inl s),
+    s1 = s2.
+Proof.
+  intros s1 s2 X Y Z W xs ys.
+  remember (xs, ys) as ZIP.
+  replace xs with (fst ZIP) in * by (subst; auto).
+  replace ys with (snd ZIP) in * by (inv HeqZIP; cbn; auto).
+  clear xs ys HeqZIP.
+  induction ZIP using double_list_rect; intros f g MAPM1 MAPM2 SAME_ERROR;
+    try solve
+      [ cbn in *;
+        solve
+          [ inv MAPM1
+          | inv MAPM2
+          ]
+      ].
+
+  cbn in *.          
+  break_match_hyp_inv; break_match_hyp_inv.
+  - specialize (SAME_ERROR 0%nat x y s1 eq_refl eq_refl).
+    apply SAME_ERROR in Heqs0.
+    rewrite Heqs in Heqs0; inv Heqs0; auto.
+  - specialize (SAME_ERROR 0%nat x y s2 eq_refl eq_refl).
+    apply SAME_ERROR in Heqs.
+    rewrite Heqs in Heqs0; inv Heqs0; auto.
+  - break_match_hyp_inv.
+    + eapply (SAME_ERROR 0%nat) in Heqs1; cbn; eauto.
+      rewrite Heqs in Heqs1; inv Heqs1.
+    + break_match_hyp_inv.
+      eapply IHZIP; eauto.
+      intros n x0 y0 s H H0.
+      eapply SAME_ERROR;
+        apply nth_error_cons; eauto.
 Qed.
 
 Lemma map_monad_map :
