@@ -831,15 +831,15 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
   Definition endianess : Endianess
     := ENDIAN_LITTLE.
 
-  Fixpoint all_extract_bytes_from_uvalue_helper (idx' : Z) (sid' : store_id) (dt' : dtyp) (parent : uvalue) (bytes : list uvalue) : option uvalue
+  Fixpoint all_extract_bytes_from_uvalue_helper (idx' : N) (sid' : store_id) (dt' : dtyp) (parent : uvalue) (bytes : list uvalue) : option uvalue
     := match bytes with
        | [] => Some parent
        | (UVALUE_ExtractByte uv dt idx sid)::bytes =>
-           guard_opt (uvalue_int_eq_Z idx idx');;
+           guard_opt (N.eqb idx idx');;
            guard_opt (RelDec.rel_dec uv parent);;
            guard_opt (N.eqb sid sid');;
            guard_opt (dtyp_eqb dt dt');;
-           all_extract_bytes_from_uvalue_helper (Z.succ idx') sid' dt' parent bytes
+           all_extract_bytes_from_uvalue_helper (N.succ idx') sid' dt' parent bytes
        | _ => None
        end.
 
@@ -1475,14 +1475,11 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
       with
 
       (* Take a UVALUE_ExtractByte, and replace the uvalue with a given dvalue...
-
-         Note: this also concretizes the index.
        *)
       uvalue_byte_replace_with_dvalue_byte (uv : uvalue) (dv : dvalue) {struct uv} : M dvalue_byte
       := match uv with
          | UVALUE_ExtractByte uv dt idx sid =>
-             cidx <- concretize_uvalueM idx;;
-             ret (DVALUE_ExtractByte dv dt (Z.to_N (dvalue_int_unsigned cidx)))
+             ret (DVALUE_ExtractByte dv dt idx)
          | _ => lift_ue (raise_error "uvalue_byte_replace_with_dvalue_byte called with non-UVALUE_ExtractByte value.")
          end
 
@@ -1504,8 +1501,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                  let '(ins, outs) := filter_uvalue_sid_matches uv uvs in
                  (* Concretize first uvalue *)
                  dv <- concretize_uvalueM byte_uv;;
-                 cidx <- concretize_uvalueM idx;;
-                 let dv_byte := DVALUE_ExtractByte dv dt (Z.to_N (dvalue_int_unsigned cidx)) in
+                 let dv_byte := DVALUE_ExtractByte dv dt idx in
                  let acc := @NM.add _ n dv_byte acc in
                  (* Concretize entangled bytes *)
                  acc <- monad_fold_right (fun acc '(n, uv) =>

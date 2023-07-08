@@ -64,9 +64,9 @@ Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModul
 
   Lemma all_bytes_helper_app :
     forall  sbytes sbytes2 start sid uv,
-      all_bytes_from_uvalue_helper (Z.of_N start) sid uv sbytes = Some uv ->
-      all_bytes_from_uvalue_helper (Z.of_N (start + N.of_nat (List.length sbytes))) sid uv sbytes2 = Some uv ->
-      all_bytes_from_uvalue_helper (Z.of_N start) sid uv (sbytes ++ sbytes2) = Some uv.
+      all_bytes_from_uvalue_helper start sid uv sbytes = Some uv ->
+      all_bytes_from_uvalue_helper (start + N.of_nat (List.length sbytes)) sid uv sbytes2 = Some uv ->
+      all_bytes_from_uvalue_helper start sid uv (sbytes ++ sbytes2) = Some uv.
   Proof.
     induction sbytes;
       intros sbytes2 start sid uv INIT REST.
@@ -79,110 +79,63 @@ Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModul
       do 3 (break_match; [|solve [inv INIT]]).
 
       cbn in REST. auto.
-      replace (Z.of_N (start + N.pos (Pos.of_succ_nat (Datatypes.length sbytes)))) with (Z.of_N (N.succ start + N.of_nat (Datatypes.length sbytes))) in REST by lia.
-
-      rewrite <- N2Z.inj_succ in *.
-
+      replace (start + N.pos (Pos.of_succ_nat (Datatypes.length sbytes))) with (N.succ start + N.of_nat (Datatypes.length sbytes)) in REST by lia.
       apply IHsbytes; auto.
   Qed.
 
   Lemma to_ubytes_all_bytes_from_uvalue_helper' :
     forall len uv dt sid sbytes start,
       is_supported dt ->
-      map_monad (fun n : N =>
-                   n' <- IP.from_Z (Z.of_N n);;
-                   ret (uvalue_sbyte uv dt (UVALUE_IPTR n') sid)) (Nseq start len) = NoOom sbytes ->
-      all_bytes_from_uvalue_helper (Z.of_N start) sid uv sbytes = Some uv.
+      map (fun n : N => uvalue_sbyte uv dt n sid) (Nseq start len) = sbytes ->
+      all_bytes_from_uvalue_helper start sid uv sbytes = Some uv.
   Proof.
     induction len;
       intros uv dt sid sbytes start SUP TO.
     - inv TO; reflexivity.
     - rewrite Nseq_S in TO.
-      assert (Monad.eq1 (map_monad
-                (fun n : N => n' <- IP.from_Z (Z.of_N n);; ret (uvalue_sbyte uv dt (UVALUE_IPTR n') sid))
-                (Nseq start len ++ start + N.of_nat len :: nil)) (NoOom sbytes)) as EQ1.
-      { unfold Monad.eq1, MonadEq1OOM.
-        rewrite TO.
-        auto.
-      }
-
-      setoid_rewrite -> map_monad_app in EQ1.
-      destruct (map_monad
-             (fun n : N => n' <- IP.from_Z (Z.of_N n);; ret (uvalue_sbyte uv dt (UVALUE_IPTR n') sid))
-             (Nseq start len)) eqn:Hfirst; [|inversion EQ1].
-      destruct (map_monad
-             (fun n : N => n' <- IP.from_Z (Z.of_N n);; ret (uvalue_sbyte uv dt (UVALUE_IPTR n') sid))
-             (start + N.of_nat len :: nil)) eqn:Hlast; [|inversion EQ1].
-
-      cbn in EQ1; subst.
-      apply all_bytes_helper_app.
-      + eauto.
-      + cbn in Hlast.
-        break_match_hyp; inversion Hlast; subst.
-        cbn.
-        break_match_hyp; inversion Heqo; subst.
-        rewrite sbyte_to_extractbyte_of_uvalue_sbyte.
-        cbn.
-
-        apply IP.from_Z_to_Z in Heqo0.
-        rewrite Heqo0.
-        assert (len = Datatypes.length l) as Hlen.
-
-        { assert (MReturns l (map_monad
-                                (fun n : N => n' <- IP.from_Z (Z.of_N n);; ret (uvalue_sbyte uv dt (UVALUE_IPTR n') sid))
-                                (Nseq start len))) as RETS.
-          { rewrite Hfirst.
-            reflexivity.
-          }
-
-          apply MapMonadExtra.map_monad_length in RETS.
-          rewrite Nseq_length in RETS.
-          auto.
-        }
-
-        subst.
-        rewrite Z.eqb_refl.
-        rewrite eq_dec_eq.
-        rewrite N.eqb_refl.
-        cbn.
-        reflexivity.
+      rewrite map_app in TO.
+      subst.
+      eapply all_bytes_helper_app.
+      eapply IHlen; eauto.
+      cbn.
+      rewrite sbyte_to_extractbyte_of_uvalue_sbyte.
+      rewrite map_length.
+      rewrite Nseq_length.
+      unfold OptionUtil.guard_opt.
+      rewrite N.eqb_refl.
+      rewrite eq_dec_eq.
+      rewrite N.eqb_refl.
+      reflexivity.
   Qed.
 
   Lemma to_ubytes_all_bytes_from_uvalue_helper :
     forall uv dt sid sbytes,
       is_supported dt ->
-      to_ubytes uv dt sid = NoOom sbytes ->
+      to_ubytes uv dt sid = sbytes ->
       all_bytes_from_uvalue_helper 0 sid uv sbytes = Some uv.
   Proof.
     intros uv dt sid sbytes SUP TO.
-
-    change 0%Z with (Z.of_N 0).
     eapply to_ubytes_all_bytes_from_uvalue_helper'; eauto.
   Qed.
 
   Lemma to_ubytes_sizeof_dtyp :
     forall uv dt sid sbytes,
-      to_ubytes uv dt sid = NoOom sbytes ->
+      to_ubytes uv dt sid = sbytes ->
       N.of_nat (List.length sbytes) = sizeof_dtyp dt.
   Proof.
     intros uv dt sid sbytes TOUBYTES.
     unfold to_ubytes in *.
-    assert (MReturns sbytes (map_monad
-               (fun n : N =>
-                n' <- IP.from_Z (Z.of_N n);; ret (uvalue_sbyte uv dt (UVALUE_IPTR n') sid))
-               (Nseq 0 (N.to_nat (sizeof_dtyp dt))))) as RETS.
-    { rewrite TOUBYTES; reflexivity.
-    }
-
-    apply MapMonadExtra.map_monad_length in RETS.
-    rewrite Nseq_length in RETS.
-    lia.
+    subst.
+    rewrite map_length.
+    rewrite Nseq_length.
+    rewrite Nnat.N2Nat.id.
+    reflexivity.
   Qed.
 
   Lemma to_ubytes_first_byte :
     forall uv dt sid s l,
-      to_ubytes uv dt sid = NoOom (s :: l) ->
-      s = uvalue_sbyte uv dt (UVALUE_IPTR IP.zero) sid.
+      to_ubytes uv dt sid = (s :: l) ->
+      s = uvalue_sbyte uv dt 0 sid.
   Proof.
     intros uv dt sid s l TO.
     unfold to_ubytes in TO.
@@ -202,8 +155,7 @@ Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModul
     rewrite Hsn in TO.
     cbn in TO.
 
-    rewrite IP.from_Z_0 in TO.
-    break_match_hyp; inversion TO; subst.
+    inversion TO; subst.
     auto.
   Qed.
 
@@ -212,7 +164,7 @@ Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModul
       is_supported dt ->
       sizeof_dtyp dt > 0 ->
       uvalue_has_dtyp uv dt ->
-      to_ubytes uv dt sid = NoOom sbytes ->
+      to_ubytes uv dt sid = sbytes ->
       from_ubytes sbytes dt = uv.
   Proof.
     intros uv dt sid sbytes SUP SIZE TYPE TOUBYTES.

@@ -234,14 +234,13 @@ Module InfiniteToFinite.
   Definition convert_SByte (sb1 : MemoryBigIntptr.MP.BYTE_IMPL.SByte) : OOM (Memory64BitIntptr.MP.BYTE_IMPL.SByte).
     destruct sb1.
     refine (uv' <- DVC1.uvalue_convert_strict uv;;
-            idx' <- DVC1.uvalue_convert_strict idx;;
-            ret (FiniteSizeof.mkUByte LLVMParams64BitIntptr.Events.DV.uvalue uv' dt idx' sid)).
+            ret (FiniteSizeof.mkUByte LLVMParams64BitIntptr.Events.DV.uvalue uv' dt idx sid)).
   Defined.
 
   Definition lift_SByte (sb1 : Memory64BitIntptr.MP.BYTE_IMPL.SByte) : MemoryBigIntptr.MP.BYTE_IMPL.SByte.
     destruct sb1.
     remember (DVC2.uvalue_convert_strict uv).
-    exact (FiniteSizeof.mkUByte DVC2.DV2.uvalue (fin_to_inf_uvalue uv) dt (fin_to_inf_uvalue idx) sid).
+    exact (FiniteSizeof.mkUByte DVC2.DV2.uvalue (fin_to_inf_uvalue uv) dt idx sid).
   Defined.
 
   Lemma lift_SByte_convert_SByte_inverse :
@@ -255,12 +254,9 @@ Module InfiniteToFinite.
     destruct sb_inf eqn: EQ1.
     destruct (DVC1.uvalue_convert_strict uv) eqn: EQ2; [|inversion H].
     cbn in H.
-    destruct (DVC1.uvalue_convert_strict idx) eqn: EQ3; [|inversion H].
     inversion H.
     apply fin_to_inf_convert_uvalue_inversion in EQ2.
-    apply fin_to_inf_convert_uvalue_inversion in EQ3.
     rewrite EQ2.
-    rewrite EQ3.
     reflexivity.
   Qed.
 
@@ -275,7 +271,7 @@ Module InfiniteToFinite.
     unfold sbyte_refine, lift_SByte.
     destruct byte.
     cbn.
-    do 2 rewrite convert_fin_to_inf_uvalue_succeeds.
+    rewrite convert_fin_to_inf_uvalue_succeeds.
     reflexivity.
   Qed.
 
@@ -9433,7 +9429,7 @@ cofix CIH
     destruct b1, b2.
     cbn in *.
     inv H.
-    apply fin_to_inf_uvalue_injective in H1, H3.
+    apply fin_to_inf_uvalue_injective in H1.
     subst.
     auto.
   Qed.
@@ -9879,9 +9875,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       exists ms_inf. exists bytes_inf'.
       split; auto.
 
-      destruct addrs_inf as [? | a_inf' addrs_inf].
+      destruct addrs_inf as [ | a_inf' addrs_inf].
       {
-        destruct addrs_fin as [? | a_fin' addrs_fin].
+        destruct addrs_fin as [ | a_fin' addrs_fin].
         {
           cbn in READ_SPEC_REST.
           destruct READ_SPEC_REST; subst.
@@ -9893,7 +9889,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         inv ADDRS_CONV.
       }
 
-      destruct addrs_fin as [? | a_fin' addrs_fin].
+      destruct addrs_fin as [ | a_fin' addrs_fin].
       { (* Should be a contradiction *)
         inv ADDRS_CONV.
       }
@@ -13482,7 +13478,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           unfold sbyte_refine, convert_SByte in BYTE_REFINE.
           break_match_hyp; cbn in BYTE_REFINE.
           break_match_hyp; inv BYTE_REFINE.
-          break_match_hyp; inv H0.
+          inv H0.
 
           (* TODO: Need lemmas about sbyte_sid *)
           admit.
@@ -13526,12 +13522,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           unfold sbyte_refine, convert_SByte in BYTE_REFINE.
           break_match_hyp; cbn in BYTE_REFINE.
           break_match_hyp; inv BYTE_REFINE.
-          break_match_hyp; inv H0.
+          inv H0.
 
           (* TODO: Need lemmas about sbyte_sid *)
           unfold FinMem.MMEP.MMSP.MemByte.sbyte_sid, InfMem.MMEP.MMSP.MemByte.sbyte_sid in *.
           break_match_hyp; inv BYTE.
-          cbn in Hequ1.
+          cbn in Hequ0.
           unfold FinMem.MP.BYTE_IMPL.sbyte_to_extractbyte.
           (* unfold Memory64BitIntptr.Byte.sbyte_to_extractbyte. *)
           admit.
@@ -13627,14 +13623,13 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       Memory64BitIntptr.MMEP.MemSpec.MemHelpers.generate_num_undef_bytes_h start_ix (N.succ sz) t sid = NoOom bytes_fin ->
       exists byte bytes_fin',
         Memory64BitIntptr.MMEP.MemSpec.MemHelpers.generate_num_undef_bytes_h (N.succ start_ix) sz t sid = NoOom bytes_fin' /\
-          (x' <- IP.from_Z (Z.of_N start_ix);;
-           ret (uvalue_sbyte (UVALUE_Undef t) t (UVALUE_IPTR x') sid)) = NoOom byte /\
+          (uvalue_sbyte (UVALUE_Undef t) t start_ix sid = byte) /\
           bytes_fin = byte :: bytes_fin'.
   Proof.
     induction sz using N.peano_rect; intros start_ix t sid bytes_fin GEN.
     unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.generate_num_undef_bytes_h in *.
     - cbn in *.
-      break_match_hyp; inv GEN.
+      inv GEN.
       do 2 eexists.
       split; eauto.
     - unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.generate_num_undef_bytes_h in GEN.
@@ -13642,8 +13637,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       pose proof @N.recursion_succ (N -> OOM (list SByte)) eq (fun _ : N => ret [])
         (fun (_ : N) (mf : N -> OOM (list SByte)) (x : N) =>
            rest_bytes <- mf (N.succ x);;
-           x' <- IP.from_Z (Z.of_N x);;
-           ret (uvalue_sbyte (UVALUE_Undef t) t (UVALUE_IPTR x') sid :: rest_bytes))
+           ret (uvalue_sbyte (UVALUE_Undef t) t x sid :: rest_bytes))
         eq_refl.
       forward H.
       { unfold Proper, respectful.
@@ -13656,11 +13650,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
       cbn in *.
       break_match_hyp; inv GEN.
-      break_match_hyp; inv H0.
 
       specialize (IHsz (N.succ start_ix) t sid l Heqo).
       destruct IHsz as (byte&bytes_fin'&GEN'&BYTE&BYTES).
-      break_match_hyp; inv BYTE.
+      subst.
 
       eexists.
       eexists.
@@ -13673,8 +13666,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       MemoryBigIntptr.MMEP.MemSpec.MemHelpers.generate_num_undef_bytes_h start_ix (N.succ sz) t sid = NoOom bytes_inf ->
       exists byte bytes_inf',
         MemoryBigIntptr.MMEP.MemSpec.MemHelpers.generate_num_undef_bytes_h (N.succ start_ix) sz t sid = NoOom bytes_inf' /\
-          (x' <- InfLP.IP.from_Z (Z.of_N start_ix);;
-           ret (MemoryBigIntptr.Byte.uvalue_sbyte (LLVMParamsBigIntptr.Events.DV.UVALUE_Undef t) t (LLVMParamsBigIntptr.Events.DV.UVALUE_IPTR x') sid)) = NoOom byte /\
+          (MemoryBigIntptr.Byte.uvalue_sbyte (LLVMParamsBigIntptr.Events.DV.UVALUE_Undef t) t
+             start_ix sid) = byte /\
           bytes_inf = byte :: bytes_inf'.
   Proof.
     induction sz using N.peano_rect; intros start_ix t sid bytes_fin GEN.
@@ -13688,8 +13681,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       pose proof @N.recursion_succ (N -> OOM (list InfMem.MP.BYTE_IMPL.SByte)) eq (fun _ : N => ret [])
         (fun (_ : N) (mf : N -> OOM (list InfMem.MP.BYTE_IMPL.SByte)) (x : N) =>
            rest_bytes <- mf (N.succ x);;
-           x' <- InfLP.IP.from_Z (Z.of_N x);;
-           ret (MemoryBigIntptr.Byte.uvalue_sbyte (LLVMParamsBigIntptr.Events.DV.UVALUE_Undef t) t (LLVMParamsBigIntptr.Events.DV.UVALUE_IPTR x') sid :: rest_bytes))
+           ret (MemoryBigIntptr.Byte.uvalue_sbyte (LLVMParamsBigIntptr.Events.DV.UVALUE_Undef t) t
+                  x sid :: rest_bytes))
         eq_refl.
       forward H.
       { unfold Proper, respectful.
@@ -13733,10 +13726,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       destruct GEN' as (byte&bytes_fin'&GEN'&BYTE&BYTES).
       subst.
       cbn in *.
-      break_match_hyp; inv BYTE.
 
       specialize (IHsz _ t sid bytes_fin' GEN') as (bytes_inf&GEN_INF&BYTES_REF).
-      exists (MemoryBigIntptr.Byte.uvalue_sbyte (LLVMParamsBigIntptr.Events.DV.UVALUE_Undef t) t (LLVMParamsBigIntptr.Events.DV.UVALUE_IPTR (Z.of_N start_ix)) sid :: bytes_inf).
+      exists (MemoryBigIntptr.Byte.uvalue_sbyte (LLVMParamsBigIntptr.Events.DV.UVALUE_Undef t) t start_ix sid :: bytes_inf).
       split.
       + setoid_rewrite MemoryBigIntptrInfiniteSpecHelpers.generate_num_undef_bytes_h_cons.
         cbn.
@@ -13753,7 +13745,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         cbn in *.
         cbn.
         unfold InterpreterStackBigIntptr.LP.IP.to_Z.
-        rewrite Heqo.
         reflexivity.
   Qed.
 
@@ -16258,60 +16249,34 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Qed.
 
   Lemma to_ubytes_fin_inf_helper :
-    forall {uv_fin uv_inf t sid bytes_fin start},
-      DVC1.uvalue_refine_strict uv_inf uv_fin ->
-      map_monad
+    forall {uv_fin uv_inf t sid bytes_fin l},
+      DVC1.uvalue_refine_strict uv_inf uv_fin  ->
+      map 
         (fun n : N =>
-           n' <- LLVMParams64BitIntptr.IP.from_Z (Z.of_N n);;
-           ret
-             (Memory64BitIntptr.MP.BYTE_IMPL.uvalue_sbyte uv_fin t
-                (LLVMParams64BitIntptr.Events.DV.UVALUE_IPTR n') sid))
-        (Nseq start (N.to_nat (FiniteSizeof.FinSizeof.sizeof_dtyp t))) =
-        NoOom bytes_fin ->
-      map_monad
+             (Memory64BitIntptr.MP.BYTE_IMPL.uvalue_sbyte uv_fin t n sid))
+        l =
+        bytes_fin ->
+      map
         (fun n : N =>
-           n' <- LLVMParamsBigIntptr.IP.from_Z (Z.of_N n);;
-           ret
-             (MemoryBigIntptr.MP.BYTE_IMPL.uvalue_sbyte uv_inf t
-                (LLVMParamsBigIntptr.Events.DV.UVALUE_IPTR n') sid))
-        (Nseq start (N.to_nat (FiniteSizeof.FinSizeof.sizeof_dtyp t))) = NoOom (map lift_SByte bytes_fin).
+             (MemoryBigIntptr.MP.BYTE_IMPL.uvalue_sbyte uv_inf t n sid))
+        l =
+        (map lift_SByte bytes_fin).
   Proof.
-    intros uv_fin uv_inf t sid bytes_fin start UV_REF UBYTES.
+    intros uv_fin uv_inf t sid bytes_fin l UV_REF UBYTES.
     generalize dependent bytes_fin.
-    generalize dependent start.
-    induction (N.to_nat (FiniteSizeof.FinSizeof.sizeof_dtyp t));
-      intros start bytes_fin UBYTES.
-    - cbn in *.
-      inv UBYTES.
+    induction l; intros; cbn in *.
+    - subst; auto.
+    - destruct bytes_fin; inversion UBYTES.
       cbn.
+      remember (map (fun n : N => Memory64BitIntptr.MP.BYTE_IMPL.uvalue_sbyte uv_fin t n sid) l) as bytes_fin'.
+      rewrite (IHl bytes_fin'); auto.
+
+      assert (MemoryBigIntptr.MP.BYTE_IMPL.uvalue_sbyte uv_inf t a sid =
+                FiniteSizeof.mkUByte DVC2.DV2.uvalue (fin_to_inf_uvalue uv_fin) t a sid).
+      {  unfold MemoryBigIntptr.MP.BYTE_IMPL.uvalue_sbyte.
+         erewrite <- fin_to_inf_uvalue_refine_strict'; eauto. }
+      rewrite H.
       reflexivity.
-    - rewrite <- cons_Nseq.
-      rewrite <- cons_Nseq in UBYTES.
-
-      rewrite map_monad_unfold.
-      rewrite map_monad_unfold in UBYTES.
-
-      cbn.
-      cbn in UBYTES.
-
-      break_match_hyp; inv UBYTES.
-      break_match_hyp; inv H0.
-      break_match_hyp; inv Heqo.
-
-      apply IHn in Heqo0.
-      cbn in Heqo0.
-      rewrite Heqo0.
-      cbn.
-      unfold MemoryBigIntptr.MP.BYTE_IMPL.uvalue_sbyte.
-      erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
-      erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
-
-      rewrite DVC1.uvalue_refine_strict_equation.
-      cbn.
-
-      erewrite FinToInfIntptrConvertSafe.intptr_convert_safe; eauto.
-      cbn.
-      erewrite IP64Bit.from_Z_to_Z; eauto.
   Qed.
 
   (* TODO: move this *)
@@ -16336,13 +16301,13 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Lemma to_ubytes_fin_inf :
     forall {uv_fin uv_inf t sid bytes_fin},
       DVC1.uvalue_refine_strict uv_inf uv_fin ->
-      Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes uv_fin t sid = NoOom bytes_fin ->
-      exists bytes_inf,
-        MemoryBigIntptr.MMEP.MMSP.MemByte.to_ubytes uv_inf t sid = NoOom bytes_inf /\
-          sbytes_refine bytes_inf bytes_fin.
+       (Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes uv_fin t sid) = bytes_fin ->
+        exists bytes_inf,
+        (MemoryBigIntptr.MMEP.MMSP.MemByte.to_ubytes uv_inf t sid) = bytes_inf /\
+           sbytes_refine bytes_inf bytes_fin.
   Proof.
     intros uv_fin uv_inf t sid bytes_fin UV_REF UBYTES.
-    exists (map lift_SByte bytes_fin).
+    exists (lift_SBytes bytes_fin).
     split.
     2: {
       apply lift_SBytes_refine.
@@ -16357,6 +16322,18 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     eapply to_ubytes_fin_inf_helper; eauto.
   Qed.
 
+  Lemma to_ubytes_fin_inf_eq :
+    forall {uv_fin uv_inf t sid},
+      DVC1.uvalue_refine_strict uv_inf uv_fin ->
+       sbytes_refine
+        (MemoryBigIntptr.MMEP.MMSP.MemByte.to_ubytes uv_inf t sid) 
+        (Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes uv_fin t sid).
+  Proof.
+    intros.
+    destruct (@to_ubytes_fin_inf _ _ t sid _ H eq_refl) as [l [EQ R]].
+    rewrite EQ. assumption.
+  Qed.
+    
   (* TODO: Move this into MemoryModel.v *)
   #[global] Instance preserve_allocation_ids_Reflexive :
     Reflexive Memory64BitIntptr.MMEP.MemSpec.preserve_allocation_ids.
@@ -16721,74 +16698,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     - eapply heap_preserved_Symmetric; eauto.
   Qed.
 
-  (* TODO: move this. Should hold for fin / inf *)
-  (* TODO: This isn't true... The bytes can get different sids *)
-  Lemma serialize_sbytes_deterministic :
-    forall {uv t ms ms' bytes bytes'},
-      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv t ms (success_unERR_UB_OOM (ms', bytes)) ->
-      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv t ms (success_unERR_UB_OOM (ms', bytes')) ->
-      bytes' = bytes.
-  Proof.
-    (* intros uv t ms ms' bytes bytes' SER1 SER2. *)
-    (* rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SER1, SER2. *)
-    (* induction uv using uvalue_ind''. *)
-
-    (* { *)
-    (*   apply MemPropT_bind_ret_inv in SER1. *)
-    (*   destruct SER1 as (?&?&?&?). *)
-
-    (*   apply MemPropT_bind_ret_inv in SER2. *)
-    (*   destruct SER2 as (?&?&?&?). *)
-
-    (*   assert (Memory64BitIntptr.MMEP.MemSpec.MemState_eqv x x1) as EQV. *)
-    (*   { etransitivity. *)
-    (*     symmetry; eapply fresh_sid_MemState_eqv; eauto. *)
-    (*     eapply fresh_sid_MemState_eqv; eauto. *)
-    (*   } *)
-
-    (*   assert (Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms x) as EQV2. *)
-    (*   { etransitivity. *)
-    (*     eapply fresh_sid_MemState_eqv; eauto. *)
-    (*     symmetry; eauto. *)
-    (*   } *)
-
-    (*   red in H0. *)
-    (*   red in H2. *)
-
-
-    (*       etransitivity; *)
-    (*       [eapply fresh_sid_MemState_eqv; eauto|]; *)
-    (*       match goal with *)
-    (*       | H: lift_OOM ?x _ _ |- _ => *)
-    (*           red in H; destruct x eqn:?HX; inv H *)
-    (*       end; reflexivity. *)
-    (*     | destruct t_orig; *)
-    (*       try solve *)
-    (*         [ *)
-    (*           apply MemPropT_bind_ret_inv in SERIALIZE; *)
-    (*           destruct SERIALIZE as (?&?&?&?); *)
-    (*           etransitivity; *)
-    (*           [eapply fresh_sid_MemState_eqv; eauto|]; *)
-    (*           match goal with *)
-    (*           | H: lift_OOM ?x _ _ |- _ => *)
-    (*               red in H; destruct x eqn:?HX; inv H *)
-    (*           end; reflexivity *)
-    (*         ]; *)
-    (*       try *)
-    (*         solve *)
-    (*         [ (* Arrays *) *)
-    (*           specialize (IHuv (DTYPE_Array sz0 t_orig) _ _ _ SERIALIZE); auto *)
-    (*         | (* Vectors *) *)
-    (*           specialize (IHuv (DTYPE_Vector sz0 t_orig) _ _ _ SERIALIZE); auto *)
-    (*         | (* Structs *) *)
-    (*           specialize (IHuv (DTYPE_Struct fields) _ _ _ SERIALIZE); auto *)
-    (*         | (* Packed structs *) *)
-    (*           specialize (IHuv (DTYPE_Packed_struct fields) _ _ _ SERIALIZE); auto *)
-    (*         ] *)
-    (*     ]. *)
-
-    (* } *)
-  Abort.
 
   (* TODO: Move this, and maybe generalize this *)
   Lemma map_monad_InT_length_noom :
@@ -16983,7 +16892,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     split; eauto.
     red.
     cbn.
-    rewrite Heqo, Heqo0.
+    rewrite Heqo.
     reflexivity.
   Qed.
 
@@ -17639,23 +17548,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   (*    *) *)
   (* Admitted.     *)
 
-  Ltac solve_to_ubytes SERIALIZE :=
-    eapply MemPropT_fin_inf_bind; [ | | | apply SERIALIZE]; eauto;
-    [ intros *; eapply fresh_sid_fin_inf; eauto |];
-    
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID FRESH UBYTES;
-      cbn in SID, UBYTES; subst;
-
-      red in UBYTES;
-      break_match_hyp_inv;
-      match goal with
-      | H: Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes _ _ _ = NoOom _ |- _ =>
-          eapply to_ubytes_fin_inf in H; auto; [
-            destruct H as (bytes_inf & UBYTES & BYTES_REF);
-            exists bytes_inf; exists ms_inf; split; auto;
-            red; erewrite UBYTES; cbn;  auto
-          | idtac]
-      end.
 
   (*
     (* SAZ: Can't prove this easily, unfortunately, because we'd need "generic" inversion principles
@@ -17772,6 +17664,34 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       red.  rewrite EQ1. cbn.  auto.
       split; auto.
   Qed.
+
+
+  Ltac solve_to_ubytes SERIALIZE :=
+    eapply MemPropT_fin_inf_bind; [ | | | apply SERIALIZE]; eauto;
+        [ intros *; eapply fresh_sid_fin_inf; eauto |];
+        
+        intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID FRESH UBYTES;
+        cbn in SID, UBYTES; destruct UBYTES; subst;
+        cbn;
+        eexists; eexists; split; [split; reflexivity|];
+        split; auto;
+    apply to_ubytes_fin_inf_eq; auto.
+    
+(*
+          pose proof UV_REF as UV_REF';
+          cbn in UV_REF';
+          inversion UV_REF; subst; 
+          repeat break_match_hyp_inv;
+          eapply MemPropT_fin_inf_bind; [ | | | apply SERIALIZE]; eauto;
+          [intros *; eapply fresh_sid_fin_inf; eauto|].
+          
+          intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH FRESH UBYTES.
+          cbn in SID; subst; destruct UBYTES; subst;
+          cbn;
+          eexists; eexists; split; [split; reflexivity|];
+          split; auto;
+          apply to_ubytes_fin_inf_eq; auto.
+*)
   
   Lemma serialize_sbytes_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start uv_fin uv_inf t bytes_fin},
@@ -17797,47 +17717,26 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     generalize dependent ms_fin_final.
     induction TYPE_INF; intros ms_fin_final ms_fin_start ms_inf_start MSR bytes_fin uv_fin UV_REF SERIALIZE TYPE_FIN.
 
-
     all :
       try solve [
           pose proof UV_REF as UV_REF';
           cbn in UV_REF';
-          inversion UV_REF;
+          inversion UV_REF; subst; 
           repeat break_match_hyp_inv;
           eapply MemPropT_fin_inf_bind; [ | | | apply SERIALIZE]; eauto;
           [intros *; eapply fresh_sid_fin_inf; eauto|];
           
           intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH FRESH UBYTES;
-          cbn in SID; subst;
-          
-          red in UBYTES;
-          break_match_hyp_inv;
-          match goal with
-          | H: Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes _ ?t _ = NoOom _ |- _ => 
-              eapply to_ubytes_fin_inf in H; eauto; destruct H as (bytes_inf&UBYTES_INF&?)
-          end;
-          exists bytes_inf; exists ms_inf;
+          cbn in SID; subst; destruct UBYTES; subst;
+          cbn;
+          eexists; eexists; split; [split; reflexivity|];
           split; auto;
-          rewrite UBYTES_INF;
-          cbn; auto].
+          apply to_ubytes_fin_inf_eq; auto
+        ].
     
-    all : try solve
-            [cbn in SERIALIZE;
-             unfold DVC1.uvalue_refine_strict in UV_REF;
-             cbn in UV_REF;
-             try solve [
-                 inversion UV_REF; subst;
-                 solve_to_ubytes SERIALIZE;
-                 red; cbn; auto
-               | break_match_hyp_inv;
-                 solve_to_ubytes SERIALIZE;
-                 red; cbn; rewrite Heqo; auto
-               ]
-            ].
-    
-    - cbn in SERIALIZE.
-      inversion UV_REF; subst.
-      cbn. cbn in SERIALIZE. destruct SERIALIZE. subst.
+    - inversion UV_REF; subst.
+      cbn in SERIALIZE.
+      destruct SERIALIZE; subst.
       eexists. eexists.  split; split; eauto.
       constructor.
 
@@ -18274,7 +18173,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           destruct Heqs as (BI & HBI & SBR).
           assert (forall byte : DVC1.DV1.uvalue,
             In byte l ->
-            exists (uv idx : DVC1.DV1.uvalue) (sid : store_id),
+            exists (uv : DVC1.DV1.uvalue) idx (sid : store_id),
               byte = DVC1.DV1.UVALUE_ExtractByte uv dt idx sid).
           { intros. apply HIN. right.  assumption. }
           destruct (IHHeqo dt H0 l0 eq_refl) as (BS & MM & BSR).
@@ -18355,6 +18254,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Qed.
 
   (* TODO: Move this *)
+  (*
   Lemma from_ubytes_dtyp :
     forall {bytes t uv},
       MemoryBigIntptr.MMEP.MMSP.MemByte.from_ubytes bytes t = uv ->
@@ -18408,8 +18308,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         subst.
         induction bytes.
   Admitted.
-
-  Lemma all_bytes_from_uvalue_fin_inf :
+   *)
+  
+  Lemma all_bytes_from_uvalue_fin_inf_Some :
     forall {bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte}
       {bytes_inf : list MemoryBigIntptr.MP.BYTE_IMPL.SByte}
       {dt uv_fin}
@@ -18419,6 +18320,72 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue dt bytes_inf = Some uv_inf /\
           DVC1.uvalue_refine_strict uv_inf uv_fin.
   Proof.
+    intros.
+    destruct bytes_fin.
+    - inversion H.
+    - cbn in H.
+      repeat break_match_hyp_inv.
+      unfold OptionUtil.guard_opt in *.
+      repeat break_match_hyp_inv.
+      inversion BYTES; subst.
+  Admitted.
+
+  Opaque MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper.
+  Opaque Memory64BitIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper.
+
+  Lemma sbyte_to_extract_byte_inversion1 :
+    forall {x s u_inf1 dt u_inf2 sid},
+      sbyte_refine x s ->
+      MemoryBigIntptr.MP.BYTE_IMPL.sbyte_to_extractbyte x =
+        LLVMParamsBigIntptr.Events.DV.UVALUE_ExtractByte u_inf1 dt u_inf2 sid ->
+      exists u_fin1 u_fin2,
+        Memory64BitIntptr.MP.BYTE_IMPL.sbyte_to_extractbyte s =
+          LLVMParams64BitIntptr.Events.DV.UVALUE_ExtractByte u_fin1 dt u_fin2 sid.
+  Proof.
+    intros x s u_inf1 dt u_inf2 sid BYTES EQ.
+    destruct x.
+    rewrite <- InterpreterStackBigIntptr.LLVM.MEM.Byte.sbyte_to_extractbyte_of_uvalue_sbyte in EQ.
+    inversion BYTES.
+    repeat break_match_hyp_inv.
+    exists u. exists u0.
+
+  Admitted.
+    
+    
+
+  
+  Lemma all_bytes_from_uvalue_fin_inf_None :
+    forall {bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte}
+      {bytes_inf : list MemoryBigIntptr.MP.BYTE_IMPL.SByte}
+      {dt}
+      (BYTES : sbytes_refine bytes_inf bytes_fin),
+      Memory64BitIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue dt bytes_fin = None ->
+        MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue dt bytes_inf = None.
+  Proof.
+    intros.
+    destruct bytes_fin.
+    - inversion BYTES. subst.
+      cbn.  reflexivity.
+    - cbn in H.
+      unfold MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue.
+      inversion BYTES; subst; auto.
+      break_match_goal; auto.
+      unfold OptionUtil.guard_opt.
+      break_match_goal; auto.
+      cbn.
+      break_match_goal; auto.
+      break_match_hyp_inv.
+      destruct (sbyte_to_extract_byte_inversion1 H3 Hequ) as [ui1 [ui2 EQ]].
+      rewrite EQ in H.
+      rewrite Heqb in H.
+      cbn in H.
+      break_match_hyp_inv.
+      unfold OptionUtil.guard_opt in *.
+      break_match_hyp_inv.
+      rewrite Heqb0 in H.
+
+      
+      
   Admitted.
 
   Lemma from_ubytes_inf_fin :
@@ -18430,10 +18397,23 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         (Memory64BitIntptr.MMEP.MMSP.MemByte.from_ubytes bytes_fin dt).
   Proof.
     intros bytes_fin bytes_inf dt BYTES.
+    unfold DVC1.uvalue_refine_strict.
+    
 
     assert (length bytes_inf = length bytes_fin) as BYTE_LENGTH.
     { eapply sbytes_refine_length; eauto.
     }
+
+    unfold MemoryBigIntptr.MMEP.MMSP.MemByte.from_ubytes.
+
+    unfold Memory64BitIntptr.MMEP.MMSP.MemByte.from_ubytes.
+    break_match_goal.
+    - rewrite BYTE_LENGTH in Heqb. rewrite Heqb.
+      destruct (Memory64BitIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue dt bytes_fin) eqn:Heqo.
+      + destruct (all_bytes_from_uvalue_fin_inf BYTES Heqo) as [uv_inf [HEQ HR]].
+        rewrite HEQ. apply HR.
+      + 
+    
 
     induction dt.
     { unfold Memory64BitIntptr.MMEP.MMSP.MemByte.from_ubytes, MemoryBigIntptr.MMEP.MMSP.MemByte.from_ubytes.
@@ -18474,100 +18454,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     induction l; auto.
   Qed.
 
-  (* TODO: Move this to listutils or something *)
-  Lemma Forall2_take :
-    forall {X Y} amount (xs : list X) (ys : list Y) P,
-      Forall2 P xs ys ->
-      Forall2 P (take amount xs) (take amount ys).
-  Proof.
-    intros X Y amount xs ys P ALL.
-    generalize dependent amount.
-    induction ALL; intros amount.
-    - cbn; auto.
-    - destruct amount; cbn; auto.
-  Qed.
-
-  (* TODO: Move this to listutils or something *)
-  Lemma Forall2_drop :
-    forall {X Y} amount (xs : list X) (ys : list Y) P,
-      Forall2 P xs ys ->
-      Forall2 P (drop amount xs) (drop amount ys).
-  Proof.
-    intros X Y amount xs ys P ALL.
-    generalize dependent amount.
-    induction ALL; intros amount.
-    - cbn; auto.
-    - destruct amount; cbn; auto.
-  Qed.
-
-  (* TODO: Move this to listutils or something *)
-  Lemma Forall2_between :
-    forall {X Y} (xs : list X) (ys : list Y) P start finish,
-      Forall2 P xs ys ->
-      Forall2 P (between start finish xs) (between start finish ys).
-  Proof.
-    unfold between.
-    intros X Y xs ys P start finish ALL.
-    apply Forall2_take.
-    apply Forall2_drop.
-    auto.
-  Qed.
-
-  (* TODO: Move this to listutils or something *)
-  Lemma take_length :
-    forall {X} (xs : list X) amount,
-      amount <= N.of_nat (length xs) ->
-      length (take amount xs) = N.to_nat amount.
-  Proof.
-    intros X xs.
-    induction xs; intros amount LE.
-    - destruct amount; cbn in *; auto.
-      lia.
-    - induction amount using N.peano_ind.
-      + cbn in *; auto.
-      + cbn.
-        break_match_goal;
-        break_match_hyp_inv; auto.
-
-        cbn in *.
-        rewrite IHxs;
-        lia.
-  Qed.
-
-  (* TODO: Move this to listutils or something *)
-  Lemma drop_length :
-    forall {X} (xs : list X) amount,
-      amount <= N.of_nat (length xs) ->
-      length (drop amount xs) = (length xs - N.to_nat amount)%nat.
-  Proof.
-    intros X xs.
-    induction xs; intros amount LE.
-    - destruct amount; cbn in *; auto.
-    - induction amount using N.peano_ind.
-      + cbn in *; auto.
-      + cbn.
-        break_match_goal;
-        break_match_hyp_inv; auto.
-        break_match_goal.
-        lia.
-        cbn in *.
-        rewrite IHxs;
-        lia.
-  Qed.
-  
-  (* TODO: Move this to listutils or something *)
-  Lemma between_length :
-    forall {X} (xs : list X) start finish,
-      start <= finish ->
-      finish <= N.of_nat (length xs) ->
-      length (between start finish xs) = N.to_nat (finish - start).
-  Proof.
-    intros X xs start finish START_LE FINISH_LE.
-    unfold between.
-    apply take_length.
-    pose proof drop_length xs start as DROP.
-    forward DROP; lia.
-  Qed.
 
   Lemma monad_fold_right_deserialize_sbytes_fin_inf :
     forall {t : dtyp} {bytes_fin bytes_inf}

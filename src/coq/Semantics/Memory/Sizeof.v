@@ -1,5 +1,6 @@
 From Coq Require Import
-     ZArith.
+         ZArith
+         List.
 
 From Vellvm Require Import
      DynamicTypes.
@@ -18,20 +19,14 @@ Module Type Sizeof.
     forall dt,
       (0 <= sizeof_dtyp dt)%N.
 
-  Parameter sizeof_dtyp_packed_struct_0 :
-    sizeof_dtyp (DTYPE_Packed_struct nil) = 0%N.
+  (* Should take padding into account *)
+  Parameter sizeof_dtyp_Struct :
+    forall dts,
+      sizeof_dtyp (DTYPE_Struct dts) = List.fold_left (fun acc dt => N.add acc (sizeof_dtyp dt)) dts 0%N.
 
-  Parameter sizeof_dtyp_packed_struct_cons :
-    forall dt dts,
-    sizeof_dtyp (DTYPE_Packed_struct (dt :: dts)) = (sizeof_dtyp dt + sizeof_dtyp (DTYPE_Packed_struct dts))%N.
-
-  Parameter sizeof_dtyp_struct_0 :
-    sizeof_dtyp (DTYPE_Struct nil) = 0%N.
-
-  (* TODO: this should take padding into account *)
-  Parameter sizeof_dtyp_struct_cons :
-    forall dt dts,
-    sizeof_dtyp (DTYPE_Struct (dt :: dts)) = (sizeof_dtyp dt + sizeof_dtyp (DTYPE_Struct dts))%N.
+  Parameter sizeof_dtyp_Packed_struct :
+    forall dts,
+      sizeof_dtyp (DTYPE_Packed_struct dts) = List.fold_left (fun acc dt => N.add acc (sizeof_dtyp dt)) dts 0%N.
 
   Parameter sizeof_dtyp_array :
     forall sz t,

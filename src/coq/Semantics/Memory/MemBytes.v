@@ -35,7 +35,7 @@ Module Type ByteImpl(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents: LLVM_IN
      - The index of the byte (as a uvalue).
      - The store id for the byte we are creating.
    *)
-  Parameter uvalue_sbyte : uvalue -> dtyp -> uvalue -> store_id -> SByte.
+  Parameter uvalue_sbyte : uvalue -> dtyp -> N -> store_id -> SByte.
 
   (* Turn an SByte into a UVALUE_ExtractByte value *)
   Parameter sbyte_to_extractbyte : SByte -> uvalue.
@@ -56,16 +56,16 @@ Module Type ByteModule(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_I
   Import DV.
   Import SIZEOF.
 
-  Fixpoint all_bytes_from_uvalue_helper (idx' : Z) (sid' : store_id) (parent : uvalue) (bytes : list SByte) : option uvalue
+  Fixpoint all_bytes_from_uvalue_helper (idx' : N) (sid' : store_id) (parent : uvalue) (bytes : list SByte) : option uvalue
     := match bytes with
        | [] => Some parent
        | sbyte::bytes =>
          match sbyte_to_extractbyte sbyte with
          | UVALUE_ExtractByte uv dt idx sid =>
-           guard_opt (uvalue_int_eq_Z idx idx');;
+           guard_opt (N.eqb idx idx');;
            guard_opt (RelDec.rel_dec uv parent);;
            guard_opt (N.eqb sid sid');;
-           all_bytes_from_uvalue_helper (Z.succ idx') sid' parent bytes
+           all_bytes_from_uvalue_helper (N.succ idx') sid' parent bytes
          | _ => None
          end
        end.
@@ -83,21 +83,20 @@ Module Type ByteModule(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_I
          end
        end.
 
-  Definition to_ubytes (uv :  uvalue) (dt : dtyp) (sid : store_id) : OOM (list SByte)
-    := map_monad
-         (fun n => n' <- IP.from_Z (Z.of_N n);;
-                ret (uvalue_sbyte uv dt (UVALUE_IPTR n') sid))
+  Definition to_ubytes (uv :  uvalue) (dt : dtyp) (sid : store_id) : list SByte
+    := map
+         (fun n => uvalue_sbyte uv dt n sid)
          (Nseq 0 (N.to_nat (sizeof_dtyp dt))).
 
-  Fixpoint all_extract_bytes_from_uvalue_helper (idx' : Z) (sid' : store_id) (dt' : dtyp) (parent : uvalue) (bytes : list uvalue) : option uvalue
+  Fixpoint all_extract_bytes_from_uvalue_helper (idx' : N) (sid' : store_id) (dt' : dtyp) (parent : uvalue) (bytes : list uvalue) : option uvalue
     := match bytes with
        | [] => Some parent
        | (UVALUE_ExtractByte uv dt idx sid)::bytes =>
-         guard_opt (uvalue_int_eq_Z idx idx');;
+         guard_opt (N.eqb idx idx');;
          guard_opt (RelDec.rel_dec uv parent);;
          guard_opt (N.eqb sid sid');;
          guard_opt (dtyp_eqb dt dt');;
-         all_extract_bytes_from_uvalue_helper (Z.succ idx') sid' dt' parent bytes
+         all_extract_bytes_from_uvalue_helper (N.succ idx') sid' dt' parent bytes
        | _ => None
        end.
 
@@ -120,14 +119,13 @@ Module Type ByteModule(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_I
       end.
 
   Lemma to_ubytes_sizeof :
-    forall uv dt sid bytes,
-      MReturns bytes (to_ubytes uv dt sid) ->
-      N.of_nat (length bytes) = sizeof_dtyp dt.
+    forall uv dt sid,
+      N.of_nat (length (to_ubytes uv dt sid)) = sizeof_dtyp dt.
   Proof.
-    intros uv dt sid bytes TO.
-    unfold to_ubytes in TO.
-    apply map_monad_length in TO. rewrite Nseq_length in TO.
-    rewrite <- TO.
+    intros uv dt sid.
+    unfold to_ubytes.
+    rewrite map_length.
+    rewrite Nseq_length.
     apply Nnat.N2Nat.id.
   Qed.
 

@@ -565,8 +565,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
            ret (DV2.UVALUE_Select cnd' v1' v2')
        | DV1.UVALUE_ExtractByte uv dt idx sid =>
            uv' <- uvalue_convert_strict uv;;
-           idx' <- uvalue_convert_strict idx;;
-           ret (DV2.UVALUE_ExtractByte uv' dt idx' sid)
+           ret (DV2.UVALUE_ExtractByte uv' dt idx sid)
        | DV1.UVALUE_ConcatBytes uvs dt =>
            uvs' <- map_monad uvalue_convert_strict uvs;;
            ret (DV2.UVALUE_ConcatBytes uvs' dt)
@@ -1618,8 +1617,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
            ret (DV2.UVALUE_Select cnd' v1' v2')
        | DV1.UVALUE_ExtractByte uv dt idx sid =>
            uv' <- uvalue_convert_strict uv;;
-           idx' <- uvalue_convert_strict idx;;
-           ret (DV2.UVALUE_ExtractByte uv' dt idx' sid)
+           ret (DV2.UVALUE_ExtractByte uv' dt idx sid)
        | DV1.UVALUE_ConcatBytes uvs dt =>
            uvs' <- map_monad uvalue_convert_strict uvs;;
            ret (DV2.UVALUE_ConcatBytes uvs' dt)

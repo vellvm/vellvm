@@ -2037,8 +2037,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       (fun (x : N) => ret [])
       (fun n mf x =>
          rest_bytes <- mf (N.succ x);;
-         x' <- IP.from_Z (Z.of_N x);;
-         let byte := uvalue_sbyte (UVALUE_Undef dt) dt (UVALUE_IPTR x') sid in
+         let byte := uvalue_sbyte (UVALUE_Undef dt) dt x sid in
          ret (byte :: rest_bytes))
       num start_ix.
 
@@ -2062,8 +2061,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       pose proof @N.recursion_succ (N -> OOM (list SByte)) eq (fun _ : N => ret [])
            (fun (_ : N) (mf : N -> OOM (list SByte)) (x : N) =>
            rest_bytes <- mf (N.succ x);;
-           x' <- IP.from_Z (Z.of_N x);;
-           ret (uvalue_sbyte (UVALUE_Undef dt) dt (UVALUE_IPTR x') sid :: rest_bytes))
+           ret (uvalue_sbyte (UVALUE_Undef dt) dt x sid :: rest_bytes))
            eq_refl.
       forward H.
       { unfold Proper, respectful.
@@ -2078,12 +2076,11 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         (N.recursion (fun _ : N => ret [])
                      (fun (_ : N) (mf : N -> OOM (list SByte)) (x : N) =>
                         rest_bytes <- mf (N.succ x);;
-                        x' <- IP.from_Z (Z.of_N x);;
-                        ret (uvalue_sbyte (UVALUE_Undef dt) dt (UVALUE_IPTR x') sid :: rest_bytes)) num
+                        ret (uvalue_sbyte (UVALUE_Undef dt) dt x sid :: rest_bytes)) num
                      (N.succ start_ix)) eqn:HREC.
       + (* No OOM *)
         cbn in GEN.
-        break_match_hyp; inv GEN.
+        inv GEN.
         cbn.
 
         unfold generate_num_undef_bytes_h in IHnum.
@@ -2142,12 +2139,12 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   (* Definition sbytes_of_int (e : Endianess) (count:nat) (z:Z) : list SByte := *)
   (*   List.map Byte (bytes_of_int e count z). *)
 
-    Definition uvalue_bytes_little_endian (uv :  uvalue) (dt : dtyp) (sid : store_id) : OOM (list uvalue)
-      := map_monad (fun n => n' <- IP.from_Z (Z.of_N n);;
-                          ret (UVALUE_ExtractByte uv dt (UVALUE_IPTR n') sid)) (Nseq 0 (N.to_nat (sizeof_dtyp DTYPE_Pointer))).
+    Definition uvalue_bytes_little_endian (uv :  uvalue) (dt : dtyp) (sid : store_id) : list uvalue
+      := map (fun n => UVALUE_ExtractByte uv dt n sid)
+           (Nseq 0 (N.to_nat (sizeof_dtyp DTYPE_Pointer))).
 
-    Definition uvalue_bytes (e : Endianess) (uv :  uvalue) (dt : dtyp) (sid : store_id) : OOM (list uvalue)
-      := fmap (correct_endianess e) (uvalue_bytes_little_endian uv dt sid).
+    Definition uvalue_bytes (e : Endianess) (uv :  uvalue) (dt : dtyp) (sid : store_id) : list uvalue
+      :=  (correct_endianess e) (uvalue_bytes_little_endian uv dt sid).
 
     (* TODO: move this *)
     Definition dtyp_eqb (dt1 dt2 : dtyp) : bool
@@ -2413,7 +2410,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
 
       | _ =>
           sid <- fresh_sid;;
-          lift_OOM (to_ubytes (CTR dt) dt sid)
+          ret (to_ubytes (CTR dt) dt sid)
       end.
 
     Fixpoint serialize_sbytes {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M} `{RAISE_OOM M}
@@ -2444,7 +2441,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       | UVALUE_InsertValue _ _ _ _ _
       | UVALUE_Select _ _ _ =>
           sid <- fresh_sid;;
-          lift_OOM (to_ubytes uv dt sid)
+          ret (to_ubytes uv dt sid)
 
       | UVALUE_Undef _ => serialize_by_dtyp UVALUE_Undef dt
       | UVALUE_Poison _ => serialize_by_dtyp UVALUE_Poison dt
@@ -5862,8 +5859,7 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
     cbn in *.
     rewrite S.
 
-    break_match; break_match; auto.
-    inv NOOM.
+    break_match; auto.
   Qed.
 
   (* TODO: should this be here? *)
@@ -5884,7 +5880,7 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
       eexists.
       erewrite generate_num_undef_bytes_h_cons; eauto.
       rewrite IHn.
-      cbn; rewrite Heqo; cbn.
+      cbn.  
       reflexivity.
   Qed.
 

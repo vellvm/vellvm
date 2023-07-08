@@ -414,6 +414,95 @@ Proof.
         reflexivity.
 Qed.
 
+Lemma split_n_Forall : forall {A} (P:A -> Prop) n (l1 l2 l3 : list A),
+    split_n n l1 = ret (l2, l3) ->
+    Forall P l1 <-> (Forall P l2 /\ Forall P l3).
+Proof.
+  intros A P n l1 l2 l3 H.
+  split; intros HF.
+  - revert n l2 l3 H.
+    induction HF; intros n l2 l3 HS.
+    + destruct n; inversion HS; subst.
+      split; constructor.
+    + destruct n; inversion HS; subst.
+      * split; constructor; auto.
+      * break_match_hyp_inv.
+        destruct p. inversion H2; subst.
+        apply IHHF in Heqs. destruct Heqs.
+        split. constructor; auto. auto.
+  - revert l1 l2 l3 H HF.
+    induction n; intros l1 l2 l3 H [HF1 HF2]; inversion H; subst; auto.
+    repeat break_match_hyp_inv.
+    inversion HF1; subst.
+    constructor; auto.
+    eapply IHn; eauto.
+Qed.
+
+Lemma split_n_Forall2 : forall {A B} (P:A -> B -> Prop) n (l1 l2 l3 : list A) (m1 m2 m3 : list B),
+    split_n n l1 = ret (l2, l3) ->
+    split_n n m1 = ret (m2, m3) ->    
+    Forall2 P l1 m1 <-> (Forall2 P l2 m2 /\ Forall2 P l3 m3).
+Proof.
+  intros A B P n l1 l2 l3 m1 m2 m3 HL HM.
+  split; intros HF.
+  - revert n l2 l3 m2 m3 HL HM.
+    induction HF; intros n l2 l3 m2 m3 HS HSm.
+    + destruct n; inversion HS; subst.
+      inversion HSm; subst.
+      split; constructor.
+    + destruct n; inversion HS; subst.
+      inversion HSm; subst.
+      * split; constructor; auto.
+      * inversion HSm.
+        repeat break_match_hyp_inv.
+        specialize (IHHF _ _ _ _ _ Heqs0 Heqs). destruct IHHF.
+        split. constructor; auto. auto.
+  - revert l1 l2 l3 m1 m2 m3 HL HM HF.
+    induction n; intros l1 l2 l3 m1 m2 m3 HL HM [HF1 HF2]; inversion HL; inversion HM; subst; auto.
+    repeat break_match_hyp_inv.
+    inversion HF1; subst.
+    constructor; auto.
+    eapply IHn; eauto.
+Qed.
+
+Lemma split_n_Forall2_exists1 : forall {A B} (P:A -> B -> Prop) n (l1 l2 l3 : list A) m1,
+    split_n n l1 = ret (l2, l3) ->
+    Forall2 P l1 m1 ->
+    exists m2 m3,
+      (split_n n m1 = ret (m2, m3)) /\
+        (Forall2 P l2 m2) /\ (Forall2 P l3 m3).
+Proof.
+  intros A B P n.
+  induction n; intros l1 l2 l3 m1 HS HF.
+  - inversion HS; subst.
+    * exists []. exists m1. split; auto.
+  - inversion HS; subst.
+    repeat break_match_hyp_inv.
+    inversion HF; subst.
+    destruct (IHn _ _ _ _ Heqs H3) as [m2 [m3 [S [F1 F2]]]].
+    exists (y::m2). exists m3.
+    split; auto. cbn.  rewrite S. reflexivity.
+Qed.
+
+Lemma split_n_Forall2_exists2 : forall {A B} (P:A -> B -> Prop) n (l1 : list A) (m1 m2 m3: list B),
+    split_n n m1 = ret (m2, m3) ->
+    Forall2 P l1 m1 ->
+    exists l2 l3,
+      (split_n n l1 = ret (l2, l3)) /\
+        (Forall2 P l2 m2) /\ (Forall2 P l3 m3).
+Proof.
+  intros A B P n.
+  induction n; intros l1 m1 m2 m3 HS HF.
+  - inversion HS; subst.
+    * exists []. exists l1. split; auto.
+  - inversion HS; subst.
+    repeat break_match_hyp_inv.
+    inversion HF; subst.
+    destruct (IHn _ _ _ _ Heqs H3) as [l2' [l3' [S [F1 F2]]]].
+    exists (x::l2'). exists l3'.
+    split; auto. cbn.  rewrite S. reflexivity.
+Qed.
+
 Lemma split_n_err : forall {A} n (l:list A),
     (exists s, split_n n l = inl s) <->
     length l < n.
@@ -1826,4 +1915,112 @@ Proof.
 Qed.
 
 
+
+  (* TODO: Move this to listutils or something *)
+  Lemma Forall2_take :
+    forall {X Y} amount (xs : list X) (ys : list Y) P,
+      Forall2 P xs ys ->
+      Forall2 P (take amount xs) (take amount ys).
+  Proof.
+    intros X Y amount xs ys P ALL.
+    generalize dependent amount.
+    induction ALL; intros amount.
+    - cbn; auto.
+    - destruct amount; cbn; auto.
+  Qed.
+
+  (* TODO: Move this to listutils or something *)
+  Lemma Forall2_drop :
+    forall {X Y} amount (xs : list X) (ys : list Y) P,
+      Forall2 P xs ys ->
+      Forall2 P (drop amount xs) (drop amount ys).
+  Proof.
+    intros X Y amount xs ys P ALL.
+    generalize dependent amount.
+    induction ALL; intros amount.
+    - cbn; auto.
+    - destruct amount; cbn; auto.
+  Qed.
+
+  (* TODO: Move this to listutils or something *)
+  Lemma Forall2_between :
+    forall {X Y} (xs : list X) (ys : list Y) P start finish,
+      Forall2 P xs ys ->
+      Forall2 P (between start finish xs) (between start finish ys).
+  Proof.
+    unfold between.
+    intros X Y xs ys P start finish ALL.
+    apply Forall2_take.
+    apply Forall2_drop.
+    auto.
+  Qed.
+
+  (* TODO: Move this to listutils or something *)
+  Lemma take_length :
+    forall {X} (xs : list X) amount,
+      (amount <= N.of_nat (length xs))%N ->
+      length (take amount xs) = N.to_nat amount.
+  Proof.
+    intros X xs.
+    induction xs; intros amount LE.
+    - destruct amount; cbn in *; auto.
+      lia.
+    - induction amount using N.peano_ind.
+      + cbn in *; auto.
+      + cbn.
+        break_match_goal;
+        break_match_hyp_inv; auto.
+
+        cbn in *.
+        rewrite IHxs;
+        lia.
+  Qed.
+
+  (* TODO: Move this to listutils or something *)
+  Lemma drop_length :
+    forall {X} (xs : list X) amount,
+      (amount <= N.of_nat (length xs))%N ->
+      length (drop amount xs) = (length xs - N.to_nat amount)%nat.
+  Proof.
+    intros X xs.
+    induction xs; intros amount LE.
+    - destruct amount; cbn in *; auto.
+    - induction amount using N.peano_ind.
+      + cbn in *; auto.
+      + cbn.
+        break_match_goal;
+        break_match_hyp_inv; auto.
+        break_match_goal.
+        lia.
+        cbn in *.
+        rewrite IHxs;
+        lia.
+  Qed.
+  
+  (* TODO: Move this to listutils or something *)
+  Lemma between_length :
+    forall {X} (xs : list X) start finish,
+      (start <= finish)%N ->
+      (finish <= N.of_nat (length xs))%N ->
+      length (between start finish xs) = N.to_nat (finish - start).
+  Proof.
+    intros X xs start finish START_LE FINISH_LE.
+    unfold between.
+    apply take_length.
+    pose proof drop_length xs start as DROP.
+    forward DROP; lia.
+  Qed.
+
+    Lemma Forall2_In_exists2:
+    forall {A B : Type} (f : A -> B -> Prop) (l1 : list A) (l2 : list B) (y : B),
+      Forall2 f l1 l2 -> In y l2 -> exists x : A, In x l1 /\ f x y.
+  Proof.
+    intros.
+    induction H.
+    - inversion H0.
+    - inversion H0.
+      + subst. exists x. split; auto. left; auto.
+      + subst. destruct (IHForall2 H2) as [z [HI Hz]].
+        exists z. split; auto. right; auto.
+  Qed.
 
