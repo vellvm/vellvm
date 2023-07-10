@@ -74,7 +74,7 @@ $(EXTRACTDIR)/STAMP: $(VFILES) $(EXTRACTDIR)/Extract.v
 	$(COQEXEC) $(EXTRACTDIR)/Extract.v
 	@echo "Patching extraction"
 	patch -p0 < CRelationClasses.mli.patch
-	patch -u $(EXTRACTDIR)/GenAlive2.ml -i GenAlive2.ml.patch
+	# patch -u $(EXTRACTDIR)/GenAlive2.ml -i GenAlive2.ml.patch
 	@echo "Fixing Extraction"
 	bash fix-extraction.sh
 	touch $(EXTRACTDIR)/STAMP

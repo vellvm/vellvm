@@ -5,6 +5,7 @@ EXTRACT_DIR=ml/extracted
 FILENAMES=("InterpretationStack.ml" "InterpretationStack.mli" "TopLevel.ml" "TopLevel.mli")
 MEMORYFILES=("MemoryModelImplementation.mli")
 BYTEPATCHFILES=("Pick.mli" "Pick.ml" "Denotation.mli" "Denotation.ml")
+GENFILES=("GenAlive2.ml")
 
 function replace () {
     perl -i.bak -p0777ne "$1" $EXTRACT_DIR/$2
