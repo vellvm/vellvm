@@ -5,12 +5,13 @@ EXTRACT_DIR=ml/extracted
 FILENAMES=("InterpretationStack.ml" "InterpretationStack.mli" "TopLevel.ml" "TopLevel.mli")
 MEMORYFILES=("MemoryModelImplementation.mli")
 BYTEPATCHFILES=("Pick.mli" "Pick.ml" "Denotation.mli" "Denotation.ml")
-GENFILES=("GenAlive2.ml")
+GENFILES=("GenAlive2.mli")
 
 function replace () {
     perl -i.bak -p0777ne "$1" $EXTRACT_DIR/$2
     rm -rf $EXTRACT_DIR/*.bak
 }
+
 
 for f in "${FILENAMES[@]}"
 do
@@ -63,6 +64,26 @@ do
     replace "s/Byte.int/Integers.Byte.int/g" $f
 done
 
+for f in "${GENFILES[@]}"
+do
+    sed -i "/module Int/,/end/d" $EXTRACT_DIR/$f
+    sed -i "/module Int1/,/end/d" $EXTRACT_DIR/$f
+    sed -i "/module Int8/,/end/d" $EXTRACT_DIR/$f
+    sed -i "/module Int32/,/end/d" $EXTRACT_DIR/$f
+    sed -i "/module Coq_Int64/,/end/d" $EXTRACT_DIR/$f
+    sed -i "/type \(\w\+\) = \1$/d" $EXTRACT_DIR/$f
+    replace "s/Int.int/int/g" $f
+    replace "s/Int1.int/int/g" $f
+    replace "s/Int8.int/int/g" $f
+    replace "s/Int32.int/int/g" $f
+    replace "s/Coq_Int64.int/int/g" $f
+    replace "s/Int64.int/int/g" $f
+
+    
+    
+    
+done
+
 # This feels risky. These two are very similar, and only differ because of some newlines in the extraction...
 replace "s/^(\s*)type dvalue_byte = MemoryBigIntptr.CP.CONCBASE.dvalue_byte =\n(\s*)\| DVALUE_ExtractByte of LLVMParamsBigIntptr.Events.DV.dvalue \* $/\1type dvalue_byte =\n\2\| DVALUE_ExtractByte of LP.Events.DV.dvalue \* /gm" "InterpretationStack.mli"
 replace "s/^(\s*)type dvalue_byte = MemoryBigIntptr.CP.CONCBASE.dvalue_byte =\n(\s*)\| DVALUE_ExtractByte of LLVMParamsBigIntptr.Events.DV.dvalue \* dtyp \* coq_N/\1type dvalue_byte = MEM.CP.CONCBASE.dvalue_byte =\n\2\| DVALUE_ExtractByte of LP.Events.DV.dvalue \* dtyp \* coq_N/gm" "InterpretationStack.mli"
@@ -75,4 +96,5 @@ replace "s/^(\s*)type dvalue_byte = Memory64BitIntptr.CP.CONCBASE.dvalue_byte =\
 find $EXTRACT_DIR -type f -exec sed -i.bak -e "s/('a1, __) coq_MemPropT coq_Monad/(__, __) coq_MemPropT coq_Monad/g" {} \;
 rm -rf $EXTRACT_DIR/*.bak
 find $EXTRACT_DIR -type f -exec sed -i.bak -e "s/('a1, ('a1, __) coq_MemPropT) coq_MonadMemState/(__, (__, __) coq_MemPropT) coq_MonadMemState/g" {} \;
+rm -rf $EXTRACT_DIR/*.bak
 rm -rf $EXTRACT_DIR/*.bak
