@@ -78,10 +78,6 @@ do
     replace "s/Int32.int/int/g" $f
     replace "s/Coq_Int64.int/int/g" $f
     replace "s/Int64.int/int/g" $f
-
-    
-    
-    
 done
 
 # This feels risky. These two are very similar, and only differ because of some newlines in the extraction...
@@ -96,5 +92,4 @@ replace "s/^(\s*)type dvalue_byte = Memory64BitIntptr.CP.CONCBASE.dvalue_byte =\
 find $EXTRACT_DIR -type f -exec sed -i.bak -e "s/('a1, __) coq_MemPropT coq_Monad/(__, __) coq_MemPropT coq_Monad/g" {} \;
 rm -rf $EXTRACT_DIR/*.bak
 find $EXTRACT_DIR -type f -exec sed -i.bak -e "s/('a1, ('a1, __) coq_MemPropT) coq_MonadMemState/(__, (__, __) coq_MemPropT) coq_MonadMemState/g" {} \;
-rm -rf $EXTRACT_DIR/*.bak
 rm -rf $EXTRACT_DIR/*.bak
