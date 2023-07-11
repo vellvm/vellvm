@@ -64,21 +64,21 @@ do
     replace "s/Byte.int/Integers.Byte.int/g" $f
 done
 
-for f in "${GENFILES[@]}"
-do
-    sed -i "/module Int/,/end/d" $EXTRACT_DIR/$f
-    sed -i "/module Int1/,/end/d" $EXTRACT_DIR/$f
-    sed -i "/module Int8/,/end/d" $EXTRACT_DIR/$f
-    sed -i "/module Int32/,/end/d" $EXTRACT_DIR/$f
-    sed -i "/module Coq_Int64/,/end/d" $EXTRACT_DIR/$f
-    sed -i "/type \(\w\+\) = \1$/d" $EXTRACT_DIR/$f
-    replace "s/Int.int/int/g" $f
-    replace "s/Int1.int/int/g" $f
-    replace "s/Int8.int/int/g" $f
-    replace "s/Int32.int/int/g" $f
-    replace "s/Coq_Int64.int/int/g" $f
-    replace "s/Int64.int/int/g" $f
-done
+# for f in "${GENFILES[@]}"
+# do
+#     sed -i "/module Int/,/end/d" $EXTRACT_DIR/$f
+#     sed -i "/module Int1/,/end/d" $EXTRACT_DIR/$f
+#     sed -i "/module Int8/,/end/d" $EXTRACT_DIR/$f
+#     sed -i "/module Int32/,/end/d" $EXTRACT_DIR/$f
+#     sed -i "/module Coq_Int64/,/end/d" $EXTRACT_DIR/$f
+#     sed -i "/type \(\w\+\) = \1$/d" $EXTRACT_DIR/$f
+#     replace "s/Int.int/int/g" $f
+#     replace "s/Int1.int/int/g" $f
+#     replace "s/Int8.int/int/g" $f
+#     replace "s/Int32.int/int/g" $f
+#     replace "s/Coq_Int64.int/int/g" $f
+#     replace "s/Int64.int/int/g" $f
+# done
 
 # This feels risky. These two are very similar, and only differ because of some newlines in the extraction...
 replace "s/^(\s*)type dvalue_byte = MemoryBigIntptr.CP.CONCBASE.dvalue_byte =\n(\s*)\| DVALUE_ExtractByte of LLVMParamsBigIntptr.Events.DV.dvalue \* $/\1type dvalue_byte =\n\2\| DVALUE_ExtractByte of LP.Events.DV.dvalue \* /gm" "InterpretationStack.mli"
