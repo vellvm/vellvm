@@ -105,6 +105,10 @@
           default = pkgs.mkShell {
             inputsFrom = [ packages.default ];
             buildInputs = [ pkgs.clang_13 ocamlPkgs.utop ocamlPkgs.merlin ocamlPkgs.ocp-indent];
+            IN_NIX_SHELL = 1; 
+            UTOP_SITE_LISP = "${ocamlPkgs.utop}/share/emacs/site-lisp";
+            MERLIN_SITE_LISP = "${ocamlPkgs.merlin}/share/emacs/site-lisp";
+            OCP_INDENT_SITE_LISP = "${ocamlPkgs.ocp-indent}/share/emacs/site-lisp";
           };
         };
 
