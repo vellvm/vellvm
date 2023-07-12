@@ -5,7 +5,8 @@ EXTRACT_DIR=ml/extracted
 FILENAMES=("InterpretationStack.ml" "InterpretationStack.mli" "TopLevel.ml" "TopLevel.mli")
 MEMORYFILES=("MemoryModelImplementation.mli")
 BYTEPATCHFILES=("Pick.mli" "Pick.ml" "Denotation.mli" "Denotation.ml")
-GENFILES=("GenAlive2.mli")
+GENMLIFILES=("GenAlive2.mli")
+GENFILES=("GenAlive2.ml")
 
 function replace () {
     perl -i.bak -p0777ne "$1" $EXTRACT_DIR/$2
@@ -64,7 +65,7 @@ do
     replace "s/Byte.int/Integers.Byte.int/g" $f
 done
 
-for f in "${GENFILES[@]}"
+for f in "${GENMLIFILES[@]}"
 do
     sed -i "/module Int/,/end/d" $EXTRACT_DIR/$f
     sed -i "/module Int1/,/end/d" $EXTRACT_DIR/$f
@@ -78,6 +79,27 @@ do
     replace "s/Int32.int/int/g" $f
     replace "s/Coq_Int64.int/int/g" $f
     replace "s/Int64.int/int/g" $f
+    sed -i "/val succ : int -> int/d" $EXTRACT_DIR/$f
+    replace "s/coq_VMemintptr/coq_VMemInt_intptr/g" $f
+done
+
+for f in "${GENFILES[@]}"
+do
+    replace "s/Pervasives.succ/succ/g" $f
+    replace "s/Pervasives.max/max/g" $f
+    replace "s/Pervasives.pred/pred/g" $f
+    sed -i "/type \(\w\+\) = \1$/d" $EXTRACT_DIR/$f
+    sed -i "/let rec \(\w\+\) = \1$/d" $EXTRACT_DIR/$f
+    replace "s/Coq_Pos.succ/succ/g" $f
+    replace "s/Coq_Z.max/max/g" $f
+    replace "s/Coq_Z.min/min/g" $f
+    replace "s/Coq_Z.pred/pred/g" $f
+    replace "s/Int1.int/int/g" $f
+    replace "s/Int8.int/int/g" $f
+    replace "s/Int32.int/int/g" $f
+    replace "s/Coq_Int64.int/int/g" $f
+    sed -i "1s/^/open EitherMonad\n/" $EXTRACT_DIR/$f
+    # replace "s/Coq_Pos.succ/succ/g" $f
 done
 
 # This feels risky. These two are very similar, and only differ because of some newlines in the extraction...
@@ -93,3 +115,6 @@ find $EXTRACT_DIR -type f -exec sed -i.bak -e "s/('a1, __) coq_MemPropT coq_Mona
 rm -rf $EXTRACT_DIR/*.bak
 find $EXTRACT_DIR -type f -exec sed -i.bak -e "s/('a1, ('a1, __) coq_MemPropT) coq_MonadMemState/(__, (__, __) coq_MemPropT) coq_MonadMemState/g" {} \;
 rm -rf $EXTRACT_DIR/*.bak
+rm -rf $EXTRACT_DIR/.DS_Store.bak
+rm -rf $EXTRACT_DIR/.DS_Store.*.bak
+rm -rf $EXTRACT_DIR/*.orig
