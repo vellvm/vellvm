@@ -67,6 +67,8 @@ done
 
 for f in "${GENMLIFILES[@]}"
 do
+    sed -i "1s/^/open DynamicValues\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open EitherMonad\n/" $EXTRACT_DIR/$f
     sed -i "/module Int/,/end/d" $EXTRACT_DIR/$f
     sed -i "/module Int1/,/end/d" $EXTRACT_DIR/$f
     sed -i "/module Int8/,/end/d" $EXTRACT_DIR/$f
@@ -74,17 +76,19 @@ do
     sed -i "/module Coq_Int64/,/end/d" $EXTRACT_DIR/$f
     sed -i "/type \(\w\+\) = \1$/d" $EXTRACT_DIR/$f
     replace "s/Int.int/int/g" $f
-    replace "s/Int1.int/int/g" $f
-    replace "s/Int8.int/int/g" $f
-    replace "s/Int32.int/int/g" $f
-    replace "s/Coq_Int64.int/int/g" $f
-    replace "s/Int64.int/int/g" $f
+    replace "s/Int1.int/DynamicValues.int1/g" $f
+    replace "s/Int8.int/DynamicValues.int8/g" $f
+    replace "s/Int32.int/DynamicValues.int32/g" $f
+    replace "s/Coq_Int64.int/DynamicValues.int64/g" $f
+    replace "s/Int64.int/DynamicValues.int64/g" $f
     sed -i "/val succ : int -> int/d" $EXTRACT_DIR/$f
     replace "s/coq_VMemintptr/coq_VMemInt_intptr/g" $f
 done
 
 for f in "${GENFILES[@]}"
 do
+    sed -i "1s/^/open DynamicValues\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open EitherMonad\n/" $EXTRACT_DIR/$f
     replace "s/Pervasives.succ/succ/g" $f
     replace "s/Pervasives.max/max/g" $f
     replace "s/Pervasives.pred/pred/g" $f
@@ -94,12 +98,10 @@ do
     replace "s/Coq_Z.max/max/g" $f
     replace "s/Coq_Z.min/min/g" $f
     replace "s/Coq_Z.pred/pred/g" $f
-    replace "s/Int1.int/int/g" $f
-    replace "s/Int8.int/int/g" $f
-    replace "s/Int32.int/int/g" $f
-    replace "s/Coq_Int64.int/int/g" $f
-    sed -i "1s/^/open EitherMonad\n/" $EXTRACT_DIR/$f
-    # replace "s/Coq_Pos.succ/succ/g" $f
+    replace "s/Int1.int/DynamicValues.int1/g" $f
+    replace "s/Int8.int/DynamicValues.int8/g" $f
+    replace "s/Int32.int/DynamicValues.int32/g" $f
+    replace "s/Coq_Int64.int/DynamicValues.int64/g" $f
 done
 
 # This feels risky. These two are very similar, and only differ because of some newlines in the extraction...
