@@ -67,28 +67,91 @@ done
 
 for f in "${GENMLIFILES[@]}"
 do
+    sed -i "1s/^/open CeresS\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open DynamicTypes\n/" $EXTRACT_DIR/$f
     sed -i "1s/^/open DynamicValues\n/" $EXTRACT_DIR/$f
     sed -i "1s/^/open EitherMonad\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open VellvmIntegers\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open BinNums\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open BinPos\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open BinNat\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open Integers\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/module LLVMAst = LLVMAst\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open Binary\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open Bits\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open Floats\n/" $EXTRACT_DIR/$f
     sed -i "/module Int/,/end/d" $EXTRACT_DIR/$f
     sed -i "/module Int1/,/end/d" $EXTRACT_DIR/$f
     sed -i "/module Int8/,/end/d" $EXTRACT_DIR/$f
     sed -i "/module Int32/,/end/d" $EXTRACT_DIR/$f
     sed -i "/module Coq_Int64/,/end/d" $EXTRACT_DIR/$f
     sed -i "/type \(\w\+\) = \1$/d" $EXTRACT_DIR/$f
-    replace "s/Int.int/int/g" $f
-    replace "s/Int1.int/DynamicValues.int1/g" $f
-    replace "s/Int8.int/DynamicValues.int8/g" $f
-    replace "s/Int32.int/DynamicValues.int32/g" $f
+    
+    sed -i "/^type positive =/,/^$/c\type positive = BinNums.positive\n" $EXTRACT_DIR/$f
+    sed -i "/^type n =/,/^$/c\type n = BinNums.coq_N\n" $EXTRACT_DIR/$f
+    sed -i "/^type z =/,/^$/c\type z = BinNums.coq_Z\n" $EXTRACT_DIR/$f
+    sed -i "/^module Pos :/,/end/c\module Pos = BinPos.Pos" $EXTRACT_DIR/$f
+    sed -i "/^module Coq_Pos :/,/end/c\module Coq_Pos = Pos" $EXTRACT_DIR/$f
+    sed -i "/^module N :/,/end/c\module N = BinNat.N" $EXTRACT_DIR/$f
+    sed -i "/^module Z :/,/end/c\module Z = BinInt.Z" $EXTRACT_DIR/$f
+    sed -i "/^module Coq_Z :/,/end/c\module Coq_Z = Z" $EXTRACT_DIR/$f
+    sed -i "/^module WORDSIZE :/,/end/c\module WORDSIZE = Integers.WORDSIZE" $EXTRACT_DIR/$f
+    sed -i "/^module Make/,/end/c\module Make = Integers.Make" $EXTRACT_DIR/$f
+    sed -i "/^module Wordsize_32/,/end/c\module Wordsize_32 = Integers.Wordsize_32" $EXTRACT_DIR/$f
+    sed -i "/^module Wordsize_64/,/end/c\module Wordsize_64 = Integers.Wordsize_64" $EXTRACT_DIR/$f
+    sed -i "/^type binary_float =/,/^$/c\type binary_float = Binary.binary_float\n" $EXTRACT_DIR/$f
+
+    # LLVMAst replacement
+    sed -i "/^type raw_id =/,/^$/c\type raw_id = LLVMAst.raw_id\n" $EXTRACT_DIR/$f
+    sed -i "/^type ident =/,/^$/c\type ident = LLVMAst.ident\n" $EXTRACT_DIR/$f
+    sed -i "/^type typ =/,/^$/c\type typ = LLVMAst.typ\n" $EXTRACT_DIR/$f
+    sed -i "/^type icmp =/,/^$/c\type icmp = LLVMAst.icmp\n" $EXTRACT_DIR/$f
+    sed -i "/^type fcmp =/,/^$/c\type fcmp = LLVMAst.fcmp\n" $EXTRACT_DIR/$f
+    sed -i "/^type ibinop =/,/^$/c\type ibinop = LLVMAst.ibinop\n" $EXTRACT_DIR/$f
+    sed -i "/^type fbinop =/,/^$/c\type fbinop = LLVMAst.fbinop\n" $EXTRACT_DIR/$f
+    sed -i "/^type fast_math =/,/^$/c\type fast_math = LLVMAst.fast_math\n" $EXTRACT_DIR/$f
+    sed -i "/^type conversion_type =/,/^$/c\type conversion_type = LLVMAst.conversion_type\n" $EXTRACT_DIR/$f
+
+    # CeresS replacement
+    sed -i "/^type 'a sexp_ =/,/^$/c\type 'a sexp_ = 'a CeresS.sexp_\n" $EXTRACT_DIR/$f
+    sed -i "/^type atom =/,/^$/c\type atom = CeresS.atom\n" $EXTRACT_DIR/$f
+
+    # DynamicTypes replacement
+    sed -i "/^type dtyp =/,/^$/c\type dtyp = DynamicTypes.dtyp\n" $EXTRACT_DIR/$f
+
+    # DynamicValues replacemeent
+    sed -i "/^module Wordsize1/,/end/c\module Wordsize1 = DynamicValues.Wordsize1" $EXTRACT_DIR/$f
+    sed -i "/^module Wordsize8/,/end/c\module Wordsize8 = DynamicValues.Wordsize8" $EXTRACT_DIR/$f
+    
+    sed -i 's/^module Int\([0-9]\+\) =.*$/module Int\1 = DynamicValues.Int\1/' $EXTRACT_DIR/$f
+    sed -i 's/^module \(Coq_Int64\) =.*$/module \1 = DynamicValues.Int64/' $EXTRACT_DIR/$f
+    sed -i 's/^type int\([1-9]\+\) =.*$/type int\1 = DynamicValues.int\1/' $EXTRACT_DIR/$f
+    
+    # replace "s/Int.int/int/g" $f
+    # replace "s/Int1.int/DynamicValues.int1/g" $f
+    # replace "s/Int8.int/DynamicValues.int8/g" $f
+    # replace "s/Int32.int/DynamicValues.int32/g" $f
     replace "s/Coq_Int64.int/DynamicValues.int64/g" $f
-    replace "s/Int64.int/DynamicValues.int64/g" $f
+    # replace "s/Int64.int/DynamicValues.int64/g" $f
     sed -i "/val succ : int -> int/d" $EXTRACT_DIR/$f
     replace "s/coq_VMemintptr/coq_VMemInt_intptr/g" $f
 done
 
 for f in "${GENFILES[@]}"
 do
+    sed -i "1s/^/open CeresS\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open DynamicTypes\n/" $EXTRACT_DIR/$f
     sed -i "1s/^/open DynamicValues\n/" $EXTRACT_DIR/$f
     sed -i "1s/^/open EitherMonad\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open VellvmIntegers\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open BinNums\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open BinPos\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open BinNat\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/module LLVMAst = LLVMAst\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open Integers\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open Binary\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open Bits\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/open Floats\n/" $EXTRACT_DIR/$f
     replace "s/Pervasives.succ/succ/g" $f
     replace "s/Pervasives.max/max/g" $f
     replace "s/Pervasives.pred/pred/g" $f
@@ -98,10 +161,61 @@ do
     replace "s/Coq_Z.max/max/g" $f
     replace "s/Coq_Z.min/min/g" $f
     replace "s/Coq_Z.pred/pred/g" $f
-    replace "s/Int1.int/DynamicValues.int1/g" $f
-    replace "s/Int8.int/DynamicValues.int8/g" $f
-    replace "s/Int32.int/DynamicValues.int32/g" $f
-    replace "s/Coq_Int64.int/DynamicValues.int64/g" $f
+    sed -i "/^type positive =/,/^$/c\type positive = BinNums.positive\n" $EXTRACT_DIR/$f
+    sed -i "/^type n =/,/^$/c\type n = BinNums.coq_N\n" $EXTRACT_DIR/$f
+    sed -i "/^type z =/,/^$/c\type z = BinNums.coq_Z\n" $EXTRACT_DIR/$f
+    sed -i "/^module Pos =/,/end/c\module Pos = BinPos.Pos" $EXTRACT_DIR/$f
+    sed -i "/^module Coq_Pos =/,/end/c\module Coq_Pos = Pos" $EXTRACT_DIR/$f
+    sed -i "/^module N =/,/end/c\module N = BinNat.N" $EXTRACT_DIR/$f
+    sed -i "/^module Z =/,/end/c\module Z = BinInt.Z" $EXTRACT_DIR/$f
+    sed -i "/^module Coq_Z =/,/end/c\module Coq_Z = Z" $EXTRACT_DIR/$f
+    sed -i "/^module WORDSIZE =/,/end/c\module WORDSIZE = Integers.WORDSIZE" $EXTRACT_DIR/$f
+    sed -i "/^module Make =/,/end/c\module Make = Integers.Make" $EXTRACT_DIR/$f
+    sed -i "/^module Wordsize_32 =/,/end/c\module Wordsize_32 = Integers.Wordsize_32" $EXTRACT_DIR/$f
+    sed -i 's/^module Int =.*$/module Int = Integers.Int/' $EXTRACT_DIR/$f
+    sed -i "/^module Wordsize_64 =/,/end/c\module Wordsize_64 = Integers.Wordsize_64" $EXTRACT_DIR/$f
+    sed -i "/^module Int64 =/,/end/c\module Int64 = Int64" $EXTRACT_DIR/$f
+    sed -i "/^type binary_float =/,/^$/c\type binary_float = Binary.binary_float\n" $EXTRACT_DIR/$f
+
+    # LLVMAst replacement
+    sed -i "/^type raw_id =/,/^$/c\type raw_id = LLVMAst.raw_id\n" $EXTRACT_DIR/$f
+    sed -i "/^type ident =/,/^$/c\type ident = LLVMAst.ident\n" $EXTRACT_DIR/$f
+    sed -i "/^type typ =/,/^$/c\type typ = LLVMAst.typ\n" $EXTRACT_DIR/$f
+    sed -i "/^type icmp =/,/^$/c\type icmp = LLVMAst.icmp\n" $EXTRACT_DIR/$f
+    sed -i "/^type fcmp =/,/^$/c\type fcmp = LLVMAst.fcmp\n" $EXTRACT_DIR/$f
+    sed -i "/^type ibinop =/,/^$/c\type ibinop = LLVMAst.ibinop\n" $EXTRACT_DIR/$f
+    sed -i "/^type fbinop =/,/^$/c\type fbinop = LLVMAst.fbinop\n" $EXTRACT_DIR/$f
+    sed -i "/^type fast_math =/,/^$/c\type fast_math = LLVMAst.fast_math\n" $EXTRACT_DIR/$f
+    sed -i "/^type conversion_type =/,/^$/c\type conversion_type = LLVMAst.conversion_type\n" $EXTRACT_DIR/$f
+
+    # CeresS replacement
+    sed -i "/^type 'a sexp_ =/,/^$/c\type 'a sexp_ = 'a CeresS.sexp_\n" $EXTRACT_DIR/$f
+    sed -i "/^type atom =/,/^$/c\type atom = CeresS.atom\n" $EXTRACT_DIR/$f
+
+    # DynamicTypes replacement
+    sed -i "/^type dtyp =/,/^$/c\type dtyp = DynamicTypes.dtyp\n" $EXTRACT_DIR/$f
+
+    # DynamicValues replacemeent
+    sed -i "/^module Wordsize1 =/,/end/c\module Wordsize1 = DynamicValues.Wordsize1" $EXTRACT_DIR/$f
+    sed -i "/^module Wordsize8 =/,/end/c\module Wordsize8 = DynamicValues.Wordsize8" $EXTRACT_DIR/$f
+    sed -i 's/^module Int\([0-9]\+\) =.*$/module Int\1 = DynamicValues.Int\1/' $EXTRACT_DIR/$f
+    sed -i 's/^module \(Coq_Int64\) =.*$/module \1 = DynamicValues.Int64/' $EXTRACT_DIR/$f
+    sed -i 's/^type int\([1-9]\+\) =.*$/type int\1 = DynamicValues.int\1/' $EXTRACT_DIR/$f
+    sed -i "/let randomRInt = /ilet rec coqPositiveToInt = function\n| Coq_xI p0 -> 2 * (coqPositiveToInt p0) + 1\n| Coq_xO p0 -> 2 * (coqPositiveToInt p0)\n| Coq_xH -> 1\n\nlet coqZToInt  = function\n| Z0 -> 0\n| Zpos p -> coqPositiveToInt p\n| Zneg p -> ~-(coqPositiveToInt p)\n\nlet intToCoqZ x =\nlet rec nonNegIntToCoqPositive y =\nmatch y with\n| 0 -> Coq_xH\n| 1 -> Coq_xH\n| _ -> if (y mod 2 > 0) then Coq_xI (nonNegIntToCoqPositive (y / 2 - 1)) else Coq_xO (nonNegIntToCoqPositive (y / 2)) in\nif (x < 0) then Zneg (nonNegIntToCoqPositive ~-x) else if (x > 0) then Zpos (nonNegIntToCoqPositive x) else Z0\n\n" $EXTRACT_DIR/$f
+
+    # sed -i "/let listOf g =/,/^$/c\let listOf g = \nGenLow__0.sized (fun n0 -> \nGenLow__0.bindGen (GenLow__0.choose chooseNat (0, coqZToInt n0)) (fun k -> \nvectorOf k g))\n\n" $EXTRACT_DIR/$f
+    # sed -i "/let suchThatMaybe g p =/,/^$/c\let suchThatMaybe g p = \nGenLow__0.sized (fun n0 -> retry (coqZToInt n0) (suchThatMaybe1 g p))\n\n" $EXTRACT_DIR/$f
+    # sed -i "/let suchThatMaybeOpt g p =/,/^$/c\  let suchThatMaybeOpt g p = \nGenLow__0.sized (fun n0 -> \nretry (coqZToInt n0) \n(GenLow__0.fmap (fun x -> \nmatch x with \n| Some a -> if p a then Some a else None\n| None -> None) g))\n" $EXTRACT_DIR/$f
+    # sed -i "/let sample/,/^$/c\let sample (g : 'a1 coq_G) : 'a1 list = \nlet l = combine (rnds newRandomSeed 10) (createRange 10 []) in \nmap (fun p -> let (r, n0) = p in g (intToCoqZ n0) r) l\n" $EXTRACT_DIR/$f
+    
+    replace "s/XO/Coq_xO/g" $f
+    replace "s/XH/Coq_xH/g" $f
+    replace "s/XI/Coq_xI/g" $f
+    replace "s/TYPE_I i/LLVMAst.TYPE_I i/g" $f
+    # replace "s/Int1.int/DynamicValues.int1/g" $f
+    # replace "s/Int8.int/DynamicValues.int8/g" $f
+    # replace "s/Int32.int/DynamicValues.int32/g" $f
+    # replace "s/Coq_Int64.int/DynamicValues.int64/g" $f
 done
 
 # This feels risky. These two are very similar, and only differ because of some newlines in the extraction...
