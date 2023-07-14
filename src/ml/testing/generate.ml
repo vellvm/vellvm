@@ -3,6 +3,16 @@ open InterpretationStack.InterpreterStackBigIntptr.LP.Events
 open QCheck
 module Z = Camlcoq.Z
 module G = QCheck.Gen
+open MemoryModelImplementation
+open MemoryAddress
+module GA = GenAlive2.GEN_ALIVE2(MemoryModelImplementation.InfAddr)
+module GL = GenAlive2.GenLow
+
+
+
+let rec gen_uvalue : LL.typ -> DV.uvalue GL.coq_G = function
+  | _ -> failwith "Unimplemented"
+
 
 let small_gen =
   let open G in
