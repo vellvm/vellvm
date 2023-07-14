@@ -7,6 +7,7 @@ From Vellvm Require Import
   QC.Utils
   QC.Generators
   Handlers.
+(* Maybe also import InterpretationStack *)
 
 From ExtLib.Structures Require Export
   Functor Applicative Monad Monoid.
@@ -24,7 +25,6 @@ Import ApplicativeNotation.
 From Coq Require Import
   ZArith Bool.Bool String.
 
-
 Require Import QuickChick.GenLow.
 Require Import QuickChick.GenHigh.
 Import GenHigh.
@@ -36,6 +36,43 @@ Set Warnings "-extraction-opaque-accessed,-extraction".
 (* (* Definition nat_gen_example : G nat := *) *)
 (* (*   choose (0, 10)%nat. *) *)
 
+(* Some code that may be useful*)
+(* Module GEN_ALIVE2'. *)
+(*   Module DV := InterpreterStackBigIntptr.LP.Events.DV. *)
+(*   Fixpoint gen_uvalue `{MonadExc string G} (t : typ) : G DV.uvalue := *)
+(*     match t with *)
+(*     | TYPE_I i => *)
+(*         match i with *)
+(*         | 1%N => *)
+(*             returnGen DV.UVALUE_I1 <*> (returnGen DV.repr <*> (choose (0, 1))) *)
+(*             (* x <- choose (0,1);; *) *)
+(*             (* returnGen (UVALUE_I1 (repr x))  *) *)
+(*         | 8%N => *)
+(*             returnGen DV.UVALUE_I8 <*> (returnGen DV.repr <*> (choose (0, 2^8))) *)
+(*             (* x <- choose (0,2 ^ 8);; *) *)
+(*             (* returnGen (UVALUE_I8 (repr x)) *) *)
+(*         | 32%N => *)
+(*             returnGen DV.UVALUE_I32 <*> (returnGen DV.repr <*> (choose (0, 2^32))) *)
+(*             (* x <- choose (0, 2 ^ 32);; *) *)
+(*             (* returnGen (UVALUE_I32 (repr x)) *) *)
+(*         | 64%N => *)
+(*             returnGen DV.UVALUE_I64 <*> (returnGen DV.repr <*> (choose (0, 2^64))) *)
+(*             (* x <- choose (0, 2 ^ 63);; *) *)
+(*             (* returnGen (UVALUE_I64 (repr x)) *) *)
+(*         | _ => failwith "Invalid size" *)
+(*         end *)
+(*     | TYPE_Float => *)
+(*         returnGen DV.UVALUE_Float <*> fing32 *)
+(*     | TYPE_Double => *)
+(*         returnGen DV.UVALUE_None (* FailGen *) *)
+(*     | TYPE_Void => returnGen DV.UVALUE_None *)
+(*     | TYPE_Vector sz subtyp => *)
+(*         returnGen DV.UVALUE_Vector <*> vectorOf (N.to_nat sz) (gen_uvalue subtyp) *)
+(*     | TYPE_Array sz subtyp => *)
+(*         returnGen DV.UVALUE_Array <*> vectorOf (N.to_nat sz) (gen_uvalue subtyp) *)
+(*     | _ => failwith "Unimplemented uvalue generators" *)
+(*     end. *)
+(* End GEN_ALIVE2'. *)
 
 Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZEOF : Sizeof) (LLVMEvents:LLVM_INTERACTIONS(ADDR)(IP)(SIZEOF)).
   Import LLVMEvents.
