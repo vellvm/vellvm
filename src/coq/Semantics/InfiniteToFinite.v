@@ -20246,18 +20246,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
                             { (* OOM *)
                               destruct e.
-
-                              rewrite HT1.
-                              cbn.
-                              rewrite get_inf_tree_equation.
-                              cbn.
-                              unfold raiseOOM.
-                              rewrite bind_trigger.
-                              unfold print_msg.
-                              reflexivity.
+                              admit.
                             }
 
                             subst_existT.
+                            admit.
                             admit.
                           }
 
@@ -21936,6 +21929,78 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                   red in HANDLER.
                   break_match_hyp.
                   { (* Negative length UB *)
+                    subst.
+                    inversion ARGS; subst.
+                    inversion H5; subst.
+                    inversion H7; subst.
+                    inversion H9; subst.
+                    inversion H11; subst.
+
+                    apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
+                    apply dvalue_refine_strict_addr_r_inv in H4 as (?&?&?); subst.
+                    apply dvalue_refine_strict_i32_r_inv in H6 as (?&?&?); subst.
+                    apply dvalue_refine_strict_i32_r_inv in H8 as (?&?&?); subst.
+                    apply dvalue_refine_strict_i1_r_inv in H10 as (?&?&?); subst.
+
+                    pstep; red; cbn.
+
+                    eapply Interp_Memory_PropT_Vis with
+                      (ta:=
+                         vis (ThrowUB tt)
+                           (fun x : void =>
+                              match
+                                x
+                                return
+                                (itree
+                                   (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
+                                                                                         LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                                   (MemoryBigIntptr.MMEP.MMSP.MemState *
+                                      (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                              with
+                              end)).
+                    
+                    2: {
+                      cbn.
+                      repeat red.
+                      left.
+                      exists "memcpy given negative length.".
+                      red.
+                      rewrite Heqb.
+                      cbn.
+                      left.
+                      red.
+                      cbn in H3.
+                      rewrite H3.
+                      rewrite Heqb0.
+                      cbn; auto.
+                    }
+
+                    intros a1 b RETa RETb AB.
+                    eapply Returns_vis_inversion in RETb.
+                    destruct RETb as [[] _].
+
+                    rewrite VIS_HANDLED.
+                    move HK after H11.
+
+                    (*
+                        get_inf_tree (ta >>= k) ≈ x <- get_inf_tree ta;; get_inf_tree (k_inf x)
+
+                     *)
+                    
+
+                    econstructor.
+                    inversion RUN; subst.
+                    { exfalso; eapply EQ; eauto. }
+
+                    { (* OOM *)
+                      destruct e.
+                      admit.
+                    }
+
+                    subst_existT.
+                    admit.
+                    admit.
+
                     econstructor.
                     admit.
                   }
