@@ -54,10 +54,13 @@ Section interp_memory_prop.
 
   Context {S1 S2 : Type}.
   Context {E F OOM : Type -> Type} {OOMF: OOM -< F}.
-  Notation interp_memory_h_spec := (forall T, E T -> stateT S1 (stateT S2 (PropT F)) T).
   Notation stateful R := (S2 * (S1 * R))%type.
 
+  Notation interp_memory_h_spec := (forall T, E T -> stateT S1 (stateT S2 (PropT F)) T).
+  Notation interp_memory_k_spec := (forall T R1 R2, E T -> itree F (stateful T) -> (T -> itree E R1) -> (stateful T -> itree F (stateful R2)) -> itree F (stateful R2) -> Prop).
+
   Context (h_spec : interp_memory_h_spec) {R1 R2 : Type} (RR : R1 -> stateful R2 -> Prop).
+  Context (k_spec : interp_memory_k_spec).
 
   Inductive interp_memory_PropTF
             (b1 b2 : bool) (sim : itree E R1 -> itree F (stateful R2) -> Prop)
@@ -90,12 +93,20 @@ Section interp_memory_prop.
                          (HK : forall a b, @Returns E A a (trigger e) ->
                                            @Returns F (stateful A) b ta ->
                                            a = snd (snd b) ->
-                                    sim (k1 a) (k2 b)),
+                                           sim (k1 a) (k2 b))
+
+                         (* k_spec => t2 ≈ bind ta k2 *)
+                         (* k_spec => True *)
+                         (KS : k_spec A R1 R2 e ta k1 k2 t2), 
         h_spec _ e s1 s2 ta ->
         t2 ≈ ta >>= k2 ->
         interp_memory_PropTF b1 b2 sim (VisF e k1) (observe t2).
 
   Hint Constructors interp_memory_PropTF : core.
+
+  Definition k_spec_correct
+             (h: forall T, E T -> itree F (stateful T)) : Prop
+    := forall T R1 R2 e k1 k2 t2, t2 ≈ bind (h T e) k2 -> k_spec T R1 R2 e (h T e) k1 k2 t2.
 
   Lemma interp_memory_PropTF_mono b1 b2 x0 x1 sim sim'
         (IN: interp_memory_PropTF b1 b2 sim x0 x1)
@@ -171,7 +182,8 @@ Section interp_memory_prop.
       pinversion HT1; subst.
       dependent induction REL.
     - pstep; eapply Interp_Memory_PropT_Vis; eauto.
-      rewrite (itree_eta t2) in H0.
+      + subst. exact KS.
+      + rewrite (itree_eta t2) in H0.
         rewrite H2 in H0. rewrite tau_eutt in H0; eauto.
   Qed.
 
