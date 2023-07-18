@@ -67,6 +67,7 @@ done
 
 for f in "${GENMLIFILES[@]}"
 do
+    sed -i "1s/^/open Error\n/" $EXTRACT_DIR/$f
     sed -i "1s/^/open CeresS\n/" $EXTRACT_DIR/$f
     sed -i "1s/^/open DynamicTypes\n/" $EXTRACT_DIR/$f
     sed -i "1s/^/open DynamicValues\n/" $EXTRACT_DIR/$f
@@ -119,6 +120,12 @@ do
     # DynamicTypes replacement
     sed -i "/^type dtyp =/,/^$/c\type dtyp = DynamicTypes.dtyp\n" $EXTRACT_DIR/$f
 
+    # VellvmIntegers
+    sed -i "/^type 'i vMemInt/,/^$/c\type 'i vMemInt = 'i VellvmIntegers.coq_VMemInt\n" $EXTRACT_DIR/$f
+
+    # Error
+    sed -i "/^type 'a oOM/,/^$/c\type 'a oOM = 'a Error.coq_OOM\n" $EXTRACT_DIR/$f
+    
     # DynamicValues replacemeent
     sed -i "/^module Wordsize1/,/end/c\module Wordsize1 = DynamicValues.Wordsize1" $EXTRACT_DIR/$f
     sed -i "/^module Wordsize8/,/end/c\module Wordsize8 = DynamicValues.Wordsize8" $EXTRACT_DIR/$f
@@ -139,6 +146,7 @@ done
 
 for f in "${GENFILES[@]}"
 do
+    sed -i "1s/^/open Error\n/" $EXTRACT_DIR/$f
     sed -i "1s/^/open CeresS\n/" $EXTRACT_DIR/$f
     sed -i "1s/^/open DynamicTypes\n/" $EXTRACT_DIR/$f
     sed -i "1s/^/open DynamicValues\n/" $EXTRACT_DIR/$f
@@ -195,6 +203,12 @@ do
     # DynamicTypes replacement
     sed -i "/^type dtyp =/,/^$/c\type dtyp = DynamicTypes.dtyp\n" $EXTRACT_DIR/$f
 
+    # VellvmIntegers
+    sed -i "/^type 'i vMemInt/,/^$/c\type 'i vMemInt = 'i VellvmIntegers.coq_VMemInt\n" $EXTRACT_DIR/$f
+
+    # Error
+    sed -i "/^type 'a oOM/,/^$/c\type 'a oOM = 'a Error.coq_OOM\n" $EXTRACT_DIR/$f
+    
     # DynamicValues replacemeent
     sed -i "/^module Wordsize1 =/,/end/c\module Wordsize1 = DynamicValues.Wordsize1" $EXTRACT_DIR/$f
     sed -i "/^module Wordsize8 =/,/end/c\module Wordsize8 = DynamicValues.Wordsize8" $EXTRACT_DIR/$f

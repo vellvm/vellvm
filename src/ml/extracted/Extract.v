@@ -16,6 +16,7 @@ From Vellvm Require Import
      Utilities
      Syntax
      Semantics
+     Handlers.Handlers
      Theory.Refinement.
 
 Import ITreeNotations.
@@ -98,6 +99,7 @@ Extraction Library Transform.
 Extraction Library ParserHelper.
 Recursive Extraction Library ShowAST.
 Recursive Extraction Library ReprAST.
+Extraction Library Handlers.
 
 (* From QuickChick Require Import ExtractionQC. *)
 
