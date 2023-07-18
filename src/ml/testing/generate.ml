@@ -5,7 +5,7 @@ module Z = Camlcoq.Z
 module G = QCheck.Gen
 open MemoryModelImplementation
 open MemoryAddress
-module GA = GenAlive2.GEN_ALIVE2(MemoryModelImplementation.InfAddr)
+module GA = GenAlive2.GEN_ALIVE2(MemoryModelImplementation.InfAddr)(MemoryModelImplementation.BigIP)(MemoryModelImplementation.FinSizeof)(Handlers.LLVMEvents)
 module GL = GenAlive2.GenLow
 
 
@@ -34,6 +34,8 @@ let g_si32 = G.map
                  (fun v -> DV.UVALUE_I32 (Z.of_sint v)) small_gen
 
 let g_si64 = G.map (fun v -> DV.UVALUE_I64 (Z.of_sint v)) small_gen
+
+(* let rec gen_uvalue'' : LL.typ -> DV.uvalue GL.coq_G = GA.gen_uvalue *)
 
 let rec gen_uvalue : LL.typ -> DV.uvalue G.t = function
   | LL.TYPE_I i ->
