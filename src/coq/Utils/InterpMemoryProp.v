@@ -74,8 +74,8 @@ Section interp_memory_prop.
 
   (* Well-formedness conditions for k_specs *)
   Class k_spec_WF := {
-      k_spec_Returns: forall {A R2} ta k2 t2 e,
-        k_spec A R2 e ta k2 t2 -> forall a, Returns a ta -> forall a', Returns a' (k2 a) -> Returns a' t2;
+      (* k_spec_Returns: forall {A R2} ta k2 t2 e, *)
+      (*   k_spec A R2 e ta k2 t2 -> forall a, Returns a ta -> forall a', Returns a' (k2 a) -> Returns a' t2; *)
       (* (* Not sure what this is supposed to be... *) *)
       (* k_spec_bind: forall {A R1 R2} ta k1 k2 (t2 : itree F _) e (k' : R1 -> itree F R2), *)
       (*   k_spec A R1 R2 e ta k1 k2 t2 -> *)

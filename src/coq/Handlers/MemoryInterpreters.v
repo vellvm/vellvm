@@ -396,13 +396,43 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       eapply handle_intrinsic_prop; auto.
     Defined.
 
+    Definition memory_k_spec
+               {T R : Type}
+               (e : Effin T)
+               (ta : itree Effout (MemState * (store_id * T)))
+               (k2 : (MemState * (store_id * T)) -> itree Effout (MemState * (store_id * R)))
+               (t2 : itree Effout (MemState * (store_id * R))) : Prop
+      := t2 ≈ (bind ta k2).
+
+    #[global] Instance memory_k_spec_proper {A R2 : Type} e ta k2 :
+      Proper
+        (eutt eq ==> iff)
+        (@memory_k_spec A R2 e ta k2).
+    Proof.
+      unfold Proper, respectful.
+      intros x y EQV.
+      split; intros K_SPEC; red; red in K_SPEC; rewrite <- K_SPEC; eauto.
+      symmetry; eauto.
+    Qed.
+
     Definition interp_memory_prop_h : forall T, Effin T -> MemStateFreshT (PropT Effout) T
       := case_ E_trigger (case_ my_handle_intrinsic_prop (case_ my_handle_memory_prop F_trigger)).
+
+    #[global] Instance memory_k_spec_WF : @k_spec_WF store_id MemState _ _ interp_memory_prop_h (@memory_k_spec).
+    Proof.
+      split.
+      - (* k_spec_Proper *)
+        typeclasses eauto.
+      - (* k_spec_Correct *)
+        red.
+        intros T R2 e k2 t2 s1 s2 ta H_SPEC BIND.
+        unfold memory_k_spec; auto.
+    Qed.
 
     Definition interp_memory_prop {R1 R2} (RR : R1 -> R2 -> Prop) :
       itree Effin R1 -> MemStateFreshT (PropT Effout) R2 :=
       fun (t : itree Effin R1) (sid : store_id) (ms : MemState) (t' : itree Effout (MemState * (store_id * R2))) =>
-        interp_memory_prop (OOM:=OOME) interp_memory_prop_h (fun x '(_, (_, y)) => RR x y) t t'.
+        interp_memory_prop (OOM:=OOME) interp_memory_prop_h (fun x '(_, (_, y)) => RR x y) (@memory_k_spec) t t'.
 
   End Interpreters.
 End MemorySpecInterpreter.
@@ -880,7 +910,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       unfold interp_memory.
       cbn.
       match goal with
-      | |- InterpMemoryProp.interp_memory_prop _ _ _ ?i => remember i
+      | |- InterpMemoryProp.interp_memory_prop _ _ _ _ ?i => remember i
       end.
       match goal with
       | [H : i = ?r |- _] => assert (i ≅ r) by (subst; reflexivity)
@@ -937,11 +967,17 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
           2 : { eapply (interp_memory_h e sid ms). }
           2 : exact sid. 2 : exact ms.
           reflexivity. }
-        2 : {
-          Unshelve.
+        3 : {
           eapply eutt_clo_bind; [ reflexivity | intros; subst ].
           destruct u2, p. cbn.
           rewrite tau_eutt. reflexivity. }
+        { (* memory_k_spec *)
+          red.
+          eapply eutt_clo_bind; [ reflexivity | intros; subst ].
+          destruct u2, p. cbn.
+          rewrite tau_eutt.
+          reflexivity.
+        }
         + red. unfold case_, case_, Case_sum1, case_sum1.
           destruct e as [ | [ | [ | ]]]; cbn.
           1,4 : red; tau_steps; apply eqit_Vis; intros;
