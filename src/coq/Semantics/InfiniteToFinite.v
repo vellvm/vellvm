@@ -19978,6 +19978,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             ++ specialize (EQ t0); contradiction.
           -- (* Vis *)
             { rewrite itree_eta in H1.
+              rewrite (itree_eta_ t2) in KS.
               genobs t2 ot2.
               clear t2 Heqot2.
               dependent induction RUN; subst.
@@ -20039,11 +20040,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                                 | Oom s => raiseOOM s
                                 end)
                         ).
-                      2: {
+                      3: {
                         cbn. red.
                         reflexivity.
                       }
-                      2: {
+                      3: {
                         cbn.
                         setoid_rewrite bind_trigger.
                         pstep; red; cbn.
@@ -20151,6 +20152,40 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
                       rewrite REL.
                       eapply K_RUTT; split; auto.
+
+                      red.
+                      cbn.
+                      rewrite bind_bind.
+                      setoid_rewrite bind_ret_l.
+                      rewrite bind_trigger.
+
+                      rewrite get_inf_tree_equation.
+                      cbn.
+                      erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+                      pstep; red; cbn.
+
+                      rewrite Forall2_map_eq with (l2:=args0).
+                      2: {
+                        eapply Forall2_flip.
+                        eapply Util.Forall2_impl; [| apply ARGS].
+                        intros a b H1.
+                        red.
+                        symmetry.
+                        apply fin_to_inf_dvalue_refine_strict'.
+                        auto.
+                      }
+
+                      constructor.
+                      intros v.
+                      red.
+
+                      left.
+                      break_match_goal.
+                      eapply paco2_eqit_refl.
+
+                      rewrite get_inf_tree_equation.
+                      cbn.
+                      eapply paco2_eqit_refl.
                     }
                     { specialize (EQ t1).
                       contradiction.
@@ -20220,7 +20255,15 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                                               (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
                                       with
                                       end)).
-                                     
+
+                            2: {
+                              red in KS.
+                              red.
+                              red.
+                              rewrite VIS_HANDLED.
+                              cbn in *.
+                            }
+
                             2: {
                               cbn.
                               repeat red.
