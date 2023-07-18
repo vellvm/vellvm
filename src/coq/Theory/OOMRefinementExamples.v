@@ -597,7 +597,7 @@ Module Infinite.
     rewrite alloc_tree_simpl.
 
     apply L3_trace_MemoryE.
-    eapply (interp_memory_prop_vis _ _ _ _ _ (Ret _) (fun _ => Ret _))
+    eapply (interp_memory_prop_vis _ _ _ _ _ _ (Ret _) _ (fun _ => Ret _))
       ; [ setoid_rewrite bind_ret_l; reflexivity |..].
 
     { cbn. unfold my_handle_memory_prop.
@@ -605,7 +605,7 @@ Module Infinite.
       right; right; right.
       exists sid, ms_final, (DVALUE_Addr addr).
       Unshelve.
-      5 : exact (ms_final, (sid, DVALUE_Addr addr)).
+      7 : exact (ms_final, (sid, DVALUE_Addr addr)).
       split; [ red; reflexivity |].
       6 : exact m. cbn in *.
       exists ms_final, addr. tauto.
@@ -726,7 +726,7 @@ Module Infinite.
     rewrite ptoi_tree_simpl.
 
     apply L3_trace_MemoryE.
-    eapply (interp_memory_prop_vis _ _ _ _ _ (Ret _) (fun _ => Ret _))
+    eapply (interp_memory_prop_vis _ _ _ _ _ _ (Ret _) _ (fun _ => Ret _))
       ; [ setoid_rewrite bind_ret_l; reflexivity |..].
 
     { cbn. unfold my_handle_memory_prop.
@@ -734,7 +734,7 @@ Module Infinite.
       right; right; right.
       exists sid, ms_final, (DVALUE_Addr addr).
       Unshelve.
-      5 : exact (ms_final, (sid, DVALUE_Addr addr)).
+      7 : exact (ms_final, (sid, DVALUE_Addr addr)).
       split; [ red; reflexivity |].
       6 : exact m. cbn in *.
       exists ms_final, addr. tauto.
