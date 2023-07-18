@@ -57,10 +57,43 @@ Section interp_memory_prop.
   Notation stateful R := (S2 * (S1 * R))%type.
 
   Notation interp_memory_h_spec := (forall T, E T -> stateT S1 (stateT S2 (PropT F)) T).
-  Notation interp_memory_k_spec := (forall T R1 R2, E T -> itree F (stateful T) -> (T -> itree E R1) -> (stateful T -> itree F (stateful R2)) -> itree F (stateful R2) -> Prop).
+  Notation interp_memory_k_spec := (forall T R2, E T -> itree F (stateful T) -> (stateful T -> itree F (stateful R2)) -> itree F (stateful R2) -> Prop).
 
   Context (h_spec : interp_memory_h_spec) {R1 R2 : Type} (RR : R1 -> stateful R2 -> Prop).
   Context (k_spec : interp_memory_k_spec).
+
+  Definition k_spec_correct : Prop
+    := forall T (R2 : Type) e k2 t2 s1 s2 ta,
+      h_spec _ e s1 s2 ta ->
+      t2 ≈ bind ta k2 ->
+      k_spec T R2 e ta k2 t2.
+
+  Definition k_spec_correct_exec
+             (h: forall T, E T -> itree F (stateful T)) : Prop
+    := forall T R2 e k2 t2, t2 ≈ bind (h T e) k2 -> k_spec T R2 e (h T e) k2 t2.
+
+  (* Well-formedness conditions for k_specs *)
+  Class k_spec_WF := {
+      k_spec_Returns: forall {A R2} ta k2 t2 e,
+        k_spec A R2 e ta k2 t2 -> forall a, Returns a ta -> forall a', Returns a' (k2 a) -> Returns a' t2;
+      (* (* Not sure what this is supposed to be... *) *)
+      (* k_spec_bind: forall {A R1 R2} ta k1 k2 (t2 : itree F _) e (k' : R1 -> itree F R2), *)
+      (*   k_spec A R1 R2 e ta k1 k2 t2 -> *)
+      (*   k_spec A R1 R2 e ta k1 (fun x => bind (k2 x) k') (bind t2 k'); *)
+      k_spec_Proper : forall {A R2} e ta k2,
+        Proper (eutt eq  ==>  iff) (@k_spec A R2 e ta k2);
+      k_spec_Correct : k_spec_correct;
+      (* k_spec_respects_h_spec : forall {A} t2 (ta : itree F _) (k : _ -> itree F _) e s1 s2, *)
+      (*   (* The interpretation of `e` can yield `ta` *) *)
+      (*   h_spec _ e s1 s2 ta -> *)
+      (*   (* t2 provides a valid handling of `e` + the continuation *) *)
+      (*   t2 ≈ x <- ta;; k x -> *)
+      (*   k_spec A R1 R2 e ta k1 k2 t2 -> *)
+      (*   (* We can handle e with x...???? *) *)
+      (*   h_spec _ e s1 s2 x *)
+    }.
+
+  Context (k_spec_wellformed : k_spec_WF).
 
   Inductive interp_memory_PropTF
             (b1 b2 : bool) (sim : itree E R1 -> itree F (stateful R2) -> Prop)
@@ -97,16 +130,12 @@ Section interp_memory_prop.
 
                          (* k_spec => t2 ≈ bind ta k2 *)
                          (* k_spec => True *)
-                         (KS : k_spec A R1 R2 e ta k1 k2 t2), 
+                         (KS : k_spec A R2 e ta k2 t2), 
         h_spec _ e s1 s2 ta ->
         t2 ≈ ta >>= k2 ->
         interp_memory_PropTF b1 b2 sim (VisF e k1) (observe t2).
 
   Hint Constructors interp_memory_PropTF : core.
-
-  Definition k_spec_correct
-             (h: forall T, E T -> itree F (stateful T)) : Prop
-    := forall T R1 R2 e k1 k2 t2, t2 ≈ bind (h T e) k2 -> k_spec T R1 R2 e (h T e) k1 k2 t2.
 
   Lemma interp_memory_PropTF_mono b1 b2 x0 x1 sim sim'
         (IN: interp_memory_PropTF b1 b2 sim x0 x1)
@@ -182,7 +211,13 @@ Section interp_memory_prop.
       pinversion HT1; subst.
       dependent induction REL.
     - pstep; eapply Interp_Memory_PropT_Vis; eauto.
-      + subst. exact KS.
+      + eapply k_spec_Proper with (y:=t2); eauto.
+        rewrite <- tau_eutt.
+        pstep; red; cbn.
+        rewrite H2.
+        apply EqTau.
+        left.
+        apply Reflexive_eqit_eq.
       + rewrite (itree_eta t2) in H0.
         rewrite H2 in H0. rewrite tau_eutt in H0; eauto.
   Qed.
@@ -227,9 +262,8 @@ Section interp_memory_prop.
   Proof.
     repeat intro. red in H0.
     punfold H; punfold H0; red in H; red in H0; cbn in *.
-    revert_until RR.
-    pcofix CIH.
-    intros x y y' EQ H.
+    revert_until k_spec.
+    pcofix CIH; intros k_spec_wellformed x y y' EQ H.
     remember (observe x); remember (observe y).
     pstep. red.
     revert x Heqi y Heqi0 EQ.
@@ -278,6 +312,16 @@ Section interp_memory_prop.
              ++ intros a b H1 H2 H3.
                 left. specialize (HK _ b H1 H2 H3). pclearbot.
                 eapply paco2_mon; eauto. intros; inv PR.
+             ++ eapply k_spec_wellformed with (y:=t2); eauto.
+                pstep; red; cbn.
+                rewrite Heqot.
+                constructor.
+
+                unfold id in *.
+                intros v; pclearbot.
+                left.
+                apply Symmetric_eqit_eq.
+                apply REL.
              ++ eapply H.
              ++ rewrite itree_eta in H0; rewrite Heqot in H0.
                 rewrite <- H0; apply eqit_Vis.
@@ -315,11 +359,19 @@ Section interp_memory_prop.
       rewrite Heqi0 in EQ.
       rewrite itree_eta in H0.
       rewrite Heqi0, <- itree_eta in H0; clear Heqi0.
+      assert (KS':k_spec A R2 e ta k2 y).
+      { eapply k_spec_Correct; eauto.
+      }
       eapply Interp_Memory_PropT_Vis; eauto.
       intros; eauto.
       specialize (HK _ _ H1 H2 H3). pclearbot.
       left. eapply paco2_mon; intros; eauto.
-      inv PR. assert (y ≈ y') by (pstep; auto).
+      inv PR.
+      { eapply k_spec_wellformed with (y:=y); eauto.
+        apply Symmetric_eqit_eq.
+        pstep; red; cbn; auto.
+      }
+      assert (y ≈ y') by (pstep; auto).
       rewrite <- H1; auto.
   Qed.
 
@@ -329,7 +381,7 @@ Section interp_memory_prop.
     intros y y' EQ x x' EQ' H.
     rewrite <- EQ'. clear x' EQ'.
     punfold H; punfold EQ; red in H; red in EQ; cbn in *.
-    revert_until RR.
+    revert_until k_spec_wellformed.
     pcofix CIH.
     intros x x' EQ y H.
     remember (observe x); remember (observe y).
@@ -376,6 +428,9 @@ Section interp_memory_prop.
              specialize (REL a). pclearbot. punfold REL.
              specialize (HK _ _ H1 H2 H3). pclearbot.
              punfold HK.
+
+             
+
         * eapply IHREL; eauto. pstep_reverse.
           assert (interp_memory_prop (Tau t0) t2) by (pstep; auto).
           apply interp_memory_prop_inv_tau_l in H. punfold H.
@@ -400,7 +455,13 @@ Section interp_memory_prop.
         intros. specialize (HK _ _ H1 H2 H3); pclearbot.
         right; eapply CIH; [ | punfold HK].
         specialize (REL a).
-        punfold REL. setoid_rewrite itree_eta at 1 ; rewrite <- Heqi0, <- itree_eta; auto.
+        punfold REL.
+        { eapply k_spec_Correct; eauto.
+          pstep; red; cbn.
+          rewrite <- Heqi0.
+          pinversion H0.
+        }
+        setoid_rewrite itree_eta at 1 ; rewrite <- Heqi0, <- itree_eta; auto.
       + econstructor; eauto.
   Qed.
 
@@ -495,6 +556,7 @@ Section interp_memory_prop.
     intros.
     red; pstep; eapply Interp_Memory_PropT_Vis; eauto.
     intros. left; eauto. eapply H1; auto.
+    eapply k_spec_Correct; eauto.
   Qed.
 
 End interp_memory_prop.
@@ -509,11 +571,13 @@ Hint Resolve interp_memory_PropT__mono : paco.
 Hint Resolve interp_memory_PropT_idclo_mono : paco.
 
 #[global] Instance interp_memory_prop_Proper_eq :
-  forall S1 S2 (E F OOM : Type -> Type) `{OOME: OOM -< F} h_spec
+  forall S1 S2 (E F OOM : Type -> Type) `{OOME: OOM -< F}
+    h_spec
+    k_spec `{KS_WF : @k_spec_WF _ _ E F h_spec k_spec}
     R (RR : R -> R -> Prop) (HR: Reflexive RR) (HT : Transitive RR),
-    Proper (@eutt _ _ _ RR ==> eq ==> flip Basics.impl) (@interp_memory_prop S1 S2 E F OOM OOME h_spec _ _ (fun x '(_, (_, y)) => RR x y)).
+    Proper (@eutt _ _ _ RR ==> eq ==> flip Basics.impl) (@interp_memory_prop S1 S2 E F OOM OOME h_spec _ _ (fun x '(_, (_, y)) => RR x y) k_spec).
 Proof.
-  intros S1 S2 E F OOM OOME h_spec R RR REFL TRANS.
+  intros S1 S2 E F OOM OOME h_spec k_spec KS_WF R RR REFL TRANS.
   intros y y' EQ x x' EQ' H. subst.
   punfold H; punfold EQ; red in H; red in EQ; cbn in *.
   revert_until TRANS.
@@ -572,7 +636,7 @@ Proof.
            specialize (HK _ _ H1 H2 H3). pclearbot.
            punfold HK.
       * eapply IHREL; eauto. pstep_reverse.
-        assert (interp_memory_prop (OOMF:=OOME) h_spec (fun x '(_, (_, y)) => RR x y) (Tau t2) t0) by (pstep; auto).
+        assert (interp_memory_prop (OOMF:=OOME) h_spec (fun x '(_, (_, y)) => RR x y) k_spec (Tau t2) t0) by (pstep; auto).
         apply interp_memory_prop_inv_tau_l in H. punfold H.
   - specialize (IHinterp_memory_PropTF _ Heqi _ Heqi0).
     assert (eutt RR (go xo) t1).
@@ -598,6 +662,13 @@ Proof.
       intros. specialize (HK _ _ H1 H2 H3); pclearbot.
       right; eapply CIH; [ | punfold HK].
       specialize (REL a).
-      punfold REL. setoid_rewrite itree_eta at 1 ; rewrite <- Heqi0, <- itree_eta; auto.
+      punfold REL.
+      { eapply k_spec_Correct; eauto.
+        rewrite (itree_eta y).
+        rewrite <- Heqi0.
+        rewrite <- itree_eta.
+        auto.
+      }
+      setoid_rewrite itree_eta at 1 ; rewrite <- Heqi0, <- itree_eta; auto.
     + econstructor; eauto.
 Qed.
