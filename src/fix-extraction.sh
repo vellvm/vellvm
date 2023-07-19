@@ -65,22 +65,44 @@ do
     replace "s/Byte.int/Integers.Byte.int/g" $f
 done
 
+join_strings() {
+  local delimiter="$1"
+  shift
+  local joined=""
+  
+  for string in "$@"; do
+      joined+="$string$delimiter"
+  done
+
+  echo "${joined%"$delimiter"}"
+}
+
+
+GEN_OPEN_MODULES=("open Bits" "open Binary" "open BinNums" "open BinPos" "open BinNat" "open Floats" "open Integers" "open VellvmIntegers" "open EitherMonad" "open DynamicValues" "open DynamicTypes" "open CeresS" "open Error" "open Datatypes" "open Decimal" "open Nat" "open CeresString" "open AstLib" "open ShowAST")
+GEN_MODULES_DECLARATION=$(join_strings "\n" "${GEN_OPEN_MODULES[@]}")
+# for string in "${GEN_OPEN_MODULESS[@]}"; do
+#     echo "$string"
+# done
+# echo "${GEN_MODULES_DECLARATION}"
+# echo "This is successful"
+
 for f in "${GENMLIFILES[@]}"
 do
-    sed -i "1s/^/open Error\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open CeresS\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open DynamicTypes\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open DynamicValues\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open EitherMonad\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open VellvmIntegers\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open BinNums\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open BinPos\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open BinNat\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open Integers\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/${GEN_MODULES_DECLARATION}\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open Error\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open CeresS\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open DynamicTypes\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open DynamicValues\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open EitherMonad\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open VellvmIntegers\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open BinNums\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open BinPos\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open BinNat\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open Integers\n/" $EXTRACT_DIR/$f
     sed -i "1s/^/module LLVMAst = LLVMAst\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open Binary\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open Bits\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open Floats\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open Binary\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open Bits\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open Floats\n/" $EXTRACT_DIR/$f
     sed -i "/module Int/,/end/d" $EXTRACT_DIR/$f
     sed -i "/module Int1/,/end/d" $EXTRACT_DIR/$f
     sed -i "/module Int8/,/end/d" $EXTRACT_DIR/$f
@@ -125,6 +147,14 @@ do
 
     # Error
     sed -i "/^type 'a oOM/,/^$/c\type 'a oOM = 'a Error.coq_OOM\n" $EXTRACT_DIR/$f
+
+    # Datatypes
+    sed -i "/^type nat /,/^$/c\type nat = Datatypes.nat\n" $EXTRACT_DIR/$f
+    # sed -i "/^type ('a, 'b) sum /,/^$/c\type ('a, 'b) sum = ('a, 'b) Datatypes.sum\n" $EXTRACT_DIR/$f
+    sed -i "/^type comparison /,/^$/c\type comparison = Datatypes.comparison\n" $EXTRACT_DIR/$f
+    
+    # Binary
+    sed -i "/^type binary_float0/,/^$/c\type binary_float0 = Binary.binary_float\n" $EXTRACT_DIR/$f
     
     # DynamicValues replacemeent
     sed -i "/^module Wordsize1/,/end/c\module Wordsize1 = DynamicValues.Wordsize1" $EXTRACT_DIR/$f
@@ -142,24 +172,42 @@ do
     # replace "s/Int64.int/DynamicValues.int64/g" $f
     sed -i "/val succ : int -> int/d" $EXTRACT_DIR/$f
     replace "s/coq_VMemintptr/coq_VMemInt_intptr/g" $f
+
+    sed -i "/^type uint =/,/^$/c\type uint = Decimal.uint\n" $EXTRACT_DIR/$f
+    sed -i '/^type uint .*$/,/type positive/{//!d}' $EXTRACT_DIR/$f
+    sed -i '/^module Wordsize_64 .*$/,/type binary_float /{//!d}' $EXTRACT_DIR/$f
+    sed -i '/type binary_float .*/,/type binary_float0 .*$/{//!d}' $EXTRACT_DIR/$f
+    sed -i '/type binary_float0 .*/,/type binary32 .*$/{//!d}' $EXTRACT_DIR/$f
+    sed -i '/type binary32 .*/,/type binary64 .*$/{//!d}' $EXTRACT_DIR/$f
+    sed -i '/type binary64 .*/,/type float .*$/{//!d}' $EXTRACT_DIR/$f
+    sed -i '/type float32 .*/,/type int0 .*$/{//!d}' $EXTRACT_DIR/$f
+    sed -i '/val show_dtyp /,/val fT_Rounding .*$/d' $EXTRACT_DIR/$f
+    sed -i '/val compb .*/,/val string_of_Z .*$/{//!d}' $EXTRACT_DIR/$f
+    sed -i '/val serialize_ibinop .*/,/val serialize_fcmp .*$/d' $EXTRACT_DIR/$f
+    sed -i '/module Coq_NilEmpty .*/,/end/d' $EXTRACT_DIR/$f
+    sed -i '/module DVALUE .*/,/ end/d' $EXTRACT_DIR/$f
+    sed -i '/val uvalue_measure .*/,/val uvalue_constructor_string/d' $EXTRACT_DIR/$f
 done
 
 for f in "${GENFILES[@]}"
 do
-    sed -i "1s/^/open Error\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open CeresS\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open DynamicTypes\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open DynamicValues\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open EitherMonad\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open VellvmIntegers\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open BinNums\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open BinPos\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open BinNat\n/" $EXTRACT_DIR/$f
+    sed -i "1s/^/${GEN_MODULES_DECLARATION}\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open Error\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open CeresS\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open DynamicTypes\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open DynamicValues\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open EitherMonad\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open VellvmIntegers\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open BinNums\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open BinPos\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open BinNat\n/" $EXTRACT_DIR/$f
     sed -i "1s/^/module LLVMAst = LLVMAst\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open Integers\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open Binary\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open Bits\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/open Floats\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open Integers\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open Binary\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open Bits\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/open Floats\n/" $EXTRACT_DIR/$f
+
+    
     replace "s/Pervasives.succ/succ/g" $f
     replace "s/Pervasives.max/max/g" $f
     replace "s/Pervasives.pred/pred/g" $f
@@ -208,6 +256,14 @@ do
 
     # Error
     sed -i "/^type 'a oOM/,/^$/c\type 'a oOM = 'a Error.coq_OOM\n" $EXTRACT_DIR/$f
+
+    # Datatypes
+    sed -i "/^type nat /,/^$/c\type nat = Datatypes.nat\n" $EXTRACT_DIR/$f
+    # sed -i "/^type ('a, 'b) sum /,/^$/c\type ('a, 'b) sum = ('a, 'b) Datatypes.sum\n" $EXTRACT_DIR/$f
+    sed -i "/^type comparison /,/^$/c\type comparison = Datatypes.comparison\n" $EXTRACT_DIR/$f
+
+    # Binary
+    sed -i "/^type binary_float0/,/^$/c\type binary_float0 = Binary.binary_float\n" $EXTRACT_DIR/$f
     
     # DynamicValues replacemeent
     sed -i "/^module Wordsize1 =/,/end/c\module Wordsize1 = DynamicValues.Wordsize1" $EXTRACT_DIR/$f
@@ -226,10 +282,28 @@ do
     replace "s/XH/Coq_xH/g" $f
     replace "s/XI/Coq_xI/g" $f
     replace "s/TYPE_I i/LLVMAst.TYPE_I i/g" $f
+    replace "s/Raw0/Raw/g" $f
     # replace "s/Int1.int/DynamicValues.int1/g" $f
     # replace "s/Int8.int/DynamicValues.int8/g" $f
     # replace "s/Int32.int/DynamicValues.int32/g" $f
     # replace "s/Coq_Int64.int/DynamicValues.int64/g" $f
+
+    sed -i "/^type uint =/,/^$/c\type uint = Decimal.uint\n" $EXTRACT_DIR/$f
+    sed -i '/^type uint .*$/,/(\*\* val compose/{//!d}' $EXTRACT_DIR/$f
+    sed -i '/(\*\* val eqb .*$/,/type positive .*$/{//!d}' $EXTRACT_DIR/$f
+    sed -i '/module Int64 .*$/,/type binary_float .*$/{//!d}' $EXTRACT_DIR/$f
+    sed -i '/type binary_float .*/,/type binary_float0 .*$/{//!d}' $EXTRACT_DIR/$f
+    sed -i '/type binary_float0 .*/,/type binary32 .*$/{//!d}' $EXTRACT_DIR/$f
+    sed -i '/type binary32 .*/,/type binary64 .*$/{//!d}' $EXTRACT_DIR/$f
+    sed -i '/type binary64 .*/,/type float .*$/{//!d}' $EXTRACT_DIR/$f
+    sed -i '/type float32 .*/,/type int0 .*$/{//!d}' $EXTRACT_DIR/$f
+    sed -i '/(\*\* val eqb_ascii .*/,/(\*\* val string_of_Z .*$/{//!d}' $EXTRACT_DIR/$f
+    sed -i '/(\*\* val serialize_ibinop .*/,/type dtyp .*$/{//!d}' $EXTRACT_DIR/$f
+    sed -i '/module Coq_NilEmpty .*/,/end/d' $EXTRACT_DIR/$f
+    replace "s/Coq_NilEmpty/NilEmpty/g" $f
+    sed -i '/(\*\* val double_to_hex_string .*/,/module Wordsize1 .*$/{//!d}' $EXTRACT_DIR/$f
+    sed -i '/module DVALUE .*/,/ end/d' $EXTRACT_DIR/$f
+    replace "s/B754_finite0/B754_finite/g" $f
 done
 
 # This feels risky. These two are very similar, and only differ because of some newlines in the extraction...
