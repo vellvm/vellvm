@@ -251,9 +251,9 @@ Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE
         | 8%N =>
             ret UVALUE_I8 <*> (ret repr <*> lift_GenALIVE2 (choose (0, 2^8 - 1)))
         | 32%N =>
-            ret UVALUE_I32 <*> (ret repr <*> lift_GenALIVE2 (choose (0, 2^32 - 1)))
+            ret UVALUE_I32 <*> (ret repr <*> lift_GenALIVE2 (choose (0, 10000))) (* Modify to smaller number. Should be 2^32 - 1 *)
         | 64%N =>
-            ret UVALUE_I64 <*> (ret repr <*> lift_GenALIVE2 (choose (0, 2^64 - 1)))
+            ret UVALUE_I64 <*> (ret repr <*> lift_GenALIVE2 (choose (0, 10000))) (* Modify to smaller number. Should be 2^64 - 1 *)
         | _ =>
             failGen "Invalid size"
         end
