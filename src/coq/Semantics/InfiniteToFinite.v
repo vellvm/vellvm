@@ -19977,8 +19977,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                intros [] _.
             ++ specialize (EQ t0); contradiction.
           -- (* Vis *)
-            { rewrite itree_eta in H1.
-              rewrite (itree_eta_ t2) in KS.
+            { rewrite (itree_eta_ t2) in KS.
               genobs t2 ot2.
               clear t2 Heqot2.
               dependent induction RUN; subst.
@@ -19993,12 +19992,14 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 2: {
                   destruct OOM as [o OOM].
                   inv OOM.
-                  repeat red in H0.
-                  rewrite H0 in H1.
-                  setoid_rewrite bind_trigger in H1.
-                  setoid_rewrite bind_vis in H1.
-                  punfold H1; red in H1; cbn in H1.
-                  dependent induction H1.
+                  cbn in HSPEC.
+                  red in HSPEC.
+                  setoid_rewrite bind_trigger in HSPEC.
+                  red in KS.
+                  rewrite HSPEC in KS.
+                  setoid_rewrite bind_vis in KS.
+                  punfold KS; red in KS; cbn in KS.
+                  dependent induction KS.
                   - destruct o.
                     eapply Interp_Memory_PropT_Vis_OOM.
                     rewrite get_inf_tree_equation.
@@ -20014,7 +20015,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 clear m1 Heqom1.
                 dependent induction M1.
                 + (* om1 = Vis *)
-                  rename H1 into VIS_HANDLED.
+                  pose proof KS as VIS_HANDLED.
+                  red in VIS_HANDLED.
 
                   (* Need to break apart events e / e1 to figure out
                 what event we're dealing with. *)
@@ -20025,8 +20027,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
                   { (* ExternalCallE *)
                     destruct EV_REL as (T&F&ARGS); subst.
-                    red in H0.
-                    rewrite H0 in VIS_HANDLED.
+                    red in HSPEC.
+                    rewrite HSPEC in VIS_HANDLED.
 
                     setoid_rewrite bind_trigger in VIS_HANDLED.
                     setoid_rewrite bind_vis in VIS_HANDLED.
@@ -20040,12 +20042,13 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                                 | Oom s => raiseOOM s
                                 end)
                         ).
-                      3: {
+                      2: {
                         cbn. red.
                         reflexivity.
                       }
-                      3: {
+                      2: {
                         cbn.
+                        red.
                         setoid_rewrite bind_trigger.
                         pstep; red; cbn.
 
@@ -20137,7 +20140,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                           reflexivity.
                         }
                         forward HK.
-                        { rewrite H0.
+                        { rewrite HSPEC.
                           rewrite bind_trigger.
                           eapply ReturnsVis.
                           reflexivity.
@@ -20152,40 +20155,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
                       rewrite REL.
                       eapply K_RUTT; split; auto.
-
-                      red.
-                      cbn.
-                      rewrite bind_bind.
-                      setoid_rewrite bind_ret_l.
-                      rewrite bind_trigger.
-
-                      rewrite get_inf_tree_equation.
-                      cbn.
-                      erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
-                      pstep; red; cbn.
-
-                      rewrite Forall2_map_eq with (l2:=args0).
-                      2: {
-                        eapply Forall2_flip.
-                        eapply Util.Forall2_impl; [| apply ARGS].
-                        intros a b H1.
-                        red.
-                        symmetry.
-                        apply fin_to_inf_dvalue_refine_strict'.
-                        auto.
-                      }
-
-                      constructor.
-                      intros v.
-                      red.
-
-                      left.
-                      break_match_goal.
-                      eapply paco2_eqit_refl.
-
-                      rewrite get_inf_tree_equation.
-                      cbn.
-                      eapply paco2_eqit_refl.
                     }
                     { specialize (EQ t1).
                       contradiction.
@@ -20194,9 +20163,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
                   { (* Intrinsic *)
                     destruct EV_REL as (T&F&ARGS); subst.
-                    red in H0.
-                    red in H0.
-                    destruct H0 as [UB | [ERR | [OOM | H0]]].
+                    red in HSPEC.
+                    red in HSPEC.
+                    destruct HSPEC as [UB | [ERR | [OOM | HSPEC]]].
                     { (* Handler raises UB *)
                       (* ta is completely unconstrained in the UB handler...
 
@@ -20256,12 +20225,13 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                                       with
                                       end)).
 
-                            2: {
+                            3: {
                               red in KS.
                               red.
                               red.
                               rewrite VIS_HANDLED.
                               cbn in *.
+                              rewrite 
                             }
 
                             2: {
