@@ -801,13 +801,13 @@ Module Infinite.
       right.
       exists A. exists e0. exists k0.
       reflexivity.
-    - dependent destruction H3.
+    - dependent destruction H1.
       left.
       eexists _,_,_,_; split; eauto.
       + rewrite <- itree_eta; eauto.
       + split; eauto.
         intros. do 3 red.
-        specialize (HK a b H1 H2 H3). pclearbot; auto.
+        specialize (HK a b H H0 H1). pclearbot; auto.
   Qed.
 
   Lemma refine_OOM_h_model_undef_h_raise_OOM:
@@ -1420,13 +1420,13 @@ Module Finite.
       right.
       exists A. exists e0. exists k0.
       reflexivity.
-    - dependent destruction H3.
+    - dependent destruction H1.
       left.
       eexists _,_,_,_; split; eauto.
       + rewrite <- itree_eta; eauto.
       + split; eauto.
         intros. do 3 red.
-        specialize (HK a b H1 H2 H3). pclearbot; auto.
+        specialize (HK a b H H0 H1). pclearbot; auto.
   Qed.
 
   Lemma model_undef_h_ret_pure :

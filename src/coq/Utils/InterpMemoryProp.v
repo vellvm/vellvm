@@ -127,12 +127,11 @@ Section interp_memory_prop.
                                            @Returns F (stateful A) b ta ->
                                            a = snd (snd b) ->
                                            sim (k1 a) (k2 b))
+                         (HSPEC : h_spec _ e s1 s2 ta)
 
                          (* k_spec => t2 ≈ bind ta k2 *)
                          (* k_spec => True *)
                          (KS : k_spec A R2 e ta k2 t2), 
-        h_spec _ e s1 s2 ta ->
-        t2 ≈ ta >>= k2 ->
         interp_memory_PropTF b1 b2 sim (VisF e k1) (observe t2).
 
   Hint Constructors interp_memory_PropTF : core.
@@ -214,12 +213,10 @@ Section interp_memory_prop.
       + eapply k_spec_Proper with (y:=t2); eauto.
         rewrite <- tau_eutt.
         pstep; red; cbn.
-        rewrite H2.
+        rewrite H0.
         apply EqTau.
         left.
         apply Reflexive_eqit_eq.
-      + rewrite (itree_eta t2) in H0.
-        rewrite H2 in H0. rewrite tau_eutt in H0; eauto.
   Qed.
 
   Lemma interp_memory_prop_inv_tau_l t0 t1:
@@ -312,6 +309,7 @@ Section interp_memory_prop.
              ++ intros a b H1 H2 H3.
                 left. specialize (HK _ b H1 H2 H3). pclearbot.
                 eapply paco2_mon; eauto. intros; inv PR.
+             ++ eauto.
              ++ eapply k_spec_wellformed with (y:=t2); eauto.
                 pstep; red; cbn.
                 rewrite Heqot.
@@ -321,11 +319,6 @@ Section interp_memory_prop.
                 intros v; pclearbot.
                 left.
                 apply Symmetric_eqit_eq.
-                apply REL.
-             ++ eapply H.
-             ++ rewrite itree_eta in H0; rewrite Heqot in H0.
-                rewrite <- H0; apply eqit_Vis.
-                symmetry. pclearbot.
                 apply REL.
         * eapply IHREL; eauto. pstep_reverse.
           assert (interp_memory_prop t0 (Tau t1)) by (pstep; auto).
@@ -357,22 +350,27 @@ Section interp_memory_prop.
         eapply IHEQ; eauto.
     - rewrite <- Heqi.
       rewrite Heqi0 in EQ.
-      rewrite itree_eta in H0.
-      rewrite Heqi0, <- itree_eta in H0; clear Heqi0.
-      assert (KS':k_spec A R2 e ta k2 y).
-      { eapply k_spec_Correct; eauto.
+      assert (t2 ≈ y) as TSY.
+      { rewrite (itree_eta t2).
+        rewrite Heqi0.
+        rewrite <- itree_eta.
+        reflexivity.
       }
+
+      assert (KS':k_spec A R2 e ta k2 y).
+      { eapply k_spec_Proper; eauto.
+        symmetry; auto.
+      }
+
       eapply Interp_Memory_PropT_Vis; eauto.
       intros; eauto.
-      specialize (HK _ _ H1 H2 H3). pclearbot.
-      left. eapply paco2_mon; intros; eauto.
-      inv PR.
+      specialize (HK _ _ H H0 H1). pclearbot.
+      left. eapply paco2_mon_bot; intros; eauto.
+
       { eapply k_spec_wellformed with (y:=y); eauto.
         apply Symmetric_eqit_eq.
         pstep; red; cbn; auto.
       }
-      assert (y ≈ y') by (pstep; auto).
-      rewrite <- H1; auto.
   Qed.
 
   #[global] Instance interp_memory_prop_eutt_Proper_impl :
@@ -450,18 +448,16 @@ Section interp_memory_prop.
       reflexivity.
     - rewrite Heqi in EQ.
       hinduction EQ before CIH; intros; try inversion Heqi1; pclearbot; inv Heqi.
-      + dependent destruction H3.
+      + dependent destruction H1.
         eapply Interp_Memory_PropT_Vis; eauto.
-        intros. specialize (HK _ _ H1 H2 H3); pclearbot.
+        intros. specialize (HK _ _ H H0 H1); pclearbot.
         right; eapply CIH; [ | punfold HK].
         specialize (REL a).
         punfold REL.
-        { eapply k_spec_Correct; eauto.
-          pstep; red; cbn.
-          rewrite <- Heqi0.
-          pinversion H0.
-        }
-        setoid_rewrite itree_eta at 1 ; rewrite <- Heqi0, <- itree_eta; auto.
+
+        eapply k_spec_Proper; eauto.
+        rewrite (itree_eta t2), Heqi0, <- itree_eta.
+        reflexivity.
       + econstructor; eauto.
   Qed.
 
@@ -555,7 +551,7 @@ Section interp_memory_prop.
   Proof.
     intros.
     red; pstep; eapply Interp_Memory_PropT_Vis; eauto.
-    intros. left; eauto. eapply H1; auto.
+    intros. left; eauto. eapply H1; eauto.
     eapply k_spec_Correct; eauto.
   Qed.
 
@@ -657,18 +653,16 @@ Proof.
   - rewrite Heqi in EQ.
     remember (VisF e k1).
     hinduction EQ before CIH; intros; try inversion Heqi1; pclearbot; inv Heqi.
-    + dependent destruction H3.
+    + dependent destruction H1.
       eapply Interp_Memory_PropT_Vis; eauto.
-      intros. specialize (HK _ _ H1 H2 H3); pclearbot.
+      intros. specialize (HK _ _ H H0 H1); pclearbot.
       right; eapply CIH; [ | punfold HK].
       specialize (REL a).
+
       punfold REL.
-      { eapply k_spec_Correct; eauto.
-        rewrite (itree_eta y).
-        rewrite <- Heqi0.
-        rewrite <- itree_eta.
-        auto.
-      }
-      setoid_rewrite itree_eta at 1 ; rewrite <- Heqi0, <- itree_eta; auto.
+
+      eapply k_spec_Proper; eauto.
+      rewrite (itree_eta t2), Heqi0, <- itree_eta.
+      reflexivity.
     + econstructor; eauto.
 Qed.

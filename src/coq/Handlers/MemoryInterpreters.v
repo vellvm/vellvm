@@ -960,17 +960,25 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         apply bisimulation_is_eq; pstep; red; auto.
         subst.
         eapply Interp_Memory_PropT_Vis; eauto.
+
         { intros. right. destruct b, p. subst. eapply CIH.
           Unshelve.
           5 : exact (fun '(m, (s, a)) => State.interp_state interp_memory_h (k2 a) s m).
           cbn in *.
           2 : { eapply (interp_memory_h e sid ms). }
           2 : exact sid. 2 : exact ms.
-          reflexivity. }
-        3 : {
-          eapply eutt_clo_bind; [ reflexivity | intros; subst ].
-          destruct u2, p. cbn.
-          rewrite tau_eutt. reflexivity. }
+          reflexivity.
+        }
+
+        { (* interp_memory_prop_h *)
+          red. unfold case_, case_, Case_sum1, case_sum1.
+          destruct e as [ | [ | [ | ]]]; cbn.
+          1,4 : red; tau_steps; apply eqit_Vis; intros;
+            tau_steps; reflexivity.
+          - eapply my_handle_intrinsic_prop_correct.
+          - eapply my_handle_memory_prop_correct.
+        }
+
         { (* memory_k_spec *)
           red.
           eapply eutt_clo_bind; [ reflexivity | intros; subst ].
@@ -978,12 +986,6 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
           rewrite tau_eutt.
           reflexivity.
         }
-        + red. unfold case_, case_, Case_sum1, case_sum1.
-          destruct e as [ | [ | [ | ]]]; cbn.
-          1,4 : red; tau_steps; apply eqit_Vis; intros;
-            tau_steps; reflexivity.
-          * eapply my_handle_intrinsic_prop_correct.
-          * eapply my_handle_memory_prop_correct.
     Qed.
 
   End Interpreters.
