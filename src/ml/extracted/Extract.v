@@ -113,9 +113,8 @@ From QuickChick Require Import RandomQC RoseTrees Test Show Checker.
 
 Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlString.
-Require Import ExtrOcamlNatInt.
+(* Require Import ExtrOcamlNatInt. *)
 (* Require Import ExtrOcamlZInt. *)
-
 Extraction Blacklist String List Nat.
 
 (** Temporary fix for https://github.com/coq/coq/issues/7017. *)
@@ -133,12 +132,12 @@ Extract Inductive Hexadecimal.int => "((Obj.t -> Obj.t) -> (Obj.t -> Obj.t) -> O
 (*     "(fun y _ hex -> hex (Obj.magic y))" *)
 (*   ] "(fun i dec hex -> Obj.magic i dec hex)". *)
 
-Extract Constant show_nat =>
-  "(fun i ->
-  let s = string_of_int i in
-  let rec copy acc i =
-    if i < 0 then acc else copy (s.[i] :: acc) (i-1)
-  in copy [] (String.length s - 1))".
+(* Extract Constant show_nat => *)
+(*   "(fun i -> *)
+(*   let s = string_of_int i in *)
+(*   let rec copy acc i = *)
+(*     if i < 0 then acc else copy (s.[i] :: acc) (i-1) *)
+(*   in copy [] (String.length s - 1))". *)
 Extract Constant show_bool =>
   "(fun i ->
   let s = string_of_bool i in
@@ -178,7 +177,7 @@ Extract Constant force => "Lazy.force".
 
 (* Extract Constant Test.ltAscii => "(<=)". *)
 (* Extract Constant Test.strEq   => "(=)". *)
-Extract Constant Nat.div => "(fun m -> function 0 -> 0 | d -> m / d)".
+(* Extract Constant Nat.div => "(fun m -> function 0 -> 0 | d -> m / d)". *)
 Extract Constant Test.gte => "(>=)".
 Extract Constant le_gt_dec => "(<=)".
 Extract Constant trace =>
@@ -223,8 +222,8 @@ Extract Inlined Constant add => "( + )".
 (*           "(fun (x,y) r -> if y < x then failwith (Obj.magic monad_either) (Obj.magic exception_either) ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))". *)
 
 
-Extract Constant randomRNat  =>
-  "(fun (x,y) r -> if y < x then failwith (Obj.magic coq_Monad_either) (Obj.magic coq_Exception_either) ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))".
+(* Extract Constant randomRNat  => *)
+(*   "(fun (x,y) r -> if y < x then failwith (Obj.magic coq_Monad_either) (Obj.magic coq_Exception_either) ""choose called with unordered arguments"" else  (x + (Random.State.int r (y - x + 1)), r))". *)
 (* Extract Constant randomRBool => "(fun _ r -> Random.State.bool r, r)". *)
 Extract Constant randomRInt  =>
   "(fun (x,y) r -> let yint = coqZToInt y in let xint = coqZToInt x in if (yint < xint) then failwith (Obj.magic coq_Monad_either) (Obj.magic coq_Exception_either) ""choose called with unordered arguments"" else (intToCoqZ (xint + (Random.State.int r (yint - xint + 1))), r))".
