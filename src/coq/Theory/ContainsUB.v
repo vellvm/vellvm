@@ -35,14 +35,12 @@ Ltac inv_observes :=
     end.
 
 Section contains_UB.
-  Context {E F G : Type -> Type}.
-  #[local] Notation Eff := (E +' F +' UBE +' G).
+  Context {Eff : Type -> Type}.
 
   Inductive contains_UB {R} : itree Eff R -> Prop :=
   | CrawlTau  : forall t1 t2, t2 ≅ Tau t1 -> contains_UB t1 -> contains_UB t2
-  | CrawlVis1 : forall Y (e : (E +' F) Y) x k t2, t2 ≅ (vis e k) -> contains_UB (k x) -> contains_UB t2
-  | CrawlVis2 : forall Y (e : G Y) x k t2, t2 ≅ (vis e k) -> contains_UB (k x) -> contains_UB t2
-  | FindUB    : forall s k t2, t2 ≅ (vis (subevent (F:=Eff) _ (ThrowUB s)) k) -> contains_UB t2.
+  | CrawlVis : forall Y (e : Eff Y) x k t2, t2 ≅ (vis e k) -> contains_UB (k x) -> contains_UB t2
+  | FindUB    : forall `{UB_EFF : UBE -< Eff} s k t2, t2 ≅ (vis (@subevent UBE Eff UB_EFF _ (ThrowUB s)) k) -> contains_UB t2.
 
   #[global] Instance proper_eutt_contains_UB {R} {RR : relation R} : Proper (@eqit Eff _ _ RR true true ==> iff) contains_UB.
   Proof.
@@ -77,7 +75,7 @@ Section contains_UB.
             cbn in H.
             dependent induction H.
 
-            eapply CrawlVis1 with (k:=k2) (e:=subevent T e').
+            eapply CrawlVis with (k:=k2) (e:=subevent T e').
             { symmetry.
               pfold; red.
               rewrite <- Heqyo.
@@ -108,80 +106,22 @@ Section contains_UB.
             pfold; red; rewrite <- x.
             cbn; constructor; eauto.
         }
-      - rename Y into T.
-        intros y EQ.
-        punfold EQ; red in EQ.
-        { remember (observe t2) as t2o.
-          remember (observe y) as yo.
-          revert e k t2 y H UB IHUB Heqt2o Heqyo.
-          induction EQ; intros e' k t2' y H UB IHUB Heqt2o Heqyo.
-
-          punfold H; red in H.
-          rewrite <- Heqt2o in H.
-          inversion H.
-
-          punfold H; red in H.
-          rewrite <- Heqt2o in H.
-          cbn in H.
-          inversion H; inversion CHECK.
-
-          - punfold H; red in H.
-            rewrite <- Heqt2o in H.
-            cbn in H.
-            dependent induction H.
-
-            eapply CrawlVis2 with (k:=k2).
-            { symmetry.
-              pfold; red.
-              rewrite <- Heqyo.
-              cbn.
-              econstructor; eauto.
-              intros v.
-              red. left.
-              apply Reflexive_eqit. typeclasses eauto.
-            }
-
-            apply IHUB.
-            pclearbot.
-            rewrite <- REL0.
-            apply REL.
-          - punfold H; red in H.
-            rewrite <- Heqt2o in H.
-            cbn in H.
-            inversion H; inversion CHECK0.
-          - punfold H; red in H.
-            cbn in H.
-            dependent induction H.
-            eapply CrawlTau with (t1 := t2).
-
-            pfold; red; rewrite <- Heqyo.
-            cbn.
-            constructor; left.
-            apply Reflexive_eqit. typeclasses eauto.
-            eapply IHEQ; eauto.
-            pfold; red; rewrite <- x.
-            cbn; constructor; eauto.
-        }
       - intros y EQ.
-        punfold H; red in H.
-        dependent induction H.
-        punfold EQ; red in EQ.
-        genobs t2 ot2. genobs y oy. clear t2 Heqot2.
-        revert y Heqoy.
+        eapply eutt_cong_eq in EQ.
+        2: symmetry; eauto.
+        2: reflexivity.
 
-        induction EQ; try solve [inv x]; intros.
-        + subst. inv x.
-          dependent destruction H1.
-          eapply FindUB.
-          pfold; red.
-          rewrite <- Heqoy.
-          cbn.
-          econstructor; intros [].
-        + subst.
-          eapply CrawlTau with (t1:=t2).
-          pfold; red; rewrite <- Heqoy; cbn.
-          constructor. left.
-          apply Reflexive_eqit. typeclasses eauto.
+        punfold EQ; red in EQ; cbn in EQ.
+        dependent induction EQ; subst.
+        + eapply FindUB.
+          rewrite itree_eta.
+          rewrite <- x.
+          reflexivity.
+        + eapply CrawlTau.
+
+          rewrite itree_eta.
+          rewrite <- x.
+          reflexivity.
 
           eapply IHEQ; eauto.
     }
@@ -215,7 +155,7 @@ Section contains_UB.
             cbn in H.
             dependent induction H.
 
-            eapply CrawlVis1 with (k:=k1) (e:=subevent T e').
+            eapply CrawlVis with (k:=k1) (e:=subevent T e').
             { symmetry.
               pfold; red.
               rewrite <- Heqxo.
@@ -235,60 +175,6 @@ Section contains_UB.
             eapply CrawlTau with (t1 := t1).
 
             pfold; red; rewrite <- Heqxo.
-            cbn.
-            constructor; left.
-            apply Reflexive_eqit. typeclasses eauto.
-            eapply IHEQ; eauto.
-            pfold; red; rewrite <- x.
-            cbn; constructor; eauto.
-          - punfold H; red in H.
-            rewrite <- Heqt2o in H.
-            cbn in H.
-            inversion H; inversion CHECK0.
-        }
-      - rename Y into T.
-        intros y EQ.
-        punfold EQ; red in EQ.
-        { remember (observe t2) as t2o.
-          remember (observe y) as yo.
-          revert e k t2 y H UB IHUB Heqt2o Heqyo.
-          induction EQ; intros e' k t2' y H UB IHUB Heqt2o Heqyo.
-
-          punfold H; red in H.
-          rewrite <- Heqt2o in H.
-          inversion H.
-
-          punfold H; red in H.
-          rewrite <- Heqt2o in H.
-          cbn in H.
-          inversion H; inversion CHECK.
-
-          - punfold H; red in H.
-            rewrite <- Heqt2o in H.
-            cbn in H.
-            dependent induction H.
-
-            eapply CrawlVis2 with (k:=k1).
-            { symmetry.
-              pfold; red.
-              rewrite <- Heqyo.
-              cbn.
-              econstructor; eauto.
-              intros v.
-              red. left.
-              apply Reflexive_eqit. typeclasses eauto.
-            }
-
-            apply IHUB.
-            pclearbot.
-            rewrite <- REL0.
-            apply REL.
-          - punfold H; red in H.
-            cbn in H.
-            dependent induction H.
-            eapply CrawlTau with (t1 := t1).
-
-            pfold; red; rewrite <- Heqyo.
             cbn.
             constructor; left.
             apply Reflexive_eqit. typeclasses eauto.
@@ -383,8 +269,15 @@ Section contains_UB_lemmas.
 End contains_UB_lemmas.
 
 Section bind_lemmas.
-  Context {E F G : Type -> Type}.
-  Local Notation Eff := (E +' F +' UBE +' G).
+  Context {Eff : Type -> Type}.
+
+  (* TODO: Move this somewhere more useful? *)
+  Class SubeventInversion (Eff : Type -> Type) : Prop :=
+    {
+      subevent_inv : forall T (e : Eff T), exists (E : Type -> Type) (e' : E T) (E_Eff : E -< Eff), e = @subevent E Eff E_Eff T e'
+    }.
+
+  Context `{EffInv : SubeventInversion Eff}.
 
   Lemma bind_contains_UB :
     forall {R T} (t : itree Eff R) (k : R -> itree Eff T),
@@ -398,10 +291,7 @@ Section bind_lemmas.
       eauto.
     - rewrite H.
       rewrite bind_vis.
-      eapply CrawlVis1; [reflexivity | cbn; eauto].
-    - rewrite H.
-      rewrite bind_vis.
-      eapply CrawlVis2; [reflexivity | cbn; eauto].
+      eapply CrawlVis; [reflexivity | cbn; eauto].
     - rewrite H.
       rewrite bind_vis.
       eapply FindUB; reflexivity.
@@ -418,27 +308,12 @@ Section bind_lemmas.
     induction RET.
     - rewrite H; rewrite bind_ret_l; auto.
     - rewrite H; rewrite tau_eutt; eauto.
-    - destruct e as [e | [f | [ube | g]]].
-      + rewrite H.
-        rewrite bind_vis.
-        eapply CrawlVis1 with (e := (inl1 e)) (k := (fun x0 : X => ITree.bind (k0 x0) k)).
-        reflexivity.
-        eauto.
-      + rewrite H.
-        rewrite bind_vis.
-        eapply CrawlVis1 with (e := (inr1 f)) (k := (fun x0 : X => ITree.bind (k0 x0) k)).
-        reflexivity.
-        eauto.
-      + rewrite H.
-        rewrite bind_vis.
-        destruct ube.
-        eapply FindUB with (s:=u) (k:=(fun x0 : void => ITree.bind (k0 x0) k)).
-        reflexivity.
-      + rewrite H.
-        rewrite bind_vis.
-        eapply CrawlVis2 with (e := g) (k := (fun x0 : X => ITree.bind (k0 x0) k)).
-        reflexivity.
-        eauto.
+    - rewrite H.
+      rewrite bind_vis.
+
+      eapply CrawlVis with (e:=e) (k:=(fun x0 : X => ITree.bind (k0 x0) k)).
+      reflexivity.
+      apply IHRET.
   Qed.
 
   Lemma bind_contains_UB' :
