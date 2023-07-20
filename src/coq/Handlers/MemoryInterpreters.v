@@ -20,6 +20,9 @@ From Vellvm.Utils Require Import
      InterpProp
      StateMonads Raise Tactics ITreeMap.
 
+From Vellvm.Theory Require Import
+  ContainsUB.
+
 From ITree Require Import
      ITree
      Eq.Eqit
@@ -402,7 +405,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
                (ta : itree Effout (MemState * (store_id * T)))
                (k2 : (MemState * (store_id * T)) -> itree Effout (MemState * (store_id * R)))
                (t2 : itree Effout (MemState * (store_id * R))) : Prop
-      := t2 ≈ (bind ta k2).
+      := contains_UB ta \/ t2 ≈ (bind ta k2).
 
     #[global] Instance memory_k_spec_proper {A R2 : Type} e ta k2 :
       Proper
@@ -411,7 +414,10 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Proof.
       unfold Proper, respectful.
       intros x y EQV.
-      split; intros K_SPEC; red; red in K_SPEC; rewrite <- K_SPEC; eauto.
+      split; intros K_SPEC;
+        red; red in K_SPEC; destruct K_SPEC as [UB | K_SPEC];
+        eauto; right;
+        rewrite <- K_SPEC; eauto.
       symmetry; eauto.
     Qed.
 
@@ -981,6 +987,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
         { (* memory_k_spec *)
           red.
+          right.
           eapply eutt_clo_bind; [ reflexivity | intros; subst ].
           destruct u2, p. cbn.
           rewrite tau_eutt.
