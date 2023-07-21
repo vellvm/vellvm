@@ -176,22 +176,56 @@ Set Warnings "-extraction-opaque-accessed,-extraction".
 Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZEOF : Sizeof).
   Module DV := DynamicValues.DVALUE(ADDR)(IP)(SIZEOF).
   Import DV.
-  Record GenState := {
-    num_void : nat}.
+  Definition var_context := list (ident * typ).
+  Record GenState :=
+    mkGenState
+    {
+      num_raw : N
+    ; gen_local_ctx : var_context
+    }.
 
   Definition init_GenState : GenState
     :=
     {|
-      num_void := 0
+      num_raw := 0
+    ; gen_local_ctx := []
     |}.
-  (* {}. *)
+
+  Definition increment_raw (gs : GenState) : GenState
+    :=
+    {|
+      num_raw := N.succ gs.(num_raw)
+    ; gen_local_ctx := gs.(gen_local_ctx)
+    |}.
+
+  Definition replace_local_ctx (ctx : var_context) (gs : GenState) : GenState
+    :=
+    {|
+      num_raw := gs.(num_raw)
+    ; gen_local_ctx := ctx
+    |}.
     
   Definition GenALIVE2 := (eitherT string (stateT GenState G)).
 
+  Definition get_raw (gs : GenState) : N
+    := gs.(num_raw).
+  
   #[global] Instance monad_stateT {s m} `{Monad m} : Monad (stateT s m).
   Proof.
     apply Monad_stateT. typeclasses eauto.
   Defined.
+
+  Definition new_raw_id : GenALIVE2 raw_id
+    := n <- gets get_raw;;
+       modify increment_raw;;
+       ret (Name ("v" ++ CeresString.string_of_N n)).
+
+  Definition get_local_ctx : GenALIVE2 var_context
+    := gets (fun gs => gs.(gen_local_ctx)).
+
+  Definition set_local_ctx (ctx : var_context) : GenALIVE2 unit
+    := modify (replace_local_ctx ctx);;
+       ret tt.
 
   #[global] Instance STGST : Monad (stateT GenState G).
   Proof.
@@ -225,6 +259,30 @@ Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE
     exact (ret (inl (s), stack)).
   Defined.
 
+  Definition add_to_local_ctx (var : ident * typ) (gs: GenState) : GenALIVE2 unit
+    := ctx <- get_local_ctx;;
+       set_local_ctx (var :: ctx).
+
+  Definition append_to_local_ctx (vars : list (ident * typ)) (gs : GenState) : GenALIVE2 unit
+    := ctx <- get_local_ctx;;
+       set_local_ctx (vars ++ ctx).
+
+  Definition reset_local_ctx : GenALIVE2 unit
+    := set_local_ctx [].
+
+  Definition hide_local_ctx {A} (g : GenALIVE2 A): GenALIVE2 A
+    := saved_local_ctx <- get_local_ctx;;
+       reset_local_ctx;;
+       a <- g;;
+       set_local_ctx saved_local_ctx;;
+       ret a.
+
+  Definition backtrack_local_ctx {A} (g : GenALIVE2 A) : GenALIVE2 A
+    := saved_local_ctx <- get_local_ctx;;
+       a <- g;;
+       set_local_ctx saved_local_ctx;;
+       ret a.
+  
   Definition vectorOf_ALIVE2 {A : Type} (k : nat) (g : GenALIVE2 A) : GenALIVE2 (list A).
     refine (fold_left _ _ _).
     refine (fun l g => _).
@@ -241,6 +299,7 @@ Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE
     '(errA, _) <- ran;;
     ret errA
   .
+
   
   Fixpoint gen_uvalue (t : typ) : GenALIVE2 uvalue :=
     match t with
@@ -270,40 +329,15 @@ Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE
     end.
                                             
 
+
+  (* How to generate a list of arguments
+     Can be done by iterate on the list of functions.
+     For each one of them, generate and backtrack required commands
+   *)
   
-  (* Fixpoint gen_uvalue (t : typ): GenALIVE2 uvalue := *)
-  (*   match t with *)
-  (*   | TYPE_I i => *)
-  (*       match i with *)
-  (*       | 1%N => *)
-  (*           ret UVALUE_I1 <*> (returnGen repr <*> (choose (0, 1))) *)
-  (*           (* x <- choose (0,1);; *) *)
-  (*           (* returnGen (UVALUE_I1 (repr x))  *) *)
-  (*       | 8%N => *)
-  (*           ret UVALUE_I8 <*> (returnGen repr <*> (choose (0, 2^8))) *)
-  (*           (* x <- choose (0,2 ^ 8);; *) *)
-  (*           (* returnGen (UVALUE_I8 (repr x)) *) *)
-  (*       | 32%N => *)
-  (*           ret UVALUE_I32 <*> (returnGen repr <*> (choose (0, 2^32))) *)
-  (*           (* x <- choose (0, 2 ^ 32);; *) *)
-  (*           (* returnGen (UVALUE_I32 (repr x)) *) *)
-  (*       | 64%N => *)
-  (*           ret UVALUE_I64 <*> (returnGen repr <*> (choose (0, 2^64))) *)
-  (*           (* x <- choose (0, 2 ^ 63);; *) *)
-  (*           (* returnGen (UVALUE_I64 (repr x)) *) *)
-  (*       | _ => failGen "Invalid size" *)
-  (*       end *)
-  (*   | TYPE_Float => *)
-  (*       ret UVALUE_Float <*> fing32 *)
-  (*   | TYPE_Double => *)
-  (*       ret UVALUE_None (* FailGen *) *)
-  (*   | TYPE_Void => ret UVALUE_None *)
-  (*   | TYPE_Vector sz subtyp => *)
-  (*       ret UVALUE_Vector <*> vectorOf (N.to_nat sz) (gen_uvalue subtyp) *)
-  (*   | TYPE_Array sz subtyp => *)
-  (*       ret UVALUE_Array <*> vectorOf (N.to_nat sz) (gen_uvalue subtyp) *)
-  (*   | _ => failGen "Unimplemented uvalue generators" *)
-  (*   end. *)
+  Definition gen_pred_function (args: list typ) (ret_t : typ) (fn1 fn2: string) : GenALIVE2 (toplevel_entity typ (block typ * list (block typ)))
+    :=
+    failGen "Invalid".
   
 End GEN_ALIVE2.
 
