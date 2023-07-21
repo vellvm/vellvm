@@ -23,6 +23,7 @@ Import ListNotations.
 Import MonadNotation.
 Import ApplicativeNotation.
 
+(* Import Floats. *)
 From Coq Require Import
   ZArith Bool.Bool String.
 
@@ -34,6 +35,8 @@ Import GenLow.
 Open Scope qc_scope.
 Open Scope Z_scope.
 Set Warnings "-extraction-opaque-accessed,-extraction".
+
+Unset Guard Checking.
 (* (* Definition nat_gen_example : G nat := *) *)
 (* (*   choose (0, 10)%nat. *) *)
 
@@ -299,9 +302,67 @@ Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE
     '(errA, _) <- ran;;
     ret errA
   .
+  
+  Definition gen_int (sz : N) : GenALIVE2 Z :=
+    let i_sz := Z.of_N sz in
+    if i_sz <=? 8 then lift_GenALIVE2 (choose (0, 2 ^ i_sz - 1)) else ret 10000.
+  
+  Definition gen_float32 : GenALIVE2 float32 :=
+    lift_GenALIVE2 fing32.
+  
+  Definition gen_int_exp (sz : N) : GenALIVE2 (exp typ) :=
+    i_val <- gen_int sz;;
+    (ret (EXP_Integer i_val)).
 
+  Definition gen_float_exp : GenALIVE2 (exp typ) :=
+    ret EXP_Float <*> gen_float32.
+  
+  Fixpoint gen_exp_size (sz : nat) (t : typ) {struct sz} : GenALIVE2 (exp typ) :=
+    local_ctx <- get_local_ctx;;
+    match sz with
+    | 0%nat =>
+        let fix gen_size_0 (ty : typ) : GenALIVE2 (exp typ) :=
+          match ty with
+          | TYPE_I sz =>
+              ret sz >>= gen_int_exp
+          | TYPE_Float =>
+              gen_float_exp
+          | TYPE_Array n t =>
+              es <- vectorOf_ALIVE2 (N.to_nat n) (gen_exp_size 0 t);;
+              ret (EXP_Array (map (fun e => (t, e)) es))
+          | TYPE_Double =>
+              failGen "Unimplemented"
+          | _ => failGen "Unimplemented"
+          end in
+        gen_size_0 t
+    | (S z)%nat =>
+        match t with
+        | TYPE_I sz =>
+            ret (OP_IBinop (LLVMAst.Add false false)) <*> ret t <*> gen_exp_size 0 t <*> ret (EXP_Integer 0)
+        | TYPE_Float =>
+            ret (OP_FBinop (LLVMAst.FAdd) []) <*> ret t <*> gen_exp_size 0 t <*> ret (EXP_Integer 0)
+        | _ => failGen "Unimplemented"
+        end
+    end
+  (* Need to think about this. *)
+  .
+
+  
   Fixpoint gen_instr (t : typ) : GenALIVE2 (typ * instr typ) :=
-    failGen "Unimplemented".
+    match t with
+    | TYPE_I sz =>
+        exp <- gen_int_exp sz;;
+        ret (t, INSTR_Op exp)
+    | TYPE_Float =>
+        exp <- gen_float
+    | TYPE_Double => failGen "Unimplemented"
+    | TYPE_Array sz t => failGen "Unimplemented"
+    | TYPE_Vector sz t => failGen "Unimplemented"
+    | TYPE_Struct fields => failGen "Unimplemented"
+    | TYPE_Packed_struct fields => failGen "Unimplemented"
+    | TYPE_Pointer t => failGen "Unimplemented"
+    | _ => failGen "Unimplemented"
+    end.
 
   Definition add_id_to_instr (t_instr : typ * instr typ) : GenALIVE2 (instr_id * instr typ)
     := failGen "Unimplemented".
