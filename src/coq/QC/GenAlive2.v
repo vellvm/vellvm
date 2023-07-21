@@ -300,6 +300,27 @@ Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE
     ret errA
   .
 
+  Fixpoint gen_instr (t : typ) : GenALIVE2 (typ * instr typ) :=
+    failGen "Unimplemented".
+
+  Definition add_id_to_instr (t_instr : typ * instr typ) : GenALIVE2 (instr_id * instr typ)
+    := failGen "Unimplemented".
+
+  Definition gen_instr_id (t : typ): GenALIVE2 (instr_id * instr typ)
+    := t_instr <- gen_instr t;; add_id_to_instr t_instr.
+
+  Fixpoint gen_initializations (args : list typ) : GenALIVE2 (code typ)
+    :=
+    match args with
+    | nil => ret []
+    | t::args' =>
+        instr <- gen_instr_id t;;
+        (* Not sure if I need this.
+           Allocate store *)
+        (* alloca_store <- fix_alloca isntr;; *)
+        rest <- gen_initializations args';;
+        ret (instr :: rest)
+    end.
   
   Fixpoint gen_uvalue (t : typ) : GenALIVE2 uvalue :=
     match t with
