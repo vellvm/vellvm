@@ -400,20 +400,34 @@ Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE
     | TYPE_Pointer t => failGen "Unimplemented"
     | _ => failGen "Unimplemented"
     end.
-
+Search length.
   Fixpoint gen_instrs (depth : nat) (t : typ) {struct depth} : GenALIVE2 (list (instr_id * instr typ))
-    := match t with
-       | TYPE_I _ =>
-           inst <- gen_instr 0 t;;
-           ret [inst]
-       | TYPE_Float
-       | TYPE_Double =>
-           inst <- gen_instr 0 t;;
-           ret [inst]
-       | TYPE_Vector sz t' =>
-       (* Put an undef vector in there *)
-           
-       | _ => failGen "Unimplemented"
+    :=
+    let fix gen_instr_iter (sz : nat) (l : list (instr_id * instr typ)) {struct sz}: GenALIVE2 (list (instr_id * instr typ)):=
+      match sz with
+      | O => ret l
+      | S z =>
+          inst <- gen_instr z t;;
+          gen_instr_iter sz l
+      end in
+    match t with
+    | TYPE_I _ =>
+        inst <- gen_instr 0 t;;
+        ret [inst]
+    | TYPE_Float
+    | TYPE_Double =>
+        inst <- gen_instr 0 t;;
+        ret [inst]
+    | TYPE_Vector sz t' =>
+        gen_instr_iter (N.to_nat sz) []
+    | TYPE_Array sz t' =>
+        (* Put an undef vector in there *)
+        gen_instr_iter (N.to_nat sz) []
+    | TYPE_Struct fields =>
+        gen_instr_iter (List.length fields) []
+    | TYPE_Packed_struct fields =>
+        gen_instr_iter (List.length fields) []
+    | _ => failGen "Unimplemented"
        end.
 
 
