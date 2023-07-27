@@ -10,7 +10,7 @@ From Vellvm Require Import
 (* Maybe also import InterpretationStack *)
 
 From ExtLib.Structures Require Export
-  Functor Applicative Monad Monoid.
+  Applicative Monad Monoid.
 
 Require Import ExtLib.Data.Monads.StateMonad.
 Require Import ExtLib.Structures.Monads.
@@ -31,6 +31,8 @@ Require Import QuickChick.GenLow.
 Require Import QuickChick.GenHigh.
 Import GenHigh.
 Import GenLow.
+
+From ExtLib.Structures Require Export Functor.
 (* Import QcDefaultNotation. *)
 Open Scope qc_scope.
 Open Scope Z_scope.
@@ -182,6 +184,36 @@ Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE
        a <- g;;
        set_local_ctx saved_local_ctx;;
        ret a.
+
+  Definition freq_ALIVE2 {A} (gs : list (nat * GenALIVE2 A)) : GenALIVE2 A
+    :=
+     fst
+         (fold_left
+            (fun '(gacc, k) '(fk, a) =>
+               let fkn := N.of_nat fk in
+               let k' := (k + fkn)%N in
+               let gen' :=
+                 swap <- lift (fmap (fun x => N.leb x fkn) (choose (0%N, k')));;
+                 if swap
+                 then (* swap *)
+                   a
+                 else (* No swap *)
+                   gacc
+               in (gen', k'))
+            gs (failGen ("freq_LLVM"), 0%N)).
+
+  Definition elems_ALIVE2 {A : Type} (l: list A) : GenALIVE2 A
+    := fst
+         (fold_left
+            (fun '(gacc, k) a =>
+               let gen' :=
+                 swap <- lift (fmap (N.eqb 0) (choose (0%N, k)));;
+                 match swap with
+                 | true => ret a
+                 | false => gacc
+                 end
+               in (gen', (k+1)%N))
+            l (failGen "elems_LLVM", 0%N)).
   
   Definition vectorOf_ALIVE2 {A : Type} (k : nat) (g : GenALIVE2 A) : GenALIVE2 (list A).
     refine (fold_left _ _ _).
@@ -299,11 +331,119 @@ Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE
   (*   | _ => failGen "Unimplemented" *)
   (*   end *)
   (* . *)
+Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
+    := match a with
+       | TYPE_I sz =>
+         match b with
+         | TYPE_I sz' => if N.eq_dec sz sz' then true else false
+         | _ => false
+         end
+       | TYPE_IPTR =>
+         match b with
+         | TYPE_IPTR => true
+         | _ => false
+         end
+       | TYPE_Pointer t =>
+         match b with
+         | TYPE_Pointer t' => normalized_typ_eq t t'
+         | _ => false
+         end
+       | TYPE_Void =>
+         match b with
+         | TYPE_Void => true
+         | _ => false
+         end
+       | TYPE_Half =>
+         match b with
+         | TYPE_Half => true
+         | _ => false
+         end
+       | TYPE_Float =>
+         match b with
+         | TYPE_Float => true
+         | _ => false
+         end
+       | TYPE_Double =>
+         match b with
+         | TYPE_Double => true
+         | _ => false
+         end
+       | TYPE_X86_fp80 =>
+         match b with
+         | TYPE_X86_fp80 => true
+         | _ => false
+         end
+       | TYPE_Fp128 =>
+         match b with
+         | TYPE_Fp128 => true
+         | _ => false
+         end
+       | TYPE_Ppc_fp128 =>
+         match b with
+         | TYPE_Ppc_fp128 => true
+         | _ => false
+         end
+       | TYPE_Metadata =>
+         match b with
+         | TYPE_Metadata => true
+         | _ => false
+         end
+       | TYPE_X86_mmx =>
+         match b with
+         | TYPE_X86_mmx => true
+         | _ => false
+         end
+       | TYPE_Array sz t =>
+         match b with
+         | TYPE_Array sz' t' =>
+           if N.eq_dec sz sz'
+           then normalized_typ_eq t t'
+           else false
+         | _ => false
+         end
+       | TYPE_Function ret args varargs=>
+         match b with
+         | TYPE_Function ret' args' varargs' =>
+             Nat.eqb (Datatypes.length args) (Datatypes.length args') &&
+               normalized_typ_eq ret ret' &&
+               forallb id (zipWith (fun a b => normalized_typ_eq a b) args args')
+             && Bool.eqb varargs varargs'
+         | _ => false
+         end
+       | TYPE_Struct fields =>
+         match b with
+         | TYPE_Struct fields' =>
+             Nat.eqb (Datatypes.length fields) (Datatypes.length fields') &&
+             forallb id (zipWith (fun a b => normalized_typ_eq a b) fields fields')
+         | _ => false
+         end
+       | TYPE_Packed_struct fields =>
+         match b with
+         | TYPE_Packed_struct fields' =>
+             Nat.eqb (Datatypes.length fields) (Datatypes.length fields') &&
+             forallb id (zipWith (fun a b => normalized_typ_eq a b) fields fields')
+         | _ => false
+         end
+       | TYPE_Opaque =>
+         match b with
+         | TYPE_Opaque => false (* TODO: Unsure if this should compare equal *)
+         | _ => false
+         end
+       | TYPE_Vector sz t =>
+         match b with
+         | TYPE_Vector sz' t' =>
+           if N.eq_dec sz sz'
+           then normalized_typ_eq t t'
+           else false
+         | _ => false
+         end
+       | TYPE_Identified id => false
+       end.
 
-
-  
+  Definition filter_type (ty : typ) (ctx : list (ident * typ)) : list (ident * typ)
+    := filter (fun '(i, t) => normalized_typ_eq (ty) (t)) ctx.
+  Print fmap.
   Fixpoint gen_exp_size (sz : nat) (t : typ) {struct sz}: GenALIVE2 (exp typ) :=
-    local_ctx <- get_local_ctx;;
     let fix gen_size_0 (ty : typ) : GenALIVE2 (exp typ) :=
           match ty with
           | TYPE_I sz =>
@@ -321,7 +461,7 @@ Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE
               failGen "Unimplemented"
           | TYPE_Packed_struct vars =>
               failGen "Unimplemented"
-          | _ => failGen "Unimplemented"
+          | _ => failGen "Not supported"
           end in
     match sz with
     | 0%nat =>
@@ -337,10 +477,17 @@ Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE
         | _ => failGen "Unimplemented"
         end
     end
-  with gen_exp_ident (t : typ): GenALIVE2 (exp typ) :=
-         (* Remove from local ctx *)
-        failGen "Unimplemented"
-  (* Need to think about this. *)
+  with
+  gen_exp_ident (t : typ): GenALIVE2 (exp typ) :=
+    (* Remove from local ctx *)
+    local_ctx <- get_local_ctx;;
+    let ts := filter_type t local_ctx in
+    let gen_idents : list (nat * GenALIVE2 (exp typ)) :=
+      match ts with
+      | [] => []
+      | _ => [(16%nat, fmap (fun '(i, _) => EXP_Ident i) (elems_ALIVE2 ts))]
+      end in
+    freq_ALIVE2 (gen_idents)
   .
 
   Definition add_id_to_instr (t_instr : typ * instr typ) : GenALIVE2 (instr_id * instr typ)
@@ -400,7 +547,7 @@ Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE
     | TYPE_Pointer t => failGen "Unimplemented"
     | _ => failGen "Unimplemented"
     end.
-Search length.
+
   Fixpoint gen_instrs (depth : nat) (t : typ) {struct depth} : GenALIVE2 (list (instr_id * instr typ))
     :=
     let fix gen_instr_iter (sz : nat) (l : list (instr_id * instr typ)) {struct sz}: GenALIVE2 (list (instr_id * instr typ)):=
@@ -419,32 +566,36 @@ Search length.
         inst <- gen_instr 0 t;;
         ret [inst]
     | TYPE_Vector sz t' =>
-        gen_instr_iter (N.to_nat sz) []
+        l_instrs <- gen_instrs (depth - 1) t';;
+        upper_instrs <- gen_instr_iter (N.to_nat sz) [];;
+        ret (upper_instrs ++ l_instrs)
     | TYPE_Array sz t' =>
-        (* Put an undef vector in there *)
-        gen_instr_iter (N.to_nat sz) []
+        l_instrs <- gen_instrs (depth - 1) t';;
+        upper_instrs <- gen_instr_iter (N.to_nat sz) [];;
+        ret (upper_instrs ++ l_instrs)
     | TYPE_Struct fields =>
-        gen_instr_iter (List.length fields) []
+        l_instrs <- foldM (fun acc t' => gen_instrs (depth - 1) t' >>= (fun instrs => ret (acc ++ instrs))) [] fields;;
+        upper_instrs <- gen_instr_iter (List.length fields) [];;
+        ret (upper_instrs ++ l_instrs)
     | TYPE_Packed_struct fields =>
-        gen_instr_iter (List.length fields) []
+        l_instrs <- foldM (fun acc t' => gen_instrs (depth - 1) t' >>= (fun instrs => ret (acc ++ instrs))) [] fields;;
+        upper_instrs <- gen_instr_iter (List.length fields) [];;
+        ret (upper_instrs ++ l_instrs)
     | _ => failGen "Unimplemented"
        end.
-
-
-  Definition gen_instr_id (t : typ): GenALIVE2 (instr_id * instr typ)
-    := t_instr <- gen_instr t;; add_id_to_instr t_instr.
 
   Fixpoint gen_initializations (args : list typ) : GenALIVE2 (code typ)
     :=
     match args with
     | nil => ret []
     | t::args' =>
-        instr <- gen_instr_id t;;
+        let depth_t := depth_of_typ t in
+        instr <- gen_instrs depth_t t;;
         (* Not sure if I need this.
            Allocate store *)
         (* alloca_store <- fix_alloca isntr;; *)
         rest <- gen_initializations args';;
-        ret (instr :: rest)
+        ret (instr ++ rest)
     end.
   
   Fixpoint gen_uvalue (t : typ) : GenALIVE2 uvalue :=
