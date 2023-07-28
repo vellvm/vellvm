@@ -502,7 +502,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         ret (IId i, instr)
     end.
 
-  Fixpoint gen_instr (index : nat) (tgt : typ) {struct index}: GenALIVE2 (instr_id * instr typ) :=
+  Fixpoint gen_instantiate_instr (index : nat) (tgt : typ) {struct index}: GenALIVE2 (instr_id * instr typ) :=
     match tgt with
     | TYPE_I _ =>
         exp <- gen_exp_size 1 tgt;;
@@ -529,7 +529,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         (* Assumption is that src have already been created, either undef or not *)
         e_src <- gen_exp_ident tgt;;
         t' <-  match nth_error fields index with
-            | Some t => ret t
+              | Some t => ret t
               | _ => failGen "Out of Bounds"
               end;;
         e_input <- gen_exp_size 0 t';;
@@ -538,32 +538,40 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     | TYPE_Packed_struct fields =>
         e_src <- gen_exp_size 0 tgt;;
         t' <-  match nth_error fields index with
-            | Some t => ret t
+              | Some t => ret t
               | _ => failGen "Out of Bounds"
               end;;
         e_input <- gen_exp_size 0 t';;
         let exp := OP_InsertValue (tgt, e_src) (t', e_input) [Z.of_nat index] in
         add_id_to_instr (tgt, INSTR_Op exp)
-    | TYPE_Pointer t => failGen "Unimplemented"
+    | TYPE_Pointer t' =>
+        e_src <- gen_exp_ident tgt;;
+        e_input <- gen_exp_size 0 t';;
+        let ins := INSTR_Store (t', e_input) (tgt, e_src) [] in
+        add_id_to_instr (tgt, ins)
     | _ => failGen "Unimplemented"
     end.
 
+  (* ins_<_> is type instr typ
+     inst_<_> is type (instr_id * instr typ)
+     <_>_instrs is type (list (instr_id * instr typ))
+   *)
   Fixpoint gen_instrs (depth : nat) (t : typ) {struct depth} : GenALIVE2 (list (instr_id * instr typ))
     :=
     let fix gen_instr_iter (sz : nat) (l : list (instr_id * instr typ)) {struct sz}: GenALIVE2 (list (instr_id * instr typ)):=
       match sz with
       | O => ret l
       | S z =>
-          inst <- gen_instr z t;;
+          inst <- gen_instantiate_instr z t;;
           gen_instr_iter sz l
       end in
     match t with
     | TYPE_I _ =>
-        inst <- gen_instr 0 t;;
+        inst <- gen_instantiate_instr 0 t;;
         ret [inst]
     | TYPE_Float
     | TYPE_Double =>
-        inst <- gen_instr 0 t;;
+        inst <- gen_instantiate_instr 0 t;;
         ret [inst]
     | TYPE_Vector sz t' =>
         l_instrs <- gen_instrs (depth - 1) t';;
@@ -581,6 +589,15 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         l_instrs <- foldM (fun acc t' => gen_instrs (depth - 1) t' >>= (fun instrs => ret (acc ++ instrs))) [] fields;;
         upper_instrs <- gen_instr_iter (List.length fields) [];;
         ret (upper_instrs ++ l_instrs)
+    | TYPE_Pointer t' =>
+    (* Generate alloca *)
+        let ins_alloca := INSTR_Alloca t [] in
+        inst_alloca <- add_id_to_instr (t, ins_alloca);;
+    (* Generate instructions for subtypes *)
+        upper_instrs <- gen_instrs (depth - 1) t';;
+    (* Generate instantiation *)
+        inst_store <- gen_instantiate_instr 0 t;;
+        ret (inst_alloca :: upper_instrs ++ [inst_store])
     | _ => failGen "Unimplemented"
        end.
 
