@@ -77,8 +77,6 @@ Section Endo.
         | TYPE_Array sz t' => TYPE_Array sz (endo_typ t')
         | TYPE_Function ret args => TYPE_Function (endo_typ ret) (List.map endo_typ args)
         | TYPE_Struct fields => TYPE_Struct (List.map endo_typ fields)
-        | TYPE_Packed_struct fields => TYPE_Packed_struct (List.map endo_typ fields)
-        | TYPE_Vector sz t' => TYPE_Vector sz (endo_typ t')
         | TYPE_Identified id => TYPE_Identified (endo id)
         | _ => t
         end.
@@ -106,49 +104,17 @@ Section Endo.
           EXP_Cstring (List.map (fun '(t,e) => (endo t, f_exp e)) elts)          
         | EXP_Struct fields =>
           EXP_Struct (List.map (fun '(t,e) => (endo t, f_exp e)) fields)
-        | EXP_Packed_struct fields =>
-          EXP_Packed_struct (List.map (fun '(t,e) => (endo t, f_exp e)) fields)
         | EXP_Array elts =>
           EXP_Array (List.map (fun '(t,e) => (endo t, f_exp e)) elts)
-        | EXP_Vector elts =>
-          EXP_Vector (List.map (fun '(t,e) => (endo t, f_exp e)) elts)
         | OP_IBinop iop t v1 v2 =>
           OP_IBinop (endo iop) (endo t) (f_exp v1) (f_exp v2)
         | OP_ICmp cmp t v1 v2 =>
           OP_ICmp (endo cmp) (endo t) (f_exp v1) (f_exp v2)
-        | OP_FBinop fop fm t v1 v2 =>
-          OP_FBinop (endo fop) fm (endo t) (f_exp v1) (f_exp v2)
-        | OP_FCmp cmp t v1 v2 =>
-          OP_FCmp (endo cmp) (endo t) (f_exp v1) (f_exp v2)
         | OP_Conversion conv t_from v t_to =>
           OP_Conversion conv (endo t_from) (f_exp v) (endo t_to)
         | OP_GetElementPtr t ptrval idxs =>
           OP_GetElementPtr (endo t) (endo (fst ptrval), f_exp (snd ptrval))
                            (List.map (fun '(a,b) => (endo a, f_exp b)) idxs)
-        | OP_ExtractElement vec idx =>
-          OP_ExtractElement (endo (fst vec), f_exp (snd vec))
-                            (endo (fst idx), f_exp (snd idx))
-        | OP_InsertElement  vec elt idx =>
-          OP_InsertElement (endo (fst vec), f_exp (snd vec))
-                           (endo (fst elt), f_exp (snd elt))
-                           (endo (fst idx), f_exp (snd idx))
-        | OP_ShuffleVector vec1 vec2 idxmask =>
-          OP_ShuffleVector (endo (fst vec1), f_exp (snd vec1))
-                           (endo (fst vec2), f_exp (snd vec2))
-                           (endo (fst idxmask), f_exp (snd idxmask))
-        | OP_ExtractValue vec idxs =>
-          OP_ExtractValue (endo (fst vec), f_exp (snd vec))
-                          idxs
-        | OP_InsertValue vec elt idxs =>
-          OP_InsertValue (endo (fst vec), f_exp (snd vec))
-                         (endo (fst elt), f_exp (snd elt))
-                         idxs
-        | OP_Select cnd v1 v2 =>
-          OP_Select (endo (fst cnd), f_exp (snd cnd))
-                    (endo (fst v1), f_exp (snd v1))
-                    (endo (fst v2), f_exp (snd v2))
-        | OP_Freeze v =>
-          OP_Freeze (endo (fst v), f_exp (snd v))
         end.
 
     #[global] Instance Endo_texp
@@ -461,22 +427,11 @@ Section TFunctor.
         | EXP_Cstring elts                   => EXP_Cstring (tfmap ftexp elts)
         | EXP_Undef                          => EXP_Undef
         | EXP_Struct fields                  => EXP_Struct (tfmap ftexp fields)
-        | EXP_Packed_struct fields           => EXP_Packed_struct (tfmap ftexp fields)
         | EXP_Array elts                     => EXP_Array (tfmap ftexp elts)
-        | EXP_Vector elts                    => EXP_Vector (tfmap ftexp elts)
         | OP_IBinop iop t v1 v2              => OP_IBinop (endo iop) (f t) (f_exp v1) (f_exp v2)
         | OP_ICmp cmp t v1 v2                => OP_ICmp (endo cmp) (f t) (f_exp v1) (f_exp v2)
-        | OP_FBinop fop fm t v1 v2           => OP_FBinop (endo fop) fm (f t) (f_exp v1) (f_exp v2)
-        | OP_FCmp cmp t v1 v2                => OP_FCmp (endo cmp) (f t) (f_exp v1) (f_exp v2)
         | OP_Conversion conv t_from v t_to   => OP_Conversion conv (f t_from) (f_exp v) (f t_to)
         | OP_GetElementPtr t ptr idxs        => OP_GetElementPtr (f t) (ftexp ptr) (tfmap ftexp idxs)
-        | OP_ExtractElement vec idx          => OP_ExtractElement (ftexp vec) (ftexp idx)
-        | OP_InsertElement vec elt idx       => OP_InsertElement (ftexp vec) (ftexp elt) (ftexp idx)
-        | OP_ShuffleVector vec1 vec2 idxmask => OP_ShuffleVector (ftexp vec1) (ftexp vec2) (ftexp  idxmask)
-        | OP_ExtractValue vec idxs           => OP_ExtractValue (ftexp vec) idxs
-        | OP_InsertValue vec elt idxs        => OP_InsertValue (ftexp vec) (ftexp elt) idxs
-        | OP_Select cnd v1 v2                => OP_Select (ftexp cnd) (ftexp v1) (ftexp v2)
-        | OP_Freeze v                        => OP_Freeze (ftexp v)
         end.
 
     #[global] Instance TFunctor_texp 

@@ -94,9 +94,6 @@ Inductive is_supported : dtyp -> Prop :=
 | is_supported_DTYPE_Double : is_supported (DTYPE_Double)
 | is_supported_DTYPE_Array : forall sz τ, is_supported τ -> is_supported (DTYPE_Array sz τ)
 | is_supported_DTYPE_Struct : forall fields, Forall is_supported fields -> is_supported (DTYPE_Struct fields)
-| is_supported_DTYPE_Packed_struct : forall fields, Forall is_supported fields -> is_supported (DTYPE_Packed_struct fields)
-(* TODO: unclear if is_supported τ is good enough here. Might need to make sure it's a sized type *)
-| is_supported_DTYPE_Vector : forall sz τ, is_supported τ -> is_supported (DTYPE_Vector sz τ)
 .
 
 
@@ -391,9 +388,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | DVALUE_Float f => sbytes_of_int 4 (unsigned (Float32.to_bits f))
       | DVALUE_Double d => sbytes_of_int 8 (unsigned (Float.to_bits d))
       | DVALUE_Struct fields
-      | DVALUE_Packed_struct fields
-      | DVALUE_Array fields
-      | DVALUE_Vector fields =>
+      | DVALUE_Array fields =>
         (* note the _right_ fold is necessary for byte ordering. *)
         fold_right (fun 'dv acc => ((serialize_dvalue dv) ++ acc) % list) [] fields
       | _ => [] 
@@ -416,9 +411,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | DTYPE_I 64         => 8 (* All integers are padded to 8 bytes. *)
       | DTYPE_I _          => 0 (* Unsupported integers *)
       | DTYPE_Pointer      => 8
-      | DTYPE_Packed_struct l
       | DTYPE_Struct l     => fold_left (fun acc x => (acc + sizeof_dtyp x)%N) l 0%N
-      | DTYPE_Vector sz ty'
       | DTYPE_Array sz ty' => sz * sizeof_dtyp ty'
       | DTYPE_Float        => 4
       | DTYPE_Double       => 8
@@ -464,14 +457,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
                       :: array_parse n byte_sz (skipn byte_sz bytes)
             end in
         UVALUE_Array (array_parse (N.to_nat sz) (N.to_nat (sizeof_dtyp t')) bytes)
-      | DTYPE_Vector sz t' =>
-        let fix array_parse count byte_sz bytes :=
-            match count with
-            | O => []
-            | S n => (deserialize_sbytes_defined (firstn byte_sz bytes) t')
-                      :: array_parse n byte_sz (skipn byte_sz bytes)
-            end in
-        UVALUE_Vector (array_parse (N.to_nat sz) (N.to_nat (sizeof_dtyp t')) bytes)
       | DTYPE_Struct fields =>
         let fix struct_parse typ_list bytes :=
             match typ_list with
@@ -482,16 +467,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
                 :: struct_parse tl (skipn size_ty bytes)
             end in
         UVALUE_Struct (struct_parse fields bytes)
-      | DTYPE_Packed_struct fields =>
-        let fix struct_parse typ_list bytes :=
-            match typ_list with
-            | [] => []
-            | t :: tl =>
-              let size_ty := N.to_nat (sizeof_dtyp t) in
-              (deserialize_sbytes_defined (firstn size_ty bytes) t)
-                :: struct_parse tl (skipn size_ty bytes)
-            end in
-        UVALUE_Packed_struct (struct_parse fields bytes)
       | _ => UVALUE_None (* TODO add more as serialization support increases *)
       end.
 
@@ -539,11 +514,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           let k := unsigned i in
           let n := BinIntDef.Z.to_nat k in
           match t with
-          | DTYPE_Vector _ ta
           | DTYPE_Array _ ta =>
             handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
-          | DTYPE_Struct ts
-          | DTYPE_Packed_struct ts => (* Handle these differently in future *)
+          | DTYPE_Struct ts =>
+            (* Handle these differently in future *)
             let offset := fold_left (fun acc t => (acc + (Z.of_N (sizeof_dtyp t))))%Z
                                     (firstn n ts) 0%Z in
             match nth_error ts n with
@@ -557,7 +531,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           let k := unsigned i in
           let n := BinIntDef.Z.to_nat k in
           match t with
-          | DTYPE_Vector _ ta
           | DTYPE_Array _ ta =>
             handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
           | _ => failwith ("non-i8-indexable type")
@@ -566,7 +539,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           let k := unsigned i in
           let n := BinIntDef.Z.to_nat k in
           match t with
-          | DTYPE_Vector _ ta
           | DTYPE_Array _ ta =>
             handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
           | _ => failwith ("non-i64-indexable type")

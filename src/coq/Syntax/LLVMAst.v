@@ -193,9 +193,7 @@ Inductive typ : Set :=
 | TYPE_Array (sz:N) (t:typ)
 | TYPE_Function (ret:typ) (args:list typ)
 | TYPE_Struct (fields:list typ)
-| TYPE_Packed_struct (fields:list typ)
 | TYPE_Opaque
-| TYPE_Vector (sz:N) (t:typ)     (* t must be integer, floating point, or pointer type *)
 | TYPE_Identified (id:ident)
 .
 Set Elimination Schemes.
@@ -274,22 +272,11 @@ Inductive exp : Set :=
 
 | EXP_Undef
 | EXP_Struct          (fields: list (T * exp))
-| EXP_Packed_struct   (fields: list (T * exp))
 | EXP_Array           (elts: list (T * exp))
-| EXP_Vector          (elts: list (T * exp))
 | OP_IBinop           (iop:ibinop) (t:T) (v1:exp) (v2:exp)
 | OP_ICmp             (cmp:icmp)   (t:T) (v1:exp) (v2:exp)
-| OP_FBinop           (fop:fbinop) (fm:list fast_math) (t:T) (v1:exp) (v2:exp)
-| OP_FCmp             (cmp:fcmp)   (t:T) (v1:exp) (v2:exp)
 | OP_Conversion       (conv:conversion_type) (t_from:T) (v:exp) (t_to:T)
 | OP_GetElementPtr    (t:T) (ptrval:(T * exp)) (idxs:list (T * exp))
-| OP_ExtractElement   (vec:(T * exp)) (idx:(T * exp))
-| OP_InsertElement    (vec:(T * exp)) (elt:(T * exp)) (idx:(T * exp))
-| OP_ShuffleVector    (vec1:(T * exp)) (vec2:(T * exp)) (idxmask:(T * exp))
-| OP_ExtractValue     (vec:(T * exp)) (idxs:list int)
-| OP_InsertValue      (vec:(T * exp)) (elt:(T * exp)) (idxs:list int)
-| OP_Select           (cnd:(T * exp)) (v1:(T * exp)) (v2:(T * exp)) (* if * then * else *)
-| OP_Freeze           (v:(T * exp))
 .
 
 Set Elimination Schemes.

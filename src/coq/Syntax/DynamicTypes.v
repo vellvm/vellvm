@@ -47,9 +47,7 @@ Inductive dtyp : Set :=
 | DTYPE_X86_mmx
 | DTYPE_Array (sz:N) (t:dtyp)
 | DTYPE_Struct (fields:list dtyp)
-| DTYPE_Packed_struct (fields:list dtyp)
 | DTYPE_Opaque
-| DTYPE_Vector (sz:N) (t:dtyp)     (* t must be integer, floating point, or pointer type *)
 .
 Set Elimination Schemes.
 
@@ -78,9 +76,7 @@ Lemma dtyp_eq_dec : forall (t1 t2:dtyp), {t1 = t2} + {t1 <> t2}.
             | DTYPE_X86_mmx, DTYPE_X86_mmx => _
             | DTYPE_Array n t, DTYPE_Array m t' => _
             | DTYPE_Struct l, DTYPE_Struct l' => _
-            | DTYPE_Packed_struct l, DTYPE_Packed_struct l' => _
             | DTYPE_Opaque, DTYPE_Opaque => _
-            | DTYPE_Vector n t, DTYPE_Vector m t' => _
             | _, _ => _
             end); try (ltac:(dec_dtyp); fail).
   - destruct (N.eq_dec n m).
@@ -94,14 +90,6 @@ Lemma dtyp_eq_dec : forall (t1 t2:dtyp), {t1 = t2} + {t1 <> t2}.
   - destruct (lsteq_dec l l').
     * left; subst; reflexivity.
     * right; intros H; inversion H. contradiction.
-  - destruct (lsteq_dec l l').
-    * left; subst; reflexivity.
-    * right; intros H; inversion H. contradiction.
-  - destruct (N.eq_dec n m).
-    * destruct (f t t').
-    + left; subst; reflexivity.
-    + right; intros H; inversion H. contradiction.
-      * right; intros H; inversion H. contradiction.
 Defined.
 Arguments dtyp_eq_dec: clear implicits.
 
@@ -130,9 +118,7 @@ Section DtypInd.
   Hypothesis IH_X86_mmx       : P DTYPE_X86_mmx.
   Hypothesis IH_Array         : forall sz t, P t -> P (DTYPE_Array sz t).
   Hypothesis IH_Struct        : forall (fields: list dtyp), (forall u, In u fields -> P u) -> P (DTYPE_Struct fields).
-  Hypothesis IH_Packed_Struct : forall (fields: list dtyp), (forall u, In u fields -> P u) -> P (DTYPE_Packed_struct fields).
   Hypothesis IH_Opaque        : P DTYPE_Opaque.
-  Hypothesis IH_Vector        : forall sz t, P t -> P (DTYPE_Vector sz t).
 
   Lemma dtyp_ind : forall (dt:dtyp), P dt.
     fix IH 1.
@@ -144,12 +130,6 @@ Section DtypInd.
         fix IHfields 1. intros [|u fields']. intros. inversion H.
         intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
       }
-    - apply IH_Packed_Struct.
-      { revert fields.
-        fix IHfields 1. intros [|u fields']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
-      }
-    - apply IH_Vector. auto.
   Qed.
 End DtypInd.
 
@@ -172,23 +152,12 @@ Section WF_dtyp.
       N.le 0 sz ->
       forall t, well_formed_dtyp t ->
            well_formed_dtyp (DTYPE_Array sz t)
-  | Wf_Vector : forall (sz : N),
-      N.le 0 sz ->
-      forall t, vector_dtyp t ->
-           well_formed_dtyp t ->
-           well_formed_dtyp (DTYPE_Vector sz t)
   | Wf_Struct_nil :
       well_formed_dtyp (DTYPE_Struct nil)
   | Wf_Struct_cons :
       forall t, well_formed_dtyp t ->
            forall l, well_formed_dtyp (DTYPE_Struct l) ->
                 well_formed_dtyp (DTYPE_Struct (t :: l))
-  | Wf_Packed_struct_nil :
-      well_formed_dtyp (DTYPE_Packed_struct nil)
-  | Wf_Packed_truct_cons :
-      forall t, well_formed_dtyp t ->
-           forall l, well_formed_dtyp (DTYPE_Packed_struct l) ->
-                well_formed_dtyp (DTYPE_Packed_struct (t :: l))
   .
 
 End WF_dtyp.
@@ -208,9 +177,7 @@ Fixpoint dtyp_measure (t : dtyp) : nat :=
   | DTYPE_X86_mmx => 0
   | DTYPE_Array sz t => S (dtyp_measure t)
   | DTYPE_Struct fields => S (list_sum (map dtyp_measure fields))
-  | DTYPE_Packed_struct fields => S (list_sum (map dtyp_measure fields))
   | DTYPE_Opaque => 0
-  | DTYPE_Vector sz t => S (dtyp_measure t)
   end.
 
 Section hiding_notation.
@@ -233,11 +200,7 @@ Section hiding_notation.
       => [Atom ("[" ++ to_string sz) ; Atom "x" ; serialize_dtyp' t ; Atom "]"]%string
     | DTYPE_Struct fields
       => [Atom "{" ; to_sexp (List.map (fun x => [serialize_dtyp' x ; Atom ","]) fields) ; Atom "}"]
-    | DTYPE_Packed_struct fields
-      => [Atom "packed{" ; to_sexp (List.map (fun x => [serialize_dtyp' x ; Atom ","]) fields) ; Atom "}"]
     | DTYPE_Opaque => Atom "opaque"
-    | DTYPE_Vector sz t
-      => [Atom ("<" ++ to_string sz) ; Atom "x" ; serialize_dtyp' t ; Atom ">"]%string  (* TODO: right notation? *)
     end.
 
   #[global] Instance serialize_dtyp : Serialize dtyp := serialize_dtyp'.

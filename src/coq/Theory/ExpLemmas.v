@@ -165,14 +165,6 @@ Proof.
     eapply uvalue_to_dvalue_list_concrete; eauto.
     intros u IN (dv' & CONV').
     eapply H; eauto.
-  - break_match; inversion H1.
-    eapply uvalue_to_dvalue_list_concrete; eauto.
-    intros u IN (dv' & CONV').
-    eapply H; eauto.
-  - break_match; inversion H1.
-    eapply uvalue_to_dvalue_list_concrete; eauto.
-    intros u IN (dv' & CONV').
-    eapply H; eauto.
 Qed.
 
 Module ExpTactics.

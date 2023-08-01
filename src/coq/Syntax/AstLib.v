@@ -308,9 +308,7 @@ Hypothesis IH_X86_mmx    : P(TYPE_X86_mmx).
 Hypothesis IH_Array      : forall sz t, P t -> P(TYPE_Array sz t).
 Hypothesis IH_Function   : forall ret args, P ret -> (forall u, In u args -> P u) -> P(TYPE_Function ret args).
 Hypothesis IH_Struct     : forall fields, (forall u, In u fields -> P u) -> P(TYPE_Struct fields).
-Hypothesis IH_Packed_struct : forall fields, (forall u, In u fields -> P u) -> P(TYPE_Packed_struct fields).
 Hypothesis IH_Opaque     : P(TYPE_Opaque).
-Hypothesis IH_Vector     : forall sz t, P t -> P(TYPE_Vector sz t).
 Hypothesis IH_Identified : forall id, P(TYPE_Identified id).
 
 Lemma typ_ind : forall (t:typ), P t.
@@ -338,13 +336,7 @@ Lemma typ_ind : forall (t:typ), P t.
       fix IHfields 1. intros [|u fields']. intros. inversion H.
       intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
     }
-  - apply IH_Packed_struct.
-    { revert fields.
-      fix IHfields 1. intros [|u fields']. intros. inversion H.
-      intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
-    }
   - apply IH_Opaque.
-  - apply IH_Vector. apply IH.
   - apply IH_Identified.
 Qed.
 
@@ -367,9 +359,7 @@ Hypothesis IH_X86_mmx    : P(TYPE_X86_mmx).
 Hypothesis IH_Array      : forall sz t, P t -> P(TYPE_Array sz t).
 Hypothesis IH_Function   : forall ret args, P ret -> (forall u : typ, (P u -> typ -> P u) -> list typ -> P u -> P u) -> P(TYPE_Function ret args).
 Hypothesis IH_Struct     : forall fields, (forall u : typ, (P u -> typ -> P u) -> list typ -> P u -> P u) -> P(TYPE_Struct fields).
-Hypothesis IH_Packed_struct : forall fields, (forall u : typ, (P u -> typ -> P u) -> list typ -> P u -> P u) -> P(TYPE_Packed_struct fields).
 Hypothesis IH_Opaque     : P(TYPE_Opaque).
-Hypothesis IH_Vector     : forall sz t, P t -> P(TYPE_Vector sz t).
 Hypothesis IH_Identified : forall id, P(TYPE_Identified id).
 
 Lemma typ_rect' : forall (t:typ), P t.
@@ -393,11 +383,7 @@ Lemma typ_rect' : forall (t:typ), P t.
   - apply IH_Struct.
     intros u f l def.
     refine (match fields with [] => def | (x::rest) => f def x end).
-  - apply IH_Packed_struct.
-    intros u f l def.
-    refine (match fields with [] => def | (x::rest) => f def x end).
   - apply IH_Opaque.
-  - apply IH_Vector. apply IH.
   - apply IH_Identified.
 Qed.
 
@@ -418,25 +404,12 @@ Section ExpInd.
   Hypothesis IH_Cstring : forall (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Cstring elts)).
   Hypothesis IH_Undef   : P ((EXP_Undef)).
   Hypothesis IH_Struct  : forall (fields: list (T * (exp T))), (forall p, In p fields -> P (snd p)) -> P ((EXP_Struct fields)).
-  Hypothesis IH_Packed_struct : forall (fields: list (T * (exp T))), (forall p, In p fields -> P (snd p)) -> P ((EXP_Packed_struct fields)).
   Hypothesis IH_Array   : forall (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Array elts)).
-  Hypothesis IH_Vector  : forall (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Vector elts)).
   Hypothesis IH_IBinop  : forall (iop:ibinop) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_IBinop iop t v1 v2)).
   Hypothesis IH_ICmp    : forall (cmp:icmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_ICmp cmp t v1 v2)).
-  Hypothesis IH_FBinop  : forall (fop:fbinop) (fm:list fast_math) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FBinop fop fm t v1 v2)).
-  Hypothesis IH_FCmp    : forall (cmp:fcmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FCmp cmp t v1 v2)).
   Hypothesis IH_Conversion : forall (conv:conversion_type) (t_from:T) (v:exp T) (t_to:T), P v -> P ((OP_Conversion conv t_from v t_to)).
   Hypothesis IH_GetElementPtr : forall (t:T) (ptrval:(T * exp T)) (idxs:list (T * exp T)),
       P (snd ptrval) -> (forall p, In p idxs -> P (snd p)) -> P ((OP_GetElementPtr t ptrval idxs)).
-  Hypothesis IH_ExtractElement: forall (vec:(T * exp T)) (idx:(T * exp T)), P (snd vec) -> P (snd idx) -> P ((OP_ExtractElement vec idx)).
-  Hypothesis IH_InsertElement : forall (vec:(T * exp T)) (elt:(T * exp T)) (idx:(T * exp T)),
-      P (snd vec) -> P (snd elt) -> P (snd idx) -> P ((OP_InsertElement vec elt idx)).
-  Hypothesis IH_ShuffleVector : forall (vec1:(T * exp T)) (vec2:(T * exp T)) (idxmask:(T * exp T)),
-      P (snd vec1) -> P (snd vec2 ) -> P (snd idxmask) -> P ((OP_ShuffleVector vec1 vec2 idxmask)).
-  Hypothesis IH_ExtractValue  : forall (vec:(T * exp T)) (idxs:list int), P (snd vec) -> P ((OP_ExtractValue vec idxs)).
-  Hypothesis IH_InsertValue   : forall (vec:(T * exp T)) (elt:(T * exp T)) (idxs:list int), P (snd vec) -> P (snd elt) -> P ((OP_InsertValue vec elt idxs)).
-  Hypothesis IH_Select        : forall (cnd:(T * exp T)) (v1:(T * exp T)) (v2:(T * exp T)), P (snd cnd) -> P (snd v1) -> P (snd v2) -> P ((OP_Select cnd v1 v2)).
-  Hypothesis IH_Freeze        : forall (v:(T * exp T)), P (snd v) -> P ((OP_Freeze v)).
 
   Lemma exp_ind : forall (v:exp T), P v.
     fix IH 1.
@@ -461,38 +434,19 @@ Section ExpInd.
         fix IHfields 1. intros [|u fields']. intros. inversion H.
         intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
       }
-    - apply IH_Packed_struct.
-      { revert fields.
-        fix IHfields 1. intros [|u fields']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
-      }
     - apply IH_Array.
-      { revert elts.
-        fix IHelts 1. intros [|u elts']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
-      }
-    - apply IH_Vector.
       { revert elts.
         fix IHelts 1. intros [|u elts']. intros. inversion H.
         intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
       }
     - apply IH_IBinop. apply IH. apply IH.
     - apply IH_ICmp. apply IH. apply IH.
-    - apply IH_FBinop. apply IH. apply IH.
-    - apply IH_FCmp. apply IH. apply IH.
     - apply IH_Conversion. apply IH.
     - apply IH_GetElementPtr. apply IH.
       { revert idxs.
         fix IHidxs 1. intros [|u idxs']. intros. inversion H.
         intros u' [<-|Hin]. apply IH. eapply IHidxs. apply Hin.
       }
-    - apply IH_ExtractElement. apply IH. apply IH.
-    - apply IH_InsertElement. apply IH. apply IH. apply IH.
-    - apply IH_ShuffleVector. apply IH. apply IH. apply IH.
-    - apply IH_ExtractValue. apply IH.
-    - apply IH_InsertValue. apply IH. apply IH.
-    - apply IH_Select.  apply IH. apply IH. apply IH.
-    - apply IH_Freeze. apply IH.
   Qed.
 End ExpInd.
 
@@ -612,9 +566,7 @@ Section hiding_notation.
     | TYPE_Array sz t => [Atom "["; Atom (show_N sz); Atom "x"; serialize_typ' t; Atom "]"]
     | TYPE_Function ret args => [serialize_typ' ret; Atom "("; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexp (serialize_typ' x)) args)); Atom ")"]
     | TYPE_Struct fields => [Atom "{"; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexp (serialize_typ' x)) fields)); Atom "}"]
-    | TYPE_Packed_struct fields => [Atom "<{"; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexp (serialize_typ' x)) fields)); Atom "}>"]
     | TYPE_Opaque => Atom "opaque"
-    | TYPE_Vector sz t => [Atom "<"; Atom (show_N sz); Atom "x"; serialize_typ' t; Atom ">"]
     | TYPE_Identified id => Atom (to_string id)
     end.
 

@@ -104,15 +104,7 @@ Proof.
     reflexivity.
   - cbn.
     pose proof uvalue_to_dvalue_list _ H H1 as (dv & MAP).
-    exists (DVALUE_Packed_struct dv). rewrite MAP.
-    reflexivity.
-  - cbn.
-    pose proof uvalue_to_dvalue_list _ H H1 as (dv & MAP).
     exists (DVALUE_Array dv). rewrite MAP.
-    reflexivity.
-  - cbn.
-    pose proof uvalue_to_dvalue_list _ H H1 as (dv & MAP).
-    exists (DVALUE_Vector dv). rewrite MAP.
     reflexivity.
 Qed.
 

@@ -201,10 +201,7 @@ and typ : Format.formatter -> LLVMAst.typ -> unit =
   | TYPE_Function (t, tl) -> fprintf ppf "%a (%a)" typ t (pp_print_list ~pp_sep:pp_comma_space typ) tl
   | TYPE_Struct tl        -> fprintf ppf "{%a}"
                                      (pp_print_list ~pp_sep:pp_comma_space typ) tl
-  | TYPE_Packed_struct tl -> fprintf ppf "<{%a}>"
-                                     (pp_print_list ~pp_sep:pp_comma_space typ) tl
   | TYPE_Opaque           -> fprintf ppf "opaque"
-  | TYPE_Vector (i, t)    -> fprintf ppf "<%d x %a>" (n_to_int i) typ t ;
   | TYPE_Identified i     -> ident ppf i
 
 and icmp : Format.formatter -> LLVMAst.icmp -> unit =
@@ -309,11 +306,7 @@ and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
   | EXP_Undef             -> pp_print_string ppf "undef"
   | EXP_Array tvl         -> fprintf ppf "[%a]"
                                        (pp_print_list ~pp_sep:pp_comma_space texp) tvl
-  | EXP_Vector tvl        -> fprintf ppf "<%a>"
-                                       (pp_print_list ~pp_sep:pp_comma_space texp) tvl
   | EXP_Struct tvl        -> fprintf ppf "{%a}"
-                                       (pp_print_list ~pp_sep:pp_comma_space texp) tvl
-  | EXP_Packed_struct tvl -> fprintf ppf "<{%a}>"
                                        (pp_print_list ~pp_sep:pp_comma_space texp) tvl
   | EXP_Zero_initializer  -> pp_print_string ppf "zeroinitializer"
 
@@ -335,24 +328,6 @@ and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
              typ t
              exp v2
 
-  | OP_FBinop (op, f, t, v1, v2) ->
-     fbinop ppf op ;
-     if f <> [] then (pp_space ppf () ;
-                      pp_print_list ~pp_sep:pp_space fast_math ppf f) ;
-     fprintf ppf " (%a %a, %a %a)"
-             typ t
-             exp v1
-             typ t
-             exp v2
-
-  | OP_FCmp (c, t, v1, v2) ->
-     fprintf ppf "fcmp %a (%a %a, %a %a)"
-             fcmp c
-             typ t
-             exp v1
-             typ t
-             exp v2
-
   | OP_Conversion (c, t1, v, t2) ->
      fprintf ppf "%a (%a %a to %a)"
              conversion_type c
@@ -366,44 +341,6 @@ and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
              texp tv
              (pp_print_list ~pp_sep:pp_comma_space texp) tvl
 
-  | OP_Select (if_, then_, else_) ->
-     fprintf ppf "select (%a, %a, %a)"
-             texp if_
-             texp then_
-             texp else_
-
-  | OP_Freeze (tv) ->
-    fprintf ppf "freeze %a"
-      texp tv
-
-  | OP_ExtractElement (vec, idx) ->
-     fprintf ppf "extractelement (%a, %a)"
-             texp vec
-             texp idx
-
-  | OP_InsertElement (vec, new_val, idx) ->
-     fprintf ppf "insertelement (%a, %a, %a)"
-             texp vec
-             texp new_val
-             texp idx
-
-  | OP_ExtractValue (agg, idx) ->
-     fprintf ppf "extractvalue (%a, %a)"
-             texp agg
-             (pp_print_list ~pp_sep:pp_comma_space pp_print_int) (List.map to_int idx)
-
-  | OP_InsertValue (agg, new_val, idx) ->
-     fprintf ppf "insertvalue (%a, %a, %a)"
-             texp agg
-             texp new_val
-             (pp_print_list ~pp_sep:pp_comma_space pp_print_int) (List.map to_int idx)
-
-  | OP_ShuffleVector (v1, v2, mask) ->
-     fprintf ppf "shufflevector (%a, %a, %a)"
-             texp v1
-             texp v2
-             texp mask
-
 and inst_exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
   fun ppf vv ->
     match vv with
@@ -416,9 +353,7 @@ and inst_exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
   | EXP_Null
   | EXP_Undef
   | EXP_Array _
-  | EXP_Vector _
   | EXP_Struct _
-  | EXP_Packed_struct _
   | EXP_Zero_initializer
   | EXP_Cstring _ -> assert false   (* there should be no "raw" exps as instructions *)
 
@@ -436,22 +371,6 @@ and inst_exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
              exp v1
              exp v2
 
-  | OP_FBinop (op, f, t, v1, v2) ->
-     fbinop ppf op ;
-     if f <> [] then (pp_space ppf () ;
-                      pp_print_list ~pp_sep:pp_space fast_math ppf f) ;
-     fprintf ppf " %a %a, %a"
-             typ t
-             exp v1
-             exp v2
-
-  | OP_FCmp (c, t, v1, v2) ->
-     fprintf ppf "fcmp %a %a %a, %a"
-             fcmp c
-             typ t
-             exp v1
-             exp v2
-
   | OP_Conversion (c, t1, v, t2) ->
      fprintf ppf "%a %a %a to %a"
              conversion_type c
@@ -464,45 +383,6 @@ and inst_exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
              typ t
              texp tv
              (pp_print_list ~pp_sep:pp_comma_space texp) tvl
-
-  | OP_Select (if_, then_, else_) ->
-     fprintf ppf "select %a, %a, %a"
-             texp if_
-             texp then_
-             texp else_
-
-  | OP_Freeze (tv) ->
-    fprintf ppf "freeze %a"
-      texp tv
-
-  | OP_ExtractElement (vec, idx) ->
-     fprintf ppf "extractelement %a, %a"
-             texp vec
-             texp idx
-
-  | OP_InsertElement (vec, new_val, idx) ->
-     fprintf ppf "insertelement %a, %a, %a"
-             texp vec
-             texp new_val
-             texp idx
-
-  | OP_ExtractValue (agg, idx) ->
-     fprintf ppf "extractvalue %a, %a"
-             texp agg
-             (pp_print_list ~pp_sep:pp_comma_space pp_print_int) (List.map to_int idx)
-
-  | OP_InsertValue (agg, new_val, idx) ->
-     fprintf ppf "insertvalue %a, %a, %a"
-             texp agg
-             texp new_val
-             (pp_print_list ~pp_sep:pp_comma_space pp_print_int) (List.map to_int idx)
-
-  | OP_ShuffleVector (v1, v2, mask) ->
-     fprintf ppf "shufflevector %a, %a, %a"
-             texp v1
-             texp v2
-             texp mask
-
 
 and phi : Format.formatter -> (LLVMAst.typ LLVMAst.phi) -> unit =
   fun ppf ->

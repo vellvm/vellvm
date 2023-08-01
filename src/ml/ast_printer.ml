@@ -103,9 +103,7 @@ and typ : Format.formatter -> LLVMAst.typ -> unit =
   | TYPE_X86_mmx          -> fprintf ppf "TYPE_X86_mmx"
   | TYPE_Array (i, t)     -> fprintf ppf "(TYPE_Array %d%%Z %a)" (n_to_int i) typ t
   | TYPE_Struct tl        -> fprintf ppf "(TYPE_Struct [%a])" (pp_print_list ~pp_sep:pp_sc_space typ) tl
-  | TYPE_Packed_struct tl -> fprintf ppf "(TYPE_Packed_struct [%a])" (pp_print_list ~pp_sep:pp_sc_space typ) tl
   | TYPE_Opaque           -> fprintf ppf "TYPE_Opaque"
-  | TYPE_Vector (i, t)    -> fprintf ppf "(TYPE_Vector %d%%Z %a)" (n_to_int i) typ t
   | TYPE_Identified i     -> fprintf ppf "(TYPE_Identified %a)" ident i
 
 and icmp : Format.formatter -> LLVMAst.icmp -> unit =
@@ -229,16 +227,8 @@ and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
       fprintf ppf "(EXP_Array [%a])"
         (pp_print_list ~pp_sep:pp_sc_space (pp_print_prod typ exp)) tvl
 
-    | EXP_Vector tvl        ->
-      fprintf ppf "(EXP_Vector [%a])"
-        (pp_print_list ~pp_sep:pp_sc_space (pp_print_prod typ exp)) tvl
-
     | EXP_Struct tvl        ->
       fprintf ppf "(EXP_Struct [%a])"
-        (pp_print_list ~pp_sep:pp_sc_space (pp_print_prod typ exp)) tvl
-
-    | EXP_Packed_struct tvl ->
-      fprintf ppf "(EXP_Packed_struct [%a])"
         (pp_print_list ~pp_sep:pp_sc_space (pp_print_prod typ exp)) tvl
 
     | EXP_Zero_initializer  -> pp_print_string ppf "EXP_Zero_initializer"
@@ -261,21 +251,6 @@ and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
         exp v1
         exp v2
 
-  | OP_FBinop (op, f, t, v1, v2) ->
-     fprintf ppf "(OP_FBinop %a %a %a %a %a)"
-        fbinop op
-        (pp_print_list ~pp_sep:pp_sc_space fast_math) f
-        typ t
-        exp v1
-        exp v2
-
-  | OP_FCmp (c, t, v1, v2) ->
-     fprintf ppf "(OP_FCmp %a %a %a %a)"
-        fcmp c
-        typ t
-        exp v1
-        exp v2
-
   | OP_Conversion (c, t1, v, t2) ->
      fprintf ppf "(OP_Conversion %a %a %a %a)"
         conversion_type c
@@ -289,44 +264,6 @@ and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
        (pp_print_prod typ exp) tv
        (pp_print_list ~pp_sep:pp_sc_space (pp_print_prod typ exp)) tvl
 
-  | OP_Select (if_, then_, else_) ->
-     fprintf ppf "(OP_Select %a %a %a)"
-       (pp_print_prod typ exp) if_
-       (pp_print_prod typ exp) then_
-       (pp_print_prod typ exp) else_
-
-  | OP_Freeze (v) ->
-    fprintf ppf "(OP_Freeze %a)"
-      (pp_print_prod typ exp) v
-
-  | OP_ExtractElement (vec, idx) ->
-     fprintf ppf "(OP_ExtractElement %a %a)"
-       (pp_print_prod typ exp) vec
-       (pp_print_prod typ exp) idx
-
-  | OP_InsertElement (vec, new_val, idx) ->
-     fprintf ppf "(OP_InsertElement %a %a %a)"
-       (pp_print_prod typ exp) vec
-       (pp_print_prod typ exp) new_val
-       (pp_print_prod typ exp) idx
-
-  | OP_ExtractValue (agg, idx) ->
-      fprintf ppf "(OP_ExtractValue %a [%a])"
-       (pp_print_prod typ exp) agg
-       (pp_print_list ~pp_sep:pp_sc_space (fun ppf i -> fprintf ppf "%d%%Z" (to_int i))) idx
-
-  | OP_InsertValue (agg, new_val, idx) ->
-     fprintf ppf "(OP_InsertValue %a %a [%a])"
-       (pp_print_prod typ exp) agg
-       (pp_print_prod typ exp) new_val
-       (pp_print_list ~pp_sep:pp_sc_space (fun ppf i -> fprintf ppf "%d%%Z" (to_int i))) idx
-
-  | OP_ShuffleVector (v1, v2, mask) ->
-     fprintf ppf "(OP_ShuffleVector %a %a %a)"
-       (pp_print_prod typ exp) v1
-       (pp_print_prod typ exp) v2
-       (pp_print_prod typ exp) mask
-
 and inst_exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
   fun ppf vv ->
     match vv with
@@ -339,9 +276,7 @@ and inst_exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
   | EXP_Null
   | EXP_Undef
   | EXP_Array _
-  | EXP_Vector _
   | EXP_Struct _
-  | EXP_Packed_struct _
   | EXP_Zero_initializer
   | EXP_Cstring _ -> assert false (* there should be no "raw" exps as instructions *)
 
@@ -359,21 +294,6 @@ and inst_exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
       exp v1
       exp v2
 
-  | OP_FBinop (op, f, t, v1, v2) ->
-    fprintf ppf "(OP_FBinop %a %a %a %a %a)"
-      fbinop op
-      (pp_print_list ~pp_sep:pp_sc_space fast_math) f
-      typ t
-      exp v1
-      exp v2
-
-  | OP_FCmp (c, t, v1, v2) ->
-    fprintf ppf "(OP_FCmp %a %a %a %a)"
-      fcmp c
-      typ t
-      exp v1
-      exp v2
-
   | OP_Conversion (c, t1, v, t2) ->
     fprintf ppf "(OP_Conversion %a %a %a %a)"
       conversion_type c
@@ -386,45 +306,6 @@ and inst_exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
       typ t
       (pp_print_prod typ exp) tv
       (pp_print_list ~pp_sep:pp_sc_space (pp_print_prod typ exp)) tvl
-
-  | OP_Select (if_, then_, else_) ->
-    fprintf ppf "(OP_Select %a %a %a)"
-      (pp_print_prod typ exp) if_
-      (pp_print_prod typ exp) then_
-      (pp_print_prod typ exp) else_
-
-  | OP_Freeze (v) ->
-    fprintf ppf "(OP_Freeze %a)"
-      (pp_print_prod typ exp) v
-
-
-  | OP_ExtractElement (vec, idx) ->
-    fprintf ppf "(OP_ExtractElement %a %a)"
-      (pp_print_prod typ exp) vec
-      (pp_print_prod typ exp) idx
-
-  | OP_InsertElement (vec, new_val, idx) ->
-    fprintf ppf "(OP_InsertElement %a %a %a)"
-      (pp_print_prod typ exp) vec
-      (pp_print_prod typ exp) new_val
-      (pp_print_prod typ exp) idx
-
-  | OP_ExtractValue (agg, idx) ->
-    fprintf ppf "(OP_ExtractValue %a [%a]%%Z)"
-      (pp_print_prod typ exp) agg
-      (pp_print_list ~pp_sep:pp_sc_space (fun ppf i -> fprintf ppf "%d%%Z" (to_int i))) idx
-
-  | OP_InsertValue (agg, new_val, idx) ->
-    fprintf ppf "(OP_InsertValue %a %a [%a]%%Z)"
-      (pp_print_prod typ exp) agg
-      (pp_print_prod typ exp) new_val
-      (pp_print_list ~pp_sep:pp_sc_space (fun ppf i -> fprintf ppf "%d%%Z" (to_int i))) idx
-
-  | OP_ShuffleVector (v1, v2, mask) ->
-    fprintf ppf "(OP_ShuffleVector %a %a %a)"
-      (pp_print_prod typ exp) v1
-      (pp_print_prod typ exp) v2
-      (pp_print_prod typ exp) mask
 
 and phi : Format.formatter -> (LLVMAst.typ LLVMAst.phi) -> unit =
   fun ppf ->

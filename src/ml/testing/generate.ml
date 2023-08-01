@@ -32,17 +32,6 @@ let rec gen_uvalue : LL.typ -> DV.uvalue G.t = function
      | _ -> failwith "generating integer values of this type is not implemented"
      end
   | LL.TYPE_Void -> g_const DV.UVALUE_None
-  | LL.TYPE_Vector (sz, ty) ->
-     print_endline "generating vector value";
-     let open G in
-     let gen_t = gen_uvalue ty in
-     let list_ts = G.list_size (g_const (sz |> Camlcoq.N.to_int32 |> Int32.to_int)) gen_t in
-     list_ts >>= (fun l -> G.return @@ DV.UVALUE_Vector l)
-  | LL.TYPE_Array (sz, ty) ->  
-     let open G in
-     let gen_t = gen_uvalue ty in
-     let list_ts = G.list_size (g_const (sz |> Camlcoq.N.to_int32 |> Int32.to_int)) gen_t in
-     list_ts >>= (fun l -> G.return @@ DV.UVALUE_Vector l)
   | _ -> failwith "generating values of this type is not implemented"
 
 

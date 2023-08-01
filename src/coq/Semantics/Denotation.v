@@ -300,9 +300,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
     Definition eval_conv (conv : conversion_type) (t1 : dtyp) (x : dvalue) (t2:dtyp) : itree conv_E dvalue :=
       match t1, x with
-      | DTYPE_Vector s t, (DVALUE_Vector elts) =>
-        (* In the future, implement bitcast and etc with vectors *)
-        raise "vectors unimplemented"
       | _, _ => eval_conv_h conv t1 x t2
       end.
     Arguments eval_conv _ _ _ _ : simpl nomatch.
@@ -440,23 +437,9 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           vs <- map_monad eval_texp es ;;
           ret (UVALUE_Struct vs)
 
-        (* Option 2: do a little bit of typechecking *)
-        | EXP_Packed_struct es =>
-          match top with
-          | None => raise "denote_exp given untyped EXP_Struct"
-          | Some (DTYPE_Packed_struct _) =>
-            vs <- map_monad eval_texp es ;;
-            ret (UVALUE_Packed_struct vs)
-          | _ => raise "bad type for VALUE_Packed_struct"
-          end
-
         | EXP_Array es =>
           vs <- map_monad eval_texp es ;;
           ret (UVALUE_Array vs)
-
-        | EXP_Vector es =>
-          vs <- map_monad eval_texp es ;;
-          ret (UVALUE_Vector vs)
 
         (* The semantics of operators is complicated by both uvalues and *)
         (*    undefined behaviors. *)
@@ -473,16 +456,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           v2 <- denote_exp (Some dt) op2 ;;
           ret (UVALUE_ICmp cmp v1 v2)
 
-        | OP_FBinop fop fm dt op1 op2 =>
-          v1 <- denote_exp (Some dt) op1 ;;
-          v2 <- denote_exp (Some dt) op2 ;;
-          ret (UVALUE_FBinop fop fm v1 v2)
-
-        | OP_FCmp fcmp dt op1 op2 =>
-          v1 <- denote_exp (Some dt) op1 ;;
-          v2 <- denote_exp (Some dt) op2 ;;
-          ret (UVALUE_FCmp fcmp v1 v2)
-
         | OP_Conversion conv dt_from op dt_to =>
           v <- denote_exp (Some dt_from) op ;;
           ret (UVALUE_Conversion conv dt_from v dt_to)
@@ -491,27 +464,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           vptr <- denote_exp (Some dt2) ptrval ;;
           vs <- map_monad (fun '(dt, index) => denote_exp (Some dt) index) idxs ;;
           ret (UVALUE_GetElementPtr dt1 vptr vs)
-
-        | OP_ExtractElement _ _ =>
-            raise "Unsupported expression: ExtractElement"
-
-        | OP_InsertElement _ _ _ =>
-            raise "Unsupported expression: InsertElement"
-
-        | OP_ShuffleVector _ _ _ =>
-            raise "Unsupported expression: ShuffleVector"
-
-        | OP_ExtractValue _ _ =>
-            raise "Unsupported expression: ExtractValue"
-
-        | OP_InsertValue _ _ _ =>
-            raise "Unsupported expression: InsertValue"
-
-        | OP_Select _ _ _ =>
-            raise "Unsupported expression: Select"
-
-        | OP_Freeze _ =>
-            raise "Unsupported expression: Freeze"
         end.
   Arguments denote_exp _ : simpl nomatch.
 

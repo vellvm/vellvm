@@ -146,31 +146,6 @@ Module VIR_Notations.
   Notation "'slt' e f"  := (OP_ICmp Slt _ e f)                 (at level 20, only printing).
   Notation "'sle' e f"  := (OP_ICmp Sle _ e f)                 (at level 20, only printing).
 
-  (* fbinop *)
-  Notation "'fadd' e f" := (OP_FBinop FAdd _ e f) (at level 20, only printing).
-  Notation "'fsub' e f" := (OP_FBinop FSub _ e f) (at level 20, only printing).
-  Notation "'fmul' e f" := (OP_FBinop FMul _ e f) (at level 20, only printing).
-  Notation "'fdiv' e f" := (OP_FBinop FDiv _ e f) (at level 20, only printing).
-  Notation "'frem' e f" := (OP_FBinop FRem _ e f) (at level 20, only printing).
-
-  (* fcmp *)
-  Notation "'false'"     := (OP_FCmp FFalse _ _ _) (at level 20, only printing).
-  Notation "'true'"      := (OP_FCmp FTrue _ _ _)  (at level 20, only printing).
-  Notation "'oeq' e f"   := (OP_FCmp FOeq _ e f)   (at level 20, only printing).
-  Notation "'ogt' e f"   := (OP_FCmp FOgt _ e f)   (at level 20, only printing).
-  Notation "'oge' e f"   := (OP_FCmp FOge _ e f)   (at level 20, only printing).
-  Notation "'olt' e f"   := (OP_FCmp FOlt _ e f)   (at level 20, only printing).
-  Notation "'ole' e f"   := (OP_FCmp FOle _ e f)   (at level 20, only printing).
-  Notation "'one' e f"   := (OP_FCmp FOne _ e f)   (at level 20, only printing).
-  Notation "'ord' e f"   := (OP_FCmp FOrd _ e f)   (at level 20, only printing).
-  Notation "'uno' e f"   := (OP_FCmp FUno _ e f)   (at level 20, only printing).
-  Notation "'ueq' e f"   := (OP_FCmp FUeq _ e f)   (at level 20, only printing).
-  Notation "'ugt' e f"   := (OP_FCmp FUgt _ e f)   (at level 20, only printing).
-  Notation "'uge' e f"   := (OP_FCmp FUge _ e f)   (at level 20, only printing).
-  Notation "'ult' e f"   := (OP_FCmp FUlt _ e f)   (at level 20, only printing).
-  Notation "'ule' e f"   := (OP_FCmp FUle _ e f)   (at level 20, only printing).
-  Notation "'une' e f"   := (OP_FCmp FUne _ e f)   (at level 20, only printing).
-
 
   (** * Instructions *)
 

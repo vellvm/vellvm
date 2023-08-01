@@ -47,9 +47,7 @@ let rec pp_uvalue : Format.formatter -> DV.uvalue -> unit =
   | UVALUE_None     -> fprintf ppf "UVALUE_None"
   | UVALUE_Undef _  -> fprintf ppf "UVALUE_Undef"
   | UVALUE_Struct        l -> fprintf ppf "UVALUE_Struct(%a)"        (pp_print_list ~pp_sep:pp_comma_space pp_uvalue) l
-  | UVALUE_Packed_struct l -> fprintf ppf "UVALUE_Packet_struct(%a)" (pp_print_list ~pp_sep:pp_comma_space pp_uvalue) l
   | UVALUE_Array         l -> fprintf ppf "UVALUE_Array(%a)"         (pp_print_list ~pp_sep:pp_comma_space pp_uvalue) l
-  | UVALUE_Vector        l -> fprintf ppf "UVALUE_Vector(%a)"        (pp_print_list ~pp_sep:pp_comma_space pp_uvalue) l
   | _ -> fprintf ppf "todo"
 
 let debug_flag = ref false

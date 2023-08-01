@@ -49,36 +49,16 @@ let rec eq_uvalue (l: DV.uvalue) (r: DV.uvalue) : bool =
   | UVALUE_None, UVALUE_None -> true
   | UVALUE_Struct ul, UVALUE_Struct ur ->
      List.for_all2 eq_uvalue ul ur
-  | UVALUE_Packed_struct ul, UVALUE_Packed_struct ur ->
-     List.for_all2 eq_uvalue ul ur
   | UVALUE_Array ul, UVALUE_Array ur ->
-     List.for_all2 eq_uvalue ul ur
-  | UVALUE_Vector ul, UVALUE_Vector ur ->
      List.for_all2 eq_uvalue ul ur
   | UVALUE_IBinop (bl, l1, l2), UVALUE_IBinop (br, r1, r2) ->
      bl = br && eq_uvalue l1 r1 && eq_uvalue l2 r2
   | UVALUE_ICmp (bl, l1, l2), UVALUE_ICmp (br, r1, r2) ->
      bl = br && eq_uvalue l1 r1 && eq_uvalue l2 r2
-  | UVALUE_FBinop (fl, ml, l1, l2), UVALUE_FBinop (fr, mr, r1, r2) ->
-     fl = fr && ml = mr && eq_uvalue l1 r1 && eq_uvalue l2 r2
-  | UVALUE_FCmp (bl, l1, l2), UVALUE_FCmp (br, r1, r2) ->
-     bl = br && eq_uvalue l1 r1 && eq_uvalue l2 r2
   (* | UVALUE_Conversion (t, l, tl), UVALUE_Conversion (t', r, tr) -> *)
      (* t = t' && eq_uvalue l r && tl = tr *)
   | UVALUE_GetElementPtr (ctl, l', ls), UVALUE_GetElementPtr(ctr, r', rs) ->
      ctl = ctr && eq_uvalue l' r' && List.for_all2 eq_uvalue ls rs
-  (* | UVALUE_ExtractElement (a,b), UVALUE_ExtractElement (c,d) -> *)
-  (*    eq_uvalue a c && eq_uvalue b d *)
-  (* | UVALUE_InsertElement (l1, l2, l3), UVALUE_InsertElement (r1,r2,r3) -> *)
-  (*    eq_uvalue l1 r1 && eq_uvalue l2 r2 && eq_uvalue l3 r3 *)
-  | UVALUE_ShuffleVector (l1, l2, l3), UVALUE_ShuffleVector (r1,r2,r3) ->
-     eq_uvalue l1 r1 && eq_uvalue l2 r2 && eq_uvalue l3 r3
-  (* | UVALUE_ExtractValue (l, ls), UVALUE_ExtractValue (r, rs) -> *)
-  (*    eq_uvalue l r && ls = rs *)
-  (* | UVALUE_InsertValue (l1, l2, ls), UVALUE_InsertValue (r1, r2, rs) -> *)
-  (*    eq_uvalue l1 r1 && eq_uvalue l2 r2 && ls = rs *)
-  | UVALUE_Select (l1, l2, l3), UVALUE_Select (r1,r2,r3) ->
-     eq_uvalue l1 r1 && eq_uvalue l2 r2 && eq_uvalue l3 r3
   | _ -> false
 
 (*  Directly converts a piece of syntax to a uvalue without going through semantic interpretation.
@@ -101,8 +81,6 @@ let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV
   | TYPE_Double, EXP_Double f -> UVALUE_Double f
   | TYPE_Array _, EXP_Array elts -> UVALUE_Array (List.map texp_to_uvalue elts)
   | TYPE_Struct _, EXP_Struct elts -> UVALUE_Struct (List.map texp_to_uvalue elts)
-  | TYPE_Packed_struct _, EXP_Packed_struct elts -> UVALUE_Packed_struct (List.map texp_to_uvalue elts)
-  | TYPE_Vector _, EXP_Vector elts -> UVALUE_Vector (List.map texp_to_uvalue elts)
   | _,_ -> failwith "Assertion includes unsupported expression"
 
 let rec typ_to_dtyp (typ : LLVMAst.typ) : DynamicTypes.dtyp =
@@ -113,8 +91,6 @@ let rec typ_to_dtyp (typ : LLVMAst.typ) : DynamicTypes.dtyp =
   | TYPE_Double -> DTYPE_Double
   | TYPE_Array (sz,dtyp) -> DTYPE_Array (sz, typ_to_dtyp dtyp)
   | TYPE_Struct dtyps -> DTYPE_Struct (List.map typ_to_dtyp dtyps)
-  | TYPE_Packed_struct dtyps -> DTYPE_Packed_struct (List.map typ_to_dtyp dtyps)
-  | TYPE_Vector (sz,dtyp) -> DTYPE_Vector (sz, typ_to_dtyp dtyp)
   | _ -> failwith "Assertion includes unsupported expression"
 
 

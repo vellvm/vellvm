@@ -184,9 +184,7 @@ Inductive dvalue : Set :=
 | DVALUE_Poison
 | DVALUE_None
 | DVALUE_Struct        (fields: list dvalue)
-| DVALUE_Packed_struct (fields: list dvalue)
 | DVALUE_Array         (elts: list dvalue)
-| DVALUE_Vector        (elts: list dvalue)
 .
 Set Elimination Schemes.
 
@@ -202,9 +200,7 @@ Section DvalueInd.
   Hypothesis IH_Poison        : P DVALUE_Poison.
   Hypothesis IH_None          : P DVALUE_None.
   Hypothesis IH_Struct        : forall (fields: list dvalue), (forall u, In u fields -> P u) -> P (DVALUE_Struct fields).
-  Hypothesis IH_Packed_Struct : forall (fields: list dvalue), (forall u, In u fields -> P u) -> P (DVALUE_Packed_struct fields).
   Hypothesis IH_Array         : forall (elts: list dvalue), (forall e, In e elts -> P e) -> P (DVALUE_Array elts).
-  Hypothesis IH_Vector        : forall (elts: list dvalue), (forall e, In e elts -> P e) -> P (DVALUE_Vector elts).
 
   Lemma dvalue_ind : forall (dv:dvalue), P dv.
     fix IH 1.
@@ -215,17 +211,7 @@ Section DvalueInd.
         fix IHfields 1. intros [|u fields']. intros. inversion H.
         intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
       }
-    - apply IH_Packed_Struct.
-      { revert fields.
-        fix IHfields 1. intros [|u fields']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
-      }
     - apply IH_Array.
-      { revert elts.
-        fix IHelts 1. intros [|u elts']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
-      }
-    - apply IH_Vector.
       { revert elts.
         fix IHelts 1. intros [|u elts']. intros. inversion H.
         intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
@@ -248,9 +234,7 @@ Inductive uvalue : Type :=
 | UVALUE_Poison
 | UVALUE_None
 | UVALUE_Struct        (fields: list uvalue)
-| UVALUE_Packed_struct (fields: list uvalue)
 | UVALUE_Array         (elts: list uvalue)
-| UVALUE_Vector        (elts: list uvalue)
 | UVALUE_IBinop           (iop:ibinop) (v1:uvalue) (v2:uvalue)
 | UVALUE_ICmp             (cmp:icmp)   (v1:uvalue) (v2:uvalue)
 | UVALUE_FBinop           (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue)
@@ -282,9 +266,7 @@ Section UvalueInd.
   Hypothesis IH_Poison         : P UVALUE_Poison.
   Hypothesis IH_None           : P UVALUE_None.
   Hypothesis IH_Struct         : forall (fields: list uvalue), (forall u, In u fields -> P u) -> P (UVALUE_Struct fields).
-  Hypothesis IH_Packed_Struct  : forall (fields: list uvalue), (forall u, In u fields -> P u) -> P (UVALUE_Packed_struct fields).
   Hypothesis IH_Array          : forall (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Array elts).
-  Hypothesis IH_Vector         : forall (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Vector elts).
   Hypothesis IH_IBinop         : forall (iop:ibinop) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_IBinop iop v1 v2).
   Hypothesis IH_ICmp           : forall (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp cmp v1 v2).
   Hypothesis IH_FBinop         : forall (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FBinop fop fm v1 v2).
@@ -307,17 +289,7 @@ Section UvalueInd.
         fix IHfields 1. intros [|u fields']. intros. inversion H.
         intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
       }
-    - apply IH_Packed_Struct.
-      { revert fields.
-        fix IHfields 1. intros [|u fields']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
-      }
     - apply IH_Array.
-      { revert elts.
-        fix IHelts 1. intros [|u elts']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
-      }
-    - apply IH_Vector.
       { revert elts.
         fix IHelts 1. intros [|u elts']. intros. inversion H.
         intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
@@ -354,9 +326,7 @@ Fixpoint dvalue_to_uvalue (dv : dvalue) : uvalue :=
   | DVALUE_Poison => UVALUE_Poison
   | DVALUE_None => UVALUE_None
   | DVALUE_Struct fields => UVALUE_Struct (map dvalue_to_uvalue fields)
-  | DVALUE_Packed_struct fields => UVALUE_Packed_struct (map dvalue_to_uvalue fields)
   | DVALUE_Array elts => UVALUE_Array (map dvalue_to_uvalue elts)
-  | DVALUE_Vector elts => UVALUE_Vector (map dvalue_to_uvalue elts)
   end.
 
 (* Partial injection of [uvalue] into [dvalue] *)
@@ -377,17 +347,10 @@ Fixpoint uvalue_to_dvalue (uv : uvalue) : err dvalue :=
     fields' <- map_monad uvalue_to_dvalue fields ;;
     ret (DVALUE_Struct fields')
 
-  | UVALUE_Packed_struct fields            =>
-    fields' <- map_monad uvalue_to_dvalue fields ;;
-    ret (DVALUE_Packed_struct fields')
 
   | UVALUE_Array elts                      =>
     elts' <- map_monad uvalue_to_dvalue elts ;;
     ret (DVALUE_Array elts')
-
-  | UVALUE_Vector elts                     =>
-    elts' <- map_monad uvalue_to_dvalue elts ;;
-    ret (DVALUE_Vector elts')
 
   | _ => failwith "Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen"
 end.
@@ -408,28 +371,6 @@ Proof.
     destruct (map_monad uvalue_to_dvalue (map dvalue_to_uvalue fields)) eqn: EQ.
     + discriminate IHfields.
     + rewrite H. cbn. inversion IHfields. reflexivity.
-      constructor; auto.
-  - cbn. induction fields. cbn. reflexivity.
-    assert (forall u : dvalue,
-               In u fields ->
-               uvalue_to_dvalue (dvalue_to_uvalue u) = inr u).
-    intros. apply H. apply in_cons; auto. specialize (IHfields H0).
-    clear H0. rewrite map_cons. rewrite list_cons_app.
-    rewrite map_monad_app. cbn.
-    destruct (map_monad uvalue_to_dvalue (map dvalue_to_uvalue fields)) eqn: EQ.
-    + discriminate IHfields.
-    + rewrite H. cbn. inversion IHfields. reflexivity.
-      constructor; auto.
-  - cbn. induction elts. cbn. reflexivity.
-    assert (forall u : dvalue,
-               In u elts ->
-               uvalue_to_dvalue (dvalue_to_uvalue u) = inr u).
-    intros. apply H. apply in_cons; auto. specialize (IHelts H0).
-    clear H0. rewrite map_cons. rewrite list_cons_app.
-    rewrite map_monad_app. cbn.
-    destruct (map_monad uvalue_to_dvalue (map dvalue_to_uvalue elts)) eqn: EQ.
-    + discriminate IHelts.
-    + rewrite H. cbn. inversion IHelts. reflexivity.
       constructor; auto.
   - cbn. induction elts. cbn. reflexivity.
     assert (forall u : dvalue,
@@ -459,9 +400,7 @@ Fixpoint is_concrete (uv : uvalue) : bool :=
   | UVALUE_Poison => true
   | UVALUE_None => true
   | UVALUE_Struct fields => forallb is_concrete fields
-  | UVALUE_Packed_struct fields => forallb is_concrete fields
   | UVALUE_Array elts => forallb is_concrete elts
-  | UVALUE_Vector elts => forallb is_concrete elts
   | _ => false
   end.
 
@@ -508,12 +447,8 @@ Section hiding_notation.
     | DVALUE_None => Atom "none"
     | DVALUE_Struct fields
       => [Atom "{" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom ","]) fields) ; Atom "}"]
-    | DVALUE_Packed_struct fields
-      => [Atom "packed{" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom ","]) fields) ; Atom "}"]
     | DVALUE_Array elts
       => [Atom "[" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom ","]) elts) ; Atom "]"]
-    | DVALUE_Vector elts
-      => [Atom "<" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom  ","]) elts) ; Atom ">"]
     end.
 
   #[global] Instance serialize_dvalue : Serialize dvalue := serialize_dvalue'.
@@ -531,12 +466,8 @@ Section hiding_notation.
     | UVALUE_None => Atom (pre ++ "none" ++ post)%string
     | UVALUE_Struct fields
       => [Atom "{" ; to_sexp (List.map (serialize_uvalue' "" ",") fields) ; Atom "}"]
-    | UVALUE_Packed_struct fields
-      => [Atom "packed{" ; to_sexp (List.map (serialize_uvalue' "" ",") fields) ; Atom "}"]
     | UVALUE_Array elts
       => [Atom "[" ; to_sexp (List.map (serialize_uvalue' "" ",") elts) ; Atom "]"]
-    | UVALUE_Vector elts
-      => [Atom "<" ; to_sexp (List.map (serialize_uvalue' "" ",") elts) ; Atom ">"]
     | UVALUE_Undef t => [Atom "undef(" ; to_sexp t ; Atom ")"]
     | UVALUE_IBinop iop v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp iop ; serialize_uvalue' "" ")" v2]
     | UVALUE_ICmp cmp v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp cmp; serialize_uvalue' "" ")" v2]
@@ -580,11 +511,7 @@ Section DecidableEquality.
     | DVALUE_None, DVALUE_None => true
     | DVALUE_Struct f1, DVALUE_Struct f2 =>
       lsteq f1 f2
-    | DVALUE_Packed_struct f1, DVALUE_Packed_struct f2 =>
-      lsteq f1 f2
     | DVALUE_Array f1, DVALUE_Array f2 =>
-      lsteq f1 f2
-    | DVALUE_Vector f1, DVALUE_Vector f2 =>
       lsteq f1 f2
     | _, _ => false
     end.
@@ -603,9 +530,7 @@ Section DecidableEquality.
     | DVALUE_Poison, DVALUE_Poison => _
     | DVALUE_None, DVALUE_None => _
     | DVALUE_Struct f1, DVALUE_Struct f2 => _
-    | DVALUE_Packed_struct f1, DVALUE_Packed_struct f2 => _
     | DVALUE_Array f1, DVALUE_Array f2 => _
-    | DVALUE_Vector f1, DVALUE_Vector f2 => _
     | _, _ => _
     end);  ltac:(dec_dvalue).
     - destruct (A.eq_dec a1 a2).
@@ -627,12 +552,6 @@ Section DecidableEquality.
       * left; subst; reflexivity.
       * right; intros H; inversion H. contradiction.
     - destruct (Float32.eq_dec x1 x2).
-      * left; subst; reflexivity.
-      * right; intros H; inversion H. contradiction.
-    - destruct (lsteq_dec f1 f2).
-      * left; subst; reflexivity.
-      * right; intros H; inversion H. contradiction.
-    - destruct (lsteq_dec f1 f2).
       * left; subst; reflexivity.
       * right; intros H; inversion H. contradiction.
     - destruct (lsteq_dec f1 f2).
@@ -664,9 +583,7 @@ Section DecidableEquality.
               | DTYPE_X86_mmx, DTYPE_X86_mmx => _
               | DTYPE_Array n t, DTYPE_Array m t' => _
               | DTYPE_Struct l, DTYPE_Struct l' => _
-              | DTYPE_Packed_struct l, DTYPE_Packed_struct l' => _
               | DTYPE_Opaque, DTYPE_Opaque => _
-              | DTYPE_Vector n t, DTYPE_Vector m t' => _
               | _, _ => _
               end); try (ltac:(dec_dvalue); fail).
     - destruct (N.eq_dec n m).
@@ -680,14 +597,6 @@ Section DecidableEquality.
     - destruct (lsteq_dec l l').
       * left; subst; reflexivity.
       * right; intros H; inversion H. contradiction.
-    - destruct (lsteq_dec l l').
-      * left; subst; reflexivity.
-      * right; intros H; inversion H. contradiction.
-    - destruct (N.eq_dec n m).
-      * destruct (f t t').
-      + left; subst; reflexivity.
-      + right; intros H; inversion H. contradiction.
-        * right; intros H; inversion H. contradiction.
   Qed.
   Arguments dtyp_eq_dec: clear implicits.
 
@@ -747,9 +656,7 @@ Section DecidableEquality.
               | UVALUE_Poison, UVALUE_Poison => _
               | UVALUE_None, UVALUE_None => _
               | UVALUE_Struct f1, UVALUE_Struct f2 => _
-              | UVALUE_Packed_struct f1, UVALUE_Packed_struct f2 => _
               | UVALUE_Array f1, UVALUE_Array f2 => _
-              | UVALUE_Vector f1, UVALUE_Vector f2 => _
               | UVALUE_IBinop op uv1 uv2, UVALUE_IBinop op' uv1' uv2' => _
               | UVALUE_ICmp op uv1 uv2, UVALUE_ICmp op' uv1' uv2' => _
               | UVALUE_FBinop op fm uv1 uv2, UVALUE_FBinop op' fm' uv1' uv2' => _
@@ -772,8 +679,6 @@ Section DecidableEquality.
     - destruct (Float.eq_dec x1 x2)...
     - destruct (Float32.eq_dec x1 x2)...
     - destruct (dtyp_eq_dec t1 t2)...
-    - destruct (lsteq_dec f1 f2)...
-    - destruct (lsteq_dec f1 f2)...
     - destruct (lsteq_dec f1 f2)...
     - destruct (lsteq_dec f1 f2)...
     - destruct (ibinop_eq_dec op op')...
@@ -1308,9 +1213,6 @@ Class VInt I : Type :=
 
   Definition eval_iop iop v1 v2 : undef_or_err dvalue :=
     match v1, v2 with
-    | (DVALUE_Vector elts1), (DVALUE_Vector elts2) =>
-      val <- vec_loop (eval_iop_integer_h iop) (List.combine elts1 elts2) ;;
-      ret (DVALUE_Vector val)
     | _, _ => eval_iop_integer_h iop v1 v2
     end.
   Arguments eval_iop _ _ _ : simpl nomatch.
@@ -1353,13 +1255,6 @@ Class VInt I : Type :=
     (*   else *)
     (*     failwith ("Negative array length for generating default value" ++ *)
     (*     "of DTYPE_Array or DTYPE_Vector") *)
-    | DTYPE_Vector sz (DTYPE_Float) =>
-        ret (DVALUE_Vector
-               (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))
-    | DTYPE_Vector sz (DTYPE_Double) =>
-        ret (DVALUE_Vector
-               (repeat (DVALUE_Double (Float32.to_double Float32.zero))
-                       (N.to_nat sz)))
     (* | DTYPE_Vector sz (DTYPE_X86_fp80) => *)
     (*   if (0 <=? sz) then *)
     (*     (ret (DVALUE_Vector *)
@@ -1374,20 +1269,9 @@ Class VInt I : Type :=
     (*   else *)
     (*     failwith ("Negative array length for generating default value" ++ *)
     (*     "of DTYPE_Array or DTYPE_Vector") *)
-    | DTYPE_Vector sz (DTYPE_I n) =>
-        v <- default_dvalue_of_dtyp_i n ;;
-        ret (DVALUE_Vector (repeat v (N.to_nat sz)))
-
-    | DTYPE_Vector sz DTYPE_Pointer =>
-        ret (DVALUE_Vector (repeat (DVALUE_Addr A.null) (N.to_nat sz)))
-
-    | DTYPE_Vector _ _ => failwith ("Non-valid or unsupported vector type when generating default vector")
     | DTYPE_Struct fields =>
         v <- @map_monad err _ dtyp dvalue default_dvalue_of_dtyp fields;;
         ret (DVALUE_Struct v)
-    | DTYPE_Packed_struct fields =>
-        v <- @map_monad err _ dtyp dvalue default_dvalue_of_dtyp fields;;
-        ret (DVALUE_Packed_struct v)
     end.
 
   Definition eval_int_icmp {Int} `{VInt Int} icmp (x y : Int) : dvalue :=
@@ -1531,7 +1415,7 @@ Class VInt I : Type :=
 
   (* Same deal as above with the helper *)
   (* The pattern matching generates hundreds of subgoals, hence the factorization of the typeclass inference *)
-  Definition eval_select_h (cnd : dvalue) (v1 v2 : uvalue) : undef_or_err uvalue :=
+  Definition eval_select (cnd : dvalue) (v1 v2 : uvalue) : undef_or_err uvalue :=
     let failwith_local := (@failwith _ undef_or_err (Monad_eitherT string Monad_err) (Exception_eitherT string Monad_err))
     in
     let ret_local := (@ret undef_or_err (Monad_eitherT string Monad_err) uvalue)
@@ -1548,23 +1432,6 @@ Class VInt I : Type :=
       end
     end.
 
-  Definition eval_select cnd v1 v2 : undef_or_err uvalue :=
-    match cnd, v1, v2 with
-    | (DVALUE_Vector es), (UVALUE_Vector es1), (UVALUE_Vector es2) =>
-      (* vec needs to loop over es, es1, and es2. Is there a way to
-         generalize vec_loop to cover this? (make v1,v2 generic?) *)
-      let fix loop elts :=
-          match elts with
-          | [] => ret []
-          | (cnd,(v1,v2)) :: tl =>
-              val <- eval_select_h cnd v1 v2 ;;
-              vec <- loop tl ;;
-              ret (val :: vec)
-          end in
-      val <- loop (List.combine es (List.combine es1 es2)) ;;
-      ret (UVALUE_Vector val)
-    | _, _, _ => eval_select_h cnd v1 v2
-    end.
   Arguments eval_select _ _ _ : simpl nomatch.
 
   (* Helper function for indexing into a structured datatype
@@ -1633,12 +1500,6 @@ Class VInt I : Type :=
         dvalue_has_dtyp (DVALUE_Struct fields) (DTYPE_Struct dts) ->
         dvalue_has_dtyp (DVALUE_Struct (f :: fields)) (DTYPE_Struct (dt :: dts))
 
-  | DVALUE_Packed_struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Packed_struct []) (DTYPE_Packed_struct [])
-  | DVALUE_Packed_struct_Cons_typ :
-      forall f dt fields dts,
-        dvalue_has_dtyp f dt ->
-        dvalue_has_dtyp (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
-        dvalue_has_dtyp (DVALUE_Packed_struct (f :: fields)) (DTYPE_Packed_struct (dt :: dts))
 
   (* Do we have to exclude mmx? "There are no arrays, vectors or constants of this type" *)
   | DVALUE_Array_typ :
@@ -1646,13 +1507,6 @@ Class VInt I : Type :=
         Forall (fun x => dvalue_has_dtyp x dt) xs ->
         length xs = sz ->
         dvalue_has_dtyp (DVALUE_Array xs) (DTYPE_Array (N.of_nat sz) dt)
-
-  | DVALUE_Vector_typ :
-      forall xs sz dt,
-        Forall (fun x => dvalue_has_dtyp x dt) xs ->
-        length xs = sz ->
-        vector_dtyp dt ->
-        dvalue_has_dtyp (DVALUE_Vector xs) (DTYPE_Vector (N.of_nat sz) dt)
   .
   Set Elimination Schemes.
 
@@ -1675,26 +1529,12 @@ Class VInt I : Type :=
         uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct dts) ->
         uvalue_has_dtyp (UVALUE_Struct (f :: fields)) (DTYPE_Struct (dt :: dts))
 
-  | UVALUE_Packed_struct_Nil_typ  : uvalue_has_dtyp (UVALUE_Packed_struct []) (DTYPE_Packed_struct [])
-  | UVALUE_Packed_struct_Cons_typ :
-      forall f dt fields dts,
-        uvalue_has_dtyp f dt ->
-        uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
-        uvalue_has_dtyp (UVALUE_Packed_struct (f :: fields)) (DTYPE_Packed_struct (dt :: dts))
-
   (* Do we have to exclude mmx? "There are no arrays, vectors or constants of this type" *)
   | UVALUE_Array_typ :
       forall xs sz dt,
         Forall (fun x => uvalue_has_dtyp x dt) xs ->
         length xs = sz ->
         uvalue_has_dtyp (UVALUE_Array xs) (DTYPE_Array (N.of_nat sz) dt)
-
-  | UVALUE_Vector_typ :
-      forall xs sz dt,
-        Forall (fun x => uvalue_has_dtyp x dt) xs ->
-        length xs = sz ->
-        vector_dtyp dt ->
-        uvalue_has_dtyp (UVALUE_Vector xs) (DTYPE_Vector (N.of_nat sz) dt)
 
   | UVALUE_IBinop_typ :
       forall x y sz op,
@@ -1713,17 +1553,6 @@ Class VInt I : Type :=
       uvalue_has_dtyp x DTYPE_Pointer ->
       uvalue_has_dtyp y DTYPE_Pointer ->
       uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_I 1)
-  | UVALUE_ICmp_vector_typ :
-      forall x y vsz isz op,
-      IX_supported isz ->
-      uvalue_has_dtyp x (DTYPE_Vector vsz (DTYPE_I isz)) ->
-      uvalue_has_dtyp y (DTYPE_Vector vsz (DTYPE_I isz)) ->
-      uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1))
-  | UVALUE_ICmp_vector_pointer_typ :
-      forall x y vsz op,
-      uvalue_has_dtyp x (DTYPE_Vector vsz DTYPE_Pointer) ->
-      uvalue_has_dtyp y (DTYPE_Vector vsz DTYPE_Pointer) ->
-      uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1))
   | UVALUE_FBinop_Float_typ :
       forall x y op fms,
       uvalue_has_dtyp x DTYPE_Float ->
@@ -1749,53 +1578,19 @@ Class VInt I : Type :=
         from_sz > to_sz ->
         uvalue_has_dtyp value (DTYPE_I from_sz) ->
         uvalue_has_dtyp (UVALUE_Conversion Trunc (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz)
-  | UVALUE_Conversion_trunc_vec_typ :
-      forall from_sz to_sz n value,
-        from_sz > to_sz ->
-        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        uvalue_has_dtyp (UVALUE_Conversion Trunc (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
   | UVALUE_Conversion_zext_int_typ :
       forall from_sz to_sz value,
         from_sz < to_sz ->
         uvalue_has_dtyp value (DTYPE_I from_sz) ->
         uvalue_has_dtyp (UVALUE_Conversion Zext (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz)
-  | UVALUE_Conversion_zext_vec_typ :
-      forall from_sz to_sz n value,
-        from_sz < to_sz ->
-        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        uvalue_has_dtyp (UVALUE_Conversion Zext (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
   | UVALUE_Conversion_sext_int_typ :
       forall from_sz to_sz value,
         from_sz < to_sz ->
         uvalue_has_dtyp value (DTYPE_I from_sz) ->
         uvalue_has_dtyp (UVALUE_Conversion Sext (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz)
-  | UVALUE_Conversion_sext_vec_typ :
-      forall from_sz to_sz n value,
-        from_sz < to_sz ->
-        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        uvalue_has_dtyp (UVALUE_Conversion Sext (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
   | UVALUE_GetElementPtr_typ :
       forall dt uv idxs,
         uvalue_has_dtyp (UVALUE_GetElementPtr dt uv idxs) DTYPE_Pointer
-  | UVALUE_ExtractElement_typ :
-      forall n vect idx t sz,
-        IX_supported sz ->
-        uvalue_has_dtyp idx (DTYPE_I sz) ->
-        uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
-        uvalue_has_dtyp (UVALUE_ExtractElement (DTYPE_Vector (N.of_nat n) t) vect idx) t
-  | UVALUE_InsertElement_typ :
-      forall n vect val idx t sz,
-        IX_supported sz ->
-        uvalue_has_dtyp idx (DTYPE_I sz) ->
-        uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
-        uvalue_has_dtyp val t ->
-        uvalue_has_dtyp (UVALUE_InsertElement (DTYPE_Vector (N.of_nat n) t) vect val idx) (DTYPE_Vector (N.of_nat n) t)
-  | UVALUE_ShuffleVector_typ :
-      forall n m v1 v2 idxs t,
-        uvalue_has_dtyp idxs (DTYPE_Vector (N.of_nat m) (DTYPE_I 32)) ->
-        uvalue_has_dtyp v1 (DTYPE_Vector (N.of_nat n) t) ->
-        uvalue_has_dtyp v2 (DTYPE_Vector (N.of_nat n) t) ->
-        uvalue_has_dtyp (UVALUE_ShuffleVector v1 v2 idxs) (DTYPE_Vector (N.of_nat m) t)
   | UVALUE_ExtractValue_Struct_sing_typ :
       forall fields fts dt (idx : LLVMAst.int),
         uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
@@ -1811,21 +1606,6 @@ Class VInt I : Type :=
         uvalue_has_dtyp fld ft ->
         uvalue_has_dtyp (UVALUE_ExtractValue ft fld idxs) dt ->
         uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Struct fts) (UVALUE_Struct fields) (idx :: idxs)) dt
-  | UVALUE_ExtractValue_Packed_struct_sing_typ :
-      forall fields fts dt idx,
-        uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct fts) ->
-        (0 <= idx)%Z ->
-        Nth fts (Z.to_nat idx) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Packed_struct fts) (UVALUE_Packed_struct fields) [idx]) dt
-  | UVALUE_ExtractValue_Packed_struct_cons_typ :
-      forall fields fts fld ft dt idx idxs,
-        uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct fts) ->
-        (0 <= idx)%Z ->
-        Nth fts (Z.to_nat idx) ft ->
-        Nth fields (Z.to_nat idx) fld ->
-        uvalue_has_dtyp fld ft ->
-        uvalue_has_dtyp (UVALUE_ExtractValue ft fld idxs) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Packed_struct fts) (UVALUE_Packed_struct fields) (idx :: idxs)) dt
   | UVALUE_ExtractValue_Array_sing_typ :
       forall elements dt idx n,
         uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n dt) ->
@@ -1850,13 +1630,7 @@ Class VInt I : Type :=
         uvalue_has_dtyp cond (DTYPE_I 1) ->
         uvalue_has_dtyp x t ->
         uvalue_has_dtyp y t ->
-        uvalue_has_dtyp (UVALUE_Select cond x y) t
-  | UVALUE_Select_vect :
-      forall cond x y t sz,
-        uvalue_has_dtyp cond (DTYPE_Vector (N.of_nat sz) (DTYPE_I 1)) ->
-        uvalue_has_dtyp x (DTYPE_Vector (N.of_nat sz) t) ->
-        uvalue_has_dtyp y (DTYPE_Vector (N.of_nat sz) t) ->
-        uvalue_has_dtyp (UVALUE_Select cond x y) (DTYPE_Vector (N.of_nat sz) t).
+        uvalue_has_dtyp (UVALUE_Select cond x y) t.
 
   Section dvalue_has_dtyp_ind.
     Variable P : dvalue -> dtyp -> Prop.
@@ -1876,23 +1650,10 @@ Class VInt I : Type :=
         dvalue_has_dtyp (DVALUE_Struct fields) (DTYPE_Struct dts) ->
         P (DVALUE_Struct fields) (DTYPE_Struct dts) ->
         P (DVALUE_Struct (f :: fields)) (DTYPE_Struct (dt :: dts)).
-    Hypothesis IH_Packed_Struct_nil     : P (DVALUE_Packed_struct []) (DTYPE_Packed_struct []).
-    Hypothesis IH_Packed_Struct_cons    : forall (f : dvalue) (dt : dtyp) (fields : list dvalue) (dts : list dtyp),
-        dvalue_has_dtyp f dt ->
-        P f dt ->
-        dvalue_has_dtyp (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
-        P (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
-        P (DVALUE_Packed_struct (f :: fields)) (DTYPE_Packed_struct (dt :: dts)).
     Hypothesis IH_Array : forall (xs : list dvalue) (sz : nat) (dt : dtyp)
                             (IH : forall x, In x xs -> P x dt)
                             (IHdtyp : forall x, In x xs -> dvalue_has_dtyp x dt),
         Datatypes.length xs = sz -> P (DVALUE_Array xs) (DTYPE_Array (N.of_nat sz) dt).
-
-    Hypothesis IH_Vector : forall (xs : list dvalue) (sz : nat) (dt : dtyp)
-                             (IH : forall x, In x xs -> P x dt)
-                             (IHdtyp : forall x, In x xs -> dvalue_has_dtyp x dt),
-        Datatypes.length xs = sz ->
-        vector_dtyp dt -> P (DVALUE_Vector xs) (DTYPE_Vector (N.of_nat sz) dt).
 
     Lemma dvalue_has_dtyp_ind : forall (dv:dvalue) (dt:dtyp) (TYP: dvalue_has_dtyp dv dt), P dv dt.
       fix IH 3.
@@ -1909,29 +1670,9 @@ Class VInt I : Type :=
       - apply IH_None.
       - apply IH_Struct_nil.
       - apply (IH_Struct_cons TYP1 (IH f dt TYP1) TYP2 (IH (DVALUE_Struct fields) (DTYPE_Struct dts) TYP2)).
-      - apply IH_Packed_Struct_nil.
-      - apply (IH_Packed_Struct_cons TYP1 (IH f dt TYP1) TYP2 (IH (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) TYP2)).
       - rename H into Hforall.
         rename H0 into Hlen.
         refine (IH_Array _ _ Hlen).
-
-        { generalize dependent sz.
-          generalize dependent xs.
-          fix IHxs 2.
-          intros xs Hforall sz Hlen x H.
-          destruct xs.
-          + inversion H.
-          + inversion H; subst.
-            * inversion Hforall; subst; auto.
-            * eapply IHxs. inversion Hforall; subst.
-              all: try eassumption. reflexivity.
-        }
-
-        apply Forall_forall; auto.
-      - rename H into Hforall.
-        rename H0 into Hlen.
-        rename H1 into Hvect.
-        refine (IH_Vector _ _ Hlen Hvect).
 
         { generalize dependent sz.
           generalize dependent xs.
@@ -2003,19 +1744,6 @@ Class VInt I : Type :=
                     | _ => failwith "illegal Struct Cons"
                     end)
 
-
-  | Concretize_Packed_struct_Nil     : concretize_u (UVALUE_Packed_struct []) (ret (DVALUE_Packed_struct []))
-  | Concretize_Packed_struct_Cons    : forall u e us es,
-      concretize_u u e ->
-      concretize_u (UVALUE_Packed_struct us) es ->
-      concretize_u (UVALUE_Packed_struct (u :: us))
-                   (d <- e ;;
-                    vs <- es ;;
-                    match vs with
-                    | (DVALUE_Packed_struct ds) => ret (DVALUE_Packed_struct (d :: ds))
-                    | _ => failwith "illegal Packed_struct cons"
-                    end)
-
   | Concretize_Array_Nil :
       concretize_u (UVALUE_Array []) (ret (DVALUE_Array []))
 
@@ -2028,20 +1756,6 @@ Class VInt I : Type :=
                     match vs with
                     | (DVALUE_Array ds) => ret (DVALUE_Array (d :: ds))
                     | _ => failwith "illegal Array cons"
-                    end)
-
-  | Concretize_Vector_Nil :
-      concretize_u (UVALUE_Vector []) (ret (DVALUE_Vector []))
-
-  | Concretize_Vector_Cons : forall u e us es,
-      concretize_u u e ->
-      concretize_u (UVALUE_Vector us) es ->
-      concretize_u (UVALUE_Vector (u :: us))
-                   (d <- e ;;
-                    vs <- es ;;
-                    match vs with
-                    | (DVALUE_Vector ds) => ret (DVALUE_Vector (d :: ds))
-                    | _ => failwith "illegal Vector cons"
                     end)
   .
 

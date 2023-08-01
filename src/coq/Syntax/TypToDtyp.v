@@ -33,11 +33,8 @@ Open Scope list_scope.
 Inductive typ_order : typ -> typ -> Prop :=
 | typ_order_Pointer : forall (t : typ), typ_order t (TYPE_Pointer t)
 | typ_order_Array : forall (sz : N) (t : typ), typ_order t (TYPE_Array sz t)
-| typ_order_Vector : forall (sz : N) (t : typ), typ_order t (TYPE_Vector sz t)
 | typ_order_Struct : forall (fields : list typ),
     forall f, In f fields -> typ_order f (TYPE_Struct fields)
-| typ_order_Packed_struct : forall (fields : list typ),
-    forall f, In f fields -> typ_order f (TYPE_Packed_struct fields)
 | typ_order_Function_args : forall (ret : typ) (args : list typ),
     forall a, In a args -> typ_order a (TYPE_Function ret args)
 | typ_order_Function_ret : forall (ret : typ) (args : list typ),
@@ -114,14 +111,6 @@ Program Fixpoint typ_to_dtyp (env : list (ident * typ)) (t : typ) {measure (List
     let nfields := map_In fields (fun t _ => typ_to_dtyp env t) in
     DTYPE_Struct nfields
 
-  | TYPE_Packed_struct fields =>
-    let nfields := map_In fields (fun t _ => typ_to_dtyp env t) in
-    DTYPE_Packed_struct nfields
-
-  | TYPE_Vector sz t =>
-    let nt := typ_to_dtyp env t in
-    DTYPE_Vector sz nt
-
   | TYPE_Identified id =>
     let opt := find (fun a => Ident.eq_dec id (fst a)) env in
     match opt with
@@ -164,13 +153,6 @@ Lemma typ_to_dtyp_equation  : forall env t,
       let nfields := map_In fields (fun t _ => typ_to_dtyp env t) in
       DTYPE_Struct nfields
 
-    | TYPE_Packed_struct fields =>
-      let nfields := map_In fields (fun t _ => typ_to_dtyp env t) in
-      DTYPE_Packed_struct nfields
-
-    | TYPE_Vector sz t =>
-      let nt := typ_to_dtyp env t in
-      DTYPE_Vector sz nt
 
     | TYPE_Identified id =>
       let opt := find (fun a => Ident.eq_dec id (fst a)) env in

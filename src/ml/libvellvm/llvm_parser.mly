@@ -753,9 +753,7 @@ typ:
   | LSQUARE n=INTEGER KW_X t=typ RSQUARE              { TYPE_Array (n_of_z n, t)  }
   | t=typ LPAREN ts=separated_list(csep, typ) RPAREN  { TYPE_Function (t, ts) }
   | LCURLY ts=separated_list(csep, typ) RCURLY        { TYPE_Struct ts        }
-  | LTLCURLY ts=separated_list(csep, typ) RCURLYGT    { TYPE_Packed_struct ts }
   | KW_OPAQUE                                         { TYPE_Opaque           }
-  | LT n=INTEGER KW_X t=typ GT                        { TYPE_Vector (n_of_z n, t) }
   | l=lident                                          { TYPE_Identified (ID_Local l)  }
 
 param_attr:
@@ -947,41 +945,11 @@ instr_op:
   | KW_ICMP op=icmp t=typ o1=exp COMMA o2=exp
     { OP_ICmp (op, t, o1 t, o2 t) }
 
-  | op=fbinop f=fast_math* t=typ o1=exp COMMA o2=exp
-    { OP_FBinop (op, f, t, o1 t, o2 t) }
-
-  | KW_FCMP op=fcmp t=typ o1=exp COMMA o2=exp
-    { OP_FCmp (op, t, o1 t, o2 t) }
-
   | c=conversion t1=typ v=exp KW_TO t2=typ
     { OP_Conversion (c, t1, v t1, t2) }
 
   | KW_GETELEMENTPTR KW_INBOUNDS? t=typ COMMA ptr=texp idx=preceded(COMMA, texp)*
     { OP_GetElementPtr (t, ptr, idx) }
-
-  | KW_SELECT if_=texp COMMA then_=texp COMMA else_= texp
-    { OP_Select (if_, then_, else_) }
-
-  | KW_FREEZE v=texp
-    { OP_Freeze v }
-
-  | KW_EXTRACTELEMENT vec=texp COMMA idx=texp
-    { OP_ExtractElement (vec, idx) }
-
-  | KW_INSERTELEMENT vec=texp
-    COMMA new_el=texp COMMA idx=texp
-    { OP_InsertElement (vec, new_el, idx)  }
-
-  | KW_EXTRACTVALUE tv=texp COMMA
-    idx=separated_nonempty_list (csep, INTEGER)
-    { OP_ExtractValue (tv, idx) }
-
-  | KW_INSERTVALUE agg=texp COMMA new_val=texp COMMA
-    idx=separated_nonempty_list (csep, INTEGER)
-    { OP_InsertValue (agg, new_val, idx) }
-
-  | KW_SHUFFLEVECTOR v1=texp COMMA v2=texp COMMA mask=texp
-    { OP_ShuffleVector (v1, v2, mask)  }
 
 expr_op:
   | op=ibinop LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
@@ -990,38 +958,11 @@ expr_op:
   | KW_ICMP op=icmp LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
     { OP_ICmp (op, t, o1 t, o2 t) }
 
-  | op=fbinop f=fast_math* LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
-    { OP_FBinop (op, f, t, o1 t, o2 t) }
-
-  | KW_FCMP op=fcmp LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
-    { OP_FCmp (op, t, o1 t, o2 t) }
-
   | c=conversion LPAREN t1=typ v=exp KW_TO t2=typ RPAREN
     { OP_Conversion (c, t1, v t1, t2) }
 
   | KW_GETELEMENTPTR KW_INBOUNDS? LPAREN t=typ COMMA ptr=texp idx=preceded(COMMA, texp)* RPAREN
     { OP_GetElementPtr (t, ptr, idx) }
-
-  | KW_SELECT LPAREN if_=texp COMMA then_=texp COMMA else_= texp RPAREN
-    { OP_Select (if_, then_, else_) }
-
-  | KW_FREEZE LPAREN v=texp RPAREN
-    { OP_Freeze v }
-
-  | KW_EXTRACTELEMENT LPAREN vec=texp COMMA idx=texp RPAREN
-    { OP_ExtractElement (vec, idx) }
-
-  | KW_INSERTELEMENT LPAREN vec=texp COMMA new_el=texp COMMA idx=texp RPAREN
-    { OP_InsertElement (vec, new_el, idx)  }
-
-  | KW_EXTRACTVALUE LPAREN tv=texp COMMA idx=separated_nonempty_list (csep, INTEGER) RPAREN
-    { OP_ExtractValue (tv, idx) }
-
-  | KW_INSERTVALUE LPAREN agg=texp COMMA new_val=texp COMMA idx=separated_nonempty_list (csep, INTEGER) RPAREN
-    { OP_InsertValue (agg, new_val, idx) }
-
-  | KW_SHUFFLEVECTOR LPAREN v1=texp COMMA v2=texp COMMA mask=texp RPAREN
-    { OP_ShuffleVector (v1, v2, mask)  }
 
 
 expr_val:
@@ -1034,9 +975,7 @@ expr_val:
   | KW_UNDEF                                          { fun _ -> EXP_Undef            }
   | KW_ZEROINITIALIZER                                { fun _ -> EXP_Zero_initializer }
   | LCURLY l=separated_list(csep, tconst) RCURLY      { fun _ -> EXP_Struct l         }
-  | LTLCURLY l=separated_list(csep, tconst) RCURLYGT  { fun _ -> EXP_Packed_struct l  }
   | LSQUARE l=separated_list(csep, tconst) RSQUARE    { fun _ -> EXP_Array l          }
-  | LT l=separated_list(csep, tconst) GT              { fun _ -> EXP_Vector l         }
   | i=ident                                           { fun _ -> EXP_Ident i          }
   | KW_C cstr=STRING                                  { fun _ -> EXP_Cstring (
 								     cstring_bytes_to_LLVM_i8_array

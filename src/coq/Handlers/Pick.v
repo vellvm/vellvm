@@ -102,60 +102,9 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
         else
           failwith ("Negative array length for generating default value" ++
           "of DTYPE_Array or DTYPE_Vector")
-
-      (* Matching valid Vector types... *)
-      (* Currently commented out unsupported ones *)
-      (* | DTYPE_Vector sz (DTYPE_Half) => *)
-      (*   if (0 <=? sz) then *)
-      (*     (ret (DVALUE_Vector *)
-      (*             (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))) *)
-      (*   else *)
-      (*     failwith ("Negative array length for generating default value" ++ *)
-      (*     "of DTYPE_Array or DTYPE_Vector") *)
-      | DTYPE_Vector sz (DTYPE_Float) =>
-        if (0 <=? sz) then
-          (ret (DVALUE_Vector
-                  (repeat (DVALUE_Float Float32.zero) (N.to_nat sz))))
-        else
-          failwith ("Negative array length for generating default value" ++
-          "of DTYPE_Array or DTYPE_Vector")
-      | DTYPE_Vector sz (DTYPE_Double) =>
-        if (0 <=? sz) then
-          (ret (DVALUE_Vector
-                  (repeat (DVALUE_Double (Float32.to_double Float32.zero))
-                          (N.to_nat sz))))
-        else
-          failwith ("Negative array length for generating default value" ++
-          "of DTYPE_Array or DTYPE_Vector")
-      (* | DTYPE_Vector sz (DTYPE_X86_fp80) => *)
-      (*   if (0 <=? sz) then *)
-      (*     (ret (DVALUE_Vector *)
-      (*             (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))) *)
-      (*   else *)
-      (*     failwith ("Negative array length for generating default value" ++ *)
-      (*     "of DTYPE_Array or DTYPE_Vector") *)
-      (* | DTYPE_Vector sz (DTYPE_Fp128) => *)
-      (*   if (0 <=? sz) then *)
-      (*     (ret (DVALUE_Vector *)
-      (*             (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))) *)
-      (*   else *)
-      (*     failwith ("Negative array length for generating default value" ++ *)
-      (*     "of DTYPE_Array or DTYPE_Vector") *)
-      | DTYPE_Vector sz (DTYPE_I n) =>
-        if (0 <=? sz) then
-          v <- default_dvalue_of_dtyp_i n ;;
-          (ret (DVALUE_Vector (repeat v (N.to_nat sz))))
-        else
-          failwith ("Negative array length for generating default value" ++
-          "of DTYPE_Array or DTYPE_Vector")
-      | DTYPE_Vector _ _ => failwith ("Non-valid vector type when" ++
-          "generating default vector")
       | DTYPE_Struct fields =>
         v <- @map_monad err _ dtyp dvalue default_dvalue_of_dtyp fields;;
         ret (DVALUE_Struct v)
-      | DTYPE_Packed_struct fields =>
-        v <- @map_monad err _ dtyp dvalue default_dvalue_of_dtyp fields;;
-        ret (DVALUE_Packed_struct v)
       end.
 
     Import MonadNotation.
@@ -173,12 +122,8 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       | UVALUE_None                            => ret DVALUE_None
       | UVALUE_Struct fields                   => 'dfields <- map_monad concretize_uvalue fields ;;
                                                   ret (DVALUE_Struct dfields)
-      | UVALUE_Packed_struct fields            => 'dfields <- map_monad concretize_uvalue fields ;;
-                                                   ret (DVALUE_Packed_struct dfields)
       | UVALUE_Array elts                      => 'delts <- map_monad concretize_uvalue elts ;;
                                                    ret (DVALUE_Array delts)
-      | UVALUE_Vector elts                     => 'delts <- map_monad concretize_uvalue elts ;;
-                                                   ret (DVALUE_Vector delts)
       | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalue v1 ;;
                                                  dv2 <- concretize_uvalue v2 ;;
                                                  eval_iop iop dv1 dv2
@@ -258,58 +203,6 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
           inv H0. constructor. apply H. apply in_eq.
           symmetry. auto.
           apply IHfields. cbn. rewrite FIELDS. reflexivity.
-      - revert H. induction fields.
-        + intros. inv H0. constructor.
-        + intros.
-          assert (forall u : dtyp,
-              In u fields ->
-              forall v : dvalue,
-                inr v = default_dvalue_of_dtyp u -> dvalue_has_dtyp v u).
-          { intros. apply H. apply in_cons. auto. auto. }
-          specialize (IHfields H1). clear H1.
-          Opaque map_monad.
-          (* Reduce H0 *)
-          cbn in H0.
-          rewrite list_cons_app in H0.
-          rewrite map_monad_app in H0. cbn in H0.
-          Transparent map_monad.
-          unfold map_monad at 1 in H0.
-          Opaque map_monad. cbn in H0.
-          destruct (default_dvalue_of_dtyp a) eqn: A_DEFAULT.
-          inv H0.
-          destruct (map_monad default_dvalue_of_dtyp fields) eqn: FIELDS.
-          inv H0.
-          inv H0. constructor. apply H. apply in_eq.
-          symmetry. auto.
-          apply IHfields. cbn. rewrite FIELDS. reflexivity.
-      - intros. subst. inversion H. clear H.
-        revert H1. revert v. revert IHt. revert t.
-        induction sz.
-        + intros. cbn in H1.
-          pose proof DVALUE_Vector_typ.
-          specialize (H nil (N.to_nat 0)).
-          rewrite Nnat.N2Nat.id in H.
-          destruct t; inv H1;
-              try
-                (apply H;
-                 [constructor | constructor |
-                  unfold vector_dtyp; intuition]).
-          destruct (default_dvalue_of_dtyp_i sz) eqn: HI; inv H2.
-          apply H. constructor. auto. unfold vector_dtyp. left.
-          exists sz. reflexivity.
-        + intros. cbn in H1.
-          destruct t; inv H1;
-            try (
-                rewrite <- positive_nat_N;
-                   constructor; [apply forall_repeat_true ; constructor |
-                          apply repeat_length |
-                          unfold vector_dtyp ; intuition ]).
-          destruct (default_dvalue_of_dtyp_i sz) eqn: SZ; inv H0.
-            pose proof DVALUE_Vector_typ.
-            rewrite <- positive_nat_N. apply H.
-            apply forall_repeat_true. apply IHt. symmetry. auto.
-            apply repeat_length.
-            left. exists sz. reflexivity.
     Qed.
 
    Transparent map_monad.
@@ -335,19 +228,6 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
             -- destruct s; auto.
                destruct (unEitherT (map_monad concretize_uvalue fields)); auto.
                destruct s; auto.
-      - cbn. induction fields.
-        + cbn. constructor. auto.
-        + rewrite list_cons_app. rewrite map_monad_app. cbn.
-          assert (IN: forall u : uvalue, In u fields -> concretize_u u (concretize_uvalue u)).
-          { intros. apply H. apply in_cons; auto. } specialize (IHfields IN).
-          specialize (H a). assert (In a (a :: fields)) by apply in_eq. specialize (H H0).
-          pose proof Concretize_Packed_struct_Cons as CONS.
-          specialize (CONS _ _ _ _ H IHfields). cbn in CONS.
-          * destruct (unEitherT (concretize_uvalue a)).
-            -- auto.
-            -- destruct s; auto.
-               destruct (unEitherT (map_monad concretize_uvalue fields)); auto.
-               destruct s; auto.
       - cbn. induction elts.
         + cbn. constructor. auto.
         + rewrite list_cons_app. rewrite map_monad_app. cbn.
@@ -355,19 +235,6 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
           { intros. apply H. apply in_cons; auto. } specialize (IHelts IN).
           specialize (H a). assert (In a (a :: elts)) by apply in_eq. specialize (H H0).
           pose proof Concretize_Array_Cons as CONS.
-          specialize (CONS _ _ _ _ H IHelts). cbn in CONS.
-          * destruct (unEitherT (concretize_uvalue a)).
-            -- auto.
-            -- destruct s; auto.
-               destruct (unEitherT (map_monad concretize_uvalue elts)); auto.
-               destruct s; auto.
-      - cbn. induction elts.
-        + cbn. constructor. auto.
-        + rewrite list_cons_app. rewrite map_monad_app. cbn.
-          assert (IN: forall u : uvalue, In u elts -> concretize_u u (concretize_uvalue u)).
-          { intros. apply H. apply in_cons; auto. } specialize (IHelts IN).
-          specialize (H a). assert (In a (a :: elts)) by apply in_eq. specialize (H H0).
-          pose proof Concretize_Vector_Cons as CONS.
           specialize (CONS _ _ _ _ H IHelts). cbn in CONS.
           * destruct (unEitherT (concretize_uvalue a)).
             -- auto.
