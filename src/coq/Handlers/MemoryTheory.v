@@ -856,16 +856,19 @@ Section Serialization_Theory.
   Lemma all_not_sundef_deserialized :
     forall bs t,
       all_not_sundef bs ->
+      not (is_poisoned bs) ->
       deserialize_sbytes_defined bs t = deserialize_sbytes bs t.
   Proof.
     intros bs t H.
     unfold deserialize_sbytes.
     rewrite H.
-    auto.
+    intros. destruct (is_poisoned bs); eauto.
+    exfalso. apply H0; eauto.
   Qed.
 
   Lemma deserialize_sbytes_defined_dvalue :
     forall dv t,
+      ~ is_poisoned (serialize_dvalue dv) ->
       deserialize_sbytes_defined (serialize_dvalue dv) t = deserialize_sbytes (serialize_dvalue dv) t.
   Proof.
     intros dv t.
@@ -1249,13 +1252,14 @@ Section Memory_Stack_Theory.
         lia
       end.
 
-    Lemma deserialize_sbytes_dvalue_all_not_sundef :
+    Lemma deserialize_sbytes_dvalue_all_not_sundef_or_poisoned :
       forall dv dt bytes,
         deserialize_sbytes bytes dt = dvalue_to_uvalue dv ->
-        all_not_sundef bytes = true.
+        all_not_sundef bytes = true \/ is_poisoned bytes.
     Proof.
       intros dv dt bytes DES.
       unfold deserialize_sbytes in DES.
+      break_match_hyp; auto.
       break_match_hyp; auto.
 
       destruct dv; inversion DES.
@@ -1266,6 +1270,8 @@ Section Memory_Stack_Theory.
         is_supported (DTYPE_Struct (ft :: fts)) ->
         all_not_sundef f_bytes = true ->
         all_not_sundef fields_bytes = true ->
+        ~ (is_poisoned f_bytes) ->
+        ~ (is_poisoned fields_bytes) ->
         N.to_nat (sizeof_dtyp ft) = Datatypes.length f_bytes ->
         deserialize_sbytes f_bytes ft = f ->
         deserialize_sbytes fields_bytes (DTYPE_Struct fts) = UVALUE_Struct fields ->
@@ -1276,11 +1282,14 @@ Section Memory_Stack_Theory.
       generalize dependent ft.
       generalize dependent fields.
       generalize dependent f.
-      induction fts; intros f fields ft f_bytes fields_bytes SUP UNDEF_BYTES UNDEF_FIELDS SIZE FIELD FIELDS.
+      induction fts; intros f fields ft f_bytes fields_bytes SUP UNDEF_BYTES UNDEF_FIELDS HP HPS SIZE FIELD FIELDS.
 
       - rewrite <- all_not_sundef_deserialized in FIELD; auto.
         rewrite <- all_not_sundef_deserialized in FIELDS; auto.
-        rewrite <- all_not_sundef_deserialized; auto using all_not_sundef_app.
+        rewrite <- all_not_sundef_deserialized; auto using all_not_sundef_app; cycle 1.
+        { intro.
+          setoid_rewrite existsb_app in H.
+          inversion H. rewrite orb_true_iff in H1; destruct H1; eauto. }
 
         cbn in FIELDS; inversion FIELDS; subst; cbn.
 
@@ -1291,7 +1300,9 @@ Section Memory_Stack_Theory.
         congruence.
       - rewrite <- all_not_sundef_deserialized in FIELD; auto.
         rewrite <- all_not_sundef_deserialized in FIELDS; auto.
-        rewrite <- all_not_sundef_deserialized; auto using all_not_sundef_app.
+        rewrite <- all_not_sundef_deserialized; auto using all_not_sundef_app; cycle 1.
+        { intro. setoid_rewrite existsb_app in H.
+          inversion H. rewrite orb_true_iff in H1; destruct H1; eauto. }
 
         cbn in FIELDS; inversion FIELDS; subst; cbn.
 
@@ -1306,6 +1317,7 @@ Section Memory_Stack_Theory.
         congruence.
     Qed.
 
+    (* TODO: Repair WIP..  *)
     Lemma deserialize_array_element :
       forall sz elt elts ft elt_bytes elts_bytes,
         is_supported (DTYPE_Array sz ft) ->

@@ -368,6 +368,12 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | _ => true
       end.
 
+    Definition Poisoned (sb:SByte) : bool :=
+      match sb with
+      | Poison => true
+      | _ => false
+      end.
+
     Definition sbyte_list_to_byte_list (bytes:list SByte) : list byte :=
       List.flat_map Sbyte_to_byte_list bytes.
 
@@ -427,6 +433,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition all_not_sundef (bytes : list SByte) : bool :=
       forallb Sbyte_defined bytes.
 
+    (* A block is poisoned if any byte stores a poisoned byte *)
+    Definition is_poisoned (bytes : list SByte) : bool :=
+      existsb Poisoned bytes.
+
     (** ** Deserialization of a list of sbytes
       Deserialize a list [bytes] of SBytes into a uvalue of type [t],
       assuming that none of the bytes are undef.
@@ -477,10 +487,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
      depends on all the bytes provided, not just the first one!
      *)
     Definition deserialize_sbytes (bytes : list SByte) (t : dtyp) : uvalue :=
-      (* TODO *)
-      (* if any_poisoned_bytes *)
-      (* then return poison *)
-      if all_not_sundef bytes
+      if is_poisoned bytes then UVALUE_Poison t
+      else if all_not_sundef bytes
       then deserialize_sbytes_defined bytes t
       else UVALUE_Undef t.
 
