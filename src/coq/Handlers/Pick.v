@@ -118,7 +118,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       | UVALUE_Double x                        => ret (DVALUE_Double x)
       | UVALUE_Float x                         => ret (DVALUE_Float x)
       | UVALUE_Undef t                         => lift (default_dvalue_of_dtyp t)
-      | UVALUE_Poison                          => ret (DVALUE_Poison)
+      | UVALUE_Poison t                        => ret (DVALUE_Poison t)
       | UVALUE_None                            => ret DVALUE_None
       | UVALUE_Struct fields                   => 'dfields <- map_monad concretize_uvalue fields ;;
                                                   ret (DVALUE_Struct dfields)
@@ -130,12 +130,6 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       | UVALUE_ICmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
                                                   dv2 <- concretize_uvalue v2 ;;
                                                   eval_icmp cmp dv1 dv2
-      | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalue v1 ;;
-                                                  dv2 <- concretize_uvalue v2 ;;
-                                                  eval_fop fop dv1 dv2
-      | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
-                                                  dv2 <- concretize_uvalue v2 ;;
-                                                  eval_fcmp cmp dv1 dv2
       | _ => (lift (failwith "Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen"))
       
       end.
@@ -241,10 +235,6 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
             -- destruct s; auto.
                destruct (unEitherT (map_monad concretize_uvalue elts)); auto.
                destruct s; auto.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
       - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
       - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
       - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.

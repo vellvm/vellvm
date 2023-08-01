@@ -674,6 +674,8 @@ Section Serialization_Theory.
     intros dv dt TYP.
     induction TYP; try solve [cbn; auto].
     - cbn. rewrite DynamicValues.unsupported_cases_match; auto.
+    - cbn. rewrite repeat_length.
+      rewrite Nnat.N2Nat.id; reflexivity.
     - cbn.
       rewrite app_length.
       rewrite Nnat.Nat2N.inj_add.
@@ -712,6 +714,9 @@ Section Serialization_Theory.
     intros dv dt TYP.
     induction TYP; auto.
     - cbn. rewrite DynamicValues.unsupported_cases_match. reflexivity. auto.
+    - cbn.
+      setoid_rewrite <- (repeat_length Poison (N.to_nat (sizeof_dtyp x))) at 1.
+      rewrite firstn_all; reflexivity.
     - (* Structs *)
       rewrite sizeof_struct_cons.
       cbn.
@@ -807,6 +812,9 @@ Section Serialization_Theory.
   Proof.
     intros dv.
     induction dv; auto.
+    - cbn. apply forallb_forall.
+      intros. apply repeat_spec in H; subst.
+      f_equiv.
     - induction fields.
       + reflexivity.
       + cbn. apply forallb_forall.
@@ -1446,6 +1454,13 @@ Section Memory_Stack_Theory.
           rewrite Z.add_0_l in *.
           subst.
           lia.
+      -  unroll_lookup_all_index; cbn; f_equal.
+         setoid_rewrite <- (Nnat.N2Nat.id (sizeof_dtyp x)) at 1.
+         rewrite lookup_all_index_add_all_index_same_length; cycle 1.
+         { rewrite repeat_length; reflexivity. }
+         unfold deserialize_sbytes.
+
+
       - (* Structs *)
         rewrite sizeof_struct_cons.
 

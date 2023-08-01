@@ -145,13 +145,13 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 32 =>
           Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
 
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 1
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 1 
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 8
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_I 1 
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_I 8 
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_I 32 =>
-          Conv_Pure DVALUE_Poison
+        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 1
+        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 1 
+        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 8
+        | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 1 
+        | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 8 
+        | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 32 =>
+          Conv_Pure (DVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed conv"
         end
@@ -170,13 +170,13 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
           Conv_Pure (DVALUE_I64 (repr (unsigned i1)))
 
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 8
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 32 
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 32
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 64 
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 64 =>
-          Conv_Pure DVALUE_Poison
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32 
+        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 32
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
+        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64 
+        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
+          Conv_Pure (DVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed conv"
         end
@@ -195,13 +195,13 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
           Conv_Pure (DVALUE_I64 (repr (signed i1)))
 
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 8
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 32 
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 32
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 64 
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 64 =>
-          Conv_Pure DVALUE_Poison
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32 
+        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 32
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
+        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64 
+        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
+          Conv_Pure (DVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed conv"
         end
@@ -212,8 +212,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           if bits1 =? bits2 then Conv_Pure x else Conv_Illegal "unequal bitsize in cast"
         | DTYPE_Pointer, DVALUE_Addr a, DTYPE_Pointer =>
           Conv_Pure (DVALUE_Addr a)
-        | DTYPE_Pointer, DVALUE_Poison, DTYPE_Pointer =>
-          Conv_Pure DVALUE_Poison
+        | DTYPE_Pointer, DVALUE_Poison t, DTYPE_Pointer =>
+          Conv_Pure (DVALUE_Poison t)
         | _, _, _ => Conv_Illegal "ill-typed conv"
         end
 
@@ -231,15 +231,15 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
           Conv_Pure (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
 
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_Float 
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_Float 
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_Float 
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_Float 
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_Double 
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_Double 
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_Double 
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_Double =>
-          Conv_Pure DVALUE_Poison
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float 
+        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float 
+        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Float 
+        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Float 
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Double 
+        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double 
+        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double 
+        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
+          Conv_Pure (DVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed Uitofp"
         end
@@ -258,15 +258,15 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
           Conv_Pure (DVALUE_Double (Float.of_longu (repr (signed i1))))
 
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_Float 
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_Float 
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_Float 
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_Float 
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_Double 
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_Double 
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_Double 
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_Double =>
-          Conv_Pure DVALUE_Poison
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float 
+        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float 
+        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Float 
+        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Float 
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Double 
+        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double 
+        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double 
+        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
+          Conv_Pure (DVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed Sitofp"
         end
@@ -342,14 +342,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
     if is_concrete uv
     then lift_err ret (uvalue_to_dvalue uv)
     else trigger (pick uv P).
-  
-  (* Pick a possibly poison value, treating poison as nondeterminism.
-     This is used for freeze. *)
-  Definition pick_your_poison {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (dt : dtyp) (uv : uvalue) : itree E dvalue :=
-    match uv with
-    | UVALUE_Poison => concretize_or_pick (UVALUE_Undef dt) True
-    | _             => concretize_or_pick uv True
-    end.
 
   Definition pickUnique {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue
     := concretize_or_pick uv (unique_prop uv).
@@ -489,7 +481,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | (IId id, INSTR_Load _ dt (du,ptr) _) =>
           ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
           da <- concretize_or_pick ua True ;;
-          if (@dvalue_eq_dec da DVALUE_Poison)
+          if (@dvalue_eq_dec da (DVALUE_Poison du))
           then raiseUB "Load from poisoned address."
           else dv <- trigger (Load dt da);;
                 trigger (LocalWrite id dv)
@@ -500,7 +492,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           dv <- concretize_or_pick uv True ;;
           ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
           da <- pickUnique ua ;;
-          if (@dvalue_eq_dec da DVALUE_Poison)
+          if (@dvalue_eq_dec da (DVALUE_Poison du))
           then raiseUB "Store to poisoned address."
           else trigger (Store da dv)
 
@@ -559,7 +551,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
       Definition dvalue_is_poison (dv : dvalue) : bool :=
         match dv with
-        | DVALUE_Poison => true
+        | DVALUE_Poison _ => true
         | _ => false
         end.
 
@@ -584,7 +576,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
               ret (inl br1)
             else
               ret (inl br2)
-          | DVALUE_Poison => raiseUB "Branching on poison."
+          | DVALUE_Poison _ => raiseUB "Branching on poison."
           | _ => raise "Br got non-bool value"
           end
 

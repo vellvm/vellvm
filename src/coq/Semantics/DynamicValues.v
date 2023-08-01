@@ -181,7 +181,7 @@ Inductive dvalue : Set :=
 | DVALUE_I64 (x:int64)
 | DVALUE_Double (x:ll_double)
 | DVALUE_Float (x:ll_float)
-| DVALUE_Poison
+| DVALUE_Poison (t:dtyp)
 | DVALUE_None
 | DVALUE_Struct        (fields: list dvalue)
 | DVALUE_Array         (elts: list dvalue)
@@ -197,7 +197,7 @@ Section DvalueInd.
   Hypothesis IH_I64           : forall x, P (DVALUE_I64 x).
   Hypothesis IH_Double        : forall x, P (DVALUE_Double x).
   Hypothesis IH_Float         : forall x, P (DVALUE_Float x).
-  Hypothesis IH_Poison        : P DVALUE_Poison.
+  Hypothesis IH_Poison        : forall t, P (DVALUE_Poison t).
   Hypothesis IH_None          : P DVALUE_None.
   Hypothesis IH_Struct        : forall (fields: list dvalue), (forall u, In u fields -> P u) -> P (DVALUE_Struct fields).
   Hypothesis IH_Array         : forall (elts: list dvalue), (forall e, In e elts -> P e) -> P (DVALUE_Array elts).
@@ -231,7 +231,7 @@ Inductive uvalue : Type :=
 | UVALUE_Double (x:ll_double)
 | UVALUE_Float (x:ll_float)
 | UVALUE_Undef (t:dtyp)
-| UVALUE_Poison
+| UVALUE_Poison (t:dtyp)
 | UVALUE_None
 | UVALUE_Struct        (fields: list uvalue)
 | UVALUE_Array         (elts: list uvalue)
@@ -240,17 +240,10 @@ Inductive uvalue : Type :=
 | UVALUE_FBinop           (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue)
 | UVALUE_FCmp             (cmp:fcmp)   (v1:uvalue) (v2:uvalue)
 | UVALUE_Conversion       (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp)
-| UVALUE_GetElementPtr    (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)) (* TODO: do we ever need this? GEP raises an event? *)
-| UVALUE_ExtractElement   (vec_typ : dtyp) (vec: uvalue) (idx: uvalue)
-| UVALUE_InsertElement    (vec_typ : dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue)
-| UVALUE_ShuffleVector    (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue)
-| UVALUE_ExtractValue     (vec_typ : dtyp) (vec:uvalue) (idxs:list LLVMAst.int)
-| UVALUE_InsertValue      (vec_typ : dtyp) (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int)
-| UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue)
+| UVALUE_GetElementPtr    (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)).
 (* Extract the `idx` byte from a uvalue `uv`, which was stored with
   type `dt`. `idx` 0 is the least significant byte. `sid` is the "store
   id". *)
-.
 Set Elimination Schemes.
 
 Section UvalueInd.
@@ -263,7 +256,7 @@ Section UvalueInd.
   Hypothesis IH_Double         : forall x, P (UVALUE_Double x).
   Hypothesis IH_Float          : forall x, P (UVALUE_Float x).
   Hypothesis IH_Undef          : forall t, P (UVALUE_Undef t).
-  Hypothesis IH_Poison         : P UVALUE_Poison.
+  Hypothesis IH_Poison         : forall t, P (UVALUE_Poison t).
   Hypothesis IH_None           : P UVALUE_None.
   Hypothesis IH_Struct         : forall (fields: list uvalue), (forall u, In u fields -> P u) -> P (UVALUE_Struct fields).
   Hypothesis IH_Array          : forall (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Array elts).
@@ -273,12 +266,6 @@ Section UvalueInd.
   Hypothesis IH_FCmp           : forall (cmp:fcmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FCmp cmp v1 v2).
   Hypothesis IH_Conversion     : forall (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp), P v -> P (UVALUE_Conversion conv t_from v t_to).
   Hypothesis IH_GetElementPtr  : forall (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)), P ptrval -> (forall idx, In idx idxs -> P idx) -> P (UVALUE_GetElementPtr t ptrval idxs).
-  Hypothesis IH_ExtractElement : forall (t:dtyp) (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement t vec idx).
-  Hypothesis IH_InsertElement  : forall (t:dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement t vec elt idx).
-  Hypothesis IH_ShuffleVector  : forall (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector vec1 vec2 idxmask).
-  Hypothesis IH_ExtractValue   : forall (t:dtyp) (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue t vec idxs).
-  Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec elt idxs).
-  Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
 
   Lemma uvalue_ind : forall (uv:uvalue), P uv.
     fix IH 1.
@@ -304,12 +291,6 @@ Section UvalueInd.
         fix IHidxs 1. intros [|u idxs']. intros. inversion H.
         intros u' [<-|Hin]. apply IH. eapply IHidxs. apply Hin.
       }
-    - apply IH_ExtractElement; auto.
-    - apply IH_InsertElement; auto.
-    - apply IH_ShuffleVector; auto.
-    - apply IH_ExtractValue; auto.
-    - apply IH_InsertValue; auto.
-    - apply IH_Select; auto.
   Qed.
 End UvalueInd.
 
@@ -323,7 +304,7 @@ Fixpoint dvalue_to_uvalue (dv : dvalue) : uvalue :=
   | DVALUE_I64 x => UVALUE_I64 x
   | DVALUE_Double x => UVALUE_Double x
   | DVALUE_Float x => UVALUE_Float x
-  | DVALUE_Poison => UVALUE_Poison
+  | DVALUE_Poison t => UVALUE_Poison t
   | DVALUE_None => UVALUE_None
   | DVALUE_Struct fields => UVALUE_Struct (map dvalue_to_uvalue fields)
   | DVALUE_Array elts => UVALUE_Array (map dvalue_to_uvalue elts)
@@ -340,7 +321,7 @@ Fixpoint uvalue_to_dvalue (uv : uvalue) : err dvalue :=
   | UVALUE_Double x                        => ret (DVALUE_Double x)
   | UVALUE_Float x                         => ret (DVALUE_Float x)
   | UVALUE_Undef t                         => failwith "Attempting to convert a non-defined uvalue to dvalue. The conversion should be guarded by is_concrete"
-  | UVALUE_Poison                          => ret (DVALUE_Poison)
+  | UVALUE_Poison t                        => ret (DVALUE_Poison t)
   | UVALUE_None                            => ret (DVALUE_None)
 
   | UVALUE_Struct fields                   =>
@@ -397,7 +378,7 @@ Fixpoint is_concrete (uv : uvalue) : bool :=
   | UVALUE_Double x => true
   | UVALUE_Float x => true
   | UVALUE_Undef t => false
-  | UVALUE_Poison => true
+  | UVALUE_Poison t => true
   | UVALUE_None => true
   | UVALUE_Struct fields => forallb is_concrete fields
   | UVALUE_Array elts => forallb is_concrete elts
@@ -443,7 +424,7 @@ Section hiding_notation.
     | DVALUE_I64 x => Atom "dvalue(i64)"
     | DVALUE_Double x => Atom "dvalue(double)"
     | DVALUE_Float x => Atom "dvalue(float)"
-    | DVALUE_Poison => Atom "poison"
+    | DVALUE_Poison t => Atom "poison"
     | DVALUE_None => Atom "none"
     | DVALUE_Struct fields
       => [Atom "{" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom ","]) fields) ; Atom "}"]
@@ -462,7 +443,7 @@ Section hiding_notation.
     | UVALUE_I64 x => Atom (pre ++ "uvalue(i64)" ++ post)%string
     | UVALUE_Double x => Atom (pre ++ "uvalue(double)" ++ post)%string
     | UVALUE_Float x => Atom (pre ++ "uvalue(float)" ++ post)%string
-    | UVALUE_Poison => Atom (pre ++ "poison" ++ post)%string
+    | UVALUE_Poison t => Atom (pre ++ "poison" ++ post)%string
     | UVALUE_None => Atom (pre ++ "none" ++ post)%string
     | UVALUE_Struct fields
       => [Atom "{" ; to_sexp (List.map (serialize_uvalue' "" ",") fields) ; Atom "}"]
@@ -507,7 +488,8 @@ Section DecidableEquality.
       if Float.eq_dec x1 x2 then true else false
     | DVALUE_Float x1, DVALUE_Float x2 =>
       if Float32.eq_dec x1 x2 then true else false
-    | DVALUE_Poison, DVALUE_Poison => true
+    | DVALUE_Poison t1, DVALUE_Poison t2 =>
+      dtyp_eqb t1 t2
     | DVALUE_None, DVALUE_None => true
     | DVALUE_Struct f1, DVALUE_Struct f2 =>
       lsteq f1 f2
@@ -527,7 +509,7 @@ Section DecidableEquality.
     | DVALUE_I64 x1, DVALUE_I64 x2 => _
     | DVALUE_Double x1, DVALUE_Double x2 => _
     | DVALUE_Float x1, DVALUE_Float x2 => _
-    | DVALUE_Poison, DVALUE_Poison => _
+    | DVALUE_Poison t1, DVALUE_Poison t2 => _
     | DVALUE_None, DVALUE_None => _
     | DVALUE_Struct f1, DVALUE_Struct f2 => _
     | DVALUE_Array f1, DVALUE_Array f2 => _
@@ -552,6 +534,9 @@ Section DecidableEquality.
       * left; subst; reflexivity.
       * right; intros H; inversion H. contradiction.
     - destruct (Float32.eq_dec x1 x2).
+      * left; subst; reflexivity.
+      * right; intros H; inversion H. contradiction.
+    - destruct (dtyp_eq_dec t1 t2).
       * left; subst; reflexivity.
       * right; intros H; inversion H. contradiction.
     - destruct (lsteq_dec f1 f2).
@@ -653,7 +638,7 @@ Section DecidableEquality.
               | UVALUE_Double x1, UVALUE_Double x2 => _
               | UVALUE_Float x1, UVALUE_Float x2 => _
               | UVALUE_Undef t1, UVALUE_Undef t2 => _
-              | UVALUE_Poison, UVALUE_Poison => _
+              | UVALUE_Poison t1, UVALUE_Poison t2 => _
               | UVALUE_None, UVALUE_None => _
               | UVALUE_Struct f1, UVALUE_Struct f2 => _
               | UVALUE_Array f1, UVALUE_Array f2 => _
@@ -663,12 +648,6 @@ Section DecidableEquality.
               | UVALUE_FCmp op uv1 uv2, UVALUE_FCmp op' uv1' uv2' => _
               | UVALUE_Conversion ct tf u t, UVALUE_Conversion ct' tf' u' t' => _
               | UVALUE_GetElementPtr t u l, UVALUE_GetElementPtr t' u' l' => _
-              | UVALUE_ExtractElement t u v, UVALUE_ExtractElement t' u' v' => _
-              | UVALUE_InsertElement t u v x, UVALUE_InsertElement t' u' v' x' => _
-              | UVALUE_ShuffleVector u v x, UVALUE_ShuffleVector u' v' x' => _
-              | UVALUE_ExtractValue t u l, UVALUE_ExtractValue t' u' l' => _
-              | UVALUE_InsertValue t u v l, UVALUE_InsertValue t' u' v' l' => _
-              | UVALUE_Select u v w, UVALUE_Select u' v' w' => _
               | _, _ => _
               end); try (ltac:(dec_dvalue); fail).
     - destruct (A.eq_dec a1 a2)...
@@ -678,6 +657,7 @@ Section DecidableEquality.
     - destruct (Int64.eq_dec x1 x2)...
     - destruct (Float.eq_dec x1 x2)...
     - destruct (Float32.eq_dec x1 x2)...
+    - destruct (dtyp_eq_dec t1 t2)...
     - destruct (dtyp_eq_dec t1 t2)...
     - destruct (lsteq_dec f1 f2)...
     - destruct (lsteq_dec f1 f2)...
@@ -701,26 +681,6 @@ Section DecidableEquality.
     - destruct (dtyp_eq_dec t t')...
       destruct (f u u')...
       destruct (lsteq_dec l l')...
-    - destruct (dtyp_eq_dec t t')...
-      destruct (f u u')...
-      destruct (f v v')...
-    - destruct (dtyp_eq_dec t t')...
-      destruct (f u u')...
-      destruct (f v v')...
-      destruct (f x x')...
-    - destruct (f u u')...
-      destruct (f v v')...
-      destruct (f x x')...
-    - destruct (dtyp_eq_dec t t')...
-      destruct (f u u')...
-      destruct (list_eq_dec Z.eq_dec l l')...
-    - destruct (dtyp_eq_dec t t')...
-      destruct (f u u')...
-      destruct (f v v')...
-      destruct (list_eq_dec Z.eq_dec l l')...
-    - destruct (f u u')...
-      destruct (f v v')...
-      destruct (f w w')...
   Qed.
 
   #[global] Instance eq_dec_uvalue : RelDec (@eq uvalue) := RelDec_from_dec (@eq uvalue) (@uvalue_eq_dec).
@@ -807,6 +767,8 @@ Class VInt I : Type :=
     signed : I -> Z;
 
     repr : Z -> I;
+
+    type_of : dtyp;
   }.
 
 
@@ -860,6 +822,8 @@ Class VInt I : Type :=
     signed := Int1.signed;
 
     repr := Int1.repr;
+
+    type_of := DTYPE_I 1;
   }.
 
 
@@ -913,6 +877,8 @@ Class VInt I : Type :=
     signed := Int8.signed;
 
     repr := Int8.repr;
+
+    type_of := DTYPE_I 8;
   }.
 
 
@@ -966,6 +932,8 @@ Class VInt I : Type :=
     signed := Int32.signed;
 
     repr := Int32.repr;
+
+    type_of := DTYPE_I 32;
   }.
 
   #[global] Instance VInt64 : VInt Int64.int :=
@@ -1018,6 +986,8 @@ Class VInt I : Type :=
     signed := Int64.signed;
 
     repr := Int64.repr;
+
+    type_of := DTYPE_I 64;
   }.
 
   (* Check if this is an instruction which can trigger UB with division by 0. *)
@@ -1062,12 +1032,12 @@ Class VInt I : Type :=
       | Add nuw nsw =>
         ret (if orb (andb nuw (equ (add_carry x y zero) one))
                     (andb nsw (equ (add_overflow x y zero) one))
-             then DVALUE_Poison else to_dvalue (add x y))
+             then DVALUE_Poison type_of else to_dvalue (add x y))
 
       | Sub nuw nsw =>
         ret (if orb (andb nuw (equ (sub_borrow x y zero) one))
                     (andb nsw (equ (sub_overflow x y zero) one))
-            then DVALUE_Poison else to_dvalue (sub x y))
+            then DVALUE_Poison type_of else to_dvalue (sub x y))
 
       | Mul nuw nsw =>
         (* I1 mul can't overflow, just based on the 4 possible multiplications. *)
@@ -1079,7 +1049,7 @@ Class VInt I : Type :=
                         unsigned res))
               (andb nsw (orb (min_signed >? res_s')
                               (res_s' >? max_signed)))
-        then ret DVALUE_Poison else ret (to_dvalue res)
+        then ret (DVALUE_Poison type_of) else ret (to_dvalue res)
 
       | Shl nuw nsw =>
         let bz := Z.of_nat bitwidth in
@@ -1088,19 +1058,19 @@ Class VInt I : Type :=
         let res_u' := Z.shiftl (unsigned x) (unsigned y) in
         (* Unsigned shift x right by bitwidth - y. If shifted x != sign bit * (2^y - 1),
           then there is overflow. *)
-        if (unsigned y) >=? bz then ret DVALUE_Poison
+        if (unsigned y) >=? bz then ret (DVALUE_Poison type_of)
         else if orb (andb nuw (res_u' >? res_u))
                     (andb nsw (negb (Z.shiftr (unsigned x)
                                               (bz - unsigned y)
                                     =? (unsigned (negative res))
                                         * (Z.pow 2 (unsigned y) - 1))%Z))
-            then ret DVALUE_Poison else ret (to_dvalue res)
+            then ret (DVALUE_Poison type_of) else ret (to_dvalue res)
 
       | UDiv ex =>
         if (unsigned y =? 0)%Z
         then failwith "Unsigned division by 0."
         else if andb ex (negb ((unsigned x) mod (unsigned y) =? 0))%Z
-            then ret DVALUE_Poison
+            then ret (DVALUE_Poison type_of)
             else ret (to_dvalue (divu x y))
 
       | SDiv ex =>
@@ -1108,22 +1078,22 @@ Class VInt I : Type :=
         if (signed y =? 0)%Z
         then failwith "Signed division by 0."
         else if andb ex (negb ((signed x) mod (signed y) =? 0))%Z
-            then ret DVALUE_Poison
+            then ret (DVALUE_Poison type_of)
             else ret (to_dvalue (divs x y))
 
       | LShr ex =>
         let bz := Z.of_nat bitwidth in
-        if (unsigned y) >=? bz then ret DVALUE_Poison
+        if (unsigned y) >=? bz then ret (DVALUE_Poison type_of)
         else if andb ex (negb ((unsigned x)
                                 mod (Z.pow 2 (unsigned y)) =? 0))%Z
-            then ret DVALUE_Poison else ret (to_dvalue (shru x y))
+            then ret (DVALUE_Poison type_of) else ret (to_dvalue (shru x y))
 
       | AShr ex =>
         let bz := Z.of_nat bitwidth in
-        if (unsigned y) >=? bz then ret DVALUE_Poison
+        if (unsigned y) >=? bz then ret (DVALUE_Poison type_of)
         else if andb ex (negb ((unsigned x)
                                 mod (Z.pow 2 (unsigned y)) =? 0))%Z
-            then ret DVALUE_Poison else ret (to_dvalue (shr x y))
+            then ret (DVALUE_Poison type_of) else ret (to_dvalue (shr x y))
 
       | URem =>
         if (unsigned y =? 0)%Z
@@ -1189,11 +1159,11 @@ Class VInt I : Type :=
     | DVALUE_I8 i1, DVALUE_I8 i2    => lift (eval_int_op iop i1 i2)
     | DVALUE_I32 i1, DVALUE_I32 i2  => lift (eval_int_op iop i1 i2)
     | DVALUE_I64 i1, DVALUE_I64 i2  => lift (eval_int_op iop i1 i2)
-    | DVALUE_Poison, _              => lift (ret DVALUE_Poison)
-    | _, DVALUE_Poison              =>
+    | DVALUE_Poison t, _              => lift (ret (DVALUE_Poison t))
+    | _, (DVALUE_Poison t)              =>
       if iop_is_div iop
       then lift (raise "Division by poison.")
-      else ret DVALUE_Poison
+      else ret (DVALUE_Poison t)
     | _, _                          => failwith "ill_typed-iop"
     end.
   Arguments eval_iop_integer_h _ _ _ : simpl nomatch.
@@ -1296,9 +1266,11 @@ Class VInt I : Type :=
     | DVALUE_I8 i1, DVALUE_I8 i2 => ret (eval_int_icmp icmp i1 i2)
     | DVALUE_I32 i1, DVALUE_I32 i2 => ret (eval_int_icmp icmp i1 i2)
     | DVALUE_I64 i1, DVALUE_I64 i2 => ret (eval_int_icmp icmp i1 i2)
-    | DVALUE_Poison, DVALUE_Poison => ret DVALUE_Poison
-    | DVALUE_Poison, _ => if is_DVALUE_IX v2 then ret DVALUE_Poison else failwith "ill_typed-iop"
-    | _, DVALUE_Poison => if is_DVALUE_IX v1 then ret DVALUE_Poison else failwith "ill_typed-iop"
+    | DVALUE_Poison t1, DVALUE_Poison t2 =>
+        if @dtyp_eq_dec t1 t2 then ret (DVALUE_Poison t1) else failwith "ill_typed-iop"
+    | DVALUE_Poison t, _ =>
+        if is_DVALUE_IX v2 then ret (DVALUE_Poison t) else failwith "ill_typed-iop"
+    | _, DVALUE_Poison t => if is_DVALUE_IX v1 then ret (DVALUE_Poison t) else failwith "ill_typed-iop"
     | DVALUE_Addr a1, DVALUE_Addr a2 =>
       match icmp with
       | Eq => if A.eq_dec a1 a2 then ret (DVALUE_I1 (Int1.one)) else ret (DVALUE_I1 (Int1.zero))
@@ -1335,11 +1307,11 @@ Class VInt I : Type :=
     match v1, v2 with
     | DVALUE_Float f1, DVALUE_Float f2   => float_op fop f1 f2
     | DVALUE_Double d1, DVALUE_Double d2 => double_op fop d1 d2
-    | DVALUE_Poison, _                   => ret DVALUE_Poison
-    | _, DVALUE_Poison                   =>
+    | DVALUE_Poison t, _                   => ret (DVALUE_Poison t)
+    | _, DVALUE_Poison t                   =>
       if fop_is_div fop
       then lift (raise "Division by poison.")
-      else ret DVALUE_Poison
+      else ret (DVALUE_Poison t)
     | _, _                               => failwith ("ill_typed-fop: " ++ (to_string fop) ++ " " ++ (to_string v1) ++ " " ++ (to_string v2))
     end.
 
@@ -1399,40 +1371,7 @@ Class VInt I : Type :=
     then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
     Arguments double_cmp _ _ _ : simpl nomatch.
 
-  Definition eval_fcmp (fcmp:fcmp) (v1:dvalue) (v2:dvalue) : undef_or_err dvalue :=
-    match v1, v2 with
-    | DVALUE_Float f1, DVALUE_Float f2 => ret (float_cmp fcmp f1 f2)
-    | DVALUE_Double f1, DVALUE_Double f2 => ret (double_cmp fcmp f1 f2)
-    | DVALUE_Poison, DVALUE_Poison => ret DVALUE_Poison
-    | DVALUE_Poison, DVALUE_Double _ => ret DVALUE_Poison
-    | DVALUE_Poison, DVALUE_Float _ => ret DVALUE_Poison
-    | DVALUE_Double _, DVALUE_Poison => ret DVALUE_Poison
-    | DVALUE_Float _, DVALUE_Poison => ret DVALUE_Poison
-    | _, _ => failwith "ill_typed-fcmp"
-    end.
-
   End ARITHMETIC.
-
-  (* Same deal as above with the helper *)
-  (* The pattern matching generates hundreds of subgoals, hence the factorization of the typeclass inference *)
-  Definition eval_select (cnd : dvalue) (v1 v2 : uvalue) : undef_or_err uvalue :=
-    let failwith_local := (@failwith _ undef_or_err (Monad_eitherT string Monad_err) (Exception_eitherT string Monad_err))
-    in
-    let ret_local := (@ret undef_or_err (Monad_eitherT string Monad_err) uvalue)
-    in
-    match v1, v2 with
-    | UVALUE_Poison, _ => ret_local UVALUE_Poison
-    | _, UVALUE_Poison => ret_local UVALUE_Poison
-    | _, _ =>
-      match cnd with
-      | DVALUE_I1 i =>
-        ret_local (if (Int1.unsigned i =? 1)%Z then v1 else v2)
-      | DVALUE_Poison => ret_local UVALUE_Poison
-      | _ => failwith_local "ill_typed select"
-      end
-    end.
-
-  Arguments eval_select _ _ _ : simpl nomatch.
 
   (* Helper function for indexing into a structured datatype
      for extractvalue and insertvalue *)
@@ -1492,6 +1431,7 @@ Class VInt I : Type :=
   | DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) DTYPE_Double
   | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Float
   | DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
+  | DVALUE_Poison_typ   : forall x, dvalue_has_dtyp (DVALUE_Poison x) x
 
   | DVALUE_Struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Struct []) (DTYPE_Struct [])
   | DVALUE_Struct_Cons_typ :
@@ -1521,6 +1461,7 @@ Class VInt I : Type :=
   | UVALUE_Float_typ  : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Float
   | UVALUE_None_typ   : uvalue_has_dtyp UVALUE_None DTYPE_Void
   | UVALUE_Undef_typ  : forall τ, uvalue_has_dtyp (UVALUE_Undef τ) τ
+  | UVALUE_Poison_typ   : forall x, uvalue_has_dtyp (UVALUE_Poison x) x
 
   | UVALUE_Struct_Nil_typ  : uvalue_has_dtyp (UVALUE_Struct []) (DTYPE_Struct [])
   | UVALUE_Struct_Cons_typ :
@@ -1590,47 +1531,7 @@ Class VInt I : Type :=
         uvalue_has_dtyp (UVALUE_Conversion Sext (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz)
   | UVALUE_GetElementPtr_typ :
       forall dt uv idxs,
-        uvalue_has_dtyp (UVALUE_GetElementPtr dt uv idxs) DTYPE_Pointer
-  | UVALUE_ExtractValue_Struct_sing_typ :
-      forall fields fts dt (idx : LLVMAst.int),
-        uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
-        (0 <= idx)%Z ->
-        Nth fts (Z.to_nat idx) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Struct fts) (UVALUE_Struct fields) [idx]) dt
-  | UVALUE_ExtractValue_Struct_cons_typ :
-      forall fields fts fld ft dt idx idxs,
-        uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
-        (0 <= idx)%Z ->
-        Nth fts (Z.to_nat idx) ft ->
-        Nth fields (Z.to_nat idx) fld ->
-        uvalue_has_dtyp fld ft ->
-        uvalue_has_dtyp (UVALUE_ExtractValue ft fld idxs) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Struct fts) (UVALUE_Struct fields) (idx :: idxs)) dt
-  | UVALUE_ExtractValue_Array_sing_typ :
-      forall elements dt idx n,
-        uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n dt) ->
-        (0 <= idx <= Z.of_N n)%Z ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Array n dt) (UVALUE_Array elements) [idx]) dt
-  | UVALUE_ExtractValue_Array_cons_typ :
-      forall elements elem et dt n idx idxs,
-        uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n et) ->
-        (0 <= idx <= Z.of_N n)%Z ->
-        Nth elements (Z.to_nat idx) elem ->
-        uvalue_has_dtyp elem et ->
-        uvalue_has_dtyp (UVALUE_ExtractValue et elem idxs) dt ->
-        uvalue_has_dtyp (UVALUE_ExtractValue (DTYPE_Array n et) (UVALUE_Array elements) (idx :: idxs)) dt
-  | UVALUE_InsertValue_typ :
-      forall struc idxs uv st dt,
-        uvalue_has_dtyp (UVALUE_ExtractValue st struc idxs) dt ->
-        uvalue_has_dtyp uv dt ->
-        uvalue_has_dtyp struc st ->
-        uvalue_has_dtyp (UVALUE_InsertValue st struc uv idxs) st
-  | UVALUE_Select_i1 :
-      forall cond x y t,
-        uvalue_has_dtyp cond (DTYPE_I 1) ->
-        uvalue_has_dtyp x t ->
-        uvalue_has_dtyp y t ->
-        uvalue_has_dtyp (UVALUE_Select cond x y) t.
+        uvalue_has_dtyp (UVALUE_GetElementPtr dt uv idxs) DTYPE_Pointer.
 
   Section dvalue_has_dtyp_ind.
     Variable P : dvalue -> dtyp -> Prop.
@@ -1643,6 +1544,7 @@ Class VInt I : Type :=
     Hypothesis IH_Double         : forall x, P (DVALUE_Double x) DTYPE_Double.
     Hypothesis IH_Float          : forall x, P (DVALUE_Float x) DTYPE_Float.
     Hypothesis IH_None           : P DVALUE_None DTYPE_Void.
+    Hypothesis IH_Poison         : forall x, P (DVALUE_Poison x) x.
     Hypothesis IH_Struct_nil     : P (DVALUE_Struct []) (DTYPE_Struct []).
     Hypothesis IH_Struct_cons    : forall (f : dvalue) (dt : dtyp) (fields : list dvalue) (dts : list dtyp),
         dvalue_has_dtyp f dt ->
@@ -1668,6 +1570,7 @@ Class VInt I : Type :=
       - apply IH_Double.
       - apply IH_Float.
       - apply IH_None.
+      - apply IH_Poison.
       - apply IH_Struct_nil.
       - apply (IH_Struct_cons TYP1 (IH f dt TYP1) TYP2 (IH (DVALUE_Struct fields) (DTYPE_Struct dts) TYP2)).
       - rename H into Hforall.
@@ -1715,22 +1618,6 @@ Class VInt I : Type :=
                    (dv1 <- e1 ;;
                     dv2 <- e2 ;;
                     eval_icmp cmp dv1 dv2)
-
-  | Concretize_FBinop : forall fop fm uv1 e1 uv2 e2,
-      concretize_u uv1 e1 ->
-      concretize_u uv2 e2 ->
-      concretize_u (UVALUE_FBinop fop fm uv1 uv2)
-                   (dv1 <- e1 ;;
-                    dv2 <- e2 ;;
-                    eval_fop fop dv1 dv2)
-
-  | Concretize_FCmp : forall cmp uv1 e1 uv2 e2,
-      concretize_u uv1 e1 ->
-      concretize_u uv2 e2 ->
-      concretize_u (UVALUE_FCmp cmp uv1 uv2)
-                   (dv1 <- e1 ;;
-                    dv2 <- e2 ;;
-                    eval_fcmp cmp dv1 dv2)
 
   | Concretize_Struct_Nil     : concretize_u (UVALUE_Struct []) (ret (DVALUE_Struct []))
   | Concretize_Struct_Cons    : forall u e us es,

@@ -291,7 +291,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     | Byte : byte -> SByte
     | Ptr : addr -> SByte
     | PtrFrag : SByte
-    | SUndef : SByte.
+    | SUndef : SByte
+    | Poison : SByte.
     Definition mem_block    := IntMap SByte.
     Inductive logical_block :=
     | LBlock (size : N) (bytes : mem_block) (concrete_id : option Z) : logical_block.
@@ -352,13 +353,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition Sbyte_to_byte (sb:SByte) : option byte :=
       match sb with
       | Byte b => ret b
-      | Ptr _ | PtrFrag | SUndef => None
+      | Ptr _ | PtrFrag | SUndef | Poison => None
       end.
 
     Definition Sbyte_to_byte_list (sb:SByte) : list byte :=
       match sb with
       | Byte b => [b]
-      | Ptr _ | PtrFrag | SUndef => []
+      | Ptr _ | PtrFrag | SUndef | Poison => []
       end.
 
     Definition Sbyte_defined (sb:SByte) : bool :=
@@ -372,34 +373,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
     Definition sbyte_list_to_Z (bytes:list SByte) : Z :=
       int_of_bytes (sbyte_list_to_byte_list bytes).
-
-    (** ** Serialization of [dvalue]
-      Serializes a dvalue into its SByte-sensitive form.
-      Integer are stored over 8 bytes.
-      Pointers as well: the address is stored in the first, [PtrFrag] flags mark the seven others.
-     *)
-    Fixpoint serialize_dvalue (dval:dvalue) : list SByte :=
-      match dval with
-      | DVALUE_Addr addr => (Ptr addr) :: (repeat PtrFrag 7)
-      | DVALUE_I1 i => sbytes_of_int 8 (unsigned i)
-      | DVALUE_I8 i => sbytes_of_int 8 (unsigned i)
-      | DVALUE_I32 i => sbytes_of_int 8 (unsigned i)
-      | DVALUE_I64 i => sbytes_of_int 8 (unsigned i)
-      | DVALUE_Float f => sbytes_of_int 4 (unsigned (Float32.to_bits f))
-      | DVALUE_Double d => sbytes_of_int 8 (unsigned (Float.to_bits d))
-      | DVALUE_Struct fields
-      | DVALUE_Array fields =>
-        (* note the _right_ fold is necessary for byte ordering. *)
-        fold_right (fun 'dv acc => ((serialize_dvalue dv) ++ acc) % list) [] fields
-      | _ => [] 
-      end.
-
-    (** ** Well defined block
-      A list of [sbytes] is considered undefined if any of its bytes is undefined.
-      This predicate checks that they are all well-defined.
-     *)
-    Definition all_not_sundef (bytes : list SByte) : bool :=
-      forallb Sbyte_defined bytes.
 
     (** ** Size of a dynamic type
       Computes the byte size of a [dtyp]. *)
@@ -424,6 +397,35 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | DTYPE_Opaque       => 0 (* TODO: Unsupported *)
       | _                  => 0 (* TODO: add support for more types as necessary *)
       end.
+
+    (** ** Serialization of [dvalue]
+      Serializes a dvalue into its SByte-sensitive form.
+      Integer are stored over 8 bytes.
+      Pointers as well: the address is stored in the first, [PtrFrag] flags mark the seven others.
+     *)
+    Fixpoint serialize_dvalue (dval:dvalue) : list SByte :=
+      match dval with
+      | DVALUE_Addr addr => (Ptr addr) :: (repeat PtrFrag 7)
+      | DVALUE_I1 i => sbytes_of_int 8 (unsigned i)
+      | DVALUE_I8 i => sbytes_of_int 8 (unsigned i)
+      | DVALUE_I32 i => sbytes_of_int 8 (unsigned i)
+      | DVALUE_I64 i => sbytes_of_int 8 (unsigned i)
+      | DVALUE_Float f => sbytes_of_int 4 (unsigned (Float32.to_bits f))
+      | DVALUE_Double d => sbytes_of_int 8 (unsigned (Float.to_bits d))
+      | DVALUE_Struct fields
+      | DVALUE_Array fields =>
+        (* note the _right_ fold is necessary for byte ordering. *)
+        fold_right (fun 'dv acc => ((serialize_dvalue dv) ++ acc) % list) [] fields
+      | DVALUE_Poison t => repeat Poison (N.to_nat (sizeof_dtyp t))
+      | _ => []
+      end.
+
+    (** ** Well defined block
+      A list of [sbytes] is considered undefined if any of its bytes is undefined.
+      This predicate checks that they are all well-defined.
+     *)
+    Definition all_not_sundef (bytes : list SByte) : bool :=
+      forallb Sbyte_defined bytes.
 
     (** ** Deserialization of a list of sbytes
       Deserialize a list [bytes] of SBytes into a uvalue of type [t],
@@ -475,6 +477,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
      depends on all the bytes provided, not just the first one!
      *)
     Definition deserialize_sbytes (bytes : list SByte) (t : dtyp) : uvalue :=
+      (* TODO *)
+      (* if any_poisoned_bytes *)
+      (* then return poison *)
       if all_not_sundef bytes
       then deserialize_sbytes_defined bytes t
       else UVALUE_Undef t.
