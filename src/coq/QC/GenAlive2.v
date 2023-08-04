@@ -167,7 +167,7 @@ Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE
   Definition remove_fst_from_local_ctx (var : ident * typ) : GenALIVE2 unit
     := ctx <- get_local_ctx;;
        set_local_ctx (remove_fst_id_var_context (fst var) ctx);;
-         ret tt.
+       ret tt.
 
   Definition reset_local_ctx : GenALIVE2 unit
     := set_local_ctx [].
@@ -442,7 +442,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
 
   Definition filter_type (ty : typ) (ctx : list (ident * typ)) : list (ident * typ)
     := filter (fun '(i, t) => normalized_typ_eq (ty) (t)) ctx.
-  Print fmap.
+  
   Fixpoint gen_exp_size (sz : nat) (t : typ) {struct sz}: GenALIVE2 (exp typ) :=
     let fix gen_size_0 (ty : typ) : GenALIVE2 (exp typ) :=
           match ty with
@@ -464,9 +464,13 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
           | _ => failGen "Not supported"
           end in
     match sz with
-    | 0%nat =>
-        gen_size_0 t
-    | (S z)%nat =>
+    | 0%nat => (* Generate value-like expression *)
+        exp1 <- gen_size_0 t;;
+        exp2 <- gen_exp_ident t;;
+        (* TODO: Can express this in more elegant way *)
+        (* TODO: May have some problem at generating ident *)
+        freq_ALIVE2 [(1%nat, ret exp1); (1%nat, ret exp2)]
+    | (S z)%nat => (* Generate instruction-like expression *)
         match t with
         | TYPE_I sz =>
             ret (OP_IBinop (LLVMAst.Add false false)) <*> ret t <*> gen_exp_size 0 t <*> ret (EXP_Integer 0)
@@ -518,13 +522,23 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         e_input <- gen_exp_size 0 t';;
         let e_index := EXP_Integer (Z.of_nat index) in
         let exp := OP_InsertElement (tgt, e_src) (t', e_input) (TYPE_I 8, e_index) in
-        add_id_to_instr (tgt, INSTR_Op exp)
+        ins <- add_id_to_instr (tgt, INSTR_Op exp);;
+        match e_src with
+        | EXP_Ident id => remove_fst_from_local_ctx (id, tgt);;
+                         ret ins
+        | _ => ret ins
+        end
     | TYPE_Array sz t' =>
         (* Assumption is that src have already been created, either undef or not *)
         e_src <- gen_exp_ident tgt;;
         e_input <- gen_exp_size 0 t';;
         let exp := OP_InsertValue (tgt, e_src) (t', e_input) [Z.of_nat index] in
-        add_id_to_instr (tgt, INSTR_Op exp)
+        ins <- add_id_to_instr (tgt, INSTR_Op exp);;
+        match e_src with
+        | EXP_Ident id => remove_fst_from_local_ctx (id, tgt);;
+                         ret ins
+        | _ => ret ins
+        end
     | TYPE_Struct fields =>
         (* Assumption is that src have already been created, either undef or not *)
         e_src <- gen_exp_ident tgt;;
@@ -534,7 +548,12 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
               end;;
         e_input <- gen_exp_size 0 t';;
         let exp := OP_InsertValue (tgt, e_src) (t', e_input) [Z.of_nat index] in
-        add_id_to_instr (tgt, INSTR_Op exp)
+        ins <- add_id_to_instr (tgt, INSTR_Op exp);;
+        match e_src with
+        | EXP_Ident id => remove_fst_from_local_ctx (id, tgt);;
+                         ret ins
+        | _ => ret ins
+        end
     | TYPE_Packed_struct fields =>
         e_src <- gen_exp_size 0 tgt;;
         t' <-  match nth_error fields index with
@@ -543,7 +562,12 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
               end;;
         e_input <- gen_exp_size 0 t';;
         let exp := OP_InsertValue (tgt, e_src) (t', e_input) [Z.of_nat index] in
-        add_id_to_instr (tgt, INSTR_Op exp)
+        ins <- add_id_to_instr (tgt, INSTR_Op exp);;
+        match e_src with
+        | EXP_Ident id => remove_fst_from_local_ctx (id, tgt);;
+                         ret ins
+        | _ => ret ins
+        end
     | TYPE_Pointer t' =>
         e_src <- gen_exp_ident tgt;;
         e_input <- gen_exp_size 0 t';;
@@ -563,7 +587,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
       | O => ret l
       | S z =>
           inst <- gen_instantiate_instr z t;;
-          gen_instr_iter sz l
+          gen_instr_iter sz ([inst] ++ l)
       end in
     match t with
     | TYPE_I _ =>
@@ -614,6 +638,15 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         rest <- gen_initializations args';;
         ret (instr ++ rest)
     end.
+
+  (* How to generate a list of arguments
+     Can be done by iterate on the list of functions.
+     For each one of them, generate and backtrack required commands
+   *)
+  
+  Definition gen_pred_function (args: list typ) (ret_t : typ) (fn1 fn2: string) : GenALIVE2 (toplevel_entity typ (block typ * list (block typ)))
+    :=
+    failGen "Invalid".
   
   Fixpoint gen_uvalue (t : typ) : GenALIVE2 uvalue :=
     match t with
@@ -642,18 +675,10 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     | _ => failGen "Invalid"
     end.
                                             
-
-
-  (* How to generate a list of arguments
-     Can be done by iterate on the list of functions.
-     For each one of them, generate and backtrack required commands
-   *)
-  
-  Definition gen_pred_function (args: list typ) (ret_t : typ) (fn1 fn2: string) : GenALIVE2 (toplevel_entity typ (block typ * list (block typ)))
-    :=
-    failGen "Invalid".
   
 End GEN_ALIVE2.
+
+
 
 (* Module G := GEN_ALIVE2 MemoryModelImplementation.FinAddr MemoryModelImplementation.IP64Bit MemoryModelImplementation.FinSizeof  . (* LLVMEvents64. *) *)
  
@@ -665,3 +690,4 @@ End GEN_ALIVE2.
 (* (* (* Extract Inlined Constant eqn => "( == )". *) *) *)
 
 (* (* Recursive Extraction nat_gen_example. *) *)
+
