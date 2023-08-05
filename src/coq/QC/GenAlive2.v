@@ -714,9 +714,11 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
   Definition gen_runner_tle (args : list typ) (ret_t : typ) (fn : string): GenALIVE2 (toplevel_entity typ (block typ * list (block typ)))
     :=
     ret TLE_Definition <*> gen_runner_def args ret_t fn
-    .
-    
-    
+  .
+
+  Definition gen_tester : GenALIVE2 (list (toplevel_entity typ (block typ * list (block typ))))
+    :=
+    failGen "Unimplemented".
   
   Fixpoint gen_uvalue (t : typ) : GenALIVE2 uvalue :=
     match t with
