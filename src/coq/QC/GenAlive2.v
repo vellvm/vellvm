@@ -643,10 +643,39 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
      Can be done by iterate on the list of functions.
      For each one of them, generate and backtrack required commands
    *)
+
+  (* This function assumes the existence of such function in the LLVM context, i.e. the AST *)
+  Definition gen_call_fn (args: list typ) (ret_t : typ) (fn : string) : GenALIVE2 (code typ) :=
+    args_texp <- map_monad
+                  (fun (arg_typ : typ) =>
+                     arg_exp <- gen_exp_size 0 arg_typ;;
+                     ret ((arg_typ,arg_exp), []))
+                  args;;
+    let fun_exp : (exp typ) := EXP_Ident (ID_Global (Name fn)) in
+    let fun_typ : typ := TYPE_Function ret_t args false in
+    let fun_instr : (instr typ) := INSTR_Call (fun_typ, fun_exp) args_texp [] in
+    fun_id_instr <- add_id_to_instr (fun_typ, fun_instr);;
+    ret [fun_id_instr].
   
-  Definition gen_pred_function (args: list typ) (ret_t : typ) (fn1 fn2: string) : GenALIVE2 (toplevel_entity typ (block typ * list (block typ)))
+  Fixpoint gen_code_w_pred_aux (args: list typ) (ret_t : typ) (fn: string) (l : code typ) : GenALIVE2 (code typ)
     :=
-    failGen "Invalid".
+    match args with
+    | nil =>
+        
+    | hd::tl =>
+        failGen "Unimplemented"
+    end.
+  
+  Fixpoint gen_pred_block (args: list typ) (ret_t : typ) (fn1 fn2: string) : GenALIVE2 (block typ * list (block typ))
+    :=
+    match args with
+    | nil =>
+        failGen "Unimplemented"
+    | _ => 
+        failGen "Unimplemented"
+    end.
+    
+    
   
   Fixpoint gen_uvalue (t : typ) : GenALIVE2 uvalue :=
     match t with
