@@ -716,6 +716,8 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     ret TLE_Definition <*> gen_runner_def args ret_t fn
   .
 
+  (* TODO: Supposed to take a parsed program (TLE maybe?) and output a fixed list of TLEs
+   Need to find what the type of the input is *)
   Definition gen_tester : GenALIVE2 (list (toplevel_entity typ (block typ * list (block typ))))
     :=
     failGen "Unimplemented".
