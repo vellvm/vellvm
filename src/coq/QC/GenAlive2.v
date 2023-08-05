@@ -664,6 +664,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
   
   Definition gen_pred_fn_blocks (args: list typ) (ret_t : typ) (fn : string): GenALIVE2 (block typ * list (block typ))
     :=
+    (* TODO: Hard coded at thi point... *)
     let pred_bid : block_id := Name "predicate" in
     let fn_bid : block_id := Name "fn" in
     init_code <- gen_initializations args;;
@@ -689,6 +690,32 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
       ; blk_comments := None
       |} in
     ret (pred_b, [fn_b]).
+
+  Definition gen_runner_def (args_typ : list typ) (ret_typ : typ) (fn : string) : GenALIVE2 (definition typ (block typ * list (block typ)))
+    :=
+    reset_local_ctx;;
+    blks <- gen_pred_fn_blocks args_typ ret_typ fn;;
+    let name := Name "runner" in
+    let runner_typ :=
+      TYPE_Function ret_typ args_typ false in
+    let param_attr_slots := map (fun t => []) args_typ in
+    let prototype :=
+      mk_declaration name runner_typ
+        ([], param_attr_slots)
+        []
+        []
+    in
+    reset_local_ctx;;
+    blks <- gen_pred_fn_blocks args_typ ret_typ fn;;
+    (* Should not have any parameter input for runner i.e. main *)
+    let runner_def := mk_definition (block typ * list (block typ)) prototype [] blks in
+    ret runner_def.
+    
+  
+  Definition gen_runner (args : list typ) (ret_t : typ) (fn : string): GenALIVE2 (toplevel_entity typ (block typ * list (block typ)))
+    :=
+    ret TLE_Definition <*> gen_pred_fn_blocks args ret_t fn
+    .
     
     
   
