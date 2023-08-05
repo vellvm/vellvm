@@ -660,6 +660,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
 (*   Definition gen_code_w_pred (args: list typ) (ret_t : typ) (fn: string) : GenALIVE2 (code typ) *)
 (*     := *)
   (* . *)
+
   
   Definition gen_pred_fn_blocks (args: list typ) (ret_t : typ) (fn : string): GenALIVE2 (block typ * list (block typ))
     :=
@@ -675,12 +676,16 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
       ; blk_term := TERM_Br_1 fn_bid
       ; blk_comments := None
       |} in
+    let fn_term := match fn_instr_id with
+                   | IId rid => TERM_Ret (ret_t, EXP_Ident (ID_Global rid))
+                   | IVoid _ => TERM_Ret_void
+                   end in
     let fn_b :=
       {|
         blk_id := fn_bid
       ; blk_phis := []
       ; blk_code := [(fn_instr_id, fn_instr)]
-      ; blk_term := TERM_Ret_void
+      ; blk_term := fn_term
       ; blk_comments := None
       |} in
     ret (pred_b, [fn_b]).
