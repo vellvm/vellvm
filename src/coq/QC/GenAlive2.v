@@ -631,11 +631,11 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     | nil => ret []
     | t::args' =>
         let depth_t := depth_of_typ t in
-        instr <- gen_instrs depth_t t;;
+        rest <- gen_initializations args';;
+        instr <- hide_local_ctx (gen_instrs depth_t t);;
         (* Not sure if I need this.
            Allocate store *)
         (* alloca_store <- fix_alloca isntr;; *)
-        rest <- gen_initializations args';;
         ret (instr ++ rest)
     end.
 
@@ -645,7 +645,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
    *)
 
   (* This function assumes the existence of such function in the LLVM context, i.e. the AST *)
-  Definition gen_call_fn (args: list typ) (ret_t : typ) (fn : string) : GenALIVE2 (code typ) :=
+  Definition gen_call_fn (args: list typ) (ret_t : typ) (fn : string) : GenALIVE2 (instr_id * instr typ) :=
     args_texp <- map_monad
                   (fun (arg_typ : typ) =>
                      arg_exp <- gen_exp_size 0 arg_typ;;
@@ -655,25 +655,35 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     let fun_typ : typ := TYPE_Function ret_t args false in
     let fun_instr : (instr typ) := INSTR_Call (fun_typ, fun_exp) args_texp [] in
     fun_id_instr <- add_id_to_instr (fun_typ, fun_instr);;
-    ret [fun_id_instr].
+    ret fun_id_instr.
   
-  Fixpoint gen_code_w_pred_aux (args: list typ) (ret_t : typ) (fn: string) (l : code typ) : GenALIVE2 (code typ)
-    :=
-    match args with
-    | nil =>
-        
-    | hd::tl =>
-        failGen "Unimplemented"
-    end.
+(*   Definition gen_code_w_pred (args: list typ) (ret_t : typ) (fn: string) : GenALIVE2 (code typ) *)
+(*     := *)
+  (* . *)
   
-  Fixpoint gen_pred_block (args: list typ) (ret_t : typ) (fn1 fn2: string) : GenALIVE2 (block typ * list (block typ))
+  Definition gen_pred_fn_blocks (args: list typ) (ret_t : typ) (fn : string): GenALIVE2 (block typ * list (block typ))
     :=
-    match args with
-    | nil =>
-        failGen "Unimplemented"
-    | _ => 
-        failGen "Unimplemented"
-    end.
+    let pred_bid : block_id := Name "predicate" in
+    let fn_bid : block_id := Name "fn" in
+    init_code <- gen_initializations args;;
+    '(fn_instr_id, fn_instr) <- gen_call_fn args ret_t fn;;
+    let pred_b :=
+      {|
+        blk_id := pred_bid
+      ; blk_phis := []
+      ; blk_code := init_code
+      ; blk_term := TERM_Br_1 fn_bid
+      ; blk_comments := None
+      |} in
+    let fn_b :=
+      {|
+        blk_id := fn_bid
+      ; blk_phis := []
+      ; blk_code := [(fn_instr_id, fn_instr)]
+      ; blk_term := TERM_Ret_void
+      ; blk_comments := None
+      |} in
+    ret (pred_b, [fn_b]).
     
     
   
