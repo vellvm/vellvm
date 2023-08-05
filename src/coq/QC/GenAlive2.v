@@ -711,10 +711,9 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     let runner_def := mk_definition (block typ * list (block typ)) prototype [] blks in
     ret runner_def.
     
-  
-  Definition gen_runner (args : list typ) (ret_t : typ) (fn : string): GenALIVE2 (toplevel_entity typ (block typ * list (block typ)))
+  Definition gen_runner_tle (args : list typ) (ret_t : typ) (fn : string): GenALIVE2 (toplevel_entity typ (block typ * list (block typ)))
     :=
-    ret TLE_Definition <*> gen_pred_fn_blocks args ret_t fn
+    ret TLE_Definition <*> gen_runner_def args ret_t fn
     .
     
     
