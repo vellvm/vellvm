@@ -1189,8 +1189,10 @@ Class VInt I : Type :=
     | DVALUE_I8 i1, DVALUE_I8 i2    => lift (eval_int_op iop i1 i2)
     | DVALUE_I32 i1, DVALUE_I32 i2  => lift (eval_int_op iop i1 i2)
     | DVALUE_I64 i1, DVALUE_I64 i2  => lift (eval_int_op iop i1 i2)
-    | DVALUE_Poison, _              => lift (ret DVALUE_Poison)
-    | _, DVALUE_Poison              =>
+    | DVALUE_Poison, (DVALUE_I1 _ | DVALUE_I8 _ | DVALUE_I32 _ | DVALUE_I64 _) =>
+        lift (ret DVALUE_Poison)
+    | (DVALUE_I1 _ | DVALUE_I8 _ | DVALUE_I32 _ | DVALUE_I64 _),
+        DVALUE_Poison              =>
       if iop_is_div iop
       then lift (raise "Division by poison.")
       else ret DVALUE_Poison
