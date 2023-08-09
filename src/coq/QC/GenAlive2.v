@@ -404,10 +404,17 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
        | TYPE_Function ret args varargs=>
          match b with
          | TYPE_Function ret' args' varargs' =>
+             (* Do this to fix the extraction *)
+             let eq_vararg := match varargs, varargs' with
+                              | true, true => true
+                              | false, false => true
+                              | _, _ => false
+                              end in
+                             
              Nat.eqb (Datatypes.length args) (Datatypes.length args') &&
                normalized_typ_eq ret ret' &&
                forallb id (zipWith (fun a b => normalized_typ_eq a b) args args')
-             && Bool.eqb varargs varargs'
+             && eq_vararg(* Bool.eqb varargs varargs' *)
          | _ => false
          end
        | TYPE_Struct fields =>
