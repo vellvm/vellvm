@@ -717,7 +717,8 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
   .
 
   (* TODO: Supposed to take a parsed program (TLE maybe?) and output a fixed list of TLEs
-   Need to find what the type of the input is *)
+   Need to find what the type of the input is
+   TODO: Maybe don't need this. Cuz it requires me to record the generated program. Should instead manipulate it at main *)
   Definition gen_tester : GenALIVE2 (list (toplevel_entity typ (block typ * list (block typ))))
     :=
     failGen "Unimplemented".
