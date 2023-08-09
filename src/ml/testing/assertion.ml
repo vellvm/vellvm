@@ -308,7 +308,9 @@ and parse_srctgt_assertion (filename: string) (line: string) : test list =
     | (Some src), (Some tgt) ->
        begin  try
         let  (src_t, tgt_t) = find_ty src, find_ty tgt in
+        (* TODO: Need to replace the following command with generate program and do SRCTGTTEST with it -> type to dtype*)
         let  generated_args : (LLVMAst.typ * DV.uvalue) list list = Generate.generate_n_args num_trials (fst src_t) in
+        (* tgt_t is args_t * ret_t*)
         List.map (fun arg -> SRCTGTTest (!parsing_mode , (typ_to_dtyp (snd tgt_t)), arg)   ) generated_args
        with _ -> [] end
     | _ -> []

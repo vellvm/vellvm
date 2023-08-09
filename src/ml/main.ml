@@ -54,6 +54,8 @@ let compare_tgt_for_poison src tgt : unit =
 let make_test name ll_ast t : string * assertion  =
   let open Format in
 
+  (* TODO: ll_ast is of type list (toplevel_entity typ (block typ * list (block typ))) *)
+  (* Can just replace this with the newer ones? *)
   let run dtyp entry args ll_ast  =
     Interpreter.step
       (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp (Camlcoq.coqstring_of_camlstring entry) args ll_ast)
@@ -96,7 +98,8 @@ let make_test name ll_ast t : string * assertion  =
          
   | Assertion.SRCTGTTest (mode, expected_rett, generated_args) ->
     let (_t_args, v_args) = List.split generated_args in
-    let assertion () = 
+    let assertion () =
+      (* Check tgt and src separately with respect to the AST *)
       let res_tgt = run expected_rett "tgt" v_args ll_ast in
       let res_src = run expected_rett "src" v_args ll_ast in
       begin match res_tgt with
