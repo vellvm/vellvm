@@ -78,7 +78,7 @@ join_strings() {
 }
 
 
-GEN_OPEN_MODULES=("open Bits" "open Binary" "open BinNums" "open BinPos" "open BinNat" "open Floats" "open Integers" "open VellvmIntegers" "open EitherMonad" "open DynamicValues" "open DynamicTypes" "open CeresS" "open Error" "open Datatypes" "open Decimal" "open Nat" "open CeresString" "open AstLib" "open ShowAST")
+GEN_OPEN_MODULES=("open LLVMAst" "open Bits" "open Binary" "open BinNums" "open BinPos" "open BinNat" "open Floats" "open Integers" "open VellvmIntegers" "open EitherMonad" "open DynamicValues" "open DynamicTypes" "open CeresS" "open Error" "open Datatypes" "open Decimal" "open Nat" "open CeresString" "open AstLib" "open ShowAST")
 GEN_MODULES_DECLARATION=$(join_strings "\n" "${GEN_OPEN_MODULES[@]}")
 # for string in "${GEN_OPEN_MODULESS[@]}"; do
 #     echo "$string"
@@ -99,7 +99,7 @@ do
     # sed -i "1s/^/open BinPos\n/" $EXTRACT_DIR/$f
     # sed -i "1s/^/open BinNat\n/" $EXTRACT_DIR/$f
     # sed -i "1s/^/open Integers\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/module LLVMAst = LLVMAst\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/module LLVMAst = LLVMAst\n/" $EXTRACT_DIR/$f
     # sed -i "1s/^/open Binary\n/" $EXTRACT_DIR/$f
     # sed -i "1s/^/open Bits\n/" $EXTRACT_DIR/$f
     # sed -i "1s/^/open Floats\n/" $EXTRACT_DIR/$f
@@ -201,7 +201,7 @@ do
     # sed -i "1s/^/open BinNums\n/" $EXTRACT_DIR/$f
     # sed -i "1s/^/open BinPos\n/" $EXTRACT_DIR/$f
     # sed -i "1s/^/open BinNat\n/" $EXTRACT_DIR/$f
-    sed -i "1s/^/module LLVMAst = LLVMAst\n/" $EXTRACT_DIR/$f
+    # sed -i "1s/^/module LLVMAst = LLVMAst\n/" $EXTRACT_DIR/$f
     # sed -i "1s/^/open Integers\n/" $EXTRACT_DIR/$f
     # sed -i "1s/^/open Binary\n/" $EXTRACT_DIR/$f
     # sed -i "1s/^/open Bits\n/" $EXTRACT_DIR/$f
@@ -244,6 +244,11 @@ do
     sed -i "/^type fast_math =/,/^$/c\type fast_math = LLVMAst.fast_math\n" $EXTRACT_DIR/$f
     sed -i "/^type conversion_type =/,/^$/c\type conversion_type = LLVMAst.conversion_type\n" $EXTRACT_DIR/$f
 
+    #AstLib replacement
+    sed -i "/^module RawIDOrd =/,/end/c\module RawIDOrd = AstLib.RawIDOrd" $EXTRACT_DIR/$f
+    sed -i "/^module IdentDec =/,/end/c\module IdentDec = AstLib.IdentDec" $EXTRACT_DIR/$f
+    sed -i "/^module Ident =/,/^$/c\module Ident = AstLib.Ident\n" $EXTRACT_DIR/$f
+    
     # CeresS replacement
     sed -i "/^type 'a sexp_ =/,/^$/c\type 'a sexp_ = 'a CeresS.sexp_\n" $EXTRACT_DIR/$f
     sed -i "/^type atom =/,/^$/c\type atom = CeresS.atom\n" $EXTRACT_DIR/$f
@@ -271,7 +276,9 @@ do
     sed -i 's/^module Int\([0-9]\+\) =.*$/module Int\1 = DynamicValues.Int\1/' $EXTRACT_DIR/$f
     sed -i 's/^module \(Coq_Int64\) =.*$/module \1 = DynamicValues.Int64/' $EXTRACT_DIR/$f
     sed -i 's/^type int\([1-9]\+\) =.*$/type int\1 = DynamicValues.int\1/' $EXTRACT_DIR/$f
-    sed -i "/let randomRInt = /ilet rec coqPositiveToInt = function\n| Coq_xI p0 -> 2 * (coqPositiveToInt p0) + 1\n| Coq_xO p0 -> 2 * (coqPositiveToInt p0)\n| Coq_xH -> 1\n\nlet coqZToInt  = function\n| Z0 -> 0\n| Zpos p -> coqPositiveToInt p\n| Zneg p -> ~-(coqPositiveToInt p)\n\nlet intToCoqZ x =\nlet rec nonNegIntToCoqPositive y =\nmatch y with\n| 0 -> Coq_xH\n| 1 -> Coq_xH\n| _ -> if (y mod 2 > 0) then Coq_xI (nonNegIntToCoqPositive (y / 2 - 1)) else Coq_xO (nonNegIntToCoqPositive (y / 2)) in\nif (x < 0) then Zneg (nonNegIntToCoqPositive ~-x) else if (x > 0) then Zpos (nonNegIntToCoqPositive x) else Z0\n\n" $EXTRACT_DIR/$f
+    sed -i "/let randomRInt = /ilet rec coqPositiveToInt = function\n| Coq_xI p0 -> 2 * (coqPositiveToInt p0) + 1\n| Coq_xO p0 -> 2 * (coqPositiveToInt p0)\n| Coq_xH -> 1\n\nlet coqZToInt  = function\n| Z0 -> 0\n| Zpos p -> coqPositiveToInt p\n| Zneg p -> ~-(coqPositiveToInt p)\n\nlet rec nonNegIntToCoqPositive y =\nmatch y with\n| 0 -> Coq_xH\n| 1 -> Coq_xH\n| _ -> if (y mod 2 > 0) then Coq_xI (nonNegIntToCoqPositive (y / 2 - 1)) else Coq_xO (nonNegIntToCoqPositive (y / 2))\n\nlet intToCoqZ x =\nif (x < 0) then Zneg (nonNegIntToCoqPositive ~-x) else if (x > 0) then Zpos (nonNegIntToCoqPositive x) else Z0\n\n" $EXTRACT_DIR/$f
+
+    sed -i "/let randomRN = /ilet coqNToInt = function\n| N0 -> 0\n| Npos p -> coqPositiveToInt p\n\nlet intToCoqN x =\nif (x < 0) then Npos (nonNegIntToCoqPositive ~-x) else if (x > 0) then Npos (nonNegIntToCoqPositive x) else N0\n\n" $EXTRACT_DIR/$f
 
     # sed -i "/let listOf g =/,/^$/c\let listOf g = \nGenLow__0.sized (fun n0 -> \nGenLow__0.bindGen (GenLow__0.choose chooseNat (0, coqZToInt n0)) (fun k -> \nvectorOf k g))\n\n" $EXTRACT_DIR/$f
     # sed -i "/let suchThatMaybe g p =/,/^$/c\let suchThatMaybe g p = \nGenLow__0.sized (fun n0 -> retry (coqZToInt n0) (suchThatMaybe1 g p))\n\n" $EXTRACT_DIR/$f

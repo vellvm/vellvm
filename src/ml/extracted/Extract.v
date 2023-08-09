@@ -227,7 +227,8 @@ Extract Inlined Constant add => "( + )".
 (* Extract Constant randomRBool => "(fun _ r -> Random.State.bool r, r)". *)
 Extract Constant randomRInt  =>
   "(fun (x,y) r -> let yint = coqZToInt y in let xint = coqZToInt x in if (yint < xint) then failwith (Obj.magic coq_Monad_either) (Obj.magic coq_Exception_either) ""choose called with unordered arguments"" else (intToCoqZ (xint + (Random.State.int r (yint - xint + 1))), r))".
-
+Extract Constant randomRN =>
+  "(fun (x,y) r -> let yint = coqNToInt y in let xint = coqNToInt x in if yint < xint then failwith (Obj.magic coq_Monad_either) (Obj.magic coq_Exception_either) ""choose called with unordered arguments"" else  (intToCoqN (xint + (Random.State.int r (yint - xint + 1))), r))".
 (* Extract Constant randomRInt => *)
 (*           "(fun (x,y) r -> if y < x then failwith (Obj.magic coq_Monad_either) (Obj.magic coq_Exception_either) ""choose called with unordered arguments"" else let range_Z = (y - x) in let range_int = range_Z in (x + (Random.State.int r range_int), r))". *)
 (* Extract Constant randomRN => *)
