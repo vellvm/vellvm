@@ -19997,6 +19997,24 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                   setoid_rewrite bind_trigger in HSPEC.
                   red in KS.
                   rewrite HSPEC in KS.
+                  destruct KS as [CONTRA | KS].
+                  { exfalso.
+                    inv CONTRA.
+                    - pinversion H0.
+                      inv CHECK1.
+                    - pinversion H0.
+                      subst_existT.
+                      subst_existT.
+                      inv H0.
+                      subst_existT.
+                      specialize (REL0 x).
+                      red in REL0.
+                      pclearbot.
+                      eapply ret_not_contains_UB; [| eapply H1].
+                      rewrite <- REL0 in H1.
+                      pinversion H1.
+                    pinversion H0
+                  }
                   setoid_rewrite bind_vis in KS.
                   punfold KS; red in KS; cbn in KS.
                   dependent induction KS.
@@ -20231,7 +20249,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                               red.
                               rewrite VIS_HANDLED.
                               cbn in *.
-                              rewrite 
                             }
 
                             2: {

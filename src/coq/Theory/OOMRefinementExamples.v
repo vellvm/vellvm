@@ -761,6 +761,7 @@ Module Infinite.
 
   Lemma interp_memory_prop_vis_inv:
     forall E R X
+      (ENUB : E <> UBE)
       (e : (E +' LLVMParamsBigIntptr.Events.IntrinsicE +' LLVMParamsBigIntptr.Events.MemoryE +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X)
       k sid m x,
       interp_memory_prop (E:=E) (R2 := R) eq (Vis e k) sid m x ->
@@ -801,7 +802,105 @@ Module Infinite.
       right.
       exists A. exists e0. exists k0.
       reflexivity.
-    - dependent destruction H1.
+    - subst_existT.
+      red in KS.
+      destruct KS as [UB | KS].
+      { (* UB... *)
+        exfalso.
+        repeat red in HSPEC.
+        destruct e.
+        - repeat red in HSPEC.
+          rewrite HSPEC in UB.
+          setoid_rewrite bind_trigger in UB.
+          dependent induction UB.
+          + pinversion H; subst.
+            inv CHECK.
+          + (* CrawlVis *)
+          (* Should mean that k0 is just a ret, which should lead to a contradiction in UB *)
+            eapply eqit_inv_Vis_weak in H.
+            destruct H as (?&?&?); subst.
+            red in H0.
+            rewrite <- H0 in UB.
+            eapply ContainsUB.ret_not_contains_UB.
+            2: {
+              eapply UB.
+            }
+            
+            inv UB.
+            pinversion H1.
+            punfold H; red in H; cbn in H.
+            
+            inv H.
+            subst_existT.
+            
+            Set Printing Implicit.
+            assert
+              (
+(@subevent E (E +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+              (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 E E
+                 (LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                 (@ReSum_id (Type -> Type) IFun Id_IFun E)) X e) =
+(@subevent (E +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+              (E +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+              (@ReSum_id (Type -> Type) IFun Id_IFun
+                 (E +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) Y e0)).
+  
+
+                (@subevent E (E +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                  (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 E E
+                     (LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) =
+                     (@subevent (E +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                        (E +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                        (@ReSum_id (Type -> Type) IFun Id_IFun
+                           (E +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) Y e0)
+                      (@ReSum_id (Type -> Type) IFun Id_IFun E)) X e)).
+                subevent X e = subevent Y e0).
+            inv H.
+            subst_existT.
+            
+          + pinversion H; repeat subst_existT.
+            unfold subevent in H5.
+            unfold resum in H5.
+            unfold ReSum_inl, ReSum_id in H5.
+            unfold id_, Id_IFun in H5.
+            unfold cat, Cat_IFun in H5.
+            unfold inl_, Inl_sum1 in H5.
+            unfold resum in H5.
+            
+            
+          + subst.
+            pinversion H.
+            repeat subst_existT.
+            
+            unfold subevent in *.
+            unfold resum in H6.
+            cbn in H6.
+          rw
+          rewrite vis_ret in UB.
+          dependent induction UB.
+          + pinversion H; subst_existT.
+            inv CHECK.
+          + pinversion H; subst_existT.
+            subst_existT.
+            inv H5.
+
+          admit. (* Need to know that E is not UBE, so UB is a contradiction *)
+        - repeat red in HSPEC.
+          destruct s.
+          + repeat red in HSPEC.
+            destruct HSPEC as [UB' | [ERR | [OOM | HSPEC]]].
+            * destruct UB'.
+              repeat red in H.
+              destruct i.
+              break_match_hyp.
+              -- cbn in H.
+                 cbn in H.
+          rewrite HSPEC in UB.
+          setoid_rewrite bind_trigger in UB.
+        
+      }
+
+      dependent destruction H1.
       left.
       eexists _,_,_,_; split; eauto.
       + rewrite <- itree_eta; eauto.

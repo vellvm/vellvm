@@ -40,7 +40,7 @@ Section contains_UB.
   Inductive contains_UB {R} : itree Eff R -> Prop :=
   | CrawlTau  : forall t1 t2, t2 ≅ Tau t1 -> contains_UB t1 -> contains_UB t2
   | CrawlVis : forall Y (e : Eff Y) x k t2, t2 ≅ (vis e k) -> contains_UB (k x) -> contains_UB t2
-  | FindUB    : forall `{UB_EFF : UBE -< Eff} s k t2, t2 ≅ (vis (@subevent UBE Eff UB_EFF _ (ThrowUB s)) k) -> contains_UB t2.
+  | FindUB    : forall `{Eff_UBE : UBE -< Eff} s k t2, t2 ≅ (vis (@subevent UBE Eff Eff_UBE void (ThrowUB s)) k) -> contains_UB t2.
 
   #[global] Instance proper_eutt_contains_UB {R} {RR : relation R} : Proper (@eqit Eff _ _ RR true true ==> iff) contains_UB.
   Proof.
@@ -269,7 +269,8 @@ Section contains_UB_lemmas.
 End contains_UB_lemmas.
 
 Section bind_lemmas.
-  Context {Eff : Type -> Type}.
+  Context {E F G : Type -> Type}.
+  Local Notation Eff := (E +' F +' UBE +' G).
 
   (* TODO: Move this somewhere more useful? *)
   Class SubeventInversion (Eff : Type -> Type) : Prop :=
