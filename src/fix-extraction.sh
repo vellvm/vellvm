@@ -311,6 +311,13 @@ do
     sed -i '/(\*\* val double_to_hex_string .*/,/module Wordsize1 .*$/{//!d}' $EXTRACT_DIR/$f
     sed -i '/module DVALUE .*/,/ end/d' $EXTRACT_DIR/$f
     replace "s/B754_finite0/B754_finite/g" $f
+
+    # Annotation
+    sed -i "/let coq_STGST =/c\let coq_STGST : (coq_GenState, __ GenLow.coq_G, __) stateT monad =" $EXTRACT_DIR/$f
+    sed -i "/let coq_MGEN =/c\let coq_MGEN :  __ coq_GenALIVE2 monad =" $EXTRACT_DIR/$f
+    sed -i "/let gen_float32 =/c\let gen_float32 : float32 coq_GenALIVE2 =" $EXTRACT_DIR/$f
+    sed -i "/let gen_float32 =/c\let gen_float32 : float32 coq_GenALIVE2 =" $EXTRACT_DIR/$f
+    sed -i "/let gen_tester =/c\let gen_tester:  (typ, typ block * typ block list) toplevel_entity list coq_GenALIVE2 =" $EXTRACT_DIR/$f
 done
 
 # This feels risky. These two are very similar, and only differ because of some newlines in the extraction...
