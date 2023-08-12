@@ -6,7 +6,8 @@ open TopLevel
 open InterpretationStack.InterpreterStackBigIntptr.LP.Events
 open Llvm_printer
 open Either
-
+module GA = Generate.GA
+open List
 type raw_assertion_string =
   | Eq of { lhs : string ; rhs : string}
   | Poison' of { fcall: string }
@@ -48,7 +49,7 @@ type test =
   | POISONTest of DynamicTypes.dtyp * string * DV.uvalue list
   (* Find a better name for this *)
   (* retty, args for src, (t, args) for arguments to source and test *)
-  | SRCTGTTest of src_tgt_mode * DynamicTypes.dtyp * ((LLVMAst.typ * DV.uvalue) list, (typ, typ block * typ block list) toplevel_entity list) Either.t
+  | SRCTGTTest of src_tgt_mode * DynamicTypes.dtyp * ((LLVMAst.typ * DV.uvalue) list, (LLVMAst.typ, GA.runnable_blocks) LLVMAst.toplevel_entity list) Either.t
 
 (* DVALUE equality *)
 (* TODO: implement this in ASTLib and use extraction *)
@@ -309,11 +310,20 @@ and parse_srctgt_assertion (filename: string) (line: string) : test list =
     begin match src_fxn, tgt_fxn with
     | (Some src), (Some tgt) ->
        begin try
-        let  (src_t, tgt_t) = find_ty src, find_ty tgt in
-        (* TODO: Need to replace the following command with generate program and do SRCTGTTEST with it -> type to dtype*)
-        let  generated_args : (LLVMAst.typ * DV.uvalue) list list = Generate.generate_n_args num_trials (fst src_t) in
-        (* tgt_t is args_t * ret_t*)
-        List.map (fun arg -> SRCTGTTest (!parsing_mode , (typ_to_dtyp (snd tgt_t)), Left arg)) generated_args
+           let  (src_t, tgt_t) = find_ty src, find_ty tgt in
+           (* TODO: Need to edit dummy_bool into something determined dynamically,
+              then there can be two modes *)
+           let dummy_bool = false in
+           begin match dummy_bool with
+             | true -> 
+               (* TODO: Need to replace the following command with generate program and do SRCTGTTEST with it -> type to dtype*)
+               let  generated_args : (LLVMAst.typ * DV.uvalue) list list = Generate.generate_n_args num_trials (fst src_t) in
+               (* tgt_t is args_t * ret_t*)
+               List.map (fun arg -> SRCTGTTest (!parsing_mode , (typ_to_dtyp (snd tgt_t)), Left arg)) generated_args
+             | false ->
+               let generated_asts : ((LLVMAst.typ, GA.runnable_blocks) LLVMAst.toplevel_entity * (LLVMAst.typ, GA.runnable_blocks) LLVMAst.toplevel_entity) list = Generate.generate_n_runner num_trials (fst src_t) (snd src_t) [] [] in
+               List.map (fun ast -> SRCTGTTest (!parsing_mode, (typ_to_dtyp (snd tgt_t)), Right ([fst ast; snd ast]))) generated_asts
+           end
        with _ -> [] end
     | _ -> []
     end
