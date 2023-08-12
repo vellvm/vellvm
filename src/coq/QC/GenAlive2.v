@@ -731,7 +731,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
 
   Definition assemble_runner_def (args_t : list typ) (ret_t : typ) (fn_str : string) (pred_fn_blocks : runnable_blocks) : definition typ runnable_blocks
     :=
-    let name := Name "runner" in
+    let name := Name ("runner" ++ fn_str) in
     let runner_typ :=
       TYPE_Function ret_t args_t false in
     let param_attr_slots := map (fun t => []) args_t in
