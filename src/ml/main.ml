@@ -97,39 +97,42 @@ let make_test name ll_ast t : string * assertion  =
      str, (dvalue_eq_assertion name result (fun () -> expected))
          
   | Assertion.SRCTGTTest (mode, expected_rett, generated_args) ->
-    let (_t_args, v_args) = List.split generated_args in
-    let assertion () =
-      (* Check tgt and src separately with respect to the AST *)
-      let res_tgt = run expected_rett "tgt" v_args ll_ast in
-      let res_src = run expected_rett "src" v_args ll_ast in
-      begin match res_tgt with
-        | Error (UndefinedBehavior _) -> ()  (* If the target is UB then the src can be anything! *)
-        | Error (UninterpretedCall _) -> Platform.verb (Printf.sprintf "  src-tgt test %s passed due to uninterpreted call\n" name)
-        | Ok v_tgt ->
-          begin match res_src with
-            | Ok v_src ->
-              Assertion.(begin match mode with
-                | NormalEquality -> compare_dvalues_exn v_src v_tgt true
-                | ValueMismatch -> compare_dvalues_exn v_src v_tgt false
-                | TargetMorePoisonous -> compare_tgt_for_poison v_src v_tgt
-                | TargetMoreUndefined -> failwith "todo: TargetMoreUndefined"
-                | SourceMoreDefined -> failwith "todo: SourceMoreDefined"
-                | MismatchInMemory -> failwith "todo: MismatchInMemory"
-              end)
-            | Error (UninterpretedCall _) -> Platform.verb (Printf.sprintf "  src-tgt test %s passed due to uninterpreted call\n" name)
-            | Error e -> failwith (Printf.sprintf "src - %s" (Interpreter.string_of_exit_condition e))
-          end
-        | Error e -> failwith (Printf.sprintf "tgt - %s" (Interpreter.string_of_exit_condition e))
-      end
-    in
-     let str = 
-      let args_str: doc =
-        pp_print_list ~pp_sep:(fun f () -> pp_print_string f ", ") Interpreter.pp_uvalue str_formatter v_args;
-        flush_str_formatter()
+    match generated_args with
+    | Left g_args ->
+      let (_t_args, v_args) = List.split g_args in
+      let assertion () =
+        (* Check tgt and src separately with respect to the AST *)
+        let res_tgt = run expected_rett "tgt" v_args ll_ast in
+        let res_src = run expected_rett "src" v_args ll_ast in
+        begin match res_tgt with
+          | Error (UndefinedBehavior _) -> ()  (* If the target is UB then the src can be anything! *)
+          | Error (UninterpretedCall _) -> Platform.verb (Printf.sprintf "  src-tgt test %s passed due to uninterpreted call\n" name)
+          | Ok v_tgt ->
+            begin match res_src with
+              | Ok v_src ->
+                Assertion.(begin match mode with
+                    | NormalEquality -> compare_dvalues_exn v_src v_tgt true
+                    | ValueMismatch -> compare_dvalues_exn v_src v_tgt false
+                    | TargetMorePoisonous -> compare_tgt_for_poison v_src v_tgt
+                    | TargetMoreUndefined -> failwith "todo: TargetMoreUndefined"
+                    | SourceMoreDefined -> failwith "todo: SourceMoreDefined"
+                    | MismatchInMemory -> failwith "todo: MismatchInMemory"
+                  end)
+              | Error (UninterpretedCall _) -> Platform.verb (Printf.sprintf "  src-tgt test %s passed due to uninterpreted call\n" name)
+              | Error e -> failwith (Printf.sprintf "src - %s" (Interpreter.string_of_exit_condition e))
+            end
+          | Error e -> failwith (Printf.sprintf "tgt - %s" (Interpreter.string_of_exit_condition e))
+        end
       in
-       Printf.sprintf "src = tgt on generated input (%s)" args_str
-     in
-     (str,  assertion) 
+      let str = 
+        let args_str: doc =
+          pp_print_list ~pp_sep:(fun f () -> pp_print_string f ", ") Interpreter.pp_uvalue str_formatter v_args;
+          flush_str_formatter()
+        in
+        Printf.sprintf "src = tgt on generated input (%s)" args_str
+      in
+      (str,  assertion)
+    | Right _ -> failwith "todo: add code before"
 
 let test_pp_dir dir =
   let _ = Printf.printf "===> RUNNING PRETTY PRINTING TESTS IN: %s\n" dir in  

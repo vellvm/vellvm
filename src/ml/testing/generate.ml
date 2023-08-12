@@ -46,9 +46,16 @@ let gen_uvalue'' (t : LL.typ) : DV.uvalue GL.coq_G =
          | GenAlive2.Inr b -> GL.returnGen b
        end)
 
+let run_gen : 'a1 GL.coq_G -> 'a1 =
+  fun generator -> GL.run generator O GenAlive2.newRandomSeed
+
 let gen_uvalue' (t : LL.typ) : DV.uvalue G.t =
-  let uv = GL.run (gen_uvalue'' t) O GenAlive2.newRandomSeed in (* This needs to be edited. Cannot afford to have random seed everytime*)
+  let uv = run_gen (gen_uvalue'' t) in
   G.return uv
+
+(* let gen_uvalue' (t : LL.typ) : DV.uvalue G.t =
+ *   let uv = GL.run (gen_uvalue'' t) O GenAlive2.newRandomSeed in (\* This needs to be edited. Cannot afford to have random seed everytime*\)
+ *   G.return uv *)
 
 let gen_uvalue : LL.typ -> DV.uvalue G.t = gen_uvalue'
 
@@ -72,7 +79,6 @@ let gen_uvalue : LL.typ -> DV.uvalue G.t = gen_uvalue'
  *      list_ts >>= (fun l -> G.return @@ DV.UVALUE_Vector l)
  *   | _ -> failwith "generating values of this type is not implemented" *)
 
-
 let gen_args : LL.typ list -> (DV.uvalue) list G.t = fun ts -> ts |> List.map (fun t -> gen_uvalue t) |> G.flatten_l 
 
 let generate_args : LL.typ list -> (LL.typ * DV.uvalue) list = fun t_args ->
@@ -82,3 +88,7 @@ let generate_args : LL.typ list -> (LL.typ * DV.uvalue) list = fun t_args ->
 let generate_n_args : int -> LL.typ list -> (LL.typ * DV.uvalue) list list = fun n t_args ->
   let vals = G.generate ~n:n (gen_args t_args) in
   List.map (List.combine t_args) vals
+
+let gen_runner' (args_t : LL.typ list) (ret_t : LL.typ) : (typ, typ block * typ block list) toplevel_entity list GL.coq_G =
+  let ran = GA.run_GenALIVE2 (GA.gen_runner_tle t) in
+  

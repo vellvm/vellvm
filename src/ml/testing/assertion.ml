@@ -5,6 +5,7 @@ open LLVMAst
 open TopLevel
 open InterpretationStack.InterpreterStackBigIntptr.LP.Events
 open Llvm_printer
+open Either
 
 type raw_assertion_string =
   | Eq of { lhs : string ; rhs : string}
@@ -47,7 +48,7 @@ type test =
   | POISONTest of DynamicTypes.dtyp * string * DV.uvalue list
   (* Find a better name for this *)
   (* retty, args for src, (t, args) for arguments to source and test *)
-  | SRCTGTTest of src_tgt_mode * DynamicTypes.dtyp * (LLVMAst.typ * DV.uvalue) list
+  | SRCTGTTest of src_tgt_mode * DynamicTypes.dtyp * ((LLVMAst.typ * DV.uvalue) list, (typ, typ block * typ block list) toplevel_entity list) Either.t
 
 (* DVALUE equality *)
 (* TODO: implement this in ASTLib and use extraction *)
@@ -303,15 +304,16 @@ and parse_srctgt_assertion (filename: string) (line: string) : test list =
         int_of_string str
       with _ -> 10 in
       *)
+    (* TODO: Choose between two modes *)
     let (src_fxn, tgt_fxn) = (List.find_opt (find_fn "src") ast), (List.find_opt (find_fn "tgt") ast) in
     begin match src_fxn, tgt_fxn with
     | (Some src), (Some tgt) ->
-       begin  try
+       begin try
         let  (src_t, tgt_t) = find_ty src, find_ty tgt in
         (* TODO: Need to replace the following command with generate program and do SRCTGTTEST with it -> type to dtype*)
         let  generated_args : (LLVMAst.typ * DV.uvalue) list list = Generate.generate_n_args num_trials (fst src_t) in
         (* tgt_t is args_t * ret_t*)
-        List.map (fun arg -> SRCTGTTest (!parsing_mode , (typ_to_dtyp (snd tgt_t)), arg)   ) generated_args
+        List.map (fun arg -> SRCTGTTest (!parsing_mode , (typ_to_dtyp (snd tgt_t)), Left arg)) generated_args
        with _ -> [] end
     | _ -> []
     end
