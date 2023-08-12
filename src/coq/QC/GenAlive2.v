@@ -668,14 +668,26 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
 (*     := *)
   (* . *)
 
-  
-  Definition gen_pred_fn_blocks (args: list typ) (ret_t : typ) (fn : string): GenALIVE2 (block typ * list (block typ))
+  Definition gen_fn_params (args: list typ) : GenALIVE2 (list (typ * exp typ * list param_attr))
     :=
-    (* TODO: Hard coded at thi point... *)
+        args_texp <- map_monad
+                  (fun (arg_typ : typ) =>
+                     arg_exp <- gen_exp_size 0 arg_typ;;
+                     ret ((arg_typ,arg_exp), []))
+                  args;;
+  ret args_texp.
+    
+  
+  Definition assemble_pred_fn_blocks (init_code: code typ) (args_t : list typ) (ret_t : typ) (args_texp : list (typ * exp typ * list param_attr)) (fn_str: string): GenALIVE2 (block typ * list (block typ))
+    :=
     let pred_bid : block_id := Name "predicate" in
     let fn_bid : block_id := Name "fn" in
-    init_code <- gen_initializations args;;
-    '(fn_instr_id, fn_instr) <- gen_call_fn args ret_t fn;;
+    (* Generate function call itself *)
+    let fn_exp : (exp typ) := EXP_Ident (ID_Global (Name fn_str)) in
+    let fn_typ : typ := TYPE_Function ret_t args_t false in
+    let fn_instr : (instr typ) := INSTR_Call (fn_typ, fn_exp) args_texp [] in
+    '(fn_instr_id, fn_instr) <- add_id_to_instr (fn_typ, fn_instr);;
+ 
     let pred_b :=
       {|
         blk_id := pred_bid
@@ -698,30 +710,48 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
       |} in
     ret (pred_b, [fn_b]).
 
-  Definition gen_runner_def (args_typ : list typ) (ret_typ : typ) (fn : string) : GenALIVE2 (definition typ (block typ * list (block typ)))
+  (* Definition var_context := list (ident * typ). *)
+  Definition runnable_blocks : Set := (block typ * list (block typ)).
+  
+  Definition gen_pred_fn_blocks (args_t: list typ) (ret_t : typ) (src_fn_str tgt_fn_str : string): GenALIVE2 (runnable_blocks * runnable_blocks)
     :=
-    reset_local_ctx;;
-    blks <- gen_pred_fn_blocks args_typ ret_typ fn;;
+    init_code <- gen_initializations args_t;;
+    (* '(fn_instr_id, fn_instr) <- gen_call_fn args ret_t fn;; *)
+
+    (* Generate params that will be used by both function calls *)
+    args_texp <- map_monad
+                  (fun (arg_typ : typ) =>
+                     arg_exp <- gen_exp_size 0 arg_typ;;
+                     ret ((arg_typ,arg_exp), []))
+                  args_t;;
+    src_fn_blocks <- assemble_pred_fn_blocks init_code args_t ret_t args_texp src_fn_str;;
+    tgt_fn_blocks <- assemble_pred_fn_blocks init_code args_t ret_t args_texp tgt_fn_str;;
+    ret (src_fn_blocks, tgt_fn_blocks)
+  .
+
+  Definition assemble_runner_def (args_t : list typ) (ret_t : typ) (fn_str : string) (pred_fn_blocks : runnable_blocks) : definition typ runnable_blocks
+    :=
     let name := Name "runner" in
     let runner_typ :=
-      TYPE_Function ret_typ args_typ false in
-    let param_attr_slots := map (fun t => []) args_typ in
+      TYPE_Function ret_t args_t false in
+    let param_attr_slots := map (fun t => []) args_t in
     let prototype :=
       mk_declaration name runner_typ
         ([], param_attr_slots)
         []
         []
     in
-    reset_local_ctx;;
-    blks <- gen_pred_fn_blocks args_typ ret_typ fn;;
-    (* Should not have any parameter input for runner i.e. main *)
-    let runner_def := mk_definition (block typ * list (block typ)) prototype [] blks in
-    ret runner_def.
-    
-  Definition gen_runner_tle (args : list typ) (ret_t : typ) (fn : string): GenALIVE2 (toplevel_entity typ (block typ * list (block typ)))
+    mk_definition (runnable_blocks) prototype [] pred_fn_blocks.
+  
+  Definition gen_runner_tle (args_t : list typ) (ret_t : typ) (src_fn_str tgt_fn_str : string) : GenALIVE2 (toplevel_entity typ runnable_blocks * toplevel_entity typ runnable_blocks)
     :=
-    ret TLE_Definition <*> gen_runner_def args ret_t fn
-  .
+    reset_local_ctx;;
+    '(src_fn_blocks, tgt_fn_blocks) <- gen_pred_fn_blocks args_t ret_t src_fn_str tgt_fn_str;;
+    let src_def := assemble_runner_def args_t ret_t src_fn_str src_fn_blocks in
+    let tgt_def := assemble_runner_def args_t ret_t tgt_fn_str tgt_fn_blocks in
+    ret (TLE_Definition src_def, TLE_Definition tgt_def).
+
+  
 
   (* TODO: Supposed to take a parsed program (TLE maybe?) and output a fixed list of TLEs
    Need to find what the type of the input is
