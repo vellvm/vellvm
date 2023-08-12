@@ -89,6 +89,28 @@ let generate_n_args : int -> LL.typ list -> (LL.typ * DV.uvalue) list list = fun
   let vals = G.generate ~n:n (gen_args t_args) in
   List.map (List.combine t_args) vals
 
-let gen_runner' (args_t : LL.typ list) (ret_t : LL.typ) : (typ, typ block * typ block list) toplevel_entity list GL.coq_G =
-  let ran = GA.run_GenALIVE2 (GA.gen_runner_tle t) in
-  
+let gen_runner' (args_t : LL.typ list) (ret_t : LL.typ) (src_fn_str : char list) (tgt_fn_str : char list): ((LL.typ, GA.runnable_blocks) LL.toplevel_entity * (LL.typ, GA.runnable_blocks) LL.toplevel_entity) GL.coq_G =
+  let ran = GA.run_GenALIVE2 (GA.gen_runner_tle args_t ret_t src_fn_str tgt_fn_str) in
+  GL.bindGen
+    (ran)
+    (fun x ->
+       begin match x with
+         | GenAlive2.Inl a -> failwith (string_of_char_list a)
+         | GenAlive2.Inr b -> GL.returnGen b
+       end)
+
+let gen_runner (args_t : LL.typ list) (ret_t : LL.typ) (src_fn_str : char list) (tgt_fn_str : char list) : ((LL.typ, GA.runnable_blocks) LL.toplevel_entity * (LL.typ, GA.runnable_blocks) LL.toplevel_entity) G.t =
+  let runner = run_gen (gen_runner' args_t ret_t src_fn_str tgt_fn_str) in
+  G.return runner
+
+let generate_n_runner (n : int) (args_t : LL.typ list) (ret_t : LL.typ) (src_fn_str : char list) (tgt_fn_str : char list) : ((LL.typ, GA.runnable_blocks) LL.toplevel_entity * (LL.typ, GA.runnable_blocks) LL.toplevel_entity) list =
+  let vals = G.generate ~n:n (gen_runner args_t ret_t src_fn_str tgt_fn_str) in
+  vals
+  (* let ran = GA.run_GenALIVE2 (GA.gen_uvalue t) in
+  GL.bindGen
+    (ran)
+    (fun x ->
+       begin match x with
+         | GenAlive2.Inl a -> failwith (string_of_char_list a)
+         | GenAlive2.Inr b -> GL.returnGen b
+       end)*)
