@@ -134,6 +134,10 @@ do
     sed -i "/^type fbinop =/,/^$/c\type fbinop = LLVMAst.fbinop\n" $EXTRACT_DIR/$f
     sed -i "/^type fast_math =/,/^$/c\type fast_math = LLVMAst.fast_math\n" $EXTRACT_DIR/$f
     sed -i "/^type conversion_type =/,/^$/c\type conversion_type = LLVMAst.conversion_type\n" $EXTRACT_DIR/$f
+    sed -i "/^type 't block =/,/^$/c\type 't block = 't LLVMAst.block\n" $EXTRACT_DIR/$f
+    sed -i "/^type instr_id =/,/^$/c\type instr_id = LLVMAst.instr_id\n" $EXTRACT_DIR/$f
+    sed -i "/^type 't terminator =/,/^$/c\type 't terminator = 't LLVMAst.terminator\n" $EXTRACT_DIR/$f
+    sed -i "/^type 't code =/,/^$/c\type 't code = 't LLVMAst.code\n" $EXTRACT_DIR/$f
 
     # CeresS replacement
     sed -i "/^type 'a sexp_ =/,/^$/c\type 'a sexp_ = 'a CeresS.sexp_\n" $EXTRACT_DIR/$f
@@ -243,6 +247,10 @@ do
     sed -i "/^type fbinop =/,/^$/c\type fbinop = LLVMAst.fbinop\n" $EXTRACT_DIR/$f
     sed -i "/^type fast_math =/,/^$/c\type fast_math = LLVMAst.fast_math\n" $EXTRACT_DIR/$f
     sed -i "/^type conversion_type =/,/^$/c\type conversion_type = LLVMAst.conversion_type\n" $EXTRACT_DIR/$f
+    sed -i "/^type 't block =/,/^$/c\type 't block = 't LLVMAst.block\n" $EXTRACT_DIR/$f
+    sed -i "/^type instr_id =/,/^$/c\type instr_id = LLVMAst.instr_id\n" $EXTRACT_DIR/$f
+    sed -i "/^type 't terminator =/,/^$/c\type 't terminator = 't LLVMAst.terminator\n" $EXTRACT_DIR/$f
+    sed -i "/^type 't code =/,/^$/c\type 't code = 't LLVMAst.code\n" $EXTRACT_DIR/$f
 
     #AstLib replacement
     sed -i "/^module RawIDOrd =/,/end/c\module RawIDOrd = AstLib.RawIDOrd" $EXTRACT_DIR/$f
