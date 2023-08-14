@@ -35,16 +35,16 @@ Ltac inv_observes :=
     end.
 
 Section contains_UB.
-  Context {E F G : Type -> Type}.
-  #[local] Notation Eff := (E +' F +' UBE +' G).
+  Context {E F G J : Type -> Type}.
+  #[local] Notation Eff := (E +' F +' G +' UBE +' J).
 
-  Inductive contains_UB {R} : itree Eff R -> Prop :=
-  | CrawlTau  : forall t1 t2, t2 ≅ Tau t1 -> contains_UB t1 -> contains_UB t2
-  | CrawlVis1 : forall Y (e : (E +' F) Y) x k t2, t2 ≅ (vis e k) -> contains_UB (k x) -> contains_UB t2
-  | CrawlVis2 : forall Y (e : G Y) x k t2, t2 ≅ (vis e k) -> contains_UB (k x) -> contains_UB t2
-  | FindUB    : forall s k t2, t2 ≅ (vis (subevent (F:=Eff) _ (ThrowUB s)) k) -> contains_UB t2.
+  Inductive contains_UB_Extra {R} : itree Eff R -> Prop :=
+  | CrawlTau  : forall t1 t2, t2 ≅ Tau t1 -> contains_UB_Extra t1 -> contains_UB_Extra t2
+  | CrawlVis1 : forall Y (e : (E +' F +' G) Y) x k t2, t2 ≅ (vis e k) -> contains_UB_Extra (k x) -> contains_UB_Extra t2
+  | CrawlVis2 : forall Y (e : J Y) x k t2, t2 ≅ (vis e k) -> contains_UB_Extra (k x) -> contains_UB_Extra t2
+  | FindUB    : forall s k t2, t2 ≅ (vis (subevent (F:=Eff) _ (ThrowUB s)) k) -> contains_UB_Extra t2.
 
-  #[global] Instance proper_eutt_contains_UB {R} {RR : relation R} : Proper (@eqit Eff _ _ RR true true ==> iff) contains_UB.
+  #[global] Instance proper_eutt_contains_UB_Extra {R} {RR : relation R} : Proper (@eqit Eff _ _ RR true true ==> iff) contains_UB_Extra.
   Proof.
     unfold Proper, respectful.
     intros x y EQ.
@@ -365,14 +365,14 @@ Section contains_UB.
   Qed.
 *)
 
-End contains_UB.
+End contains_UB_Extra.
 
-Section contains_UB_lemmas.
-  Context {E F G : Type -> Type}.
-  Local Notation Eff := (E +' F +' UBE +' G).
+Section contains_UB_Extra_lemmas.
+  Context {E F G J : Type -> Type}.
+  Local Notation Eff := (E +' F +' G +' UBE +' J).
 
-  Lemma ret_not_contains_UB {R} {RR : relation R} :
-    forall (t : itree Eff R) rv, eqit RR true true t (ret rv) -> ~ contains_UB t.
+  Lemma ret_not_contains_UB_Extra {R} {RR : relation R} :
+    forall (t : itree Eff R) rv, eqit RR true true t (ret rv) -> ~ contains_UB_Extra t.
   Proof.
     intros t rv EQ CUB.
     rewrite EQ in CUB.
@@ -380,16 +380,16 @@ Section contains_UB_lemmas.
       pinversion H; inversion CHECK.
   Qed.
 
-End contains_UB_lemmas.
+End contains_UB_Extra_lemmas.
 
 Section bind_lemmas.
-  Context {E F G : Type -> Type}.
-  Local Notation Eff := (E +' F +' UBE +' G).
+  Context {E F G J : Type -> Type}.
+  Local Notation Eff := (E +' F +' G +' UBE +' J).
 
-  Lemma bind_contains_UB :
+  Lemma bind_contains_UB_Extra :
     forall {R T} (t : itree Eff R) (k : R -> itree Eff T),
-      contains_UB t ->
-      contains_UB (ITree.bind t k).
+      contains_UB_Extra t ->
+      contains_UB_Extra (ITree.bind t k).
   Proof.
     intros R T t k CUB.
     induction CUB.
@@ -407,18 +407,18 @@ Section bind_lemmas.
       eapply FindUB; reflexivity.
   Qed.
 
-  Lemma bind_contains_UB_k :
+  Lemma bind_contains_UB_Extra_k :
     forall {R T} (t : itree Eff R) (k : R -> itree Eff T) (a : R),
       (* Need to make sure `t` doesn't spin. *)
       Returns a t ->
-      contains_UB (k a) ->
-      contains_UB (ITree.bind t k).
+      contains_UB_Extra (k a) ->
+      contains_UB_Extra (ITree.bind t k).
   Proof.
     intros R T t k a RET CUB.
     induction RET.
     - rewrite H; rewrite bind_ret_l; auto.
     - rewrite H; rewrite tau_eutt; eauto.
-    - destruct e as [e | [f | [ube | g]]].
+    - destruct e as [e | [f | [g | [ube | j]]]].
       + rewrite H.
         rewrite bind_vis.
         eapply CrawlVis1 with (e := (inl1 e)) (k := (fun x0 : X => ITree.bind (k0 x0) k)).
@@ -426,7 +426,12 @@ Section bind_lemmas.
         eauto.
       + rewrite H.
         rewrite bind_vis.
-        eapply CrawlVis1 with (e := (inr1 f)) (k := (fun x0 : X => ITree.bind (k0 x0) k)).
+        eapply CrawlVis1 with (e := (inr1 (inl1 f))) (k := (fun x0 : X => ITree.bind (k0 x0) k)).
+        reflexivity.
+        eauto.
+      + rewrite H.
+        rewrite bind_vis.
+        eapply CrawlVis1 with (e := (inr1 (inr1 g))) (k := (fun x0 : X => ITree.bind (k0 x0) k)).
         reflexivity.
         eauto.
       + rewrite H.
@@ -436,44 +441,44 @@ Section bind_lemmas.
         reflexivity.
       + rewrite H.
         rewrite bind_vis.
-        eapply CrawlVis2 with (e := g) (k := (fun x0 : X => ITree.bind (k0 x0) k)).
+        eapply CrawlVis2 with (e := j) (k := (fun x0 : X => ITree.bind (k0 x0) k)).
         reflexivity.
         eauto.
   Qed.
 
-  Lemma bind_contains_UB' :
+  Lemma bind_contains_UB_Extra' :
     forall {R T} (t : itree Eff R) (k : R -> itree Eff T),
-      contains_UB (ITree.bind t k) ->
-      (forall x, ~ contains_UB (k x)) ->
-      contains_UB t.
+      contains_UB_Extra (ITree.bind t k) ->
+      (forall x, ~ contains_UB_Extra (k x)) ->
+      contains_UB_Extra t.
   Proof.
     intros R T t k UB NUB.
   Admitted.
 End bind_lemmas.
 
 Section interp_lemmas.
-  Context {E1 F1 G1 : Type -> Type}.
-  Local Notation Eff1 := (E1 +' F1 +' UBE +' G1).
+  Context {E1 F1 G1 J1 : Type -> Type}.
+  Local Notation Eff1 := (E1 +' F1 +' G1 +' UBE +' J1).
 
-  Context {E2 F2 G2 : Type -> Type}.
-  Local Notation Eff2 := (E2 +' F2 +' UBE +' G2).
+  Context {E2 F2 G2 J2 : Type -> Type}.
+  Local Notation Eff2 := (E2 +' F2 +' G2 +' UBE +' J2).
 
   Variable (handler : Handler Eff1 Eff2).
 
   Definition handler_keeps_UB :=
     forall {R} (e : UBE R),
-      contains_UB (handler _ ((inr1 (inr1 (inl1 e))) : Eff1 R)).
+      contains_UB_Extra (handler _ (inr1 ((inr1 (inr1 (inl1 e)))) : Eff1 R)).
 
-  (* We want a lemma about `interp` preserving `contains_UB`.
+  (* We want a lemma about `interp` preserving `contains_UB_Extra`.
 
     It seems like we could say something like:
 
       Definition handler_keeps_UB := forall {R} (e : UBE R),
-        contains_UB (handler _ ((inr1 (inr1 (inl1 e))) : Eff1 R)).
+        contains_UB_Extra (handler _ ((inr1 (inr1 (inl1 e))) : Eff1 R)).
 
     Unfortunately, this isn't good enough to ensure:
 
-      contains_UB (interp handler t).
+      contains_UB_Extra (interp handler t).
 
     `handler_keeps_UB` isn't enough because there are other events
     besides `UBE` that `handler` interprets into itrees. Let's say I
@@ -484,10 +489,10 @@ Section interp_lemmas.
         if b then raiseUB "UB happens!"else (ret 0)
 
     Depending on how `e` is handled the resulting tree may or may not
-    have UB. If we look at the relevant constructor for `contains_UB`:
+    have UB. If we look at the relevant constructor for `contains_UB_Extra`:
 
       | CrawlVis1 : forall Y (e : (E +' F) Y) x k t2, t2 ≅ (vis e k)
-        -> contains_UB (k x) -> contains_UB t2
+        -> contains_UB_Extra (k x) -> contains_UB_Extra t2
 
     We see that `maybe_UB` contains UB because there exists `x = true`
     that will make the continuation contain UB.
@@ -509,12 +514,12 @@ Section interp_lemmas.
     divergent itree.
    *)
 
-  Lemma interp_contains_UB :
+  Lemma interp_contains_UB_Extra :
     forall {R} (t : itree Eff1 R),
-      contains_UB t ->
+      contains_UB_Extra t ->
       handler_keeps_UB ->
       (forall {T} (e : Eff1 T), exists a, Returns a (handler T e)) ->
-      contains_UB (interp handler t).
+      contains_UB_Extra (interp handler t).
   Proof.
     intros R t UB KEEP RET.
     Import InterpFacts.
@@ -527,14 +532,14 @@ End interp_lemmas.
 
 
 Section refine_OOM_h_lemmas.
-  Context {E G : Type -> Type}.
-  Local Notation Eff := (E +' OOME +' UBE +' G).
+  Context {E F G : Type -> Type}.
+  Local Notation Eff := (E +' F +' OOME +' UBE +' G).
 
   Hint Resolve interp_PropT__mono : paco.
 
   (* Only the <- direction is true *)
   Global Instance proper_refine_OOM_h
-           {R} {RR : relation R} : Proper (@refine_OOM_h Eff _ _ RR ==> flip impl) contains_UB.
+           {R} {RR : relation R} : Proper (@refine_OOM_h Eff _ _ RR ==> flip impl) contains_UB_Extra.
     unfold Proper, respectful.
     intros x y EQ UB; revert x EQ.
     induction UB.
@@ -674,11 +679,11 @@ Section refine_OOM_h_lemmas.
     (* } *)
   Admitted.
 
-  Lemma contains_UB_refine_OOM_h :
+  Lemma contains_UB_Extra_refine_OOM_h :
     forall R (RR : relation R) (x y : itree Eff R),
-      contains_UB y ->
+      contains_UB_Extra y ->
       refine_OOM_h RR x y ->
-      contains_UB x.
+      contains_UB_Extra x.
   Proof.
     intros R RR x y UB REF.
     rewrite REF.
