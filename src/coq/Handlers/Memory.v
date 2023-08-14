@@ -1152,12 +1152,12 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       match e with
       | Intrinsic t name args =>
         (* Pick all arguments, they should all be unique. *)
-        if string_dec name "llvm.memcpy.p0i8.p0i8.i32" then  (* FIXME: use reldec typeclass? *)
-          match handle_memcpy args m with
-          | inl err => raise err
-          | inr m' => ret ((m', s), DVALUE_None)
-          end
-        else
+        (* if string_dec name "llvm.memcpy.p0i8.p0i8.i32" then  (* FIXME: use reldec typeclass? *) *)
+        (*   match handle_memcpy args m with *)
+        (*   | inl err => raise err *)
+        (*   | inr m' => ret ((m', s), DVALUE_None) *)
+        (*   end *)
+        (* else *)
           raise ("Unknown intrinsic: " ++ name)
       end.
 

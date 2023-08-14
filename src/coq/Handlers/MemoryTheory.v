@@ -3259,62 +3259,62 @@ Section PARAMS.
           rewrite map_length. auto.
     Qed.
 
-    (* Note : For the current version of subevents, [interp_memory] must
-        have subevent clauses assumed in Context, or else the
-        [handle_intrinsic] handler will not get properly invoked. *)
-    (* This is specialized to DTYPE_Array for practical
-       purposes. We could conjure a more complete definition later. *)
-    Lemma interp_memory_intrinsic_memcpy :
-      forall (m : memory_stack) (dst src : Addr.addr) (sz : N)
-        (dst_val src_val : uvalue) (dτ : dtyp) volatile align,
-        0 <= Z.of_N (sz * sizeof_dtyp dτ) <= Int32.max_unsigned ->
-        read m dst (DTYPE_Array sz dτ) = inr dst_val ->
-        read m src (DTYPE_Array sz dτ) = inr src_val ->
-        no_overlap dst (Int32.unsigned (Int32.repr (Z.of_N (sz * sizeof_dtyp dτ)))) src
-                   (Int32.unsigned (Int32.repr (Z.of_N (sz * sizeof_dtyp dτ)))) ->
-        exists m' s,
-          (interp_memory (trigger (Intrinsic DTYPE_Void
-                                             "llvm.memcpy.p0i8.p0i8.i32"
-                                             [DVALUE_Addr dst; DVALUE_Addr src;
-                                             DVALUE_I32 (Int32.repr (Z.of_N (sizeof_dtyp (DTYPE_Array sz dτ))));
-                                             DVALUE_I32 align ;
-                                             DVALUE_I1 volatile])) m ≈
-                         ret (m', s, DVALUE_None)) /\
-          read (m', s) dst (DTYPE_Array sz dτ) = inr src_val.
-    Proof.
-      intros m dst src i dst_val src_val dτ volatile align.
-      intros size_H  MEM_dst MEM_src NO_OVERLAP.
-      unfold read in MEM_dst, MEM_src.
-      destruct (get_logical_block m (fst dst)) eqn: HM_dst. cbn in MEM_dst.
-      destruct l. 2 : { inversion MEM_dst. }
-      destruct (get_logical_block m (fst src)) eqn: HM_src. cbn in MEM_src.
-      destruct l. 2 : { inversion MEM_src. }
-      setoid_rewrite interp_memory_trigger.
-      unfold interp_memory_h. cbn.
-      unfold resum, ReSum_id, id_, Id_IFun.
-      unfold handle_intrinsic. cbn.
-      destruct m.
-      destruct dst as (dst_base & dst_offset).
-      destruct src as (src_base & src_offset).
-      epose proof no_overlap_reflect as reflect_H.
-      eapply reflect_iff in reflect_H.
-      rewrite reflect_iff in NO_OVERLAP. clear reflect_H.
-      setoid_rewrite NO_OVERLAP. cbn in *.
-      setoid_rewrite HM_src. cbn. setoid_rewrite HM_dst. cbn.
-      eexists. exists f.
-      split; try reflexivity.
-      rewrite <- MEM_src. unfold read. cbn.
-      unfold read_in_mem_block. cbn.
-      rewrite Int32.unsigned_repr. 2 : apply size_H.
-      rewrite get_logical_block_of_add_logical_block_mem.
-      pose proof lookup_all_index_add_all_index.
-      specialize (H2 (N.to_nat (i * sizeof_dtyp dτ))).
-      rewrite Nnat.N2Nat.id in H2.
-      rewrite N2Z.id.
-      rewrite H2. reflexivity.
-      apply no_overlap_reflect. Unshelve. unfold addr, Addr.addr.
-      exact (0, 0). exact (0, 0). eauto.
-    Qed.
+    (* (* Note : For the current version of subevents, [interp_memory] must *)
+    (*     have subevent clauses assumed in Context, or else the *)
+    (*     [handle_intrinsic] handler will not get properly invoked. *) *)
+    (* (* This is specialized to DTYPE_Array for practical *)
+    (*    purposes. We could conjure a more complete definition later. *) *)
+    (* Lemma interp_memory_intrinsic_memcpy : *)
+    (*   forall (m : memory_stack) (dst src : Addr.addr) (sz : N) *)
+    (*     (dst_val src_val : uvalue) (dτ : dtyp) volatile align, *)
+    (*     0 <= Z.of_N (sz * sizeof_dtyp dτ) <= Int32.max_unsigned -> *)
+    (*     read m dst (DTYPE_Array sz dτ) = inr dst_val -> *)
+    (*     read m src (DTYPE_Array sz dτ) = inr src_val -> *)
+    (*     no_overlap dst (Int32.unsigned (Int32.repr (Z.of_N (sz * sizeof_dtyp dτ)))) src *)
+    (*                (Int32.unsigned (Int32.repr (Z.of_N (sz * sizeof_dtyp dτ)))) -> *)
+    (*     exists m' s, *)
+    (*       (interp_memory (trigger (Intrinsic DTYPE_Void *)
+    (*                                          "llvm.memcpy.p0i8.p0i8.i32" *)
+    (*                                          [DVALUE_Addr dst; DVALUE_Addr src; *)
+    (*                                          DVALUE_I32 (Int32.repr (Z.of_N (sizeof_dtyp (DTYPE_Array sz dτ)))); *)
+    (*                                          DVALUE_I32 align ; *)
+    (*                                          DVALUE_I1 volatile])) m ≈ *)
+    (*                      ret (m', s, DVALUE_None)) /\ *)
+    (*       read (m', s) dst (DTYPE_Array sz dτ) = inr src_val. *)
+    (* Proof. *)
+    (*   intros m dst src i dst_val src_val dτ volatile align. *)
+    (*   intros size_H  MEM_dst MEM_src NO_OVERLAP. *)
+    (*   unfold read in MEM_dst, MEM_src. *)
+    (*   destruct (get_logical_block m (fst dst)) eqn: HM_dst. cbn in MEM_dst. *)
+    (*   destruct l. 2 : { inversion MEM_dst. } *)
+    (*   destruct (get_logical_block m (fst src)) eqn: HM_src. cbn in MEM_src. *)
+    (*   destruct l. 2 : { inversion MEM_src. } *)
+    (*   setoid_rewrite interp_memory_trigger. *)
+    (*   unfold interp_memory_h. cbn. *)
+    (*   unfold resum, ReSum_id, id_, Id_IFun. *)
+    (*   unfold handle_intrinsic. cbn. *)
+    (*   destruct m. *)
+    (*   destruct dst as (dst_base & dst_offset). *)
+    (*   destruct src as (src_base & src_offset). *)
+    (*   epose proof no_overlap_reflect as reflect_H. *)
+    (*   eapply reflect_iff in reflect_H. *)
+    (*   rewrite reflect_iff in NO_OVERLAP. clear reflect_H. *)
+    (*   setoid_rewrite NO_OVERLAP. cbn in *. *)
+    (*   setoid_rewrite HM_src. cbn. setoid_rewrite HM_dst. cbn. *)
+    (*   eexists. exists f. *)
+    (*   split; try reflexivity. *)
+    (*   rewrite <- MEM_src. unfold read. cbn. *)
+    (*   unfold read_in_mem_block. cbn. *)
+    (*   rewrite Int32.unsigned_repr. 2 : apply size_H. *)
+    (*   rewrite get_logical_block_of_add_logical_block_mem. *)
+    (*   pose proof lookup_all_index_add_all_index. *)
+    (*   specialize (H2 (N.to_nat (i * sizeof_dtyp dτ))). *)
+    (*   rewrite Nnat.N2Nat.id in H2. *)
+    (*   rewrite N2Z.id. *)
+    (*   rewrite H2. reflexivity. *)
+    (*   apply no_overlap_reflect. Unshelve. unfold addr, Addr.addr. *)
+    (*   exact (0, 0). exact (0, 0). eauto. *)
+    (* Qed. *)
 
   End Structural_Lemmas.
 
