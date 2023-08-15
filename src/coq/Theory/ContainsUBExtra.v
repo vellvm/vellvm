@@ -34,7 +34,7 @@ Ltac inv_observes :=
         setoid_rewrite <- H1 in H2; inversion H2; subst
     end.
 
-Section contains_UB.
+Section contains_UB_Extra.
   Context {E F G J : Type -> Type}.
   #[local] Notation Eff := (E +' F +' G +' UBE +' J).
 

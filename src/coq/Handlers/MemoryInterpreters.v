@@ -21,7 +21,7 @@ From Vellvm.Utils Require Import
      StateMonads Raise Tactics ITreeMap.
 
 From Vellvm.Theory Require Import
-  ContainsUB.
+  ContainsUBExtra.
 
 From ITree Require Import
      ITree
@@ -405,7 +405,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
                (ta : itree Effout (MemState * (store_id * T)))
                (k2 : (MemState * (store_id * T)) -> itree Effout (MemState * (store_id * R)))
                (t2 : itree Effout (MemState * (store_id * R))) : Prop
-      := contains_UB ta \/ t2 ≈ (bind ta k2).
+         := contains_UB_Extra ta \/ t2 ≈ (bind ta k2).
 
     #[global] Instance memory_k_spec_proper {A R2 : Type} e ta k2 :
       Proper

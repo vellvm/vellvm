@@ -14,6 +14,7 @@ From Vellvm Require Import
      Utils.Tactics
      Theory.DenotationTheory
      Theory.InterpreterMCFG
+     Theory.ContainsUBExtra
      Handlers.MemoryModelImplementation.
 
 From ITree Require Import
@@ -761,31 +762,33 @@ Module Infinite.
 
   Lemma interp_memory_prop_vis_inv:
     forall E R X
-      (ENUB : E <> UBE)
       (e : (E +' LLVMParamsBigIntptr.Events.IntrinsicE +' LLVMParamsBigIntptr.Events.MemoryE +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X)
-      k sid m x,
-      interp_memory_prop (E:=E) (R2 := R) eq (Vis e k) sid m x ->
+      k sid m t,
+      interp_memory_prop (E:=E) (R2 := R) eq (Vis e k) sid m t ->
       ((exists ta k2 s1 s2 ,
-        x ≈ x <- ta;; k2 x /\
+        t ≈ a <- ta;; k2 a /\
           interp_memory_prop_h e s1 s2 ta /\
           (forall (a : X) (b : MMEP.MMSP.MemState * (store_id * X)),
             @Returns (E +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X a (trigger e) ->
             @Returns (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) (MMEP.MMSP.MemState * (store_id * X)) b ta ->
             a = snd (snd b) ->
             interp_memory_prop (E := E) eq (k a) sid m (k2 b))) \/
-        (exists A (e : OOME A) k, x ≈ vis e k)%type).
+         (exists ta s1 s2, interp_memory_prop_h e s1 s2 ta /\ contains_UB_Extra ta)%type \/
+         (exists A (e : OOME A) k, t ≈ vis e k)%type).
   Proof.
     intros.
     punfold H.
     red in H. cbn in H.
-    setoid_rewrite (itree_eta x).
+    setoid_rewrite (itree_eta t).
     remember (VisF e k).
-    genobs x ox.
-    clear x Heqox.
+    genobs t ot.
+    clear t Heqot.
     hinduction H before sid; intros; inv Heqi; eauto.
     - specialize (IHinterp_memory_PropTF m eq_refl).
-      destruct IHinterp_memory_PropTF as [(?&?&?&?&?&?&?) | (?&?&?&?)].
-      2: {
+      destruct IHinterp_memory_PropTF as [(?&?&?&?&?&?&?) | [(?&?&?&?) | (?&?&?&?)]].
+      3: {
+        (* OOM *)
+        right.
         right.
         setoid_rewrite tau_eutt.
         rewrite <- itree_eta in H1.
@@ -794,113 +797,31 @@ Module Infinite.
         reflexivity.
       }
 
+      2: {
+        (* UB *)
+        right. left.
+        exists x. exists x0. exists x1.
+        auto.        
+      }
+
       left.
       eexists _,_,_,_; split; eauto. rewrite tau_eutt.
       rewrite <- itree_eta in H1. eauto.
     - setoid_rewrite <- itree_eta.
       setoid_rewrite HT1.
-      right.
+      right. right.
       exists A. exists e0. exists k0.
       reflexivity.
-    - subst_existT.
-      red in KS.
-      destruct KS as [UB | KS].
-      { (* UB... *)
-        exfalso.
-        repeat red in HSPEC.
-        destruct e.
-        - repeat red in HSPEC.
-          rewrite HSPEC in UB.
-          setoid_rewrite bind_trigger in UB.
-          dependent induction UB.
-          + pinversion H; subst.
-            inv CHECK.
-          + (* CrawlVis *)
-          (* Should mean that k0 is just a ret, which should lead to a contradiction in UB *)
-            eapply eqit_inv_Vis_weak in H.
-            destruct H as (?&?&?); subst.
-            red in H0.
-            rewrite <- H0 in UB.
-            eapply ContainsUB.ret_not_contains_UB.
-            2: {
-              eapply UB.
-            }
-            
-            inv UB.
-            pinversion H1.
-            punfold H; red in H; cbn in H.
-            
-            inv H.
-            subst_existT.
-            
-            Set Printing Implicit.
-            assert
-              (
-(@subevent E (E +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
-              (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 E E
-                 (LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
-                 (@ReSum_id (Type -> Type) IFun Id_IFun E)) X e) =
-(@subevent (E +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
-              (E +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
-              (@ReSum_id (Type -> Type) IFun Id_IFun
-                 (E +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) Y e0)).
-  
-
-                (@subevent E (E +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
-                  (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 E E
-                     (LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) =
-                     (@subevent (E +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
-                        (E +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
-                        (@ReSum_id (Type -> Type) IFun Id_IFun
-                           (E +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) Y e0)
-                      (@ReSum_id (Type -> Type) IFun Id_IFun E)) X e)).
-                subevent X e = subevent Y e0).
-            inv H.
-            subst_existT.
-            
-          + pinversion H; repeat subst_existT.
-            unfold subevent in H5.
-            unfold resum in H5.
-            unfold ReSum_inl, ReSum_id in H5.
-            unfold id_, Id_IFun in H5.
-            unfold cat, Cat_IFun in H5.
-            unfold inl_, Inl_sum1 in H5.
-            unfold resum in H5.
-            
-            
-          + subst.
-            pinversion H.
-            repeat subst_existT.
-            
-            unfold subevent in *.
-            unfold resum in H6.
-            cbn in H6.
-          rw
-          rewrite vis_ret in UB.
-          dependent induction UB.
-          + pinversion H; subst_existT.
-            inv CHECK.
-          + pinversion H; subst_existT.
-            subst_existT.
-            inv H5.
-
-          admit. (* Need to know that E is not UBE, so UB is a contradiction *)
-        - repeat red in HSPEC.
-          destruct s.
-          + repeat red in HSPEC.
-            destruct HSPEC as [UB' | [ERR | [OOM | HSPEC]]].
-            * destruct UB'.
-              repeat red in H.
-              destruct i.
-              break_match_hyp.
-              -- cbn in H.
-                 cbn in H.
-          rewrite HSPEC in UB.
-          setoid_rewrite bind_trigger in UB.
-        
+    - dependent destruction H1.
+      red in KS; cbn in KS.
+      destruct KS as [KS_UB | KS].
+      { (* Interpretation of e contains UB *)
+        right; left.
+        exists ta. exists s1. exists s2.
+        auto.
       }
 
-      dependent destruction H1.
+      (* Interpretation of e does not contain UB *)
       left.
       eexists _,_,_,_; split; eauto.
       + rewrite <- itree_eta; eauto.
@@ -983,6 +904,7 @@ Module Infinite.
     rewrite alloc_tree_simpl in H.
     apply L3_trace_MemoryE in H.
 
+    (* Given `H`, what can `x` be? *)
     apply interp_memory_prop_vis_inv in H.
     destruct H as [(alloc_t&k1&s1&ms1&EQ1&SPEC1&HK) | (A&e&k&EUTT)].
     2: {
