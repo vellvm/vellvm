@@ -26,7 +26,7 @@ From Vellvm Require Import
   Semantics.InfiniteToFinite.LangRefine
   Syntax.DynamicTypes
   Theory.TopLevelRefinements
-  Theory.ContainsUB
+  Theory.ContainsUBExtra
   Utils.Error
   Utils.Monads
   Utils.MapMonadExtra
@@ -20010,10 +20010,16 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       specialize (REL0 x).
                       red in REL0.
                       pclearbot.
-                      eapply ret_not_contains_UB; [| eapply H1].
                       rewrite <- REL0 in H1.
-                      pinversion H1.
-                    pinversion H0
+                      eapply ret_not_contains_UB_Extra in H1; eauto.
+                      cbn.
+                      reflexivity.
+                    - pinversion H0.
+                      do 2 subst_existT.
+                      inv H7.
+                    - pinversion H0.
+                      do 2 subst_existT.
+                      inv H6.
                   }
                   setoid_rewrite bind_vis in KS.
                   punfold KS; red in KS; cbn in KS.
@@ -20047,6 +20053,27 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     destruct EV_REL as (T&F&ARGS); subst.
                     red in HSPEC.
                     rewrite HSPEC in VIS_HANDLED.
+                    destruct VIS_HANDLED as [UB | VIS_HANDLED].
+
+                    { (* UB... Should be contradiction *)
+                      exfalso.
+                      setoid_rewrite bind_trigger in UB.
+                      dependent destruction UB.
+                      - pinversion H; subst; inv CHECK1.
+                      - pinversion H; do 2 subst_existT.
+                        specialize (REL0 x).
+                        rewrite <- REL0 in UB.
+                        eapply ret_not_contains_UB_Extra in UB; cbn; auto.
+                        reflexivity.
+                      - pinversion H; do 2 subst_existT.
+                        specialize (REL0 x).
+                        rewrite <- REL0 in UB.
+                        eapply ret_not_contains_UB_Extra in UB; cbn; auto.
+                        reflexivity.
+                      - pinversion H; do 2 subst_existT.
+                        subst.
+                        dependent destruction H6.
+                    }
 
                     setoid_rewrite bind_trigger in VIS_HANDLED.
                     setoid_rewrite bind_vis in VIS_HANDLED.
@@ -20068,6 +20095,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         cbn.
                         red.
                         setoid_rewrite bind_trigger.
+                        right.
                         pstep; red; cbn.
 
                         pose proof (fin_to_inf_uvalue_refine_strict' _ _ F).
@@ -20246,6 +20274,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                             3: {
                               red in KS.
                               red.
+                              right.
                               red.
                               rewrite VIS_HANDLED.
                               cbn in *.
