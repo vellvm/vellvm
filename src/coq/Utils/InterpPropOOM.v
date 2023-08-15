@@ -29,6 +29,7 @@ From ITree Require Import
 
 From Vellvm Require Import
      Utils.PropT.
+
 Require Import Paco.paco.
 
 Import ListNotations.
@@ -47,22 +48,6 @@ Local Open Scope cat_scope.
 #[global] Instance void1_unit {E} : void1 -< E.
   repeat intro; contradiction.
 Qed.
-
-(* TODO: Move this? *)
-Ltac inj_pair2_existT :=
-  repeat
-      match goal with
-      | H : _ |- _ => apply inj_pair2 in H
-      end.
-
-Ltac subst_existT :=
-  inj_pair2_existT; subst.
-
-Ltac observe_vis :=
-  match goal with
-  | |- context [VisF ?e ?k] =>
-      change (VisF e k) with (observe (Vis e k))
-  end.
 
 Section interp_prop_oom.
 

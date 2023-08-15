@@ -1151,3 +1151,17 @@ Qed.
 
 End BIND_BIND_COUNTEREXAMPLE.
 
+Ltac inj_pair2_existT :=
+  repeat
+      match goal with
+      | H : _ |- _ => apply inj_pair2 in H
+      end.
+
+Ltac subst_existT :=
+  inj_pair2_existT; subst.
+
+Ltac observe_vis :=
+  match goal with
+  | |- context [VisF ?e ?k] =>
+      change (VisF e k) with (observe (Vis e k))
+  end.

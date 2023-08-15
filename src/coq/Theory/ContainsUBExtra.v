@@ -690,3 +690,27 @@ Section refine_OOM_h_lemmas.
     eauto.
   Qed.
 End refine_OOM_h_lemmas.
+
+Lemma contains_UB_Extra_raiseOOM :
+  forall {E F G J} `{O : OOME -< E +' F +' G +' UBE +' J} {X} msg,
+    (forall X e1 e2, O X e1 <> inr1 (inr1 (inr1 (inl1 e2)))) ->
+    ~ contains_UB_Extra (@raiseOOM _ _ X msg).
+Proof.
+  intros E F G J O X msg NUBE CONTRA.
+  dependent destruction CONTRA.
+  - pinversion H; subst; inv CHECK.
+  - pinversion H; do 2 subst_existT.
+    cbn in *.
+    inv x.
+  - pinversion H; do 2 subst_existT.
+    cbn in *.
+    inv x.
+  - pinversion H; do 2 subst_existT.
+    cbn in *.
+    subst.
+    rewrite subevent_subevent in H4.
+    unfold subevent in *.
+    repeat unfold resum, ReSum_id, id_, Id_IFun, ReSum_inr, ReSum_inl, inr_, inl_, cat, Cat_IFun, Inr_sum1, Inl_sum1 in H4.
+    apply NUBE in H4.
+    auto.
+Qed.

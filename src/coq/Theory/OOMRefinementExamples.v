@@ -906,8 +906,8 @@ Module Infinite.
 
     (* Given `H`, what can `x` be? *)
     apply interp_memory_prop_vis_inv in H.
-    destruct H as [(alloc_t&k1&s1&ms1&EQ1&SPEC1&HK) | (A&e&k&EUTT)].
-    2: {
+    destruct H as [(alloc_t&k1&s1&ms1&EQ1&SPEC1&HK) | [(ta&s1&s2&INTERP&UB) | (A&e&k&EUTT)]].
+    3: { (* OOM *)
       exists t'.
       split.
       - unfold interp_mcfg4.
@@ -1000,6 +1000,49 @@ Module Infinite.
             reflexivity.
       - reflexivity.
     }
+
+    2: { (* UB *)
+      exfalso.
+
+      pose proof allocate_dtyp_spec_inv s2 (DTYPE_I 64) as ALLOCINV.
+      assert (abs : DTYPE_I 64 <> DTYPE_Void) by (intros abs; inv abs).
+      specialize (ALLOCINV 1%N abs); eauto; clear abs.
+
+      repeat red in INTERP.
+      destruct INTERP as [ALLOC_UB | [ALLOC_ERR | [ALLOC_OOM | ALLOC_SUC]]].
+      { (* UB *)
+        destruct ALLOC_UB as [ub_msg [ALLOC_UB | [sab [a [ALLOC_UB []]]]]].
+        specialize (ALLOCINV _ ALLOC_UB).
+        destruct ALLOCINV as [[ms_final [ptr ALLOC_INV]] | [oom_msg ALLOC_INV]];
+          inv ALLOC_INV.
+      }
+      { (* ERR *)
+        destruct ALLOC_ERR as [err_msg [MAP [spec_msg [ALLOC_ERR | [sab [a [ALLOC_ERR []]]]]]]].
+        apply ALLOCINV in ALLOC_ERR.
+        destruct ALLOC_ERR as [[ms_final [ptr ALLOC_ERR]] | [oom_msg ALLOC_ERR]];
+          inv ALLOC_ERR.
+      }
+      { (* OOM *)
+        destruct ALLOC_OOM as [err_msg [MAP [spec_msg [ALLOC_OOM | [sab [a [ALLOC_OOM []]]]]]]].
+        apply ALLOCINV in ALLOC_OOM. clear ALLOCINV.
+        destruct ALLOC_OOM as [[ms_final [ptr ALLOC_OOM]] | [oom_msg ALLOC_OOM]];
+          inv ALLOC_OOM.
+
+        rewrite MAP in UB.
+        cbn in UB.
+
+        eapply contains_UB_Extra_raiseOOM in UB; eauto.
+        intros X e1 e2.
+        repeat unfold resum, ReSum_id, id_, Id_IFun, ReSum_inr, ReSum_inl, inr_, inl_, cat, Cat_IFun, Inr_sum1, Inl_sum1.
+        intros CONTRA; discriminate.
+      }
+
+      destruct ALLOC_SUC as (?&?&?&?&?).
+      rewrite H in UB.
+      eapply ret_not_contains_UB_Extra in UB; eauto.
+      reflexivity.
+    }
+    
     rewrite EQ1 in H0. clear x EQ1.
 
     pose proof allocate_dtyp_spec_inv ms1 (DTYPE_I 64) as ALLOCINV.
@@ -1402,29 +1445,32 @@ Module Finite.
   Lemma interp_memory_prop_vis_inv:
     forall E R X
       (e : (E +' LLVMParams64BitIntptr.Events.IntrinsicE +' LLVMParams64BitIntptr.Events.MemoryE +' LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X)
-      k sid m x,
-      interp_memory_prop (E:=E) (R2 := R) eq (Vis e k) sid m x ->
+      k sid m t,
+      interp_memory_prop (E:=E) (R2 := R) eq (Vis e k) sid m t ->
       ((exists ta k2 s1 s2 ,
-        x ≈ x <- ta;; k2 x /\
+        t ≈ a <- ta;; k2 a /\
           interp_memory_prop_h e s1 s2 ta /\
           (forall (a : X) (b : MMEP.MMSP.MemState * (store_id * X)),
             @Returns (E +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X a (trigger e) ->
             @Returns (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) (MMEP.MMSP.MemState * (store_id * X)) b ta ->
             a = snd (snd b) ->
             interp_memory_prop (E := E) eq (k a) sid m (k2 b))) \/
-        (exists A (e : OOME A) k, x ≈ vis e k)%type).
+         (exists ta s1 s2, interp_memory_prop_h e s1 s2 ta /\ contains_UB_Extra ta)%type \/
+         (exists A (e : OOME A) k, t ≈ vis e k)%type).
   Proof.
     intros.
     punfold H.
     red in H. cbn in H.
-    setoid_rewrite (itree_eta x).
+    setoid_rewrite (itree_eta t).
     remember (VisF e k).
-    genobs x ox.
-    clear x Heqox.
+    genobs t ot.
+    clear t Heqot.
     hinduction H before sid; intros; inv Heqi; eauto.
     - specialize (IHinterp_memory_PropTF m eq_refl).
-      destruct IHinterp_memory_PropTF as [(?&?&?&?&?&?&?) | (?&?&?&?)].
-      2: {
+      destruct IHinterp_memory_PropTF as [(?&?&?&?&?&?&?) | [(?&?&?&?) | (?&?&?&?)]].
+      3: {
+        (* OOM *)
+        right.
         right.
         setoid_rewrite tau_eutt.
         rewrite <- itree_eta in H1.
@@ -1433,15 +1479,31 @@ Module Finite.
         reflexivity.
       }
 
+      2: {
+        (* UB *)
+        right. left.
+        exists x. exists x0. exists x1.
+        auto.        
+      }
+
       left.
       eexists _,_,_,_; split; eauto. rewrite tau_eutt.
       rewrite <- itree_eta in H1. eauto.
     - setoid_rewrite <- itree_eta.
       setoid_rewrite HT1.
-      right.
+      right. right.
       exists A. exists e0. exists k0.
       reflexivity.
     - dependent destruction H1.
+      red in KS; cbn in KS.
+      destruct KS as [KS_UB | KS].
+      { (* Interpretation of e contains UB *)
+        right; left.
+        exists ta. exists s1. exists s2.
+        auto.
+      }
+
+      (* Interpretation of e does not contain UB *)
       left.
       eexists _,_,_,_; split; eauto.
       + rewrite <- itree_eta; eauto.
@@ -1571,8 +1633,8 @@ Module Finite.
     apply L3_trace_MemoryE in H.
 
     apply interp_memory_prop_vis_inv in H.
-    destruct H as [(alloc_t&k1&s1&ms1&EQ1&SPEC1&HK) | (A&e&k&EUTT)].
-    2: {
+    destruct H as [(alloc_t&k1&s1&ms1&EQ1&SPEC1&HK) | [(ta&s1&s2&INTERP&UB) | (A&e&k&EUTT)]].
+    3: { (* OOM *)
       exists t'.
       split.
       - unfold interp_mcfg4.
@@ -1665,6 +1727,49 @@ Module Finite.
             reflexivity.
       - reflexivity.
     }
+
+    2: { (* UB *)
+      exfalso.
+
+      pose proof allocate_dtyp_spec_inv s2 (DTYPE_I 64) as ALLOCINV.
+      assert (abs : DTYPE_I 64 <> DTYPE_Void) by (intros abs; inv abs).
+      specialize (ALLOCINV 1%N abs); eauto; clear abs.
+
+      repeat red in INTERP.
+      destruct INTERP as [ALLOC_UB | [ALLOC_ERR | [ALLOC_OOM | ALLOC_SUC]]].
+      { (* UB *)
+        destruct ALLOC_UB as [ub_msg [ALLOC_UB | [sab [a [ALLOC_UB []]]]]].
+        specialize (ALLOCINV _ ALLOC_UB).
+        destruct ALLOCINV as [[ms_final [ptr ALLOC_INV]] | [oom_msg ALLOC_INV]];
+          inv ALLOC_INV.
+      }
+      { (* ERR *)
+        destruct ALLOC_ERR as [err_msg [MAP [spec_msg [ALLOC_ERR | [sab [a [ALLOC_ERR []]]]]]]].
+        apply ALLOCINV in ALLOC_ERR.
+        destruct ALLOC_ERR as [[ms_final [ptr ALLOC_ERR]] | [oom_msg ALLOC_ERR]];
+          inv ALLOC_ERR.
+      }
+      { (* OOM *)
+        destruct ALLOC_OOM as [err_msg [MAP [spec_msg [ALLOC_OOM | [sab [a [ALLOC_OOM []]]]]]]].
+        apply ALLOCINV in ALLOC_OOM. clear ALLOCINV.
+        destruct ALLOC_OOM as [[ms_final [ptr ALLOC_OOM]] | [oom_msg ALLOC_OOM]];
+          inv ALLOC_OOM.
+
+        rewrite MAP in UB.
+        cbn in UB.
+
+        eapply contains_UB_Extra_raiseOOM in UB; eauto.
+        intros X e1 e2.
+        repeat unfold resum, ReSum_id, id_, Id_IFun, ReSum_inr, ReSum_inl, inr_, inl_, cat, Cat_IFun, Inr_sum1, Inl_sum1.
+        intros CONTRA; discriminate.
+      }
+
+      destruct ALLOC_SUC as (?&?&?&?&?).
+      rewrite H in UB.
+      eapply ret_not_contains_UB_Extra in UB; eauto.
+      reflexivity.
+    }
+    
     rewrite EQ1 in H0. clear x EQ1.
 
     pose proof allocate_dtyp_spec_inv ms1 (DTYPE_I 64) as ALLOCINV.
@@ -1710,10 +1815,11 @@ Module Finite.
     assert (alloca_returns:
              forall x, Returns
                     (E := ExternalCallE +'
-                          LLVMParams64BitIntptr.Events.IntrinsicE +'
-                          LLVMParams64BitIntptr.Events.MemoryE +'
-                          LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
-                    x (trigger (Alloca (DTYPE_I 64) 1 None))).
+                        LLVMParams64BitIntptr.Events.IntrinsicE +'
+                        LLVMParams64BitIntptr.Events.MemoryE +'
+                        LLVMParams64BitIntptr.Events.PickUvalueE +'
+                        OOME +' UBE +' DebugE +' FailureE)
+                                   x (trigger (Alloca (DTYPE_I 64) 1 None))).
     { intros. unfold trigger.
       eapply ReturnsVis; [ reflexivity | ].
       Unshelve. eapply ReturnsRet. reflexivity. }
