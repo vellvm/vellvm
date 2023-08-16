@@ -20212,17 +20212,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     red in HSPEC.
                     red in HSPEC.
                     destruct HSPEC as [UB | [ERR | [OOM | HSPEC]]].
+
                     { (* Handler raises UB *)
-                      (* ta is completely unconstrained in the UB handler...
-
-                         Should UB actually be handled this way by
-                         handle_intrinsic_prop / MemPropT?
-
-                         Alternatively it might make sense to handle
-                         this more like error, and then handle UB
-                         later?
-                       *)
-
                       destruct UB as [ub_msg INTRINSIC].
                       red in INTRINSIC.
                       break_match_hyp.
@@ -20274,10 +20265,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                             3: {
                               red in KS.
                               red.
-                              right.
-                              red.
-                              rewrite VIS_HANDLED.
-                              cbn in *.
+                              left.
+                              eapply FindUB.
+                              pstep; red; cbn.
+                              constructor.
+                              intros [].
                             }
 
                             2: {
@@ -20297,32 +20289,86 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                             }
 
                             intros a1 b RETa RETb AB.
-
-
-                            econstructor.
-                            inversion RUN; subst.
-                            { exfalso; eapply EQ; eauto. }
-
-                            { (* OOM *)
-                              destruct e.
-                              admit.
-                            }
-
-                            subst_existT.
-                            admit.
-                            admit.
+                            eapply Returns_vis_inversion in RETb.
+                            destruct RETb as [[] _].                            
                           }
 
                           break_match_hyp.
                           2: {
                             (* Overlapping UB *)
+                            subst.
+                            inversion ARGS; subst.
+                            inversion H4; subst.
+                            inversion H6; subst.
+                            inversion H8; subst.
+                            inversion H10; subst.
+
+                            apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
+                            apply dvalue_refine_strict_addr_r_inv in H3 as (?&?&?); subst.
+                            apply dvalue_refine_strict_i32_r_inv in H5 as (?&?&?); subst.
+                            apply dvalue_refine_strict_i32_r_inv in H7 as (?&?&?); subst.
+                            apply dvalue_refine_strict_i1_r_inv in H9 as (?&?&?); subst.
+
+                            eapply Interp_Memory_PropT_Vis with
+                              (ta:=
+                                 vis (ThrowUB tt)
+                                   (fun x : void =>
+                                      match
+                                        x
+                                        return
+                                        (itree
+                                           (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
+                                                                                                 LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                                           (MemoryBigIntptr.MMEP.MMSP.MemState *
+                                              (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                      with
+                                      end)).
+
+                            3: {
+                              red in KS.
+                              red.
+                              left.
+                              eapply FindUB.
+                              pstep; red; cbn.
+                              constructor.
+                              intros [].
+                            }
+
+                            2: {
+                              cbn.
+                              repeat red.
+                              left.
+                              exists "memcpy with overlapping or non-equal src and dst memory locations.".
+                              red.
+                              rewrite Heqb.
+                              cbn.
+                              left.
+                              red.
+                              cbn in H2.
+                              rewrite H2.
+                              rewrite Heqb0.
+                              erewrite <- fin_inf_no_overlap; eauto.
+                              erewrite <- fin_inf_ptoi; eauto.
+                              erewrite <- fin_inf_ptoi; eauto.
+                              rewrite Heqb1.
+                              cbn; auto.
+                            }
+
+                            intros a1 b RETa RETb AB.
+                            eapply Returns_vis_inversion in RETb.
+                            destruct RETb as [[] _].                            
+                          }
+
+                          (* May be UB in read / write... *)
+                          destruct HANDLER as [READ_UB | HANDLER].
+                          { (* UB in read *)
                             admit.
                           }
 
-                          (* No UB *)
-                          (* May be UB in read / write... *)
-                          cbn in HANDLER.
-                          admit.
+                          { (* UB in write *)
+                            destruct HANDLER as (ms_read & bytes & READ & HANDLER).
+                            admit.
+                          }
                         }
 
                         { (* 64 bit *)
