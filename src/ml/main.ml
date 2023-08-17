@@ -231,7 +231,9 @@ let test_file path =
   begin match ext with
     | "ll" -> 
       let tests = parse_tests path in
+      let _ = Printf.printf "Parsed successfully" in
       let ll_ast = IO.parse_file path in
+      let _ = Printf.printf "AST retrieved successfully" in
       let suite = Test (path, List.map (make_test path ll_ast) tests) in
       let outcome = run_suite [suite] in
       Printf.printf "%s\n" (outcome_to_string outcome);
