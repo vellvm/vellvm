@@ -6654,6 +6654,22 @@ cofix CIH
     auto.
   Qed.
 
+  (* TODO: Move this... *)
+  Lemma MemPropT_bind_raise_ub_inv :
+    forall {S A B}
+      (ma : MemPropT S A)
+      (mab : A -> MemPropT S B)
+      {s1 msg}
+      (M :
+        (a <- ma;;
+         mab a) s1 (raise_ub msg)),
+      (ma s1 (raise_ub msg) \/
+         exists s' a, ma s1 (ret (s', a)) /\ mab a s' (raise_ub msg)).
+  Proof.
+    intros S A B ma mab s1 msg M.
+    auto.
+  Qed.
+
   (* This might be a good idea, should make the proofs more modular... *)
   (* TODO: Move this *)
   Lemma MemPropT_fin_inf_bind :
@@ -6917,6 +6933,67 @@ cofix CIH
 
     right.
     eauto.
+  Qed.
+
+  Lemma MemPropT_fin_inf_map_monad_ub :
+    forall {A_INF A_FIN B_INF B_FIN}
+      {l_inf : list A_INF} {l_fin : list A_FIN}
+      {f_fin : A_FIN -> MemPropT Memory64BitIntptr.MMEP.MMSP.MemState B_FIN} {f_inf : A_INF -> MemPropT MemoryBigIntptr.MMEP.MMSP.MemState B_INF}
+      {ms_fin_start ms_fin_final : Memory64BitIntptr.MMEP.MMSP.MemState}
+      {ms_inf_start : MemoryBigIntptr.MMEP.MMSP.MemState}
+      {msg : string}
+
+      (A_REF : A_INF -> A_FIN -> Prop)
+      (B_REF : B_INF -> B_FIN -> Prop)
+
+      (MEM_REF_START : MemState_refine_prop ms_inf_start ms_fin_start)
+
+      (F : forall a_fin a_inf b_fin ms_fin ms_inf ms_fin_ma,
+          MemState_refine_prop ms_inf ms_fin ->
+          A_REF a_inf a_fin ->
+          f_fin a_fin ms_fin (ret (ms_fin_ma, b_fin)) ->
+          exists b_inf ms_inf_ma,
+            f_inf a_inf ms_inf (ret (ms_inf_ma, b_inf)) /\
+              B_REF b_inf b_fin /\
+              MemState_refine_prop ms_inf_ma ms_fin_ma)
+
+      (F_UB : forall a_fin a_inf ms_fin ms_inf msg,
+          MemState_refine_prop ms_inf ms_fin ->
+          A_REF a_inf a_fin ->
+          f_fin a_fin ms_fin (raise_ub msg) ->
+          f_inf a_inf ms_inf (raise_ub msg))
+
+      (AS : Forall2 A_REF l_inf l_fin)
+      (FIN : map_monad f_fin l_fin ms_fin_start (raise_ub msg)),
+
+      map_monad f_inf l_inf ms_inf_start (raise_ub msg).
+  Proof.
+    intros A_INF A_FIN B_INF B_FIN l_inf l_fin f_fin f_inf ms_fin_start ms_fin_final ms_inf_start msg A_REF B_REF MEM_REF_START F F_UB AS FIN.
+
+    generalize dependent msg.
+    generalize dependent ms_fin_start.
+    generalize dependent ms_inf_start.
+    induction AS; intros ms_inf_start ms_fin_start MEM_REF_START msg FIN.
+    - cbn in *; auto.
+    - rewrite map_monad_unfold in FIN.
+      apply MemPropT_bind_raise_ub_inv in FIN as [UB | (ms_fin' & b_fin & F_Y & FIN)].
+      { (* UB in first component *)
+        left; eauto.
+      }
+
+      apply MemPropT_bind_raise_ub_inv in FIN as [UB | (ms_fin_final' & b_fin_rest & MAP_FIN & RET_FIN)].
+      2: {
+        cbn in RET_FIN.
+        contradiction.
+      }
+
+      (* UB in rest *)
+      right.
+      pose proof (F _ _ _ _ _ _ MEM_REF_START H F_Y) as (b_inf & ms_inf' & F_X & B & MSR).
+      specialize (IHAS ms_inf' ms_fin' MSR msg UB).
+      exists ms_inf'. exists b_inf.
+      split; eauto.
+      left; auto.
   Qed.
 
   Lemma get_inf_tree_rutt :
