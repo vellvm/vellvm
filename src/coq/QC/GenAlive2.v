@@ -791,8 +791,12 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
 End GEN_ALIVE2.
 
 
+Require Import QuickChick.QuickChick.
 
-(* Module G := GEN_ALIVE2 MemoryModelImplementation.FinAddr MemoryModelImplementation.IP64Bit MemoryModelImplementation.FinSizeof  . (* LLVMEvents64. *) *)
+Module G := GEN_ALIVE2 MemoryModelImplementation.FinAddr MemoryModelImplementation.IP64Bit MemoryModelImplementation.FinSizeof  . (* LLVMEvents64. *)
+Import G.
+
+Sample (lift (gen_exp_size O (TYPE_I 1))).
  
 (* (* Extract Inlined Constant fst => "fst". *) *)
 (* (* Extract Inlined Constant app => "append". *) *)
