@@ -200,7 +200,7 @@ Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE
                  else (* No swap *)
                    gacc
                in (gen', k'))
-            gs (failGen ("freq_LLVM"), 0%N)).
+            gs (failGen ("Failgen at freq_ALIVE2"), 0%N)).
 
   Definition elems_ALIVE2 {A : Type} (l: list A) : GenALIVE2 A
     := fst
@@ -465,18 +465,19 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
               es <- vectorOf_ALIVE2 (N.to_nat n) (gen_exp_size 0 t);;
               ret (EXP_Array (map (fun e => (t, e)) es))    
           | TYPE_Struct vars =>
-              failGen "Unimplemented"
+              failGen "Struct generation unimplemented"
           | TYPE_Packed_struct vars =>
               failGen "Unimplemented"
-          | _ => failGen "Not supported"
+          | _ => failGen "Packed Struct generation unimplemented"
           end in
     match sz with
     | 0%nat => (* Generate value-like expression *)
         exp1 <- gen_size_0 t;;
-        exp2 <- gen_exp_ident t;;
+        (* exp2 <- gen_exp_ident t;; *)
         (* TODO: Can express this in more elegant way *)
         (* TODO: May have some problem at generating ident *)
-        freq_ALIVE2 [(1%nat, ret exp1); (1%nat, ret exp2)]
+        (* It is possible that exp2 is none, so need to match exp2*)
+        freq_ALIVE2 [(1%nat, ret exp1)]
     | (S z)%nat => (* Generate instruction-like expression *)
         match t with
         | TYPE_I sz =>
@@ -791,12 +792,10 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
 End GEN_ALIVE2.
 
 
-Require Import QuickChick.QuickChick.
+(* Require Import QuickChick.QuickChick. *)
 
-Module G := GEN_ALIVE2 MemoryModelImplementation.FinAddr MemoryModelImplementation.IP64Bit MemoryModelImplementation.FinSizeof  . (* LLVMEvents64. *)
-Import G.
-
-Sample (lift (gen_exp_size O (TYPE_I 1))).
+(* Module G := GEN_ALIVE2 MemoryModelImplementation.FinAddr MemoryModelImplementation.IP64Bit MemoryModelImplementation.FinSizeof  . (* LLVMEvents64. *) *)
+(* Import G. *)
  
 (* (* Extract Inlined Constant fst => "fst". *) *)
 (* (* Extract Inlined Constant app => "append". *) *)
