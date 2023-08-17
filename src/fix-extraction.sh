@@ -167,6 +167,10 @@ do
     sed -i 's/^module Int\([0-9]\+\) =.*$/module Int\1 = DynamicValues.Int\1/' $EXTRACT_DIR/$f
     sed -i 's/^module \(Coq_Int64\) =.*$/module \1 = DynamicValues.Int64/' $EXTRACT_DIR/$f
     sed -i 's/^type int\([1-9]\+\) =.*$/type int\1 = DynamicValues.int\1/' $EXTRACT_DIR/$f
+
+
+    sed -i "/val randomRInt :/ival coqPositive2Int : positive -> Stdlib.Int.t\n\nvalcoqZ2Int : coq_Z -> Stdlib.Int.t\n\nval nonNegInt2CoqPositive : Stdlib.Int.t -> positive\n\nval int2CoqZ : Stdlib.Int.t -> coq_Z\n\n"
+    sed -i "/val randomRN :/ival coqN2Int : n -> Stdlib.Int.t\n\nval int2CoqN : Stdlib.Int.t -> n\n\n" $EXTRACT_DIR/$f
     
     # replace "s/Int.int/int/g" $f
     # replace "s/Int1.int/DynamicValues.int1/g" $f
@@ -284,9 +288,9 @@ do
     sed -i 's/^module Int\([0-9]\+\) =.*$/module Int\1 = DynamicValues.Int\1/' $EXTRACT_DIR/$f
     sed -i 's/^module \(Coq_Int64\) =.*$/module \1 = DynamicValues.Int64/' $EXTRACT_DIR/$f
     sed -i 's/^type int\([1-9]\+\) =.*$/type int\1 = DynamicValues.int\1/' $EXTRACT_DIR/$f
-    sed -i "/let randomRInt = /ilet rec coqPositiveToInt = function\n| Coq_xI p0 -> 2 * (coqPositiveToInt p0) + 1\n| Coq_xO p0 -> 2 * (coqPositiveToInt p0)\n| Coq_xH -> 1\n\nlet coqZToInt  = function\n| Z0 -> 0\n| Zpos p -> coqPositiveToInt p\n| Zneg p -> ~-(coqPositiveToInt p)\n\nlet rec nonNegIntToCoqPositive y =\nmatch y with\n| 0 -> Coq_xH\n| 1 -> Coq_xH\n| _ -> if (y mod 2 > 0) then Coq_xI (nonNegIntToCoqPositive (y / 2 - 1)) else Coq_xO (nonNegIntToCoqPositive (y / 2))\n\nlet intToCoqZ x =\nif (x < 0) then Zneg (nonNegIntToCoqPositive ~-x) else if (x > 0) then Zpos (nonNegIntToCoqPositive x) else Z0\n\n" $EXTRACT_DIR/$f
+    sed -i "/let randomRInt = /ilet rec coqPositive2Int = function\n| Coq_xI p0 -> 2 * (coqPositive2Int p0) + 1\n| Coq_xO p0 -> 2 * (coqPositive2Int p0)\n| Coq_xH -> 1\n\nlet coqZ2Int  = function\n| Z0 -> 0\n| Zpos p -> coqPositive2Int p\n| Zneg p -> ~-(coqPositive2Int p)\n\nlet rec nonNegInt2CoqPositive y =\nmatch y with\n| 0 -> Coq_xH\n| 1 -> Coq_xH\n| _ -> if (y mod 2 > 0) then Coq_xI (nonNegInt2CoqPositive (y / 2 - 1)) else Coq_xO (nonNegInt2CoqPositive (y / 2))\n\nlet int2CoqZ x =\nif (x < 0) then Zneg (nonNegInt2CoqPositive ~-x) else if (x > 0) then Zpos (nonNegInt2CoqPositive x) else Z0\n\n" $EXTRACT_DIR/$f
 
-    sed -i "/let randomRN = /ilet coqNToInt = function\n| N0 -> 0\n| Npos p -> coqPositiveToInt p\n\nlet intToCoqN x =\nif (x < 0) then Npos (nonNegIntToCoqPositive ~-x) else if (x > 0) then Npos (nonNegIntToCoqPositive x) else N0\n\n" $EXTRACT_DIR/$f
+    sed -i "/let randomRN = /ilet coqN2Int = function\n| N0 -> 0\n| Npos p -> coqPositive2Int p\n\nlet int2CoqN x =\nif (x < 0) then Npos (nonNegInt2CoqPositive ~-x) else if (x > 0) then Npos (nonNegInt2CoqPositive x) else N0\n\n" $EXTRACT_DIR/$f
 
     # sed -i "/let listOf g =/,/^$/c\let listOf g = \nGenLow__0.sized (fun n0 -> \nGenLow__0.bindGen (GenLow__0.choose chooseNat (0, coqZToInt n0)) (fun k -> \nvectorOf k g))\n\n" $EXTRACT_DIR/$f
     # sed -i "/let suchThatMaybe g p =/,/^$/c\let suchThatMaybe g p = \nGenLow__0.sized (fun n0 -> retry (coqZToInt n0) (suchThatMaybe1 g p))\n\n" $EXTRACT_DIR/$f
