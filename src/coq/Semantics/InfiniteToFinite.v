@@ -6862,6 +6862,63 @@ cofix CIH
       eapply F; eauto.
   Qed.
 
+  Lemma MemPropT_fin_inf_bind_ub :
+    forall {ms_inf_start : MemoryBigIntptr.MMEP.MMSP.MemState}
+      {ms_fin_start ms_fin_final : Memory64BitIntptr.MMEP.MMSP.MemState}
+      {A_FIN A_INF B_FIN B_INF}
+      (ma_fin : MemPropT Memory64BitIntptr.MMEP.MMSP.MemState A_FIN)
+      {ma_inf : MemPropT MemoryBigIntptr.MMEP.MMSP.MemState A_INF}
+      {mab_fin : A_FIN -> MemPropT Memory64BitIntptr.MMEP.MMSP.MemState B_FIN}
+      {mab_inf : A_INF -> MemPropT MemoryBigIntptr.MMEP.MMSP.MemState B_INF}
+      {msg : string}
+
+      (A_REF : A_INF -> A_FIN -> Prop)
+
+      (MEM_REF_START : MemState_refine_prop ms_inf_start ms_fin_start)
+
+      (* Not sure about quantification *)
+      (MA: forall a_fin ms_fin_ma,
+          ma_fin ms_fin_start (ret (ms_fin_ma, a_fin)) ->
+          exists a_inf ms_inf_ma,
+            ma_inf ms_inf_start (ret (ms_inf_ma, a_inf)) /\
+              A_REF a_inf a_fin /\
+              MemState_refine_prop ms_inf_ma ms_fin_ma)
+
+      (MA_UB: forall msg,
+          ma_fin ms_fin_start (raise_ub msg) ->
+          ma_inf ms_inf_start (raise_ub msg))
+
+      (* Not sure about quantification *)
+      (* ma >>= k *)
+      (K: forall ms_inf ms_fin a_fin a_inf msg,
+          A_REF a_inf a_fin ->
+          MemState_refine_prop ms_inf ms_fin ->
+          ma_inf ms_inf_start (ret (ms_inf, a_inf)) ->
+          mab_fin a_fin ms_fin (raise_ub msg) ->
+          mab_inf a_inf ms_inf (raise_ub msg))
+
+      (FIN: (a <- ma_fin;;
+             mab_fin a) ms_fin_start (raise_ub msg)),
+
+      (a <- ma_inf;;
+       mab_inf a) ms_inf_start (raise_ub msg).
+  Proof.
+    intros ms_inf_start ms_fin_start ms_fin_final A_FIN A_INF B_FIN B_INF ma_fin ma_inf mab_fin mab_inf msg A_REF MEM_REF_START MA MA_UB K FIN.
+
+    repeat red in FIN.
+    destruct FIN as [UB | (sab&a&FIN&FIN_AB)].
+    { (* UB in ma_fin *)
+      left.
+      auto.
+    }
+
+    apply MA in FIN as (a_inf&ms_inf''&INF&A&MSR).
+    eapply K in FIN_AB; eauto.
+
+    right.
+    eauto.
+  Qed.
+
   Lemma get_inf_tree_rutt :
     forall t,
       orutt (OOM:=OOME) L3_refine_strict L3_res_refine_strict
@@ -20484,69 +20541,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                                     repeat red in H.
                                     repeat red.
                                     admit.
-
-                                    Set Nested Proofs Allowed.
-                                    Lemma MemPropT_fin_inf_bind_ub :
-                                      forall {ms_inf_start : MemoryBigIntptr.MMEP.MMSP.MemState}
-                                        {ms_fin_start ms_fin_final : Memory64BitIntptr.MMEP.MMSP.MemState}
-                                        {A_FIN A_INF B_FIN B_INF}
-                                        (ma_fin : MemPropT Memory64BitIntptr.MMEP.MMSP.MemState A_FIN)
-                                        {ma_inf : MemPropT MemoryBigIntptr.MMEP.MMSP.MemState A_INF}
-                                        {mab_fin : A_FIN -> MemPropT Memory64BitIntptr.MMEP.MMSP.MemState B_FIN}
-                                        {mab_inf : A_INF -> MemPropT MemoryBigIntptr.MMEP.MMSP.MemState B_INF}
-                                        {msg_fin msg_inf}
-
-                                        (A_REF : A_INF -> A_FIN -> Prop)
-                                        (B_REF : B_INF -> B_FIN -> Prop)
-
-                                        (MEM_REF_START : MemState_refine_prop ms_inf_start ms_fin_start)
-
-                                        (* Not sure about quantification *)
-                                        (MA: forall a_fin ms_fin_ma,
-                                            ma_fin ms_fin_start (ret (ms_fin_ma, a_fin)) ->
-                                            exists a_inf ms_inf_ma,
-                                              ma_inf ms_inf_start (ret (ms_inf_ma, a_inf)) /\
-                                                A_REF a_inf a_fin /\
-                                                MemState_refine_prop ms_inf_ma ms_fin_ma)
-
-                                        (* Not sure about quantification *)
-                                        (* ma >>= k *)
-                                        (K: forall ms_inf ms_fin ms_fin' a_fin a_inf b_fin,
-                                            A_REF a_inf a_fin ->
-                                            MemState_refine_prop ms_inf ms_fin ->
-                                            ma_inf ms_inf_start (ret (ms_inf, a_inf)) ->
-                                            mab_fin a_fin ms_fin (ret (ms_fin', b_fin)) ->
-                                            exists b_inf ms_inf',
-                                              mab_inf a_inf ms_inf (ret (ms_inf', b_inf)) /\
-                                                B_REF b_inf b_fin /\
-                                                MemState_refine_prop ms_inf' ms_fin')
-
-                                        (FIN: (a <- ma_fin;;
-                                               mab_fin a) ms_fin_start (ret (ms_fin_final, res_fin))),
-
-                                      exists res_inf ms_inf_final,
-                                        (a <- ma_inf;;
-                                         mab_inf a) ms_inf_start (raise_ub msg_inf).
-                                    Proof.
-                                      intros ms_inf_start ms_fin_start ms_fin_final A_FIN A_INF B_FIN B_INF ma_fin ma_inf mab_fin mab_inf res_fin A_REF B_REF MEM_REF_START MA K FIN.
-
-                                      repeat red in FIN.
-                                      destruct FIN as (sab&a&FIN&FIN_AB).
-
-                                      apply MA in FIN as (a_inf&ms_inf''&INF&A&MSR).
-                                      eapply K in FIN_AB; eauto.
-
-                                      destruct FIN_AB as (res_inf & ms_inf_final & MAB_INF & RES_REF & MEM_RES_FINAL).
-
-                                      exists res_inf. exists ms_inf_final.
-                                      split; auto.
-
-                                      repeat red.
-                                      exists ms_inf''.
-                                      exists a_inf.
-                                      split; auto.
-                                    Qed.
-
                                   }
 
                                   { admit.
