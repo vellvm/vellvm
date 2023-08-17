@@ -13429,11 +13429,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
     (* TODO: Move to listutils *)
     Lemma Forall2_map :
-      forall {A B} (R : B -> B -> Prop) (f : A -> B) l1 l2,
+      forall {A B C} (R : B -> C -> Prop) (f : A -> B) (l1 : list A) (l2 : list C),
         Forall2 (fun a b => R (f a) b) l1 l2 ->
         Forall2 R (map f l1) l2.
     Proof.
-      intros A B R f l1 l2 ALL.
+      intros A B C R f l1 l2 ALL.
       induction ALL; cbn; auto.
     Qed.
 
@@ -20362,7 +20362,200 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                           (* May be UB in read / write... *)
                           destruct HANDLER as [READ_UB | HANDLER].
                           { (* UB in read *)
-                            admit.
+                            (* TODO: This can probably be a separate lemma... *)
+                            (* TODO: Reason compositionally? *)
+                            subst.
+                            red in READ_UB.
+
+                            destruct READ_UB as [GCP_UB | READ_UB].
+                            { (* UB in get_consecutive_ptrs *)
+                              (* TODO: Should be a separate lemma *)
+                              exfalso.
+                              clear - GCP_UB.
+
+                              assert (exists (pre : Memory64BitIntptr.MMEP.MMSP.MemState) (post : Memory64BitIntptr.MMEP.MMSP.MemState),
+                                         Within.within (Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a0 (Z.to_nat (Int32.unsigned x0))) pre
+                                           (raise_ub ub_msg) post) as GCP.
+                              {
+                                exists s2.
+                                exists s2.
+                                cbn.
+                                repeat red.
+                                cbn.
+                                Transparent Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+                                unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs in GCP_UB.
+
+                                unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+                                Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+                                red.
+                                cbn.
+                                repeat red in GCP_UB.
+                                auto.
+                              }
+
+                              eapply InterpreterStack64BitIntptr.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_no_ub in GCP; auto.
+                            }
+
+                            (* UB in read *)
+                            subst.
+                            inversion ARGS; subst.
+                            inversion H4; subst.
+                            inversion H6; subst.
+                            inversion H8; subst.
+                            inversion H10; subst.
+
+                            apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
+                            apply dvalue_refine_strict_addr_r_inv in H3 as (?&?&?); subst.
+                            apply dvalue_refine_strict_i32_r_inv in H5 as (?&?&?); subst.
+                            apply dvalue_refine_strict_i32_r_inv in H7 as (?&?&?); subst.
+                            apply dvalue_refine_strict_i1_r_inv in H9 as (?&?&?); subst.
+
+                            destruct READ_UB as (sab & ptrs & GCP & MAP_UB).
+
+                            eapply Interp_Memory_PropT_Vis with
+                              (ta:=
+                                 vis (ThrowUB tt)
+                                   (fun x : void =>
+                                      match
+                                        x
+                                        return
+                                        (itree
+                                           (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
+                                                                                                 LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                                           (MemoryBigIntptr.MMEP.MMSP.MemState *
+                                              (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                      with
+                                      end)).
+
+                            3: {
+                              red in KS.
+                              red.
+                              left.
+                              eapply FindUB.
+                              pstep; red; cbn.
+                              constructor.
+                              intros [].
+                            }
+
+                            2: {
+                              cbn.
+                              repeat red.
+                              left.
+                              exists ub_msg.
+                              red.
+                              rewrite Heqb.
+                              cbn.
+                              left.
+                              red.
+                              cbn in H2.                              
+                              rewrite H2.
+                              rewrite Heqb0.
+                              erewrite <- fin_inf_no_overlap; eauto.
+                              erewrite <- fin_inf_ptoi; eauto.
+                              erewrite <- fin_inf_ptoi; eauto.
+                              rewrite Heqb1.
+                              repeat red.
+                              cbn; auto.
+                              left.
+                              right.
+                              do 2 eexists.
+                              split.
+                              - eapply fin_inf_get_consecutive_ptrs_success with (ys:=map fin_to_inf_addr ptrs);
+                                  [ | | eapply GCP]; eauto.
+                                apply Forall2_flip.
+                                unfold Util.flip, flip.
+                                eapply Forall2_map.
+                                clear.
+                                induction ptrs.
+                                constructor.
+                                constructor.
+                                apply addr_convert_fin_to_inf_addr.
+                                eapply IHptrs.
+                              - cbn in *.
+                                induction ptrs.
+                                + cbn in *; auto.
+                                + rewrite map_cons.
+                                  rewrite map_monad_unfold.
+                                  rewrite map_monad_unfold in MAP_UB.
+
+                                  repeat red in MAP_UB.
+                                  destruct MAP_UB.
+                                  { (* UB in read_byte *)
+                                    repeat red in H.
+                                    repeat red.
+                                    admit.
+
+                                    Set Nested Proofs Allowed.
+                                    Lemma MemPropT_fin_inf_bind_ub :
+                                      forall {ms_inf_start : MemoryBigIntptr.MMEP.MMSP.MemState}
+                                        {ms_fin_start ms_fin_final : Memory64BitIntptr.MMEP.MMSP.MemState}
+                                        {A_FIN A_INF B_FIN B_INF}
+                                        (ma_fin : MemPropT Memory64BitIntptr.MMEP.MMSP.MemState A_FIN)
+                                        {ma_inf : MemPropT MemoryBigIntptr.MMEP.MMSP.MemState A_INF}
+                                        {mab_fin : A_FIN -> MemPropT Memory64BitIntptr.MMEP.MMSP.MemState B_FIN}
+                                        {mab_inf : A_INF -> MemPropT MemoryBigIntptr.MMEP.MMSP.MemState B_INF}
+                                        {msg_fin msg_inf}
+
+                                        (A_REF : A_INF -> A_FIN -> Prop)
+                                        (B_REF : B_INF -> B_FIN -> Prop)
+
+                                        (MEM_REF_START : MemState_refine_prop ms_inf_start ms_fin_start)
+
+                                        (* Not sure about quantification *)
+                                        (MA: forall a_fin ms_fin_ma,
+                                            ma_fin ms_fin_start (ret (ms_fin_ma, a_fin)) ->
+                                            exists a_inf ms_inf_ma,
+                                              ma_inf ms_inf_start (ret (ms_inf_ma, a_inf)) /\
+                                                A_REF a_inf a_fin /\
+                                                MemState_refine_prop ms_inf_ma ms_fin_ma)
+
+                                        (* Not sure about quantification *)
+                                        (* ma >>= k *)
+                                        (K: forall ms_inf ms_fin ms_fin' a_fin a_inf b_fin,
+                                            A_REF a_inf a_fin ->
+                                            MemState_refine_prop ms_inf ms_fin ->
+                                            ma_inf ms_inf_start (ret (ms_inf, a_inf)) ->
+                                            mab_fin a_fin ms_fin (ret (ms_fin', b_fin)) ->
+                                            exists b_inf ms_inf',
+                                              mab_inf a_inf ms_inf (ret (ms_inf', b_inf)) /\
+                                                B_REF b_inf b_fin /\
+                                                MemState_refine_prop ms_inf' ms_fin')
+
+                                        (FIN: (a <- ma_fin;;
+                                               mab_fin a) ms_fin_start (ret (ms_fin_final, res_fin))),
+
+                                      exists res_inf ms_inf_final,
+                                        (a <- ma_inf;;
+                                         mab_inf a) ms_inf_start (raise_ub msg_inf).
+                                    Proof.
+                                      intros ms_inf_start ms_fin_start ms_fin_final A_FIN A_INF B_FIN B_INF ma_fin ma_inf mab_fin mab_inf res_fin A_REF B_REF MEM_REF_START MA K FIN.
+
+                                      repeat red in FIN.
+                                      destruct FIN as (sab&a&FIN&FIN_AB).
+
+                                      apply MA in FIN as (a_inf&ms_inf''&INF&A&MSR).
+                                      eapply K in FIN_AB; eauto.
+
+                                      destruct FIN_AB as (res_inf & ms_inf_final & MAB_INF & RES_REF & MEM_RES_FINAL).
+
+                                      exists res_inf. exists ms_inf_final.
+                                      split; auto.
+
+                                      repeat red.
+                                      exists ms_inf''.
+                                      exists a_inf.
+                                      split; auto.
+                                    Qed.
+
+                                  }
+
+                                  { admit.
+                                  }
+                            }
+
+                            intros a1 b RETa RETb AB.
+                            eapply Returns_vis_inversion in RETb.
+                            destruct RETb as [[] _].
                           }
 
                           { (* UB in write *)
