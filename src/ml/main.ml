@@ -13,6 +13,7 @@ open Arg
 open Base    
 open Assert
 open Driver
+open ShowAST
 
 module DV = InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV
 
@@ -275,6 +276,13 @@ let test_all () =
   let b2 = try test_pp_dir (!test_directory) with Ran_tests b -> b in
   let b3 = try test_dir (!test_directory) with Ran_tests b -> b in
   raise (Ran_tests (b1 && b2 && b3))
+    
+let test_genAlive2 () =
+  let _ = Printf.printf "============== RUNNING GENALIVE2 ==============\n" in
+  let es = Generate.sample_exp 10 in
+  let show_output : char list = (coq_DShowShow (coq_DShowList (dshow_exp dshow_typ false))) es in
+  let _ = Printf.eprintf (String.concat "" show_output) in
+  ()
 
 let args =
   [
@@ -290,7 +298,8 @@ let args =
   ; ("-interpret", Set Driver.interpret, "interpret ll program starting from 'main'")
   ; ("-i", Set Driver.interpret, "interpret ll program starting from 'main' (same as -interpret)")      
   ; ("-debug", Set Interpreter.debug_flag, "enable debugging trace output")
-  ; ("-v", Set Platform.verbose, "enables more verbose compilation output")] 
+  ; ("-v", Set Platform.verbose, "enables more verbose compilation output")
+  ; ("-genalive2", Unit test_genAlive2, "Run the alive 2 generator and get some sample")] 
 
 let files = ref []
 let _ =
