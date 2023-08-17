@@ -106,11 +106,22 @@ let gen_runner (args_t : LL.typ list) (ret_t : LL.typ) (src_fn_str : char list) 
 let generate_n_runner (n : int) (args_t : LL.typ list) (ret_t : LL.typ) (src_fn_str : char list) (tgt_fn_str : char list) : ((LL.typ, GA.runnable_blocks) LL.toplevel_entity * (LL.typ, GA.runnable_blocks) LL.toplevel_entity) list =
   let vals = G.generate ~n:n (gen_runner args_t ret_t src_fn_str tgt_fn_str) in
   vals
-  (* let ran = GA.run_GenALIVE2 (GA.gen_uvalue t) in
-  GL.bindGen
+
+let sample_exp' : LL.typ LL.exp GL.coq_G =
+  let ran = GA.run_GenALIVE2 (GA.gen_exp_size O (LLVMAst.TYPE_I (GenAlive2.int2CoqN 1))) in
+  let ge = GL.bindGen
     (ran)
     (fun x ->
        begin match x with
-         | GenAlive2.Inl a -> failwith (string_of_char_list a)
+         | GenAlive2.Inl a ->
+           failwith (string_of_char_list a)
          | GenAlive2.Inr b -> GL.returnGen b
-       end)*)
+       end) in
+  ge
+
+let sample_exp (n : int) : LL.typ LL.exp list =
+  let e = run_gen sample_exp'  in
+  let re = G.return e in
+  let ge = G.generate ~n:n (re) in
+  ge
+      
