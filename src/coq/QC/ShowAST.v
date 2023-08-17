@@ -198,6 +198,16 @@ Section ShowInstances.
   #[global] Instance showCConv : Show cconv
     := {| show := show_cconv |}.
 
+  Definition show_sum {A B} `{Show A} `{Show B} (s : A + B) : string
+    :=
+    match s with
+    | inl a => show a
+    | inr b => show b
+    end.
+
+  #[global] Instance showSum {A B} `{Show A} `{Show B} : Show (A + B)
+    := {| show := show_sum |}.
+
   Definition show_param_attr (p : param_attr) : DString :=
     match p with
     | PARAMATTR_Zeroext => string_to_DString "zeroext"
@@ -1123,7 +1133,7 @@ tes on cstring on LLVMAst.v *)
     let arg_str := concat_DString (string_to_DString ", ") (map dshow args)
     in
     string_to_DString "(" @@ arg_str @@ vararg_str @@ string_to_DString ")".
-
+  
 End ShowInstances.
 
 (* TODO: REALLY?!? *)
