@@ -2787,5 +2787,3 @@ Section InstrGenerators.
     ret (high_levels ++ new_globals ++ functions ++ [main])%list.
 
 End InstrGenerators.
-
-Sample (run_GenLLVM gen_typ_0).
