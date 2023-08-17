@@ -7912,6 +7912,46 @@ cofix CIH
     auto.
   Qed.
 
+  (* TODO: Move this? *)
+  (* Should figure out if there's a cleaner way to do this with typeclasses... *)
+  Lemma withinify :
+    forall {MemState X} (m : MemPropT MemState X) s res,
+      m s res ->
+      exists (pre : MemState) (post : MemState),
+        @Within.within (MemPropT MemState) (@MemPropT_Eq1 MemState) err_ub_oom MemState MemState _ _ m pre (fmap snd res) post.
+  Proof.
+    intros MemState X m s res M.
+    exists s.
+    destruct_err_ub_oom res.
+    - exists s.
+      cbn; repeat red; cbn.
+      auto.
+    - exists s.
+      cbn; repeat red; cbn.
+      auto.
+    - exists s.
+      cbn; repeat red; cbn.
+      auto.
+    - destruct res0 as (s' & res').
+      exists s'.
+      cbn; repeat red; cbn.
+      auto.
+  Qed.
+
+  (* TODO: Move this, kind of shocked this doesn't exist somewhere? *)
+  Lemma fmap_ret :
+    forall {M} `{HM: Monad M} `{EQM : Monad.Eq1 M} `{MLAWS : @Monad.MonadLawsE M EQM HM} {X Y} (f : X -> Y) x,
+      Monad.eq1 (@fmap M _ X Y f (@ret M HM X x)) (@ret M HM Y (f x)).
+  Proof.
+    intros M HM EQM MLAWS X Y f x.
+    unfold fmap.
+    cbn.
+    unfold liftM.
+    pose proof Monad.bind_ret_l _ _ (fun x => (ret (f x))) x.
+    cbn in H.
+    auto.
+  Qed.
+
   Lemma fin_inf_get_consecutive_ptrs_success_exists' :
     forall a_fin a_inf n ms_fin ms_fin' addrs_fin ms_inf,
       (* TODO: ADDR probably not necessary, can conclude this from ADDRS...
@@ -19589,51 +19629,17 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     }
     subst.
 
-    destruct GCP as (ms_ipseq&ips&SEQ&GCP).
-    red in SEQ.
-    break_match_hyp_inv.
+    eapply withinify in GCP.
 
-
-    assert (exists (pre : MemoryBigIntptr.MMEP.MMSP.MemState) (post : MemoryBigIntptr.MMEP.MMSP.MemState),
-               Within.within (InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs ptr sz) pre
-                 (ret ptrs) post).
-    {
-      exists ms_gcp.
-      cbn.
-      exists ms_gcp.
-      Transparent MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
-      unfold MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs in GCP.
-      unfold InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
-      Opaque MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
-      red.
-      cbn.
-
-      exists ms_gcp. exists l.
-      split.
-      { red. rewrite Heqo.
-        cbn.
-        auto.
-      }
-
-      cbn in GCP.
-      destruct GCP as (?&?&?&?).
-      red in H.
-
-      exists x. exists x0.
-      split.
-      { cbn.
-        red.
-        break_match_goal; cbn in *; try contradiction.
-        auto.
-      }
-
-      red. red in H0.
-      break_match_hyp_inv.
-      cbn.
-      auto.
-    }
-
-    pose proof InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_length _ _ _ H; eauto.
+    assert ((@fmap err_ub_oom (@Functor_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+               (MemoryBigIntptr.MMEP.MMSP.MemState * list LLVMParamsBigIntptr.ADDR.addr)
+               (list LLVMParamsBigIntptr.ADDR.addr)
+               (@snd MemoryBigIntptr.MMEP.MMSP.MemState (list LLVMParamsBigIntptr.ADDR.addr))
+               (@ret err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+                  (MemoryBigIntptr.MMEP.MMSP.MemState * list LLVMParamsBigIntptr.ADDR.addr)
+                  (ms_gcp, ptrs))) = ret ptrs) as EQ by (cbn; auto).
+    rewrite EQ in GCP.
+    pose proof InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_length _ _ _ GCP; eauto.
     apply map_monad_MemPropT_length in MAPREAD.
     lia.
   Qed.
@@ -19838,6 +19844,29 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       destruct ERR as (?&?&GCP&ERR).
       red in ERR.
       break_match_hyp_inv.
+  Qed.
+
+  Lemma get_consecutive_ptrs_never_ubs :
+    Proof.
+    assert (exists (pre : Memory64BitIntptr.MMEP.MMSP.MemState) (post : Memory64BitIntptr.MMEP.MMSP.MemState),
+               Within.within (Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a0 (Z.to_nat (Int32.unsigned x0))) pre
+                 (raise_ub ub_msg) post) as GCP.
+    {
+      exists s2.
+      exists s2.
+      cbn.
+      repeat red.
+      cbn.
+      Transparent Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+      unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs in GCP_UB.
+
+      unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+      Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+      red.
+      cbn.
+      repeat red in GCP_UB.
+      auto.
+    }
   Qed.
 
   (* TODO: Move this, should apply for fin / inf *)
@@ -20494,6 +20523,105 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                           }
 
                           (* May be UB in read / write... *)
+                          eapply Interp_Memory_PropT_Vis with
+                            (ta:=raise_ub "").
+
+                          3: {
+                            red in KS.
+                            red.
+                            left.
+                            eapply FindUB.
+                            pstep; red; cbn.
+                            constructor.
+                            intros [].
+                          }
+
+                          { intros a1 b RETa RETb AB.
+                            cbn in RETb.
+                            unfold raiseUB in RETb.
+                            rewrite bind_trigger in RETb.
+                            eapply Returns_vis_inversion in RETb.
+                            destruct RETb as [[] _].
+                          }
+
+                          cbn.
+                          red.
+                          left.
+                          exists ub_msg.
+                          red.
+                          rewrite Heqb.
+
+                          eapply MemPropT_fin_inf_bind_ub.
+                          5: eapply HANDLER.
+
+                          3: {
+                            (* Make this a separate lemma? *)
+                            (* Read bytes UB means memcpy yields UB... *)
+                            intros msg H0.
+                            subst.
+                            inversion ARGS; subst.
+                            inversion H5; subst.
+                            inversion H7; subst.
+                            inversion H9; subst.
+                            inversion H11; subst.
+
+                            apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
+                            apply dvalue_refine_strict_addr_r_inv in H4 as (?&?&?); subst.
+                            apply dvalue_refine_strict_i32_r_inv in H6 as (?&?&?); subst.
+                            apply dvalue_refine_strict_i32_r_inv in H8 as (?&?&?); subst.
+                            apply dvalue_refine_strict_i1_r_inv in H10 as (?&?&?); subst.
+
+                            red.
+                            (* TODO: Move this *)
+                            Lemma fin_inf_read_bytes_spec_ub' :
+                              forall (a_fin : FinAddr.addr) (a_inf : InfAddr.addr) (n : nat)
+                                (ms_fin : FinMem.MMEP.MMSP.MemState) (ms_inf : InfMem.MMEP.MMSP.MemState)
+                                msg_fin msg_inf,
+                                InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
+                                MemState_refine_prop ms_inf ms_fin ->
+                                Memory64BitIntptr.MMEP.MemSpec.read_bytes_spec a_fin n ms_fin
+                                  (raise_ub msg_fin) ->
+                                MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec a_inf n ms_inf
+                                  (raise_ub msg_inf).
+                            Proof.
+                              intros a_fin a_inf n ms_fin ms_inf msg_fin msg_inf CONV MSR READ.
+                              red in READ.
+                              destruct READ.
+                              eapply MemHelpers.get_consecutive_ptrs_no_ub in H.
+                              right.
+                            Qed.
+
+                            eapply fin_inf_read_bytes_spec_ub' in H0; eauto.
+
+                            (* TODO: Move this to memory model so it applies for both infinite / finite *)
+                            (* TODO: Somewhat unclear if we should allow the messages to be distinct... *)
+                            (** If reading bytes at the source causes UB, then the memcpy contains UB *)
+                            Lemma memcpy_spec_read_ub :
+                              forall src_addr dst_addr len align volatile ms msg
+                                (READ: MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec src_addr (Z.to_nat len) ms (raise_ub msg)),
+                                MemoryBigIntptr.MMEP.MemSpec.memcpy_spec src_addr dst_addr len align volatile ms (raise_ub msg).
+                            Proof.
+                              intros src_addr dst_addr len align volatile ms msg READ.
+                              repeat red.
+                              break_match; [cbn; auto|].
+                              break_match; [|cbn; auto].
+                              left; auto.
+                            Qed.
+
+                            eapply memcpy_spec_read_ub; eauto.
+                            rewrite H3.
+                            eapply H0.
+                          }
+                          
+
+
+
+
+                          2: {
+
+                          }
+
+                          
                           destruct HANDLER as [READ_UB | HANDLER].
                           { (* UB in read *)
                             (* TODO: This can probably be a separate lemma... *)
@@ -20544,22 +20672,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                             apply dvalue_refine_strict_i32_r_inv in H7 as (?&?&?); subst.
                             apply dvalue_refine_strict_i1_r_inv in H9 as (?&?&?); subst.
 
-                            destruct READ_UB as (sab & ptrs & GCP & MAP_UB).
-
                             eapply Interp_Memory_PropT_Vis with
-                              (ta:=
-                                 vis (ThrowUB tt)
-                                   (fun x : void =>
-                                      match
-                                        x
-                                        return
-                                        (itree
-                                           (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
-                                                                                                 LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
-                                           (MemoryBigIntptr.MMEP.MMSP.MemState *
-                                              (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
-                                      with
-                                      end)).
+                              (ta:=raise_ub "").
 
                             3: {
                               red in KS.
@@ -20578,6 +20692,13 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                               exists ub_msg.
                               red.
                               rewrite Heqb.
+                              eapply MemPropT_fin_inf_bind_ub.
+                              5: {
+                                cbn.
+                                right.
+                                eapply READ_UB.
+                              }
+                              all: eauto.
                               cbn.
                               left.
                               red.
