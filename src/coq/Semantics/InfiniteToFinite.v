@@ -19931,6 +19931,100 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         reflexivity.
   Qed.
 
+  (* TODO: Move this *)
+  Lemma fin_inf_get_consecutive_ptrs_ub :
+    forall a_fin a_inf ms_fin ms_inf n_fin n_inf msg_fin msg_inf,
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs (M:=(MemPropT Memory64BitIntptr.MMEP.MMSP.MemState)) a_fin n_fin ms_fin (raise_ub msg_fin) ->
+      MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs (M:=(MemPropT MemoryBigIntptr.MMEP.MMSP.MemState)) a_inf n_inf ms_inf (raise_ub msg_inf).
+  Proof.
+    intros a_fin a_inf ms_fin ms_inf n_fin n_inf msg_fin msg_inf H.
+    eapply get_consecutive_ptrs_never_ubs in H.
+    contradiction.
+  Qed.
+
+  #[global] Hint Resolve fin_inf_get_consecutive_ptrs_ub : FinInf.
+
+  Lemma fin_inf_read_byte_spec_MemPropT_ub :
+    forall (addr_fin : LLVMParams64BitIntptr.ADDR.addr) (addr_inf : LLVMParamsBigIntptr.ADDR.addr)
+      (ms_fin : FinMem.MMEP.MMSP.MemState) (ms_inf : InfMem.MMEP.MMSP.MemState) 
+      (msg : string),
+      MemState_refine_prop ms_inf ms_fin ->
+      addr_refine addr_inf addr_fin ->
+      (fun ptr : LLVMParams64BitIntptr.ADDR.addr =>
+         Memory64BitIntptr.MMEP.MemSpec.read_byte_spec_MemPropT ptr) addr_fin ms_fin
+        (raise_ub msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.read_byte_spec_MemPropT addr_inf ms_inf (raise_ub msg).
+  Proof.
+    intros addr_fin addr_inf ms_fin ms_inf msg MSR ADDR_REF READ.
+    cbn in *.
+    intros byte CONTRA.
+    eapply inf_fin_read_byte_spec_exists in CONTRA; eauto.
+    destruct CONTRA as (ptr_fin & byte_fin & READ_BYTES & BYTE_REF & ADDR_REF').
+    eapply READ; eauto.
+    red in ADDR_REF, ADDR_REF'. rewrite ADDR_REF in ADDR_REF'.
+    inv ADDR_REF'.
+    eapply READ_BYTES.
+  Qed.
+
+  #[global] Hint Resolve fin_inf_read_byte_spec_MemPropT_ub : FinInf.
+
+  (* TODO: Move this *)
+  (* TODO: Can we make msg_fin / msg_inf work? *)
+  Lemma fin_inf_read_bytes_spec_ub' :
+    forall (a_fin : FinAddr.addr) (a_inf : InfAddr.addr) (n : nat)
+      (ms_fin : FinMem.MMEP.MMSP.MemState) (ms_inf : InfMem.MMEP.MMSP.MemState)
+      msg,
+      InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
+      MemState_refine_prop ms_inf ms_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.read_bytes_spec a_fin n ms_fin
+        (raise_ub msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec a_inf n ms_inf
+        (raise_ub msg).
+  Proof.
+    intros a_fin a_inf n ms_fin ms_inf msg CONV MSR READ.
+    red; red in READ.
+    eapply MemPropT_fin_inf_bind_ub.
+    5: apply READ.
+    all: eauto with FinInf.
+
+    2: {
+      intros ms_inf0 ms_fin0 ptrs_fin ptrs_inf msg' PTRS MSR' GCP READ'.
+      eapply MemPropT_fin_inf_map_monad_ub.
+      5: apply READ'.
+      all: eauto with FinInf.
+      intros a_fin0 a_inf0 b_fin ms_fin1 ms_inf1 ms_fin_ma H H0 H1.
+      eapply fin_inf_read_byte_spec_MemPropT; eauto.
+      apply H1.
+    }
+
+    intros a_fin0 ms_fin_ma GCP.
+    eapply fin_inf_get_consecutive_ptrs_success_exists in GCP; eauto.
+    destruct GCP as (addrs_inf & ms_inf' & GCP & ADDRS & MSR').
+    exists addrs_inf. exists ms_inf'.
+    split; auto.
+    split; eauto.
+
+    eapply Forall2_flip; eauto.
+
+    Unshelve.
+    all: eauto.
+  Qed.
+
+  (* TODO: Move this to memory model so it applies for both infinite / finite *)
+  (* TODO: Somewhat unclear if we should allow the messages to be distinct... *)
+  (** If reading bytes at the source causes UB, then the memcpy contains UB *)
+  Lemma memcpy_spec_read_ub :
+    forall src_addr dst_addr len align volatile ms msg
+      (READ: MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec src_addr (Z.to_nat len) ms (raise_ub msg)),
+      MemoryBigIntptr.MMEP.MemSpec.memcpy_spec src_addr dst_addr len align volatile ms (raise_ub msg).
+  Proof.
+    intros src_addr dst_addr len align volatile ms msg READ.
+    repeat red.
+    break_match; [cbn; auto|].
+    break_match; [|cbn; auto].
+    left; auto.
+  Qed.
+
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
       L2_E1E2_orutt_strict t_inf t_fin ->
@@ -20547,8 +20641,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
                           eapply MemPropT_fin_inf_bind_ub.
                           5: eapply HANDLER.
+                          all: eauto with FinInf.
 
-                          3: {
+                          2: {
                             (* Make this a separate lemma? *)
                             (* Read bytes UB means memcpy yields UB... *)
                             intros msg H0.
@@ -20567,107 +20662,24 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
                             red.
 
-                            (* TODO: Move this *)
-                            Lemma fin_inf_get_consecutive_ptrs_ub :
-                              forall a_fin a_inf ms_fin ms_inf n_fin n_inf msg_fin msg_inf,
-                                Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs (M:=(MemPropT Memory64BitIntptr.MMEP.MMSP.MemState)) a_fin n_fin ms_fin (raise_ub msg_fin) ->
-                                MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs (M:=(MemPropT MemoryBigIntptr.MMEP.MMSP.MemState)) a_inf n_inf ms_inf (raise_ub msg_inf).
-                            Proof.
-                              intros a_fin a_inf ms_fin ms_inf n_fin n_inf msg_fin msg_inf H.
-                              eapply get_consecutive_ptrs_never_ubs in H.
-                              contradiction.
-                            Qed.
-
-                            #[global] Hint Resolve fin_inf_get_consecutive_ptrs_ub : FinInf.
-
-                            Lemma fin_inf_read_byte_spec_MemPropT_ub :
-                              forall (addr_fin : LLVMParams64BitIntptr.ADDR.addr) (addr_inf : LLVMParamsBigIntptr.ADDR.addr)
-                                (ms_fin : FinMem.MMEP.MMSP.MemState) (ms_inf : InfMem.MMEP.MMSP.MemState) 
-                                (msg : string),
-                                MemState_refine_prop ms_inf ms_fin ->
-                                addr_refine addr_inf addr_fin ->
-                                (fun ptr : LLVMParams64BitIntptr.ADDR.addr =>
-                                   Memory64BitIntptr.MMEP.MemSpec.read_byte_spec_MemPropT ptr) addr_fin ms_fin
-                                  (raise_ub msg) ->
-                                MemoryBigIntptr.MMEP.MemSpec.read_byte_spec_MemPropT addr_inf ms_inf (raise_ub msg).
-                            Proof.
-                              intros addr_fin addr_inf ms_fin ms_inf msg MSR ADDR_REF READ.
-                              cbn in *.
-                              intros byte CONTRA.
-                              eapply inf_fin_read_byte_spec_exists in CONTRA; eauto.
-                              destruct CONTRA as (ptr_fin & byte_fin & READ_BYTES & BYTE_REF & ADDR_REF').
-                              eapply READ; eauto.
-                              red in ADDR_REF, ADDR_REF'. rewrite ADDR_REF in ADDR_REF'.
-                              inv ADDR_REF'.
-                              eapply READ_BYTES.
-                            Qed.
-
-                            #[global] Hint Resolve fin_inf_read_byte_spec_MemPropT_ub : FinInf.
-
-                            (* TODO: Move this *)
-                            (* TODO: Can we make msg_fin / msg_inf work? *)
-                            Lemma fin_inf_read_bytes_spec_ub' :
-                              forall (a_fin : FinAddr.addr) (a_inf : InfAddr.addr) (n : nat)
-                                (ms_fin : FinMem.MMEP.MMSP.MemState) (ms_inf : InfMem.MMEP.MMSP.MemState)
-                                msg,
-                                InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
-                                MemState_refine_prop ms_inf ms_fin ->
-                                Memory64BitIntptr.MMEP.MemSpec.read_bytes_spec a_fin n ms_fin
-                                  (raise_ub msg) ->
-                                MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec a_inf n ms_inf
-                                  (raise_ub msg).
-                            Proof.
-                              intros a_fin a_inf n ms_fin ms_inf msg CONV MSR READ.
-                              red; red in READ.
-                              eapply MemPropT_fin_inf_bind_ub.
-                              5: apply READ.
-                              all: eauto with FinInf.
-
-                              2: {
-                                intros ms_inf0 ms_fin0 ptrs_fin ptrs_inf msg' PTRS MSR' GCP READ'.
-                                eapply MemPropT_fin_inf_map_monad_ub.
-                                5: apply READ'.
-                                all: eauto with FinInf.
-                                intros a_fin0 a_inf0 b_fin ms_fin1 ms_inf1 ms_fin_ma H H0 H1.
-                                eapply fin_inf_read_byte_spec_MemPropT; eauto.
-                                apply H1.
-                              }
-
-                              intros a_fin0 ms_fin_ma GCP.
-                              eapply fin_inf_get_consecutive_ptrs_success_exists in GCP; eauto.
-                              destruct GCP as (addrs_inf & ms_inf' & GCP & ADDRS & MSR').
-                              exists addrs_inf. exists ms_inf'.
-                              split; auto.
-                              split; eauto.
-
-                              eapply Forall2_flip; eauto.
-
-                              Unshelve.
-                              all: eauto.
-                            Qed.
-
                             eapply fin_inf_read_bytes_spec_ub' in H0; eauto.
-
-                            (* TODO: Move this to memory model so it applies for both infinite / finite *)
-                            (* TODO: Somewhat unclear if we should allow the messages to be distinct... *)
-                            (** If reading bytes at the source causes UB, then the memcpy contains UB *)
-                            Lemma memcpy_spec_read_ub :
-                              forall src_addr dst_addr len align volatile ms msg
-                                (READ: MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec src_addr (Z.to_nat len) ms (raise_ub msg)),
-                                MemoryBigIntptr.MMEP.MemSpec.memcpy_spec src_addr dst_addr len align volatile ms (raise_ub msg).
-                            Proof.
-                              intros src_addr dst_addr len align volatile ms msg READ.
-                              repeat red.
-                              break_match; [cbn; auto|].
-                              break_match; [|cbn; auto].
-                              left; auto.
-                            Qed.
 
                             eapply memcpy_spec_read_ub; eauto.
                             rewrite H3.
                             eapply H0.
+                            apply lift_MemState_refine_prop.
                           }
-                          
+
+                          { intros a_fin ms_fin_ma READ.
+                            eapply handle_memcpy_fin_inf; eauto.
+                            apply lift_MemState_refine_prop.
+
+                            red. red.
+                            cbn.
+                            rewrite Heqb0.
+                            rewrite Heqb1.
+                            cbn; auto.
+                          }
 
 
 
