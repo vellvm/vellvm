@@ -20628,52 +20628,22 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                                 eapply MemPropT_fin_inf_map_monad_ub.
                                 5: apply READ'.
                                 all: eauto with FinInf.
+                                intros a_fin0 a_inf0 b_fin ms_fin1 ms_inf1 ms_fin_ma H H0 H1.
+                                eapply fin_inf_read_byte_spec_MemPropT; eauto.
+                                apply H1.
                               }
 
-                              3: {
-                                eapply fin_inf_get
-                                intros.
-                                eauto with FinInf.
-                              }
+                              intros a_fin0 ms_fin_ma GCP.
+                              eapply fin_inf_get_consecutive_ptrs_success_exists in GCP; eauto.
+                              destruct GCP as (addrs_inf & ms_inf' & GCP & ADDRS & MSR').
+                              exists addrs_inf. exists ms_inf'.
+                              split; auto.
+                              split; eauto.
 
+                              eapply Forall2_flip; eauto.
 
-                              2: {
-
-
-
-
-                              }
-                              
-                                with (ma_fin:=Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_fin n)
-                                     (mab_fin:=fun ptrs =>
-                                                 map_monad
-                                                   (fun ptr : LLVMParams64BitIntptr.ADDR.addr =>
-                                                      Memory64BitIntptr.MMEP.MemSpec.read_byte_spec_MemPropT ptr) ptrs)
-                                     (ms_fin_start:=ms_fin).
-                              6: {
-                                apply READ.
-                              }
-                              5: {
-                                cbn.
-                                red in READ.
-                                cbn in READ.
-                                apply READ.
-                              }
-
-                              destruct READ.
-                              - eapply get_consecutive_ptrs_never_ubs in H.
-                                contradiction.
-                              - red.
-
-
-                                destruct H as (ms&ptrs&GCP&READ).
-                                right.
-                                exists (ms_inf).
-                                exists (map fin_to_inf_addr ptrs).
-
-                                split.
-                                
-                                
+                              Unshelve.
+                              all: eauto.
                             Qed.
 
                             eapply fin_inf_read_bytes_spec_ub' in H0; eauto.
