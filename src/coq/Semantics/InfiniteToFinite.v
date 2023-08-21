@@ -1015,7 +1015,7 @@ Module InfiniteToFinite.
   Definition get_inf_tree :
     forall (t_fin2 : itree L3 (FinMem.MMEP.MMSP.MemState * (MemPropT.store_id * (local_env * @stack local_env * res_L1)))), itree InfLP.Events.L3 TopLevelBigIntptr.res_L6 :=
 cofix CIH
-  (t_fin2 : 
+  (t_fin2 :
    itree L3
      (prod
         FinMem.MMEP.MMSP.MemState
@@ -1043,7 +1043,7 @@ cofix CIH
          InterpreterStackBigIntptr.LLVM.Global.global_env
          InterpreterStackBigIntptr.LP.Events.DV.dvalue)))) :=
   (fun
-     _observe : 
+     _observe :
       itreeF
         L3
         (prod
@@ -1092,7 +1092,7 @@ cofix CIH
    with
    | RetF r =>
        (fun
-         r0 : 
+         r0 :
          prod
          FinMem.MMEP.MMSP.MemState
          (prod
@@ -1141,7 +1141,7 @@ cofix CIH
          a b =>
          (fun
          (ms : FinMem.MMEP.MMSP.MemState)
-         (p : 
+         (p :
          prod
          MemPropT.store_id
          (prod
@@ -1172,7 +1172,7 @@ cofix CIH
          a0 b0 =>
          (fun
          (sid : MemPropT.store_id)
-         (p0 : 
+         (p0 :
          prod
          (prod
          local_env
@@ -1200,7 +1200,7 @@ cofix CIH
          | pair
          a1 b1 =>
          (fun
-         p1 : 
+         p1 :
          prod
          local_env
          (@stack
@@ -1210,7 +1210,7 @@ cofix CIH
          p1
          return
          (forall
-         _ : 
+         _ :
          prod
          global_env
          dvalue,
@@ -1230,10 +1230,10 @@ cofix CIH
          a2 b2 =>
          (fun
          (lenv : local_env)
-         (s : 
+         (s :
          @stack
          local_env)
-         (p2 : 
+         (p2 :
          prod
          global_env
          dvalue)
@@ -1316,7 +1316,7 @@ cofix CIH
          r
    | TauF t =>
        (fun
-         t0 : 
+         t0 :
          itree
          L3
          (prod
@@ -1378,9 +1378,9 @@ cofix CIH
      _ X e k =>
        (fun
          (X0 : Type)
-         (e0 : 
+         (e0 :
          L3 X0)
-         (k0 : 
+         (k0 :
          forall
          _ : X0,
          itree
@@ -1433,17 +1433,17 @@ cofix CIH
          | inl1
          x =>
          (fun
-         H : 
+         H :
          ExternalCallE
          X0 =>
          (fun
-         H0 : 
+         H0 :
          ExternalCallE
          X0 =>
          let
          X1 :
          forall
-         _ : 
+         _ :
          @eq
          Type
          X0 X0,
@@ -1466,7 +1466,7 @@ cofix CIH
          T)
          return
          (forall
-         _ : 
+         _ :
          @eq
          Type
          T X0,
@@ -1490,17 +1490,17 @@ cofix CIH
          (fun
          (t0 : dtyp)
          (f0 : uvalue)
-         (args0 : 
+         (args0 :
          list
          dvalue)
-         (H1 : 
+         (H1 :
          @eq
          Type
          dvalue
          X0)
          =>
          (fun
-         H2 : 
+         H2 :
          @eq
          Type
          dvalue
@@ -1521,7 +1521,7 @@ cofix CIH
          forall
          (_ : dtyp)
          (_ : uvalue)
-         (_ : 
+         (_ :
          list
          dvalue),
          itree
@@ -1540,7 +1540,7 @@ cofix CIH
          (fun
          (t1 : dtyp)
          (f1 : uvalue)
-         (args1 : 
+         (args1 :
          list
          dvalue)
          =>
@@ -1551,7 +1551,7 @@ cofix CIH
          X1 : Type
          =>
          forall
-         (_ : 
+         (_ :
          forall
          _ : X1,
          itree
@@ -1568,7 +1568,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          ExternalCallE
          X1),
          itree
@@ -1585,7 +1585,7 @@ cofix CIH
          InterpreterStackBigIntptr.LLVM.Global.global_env
          InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
          (fun
-         (k1 : 
+         (k1 :
          forall
          _ : dvalue,
          itree
@@ -1602,7 +1602,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          ExternalCallE
          dvalue)
          =>
@@ -1817,7 +1817,7 @@ cofix CIH
          | inr1
          x =>
          (fun
-         X1 : 
+         X1 :
          sum1
          PickUvalueE
          (sum1
@@ -1829,7 +1829,7 @@ cofix CIH
          FailureE)))
          X0 =>
          (fun
-         X2 : 
+         X2 :
          sum1
          PickUvalueE
          (sum1
@@ -1875,17 +1875,17 @@ cofix CIH
          | inl1
          x0 =>
          (fun
-         X3 : 
+         X3 :
          PickUvalueE
          X0 =>
          (fun
-         X4 : 
+         X4 :
          PickUvalueE
          X0 =>
          let
          X5 :
          forall
-         _ : 
+         _ :
          @eq
          Type
          X0 X0,
@@ -1908,7 +1908,7 @@ cofix CIH
          T)
          return
          (forall
-         _ : 
+         _ :
          @eq
          Type
          T X0,
@@ -1932,7 +1932,7 @@ cofix CIH
          (fun
          (Pre0 : Prop)
          (x2 : uvalue)
-         (H : 
+         (H :
          @eq
          Type
          (@sig
@@ -1944,7 +1944,7 @@ cofix CIH
          X0)
          =>
          (fun
-         H0 : 
+         H0 :
          @eq
          Type
          (@sig
@@ -2009,7 +2009,7 @@ cofix CIH
          X5 : Type
          =>
          forall
-         (_ : 
+         (_ :
          forall
          _ : X5,
          itree
@@ -2026,7 +2026,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          PickUvalueE
          X5),
          itree
@@ -2043,9 +2043,9 @@ cofix CIH
          InterpreterStackBigIntptr.LLVM.Global.global_env
          InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
          (fun
-         (k1 : 
+         (k1 :
          forall
-         _ : 
+         _ :
          @sig
          dvalue
          (fun
@@ -2066,7 +2066,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          PickUvalueE
          (@sig
          dvalue
@@ -2205,7 +2205,7 @@ cofix CIH
          (fin_to_inf_uvalue
          x3)))
          (fun
-         res : 
+         res :
          @sig
          InfLP.Events.DV.dvalue
          (fun
@@ -2376,7 +2376,7 @@ cofix CIH
          | inr1
          x0 =>
          (fun
-         H : 
+         H :
          sum1
          OOME
          (sum1
@@ -2386,7 +2386,7 @@ cofix CIH
          FailureE))
          X0 =>
          (fun
-         H0 : 
+         H0 :
          sum1
          OOME
          (sum1
@@ -2430,17 +2430,17 @@ cofix CIH
          | inl1
          x1 =>
          (fun
-         H1 : 
+         H1 :
          OOME
          X0 =>
          (fun
-         H2 : 
+         H2 :
          OOME
          X0 =>
          let
          X3 :
          forall
-         _ : 
+         _ :
          @eq
          Type
          X0 X0,
@@ -2463,7 +2463,7 @@ cofix CIH
          T)
          return
          (forall
-         _ : 
+         _ :
          @eq
          Type
          T X0,
@@ -2485,14 +2485,14 @@ cofix CIH
          x2 =>
          (fun
          (H3 : unit)
-         (H4 : 
+         (H4 :
          @eq
          Type
          Empty_set
          X0)
          =>
          (fun
-         H5 : 
+         H5 :
          @eq
          Type
          Empty_set
@@ -2535,7 +2535,7 @@ cofix CIH
          X3 : Type
          =>
          forall
-         (_ : 
+         (_ :
          forall
          _ : X3,
          itree
@@ -2552,7 +2552,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          OOME
          X3),
          itree
@@ -2569,7 +2569,7 @@ cofix CIH
          InterpreterStackBigIntptr.LLVM.Global.global_env
          InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
          (fun
-         (_ : 
+         (_ :
          forall
          _ : Empty_set,
          itree
@@ -2586,7 +2586,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          OOME
          Empty_set)
          =>
@@ -2678,7 +2678,7 @@ cofix CIH
          | inr1
          x1 =>
          (fun
-         H1 : 
+         H1 :
          sum1
          UBE
          (sum1
@@ -2686,7 +2686,7 @@ cofix CIH
          FailureE)
          X0 =>
          (fun
-         H2 : 
+         H2 :
          sum1
          UBE
          (sum1
@@ -2728,17 +2728,17 @@ cofix CIH
          | inl1
          x2 =>
          (fun
-         H3 : 
+         H3 :
          UBE
          X0 =>
          (fun
-         H4 : 
+         H4 :
          UBE
          X0 =>
          let
          X3 :
          forall
-         _ : 
+         _ :
          @eq
          Type
          X0 X0,
@@ -2761,7 +2761,7 @@ cofix CIH
          T)
          return
          (forall
-         _ : 
+         _ :
          @eq
          Type
          T X0,
@@ -2783,14 +2783,14 @@ cofix CIH
          x3 =>
          (fun
          (H5 : unit)
-         (H6 : 
+         (H6 :
          @eq
          Type
          Empty_set
          X0)
          =>
          (fun
-         H7 : 
+         H7 :
          @eq
          Type
          Empty_set
@@ -2833,7 +2833,7 @@ cofix CIH
          X3 : Type
          =>
          forall
-         (_ : 
+         (_ :
          forall
          _ : X3,
          itree
@@ -2850,7 +2850,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          UBE
          X3),
          itree
@@ -2867,7 +2867,7 @@ cofix CIH
          InterpreterStackBigIntptr.LLVM.Global.global_env
          InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
          (fun
-         (_ : 
+         (_ :
          forall
          _ : Empty_set,
          itree
@@ -2884,7 +2884,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          UBE
          Empty_set)
          =>
@@ -2989,13 +2989,13 @@ cofix CIH
          | inr1
          x2 =>
          (fun
-         H3 : 
+         H3 :
          sum1
          DebugE
          FailureE
          X0 =>
          (fun
-         H4 : 
+         H4 :
          sum1
          DebugE
          FailureE
@@ -3035,17 +3035,17 @@ cofix CIH
          | inl1
          x3 =>
          (fun
-         H5 : 
+         H5 :
          DebugE
          X0 =>
          (fun
-         H6 : 
+         H6 :
          DebugE
          X0 =>
          let
          X3 :
          forall
-         _ : 
+         _ :
          @eq
          Type
          X0 X0,
@@ -3068,7 +3068,7 @@ cofix CIH
          T)
          return
          (forall
-         _ : 
+         _ :
          @eq
          Type
          T X0,
@@ -3090,14 +3090,14 @@ cofix CIH
          x4 =>
          (fun
          (H7 : unit)
-         (H8 : 
+         (H8 :
          @eq
          Type
          unit
          X0)
          =>
          (fun
-         H9 : 
+         H9 :
          @eq
          Type
          unit
@@ -3140,7 +3140,7 @@ cofix CIH
          X3 : Type
          =>
          forall
-         (_ : 
+         (_ :
          forall
          _ : X3,
          itree
@@ -3157,7 +3157,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          DebugE
          X3),
          itree
@@ -3174,7 +3174,7 @@ cofix CIH
          InterpreterStackBigIntptr.LLVM.Global.global_env
          InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
          (fun
-         (k1 : 
+         (k1 :
          forall
          _ : unit,
          itree
@@ -3191,7 +3191,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          DebugE
          unit)
          =>
@@ -3346,17 +3346,17 @@ cofix CIH
          | inr1
          x3 =>
          (fun
-         H5 : 
+         H5 :
          FailureE
          X0 =>
          (fun
-         H6 : 
+         H6 :
          FailureE
          X0 =>
          let
          X3 :
          forall
-         _ : 
+         _ :
          @eq
          Type
          X0 X0,
@@ -3379,7 +3379,7 @@ cofix CIH
          T)
          return
          (forall
-         _ : 
+         _ :
          @eq
          Type
          T X0,
@@ -3401,14 +3401,14 @@ cofix CIH
          x4 =>
          (fun
          (H7 : unit)
-         (H8 : 
+         (H8 :
          @eq
          Type
          Empty_set
          X0)
          =>
          (fun
-         H9 : 
+         H9 :
          @eq
          Type
          Empty_set
@@ -3451,7 +3451,7 @@ cofix CIH
          X3 : Type
          =>
          forall
-         (_ : 
+         (_ :
          forall
          _ : X3,
          itree
@@ -3468,7 +3468,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          FailureE
          X3),
          itree
@@ -3485,7 +3485,7 @@ cofix CIH
          InterpreterStackBigIntptr.LLVM.Global.global_env
          InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
          (fun
-         (_ : 
+         (_ :
          forall
          _ : Empty_set,
          itree
@@ -3502,7 +3502,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          FailureE
          Empty_set)
          =>
@@ -3647,7 +3647,7 @@ cofix CIH
    match t_fin2 with
    | RetF r =>
        (fun
-         r0 : 
+         r0 :
          prod
          FinMem.MMEP.MMSP.MemState
          (prod
@@ -3696,7 +3696,7 @@ cofix CIH
          a b =>
          (fun
          (ms : FinMem.MMEP.MMSP.MemState)
-         (p : 
+         (p :
          prod
          MemPropT.store_id
          (prod
@@ -3727,7 +3727,7 @@ cofix CIH
          a0 b0 =>
          (fun
          (sid : MemPropT.store_id)
-         (p0 : 
+         (p0 :
          prod
          (prod
          local_env
@@ -3755,7 +3755,7 @@ cofix CIH
          | pair
          a1 b1 =>
          (fun
-         p1 : 
+         p1 :
          prod
          local_env
          (@stack
@@ -3765,7 +3765,7 @@ cofix CIH
          p1
          return
          (forall
-         _ : 
+         _ :
          prod
          global_env
          dvalue,
@@ -3785,10 +3785,10 @@ cofix CIH
          a2 b2 =>
          (fun
          (lenv : local_env)
-         (s : 
+         (s :
          @stack
          local_env)
-         (p2 : 
+         (p2 :
          prod
          global_env
          dvalue)
@@ -3871,7 +3871,7 @@ cofix CIH
          r
    | TauF t =>
        (fun
-         t0 : 
+         t0 :
          itree
          L3
          (prod
@@ -3933,9 +3933,9 @@ cofix CIH
      _ X e k =>
        (fun
          (X0 : Type)
-         (e0 : 
+         (e0 :
          L3 X0)
-         (k0 : 
+         (k0 :
          forall
          _ : X0,
          itree
@@ -3988,17 +3988,17 @@ cofix CIH
          | inl1
          x =>
          (fun
-         H : 
+         H :
          ExternalCallE
          X0 =>
          (fun
-         H0 : 
+         H0 :
          ExternalCallE
          X0 =>
          let
          X1 :
          forall
-         _ : 
+         _ :
          @eq
          Type
          X0 X0,
@@ -4021,7 +4021,7 @@ cofix CIH
          T)
          return
          (forall
-         _ : 
+         _ :
          @eq
          Type
          T X0,
@@ -4045,17 +4045,17 @@ cofix CIH
          (fun
          (t0 : dtyp)
          (f0 : uvalue)
-         (args0 : 
+         (args0 :
          list
          dvalue)
-         (H1 : 
+         (H1 :
          @eq
          Type
          dvalue
          X0)
          =>
          (fun
-         H2 : 
+         H2 :
          @eq
          Type
          dvalue
@@ -4076,7 +4076,7 @@ cofix CIH
          forall
          (_ : dtyp)
          (_ : uvalue)
-         (_ : 
+         (_ :
          list
          dvalue),
          itree
@@ -4095,7 +4095,7 @@ cofix CIH
          (fun
          (t1 : dtyp)
          (f1 : uvalue)
-         (args1 : 
+         (args1 :
          list
          dvalue)
          =>
@@ -4106,7 +4106,7 @@ cofix CIH
          X1 : Type
          =>
          forall
-         (_ : 
+         (_ :
          forall
          _ : X1,
          itree
@@ -4123,7 +4123,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          ExternalCallE
          X1),
          itree
@@ -4140,7 +4140,7 @@ cofix CIH
          InterpreterStackBigIntptr.LLVM.Global.global_env
          InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
          (fun
-         (k1 : 
+         (k1 :
          forall
          _ : dvalue,
          itree
@@ -4157,7 +4157,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          ExternalCallE
          dvalue)
          =>
@@ -4372,7 +4372,7 @@ cofix CIH
          | inr1
          x =>
          (fun
-         X1 : 
+         X1 :
          sum1
          PickUvalueE
          (sum1
@@ -4384,7 +4384,7 @@ cofix CIH
          FailureE)))
          X0 =>
          (fun
-         X2 : 
+         X2 :
          sum1
          PickUvalueE
          (sum1
@@ -4430,17 +4430,17 @@ cofix CIH
          | inl1
          x0 =>
          (fun
-         X3 : 
+         X3 :
          PickUvalueE
          X0 =>
          (fun
-         X4 : 
+         X4 :
          PickUvalueE
          X0 =>
          let
          X5 :
          forall
-         _ : 
+         _ :
          @eq
          Type
          X0 X0,
@@ -4463,7 +4463,7 @@ cofix CIH
          T)
          return
          (forall
-         _ : 
+         _ :
          @eq
          Type
          T X0,
@@ -4487,7 +4487,7 @@ cofix CIH
          (fun
          (Pre0 : Prop)
          (x2 : uvalue)
-         (H : 
+         (H :
          @eq
          Type
          (@sig
@@ -4499,7 +4499,7 @@ cofix CIH
          X0)
          =>
          (fun
-         H0 : 
+         H0 :
          @eq
          Type
          (@sig
@@ -4564,7 +4564,7 @@ cofix CIH
          X5 : Type
          =>
          forall
-         (_ : 
+         (_ :
          forall
          _ : X5,
          itree
@@ -4581,7 +4581,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          PickUvalueE
          X5),
          itree
@@ -4598,9 +4598,9 @@ cofix CIH
          InterpreterStackBigIntptr.LLVM.Global.global_env
          InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
          (fun
-         (k1 : 
+         (k1 :
          forall
-         _ : 
+         _ :
          @sig
          dvalue
          (fun
@@ -4621,7 +4621,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          PickUvalueE
          (@sig
          dvalue
@@ -4760,7 +4760,7 @@ cofix CIH
          (fin_to_inf_uvalue
          x3)))
          (fun
-         res : 
+         res :
          @sig
          InfLP.Events.DV.dvalue
          (fun
@@ -4931,7 +4931,7 @@ cofix CIH
          | inr1
          x0 =>
          (fun
-         H : 
+         H :
          sum1
          OOME
          (sum1
@@ -4941,7 +4941,7 @@ cofix CIH
          FailureE))
          X0 =>
          (fun
-         H0 : 
+         H0 :
          sum1
          OOME
          (sum1
@@ -4985,17 +4985,17 @@ cofix CIH
          | inl1
          x1 =>
          (fun
-         H1 : 
+         H1 :
          OOME
          X0 =>
          (fun
-         H2 : 
+         H2 :
          OOME
          X0 =>
          let
          X3 :
          forall
-         _ : 
+         _ :
          @eq
          Type
          X0 X0,
@@ -5018,7 +5018,7 @@ cofix CIH
          T)
          return
          (forall
-         _ : 
+         _ :
          @eq
          Type
          T X0,
@@ -5040,14 +5040,14 @@ cofix CIH
          x2 =>
          (fun
          (H3 : unit)
-         (H4 : 
+         (H4 :
          @eq
          Type
          Empty_set
          X0)
          =>
          (fun
-         H5 : 
+         H5 :
          @eq
          Type
          Empty_set
@@ -5090,7 +5090,7 @@ cofix CIH
          X3 : Type
          =>
          forall
-         (_ : 
+         (_ :
          forall
          _ : X3,
          itree
@@ -5107,7 +5107,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          OOME
          X3),
          itree
@@ -5124,7 +5124,7 @@ cofix CIH
          InterpreterStackBigIntptr.LLVM.Global.global_env
          InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
          (fun
-         (_ : 
+         (_ :
          forall
          _ : Empty_set,
          itree
@@ -5141,7 +5141,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          OOME
          Empty_set)
          =>
@@ -5233,7 +5233,7 @@ cofix CIH
          | inr1
          x1 =>
          (fun
-         H1 : 
+         H1 :
          sum1
          UBE
          (sum1
@@ -5241,7 +5241,7 @@ cofix CIH
          FailureE)
          X0 =>
          (fun
-         H2 : 
+         H2 :
          sum1
          UBE
          (sum1
@@ -5283,17 +5283,17 @@ cofix CIH
          | inl1
          x2 =>
          (fun
-         H3 : 
+         H3 :
          UBE
          X0 =>
          (fun
-         H4 : 
+         H4 :
          UBE
          X0 =>
          let
          X3 :
          forall
-         _ : 
+         _ :
          @eq
          Type
          X0 X0,
@@ -5316,7 +5316,7 @@ cofix CIH
          T)
          return
          (forall
-         _ : 
+         _ :
          @eq
          Type
          T X0,
@@ -5338,14 +5338,14 @@ cofix CIH
          x3 =>
          (fun
          (H5 : unit)
-         (H6 : 
+         (H6 :
          @eq
          Type
          Empty_set
          X0)
          =>
          (fun
-         H7 : 
+         H7 :
          @eq
          Type
          Empty_set
@@ -5388,7 +5388,7 @@ cofix CIH
          X3 : Type
          =>
          forall
-         (_ : 
+         (_ :
          forall
          _ : X3,
          itree
@@ -5405,7 +5405,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          UBE
          X3),
          itree
@@ -5422,7 +5422,7 @@ cofix CIH
          InterpreterStackBigIntptr.LLVM.Global.global_env
          InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
          (fun
-         (_ : 
+         (_ :
          forall
          _ : Empty_set,
          itree
@@ -5439,7 +5439,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          UBE
          Empty_set)
          =>
@@ -5544,13 +5544,13 @@ cofix CIH
          | inr1
          x2 =>
          (fun
-         H3 : 
+         H3 :
          sum1
          DebugE
          FailureE
          X0 =>
          (fun
-         H4 : 
+         H4 :
          sum1
          DebugE
          FailureE
@@ -5590,17 +5590,17 @@ cofix CIH
          | inl1
          x3 =>
          (fun
-         H5 : 
+         H5 :
          DebugE
          X0 =>
          (fun
-         H6 : 
+         H6 :
          DebugE
          X0 =>
          let
          X3 :
          forall
-         _ : 
+         _ :
          @eq
          Type
          X0 X0,
@@ -5623,7 +5623,7 @@ cofix CIH
          T)
          return
          (forall
-         _ : 
+         _ :
          @eq
          Type
          T X0,
@@ -5645,14 +5645,14 @@ cofix CIH
          x4 =>
          (fun
          (H7 : unit)
-         (H8 : 
+         (H8 :
          @eq
          Type
          unit
          X0)
          =>
          (fun
-         H9 : 
+         H9 :
          @eq
          Type
          unit
@@ -5695,7 +5695,7 @@ cofix CIH
          X3 : Type
          =>
          forall
-         (_ : 
+         (_ :
          forall
          _ : X3,
          itree
@@ -5712,7 +5712,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          DebugE
          X3),
          itree
@@ -5729,7 +5729,7 @@ cofix CIH
          InterpreterStackBigIntptr.LLVM.Global.global_env
          InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
          (fun
-         (k1 : 
+         (k1 :
          forall
          _ : unit,
          itree
@@ -5746,7 +5746,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          DebugE
          unit)
          =>
@@ -5901,17 +5901,17 @@ cofix CIH
          | inr1
          x3 =>
          (fun
-         H5 : 
+         H5 :
          FailureE
          X0 =>
          (fun
-         H6 : 
+         H6 :
          FailureE
          X0 =>
          let
          X3 :
          forall
-         _ : 
+         _ :
          @eq
          Type
          X0 X0,
@@ -5934,7 +5934,7 @@ cofix CIH
          T)
          return
          (forall
-         _ : 
+         _ :
          @eq
          Type
          T X0,
@@ -5956,14 +5956,14 @@ cofix CIH
          x4 =>
          (fun
          (H7 : unit)
-         (H8 : 
+         (H8 :
          @eq
          Type
          Empty_set
          X0)
          =>
          (fun
-         H9 : 
+         H9 :
          @eq
          Type
          Empty_set
@@ -6006,7 +6006,7 @@ cofix CIH
          X3 : Type
          =>
          forall
-         (_ : 
+         (_ :
          forall
          _ : X3,
          itree
@@ -6023,7 +6023,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          FailureE
          X3),
          itree
@@ -6040,7 +6040,7 @@ cofix CIH
          InterpreterStackBigIntptr.LLVM.Global.global_env
          InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
          (fun
-         (_ : 
+         (_ :
          forall
          _ : Empty_set,
          itree
@@ -6057,7 +6057,7 @@ cofix CIH
          (prod
          global_env
          dvalue)))))
-         (_ : 
+         (_ :
          FailureE
          Empty_set)
          =>
@@ -10542,6 +10542,26 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     }
   Qed.
 
+  (* One iffy case is if ptr_fin is at the edge of memory, then
+     /maybe/ the write could succeed in the infinite case, and walk off
+     the edge in the finite case. This should be ruled out by the
+     refinement between ms_inf_start and ms_fin_start, however.
+   *)
+  Lemma inf_fin_write_byte_spec_exists :
+    forall {ms_inf_start ms_inf_final ms_fin_start ptr_inf ptr_fin byte_inf byte_fin},
+      MemState_refine_prop ms_inf_start ms_fin_start ->
+      sbyte_refine byte_inf byte_fin ->
+      addr_refine ptr_inf ptr_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.write_byte_spec ms_inf_start ptr_inf byte_inf ms_inf_final ->
+      exists ms_fin_final,
+        Memory64BitIntptr.MMEP.MemSpec.write_byte_spec ms_fin_start ptr_fin byte_fin ms_fin_final /\
+          addr_refine ptr_inf ptr_fin /\
+          MemState_refine_prop ms_inf_final ms_fin_final.
+  Proof.
+    intros ms_inf_start ms_inf_final ms_fin_start ptr_inf ptr_fin byte_inf byte_fin MSR BYTES ADDR_REF WRITE.
+    destruct WRITE.
+  Admitted.
+
   (* TODO: Move this *)
   (* TODO: Ask about in meeting? *)
   (* TODO: This may not currently be true
@@ -12170,6 +12190,259 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     cbn in H1.
     destruct H2; subst; auto.
   Qed.
+
+  (* TODO: Move near gcp in memory model... Maybe near get_consecutive_ptrs_no_ub *)
+  Lemma get_consecutive_ptrs_never_fails :
+    forall ptr sz ms msg,
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs (M:=(MemPropT Memory64BitIntptr.MMEP.MMSP.MemState)) ptr sz ms (raise_error msg) -> False.
+  Proof.
+    intros ptr sz ms msg ERR.
+    Transparent Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+    unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs in ERR.
+    Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+    repeat red in ERR.
+    destruct ERR as [ERR | ERR].
+    - red in ERR.
+      break_match_hyp_inv.
+    - destruct ERR as (?&?&?&ERR).
+      repeat red in ERR.
+      destruct ERR as [ERR | ERR].
+      { red in ERR.
+        break_match_hyp_inv.
+        exfalso.
+        apply map_monad_err_fail in Heqs.
+        destruct Heqs as (?&?&GEP).
+        cbn in GEP.
+        inv GEP.
+      }
+
+      destruct ERR as (?&?&GCP&ERR).
+      red in ERR.
+      break_match_hyp_inv.
+  Qed.
+
+  Lemma get_consecutive_ptrs_never_ubs :
+    forall ptr sz ms msg,
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs (M:=(MemPropT Memory64BitIntptr.MMEP.MMSP.MemState)) ptr sz ms (raise_ub msg) -> False.
+  Proof.
+    intros ptr sz ms msg GCP.
+    eapply withinify in GCP.
+
+    assert ((@fmap err_ub_oom (@Functor_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+               (Memory64BitIntptr.MMEP.MMSP.MemState * list LLVMParams64BitIntptr.ADDR.addr)
+               (list LLVMParams64BitIntptr.ADDR.addr)
+               (@snd Memory64BitIntptr.MMEP.MMSP.MemState (list LLVMParams64BitIntptr.ADDR.addr))
+               (@raise_ub err_ub_oom
+                  (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+                  (Memory64BitIntptr.MMEP.MMSP.MemState * list LLVMParams64BitIntptr.ADDR.addr) msg)) = raise_ub msg) as EQ by (cbn; auto).
+    rewrite EQ in GCP.
+    eapply FinLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_no_ub in GCP; auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma fin_inf_get_consecutive_ptrs_ub :
+    forall a_fin a_inf ms_fin ms_inf n_fin n_inf msg_fin msg_inf,
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs (M:=(MemPropT Memory64BitIntptr.MMEP.MMSP.MemState)) a_fin n_fin ms_fin (raise_ub msg_fin) ->
+      MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs (M:=(MemPropT MemoryBigIntptr.MMEP.MMSP.MemState)) a_inf n_inf ms_inf (raise_ub msg_inf).
+  Proof.
+    intros a_fin a_inf ms_fin ms_inf n_fin n_inf msg_fin msg_inf H.
+    eapply get_consecutive_ptrs_never_ubs in H.
+    contradiction.
+  Qed.
+
+  #[global] Hint Resolve fin_inf_get_consecutive_ptrs_ub : FinInf.
+
+  Lemma fin_inf_read_byte_spec_MemPropT_ub :
+    forall (addr_fin : LLVMParams64BitIntptr.ADDR.addr) (addr_inf : LLVMParamsBigIntptr.ADDR.addr)
+      (ms_fin : FinMem.MMEP.MMSP.MemState) (ms_inf : InfMem.MMEP.MMSP.MemState)
+      (msg : string),
+      MemState_refine_prop ms_inf ms_fin ->
+      addr_refine addr_inf addr_fin ->
+      (fun ptr : LLVMParams64BitIntptr.ADDR.addr =>
+         Memory64BitIntptr.MMEP.MemSpec.read_byte_spec_MemPropT ptr) addr_fin ms_fin
+        (raise_ub msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.read_byte_spec_MemPropT addr_inf ms_inf (raise_ub msg).
+  Proof.
+    intros addr_fin addr_inf ms_fin ms_inf msg MSR ADDR_REF READ.
+    cbn in *.
+    intros byte CONTRA.
+    eapply inf_fin_read_byte_spec_exists in CONTRA; eauto.
+    destruct CONTRA as (ptr_fin & byte_fin & READ_BYTES & BYTE_REF & ADDR_REF').
+    eapply READ; eauto.
+    red in ADDR_REF, ADDR_REF'. rewrite ADDR_REF in ADDR_REF'.
+    inv ADDR_REF'.
+    eapply READ_BYTES.
+  Qed.
+
+  #[global] Hint Resolve fin_inf_read_byte_spec_MemPropT_ub : FinInf.
+
+  Lemma fin_inf_write_byte_spec_MemPropT_ub :
+    forall (addr_fin : LLVMParams64BitIntptr.ADDR.addr) (addr_inf : LLVMParamsBigIntptr.ADDR.addr)
+      (ms_fin : FinMem.MMEP.MMSP.MemState) (ms_inf : InfMem.MMEP.MMSP.MemState)
+      byte_fin byte_inf
+      (msg : string),
+      MemState_refine_prop ms_inf ms_fin ->
+      sbyte_refine byte_inf byte_fin ->
+      addr_refine addr_inf addr_fin ->
+      (fun ptr : LLVMParams64BitIntptr.ADDR.addr =>
+         Memory64BitIntptr.MMEP.MemSpec.write_byte_spec_MemPropT ptr byte_fin) addr_fin ms_fin
+        (raise_ub msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_inf byte_inf ms_inf (raise_ub msg).
+  Proof.
+    intros addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf msg MSR BYTE_REF ADDR_REF WRITE.
+
+    cbn in *.
+    intros byte CONTRA.
+    eapply inf_fin_write_byte_spec_exists in CONTRA; eauto.
+    destruct CONTRA as (ms_fin_final & WRITE' & ADDR_REF' & MSR').
+    eapply WRITE; eauto.
+  Qed.
+
+  #[global] Hint Resolve fin_inf_write_byte_spec_MemPropT_ub : FinInf.
+
+  (* TODO: Move this *)
+  (* TODO: Can we make msg_fin / msg_inf work? *)
+  Lemma fin_inf_read_bytes_spec_ub' :
+    forall (a_fin : FinAddr.addr) (a_inf : InfAddr.addr) (n : nat)
+      (ms_fin : FinMem.MMEP.MMSP.MemState) (ms_inf : InfMem.MMEP.MMSP.MemState)
+      msg,
+      InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
+      MemState_refine_prop ms_inf ms_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.read_bytes_spec a_fin n ms_fin
+        (raise_ub msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec a_inf n ms_inf
+        (raise_ub msg).
+  Proof.
+    intros a_fin a_inf n ms_fin ms_inf msg CONV MSR READ.
+    red; red in READ.
+    eapply MemPropT_fin_inf_bind_ub.
+    5: apply READ.
+    all: eauto with FinInf.
+
+    2: {
+      intros ms_inf0 ms_fin0 ptrs_fin ptrs_inf msg' PTRS MSR' GCP READ'.
+      eapply MemPropT_fin_inf_map_monad_ub.
+      5: apply READ'.
+      all: eauto with FinInf.
+      intros a_fin0 a_inf0 b_fin ms_fin1 ms_inf1 ms_fin_ma H H0 H1.
+      eapply fin_inf_read_byte_spec_MemPropT; eauto.
+      apply H1.
+    }
+
+    intros a_fin0 ms_fin_ma GCP.
+    eapply fin_inf_get_consecutive_ptrs_success_exists in GCP; eauto.
+    destruct GCP as (addrs_inf & ms_inf' & GCP & ADDRS & MSR').
+    exists addrs_inf. exists ms_inf'.
+    split; auto.
+    split; eauto.
+
+    eapply Forall2_flip; eauto.
+
+    Unshelve.
+    all: eauto.
+  Qed.
+
+  (* TODO: Move this to memory model so it applies for both infinite / finite *)
+  (* TODO: Somewhat unclear if we should allow the messages to be distinct... *)
+  (** If reading bytes at the source causes UB, then the memcpy contains UB *)
+  Lemma memcpy_spec_read_ub :
+    forall src_addr dst_addr len align volatile ms msg
+      (READ: MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec src_addr (Z.to_nat len) ms (raise_ub msg)),
+      MemoryBigIntptr.MMEP.MemSpec.memcpy_spec src_addr dst_addr len align volatile ms (raise_ub msg).
+  Proof.
+    intros src_addr dst_addr len align volatile ms msg READ.
+    repeat red.
+    break_match; [cbn; auto|].
+    break_match; [|cbn; auto].
+    left; auto.
+  Qed.
+
+
+  Lemma fin_inf_write_bytes_spec_ub :
+    forall a_fin a_inf ms_fin ms_inf bytes_inf bytes_fin msg,
+      InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
+      MemState_refine_prop ms_inf ms_fin ->
+      sbytes_refine bytes_inf bytes_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.write_bytes_spec a_fin bytes_fin ms_fin (raise_ub msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.write_bytes_spec a_inf bytes_inf ms_inf (raise_ub msg).
+  Proof.
+    intros a_fin a_inf ms_fin ms_inf bytes_inf bytes_fin msg ADDR_CONV MEM_REF1 BYTES_REF WRITE_SPEC.
+
+    (* TODO: Make these opaque earlier *)
+    Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+    Opaque MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+
+    red; red in WRITE_SPEC.
+
+    eapply MemPropT_fin_inf_bind_ub.
+    5: apply WRITE_SPEC.
+    all: eauto with FinInf.
+
+    { (* MA *)
+      intros a_fin0 ms_fin_ma H.
+      eapply fin_inf_get_consecutive_ptrs_success_exists; eauto.
+      erewrite sbytes_refine_length; eauto.
+      apply H.
+    }
+
+    intros ms_inf0 ms_fin0 a_fin0 a_inf0 msg0 ADDRS MSR GCP WRITES.
+
+    eapply MemPropT_fin_inf_bind_ub with
+      (A_REF := Forall2 eq).
+    5: apply WRITES.
+    all: eauto with FinInf.
+
+    { (* MA *)
+      intros a_fin1 ms_fin_ma MAP.
+      eapply MemPropT_fin_inf_map_monad with
+        (A_REF := (fun '(a_inf, byte_inf) '(a_fin, byte_fin) =>
+                     InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin /\
+                       sbyte_refine byte_inf byte_fin)).
+      4: apply MAP.
+      all: eauto.
+
+      { intros a_fin2 a_inf1 b_fin0 ms_fin1 ms_inf1 ms_fin_ma0 MSR' A_REF WRITE.
+        destruct a_fin2, a_inf1.
+        destruct A_REF.
+        eapply fin_inf_write_byte_spec_MemPropT; eauto.
+      }
+
+      cbn in ADDRS.
+
+      apply Forall2_zip; eauto.
+      apply Forall2_flip in ADDRS.
+      apply ADDRS.
+    }
+
+    intros msg1 MAP.
+    eapply MemPropT_fin_inf_map_monad_ub with
+      (A_REF := (fun '(a_inf, byte_inf) '(a_fin, byte_fin) =>
+                   InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin /\
+                     sbyte_refine byte_inf byte_fin)).
+    5: apply MAP.
+    all: eauto with FinInf.
+
+    2: {
+      intros a_fin1 a_inf1 ms_fin1 ms_inf1 msg2 H H0 H1.
+      destruct a_inf1, a_fin1.
+      destruct H0.
+      eapply fin_inf_write_byte_spec_MemPropT_ub; eauto.
+    }
+
+    2: {
+      eapply Forall2_zip; eauto.
+      eapply Forall2_flip; eauto.
+    }
+
+    intros a_fin1 a_inf1 b_fin ms_fin1 ms_inf1 ms_fin_ma H H0 H1.
+    destruct a_inf1, a_fin1.
+    destruct H0.
+    eapply fin_inf_write_byte_spec_MemPropT; eauto.
+
+    Unshelve.
+    all: exact ms_fin.
+  Qed.
+
 
   (* TODO: Move this to somewhere it can
      be instantiated for all memory model
@@ -16443,7 +16716,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       admit.
     }
 
-    
+
     (* { rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in UV_REF; *)
     (*     cbn in UV_REF; *)
     (*     repeat break_match_hyp_inv; *)
@@ -18545,7 +18818,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       { cbn.
         exists ms_inf_final'.
         exists rest_bytes_inf.
-        split; auto.        
+        split; auto.
       }
       split; auto.
       apply Forall2_app; auto.
@@ -18594,7 +18867,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       { cbn.
         exists ms_inf_final'.
         exists rest_bytes_inf.
-        split; auto.        
+        split; auto.
       }
       split; auto.
       apply Forall2_app; auto.
@@ -18729,7 +19002,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           red in UBYTES;
           break_match_hyp_inv;
           match goal with
-          | H: Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes _ ?t _ = NoOom _ |- _ => 
+          | H: Memory64BitIntptr.MMEP.MMSP.MemByte.to_ubytes _ ?t _ = NoOom _ |- _ =>
               eapply to_ubytes_fin_inf in H; eauto; destruct H as (bytes_inf&UBYTES_INF&?)
           end;
           exists bytes_inf; exists ms_inf;
@@ -19014,7 +19287,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       monad_fold_right f l b =
         match l with
         | [] => ret b
-        | x::xs => 
+        | x::xs =>
             r <- monad_fold_right f xs b ;;
             f r x
         end.
@@ -19103,7 +19376,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         rewrite IHxs;
         lia.
   Qed.
-  
+
   (* TODO: Move this to listutils or something *)
   Lemma between_length :
     forall {X} (xs : list X) start finish,
@@ -19137,7 +19410,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
            uv <-
              Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
                (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
-                  ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;; 
+                  ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;;
            @ret err _ _ (uv :: acc)) (Nseq start (N.to_nat seq_len)) [] = inr uv_fins ->
       exists (uv_infs : list LLVMParamsBigIntptr.Events.DV.uvalue),
         (monad_fold_right
@@ -19145,7 +19418,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               uv <-
                 MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
                   (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
-                     ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_inf) t;; 
+                     ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_inf) t;;
               @ret err _ _ (uv :: acc)) (Nseq start (N.to_nat seq_len)) [] = inr uv_infs) /\
           Forall2 DVC1.uvalue_refine_strict uv_infs uv_fins.
   Proof.
@@ -19169,7 +19442,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
            (fun (acc : list LLVMParams64BitIntptr.Events.DV.uvalue) (idx : N) =>
               uv <-
                 Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
-                  (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t) ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;; 
+                  (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t) ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;;
               ret (uv :: acc)) (Nseq (N.succ start) (N.to_nat seq_len)) []) eqn:HFOLDR'; [cbn in HFOLDR; inv HFOLDR|].
 
       cbn in HFOLDR.
@@ -19182,7 +19455,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       }
 
       destruct Heqs as (uv_inf&DESER_INFS&REF).
-      
+
       apply IHseq_len in HFOLDR' as (uv_infs&HFOLDR'&REFS).
 
       exists (uv_inf :: uv_infs).
@@ -19225,7 +19498,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
              uv <-
              Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
                (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
-                  ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;; 
+                  ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;;
              ret (uv :: acc)) (Nseq 0 (N.to_nat sz)) []) eqn:HFOLDR; cbn in DESER; inv DESER.
 
       eapply monad_fold_right_deserialize_sbytes_fin_inf in HFOLDR; eauto.
@@ -19277,7 +19550,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           apply Forall2_drop; eauto.
         }
         destruct Heqs0 as (uv_infs&FIELDS&REFS).
-        
+
         eapply H in Heqs.
         2: left; auto.
         2: apply Forall2_take; eauto.
@@ -19335,7 +19608,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         }
 
         destruct Heqs0 as (uv_infs&FIELDS&REFS).
-        
+
         eapply H in Heqs.
         2: left; auto.
         2: apply Forall2_take; eauto.
@@ -19371,7 +19644,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
              uv <-
              Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
                (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
-                  ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;; 
+                  ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;;
              ret (uv :: acc)) (Nseq 0 (N.to_nat sz)) []) eqn:HFOLDR; cbn in DESER; inv DESER.
 
       eapply monad_fold_right_deserialize_sbytes_fin_inf in HFOLDR; eauto.
@@ -19406,14 +19679,14 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
            uv <-
              Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
                (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
-                  ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;; 
+                  ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;;
            @ret err _ _ (uv :: acc)) (Nseq start (N.to_nat seq_len)) [] = inl s ->
       (monad_fold_right
          (fun (acc : list LLVMParamsBigIntptr.Events.DV.uvalue) (idx : N) =>
             uv <-
               MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
                 (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
-                   ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_inf) t;; 
+                   ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_inf) t;;
             @ret err _ _ (uv :: acc)) (Nseq start (N.to_nat seq_len)) [] = inl s).
   Proof.
     intros t bytes_fin bytes_inf start seq_len s BYTES_REF IHt HFOLDR.
@@ -19433,7 +19706,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                      uv <-
                        Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
                          (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
-                            ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;; 
+                            ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;;
                      ret (uv :: acc)) (Nseq (N.succ start) (N.to_nat seq_len)) []) eqn:HFOLDR'.
       + eapply IHseq_len in HFOLDR'.
         cbn in HFOLDR; inv HFOLDR.
@@ -19483,7 +19756,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
              uv <-
              Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
                (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
-                  ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;; 
+                  ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;;
              ret (uv :: acc)) (Nseq 0 (N.to_nat sz)) []) eqn:HFOLDR; cbn in DESER; inv DESER.
 
       (* rewrite FinLP.SIZEOF.sizeof_dtyp_array in BYTES_LENGTH. *)
@@ -19604,7 +19877,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
              uv <-
              Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
                (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
-                  ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;; 
+                  ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;;
              ret (uv :: acc)) (Nseq 0 (N.to_nat sz)) []) eqn:HFOLDR; cbn in DESER; inv DESER.
 
       eapply monad_fold_right_deserialize_sbytes_fail_fin_inf in HFOLDR; eauto.
@@ -19779,7 +20052,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
         clear H.
         generalize dependent x.
-        generalize dependent x0.                            
+        generalize dependent x0.
         induction num_elements using N.peano_ind; intros x0 x H0.
         * cbn in H0; auto.
         * rewrite repeatN_succ in H0.
@@ -19813,54 +20086,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     - destruct HANDLE as (?&?&?&?).
       cbn in H0.
       auto.
-  Qed.
-
-  (* TODO: Move near gcp in memory model... Maybe near get_consecutive_ptrs_no_ub *)
-  Lemma get_consecutive_ptrs_never_fails :
-    forall ptr sz ms msg,
-      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs (M:=(MemPropT Memory64BitIntptr.MMEP.MMSP.MemState)) ptr sz ms (raise_error msg) -> False.
-  Proof.
-    intros ptr sz ms msg ERR.
-    Transparent Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
-    unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs in ERR.
-    Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
-    repeat red in ERR.
-    destruct ERR as [ERR | ERR].
-    - red in ERR.
-      break_match_hyp_inv.
-    - destruct ERR as (?&?&?&ERR).
-      repeat red in ERR.
-      destruct ERR as [ERR | ERR].
-      { red in ERR.
-        break_match_hyp_inv.
-        exfalso.
-        apply map_monad_err_fail in Heqs.
-        destruct Heqs as (?&?&GEP).
-        cbn in GEP.
-        inv GEP.
-      }
-
-      destruct ERR as (?&?&GCP&ERR).
-      red in ERR.
-      break_match_hyp_inv.
-  Qed.
-
-  Lemma get_consecutive_ptrs_never_ubs :
-    forall ptr sz ms msg,
-      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs (M:=(MemPropT Memory64BitIntptr.MMEP.MMSP.MemState)) ptr sz ms (raise_ub msg) -> False.
-  Proof.
-    intros ptr sz ms msg GCP.
-    eapply withinify in GCP.
-
-    assert ((@fmap err_ub_oom (@Functor_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-               (Memory64BitIntptr.MMEP.MMSP.MemState * list LLVMParams64BitIntptr.ADDR.addr)
-               (list LLVMParams64BitIntptr.ADDR.addr)
-               (@snd Memory64BitIntptr.MMEP.MMSP.MemState (list LLVMParams64BitIntptr.ADDR.addr))
-               (@raise_ub err_ub_oom
-                  (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-                  (Memory64BitIntptr.MMEP.MMSP.MemState * list LLVMParams64BitIntptr.ADDR.addr) msg)) = raise_ub msg) as EQ by (cbn; auto).
-    rewrite EQ in GCP.    
-    eapply FinLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_no_ub in GCP; auto.
   Qed.
 
   (* TODO: Move this, should apply for fin / inf *)
@@ -19929,100 +20154,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         unfold Memory64BitIntptr.MMEP.MMSP.memory_stack_heap_prop. cbn.
         unfold Memory64BitIntptr.MMEP.MMSP.memory_stack_heap.
         reflexivity.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma fin_inf_get_consecutive_ptrs_ub :
-    forall a_fin a_inf ms_fin ms_inf n_fin n_inf msg_fin msg_inf,
-      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs (M:=(MemPropT Memory64BitIntptr.MMEP.MMSP.MemState)) a_fin n_fin ms_fin (raise_ub msg_fin) ->
-      MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs (M:=(MemPropT MemoryBigIntptr.MMEP.MMSP.MemState)) a_inf n_inf ms_inf (raise_ub msg_inf).
-  Proof.
-    intros a_fin a_inf ms_fin ms_inf n_fin n_inf msg_fin msg_inf H.
-    eapply get_consecutive_ptrs_never_ubs in H.
-    contradiction.
-  Qed.
-
-  #[global] Hint Resolve fin_inf_get_consecutive_ptrs_ub : FinInf.
-
-  Lemma fin_inf_read_byte_spec_MemPropT_ub :
-    forall (addr_fin : LLVMParams64BitIntptr.ADDR.addr) (addr_inf : LLVMParamsBigIntptr.ADDR.addr)
-      (ms_fin : FinMem.MMEP.MMSP.MemState) (ms_inf : InfMem.MMEP.MMSP.MemState) 
-      (msg : string),
-      MemState_refine_prop ms_inf ms_fin ->
-      addr_refine addr_inf addr_fin ->
-      (fun ptr : LLVMParams64BitIntptr.ADDR.addr =>
-         Memory64BitIntptr.MMEP.MemSpec.read_byte_spec_MemPropT ptr) addr_fin ms_fin
-        (raise_ub msg) ->
-      MemoryBigIntptr.MMEP.MemSpec.read_byte_spec_MemPropT addr_inf ms_inf (raise_ub msg).
-  Proof.
-    intros addr_fin addr_inf ms_fin ms_inf msg MSR ADDR_REF READ.
-    cbn in *.
-    intros byte CONTRA.
-    eapply inf_fin_read_byte_spec_exists in CONTRA; eauto.
-    destruct CONTRA as (ptr_fin & byte_fin & READ_BYTES & BYTE_REF & ADDR_REF').
-    eapply READ; eauto.
-    red in ADDR_REF, ADDR_REF'. rewrite ADDR_REF in ADDR_REF'.
-    inv ADDR_REF'.
-    eapply READ_BYTES.
-  Qed.
-
-  #[global] Hint Resolve fin_inf_read_byte_spec_MemPropT_ub : FinInf.
-
-  (* TODO: Move this *)
-  (* TODO: Can we make msg_fin / msg_inf work? *)
-  Lemma fin_inf_read_bytes_spec_ub' :
-    forall (a_fin : FinAddr.addr) (a_inf : InfAddr.addr) (n : nat)
-      (ms_fin : FinMem.MMEP.MMSP.MemState) (ms_inf : InfMem.MMEP.MMSP.MemState)
-      msg,
-      InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
-      MemState_refine_prop ms_inf ms_fin ->
-      Memory64BitIntptr.MMEP.MemSpec.read_bytes_spec a_fin n ms_fin
-        (raise_ub msg) ->
-      MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec a_inf n ms_inf
-        (raise_ub msg).
-  Proof.
-    intros a_fin a_inf n ms_fin ms_inf msg CONV MSR READ.
-    red; red in READ.
-    eapply MemPropT_fin_inf_bind_ub.
-    5: apply READ.
-    all: eauto with FinInf.
-
-    2: {
-      intros ms_inf0 ms_fin0 ptrs_fin ptrs_inf msg' PTRS MSR' GCP READ'.
-      eapply MemPropT_fin_inf_map_monad_ub.
-      5: apply READ'.
-      all: eauto with FinInf.
-      intros a_fin0 a_inf0 b_fin ms_fin1 ms_inf1 ms_fin_ma H H0 H1.
-      eapply fin_inf_read_byte_spec_MemPropT; eauto.
-      apply H1.
-    }
-
-    intros a_fin0 ms_fin_ma GCP.
-    eapply fin_inf_get_consecutive_ptrs_success_exists in GCP; eauto.
-    destruct GCP as (addrs_inf & ms_inf' & GCP & ADDRS & MSR').
-    exists addrs_inf. exists ms_inf'.
-    split; auto.
-    split; eauto.
-
-    eapply Forall2_flip; eauto.
-
-    Unshelve.
-    all: eauto.
-  Qed.
-
-  (* TODO: Move this to memory model so it applies for both infinite / finite *)
-  (* TODO: Somewhat unclear if we should allow the messages to be distinct... *)
-  (** If reading bytes at the source causes UB, then the memcpy contains UB *)
-  Lemma memcpy_spec_read_ub :
-    forall src_addr dst_addr len align volatile ms msg
-      (READ: MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec src_addr (Z.to_nat len) ms (raise_ub msg)),
-      MemoryBigIntptr.MMEP.MemSpec.memcpy_spec src_addr dst_addr len align volatile ms (raise_ub msg).
-  Proof.
-    intros src_addr dst_addr len align volatile ms msg READ.
-    repeat red.
-    break_match; [cbn; auto|].
-    break_match; [|cbn; auto].
-    left; auto.
   Qed.
 
   Lemma model_E1E2_23_orutt_strict :
@@ -20533,7 +20664,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                               cbn.
                               left.
                               red.
-                              cbn in H2.                              
+                              cbn in H2.
                               rewrite H2.
                               rewrite Heqb0.
                               cbn; auto.
@@ -20541,25 +20672,26 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
                             intros a1 b RETa RETb AB.
                             eapply Returns_vis_inversion in RETb.
-                            destruct RETb as [[] _].                            
+                            destruct RETb as [[] _].
                           }
 
+                          subst.
+                          inversion ARGS; subst.
+                          inversion H4; subst.
+                          inversion H6; subst.
+                          inversion H8; subst.
+                          inversion H10; subst.
+
+                          apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
+                          apply dvalue_refine_strict_addr_r_inv in H3 as (?&?&?); subst.
+                          apply dvalue_refine_strict_i32_r_inv in H5 as (?&?&?); subst.
+                          apply dvalue_refine_strict_i32_r_inv in H7 as (?&?&?); subst.
+                          apply dvalue_refine_strict_i1_r_inv in H9 as (?&?&?); subst.
+
                           break_match_hyp.
+
                           2: {
                             (* Overlapping UB *)
-                            subst.
-                            inversion ARGS; subst.
-                            inversion H4; subst.
-                            inversion H6; subst.
-                            inversion H8; subst.
-                            inversion H10; subst.
-
-                            apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
-                            apply dvalue_refine_strict_addr_r_inv in H3 as (?&?&?); subst.
-                            apply dvalue_refine_strict_i32_r_inv in H5 as (?&?&?); subst.
-                            apply dvalue_refine_strict_i32_r_inv in H7 as (?&?&?); subst.
-                            apply dvalue_refine_strict_i1_r_inv in H9 as (?&?&?); subst.
-
                             eapply Interp_Memory_PropT_Vis with
                               (ta:=
                                  vis (ThrowUB tt)
@@ -20607,10 +20739,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
                             intros a1 b RETa RETb AB.
                             eapply Returns_vis_inversion in RETb.
-                            destruct RETb as [[] _].                            
+                            destruct RETb as [[] _].
                           }
 
                           (* May be UB in read / write... *)
+                          (* HANDLER has UB in it *)
                           eapply Interp_Memory_PropT_Vis with
                             (ta:=raise_ub "").
 
@@ -20639,93 +20772,41 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                           red.
                           rewrite Heqb.
 
+                          left.
+                          cbn.
+                          red.
+
+                          cbn in H2, H3, H5.
+                          rewrite H2.
+                          rewrite Heqb0.
+                          erewrite <- fin_inf_no_overlap; eauto.
+                          erewrite <- fin_inf_ptoi; eauto.
+                          erewrite <- fin_inf_ptoi; eauto.
+                          rewrite Heqb1.
                           eapply MemPropT_fin_inf_bind_ub.
-                          5: eapply HANDLER.
+                          5: apply HANDLER.
                           all: eauto with FinInf.
 
                           2: {
-                            (* Make this a separate lemma? *)
-                            (* Read bytes UB means memcpy yields UB... *)
-                            intros msg H0.
-                            subst.
-                            inversion ARGS; subst.
-                            inversion H5; subst.
-                            inversion H7; subst.
-                            inversion H9; subst.
-                            inversion H11; subst.
-
-                            apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
-                            apply dvalue_refine_strict_addr_r_inv in H4 as (?&?&?); subst.
-                            apply dvalue_refine_strict_i32_r_inv in H6 as (?&?&?); subst.
-                            apply dvalue_refine_strict_i32_r_inv in H8 as (?&?&?); subst.
-                            apply dvalue_refine_strict_i1_r_inv in H10 as (?&?&?); subst.
-
-                            red.
-
-                            eapply fin_inf_read_bytes_spec_ub' in H0; eauto.
-
-                            eapply memcpy_spec_read_ub; eauto.
-                            rewrite H3.
-                            eapply H0.
+                            intros msg H.
+                            eapply fin_inf_read_bytes_spec_ub'; eauto.
                             apply lift_MemState_refine_prop.
                           }
-
-                          { intros a_fin ms_fin_ma READ.
-                            eapply handle_memcpy_fin_inf; eauto.
-                            apply lift_MemState_refine_prop.
-
-                            red. red.
-                            cbn.
-                            rewrite Heqb0.
-                            rewrite Heqb1.
-                            cbn; auto.
-                          }
-
-
-
 
                           2: {
-
+                            intros ms_inf ms_fin a_fin a_inf msg H H7 H9 H11.
+                            eapply fin_inf_write_bytes_spec_ub; eauto.
                           }
 
-                          
-                          destruct HANDLER as [READ_UB | HANDLER].
-                          { (* UB in read *)
-                            (* TODO: This can probably be a separate lemma... *)
-                            (* TODO: Reason compositionally? *)
-                            subst.
-                            red in READ_UB.
+                          intros a_fin ms_fin_ma READ.
+                          eapply fin_inf_read_bytes_spec; eauto.
+                          apply lift_MemState_refine_prop.
+                        }
 
-                            destruct READ_UB as [GCP_UB | READ_UB].
-                            { (* UB in get_consecutive_ptrs *)
-                              (* TODO: Should be a separate lemma *)
-                              exfalso.
-                              clear - GCP_UB.
-
-                              assert (exists (pre : Memory64BitIntptr.MMEP.MMSP.MemState) (post : Memory64BitIntptr.MMEP.MMSP.MemState),
-                                         Within.within (Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a0 (Z.to_nat (Int32.unsigned x0))) pre
-                                           (raise_ub ub_msg) post) as GCP.
-                              {
-                                exists s2.
-                                exists s2.
-                                cbn.
-                                repeat red.
-                                cbn.
-                                Transparent Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
-                                unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs in GCP_UB.
-
-                                unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
-                                Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
-                                red.
-                                cbn.
-                                repeat red in GCP_UB.
-                                auto.
-                              }
-
-                              eapply InterpreterStack64BitIntptr.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_no_ub in GCP; auto.
-                            }
-
-                            (* UB in read *)
+                        { (* 64 bit *)
+                          red in HANDLER.
+                          break_match_hyp.
+                          { (* Negative length UB *)
                             subst.
                             inversion ARGS; subst.
                             inversion H4; subst.
@@ -20735,12 +20816,24 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
                             apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
                             apply dvalue_refine_strict_addr_r_inv in H3 as (?&?&?); subst.
-                            apply dvalue_refine_strict_i32_r_inv in H5 as (?&?&?); subst.
-                            apply dvalue_refine_strict_i32_r_inv in H7 as (?&?&?); subst.
+                            apply dvalue_refine_strict_i64_r_inv in H5 as (?&?&?); subst.
+                            apply dvalue_refine_strict_i64_r_inv in H7 as (?&?&?); subst.
                             apply dvalue_refine_strict_i1_r_inv in H9 as (?&?&?); subst.
 
                             eapply Interp_Memory_PropT_Vis with
-                              (ta:=raise_ub "").
+                              (ta:=
+                                 vis (ThrowUB tt)
+                                   (fun x : void =>
+                                      match
+                                        x
+                                        return
+                                        (itree
+                                           (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
+                                                                                                 LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                                           (MemoryBigIntptr.MMEP.MMSP.MemState *
+                                              (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                      with
+                                      end)).
 
                             3: {
                               red in KS.
@@ -20756,60 +20849,16 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                               cbn.
                               repeat red.
                               left.
-                              exists ub_msg.
+                              exists "memcpy given negative length.".
                               red.
                               rewrite Heqb.
-                              eapply MemPropT_fin_inf_bind_ub.
-                              5: {
-                                cbn.
-                                right.
-                                eapply READ_UB.
-                              }
-                              all: eauto.
                               cbn.
                               left.
                               red.
-                              cbn in H2.                              
+                              cbn in H2.
                               rewrite H2.
                               rewrite Heqb0.
-                              erewrite <- fin_inf_no_overlap; eauto.
-                              erewrite <- fin_inf_ptoi; eauto.
-                              erewrite <- fin_inf_ptoi; eauto.
-                              rewrite Heqb1.
-                              repeat red.
                               cbn; auto.
-                              left.
-                              right.
-                              do 2 eexists.
-                              split.
-                              - eapply fin_inf_get_consecutive_ptrs_success with (ys:=map fin_to_inf_addr ptrs);
-                                  [ | | eapply GCP]; eauto.
-                                apply Forall2_flip.
-                                unfold Util.flip, flip.
-                                eapply Forall2_map.
-                                clear.
-                                induction ptrs.
-                                constructor.
-                                constructor.
-                                apply addr_convert_fin_to_inf_addr.
-                                eapply IHptrs.
-                              - cbn in *.
-                                induction ptrs.
-                                + cbn in *; auto.
-                                + rewrite map_cons.
-                                  rewrite map_monad_unfold.
-                                  rewrite map_monad_unfold in MAP_UB.
-
-                                  repeat red in MAP_UB.
-                                  destruct MAP_UB.
-                                  { (* UB in read_byte *)
-                                    repeat red in H.
-                                    repeat red.
-                                    admit.
-                                  }
-
-                                  { admit.
-                                  }
                             }
 
                             intros a1 b RETa RETb AB.
@@ -20817,18 +20866,330 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                             destruct RETb as [[] _].
                           }
 
-                          { (* UB in write *)
-                            destruct HANDLER as (ms_read & bytes & READ & HANDLER).
-                            admit.
-                          }
-                        }
+                          subst.
+                          inversion ARGS; subst.
+                          inversion H4; subst.
+                          inversion H6; subst.
+                          inversion H8; subst.
+                          inversion H10; subst.
 
-                        { (* 64 bit *)
-                          admit.
+                          apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
+                          apply dvalue_refine_strict_addr_r_inv in H3 as (?&?&?); subst.
+                          apply dvalue_refine_strict_i64_r_inv in H5 as (?&?&?); subst.
+                          apply dvalue_refine_strict_i64_r_inv in H7 as (?&?&?); subst.
+                          apply dvalue_refine_strict_i1_r_inv in H9 as (?&?&?); subst.
+
+                          break_match_hyp.
+
+                          2: {
+                            (* Overlapping UB *)
+                            eapply Interp_Memory_PropT_Vis with
+                              (ta:=
+                                 vis (ThrowUB tt)
+                                   (fun x : void =>
+                                      match
+                                        x
+                                        return
+                                        (itree
+                                           (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
+                                                                                                 LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                                           (MemoryBigIntptr.MMEP.MMSP.MemState *
+                                              (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                      with
+                                      end)).
+
+                            3: {
+                              red in KS.
+                              red.
+                              left.
+                              eapply FindUB.
+                              pstep; red; cbn.
+                              constructor.
+                              intros [].
+                            }
+
+                            2: {
+                              cbn.
+                              repeat red.
+                              left.
+                              exists "memcpy with overlapping or non-equal src and dst memory locations.".
+                              red.
+                              rewrite Heqb.
+                              cbn.
+                              left.
+                              red.
+                              cbn in H2.
+                              rewrite H2.
+                              rewrite Heqb0.
+                              erewrite <- fin_inf_no_overlap; eauto.
+                              erewrite <- fin_inf_ptoi; eauto.
+                              erewrite <- fin_inf_ptoi; eauto.
+                              rewrite Heqb1.
+                              cbn; auto.
+                            }
+
+                            intros a1 b RETa RETb AB.
+                            eapply Returns_vis_inversion in RETb.
+                            destruct RETb as [[] _].
+                          }
+
+                          (* May be UB in read / write... *)
+                          (* HANDLER has UB in it *)
+                          eapply Interp_Memory_PropT_Vis with
+                            (ta:=raise_ub "").
+
+                          3: {
+                            red in KS.
+                            red.
+                            left.
+                            eapply FindUB.
+                            pstep; red; cbn.
+                            constructor.
+                            intros [].
+                          }
+
+                          { intros a1 b RETa RETb AB.
+                            cbn in RETb.
+                            unfold raiseUB in RETb.
+                            rewrite bind_trigger in RETb.
+                            eapply Returns_vis_inversion in RETb.
+                            destruct RETb as [[] _].
+                          }
+
+                          cbn.
+                          red.
+                          left.
+                          exists ub_msg.
+                          red.
+                          rewrite Heqb.
+
+                          left.
+                          cbn.
+                          red.
+
+                          cbn in H2, H3, H5.
+                          rewrite H2.
+                          rewrite Heqb0.
+                          erewrite <- fin_inf_no_overlap; eauto.
+                          erewrite <- fin_inf_ptoi; eauto.
+                          erewrite <- fin_inf_ptoi; eauto.
+                          rewrite Heqb1.
+                          eapply MemPropT_fin_inf_bind_ub.
+                          5: apply HANDLER.
+                          all: eauto with FinInf.
+
+                          2: {
+                            intros msg H.
+                            eapply fin_inf_read_bytes_spec_ub'; eauto.
+                            apply lift_MemState_refine_prop.
+                          }
+
+                          2: {
+                            intros ms_inf ms_fin a_fin a_inf msg H H7 H9 H11.
+                            eapply fin_inf_write_bytes_spec_ub; eauto.
+                          }
+
+                          intros a_fin ms_fin_ma READ.
+                          eapply fin_inf_read_bytes_spec; eauto.
+                          apply lift_MemState_refine_prop.
                         }
 
                         { (* iptr *)
-                          admit.
+                          red in HANDLER.
+                          break_match_hyp.
+                          { (* Negative length UB *)
+                            subst.
+                            inversion ARGS; subst.
+                            inversion H4; subst.
+                            inversion H6; subst.
+                            inversion H8; subst.
+                            inversion H10; subst.
+
+                            apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
+                            apply dvalue_refine_strict_addr_r_inv in H3 as (?&?&?); subst.
+                            apply dvalue_refine_strict_iptr_r_inv in H5 as (?&?&?); subst.
+                            apply dvalue_refine_strict_iptr_r_inv in H7 as (?&?&?); subst.
+                            apply dvalue_refine_strict_i1_r_inv in H9 as (?&?&?); subst.
+
+                            eapply Interp_Memory_PropT_Vis with
+                              (ta:=
+                                 vis (ThrowUB tt)
+                                   (fun x : void =>
+                                      match
+                                        x
+                                        return
+                                        (itree
+                                           (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
+                                                                                                 LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                                           (MemoryBigIntptr.MMEP.MMSP.MemState *
+                                              (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                      with
+                                      end)).
+
+                            3: {
+                              red in KS.
+                              red.
+                              left.
+                              eapply FindUB.
+                              pstep; red; cbn.
+                              constructor.
+                              intros [].
+                            }
+
+                            2: {
+                              cbn.
+                              repeat red.
+                              left.
+                              exists "memcpy given negative length.".
+                              red.
+                              rewrite Heqb.
+                              cbn.
+                              left.
+                              red.
+                              cbn in H2.
+                              unfold InterpreterStackBigIntptr.LP.IP.to_Z in *.
+                              erewrite IP.from_Z_to_Z in Heqb0; eauto.
+                              rewrite Heqb0.
+                              cbn; auto.
+                            }
+
+                            intros a1 b RETa RETb AB.
+                            eapply Returns_vis_inversion in RETb.
+                            destruct RETb as [[] _].
+                          }
+
+                          subst.
+                          inversion ARGS; subst.
+                          inversion H4; subst.
+                          inversion H6; subst.
+                          inversion H8; subst.
+                          inversion H10; subst.
+
+                          apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
+                          apply dvalue_refine_strict_addr_r_inv in H3 as (?&?&?); subst.
+                          apply dvalue_refine_strict_iptr_r_inv in H5 as (?&?&?); subst.
+                          apply dvalue_refine_strict_iptr_r_inv in H7 as (?&?&?); subst.
+                          apply dvalue_refine_strict_i1_r_inv in H9 as (?&?&?); subst.
+
+                          break_match_hyp.
+
+                          2: {
+                            (* Overlapping UB *)
+                            eapply Interp_Memory_PropT_Vis with
+                              (ta:=
+                                 vis (ThrowUB tt)
+                                   (fun x : void =>
+                                      match
+                                        x
+                                        return
+                                        (itree
+                                           (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
+                                                                                                 LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                                           (MemoryBigIntptr.MMEP.MMSP.MemState *
+                                              (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                      with
+                                      end)).
+
+                            3: {
+                              red in KS.
+                              red.
+                              left.
+                              eapply FindUB.
+                              pstep; red; cbn.
+                              constructor.
+                              intros [].
+                            }
+
+                            2: {
+                              cbn.
+                              repeat red.
+                              left.
+                              exists "memcpy with overlapping or non-equal src and dst memory locations.".
+                              red.
+                              rewrite Heqb.
+                              cbn.
+                              left.
+                              red.
+                              cbn in H2.
+                              unfold InterpreterStackBigIntptr.LP.IP.to_Z in *.
+                              erewrite IP.from_Z_to_Z in Heqb0; eauto.
+                              rewrite Heqb0.
+                              erewrite <- fin_inf_no_overlap; eauto.
+                              erewrite <- fin_inf_ptoi; eauto.
+                              erewrite <- fin_inf_ptoi; eauto.
+                              erewrite IP.from_Z_to_Z in Heqb1; eauto.
+                              rewrite Heqb1.
+                              cbn; auto.
+                            }
+
+                            intros a1 b RETa RETb AB.
+                            eapply Returns_vis_inversion in RETb.
+                            destruct RETb as [[] _].
+                          }
+
+                          (* May be UB in read / write... *)
+                          (* HANDLER has UB in it *)
+                          eapply Interp_Memory_PropT_Vis with
+                            (ta:=raise_ub "").
+
+                          3: {
+                            red in KS.
+                            red.
+                            left.
+                            eapply FindUB.
+                            pstep; red; cbn.
+                            constructor.
+                            intros [].
+                          }
+
+                          { intros a1 b RETa RETb AB.
+                            cbn in RETb.
+                            unfold raiseUB in RETb.
+                            rewrite bind_trigger in RETb.
+                            eapply Returns_vis_inversion in RETb.
+                            destruct RETb as [[] _].
+                          }
+
+                          cbn.
+                          red.
+                          left.
+                          exists ub_msg.
+                          red.
+                          rewrite Heqb.
+
+                          left.
+                          cbn.
+                          red.
+
+                          cbn in H2, H3, H5.
+                          unfold InterpreterStackBigIntptr.LP.IP.to_Z in *.
+                          erewrite IP.from_Z_to_Z in Heqb0; eauto.
+                          rewrite Heqb0.
+                          erewrite <- fin_inf_no_overlap; eauto.
+                          erewrite <- fin_inf_ptoi; eauto.
+                          erewrite <- fin_inf_ptoi; eauto.
+                          erewrite IP.from_Z_to_Z in Heqb1; eauto.
+                          rewrite Heqb1.
+                          eapply MemPropT_fin_inf_bind_ub.
+                          5: apply HANDLER.
+                          all: eauto with FinInf.
+
+                          2: {
+                            intros msg H.
+                            erewrite IP.from_Z_to_Z in H; eauto.
+                            eapply fin_inf_read_bytes_spec_ub'; eauto.
+                            apply lift_MemState_refine_prop.
+                          }
+
+                          2: {
+                            intros ms_inf ms_fin a_fin a_inf msg H H7 H9 H11.
+                            eapply fin_inf_write_bytes_spec_ub; eauto.
+                          }
+
+                          intros a_fin ms_fin_ma READ.
+                          erewrite IP.from_Z_to_Z in READ; eauto.
+                          eapply fin_inf_read_bytes_spec; eauto.
+                          apply lift_MemState_refine_prop.
                         }
                       }
 
@@ -21934,7 +22295,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     (*   { admit. (* TODO: Not provable? *) *)
                     (*   } *)
                     (*   subst. *)
-                      
+
                     (*   cbn. *)
                     (*   pstep. red. cbn. *)
                     (*   eapply EqVis. *)
@@ -21952,7 +22313,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
                     (*   red. left. *)
                     (*   destruct v. *)
-                      
+
                     (* } *)
                     (*   { intros a b H H1 H2. *)
                     (*     destruct b. destruct p. *)
@@ -21960,7 +22321,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     (*     right. *)
 
                     (*     left. *)
-                        
+
                     (*   } *)
 
                     (*     with *)
@@ -21974,7 +22335,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     (*   } *)
                     (* - specialize (EQ t1); contradiction. *)
 
-                    
+
 
 
                     (*           get_inf_tree (k2 (s2, (s2, r))))). *)
@@ -21985,9 +22346,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     (*   rewrite get_inf_tree_equation. *)
                     (*   red. *)
                     (*   cbn. *)
-                      
+
                     (* } *)
-                    
+
                     (* destruct t2; pinversion VIS_HANDLED; subst_existT. *)
                     (* { exfalso; eapply EQ; eauto. } *)
                     (* subst_existT. *)
@@ -21996,7 +22357,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     (* 3: { *)
                     (*   rewrite get_inf_tree_equation. *)
                     (*   cbn. *)
-                      
+
                     (* } *)
                     (* - intros a b H H1 H2. *)
                     (*   left. *)
@@ -22394,7 +22755,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               }
 
               pstep; red; cbn.
-              constructor.              
+              constructor.
 
               intros v.
               red.
@@ -22515,7 +22876,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                                       (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
                               with
                               end)).
-                    
+
                     2: {
                       cbn.
                       repeat red.
@@ -22543,7 +22904,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         get_inf_tree (ta >>= k) ≈ x <- get_inf_tree ta;; get_inf_tree (k_inf x)
 
                      *)
-                    
+
 
                     econstructor.
                     inversion RUN; subst.
@@ -23182,7 +23543,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               forward REL; auto.
               pclearbot.
 
-              repeat rewrite <- itree_eta.              
+              repeat rewrite <- itree_eta.
               exact REL.
             }
           }
@@ -23368,7 +23729,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         ITree.subst
           (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
                            end) (Ret x)))).
-              
+
               eapply Interp_Memory_PropT_Vis_OOM.
               reflexivity.
             }
@@ -23737,7 +24098,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             (*   { admit. (* TODO: Not provable? *) *)
             (*   } *)
             (*   subst. *)
-            
+
             (*   cbn. *)
             (*   pstep. red. cbn. *)
             (*   eapply EqVis. *)
@@ -23755,7 +24116,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
             (*   red. left. *)
             (*   destruct v. *)
-            
+
             (* } *)
             (*   { intros a b H H1 H2. *)
             (*     destruct b. destruct p. *)
@@ -23763,7 +24124,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             (*     right. *)
 
             (*     left. *)
-            
+
             (*   } *)
 
             (*     with *)
@@ -23777,7 +24138,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             (*   } *)
             (* - specialize (EQ t1); contradiction. *)
 
-            
+
 
 
             (*           get_inf_tree (k2 (s2, (s2, r))))). *)
@@ -23788,9 +24149,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             (*   rewrite get_inf_tree_equation. *)
             (*   red. *)
             (*   cbn. *)
-            
+
             (* } *)
-            
+
             (* destruct t2; pinversion VIS_HANDLED; subst_existT. *)
             (* { exfalso; eapply EQ; eauto. } *)
             (* subst_existT. *)
@@ -23799,7 +24160,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             (* 3: { *)
             (*   rewrite get_inf_tree_equation. *)
             (*   cbn. *)
-            
+
             (* } *)
             (* - intros a b H H1 H2. *)
             (*   left. *)
@@ -24107,11 +24468,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Qed.
 
   (* Extra stuff from the proof of the above lemma that needs to get cleaned up... But there's some other stuff in here that I need to not accidentally delete *)
-        
-          
+
+
           destruct e.
 
-          
+
           rewrite HT1.
           eapply Interp_Memory_PropT_Vis_OOM.
 
