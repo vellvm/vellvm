@@ -11925,7 +11925,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     intros ms_fin ms_inf ms_fin' ms_inf' REF REF' HP.
   Admitted.
 
-  Hint Resolve
+  #[global] Hint Resolve
     lift_MemState_refine_prop
     fin_inf_allocations_preserved
     fin_inf_frame_stack_preserved
@@ -20156,6 +20156,65 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         reflexivity.
   Qed.
 
+  Lemma fin_inf_malloc_bytes_with_pr_spec_MemPropT_ub :
+    forall bytes_fin bytes_inf sid ms_fin ms_fin' ms_inf ms_inf' msg,
+      MemState_refine_prop ms_inf ms_fin ->
+      MemState_refine_prop ms_inf' ms_fin' ->
+      sbytes_refine bytes_inf bytes_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.malloc_bytes_with_pr_spec_MemPropT bytes_fin sid ms_fin' (raise_ub msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.malloc_bytes_with_pr_spec_MemPropT bytes_inf sid ms_inf' (raise_ub msg).
+  Proof.
+    intros bytes_fin bytes_inf sid ms_fin ms_fin' ms_inf ms_inf' msg MSR1 MSR2 BYTES_REF MALLOC.
+    red; red in MALLOC.
+
+    eapply MemPropT_fin_inf_bind_ub.
+    5: apply MALLOC.
+    all: eauto with FinInf.
+
+    { intros a_fin ms_fin_ma H.
+      eapply find_free_block_fin_inf; eauto.
+      erewrite sbytes_refine_length; eauto.                              
+    }
+
+    intros ms_inf0 ms_fin0 a_fin a_inf msg0 REF MSR FIND_FREE MALLOC'.
+    cbn in *.
+    break_match_hyp.
+    destruct MALLOC' as [[] | (?&?&?&[])].
+
+    Unshelve.
+    apply ms_fin.
+  Qed.
+
+  #[global] Hint Resolve fin_inf_malloc_bytes_with_pr_spec_MemPropT_ub : FinInf.
+
+  Lemma fin_inf_malloc_bytes_spec_MemPropT_ub :
+    forall bytes_fin bytes_inf ms_fin ms_inf msg,
+      MemState_refine_prop ms_inf ms_fin ->
+      sbytes_refine bytes_inf bytes_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.malloc_bytes_spec_MemPropT bytes_fin ms_fin (raise_ub msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.malloc_bytes_spec_MemPropT bytes_inf ms_inf (raise_ub msg).
+  Proof.
+    intros bytes_fin bytes_inf ms_fin ms_inf msg MSR BYTES MALLOC.
+    red; red in MALLOC.
+
+    eapply MemPropT_fin_inf_bind_ub.
+    5: apply MALLOC.
+    all: eauto with FinInf.
+
+    { intros a_fin ms_fin_ma H.
+      eapply fresh_provenance_fin_inf; eauto.
+    }
+
+    intros ms_inf0 ms_fin0 sid a_inf msg0 EQ MSR' FRESH_PR MALLOC'.
+    cbn in EQ; subst.
+    eapply fin_inf_malloc_bytes_with_pr_spec_MemPropT_ub in MALLOC'; eauto.
+
+    Unshelve.
+    eauto.
+  Qed.
+
+  #[global] Hint Resolve fin_inf_malloc_bytes_spec_MemPropT_ub : FinInf.
+
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
       L2_E1E2_orutt_strict t_inf t_fin ->
@@ -21193,7 +21252,385 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         }
                       }
 
-                      (* Not memcpy... *)
+                      break_match_hyp.
+                      { (* Malloc *)
+                        cbn in *.
+                        destruct INTRINSIC as [HANDLER | [sab [[] [HANDLER []]]]].
+                        red in HANDLER.
+                        repeat (destruct ARGS;
+                                [solve [ inversion HANDLER
+                                       | red in HANDLER;
+                                         repeat break_match_hyp; cbn in HANDLER; inversion HANDLER
+                                   ]
+                                |
+                               ]).
+                        repeat (break_match_hyp; try solve [cbn in HANDLER; contradiction]);
+                        inv ARGS;
+                        rename H into ARG_REF.
+
+                        { (* i1 *)
+                          apply dvalue_refine_strict_i1_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
+                          eapply Interp_Memory_PropT_Vis with
+                            (ta:=raise_ub "").
+
+                          3: {
+                            red.
+                            left.
+                            eapply FindUB.
+                            pstep; red; cbn.
+                            constructor.
+                            intros [].
+                          }
+
+                          { intros a b RETa RETb AB.
+                            cbn in RETb.
+                            unfold raiseUB in RETb.
+                            rewrite bind_trigger in RETb.
+                            eapply Returns_vis_inversion in RETb.
+                            destruct RETb as [[] _].
+                          }
+
+                          cbn.
+                          red.
+                          red.
+                          left.
+                          exists ub_msg.
+                          red.
+                          rewrite Heqb, Heqb0.
+                          left.
+
+                          eapply MemPropT_fin_inf_bind_ub.
+                          5: apply HANDLER.
+                          all: eauto with FinInf.
+
+                          { intros a_fin ms_fin_ma H.
+                            eapply fresh_sid_fin_inf; eauto with FinInf.
+                          }
+
+                          intros ms_inf ms_fin a_fin a_inf msg SID MSR' FRESH MALLOC.
+
+                          eapply MemPropT_fin_inf_bind_ub with
+                            (A_REF:=sbytes_refine).
+                          5: apply MALLOC.
+                          all: eauto with FinInf.
+
+                          2: {
+                            intros msg0 GEN.
+                            red; red in GEN.
+                            break_match_hyp; cbn in GEN; try contradiction.
+                          }
+
+                          { intros a_fin0 ms_fin_ma GEN.
+                            red in GEN.
+                            break_match_hyp; cbn in GEN; try contradiction.
+                            destruct GEN; subst.
+                            eapply generate_num_undef_bytes_fin_inf in Heqo.
+
+                            destruct Heqo as (bytes_inf&GEN&BYTE_REF).
+                            exists bytes_inf. exists ms_inf.
+                            split; auto.
+
+                            red.
+                            cbn in *; subst.
+                            rewrite ARG_REF.
+                            rewrite GEN.
+                            auto.
+                          }
+                        }
+
+                        { (* i8 *)
+                          apply dvalue_refine_strict_i8_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
+                          eapply Interp_Memory_PropT_Vis with
+                            (ta:=raise_ub "").
+
+                          3: {
+                            red.
+                            left.
+                            eapply FindUB.
+                            pstep; red; cbn.
+                            constructor.
+                            intros [].
+                          }
+
+                          { intros a b RETa RETb AB.
+                            cbn in RETb.
+                            unfold raiseUB in RETb.
+                            rewrite bind_trigger in RETb.
+                            eapply Returns_vis_inversion in RETb.
+                            destruct RETb as [[] _].
+                          }
+
+                          cbn.
+                          red.
+                          red.
+                          left.
+                          exists ub_msg.
+                          red.
+                          rewrite Heqb, Heqb0.
+                          left.
+
+                          eapply MemPropT_fin_inf_bind_ub.
+                          5: apply HANDLER.
+                          all: eauto with FinInf.
+
+                          { intros a_fin ms_fin_ma H.
+                            eapply fresh_sid_fin_inf; eauto with FinInf.
+                          }
+
+                          intros ms_inf ms_fin a_fin a_inf msg SID MSR' FRESH MALLOC.
+
+                          eapply MemPropT_fin_inf_bind_ub with
+                            (A_REF:=sbytes_refine).
+                          5: apply MALLOC.
+                          all: eauto with FinInf.
+
+                          2: {
+                            intros msg0 GEN.
+                            red; red in GEN.
+                            break_match_hyp; cbn in GEN; try contradiction.
+                          }
+
+                          { intros a_fin0 ms_fin_ma GEN.
+                            red in GEN.
+                            break_match_hyp; cbn in GEN; try contradiction.
+                            destruct GEN; subst.
+                            eapply generate_num_undef_bytes_fin_inf in Heqo.
+
+                            destruct Heqo as (bytes_inf&GEN&BYTE_REF).
+                            exists bytes_inf. exists ms_inf.
+                            split; auto.
+
+                            red.
+                            cbn in *; subst.
+                            rewrite ARG_REF.
+                            rewrite GEN.
+                            auto.
+                          }
+                        }
+
+                        { (* i32 *)
+                          apply dvalue_refine_strict_i32_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
+                          eapply Interp_Memory_PropT_Vis with
+                            (ta:=raise_ub "").
+
+                          3: {
+                            red.
+                            left.
+                            eapply FindUB.
+                            pstep; red; cbn.
+                            constructor.
+                            intros [].
+                          }
+
+                          { intros a b RETa RETb AB.
+                            cbn in RETb.
+                            unfold raiseUB in RETb.
+                            rewrite bind_trigger in RETb.
+                            eapply Returns_vis_inversion in RETb.
+                            destruct RETb as [[] _].
+                          }
+
+                          cbn.
+                          red.
+                          red.
+                          left.
+                          exists ub_msg.
+                          red.
+                          rewrite Heqb, Heqb0.
+                          left.
+
+                          eapply MemPropT_fin_inf_bind_ub.
+                          5: apply HANDLER.
+                          all: eauto with FinInf.
+
+                          { intros a_fin ms_fin_ma H.
+                            eapply fresh_sid_fin_inf; eauto with FinInf.
+                          }
+
+                          intros ms_inf ms_fin a_fin a_inf msg SID MSR' FRESH MALLOC.
+
+                          eapply MemPropT_fin_inf_bind_ub with
+                            (A_REF:=sbytes_refine).
+                          5: apply MALLOC.
+                          all: eauto with FinInf.
+
+                          2: {
+                            intros msg0 GEN.
+                            red; red in GEN.
+                            break_match_hyp; cbn in GEN; try contradiction.
+                          }
+
+                          { intros a_fin0 ms_fin_ma GEN.
+                            red in GEN.
+                            break_match_hyp; cbn in GEN; try contradiction.
+                            destruct GEN; subst.
+                            eapply generate_num_undef_bytes_fin_inf in Heqo.
+
+                            destruct Heqo as (bytes_inf&GEN&BYTE_REF).
+                            exists bytes_inf. exists ms_inf.
+                            split; auto.
+
+                            red.
+                            cbn in *; subst.
+                            rewrite ARG_REF.
+                            rewrite GEN.
+                            auto.
+                          }
+                        }
+
+                        { (* i64 *)
+                          apply dvalue_refine_strict_i64_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
+                          eapply Interp_Memory_PropT_Vis with
+                            (ta:=raise_ub "").
+
+                          3: {
+                            red.
+                            left.
+                            eapply FindUB.
+                            pstep; red; cbn.
+                            constructor.
+                            intros [].
+                          }
+
+                          { intros a b RETa RETb AB.
+                            cbn in RETb.
+                            unfold raiseUB in RETb.
+                            rewrite bind_trigger in RETb.
+                            eapply Returns_vis_inversion in RETb.
+                            destruct RETb as [[] _].
+                          }
+
+                          cbn.
+                          red.
+                          red.
+                          left.
+                          exists ub_msg.
+                          red.
+                          rewrite Heqb, Heqb0.
+                          left.
+
+                          eapply MemPropT_fin_inf_bind_ub.
+                          5: apply HANDLER.
+                          all: eauto with FinInf.
+
+                          { intros a_fin ms_fin_ma H.
+                            eapply fresh_sid_fin_inf; eauto with FinInf.
+                          }
+
+                          intros ms_inf ms_fin a_fin a_inf msg SID MSR' FRESH MALLOC.
+
+                          eapply MemPropT_fin_inf_bind_ub with
+                            (A_REF:=sbytes_refine).
+                          5: apply MALLOC.
+                          all: eauto with FinInf.
+
+                          2: {
+                            intros msg0 GEN.
+                            red; red in GEN.
+                            break_match_hyp; cbn in GEN; try contradiction.
+                          }
+
+                          { intros a_fin0 ms_fin_ma GEN.
+                            red in GEN.
+                            break_match_hyp; cbn in GEN; try contradiction.
+                            destruct GEN; subst.
+                            eapply generate_num_undef_bytes_fin_inf in Heqo.
+
+                            destruct Heqo as (bytes_inf&GEN&BYTE_REF).
+                            exists bytes_inf. exists ms_inf.
+                            split; auto.
+
+                            red.
+                            cbn in *; subst.
+                            rewrite ARG_REF.
+                            rewrite GEN.
+                            auto.
+                          }
+                        }
+
+                        { (* iptr *)
+                          apply dvalue_refine_strict_iptr_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
+                          eapply Interp_Memory_PropT_Vis with
+                            (ta:=raise_ub "").
+
+                          3: {
+                            red.
+                            left.
+                            eapply FindUB.
+                            pstep; red; cbn.
+                            constructor.
+                            intros [].
+                          }
+
+                          { intros a b RETa RETb AB.
+                            cbn in RETb.
+                            unfold raiseUB in RETb.
+                            rewrite bind_trigger in RETb.
+                            eapply Returns_vis_inversion in RETb.
+                            destruct RETb as [[] _].
+                          }
+
+                          cbn.
+                          red.
+                          red.
+                          left.
+                          exists ub_msg.
+                          red.
+                          rewrite Heqb, Heqb0.
+                          left.
+
+                          eapply MemPropT_fin_inf_bind_ub.
+                          5: apply HANDLER.
+                          all: eauto with FinInf.
+
+                          { intros a_fin ms_fin_ma H.
+                            eapply fresh_sid_fin_inf; eauto with FinInf.
+                          }
+
+                          intros ms_inf ms_fin a_fin a_inf msg SID MSR' FRESH MALLOC.
+
+                          eapply MemPropT_fin_inf_bind_ub with
+                            (A_REF:=sbytes_refine).
+                          5: apply MALLOC.
+                          all: eauto with FinInf.
+
+                          2: {
+                            intros msg0 GEN.
+                            red; red in GEN.
+                            break_match_hyp; cbn in GEN; try contradiction.
+                          }
+
+                          { intros a_fin0 ms_fin_ma GEN.
+                            red in GEN.
+                            break_match_hyp; cbn in GEN; try contradiction.
+                            destruct GEN; subst.
+                            eapply generate_num_undef_bytes_fin_inf in Heqo.
+
+                            destruct Heqo as (bytes_inf&GEN&BYTE_REF).
+                            exists bytes_inf. exists ms_inf.
+                            split; auto.
+
+
+                            red.
+                            assert (Z.to_N (LLVMParamsBigIntptr.IP.to_unsigned x1) = (Z.to_N (LLVMParams64BitIntptr.IP.to_unsigned x0))) as EQ'.
+                            { unfold Z.to_N.
+                              unfold LLVMParams64BitIntptr.IP.to_unsigned.
+                              rewrite <- IP.to_Z_to_unsigned.
+                              erewrite IP.from_Z_to_Z; eauto.
+                              rewrite <- ARG_REF.
+                              rewrite <- MemoryBigIntptrInfiniteSpec.LP.IP.to_Z_to_unsigned.
+                              reflexivity.
+                            }
+
+                            rewrite EQ'.
+                            cbn in SID; subst.
+                            rewrite GEN.
+                            cbn; auto.
+                          }
+                        }
+                      }
+
+                      (* Other intrinsics... *)
                       admit.
                     }
 
