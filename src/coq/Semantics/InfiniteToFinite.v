@@ -20215,6 +20215,20 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
   #[global] Hint Resolve fin_inf_malloc_bytes_spec_MemPropT_ub : FinInf.
 
+  (* TODO: Prove this / move this *)
+  Lemma inf_fin_free_spec :
+    forall {ms_inf_start : InfMem.MMEP.MMSP.MemState}
+      {ms_inf_final : InfMem.MMEP.MMSP.MemState} {ms_fin_start : FinMem.MMEP.MMSP.MemState}
+      {ptr_fin : FinAddr.addr} {ptr_inf : InfAddr.addr},
+      MemState_refine_prop ms_inf_start ms_fin_start ->
+      addr_refine ptr_inf ptr_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.free_spec ms_inf_start ptr_inf ms_inf_final ->
+      exists ms_fin_final : Memory64BitIntptr.MMEP.MMSP.MemState,
+        Memory64BitIntptr.MMEP.MemSpec.free_spec ms_fin_start ptr_fin ms_fin_final /\
+          MemState_refine_prop ms_inf_final ms_fin_final.
+  Proof.
+  Admitted.
+
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
       L2_E1E2_orutt_strict t_inf t_fin ->
@@ -21630,8 +21644,69 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         }
                       }
 
-                      (* Other intrinsics... *)
-                      admit.
+                      break_match_hyp.
+                      { (* Free *)
+                        cbn in *.
+                        destruct INTRINSIC as [HANDLER | [sab [[] [HANDLER []]]]].
+                        red in HANDLER.
+                        repeat (destruct ARGS;
+                                [solve [ inversion HANDLER
+                                       | red in HANDLER;
+                                         repeat break_match_hyp; cbn in HANDLER; inversion HANDLER
+                                   ]
+                                |
+                               ]).
+                        repeat (break_match_hyp; try solve [cbn in HANDLER; contradiction]);
+                        inv ARGS;
+                        rename H into ARG_REF.
+
+                        apply dvalue_refine_strict_addr_r_inv in ARG_REF as (?&?&ARG_REF);
+                          cbn in ARG_REF; subst.
+                        eapply Interp_Memory_PropT_Vis with
+                          (ta:=raise_ub "").
+
+                        3: {
+                          red.
+                          left.
+                          eapply FindUB.
+                          pstep; red; cbn.
+                          constructor.
+                          intros [].
+                        }
+
+                        { intros a0 b RETa RETb AB.
+                          cbn in RETb.
+                          unfold raiseUB in RETb.
+                          rewrite bind_trigger in RETb.
+                          eapply Returns_vis_inversion in RETb.
+                          destruct RETb as [[] _].
+                        }
+
+                        cbn.
+                        red.
+                        red.
+                        left.
+                        exists ub_msg.
+                        red.
+                        rewrite Heqb, Heqb0, Heqb1.
+                        left.
+
+                        cbn.
+                        intros m2 CONTRA.
+
+                        eapply inf_fin_free_spec in CONTRA.
+                        destruct CONTRA as (?&?&?).
+
+                        cbn in HANDLER.
+                        eapply HANDLER.
+                        eapply H.
+
+                        all: eauto.
+                        apply lift_MemState_refine_prop.
+                      }
+
+                      cbn in INTRINSIC.
+                      contradiction.
                     }
 
                     { (* Handler raises Error *)
@@ -21640,6 +21715,48 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       cbn in TA.
                       unfold LLVMEvents.raise in TA.
                       rewrite bind_trigger in TA.
+
+                      destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                      { rewrite TA in VIS_HANDLED.
+
+                        (* TODO: Move this *)
+                        Lemma contains_UB_Extra_raise_error :
+                          forall {E F G J} `{O : FailureE -< E +' F +' G +' UBE +' J} {X} msg,
+                            (forall X e1 e2, O X e1 <> inr1 (inr1 (inr1 (inl1 e2)))) ->
+                            ~ contains_UB_Extra (@raise_error _ _ X msg).
+                        Proof.
+                          intros E F G J O X msg NUBE CONTRA.
+                          dependent destruction CONTRA.
+                          - pinversion H; subst; inv CHECK.
+                          - pinversion H; do 2 subst_existT.
+                            cbn in *.
+                            inv x.
+                          - pinversion H; do 2 subst_existT.
+                            cbn in *.
+                            inv x.
+                          - pinversion H; do 2 subst_existT.
+                            cbn in *.
+                            subst.
+                            rewrite subevent_subevent in H4.
+                            unfold subevent in *.
+                            repeat unfold resum, ReSum_id, id_, Id_IFun, ReSum_inr, ReSum_inl, inr_, inl_, cat, Cat_IFun, Inr_sum1, Inl_sum1 in H4.
+                            apply NUBE in H4.
+                            auto.
+                        Qed.
+
+                        exfalso.
+                        eapply contains_UB_Extra_raise_error.
+                        2: {
+                          unfold raise_error.
+                          cbn.
+                          unfold LLVMEvents.raise.
+                          rewrite bind_trigger.
+                          eapply VIS_HANDLED.
+                        }
+
+                        intros X e1 e2 CONTRA.
+                        inv CONTRA.
+                      }
 
                       eapply Interp_Memory_PropT_Vis with (ta:=
                                                              vis (Throw (print_msg err_msg))
@@ -21657,6 +21774,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       .
 
                       3: {
+                        right.
                         rewrite VIS_HANDLED.
                         rewrite TA.
                         rewrite bind_vis.
@@ -21695,6 +21813,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       destruct HANDLER as [msg_spec HANDLER].
                       cbn in HANDLER.
                       break_match_hyp.
+                      destruct HANDLER as [HANDLER | (?&?&?&[])].
+                      exists msg_spec.
+                      cbn.
+                      rewrite Heqb.
+                      left.
                       admit.
                       admit.
                     }
@@ -21708,6 +21831,19 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
                       rewrite TA in VIS_HANDLED.
                       rewrite bind_vis in VIS_HANDLED.
+
+                      destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                      { exfalso.
+                        eapply contains_UB_Extra_raiseOOM.
+                        2: {
+                          unfold raiseOOM.
+                          rewrite bind_trigger.
+                          eapply VIS_HANDLED.
+                        }
+
+                        intros X e1 e2 CONTRA.
+                        inv CONTRA.
+                      }
 
                       punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
                       dependent induction VIS_HANDLED.
