@@ -20173,7 +20173,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
     { intros a_fin ms_fin_ma H.
       eapply find_free_block_fin_inf; eauto.
-      erewrite sbytes_refine_length; eauto.                              
+      erewrite sbytes_refine_length; eauto.
     }
 
     intros ms_inf0 ms_fin0 a_fin a_inf msg0 REF MSR FIND_FREE MALLOC'.
@@ -21860,8 +21860,14 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     }
 
                     (* Handler succeeds *)
-                    destruct H0 as (st1&ms'&d&TA&INTRINSIC).
+                    destruct HSPEC as (st1&ms'&d&TA&INTRINSIC).
                     rewrite TA in VIS_HANDLED.
+
+                    destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                    { eapply ret_not_contains_UB_Extra in VIS_HANDLED; try contradiction.
+                      reflexivity.
+                    }
+
                     setoid_rewrite bind_ret_l in VIS_HANDLED.
 
                     { epose proof handle_intrinsic_fin_inf ARGS (lift_MemState_refine_prop s2) INTRINSIC as (dv_inf&ms_inf'&INTRINSIC_INF&DV_REF&MSR_INTRINSIC).
@@ -21885,6 +21891,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       }
 
                       2: {
+                        right.
                         cbn.
                         rewrite bind_ret_l.
                         rewrite VIS_HANDLED.
@@ -21940,7 +21947,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                   { (* MemPush *)
                     repeat red in H0.
                     rename s2 into m1.
-                    destruct H0 as [UB | [ERR | [OOM | H0]]].
+                    destruct HSPEC as [UB | [ERR | [OOM | HSPEC]]].
                     { (* Handler raises UB *)
                       destruct UB as [ub_msg UB].
                       cbn in UB.
@@ -21962,6 +21969,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
                                                                                  LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k2 oom_msg) as RAISE.
                       rewrite RAISE in VIS_HANDLED.
+                      destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                      { eapply contains_UB_Extra_raiseOOM in VIS_HANDLED; try contradiction.
+                        intros X e1 e2 CONTRA.
+                        inv CONTRA.
+                      }
+
                       punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
                       dependent induction VIS_HANDLED.
                       - eapply Interp_Memory_PropT_Vis_OOM.
@@ -21974,13 +21987,18 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     }
 
                     (* Handler succeeds *)
-                    destruct H0 as [st' [ms_push [[] [TA PUSH_HANDLER]]]].
+                    destruct HSPEC as [st' [ms_push [[] [TA PUSH_HANDLER]]]].
                     cbn in PUSH_HANDLER.
 
                     rewrite TA in VIS_HANDLED.
                     cbn in VIS_HANDLED.
-                    rewrite bind_ret_l in VIS_HANDLED.
 
+                    destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                    { eapply ret_not_contains_UB_Extra in VIS_HANDLED; try contradiction.
+                      cbn. reflexivity.
+                    }
+
+                    rewrite bind_ret_l in VIS_HANDLED.
 
                     { epose proof mem_push_spec_fin_inf (lift_MemState_refine_prop m1) (lift_MemState_refine_prop ms_push) PUSH_HANDLER as PUSH_INF.
 
@@ -22006,6 +22024,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       }
 
                       2: {
+                        right.
                         cbn.
                         rewrite bind_ret_l.
                         rewrite MemState_fin_to_inf_to_fin.
@@ -22062,8 +22081,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                   }
 
                   { (* MemPop *)
-                    repeat red in H0.
-                    destruct H0 as [UB | [ERR | [OOM | H0]]].
+                    repeat red in HSPEC.
+                    destruct HSPEC as [UB | [ERR | [OOM | HSPEC]]].
                     { (* Handler raises UB *)
                       cbn in UB.
                       destruct UB as [_ [NPOP NPOPSPEC]].
@@ -22090,6 +22109,13 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
                                                                                  LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_error _ _) _ _ _ k2 msg) as RAISE.
                       rewrite RAISE in VIS_HANDLED.
+
+                      destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                      { eapply contains_UB_Extra_raise_error in VIS_HANDLED; try contradiction.
+                        intros X e1 e2 CONTRA.
+                        inv CONTRA.
+                      }
+
                       punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
                       dependent induction VIS_HANDLED.
                       2: {
@@ -22102,6 +22128,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         ))
                         (s1:=s1)
                         (s2:=lift_MemState s2).
+
                       2: {
                         pose proof cannot_pop_fin_inf (lift_MemState_refine_prop s2) ERR as ERR_INF.
                         cbn.
@@ -22116,6 +22143,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       }
 
                       2: {
+                        right.
                         rewrite get_inf_tree_equation.
                         cbn.
                         setoid_rewrite Raise.raise_bind_itree.
@@ -22136,6 +22164,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
                                                                                  LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k2 oom_msg) as RAISE.
                       rewrite RAISE in VIS_HANDLED.
+                      destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                      { eapply contains_UB_Extra_raiseOOM in VIS_HANDLED; try contradiction.
+                        intros X e1 e2 CONTRA.
+                        inv CONTRA.
+                      }
+
                       punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
                       dependent induction VIS_HANDLED.
                       - eapply Interp_Memory_PropT_Vis_OOM.
@@ -22148,11 +22182,16 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     }
 
                     (* Handler succeeds *)
-                    destruct H0 as [st' [ms_pop [[] [TA POP_HANDLER]]]].
+                    destruct HSPEC as [st' [ms_pop [[] [TA POP_HANDLER]]]].
                     cbn in POP_HANDLER.
 
                     rewrite TA in VIS_HANDLED.
                     cbn in VIS_HANDLED.
+                    destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                    { eapply ret_not_contains_UB_Extra in VIS_HANDLED; try contradiction.
+                      cbn. reflexivity.
+                    }
+
                     rewrite bind_ret_l in VIS_HANDLED.
 
                     { eapply Interp_Memory_PropT_Vis with
@@ -22179,6 +22218,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       }
 
                       2: {
+                        right.
                         cbn.
                         rewrite bind_ret_l.
                         rewrite MemState_fin_to_inf_to_fin.
@@ -22236,8 +22276,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                   }
 
                   { (* Alloca *)
-                    repeat red in H0.
-                    destruct H0 as [UB | [ERR | [OOM | H0]]].
+                    repeat red in HSPEC.
+                    destruct HSPEC as [UB | [ERR | [OOM | HSPEC]]].
                     { (* Handler raises UB *)
 
                       (* TODO: look into lemmas like:
@@ -22262,6 +22302,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
                                                                                  LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k2 oom_msg) as RAISE.
                       rewrite RAISE in VIS_HANDLED.
+                      destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                      { eapply contains_UB_Extra_raiseOOM in VIS_HANDLED; try contradiction.
+                        intros X e1 e2 CONTRA.
+                        inv CONTRA.
+                      }
+
                       punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
                       dependent induction VIS_HANDLED.
                       - eapply Interp_Memory_PropT_Vis_OOM.
@@ -22274,10 +22320,15 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     }
 
                     (* Handler succeeds *)
-                    destruct H0 as [st' [ms_alloca [d [TA ALLOCA_HANDLER]]]].
+                    destruct HSPEC as [st' [ms_alloca [d [TA ALLOCA_HANDLER]]]].
 
                     rewrite TA in VIS_HANDLED.
                     cbn in VIS_HANDLED.
+                    destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                    { eapply ret_not_contains_UB_Extra in VIS_HANDLED; try contradiction.
+                      cbn. reflexivity.
+                    }
+
                     rewrite bind_ret_l in VIS_HANDLED.
                     destruct EV_REL as (?&?&?); subst.
 
@@ -22299,6 +22350,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       }
 
                       2: {
+                        right.
                         cbn.
                         rewrite bind_ret_l.
                         rewrite VIS_HANDLED.
@@ -22353,8 +22405,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                   }
 
                   { (* Load *)
-                    repeat red in H0.
-                    destruct H0 as [UB | [ERR | [OOM | H0]]].
+                    repeat red in HSPEC.
+                    destruct HSPEC as [UB | [ERR | [OOM | HSPEC]]].
                     { (* Handler raises UB *)
                       admit.
                     }
@@ -22367,6 +22419,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
                                                                                  LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_error _ _) _ _ _ k2 msg) as RAISE.
                       rewrite RAISE in VIS_HANDLED.
+                      destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                      { eapply contains_UB_Extra_raise_error in VIS_HANDLED; try contradiction.
+                        intros X e1 e2 CONTRA.
+                        inv CONTRA.
+                      }
+
                       punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
                       dependent induction VIS_HANDLED.
                       2: {
@@ -22384,6 +22442,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         (s2:=lift_MemState s2)
                         (ta:= raise_error msg).
                       3: {
+                        right.
                         rewrite get_inf_tree_equation.
                         cbn.
                         setoid_rewrite Raise.raise_bind_itree.
@@ -22517,6 +22576,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
                                                                                  LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k2 oom_msg) as RAISE.
                       rewrite RAISE in VIS_HANDLED.
+                      destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                      { eapply contains_UB_Extra_raiseOOM in VIS_HANDLED; try contradiction.
+                        intros X e1 e2 CONTRA.
+                        inv CONTRA.
+                      }
+
                       punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
                       dependent induction VIS_HANDLED.
                       - eapply Interp_Memory_PropT_Vis_OOM.
@@ -22529,10 +22594,15 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     }
 
                     (* Handler succeeds *)
-                    destruct H0 as [st' [ms_load [uv_fin [TA LOAD_HANDLER]]]].
+                    destruct HSPEC as [st' [ms_load [uv_fin [TA LOAD_HANDLER]]]].
 
                     rewrite TA in VIS_HANDLED.
                     cbn in VIS_HANDLED.
+                    destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                    { eapply ret_not_contains_UB_Extra in VIS_HANDLED; try contradiction.
+                      cbn; reflexivity.
+                    }
+
                     rewrite bind_ret_l in VIS_HANDLED.
                     destruct EV_REL as (?&?); subst.
 
@@ -22554,6 +22624,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       }
 
                       2: {
+                        right.
                         cbn.
                         rewrite bind_ret_l.
                         rewrite VIS_HANDLED.
@@ -22608,8 +22679,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                   }
 
                   { (* Store *)
-                    repeat red in H0.
-                    destruct H0 as [UB | [ERR | [OOM | H0]]].
+                    repeat red in HSPEC.
+                    destruct HSPEC as [UB | [ERR | [OOM | HSPEC]]].
                     { (* Handler raises UB *)
                       admit.
                     }
@@ -22622,6 +22693,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
                                                                                  LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_error _ _) _ _ _ k2 msg) as RAISE.
                       rewrite RAISE in VIS_HANDLED.
+                      destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                      { eapply contains_UB_Extra_raise_error in VIS_HANDLED; try contradiction.
+                        intros X e1 e2 CONTRA.
+                        inv CONTRA.
+                      }
+
                       punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
                       dependent induction VIS_HANDLED.
                       2: {
@@ -22635,7 +22712,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         (s1:=s1)
                         (s2:=lift_MemState s2)
                         (ta:= raise_error msg).
+
                       3: {
+                        right.
                         rewrite get_inf_tree_equation.
                         cbn.
                         setoid_rewrite Raise.raise_bind_itree.
@@ -22724,6 +22803,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
                                                                                  LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k2 oom_msg) as RAISE.
                       rewrite RAISE in VIS_HANDLED.
+                      destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                      { eapply contains_UB_Extra_raiseOOM in VIS_HANDLED; try contradiction.
+                        intros X e1 e2 CONTRA.
+                        inv CONTRA.
+                      }
+
                       punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
                       dependent induction VIS_HANDLED.
                       - eapply Interp_Memory_PropT_Vis_OOM.
@@ -22736,10 +22821,15 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     }
 
                     (* Handler succeeds *)
-                    destruct H0 as [st' [ms_store [[] [TA STORE_HANDLER]]]].
+                    destruct HSPEC as [st' [ms_store [[] [TA STORE_HANDLER]]]].
 
                     rewrite TA in VIS_HANDLED.
                     cbn in VIS_HANDLED.
+                    destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                    { eapply ret_not_contains_UB_Extra in VIS_HANDLED; try contradiction.
+                      cbn; reflexivity.
+                    }
+
                     rewrite bind_ret_l in VIS_HANDLED.
                     destruct EV_REL as (?&?&?); subst.
 
@@ -22766,6 +22856,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       }
 
                       2: {
+                        right.
                         cbn.
                         rewrite bind_ret_l.
                         rewrite VIS_HANDLED.
@@ -22827,11 +22918,32 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     destruct p.
                     cbn in *.
                     destruct EV_REL as [EV_PRE UV_REF].
-                    unfold FinMemInterp.F_trigger in H0.
-                    setoid_rewrite bind_trigger in H0.
-                    cbn in H0.
-                    rewrite H0 in VIS_HANDLED.
+                    unfold FinMemInterp.F_trigger in HSPEC.
+                    setoid_rewrite bind_trigger in HSPEC.
+                    cbn in HSPEC.
+                    rewrite HSPEC in VIS_HANDLED.
                     rewrite bind_vis in VIS_HANDLED.
+                    destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                    { exfalso.
+                      clear - VIS_HANDLED.
+                      dependent induction VIS_HANDLED.
+                      - pinversion H; subst; inv CHECK.
+                      - pinversion H; do 2 subst_existT; subst.
+                        specialize (REL x).
+                        exfalso.
+                        rewrite <- REL in VIS_HANDLED.
+                        eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
+                        cbn; reflexivity.
+                      - pinversion H; do 2 subst_existT; subst.
+                        specialize (REL x).
+                        exfalso.
+                        rewrite <- REL in VIS_HANDLED.
+                        eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
+                        cbn; reflexivity.
+                      - pinversion H; do 2 subst_existT; subst.
+                        inversion H5.
+                    }
+
                     setoid_rewrite bind_ret_l in VIS_HANDLED.
                     punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
                     dependent induction VIS_HANDLED.
@@ -22974,10 +23086,35 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                   }
 
                   { (* OOM *)
-                    red in H0.
-                    rewrite H0 in VIS_HANDLED.
-                    setoid_rewrite bind_trigger in VIS_HANDLED.
-                    rewrite bind_vis in VIS_HANDLED.
+                    red in HSPEC.
+                    rewrite HSPEC in VIS_HANDLED.
+                    destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                    { destruct o.
+                      cbn in VIS_HANDLED.
+                      exfalso.
+                      rewrite bind_trigger in VIS_HANDLED.
+                      clear - VIS_HANDLED.
+                      dependent induction VIS_HANDLED.
+                      - pinversion H; subst; inv CHECK.
+                      - pinversion H; do 2 subst_existT; subst.
+                        specialize (REL x).
+                        exfalso.
+                        rewrite <- REL in VIS_HANDLED.
+                        eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
+                        cbn; reflexivity.
+                      - pinversion H; do 2 subst_existT; subst.
+                        specialize (REL x).
+                        exfalso.
+                        rewrite <- REL in VIS_HANDLED.
+                        eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
+                        cbn; reflexivity.
+                      - pinversion H; do 2 subst_existT; subst.
+                        inversion H4.
+                    }
+
+                    setoid_rewrite bind_bind in VIS_HANDLED.
+                    rewrite bind_trigger in VIS_HANDLED.
+                    setoid_rewrite bind_ret_l in VIS_HANDLED.
 
                     destruct t2; pinversion VIS_HANDLED; subst_existT.
                     { exfalso; eapply EQ; eauto. }
@@ -22994,24 +23131,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                   }
 
                   { (* UBE *)
-                    rename H0 into HANDLER.
+                    rename HSPEC into HANDLER.
                     subst.
                     destruct u, u0.
-                    red in HANDLER.
-                    cbn in HANDLER.
-                    rewrite bind_trigger in HANDLER.
-                    rewrite HANDLER in VIS_HANDLED.
-                    rewrite bind_vis in VIS_HANDLED.
 
-                    destruct t2; pinversion VIS_HANDLED; subst_existT.
-                    { exfalso; eapply EQ; eauto. }
-                    subst_existT.
-
-                    eapply Interp_Memory_PropT_Vis with
-                      (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
-                              get_inf_tree (k7 _)))
-                      (s1:=s1)
-                      (s2:=lift_MemState s2).
+                    eapply Interp_Memory_PropT_Vis.
 
                     2: {
                       cbn. red.
@@ -23021,14 +23145,13 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     }
 
                     2: {
-                      rewrite get_inf_tree_equation.
+                      left.
+                      rewrite resum_to_subevent.
+                      eapply FindUB.
+                      pstep.
+                      red.
                       cbn.
-                      unfold raiseUB.
-                      rewrite bind_trigger.
-                      rewrite bind_vis.
-                      unfold print_msg.
-                      destruct u0.
-                      pstep; red; cbn.
+                      rewrite subevent_subevent.
                       constructor.
                       intros [].
                     }
@@ -23037,7 +23160,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                   }
 
                   { (* DebugE *)
-                    rename H0 into HANDLER.
+                    rename HSPEC into HANDLER.
                     red in HANDLER.
                     destruct d, d0.
                     subst.
@@ -23045,6 +23168,27 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     cbn in HANDLER.
                     rewrite bind_trigger in HANDLER.
                     rewrite HANDLER in VIS_HANDLED.
+                    destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                    { cbn in VIS_HANDLED.
+                      exfalso.
+                      clear - VIS_HANDLED.
+                      dependent induction VIS_HANDLED.
+                      - pinversion H; subst; inv CHECK.
+                      - pinversion H; do 2 subst_existT; subst.
+                        specialize (REL x).
+                        exfalso.
+                        rewrite <- REL in VIS_HANDLED.
+                        eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
+                        cbn; reflexivity.
+                      - pinversion H; do 2 subst_existT; subst.
+                        specialize (REL x).
+                        exfalso.
+                        rewrite <- REL in VIS_HANDLED.
+                        eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
+                        cbn; reflexivity.
+                      - pinversion H; do 2 subst_existT; subst.
+                        inversion H5.
+                    }
                     rewrite bind_vis in VIS_HANDLED.
 
                     destruct t2; pinversion VIS_HANDLED; subst_existT.
@@ -23066,6 +23210,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     }
 
                     2: {
+                      right.
                       cbn.
                       rewrite bind_vis.
                       setoid_rewrite bind_ret_l.
@@ -23137,11 +23282,33 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                   }
 
                   { (* FailureE *)
-                    red in H0.
+                    red in HSPEC.
                     destruct f, f0.
-                    cbn in H0.
-                    rewrite bind_trigger in H0.
-                    rewrite H0 in VIS_HANDLED.
+                    cbn in HSPEC.
+                    rewrite bind_trigger in HSPEC.
+                    rewrite HSPEC in VIS_HANDLED.
+                    destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+                    { cbn in VIS_HANDLED.
+                      exfalso.
+                      clear - VIS_HANDLED.
+                      dependent induction VIS_HANDLED.
+                      - pinversion H; subst; inv CHECK.
+                      - pinversion H; do 2 subst_existT; subst.
+                        specialize (REL x).
+                        exfalso.
+                        rewrite <- REL in VIS_HANDLED.
+                        eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
+                        cbn; reflexivity.
+                      - pinversion H; do 2 subst_existT; subst.
+                        specialize (REL x).
+                        exfalso.
+                        rewrite <- REL in VIS_HANDLED.
+                        eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
+                        cbn; reflexivity.
+                      - pinversion H; do 2 subst_existT; subst.
+                        inversion H4.
+                    }
+
                     rewrite bind_vis in VIS_HANDLED.
                     punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
                     dependent induction VIS_HANDLED.
@@ -23162,6 +23329,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     }
 
                     2: {
+                      right.
                       rewrite get_inf_tree_equation.
                       cbn.
                       unfold LLVMEvents.raise.
@@ -23256,8 +23424,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         + (* Vis *)
           rename H0 into REL.
           rename H into EV_REL.
-          rename H2 into VIS_HANDLED.
-          rename H3 into HANDLER.
+          rename KS into VIS_HANDLED.
+          rename HSPEC into HANDLER.
+          red in VIS_HANDLED.
 
           repeat red in HANDLER.
           (* Need to break apart events e / e1 to figure out
@@ -23271,6 +23440,27 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             red in HANDLER. cbn in HANDLER.
             rewrite bind_trigger in HANDLER.
             rewrite HANDLER in VIS_HANDLED.
+            destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+            { cbn in VIS_HANDLED.
+              exfalso.
+              clear - VIS_HANDLED.
+              dependent induction VIS_HANDLED.
+              - pinversion H; subst; inv CHECK.
+              - pinversion H; do 2 subst_existT; subst.
+                specialize (REL x).
+                exfalso.
+                rewrite <- REL in VIS_HANDLED.
+                eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
+                cbn; reflexivity.
+              - pinversion H; do 2 subst_existT; subst.
+                specialize (REL x).
+                exfalso.
+                rewrite <- REL in VIS_HANDLED.
+                eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
+                cbn; reflexivity.
+              - pinversion H; do 2 subst_existT; subst.
+                inversion H5.
+            }
             pstep; red; cbn.
 
             destruct EV_REL as (?&F_REF&ARGS_REF).
@@ -23307,6 +23497,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             }
 
             2: {
+              right.
               cbn.
               rewrite bind_vis.
               cbn.
@@ -23403,6 +23594,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               destruct UB as [ub_msg INTRINSIC].
               red in INTRINSIC.
               break_match_hyp.
+
               { (* memcpy *)
                 cbn in *.
                 destruct INTRINSIC as [HANDLER | [sab [[] [HANDLER []]]]].
@@ -23470,30 +23662,14 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     eapply Returns_vis_inversion in RETb.
                     destruct RETb as [[] _].
 
-                    rewrite VIS_HANDLED.
-                    move HK after H11.
-
-                    (*
-                        get_inf_tree (ta >>= k) ≈ x <- get_inf_tree ta;; get_inf_tree (k_inf x)
-
-                     *)
-
-
-                    econstructor.
-                    inversion RUN; subst.
-                    { exfalso; eapply EQ; eauto. }
-
-                    { (* OOM *)
-                      destruct e.
-                      admit.
-                    }
-
-                    subst_existT.
-                    admit.
-                    admit.
-
-                    econstructor.
-                    admit.
+                    left.
+                    eapply FindUB.
+                    pstep.
+                    red.
+                    cbn.
+                    rewrite subevent_subevent.
+                    constructor.
+                    intros [].
                   }
 
                   break_match_hyp.
@@ -23531,6 +23707,20 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               rewrite TA in VIS_HANDLED.
               rewrite bind_vis in VIS_HANDLED.
 
+              destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+              { cbn in VIS_HANDLED.
+                exfalso.
+                clear - VIS_HANDLED.
+                dependent induction VIS_HANDLED.
+                - pinversion H; subst; inv CHECK.
+                - pinversion H; do 2 subst_existT; subst.
+                  destruct x.
+                - pinversion H; do 2 subst_existT; subst.
+                  destruct x.
+                - pinversion H; do 2 subst_existT; subst.
+                  inversion H4.
+              }
+
               pstep; red; cbn.
               eapply Interp_Memory_PropT_Vis with (ta:=
                                                      vis (Throw (print_msg err_msg))
@@ -23544,10 +23734,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                                                                (MemoryBigIntptr.MMEP.MMSP.MemState *
                                                                   (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
                                                           with
-                                                          end))
-              .
+                                                          end)).
 
               3: {
+                right.
                 rewrite VIS_HANDLED.
                 rewrite get_inf_tree_equation.
                 cbn. unfold LLVMEvents.raise.
@@ -23584,12 +23774,17 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
             { (* Handler raises OOM *)
               destruct OOM as [oom_msg [TA HANDLER]].
-              unfold raise_oom in TA.
-              cbn in TA.
-              unfold raiseOOM in TA.
-              rewrite bind_trigger in TA.
 
               rewrite TA in VIS_HANDLED.
+              destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+              { eapply contains_UB_Extra_raiseOOM in VIS_HANDLED; try contradiction.
+                intros X e1 e2 CONTRA.
+                inv CONTRA.
+              }
+              unfold raise_oom in TA, VIS_HANDLED.
+              cbn in TA, VIS_HANDLED.
+              unfold raiseOOM in TA, VIS_HANDLED.
+              rewrite bind_trigger in TA, VIS_HANDLED.
               rewrite bind_vis in VIS_HANDLED.
 
               eapply paco2_mon_bot; eauto.
@@ -23615,6 +23810,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             destruct HANDLER as (st1&ms'&d&TA&INTRINSIC).
             rewrite TA in VIS_HANDLED.
             setoid_rewrite bind_ret_l in VIS_HANDLED.
+            destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+            { eapply ret_not_contains_UB_Extra in VIS_HANDLED; try contradiction.
+              cbn; reflexivity.
+            }
 
             { epose proof handle_intrinsic_fin_inf ARGS (lift_MemState_refine_prop s2) INTRINSIC as (dv_inf&ms_inf'&INTRINSIC_INF&DV_REF&MSR_INTRINSIC).
 
@@ -23638,6 +23837,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               }
 
               2: {
+                right.
                 cbn.
                 rewrite bind_ret_l.
                 rewrite VIS_HANDLED.
@@ -23718,6 +23918,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
                                                                          LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k3 oom_msg) as RAISE.
               rewrite RAISE in VIS_HANDLED.
+              destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+              { eapply contains_UB_Extra_raiseOOM in VIS_HANDLED; try contradiction.
+                intros X e1 e2 CONTRA.
+                inv CONTRA.
+              }
               eapply paco2_mon_bot; eauto.
               rewrite VIS_HANDLED.
               cbn.
@@ -23743,7 +23948,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             rewrite TA in VIS_HANDLED.
             cbn in VIS_HANDLED.
             rewrite bind_ret_l in VIS_HANDLED.
-
+            destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+            { eapply ret_not_contains_UB_Extra in VIS_HANDLED; try contradiction.
+              cbn; reflexivity.
+            }
 
             { epose proof mem_push_spec_fin_inf (lift_MemState_refine_prop m1) (lift_MemState_refine_prop ms_push) PUSH_HANDLER as PUSH_INF.
 
@@ -23771,6 +23979,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               }
 
               2: {
+                right.
                 cbn.
                 rewrite bind_ret_l.
                 rewrite MemState_fin_to_inf_to_fin.
@@ -23848,6 +24057,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
                                                                          LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_error _ _) _ _ _ k3 msg) as RAISE.
               rewrite RAISE in VIS_HANDLED.
+              destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+              { eapply contains_UB_Extra_raise_error in VIS_HANDLED; try contradiction.
+                intros X e1 e2 CONTRA.
+                inv CONTRA.
+              }
 
               pstep; red; cbn.
 
@@ -23871,6 +24085,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               }
 
               2: {
+                right.
                 rewrite VIS_HANDLED.
                 rewrite get_inf_tree_equation.
                 cbn.
@@ -23892,6 +24107,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
                                                                          LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k3 oom_msg) as RAISE.
               rewrite RAISE in VIS_HANDLED.
+              destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+              { eapply contains_UB_Extra_raiseOOM in VIS_HANDLED; try contradiction.
+                intros X e1 e2 CONTRA.
+                inv CONTRA.
+              }
 
               eapply paco2_mon_bot; eauto.
               rewrite VIS_HANDLED.
@@ -23919,6 +24139,10 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             rewrite TA in VIS_HANDLED.
             cbn in VIS_HANDLED.
             rewrite bind_ret_l in VIS_HANDLED.
+            destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+            { eapply ret_not_contains_UB_Extra in VIS_HANDLED; try contradiction.
+              cbn; reflexivity.
+            }
 
             { pstep; red; cbn.
               eapply Interp_Memory_PropT_Vis with
@@ -23945,6 +24169,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               }
 
               2: {
+                right.
                 cbn.
                 rewrite bind_ret_l.
                 rewrite MemState_fin_to_inf_to_fin.
@@ -24021,6 +24246,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
                                                                          LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k3 oom_msg) as RAISE.
               rewrite RAISE in VIS_HANDLED.
+              destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+              { eapply contains_UB_Extra_raiseOOM in VIS_HANDLED; try contradiction.
+                intros X e1 e2 CONTRA.
+                inv CONTRA.
+              }
 
               eapply paco2_mon_bot; eauto.
               rewrite VIS_HANDLED.
@@ -24047,6 +24277,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             rewrite TA in VIS_HANDLED.
             cbn in VIS_HANDLED.
             rewrite bind_ret_l in VIS_HANDLED.
+            destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+            { eapply ret_not_contains_UB_Extra in VIS_HANDLED; try contradiction.
+              cbn; reflexivity.
+            }
+
             destruct EV_REL as (?&?&?); subst.
 
             { epose proof handle_alloca_fin_inf (lift_MemState_refine_prop s2) ALLOCA_HANDLER as (dv_inf&ms_inf'&ALLOCA_INF&DV_REF&MSR_ALLOCA).
@@ -24069,6 +24304,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               }
 
               2: {
+                right.
                 cbn.
                 rewrite bind_ret_l.
                 rewrite VIS_HANDLED.
@@ -24136,6 +24372,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
                                                                          LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_error _ _) _ _ _ k3 msg) as RAISE.
               rewrite RAISE in VIS_HANDLED.
+              destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+              { eapply contains_UB_Extra_raise_error in VIS_HANDLED; try contradiction.
+                intros X e1 e2 CONTRA.
+                inv CONTRA.
+              }
 
               pstep; red; cbn.
 
@@ -24150,6 +24391,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 (s2:=lift_MemState s2)
                 (ta:= raise_error msg).
               3: {
+                right.
                 rewrite VIS_HANDLED.
                 rewrite get_inf_tree_equation.
                 cbn.
@@ -24286,6 +24528,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
                                                                          LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k3 oom_msg) as RAISE.
               rewrite RAISE in VIS_HANDLED.
+              destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+              { eapply contains_UB_Extra_raiseOOM in VIS_HANDLED; try contradiction.
+                intros X e1 e2 CONTRA.
+                inv CONTRA.
+              }
 
               eapply paco2_mon_bot; eauto.
               rewrite VIS_HANDLED.
@@ -24313,6 +24560,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             rewrite TA in VIS_HANDLED.
             cbn in VIS_HANDLED.
             rewrite bind_ret_l in VIS_HANDLED.
+            destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+            { eapply ret_not_contains_UB_Extra in VIS_HANDLED; try contradiction.
+              cbn; reflexivity.
+            }
+
             destruct EV_REL as (?&?); subst.
 
             { epose proof handle_load_fin_inf (lift_MemState_refine_prop s2) H0 LOAD_HANDLER as (uv_inf&ms_inf'&LOAD_INF&UV_REF&MSR_LOAD).
@@ -24335,6 +24587,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               }
 
               2: {
+                right.
                 cbn.
                 rewrite bind_ret_l.
                 rewrite VIS_HANDLED.
@@ -24402,6 +24655,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
                                                                          LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_error _ _) _ _ _ k3 msg) as RAISE.
               rewrite RAISE in VIS_HANDLED.
+              destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+              { eapply contains_UB_Extra_raise_error in VIS_HANDLED; try contradiction.
+                intros X e1 e2 CONTRA.
+                inv CONTRA.
+              }
 
               eapply paco2_mon_bot; eauto.
               rewrite VIS_HANDLED.
@@ -24427,6 +24685,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 (s2:=lift_MemState s2)
                 (ta:= raise_error msg).
               3: {
+                right.
                 cbn.
                 setoid_rewrite Raise.raise_bind_itree.
                 unfold LLVMEvents.raise.
@@ -24519,6 +24778,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               pose proof (@Raise.rbm_raise_bind (itree (ExternalCallE +'
                                                                          LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) _ _ string (@raise_oom _ _) _ _ _ k3 oom_msg) as RAISE.
               rewrite RAISE in VIS_HANDLED.
+              destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+              { eapply contains_UB_Extra_raiseOOM in VIS_HANDLED; try contradiction.
+                intros X e1 e2 CONTRA.
+                inv CONTRA.
+              }
 
               eapply paco2_mon_bot; eauto.
               rewrite VIS_HANDLED.
@@ -24546,6 +24810,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             rewrite TA in VIS_HANDLED.
             cbn in VIS_HANDLED.
             rewrite bind_ret_l in VIS_HANDLED.
+            destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+            { eapply ret_not_contains_UB_Extra in VIS_HANDLED; try contradiction.
+              cbn; reflexivity.
+            }
+
             destruct EV_REL as (?&?&?); subst.
 
             { assert (LLVMParamsBigIntptr.Events.DV.uvalue_has_dtyp v t0) as TYPE.
@@ -24572,6 +24841,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               }
 
               2: {
+                right.
                 cbn.
                 rewrite bind_ret_l.
                 rewrite VIS_HANDLED.
@@ -24637,6 +24907,26 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             rewrite HANDLER in VIS_HANDLED.
             rewrite bind_vis in VIS_HANDLED.
             setoid_rewrite bind_ret_l in VIS_HANDLED.
+            destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+            { exfalso.
+              clear - VIS_HANDLED.
+              dependent induction VIS_HANDLED.
+              - pinversion H; subst; inv CHECK.
+              - pinversion H; do 2 subst_existT; subst.
+                specialize (REL x0).
+                exfalso.
+                rewrite <- REL in VIS_HANDLED.
+                eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
+                cbn; reflexivity.
+              - pinversion H; do 2 subst_existT; subst.
+                specialize (REL x0).
+                exfalso.
+                rewrite <- REL in VIS_HANDLED.
+                eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
+                cbn; reflexivity.
+              - pinversion H; do 2 subst_existT; subst.
+                inversion H5.
+            }
 
             eapply paco2_mon_bot; eauto.
             rewrite VIS_HANDLED.
@@ -24779,6 +25069,21 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           { (* OOM *)
             red in HANDLER.
             rewrite HANDLER in VIS_HANDLED.
+            destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+            { destruct o0.
+              exfalso.
+              clear - VIS_HANDLED.
+              setoid_rewrite bind_trigger in VIS_HANDLED.
+              dependent induction VIS_HANDLED.
+              - pinversion H; subst; inv CHECK.
+              - pinversion H; do 2 subst_existT; subst.
+                destruct x.
+              - pinversion H; do 2 subst_existT; subst.
+                destruct x.
+              - pinversion H; do 2 subst_existT; subst.
+                inversion H4.
+            }
+
             setoid_rewrite bind_trigger in VIS_HANDLED.
             rewrite bind_vis in VIS_HANDLED.
 
@@ -24820,15 +25125,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             }
 
             2: {
-              rewrite VIS_HANDLED.
-              rewrite get_inf_tree_equation.
+              left.
+              eapply FindUB.
+              pstep.
+              red.
               cbn.
-              unfold raiseUB.
-              rewrite bind_trigger.
-              rewrite bind_vis.
-              unfold print_msg.
-              destruct u.
-              pstep; red; cbn.
+              rewrite subevent_subevent.
               constructor.
               intros [].
             }
@@ -24844,6 +25146,27 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             cbn in HANDLER.
             rewrite bind_trigger in HANDLER.
             rewrite HANDLER in VIS_HANDLED.
+            destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+            { cbn in VIS_HANDLED.
+              exfalso.
+              clear - VIS_HANDLED.
+              dependent induction VIS_HANDLED.
+              - pinversion H; subst; inv CHECK.
+              - pinversion H; do 2 subst_existT; subst.
+                specialize (REL x).
+                exfalso.
+                rewrite <- REL in VIS_HANDLED.
+                eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
+                cbn; reflexivity.
+              - pinversion H; do 2 subst_existT; subst.
+                specialize (REL x).
+                exfalso.
+                rewrite <- REL in VIS_HANDLED.
+                eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
+                cbn; reflexivity.
+              - pinversion H; do 2 subst_existT; subst.
+                inversion H5.
+            }
             rewrite bind_vis in VIS_HANDLED.
 
             pstep; red; cbn.
@@ -24871,6 +25194,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             }
 
             2: {
+              right.
               cbn.
               rewrite VIS_HANDLED.
               rewrite bind_vis.
@@ -24936,6 +25260,27 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             cbn in HANDLER.
             rewrite bind_trigger in HANDLER.
             rewrite HANDLER in VIS_HANDLED.
+            destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
+            { cbn in VIS_HANDLED.
+              exfalso.
+              clear - VIS_HANDLED.
+              dependent induction VIS_HANDLED.
+              - pinversion H; subst; inv CHECK.
+              - pinversion H; do 2 subst_existT; subst.
+                specialize (REL x).
+                exfalso.
+                rewrite <- REL in VIS_HANDLED.
+                eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
+                cbn; reflexivity.
+              - pinversion H; do 2 subst_existT; subst.
+                specialize (REL x).
+                exfalso.
+                rewrite <- REL in VIS_HANDLED.
+                eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
+                cbn; reflexivity.
+              - pinversion H; do 2 subst_existT; subst.
+                inversion H4.
+            }
             rewrite bind_vis in VIS_HANDLED.
 
             eapply paco2_mon_bot; eauto.
@@ -24967,6 +25312,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             }
 
             2: {
+              right.
               cbn.
               rewrite bind_vis.
               destruct u; unfold print_msg; cbn.
@@ -25005,13 +25351,36 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           eapply Interp_Memory_PropT_Vis_OOM.
           reflexivity.
         + (* Vis *)
-          cbn in H.
-          red in H.
-          cbn in H.
-          rewrite bind_trigger in H.
-          rewrite H in H0.
+          cbn in HSPEC.
+          red in HSPEC.
+          cbn in HSPEC.
+          rewrite bind_trigger in HSPEC.
+          red in KS.
+          rewrite HSPEC in KS.
+          destruct KS as [KS | KS].
+          { cbn in KS.
+            exfalso.
+            clear - KS.
+            dependent induction KS.
+            - pinversion H; subst; inv CHECK.
+            - pinversion H; do 2 subst_existT; subst.
+              specialize (REL x).
+              exfalso.
+              rewrite <- REL in KS.
+              eapply ret_not_contains_UB_Extra in KS; eauto.
+              cbn; reflexivity.
+            - pinversion H; do 2 subst_existT; subst.
+              specialize (REL x).
+              exfalso.
+              rewrite <- REL in KS.
+              eapply ret_not_contains_UB_Extra in KS; eauto.
+              cbn; reflexivity.
+            - pinversion H; do 2 subst_existT; subst.
+              inversion H4.
+          }
+
           eapply paco2_mon_bot; eauto.
-          rewrite H0.
+          rewrite KS.
           cbn.
           rewrite get_inf_tree_equation.
           cbn.
