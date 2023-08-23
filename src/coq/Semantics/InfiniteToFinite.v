@@ -14636,6 +14636,29 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     split; auto.
   Qed.
 
+  (* This version assures the structure of res... *)
+  Lemma allocate_bytes_post_conditions_MemPropT_fin_inf' :
+    forall {ms_fin_start ms_fin_final ms_inf_start t num_elements bytes_fin addr_fin addrs_fin bytes_inf pr},
+      MemState_refine_prop ms_inf_start ms_fin_start ->
+      (Forall2 sbyte_refine) bytes_inf bytes_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_post_conditions_MemPropT t num_elements bytes_fin
+        pr addr_fin addrs_fin ms_fin_start (ret (ms_fin_final, (addr_fin, addrs_fin))) ->
+      exists addr_inf addrs_inf ms_inf_final,
+        MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_post_conditions_MemPropT t num_elements bytes_inf pr addr_inf addrs_inf ms_inf_start (ret (ms_inf_final, (addr_inf, addrs_inf))) /\
+          (addr_refine × (Forall2 addr_refine)) (addr_inf, addrs_inf) (addr_fin, addrs_fin) /\
+          MemState_refine_prop ms_inf_final ms_fin_final.
+  Proof.
+    intros ms_fin_start ms_fin_final ms_inf_start t num_elements bytes_fin addr_fin addrs_fin bytes_inf pr MSR BYTES ALLOC.
+    repeat red in ALLOC.
+    destruct ALLOC.
+    destruct H0; subst.
+
+    eapply allocate_bytes_post_conditions_fin_inf in H; eauto.
+    destruct H as (?&?&?&?&?&?&?).
+    exists x, x0, x1.
+    split; auto.
+    split; auto.
+  Qed.
 
   Lemma allocate_bytes_with_pr_spec_MemPropT_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start t num_elements bytes_fin addr_fin bytes_inf pr},
@@ -14744,6 +14767,114 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     eapply allocate_bytes_with_pr_spec_MemPropT_fin_inf; eauto.
   Qed.
 
+  Lemma allocate_bytes_post_conditions_MemPropT_fin_inf_ub :
+    forall t num_elements bytes_inf bytes_fin pr ptr_fin ptrs_fin ptr_inf ptrs_inf msg ms_fin ms_inf,
+      MemState_refine_prop ms_inf ms_fin ->
+      sbytes_refine bytes_inf bytes_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_post_conditions_MemPropT t num_elements bytes_fin pr ptr_fin ptrs_fin ms_fin (raise_ub msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_post_conditions_MemPropT t num_elements bytes_inf pr ptr_inf ptrs_inf ms_inf (raise_ub msg).
+  Proof.
+    intros t num_elements bytes_inf bytes_fin pr ptr_fin ptrs_fin ptr_inf ptrs_inf msg ms_fin ms_inf MSR BYTES_REF ALLOC.
+    cbn in *.
+    destruct ALLOC as [ALLOC | ALLOC]; auto.
+    right.
+    erewrite sbytes_refine_length; eauto.  
+  Qed.
+
+  #[global] Hint Resolve allocate_bytes_post_conditions_MemPropT_fin_inf_ub : FinInf.
+  Lemma allocate_bytes_with_pr_spec_MemPropT_fin_inf_ub :
+    forall bytes_fin bytes_inf ms_inf ms_fin t num_elements pr msg,
+      sbytes_refine bytes_inf bytes_fin ->
+      MemState_refine_prop ms_inf ms_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_with_pr_spec_MemPropT t num_elements bytes_fin pr ms_fin (raise_ub msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_with_pr_spec_MemPropT t num_elements bytes_inf pr ms_inf (raise_ub msg).
+  Proof.
+    intros bytes_fin bytes_inf ms_inf ms_fin t num_elements pr msg BYTES_REF MSR ALLOC.
+    red; red in ALLOC.
+
+    eapply MemPropT_fin_inf_bind_ub.
+    5: apply ALLOC.
+    all: eauto with FinInf.
+
+    { intros a_fin ms_fin_ma H.
+      eapply find_free_block_fin_inf; eauto.
+      erewrite sbytes_refine_length; eauto.
+    }
+
+    intros ms_inf0 ms_fin0
+      [ptr_fin ptrs_fin] [ptr_inf ptrs_inf]
+      msg0 [ADDR_REF ADDRS_REF] MSR' FIND_FREE POST.
+
+    eapply MemPropT_fin_inf_bind_ub.
+    5: apply POST.
+    all: eauto with FinInf.
+
+    intros [ptr_fin' ptrs_fin'] ms_fin_ma ALLOC'.
+    pose proof ALLOC' as [_ [PTR_FIN PTRS_FIN]]; subst.
+    eapply allocate_bytes_post_conditions_MemPropT_fin_inf in ALLOC'; eauto.
+    destruct ALLOC' as ((ptr_inf'&ptrs_inf')&ms_inf_ma&POST'&REFS&MSR'').
+    cbn in POST'.
+    exists (ptr_inf, ptrs_inf).
+    exists ms_inf_ma.
+
+    destruct POST' as [POST' _].
+    pose proof REFS as [ADDR_REF' ADDRS_REF'].
+    cbn in ADDR_REF', ADDRS_REF'.
+    
+    assert (ptr_inf = ptr_inf') as PTR_INF.
+    { eapply InfToFinAddrConvert.addr_convert_injective; eauto.
+    }
+    subst.
+
+    assert (ptrs_inf = ptrs_inf') as PTRS_INF.
+    { clear - ADDRS_REF ADDRS_REF'.
+      generalize dependent ptrs_inf'.
+      induction ADDRS_REF; intros ptrs_inf' ADDRS_REF'.
+      - inv ADDRS_REF'; auto.
+      - inv ADDRS_REF'.
+        assert (x = x0).
+        eapply InfToFinAddrConvert.addr_convert_injective; eauto.
+        subst.
+
+        assert (l = l0).
+        eapply IHADDRS_REF; eauto.
+        subst.
+        reflexivity.                                        
+    }
+    subst.
+
+    split; eauto.
+    split; eauto.
+
+    Unshelve.
+    all: eauto.
+  Qed.
+
+  #[global] Hint Resolve allocate_bytes_with_pr_spec_MemPropT_fin_inf_ub : FinInf.
+
+  Lemma allocate_bytes_spec_MemPropT_fin_inf_ub :
+    forall bytes_fin bytes_inf ms_inf ms_fin t num_elements msg,
+      sbytes_refine bytes_inf bytes_fin ->
+      MemState_refine_prop ms_inf ms_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_spec_MemPropT t num_elements bytes_fin ms_fin (raise_ub msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_spec_MemPropT t num_elements bytes_inf ms_inf (raise_ub msg).
+  Proof.
+    intros bytes_fin bytes_inf ms_inf ms_fin t num_elements msg BYTES_REF MSR ALLOC.
+    red in ALLOC; red.
+
+    eapply MemPropT_fin_inf_bind_ub.
+    5: apply ALLOC.
+    all: eauto with FinInf.
+
+    intros ms_inf0 ms_fin0 a_fin a_inf msg0 H MSR' FRESH ALLOC'; subst.
+    eapply allocate_bytes_with_pr_spec_MemPropT_fin_inf_ub; eauto.
+
+    Unshelve.
+    all: eauto.
+  Qed.
+
+  #[global] Hint Resolve allocate_bytes_spec_MemPropT_fin_inf_ub : FinInf.
+
   Lemma allocate_dtyp_spec_fin_inf :
     forall {t num_elements ms_fin_start ms_fin_final ms_inf_start addr_fin},
       MemState_refine_prop ms_inf_start ms_fin_start ->
@@ -14813,6 +14944,86 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     eapply allocate_bytes_spec_MemPropT_fin_inf; eauto.
     apply Forall2_concat; auto.
   Qed.
+
+  Lemma allocate_dtyp_spec_fin_inf_ub :
+    forall t num_elements ms_inf ms_fin msg,
+      MemState_refine_prop ms_inf ms_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.allocate_dtyp_spec t num_elements ms_fin (raise_ub msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.allocate_dtyp_spec t num_elements ms_inf (raise_ub msg).
+  Proof.
+    intros t num_elements ms_inf ms_fin msg MSR ALLOC.
+    red in ALLOC.
+    red.
+
+    eapply MemPropT_fin_inf_bind_ub.
+    5: apply ALLOC.
+    all: eauto with FinInf.
+
+    { intros a_fin ms_fin_ma FRESH.
+      eapply fresh_sid_fin_inf; eauto.
+    }
+
+    intros ms_inf0 ms_fin0 a_fin a_inf msg0 SID MSR' FRESH ALLOC'.
+    cbn in SID; subst.
+
+    eapply MemPropT_fin_inf_bind_ub with
+      (A_REF := fun a_inf a_fin => sbytes_refine (concat a_inf) (concat a_fin)).
+    5: apply ALLOC'.
+    all: eauto with FinInf.
+
+    2: {
+      intros msg1 H.
+      eapply MemPropT_fin_inf_repeatMN_ub.
+      4: apply H.
+      all: eauto with FinInf.
+
+      { intros res_fin ms_fin1 ms_inf1 ms_fin_ma H0 H1.
+        unfold lift_OOM in *.
+        break_match_hyp; cbn in H1; try contradiction.
+        destruct H1; subst.
+
+        pose proof generate_undef_bytes_fin_inf Heqo.
+        destruct H1 as (?&?&?).
+        rewrite H1.
+        exists x. exists ms_inf1.
+        split; eauto.
+        cbn.
+        split; auto.
+      }
+
+      intros ms_fin1 ms_inf1 msg2 H0 H1.
+      red; red in H1.
+      break_match_hyp; cbn in H1; try contradiction.
+    }
+
+    intros a_fin0 ms_fin_ma REPEAT.
+    eapply MemPropT_fin_inf_repeatMN in REPEAT; eauto.
+
+    { destruct REPEAT as (res_inf&ms_inf_final&REPEAT&ALL&MSR'').
+      exists res_inf. exists ms_inf_final.
+      split; eauto.
+      split; eauto.
+      eapply Forall2_concat; eauto.
+    }
+
+    intros res_fin ms_fin1 ms_inf1 ms_fin_ma0 MSR'' GEN.
+    red in GEN.
+    break_match_hyp; cbn in GEN; try contradiction.
+    destruct GEN; subst.
+
+    eapply generate_undef_bytes_fin_inf in Heqo.
+    destruct Heqo as (bytes_inf&GEN&BYTES_REF).
+    rewrite GEN.
+    cbn.
+    exists bytes_inf.
+    exists ms_inf1.
+    tauto.
+
+    Unshelve.
+    all: eauto.
+  Qed.
+
+  #[global] Hint Resolve allocate_dtyp_spec_fin_inf_ub : FinInf.
 
   (* TODO: Move this *)
   Lemma handle_alloca_fin_inf :
@@ -22428,142 +22639,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
                           2: {
                             intros msg ALLOC.
-                            Lemma allocate_dtyp_spec_fin_inf_ub :
-                              forall t num_elements ms_inf ms_fin msg,
-                                MemState_refine_prop ms_inf ms_fin ->
-                                Memory64BitIntptr.MMEP.MemSpec.allocate_dtyp_spec t num_elements ms_fin (raise_ub msg) ->
-                                MemoryBigIntptr.MMEP.MemSpec.allocate_dtyp_spec t num_elements ms_inf (raise_ub msg).
-                            Proof.
-                              intros t num_elements ms_inf ms_fin msg MSR ALLOC.
-                              red in ALLOC.
-                              red.
 
-                              eapply MemPropT_fin_inf_bind_ub.
-                              5: apply ALLOC.
-                              all: eauto with FinInf.
-
-                              { intros a_fin ms_fin_ma FRESH.
-                                eapply fresh_sid_fin_inf; eauto.
-                              }
-
-                              intros ms_inf0 ms_fin0 a_fin a_inf msg0 SID MSR' FRESH ALLOC'.
-                              cbn in SID; subst.
-
-                              eapply MemPropT_fin_inf_bind_ub.
-                              5: apply ALLOC'.
-                              all: eauto with FinInf.
-
-                              2: {
-                                intros msg1 H.
-                                eapply MemPropT_fin_inf_repeatMN_ub.
-                                4: apply H.
-                                all: eauto with FinInf.
-
-                                { intros res_fin ms_fin1 ms_inf1 ms_fin_ma H0 H1.
-                                  unfold lift_OOM in *.
-                                  break_match_hyp; cbn in H1; try contradiction.
-                                  destruct H1; subst.
-
-                                  pose proof generate_undef_bytes_fin_inf Heqo.
-                                  destruct H1 as (?&?&?).
-                                  rewrite H1.
-                                  exists x. exists ms_inf1.
-                                  split; eauto.
-                                  cbn.
-                                  split; auto.
-                                }
-
-                                intros ms_fin1 ms_inf1 msg2 H0 H1.
-                                red; red in H1.
-                                break_match_hyp; cbn in H1; try contradiction.
-                              }
 
                               2: {
                                 intros ms_inf1 ms_fin1 a_fin0 a_inf msg1 H H0 H1 H2.
-
-                                Lemma allocate_bytes_post_conditions_MemPropT_fin_inf_ub :
-                                  forall t num_elements bytes_inf bytes_fin pr ptr_fin ptrs_fin ptr_inf ptrs_inf msg ms_fin ms_inf,
-                                    MemState_refine_prop ms_inf ms_fin ->
-                                    sbytes_refine bytes_inf bytes_fin ->
-                                    Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_post_conditions_MemPropT t num_elements bytes_fin pr ptr_fin ptrs_fin ms_fin (raise_ub msg) ->
-                                    MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_post_conditions_MemPropT t num_elements bytes_inf pr ptr_inf ptrs_inf ms_inf (raise_ub msg).
-                                Proof.
-                                  intros t num_elements bytes_inf bytes_fin pr ptr_fin ptrs_fin ptr_inf ptrs_inf msg ms_fin ms_inf MSR BYTES_REF ALLOC.
-                                  cbn in *.
-                                  destruct ALLOC as [ALLOC | ALLOC]; auto.
-                                  right.
-                                  erewrite sbytes_refine_length; eauto.  
-                                Qed.
-
-                                #[global] Hint Resolve allocate_bytes_post_conditions_MemPropT_fin_inf_ub.
-
-                                Lemma allocate_bytes_spec_MemPropT_fin_inf_ub :
-                                  forall bytes_fin bytes_inf ms_inf ms_fin t num_elements msg,
-                                    sbytes_refine bytes_inf bytes_fin ->
-                                    MemState_refine_prop ms_inf ms_fin ->
-                                    Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_spec_MemPropT t num_elements bytes_fin ms_fin (raise_ub msg) ->
-                                    MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_spec_MemPropT t num_elements bytes_inf ms_inf (raise_ub msg).
-                                Proof.
-                                  intros bytes_fin bytes_inf ms_inf ms_fin t num_elements msg BYTES_REF MSR ALLOC.
-                                  red in ALLOC; red.
-
-                                  eapply MemPropT_fin_inf_bind_ub.
-                                  5: apply ALLOC.
-                                  all: eauto with FinInf.
-
-                                  intros ms_inf0 ms_fin0 a_fin a_inf msg0 H MSR' FRESH ALLOC'; subst.
-
-                                  Lemma allocate_bytes_with_pr_spec_MemPropT_fin_inf_ub :
-                                    forall bytes_fin bytes_inf ms_inf ms_fin t num_elements pr msg,
-                                      sbytes_refine bytes_inf bytes_fin ->
-                                      MemState_refine_prop ms_inf ms_fin ->
-                                      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_with_pr_spec_MemPropT t num_elements bytes_fin pr ms_fin (raise_ub msg) ->
-                                      MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_with_pr_spec_MemPropT t num_elements bytes_inf pr ms_inf (raise_ub msg).
-                                  Proof.
-                                    intros bytes_fin bytes_inf ms_inf ms_fin t num_elements pr msg BYTES_REF MSR ALLOC.
-                                    red; red in ALLOC.
-
-                                    eapply MemPropT_fin_inf_bind_ub.
-                                    5: apply ALLOC.
-                                    all: eauto with FinInf.
-
-                                    { intros a_fin ms_fin_ma H.
-                                      eapply find_free_block_fin_inf; eauto.
-                                      erewrite sbytes_refine_length; eauto.
-                                    }
-
-                                    intros ms_inf0 ms_fin0
-                                      [ptr_fin ptrs_fin] [ptr_inf ptrs_inf]
-                                      msg0 [ADDR_REF ADDRS_REF] MSR' FIND_FREE POST.
-
-                                    eapply MemPropT_fin_inf_bind_ub.
-                                    5: apply POST.
-                                    all: eauto with FinInf.
-
-                                    intros [ptr_fin' ptrs_fin'] ms_fin_ma ALLOC'.
-                                    eapply allocate_bytes_post_conditions_MemPropT_fin_inf in ALLOC'; eauto.
-                                    destruct ALLOC' as ((ptr_inf'&ptrs_inf')&ms_inf_ma&POST'&REFS&MSR'').
-                                    cbn in POST'.
-                                    exists (ptr_inf', ptrs_inf').
-                                    exists ms_inf_ma.
-                                    
-                                    split; eauto.
-                                    cbn.
-
-                                    destruct POST' as [POST' _].
-                                    destruct REFS as [ADDR_REF' ADDRS_REF'].
-                                    cbn in ADDR_REF', ADDRS_REF'.
-
-                                    destruct x.
-                                    cbn in H3; cbn.
-                                    cbn.
-                                    admit.
-                                  Qed.
-
-                                Qed.
-                                    
-                                red in H2.
-
+                                eapply allocate_bytes_spec_MemPropT_fin_inf_ub; eauto.
                               }
 
                                 
