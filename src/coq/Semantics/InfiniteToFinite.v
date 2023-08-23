@@ -14778,7 +14778,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     cbn in *.
     destruct ALLOC as [ALLOC | ALLOC]; auto.
     right.
-    erewrite sbytes_refine_length; eauto.  
+    erewrite sbytes_refine_length; eauto.
   Qed.
 
   #[global] Hint Resolve allocate_bytes_post_conditions_MemPropT_fin_inf_ub : FinInf.
@@ -14820,7 +14820,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     destruct POST' as [POST' _].
     pose proof REFS as [ADDR_REF' ADDRS_REF'].
     cbn in ADDR_REF', ADDRS_REF'.
-    
+
     assert (ptr_inf = ptr_inf') as PTR_INF.
     { eapply InfToFinAddrConvert.addr_convert_injective; eauto.
     }
@@ -14839,7 +14839,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         assert (l = l0).
         eapply IHADDRS_REF; eauto.
         subst.
-        reflexivity.                                        
+        reflexivity.
     }
     subst.
 
@@ -20335,6 +20335,75 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       split; cbn; auto.
   Qed.
 
+  Lemma handle_load_fin_inf_ub :
+    forall {t addr_fin addr_inf ms_fin_start ms_inf_start msg},
+      MemState_refine_prop ms_inf_start ms_fin_start ->
+      DVC1.dvalue_refine_strict addr_inf addr_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.handle_memory_prop _
+        (LLVMParams64BitIntptr.Events.Load t addr_fin) ms_fin_start (raise_ub msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.handle_memory_prop _
+        (LLVMParamsBigIntptr.Events.Load t addr_inf) ms_inf_start (raise_ub msg).
+  Proof.
+    intros t addr_fin addr_inf ms_fin_start ms_inf_start msg MSR ADDR_REF HANDLE.
+
+    red in HANDLE.
+    induction addr_fin;
+      try
+        solve
+        [ rewrite DVC1.dvalue_refine_strict_equation in ADDR_REF;
+          first
+            [ apply dvalue_convert_strict_i1_inv in ADDR_REF
+            | apply dvalue_convert_strict_i8_inv in ADDR_REF
+            | apply dvalue_convert_strict_i32_inv in ADDR_REF
+            | apply dvalue_convert_strict_i64_inv in ADDR_REF
+            | apply dvalue_convert_strict_iptr_inv in ADDR_REF
+            | apply dvalue_convert_strict_addr_inv in ADDR_REF
+            | apply dvalue_convert_strict_double_inv in ADDR_REF
+            | apply dvalue_convert_strict_float_inv in ADDR_REF
+            | apply dvalue_convert_strict_poison_inv in ADDR_REF
+            | apply dvalue_convert_strict_oom_inv in ADDR_REF
+            | apply dvalue_convert_strict_none_inv in ADDR_REF
+            | apply dvalue_convert_strict_struct_inv in ADDR_REF
+            | apply dvalue_convert_strict_packed_struct_inv in ADDR_REF
+            | apply dvalue_convert_strict_array_inv in ADDR_REF
+            | apply dvalue_convert_strict_vector_inv in ADDR_REF
+            ]; subst; cbn; auto;
+          first [destruct ADDR_REF as (?&?&?)
+                | destruct ADDR_REF as (?&?)]; subst; cbn; auto
+        ].
+
+    { (* Main successful portion of the lemma *)
+      unfold MemoryBigIntptr.MMEP.MemSpec.handle_memory_prop.
+      eapply dvalue_refine_strict_addr_r_inv in ADDR_REF as (ptr_inf&PTR_INF&PTR_REF).
+      subst.
+
+      eapply MemPropT_fin_inf_bind_ub.
+      5: apply HANDLE.
+      all: eauto with FinInf.
+
+      { (* MA: read_bytes_spec *)
+        intros a_fin ms_fin_ma READ.
+        eapply fin_inf_read_bytes_spec; eauto.
+        apply READ.
+      }
+
+      { intros msg0 H.
+        eapply fin_inf_read_bytes_spec_ub'; eauto.
+      }
+
+      intros ms_inf ms_fin a_fin a_inf msg0 H H0 H1 H2.
+      red.
+      cbn in H2.
+      red in H2.
+      break_match_hyp; cbn in H2; try contradiction.
+    }
+
+    Unshelve.
+    all: eauto.
+  Qed.
+
+  #[global] Hint Resolve handle_load_fin_inf handle_load_fin_inf_ub : FinInf.
+
   (* TODO: Move to where the other frame stack lemmas are *)
   Lemma cannot_pop_fin_inf :
     forall {ms_fin ms_inf},
@@ -22777,7 +22846,41 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     repeat red in HSPEC.
                     destruct HSPEC as [UB | [ERR | [OOM | HSPEC]]].
                     { (* Handler raises UB *)
-                      admit.
+                      destruct UB as (msg_spec&UB).
+                      destruct EV_REL as (?&?); subst.
+                      rename H0 into DV_REF.
+
+                      eapply Interp_Memory_PropT_Vis
+                        with (ta:= raise_ub "").
+
+                      2: {
+                        cbn; red.
+                        left.
+                        exists msg_spec.
+                        eapply handle_load_fin_inf_ub.
+                        3: apply UB.
+                        all: eauto with FinInf.
+                      }
+
+                      { intros a1 b RETa RETb AB.
+                        cbn in AB; subst.
+                        unfold raise_ub in RETb.
+                        cbn in RETb.
+                        unfold raiseUB in RETb.
+                        rewrite bind_trigger in RETb.
+
+                        eapply Returns_vis_inversion in RETb.
+                        destruct RETb as [[] _].
+                      }
+
+                      left.
+                      eapply FindUB.
+                      unfold raise_ub. cbn; unfold raiseUB; cbn.
+                      rewrite bind_trigger.
+                      pstep; red; cbn.
+                      rewrite subevent_subevent.
+                      constructor.
+                      intros [].
                     }
 
                     { (* Handler raises error *)
