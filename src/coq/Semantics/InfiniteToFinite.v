@@ -22618,16 +22618,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     destruct HSPEC as [UB | [ERR | [OOM | HSPEC]]].
                     { (* Handler raises UB *)
 
-                      (* TODO: look into lemmas like:
-
-                         - get_consecutive_ptrs_no_ub
-                         - allocate_bytes_spec_MemPropT_no_ub
-                       *)
                       destruct UB as (msg_spec&UB).
                       destruct EV_REL as (?&?&?); subst.
 
-                      destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
-                      { eapply Interp_Memory_PropT_Vis.
+                      eapply Interp_Memory_PropT_Vis
+                          with (ta:= raise_ub "").
                         2: {
                           cbn; red.
                           left.
@@ -22637,71 +22632,29 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                           5: apply UB.
                           all: eauto with FinInf.
 
-                          2: {
-                            intros msg ALLOC.
-
-
-                              2: {
-                                intros ms_inf1 ms_fin1 a_fin0 a_inf msg1 H H0 H1 H2.
-                                eapply allocate_bytes_spec_MemPropT_fin_inf_ub; eauto.
-                              }
-
-                                
-                                intros msg1 GEN.
-                                do 2 red in GEN.
-                                eapply MemPropT_fin_inf_map_monad_ub
-                                  with (A_REF:=fun a_inf a_fin => Monad.eq1 a_inf (fmap _ a_fin)).
-                                5: apply GEN.
-                                all: eauto with FinInf.
-
-                                { intros a_fin0 a_inf b_fin ms_fin1 ms_inf1 ms_fin_ma H H0 H1.
-                                  red in H1.
-                                  fun a_inf a_fin => forall ms_inf ms_fin, MemState_refine_prop ms_inf ms_fin -> a_inf ms_fin1
-                                }
-                                
-                                3: {
-
-                                }
-
-                                2: {
-                                  intros a_fin0 a_inf ms_fin1 ms_inf1 msg2 H H0 H1.
-                                  red.
-                                  red in H1.
-                                  admit.
-                                }
-                              }
-                            Qed.
-                              
-                            eapply allocate_dtyp_spec_fin_inf in ALLOC.
-                          }
-                          3: {
-                            intros ms_inf ms_fin a_fin a_inf msg H H0 H1 [].
-                          }
-
-                          2: {
-                            intros msg CONTRA.
-                            exfalso.
-                            
-                          }
+                          intros a_fin ms_fin_ma ALLOC.
+                          eapply allocate_dtyp_spec_fin_inf; eauto with FinInf.
                         }
-                        3: {
-                          red.
-                          - left. eapply VIS_HANDLED.
 
-                      }
-                      eapply Interp_Memory_PropT_Vis.
-                      3: {
-                        red.
-                        - left. eapply VIS_HANDLED.
-                        
-                        apply VIS_HANDLED.
-                      }
-                      2: {
-                        cbn; red.
+                        { intros a b RETa RETb AB.
+                          cbn in AB; subst.
+                          unfold raise_ub in RETb.
+                          cbn in RETb.
+                          unfold raiseUB in RETb.
+                          rewrite bind_trigger in RETb.
+
+                          eapply Returns_vis_inversion in RETb.
+                          destruct RETb as [[] _].
+                        }
+
                         left.
-                        
-                      }
-                      admit.
+                        eapply FindUB.
+                        unfold raise_ub. cbn; unfold raiseUB; cbn.
+                        rewrite bind_trigger.
+                        pstep; red; cbn.
+                        rewrite subevent_subevent.
+                        constructor.
+                        intros [].
                     }
 
                     { (* Handler raises error *)
