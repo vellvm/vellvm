@@ -29,6 +29,7 @@ CP=cp
 
 ######## The full vellvm executable
 VELLVM_EXE=_build/default/ml/main.exe
+VELLVM_BC =_build/default/ml/main.bc
 
 ######## The "frontend" is only the parser/pretty-printer 
 FRONTEND_EXE=_build/default/ml/frontend.exe
@@ -40,7 +41,7 @@ FRONTEND_VOFILES := $(COQFILES_FRONTEND:%=coq/%.vo)
 
 ######## targets not in this "KNOWNTARGETS" list will be forwarded to CoqMakefile via invoke-coqmakefile
 ######## WARNING - every target of *this* Makefile must be listed here
-KNOWNTARGETS := CoqMakefile invoke-coqmakefile coq extracted $(EXTRACTDIR)/STAMP $(VELLVM_EXE) vellvm test check qc-tests rm-qc-test-vo clean extractedclean clean-coqmakefile doc/coq2html documentation $(EXTRACTDIR)/FRONTEND_STAMP $(FRONTEND_EXE) frontend frontend_exe pin-coq opam print-opam print-includes
+KNOWNTARGETS := CoqMakefile invoke-coqmakefile coq extracted $(EXTRACTDIR)/STAMP $(VELLVM_EXE) vellvm vellvmbc test check qc-tests rm-qc-test-vo clean extractedclean clean-coqmakefile doc/coq2html documentation $(EXTRACTDIR)/FRONTEND_STAMP $(FRONTEND_EXE) frontend frontend_exe pin-coq opam print-opam print-includes
 
 KNOWNFILES := Makefile _CoqProject
 
@@ -73,7 +74,7 @@ $(EXTRACTDIR)/STAMP: $(VFILES) $(EXTRACTDIR)/Extract.v
 	@echo "Extracting"
 	$(COQEXEC) $(EXTRACTDIR)/Extract.v
 	@echo "Patching extraction"
-	patch -p0 < CRelationClasses.mli.patch
+	# patch -p0 < CRelationClasses.mli.patch
 	# patch -u $(EXTRACTDIR)/GenAlive2.ml -i GenAlive2.ml.patch
 	@echo "Fixing Extraction"
 	bash fix-extraction.sh
@@ -86,6 +87,16 @@ $(VELLVM_EXE): extracted ml/dune ml/extracted/dune ml/testing/dune
 vellvm: $(VELLVM_EXE)
 	cp $(VELLVM_EXE) vellvm
 	chmod u+w vellvm
+
+.PHONY: vellvmbc
+vellvmbc: $(VELLVM_BC)
+	@echo "Something"
+	cp $(VELLVM_BC) vellvmbc
+	chmod u+w vellvmbc
+
+$(VELLVM_BC): extracted ml/dune ml/extracted/dune ml/testing/dune
+	dune build ml/main.bc
+
 
 ######## testing the Vellvm interperter
 
