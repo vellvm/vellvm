@@ -22639,10 +22639,84 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     destruct HSPEC as [UB | [ERR | [OOM | HSPEC]]].
                     { (* Handler raises UB *)
                       cbn in UB.
-                      destruct UB as [_ [NPOP NPOPSPEC]].
-                      unfold Memory64BitIntptr.MMEP.MemSpec.cannot_pop in *.
+                      destruct UB as [msg [NPOP NPOPSPEC]].
 
-                      (* If we cannot pop we should have an empty frame stack *)
+                      (* TODO: Move to where the other frame stack lemmas are *)
+                      Lemma cannot_pop_inf_fin :
+                        forall {ms_fin ms_inf},
+                          MemState_refine_prop ms_inf ms_fin ->
+                          MemoryBigIntptr.MMEP.MemSpec.cannot_pop ms_inf ->
+                          Memory64BitIntptr.MMEP.MemSpec.cannot_pop ms_fin.
+                      Proof.
+                        intros ms_fin ms_inf MSR NPOP.
+                        red.
+                        red in NPOP.
+                        intros fs1 fs2 MSFP POP.
+                        red in POP.
+                        break_match_hyp; auto.
+
+                        (* Finite memory had frame to pop *)
+                        destruct ms_fin as [[ms_fin fss_fin hs_fin] msprovs_fin].
+                        cbn in *.
+                        specialize (NPOP (lift_FrameStack fss_fin) (lift_FrameStack fs2)).
+                        eapply NPOP.
+                        { eapply MemState_refine_prop_frame_stack_preserved; eauto.
+                          red.
+                          cbn in *.
+                          reflexivity.
+                        }
+
+                        red.
+                        red in MSFP.
+                        cbn in MSFP.
+                        destruct fss_fin; subst.
+                        - cbn; apply FinMem.MMEP.MMSP.frame_stack_eqv_sing_snoc_inv in MSFP; auto.
+                        - rewrite lift_FrameStack_snoc.
+                          apply FinMemMMSP.frame_stack_inv in MSFP.
+                          destruct MSFP as [MSFP | CONTRA].
+                          2: {
+                            destruct CONTRA as (?&?&?&?).
+                            inv H.
+                          }
+
+                          destruct MSFP as (?&?&?&?&?&?&?&?).
+                          inv H.
+                          inv H0.
+                          apply frame_stack_eqv_lift.
+                          rewrite H1.
+                          rewrite POP.
+                          reflexivity.
+                      Qed.
+
+                      (* If we cannot pop we should have an empty
+                         frame stack... Should be empty in both fin /
+                         inf.
+                       *)
+                      eapply Interp_Memory_PropT_Vis
+                          with (ta:= raise_ub msg).
+                      2: {
+                        cbn; red.
+                        left.
+                        exists msg.
+                        red.
+                        red.
+                        cbn.
+                        split.
+                        - intros NPOP'.
+                          eapply NPOP.
+                          eapply cannot_pop_inf_fin; eauto.
+                          apply lift_MemState_refine_prop.
+                        - intros m2 CONTRA.
+                          eapply NPOPSPEC.
+
+                        eapply MemPropT_fin_inf_bind_ub.
+                        5: apply UB.
+                        all: eauto with FinInf.
+
+                        intros a_fin ms_fin_ma ALLOC.
+                        eapply allocate_dtyp_spec_fin_inf; eauto with FinInf.
+                      }
+
                       admit.
                     }
 
