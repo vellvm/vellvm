@@ -6,7 +6,7 @@ FILENAMES=("InterpretationStack.ml" "InterpretationStack.mli" "TopLevel.ml" "Top
 MEMORYFILES=("MemoryModelImplementation.mli")
 BYTEPATCHFILES=("Pick.mli" "Pick.ml" "Denotation.mli" "Denotation.ml")
 GENMLIFILES=("GenAlive2.mli")
-GENFILES=("GenAlive2.ml")
+GENFILES=("GenAlive2.ml" "RandomQC.ml")
 
 function replace () {
     perl -i.bak -p0777ne "$1" $EXTRACT_DIR/$2
@@ -82,7 +82,10 @@ do
     # Annotation
     sed -i "/let coq_STGST =/c\let coq_STGST : (coq_GenState, __ GenLow.GenLow.coq_G, __) stateT coq_Monad =" $EXTRACT_DIR/$f
     sed -i "/let gen_float32 =/c\let gen_float32 : Floats.float32 coq_GenALIVE2 =" $EXTRACT_DIR/$f
-    sed -i "/let gen_tester =/c\let gen_tester : (typ, typ block * typ block list) toplevel_entity list coq_GenALIVE2 =" $EXTRACT_DIR/$f    
+    sed -i "/let gen_tester =/c\let gen_tester : (typ, typ block * typ block list) toplevel_entity list coq_GenALIVE2 =" $EXTRACT_DIR/$f
+    sed -i "/let randomRInt = /ilet rec coqPositive2Int = function\n| Coq_xI p0 -> 2 * (coqPositive2Int p0) + 1\n| Coq_xO p0 -> 2 * (coqPositive2Int p0)\n| Coq_xH -> 1\n\nlet coqZ2Int  = function\n| Z0 -> 0\n| Zpos p -> coqPositive2Int p\n| Zneg p -> ~-(coqPositive2Int p)\n\nlet rec nonNegInt2CoqPositive y =\nmatch y with\n| 0 -> Coq_xH\n| 1 -> Coq_xH\n| _ -> if (y mod 2 > 0) then Coq_xI (nonNegInt2CoqPositive (y / 2 - 1)) else Coq_xO (nonNegInt2CoqPositive (y / 2))\n\nlet int2CoqZ x =\nif (x < 0) then Zneg (nonNegInt2CoqPositive ~-x) else if (x > 0) then Zpos (nonNegInt2CoqPositive x) else Z0\n\n" $EXTRACT_DIR/$f
+
+    sed -i "/let randomRN = /ilet coqN2Int = function\n| N0 -> 0\n| Npos p -> coqPositive2Int p\n\nlet int2CoqN x =\nif (x < 0) then Npos (nonNegInt2CoqPositive ~-x) else if (x > 0) then Npos (nonNegInt2CoqPositive x) else N0\n\n" $EXTRACT_DIR/$f
 done
 
 

@@ -6,7 +6,7 @@ module G = QCheck.Gen
 open MemoryModelImplementation
 open MemoryAddress
 module GA = GenAlive2.GEN_ALIVE2(MemoryModelImplementation.InfAddr)(MemoryModelImplementation.BigIP)(MemoryModelImplementation.FinSizeof)
-module GL = GenAlive2.GenLow
+module GL = GenLow.GenLow
 open Buffer
 
 let string_of_char_list : char list -> string = fun l ->
@@ -42,12 +42,12 @@ let gen_uvalue'' (t : LL.typ) : DV.uvalue GL.coq_G =
     (ran)
     (fun x ->
        begin match x with
-         | GenAlive2.Inl a -> failwith (string_of_char_list a)
-         | GenAlive2.Inr b -> GL.returnGen b
+         | Datatypes.Coq_inl a -> failwith (string_of_char_list a)
+         | Datatypes.Coq_inr b -> GL.returnGen b
        end)
 
 let run_gen : 'a1 GL.coq_G -> 'a1 =
-  fun generator -> GL.run generator O GenAlive2.newRandomSeed
+  fun generator -> GL.run generator O RandomQC.newRandomSeed
 
 let gen_uvalue' (t : LL.typ) : DV.uvalue G.t =
   let uv = run_gen (gen_uvalue'' t) in
@@ -95,8 +95,8 @@ let gen_runner' (args_t : LL.typ list) (ret_t : LL.typ) (src_fn_str : char list)
     (ran)
     (fun x ->
        begin match x with
-         | GenAlive2.Inl a -> failwith (string_of_char_list a)
-         | GenAlive2.Inr b -> GL.returnGen b
+         | Datatypes.Coq_inl a -> failwith (string_of_char_list a)
+         | Datatypes.Coq_inr b -> GL.returnGen b
        end)
 
 let gen_runner (args_t : LL.typ list) (ret_t : LL.typ) (src_fn_str : char list) (tgt_fn_str : char list) : ((LL.typ, GA.runnable_blocks) LL.toplevel_entity * (LL.typ, GA.runnable_blocks) LL.toplevel_entity) G.t =
@@ -107,15 +107,19 @@ let generate_n_runner (n : int) (args_t : LL.typ list) (ret_t : LL.typ) (src_fn_
   let vals = G.generate ~n:n (gen_runner args_t ret_t src_fn_str tgt_fn_str) in
   vals
 
+let rec nonNegInt2CoqPositive y =match y with| 0 -> BinNums.Coq_xH| 1 -> Coq_xH| _ -> if (y mod 2 > 0) then Coq_xI (nonNegInt2CoqPositive (y / 2 - 1)) else Coq_xO (nonNegInt2CoqPositive (y / 2))
+
+let int2CoqN x =if (x < 0) then BinNums.Npos (nonNegInt2CoqPositive ~-x) else if (x > 0) then BinNums.Npos (nonNegInt2CoqPositive x) else N0
+
 let sample_exp' : LL.typ LL.exp GL.coq_G =
-  let ran = GA.run_GenALIVE2 (GA.gen_exp_size O (LLVMAst.TYPE_I (GenAlive2.int2CoqN 1))) in
+  let ran = GA.run_GenALIVE2 (GA.gen_exp_size O (LLVMAst.TYPE_I (int2CoqN 8))) in
   let ge = GL.bindGen
     (ran)
     (fun x ->
        begin match x with
-         | GenAlive2.Inl a ->
+         | Datatypes.Coq_inl a ->
            failwith (string_of_char_list a)
-         | GenAlive2.Inr b -> GL.returnGen b
+         | Datatypes.Coq_inr b -> GL.returnGen b
        end) in
   ge
 
@@ -124,4 +128,5 @@ let sample_exp (n : int) : LL.typ LL.exp list =
   let re = G.return e in
   let ge = G.generate ~n:n (re) in
   ge
-      
+
+let explode_str s = List.init (String.length s) (String.get s)

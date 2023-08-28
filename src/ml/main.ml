@@ -280,9 +280,11 @@ let test_all () =
 let test_genAlive2 () =
   let _ = Printf.printf "============== RUNNING GENALIVE2 ==============\n" in
   let es = Generate.sample_exp 10 in
-  let show_output : char list = (coq_DShowShow (coq_DShowList (dshow_exp dshow_typ false))) es in
-  let _ = Printf.eprintf (String.concat "" show_output) in
-  ()
+  let output_charlist : char list = (coq_DShowShow (coq_DShowList (dshow_exp dshow_typ false))) es in
+  let buf = Buffer.create 16 in
+  List.iter (Buffer.add_char buf) output_charlist;
+  Printf.printf "%s\n" (Buffer.contents buf)
+  (* () *)
 
 let args =
   [

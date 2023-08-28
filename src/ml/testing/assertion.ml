@@ -286,7 +286,7 @@ and parse_srctgt_assertion (filename: string) (line: string) : test list =
   let find_ty toplevel_entity : (LLVMAst.typ list * LLVMAst.typ) =
     match toplevel_entity with
     | TLE_Definition df ->
-       begin match LLVMAst.dc_type df.df_prototype with
+       begin match df.df_prototype.dc_type with
        | LLVMAst.TYPE_Function (rt, args,_) -> args, rt
        | _ -> failwith "given entity not a function definition"
        end
@@ -321,7 +321,7 @@ and parse_srctgt_assertion (filename: string) (line: string) : test list =
                (* tgt_t is args_t * ret_t*)
                List.map (fun arg -> SRCTGTTest (!parsing_mode , (typ_to_dtyp (snd tgt_t)), Left arg)) generated_args
              | false ->
-               let generated_asts : ((LLVMAst.typ, GA.runnable_blocks) LLVMAst.toplevel_entity * (LLVMAst.typ, GA.runnable_blocks) LLVMAst.toplevel_entity) list = Generate.generate_n_runner num_trials (fst src_t) (snd src_t) [] [] in
+               let generated_asts : ((LLVMAst.typ, GA.runnable_blocks) LLVMAst.toplevel_entity * (LLVMAst.typ, GA.runnable_blocks) LLVMAst.toplevel_entity) list = Generate.generate_n_runner num_trials (fst src_t) (snd src_t) (Generate.explode_str "runnersrc") (Generate.explode_str "runnertgt") in
                List.map (fun ast -> SRCTGTTest (!parsing_mode, (typ_to_dtyp (snd tgt_t)), Right ([fst ast; snd ast]))) generated_asts
            end
        with _ -> [] end
