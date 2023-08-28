@@ -17,9 +17,9 @@
 
 (executables
  (names main)
+  (modes byte exe)
   (modules main driver interpreter test)
   (libraries base extracted libvellvm testing unix str)
   )
-
 
 
