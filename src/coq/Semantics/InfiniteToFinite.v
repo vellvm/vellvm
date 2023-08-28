@@ -22709,6 +22709,220 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         - intros m2 CONTRA.
                           eapply NPOPSPEC.
 
+                          (* TODO: Move this *)
+                          Lemma fin_inf_ptr_not_in_current_frame :
+                            forall {ms_inf ms_fin ptr_inf ptr_fin},
+                              MemState_refine_prop ms_inf ms_fin ->
+                              FinToInfAddrConvert.addr_convert ptr_fin = NoOom ptr_inf ->
+                              ~ Memory64BitIntptr.MMEP.MemSpec.ptr_in_current_frame ms_fin ptr_fin ->
+                              ~ MemoryBigIntptr.MMEP.MemSpec.ptr_in_current_frame ms_inf ptr_inf.
+                          Proof.
+                            intros ms_inf ms_fin ptr_inf ptr_fin MSR ADDR_CONV PTR_NIN_FRAME PTR_IN_FRAME.
+                            eapply PTR_NIN_FRAME.
+                            eapply fin_inf_ptr_in_current_frame in PTR_IN_FRAME; eauto.
+                            destruct PTR_IN_FRAME as (?&?&?).
+                            pose proof FinToInfAddrConvertSafe.addr_convert_safe _ _ ADDR_CONV.
+                            rewrite H in H1.
+                            inv H1.
+                            auto.
+                          Qed.
+
+                          (* TODO: Move this *)
+                          Lemma frame_eqv_lift_inv :
+                            forall f1 f2,
+                              InfMem.MMEP.MMSP.frame_eqv (lift_Frame f1) (lift_Frame f2) ->
+                              FinMem.MMEP.MMSP.frame_eqv f1 f2.
+                          Proof.
+                            intros f1 f2 EQV.
+                            red in EQV; red.
+
+                            intros ptr.
+                            split; intros IN.
+                            - apply ptr_in_frame_prop_lift in IN.
+                              apply EQV in IN.
+                              apply ptr_in_frame_prop_lift_inv in IN.
+                              destruct IN as (ptr_fin & CONV & IN).
+                              rewrite addr_refine_fin_to_inf_addr in CONV.
+                              inv CONV.
+                              auto.
+                            - apply ptr_in_frame_prop_lift in IN.
+                              apply EQV in IN.
+                              apply ptr_in_frame_prop_lift_inv in IN.
+                              destruct IN as (ptr_fin & CONV & IN).
+                              rewrite addr_refine_fin_to_inf_addr in CONV.
+                              inv CONV.
+                              auto.
+                          Qed.
+
+                          (* TODO: Move this *)
+                          Lemma frame_stack_eqv_lift_inf_fin :
+                            forall fs1 fs2,
+                              InfMem.MMEP.MMSP.frame_stack_eqv (lift_FrameStack fs1) (lift_FrameStack fs2) ->
+                              FinMem.MMEP.MMSP.frame_stack_eqv fs1 fs2.
+                          Proof.
+                            intros fs1 fs2 EQV.
+                            red in *.
+                            intros f n.
+                            split; intros FSE.
+                            - apply FSNth_eqv_lift in FSE.
+                              apply EQV in FSE.
+                              apply FSNth_eqv_lift_inv in FSE.
+                              destruct FSE as (f_fin & F & FSE).
+                              apply frame_eqv_lift_inv in F.
+                              epose proof FSNth_eqv_Proper. (* Need a finite version of this... Ugh *).
+                              setoid_rewrite F in FSE.
+
+                              rewrite <- F.
+                              apply FSNth_eqv_lift.
+                              apply EQV.
+                              auto.
+                            - apply FSNth_eqv_lift_inv in FSE.
+                              destruct FSE as (f_fin & F & FSE).
+
+                              rewrite <- F.
+                              apply FSNth_eqv_lift.
+                              apply EQV.
+                              auto.
+                          Qed.
+
+
+                          (* TODO: Move this *)
+                          Lemma mem_pop_spec_inf_fin :
+                            forall {m_fin_start m_fin_final m_inf_start m_inf_final},
+                              MemState_refine_prop m_inf_start m_fin_start ->
+                              MemState_refine_prop m_inf_final m_fin_final ->
+                              MemoryBigIntptr.MMEP.MemSpec.mempop_spec m_inf_start m_inf_final ->
+                              Memory64BitIntptr.MMEP.MemSpec.mempop_spec m_fin_start m_fin_final.
+                          Proof.
+                            intros m_fin_start m_fin_final m_inf_start m_inf_final MSR1 MSR2 [BYTES_FREED NON_FRAME_BYTES_PRESERVED NON_FRAME_BYTES_READ POP_FRAME INVARIANTS].
+
+                            split.
+                            - (* Bytes freed *)
+                              clear NON_FRAME_BYTES_PRESERVED NON_FRAME_BYTES_READ POP_FRAME INVARIANTS.
+                              cbn in *.
+                              intros ptr PTR.
+
+                              (* ptr is in the current frame, which has a finite refinement,
+         so there should be a finite version of ptr as well *)
+                              pose proof inf_fin_ptr_in_current_frame MSR1 PTR as (ptr_fin&PTR_CONV&PTR_FIN).
+                              eapply inf_fin_byte_not_allocated; eauto.
+                            - (* NON_FRAME_BYTES_PRESERVED *)
+                              clear - MSR1 MSR2 NON_FRAME_BYTES_PRESERVED.
+                              intros ptr aid PTR.
+
+                              pose proof (FinToInfAddrConvertSafe.addr_convert_succeeds ptr) as (ptr_inf & PTR_CONV).
+                              eapply fin_inf_ptr_not_in_current_frame in PTR; eauto.
+                              specialize (NON_FRAME_BYTES_PRESERVED ptr_inf aid PTR).
+                              pose proof FinToInfAddrConvertSafe.addr_convert_safe _ _ PTR_CONV as PTR_CONV'.
+
+                              split; intros BYTE_ALLOCATED.
+                              + eapply fin_inf_byte_allocated in BYTE_ALLOCATED; eauto.
+                                apply NON_FRAME_BYTES_PRESERVED in BYTE_ALLOCATED.
+                                eapply inf_fin_byte_allocated; eauto.
+                              + eapply fin_inf_byte_allocated in BYTE_ALLOCATED; eauto.
+                                apply NON_FRAME_BYTES_PRESERVED in BYTE_ALLOCATED.
+                                eapply inf_fin_byte_allocated; eauto.
+                            - (* NON_FRAME_BYTES_READ *)
+                              clear - MSR1 MSR2 NON_FRAME_BYTES_READ.
+                              intros ptr byte PTR.
+
+                              pose proof (FinToInfAddrConvertSafe.addr_convert_succeeds ptr) as (ptr_inf & PTR_CONV).
+                              pose proof FinToInfAddrConvertSafe.addr_convert_safe _ _ PTR_CONV as PTR_CONV'.
+                              eapply fin_inf_ptr_not_in_current_frame in PTR; eauto.
+
+                              split; intros READ.
+                              + pose proof fin_inf_read_byte_spec_exists MSR1 READ as [addr_inf [byte_inf [READ_INF [ADDR_REF BYTE_REF]]]].
+                                red in BYTE_REF.
+                                red in ADDR_REF.
+                                pose proof InfToFinAddrConvert.addr_convert_injective _ _ _ ADDR_REF PTR_CONV'.
+                                subst.
+
+                                specialize (NON_FRAME_BYTES_READ ptr_inf byte_inf PTR).
+                                eapply NON_FRAME_BYTES_READ in READ_INF.
+                                eapply inf_fin_read_byte_spec in READ_INF; eauto.
+                                destruct READ_INF as (?&?&?).
+                                red in H0.
+                                rewrite BYTE_REF in H0; inv H0.
+                                auto.
+                              + pose proof fin_inf_read_byte_spec_exists MSR2 READ as [addr_inf [byte_inf [READ_INF [ADDR_REF BYTE_REF]]]].
+                                red in BYTE_REF.
+                                red in ADDR_REF.
+                                pose proof InfToFinAddrConvert.addr_convert_injective _ _ _ ADDR_REF PTR_CONV'.
+                                subst.
+
+                                specialize (NON_FRAME_BYTES_READ ptr_inf byte_inf PTR).
+                                eapply NON_FRAME_BYTES_READ in READ_INF.
+                                eapply inf_fin_read_byte_spec in READ_INF; eauto.
+                                destruct READ_INF as (?&?&?).
+                                red in H0.
+                                rewrite BYTE_REF in H0; inv H0.
+                                auto.
+                            - (* POP_FRAME *)
+                              clear - MSR1 MSR2 POP_FRAME. 
+                              intros fs1 fs2 FSP POP.
+
+                              red; red in FSP.
+                              cbn in *.
+
+                              red in POP.
+                              destruct fs1; try contradiction.
+                              rewrite <- POP.
+
+                              destruct m_fin_start. destruct ms_memory_stack.
+                              destruct m_inf_start. destruct ms_memory_stack.
+                              cbn in *.
+                              destruct memory_stack_frame_stack.
+                              apply Memory64BitIntptr.MMEP.MMSP.frame_stack_eqv_sing_snoc_inv in FSP; contradiction.
+                              pose proof FSP as F.
+                              apply Memory64BitIntptr.MMEP.MMSP.frame_stack_snoc_inv_fs in FSP.
+                              apply Memory64BitIntptr.MMEP.MMSP.frame_stack_snoc_inv_f in F.
+
+                              rewrite <- FSP.
+                              apply MemState_refine_prop_frame_stack_preserved in MSR1, MSR2.
+                              cbn in *. red in MSR1, MSR2.
+                              cbn in MSR1, MSR2.
+                              unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop in *.
+                              cbn in *.
+
+                              destruct m_inf_final. destruct ms_memory_stack.
+                              destruct m_fin_final. destruct ms_memory_stack.
+                              cbn in *.
+
+                              rewrite FSP, POP.
+
+                              specialize (MSR1 memory_stack_frame_stack0).
+                              destruct MSR1 as [MSR1 _].
+                              forward MSR1; [reflexivity|].
+
+                              specialize (MSR2 memory_stack_frame_stack1).
+                              destruct MSR2 as [MSR2 _].
+                              forward MSR2; [reflexivity|].
+                              rewrite <- MSR1.
+
+                              destruct memory_stack_frame_stack.
+                              {
+                                cbn in MSR1.
+                                apply Memory64BitIntptrInfiniteSpec.MMSP.frame_stack_eqv_sing_snoc_inv in MSR1; contradiction.
+                              }
+                              rewrite lift_FrameStack_snoc in MSR1.
+                              apply Memory64BitIntptrInfiniteSpec.MMSP.frame_stack_snoc_inv_fs in MSR1.
+                              rewrite <- MSR1.
+
+                              unfold Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *.
+                              cbn in *.
+
+                              specialize (POP_FRAME (FinMem.MMEP.MMSP.Snoc memory_stack_frame_stack f1) memory_stack_frame_stack).
+                              forward POP_FRAME; [red; cbn; reflexivity|].
+                              forward POP_FRAME; [red; cbn; reflexivity|].
+                              red in POP_FRAME; cbn in POP_FRAME.
+                              eapply frame_stack_eqv_lift.
+                              auto.
+                            - (* mempop_operation_invariants *)
+                              destruct INVARIANTS.
+                              split; cbn in *.
+                              + eapply fin_inf_preserve_allocation_ids; eauto.
+                              + eapply fin_inf_heap_preserved; eauto.
+                          Qed.
                         eapply MemPropT_fin_inf_bind_ub.
                         5: apply UB.
                         all: eauto with FinInf.
