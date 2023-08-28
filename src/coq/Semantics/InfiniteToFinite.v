@@ -25451,12 +25451,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               destruct UB as [ub_msg UB].
               cbn in UB.
 
-              (* TODO: look into lemmas like:
-
-                         - get_consecutive_ptrs_no_ub
-                         - allocate_bytes_spec_MemPropT_no_ub
-               *)
-              admit.
+              pose proof mempush_spec_always_succeeds m1 as [m2 ?].
+              specialize (UB m2); contradiction.
             }
 
             { (* Handler raises error *)
@@ -25783,7 +25779,45 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             repeat red in HANDLER.
             destruct HANDLER as [UB | [ERR | [OOM | HANDLER]]].
             { (* Handler raises UB *)
-              admit.
+
+              destruct UB as (msg_spec&UB).
+              destruct EV_REL as (?&?&?); subst.
+
+              pstep; red; cbn.
+              eapply Interp_Memory_PropT_Vis
+                with (ta:= raise_ub "").
+              2: {
+                cbn; red.
+                left.
+                exists msg_spec.
+                red.
+                eapply MemPropT_fin_inf_bind_ub.
+                5: apply UB.
+                all: eauto with FinInf.
+
+                intros a_fin ms_fin_ma ALLOC.
+                eapply allocate_dtyp_spec_fin_inf; eauto with FinInf.
+              }
+
+              { intros a b RETa RETb AB.
+                cbn in AB; subst.
+                unfold raise_ub in RETb.
+                cbn in RETb.
+                unfold raiseUB in RETb.
+                rewrite bind_trigger in RETb.
+
+                eapply Returns_vis_inversion in RETb.
+                destruct RETb as [[] _].
+              }
+
+              left.
+              eapply FindUB.
+              unfold raise_ub. cbn; unfold raiseUB; cbn.
+              rewrite bind_trigger.
+              pstep; red; cbn.
+              rewrite subevent_subevent.
+              constructor.
+              intros [].
             }
 
             { (* Handler raises error *)
@@ -25915,7 +25949,42 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             repeat red in HANDLER.
             destruct HANDLER as [UB | [ERR | [OOM | HANDLER]]].
             { (* Handler raises UB *)
-              admit.
+              destruct UB as (msg_spec&UB).
+              destruct EV_REL as (?&?); subst.
+              rename H0 into DV_REF.
+
+              pstep; red; cbn.
+              eapply Interp_Memory_PropT_Vis
+                with (ta:= raise_ub "").
+
+              2: {
+                cbn; red.
+                left.
+                exists msg_spec.
+                eapply handle_load_fin_inf_ub.
+                3: apply UB.
+                all: eauto with FinInf.
+              }
+
+              { intros a1 b RETa RETb AB.
+                cbn in AB; subst.
+                unfold raise_ub in RETb.
+                cbn in RETb.
+                unfold raiseUB in RETb.
+                rewrite bind_trigger in RETb.
+
+                eapply Returns_vis_inversion in RETb.
+                destruct RETb as [[] _].
+              }
+
+              left.
+              eapply FindUB.
+              unfold raise_ub. cbn; unfold raiseUB; cbn.
+              rewrite bind_trigger.
+              pstep; red; cbn.
+              rewrite subevent_subevent.
+              constructor.
+              intros [].
             }
 
             { (* Handler raises error *)
@@ -26198,7 +26267,48 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             repeat red in HANDLER.
             destruct HANDLER as [UB | [ERR | [OOM | HANDLER]]].
             { (* Handler raises UB *)
-              admit.
+              destruct UB as (msg_spec&UB).
+              destruct EV_REL as (?&?); subst.
+              rename H0 into DV_REF.
+              destruct DV_REF as [DV_REF UV_REF].
+
+              assert (LLVMParamsBigIntptr.Events.DV.uvalue_has_dtyp v t0) as TYPE.
+              { (* TODO: Will need a well-typed predicate to prove this *)
+                admit.
+              }
+
+              pstep; red; cbn.
+              eapply Interp_Memory_PropT_Vis
+                with (ta:= raise_ub "").
+
+              2: {
+                cbn; red.
+                left.
+                exists msg_spec.
+                eapply handle_store_fin_inf_ub.
+                5: apply UB.
+                all: eauto with FinInf.
+              }
+
+              { intros a1 b RETa RETb AB.
+                cbn in AB; subst.
+                unfold raise_ub in RETb.
+                cbn in RETb.
+                unfold raiseUB in RETb.
+                rewrite bind_trigger in RETb.
+
+                eapply Returns_vis_inversion in RETb.
+                destruct RETb as [[] _].
+              }
+
+              left.
+              eapply FindUB.
+              unfold raise_ub. cbn; unfold raiseUB; cbn.
+              rewrite bind_trigger.
+              pstep; red; cbn.
+              rewrite subevent_subevent.
+              constructor.
+              intros [].
             }
 
             { (* Handler raises error *)
