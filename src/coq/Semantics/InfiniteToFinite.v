@@ -15947,8 +15947,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Definition heap_refine h_inf h_fin : Prop :=
     InfMemMMSP.heap_eqv h_inf (lift_Heap h_fin).
 
-  (* TODO: Finish this proof *)
-  (* Will probably need to know heap is in finite range. *)
   Lemma free_block_prop_fin_inf :
     forall {h_fin_start h_fin_final h_inf_start h_inf_final ptr_fin ptr_inf},
       addr_refine ptr_inf ptr_fin ->
@@ -16107,6 +16105,130 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         subst.
         specialize (free_block_disjoint_roots root_fin DISJOINT).
         destruct free_block_disjoint_roots.
+        auto.
+      }
+  Qed.
+
+  Lemma fin_to_inf_addr_injective :
+    forall ptr1 ptr2,
+      fin_to_inf_addr ptr1 = fin_to_inf_addr ptr2 ->
+      ptr1 = ptr2.
+  Proof.
+    intros ptr1 ptr2 H.
+    unfold fin_to_inf_addr in *.
+    do 2 destruct FinToInfAddrConvertSafe.addr_convert_succeeds in H.
+    subst.
+    eapply FinToInfAddrConvert.addr_convert_injective; eauto.
+  Qed.
+
+  Lemma free_block_prop_inf_fin :
+    forall {h_fin_start h_fin_final h_inf_start h_inf_final ptr_fin ptr_inf},
+      addr_refine ptr_inf ptr_fin ->
+      heap_refine h_inf_start h_fin_start ->
+      heap_refine h_inf_final h_fin_final ->
+      MemoryBigIntptr.MMEP.MemSpec.free_block_prop h_inf_start ptr_inf h_inf_final ->
+      Memory64BitIntptr.MMEP.MemSpec.free_block_prop h_fin_start ptr_fin h_fin_final.
+  Proof.
+    intros h_fin_start h_fin_final h_inf_start h_inf_final ptr_fin ptr_inf ADDR_REF HEAP_START_REF HEAP_FINAL_REF FREE_BLOCK.
+    destruct FREE_BLOCK.
+    split.
+    - clear - ADDR_REF HEAP_START_REF HEAP_FINAL_REF free_block_ptrs_freed.
+      intros ptr IN CONTRA.
+
+      apply ptr_in_heap_prop_lift in IN, CONTRA.
+      erewrite fin_to_inf_addr_conv_inf in IN, CONTRA; eauto.
+      setoid_rewrite HEAP_START_REF in free_block_ptrs_freed.
+      setoid_rewrite HEAP_FINAL_REF in free_block_ptrs_freed.
+      eapply free_block_ptrs_freed; eauto.
+    - clear - ADDR_REF HEAP_START_REF HEAP_FINAL_REF free_block_root_freed.
+      intros CONTRA.
+      eapply free_block_root_freed.
+
+      red in HEAP_FINAL_REF, HEAP_START_REF.
+      rewrite HEAP_FINAL_REF.
+      eapply root_in_heap_prop_lift in CONTRA.
+      erewrite fin_to_inf_addr_conv_inf in CONTRA; eauto.
+    - clear - ADDR_REF HEAP_START_REF HEAP_FINAL_REF free_block_disjoint_preserved.
+      intros ptr root' DISJOINT.
+      split; intros IN.
+      {
+        red in HEAP_FINAL_REF, HEAP_START_REF.
+        setoid_rewrite HEAP_START_REF in free_block_disjoint_preserved.
+        setoid_rewrite HEAP_FINAL_REF in free_block_disjoint_preserved.
+
+        eapply ptr_in_heap_prop_lift in IN.
+        eapply free_block_disjoint_preserved in IN.
+        2: {
+          eapply fin_inf_disjoint_ptr_byte; eauto.
+          apply addr_refine_fin_to_inf_addr.
+        }
+
+        eapply ptr_in_heap_prop_lift_inv in IN.
+        destruct IN as (?&?&?&?&?).
+        apply fin_to_inf_addr_conv_inf in H, H0.
+
+        apply fin_to_inf_addr_injective in H, H0; subst.
+        auto.
+      }
+
+      {
+        red in HEAP_FINAL_REF, HEAP_START_REF.
+        setoid_rewrite HEAP_START_REF in free_block_disjoint_preserved.
+        setoid_rewrite HEAP_FINAL_REF in free_block_disjoint_preserved.
+
+        eapply ptr_in_heap_prop_lift in IN.
+        eapply free_block_disjoint_preserved in IN.
+        2: {
+          eapply fin_inf_disjoint_ptr_byte; eauto.
+          apply addr_refine_fin_to_inf_addr.
+        }
+
+        eapply ptr_in_heap_prop_lift_inv in IN.
+        destruct IN as (?&?&?&?&?).
+        apply fin_to_inf_addr_conv_inf in H, H0.
+
+        apply fin_to_inf_addr_injective in H, H0; subst.
+        auto.
+      }
+    - clear - ADDR_REF HEAP_START_REF HEAP_FINAL_REF free_block_disjoint_roots.
+      intros root' DISJOINT.
+
+      split; intros IN.
+      {
+        red in HEAP_FINAL_REF, HEAP_START_REF.
+        setoid_rewrite HEAP_START_REF in free_block_disjoint_roots.
+        setoid_rewrite HEAP_FINAL_REF in free_block_disjoint_roots.
+
+        eapply root_in_heap_prop_lift in IN.
+        eapply free_block_disjoint_roots in IN.
+        2: {
+          eapply fin_inf_disjoint_ptr_byte; eauto.
+          apply addr_refine_fin_to_inf_addr.
+        }
+
+        eapply root_in_heap_prop_lift_inv in IN.
+        destruct IN as (?&?&?).
+        apply fin_to_inf_addr_conv_inf in H.
+        apply fin_to_inf_addr_injective in H; subst.
+        auto.
+      }
+
+      {
+        red in HEAP_FINAL_REF, HEAP_START_REF.
+        setoid_rewrite HEAP_START_REF in free_block_disjoint_roots.
+        setoid_rewrite HEAP_FINAL_REF in free_block_disjoint_roots.
+
+        eapply root_in_heap_prop_lift in IN.
+        eapply free_block_disjoint_roots in IN.
+        2: {
+          eapply fin_inf_disjoint_ptr_byte; eauto.
+          apply addr_refine_fin_to_inf_addr.
+        }
+
+        eapply root_in_heap_prop_lift_inv in IN.
+        destruct IN as (?&?&?).
+        apply fin_to_inf_addr_conv_inf in H.
+        apply fin_to_inf_addr_injective in H; subst.
         auto.
       }
   Qed.
