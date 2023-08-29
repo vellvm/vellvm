@@ -16947,7 +16947,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       destruct (Memory64BitIntptr.MMEP.MemSpec.MemHelpers.filter_sid_matches s ixbytes) eqn:FILTER.
       repeat red in RESID.
       destruct RESID as (?&?&FRESH&RESID).
-      apply fresh_sid_MemState_eqv in FRESH.
+      apply Memory64BitIntptr.MMEP.MemSpec.fresh_sid_MemState_eqv in FRESH.
       etransitivity; eauto.
       eapply H.
       2: apply RESID.
@@ -17057,7 +17057,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       4: eauto.
 
       eapply filter_sid_matches_length_r_le; eauto.
-      eapply fresh_sid_MemState_eqv_inf in H.
+      eapply MemoryBigIntptr.MMEP.MemSpec.fresh_sid_MemState_eqv in H.
       admit.
   Admitted.
 
@@ -17121,7 +17121,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               apply MemPropT_bind_ret_inv in SERIALIZE;
               destruct SERIALIZE as (?&?&?&?);
               etransitivity;
-              [eapply fresh_sid_MemState_eqv; eauto|];
+              [eapply Memory64BitIntptr.MMEP.MemSpec.fresh_sid_MemState_eqv; eauto|];
               match goal with
               | H: lift_OOM ?x _ _ |- _ =>
                   red in H; destruct x eqn:?HX; inv H
@@ -17132,7 +17132,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                   apply MemPropT_bind_ret_inv in SERIALIZE;
                   destruct SERIALIZE as (?&?&?&?);
                   etransitivity;
-                  [eapply fresh_sid_MemState_eqv; eauto|];
+                  [eapply Memory64BitIntptr.MMEP.MemSpec.fresh_sid_MemState_eqv; eauto|];
                   match goal with
                   | H: lift_OOM ?x _ _ |- _ =>
                       red in H; destruct x eqn:?HX; inv H
@@ -17264,7 +17264,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         try solve
           [ rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE;
             destruct SERIALIZE as (?&?&FRESH&SERIALIZE);
-            apply fresh_sid_MemState_eqv in FRESH as EQV1;
+            apply Memory64BitIntptr.MMEP.MemSpec.fresh_sid_MemState_eqv in FRESH as EQV1;
             match goal with
             | H: lift_OOM _ _ _ |- _ =>
                 red in H; break_match_hyp_inv
@@ -17388,7 +17388,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         try solve
           [ rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE;
             destruct SERIALIZE as (?&?&FRESH&SERIALIZE);
-            apply fresh_sid_MemState_eqv in FRESH as EQV1;
+            apply Memory64BitIntptr.MMEP.MemSpec.fresh_sid_MemState_eqv in FRESH as EQV1;
             match goal with
             | H: lift_OOM _ _ _ |- _ =>
                 red in H; break_match_hyp_inv
@@ -17512,7 +17512,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         try solve
           [ rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in SERIALIZE;
             destruct SERIALIZE as (?&?&FRESH&SERIALIZE);
-            apply fresh_sid_MemState_eqv in FRESH as EQV1;
+            apply Memory64BitIntptr.MMEP.MemSpec.fresh_sid_MemState_eqv in FRESH as EQV1;
             match goal with
             | H: lift_OOM _ _ _ |- _ =>
                 red in H; break_match_hyp_inv
