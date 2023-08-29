@@ -3845,6 +3845,330 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
            end.
 
   End Handlers.
+
+  (* TODO: Should these be here, or in another module? *)
+  (* Useful helper lemmas and relations... *)
+  #[global] Instance preserve_allocation_ids_Reflexive :
+    Reflexive preserve_allocation_ids.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance read_byte_allowed_all_preserved_Reflexive :
+    Reflexive read_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance read_byte_prop_all_preserved_Reflexive :
+    Reflexive read_byte_prop_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance read_byte_preserved_Reflexive :
+    Reflexive read_byte_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    split; reflexivity.
+  Qed.
+
+  #[global] Instance write_byte_allowed_all_preserved_Reflexive :
+    Reflexive write_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance free_byte_allowed_all_preserved_Reflexive :
+    Reflexive free_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance allocations_preserved_Reflexive :
+    Reflexive allocations_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance frame_stack_preserved_Reflexive :
+    Reflexive frame_stack_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance heap_preserved_Reflexive :
+    Reflexive heap_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance MemState_eqv_Reflexive : Reflexive MemState_eqv.
+  Proof.
+    red.
+    intros ms.
+    repeat (split; [reflexivity|]); reflexivity.
+  Qed.
+
+  Lemma fresh_sid_MemState_eqv :
+    forall ms ms' sid,
+      fresh_sid ms (ret (ms', sid)) ->
+      MemState_eqv ms ms'.
+  Proof.
+    intros ms ms' sid H.
+    destruct H.
+    split; [|split; [|split; [|split; [|split; [|split]]]]];
+      tauto.
+  Qed.
+
+  #[global] Instance preserve_allocation_ids_Transitive :
+    Transitive preserve_allocation_ids.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 p.
+    split; intros USED.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  #[global] Instance read_byte_allowed_all_preserved_Transitive :
+    Transitive read_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 ptr.
+    split; intros READ.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  #[global] Instance read_byte_prop_all_preserved_Transitive :
+    Transitive read_byte_prop_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 ptr byte.
+    split; intros READ.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  #[global] Instance read_byte_preserved_Transitive :
+    Transitive read_byte_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0.
+    destruct H, H0.
+    split.
+    - eapply read_byte_allowed_all_preserved_Transitive; eauto.
+    - eapply read_byte_prop_all_preserved_Transitive; eauto.
+  Qed.
+
+  #[global] Instance write_byte_allowed_all_preserved_Transitive :
+    Transitive write_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 ptr.
+    split; intros WRITE.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  #[global] Instance free_byte_allowed_all_preserved_Transitive :
+    Transitive free_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 ptr.
+    split; intros FREE.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  #[global] Instance allocations_preserved_Transitive :
+    Transitive allocations_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 ptr aid.
+    split; intros BYTE.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  #[global] Instance frame_stack_preserved_Transitive :
+    Transitive frame_stack_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 fs.
+    split; intros FSP.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  #[global] Instance heap_preserved_Transitive :
+    Transitive heap_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 h.
+    split; intros HEAP.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  #[global] Instance MemState_eqv_Transitive : Transitive MemState_eqv.
+  Proof.
+    red.
+    intros x y z H H0.
+    destruct H as (?&?&?&?&?&?&?).
+    destruct H0 as (?&?&?&?&?&?&?).
+    split; [|split; [|split; [|split; [|split; [|split]]]]].
+    - eapply preserve_allocation_ids_Transitive; eauto.
+    - eapply read_byte_preserved_Transitive; eauto.
+    - eapply write_byte_allowed_all_preserved_Transitive; eauto.
+    - eapply free_byte_allowed_all_preserved_Transitive; eauto.
+    - eapply allocations_preserved_Transitive; eauto.
+    - eapply frame_stack_preserved_Transitive; eauto.
+    - eapply heap_preserved_Transitive; eauto.
+  Qed.
+
+  #[global] Instance preserve_allocation_ids_Symmetric :
+    Symmetric preserve_allocation_ids.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H p.
+    split; intros USED.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  #[global] Instance read_byte_allowed_all_preserved_Symmetric :
+    Symmetric read_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H ptr.
+    split; intros READ.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  #[global] Instance read_byte_prop_all_preserved_Symmetric :
+    Symmetric read_byte_prop_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H ptr byte.
+    split; intros READ.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  #[global] Instance read_byte_preserved_Symmetric :
+    Symmetric read_byte_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H.
+    destruct H.
+    split.
+    - eapply read_byte_allowed_all_preserved_Symmetric; eauto.
+    - eapply read_byte_prop_all_preserved_Symmetric; eauto.
+  Qed.
+
+  #[global] Instance write_byte_allowed_all_preserved_Symmetric :
+    Symmetric write_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H ptr.
+    split; intros WRITE.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  #[global] Instance free_byte_allowed_all_preserved_Symmetric :
+    Symmetric free_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H ptr.
+    split; intros FREE.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  #[global] Instance allocations_preserved_Symmetric :
+    Symmetric allocations_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H ptr aid.
+    split; intros BYTE.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  #[global] Instance frame_stack_preserved_Symmetric :
+    Symmetric frame_stack_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H fs.
+    split; intros FSP.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  #[global] Instance heap_preserved_Symmetric :
+    Symmetric heap_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H h.
+    split; intros HEAP.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  #[global] Instance MemState_eqv_Symmetric : Symmetric MemState_eqv.
+  Proof.
+    red.
+    intros x y H.
+    destruct H as (?&?&?&?&?&?&?).
+    split; [|split; [|split; [|split; [|split; [|split]]]]].
+    - eapply preserve_allocation_ids_Symmetric; eauto.
+    - eapply read_byte_preserved_Symmetric; eauto.
+    - eapply write_byte_allowed_all_preserved_Symmetric; eauto.
+    - eapply free_byte_allowed_all_preserved_Symmetric; eauto.
+    - eapply allocations_preserved_Symmetric; eauto.
+    - eapply frame_stack_preserved_Symmetric; eauto.
+    - eapply heap_preserved_Symmetric; eauto.
+  Qed.
+
 End MemoryModelSpec.
 
 Module MakeMemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) <: MemoryModelSpec LP MP MMSP.

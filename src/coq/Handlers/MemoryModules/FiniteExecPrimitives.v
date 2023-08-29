@@ -639,6 +639,36 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         auto.
     Qed.
 
+    (* TODO: Move this *)
+    Lemma FSNth_frame_eqv :
+      forall n fs f1 f2,
+        frame_eqv f1 f2 ->
+        FSNth_eqv fs n f1 ->
+        FSNth_eqv fs n f2.
+    Proof.
+      induction n;
+        intros fs f1 f2 EQV NTHEQV.
+      - destruct fs; cbn in *;
+          rewrite NTHEQV; auto.
+      - destruct fs; cbn in *; eauto.
+    Qed.
+
+    (* TODO: Move this *)
+    #[global] Instance FSNth_eqv_Proper :
+      Proper (frame_stack_eqv ==> eq ==> frame_eqv ==> iff) FSNth_eqv.
+    Proof.
+      unfold Proper, respectful.
+      intros x y H' x0 y0 H0 x1 y1 H1; subst.
+      split; intros NTH.
+      - red in H'.
+        apply H'.
+        eapply FSNth_frame_eqv; eauto.
+      - red in H'.
+        apply H'.
+        eapply FSNth_frame_eqv; eauto.
+        symmetry; auto.
+    Qed.
+
     #[global] Instance heap_eqv_ptr_in_head_prop_Proper :
       Proper (heap_eqv ==> eq ==> eq ==> iff) ptr_in_heap_prop.
     Proof.

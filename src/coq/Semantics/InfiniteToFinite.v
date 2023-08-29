@@ -6435,38 +6435,6 @@ cofix CIH
   Qed.
 
   (* TODO: Move this *)
-  Lemma FSNth_frame_eqv :
-    forall n fs f1 f2,
-      InfMem.MMEP.MMSP.frame_eqv f1 f2 ->
-      InfMem.MMEP.MMSP.FSNth_eqv fs n f1 ->
-      InfMem.MMEP.MMSP.FSNth_eqv fs n f2.
-  Proof.
-    induction n;
-      intros fs f1 f2 EQV NTHEQV.
-    - destruct fs; cbn in *;
-        rewrite NTHEQV; auto.
-    - destruct fs; cbn in *; eauto.
-  Qed.
-
-
-  (* TODO: Move this *)
-  #[global] Instance FSNth_eqv_Proper :
-    Proper (InfMem.MMEP.MMSP.frame_stack_eqv ==> eq ==> InfMem.MMEP.MMSP.frame_eqv ==> iff) InfMem.MMEP.MMSP.FSNth_eqv.
-  Proof.
-    unfold Proper, respectful.
-    intros x y H x0 y0 H0 x1 y1 H1; subst.
-    split; intros NTH.
-    - red in H.
-      apply H.
-      eapply FSNth_frame_eqv; eauto.
-    - red in H.
-      apply H.
-      eapply FSNth_frame_eqv; eauto.
-      symmetry; auto.
-  Qed.
-
-
-  (* TODO: Move this *)
   Lemma frame_stack_eqv_lift :
     forall fs1 fs2,
       FinMem.MMEP.MMSP.frame_stack_eqv fs1 fs2 ->
@@ -12052,6 +12020,14 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       + red. reflexivity.
   Qed.
 
+  Lemma inf_fin_heap_preserved :
+    forall ms_fin ms_inf ms_fin' ms_inf',
+      MemState_refine_prop ms_inf ms_fin ->
+      MemState_refine_prop ms_inf' ms_fin' ->
+      MemoryBigIntptr.MMEP.MemSpec.heap_preserved ms_inf ms_inf' ->
+      Memory64BitIntptr.MMEP.MemSpec.heap_preserved ms_fin ms_fin'.
+  Proof.
+  Admitted.
 
   Lemma MemState_refine_prop_read_byte_allowed_all_preserved :
     forall ms_inf ms_fin,
@@ -12123,6 +12099,16 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     intros ms_fin ms_inf ms_fin' ms_inf' REF REF' HP.
   Admitted.
 
+  Lemma inf_fin_preserve_allocation_ids :
+    forall ms_fin ms_inf ms_fin' ms_inf',
+      MemState_refine_prop ms_inf ms_fin ->
+      MemState_refine_prop ms_inf' ms_fin' ->
+      MemoryBigIntptr.MMEP.MemSpec.preserve_allocation_ids ms_inf ms_inf' ->
+      Memory64BitIntptr.MMEP.MemSpec.preserve_allocation_ids ms_fin ms_fin'.
+  Proof.
+    intros ms_fin ms_inf ms_fin' ms_inf' REF REF' HP.
+  Admitted.
+
   #[global] Hint Resolve
     lift_MemState_refine_prop
     fin_inf_allocations_preserved
@@ -12132,6 +12118,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     fin_inf_write_byte_allowed_all_preserved
     fin_inf_free_byte_allowed_all_preserved
     fin_inf_preserve_allocation_ids
+    inf_fin_preserve_allocation_ids
     fin_inf_read_byte_prop_all_preserved
     : FinInf.
 
@@ -16447,370 +16434,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     eapply to_ubytes_fin_inf_helper; eauto.
   Qed.
 
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance preserve_allocation_ids_Reflexive :
-    Reflexive Memory64BitIntptr.MMEP.MemSpec.preserve_allocation_ids.
-  Proof.
-    red; intros ms.
-    red.
-    reflexivity.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance read_byte_allowed_all_preserved_Reflexive :
-    Reflexive Memory64BitIntptr.MMEP.MemSpec.read_byte_allowed_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    reflexivity.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance read_byte_prop_all_preserved_Reflexive :
-    Reflexive Memory64BitIntptr.MMEP.MemSpec.read_byte_prop_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    reflexivity.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance read_byte_preserved_Reflexive :
-    Reflexive Memory64BitIntptr.MMEP.MemSpec.read_byte_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    split; reflexivity.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance write_byte_allowed_all_preserved_Reflexive :
-    Reflexive Memory64BitIntptr.MMEP.MemSpec.write_byte_allowed_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    reflexivity.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance free_byte_allowed_all_preserved_Reflexive :
-    Reflexive Memory64BitIntptr.MMEP.MemSpec.free_byte_allowed_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    reflexivity.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance allocations_preserved_Reflexive :
-    Reflexive Memory64BitIntptr.MMEP.MemSpec.allocations_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    reflexivity.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance frame_stack_preserved_Reflexive :
-    Reflexive Memory64BitIntptr.MMEP.MemSpec.frame_stack_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    reflexivity.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance heap_preserved_Reflexive :
-    Reflexive Memory64BitIntptr.MMEP.MemSpec.heap_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    reflexivity.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance MemState_eqv_Reflexive : Reflexive Memory64BitIntptr.MMEP.MemSpec.MemState_eqv.
-  Proof.
-    red.
-    intros ms.
-    repeat (split; [reflexivity|]); reflexivity.
-  Qed.
-
-  (* TODO: Move this into memory model files so it's available for fin / inf *)
-  Lemma fresh_sid_MemState_eqv :
-    forall ms ms' sid,
-      fresh_sid ms (ret (ms', sid)) ->
-      Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms ms'.
-  Proof.
-    intros ms ms' sid H.
-    destruct H.
-    split; [|split; [|split; [|split; [|split; [|split]]]]];
-      tauto.
-  Qed.
-
-  (* TODO: Move this into memory model files so it's available for fin / inf *)
-  Lemma fresh_sid_MemState_eqv_inf :
-    forall (ms ms' : MemoryBigIntptr.MMEP.MMSP.MemState) sid,
-      fresh_sid (M:=MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) ms (ret (ms', sid)) ->
-      MemoryBigIntptr.MMEP.MemSpec.MemState_eqv ms ms'.
-  Proof.
-    intros ms ms' sid H.
-    destruct H.
-    split; [|split; [|split; [|split; [|split; [|split]]]]];
-      tauto.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance preserve_allocation_ids_Transitive :
-    Transitive Memory64BitIntptr.MMEP.MemSpec.preserve_allocation_ids.
-  Proof.
-    red; intros ms.
-    red.
-    intros y z H H0 p.
-    split; intros USED.
-    - apply H0, H; auto.
-    - apply H, H0; auto.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance read_byte_allowed_all_preserved_Transitive :
-    Transitive Memory64BitIntptr.MMEP.MemSpec.read_byte_allowed_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y z H H0 ptr.
-    split; intros READ.
-    - apply H0, H; auto.
-    - apply H, H0; auto.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance read_byte_prop_all_preserved_Transitive :
-    Transitive Memory64BitIntptr.MMEP.MemSpec.read_byte_prop_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y z H H0 ptr byte.
-    split; intros READ.
-    - apply H0, H; auto.
-    - apply H, H0; auto.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance read_byte_preserved_Transitive :
-    Transitive Memory64BitIntptr.MMEP.MemSpec.read_byte_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y z H H0.
-    destruct H, H0.
-    split.
-    - eapply read_byte_allowed_all_preserved_Transitive; eauto.
-    - eapply read_byte_prop_all_preserved_Transitive; eauto.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance write_byte_allowed_all_preserved_Transitive :
-    Transitive Memory64BitIntptr.MMEP.MemSpec.write_byte_allowed_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y z H H0 ptr.
-    split; intros WRITE.
-    - apply H0, H; auto.
-    - apply H, H0; auto.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance free_byte_allowed_all_preserved_Transitive :
-    Transitive Memory64BitIntptr.MMEP.MemSpec.free_byte_allowed_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y z H H0 ptr.
-    split; intros FREE.
-    - apply H0, H; auto.
-    - apply H, H0; auto.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance allocations_preserved_Transitive :
-    Transitive Memory64BitIntptr.MMEP.MemSpec.allocations_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y z H H0 ptr aid.
-    split; intros BYTE.
-    - apply H0, H; auto.
-    - apply H, H0; auto.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance frame_stack_preserved_Transitive :
-    Transitive Memory64BitIntptr.MMEP.MemSpec.frame_stack_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y z H H0 fs.
-    split; intros FSP.
-    - apply H0, H; auto.
-    - apply H, H0; auto.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance heap_preserved_Transitive :
-    Transitive Memory64BitIntptr.MMEP.MemSpec.heap_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y z H H0 h.
-    split; intros HEAP.
-    - apply H0, H; auto.
-    - apply H, H0; auto.
-  Qed.
-
-  (* TODO: move this so it's available for fin / inf *)
-  #[global] Instance MemState_eqv_Transitive : Transitive Memory64BitIntptr.MMEP.MemSpec.MemState_eqv.
-  Proof.
-    red.
-    intros x y z H H0.
-    destruct H as (?&?&?&?&?&?&?).
-    destruct H0 as (?&?&?&?&?&?&?).
-    split; [|split; [|split; [|split; [|split; [|split]]]]].
-    - eapply preserve_allocation_ids_Transitive; eauto.
-    - eapply read_byte_preserved_Transitive; eauto.
-    - eapply write_byte_allowed_all_preserved_Transitive; eauto.
-    - eapply free_byte_allowed_all_preserved_Transitive; eauto.
-    - eapply allocations_preserved_Transitive; eauto.
-    - eapply frame_stack_preserved_Transitive; eauto.
-    - eapply heap_preserved_Transitive; eauto.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance preserve_allocation_ids_Symmetric :
-    Symmetric Memory64BitIntptr.MMEP.MemSpec.preserve_allocation_ids.
-  Proof.
-    red; intros ms.
-    red.
-    intros y H p.
-    split; intros USED.
-    - apply H; auto.
-    - apply H; auto.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance read_byte_allowed_all_preserved_Symmetric :
-    Symmetric Memory64BitIntptr.MMEP.MemSpec.read_byte_allowed_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y H ptr.
-    split; intros READ.
-    - apply H; auto.
-    - apply H; auto.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance read_byte_prop_all_preserved_Symmetric :
-    Symmetric Memory64BitIntptr.MMEP.MemSpec.read_byte_prop_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y H ptr byte.
-    split; intros READ.
-    - apply H; auto.
-    - apply H; auto.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance read_byte_preserved_Symmetric :
-    Symmetric Memory64BitIntptr.MMEP.MemSpec.read_byte_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y H.
-    destruct H.
-    split.
-    - eapply read_byte_allowed_all_preserved_Symmetric; eauto.
-    - eapply read_byte_prop_all_preserved_Symmetric; eauto.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance write_byte_allowed_all_preserved_Symmetric :
-    Symmetric Memory64BitIntptr.MMEP.MemSpec.write_byte_allowed_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y H ptr.
-    split; intros WRITE.
-    - apply H; auto.
-    - apply H; auto.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance free_byte_allowed_all_preserved_Symmetric :
-    Symmetric Memory64BitIntptr.MMEP.MemSpec.free_byte_allowed_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y H ptr.
-    split; intros FREE.
-    - apply H; auto.
-    - apply H; auto.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance allocations_preserved_Symmetric :
-    Symmetric Memory64BitIntptr.MMEP.MemSpec.allocations_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y H ptr aid.
-    split; intros BYTE.
-    - apply H; auto.
-    - apply H; auto.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance frame_stack_preserved_Symmetric :
-    Symmetric Memory64BitIntptr.MMEP.MemSpec.frame_stack_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y H fs.
-    split; intros FSP.
-    - apply H; auto.
-    - apply H; auto.
-  Qed.
-
-  (* TODO: Move this into MemoryModel.v *)
-  #[global] Instance heap_preserved_Symmetric :
-    Symmetric Memory64BitIntptr.MMEP.MemSpec.heap_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y H h.
-    split; intros HEAP.
-    - apply H; auto.
-    - apply H; auto.
-  Qed.
-
-  (* TODO: move this so it's available for fin / inf *)
-  #[global] Instance MemState_eqv_Symmetric : Symmetric Memory64BitIntptr.MMEP.MemSpec.MemState_eqv.
-  Proof.
-    red.
-    intros x y H.
-    destruct H as (?&?&?&?&?&?&?).
-    split; [|split; [|split; [|split; [|split; [|split]]]]].
-    - eapply preserve_allocation_ids_Symmetric; eauto.
-    - eapply read_byte_preserved_Symmetric; eauto.
-    - eapply write_byte_allowed_all_preserved_Symmetric; eauto.
-    - eapply free_byte_allowed_all_preserved_Symmetric; eauto.
-    - eapply allocations_preserved_Symmetric; eauto.
-    - eapply frame_stack_preserved_Symmetric; eauto.
-    - eapply heap_preserved_Symmetric; eauto.
-  Qed.
-
   (* TODO: move this. Should hold for fin / inf *)
   (* TODO: This isn't true... The bytes can get different sids *)
   Lemma serialize_sbytes_deterministic :
@@ -20781,7 +20404,66 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         Memory64BitIntptr.MMEP.MemSpec.free_spec ms_fin_start ptr_fin ms_fin_final /\
           MemState_refine_prop ms_inf_final ms_fin_final.
   Proof.
-  Admitted.
+    intros ms_inf_start ms_inf_final ms_fin_start ptr_fin ptr_inf MSR ADDR_REF FREE_SPEC.
+    destruct FREE_SPEC.
+    destruct free_invariants.
+
+    (* How do I get an appropriate MemState for this?
+
+       A better question might be... When I have an ms_inf, what can
+       make it so I cannot have an ms_fin such that...
+
+       MemState_refine_prop ms_inf ms_fin
+
+       MemState_refine_prop = 
+       fun (ms_inf : InfMem.MMEP.MMSP.MemState) (ms_fin : FinMem.MMEP.MMSP.MemState) =>
+       let ms_fin_lifted := lift_MemState ms_fin in InfMem.MMEP.MemSpec.MemState_eqv ms_inf ms_fin_lifted
+       : InfMem.MMEP.MMSP.MemState -> FinMem.MMEP.MMSP.MemState -> Prop
+
+       InfMem.MMEP.MemSpec.MemState_eqv = 
+       fun ms1 ms2 : InfMem.MMEP.MMSP.MemState =>
+       InfMem.MMEP.MemSpec.preserve_allocation_ids ms1 ms2 /\
+       InfMem.MMEP.MemSpec.read_byte_preserved ms1 ms2 /\
+       InfMem.MMEP.MemSpec.write_byte_allowed_all_preserved ms1 ms2 /\
+       InfMem.MMEP.MemSpec.free_byte_allowed_all_preserved ms1 ms2 /\
+       InfMem.MMEP.MemSpec.allocations_preserved ms1 ms2 /\
+       InfMem.MMEP.MemSpec.frame_stack_preserved ms1 ms2 /\ InfMem.MMEP.MemSpec.heap_preserved ms1 ms2
+
+       HMMMM. Maybe I can use convert_MemState?
+     *)
+
+    destruct (convert_MemState ms_inf_final) as [ms_fin_final | ] eqn:MS_FIN_FINAL.
+    2: {
+      exfalso.
+      admit.
+    }
+
+    exists ms_fin_final.
+    split.
+    2: {
+      red.
+      erewrite lift_MemState_convert_MemState_inverse; eauto.
+
+      #[global] Instance MemState_eqv_Reflexive : Reflexive MMEP.MemSpec.preserve_allocation_ids.
+      Proof.
+        red.
+      Qed.
+
+      (* TODO: Move this to where MemState_eqv is defined *)
+      #[global] Instance MemState_eqv_Reflexive  : Reflexive InfMem.MMEP.MemSpec.MemState_eqv.
+      Proof.
+        red.
+        intros x.
+        red.
+        split.
+        reflexivity.
+      Qed.
+
+      reflexivity.
+    }
+  Qed.
+
+  
 
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
@@ -22693,21 +22375,37 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                          inf.
                        *)
                       eapply Interp_Memory_PropT_Vis
-                          with (ta:= raise_ub msg).
-                      2: {
-                        cbn; red.
+                        with (ta:= raise_ub msg).
+
+                      3: {
+                        red.
                         left.
-                        exists msg.
-                        red.
-                        red.
-                        cbn.
-                        split.
-                        - intros NPOP'.
-                          eapply NPOP.
-                          eapply cannot_pop_inf_fin; eauto.
-                          apply lift_MemState_refine_prop.
-                        - intros m2 CONTRA.
-                          eapply NPOPSPEC.
+                        eapply FindUB.
+                        pstep; red; cbn.
+                        constructor.
+                        intros [].
+                      }
+
+                      { intros a0 b RETa RETb AB.
+                        cbn in RETb.
+                        unfold raiseUB in RETb.
+                        rewrite bind_trigger in RETb.
+                        eapply Returns_vis_inversion in RETb.
+                        destruct RETb as [[] _].
+                      }
+                      
+                      cbn; red.
+                      left.
+                      exists msg.
+                      red.
+                      red.
+                      cbn.
+                      split.
+                      - intros NPOP'.
+                        eapply NPOP.
+                        eapply cannot_pop_inf_fin; eauto.
+                        apply lift_MemState_refine_prop.
+                      - intros m2 CONTRA.
 
                           (* TODO: Move this *)
                           Lemma fin_inf_ptr_not_in_current_frame :
@@ -22769,22 +22467,16 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                               apply FSNth_eqv_lift_inv in FSE.
                               destruct FSE as (f_fin & F & FSE).
                               apply frame_eqv_lift_inv in F.
-                              epose proof FSNth_eqv_Proper. (* Need a finite version of this... Ugh *).
-                              setoid_rewrite F in FSE.
-
-                              rewrite <- F.
-                              apply FSNth_eqv_lift.
-                              apply EQV.
+                              rewrite F in FSE.
                               auto.
-                            - apply FSNth_eqv_lift_inv in FSE.
+                            - apply FSNth_eqv_lift in FSE.
+                              apply EQV in FSE.
+                              apply FSNth_eqv_lift_inv in FSE.
                               destruct FSE as (f_fin & F & FSE).
-
-                              rewrite <- F.
-                              apply FSNth_eqv_lift.
-                              apply EQV.
+                              apply frame_eqv_lift_inv in F.
+                              rewrite F in FSE.
                               auto.
                           Qed.
-
 
                           (* TODO: Move this *)
                           Lemma mem_pop_spec_inf_fin :
@@ -22879,6 +22571,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
                               rewrite <- FSP.
                               apply MemState_refine_prop_frame_stack_preserved in MSR1, MSR2.
+                              Opaque lift_FrameStack.
                               cbn in *. red in MSR1, MSR2.
                               cbn in MSR1, MSR2.
                               unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop in *.
@@ -22890,45 +22583,54 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
                               rewrite FSP, POP.
 
-                              specialize (MSR1 memory_stack_frame_stack0).
-                              destruct MSR1 as [MSR1 _].
-                              forward MSR1; [reflexivity|].
+                              eapply frame_stack_eqv_lift_inf_fin.
+                              eapply MSR2.
 
-                              specialize (MSR2 memory_stack_frame_stack1).
-                              destruct MSR2 as [MSR2 _].
-                              forward MSR2; [reflexivity|].
-                              rewrite <- MSR1.
 
-                              destruct memory_stack_frame_stack.
-                              {
-                                cbn in MSR1.
-                                apply Memory64BitIntptrInfiniteSpec.MMSP.frame_stack_eqv_sing_snoc_inv in MSR1; contradiction.
-                              }
                               rewrite lift_FrameStack_snoc in MSR1.
-                              apply Memory64BitIntptrInfiniteSpec.MMSP.frame_stack_snoc_inv_fs in MSR1.
-                              rewrite <- MSR1.
+                              specialize (MSR1 (InfMemMMSP.Snoc (lift_FrameStack memory_stack_frame_stack) (lift_Frame f0))).
+                              destruct MSR1 as [_ MSR1].
+                              forward MSR1; [reflexivity|].
+                              setoid_rewrite MSR1 in POP_FRAME.
 
-                              unfold Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *.
-                              cbn in *.
-
-                              specialize (POP_FRAME (FinMem.MMEP.MMSP.Snoc memory_stack_frame_stack f1) memory_stack_frame_stack).
-                              forward POP_FRAME; [red; cbn; reflexivity|].
-                              forward POP_FRAME; [red; cbn; reflexivity|].
-                              red in POP_FRAME; cbn in POP_FRAME.
+                              eapply POP_FRAME. reflexivity.
+                              red.
                               eapply frame_stack_eqv_lift.
-                              auto.
+                              rewrite FSP, POP.
+                              reflexivity.
                             - (* mempop_operation_invariants *)
                               destruct INVARIANTS.
                               split; cbn in *.
-                              + eapply fin_inf_preserve_allocation_ids; eauto.
-                              + eapply fin_inf_heap_preserved; eauto.
+                              + eapply inf_fin_preserve_allocation_ids; eauto.
+                              + eapply inf_fin_heap_preserved; eauto.
                           Qed.
-                        eapply MemPropT_fin_inf_bind_ub.
-                        5: apply UB.
-                        all: eauto with FinInf.
 
-                        intros a_fin ms_fin_ma ALLOC.
-                        eapply allocate_dtyp_spec_fin_inf; eauto with FinInf.
+                          (* TODO: Move this *)
+                          Lemma mem_pop_spec_inf_fin_exists :
+                            forall {m_fin_start m_inf_start m_inf_final},
+                              MemState_refine_prop m_inf_start m_fin_start ->
+                              MemoryBigIntptr.MMEP.MemSpec.mempop_spec m_inf_start m_inf_final ->
+                              exists m_fin_final,
+                                Memory64BitIntptr.MMEP.MemSpec.mempop_spec m_fin_start m_fin_final /\
+                                  MemState_refine_prop m_inf_final m_fin_final.
+                          Proof.
+                            intros m_fin_start m_inf_start m_inf_final MSR1 [BYTES_FREED NON_FRAME_BYTES_PRESERVED NON_FRAME_BYTES_READ POP_FRAME INVARIANTS].
+                            destruct m_fin_start as [[ms_fin fss_fin hs_fin] msprovs_fin].
+                            destruct m_inf_start as [[ms_inf fss_inf hs_inf] msprovs_inf].
+                            cbn in *.
+                            eexists.
+                            split.
+                            { split.
+                              all: cbn.
+                            }
+                            destruct m_fin_start.
+                            destruct INVARIANTS.
+                          Qed.
+
+                          eapply mem_pop_spec_inf_fin_exists in CONTRA.
+                          destruct CONTRA as (?&?&?).
+                          eapply NPOPSPEC; eauto.
+                          apply lift_MemState_refine_prop.
                       }
 
                       admit.
