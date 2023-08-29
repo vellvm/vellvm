@@ -15178,6 +15178,62 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     symmetry; auto.
   Qed.
 
+  Lemma root_in_heap_prop_lifted_inf_fin :
+    forall {h_fin ptr_inf ptr_fin},
+      addr_refine ptr_inf ptr_fin ->
+      MemoryBigIntptr.MMEP.MMSP.root_in_heap_prop (lift_Heap h_fin) ptr_inf ->
+      Memory64BitIntptr.MMEP.MMSP.root_in_heap_prop h_fin ptr_fin.
+  Proof.
+    intros h_fin ptr_inf ptr_fin ADDR_REF ROOT.
+    pose proof addr_refine_fin_to_inf_addr ptr_fin.
+    red in H, ADDR_REF.
+    pose proof InfToFinAddrConvert.addr_convert_injective _ _ _ ADDR_REF H.
+    subst.
+    apply root_in_heap_prop_lift_inv in ROOT.
+    destruct ROOT as (?&?&?).
+    rewrite addr_convert_fin_to_inf_addr in H0.
+    inv H0.
+    auto.
+  Qed.
+
+  Lemma root_in_heap_prop_lifted_inf_fin_transitive :
+    forall {h_fin h_inf ptr_inf ptr_fin},
+      InfMem.MMEP.MMSP.heap_eqv h_inf (lift_Heap h_fin) ->
+      addr_refine ptr_inf ptr_fin ->
+      MemoryBigIntptr.MMEP.MMSP.root_in_heap_prop h_inf ptr_inf ->
+      Memory64BitIntptr.MMEP.MMSP.root_in_heap_prop h_fin ptr_fin.
+  Proof.
+    intros h_fin h_inf ptr_inf ptr_fin EQV ADDR_REF ROOT.
+    rewrite EQV in ROOT.
+    eapply root_in_heap_prop_lifted_inf_fin; eauto.
+  Qed.
+
+  Lemma root_in_memstate_heap_inf_fin :
+    forall {ms_inf ms_fin ptr_inf ptr_fin},
+      MemState_refine_prop ms_inf ms_fin ->
+      addr_refine ptr_inf ptr_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.root_in_memstate_heap ms_inf ptr_inf ->
+      Memory64BitIntptr.MMEP.MemSpec.root_in_memstate_heap ms_fin ptr_fin.
+  Proof.
+    intros ms_inf ms_fin ptr_inf ptr_fin MSR ADDR_REF ROOT.
+    destruct ms_inf; destruct ms_memory_stack.
+    destruct ms_fin; destruct ms_memory_stack.
+    apply MemState_refine_prop_heap_preserved in MSR.
+    red; red in MSR; red in ROOT.
+    cbn in *.
+    unfold InfMem.MMEP.MMSP.memory_stack_heap_prop, Memory64BitIntptr.MMEP.MMSP.memory_stack_heap_prop in *; cbn in *.
+
+    intros h H.
+    eapply root_in_heap_prop_lifted_inf_fin_transitive; eauto.
+    2: {
+      eapply ROOT.
+      reflexivity.
+    }
+
+    apply MSR.
+    apply Heap_eqv_lift; auto.
+  Qed.
+
   Lemma ptr_in_memstate_heap_fin_inf :
     forall {ms_inf ms_fin root_inf root_fin ptr_inf ptr_fin},
       MemState_refine_prop ms_inf ms_fin ->
@@ -15290,6 +15346,21 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     split; auto.
     intros h H2.
     rewrite <- H2; auto.
+  Qed.
+
+  Lemma ptr_not_in_memstate_heap_fin_inf :
+    forall {ms_inf : InfMem.MMEP.MMSP.MemState} {ms_fin : FinMem.MMEP.MMSP.MemState}
+      {root_inf : InfAddr.addr} {root_fin : FinAddr.addr} {ptr_inf : InfAddr.addr}
+      {ptr_fin : FinAddr.addr},
+      MemState_refine_prop ms_inf ms_fin ->
+      addr_refine root_inf root_fin ->
+      addr_refine ptr_inf ptr_fin ->
+      ~ Memory64BitIntptr.MMEP.MemSpec.ptr_in_memstate_heap ms_fin root_fin ptr_fin ->
+      ~ MemoryBigIntptr.MMEP.MemSpec.ptr_in_memstate_heap ms_inf root_inf ptr_inf.
+  Proof.
+    intros ms_inf ms_fin root_inf root_fin ptr_inf ptr_fin MSR ADDR_REF1 ADDR_REF2 NPTR.
+    intros PTR.
+    eapply ptr_in_memstate_heap_inf_fin in PTR; eauto.
   Qed.
 
   (* SAZ: Look at this one too *)
@@ -20392,6 +20463,17 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
   #[global] Hint Resolve fin_inf_malloc_bytes_spec_MemPropT_ub : FinInf.
 
+  Lemma convert_MemState_MemState_refine_prop :
+    forall ms_inf ms_fin,
+      convert_MemState ms_inf = NoOom ms_fin ->
+      MemState_refine_prop ms_inf ms_fin.
+  Proof.
+    intros ms_inf ms_fin CONV.
+    red.
+    erewrite lift_MemState_convert_MemState_inverse; eauto.
+    reflexivity.
+  Qed.
+
   (* TODO: Prove this / move this *)
   Lemma inf_fin_free_spec :
     forall {ms_inf_start : InfMem.MMEP.MMSP.MemState}
@@ -20441,26 +20523,107 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     exists ms_fin_final.
     split.
     2: {
-      red.
-      erewrite lift_MemState_convert_MemState_inverse; eauto.
-
-      #[global] Instance MemState_eqv_Reflexive : Reflexive MMEP.MemSpec.preserve_allocation_ids.
-      Proof.
-        red.
-      Qed.
-
-      (* TODO: Move this to where MemState_eqv is defined *)
-      #[global] Instance MemState_eqv_Reflexive  : Reflexive InfMem.MMEP.MemSpec.MemState_eqv.
-      Proof.
-        red.
-        intros x.
-        red.
-        split.
-        reflexivity.
-      Qed.
-
-      reflexivity.
+      apply convert_MemState_MemState_refine_prop; auto.
     }
+
+    split.
+    - (* free_was_root *)
+      eapply root_in_memstate_heap_inf_fin; eauto.
+    - (* free_was_allocated *)
+      destruct free_was_allocated.
+      exists x.
+      eapply inf_fin_byte_allocated; eauto.
+    - (* free_block_allocated *)
+      intros ptr PTR.
+      pose proof PTR as PTR_INF.
+      eapply ptr_in_memstate_heap_fin_inf in PTR_INF; eauto.
+      2: {
+        apply addr_refine_fin_to_inf_addr.
+      }
+      apply free_block_allocated in PTR_INF.
+      destruct PTR_INF as (aid&BYTE_ALLOCATED).
+      exists aid.
+      eapply inf_fin_byte_allocated; eauto.
+      apply addr_refine_fin_to_inf_addr.
+    - (* free_bytes_freed *)
+      intros ptr PTR.
+      pose proof PTR as PTR_INF.
+      eapply ptr_in_memstate_heap_fin_inf in PTR_INF; eauto.
+      2: {
+        apply addr_refine_fin_to_inf_addr.
+      }
+      apply free_bytes_freed in PTR_INF.
+      eapply inf_fin_byte_not_allocated; eauto.
+      apply convert_MemState_MemState_refine_prop; auto.
+      apply addr_refine_fin_to_inf_addr.
+    - (* free_non_block_bytes_preserved *)
+      intros ptr aid NPTR.
+      pose proof NPTR as NPTR_INF.
+      eapply ptr_not_in_memstate_heap_fin_inf in NPTR_INF; eauto.
+      2: apply addr_refine_fin_to_inf_addr.
+      eapply free_non_block_bytes_preserved in NPTR_INF.
+      destruct NPTR_INF as [NPTR_INF1 NPTR_INF2].
+      split; intros ALLOC.
+      + eapply inf_fin_byte_allocated.
+        3: {
+          apply NPTR_INF1.
+          eapply fin_inf_byte_allocated; eauto.
+          apply addr_refine_fin_to_inf_addr.
+        }
+
+        apply convert_MemState_MemState_refine_prop; auto.
+        apply addr_refine_fin_to_inf_addr.
+      + eapply inf_fin_byte_allocated; eauto.
+        2: {
+          apply NPTR_INF2.
+          eapply fin_inf_byte_allocated; eauto.
+          apply convert_MemState_MemState_refine_prop; auto.
+          apply addr_refine_fin_to_inf_addr.
+        }
+
+        apply addr_refine_fin_to_inf_addr.
+    - (* free_non_frame_bytes_read *)
+      intros ptr byte NPTR.
+      pose proof NPTR as NPTR_INF.
+      eapply ptr_not_in_memstate_heap_fin_inf in NPTR_INF; eauto.
+      2: apply addr_refine_fin_to_inf_addr.
+      eapply free_non_frame_bytes_read in NPTR_INF.
+      split; intros READ.
+      + eapply fin_inf_read_byte_spec_exists in READ; eauto.
+        { destruct READ as (?&?&READ&?&?).
+          eapply free_non_frame_bytes_read in READ.
+          - eapply inf_fin_read_byte_spec in READ.
+            + destruct READ as (?&?&?).
+              red in H0, H2.
+              rewrite H0 in H2.
+              inv H2.
+              apply H1.
+            + eapply convert_MemState_MemState_refine_prop; eauto.
+            + apply H.
+          - intros PTR.
+            eapply ptr_in_memstate_heap_inf_fin in PTR; eauto.
+        }
+      + eapply fin_inf_read_byte_spec_exists in READ; eauto.
+        { destruct READ as (?&?&READ&?&?).
+          eapply free_non_frame_bytes_read in READ.
+          - eapply inf_fin_read_byte_spec in READ.
+            + destruct READ as (?&?&?).
+              red in H0, H2.
+              rewrite H0 in H2.
+              inv H2.
+              apply H1.
+            + eauto.
+            + apply H.
+          - intros PTR.
+            eapply ptr_in_memstate_heap_inf_fin in PTR; eauto.
+        }
+
+        eapply convert_MemState_MemState_refine_prop; eauto.
+    - (* free_block *)
+      intros h1 h2 HEAP1 HEAP2.
+      admit.
+    - (* free_operation_invariants *)
+      admit.
   Qed.
 
   
