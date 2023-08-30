@@ -20742,8 +20742,30 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
         eapply convert_MemState_MemState_refine_prop; eauto.
     - (* free_block *)
+      clear - MSR ADDR_REF MS_FIN_FINAL free_block.
       intros h1 h2 HEAP1 HEAP2.
-      admit.
+      red in HEAP1, HEAP2.
+      eapply free_block_prop_inf_fin; eauto.
+      1-2: red; eapply Heap_eqv_lift; eauto.
+
+      apply convert_MemState_MemState_refine_prop in MS_FIN_FINAL.
+      destruct ms_fin_start as [[ms_fin fss_fin hs_fin] msprovs_fin].
+      destruct ms_inf_start as [[ms_inf fss_inf hs_inf] msprovs_inf].
+      destruct ms_fin_final as [[ms_fin' fss_fin' hs_fin'] msprovs_fin'].
+      destruct ms_inf_final as [[ms_inf' fss_inf' hs_inf'] msprovs_inf'].
+
+
+      eapply free_block; red; cbn in *.
+      { apply MemState_refine_prop_heap_preserved in MSR.
+        apply MSR.
+        cbn; red; cbn.
+        reflexivity.
+      }
+      { apply MemState_refine_prop_heap_preserved in MS_FIN_FINAL.
+        apply MS_FIN_FINAL.
+        cbn; red; cbn.
+        reflexivity.
+      }
     - (* free_operation_invariants *)
       admit.
   Qed.
