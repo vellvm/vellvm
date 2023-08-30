@@ -463,13 +463,8 @@ Module InfiniteToFinite.
              apply HR.
   Qed.
 
-  Definition convert_Frame (f : InfMemMMSP.Frame) : OOM (FinMemMMSP.Frame).
-    induction f.
-    - exact (ret []).
-    - refine (a' <- InfToFinAddrConvert.addr_convert a;;
-              f' <- IHf;;
-              ret (a' :: f')).
-  Defined.
+  Definition convert_Frame (f : InfMemMMSP.Frame) : OOM (FinMemMMSP.Frame) :=
+    map_monad InfToFinAddrConvert.addr_convert f.
 
   Definition lift_Frame (f : FinMemMMSP.Frame) : InfMemMMSP.Frame :=
     map fin_to_inf_addr f.
@@ -20829,7 +20824,118 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       }
 
       { (* convert_FrameStack OOM *)
-        admit.
+        (* Must be an address in one of the frames that does not
+           convert... Frames are preserved, though.
+         *)
+
+        destruct free_invariants.
+        clear - MSR ADDR_REF Heqo free_frame_stack_preserved.
+        apply MemState_refine_prop_frame_stack_preserved in MSR.
+        cbn in *.
+        red in MSR, free_frame_stack_preserved.
+        unfold MemoryBigIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *.
+        cbn in *.
+
+        specialize (MSR fss_inf).
+        destruct MSR as [MSR _]; forward MSR; [reflexivity|].
+
+        specialize (free_frame_stack_preserved fss_inf).
+        destruct free_frame_stack_preserved as [FSP _]; forward FSP; [reflexivity|].
+        rewrite <- MSR in FSP.
+
+        symmetry in FSP.
+        generalize dependent fss_inf.
+        generalize dependent fss_inf'.
+        induction fss_fin; intros fss_inf' FSP Heqo fss_inf MSR.
+        - cbn in FSP.
+          apply InfMemMMSP.frame_stack_inv in FSP.
+          destruct FSP as [CONTRA | FSP].
+          { destruct CONTRA as (?&?&?&?&?&?&?).
+            inv H.
+          }
+
+          destruct FSP as (f1&f2&F&F2&EQV).
+          subst.
+          inv F.
+
+          cbn in Heqo.
+          break_match_hyp_inv.
+
+          unfold convert_Frame in Heqo0.
+          apply map_monad_OOM_fail in Heqo0.
+          destruct Heqo0 as (bad_addr&IN_BLOCK&BAD_CONV).
+          red in EQV.
+          unfold InfMemMMSP.ptr_in_frame_prop in EQV.
+          eapply in_map in IN_BLOCK.
+          eapply EQV in IN_BLOCK.
+          unfold lift_Frame in IN_BLOCK.
+          apply in_map_iff in IN_BLOCK.
+          destruct IN_BLOCK as (?&?&?).
+          apply in_map_iff in H0.
+          destruct H0 as (?&?&?).
+          subst.
+          pose proof fin_to_inf_addr_ptr_to_int x0.
+          rewrite H in H0.
+          unfold InfToFinAddrConvert.addr_convert in BAD_CONV.
+          destruct bad_addr.
+          destruct x0.
+          pose proof LLVMParams64BitIntptr.ITOP.int_to_ptr_ptr_to_int (i0, p0) p0.
+          forward H2; cbn; auto.
+          cbn in *.
+          rewrite <- H0 in H2.
+          eapply int_to_ptr_succeeds_regardless_of_provenance in H2 as (?&?).
+          rewrite BAD_CONV in H2.
+          inv H2.
+        - rewrite lift_FrameStack_snoc in MSR.
+          apply InfMemMMSP.frame_stack_inv in FSP.
+          destruct FSP as [FSP | CONTRA].
+          2: {
+            destruct CONTRA as (?&?&?&?).
+            inv H.
+          }
+
+          destruct FSP as (fs1'&fs2'&f1&f2&SNOC&SNOC'&FSEQV&FEQV).
+          subst.
+
+          rewrite lift_FrameStack_snoc in SNOC.
+          inv SNOC.
+
+          rewrite convert_FrameStack_Snoc_equation in Heqo.
+          cbn in Heqo.
+          repeat break_match_hyp_inv.
+
+          { (* First frame converts *)
+            specialize (IHfss_fin fs2' FSEQV Heqo (lift_FrameStack fss_fin)).
+            eapply IHfss_fin; reflexivity.
+          }
+
+          { (* First frame OOMs *)
+            unfold convert_Frame in Heqo0.
+            apply map_monad_OOM_fail in Heqo0.
+            destruct Heqo0 as (bad_addr&IN_BLOCK&BAD_CONV).
+            red in FEQV.
+            unfold InfMemMMSP.ptr_in_frame_prop in FEQV.
+            eapply in_map in IN_BLOCK.
+            eapply FEQV in IN_BLOCK.
+            unfold lift_Frame in IN_BLOCK.
+            apply in_map_iff in IN_BLOCK.
+            destruct IN_BLOCK as (?&?&?).
+            apply in_map_iff in H0.
+            destruct H0 as (?&?&?).
+            subst.
+            pose proof fin_to_inf_addr_ptr_to_int x0.
+            rewrite H in H0.
+            unfold InfToFinAddrConvert.addr_convert in BAD_CONV.
+            destruct bad_addr.
+            destruct x0.
+            pose proof LLVMParams64BitIntptr.ITOP.int_to_ptr_ptr_to_int (i0, p0) p0.
+            forward H2; cbn; auto.
+            cbn in *.
+            rewrite <- H0 in H2.
+            eapply int_to_ptr_succeeds_regardless_of_provenance in H2 as (?&?).
+            rewrite BAD_CONV in H2.
+            inv H2.            
+          }
       }
 
       { (* convert_memory OOM *)
