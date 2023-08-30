@@ -6396,6 +6396,60 @@ cofix CIH
   Qed.
 
   (* TODO: Move this *)
+  Lemma addr_convert_fin_to_inf_addr :
+    forall addr_fin,
+      InfToFinAddrConvert.addr_convert (fin_to_inf_addr addr_fin) = NoOom addr_fin.
+  Proof.
+    intros addr_fin.
+    unfold fin_to_inf_addr in *.
+    destruct (FinToInfAddrConvertSafe.addr_convert_succeeds addr_fin).
+    apply FinToInfAddrConvertSafe.addr_convert_safe in e.
+    auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma addr_refine_fin_to_inf_addr :
+    forall addr_fin,
+      addr_refine (fin_to_inf_addr addr_fin) addr_fin.
+  Proof.
+    intros addr_fin.
+    red. unfold fin_to_inf_addr.
+    break_match_goal.
+    clear Heqs.
+    apply FinToInfAddrConvertSafe.addr_convert_safe in e.
+    auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma frame_eqv_lift_inv :
+    forall f1 f2,
+      InfMem.MMEP.MMSP.frame_eqv (lift_Frame f1) (lift_Frame f2) ->
+      FinMem.MMEP.MMSP.frame_eqv f1 f2.
+  Proof.
+    intros f1 f2 EQV.
+    red in EQV; red.
+
+    intros ptr.
+    split; intros IN.
+    - apply ptr_in_frame_prop_lift in IN.
+      apply EQV in IN.
+      apply ptr_in_frame_prop_lift_inv in IN.
+      destruct IN as (ptr_fin & CONV & IN).
+      pose proof addr_convert_fin_to_inf_addr ptr as CONV'.
+      rewrite CONV in CONV'.
+      inv CONV'.
+      auto.
+    - apply ptr_in_frame_prop_lift in IN.
+      apply EQV in IN.
+      apply ptr_in_frame_prop_lift_inv in IN.
+      destruct IN as (ptr_fin & CONV & IN).
+      pose proof addr_convert_fin_to_inf_addr ptr as CONV'.
+      rewrite CONV in CONV'.
+      inv CONV'.
+      auto.
+  Qed.
+
+  (* TODO: Move this *)
   Lemma FSNth_eqv_lift :
     forall n fs f,
       FinMem.MMEP.MMSP.FSNth_eqv fs n f ->
@@ -9244,17 +9298,6 @@ cofix CIH
       auto.
   Qed.
 
-  Lemma addr_convert_fin_to_inf_addr :
-    forall addr_fin,
-      InfToFinAddrConvert.addr_convert (fin_to_inf_addr addr_fin) = NoOom addr_fin.
-  Proof.
-    intros addr_fin.
-    unfold fin_to_inf_addr in *.
-    destruct (FinToInfAddrConvertSafe.addr_convert_succeeds addr_fin).
-    apply FinToInfAddrConvertSafe.addr_convert_safe in e.
-    auto.
-  Qed.
-
   Lemma fin_inf_byte_allocated_MemPropT_exists :
     forall addr_fin ms_fin ms_inf aid,
       MemState_refine_prop ms_inf ms_fin ->
@@ -11942,6 +11985,53 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       reflexivity.
   Qed.
 
+  Lemma inf_fin_frame_stack_preserved :
+    forall ms_fin ms_inf ms_fin' ms_inf',
+      MemState_refine_prop ms_inf ms_fin ->
+      MemState_refine_prop ms_inf' ms_fin' ->
+      MemoryBigIntptr.MMEP.MemSpec.frame_stack_preserved ms_inf ms_inf' ->
+      Memory64BitIntptr.MMEP.MemSpec.frame_stack_preserved ms_fin ms_fin'.
+  Proof.
+    intros ms_fin ms_inf ms_fin' ms_inf' REF REF' FSP_INF.
+
+    apply MemState_refine_prop_frame_stack_preserved in REF, REF'.
+    red in REF, REF', FSP_INF.
+    red.
+
+    intros fs.
+    split; intros FSP_FIN.
+    - red. red in FSP_FIN.
+      rewrite <- FSP_FIN.
+      apply REF.
+      red.
+      symmetry.
+      apply REF.
+
+      pose proof frame_stack_preserved_lift_MemState ms_fin ms_fin'.
+      forward H; auto.
+      red in H.
+      apply H.
+
+      destruct ms_fin', ms_memory_stack; cbn.
+      red. cbn.
+      reflexivity.
+    - red. red in FSP_FIN.
+      rewrite <- FSP_FIN.
+      apply REF.
+      red.
+      symmetry.
+      apply REF'.
+
+      pose proof frame_stack_preserved_lift_MemState ms_fin ms_fin'.
+      forward H; auto.
+      red in H.
+      apply H.
+
+      destruct ms_fin, ms_memory_stack; cbn.
+      red. cbn.
+      reflexivity.
+  Qed.
+
   (* TODO: Move this *)
   Lemma convert_FrameStack_Snoc_equation :
     forall fs f,
@@ -14109,18 +14199,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Qed.
 
   #[global] Hint Resolve find_free_block_fin_inf : FinInf.
-
-  Lemma addr_refine_fin_to_inf_addr :
-    forall addr_fin,
-      addr_refine (fin_to_inf_addr addr_fin) addr_fin.
-  Proof.
-    intros addr_fin.
-    red. unfold fin_to_inf_addr.
-    break_match_goal.
-    clear Heqs.
-    apply FinToInfAddrConvertSafe.addr_convert_safe in e.
-    auto.
-  Qed.
 
   (* TODO: Move this *)
   Lemma MemState_refine_prop_preserve_allocation_ids :
@@ -20610,7 +20688,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Proof.
     intros ms_inf_start ms_inf_final ms_fin_start ptr_fin ptr_inf MSR ADDR_REF FREE_SPEC.
     destruct FREE_SPEC.
-    destruct free_invariants.
 
     (* How do I get an appropriate MemState for this?
 
@@ -20767,6 +20844,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         reflexivity.
       }
     - (* free_operation_invariants *)
+      clear - MSR ADDR_REF MS_FIN_FINAL free_invariants.
+      apply convert_MemState_MemState_refine_prop in MS_FIN_FINAL.
+      destruct free_invariants.
+      split.
+      + eapply inf_fin_preserve_allocation_ids; eauto.
+      + eapply inf_fin_fra
       admit.
   Qed.
 
