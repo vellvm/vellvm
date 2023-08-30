@@ -12018,37 +12018,34 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     red in REF, REF', FSP_INF.
     red.
 
+    destruct ms_fin as [[ms_fin fss_fin hs_fin] msprovs_fin].
+    destruct ms_inf as [[ms_inf fss_inf hs_inf] msprovs_inf].
+    destruct ms_fin' as [[ms_fin' fss_fin' hs_fin'] msprovs_fin'].
+    destruct ms_inf' as [[ms_inf' fss_inf' hs_inf'] msprovs_inf'].
+
     intros fs.
     split; intros FSP_FIN.
     - red. red in FSP_FIN.
+      cbn in *.
+      unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop in *.
+      cbn in *.
       rewrite <- FSP_FIN.
-      apply REF.
-      red.
+      apply frame_stack_eqv_lift_inf_fin.
+      apply REF'.
       symmetry.
       apply REF.
-
-      pose proof frame_stack_preserved_lift_MemState ms_fin ms_fin'.
-      forward H; auto.
-      red in H.
-      apply H.
-
-      destruct ms_fin', ms_memory_stack; cbn.
-      red. cbn.
+      apply FSP_INF.
       reflexivity.
     - red. red in FSP_FIN.
+      cbn in *.
+      unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop in *.
+      cbn in *.
       rewrite <- FSP_FIN.
+      apply frame_stack_eqv_lift_inf_fin.
       apply REF.
-      red.
       symmetry.
       apply REF'.
-
-      pose proof frame_stack_preserved_lift_MemState ms_fin ms_fin'.
-      forward H; auto.
-      red in H.
-      apply H.
-
-      destruct ms_fin, ms_memory_stack; cbn.
-      red. cbn.
+      apply FSP_INF.
       reflexivity.
   Qed.
 
@@ -20850,7 +20847,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       destruct ms_inf_start as [[ms_inf fss_inf hs_inf] msprovs_inf].
       destruct ms_fin_final as [[ms_fin' fss_fin' hs_fin'] msprovs_fin'].
       destruct ms_inf_final as [[ms_inf' fss_inf' hs_inf'] msprovs_inf'].
-
 
       eapply free_block; red; cbn in *.
       { apply MemState_refine_prop_heap_preserved in MSR.
