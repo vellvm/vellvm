@@ -20733,7 +20733,108 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     destruct (convert_MemState ms_inf_final) as [ms_fin_final | ] eqn:MS_FIN_FINAL.
     2: {
       exfalso.
-      admit.
+
+      destruct ms_fin_start as [[ms_fin fss_fin hs_fin] msprovs_fin].
+      destruct ms_inf_start as [[ms_inf fss_inf hs_inf] msprovs_inf].
+      destruct ms_inf_final as [[ms_inf' fss_inf' hs_inf'] msprovs_inf'].
+
+      unfold convert_MemState in MS_FIN_FINAL.
+      cbn in MS_FIN_FINAL.
+      repeat break_match_hyp_inv.
+      { (* convert_Heap OOM *)
+        (* Block failed to convert, which means there's an out of
+           bounds address in the block... *)
+        apply map_monad_OOM_fail in Heqo2.
+        destruct Heqo2 as ((root&block)&?&?).
+        break_match_hyp_inv.
+
+        apply map_monad_OOM_fail in Heqo0.
+        destruct Heqo0 as (bad_addr&IN_BLOCK&BAD_CONV).
+
+        (* Where did this bad_addr come from?
+
+           There should be a contradiction within free_block's
+           free_block_prop...
+         *)
+
+        clear - MSR ADDR_REF IN_BLOCK BAD_CONV H free_block.
+        apply MemState_refine_prop_heap_preserved in MSR.
+        cbn in *.
+        red in MSR.
+        unfold MemoryBigIntptr.MMEP.MMSP.memory_stack_heap_prop in *.
+        cbn in *.
+
+        specialize (free_block hs_inf hs_inf').
+        repeat (forward free_block; [reflexivity|]).
+        destruct free_block.
+
+      (* Need to know if root is disjoint from ptr_inf or not...
+
+         ptr_inf is the pointer being freed.
+
+         - If root is not disjoint then free_block_root_freed might be
+           a contradiction.
+         - If root is disjoint then it should exist in hs_inf already,
+           which should lead to a contradiction with free_block_disjoint_preserved.
+       *)
+
+        pose proof (Z.eq_dec (LLVMParamsBigIntptr.PTOI.ptr_to_int ptr_inf) root) as [NDISJOINT | DISJOINT].
+        { (* Not disjoint *)
+          red in ADDR_REF.
+          eapply free_block_root_freed.
+          red.
+          rewrite NDISJOINT.
+          eapply SetoidList.In_InA in H.
+          eapply IntMaps.IP.F.elements_mapsto_iff in H.
+          2: typeclasses eauto.
+          eapply IntMaps.IP.F.find_mapsto_iff in H.
+          eapply IntMaps.lookup_member.
+          unfold IntMaps.lookup.
+          rewrite H.
+          reflexivity.
+        }
+
+        { (* Disjoint *)
+          pose proof InfITOP_BIG.int_to_ptr_safe root InfPROV.nil_prov.
+          break_match_hyp_inv.
+          rename a into root_ptr.
+          pose proof InfITOP.ptr_to_int_int_to_ptr _ _ _ Heqo as ROOT.
+
+          specialize (free_block_disjoint_preserved bad_addr root_ptr).
+          forward free_block_disjoint_preserved.
+          { red.
+            lia.
+          }
+
+          assert (MemoryBigIntptr.MMEP.MMSP.ptr_in_heap_prop hs_inf' root_ptr bad_addr) as IN_HEAP.
+          { red.
+            eapply SetoidList.In_InA in H.
+            eapply IntMaps.IP.F.elements_mapsto_iff in H.
+            2: typeclasses eauto.
+            eapply IntMaps.IP.F.find_mapsto_iff in H.
+            subst.
+            rewrite H.
+            eapply in_map; eauto.
+          }
+
+          apply free_block_disjoint_preserved in IN_HEAP.
+          specialize (MSR hs_inf).
+          destruct MSR as [MSR _]; forward MSR; [reflexivity|].
+          rewrite <- MSR in IN_HEAP.
+          eapply ptr_in_heap_prop_lift_inv in IN_HEAP.
+          destruct IN_HEAP as (?&?&?&CONV&?).
+          rewrite BAD_CONV in CONV.
+          inv CONV.
+        }
+      }
+
+      { (* convert_FrameStack OOM *)
+        admit.
+      }
+
+      { (* convert_memory OOM *)
+        admit.
+      }
     }
 
     exists ms_fin_final.
@@ -20865,10 +20966,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       destruct free_invariants.
       split.
       + eapply inf_fin_preserve_allocation_ids; eauto.
-      + eapply inf_fin_fra
-      admit.
+      + eapply inf_fin_frame_stack_preserved; eauto.
   Qed.
-
   
 
   Lemma model_E1E2_23_orutt_strict :
