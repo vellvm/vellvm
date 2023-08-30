@@ -6354,23 +6354,20 @@ cofix CIH
   Qed.
 
 
-  (* TODO: Move this *)
-  Lemma frame_stack_eqv_lift_inv :
-    forall fs1 fs2,
-      InfMem.MMEP.MMSP.frame_stack_eqv fs1 fs2 ->
-      exists fs1_fin fs2_fin,
-        fs1 = lift_FrameStack fs1_fin /\
-          fs2 = lift_FrameStack fs2_fin /\
-          FinMem.MMEP.MMSP.frame_stack_eqv fs1_fin fs2_fin.
-  Proof.
-    unfold InfMem.MMEP.MMSP.frame_stack_eqv.
-    induction fs1.
-    - destruct fs2; intros.
-      + specialize (H f).
-
-
-  Admitted.
-
+  (* (* TODO: Move this *) *)
+  (* Lemma frame_stack_eqv_lift_inv : *)
+  (*   forall fs1 fs2, *)
+  (*     InfMem.MMEP.MMSP.frame_stack_eqv fs1 fs2 -> *)
+  (*     exists fs1_fin fs2_fin, *)
+  (*       fs1 = lift_FrameStack fs1_fin /\ *)
+  (*         fs2 = lift_FrameStack fs2_fin /\ *)
+  (*         FinMem.MMEP.MMSP.frame_stack_eqv fs1_fin fs2_fin. *)
+  (* Proof. *)
+  (*   unfold InfMem.MMEP.MMSP.frame_stack_eqv. *)
+  (*   induction fs1. *)
+  (*   - destruct fs2; intros. *)
+  (*     + specialize (H f). *)
+  (* Admitted. *)
 
   (* TODO: Move this *)
   Lemma frame_eqv_lift :
@@ -6514,8 +6511,31 @@ cofix CIH
       auto.
   Qed.
 
-
-
+  (* TODO: Move this *)
+  Lemma frame_stack_eqv_lift_inf_fin :
+    forall fs1 fs2,
+      InfMem.MMEP.MMSP.frame_stack_eqv (lift_FrameStack fs1) (lift_FrameStack fs2) ->
+      FinMem.MMEP.MMSP.frame_stack_eqv fs1 fs2.
+  Proof.
+    intros fs1 fs2 EQV.
+    red in *.
+    intros f n.
+    split; intros FSE.
+    - apply FSNth_eqv_lift in FSE.
+      apply EQV in FSE.
+      apply FSNth_eqv_lift_inv in FSE.      
+      destruct FSE as (f_fin & F & FSE).
+      apply frame_eqv_lift_inv in F.
+      rewrite <- F.
+      auto.
+    - apply FSNth_eqv_lift in FSE.
+      apply EQV in FSE.
+      apply FSNth_eqv_lift_inv in FSE.      
+      destruct FSE as (f_fin & F & FSE).
+      apply frame_eqv_lift_inv in F.
+      rewrite <- F.
+      auto.
+  Qed.
 
   Lemma get_inf_tree_equation :
     forall t_fin2,
