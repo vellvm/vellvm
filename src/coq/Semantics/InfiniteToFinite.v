@@ -20939,6 +20939,147 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       }
 
       { (* convert_memory OOM *)
+        unfold MemoryBigIntptr.MMEP.MemSpec.ptr_in_memstate_heap in *.
+        unfold MemoryBigIntptr.MMEP.MMSP.memory_stack_heap_prop in *.
+        cbn in free_bytes_freed.
+        eapply MemState_refine_prop_allocations_preserved in MSR.
+        red in MSR.
+
+        apply map_monad_OOM_fail in Heqo.
+        destruct Heqo as (bad_byte&IN_BLOCK&BAD_CONV).
+        destruct bad_byte.
+        break_match_hyp_inv.
+        2: {
+          destruct m.
+          assert (MemoryBigIntptr.MMEP.MemSpec.byte_allocated
+                    {|
+                      InfMemMMSP.ms_memory_stack :=
+                        {|
+                          InfMemMMSP.memory_stack_memory := ms_inf';
+                          InfMemMMSP.memory_stack_frame_stack := fss_inf';
+                          InfMemMMSP.memory_stack_heap := hs_inf'
+                        |};
+                      InfMemMMSP.ms_provenance := msprovs_inf'
+                    |} (k, PROV.nil_prov) a).
+          { cbn.
+            do 2 eexists.
+            cbn.
+            repeat split; auto.
+            2: {
+              intros ms' x H.
+              cbn in *.
+              inv H.
+              cbn.
+              reflexivity.
+            }
+            cbn.
+            do 2 eexists.
+            split; eauto.
+            cbn.
+            Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+            unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+            Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+            eapply SetoidList.In_InA in IN_BLOCK.
+            eapply IntMaps.IP.F.elements_mapsto_iff in IN_BLOCK.
+            2: typeclasses eauto.
+            eapply IntMaps.IP.F.find_mapsto_iff in IN_BLOCK.
+            rewrite IN_BLOCK.
+            split; auto.
+            apply InfPROV.aid_eq_dec_refl.
+          }
+
+          (* TODO: Move. Should apply to fin / inf *)
+          Lemma ptr_in_heap_prop_dec :
+            forall h root ptr,
+              {MemoryBigIntptr.MMEP.MMSP.ptr_in_heap_prop h root ptr} + {~ MemoryBigIntptr.MMEP.MMSP.ptr_in_heap_prop h root ptr}.
+          Proof.
+            intros h root ptr.
+            unfold MemoryBigIntptr.MMEP.MMSP.ptr_in_heap_prop.
+            destruct (IntMaps.IM.find (elt:=MemoryBigIntptr.MMEP.MMSP.Block) (LLVMParamsBigIntptr.PTOI.ptr_to_int root) h) eqn:FIND; eauto.
+            eapply in_dec.
+            eapply Z.eq_dec.
+          Qed.
+
+
+          (* Need to know if k is in the freed block or not *)
+          pose proof (ptr_in_heap_prop_dec hs_inf ptr_inf (k, PROV.nil_prov)) as [IN_HEAP | NIN_HEAP].
+          { (* k is in freed block *)
+            eapply free_bytes_freed.
+            intros h H0.
+            rewrite <- H0.
+            apply IN_HEAP.
+            eauto.
+          }
+
+          (* k is not in the freed block *)
+          pose proof H as ALLOC.
+          apply free_non_block_bytes_preserved in ALLOC.
+          2: {
+            intros CONTRA.
+            cbn in CONTRA.
+            specialize (CONTRA hs_inf).
+            forward CONTRA; [reflexivity|].
+
+            red in CONTRA.
+            break_match_hyp; auto.
+            apply in_map_iff in CONTRA.
+            destruct CONTRA as (?&?&?).
+            cbn in H1.
+
+            eapply NIN_HEAP.
+            red.
+            rewrite Heqo0.
+            cbn.
+            rewrite <- H1.
+            eapply in_map; eauto.            
+          }
+
+          (* k was allocated in the original finite memory, which
+             should mean it must be in bounds. *)
+          apply MSR in ALLOC.
+          rename Heqo into CONTRA.
+          move CONTRA before ALLOC.
+
+          red in ALLOC.
+          apply MemPropT_bind_ret_inv in ALLOC.
+          destruct ALLOC as (?&?&ALLOC&ASSERT).
+          cbn in ALLOC.
+          red in ALLOC.
+          cbn in ALLOC.
+          destruct ALLOC as (?&?).
+          destruct H0 as (?&?&?&?).
+          destruct H0; subst.
+          destruct ASSERT; subst.
+          cbn in H2.
+          break_match_hyp.
+          2: {
+            destruct H2.
+            inv H2.
+          }
+
+          destruct m.
+          destruct H2.
+          inv H0.
+
+          Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+          unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw in Heqo.
+          Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+          unfold lift_memory in Heqo.
+          rewrite IntMaps.IP.F.map_o in Heqo.
+          unfold option_map in Heqo.
+          break_match_hyp_inv.
+
+          (* TODO: Need to know ms_fin only has in bounds addresses *)
+          admit.
+        }
+
+        break_match_hyp_inv.
+        destruct m.
+        cbn in Heqo0.
+        break_match_hyp_inv.
+        unfold convert_SByte in Heqo1.
+        repeat break_match_hyp_inv.
+        admit.
         admit.
       }
     }
