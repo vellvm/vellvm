@@ -182,7 +182,7 @@ Module InfiniteToFinite.
   Defined.
 
   (* SAZ: These seem like the basic inversion properties - but things are too opaque? *)
-  Lemma fin_to_inf_conbert_dvalue_inversion :
+  Lemma fin_to_inf_convert_dvalue_inversion :
     forall {dv_inf dv_fin},
       DVC1.dvalue_convert_strict dv_inf = NoOom dv_fin ->
       fin_to_inf_dvalue dv_fin = dv_inf.
@@ -13494,6 +13494,23 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     }
   Qed.
 
+  Lemma fin_inf_ptr_not_in_current_frame :
+    forall {ms_inf ms_fin ptr_inf ptr_fin},
+      MemState_refine_prop ms_inf ms_fin ->
+      FinToInfAddrConvert.addr_convert ptr_fin = NoOom ptr_inf ->
+      ~ Memory64BitIntptr.MMEP.MemSpec.ptr_in_current_frame ms_fin ptr_fin ->
+      ~ MemoryBigIntptr.MMEP.MemSpec.ptr_in_current_frame ms_inf ptr_inf.
+  Proof.
+    intros ms_inf ms_fin ptr_inf ptr_fin MSR ADDR_CONV PTR_NIN_FRAME PTR_IN_FRAME.
+    eapply PTR_NIN_FRAME.
+    eapply fin_inf_ptr_in_current_frame in PTR_IN_FRAME; eauto.
+    destruct PTR_IN_FRAME as (?&?&?).
+    pose proof FinToInfAddrConvertSafe.addr_convert_safe _ _ ADDR_CONV.
+    rewrite H in H1.
+    inv H1.
+    auto.
+  Qed.
+
   Lemma inf_fin_ptr_not_in_current_frame :
     forall {ms_inf ms_fin ptr_inf ptr_fin},
       MemState_refine_prop ms_inf ms_fin ->
@@ -13652,6 +13669,516 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       split; cbn in *.
       + eapply fin_inf_preserve_allocation_ids; eauto.
       + eapply fin_inf_heap_preserved; eauto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma mem_pop_spec_inf_fin :
+    forall {m_fin_start m_fin_final m_inf_start m_inf_final},
+      MemState_refine_prop m_inf_start m_fin_start ->
+      MemState_refine_prop m_inf_final m_fin_final ->
+      MemoryBigIntptr.MMEP.MemSpec.mempop_spec m_inf_start m_inf_final ->
+      Memory64BitIntptr.MMEP.MemSpec.mempop_spec m_fin_start m_fin_final.
+  Proof.
+    intros m_fin_start m_fin_final m_inf_start m_inf_final MSR1 MSR2 [BYTES_FREED NON_FRAME_BYTES_PRESERVED NON_FRAME_BYTES_READ POP_FRAME INVARIANTS].
+
+    split.
+    - (* Bytes freed *)
+      clear NON_FRAME_BYTES_PRESERVED NON_FRAME_BYTES_READ POP_FRAME INVARIANTS.
+      cbn in *.
+      intros ptr PTR.
+
+      (* ptr is in the current frame, which has a finite refinement,
+         so there should be a finite version of ptr as well *)
+      pose proof inf_fin_ptr_in_current_frame MSR1 PTR as (ptr_fin&PTR_CONV&PTR_FIN).
+      eapply inf_fin_byte_not_allocated; eauto.
+    - (* NON_FRAME_BYTES_PRESERVED *)
+      clear - MSR1 MSR2 NON_FRAME_BYTES_PRESERVED.
+      intros ptr aid PTR.
+
+      pose proof (FinToInfAddrConvertSafe.addr_convert_succeeds ptr) as (ptr_inf & PTR_CONV).
+      eapply fin_inf_ptr_not_in_current_frame in PTR; eauto.
+      specialize (NON_FRAME_BYTES_PRESERVED ptr_inf aid PTR).
+      pose proof FinToInfAddrConvertSafe.addr_convert_safe _ _ PTR_CONV as PTR_CONV'.
+
+      split; intros BYTE_ALLOCATED.
+      + eapply fin_inf_byte_allocated in BYTE_ALLOCATED; eauto.
+        apply NON_FRAME_BYTES_PRESERVED in BYTE_ALLOCATED.
+        eapply inf_fin_byte_allocated; eauto.
+      + eapply fin_inf_byte_allocated in BYTE_ALLOCATED; eauto.
+        apply NON_FRAME_BYTES_PRESERVED in BYTE_ALLOCATED.
+        eapply inf_fin_byte_allocated; eauto.
+    - (* NON_FRAME_BYTES_READ *)
+      clear - MSR1 MSR2 NON_FRAME_BYTES_READ.
+      intros ptr byte PTR.
+
+      pose proof (FinToInfAddrConvertSafe.addr_convert_succeeds ptr) as (ptr_inf & PTR_CONV).
+      pose proof FinToInfAddrConvertSafe.addr_convert_safe _ _ PTR_CONV as PTR_CONV'.
+      eapply fin_inf_ptr_not_in_current_frame in PTR; eauto.
+
+      split; intros READ.
+      + pose proof fin_inf_read_byte_spec_exists MSR1 READ as [addr_inf [byte_inf [READ_INF [ADDR_REF BYTE_REF]]]].
+        red in BYTE_REF.
+        red in ADDR_REF.
+        pose proof InfToFinAddrConvert.addr_convert_injective _ _ _ ADDR_REF PTR_CONV'.
+        subst.
+
+        specialize (NON_FRAME_BYTES_READ ptr_inf byte_inf PTR).
+        eapply NON_FRAME_BYTES_READ in READ_INF.
+        eapply inf_fin_read_byte_spec in READ_INF; eauto.
+        destruct READ_INF as (?&?&?).
+        red in H0.
+        rewrite BYTE_REF in H0; inv H0.
+        auto.
+      + pose proof fin_inf_read_byte_spec_exists MSR2 READ as [addr_inf [byte_inf [READ_INF [ADDR_REF BYTE_REF]]]].
+        red in BYTE_REF.
+        red in ADDR_REF.
+        pose proof InfToFinAddrConvert.addr_convert_injective _ _ _ ADDR_REF PTR_CONV'.
+        subst.
+
+        specialize (NON_FRAME_BYTES_READ ptr_inf byte_inf PTR).
+        eapply NON_FRAME_BYTES_READ in READ_INF.
+        eapply inf_fin_read_byte_spec in READ_INF; eauto.
+        destruct READ_INF as (?&?&?).
+        red in H0.
+        rewrite BYTE_REF in H0; inv H0.
+        auto.
+    - (* POP_FRAME *)
+      clear - MSR1 MSR2 POP_FRAME. 
+      intros fs1 fs2 FSP POP.
+
+      red; red in FSP.
+      cbn in *.
+
+      red in POP.
+      destruct fs1; try contradiction.
+      rewrite <- POP.
+
+      destruct m_fin_start. destruct ms_memory_stack.
+      destruct m_inf_start. destruct ms_memory_stack.
+      cbn in *.
+      destruct memory_stack_frame_stack.
+      apply Memory64BitIntptr.MMEP.MMSP.frame_stack_eqv_sing_snoc_inv in FSP; contradiction.
+      pose proof FSP as F.
+      apply Memory64BitIntptr.MMEP.MMSP.frame_stack_snoc_inv_fs in FSP.
+      apply Memory64BitIntptr.MMEP.MMSP.frame_stack_snoc_inv_f in F.
+
+      rewrite <- FSP.
+      apply MemState_refine_prop_frame_stack_preserved in MSR1, MSR2.
+      Opaque lift_FrameStack.
+      cbn in *. red in MSR1, MSR2.
+      cbn in MSR1, MSR2.
+      unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop in *.
+      cbn in *.
+
+      destruct m_inf_final. destruct ms_memory_stack.
+      destruct m_fin_final. destruct ms_memory_stack.
+      cbn in *.
+
+      rewrite FSP, POP.
+
+      eapply frame_stack_eqv_lift_inf_fin.
+      eapply MSR2.
+
+
+      rewrite lift_FrameStack_snoc in MSR1.
+      specialize (MSR1 (InfMemMMSP.Snoc (lift_FrameStack memory_stack_frame_stack) (lift_Frame f0))).
+      destruct MSR1 as [_ MSR1].
+      forward MSR1; [reflexivity|].
+      setoid_rewrite MSR1 in POP_FRAME.
+
+      eapply POP_FRAME. reflexivity.
+      red.
+      eapply frame_stack_eqv_lift.
+      rewrite FSP, POP.
+      reflexivity.
+    - (* mempop_operation_invariants *)
+      destruct INVARIANTS.
+      split; cbn in *.
+      + eapply inf_fin_preserve_allocation_ids; eauto.
+      + eapply inf_fin_heap_preserved; eauto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma mem_pop_spec_inf_fin_exists :
+    forall {m_fin_start m_inf_start m_inf_final},
+      MemState_refine_prop m_inf_start m_fin_start ->
+      MemoryBigIntptr.MMEP.MemSpec.mempop_spec m_inf_start m_inf_final ->
+      exists m_fin_final,
+        Memory64BitIntptr.MMEP.MemSpec.mempop_spec m_fin_start m_fin_final /\
+          MemState_refine_prop m_inf_final m_fin_final.
+  Proof.
+    intros m_fin_start m_inf_start m_inf_final MSR [BYTES_FREED NON_FRAME_BYTES_PRESERVED NON_FRAME_BYTES_READ POP_FRAME INVARIANTS].
+
+    destruct (convert_MemState m_inf_final) as [m_fin_final | ] eqn:MS_FIN_FINAL.
+    2: {
+      exfalso.
+
+      destruct m_fin_start as [[ms_fin fss_fin hs_fin] msprovs_fin].
+      destruct m_inf_start as [[ms_inf fss_inf hs_inf] msprovs_inf].
+      destruct m_inf_final as [[ms_inf' fss_inf' hs_inf'] msprovs_inf'].
+
+      unfold convert_MemState in MS_FIN_FINAL.
+      cbn in MS_FIN_FINAL.
+      repeat break_match_hyp_inv.
+      { (* convert_Heap OOM *)
+        (* This shouldn't happen because mempop does not touch the heap *)
+        clear - Heqo2 Heqo Heqo1 MSR INVARIANTS.
+        destruct INVARIANTS.
+        clear mempop_op_allocation_ids.
+
+        apply MemState_refine_prop_heap_preserved in MSR.
+        red in mempop_heap_preserved, MSR.
+        cbn in *.
+        unfold MemoryBigIntptr.MMEP.MMSP.memory_stack_heap_prop,
+          MemoryBigIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *.
+        cbn in *.
+
+        (* Block failed to convert, which means there's an out of
+           bounds address in the block... *)
+        apply map_monad_OOM_fail in Heqo2.
+        destruct Heqo2 as ((root&block)&?&?).
+        break_match_hyp_inv.
+
+        apply map_monad_OOM_fail in Heqo0.
+        destruct Heqo0 as (bad_addr&IN_BLOCK&BAD_CONV).
+
+        
+        
+
+        specialize (free_block hs_inf hs_inf').
+        repeat (forward free_block; [reflexivity|]).
+        destruct free_block.
+
+      (* Need to know if root is disjoint from ptr_inf or not...
+
+         ptr_inf is the pointer being freed.
+
+         - If root is not disjoint then free_block_root_freed might be
+           a contradiction.
+         - If root is disjoint then it should exist in hs_inf already,
+           which should lead to a contradiction with free_block_disjoint_preserved.
+       *)
+
+        pose proof (Z.eq_dec (LLVMParamsBigIntptr.PTOI.ptr_to_int ptr_inf) root) as [NDISJOINT | DISJOINT].
+        { (* Not disjoint *)
+          red in ADDR_REF.
+          eapply free_block_root_freed.
+          red.
+          rewrite NDISJOINT.
+          eapply SetoidList.In_InA in H.
+          eapply IntMaps.IP.F.elements_mapsto_iff in H.
+          2: typeclasses eauto.
+          eapply IntMaps.IP.F.find_mapsto_iff in H.
+          eapply IntMaps.lookup_member.
+          unfold IntMaps.lookup.
+          rewrite H.
+          reflexivity.
+        }
+
+        { (* Disjoint *)
+          pose proof InfITOP_BIG.int_to_ptr_safe root InfPROV.nil_prov.
+          break_match_hyp_inv.
+          rename a into root_ptr.
+          pose proof InfITOP.ptr_to_int_int_to_ptr _ _ _ Heqo as ROOT.
+
+          specialize (free_block_disjoint_preserved bad_addr root_ptr).
+          forward free_block_disjoint_preserved.
+          { red.
+            lia.
+          }
+
+          assert (MemoryBigIntptr.MMEP.MMSP.ptr_in_heap_prop hs_inf' root_ptr bad_addr) as IN_HEAP.
+          { red.
+            eapply SetoidList.In_InA in H.
+            eapply IntMaps.IP.F.elements_mapsto_iff in H.
+            2: typeclasses eauto.
+            eapply IntMaps.IP.F.find_mapsto_iff in H.
+            subst.
+            rewrite H.
+            eapply in_map; eauto.
+          }
+
+          apply free_block_disjoint_preserved in IN_HEAP.
+          specialize (MSR hs_inf).
+          destruct MSR as [MSR _]; forward MSR; [reflexivity|].
+          rewrite <- MSR in IN_HEAP.
+          eapply ptr_in_heap_prop_lift_inv in IN_HEAP.
+          destruct IN_HEAP as (?&?&?&CONV&?).
+          rewrite BAD_CONV in CONV.
+          inv CONV.
+        }
+      }
+
+      { (* convert_FrameStack OOM *)
+        (* Must be an address in one of the frames that does not
+           convert... Frames are preserved, though.
+         *)
+
+        destruct free_invariants.
+        clear - MSR ADDR_REF Heqo free_frame_stack_preserved.
+        apply MemState_refine_prop_frame_stack_preserved in MSR.
+        cbn in *.
+        red in MSR, free_frame_stack_preserved.
+        unfold MemoryBigIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *.
+        cbn in *.
+
+        specialize (MSR fss_inf).
+        destruct MSR as [MSR _]; forward MSR; [reflexivity|].
+
+        specialize (free_frame_stack_preserved fss_inf).
+        destruct free_frame_stack_preserved as [FSP _]; forward FSP; [reflexivity|].
+        rewrite <- MSR in FSP.
+
+        symmetry in FSP.
+        generalize dependent fss_inf.
+        generalize dependent fss_inf'.
+        induction fss_fin; intros fss_inf' FSP Heqo fss_inf MSR.
+        - cbn in FSP.
+          apply InfMemMMSP.frame_stack_inv in FSP.
+          destruct FSP as [CONTRA | FSP].
+          { destruct CONTRA as (?&?&?&?&?&?&?).
+            inv H.
+          }
+
+          destruct FSP as (f1&f2&F&F2&EQV).
+          subst.
+          inv F.
+
+          cbn in Heqo.
+          break_match_hyp_inv.
+
+          unfold convert_Frame in Heqo0.
+          apply map_monad_OOM_fail in Heqo0.
+          destruct Heqo0 as (bad_addr&IN_BLOCK&BAD_CONV).
+          red in EQV.
+          unfold InfMemMMSP.ptr_in_frame_prop in EQV.
+          eapply in_map in IN_BLOCK.
+          eapply EQV in IN_BLOCK.
+          unfold lift_Frame in IN_BLOCK.
+          apply in_map_iff in IN_BLOCK.
+          destruct IN_BLOCK as (?&?&?).
+          apply in_map_iff in H0.
+          destruct H0 as (?&?&?).
+          subst.
+          pose proof fin_to_inf_addr_ptr_to_int x0.
+          rewrite H in H0.
+          unfold InfToFinAddrConvert.addr_convert in BAD_CONV.
+          destruct bad_addr.
+          destruct x0.
+          pose proof LLVMParams64BitIntptr.ITOP.int_to_ptr_ptr_to_int (i0, p0) p0.
+          forward H2; cbn; auto.
+          cbn in *.
+          rewrite <- H0 in H2.
+          eapply int_to_ptr_succeeds_regardless_of_provenance in H2 as (?&?).
+          rewrite BAD_CONV in H2.
+          inv H2.
+        - rewrite lift_FrameStack_snoc in MSR.
+          apply InfMemMMSP.frame_stack_inv in FSP.
+          destruct FSP as [FSP | CONTRA].
+          2: {
+            destruct CONTRA as (?&?&?&?).
+            inv H.
+          }
+
+          destruct FSP as (fs1'&fs2'&f1&f2&SNOC&SNOC'&FSEQV&FEQV).
+          subst.
+
+          rewrite lift_FrameStack_snoc in SNOC.
+          inv SNOC.
+
+          rewrite convert_FrameStack_Snoc_equation in Heqo.
+          cbn in Heqo.
+          repeat break_match_hyp_inv.
+
+          { (* First frame converts *)
+            specialize (IHfss_fin fs2' FSEQV Heqo (lift_FrameStack fss_fin)).
+            eapply IHfss_fin; reflexivity.
+          }
+
+          { (* First frame OOMs *)
+            unfold convert_Frame in Heqo0.
+            apply map_monad_OOM_fail in Heqo0.
+            destruct Heqo0 as (bad_addr&IN_BLOCK&BAD_CONV).
+            red in FEQV.
+            unfold InfMemMMSP.ptr_in_frame_prop in FEQV.
+            eapply in_map in IN_BLOCK.
+            eapply FEQV in IN_BLOCK.
+            unfold lift_Frame in IN_BLOCK.
+            apply in_map_iff in IN_BLOCK.
+            destruct IN_BLOCK as (?&?&?).
+            apply in_map_iff in H0.
+            destruct H0 as (?&?&?).
+            subst.
+            pose proof fin_to_inf_addr_ptr_to_int x0.
+            rewrite H in H0.
+            unfold InfToFinAddrConvert.addr_convert in BAD_CONV.
+            destruct bad_addr.
+            destruct x0.
+            pose proof LLVMParams64BitIntptr.ITOP.int_to_ptr_ptr_to_int (i0, p0) p0.
+            forward H2; cbn; auto.
+            cbn in *.
+            rewrite <- H0 in H2.
+            eapply int_to_ptr_succeeds_regardless_of_provenance in H2 as (?&?).
+            rewrite BAD_CONV in H2.
+            inv H2.            
+          }
+      }
+
+      { (* convert_memory OOM *)
+        unfold MemoryBigIntptr.MMEP.MemSpec.ptr_in_memstate_heap in *.
+        unfold MemoryBigIntptr.MMEP.MMSP.memory_stack_heap_prop in *.
+        cbn in free_bytes_freed.
+        eapply MemState_refine_prop_allocations_preserved in MSR.
+        red in MSR.
+
+        apply map_monad_OOM_fail in Heqo.
+        destruct Heqo as (bad_byte&IN_BLOCK&BAD_CONV).
+        destruct bad_byte.
+        break_match_hyp_inv.
+        2: {
+          destruct m.
+          assert (MemoryBigIntptr.MMEP.MemSpec.byte_allocated
+                    {|
+                      InfMemMMSP.ms_memory_stack :=
+                        {|
+                          InfMemMMSP.memory_stack_memory := ms_inf';
+                          InfMemMMSP.memory_stack_frame_stack := fss_inf';
+                          InfMemMMSP.memory_stack_heap := hs_inf'
+                        |};
+                      InfMemMMSP.ms_provenance := msprovs_inf'
+                    |} (k, PROV.nil_prov) a).
+          { cbn.
+            do 2 eexists.
+            cbn.
+            repeat split; auto.
+            2: {
+              intros ms' x H.
+              cbn in *.
+              inv H.
+              cbn.
+              reflexivity.
+            }
+            cbn.
+            do 2 eexists.
+            split; eauto.
+            cbn.
+            Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+            unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+            Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+            eapply SetoidList.In_InA in IN_BLOCK.
+            eapply IntMaps.IP.F.elements_mapsto_iff in IN_BLOCK.
+            2: typeclasses eauto.
+            eapply IntMaps.IP.F.find_mapsto_iff in IN_BLOCK.
+            rewrite IN_BLOCK.
+            split; auto.
+            apply InfPROV.aid_eq_dec_refl.
+          }
+
+          (* TODO: Move. Should apply to fin / inf *)
+          Lemma ptr_in_heap_prop_dec :
+            forall h root ptr,
+              {MemoryBigIntptr.MMEP.MMSP.ptr_in_heap_prop h root ptr} + {~ MemoryBigIntptr.MMEP.MMSP.ptr_in_heap_prop h root ptr}.
+          Proof.
+            intros h root ptr.
+            unfold MemoryBigIntptr.MMEP.MMSP.ptr_in_heap_prop.
+            destruct (IntMaps.IM.find (elt:=MemoryBigIntptr.MMEP.MMSP.Block) (LLVMParamsBigIntptr.PTOI.ptr_to_int root) h) eqn:FIND; eauto.
+            eapply in_dec.
+            eapply Z.eq_dec.
+          Qed.
+
+          (* Need to know if k is in the freed block or not *)
+          pose proof (ptr_in_heap_prop_dec hs_inf ptr_inf (k, PROV.nil_prov)) as [IN_HEAP | NIN_HEAP].
+          { (* k is in freed block *)
+            eapply free_bytes_freed.
+            intros h H0.
+            rewrite <- H0.
+            apply IN_HEAP.
+            eauto.
+          }
+
+          (* k is not in the freed block *)
+          pose proof H as ALLOC.
+          apply free_non_block_bytes_preserved in ALLOC.
+          2: {
+            intros CONTRA.
+            cbn in CONTRA.
+            specialize (CONTRA hs_inf).
+            forward CONTRA; [reflexivity|].
+
+            red in CONTRA.
+            break_match_hyp; auto.
+            apply in_map_iff in CONTRA.
+            destruct CONTRA as (?&?&?).
+            cbn in H1.
+
+            eapply NIN_HEAP.
+            red.
+            rewrite Heqo0.
+            cbn.
+            rewrite <- H1.
+            eapply in_map; eauto.            
+          }
+
+          (* k was allocated in the original finite memory, which
+             should mean it must be in bounds. *)
+          apply MSR in ALLOC.
+          rename Heqo into CONTRA.
+          move CONTRA before ALLOC.
+
+          red in ALLOC.
+          apply MemPropT_bind_ret_inv in ALLOC.
+          destruct ALLOC as (?&?&ALLOC&ASSERT).
+          cbn in ALLOC.
+          red in ALLOC.
+          cbn in ALLOC.
+          destruct ALLOC as (?&?).
+          destruct H0 as (?&?&?&?).
+          destruct H0; subst.
+          destruct ASSERT; subst.
+          cbn in H2.
+          break_match_hyp.
+          2: {
+            destruct H2.
+            inv H2.
+          }
+
+          destruct m.
+          destruct H2.
+          inv H0.
+
+          Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+          unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw in Heqo.
+          Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+          unfold lift_memory in Heqo.
+          rewrite IntMaps.IP.F.map_o in Heqo.
+          unfold option_map in Heqo.
+          break_match_hyp_inv.
+
+          (* TODO: Need to know ms_fin only has in bounds addresses *)
+          (* I should be able to get this from MSR? *)
+          pose proof convert_memory_lift ms_fin as CONV_MEM.
+
+          admit.
+        }
+
+        break_match_hyp_inv.
+        destruct m.
+        cbn in Heqo0.
+        break_match_hyp_inv.
+        unfold convert_SByte in Heqo1.
+        repeat break_match_hyp_inv.
+        admit.
+        admit.
+      }
+    }
+
+    eexists.
+    split.
+    { split.
+      all: cbn.
+    }
+    destruct m_fin_start.
+    destruct INVARIANTS.
   Qed.
 
   (* TODO: Move this *)
@@ -21000,7 +21527,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             eapply Z.eq_dec.
           Qed.
 
-
           (* Need to know if k is in the freed block or not *)
           pose proof (ptr_in_heap_prop_dec hs_inf ptr_inf (k, PROV.nil_prov)) as [IN_HEAP | NIN_HEAP].
           { (* k is in freed block *)
@@ -21070,6 +21596,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           break_match_hyp_inv.
 
           (* TODO: Need to know ms_fin only has in bounds addresses *)
+          (* I should be able to get this from MSR? *)
+          pose proof convert_memory_lift ms_fin as CONV_MEM.
+
           admit.
         }
 
@@ -21214,8 +21743,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       split.
       + eapply inf_fin_preserve_allocation_ids; eauto.
       + eapply inf_fin_frame_stack_preserved; eauto.
-  Qed.
-  
+  Admitted.
 
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
@@ -23159,225 +23687,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         apply lift_MemState_refine_prop.
                       - intros m2 CONTRA.
 
-                          (* TODO: Move this *)
-                          Lemma fin_inf_ptr_not_in_current_frame :
-                            forall {ms_inf ms_fin ptr_inf ptr_fin},
-                              MemState_refine_prop ms_inf ms_fin ->
-                              FinToInfAddrConvert.addr_convert ptr_fin = NoOom ptr_inf ->
-                              ~ Memory64BitIntptr.MMEP.MemSpec.ptr_in_current_frame ms_fin ptr_fin ->
-                              ~ MemoryBigIntptr.MMEP.MemSpec.ptr_in_current_frame ms_inf ptr_inf.
-                          Proof.
-                            intros ms_inf ms_fin ptr_inf ptr_fin MSR ADDR_CONV PTR_NIN_FRAME PTR_IN_FRAME.
-                            eapply PTR_NIN_FRAME.
-                            eapply fin_inf_ptr_in_current_frame in PTR_IN_FRAME; eauto.
-                            destruct PTR_IN_FRAME as (?&?&?).
-                            pose proof FinToInfAddrConvertSafe.addr_convert_safe _ _ ADDR_CONV.
-                            rewrite H in H1.
-                            inv H1.
-                            auto.
-                          Qed.
-
-                          (* TODO: Move this *)
-                          Lemma frame_eqv_lift_inv :
-                            forall f1 f2,
-                              InfMem.MMEP.MMSP.frame_eqv (lift_Frame f1) (lift_Frame f2) ->
-                              FinMem.MMEP.MMSP.frame_eqv f1 f2.
-                          Proof.
-                            intros f1 f2 EQV.
-                            red in EQV; red.
-
-                            intros ptr.
-                            split; intros IN.
-                            - apply ptr_in_frame_prop_lift in IN.
-                              apply EQV in IN.
-                              apply ptr_in_frame_prop_lift_inv in IN.
-                              destruct IN as (ptr_fin & CONV & IN).
-                              rewrite addr_refine_fin_to_inf_addr in CONV.
-                              inv CONV.
-                              auto.
-                            - apply ptr_in_frame_prop_lift in IN.
-                              apply EQV in IN.
-                              apply ptr_in_frame_prop_lift_inv in IN.
-                              destruct IN as (ptr_fin & CONV & IN).
-                              rewrite addr_refine_fin_to_inf_addr in CONV.
-                              inv CONV.
-                              auto.
-                          Qed.
-
-                          (* TODO: Move this *)
-                          Lemma frame_stack_eqv_lift_inf_fin :
-                            forall fs1 fs2,
-                              InfMem.MMEP.MMSP.frame_stack_eqv (lift_FrameStack fs1) (lift_FrameStack fs2) ->
-                              FinMem.MMEP.MMSP.frame_stack_eqv fs1 fs2.
-                          Proof.
-                            intros fs1 fs2 EQV.
-                            red in *.
-                            intros f n.
-                            split; intros FSE.
-                            - apply FSNth_eqv_lift in FSE.
-                              apply EQV in FSE.
-                              apply FSNth_eqv_lift_inv in FSE.
-                              destruct FSE as (f_fin & F & FSE).
-                              apply frame_eqv_lift_inv in F.
-                              rewrite F in FSE.
-                              auto.
-                            - apply FSNth_eqv_lift in FSE.
-                              apply EQV in FSE.
-                              apply FSNth_eqv_lift_inv in FSE.
-                              destruct FSE as (f_fin & F & FSE).
-                              apply frame_eqv_lift_inv in F.
-                              rewrite F in FSE.
-                              auto.
-                          Qed.
-
-                          (* TODO: Move this *)
-                          Lemma mem_pop_spec_inf_fin :
-                            forall {m_fin_start m_fin_final m_inf_start m_inf_final},
-                              MemState_refine_prop m_inf_start m_fin_start ->
-                              MemState_refine_prop m_inf_final m_fin_final ->
-                              MemoryBigIntptr.MMEP.MemSpec.mempop_spec m_inf_start m_inf_final ->
-                              Memory64BitIntptr.MMEP.MemSpec.mempop_spec m_fin_start m_fin_final.
-                          Proof.
-                            intros m_fin_start m_fin_final m_inf_start m_inf_final MSR1 MSR2 [BYTES_FREED NON_FRAME_BYTES_PRESERVED NON_FRAME_BYTES_READ POP_FRAME INVARIANTS].
-
-                            split.
-                            - (* Bytes freed *)
-                              clear NON_FRAME_BYTES_PRESERVED NON_FRAME_BYTES_READ POP_FRAME INVARIANTS.
-                              cbn in *.
-                              intros ptr PTR.
-
-                              (* ptr is in the current frame, which has a finite refinement,
-         so there should be a finite version of ptr as well *)
-                              pose proof inf_fin_ptr_in_current_frame MSR1 PTR as (ptr_fin&PTR_CONV&PTR_FIN).
-                              eapply inf_fin_byte_not_allocated; eauto.
-                            - (* NON_FRAME_BYTES_PRESERVED *)
-                              clear - MSR1 MSR2 NON_FRAME_BYTES_PRESERVED.
-                              intros ptr aid PTR.
-
-                              pose proof (FinToInfAddrConvertSafe.addr_convert_succeeds ptr) as (ptr_inf & PTR_CONV).
-                              eapply fin_inf_ptr_not_in_current_frame in PTR; eauto.
-                              specialize (NON_FRAME_BYTES_PRESERVED ptr_inf aid PTR).
-                              pose proof FinToInfAddrConvertSafe.addr_convert_safe _ _ PTR_CONV as PTR_CONV'.
-
-                              split; intros BYTE_ALLOCATED.
-                              + eapply fin_inf_byte_allocated in BYTE_ALLOCATED; eauto.
-                                apply NON_FRAME_BYTES_PRESERVED in BYTE_ALLOCATED.
-                                eapply inf_fin_byte_allocated; eauto.
-                              + eapply fin_inf_byte_allocated in BYTE_ALLOCATED; eauto.
-                                apply NON_FRAME_BYTES_PRESERVED in BYTE_ALLOCATED.
-                                eapply inf_fin_byte_allocated; eauto.
-                            - (* NON_FRAME_BYTES_READ *)
-                              clear - MSR1 MSR2 NON_FRAME_BYTES_READ.
-                              intros ptr byte PTR.
-
-                              pose proof (FinToInfAddrConvertSafe.addr_convert_succeeds ptr) as (ptr_inf & PTR_CONV).
-                              pose proof FinToInfAddrConvertSafe.addr_convert_safe _ _ PTR_CONV as PTR_CONV'.
-                              eapply fin_inf_ptr_not_in_current_frame in PTR; eauto.
-
-                              split; intros READ.
-                              + pose proof fin_inf_read_byte_spec_exists MSR1 READ as [addr_inf [byte_inf [READ_INF [ADDR_REF BYTE_REF]]]].
-                                red in BYTE_REF.
-                                red in ADDR_REF.
-                                pose proof InfToFinAddrConvert.addr_convert_injective _ _ _ ADDR_REF PTR_CONV'.
-                                subst.
-
-                                specialize (NON_FRAME_BYTES_READ ptr_inf byte_inf PTR).
-                                eapply NON_FRAME_BYTES_READ in READ_INF.
-                                eapply inf_fin_read_byte_spec in READ_INF; eauto.
-                                destruct READ_INF as (?&?&?).
-                                red in H0.
-                                rewrite BYTE_REF in H0; inv H0.
-                                auto.
-                              + pose proof fin_inf_read_byte_spec_exists MSR2 READ as [addr_inf [byte_inf [READ_INF [ADDR_REF BYTE_REF]]]].
-                                red in BYTE_REF.
-                                red in ADDR_REF.
-                                pose proof InfToFinAddrConvert.addr_convert_injective _ _ _ ADDR_REF PTR_CONV'.
-                                subst.
-
-                                specialize (NON_FRAME_BYTES_READ ptr_inf byte_inf PTR).
-                                eapply NON_FRAME_BYTES_READ in READ_INF.
-                                eapply inf_fin_read_byte_spec in READ_INF; eauto.
-                                destruct READ_INF as (?&?&?).
-                                red in H0.
-                                rewrite BYTE_REF in H0; inv H0.
-                                auto.
-                            - (* POP_FRAME *)
-                              clear - MSR1 MSR2 POP_FRAME. 
-                              intros fs1 fs2 FSP POP.
-
-                              red; red in FSP.
-                              cbn in *.
-
-                              red in POP.
-                              destruct fs1; try contradiction.
-                              rewrite <- POP.
-
-                              destruct m_fin_start. destruct ms_memory_stack.
-                              destruct m_inf_start. destruct ms_memory_stack.
-                              cbn in *.
-                              destruct memory_stack_frame_stack.
-                              apply Memory64BitIntptr.MMEP.MMSP.frame_stack_eqv_sing_snoc_inv in FSP; contradiction.
-                              pose proof FSP as F.
-                              apply Memory64BitIntptr.MMEP.MMSP.frame_stack_snoc_inv_fs in FSP.
-                              apply Memory64BitIntptr.MMEP.MMSP.frame_stack_snoc_inv_f in F.
-
-                              rewrite <- FSP.
-                              apply MemState_refine_prop_frame_stack_preserved in MSR1, MSR2.
-                              Opaque lift_FrameStack.
-                              cbn in *. red in MSR1, MSR2.
-                              cbn in MSR1, MSR2.
-                              unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop in *.
-                              cbn in *.
-
-                              destruct m_inf_final. destruct ms_memory_stack.
-                              destruct m_fin_final. destruct ms_memory_stack.
-                              cbn in *.
-
-                              rewrite FSP, POP.
-
-                              eapply frame_stack_eqv_lift_inf_fin.
-                              eapply MSR2.
-
-
-                              rewrite lift_FrameStack_snoc in MSR1.
-                              specialize (MSR1 (InfMemMMSP.Snoc (lift_FrameStack memory_stack_frame_stack) (lift_Frame f0))).
-                              destruct MSR1 as [_ MSR1].
-                              forward MSR1; [reflexivity|].
-                              setoid_rewrite MSR1 in POP_FRAME.
-
-                              eapply POP_FRAME. reflexivity.
-                              red.
-                              eapply frame_stack_eqv_lift.
-                              rewrite FSP, POP.
-                              reflexivity.
-                            - (* mempop_operation_invariants *)
-                              destruct INVARIANTS.
-                              split; cbn in *.
-                              + eapply inf_fin_preserve_allocation_ids; eauto.
-                              + eapply inf_fin_heap_preserved; eauto.
-                          Qed.
-
-                          (* TODO: Move this *)
-                          Lemma mem_pop_spec_inf_fin_exists :
-                            forall {m_fin_start m_inf_start m_inf_final},
-                              MemState_refine_prop m_inf_start m_fin_start ->
-                              MemoryBigIntptr.MMEP.MemSpec.mempop_spec m_inf_start m_inf_final ->
-                              exists m_fin_final,
-                                Memory64BitIntptr.MMEP.MemSpec.mempop_spec m_fin_start m_fin_final /\
-                                  MemState_refine_prop m_inf_final m_fin_final.
-                          Proof.
-                            intros m_fin_start m_inf_start m_inf_final MSR1 [BYTES_FREED NON_FRAME_BYTES_PRESERVED NON_FRAME_BYTES_READ POP_FRAME INVARIANTS].
-                            destruct m_fin_start as [[ms_fin fss_fin hs_fin] msprovs_fin].
-                            destruct m_inf_start as [[ms_inf fss_inf hs_inf] msprovs_inf].
-                            cbn in *.
-                            eexists.
-                            split.
-                            { split.
-                              all: cbn.
-                            }
-                            destruct m_fin_start.
-                            destruct INVARIANTS.
-                          Qed.
 
                           eapply mem_pop_spec_inf_fin_exists in CONTRA.
                           destruct CONTRA as (?&?&?).
