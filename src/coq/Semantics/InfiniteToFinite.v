@@ -14098,12 +14098,15 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
              before with MSR, they should be good now *)
           (* May be some read_byte_raw lemmas that can help here *)
           (* Will likely need to use NON_FRAME_BYTES_PRESERVED and BYTES_FREED *)
-          clear - MSR BYTES_FREED NON_FRAME_BYTES_PRESERVED Heqo Heqo1 MEM_ELEMS.
+          clear - MSR BYTES_FREED NON_FRAME_BYTES_PRESERVED NON_FRAME_BYTES_READ Heqo Heqo1 MEM_ELEMS.
           rename Heqo into A.
           rename Heqo1 into CONV_BYTE.
+          epose proof (@int_to_ptr_succeeds_regardless_of_provenance _ (FinPROV.allocation_id_to_prov aid) _ _ A).
+          clear a A.
+          destruct H as (a&A).
 
-          specialize (NON_FRAME_BYTES_PRESERVED (fin_to_inf_addr a) aid).
-          forward NON_FRAME_BYTES_PRESERVED.
+          specialize (NON_FRAME_BYTES_READ (fin_to_inf_addr a) byte).
+          forward NON_FRAME_BYTES_READ.
           { (* Pointer cannot be in frame because the byte isn't freed in MEM_ELEMS *)
             intros CONTRA.
             apply BYTES_FREED in CONTRA.
@@ -14112,13 +14115,13 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
             (* TODO: Move this *)
             Lemma In_memory_is_allocated_inf :
-              forall addr ptr byte aid mem ms,
+              forall addr ptr byte aid mem ms pr,
                 In (addr, (byte, aid)) (IntMaps.IM.elements (elt:=InfMemMMSP.mem_byte) mem) ->
-                LLVMParams64BitIntptr.ITOP.int_to_ptr addr PROV.nil_prov = NoOom ptr ->
+                LLVMParams64BitIntptr.ITOP.int_to_ptr addr pr = NoOom ptr ->
                 MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory ms = mem ->
                 MemoryBigIntptr.MMEP.MemSpec.byte_allocated ms (fin_to_inf_addr ptr) aid.
             Proof.
-              intros addr ptr byte aid mem ms ELEMS PTR MEM.
+              intros addr ptr byte aid mem ms pr ELEMS PTR MEM.
               cbn.
               do 2 eexists; split; eauto.
               cbn.
@@ -14157,49 +14160,32 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             eapply In_memory_is_allocated_inf; eauto.
           }
 
-          destruct NON_FRAME_BYTES_PRESERVED as [_ NON_FRAME_BYTES_PRESERVED].
-          forward NON_FRAME_BYTES_PRESERVED.
-          eapply In_memory_is_allocated_inf; eauto.
-
-          pose NON_FRAME_BYTES_PRESERVED as ALLOC.
-          apply (MemState_refine_prop_allocations_preserved MSR) in ALLOC.
-
-
-          epose proof (inf_fin_byte_allocated_exists _ _ _ _ MSR NON_FRAME_BYTES_PRESERVED).
-          destruct H as (?&?&?).
-          pose proof (addr_convert_fin_to_inf_addr a).
-          rewrite H in H1.
-          inv H1.
+          destruct NON_FRAME_BYTES_READ as [_ NON_FRAME_BYTES_READ].
+          forward NON_FRAME_BYTES_READ.
 
           (* TODO: Move this *)
-          Lemma allocated_is_In_memory_fin :
-            forall ptr aid mem ms,
-              Memory64BitIntptr.MMEP.MemSpec.byte_allocated ms ptr aid ->
-              Memory64BitIntptr.MMEP.MMSP.mem_state_memory ms = mem ->
-              exists byte,
-                In (FinPTOI.ptr_to_int ptr, (byte, aid)) (IntMaps.IM.elements (elt:=FinMemMMSP.mem_byte) mem).
-              
+          Lemma In_memory_read_byte_inf :
+            forall addr ptr byte aid mem ms,
               In (addr, (byte, aid)) (IntMaps.IM.elements (elt:=InfMemMMSP.mem_byte) mem) ->
-              LLVMParams64BitIntptr.ITOP.int_to_ptr addr PROV.nil_prov = NoOom ptr ->
-              
-              .
+              LLVMParams64BitIntptr.ITOP.int_to_ptr addr (FinPROV.allocation_id_to_prov aid) = NoOom ptr ->
+              MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory ms = mem ->
+              MemoryBigIntptr.MMEP.MemSpec.read_byte_spec ms (fin_to_inf_addr ptr) byte.
           Proof.
             intros addr ptr byte aid mem ms ELEMS PTR MEM.
-            cbn.
-            do 2 eexists; split; eauto.
-            cbn.
-            red.
             split.
-            2: {
-              intros ms' x H.
-              inv H.
-              reflexivity.
+            { red.
+              exists aid.
+              split.
+              - eapply In_memory_is_allocated_inf; eauto.
+              - eapply fin_inf_access_allowed.
+                + apply addr_convert_fin_to_inf_addr.
+                + erewrite ITOP.int_to_ptr_provenance; eauto.
+                  apply FinLP.PROV.access_allowed_refl.
             }
 
             cbn.
-            exists (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms).
-            exists (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms).
-            split; auto.
+            do 2 eexists; split; eauto.
+            cbn.
 
             Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
             unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
@@ -14216,14 +14202,99 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             eapply IntMaps.IP.F.find_mapsto_iff in ELEMS.
             rewrite ELEMS.
 
+            cbn.
+
+            assert (LLVMParamsBigIntptr.PROV.access_allowed
+                      (LLVMParamsBigIntptr.PROV.address_provenance (fin_to_inf_addr ptr)) aid = true) as ACCESS.
+            { eapply fin_inf_access_allowed.
+              - apply addr_convert_fin_to_inf_addr.
+              - erewrite ITOP.int_to_ptr_provenance; eauto.
+                apply FinLP.PROV.access_allowed_refl.
+            }
+            rewrite ACCESS.
+
             split; auto.
-            apply InfPROV.aid_eq_dec_refl.
           Qed.
 
+          eapply In_memory_read_byte_inf; eauto.
 
-          cbn in 
-          
-          admit.
+          (* TODO: Move this *)
+          Lemma MemState_refine_prop_read_byte_preserved :
+            forall {ms_inf ms_fin},
+              MemState_refine_prop ms_inf ms_fin ->
+              InfMem.MMEP.MemSpec.read_byte_preserved ms_inf (lift_MemState ms_fin).
+          Proof.
+            intros ms_inf ms_fin MSR.
+            do 2 red in MSR.
+            tauto.
+          Qed.
+
+          (* TODO: Move this, should be in MemoryModel.v with read_byte_preserved *)
+          Definition read_byte_spec_preserved m1 m2 :=
+            forall ptr byte, MemoryBigIntptr.MMEP.MemSpec.read_byte_spec m1 ptr byte <-> MemoryBigIntptr.MMEP.MemSpec.read_byte_spec m2 ptr byte.
+
+          Lemma read_byte_preserved_read_byte_spec_preserved :
+            forall m1 m2,
+              InfMem.MMEP.MemSpec.read_byte_preserved m1 m2 ->
+              read_byte_spec_preserved m1 m2.
+          Proof.
+            intros m1 m2.
+            intros PRES.
+            { destruct PRES as [ALLOWED_PRES PROP_PRES].
+              red.
+              intros ptr byte.
+              split; intros [ALLOWED PROP].
+              - split.
+                + apply ALLOWED_PRES; auto.
+                + apply PROP_PRES; auto.
+              - split.
+                + apply ALLOWED_PRES; auto.
+                + apply PROP_PRES; auto.
+            }
+          Qed.
+
+          Lemma MemState_refine_prop_read_byte_spec_preserved :
+            forall {ms_inf : InfMem.MMEP.MMSP.MemState} {ms_fin : FinMem.MMEP.MMSP.MemState},
+              MemState_refine_prop ms_inf ms_fin ->
+              read_byte_spec_preserved ms_inf (lift_MemState ms_fin).
+          Proof.
+            intros ms_inf ms_fin MSR.
+            apply read_byte_preserved_read_byte_spec_preserved.
+            apply MemState_refine_prop_read_byte_preserved; auto.
+          Qed.
+
+          pose NON_FRAME_BYTES_READ as READ.
+          apply (MemState_refine_prop_read_byte_spec_preserved MSR) in READ.
+
+          (* Using READ I want to be able to conclude that byte is a lifted SByte... *)
+
+          (* TODO: Move this *)
+          Lemma read_byte_spec_lifted_memory_lifted_sbyte :
+            forall {ms ptr byte},
+              MemoryBigIntptr.MMEP.MemSpec.read_byte_spec (lift_MemState ms) ptr byte ->
+              exists fin_byte, byte = lift_SByte fin_byte.
+          Proof.
+          Admitted.
+
+          apply read_byte_spec_lifted_memory_lifted_sbyte in READ.
+          destruct READ as (fin_byte & LIFT_BYTE).
+          subst.
+
+          (* TODO: Move this *)
+          Lemma convert_SByte_lift_SByte :
+            forall byte,
+              convert_SByte (lift_SByte byte) = NoOom byte.
+          Proof.
+            intros byte.
+            unfold lift_SByte.
+            destruct byte.
+            cbn.
+            repeat rewrite convert_fin_to_inf_uvalue_succeeds.
+            reflexivity.
+          Qed.
+
+          rewrite convert_SByte_lift_SByte in CONV_BYTE.
+          inv CONV_BYTE.
         }
 
         { (* Address conversion OOM *)
