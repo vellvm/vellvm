@@ -321,7 +321,7 @@ and parse_srctgt_assertion (filename: string) (line: string) : test list =
                (* tgt_t is args_t * ret_t*)
                List.map (fun arg -> SRCTGTTest (!parsing_mode , (typ_to_dtyp (snd tgt_t)), Left arg)) generated_args
              | false ->
-               let generated_asts : ((LLVMAst.typ, GA.runnable_blocks) LLVMAst.toplevel_entity * (LLVMAst.typ, GA.runnable_blocks) LLVMAst.toplevel_entity) list = Generate.generate_n_runner num_trials (fst src_t) (snd src_t) (Generate.explode_str "runnersrc") (Generate.explode_str "runnertgt") in
+               let generated_asts : ((LLVMAst.typ, GA.runnable_blocks) LLVMAst.toplevel_entity * (LLVMAst.typ, GA.runnable_blocks) LLVMAst.toplevel_entity) list = Generate.generate_n_runner num_trials (fst src_t) (snd src_t) (Generate.explode_str "src") (Generate.explode_str "tgt") in
                List.map (fun ast -> SRCTGTTest (!parsing_mode, (typ_to_dtyp (snd tgt_t)), Right ([fst ast; snd ast]))) generated_asts
            end
        with _ -> [] end

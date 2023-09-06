@@ -389,12 +389,12 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
           | TYPE_Float =>
               gen_float_exp
           | TYPE_Double =>
-              f32 <- gen_float32;;              
+              f32 <- gen_float32;;
               ret (EXP_Double (Float.of_single f32))
           | TYPE_Array n t
           | TYPE_Vector n t =>
               es <- vectorOf_ALIVE2 (N.to_nat n) (gen_exp_size 0 t);;
-              ret (EXP_Array (map (fun e => (t, e)) es))    
+              ret (EXP_Array (map (fun e => (t, e)) es))
           | TYPE_Struct vars =>
               failGen "Struct generation unimplemented"
           | TYPE_Packed_struct vars =>
@@ -432,7 +432,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
       end in
     freq_ALIVE2 (gen_idents)
   .
-
+  
   Definition add_id_to_instr (t_instr : typ * instr typ) : GenALIVE2 (instr_id * instr typ)
     :=
     match t_instr with
@@ -629,7 +629,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
       ; blk_comments := None
       |} in
     let fn_term := match fn_instr_id with
-                   | IId rid => TERM_Ret (ret_t, EXP_Ident (ID_Global rid))
+                   | IId rid => TERM_Ret (ret_t, EXP_Ident (ID_Local rid))
                    | IVoid _ => TERM_Ret_void
                    end in
     let fn_b :=
@@ -654,7 +654,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     args_texp <- map_monad
                   (fun (arg_typ : typ) =>
                      arg_exp <- gen_exp_size 0 arg_typ;;
-                     ret ((arg_typ,arg_exp), []))
+                     ret ((arg_typ, arg_exp), []))
                   args_t;;
     src_fn_blocks <- assemble_pred_fn_blocks init_code args_t ret_t args_texp src_fn_str;;
     tgt_fn_blocks <- assemble_pred_fn_blocks init_code args_t ret_t args_texp tgt_fn_str;;

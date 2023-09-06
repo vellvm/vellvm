@@ -126,7 +126,11 @@ let make_test name ll_ast t : string * assertion  =
                 | Error (UninterpretedCall _) -> Platform.verb (Printf.sprintf "  src-tgt test %s passed due to uninterpreted call\n" name)
                 | Error e -> failwith (Printf.sprintf "src - %s" (Interpreter.string_of_exit_condition e))
               end
-            | Error e -> failwith (Printf.sprintf "tgt - %s" (Interpreter.string_of_exit_condition e))
+            | Error e ->
+                let buf = Buffer.create 16 in
+                List.iter (Buffer.add_char buf) (showProg sum_ast);
+              Printf.printf "aaabbb\n%s" (Buffer.contents buf);
+              failwith (Printf.sprintf "tgt - %s" (Interpreter.string_of_exit_condition e))
           end
         in
         let str = 
