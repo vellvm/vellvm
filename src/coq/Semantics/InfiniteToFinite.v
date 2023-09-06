@@ -14088,8 +14088,147 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         }
       }
 
-      { (* OOM *)
-        admit.
+      { (* convert_memory OOM *)
+        apply map_monad_OOM_fail in Heqo.
+        destruct Heqo as ((addr&(byte&aid))&MEM_ELEMS&CONV).
+        repeat break_match_hyp_inv.
+
+        { (* convert_mem_byte OOM *)
+          (* We only remove bytes from the map, so if they were good
+             before with MSR, they should be good now *)
+          (* May be some read_byte_raw lemmas that can help here *)
+          (* Will likely need to use NON_FRAME_BYTES_PRESERVED and BYTES_FREED *)
+          clear - MSR BYTES_FREED NON_FRAME_BYTES_PRESERVED Heqo Heqo1 MEM_ELEMS.
+          rename Heqo into A.
+          rename Heqo1 into CONV_BYTE.
+
+          specialize (NON_FRAME_BYTES_PRESERVED (fin_to_inf_addr a) aid).
+          forward NON_FRAME_BYTES_PRESERVED.
+          { (* Pointer cannot be in frame because the byte isn't freed in MEM_ELEMS *)
+            intros CONTRA.
+            apply BYTES_FREED in CONTRA.
+            red in CONTRA.
+            eapply (CONTRA aid).
+
+            (* TODO: Move this *)
+            Lemma In_memory_is_allocated_inf :
+              forall addr ptr byte aid mem ms,
+                In (addr, (byte, aid)) (IntMaps.IM.elements (elt:=InfMemMMSP.mem_byte) mem) ->
+                LLVMParams64BitIntptr.ITOP.int_to_ptr addr PROV.nil_prov = NoOom ptr ->
+                MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory ms = mem ->
+                MemoryBigIntptr.MMEP.MemSpec.byte_allocated ms (fin_to_inf_addr ptr) aid.
+            Proof.
+              intros addr ptr byte aid mem ms ELEMS PTR MEM.
+              cbn.
+              do 2 eexists; split; eauto.
+              cbn.
+              red.
+              split.
+              2: {
+                intros ms' x H.
+                inv H.
+                reflexivity.
+              }
+
+              cbn.
+              exists (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms).
+              exists (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms).
+              split; auto.
+
+              Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+              unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+              Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+
+              rewrite fin_to_inf_addr_ptr_to_int.
+              erewrite FinLP.ITOP.ptr_to_int_int_to_ptr; eauto.
+              rewrite memory_stack_memory_mem_state_memory.
+              rewrite MEM.
+
+              eapply SetoidList.In_InA in ELEMS.
+              eapply IntMaps.IP.F.elements_mapsto_iff in ELEMS.
+              2: typeclasses eauto.
+              eapply IntMaps.IP.F.find_mapsto_iff in ELEMS.
+              rewrite ELEMS.
+
+              split; auto.
+              apply InfPROV.aid_eq_dec_refl.
+            Qed.
+
+            eapply In_memory_is_allocated_inf; eauto.
+          }
+
+          destruct NON_FRAME_BYTES_PRESERVED as [_ NON_FRAME_BYTES_PRESERVED].
+          forward NON_FRAME_BYTES_PRESERVED.
+          eapply In_memory_is_allocated_inf; eauto.
+
+          pose NON_FRAME_BYTES_PRESERVED as ALLOC.
+          apply (MemState_refine_prop_allocations_preserved MSR) in ALLOC.
+
+
+          epose proof (inf_fin_byte_allocated_exists _ _ _ _ MSR NON_FRAME_BYTES_PRESERVED).
+          destruct H as (?&?&?).
+          pose proof (addr_convert_fin_to_inf_addr a).
+          rewrite H in H1.
+          inv H1.
+
+          (* TODO: Move this *)
+          Lemma allocated_is_In_memory_fin :
+            forall ptr aid mem ms,
+              Memory64BitIntptr.MMEP.MemSpec.byte_allocated ms ptr aid ->
+              Memory64BitIntptr.MMEP.MMSP.mem_state_memory ms = mem ->
+              exists byte,
+                In (FinPTOI.ptr_to_int ptr, (byte, aid)) (IntMaps.IM.elements (elt:=FinMemMMSP.mem_byte) mem).
+              
+              In (addr, (byte, aid)) (IntMaps.IM.elements (elt:=InfMemMMSP.mem_byte) mem) ->
+              LLVMParams64BitIntptr.ITOP.int_to_ptr addr PROV.nil_prov = NoOom ptr ->
+              
+              .
+          Proof.
+            intros addr ptr byte aid mem ms ELEMS PTR MEM.
+            cbn.
+            do 2 eexists; split; eauto.
+            cbn.
+            red.
+            split.
+            2: {
+              intros ms' x H.
+              inv H.
+              reflexivity.
+            }
+
+            cbn.
+            exists (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms).
+            exists (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms).
+            split; auto.
+
+            Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+            unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+            Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+
+            rewrite fin_to_inf_addr_ptr_to_int.
+            erewrite FinLP.ITOP.ptr_to_int_int_to_ptr; eauto.
+            rewrite memory_stack_memory_mem_state_memory.
+            rewrite MEM.
+
+            eapply SetoidList.In_InA in ELEMS.
+            eapply IntMaps.IP.F.elements_mapsto_iff in ELEMS.
+            2: typeclasses eauto.
+            eapply IntMaps.IP.F.find_mapsto_iff in ELEMS.
+            rewrite ELEMS.
+
+            split; auto.
+            apply InfPROV.aid_eq_dec_refl.
+          Qed.
+
+
+          cbn in 
+          
+          admit.
+        }
+
+        { (* Address conversion OOM *)
+          admit.
+        }
       }
     }
 
