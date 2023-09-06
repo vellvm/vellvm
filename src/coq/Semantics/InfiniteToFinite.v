@@ -6518,14 +6518,14 @@ cofix CIH
     split; intros FSE.
     - apply FSNth_eqv_lift in FSE.
       apply EQV in FSE.
-      apply FSNth_eqv_lift_inv in FSE.      
+      apply FSNth_eqv_lift_inv in FSE.
       destruct FSE as (f_fin & F & FSE).
       apply frame_eqv_lift_inv in F.
       rewrite <- F.
       auto.
     - apply FSNth_eqv_lift in FSE.
       apply EQV in FSE.
-      apply FSNth_eqv_lift_inv in FSE.      
+      apply FSNth_eqv_lift_inv in FSE.
       destruct FSE as (f_fin & F & FSE).
       apply frame_eqv_lift_inv in F.
       rewrite <- F.
@@ -13743,7 +13743,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         rewrite BYTE_REF in H0; inv H0.
         auto.
     - (* POP_FRAME *)
-      clear - MSR1 MSR2 POP_FRAME. 
+      clear - MSR1 MSR2 POP_FRAME.
       intros fs1 fs2 FSP POP.
 
       red; red in FSP.
@@ -13983,7 +13983,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           inv e.
           unfold FinITOP.int_to_ptr.
           cbn.
-          break_match_goal.            
+          break_match_goal.
           pose proof (Int64.unsigned_range i).
           lia.
           rewrite Int64.repr_unsigned.
@@ -13998,7 +13998,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         { (* Singleton *)
           cbn in Heqo.
           break_match_hyp_inv.
-          
+
           apply InfMemMMSP.frame_stack_inv in H1 as [H1 | H1].
           { (* Snoc is contradiction *)
             destruct H1 as (?&?&?&?&?&?&?).
@@ -14267,14 +14267,40 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           apply (MemState_refine_prop_read_byte_spec_preserved MSR) in READ.
 
           (* Using READ I want to be able to conclude that byte is a lifted SByte... *)
-
           (* TODO: Move this *)
           Lemma read_byte_spec_lifted_memory_lifted_sbyte :
             forall {ms ptr byte},
               MemoryBigIntptr.MMEP.MemSpec.read_byte_spec (lift_MemState ms) ptr byte ->
               exists fin_byte, byte = lift_SByte fin_byte.
           Proof.
-          Admitted.
+            intros ms ptr byte READ.
+            destruct READ as [ALLOWED READ].
+
+            red in ALLOWED.
+            destruct ALLOWED as (aid&ALLOC&ALLOWED).
+            pose proof ALLOC as READ_RAW.
+            apply inf_byte_allocated_read_byte_raw in READ_RAW.
+            destruct READ_RAW as (byte'&READ_RAW).
+
+            cbn in READ.
+            destruct READ as (?&?&(?&?)&READ).
+            subst.
+            rewrite READ_RAW in READ.
+            cbn in READ.
+            rewrite ALLOWED in READ.
+
+            destruct READ; subst.
+            clear H.
+
+            destruct ms as [[ms fss hs] msprovs].
+            cbn in READ_RAW.
+            eapply read_byte_raw_lifted in READ_RAW.
+            destruct READ_RAW as (fin_byte&READ_RAW&BYTE_REF).
+            exists fin_byte.
+            unfold sbyte_refine in BYTE_REF.
+            symmetry.
+            apply lift_SByte_convert_SByte_inverse; auto.
+          Qed.
 
           apply read_byte_spec_lifted_memory_lifted_sbyte in READ.
           destruct READ as (fin_byte & LIFT_BYTE).
@@ -21361,12 +21387,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
        MemState_refine_prop ms_inf ms_fin
 
-       MemState_refine_prop = 
+       MemState_refine_prop =
        fun (ms_inf : InfMem.MMEP.MMSP.MemState) (ms_fin : FinMem.MMEP.MMSP.MemState) =>
        let ms_fin_lifted := lift_MemState ms_fin in InfMem.MMEP.MemSpec.MemState_eqv ms_inf ms_fin_lifted
        : InfMem.MMEP.MMSP.MemState -> FinMem.MMEP.MMSP.MemState -> Prop
 
-       InfMem.MMEP.MemSpec.MemState_eqv = 
+       InfMem.MMEP.MemSpec.MemState_eqv =
        fun ms1 ms2 : InfMem.MMEP.MMSP.MemState =>
        InfMem.MMEP.MemSpec.preserve_allocation_ids ms1 ms2 /\
        InfMem.MMEP.MemSpec.read_byte_preserved ms1 ms2 /\
@@ -21587,7 +21613,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             rewrite <- H0 in H2.
             eapply int_to_ptr_succeeds_regardless_of_provenance in H2 as (?&?).
             rewrite BAD_CONV in H2.
-            inv H2.            
+            inv H2.
           }
       }
 
@@ -21683,7 +21709,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             rewrite Heqo0.
             cbn.
             rewrite <- H1.
-            eapply in_map; eauto.            
+            eapply in_map; eauto.
           }
 
           (* k was allocated in the original finite memory, which
@@ -23799,7 +23825,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         eapply Returns_vis_inversion in RETb.
                         destruct RETb as [[] _].
                       }
-                      
+
                       cbn; red.
                       left.
                       exists msg.
