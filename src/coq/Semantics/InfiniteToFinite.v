@@ -13799,6 +13799,18 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Qed.
 
   (* TODO: Move this *)
+  Lemma convert_MemState_MemState_refine_prop :
+    forall ms_inf ms_fin,
+      convert_MemState ms_inf = NoOom ms_fin ->
+      MemState_refine_prop ms_inf ms_fin.
+  Proof.
+    intros ms_inf ms_fin CONV.
+    red.
+    erewrite lift_MemState_convert_MemState_inverse; eauto.
+    reflexivity.
+  Qed.
+
+  (* TODO: Move this *)
   Lemma mem_pop_spec_inf_fin_exists :
     forall {m_fin_start m_inf_start m_inf_final},
       MemState_refine_prop m_inf_start m_fin_start ->
@@ -14324,13 +14336,133 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         }
 
         { (* Address conversion OOM *)
+          (* May need to make sure this is in bounds *)
           admit.
         }
       }
     }
 
     (* Main lemma *)
-    admit.
+    pose proof convert_MemState_MemState_refine_prop m_inf_final m_fin_final MS_FIN_FINAL as MSR_FINAL.
+
+    exists m_fin_final.
+    split; auto.
+    split.
+    - (* bytes_freed *)
+      intros ptr IN_FRAME.
+
+      epose proof inf_fin_ptr_in_current_frame MSR IN_FRAME as
+        (ptr_inf & PTR_CONV & IN_FRAME_INF).      
+
+      eapply inf_fin_byte_not_allocated; eauto.
+    - (* non_frame_bytes_preserved *)
+      intros ptr aid NIN_FRAME.
+      pose proof FinToInfAddrConvertSafe.addr_convert_succeeds ptr as (ptr_inf & ADDR_CONV).
+      pose proof FinToInfAddrConvertSafe.addr_convert_safe _ _ ADDR_CONV as ADDR_CONV'.
+      epose proof fin_inf_ptr_not_in_current_frame MSR ADDR_CONV NIN_FRAME as NIN_FRAME_INF.
+
+      specialize (NON_FRAME_BYTES_PRESERVED ptr_inf aid NIN_FRAME_INF).
+      split; intros ALLOC.
+      + eapply inf_fin_byte_allocated; eauto.
+        apply NON_FRAME_BYTES_PRESERVED.
+        eapply fin_inf_byte_allocated; eauto.
+      + eapply inf_fin_byte_allocated; eauto.
+        apply NON_FRAME_BYTES_PRESERVED.
+        eapply fin_inf_byte_allocated; eauto.
+    - (* non_frame_bytes_read *)
+      intros ptr byte NIN_FRAME.
+      pose proof FinToInfAddrConvertSafe.addr_convert_succeeds ptr as (ptr_inf & ADDR_CONV).
+      pose proof FinToInfAddrConvertSafe.addr_convert_safe _ _ ADDR_CONV as ADDR_CONV'.
+      epose proof fin_inf_ptr_not_in_current_frame MSR ADDR_CONV NIN_FRAME as NIN_FRAME_INF.
+
+      specialize (NON_FRAME_BYTES_READ ptr_inf (lift_SByte byte) NIN_FRAME_INF).
+      split; intros ALLOC.
+      + eapply fin_inf_read_byte_spec in ALLOC; eauto.
+        2: {
+          apply convert_SByte_lift_SByte.
+        }
+        eapply NON_FRAME_BYTES_READ in ALLOC.
+        eapply inf_fin_read_byte_spec in ALLOC; eauto.
+        destruct ALLOC as (byte_fin&RBS&BYTE).
+        red in BYTE.
+        apply lift_SByte_convert_SByte_inverse in BYTE.
+        apply lift_SByte_injective in BYTE.
+        subst.
+        auto.
+      + eapply fin_inf_read_byte_spec in ALLOC; eauto.
+        2: {
+          apply convert_SByte_lift_SByte.
+        }
+        eapply NON_FRAME_BYTES_READ in ALLOC.
+        eapply inf_fin_read_byte_spec in ALLOC; eauto.
+        destruct ALLOC as (byte_fin&RBS&BYTE).
+        red in BYTE.
+        apply lift_SByte_convert_SByte_inverse in BYTE.
+        apply lift_SByte_injective in BYTE.
+        subst.
+        auto.
+    - (* pop_frame *)
+      clear - MSR MSR_FINAL CAN_POP POP_FRAME.
+
+      intros fs1 fs2 FSP POP.
+      red; red in FSP.
+      red in POP.
+      destruct fs1 as [f1 | fs1 f1]; try contradiction.
+
+      destruct m_fin_start as [[ms_fin fss_fin hs_fin] msprovs_fin].
+      destruct m_fin_final as [[ms_fin' fss_fin' hs_ifin'] msprovs_fin'].
+      destruct m_inf_start as [[ms_inf fss_inf hs_inf] msprovs_inf].
+      destruct m_inf_final as [[ms_inf' fss_inf' hs_inf'] msprovs_inf'].
+
+      cbn in *.
+      apply MemState_refine_prop_frame_stack_preserved in MSR, MSR_FINAL.
+      red in MSR, MSR_FINAL.
+      unfold MemoryBigIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *.
+      cbn in *.
+
+      apply FinMemMMSP.frame_stack_inv in FSP as [FSP | FSP].
+      2: { (* Singleton is contradiction *)
+        destruct FSP as (?&?&?&?&?).
+        inv H0.
+      }
+
+      destruct FSP as (fs1' & fs2' & f2 & f3 & FSS_FIN & SNOC & FS_EQV & F_EQV).
+      symmetry in SNOC; inv SNOC.
+
+      specialize (MSR fss_inf).
+      destruct MSR as [MSR _]; forward MSR; [reflexivity|].
+
+      apply InfMemMMSP.frame_stack_inv in MSR as [MSR | MSR].
+      2: { (* Singleton is contradiction *)
+        destruct MSR as (?&?&?&?&?).
+        rewrite lift_FrameStack_snoc in H.
+        inv H.
+      }
+
+      destruct MSR as (?&?&?&?&?&?&?&?); subst.
+      rewrite lift_FrameStack_snoc in H.
+      symmetry in H; inv H.
+
+      
+      specialize (POP_FRAME (InfMemMMSP.Snoc x0 x2) x0).
+      forward POP_FRAME; [reflexivity|].
+      forward POP_FRAME; [red; reflexivity|].
+
+      specialize (MSR_FINAL x0).
+      destruct MSR_FINAL as [MSR_FINAL _]; forward MSR_FINAL; auto.
+
+      rewrite <- POP, <- FS_EQV.
+      eapply frame_stack_eqv_lift_inf_fin.
+      rewrite MSR_FINAL, H1.
+      reflexivity.
+    - (* mempop_invariants *)
+      clear - MSR MSR_FINAL INVARIANTS.
+      destruct INVARIANTS.
+      split.
+      + (* Preserve allocation ids *)
+        eapply inf_fin_preserve_allocation_ids; eauto.
+      + (* Heap preserved *)
+        eapply inf_fin_heap_preserved; eauto.
   Admitted.
 
   (* TODO: Move this *)
@@ -21353,17 +21485,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Qed.
 
   #[global] Hint Resolve fin_inf_malloc_bytes_spec_MemPropT_ub : FinInf.
-
-  Lemma convert_MemState_MemState_refine_prop :
-    forall ms_inf ms_fin,
-      convert_MemState ms_inf = NoOom ms_fin ->
-      MemState_refine_prop ms_inf ms_fin.
-  Proof.
-    intros ms_inf ms_fin CONV.
-    red.
-    erewrite lift_MemState_convert_MemState_inverse; eauto.
-    reflexivity.
-  Qed.
 
   (* TODO: Prove this / move this *)
   Lemma inf_fin_free_spec :
