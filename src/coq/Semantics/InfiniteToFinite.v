@@ -874,8 +874,8 @@ Module InfiniteToFinite.
 
   Definition model_E1E2_L3_orutt_strict p1 p2 :=
     L3_E1E2_orutt_strict
-      (TopLevelBigIntptr.model_oom_L3 p1)
-      (TopLevel64BitIntptr.model_oom_L3 p2).
+      (TopLevelBigIntptr.model_oom_L3 TLR_INF.R.refine_res2 p1)
+      (TopLevel64BitIntptr.model_oom_L3 TLR_FIN.R.refine_res2 p2).
 
   Definition lift_local_env (lenv : InterpreterStack64BitIntptr.LLVM.Local.local_env) : InterpreterStackBigIntptr.LLVM.Local.local_env.
     refine (map _ lenv).
@@ -28455,7 +28455,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         forward IHREL; auto.
         pfold. red. constructor; auto.
         punfold IHREL.
-      - (* oruttF's EqTauR *)
+      - (* oruttF's Equator *)
         forward IHREL.
         { repeat red.
           repeat red in RUN.
@@ -28473,6 +28473,25 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
   (* Extra stuff from the proof of the above lemma that needs to get cleaned up... But there's some other stuff in here that I need to not accidentally delete *)
 
+  (* TODO: Move this *)
+  Lemma MemState_refine_prop_initial :
+    MemState_refine_prop InfMemMMSP.initial_memory_state FinMemMMSP.initial_memory_state.
+  Proof.
+    red. red.
+    split; [| split; [| split; [| split; [| split; [| split]]]]].
+    - red.
+      intros p.
+      split; intros USED;
+        red; red in USED; cbn in *;
+        auto.
+    - red.
+      split.
+      + (* Read byte allowed *)
+        red.
+        intros ptr.
+        split; intros ALLOWED.
+  Admitted.
+
   Lemma model_E1E2_L3_orutt_strict_sound
     (p : list
            (LLVMAst.toplevel_entity
@@ -28480,9 +28499,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))) :
     model_E1E2_L3_orutt_strict p p.
   Proof.
-    apply model_E1E2_13_orutt_strict;
+    eapply model_E1E2_23_orutt_strict;
       [ apply model_E1E2_L2_orutt_strict_sound
-      | apply local_stack_refine_strict_empty
+      | apply MemState_refine_prop_initial
       ].
   Qed.
 
