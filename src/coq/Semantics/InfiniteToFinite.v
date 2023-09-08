@@ -28505,6 +28505,37 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       ].
   Qed.
 
+  Definition L4_E1E2_orutt_strict
+    (t1 : PropT InfLP.Events.L4 (InfMemMMSP.MemState *
+                                   (MemPropT.store_id * (InfLLVM.Local.local_env * InfLLVM.Stack.lstack * (InfLLVM.Global.global_env * InfLP.Events.DV.dvalue)))))
+    t2
+    : Prop :=
+    forall t', t2 t' ->
+               exists t, t1 t /\
+                           orutt
+                             L4_refine_strict
+                             L4_res_refine_strict
+                             (MemState_refine × (eq × (local_refine_strict × stack_refine_strict × (global_refine_strict × DVC1.dvalue_refine_strict))))
+                             t t' (OOM:=OOME).
+
+  Definition model_E1E2_L4_orutt_strict p1 p2 :=
+    L4_E1E2_orutt_strict
+      (TopLevelBigIntptr.model_oom_L4 TLR_INF.R.refine_res2 TLR_INF.R.refine_res3 p1)
+      (TopLevel64BitIntptr.model_oom_L4 TLR_FIN.R.refine_res2 TLR_FIN.R.refine_res3 p2).
+
+  Lemma model_E1E2_L4_orutt_strict_sound
+    (p : list
+           (LLVMAst.toplevel_entity
+              LLVMAst.typ
+              (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))) :
+    model_E1E2_L4_orutt_strict p p.
+  Proof.
+    eapply model_E1E2_34_orutt_strict;
+      [ apply model_E1E2_L2_orutt_strict_sound
+      | apply MemState_refine_prop_initial
+      ].
+  Qed.
+
   (* If
 
     - ti2 is a refinement of ti1 tf2 refines ti2 tf1 refines tf2 at
