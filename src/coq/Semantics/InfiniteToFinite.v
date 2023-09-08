@@ -862,7 +862,9 @@ Module InfiniteToFinite.
 
   (** More refinement relations *)
   Definition L3_E1E2_orutt_strict (t1 : PropT InfLP.Events.L3 (InfMemMMSP.MemState *
-                                                                 (MemPropT.store_id * (InfLLVM.Local.local_env * InfLLVM.Stack.lstack * (InfLLVM.Global.global_env * InfLP.Events.DV.dvalue))))) t2
+                                                                 (MemPropT.store_id * (InfLLVM.Local.local_env * InfLLVM.Stack.lstack * (InfLLVM.Global.global_env * InfLP.Events.DV.dvalue)))))
+    (t2 : PropT FinLP.Events.L3 (FinMemMMSP.MemState *
+                                   (MemPropT.store_id * (FinLLVM.Local.local_env * FinLLVM.Stack.lstack * (FinLLVM.Global.global_env * FinLP.Events.DV.dvalue)))))
     : Prop :=
     forall t', t2 t' ->
                exists t, t1 t /\
@@ -28523,6 +28525,14 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       (TopLevelBigIntptr.model_oom_L4 TLR_INF.R.refine_res2 TLR_INF.R.refine_res3 p1)
       (TopLevel64BitIntptr.model_oom_L4 TLR_FIN.R.refine_res2 TLR_FIN.R.refine_res3 p2).
 
+  Lemma model_E1E2_34_orutt_strict :
+    forall t_inf t_fin,
+      L3_E1E2_orutt_strict t_inf t_fin ->
+      L4_E1E2_orutt_strict (InfLLVM.Pick.model_undef TLR_INF.R.refine_res3 t_inf) (FinLLVM.Pick.model_undef TLR_FIN.R.refine_res3 t_fin).
+  Proof.
+    intros t_inf t_fin REL.
+  Admitted.
+
   Lemma model_E1E2_L4_orutt_strict_sound
     (p : list
            (LLVMAst.toplevel_entity
@@ -28530,10 +28540,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))) :
     model_E1E2_L4_orutt_strict p p.
   Proof.
-    eapply model_E1E2_34_orutt_strict;
-      [ apply model_E1E2_L2_orutt_strict_sound
-      | apply MemState_refine_prop_initial
-      ].
+    apply model_E1E2_34_orutt_strict; apply model_E1E2_L3_orutt_strict_sound.
   Qed.
 
   (* If
