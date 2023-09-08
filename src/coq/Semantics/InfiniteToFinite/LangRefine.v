@@ -1959,6 +1959,52 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
+  Definition L4_refine_strict A B (e1 : IS1.LP.Events.L4 A) (e2 : IS2.LP.Events.L4 B) : Prop.
+  Proof.
+    refine (match e1, e2 with
+            | inl1 (E1.ExternalCall dt1 f1 args1), inl1 (E2.ExternalCall dt2 f2 args2) =>
+                _
+            | inr1 (inl1 e1), inr1 (inl1 e2) =>
+                _ (* OOME *)
+            | inr1 (inr1 (inl1 e0)), inr1 (inr1 (inl1 e1)) =>
+                _ (* UBE *)
+            | inr1 (inr1 (inr1 (inl1 e1))), inr1 (inr1 (inr1 (inl1 e2))) =>
+                _ (* DebugE *)
+            | inr1 (inr1 (inr1 (inr1 e1))), inr1 (inr1 (inr1 (inr1 e2))) =>
+                _ (* FailureE *)
+            | _, _ =>
+                (* Mismatch of event types *)
+                False
+            end).
+
+    (* External Calls *)
+    { (* Doesn't say anything about return value... *)
+      apply (dt1 = dt2 /\
+               uvalue_refine_strict f1 f2 /\
+               Forall2 dvalue_refine_strict args1 args2).
+    }
+
+    (* OOME *)
+    { apply True.
+    }
+
+    (* UBE *)
+    { apply True.
+    }
+
+    (* DebugE *)
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
+    }
+
+    (* FailureE *)
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
+    }
+  Defined.
+
   (*
   Definition event_converted_lazy A B (e1 : IS1.LP.Events.L0 A) (e2 : IS2.LP.Events.L0 B) : Prop.
   Proof.
@@ -2703,6 +2749,56 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       apply ((Pre <-> Pre0) /\
                uvalue_refine_strict x x0 /\
                dvalue_refine_strict r1 r2).
+    }
+
+    (* OOME *)
+    { apply True.
+    }
+
+    (* UBE *)
+    { apply True.
+    }
+
+    (* DebugE *)
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
+    }
+
+    (* FailureE *)
+    { destruct e1 as [e1_msg ?].
+      destruct e2 as [e2_msg ?].
+      exact (e1_msg = e2_msg).
+    }
+  Defined.
+
+  Definition L4_res_refine_strict A B (e1 : IS1.LP.Events.L4 A) (res1 : A) (e2 : IS2.LP.Events.L4 B) (res2 : B) : Prop.
+  Proof.
+    refine (match e1, e2 with
+            | inl1 e1, inl1 e2 =>
+                _
+            | inr1 (inl1 e1), inr1 (inl1 e2) =>
+                _ (* OOME *)
+            | inr1 (inr1 (inl1 e0)), inr1 (inr1 (inl1 e1)) =>
+                _ (* UBE *)
+            | inr1 (inr1 (inr1 (inl1 e1))), inr1 (inr1 (inr1 (inl1 e2))) =>
+                _ (* DebugE *)
+            | inr1 (inr1 (inr1 (inr1 e1))), inr1 (inr1 (inr1 (inr1 e2))) =>
+                _ (* FailureE *)
+            | _, _ =>
+                (* Mismatch of event types *)
+                False
+            end).
+
+    (* External Calls *)
+    { inv e1.
+      inv e2.
+
+      apply (t = t0 /\
+               uvalue_refine_strict f f0 /\
+               Forall2 dvalue_refine_strict args args0 /\
+               dvalue_refine_strict res1 res2
+            ).
     }
 
     (* OOME *)
