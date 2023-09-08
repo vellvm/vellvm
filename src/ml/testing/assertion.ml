@@ -313,7 +313,7 @@ and parse_srctgt_assertion (filename: string) (line: string) : test list =
            let  (src_t, tgt_t) = find_ty src, find_ty tgt in
            (* TODO: Need to edit dummy_bool into something determined dynamically,
               then there can be two modes *)
-           let dummy_bool = true in
+           let dummy_bool = false in
            begin match dummy_bool with
              | true -> 
                (* TODO: Need to replace the following command with generate program and do SRCTGTTEST with it -> type to dtype*)

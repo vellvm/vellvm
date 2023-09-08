@@ -129,7 +129,7 @@ let make_test name ll_ast t : string * assertion  =
             | Error e ->
                 let buf = Buffer.create 16 in
                 List.iter (Buffer.add_char buf) (showProg sum_ast);
-              Printf.printf "aaabbb\n%s" (Buffer.contents buf);
+              Printf.printf "%s\n" (Buffer.contents buf);
               failwith (Printf.sprintf "tgt - %s" (Interpreter.string_of_exit_condition e))
           end
         in
@@ -247,7 +247,7 @@ let test_file path =
   end
 
 let test_dir dir =
-  let _ = Printf.printf "===> TESTING ASSERTIONS IN: %s\n" dir in
+  Printf.printf "===> TESTING ASSERTIONS IN: %s\n" dir;
   Platform.configure();
   let pathlist = Test.ll_files_of_dir dir in
   let files = List.filter_map (fun path ->

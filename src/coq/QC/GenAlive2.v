@@ -398,8 +398,8 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
           | TYPE_Struct vars =>
               failGen "Struct generation unimplemented"
           | TYPE_Packed_struct vars =>
-              failGen "Unimplemented"
-          | _ => failGen "Packed Struct generation unimplemented"
+               failGen "Packed Struct generation unimplemented"
+          | _ => failGen "Unimplemented"
           end in
     match sz with
     | 0%nat => (* Generate value-like expression *)
@@ -661,12 +661,14 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     ret (src_fn_blocks, tgt_fn_blocks)
   .
 
-  Definition assemble_runner_def (args_t : list typ) (ret_t : typ) (fn_str : string) (pred_fn_blocks : runnable_blocks) : definition typ runnable_blocks
+  (* Assemble the wrapper function *)
+  Definition assemble_runner_def (ret_t : typ) (fn_str : string) (pred_fn_blocks : runnable_blocks) : definition typ runnable_blocks
     :=
     let name := Name ("runner" ++ fn_str) in
     let runner_typ :=
-      TYPE_Function ret_t args_t false in
-    let param_attr_slots := map (fun t => []) args_t in
+      TYPE_Function ret_t [] false in
+    (* let param_attr_slots := map (fun _ => []) args_t in *)
+    let param_attr_slots := [] in
     let prototype :=
       mk_declaration name runner_typ
         ([], param_attr_slots)
@@ -679,8 +681,8 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     :=
     reset_local_ctx;;
     '(src_fn_blocks, tgt_fn_blocks) <- gen_pred_fn_blocks args_t ret_t src_fn_str tgt_fn_str;;
-    let src_def := assemble_runner_def args_t ret_t src_fn_str src_fn_blocks in
-    let tgt_def := assemble_runner_def args_t ret_t tgt_fn_str tgt_fn_blocks in
+    let src_def := assemble_runner_def ret_t src_fn_str src_fn_blocks in
+    let tgt_def := assemble_runner_def ret_t tgt_fn_str tgt_fn_blocks in
     ret (TLE_Definition src_def, TLE_Definition tgt_def).
 
   
