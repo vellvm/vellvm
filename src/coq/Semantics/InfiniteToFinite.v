@@ -325,190 +325,6 @@ Module InfiniteToFinite.
               ret (ix, mb')).
   Defined.
 
-  Definition lift_memory (mem : FinMemMMSP.memory) : InfMemMMSP.memory :=
-    IntMaps.IM.map lift_mem_byte mem.
-
-  Lemma IntMaps_map_list_map_Equal :
-    forall {A B} (f : A -> B) l,
-      IntMaps.IM.Equal (IntMaps.IM.map f (IntMaps.IP.of_list l)) (IntMaps.IP.of_list (List.map (fun '(i, x) => (i, f x)) l)).
-  Proof.
-  Admitted.
-
-  Lemma Forall2_cons_inversion :
-    forall {A B} f (x:A) (y:B) xs ys,
-      Forall2 f (x::xs) (y::ys) -> f x y /\ Forall2 f xs ys.
-  Proof.
-    intros.
-    inversion H; subst.
-    tauto.
-  Qed.
-
-  Lemma lift_memory_convert_memory_inversion :
-    forall {mem_inf mem_fin},
-      convert_memory mem_inf = NoOom mem_fin ->
-      IntMaps.IM.Equal (lift_memory mem_fin) mem_inf.
-  Proof.
-    intros mem_inf mem_fin H.
-    unfold convert_memory in H.
-    unfold lift_memory.
-    unfold FinMemMMSP.memory in *.
-    unfold IntMaps.IM.key in *.
-    destruct (map_monad
-        (fun '(ix, mb) =>
-         _ <- LLVMParams64BitIntptr.ITOP.int_to_ptr ix PROV.nil_prov;;
-         mb' <- convert_mem_byte mb;; ret (ix, mb'))
-        (IntMaps.IM.elements (elt:=InfMemMMSP.mem_byte) mem_inf)) eqn: EQ1; [| inversion H].
-
-    cbn in H.
-    inversion H.
-    subst; clear H.
-    apply map_monad_oom_forall2 in EQ1.
-
-    apply IntMaps.IP.F.Equal_mapsto_iff.
-    intros.
-
-    rewrite IntMaps_map_list_map_Equal.
-    rewrite IntMaps.IP.of_list_1.
-    - rewrite (@IntMaps.IP.F.elements_mapsto_iff _ _ k e).
-      revert k e.
-      remember (fun (a : Z * InfMemMMSP.mem_byte) (b : Z * FinMemMMSP.mem_byte) =>
-             (let
-            '(ix, mb) := a in
-             _ <- LLVMParams64BitIntptr.ITOP.int_to_ptr ix PROV.nil_prov;;
-             mb' <- convert_mem_byte mb;;
-             ret (ix, mb')) = NoOom b) as body.
-      remember (IntMaps.IM.elements (elt:=InfMemMMSP.mem_byte) mem_inf) as l_inf.
-      clear mem_inf Heql_inf.
-      revert l_inf EQ1.
-      induction l; intros.
-      + destruct l_inf.
-        * intros. reflexivity.
-        * inversion EQ1.
-      + destruct l_inf.
-        * inversion EQ1.
-        * inversion EQ1; subst.
-          intros.
-          destruct p.
-          destruct (LLVMParams64BitIntptr.ITOP.int_to_ptr k0 PROV.nil_prov) eqn: EQ2; [|inversion H2].
-          cbn in H2.
-          destruct (convert_mem_byte m) eqn: EQ3; [|inversion H2].
-          inversion H2.
-          subst.
-          cbn.
-          split; intros.
-          -- apply SetoidList.InA_cons in H.
-             destruct H as [HEQ | HR].
-             ++ inversion HEQ.
-                cbn in H. cbn in H0.
-                subst.
-                apply lift_mem_byte_convert_mem_byte_inversion in EQ3.
-                rewrite EQ3.
-                apply SetoidList.InA_cons_hd. reflexivity.
-             ++ apply SetoidList.InA_cons_tl.
-                apply IHl.
-                apply Forall2_cons_inversion in EQ1.
-                destruct EQ1 as [_ H].
-                apply H.
-                assumption.
-          -- apply SetoidList.InA_cons in H.
-             destruct H as [HEQ | HR].
-             ++ inversion HEQ.
-                cbn in H. cbn in H0.
-                subst.
-                apply lift_mem_byte_convert_mem_byte_inversion in EQ3.
-                rewrite EQ3.
-                apply SetoidList.InA_cons_hd. reflexivity.
-             ++ apply SetoidList.InA_cons_tl.
-                apply (@IHl l_inf).
-                apply Forall2_cons_inversion in EQ1.
-                destruct EQ1 as [_ H].
-                apply H.
-                assumption.
-    - clear k. clear e.
-      assert (SetoidList.NoDupA (IntMaps.IM.eq_key (elt:=InfMemMMSP.mem_byte))
-                (IntMaps.IM.elements mem_inf)).
-      { apply IntMaps.IM.elements_3w. }
-      remember (IntMaps.IM.elements (elt:=InfMemMMSP.mem_byte) mem_inf) as l_inf.
-      clear mem_inf Heql_inf.
-      revert l EQ1.
-      induction H; intros.
-      + inversion EQ1. subst. cbn. auto.
-      + inversion EQ1. subst. cbn.
-        destruct x.
-        destruct (LLVMParams64BitIntptr.ITOP.int_to_ptr k PROV.nil_prov) eqn: EQ2; [|inversion H3].
-        cbn in H3.
-        destruct (convert_mem_byte m) eqn: EQ3; [|inversion H3].
-        inversion H3.
-        subst. clear H3.
-        constructor.
-        2 : { apply IHNoDupA. assumption. }
-        intros X.
-        apply H.
-        clear H H0 IHNoDupA EQ1 a EQ2 EQ3.
-
-        induction H5.
-        * inversion X.
-        * destruct x.
-          destruct (LLVMParams64BitIntptr.ITOP.int_to_ptr z PROV.nil_prov) eqn: EQ2; [|inversion H].
-          cbn in H.
-          destruct (convert_mem_byte m1) eqn: EQ3; [|inversion H].
-          inversion H.
-          subst. clear H.
-          apply SetoidList.InA_cons in X.
-          destruct X as [HEQ | HR].
-          -- apply SetoidList.InA_cons_hd.
-             apply HEQ.
-          -- apply SetoidList.InA_cons_tl.
-             apply IHForall2.
-             apply HR.
-  Qed.
-
-  Definition convert_Frame (f : InfMemMMSP.Frame) : OOM (FinMemMMSP.Frame) :=
-    map_monad InfToFinAddrConvert.addr_convert f.
-
-  Definition lift_Frame (f : FinMemMMSP.Frame) : InfMemMMSP.Frame :=
-    map fin_to_inf_addr f.
-
-  Definition convert_FrameStack (fs : InfMemMMSP.FrameStack) : OOM (FinMemMMSP.FrameStack).
-    induction fs.
-    - refine (f' <- convert_Frame f;;
-              ret (FinMemMMSP.Singleton f')).
-    - refine (f' <- convert_Frame f;;
-              fs' <- IHfs;;
-              ret (FinMemMMSP.Snoc fs' f')).
-  Defined.
-
-  Definition lift_FrameStack (fs : FinMemMMSP.FrameStack) : InfMemMMSP.FrameStack.
-    induction fs.
-    - refine (let f' := lift_Frame f in
-              InfMemMMSP.Singleton f').
-    - refine (let f' := lift_Frame f in
-              InfMemMMSP.Snoc IHfs f').
-  Defined.
-
-  Definition convert_Block (b : InfMemMMSP.Block) : OOM (FinMemMMSP.Block)
-    := map_monad InfToFinAddrConvert.addr_convert b.
-
-  Definition lift_Block (b : FinMemMMSP.Block) : InfMemMMSP.Block
-    := map fin_to_inf_addr b.
-
-  Lemma lift_Block_convert_Block_inverse :
-    forall {b_inf b_fin},
-      convert_Block b_inf = NoOom b_fin ->
-      lift_Block b_fin = b_inf.
-  Proof.
-  Admitted.
-
-
-  Definition convert_Heap (h : InfMemMMSP.Heap) : OOM (FinMemMMSP.Heap).
-    refine (blocks <- map_monad _ (IntMaps.IM.elements h);;
-            ret (IntMaps.IP.of_list blocks)).
-
-    refine (fun '(ix, b) =>
-              b' <- convert_Block b;;
-              ret (ix, b')).
-  Defined.
-
   Definition in_bounds (z:Z) : bool :=
     match LLVMParams64BitIntptr.ITOP.int_to_ptr z PROV.nil_prov with
     | NoOom _ => true
@@ -522,7 +338,6 @@ Module InfiniteToFinite.
     unfold LLVMParams64BitIntptr.ITOP.int_to_ptr.
     break_match; break_match_hyp; inversion Heqo; lia.
   Qed.
-
 
   Lemma in_bounds_exists_addr : forall z (p:Prov), in_bounds z = true <-> exists addr, LLVMParams64BitIntptr.PTOI.ptr_to_int addr = z /\ snd addr = p.
   Proof.
@@ -552,6 +367,61 @@ Module InfiniteToFinite.
       destruct i.
       cbn.
       lia.
+  Qed.
+
+  Lemma in_bounds_exists_addr' : forall z, in_bounds z = true <-> exists addr, LLVMParams64BitIntptr.PTOI.ptr_to_int addr = z.
+  Proof.
+    intros.
+    unfold in_bounds.
+    split; intros H.
+    - break_match_hyp_inv.
+      exists (fst a, FinPROV.nil_prov).
+      unfold LLVMParams64BitIntptr.ITOP.int_to_ptr in Heqo.
+      break_match_hyp; inversion Heqo.
+      unfold LLVMParams64BitIntptr.PTOI.ptr_to_int. cbn.
+      apply unsigned_repr_eq. lia.
+    - destruct H as [ptr HP].
+      subst.
+      unfold LLVMParams64BitIntptr.ITOP.int_to_ptr.
+      unfold LLVMParams64BitIntptr.PTOI.ptr_to_int.
+      break_match.
+      break_match_hyp; inversion Heqo.
+      reflexivity.
+      break_match_hyp; inversion Heqo.
+      destruct ptr.
+      clear Heqo H0.
+      cbn in *.
+      rewrite <- Heqb.
+      unfold FiniteAddresses.Iptr in i.
+      destruct i.
+      cbn.
+      lia.
+  Qed.
+
+  Definition lift_memory (mem : FinMemMMSP.memory) : InfMemMMSP.memory :=
+    let mem' := IntMaps.IP.filter_dom in_bounds mem in
+    IntMaps.IM.map lift_mem_byte mem'.
+
+  Lemma IntMaps_map_list_map_Equal :
+    forall {A B} (f : A -> B) l,
+      IntMaps.IM.Equal (IntMaps.IM.map f (IntMaps.IP.of_list l)) (IntMaps.IP.of_list (List.map (fun '(i, x) => (i, f x)) l)).
+  Proof.
+  Admitted.
+
+  Lemma IntMaps_filter_dom_list_filter_Equal :
+    forall {A : Type} (f : IntMaps.IM.key -> bool) (l : list (IntMaps.IM.key * A)),
+      IntMaps.IM.Equal (IntMaps.IP.filter_dom f (IntMaps.IP.of_list l))
+        (IntMaps.IP.of_list (filter (fun '(i, x) => f i) l)).
+  Proof.
+  Admitted.
+
+  Lemma Forall2_cons_inversion :
+    forall {A B} f (x:A) (y:B) xs ys,
+      Forall2 f (x::xs) (y::ys) -> f x y /\ Forall2 f xs ys.
+  Proof.
+    intros.
+    inversion H; subst.
+    tauto.
   Qed.
 
   Lemma filter_dom_map_eq :
@@ -738,6 +608,242 @@ Module InfiniteToFinite.
     apply find_filter_None.
     assumption.
   Qed.
+
+  Lemma find_filter_dom_false :
+    forall {elt m k f},
+      f k = false ->
+      IntMaps.IM.find (elt:=elt) k (IntMaps.IP.filter_dom f m) = None.
+  Proof.
+    intros elt m k f F.
+    unfold IntMaps.IP.filter_dom.
+    apply IntMaps_find_None.
+    intros e CONTRA.
+    apply IntMaps.IP.filter_iff in CONTRA; try typeclasses eauto.
+    destruct CONTRA as [_ CONTRA].
+    rewrite F in CONTRA; inv CONTRA.
+  Qed.
+  
+  #[global] Instance filter_dom_Proper {elt f} :
+    Proper (IntMaps.IM.Equal (elt:=elt) ==> IntMaps.IM.Equal) (IntMaps.IP.filter_dom f).
+  Proof.
+    unfold Proper, respectful.
+    intros x y EQ.
+    red.
+    intros y0.
+    destruct (IntMaps.IM.find (elt:=elt) y0 (IntMaps.IP.filter_dom f x)) eqn:FIND.
+    - apply find_filter_dom_true in FIND as (FIND&TRUE).
+      red in EQ.
+      rewrite EQ in FIND.
+      symmetry.
+      apply find_filter_dom_true.
+      split; auto.
+    - (* Two ways for this to be none... Either y0 was filtered out,
+           or y0 was not in the original map *)
+      destruct (IntMaps.IM.find (elt:=elt) y0 x) eqn:FIND'.
+      + destruct (f y0) eqn:F.
+        * epose proof find_filter_dom_true f x y0 e.
+          destruct H.
+          forward H0; auto.
+          rewrite FIND in H0.
+          discriminate.
+        * symmetry.
+          apply find_filter_dom_false; auto.
+      + symmetry.
+        apply find_filter_dom_None.
+        rewrite <- EQ.
+        auto.
+  Qed.
+
+
+  Lemma lift_memory_convert_memory_inversion :
+    forall {mem_inf mem_fin},
+      convert_memory mem_inf = NoOom mem_fin ->
+      IntMaps.IM.Equal (lift_memory mem_fin) mem_inf.
+  Proof.
+    intros mem_inf mem_fin H.
+    unfold convert_memory in H.
+    unfold lift_memory.
+    unfold FinMemMMSP.memory in *.
+    unfold IntMaps.IM.key in *.
+    destruct (map_monad
+                (fun '(ix, mb) =>
+                   _ <- LLVMParams64BitIntptr.ITOP.int_to_ptr ix PROV.nil_prov;;
+                   mb' <- convert_mem_byte mb;; ret (ix, mb'))
+                (IntMaps.IM.elements (elt:=InfMemMMSP.mem_byte) mem_inf)) eqn: EQ1; [| inversion H].
+
+    cbn in H.
+    inversion H.
+    subst; clear H.
+    apply map_monad_oom_forall2 in EQ1.
+
+    apply IntMaps.IP.F.Equal_mapsto_iff.
+    intros.
+
+    rewrite filter_dom_map_eq.
+    rewrite IntMaps_map_list_map_Equal.
+    rewrite IntMaps_filter_dom_list_filter_Equal.
+    rewrite IntMaps.IP.of_list_1.
+    - rewrite (@IntMaps.IP.F.elements_mapsto_iff _ _ k e).
+      revert k e.
+      remember (fun (a : Z * InfMemMMSP.mem_byte) (b : Z * FinMemMMSP.mem_byte) =>
+             (let
+            '(ix, mb) := a in
+             _ <- LLVMParams64BitIntptr.ITOP.int_to_ptr ix PROV.nil_prov;;
+             mb' <- convert_mem_byte mb;;
+             ret (ix, mb')) = NoOom b) as body.
+      remember (IntMaps.IM.elements (elt:=InfMemMMSP.mem_byte) mem_inf) as l_inf.
+      clear mem_inf Heql_inf.
+      revert l_inf EQ1.
+      induction l; intros.
+      + destruct l_inf.
+        * intros. reflexivity.
+        * inversion EQ1.
+      + destruct l_inf.
+        * inversion EQ1.
+        * inversion EQ1; subst.
+          intros.
+          destruct p.
+          destruct (LLVMParams64BitIntptr.ITOP.int_to_ptr k0 PROV.nil_prov) eqn: EQ2; [|inversion H2].
+          cbn in H2.
+          destruct (convert_mem_byte m) eqn: EQ3; [|inversion H2].
+          inversion H2.
+          subst.
+          cbn.
+          assert (in_bounds k0 = true) as IN_BOUNDS.
+          { apply in_bounds_exists_addr'.
+            exists a0.
+            erewrite ITOP.ptr_to_int_int_to_ptr; eauto.
+          }
+          rewrite IN_BOUNDS.
+          split; intros.
+          -- apply SetoidList.InA_cons in H.
+             destruct H as [HEQ | HR].
+             ++ inversion HEQ.
+                cbn in H. cbn in H0.
+                subst.
+                apply lift_mem_byte_convert_mem_byte_inversion in EQ3.
+                rewrite EQ3.
+                apply SetoidList.InA_cons_hd. reflexivity.
+             ++ apply SetoidList.InA_cons_tl.
+                apply IHl.
+                apply Forall2_cons_inversion in EQ1.
+                destruct EQ1 as [_ H].
+                apply H.
+                assumption.
+          -- apply SetoidList.InA_cons in H.
+             destruct H as [HEQ | HR].
+             ++ inversion HEQ.
+                cbn in H. cbn in H0.
+                subst.
+                apply lift_mem_byte_convert_mem_byte_inversion in EQ3.
+                rewrite EQ3.
+                apply SetoidList.InA_cons_hd. reflexivity.
+             ++ apply SetoidList.InA_cons_tl.
+                apply (@IHl l_inf).
+                apply Forall2_cons_inversion in EQ1.
+                destruct EQ1 as [_ H].
+                apply H.
+                assumption.
+    - clear k. clear e.
+      assert (SetoidList.NoDupA (IntMaps.IM.eq_key (elt:=InfMemMMSP.mem_byte))
+                (IntMaps.IM.elements mem_inf)).
+      { apply IntMaps.IM.elements_3w. }
+      remember (IntMaps.IM.elements (elt:=InfMemMMSP.mem_byte) mem_inf) as l_inf.
+      clear mem_inf Heql_inf.
+      revert l EQ1.
+      induction H; intros.
+      + inversion EQ1. subst. cbn. auto.
+      + inversion EQ1. subst. cbn.
+        destruct x.
+        destruct (LLVMParams64BitIntptr.ITOP.int_to_ptr k PROV.nil_prov) eqn: EQ2; [|inversion H3].
+        cbn in H3.
+        destruct (convert_mem_byte m) eqn: EQ3; [|inversion H3].
+        inversion H3.
+        subst. clear H3.
+
+        assert (in_bounds k = true) as IN_BOUNDS.
+        { apply in_bounds_exists_addr'.
+          exists a.
+          erewrite ITOP.ptr_to_int_int_to_ptr; eauto.
+        }
+        rewrite IN_BOUNDS.
+
+        constructor.
+        2 : { apply IHNoDupA. assumption. }
+        intros X.
+        apply H.
+        clear H H0 IHNoDupA EQ1 a EQ2 EQ3.
+
+        induction H5.
+        * inversion X.
+        * destruct x.
+          destruct (LLVMParams64BitIntptr.ITOP.int_to_ptr z PROV.nil_prov) eqn: EQ2; [|inversion H].
+          cbn in H.
+          destruct (convert_mem_byte m1) eqn: EQ3; [|inversion H].
+          inversion H.
+          subst. clear H.
+          cbn in X.
+          assert (in_bounds z = true) as IN_BOUNDS'.
+          { apply in_bounds_exists_addr'.
+            exists a.
+            erewrite ITOP.ptr_to_int_int_to_ptr; eauto.
+          }
+          rewrite IN_BOUNDS' in X.
+
+          apply SetoidList.InA_cons in X.
+          destruct X as [HEQ | HR].
+          -- apply SetoidList.InA_cons_hd.
+             apply HEQ.
+          -- apply SetoidList.InA_cons_tl.
+             apply IHForall2.
+             apply HR.
+  Qed.
+
+  Definition convert_Frame (f : InfMemMMSP.Frame) : OOM (FinMemMMSP.Frame) :=
+    map_monad InfToFinAddrConvert.addr_convert f.
+
+  Definition lift_Frame (f : FinMemMMSP.Frame) : InfMemMMSP.Frame :=
+    map fin_to_inf_addr f.
+
+  Definition convert_FrameStack (fs : InfMemMMSP.FrameStack) : OOM (FinMemMMSP.FrameStack).
+    induction fs.
+    - refine (f' <- convert_Frame f;;
+              ret (FinMemMMSP.Singleton f')).
+    - refine (f' <- convert_Frame f;;
+              fs' <- IHfs;;
+              ret (FinMemMMSP.Snoc fs' f')).
+  Defined.
+
+  Definition lift_FrameStack (fs : FinMemMMSP.FrameStack) : InfMemMMSP.FrameStack.
+    induction fs.
+    - refine (let f' := lift_Frame f in
+              InfMemMMSP.Singleton f').
+    - refine (let f' := lift_Frame f in
+              InfMemMMSP.Snoc IHfs f').
+  Defined.
+
+  Definition convert_Block (b : InfMemMMSP.Block) : OOM (FinMemMMSP.Block)
+    := map_monad InfToFinAddrConvert.addr_convert b.
+
+  Definition lift_Block (b : FinMemMMSP.Block) : InfMemMMSP.Block
+    := map fin_to_inf_addr b.
+
+  Lemma lift_Block_convert_Block_inverse :
+    forall {b_inf b_fin},
+      convert_Block b_inf = NoOom b_fin ->
+      lift_Block b_fin = b_inf.
+  Proof.
+  Admitted.
+
+
+  Definition convert_Heap (h : InfMemMMSP.Heap) : OOM (FinMemMMSP.Heap).
+    refine (blocks <- map_monad _ (IntMaps.IM.elements h);;
+            ret (IntMaps.IP.of_list blocks)).
+
+    refine (fun '(ix, b) =>
+              b' <- convert_Block b;;
+              ret (ix, b')).
+  Defined.
 
   Definition lift_Heap (h : FinMemMMSP.Heap) : InfMemMMSP.Heap
     :=
@@ -10901,35 +11007,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     destruct IN_BOUNDS; auto.
   Qed.
 
-  Lemma in_bounds_exists_addr' : forall z, in_bounds z = true <-> exists addr, LLVMParams64BitIntptr.PTOI.ptr_to_int addr = z.
-  Proof.
-    intros.
-    unfold in_bounds.
-    split; intros H.
-    - break_match_hyp_inv.
-      exists (fst a, FinPROV.nil_prov).
-      unfold LLVMParams64BitIntptr.ITOP.int_to_ptr in Heqo.
-      break_match_hyp; inversion Heqo.
-      unfold LLVMParams64BitIntptr.PTOI.ptr_to_int. cbn.
-      apply unsigned_repr_eq. lia.
-    - destruct H as [ptr HP].
-      subst.
-      unfold LLVMParams64BitIntptr.ITOP.int_to_ptr.
-      unfold LLVMParams64BitIntptr.PTOI.ptr_to_int.
-      break_match.
-      break_match_hyp; inversion Heqo.
-      reflexivity.
-      break_match_hyp; inversion Heqo.
-      destruct ptr.
-      clear Heqo H0.
-      cbn in *.
-      rewrite <- Heqb.
-      unfold FiniteAddresses.Iptr in i.
-      destruct i.
-      cbn.
-      lia.
-  Qed.
-
   Lemma in_in_bounds_is_in_bounds :
     forall addr m,
       MemState_in_bounds m ->
@@ -11049,6 +11126,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       MemState_refine_prop ms_inf ms_fin ->
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
       sbyte_refine byte_inf byte_fin ->
+      MemState_in_bounds ms_fin' ->
       Memory64BitIntptr.MMEP.MemSpec.set_byte_memory ms_fin addr_fin byte_fin ms_fin' ->
       exists ms_inf',
         MemoryBigIntptr.MMEP.MemSpec.set_byte_memory ms_inf addr_inf byte_inf ms_inf' /\
