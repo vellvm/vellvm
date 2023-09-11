@@ -398,6 +398,14 @@ Module InfiniteToFinite.
       lia.
   Qed.
 
+  Lemma in_bounds_ptr_to_int_fin :
+    forall addr_fin,
+      is_true (in_bounds (LLVMParams64BitIntptr.PTOI.ptr_to_int addr_fin)).
+  Proof.
+    intros addr_fin.
+    eapply in_bounds_exists_addr'; eauto.
+  Qed.
+
   Definition lift_memory (mem : FinMemMMSP.memory) : InfMemMMSP.memory :=
     let mem' := IntMaps.IP.filter_dom in_bounds mem in
     IntMaps.IM.map lift_mem_byte mem'.
@@ -622,7 +630,7 @@ Module InfiniteToFinite.
     destruct CONTRA as [_ CONTRA].
     rewrite F in CONTRA; inv CONTRA.
   Qed.
-  
+
   #[global] Instance filter_dom_Proper {elt f} :
     Proper (IntMaps.IM.Equal (elt:=elt) ==> IntMaps.IM.Equal) (IntMaps.IP.filter_dom f).
   Proof.
@@ -945,7 +953,7 @@ Module InfiniteToFinite.
   Proof.
     intros ms.
   Admitted.
-      
+
   (* TODO: Need a MemState_refine_prop that takes all of the predicates
       like write_byte_all_preserved and bundles them in one place
       between memories. Should use this for these lemmas... *)
@@ -8863,6 +8871,7 @@ cofix CIH
     exists byte_fin.
     cbn in BYTE.
     inv BYTE.
+    apply find_filter_dom_true in FIND as (FIND & IN_BOUNDS).
     split; auto.
     apply sbyte_refine_lifted.
 
@@ -8872,18 +8881,22 @@ cofix CIH
 
   Lemma read_byte_raw_lifted_fin_inf :
     forall mem byte_fin addr aid,
+      is_true (in_bounds addr) ->
       Memory64BitIntptr.MMEP.MMSP.read_byte_raw mem addr = Some (byte_fin, aid) ->
       InfMem.MMEP.MMSP.read_byte_raw (lift_memory mem) addr = Some (lift_SByte byte_fin, aid).
   Proof.
-    intros mem byte_lifted addr aid READ.
+    intros mem byte_lifted addr aid IN_BOUNDS READ.
     Transparent Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
     Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
     unfold Memory64BitIntptr.MMEP.MMSP.read_byte_raw in READ.
     unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
 
+    pose proof find_filter_dom_true in_bounds mem addr (byte_lifted, aid) as [_ FILTER].
+    forward FILTER; auto.
+
     unfold lift_memory.
     rewrite IntMaps.IP.F.map_o.
-    rewrite READ.
+    rewrite FILTER.
     cbn.
     reflexivity.
 
@@ -8895,6 +8908,7 @@ cofix CIH
   Lemma fin_inf_read_byte_raw :
     forall {m_inf m_fin ptr byte_fin aid},
       MemState_refine_prop m_inf m_fin ->
+      is_true (in_bounds ptr) ->
       Memory64BitIntptr.MMEP.MMSP.read_byte_raw
         (Memory64BitIntptr.MMEP.MMSP.mem_state_memory m_fin)
         ptr = Some (byte_fin, aid) ->
@@ -8902,7 +8916,7 @@ cofix CIH
         (MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory m_inf)
         ptr = Some (lift_SByte byte_fin, aid).
   Proof.
-    intros m_inf m_fin addr byte_fin aid MSR READ_RAW.
+    intros m_inf m_fin addr byte_fin aid MSR PTR_IN_BOUNDS READ_RAW.
 
     destruct MSR as [MSR IN_BOUNDS].
     destruct MSR.
@@ -9269,6 +9283,8 @@ cofix CIH
 
     destruct (LLVMParams64BitIntptr.PROV.aid_eq_dec aid a); cbn in *; try discriminate; subst.
     destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec a a); cbn in *; try contradiction; auto.
+
+    eapply in_bounds_exists_addr'; eauto.
   Qed.
 
   Lemma inf_fin_addr_allocated_prop :
@@ -9775,7 +9791,7 @@ cofix CIH
       subst.
 
       destruct m.
-      epose proof fin_inf_read_byte_raw MSR Heqo.
+      epose proof fin_inf_read_byte_raw MSR (in_bounds_ptr_to_int_fin addr_fin) Heqo.
 
       cbn.
       eexists. eexists.
@@ -10584,7 +10600,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     {
       pose proof Heqo as Heqo'.
       destruct m.
-      epose proof fin_inf_read_byte_raw MEM_REF Heqo as READ_INF_RAW.
+      epose proof fin_inf_read_byte_raw MEM_REF (in_bounds_ptr_to_int_fin addr_fin) Heqo as READ_INF_RAW.
       assert (LLVMParams64BitIntptr.PTOI.ptr_to_int addr_fin = LLVMParamsBigIntptr.PTOI.ptr_to_int addr_inf).
       {
         destruct addr_inf.
@@ -11104,7 +11120,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       apply Heqo.
     }
   Qed.
-  
+
   Lemma allocations_preserved_memory_in_bounds :
     forall m1 m2,
       MemState_in_bounds m1 ->
@@ -11115,7 +11131,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     red.
     intros addr IN_MEM.
     red in IN_MEM.
-    red in PRESERVED.    
+    red in PRESERVED.
 
     pose proof in_memory_allocated.
   Admitted.
@@ -14671,7 +14687,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       intros ptr IN_FRAME.
 
       epose proof inf_fin_ptr_in_current_frame MSR IN_FRAME as
-        (ptr_inf & PTR_CONV & IN_FRAME_INF).      
+        (ptr_inf & PTR_CONV & IN_FRAME_INF).
 
       eapply inf_fin_byte_not_allocated; eauto.
     - (* non_frame_bytes_preserved *)
@@ -14762,7 +14778,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       rewrite lift_FrameStack_snoc in H.
       symmetry in H; inv H.
 
-      
+
       specialize (POP_FRAME (InfMemMMSP.Snoc x0 x2) x0).
       forward POP_FRAME; [reflexivity|].
       forward POP_FRAME; [red; reflexivity|].
@@ -24285,7 +24301,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
                         intros POP.
                         eapply NPOP.
-                        eapply cannot_pop_inf_fin; eauto with FinInf.                        
+                        eapply cannot_pop_inf_fin; eauto with FinInf.
                     }
 
                     { (* Handler raises error *)
