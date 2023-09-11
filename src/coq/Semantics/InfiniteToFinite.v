@@ -806,6 +806,17 @@ Module InfiniteToFinite.
     reflexivity.
   Qed.
 
+  Definition Heap_in_bounds (ms_fin:FinMem.MMEP.MMSP.MemState) : Prop :=
+    let h := Memory64BitIntptr.MMEP.MMSP.mem_state_heap ms_fin in
+    forall i, is_true (IntMaps.member i h) -> exists ptr, FinPTOI.ptr_to_int ptr = i.
+
+  Definition memory_in_bounds (ms_fin:FinMem.MMEP.MMSP.MemState) : Prop :=
+    let mem := Memory64BitIntptr.MMEP.MMSP.mem_state_memory ms_fin in
+    forall i, is_true (IntMaps.member i mem) -> exists ptr, FinPTOI.ptr_to_int ptr = i.
+
+  Definition MemState_in_bounds (ms_fin:FinMem.MMEP.MMSP.MemState) :=
+    Heap_in_bounds ms_fin /\ memory_in_bounds ms_fin.
+
   (* TODO: Move this *)
   Lemma lift_MemState_convert_MemState_inverse :
     forall {ms_inf ms_fin},
@@ -823,22 +834,19 @@ Module InfiniteToFinite.
   (* TODO: Move this *)
   Lemma MemState_fin_to_inf_to_fin :
     forall ms,
+      MemState_in_bounds ms ->
       convert_MemState (lift_MemState ms) = NoOom ms.
   Proof.
     intros ms.
   Admitted.
-
-  Definition Heap_in_bounds (ms_fin:FinMem.MMEP.MMSP.MemState) : Prop :=
-    let h := Memory64BitIntptr.MMEP.MMSP.mem_state_heap ms_fin in
-    forall i, is_true (IntMaps.member i h) -> exists ptr, FinPTOI.ptr_to_int ptr = i.
-
+      
   (* TODO: Need a MemState_refine_prop that takes all of the predicates
       like write_byte_all_preserved and bundles them in one place
       between memories. Should use this for these lemmas... *)
   (* TODO: Confirm and move this *)
   Definition MemState_refine_prop ms_inf ms_fin :=
     let ms_fin_lifted := lift_MemState ms_fin in
-    InfMem.MMEP.MemSpec.MemState_eqv ms_inf ms_fin_lifted.
+    InfMem.MMEP.MemSpec.MemState_eqv ms_inf ms_fin_lifted /\ MemState_in_bounds ms_fin.
 
   (* TODO: move this *)
   (*
@@ -6668,12 +6676,14 @@ cofix CIH
 
   Lemma lift_MemState_refine_prop :
     forall ms,
+      MemState_in_bounds ms ->
       MemState_refine_prop (lift_MemState ms) ms.
   Proof.
-    intros ms.
+    intros ms IN_BOUNDS.
     red.
     destruct ms.
     cbn.
+    split; auto.
     repeat split; intros; cbn in * ; try reflexivity; try intuition;
       try red in H; try (rewrite <- H; auto); try (rewrite H; auto).
   Qed.
@@ -8788,6 +8798,7 @@ cofix CIH
   Proof.
     intros m_inf m_fin addr byte_fin aid MSR READ_RAW.
 
+    destruct MSR as [MSR IN_BOUNDS].
     destruct MSR.
     destruct H0.
     clear H1 H.
@@ -8982,6 +8993,7 @@ cofix CIH
           sbyte_refine byte_inf byte_fin.
   Proof.
     intros m_inf m_fin addr byte_inf aid MSR READ_RAW.
+    destruct MSR as [MSR IN_BOUNDS].
     destruct MSR.
     destruct H0.
     clear H1 H.
@@ -10880,6 +10892,157 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     - admit.
   Admitted.
 
+  Lemma MemState_in_bounds_memory_in_bounds :
+    forall m,
+      MemState_in_bounds m ->
+      memory_in_bounds m.
+  Proof.
+    intros m IN_BOUNDS.
+    destruct IN_BOUNDS; auto.
+  Qed.
+
+  Lemma in_bounds_exists_addr' : forall z, in_bounds z = true <-> exists addr, LLVMParams64BitIntptr.PTOI.ptr_to_int addr = z.
+  Proof.
+    intros.
+    unfold in_bounds.
+    split; intros H.
+    - break_match_hyp_inv.
+      exists (fst a, FinPROV.nil_prov).
+      unfold LLVMParams64BitIntptr.ITOP.int_to_ptr in Heqo.
+      break_match_hyp; inversion Heqo.
+      unfold LLVMParams64BitIntptr.PTOI.ptr_to_int. cbn.
+      apply unsigned_repr_eq. lia.
+    - destruct H as [ptr HP].
+      subst.
+      unfold LLVMParams64BitIntptr.ITOP.int_to_ptr.
+      unfold LLVMParams64BitIntptr.PTOI.ptr_to_int.
+      break_match.
+      break_match_hyp; inversion Heqo.
+      reflexivity.
+      break_match_hyp; inversion Heqo.
+      destruct ptr.
+      clear Heqo H0.
+      cbn in *.
+      rewrite <- Heqb.
+      unfold FiniteAddresses.Iptr in i.
+      destruct i.
+      cbn.
+      lia.
+  Qed.
+
+  Lemma in_in_bounds_is_in_bounds :
+    forall addr m,
+      MemState_in_bounds m ->
+      is_true (IntMaps.member addr (Memory64BitIntptr.MMEP.MMSP.mem_state_memory m)) ->
+      is_true (in_bounds addr).
+  Proof.
+    intros addr m IN_BOUNDS IN_MEM.
+    apply MemState_in_bounds_memory_in_bounds in IN_BOUNDS.
+
+    red in IN_BOUNDS.
+    apply IN_BOUNDS in IN_MEM.
+
+    apply in_bounds_exists_addr'; auto.
+  Qed.
+
+  Lemma in_memory_allocated :
+    forall addr m,
+      MemState_in_bounds m ->
+      is_true (IntMaps.member addr (Memory64BitIntptr.MMEP.MMSP.mem_state_memory m)) <->
+        exists ptr aid,
+          FinPTOI.ptr_to_int ptr = addr /\ FinMem.MMEP.MemSpec.byte_allocated m ptr aid.
+  Proof.
+    intros addr m IN_BOUNDS.
+    split.
+    { intros IN_MEM.
+
+      pose proof IN_MEM as ADDR_IN_BOUNDS.
+      apply in_in_bounds_is_in_bounds in ADDR_IN_BOUNDS; auto.
+
+      apply IntMaps.member_lookup in IN_MEM.
+      destruct IN_MEM as ((byte&aid)&IN_MEM).
+
+      eapply in_bounds_exists_addr with (p:=(FinPROV.allocation_id_to_prov aid)) in ADDR_IN_BOUNDS.
+      destruct ADDR_IN_BOUNDS as (ptr&PTOI&PROV).
+
+      exists ptr. exists aid.
+      split; auto.
+
+      repeat red.
+      exists m. exists true.
+      split; [|cbn; auto].
+
+      repeat red.
+      split.
+      2: {
+        intros ms' x H.
+        inv H.
+        auto.
+      }
+
+      repeat red.
+      exists (FinMem.MMEP.MMSP.MemState_get_memory m).
+      exists (FinMem.MMEP.MMSP.MemState_get_memory m).
+
+      split; [cbn; auto|].
+
+      Transparent Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
+      unfold FinMem.MMEP.MMSP.read_byte_raw.
+      Opaque Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
+
+      unfold IntMaps.lookup in IN_MEM.
+      subst.
+      rewrite memory_stack_memory_mem_state_memory_fin.
+      rewrite IN_MEM.
+      cbn.
+      split; auto.
+      apply FinPROV.aid_eq_dec_refl.
+    }
+
+    { intros (ptr&aid&PTOI&ALLOC).
+
+      eapply MemPropT_bind_ret_inv in ALLOC as (m'&a&ALLOC&ASSERT).
+      cbn in ASSERT; inv ASSERT.
+
+      repeat red in ALLOC.
+      destruct ALLOC as [ALLOC PROV].
+      repeat red in ALLOC.
+
+      destruct ALLOC as (sab&a&MS&ALLOC).
+      cbn in MS; inv MS.
+
+      Transparent Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
+      unfold FinMem.MMEP.MMSP.read_byte_raw in ALLOC.
+      Opaque Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
+
+      break_match_hyp.
+      2: {
+        cbn in ALLOC.
+        inv ALLOC.
+        inv H0.
+      }
+
+      rewrite memory_stack_memory_mem_state_memory_fin in Heqo.
+      eapply IntMaps.lookup_member.
+      apply Heqo.
+    }
+  Qed.
+  
+  Lemma allocations_preserved_memory_in_bounds :
+    forall m1 m2,
+      MemState_in_bounds m1 ->
+      FinMem.MMEP.MemSpec.allocations_preserved m1 m2 ->
+      memory_in_bounds m2.
+  Proof.
+    intros m1 m2 IN_BOUNDS PRESERVED.
+    red.
+    intros addr IN_MEM.
+    red in IN_MEM.
+    red in PRESERVED.    
+
+    pose proof in_memory_allocated.
+  Admitted.
+
   (** Lemmas about writing bytes *)
   Lemma fin_inf_set_byte_memory :
     forall {addr_inf addr_fin byte_inf byte_fin ms_fin ms_fin' ms_inf},
@@ -10894,12 +11057,13 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     intros addr_inf addr_fin byte_inf byte_fin ms_fin ms_fin' ms_inf REF CONV BYTE_REF SET.
 
     pose proof (lift_MemState_refine_prop ms_fin') as REF'.
+    auto.
     exists (lift_MemState ms_fin').
 
     destruct SET.
     split.
     2: {
-      apply lift_MemState_refine_prop.
+      apply lift_MemState_refine_prop; auto.
     }
 
     split.
