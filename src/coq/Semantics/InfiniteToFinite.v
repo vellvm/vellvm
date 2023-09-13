@@ -948,10 +948,8 @@ Module InfiniteToFinite.
   (* TODO: Move this *)
   Lemma MemState_fin_to_inf_to_fin :
     forall ms,
-      MemState_in_bounds ms ->
-      convert_MemState (lift_MemState ms) = NoOom ms.
+      exists ms', convert_MemState (lift_MemState ms) = NoOom ms' /\ Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms ms'.
   Proof.
-    intros ms.
   Admitted.
 
   (* TODO: Need a MemState_refine_prop that takes all of the predicates
@@ -9113,6 +9111,7 @@ cofix CIH
           sbyte_refine byte_inf byte_fin.
   Proof.
     intros m_inf m_fin addr byte_inf aid MSR READ_RAW.
+
     destruct MSR as [MSR IN_BOUNDS].
     destruct MSR.
     destruct H0.
@@ -11025,12 +11024,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
   Lemma in_in_bounds_is_in_bounds :
     forall addr m,
-      MemState_in_bounds m ->
+      memory_in_bounds m ->
       is_true (IntMaps.member addr (Memory64BitIntptr.MMEP.MMSP.mem_state_memory m)) ->
       is_true (in_bounds addr).
   Proof.
     intros addr m IN_BOUNDS IN_MEM.
-    apply MemState_in_bounds_memory_in_bounds in IN_BOUNDS.
 
     red in IN_BOUNDS.
     apply IN_BOUNDS in IN_MEM.
@@ -11040,7 +11038,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
   Lemma in_memory_allocated :
     forall addr m,
-      MemState_in_bounds m ->
+      memory_in_bounds m ->
       is_true (IntMaps.member addr (Memory64BitIntptr.MMEP.MMSP.mem_state_memory m)) <->
         exists ptr aid,
           FinPTOI.ptr_to_int ptr = addr /\ FinMem.MMEP.MemSpec.byte_allocated m ptr aid.
@@ -11123,7 +11121,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
   Lemma allocations_preserved_memory_in_bounds :
     forall m1 m2,
-      MemState_in_bounds m1 ->
+      memory_in_bounds m1 ->
       FinMem.MMEP.MemSpec.allocations_preserved m1 m2 ->
       memory_in_bounds m2.
   Proof.
@@ -11132,25 +11130,23 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     intros addr IN_MEM.
     red in IN_MEM.
     red in PRESERVED.
-
-    pose proof in_memory_allocated.
   Admitted.
 
   (** Lemmas about writing bytes *)
   Lemma fin_inf_set_byte_memory :
     forall {addr_inf addr_fin byte_inf byte_fin ms_fin ms_fin' ms_inf},
       MemState_refine_prop ms_inf ms_fin ->
+      MemState_in_bounds ms_fin' ->
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
       sbyte_refine byte_inf byte_fin ->
-      MemState_in_bounds ms_fin' ->
       Memory64BitIntptr.MMEP.MemSpec.set_byte_memory ms_fin addr_fin byte_fin ms_fin' ->
       exists ms_inf',
         MemoryBigIntptr.MMEP.MemSpec.set_byte_memory ms_inf addr_inf byte_inf ms_inf' /\
           MemState_refine_prop ms_inf' ms_fin'.
   Proof.
-    intros addr_inf addr_fin byte_inf byte_fin ms_fin ms_fin' ms_inf REF CONV BYTE_REF SET.
+    intros addr_inf addr_fin byte_inf byte_fin ms_fin ms_fin' ms_inf REF BOUNDS CONV BYTE_REF SET.
 
-    pose proof (lift_MemState_refine_prop ms_fin') as REF'.
+    pose proof (lift_MemState_refine_prop ms_fin' BOUNDS) as REF'.
     auto.
     exists (lift_MemState ms_fin').
 
@@ -12198,7 +12194,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       InfMem.MMEP.MemSpec.frame_stack_preserved ms_inf (lift_MemState ms_fin).
   Proof.
     intros ms_inf ms_fin MSR.
-    do 2 red in MSR.
+    destruct MSR as [MSR _].
+    red in MSR.
     tauto.
   Qed.
 
@@ -12209,7 +12206,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       InfMem.MMEP.MemSpec.allocations_preserved ms_inf (lift_MemState ms_fin).
   Proof.
     intros ms_inf ms_fin MSR.
-    do 2 red in MSR.
+    destruct MSR as [MSR _].
+    red in MSR.
     tauto.
   Qed.
 
@@ -12337,7 +12335,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       InfMem.MMEP.MemSpec.heap_preserved ms_inf (lift_MemState ms_fin).
   Proof.
     intros ms_inf ms_fin MSR.
-    do 2 red in MSR.
+    destruct MSR as [MSR _].
+    red in MSR.
     tauto.
   Qed.
 
@@ -12397,7 +12396,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       InfMem.MMEP.MemSpec.read_byte_allowed_all_preserved ms_inf (lift_MemState ms_fin).
   Proof.
     intros ms_inf ms_fin MSR.
-    do 2 red in MSR.
+    destruct MSR as [MSR _].
+    red in MSR.
     tauto.
   Qed.
 
@@ -12533,6 +12533,18 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   (*   (* should follow from write_byte_spec ? *) *)
   (* Admitted. *)
 
+  (* TODO: Should hold for fin / inf *)
+  Lemma write_byte_operation_invariants_preserves_memory_in_bounds_fin :
+    forall ms_fin ms_fin',
+      memory_in_bounds ms_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.write_byte_operation_invariants ms_fin ms_fin' ->
+      memory_in_bounds ms_fin'.
+  Proof.
+    intros ms_fin ms_fin' IN_BOUNDS INVARIANTS.
+    destruct INVARIANTS.
+    eapply allocations_preserved_memory_in_bounds; eauto.
+  Qed.
+
   Lemma fin_inf_write_byte_spec_MemPropT :
     forall {addr_fin addr_inf ms_fin ms_fin' ms_inf byte_inf byte_fin res_fin},
       (* TODO - QUESTION - which should be declared in bounds and which should be derived to be.
@@ -12552,6 +12564,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Proof.
     intros addr_fin addr_inf ms_fin ms_fin' ms_inf byte_inf byte_fin [] MSR ADDR_CONV BYTE_REF WBP.
     destruct WBP.
+
+    assert (MemState_in_bounds ms_fin') as IN_BOUNDS_FIN'.
+    { split.
+      apply write_byte_operation_invariants_preserves_memory_in_bounds_fin.
+    }
+    
     pose proof fin_inf_set_byte_memory MSR ADDR_CONV BYTE_REF byte_written as (ms_inf' & SET_INF & MSR').
 
     exists tt. exists ms_inf'.
@@ -24126,6 +24144,24 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
                     { epose proof mem_push_spec_fin_inf (lift_MemState_refine_prop m1) (lift_MemState_refine_prop ms_push) PUSH_HANDLER as PUSH_INF.
 
+                      pose proof MemState_fin_to_inf_to_fin ms_push as (ms_push'&MS_PUSH_CONV&MS_PUSH_EQV).
+
+
+                      #[global] Instance mempush_spec_MemState_eqv_Proper :
+                        Proper (MemoryBigIntptr.MMEP.MemSpec.MemState_eqv ==> MemoryBigIntptr.MMEP.MemSpec.MemState_eqv ==> iff) MemoryBigIntptr.MMEP.MemSpec.mempush_spec.
+                      Proof.
+                      Admitted.
+
+                      Lemma MemState_eqv_lift_MemState :
+                        forall ms1 ms2,
+                          Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms1 ms2 ->
+                          MemoryBigIntptr.MMEP.MemSpec.MemState_eqv (lift_MemState ms1) (lift_MemState ms2).
+                      Proof.
+                      Admitted.
+
+                      apply MemState_eqv_lift_MemState in MS_PUSH_EQV.
+                      rewrite MS_PUSH_EQV in PUSH_INF.
+
                       eapply Interp_Memory_PropT_Vis with
                         (k2:=(fun '(ms_inf, (sid', _)) =>
                                 match convert_MemState ms_inf with
@@ -24141,7 +24177,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         cbn. red. red.
                         repeat right.
                         exists s1.
-                        exists (lift_MemState ms_push).
+                        exists (lift_MemState ms_push').
                         exists tt.
                         split; try reflexivity.
                         cbn; auto.
@@ -24151,7 +24187,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         right.
                         cbn.
                         rewrite bind_ret_l.
-                        rewrite MemState_fin_to_inf_to_fin.
+                        rewrite MS_PUSH_CONV.
                         rewrite VIS_HANDLED.
                         reflexivity.
                       }
