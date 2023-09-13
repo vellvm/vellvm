@@ -958,7 +958,7 @@ Module InfiniteToFinite.
   (* TODO: Confirm and move this *)
   Definition MemState_refine_prop ms_inf ms_fin :=
     let ms_fin_lifted := lift_MemState ms_fin in
-    InfMem.MMEP.MemSpec.MemState_eqv ms_inf ms_fin_lifted /\ MemState_in_bounds ms_fin.
+    InfMem.MMEP.MemSpec.MemState_eqv ms_inf ms_fin_lifted.
 
   (* TODO: move this *)
   (*
@@ -6788,14 +6788,12 @@ cofix CIH
 
   Lemma lift_MemState_refine_prop :
     forall ms,
-      MemState_in_bounds ms ->
       MemState_refine_prop (lift_MemState ms) ms.
   Proof.
-    intros ms IN_BOUNDS.
+    intros ms.
     red.
     destruct ms.
     cbn.
-    split; auto.
     repeat split; intros; cbn in * ; try reflexivity; try intuition;
       try red in H; try (rewrite <- H; auto); try (rewrite H; auto).
   Qed.
@@ -8916,7 +8914,6 @@ cofix CIH
   Proof.
     intros m_inf m_fin addr byte_fin aid MSR PTR_IN_BOUNDS READ_RAW.
 
-    destruct MSR as [MSR IN_BOUNDS].
     destruct MSR.
     destruct H0.
     clear H1 H.
@@ -9112,7 +9109,6 @@ cofix CIH
   Proof.
     intros m_inf m_fin addr byte_inf aid MSR READ_RAW.
 
-    destruct MSR as [MSR IN_BOUNDS].
     destruct MSR.
     destruct H0.
     clear H1 H.
@@ -11136,7 +11132,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Lemma fin_inf_set_byte_memory :
     forall {addr_inf addr_fin byte_inf byte_fin ms_fin ms_fin' ms_inf},
       MemState_refine_prop ms_inf ms_fin ->
-      MemState_in_bounds ms_fin' ->
       InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin ->
       sbyte_refine byte_inf byte_fin ->
       Memory64BitIntptr.MMEP.MemSpec.set_byte_memory ms_fin addr_fin byte_fin ms_fin' ->
@@ -11144,9 +11139,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         MemoryBigIntptr.MMEP.MemSpec.set_byte_memory ms_inf addr_inf byte_inf ms_inf' /\
           MemState_refine_prop ms_inf' ms_fin'.
   Proof.
-    intros addr_inf addr_fin byte_inf byte_fin ms_fin ms_fin' ms_inf REF BOUNDS CONV BYTE_REF SET.
+    intros addr_inf addr_fin byte_inf byte_fin ms_fin ms_fin' ms_inf REF CONV BYTE_REF SET.
 
-    pose proof (lift_MemState_refine_prop ms_fin' BOUNDS) as REF'.
+    pose proof (lift_MemState_refine_prop ms_fin') as REF'.
     auto.
     exists (lift_MemState ms_fin').
 
@@ -12194,8 +12189,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       InfMem.MMEP.MemSpec.frame_stack_preserved ms_inf (lift_MemState ms_fin).
   Proof.
     intros ms_inf ms_fin MSR.
-    destruct MSR as [MSR _].
-    red in MSR.
+    do 2 red in MSR.
     tauto.
   Qed.
 
@@ -12206,8 +12200,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       InfMem.MMEP.MemSpec.allocations_preserved ms_inf (lift_MemState ms_fin).
   Proof.
     intros ms_inf ms_fin MSR.
-    destruct MSR as [MSR _].
-    red in MSR.
+    do 2 red in MSR.
     tauto.
   Qed.
 
@@ -12335,8 +12328,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       InfMem.MMEP.MemSpec.heap_preserved ms_inf (lift_MemState ms_fin).
   Proof.
     intros ms_inf ms_fin MSR.
-    destruct MSR as [MSR _].
-    red in MSR.
+    do 2 red in MSR.
     tauto.
   Qed.
 
@@ -12396,8 +12388,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       InfMem.MMEP.MemSpec.read_byte_allowed_all_preserved ms_inf (lift_MemState ms_fin).
   Proof.
     intros ms_inf ms_fin MSR.
-    destruct MSR as [MSR _].
-    red in MSR.
+    do 2 red in MSR.
     tauto.
   Qed.
 
@@ -12564,11 +12555,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Proof.
     intros addr_fin addr_inf ms_fin ms_fin' ms_inf byte_inf byte_fin [] MSR ADDR_CONV BYTE_REF WBP.
     destruct WBP.
-
-    assert (MemState_in_bounds ms_fin') as IN_BOUNDS_FIN'.
-    { split.
-      apply write_byte_operation_invariants_preserves_memory_in_bounds_fin.
-    }
     
     pose proof fin_inf_set_byte_memory MSR ADDR_CONV BYTE_REF byte_written as (ms_inf' & SET_INF & MSR').
 
