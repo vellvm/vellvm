@@ -211,7 +211,7 @@ Module Infinite.
 
   Lemma interp_mcfg4_ret :
     forall R g l sid m (r : R),
-      ℑs4 eq eq (ret r) g l sid m (Ret5 g l sid m r).
+      ℑs4 eq (MemoryBigIntptr.MMEP.MemSpec.MemState_eqv × eq) (ret r) g l sid m (Ret5 g l sid m r).
   Proof.
     intros.
     unfold interp_mcfg4, model_undef.
@@ -226,6 +226,7 @@ Module Infinite.
     pstep; econstructor; eauto.
     2 : eapply model_undef_h_ret_pure; eauto.
     cbn. reflexivity.
+    typeclasses eauto.
   Qed.
 
   Lemma interp_mcfg4_ret_inv :
@@ -248,7 +249,9 @@ Module Infinite.
       rewrite H1 in H0.
       apply interp_prop_ret_inv in H0.
       destruct H0 as (?&?&?). subst.
-      cbn. left. exists m0, s. rewrite H2. reflexivity.
+      cbn. left. exists m0, s. rewrite H2.
+      cbn.
+      reflexivity.
     }
 
     right.
@@ -836,7 +839,7 @@ Module Infinite.
   Lemma refine_OOM_h_model_undef_h_raise_OOM:
     forall R t1 oom_msg (k1 : R -> _) t3,
       refine_OOM_h (E := L4) refine_res3 t1 (raiseOOM oom_msg) ->
-      model_undef_h eq (x <- Error.raise_oom oom_msg;; k1 x) t3 ->
+      model_undef_h (prod_rel MemoryBigIntptr.MMEP.MemSpec.MemState_eqv eq) (x <- Error.raise_oom oom_msg;; k1 x) t3 ->
       refine_OOM_h (E := L4) refine_res3 t1 t3.
   Proof.
     intros. punfold H. red in H.
@@ -877,7 +880,7 @@ Module Infinite.
   Lemma refine_OOM_h_model_undef_h_raise_ret:
     forall t1 t3 r,
       refine_OOM_h (E := L4) refine_res3 t1 (ret r) ->
-      model_undef_h eq (ret r) t3 ->
+      model_undef_h (prod_rel MemoryBigIntptr.MMEP.MemSpec.MemState_eqv eq) (ret r) t3 ->
       refine_OOM_h (E := L4) refine_res3 t1 t3.
   Proof.
     intros.
@@ -888,8 +891,15 @@ Module Infinite.
     red in H.
     eapply interp_prop_oom_l_ret_inv in H.
     destruct H as (?&?&?).
-    subst. rewrite H0.
-    pstep; constructor; eauto.
+    subst. rewrite H2.
+    pstep; constructor; auto.
+    red.
+    destruct r, x, x0.
+    red.
+    constructor; cbn; auto.
+    inv H0; cbn in *; subst.
+    inv H; cbn in *; subst.
+    auto.
   Qed.
 
   (* Add allocation in infinite language *)
@@ -1046,10 +1056,10 @@ Module Infinite.
       reflexivity.
     }
 
+    (* Why can't this just be a rewrite? *)
     eapply interp_prop_Proper_eq in H0; try typeclasses eauto; eauto.
     2: symmetry; apply EQ1.
-    unfold model_undef_h in H0.
-    rewrite EQ1 in H0. clear x EQ1.
+    clear x EQ1.
 
     pose proof allocate_dtyp_spec_inv ms1 (DTYPE_I 64) as ALLOCINV.
     assert (abs : DTYPE_I 64 <> DTYPE_Void) by (intros abs; inv abs).
@@ -1075,7 +1085,7 @@ Module Infinite.
       rewrite MAP in H0.
       exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
       split; cycle 1.
-      { clear -H0.
+      { clear - H0.
         eapply refine_OOM_h_model_undef_h_raise_OOM; eauto.
         eapply refine_oom_h_raise_oom; typeclasses eauto. }
       { unfold interp_instr_E_to_L0. unfold ret_tree. cbn.
@@ -1310,7 +1320,7 @@ Module Finite.
   Lemma refine_OOM_h_model_undef_h_raise_OOM:
     forall R t1 oom_msg (k1 : R -> _) t3,
       refine_OOM_h (E := L4) refine_res3 t1 (raiseOOM oom_msg) ->
-      model_undef_h eq (x <- Error.raise_oom oom_msg;; k1 x) t3 ->
+      model_undef_h (prod_rel Memory64BitIntptr.MMEP.MemSpec.MemState_eqv eq) (x <- Error.raise_oom oom_msg;; k1 x) t3 ->
       refine_OOM_h (E := L4) refine_res3 t1 t3.
   Proof.
     intros. punfold H. red in H.
@@ -1351,7 +1361,7 @@ Module Finite.
   Lemma refine_OOM_h_model_undef_h_raise_ret:
     forall t1 t3 r,
       refine_OOM_h (E := L4) refine_res3 t1 (ret r) ->
-      model_undef_h eq (ret r) t3 ->
+      model_undef_h (prod_rel Memory64BitIntptr.MMEP.MemSpec.MemState_eqv eq) (ret r) t3 ->
       refine_OOM_h (E := L4) refine_res3 t1 t3.
   Proof.
     intros.
@@ -1362,8 +1372,15 @@ Module Finite.
     red in H.
     eapply interp_prop_oom_l_ret_inv in H.
     destruct H as (?&?&?).
-    subst. rewrite H0.
-    pstep; constructor; eauto.
+    subst. rewrite H2.
+    pstep; constructor; auto.
+    red.
+    destruct r, x, x0.
+    red.
+    constructor; cbn; auto.
+    inv H0; cbn in *; subst.
+    inv H; cbn in *; subst.
+    auto.
   Qed.
 
   (* Few remarks about [L3_trace] used in [interp_mcfg4] *)
@@ -1454,15 +1471,15 @@ Module Finite.
       k sid m t,
       interp_memory_prop (E:=E) (R2 := R) eq (Vis e k) sid m t ->
       ((exists ta k2 s1 s2 ,
-        t ≈ a <- ta;; k2 a /\
-          interp_memory_prop_h e s1 s2 ta /\
-          (forall (a : X) (b : MMEP.MMSP.MemState * (store_id * X)),
-            @Returns (E +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X a (trigger e) ->
-            @Returns (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) (MMEP.MMSP.MemState * (store_id * X)) b ta ->
-            a = snd (snd b) ->
-            interp_memory_prop (E := E) eq (k a) sid m (k2 b))) \/
+           eutt (MMEP.MemSpec.MemState_eqv × eq) t (a <- ta;; k2 a) /\
+             interp_memory_prop_h e s1 s2 ta /\
+             (forall (a : X) (b : MMEP.MMSP.MemState * (store_id * X)),
+                 @Returns (E +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X a (trigger e) ->
+                 @Returns (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) (MMEP.MMSP.MemState * (store_id * X)) b ta ->
+                 a = snd (snd b) ->
+                 interp_memory_prop (E := E) eq (k a) sid m (k2 b))) \/
          (exists ta s1 s2, interp_memory_prop_h e s1 s2 ta /\ contains_UB_Extra ta)%type \/
-         (exists A (e : OOME A) k, t ≈ vis e k)%type).
+         (exists A (e : OOME A) k, t ≈ (vis e k)%type)).
   Proof.
     intros.
     punfold H.
@@ -1513,6 +1530,7 @@ Module Finite.
       left.
       eexists _,_,_,_; split; eauto.
       + rewrite <- itree_eta; eauto.
+
       + split; eauto.
         intros. do 3 red.
         specialize (HK a b H H0 H1). pclearbot; auto.
@@ -1551,7 +1569,7 @@ Module Finite.
 
   Lemma interp_mcfg4_ret :
     forall R g l sid m (r : R),
-      ℑs4 eq eq (ret r) g l sid m (Ret5 g l sid m r).
+      ℑs4 eq (Memory64BitIntptr.MMEP.MemSpec.MemState_eqv × eq) (ret r) g l sid m (Ret5 g l sid m r).
   Proof.
     intros.
     unfold interp_mcfg4, model_undef.
@@ -1566,6 +1584,7 @@ Module Finite.
     pstep; econstructor; eauto.
     2 : eapply model_undef_h_ret_pure; eauto.
     cbn. reflexivity.
+    typeclasses eauto.
   Qed.
 
   Lemma interp_mcfg4_ret_inv :
@@ -1626,8 +1645,8 @@ Module Finite.
   (* Add allocation in the finite language *)
   Example add_alloc :
     forall genv lenv stack sid m,
-      refine_L6 (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m)
-                (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ alloc_tree) genv (lenv, stack) sid m).
+      refine_L6 (interp_mcfg4 eq (prod_rel Memory64BitIntptr.MMEP.MemSpec.MemState_eqv eq) (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m)
+                (interp_mcfg4 eq (prod_rel Memory64BitIntptr.MMEP.MemSpec.MemState_eqv eq) (interp_instr_E_to_L0 _ alloc_tree) genv (lenv, stack) sid m).
   Proof.
     intros genv lenv stack sid m.
     unfold refine_L6.
@@ -1775,8 +1794,11 @@ Module Finite.
       eapply ret_not_contains_UB_Extra in UB; eauto.
       reflexivity.
     }
-    
-    rewrite EQ1 in H0. clear x EQ1.
+
+    (* Why can't this just be a rewrite? *)
+    eapply interp_prop_Proper_eq in H0; try typeclasses eauto; eauto.
+    2: symmetry; apply EQ1.
+    clear x EQ1.
 
     pose proof allocate_dtyp_spec_inv ms1 (DTYPE_I 64) as ALLOCINV.
     assert (abs : DTYPE_I 64 <> DTYPE_Void) by (intros abs; inv abs).
