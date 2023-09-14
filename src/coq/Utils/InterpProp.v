@@ -439,6 +439,92 @@ Proof.
     + econstructor; eauto.
 Qed.
 
+#[global] Instance interp_prop_Proper_eq' :
+  forall (E F : Type -> Type) (h_spec : forall T : Type, E T -> PropT F T)
+    R (RR : R -> R -> Prop) (EQV: Equivalence RR),
+    Proper (@eutt _ _ _ RR ==> eq ==> Basics.impl) (@interp_prop E F h_spec _ _ RR).
+Proof.
+  intros E F h_spec R RR EQV.
+  intros y y' EQ x x' EQ' H. subst.
+  punfold H; punfold EQ; red in H; red in EQ; cbn in *.
+  revert_until EQV.
+  pcofix CIH.
+  intros x x' EQ y H.
+  remember (observe x); remember (observe y).
+  pstep. red. genobs_clear x' ox'.
+  revert x Heqi y Heqi0 EQ.
+  (* induct on interp_prop *)
+  rename i into xo, i0 into yo.
+  induction H; subst; pclearbot; intros.
+  - rewrite <- Heqi0.
+    remember (RetF (E:= E) r1).
+    hinduction EQ before REL; intros; inv Heqi1.
+    + constructor; eauto.
+      transitivity r1; auto.
+      symmetry; auto.
+    + constructor; eauto.
+  - rewrite <- Heqi0.
+    assert (DEC: (exists m3, ox' = TauF m3) \/ (forall m3, ox' <> TauF m3)).
+    { destruct ox'; eauto; right; red; intros; inv H. }
+
+    rename EQ into INR.
+    destruct DEC as [EQ | EQ].
+    + destruct EQ as [m3 H]; rewrite H.
+      econstructor. right. pclearbot. eapply CIH; eauto with paco.
+      rewrite H in INR.
+      assert (eutt RR (Tau t1) (Tau m3)) by (pstep; eauto).
+      2 : punfold HS.
+      eapply eqit_inv_Tau in H0. punfold H0.
+
+    + inv INR; try (exfalso; eapply EQ; eauto; fail).
+      econstructor; eauto.
+      punfold HS. red in HS.
+      pclearbot.
+      hinduction REL before CIH; intros; try (exfalso; eapply EQ; eauto; fail).
+      * subst. remember (RetF r1) as ot.
+        hinduction HS before r2; intros; inv Heqot.
+        -- econstructor; eauto.
+           transitivity r1; auto.
+           symmetry; auto.
+        -- econstructor; eauto.
+      * remember (VisF e k1) as ot.
+        hinduction HS before CIH; intros; try discriminate; eauto.
+        -- inv Heqot.
+            dependent destruction H3. econstructor.
+            2, 3: eauto.
+            intros. right.
+            eapply CIH; eauto.
+            specialize (REL a). pclearbot. punfold REL.
+            specialize (HK _ H1). pclearbot.
+            punfold HK.
+      * eapply IHREL; eauto. pstep_reverse.
+        assert (@interp_prop _ _ h_spec _ _ RR (Tau t0) t2) by (pstep; auto).
+        apply interp_prop_inv_tau_l in H. punfold H.
+  - specialize (IHinterp_PropTF _ eq_refl _ Heqi0).
+    assert (eutt RR t1 (go ox')).
+    { rewrite <- (tau_eutt t1); pstep; auto. }
+    punfold H0.
+  - rewrite <- Heqi0.
+    constructor; eauto.
+  - remember (VisF e k1).
+    hinduction EQ before CIH; intros; try inversion Heqi1; pclearbot; inv Heqi.
+    + dependent destruction H3.
+      econstructor; eauto.
+      intros. specialize (HK _ H1); pclearbot.
+      right; eapply CIH; [ | punfold HK].
+      specialize (REL a).
+      punfold REL. setoid_rewrite itree_eta at 1 ; rewrite <- Heqi0, <- itree_eta; auto.
+    + econstructor; eauto.
+Qed.
+
+#[global] Instance interp_prop_Proper_eq_iff :
+  forall (E F : Type -> Type) (h_spec : forall T : Type, E T -> PropT F T)
+    R (RR : R -> R -> Prop) (EQV: Equivalence RR),
+    Proper (@eutt _ _ _ RR ==> eq ==> iff) (@interp_prop E F h_spec _ _ RR).
+Proof.
+  split; intros; [rewrite <- H, <- H0 | rewrite H, H0]; auto.
+Qed.
+
 Section interp_prop_extra.
 
   Context {E F OOM : Type -> Type} {OOME: OOM -< E}.
