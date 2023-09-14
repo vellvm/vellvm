@@ -22,6 +22,8 @@ From ITree Require Import
      Eq
      Basics.
 
+Import HeterogeneousRelations.
+
 From Coq Require Import
      ZArith
      Relations.
@@ -766,15 +768,15 @@ Module Infinite.
       k sid m t,
       interp_memory_prop (E:=E) (R2 := R) eq (Vis e k) sid m t ->
       ((exists ta k2 s1 s2 ,
-        t ≈ a <- ta;; k2 a /\
-          interp_memory_prop_h e s1 s2 ta /\
-          (forall (a : X) (b : MMEP.MMSP.MemState * (store_id * X)),
-            @Returns (E +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X a (trigger e) ->
-            @Returns (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) (MMEP.MMSP.MemState * (store_id * X)) b ta ->
-            a = snd (snd b) ->
-            interp_memory_prop (E := E) eq (k a) sid m (k2 b))) \/
+           eutt (MMEP.MemSpec.MemState_eqv × eq) t (a <- ta;; k2 a) /\
+             interp_memory_prop_h e s1 s2 ta /\
+             (forall (a : X) (b : MMEP.MMSP.MemState * (store_id * X)),
+                 @Returns (E +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X a (trigger e) ->
+                 @Returns (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) (MMEP.MMSP.MemState * (store_id * X)) b ta ->
+                 a = snd (snd b) ->
+                 interp_memory_prop (E := E) eq (k a) sid m (k2 b))) \/
          (exists ta s1 s2, interp_memory_prop_h e s1 s2 ta /\ contains_UB_Extra ta)%type \/
-         (exists A (e : OOME A) k, t ≈ vis e k)%type).
+         (exists A (e : OOME A) k, t ≈ (vis e k)%type)).
   Proof.
     intros.
     punfold H.
@@ -825,6 +827,7 @@ Module Infinite.
       left.
       eexists _,_,_,_; split; eauto.
       + rewrite <- itree_eta; eauto.
+
       + split; eauto.
         intros. do 3 red.
         specialize (HK a b H H0 H1). pclearbot; auto.
@@ -892,8 +895,8 @@ Module Infinite.
   (* Add allocation in infinite language *)
   Example add_alloc :
     forall genv lenv stack sid m,
-      refine_L6 (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m)
-                (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ alloc_tree) genv (lenv, stack) sid m).
+      refine_L6 (interp_mcfg4 eq (prod_rel MemoryBigIntptr.MMEP.MemSpec.MemState_eqv eq) (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m)
+                (interp_mcfg4 eq (prod_rel MemoryBigIntptr.MMEP.MemSpec.MemState_eqv eq) (interp_instr_E_to_L0 _ alloc_tree) genv (lenv, stack) sid m).
   Proof.
     intros genv lenv stack sid m.
     unfold refine_L6.
@@ -1042,7 +1045,10 @@ Module Infinite.
       eapply ret_not_contains_UB_Extra in UB; eauto.
       reflexivity.
     }
-    
+
+    eapply interp_prop_Proper_eq in H0; try typeclasses eauto; eauto.
+    2: symmetry; apply EQ1.
+    unfold model_undef_h in H0.
     rewrite EQ1 in H0. clear x EQ1.
 
     pose proof allocate_dtyp_spec_inv ms1 (DTYPE_I 64) as ALLOCINV.

@@ -29,6 +29,8 @@ From ITree Require Import
      Eq.EqAxiom
      Events.StateFacts.
 
+Import HeterogeneousRelations.
+
 From ExtLib Require Import
      Structures.Functor
      Structures.Monads.
@@ -405,7 +407,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
                (ta : itree Effout (MemState * (store_id * T)))
                (k2 : (MemState * (store_id * T)) -> itree Effout (MemState * (store_id * R)))
                (t2 : itree Effout (MemState * (store_id * R))) : Prop
-         := contains_UB_Extra ta \/ t2 ≈ (bind ta k2).
+         := contains_UB_Extra ta \/ eutt (prod_rel MM.MemState_eqv eq) t2 (bind ta k2).
 
     #[global] Instance memory_k_spec_proper {A R2 : Type} e ta k2 :
       Proper
@@ -417,8 +419,8 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       split; intros K_SPEC;
         red; red in K_SPEC; destruct K_SPEC as [UB | K_SPEC];
         eauto; right;
-        rewrite <- K_SPEC; eauto.
-      symmetry; eauto.
+        first [rewrite EQV | rewrite <- EQV];
+        eauto.
     Qed.
 
     Definition interp_memory_prop_h : forall T, Effin T -> MemStateFreshT (PropT Effout) T
@@ -432,7 +434,10 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       - (* k_spec_Correct *)
         red.
         intros T R2 e k2 t2 s1 s2 ta H_SPEC BIND.
-        unfold memory_k_spec; auto.
+        unfold memory_k_spec.
+        right.
+        rewrite BIND.
+        reflexivity.
     Qed.
 
     Definition interp_memory_prop {R1 R2} (RR : R1 -> R2 -> Prop) :
