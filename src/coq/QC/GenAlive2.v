@@ -41,6 +41,12 @@ Set Warnings "-extraction-opaque-accessed,-extraction".
 Unset Guard Checking.
 
 Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZEOF : Sizeof).
+  Definition is_nil {A} (l : list A) : bool :=
+    match l with
+    | nil => true   
+    | _ => false
+    end.
+  
   Module DV := DynamicValues.DVALUE(ADDR)(IP)(SIZEOF).
   Import DV.
   Definition var_context := list (ident * typ).
@@ -254,9 +260,9 @@ Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE
    *)
   Fixpoint depth_of_typ (t : typ) : nat :=
     match t with
-    | TYPE_Array n t
-    | TYPE_Vector n t => depth_of_typ (t) + 1
-    | TYPE_Pointer t => depth_of_typ (t) + 1
+    | TYPE_Array n sub_t
+    | TYPE_Vector n sub_t => depth_of_typ (sub_t) + 1
+    | TYPE_Pointer sub_t => depth_of_typ (sub_t) + 1
     | TYPE_Struct vars
     | TYPE_Packed_struct vars => fold_right (fun x acc => max (depth_of_typ x) acc) 0%nat vars
     | _ => 0
@@ -380,7 +386,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
 
   Definition filter_type (ty : typ) (ctx : list (ident * typ)) : list (ident * typ)
     := filter (fun '(i, t) => normalized_typ_eq (ty) (t)) ctx.
-  
+
   Fixpoint gen_exp_size (sz : nat) (t : typ) {struct sz}: GenALIVE2 (exp typ) :=
     let fix gen_size_0 (ty : typ) : GenALIVE2 (exp typ) :=
           match ty with
@@ -430,8 +436,11 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
       | [] => []
       | _ => [(16%nat, fmap (fun '(i, _) => EXP_Ident i) (elems_ALIVE2 ts))]
       end in
-    freq_ALIVE2 (gen_idents)
+    if (is_nil gen_idents) then freq_ALIVE2 gen_idents else gen_exp_size 0 t
   .
+
+  Fixpoint gen_exp (ty : typ) : GenALIVE2 (exp typ) :=
+    freq_ALIVE2 [(16%nat, gen_exp_ident ty); (16%nat, gen_exp_size 0 ty)].
   
   Definition add_id_to_instr (t_instr : typ * instr typ) : GenALIVE2 (instr_id * instr typ)
     :=
@@ -519,15 +528,40 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
      inst_<_> is type (instr_id * instr typ)
      <_>_instrs is type (list (instr_id * instr typ))
    *)
+
+  Definition instr_id2raw_id (iid : instr_id) : GenALIVE2 raw_id
+    :=
+    match iid with
+    | IId rid => ret rid
+    | _ => failGen "No raw id"
+    end.
+
+  (*
+    Given an array of types (assuming from struct, packedstruct, array, or vector),
+    the auxiliary function will generate all the instructions needed to instantiate those functions,
+    following with an insertelements / insertvalue functions.
+   *)
+  (* Fixpoint gen_instrs_arrays (depth index : nat) (t : typ) : GenALIVE2 (list (instr_id * instr typ * typ)) *)
+  (*   := *)
+  (*   subtyp_array <- *)
+  (*     match t with *)
+  (*     | TYPE_Vector sz sub_t *)
+  (*     | TYPE_Array sz sub_t => ret (repeat sub_t (N.to_nat sz)) *)
+  (*     | TYPE_Struct sub_ts *)
+  (*     | TYPE_Packed_struct sub_ts => ret sub_ts *)
+  (*     | _ => failGen "No array" *)
+  (*     end;; *)
+  (*   @foldM GenALIVE2 MGEN step []. *)
   Fixpoint gen_instrs (depth : nat) (t : typ) {struct depth} : GenALIVE2 (list (instr_id * instr typ))
     :=
-    let fix gen_instr_iter (sz : nat) (l : list (instr_id * instr typ)) {struct sz}: GenALIVE2 (list (instr_id * instr typ)):=
-      match sz with
-      | O => ret l
-      | S z =>
-          inst <- gen_instantiate_instr z t;;
-          gen_instr_iter sz ([inst] ++ l)
-      end in
+    (* here is a potential infinite loop *)
+    (* let fix gen_instr_iter (sz : nat) (l : list (instr_id * instr typ)) {struct sz}: GenALIVE2 (list (instr_id * instr typ)):= *)
+    (*   match sz with *)
+    (*   | O => ret l *)
+    (*   | S z => *)
+    (*       inst <- gen_instantiate_instr z t;; *)
+    (*       gen_instr_iter sz ([inst] ++ l) *)
+    (*   end in *)
     match t with
     | TYPE_I _ =>
         inst <- gen_instantiate_instr 0 t;;
@@ -537,21 +571,37 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         inst <- gen_instantiate_instr 0 t;;
         ret [inst]
     | TYPE_Vector sz t' =>
-        l_instrs <- gen_instrs (depth - 1) t';;
-        upper_instrs <- gen_instr_iter (N.to_nat sz) [];;
-        ret (upper_instrs ++ l_instrs)
-    | TYPE_Array sz t' =>
-        l_instrs <- gen_instrs (depth - 1) t';;
-        upper_instrs <- gen_instr_iter (N.to_nat sz) [];;
-        ret (upper_instrs ++ l_instrs)
-    | TYPE_Struct fields =>
-        l_instrs <- foldM (fun acc t' => gen_instrs (depth - 1) t' >>= (fun instrs => ret (acc ++ instrs))) [] fields;;
-        upper_instrs <- gen_instr_iter (List.length fields) [];;
-        ret (upper_instrs ++ l_instrs)
-    | TYPE_Packed_struct fields =>
-        l_instrs <- foldM (fun acc t' => gen_instrs (depth - 1) t' >>= (fun instrs => ret (acc ++ instrs))) [] fields;;
-        upper_instrs <- gen_instr_iter (List.length fields) [];;
-        ret (upper_instrs ++ l_instrs)
+        (*
+          1. Generate an instruction for this type
+          2. rest <- gen_initializations args';;
+          3. Generate some instructions for filling this type
+         *)
+        let sz_nat := N.to_nat sz in
+        let init_vector_exp := EXP_Vector (repeat (t', EXP_Undef) sz_nat) in
+        let ins_alloca := INSTR_Alloca t [] in
+        '(inst_alloca_id, inst_alloca_instr) <- hide_local_ctx (add_id_to_instr (TYPE_Pointer t, ins_alloca));;
+        inst_alloca_raw_id <- instr_id2raw_id inst_alloca_id;;
+        let ins_load := INSTR_Load t (TYPE_Pointer t, EXP_Ident (ID_Local inst_alloca_raw_id)) [] in
+        '(inst_load_id, inst_load_instr) <- hide_local_ctx (add_id_to_instr (t, ins_load));;
+        inst_load_raw_id <- instr_id2raw_id inst_load_id;;
+        gen_instrs_arrays (depth - 1) (inst_load_raw_id) t;;
+        (* Need a foldr here -> insertsomething in, for each one, possibly generate higher value using maybe... *)
+        ret []
+        (* l_instrs <- gen_instrs (depth - 1) t';; *)
+        (* upper_instrs <- gen_instr_iter (N.to_nat sz) [];; *)
+        (* ret (upper_instrs ++ l_instrs) *)
+    | TYPE_Array sz t' => failGen "Unimplemented"
+        (* l_instrs <- gen_instrs (depth - 1) t';; *)
+        (* upper_instrs <- gen_instr_iter (N.to_nat sz) [];; *)
+        (* ret (upper_instrs ++ l_instrs) *)
+    | TYPE_Struct fields => failGen "Unimplemented"
+        (* l_instrs <- foldM (fun acc t' => gen_instrs (depth - 1) t' >>= (fun instrs => ret (acc ++ instrs))) [] fields;; *)
+        (* upper_instrs <- gen_instr_iter (List.length fields) [];; *)
+        (* ret (upper_instrs ++ l_instrs) *)
+    | TYPE_Packed_struct fields => failGen "Unimplemented"
+        (* l_instrs <- foldM (fun acc t' => gen_instrs (depth - 1) t' >>= (fun instrs => ret (acc ++ instrs))) [] fields;; *)
+        (* upper_instrs <- gen_instr_iter (List.length fields) [];; *)
+        (* ret (upper_instrs ++ l_instrs) *)
     | TYPE_Pointer t' =>
     (* Generate alloca *)
         let ins_alloca := INSTR_Alloca t [] in
@@ -562,18 +612,79 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         inst_store <- gen_instantiate_instr 0 t;;
         ret (inst_alloca :: upper_instrs ++ [inst_store])
     | _ => failGen "Unimplemented"
-       end.
+    end
+  with
+  (*
+    Given an array of types (assuming from struct, packedstruct, array, or vector),
+    the auxiliary function will generate all the instructions needed to instantiate those functions,
+    following with an insertelements / insertvalue functions.
+   *)
+   gen_instrs_arrays (depth: nat) (rid: raw_id) (t : typ) {struct depth} : GenALIVE2 (list (instr_id * instr typ))
+   :=
+     let step (acc : list (instr_id * instr typ) * raw_id) (it : nat * typ) : GenALIVE2 (list (instr_id * instr typ) * raw_id) :=
+       (* Recurring by generating more instructions on gen_instrs.
+          There are two ways to generate instructions.
+          1. Not generate -> simply get an expression. <- Only do this when there exists some expression that I can use.
+          1.1 If the output is failGen, don't roll a dice. Else, roll a dice.
+          2. Generate -> create newer instructions and put them into lists.
+          Then, instantiate the element into the list *)
+       let (index, t') := it in
+       let (accl, accid) := acc in
+     (*   exp <- catch (gen_exp t) (fun err => ret (EXP_Undef));; *)
+     (*   want_instr <- *)
+     (*     match exp with *)
+     (*     | EXP_Undef (* Nothing was generated *) *)
+     (*       => ret false *)
+     (*     | _ => freq_ALIVE2 [(16%nat, true); (16%nat, false)] *)
+     (*     end in *)
+     (* if want_instr *)
+     (* then  *)
+     (* else *)
+       instrs <- gen_instrs depth t;;
+       e_src <- gen_exp t;;
+       e_input <- gen_exp t';;
+       let e_index := EXP_Integer (Z.of_nat index) in
+       let set_instr := OP_InsertElement (t', e_src) (t', e_input) (TYPE_I 8, e_index) in
+       (* TODO: Need to remove the old one *)
+       (* TODO: Give a new instruction id *)
+       ret (accl ++ instrs, accid)
+     in
+       
+       subtyp_array <-
+         match t with
+         | TYPE_Vector sz sub_t
+         | TYPE_Array sz sub_t => ret (repeat sub_t (N.to_nat sz))
+         | TYPE_Struct sub_ts
+         | TYPE_Packed_struct sub_ts => ret sub_ts
+         | _ => failGen "No array"
+         end;;
+       gen_instrs depth t;;
+       let fix get_index_array (index : nat) (typ_array : list typ) : list (nat * typ) :=
+         match typ_array with
+         | nil => []
+         | x::xs => (index , x) :: get_index_array (index + 1)%nat xs
+         end in
+       '(codes, raw) <- @foldM GenALIVE2 MGEN (nat * typ) (list (instr_id * instr typ) * raw_id) step ([], rid) (get_index_array 0%nat subtyp_array);;
+       ret codes.
+
+  (* Definition gen_initializations_aux (acc : GenALIVE2 (code typ)) (t : typ): GenALIVE2 (code typ) *)
+  (*   := *)
+  (*   let depth_t := depth_of_typ t in *)
+  (*       rest <- acc;; *)
+  (*       instr <- hide_local_ctx (gen_instrs depth_t t);; *)
+  (*       ret (rest ++ instr). *)
 
   Fixpoint gen_initializations (args : list typ) : GenALIVE2 (code typ)
     :=
+    (* foldM gen_initializations_aux (ret []) args. *)
     match args with
     | nil => ret []
     | t::args' =>
         let depth_t := depth_of_typ t in
         rest <- gen_initializations args';;
         instr <- hide_local_ctx (gen_instrs depth_t t);;
-        (* Not sure if I need this.
-           Allocate store *)
+        (* Not sure if I need this. *)
+        (*    Allocate store *)
         (* alloca_store <- fix_alloca isntr;; *)
         ret (instr ++ rest)
     end.
