@@ -583,9 +583,9 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         let ins_load := INSTR_Load t (TYPE_Pointer t, EXP_Ident (ID_Local inst_alloca_raw_id)) [] in
         '(inst_load_id, inst_load_instr) <- add_id_to_instr (t, ins_load);;
         inst_load_raw_id <- instr_id2raw_id inst_load_id;;
-        gen_instrs_arrays (depth - 1) (inst_load_raw_id) t;;
+        insts <- gen_instrs_arrays (depth - 1) (inst_load_raw_id) t;;
         (* Need a foldr here -> insertsomething in, for each one, possibly generate higher value using maybe... *)
-        ret []
+        ret ([(inst_alloca_id, inst_alloca_instr); (inst_load_id, inst_load_instr)] ++ insts)
         (* l_instrs <- gen_instrs (depth - 1) t';; *)
         (* upper_instrs <- gen_instr_iter (N.to_nat sz) [];; *)
         (* ret (upper_instrs ++ l_instrs) *)
@@ -639,7 +639,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
      (* if want_instr *)
      (* then  *)
      (* else *)
-       instrs <- gen_instrs depth t;;
+       instrs <- gen_instrs depth t';;
        let src_id := ID_Local accid in
        let e_src := EXP_Ident src_id in
        e_input <- gen_exp t';;
@@ -648,9 +648,9 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
        (* Need to remove the old one *)
        remove_fst_from_local_ctx src_id;;
        (* Give a new instruction id *)
-       '(inst_set_id, _) <- add_id_to_instr (t, set_instr);;
+       '(inst_set_id, inst_set_instr) <- add_id_to_instr (t, set_instr);;
        inst_set_raw_id <- instr_id2raw_id inst_set_id;;
-       ret (accl ++ instrs, inst_set_raw_id)
+       ret (accl ++ instrs ++ [(inst_set_id, inst_set_instr)], inst_set_raw_id)
      in
        subtyp_array <-
          match t with
@@ -660,13 +660,12 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
          | TYPE_Packed_struct sub_ts => ret sub_ts
          | _ => failGen "No array"
          end;;
-       gen_instrs depth t;;
        let fix get_index_array (index : nat) (typ_array : list typ) : list (nat * typ) :=
          match typ_array with
          | nil => []
          | x::xs => (index , x) :: get_index_array (index + 1)%nat xs
          end in
-       '(codes, raw) <- @foldM GenALIVE2 MGEN (nat * typ) (list (instr_id * instr typ) * raw_id) step ([], rid) (get_index_array 0%nat subtyp_array);;
+       '(codes, _) <- @foldM GenALIVE2 MGEN (nat * typ) (list (instr_id * instr typ) * raw_id) step ([], rid) (get_index_array 0%nat subtyp_array);;
        ret codes.
 
   (* Definition gen_initializations_aux (acc : GenALIVE2 (code typ)) (t : typ): GenALIVE2 (code typ) *)
