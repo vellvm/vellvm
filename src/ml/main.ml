@@ -69,7 +69,7 @@ let make_test name ll_ast t : string * assertion  =
     | Ok dv -> dv
     | Error e -> failwith (Interpreter.string_of_exit_condition e)
   in
-  
+  let _ = Printf.printf "I can get here\n" in
   match t with
   | Assertion.EQTest (expected, dtyp, entry, args) ->
     let str =
@@ -106,7 +106,10 @@ let make_test name ll_ast t : string * assertion  =
       | Right g_ast ->
         [], "runnersrc", "runnertgt", List.append g_ast ll_ast
     end in
-      let assertion () = 
+    let assertion () =
+      let buf = Buffer.create 16 in
+      List.iter (Buffer.add_char buf) (showProg sum_ast);
+      Printf.printf "%s\n" (Buffer.contents buf);
           let res_tgt = run expected_rett tgt_fn_str v_args sum_ast in
           let res_src = run expected_rett src_fn_str v_args sum_ast in
           begin match res_tgt with
@@ -236,9 +239,9 @@ let test_file path =
   begin match ext with
     | "ll" -> 
       let tests = parse_tests path in
-      let _ = Printf.printf "Parsed successfully" in
+      let _ = Printf.printf "Parsed successfully\n" in
       let ll_ast = IO.parse_file path in
-      let _ = Printf.printf "AST retrieved successfully" in
+      let _ = Printf.printf "AST retrieved successfully\n" in
       let suite = Test (path, List.map (make_test path ll_ast) tests) in
       let outcome = run_suite [suite] in
       Printf.printf "%s\n" (outcome_to_string outcome);

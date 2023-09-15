@@ -47,7 +47,8 @@ let gen_uvalue'' (t : LL.typ) : DV.uvalue GL.coq_G =
        end)
 
 let run_gen : 'a1 GL.coq_G -> 'a1 =
-  fun generator -> GL.run generator O RandomQC.newRandomSeed
+  fun generator ->
+  GL.run generator O RandomQC.newRandomSeed
 
 let gen_uvalue' (t : LL.typ) : DV.uvalue G.t =
   let uv = run_gen (gen_uvalue'' t) in
@@ -91,13 +92,23 @@ let generate_n_args : int -> LL.typ list -> (LL.typ * DV.uvalue) list list = fun
 
 let gen_runner' (args_t : LL.typ list) (ret_t : LL.typ) (src_fn_str : char list) (tgt_fn_str : char list): ((LL.typ, GA.runnable_blocks) LL.toplevel_entity * (LL.typ, GA.runnable_blocks) LL.toplevel_entity) GL.coq_G =
   let ran = GA.run_GenALIVE2 (GA.gen_runner_tle args_t ret_t src_fn_str tgt_fn_str) in
-  GL.bindGen
-    (ran)
-    (fun x ->
-       begin match x with
-         | Datatypes.Coq_inl a -> failwith (string_of_char_list a)
-         | Datatypes.Coq_inr b -> GL.returnGen b
-       end)
+  begin match run_gen ran with
+    | Datatypes.Coq_inl a ->
+      failwith (string_of_char_list a)
+    | Datatypes.Coq_inr b ->
+      GL.returnGen b
+  end
+  (* GL.bindGen
+   *   (ran)
+   *   (fun x ->
+   *      begin match x with
+   *        | Datatypes.Coq_inl a ->
+   *          let _ = Printf.printf "Parsing srctgt4\n" in
+   *          failwith (string_of_char_list a)
+   *        | Datatypes.Coq_inr b ->
+   *          let _ = Printf.printf "Parsing srctgt2\n" in
+   *          GL.returnGen b
+   *      end) *)
 
 let gen_runner (args_t : LL.typ list) (ret_t : LL.typ) (src_fn_str : char list) (tgt_fn_str : char list) : ((LL.typ, GA.runnable_blocks) LL.toplevel_entity * (LL.typ, GA.runnable_blocks) LL.toplevel_entity) G.t =
   let runner = run_gen (gen_runner' args_t ret_t src_fn_str tgt_fn_str) in
