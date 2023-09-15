@@ -105,14 +105,14 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 1
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 1
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 1 =>
-          Conv_Pure (DVALUE_I1 (repr (unsigned i1)))
+          Conv_Pure (UVALUE_I1 (repr (unsigned i1)))
 
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 8
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
+          Conv_Pure (UVALUE_I8 (repr (unsigned i1)))
 
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
+          Conv_Pure (UVALUE_I32 (repr (unsigned i1)))
 
         | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 1
         | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 1
@@ -120,7 +120,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
         | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 1
         | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 8
         | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_Poison t)
+          Conv_Pure (UVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed conv"
         end
@@ -128,16 +128,16 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
       | Zext =>
         match t1, x, t2 with
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
+          Conv_Pure (UVALUE_I8 (repr (unsigned i1)))
 
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
+          Conv_Pure (UVALUE_I32 (repr (unsigned i1)))
 
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_I64 (repr (unsigned i1)))
+          Conv_Pure (UVALUE_I64 (repr (unsigned i1)))
 
         | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
         | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32
@@ -145,7 +145,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
         | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
         | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64
         | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_Poison t)
+          Conv_Pure (UVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed conv"
         end
@@ -153,16 +153,16 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
       | Sext =>
         match t1, x, t2 with
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (signed i1)))
+          Conv_Pure (UVALUE_I8 (repr (signed i1)))
 
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (signed i1)))
+          Conv_Pure (UVALUE_I32 (repr (signed i1)))
 
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_I64 (repr (signed i1)))
+          Conv_Pure (UVALUE_I64 (repr (signed i1)))
 
         | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
         | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32
@@ -170,7 +170,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
         | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
         | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64
         | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_Poison t)
+          Conv_Pure (UVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed conv"
         end
@@ -189,11 +189,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
             | inr (inr (inr bytes)) =>
                 match deserialize_sbytes bytes t2 with
                 | inl msg => Conv_Illegal ("Bitcast failed: " ++ msg)
-                | inr uv =>
-                    match uvalue_to_dvalue uv with
-                    | inl msg => Conv_Illegal ("Bitcast failed to convert to dvalue: " ++ msg)
-                    | inr dv => Conv_Pure dv
-                    end
+                | inr uv => Conv_Pure uv
                 end
             end
           else Conv_Illegal "unequal bitsize in cast"
@@ -204,13 +200,13 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
-          Conv_Pure (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
+          Conv_Pure (UVALUE_Float (Float32.of_intu (repr (unsigned i1))))
 
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
-          Conv_Pure (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
+          Conv_Pure (UVALUE_Double (Float.of_longu (repr (unsigned i1))))
 
         | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float
         | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float
@@ -220,7 +216,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
         | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double
         | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double
         | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
-          Conv_Pure (DVALUE_Poison t)
+          Conv_Pure (UVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed Uitofp"
         end
@@ -231,13 +227,13 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
-          Conv_Pure (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+          Conv_Pure (UVALUE_Float (Float32.of_intu (repr (signed i1))))
 
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
-          Conv_Pure (DVALUE_Double (Float.of_longu (repr (signed i1))))
+          Conv_Pure (UVALUE_Double (Float.of_longu (repr (signed i1))))
 
         | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float
         | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float
@@ -247,7 +243,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
         | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double
         | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double
         | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
-          Conv_Pure (DVALUE_Poison t)
+          Conv_Pure (UVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed Sitofp"
         end
@@ -336,7 +332,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
         | UVALUE_Conversion conv t_from v t_to =>
             dv <- concretize_uvalueM M undef_handler ERR_M lift_ue v;;
             match get_conv_case conv t_from dv t_to with
-            | Conv_Pure x => ret x
+            | Conv_Pure x => concretize_uvalueM M undef_handler ERR_M lift_ue x
             | Conv_ItoP x =>
                 match int_to_ptr (dvalue_int_unsigned x) wildcard_prov with
                 | NoOom a =>
@@ -650,14 +646,14 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 1
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 1
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 1 =>
-          Conv_Pure (DVALUE_I1 (repr (unsigned i1)))
+          Conv_Pure (UVALUE_I1 (repr (unsigned i1)))
 
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 8
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
+          Conv_Pure (UVALUE_I8 (repr (unsigned i1)))
 
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
+          Conv_Pure (UVALUE_I32 (repr (unsigned i1)))
 
         | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 1
         | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 1
@@ -665,7 +661,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
         | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 1
         | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 8
         | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_Poison t)
+          Conv_Pure (UVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed conv"
         end
@@ -673,16 +669,16 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
       | Zext =>
         match t1, x, t2 with
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
+          Conv_Pure (UVALUE_I8 (repr (unsigned i1)))
 
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
+          Conv_Pure (UVALUE_I32 (repr (unsigned i1)))
 
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_I64 (repr (unsigned i1)))
+          Conv_Pure (UVALUE_I64 (repr (unsigned i1)))
 
         | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
         | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32
@@ -690,7 +686,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
         | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
         | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64
         | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_Poison t)
+          Conv_Pure (UVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed conv"
         end
@@ -698,16 +694,16 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
       | Sext =>
         match t1, x, t2 with
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (signed i1)))
+          Conv_Pure (UVALUE_I8 (repr (signed i1)))
 
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (signed i1)))
+          Conv_Pure (UVALUE_I32 (repr (signed i1)))
 
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_I64 (repr (signed i1)))
+          Conv_Pure (UVALUE_I64 (repr (signed i1)))
 
         | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
         | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32
@@ -715,7 +711,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
         | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
         | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64
         | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_Poison t)
+          Conv_Pure (UVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed conv"
         end
@@ -734,11 +730,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
             | inr (inr (inr bytes)) =>
                 match deserialize_sbytes bytes t2 with
                 | inl msg => Conv_Illegal ("Bitcast failed: " ++ msg)
-                | inr uv =>
-                    match uvalue_to_dvalue uv with
-                    | inl msg => Conv_Illegal ("Bitcast failed to convert to dvalue: " ++ msg)
-                    | inr dv => Conv_Pure dv
-                    end
+                | inr uv => Conv_Pure uv
                 end
             end
           else Conv_Illegal "unequal bitsize in cast"
@@ -749,13 +741,13 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
-          Conv_Pure (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
+          Conv_Pure (UVALUE_Float (Float32.of_intu (repr (unsigned i1))))
 
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
-          Conv_Pure (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
+          Conv_Pure (UVALUE_Double (Float.of_longu (repr (unsigned i1))))
 
         | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float
         | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float
@@ -765,7 +757,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
         | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double
         | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double
         | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
-          Conv_Pure (DVALUE_Poison t)
+          Conv_Pure (UVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed Uitofp"
         end
@@ -776,13 +768,13 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
-          Conv_Pure (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+          Conv_Pure (UVALUE_Float (Float32.of_intu (repr (signed i1))))
 
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
-          Conv_Pure (DVALUE_Double (Float.of_longu (repr (signed i1))))
+          Conv_Pure (UVALUE_Double (Float.of_longu (repr (signed i1))))
 
         | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float
         | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float
@@ -792,7 +784,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
         | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double
         | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double
         | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
-          Conv_Pure (DVALUE_Poison t)
+          Conv_Pure (UVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed Sitofp"
         end
@@ -1337,7 +1329,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                 | Oom msg =>
                     lift_ue (raise_oom ("concretize_uvalueM OOM in Conv_ItoP: " ++ msg))
                 end
-            | Conv_Pure x => ret x
+            | Conv_Pure x => concretize_uvalueM x
             | Conv_Illegal s => lift_ue (raise_error s)
             end
 
@@ -1590,7 +1582,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                     | Oom msg =>
                         lift_ue (raise_oom ("concretize_uvalueM OOM in Conv_ItoP: " ++ msg))
                     end
-                | Conv_Pure x => ret x
+                | Conv_Pure x => concretize_uvalueM x
                 | Conv_Illegal s => lift_ue (raise_error s)
                 end
 
