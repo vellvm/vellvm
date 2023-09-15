@@ -6,7 +6,8 @@ From Vellvm Require Import
   LLVMAst
   QC.Utils
   QC.Generators
-  Handlers.
+  Handlers
+  QC.DList.
 (* Maybe also import InterpretationStack *)
 
 From ExtLib.Structures Require Export
@@ -436,7 +437,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
       | [] => []
       | _ => [(16%nat, fmap (fun '(i, _) => EXP_Ident i) (elems_ALIVE2 ts))]
       end in
-    if (is_nil gen_idents) then freq_ALIVE2 gen_idents else gen_exp_size 0 t
+    if (is_nil gen_idents) then gen_exp_size 0 t else freq_ALIVE2 gen_idents
   .
 
   Fixpoint gen_exp (ty : typ) : GenALIVE2 (exp typ) :=
@@ -552,6 +553,8 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
   (*     | _ => failGen "No array" *)
   (*     end;; *)
   (*   @foldM GenALIVE2 MGEN step []. *)
+
+
   Fixpoint gen_instrs (depth : nat) (t : typ) {struct depth} : GenALIVE2 (list (instr_id * instr typ))
     :=
     (* here is a potential infinite loop *)
@@ -583,21 +586,49 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         let ins_load := INSTR_Load t (TYPE_Pointer t, EXP_Ident (ID_Local inst_alloca_raw_id)) [] in
         '(inst_load_id, inst_load_instr) <- add_id_to_instr (t, ins_load);;
         inst_load_raw_id <- instr_id2raw_id inst_load_id;;
-        insts <- gen_instrs_arrays (depth - 1) (inst_load_raw_id) t;;
+        insts <- gen_instrs_arrays (depth - 1) (inst_load_raw_id) t true;;
         (* Need a foldr here -> insertsomething in, for each one, possibly generate higher value using maybe... *)
         ret ([(inst_alloca_id, inst_alloca_instr); (inst_load_id, inst_load_instr)] ++ insts)
         (* l_instrs <- gen_instrs (depth - 1) t';; *)
         (* upper_instrs <- gen_instr_iter (N.to_nat sz) [];; *)
         (* ret (upper_instrs ++ l_instrs) *)
-    | TYPE_Array sz t' => failGen "Unimplemented"
+    | TYPE_Array sz t' => 
+        let sz_nat := N.to_nat sz in
+        let ins_alloca := INSTR_Alloca t [] in
+        '(inst_alloca_id, inst_alloca_instr) <- hide_local_ctx (add_id_to_instr (TYPE_Pointer t, ins_alloca));;
+        inst_alloca_raw_id <- instr_id2raw_id inst_alloca_id;;
+        let ins_load := INSTR_Load t (TYPE_Pointer t, EXP_Ident (ID_Local inst_alloca_raw_id)) [] in
+        '(inst_load_id, inst_load_instr) <- add_id_to_instr (t, ins_load);;
+        inst_load_raw_id <- instr_id2raw_id inst_load_id;;
+        insts <- gen_instrs_arrays (depth - 1) (inst_load_raw_id) t false;;
+        (* Need a foldr here -> insertsomething in, for each one, possibly generate higher value using maybe... *)
+        ret ([(inst_alloca_id, inst_alloca_instr); (inst_load_id, inst_load_instr)] ++ insts)
         (* l_instrs <- gen_instrs (depth - 1) t';; *)
         (* upper_instrs <- gen_instr_iter (N.to_nat sz) [];; *)
         (* ret (upper_instrs ++ l_instrs) *)
-    | TYPE_Struct fields => failGen "Unimplemented"
+    | TYPE_Struct fields =>
+        let ins_alloca := INSTR_Alloca t [] in
+        '(inst_alloca_id, inst_alloca_instr) <- hide_local_ctx (add_id_to_instr (TYPE_Pointer t, ins_alloca));;
+        inst_alloca_raw_id <- instr_id2raw_id inst_alloca_id;;
+        let ins_load := INSTR_Load t (TYPE_Pointer t, EXP_Ident (ID_Local inst_alloca_raw_id)) [] in
+        '(inst_load_id, inst_load_instr) <- add_id_to_instr (t, ins_load);;
+        inst_load_raw_id <- instr_id2raw_id inst_load_id;;
+        insts <- gen_instrs_arrays (depth - 1) (inst_load_raw_id) t false;;
+        (* Need a foldr here -> insertsomething in, for each one, possibly generate higher value using maybe... *)
+        ret ([(inst_alloca_id, inst_alloca_instr); (inst_load_id, inst_load_instr)] ++ insts)
         (* l_instrs <- foldM (fun acc t' => gen_instrs (depth - 1) t' >>= (fun instrs => ret (acc ++ instrs))) [] fields;; *)
         (* upper_instrs <- gen_instr_iter (List.length fields) [];; *)
         (* ret (upper_instrs ++ l_instrs) *)
-    | TYPE_Packed_struct fields => failGen "Unimplemented"
+    | TYPE_Packed_struct fields =>
+        let ins_alloca := INSTR_Alloca t [] in
+        '(inst_alloca_id, inst_alloca_instr) <- hide_local_ctx (add_id_to_instr (TYPE_Pointer t, ins_alloca));;
+        inst_alloca_raw_id <- instr_id2raw_id inst_alloca_id;;
+        let ins_load := INSTR_Load t (TYPE_Pointer t, EXP_Ident (ID_Local inst_alloca_raw_id)) [] in
+        '(inst_load_id, inst_load_instr) <- add_id_to_instr (t, ins_load);;
+        inst_load_raw_id <- instr_id2raw_id inst_load_id;;
+        insts <- gen_instrs_arrays (depth - 1) (inst_load_raw_id) t false;;
+        (* Need a foldr here -> insertsomething in, for each one, possibly generate higher value using maybe... *)
+        ret ([(inst_alloca_id, inst_alloca_instr); (inst_load_id, inst_load_instr)] ++ insts)
         (* l_instrs <- foldM (fun acc t' => gen_instrs (depth - 1) t' >>= (fun instrs => ret (acc ++ instrs))) [] fields;; *)
         (* upper_instrs <- gen_instr_iter (List.length fields) [];; *)
         (* ret (upper_instrs ++ l_instrs) *)
@@ -618,7 +649,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     the auxiliary function will generate all the instructions needed to instantiate those functions,
     following with an insertelements / insertvalue functions.
    *)
-   gen_instrs_arrays (depth: nat) (rid: raw_id) (t : typ) {struct depth} : GenALIVE2 (list (instr_id * instr typ))
+   gen_instrs_arrays (depth: nat) (rid: raw_id) (t : typ) (is_insertelement : bool) {struct depth} : GenALIVE2 (list (instr_id * instr typ))
    :=
      let step (acc : list (instr_id * instr typ) * raw_id) (it : nat * typ) : GenALIVE2 (list (instr_id * instr typ) * raw_id) :=
        (* Recurring by generating more instructions on gen_instrs.
@@ -642,9 +673,15 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
        instrs <- gen_instrs depth t';;
        let src_id := ID_Local accid in
        let e_src := EXP_Ident src_id in
-       e_input <- gen_exp t';;
+       e_input <- gen_exp_ident t';;
        let e_index := EXP_Integer (Z.of_nat index) in
-       let set_instr := INSTR_Op (OP_InsertElement (t, e_src) (t', e_input) (TYPE_I 8, e_index)) in
+       let set_instr :=
+         if is_insertelement
+         then
+           INSTR_Op (OP_InsertElement (t, e_src) (t', e_input) (TYPE_I 32, e_index))
+         else
+           INSTR_Op (OP_InsertValue (t, e_src) (t', e_input) (map (Z.of_nat) [0%nat; index]))
+           in
        (* Need to remove the old one *)
        remove_fst_from_local_ctx src_id;;
        (* Give a new instruction id *)
@@ -683,7 +720,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     | t::args' =>
         let depth_t := depth_of_typ t in
         rest <- gen_initializations args';;
-        instr <- hide_local_ctx (gen_instrs depth_t t);;
+        instr <- gen_instrs depth_t t;;
         (* Not sure if I need this. *)
         (*    Allocate store *)
         (* alloca_store <- fix_alloca isntr;; *)
@@ -699,14 +736,15 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
   Definition gen_call_fn (args: list typ) (ret_t : typ) (fn : string) : GenALIVE2 (instr_id * instr typ) :=
     args_texp <- map_monad
                   (fun (arg_typ : typ) =>
-                     arg_exp <- gen_exp_size 0 arg_typ;;
+                     arg_exp <- gen_exp_ident arg_typ;;
                      ret ((arg_typ,arg_exp), []))
                   args;;
     let fun_exp : (exp typ) := EXP_Ident (ID_Global (Name fn)) in
     let fun_typ : typ := TYPE_Function ret_t args false in
     let fun_instr : (instr typ) := INSTR_Call (fun_typ, fun_exp) args_texp [] in
     fun_id_instr <- add_id_to_instr (fun_typ, fun_instr);;
-    ret fun_id_instr.
+    ret fun_id_instr
+    .
   
 (*   Definition gen_code_w_pred (args: list typ) (ret_t : typ) (fn: string) : GenALIVE2 (code typ) *)
 (*     := *)
@@ -761,16 +799,21 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     :=
     init_code <- gen_initializations args_t;;
     (* '(fn_instr_id, fn_instr) <- gen_call_fn args ret_t fn;; *)
-
+    local_ctx <- get_local_ctx;;
+    let show_string := DString_to_string (ShowAST.dshow local_ctx) in
     (* Generate params that will be used by both function calls *)
     args_texp <- map_monad
                   (fun (arg_typ : typ) =>
-                     arg_exp <- gen_exp_size 0 arg_typ;;
+                     arg_exp <- gen_exp_ident arg_typ;;
                      ret ((arg_typ, arg_exp), []))
                   args_t;;
     src_fn_blocks <- assemble_pred_fn_blocks init_code args_t ret_t args_texp src_fn_str;;
     tgt_fn_blocks <- assemble_pred_fn_blocks init_code args_t ret_t args_texp tgt_fn_str;;
-    ret (src_fn_blocks, tgt_fn_blocks)
+    match ret_t with
+    | TYPE_Opaque => failGen show_string
+    | _ =>
+        ret (src_fn_blocks, tgt_fn_blocks)
+    end
   .
 
   (* Assemble the wrapper function *)
