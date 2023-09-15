@@ -170,9 +170,9 @@ Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE
                  end
        end.
            
-  Definition remove_fst_from_local_ctx (var : ident * typ) : GenALIVE2 unit
+  Definition remove_fst_from_local_ctx (id : ident) : GenALIVE2 unit
     := ctx <- get_local_ctx;;
-       set_local_ctx (remove_fst_id_var_context (fst var) ctx);;
+       set_local_ctx (remove_fst_id_var_context id ctx);;
        ret tt.
 
   Definition reset_local_ctx : GenALIVE2 unit
@@ -472,7 +472,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         let exp := OP_InsertElement (tgt, e_src) (t', e_input) (TYPE_I 8, e_index) in
         ins <- add_id_to_instr (tgt, INSTR_Op exp);;
         match e_src with
-        | EXP_Ident id => remove_fst_from_local_ctx (id, tgt);;
+        | EXP_Ident id => remove_fst_from_local_ctx id;;
                          ret ins
         | _ => ret ins
         end
@@ -483,7 +483,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         let exp := OP_InsertValue (tgt, e_src) (t', e_input) [Z.of_nat index] in
         ins <- add_id_to_instr (tgt, INSTR_Op exp);;
         match e_src with
-        | EXP_Ident id => remove_fst_from_local_ctx (id, tgt);;
+        | EXP_Ident id => remove_fst_from_local_ctx id;;
                          ret ins
         | _ => ret ins
         end
@@ -498,7 +498,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         let exp := OP_InsertValue (tgt, e_src) (t', e_input) [Z.of_nat index] in
         ins <- add_id_to_instr (tgt, INSTR_Op exp);;
         match e_src with
-        | EXP_Ident id => remove_fst_from_local_ctx (id, tgt);;
+        | EXP_Ident id => remove_fst_from_local_ctx id;;
                          ret ins
         | _ => ret ins
         end
@@ -512,7 +512,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         let exp := OP_InsertValue (tgt, e_src) (t', e_input) [Z.of_nat index] in
         ins <- add_id_to_instr (tgt, INSTR_Op exp);;
         match e_src with
-        | EXP_Ident id => remove_fst_from_local_ctx (id, tgt);;
+        | EXP_Ident id => remove_fst_from_local_ctx id;;
                          ret ins
         | _ => ret ins
         end
@@ -577,12 +577,11 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
           3. Generate some instructions for filling this type
          *)
         let sz_nat := N.to_nat sz in
-        let init_vector_exp := EXP_Vector (repeat (t', EXP_Undef) sz_nat) in
         let ins_alloca := INSTR_Alloca t [] in
         '(inst_alloca_id, inst_alloca_instr) <- hide_local_ctx (add_id_to_instr (TYPE_Pointer t, ins_alloca));;
         inst_alloca_raw_id <- instr_id2raw_id inst_alloca_id;;
         let ins_load := INSTR_Load t (TYPE_Pointer t, EXP_Ident (ID_Local inst_alloca_raw_id)) [] in
-        '(inst_load_id, inst_load_instr) <- hide_local_ctx (add_id_to_instr (t, ins_load));;
+        '(inst_load_id, inst_load_instr) <- add_id_to_instr (t, ins_load);;
         inst_load_raw_id <- instr_id2raw_id inst_load_id;;
         gen_instrs_arrays (depth - 1) (inst_load_raw_id) t;;
         (* Need a foldr here -> insertsomething in, for each one, possibly generate higher value using maybe... *)
@@ -641,15 +640,18 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
      (* then  *)
      (* else *)
        instrs <- gen_instrs depth t;;
-       e_src <- gen_exp t;;
+       let src_id := ID_Local accid in
+       let e_src := EXP_Ident src_id in
        e_input <- gen_exp t';;
        let e_index := EXP_Integer (Z.of_nat index) in
-       let set_instr := OP_InsertElement (t', e_src) (t', e_input) (TYPE_I 8, e_index) in
-       (* TODO: Need to remove the old one *)
-       (* TODO: Give a new instruction id *)
-       ret (accl ++ instrs, accid)
+       let set_instr := INSTR_Op (OP_InsertElement (t, e_src) (t', e_input) (TYPE_I 8, e_index)) in
+       (* Need to remove the old one *)
+       remove_fst_from_local_ctx src_id;;
+       (* Give a new instruction id *)
+       '(inst_set_id, _) <- add_id_to_instr (t, set_instr);;
+       inst_set_raw_id <- instr_id2raw_id inst_set_id;;
+       ret (accl ++ instrs, inst_set_raw_id)
      in
-       
        subtyp_array <-
          match t with
          | TYPE_Vector sz sub_t
