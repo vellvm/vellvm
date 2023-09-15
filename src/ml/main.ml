@@ -104,7 +104,7 @@ let make_test name ll_ast t : string * assertion  =
         let (_t_args, v_args) = List.split g_args in
         v_args, "src", "tgt", ll_ast
       | Right g_ast ->
-        [], "runnersrc", "runnertgt", List.append g_ast ll_ast
+        [], "runnersrc", "runnertgt", List.append ll_ast g_ast
     end in
     let assertion () =
       let buf = Buffer.create 16 in
