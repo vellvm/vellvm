@@ -22573,15 +22573,31 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       }
   Qed.
 
-  #[global] Instance interp_memory_prop_eutt_Proper_impl :
-    Proper (eutt eq ==> eutt eq ==> impl) (interp_memory_prop).
+  #[global] Instance interp_memory_prop_eutt_S1S2_Proper_impl :
+    forall {S1 S2 : Type} {E F OOM : Type -> Type} {OOMF : OOM -< F}
+      (h_spec : forall T : Type, E T -> Monads.stateT S1 (Monads.stateT S2 (PropT F)) T)
+      {R1 R2 : Type} (RR : R1 -> S2 * (S1 * R2) -> Prop)
+      (RS1 : relation S1)
+      (RS2 : relation S2)
+      `{SYMRS1 : Symmetric _ RS1}
+      `{SYMRS2 : Symmetric _ RS2}
+      `{REFRS1 : Reflexive _ RS1}
+      `{REFRS2 : Reflexive _ RS2}
+      (RR2_RR : forall r1 r2 r3,
+          RR r1 r2 -> (prod_rel RS2 (prod_rel RS1 eq)) r2 r3 -> RR r1 r3)
+      (k_spec : forall T R3 : Type, E T -> itree F (S2 * (S1 * T)) -> (S2 * (S1 * T) -> itree F (S2 * (S1 * R3))) -> itree F (S2 * (S1 * R3)) -> Prop),
+      k_spec_WF h_spec k_spec ->
+      k_spec_Proper_S1S2 k_spec RS1 RS2 ->
+      forall x : itree E R1, Proper (eutt eq ==> eutt (prod_rel RS2 (prod_rel RS1 eq)) ==> impl) (@interp_memory_prop S1 S2 E F OOM OOMF h_spec _ _ RR k_spec).
   Proof.
+    intros S1 S2 E F OOM OOMF h_spec R1 R2 RR RS1 RS2 SYMRS1 SYMRS2 REFRS1 REFRS2 RR2_RR k_spec k_spec_wellformed KP t.
     intros y y' EQ x x' EQ' H.
-    rewrite <- EQ'. clear x' EQ'.
+    eapply interp_memory_prop_eutt_S1S2_Proper_impl_; eauto.
+    clear x' EQ'.
     punfold H; punfold EQ; red in H; red in EQ; cbn in *.
-    revert_until k_spec_wellformed.
+    Tactics.revert_until k_spec_wellformed.
     pcofix CIH.
-    intros x x' EQ y H.
+    intros KP t x x' EQ y H.
     remember (observe x); remember (observe y).
     pstep. red. genobs_clear x' ox'.
     revert x Heqi y Heqi0 EQ.
@@ -22627,10 +22643,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
              specialize (HK _ _ H1 H2 H3). pclearbot.
              punfold HK.
 
-             
-
         * eapply IHREL; eauto. pstep_reverse.
-          assert (interp_memory_prop (Tau t0) t2) by (pstep; auto).
+          assert (@interp_memory_prop S1 S2 E F OOM OOMF h_spec _ _ RR k_spec (Tau t0) t2) by (pstep; auto).
           apply interp_memory_prop_inv_tau_l in H. punfold H.
     - specialize (IHinterp_memory_PropTF _ eq_refl _ Heqi0).
       assert (t1 ≈ go ox').
@@ -22651,7 +22665,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       + dependent destruction H1.
         eapply Interp_Memory_PropT_Vis; eauto.
         intros. specialize (HK _ _ H H0 H1); pclearbot.
-        right; eapply CIH; [ | punfold HK].
+        right; eapply CIH; eauto; [ | punfold HK].
         specialize (REL a).
         punfold REL.
 
@@ -22661,10 +22675,31 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       + econstructor; eauto.
   Qed.
 
-  #[global] Instance interp_memory_prop_eutt_Proper :
-    Proper (eutt eq ==> eutt eq ==> iff) interp_memory_prop.
+  #[global] Instance interp_memory_prop_eutt_S1S2_Proper :
+    forall {S1 S2 : Type} {E F OOM : Type -> Type} {OOMF : OOM -< F}
+      (h_spec : forall T : Type, E T -> Monads.stateT S1 (Monads.stateT S2 (PropT F)) T)
+      {R1 R2 : Type} (RR : R1 -> S2 * (S1 * R2) -> Prop)
+      (RS1 : relation S1)
+      (RS2 : relation S2)
+      `{SYMRS1 : Symmetric _ RS1}
+      `{SYMRS2 : Symmetric _ RS2}
+      `{REFRS1 : Reflexive _ RS1}
+      `{REFRS2 : Reflexive _ RS2}
+      (RR2_RR : forall r1 r2 r3,
+          RR r1 r2 -> (prod_rel RS2 (prod_rel RS1 eq)) r2 r3 -> RR r1 r3)
+      (k_spec : forall T R3 : Type, E T -> itree F (S2 * (S1 * T)) -> (S2 * (S1 * T) -> itree F (S2 * (S1 * R3))) -> itree F (S2 * (S1 * R3)) -> Prop),
+      k_spec_WF h_spec k_spec ->
+      k_spec_Proper_S1S2 k_spec RS1 RS2 ->
+      forall x : itree E R1, Proper (eutt eq ==> eutt (prod_rel RS2 (prod_rel RS1 eq)) ==> iff) (@interp_memory_prop S1 S2 E F OOM OOMF h_spec _ _ RR k_spec).
   Proof.
-    split; intros; [rewrite <- H, <- H0 | rewrite H, H0]; auto.
+    split; intros.
+    - eapply interp_memory_prop_eutt_S1S2_Proper_impl_; eauto.
+      setoid_rewrite <- H1.
+      auto.
+    - symmetry in H2.
+      eapply interp_memory_prop_eutt_S1S2_Proper_impl_; eauto.
+      setoid_rewrite H1.
+      auto.
   Qed.
 
   Lemma model_E1E2_23_orutt_strict :
