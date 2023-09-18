@@ -407,7 +407,9 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
                (ta : itree Effout (MemState * (store_id * T)))
                (k2 : (MemState * (store_id * T)) -> itree Effout (MemState * (store_id * R)))
                (t2 : itree Effout (MemState * (store_id * R))) : Prop
-         := contains_UB_Extra ta \/ eutt (prod_rel MM.MemState_eqv eq) t2 (bind ta k2).
+      := contains_UB_Extra ta \/ eutt (prod_rel MM.MemState_eqv eq) t2 (bind ta k2).
+(* /\
+   Proper (prod_rel MM.MemState_eqv eq ==> eutt (prod_rel MM.MemState_eqv eq)) k2) *)
 
     #[global] Instance memory_k_spec_proper {A R2 : Type} e ta k2 :
       Proper
@@ -421,6 +423,30 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         eauto; right;
         first [rewrite EQV | rewrite <- EQV];
         eauto.
+    Qed.
+
+    #[global] Instance memory_k_spec_Proper_S1S2_Proper {A R2 : Type} e ta k2 :
+      Proper
+        (eutt (prod_rel MM.MemState_eqv (prod_rel eq eq)) ==> iff)
+        (@memory_k_spec A R2 e ta k2).
+    Proof.
+      unfold Proper, respectful.
+      intros x y EQV.
+      split; intros K_SPEC;
+        red; red in K_SPEC; destruct K_SPEC as [UB | K_SPEC];
+        eauto; right.
+      - rewrite prod_rel_eq in EQV.
+        rewrite <- EQV.
+        auto.
+      - rewrite prod_rel_eq in EQV.
+        rewrite EQV.
+        auto.
+    Qed.
+
+    #[global] Instance k_spec_Proper_S1S2_memory_k_spec : k_spec_Proper_S1S2 (@memory_k_spec) eq MM.MemState_eqv.
+    Proof.
+      split.
+      typeclasses eauto.
     Qed.
 
     Definition interp_memory_prop_h : forall T, Effin T -> MemStateFreshT (PropT Effout) T

@@ -95,6 +95,13 @@ Section interp_memory_prop.
 
   Context (k_spec_wellformed : k_spec_WF).
 
+  (* A more general proper relation with k_spec and eutt, allowing the
+     states to be compared differently *)
+  Class k_spec_Proper_S1S2 (RS1 : relation S1) (RS2 : relation S2) := {
+      k_spec_Proper_RR_Proper : forall {A R2} e ta k2,
+        Proper (eutt (prod_rel RS2 (prod_rel RS1 eq)) ==> iff) (@k_spec A R2 e ta k2);
+    }.
+
   Inductive interp_memory_PropTF
             (b1 b2 : bool) (sim : itree E R1 -> itree F (stateful R2) -> Prop)
             : itree' E R1 -> itree' F (stateful R2) -> Prop :=
