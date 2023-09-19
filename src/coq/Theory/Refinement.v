@@ -2,28 +2,29 @@
 Require Import String.
 
 From ITree Require Import
-     ITree
-     Basics
-     Basics.HeterogeneousRelations
-     Eq.Eqit.
+  ITree
+  Basics
+  Basics.HeterogeneousRelations
+  Eq.Eqit.
 
 From Vellvm Require Import
-     Utilities
-     Syntax
-     Semantics
-     Semantics.MemoryAddress
-     Semantics.GepM
-     Semantics.Memory.Sizeof
-     Semantics.Memory.MemBytes
-     Semantics.LLVMParams
-     Semantics.Lang
-     Theory.ContainsUB
-     Handlers.OOM.
+  Utilities
+  Utils.VellvmRelations
+  Syntax
+  Semantics
+  Semantics.MemoryAddress
+  Semantics.GepM
+  Semantics.Memory.Sizeof
+  Semantics.Memory.MemBytes
+  Semantics.LLVMParams
+  Semantics.Lang
+  Theory.ContainsUB
+  Handlers.OOM.
 
 From ExtLib Require Import
-     Structures.Monads
-     Data.Monads.EitherMonad
-     Structures.Functor.
+  Structures.Monads
+  Data.Monads.EitherMonad
+  Structures.Functor.
 
 From Coq Require Import Relations RelationClasses.
 (* end hide *)
@@ -358,33 +359,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
             subst; contradiction.
 
   Admitted. *)
-
-  Infix"×" := prod_rel (at level 90, left associativity).
-
-  Definition TT {A} : relation A := fun _ _ => True.
-
-  #[global] Instance TT_Reflexive {A} : Reflexive (@TT A).
-  Proof.
-    intro.
-    reflexivity.
-  Qed.
-
-  #[global] Instance TT_Transitive {A} : Transitive (@TT A).
-  Proof.
-    intro.
-    auto.
-  Qed.
-
-  #[global] Instance TT_Symmetric {A} : Symmetric (@TT A).
-  Proof.
-    intro.
-    auto.
-  Qed.
-
-  #[global] Instance TT_Equivalence {A} : Equivalence (@TT A).
-  Proof.
-    split; typeclasses eauto.
-  Qed.
 
   (* Lemma 5.7 - uses this definition of refinement
    note that refine_uvalue is the basic Uvalue refinement given by Definition 5.6 *)

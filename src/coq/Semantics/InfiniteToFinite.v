@@ -23112,29 +23112,45 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         red.
                         red in KS.
                         move REL0 after Heqo.
-                        rewrite REL0.
-                        specialize (HK d (s2, (s1, d))).
-                        forward HK.
-                        { eapply ReturnsVis.
-                          pstep; red; cbn.
-                          constructor.
-                          intros v. red.
-                          left; apply paco2_eqit_refl.
-                          constructor.
-                          reflexivity.
+                        eapply interp_memory_prop_eutt_S1S2_Proper with (RS2:=Memory64BitIntptr.MMEP.MemSpec.MemState_eqv) (RS1:=eq); eauto; try typeclasses eauto.
+                        { intros r1 r2 r3 H H0.
+                          destruct r2, p.
+                          destruct r3, p0.
+                          inv H0.
+                          inv snd_rel.
+                          cbn in *; subst.
+                          auto.
                         }
-                        forward HK.first
-                        { rewrite HSPEC.
-                          rewrite bind_trigger.
-                          eapply ReturnsVis.
-                          reflexivity.
-                          cbn.
-                          constructor.
-                          reflexivity.
+                        2: {
+                          rewrite prod_rel_eq.
+                          apply REL0.
                         }
-                        forward HK; cbn; auto.
-                        pclearbot.
-                        apply HK.
+                        2: {
+                          specialize (HK d (s2, (s1, d))).
+                          forward HK.
+                          { eapply ReturnsVis.
+                            pstep; red; cbn.
+                            constructor.
+                            intros v. red.
+                            left; apply paco2_eqit_refl.
+                            constructor.
+                            reflexivity.
+                          }
+                          forward HK.
+                          { rewrite HSPEC.
+                            rewrite bind_trigger.
+                            eapply ReturnsVis.
+                            reflexivity.
+                            cbn.
+                            constructor.
+                            reflexivity.
+                          }
+                          forward HK; cbn; auto.
+                          pclearbot.
+                          apply HK.
+                        }
+
+                        reflexivity.
                       }
 
                       rewrite REL.

@@ -18,6 +18,7 @@ From Vellvm.Handlers Require Import
 From Vellvm.Utils Require Import
      Tactics
      InterpProp
+     VellvmRelations
      StateMonads Raise Tactics ITreeMap.
 
 From Vellvm.Theory Require Import

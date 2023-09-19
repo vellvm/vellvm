@@ -12,6 +12,7 @@ From Vellvm Require Import
      Utils.ITreeMap
      Utils.Raise
      Utils.Tactics
+     Utils.VellvmRelations
      Theory.DenotationTheory
      Theory.InterpreterMCFG
      Theory.ContainsUBExtra

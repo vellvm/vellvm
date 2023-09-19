@@ -1361,7 +1361,7 @@ End DECIDABLE_PREDICATE.
 
 (** * Well-founded orderings *)
 
-Require Import Relations.
+From Coq Require Import Relations.
 
 (** A non-dependent version of lexicographic ordering. *)
 
