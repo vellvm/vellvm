@@ -1021,6 +1021,18 @@ Module InfiniteToFinite.
     - exact (lift_local_env a :: IHstack).
   Defined.
 
+  #[global] Instance mempush_spec_MemState_eqv_Proper :
+    Proper (MemoryBigIntptr.MMEP.MemSpec.MemState_eqv ==> MemoryBigIntptr.MMEP.MemSpec.MemState_eqv ==> iff) MemoryBigIntptr.MMEP.MemSpec.mempush_spec.
+  Proof.
+  Admitted.
+
+  Lemma MemState_eqv_lift_MemState :
+    forall ms1 ms2,
+      Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms1 ms2 ->
+      MemoryBigIntptr.MMEP.MemSpec.MemState_eqv (lift_MemState ms1) (lift_MemState ms2).
+  Proof.
+  Admitted.
+
   Unset Implicit Arguments.
   Unset Contextual Implicit.
   Definition get_inf_tree' :
@@ -7517,7 +7529,7 @@ cofix CIH
 
   Import InterpMemoryProp.
 
-  #[global] Instance get_inf_tree_eq_itree_Proper :
+  #[global] Instance get_inf_tree_eq_itree_eq_Proper :
     Proper (eq_itree eq ==> eq_itree eq) get_inf_tree.
   Proof.
     unfold Proper, respectful.
@@ -7650,7 +7662,147 @@ cofix CIH
       punfold IHEQ.
   Qed.
 
-  #[global] Instance get_inf_tree_Proper :
+  #[global] Instance get_inf_tree_eq_itree_Proper :
+    Proper (eq_itree (Memory64BitIntptr.MMEP.MemSpec.MemState_eqv × eq) ==> eq_itree (MemoryBigIntptr.MMEP.MemSpec.MemState_eqv × eq)) get_inf_tree.
+  Proof.
+    unfold Proper, respectful.
+    intros x y EQ.
+    rewrite (itree_eta_ x) in *.
+    rewrite (itree_eta_ y) in *.
+    genobs x ox.
+    genobs y oy.
+    clear x Heqox y Heqoy.
+    revert ox oy EQ.
+    pcofix CIH.
+    intros ox oy EQ.
+    punfold EQ. red in EQ. cbn in EQ.
+    dependent induction EQ.
+    - (* Ret Ret *)
+      subst.
+      pstep; red; cbn.
+      constructor; auto.
+      destruct r1 as (ms1&sid1&((lenv1&stack1)&genv1&r1)).
+      destruct r2 as (ms2&sid2&((lenv2&stack2)&genv2&r2)).
+      inv REL.
+      cbn in *.
+      inv snd_rel.
+      constructor; cbn; auto.
+      eapply MemState_eqv_lift_MemState; auto.
+    - (* Tau Tau *)
+      pstep; red; cbn.
+      constructor.
+      right.
+      rewrite (itree_eta_ m1).
+      rewrite (itree_eta_ m2).
+      eapply CIH.
+      pclearbot.
+      repeat rewrite <- itree_eta_.
+      apply REL.
+    - (* Vis Vis *)
+      destruct e.
+
+      { (* ExternalCallE *)
+        destruct e.
+        pstep; red; cbn.
+        constructor.
+        intros v.
+        red.
+        right.
+        rewrite (itree_eta_
+                   match DVCInfFin.dvalue_convert_strict v with
+                   | NoOom a => k1 a
+                   | Oom s => raiseOOM s
+                   end).
+        rewrite (itree_eta_
+                   match DVCInfFin.dvalue_convert_strict v with
+                   | NoOom a => k2 a
+                   | Oom s => raiseOOM s
+                   end).
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        break_match; [|reflexivity].
+        specialize (REL d).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      destruct s.
+      { (* PickUvalueE *)
+        destruct p.
+        pstep; red; cbn.
+        constructor.
+        intros [v []].
+        red.
+        right.
+        match goal with
+        | H: _ |- r (get_inf_tree ?t1) (get_inf_tree ?t2) =>
+            rewrite (itree_eta_ t1);
+            rewrite (itree_eta_ t2)
+        end.
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        break_match; [|reflexivity].
+        specialize (REL (exist _ d I)).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      destruct s.
+      { (* OOME *)
+        destruct o.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+
+      destruct s.
+      { (* UBE *)
+        destruct u0.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+
+      destruct s.
+      { (* DebugE *)
+        destruct d.
+        pstep; red; cbn.
+        constructor.
+        intros [].
+        red.
+        right.
+        match goal with
+        | H: _ |- r (get_inf_tree ?t1) (get_inf_tree ?t2) =>
+            rewrite (itree_eta_ t1);
+            rewrite (itree_eta_ t2)
+        end.
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        specialize (REL tt).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      { (* FailureE *)
+        destruct f.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+    - (* TauL *)
+      pstep; red; cbn.
+      constructor; auto.
+      punfold IHEQ.
+    - (* TauR *)
+      pstep; red; cbn.
+      constructor; auto.
+      punfold IHEQ.
+  Qed.
+
+  #[global] Instance get_inf_tree_eq_Proper :
     Proper (eutt eq ==> eutt eq) get_inf_tree.
   Proof.
     unfold Proper, respectful.
@@ -7669,6 +7821,146 @@ cofix CIH
       subst.
       pstep; red; cbn.
       constructor; auto.
+    - (* Tau Tau *)
+      pstep; red; cbn.
+      constructor.
+      right.
+      rewrite (itree_eta_ m1).
+      rewrite (itree_eta_ m2).
+      eapply CIH.
+      pclearbot.
+      repeat rewrite <- itree_eta_.
+      apply REL.
+    - (* Vis Vis *)
+      destruct e.
+
+      { (* ExternalCallE *)
+        destruct e.
+        pstep; red; cbn.
+        constructor.
+        intros v.
+        red.
+        right.
+        rewrite (itree_eta_
+                   match DVCInfFin.dvalue_convert_strict v with
+                   | NoOom a => k1 a
+                   | Oom s => raiseOOM s
+                   end).
+        rewrite (itree_eta_
+                   match DVCInfFin.dvalue_convert_strict v with
+                   | NoOom a => k2 a
+                   | Oom s => raiseOOM s
+                   end).
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        break_match; [|reflexivity].
+        specialize (REL d).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      destruct s.
+      { (* PickUvalueE *)
+        destruct p.
+        pstep; red; cbn.
+        constructor.
+        intros [v []].
+        red.
+        right.
+        match goal with
+        | H: _ |- r (get_inf_tree ?t1) (get_inf_tree ?t2) =>
+            rewrite (itree_eta_ t1);
+            rewrite (itree_eta_ t2)
+        end.
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        break_match; [|reflexivity].
+        specialize (REL (exist _ d I)).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      destruct s.
+      { (* OOME *)
+        destruct o.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+
+      destruct s.
+      { (* UBE *)
+        destruct u0.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+
+      destruct s.
+      { (* DebugE *)
+        destruct d.
+        pstep; red; cbn.
+        constructor.
+        intros [].
+        red.
+        right.
+        match goal with
+        | H: _ |- r (get_inf_tree ?t1) (get_inf_tree ?t2) =>
+            rewrite (itree_eta_ t1);
+            rewrite (itree_eta_ t2)
+        end.
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        specialize (REL tt).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      { (* FailureE *)
+        destruct f.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+    - (* TauL *)
+      pstep; red; cbn.
+      constructor; auto.
+      punfold IHEQ.
+    - (* TauR *)
+      pstep; red; cbn.
+      constructor; auto.
+      punfold IHEQ.
+  Qed.
+
+  #[global] Instance get_inf_tree_Proper :
+    Proper (eutt (Memory64BitIntptr.MMEP.MemSpec.MemState_eqv × eq) ==> eutt (MemoryBigIntptr.MMEP.MemSpec.MemState_eqv × eq)) get_inf_tree.
+  Proof.
+    unfold Proper, respectful.
+    intros x y EQ.
+    rewrite (itree_eta_ x) in *.
+    rewrite (itree_eta_ y) in *.
+    genobs x ox.
+    genobs y oy.
+    clear x Heqox y Heqoy.
+    revert ox oy EQ.
+    pcofix CIH.
+    intros ox oy EQ.
+    punfold EQ. red in EQ. cbn in EQ.
+    dependent induction EQ.
+    - (* Ret Ret *)
+      subst.
+      pstep; red; cbn.
+      destruct r1 as (ms1&sid1&((lenv1&stack1)&genv1&r1)).
+      destruct r2 as (ms2&sid2&((lenv2&stack2)&genv2&r2)).
+      constructor; auto.
+      inv REL.
+      cbn in *.
+      inv snd_rel.
+      constructor; cbn; auto.
+      eapply MemState_eqv_lift_MemState; auto.
     - (* Tau Tau *)
       pstep; red; cbn.
       constructor.
@@ -24502,20 +24794,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     { epose proof mem_push_spec_fin_inf (lift_MemState_refine_prop m1) (lift_MemState_refine_prop ms_push) PUSH_HANDLER as PUSH_INF.
 
                       pose proof MemState_fin_to_inf_to_fin ms_push as (ms_push'&MS_PUSH_CONV&MS_PUSH_EQV).
-
-
-                      #[global] Instance mempush_spec_MemState_eqv_Proper :
-                        Proper (MemoryBigIntptr.MMEP.MemSpec.MemState_eqv ==> MemoryBigIntptr.MMEP.MemSpec.MemState_eqv ==> iff) MemoryBigIntptr.MMEP.MemSpec.mempush_spec.
-                      Proof.
-                      Admitted.
-
-                      Lemma MemState_eqv_lift_MemState :
-                        forall ms1 ms2,
-                          Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms1 ms2 ->
-                          MemoryBigIntptr.MMEP.MemSpec.MemState_eqv (lift_MemState ms1) (lift_MemState ms2).
-                      Proof.
-                      Admitted.
-
                       apply MemState_eqv_lift_MemState in MS_PUSH_EQV.
                       rewrite MS_PUSH_EQV in PUSH_INF.
 
@@ -24523,7 +24801,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         (k2:=(fun '(ms_inf, (sid', _)) =>
                                 match convert_MemState ms_inf with
                                 | NoOom ms_fin =>
-                                    get_inf_tree (k2 (ms_fin, (st', tt)))
+                                    get_inf_tree (k2 (ms_push, (st', tt)))
                                 | Oom s => raiseOOM s
                                 end)
                         )
@@ -24534,10 +24812,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         cbn. red. red.
                         repeat right.
                         exists s1.
-                        exists (lift_MemState ms_push').
+                        exists (lift_MemState ms_push).
                         exists tt.
                         split; try reflexivity.
                         cbn; auto.
+                        rewrite MS_PUSH_EQV.
+                        auto.
                       }
 
                       2: {
@@ -24557,7 +24837,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       inv H1.
 
                       cbn.
-                      rewrite MemState_fin_to_inf_to_fin.
+                      rewrite MS_PUSH_CONV.
                       rewrite (itree_eta_ (k0 tt)).
                       rewrite (itree_eta_ (k2 (ms_push, (st', tt)))).
                       right.
@@ -24798,12 +25078,13 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     }
 
                     rewrite bind_ret_l in VIS_HANDLED.
+                    pose proof MemState_fin_to_inf_to_fin ms_pop as (ms_pop'&MS_POP_CONV&MS_POP_EQV).
 
                     { eapply Interp_Memory_PropT_Vis with
                         (k2:=(fun '(ms_inf, (sid', _)) =>
                                 match convert_MemState ms_inf with
                                 | NoOom ms_fin =>
-                                    get_inf_tree (k2 (ms_fin, (st', tt)))
+                                    get_inf_tree (k2 (ms_pop, (st', tt)))
                                 | Oom s => raiseOOM s
                                 end)
                         )
@@ -24826,7 +25107,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         right.
                         cbn.
                         rewrite bind_ret_l.
-                        rewrite MemState_fin_to_inf_to_fin.
+                        rewrite MS_POP_CONV.
                         rewrite VIS_HANDLED.
                         reflexivity.
                       }
@@ -24840,7 +25121,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       inv H1.
 
                       cbn.
-                      rewrite MemState_fin_to_inf_to_fin.
+                      rewrite MS_POP_CONV.
                       rewrite (itree_eta_ (k0 tt)).
                       rewrite (itree_eta_ (k2 (ms_pop, (st', tt)))).
                       right.
@@ -25938,7 +26219,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                       pclearbot.
                       rewrite REL1.
                       setoid_rewrite bind_ret_l.
-                      eapply paco2_eqit_refl.
+                      eapply paco2_eqit_RR_refl; typeclasses eauto.
                     }
 
                     intros a b RETa RETb AB.
@@ -26211,6 +26492,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               cbn.
               rewrite bind_vis.
               cbn.
+              rewrite itree_eta in VIS_HANDLED.
               rewrite VIS_HANDLED.
               cbn.
               rewrite get_inf_tree_equation.
@@ -26239,7 +26521,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               setoid_rewrite bind_ret_l.
 
               break_match_goal.
-              - apply paco2_eqit_refl.
+              - apply paco2_eqit_RR_refl; typeclasses eauto.
               - rewrite get_inf_tree_equation.
                 cbn.
                 pstep; red; cbn.
@@ -27343,6 +27625,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
               3: {
                 right.
+                rewrite itree_eta in VIS_HANDLED.
                 rewrite VIS_HANDLED.
                 rewrite get_inf_tree_equation.
                 cbn. unfold LLVMEvents.raise.
@@ -27393,6 +27676,39 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               rewrite bind_vis in VIS_HANDLED.
 
               eapply paco2_mon_bot; eauto.
+              eapply interp_memory_prop_eutt_S1S2_Proper with (RS2:=MemoryBigIntptr.MMEP.MemSpec.MemState_eqv) (RS1:=eq); eauto; try typeclasses eauto.
+              { intros r1 r2 r3 H H0.
+                destruct r2, p.
+                destruct r3, p0.
+                inv H0.
+                inv snd_rel.
+                cbn in *; subst.
+                auto.
+              }
+              3: {
+                reflexivity.
+              }
+              3: {
+                specialize (HK d0 (s2, (s1, d0))).
+                forward HK.
+                { eapply ReturnsVis.
+                  unfold ITree.trigger.
+                  cbn.
+                  reflexivity.
+                  cbn.
+                  constructor; reflexivity.
+                }
+                forward HK.
+                { rewrite HANDLER.
+                  eapply ReturnsVis.
+                  reflexivity.
+                  constructor; reflexivity.
+                }
+
+                forward HK; cbn; auto.
+                pclearbot.
+                apply HK.                
+              }
               rewrite VIS_HANDLED.
 
               pstep; red; cbn.
