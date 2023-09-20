@@ -27686,45 +27686,33 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 auto.
               }
               3: {
+                rewrite prod_rel_eq.
+                rewrite <- itree_eta.
+                setoid_rewrite VIS_HANDLED.
+                rewrite get_inf_tree_equation.
+                cbn.
                 reflexivity.
               }
-              3: {
-                specialize (HK d0 (s2, (s1, d0))).
-                forward HK.
-                { eapply ReturnsVis.
-                  unfold ITree.trigger.
-                  cbn.
-                  reflexivity.
-                  cbn.
-                  constructor; reflexivity.
-                }
-                forward HK.
-                { rewrite HANDLER.
-                  eapply ReturnsVis.
-                  reflexivity.
-                  constructor; reflexivity.
-                }
-
-                forward HK; cbn; auto.
-                pclearbot.
-                apply HK.                
+              2: {
+                reflexivity.
               }
-              rewrite VIS_HANDLED.
+              2: {
+                pstep; red; cbn.
+                change ((VisF (subevent void (ThrowOOM (print_msg "")))
+                           (fun x : void =>
+                              ITree.subst
+                                (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                                                                               (fun x : void =>
+                                                                                  ITree.subst
+                                                                                    (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                                                                                  end) (Ret x)))).
+                eapply Interp_Memory_PropT_Vis_OOM.
+                reflexivity.
+              }
 
-              pstep; red; cbn.
-              change (VisF (subevent void (ThrowOOM (print_msg "")))
-                        (fun x : void =>
-                           ITree.subst
-                             (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                                           end) (Ret x)))
-                with (observe (Vis (subevent void (ThrowOOM (print_msg "")))
-                                 (fun x : void =>
-                                    ITree.subst
-                                      (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                                                    end) (Ret x)))).
-
-              eapply Interp_Memory_PropT_Vis_OOM.
-              reflexivity.
+              apply k1.
+              apply InterpreterStackBigIntptr.LP.Events.DV.DVALUE_None.
             }
 
             (* Handler succeeds *)
@@ -27761,8 +27749,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 right.
                 cbn.
                 rewrite bind_ret_l.
-                rewrite VIS_HANDLED.
                 rewrite <- itree_eta.
+                rewrite VIS_HANDLED.
                 reflexivity.
               }
 
@@ -27841,21 +27829,42 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 inv CONTRA.
               }
               eapply paco2_mon_bot; eauto.
-              rewrite VIS_HANDLED.
-              cbn.
-              pstep; red; cbn.
-              change ((VisF (subevent void (ThrowOOM (print_msg "")))
-                         (fun x : void =>
-                            ITree.subst
-                              (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                                            end) (Ret x)))) with
-                (observe (Vis (subevent void (ThrowOOM (print_msg "")))
-                            (fun x : void =>
-                               ITree.subst
-                                 (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                                               end) (Ret x)))).
-              eapply Interp_Memory_PropT_Vis_OOM.
-              reflexivity.
+              rewrite <- itree_eta.
+              eapply interp_memory_prop_eutt_S1S2_Proper with (RS2:=MemoryBigIntptr.MMEP.MemSpec.MemState_eqv) (RS1:=eq); eauto; try typeclasses eauto.
+              { intros r1 r2 r3 H H0.
+                destruct r2, p.
+                destruct r3, p0.
+                inv H0.
+                inv snd_rel.
+                cbn in *; subst.
+                auto.
+              }
+              3: {
+                rewrite prod_rel_eq.
+                setoid_rewrite VIS_HANDLED.
+                rewrite get_inf_tree_equation.
+                cbn.
+                reflexivity.
+              }
+              2: {
+                reflexivity.
+              }
+              2: {
+                pstep; red; cbn.
+                change ((VisF (subevent void (ThrowOOM (print_msg "")))
+                           (fun x : void =>
+                              ITree.subst
+                                (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                                                                               (fun x : void =>
+                                                                                  ITree.subst
+                                                                                    (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                                                                                  end) (Ret x)))).
+                eapply Interp_Memory_PropT_Vis_OOM.
+                reflexivity.
+              }
+
+              apply k1; constructor.
             }
 
             (* Handler succeeds *)
@@ -27872,15 +27881,14 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
             { epose proof mem_push_spec_fin_inf (lift_MemState_refine_prop m1) (lift_MemState_refine_prop ms_push) PUSH_HANDLER as PUSH_INF.
 
+              pose proof MemState_fin_to_inf_to_fin ms_push as (ms_push'&MS_PUSH_CONV&MS_PUSH_EQV).
+              apply MemState_eqv_lift_MemState in MS_PUSH_EQV.
               pstep; red; cbn.
 
               eapply Interp_Memory_PropT_Vis with
                 (k2:=(fun '(ms_inf, (sid', _)) =>
-                        match convert_MemState ms_inf with
-                        | NoOom ms_fin =>
-                            get_inf_tree (k3 (ms_fin, (st', tt)))
-                        | Oom s => raiseOOM s
-                        end)
+                            get_inf_tree (k3 (ms_push, (st', tt)))
+                     )
                 )
                 (s1:=s1)
                 (s2:=lift_MemState m1).
@@ -27899,9 +27907,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 right.
                 cbn.
                 rewrite bind_ret_l.
-                rewrite MemState_fin_to_inf_to_fin.
-                rewrite VIS_HANDLED.
                 rewrite <- itree_eta.
+                rewrite VIS_HANDLED.
                 reflexivity.
               }
 
@@ -27913,7 +27920,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               inv RETb.
 
               cbn.
-              rewrite MemState_fin_to_inf_to_fin.
               rewrite (itree_eta_ (k1 tt)).
               rewrite (itree_eta_ (k3 (ms_push, (st', tt)))).
               right.
@@ -28003,6 +28009,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
               2: {
                 right.
+                rewrite <- itree_eta.
                 rewrite VIS_HANDLED.
                 rewrite get_inf_tree_equation.
                 cbn.
@@ -28031,22 +28038,42 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               }
 
               eapply paco2_mon_bot; eauto.
-              rewrite VIS_HANDLED.
-              pstep; red; cbn.
+              rewrite <- itree_eta.
+              eapply interp_memory_prop_eutt_S1S2_Proper with (RS2:=MemoryBigIntptr.MMEP.MemSpec.MemState_eqv) (RS1:=eq); eauto; try typeclasses eauto.
+              { intros r1 r2 r3 H H0.
+                destruct r2, p.
+                destruct r3, p0.
+                inv H0.
+                inv snd_rel.
+                cbn in *; subst.
+                auto.
+              }
+              3: {
+                rewrite prod_rel_eq.
+                setoid_rewrite VIS_HANDLED.
+                rewrite get_inf_tree_equation.
+                cbn.
+                reflexivity.
+              }
+              2: {
+                reflexivity.
+              }
+              2: {
+                pstep; red; cbn.
+                change ((VisF (subevent void (ThrowOOM (print_msg "")))
+                           (fun x : void =>
+                              ITree.subst
+                                (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                                                                               (fun x : void =>
+                                                                                  ITree.subst
+                                                                                    (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                                                                                  end) (Ret x)))).
+                eapply Interp_Memory_PropT_Vis_OOM.
+                reflexivity.
+              }
 
-              change (VisF (subevent void (ThrowOOM (print_msg "")))
-                        (fun x : void =>
-                           ITree.subst
-                             (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                                           end) (Ret x))) with
-                (observe (Vis (subevent void (ThrowOOM (print_msg "")))
-                            (fun x : void =>
-                               ITree.subst
-                                 (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                                               end) (Ret x)))).
-
-              eapply Interp_Memory_PropT_Vis_OOM.
-              reflexivity.
+              apply k1; constructor.
             }
 
             (* Handler succeeds *)
@@ -28064,11 +28091,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             { pstep; red; cbn.
               eapply Interp_Memory_PropT_Vis with
                 (k2:=(fun '(ms_inf, (sid', _)) =>
-                        match convert_MemState ms_inf with
-                        | NoOom ms_fin =>
-                            get_inf_tree (k3 (ms_fin, (st', tt)))
-                        | Oom s => raiseOOM s
-                        end)
+                            get_inf_tree (k3 (ms_pop, (st', tt)))
+                     )
                 )
                 (s1:=s1)
                 (s2:=lift_MemState s2).
@@ -28089,9 +28113,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 right.
                 cbn.
                 rewrite bind_ret_l.
-                rewrite MemState_fin_to_inf_to_fin.
-                rewrite VIS_HANDLED.
                 rewrite <- itree_eta.
+                rewrite VIS_HANDLED.                
                 reflexivity.
               }
 
@@ -28104,7 +28127,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               inv RETb.
 
               cbn.
-              rewrite MemState_fin_to_inf_to_fin.
               rewrite (itree_eta_ (k1 tt)).
               rewrite (itree_eta_ (k3 (ms_pop, (st', tt)))).
               right.
@@ -28208,22 +28230,43 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               }
 
               eapply paco2_mon_bot; eauto.
-              rewrite VIS_HANDLED.
-              pstep; red; cbn.
-              change ((VisF (subevent void (ThrowOOM (print_msg "")))
-                         (fun x : void =>
-                            ITree.subst
-                              (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                                            end) (Ret x))))
-                with
-                (observe (Vis (subevent void (ThrowOOM (print_msg "")))
-                            (fun x : void =>
-                               ITree.subst
-                                 (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                                               end) (Ret x)))).
+              eapply interp_memory_prop_eutt_S1S2_Proper with (RS2:=MemoryBigIntptr.MMEP.MemSpec.MemState_eqv) (RS1:=eq); eauto; try typeclasses eauto.
+              { intros r1 r2 r3 H H0.
+                destruct r2, p.
+                destruct r3, p0.
+                inv H0.
+                inv snd_rel.
+                cbn in *; subst.
+                auto.
+              }
+              3: {
+                rewrite prod_rel_eq.
+                rewrite <- itree_eta.
+                setoid_rewrite VIS_HANDLED.
+                rewrite get_inf_tree_equation.
+                cbn.
+                reflexivity.
+              }
+              2: {
+                reflexivity.
+              }
+              2: {
+                pstep; red; cbn.
+                change ((VisF (subevent void (ThrowOOM (print_msg "")))
+                           (fun x : void =>
+                              ITree.subst
+                                (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                                                                               (fun x : void =>
+                                                                                  ITree.subst
+                                                                                    (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                                                                                  end) (Ret x)))).
+                eapply Interp_Memory_PropT_Vis_OOM.
+                reflexivity.
+              }
 
-              eapply Interp_Memory_PropT_Vis_OOM.
-              reflexivity.
+              apply k1.
+              apply InterpreterStackBigIntptr.LP.Events.DV.DVALUE_None.
             }
 
             (* Handler succeeds *)
@@ -28262,8 +28305,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 right.
                 cbn.
                 rewrite bind_ret_l.
-                rewrite VIS_HANDLED.
                 rewrite <- itree_eta.
+                rewrite VIS_HANDLED.                
                 reflexivity.
               }
 
@@ -28382,6 +28425,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 (ta:= raise_error msg).
               3: {
                 right.
+                rewrite <- itree_eta.
                 rewrite VIS_HANDLED.
                 rewrite get_inf_tree_equation.
                 cbn.
@@ -28525,23 +28569,43 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               }
 
               eapply paco2_mon_bot; eauto.
-              rewrite VIS_HANDLED.
+              rewrite <- itree_eta.
+              eapply interp_memory_prop_eutt_S1S2_Proper with (RS2:=MemoryBigIntptr.MMEP.MemSpec.MemState_eqv) (RS1:=eq); eauto; try typeclasses eauto.
+              { intros r1 r2 r3 H H0.
+                destruct r2, p.
+                destruct r3, p0.
+                inv H0.
+                inv snd_rel.
+                cbn in *; subst.
+                auto.
+              }
+              3: {
+                rewrite prod_rel_eq.
+                setoid_rewrite VIS_HANDLED.
+                rewrite get_inf_tree_equation.
+                cbn.
+                reflexivity.
+              }
+              2: {
+                reflexivity.
+              }
+              2: {
+                pstep; red; cbn.
+                change ((VisF (subevent void (ThrowOOM (print_msg "")))
+                           (fun x : void =>
+                              ITree.subst
+                                (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                                                                               (fun x : void =>
+                                                                                  ITree.subst
+                                                                                    (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                                                                                  end) (Ret x)))).
+                eapply Interp_Memory_PropT_Vis_OOM.
+                reflexivity.
+              }
 
-              pstep; red; cbn.
-              change (VisF (subevent void (ThrowOOM (print_msg "")))
-                        (fun x : void =>
-                           ITree.subst
-                             (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                                           end) (Ret x)))
-                with
-                (observe (Vis (subevent void (ThrowOOM (print_msg "")))
-       (fun x : void =>
-        ITree.subst
-          (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                           end) (Ret x)))).
-
-              eapply Interp_Memory_PropT_Vis_OOM.
-              reflexivity.
+              apply k1.
+              apply InterpreterStackBigIntptr.LP.Events.DV.UVALUE_None.
             }
 
             (* Handler succeeds *)
@@ -28580,8 +28644,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 right.
                 cbn.
                 rewrite bind_ret_l.
-                rewrite VIS_HANDLED.
                 rewrite <- itree_eta.
+                rewrite VIS_HANDLED.
                 reflexivity.
               }
 
@@ -28693,9 +28757,37 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               }
 
               eapply paco2_mon_bot; eauto.
-              rewrite VIS_HANDLED.
-              pstep; red; cbn.
-
+              rewrite <- itree_eta.
+              eapply interp_memory_prop_eutt_S1S2_Proper with (RS2:=MemoryBigIntptr.MMEP.MemSpec.MemState_eqv) (RS1:=eq); eauto; try typeclasses eauto.
+              { intros r1 r2 r3 H H3.
+                destruct r2, p.
+                destruct r3, p0.
+                inv H3.
+                inv snd_rel.
+                cbn in *; subst.
+                auto.
+              }
+              3: {
+                rewrite prod_rel_eq.
+                setoid_rewrite VIS_HANDLED.
+                rewrite get_inf_tree_equation.
+                cbn.
+                reflexivity.
+              }
+              2: {
+                reflexivity.
+              }
+              2: {
+                pstep; red; cbn.
+                change ((VisF (subevent void (raise ""))
+                           (fun x : void =>
+                              ITree.subst
+                                (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                                                                               (fun x : void =>
+                                                                                  ITree.subst
+                                                                                    (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                                                                                  end) (Ret x)))).
               change (VisF (subevent void (Throw (print_msg "")))
        (fun x : void =>
         ITree.subst
@@ -28801,6 +28893,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               rewrite bind_trigger in RETb.
               apply Returns_vis_inversion in RETb.
               destruct RETb as [[] _].
+              }
+
+              apply k1; constructor.
             }
 
             { (* Handler raises OOM *)
@@ -28816,26 +28911,45 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               }
 
               eapply paco2_mon_bot; eauto.
-              rewrite VIS_HANDLED.
-              pstep; red; cbn.
+              rewrite <- itree_eta.
+              eapply interp_memory_prop_eutt_S1S2_Proper with (RS2:=MemoryBigIntptr.MMEP.MemSpec.MemState_eqv) (RS1:=eq); eauto; try typeclasses eauto.
+              { intros r1 r2 r3 H H0.
+                destruct r2, p.
+                destruct r3, p0.
+                inv H0.
+                inv snd_rel.
+                cbn in *; subst.
+                auto.
+              }
+              3: {
+                rewrite prod_rel_eq.
+                setoid_rewrite VIS_HANDLED.
+                rewrite get_inf_tree_equation.
+                cbn.
+                reflexivity.
+              }
+              2: {
+                reflexivity.
+              }
+              2: {
+                pstep; red; cbn.
+                change ((VisF (subevent void (ThrowOOM (print_msg "")))
+                           (fun x : void =>
+                              ITree.subst
+                                (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                                                                               (fun x : void =>
+                                                                                  ITree.subst
+                                                                                    (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                                                                                  end) (Ret x)))).
+                eapply Interp_Memory_PropT_Vis_OOM.
+                reflexivity.
+              }
 
-              change (VisF (subevent void (ThrowOOM (print_msg "")))
-       (fun x : void =>
-        ITree.subst
-          (fun v1 : void => match v1 return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                         end) (Ret x)))
-                with
-                (observe (Vis (subevent void (ThrowOOM (print_msg "")))
-       (fun x : void =>
-        ITree.subst
-          (fun v1 : void => match v1 return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                         end) (Ret x)))).
-
-              eapply Interp_Memory_PropT_Vis_OOM.
-              reflexivity.
+              apply k1; constructor.
             }
 
-            (* Handler succeeds *)
+            { (* Handler succeeds *)
             destruct HANDLER as [st' [ms_store [[] [TA STORE_HANDLER]]]].
 
             rewrite TA in VIS_HANDLED.
@@ -28875,8 +28989,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 right.
                 cbn.
                 rewrite bind_ret_l.
-                rewrite VIS_HANDLED.
                 rewrite <- itree_eta.
+                rewrite VIS_HANDLED.
                 reflexivity.
               }
 
@@ -28924,6 +29038,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               repeat rewrite <- itree_eta.
               exact REL.
             }
+            }
           }
 
           { (* Pick *)
@@ -28959,176 +29074,12 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 inversion H5.
             }
 
-            eapply paco2_mon_bot; eauto.
-            rewrite VIS_HANDLED.
-            pstep; red; cbn.
-
-            rename Pre into Pre_inf.
-            rename Pre0 into Pre_fin.
-
-            (* eapply Interp_Memory_PropT_Vis *)
-            (*   with (k2:= *)
-            (*           fun (x : {_ : InterpreterStackBigIntptr.LP.Events.DV.dvalue | True}) => *)
-            (*             (let (x4, p) := x in *)
-            (*              get_inf_tree *)
-            (*                match DVCInfFin.dvalue_convert_strict x4 with *)
-            (*                | NoOom a => k5 (exist (fun _ : dvalue => True) a p) *)
-            (*                | Oom s => raiseOOM s *)
-            (*                end)). *)
-
-            (* 2: { *)
-            (*   cbn. *)
-            (*   red. *)
-            (*   reflexivity. *)
-            (* } *)
-            (* 2: { *)
-            (*   rewrite get_inf_tree_equation. *)
-            (*   cbn. *)
-            (*   rewrite bind_bind. *)
-            (*   rewrite bind_trigger. *)
-            (*   setoid_rewrite bind_ret_l. *)
-            (*   erewrite <- fin_to_inf_uvalue_refine_strict'; eauto. *)
-            (*   assert (Pre_inf = Pre_fin). *)
-            (*   { admit. (* TODO: Not provable? *) *)
-            (*   } *)
-            (*   subst. *)
-
-            (*   cbn. *)
-            (*   pstep. red. cbn. *)
-            (*   eapply EqVis. *)
-            (*   intros v. *)
-
-            (*   with (k2:= *)
-            (*           fun (v : {_ : InterpreterStackBigIntptr.LP.Events.DV.dvalue | True}) => *)
-            (*           (let (x4, p) := v in *)
-            (*            get_inf_tree *)
-            (*              match DVCInfFin.dvalue_convert_strict x4 with *)
-            (*              | NoOom a => k5 (exist (fun _ : dvalue => True) a p) *)
-            (*              | Oom s => raiseOOM s *)
-            (*              end)). *)
-
-
-            (*   red. left. *)
-            (*   destruct v. *)
-
-            (* } *)
-            (*   { intros a b H H1 H2. *)
-            (*     destruct b. destruct p. *)
-            (*     cbn in *; subst. *)
-            (*     right. *)
-
-            (*     left. *)
-
-            (*   } *)
-
-            (*     with *)
-            (*     (k2:=(fun '(ms_inf, (sid', uv_inf)) => *)
-            (*             get_inf_tree (k2 (s2, (s1, x))))). *)
-
-            (*   eapply Interp_Memory_PropT_Vis. *)
-            (*   3: { *)
-            (*     rewrite get_inf_tree_equation. *)
-            (*     cbn. *)
-            (*   } *)
-            (* - specialize (EQ t1); contradiction. *)
-
-
-
-
-            (*           get_inf_tree (k2 (s2, (s2, r))))). *)
-            (* eapply Interp_Memory_PropT_Vis with *)
-            (*   (ta:=trigger (E1.pick Pre0 (fin_to_inf_uvalue x0))). *)
-            (* 3: { *)
-            (*   rewrite VIS_HANDLED. *)
-            (*   rewrite get_inf_tree_equation. *)
-            (*   red. *)
-            (*   cbn. *)
-
-            (* } *)
-
-            (* destruct t2; pinversion VIS_HANDLED; subst_existT. *)
-            (* { exfalso; eapply EQ; eauto. } *)
-            (* subst_existT. *)
-
-            (* eapply Interp_Memory_PropT_Vis. *)
-            (* 3: { *)
-            (*   rewrite get_inf_tree_equation. *)
-            (*   cbn. *)
-
-            (* } *)
-            (* - intros a b H H1 H2. *)
-            (*   left. *)
-            (*   setoid_rewrite REL. *)
-            (*   apply REL. *)
-
-            (* rewrite get_inf_tree_equation. *)
-            (* cbn. *)
-            (* pfold. red. *)
-            (* cbn. *)
-
-            (* eapply Interp_Memory_PropT_Vis with *)
-            (*   (k2:=(fun res : {_ : InfLP.Events.DV.dvalue | True} => *)
-            (*           let (x4, p) := res in *)
-            (*           get_inf_tree *)
-            (*             match DVCInfFin.dvalue_convert_strict x4 with *)
-            (*             | NoOom a => k (exist (fun _ : dvalue => True) a p) *)
-            (*             | Oom s => raiseOOM s *)
-            (*             end)). *)
-
-
-
-            (*   (k2:=(fun '(ms_inf, (sid', dv_inf)) => *)
-            (*           get_inf_tree (k2 (ms_store, (st', tt))))) *)
-            (*   (s1:=s1) *)
-            (*   (s2:=lift_MemState s2). *)
-
-            (* constructor. *)
-
-            (* cbn *)
-
-            (* epose proof (@itree_eta _ _ t2). *)
-
-            (* punfold VIS_HANDLED. *)
-            (* cbn in VIS_HANDLED. *)
-            (* red in VIS_HANDLED. *)
-            (* dependent induction VIS_HANDLED. *)
-            (* - admit. *)
-            (* - specialize (EQ *)
             admit.
           }
 
           { (* OOM *)
-            red in HANDLER.
-            rewrite HANDLER in VIS_HANDLED.
-            destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
-            { destruct o0.
-              exfalso.
-              clear - VIS_HANDLED.
-              setoid_rewrite bind_trigger in VIS_HANDLED.
-              dependent induction VIS_HANDLED.
-              - pinversion H; subst; inv CHECK.
-              - pinversion H; do 2 subst_existT; subst.
-                destruct x.
-              - pinversion H; do 2 subst_existT; subst.
-                destruct x.
-              - pinversion H; do 2 subst_existT; subst.
-                inversion H4.
-            }
-
-            setoid_rewrite bind_trigger in VIS_HANDLED.
-            rewrite bind_vis in VIS_HANDLED.
-
-            eapply paco2_mon_bot; eauto.
-            rewrite VIS_HANDLED.
-            pstep; red; cbn.
-
-            destruct o, o0.
-            eapply Interp_Memory_PropT_Vis_OOM.
-            cbn.
-            rewrite get_inf_tree_equation.
-            cbn.
-            unfold raiseOOM.
-            rewrite bind_trigger.
+            exfalso.
+            eapply H1.
             reflexivity.
           }
 
@@ -29227,6 +29178,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             2: {
               right.
               cbn.
+              rewrite <- itree_eta.
               rewrite VIS_HANDLED.
               rewrite bind_vis.
               setoid_rewrite bind_ret_l.
@@ -29235,7 +29187,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
               intros [].
               red.
               left.
-              eapply paco2_eqit_refl.
+              eapply paco2_eqit_RR_refl; typeclasses eauto.
             }
 
             intros a b RETa RETb AB.
@@ -29315,45 +29267,50 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             rewrite bind_vis in VIS_HANDLED.
 
             eapply paco2_mon_bot; eauto.
-            rewrite VIS_HANDLED.
-            pstep; red; cbn.
-
-            change (VisF (subevent void (Throw (print_msg "")))
-       (fun x : void =>
-        ITree.subst
-          (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                        end) (Ret x)))
-              with
-              (observe (Vis (subevent void (Throw (print_msg "")))
-       (fun x : void =>
-        ITree.subst
-          (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                        end) (Ret x)))).
-
-            eapply Interp_Memory_PropT_Vis with
-              (s1:=s1)
-              (s2:=lift_MemState s2).
-
-            2: {
+            eapply interp_memory_prop_eutt_S1S2_Proper with (RS2:=MemoryBigIntptr.MMEP.MemSpec.MemState_eqv) (RS1:=eq); eauto; try typeclasses eauto.
+            { intros r1 r2 r3 H H0.
+              destruct r2, p.
+              destruct r3, p0.
+              inv H0.
+              inv snd_rel.
+              cbn in *; subst.
+              auto.
+            }
+            3: {
+              rewrite prod_rel_eq.
+              rewrite <- itree_eta.
+              setoid_rewrite VIS_HANDLED.
+              rewrite get_inf_tree_equation.
               cbn.
-              red.
-              cbn.
-              rewrite bind_trigger.
               reflexivity.
             }
-
             2: {
-              right.
-              cbn.
+              reflexivity.
+            }
+            2: {
+              pstep; red; cbn.
+              match goal with
+              | |- interp_memory_PropTF _ _ _ _ _ _ _ (VisF ?e ?k) =>
+                  change (VisF e k) with (observe (Vis e k))
+              end.
+              eapply Interp_Memory_PropT_Vis.
+
+              intros [].
+              cbn; red; cbn.
+              reflexivity.
+
+              red; cbn; right.
+              rewrite bind_trigger.
               rewrite bind_vis.
-              destruct u; unfold print_msg; cbn.
-              setoid_rewrite bind_ret_l.
+              destruct u.
+              unfold print_msg.
               pstep; red; cbn.
               constructor.
               intros [].
             }
 
-            intros [].
+            apply ret.
+            repeat constructor.
           }
       - (* oruttF's EqVisOOM *)
         destruct e.
@@ -29411,14 +29368,42 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           }
 
           eapply paco2_mon_bot; eauto.
-          rewrite KS.
-          cbn.
-          rewrite get_inf_tree_equation.
-          cbn.
-          pstep; red; cbn.
-          observe_vis.
-          eapply Interp_Memory_PropT_Vis_OOM.
-          reflexivity.
+          eapply interp_memory_prop_eutt_S1S2_Proper with (RS2:=MemoryBigIntptr.MMEP.MemSpec.MemState_eqv) (RS1:=eq); eauto; try typeclasses eauto.
+          { intros r1 r2 r3 H H0.
+            destruct r2, p.
+            destruct r3, p0.
+            inv H0.
+            inv snd_rel.
+            cbn in *; subst.
+            auto.
+          }
+          3: {
+            rewrite prod_rel_eq.
+            rewrite <- itree_eta.
+            setoid_rewrite KS.
+            rewrite get_inf_tree_equation.
+            cbn.
+            reflexivity.
+          }
+          2: {
+            reflexivity.
+          }
+          2: {
+            pstep; red; cbn.
+            change ((VisF (subevent void (ThrowOOM (print_msg "")))
+                       (fun x : void =>
+                          ITree.subst
+                            (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                          end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                                                                           (fun x : void =>
+                                                                              ITree.subst
+                                                                                (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
+                                                                                              end) (Ret x)))).
+            eapply Interp_Memory_PropT_Vis_OOM.
+            reflexivity.
+          }
+
+          apply ret; repeat constructor.
       - (* oruttF's EqTauL *)
         forward IHREL; [exact RUN|].
         forward IHREL; auto.
