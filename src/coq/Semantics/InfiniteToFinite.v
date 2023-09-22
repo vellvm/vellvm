@@ -31669,6 +31669,794 @@ cofix CIH
       }
   Qed.
 
+  #[global] Instance get_inf_tree_L4_eq_itree_eq_Proper :
+    Proper (eq_itree eq ==> eq_itree eq) get_inf_tree_L4.
+  Proof.
+    unfold Proper, respectful.
+    intros x y EQ.
+    rewrite (itree_eta_ x) in *.
+    rewrite (itree_eta_ y) in *.
+    genobs x ox.
+    genobs y oy.
+    clear x Heqox y Heqoy.
+    revert ox oy EQ.
+    pcofix CIH.
+    intros ox oy EQ.
+    punfold EQ. red in EQ. cbn in EQ.
+    dependent induction EQ.
+    - (* Ret Ret *)
+      subst.
+      pstep; red; cbn.
+      constructor; auto.
+    - (* Tau Tau *)
+      pstep; red; cbn.
+      constructor.
+      right.
+      rewrite (itree_eta_ m1).
+      rewrite (itree_eta_ m2).
+      eapply CIH.
+      pclearbot.
+      repeat rewrite <- itree_eta_.
+      apply REL.
+    - (* Vis Vis *)
+      destruct e.
+
+      { (* ExternalCallE *)
+        destruct e.
+        pstep; red; cbn.
+        constructor.
+        intros v.
+        red.
+        right.
+        rewrite (itree_eta_
+                   match DVCInfFin.dvalue_convert_strict v with
+                   | NoOom a => k1 a
+                   | Oom s => raiseOOM s
+                   end).
+        rewrite (itree_eta_
+                   match DVCInfFin.dvalue_convert_strict v with
+                   | NoOom a => k2 a
+                   | Oom s => raiseOOM s
+                   end).
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        break_match; [|reflexivity].
+        specialize (REL d).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      destruct s.
+      { (* OOME *)
+        destruct o.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+
+      destruct s.
+      { (* UBE *)
+        destruct u0.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+
+      destruct s.
+      { (* DebugE *)
+        destruct d.
+        pstep; red; cbn.
+        constructor.
+        intros [].
+        red.
+        right.
+        match goal with
+        | H: _ |- r (get_inf_tree_L4 ?t1) (get_inf_tree_L4 ?t2) =>
+            rewrite (itree_eta_ t1);
+            rewrite (itree_eta_ t2)
+        end.
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        specialize (REL tt).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      { (* FailureE *)
+        destruct f.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+    - (* TauL *)
+      pstep; red; cbn.
+      constructor; auto.
+      punfold IHEQ.
+    - (* TauR *)
+      pstep; red; cbn.
+      constructor; auto.
+      punfold IHEQ.
+  Qed.
+
+  #[global] Instance get_inf_tree_L4_eq_itree_Proper :
+    Proper (eq_itree (Memory64BitIntptr.MMEP.MemSpec.MemState_eqv × eq) ==> eq_itree (MemoryBigIntptr.MMEP.MemSpec.MemState_eqv × eq)) get_inf_tree_L4.
+  Proof.
+    unfold Proper, respectful.
+    intros x y EQ.
+    rewrite (itree_eta_ x) in *.
+    rewrite (itree_eta_ y) in *.
+    genobs x ox.
+    genobs y oy.
+    clear x Heqox y Heqoy.
+    revert ox oy EQ.
+    pcofix CIH.
+    intros ox oy EQ.
+    punfold EQ. red in EQ. cbn in EQ.
+    dependent induction EQ.
+    - (* Ret Ret *)
+      subst.
+      pstep; red; cbn.
+      constructor; auto.
+      destruct r1 as (ms1&sid1&((lenv1&stack1)&genv1&r1)).
+      destruct r2 as (ms2&sid2&((lenv2&stack2)&genv2&r2)).
+      inv REL.
+      cbn in *.
+      inv snd_rel.
+      constructor; cbn; auto.
+      eapply MemState_eqv_lift_MemState; auto.
+    - (* Tau Tau *)
+      pstep; red; cbn.
+      constructor.
+      right.
+      rewrite (itree_eta_ m1).
+      rewrite (itree_eta_ m2).
+      eapply CIH.
+      pclearbot.
+      repeat rewrite <- itree_eta_.
+      apply REL.
+    - (* Vis Vis *)
+      destruct e.
+
+      { (* ExternalCallE *)
+        destruct e.
+        pstep; red; cbn.
+        constructor.
+        intros v.
+        red.
+        right.
+        rewrite (itree_eta_
+                   match DVCInfFin.dvalue_convert_strict v with
+                   | NoOom a => k1 a
+                   | Oom s => raiseOOM s
+                   end).
+        rewrite (itree_eta_
+                   match DVCInfFin.dvalue_convert_strict v with
+                   | NoOom a => k2 a
+                   | Oom s => raiseOOM s
+                   end).
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        break_match; [|reflexivity].
+        specialize (REL d).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      destruct s.
+      { (* OOME *)
+        destruct o.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+
+      destruct s.
+      { (* UBE *)
+        destruct u0.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+
+      destruct s.
+      { (* DebugE *)
+        destruct d.
+        pstep; red; cbn.
+        constructor.
+        intros [].
+        red.
+        right.
+        match goal with
+        | H: _ |- r (get_inf_tree_L4 ?t1) (get_inf_tree_L4 ?t2) =>
+            rewrite (itree_eta_ t1);
+            rewrite (itree_eta_ t2)
+        end.
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        specialize (REL tt).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      { (* FailureE *)
+        destruct f.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+    - (* TauL *)
+      pstep; red; cbn.
+      constructor; auto.
+      punfold IHEQ.
+    - (* TauR *)
+      pstep; red; cbn.
+      constructor; auto.
+      punfold IHEQ.
+  Qed.
+
+  #[global] Instance get_inf_tree_L4_eq_Proper :
+    Proper (eutt eq ==> eutt eq) get_inf_tree_L4.
+  Proof.
+    unfold Proper, respectful.
+    intros x y EQ.
+    rewrite (itree_eta_ x) in *.
+    rewrite (itree_eta_ y) in *.
+    genobs x ox.
+    genobs y oy.
+    clear x Heqox y Heqoy.
+    revert ox oy EQ.
+    pcofix CIH.
+    intros ox oy EQ.
+    punfold EQ. red in EQ. cbn in EQ.
+    dependent induction EQ.
+    - (* Ret Ret *)
+      subst.
+      pstep; red; cbn.
+      constructor; auto.
+    - (* Tau Tau *)
+      pstep; red; cbn.
+      constructor.
+      right.
+      rewrite (itree_eta_ m1).
+      rewrite (itree_eta_ m2).
+      eapply CIH.
+      pclearbot.
+      repeat rewrite <- itree_eta_.
+      apply REL.
+    - (* Vis Vis *)
+      destruct e.
+
+      { (* ExternalCallE *)
+        destruct e.
+        pstep; red; cbn.
+        constructor.
+        intros v.
+        red.
+        right.
+        rewrite (itree_eta_
+                   match DVCInfFin.dvalue_convert_strict v with
+                   | NoOom a => k1 a
+                   | Oom s => raiseOOM s
+                   end).
+        rewrite (itree_eta_
+                   match DVCInfFin.dvalue_convert_strict v with
+                   | NoOom a => k2 a
+                   | Oom s => raiseOOM s
+                   end).
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        break_match; [|reflexivity].
+        specialize (REL d).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      destruct s.
+      { (* OOME *)
+        destruct o.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+
+      destruct s.
+      { (* UBE *)
+        destruct u0.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+
+      destruct s.
+      { (* DebugE *)
+        destruct d.
+        pstep; red; cbn.
+        constructor.
+        intros [].
+        red.
+        right.
+        match goal with
+        | H: _ |- r (get_inf_tree_L4 ?t1) (get_inf_tree_L4 ?t2) =>
+            rewrite (itree_eta_ t1);
+            rewrite (itree_eta_ t2)
+        end.
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        specialize (REL tt).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      { (* FailureE *)
+        destruct f.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+    - (* TauL *)
+      pstep; red; cbn.
+      constructor; auto.
+      punfold IHEQ.
+    - (* TauR *)
+      pstep; red; cbn.
+      constructor; auto.
+      punfold IHEQ.
+  Qed.
+
+  #[global] Instance get_inf_tree_L4_Proper :
+    Proper (eutt (Memory64BitIntptr.MMEP.MemSpec.MemState_eqv × eq) ==> eutt (MemoryBigIntptr.MMEP.MemSpec.MemState_eqv × eq)) get_inf_tree_L4.
+  Proof.
+    unfold Proper, respectful.
+    intros x y EQ.
+    rewrite (itree_eta_ x) in *.
+    rewrite (itree_eta_ y) in *.
+    genobs x ox.
+    genobs y oy.
+    clear x Heqox y Heqoy.
+    revert ox oy EQ.
+    pcofix CIH.
+    intros ox oy EQ.
+    punfold EQ. red in EQ. cbn in EQ.
+    dependent induction EQ.
+    - (* Ret Ret *)
+      subst.
+      pstep; red; cbn.
+      destruct r1 as (ms1&sid1&((lenv1&stack1)&genv1&r1)).
+      destruct r2 as (ms2&sid2&((lenv2&stack2)&genv2&r2)).
+      constructor; auto.
+      inv REL.
+      cbn in *.
+      inv snd_rel.
+      constructor; cbn; auto.
+      eapply MemState_eqv_lift_MemState; auto.
+    - (* Tau Tau *)
+      pstep; red; cbn.
+      constructor.
+      right.
+      rewrite (itree_eta_ m1).
+      rewrite (itree_eta_ m2).
+      eapply CIH.
+      pclearbot.
+      repeat rewrite <- itree_eta_.
+      apply REL.
+    - (* Vis Vis *)
+      destruct e.
+
+      { (* ExternalCallE *)
+        destruct e.
+        pstep; red; cbn.
+        constructor.
+        intros v.
+        red.
+        right.
+        rewrite (itree_eta_
+                   match DVCInfFin.dvalue_convert_strict v with
+                   | NoOom a => k1 a
+                   | Oom s => raiseOOM s
+                   end).
+        rewrite (itree_eta_
+                   match DVCInfFin.dvalue_convert_strict v with
+                   | NoOom a => k2 a
+                   | Oom s => raiseOOM s
+                   end).
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        break_match; [|reflexivity].
+        specialize (REL d).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      destruct s.
+      { (* OOME *)
+        destruct o.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+
+      destruct s.
+      { (* UBE *)
+        destruct u0.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+
+      destruct s.
+      { (* DebugE *)
+        destruct d.
+        pstep; red; cbn.
+        constructor.
+        intros [].
+        red.
+        right.
+        match goal with
+        | H: _ |- r (get_inf_tree_L4 ?t1) (get_inf_tree_L4 ?t2) =>
+            rewrite (itree_eta_ t1);
+            rewrite (itree_eta_ t2)
+        end.
+        apply CIH.
+        repeat rewrite <- itree_eta_.
+        specialize (REL tt).
+        red in REL.
+        pclearbot.
+        eauto.
+      }
+
+      { (* FailureE *)
+        destruct f.
+        pstep; red; cbn.
+        constructor.
+        intros [] _.
+      }
+    - (* TauL *)
+      pstep; red; cbn.
+      constructor; auto.
+      punfold IHEQ.
+    - (* TauR *)
+      pstep; red; cbn.
+      constructor; auto.
+      punfold IHEQ.
+  Qed.
+
+  Lemma model_undef_h_fin_inf :
+    forall (t_fin : itree (FinLP.Events.ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                 (MMEP.MMSP.MemState * (MemPropT.store_id * (local_env * @stack (list (LLVMAst.raw_id * uvalue)) * res_L1))))
+      (t_inf : itree InfLP.Events.L3 TopLevelBigIntptr.res_L6)
+      (t_fin' : itree L4 (FinMem.MMEP.MMSP.MemState * (MemPropT.store_id * (local_env * @stack (list (LLVMAst.raw_id * uvalue)) * res_L1))))
+      (REL: orutt (OOM:=OOME) L3_refine_strict L3_res_refine_strict
+              (MemState_refine
+                 × (eq
+                      × (local_refine_strict × stack_refine_strict
+                           × (global_refine_strict × DVC1.dvalue_refine_strict)))) t_inf t_fin)
+      (UNDEF_FIN: FinLLVM.Pick.model_undef_h TLR_FIN.R.refine_res3 t_fin t_fin'),
+      InfLLVM.Pick.model_undef_h TLR_INF.R.refine_res3 t_inf (get_inf_tree_L4 t_fin').
+  Proof.
+    intros t_fin t_inf t_fin' REL UNDEF_FIN.
+    red.
+    red in UNDEF_FIN.
+
+    red.
+    revert UNDEF_FIN.
+    revert REL.
+
+    rewrite (itree_eta_ t_fin).
+    rewrite (itree_eta_ t_fin').
+    rewrite (itree_eta_ t_inf).
+
+    genobs t_fin ot_fin.
+    genobs t_fin' ot_fin'.
+    genobs t_inf ot_inf.
+    clear t_inf Heqot_inf.
+    clear t_fin Heqot_fin.
+    clear t_fin' Heqot_fin'.
+
+    revert ot_inf ot_fin ot_fin'.
+    pcofix CIH.
+    intros ot_inf ot_fin ot_fin2 REL RUN.
+
+    punfold REL.
+    red in REL.
+    cbn in REL.
+
+    dependent induction REL.
+    - (* EqRet *)
+      apply interp_prop_ret_inv in RUN.
+      destruct RUN as (?&?&?).
+      eapply paco2_mon_bot; eauto.
+      rewrite H1.
+      pstep; red; cbn.
+      constructor.
+      destruct r1 as (?&?&?&?&?).
+      destruct r2 as (?&?&?&?&?).
+      destruct x as (?&?&?&?&?).
+      destruct p0.
+      repeat constructor.
+      cbn in *.
+
+      destruct H as (?&?&?&?&?).
+      destruct H0 as (?&?&?&?&?).
+      cbn in *.
+      destruct p1.
+      cbn.
+      subst.
+      eapply fin_to_inf_dvalue_refine_strict'; eauto.
+    - (* EqTau *)
+      assert (DEC: (exists m3, ot_fin2 = TauF m3) \/ (forall m3, ot_fin2 <> TauF m3)).
+      { destruct ot_fin2; eauto; right; red; intros; inversion H0. }
+
+      destruct DEC as [EQ | EQ].
+      { (* Tau on the right and left... Coinductive case *)
+        destruct EQ as (m3&EQ).
+        subst.
+        rewrite (itree_eta_ m1).
+        rewrite (itree_eta_ m3).
+        pstep; red; cbn.
+        constructor.
+        right.
+
+        pclearbot.
+        eapply CIH.
+        - repeat rewrite <- itree_eta.
+          eauto.
+        - repeat rewrite <- itree_eta.
+          eapply interp_prop_inv_tau; eauto.
+      }
+
+      pclearbot.
+      apply interp_prop_inv_tau_l in RUN.
+      rewrite (itree_eta_ m2) in H.
+      rewrite (itree_eta_ m2) in RUN.
+      genobs m2 om2.
+      clear Heqom2 m2.
+      punfold RUN; red in RUN; cbn in RUN.
+      dependent induction RUN; subst.
+      -- apply orutt_inv_Ret_r in H.
+         eapply paco2_mon_bot; eauto.
+         destruct H as (r2'&M1&H).
+         rewrite tau_eutt.
+         rewrite M1.
+         rewrite get_inf_tree_L4_equation.
+         cbn.
+         eapply interp_prop_ret_refine.
+         destruct r1 as (?&?&?&?&?).
+         destruct r2 as (?&?&?&?&?).
+         destruct r2' as (?&?&?&?&?).
+         repeat constructor.
+         cbn; destruct p0; cbn.
+         destruct H as (?&?&?&?&?).
+         destruct REL as (?&?&?&?&?).
+         cbn in *; subst.
+         eapply fin_to_inf_dvalue_refine_strict'; eauto.
+      -- specialize (EQ t2).
+         contradiction.
+      -- eapply IHRUN; eauto.
+         rewrite <- itree_eta_.
+         apply orutt_inv_Tau_r; eauto.
+      -- specialize (EQ t2).
+         contradiction.
+      -- (* Interp_PropT_Vis case *)
+        eapply paco2_mon_bot; eauto.
+        setoid_rewrite tau_eutt.
+        repeat red in H0.
+        destruct e.
+        { (* ExternalCallE *)
+          red in H0.
+          rewrite H0 in H1.
+          setoid_rewrite bind_bind in H1.
+          setoid_rewrite bind_ret_l in H1.
+          setoid_rewrite bind_trigger in H1.
+          rewrite H1.
+          cbn.
+          rewrite get_inf_tree_L4_equation.
+          cbn; break_match_goal; cbn.
+
+          apply orutt_inv_Vis_r in H.
+          destruct H as [(?&?&?&?&?) | OOM].
+          2: {
+            destruct OOM.
+            inv H.
+          }
+
+          destruct H2.
+          red in H2.
+          destruct x0.
+          2: repeat destruct s; inv H2.
+          destruct e0.
+          (* Why can I not destruct e...? *)
+          dependent destruction e.
+          inv Heqe0.
+          destruct H2 as (?&F&ARGS).
+          subst.
+
+          rewrite H.
+          pstep; red; cbn.
+          match goal with
+          | |- interp_PropTF _ _ _ _ _ _ (VisF ?e ?k) =>
+              change (VisF e k) with (observe (Vis e k))
+          end.
+          eapply Interp_PropT_Vis with
+            (k2:=(fun v => get_inf_tree_L4
+                          match DVCInfFin.dvalue_convert_strict v with
+                          | NoOom a => k2 a
+                          | Oom s => raiseOOM s
+                          end)).
+          2: {
+            cbn.
+            red.
+            setoid_rewrite bind_ret_r.
+            reflexivity.
+          }
+          2: {
+            setoid_rewrite bind_trigger.
+            erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+
+            (* TODO: Move this *)
+            Lemma map_fin_to_inf_uvalue_refine_strict' :
+              forall dv_fins dv_infs,
+                Forall2 DVCInfFin.dvalue_refine_strict dv_infs dv_fins ->
+                map fin_to_inf_dvalue dv_fins = dv_infs.
+            Proof.
+              intros dv_fins dv_infs REF.
+              erewrite Forall2_map_eq; eauto.
+              unfold DVCInfFin.dvalue_refine_strict in REF.
+              apply Util.Forall2_forall.
+              apply Util.Forall2_forall in REF as (LENGTH & REF).
+              split; auto.
+              intros i a b H H0.
+              pose proof (REF i b a H0 H).
+              apply fin_to_inf_convert_dvalue_inversion; auto.
+            Qed.
+
+            erewrite map_fin_to_inf_uvalue_refine_strict'; eauto.
+            reflexivity.
+          }
+
+          intros a RET.
+          break_match_goal.
+          - specialize (H3 a d).
+            forward H3; cbn; try tauto.
+            left.
+            admit.
+          - left.
+            rewrite get_inf_tree_L4_equation.
+            cbn.
+
+            Lemma interp_prop_raise_oom :
+              forall {E1 E2} `{OOME2 : OOME -< E2}
+                {R1 R2}
+                (R1R2 : R1 -> R2 -> Prop)
+                t msg
+                (X Y : Type) h_spec,
+                interp_prop (E:=E1) (F:=E2) h_spec R1R2 t (raiseOOM msg).
+            Proof.
+              intros E1 E2 OOME2 R1 R2 R1R2 t msg X Y h_spec.
+              pstep; red; cbn.
+              eapply 
+            Qed.
+
+              forall 
+            
+
+
+
+          Lemma interp_prop_vis_refine :
+            forall {E1 E2} `{OOME2 : OOME -< E2}
+              (REF : prerel E1 E2)
+              (RES_REF : postrel E1 E2)
+              {R1 R2}
+              (R1R2 : R1 -> R2 -> Prop)
+              (X Y : Type) h_spec (e1 : E1 X) (e2 : E2 Y) k1 k2,
+              (forall x y, RES_REF X Y e1 x e2 y -> orutt (OOM:=OOME) REF RES_REF R1R2 (k1 x) (k2 y)) ->
+              interp_prop h_spec R1R2 (vis e1 k1) (vis e2 k2).
+          Proof.
+            intros.
+            pstep; red; cbn.
+            match goal with
+            | |- interp_PropTF _ _ _ _ _ _ (VisF ?e ?k) =>
+                change (VisF e k) with (observe (Vis e k))
+            end.
+            eapply Interp_PropT_Vis. with (ta:=)
+            econstructor.
+            3: {
+              cbn.
+              rewrite bind_trigger.
+              cbn.
+              replace k2 with (fun x => k2 x).
+              reflexivity.
+            }
+            2: {
+              red.
+            }
+            - intros a H0.
+              left.
+              eauto.
+              
+
+            generalize dependent y.
+            generalize dependent x.
+            pcofix CIH.
+            intros x y RRxy.
+            pstep.
+            cbn.
+            econstructor; eauto.
+          Qed.
+
+          pstep; red; cbn.
+          
+          cbn.
+          pstep; red; cbn.
+
+          constructor.
+          { red. cbn.
+            split; auto.
+            split.
+            apply fin_to_inf_uvalue_refine_strict.
+            apply Util.Forall2_forall.
+            split.
+            apply map_length.
+
+            intros i a b H H0.
+            apply Nth_map_iff in H.
+            destruct H. destruct H.
+            subst.
+
+            cbn in *.
+            rewrite H1 in H0.
+            inv H0.
+            apply fin_to_inf_dvalue_refine_strict.
+          }
+
+          { intros a b [TT [F [ARGS AB]]].
+            rewrite DVCInfFin.dvalue_refine_strict_equation in AB.
+            rewrite AB.
+            rewrite (itree_eta_ (k b)).
+            right.
+            apply CIH.
+          }
+
+          { intros o CONTRA; inv CONTRA.
+          }
+
+        }
+             left.
+             pclearbot.
+             assert (orutt (OOM:=OOME) (@L2_refine_strict) (@L2_res_refine_strict) (local_refine_strict × stack_refine_strict
+                                                                                      × (global_refine_strict × DVCInfFin.dvalue_refine_strict)) m1 (Tau t1)).
+             { apply H.
+             }
+             setoid_rewrite tau_eutt in H0.
+             rewrite <- itree_eta_.
+             apply H0.
+          -- specialize (EQ t2).
+             contradiction.
+
+      
+
+      applpunfold RUN.
+      red in RUN.
+      inversion RUN; cbn in H0.
+      + exfalso; eapply EQ; eauto.
+      + subst.
+
+      pstep; red; cbn.
+      constructor; eauto.
+      destruct DEC
+
+
+      constructor; auto.
+      rewrite 
+      
+  Qed.
+
   Lemma model_E1E2_34_orutt_strict :
     forall t_inf t_fin,
       L3_E1E2_orutt_strict t_inf t_fin ->
@@ -31691,9 +32479,20 @@ cofix CIH
        orutt t_inf_L4 t_fin_L4...
      *)
     exists (get_inf_tree_L4 t_fin_L4).
+    split.
+    2: apply get_inf_tree_L4_rutt.
 
-    
-  Admitted.
+    red.
+    red in UNDEF_FIN.
+    destruct UNDEF_FIN as (t_fin_L3 & T_FIN & UNDEF_FIN).
+
+    specialize (REL t_fin_L3 T_FIN).
+    destruct REL as (t_inf_L3 & T_INF & REL).
+
+    exists t_inf_L3.
+    split; auto.
+    eapply model_undef_h_fin_inf; eauto.
+  Qed.
 
   Lemma model_E1E2_L4_orutt_strict_sound
     (p : list
