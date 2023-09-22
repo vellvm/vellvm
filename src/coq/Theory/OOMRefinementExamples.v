@@ -160,7 +160,14 @@ Module Infinite.
                 (vis (ThrowOOM (print_msg oom_msg)) (fun x : void => match x return (itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) R) with
                                                          end))).
 
-    hinduction Hmodel before CIH; cbn; intros; inv Heqi; eauto; [solve [cbn in *; eapply EqTauL; auto] |]; try discriminate.
+    hinduction Hmodel before CIH; cbn; intros; inv Heqi; eauto; [solve [cbn in *; eapply EqTauL; auto] | | |]; try discriminate.
+    { destruct e, u.
+      pinversion HT1; subst_existT.
+      - unfold print_msg.
+        constructor.
+        intros [].
+      - inv CHECK0.
+    }
 
     dependent destruction H3.
     do 20 red in H.
@@ -183,31 +190,29 @@ Module Infinite.
     forall {E F : Type -> Type}
       `{FAIL : FailureE -< E +' F}
       `{UB : UBE -< E +' F}
-      `{OOM : OOME -< E +' F}
+      `{OOM : OOME -< F}
       {X} (x : X)
       (RR : relation X) `{REF : Reflexive X RR},
       model_undef_h RR (ret x) (ret x).
   Proof.
     intros E F FAIL UB OOM X x RR REF.
     unfold model_undef_h.
-    apply interp_prop_ret_pure; auto.
+    apply interp_prop_oom_ret_pure; auto.
   Qed.
 
   Lemma model_undef_h_ret_inv :
     forall {E F : Type -> Type}
       `{FAIL : FailureE -< E +' F}
       `{UB : UBE -< E +' F}
-      `{OOM : OOME -< E +' F}
+      `{OOMF : OOME -< F}
       {X} (x : X) (t : itree (E +' F) X),
       model_undef_h eq (ret x) t ->
-      t ≈ Ret x.
+      t ≈ Ret x \/ (exists (A : Type) (e : OOME A) (k : A -> itree (E +' F) X), t ≈ vis e k).
   Proof.
     intros E F FAIL UB OOM X x t UNDEF.
     unfold model_undef_h in *.
-    eapply interp_prop_ret_inv in UNDEF.
-    destruct UNDEF as [r2 [EQ T']].
-    subst.
-    auto.
+    eapply interp_prop_oom_ret_inv in UNDEF.
+    destruct UNDEF as [[r2 [EQ T']] | OOM_CASE]; subst; eauto.
   Qed.
 
   Lemma interp_mcfg4_ret :
@@ -248,8 +253,8 @@ Module Infinite.
     destruct H as [(?&?&?) | (A&e&k&?)].
     { destruct x1 as (?&?&?).
       rewrite H1 in H0.
-      apply interp_prop_ret_inv in H0.
-      destruct H0 as (?&?&?). subst.
+      apply interp_prop_oom_ret_inv in H0.
+      destruct H0 as [(?&?&?) | OOM_CASE]; subst; eauto.
       cbn. left. exists m0, s. rewrite H2.
       cbn.
       reflexivity.
@@ -268,7 +273,12 @@ Module Infinite.
     dependent induction H0.
     - setoid_rewrite tau_eutt.
       setoid_rewrite itree_eta.
-      eapply IHinterp_PropTF; eauto.
+      eapply IHinterp_prop_oomTF; eauto.
+    - cbn.
+      setoid_rewrite <- itree_eta.
+      setoid_rewrite HT1.
+      exists A0. exists e0. exists k2.
+      reflexivity.
     - red in H; cbn in H; red in H.
       setoid_rewrite bind_ret_r in H.
       rewrite H in H0.
@@ -569,14 +579,8 @@ Module Infinite.
           red.
           pstep; red; cbn.
           change (VisF (subevent void (ThrowOOM u)) k) with (observe (Vis (subevent void (ThrowOOM u)) k)).
-          econstructor.
-          * intros [] _.
-          * cbn. red.
-            setoid_rewrite bind_ret_r.
-            reflexivity.
-          * setoid_rewrite bind_trigger.
-            unfold print_msg. destruct u.
-            reflexivity.
+          econstructor; eauto.
+          reflexivity.
       - reflexivity.
     }
 
@@ -698,14 +702,8 @@ Module Infinite.
           red.
           pstep; red; cbn.
           change (VisF (subevent void (ThrowOOM u)) k) with (observe (Vis (subevent void (ThrowOOM u)) k)).
-          econstructor.
-          * intros [] _.
-          * cbn. red.
-            setoid_rewrite bind_ret_r.
-            reflexivity.
-          * setoid_rewrite bind_trigger.
-            unfold print_msg. destruct u.
-            reflexivity.
+          econstructor; eauto.
+          reflexivity.
       - reflexivity.
     }
 
@@ -866,7 +864,9 @@ Module Infinite.
             end)).
     hinduction H0 before i0; intros; inv Heqi.
     - pstep; constructor; eauto.
-      specialize (IHinterp_PropTF eq_refl H eq_refl). punfold IHinterp_PropTF.
+      specialize (IHinterp_prop_oomTF eq_refl H eq_refl). punfold IHinterp_prop_oomTF.
+    - inv CHECK.
+    - pstep; red; cbn; eauto.
     - dependent destruction H4.
       cbn in H. red in H.
       rewrite H in H0.
@@ -885,22 +885,28 @@ Module Infinite.
       refine_OOM_h (E := L4) refine_res3 t1 t3.
   Proof.
     intros.
-    eapply interp_prop_ret_inv in H0.
-    destruct H0 as (?&?&?).
+    eapply interp_prop_oom_ret_inv in H0.
+    rewrite H.
+    destruct H0 as [(?&?&?) | OOM_CASE].
+    2: {
+      red.
+      red.
+      destruct OOM_CASE as (?&?&?&?).
+      rewrite H0.
+      pstep; red; cbn.
+      observe_vis.
+      eapply Interp_Prop_OomT_Vis_OOM_L; eauto.
+      reflexivity.
+    }
+
     subst. rewrite H1.
     red in H.
-    red in H.
-    eapply interp_prop_oom_l_ret_inv in H.
-    destruct H as (?&?&?).
-    subst. rewrite H2.
+    inv H0.
+    destruct r, x.
+    cbn in *; subst.
     pstep; constructor; auto.
     red.
-    destruct r, x, x0.
-    red.
-    constructor; cbn; auto.
-    inv H0; cbn in *; subst.
-    inv H; cbn in *; subst.
-    auto.
+    repeat constructor; cbn; auto.
   Qed.
 
   (* Add allocation in infinite language *)
@@ -967,7 +973,18 @@ Module Infinite.
           { setoid_rewrite (itree_eta t').
             setoid_rewrite <- x.
             setoid_rewrite tau_eutt.
-            eapply IHinterp_PropTF; eauto.
+            eapply IHinterp_prop_oomTF; eauto.
+          }
+
+          { setoid_rewrite (itree_eta t').
+            setoid_rewrite <- x.
+            rewrite HT1.
+            cbn.
+            destruct e.
+            pstep; red; cbn.
+            observe_vis_r.
+            eapply Interp_Prop_OomT_Vis_OOM_R; eauto.
+            reflexivity.
           }
 
           cbn in H.
@@ -1004,7 +1021,7 @@ Module Infinite.
                      (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME
                         (UBE +' DebugE +' FailureE) (@ReSum_id (Type -> Type) IFun Id_IFun OOME)) void
                      (ThrowOOM u))) (fun x1 : void => k2 x1))).
-          eapply Interp_PropT_Vis.
+          eapply Interp_Prop_OomT_Vis.
           * intros [] _.
           * cbn. red.
             setoid_rewrite bind_ret_r.
@@ -1058,7 +1075,7 @@ Module Infinite.
     }
 
     (* Why can't this just be a rewrite? *)
-    eapply interp_prop_Proper_eq in H0; try typeclasses eauto; eauto.
+    eapply interp_prop_oom_Proper_eq in H0; try typeclasses eauto; eauto.
     2: symmetry; apply EQ1.
     clear x EQ1.
 
@@ -1136,7 +1153,18 @@ Module Infinite.
         setoid_rewrite <- x.
         eapply interp_prop_oom_Proper_eq; try typeclasses eauto; auto.
         rewrite tau_eutt; reflexivity.
-        eapply IHinterp_PropTF; eauto.
+        eapply IHinterp_prop_oomTF; eauto.
+      }
+
+      { setoid_rewrite (itree_eta t').
+        setoid_rewrite <- x.
+        rewrite HT1.
+        cbn.
+        destruct e.
+        pstep; red; cbn.
+        observe_vis.
+        eapply Interp_Prop_OomT_Vis_OOM_L; eauto.
+        reflexivity.
       }
 
       cbn in H2.
@@ -1347,7 +1375,9 @@ Module Finite.
             end)).
     hinduction H0 before i0; intros; inv Heqi.
     - pstep; constructor; eauto.
-      specialize (IHinterp_PropTF eq_refl H eq_refl). punfold IHinterp_PropTF.
+      specialize (IHinterp_prop_oomTF eq_refl H eq_refl). punfold IHinterp_prop_oomTF.
+    - inv CHECK.
+    - pstep; red; cbn; eauto.      
     - dependent destruction H4.
       cbn in H. red in H.
       rewrite H in H0.
@@ -1366,22 +1396,28 @@ Module Finite.
       refine_OOM_h (E := L4) refine_res3 t1 t3.
   Proof.
     intros.
-    eapply interp_prop_ret_inv in H0.
-    destruct H0 as (?&?&?).
+    eapply interp_prop_oom_ret_inv in H0.
+    rewrite H.
+    destruct H0 as [(?&?&?) | OOM_CASE].
+    2: {
+      red.
+      red.
+      destruct OOM_CASE as (?&?&?&?).
+      rewrite H0.
+      pstep; red; cbn.
+      observe_vis.
+      eapply Interp_Prop_OomT_Vis_OOM_L; eauto.
+      reflexivity.
+    }
+
     subst. rewrite H1.
     red in H.
-    red in H.
-    eapply interp_prop_oom_l_ret_inv in H.
-    destruct H as (?&?&?).
-    subst. rewrite H2.
+    inv H0.
+    destruct r, x.
+    cbn in *; subst.
     pstep; constructor; auto.
     red.
-    destruct r, x, x0.
-    red.
-    constructor; cbn; auto.
-    inv H0; cbn in *; subst.
-    inv H; cbn in *; subst.
-    auto.
+    repeat constructor; cbn; auto.
   Qed.
 
   (* Few remarks about [L3_trace] used in [interp_mcfg4] *)
@@ -1541,31 +1577,29 @@ Module Finite.
     forall {E F : Type -> Type}
       `{FAIL : FailureE -< E +' F}
       `{UB : UBE -< E +' F}
-      `{OOM : OOME -< E +' F}
+      `{OOM : OOME -< F}
       {X} (x : X)
       (RR : relation X) `{REF : Reflexive X RR},
       model_undef_h RR (ret x) (ret x).
   Proof.
     intros E F FAIL UB OOM X x RR REF.
     unfold model_undef_h.
-    apply interp_prop_ret_pure; auto.
+    apply interp_prop_oom_ret_pure; auto.
   Qed.
 
   Lemma model_undef_h_ret_inv :
     forall {E F : Type -> Type}
       `{FAIL : FailureE -< E +' F}
       `{UB : UBE -< E +' F}
-      `{OOM : OOME -< E +' F}
+      `{OOMF : OOME -< F}
       {X} (x : X) (t : itree (E +' F) X),
       model_undef_h eq (ret x) t ->
-      t ≈ Ret x.
+      t ≈ Ret x \/ (exists (A : Type) (e : OOME A) (k : A -> itree (E +' F) X), t ≈ vis e k).
   Proof.
     intros E F FAIL UB OOM X x t UNDEF.
     unfold model_undef_h in *.
-    eapply interp_prop_ret_inv in UNDEF.
-    destruct UNDEF as [r2 [EQ T']].
-    subst.
-    auto.
+    eapply interp_prop_oom_ret_inv in UNDEF.
+    destruct UNDEF as [[r2 [EQ T']] | OOM_CASE]; subst; eauto.
   Qed.
 
   Lemma interp_mcfg4_ret :
@@ -1606,9 +1640,11 @@ Module Finite.
     destruct H as [(?&?&?) | (A&e&k&?)].
     { destruct x1 as (?&?&?).
       rewrite H1 in H0.
-      apply interp_prop_ret_inv in H0.
-      destruct H0 as (?&?&?). subst.
-      cbn. left. exists m0, s. rewrite H2. reflexivity.
+      apply interp_prop_oom_ret_inv in H0.
+      destruct H0 as [(?&?&?) | OOM_CASE]; subst; eauto.
+      cbn. left. exists m0, s. rewrite H2.
+      cbn.
+      reflexivity.
     }
 
     right.
@@ -1624,7 +1660,12 @@ Module Finite.
     dependent induction H0.
     - setoid_rewrite tau_eutt.
       setoid_rewrite itree_eta.
-      eapply IHinterp_PropTF; eauto.
+      eapply IHinterp_prop_oomTF; eauto.
+    - cbn.
+      setoid_rewrite <- itree_eta.
+      setoid_rewrite HT1.
+      exists A0. exists e0. exists k2.
+      reflexivity.
     - red in H; cbn in H; red in H.
       setoid_rewrite bind_ret_r in H.
       rewrite H in H0.
@@ -1658,6 +1699,7 @@ Module Finite.
     rewrite alloc_tree_simpl in H.
     apply L3_trace_MemoryE in H.
 
+    (* Given `H`, what can `x` be? *)
     apply interp_memory_prop_vis_inv in H.
     destruct H as [(alloc_t&k1&s1&ms1&EQ1&SPEC1&HK) | [(ta&s1&s2&INTERP&UB) | (A&e&k&EUTT)]].
     3: { (* OOM *)
@@ -1706,7 +1748,18 @@ Module Finite.
           { setoid_rewrite (itree_eta t').
             setoid_rewrite <- x.
             setoid_rewrite tau_eutt.
-            eapply IHinterp_PropTF; eauto.
+            eapply IHinterp_prop_oomTF; eauto.
+          }
+
+          { setoid_rewrite (itree_eta t').
+            setoid_rewrite <- x.
+            rewrite HT1.
+            cbn.
+            destruct e.
+            pstep; red; cbn.
+            observe_vis_r.
+            eapply Interp_Prop_OomT_Vis_OOM_R; eauto.
+            reflexivity.
           }
 
           cbn in H.
@@ -1743,7 +1796,7 @@ Module Finite.
                      (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME
                         (UBE +' DebugE +' FailureE) (@ReSum_id (Type -> Type) IFun Id_IFun OOME)) void
                      (ThrowOOM u))) (fun x1 : void => k2 x1))).
-          eapply Interp_PropT_Vis.
+          eapply Interp_Prop_OomT_Vis.
           * intros [] _.
           * cbn. red.
             setoid_rewrite bind_ret_r.
@@ -1797,7 +1850,7 @@ Module Finite.
     }
 
     (* Why can't this just be a rewrite? *)
-    eapply interp_prop_Proper_eq in H0; try typeclasses eauto; eauto.
+    eapply interp_prop_oom_Proper_eq in H0; try typeclasses eauto; eauto.
     2: symmetry; apply EQ1.
     clear x EQ1.
 
@@ -1825,7 +1878,7 @@ Module Finite.
       rewrite MAP in H0.
       exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
       split; cycle 1.
-      { clear -H0.
+      { clear - H0.
         eapply refine_OOM_h_model_undef_h_raise_OOM; eauto.
         eapply refine_oom_h_raise_oom; typeclasses eauto. }
       { unfold interp_instr_E_to_L0. unfold ret_tree. cbn.
@@ -1875,7 +1928,18 @@ Module Finite.
         setoid_rewrite <- x.
         eapply interp_prop_oom_Proper_eq; try typeclasses eauto; auto.
         rewrite tau_eutt; reflexivity.
-        eapply IHinterp_PropTF; eauto.
+        eapply IHinterp_prop_oomTF; eauto.
+      }
+
+      { setoid_rewrite (itree_eta t').
+        setoid_rewrite <- x.
+        rewrite HT1.
+        cbn.
+        destruct e.
+        pstep; red; cbn.
+        observe_vis.
+        eapply Interp_Prop_OomT_Vis_OOM_L; eauto.
+        reflexivity.
       }
 
       cbn in H2.

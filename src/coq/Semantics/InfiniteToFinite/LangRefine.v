@@ -7092,6 +7092,35 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     apply NUNIQUE.
   Admitted.
 
+
+  
+  (* Definition unique_prop (uv : uvalue) : Prop
+    := exists x, concretize uv x /\ forall dv, concretize uv dv -> dv = x. *)
+
+  (* Definition uvalue_refine_strict (uv1 : DV1.uvalue) (uv2 : DV2.uvalue) : Prop
+    := uvalue_convert_strict uv1 = NoOom uv2.*)
+
+  (*
+    Definition uvalue_concretize_inf_fin_inclusion uv_inf uv_fin :=
+      forall dv_inf, concretize_inf uv_inf dv_inf ->
+      exists dv_fin,
+        dvalue_refine_strict dv_inf dv_fin /\
+        concretize_fin uv_fin dv_fin.
+
+    Definition uvalue_concretize_fin_inf_inclusion uv_inf uv_fin :=
+      forall dv_fin, concretize_fin uv_fin dv_fin ->
+      concretize_inf uv_inf (lift_dvalue dv_fin).
+
+    May need lift_dvalue is an injective.
+
+    Lemma uvalue_concretize_strict_concretize_inclusion :
+      forall uv_inf uv_fin,
+        uvalue_refine_strict uv_inf uv_fin ->
+        uvalue_concretize_fin_inf_inclusion uv_inf uv_fin.
+
+   Should hopefully just be by induction on uv_inf...
+   *)
+
   Lemma uvalue_refine_strict_unique_prop :
     forall uv1 uv2,
       uvalue_refine_strict uv1 uv2 ->
