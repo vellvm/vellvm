@@ -136,7 +136,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   | Call        : forall (t:dtyp) (f:uvalue) (args:list uvalue) (attr:list fn_attr), CallE uvalue.
 
   Variant ExternalCallE : Type -> Type :=
-  | ExternalCall        : forall (t:dtyp) (f:uvalue) (args:list dvalue) (attr:list fn_attr), ExternalCallE uvalue.
+  | ExternalCall        : forall (t:dtyp) (f:uvalue) (args:list uvalue) (attr:list fn_attr), ExternalCallE uvalue.
 
   (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)
   Variant IntrinsicE : Type -> Type :=
