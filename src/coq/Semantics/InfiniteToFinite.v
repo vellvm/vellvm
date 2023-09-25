@@ -32127,6 +32127,9 @@ cofix CIH
       punfold IHEQ.
   Qed.
 
+  (* TODO: Move this import *)
+  From Vellvm Require Import Utils.InterpPropOOM.
+
   Lemma model_undef_h_fin_inf :
     forall (t_fin : itree (FinLP.Events.ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
                  (MMEP.MMSP.MemState * (MemPropT.store_id * (local_env * @stack (list (LLVMAst.raw_id * uvalue)) * res_L1))))
@@ -32169,7 +32172,35 @@ cofix CIH
 
     dependent induction REL.
     - (* EqRet *)
-      apply interp_prop_ret_inv in RUN.
+      apply interp_prop_oom_ret_inv in RUN.
+      destruct RUN as [RUN | RUN].
+      2: {
+        destruct RUN as (?&?&?&?).
+        eapply paco2_mon_bot; eauto.
+        setoid_rewrite H0.
+        rewrite get_inf_tree_L4_equation.
+        cbn.
+        destruct x0.
+        cbn.
+
+        (* TODO: Move this *)
+        Lemma interp_prop_oom_raiseOOM :
+          forall {E F : Type -> Type} {OOM1 : OOME -< E} {OOM2 : OOME -< F}
+            (h : forall T : Type, E T -> PropT F T) {T : Type} (b1 b2 o1 : bool)
+            t oom_msg
+            (RR : relation T),
+            interp_prop_oom' (OOM:=OOME) h RR b1 b2 o1 true t (raiseOOM oom_msg).
+        Proof.
+          intros E F OOM1 OOM2 h T b1 b2 o1 t oom_msg RR.
+          pstep; red; cbn.
+          observe_vis_r.
+          eapply Interp_Prop_OomT_Vis_OOM_R; eauto.
+          reflexivity.
+        Qed.
+        
+        apply interp_prop_oom_raiseOOM.
+      }
+
       destruct RUN as (?&?&?).
       eapply paco2_mon_bot; eauto.
       rewrite H1.
@@ -32208,11 +32239,11 @@ cofix CIH
         - repeat rewrite <- itree_eta.
           eauto.
         - repeat rewrite <- itree_eta.
-          eapply interp_prop_inv_tau; eauto.
+          eapply interp_prop_oom_inv_tau; eauto.
       }
 
       pclearbot.
-      apply interp_prop_inv_tau_l in RUN.
+      apply interp_prop_oom_inv_tau_l in RUN.
       rewrite (itree_eta_ m2) in H.
       rewrite (itree_eta_ m2) in RUN.
       genobs m2 om2.
@@ -32226,7 +32257,7 @@ cofix CIH
          rewrite M1.
          rewrite get_inf_tree_L4_equation.
          cbn.
-         eapply interp_prop_ret_refine.
+         eapply interp_prop_oom_ret_refine.
          destruct r1 as (?&?&?&?&?).
          destruct r2 as (?&?&?&?&?).
          destruct r2' as (?&?&?&?&?).
@@ -32243,6 +32274,14 @@ cofix CIH
          apply orutt_inv_Tau_r; eauto.
       -- specialize (EQ t2).
          contradiction.
+      -- inv CHECK.
+      -- destruct e, u.
+         pinversion HT1; subst_existT.
+         2: inv CHECK0.
+         eapply paco2_mon_bot; eauto.
+         setoid_rewrite get_inf_tree_L4_equation.
+         cbn.
+         eapply interp_prop_oom_raiseOOM.
       -- (* Interp_PropT_Vis case *)
         eapply paco2_mon_bot; eauto.
         setoid_rewrite tau_eutt.
@@ -32279,11 +32318,8 @@ cofix CIH
 
           rewrite H.
           pstep; red; cbn.
-          match goal with
-          | |- interp_PropTF _ _ _ _ _ _ (VisF ?e ?k) =>
-              change (VisF e k) with (observe (Vis e k))
-          end.
-          eapply Interp_PropT_Vis with
+          observe_vis_r.
+          eapply Interp_Prop_OomT_Vis with
             (k2:=(fun v => get_inf_tree_L4
                           match DVCInfFin.dvalue_convert_strict v with
                           | NoOom a => k2 a
@@ -32324,8 +32360,21 @@ cofix CIH
           break_match_goal.
           - specialize (H3 a d).
             forward H3; cbn; try tauto.
+            
             left.
-            admit.
+            specialize (HK d).
+            forward HK.
+            { rewrite H0.
+              setoid_rewrite bind_trigger.
+              eapply ReturnsVis.
+              reflexivity.
+              cbn.
+              constructor.
+              reflexivity.
+            }
+
+            pclearbot.
+            rewrite H3.
           - left.
             rewrite get_inf_tree_L4_equation.
             cbn.
