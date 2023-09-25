@@ -135,6 +135,8 @@ Variant fn_attr : Set :=
 | FNATTR_String (s:string) (* "no-see" *)
 | FNATTR_Key_value (kv : string * string) (* "unsafe-fp-math"="false" *)
 | FNATTR_Attr_grp (g:int)
+| FNATTR_Internal
+| FNATTR_External
 .
 
 Variant thread_local_storage : Set :=

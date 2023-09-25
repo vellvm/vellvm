@@ -707,6 +707,14 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
       Definition lookup_defn {B} := @assoc uvalue B _.
 
+      Definition remove_tag : list fn_attr -> list fn_attr :=
+        List.filter (fun attr =>
+                      match attr with
+                      | FNATTR_Internal
+                      | FNATTR_External => false
+                      | _ => true
+                      end).
+
       Definition denote_mcfg
                  (fundefs:list (uvalue * definition dtyp (cfg dtyp))) (dt : dtyp)
                  (f_value : uvalue) (args : list uvalue) : itree L0 uvalue :=
@@ -719,7 +727,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                      denote_function (f_den) args
                    | None =>
                      dargs <- map_monad (fun uv => pickUnique uv) args ;;
-                     trigger (ExternalCall dt fv (map dvalue_to_uvalue dargs) attr)
+                     trigger (ExternalCall dt fv (map dvalue_to_uvalue dargs) (remove_tag attr))
                    end
                  end)
               _ (Call dt f_value args []).
