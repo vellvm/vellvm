@@ -51,7 +51,6 @@ From Vellvm Require Import
 
 Require Import Ceres.Ceres.
 
-Import MonadNotation.
 Import EqvNotation.
 Import ListNotations.
 
@@ -116,6 +115,9 @@ Module Addr : MemoryAddress.ADDRESS with Definition addr := (Z * Z) % type.
   Qed.
 End Addr.
 
+From stdpp Require Import gmap.
+
+#[global] Coercion is_true : bool >-> Sortclass.
 (** ** Memory model
     Implementation of the memory model, i.e. a handler for [MemoryE].
     The memory itself, [memory], is a finite map (using the standard library's AVLs)
@@ -128,13 +130,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
   Definition addr := Addr.addr.
 
-  Module IM := FMapAVL.Make(Coq.Structures.OrderedTypeEx.Z_as_OT).
-  Module IS := FSetAVL.Make(Coq.Structures.OrderedTypeEx.Z_as_OT).
-  Module Import ISP := FSetProperties.WProperties_fun(Coq.Structures.OrderedTypeEx.Z_as_OT)(IS).
-  Module Import IP := FMapFacts.WProperties_fun(Coq.Structures.OrderedTypeEx.Z_as_OT)(IM).
-
-  #[global] Coercion is_true : bool >-> Sortclass.
-
   (** ** Finite maps
       We use finite maps in several place of the memory model. We rely on the AVL implementation from the standard library.
       We redefine locally the operations we use and their axiomatisation as the interface exposed by the standard library
@@ -142,44 +137,23 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
    *)
   Section Map_Operations.
 
-  
     (* Polymorphic type of maps indexed by [Z] *)
-    Definition IntMap := IM.t.
-    
-    Definition add {a} k (v:a) := IM.add k v.
-    Definition delete {a} k (m:IntMap a) := IM.remove k m.
-    Definition member {a} k (m:IntMap a) := IM.mem k m.
-    Definition lookup {a} k (m:IntMap a) := IM.find k m.
-    Definition empty {a} := @IM.empty a.
+    Definition IntMap := gmap Z.
 
-    (* We use two notions of equivalence of maps depending on the type of objects stored.
-       When we can get away with Leibniz's equality over the return type, we simply use
-       [Equal] that implements extensional equality (and equality of domains).
-       When the domain of value itself has a non-trivial notion of equivalence, we use [Equiv]
-       which relax functional equivalence up-to this relation.
-     *)
-    Definition Equal {a} : IntMap a -> IntMap a -> Prop :=
-      fun m m' => forall k, lookup k m = lookup k m'.
-    Definition Equiv {a} (R : a -> a -> Prop) : IntMap a -> IntMap a -> Prop :=
-      fun m m' =>
-        (forall k, member k m <-> member k m') /\
-        (forall k e e', lookup k m = Some e -> lookup k m' = Some e' -> R e e').
+    Definition empty {a} := @gmap_empty a.
 
     (* Extends the map with a list of pairs key/value.
      Note: additions start from the end of the list, so in case of duplicate
      keys, the binding in the front will shadow though in the back.
      *)
-    Fixpoint add_all {a} ks (m:IntMap a) :=
-      match ks with
-      | [] => m
-      | (k,v) :: tl => add k v (add_all tl m)
-      end.
+    Definition add_all {a} ks (m:IntMap a) :=
+      foldr (fun '(x, v) acc => <[x := v]> acc) m ks.
 
     (* Extends the map with the bindings {(i,v_1) .. (i+n-1, v_n)} for [vs ::= v_1..v_n] *)
     Fixpoint add_all_index {a} vs (i:Z) (m:IntMap a) :=
       match vs with
       | [] => m
-      | v :: tl => add i v (add_all_index tl (i+1) m)
+      | v :: tl => <[ i := v ]> (add_all_index tl (i+1) m)
       end.
 
     Fixpoint Zseq (start : Z) (len : nat) : list Z :=
@@ -204,11 +178,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
                   | Some val => val
                   end) (Zseq i (N.to_nat sz)).
 
-    (* Takes the join of two maps, favoring the first one over the intersection of their domains *)
-    Definition union {a} (m1 : IntMap a) (m2 : IntMap a)
-      := IM.map2 (fun mx my =>
-                    match mx with | Some x => Some x | None => my end) m1 m2.
-
     (* TODO : Move the three following functions *)
     Fixpoint max_default (l:list Z) (x:Z) :=
       match l with
@@ -222,8 +191,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
     Definition maximumBy_Z_le_def :
       forall def l e,
-        (e <=? def ->
-        e <=? maximumBy Z.leb def l)%Z.
+        (e <=? def = true ->
+        e <=? maximumBy Z.leb def l = true)%Z.
     Proof.
       intros def l.
       revert def.
@@ -237,7 +206,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
     Definition maximumBy_Z_def :
       forall def l,
-        (def <=? maximumBy Z.leb def l)%Z.
+        (def <=? maximumBy Z.leb def l = true)%Z.
     Proof.
       intros def l.
       apply maximumBy_Z_le_def; eauto.
@@ -246,7 +215,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
     Definition maximumBy_Z_correct :
       forall def (l : list Z),
-        forall a, In a l -> Z.leb a (maximumBy Z.leb def l).
+        forall a, In a l -> Z.leb a (maximumBy Z.leb def l) = true.
     Proof.
       intros def l.
       revert def.
@@ -273,12 +242,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
   Section Datatype_Definition.
 
-    (** ** Simple view of memory
-      A concrete block is determined by its id and its size.
-     *)
-    Inductive concrete_block :=
-    | CBlock (size : N) (block_id : Z) : concrete_block.
-
     (** ** Logical view of memory
       A logical block is determined by a size and a mapping from [Z] to special bytes,
       we call such a mapping a [mem_block].
@@ -300,9 +263,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       A concrete memory, resp. logical memory, maps addresses to concrete blocks, resp. logical blocks.
       A memory is a pair of both views of the memory.
      *)
-    Definition concrete_memory := IntMap concrete_block.
     Definition logical_memory  := IntMap logical_block.
-    Definition memory          := (concrete_memory * logical_memory)%type.
+    Definition memory          := logical_memory.
 
     (** ** Stack frames
       A frame contains the list of block ids that need to be freed when popped,
@@ -555,17 +517,17 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       let '(b, o) := a in
       match vs with
       | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 / i64 indices *)
-        off <- handle_gep_h t (o + Z.of_N (sizeof_dtyp t) * (unsigned i)) vs' ;;
-        ret (b, off)
+        bind (handle_gep_h t (o + Z.of_N (sizeof_dtyp t) * (unsigned i)) vs')
+        (fun off => ret (b, off))
       | DVALUE_I64 i :: vs' =>
-        off <- handle_gep_h t (o + Z.of_N (sizeof_dtyp t) * (unsigned i)) vs' ;;
-        ret (b, off)
+        bind (handle_gep_h t (o + Z.of_N (sizeof_dtyp t) * (unsigned i)) vs')
+        (fun off => ret (b, off))
       | _ => failwith "non-I32 index"
       end.
 
     Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err dvalue :=
       match dv with
-      | DVALUE_Addr a => fmap DVALUE_Addr (handle_gep_addr t a vs)
+      | DVALUE_Addr a => Functor.fmap DVALUE_Addr (handle_gep_addr t a vs)
       | _ => failwith "non-address"
       end.
 
@@ -577,7 +539,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
     (* Returns a fresh key for use in memory map *)
     Definition logical_next_key (m : logical_memory) : Z
-      := let keys := map fst (IM.elements m) in
+      := let keys := map fst (map_to_list m) in
          1 + maximumBy Z.leb (-1)%Z keys.
 
     (** ** Initialization of blocks
@@ -585,8 +547,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
      *)
     Fixpoint init_block_undef (n:nat) (m:mem_block) : mem_block :=
       match n with
-      | O => add 0%Z SUndef m
-      | S n' => add (Z.of_nat n) SUndef (init_block_undef n' m)
+      | O => <[ 0%Z := SUndef ]> m
+      | S n' => <[ Z.of_nat n := SUndef ]> (init_block_undef n' m)
       end.
 
     (* Constructs an initial [mem_block] containing [n] undefined [SByte]s, indexed from [0] to [n - 1].
@@ -613,10 +575,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       The [size] argument has no effect, but we need to provide one to the array type.
      *)
     Definition get_array_cell_mem_block (bk : mem_block) (bk_offset : Z) (i : nat) (size : N) (t : dtyp) : err uvalue :=
-      'offset <- handle_gep_h (DTYPE_Array size t)
+      bind (handle_gep_h (DTYPE_Array size t)
                              bk_offset
-                             [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))];;
-      inr (read_in_mem_block bk offset t).
+                             [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))])
+      (fun offset => inr (read_in_mem_block bk offset t)).
 
     (** ** Array element writing
       Treat a [mem_block] as though it is an array storing elements of
@@ -626,10 +588,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       - [size] does nothing, but we need to provide one for the array type.
     *)
     Definition write_array_cell_mem_block (bk : mem_block) (bk_offset : Z) (i : nat) (size : N) (t : dtyp) (v : dvalue) : err mem_block :=
-      'offset <- handle_gep_h (DTYPE_Array size t)
+      bind (handle_gep_h (DTYPE_Array size t)
                              bk_offset
-                             [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))];;
-      inr (write_to_mem_block bk offset v).
+                             [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))])
+      (fun offset => inr (write_to_mem_block bk offset v)).
 
     (** ** Array lookups -- mem_block
       Retrieve the values stored at position [from] to position [from + len - 1] in an array stored in a [mem_block].
@@ -638,14 +600,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       map_monad (fun i => get_array_cell_mem_block bk bk_offset i size t) (seq from len).
 
 
-    (* TODO: Move this? *)
-    Fixpoint foldM {a b} {M} `{Monad M} (f : b -> a -> M b ) (acc : b) (l : list a) : M b
-      := match l with
-         | [] => ret acc
-         | (x :: xs) =>
-           b <- f acc x;;
-           foldM f b xs
-         end.
+    (* (* TODO: Move this? *) *)
+    (* Fixpoint foldM {a b} {M} `{Monad M} (f : b -> a -> M b) (acc : b) (l : list a) : M b *)
+    (*   := match l with *)
+    (*      | [] => ret acc *)
+    (*      | (x :: xs) => *)
+    (*        bind (f acc x) (fun b => foldM f b xs) *)
+    (*      end. *)
 
     (** ** Array writes -- mem_block
       Write all of the values in [vs] to an array stored in a [mem_block], starting from index [from].
@@ -656,8 +617,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       match vs with
       | []       => ret bk
       | (v :: vs) =>
-        bk' <- write_array_cell_mem_block bk bk_offset i size t v;;
-        write_array_mem_block' bk' bk_offset (S i) size t vs
+        bind (write_array_cell_mem_block bk bk_offset i size t v)
+        (fun bk' => write_array_mem_block' bk' bk_offset (S i) size t vs)
       end.
 
     Definition write_array_mem_block (bk : mem_block) (bk_offset : Z) (from : nat) (t : dtyp) (vs : list dvalue) : err mem_block :=
@@ -666,54 +627,18 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
   End Logical_Operations.
 
-  Section Concrete_Operations.
-
-    Definition concrete_empty : concrete_memory := empty.
-
-    Definition equivc : concrete_memory -> concrete_memory -> Prop := Equal.
-
-    Definition concrete_next_key (m : concrete_memory) : Z :=
-      let keys         := List.map fst (IM.elements m) in
-      let max          := max_default keys 0 in
-      let offset       := 1 in (* TODO: This should be "random" *)
-      match lookup max m with
-      | None => offset
-      | Some (CBlock sz _) => max + (Z.of_N sz) + offset
-      end.
-
-  End Concrete_Operations.
-
   Section Memory_Operations.
 
       (** ** Smart lookups *)
-      Definition get_concrete_block_mem (b : Z) (m : memory) : option concrete_block :=
-        let concrete_map := fst m in
-        lookup b concrete_map.
-
       Definition get_logical_block_mem (b : Z) (m : memory) : option logical_block :=
-        let logical_map := snd m in
-        lookup b logical_map.
+        lookup b m.
 
       (* Get the next key in the logical map *)
       Definition next_logical_key_mem (m : memory) : Z :=
-        logical_next_key (snd m).
-
-      (* Get the next key in the concrete map *)
-      Definition next_concrete_key_mem (m : memory) : Z :=
-        concrete_next_key (fst m).
-
-      (** ** Extending the memory  *)
-      Definition add_concrete_block_mem (id : Z) (b : concrete_block) (m : memory) : memory :=
-        match m with
-        | (cm, lm) =>
-          (add id b cm, lm)
-        end.
+        logical_next_key m.
 
       Definition add_logical_block_mem (id : Z) (b : logical_block) (m : memory) : memory :=
-        match m with
-        | (cm, lm) =>
-          (cm, add id b lm)
-        end.
+        <[ id := b ]> m.
 
     (** Check if the block for an address is allocated.
 
@@ -721,7 +646,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         block. *)
     (* TODO: should this check if everything is in range...? *)
     Definition allocated (a : addr) (m : memory_stack) : Prop :=
-      let '((_,lm),_) := m in member (fst a) lm.
+      (fst a) ∈ dom (fst m).
 
     (** Do two memory regions overlap each other?
 
@@ -731,11 +656,11 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         Proposition should hold whenever the two regions overlap each
         other. *)
     Definition overlaps (a1 : addr) (sz1 : Z) (a2 : addr) (sz2 : Z) : Prop :=
-      let a1_start := snd a1 in
+      (let a1_start := snd a1 in
       let a1_end   := snd a1 + sz1 in
       let a2_start := snd a2 in
       let a2_end   := snd a2 + sz2 in
-      fst a1 = fst a2 /\ a1_start <= (a2_end - 1) /\ a2_start <= (a1_end - 1).
+      fst a1 = fst a2 /\ a1_start <= (a2_end - 1) /\ a2_start <= (a1_end - 1))%Z.
 
     (** Checks if two regions of memory overlap each other. The types
         *τ1* and *τ2* are used to determine the size of the two memory
@@ -747,11 +672,11 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
     (** Make sure that two regions of memory do not overlap *)
     Definition no_overlap (a1 : addr) (sz1 : Z) (a2 : addr) (sz2 : Z) : Prop :=
-      let a1_start := snd a1 in
+      (let a1_start := snd a1 in
       let a1_end   := snd a1 + sz1 in
       let a2_start := snd a2 in
       let a2_end   := snd a2 + sz2 in
-      fst a1 <> fst a2 \/ a1_start > (a2_end - 1) \/ a2_start > (a1_end - 1).
+      fst a1 <> fst a2 \/ a1_start > (a2_end - 1) \/ a2_start > (a1_end - 1))%Z.
 
     (** Same as *no_overlap*, but using *dtyp*s *τ1* and *τ2* to
         determine the size of the regions. *)
@@ -761,49 +686,11 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
     (** Boolean version of *no_overlap* *)
     Definition no_overlap_b (a1 : addr) (sz1 : Z) (a2 : addr) (sz2 : Z) : bool :=
-      let a1_start := snd a1 in
+      (let a1_start := snd a1 in
       let a1_end   := snd a1 + sz1 in
       let a2_start := snd a2 in
       let a2_end   := snd a2 + sz2 in
-      (fst a1 /~=? fst a2) || (a1_start >? (a2_end - 1)) || (a2_start >? (a1_end - 1)).
-
-      (** ** Concretization of blocks
-          Look-ups a concrete block in memory. The logical memory acts first as a potential layer of indirection:
-          - if no logical block is found, the input is directly returned.
-          - if a logical block is found, and that a concrete block is associated, the address of this concrete block
-          is returned, paired with the input memory.
-          - if a logical block is found, but that no concrete block is (yet) associated to it, then the associated
-          concrete block is allocated, and the association is added to the logical block.
-       *)
-      Definition concretize_block_mem (b:Z) (m:memory) : Z * memory :=
-        match get_logical_block_mem b m with
-        | None => (b, m) (* TODO: Not sure this makes sense??? *)
-        | Some (LBlock sz bytes (Some cid)) => (cid, m)
-        | Some (LBlock sz bytes None) =>
-          (* Allocates a concrete block for this one *)
-          let id        := next_concrete_key_mem m in
-          let new_block := CBlock sz b in
-          let m'        := add_concrete_block_mem id new_block m in
-          let m''       := add_logical_block_mem  b (LBlock sz bytes (Some id)) m' in
-          (id, m'')
-        end.
-
-      (** ** Abstraction of blocks
-          Retrieve a logical description of a block as address and offset from its concrete address.
-          The non-trivial part consists in extracting from the [concrete_memory] the concrete address
-          and block corresponding to a logical one.
-       *)
-      Definition get_real_cid (cid : Z) (m : memory) : option (Z * concrete_block)
-        := IM.fold (fun k '(CBlock sz bid) a => if (k <=? cid) && (cid <? k + (Z.of_N sz))
-                                             then Some (k, CBlock sz bid)
-                                             else a) (fst m) None.
-
-      Definition concrete_address_to_logical_mem (cid : Z) (m : memory) : option (Z * Z)
-        := match m with
-           | (cm, lm) =>
-             '(rid, CBlock sz bid) <- get_real_cid cid m ;;
-             ret (bid, cid-rid)
-           end.
+      (fst a1 /~=? fst a2) || (a1_start >? (a2_end - 1)) || (a2_start >? (a1_end - 1)))%Z.
 
       (* LLVM 5.0 memcpy
          According to the documentation: http://releases.llvm.org/5.0.0/docs/LangRef.html#llvm-memcpy-intrinsic
@@ -828,19 +715,20 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           if (no_overlap_b (dst_b, dst_o) mem_block_size
                                  (src_b, src_o) mem_block_size) then
             (* No guarantee that src_block has a certain size. *)
-            src_block <- trywith "memcpy src block not found"
-                                (get_logical_block_mem src_b m) ;;
-            dst_block <- trywith "memcpy dst block not found"
-                                (get_logical_block_mem dst_b m) ;;
-
-            let src_bytes
-                := match src_block with
-                  | LBlock size bytes concrete_id => bytes
-                  end in
-            let '(dst_sz, dst_bytes, dst_cid)
-                := match dst_block with
-                  | LBlock size bytes concrete_id => (size, bytes, concrete_id)
-                  end in
+            bind (trywith "memcpy src block not found"
+                                (get_logical_block_mem src_b m))
+            (fun src_block =>
+               bind (trywith "memcpy dst block not found"
+                                (get_logical_block_mem dst_b m))
+              (fun dst_block =>
+              let src_bytes
+                  := match src_block with
+                    | LBlock size bytes concrete_id => bytes
+                    end in
+              let '(dst_sz, dst_bytes, dst_cid)
+                  := match dst_block with
+                    | LBlock size bytes concrete_id => (size, bytes, concrete_id)
+                    end in
 
             (* IY: What happens if [src_block_size < mem_block_size]?
                Since we have logical blocks, there isn't a way to get around
@@ -849,7 +737,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
             let dst_bytes' := add_all_index sdata dst_o dst_bytes in
             let dst_block' := LBlock dst_sz dst_bytes' dst_cid in
             let m' := add_logical_block_mem dst_b dst_block' m in
-            (ret m' : err memory)
+            (ret m' : err memory)))
           (* IY: For now, we're returning a "failwith". Maybe it's more ideal
              to return an "UNDEF" here? *)
           else failwith "memcpy has overlapping src and dst memory location"
@@ -863,28 +751,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     (* The initial frame stack is not an empty stack, but a singleton stack containing an empty frame *)
     Definition frame_empty : frame_stack := Singleton [].
 
-    (** ** Free
-        [free_frame f m] deallocates the frame [f] from the memory [m].
-        This acts on both representations of the memory:
-        - on the logical memory, it simply removes all keys indicated by the frame;
-        - on the concrete side, for each element of the frame, we lookup in the logical memory
-        if it is bounded to a logical block, and if so if this logical block contains an associated
-        concrete block. If so, we delete this association from the concrete memory.
-     *)
-    Definition free_concrete_of_logical
-               (b : Z)
-               (lm : logical_memory)
-               (cm : concrete_memory) : concrete_memory
-      := match lookup b lm with
-         | None => cm
-         | Some (LBlock _ _ None) => cm
-         | Some (LBlock _ _ (Some cid)) => delete cid cm
-         end.
-
     Definition free_frame_memory (f : mem_frame) (m : memory) : memory :=
-      let '(cm, lm) := m in
-      let cm' := fold_left (fun m key => free_concrete_of_logical key lm m) f cm in
-      (cm', fold_left (fun m key => delete key m) f lm).
+      fold_left (fun m key => delete key m) f m.
 
     Definition equivs : frame_stack -> frame_stack -> Prop := Logic.eq.
 
@@ -904,12 +772,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         It is a matter of convention, by we consider the empty memory to contain a single empty frame
         in its stack, rather than an empty stack.
      *)
-    Definition empty_memory_stack : memory_stack := ((concrete_empty, logical_empty), frame_empty).
+    Definition empty_memory_stack : memory_stack := (logical_empty, frame_empty).
 
     (** ** Smart lookups *)
-
-    Definition get_concrete_block (m : memory_stack) (key : Z) : option concrete_block :=
-      get_concrete_block_mem key (fst m).
 
     Definition get_logical_block (m : memory_stack) (key : Z) : option logical_block :=
       get_logical_block_mem key (fst m).
@@ -920,14 +785,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition next_logical_key (m : memory_stack) : Z :=
       next_logical_key_mem (fst m).
 
-    (* Get the next key in the concrete map *)
-    Definition next_concrete_key (m : memory_stack) : Z :=
-      next_concrete_key_mem (fst m).
-
     (** ** Extending the memory  *)
-    Definition add_concrete_block (id : Z) (b : concrete_block) (m : memory_stack) : memory_stack :=
-      let '(m,s) := m in (add_concrete_block_mem id b m,s).
-
     Definition add_logical_block (id : Z) (b : logical_block) (m : memory_stack) : memory_stack :=
       let '(m,s) := m in (add_logical_block_mem id b m,s).
 
@@ -956,9 +814,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       let '(b, o) := a in
       match get_logical_block m b with
       | Some (LBlock sz bk cid) =>
-        bk' <- write_array_mem_block bk o from τ vs;;
-        let block' := LBlock sz bk' cid in
-        ret (add_logical_block b block' m)
+        bind (write_array_mem_block bk o from τ vs)
+        (fun bk' => let block' := LBlock sz bk' cid in
+        ret (add_logical_block b block' m))
       | None => failwith "Memory function [write_array] called at a non-allocated address"
       end.
 
@@ -966,9 +824,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       let '(b, o) := a in
       match get_logical_block m b with
       | Some (LBlock sz bk cid) =>
-        bk' <- write_array_cell_mem_block bk o i 0 τ v;;
-        let block' := LBlock sz bk' cid in
-        ret (add_logical_block b block' m)
+        bind (write_array_cell_mem_block bk o i 0 τ v)
+        (fun bk' =>
+          let block' := LBlock sz bk' cid in
+          ret (add_logical_block b block' m))
       | None => failwith "Memory function [write_array_cell] called at a non-allocated address"
       end.
 
@@ -990,20 +849,20 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       end.
 
     Definition allocate (m : memory_stack) (t : dtyp) : err (memory_stack * addr) :=
-      match t with
-      | DTYPE_Void => failwith "Allocation of type void"
+      (match t with
+      | DTYPE_Void => failwith (F := err) "Allocation of type void"
       | _ =>
         let new_block := make_empty_logical_block t in
         let key       := next_logical_key m in
         let m         := add_logical_block key new_block m in
-        ret (add_to_frame m key, (key,0))
-      end.
+        ret (m := err) (add_to_frame m key, (key,0))
+      end)%Z.
 
     (* TODO: very similar to overlaps *)
     Definition dtyp_fits (m : memory_stack) (a : addr) (τ : dtyp) :=
       exists sz bytes cid,
         get_logical_block m (fst a) = Some (LBlock sz bytes cid) /\
-        snd a + (Z.of_N (sizeof_dtyp τ)) <= Z.of_N sz.
+        (snd a + (Z.of_N (sizeof_dtyp τ)) <= Z.of_N sz)%Z.
 
     Definition read (m : memory_stack) (ptr : addr) (t : dtyp) : err uvalue :=
       match get_logical_block m (fst ptr) with
@@ -1062,13 +921,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       is_read : read m a τ = inr v
       }.
 
-    Definition concrete_address_to_logical (cid : Z) (m : memory_stack) : option (Z * Z) :=
-      concrete_address_to_logical_mem cid (fst m).
-
-    Definition concretize_block (ptr : addr) (m : memory_stack) : Z * memory_stack :=
-      let '(b', m') := concretize_block_mem (fst ptr) (fst m) in
-      (b', (m', snd m)).
-
   End Memory_Stack_Operations.
 
   (** ** Memory Handler
@@ -1081,12 +933,12 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         ret (push_fresh_frame m, tt)
 
       | MemPop =>
-        'm' <- lift_pure_err (free_frame m);;
-        ret (m',tt)
+        bind ( lift_pure_err (free_frame m))
+        (fun m' => ret (m',tt))
 
       | Alloca t =>
-        '(m',a) <- lift_pure_err (allocate m t);;
-        ret (m', DVALUE_Addr a)
+        bind (lift_pure_err (allocate m t))
+        (fun '(m',a) => ret (m', DVALUE_Addr a))
 
       | Load t dv =>
         match dv with
@@ -1101,50 +953,16 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | Store dv v =>
         match dv with
         | DVALUE_Addr ptr =>
-          'm' <- lift_pure_err (write m ptr v);;
-          ret (m', tt)
+          bind (lift_pure_err (write m ptr v))
+          (fun 'm' => ret (m', tt))
         | _ => raise ("Attempting to store to a non-address dvalue: " ++ (to_string dv))
         end
 
       | GEP t dv vs =>
-        'dv' <- lift_pure_err (handle_gep t dv vs);;
-        ret (m, dv')
+        bind (lift_pure_err (handle_gep t dv vs))
+        (fun dv' => ret (m, dv'))
 
-      | ItoP x =>
-        match x with
-        | DVALUE_I64 i =>
-          match concrete_address_to_logical (unsigned i) m with
-          | None => raise ("Invalid concrete address " ++ (to_string x))
-          | Some (b, o) => ret (m, DVALUE_Addr (b, o))
-          end
-        | DVALUE_I32 i =>
-          match concrete_address_to_logical (unsigned i) m with
-          | None => raise "Invalid concrete address "
-          | Some (b, o) => ret (m, DVALUE_Addr (b, o))
-          end
-        | DVALUE_I8 i  =>
-          match concrete_address_to_logical (unsigned i) m with
-          | None => raise "Invalid concrete address"
-          | Some (b, o) => ret (m, DVALUE_Addr (b, o))
-          end
-        | DVALUE_I1 i  =>
-          match concrete_address_to_logical (unsigned i) m with
-          | None => raise "Invalid concrete address"
-          | Some (b, o) => ret (m, DVALUE_Addr (b, o))
-          end
-        | _            => raise "Non integer passed to ItoP"
-        end
-
-      (* TODO take integer size into account *)
-      | PtoI t a =>
-        match a, t with
-        | DVALUE_Addr ptr, DTYPE_I sz =>
-          let (cid, m') := concretize_block ptr m in
-          'addr <- lift_undef_or_err ret (coerce_integer_to_int sz (cid + (snd ptr))) ;;
-          ret (m', addr)
-        | _, _ => raise "PtoI type error."
-        end
-
+      | _            => raise "Unsupported"
       end.
 
   Definition handle_intrinsic {E} `{FailureE -< E}: IntrinsicE ~> stateT memory_stack (itree E) :=
@@ -1168,10 +986,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Notation Effout := (E +' F).
 
     Definition E_trigger {M} : forall R, E R -> (stateT M (itree Effout) R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
+      fun R e m => bind (trigger e) (fun r => ret (m, r)).
 
     Definition F_trigger {M} : forall R, F R -> (stateT M (itree Effout) R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
+      fun R e m => bind (trigger e) (fun r => ret (m, r)).
 
     Definition interp_memory_h := case_ E_trigger (case_ handle_intrinsic  (case_ handle_memory  F_trigger)).
     Definition interp_memory :
