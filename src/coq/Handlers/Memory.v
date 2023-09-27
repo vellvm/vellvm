@@ -255,6 +255,70 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     | Ptr : addr -> SByte
     | PtrFrag : SByte
     | SUndef : SByte.
+
+    #[global] Instance byte_eq_dec : EqDecision byte := Byte.eq_dec.
+
+    #[global] Instance sbyte_eq_dec : EqDecision SByte.
+    Proof.
+      repeat intro. destruct x, y.
+      2-5,7-10,12-15: try solve [right; intro; inversion H].
+      - destruct (Byte.eq_dec i i0) eqn: Hb.
+        + subst; by left.
+        + right; intro; by inversion H.
+      - destruct (Addr.eq_dec a a0) eqn: Hb.
+        + subst; by left.
+        + right; intro; by inversion H.
+      - left; auto.
+      - left; auto.
+    Defined.
+
+    #[global] Instance sbyte_equiv : Equiv SByte.
+    Proof.
+      repeat intro. exact (@sbyte_eq_dec H H0).
+    Defined.
+
+    #[global] Instance sbyte_equiv_refl : Reflexive (@equiv SByte _).
+    Proof.
+      repeat intro.
+      destruct x; eauto.
+      - repeat red.
+        match goal with
+        | [ |- if ?x then _ else _] => remember x as Hguard
+        end. destruct Hguard; try done.
+        symmetry in HeqHguard.
+        match goal with
+          | [ H : (if ?x then _ else _) = false |- _] => remember x as Hguard
+        end; destruct Hguard; try done.
+      - repeat red.
+        match goal with
+        | [ |- if ?x then _ else _] => remember x as Hguard
+        end. destruct Hguard; try done.
+        symmetry in HeqHguard.
+        match goal with
+          | [ H : (if ?x then _ else _) = false |- _] => remember x as Hguard
+        end; destruct Hguard; try done.
+    Qed.
+
+    #[global] Instance sbyte_leibniz : @LeibnizEquiv SByte sbyte_equiv.
+      repeat intro. do 2 red in H.
+      repeat red in H.
+      destruct x, y; eauto; cbn in H; try solve [inversion H].
+      - match goal with
+        | [ H : if ?x then _ else _ |- _] => remember x as Hguard
+        end. destruct Hguard; try done.
+        symmetry in HeqHguard.
+        match goal with
+          | [ H : (if ?x then _ else _) = true |- _] => remember x as Hguard
+        end; destruct Hguard; try done.
+      - match goal with
+        | [ H : if ?x then _ else _ |- _] => remember x as Hguard
+        end. destruct Hguard; try done.
+        symmetry in HeqHguard.
+        match goal with
+          | [ H : (if ?x then _ else _) = true |- _] => remember x as Hguard
+        end; destruct Hguard; try done.
+    Qed.
+
     Definition mem_block    := IntMap SByte.
     Inductive logical_block :=
     | LBlock (size : N) (bytes : mem_block) (concrete_id : option Z) : logical_block.

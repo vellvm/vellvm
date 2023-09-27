@@ -1,4 +1,3 @@
-(* begin hide *)
 From Coq Require Import
      Morphisms ZArith List String Lia
      FSets.FMapAVL
@@ -37,9 +36,9 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Handlers.Memory.
 
+From stdpp Require Import gmap.
 Require Import Ceres.Ceres.
 
-Import MonadNotation.
 Import EqvNotation.
 Import ListNotations.
 
@@ -47,7 +46,6 @@ Set Implicit Arguments.
 Set Contextual Implicit.
 
 #[local] Open Scope Z_scope.
-(* end hide *)
 
 (** * Memory Model: Theory
     Reasoning principles for VIR's main memory model.
@@ -66,19 +64,7 @@ Module Type MEMORY_THEORY (LLVMEvents : LLVM_INTERACTIONS(Addr)).
  *)
 Section Map_Theory.
 
-  (* begin hide *)
-  (** ** Utilitary lemmas  *)
-  Lemma MapsTo_inj : forall {a} k v v' (m : IM.t a),
-    IM.MapsTo k v m ->
-    IM.MapsTo k v' m ->
-    v = v'.
-  Proof.
-    intros.
-    apply IM.find_1 in H; apply IM.find_1 in H0.
-    rewrite H0 in H; inv H.
-    reflexivity.
-  Qed.
-
+  (** ** Utility lemmas  *)
   Lemma Zseq_succ : forall off (n : N),
       Zseq off (N.to_nat (N.succ n)) = off :: Zseq (Z.succ off) (N.to_nat n).
   Proof.
@@ -141,242 +127,12 @@ Section Map_Theory.
     apply range_list_nth_z; lia.
   Qed.
 
-  (* end hide *)
-
-  (** ** [member]/[lookup] interaction
-        Keys are in the domain if and only if they lead to values when looked-up
-   *)
-  Lemma member_lookup {a} : forall k (m : IM.t a),
-      member k m -> exists v, lookup k m = Some v.
-  Proof.
-    unfold member,lookup in *.
-    intros * IN.
-    apply IM.Raw.Proofs.mem_2, IM.Raw.Proofs.In_MapsTo in IN.
-    destruct IN as [v IN].
-    exists v.
-    apply IM.Raw.Proofs.find_1; eauto.
-    apply IM.is_bst.
-  Qed.
-
-  Lemma lookup_member {a} : forall k v(m : IM.t a),
-      lookup k m = Some v -> member k m .
-  Proof.
-    unfold member,lookup in *.
-    intros * IN.
-    apply IM.Raw.Proofs.mem_1; [apply IM.is_bst |].
-    apply IM.Raw.Proofs.find_2 in IN; eauto.
-    eapply IM.Raw.Proofs.MapsTo_In; eauto.
-  Qed.
-
-  (** ** [add]/[lookup] interaction
-        Lookups look up the lastly added value
-   *)
-  Lemma lookup_add_eq : forall {a} k x (m : IM.t a),
-      lookup k (add k x m) = Some x.
-  Proof.
-    intros.
-    unfold lookup, add.
-    apply IM.find_1, IM.add_1; auto.
-  Qed.
-
-  Lemma lookup_add_ineq : forall {a} k k' x (m : IM.t a),
-      k <> k' ->
-      lookup k (add k' x m) = lookup k m.
-  Proof.
-    intros.
-    unfold lookup, add.
-    match goal with
-      |- ?x = ?y => destruct x eqn:EQx,y eqn:EQy;
-                    try apply IM.find_2,IM.add_3 in EQx;
-                    try apply IM.find_2 in EQy
-    end; auto.
-    eapply MapsTo_inj in EQx; eauto; subst; eauto.
-    apply IM.find_1 in EQx; rewrite EQx in EQy; inv EQy.
-    cbn in *.
-    apply IM.Raw.Proofs.not_find_iff in EQx; [| apply IM.Raw.Proofs.add_bst, IM.is_bst].
-    exfalso; apply EQx, IM.Raw.Proofs.add_in.
-    destruct (RelDec.rel_dec_p k k'); auto.
-    right.
-    unfold IM.MapsTo in *.
-    eapply IM.Raw.Proofs.MapsTo_In,EQy.
-  Qed.
-
-  (** ** [add]/[member] interaction
-        Added keys are a member of the map
-   *)
-  Lemma member_add_eq {a}: forall k v (m: IM.t a),
-      member k (add k v m).
-  Proof.
-    intros.
-    cbn.
-    apply IM.Raw.Proofs.mem_1.
-    apply IM.Raw.Proofs.add_bst, IM.is_bst.
-    rewrite IM.Raw.Proofs.add_in; auto.
-  Qed.
-
-  Lemma member_add_ineq {a}: forall k k' v (m: IM.t a),
-      k <> k' ->
-      member k (add k' v m) <-> member k m.
-  Proof.
-    intros.
-    cbn. split.
-    - intros IN; apply IM.Raw.Proofs.mem_2 in IN.
-      rewrite IM.Raw.Proofs.add_in in IN.
-      destruct IN as [-> | IN]; [contradiction H; auto | ].
-      apply IM.Raw.Proofs.mem_1; [apply IM.is_bst | auto].
-    - intros IN.
-      apply IM.Raw.Proofs.mem_1.
-      apply IM.Raw.Proofs.add_bst, IM.is_bst.
-      rewrite IM.Raw.Proofs.add_in; right; auto.
-      apply IM.Raw.Proofs.mem_2 in IN; auto.
-  Qed.
-
-  Lemma member_add_preserved {a}: forall k k' v (m: IM.t a),
-      member k m ->
-      member k (add k' v m).
-  Proof.
-    intros k k' v m H.
-    cbn in *.
-    apply IM.Raw.Proofs.mem_1.
-    apply IM.Raw.Proofs.add_bst, IM.is_bst.
-    rewrite IM.Raw.Proofs.add_in; auto.
-    right. apply IM.Raw.Proofs.mem_2.
-    apply H.
-  Qed.
-
-  (** ** Equivalences
-        Both notions of equivalence of maps that we manipulate are indeed equivalences
-        (assuming the relation on values is itself an equivalence for [Equiv]).
-   *)
-  #[global] Instance Equal_Equiv {a}: Equivalence (@Equal a).
-  Proof.
-    split.
-    - repeat intro; reflexivity.
-    - repeat intro.
-      symmetry; apply H.
-    - intros ? ? ? EQ1 EQ2 ?.
-      etransitivity; eauto.
-  Qed.
-
-  #[global] Instance Equiv_Equiv {a} {r: a -> a -> Prop} {rE : Equivalence r} : Equivalence (Equiv r).
-  Proof.
-    split.
-    - intros ?; split.
-      intros k; reflexivity.
-      intros * LU1 LU2; rewrite LU1 in LU2; inv LU2; reflexivity.
-    - intros ? ? [DOM EQ]; split.
-      intros ?; split; intros ?; apply DOM; auto.
-      intros; symmetry; eapply EQ; eauto.
-    - intros ? ? ? [DOM1 EQ1] [DOM2 EQ2]; split.
-      intros ?; split; intros ?.
-      apply DOM2,DOM1; auto.
-      apply DOM1,DOM2; auto.
-      intros ? ? ? LU1 LU2.
-      generalize LU1; intros LU3; apply lookup_member,DOM1,member_lookup in LU3.
-      destruct LU3 as [e'' LU3].
-      transitivity e''.
-      eapply EQ1; eauto.
-      eapply EQ2; eauto.
-  Qed.
-
-  #[global] Instance Proper_lookup {a} k: Proper (@Equal a ==> Logic.eq) (lookup k).
-  Proof.
-    repeat intro.
-    apply H.
-  Qed.
-
-  #[global] Instance Proper_add {a} : Proper (Logic.eq ==> Logic.eq ==> Equal ==> Equal) (@add a).
-  Proof.
-    repeat intro; subst.
-    destruct (RelDec.rel_dec_p k y); [subst; rewrite 2 lookup_add_eq; auto | rewrite 2 lookup_add_ineq; auto].
-  Qed.
-
-  Inductive equivlb : logical_block -> logical_block -> Prop :=
-  | Equivlb : forall z m m' cid, Equal m m' -> equivlb (LBlock z m cid) (LBlock z m' cid).
-
-  #[global] Instance equivlb_Equiv : Equivalence equivlb.
-  Proof.
-    split.
-    - intros []; constructor; reflexivity.
-    - intros [] [] EQ; inv EQ; constructor; symmetry; auto.
-    - intros [] [] [] EQ1 EQ2; inv EQ1; inv EQ2; constructor; etransitivity; eauto.
-  Qed.
-
-  Definition equivl : logical_memory -> logical_memory -> Prop :=
-    @Equiv _ equivlb.
-
-  #[global] Instance equivl_Equiv : Equivalence equivl.
-  Proof.
-    unfold equivl.
-    apply Equiv_Equiv.
-  Qed.
-
-  #[global] Instance equivc_Equiv : Equivalence equivc.
-  Proof.
-    unfold equivc; typeclasses eauto.
-  Qed.
-
-  Infix "≡" := equivc (at level 39).
-
-
-  (** ** [add]/[add]
-        Consecutive extensions of the map either commute or erase the oldest one.
-   *)
-  Lemma add_add : forall {a} off b1 b2 (m : IM.t a),
-      Equal (add off b2 (add off b1 m)) (add off b2 m).
-  Proof.
-    intros; intro key; cbn.
-    rewrite IM.Raw.Proofs.add_find; [| apply IM.Raw.Proofs.add_bst, IM.is_bst].
-    rewrite IM.Raw.Proofs.add_find; [| apply  IM.is_bst].
-    rewrite IM.Raw.Proofs.add_find; [| apply  IM.is_bst].
-    flatten_goal; auto.
-  Qed.
-
-  Lemma Equiv_add_add : forall {a} {r: a -> a -> Prop} {rR: Reflexive r},
-      forall k v1 v2 (m: IM.t a),
-        Equiv r (add k v2 (add k v1 m)) (add k v2 m).
-  Proof.
-    intros; split.
-    - intros key.
-      destruct (RelDec.rel_dec_p key k).
-      + subst; rewrite 2 member_add_eq; reflexivity.
-      + subst; rewrite 3 member_add_ineq; auto; reflexivity.
-    - intros key v v' LU1 LU2; cbn.
-      destruct (RelDec.rel_dec_p key k).
-      + subst; rewrite lookup_add_eq in LU1, LU2; inv LU1; inv LU2.
-        reflexivity.
-      + subst; rewrite lookup_add_ineq in LU1, LU2; auto; rewrite lookup_add_ineq in LU1; auto.
-        rewrite LU1 in LU2; inv LU2.
-        reflexivity.
-  Qed.
-
-  Lemma add_add_ineq : forall {a} k1 k2 v1 v2 (m : IM.t a),
-      k1 <> k2 ->
-      Equal (add k2 v2 (add k1 v1 m)) (add k1 v1 (add k2 v2 m)).
-  Proof.
-    intros; intro key; cbn.
-    rewrite IM.Raw.Proofs.add_find; [| apply IM.Raw.Proofs.add_bst, IM.is_bst].
-    rewrite IM.Raw.Proofs.add_find; [| apply  IM.is_bst].
-    rewrite IM.Raw.Proofs.add_find; [| apply IM.Raw.Proofs.add_bst, IM.is_bst].
-    rewrite IM.Raw.Proofs.add_find; [| apply  IM.is_bst].
-    pose proof (IM.Raw.Proofs.MX.eqb_alt key k2).
-    flatten_goal; auto.
-    pose proof (IM.Raw.Proofs.MX.eqb_alt key k1).
-    flatten_goal; auto.
-    unfold IM.Raw.Proofs.MX.eqb in *.
-    flatten_hyp H0.
-    flatten_hyp H1.
-    subst; contradiction H; auto.
-    inv H1.
-    inv H0.
-  Qed.
-
   (** ** Behavior of [lookup_all_index]
    *)
 
   Lemma lookup_all_index_cons {a} : forall k (n : N) (m : IntMap a) def,
       lookup_all_index k (N.succ n) m def =
-      match lookup k m with
+      match m !! k with
       | Some val => val
       | None => def
       end :: lookup_all_index (Z.succ k) n m def.
@@ -390,7 +146,7 @@ Section Map_Theory.
   Lemma lookup_all_index_add_out_aux {a} : forall l k (n : N) (m : IntMap a) key x def,
       l = Zseq k (N.to_nat n) ->
       (key < k \/ key >= k + Z.of_N n) ->
-      lookup_all_index k n (add key x m) def =
+      lookup_all_index k n (<[ key := x ]> m) def =
       lookup_all_index k n m def.
   Proof.
     induction l as [| x l IH]; simpl.
@@ -402,7 +158,7 @@ Section Map_Theory.
       assert (n = N.succ (N.of_nat n0)) by lia.
       subst; rewrite lookup_all_index_cons; auto; try lia.
       subst; rewrite lookup_all_index_cons; auto; try lia.
-      rewrite lookup_add_ineq; [| lia].
+      rewrite lookup_insert_ne; [ | lia].
       f_equal.
       apply IH; try lia.
       rewrite Nnat.Nat2N.id.
@@ -412,19 +168,19 @@ Section Map_Theory.
   (* Generalization of [lookup_add_ineq]: adding outside of the range of the lookup is inconsequential *)
   Lemma lookup_all_index_add_out {a} : forall k (n : N) (m : IntMap a) key x def,
       (key < k \/ key >= k + Z.of_N n) ->
-      lookup_all_index k n (add key x m) def =
+      lookup_all_index k n (<[ key := x ]> m) def =
       lookup_all_index k n m def.
   Proof.
     intros; eapply lookup_all_index_add_out_aux; eauto.
   Qed.
 
   Lemma lookup_all_index_add {a} : forall k (size : N) x (m : IntMap a) def,
-      lookup_all_index k (N.succ size) (add k x m) def =
+      lookup_all_index k (N.succ size) (<[ k := x ]> m) def =
       x :: lookup_all_index (Z.succ k) size m def.
   Proof.
     intros *.
     rewrite lookup_all_index_cons; auto; try lia.
-    rewrite lookup_add_eq.
+    rewrite lookup_insert.
     f_equal.
     rewrite lookup_all_index_add_out; auto; try lia.
   Qed.
@@ -537,8 +293,8 @@ Section Map_Theory.
     destruct (RelDec.rel_dec_p k z).
     - subst.
       rewrite Z.sub_diag in LU; cbn in LU; inv LU.
-      rewrite lookup_add_eq;  reflexivity.
-    - rewrite lookup_add_ineq; auto.
+      rewrite lookup_insert;  reflexivity.
+    - rewrite lookup_insert_ne; auto.
       apply IH.
       rewrite Zlength_cons in INEQ; lia.
       destruct (zeq (k - z)) eqn:INEQ'; [lia |].
@@ -554,7 +310,7 @@ Section Map_Theory.
     destruct (RelDec.rel_dec_p k z).
     - subst. exfalso; destruct INEQ as [INEQ | INEQ]; try lia.
       rewrite Zlength_cons, Zlength_correct in INEQ; lia.
-    - rewrite lookup_add_ineq; auto.
+    - rewrite lookup_insert_ne; auto.
       apply IH.
       destruct INEQ as [INEQ | INEQ]; [left; lia | ].
       right.
@@ -564,17 +320,19 @@ Section Map_Theory.
   Qed.
 
   (* Generalization of [add_ad], with the added constraint on the size of the lists *)
-  Lemma add_all_index_twice {a} : forall (l1 l2 : list a) z m,
+  Lemma add_all_index_twice {A} `{Equiv A, !Reflexive (≡@{A})}:
+    forall (l1 l2 : list A) z m,
       Zlength l1 = Zlength l2 ->
-      Equal (add_all_index l2 z (add_all_index l1 z m))
-            (add_all_index l2 z m).
+      (add_all_index l2 z (add_all_index l1 z m)) ≡ (add_all_index l2 z m).
   Proof.
-    intros * EQ k.
-    destruct (@key_in_range_or_not _ k z l2) as [IN | OUT].
+    repeat intro.
+    destruct (@key_in_range_or_not _ i z l2) as [IN | OUT].
     - destruct (in_range_is_in _ IN) as [? LU].
-      erewrite 2 lookup_add_all_index_in; eauto.
+      erewrite 2 lookup_add_all_index_in; eauto. f_equiv.
     - rewrite 3 lookup_add_all_index_out; eauto.
-      rewrite EQ; auto.
+      { destruct (m !! i); try f_equiv. repeat red.
+        constructor. }
+      lia.
   Qed.
 
 End Map_Theory.
@@ -644,7 +402,8 @@ Section Serialization_Theory.
   Proof.
     induction dts; intros n.
     - cbn. rewrite N.add_0_r. reflexivity.
-    - cbn. rewrite IHdts at 1. rewrite (IHdts (sizeof_dtyp a)).
+    - cbn. rewrite IHdts at 1. specialize (IHdts (sizeof_dtyp a)).
+      setoid_rewrite IHdts.
       rewrite N.add_assoc.
       reflexivity.
   Qed.
@@ -812,7 +571,8 @@ Section Serialization_Theory.
       + cbn. apply forallb_forall.
         intros x Hin.
         apply in_app_or in Hin as [Hin | Hin].
-        * assert (In a (a :: fields)) as Hina by intuition.
+        * assert (In a (a :: fields)) as Hina.
+          { intuition; apply in_eq. }
           specialize (H a Hina).
           eapply byte_defined; eauto.
         * assert (forall u : dvalue, In u fields -> all_not_sundef (serialize_dvalue u) = true) as Hu.
@@ -913,17 +673,21 @@ Section Serialization_Theory.
     rewrite Nnat.Nat2N.inj_add.
 
     break_match.
-    - erewrite sizeof_serialized; intuition.
+    - erewrite sizeof_serialized; cycle 1.
+      { apply H; apply in_eq. }
 
-      rewrite Heqn. cbn.
-      erewrite <- IHxs; intuition.
-      lia.
-    - erewrite sizeof_serialized; intuition.
+      rewrite !Heqn. cbn.
+      erewrite <- IHxs; cycle 1.
+      { intros; apply H; by apply in_cons. }
+      rewrite Heqn. lia.
+    - erewrite sizeof_serialized; cycle 1.
+      { apply H; apply in_eq. }
 
-      rewrite Heqn. cbn.
-      erewrite <- IHxs; intuition.
+      rewrite Heqn.
+      erewrite <- IHxs; cycle 1.
+      { intros; apply H; by apply in_cons. }
       rewrite Nnat.N2Nat.id.
-      break_match; lia.
+      lia.
   Qed.
 
 
@@ -1002,7 +766,9 @@ Section Memory_Stack_Theory.
 
     destruct NO_OVER as [NO_OVER | [NO_OVER | NO_OVER]].
     - auto.
-    - rewrite Integers.Int64.unsigned_repr in NO_OVER; [|cbn; lia].
+    - rewrite Integers.Int64.unsigned_repr in NO_OVER; cycle 1.
+      { pose proof Int64.unsigned_range_2.
+        specialize (H Int64.zero). lia. }
       replace (ptr_i + Z.of_N (sz * sizeof_dtyp τ) * 0 + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) with (ptr_i + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) in NO_OVER by lia.
       pose proof (Int64.unsigned_range ix) as [? ?].
       assert (Z.of_N sz > 0). lia.
@@ -1015,7 +781,9 @@ Section Memory_Stack_Theory.
       assert (Int64.unsigned ix * Z.of_N (sizeof_dtyp τ) <= (Z.of_N sz - 1) * Z.of_N (sizeof_dtyp τ)).
       { apply Zmult_le_compat_r; lia. }
       lia.
-    - rewrite Integers.Int64.unsigned_repr in NO_OVER; [|cbn; lia].
+    - rewrite Integers.Int64.unsigned_repr in NO_OVER; cycle 1.
+      { pose proof Int64.unsigned_range_2.
+        specialize (H Int64.zero). lia. }
       replace (ptr_i + Z.of_N (sz * sizeof_dtyp τ) * 0 + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) with (ptr_i + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) in NO_OVER by lia.
       pose proof (Int64.unsigned_range ix) as [? ?].
       lia.
@@ -1046,13 +814,8 @@ Section Memory_Stack_Theory.
     forall (m : memory_stack) (key : Z) (lb : logical_block),
       get_logical_block (add_logical_block key lb m) key = Some lb.
   Proof.
-    intros [[cm lm] s] b lb.
-    cbn.
-    rewrite IM.Raw.Proofs.add_find.
-    pose proof @IM.Raw.Proofs.MX.elim_compare_eq b b eq_refl as [blah Heq].
-    rewrite Heq.
-    reflexivity.
-    apply IM.is_bst.
+    intros [lm s] b lb.
+    cbn. setoid_rewrite lookup_insert. reflexivity.
   Qed.
 
   Lemma get_logical_block_of_add_logical_block_mem :
@@ -1070,12 +833,8 @@ Section Memory_Stack_Theory.
       key <> key' ->
       get_logical_block (add_logical_block key lb m) key' = get_logical_block m key'.
   Proof.
-    intros [[cm lm] s] b b' lb NEQ.
-    cbn.
-    rewrite IM.Raw.Proofs.add_find.
-    break_match; eauto.
-    red in e. rewrite e in NEQ. contradiction.
-    apply IM.is_bst.
+    intros [lm s] b b' lb NEQ.
+    cbn. by setoid_rewrite lookup_insert_ne.
   Qed.
 
   Lemma get_logical_block_of_add_logical_block_mem_neq :
@@ -1103,11 +862,9 @@ Section Memory_Stack_Theory.
     cbn in *.
     unfold get_logical_block, get_logical_block_mem in *.
     unfold add_logical_block. destruct mv. cbn.
-    unfold add_logical_block_mem. destruct m0.
-    Opaque lookup.
-    Opaque add.
+    unfold add_logical_block_mem.
     cbn in *.
-    rewrite lookup_add_ineq; auto.
+    setoid_rewrite lookup_insert_ne; auto.
   Qed.
 
   Lemma unsigned_I1_in_range : forall (x : DynamicValues.int1),
@@ -1342,16 +1099,24 @@ Section Memory_Stack_Theory.
         congruence.
     Qed.
 
-    (** ** Deserialize - Serialize
-        Starting from a dvalue [val] whose [dtyp] is [t], if:
-        1. we serialize [val], getting a [list SByte]
-        2. we add all these bytes to the memory block, starting from the position [off], getting back a new [mem_block] m'
-        3. we lookup in this new memory [m'] the indices starting from [off] for the size of [t], getting back a [list SByte]
-        4. we deserialize this final list of bytes
-        then we should get back the initial value [val], albeit injected into [uvalue].
+    Lemma int64_modulus_range :
+      0 ≤ Int64.modulus - 1.
+    Proof.
+      pose proof (@Int64.unsigned_range Int64.zero).
+      assert (0 < Int64.modulus) by lia.
+      lia.
+    Qed.
 
-        The proof should go by induction over [TYP] I think, and rely on [lookup_all_index_add] notably.
-     *)
+    (** ** Deserialize - Serialize *)
+(*         Starting from a dvalue [val] whose [dtyp] is [t], if: *)
+(*         1. we serialize [val], getting a [list SByte] *)
+(*         2. we add all these bytes to the memory block, starting from the position [off], getting back a new [mem_block] m' *)
+(*         3. we lookup in this new memory [m'] the indices starting from [off] for the size of [t], getting back a [list SByte] *)
+(*         4. we deserialize this final list of bytes *)
+(*         then we should get back the initial value [val], albeit injected into [uvalue]. *)
+
+(*         The proof should go by induction over [TYP] I think, and rely on [lookup_all_index_add] notably. *)
+(*      *)
     Lemma deserialize_serialize : forall val t (TYP : dvalue_has_dtyp val t),
         forall off (bytes : mem_block) (SUP : is_supported t),
           deserialize_sbytes (lookup_all_index off (sizeof_dtyp t) (add_all_index (serialize_dvalue val) off bytes) SUndef) t = dvalue_to_uvalue val.
@@ -1368,8 +1133,20 @@ Section Memory_Stack_Theory.
         apply Z.div_small; lia.
         rewrite EQ.
         repeat rewrite Zdiv_0_l.
-        repeat rewrite Byte.unsigned_repr.
-        all: unfold Byte.max_unsigned, Byte.modulus; cbn; try lia.
+        pose proof Byte.modulus_pos.
+        repeat rewrite Byte.unsigned_repr; cycle 1.
+        all: try solve [unfold Byte.max_unsigned; try lia].
+        { split; try lia.
+          pose proof (@Int1.unsigned_range x).
+          destruct H1.
+          apply Z.lt_le_incl.
+          eapply Z.lt_le_trans; eauto.
+          unfold Int1.modulus, Byte.max_unsigned, Byte.modulus.
+          unfold Int1.wordsize, Wordsize1.wordsize.
+          unfold Byte.wordsize, Wordsize_8.wordsize.
+
+          unfold two_power_nat. unfold shift_nat; cbn.
+          lia. }
         rewrite Z.add_0_r.
         apply DynamicValues.Int1.repr_unsigned.
       - solve_integer_deserialize.
@@ -1506,15 +1283,17 @@ Section Memory_Stack_Theory.
 
             apply all_not_sundef_fold_right_serialize.
 
-            apply serialize_fold_length; intuition.
+            apply serialize_fold_length; intuition. apply IHdtyp; eauto.
+            by apply in_cons.
           * replace (sizeof_dtyp dt) with (N.of_nat (N.to_nat (sizeof_dtyp dt))) by lia.
-            rewrite lookup_all_index_add_all_index_same_length.
-            erewrite <- sizeof_serialized; intuition.
-            lia.
-            erewrite <- sizeof_serialized; intuition.
-            lia.
+            rewrite lookup_all_index_add_all_index_same_length; cycle 1.
+            { erewrite <- sizeof_serialized; intuition.
+              by rewrite Nat2N.id. done. }
+            erewrite <- sizeof_serialized; intuition; eauto.
+            by do 2 rewrite Nat2N.id.
           * rewrite IH; intuition.
-            inversion SUP; auto.
+            inversion SUP; auto. by apply in_eq.
+            inversion SUP; eauto.
           * cbn.
 
             unfold deserialize_sbytes.
@@ -1534,13 +1313,19 @@ Section Memory_Stack_Theory.
               apply all_not_sundef_fold_right_serialize.
 
               apply serialize_fold_length; intuition.
+              { apply IHdtyp; by apply in_cons. }
 
               rewrite Heqb in CONTRA.
               inversion CONTRA.
             }
 
             forward IHxs; intuition.
+            { eapply IH; eauto; by apply in_cons. }
+
+
             forward IHxs; intuition.
+            { by apply IHdtyp, in_cons. }
+
             specialize (IHxs (Datatypes.length xs) eq_refl).
             forward IHxs.
             { inversion SUP; constructor; eauto. }
@@ -1566,7 +1351,7 @@ Section Memory_Stack_Theory.
               reflexivity.
 
               eauto.
-              intuition.
+              intuition; by apply IHdtyp, in_cons.
             }
 
             { erewrite <- serialize_fold_length.
@@ -1577,17 +1362,17 @@ Section Memory_Stack_Theory.
               reflexivity.
 
               eauto.
-              intuition.
+              intuition; by apply IHdtyp, in_cons.
             }
 
             eauto.
     Qed.
 
-    (** ** Write - Read
-        The expected law: reading the key that has just been written to returns the written value.
-        The only subtlety comes from the fact that it holds _if_ the read is performed at the type of
-        the written value.
-     *)
+    (** ** Write - Read *)
+(*         The expected law: reading the key that has just been written to returns the written value. *)
+(*         The only subtlety comes from the fact that it holds _if_ the read is performed at the type of *)
+(*         the written value. *)
+(*      *)
     Lemma write_read :
       forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr),
         is_supported t ->
@@ -1613,10 +1398,14 @@ Section Memory_Stack_Theory.
         write m a val = inr m' ->
         allocated a m.
     Proof.
-      unfold write; intros ((cm,lm),s) * WR; cbn in *.
+      unfold write; intros (m,s) * WR; cbn in *.
       flatten_hyp WR; [| inv_sum].
       destruct l,a; inv WR.
-      cbn in *; eapply lookup_member; eauto.
+      cbn in *. unfold allocated.
+      cbn.
+      unfold get_logical_block, get_logical_block_mem in Heq.
+      cbn in Heq.
+      by eapply elem_of_dom_2.
     Qed.
 
     Lemma lookup_all_index_add_all_index_no_overlap :
@@ -1641,7 +1430,7 @@ Section Memory_Stack_Theory.
           no_overlap_dtyp a τ a' τ' ->
           read m2 a' τ' = read m1 a' τ'.
     Proof.
-      intros ((cm,lm),s) [a off] v τ ((cm',lm'),s') TYP WR [a' off'] τ' INEQ.
+      intros (m,s) [a off] v τ (m',s') TYP WR [a' off'] τ' INEQ.
       unfold read,write in *.
       cbn in *.
       flatten_hyp WR; try inv_sum.
@@ -1650,7 +1439,7 @@ Section Memory_Stack_Theory.
         unfold overlaps_dtyp, overlaps in INEQ; cbn in INEQ.
       unfold get_logical_block, get_logical_block_mem; cbn.
       destruct (Z.eq_dec a a') eqn:Haa'.
-      - subst. rewrite lookup_add_eq.
+      - subst. setoid_rewrite lookup_insert.
         unfold get_logical_block,get_logical_block_mem in Heq. cbn in Heq.
         rewrite Heq.
         destruct (Z.le_gt_cases off (off' + (Z.of_N (sizeof_dtyp τ') - 1))) as [Hle | Hnle].
@@ -1665,7 +1454,7 @@ Section Memory_Stack_Theory.
           unfold read_in_mem_block.
           rewrite lookup_all_index_add_all_index_no_overlap; auto.
           lia.
-      - rewrite lookup_add_ineq; auto.
+      - setoid_rewrite lookup_insert_ne; auto.
     Qed.
 
     Lemma write_succeeds : forall m1 v τ a,
@@ -1838,16 +1627,6 @@ Section Memory_Stack_Theory.
       rewrite get_logical_block_of_add_logical_block_neq; eauto.
     Qed.
 
-    Lemma lookup_mapsto :
-      forall {A} k m (v : A),
-        lookup k m = Some v <-> IM.MapsTo k v m.
-    Proof.
-      intros A k m v.
-      split.
-      - apply IM.find_2.
-      - apply IM.find_1.
-    Qed.
-
     Lemma all_neq_not_in:
       forall {A} (m : A) l,
         Forall (fun a => a <> m) l -> ~ In m l.
@@ -1858,43 +1637,29 @@ Section Memory_Stack_Theory.
       - contradiction.
     Qed.
 
-    Lemma assoc_list_in_key_in :
-      forall A k v l,
-        SetoidList.InA (IM.eq_key_elt (elt:=A)) (k, v) l ->
-        In k (map fst l).
+    Instance logical_block_inhabited : Inhabited logical_block.
     Proof.
-      intros A k v l IN.
-      induction IN as [[k' v'] l EQ | [k' v'] l INA IH].
-      - cbn. cbv in EQ. intuition.
-      - cbn. auto.
-    Qed.
-
-    Lemma no_key_not_in :
-      forall A l k v,
-        (forall a : Z, In a (map fst l) -> a <> k) ->
-        ~ SetoidList.InA (IM.eq_key_elt (elt:=A)) (k, v) l.
-    Proof.
-      intros A l k v NOKEY.
-      intros IN. apply assoc_list_in_key_in in IN.
-      specialize (NOKEY k IN).
-      contradiction.
+      constructor; eauto.
+      constructor.
+      - exact 0%N.
+      - exact empty.
+      - exact None.
     Qed.
 
     Lemma next_logical_key_fresh : forall lm,
-        ~ member (logical_next_key lm) lm.
+        (logical_next_key lm) ∉ dom lm.
     Proof.
       intros lm MEM.
-      unfold logical_next_key in MEM.
-      apply member_lookup in MEM as [lb LUP].
-      apply lookup_mapsto in LUP.
-      apply IM.elements_1 in LUP.
-      assert (forall a : Z, In a (map fst (IM.elements (elt:=logical_block) lm)) -> a <> 1 + maximumBy Z.leb (-1) (map fst (IM.elements (elt:=logical_block) lm))) as NOKEY.
-      - intros a IN.
-        apply (maximumBy_Z_correct (-1)) in IN.
-        apply Zle_bool_imp_le in IN.
-        lia.
-      - apply no_key_not_in with (v:=lb) in NOKEY.
-        contradiction.
+
+      assert (In (logical_next_key lm) (map fst (map_to_list lm))).
+      { apply elem_of_list_In.
+        setoid_rewrite dom_alt in MEM.
+        by eapply elem_of_list_to_set. Unshelve.
+        typeclasses eauto. }
+      apply (maximumBy_Z_correct (-1)) in H.
+      apply Zle_bool_imp_le in H.
+      unfold logical_next_key in H.
+      remember (map fst (map_to_list lm)) in H. lia.
     Qed.
 
     Lemma lookup_init_block_undef :
@@ -1903,7 +1668,7 @@ Section Memory_Stack_Theory.
     Proof.
       induction n; auto.
       cbn.
-      rewrite lookup_add_ineq; [|lia].
+      setoid_rewrite lookup_insert_ne; [|lia].
       auto.
     Qed.
 
@@ -2005,7 +1770,7 @@ Section Memory_Stack_Theory.
         allocate m1 τ = inr (m2,a) ->
         allocate_spec m1 τ m2 a.
     Proof.
-      intros ((cm,lm),s) * EQ;
+      intros (m,s) * EQ;
         destruct s as [|f s]; apply allocate_inv in EQ as [NV [EQm2 EQa]]; subst; cbn.
       - split.
         + cbn. apply next_logical_key_fresh.
@@ -2013,7 +1778,7 @@ Section Memory_Stack_Theory.
             + intros SIZE.
               unfold read; cbn.
               unfold get_logical_block, get_logical_block_mem; cbn.
-              rewrite lookup_add_eq; cbn.
+              setoid_rewrite lookup_insert; cbn.
               unfold non_void in NV.
               f_equal; apply read_empty_block.
               lia.
@@ -2026,11 +1791,11 @@ Section Memory_Stack_Theory.
               apply no_overlap__not_overlaps in NOVER.
               unfold next_logical_key, next_logical_key_mem, overlaps in *.
               cbn in *.
-              destruct (Z.eq_dec (logical_next_key lm) (fst a')) as [Ha' | Ha'].
+              destruct (Z.eq_dec (logical_next_key m) (fst a')) as [Ha' | Ha'].
               -- (* Bogus branch where a' is the freshly allocated block *)
                 exfalso. eapply next_logical_key_fresh; erewrite Ha'; eauto.
               -- (* Good branch *)
-                rewrite lookup_add_ineq; auto.
+                setoid_rewrite lookup_insert_ne; auto.
           }
       - split.
         + cbn. apply next_logical_key_fresh.
@@ -2038,7 +1803,7 @@ Section Memory_Stack_Theory.
             + intros SIZE.
               unfold read; cbn.
               unfold get_logical_block, get_logical_block_mem; cbn.
-              rewrite lookup_add_eq; cbn.
+              setoid_rewrite lookup_insert; cbn.
               f_equal; apply read_empty_block.
               lia.
             + intros * ALLOC NOVER.
@@ -2050,11 +1815,11 @@ Section Memory_Stack_Theory.
               apply no_overlap__not_overlaps in NOVER.
               unfold next_logical_key, next_logical_key_mem, overlaps in *.
               cbn in *.
-              destruct (Z.eq_dec (logical_next_key lm) (fst a')) as [Ha' | Ha'].
+              destruct (Z.eq_dec (logical_next_key m) (fst a')) as [Ha' | Ha'].
               -- (* Bogus branch where a' is the freshly allocated block *)
                 exfalso. eapply next_logical_key_fresh; erewrite Ha'; eauto.
               -- (* Good branch *)
-                rewrite lookup_add_ineq; auto.
+                setoid_rewrite lookup_insert_ne; auto.
           }
     Qed.
 
@@ -2065,11 +1830,10 @@ Section Memory_Stack_Theory.
     Proof.
       intros a m H.
       unfold allocated in H.
-      destruct m as [[cm lm] fs].
-      apply member_lookup in H as [b LUP].
-      exists b. unfold get_logical_block. cbn.
-      unfold get_logical_block_mem. cbn.
-      auto.
+      destruct m as [m fs].
+      cbn in H.
+
+      apply elem_of_dom in H; eauto.
     Qed.
 
     Lemma read_array: forall m size τ i a elem_addr,
@@ -2093,8 +1857,9 @@ Section Memory_Stack_Theory.
             with  (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * Z.of_N (sizeof_dtyp τ))
             by lia.
           reflexivity.
-        + unfold Int64.max_unsigned. cbn. lia.
-      - pose proof allocated_get_logical_block (z, z0) m ALLOC as [b GETSOME].
+        + pose proof Int64.unsigned_range_2.
+          specialize (H Int64.zero). lia.
+      - pose proof (@allocated_get_logical_block (z, z0) m ALLOC) as [b GETSOME].
         cbn in GETSOME.
         rewrite GET in GETSOME.
         inversion GETSOME.
@@ -2110,10 +1875,8 @@ Section Memory_Stack_Theory.
       destruct (get_logical_block m (fst ptr)) eqn:LBLOCK.
       - destruct l.
         red. unfold get_logical_block, get_logical_block_mem in LBLOCK.
-        apply lookup_member in LBLOCK.
-        do 2 destruct m.
-        cbn in LBLOCK.
-        auto.
+        destruct m, ptr; cbn in LBLOCK; cbn.
+        apply elem_of_dom; eauto.
       - inversion READ.
     Qed.
 
@@ -2190,7 +1953,9 @@ Section Memory_Stack_Theory.
                  Int64.unsigned (Int64.repr (Z.of_nat i)) * Z.of_N (sizeof_dtyp τ))
           with (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * Z.of_N (sizeof_dtyp τ)) by lia.
         reflexivity.
-        unfold Int64.max_unsigned. cbn. lia.
+        unfold Int64.max_unsigned. cbn.
+        split; [ lia | ]; apply int64_modulus_range.
+
       - eapply read_array; cbn; eauto.
         rewrite N2Z.inj_mul.
         reflexivity.
@@ -2218,8 +1983,10 @@ Section Memory_Stack_Theory.
             by lia.
 
           reflexivity.
-        + unfold Int64.max_unsigned. cbn. lia.
-      - pose proof allocated_get_logical_block (z, z0) m ALLOC as [b GETSOME].
+        + unfold Int64.max_unsigned. cbn.
+
+          split; [ lia | ]; apply int64_modulus_range.
+      - pose proof @allocated_get_logical_block (z, z0) m ALLOC as [b GETSOME].
         cbn in GETSOME.
         rewrite GET in GETSOME.
         inversion GETSOME.
@@ -2243,7 +2010,8 @@ Section Memory_Stack_Theory.
           with  (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * Z.of_N (sizeof_dtyp τ))
           by lia.
         reflexivity.
-        unfold Int64.max_unsigned. cbn. lia.
+        unfold Int64.max_unsigned.
+        split; [ lia | ]; apply int64_modulus_range.
       - eapply write_array_lemma; cbn; eauto.
     Qed.
 
@@ -2255,19 +2023,18 @@ Section Memory_Stack_Theory.
     Proof.
       intros m1 m2 ptr ptr' v ALLOC WRITE.
       unfold allocated in *.
-      destruct m1 as [[cm1 lm1] f1].
-      destruct m2 as [[cm2 lm2] f2].
+      destruct m1 as [m1 f1].
+      destruct m2 as [m2 f2].
 
       unfold write in WRITE.
-      destruct (get_logical_block (cm1, lm1, f1) (fst ptr)) eqn:LB.
-      - setoid_rewrite LB in WRITE.
-        destruct l.
-        destruct ptr as [ptr_b ptr_i].
+      destruct (get_logical_block (m1, f1) (fst ptr)) eqn:LB.
+      - destruct l. destruct ptr, ptr'; cbn in *.
         inversion WRITE; subst.
-        destruct ptr' as [ptr'_b ptr'_i].
-        eapply member_add_preserved; auto.
-      - setoid_rewrite LB in WRITE.
-        inversion WRITE.
+        unfold add_logical_block_mem.
+        unfold get_logical_block, get_logical_block_mem in LB.
+        cbn in *.
+        apply dom_insert. set_solver.
+      - inversion WRITE.
     Qed.
 
     Lemma dtyp_fits_allocated :
@@ -2283,78 +2050,8 @@ Section Memory_Stack_Theory.
 
       (* TODO: Make this part of the allocated / get_logical_block lemma *)
       unfold get_logical_block, get_logical_block_mem in LB.
-      destruct m as [[cm lm] f].
-      cbn in LB.
-      eapply lookup_member; eauto.
-    Qed.
-
-    Lemma NM_NS_In {elt:Type} (k:IM.key) (m:IM.t elt):
-      IM.In k m ->
-      IS.In k (ISP.of_list (map fst (IM.elements  m))).
-    Proof.
-      pose proof (IM.elements_3w m) as U.
-      intros H.
-      rewrite <- IP.of_list_3 with (s:=m) in H.
-      unfold IP.of_list, IP.to_list in H.
-      generalize dependent (IM.elements m). intros l U H.
-      induction l.
-      -
-        simpl in H.
-        apply IP.F.empty_in_iff in H.
-        tauto.
-      -
-        destruct a as [k' v].
-        simpl in *.
-        destruct (Z.eq_decidable k k') as [K|NK].
-        +
-          (* k=k' *)
-          apply IS.add_1.
-          auto.
-        +
-          (* k!=k' *)
-          apply ISP.FM.add_neq_iff; try auto.
-          apply IHl.
-          *
-            inversion U.
-            auto.
-          *
-            eapply IP.F.add_neq_in_iff with (x:=k').
-            auto.
-            apply H.
-    Qed.
-
-    Lemma IM_key_in_elements :
-      forall k elt m,
-        IM.In (elt:=elt) k m ->
-        In k (map fst (IM.elements (elt:=elt) m)).
-    Proof.
-      intros k elt m H.
-      apply NM_NS_In in H.
-      pose proof (IM.elements_3w m) as U.
-      generalize dependent (IM.elements m). intros l U H.
-      induction l.
-      -
-        cbn in U.
-        apply ISP.FM.empty_iff in U.
-        trivial.
-      -
-        destruct a as [k' v].
-        simpl in *.
-        destruct (Z.eq_decidable k k') as [K|NK].
-        +
-          (* k=k' *)
-          left.
-          auto.
-        +
-          (* k!=k' *)
-          right.
-          apply IHl.
-          *
-            apply ISP.FM.add_neq_iff in U; auto.
-          *
-            clear IHl.
-            inv H.
-            auto.
+      destruct m as [m f]; cbn in *.
+      apply elem_of_dom; eauto.
     Qed.
 
     Lemma allocated_next_key_diff :
@@ -2362,37 +2059,22 @@ Section Memory_Stack_Theory.
         allocated ptr m ->
         next_logical_key m <> fst ptr.
     Proof.
-      intros [[cm lm] fs] [ptr_a ptr_o] H.
+      intros [m fs] [ptr_a ptr_o] H.
       Transparent next_logical_key.
       unfold next_logical_key, next_logical_key_mem, logical_next_key.
       cbn.
       unfold allocated in H.
       epose proof maximumBy_Z_correct.
-      assert (In ptr_a (map fst (IM.elements (elt:=logical_block) lm))).
-      { apply IM_key_in_elements.
-        apply IM.mem_2; auto.
-      }
-
-      eapply H0 with (def:= (-1)%Z) in H1.
-      apply Z.leb_le in H1.
-
-      destruct (maximumBy Z.leb (-1)%Z (map fst (IM.elements (elt:=logical_block) lm))) eqn:BLAH.              - lia.
-      - destruct p; lia.
-      - destruct ptr_a; try lia.
-        assert (p0 >= p)%positive by lia.
-        assert (p = 1 \/ 1 < p)%positive by lia.
-        destruct H3.
-        + subst.
-          cbn. lia.
-        + pose proof H3. apply Z.pos_sub_lt in H3. rewrite H3.
-          lia.
+      cbn in *.
+      pose proof (next_logical_key_fresh m).
+      intro; apply H1. set_solver.
     Qed.
 
     Lemma get_logical_block_frames :
-      forall cm lm f1 f2,
-        get_logical_block ((cm, lm), f1) = get_logical_block ((cm, lm), f2).
+      forall m f1 f2,
+        get_logical_block (m, f1) = get_logical_block (m, f2).
     Proof.
-      intros cm lm f1 f2.
+      intros m f1 f2.
       unfold get_logical_block.
       cbn.
       reflexivity.
@@ -2435,7 +2117,8 @@ Section Memory_Stack_Theory.
       intros m1 m2 τ ptr τ' ptr_allocated ALLOC FITS.
       pose proof FITS as ALLOCATED.
       apply dtyp_fits_allocated in ALLOCATED.
-      pose proof (freshly_allocated_different_blocks _ _ _ ALLOC ALLOCATED) as DIFF.
+      pose proof (freshly_allocated_different_blocks _
+                    ALLOC ALLOCATED) as DIFF.
 
       unfold dtyp_fits in *.
       erewrite get_logical_block_allocated; eauto.
@@ -2457,9 +2140,9 @@ Section Memory_Stack_Theory.
           apply ALLOC.
     Qed.
 
-    (* ext_memory only talks in terms of reads... Does not
-       necessarily preserved what's allocated, because you might
-       not be able to read from an allocated block *)
+    (* ext_memory only talks in terms of reads... Does not *)
+(*        necessarily preserved what's allocated, because you might *)
+(*        not be able to read from an allocated block *)
     Lemma ext_memory_trans :
       forall m1 m2 m3 τ v1 v2 dst,
         ext_memory m1 dst τ v1 m2 ->
@@ -2470,7 +2153,7 @@ Section Memory_Stack_Theory.
       split; auto.
       intros a' τ' ALLOC DISJOINT.
       rewrite <- OLD1; eauto.
-      pose proof (allocated_can_read _ _ τ' ALLOC) as [v READ].
+      pose proof (allocated_can_read τ' ALLOC) as [v READ].
       rewrite <- OLD1 in READ; eauto.
       apply can_read_allocated in READ.
       rewrite <- OLD2; eauto.
@@ -2545,7 +2228,9 @@ Section Memory_Stack_Theory.
       cbn.
       right.
 
-      rewrite Integers.Int64.unsigned_repr; [|cbn; lia].
+      rewrite Integers.Int64.unsigned_repr; cycle 1.
+      { split; [ lia | ]; apply int64_modulus_range. }
+
 
       replace (ptr_o + Z.of_N (sz * sizeof_dtyp τ) * 0 + Int64.unsigned ix * Z.of_N (sizeof_dtyp τ))
         with
@@ -2573,64 +2258,16 @@ Section Memory_Stack_Theory.
         lia.
     Qed.
 
-    Definition equiv : memory_stack -> memory_stack -> Prop :=
-      fun '((cm,lm), s) '((cm',lm'),s') =>
-        equivs s s' /\
-        equivc cm cm' /\
-        equivl lm lm'.
-
-    #[global] Instance equiv_Equiv : Equivalence equiv.
-    Proof.
-      split.
-      - intros ((cm,lm),s); cbn; split; [| split]; reflexivity.
-      - intros ((cm,lm),s) ((cm',lm'),s') EQ; cbn; split; [| split]; symmetry; apply EQ.
-      - intros ((cm,lm),s) ((cm',lm'),s') ((cm'',lm''),s'') EQ1 EQ2; cbn; split; [| split]; (etransitivity; [apply EQ1 | apply EQ2]).
-    Qed.
-
-    Infix "≡" := equiv (at level 25).
-
-    Lemma add_add_logical : forall off b1 b2 m,
-        equivl (add off b2 (add off b1 m)) (add off b2 m).
-    Proof.
-      intros; apply Equiv_add_add.
-    Qed.
-
     Lemma add_logical_block_add_logical_block :
       forall off b1 b2 m,
-        add_logical_block off b2 (add_logical_block off b1 m) ≡ add_logical_block off b2 m.
+        add_logical_block off b2 (add_logical_block off b1 m) =
+        add_logical_block off b2 m.
     Proof.
-      intros ? ? ? ((cm,lm),s).
-      cbn; split; [reflexivity | split; [reflexivity |]].
-      apply add_add_logical.
+      intros ? ? ? (m,s).
+      unfold add_logical_block, add_logical_block_mem.
+      setoid_rewrite insert_insert; done.
     Qed.
 
-    #[global] Instance Proper_add_logical : Proper (Logic.eq ==> equivlb ==> equivl ==> equivl) add.
-    Proof.
-      repeat intro; subst.
-      destruct H1 as [DOM EQUIV].
-      split.
-      - intros k; destruct (RelDec.rel_dec_p k y); [subst; rewrite 2 member_add_eq; auto | rewrite 2 member_add_ineq; auto]; reflexivity.
-      - intros k; destruct (RelDec.rel_dec_p k y); [subst; rewrite 2 lookup_add_eq; auto | rewrite 2 lookup_add_ineq; auto].
-        intros v v' EQ1 EQ2; inv EQ1; inv EQ2; auto.
-        intros v v' EQ1 EQ2.
-        eapply EQUIV; eauto.
-    Qed.
-
-    #[global] Instance Proper_add_logical_block :
-      Proper (Logic.eq ==> equivlb ==> equiv ==> equiv) add_logical_block.
-    Proof.
-      repeat intro; subst.
-      destruct x1 as ((mc,ml),s), y1 as ((mc',ml'),s'), H1 as (? & ? & EQ); cbn in *.
-      split; [| split]; auto.
-      rewrite EQ, H0.
-      reflexivity.
-    Qed.
-
-    #[global] Instance Proper_LBlock : Proper (Logic.eq ==> Equal ==> Logic.eq ==> equivlb) LBlock.
-    Proof.
-      repeat intro; subst.
-      constructor; auto.
-    Qed.
 
     Definition equiv_sum {A : Type} (R : A -> A -> Prop) : err A -> err A -> Prop :=
       fun ma ma' => match ma,ma' with
@@ -2643,7 +2280,9 @@ Section Memory_Stack_Theory.
       forall (m : memory_stack) (v1 v2 : dvalue) (a : addr) τ,
         dvalue_has_dtyp v1 τ ->
         dvalue_has_dtyp v2 τ ->
-        equiv_sum equiv ('m1 <- write m a v1;; write m1 a v2) (write m a v2).
+        equiv_sum eq
+          (bind (write m a v1) (fun m1 => write m1 a v2))
+          (write m a v2).
     Proof.
       intros * T1 T2.
       unfold write; cbn.
@@ -2651,9 +2290,10 @@ Section Memory_Stack_Theory.
       reflexivity.
       cbn in *.
       rewrite get_logical_block_of_add_logical_block.
-      cbn.
-      rewrite add_all_index_twice.
-      apply add_logical_block_add_logical_block.
+      cbn. destruct m; cbn. unfold add_logical_block_mem.
+      setoid_rewrite insert_insert. do 2 f_equiv.
+      f_equiv. eapply map_leibniz.
+      apply add_all_index_twice.
       erewrite 2 Zlength_correct.
       do 2 rewrite <- nat_N_Z.
       erewrite 2 sizeof_serialized; eauto.
@@ -2840,22 +2480,6 @@ Section PARAMS.
       auto using interp_memory_alloca.
     Qed.
 
-    Lemma lookup_all_add_all_app :
-      forall (xs ys : list SByte) o bytes def,
-        lookup_all_index o (N.of_nat (List.length xs + List.length ys)) (add_all_index (xs ++ ys) o bytes) def = xs ++ lookup_all_index (o + Z.of_nat (List.length xs)) (N.of_nat (List.length ys)) (add_all_index (xs ++ ys) o bytes) def.
-    Proof.
-    Abort.
-
-    Lemma lookup_all_add_all :
-      forall o bytes (sbytes : list SByte) def,
-        lookup_all_index o (N.of_nat (List.length sbytes)) (add_all_index sbytes o bytes) def = sbytes.
-    Proof.
-      intros o bytes sbytes def.
-      induction sbytes.
-      - reflexivity.
-      - cbn in *.
-    Abort.
-
     Lemma get_array_succeeds_allocated : forall m a i t val,
         get_array_cell m a i t = inr val ->
         allocated a m.
@@ -2865,10 +2489,9 @@ Section PARAMS.
       unfold get_logical_block in GET.
       unfold get_logical_block_mem in GET.
       break_match; inv GET.
-
-      apply lookup_member in Heqo0.
-      destruct m as [[lm cm] f].
-      cbn in *. auto.
+      destruct l; cbn in *; inversion H3.
+      red; cbn. destruct m; cbn in *.
+      apply elem_of_dom; eauto.
     Qed.
 
     Lemma interp_memory_GEP_array_addr : forall t a (size :N) m val i ptr,
@@ -2906,7 +2529,7 @@ Section PARAMS.
     Proof.
       intros t a size m val i GET.
       pose proof get_array_succeeds_allocated _ _ _ _ GET as ALLOC.
-      pose proof read_array_exists m size t i a ALLOC as RARRAY.
+      pose proof @read_array_exists m size t i a ALLOC as RARRAY.
       destruct RARRAY as (ptr & GEP & READ).
       exists ptr.
       split.
@@ -2965,7 +2588,7 @@ Section PARAMS.
     Proof.
       intros t a size m i FITS.
       pose proof (dtyp_fits_allocated FITS) as ALLOC.
-      pose proof read_array_exists m size t i a ALLOC as RARRAY.
+      pose proof @read_array_exists m size t i a ALLOC as RARRAY.
       destruct RARRAY as (ptr & GEP & READ).
       exists ptr.
       split.
@@ -3038,7 +2661,7 @@ Section PARAMS.
       clear Heqsz off_H.
       revert off.
       induction sz.
-      - intros. cbn.
+      - intros. cbn. f_equiv.
         rewrite Zred_factor6 at 1.
         reflexivity.
       - intros.
@@ -3067,7 +2690,7 @@ Section PARAMS.
       clear Heqsz off_H.
       revert off.
       induction sz.
-      - intros. cbn.
+      - intros. cbn. f_equiv.
         setoid_rewrite Zred_factor6 at 1.
         reflexivity.
       - intros.
@@ -3093,7 +2716,7 @@ Section PARAMS.
         { cbn. lia. }
         rewrite <- HeqLEN in H2.
         destruct (zeq (Z.of_nat LEN) 0) eqn: LENZERO.
-        + intuition. (* absurd case *)
+        + intuition. lia.
         + rewrite <- Nat2Z.inj_pred. 2 : lia.
           apply IHl. cbn in HeqLEN. lia.
     Qed.
@@ -3183,8 +2806,8 @@ Section PARAMS.
         lia.
         rewrite H2.
         unfold lookup_all_index in *.
-        remember (fun x0 : IM.key =>
-                    match lookup x0 src_bytes with
+        remember (fun x0 =>
+                    match src_bytes !! x0 with
                     | Some val => val
                     | None => def
                     end).
@@ -3236,7 +2859,7 @@ Section PARAMS.
           remember (add_all_index
                       (map s (Zseq src_offset (N.to_nat (N.of_nat sz))))
                       dst_offset dst_bytes) as m'.
-          setoid_rewrite <- IHsz at 2.
+          setoid_rewrite <- IHsz.
           match goal with
           | |- ?L = ?R => remember L as LHS; remember R as RHS
           end.
@@ -3259,11 +2882,11 @@ Section PARAMS.
           rewrite map_length. auto.
     Qed.
 
-    (* (* Note : For the current version of subevents, [interp_memory] must *)
-    (*     have subevent clauses assumed in Context, or else the *)
-    (*     [handle_intrinsic] handler will not get properly invoked. *) *)
-    (* (* This is specialized to DTYPE_Array for practical *)
-    (*    purposes. We could conjure a more complete definition later. *) *)
+    (* (* Note : For the current version of subevents, [interp_memory] must *) *)
+(*     (*     have subevent clauses assumed in Context, or else the *) *)
+(*     (*     [handle_intrinsic] handler will not get properly invoked. *) *)
+    (* (* This is specialized to DTYPE_Array for practical *) *)
+(*     (*    purposes. We could conjure a more complete definition later. *) *)
     (* Lemma interp_memory_intrinsic_memcpy : *)
     (*   forall (m : memory_stack) (dst src : Addr.addr) (sz : N) *)
     (*     (dst_val src_val : uvalue) (dτ : dtyp) volatile align, *)
