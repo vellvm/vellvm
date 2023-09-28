@@ -445,56 +445,12 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
     cbn in CONC.
     destruct CONC as (ma & k' & pama & eqm & REST).
 
-    destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma.
-    (* First thing is oom... *)
-    { cbn in SUCC.
-      unfold concretize_succeeds, concretize_fails in SUCC.
-      red in SUCC.
-      exfalso. apply SUCC.
+    cbn in eqm.
 
-      red. rewrite concretize_uvalueM_equation. cbn.
-      unfold bind_RefineProp.
-      eexists. exists ret.
+    destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma;
+      cbn in eqm; inv eqm.
 
-      split; [apply pama|].
-      split; auto. left. reflexivity.
-    }
-
-    (* First thing is ub... *)
-    (* This should be ruled out by SUCC *)
-    { cbn in SUCC.
-      unfold concretize_succeeds, concretize_fails in SUCC.
-      red in SUCC.
-
-      exfalso. apply SUCC.
-
-      red. rewrite concretize_uvalueM_equation. cbn.
-      unfold bind_RefineProp.
-
-      eexists. exists ret.
-
-      split; [apply pama|].
-      split; auto.
-    }
-
-    (* First thing is failure... *)
-    (* This should be ruled out by SUCC *)
-    { cbn in SUCC.
-      unfold concretize_succeeds, concretize_fails in SUCC.
-      red in SUCC.
-
-      exfalso. apply SUCC.
-
-      red. rewrite concretize_uvalueM_equation. cbn.
-
-      unfold bind_RefineProp. eexists. exists ret.
-
-      split; [apply pama|].
-      split; auto.
-    }
-
-    destruct REST as [FAILS | REST].
-    inversion FAILS.
+    destruct REST as [[] | REST].
     specialize (REST a).
     forward REST; [reflexivity|].
 
@@ -505,151 +461,28 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
     cbn in SUCC.
     unfold bind_RefineProp in SUCC.
 
-    destruct mb as [[[[[[[oom_mb] | [[ub_mb] | [[err_mb] | b]]]]]]]] eqn:Hmb.
+    exists a.
 
-    (* y raises OOM *)
-    { exfalso.
-      apply SUCC.
-
-      eexists.
-      exists (fun _ => raise_ub "").
-
-      split; [apply pama|]. split; cbn; auto.
-
-      right. intros a0 H; subst.
-      eexists. exists ret.
-      split; [apply pbmb|]. cbn. split; auto.
-
-      cbn in eqmb. cbn in *.
-
-      destruct (k' a0) as [[[[[[[oom_k'a0] | [[ub_k'a0] | [[err_k'a0] | k'a0]]]]]]]];
-        cbn in *; contradiction.
-    }
-
-    (* y raises UB *)
-    { exfalso. apply SUCC.
-
-      eexists. exists (fun _ => raise_ub "").
-      split; [apply pama|]. split; cbn; auto.
-      right. intros a0 H; subst. eexists.
-      exists ret.
-      split; [apply pbmb|].
-      split; auto.
-    }
-
-    (* y fails *)
-    { exfalso. apply SUCC.
-
-      eexists. exists (fun _ => raise_ub "").
-      split; [apply pama|]. split; cbn; auto.
-
-      right. intros a0 H; subst.
-      eexists. exists ret.
-
-      split; [apply pbmb|].
-      split; auto.
-    }
+    destruct mb as [[[[[[[oom_mb] | [[ub_mb] | [[err_mb] | b]]]]]]]] eqn:Hmb;
+      cbn in eqmb; subst; cbn in *; eauto;
+      rewrite <- eqmb in H0;
+      cbn in H0;
+      inv H0.
 
     (* Both x and y successfully concretized. *)
 
-  (*        Now eval_iop must succeed too. *)
-  (*    *)
-    destruct REST as [FAILS | REST].
-    inversion FAILS.
+    (*        Now eval_iop must succeed too. *)
+    (*    *)
+    destruct REST as [[] | REST].
     specialize (REST b).
     forward REST; [reflexivity|].
 
-    destruct (eval_icmp op a b) as [[[[[[[oom_z] | [[ub_z] | [[err_z] | z]]]]]]]] eqn:Hmz.
+    rewrite <- REST in H1.
+    destruct (eval_icmp op a b) as [[[[[[[oom_z] | [[ub_z] | [[err_z] | z]]]]]]]] eqn:Hmz;
+      cbn in H1; inv H1.
 
-    (* Eval raises OOM *)
-    { exfalso. apply SUCC.
-
-      eexists. exists (fun _ => raise_ub "").
-
-      split; [apply pama|]. split; cbn; auto.
-
-      right. intros a0 H; subst.
-
-      eexists. exists (fun _ => raise_ub "").
-
-      split; [apply pbmb|].
-      split; cbn; auto.
-
-      right.
-      intros a H; subst.
-
-      rewrite Hmz.
-      destruct (kb a) as [[[[[[[oom_kba] | [[ub_kba] | [[err_kba] | kba]]]]]]]] eqn:Hkba;
-        cbn in *; try contradiction.
-      rewrite Hkba in eqmb.
-      cbn in eqmb.
-      destruct (k' a0) as [[[[[[[oom_k'a0] | [[ub_k'a0] | [[err_k'a0] | k'a0]]]]]]]] eqn:Hk'a0;
-        cbn in eqm; contradiction.
-    }
-
-    (* Eval raises ub *)
-    { exfalso. apply SUCC.
-
-      eexists. exists (fun _ => raise_ub "").
-
-      split; [apply pama|].
-      split; cbn; auto.
-
-      right.
-      intros a0 H; subst.
-
-      eexists.
-      exists (fun _ => raise_ub "").
-
-      split; [apply pbmb|].
-      split; cbn; auto.
-
-      right.
-      intros a H; subst.
-
-      rewrite Hmz.
-      reflexivity.
-    }
-
-    (* Eval fails *)
-    { exfalso.
-      apply SUCC.
-
-      eexists.
-      exists (fun _ => raise_ub "").
-
-      split; [apply pama|].
-      split; cbn; auto.
-
-      right.
-      intros a0 H; subst.
-
-      eexists.
-      exists (fun _ => raise_ub "").
-
-      split; [apply pbmb|].
-      split; cbn; auto.
-
-      right.
-      intros a H; subst.
-
-      rewrite Hmz.
-      reflexivity.
-    }
-
-    cbn in eqmb.
-    cbn in eqm.
-
-    destruct (kb b) as [[[[[[[oom_kbb] | [[ub_kbb] | [[err_kbb] | kbb]]]]]]]] eqn:Hkbb;
-      try contradiction; subst.
-    cbn in eqmb.
-
-    destruct (k' a) as [[[[[[[oom_k'a] | [[ub_k'a] | [[err_k'a] | k'a]]]]]]]] eqn:Hk'a;
-      try contradiction; subst.
-    cbn in eqm; subst.
-
-    exists a. exists b.
-    repeat split; auto.
+    exists b.
+    repeat split; eauto.
 
     { unfold concretize_succeeds, concretize_fails, concretize_u.
       intros CONC.
@@ -688,12 +521,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
 
     apply eval_icmp_err_ub_oom_to_M.
     rewrite Hmz.
-    cbn.
-
-    destruct (k' a) as [[[[[[[oom_k'a] | [[ub_k'a] | [[err_k'a] | k'a]]]]]]]] eqn:Hk'a;
-      cbn in eqm; try contradiction.
-    cbn in eqmb.
-    subst; auto.
+    reflexivity.
   Qed.
 
   Lemma concretize_ibinop_inv:
@@ -716,75 +544,12 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
     cbn in CONC.
     destruct CONC as (ma & k' & pama & eqm & REST).
 
-    destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma.
+    cbn in eqm.
 
-    (* First thing is oom... *)
-    { cbn in SUCC.
-      unfold concretize_succeeds, concretize_fails in SUCC.
-      red in SUCC.
+    destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma;
+      cbn in eqm; inv eqm.
 
-      exfalso.
-      apply SUCC.
-
-      red. rewrite concretize_uvalueM_equation.
-      cbn.
-
-      unfold bind_RefineProp.
-
-      eexists.
-      exists ret.
-
-      split; [apply pama|].
-      split; auto.
-
-      left.
-      reflexivity.
-    }
-
-    (* First thing is ub... *)
-    (* This should be ruled out by SUCC *)
-    { cbn in SUCC.
-      unfold concretize_succeeds, concretize_fails in SUCC.
-      red in SUCC.
-
-      exfalso.
-      apply SUCC.
-
-      red. rewrite concretize_uvalueM_equation.
-      cbn.
-
-      unfold bind_RefineProp.
-
-      eexists.
-      exists ret.
-
-      split; [apply pama|].
-      split; auto.
-    }
-
-    (* First thing is failure... *)
-    (* This should be ruled out by SUCC *)
-    { cbn in SUCC.
-      unfold concretize_succeeds, concretize_fails in SUCC.
-      red in SUCC.
-
-      exfalso.
-      apply SUCC.
-
-      red. rewrite concretize_uvalueM_equation.
-      cbn.
-
-      unfold bind_RefineProp.
-
-      eexists.
-      exists ret.
-
-      split; [apply pama|].
-      split; auto.
-    }
-
-    destruct REST as [FAILS | REST].
-    inversion FAILS.
+    destruct REST as [[] | REST].
     specialize (REST a).
     forward REST; [reflexivity|].
 
@@ -795,185 +560,28 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
     cbn in SUCC.
     unfold bind_RefineProp in SUCC.
 
-    destruct mb as [[[[[[[oom_mb] | [[ub_mb] | [[err_mb] | b]]]]]]]] eqn:Hmb.
+    exists a.
 
-    (* y raises OOM *)
-    { exfalso.
-      apply SUCC.
+    destruct mb as [[[[[[[oom_mb] | [[ub_mb] | [[err_mb] | b]]]]]]]] eqn:Hmb;
+      cbn in eqmb; subst; cbn in *; eauto;
+      rewrite <- eqmb in H0;
+      cbn in H0;
+      inv H0.
 
-      eexists.
-      exists (fun _ => raise_ub "").
+    (* Both x and y successfully concretized. *)
 
-
-      split; [apply pama|].
-      split; cbn; auto.
-
-      right.
-      intros a0 H; subst.
-
-      eexists.
-      exists ret.
-
-      split; [apply pbmb|].
-      cbn.
-      split; auto.
-
-      cbn in eqmb.
-      cbn in *.
-
-      destruct (k' a0) as [[[[[[[oom_k'a0] | [[ub_k'a0] | [[err_k'a0] | k'a0]]]]]]]];
-        cbn in *; contradiction.
-    }
-
-    (* y raises UB *)
-    { exfalso.
-      apply SUCC.
-
-      eexists.
-      exists (fun _ => raise_ub "").
-
-
-      split; [apply pama|].
-      split; cbn; auto.
-
-      right.
-      intros a0 H; subst.
-
-      eexists.
-      exists ret.
-
-      split; [apply pbmb|].
-      split; auto.
-    }
-
-    (* y fails *)
-    { exfalso.
-      apply SUCC.
-
-      eexists.
-      exists (fun _ => raise_ub "").
-
-
-      split; [apply pama|].
-      split; cbn; auto.
-
-      right.
-      intros a0 H; subst.
-
-      eexists.
-      exists ret.
-
-      split; [apply pbmb|].
-      split; auto.
-    }
-
-    (* Both x and y successfully concretized.
-
-         Now eval_iop must succeed too.
-     *)
-    destruct REST as [FAILS | REST].
-    inversion FAILS.
+    (*        Now eval_iop must succeed too. *)
+    (*    *)
+    destruct REST as [[] | REST].
     specialize (REST b).
     forward REST; [reflexivity|].
 
-    destruct (eval_iop op a b) as [[[[[[[oom_z] | [[ub_z] | [[err_z] | z]]]]]]]] eqn:Hmz.
+    rewrite <- REST in H1.
+    destruct (eval_iop op a b) as [[[[[[[oom_z] | [[ub_z] | [[err_z] | z]]]]]]]] eqn:Hmz;
+      cbn in H1; inv H1.
 
-    (* Eval raises OOM *)
-    { exfalso.
-      apply SUCC.
-
-      eexists.
-      exists (fun _ => raise_ub "").
-
-      split; [apply pama|].
-      split; cbn; auto.
-
-      right.
-      intros a0 H; subst.
-
-      eexists.
-      exists (fun _ => raise_ub "").
-
-      split; [apply pbmb|].
-      split; cbn; auto.
-
-      right.
-      intros a H; subst.
-
-      rewrite Hmz.
-      destruct (kb a) as [[[[[[[oom_kba] | [[ub_kba] | [[err_kba] | kba]]]]]]]] eqn:Hkba;
-        cbn in *; try contradiction.
-      rewrite Hkba in eqmb.
-      cbn in eqmb.
-      destruct (k' a0) as [[[[[[[oom_k'a0] | [[ub_k'a0] | [[err_k'a0] | k'a0]]]]]]]] eqn:Hk'a0;
-        cbn in eqm; contradiction.
-    }
-
-    (* Eval raises ub *)
-    { exfalso.
-      apply SUCC.
-
-      eexists.
-      exists (fun _ => raise_ub "").
-
-      split; [apply pama|].
-      split; cbn; auto.
-
-      right.
-      intros a0 H; subst.
-
-      eexists.
-      exists (fun _ => raise_ub "").
-
-      split; [apply pbmb|].
-      split; cbn; auto.
-
-      right.
-      intros a H; subst.
-
-      rewrite Hmz.
-      reflexivity.
-    }
-
-    (* Eval fails *)
-    { exfalso.
-      apply SUCC.
-
-      eexists.
-      exists (fun _ => raise_ub "").
-
-      split; [apply pama|].
-      split; cbn; auto.
-
-      right.
-      intros a0 H; subst.
-
-      eexists.
-      exists (fun _ => raise_ub "").
-
-      split; [apply pbmb|].
-      split; cbn; auto.
-
-      right.
-      intros a H; subst.
-
-      rewrite Hmz.
-      reflexivity.
-    }
-
-    cbn in eqmb.
-    cbn in eqm.
-
-    destruct (kb b) as [[[[[[[oom_kbb] | [[ub_kbb] | [[err_kbb] | kbb]]]]]]]] eqn:Hkbb;
-      try contradiction; subst.
-    cbn in eqmb.
-
-    destruct (k' a) as [[[[[[[oom_k'a] | [[ub_k'a] | [[err_k'a] | k'a]]]]]]]] eqn:Hk'a;
-      try contradiction; subst.
-    cbn in eqm; subst.
-
-    exists a. exists b.
-    repeat split; auto.
+    exists b.
+    repeat split; eauto.
 
     { unfold concretize_succeeds, concretize_fails, concretize_u.
       intros CONC.
@@ -1010,11 +618,9 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
       split; cbn; auto.
     }
 
-    cbn in *.
-    destruct (k' a) as [[[[[[[oom_k'a] | [[ub_k'a] | [[err_k'a] | k'a]]]]]]]] eqn:Hk'a;
-      cbn in eqm; try contradiction.
-    cbn in eqmb.
-    subst; auto.
+    rewrite Hmz, <- REST.
+    cbn.
+    reflexivity.
   Qed.
 
   Lemma concretize_succeeds_poison :
@@ -1025,6 +631,8 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
       unfold concretize_succeeds, concretize_fails, concretize_u;
       rewrite concretize_uvalueM_equation;
       cbn; auto.
+
+    all: intros CONTRA; discriminate.
   Qed.
 
   Lemma concretize_dtyp :

@@ -11,7 +11,7 @@ From Vellvm Require Import
      Utils.NMaps
      Utils.Monads
      Utils.MonadReturnsLaws
-     Utils.RefineProp
+     Utils.ErrUbOomProp
      Syntax.LLVMAst
      Syntax.DynamicTypes
      Syntax.DataLayout
@@ -431,11 +431,11 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
              (uv : uvalue) : M dvalue
     := concretize_uvalueM M (fun dt => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) M (fun _ x => x) uv.
 
-  Definition concretize_u (uv : uvalue) : RefineProp dvalue.
+  Definition concretize_u (uv : uvalue) : ErrUbOomProp dvalue.
     refine (concretize_uvalueM _ (fun dt => _) err_ub_oom (fun _ x => _) uv).
 
     (* Undef handler *)
-    { unfold RefineProp.
+    { unfold ErrUbOomProp.
       refine (fun edv => match unERR_UB_OOM edv with
                       | mkEitherT (mkEitherT (mkEitherT (mkIdent (inr (inr (inr dv)))))) =>
                           (* As long as the dvalue has the same type, it's a refinement *)
@@ -445,36 +445,17 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
     }
 
     (* lift_ue *)
-    { unfold RefineProp.
+    { unfold ErrUbOomProp.
       intros ue.
-
-      (* Is x or ue the thing that should be the refinement? *)
-      (* I think ue is the refinement *)
-      destruct x as [[[[[[[oom_x] | [[ub_x] | [[err_x] | x]]]]]]]].
-      - (* OOM *)
-        (* OOM only refines OOM *)
-        destruct ue as [[[[[[[oom_ue] | [[ub_ue] | [[err_ue] | ue]]]]]]]].
-        + exact True.
-        + exact False.
-        + exact False.
-        + exact False.
-      - (* UB *)
-        exact True.
-      - (* ERR *)
-        exact True.
-      - destruct ue as [[[[[[[oom_ue] | [[ub_ue] | [[err_ue] | ue]]]]]]]].
-        + exact True. (* OOM refines everything *)
-        + exact False.
-        + exact False.
-        + exact (x = ue).
+      exact (x=ue).
     }
   Defined.
 
-  Definition concretize_u_succeeds (uv : uvalue) : RefineProp dvalue.
+  Definition concretize_u_succeeds (uv : uvalue) : ErrUbOomProp dvalue.
     refine (concretize_uvalueM _ (fun dt => _) err_ub_oom (fun _ x => _) uv).
 
     (* Undef handler *)
-    { unfold RefineProp.
+    { unfold ErrUbOomProp.
       refine (fun edv => match unERR_UB_OOM edv with
                       | mkEitherT (mkEitherT (mkEitherT (mkIdent (inr (inr (inr dv)))))) =>
                           (* As long as the dvalue has the same type, it's a refinement *)
@@ -484,7 +465,7 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
     }
 
     (* lift_ue *)
-    { unfold RefineProp.
+    { unfold ErrUbOomProp.
       intros ue.
 
       exact (~MFails x /\ ~MFails ue).
@@ -543,7 +524,7 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
 
     unfold bind.
     cbn.
-    unfold bind_RefineProp.
+    unfold bind_ErrUbOomProp.
 
     eexists.
     exists (fun x => match unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM e2)))) with
@@ -553,15 +534,13 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
              | inr (inr (inr x0)) => eval_iop iop x x0
              end).
     split; eauto.
-    split.
+    split; eauto.
 
     { (* Monad.eq1 mb (x <- ma;; k' x) *)
       unfold bind.
       cbn.
       destruct e1 as [[[[[[[oom_e1] | [[ub_e1] | [[err_e1] | e1]]]]]]]]; cbn; try reflexivity.
       destruct e2 as [[[[[[[oom_e2] | [[ub_e2] | [[err_e2] | e2]]]]]]]]; cbn; try reflexivity.
-
-      destruct (eval_iop iop e1 e2) as [[[[[[[oom_eval_iopiope1e2] | [[ub_eval_iopiope1e2] | [[err_eval_iopiope1e2] | eval_iopiope1e2]]]]]]]]; reflexivity.
     }
 
     right.

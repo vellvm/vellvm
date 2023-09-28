@@ -135,11 +135,24 @@ Qed.
 
 Lemma Forall2_Forall2_HInT :
   forall {A B : Type} (xs : list A) (ys : list B) f,
-    Forall2 f xs ys ->
+    Forall2 f xs ys <->
     Forall2_HInT xs ys (fun a b HIna HInb => f a b).
 Proof.
-  intros A B xs ys f H.
-  induction H; cbn; auto.
+  intros A B xs ys f.
+  split; intros H.
+  - induction H; cbn; auto.
+  - remember (xs, ys) as ZIP.
+    replace xs with (fst ZIP) in H by (subst; cbn; auto).
+    replace xs with (fst ZIP) by (subst; cbn; auto).
+    replace ys with (snd ZIP) in H by (subst; cbn; auto).
+    replace ys with (snd ZIP) by (subst; cbn; auto).
+    clear HeqZIP xs ys.
+
+    induction ZIP using double_list_rect;
+      cbn in *; try contradiction.
+    + constructor.
+    + destruct H.
+      constructor; eauto.      
 Qed.
 
 Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) (ACS : AddrConvertSafe IS2.LP.ADDR IS1.LP.ADDR AC2 AC1) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC).
@@ -7178,7 +7191,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN;
           red in CONC_FIN;
           rewrite CONCBASE.concretize_uvalueM_equation in CONC_FIN;
-          cbn in CONC_FIN; subst;
+          cbn in CONC_FIN; inv CONC_FIN;
 
           rewrite IS1.MEM.CP.CONC.concretize_equation;
           red;
@@ -7211,7 +7224,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn in e.
       break_match_hyp_inv.
       pose proof (addr_convert_safe _ _ Heqo0).
-      pose proof (AC1.addr_convert_injective _ _ _ Heqo H0); subst.
+      pose proof (AC1.addr_convert_injective _ _ _ Heqo H); subst.
       reflexivity.
     - (* IPTR *)
       red; intros dv_fin CONC_FIN.
@@ -7266,10 +7279,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       Set Nested Proofs Allowed.
 
-      Import RefineProp.
+      Import ErrUbOomProp.
       (* TODO: Move *)
-      (* Lemma RefineProp_bind_success : *)
-      (*   forall {A B} (ma : RefineProp A) (k : A -> RefineProp B) b, *)
+      (* Lemma ErrUbOomProp_bind_success : *)
+      (*   forall {A B} (ma : ErrUbOomProp A) (k : A -> ErrUbOomProp B) b, *)
       (*     (ma >>= k) (ret b) -> *)
       (*     ((exists a, ma (ret a) /\ *)
       (*            (k a) (ret b)) \/ (exists msg, (ma >>= k) (raise_ub msg))). *)
@@ -7288,10 +7301,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       (* Qed. *)
 
       (* TODO: move / generalize these *)
-      Lemma map_monad_RefineProp_forall2 :
-        forall {A B} (f : A -> RefineProp B) l res,
-          map_monad (m:=RefineProp) f l (ret res) <->
-            Forall2 (fun a b => f a = ret b) l res.
+      Lemma map_monad_ErrUbOomProp_forall2 :
+        forall {A B} (f : A -> ErrUbOomProp B) l res,
+          @map_monad ErrUbOomProp Monad_ErrUbOomProp _ _ f l (ret res) <->
+            Forall2 (fun a b => f a (ret b)) l res.
       Proof.
         intros A B f.
         induction l; intros res.
@@ -7307,324 +7320,119 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             repeat red in MAP.
             destruct MAP as (?&?&?&?&?).
 
-            repeat red in H0.
-            destruct_err_ub_oom x; cbn in *; subst; try contradiction.
-            3: {
-              destruct H1 as [[] | H1].
+            cbn in H0.
+            destruct_err_ub_oom x; cbn in *; subst; inv H0.
 
-              specialize (H1 x1 eq_refl).
-              repeat red in H1.
-              destruct H1 as (?&?&?&?&?).
+            destruct H1 as [[] | H1].
+            specialize (H1 x1 eq_refl).
+            repeat red in H1.
+            destruct H1 as (?&?&?&?&?).
+            cbn in H1.
 
-              destruct_err_ub_oom x; cbn in *; subst; try contradiction.
-              4: {
-                destruct H3 as [[] | H3].
-                specialize (H3 x3 eq_refl).
+            destruct_err_ub_oom x; cbn in *; subst; inv H1;
+              rewrite <- H5 in H3; inv H3.
 
-                epose proof (IHl x3).
-                destruct H4.
-                specialize (H4 H1).
-                clear H5.
+            destruct H2 as [[] | H2].
+            specialize (H2 x3 eq_refl).
+            rewrite <- H2 in H5.
+            cbn in H5.
+            rewrite H2 in H5.
+            rewrite <- H2 in H4.
+            cbn in H4.
+            inv H4.
 
-                remember (x0 x1) as x0x1.
-                destruct_err_ub_oom x0x1; subst; try contradiction.
-                3: {
-                  cbn in H0; subst.
-                  cbn in H2.
-
-                  remember (x2 x3) as x2x3.
-                  destruct_err_ub_oom x2x3; subst; try contradiction.
-
-                  cbn in H2.
-                  subst.
-
-                  constructor; cbn; auto.
-                  admit. (* Ughhhhh *)
-                }
-                admit.
-                admit.
-              }
-              admit.
-              admit.
-              admit.
+            constructor.
+            2: {
+              apply IHl.
+              apply H0.
             }
 
-            admit.
-            admit.
-          + admit.
-      Admitted.
+            auto.
+          + inv MAP.
+            rewrite map_monad_unfold.
+            repeat red.
+            exists (ret y).
+            exists (fun x => ret (x :: l')).
 
-      Set Printing Implicit.
+            apply IHl in H3.
+            split; eauto.
+            split; eauto.
+
+            right.
+            intros a0 H.
+            cbn in H; subst.
+            repeat red.
+            exists (ret l').
+            exists (fun l => ret (a0 :: l)).
+            split; eauto.
+            split; cbn; eauto.
+      Qed.
+
       rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
       rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
 
+      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
+      red in CONC_FIN.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
+
+      repeat red in CONC_FIN.
+      destruct CONC_FIN as (?&?&?&?&?).
+      destruct_err_ub_oom x; cbn in H1; inv H1.
+      destruct H2 as [[] | H2].
+      specialize (H2 x1 eq_refl).
+      cbn in H2.
+      rewrite <- H2 in H4.
+      cbn in H4. inv H4.
+
+      rename H0 into MAP.
+
       repeat red.
-      do 2 eexists.
+      exists (ret (map lift_dvalue_fin_inf x1)).
+      exists (fun fields => ret (IS1.LP.Events.DV.DVALUE_Struct fields)).
       split.
-      (* { eapply map_monad_RefineProp_forall2. *)
-        
-      (* } *)
-      (* eapply map_monad (m:=RefineProp) f l (ret res) *)
+      { eapply map_monad_ErrUbOomProp_forall2.
+        apply Util.Forall2_forall.
+        split.
+        - rewrite map_length.
+          (* map_monad_length lemma *)
+          admit.
+        - intros i a b NTH_fields NTH_res.
 
-      (* generalize dependent dv_fin. *)
-      (* generalize dependent l. *)
-      (* induction fields; intros l Heqo dv_fin CONC_FIN. *)
-      (* + rewrite IS1.MEM.CP.CONC.concretize_equation. *)
-      (*   red. *)
-      (*   rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation. *)
-      (*   cbn. *)
-      (*   red. *)
+          apply Forall2_Forall2_HInT in Heqo.
+          epose proof Util.Forall2_Nth_left NTH_fields Heqo as (x&NTHl&CONV).
 
-      (*   cbn in Heqo. *)
-      (*   break_match_hyp_inv. *)
+          apply Util.Nth_In in NTH_fields.
+          specialize (H a NTH_fields x CONV).
 
-      (*   rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN. *)
-      (*   red in CONC_FIN. *)
-      (*   rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN. *)
-      (*   repeat red in CONC_FIN. *)
+          eapply map_monad_ErrUbOomProp_forall2 in MAP.
+          epose proof Util.Forall2_Nth_left NTHl MAP as (?&NTH_CONC&CONC).
+          specialize (H _ CONC).
 
-      (*   destruct CONC_FIN as (ma&k'&?&?&?). *)
-      (*   repeat red in H0. *)
-      (*   destruct_err_ub_oom ma; cbn in *; subst; try contradiction. *)
-      (*   destruct H2 as [[] | H2]. *)
+          apply Nth_map_iff in NTH_res as (?&?&?).
+          subst.
 
-      (*   specialize (H2 [] eq_refl). *)
-      (*   remember (k' []) as k'_nil. *)
-      (*   destruct_err_ub_oom k'_nil; cbn in *; subst; try contradiction. *)
+          red in NTH_CONC, H1.
+          rewrite H1 in NTH_CONC.
+          inv NTH_CONC.
+          apply H.
+      }
 
-      (*   exists (ret []). *)
-      (*   exists (fun fields => ret (IS1.LP.Events.DV.DVALUE_Struct fields)). *)
-      (*   cbn. *)
-      (*   split; auto. *)
+      cbn.
+      split.
+      { unfold lift_dvalue_fin_inf at 2.
+        break_match_goal.
+        clear Heqs.
+        rewrite DVCrev.dvalue_convert_strict_equation in e.
+        cbn in e.
+        admit.
+      }
 
-      (*   split; cbn; auto. *)
-      (*   unfold lift_dvalue_fin_inf. *)
-      (*   break_match_goal. *)
-      (*   clear Heqs. *)
-
-      (*   rewrite DVCrev.dvalue_convert_strict_equation in e. *)
-      (*   cbn in e. *)
-      (*   inv e. *)
-      (*   reflexivity. *)
-      (* + forward IHfields. *)
-      (*   { intros u H0 uv_fin H1 dv_fin0 H2. *)
-      (*     eapply H; *)
-      (*     try right; eauto. *)
-      (*   } *)
-
-      (*   destruct l. *)
-      (*   { cbn in Heqo. *)
-      (*     contradiction. *)
-      (*   } *)
-
-      (*   specialize (IHfields l). *)
-      (*   cbn in Heqo. *)
-      (*   destruct Heqo. *)
-      (*   forward IHfields; eauto. *)
-
-      (*   rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN. *)
-      (*   red in CONC_FIN. *)
-      (*   rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN. *)
-      (*   repeat red in CONC_FIN. *)
-      (*   destruct CONC_FIN as (fields'&k'&?&?&?). *)
-
-      (*   pose proof (H a (or_introl eq_refl) _ H0) as CONV. *)
-
-      (*   destruct_err_ub_oom fields'. *)
-      (*   4: { *)
-      (*     destruct H4 as [[] | H4]. *)
-      (*     subst. *)
-      (*     cbn in H3. *)
-
-      (*     specialize (H4 fields'0). *)
-      (*     forward H4; [cbn; auto|]. *)
-
-      (*     cbn in H4. *)
-      (*     remember (k' fields'0) as k'_fields. *)
-      (*     destruct_err_ub_oom k'_fields; subst; try contradiction. *)
-
-      (*     cbn in H3. *)
-      (*     subst. *)
-
-      (*     rewrite map_monad_unfold in H2. *)
-      (*     cbn in H2. *)
-      (*     repeat red in H2. *)
-      (*     destruct H2 as (?&?&?&?&?). *)
-
-      (*     destruct_err_ub_oom x; cbn in H3; subst; try contradiction. *)
-      (*     3: { *)
-      (*       specialize (CONV _ H2). *)
-      (*       destruct H4 as [[] | H4]. *)
-
-      (*       remember (x0 x1) as x0x1. *)
-      (*       destruct_err_ub_oom x0x1; subst; try contradiction. *)
-      (*       3: { *)
-      (*         cbn in H3; subst. *)
-      (*         specialize (H4 x1). *)
-      (*         forward H4; [cbn; auto|]. *)
-      (*         repeat red in H4. *)
-      (*         destruct H4 as (?&?&?&?&?). *)
-      (*         specialize (IHfields x1). *)
-      (*         forward IHfields. *)
-      (*         {  *)
-      (*         } *)
-      (*       } *)
-            
-      (*     } *)
-      (*     cbn in H3. *)
-
-      (*     cbn in H3. *)
-
-      (*     destruct_err_ub_oom x; subst; try contradiction. *)
-      (*     3: { *)
-      (*       apply CONV in H2. *)
-      (*       rename H2 into CONC_a. *)
-      (*       move CONC_a after CONV. *)
-
-
-      (*       4: { *)
-      (*         cbn in H3; subst. *)
-      (*         move H5 after CONC_a. *)
-      (*         cbn in H5. *)
-      (*       } *)
-      (*     } *)
-      (*     rewrite map_monad *)
-          
-
-      (*     4: { *)
-      (*       cbn in H3; subst. *)
-      (*     } *)
-      (*   } *)
-
-      (*   repeat red in H2. *)
-      (*   destruct H2 as (?&?&?&?&?). *)
-      (*   rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in H2. *)
-      (*   repeat red in H2. *)
-
-      (*   rename u into blah. *)
-      (*   rename a into foobar. *)
-
-      (*   cbn in H3. *)
-      (*   repeat red in H3. *)
-
-      (*   cbn in H5. *)
-      (*   repeat red in H5. *)
-        
-      (*   destruct_err_ub_oom fields'; cbn in H3; subst; try contradiction. *)
-      (*   cbn in H4. *)
-      (*   repeat red in H4. *)
-      (*   destruct H2 as [[] | H2]. *)
-
-      (*   specialize (H2 [] eq_refl). *)
-      (*   remember (k' []) as k'_nil. *)
-      (*   destruct_err_ub_oom k'_nil; cbn in *; subst; try contradiction. *)
-
-        
-
-      (* (* Try making a map_monad_forall2 lemma for this monad. Assert *) *)
-      (* (* it and do the proof *) *)
-      
-
-
-      (* 2: { *)
-      (*   split. *)
-      (*   - repeat red. *)
-      (*     admit. *)
-      (*   - right. *)
-      (*     intros a RET. *)
-      (*     cbn in RET. *)
-      (*     repeat red in RET. *)
-
-      (* } *)
-
-      (* { eapply map_monad_RefineProp_forall2. *)
-      (*   cbn. *)
-
-        
-      (* } *)
-
-      (* rewrite IS1.MEM.CP.CONC.concretize_equation. *)
-      (* red. *)
-      (* rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation. *)
-
-      (* eapply RefineProp *)
-      (* cbn. *)
-      (* red. *)
-
-      
-
-
-      
-
-      (* rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN. *)
-      (* red in CONC_FIN. *)
-      (* rewrite CONCBASE.concretize_uvalueM_equation in CONC_FIN. *)
-      (* cbn in CONC_FIN. *)
-      (* repeat red in CONC_FIN. *)
-
-
-      (* induction fields. *)
-      (* + cbn in Heqo; inv Heqo. *)
-
-      (*   rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN. *)
-      (*   red in CONC_FIN. *)
-      (*   rewrite CONCBASE.concretize_uvalueM_equation in CONC_FIN. *)
-      (*   cbn in CONC_FIN. *)
-      (*   repeat red in CONC_FIN. *)
-      (*   destruct CONC_FIN as (?&?&?&?&?). *)
-      (*   destruct_err_ub_oom x; try contradiction. *)
-      (*   subst. *)
-      (*   cbn in H2. *)
-      (*   destruct H2 as [[] | H2]. *)
-      (*   specialize (H2 [] eq_refl). *)
-      (*   remember (x0 []) as x0_nil. *)
-      (*   destruct_err_ub_oom x0_nil; try contradiction. *)
-      (*   * cbn in H1. *)
-      (*     rewrite <- Heqx0_nil in H1. *)
-      (*     cbn in H1. *)
-      (*     contradiction. *)
-      (*   * cbn in H1. *)
-      (*     rewrite <- Heqx0_nil in H1. *)
-      (*     cbn in H1. *)
-      (*     subst. *)
-
-      (*     rewrite IS1.MEM.CP.CONC.concretize_equation. *)
-      (*     red. *)
-      (*     rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation. *)
-      (*     cbn. *)
-      (*     red. *)
-      (*     exists (ret []). *)
-      (*     exists (fun fields => ret (lift_dvalue_fin_inf (DVALUE_Struct []))). *)
-      (*     cbn. *)
-      (*     eexists. *)
-      (*     split; auto. *)
-      (*     split; auto. *)
-      (*     right. *)
-      (*     intros a H0; subst. *)
-      (*     unfold lift_dvalue_fin_inf. *)
-      (*     break_match_goal; clear Heqs. *)
-      (*     rewrite DVCrev.dvalue_convert_strict_equation in e. *)
-      (*     cbn in e. *)
-      (*     inv e. *)
-      (*     reflexivity. *)
-      (* + *)
-
-
-
-          
-      (*     contradiction. *)
-
-      (*   do 3 (break_match_hyp; try contradiction). *)
-      (*   admit. *)
-      (*   break_match_hyp. *)
-      (*   admit. *)
-
-
-      (* rewrite IS1.MEM.CP.CONC.concretize_equation. *)
-      (* red. *)
-      (* rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation. *)
-      (* cbn. *)
+      right.
+      intros a H0.
+      reflexivity.
+    - (* Packed structs *)
+      admit.
   Admitted.
 
   Lemma uvalue_refine_strict_unique_prop :
