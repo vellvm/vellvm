@@ -6,8 +6,6 @@ From Vellvm Require Import
      Utils.Tactics
      Utils.MonadReturnsLaws.
 
-
-
 From ITree Require Import Basics.Monad.
 
 Import MonadNotation.

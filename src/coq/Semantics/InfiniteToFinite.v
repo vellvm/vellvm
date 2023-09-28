@@ -32283,8 +32283,6 @@ cofix CIH
          cbn.
          eapply interp_prop_oom_raiseOOM.
       -- (* Interp_PropT_Vis case *)
-        eapply paco2_mon_bot; eauto.
-        setoid_rewrite tau_eutt.
         repeat red in H0.
         destruct e.
         { (* ExternalCallE *)
@@ -32293,9 +32291,19 @@ cofix CIH
           setoid_rewrite bind_bind in H1.
           setoid_rewrite bind_ret_l in H1.
           setoid_rewrite bind_trigger in H1.
-          rewrite H1.
-          cbn.
+
+          pinversion H1; subst_existT.
+          2: exfalso; eapply EQ; eauto.
+
+          pstep; red; cbn.
+          constructor; auto.
+
+          constructor.
+
           rewrite get_inf_tree_L4_equation.
+          pstep; red; cbn.
+          constructor; auto.
+
           cbn; break_match_goal; cbn.
 
           apply orutt_inv_Vis_r in H.
