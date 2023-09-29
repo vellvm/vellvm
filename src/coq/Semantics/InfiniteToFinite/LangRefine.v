@@ -40,6 +40,7 @@ From Vellvm Require Import
      Utils.RuttPropsExtra
      Utils.AListFacts
      Utils.VellvmRelations
+     Utils.ErrUbOomProp
      Handlers.MemoryModules.FiniteAddresses
      Handlers.MemoryModules.InfiniteAddresses
      Handlers.MemoryModelImplementation.
@@ -7176,6 +7177,141 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       IS2.MEM.CP.CONC.concretize uv_fin dv_fin ->
       IS1.MEM.CP.CONC.concretize uv_inf (lift_dvalue_fin_inf dv_fin).
 
+  (* TODO: Move this *)
+  Lemma dvalue_convert_strict_fin_inf_succeeds_lift_dvalue_fin_inf :
+    forall x y,
+      DVCrev.dvalue_convert_strict x = NoOom y ->
+      lift_dvalue_fin_inf x = y.
+  Proof.
+    intros x y CONV.
+    unfold lift_dvalue_fin_inf.
+    break_match_goal.
+    clear Heqs.
+    rewrite CONV in e.
+    inv e; auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma dvalue_convert_strict_struct_map :
+    forall fields_fin res,
+      DVCrev.dvalue_convert_strict (DVALUE_Struct fields_fin) = NoOom res ->
+      res = (IS1.LP.Events.DV.DVALUE_Struct (map lift_dvalue_fin_inf fields_fin)).
+  Proof.
+    intros fields_fin res CONV.
+    rewrite DVCrev.dvalue_convert_strict_equation in CONV.
+    cbn in CONV.
+    break_match_hyp_inv.
+    apply map_monad_InT_oom_forall2 in Heqo.
+    apply Forall2_Forall2_HInT in Heqo.
+    induction Heqo.
+    - cbn. reflexivity.
+    - rewrite map_cons.
+      apply dvalue_convert_strict_fin_inf_succeeds_lift_dvalue_fin_inf in H.
+      rewrite H.
+      inv IHHeqo.
+      reflexivity.
+  Qed.
+
+  (* TODO: move / generalize these *)
+  Lemma map_monad_ErrUbOomProp_forall2 :
+    forall {A B} (f : A -> ErrUbOomProp B) l res,
+      @map_monad ErrUbOomProp Monad_ErrUbOomProp _ _ f l (ret res) <->
+        Forall2 (fun a b => f a (ret b)) l res.
+  Proof.
+    intros A B f.
+    induction l; intros res.
+    - split; intros MAP.
+      + cbn in *.
+        inv MAP.
+        auto.
+      + inv MAP.
+        reflexivity.
+    - split; intros MAP.
+      + rewrite map_monad_unfold in MAP.
+        cbn in MAP.
+        repeat red in MAP.
+        destruct MAP as (?&?&?&?&?).
+
+        cbn in H0.
+        destruct_err_ub_oom x; cbn in *; subst; inv H0.
+
+        destruct H1 as [[] | H1].
+        specialize (H1 x1 eq_refl).
+        repeat red in H1.
+        destruct H1 as (?&?&?&?&?).
+        cbn in H1.
+
+        destruct_err_ub_oom x; cbn in *; subst; inv H1;
+          rewrite <- H5 in H3; inv H3.
+
+        destruct H2 as [[] | H2].
+        specialize (H2 x3 eq_refl).
+        rewrite <- H2 in H5.
+        cbn in H5.
+        rewrite H2 in H5.
+        rewrite <- H2 in H4.
+        cbn in H4.
+        inv H4.
+
+        constructor.
+        2: {
+          apply IHl.
+          apply H0.
+        }
+
+        auto.
+      + inv MAP.
+        rewrite map_monad_unfold.
+        repeat red.
+        exists (ret y).
+        exists (fun x => ret (x :: l')).
+
+        apply IHl in H3.
+        split; eauto.
+        split; eauto.
+
+        right.
+        intros a0 H.
+        cbn in H; subst.
+        repeat red.
+        exists (ret l').
+        exists (fun l => ret (a0 :: l)).
+        split; eauto.
+        split; cbn; eauto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma map_monad_ErrUbOomProp_length :
+    forall {A B : Type} {xs : list A} {f : A -> ErrUbOomProp B} {res},
+      @map_monad ErrUbOomProp Monad_ErrUbOomProp A B f xs (ret res) ->
+      length xs = length res.
+  Proof.
+    intros A B xs f res MAP.
+    generalize dependent res.
+    induction xs; intros res MAP.
+    - cbn in *; inv MAP; reflexivity.
+    - rewrite map_monad_unfold in MAP.
+      repeat red in MAP.
+      destruct MAP as (?&?&?&?&?).
+      destruct_err_ub_oom x; subst; cbn in H0; inv H0.
+      destruct H1 as [[] | H1].
+      specialize (H1 x1 eq_refl).
+      repeat red in H1.
+      destruct H1 as (?&?&?&?&?).
+      destruct_err_ub_oom x; cbn in H1; rewrite <- H1 in H3; inv H3.
+      cbn in *.
+      destruct H2 as [[] | H2].
+      specialize (H2 _ eq_refl).
+      rewrite <- H2 in H1.
+      cbn in H1.
+      rewrite <- H2 in H5.
+      cbn in H5.
+      inv H5.
+      cbn.
+      apply IHxs in H0.
+      lia.
+  Qed.
+
   Lemma uvalue_concretize_strict_concretize_inclusion :
     forall uv_inf uv_fin,
       uvalue_refine_strict uv_inf uv_fin ->
@@ -7277,97 +7413,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       unfold uvalue_concretize_fin_inf_inclusion in H.
       apply map_monad_InT_oom_forall2 in Heqo.
 
-      Set Nested Proofs Allowed.
-
-      Import ErrUbOomProp.
-      (* TODO: Move *)
-      (* Lemma ErrUbOomProp_bind_success : *)
-      (*   forall {A B} (ma : ErrUbOomProp A) (k : A -> ErrUbOomProp B) b, *)
-      (*     (ma >>= k) (ret b) -> *)
-      (*     ((exists a, ma (ret a) /\ *)
-      (*            (k a) (ret b)) \/ (exists msg, (ma >>= k) (raise_ub msg))). *)
-      (* Proof. *)
-      (*   intros A B ma k b MA. *)
-      (*   repeat red in MA. *)
-      (*   destruct MA as (a&k'&MA&EQ&K).         *)
-      (*   repeat red in EQ. *)
-      (*   destruct_err_ub_oom a; cbn in *; try contradiction. *)
-      (*   - right. *)
-      (*     exists ub_x. *)
-      (*     repeat red. *)
-      (*     exists a. exists k'. *)
-      (*     subst; auto. *)
-      (*   -  *)
-      (* Qed. *)
-
-      (* TODO: move / generalize these *)
-      Lemma map_monad_ErrUbOomProp_forall2 :
-        forall {A B} (f : A -> ErrUbOomProp B) l res,
-          @map_monad ErrUbOomProp Monad_ErrUbOomProp _ _ f l (ret res) <->
-            Forall2 (fun a b => f a (ret b)) l res.
-      Proof.
-        intros A B f.
-        induction l; intros res.
-        - split; intros MAP.
-          + cbn in *.
-            inv MAP.
-            auto.
-          + inv MAP.
-            reflexivity.
-        - split; intros MAP.
-          + rewrite map_monad_unfold in MAP.
-            cbn in MAP.
-            repeat red in MAP.
-            destruct MAP as (?&?&?&?&?).
-
-            cbn in H0.
-            destruct_err_ub_oom x; cbn in *; subst; inv H0.
-
-            destruct H1 as [[] | H1].
-            specialize (H1 x1 eq_refl).
-            repeat red in H1.
-            destruct H1 as (?&?&?&?&?).
-            cbn in H1.
-
-            destruct_err_ub_oom x; cbn in *; subst; inv H1;
-              rewrite <- H5 in H3; inv H3.
-
-            destruct H2 as [[] | H2].
-            specialize (H2 x3 eq_refl).
-            rewrite <- H2 in H5.
-            cbn in H5.
-            rewrite H2 in H5.
-            rewrite <- H2 in H4.
-            cbn in H4.
-            inv H4.
-
-            constructor.
-            2: {
-              apply IHl.
-              apply H0.
-            }
-
-            auto.
-          + inv MAP.
-            rewrite map_monad_unfold.
-            repeat red.
-            exists (ret y).
-            exists (fun x => ret (x :: l')).
-
-            apply IHl in H3.
-            split; eauto.
-            split; eauto.
-
-            right.
-            intros a0 H.
-            cbn in H; subst.
-            repeat red.
-            exists (ret l').
-            exists (fun l => ret (a0 :: l)).
-            split; eauto.
-            split; cbn; eauto.
-      Qed.
-
       rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
       rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
@@ -7395,8 +7440,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         apply Util.Forall2_forall.
         split.
         - rewrite map_length.
-          (* map_monad_length lemma *)
-          admit.
+
+          apply map_monad_ErrUbOomProp_length in MAP.
+          apply Forall2_Forall2_HInT in Heqo.
+          apply Util.Forall2_length in Heqo.
+          congruence.
         - intros i a b NTH_fields NTH_res.
 
           apply Forall2_Forall2_HInT in Heqo.
@@ -7423,9 +7471,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       { unfold lift_dvalue_fin_inf at 2.
         break_match_goal.
         clear Heqs.
-        rewrite DVCrev.dvalue_convert_strict_equation in e.
-        cbn in e.
-        admit.
+
+        erewrite <- dvalue_convert_strict_struct_map; eauto.
       }
 
       right.
