@@ -258,7 +258,7 @@ Section REGISTER_OPERATIONS.
     #[global] Instance instr_use_sites {T} : Use_sites (instr T) :=
       {| use_sites := fun i => match i with
                           | INSTR_Op e => use_sites e
-                          | INSTR_Call e l => use_sites e +++ set_flat_map use_sites l
+                          | INSTR_Call e l _ => use_sites e +++ set_flat_map use_sites l
                           | INSTR_Alloca _ e _ 
                           | INSTR_Load _ _ e _ 
                             => use_sites e

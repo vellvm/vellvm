@@ -704,7 +704,7 @@ Definition is_void_typ (t:typ) : bool :=
 Definition is_void_instr (i:instr typ) : bool :=
   match i with
   | INSTR_Comment _ => true
-  | INSTR_Call (t,_) _ => is_void_typ t
+  | INSTR_Call (t,_) _ _ => is_void_typ t
   | INSTR_Store _ _ _ _ => true
   | _ => false
   end.

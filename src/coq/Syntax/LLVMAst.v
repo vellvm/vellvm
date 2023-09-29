@@ -304,7 +304,7 @@ Variant phi : Set :=
 Variant instr : Set :=
 | INSTR_Comment (msg:string)
 | INSTR_Op   (op:exp)                        (* INVARIANT: op must be of the form (OP_ ...) *)
-| INSTR_Call (fn:texp) (args:list texp)      (* CORNER CASE: return type is void treated specially *)
+| INSTR_Call (fn:texp) (args:list texp) (attr: list fn_attr)      (* CORNER CASE: return type is void treated specially *)
 | INSTR_Alloca (t:T) (nb: option texp) (align:option int)
 | INSTR_Load  (volatile:bool) (t:T) (ptr:texp) (align:option int)
 | INSTR_Store (volatile:bool) (val:texp) (ptr:texp) (align:option int)

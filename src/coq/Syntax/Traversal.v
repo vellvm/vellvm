@@ -133,7 +133,7 @@ Section Endo.
       fun ins =>
         match ins with
         | INSTR_Op op => INSTR_Op (endo op)
-        | INSTR_Call fn args => INSTR_Call (endo fn) (endo args)
+        | INSTR_Call fn args attrs => INSTR_Call (endo fn) (endo args) attrs
         | INSTR_Alloca t nb align =>
           INSTR_Alloca (endo t) (endo nb) align
         | INSTR_Load volatile t ptr align =>
@@ -446,7 +446,7 @@ Section TFunctor.
         match ins with
         | INSTR_Comment s => INSTR_Comment s
         | INSTR_Op op => INSTR_Op (tfmap f op) 
-        | INSTR_Call fn args => INSTR_Call  (tfmap f fn) (tfmap f args)
+        | INSTR_Call fn args attrs => INSTR_Call  (tfmap f fn) (tfmap f args) attrs
         | INSTR_Alloca t nb align => INSTR_Alloca (f t) (tfmap f nb) align
         | INSTR_Load volatile t ptr align => INSTR_Load volatile (f t) (tfmap f ptr) align
         | INSTR_Store volatile val ptr align => INSTR_Store volatile (tfmap f val) (tfmap f ptr) align

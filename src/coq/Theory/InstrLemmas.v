@@ -417,7 +417,7 @@ Qed.
 (* Qed. *)
 
 Lemma denote_instr_intrinsic :
-  forall i τ fn in_n sem_f args arg_vs conc_args res g l m,
+  forall i τ fn in_n sem_f args attrs arg_vs conc_args res g l m,
     @intrinsic_exp dtyp (EXP_Ident (ID_Global (Name fn))) = Some in_n
     ->
     assoc in_n (defs_assoc) = Some sem_f
@@ -432,7 +432,7 @@ Lemma denote_instr_intrinsic :
     ->
     sem_f conc_args = inr res
     ->
-    ⟦ (IId i, INSTR_Call (τ, EXP_Ident (ID_Global (Name fn))) args) ⟧i3 g l m
+    ⟦ (IId i, INSTR_Call (τ, EXP_Ident (ID_Global (Name fn))) args attrs) ⟧i3 g l m
     ≈
     Ret3 g (alist_add _ i (dvalue_to_uvalue res) l) m tt.
 Proof.

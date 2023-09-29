@@ -507,7 +507,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | (_, INSTR_Store _ _ _ _) => raise "ILL-FORMED itree ERROR: Store to non-void ID"
 
         (* Call *)
-        | (pt, INSTR_Call (dt, f) args) =>
+        | (pt, INSTR_Call (dt, f) args attrs) =>
           uvs <- map_monad (fun '(t, op) => (translate exp_to_instr (denote_exp (Some t) op))) args ;;
           returned_value <-
           match intrinsic_exp f with
@@ -516,7 +516,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             fmap dvalue_to_uvalue (trigger (Intrinsic dt s dvs))
           | None =>
             fv <- translate exp_to_instr (denote_exp None f) ;;
-            trigger (Call dt fv uvs [])
+            trigger (Call dt fv uvs attrs)
           end
           ;;
           match pt with
