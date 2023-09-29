@@ -404,7 +404,7 @@ and instr : Format.formatter -> (LLVMAst.typ LLVMAst.instr) -> unit =
 
   | INSTR_Op v -> inst_exp ppf v
 
-  | INSTR_Call (tv, tvl) ->
+  | INSTR_Call (tv, tvl, _) ->
      fprintf ppf "call %a(%a)"
              texp tv
              (pp_print_list ~pp_sep:pp_comma_space texp) tvl

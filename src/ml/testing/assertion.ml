@@ -102,7 +102,7 @@ let texp_to_function_name (_, exp) : string =
 (* | INSTR_Call of 't texp * 't texp list *)
 let instr_to_call_data instr =
   match instr with
-  | INSTR_Call (fn, args) ->
+  | INSTR_Call (fn, args, _) ->
      (texp_to_function_name fn, List.map texp_to_uvalue args)
   | _ -> failwith "Assertion includes unsupported instruction (must be a call)"
 
@@ -114,7 +114,7 @@ let texp_to_name_retty (texp : LLVMAst.typ texp) : DynamicTypes.dtyp * string =
 
 let instr_to_call_data' instr =
   match instr with
-  | INSTR_Call (fn, args) ->
+  | INSTR_Call (fn, args, _) ->
      let (t, fname) = texp_to_name_retty fn in
      (t, fname, List.map texp_to_uvalue args)
   | _ -> failwith "Assertion includes unsupported instruction (must be a call)"

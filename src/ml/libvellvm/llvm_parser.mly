@@ -991,7 +991,7 @@ exp:
   | KW_TAIL? KW_CALL cconv? list(param_attr) f=texp
     a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
     list(fn_attr)
-    { INSTR_Call (f, a) }
+    { INSTR_Call (f, a, []) }
 
   | KW_ALLOCA t=typ opt=preceded(COMMA, alloca_opt)?
     { let (n, a) = match opt with Some x -> x | None -> (None, None) in
@@ -1087,4 +1087,4 @@ test_call:
   | KW_TAIL? KW_CALL cconv? list(param_attr) f=texp
     a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
     list(fn_attr) EOF
-    { INSTR_Call (f, a) }
+    { INSTR_Call (f, a, []) }

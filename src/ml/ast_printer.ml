@@ -332,7 +332,7 @@ and instr : Format.formatter -> (LLVMAst.typ LLVMAst.instr) -> unit =
     inst_exp ppf v;
     pp_print_string ppf ")";
 
-  | INSTR_Call (tv, tvl) ->
+  | INSTR_Call (tv, tvl, _) ->
     fprintf ppf "(INSTR_Call %a [%a])"
              texp tv
              (pp_print_list ~pp_sep:pp_sc_space texp) tvl
