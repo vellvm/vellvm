@@ -7105,7 +7105,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     rewrite uvalue_refine_strict_equation in REF.
     eapply not_ex_all_not in NUNIQUE.
     apply NUNIQUE.
-  Admitted.
+  Abort.
 
 
 
@@ -7176,6 +7176,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     forall dv_fin,
       IS2.MEM.CP.CONC.concretize uv_fin dv_fin ->
       IS1.MEM.CP.CONC.concretize uv_inf (lift_dvalue_fin_inf dv_fin).
+
+  Definition uvalue_concretize_inf_fin_inclusion uv_inf uv_fin :=
+    forall dv_inf,
+      IS1.MEM.CP.CONC.concretize uv_inf dv_inf ->
+      exists dv_fin,
+        dvalue_refine_strict dv_inf dv_fin /\
+          IS2.MEM.CP.CONC.concretize uv_fin dv_fin.
 
   (* TODO: Move this *)
   Lemma dvalue_convert_strict_fin_inf_succeeds_lift_dvalue_fin_inf :
@@ -8506,219 +8513,71 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       admit.
   Admitted.
 
-  Lemma uvalue_refine_strict_unique_prop :
-    forall uv1 uv2,
-      uvalue_refine_strict uv1 uv2 ->
-      IS1.LLVM.D.unique_prop uv1 -> unique_prop uv2.
+  Lemma uvalue_concretize_strict_concretize_inclusion_inf_fin :
+    forall uv_inf uv_fin,
+      uvalue_refine_strict uv_inf uv_fin ->
+      uvalue_concretize_inf_fin_inclusion uv_inf uv_fin.
   Proof.
-    intros uv1 uv2 REF UNIQUE.
+  Admitted.
+
+  Lemma lift_dvalue_fin_inf_injective :
+    forall dv1 dv2,
+      lift_dvalue_fin_inf dv1 = lift_dvalue_fin_inf dv2 ->
+      dv1 = dv2.
+  Proof.
+    intros dv1 dv2 LIFT.
+    induction dv1.
+    - unfold lift_dvalue_fin_inf in *.
+      break_match_hyp; clear Heqs.
+      break_match_hyp_inv; clear Heqs.
+      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
+      break_match_hyp_inv.
+      (* TODO: Need to move dvalue_convert_strict_addr_inv *)
+      admit.
+  Admitted.
+
+  Lemma concretize_inf_concretize_fin :
+    forall uv_inf uv_fin dv_inf,
+      uvalue_refine_strict uv_inf uv_fin ->
+      IS1.LLVM.MEM.CP.CONC.concretize uv_inf dv_inf ->
+      (exists dv_fin, IS2.LLVM.MEM.CP.CONC.concretize uv_fin dv_fin) \/
+        (* Should actually only be OOM in concretization... *)
+        (forall dv_fin, ~ IS2.LLVM.MEM.CP.CONC.concretize uv_fin dv_fin).
+  Proof.
+  Admitted.
+
+  Lemma uvalue_refine_strict_unique_prop :
+    forall uv_inf uv_fin,
+      uvalue_refine_strict uv_inf uv_fin ->
+      IS1.LLVM.D.unique_prop uv_inf -> unique_prop uv_fin.
+  Proof.
+    intros uv_inf uv_fin REF UNIQUE_INF.
 
     unfold unique_prop.
-    unfold IS1.LLVM.D.unique_prop in UNIQUE.
-    destruct UNIQUE as [dv1 [CONC UNIQUE]].
+    unfold IS1.LLVM.D.unique_prop in UNIQUE_INF.
+    destruct UNIQUE_INF as [dv_inf [CONC UNIQUE_INF]].
 
-    Set Printing Implicit.
-    assert (IS2.MEM.CP.CONC.concretize = IS1.LLVM.MEM.CP.CONC.concretize).
     pose proof uvalue_concretize_strict_concretize_inclusion _ _ REF.
     red in H.
-    specialize (H _ CONC).
+    epose proof uvalue_concretize_strict_concretize_inclusion_inf_fin _ _ REF as ConcInfFin.
+    
+    pose proof hmmm.
+    specialize (H0 _ _ _ REF CONC).
+    destruct H0 as [(dv_fin & CONC_FIN) | CONC_FAIL].
+    2: {
+      (* This is NOT true *)
+      admit.
+    }
 
-  (*   split. *)
-  (*   { revert uv2 H. *)
-  (*     induction uv1 using IS1.LP.Events.DV.uvalue_ind'; intros uv2 REF [dv UNIQUE]; *)
-  (*       try *)
-  (*         solve *)
-  (*         [ *)
-  (*           red in REF; *)
-  (*           rewrite uvalue_convert_strict_equation in REF; *)
-  (*           cbn in REF; *)
-  (*           first [break_match_hyp; inv REF | inv REF]; *)
-  (*           eexists; *)
-  (*           intros dv0 CONC; *)
-  (*           do 2 red in CONC; *)
-  (*           rewrite concretize_uvalueM_equation in CONC; *)
-  (*           inv CONC; *)
-  (*           auto *)
-  (*         ]. *)
-
-  (*     { (* Undef will be a contradiction in most cases... *) *)
-  (* (*          Though not all *) *)
-  (*       admit. *)
-  (*     } *)
-
-  (*     { (* Struct nil *) *)
-  (*       red in REF; *)
-  (*         rewrite uvalue_convert_strict_equation in REF; *)
-  (*         cbn in REF; *)
-  (*         first [break_match_hyp; inv REF | inv REF]; *)
-  (*         eexists; *)
-  (*         intros dv0 CONC. *)
-  (*       do 2 red in CONC. *)
-  (*       rewrite concretize_uvalueM_equation in CONC. *)
-  (*       cbn in CONC. *)
-  (*       red in CONC. *)
-  (*       destruct CONC as [ma [k' [ARGS [CONC1 CONC2]]]]. *)
-  (*       destruct_err_ub_oom ma; inv ARGS; try contradiction. *)
-  (*       cbn in CONC2. *)
-  (*       cbn in CONC1. *)
-  (*       destruct CONC2 as [CONTRA | CONC2]; try contradiction. *)
-  (*       specialize (CONC2 [] eq_refl). *)
-  (*       set (k'_nil := k' []). *)
-  (*       destruct_err_ub_oom k'_nil; subst k'_nil; *)
-  (*         rewrite Hx in CONC2, CONC1; *)
-  (*         try contradiction. *)
-
-  (*       cbn in CONC1. *)
-  (*       inv CONC1. *)
-  (*       reflexivity. *)
-  (*     } *)
-
-  (*     { (* Structs *) *)
-  (*       admit. *)
-  (*     } *)
-
-  (*     { (* Packed struct nil *) *)
-  (*       red in REF; *)
-  (*         rewrite uvalue_convert_strict_equation in REF; *)
-  (*         cbn in REF; *)
-  (*         first [break_match_hyp; inv REF | inv REF]; *)
-  (*         eexists; *)
-  (*         intros dv0 CONC. *)
-  (*       do 2 red in CONC. *)
-  (*       rewrite concretize_uvalueM_equation in CONC. *)
-  (*       cbn in CONC. *)
-  (*       red in CONC. *)
-  (*       destruct CONC as [ma [k' [ARGS [CONC1 CONC2]]]]. *)
-  (*       destruct_err_ub_oom ma; inv ARGS; try contradiction. *)
-  (*       cbn in CONC2. *)
-  (*       cbn in CONC1. *)
-  (*       destruct CONC2 as [CONTRA | CONC2]; try contradiction. *)
-  (*       specialize (CONC2 [] eq_refl). *)
-  (*       set (k'_nil := k' []). *)
-  (*       destruct_err_ub_oom k'_nil; subst k'_nil; *)
-  (*         rewrite Hx in CONC2, CONC1; *)
-  (*         try contradiction. *)
-
-  (*       cbn in CONC1. *)
-  (*       inv CONC1. *)
-  (*       reflexivity. *)
-  (*     } *)
-
-  (*     { (* Packed structs *) *)
-  (*       admit. *)
-  (*     } *)
-
-  (*     { (* Array nil *) *)
-  (*       red in REF; *)
-  (*         rewrite uvalue_convert_strict_equation in REF; *)
-  (*         cbn in REF; *)
-  (*         first [break_match_hyp; inv REF | inv REF]; *)
-  (*         eexists; *)
-  (*         intros dv0 CONC. *)
-  (*       do 2 red in CONC. *)
-  (*       rewrite concretize_uvalueM_equation in CONC. *)
-  (*       cbn in CONC. *)
-  (*       red in CONC. *)
-  (*       destruct CONC as [ma [k' [ARGS [CONC1 CONC2]]]]. *)
-  (*       destruct_err_ub_oom ma; inv ARGS; try contradiction. *)
-  (*       cbn in CONC2. *)
-  (*       cbn in CONC1. *)
-  (*       destruct CONC2 as [CONTRA | CONC2]; try contradiction. *)
-  (*       specialize (CONC2 [] eq_refl). *)
-  (*       set (k'_nil := k' []). *)
-  (*       destruct_err_ub_oom k'_nil; subst k'_nil; *)
-  (*         rewrite Hx in CONC2, CONC1; *)
-  (*         try contradiction. *)
-
-  (*       cbn in CONC1. *)
-  (*       inv CONC1. *)
-  (*       reflexivity. *)
-  (*     } *)
-
-  (*     { (* Arrays *) *)
-  (*       admit. *)
-  (*     } *)
-
-  (*     { (* Vector nil *) *)
-  (*       red in REF; *)
-  (*         rewrite uvalue_convert_strict_equation in REF; *)
-  (*         cbn in REF; *)
-  (*         first [break_match_hyp; inv REF | inv REF]; *)
-  (*         eexists; *)
-  (*         intros dv0 CONC. *)
-  (*       do 2 red in CONC. *)
-  (*       rewrite concretize_uvalueM_equation in CONC. *)
-  (*       cbn in CONC. *)
-  (*       red in CONC. *)
-  (*       destruct CONC as [ma [k' [ARGS [CONC1 CONC2]]]]. *)
-  (*       destruct_err_ub_oom ma; inv ARGS; try contradiction. *)
-  (*       cbn in CONC2. *)
-  (*       cbn in CONC1. *)
-  (*       destruct CONC2 as [CONTRA | CONC2]; try contradiction. *)
-  (*       specialize (CONC2 [] eq_refl). *)
-  (*       set (k'_nil := k' []). *)
-  (*       destruct_err_ub_oom k'_nil; subst k'_nil; *)
-  (*         rewrite Hx in CONC2, CONC1; *)
-  (*         try contradiction. *)
-
-  (*       cbn in CONC1. *)
-  (*       inv CONC1. *)
-  (*       reflexivity. *)
-  (*     } *)
-
-  (*     { (* Vectors *) *)
-  (*       admit. *)
-  (*     } *)
-
-  (*     { (* IBinop *) *)
-  (*       red in REF; *)
-  (*         rewrite uvalue_convert_strict_equation in REF; *)
-  (*         cbn in REF. *)
-  (*       first [ *)
-  (*           break_match_hyp; inv REF; *)
-  (*           break_match_hyp; inv H0 *)
-  (*         | *)
-  (*           break_match_hyp; inv REF | inv REF]. *)
-
-  (*       red. *)
-  (*       eexists. *)
-  (*       intros dv0 CONC. *)
-
-  (*       do 2 red in CONC. *)
-  (*       rewrite concretize_uvalueM_equation in CONC. *)
-  (*       cbn in CONC. *)
-  (*       destruct CONC as [ma [k' [MA [CONC1 CONC2]]]]. *)
-  (*       destruct_err_ub_oom ma; subst; cbn in CONC1, CONC2. *)
-  (*       - (* OOM *) *)
-  (*         inv CONC1. *)
-  (*       - (* UB *) *)
-  (*         (* May be a contradiction with UNIQUE? *) *)
-  (*         rename dv into BLAH. *)
-  (*         admit. *)
-  (*       - (* Error *) *)
-  (*         admit. *)
-  (*       - (* Success *) *)
-  (*         destruct CONC2 as [[] | CONC2]. *)
-  (*         specialize (CONC2 ma0 eq_refl). *)
-  (*         red in CONC2. *)
-  (*         destruct CONC2 as [ma [k'0 CONC2]]. *)
-  (*         destruct CONC2 as [CONC2 [CONC2_EQV CONC2_RET]]. *)
-
-  (*         rewrite concretize_uvalueM_equation in CONC2. *)
-
-  (*       cbn in CONC2. *)
-  (*       cbn in CONC1. *)
-  (*       (* specialize (CONC2 [] eq_refl). *) *)
-  (*       (* set (k'_nil := k' []). *) *)
-  (*       (* destruct_err_ub_oom k'_nil; subst k'_nil; *) *)
-  (*       (*   rewrite Hx in CONC2, CONC1; *) *)
-  (*       (*   try contradiction. *) *)
-
-  (*       (* cbn in CONC1. *) *)
-  (*       (* inv CONC1. *) *)
-  (*       (* reflexivity. *) *)
-  (*       admit. *)
-  (*     } *)
+    exists dv_fin.
+    split; eauto.
+    intros dv H1.
+    apply H in H1, CONC_FIN.
+    apply UNIQUE_INF in H1, CONC_FIN.
+    subst.    
+    apply lift_dvalue_fin_inf_injective in H1;
+      subst; auto.
   Admitted.
 
   (* TODO: This may not actually be true...
