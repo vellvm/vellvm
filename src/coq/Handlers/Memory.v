@@ -319,9 +319,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         end; destruct Hguard; try done.
     Qed.
 
-    Definition mem_block    := IntMap SByte.
-    Inductive logical_block :=
-    | LBlock (size : N) (bytes : mem_block) (concrete_id : option Z) : logical_block.
+    Definition mem_block : Set := gmap Z SByte.
+
+    Inductive logical_block : Set :=
+    | LBlock (size : N) (bytes : gmap Z SByte) (concrete_id : option Z) : logical_block.
 
     (** ** Memory
       A concrete memory, resp. logical memory, maps addresses to concrete blocks, resp. logical blocks.
