@@ -7117,7 +7117,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   (*
     Definition uvalue_concretize_inf_fin_inclusion uv_inf uv_fin :=
-      forall dv_inf, concretize_inf uv_inf dv_inf ->
+      forall dv_inf,
+      uvalue-refine_strict uv_inf uv_fin ->
+      concretize_inf uv_inf dv_inf ->
       exists dv_fin,
         dvalue_refine_strict dv_inf dv_fin /\
         concretize_fin uv_fin dv_fin.
@@ -8537,20 +8539,227 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       admit.
   Admitted.
 
+  (* Could be the case that OOM happens...
+
+     If uv_inf is an IBinop, for instance...
+
+     64_bit_intmax + 1
+
+     Then the infinite concretization will produce a value, but the
+     finite concretization should OOM.
+   *)
   Lemma concretize_inf_concretize_fin :
     forall uv_inf uv_fin dv_inf,
       uvalue_refine_strict uv_inf uv_fin ->
       IS1.LLVM.MEM.CP.CONC.concretize uv_inf dv_inf ->
-      (exists dv_fin, IS2.LLVM.MEM.CP.CONC.concretize uv_fin dv_fin) \/
-        (* Should actually only be OOM in concretization... *)
-        (forall dv_fin, ~ IS2.LLVM.MEM.CP.CONC.concretize uv_fin dv_fin).
+      (exists dv_fin,
+          IS2.LLVM.MEM.CP.CONC.concretize uv_fin dv_fin) \/
+          (* Should actually only be OOM in concretization... *)
+          (forall dv_fin, ~ IS2.LLVM.MEM.CP.CONC.concretize uv_fin dv_fin).
   Proof.
+    induction uv_inf; 
+      intros uv_fin dv_inf REF CONC;
+      try
+        solve
+        [ left;
+          rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF;
+          cbn in REF; inv REF;
+
+          rewrite IS1.LLVM.MEM.CP.CONC.concretize_equation in CONC;
+          red in CONC;
+          rewrite IS1.LLVM.MEM.CP.CONC.concretize_uvalueM_equation in CONC;
+          cbn in CONC;
+          inv CONC;
+
+          eexists;
+          rewrite concretize_equation;
+          red;
+          rewrite concretize_uvalueM_equation;
+          cbn;
+          reflexivity
+        ].
+
+    { (* Addr *)
+      left.
+      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      cbn in REF.
+      break_match_hyp_inv.
+
+      rewrite IS1.LLVM.MEM.CP.CONC.concretize_equation in CONC.
+      red in CONC.
+      rewrite IS1.LLVM.MEM.CP.CONC.concretize_uvalueM_equation in CONC.
+      cbn in CONC.
+      inv CONC.
+
+      eexists.
+      rewrite concretize_equation.
+      red.
+      rewrite concretize_uvalueM_equation.
+      cbn.
+      reflexivity.
+    }
+
+    { (* Iptr *)
+      left.
+      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      cbn in REF.
+      break_match_hyp_inv.
+
+      rewrite IS1.LLVM.MEM.CP.CONC.concretize_equation in CONC.
+      red in CONC.
+      rewrite IS1.LLVM.MEM.CP.CONC.concretize_uvalueM_equation in CONC.
+      cbn in CONC.
+      inv CONC.
+
+      eexists.
+      rewrite concretize_equation.
+      red.
+      rewrite concretize_uvalueM_equation.
+      cbn.
+      reflexivity.
+    }
+
+    { (* Undef *)
+      pose proof REF as REF'.
+      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      cbn in REF; inv REF.
+
+      rewrite IS1.LLVM.MEM.CP.CONC.concretize_equation in CONC.
+      red in CONC.
+      rewrite IS1.LLVM.MEM.CP.CONC.concretize_uvalueM_equation in CONC.
+      cbn in CONC.
+
+      (* TODO: Move this *)
+      Lemma dtyp_inhabited_inf_fin :
+        forall dv_inf t,
+          IS1.LP.Events.DV.dvalue_has_dtyp dv_inf t ->
+          exists dv_fin,
+            dvalue_has_dtyp dv_fin t.
+      Proof.
+        intros dv_inf t DTYP.
+        induction DTYP;
+          try solve [eexists; constructor].
+        - exists (DVALUE_Poison t);
+          constructor; auto.
+        - exists (DVALUE_Oom t);
+            constructor; auto.
+        - admit.
+        - admit.
+        - admit.
+        - admit.
+      Admitted.
+
+      left.
+      pose proof dtyp_inhabited_inf_fin dv_inf t CONC as (dv&TYP).
+      exists dv.
+      rewrite concretize_equation.
+      red.
+      rewrite concretize_uvalueM_equation.
+      cbn.
+      auto.
+    }
+
+    { (* UVALUE_Struct *)
+      left.
+      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      cbn in REF.
+      break_match_hyp_inv.
+
+      rewrite IS1.LLVM.MEM.CP.CONC.concretize_equation in CONC.
+      red in CONC.
+      rewrite IS1.LLVM.MEM.CP.CONC.concretize_uvalueM_equation in CONC.
+      cbn in CONC.
+      inv CONC.
+
+      destruct H0 as (?&?&?&?).
+      destruct_err_ub_oom x; subst; cbn in H1; inv H1.
+      destruct H2 as [[] | H2].
+      specialize (H2 x1 eq_refl).
+      rewrite <- H2 in H4.
+      cbn in H4.
+      inv H4.
+
+      apply map_monad_InT_oom_forall2 in Heqo.
+      apply Forall2_Forall2_HInT in Heqo.
+      induction Heqo.
+      - cbn in H0. inv H0.
+        eexists.
+        rewrite concretize_equation.
+        red.
+        rewrite concretize_uvalueM_equation.
+        cbn.
+        repeat red.
+
+        exists (ret []).
+        exists (fun dv_inf => ret (DVALUE_Struct [])).
+        split; eauto.
+        split; cbn; eauto.
+
+        right.
+        intros a H0; subst.
+        reflexivity.
+      - rewrite map_monad_unfold in H0.
+        repeat red in H0.
+
+        destruct H0 as (?&?&?&?&?).
+        destruct_err_ub_oom x2; subst; cbn in H3; inv H3.
+        destruct H4 as [[] | H4].
+        specialize (H4 _ eq_refl).
+
+        repeat red in H4.
+        destruct H4 as (?&?&?&?&?).
+
+        rewrite <- H4 in H6.
+        destruct_err_ub_oom x2; subst; cbn in H6; inv H6.
+        destruct H5 as [[] | H5].
+        specialize (H5 _ eq_refl).
+        cbn in H5.
+        rewrite <- H5 in H8.
+        cbn in H8.
+        inv H8.
+
+        forward IHHeqo.
+        { intros u H7 uv_fin dv_inf H8 H9.
+          eapply H; eauto.
+          right; auto.
+        }
+
+        forward IHHeqo.
+        { admit.
+        }
+
+        destruct IHHeqo as (?&?).
+        rewrite concretize_equation in H6.
+        red in H6.
+        rewrite concretize_uvalueM_equation in H6.
+        cbn in H6.
+        repeat red in H6.
+        cbn in H4.
+        rewrite <- H5 in H4.
+        cbn in H4.
+
+        destruct H6 as (?&?&?&?).
+
+        eexists.
+        rewrite concretize_equation.
+        red.
+        rewrite concretize_uvalueM_equation.
+        cbn.
+        repeat red.
+
+        eexists.
+        eexists.
+
+        admit.
+    }
   Admitted.
 
   Lemma uvalue_refine_strict_unique_prop :
     forall uv_inf uv_fin,
       uvalue_refine_strict uv_inf uv_fin ->
-      IS1.LLVM.D.unique_prop uv_inf -> unique_prop uv_fin.
+      IS1.LLVM.D.unique_prop uv_inf ->
+      unique_prop uv_fin \/
+        forall dv_fin : dvalue, ~ concretize uv_fin dv_fin.
   Proof.
     intros uv_inf uv_fin REF UNIQUE_INF.
 
@@ -8562,14 +8771,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     red in H.
     epose proof uvalue_concretize_strict_concretize_inclusion_inf_fin _ _ REF as ConcInfFin.
     
-    pose proof hmmm.
+    pose proof concretize_inf_concretize_fin.
     specialize (H0 _ _ _ REF CONC).
-    destruct H0 as [(dv_fin & CONC_FIN) | CONC_FAIL].
-    2: {
-      (* This is NOT true *)
-      admit.
-    }
+    destruct H0 as [(dv_fin & CONC_FIN) | H0]; auto.
 
+    left.
     exists dv_fin.
     split; eauto.
     intros dv H1.
@@ -8578,7 +8784,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     subst.    
     apply lift_dvalue_fin_inf_injective in H1;
       subst; auto.
-  Admitted.
+  Qed.
 
   (* TODO: This may not actually be true...
 
@@ -9291,41 +9497,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn in *.
       inv H2; inv Heqs0.
       reflexivity.
-  Qed.
-
-  Lemma pickUnique_rutt_strict :
-    forall uv1 uv2,
-      uvalue_refine_strict uv1 uv2 ->
-      rutt (sum_prerel call_refine_strict event_refine_strict)
-        (sum_postrel call_res_refine_strict event_res_refine_strict) dvalue_refine_strict
-        (IS1.LLVM.D.pickUnique uv1) (pickUnique uv2).
-  Proof.
-    intros uv1 uv2 REF.
-    unfold IS1.LLVM.D.pickUnique, IS1.LLVM.D.concretize_or_pick.
-    unfold pickUnique, concretize_or_pick.
-    cbn.
-    break_match;
-      eapply uvalue_refine_strict_preserves_is_concrete with (uvc:=uv2) in Heqb; eauto;
-      rewrite Heqb.
-
-    apply lift_err_uvalue_to_dvalue_rutt_strict; auto.
-
-    repeat rewrite bind_trigger.
-    apply rutt_Vis.
-
-    { constructor.
-      cbn.
-      split; auto.
-      - apply uvalue_refine_strict_unique_prop; auto.
-    }
-
-    intros t1 t2 H.
-    apply rutt_Ret.
-    destruct t1 as [dv1 []].
-    destruct t2 as [dv2 []].
-    cbn in *.
-    inv H; subst_existT; cbn in *.
-    tauto.
   Qed.
 
   Lemma pickUnique_orutt_strict :
