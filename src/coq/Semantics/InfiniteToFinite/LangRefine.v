@@ -9090,6 +9090,300 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         inv H0.
         reflexivity.
     }
+
+    { (* Arrays *)
+      revert X.
+      induction elts; intros X.
+      - left.
+        exists (DVALUE_Array []).
+        rewrite concretize_equation;
+          red;
+          rewrite concretize_uvalueM_equation;
+          cbn; repeat red.
+
+        exists (ret []).
+        exists (fun elts => ret (DVALUE_Array elts)).
+        cbn.
+        split; eauto.
+      - pose proof (X a).
+        forward X0; [left; auto|].
+
+        destruct X0 as [CONC | NCONC].
+        2: {
+          right.
+          intros dv CONC.
+          rewrite concretize_equation in CONC;
+            red in CONC;
+            rewrite concretize_uvalueM_equation in CONC;
+            repeat red in CONC.
+          destruct CONC as (?&?&?&?&?).
+          destruct_err_ub_oom x; inv H0.
+          destruct H1 as [[] | H1].
+          rewrite map_monad_unfold in H.
+          repeat red in H.
+          destruct H as (?&?&?&?&?).
+          destruct_err_ub_oom x; inv H0.
+          apply NCONC in H.
+          auto.
+        }
+
+        (* Concretizing the first element was successful, what about the
+           rest?
+         *)
+
+        forward IHelts.
+        { intros u X0.
+          eapply X.
+          right; auto.
+        }
+
+        destruct IHelts as [ELTS_CONC | ELTS_NCONC].
+        2: {
+          right.
+          intros dv CONC'.
+          rewrite concretize_equation in CONC';
+            red in CONC';
+            rewrite concretize_uvalueM_equation in CONC';
+            repeat red in CONC'.
+          destruct CONC' as (?&?&?&?&?).
+          destruct_err_ub_oom x; inv H0.
+          destruct H1 as [[] | H1].
+          rewrite map_monad_unfold in H.
+          repeat red in H.
+          destruct H as (?&?&?&?&?).
+          destruct_err_ub_oom x; inv H0.
+
+          destruct H2 as [[] | H2].
+          specialize (H2 _ eq_refl).
+          repeat red in H2.
+          destruct H2 as (?&?&?&?&?).
+
+          specialize (H1 _ eq_refl).
+          inv H1.
+          remember (x2 x3) as x2x3.
+          destruct_err_ub_oom x2x3; inv H5.
+          remember (x0 x1) as x0x1.
+          destruct_err_ub_oom x0x1; inv H3.
+          destruct_err_ub_oom x; inv H2.
+          destruct H4 as [[] | H4].
+          specialize (H4 _ eq_refl).
+          inv H4.
+          rewrite <- H2 in H3.
+          inv H3.
+
+          eapply ELTS_NCONC.
+          rewrite concretize_equation;
+            red;
+            rewrite concretize_uvalueM_equation;
+            repeat red.
+
+          exists (ret x5).
+          exists (fun elts => ret (DVALUE_Array elts)).
+          split; eauto.
+          split; cbn; eauto.
+        }
+        
+        left.
+        destruct CONC as [a' CONC].
+        destruct ELTS_CONC as [elts' ELTS_CONC].
+
+        rewrite concretize_equation in ELTS_CONC;
+          red in ELTS_CONC;
+          rewrite concretize_uvalueM_equation in ELTS_CONC;
+          repeat red in ELTS_CONC.
+
+        destruct ELTS_CONC as (?&?&?&?&?).
+        destruct_err_ub_oom x; inv H0.
+        destruct H1 as [[] | H1].
+
+        exists (DVALUE_Array (a' :: x1)).
+
+        rewrite concretize_equation;
+          red;
+          rewrite concretize_uvalueM_equation;
+          repeat red.
+
+        exists (ret (a' :: x1)).
+        exists (fun elts => ret (DVALUE_Array elts)).
+
+        split.
+        { rewrite map_monad_unfold.
+          repeat red.
+          exists (ret a').
+          exists (fun _ => ret (a' :: x1)).
+          split; eauto.
+          split; eauto.
+
+          right.
+          intros a0 H0.
+          inv H0.
+          repeat red.
+          exists (ret x1).
+          exists (fun _ => ret (a0 :: x1)).
+          split; eauto.
+          split; eauto.
+
+          right.
+          intros a1 H0.
+          inv H0.
+          cbn.
+          reflexivity.
+        }
+
+        split; eauto.
+
+        right.
+        intros a0 H0.
+        inv H0.
+        reflexivity.
+    }
+
+    { (* Vectors *)
+      revert X.
+      induction elts; intros X.
+      - left.
+        exists (DVALUE_Vector []).
+        rewrite concretize_equation;
+          red;
+          rewrite concretize_uvalueM_equation;
+          cbn; repeat red.
+
+        exists (ret []).
+        exists (fun elts => ret (DVALUE_Vector elts)).
+        cbn.
+        split; eauto.
+      - pose proof (X a).
+        forward X0; [left; auto|].
+
+        destruct X0 as [CONC | NCONC].
+        2: {
+          right.
+          intros dv CONC.
+          rewrite concretize_equation in CONC;
+            red in CONC;
+            rewrite concretize_uvalueM_equation in CONC;
+            repeat red in CONC.
+          destruct CONC as (?&?&?&?&?).
+          destruct_err_ub_oom x; inv H0.
+          destruct H1 as [[] | H1].
+          rewrite map_monad_unfold in H.
+          repeat red in H.
+          destruct H as (?&?&?&?&?).
+          destruct_err_ub_oom x; inv H0.
+          apply NCONC in H.
+          auto.
+        }
+
+        (* Concretizing the first element was successful, what about the
+           rest?
+         *)
+
+        forward IHelts.
+        { intros u X0.
+          eapply X.
+          right; auto.
+        }
+
+        destruct IHelts as [ELTS_CONC | ELTS_NCONC].
+        2: {
+          right.
+          intros dv CONC'.
+          rewrite concretize_equation in CONC';
+            red in CONC';
+            rewrite concretize_uvalueM_equation in CONC';
+            repeat red in CONC'.
+          destruct CONC' as (?&?&?&?&?).
+          destruct_err_ub_oom x; inv H0.
+          destruct H1 as [[] | H1].
+          rewrite map_monad_unfold in H.
+          repeat red in H.
+          destruct H as (?&?&?&?&?).
+          destruct_err_ub_oom x; inv H0.
+
+          destruct H2 as [[] | H2].
+          specialize (H2 _ eq_refl).
+          repeat red in H2.
+          destruct H2 as (?&?&?&?&?).
+
+          specialize (H1 _ eq_refl).
+          inv H1.
+          remember (x2 x3) as x2x3.
+          destruct_err_ub_oom x2x3; inv H5.
+          remember (x0 x1) as x0x1.
+          destruct_err_ub_oom x0x1; inv H3.
+          destruct_err_ub_oom x; inv H2.
+          destruct H4 as [[] | H4].
+          specialize (H4 _ eq_refl).
+          inv H4.
+          rewrite <- H2 in H3.
+          inv H3.
+
+          eapply ELTS_NCONC.
+          rewrite concretize_equation;
+            red;
+            rewrite concretize_uvalueM_equation;
+            repeat red.
+
+          exists (ret x5).
+          exists (fun elts => ret (DVALUE_Vector elts)).
+          split; eauto.
+          split; cbn; eauto.
+        }
+        
+        left.
+        destruct CONC as [a' CONC].
+        destruct ELTS_CONC as [elts' ELTS_CONC].
+
+        rewrite concretize_equation in ELTS_CONC;
+          red in ELTS_CONC;
+          rewrite concretize_uvalueM_equation in ELTS_CONC;
+          repeat red in ELTS_CONC.
+
+        destruct ELTS_CONC as (?&?&?&?&?).
+        destruct_err_ub_oom x; inv H0.
+        destruct H1 as [[] | H1].
+
+        exists (DVALUE_Vector (a' :: x1)).
+
+        rewrite concretize_equation;
+          red;
+          rewrite concretize_uvalueM_equation;
+          repeat red.
+
+        exists (ret (a' :: x1)).
+        exists (fun elts => ret (DVALUE_Vector elts)).
+
+        split.
+        { rewrite map_monad_unfold.
+          repeat red.
+          exists (ret a').
+          exists (fun _ => ret (a' :: x1)).
+          split; eauto.
+          split; eauto.
+
+          right.
+          intros a0 H0.
+          inv H0.
+          repeat red.
+          exists (ret x1).
+          exists (fun _ => ret (a0 :: x1)).
+          split; eauto.
+          split; eauto.
+
+          right.
+          intros a1 H0.
+          inv H0.
+          cbn.
+          reflexivity.
+        }
+
+        split; eauto.
+
+        right.
+        intros a0 H0.
+        inv H0.
+        reflexivity.
+    }
   Qed.
 
   Lemma concretize_fails_inf_fin :
@@ -9170,7 +9464,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           repeat red.
 
         exists (ret []).
-        exists (fun fields => ret (IS1.LP.Events.DV.DVALUE_Packed_struct fields)).
+        exists (fun elts => ret (IS1.LP.Events.DV.DVALUE_Packed_struct elts)).
 
         cbn.
         split; eauto.
