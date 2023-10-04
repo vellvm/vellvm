@@ -416,43 +416,6 @@ Qed.
 (*   step; reflexivity. *)
 (* Qed. *)
 
-Lemma denote_instr_intrinsic :
-  forall i τ fn in_n sem_f args attrs arg_vs conc_args res g l m,
-    @intrinsic_exp dtyp (EXP_Ident (ID_Global (Name fn))) = Some in_n
-    ->
-    assoc in_n (defs_assoc) = Some sem_f
-    ->
-    ℑ3 (map_monad (fun '(t, op) => translate exp_to_instr ⟦ op at t ⟧e) args) g l m
-    ≈
-    Ret3 g l m arg_vs
-    ->
-    ℑ3 (map_monad (fun uv : uvalue => pickUnique uv) arg_vs) g l m
-    ≈
-    Ret3 g l m conc_args
-    ->
-    sem_f conc_args = inr res
-    ->
-    ⟦ (IId i, INSTR_Call (τ, EXP_Ident (ID_Global (Name fn))) args attrs) ⟧i3 g l m
-    ≈
-    Ret3 g (alist_add _ i (dvalue_to_uvalue res) l) m tt.
-Proof.
-  intros * INTRINSIC ASSOC MAP CONCARGS RES.
-
-  cbn.
-  go.
-  rewrite MAP.
-  go.
-  cbn in *.
-  rewrite INTRINSIC.
-  go.
-  rewrite CONCARGS.
-  unfold ITree.map; go.
-  rewrite interp_cfg3_intrinsic; eauto.
-  go.
-  step.
-  reflexivity.
-Qed.
-
 Lemma denote_term_br_l :
   forall (e : exp dtyp) b1 b2 g l l' m,
     ⟦ e at DTYPE_I 1 ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_I1 one) ->

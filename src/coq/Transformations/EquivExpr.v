@@ -101,11 +101,12 @@ Section ExpOptim.
             reflexivity.
           * intro3.
             rewrite !interp_cfg3_bind; apply eutt_clo_bind with (UU := eq).
-            rewrite opt_respect_int.
+            { unfold endo, opt_exp_endo_exp. apply opt_correct. }
+            intros; subst.
             unfold endo, opt_exp_endo_exp.
-            break_match_goal; [reflexivity |].
-            rewrite !interp_cfg3_bind, opt_correct; reflexivity.
-            intro3.
+
+            (* break_match_goal; [reflexivity |]. *)
+            destruct u2 as (?&?&(?&?)). unfold Endo_id.
             reflexivity.
         + destruct fn.
           simpl.
@@ -122,10 +123,8 @@ Section ExpOptim.
             reflexivity.
           * intro3.
             rewrite !interp_cfg3_bind; apply eutt_clo_bind with (UU := eq).
-            rewrite opt_respect_int.
             unfold endo, opt_exp_endo_exp.
-            break_match_goal; [reflexivity |].
-            rewrite !interp_cfg3_bind, opt_correct; reflexivity.
+            rewrite ?interp_cfg3_bind, opt_correct; reflexivity.
             intro3.
             reflexivity.
       - destruct x; cbn; try reflexivity.

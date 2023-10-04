@@ -509,16 +509,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         (* Call *)
         | (pt, INSTR_Call (dt, f) args attrs) =>
           uvs <- map_monad (fun '(t, op) => (translate exp_to_instr (denote_exp (Some t) op))) args ;;
-          returned_value <-
-          match intrinsic_exp f with
-          | Some s =>
-            dvs <- map_monad (fun uv => pickUnique uv) uvs ;;
-            fmap dvalue_to_uvalue (trigger (Intrinsic dt s dvs))
-          | None =>
-            fv <- translate exp_to_instr (denote_exp None f) ;;
-            trigger (Call dt fv uvs attrs)
-          end
-          ;;
+          fv <- translate exp_to_instr (denote_exp None f) ;;
+          returned_value <- trigger (Call dt fv uvs attrs) ;;
           match pt with
           | IVoid _ => ret tt
           | IId id  => trigger (LocalWrite id returned_value)
