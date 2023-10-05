@@ -8038,12 +8038,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Admitted.
 
   Lemma eval_int_icmp_fin_inf :
-    forall icmp a b,
-      DVCrev.dvalue_convert_strict (@eval_int_icmp Z VellvmIntegers.VMemInt_Z icmp a b) =
+    forall {Int} {VMInt : VellvmIntegers.VMemInt Int} icmp a b,
+      DVCrev.dvalue_convert_strict (@eval_int_icmp Int VMInt icmp a b) =
         NoOom
-          (@IS1.LP.Events.DV.eval_int_icmp Z VellvmIntegers.VMemInt_Z icmp a b).
+          (@IS1.LP.Events.DV.eval_int_icmp Int VMInt icmp a b).
   Proof.
-    intros icmp a b.
+    intros Int VMInt icmp a b.
     unfold eval_int_icmp, IS1.LP.Events.DV.eval_int_icmp.
     destruct icmp;
       try solve
@@ -8068,7 +8068,42 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     intros dv1_fin dv2_fin res_fin icmp dv1_inf dv2_inf EVAL LIFT1 LIFT2.
     unfold eval_icmp in EVAL.
     (* Nasty case analysis... *)
-    break_match_hyp_inv.
+    break_match_hyp_inv;
+      try solve
+        [ (* Simple integer cases *)
+          break_match_hyp_inv;
+          [ unfold lift_dvalue_fin_inf;
+
+            break_match_goal; clear Heqs;
+            rewrite DVCrev.dvalue_convert_strict_equation in e;
+            cbn in *; inv e;
+
+            break_match_goal; clear Heqs;
+            rewrite DVCrev.dvalue_convert_strict_equation in e;
+            cbn in *; inv e;
+
+            break_match_goal; clear Heqs;
+            cbn;
+
+            rewrite eval_int_icmp_fin_inf in e; inv e;
+            reflexivity
+          | unfold lift_dvalue_fin_inf;
+
+            break_match_goal; clear Heqs;
+            rewrite DVCrev.dvalue_convert_strict_equation in e;
+            cbn in *; inv e;
+
+            break_match_goal; clear Heqs;
+            rewrite DVCrev.dvalue_convert_strict_equation in e;
+            cbn in *; inv e;
+
+            cbn;
+            reflexivity
+          ]
+        | (* Ill-typed cases *)
+          break_match_hyp_inv
+        ].
+    
     { (* dv1: addr *)
       break_match_hyp_inv.
       unfold lift_dvalue_fin_inf.
@@ -8093,7 +8128,45 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       reflexivity.
     }
 
-  Qed.
+    { (* dv1: iptr *)
+      break_match_hyp_inv.
+      unfold lift_dvalue_fin_inf.
+
+      break_match_goal; clear Heqs.
+      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in *.
+      break_match_hyp_inv.
+
+      break_match_goal; clear Heqs.
+      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in *.
+      break_match_hyp_inv.
+
+      break_match_goal; clear Heqs.
+      cbn.
+
+      (* TODO: Annoying intptr differences... *)
+      (* NOTE: different implicit arguments *)
+      rewrite eval_int_icmp_fin_inf in e; inv e.
+      admit.
+    }
+
+    { (* dv1: poison *)
+      break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+
+        break_match_goal; clear Heqs;
+        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in *; inv e;
+
+        break_match_goal; clear Heqs;
+        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in *; inv e;
+
+        cbn;
+        reflexivity.
+    }
+  Admitted.
 
   Lemma uvalue_concretize_strict_concretize_inclusion :
     forall uv_inf uv_fin,
