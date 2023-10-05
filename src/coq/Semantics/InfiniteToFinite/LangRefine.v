@@ -8621,7 +8621,69 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       eapply eval_iop_fin_inf; eauto.
     - (* ICmp *)
-      admit.
+      red; intros dv_fin CONC_FIN.
+      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      cbn in REF.
+      break_match_hyp_inv.
+      break_match_hyp_inv.
+
+      unfold uvalue_concretize_fin_inf_inclusion in IHuv_inf1, IHuv_inf2.
+
+      specialize (IHuv_inf1 u Heqo).
+      specialize (IHuv_inf2 u0 Heqo0).
+
+      rewrite IS1.MEM.CP.CONC.concretize_equation.
+      red.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+
+      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
+      red in CONC_FIN.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
+
+      repeat red in CONC_FIN.
+      destruct CONC_FIN as (?&?&?&?&?).
+      destruct_err_ub_oom x; cbn in H0; inv H0.
+      destruct H1 as [[] | H1].
+      specialize (H1 _ eq_refl).
+      cbn in H1.
+      repeat red in H1.
+      destruct H1 as (?&?&?&?&?).
+      destruct_err_ub_oom x; cbn in H1; rewrite <- H1 in H3; inv H3.
+      destruct H2 as [[] | H2].
+      specialize (H2 _ eq_refl).
+      rewrite <- H2 in H5, H1.
+
+      remember (eval_icmp cmp0 x1 x3) as x1x3.
+      destruct_err_ub_oom x1x3; inv H5.
+      cbn in H1.
+
+      apply IHuv_inf1 in H.
+      apply IHuv_inf2 in H0.
+
+      repeat red.
+      exists (ret (lift_dvalue_fin_inf x1)).
+      exists (fun dv_inf => (fmap lift_dvalue_fin_inf (x0 x1))).
+      cbn.
+      rewrite <- H1.
+      cbn.
+      split; eauto.
+      split; eauto.
+
+      right.
+      intros a H3.
+      repeat red.
+      exists (ret (lift_dvalue_fin_inf x3)).
+      exists (fun dv_inf => (fmap lift_dvalue_fin_inf (x2 x3))).
+      cbn.
+      rewrite <- H2.
+      cbn.
+      split; eauto.
+      split; eauto.
+
+      right.
+      intros a0 H4.
+
+      eapply eval_icmp_fin_inf; eauto.
     - (* FBinop *)
       admit.
     - (* Conversion *)
