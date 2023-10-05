@@ -157,7 +157,7 @@ Proof.
       constructor; eauto.
 Qed.
 
-Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) (ACS : AddrConvertSafe IS2.LP.ADDR IS1.LP.ADDR AC2 AC1) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC).
+Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS1.LP.PTOI IS2.LP.ADDR IS2.LP.PTOI) (AC2 : AddrConvert IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) (ACS : AddrConvertSafe IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI AC2 AC1) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC).
   Import TLR.
 
   Import TC.
@@ -8037,6 +8037,21 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Admitted.
 
+  Lemma eval_int_icmp_fin_inf :
+    forall icmp a b,
+      DVCrev.dvalue_convert_strict (@eval_int_icmp Z VellvmIntegers.VMemInt_Z icmp a b) =
+        NoOom
+          (@IS1.LP.Events.DV.eval_int_icmp Z VellvmIntegers.VMemInt_Z icmp a b).
+  Proof.
+    intros icmp a b.
+    unfold eval_int_icmp, IS1.LP.Events.DV.eval_int_icmp.
+    destruct icmp;
+      try solve
+        [ break_match_goal;
+          rewrite DVCrev.dvalue_convert_strict_equation; auto
+        ].
+  Qed.
+
   (* TODO: Move this / generalize monad? *)
   Lemma eval_icmp_fin_inf :
     forall dv1_fin dv2_fin res_fin icmp dv1_inf dv2_inf,
@@ -8071,35 +8086,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       break_match_goal; clear Heqs.
       cbn.
 
-      Set Nested Proofs Allowed.
+      erewrite AC2.addr_convert_ptoi in e; eauto.
+      erewrite AC2.addr_convert_ptoi in e; eauto.
 
-      (* May need a lemma like this in AddrConvert... *)
-      Lemma fin_inf_ptr_to_int :
-        forall addr_fin addr_inf,
-          AC2.addr_convert addr_fin = NoOom addr_inf ->
-          PTOI.ptr_to_int addr_fin = IS1.LP.PTOI.ptr_to_int addr_inf.
-      Proof.
-        intros addr_fin addr_inf CONV.
-        destruct addr_fin.
-      Qed.
-      .
-
-      
-      Lemma eval_int_icmp_fin_inf :
-        forall icmp a b res,
-          DVCrev.dvalue_convert_strict (eval_int_icmp icmp a b) = NoOom res ->
-            IS1.MEM.CP.CONC.eval_icmp icmp x x0 = ret x1
-
-      Proof.
-        intros icmp a b res.
-        unfold eval_int_icmp.
-        break_match_goal.
-      Qed.
-
-      cbn.
-      cbn.
-      unfold IS1.MEM.CP.CONC.eval_icmp.
-      cbn.
+      rewrite eval_int_icmp_fin_inf in e; inv e.
+      reflexivity.
     }
 
   Qed.
@@ -13323,7 +13314,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 End LangRefine.
 
 Module MakeLangRefine
-  (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) (ACS : AddrConvertSafe IS2.LP.ADDR IS1.LP.ADDR AC2 AC1) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC) : LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR IPS ACS DVC DVCrev EC TC.
+  (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS1.LP.PTOI IS2.LP.ADDR IS2.LP.PTOI) (AC2 : AddrConvert IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) (ACS : AddrConvertSafe IS2.LP.ADDR IS1.LP.ADDR AC2 AC1) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC) : LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR IPS ACS DVC DVCrev EC TC.
   Include LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR IPS ACS DVC DVCrev EC TC.
 End MakeLangRefine.
 
