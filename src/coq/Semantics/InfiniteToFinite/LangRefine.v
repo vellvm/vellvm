@@ -8823,6 +8823,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn in CONC.
 
       (* TODO: Move this *)
+      Set Nested Proofs Allowed.
       Lemma dtyp_inhabited_inf_fin :
         forall dv_inf t,
           IS1.LP.Events.DV.dvalue_has_dtyp dv_inf t ->
@@ -10344,7 +10345,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       auto.
     }
 
-
     { (* ICmp *)
       rewrite uvalue_refine_strict_equation,
         uvalue_convert_strict_equation in REF;
@@ -10377,7 +10377,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       remember (x2 x3) as x2x3.
       destruct_err_ub_oom x2x3; inv H4.
 
-      pose proof (eval_iop_fin_inf _ _ _ _ _ _ H2 eq_refl eq_refl) as EVAL.
+      pose proof (eval_icmp_fin_inf _ _ _ _ _ _ H2 eq_refl eq_refl) as EVAL.
 
       eapply FAILS.
 
@@ -10387,7 +10387,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         repeat red.
 
       exists (ret (lift_dvalue_fin_inf x1)).
-      exists (fun _ => IS1.LP.Events.DV.eval_iop iop (lift_dvalue_fin_inf x1) (lift_dvalue_fin_inf x3)).
+      exists (fun _ => IS1.MEM.CP.CONC.eval_icmp cmp0 (lift_dvalue_fin_inf x1) (lift_dvalue_fin_inf x3)).
 
       split; eauto.
       split.
@@ -10400,7 +10400,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       repeat red.
       exists (ret (lift_dvalue_fin_inf x3)).
-      exists (fun _ => IS1.LP.Events.DV.eval_iop iop (lift_dvalue_fin_inf x1) (lift_dvalue_fin_inf x3)).
+      exists (fun _ => IS1.MEM.CP.CONC.eval_icmp cmp0 (lift_dvalue_fin_inf x1) (lift_dvalue_fin_inf x3)).
 
       split; eauto.
       split; cbn; eauto.
