@@ -10779,7 +10779,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       remember (x2 x3) as x2x3.
       destruct_err_ub_oom x2x3; inv H4.
 
-      pose proof (eval_icmp_fin_inf _ _ _ _ _ _ H2 eq_refl eq_refl) as EVAL.
+      pose proof (eval_fcmp_fin_inf _ _ _ _ _ _ H2 eq_refl eq_refl) as EVAL.
 
       eapply FAILS.
 
@@ -10789,7 +10789,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         repeat red.
 
       exists (ret (lift_dvalue_fin_inf x1)).
-      exists (fun _ => IS1.MEM.CP.CONC.eval_icmp cmp0 (lift_dvalue_fin_inf x1) (lift_dvalue_fin_inf x3)).
+      exists (fun _ => IS1.LP.Events.DV.eval_fcmp cmp0 (lift_dvalue_fin_inf x1) (lift_dvalue_fin_inf x3)).
 
       split; eauto.
       split.
@@ -10802,7 +10802,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       repeat red.
       exists (ret (lift_dvalue_fin_inf x3)).
-      exists (fun _ => IS1.MEM.CP.CONC.eval_icmp cmp0 (lift_dvalue_fin_inf x1) (lift_dvalue_fin_inf x3)).
+      exists (fun _ => IS1.LP.Events.DV.eval_fcmp cmp0 (lift_dvalue_fin_inf x1) (lift_dvalue_fin_inf x3)).
 
       split; eauto.
       split; cbn; eauto.
