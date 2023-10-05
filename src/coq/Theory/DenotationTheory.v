@@ -16,10 +16,12 @@ From ITree Require Import
 
 From Vellvm Require Import
      Utilities
+     Handlers
      Syntax
-     Semantics
      Syntax.ScopeTheory
-     Utils.PostConditions.
+     Utils.PostConditions
+     Semantics.InterpretationStack
+     Semantics.LLVMEvents.
 
 #[export] Remove Hints Eqv.EqvWF_Build : typeclass_instances.
 
