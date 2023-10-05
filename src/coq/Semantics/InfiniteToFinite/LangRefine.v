@@ -8277,6 +8277,163 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Qed.
 
+  Lemma double_cmp_fin_inf :
+    forall fcmp a b res_fin res_inf,
+      double_cmp fcmp a b = res_fin ->
+      DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
+      IS1.LP.Events.DV.double_cmp fcmp a b = res_inf.
+  Proof.
+    intros fcmp a b res_fin res_inf EVAL REF.
+    destruct fcmp; cbn in *; subst;
+      rewrite DVCrev.dvalue_convert_strict_equation in REF;
+      inv REF; auto;
+      solve
+        [ unfold double_cmp, IS1.LP.Events.DV.double_cmp in *;
+          repeat break_match_hyp_inv; auto;
+          setoid_rewrite Heqb0; reflexivity
+        ].
+  Qed.
+
+  Lemma float_cmp_fin_inf :
+    forall fcmp a b res_fin res_inf,
+      float_cmp fcmp a b = res_fin ->
+      DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
+      IS1.LP.Events.DV.float_cmp fcmp a b = res_inf.
+  Proof.
+    intros fcmp a b res_fin res_inf EVAL REF.
+    destruct fcmp; cbn in *; subst;
+      rewrite DVCrev.dvalue_convert_strict_equation in REF;
+      inv REF; auto;
+      solve
+        [ unfold float_cmp, IS1.LP.Events.DV.float_cmp in *;
+          repeat break_match_hyp_inv; auto;
+          setoid_rewrite Heqb0; reflexivity
+        ].
+  Qed.
+
+  (* TODO: Move this / generalize monad? *)
+  Lemma eval_fcmp_fin_inf :
+    forall dv1_fin dv2_fin res_fin fcmp dv1_inf dv2_inf,
+      @eval_fcmp err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        fcmp dv1_fin dv2_fin = ret res_fin ->
+      lift_dvalue_fin_inf dv1_fin = dv1_inf ->
+      lift_dvalue_fin_inf dv2_fin = dv2_inf ->
+      @IS1.LP.Events.DV.eval_fcmp err_ub_oom
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        fcmp dv1_inf dv2_inf = ret (lift_dvalue_fin_inf res_fin).
+  Proof.
+    intros dv1_fin dv2_fin res_fin fcmp dv1_inf dv2_inf EVAL LIFT1 LIFT2.
+    unfold eval_fcmp in EVAL.
+    (* Nasty case analysis... *)
+    break_match_hyp_inv;
+      try solve
+        [ (* Simple integer cases *)
+          break_match_hyp_inv;
+          [ unfold lift_dvalue_fin_inf;
+
+            break_match_goal; clear Heqs;
+            rewrite DVCrev.dvalue_convert_strict_equation in e;
+            cbn in *; inv e;
+
+            break_match_goal; clear Heqs;
+            rewrite DVCrev.dvalue_convert_strict_equation in e;
+            cbn in *; inv e;
+
+            break_match_goal; clear Heqs;
+            cbn;
+
+            rewrite eval_int_icmp_fin_inf in e; inv e;
+            reflexivity
+          | unfold lift_dvalue_fin_inf;
+
+            break_match_goal; clear Heqs;
+            rewrite DVCrev.dvalue_convert_strict_equation in e;
+            cbn in *; inv e;
+
+            break_match_goal; clear Heqs;
+            rewrite DVCrev.dvalue_convert_strict_equation in e;
+            cbn in *; inv e;
+
+            cbn;
+            reflexivity
+          ]
+        | (* Ill-typed cases *)
+          break_match_hyp_inv
+        ].
+
+    { (* dv1: Double *)
+      break_match_hyp_inv.
+      unfold lift_dvalue_fin_inf.
+
+      break_match_goal; clear Heqs.
+      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in *; inv e.
+
+      break_match_goal; clear Heqs.
+      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in *; inv e.
+
+      break_match_goal; clear Heqs.
+      cbn.
+
+      erewrite double_cmp_fin_inf; eauto.
+      unfold lift_dvalue_fin_inf.
+      break_match_goal; clear Heqs.
+      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in *; inv e.
+
+      break_match_goal; clear Heqs.
+      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in *; inv e.
+      reflexivity.
+    }
+
+    { (* dv1: Float *)
+      break_match_hyp_inv.
+      unfold lift_dvalue_fin_inf.
+
+      break_match_goal; clear Heqs.
+      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in *; inv e.
+
+      break_match_goal; clear Heqs.
+      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in *; inv e.
+
+      break_match_goal; clear Heqs.
+      cbn.
+
+      erewrite float_cmp_fin_inf; eauto.
+      unfold lift_dvalue_fin_inf.
+      break_match_goal; clear Heqs.
+      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in *; inv e.
+
+      break_match_goal; clear Heqs.
+      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in *; inv e.
+      reflexivity.
+    }
+
+    { (* dv1: poison *)
+      break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+
+        break_match_goal; clear Heqs;
+        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in *; inv e;
+
+        break_match_goal; clear Heqs;
+        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in *; inv e;
+
+        cbn;
+        reflexivity.
+    }
+  Qed.
+
   Lemma uvalue_concretize_strict_concretize_inclusion :
     forall uv_inf uv_fin,
       uvalue_refine_strict uv_inf uv_fin ->
@@ -10523,6 +10680,74 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     { (* FBinop *)
+      rewrite uvalue_refine_strict_equation,
+        uvalue_convert_strict_equation in REF;
+        cbn in REF; inv REF.
+
+      do 2 break_match_hyp_inv.
+
+      intros CONC;
+        rewrite concretize_equation in CONC;
+        repeat red in CONC;
+        rewrite concretize_uvalueM_equation in CONC;
+        repeat red in CONC.
+
+      destruct CONC as (?&?&?&?&?).
+
+      destruct_err_ub_oom x; inv H0.
+      destruct H1 as [[] | H1].
+      specialize (H1 _ eq_refl).
+
+      repeat red in H1.
+      destruct H1 as (?&?&?&?&?).
+      destruct_err_ub_oom x; inv H1;
+        rewrite <- H5 in H3; inv H3.
+      destruct H2 as [[] | H2].
+      specialize (H2 _ eq_refl).
+
+      pose proof (uvalue_concretize_strict_concretize_inclusion _ _ Heqo _ H).
+      pose proof (uvalue_concretize_strict_concretize_inclusion _ _ Heqo0 _ H0).
+
+      remember (x2 x3) as x2x3.
+      destruct_err_ub_oom x2x3; inv H4.
+
+      pose proof (eval_fop_fin_inf _ _ _ _ _ _ H2 eq_refl eq_refl) as EVAL.
+
+      eapply FAILS.
+
+      rewrite IS1.LLVM.MEM.CP.CONC.concretize_equation;
+        red;
+        rewrite IS1.LLVM.MEM.CP.CONC.concretize_uvalueM_equation;
+        repeat red.
+
+      exists (ret (lift_dvalue_fin_inf x1)).
+      exists (fun _ => IS1.LP.Events.DV.eval_fop fop (lift_dvalue_fin_inf x1) (lift_dvalue_fin_inf x3)).
+
+      split; eauto.
+      split.
+      cbn. rewrite EVAL.
+      cbn. reflexivity.
+
+      right.
+      intros a H6.
+      cbn in H6; subst.
+
+      repeat red.
+      exists (ret (lift_dvalue_fin_inf x3)).
+      exists (fun _ => IS1.LP.Events.DV.eval_fop fop (lift_dvalue_fin_inf x1) (lift_dvalue_fin_inf x3)).
+
+      split; eauto.
+      split; cbn; eauto.
+      cbn. rewrite EVAL.
+      cbn. reflexivity.
+
+      right.
+      intros a H6.
+      cbn in H6; subst.
+      auto.
+    }
+
+    { (* FCmp *)
       rewrite uvalue_refine_strict_equation,
         uvalue_convert_strict_equation in REF;
         cbn in REF; inv REF.
