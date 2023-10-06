@@ -11247,6 +11247,157 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       reflexivity.
     }
 
+    { (* InsertElement *)
+      rewrite uvalue_refine_strict_equation,
+        uvalue_convert_strict_equation in REF;
+        cbn in REF; inv REF.
+
+      do 3 break_match_hyp_inv.
+
+      intros CONC;
+        rewrite concretize_equation in CONC;
+        repeat red in CONC;
+        rewrite concretize_uvalueM_equation in CONC;
+        repeat red in CONC.
+
+      destruct CONC as (?&?&?&?&?).
+
+      destruct_err_ub_oom x; inv H0.
+      destruct H1 as [[] | H1].
+      specialize (H1 _ eq_refl).
+
+      repeat red in H1.
+      destruct H1 as (?&?&?&?&?).
+      destruct_err_ub_oom x; inv H1;
+        rewrite <- H5 in H3; inv H3.
+      destruct H2 as [[] | H2].
+      specialize (H2 _ eq_refl).
+
+      repeat red in H2.
+      destruct H2 as (?&?&?&?&?).
+      rewrite <- H2 in H4.
+      destruct_err_ub_oom x; inv H4.
+      destruct H3 as [[] | H3].
+      specialize (H3 _ eq_refl).
+
+      pose proof (uvalue_concretize_strict_concretize_inclusion _ _ Heqo _ H).
+      pose proof (uvalue_concretize_strict_concretize_inclusion _ _ Heqo1 _ H0).
+      pose proof (uvalue_concretize_strict_concretize_inclusion _ _ Heqo0 _ H1).
+
+      cbn in H2.
+      remember (x4 x5) as x4x5.
+      destruct_err_ub_oom x4x5; inv H7.
+      cbn in H2.
+      rewrite <- H2 in H5.
+      cbn in H5.
+
+      (* TODO: Move this / generalize monad? *)
+      (* TODO: Prove this *)
+      Lemma insert_into_vec_dv_fin_inf :
+        forall dv1_fin dv2_fin dv3_fin res_fin dv1_inf dv2_inf dv3_inf t,
+          @insert_into_vec_dv err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+            (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+            t dv1_fin dv2_fin dv3_fin = ret res_fin ->
+          lift_dvalue_fin_inf dv1_fin = dv1_inf ->
+          lift_dvalue_fin_inf dv2_fin = dv2_inf ->
+          lift_dvalue_fin_inf dv3_fin = dv3_inf ->
+          @IS1.LP.Events.DV.insert_into_vec_dv err_ub_oom
+            (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+            (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+            t dv1_inf dv2_inf dv3_inf = ret (lift_dvalue_fin_inf res_fin).
+      Proof.
+        intros dv1_fin dv2_fin dv3_fin res_fin
+          dv1_inf dv2_inf dv3_inf t EVAL LIFT1 LIFT2 LIFT3.
+        unfold insert_into_vec_dv in EVAL.
+        (* Nasty case analysis... *)
+        break_match_hyp_inv.
+        { (* dv1: Array *)
+          break_match_hyp_inv.
+          { (* i32 indices *)
+            break_match_hyp_inv.
+            - (* 0 index *)       
+              revert t res_fin dv2_fin x Heqz H0.
+              induction elts; intros t res_fin dv2_fin x Heqz H0.
+              + inv H0.
+                unfold IS1.LP.Events.DV.insert_into_vec_dv.
+                unfold lift_dvalue_fin_inf.
+                break_match_goal; break_match_hyp; clear Heqs;
+                  rewrite DVCrev.dvalue_convert_strict_equation in e;
+                  cbn in e; inv e; inv H0.
+                break_match_goal; break_match_hyp; clear Heqs;
+                  rewrite DVCrev.dvalue_convert_strict_equation in e;
+                  cbn in e; inv e; inv H0.
+                cbn.
+                rewrite Heqz.
+                break_match_goal; clear Heqs;
+                  rewrite DVCrev.dvalue_convert_strict_equation in e;
+                  cbn in e; inv e.
+                reflexivity.
+              + cbn in H0.
+                inv H0.
+                admit.
+            - admit.
+          }
+
+          (* i64 indices *)
+          admit.
+        }
+
+        { (* dv1: Vector *)
+          admit.
+        }
+      Admitted.
+
+      symmetry in Heqx4x5.
+      pose proof (insert_into_vec_dv_fin_inf _ _ _ _ _ _ _ _ H3 eq_refl eq_refl eq_refl) as EVAL.
+
+      eapply FAILS.
+
+      rewrite IS1.LLVM.MEM.CP.CONC.concretize_equation;
+        red;
+        rewrite IS1.LLVM.MEM.CP.CONC.concretize_uvalueM_equation;
+        repeat red.
+
+      exists (ret (lift_dvalue_fin_inf x1)).
+      exists (fun _ => IS1.LP.Events.DV.insert_into_vec_dv t (lift_dvalue_fin_inf x1) (lift_dvalue_fin_inf x5) (lift_dvalue_fin_inf x3)).
+
+      split; eauto.
+      split.
+      cbn. rewrite EVAL.
+      cbn. reflexivity.
+
+      right.
+      intros a ?.
+      cbn in H7; subst.
+
+      repeat red.
+      exists (ret (lift_dvalue_fin_inf x3)).
+      exists (fun _ => IS1.LP.Events.DV.insert_into_vec_dv t (lift_dvalue_fin_inf x1) (lift_dvalue_fin_inf x5) (lift_dvalue_fin_inf x3)).
+
+      split; eauto.
+      split; cbn; eauto.
+      cbn. rewrite EVAL.
+      cbn. reflexivity.
+
+      right.
+      intros a ?.
+      cbn in H7; subst.
+
+      repeat red.
+      exists (ret (lift_dvalue_fin_inf x5)).
+      exists (fun _ => IS1.LP.Events.DV.insert_into_vec_dv t (lift_dvalue_fin_inf x1) (lift_dvalue_fin_inf x5) (lift_dvalue_fin_inf x3)).
+
+      split; eauto.
+      split; cbn; eauto.
+      cbn. rewrite EVAL.
+      cbn. reflexivity.
+
+      right.
+      intros a ?.
+      cbn in H7; subst.
+      reflexivity.
+    }
+
   Lemma uvalue_concretize_strict_concretize_inclusion :
     forall uv_inf uv_fin,
       uvalue_refine_strict uv_inf uv_fin ->
