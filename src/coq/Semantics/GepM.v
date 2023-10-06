@@ -34,6 +34,10 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
     forall (dt : dtyp) (p : addr),
       handle_gep_addr dt p [DVALUE_IPTR IP.zero] = inr (ret p).
 
+  Parameter handle_gep_addr_nil :
+    forall (dt : dtyp) (p : addr),
+      handle_gep_addr dt p [] = inl "handle_gep_addr: no indices"%string.
+
   Parameter handle_gep_addr_ix :
     forall (dt : dtyp) (p p' : addr) ix,
       handle_gep_addr dt p [DVALUE_IPTR ix] = inr (ret p') ->
@@ -158,6 +162,7 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
     | DVALUE_IPTR i :: vs' =>
       ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (IP.to_Z i)) vs' ;;
       ret (int_to_ptr ptr' prov)
+    | [] => failwith "handle_gep_addr: no indices"
     | _ => failwith "handle_gep_addr: unsupported index type"
     end.
 
@@ -170,6 +175,14 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
     rewrite IP.to_Z_0.
     replace (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * 0)%Z with (ptr_to_int p) by lia.
     rewrite int_to_ptr_ptr_to_int; auto.
+  Qed.
+
+  Lemma handle_gep_addr_nil :
+    forall (dt : dtyp) (p : addr),
+      handle_gep_addr dt p [] = inl "handle_gep_addr: no indices"%string.
+  Proof.
+    intros dt p.
+    cbn; auto.
   Qed.
 
   Lemma handle_gep_addr_ix :
