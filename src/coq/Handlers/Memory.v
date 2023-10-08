@@ -328,8 +328,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       A concrete memory, resp. logical memory, maps addresses to concrete blocks, resp. logical blocks.
       A memory is a pair of both views of the memory.
      *)
-    Definition logical_memory  := IntMap logical_block.
-    Definition memory          := logical_memory.
+    Definition logical_memory := IntMap logical_block.
+    Definition used_locs := gset Z.
+    Definition memory         := (logical_memory * used_locs)%type.
 
     (** ** Stack frames
       A frame contains the list of block ids that need to be freed when popped,
@@ -696,14 +697,14 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
       (** ** Smart lookups *)
       Definition get_logical_block_mem (b : Z) (m : memory) : option logical_block :=
-        lookup b m.
+        lookup b m.1.
 
       (* Get the next key in the logical map *)
       Definition next_logical_key_mem (m : memory) : Z :=
-        logical_next_key m.
+        logical_next_key m.1.
 
       Definition add_logical_block_mem (id : Z) (b : logical_block) (m : memory) : memory :=
-        <[ id := b ]> m.
+        (<[ id := b ]> m.1, {[ id ]} ∪ m.2).
 
     (** Check if the block for an address is allocated.
 
@@ -711,7 +712,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         block. *)
     (* TODO: should this check if everything is in range...? *)
     Definition allocated (a : addr) (m : memory_stack) : Prop :=
-      (fst a) ∈ dom (fst m).
+      (fst a) ∈ dom (fst m.1).
 
     (** Do two memory regions overlap each other?
 
@@ -817,7 +818,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition frame_empty : frame_stack := Singleton [].
 
     Definition free_frame_memory (f : mem_frame) (m : memory) : memory :=
-      fold_left (fun m key => delete key m) f m.
+      (fold_left (fun m key => delete key m) f m.1, m.2).
 
     Definition equivs : frame_stack -> frame_stack -> Prop := Logic.eq.
 
@@ -837,7 +838,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         It is a matter of convention, by we consider the empty memory to contain a single empty frame
         in its stack, rather than an empty stack.
      *)
-    Definition empty_memory_stack : memory_stack := (logical_empty, frame_empty).
+    Definition empty_memory_stack : memory_stack := ((logical_empty, ∅), frame_empty).
 
     (** ** Smart lookups *)
 

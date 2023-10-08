@@ -1788,7 +1788,7 @@ Section Memory_Stack_Theory.
               apply no_overlap__not_overlaps in NOVER.
               unfold next_logical_key, next_logical_key_mem, overlaps in *.
               cbn in *.
-              destruct (Z.eq_dec (logical_next_key m) (fst a')) as [Ha' | Ha'].
+              destruct (Z.eq_dec (logical_next_key m.1) (fst a')) as [Ha' | Ha'].
               -- (* Bogus branch where a' is the freshly allocated block *)
                 exfalso. eapply next_logical_key_fresh; erewrite Ha'; eauto.
               -- (* Good branch *)
@@ -1812,7 +1812,7 @@ Section Memory_Stack_Theory.
               apply no_overlap__not_overlaps in NOVER.
               unfold next_logical_key, next_logical_key_mem, overlaps in *.
               cbn in *.
-              destruct (Z.eq_dec (logical_next_key m) (fst a')) as [Ha' | Ha'].
+              destruct (Z.eq_dec (logical_next_key m.1) (fst a')) as [Ha' | Ha'].
               -- (* Bogus branch where a' is the freshly allocated block *)
                 exfalso. eapply next_logical_key_fresh; erewrite Ha'; eauto.
               -- (* Good branch *)
@@ -2063,7 +2063,7 @@ Section Memory_Stack_Theory.
       unfold allocated in H.
       epose proof maximumBy_Z_correct.
       cbn in *.
-      pose proof (next_logical_key_fresh m).
+      pose proof (next_logical_key_fresh m.1).
       intro; apply H1. set_solver.
     Qed.
 
@@ -2260,11 +2260,11 @@ Section Memory_Stack_Theory.
         add_logical_block off b2 (add_logical_block off b1 m) =
         add_logical_block off b2 m.
     Proof.
-      intros ? ? ? (m,s).
-      unfold add_logical_block, add_logical_block_mem.
-      setoid_rewrite insert_insert; done.
+      intros ? ? ? ((m, ?),s); cbn.
+      unfold add_logical_block, add_logical_block_mem; cbn.
+      repeat setoid_rewrite insert_insert.
+      do 2 f_equiv; try set_solver.
     Qed.
-
 
     Definition equiv_sum {A : Type} (R : A -> A -> Prop) : err A -> err A -> Prop :=
       fun ma ma' => match ma,ma' with
@@ -2288,12 +2288,16 @@ Section Memory_Stack_Theory.
       cbn in *.
       rewrite get_logical_block_of_add_logical_block.
       cbn. destruct m; cbn. unfold add_logical_block_mem.
-      setoid_rewrite insert_insert. do 2 f_equiv.
-      f_equiv. eapply map_leibniz.
-      apply add_all_index_twice.
-      erewrite 2 Zlength_correct.
-      do 2 rewrite <- nat_N_Z.
-      erewrite 2 sizeof_serialized; eauto.
+      setoid_rewrite insert_insert.
+
+      destruct m; cbn.
+      do 2 f_equiv.
+      { do 2 f_equiv. eapply map_leibniz.
+        apply add_all_index_twice.
+        erewrite 2 Zlength_correct.
+        do 2 rewrite <- nat_N_Z.
+        erewrite 2 sizeof_serialized; eauto. }
+      set_solver.
     Qed.
 
     Lemma write_different_blocks :
