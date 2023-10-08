@@ -604,7 +604,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
     (* Returns a fresh key for use in memory map *)
     Definition logical_next_key (m : logical_memory) : Z
-      := let keys := map fst (map_to_list m) in
+      := let keys := elements (dom m) in
          1 + maximumBy Z.leb (-1)%Z keys.
 
     (** ** Initialization of blocks

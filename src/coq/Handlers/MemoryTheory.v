@@ -1651,15 +1651,12 @@ Section Memory_Stack_Theory.
     Proof.
       intros lm MEM.
 
-      assert (In (logical_next_key lm) (map fst (map_to_list lm))).
-      { apply elem_of_list_In.
-        setoid_rewrite dom_alt in MEM.
-        by eapply elem_of_list_to_set. Unshelve.
-        typeclasses eauto. }
+      assert (In (logical_next_key lm) (elements (dom lm))).
+      { apply elem_of_list_In. set_solver. }
       apply (maximumBy_Z_correct (-1)) in H.
       apply Zle_bool_imp_le in H.
       unfold logical_next_key in H.
-      remember (map fst (map_to_list lm)) in H. lia.
+      remember (elements (dom lm)) in H. lia.
     Qed.
 
     Lemma lookup_init_block_undef :
