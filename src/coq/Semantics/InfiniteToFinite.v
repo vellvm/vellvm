@@ -8692,7 +8692,7 @@ cofix CIH
       assert (n = Datatypes.length addrs_fin) as ADDRS_FIN_LEN.
       {
         assert (exists (pre : Memory64BitIntptr.MMEP.MMSP.MemState) (post : Memory64BitIntptr.MMEP.MMSP.MemState),
-                   Within.within (FinLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_fin n) pre
+                   @Within.within (MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) (@MemPropT_Eq1 Memory64BitIntptr.MMEP.MMSP.MemState) err_ub_oom Memory64BitIntptr.MMEP.MMSP.MemState Memory64BitIntptr.MMEP.MMSP.MemState _ _ (FinLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_fin n) pre
                      (ret addrs_fin) post).
         { exists FinMemMMSP.initial_memory_state. exists FinMemMMSP.initial_memory_state.
           cbn.
@@ -10512,7 +10512,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       }
 
       assert ((exists (pre : MemoryBigIntptr.MMEP.MMSP.MemState) (post : MemoryBigIntptr.MMEP.MMSP.MemState),
-                  Within.within (InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_inf n) pre
+                  @Within.within (MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) (@MemPropT_Eq1 MemoryBigIntptr.MMEP.MMSP.MemState) err_ub_oom MemoryBigIntptr.MMEP.MMSP.MemState MemoryBigIntptr.MMEP.MMSP.MemState _ _  (InfLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_inf n) pre
                     (ret (x_inf :: addrs_inf)) post)).
       { exists ms_inf. exists ms_inf.
         cbn. red. cbn.
@@ -10687,7 +10687,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       + (* Should follow from CONSEC *)
 
         assert ((exists (pre : FinMem.MMEP.MMSP.MemState) (post : FinMem.MMEP.MMSP.MemState),
-                    Within.within (FinLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_fin (S len')) pre
+                    @Within.within (MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) (@MemPropT_Eq1 Memory64BitIntptr.MMEP.MMSP.MemState) err_ub_oom Memory64BitIntptr.MMEP.MMSP.MemState Memory64BitIntptr.MMEP.MMSP.MemState _ _ (FinLLVM.MEM.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs a_fin (S len')) pre
                       (ret (x_fin :: a_fin' :: addrs_fin)) post)).
         {
           exists ms_fin'. exists ms_fin'.
