@@ -11587,76 +11587,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       subst; auto.
   Qed.
 
-  (* TODO: This may not actually be true...
-
-     Suppose uv1 is in the infinite language, and uv2 is in the finite
-     language...
-
-     If uv2 causes OOM (e.g., it represents an intptr expression of
-     any value greater than 2^64), then `unique_prop uv2` would
-     actually hold vacuously...
-
-        Definition unique_prop (uv : uvalue) : Prop
-          := exists x, forall dv, concretize uv dv -> dv = x.
-
-     because `forall dv, concretize uv2 dv <-> False`...
-
-     However in the infinite language `uv1` might not be unique.
-   *)
-  Lemma uvalue_refine_strict_unique_prop_rev :
-    forall uv1 uv2,
-      uvalue_refine_strict uv1 uv2 ->
-      unique_prop uv2 -> IS1.LLVM.D.unique_prop uv1.
-  Proof.
-  Abort.
-
-
-  (* Lemma pickUnique_lazy_rutt : *)
-  (*   forall uv1 uv2, *)
-  (*     uvalue_refine_lazy uv1 uv2 -> *)
-  (*     rutt (sum_prerel call_refine_lazy event_refine_lazy) *)
-  (*       (sum_postrel call_res_refine_lazy event_res_refine_lazy) dvalue_refine_lazy *)
-  (*       (IS1.LLVM.D.pickUnique uv1) (pickUnique uv2). *)
-  (* Proof. *)
-  (*   (* intros uv1 uv2 REF. *) *)
-  (*   (* unfold IS1.LLVM.D.pickUnique, IS1.LLVM.D.concretize_or_pick. *) *)
-  (*   (* unfold pickUnique, concretize_or_pick. *) *)
-  (*   (* cbn. *) *)
-  (*   (* break_match; *) *)
-  (*   (*   eapply uvalue_convert_lazy_preserves_is_concrete with (uvc:=uv2) in Heqb; eauto; *) *)
-  (*   (*   rewrite Heqb. *) *)
-
-  (*   (* apply lift_err_uvalue_to_dvalue_rutt; auto. *) *)
-
-  (*   (* repeat rewrite bind_trigger. *) *)
-  (*   (* apply rutt_Vis. *) *)
-
-  (*   (* { constructor. *) *)
-  (*   (*   cbn. *) *)
-  (*   (*   split; auto. *) *)
-  (*   (*   apply uvalue_refine_lazy_unique_prop; *) *)
-  (*   (*     eauto. *) *)
-  (*   (* } *) *)
-
-  (*   (* intros t1 t2 H. *) *)
-  (*   (* apply rutt_Ret. *) *)
-  (*   (* destruct t1, t2. *) *)
-  (*   (* cbn in *. *) *)
-  (*   (* destruct H; cbn in *. *) *)
-  (*   (* { red in H. *) *)
-  (*   (*   destruct e1; cbn in *. *) *)
-  (*   (*   destruct d1; cbn in *. *) *)
-  (*   (*   admit. (* ???? *) *) *)
-  (*   (* } *) *)
-  (*   (* { destruct e2; cbn in *. *) *)
-  (*   (*   admit. *) *)
-  (*   (*   cbn in *. *) *)
-  (*   (*   destruct d2; cbn in *. *) *)
-  (*   (*   repeat (destruct s; try inv H). *) *)
-  (*   (*   admit. *) *)
-  (*   (* } *) *)
-  (* Admitted. *)
-
   Lemma lift_err_uvalue_to_dvalue_rutt_strict :
     forall uv1 uv2,
       uvalue_refine_strict uv1 uv2 ->
@@ -13208,9 +13138,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           cbn.
           eapply orutt_bind with (RR:=dvalue_refine_strict).
           {
-            apply rutt_orutt.
-            apply pickUnique_rutt_strict; auto.
-            solve_dec_oom.
+            apply pickUnique_orutt_strict; auto.
           }
 
           intros r0 r3 R0R3.
@@ -14427,7 +14355,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 End LangRefine.
 
 Module MakeLangRefine
-  (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS1.LP.PTOI IS2.LP.ADDR IS2.LP.PTOI) (AC2 : AddrConvert IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) (ACS : AddrConvertSafe IS2.LP.ADDR IS1.LP.ADDR AC2 AC1) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC) : LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR IPS ACS DVC DVCrev EC TC.
+  (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS1.LP.PTOI IS2.LP.ADDR IS2.LP.PTOI) (AC2 : AddrConvert IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) (ACS : AddrConvertSafe IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI AC2 AC1) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC) : LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR IPS ACS DVC DVCrev EC TC.
   Include LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR IPS ACS DVC DVCrev EC TC.
 End MakeLangRefine.
 
