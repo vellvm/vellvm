@@ -8384,6 +8384,18 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         ].
   Qed.
 
+  (* TODO: May need to know something about byte
+     conversion... Currently this is in InfiniteToFinite.v and
+     needs to know something about actual MemState implementation... *)
+  Lemma runStateT_succeeds_serialize_sbytes_fin_inf :
+    forall dv t res_fin,
+      StateMonad.runStateT (MemHelpers.serialize_sbytes (dvalue_to_uvalue dv) t) 0 = success_unERR_UB_OOM res_fin ->
+      exists res_inf, StateMonad.runStateT
+                   (IS1.LLVM.MEM.CP.CONC.MemHelpers.serialize_sbytes
+                      (IS1.LP.Events.DV.dvalue_to_uvalue (lift_dvalue_fin_inf dv)) t) 0 = success_unERR_UB_OOM res_inf.
+  Proof.
+  Admitted.
+
   (* TODO: Move this / generalize monad? *)
   Lemma eval_fcmp_fin_inf :
     forall dv1_fin dv2_fin res_fin fcmp dv1_inf dv2_inf,
@@ -8506,6 +8518,168 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         reflexivity.
     }
   Qed.
+
+  (* TODO: Move this *)
+  Lemma bit_sizeof_dtyp_fin_inf :
+    forall t,
+      IS1.LP.SIZEOF.bit_sizeof_dtyp t = SIZEOF.bit_sizeof_dtyp t.
+  Proof.
+    (* Need to expose more stuff to be able to prove this *)
+  Admitted.
+
+  Lemma get_conv_case_pure_fin_inf:
+    forall conv t_from dv t_to res,
+      get_conv_case conv t_from dv t_to = Conv_Pure res ->
+      IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (lift_dvalue_fin_inf dv) t_to = IS1.LP.Events.DV.Conv_Pure (lift_dvalue_fin_inf res).
+  Proof.
+    intros conv t_from dv t_to res CONV.
+    destruct conv.
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+        break_match_goal;
+        break_match_hyp;
+        clear Heqs; 
+        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs;
+             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+        break_match_goal;
+        break_match_hyp;
+        clear Heqs; 
+        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs;
+             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+        break_match_goal;
+        break_match_hyp;
+        clear Heqs; 
+        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs;
+             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf; inv CONV.
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf; inv CONV.
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+        break_match_goal;
+        break_match_hyp;
+        clear Heqs; 
+        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs;
+             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+        break_match_goal;
+        break_match_hyp;
+        clear Heqs; 
+        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs;
+             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+        inv CONV.
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+        inv CONV.
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+        break_match_goal;
+        break_match_hyp;
+        clear Heqs; 
+        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs;
+             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+        break_match_goal;
+        break_match_hyp;
+        clear Heqs; 
+        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs;
+             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e; inv e; reflexivity).
+    }
+
+    { (* Conversions... *)
+      unfold get_conv_case in CONV.
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
+
+      repeat rewrite bit_sizeof_dtyp_fin_inf.
+      repeat break_match_hyp_inv.
+      destruct unERR_UB_OOM.
+      do 3 destruct unEitherT.
+      destruct unIdent;
+        inv Heqs.
+      unfold StateMonad.evalStateT.
+
+      pose proof runStateT_succeeds_serialize_sbytes_fin_inf _ _ _ Heqe as (res_inf&SERIALIZE).
+      rewrite SERIALIZE.
+      Opaque IS1.LLVM.MEM.CP.CONC.MemHelpers.deserialize_sbytes.
+      cbn.
+      admit.
+    }
+
+    { (* Addrspacecast *)
+      cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+        break_match_goal; inv CONV.
+    }
+  Admitted.
 
   Lemma uvalue_concretize_strict_concretize_inclusion :
     forall uv_inf uv_fin,
@@ -9024,9 +9198,174 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       eapply eval_icmp_fin_inf; eauto.
     - (* FBinop *)
-      admit.
+      red; intros dv_fin CONC_FIN.
+      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      cbn in REF.
+      break_match_hyp_inv.
+      break_match_hyp_inv.
+
+      unfold uvalue_concretize_fin_inf_inclusion in IHuv_inf1, IHuv_inf2.
+
+      specialize (IHuv_inf1 u Heqo).
+      specialize (IHuv_inf2 u0 Heqo0).
+
+      rewrite IS1.MEM.CP.CONC.concretize_equation.
+      red.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+
+      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
+      red in CONC_FIN.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
+
+      repeat red in CONC_FIN.
+      destruct CONC_FIN as (?&?&?&?&?).
+      destruct_err_ub_oom x; cbn in H0; inv H0.
+      destruct H1 as [[] | H1].
+      specialize (H1 _ eq_refl).
+      cbn in H1.
+      repeat red in H1.
+      destruct H1 as (?&?&?&?&?).
+      destruct_err_ub_oom x; cbn in H1; rewrite <- H1 in H3; inv H3.
+      destruct H2 as [[] | H2].
+      specialize (H2 _ eq_refl).
+      rewrite <- H2 in H5, H1.
+
+      remember (eval_fop fop x1 x3) as x1x3.
+      destruct_err_ub_oom x1x3; inv H5.
+      cbn in H1.
+
+      apply IHuv_inf1 in H.
+      apply IHuv_inf2 in H0.
+
+      repeat red.
+      exists (ret (lift_dvalue_fin_inf x1)).
+      exists (fun dv_inf => (fmap lift_dvalue_fin_inf (x0 x1))).
+      cbn.
+      rewrite <- H1.
+      cbn.
+      split; eauto.
+      split; eauto.
+
+      right.
+      intros a H3.
+      repeat red.
+      exists (ret (lift_dvalue_fin_inf x3)).
+      exists (fun dv_inf => (fmap lift_dvalue_fin_inf (x2 x3))).
+      cbn.
+      rewrite <- H2.
+      cbn.
+      split; eauto.
+      split; eauto.
+
+      right.
+      intros a0 H4.
+
+      eapply eval_fop_fin_inf; eauto.
+    - (* fcmp *)
+      red; intros dv_fin CONC_FIN.
+      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      cbn in REF.
+      break_match_hyp_inv.
+      break_match_hyp_inv.
+
+      unfold uvalue_concretize_fin_inf_inclusion in IHuv_inf1, IHuv_inf2.
+
+      specialize (IHuv_inf1 u Heqo).
+      specialize (IHuv_inf2 u0 Heqo0).
+
+      rewrite IS1.MEM.CP.CONC.concretize_equation.
+      red.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+
+      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
+      red in CONC_FIN.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
+
+      repeat red in CONC_FIN.
+      destruct CONC_FIN as (?&?&?&?&?).
+      destruct_err_ub_oom x; cbn in H0; inv H0.
+      destruct H1 as [[] | H1].
+      specialize (H1 _ eq_refl).
+      cbn in H1.
+      repeat red in H1.
+      destruct H1 as (?&?&?&?&?).
+      destruct_err_ub_oom x; cbn in H1; rewrite <- H1 in H3; inv H3.
+      destruct H2 as [[] | H2].
+      specialize (H2 _ eq_refl).
+      rewrite <- H2 in H5, H1.
+
+      remember (eval_fcmp cmp0 x1 x3) as x1x3.
+      destruct_err_ub_oom x1x3; inv H5.
+      cbn in H1.
+
+      apply IHuv_inf1 in H.
+      apply IHuv_inf2 in H0.
+
+      repeat red.
+      exists (ret (lift_dvalue_fin_inf x1)).
+      exists (fun dv_inf => (fmap lift_dvalue_fin_inf (x0 x1))).
+      cbn.
+      rewrite <- H1.
+      cbn.
+      split; eauto.
+      split; eauto.
+
+      right.
+      intros a H3.
+      repeat red.
+      exists (ret (lift_dvalue_fin_inf x3)).
+      exists (fun dv_inf => (fmap lift_dvalue_fin_inf (x2 x3))).
+      cbn.
+      rewrite <- H2.
+      cbn.
+      split; eauto.
+      split; eauto.
+
+      right.
+      intros a0 H4.
+
+      eapply eval_fcmp_fin_inf; eauto.
     - (* Conversion *)
-      admit.
+      red; intros dv_fin CONC_FIN.
+      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      cbn in REF.
+      break_match_hyp_inv.
+
+      specialize (IHuv_inf _ Heqo).
+      unfold uvalue_concretize_fin_inf_inclusion in IHuv_inf.
+
+      rewrite IS1.MEM.CP.CONC.concretize_equation.
+      red.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+
+      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
+      red in CONC_FIN.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
+
+      repeat red in CONC_FIN.
+      destruct CONC_FIN as (?&?&?&?&?).
+      destruct_err_ub_oom x; cbn in H0; inv H0.
+      destruct H1 as [[] | H1].
+      specialize (H1 _ eq_refl).
+      cbn in H1.
+
+      break_match_hyp.
+      { (* Conv_Pure *)
+        admit.
+      }
+
+      { (* Conv_ItoP *)
+        admit.
+      }
+
+      { (* Conv_PtoI *)
+        admit.
+      }
+
+      { (* Conv_Illegal *)
+        exfalso.
+        rewrite <- H1 in H3; inv H3.
+      }
     - (* GetElementPtr *)
       admit.
     - (* ExtractElement *)
@@ -10121,180 +10460,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (*       reflexivity. *)
   (*   } *)
   (* Qed. *)
-
-  (* TODO: Move this *)
-  Lemma bit_sizeof_dtyp_fin_inf :
-    forall t,
-      IS1.LP.SIZEOF.bit_sizeof_dtyp t = SIZEOF.bit_sizeof_dtyp t.
-  Proof.
-    (* Need to expose more stuff to be able to prove this *)
-  Admitted.
-
-  Lemma get_conv_case_pure_fin_inf:
-    forall conv t_from dv t_to res,
-      get_conv_case conv t_from dv t_to = Conv_Pure res ->
-      IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (lift_dvalue_fin_inf dv) t_to = IS1.LP.Events.DV.Conv_Pure (lift_dvalue_fin_inf res).
-  Proof.
-    intros conv t_from dv t_to res CONV.
-    destruct conv.
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold lift_dvalue_fin_inf;
-        break_match_goal;
-        break_match_hyp;
-        clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
-        cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
-             cbn in e; inv e; reflexivity).
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold lift_dvalue_fin_inf;
-        break_match_goal;
-        break_match_hyp;
-        clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
-        cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
-             cbn in e; inv e; reflexivity).
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold lift_dvalue_fin_inf;
-        break_match_goal;
-        break_match_hyp;
-        clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
-        cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
-             cbn in e; inv e; reflexivity).
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold lift_dvalue_fin_inf; inv CONV.
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold lift_dvalue_fin_inf; inv CONV.
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold lift_dvalue_fin_inf;
-        break_match_goal;
-        break_match_hyp;
-        clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
-        cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
-             cbn in e; inv e; reflexivity).
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold lift_dvalue_fin_inf;
-        break_match_goal;
-        break_match_hyp;
-        clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
-        cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
-             cbn in e; inv e; reflexivity).
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold lift_dvalue_fin_inf;
-        inv CONV.
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold lift_dvalue_fin_inf;
-        inv CONV.
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold lift_dvalue_fin_inf;
-        break_match_goal;
-        break_match_hyp;
-        clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
-        cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
-             cbn in e; inv e; reflexivity).
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold lift_dvalue_fin_inf;
-        break_match_goal;
-        break_match_hyp;
-        clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
-        cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
-             cbn in e; inv e; reflexivity).
-    }
-
-    { (* Conversions... *)
-      unfold get_conv_case in CONV.
-      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
-
-      repeat rewrite bit_sizeof_dtyp_fin_inf.
-      repeat break_match_hyp_inv.
-      destruct unERR_UB_OOM.
-      do 3 destruct unEitherT.
-      destruct unIdent;
-        inv Heqs.
-      unfold StateMonad.evalStateT.
-
-      (* TODO: Need to know something about byte
-            conversion... Currently this is in InfiniteToFinite.v and
-            needs to know something about actual MemState implementation... *)
-      Lemma runStateT_succeeds_serialize_sbytes_fin_inf :
-        forall dv t res_fin,
-          StateMonad.runStateT (MemHelpers.serialize_sbytes (dvalue_to_uvalue dv) t) 0 = success_unERR_UB_OOM res_fin ->
-          exists res_inf, StateMonad.runStateT
-                       (IS1.LLVM.MEM.CP.CONC.MemHelpers.serialize_sbytes
-                          (IS1.LP.Events.DV.dvalue_to_uvalue (lift_dvalue_fin_inf dv)) t) 0 = success_unERR_UB_OOM res_inf.
-      Proof.
-      Admitted.
-
-      pose proof runStateT_succeeds_serialize_sbytes_fin_inf _ _ _ Heqe as (res_inf&SERIALIZE).
-      rewrite SERIALIZE.
-      Opaque IS1.LLVM.MEM.CP.CONC.MemHelpers.deserialize_sbytes.
-      cbn.
-      admit.
-    }
-
-    { (* Addrspacecast *)
-      cbn in *;
-        repeat break_match_hyp_inv;
-        unfold lift_dvalue_fin_inf;
-        break_match_goal; inv CONV.
-    }
-  Admitted.
 
   Lemma concretize_fails_inf_fin :
     forall uv_inf uv_fin
