@@ -7035,41 +7035,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
   Opaque uvalue_refine_strict.
 
-  (* TODO: Move this *)
-  (* TODO: May not hold for addresses / iptr depending on their size *)
-  (* May be weird for integer sizes as well... *)
-  Lemma undef_not_unique_prop :
-    forall dt,
-      dt <> DTYPE_Void ->
-      ~ unique_prop (UVALUE_Undef dt).
-  Proof.
-    induction dt;
-      intros NVOID;
-      try contradiction.
-
-  (*   { intros [dv UNIQUE]. *)
-  (*     setoid_rewrite concretize_equation in UNIQUE. *)
-  (*     unfold concretize_u in UNIQUE. *)
-  (*     cbn in UNIQUE. *)
-
-  (*     induction (dvalue_has_dtyp dv (DTYPE_I a)). *)
-  (*   } *)
-  (*   red in UNIQUE. *)
-  (*   assert (dt = DTYPE_Void). *)
-  (*   admit. *)
-  (*   subst. *)
-  (*   destruct UNIQUE as [dv UNIQUE]. *)
-  (*   specialize (UNIQUE DVALUE_None). *)
-  (*   unfold concretize, concretize_u in UNIQUE. *)
-  (*   rewrite concretize_uvalueM_equation in UNIQUE. *)
-  (*   cbn in *. *)
-  (*   forward UNIQUE. *)
-  (*   constructor. *)
-  (*   subst. *)
-  (* Qed. *)
-  Admitted.
-
-
   (* (* Maybe I can use something like this for uvalue_refine_unique_prop *) *)
   (* Lemma convert_concretize : *)
   (*   uvalue_convert uv1 = uv2 -> *)
@@ -7159,7 +7124,115 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       rewrite DVCrev.dvalue_convert_strict_equation.
       cbn.
       rewrite CONV; cbn; eauto.
-  Admitted.
+    - induction fields.
+      + exists (DVCrev.DV2.DVALUE_Struct []).
+        rewrite DVCrev.dvalue_convert_strict_equation.
+        cbn.
+        reflexivity.
+      + forward IHfields.
+        { intros u X0.
+          eapply X.
+          right; auto.
+        }
+
+        destruct IHfields.
+        rewrite DVCrev.dvalue_convert_strict_equation in e.
+        cbn in e.
+        break_match_hyp_inv.
+
+        pose proof (X a).
+        forward X0; cbn; auto.
+        destruct X0 as (a'&A).
+        exists (DVCrev.DV2.DVALUE_Struct (a' :: l)).
+
+        rewrite DVCrev.dvalue_convert_strict_equation.
+        rewrite map_monad_InT_unfold.
+        cbn.
+        rewrite A.
+        rewrite Heqo.
+        reflexivity.
+    - induction fields.
+      + exists (DVCrev.DV2.DVALUE_Packed_struct []).
+        rewrite DVCrev.dvalue_convert_strict_equation.
+        cbn.
+        reflexivity.
+      + forward IHfields.
+        { intros u X0.
+          eapply X.
+          right; auto.
+        }
+
+        destruct IHfields.
+        rewrite DVCrev.dvalue_convert_strict_equation in e.
+        cbn in e.
+        break_match_hyp_inv.
+
+        pose proof (X a).
+        forward X0; cbn; auto.
+        destruct X0 as (a'&A).
+        exists (DVCrev.DV2.DVALUE_Packed_struct (a' :: l)).
+
+        rewrite DVCrev.dvalue_convert_strict_equation.
+        rewrite map_monad_InT_unfold.
+        cbn.
+        rewrite A.
+        rewrite Heqo.
+        reflexivity.
+    - induction elts.
+      + exists (DVCrev.DV2.DVALUE_Array []).
+        rewrite DVCrev.dvalue_convert_strict_equation.
+        cbn.
+        reflexivity.
+      + forward IHelts.
+        { intros u X0.
+          eapply X.
+          right; auto.
+        }
+
+        destruct IHelts.
+        rewrite DVCrev.dvalue_convert_strict_equation in e.
+        cbn in e.
+        break_match_hyp_inv.
+
+        pose proof (X a).
+        forward X0; cbn; auto.
+        destruct X0 as (a'&A).
+        exists (DVCrev.DV2.DVALUE_Array (a' :: l)).
+
+        rewrite DVCrev.dvalue_convert_strict_equation.
+        rewrite map_monad_InT_unfold.
+        cbn.
+        rewrite A.
+        rewrite Heqo.
+        reflexivity.
+    - induction elts.
+      + exists (DVCrev.DV2.DVALUE_Vector []).
+        rewrite DVCrev.dvalue_convert_strict_equation.
+        cbn.
+        reflexivity.
+      + forward IHelts.
+        { intros u X0.
+          eapply X.
+          right; auto.
+        }
+
+        destruct IHelts.
+        rewrite DVCrev.dvalue_convert_strict_equation in e.
+        cbn in e.
+        break_match_hyp_inv.
+
+        pose proof (X a).
+        forward X0; cbn; auto.
+        destruct X0 as (a'&A).
+        exists (DVCrev.DV2.DVALUE_Vector (a' :: l)).
+
+        rewrite DVCrev.dvalue_convert_strict_equation.
+        rewrite map_monad_InT_unfold.
+        cbn.
+        rewrite A.
+        rewrite Heqo.
+        reflexivity.
+  Qed.
 
   Definition lift_dvalue_fin_inf (dv_fin : DVCrev.DV1.dvalue) : DVCrev.DV2.dvalue.
     pose proof dvalue_convert_strict_fin_inf_succeeds dv_fin.
