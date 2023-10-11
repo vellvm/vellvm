@@ -21,6 +21,7 @@ COQFILESNUMERIC := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits N
 
 COQFILESUTILS := Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/ListUtil Utils/Error\
 								 Utils/PropT Utils/PostConditions Utils/NoFailure Utils/TFor\
+								 Utils/Misc\
 								 Utilities
 
 COQFILESSYNTAX := Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
