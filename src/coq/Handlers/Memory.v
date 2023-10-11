@@ -604,8 +604,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition logical_empty : logical_memory := empty.
 
     (* Returns a fresh key for use in memory map *)
-    Definition logical_next_key (m : logical_memory) : Z
-      := let keys := elements (dom m) in
+    Definition logical_next_key (m : memory) : Z
+      := let keys := elements (dom m.1 ∪ m.2) in
          1 + maximumBy Z.leb (-1)%Z keys.
 
     (** ** Initialization of blocks
@@ -701,7 +701,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
       (* Get the next key in the logical map *)
       Definition next_logical_key_mem (m : memory) : Z :=
-        logical_next_key m.1.
+        logical_next_key m.
 
       Definition add_logical_block_mem (id : Z) (b : logical_block) (m : memory) : memory :=
         (<[ id := b ]> m.1, {[ id ]} ∪ m.2).

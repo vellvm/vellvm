@@ -1647,16 +1647,30 @@ Section Memory_Stack_Theory.
     Qed.
 
     Lemma next_logical_key_fresh : forall lm,
-        (logical_next_key lm) ∉ dom lm.
+        (logical_next_key lm) ∉ dom lm.1 ∪ lm.2.
     Proof.
       intros lm MEM.
 
-      assert (In (logical_next_key lm) (elements (dom lm))).
+      assert (In (logical_next_key lm) (elements (dom lm.1 ∪ lm.2))).
       { apply elem_of_list_In. set_solver. }
       apply (maximumBy_Z_correct (-1)) in H.
       apply Zle_bool_imp_le in H.
       unfold logical_next_key in H.
-      remember (elements (dom lm)) in H. lia.
+      remember (elements (dom lm.1 ∪ lm.2)) in H. lia.
+    Qed.
+
+    Lemma next_logical_key_fresh_logical_mem : forall lm,
+        (logical_next_key lm) ∉ dom lm.1.
+    Proof.
+      pose proof next_logical_key_fresh.
+      set_solver.
+    Qed.
+
+    Lemma next_logical_key_fresh_dyn : forall lm,
+        (logical_next_key lm) ∉ lm.2.
+    Proof.
+      pose proof next_logical_key_fresh.
+      set_solver.
     Qed.
 
     Lemma lookup_init_block_undef :
@@ -1770,7 +1784,7 @@ Section Memory_Stack_Theory.
       intros (m,s) * EQ;
         destruct s as [|f s]; apply allocate_inv in EQ as [NV [EQm2 EQa]]; subst; cbn.
       - split.
-        + cbn. apply next_logical_key_fresh.
+        + cbn. apply next_logical_key_fresh_logical_mem.
         + { split.
             + intros SIZE.
               unfold read; cbn.
@@ -1788,14 +1802,14 @@ Section Memory_Stack_Theory.
               apply no_overlap__not_overlaps in NOVER.
               unfold next_logical_key, next_logical_key_mem, overlaps in *.
               cbn in *.
-              destruct (Z.eq_dec (logical_next_key m.1) (fst a')) as [Ha' | Ha'].
+              destruct (Z.eq_dec (logical_next_key m) (fst a')) as [Ha' | Ha'].
               -- (* Bogus branch where a' is the freshly allocated block *)
-                exfalso. eapply next_logical_key_fresh; erewrite Ha'; eauto.
+                exfalso. eapply next_logical_key_fresh_logical_mem; erewrite Ha'; eauto.
               -- (* Good branch *)
                 setoid_rewrite lookup_insert_ne; auto.
           }
       - split.
-        + cbn. apply next_logical_key_fresh.
+        + cbn. apply next_logical_key_fresh_logical_mem.
         + { split.
             + intros SIZE.
               unfold read; cbn.
@@ -1812,9 +1826,9 @@ Section Memory_Stack_Theory.
               apply no_overlap__not_overlaps in NOVER.
               unfold next_logical_key, next_logical_key_mem, overlaps in *.
               cbn in *.
-              destruct (Z.eq_dec (logical_next_key m.1) (fst a')) as [Ha' | Ha'].
+              destruct (Z.eq_dec (logical_next_key m) (fst a')) as [Ha' | Ha'].
               -- (* Bogus branch where a' is the freshly allocated block *)
-                exfalso. eapply next_logical_key_fresh; erewrite Ha'; eauto.
+                exfalso. eapply next_logical_key_fresh_logical_mem; erewrite Ha'; eauto.
               -- (* Good branch *)
                 setoid_rewrite lookup_insert_ne; auto.
           }
@@ -2063,7 +2077,7 @@ Section Memory_Stack_Theory.
       unfold allocated in H.
       epose proof maximumBy_Z_correct.
       cbn in *.
-      pose proof (next_logical_key_fresh m.1).
+      pose proof (next_logical_key_fresh_logical_mem m).
       intro; apply H1. set_solver.
     Qed.
 
