@@ -48,8 +48,6 @@ Section keyed.
     unfold alist_find', compose.
     simpl.
     destruct (k ?[ R ] a0) eqn:Heq; intuition.
-    rewrite IHm.
-    reflexivity.
   Qed.
 
   Section fold.

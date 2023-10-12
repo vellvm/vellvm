@@ -211,7 +211,8 @@ Proof.
   cbn in *; rewrite LU.
   unfold raise; cbn.
   go.
-  rewrite interp_memory_trigger; cbn; rewrite subevent_subevent, bind_bind.
+  rewrite interp_memory_trigger; cbn; setoid_rewrite subevent_subevent;
+    setoid_rewrite bind_bind.
   apply eutt_eq_bind; intros [].
 Qed.
 
@@ -225,7 +226,9 @@ Proof.
   cbn in *; rewrite LU.
   unfold raise; cbn.
   go.
-  rewrite interp_memory_trigger; cbn; rewrite subevent_subevent, bind_bind.
+  rewrite interp_memory_trigger; cbn;
+    setoid_rewrite subevent_subevent;
+    setoid_rewrite bind_bind.
   apply eutt_eq_bind; intros [].
 Qed.
 

@@ -65,10 +65,12 @@ Section RemoveBlock.
     break_match_hyp; intuition.
     subst.
     eapply wf_ocfg_cons_not_in_tail; eauto.
-    cbn.
-    break_match_goal.
-    break_match_hyp; intuition.
-    break_match_hyp; intuition.
+    inversion Heqb0.
+    cbn; eauto.
+    break_match_goal; try solve [inversion Heqb0].
+    break_match_hyp; intuition; inversion Heqb1.
+    break_match_hyp; intuition; inversion Heqb0.
+    exfalso; apply n; auto.
     apply IH.
     eapply wf_ocfg_bid_cons; eauto.
   Qed.
@@ -82,9 +84,9 @@ Section RemoveBlock.
     intros INEQ.
     simpl remove_block.
     break_match_goal.
-    break_match_hyp; intuition.
+    break_match_hyp; intuition; inversion Heqb0.
     subst; rewrite find_block_ineq; auto.
-    break_match_hyp; intuition.
+    break_match_hyp; intuition; inversion Heqb0.
     cbn; break_match_goal; auto.
   Qed.
 
@@ -306,7 +308,7 @@ Section BlockFusionCorrect.
           unfold is_predecessor, successors. 
           rewrite Heqt; cbn.
           break_match_goal; intuition.
-          break_match_hyp; intuition.
+          break_match_hyp; intuition; inversion Heqb.
         }          
         rewrite !app_length, EQ1 in SINGLEPRED.
         cbn in SINGLEPRED.
@@ -326,13 +328,14 @@ Section BlockFusionCorrect.
         rewrite predecessors_app,EQ3, app_nil_r in IN.
         rewrite predecessors_cons, EQ2, app_nil_l in IN.
         rewrite EQ1 in IN.
-        inv IN; intuition.
+        inv IN; intuition; inversion H.
 
       + auto.
 
       + cbn.
         break_match_goal; auto.
-        break_match_hyp; intuition.
+        break_match_hyp; intuition; inversion Heqb0.
+       exfalso. apply n; repeat red; eauto.
 
       + rename bk into src, b into tgt.
         cbn.
@@ -343,6 +346,7 @@ Section BlockFusionCorrect.
           apply Bool.negb_true_iff in INEQ.
           apply RelDec.neg_rel_dec_correct in INEQ.
           exfalso; apply INEQ; do 2 red; reflexivity.
+          inversion Heqb.
         }
 
         rewrite map_remove_block; auto.
@@ -353,8 +357,10 @@ Section BlockFusionCorrect.
       + intros f bk' INEQ1 INEQ2 FIND.
         cbn.
         break_match_goal.
+        * break_match_hyp; intuition; inversion Heqb0.
+          exfalso. apply INEQ1. repeat red in e; eauto.
         * break_match_hyp; intuition.
-        * break_match_hyp; intuition.
+          inversion Heqb0.
           match goal with
             |- ?x = _ => replace x with (find_block (map (update_provenance_block f2 (blk_id bk)) (((pre ++ bk :: bks) ∖ blk_id bk) ∖ f2)) f) by reflexivity
           end.
@@ -364,11 +370,15 @@ Section BlockFusionCorrect.
           rewrite remove_block_find_block_ineq; auto.
           apply find_block_map_some; auto.
 
+
       + intros f INEQ1 INEQ2 FIND.
         cbn.
         break_match_goal.
+        * break_match_hyp; intuition. exfalso.
+          apply INEQ1. repeat red in e; eauto.
+            inversion Heqb0.
         * break_match_hyp; intuition.
-        * break_match_hyp; intuition.
+          inversion Heqb0.
           match goal with
             |- ?x = _ => replace x with (find_block (map (update_provenance_block f2 (blk_id bk)) (((pre ++ bk :: bks) ∖ blk_id bk) ∖ f2)) f) by reflexivity
           end.
@@ -377,6 +387,7 @@ Section BlockFusionCorrect.
           rewrite map_remove_block; auto.
           rewrite remove_block_find_block_ineq; auto.
           apply find_block_map_none; auto.
+
 
   Qed.
 
@@ -454,6 +465,7 @@ Section BlockFusionCorrect.
     unfold update_provenance.
     break_match_goal; auto.
     unfold Eqv.eqv_dec,RelDec.rel_dec in Heqb; cbn in *; break_match_hyp; intuition.
+    inversion Heqb.
   Qed.
 
   Lemma update_provenance_ineq : forall old new to,
@@ -464,6 +476,7 @@ Section BlockFusionCorrect.
     unfold update_provenance.
     break_match_goal; auto.
     unfold Eqv.eqv_dec,RelDec.rel_dec in Heqb; cbn in *; break_match_hyp; intuition.
+    subst. exfalso; auto. inversion Heqb.
   Qed.
   
   Lemma assoc_update_provenance :
@@ -728,6 +741,7 @@ Section BlockFusionCorrect.
     rewrite wf_ocfg_bid_In_is_found in LU2; auto; inv LU2.
     unfold has_no_phi in NOPHI.
     break_match_hyp; intuition.
+    inversion NOPHI.
   Qed.
 
   Arguments denote_block : simpl never.

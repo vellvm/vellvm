@@ -62,7 +62,8 @@ Lemma uvalue_to_dvalue_list :
 Proof.
   induction fields; intros H ALL.
   - exists nil. reflexivity.
-  - assert (List.In a (a :: fields)) as IN by intuition.
+  - assert (List.In a (a :: fields)) as IN.
+    { constructor; reflexivity. }
 
     change (a :: fields) with ([a] ++ fields) in ALL.
     rewrite forallb_app in ALL.
@@ -76,6 +77,7 @@ Proof.
                List.In u fields -> is_concrete u -> exists dv : dvalue, uvalue_to_dvalue u = inr dv) as HCONV.
     { intros u INFS CONCU.
       apply H; intuition.
+      apply in_cons; auto.
     }
 
     pose proof (IHfields HCONV CONC_FIELDS) as (dfields & CONV_DFIELDS).

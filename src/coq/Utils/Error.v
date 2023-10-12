@@ -67,7 +67,6 @@ Defined.
 
 #[global] Instance EqMProps_undef_or_err : Monad.Eq1Equivalence undef_or_err.
 constructor; intuition.
-repeat intro. etransitivity; eauto.
 Defined.
 
 #[global] Instance MonadLaws_undef_or_err: Monad.MonadLawsE undef_or_err.

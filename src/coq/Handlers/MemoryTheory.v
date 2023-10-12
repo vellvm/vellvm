@@ -211,51 +211,33 @@ Section Map_Theory.
     auto.
   Qed.
 
-
   Lemma lookup_all_index_append:
-    forall serialized_bytes serialized_length rest_bytes rest_length off bytes ,
-      N.of_nat (Datatypes.length serialized_bytes) = serialized_length ->
-      (lookup_all_index off
-                        (serialized_length + rest_length)
-                        (add_all_index
-                           (serialized_bytes ++ rest_bytes)
-                           off bytes) SUndef) =
-      (lookup_all_index off serialized_length
-                        (add_all_index
-                           (serialized_bytes)
-                           off bytes) SUndef) ++
-                                              (lookup_all_index (off + Z.of_N serialized_length) rest_length
-                                                                (add_all_index
-                                                                   (rest_bytes)
-                                                                   (off + Z.of_N serialized_length) bytes) SUndef).
+    forall sbytes slen bytes len off m,
+      N.of_nat (Datatypes.length sbytes) = slen ->
+      (lookup_all_index off (slen + len)
+         (add_all_index (sbytes ++ bytes) off m) SUndef) =
+      (lookup_all_index off slen
+        (add_all_index (sbytes) off m) SUndef) ++
+      lookup_all_index (off + Z.of_N slen) len
+        (add_all_index (bytes) (off + Z.of_N slen) m) SUndef.
   Proof.
-    induction serialized_bytes;
-      intros serialized_length rest_bytes rest_length off bytes LEN.
-    - cbn in *.
-      subst.
-      cbn in *.
-      replace (off + 0) with off by lia.
-      reflexivity.
-    - cbn in LEN.
-      subst.
+    induction sbytes; intros * LEN.
+    { cbn in *; subst; rewrite nat_N_Z.
+      cbn in *; replace (off + Z.of_nat 0) with off by lia.
+      reflexivity. }
 
-      rewrite <- N.succ_pos_pred.
-      rewrite <- app_comm_cons.
-      cbn.
+    cbn in LEN.
+    subst; rewrite !nat_N_Z, Nat2N.inj_succ.
+    remember (N.succ _ + _)%N as subterm.
+    assert (subterm =
+        N.succ (N.of_nat (length sbytes) + len)%N) by lia.
+    rewrite H; clear subterm Heqsubterm H; cbn.
 
-      rewrite lookup_all_index_add.
-      replace (N.succ (Pos.pred_N (Pos.of_succ_nat (Datatypes.length serialized_bytes))) + rest_length)%N with (N.succ ((Pos.pred_N (Pos.of_succ_nat (Datatypes.length serialized_bytes))) + rest_length)) by lia.
-      rewrite lookup_all_index_add.
-
-      pose proof (IHserialized_bytes (N.of_nat (Datatypes.length serialized_bytes)) rest_bytes rest_length off bytes).
-      forward H; [reflexivity|].
-
-      rewrite pred_succ_of_nat.
-
-      rewrite IHserialized_bytes; auto.
-      replace (off + 1) with (Z.succ off) by lia.
-      replace (off + Z.of_N (N.succ (N.of_nat (Datatypes.length serialized_bytes)))) with ((Z.succ off + Z.of_N (N.of_nat (Datatypes.length serialized_bytes)))) by lia.
-      reflexivity.
+    rewrite !lookup_all_index_add.
+    rewrite <- app_comm_cons. f_equiv.
+    rewrite (IHsbytes _ _ _ _ _ (ltac:(reflexivity))).
+    replace (off + 1) with (Z.succ off) by lia.
+    rewrite nat_N_Z; do 2 f_equiv; [ lia | f_equiv; lia].
   Qed.
 
   Lemma lookup_all_index_length :
@@ -265,19 +247,12 @@ Section Map_Theory.
     intros A len.
     remember (N.to_nat len) as n.
     assert (len = N.of_nat (N.to_nat len)) by lia.
-    rewrite H. clear H.
-    rewrite <- Heqn.
-    clear Heqn len.
+    rewrite H; clear H.
+    rewrite <- Heqn; clear Heqn len.
 
-    induction n;
-      intros off bytes def; auto.
-
-    cbn.
-    rewrite map_length.
-
-    rewrite <- (IHn off bytes def).
-    rewrite Zseq_length.
-    lia.
+    induction n; intros *; auto.
+    rewrite Nat2N.inj_succ, lookup_all_index_cons.
+    cbn; by f_equiv.
   Qed.
 
   (** ** Behavior of [add_all_index]
@@ -662,34 +637,16 @@ Section Serialization_Theory.
       (forall x, In x xs -> dvalue_has_dtyp x dt) ->
       N.to_nat (N.of_nat (Datatypes.length xs) * sizeof_dtyp dt) =
       Datatypes.length
-        (fold_right (fun (dv : dvalue) (acc : list SByte) => serialize_dvalue dv ++ acc) [] xs).
+        (fold_right (fun dv acc => serialize_dvalue dv ++ acc) [] xs).
   Proof.
-    induction xs; intros dt H; auto.
-
-    cbn.
-    rewrite app_length.
-    apply Nnat.Nat2N.inj.
-    rewrite Nnat.N2Nat.id.
-    rewrite Nnat.Nat2N.inj_add.
-
-    break_match.
-    - erewrite sizeof_serialized; cycle 1.
-      { apply H; apply in_eq. }
-
-      rewrite !Heqn. cbn.
-      erewrite <- IHxs; cycle 1.
-      { intros; apply H; by apply in_cons. }
-      rewrite Heqn. lia.
-    - erewrite sizeof_serialized; cycle 1.
-      { apply H; apply in_eq. }
-
-      rewrite Heqn.
-      erewrite <- IHxs; cycle 1.
-      { intros; apply H; by apply in_cons. }
-      rewrite Nnat.N2Nat.id.
-      lia.
+    induction xs; intros dt H; auto; cbn.
+    rewrite app_length ; apply Nnat.Nat2N.inj.
+    rewrite Nnat.N2Nat.id, Nnat.Nat2N.inj_add.
+    cbn in H; rewrite Nat2N.inj_succ, Nmult_Sn_m.
+    erewrite sizeof_serialized; eauto.
+    f_equiv; erewrite <-IHxs; eauto.
+    lia.
   Qed.
-
 
 End Serialization_Theory.
 
@@ -959,44 +916,45 @@ Section Memory_Stack_Theory.
       repeat unfold_lookup_all_index.
 
     Ltac solve_integer_deserialize :=
-      unroll_lookup_all_index; cbn; f_equal;
-      match goal with
-      | |- _ = ?x =>
-        first [ pose proof (unsigned_I8_in_range x)
-              | pose proof (unsigned_I32_in_range x)
-              | pose proof (unsigned_I64_in_range x)
-              ];
-
-        repeat rewrite Byte.unsigned_repr_eq;
-        unfold Byte.max_unsigned, Byte.modulus, Byte.wordsize, Wordsize_8.wordsize;
-        cbn;
-        change (two_power_nat 8) with 256;
-        let xv := fresh "xv" in
-        let Hxv := fresh "Hxv" in
-        first [ remember (Int8.unsigned x) as xv eqn:Hxv
-              | remember (Int32.unsigned x) as xv eqn:Hxv
-              | remember (Int64.unsigned x) as xv eqn:Hxv
-              ];
+        unroll_lookup_all_index;
+        unfold deserialize_sbytes; simpl; f_equal;
         match goal with
-        | [|- context[Int8.repr ?zv]] => replace zv with xv
-        | [|- context[Int32.repr ?zv]] => replace zv with xv
-        | [|- context[Int64.repr ?zv]] => replace zv with xv
-        end;
-        [subst xv;
-         try solve [ apply Int1.repr_unsigned
-                   | apply Int8.repr_unsigned
-                   | apply Int32.repr_unsigned
-                   | apply Int64.repr_unsigned
-                   ]
-        |];
-        clear Hxv;
-        unfold Z.modulo;
-        repeat break_let;
-        destruct_div_eucls;
-        subst;
-        rewrite_div_adds;
-        lia
-      end.
+        | |- _ = ?x =>
+          first [ pose proof (unsigned_I8_in_range x)
+                | pose proof (unsigned_I32_in_range x)
+                | pose proof (unsigned_I64_in_range x)
+                ];
+          unfold sbyte_list_to_Z; simpl;
+          repeat rewrite Byte.unsigned_repr_eq;
+          unfold Byte.max_unsigned, Byte.modulus, Byte.wordsize, Wordsize_8.wordsize;
+          cbn;
+          change (two_power_nat 8) with 256;
+          let xv := fresh "xv" in
+          let Hxv := fresh "Hxv" in
+          first [ remember (Int8.unsigned x) as xv eqn:Hxv
+                | remember (Int32.unsigned x) as xv eqn:Hxv
+                | remember (Int64.unsigned x) as xv eqn:Hxv
+                ];
+          match goal with
+          | [|- context[Int8.repr ?zv]] => replace zv with xv
+          | [|- context[Int32.repr ?zv]] => replace zv with xv
+          | [|- context[Int64.repr ?zv]] => replace zv with xv
+          end;
+          [subst xv;
+          try solve [ apply Int1.repr_unsigned
+                    | apply Int8.repr_unsigned
+                    | apply Int32.repr_unsigned
+                    | apply Int64.repr_unsigned
+                    ]
+          |];
+          clear Hxv;
+          unfold Z.modulo;
+          repeat break_let;
+          destruct_div_eucls;
+          subst;
+          rewrite_div_adds;
+          lia
+        end.
 
     Lemma deserialize_sbytes_dvalue_all_not_sundef :
       forall dv dt bytes,
@@ -1067,7 +1025,8 @@ Section Memory_Stack_Theory.
         UVALUE_Array (elt :: elts).
     Proof.
       induction sz;
-        intros elt elts ft elt_bytes elts_bytes SUP UNDEF_BYTES UNDEF_ELTS SIZE ELT ELTS.
+        intros elt elts ft elt_bytes elts_bytes
+          SUP UNDEF_BYTES UNDEF_ELTS SIZE ELT ELTS.
 
       - rewrite <- all_not_sundef_deserialized in ELT; auto.
         rewrite <- all_not_sundef_deserialized in ELTS; auto.
@@ -1075,26 +1034,27 @@ Section Memory_Stack_Theory.
 
         cbn in ELTS; inversion ELTS; subst; cbn.
 
-        replace (N.to_nat (sizeof_dtyp ft)) with (Datatypes.length elt_bytes + 0)%nat by lia.
-        rewrite Pos2Nat.inj_1.
-        rewrite firstn_app_2; cbn.
-        rewrite app_nil_r.
-
-        congruence.
+        replace (N.to_nat (sizeof_dtyp ft)) with
+          (Datatypes.length elt_bytes + 0)%nat by lia.
+        replace (N.to_nat (N.succ 0)) with 1%nat by lia.
+        rewrite firstn_app_2, app_nil_r; congruence.
       - rewrite <- all_not_sundef_deserialized in ELT; auto.
         rewrite <- all_not_sundef_deserialized in ELTS; auto.
         rewrite <- all_not_sundef_deserialized; auto using all_not_sundef_app.
 
         cbn in ELTS; inversion ELTS; subst; cbn.
 
-        replace (N.to_nat (sizeof_dtyp ft)) with (Datatypes.length elt_bytes + 0)%nat by lia.
-        rewrite Pos2Nat.inj_succ.
+        replace (N.to_nat (sizeof_dtyp ft)) with
+          (Datatypes.length elt_bytes + 0)%nat by lia.
+        replace (N.to_nat (N.succ (N.pos p))) with
+          (S (N.to_nat (N.pos p))) by lia.
         rewrite firstn_app_2; cbn.
         rewrite app_nil_r.
 
         do 2 f_equal.
 
-        replace (Datatypes.length elt_bytes + 0)%nat with (Datatypes.length elt_bytes) by lia.
+        replace (Datatypes.length elt_bytes + 0)%nat with
+          (Datatypes.length elt_bytes) by lia.
         rewrite skipn_length_app.
         congruence.
     Qed.
@@ -1104,6 +1064,34 @@ Section Memory_Stack_Theory.
     Proof.
       pose proof (@Int64.unsigned_range Int64.zero).
       assert (0 < Int64.modulus) by lia.
+      lia.
+    Qed.
+
+    Lemma deserialize_serialize_I1:
+      ∀ (x : int1) (off : Z) (bytes : mem_block),
+        is_supported (DTYPE_I 1)
+        → deserialize_sbytes
+            (lookup_all_index off (sizeof_dtyp (DTYPE_I 1))
+               (add_all_index (serialize_dvalue (DVALUE_I1 x)) off bytes)
+              SUndef) (DTYPE_I 1) = dvalue_to_uvalue (DVALUE_I1 x).
+    Proof.
+      intros * SUP.
+      unroll_lookup_all_index; cbn; f_equal.
+      pose proof (unsigned_I1_in_range x).
+      assert (EQ :DynamicValues.Int1.unsigned x / 256 = 0).
+      apply Z.div_small; lia.
+      rewrite EQ, !Zdiv_0_l.
+      unfold deserialize_sbytes.
+      replace (N.succ 0) with 1%N by lia.
+      cbn; unfold lookup_all_index; cbn.
+      replace (N.to_nat 0) with 0%nat by lia; cbn.
+      repeat rewrite Byte.unsigned_repr.
+      all: unfold Byte.max_unsigned, Byte.modulus; cbn; try lia.
+      rewrite Z.add_0_r. f_equiv.
+      apply DynamicValues.Int1.repr_unsigned.
+      split; try lia.
+      all: unfold Byte.wordsize, Wordsize_8.wordsize;
+      unfold two_power_nat; unfold shift_nat; cbn;
       lia.
     Qed.
 
@@ -1118,8 +1106,10 @@ Section Memory_Stack_Theory.
 (*         The proof should go by induction over [TYP] I think, and rely on [lookup_all_index_add] notably. *)
 (*      *)
     Lemma deserialize_serialize : forall val t (TYP : dvalue_has_dtyp val t),
-        forall off (bytes : mem_block) (SUP : is_supported t),
-          deserialize_sbytes (lookup_all_index off (sizeof_dtyp t) (add_all_index (serialize_dvalue val) off bytes) SUndef) t = dvalue_to_uvalue val.
+      forall off (bytes : mem_block) (SUP : is_supported t),
+        deserialize_sbytes
+          (lookup_all_index off (sizeof_dtyp t) (add_all_index (serialize_dvalue val) off bytes) SUndef) t =
+          dvalue_to_uvalue val.
     Proof.
       induction 1; try auto; intros;
         match goal with
@@ -1127,35 +1117,14 @@ Section Memory_Stack_Theory.
           try solve [inversion H]
         end.
       - unroll_lookup_all_index; cbn; f_equal.
-      - unroll_lookup_all_index; cbn; f_equal.
-        pose proof (unsigned_I1_in_range x).
-        assert (EQ :DynamicValues.Int1.unsigned x / 256 = 0).
-        apply Z.div_small; lia.
-        rewrite EQ.
-        repeat rewrite Zdiv_0_l.
-        pose proof Byte.modulus_pos.
-        repeat rewrite Byte.unsigned_repr; cycle 1.
-        all: try solve [unfold Byte.max_unsigned; try lia].
-        { split; try lia.
-          pose proof (@Int1.unsigned_range x).
-          destruct H1.
-          apply Z.lt_le_incl.
-          eapply Z.lt_le_trans; eauto.
-          unfold Int1.modulus, Byte.max_unsigned, Byte.modulus.
-          unfold Int1.wordsize, Wordsize1.wordsize.
-          unfold Byte.wordsize, Wordsize_8.wordsize.
-
-          unfold two_power_nat. unfold shift_nat; cbn.
-          lia. }
-        rewrite Z.add_0_r.
-        apply DynamicValues.Int1.repr_unsigned.
+      - by apply deserialize_serialize_I1.
       - solve_integer_deserialize.
       - solve_integer_deserialize.
       - solve_integer_deserialize.
       - inversion SUP; subst;
         exfalso; apply H; constructor.
-      - unroll_lookup_all_index; cbn; f_equal.
-        clear bytes off.
+      - unroll_lookup_all_index;
+        unfold deserialize_sbytes; simpl; f_equal; cbn.
         remember (Float.to_bits x) as xb.
         pose proof (unsigned_I64_in_range xb).
         repeat rewrite Byte.unsigned_repr_eq.
@@ -1185,8 +1154,8 @@ Section Memory_Stack_Theory.
               rewrite div_add_lemma in H; [|lia]; subst
             end.
           lia.
-      - unroll_lookup_all_index; cbn; f_equal.
-        clear bytes off.
+      - unroll_lookup_all_index;
+        unfold deserialize_sbytes; simpl; f_equal; cbn.
         remember (Float32.to_bits x) as xb.
         pose proof (unsigned_I32_in_range xb).
         repeat rewrite Byte.unsigned_repr_eq.
@@ -1702,15 +1671,16 @@ Section Memory_Stack_Theory.
         all_not_sundef (lookup_all_index 0 n (init_block n) SUndef) = false.
     Proof.
       destruct n; intros SZ.
-      inv SZ.
-      cbn.
+      inv SZ. cbn.
 
-      pose proof Pos2Nat.is_succ p as [n PN].
-      rewrite PN.
+      pose proof Pos2Nat.is_succ (p - 1) as [n PN].
+      rewrite PN. simpl.
       cbn.
+      rewrite <-N.succ_pos_pred.
+      rewrite lookup_all_index_cons; cbn.
 
-      rewrite lookup_init_block_undef.
-      reflexivity.
+      setoid_rewrite lookup_insert_ne; eauto.
+      rewrite lookup_init_block_undef; eauto.
     Qed.
 
     (* This is false for VOID, and 0 length arrays *)
@@ -2520,7 +2490,7 @@ Section PARAMS.
           read m ptr t = inr val.
     Proof.
       intros * GET. intros.
-      pose proof get_array_succeeds_allocated _ _ _ _ GET as ALLOC.
+      pose proof get_array_succeeds_allocated _ _ GET as ALLOC.
       pose proof @read_array m size t i a ptr ALLOC as RARRAY.
       split.
       - rewrite interp_memory_trigger. cbn.
@@ -2543,7 +2513,7 @@ Section PARAMS.
           read m ptr t = inr val.
     Proof.
       intros t a size m val i GET.
-      pose proof get_array_succeeds_allocated _ _ _ _ GET as ALLOC.
+      pose proof get_array_succeeds_allocated _ _ GET as ALLOC.
       pose proof @read_array_exists m size t i a ALLOC as RARRAY.
       destruct RARRAY as (ptr & GEP & READ).
       exists ptr.

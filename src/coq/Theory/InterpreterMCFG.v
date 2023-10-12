@@ -169,9 +169,9 @@ Proof.
   go.
   rewrite interp_memory_load; cycle -1.
   unfold read.
-  cbn in *; rewrite LUL; reflexivity.
+  setoid_rewrite LUL; reflexivity.
   go.
-  unfold read_in_mem_block; rewrite EQ.
+  unfold read_in_mem_block; setoid_rewrite EQ.
   reflexivity.
 Qed.
 
