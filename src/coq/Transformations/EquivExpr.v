@@ -74,6 +74,9 @@ Section ExpOptim.
     Variable opt_correct: forall e τ g l m, ⟦ e at? τ ⟧e3 g l m ≈ ⟦ opt e at? τ ⟧e3 g l m.
     Variable opt_respect_int: forall e, intrinsic_exp e = intrinsic_exp (opt e).
 
+    Variable typ_pres: forall d d0,
+      dvalue_has_dtyp_fun d d0 = dvalue_has_dtyp_fun d (endo d0).
+
     Ltac intro3 := first [intros (? & ? & ? & ?) ? <- | intros (? & ? & ? & ?)].
 
     Lemma exp_optim_correct_instr : forall x i g l m,
@@ -137,15 +140,24 @@ Section ExpOptim.
         reflexivity.
       - destruct x; cbn; try reflexivity.
         destruct ptr, val; cbn.
+        destruct d; cbn; try reflexivity.
         rewrite !interp_cfg3_bind; apply eutt_clo_bind with (UU := eq).
         rewrite opt_correct; reflexivity.
         intro3.
         rewrite !interp_cfg3_bind; apply eutt_eq_bind.
         intro3.
+        destruct (dvalue_has_dtyp_fun d d0) eqn : H.
+        pose proof (typ_pres d d0) as TYP.
+        rewrite H in TYP. rewrite <-TYP.
+
         rewrite !interp_cfg3_bind; apply eutt_clo_bind with (UU := eq).
         rewrite opt_correct; reflexivity.
         intro3.
         reflexivity.
+
+        rewrite <- typ_pres. rewrite H; reflexivity.
+
+
     Qed.
     
     Lemma exp_optim_correct_term : forall t g l m,

@@ -408,13 +408,16 @@ Section Serialization_Theory.
     intros dv dt TYP.
     induction TYP; try solve [cbn; auto].
     - cbn. rewrite DynamicValues.unsupported_cases_match; auto.
-    - cbn.
-      rewrite app_length.
-      rewrite Nnat.Nat2N.inj_add.
-      rewrite IHTYP1.
-      cbn in IHTYP2. rewrite IHTYP2.
-      symmetry.
-      apply fold_sizeof.
+    - revert fts H. induction fields; intros.
+      + destruct fts; inversion H; auto.
+      + destruct fts; inversion H; subst; eauto.
+        cbn.
+        rewrite app_length.
+        rewrite Nnat.Nat2N.inj_add.
+        specialize (IHfields _ H5).
+        rewrite H3. setoid_rewrite IHfields.
+        symmetry.
+        apply fold_sizeof.
     - generalize dependent sz.
       induction xs; intros sz H; cbn.
       + subst; auto.
@@ -444,43 +447,52 @@ Section Serialization_Theory.
       (firstn (N.to_nat (sizeof_dtyp dt)) (serialize_dvalue dv)) = serialize_dvalue dv.
   Proof.
     intros dv dt TYP.
-    induction TYP; auto.
+    pose proof (TYP' := TYP).
+    induction TYP using dvalue_has_dtyp_ind; auto.
     - cbn. rewrite DynamicValues.unsupported_cases_match. reflexivity. auto.
     - (* Structs *)
+      revert fts H TYP'.
+      induction fields; intros.
+      + destruct fts; inversion H; auto.
+      + destruct fts; inversion H; auto; subst.
+
       rewrite sizeof_struct_cons.
       cbn.
-      rewrite <- sizeof_serialized with (dv:=f); auto.
+      rewrite <- sizeof_serialized with (dv:=a); auto.
 
       replace (N.to_nat
-                 (N.of_nat (Datatypes.length (serialize_dvalue f)) +
-                  fold_left (fun (x : N) (acc : dtyp) => x + sizeof_dtyp acc) dts 0))%N with
-          (Datatypes.length (serialize_dvalue f) +
-           N.to_nat (fold_left (fun (x : N) (acc : dtyp) => (x + sizeof_dtyp acc)%N) dts 0%N))%nat.
-      + rewrite firstn_app_2.
-        cbn in *.
-        rewrite IHTYP2.
+                 (N.of_nat (Datatypes.length (serialize_dvalue a)) +
+                  fold_left (fun (x : N) (acc : dtyp) => x + sizeof_dtyp acc) fts 0))%N with
+          (Datatypes.length (serialize_dvalue a) +
+           N.to_nat (fold_left (fun (x : N) (acc : dtyp) => (x + sizeof_dtyp acc)%N) fts 0%N))%nat.
+      * rewrite firstn_app_2.
+        cbn in *. specialize (IHfields _ H5).
+        rewrite IHfields.
         reflexivity.
-      + rewrite Nnat.N2Nat.inj_add; try lia.
+        inversion TYP'; subst.
+        constructor; auto. rewrite Forall2_cons in H2.
+        destruct H2; auto.
+      * rewrite Nnat.N2Nat.inj_add; try lia.
+      * inversion TYP'; subst.
+        rewrite Forall2_cons in H2.
+        destruct H2; auto.
     - (* Arrays *)
       generalize dependent sz.
-      induction xs; intros sz H.
-      + cbn. apply firstn_nil.
+      induction xs; intros sz H Hdtyp.
+      + cbn. intros; apply firstn_nil.
       + cbn in *. inversion H.
+        inversion Hdtyp; subst.
+        apply Forall_cons in H4. destruct H4.
         replace (N.of_nat (S (Datatypes.length xs)) * sizeof_dtyp dt)%N with
             (sizeof_dtyp dt + N.of_nat (Datatypes.length xs) * sizeof_dtyp dt)%N.
         * rewrite Nnat.N2Nat.inj_add.
-          -- cbn. rewrite <- sizeof_serialized with (dv:=a).
+          -- cbn. rewrite <- sizeof_serialized with (dv:=a); auto.
              rewrite Nnat.Nat2N.id.
              rewrite firstn_app_2.
-             rewrite sizeof_serialized with (dt:=dt).
+             rewrite sizeof_serialized with (dt:=dt); auto.
              apply app_prefix.
-             apply IHxs.
-             intros x Hin.
-             apply IH; intuition.
-             intros x Hin; auto.
-             auto.
-             auto.
-             auto.
+             apply IHxs; auto.
+             constructor; auto.
         * rewrite Nnat.Nat2N.inj_succ. rewrite N.mul_succ_l. lia.
   Qed.
 
@@ -1111,7 +1123,9 @@ Section Memory_Stack_Theory.
           (lookup_all_index off (sizeof_dtyp t) (add_all_index (serialize_dvalue val) off bytes) SUndef) t =
           dvalue_to_uvalue val.
     Proof.
-      induction 1; try auto; intros;
+      intros val t H.
+      pose proof (Hτ := H).
+      induction H; try auto; intros;
         match goal with
         | H: is_supported ?t |- _ =>
           try solve [inversion H]
@@ -1193,16 +1207,20 @@ Section Memory_Stack_Theory.
           subst.
           lia.
       - (* Structs *)
-        rewrite sizeof_struct_cons.
+        revert fts H SUP off bytes Hτ.
+        induction fields; cbn; auto.
+        { intros. inversion H; subst; auto. }
 
-        inversion SUP.
-        subst.
+        intros; destruct fts; inversion H; subst; clear H.
+        cbn; inversion SUP; subst.
         rename H0 into FIELD_SUP.
         apply List.Forall_cons_iff in FIELD_SUP.
         destruct FIELD_SUP as [dt_SUP dts_SUP].
-        assert (is_supported (DTYPE_Struct dts)) as SUP_STRUCT by (constructor; auto).
-
-        cbn.
+        assert (is_supported (DTYPE_Struct fts)) as SUP_STRUCT by
+            (constructor; auto).
+        specialize (IHfields _ H5 SUP_STRUCT).
+        rewrite (N.add_0_l (sizeof_dtyp d)).
+        rewrite fold_sizeof.
         rewrite lookup_all_index_append; [|apply sizeof_serialized; auto].
 
         erewrite deserialize_struct_element; auto.
@@ -1210,26 +1228,44 @@ Section Memory_Stack_Theory.
           rewrite lookup_all_index_add_all_index_same_length; eauto.
 
           apply dvalue_serialized_not_sundef.
-        + pose proof deserialize_sbytes_dvalue_all_not_sundef (DVALUE_Struct fields) (DTYPE_Struct dts) (lookup_all_index (off + Z.of_N (sizeof_dtyp dt)) (sizeof_dtyp (DTYPE_Struct dts))
-                                                                                                                          (add_all_index (serialize_dvalue (DVALUE_Struct fields)) (off + Z.of_N (sizeof_dtyp dt)) bytes) SUndef).
+          inversion Hτ; subst.
+          rewrite Forall2_cons in H1; destruct H1; auto.
+
+        + pose proof deserialize_sbytes_dvalue_all_not_sundef (DVALUE_Struct fields) (DTYPE_Struct fts) (lookup_all_index (off + Z.of_N (sizeof_dtyp d)) (sizeof_dtyp (DTYPE_Struct fts))
+                                                                                                                          (add_all_index (serialize_dvalue (DVALUE_Struct fields)) (off + Z.of_N (sizeof_dtyp d)) bytes) SUndef).
           cbn in H.
           forward H; auto.
+          eapply IHfields; auto.
+          inversion Hτ; subst.
+          rewrite Forall2_cons in H2; destruct H2; auto.
+          constructor; auto.
+
         + rewrite lookup_all_index_length.
           reflexivity.
+        + apply H3; auto.
+          inversion Hτ; subst.
+          rewrite Forall2_cons in H1; destruct H1; auto.
+        + apply IHfields; auto.
+          inversion Hτ; subst.
+          rewrite Forall2_cons in H1; destruct H1; auto.
+          constructor; auto.
+        + inversion Hτ; subst.
+          rewrite Forall2_cons in H1; destruct H1; auto.
       - (* Arrays *)
-        rename H into SZ.
-        generalize dependent sz.
+        inversion SUP; subst; clear SUP.
+        inversion Hτ; subst; clear Hτ H0.
+        rename H1 into SZ.
         generalize dependent xs.
         induction xs;
-          intros IH IHdtyp sz SZ SUP.
+          intros IH IHdtyp SUP.
         + cbn in *.
           subst.
           reflexivity.
-        + cbn in SZ.
-          subst.
-          rewrite Nnat.Nat2N.inj_succ.
+        +
           cbn.
 
+          subst.
+          rewrite Nnat.Nat2N.inj_succ; cbn.
           assert (dvalue_has_dtyp a dt) as DTa.
           {
             apply IHdtyp.
@@ -1240,7 +1276,7 @@ Section Memory_Stack_Theory.
           rewrite lookup_all_index_append; [|apply sizeof_serialized; auto].
 
           erewrite deserialize_array_element; auto.
-          * inversion SUP; constructor; auto.
+          * inversion SUP; constructor; subst; auto.
           * erewrite <- sizeof_serialized; eauto.
             rewrite lookup_all_index_add_all_index_same_length; eauto.
 
@@ -1262,7 +1298,6 @@ Section Memory_Stack_Theory.
             by do 2 rewrite Nat2N.id.
           * rewrite IH; intuition.
             inversion SUP; auto. by apply in_eq.
-            inversion SUP; eauto.
           * cbn.
 
             unfold deserialize_sbytes.
@@ -1295,9 +1330,8 @@ Section Memory_Stack_Theory.
             forward IHxs; intuition.
             { by apply IHdtyp, in_cons. }
 
-            specialize (IHxs (Datatypes.length xs) eq_refl).
-            forward IHxs.
-            { inversion SUP; constructor; eauto. }
+            forward IHxs; auto.
+            { apply Forall_cons in SUP. destruct SUP; auto. }
 
             cbn in IHxs.
             rewrite <- IHxs.

@@ -179,30 +179,29 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
           * apply forall_repeat_true.
             apply IHt. reflexivity.
           * apply repeat_length.
-      - revert H. induction fields.
-        + intros. inv H0. constructor.
+      - cbn. intros.
+        destruct (map_monad default_dvalue_of_dtyp fields) eqn: Hfields;
+          inversion H0; subst; clear H0.
+        revert H l Hfields.
+        induction fields.
+        + intros. inv Hfields. do 2 constructor.
         + intros.
           assert (forall u : dtyp,
               In u fields ->
               forall v : dvalue,
                 inr v = default_dvalue_of_dtyp u -> dvalue_has_dtyp v u).
           { intros. apply H. apply in_cons. auto. auto. }
-          specialize (IHfields H1). clear H1.
-          Opaque map_monad.
-          (* Reduce H0 *)
-          cbn in H0.
-          rewrite list_cons_app in H0.
-          rewrite map_monad_app in H0. cbn in H0.
-          Transparent map_monad.
-          unfold map_monad at 1 in H0.
-          Opaque map_monad. cbn in H0.
+          specialize (IHfields H0). clear H0.
+          cbn in Hfields.
           destruct (default_dvalue_of_dtyp a) eqn: A_DEFAULT.
-          inv H0.
+          inv Hfields.
           destruct (map_monad default_dvalue_of_dtyp fields) eqn: FIELDS.
-          inv H0.
-          inv H0. constructor. apply H. apply in_eq.
-          symmetry. auto.
-          apply IHfields. cbn. rewrite FIELDS. reflexivity.
+          inv Hfields.
+          inv Hfields; subst.
+          do 2 constructor; auto.
+          * apply H; auto. apply in_eq.
+          * symmetry in FIELDS. specialize (IHfields _ eq_refl).
+            inversion IHfields; subst; auto.
     Qed.
 
    Transparent map_monad.

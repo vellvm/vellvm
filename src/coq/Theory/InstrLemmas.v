@@ -200,12 +200,13 @@ Proof.
 Qed.
 
 Lemma denote_instr_store :
-  forall (i : int) volatile τv val τp ptr align uv dv a g l l' l'' m m',
+  forall (i : int) volatile τv val ptr align uv dv a g l l' l'' m m',
     ⟦ val at τv ⟧e3 g l m ≈ Ret3 g l' m uv ->
-    ⟦ ptr at τp ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_Addr a) ->
+    ⟦ ptr at DTYPE_Pointer ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_Addr a) ->
     uvalue_to_dvalue uv = inr dv ->
+    dvalue_has_dtyp_fun dv τv ->
     write m a dv = inr m' ->
-    ⟦ (IVoid i, INSTR_Store volatile (τv, val) (τp, ptr) align) ⟧i3 g l m ≈ Ret3 g l'' m' tt.
+    ⟦ (IVoid i, INSTR_Store volatile (τv, val) (DTYPE_Pointer, ptr) align) ⟧i3 g l m ≈ Ret3 g l'' m' tt.
 Proof.
   intros * EXP PTR CONV_UV WRITE.
   cbn.
@@ -219,6 +220,8 @@ Proof.
   injection CONV_UV; intros; subst.
   rewrite CONC_UV.
   go.
+  destruct (dvalue_has_dtyp_fun dv τv); auto.
+  go.
   rewrite PTR.
   go.
   cbn.
@@ -228,23 +231,24 @@ Proof.
 
   destruct (dvalue_eq_dec (d1:=DVALUE_Addr a) (d2:=DVALUE_Poison)); try inversion e.
   step.
-  reflexivity.
+  reflexivity. inversion WRITE.
 Qed.
 
 Lemma denote_instr_store_exists :
-  forall (i : int) volatile τv val τp ptr align uv dv a g l l' l'' m,
+  forall (i : int) volatile τv val ptr align uv dv a g l l' l'' m,
     ⟦ val at τv ⟧e3 g l m ≈ Ret3 g l' m uv ->
-    ⟦ ptr at τp ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_Addr a) ->
+    ⟦ ptr at DTYPE_Pointer ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_Addr a) ->
     uvalue_to_dvalue uv = inr dv ->
-    dvalue_has_dtyp dv τv ->
+    dvalue_has_dtyp_fun dv τv ->
     dtyp_fits m a τv ->
     exists m',
-      write m a dv = inr m' /\ ⟦ (IVoid i, INSTR_Store volatile (τv, val) (τp, ptr) align) ⟧i3 g l m ≈ Ret3 g l'' m' tt.
+      write m a dv = inr m' /\ ⟦ (IVoid i, INSTR_Store volatile (τv, val) (DTYPE_Pointer, ptr) align) ⟧i3 g l m ≈ Ret3 g l'' m' tt.
 Proof.
   intros * EXP PTR CONV_UV TYP FITS.
   apply write_succeeds with (v:=dv) in FITS as [m2 WRITE]; auto.
   exists m2. split; auto.
   eapply denote_instr_store; eauto.
+  apply dvalue_has_dtyp_fun_sound in TYP; auto.
 Qed.
 
 Lemma denote_instr_alloca_exists :

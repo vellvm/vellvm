@@ -1494,14 +1494,10 @@ Class VInt I : Type :=
   | DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) DTYPE_Double
   | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Float
   | DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
-
-  | DVALUE_Struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Struct []) (DTYPE_Struct [])
-  | DVALUE_Struct_Cons_typ :
-      forall f dt fields dts,
-        dvalue_has_dtyp f dt ->
-        dvalue_has_dtyp (DVALUE_Struct fields) (DTYPE_Struct dts) ->
-        dvalue_has_dtyp (DVALUE_Struct (f :: fields)) (DTYPE_Struct (dt :: dts))
-
+  | DVALUE_Struct_typ :
+    forall fields dts,
+      List.Forall2 dvalue_has_dtyp fields dts ->
+      dvalue_has_dtyp (DVALUE_Struct fields) (DTYPE_Struct dts)
 
   (* Do we have to exclude mmx? "There are no arrays, vectors or constants of this type" *)
   | DVALUE_Array_typ :
@@ -1645,13 +1641,10 @@ Class VInt I : Type :=
     Hypothesis IH_Double         : forall x, P (DVALUE_Double x) DTYPE_Double.
     Hypothesis IH_Float          : forall x, P (DVALUE_Float x) DTYPE_Float.
     Hypothesis IH_None           : P DVALUE_None DTYPE_Void.
-    Hypothesis IH_Struct_nil     : P (DVALUE_Struct []) (DTYPE_Struct []).
-    Hypothesis IH_Struct_cons    : forall (f : dvalue) (dt : dtyp) (fields : list dvalue) (dts : list dtyp),
-        dvalue_has_dtyp f dt ->
-        P f dt ->
-        dvalue_has_dtyp (DVALUE_Struct fields) (DTYPE_Struct dts) ->
-        P (DVALUE_Struct fields) (DTYPE_Struct dts) ->
-        P (DVALUE_Struct (f :: fields)) (DTYPE_Struct (dt :: dts)).
+    Hypothesis IH_Struct :
+      forall fields fts,
+        List.Forall2 P fields fts ->
+        P (DVALUE_Struct fields) (DTYPE_Struct fts).
     Hypothesis IH_Array : forall (xs : list dvalue) (sz : nat) (dt : dtyp)
                             (IH : forall x, In x xs -> P x dt)
                             (IHdtyp : forall x, In x xs -> dvalue_has_dtyp x dt),
@@ -1670,8 +1663,15 @@ Class VInt I : Type :=
       - apply IH_Double.
       - apply IH_Float.
       - apply IH_None.
-      - apply IH_Struct_nil.
-      - apply (IH_Struct_cons TYP1 (IH f dt TYP1) TYP2 (IH (DVALUE_Struct fields) (DTYPE_Struct dts) TYP2)).
+      - apply IH_Struct.
+        revert fields dts H.
+        fix IHL_A 3.
+        intros fields dts H.
+        destruct H.
+        + constructor.
+        + constructor.
+          eauto.
+          eauto.
       - rename H into Hforall.
         rename H0 into Hlen.
         refine (IH_Array _ _ Hlen).
@@ -1691,6 +1691,125 @@ Class VInt I : Type :=
         apply Forall_forall; auto.
     Qed.
   End dvalue_has_dtyp_ind.
+
+
+  Fixpoint dvalue_has_dtyp_fun (dv:dvalue) (dt:dtyp) : bool :=
+    let list_forallb2 :=
+      fix go dvs dts :=
+      match dvs, dts with
+      | [], [] => true
+      | dv::utl, dt::dttl => dvalue_has_dtyp_fun dv dt && go utl dttl
+      | _,_ => false
+      end
+    in
+
+    match dv with
+    | DVALUE_Addr a =>
+        if @dtyp_eq_dec dt DTYPE_Pointer then true else false 
+        
+    | DVALUE_I1 x =>
+        if @dtyp_eq_dec dt (DTYPE_I 1) then true else false 
+        
+    | DVALUE_I8 x =>
+        if @dtyp_eq_dec dt (DTYPE_I 8) then true else false
+                                                       
+    | DVALUE_I32 x => 
+        if @dtyp_eq_dec dt (DTYPE_I 32) then true else false
+                       
+    | DVALUE_I64 x => 
+        if @dtyp_eq_dec dt (DTYPE_I 64) then true else false
+                       
+    | DVALUE_Double x => 
+        if @dtyp_eq_dec dt (DTYPE_Double) then true else false
+                                                        
+    | DVALUE_Float x =>
+        if @dtyp_eq_dec dt (DTYPE_Float) then true else false        
+
+    | DVALUE_Poison => false
+               
+    | DVALUE_None =>
+        if @dtyp_eq_dec dt (DTYPE_Void) then true else false        
+                      
+    | DVALUE_Struct fields =>
+        match dt with
+        | DTYPE_Struct field_dts =>
+            list_forallb2 fields field_dts
+        | _ => false
+        end
+
+    | DVALUE_Array elts =>
+        match dt with
+        | DTYPE_Array sz dtt =>
+            List.forallb (fun u => dvalue_has_dtyp_fun u dtt) elts &&
+              (Nat.eqb (List.length elts) (N.to_nat sz))
+        | _ => false
+        end
+    end.
+
+  Ltac invert_bools :=
+    repeat match goal with
+      | [ H : false = true |- _ ] => inversion H
+      | [ H : ((?X && ?Y) = true) |- _ ] => apply andb_true_iff in H; destruct H
+      | [ H : ((?X || ?Y) = true) |- _ ] => apply orb_true_iff in H; destruct H
+    end.
+
+  Ltac break_match_hyp_inv :=
+    match goal with
+    | [ H : context [ match ?X with _ => _ end ] |- _] =>
+        match type of X with
+        | sumbool _ _ => destruct X
+        | _ => destruct X eqn:?
+        end;
+        inv H
+    end.
+
+  Lemma dvalue_has_dtyp_fun_sound :
+    forall dv dt,
+      dvalue_has_dtyp_fun dv dt = true -> dvalue_has_dtyp dv dt.
+  Proof.
+    induction dv; intros dtx HX;
+      try solve [
+          cbn in HX; 
+          repeat break_match_hyp_inv;
+          invert_bools;
+          econstructor; eauto with dvalue
+        ].
+
+    - cbn in HX.
+      repeat break_match_hyp_inv.
+      intros. constructor.
+      revert fields0 H1.
+      induction fields; intros; cbn.
+      { destruct fields0; invert_bools.
+        constructor. }
+      { destruct fields0; invert_bools.
+        constructor.
+        eapply H; auto; constructor; auto.
+        eapply IHfields; eauto.
+        intros; eapply H; auto.
+        apply in_cons; auto. }
+        
+    - cbn in HX.
+      repeat break_match_hyp_inv.
+      apply andb_prop in H1. destruct H1.
+      apply Nat.eqb_eq in H1; subst.
+      assert (sz = N.of_nat (Datatypes.length elts)).
+      { rewrite H1; rewrite Nnat.N2Nat.id; auto. }
+      subst.
+      apply DVALUE_Array_typ; auto.
+      clear H1.
+      induction elts.
+      + constructor.
+      + cbn in H0.
+        invert_bools.
+        constructor.
+        eapply H; auto. left; auto.
+        apply IHelts; auto.
+        intros.
+        eapply H. right; auto.
+        assumption.
+
+  Qed.
 
   Inductive concretize_u : uvalue -> undef_or_err dvalue -> Prop :=
   (* Concrete uvalue are contretized into their singleton *)

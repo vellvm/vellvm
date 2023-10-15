@@ -495,16 +495,22 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                 trigger (LocalWrite id dv)
 
         (* Store *)
-        | (IVoid _, INSTR_Store _ (dt, val) (du, ptr) _) =>
+        | (IVoid _, INSTR_Store _ (dt, val) (DTYPE_Pointer, ptr) _) =>
           uv <- translate exp_to_instr (denote_exp (Some dt) val) ;;
           dv <- concretize_or_pick uv True ;;
-          ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
-          da <- pickUnique ua ;;
-          if (@dvalue_eq_dec da DVALUE_Poison)
-          then raiseUB "Store to poisoned address."
-          else trigger (Store da dv)
+          if (dvalue_has_dtyp_fun dv dt) then
+          (ua <- translate exp_to_instr
+                  (denote_exp (Some DTYPE_Pointer) ptr) ;;
+            da <- pickUnique ua ;;
+            if (@dvalue_eq_dec da DVALUE_Poison)
+            then raiseUB "Store to poisoned address."
+            else trigger (Store da dv))
+          else
+            raise "Ill-typed store instruction"
 
-        | (_, INSTR_Store _ _ _ _) => raise "ILL-FORMED itree ERROR: Store to non-void ID"
+        | (_, INSTR_Store _ _ _ _) =>
+            raise "ILL-FORMED itree ERROR: Store to non-void ID or
+                    Ill-typed Store"
 
         (* Call *)
         | (pt, INSTR_Call (dt, f) args attrs) =>
