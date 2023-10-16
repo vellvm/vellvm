@@ -10361,7 +10361,87 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       eapply index_into_vec_dv_fin_inf; eauto.
     - (* InsertElement *)
-      admit.
+      red; intros dv_fin CONC_FIN.
+      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      cbn in REF.
+      break_match_hyp_inv.
+      break_match_hyp_inv.
+      break_match_hyp_inv.
+
+      pose proof (IHuv_inf1 u Heqo) as IHuv_inf_u.
+      pose proof (IHuv_inf2 u0 Heqo0) as IHuv_inf_u0.
+      pose proof (IHuv_inf3 u1 Heqo1) as IHuv_inf_u1.
+
+      unfold uvalue_concretize_fin_inf_inclusion in IHuv_inf_u, IHuv_inf_u0, IHuv_inf_u1.
+
+      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
+      red in CONC_FIN.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
+
+      repeat red in CONC_FIN.
+      destruct CONC_FIN as (?&?&?&?&?).
+      destruct_err_ub_oom x; inv H0.
+      destruct H1 as [[] | H1].
+      specialize (H1 _ eq_refl).
+      cbn in H1.
+
+      repeat red in H1.
+      destruct H1 as (?&?&?&?&?).
+      destruct_err_ub_oom x; cbn in H1; rewrite <- H1 in H3; inv H3.
+      destruct H2 as [[] | H2].
+      specialize (H2 _ eq_refl).
+
+      repeat red in H2.
+      destruct H2 as (?&?&?&?&?).
+      destruct_err_ub_oom x; cbn in H3; rewrite <- H3 in H5; inv H5.
+      destruct H4 as [[] | H4].
+      specialize (H4 _ eq_refl).
+
+      remember (x4 x5) as x4x5.
+      destruct_err_ub_oom x4x5; inv H7.
+      cbn in H3.
+      rewrite <- H3 in H1.
+      cbn in H1.
+
+      specialize (IHuv_inf_u _ H).
+      specialize (IHuv_inf_u0 _ H2).
+      specialize (IHuv_inf_u1 _ H0).
+
+      rewrite IS1.MEM.CP.CONC.concretize_equation.
+      red.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+
+      repeat red.
+      exists (ret (lift_dvalue_fin_inf x1)).
+      exists (fun dv_inf => (fmap lift_dvalue_fin_inf (x0 x1))).
+      cbn.
+      rewrite <- H1.
+      cbn.
+      split; eauto.
+      split; eauto.
+
+      right.
+      intros a ?; subst.
+      repeat red.
+      exists (ret (lift_dvalue_fin_inf x3)).
+      exists (fun dv_inf => (fmap lift_dvalue_fin_inf (x2 x3))).
+      cbn; rewrite <- H3; cbn.
+      split; eauto.
+      split; eauto.
+
+      right.
+      intros a ?; subst.
+      repeat red.
+      exists (ret (lift_dvalue_fin_inf x5)).
+      exists (fun dv_inf => (fmap lift_dvalue_fin_inf (x4 x5))).
+      cbn; rewrite <- Heqx4x5; cbn.
+      split; eauto.
+      split; eauto.
+
+      right.
+      intros a ?; subst.
+
+      eapply insert_into_vec_dv_fin_inf; eauto.
     - (* ShuffleVector *)
       admit.
     - (* ExtractValue *)
@@ -10614,13 +10694,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
         admit.
     }
-  Admitted.
-
-  (* TODO: Move this and prove this *)
-  Lemma dtyp_inhabited_dvalue :
-    forall dt,
-      {exists dv, dvalue_has_dtyp dv dt} + {forall dv, ~ dvalue_has_dtyp dv dt}.
-  Proof.
   Admitted.
 
   (* (* TODO: Move this to where concretize is defined *) *)
