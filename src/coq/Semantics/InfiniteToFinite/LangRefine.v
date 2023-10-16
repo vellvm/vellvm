@@ -10443,9 +10443,62 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       eapply insert_into_vec_dv_fin_inf; eauto.
     - (* ShuffleVector *)
-      admit.
+      red; intros dv_fin CONC_FIN.
+      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      cbn in REF.
+      break_match_hyp_inv.
+      break_match_hyp_inv.
+      break_match_hyp_inv.
+
+      pose proof (IHuv_inf1 u Heqo) as IHuv_inf_u.
+      pose proof (IHuv_inf2 u0 Heqo0) as IHuv_inf_u0.
+      pose proof (IHuv_inf3 u1 Heqo1) as IHuv_inf_u1.
+
+      unfold uvalue_concretize_fin_inf_inclusion in IHuv_inf_u, IHuv_inf_u0, IHuv_inf_u1.
+
+      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
+      red in CONC_FIN.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
+      inv CONC_FIN.
     - (* ExtractValue *)
-      admit.
+      red; intros dv_fin CONC_FIN.
+      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      cbn in REF.
+      break_match_hyp_inv.
+
+      generalize dependent u.
+      generalize dependent dv_fin.
+      generalize dependent uv_inf.
+      generalize dependent t.
+      induction idxs; intros t uv_inf IHuv_inf dv_fin u Heqo CONC_FIN.
+      + rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
+        red in CONC_FIN.
+        rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
+        cbn in CONC_FIN.
+
+        repeat red in CONC_FIN.
+        destruct CONC_FIN as (?&?&?&?&?).
+        destruct_err_ub_oom x; inv H0.
+        destruct H1 as [[] | H1].
+        specialize (H1 _ eq_refl).
+
+        rewrite IS1.MEM.CP.CONC.concretize_equation;
+          red; rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation;
+          cbn; repeat red.
+
+        rewrite <- H1 in H3; inv H3.
+
+        exists (ret (lift_dvalue_fin_inf dv_fin)).
+        exists (fun dv_inf => (fmap lift_dvalue_fin_inf (x0 dv_fin))).
+        cbn; rewrite <- H1; cbn.
+        split.
+        eapply IHuv_inf; eauto. apply Heqo.
+        
+        split; eauto.
+        right.
+        intros a ?; subst.
+        auto.
+      + 
     - (* InsertValue *)
       admit.
     - (* Select *)
