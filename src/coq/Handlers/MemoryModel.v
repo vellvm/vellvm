@@ -683,6 +683,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   Proof.
     intros M HM EQM Pre Post B MB WM EQV WRET MLAWS OOM ERR RBMOOM RBMERR RWOOM RWERR ptr len ptrs CONSEC.
     unfold get_consecutive_ptrs in CONSEC.
+    Opaque handle_gep_addr.
     cbn in *.
     destruct (intptr_seq 0 len) eqn:SEQ.
     - (* No OOM *)
@@ -6392,6 +6393,8 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
     exists ptrs, (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad.
   Proof.
     intros M HM EQM EQV EQRET OOM ERR LAWS ptr len.
+
+    Opaque handle_gep_addr.
 
     unfold get_consecutive_ptrs.
     pose proof big_intptr_seq_succeeds 0 len as (ips & SEQ).

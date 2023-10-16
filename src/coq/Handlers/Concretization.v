@@ -1542,6 +1542,8 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
              dv1 <- concretize_uvalueM v1;;
              dv2 <- concretize_uvalueM v2;;
 
+             (* TODO: Change this to a fixpoint instead of using
+                non-structural recursion for xs_rest and ys_rest *)
              match dv1, dv2 with
              | DVALUE_Poison t, _ =>
                  ret (DVALUE_Poison t)

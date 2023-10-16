@@ -3526,6 +3526,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Proof.
       intros ExtraState0 M RunM MM0 MRun0 MPROV0 MSID0 MMS0 MERR0 MUB0 MOOM0 RunERR0 RunUB0 RunOOM0 MemMonad0 EQM' EQRI' MLAWS' EQV
              LAWS RAISE RAISEERR ms ptr len st.
+      Opaque handle_gep_addr.
 
       unfold get_consecutive_ptrs.
       destruct (intptr_seq 0 len) as [NOOM_seq | OOM_seq] eqn:HSEQ.

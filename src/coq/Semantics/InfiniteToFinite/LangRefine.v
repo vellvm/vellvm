@@ -8680,7 +8680,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         break_match_goal; inv CONV.
     }
   Admitted.
-      
 
   Lemma handle_gep_addr_fin_inf :
     forall t base_addr_fin base_addr_inf idxs_fin idxs_inf res_addr_fin res_addr_inf,
@@ -10465,6 +10464,35 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
       cbn in REF.
       break_match_hyp_inv.
+
+      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
+      red in CONC_FIN.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
+      cbn in CONC_FIN.
+      repeat red in CONC_FIN.
+
+      destruct CONC_FIN as (?&?&?&?&?).
+      destruct_err_ub_oom x; inv H0.
+      destruct H1 as [[] | H1].
+      specialize (H1 _ eq_refl).
+
+      Lemma extract_value_loop_fin_inf :
+        
+
+        | UVALUE_ExtractValue t uv idxs =>
+            str <- concretize_uvalueM uv;;
+            let fix loop str idxs : ERR_M dvalue :=
+              match idxs with
+              | [] => ret str
+              | i :: tl =>
+                  v <- index_into_str_dv str i ;;
+                  loop v tl
+              end in
+            lift_ue (loop str idxs)
+
+      rewrite IS1.MEM.CP.CONC.concretize_equation;
+        red; rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation;
+        cbn; repeat red.
 
       generalize dependent u.
       generalize dependent dv_fin.
