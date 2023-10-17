@@ -69,7 +69,7 @@ let make_test name ll_ast t : string * assertion  =
     | Ok dv -> dv
     | Error e -> failwith (Interpreter.string_of_exit_condition e)
   in
-  let _ = Printf.printf "I can get here\n" in
+  (* let _ = Printf.printf "I can get here\n" in *)
   match t with
   | Assertion.EQTest (expected, dtyp, entry, args) ->
     let str =
