@@ -9634,6 +9634,197 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       reflexivity.
   Qed.
 
+  Lemma insert_into_str_loop_fin_inf :
+    forall {elts acc v i} {res : err_ub_oom (list dvalue)},
+      (fix loop (acc elts:list dvalue) (i:LLVMAst.int) :=
+        match elts with
+        | [] => raise_error "insert_into_str: index out of bounds"
+        | h :: tl =>
+          (if i =? 0 then ret (acc ++ (v :: tl))
+          else loop (acc ++ [h]) tl (i-1))%Z
+        end%list) acc elts i = res ->
+      (fix loop (acc elts:list DVCrev.DV2.dvalue) (i:LLVMAst.int) :=
+        match elts with
+        | [] => raise_error "insert_into_str: index out of bounds"
+        | h :: tl =>
+          (if i =? 0 then ret (acc ++ ((lift_dvalue_fin_inf v) :: tl))
+          else loop (acc ++ [h]) tl (i-1))%Z
+        end%list) (fmap lift_dvalue_fin_inf acc) (fmap lift_dvalue_fin_inf elts) i = fmap (fmap lift_dvalue_fin_inf) res.
+  Proof.
+    induction elts;
+      intros acc v i res LOOP.
+    - subst; cbn; auto.
+    - break_match_hyp.
+      + cbn; rewrite Heqb; subst; cbn.
+        rewrite flat_map_app.
+        reflexivity.
+      + apply IHelts in LOOP.
+        cbn; rewrite Heqb; subst; cbn.
+        cbn in LOOP.
+        rewrite flat_map_app in LOOP.
+        setoid_rewrite LOOP.
+        reflexivity.
+  Qed.
+
+  (* TODO: Does this not exist somewhere? *)
+  Lemma fmap_map :
+    forall {A B} (f : A -> B) (l : list A),
+      fmap f l = map f l.
+  Proof.
+    intros A B f l.
+    reflexivity.
+  Qed.
+
+  Lemma insert_into_str_fin_inf :
+    forall {str v i} {res : err_ub_oom dvalue},
+      insert_into_str str v i = res ->
+      E1.DV.insert_into_str (lift_dvalue_fin_inf str) (lift_dvalue_fin_inf v) i = fmap lift_dvalue_fin_inf res.
+  Proof.
+    intros str v i res INSERT.
+    destruct str;
+      try solve
+        [ unfold lift_dvalue_fin_inf; break_match_goal; clear Heqs;
+          rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e;
+          cbn; auto
+        | unfold lift_dvalue_fin_inf; break_match_goal; clear Heqs;
+          rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; break_match_hyp_inv;
+          cbn; auto
+        ].
+
+    - (* Structs *)
+      rewrite lift_dvalue_fin_inf_struct;
+        unfold E1.DV.insert_into_str, insert_into_str in *.
+      cbn in INSERT.
+      break_match_hyp.
+      rewrite <- fmap_map.
+      apply insert_into_str_loop_fin_inf in Heqe.
+      cbn in Heqe.
+      cbn.
+      setoid_rewrite Heqe.
+      subst; cbn.
+      destruct unERR_UB_OOM, unEitherT, unEitherT, unEitherT, unIdent;
+        inv Heqe; cbn in *; auto.
+      destruct s; cbn in *; auto.
+      destruct s; cbn in *; auto.
+
+      rewrite lift_dvalue_fin_inf_struct.
+      reflexivity.
+    - (* Packed Structs *)
+      rewrite lift_dvalue_fin_inf_packed_struct;
+        unfold E1.DV.insert_into_str, insert_into_str in *.
+      cbn in INSERT.
+      break_match_hyp.
+      rewrite <- fmap_map.
+      apply insert_into_str_loop_fin_inf in Heqe.
+      cbn in Heqe.
+      cbn.
+      setoid_rewrite Heqe.
+      subst; cbn.
+      destruct unERR_UB_OOM, unEitherT, unEitherT, unEitherT, unIdent;
+        inv Heqe; cbn in *; auto.
+      destruct s; cbn in *; auto.
+      destruct s; cbn in *; auto.
+
+      rewrite lift_dvalue_fin_inf_packed_struct.
+      reflexivity.
+    - (* Array *)
+      rewrite lift_dvalue_fin_inf_array;
+        unfold E1.DV.insert_into_str, insert_into_str in *.
+      cbn in INSERT.
+      break_match_hyp.
+      rewrite <- fmap_map.
+      apply insert_into_str_loop_fin_inf in Heqe.
+      cbn in Heqe.
+      cbn.
+      setoid_rewrite Heqe.
+      subst; cbn.
+      destruct unERR_UB_OOM, unEitherT, unEitherT, unEitherT, unIdent;
+        inv Heqe; cbn in *; auto.
+      destruct s; cbn in *; auto.
+      destruct s; cbn in *; auto.
+
+      rewrite lift_dvalue_fin_inf_array.
+      reflexivity.
+  Qed.
+
+  (* TODO: Move this and consider making err_ub_oom use eq for Eq1... *)
+  Lemma err_ub_oom_bind_ret_l_eq :
+    forall {A B} (x : A) (k : A -> err_ub_oom B),
+      x <- ret x;;
+      k x = k x.
+  Proof.
+    intros A B x k.
+    cbn.
+    remember (k x) as kx.
+    destruct_err_ub_oom kx; auto.
+  Qed.
+
+  Lemma insert_value_loop_fin_inf_succeeds :
+    forall idxs str elt res,
+      (fix loop str idxs : err_ub_oom dvalue :=
+         match idxs with
+         | [] => raise_error "Index was not provided"
+         | i :: nil =>
+             v <- insert_into_str str elt i;;
+             ret v
+         | i :: tl =>
+             subfield <- index_into_str_dv str i;;
+             modified_subfield <- loop subfield tl;;
+             insert_into_str str modified_subfield i
+         end) str idxs = res ->
+      (fix loop str idxs : err_ub_oom DVCrev.DV2.dvalue :=
+         match idxs with
+         | [] => raise_error "Index was not provided"
+         | i :: nil =>
+             v <- E1.DV.insert_into_str str (lift_dvalue_fin_inf elt) i;;
+             ret v
+         | i :: tl =>
+             subfield <- E1.DV.index_into_str_dv str i;;
+             modified_subfield <- loop subfield tl;;
+             E1.DV.insert_into_str str modified_subfield i
+         end) (lift_dvalue_fin_inf str) idxs = fmap lift_dvalue_fin_inf res.
+  Proof.
+    induction idxs;
+      intros str elt res LOOP.
+    - subst; auto.
+    - break_match_hyp.
+      + cbn in *.
+        break_match_hyp.
+        remember (insert_into_str str elt a) as insert.
+        symmetry in Heqinsert.
+        pose proof insert_into_str_fin_inf Heqinsert as Heqinsert'.
+        rewrite Heqinsert'.
+        destruct_err_ub_oom insert; subst; inv Heqe; cbn in *;
+          auto.
+      + remember (index_into_str_dv str a) as index.
+        symmetry in Heqindex.
+        pose proof index_into_str_dv_fin_inf Heqindex as Hindex.
+        rewrite Hindex.
+
+        destruct_err_ub_oom index;
+          try solve [subst; cbn in *; auto].
+        
+        rename index0 into subf.
+        cbn in LOOP.
+        break_match_hyp.
+        apply IHidxs in Heqe.
+
+        setoid_rewrite err_ub_oom_bind_ret_l_eq.
+        rewrite Heqe.
+        destruct unERR_UB_OOM, unEitherT, unEitherT, unEitherT, unIdent.
+        { subst; inv Heqe; cbn in *; auto. }
+        destruct s.
+        { subst; inv Heqe; cbn in *; auto. }
+        destruct s.
+        { subst; inv Heqe; cbn in *; auto. }
+
+        setoid_rewrite err_ub_oom_bind_ret_l_eq.
+        apply insert_into_str_fin_inf.
+        subst; cbn in *.
+        remember (insert_into_str str d a) as insert.
+        destruct_err_ub_oom insert; auto.
+  Qed.
+
   Lemma uvalue_concretize_strict_concretize_inclusion :
     forall uv_inf uv_fin,
       uvalue_refine_strict uv_inf uv_fin ->
@@ -10660,7 +10851,65 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       intros a ?; subst.
       auto.
     - (* InsertValue *)
-      admit.
+      red; intros dv_fin CONC_FIN.
+      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      cbn in REF.
+      break_match_hyp_inv.
+      break_match_hyp_inv.
+
+      pose proof (IHuv_inf1 u Heqo) as IHuv_inf_u.
+      pose proof (IHuv_inf2 u0 Heqo0) as IHuv_inf_u0.
+      red in IHuv_inf_u, IHuv_inf_u0.
+
+      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
+      red in CONC_FIN.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
+      cbn in CONC_FIN.
+
+      repeat red in CONC_FIN.
+      destruct CONC_FIN as (?&?&?&?&?).
+      destruct_err_ub_oom x; inv H0.
+      destruct H1 as [[] | H1].
+      specialize (H1 _ eq_refl).
+
+      repeat red in H1.
+      destruct H1 as (?&?&?&?&?).
+      rewrite <- H1 in H3.
+      destruct_err_ub_oom x; inv H3.
+      cbn in H1.
+      destruct H2 as [[] | H2].
+      specialize (H2 _ eq_refl).
+
+      specialize (IHuv_inf_u _ H).
+      specialize (IHuv_inf_u0 _ H0).
+
+      rewrite IS1.MEM.CP.CONC.concretize_equation;
+        red; rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation;
+        cbn; repeat red.
+
+      exists (ret (lift_dvalue_fin_inf x1)).
+      exists (fun dv_inf => (fmap lift_dvalue_fin_inf (x0 x1))).
+      cbn; rewrite <- H1, H5; cbn.
+      split; eauto.
+      split; eauto.
+
+      right.
+      intros a ?; subst.
+      repeat red.
+
+      exists (ret (lift_dvalue_fin_inf x3)).
+      exists (fun dv_inf => (fmap lift_dvalue_fin_inf (x2 x3))).
+      cbn; rewrite H5; cbn.
+      split; eauto.
+      split; eauto.
+
+      right.
+      intros a ?; subst.
+      eapply insert_value_loop_fin_inf_succeeds in H2.
+      setoid_rewrite H2.
+      remember (x2 x3) as x2x3.
+      destruct_err_ub_oom x2x3; inv H5.
+      reflexivity.
     - (* Select *)
       admit.
     - (* ExtractByte *)
