@@ -1522,62 +1522,44 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
              if (Int1.unsigned i =? 1)%Z
              then concretize_uvalueM v1
              else concretize_uvalueM v2
-         | DVALUE_Vector [] =>
-             (* Make sure parameters are also empty vectors *)
-             dv1 <- concretize_uvalueM v1;;
-             dv2 <- concretize_uvalueM v2;;
-             match dv1, dv2 with
-             | DVALUE_Poison t, _ =>
-                 ret (DVALUE_Poison t)
-             | _, DVALUE_Poison t =>
-                 ret (DVALUE_Poison t)
-             | DVALUE_Vector [], DVALUE_Vector [] =>
-                 ret (DVALUE_Vector [])
-             | _, _=>
-                 lift_ue (raise_error "concretize_uvalueM: ill-typed vector select.")
-             end
-         | DVALUE_Vector (c :: conds) =>
+         | DVALUE_Vector conds =>
+             let fix loop conds xs ys : M (list dvalue) :=
+               match conds, xs, ys with
+               | [], [], [] => ret []
+               | (c::conds), (x::xs), (y::ys) =>
+                   selected <- match c with
+                              | DVALUE_Poison t =>
+                                  (* TODO: Should be the type of the result of the select... *)
+                                  ret (DVALUE_Poison t)
+                              | DVALUE_I1 i =>
+                                  if (Int1.unsigned i =? 1)%Z
+                                  then ret x
+                                  else ret y
+                              | _ =>
+                                  lift_ue
+                                    (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1.")
+                              end;;
+                   rest <- loop conds xs ys;;
+                   ret (selected :: rest)
+               | _, _, _ =>
+                   lift_ue (raise_error "concretize_uvalueM: ill-typed vector select, length mismatch.")
+               end in
              (* TODO: lazily concretize these vectors to avoid
                    evaluating elements that aren't chosen? *)
              dv1 <- concretize_uvalueM v1;;
              dv2 <- concretize_uvalueM v2;;
-
-             (* TODO: Change this to a fixpoint instead of using
-                non-structural recursion for xs_rest and ys_rest *)
              match dv1, dv2 with
              | DVALUE_Poison t, _ =>
+                 (* TODO: Should we make sure t is a vector type...? *)
                  ret (DVALUE_Poison t)
-             | _, DVALUE_Poison t =>
+             | DVALUE_Vector _, DVALUE_Poison t =>
+                 (* TODO: Should we make sure t is a vector type...? *)
                  ret (DVALUE_Poison t)
-             | DVALUE_Vector (x :: xs), DVALUE_Vector (y :: ys) =>
-                 selected <- match c with
-                            | DVALUE_Poison t =>
-                                (* TODO: Should be the type of the result of the select... *)
-                                (* This may never happen anyway, a
-                                      vector containing poison should
-                                      just concretize to poison? *)
-                                ret (DVALUE_Poison t)
-                            | DVALUE_I1 i =>
-                                if (Int1.unsigned i =? 1)%Z
-                                then ret x
-                                else ret y
-                            | _ =>
-                                lift_ue
-                                  (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1.")
-                            end;;
-                 let conds_rest  := DVALUE_Vector conds in
-                 let xs_rest     := dvalue_to_uvalue (DVALUE_Vector xs) in
-                 let ys_rest     := dvalue_to_uvalue (DVALUE_Vector ys) in
-                 rest <- eval_select conds_rest xs_rest ys_rest;;
-                 match rest with
-                 | DVALUE_Poison t => ret (DVALUE_Poison t)
-                 | DVALUE_Vector rs =>
-                     ret (DVALUE_Vector (selected :: rs))
-                 | _ =>
-                     lift_ue (raise_error "concretize_uvalueM: ill-typed vector select, did not concretize to vector.")
-                 end
+             | DVALUE_Vector xs, DVALUE_Vector ys =>
+                 selected <- loop conds xs ys;;
+                 ret (DVALUE_Vector selected)
              | _, _ =>
-                 lift_ue (raise_error "concretize_uvalueM: ill-typed vector select, cons case.")
+                 lift_ue (raise_error "concretize_uvalueM: ill-typed vector select, non-vector arguments")
              end
          | _ => lift_ue (raise_error "concretize_uvalueM: ill-typed select.")
          end.
