@@ -9995,6 +9995,208 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   Import CONCBASE.
+  Lemma eval_select_cond_fin_inf :
+    forall a d d0 x,
+      match a with
+      | DVALUE_I1 i =>
+          if (Int1.unsigned i =? 1)%Z
+          then fun y : err_ub_oom dvalue => success_unERR_UB_OOM d = y
+          else fun y : err_ub_oom dvalue => success_unERR_UB_OOM d0 = y
+      | DVALUE_Poison t => fun y : err_ub_oom dvalue => success_unERR_UB_OOM (DVALUE_Poison t) = y
+      | _ =>
+          fun ue : err_ub_oom dvalue =>
+            ERR_unERR_UB_OOM
+              "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1." = ue
+      end x ->
+      match lift_dvalue_fin_inf a with
+      | E1.DV.DVALUE_I1 i =>
+          if (Int1.unsigned i =? 1)%Z
+          then fun y : err_ub_oom DVCrev.DV2.dvalue => success_unERR_UB_OOM (lift_dvalue_fin_inf d) = y
+          else fun y : err_ub_oom DVCrev.DV2.dvalue => success_unERR_UB_OOM (lift_dvalue_fin_inf d0) = y
+      | E1.DV.DVALUE_Poison t => fun y : err_ub_oom DVCrev.DV2.dvalue => success_unERR_UB_OOM (E1.DV.DVALUE_Poison t) = y
+      | _ =>
+          fun ue : err_ub_oom DVCrev.DV2.dvalue =>
+            ERR_unERR_UB_OOM
+              "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1." = ue
+      end (fmap lift_dvalue_fin_inf x).
+  Proof.
+    intros a d d0 x H.
+    destruct a; subst.
+    unfold lift_dvalue_fin_inf; break_match_goal; cbn; auto;
+    break_match_hyp; clear Heqs;
+    subst; rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; break_match_hyp_inv.
+
+    { (* i1 *)
+      rewrite_lift_dvalue_fin_inf.
+      break_match_hyp; subst; cbn; auto.
+    }
+
+    all:
+      try solve
+        [ unfold lift_dvalue_fin_inf; break_match_goal; cbn; auto;
+          break_match_hyp; clear Heqs;
+          subst; rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e
+        | unfold lift_dvalue_fin_inf; break_match_goal; cbn; auto;
+          break_match_hyp; clear Heqs;
+          subst; rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; break_match_hyp_inv
+        ].
+
+    { (* Poison *)
+      rewrite lift_dvalue_fin_inf_poison.
+      cbn.
+      rewrite lift_dvalue_fin_inf_poison.
+      reflexivity.
+    }
+  Qed.
+
+  Lemma eval_select_loop_fin_inf :
+    forall (conds xs ys : list dvalue) (res : err_ub_oom (list dvalue)),
+      (fix loop conds xs ys {struct conds} : ErrUbOomProp (list dvalue) :=
+         match conds, xs, ys with
+         | [], [], [] => @ret ErrUbOomProp Monad_ErrUbOomProp _ []
+         | (c::conds), (x::xs), (y::ys) =>
+             @bind ErrUbOomProp Monad_ErrUbOomProp _ _
+               (match c with
+                | DVALUE_Poison t =>
+                    (* TODO: Should be the type of the result of the select... *)
+                    @ret ErrUbOomProp Monad_ErrUbOomProp _ (DVALUE_Poison t)
+                | DVALUE_I1 i =>
+                    if (Int1.unsigned i =? 1)%Z
+                    then @ret ErrUbOomProp Monad_ErrUbOomProp _ x
+                    else @ret ErrUbOomProp Monad_ErrUbOomProp _ y
+                | _ =>
+                    fun ue =>
+                      (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1." = ue)
+                end)
+               (fun selected =>
+                  @bind ErrUbOomProp Monad_ErrUbOomProp _ _
+                    (loop conds xs ys)
+                    (fun rest =>
+                       @ret ErrUbOomProp Monad_ErrUbOomProp _ (selected :: rest)))
+         | _, _, _ =>
+             fun ue => (raise_error "concretize_uvalueM: ill-typed vector select, length mismatch." = ue)
+         end) conds xs ys res ->
+      (fix loop conds xs ys {struct conds} : ErrUbOomProp (list DVCrev.DV2.dvalue) :=
+         match conds, xs, ys with
+         | [], [], [] => @ret ErrUbOomProp Monad_ErrUbOomProp _ []
+         | (c::conds), (x::xs), (y::ys) =>
+             @bind ErrUbOomProp Monad_ErrUbOomProp _ _
+               (match c with
+                | IS1.LP.Events.DV.DVALUE_Poison t =>
+                    (* TODO: Should be the type of the result of the select... *)
+                    @ret ErrUbOomProp Monad_ErrUbOomProp _ (IS1.LP.Events.DV.DVALUE_Poison t)
+                | IS1.LP.Events.DV.DVALUE_I1 i =>
+                    if (Int1.unsigned i =? 1)%Z
+                    then @ret ErrUbOomProp Monad_ErrUbOomProp _ x
+                    else @ret ErrUbOomProp Monad_ErrUbOomProp _ y
+                | _ =>
+                    fun ue =>
+                      (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1." = ue)
+                end)
+               (fun selected =>
+                  @bind ErrUbOomProp Monad_ErrUbOomProp _ _
+                    (loop conds xs ys)
+                    (fun rest =>
+                       @ret ErrUbOomProp Monad_ErrUbOomProp _ (selected :: rest)))
+         | _, _, _ =>
+             fun ue => (raise_error "concretize_uvalueM: ill-typed vector select, length mismatch." = ue)
+         end) (map lift_dvalue_fin_inf conds) (map lift_dvalue_fin_inf xs) (map lift_dvalue_fin_inf ys) (fmap (map lift_dvalue_fin_inf) res).
+  Proof.
+    induction conds, xs, ys;
+      intros res LOOP;
+      cbn in *; subst; auto.
+
+    repeat red in LOOP.
+    destruct LOOP as (?&?&?&?&?).
+    repeat red.
+
+    exists (fmap lift_dvalue_fin_inf x).
+    exists (fun _ => fmap (fmap lift_dvalue_fin_inf) res).
+    split.
+    apply (eval_select_cond_fin_inf _ _ _ _ H).
+    split.
+    subst; cbn.
+    { destruct_err_ub_oom x; cbn; auto. }
+
+    destruct_err_ub_oom x; cbn; auto.
+    right; intros a0 ?; subst.
+    repeat red.
+
+    destruct H1 as [[] | H1].
+    specialize (H1 _ eq_refl).
+
+    repeat red in H1.
+    destruct H1 as (?&?&?&?&?).
+
+    pose proof H0 as LOOP.
+    eapply IHconds in LOOP.
+    exists ({|
+             unERR_UB_OOM :=
+               {|
+                 EitherMonad.unEitherT :=
+                   {|
+                     EitherMonad.unEitherT :=
+                       {|
+                         EitherMonad.unEitherT :=
+                           match
+                             IdentityMonad.unIdent
+                               (EitherMonad.unEitherT
+                                  (EitherMonad.unEitherT (EitherMonad.unEitherT (unERR_UB_OOM x))))
+                           with
+                           | inl x => {| IdentityMonad.unIdent := inl x |}
+                           | inr x =>
+                               EitherMonad.unEitherT
+                                 match x with
+                                 | inl x0 =>
+                                     {|
+                                       EitherMonad.unEitherT :=
+                                         {| IdentityMonad.unIdent := inr (inl x0) |}
+                                     |}
+                                 | inr x0 =>
+                                     EitherMonad.unEitherT
+                                       match x0 with
+                                       | inl x1 =>
+                                           {|
+                                             EitherMonad.unEitherT :=
+                                               {|
+                                                 EitherMonad.unEitherT :=
+                                                   {| IdentityMonad.unIdent := inr (inr (inl x1)) |}
+                                               |}
+                                           |}
+                                       | inr x1 =>
+                                           {|
+                                             EitherMonad.unEitherT :=
+                                               {|
+                                                 EitherMonad.unEitherT :=
+                                                   {|
+                                                     IdentityMonad.unIdent :=
+                                                       inr (inr (inr (map lift_dvalue_fin_inf x1)))
+                                                   |}
+                                               |}
+                                           |}
+                                       end
+                                 end
+                           end
+                       |}
+                   |}
+               |}
+        |}).
+    exists (fun elts => fmap (fmap lift_dvalue_fin_inf) (x0 x1)).
+    { destruct_err_ub_oom x; cbn; rewrite <- H1; cbn; auto.
+      split; eauto.
+      cbn in H1.
+      split; eauto.
+
+      right; intros ??; subst.
+      destruct H2 as [[] | H2].
+      specialize (H2 _ eq_refl).
+      rewrite <- H2.
+      cbn.
+
+      reflexivity.
+    }
+  Qed.
+
   Lemma eval_select_fin_inf :
     forall cond uv1_fin uv2_fin uv1_inf uv2_inf res
       (IH1 : forall dv_fin : dvalue,
@@ -10060,62 +10262,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     13: { (* Vector conditional *)
       rewrite eval_select_equation in *.
       rewrite IS1.MEM.CP.CONC.eval_select_equation.
-
-      Set Nested Proofs Allowed.
-      Lemma eval_select_loop_fin_inf :
-        forall (conds xs ys : list dvalue) (res : err_ub_oom (list dvalue)),
-          (fix loop conds xs ys {struct conds} : ErrUbOomProp (list dvalue) :=
-             match conds, xs, ys with
-             | [], [], [] => @ret ErrUbOomProp Monad_ErrUbOomProp _ []
-             | (c::conds), (x::xs), (y::ys) =>
-                 @bind ErrUbOomProp Monad_ErrUbOomProp _ _
-                   (match c with
-                    | DVALUE_Poison t =>
-                        (* TODO: Should be the type of the result of the select... *)
-                        @ret ErrUbOomProp Monad_ErrUbOomProp _ (DVALUE_Poison t)
-                    | DVALUE_I1 i =>
-                        if (Int1.unsigned i =? 1)%Z
-                        then @ret ErrUbOomProp Monad_ErrUbOomProp _ x
-                        else @ret ErrUbOomProp Monad_ErrUbOomProp _ y
-                    | _ =>
-                        fun ue =>
-                          (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1." = ue)
-                    end)
-                   (fun selected =>
-                      @bind ErrUbOomProp Monad_ErrUbOomProp _ _
-                        (loop conds xs ys)
-                        (fun rest =>
-                           @ret ErrUbOomProp Monad_ErrUbOomProp _ (selected :: rest)))
-             | _, _, _ =>
-                 fun ue => (raise_error "concretize_uvalueM: ill-typed vector select, length mismatch." = ue)
-             end) conds xs ys res ->
-          (fix loop conds xs ys {struct conds} : ErrUbOomProp (list DVCrev.DV2.dvalue) :=
-             match conds, xs, ys with
-             | [], [], [] => @ret ErrUbOomProp Monad_ErrUbOomProp _ []
-             | (c::conds), (x::xs), (y::ys) =>
-                 @bind ErrUbOomProp Monad_ErrUbOomProp _ _
-                   (match c with
-                    | IS1.LP.Events.DV.DVALUE_Poison t =>
-                        (* TODO: Should be the type of the result of the select... *)
-                        @ret ErrUbOomProp Monad_ErrUbOomProp _ (IS1.LP.Events.DV.DVALUE_Poison t)
-                    | IS1.LP.Events.DV.DVALUE_I1 i =>
-                        if (Int1.unsigned i =? 1)%Z
-                        then @ret ErrUbOomProp Monad_ErrUbOomProp _ x
-                        else @ret ErrUbOomProp Monad_ErrUbOomProp _ y
-                    | _ =>
-                        fun ue =>
-                          (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1." = ue)
-                    end)
-                   (fun selected =>
-                      @bind ErrUbOomProp Monad_ErrUbOomProp _ _
-                        (loop conds xs ys)
-                        (fun rest =>
-                           @ret ErrUbOomProp Monad_ErrUbOomProp _ (selected :: rest)))
-             | _, _, _ =>
-                 fun ue => (raise_error "concretize_uvalueM: ill-typed vector select, length mismatch." = ue)
-             end) (map lift_dvalue_fin_inf conds) (map lift_dvalue_fin_inf xs) (map lift_dvalue_fin_inf ys) (fmap (map lift_dvalue_fin_inf) res).
-      Proof.
-      Admitted.
 
       repeat red in EVAL.
       destruct EVAL as (?&?&?&?&?).
