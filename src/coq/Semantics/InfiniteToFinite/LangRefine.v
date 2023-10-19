@@ -10276,29 +10276,86 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       destruct H2 as [[] | H2].
       specialize (H2 _ eq_refl).
 
-      assert ((exists elts1_fin, x1 = DVALUE_Vector elts1_fin) \/
-                forall elts1_fin, x1 <> DVALUE_Vector elts1_fin) as X1.
-      { admit.
-      }
-      destruct X1 as [[elts1_fin VEC1] | NVEC1].
-      2: {
-        admit.
+      destruct x1;
+        try (rewrite <- H2 in H5; inv H5).
+      { (* Poison *)
+        rewrite lift_dvalue_fin_inf_vector.
+        cbn.
+        repeat red.
+
+        exists (ret (lift_dvalue_fin_inf (DVALUE_Poison t))).
+        exists (fun dv_inf => (fmap lift_dvalue_fin_inf (x0 (DVALUE_Poison t)))).
+
+        split.
+        eapply IH1; eauto.
+
+        split.
+        cbn in *; rewrite <- H2 in H1; inv H1; cbn.
+        auto.
+
+        right; intros ? ?; subst.
+        repeat red.
+        cbn in *.
+        rewrite <- H2 in H1.
+        cbn in H1.
+        subst.
+
+        exists (ret (lift_dvalue_fin_inf x3)).
+        exists (fun _ => (fmap lift_dvalue_fin_inf (x2 x3))).
+        cbn; rewrite <- H2, <- H1; cbn.
+
+        split.
+        eapply IH2; eauto.
+
+        split; eauto.
+        right; intros ? ?; subst.
+        rewrite lift_dvalue_fin_inf_poison.
+        reflexivity.
       }
 
-      assert ((exists elts2_fin, x3 = DVALUE_Vector elts2_fin) \/
-                forall elts2_fin, x3 <> DVALUE_Vector elts2_fin) as X3.
-      { admit.
-      }
-      destruct X3 as [[elts2_fin VEC2] | NVEC2].
-      2: {
-        admit.
-      }
+      (* Vector *)
+      destruct x3;
+        try (rewrite <- H2 in H5; inv H5).
+      { (* Poison *)
+        rewrite lift_dvalue_fin_inf_vector.
+        cbn.
+        repeat red.
 
-      rewrite VEC1, VEC2 in H2.
+        exists (ret (lift_dvalue_fin_inf (DVALUE_Vector elts0))).
+        exists (fun dv_inf => (fmap lift_dvalue_fin_inf (x0 (DVALUE_Vector elts0)))).
+
+        split.
+        eapply IH1; eauto.
+
+        split.
+        cbn in *; rewrite <- H2 in H1; inv H1; cbn.
+        auto.
+
+        right; intros ? ?; subst.
+        repeat red.
+        cbn in *.
+        rewrite <- H2 in H1.
+        cbn in H1.
+        subst.
+
+        exists (ret (lift_dvalue_fin_inf (DVALUE_Poison t))).
+        exists (fun dv_inf => (fmap lift_dvalue_fin_inf (x2 (DVALUE_Poison t)))).
+
+        split.
+        eapply IH2; eauto.
+
+        rewrite lift_dvalue_fin_inf_poison, <- H2, <- H1; cbn.
+        split; eauto.
+        right; intros ? ?; subst.
+        rewrite lift_dvalue_fin_inf_vector, lift_dvalue_fin_inf_poison.
+        reflexivity.
+      }
 
       repeat red in H2.
       destruct H2 as (?&?&?&?&?).
 
+      rename elts0 into elts1_fin.
+      rename elts1 into elts2_fin.
       pose proof (eval_select_loop_fin_inf elts elts1_fin elts2_fin x H2) as EVAL.
 
       subst.
@@ -10370,7 +10427,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       rewrite lift_dvalue_fin_inf_poison.
       reflexivity.
     }
-  Admitted.
+  Qed.
 
   Lemma uvalue_concretize_strict_concretize_inclusion :
     forall uv_inf uv_fin,
