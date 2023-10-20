@@ -8910,9 +8910,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         erewrite IHidxs_fin; eauto.
         rewrite sizeof_dtyp_fin_inf; eauto.
         unfold intptr_fin_inf; break_match_goal; clear Heqs.
-        (* TODO: inptr conversions *)
-        assert (IP.to_Z x = IS1.LP.IP.to_Z x0) by admit.
-        rewrite <- H.
+        rewrite <- (IS1.LP.IP.from_Z_injective _ _ _ e (IS1.LP.IP.to_Z_from_Z x0)).
         auto.
       }
 
@@ -8922,12 +8920,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         erewrite IHidxs_fin; eauto.
         rewrite sizeof_dtyp_fin_inf; eauto.
         unfold intptr_fin_inf; break_match_goal; clear Heqs.
-        (* TODO: inptr conversions *)
-        assert (IP.to_Z x = IS1.LP.IP.to_Z x0) by admit.
-        rewrite <- H.
+        rewrite <- (IS1.LP.IP.from_Z_injective _ _ _ e (IS1.LP.IP.to_Z_from_Z x0)).
         auto.
       }
-  Admitted.
+  Qed.
 
   Lemma addr_convert_int_to_ptr :
     forall base_addr_fin base_addr_inf res_addr_fin res_addr_inf z
@@ -8937,6 +8933,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       (IS1.LP.ITOP.int_to_ptr z (IS1.LP.PROV.address_provenance base_addr_inf)) = ret res_addr_inf.
   Proof.
     (* Need to expose more and have some relation between int_to_ptrs / provenances *)
+    intros base_addr_fin base_addr_inf res_addr_fin res_addr_inf z CONV_BASE CONV_RES ITP.
   Admitted.
 
   Lemma handle_gep_addr_fin_inf :
@@ -8963,13 +8960,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         try erewrite addr_convert_int_to_ptr; eauto.
 
         unfold intptr_fin_inf; break_inner_match_goal; clear Heqs0.
-        (* TODO: inptr conversions *)
-        assert (IP.to_Z x = IS1.LP.IP.to_Z x0) by admit.
-        rewrite <- H.
+        rewrite <- (IS1.LP.IP.from_Z_injective _ _ _ e (IS1.LP.IP.to_Z_from_Z x0)).
 
         setoid_rewrite Heqs.
         erewrite addr_convert_int_to_ptr; eauto.
-  Admitted.
+  Qed.
 
   Lemma index_into_vec_dv_fin_inf :
     forall t vec idx res,
