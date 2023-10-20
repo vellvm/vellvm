@@ -221,10 +221,11 @@ module SRCTGTRESULT : SRCTGTRESULT = struct
 
   let dump (l : log) (file_addr : string option) : unit =
     let ok_string, err_string = dump_log_to_pair l in
+    let result_string =
+      Printf.sprintf "---ERROR---\n%s\n\n---ACCEPT---\n%s" err_string
+        ok_string
+    in
     match file_addr with
-    | None -> ()
-    | Some addr ->
-        IO.write_file addr
-          (Printf.sprintf "---ERROR---\n%s\n\n---ACCEPT---\n%s" err_string
-             ok_string )
+    | None -> output_string stdout result_string
+    | Some addr -> IO.write_file addr result_string
 end
