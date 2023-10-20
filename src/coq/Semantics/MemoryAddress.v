@@ -61,6 +61,12 @@ Module Type INTPTR.
       from_Z z = NoOom i ->
       to_Z i = z.
 
+  Parameter from_Z_injective :
+    forall (z1 z2 : Z) (i : intptr),
+      from_Z z1 = NoOom i ->
+      from_Z z2 = NoOom i ->
+      z1 = z2.
+
   Parameter to_Z_from_Z :
     forall (i : intptr),
       from_Z (to_Z i) = NoOom i.
