@@ -8682,6 +8682,140 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Admitted.
 
+  Lemma get_conv_case_itop_fin_inf:
+    forall conv t_from dv t_to res,
+      get_conv_case conv t_from dv t_to = Conv_ItoP res ->
+      IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (lift_dvalue_fin_inf dv) t_to = IS1.LP.Events.DV.Conv_ItoP (lift_dvalue_fin_inf res).
+  Proof.
+    intros conv t_from dv t_to res CONV.
+    destruct conv.
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+        break_match_goal;
+        break_match_hyp;
+        clear Heqs; 
+        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs;
+             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+        break_match_goal;
+        break_match_hyp;
+        clear Heqs; 
+        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs;
+             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+        break_match_goal;
+        break_match_hyp;
+        clear Heqs; 
+        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs;
+             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf; inv CONV.
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf; inv CONV.
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+        break_match_goal;
+        break_match_hyp;
+        clear Heqs; 
+        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs;
+             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+        break_match_goal;
+        break_match_hyp;
+        clear Heqs; 
+        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs;
+             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+        inv CONV.
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+        inv CONV.
+    }
+
+    { (* inttoptr *) 
+      cbn in *.
+      repeat break_match_hyp_inv; reflexivity.
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+        break_match_goal;
+        break_match_hyp;
+        clear Heqs; 
+        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs;
+             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e; inv e; reflexivity).
+    }
+
+    { (* Conversions... *)
+      unfold get_conv_case in CONV.
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
+
+      repeat rewrite bit_sizeof_dtyp_fin_inf.
+      repeat break_match_hyp_inv.
+    }
+
+    { (* Addrspacecast *)
+      cbn in *;
+        repeat break_match_hyp_inv;
+        unfold lift_dvalue_fin_inf;
+        break_match_goal; inv CONV.
+    }
+  Qed.
+
   Lemma lift_dvalue_fin_inf_array :
     forall elts,
       lift_dvalue_fin_inf (DVALUE_Array elts) =
@@ -11109,6 +11243,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       }
 
       { (* Conv_ItoP *)
+        break_match_hyp;
+          rewrite <- H1 in H3; inv H3.
+          
         admit.
       }
 
