@@ -2,6 +2,7 @@ open Interpreter
 open Assertion
 open Map
 open Driver
+open Base
 
 module DV = InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV
 
@@ -25,6 +26,8 @@ module type SRCTGTRESULT = sig
 
   type log = (int * src_tgt_result list) * (int * src_tgt_result list)
 
+  val show_error_side : error_side -> string
+
   val sig_eq : src_tgt_result -> src_tgt_result -> bool
 
   val check_bool :
@@ -43,7 +46,9 @@ module type SRCTGTRESULT = sig
 
   val get_type_length : log -> src_tgt_result -> int
 
-  val dump : log -> string
+  val show_src_tgt_result : src_tgt_result -> string
+
+  val dump_log_to_pair : log -> string * string
 end
 
 module SRCTGTRESULT : SRCTGTRESULT = struct
@@ -59,12 +64,15 @@ module SRCTGTRESULT : SRCTGTRESULT = struct
     | STUC : string * error_side * string -> src_tgt_result
     | STOOM : string * error_side * string -> src_tgt_result
     | STF : string * error_side * string -> src_tgt_result
-  [@@deriving ord]
   (* | SrcTgtEq : string -> src_tgt_result | SrcTgtOK : string * src_tgt_mode
      * DV.dvalue * DV.dvalue -> src_tgt_result | SrcOrTgtError : string *
      Interpreter.exit_condition * error_side -> src_tgt_result *)
 
   type log = (int * src_tgt_result list) * (int * src_tgt_result list)
+
+  let show_error_side : error_side -> string = function
+    | Src -> "src"
+    | Tgt -> "tgt"
 
   let sig_eq (res1 : src_tgt_result) (res2 : src_tgt_result) : bool =
     match (res1, res2) with
@@ -160,5 +168,63 @@ module SRCTGTRESULT : SRCTGTRESULT = struct
           (fun x acc -> if eq_fun x then acc + 1 else acc)
           (err_list l) 0
 
-  let dump (l : log) : string = ""
+  let to_string_wo_sig (res : src_tgt_result) : string =
+    match res with
+    | STOk (str, mode) ->
+        Printf.sprintf "%s,\t%s" str (Assertion.show_src_tgt_mode mode)
+    | STErr (str, mode, error_msg) ->
+        Printf.sprintf "%s,\t%s,\t%s" str
+          (Assertion.show_src_tgt_mode mode)
+          error_msg
+    | STUB (str, err_side, error_msg) ->
+        Printf.sprintf "%s,\t%s,\t%s" str
+          (show_error_side err_side)
+          error_msg
+    | STUC (str, err_side, error_msg) ->
+        Printf.sprintf "%s,\t%s,\t%s" str
+          (show_error_side err_side)
+          error_msg
+    | STOOM (str, err_side, error_msg) ->
+        Printf.sprintf "%s,\t%s,\t%s" str
+          (show_error_side err_side)
+          error_msg
+    | STF (str, err_side, error_msg) ->
+        Printf.sprintf "%s,\t%s,\t%s" str
+          (show_error_side err_side)
+          error_msg
+
+  let show_src_tgt_result (res : src_tgt_result) : string =
+    let inner_string = to_string_wo_sig res in
+    let signature =
+      match res with
+      | STOk _ -> "STOk"
+      | STErr _ -> "STEr"
+      | STUB _ -> "STUB"
+      | STUC _ -> "STUC"
+      | STOOM _ -> "STOM"
+      | STF _ -> "STFa"
+    in
+    Printf.sprintf "%s,\t%s" signature inner_string
+
+  let dump_log_to_pair (l : log) : string * string =
+    let ok_string =
+      List.fold_right
+        (fun x acc -> show_src_tgt_result x ^ "\n" ^ acc)
+        (ok_list l) ""
+    in
+    let err_string =
+      List.fold_right
+        (fun x acc -> show_src_tgt_result x ^ "\n" ^ acc)
+        (err_list l) ""
+    in
+    (ok_string, err_string)
+
+  let dump (l : log) (file_addr : string option) : unit =
+    let ok_string, err_string = dump_log_to_pair l in
+    match file_addr with
+    | None -> ()
+    | Some addr ->
+        IO.write_file addr
+          (Printf.sprintf "---ERROR---\n%s\n\n---ACCEPT---\n%s" err_string
+             ok_string )
 end
