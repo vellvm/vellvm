@@ -107,9 +107,9 @@ let make_test name ll_ast t : string * assertion  =
         [], "runnersrc", "runnertgt", List.append ll_ast g_ast
     end in
     let assertion () =
-      let buf = Buffer.create 16 in
+(*       let buf = Buffer.create 16 in
       List.iter (Buffer.add_char buf) (showProg sum_ast);
-      Printf.printf "%s\n" (Buffer.contents buf);
+      Printf.printf "%s\n" (Buffer.contents buf); *)
           let res_tgt = run expected_rett tgt_fn_str v_args sum_ast in
           let res_src = run expected_rett src_fn_str v_args sum_ast in
           begin match res_tgt with
@@ -130,9 +130,9 @@ let make_test name ll_ast t : string * assertion  =
                 | Error e -> failwith (Printf.sprintf "src - %s" (Interpreter.string_of_exit_condition e))
               end
             | Error e ->
-                let buf = Buffer.create 16 in
+(*                 let buf = Buffer.create 16 in
                 List.iter (Buffer.add_char buf) (showProg sum_ast);
-              Printf.printf "%s\n" (Buffer.contents buf);
+              Printf.printf "%s\n" (Buffer.contents buf); *)
               failwith (Printf.sprintf "tgt - %s" (Interpreter.string_of_exit_condition e))
           end
         in
