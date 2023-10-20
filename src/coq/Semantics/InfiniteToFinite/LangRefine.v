@@ -8666,6 +8666,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         inv Heqs.
       unfold StateMonad.evalStateT.
 
+      (* Need to improve this lemma... *)
       pose proof runStateT_succeeds_serialize_sbytes_fin_inf _ _ _ Heqe as (res_inf&SERIALIZE).
       rewrite SERIALIZE.
       Opaque IS1.LLVM.MEM.CP.CONC.MemHelpers.deserialize_sbytes.
@@ -10495,9 +10496,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn in e.
       break_match_hyp_inv.
       pose proof (intptr_convert_safe _ _ Heqo0).
-      (* TODO: silly injectivity lemma about from_Z... *)
-      assert (x = i0) by admit.
-      subst.
+      pose proof IP.from_Z_injective _ _ _ Heqo H.
+      apply IS1.LP.IP.to_Z_inj in H0; subst.
       reflexivity.
     - (* Undef *)
       red; intros dv_fin CONC_FIN.
@@ -11092,9 +11092,20 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       specialize (H1 _ eq_refl).
       cbn in H1.
 
+      specialize (IHuv_inf _ H).
+      repeat red.
+      exists (ret (lift_dvalue_fin_inf x1)).
+      exists (fun _ => (fmap lift_dvalue_fin_inf (x0 x1))).
+      cbn; rewrite H3; cbn.
+      split; eauto.
+      split; eauto.
+
+      right; intros ? ?; subst.
       break_match_hyp.
       { (* Conv_Pure *)
-        admit.
+        pose proof get_conv_case_pure_fin_inf _ _ _ _ _ Heqc as CONV.
+        rewrite CONV.
+        rewrite <- H1 in H3; inv H3; auto.        
       }
 
       { (* Conv_ItoP *)
