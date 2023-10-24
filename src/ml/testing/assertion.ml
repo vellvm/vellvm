@@ -49,10 +49,13 @@ let show_src_tgt_mode = function
   | MismatchInMemory -> "MismatchedInMemory"
 
 type test =
+  (* expected dvalue, dynamic type, entry, arguments *)
   | EQTest of DV.dvalue * DynamicTypes.dtyp * string * DV.uvalue list
+  (* dynamic type, entry, arguments *)
   | POISONTest of DynamicTypes.dtyp * string * DV.uvalue list
   (* Find a better name for this *)
   (* retty, args for src, (t, args) for arguments to source and test *)
+  (* Source target mode, dynamic type, Left is arguments and right is AST*)
   | SRCTGTTest of
       src_tgt_mode
       * DynamicTypes.dtyp
