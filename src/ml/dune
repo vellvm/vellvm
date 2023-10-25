@@ -5,7 +5,7 @@
 
 (library
  (name base)
- (modules assert platform IO assert_result)
+ (modules assert platform IO)
  (libraries libvellvm unix str testing))
 
 (executables
