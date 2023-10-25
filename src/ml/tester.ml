@@ -197,17 +197,4 @@ let make_test name ll_ast t : string * (unit -> test_result) =
       , eval_SRCTGTTest name expected_rett tgt_fn_str src_fn_str v_args mode
           sum_ast )
 
-(* let make_test' name ll_ast t : string * assertion1 = let open Format in
-   let run dtyp entry args ll_ast = Interpreter.step
-   (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp
-   (Camlcoq.coqstring_of_camlstring entry) args ll_ast ) in let run_to_value
-   dtyp entry args ll_ast () : DV.dvalue = match run dtyp entry args ll_ast
-   with | Ok dv -> dv | Error e -> failwith
-   (Interpreter.string_of_exit_condition e) in match t with |
-   Assertion.EQTest (expected, dtyp, entry, args) -> ( let str = let
-   expected_str = string_of_dvalue expected in let args_str : doc =
-   pp_print_list ~pp_sep:(fun f () -> pp_print_string f ", ")
-   Interpreter.pp_uvalue str_formatter args ; flush_str_formatter () in
-   Printf.sprintf "%s = %s(%s)" expected_str entry args_str in let result =
-   run_to_value dtyp entry args ll_ast in failwith "TODO: unimplemented" | _
-   -> failwith "TODO: unimplemented" ) *)
+(* Need to add in the test directory stuff... *)
