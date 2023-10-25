@@ -87,7 +87,7 @@ let run_test1 (t : assertion1 test) : test_result test =
   let run_case (cn, f) = (cn, run_assertion1 f) in
   match t with Test (n, cases) -> Test (n, List.map run_case cases)
 
-let run_suite1 (s : suite) : outcome = List.map run_test1 s
+let run_suite1 (s : suite1) : outcome1 = List.map run_test1 s
 (***********************)
 (* Reporting functions *)
 
