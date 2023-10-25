@@ -12,10 +12,16 @@
 
 type src_tgt_error_side = Src | Tgt
 
+type test_error =
+  | UninterpretedCall : string -> test_error
+  | OutOfMemory : string -> test_error
+  | UndefinedBehavior : string -> test_error
+  | Failed : string -> test_error
+
 type test_result =
   | STOk : string * Assertion.src_tgt_mode -> test_result
   | STNOk : string * Assertion.src_tgt_mode * string -> test_result
-  | STErr : string * src_tgt_error_side * string -> test_result
+  | STErr : string * src_tgt_error_side * test_error -> test_result
   | EQOk : string * Assertion.raw_assertion_string -> test_result
   | EQFal : string * Assertion.raw_assertion_string -> test_result
   | POIOk : string * Assertion.raw_assertion_string -> test_result

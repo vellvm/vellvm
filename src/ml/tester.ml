@@ -21,11 +21,19 @@ let exec_tests () =
 
 (* Given two dvalues and an answer, return whether or not they equal the
    answer*)
-let compare_dvalues_exn dv1 dv2 ans : bool = DV.dvalue_eqb dv1 dv2 = ans
+let compare_dvalues_exn dv1 dv2 ans : (doc, unit) Either.t =
+  match DV.dvalue_eqb dv1 dv2 = ans with
+  | true -> Right ()
+  | false ->
+      Left
+        (Printf.sprintf
+           "dvalue comparison for %s failed: \ngot:\n\t%s\nand:\n\t%s"
+           (if ans then "equality" else "inequality")
+           (string_of_dvalue dv1) (string_of_dvalue dv2) )
 
 (* given a name, a *)
 let dvalue_eq_assertion name (got : unit -> DV.dvalue)
-    (expected : unit -> DV.dvalue) () : bool =
+    (expected : unit -> DV.dvalue) () : (doc, unit) Either.t =
   Platform.verb (Printf.sprintf "running ASSERT in %s\n" name) ;
   let dv1 = got () in
   let dv2 = expected () in
@@ -33,7 +41,7 @@ let dvalue_eq_assertion name (got : unit -> DV.dvalue)
 
 (* This function compare and see if target is more poison If correct, will
    give the right branch. Else it will give the left branch*)
-let compare_tgt_for_poison src tgt : (string, string) Either.t =
+let compare_tgt_for_poison src tgt : (string, unit) Either.t =
   match tgt with
   | DV.DVALUE_Poison _ -> (
     match src with
@@ -41,7 +49,7 @@ let compare_tgt_for_poison src tgt : (string, string) Either.t =
         Left
           "TargetMorePoisonous: expected src to be non-poison value, but \
            got poison"
-    | _ -> Right "" )
+    | _ -> Right () )
   | _ ->
       Left
         (Printf.sprintf
@@ -60,32 +68,60 @@ let run dtyp entry args ll_ast =
 let eval_EQTest (name : string) (got : unit -> DV.dvalue)
     (expected : unit -> DV.dvalue) (lhs : string) (rhs : string) () =
   match dvalue_eq_assertion name got expected () with
-  | true -> EQOk (name, Eq {lhs; rhs})
-  | false -> EQFal (name, Eq {lhs; rhs})
+  | Right _ -> EQOk (name, Eq {lhs; rhs})
+  | Left _ -> EQFal (name, Eq {lhs; rhs})
 
 (* This function takes in a name, a got and expected function, and function
    call name. It will lift the result into the test result class *)
 let eval_POISONTest (name : string) (got : unit -> DV.dvalue)
     (expected : unit -> DV.dvalue) (fcall : string) () =
   match dvalue_eq_assertion name got expected () with
-  | true -> POIOk (name, Poison' {fcall})
-  | false -> POIFal (name, Poison' {fcall})
+  | Right _ -> POIOk (name, Poison' {fcall})
+  | Left _ -> POIFal (name, Poison' {fcall})
 
 (* | STOk : string * Assertion.src_tgt_mode -> test_result | STNOk : string *
    Assertion.src_tgt_mode * string -> test_result | STErr : string *
    src_tgt_error_side * string -> test_result*)
+let exit_cond2test_err (ec : Interpreter.exit_condition) : Assert.test_error
+    =
+  match ec with
+  | UninterpretedCall e -> UninterpretedCall e
+  | OutOfMemory e -> OutOfMemory e
+  | UndefinedBehavior e -> UndefinedBehavior e
+  | Failed e -> Failed e
+
 let eval_SRCTGTTest (name : string) (expected_rett : DynamicTypes.dtyp)
     (tgt_fn_str : string) (src_fn_str : string) (v_args : DV.uvalue list)
+    (mode : Assertion.src_tgt_mode)
     (sum_ast :
       (LLVMAst.typ, Generate.GA.runnable_blocks) LLVMAst.toplevel_entity list
-      ) () =
+      ) () : test_result =
   let res_tgt = run expected_rett tgt_fn_str v_args sum_ast in
   let res_src = run expected_rett src_fn_str v_args sum_ast in
   match res_tgt with
-  | Error (UndefinedBehavior _) -> failwith "TODO: unimplemented"
-  | Error (UninterpretedCall _) -> failwith "TODO: unimplemented"
-  | Ok v_tgt -> failwith "TODO: unimplemented"
-  | Error e -> failwith "TODO: unimplemented"
+  (* Note that the third argument of STErr is a type from assert and not from
+     interpreter *)
+  | Ok v_tgt -> (
+    match res_src with
+    | Ok v_src -> (
+      match mode with
+      | NormalEquality -> (
+        match compare_dvalues_exn v_src v_tgt true with
+        | Left fail_msg -> STNOk (name, mode, fail_msg)
+        | Right _ -> STOk (name, mode) )
+      | ValueMismatch -> (
+        match compare_dvalues_exn v_src v_tgt false with
+        | Left fail_msg -> STNOk (name, mode, fail_msg)
+        | Right _ -> STOk (name, mode) )
+      | TargetMorePoisonous -> (
+        match compare_tgt_for_poison v_src v_tgt with
+        | Left fail_msg -> STNOk (name, mode, fail_msg)
+        | Right _ -> STOk (name, mode) )
+      | TargetMoreUndefined -> failwith "todo: TargetMoreUndefined"
+      | SourceMoreDefined -> failwith "todo: SourceMoreDefined"
+      | MismatchInMemory -> failwith "todo: MismatchInMemory" )
+    | Error e -> STErr (name, Src, exit_cond2test_err e) )
+  | Error e -> STErr (name, Tgt, exit_cond2test_err e)
 
 let make_test name ll_ast t : string * (unit -> test_result) =
   let open Format in
@@ -158,7 +194,7 @@ let make_test name ll_ast t : string * (unit -> test_result) =
         Printf.sprintf "src = tgt on generated input (%s)" args_str
       in
       ( str
-      , eval_SRCTGTTest name expected_rett tgt_fn_str src_fn_str v_args
+      , eval_SRCTGTTest name expected_rett tgt_fn_str src_fn_str v_args mode
           sum_ast )
 
 (* let make_test' name ll_ast t : string * assertion1 = let open Format in
