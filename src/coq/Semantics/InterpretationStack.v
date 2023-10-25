@@ -23,6 +23,7 @@ Section InterpreterMCFG.
    This gives us a _vertical_ notion of compositionality.
    *)
 
+
   Definition interp_mcfg1 {R} (t: itree L0 R) g :=
     let uvalue_trace       := interp_intrinsics t in
     let L1_trace           := interp_global uvalue_trace g in

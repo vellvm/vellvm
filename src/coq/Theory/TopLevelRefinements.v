@@ -201,19 +201,19 @@ Section REFINEMENT.
 
   Definition model_to_L1  (prog: mcfg dtyp) :=
     let L0_trace := denote_vellvm_init prog in
-    ℑs1 L0_trace [].
+    ℑs1 L0_trace base.empty.
 
   Definition model_to_L2 (prog: mcfg dtyp) :=
     let L0_trace := denote_vellvm_init prog in
-    ℑs2 L0_trace [] ([],[]).
+    ℑs2 L0_trace base.empty ([],[]).
 
   Definition model_to_L3 (prog: mcfg dtyp) :=
     let L0_trace := denote_vellvm_init prog in
-    ℑs3 L0_trace [] ([],[]) empty_memory_stack.
+    ℑs3 L0_trace base.empty ([],[]) empty_memory_stack.
 
   Definition model_to_L4 (prog: mcfg dtyp) :=
     let L0_trace := denote_vellvm_init prog in
-    ℑs4 (refine_res3) L0_trace [] ([],[]) empty_memory_stack.
+    ℑs4 (refine_res3) L0_trace base.empty ([],[]) empty_memory_stack.
 
   (**
    Which leads to five notion of equivalence of [mcfg]s.
@@ -369,7 +369,7 @@ Definition interp_cfg {R: Type} (trace: itree instr_E R) g l m :=
 
 Definition model_to_L4_cfg (prog: cfg dtyp) :=
   let trace := denote_cfg prog in
-  interp_cfg trace [] [] empty_memory_stack.
+  interp_cfg trace base.empty [] empty_memory_stack.
 
 Definition refine_cfg_ret: relation (iforest L5 (memory_stack * (local_env * (global_env * uvalue)))) :=
   fun ts ts' => forall t, ts t -> exists t', ts' t' /\ eutt  (TT × (TT × (TT × refine_uvalue))) t t'.

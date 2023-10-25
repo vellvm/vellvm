@@ -198,9 +198,9 @@ Module ExpTactics.
     match goal with
     | |- context [trigger (GlobalRead _)] =>
       match goal with
-      | h: Maps.lookup _ _ = Some _ |- _ =>
+      | h: base.lookup _ _ = Some _ |- _ =>
         rewrite interp_cfg3_GR; [rewrite ?bind_ret_l | eauto]
-      | h: Maps.lookup _ _ = None |- _ =>
+      | h: base.lookup _ _ = None |- _ =>
         rewrite interp_cfg3_GR_fail; [rewrite ?bind_ret_l | eauto]
       end
     | |- context [trigger (LocalRead _)] =>
@@ -219,7 +219,7 @@ Import ExpTactics.
 Section ExpLemmas.
 
   Lemma denote_exp_GR :forall g l m id v τ,
-      Maps.lookup id g = Some v ->
+      base.lookup id g = Some v ->
       ⟦ EXP_Ident (ID_Global id) at τ ⟧e3 g l m
       ≈
       Ret (m,(l,(g,dvalue_to_uvalue v))).

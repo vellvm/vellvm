@@ -105,10 +105,11 @@ Definition function_env := FMapAList.alist dvalue D.function_denotation.
    Denotes a function and returns its pointer.
  *)
 
-Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)) : itree L0 (uvalue * definition dtyp (CFG.cfg dtyp)) :=
+Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)) :
+  itree L0 (dvalue * definition dtyp (CFG.cfg dtyp)) :=
   let fid := (dc_name (df_prototype df)) in
   fv <- trigger (GlobalRead fid) ;;
-  ret (dvalue_to_uvalue fv, df).
+  ret (fv, df).
 
 (**
    We are now ready to define our semantics. Guided by the events and handlers,
@@ -147,7 +148,7 @@ Definition denote_vellvm
   build_global_environment mcfg ;;
   'defns <- map_monad address_one_function (m_definitions mcfg) ;;
   'addr <- trigger (GlobalRead (Name entry)) ;;
-  denote_mcfg defns ret_typ (dvalue_to_uvalue addr) args.
+  denote_mcfg defns ret_typ addr args.
 
 
 (* main_args and denote_vellvm_main may not be needed anymore, but I'm keeping them 
@@ -175,7 +176,7 @@ Definition interpreter_gen
            (prog: list (toplevel_entity typ (block typ * list (block typ))))
   : itree L4 res_L4 :=
   let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-  interp_mcfg4_exec t [] ([],[]) empty_memory_stack.
+  interp_mcfg4_exec t gmap.gmap_empty ([],[]) empty_memory_stack.
 
 (**
      Finally, the reference interpreter assumes no user-defined intrinsics and starts 
@@ -201,7 +202,7 @@ Definition model_gen
            (prog: list (toplevel_entity typ (block typ * list (block typ))))
   : iforest L4 (memory_stack * (local_env * lstack * (global_env * uvalue))) :=
   let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-  ℑs eq t [] ([],[]) empty_memory_stack. 
+  ℑs eq t gmap.gmap_empty ([],[]) empty_memory_stack. 
 
 (**
      Finally, the official model assumes no user-defined intrinsics.

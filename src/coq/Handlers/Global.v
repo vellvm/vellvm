@@ -25,7 +25,8 @@ Require Import Ceres.Ceres.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
-Import MonadNotation.
+(* Import MonadNotation. *)
+From stdpp Require Import gmap.
 Import ITree.Basics.Basics.Monads.
 Open Scope string_scope.
 (* end hide *)
@@ -35,17 +36,17 @@ Open Scope string_scope.
 *)
 
 Section Globals.
-  Variable (k v:Type).
-  Context {map : Type}.
-  Context {M: Map k v map}.
-  Context {SK : Serialize k}.
+  Variable (k v:Set).
+  Context {Serialize_k: Serialize k}.
+  Context {EqDec_k: EqDecision k} {Countable_k : Countable k}.
+  Notation map := (gmap k v).
 
   Definition handle_global {E} `{FailureE -< E} : (GlobalE k v) ~> stateT map (itree E) :=
     fun _ e env =>
       match e with
-      | GlobalWrite k v => ret (Maps.add k v env, tt)
+      | GlobalWrite k v => ret (<[k:= v]> env, tt)
       | GlobalRead k =>
-        match Maps.lookup k env with
+        match env !! k with
         | Some v => Ret (env, v)
         | None => raise ("Could not look up global id " ++ to_string k)
         end
@@ -59,18 +60,17 @@ Section Globals.
     Notation Effout := (E +' F +' G).
 
     Definition E_trigger {M} : forall R, E R -> (stateT M (itree Effout) R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
+      fun R e m => ITree.bind (trigger e) (fun r => ret (m, r)).
 
     Definition F_trigger {M} : forall R, F R -> (stateT M (itree Effout) R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
+      fun R e m => ITree.bind (trigger e) (fun r => ret (m, r)).
 
     Definition G_trigger {M} : forall R , G R -> (stateT M (itree Effout) R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
+      fun R e m => ITree.bind (trigger e) (fun r => ret (m, r)).
 
     Definition interp_global_h := (case_ E_trigger (case_ F_trigger (case_ handle_global G_trigger))).
     Definition interp_global  : itree Effin ~> stateT map (itree Effout) :=
       interp_state interp_global_h.
-
 
     Section Structural_Lemmas.
 
@@ -177,6 +177,25 @@ From Vellvm Require Import
      MemoryAddress
      Utils.FMapAList.
 
+From stdpp Require Import countable infinite.
+
+#[global] Instance raw_id_eq_dec : EqDecision raw_id.
+Proof. solve_decision. Defined.
+#[global] Instance raw_id_countable : Countable raw_id.
+Proof.
+  refine (inj_countable'
+    (λ id,
+      match id with
+      | Name s => (inl s)
+      | Anon a => (inr (inl a))
+      | LLVMAst.Raw r => (inr (inr r)) end)
+    (λ n,
+      match n with
+      | inl s => Name s
+      | inr (inl a) => Anon a
+      | inr (inr a) => LLVMAst.Raw a end) _); by intros [].
+Qed.
+
 (* YZ TODO : Undecided about the status of this over-generalization of these events over domains of keys and values.
    The interface needs to be specialized anyway in [LLVMEvents].
    We want to have access to the specialized type both in [InterpreterMCFG] and [InterpreterCFG] so we cannot delay
@@ -184,6 +203,5 @@ From Vellvm Require Import
    So exposing the specialization here, but it is awkward.
  *)
 Module Make (A : ADDRESS) (LLVMEvents : LLVM_INTERACTIONS(A)).
-  Definition global_env := alist raw_id LLVMEvents.DV.dvalue.
+  Definition global_env : Set := gmap raw_id LLVMEvents.DV.dvalue.
 End Make.
-

@@ -151,7 +151,7 @@ Proof.
 Qed.
 
 Lemma interp3_GW : forall id g l m v,
-    ℑs3 (trigger (GlobalWrite id v)) g l m ≈ Ret3 (Maps.add id v g) l m tt.
+    ℑs3 (trigger (GlobalWrite id v)) g l m ≈ Ret3 (base.insert id v g) l m tt.
 Proof.
   intros.
   unfold ℑs3.
@@ -167,6 +167,9 @@ Proof.
   intros * LUL EQ.
   unfold ℑs3.
   go.
+  unfold Global.G_trigger.
+
+  cbn. go.
   rewrite interp_memory_load; cycle -1.
   unfold read.
   setoid_rewrite LUL; reflexivity.
@@ -187,7 +190,7 @@ Proof.
   eapply interp_memory_alloca_exists in NV as [m' [a' [ALLOC INTERP]]].
   exists m', a'.
   split; eauto.
-  go.
+  go. unfold Global.G_trigger. go.
   rewrite interp_memory_alloca; eauto.
   go; reflexivity.
   Unshelve.

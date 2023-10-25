@@ -566,7 +566,7 @@ Section DecidableEquality.
   #[global] Instance eqv_dvalue : Eqv dvalue := (@eq dvalue).
   Hint Unfold eqv_dvalue : core.
 
-	Lemma dtyp_eq_dec : forall (t1 t2:dtyp), {t1 = t2} + {t1 <> t2}.
+	Definition dtyp_eq_dec : forall (t1 t2:dtyp), {t1 = t2} + {t1 <> t2}.
     refine (fix f t1 t2 :=
               let lsteq_dec := list_eq_dec f in
               match t1, t2 with
@@ -597,7 +597,7 @@ Section DecidableEquality.
     - destruct (lsteq_dec l l').
       * left; subst; reflexivity.
       * right; intros H; inversion H. contradiction.
-  Qed.
+  Defined.
   Arguments dtyp_eq_dec: clear implicits.
 
  Lemma ibinop_eq_dec : forall (op1 op2:ibinop), {op1 = op2} + {op1 <> op2}.
@@ -721,7 +721,7 @@ Section DecidableEquality.
     - destruct (f u u')...
       destruct (f v v')...
       destruct (f w w')...
-  Qed.
+  Defined.
 
   #[global] Instance eq_dec_uvalue : RelDec (@eq uvalue) := RelDec_from_dec (@eq uvalue) (@uvalue_eq_dec).
   #[global] Instance eqv_uvalue : Eqv uvalue := (@eq uvalue).
@@ -1490,7 +1490,6 @@ Class VInt I : Type :=
   | DVALUE_I8_typ     : forall x, dvalue_has_dtyp (DVALUE_I8 x) (DTYPE_I 8)
   | DVALUE_I32_typ    : forall x, dvalue_has_dtyp (DVALUE_I32 x) (DTYPE_I 32)
   | DVALUE_I64_typ    : forall x, dvalue_has_dtyp (DVALUE_I64 x) (DTYPE_I 64)
-  | DVALUE_IX_typ     : forall x, ~IX_supported x -> dvalue_has_dtyp DVALUE_None (DTYPE_I x)
   | DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) DTYPE_Double
   | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Float
   | DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
@@ -1637,7 +1636,6 @@ Class VInt I : Type :=
     Hypothesis IH_I8             : forall x, P (DVALUE_I8 x) (DTYPE_I 8).
     Hypothesis IH_I32            : forall x, P (DVALUE_I32 x) (DTYPE_I 32).
     Hypothesis IH_I64            : forall x, P (DVALUE_I64 x) (DTYPE_I 64).
-    Hypothesis IH_IX             : forall x, ~IX_supported x -> P DVALUE_None (DTYPE_I x).
     Hypothesis IH_Double         : forall x, P (DVALUE_Double x) DTYPE_Double.
     Hypothesis IH_Float          : forall x, P (DVALUE_Float x) DTYPE_Float.
     Hypothesis IH_None           : P DVALUE_None DTYPE_Void.
@@ -1659,7 +1657,6 @@ Class VInt I : Type :=
       - apply IH_I8.
       - apply IH_I32.
       - apply IH_I64.
-      - apply IH_IX. assumption.
       - apply IH_Double.
       - apply IH_Float.
       - apply IH_None.

@@ -407,7 +407,6 @@ Section Serialization_Theory.
   Proof.
     intros dv dt TYP.
     induction TYP; try solve [cbn; auto].
-    - cbn. rewrite DynamicValues.unsupported_cases_match; auto.
     - revert fts H. induction fields; intros.
       + destruct fts; inversion H; auto.
       + destruct fts; inversion H; subst; eauto.
@@ -449,7 +448,6 @@ Section Serialization_Theory.
     intros dv dt TYP.
     pose proof (TYP' := TYP).
     induction TYP using dvalue_has_dtyp_ind; auto.
-    - cbn. rewrite DynamicValues.unsupported_cases_match. reflexivity. auto.
     - (* Structs *)
       revert fts H TYP'.
       induction fields; intros.
@@ -1135,8 +1133,6 @@ Section Memory_Stack_Theory.
       - solve_integer_deserialize.
       - solve_integer_deserialize.
       - solve_integer_deserialize.
-      - inversion SUP; subst;
-        exfalso; apply H; constructor.
       - unroll_lookup_all_index;
         unfold deserialize_sbytes; simpl; f_equal; cbn.
         remember (Float.to_bits x) as xb.

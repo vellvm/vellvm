@@ -516,6 +516,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | (pt, INSTR_Call (dt, f) args attrs) =>
           uvs <- map_monad (fun '(t, op) => (translate exp_to_instr (denote_exp (Some t) op))) args ;;
           fv <- translate exp_to_instr (denote_exp None f) ;;
+          fv <- concretize_or_pick fv True ;;
           returned_value <- trigger (Call dt fv uvs attrs) ;;
           match pt with
           | IVoid _ => ret tt
@@ -680,7 +681,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation :=
         fun (args : list uvalue) =>
           (* We match the arguments variables to the inputs *)
-          bs <- ret (List.combine (df_args df) args) ;;
+          bs <-
+            (* Allow only full application of functions *)
+            (if Nat.eqb (List.length (df_args df)) (List.length args) then
+              ret (List.combine (df_args df) args)
+             else raise ("Incorrect argument length for function")) ;;
           (* generate the corresponding writes to the local stack frame *)
           trigger MemPush ;;
           trigger (StackPush bs) ;;
@@ -703,7 +708,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          that life in the "right" injection of the [_CFG_INTERNAL] effect
        *)
 
-      Definition lookup_defn {B} := @assoc uvalue B _.
+      Definition lookup_defn {B} := @assoc dvalue B _.
 
       Definition remove_tag : list fn_attr -> list fn_attr :=
         List.filter (fun attr =>
@@ -714,8 +719,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                       end).
 
       Definition denote_mcfg
-                 (fundefs:list (uvalue * definition dtyp (cfg dtyp))) (dt : dtyp)
-                 (f_value : uvalue) (args : list uvalue) : itree L0 uvalue :=
+                 (fundefs:list (dvalue * definition dtyp (cfg dtyp))) (dt : dtyp)
+                 (f_value : dvalue) (args : list uvalue) : itree L0 uvalue :=
         @mrec CallE (ExternalCallE +' _)
               (fun T call =>
                  match call with

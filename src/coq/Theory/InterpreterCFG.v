@@ -27,6 +27,7 @@ Import SemNotations.
 
 (* TO MOVE *)
 Arguments Intrinsics.F_trigger/.
+Arguments Global.G_trigger/.
 Arguments String.append : simpl never.
 Arguments allocate : simpl never.
 Arguments defs_assoc: simpl never.
@@ -161,14 +162,12 @@ Proof.
 Qed.
 
 Lemma interp_cfg3_GR : forall id g l m v,
-    Maps.lookup id g = Some v ->
+    base.lookup id g = Some v ->
     ℑ3 (trigger (GlobalRead id)) g l m ≈ Ret3 g l m v.
 Proof.
   intros * LU.
   unfold ℑ3.
-  go. 
-  cbn in *; rewrite LU.
-  go.
+  go. setoid_rewrite LU. go.
   reflexivity.
 Qed.
 
@@ -178,7 +177,8 @@ Lemma interp_cfg3_LR : forall id g l m v,
 Proof.
   intros * LU.
   unfold ℑ3.
-  go.
+  go. unfold Global.G_trigger. go.
+
   cbn in *; rewrite LU.
   go.
   reflexivity.
@@ -194,7 +194,7 @@ Proof.
 Qed.
 
 Lemma interp_cfg3_GW : forall id g l m v,
-    ℑ3 (trigger (GlobalWrite id v)) g l m ≈ Ret3 (Maps.add id v g) l m tt.
+    ℑ3 (trigger (GlobalWrite id v)) g l m ≈ Ret3 (base.insert id v g) l m tt.
 Proof.
   intros.
   unfold ℑ3.
@@ -202,13 +202,13 @@ Proof.
 Qed.
 
 Lemma interp_cfg3_GR_fail : forall id g l m,
-    Maps.lookup id g = None ->
+    base.lookup id g = None ->
     ℑ3 (trigger (GlobalRead id)) g l m ≈ raise ("Could not look up global id " ++ CeresSerialize.to_string id).
 Proof.
   intros * LU.
   unfold interp_cfg3.
   go.
-  cbn in *; rewrite LU.
+  cbn in *; setoid_rewrite LU.
   unfold raise; cbn.
   go.
   rewrite interp_memory_trigger; cbn; setoid_rewrite subevent_subevent;
