@@ -18,18 +18,7 @@ type test_error =
   | UndefinedBehavior : string -> test_error
   | Failed : string -> test_error
 
-type test_result =
-  | STOk : string * Assertion.src_tgt_mode -> test_result
-  | STNOk : string * Assertion.src_tgt_mode * string -> test_result
-  | STErr : string * src_tgt_error_side * test_error -> test_result
-  | EQOk : string * Assertion.raw_assertion_string -> test_result
-  | EQFal : string * Assertion.raw_assertion_string -> test_result
-  | POIOk : string * Assertion.raw_assertion_string -> test_result
-  | POIFal : string * Assertion.raw_assertion_string -> test_result
-
 type assertion = unit -> unit
-
-type assertion1 = unit -> test_result
 
 type 'a test = Test of string * (string * 'a) list
 
@@ -71,6 +60,34 @@ let successful (o : outcome) : bool =
     (fun (Test (_, cases)) -> List.for_all (fun (_, r) -> r = Pass) cases)
     o
 
+(* Another version of result, which contains more information for
+   statistics*)
+type test_result =
+  | STOk : string * Assertion.src_tgt_mode -> test_result
+  | STNOk : string * Assertion.src_tgt_mode * string -> test_result
+  | STErr : string * src_tgt_error_side * test_error -> test_result
+  | EQOk : string * Assertion.raw_assertion_string -> test_result
+  | EQFal : string * Assertion.raw_assertion_string -> test_result
+  | POIOk : string * Assertion.raw_assertion_string -> test_result
+  | POIFal : string * Assertion.raw_assertion_string -> test_result
+  | UNSOLVED : string -> test_result
+
+type assertion1 = unit -> test_result
+
+type suite1 = assertion1 test list
+
+type outcome1 = test_result test list
+
+let run_assertion1 (f : assertion1) : test_result =
+  try f () with
+  | Failure m -> UNSOLVED m
+  | e -> UNSOLVED ("test threw exception: " ^ Printexc.to_string e)
+
+let run_test1 (t : assertion1 test) : test_result test =
+  let run_case (cn, f) = (cn, run_assertion1 f) in
+  match t with Test (n, cases) -> Test (n, List.map run_case cases)
+
+let run_suite1 (s : suite) : outcome = List.map run_test1 s
 (***********************)
 (* Reporting functions *)
 
