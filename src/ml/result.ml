@@ -8,15 +8,24 @@ type 'a test = Test of string * (string * 'a) list
 
 type src_tgt_error_side = Src | Tgt
 
+let string_of_src_tgt_error_side = function Src -> "Src" | Tgt -> "Tgt"
+
 (* enum function for the OrdType*)
 let int_of_src_tgt_error_side = function Src -> 1 | Tgt -> 2
 
 (* Move test_error from Assertion.ml to here *)
-type test_error =
-  | UninterpretedCall : string -> test_error
-  | OutOfMemory : string -> test_error
-  | UndefinedBehavior : string -> test_error
-  | Failed : string -> test_error
+type exit_condition =
+  | UninterpretedCall of string
+  | OutOfMemory of string
+  | UndefinedBehavior of string
+  | Failed of string
+
+let string_of_exit_condition e =
+  match e with
+  | UninterpretedCall s -> "Uninterpreted Call: " ^ s
+  | OutOfMemory s -> "Out Of Memory: " ^ s
+  | UndefinedBehavior s -> "Undefined Behavior: " ^ s
+  | Failed s -> "Failed: " ^ s
 
 (* Serve as the key for the mapping *)
 type test_result =
@@ -28,6 +37,21 @@ type test_result =
   | POIOk
   | POINOk
   | UNSOLVED
+
+let string_of_test_result = function
+  | STOk mode ->
+      Printf.sprintf "Src Tgt Correct (%s)"
+        (Assertion.show_src_tgt_mode mode)
+  | STNOk mode ->
+      Printf.sprintf "Src Tgt Incorrect (%s)"
+        (Assertion.show_src_tgt_mode mode)
+  | STErr side ->
+      Printf.sprintf "%s Error" (string_of_src_tgt_error_side side)
+  | EQOk -> "Equality Correct"
+  | EQNOk -> "Equality Incorrect"
+  | POIOk -> "Poison Correct"
+  | POINOk -> "Poison Incorrect"
+  | UNSOLVED -> "Not Runnable"
 
 (* enum function for the OrdType*)
 let int_of_test_result = function
@@ -60,7 +84,7 @@ end
 (* The value that is stored in the map *)
 type test_outcome =
   | AST_ERR_MSG : ast * string -> test_outcome
-  | AST_TEST_ERR : ast * test_error -> test_outcome
+  | AST_TEST_ERR : ast * exit_condition -> test_outcome
   | AST_CORRECT : ast -> test_outcome
   | ERR_MSG : string -> test_outcome
   | RAW_STR : Assertion.raw_assertion_string -> test_outcome
@@ -91,3 +115,32 @@ let empty : result_sum = ResultMap.empty
 let make_singleton (key : ResultMap.key) (name : string)
     (outcome : test_outcome) =
   ResultMap.singleton key [TEST_SUM (name, outcome)]
+
+(* Need a function to dump the map... *)
+
+let string_of_chars chars : string =
+  let buf = Buffer.create 16 in
+  List.iter (Buffer.add_char buf) chars ;
+  Buffer.contents buf
+
+let test_outcome_to_string (outcome : test_outcome) (with_ast : bool) :
+    string =
+  let show_ast (sum_ast : ast) =
+    if with_ast then
+      Printf.sprintf "\nAST: \n%s\n"
+        (string_of_chars (ShowAST.showProg sum_ast))
+    else ""
+  in
+  match outcome with
+  | AST_ERR_MSG (sum_ast, msg) ->
+      Printf.sprintf "Error Message: %s%s" msg (show_ast sum_ast)
+  | AST_TEST_ERR (sum_ast, exit_cond) ->
+      Printf.sprintf "Fail Test: %s%s"
+        (string_of_exit_condition exit_cond)
+        (show_ast sum_ast)
+  | AST_CORRECT sum_ast -> Printf.sprintf "Correct: %s" (show_ast sum_ast)
+  | ERR_MSG msg -> Printf.sprintf "Error Message: %s" msg
+  | RAW_STR rs ->
+      Printf.sprintf "Raw Assertion String: %s"
+        (Assertion.string_of_raw_assertion_string rs)
+(* Need to print the output *)

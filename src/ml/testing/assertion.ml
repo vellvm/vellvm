@@ -15,6 +15,9 @@ type raw_assertion_string =
   | Eq of {lhs: string; rhs: string}
   | Poison' of {fcall: string}
 
+let string_of_raw_assertion_string = function
+  | Eq {lhs; rhs} -> Printf.sprintf "Eq{LHS:%s; RHS:%s}" lhs rhs
+  | Poison' {fcall} -> Printf.sprintf "Poison'{fcall:%s}" fcall
 (* SPECIAL TREATMENT FOR Alive2 TESTS
 
    - ERROR comments put the assertion parser into a different mode: "; ERROR:

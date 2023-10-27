@@ -82,13 +82,6 @@ let eval_POISONTest (name : string) (got : unit -> DV.dvalue)
 (* | STOk : string * Assertion.src_tgt_mode -> test_result | STNOk : string *
    Assertion.src_tgt_mode * string -> test_result | STErr : string *
    src_tgt_error_side * string -> test_result*)
-let exit_cond2test_err (ec : Interpreter.exit_condition) : Result.test_error
-    =
-  match ec with
-  | UninterpretedCall e -> UninterpretedCall e
-  | OutOfMemory e -> OutOfMemory e
-  | UndefinedBehavior e -> UndefinedBehavior e
-  | Failed e -> Failed e
 
 let eval_SRCTGTTest (name : string) (expected_rett : DynamicTypes.dtyp)
     (tgt_fn_str : string) (src_fn_str : string) (v_args : DV.uvalue list)
@@ -127,11 +120,9 @@ let eval_SRCTGTTest (name : string) (expected_rett : DynamicTypes.dtyp)
       | SourceMoreDefined -> failwith "todo: SourceMoreDefined"
       | MismatchInMemory -> failwith "todo:\n\n MismatchInMemory" )
     | Error e ->
-        Result.make_singleton (STErr Src) name
-          (AST_TEST_ERR (sum_ast, exit_cond2test_err e)) )
+        Result.make_singleton (STErr Src) name (AST_TEST_ERR (sum_ast, e)) )
   | Error e ->
-      Result.make_singleton (STErr Tgt) name
-        (AST_TEST_ERR (sum_ast, exit_cond2test_err e))
+      Result.make_singleton (STErr Tgt) name (AST_TEST_ERR (sum_ast, e))
 
 let make_test name ll_ast t : string * (unit -> result_sum) =
   let open Format in
@@ -144,7 +135,7 @@ let make_test name ll_ast t : string * (unit -> result_sum) =
   let run_to_value dtyp entry args ll_ast () : DV.dvalue =
     match run dtyp entry args ll_ast with
     | Ok dv -> dv
-    | Error e -> failwith (Interpreter.string_of_exit_condition e)
+    | Error e -> failwith (Result.string_of_exit_condition e)
   in
   match t with
   | Assertion.EQTest (expected, dtyp, entry, args) ->
@@ -206,6 +197,38 @@ let make_test name ll_ast t : string * (unit -> result_sum) =
       ( str
       , eval_SRCTGTTest name expected_rett tgt_fn_str src_fn_str v_args mode
           sum_ast )
+
+let test_dir dir =
+  Printf.printf "===> TESTING ASSERTIONS IN: %s\n" dir ;
+  Platform.configure () ;
+  let pathlist = Test.ll_files_of_dir dir in
+  let files =
+    List.filter_map
+      (fun path ->
+        let _file, ext = Platform.path_to_basename_ext path in
+        try
+          match ext with
+          | "ll" -> Some (path, IO.parse_file path, parse_tests path)
+          | _ -> None
+        with
+        | Failure s | ParseUtil.InvalidAnonymousId s ->
+            let _ = Printf.printf "FAILURE %s\n\t%s\n%!" path s in
+            None
+        | _ ->
+            let _ = Printf.printf "FAILURE %s\n%!" path in
+            None )
+      pathlist
+  in
+  let suite =
+    List.map
+      (fun (file, ast, tests) ->
+        Test (file, List.map (make_test file ast) tests) )
+      files
+  in
+  let outcome = run_suite' suite in
+  failwith "unimplemented"
+(* Printf.printf "%s\n" (outcome_to_string outcome) ; raise (Ran_tests
+   (successful outcome)) *)
 
 (* Need to add in the test directory stuff... *)
 (* let test_dir2 dir = Printf.printf "===> TESTING ASSERTIONS WITH STATISTICS
