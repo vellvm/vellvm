@@ -10,17 +10,11 @@
 (* An assertion is just a unit->unit function that either *)
 (* succeeds silently or throws an Failure exception.       *)
 
-type src_tgt_error_side = Src | Tgt
-
-type test_error =
-  | UninterpretedCall : string -> test_error
-  | OutOfMemory : string -> test_error
-  | UndefinedBehavior : string -> test_error
-  | Failed : string -> test_error
+open Result
 
 type assertion = unit -> unit
 
-type 'a test = Test of string * (string * 'a) list
+type 'a test = 'a Result.test
 
 type suite = assertion test list
 
@@ -62,32 +56,44 @@ let successful (o : outcome) : bool =
 
 (* Another version of result, which contains more information for
    statistics*)
-type test_result =
-  | STOk : string * Assertion.src_tgt_mode -> test_result
-  | STNOk : string * Assertion.src_tgt_mode * string -> test_result
-  | STErr : string * src_tgt_error_side * test_error -> test_result
-  | EQOk : string * Assertion.raw_assertion_string -> test_result
-  | EQFal : string * Assertion.raw_assertion_string -> test_result
-  | POIOk : string * Assertion.raw_assertion_string -> test_result
-  | POIFal : string * Assertion.raw_assertion_string -> test_result
-  | UNSOLVED : string -> test_result
 
-type assertion1 = unit -> test_result
+type outcome' = result_sum
 
-type suite1 = assertion1 test list
+type assertion' = unit -> outcome'
 
-type outcome1 = test_result test list
+type suite' = assertion' test list
 
-let run_assertion1 (f : assertion1) : test_result =
+module ResultMap = Result.ResultMap
+
+(* This function will process the assertion and output a singleton map
+   object *)
+let run_assertion' (name : string) (test_case : string) (f : assertion') :
+    result_sum =
   try f () with
-  | Failure m -> UNSOLVED m
-  | e -> UNSOLVED ("test threw exception: " ^ Printexc.to_string e)
+  | Failure m ->
+      let msg = Printf.sprintf "%s\n\t%s" test_case m in
+      Result.make_singleton UNSOLVED name (ERR_MSG msg)
+  | e ->
+      let msg =
+        Printf.sprintf "%s\n\t%s" test_case
+          ("test threw exception: " ^ Printexc.to_string e)
+      in
+      Result.make_singleton UNSOLVED name (ERR_MSG msg)
 
-let run_test1 (t : assertion1 test) : test_result test =
-  let run_case (cn, f) = (cn, run_assertion1 f) in
-  match t with Test (n, cases) -> Test (n, List.map run_case cases)
+(* Test is file name * string (test case) * assertion *)
+let run_test' (t : assertion' test) : outcome' =
+  let run_case name (cn, f) = run_assertion' name cn f in
+  match t with
+  | Test (n, cases) ->
+      List.fold_right
+        (fun case acc -> merge_result_outcome (run_case n case) acc)
+        cases Result.empty
 
-let run_suite1 (s : suite1) : outcome1 = List.map run_test1 s
+let run_suite' (s : suite') : outcome' =
+  List.fold_right
+    (fun x acc -> merge_result_outcome (run_test' x) acc)
+    s Result.empty
+
 (***********************)
 (* Reporting functions *)
 

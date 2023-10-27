@@ -40,6 +40,14 @@ type src_tgt_mode =
   | SourceMoreDefined
   | MismatchInMemory
 
+let int_of_src_tgt_mode = function
+  | NormalEquality -> 1
+  | ValueMismatch -> 2
+  | TargetMorePoisonous -> 3
+  | TargetMoreUndefined -> 4
+  | SourceMoreDefined -> 5
+  | MismatchInMemory -> 6
+
 let show_src_tgt_mode = function
   | NormalEquality -> "NormalEquality"
   | ValueMismatch -> "ValueMismatch"

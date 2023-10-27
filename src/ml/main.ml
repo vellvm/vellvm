@@ -11,6 +11,7 @@
 (* A main harness for Coq-extracted LLVM Transformations *)
 open Arg
 open Base
+open Result
 open Assert
 open Driver
 open ShowAST

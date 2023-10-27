@@ -1,6 +1,7 @@
 (* A main harness for Coq-extracted LLVM Transformations *)
 open Arg
 open Base
+open Result
 open Assert
 open Driver
 open ShowAST
@@ -13,11 +14,9 @@ exception Ran_tests of bool
 
 let suite = ref Test.suite
 
-let exec_tests () =
-  Platform.configure () ;
-  let outcome = run_suite !suite in
-  Printf.printf "%s\n" (outcome_to_string outcome) ;
-  raise (Ran_tests (successful outcome))
+(* let exec_tests () = Platform.configure () ; let outcome = run_suite'
+   !suite in Printf.printf "%s\n" (outcome_to_string outcome) ; raise
+   (Ran_tests (successful outcome)) *)
 
 (* Given two dvalues and an answer, return whether or not they equal the
    answer*)
@@ -27,7 +26,7 @@ let compare_dvalues_exn dv1 dv2 ans : (doc, unit) Either.t =
   | false ->
       Left
         (Printf.sprintf
-           "dvalue comparison for %s failed: \ngot:\n\t%s\nand:\n\t%s"
+           "dvalue comparison for %s failed:\n   \ngot:\n\t%s\nand:\n\t%s"
            (if ans then "equality" else "inequality")
            (string_of_dvalue dv1) (string_of_dvalue dv2) )
 
@@ -47,8 +46,8 @@ let compare_tgt_for_poison src tgt : (string, unit) Either.t =
     match src with
     | DV.DVALUE_Poison _ ->
         Left
-          "TargetMorePoisonous: expected src to be non-poison value, but \
-           got poison"
+          "TargetMorePoisonous: expected src to be non-poison value, but  got\n\
+          \   poison"
     | _ -> Right () )
   | _ ->
       Left
@@ -66,23 +65,24 @@ let run dtyp entry args ll_ast =
    hand side and right hand side of the equality. It will lift the result
    into the test result class *)
 let eval_EQTest (name : string) (got : unit -> DV.dvalue)
-    (expected : unit -> DV.dvalue) (lhs : string) (rhs : string) () =
+    (expected : unit -> DV.dvalue) (lhs : string) (rhs : string) () :
+    result_sum =
   match dvalue_eq_assertion name got expected () with
-  | Right _ -> EQOk (name, Eq {lhs; rhs})
-  | Left _ -> EQFal (name, Eq {lhs; rhs})
+  | Right _ -> Result.make_singleton EQOk name (RAW_STR (Eq {lhs; rhs}))
+  | Left _ -> Result.make_singleton EQNOk name (RAW_STR (Eq {lhs; rhs}))
 
 (* This function takes in a name, a got and expected function, and function
    call name. It will lift the result into the test result class *)
 let eval_POISONTest (name : string) (got : unit -> DV.dvalue)
-    (expected : unit -> DV.dvalue) (fcall : string) () =
+    (expected : unit -> DV.dvalue) (fcall : string) () : result_sum =
   match dvalue_eq_assertion name got expected () with
-  | Right _ -> POIOk (name, Poison' {fcall})
-  | Left _ -> POIFal (name, Poison' {fcall})
+  | Right _ -> Result.make_singleton POIOk name (RAW_STR (Poison' {fcall}))
+  | Left _ -> Result.make_singleton POINOk name (RAW_STR (Poison' {fcall}))
 
 (* | STOk : string * Assertion.src_tgt_mode -> test_result | STNOk : string *
    Assertion.src_tgt_mode * string -> test_result | STErr : string *
    src_tgt_error_side * string -> test_result*)
-let exit_cond2test_err (ec : Interpreter.exit_condition) : Assert.test_error
+let exit_cond2test_err (ec : Interpreter.exit_condition) : Result.test_error
     =
   match ec with
   | UninterpretedCall e -> UninterpretedCall e
@@ -92,10 +92,7 @@ let exit_cond2test_err (ec : Interpreter.exit_condition) : Assert.test_error
 
 let eval_SRCTGTTest (name : string) (expected_rett : DynamicTypes.dtyp)
     (tgt_fn_str : string) (src_fn_str : string) (v_args : DV.uvalue list)
-    (mode : Assertion.src_tgt_mode)
-    (sum_ast :
-      (LLVMAst.typ, Generate.GA.runnable_blocks) LLVMAst.toplevel_entity list
-      ) () : test_result =
+    (mode : Assertion.src_tgt_mode) (sum_ast : Result.ast) () : result_sum =
   let res_tgt = run expected_rett tgt_fn_str v_args sum_ast in
   let res_src = run expected_rett src_fn_str v_args sum_ast in
   match res_tgt with
@@ -107,23 +104,36 @@ let eval_SRCTGTTest (name : string) (expected_rett : DynamicTypes.dtyp)
       match mode with
       | NormalEquality -> (
         match compare_dvalues_exn v_src v_tgt true with
-        | Left fail_msg -> STNOk (name, mode, fail_msg)
-        | Right _ -> STOk (name, mode) )
+        | Left fail_msg ->
+            Result.make_singleton (STNOk mode) name
+              (AST_ERR_MSG (sum_ast, fail_msg))
+        | Right _ ->
+            Result.make_singleton (STOk mode) name (AST_CORRECT sum_ast) )
       | ValueMismatch -> (
         match compare_dvalues_exn v_src v_tgt false with
-        | Left fail_msg -> STNOk (name, mode, fail_msg)
-        | Right _ -> STOk (name, mode) )
+        | Left fail_msg ->
+            Result.make_singleton (STNOk mode) name
+              (AST_ERR_MSG (sum_ast, fail_msg))
+        | Right _ ->
+            Result.make_singleton (STOk mode) name (AST_CORRECT sum_ast) )
       | TargetMorePoisonous -> (
         match compare_tgt_for_poison v_src v_tgt with
-        | Left fail_msg -> STNOk (name, mode, fail_msg)
-        | Right _ -> STOk (name, mode) )
+        | Left fail_msg ->
+            Result.make_singleton (STNOk mode) name
+              (AST_ERR_MSG (sum_ast, fail_msg))
+        | Right _ ->
+            Result.make_singleton (STOk mode) name (AST_CORRECT sum_ast) )
       | TargetMoreUndefined -> failwith "todo: TargetMoreUndefined"
       | SourceMoreDefined -> failwith "todo: SourceMoreDefined"
-      | MismatchInMemory -> failwith "todo: MismatchInMemory" )
-    | Error e -> STErr (name, Src, exit_cond2test_err e) )
-  | Error e -> STErr (name, Tgt, exit_cond2test_err e)
+      | MismatchInMemory -> failwith "todo:\n\n MismatchInMemory" )
+    | Error e ->
+        Result.make_singleton (STErr Src) name
+          (AST_TEST_ERR (sum_ast, exit_cond2test_err e)) )
+  | Error e ->
+      Result.make_singleton (STErr Tgt) name
+        (AST_TEST_ERR (sum_ast, exit_cond2test_err e))
 
-let make_test name ll_ast t : string * (unit -> test_result) =
+let make_test name ll_ast t : string * (unit -> result_sum) =
   let open Format in
   (* TODO: ll_ast is of type list (toplevel_entity typ (block typ * list
      (block typ))) *)
@@ -187,7 +197,7 @@ let make_test name ll_ast t : string * (unit -> test_result) =
       let str =
         let args_str : doc =
           pp_print_list
-            ~pp_sep:(fun f () -> pp_print_string f ", ")
+            ~pp_sep:(fun f () -> pp_print_string f ",\n   ")
             Interpreter.pp_uvalue str_formatter v_args ;
           flush_str_formatter ()
         in
@@ -198,3 +208,16 @@ let make_test name ll_ast t : string * (unit -> test_result) =
           sum_ast )
 
 (* Need to add in the test directory stuff... *)
+(* let test_dir2 dir = Printf.printf "===> TESTING ASSERTIONS WITH STATISTICS
+   IN : %s\n" dir ; Platform.configure () ; let pathlist =
+   Test.ll_files_of_dir dir in let files = List.filter_map (fun path -> let
+   _file, ext = Platform.path_to_basename_ext path in try match ext with |
+   "ll" -> Some (path, IO.parse_file path, parse_tests path) | _ -> None with
+   | Failure s | ParseUtil.InvalidAnonymousId s -> let _ = Printf.printf
+   "FAILURE\n %s\n\t%s\n%!" path s in None | _ -> let _ = Printf.printf
+   "FAILURE %s\n%!" path in None ) pathlist in let suite = List.map (fun
+   (file, ast, tests) -> Test (file, List.map (make_test file ast) tests) )
+   files in let outcome = run_suite1 suite in failwith "TODO:
+   Unimplemented" *)
+(* Printf.printf "%s\n" (outcome_to_string outcome) ; raise (Ran_tests
+   (successful outcome)) *)
