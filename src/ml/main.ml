@@ -79,7 +79,7 @@ let make_test name ll_ast t : string * assertion =
   let run_to_value dtyp entry args ll_ast () : DV.dvalue =
     match run dtyp entry args ll_ast with
     | Ok dv -> dv
-    | Error e -> failwith (Interpreter.string_of_exit_condition e)
+    | Error e -> failwith (Result.string_of_exit_condition e)
   in
   (* let _ = Printf.printf "I can get here\n" in *)
   match t with
@@ -154,14 +154,14 @@ let make_test name ll_ast t : string * assertion =
           | Error e ->
               failwith
                 (Printf.sprintf "src - %s"
-                   (Interpreter.string_of_exit_condition e) ) )
+                   (Result.string_of_exit_condition e) ) )
         | Error e ->
             (* let buf = Buffer.create 16 in List.iter (Buffer.add_char buf)
                (showProg sum_ast); Printf.printf "%s\n" (Buffer.contents
                buf); *)
             failwith
               (Printf.sprintf "tgt - %s"
-                 (Interpreter.string_of_exit_condition e) )
+                 (Result.string_of_exit_condition e) )
       in
       let str =
         let args_str : doc =

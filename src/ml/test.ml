@@ -64,7 +64,7 @@ let pp_test_of_dir dir =
 let run_dvalue_test (test : DV.dvalue -> bool) path =
   let res, msg =
     match run_ll_file path with
-    | Error e -> (false, Interpreter.string_of_exit_condition e)
+    | Error e -> (false, Base.Result.string_of_exit_condition e)
     | Ok dv -> (test dv, "")
   in
   if not res then failwith (path ^ " test failed: " ^ msg) ;
