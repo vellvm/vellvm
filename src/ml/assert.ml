@@ -11,6 +11,7 @@
 (* succeeds silently or throws an Failure exception.       *)
 
 open Result
+open IO
 
 type assertion = unit -> unit
 
