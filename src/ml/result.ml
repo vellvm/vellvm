@@ -123,7 +123,7 @@ let string_of_chars chars : string =
   List.iter (Buffer.add_char buf) chars ;
   Buffer.contents buf
 
-let test_outcome_to_string (outcome : test_outcome) (with_ast : bool) :
+let string_of_test_outcome (with_ast : bool) (outcome : test_outcome) :
     string =
   let show_ast (sum_ast : ast) =
     if with_ast then
@@ -148,3 +148,24 @@ let test_outcome_to_string (outcome : test_outcome) (with_ast : bool) :
 (* TODO: Add function in assert.ml to output the map in specific location *)
 (* TODO: Call it from main.ml*)
 (* Then DONE!!*)
+
+let string_of_test_sum (with_ast : bool) (ts : test_sum) : string =
+  match ts with
+  | TEST_SUM (filename, outcome) ->
+      Printf.sprintf "%s ==> %s" filename
+        (string_of_test_outcome with_ast outcome)
+
+let string_of_value (with_ast : bool) (v : value) : string =
+  let string_space = if with_ast then "\n" else "" in
+  String.concat string_space
+    (List.map (fun x -> string_of_test_sum with_ast x ^ "\n") v)
+
+let string_of_key_value_pair (with_ast : bool) (rs : ResultMap.key * value) :
+    string =
+  let k, v = rs in
+  Printf.sprintf "<<<<<<<%s>>>>>>>\n%s\n" (string_of_test_result k)
+    (string_of_value with_ast v)
+
+(* let string_of_result_sum (rs : result_sum) : string = let ls =
+   ResultMap.bindings rs in failwith "TODO: unimplemented" *)
+(* String.concat (List.map ()) *)
