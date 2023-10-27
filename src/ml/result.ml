@@ -143,4 +143,8 @@ let test_outcome_to_string (outcome : test_outcome) (with_ast : bool) :
   | RAW_STR rs ->
       Printf.sprintf "Raw Assertion String: %s"
         (Assertion.string_of_raw_assertion_string rs)
-(* Need to print the output *)
+
+(* TODO: Need helper function for printing out the map ? *)
+(* TODO: Add function in assert.ml to output the map in specific location *)
+(* TODO: Call it from main.ml*)
+(* Then DONE!!*)
