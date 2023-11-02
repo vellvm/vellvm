@@ -11245,7 +11245,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       { (* Conv_ItoP *)
         break_match_hyp;
           rewrite <- H1 in H3; inv H3.
-          
+
+        pose proof get_conv_case_itop_fin_inf _ _ _ _ _ Heqc as CONV.
+        rewrite CONV.
         admit.
       }
 
