@@ -24899,9 +24899,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     { (* Handler raises UB *)
                       destruct UB as [ub_msg UB].
                       cbn in UB.
-
-                      pose proof mempush_spec_always_succeeds m1 as [m2 ?].
-                      specialize (UB m2); contradiction.
+                      contradiction.
                     }
 
                     { (* Handler raises error *)
@@ -25039,7 +25037,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                     destruct HSPEC as [UB | [ERR | [OOM | HSPEC]]].
                     { (* Handler raises UB *)
                       cbn in UB.
-                      destruct UB as [msg [NPOP NPOPSPEC]].
+                      destruct UB as [msg []].
 
                       (* TODO: Move to where the other frame stack lemmas are *)
                       Lemma cannot_pop_inf_fin :
@@ -25087,51 +25085,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                           rewrite POP.
                           reflexivity.
                       Qed.
-
-                      (* If we cannot pop we should have an empty
-                         frame stack... Should be empty in both fin /
-                         inf.
-                       *)
-                      eapply Interp_Memory_PropT_Vis
-                        with (ta:= raise_ub msg).
-
-                      3: {
-                        red.
-                        left.
-                        eapply FindUB.
-                        pstep; red; cbn.
-                        constructor.
-                        intros [].
-                      }
-
-                      { intros a0 b RETa RETb AB.
-                        cbn in RETb.
-                        unfold raiseUB in RETb.
-                        rewrite bind_trigger in RETb.
-                        eapply Returns_vis_inversion in RETb.
-                        destruct RETb as [[] _].
-                      }
-
-                      cbn; red.
-                      left.
-                      exists msg.
-                      red.
-                      red.
-                      cbn.
-                      split.
-                      - intros NPOP'.
-                        eapply NPOP.
-                        eapply cannot_pop_inf_fin; eauto.
-                        apply lift_MemState_refine_prop.
-                      - intros m2 CONTRA.
-                        eapply mem_pop_spec_inf_fin_exists in CONTRA.
-                        destruct CONTRA as (?&?&?).
-                        eapply NPOPSPEC; eauto.
-                        apply lift_MemState_refine_prop.
-
-                        intros POP.
-                        eapply NPOP.
-                        eapply cannot_pop_inf_fin; eauto with FinInf.
                     }
 
                     { (* Handler raises error *)
@@ -27962,9 +27915,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             { (* Handler raises UB *)
               destruct UB as [ub_msg UB].
               cbn in UB.
-
-              pose proof mempush_spec_always_succeeds m1 as [m2 ?].
-              specialize (UB m2); contradiction.
+              contradiction.
             }
 
             { (* Handler raises error *)
@@ -28118,53 +28069,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             destruct HANDLER as [UB | [ERR | [OOM | HANDLER]]].
             { (* Handler raises UB *)
               cbn in UB.
-              destruct UB as [msg [NPOP NPOPSPEC]].
-
-              pstep; red; cbn.
-              (* If we cannot pop we should have an empty
-                         frame stack... Should be empty in both fin /
-                         inf.
-               *)
-              eapply Interp_Memory_PropT_Vis
-                with (ta:= raise_ub msg).
-
-              3: {
-                red.
-                left.
-                eapply FindUB.
-                pstep; red; cbn.
-                constructor.
-                intros [].
-              }
-
-              { intros a0 b RETa RETb AB.
-                cbn in RETb.
-                unfold raiseUB in RETb.
-                rewrite bind_trigger in RETb.
-                eapply Returns_vis_inversion in RETb.
-                destruct RETb as [[] _].
-              }
-
-              cbn; red.
-              left.
-              exists msg.
-              red.
-              red.
-              cbn.
-              split.
-              - intros NPOP'.
-                eapply NPOP.
-                eapply cannot_pop_inf_fin; eauto.
-                apply lift_MemState_refine_prop.
-              - intros m2 CONTRA.
-                eapply mem_pop_spec_inf_fin_exists in CONTRA.
-                destruct CONTRA as (?&?&?).
-                eapply NPOPSPEC; eauto.
-                apply lift_MemState_refine_prop.
-
-                intros POP.
-                eapply NPOP.
-                eapply cannot_pop_inf_fin; eauto with FinInf.
+              destruct UB as [msg []].
             }
 
             { (* Handler raises error *)

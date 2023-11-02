@@ -3221,8 +3221,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     lift_spec_to_MemPropT
       (fun m1 _ m2 =>
          mempush_spec m1 m2)
-      (fun m1 =>
-         forall m2, ~ mempush_spec m1 m2).
+      (fun m1 => False).
 
   (** mempop *)
   Record mempop_operation_invariants (m1 : MemState) (m2 : MemState) :=
@@ -3273,7 +3272,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       | inl (OOM_message x) =>
           True
       | inr (inl (UB_message x)) =>
-          ~ cannot_pop m1 /\ forall m2, ~ mempop_spec m1 m2
+          False
       | inr (inr (inl (ERR_message x))) =>
           (* Not being able to pop is an error, shouldn't happen *)
           cannot_pop m1
