@@ -9625,6 +9625,22 @@ cofix CIH
     Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
   Qed.
 
+  Lemma access_allowed_aid_eq :
+    forall aid1 aid2,
+      LLVMParamsBigIntptr.PROV.access_allowed
+      (MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov aid1) aid2 = true ->
+      aid1 = aid2.
+  Proof.
+    (* TODO: need to show that aid = aid'...
+
+       This should be true, but need a lemma about access_allowed and
+       allocation_id_to_prov to do this...
+
+       In this case there should only be one provenance in the Prov
+       argument to access_allowed, so aid' must = aid.
+     *)
+  Admitted.
+
   (* TODO: Some tricky IntMap reasoning *)
   Lemma fin_inf_read_byte_raw :
     forall {m_inf m_fin ptr byte_fin aid},
@@ -9752,18 +9768,13 @@ cofix CIH
     rewrite memory_stack_memory_mem_state_memory in Heqo.
     rewrite Heqo.
 
-    (* TODO: need to show that aid = aid'...
+    assert (a = aid).
+    { symmetry; apply access_allowed_aid_eq; eauto.
+    }
 
-       This should be true, but need a lemma about access_allowed and
-       allocation_id_to_prov to do this...
-
-       In this case there should only be one provenance in the Prov
-       argument to access_allowed, so aid' must = aid.
-     *)
-    assert (a = aid) by admit.
     subst.
     auto.
-  Admitted.
+  Qed.
 
   (* TODO: Some tricky IntMap reasoning *)
   Lemma fin_inf_read_byte_raw_None :
