@@ -9641,6 +9641,12 @@ cofix CIH
      *)
   Admitted.
 
+  Lemma access_allowed_wildcard_prov :
+    forall aid,
+      LLVMParamsBigIntptr.PROV.access_allowed wildcard_prov aid = true.
+  Proof.
+  Admitted.
+
   Lemma fin_inf_read_byte_raw :
     forall {m_inf m_fin ptr byte_fin aid},
       MemState_refine_prop m_inf m_fin ->
@@ -9775,6 +9781,84 @@ cofix CIH
     auto.
   Qed.
 
+  (* TODO: Move this into lemmas about primitives *)
+  Lemma fin_byte_allocated_read_byte_raw :
+    forall ms ptr aid,
+      Memory64BitIntptr.MMEP.MemSpec.byte_allocated ms ptr aid ->
+      exists byte,
+        Memory64BitIntptr.MMEP.MMSP.read_byte_raw
+          (Memory64BitIntptr.MMEP.MMSP.memory_stack_memory
+             (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms))
+          (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr) = Some (byte, aid).
+  Proof.
+    intros ms ptr aid ALLOC.
+    cbn in ALLOC.
+    destruct ALLOC as [ms' [b ALLOC]].
+    destruct ALLOC as (?&?&?).
+    subst.
+    red in H.
+    destruct H.
+    clear H0.
+    Transparent Memory64BitIntptr.MMEP.MMSP.addr_allocated_prop.
+    unfold Memory64BitIntptr.MMEP.MMSP.addr_allocated_prop in H.
+    cbn in H.
+
+    destruct H as [ms' [ms'' [[MS MS'] H]]].
+    break_match_hyp.
+    {
+      destruct m.
+      exists s.
+      destruct H.
+      cbn in H0.
+      destruct (LLVMParams64BitIntptr.PROV.aid_eq_dec aid a) eqn:AID;
+        cbn in *; subst; try discriminate.
+      auto.
+    }
+
+    {
+      destruct H; discriminate.
+    }
+  Qed.
+
+  (* TODO: Move this into lemmas about primitives *)
+  Lemma inf_byte_allocated_read_byte_raw :
+    forall ms ptr aid,
+      MemoryBigIntptr.MMEP.MemSpec.byte_allocated ms ptr aid ->
+      exists byte,
+        MemoryBigIntptr.MMEP.MMSP.read_byte_raw
+          (MemoryBigIntptr.MMEP.MMSP.memory_stack_memory
+             (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms))
+          (LLVMParamsBigIntptr.PTOI.ptr_to_int ptr) = Some (byte, aid).
+  Proof.
+    intros ms ptr aid ALLOC.
+    cbn in ALLOC.
+    destruct ALLOC as [ms' [b ALLOC]].
+    destruct ALLOC as (?&?&?).
+    subst.
+    red in H.
+    destruct H.
+    clear H0.
+    Transparent MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop.
+    unfold MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop in H.
+    cbn in H.
+
+    destruct H as [ms' [ms'' [[MS MS'] H]]].
+    break_match_hyp.
+    {
+      destruct m.
+      exists s.
+      destruct H.
+      cbn in H0.
+      destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid a) eqn:AID;
+        cbn in *; subst; try discriminate.
+      auto.
+    }
+
+    {
+      destruct H; discriminate.
+    }
+  Qed.
+
   (* TODO: Some tricky IntMap reasoning *)
   Lemma fin_inf_read_byte_raw_None :
     forall m_inf m_fin ptr,
@@ -9786,15 +9870,74 @@ cofix CIH
         (MemoryBigIntptr.MMEP.MMSP.mem_state_memory m_inf)
         ptr = None.
   Proof.
-    intros m_inf m_fin ptr MSR READ.
-    Transparent Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
-    Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
-    unfold Memory64BitIntptr.MMEP.MMSP.read_byte_raw in READ.
-    unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+    intros m_inf m_fin addr MSR READ_RAW.
 
-    Opaque Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
-    Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
-  Admitted.
+    destruct MSR.
+    destruct H0.
+    clear H1 H.
+    destruct H0 as [ALLOWED RBP].
+    unfold InfMem.MMEP.MemSpec.read_byte_prop_all_preserved in RBP.
+    remember (addr, wildcard_prov) as ptr_inf.
+    specialize (ALLOWED ptr_inf).
+
+    assert (~ InfMem.MMEP.MemSpec.read_byte_allowed (lift_MemState m_fin) ptr_inf) as ALLOWED_INF.
+    { intros CONTRA.
+      red in CONTRA.
+      destruct CONTRA as (aid&ALLOC&ACCESS).
+
+      apply inf_byte_allocated_read_byte_raw in ALLOC.
+      destruct ALLOC as (byte&READ).
+
+      destruct m_fin.
+      cbn in READ. destruct ms_memory_stack.
+      cbn in READ, READ_RAW.
+      apply read_byte_raw_lifted in READ.
+      destruct READ as (?&?&?).
+      subst; cbn in H.
+      rewrite READ_RAW in H.
+      inv H.
+    }
+
+    apply not_iff_compat in ALLOWED.
+    apply ALLOWED in ALLOWED_INF.
+    assert (forall byte, ~ MemoryBigIntptr.MMEP.MMSP.read_byte_raw (MemoryBigIntptr.MMEP.MMSP.mem_state_memory m_inf) addr = Some byte).
+    { unfold InfMem.MMEP.MemSpec.read_byte_allowed in ALLOWED_INF.
+      intros [byte aid] CONTRA.
+      eapply ALLOWED_INF.
+      exists aid.
+      split.
+      - (* TODO: Split into lemma *)
+        repeat red.
+        exists m_inf. exists true.
+        split.
+        2: cbn; auto.
+        red.
+        split.
+        2: {
+          cbn.
+          intros ms' x H.
+          inv H.
+          reflexivity.
+        }
+
+        red.
+        cbn.
+        do 2 eexists.
+        split; eauto.
+        rewrite memory_stack_memory_mem_state_memory.
+        subst.
+        cbn.
+        rewrite CONTRA.
+        split; auto.
+        apply MemoryBigIntptrInfiniteSpec.LP.PROV.aid_eq_dec_refl.
+      - subst; cbn.
+        apply access_allowed_wildcard_prov.
+    }
+
+    destruct (MemoryBigIntptr.MMEP.MMSP.read_byte_raw (MemoryBigIntptr.MMEP.MMSP.mem_state_memory m_inf) addr).
+    specialize (H m); contradiction.
+    auto.
+  Qed.
 
   (* TODO: Some tricky IntMap reasoning *)
   Lemma inf_fin_read_byte_raw_None :
@@ -9807,7 +9950,56 @@ cofix CIH
         (Memory64BitIntptr.MMEP.MMSP.mem_state_memory m_fin)
         ptr = None.
   Proof.
-    intros m_inf m_fin ptr CONV READ.
+    intros m_inf m_fin addr MSR READ_RAW.
+
+    destruct MSR.
+    destruct H0.
+    clear H1 H.
+    destruct H0 as [ALLOWED RBP].
+    unfold InfMem.MMEP.MemSpec.read_byte_prop_all_preserved in RBP.
+    remember (addr, wildcard_prov) as ptr_inf.
+    specialize (ALLOWED ptr_inf).
+
+    assert (~ InfMem.MMEP.MemSpec.read_byte_allowed m_inf ptr_inf) as ALLOWED_INF.
+    { intros CONTRA.
+      red in CONTRA.
+      destruct CONTRA as (aid&ALLOC&ACCESS).
+
+      apply inf_byte_allocated_read_byte_raw in ALLOC.
+      destruct ALLOC as (byte&READ).
+      rewrite memory_stack_memory_mem_state_memory in READ.
+      subst; cbn in READ.
+      rewrite READ_RAW in READ.
+      inv READ.
+    }
+
+    assert (forall byte, ~ Memory64BitIntptr.MMEP.MMSP.read_byte_raw (Memory64BitIntptr.MMEP.MMSP.mem_state_memory m_fin) addr = Some byte).
+    { unfold InfMem.MMEP.MemSpec.read_byte_allowed in ALLOWED_INF.
+      intros [byte aid] CONTRA.
+      eapply ALLOWED_INF.
+      exists aid.
+      split.
+      - (* TODO: Split into lemma *)
+        repeat red.
+        exists m_inf. exists true.
+        split.
+        2: cbn; auto.
+        red.
+        split.
+        2: {
+          cbn.
+          intros ms' x H.
+          inv H.
+          reflexivity.
+        }
+        admit.
+      - admit.
+    }
+
+    destruct (MemoryBigIntptr.MMEP.MMSP.read_byte_raw (MemoryBigIntptr.MMEP.MMSP.mem_state_memory m_inf) addr).
+    specialize (H m); contradiction.
+    auto.
+
     Transparent Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
     Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
     unfold Memory64BitIntptr.MMEP.MMSP.read_byte_raw in READ.
@@ -11231,84 +11423,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       erewrite FinLP.ITOP.ptr_to_int_int_to_ptr; [| apply CONV].
       erewrite FinLP.ITOP.ptr_to_int_int_to_ptr; [| apply CONV'].
       auto.
-  Qed.
-
-  (* TODO: Move this into lemmas about primitives *)
-  Lemma fin_byte_allocated_read_byte_raw :
-    forall ms ptr aid,
-      Memory64BitIntptr.MMEP.MemSpec.byte_allocated ms ptr aid ->
-      exists byte,
-        Memory64BitIntptr.MMEP.MMSP.read_byte_raw
-          (Memory64BitIntptr.MMEP.MMSP.memory_stack_memory
-             (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms))
-          (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr) = Some (byte, aid).
-  Proof.
-    intros ms ptr aid ALLOC.
-    cbn in ALLOC.
-    destruct ALLOC as [ms' [b ALLOC]].
-    destruct ALLOC as (?&?&?).
-    subst.
-    red in H.
-    destruct H.
-    clear H0.
-    Transparent Memory64BitIntptr.MMEP.MMSP.addr_allocated_prop.
-    unfold Memory64BitIntptr.MMEP.MMSP.addr_allocated_prop in H.
-    cbn in H.
-
-    destruct H as [ms' [ms'' [[MS MS'] H]]].
-    break_match_hyp.
-    {
-      destruct m.
-      exists s.
-      destruct H.
-      cbn in H0.
-      destruct (LLVMParams64BitIntptr.PROV.aid_eq_dec aid a) eqn:AID;
-        cbn in *; subst; try discriminate.
-      auto.
-    }
-
-    {
-      destruct H; discriminate.
-    }
-  Qed.
-
-  (* TODO: Move this into lemmas about primitives *)
-  Lemma inf_byte_allocated_read_byte_raw :
-    forall ms ptr aid,
-      MemoryBigIntptr.MMEP.MemSpec.byte_allocated ms ptr aid ->
-      exists byte,
-        MemoryBigIntptr.MMEP.MMSP.read_byte_raw
-          (MemoryBigIntptr.MMEP.MMSP.memory_stack_memory
-             (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms))
-          (LLVMParamsBigIntptr.PTOI.ptr_to_int ptr) = Some (byte, aid).
-  Proof.
-    intros ms ptr aid ALLOC.
-    cbn in ALLOC.
-    destruct ALLOC as [ms' [b ALLOC]].
-    destruct ALLOC as (?&?&?).
-    subst.
-    red in H.
-    destruct H.
-    clear H0.
-    Transparent MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop.
-    unfold MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop in H.
-    cbn in H.
-
-    destruct H as [ms' [ms'' [[MS MS'] H]]].
-    break_match_hyp.
-    {
-      destruct m.
-      exists s.
-      destruct H.
-      cbn in H0.
-      destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid a) eqn:AID;
-        cbn in *; subst; try discriminate.
-      auto.
-    }
-
-    {
-      destruct H; discriminate.
-    }
   Qed.
 
   Lemma read_byte_spec_ref_byte_is_lifted :
