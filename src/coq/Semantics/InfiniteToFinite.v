@@ -10882,7 +10882,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       destruct m.
       pose proof fin_inf_ptoi _ _ ADDR_CONV as PTOI.
       pose proof inf_fin_read_byte_raw MSR Heqo.
-      destruct H as [byte_fin' [H BYTE_REF']].
+      destruct H as [byte_fin' [H [IN_BOUNDS BYTE_REF']]].
       unfold Memory64BitIntptr.MMEP.MMSP.mem_state_memory in H.
       cbn in H.
 
@@ -10907,7 +10907,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       cbn in Heqb0.
       rewrite Heqb0 in Heqb.
       discriminate.
-    - epose proof inf_fin_read_byte_raw_None _ _ _ MSR Heqo.
+    - epose proof inf_fin_read_byte_raw_None _ _ _ MSR _ Heqo.
       cbn.
       eexists. eexists.
       split; eauto.
@@ -10915,6 +10915,14 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       destruct ms_memory_stack0; cbn in *.
       rewrite H.
       auto.
+
+      Unshelve.
+      unfold InfToFinAddrConvert.addr_convert in ADDR_CONV.
+      destruct addr_inf.
+      apply ITOP.ptr_to_int_int_to_ptr in ADDR_CONV.
+      pose proof in_bounds_ptr_to_int_fin addr_fin.
+      destruct addr_fin; cbn in ADDR_CONV. rewrite <- ADDR_CONV.
+      cbn. eauto.
   Qed.
 
 
@@ -11687,7 +11695,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     { eapply fin_inf_ptoi; eauto.
     }
 
-    epose proof inf_fin_read_byte_raw MEM_REF READ_RAW_INF as [byte_fin [READ_BYTE_RAW_FIN BYTE_REF]].
+    epose proof inf_fin_read_byte_raw MEM_REF READ_RAW_INF as [byte_fin [READ_BYTE_RAW_FIN [IN_BOUNDS BYTE_REF]]].
 
     exists byte_fin.
     split.
@@ -11712,7 +11720,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           cbn.
           exists (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin).
           exists (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin).
-          split; auto.
+          split; cbn; auto.
 
           rewrite PTR.
           rewrite memory_stack_memory_mem_state_memory_fin.
