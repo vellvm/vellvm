@@ -59,7 +59,7 @@ let successful (o : outcome) : bool =
 
 type outcome' = result_sum
 
-type assertion' = unit -> Result.test_outcome
+type assertion' = unit -> outcome'
 
 type suite' = assertion' test list
 
@@ -67,27 +67,30 @@ module ResultMap = Result.ResultMap
 
 (* This function will process the assertion and output a singleton map
    object *)
-let run_assertion' (test_case : string) (f : assertion') :
-    Result.test_outcome =
+let run_assertion' (name : string) (test_case : string) (f : assertion') :
+    result_sum =
   try f () with
   | Failure m ->
       let msg = Printf.sprintf "%s\n\t%s" test_case m in
-      ERR_MSG msg
+      Result.make_singleton UNSOLVED name (ERR_MSG msg)
   | e ->
       let msg =
         Printf.sprintf "%s\n\t%s" test_case
           ("test threw\n   exception: " ^ Printexc.to_string e)
       in
-      ERR_MSG msg
+      Result.make_singleton UNSOLVED name (ERR_MSG msg)
 
 (* Test is file name * string (test case) * assertion *)
 let run_test' (t : assertion' test) : outcome' =
   let run_case name (cn, f) = run_assertion' name cn f in
   match t with
-  | Test (n, cases) ->
-      List.fold_right
-        (fun case acc -> merge_result_outcome (run_case n case) acc)
-        cases Result.empty
+  | Test (name, cases) ->
+      if List.length cases == 0 then
+        Result.make_singleton NOASSERT name NO_ASSERT
+      else
+        List.fold_right
+          (fun case acc -> merge_result_outcome (run_case name case) acc)
+          cases Result.empty
 
 let run_suite' (s : suite') : outcome' =
   List.fold_right

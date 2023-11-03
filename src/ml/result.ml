@@ -34,6 +34,7 @@ type test_result =
   | POIOk
   | POINOk
   | UNSOLVED
+  | NOASSERT
 
 let string_of_test_result = function
   | STOk mode ->
@@ -49,6 +50,7 @@ let string_of_test_result = function
   | POIOk -> "Poison Correct"
   | POINOk -> "Poison Incorrect"
   | UNSOLVED -> "Not Runnable"
+  | NOASSERT -> "NO ASSERT"
 
 (* enum function for the OrdType*)
 let int_of_test_result = function
@@ -60,6 +62,7 @@ let int_of_test_result = function
   | POIOk -> 6
   | POINOk -> 7
   | UNSOLVED -> 8
+  | NOASSERT -> 9
 (* The first string is always file name *)
 
 module Test_Result_Key = struct
@@ -85,8 +88,9 @@ type test_outcome =
   | AST_CORRECT : ast -> test_outcome
   | ERR_MSG : string -> test_outcome
   | RAW_STR : Assertion.raw_assertion_string -> test_outcome
+  | NO_ASSERT : test_outcome
 
-type test_sum = TEST_SUM : string * test_outcome list -> test_sum
+type test_sum = TEST_SUM : string * test_outcome -> test_sum
 
 module ResultMap = Map.Make (Test_Result_Key)
 
@@ -110,7 +114,7 @@ let merge_result_outcome : result_sum -> result_sum -> result_sum =
 let empty : result_sum = ResultMap.empty
 
 let make_singleton (key : ResultMap.key) (name : string)
-    (outcome : test_outcome list) =
+    (outcome : test_outcome) =
   ResultMap.singleton key [TEST_SUM (name, outcome)]
 
 (* Need a function to dump the map... *)
@@ -142,6 +146,7 @@ let string_of_test_outcome (with_ast : bool) (outcome : test_outcome) :
   | RAW_STR rs ->
       Printf.sprintf "Raw Assertion String: %s"
         (Assertion.string_of_raw_assertion_string rs)
+  | NO_ASSERT -> "NO ASSERT"
 
 (* TODO: Need helper function for printing out the map ? *)
 (* TODO: Add function in assert.ml to output the map in specific location *)
@@ -150,7 +155,9 @@ let string_of_test_outcome (with_ast : bool) (outcome : test_outcome) :
 
 let string_of_test_sum (with_ast : bool) (ts : test_sum) : string =
   let msg outcome =
-    String.concat "\n" (List.map (string_of_test_outcome with_ast) outcome)
+    string_of_test_outcome with_ast outcome
+    (* String.concat "\n" (List.map (string_of_test_outcome with_ast)
+       outcome) *)
   in
   match ts with
   | TEST_SUM (filename, outcome) ->
