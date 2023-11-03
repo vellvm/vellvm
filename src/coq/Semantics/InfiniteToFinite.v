@@ -840,8 +840,7 @@ Module InfiniteToFinite.
       convert_Block b_inf = NoOom b_fin ->
       lift_Block b_fin = b_inf.
   Proof.
-  Admitted.
-
+  Abort.
 
   Definition convert_Heap (h : InfMemMMSP.Heap) : OOM (FinMemMMSP.Heap).
     refine (blocks <- map_monad _ (IntMaps.IM.elements h);;
@@ -862,8 +861,7 @@ Module InfiniteToFinite.
       convert_Heap h_inf = NoOom h_fin ->
       lift_Heap h_fin = h_inf.
   Proof.
-  Admitted.
-
+  Abort.
 
   Definition convert_memory_stack (ms1 : InfMemMMSP.memory_stack) : OOM (FinMemMMSP.memory_stack).
     destruct ms1 as [mem fs h].
@@ -891,8 +889,7 @@ Module InfiniteToFinite.
       convert_memory_stack ms_inf = NoOom ms_fin ->
       lift_memory_stack ms_fin = ms_inf.
   Proof.
-  Admitted.
-
+  Abort.
 
   Definition convert_MemState (m1 : InfMem.MMEP.MMSP.MemState) : OOM (FinMem.MMEP.MMSP.MemState).
     destruct m1 as [ms pr].
@@ -941,7 +938,6 @@ Module InfiniteToFinite.
     destruct ms_fin. cbn in *.
     destruct ms_inf.
     cbn in *.
-
   Admitted.
 
   (* TODO: Move this *)
@@ -6356,9 +6352,11 @@ cofix CIH
 
     unfold LLVMParams64BitIntptr.IP.from_Z in H.
     pose proof (IP.from_Z_to_Z z ip_f H).
-    rewrite <- H0.
-
-  Admitted.
+    exists z.
+    unfold LLVMParamsBigIntptr.IP.from_Z.
+    cbn.
+    reflexivity.
+  Qed.
 
   (* TODO: Move this and use it in picky intptr reasoning admits *)
   Lemma fin_inf_from_Z_to_Z :
@@ -8089,7 +8087,7 @@ cofix CIH
       orutt (OOM:=OOME) pre post T1T2 t_source t_final.
   Proof.
     intros E F T1 T2 OE OF R T1T2 pre post t_source t_oom t_final REF_OOM ORUTT.
-  Admitted.
+  Abort.
 
   (* TODO: inversion lemmas for dvalue_convert_strict *)
   Lemma dvalue_convert_strict_addr_inv :
