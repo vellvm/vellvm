@@ -6372,7 +6372,6 @@ cofix CIH
     auto.
   Qed.
 
-
     (* TODO: Move this *)
   Lemma fin_to_inf_addr_ptr_to_int :
     forall ptr,
@@ -6663,6 +6662,38 @@ cofix CIH
       auto.
   Qed.
 
+  (* TODO: Move this, possibly to itrees library? *)
+  Lemma paco2_eqit_RR_refl : forall E R RR `{REFL: Reflexive _ RR} r (t : itree E R), paco2 (eqit_ RR true true id) r t t.
+  Proof.
+    intros. eapply paco2_mon with (r := bot2); intuition.
+    enough (eutt RR t t); auto. reflexivity.
+  Qed.
+
+  (* TODO: Move this, possibly to itrees library? *)
+  Lemma paco2_eqit_b1b2_RR_refl : forall E R RR `{REFL: Reflexive _ RR} {b1 b2} r (t : itree E R), paco2 (eqit_ RR b1 b2 id) r t t.
+  Proof.
+    intros. eapply paco2_mon with (r := bot2); intuition.
+    enough (eqit RR b1 b2 t t); auto. reflexivity.
+  Qed.
+
+  #[global] Instance paco2_eqit_RR_Reflexive {E R RR} `{REFL: Reflexive _ RR} r {b1 b2} (t : itree E R):
+    Reflexive (paco2 (eqit_ (E:=E) (R2:=R) RR b1 b2 id) r).
+  Proof.
+    red.
+    intros x.
+    apply paco2_eqit_b1b2_RR_refl; eauto.
+  Qed.
+
+  #[global] Instance paco2_eqit_false_false_RR_Reflexive {E R RR} `{REFL: Reflexive _ RR} r (t : itree E R):
+    Reflexive (paco2 (eqit_ (E:=E) (R2:=R) RR false false id) r).
+  Proof.
+    red.
+    intros x.
+    apply paco2_eqit_b1b2_RR_refl; eauto.
+  Qed.
+
+  Import Coq.Classes.RelationClasses.
+
   Lemma get_inf_tree_equation :
     forall t_fin2,
       get_inf_tree t_fin2 ≅ _get_inf_tree (observe t_fin2).
@@ -6687,9 +6718,67 @@ cofix CIH
       unfold _get_inf_tree.
       rewrite HTFIN.
       destruct e.
-      admit.
-      admit.
-  Admitted.
+      { (* ExternalCallE *)
+        destruct e.
+        cbn.
+        pstep; red; cbn.
+        constructor.
+        intros v; red.
+        left; eapply paco2_mon_bot; eauto.
+        (* Why won't reflexivity work? *)
+        eapply paco2_eqit_b1b2_RR_refl; eauto.
+      }
+
+      destruct s.
+      { (* PickUvalue *)
+        destruct p.
+        cbn.
+        pstep; red; cbn.
+        constructor.
+        intros v; red.
+        left; eapply paco2_mon_bot; eauto.
+        (* Why won't reflexivity work? *)
+        eapply paco2_eqit_b1b2_RR_refl; eauto.
+      }
+
+      destruct s.
+      { (* OOM *)
+        destruct o.
+        cbn.
+        pstep; red; cbn.
+        constructor.
+        intros [].
+      }
+
+      destruct s.
+      { (* UBE *)
+        destruct u.
+        cbn.
+        pstep; red; cbn.
+        constructor.
+        intros [].
+      }
+
+      destruct s.
+      { (* DebugE *)
+        destruct d.
+        cbn.
+        pstep; red; cbn.
+        constructor.
+        intros []; red.
+        left; eapply paco2_mon_bot; eauto.
+        (* Why won't reflexivity work? *)
+        eapply paco2_eqit_b1b2_RR_refl; eauto.
+      }
+
+      { (* FailureE *)
+        destruct f.
+        cbn.
+        pstep; red; cbn.
+        constructor.
+        intros [].
+      }
+  Qed.
 
   Lemma fin_to_inf_dvalue_refine_strict :
     forall d,
@@ -23495,13 +23584,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                         setoid_rewrite bind_ret_l.
                         cbn.
                         break_match_goal.
-
-                        (* TODO: Move this, possibly to itrees library? *)
-                        Lemma paco2_eqit_RR_refl : forall E R RR `{REFL: Reflexive _ RR} r (t : itree E R), paco2 (eqit_ RR true true id) r t t.
-                        Proof.
-                          intros. eapply paco2_mon with (r := bot2); intuition.
-                          enough (eutt RR t t); auto. reflexivity.
-                        Qed.
 
                         apply paco2_eqit_RR_refl; typeclasses eauto.
                         rewrite get_inf_tree_equation; cbn.
