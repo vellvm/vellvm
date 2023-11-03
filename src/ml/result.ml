@@ -1,6 +1,3 @@
-open LLVMAst
-open Generate
-
 type ast =
   (LLVMAst.typ, Generate.GA.runnable_blocks) LLVMAst.toplevel_entity list
 
@@ -89,7 +86,7 @@ type test_outcome =
   | ERR_MSG : string -> test_outcome
   | RAW_STR : Assertion.raw_assertion_string -> test_outcome
 
-type test_sum = TEST_SUM : string * test_outcome -> test_sum
+type test_sum = TEST_SUM : string * test_outcome list -> test_sum
 
 module ResultMap = Map.Make (Test_Result_Key)
 
@@ -113,7 +110,7 @@ let merge_result_outcome : result_sum -> result_sum -> result_sum =
 let empty : result_sum = ResultMap.empty
 
 let make_singleton (key : ResultMap.key) (name : string)
-    (outcome : test_outcome) =
+    (outcome : test_outcome list) =
   ResultMap.singleton key [TEST_SUM (name, outcome)]
 
 (* Need a function to dump the map... *)
@@ -138,7 +135,9 @@ let string_of_test_outcome (with_ast : bool) (outcome : test_outcome) :
       Printf.sprintf "Fail Test: %s%s"
         (string_of_exit_condition exit_cond)
         (show_ast sum_ast)
-  | AST_CORRECT sum_ast -> Printf.sprintf "Correct: %s" (show_ast sum_ast)
+  | AST_CORRECT sum_ast ->
+      if with_ast then Printf.sprintf "Correct: %s" (show_ast sum_ast)
+      else "Correct"
   | ERR_MSG msg -> Printf.sprintf "Error Message: %s" msg
   | RAW_STR rs ->
       Printf.sprintf "Raw Assertion String: %s"
@@ -150,10 +149,12 @@ let string_of_test_outcome (with_ast : bool) (outcome : test_outcome) :
 (* Then DONE!!*)
 
 let string_of_test_sum (with_ast : bool) (ts : test_sum) : string =
+  let msg outcome =
+    String.concat "\n" (List.map (string_of_test_outcome with_ast) outcome)
+  in
   match ts with
   | TEST_SUM (filename, outcome) ->
-      Printf.sprintf "%s ==> %s" filename
-        (string_of_test_outcome with_ast outcome)
+      Printf.sprintf "%s ==> %s" filename (msg outcome)
 
 let string_of_value (with_ast : bool) (v : value) : string =
   let string_space = if with_ast then "\n" else "" in
@@ -163,8 +164,16 @@ let string_of_value (with_ast : bool) (v : value) : string =
 let string_of_key_value_pair (with_ast : bool) (rs : ResultMap.key * value) :
     string =
   let k, v = rs in
-  Printf.sprintf "<<<<<<<%s>>>>>>>\n%s\n" (string_of_test_result k)
+  Printf.sprintf "<<<<<<< %s >>>>>>>\n%s\n" (string_of_test_result k)
     (string_of_value with_ast v)
+
+let bindings = ResultMap.bindings
+
+let get_stats (rs : result_sum) =
+  let res : (ResultMap.key * value) list = ResultMap.bindings rs in
+  List.map
+    (fun elem -> (string_of_test_result (fst elem), List.length (snd elem)))
+    res
 
 (* let string_of_result_sum (rs : result_sum) : string = let ls =
    ResultMap.bindings rs in failwith "TODO: unimplemented" *)

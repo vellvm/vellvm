@@ -18,8 +18,6 @@ open ShowAST
 
 module DV = InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV
 
-open Tester
-
 (* test harness
    ------------------------------------------------------------- *)
 exception Ran_tests of bool
@@ -273,6 +271,16 @@ let test_all () =
   let b3 = try test_dir !test_directory with Ran_tests b -> b in
   raise (Ran_tests (b1 && b2 && b3))
 
+let test_all' () =
+  let _ =
+    Printf.printf "============== RUNNING TEST SUITE ==============\n"
+  in
+  let b1 = try exec_tests () with Ran_tests b -> b in
+  let b2 = try test_pp_dir !test_directory with Ran_tests b -> b in
+  let b4 = try test_dir !test_directory with Ran_tests b -> b in
+  let b3 = try Tester.test_dir !test_directory with Ran_tests b -> b in
+  raise (Ran_tests (b1 && b2 && b3 && b4))
+
 let test_genAlive2 () =
   let _ =
     Printf.printf "============== RUNNING GENALIVE2 ==============\n"
@@ -291,7 +299,7 @@ let args =
     , Set_string test_directory
     , "set the path to the tests directory [default='../tests']" )
   ; ( "-test"
-    , Unit test_all
+    , Unit test_all'
     , "run comprehensive test case:\n\
        \tequivalent to running three times with\n\
        \t -test-suite, then\n\
@@ -302,6 +310,9 @@ let args =
     , "run the test suite, ignoring later inputs" )
   ; ("-test-file", String test_file, "run the assertions in a given file")
   ; ("-test-dir", String test_dir, "run all .ll files in the given directory")
+  ; ( "-test-dir2"
+    , String Tester.test_dir
+    , "run all .ll files in the given directory and aggregate stats" )
   ; ( "-test-pp-dir"
     , String test_pp_dir
     , "run the parsing/pretty-printing tests on all .ll files in the given \

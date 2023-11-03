@@ -4,9 +4,17 @@ open Base
 open Result
 open Assert
 open Driver
-open ShowAST
 
 module DV = InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV
+
+(* test result location
+   ------------------------------------------------------------- *)
+
+let stats_output_file_name =
+  ref (Printf.sprintf "%s/%s" !Platform.result_dir_path "test_result.txt")
+
+let result_output_file_name =
+  ref (Printf.sprintf "%s/%s" !Platform.result_dir_path "result.txt")
 
 (* test harness
    ------------------------------------------------------------- *)
@@ -198,9 +206,31 @@ let make_test name ll_ast t : string * (unit -> result_sum) =
       , eval_SRCTGTTest name expected_rett tgt_fn_str src_fn_str v_args mode
           sum_ast )
 
+let print_stats (rs : result_sum) () : unit =
+  let stats = get_stats rs in
+  let output_str =
+    String.concat "\n"
+      (List.map
+         (fun res ->
+           Printf.sprintf "%s: %s" (fst res) (string_of_int (snd res)) )
+         stats )
+  in
+  IO.write_file !stats_output_file_name output_str
+
+let print_result (rs : result_sum) () : unit =
+  let res_bindings = Result.bindings rs in
+  let output_str =
+    String.concat "\n"
+      (List.map (string_of_key_value_pair false) res_bindings)
+  in
+  IO.write_file !result_output_file_name output_str
+
+let output_asts (_ : result_sum) () : unit = ()
+
 let test_dir dir =
-  Printf.printf "===> TESTING ASSERTIONS IN: %s\n" dir ;
+  Printf.printf "===> TESTING ASSERTIONS WITH STATISTICS: %s\n" dir ;
   Platform.configure () ;
+  Platform.result_dir_configure () ;
   let pathlist = Test.ll_files_of_dir dir in
   let files =
     List.filter_map
@@ -226,13 +256,18 @@ let test_dir dir =
       files
   in
   let outcome = run_suite' suite in
-  failwith "unimplemented"
+  print_stats outcome () ;
+  print_result outcome () ;
+  output_asts outcome () ;
+  raise (Ran_tests true)
+
+(* failwith "unimplemented" *)
 (* Printf.printf "%s\n" (outcome_to_string outcome) ; raise (Ran_tests
    (successful outcome)) *)
 
 (* Need to add in the test directory stuff... *)
-(* let test_dir2 dir = Printf.printf "===> TESTING ASSERTIONS WITH STATISTICS
-   IN : %s\n" dir ; Platform.configure () ; let pathlist =
+(* let test_dir2 dir = Printf.printf "===> TESTING ASSERTIONS WITH
+   STATISTICS\n IN : %s\n" dir ; Platform.configure () ; let pathlist =
    Test.ll_files_of_dir dir in let files = List.filter_map (fun path -> let
    _file, ext = Platform.path_to_basename_ext path in try match ext with |
    "ll" -> Some (path, IO.parse_file path, parse_tests path) | _ -> None with
@@ -240,7 +275,7 @@ let test_dir dir =
    "FAILURE\n %s\n\t%s\n%!" path s in None | _ -> let _ = Printf.printf
    "FAILURE %s\n%!" path in None ) pathlist in let suite = List.map (fun
    (file, ast, tests) -> Test (file, List.map (make_test file ast) tests) )
-   files in let outcome = run_suite1 suite in failwith "TODO:
+   files in let outcome = run_suite' suite in failwith "TODO:\n
    Unimplemented" *)
 (* Printf.printf "%s\n" (outcome_to_string outcome) ; raise (Ran_tests
    (successful outcome)) *)

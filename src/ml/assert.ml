@@ -11,7 +11,6 @@
 (* succeeds silently or throws an Failure exception.       *)
 
 open Result
-open IO
 
 type assertion = unit -> unit
 
@@ -60,7 +59,7 @@ let successful (o : outcome) : bool =
 
 type outcome' = result_sum
 
-type assertion' = unit -> outcome'
+type assertion' = unit -> Result.test_outcome
 
 type suite' = assertion' test list
 
@@ -68,18 +67,18 @@ module ResultMap = Result.ResultMap
 
 (* This function will process the assertion and output a singleton map
    object *)
-let run_assertion' (name : string) (test_case : string) (f : assertion') :
-    result_sum =
+let run_assertion' (test_case : string) (f : assertion') :
+    Result.test_outcome =
   try f () with
   | Failure m ->
       let msg = Printf.sprintf "%s\n\t%s" test_case m in
-      Result.make_singleton UNSOLVED name (ERR_MSG msg)
+      ERR_MSG msg
   | e ->
       let msg =
         Printf.sprintf "%s\n\t%s" test_case
-          ("test threw exception: " ^ Printexc.to_string e)
+          ("test threw\n   exception: " ^ Printexc.to_string e)
       in
-      Result.make_singleton UNSOLVED name (ERR_MSG msg)
+      ERR_MSG msg
 
 (* Test is file name * string (test case) * assertion *)
 let run_test' (t : assertion' test) : outcome' =
@@ -149,3 +148,5 @@ let outcome_to_string (o : outcome) : string =
   in
   let p, f, tot, str = List.fold_left helper (0, 0, 0, "") o in
   str ^ sep ^ Printf.sprintf "Passed: %d/%d\nFailed: %d/%d\n" p tot f tot
+
+let outcome'2outcome (_ : outcome') : outcome = failwith "unimplemented"

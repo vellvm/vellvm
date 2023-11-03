@@ -68,6 +68,8 @@ let dot_path = "./"
 
 let output_path = ref "output"
 
+let result_dir_path = ref (Printf.sprintf "%s/%s" !output_path "result")
+
 let libs = ref []
 
 let lib_paths = ref []
@@ -176,22 +178,17 @@ let link (mods : string list) (out_fn : string) (opt_level : string) : unit =
        (List.fold_left (fun s l -> s ^ " -l" ^ l) "" !libs) )
     raise_error
 
-let rec try_create_directory dir_path =
-  try mkdir dir_path 0o755 with
+let result_dir_configure () : unit =
+  try mkdir !result_dir_path 0o755 with
   | Unix_error (EEXIST, _, _) ->
-      (* Directory already exists, do nothing*)
+      (* Directory already exists, clear results*)
+      print_endline "Result directory already exists" ;
       ()
-  | Unix_error (ENOENT, _, _) ->
-      (* Some parent directory doesn't exist, create it recursively *)
-      let parent_dir = Filename.dirname dir_path in
-      try_create_directory parent_dir ;
-      mkdir dir_path 0o755
-  | _ -> ()
+  | Unix_error (e, fstr, pstr) ->
+      failwith (Printf.sprintf "%s : %s : %s" (error_message e) fstr pstr)
 
-let rec try_remove_directory dir_path =
-  try rmdir dir_path with
-  | Unix_error (ENOENT, _, _) ->
-      Printf.printf "Directory '%s' does not exist.\n" dir_path
-  | Unix_error (EACCES, _, _) ->
-      Printf.printf "Permission denied to remove directory '%s'.\n" dir_path
-  | _ -> Printf.printf "Failed to remove directory '%s'.\n" dir_path
+(* let configure () = if os <> "Unix" then failwith "Windows not supported"
+   else let _ = if !linux then ( verb "platform = linux\n" ; clang_flags :=
+   "" ) else verb "platform = OS X\n" in try ignore (stat !output_path) with
+   Unix_error (ENOENT, _, _) -> verb @@ Printf.sprintf "creating output
+   directory: %s\n" !output_path ; mkdir !output_path 0o755 *)
