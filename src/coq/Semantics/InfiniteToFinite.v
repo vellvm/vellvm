@@ -10177,15 +10177,6 @@ cofix CIH
     apply inf_read_byte_preserved_read_byte_raw; auto.
   Qed.
 
-  Lemma read_byte_raw_fin_addr :
-    forall {m_inf m_fin addr byte_fin aid},
-      MemState_refine_prop m_inf m_fin ->
-      Memory64BitIntptr.MMEP.MMSP.read_byte_raw (Memory64BitIntptr.MMEP.MMSP.mem_state_memory m_fin) addr = Some (byte_fin, aid) ->
-      (forall pr, exists ptr, FinITOP.int_to_ptr addr pr = NoOom ptr).
-  Proof.
-    (* This may need an in_bounds predicate on addr to be true... *)
-  Admitted.
-
   Lemma addr_allocated_fin_addr :
     forall {m_inf m_inf' m_fin addr_inf aid},
       MemState_refine_prop m_inf m_fin ->
