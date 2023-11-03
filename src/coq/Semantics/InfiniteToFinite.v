@@ -10338,29 +10338,33 @@ cofix CIH
       cbn in *. destruct ALLOCATED; discriminate.
     }
 
-    destruct m.
+    destruct m as [byte_inf aid'].
+    epose proof inf_fin_read_byte_raw MSR Heqo as [byte_fin [READ_FIN [IN_BOUNDS BYTE_REF]]].
 
-    epose proof inf_fin_read_byte_raw MSR Heqo.
-    destruct H as (byte_fin&READ_FIN&BYTE_REF).
     destruct addr_inf.
-    cbn in *.
+    epose proof in_bounds_exists_addr _ p.
+    pose proof IN_BOUNDS as FIN_ADDR.
+    apply H in FIN_ADDR; clear H.
+    destruct FIN_ADDR as (addr_fin & FIN_ADDR & FIN_PROV).
 
-    read_byte_raw_lifted.
+    exists addr_fin.
+    split.
+    { unfold InfToFinAddrConvert.addr_convert.
+      cbn in *; subst.
+      erewrite ITOP.int_to_ptr_ptr_to_int; eauto.
+    }
 
-    pose proof read_byte_raw_fin_addr MSR READ_FIN p as [ptr CONV].
-    exists ptr. split; auto.
-    exists (FinMem.MMEP.MMSP.MemState_get_memory ms_fin).
-    exists (FinMem.MMEP.MMSP.MemState_get_memory ms_fin).
-    split; auto.
-
-    erewrite FinLP.ITOP.ptr_to_int_int_to_ptr; eauto.
+    repeat red.
+    do 2 eexists.
+    split; [cbn; eauto|].
+    rewrite FIN_ADDR. cbn in *.
     rewrite memory_stack_memory_mem_state_memory_fin.
     rewrite READ_FIN.
 
     split; auto.
     destruct ALLOCATED; auto.
 
-    destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid a); inv H0.
+    destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid aid'); inv H0.
     apply LLVMParams64BitIntptr.PROV.aid_eq_dec_refl.
   Qed.
 
