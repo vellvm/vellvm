@@ -10021,11 +10021,161 @@ cofix CIH
     auto.
   Qed.
 
+  Lemma inf_read_byte_preserved_read_byte_raw :
+    forall ms1 ms2 addr,
+      MemoryBigIntptr.MMEP.MemSpec.read_byte_preserved ms1 ms2 ->
+      MemoryBigIntptr.MMEP.MMSP.read_byte_raw (InfMem.MMEP.MMSP.mem_state_memory ms1) addr =
+        MemoryBigIntptr.MMEP.MMSP.read_byte_raw (InfMem.MMEP.MMSP.mem_state_memory ms2) addr.
+  Proof.
+    intros ms1 ms2 addr [RBP ALLOWED].
+    destruct (MemoryBigIntptr.MMEP.MMSP.read_byte_raw (InfMem.MMEP.MMSP.mem_state_memory ms1) addr) eqn:READ.
+    - destruct m.
+      remember (addr, MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov a) as ptr_inf.
+      specialize (RBP ptr_inf).
+      specialize (ALLOWED ptr_inf).
+
+      specialize (ALLOWED s).
+      destruct ALLOWED.
+
+      forward H.
+      { repeat red.
+        eexists.
+        eexists.
+        split.
+        cbn; split; eauto.
+
+        rewrite memory_stack_memory_mem_state_memory.
+        subst; cbn.
+        rewrite READ.
+        cbn.
+        rewrite MemoryBigIntptrInfiniteSpec.LP.PROV.access_allowed_refl.
+        auto.
+      }
+      clear H0.
+
+      destruct RBP.
+      clear H1.
+      forward H0.
+      { repeat red.
+        exists a.
+        split; [|subst; cbn; apply MemoryBigIntptrInfiniteSpec.LP.PROV.access_allowed_refl].
+
+        repeat red.
+        eexists. exists true.
+        split; [|cbn; eauto].
+
+        repeat red.
+        split; [|intros ? ? X; inv X; auto].
+
+        repeat red.
+        do 2 eexists.
+        split; [cbn; eauto|].
+
+        rewrite memory_stack_memory_mem_state_memory.
+        subst; cbn.
+        rewrite READ.
+        split; auto.
+        apply MemoryBigIntptrInfiniteSpec.LP.PROV.aid_eq_dec_refl.
+      }
+
+      repeat red in H0.
+      destruct H0 as (?&?&?).
+      pose proof H0 as BYTE_ALLOCATED.
+      apply inf_byte_allocated_read_byte_raw in H0 as (byte&MS2_READ).
+      rewrite memory_stack_memory_mem_state_memory in MS2_READ.
+
+      repeat red in H.
+      destruct H as (?&?&?).
+      repeat red in H.
+      destruct H as (?&?).
+      cbn in H.
+      destruct H; subst.
+      rewrite memory_stack_memory_mem_state_memory in H0.
+      rewrite MS2_READ in H0.
+      cbn in H1, H0.
+      rewrite H1 in H0.
+      destruct H0; subst.
+
+      cbn in MS2_READ.
+      rewrite MS2_READ.
+
+      apply access_allowed_aid_eq in H1; subst.
+      auto.
+    - remember (addr, wildcard_prov) as ptr_inf.
+      specialize (RBP ptr_inf).
+      clear ALLOWED.
+
+      assert (~ MemoryBigIntptr.MMEP.MemSpec.read_byte_allowed ms1 ptr_inf) as NO_READ.
+      { intros CONTRA.
+        repeat red in CONTRA.
+        destruct CONTRA as (?&?&?).
+        repeat red in H.
+        destruct H as (?&?&?&?).
+        cbn in H1.
+        destruct H1; subst.
+        repeat red in H.
+        destruct H.
+        repeat red in H.
+        destruct H as (?&?&?&?).
+        cbn in H; destruct H; subst.
+        rewrite memory_stack_memory_mem_state_memory in H2.
+        cbn in H2.
+        rewrite READ in H2.
+        destruct H2; discriminate.
+      }
+
+      apply not_iff_compat in RBP.
+      apply RBP in NO_READ.
+      assert (forall byte, ~ MemoryBigIntptr.MMEP.MMSP.read_byte_raw (MemoryBigIntptr.MMEP.MMSP.mem_state_memory ms2) addr = Some byte).
+      { unfold InfMem.MMEP.MemSpec.read_byte_allowed in NO_READ.
+        intros [byte aid] CONTRA.
+        eapply NO_READ.
+        exists aid.
+        split.
+        - (* TODO: Split into lemma *)
+          repeat red.
+          exists ms2. exists true.
+          split.
+          2: cbn; auto.
+          red.
+          split.
+          2: {
+            cbn.
+            intros ms' x H.
+            inv H.
+            reflexivity.
+          }
+
+          red.
+          cbn.
+          do 2 eexists.
+          split; eauto.
+          rewrite memory_stack_memory_mem_state_memory.
+          subst.
+          cbn.
+          rewrite CONTRA.
+          split; auto.
+          apply MemoryBigIntptrInfiniteSpec.LP.PROV.aid_eq_dec_refl.
+        - subst; cbn.
+          apply access_allowed_wildcard_prov.
+      }
+
+      destruct (MemoryBigIntptr.MMEP.MMSP.read_byte_raw (MemoryBigIntptr.MMEP.MMSP.mem_state_memory ms2) addr).
+      specialize (H m); contradiction.
+      auto.
+  Qed.
+
   #[global] Instance inf_read_byte_raw_MemState_eqv_Proper :
     Proper (MemoryBigIntptr.MMEP.MemSpec.MemState_eqv ==> eq ==> eq) (fun ms => MemoryBigIntptr.MMEP.MMSP.read_byte_raw (InfMem.MMEP.MMSP.mem_state_memory ms)).
   Proof.
-  Admitted.
-
+    unfold Proper, respectful.
+    intros x y H x0 y0 H0; subst.
+    destruct H, H0.
+    clear H H1.
+    rename H0 into RBP.
+    repeat red in RBP.
+    apply inf_read_byte_preserved_read_byte_raw; auto.
+  Qed.
 
   Lemma read_byte_raw_fin_addr :
     forall {m_inf m_fin addr byte_fin aid},
