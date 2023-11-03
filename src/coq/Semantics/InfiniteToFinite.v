@@ -11748,7 +11748,70 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           sbyte_refine byte_inf byte_fin.
   Proof.
     intros ptr_inf byte_inf ms_inf ms_fin MSR RBP.
-  Admitted.
+    repeat red in RBP.
+    destruct RBP as (?&?&?&?).
+    cbn in H.
+    destruct H; subst.
+    rewrite memory_stack_memory_mem_state_memory in H0.
+    break_match_hyp.
+    - (* Can read a byte *)
+      destruct m.
+      pose proof Heqo as READ.
+      erewrite inf_read_byte_raw_MemState_eqv_Proper in READ; eauto.
+      destruct ms_fin, ms_memory_stack; cbn in READ.
+      eapply read_byte_raw_lifted in READ.
+      destruct READ as (byte_fin&READ_FIN&IN_BOUNDS&BYTE_REF).
+
+      destruct ptr_inf.
+      epose proof in_bounds_exists_addr _ p.
+      pose proof IN_BOUNDS as FIN_ADDR.
+      apply H in FIN_ADDR; clear H.
+      destruct FIN_ADDR as (addr_fin & FIN_ADDR & FIN_PROV).
+
+      assert (addr_refine (i, p) addr_fin) as ADDR_REF.
+      { unfold addr_refine.
+        destruct addr_fin. cbn in *.
+        subst.
+        erewrite LLVMParams64BitIntptr.ITOP.int_to_ptr_ptr_to_int; eauto.
+      }
+
+      break_match_hyp; cbn in Heqb, H0.
+      2: {
+        (* access not allowed *)
+        exists addr_fin.
+        exists byte_fin.
+
+        split.
+        { repeat red.
+          do 2 eexists.
+          split; [cbn; eauto|].
+          cbn.
+          rewrite FIN_ADDR.
+          rewrite READ_FIN.
+          erewrite inf_fin_access_allowed; eauto.
+          cbn; auto.
+        }
+
+        split; auto.
+
+        
+        cbn in H0.
+        split.
+        
+      }
+      cbn in H0.
+      
+      
+      break_match_hyp.
+      + (* Access allowed *)
+        cbn in H0.
+        destruct m.
+        destruct H0.
+        cbn in H0.
+        subst.
+        clear H.
+
+  Qed.
 
   Lemma inf_fin_read_byte_spec_exists :
     forall {ms_inf ms_fin ptr_inf byte_inf},
