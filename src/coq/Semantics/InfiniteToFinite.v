@@ -10222,148 +10222,23 @@ cofix CIH
     apply ITOP.int_to_ptr_ptr_to_int; cbn; auto.
   Qed.
 
-  (* TODO: Prove this *)
   Lemma inf_fin_read_byte_raw :
     forall {m_inf m_fin addr byte_inf aid},
       MemState_refine_prop m_inf m_fin ->
       MemoryBigIntptr.MMEP.MMSP.read_byte_raw (MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory m_inf) addr = Some (byte_inf, aid) ->
       exists byte_fin,
         Memory64BitIntptr.MMEP.MMSP.read_byte_raw (Memory64BitIntptr.MMEP.MMSP.mem_state_memory m_fin) addr = Some (byte_fin, aid) /\
+          is_true (in_bounds addr) /\
           sbyte_refine byte_inf byte_fin.
   Proof.
     intros m_inf m_fin addr byte_inf aid MSR READ_RAW.
+    pose proof READ_RAW as READ_RAW'.
+    erewrite inf_read_byte_raw_MemState_eqv_Proper in READ_RAW'; eauto.
 
-    destruct MSR.
-    destruct H0.
-    clear H1 H.
-    destruct H0 as [ALLOWED RBP].
-    unfold InfMem.MMEP.MemSpec.read_byte_prop_all_preserved in RBP.
-    remember (addr, MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov aid) as ptr_inf.
-    specialize (RBP ptr_inf byte_inf).
-    specialize (ALLOWED ptr_inf).
-
-    assert (InfMem.MMEP.MemSpec.read_byte_prop m_inf ptr_inf byte_inf) as RBP_INF.
-    {
-      repeat red.
-      exists (InfMem.MMEP.MMSP.MemState_get_memory m_inf).
-      exists (InfMem.MMEP.MMSP.MemState_get_memory m_inf).
-
-      split.
-      cbn; auto.
-
-      subst.
-      unfold LLVMParamsBigIntptr.PTOI.ptr_to_int, fst.
-      rewrite memory_stack_memory_mem_state_memory.
-      rewrite READ_RAW.
-      cbn.
-      rewrite MemoryBigIntptrInfiniteSpec.LP.PROV.access_allowed_refl.
-      split; auto.
-    }
-
-    pose proof RBP_INF as RBP_FIN.
-    apply RBP in RBP_FIN.
-
-    assert (InfMem.MMEP.MemSpec.read_byte_allowed m_inf ptr_inf) as ALLOWED_INF.
-    {
-      red.
-      exists aid.
-      split.
-      - repeat red.
-        exists m_inf. exists true.
-        split; [|cbn; auto].
-
-        repeat red.
-        split.
-        + repeat red.
-          exists (InfMem.MMEP.MMSP.MemState_get_memory m_inf).
-          exists (InfMem.MMEP.MMSP.MemState_get_memory m_inf).
-          split; cbn; auto.
-          rewrite memory_stack_memory_mem_state_memory.
-          subst; cbn.
-          rewrite READ_RAW.
-          split; auto.
-          apply MemoryBigIntptrInfiniteSpec.LP.PROV.aid_eq_dec_refl.
-        + intros ms' x H.
-          cbn in H.
-          inv H.
-          auto.
-      - subst; cbn.
-        apply MemoryBigIntptrInfiniteSpec.LP.PROV.access_allowed_refl.
-    }
-
-    pose proof ALLOWED_INF as ALLOWED_FIN.
-    apply ALLOWED in ALLOWED_FIN.
-
-    (* Because of RBP I know I can read a byte_inf from (lift_MemState
-       m_fin)... The original, unlifted byte is the byte_fin that I need
-       to supply to the existential. *)
-    repeat red in RBP_INF.
-    repeat red in RBP_FIN.
-    destruct RBP_FIN as (sab&a&MS&RBP_FIN).
-    destruct MS; subst.
-    destruct RBP_INF as (sab&a&MS&RBP_INF).
-    destruct MS; subst.
-    cbn in RBP_FIN, RBP_INF.
-    rewrite memory_stack_memory_mem_state_memory, READ_RAW in RBP_INF.
-    cbn in RBP_INF.
-    rewrite MemoryBigIntptrInfiniteSpec.LP.PROV.access_allowed_refl in RBP_INF.
-
-    assert (exists s aid', InfMem.MMEP.MMSP.read_byte_raw
-                        (InfMem.MMEP.MMSP.memory_stack_memory
-                           (InfMem.MMEP.MMSP.MemState_get_memory (lift_MemState m_fin)))
-                        addr = Some (s, aid') /\
-                        LLVMParamsBigIntptr.PROV.access_allowed
-                          (MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov aid) aid' = true) as [byte_fin_lifted [aid' [READ_BYTE_FIN_LIFTED ACCESS_ALLOWED_BYTE_FIN_LIFTED]]].
-    {
-      clear - ALLOWED_FIN.
-      red in ALLOWED_FIN.
-      destruct ALLOWED_FIN as (aid'&ALLOCATED&ACCESS).
-      repeat red in ALLOCATED.
-      destruct ALLOCATED as (sab&a&ALLOCATED&ASSERT).
-      cbn in ASSERT. destruct ASSERT; subst.
-      repeat red in ALLOCATED.
-      destruct ALLOCATED as [ALLOCATED _].
-      repeat red in ALLOCATED.
-      destruct ALLOCATED as (sab&a&MS&ALLOCATED).
-      destruct MS; subst.
-
-      cbn in ALLOCATED.
-      break_match_hyp.
-      2: {
-        destruct ALLOCATED; discriminate.
-      }
-
-      destruct m.
-      cbn in ACCESS.
-      exists s. exists a.
-      split; auto.
-      destruct ALLOCATED.
-      destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid' a); inv H0.
-      auto.
-    }
-
-    rewrite READ_BYTE_FIN_LIFTED in RBP_FIN.
-    cbn in RBP_FIN.
-    rewrite ACCESS_ALLOWED_BYTE_FIN_LIFTED in RBP_FIN.
-    destruct RBP_FIN; subst.
-
-    apply read_byte_raw_lifted.
-    (* TODO: need to show that aid = aid'...
-
-       This should be true, but need a lemma about access_allowed and
-       allocation_id_to_prov to do this...
-
-       In this case there should only be one provenance in the Prov
-       argument to access_allowed, so aid' must = aid.
-     *)
-    assert (aid = aid') by admit.
-    subst.
-
-    rewrite memory_stack_memory_mem_state_memory in READ_BYTE_FIN_LIFTED.
-    destruct m_fin. destruct ms_memory_stack.
-    cbn in *.
-    auto.
-  Admitted.
+    destruct m_fin, ms_memory_stack; cbn in READ_RAW'.
+    eapply read_byte_raw_lifted in READ_RAW'.
+    cbn; eauto.
+  Qed.
 
   (* TODO: Maybe swap MemState for memory_stack to get rid of MemState_get_memory *)
   Lemma fin_inf_addr_allocated_prop :
