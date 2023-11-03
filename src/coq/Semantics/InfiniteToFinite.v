@@ -9641,7 +9641,6 @@ cofix CIH
      *)
   Admitted.
 
-  (* TODO: Some tricky IntMap reasoning *)
   Lemma fin_inf_read_byte_raw :
     forall {m_inf m_fin ptr byte_fin aid},
       MemState_refine_prop m_inf m_fin ->
