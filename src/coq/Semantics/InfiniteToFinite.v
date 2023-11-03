@@ -9577,6 +9577,7 @@ cofix CIH
       exists byte_fin : Memory64BitIntptr.MP.BYTE_IMPL.SByte,
         Memory64BitIntptr.MMEP.MMSP.read_byte_raw mem
           addr = Some (byte_fin, aid) /\
+          is_true (in_bounds addr) /\
           sbyte_refine byte_lifted byte_fin.
   Proof.
     intros mem byte_lifted addr aid READ.
@@ -9593,6 +9594,7 @@ cofix CIH
     cbn in BYTE.
     inv BYTE.
     apply find_filter_dom_true in FIND as (FIND & IN_BOUNDS).
+    split; auto.
     split; auto.
     apply sbyte_refine_lifted.
 
@@ -10019,6 +10021,12 @@ cofix CIH
     auto.
   Qed.
 
+  #[global] Instance inf_read_byte_raw_MemState_eqv_Proper :
+    Proper (MemoryBigIntptr.MMEP.MemSpec.MemState_eqv ==> eq ==> eq) (fun ms => MemoryBigIntptr.MMEP.MMSP.read_byte_raw (InfMem.MMEP.MMSP.mem_state_memory ms)).
+  Proof.
+  Admitted.
+
+
   Lemma read_byte_raw_fin_addr :
     forall {m_inf m_fin addr byte_fin aid},
       MemState_refine_prop m_inf m_fin ->
@@ -10034,8 +10042,35 @@ cofix CIH
       MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop addr_inf aid (InfMem.MMEP.MMSP.MemState_get_memory m_inf) (ret (m_inf', true)) ->
       (forall pr, exists ptr, FinITOP.int_to_ptr (InfPTOI.ptr_to_int addr_inf) pr = NoOom ptr).
   Proof.
-    (* Because this is looking at infinite memory this might be true without the in bounds predicate *)
-  Admitted.
+    intros m_inf m_inf' m_fin addr_inf aid MSR ALLOC pr.
+    repeat red in ALLOC.
+    destruct ALLOC as (?&?&?&?).
+    break_match_hyp;
+      [|destruct H0; discriminate].
+    destruct m.
+    cbn in H0.
+    destruct H0; subst.
+    cbn in H.
+    destruct H; subst.
+
+    rewrite memory_stack_memory_mem_state_memory in Heqo.
+    unfold MemState_refine_prop in MSR.
+    erewrite inf_read_byte_raw_MemState_eqv_Proper in Heqo; eauto.
+
+    destruct m_fin, ms_memory_stack; cbn in Heqo.
+    apply read_byte_raw_lifted in Heqo.
+    destruct Heqo as (?&?&?&?).
+
+    pose proof (in_bounds_exists_addr (LLVMParamsBigIntptr.PTOI.ptr_to_int addr_inf) pr).
+    destruct H3.
+    forward H3; auto.
+    destruct H3 as (?&?&?).
+    exists x0.
+
+    destruct addr_inf, x0.
+    cbn in *; subst.
+    apply ITOP.int_to_ptr_ptr_to_int; cbn; auto.
+  Qed.
 
   (* TODO: Prove this *)
   Lemma inf_fin_read_byte_raw :
@@ -10284,6 +10319,8 @@ cofix CIH
     destruct H as (byte_fin&READ_FIN&BYTE_REF).
     destruct addr_inf.
     cbn in *.
+
+    read_byte_raw_lifted.
 
     pose proof read_byte_raw_fin_addr MSR READ_FIN p as [ptr CONV].
     exists ptr. split; auto.
@@ -13416,7 +13453,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Proof.
     intros addr_fin addr_inf ms_fin ms_fin' ms_inf byte_inf byte_fin [] MSR ADDR_CONV BYTE_REF WBP.
     destruct WBP.
-    
+
     pose proof fin_inf_set_byte_memory MSR ADDR_CONV BYTE_REF byte_written as (ms_inf' & SET_INF & MSR').
 
     exists tt. exists ms_inf'.
@@ -23437,7 +23474,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
 
              interp_memory_PropTF ... (observe t1) (RetF r1)
 
-             implies 
+             implies
 
              interp_memory_PropTF ... (observe t1) (RetF r2)
 
@@ -23457,7 +23494,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
              This proof may proceed from
 
              HS : interp_memory_PropTF h_spec RR k_spec true true
-                (upaco2 (interp_memory_PropT_ h_spec RR k_spec true true) bot2) (observe t1) 
+                (upaco2 (interp_memory_PropT_ h_spec RR k_spec true true) bot2) (observe t1)
                 (RetF r1)
 
              Or it may proceed from t1... But probably it should proceed using HS.
@@ -23470,7 +23507,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                In order to show:
 
                  interp_memory_PropTF h_spec RR k_spec true true
-                 (upaco2 (interp_memory_PropT_ h_spec RR k_spec true true) r) (RetF r) 
+                 (upaco2 (interp_memory_PropT_ h_spec RR k_spec true true) r) (RetF r)
                  (RetF r2)
 
                I'll need to show `RR r r2` from `RR2 r1 r2` and `RR r r1`...
@@ -28786,7 +28823,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 cbn.
                 rewrite bind_ret_l.
                 rewrite <- itree_eta.
-                rewrite VIS_HANDLED.                
+                rewrite VIS_HANDLED.
                 reflexivity.
               }
 
@@ -28978,7 +29015,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
                 cbn.
                 rewrite bind_ret_l.
                 rewrite <- itree_eta.
-                rewrite VIS_HANDLED.                
+                rewrite VIS_HANDLED.
                 reflexivity.
               }
 
@@ -30412,7 +30449,7 @@ cofix CIH
                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
                          (prod InterpreterStackBigIntptr.LLVM.Global.global_env
-                            InterpreterStackBigIntptr.LP.Events.DV.dvalue))))) 
+                            InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
              (CIH t0))) t
    | @VisF _ _ _ X e k =>
        (fun (X0 : Type) (e0 : L4 X0)
@@ -30493,7 +30530,7 @@ cofix CIH
                                        (prod FinMem.MMEP.MMSP.MemState
                                           (prod MemPropT.store_id
                                              (prod (prod local_env (@stack local_env))
-                                                (prod global_env dvalue))))) 
+                                                (prod global_env dvalue)))))
                                 (_ : ExternalCallE X1),
                               itree InfLP.Events.L4
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
@@ -30653,7 +30690,7 @@ cofix CIH
                                                (prod FinMem.MMEP.MMSP.MemState
                                                   (prod MemPropT.store_id
                                                      (prod (prod local_env (@stack local_env))
-                                                        (prod global_env dvalue))))) 
+                                                        (prod global_env dvalue)))))
                                         (_ : OOME X1),
                                       itree InfLP.Events.L4
                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
@@ -30959,13 +30996,13 @@ cofix CIH
                                                                          InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
                                                            unit
                                                            (@subevent DebugE InfLP.Events.L4
-                                                              (@ReSum_inr 
+                                                              (@ReSum_inr
                                                                  (forall _ : Type, Type) IFun sum1
                                                                  Cat_IFun Inr_sum1 DebugE
                                                                  (sum1 OOME
                                                                     (sum1 UBE (sum1 DebugE FailureE)))
                                                                  InfLP.Events.ExternalCallE
-                                                                 (@ReSum_inr 
+                                                                 (@ReSum_inr
                                                                     (forall _ : Type, Type) IFun sum1
                                                                     Cat_IFun Inr_sum1 DebugE
                                                                     (sum1 UBE (sum1 DebugE FailureE))
@@ -31089,15 +31126,15 @@ cofix CIH
                                                            (@ReSum_inr (forall _ : Type, Type) IFun
                                                               sum1 Cat_IFun Inr_sum1 FailureE
                                                               (sum1 UBE (sum1 DebugE FailureE)) OOME
-                                                              (@ReSum_inr 
+                                                              (@ReSum_inr
                                                                  (forall _ : Type, Type) IFun sum1
                                                                  Cat_IFun Inr_sum1 FailureE
                                                                  (sum1 DebugE FailureE) UBE
-                                                                 (@ReSum_inr 
+                                                                 (@ReSum_inr
                                                                     (forall _ : Type, Type) IFun sum1
                                                                     Cat_IFun Inr_sum1 FailureE
                                                                     FailureE DebugE
-                                                                    (@ReSum_id 
+                                                                    (@ReSum_id
                                                                        (forall _ : Type, Type) IFun
                                                                        Id_IFun FailureE)))))
                                                         EmptyString) X0 H9 k0 H6) X0 H10) H8 H7) x3
@@ -31268,7 +31305,7 @@ cofix CIH
                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
                          (prod InterpreterStackBigIntptr.LLVM.Global.global_env
-                            InterpreterStackBigIntptr.LP.Events.DV.dvalue))))) 
+                            InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
              (get_inf_tree_L4 t0))) t
    | @VisF _ _ _ X e k =>
        (fun (X0 : Type) (e0 : L4 X0)
@@ -31349,7 +31386,7 @@ cofix CIH
                                        (prod FinMem.MMEP.MMSP.MemState
                                           (prod MemPropT.store_id
                                              (prod (prod local_env (@stack local_env))
-                                                (prod global_env dvalue))))) 
+                                                (prod global_env dvalue)))))
                                 (_ : ExternalCallE X1),
                               itree InfLP.Events.L4
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
@@ -31509,7 +31546,7 @@ cofix CIH
                                                (prod FinMem.MMEP.MMSP.MemState
                                                   (prod MemPropT.store_id
                                                      (prod (prod local_env (@stack local_env))
-                                                        (prod global_env dvalue))))) 
+                                                        (prod global_env dvalue)))))
                                         (_ : OOME X1),
                                       itree InfLP.Events.L4
                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
@@ -31815,13 +31852,13 @@ cofix CIH
                                                                          InterpreterStackBigIntptr.LP.Events.DV.dvalue)))))
                                                            unit
                                                            (@subevent DebugE InfLP.Events.L4
-                                                              (@ReSum_inr 
+                                                              (@ReSum_inr
                                                                  (forall _ : Type, Type) IFun sum1
                                                                  Cat_IFun Inr_sum1 DebugE
                                                                  (sum1 OOME
                                                                     (sum1 UBE (sum1 DebugE FailureE)))
                                                                  InfLP.Events.ExternalCallE
-                                                                 (@ReSum_inr 
+                                                                 (@ReSum_inr
                                                                     (forall _ : Type, Type) IFun sum1
                                                                     Cat_IFun Inr_sum1 DebugE
                                                                     (sum1 UBE (sum1 DebugE FailureE))
@@ -31945,15 +31982,15 @@ cofix CIH
                                                            (@ReSum_inr (forall _ : Type, Type) IFun
                                                               sum1 Cat_IFun Inr_sum1 FailureE
                                                               (sum1 UBE (sum1 DebugE FailureE)) OOME
-                                                              (@ReSum_inr 
+                                                              (@ReSum_inr
                                                                  (forall _ : Type, Type) IFun sum1
                                                                  Cat_IFun Inr_sum1 FailureE
                                                                  (sum1 DebugE FailureE) UBE
-                                                                 (@ReSum_inr 
+                                                                 (@ReSum_inr
                                                                     (forall _ : Type, Type) IFun sum1
                                                                     Cat_IFun Inr_sum1 FailureE
                                                                     FailureE DebugE
-                                                                    (@ReSum_id 
+                                                                    (@ReSum_id
                                                                        (forall _ : Type, Type) IFun
                                                                        Id_IFun FailureE)))))
                                                         EmptyString) X0 H9 k0 H6) X0 H10) H8 H7) x3
@@ -32074,7 +32111,7 @@ cofix CIH
       { (* OOM *)
         destruct o.
         pstep; red; cbn.
-        
+
         change (inr1 (inl1 (ThrowOOM u))) with (@subevent _ _ (ReSum_inr IFun sum1 OOME
                                                                  (OOME +' UBE +' DebugE +' FailureE)
                                                                  ExternalCallE) _ (ThrowOOM u)).
@@ -32724,7 +32761,7 @@ cofix CIH
     (*     cbn. *)
     (*     destruct x0. *)
     (*     cbn. *)
-        
+
     (*     apply interp_prop_oom_raiseOOM. *)
     (*   } *)
 
@@ -32852,7 +32889,7 @@ cofix CIH
     (*       destruct om1. *)
     (*       pinversion H. *)
     (*       pinversion H. *)
-          
+
     (*       red in H0. *)
     (*       rewrite H0 in H1. *)
     (*       setoid_rewrite bind_bind in H1. *)
@@ -32936,7 +32973,7 @@ cofix CIH
     (*       break_match_goal. *)
     (*       - specialize (H3 a d). *)
     (*         forward H3; cbn; try tauto. *)
-            
+
     (*         left. *)
     (*         specialize (HK d). *)
     (*         forward HK. *)
@@ -32969,7 +33006,7 @@ cofix CIH
     (*         Qed. *)
 
     (*           forall  *)
-            
+
 
 
 
@@ -33004,7 +33041,7 @@ cofix CIH
     (*         - intros a H0. *)
     (*           left. *)
     (*           eauto. *)
-              
+
 
     (*         generalize dependent y. *)
     (*         generalize dependent x. *)
@@ -33016,7 +33053,7 @@ cofix CIH
     (*       Qed. *)
 
     (*       pstep; red; cbn. *)
-          
+
     (*       cbn. *)
     (*       pstep; red; cbn. *)
 
@@ -33064,7 +33101,7 @@ cofix CIH
     (*       -- specialize (EQ t2). *)
     (*          contradiction. *)
 
-      
+
 
     (*   applpunfold RUN. *)
     (*   red in RUN. *)
