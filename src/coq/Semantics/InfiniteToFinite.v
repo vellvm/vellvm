@@ -9939,10 +9939,10 @@ cofix CIH
     auto.
   Qed.
 
-  (* TODO: Some tricky IntMap reasoning *)
   Lemma inf_fin_read_byte_raw_None :
     forall m_inf m_fin ptr,
       MemState_refine_prop m_inf m_fin ->
+      is_true (in_bounds ptr) ->
       MemoryBigIntptr.MMEP.MMSP.read_byte_raw
         (MemoryBigIntptr.MMEP.MMSP.mem_state_memory m_inf)
         ptr = None ->
@@ -9950,7 +9950,7 @@ cofix CIH
         (Memory64BitIntptr.MMEP.MMSP.mem_state_memory m_fin)
         ptr = None.
   Proof.
-    intros m_inf m_fin addr MSR READ_RAW.
+    intros m_inf m_fin addr MSR BOUNDS READ_RAW.
 
     destruct MSR.
     destruct H0.
@@ -9973,6 +9973,9 @@ cofix CIH
       inv READ.
     }
 
+    apply not_iff_compat in ALLOWED.
+    apply ALLOWED in ALLOWED_INF.
+
     assert (forall byte, ~ Memory64BitIntptr.MMEP.MMSP.read_byte_raw (Memory64BitIntptr.MMEP.MMSP.mem_state_memory m_fin) addr = Some byte).
     { unfold InfMem.MMEP.MemSpec.read_byte_allowed in ALLOWED_INF.
       intros [byte aid] CONTRA.
@@ -9981,7 +9984,7 @@ cofix CIH
       split.
       - (* TODO: Split into lemma *)
         repeat red.
-        exists m_inf. exists true.
+        eexists. exists true.
         split.
         2: cbn; auto.
         red.
@@ -9992,22 +9995,29 @@ cofix CIH
           inv H.
           reflexivity.
         }
-        admit.
-      - admit.
+
+        red.
+        cbn.
+        do 2 eexists.
+        split; eauto.
+        rewrite memory_stack_memory_mem_state_memory.
+        subst.
+        cbn.
+
+        destruct m_fin, ms_memory_stack; cbn in CONTRA.
+        cbn.
+        eapply read_byte_raw_lifted_fin_inf in CONTRA; eauto.
+        rewrite CONTRA.
+        split; auto.
+        apply MemoryBigIntptrInfiniteSpec.LP.PROV.aid_eq_dec_refl.
+      - subst; cbn.
+        apply access_allowed_wildcard_prov.
     }
 
-    destruct (MemoryBigIntptr.MMEP.MMSP.read_byte_raw (MemoryBigIntptr.MMEP.MMSP.mem_state_memory m_inf) addr).
+    destruct (Memory64BitIntptr.MMEP.MMSP.read_byte_raw (Memory64BitIntptr.MMEP.MMSP.mem_state_memory m_fin) addr).
     specialize (H m); contradiction.
     auto.
-
-    Transparent Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
-    Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
-    unfold Memory64BitIntptr.MMEP.MMSP.read_byte_raw in READ.
-    unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
-
-    Opaque Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
-    Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
-  Admitted.
+  Qed.
 
   Lemma read_byte_raw_fin_addr :
     forall {m_inf m_fin addr byte_fin aid},
@@ -10015,6 +10025,7 @@ cofix CIH
       Memory64BitIntptr.MMEP.MMSP.read_byte_raw (Memory64BitIntptr.MMEP.MMSP.mem_state_memory m_fin) addr = Some (byte_fin, aid) ->
       (forall pr, exists ptr, FinITOP.int_to_ptr addr pr = NoOom ptr).
   Proof.
+    (* This may need an in_bounds predicate on addr to be true... *)
   Admitted.
 
   Lemma addr_allocated_fin_addr :
@@ -10023,6 +10034,7 @@ cofix CIH
       MemoryBigIntptr.MMEP.MMSP.addr_allocated_prop addr_inf aid (InfMem.MMEP.MMSP.MemState_get_memory m_inf) (ret (m_inf', true)) ->
       (forall pr, exists ptr, FinITOP.int_to_ptr (InfPTOI.ptr_to_int addr_inf) pr = NoOom ptr).
   Proof.
+    (* Because this is looking at infinite memory this might be true without the in bounds predicate *)
   Admitted.
 
   (* TODO: Prove this *)
