@@ -13608,7 +13608,20 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       MemoryBigIntptr.MMEP.MemSpec.read_byte_prop_all_preserved ms_inf ms_inf'.
   Proof.
     intros ms_fin ms_inf ms_fin' ms_inf' REF REF' RBP.
-  Admitted.
+    red.
+    intros ptr byte.
+    split; intros RBP_INF.
+    - pose proof inf_fin_read_byte_prop_exists REF RBP_INF as
+        (addr_fin & byte_fin & RBP_FIN & ADDR_REF & BYTE_REF).
+
+      apply RBP in RBP_FIN.
+      eapply fin_inf_read_byte_prop; eauto.
+    - pose proof inf_fin_read_byte_prop_exists REF' RBP_INF as
+        (addr_fin & byte_fin & RBP_FIN & ADDR_REF & BYTE_REF).
+
+      apply RBP in RBP_FIN.
+      eapply fin_inf_read_byte_prop; eauto.
+  Qed.
 
   Lemma fin_inf_write_byte_allowed_all_preserved :
     forall ms_fin ms_inf ms_fin' ms_inf',
