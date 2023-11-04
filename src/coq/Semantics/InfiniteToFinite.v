@@ -13754,8 +13754,19 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       MemoryBigIntptr.MMEP.MemSpec.preserve_allocation_ids ms_inf ms_inf' ->
       Memory64BitIntptr.MMEP.MemSpec.preserve_allocation_ids ms_fin ms_fin'.
   Proof.
-    intros ms_fin ms_inf ms_fin' ms_inf' REF REF' HP.
-  Admitted.
+    intros ms_fin ms_inf ms_fin' ms_inf' REF REF' PAIDS.
+    red; red in PAIDS.
+    intros p.
+    specialize (PAIDS p).
+    destruct PAIDS.
+    split; intros UP_FIN.
+    - eapply fin_inf_used_provenance_prop in UP_FIN; eauto.
+      eapply H in UP_FIN.
+      eapply inf_fin_used_provenance_prop; eauto.
+    - eapply fin_inf_used_provenance_prop in UP_FIN; eauto.
+      eapply H0 in UP_FIN.
+      eapply inf_fin_used_provenance_prop; eauto.
+  Qed.
 
   #[global] Hint Resolve
     lift_MemState_refine_prop
