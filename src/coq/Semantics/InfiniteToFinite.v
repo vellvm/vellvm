@@ -13557,16 +13557,48 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       MemoryBigIntptr.MMEP.MemSpec.read_byte_allowed_all_preserved ms_inf ms_inf'.
   Proof.
     intros ms_fin ms_inf ms_fin' ms_inf' REF REF' RBA.
-    apply MemState_refine_prop_read_byte_allowed_all_preserved in REF, REF'.
     red.
     intros h.
     split; intros HP_INF.
     - red. red in HP_INF.
       destruct HP_INF as [aid [HA1 HA2]].
-      exists aid. split; auto.
-      red in REF, REF'.
+      pose proof inf_fin_byte_allocated_exists _ _ _ _ REF HA1.
+      destruct H as (addr_fin & CONV & ALLOC_FIN).
 
-  Admitted.
+      red in RBA.
+      specialize (RBA addr_fin).
+      destruct RBA as [RBA _].
+      forward RBA.
+      { red.
+        exists aid.
+        split; eauto.
+        eapply inf_fin_access_allowed; eauto.
+      }
+
+      destruct RBA as (aid'&ALLOC&ACCESS).
+      exists aid'. split; auto.
+      eapply fin_inf_byte_allocated; eauto.
+      eapply fin_inf_access_allowed; eauto.
+    - red. red in HP_INF.
+      destruct HP_INF as [aid [HA1 HA2]].
+      pose proof inf_fin_byte_allocated_exists _ _ _ _ REF' HA1.
+      destruct H as (addr_fin & CONV & ALLOC_FIN).
+
+      red in RBA.
+      specialize (RBA addr_fin).
+      destruct RBA as [_ RBA].
+      forward RBA.
+      { red.
+        exists aid.
+        split; eauto.
+        eapply inf_fin_access_allowed; eauto.
+      }
+
+      destruct RBA as (aid'&ALLOC&ACCESS).
+      exists aid'. split; auto.
+      eapply fin_inf_byte_allocated; eauto.
+      eapply fin_inf_access_allowed; eauto.
+  Qed.
 
   Lemma fin_inf_read_byte_prop_all_preserved :
     forall ms_fin ms_inf ms_fin' ms_inf',
