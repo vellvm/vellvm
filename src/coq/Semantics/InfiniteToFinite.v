@@ -13933,15 +13933,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   Qed.
 
   (* TODO: Move this *)
-  Lemma zip_length :
-    forall {A B C D} {x : list A} {y : list B} {z : list C} {w : list D},
-      length x = length z ->
-      length y = length w ->
-      length (zip x y) = length (zip z w).
-  Proof.
-  Admitted.
-
-  (* TODO: Move this *)
   Lemma zip_cons :
     forall {X Y} (x : X) xs (y : Y) ys,
       zip (x :: xs) (y :: ys) = (x, y) :: zip xs ys.
@@ -13958,7 +13949,16 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       Forall2 ZW zs ws ->
       Forall2 (fun '(x, z) '(y, w) => XY x y /\ ZW z w) (zip xs zs) (zip ys ws).
   Proof.
-  Admitted.
+    intros X Y Z W xs ys zs ws XY ZW FXY FZW.
+    revert zs ws ZW FZW.
+    induction FXY; intros zs ws ZW FZW.
+    - cbn. constructor.
+    - destruct FZW.
+      + cbn. constructor.
+      + cbn.
+        constructor; auto.
+        apply IHFXY; eauto.
+  Qed.
 
   (* TODO: Move this *)
   Lemma sbytes_refine_length :
