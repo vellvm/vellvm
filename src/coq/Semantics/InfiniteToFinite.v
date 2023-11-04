@@ -16327,8 +16327,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     }
   Qed.
 
-  (* TODO: separate into lemma? *)
-  (* lift_MemState does not change which sids are used *)
   Lemma used_store_id_lift_MemState :
     forall ms_fin sid,
       FinMem.MMEP.MemSpec.used_store_id_prop ms_fin sid <->
@@ -16349,8 +16347,13 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         apply lift_MemState_refine_prop; auto.
         apply sbyte_refine_lifted.
       - destruct byte. cbn.
-        unfold InfMem.MMEP.MMSP.MemByte.sbyte_sid.
-        admit.
+
+        unfold FinMem.MMEP.MMSP.MemByte.sbyte_sid in *.
+        unfold InfMem.MMEP.MMSP.MemByte.sbyte_sid in *.
+        rewrite FinLLVM.MEM.Byte.sbyte_to_extractbyte_of_uvalue_sbyte in BYTE.
+        inv BYTE.
+        rewrite InfLLVM.MEM.Byte.sbyte_to_extractbyte_of_uvalue_sbyte.
+        reflexivity.
     }
     {
       cbn in *.
@@ -16358,7 +16361,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       destruct USED as [ptr [byte [READ BYTE]]].
 
       pose proof (lift_MemState_refine_prop ms_fin) as MSR.
-      pose proof inf_fin_read_byte_prop_exists MSR READ as (ptr_fin&byte_fin&READ_FIN&BYTE_REFINE).
+      pose proof inf_fin_read_byte_prop_exists MSR READ as (ptr_fin&byte_fin&READ_FIN&ADDR_REFINE&BYTE_REFINE).
       exists ptr_fin. exists byte_fin.
       split; auto.
 
@@ -16371,10 +16374,15 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       unfold FinMem.MMEP.MMSP.MemByte.sbyte_sid, InfMem.MMEP.MMSP.MemByte.sbyte_sid in *.
       break_match_hyp; inv BYTE.
       cbn in Hequ1.
-      unfold FinMem.MP.BYTE_IMPL.sbyte_to_extractbyte.
-      (* unfold Memory64BitIntptr.Byte.sbyte_to_extractbyte. *)
-      admit.
-  Admitted.
+
+      unfold FinMem.MMEP.MMSP.MemByte.sbyte_sid in *.
+      unfold InfMem.MMEP.MMSP.MemByte.sbyte_sid in *.
+      rewrite InfLLVM.MEM.Byte.sbyte_to_extractbyte_of_uvalue_sbyte in Hequ1.
+      inv Hequ1.
+      rewrite FinLLVM.MEM.Byte.sbyte_to_extractbyte_of_uvalue_sbyte.
+      reflexivity.
+    }
+  Qed.
 
   (* TODO: Move this somewhere I can use it for both fin / inf *)
   Lemma used_store_id_read_byte_preserved_fin :
