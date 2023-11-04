@@ -11941,7 +11941,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     eapply addr_oom_not_in_bounds; eauto.
   Qed.
 
-  (* TODO: a little unsure of this one, but it seems plausible. *)
   Lemma fin_to_inf_dvalue_refine_strict' :
     forall d_inf d_fin,
       DVC1.dvalue_refine_strict d_inf d_fin ->
@@ -11954,7 +11953,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     destruct p.
     clear Heqs.
 
-    induction d_inf;
+    revert d_fin H x e e0.
+    induction d_inf; intros d_fin H' x' e e0; try rename H into H''; rename H' into H;
       try solve
         [ rewrite DVC1.dvalue_convert_strict_equation in H;
           cbn in *; inv H;
@@ -11981,7 +11981,11 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       cbn in *; inv e.
       rewrite DVC1.dvalue_convert_strict_equation in e0.
       cbn in *; break_match_hyp; inv e0.
-      admit. (* Some painful IP / BigIP reasoning *)
+
+      pose proof (IP64Bit.from_Z_injective _ _ _ Heqo Heqo0).
+      apply LLVMParamsBigIntptr.IP.to_Z_inj in H.
+      subst.
+      reflexivity.
     - rewrite DVC1.dvalue_convert_strict_equation in H.
       cbn in *; break_match_hyp; inv H.
       rewrite DVC2.dvalue_convert_strict_equation in e.
@@ -11989,29 +11993,140 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       rewrite DVC1.dvalue_convert_strict_equation in e0.
       cbn in *; break_match_hyp; inv e0.
 
-      induction fields.
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction fields; intros l Heqo l0 Heqo1 H'' Heqo0.
       + cbn in *. inv Heqo.
         cbn in *. inv Heqo0.
         reflexivity.
       + rewrite map_monad_InT_unfold in Heqo.
         cbn in *.
         break_match_hyp; inv Heqo.
-        break_match_hyp; inv H1.
+        break_match_hyp; inv H0.
 
         rewrite map_monad_InT_unfold in Heqo0.
         cbn in *.
         break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H1.
+        break_match_hyp; inv H0.
 
         rewrite map_monad_InT_unfold in Heqo1.
         cbn in *.
         break_match_hyp; inv Heqo1.
-        break_match_hyp; inv H1.
-        admit.
-    - admit.
-    - admit.
-    - admit.
-  Admitted.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHfields _ eq_refl l Heqo1).
+        forward IHfields; eauto.
+        forward IHfields; eauto.
+        inv IHfields.
+        reflexivity.
+    - rewrite DVC1.dvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      rewrite DVC2.dvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      rewrite DVC1.dvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction fields; intros l Heqo l0 Heqo1 H'' Heqo0.
+      + cbn in *. inv Heqo.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_InT_unfold in Heqo.
+        cbn in *.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHfields _ eq_refl l Heqo1).
+        forward IHfields; eauto.
+        forward IHfields; eauto.
+        inv IHfields.
+        reflexivity.
+    - rewrite DVC1.dvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      rewrite DVC2.dvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      rewrite DVC1.dvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction elts; intros l Heqo l0 Heqo1 H'' Heqo0.
+      + cbn in *. inv Heqo.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_InT_unfold in Heqo.
+        cbn in *.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHelts _ eq_refl l Heqo1).
+        forward IHelts; eauto.
+        forward IHelts; eauto.
+        inv IHelts.
+        reflexivity.
+    - rewrite DVC1.dvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      rewrite DVC2.dvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      rewrite DVC1.dvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction elts; intros l Heqo l0 Heqo1 H'' Heqo0.
+      + cbn in *. inv Heqo.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_InT_unfold in Heqo.
+        cbn in *.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHelts _ eq_refl l Heqo1).
+        forward IHelts; eauto.
+        forward IHelts; eauto.
+        inv IHelts.
+        reflexivity.
+  Qed.
 
   Lemma MemState_in_bounds_memory_in_bounds :
     forall m,
