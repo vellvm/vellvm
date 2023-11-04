@@ -11880,15 +11880,44 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     destruct WRITE.
   Admitted.
 
-  (* TODO: Move this *)
-  (* TODO: Ask about in meeting? *)
-  (* TODO: This may not currently be true
-     because of how lift_memory works...
+  Lemma int_to_ptr_succeeds_regardless_of_provenance :
+    forall {pr1 pr2 addr ptr},
+      LLVMParams64BitIntptr.ITOP.int_to_ptr addr pr1 = NoOom ptr ->
+      exists ptr', LLVMParams64BitIntptr.ITOP.int_to_ptr addr pr2 = NoOom ptr'.
+  Proof.
+    intros pr1 pr2 addr0 ptr H.
+    unfold LLVMParams64BitIntptr.ITOP.int_to_ptr in *.
+    break_match_hyp_inv.
+    eexists; reflexivity.
+  Qed.
 
-     No constraint on the bounds of addresses... This can be changed,
-     though... May make sense to just add it as another condition to
-     MemState_refine_prop.
-   *)
+  Lemma int_to_ptr_fails_regardless_of_provenance :
+    forall {pr1 pr2 addr oom_msg},
+      LLVMParams64BitIntptr.ITOP.int_to_ptr addr pr1 = Oom oom_msg ->
+      LLVMParams64BitIntptr.ITOP.int_to_ptr addr pr2 = Oom oom_msg.
+  Proof.
+    intros pr1 pr2 addr0 oom_msg H.
+    unfold LLVMParams64BitIntptr.ITOP.int_to_ptr in *.
+    break_match_hyp_inv.
+    reflexivity.
+  Qed.
+
+  Lemma addr_oom_not_in_bounds :
+    forall ptr oom_msg,
+      InfToFinAddrConvert.addr_convert ptr = Oom oom_msg ->
+      in_bounds (LLVMParamsBigIntptr.PTOI.ptr_to_int ptr) = false.
+  Proof.
+    intros.
+    unfold in_bounds.
+    unfold InfToFinAddrConvert.addr_convert in *.
+    destruct ptr.
+    cbn.
+
+    epose proof int_to_ptr_fails_regardless_of_provenance (pr2:=PROV.nil_prov) H.
+    rewrite H0.
+    reflexivity.
+  Qed.
+
   Lemma fin_inf_big_addresses_no_byte_to_read :
     forall ms_inf ms_fin addr_inf oom_msg,
       MemState_refine_prop ms_inf ms_fin ->
@@ -11896,9 +11925,21 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       MemoryBigIntptr.MMEP.MMSP.read_byte_raw (InfMem.MMEP.MMSP.mem_state_memory ms_inf) (LLVMParamsBigIntptr.PTOI.ptr_to_int addr_inf) = None.
   Proof.
     intros mem_inf mem_fin addr_inf oom_msg MEM_CONV ADDR_CONV.
-    unfold InfToFinAddrConvert.addr_convert in *.
-    destruct addr_inf as [ix_inf pr].
-  Admitted.
+    erewrite inf_read_byte_raw_MemState_eqv_Proper; eauto.
+    destruct mem_fin, ms_memory_stack.
+    cbn in *.
+
+    Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+    unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+    Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
+
+    unfold lift_memory.
+    rewrite IntMaps.IP.F.map_o.
+    unfold option_map.
+    rewrite find_filter_dom_false; eauto.
+
+    eapply addr_oom_not_in_bounds; eauto.
+  Qed.
 
   (* TODO: a little unsure of this one, but it seems plausible. *)
   Lemma fin_to_inf_dvalue_refine_strict' :
@@ -12229,14 +12270,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         Unshelve.
         all: auto.
   Qed.
-
-  (* TODO: Move this, prove this. *)
-  Lemma int_to_ptr_succeeds_regardless_of_provenance :
-    forall {pr1 pr2 addr ptr},
-      LLVMParams64BitIntptr.ITOP.int_to_ptr addr pr1 = NoOom ptr ->
-      exists ptr', LLVMParams64BitIntptr.ITOP.int_to_ptr addr pr2 = NoOom ptr'.
-  Proof.
-  Admitted.
 
   (* TODO: Move. Probably a better name for this. *)
   Lemma IntMap_find_NoOom_assoc_list' :
