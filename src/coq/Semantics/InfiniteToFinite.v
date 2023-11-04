@@ -11833,7 +11833,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           cbn.
           exists (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin).
           exists (Memory64BitIntptr.MMEP.MMSP.MemState_get_memory ms_fin).
-          split; auto.
+          split; cbn; auto.
 
           rewrite PTR.
           rewrite memory_stack_memory_mem_state_memory_fin.
@@ -11856,6 +11856,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         unfold sbyte_refine in *.
         rewrite BYTE_REF in BYTE_REF'.
         inv BYTE_REF'; auto.
+        inv H0; auto.
     }
   Qed.
 
