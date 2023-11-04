@@ -17245,6 +17245,54 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       }
   Qed.
 
+  (* TODO: Move to where this applies for both fin / inf *)
+  Lemma add_ptr_to_frame_commutative :
+    forall a b f1 f2 f2' f3,
+      MemoryBigIntptr.MMEP.MemSpec.add_ptr_to_frame f1 a f2 ->
+      MemoryBigIntptr.MMEP.MemSpec.add_ptr_to_frame f2 b f3 ->
+      MemoryBigIntptr.MMEP.MemSpec.add_ptr_to_frame f1 b f2' ->
+      MemoryBigIntptr.MMEP.MemSpec.add_ptr_to_frame f2' a f3.
+  Proof.
+    intros a b f1 f2 f2' f3 F1_a_F2 F2_b_F3 F1_b_F2'.
+
+    destruct F1_a_F2 as [F1_a_F2_old F1_a_F2_new].
+    destruct F2_b_F3 as [F2_b_F3_old F2_b_F3_new].
+    destruct F1_b_F2' as [F1_b_F2'_old F1_b_F2'_new].
+
+    split.
+    - intros ptr' H.
+      specialize (F1_a_F2_old _ H).
+      destruct (InfMem.MMEP.disjoint_ptr_byte_dec b ptr').
+      2: {
+        (* b = ptr' *)
+        apply Classical_Prop.NNPP in n.
+        red; red in F2_b_F3_new.
+        unfold MemoryBigIntptr.MMEP.MMSP.ptr_in_frame_prop in *.
+        rewrite <- n.
+        auto.
+      }
+
+      specialize (F2_b_F3_old _ d).
+      specialize (F1_b_F2'_old _ d).
+      split; intros IN_FRAME.
+      + apply F2_b_F3_old.
+        apply F1_b_F2'_old in IN_FRAME.
+        apply F1_a_F2_old; auto.
+      + apply F1_b_F2'_old.
+        apply F2_b_F3_old in IN_FRAME.
+        apply F1_a_F2_old; auto.
+    - destruct (InfMem.MMEP.disjoint_ptr_byte_dec b a).
+      2: {
+        (* a = b *)
+        apply Classical_Prop.NNPP in n.
+        unfold MemoryBigIntptr.MMEP.MMSP.ptr_in_frame_prop in *.
+        rewrite <- n.
+        auto.
+      }
+
+      apply F2_b_F3_old; auto.
+  Qed.
+
   Lemma add_ptr_to_frame_stack_commutative :
     forall a b fs1 fs2 fs2' fs3,
       MemoryBigIntptr.MMEP.MemSpec.add_ptr_to_frame_stack fs1 a fs2 ->
@@ -17252,7 +17300,19 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       MemoryBigIntptr.MMEP.MemSpec.add_ptr_to_frame_stack fs1 b fs2' ->
       MemoryBigIntptr.MMEP.MemSpec.add_ptr_to_frame_stack fs2' a fs3.
   Proof.
-  Admitted.
+    intros a b fs1 fs2 fs2' fs3 FS1_a_FS2 FS2_b_FS3 FS1_b_FS2'.
+    red.
+    intros f H.
+
+    destruct fs1.
+    - red in FS1_b_FS2'.
+      specialize (FS1_b_FS2' f0).
+      forward FS1_b_FS2'; [cbn; reflexivity|].
+
+      destruct FS1_b_FS2' as (f' & F' & PEEK & POP).
+      apply FS1_b_FS2' in H.
+
+  Qed.
 
   (* TODO: Move this, make available for fin / inf *)
   Lemma add_ptrs_to_frame_stack_cons_inv :
@@ -17278,6 +17338,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       destruct ADD_PTRS as (fs_addrs_a & ADD_PTRS & ADD_PTR).
       destruct ADD_PTRS as (fs_addrs & ADD_PTRS & ADD_PTR').
 
+      pose proof add_ptr_to_frame_stack_commutative _ _ _ _ _ _ .
+
       cbn in IHaddrs.
   Abort.
 
@@ -17290,24 +17352,28 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       Memory64BitIntptr.MMEP.MemSpec.extend_stack_frame ms_fin_start addrs_fin ms_fin_final ->
       MemoryBigIntptr.MMEP.MemSpec.extend_stack_frame ms_inf_start addrs_inf ms_inf_final.
   Proof.
-    intros ms_inf_start ms_fin_start ms_inf_final ms_fin_final addrs_fin addrs_inf MSR1 MSR2 ADDRS EXTEND.
+    intros ms_inf_start ms_fin_start ms_inf_final ms_fin_final
+      addrs_fin addrs_inf MSR1 MSR2 ADDRS EXTEND.
     red in EXTEND.
     red.
 
     intros fs1 fs2 MSFSP ADD_PTRS.
-    red.
-
-    apply MemState_refine_prop_frame_stack_preserved in MSR1, MSR2.
-
-    red in MSR1, MSR2.
-    apply MSR1 in MSFSP.
+    eapply MemState_refine_prop_frame_stack_preserved in MSFSP; eauto.
+    apply memory_stack_frame_stack_prop_lift_inv in MSFSP.
+    destruct MSFSP as (?&?&?&?&?); subst.
+    rename x into ms_fin_start'.
 
     destruct ms_fin_start. destruct ms_memory_stack.
     destruct ms_inf_start. destruct ms_memory_stack.
     cbn in *.
-    red in MSFSP.
     unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop, Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *.
     cbn in *.
+
+    
+
+    destruct ms_fin_start'; cbn in *.
+    setoid_rewrite <- H1 in ADD_PTRS.
+    inversion H.
 
     generalize dependent addrs_fin.
     generalize dependent fs2.
@@ -17334,9 +17400,41 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       inv ADDRS.
       rename l' into addrs_fin.
 
+      clear MSR1.
+      specialize (MSR2 (InfMem.MMEP.MMSP.memory_stack_frame_stack
+                          (InfMem.MMEP.MMSP.MemState_get_memory ms_inf_final))).
+      destruct MSR2 as [MSR2 _].
+      forward MSR2. reflexivity.
+
+      specialize (IHaddrs_inf _ MSFSP _ ADD_PTRS _ H3).
+      forward IHaddrs_inf.
+      admit.
+
+      rewrite IHaddrs_inf.
+      specialize (MSR1 memory_stack_frame_stack0).
+      destruct MSR1 as [MSR1 _].
+      forward MSR1. reflexivity.
+
+      
+        
+      epose proof (EXTEND memory_stack_frame_stack).
+
+      epose proof (IHaddrs_inf _ _ _ _ _ H3).
+      forward H.
+      { intros fs0 fs3 H0 H2.
+        setoid_rewrite <- H2.
+      }
+
+
       eapply IHaddrs_inf.
       3: eauto.
-  Admitted.
+      eauto.
+
+      all: eauto.
+      admit.
+      admit.
+      admit.
+  Qed.
 
   (* TODO: DELETE *)
   (* TODO: Not currently true, but will be once heap_preserved is modified *)
