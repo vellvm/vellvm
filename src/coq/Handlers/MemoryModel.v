@@ -5282,7 +5282,7 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
 
         initial_memory_read_ub :
         forall ptr byte,
-          read_byte_prop initial_memory_state ptr byte
+          ~ read_byte_prop initial_memory_state ptr byte
       }.
 
     Record initial_frame_prop : Prop :=

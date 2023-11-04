@@ -10792,14 +10792,9 @@ cofix CIH
       cbn; cbn in H.
       rewrite H.
       erewrite fin_inf_access_allowed; cbn; eauto.
-      break_match_goal; cbn; eauto.
-
-      break_match_hyp.
+      break_match_hyp; try contradiction.
+      cbn in Heqb; rewrite Heqb.
       destruct READ; subst; auto.
-
-      cbn in Heqb0.
-      rewrite Heqb0 in Heqb.
-      discriminate.
     - epose proof fin_inf_read_byte_raw_None _ _ _ MSR Heqo.
       cbn.
       eexists. eexists.
@@ -10883,9 +10878,8 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       rewrite <- PTOI in H.
       rewrite H.
       erewrite inf_fin_access_allowed; cbn; eauto.
-      break_match_goal; cbn; eauto.
-
-      break_match_hyp.
+      break_match_hyp; try contradiction.
+      cbn in Heqb; rewrite Heqb.
       destruct READ; subst; auto.
 
       red in BYTE_REF'.
@@ -10894,10 +10888,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       apply lift_SByte_convert_SByte_inverse in BYTE_REF'.
       rewrite <- H1 in BYTE_REF'.
       apply lift_SByte_injective in BYTE_REF'; subst; auto.
-
-      cbn in Heqb0.
-      rewrite Heqb0 in Heqb.
-      discriminate.
     - epose proof inf_fin_read_byte_raw_None _ _ _ MSR _ Heqo.
       cbn.
       eexists. eexists.
@@ -11775,42 +11765,25 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
         erewrite LLVMParams64BitIntptr.ITOP.int_to_ptr_ptr_to_int; eauto.
       }
 
-      break_match_hyp; cbn in Heqb, H0.
-      2: {
-        (* access not allowed *)
-        exists addr_fin.
-        exists byte_fin.
+      break_match_hyp; cbn in Heqb, H0; try contradiction.
+      destruct H0; subst.
 
-        split.
-        { repeat red.
-          do 2 eexists.
-          split; [cbn; eauto|].
-          cbn.
-          rewrite FIN_ADDR.
-          rewrite READ_FIN.
-          erewrite inf_fin_access_allowed; eauto.
-          cbn; auto.
-        }
+      exists addr_fin.
+      exists byte_fin.
+      split; eauto.
 
-        split; auto.
+      repeat red.
+      do 2 eexists.
+      split; [cbn; eauto|].
+      cbn.
 
-        
-        cbn in H0.
-        split.
-        
-      }
-      cbn in H0.
-      
-      
-      break_match_hyp.
-      + (* Access allowed *)
-        cbn in H0.
-        destruct m.
-        destruct H0.
-        cbn in H0.
-        subst.
-        clear H.
+      erewrite fin_inf_ptoi; eauto.
+      rewrite READ_FIN.
 
+      erewrite inf_fin_access_allowed; eauto; cbn.
+      split; auto.
+    - cbn in H0.
+      contradiction.
   Qed.
 
   Lemma inf_fin_read_byte_spec_exists :

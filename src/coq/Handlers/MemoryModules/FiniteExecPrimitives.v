@@ -3329,6 +3329,13 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         exists ms. exists (""%string).
         split; [| solve_returns_provenance].
         unfold mem_state_memory in *.
+        cbn.
+        right.
+        do 2 eexists.
+        split; eauto.
+        rewrite READ.
+        cbn.
+        rewrite ACCESS.
         solve_read_byte_MemPropT_contra READ ACCESS.
       - (* UB from accessing unallocated memory *)
         left.
@@ -4336,7 +4343,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         }
 
         cbn.
-        break_match; [break_match|]; split; tauto.
+        break_match; [break_match|]; auto;
+          split; tauto.
       - destruct READ as [?ms' [?ms'' [[?EQ1 ?EQ2] READ]]].
         subst ms'0 ms''.
         repeat eexists.
@@ -4361,7 +4369,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         }
 
         cbn.
-        break_match; [break_match|]; split; tauto.
+        break_match; [break_match|]; auto; split; tauto.
     Qed.
 
     Lemma find_free_block_extend_reads :
@@ -6660,7 +6668,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
         initial_memory_read_ub :
         forall ptr byte,
-          read_byte_prop initial_memory_state ptr byte
+          ~ read_byte_prop initial_memory_state ptr byte
       }.
 
     Record initial_frame_prop : Prop :=
@@ -6799,8 +6807,13 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         rewrite <- HEAP.
         cbn.
         apply empty_heap_heap_empty.
-      - intros ptr byte.
-        solve_read_byte_prop.
+      - intros ptr byte CONTRA.
+        repeat red in CONTRA.
+        destruct CONTRA as (?&?&?&?).
+        cbn in H0.
+        destruct H0; subst.
+        rewrite read_byte_raw_memory_empty in H1.
+        cbn in *; auto.
     Qed.
 
     End MemoryPrimatives.

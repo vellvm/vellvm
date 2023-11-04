@@ -337,8 +337,14 @@ Proof.
   intros A ub_msg.
     intros ms res.
     destruct res as [[[[[[[oom_res] | [[ub_res] | [[err_res] | [ms' a]]]]]]]]] eqn:Hres.
-    (* Allow everything because UB *)
-    all: exact True.
+    + (* OOM *)
+      exact False. (* Must UB *)
+    + (* UB *)
+      exact True. (* Any UB message is good *)
+    + (* Error *)
+      exact False. (* Must UB *)
+    + (* Success *)
+      exact False. (* Must UB *)
 Defined.
 
 Definition within_err_ub_oom_MemPropT {MemState} {A} (m : MemPropT MemState A) (pre : MemState) (e : err_ub_oom A) (post : MemState) : Prop :=
