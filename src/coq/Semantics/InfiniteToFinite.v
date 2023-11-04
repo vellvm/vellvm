@@ -17304,14 +17304,159 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     red.
     intros f H.
 
-    destruct fs1.
+    destruct fs1, fs2.
     - red in FS1_b_FS2'.
       specialize (FS1_b_FS2' f0).
       forward FS1_b_FS2'; [cbn; reflexivity|].
-
       destruct FS1_b_FS2' as (f' & F' & PEEK & POP).
-      apply FS1_b_FS2' in H.
 
+      red in FS1_a_FS2.
+      specialize (FS1_a_FS2 f0).
+      forward FS1_a_FS2; [cbn; reflexivity|].
+      destruct FS1_a_FS2 as (?&?&?&?).
+
+      red in FS2_b_FS3.
+      specialize (FS2_b_FS3 f1).
+      forward FS2_b_FS3; [cbn; reflexivity|].
+      destruct FS2_b_FS3 as (?&?&?&?).
+
+      cbn in H1.
+      rewrite <- H1 in H3.
+      epose proof add_ptr_to_frame_commutative _ _ _ _ _ _ H0 H3 F'.
+
+      destruct fs2'; cbn in *.
+      + rewrite PEEK, <- H in H6.
+        exists x0.
+        split; auto.
+      + rewrite PEEK, <- H in H6.
+        exists x0.
+        split; auto.
+        split; auto.
+        intros fs1_pop.
+        destruct fs3; cbn in *.
+        symmetry. apply POP.
+        split; intros EQV.
+        * apply H5.
+          apply POP in EQV; auto.
+        * apply POP.
+          apply H5 in EQV; auto.
+    - red in FS1_b_FS2'.
+      specialize (FS1_b_FS2' f0).
+      forward FS1_b_FS2'; [cbn; reflexivity|].
+      destruct FS1_b_FS2' as (f' & F' & PEEK & POP).
+
+      red in FS1_a_FS2.
+      specialize (FS1_a_FS2 f0).
+      forward FS1_a_FS2; [cbn; reflexivity|].
+      destruct FS1_a_FS2 as (?&?&?&?).
+
+      red in FS2_b_FS3.
+      specialize (FS2_b_FS3 f1).
+      forward FS2_b_FS3; [cbn; reflexivity|].
+      destruct FS2_b_FS3 as (?&?&?&?).
+
+      cbn in H1.
+      rewrite <- H1 in H3.
+      epose proof add_ptr_to_frame_commutative _ _ _ _ _ _ H0 H3 F'.
+
+      destruct fs2'; cbn in *.
+      + rewrite PEEK, <- H in H6.
+        exists x0.
+        split; auto.
+        split; auto.
+        intros fs1_pop.
+        destruct fs3; cbn in *; auto.
+        split; intros EQV; try contradiction.
+        apply H5 in EQV.
+        apply H2 in EQV; auto.
+      + rewrite PEEK, <- H in H6.
+        exists x0.
+        split; auto.
+        split; auto.
+        intros fs1_pop.
+        destruct fs3; cbn in *; auto.
+        symmetry. apply POP.
+        split; intros EQV.
+        * apply POP in EQV; contradiction.
+        * apply H5 in EQV; auto.
+          apply H2 in EQV; contradiction.
+    - red in FS1_b_FS2'.
+      specialize (FS1_b_FS2' f0).
+      forward FS1_b_FS2'; [cbn; reflexivity|].
+      destruct FS1_b_FS2' as (f' & F' & PEEK & POP).
+
+      red in FS1_a_FS2.
+      specialize (FS1_a_FS2 f0).
+      forward FS1_a_FS2; [cbn; reflexivity|].
+      destruct FS1_a_FS2 as (?&?&?&?).
+
+      red in FS2_b_FS3.
+      specialize (FS2_b_FS3 f1).
+      forward FS2_b_FS3; [cbn; reflexivity|].
+      destruct FS2_b_FS3 as (?&?&?&?).
+
+      cbn in H1.
+      rewrite <- H1 in H3.
+      epose proof add_ptr_to_frame_commutative _ _ _ _ _ _ H0 H3 F'.
+
+      destruct fs2'; cbn in *.
+      + rewrite PEEK, <- H in H6.
+        exists x0.
+        split; auto.
+      + rewrite PEEK, <- H in H6.
+        exists x0.
+        split; auto.
+        split; auto.
+        intros fs1_pop.
+        split; intros EQV.
+        * apply POP in EQV.
+          apply H2 in EQV; contradiction.
+        * apply H5 in EQV; contradiction.
+    - red in FS1_b_FS2'.
+      specialize (FS1_b_FS2' f0).
+      forward FS1_b_FS2'; [cbn; reflexivity|].
+      destruct FS1_b_FS2' as (f' & F' & PEEK & POP).
+
+      red in FS1_a_FS2.
+      specialize (FS1_a_FS2 f0).
+      forward FS1_a_FS2; [cbn; reflexivity|].
+      destruct FS1_a_FS2 as (?&?&?&?).
+
+      red in FS2_b_FS3.
+      specialize (FS2_b_FS3 f1).
+      forward FS2_b_FS3; [cbn; reflexivity|].
+      destruct FS2_b_FS3 as (?&?&?&?).
+
+      cbn in H1.
+      rewrite <- H1 in H3.
+      epose proof add_ptr_to_frame_commutative _ _ _ _ _ _ H0 H3 F'.
+
+      destruct fs2'; cbn in *.
+      + rewrite PEEK, <- H in H6.
+        exists x0.
+        split; auto.
+        split; auto.
+        intros fs1_pop.
+        destruct fs3; cbn in *; auto.
+        split; intros EQV; try contradiction.
+        split; intros EQV; try contradiction.
+        apply H5 in EQV.
+        apply H2 in EQV.
+        apply POP in EQV.
+        auto.
+      + rewrite PEEK, <- H in H6.
+        exists x0.
+        split; auto.
+        split; auto.
+        intros fs1_pop.
+        split; intros EQV.
+        * apply H5.
+          apply POP in EQV.
+          apply H2.
+          auto.
+        * apply POP.
+          apply H5 in EQV.
+          apply H2; auto.
   Qed.
 
   (* TODO: Move this, make available for fin / inf *)
