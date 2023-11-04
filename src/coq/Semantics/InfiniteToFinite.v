@@ -10716,6 +10716,29 @@ cofix CIH
     - eapply inf_fin_access_allowed; eauto.
   Qed.
 
+  Lemma inf_fin_write_byte_allowed_exists :
+    forall addr_inf ms_fin ms_inf,
+      MemState_refine_prop ms_inf ms_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.write_byte_allowed ms_inf addr_inf ->
+      exists addr_fin,
+        Memory64BitIntptr.MMEP.MemSpec.write_byte_allowed ms_fin addr_fin /\
+          addr_refine addr_inf addr_fin.
+  Proof.
+    intros addr_inf ms_fin ms_inf MSR WRITE_ALLOWED.
+    red in WRITE_ALLOWED.
+
+    destruct WRITE_ALLOWED as [aid [BYTE_ALLOCATED ACCESS_ALLOWED]].
+
+    eapply inf_fin_byte_allocated_exists in BYTE_ALLOCATED; eauto.
+    destruct BYTE_ALLOCATED as (addr_fin & ADDR_REF & BYTE_ALLOCATED).
+    exists addr_fin.
+    split; eauto.
+    red.
+    exists aid.
+    split; eauto.
+    eapply inf_fin_access_allowed; eauto.
+  Qed.
+
   Lemma fin_inf_free_byte_allowed :
     forall addr_fin addr_inf ms_fin ms_inf,
       MemState_refine_prop ms_inf ms_fin ->
@@ -13630,8 +13653,21 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       Memory64BitIntptr.MMEP.MemSpec.write_byte_allowed_all_preserved ms_fin ms_fin' ->
       MemoryBigIntptr.MMEP.MemSpec.write_byte_allowed_all_preserved ms_inf ms_inf'.
   Proof.
-    intros ms_fin ms_inf ms_fin' ms_inf' REF REF' HP.
-  Admitted.
+    intros ms_fin ms_inf ms_fin' ms_inf' REF REF' WBAP.
+    red.
+    intros ptr.
+    split; intros WBA_INF.
+    - pose proof inf_fin_write_byte_allowed_exists _ _ _ REF WBA_INF
+        as (addr_fin & WBA_FIN & ADDR_REF).
+
+      apply WBAP in WBA_FIN.
+      eapply fin_inf_write_byte_allowed; eauto.
+    - pose proof inf_fin_write_byte_allowed_exists _ _ _ REF' WBA_INF
+        as (addr_fin & WBA_FIN & ADDR_REF).
+
+      apply WBAP in WBA_FIN.
+      eapply fin_inf_write_byte_allowed; eauto.
+  Qed.
 
   Lemma fin_inf_free_byte_allowed_all_preserved :
     forall ms_fin ms_inf ms_fin' ms_inf',
