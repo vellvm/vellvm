@@ -16478,6 +16478,31 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     apply InfMem.MMEP.initial_heap.
   Qed.
 
+  Lemma fin_inf_extend_provenance :
+    forall pr ms_fin ms_fin' ms_inf ms_inf',
+      MemState_refine_prop ms_inf ms_fin ->
+      MemState_refine_prop ms_inf' ms_fin' ->
+      FinMem.MMEP.MemSpec.extend_provenance ms_fin pr ms_fin' ->
+      InfMem.MMEP.MemSpec.extend_provenance ms_inf pr ms_inf'.
+  Proof.
+    intros pr ms_fin ms_fin' ms_inf ms_inf' MSR1 MSR2 [OLD NEW].
+    split.
+    - intros pr0 H.
+      eapply fin_inf_used_provenance_prop; eauto.
+      eapply inf_fin_used_provenance_prop in H.
+      2: eauto.
+      eauto.
+    - clear OLD.
+      destruct NEW as [UNUSED USED].
+      split.
+      + intros UP.
+        apply UNUSED.
+        eapply inf_fin_used_provenance_prop; eauto.
+      + eapply fin_inf_used_provenance_prop; eauto.
+  Qed.
+
+  #[global] Hint Resolve fin_inf_extend_provenance : FinInf.
+
   (* TODO: Move this, prove this *)
   Lemma fresh_provenance_fin_inf :
     forall (ms_inf : MemoryBigIntptr.MMEP.MMSP.MemState)
@@ -16489,7 +16514,15 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           pr_inf = pr_fin /\
           MemState_refine_prop ms_inf' ms_fin'.
   Proof.
-  Admitted.
+    intros ms_inf ms_fin ms_fin' pr_fin MSR FRESH.
+    exists pr_fin.
+    exists (lift_MemState ms_fin').
+    split; eauto with FinInf.
+
+    cbn in *.
+    destruct FRESH as (?&?&?&?&?&?&?).
+    split; [|split; [|split; [|split; [|split; [|split]]]]]; eauto with FinInf.
+  Qed.
 
   #[global] Hint Resolve fresh_provenance_fin_inf : FinInf.
 
