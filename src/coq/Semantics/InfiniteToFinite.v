@@ -15907,7 +15907,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
             destruct ms as [[ms fss hs] msprovs].
             cbn in READ_RAW.
             eapply read_byte_raw_lifted in READ_RAW.
-            destruct READ_RAW as (fin_byte&READ_RAW&BYTE_REF).
+            destruct READ_RAW as (fin_byte&READ_RAW&IN_BOUNDS&BYTE_REF).
             exists fin_byte.
             unfold sbyte_refine in BYTE_REF.
             symmetry.
@@ -16258,8 +16258,176 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
   (*   (* SAZ: It seems like we should add Heap_in_bounds_preserved in many places. *) *)
   (* Admitted. *)
 
+  Lemma fin_inf_sbyte_to_extractbyte :
+    forall byte uv dt idx sid,
+      FinMem.MP.BYTE_IMPL.sbyte_to_extractbyte byte = LLVMParams64BitIntptr.Events.DV.UVALUE_ExtractByte uv dt idx sid ->
+      InfMem.MP.BYTE_IMPL.sbyte_to_extractbyte (lift_SByte byte) = LLVMParamsBigIntptr.Events.DV.UVALUE_ExtractByte (fin_to_inf_uvalue uv) dt (fin_to_inf_uvalue idx) sid.
+  Proof.
+    intros byte uv dt idx sid H.
+    unfold FinMem.MP.BYTE_IMPL.sbyte_to_extractbyte in H.
+  Admitted.
 
-  (* TODO: Factor out lemma about fresh_sid *)
+  (* TODO: Move *)
+  Lemma lift_SByte_sbyte_sid :
+    forall byte sid,
+      FinMem.MMEP.MMSP.MemByte.sbyte_sid byte = inr sid ->
+      InfMem.MMEP.MMSP.MemByte.sbyte_sid (lift_SByte byte) = inr sid.
+  Proof.
+    intros byte sid H.
+    unfold FinMem.MMEP.MMSP.MemByte.sbyte_sid in H.
+    unfold InfMem.MMEP.MMSP.MemByte.sbyte_sid.
+
+    break_match_hyp_inv.
+    apply fin_inf_sbyte_to_extractbyte in Hequ.
+    rewrite Hequ.
+    reflexivity.
+  Qed.
+
+  Lemma used_store_id_fin_inf :
+    forall ms_inf ms_fin sid,
+      MemState_refine_prop ms_inf ms_fin ->
+      FinMem.MMEP.MemSpec.used_store_id_prop ms_fin sid <->
+        InfMem.MMEP.MemSpec.used_store_id_prop ms_inf sid.
+  Proof.
+    intros ms_inf ms_fin sid MSR.
+    split; intros USED.
+    {
+      cbn in *.
+      red; red in USED.
+      destruct USED as [ptr [byte [READ BYTE]]].
+
+      pose proof FinToInfAddrConvertSafe.addr_convert_succeeds ptr as [ptr_inf CONV].
+      pose proof FinToInfAddrConvertSafe.addr_convert_safe ptr ptr_inf CONV as CONV_INF.
+      exists ptr_inf. exists (lift_SByte byte).
+      split.
+      - eapply fin_inf_read_byte_prop; eauto.
+        apply sbyte_refine_lifted.
+      - apply lift_SByte_sbyte_sid; auto.
+    }
+    {
+      cbn in *.
+      red; red in USED.
+      destruct USED as [ptr [byte [READ BYTE]]].
+
+      pose proof inf_fin_read_byte_prop_exists MSR READ as (ptr_fin&byte_fin&READ_FIN&ADDR_REFINE&BYTE_REFINE).
+      exists ptr_fin. exists byte_fin.
+      split; auto.
+
+      unfold sbyte_refine, convert_SByte in BYTE_REFINE.
+      break_match_hyp; cbn in BYTE_REFINE.
+      break_match_hyp; inv BYTE_REFINE.
+      break_match_hyp; inv H0.
+      
+      unfold FinMem.MMEP.MMSP.MemByte.sbyte_sid.
+      unfold InfMem.MMEP.MMSP.MemByte.sbyte_sid in *.
+      rewrite InfLLVM.MEM.Byte.sbyte_to_extractbyte_of_uvalue_sbyte in BYTE.
+      inv BYTE.
+      rewrite FinLLVM.MEM.Byte.sbyte_to_extractbyte_of_uvalue_sbyte.
+      reflexivity.
+    }
+  Qed.
+
+  (* TODO: separate into lemma? *)
+  (* lift_MemState does not change which sids are used *)
+  Lemma used_store_id_lift_MemState :
+    forall ms_fin sid,
+      FinMem.MMEP.MemSpec.used_store_id_prop ms_fin sid <->
+        InfMem.MMEP.MemSpec.used_store_id_prop (lift_MemState ms_fin) sid.
+  Proof.
+    intros ms_fin sid.
+    split; intros USED.
+    {
+      cbn in *.
+      red; red in USED.
+      destruct USED as [ptr [byte [READ BYTE]]].
+
+      pose proof FinToInfAddrConvertSafe.addr_convert_succeeds ptr as [ptr_inf CONV].
+      pose proof FinToInfAddrConvertSafe.addr_convert_safe ptr ptr_inf CONV as CONV_INF.
+      exists ptr_inf. exists (lift_SByte byte).
+      split.
+      - eapply fin_inf_read_byte_prop; eauto.
+        apply lift_MemState_refine_prop; auto.
+        apply sbyte_refine_lifted.
+      - destruct byte. cbn.
+        unfold InfMem.MMEP.MMSP.MemByte.sbyte_sid.
+        admit.
+    }
+    {
+      cbn in *.
+      red; red in USED.
+      destruct USED as [ptr [byte [READ BYTE]]].
+
+      pose proof (lift_MemState_refine_prop ms_fin) as MSR.
+      pose proof inf_fin_read_byte_prop_exists MSR READ as (ptr_fin&byte_fin&READ_FIN&BYTE_REFINE).
+      exists ptr_fin. exists byte_fin.
+      split; auto.
+
+      unfold sbyte_refine, convert_SByte in BYTE_REFINE.
+      break_match_hyp; cbn in BYTE_REFINE.
+      break_match_hyp; inv BYTE_REFINE.
+      break_match_hyp; inv H0.
+
+      (* TODO: Need lemmas about sbyte_sid *)
+      unfold FinMem.MMEP.MMSP.MemByte.sbyte_sid, InfMem.MMEP.MMSP.MemByte.sbyte_sid in *.
+      break_match_hyp; inv BYTE.
+      cbn in Hequ1.
+      unfold FinMem.MP.BYTE_IMPL.sbyte_to_extractbyte.
+      (* unfold Memory64BitIntptr.Byte.sbyte_to_extractbyte. *)
+      admit.
+  Admitted.
+
+  (* TODO: Move this somewhere I can use it for both fin / inf *)
+  Lemma used_store_id_read_byte_preserved_fin :
+    forall ms1 ms2 sid,
+      FinMem.MMEP.MemSpec.read_byte_preserved ms1 ms2 ->
+      FinMem.MMEP.MemSpec.used_store_id_prop ms1 sid <-> FinMem.MMEP.MemSpec.used_store_id_prop ms2 sid.
+  Proof.
+    intros ms1 ms2 sid RBP.
+    split; intros [addr [byte [RB SID]]].
+    - red.
+      exists addr. exists byte.
+      split; auto.
+      apply RBP. auto.
+    - red.
+      exists addr. exists byte.
+      split; auto.
+      apply RBP. auto.
+  Qed.
+
+  (* TODO: Move this somewhere I can use it for both fin / inf *)
+  #[global] Instance fin_read_byte_allowed_all_preserved_symmetric :
+    Symmetric FinMem.MMEP.MemSpec.read_byte_allowed_all_preserved.
+  Proof.
+    intros x y RBA.
+    red; red in RBA.
+    intros ptr. split; intros RA.
+    apply RBA; auto.
+    apply RBA; auto.
+  Qed.
+
+  (* TODO: Move this somewhere I can use it for both fin / inf *)
+  #[global] Instance fin_read_byte_prop_all_preserved_symmetric :
+    Symmetric FinMem.MMEP.MemSpec.read_byte_prop_all_preserved.
+  Proof.
+    red.
+    intros x y RBP.
+    red; red in RBP.
+    intros ptr byte. split; intros RB.
+    apply RBP; auto.
+    apply RBP; auto.
+  Qed.
+
+  (* TODO: Move this somewhere I can use it for both fin / inf *)
+  #[global] Instance fin_read_byte_preserved_symmetric :
+    Symmetric FinMem.MMEP.MemSpec.read_byte_preserved.
+  Proof.
+    red.
+    intros x y H.
+    destruct H.
+    red.
+    split; symmetry; auto.
+  Qed.
+
   Lemma fresh_sid_fin_inf :
     forall (ms_inf : MemoryBigIntptr.MMEP.MMSP.MemState)
       (ms_fin ms_fin' : Memory64BitIntptr.MMEP.MMSP.MemState) (sid_fin : MemPropT.store_id),
@@ -16281,165 +16449,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     destruct FRESH as (?&?&?&?&?&?&?&?).
     split.
     { split; [|split; [|split; [|split; [|split; [|split; [|split]]]]]]; auto.
-
-      (* TODO: Move *)
-      Lemma lift_SByte_sbyte_sid :
-        forall byte sid,
-          FinMem.MMEP.MMSP.MemByte.sbyte_sid byte = inr sid ->
-          InfMem.MMEP.MMSP.MemByte.sbyte_sid (lift_SByte byte) = inr sid.
-      Proof.
-        intros byte sid H.
-        unfold FinMem.MMEP.MMSP.MemByte.sbyte_sid in H.
-        unfold InfMem.MMEP.MMSP.MemByte.sbyte_sid.
-
-        (* Need to expose some things about sbyte_extractbypte / mkUbyte *)
-      Admitted.
-
-      (* TODO: separate into lemma? *)
-      (* lift_MemState does not change which sids are used *)
-      Lemma used_store_id_fin_inf :
-        forall ms_inf ms_fin sid,
-          MemState_refine_prop ms_inf ms_fin ->
-          FinMem.MMEP.MemSpec.used_store_id_prop ms_fin sid <->
-            InfMem.MMEP.MemSpec.used_store_id_prop ms_inf sid.
-      Proof.
-        intros ms_inf ms_fin sid MSR.
-        split; intros USED.
-        {
-          cbn in *.
-          red; red in USED.
-          destruct USED as [ptr [byte [READ BYTE]]].
-
-          pose proof FinToInfAddrConvertSafe.addr_convert_succeeds ptr as [ptr_inf CONV].
-          pose proof FinToInfAddrConvertSafe.addr_convert_safe ptr ptr_inf CONV as CONV_INF.
-          exists ptr_inf. exists (lift_SByte byte).
-          split.
-          - eapply fin_inf_read_byte_prop; eauto.
-            apply sbyte_refine_lifted.
-          - apply lift_SByte_sbyte_sid; auto.
-        }
-        {
-          cbn in *.
-          red; red in USED.
-          destruct USED as [ptr [byte [READ BYTE]]].
-
-          pose proof inf_fin_read_byte_prop_exists MSR READ as (ptr_fin&byte_fin&READ_FIN&BYTE_REFINE).
-          exists ptr_fin. exists byte_fin.
-          split; auto.
-
-          unfold sbyte_refine, convert_SByte in BYTE_REFINE.
-          break_match_hyp; cbn in BYTE_REFINE.
-          break_match_hyp; inv BYTE_REFINE.
-          break_match_hyp; inv H0.
-
-          (* TODO: Need lemmas about sbyte_sid *)
-          admit.
-      Admitted.
-
-      (* TODO: separate into lemma? *)
-      (* lift_MemState does not change which sids are used *)
-      Lemma used_store_id_lift_MemState :
-        forall ms_fin sid,
-          FinMem.MMEP.MemSpec.used_store_id_prop ms_fin sid <->
-            InfMem.MMEP.MemSpec.used_store_id_prop (lift_MemState ms_fin) sid.
-      Proof.
-        intros ms_fin sid.
-        split; intros USED.
-        {
-          cbn in *.
-          red; red in USED.
-          destruct USED as [ptr [byte [READ BYTE]]].
-
-          pose proof FinToInfAddrConvertSafe.addr_convert_succeeds ptr as [ptr_inf CONV].
-          pose proof FinToInfAddrConvertSafe.addr_convert_safe ptr ptr_inf CONV as CONV_INF.
-          exists ptr_inf. exists (lift_SByte byte).
-          split.
-          - eapply fin_inf_read_byte_prop; eauto.
-            apply lift_MemState_refine_prop; auto.
-            apply sbyte_refine_lifted.
-          - destruct byte. cbn.
-            unfold InfMem.MMEP.MMSP.MemByte.sbyte_sid.
-            admit.
-        }
-        {
-          cbn in *.
-          red; red in USED.
-          destruct USED as [ptr [byte [READ BYTE]]].
-
-          pose proof (lift_MemState_refine_prop ms_fin) as MSR.
-          pose proof inf_fin_read_byte_prop_exists MSR READ as (ptr_fin&byte_fin&READ_FIN&BYTE_REFINE).
-          exists ptr_fin. exists byte_fin.
-          split; auto.
-
-          unfold sbyte_refine, convert_SByte in BYTE_REFINE.
-          break_match_hyp; cbn in BYTE_REFINE.
-          break_match_hyp; inv BYTE_REFINE.
-          break_match_hyp; inv H0.
-
-          (* TODO: Need lemmas about sbyte_sid *)
-          unfold FinMem.MMEP.MMSP.MemByte.sbyte_sid, InfMem.MMEP.MMSP.MemByte.sbyte_sid in *.
-          break_match_hyp; inv BYTE.
-          cbn in Hequ1.
-          unfold FinMem.MP.BYTE_IMPL.sbyte_to_extractbyte.
-          (* unfold Memory64BitIntptr.Byte.sbyte_to_extractbyte. *)
-          admit.
-      Admitted.
-
       intros USED.
       apply used_store_id_lift_MemState in USED.
       apply f.
-
-      (* TODO: Move this somewhere I can use it for both fin / inf *)
-      Lemma used_store_id_read_byte_preserved_fin :
-        forall ms1 ms2 sid,
-          FinMem.MMEP.MemSpec.read_byte_preserved ms1 ms2 ->
-          FinMem.MMEP.MemSpec.used_store_id_prop ms1 sid <-> FinMem.MMEP.MemSpec.used_store_id_prop ms2 sid.
-      Proof.
-        intros ms1 ms2 sid RBP.
-        split; intros [addr [byte [RB SID]]].
-        - red.
-          exists addr. exists byte.
-          split; auto.
-          apply RBP. auto.
-        - red.
-          exists addr. exists byte.
-          split; auto.
-          apply RBP. auto.
-      Qed.
-
-      (* TODO: Move this somewhere I can use it for both fin / inf *)
-      #[global] Instance fin_read_byte_allowed_all_preserved_symmetric :
-        Symmetric FinMem.MMEP.MemSpec.read_byte_allowed_all_preserved.
-      Proof.
-        intros x y RBA.
-        red; red in RBA.
-        intros ptr. split; intros RA.
-        apply RBA; auto.
-        apply RBA; auto.
-      Qed.
-
-      (* TODO: Move this somewhere I can use it for both fin / inf *)
-      #[global] Instance fin_read_byte_prop_all_preserved_symmetric :
-        Symmetric FinMem.MMEP.MemSpec.read_byte_prop_all_preserved.
-      Proof.
-        red.
-        intros x y RBP.
-        red; red in RBP.
-        intros ptr byte. split; intros RB.
-        apply RBP; auto.
-        apply RBP; auto.
-      Qed.
-
-      (* TODO: Move this somewhere I can use it for both fin / inf *)
-      #[global] Instance fin_read_byte_preserved_symmetric :
-        Symmetric FinMem.MMEP.MemSpec.read_byte_preserved.
-      Proof.
-        red.
-        intros x y H.
-        destruct H.
-        red.
-        split; symmetry; auto.
-      Qed.
 
       eapply used_store_id_read_byte_preserved_fin; eauto.
       symmetry; auto.
@@ -16454,7 +16466,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     split; auto.
     split; [|split; [|split; [|split; [|split; [|split]]]]];
       eauto with FinInf.
-  Admitted.
+    Unshelve.
+    apply InfMem.MMEP.initial_heap.
+  Qed.
 
   (* TODO: Move this, prove this *)
   Lemma fresh_provenance_fin_inf :
