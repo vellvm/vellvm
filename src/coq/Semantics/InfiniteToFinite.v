@@ -10773,6 +10773,16 @@ cofix CIH
     - eapply inf_fin_access_allowed; eauto.
   Qed.
 
+  Lemma inf_fin_free_byte_allowed_exists :
+    forall addr_inf ms_fin ms_inf,
+      MemState_refine_prop ms_inf ms_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.free_byte_allowed ms_inf addr_inf ->
+      exists addr_fin,
+        Memory64BitIntptr.MMEP.MemSpec.free_byte_allowed ms_fin addr_fin /\
+          addr_refine addr_inf addr_fin.
+  Proof.
+    eapply inf_fin_write_byte_allowed_exists.
+  Qed.
 
   Lemma fin_inf_read_byte_prop_MemPropT :
     forall addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin,
@@ -13676,8 +13686,45 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       Memory64BitIntptr.MMEP.MemSpec.free_byte_allowed_all_preserved ms_fin ms_fin' ->
       MemoryBigIntptr.MMEP.MemSpec.free_byte_allowed_all_preserved ms_inf ms_inf'.
   Proof.
-    intros ms_fin ms_inf ms_fin' ms_inf' REF REF' HP.
+    eapply fin_inf_write_byte_allowed_all_preserved.
+  Qed.
+
+  Lemma used_provenance_prop_lift :
+    forall ms_fin p,
+      InfMem.MMEP.MMSP.used_provenance_prop (lift_MemState ms_fin) p <->
+      Memory64BitIntptr.MMEP.MMSP.used_provenance_prop ms_fin p.
+  Proof.
+    intros ms_fin p.
+    split; intros UP.
+    - red; red in UP.
+      destruct ms_fin.
+      cbn in *.
+      (* TODO: need to expose provenance_lt / next_provenance definitions *)
   Admitted.
+
+  Lemma inf_fin_used_provenance_prop :
+    forall ms_inf ms_fin p,
+      MemState_refine_prop ms_inf ms_fin ->
+      MemoryBigIntptr.MMEP.MMSP.used_provenance_prop ms_inf p ->
+      Memory64BitIntptr.MMEP.MMSP.used_provenance_prop ms_fin p.
+  Proof.
+    intros ms_inf ms_fin p MSR UP.
+    destruct MSR.
+    apply H in UP.
+    apply used_provenance_prop_lift; auto.
+  Qed.
+
+  Lemma fin_inf_used_provenance_prop :
+    forall ms_inf ms_fin p,
+      MemState_refine_prop ms_inf ms_fin ->
+      Memory64BitIntptr.MMEP.MMSP.used_provenance_prop ms_fin p ->
+      MemoryBigIntptr.MMEP.MMSP.used_provenance_prop ms_inf p.
+  Proof.
+    intros ms_inf ms_fin p MSR UP.
+    destruct MSR.
+    apply H.
+    apply used_provenance_prop_lift; auto.
+  Qed.
 
   Lemma fin_inf_preserve_allocation_ids :
     forall ms_fin ms_inf ms_fin' ms_inf',
@@ -13686,8 +13733,19 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       Memory64BitIntptr.MMEP.MemSpec.preserve_allocation_ids ms_fin ms_fin' ->
       MemoryBigIntptr.MMEP.MemSpec.preserve_allocation_ids ms_inf ms_inf'.
   Proof.
-    intros ms_fin ms_inf ms_fin' ms_inf' REF REF' HP.
-  Admitted.
+    intros ms_fin ms_inf ms_fin' ms_inf' REF REF' PAIDS.
+    red; red in PAIDS.
+    intros p.
+    specialize (PAIDS p).
+    destruct PAIDS.
+    split; intros UP_INF.
+    - eapply inf_fin_used_provenance_prop in UP_INF; eauto.
+      eapply H in UP_INF.
+      eapply fin_inf_used_provenance_prop; eauto.
+    - eapply inf_fin_used_provenance_prop in UP_INF; eauto.
+      eapply H0 in UP_INF.
+      eapply fin_inf_used_provenance_prop; eauto.
+  Qed.
 
   Lemma inf_fin_preserve_allocation_ids :
     forall ms_fin ms_inf ms_fin' ms_inf',
