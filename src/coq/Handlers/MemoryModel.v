@@ -3297,6 +3297,19 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
             add_ptr_to_frame_stack fs' ptr fs2
     end.
 
+  Lemma add_ptrs_to_frame_stack_equation (fs1 : FrameStack) (ptrs : list addr) (fs2 : FrameStack) :
+    add_ptrs_to_frame_stack fs1 ptrs fs2 =
+      match ptrs with
+      | nil => frame_stack_eqv fs1 fs2
+      | (ptr :: ptrs) =>
+          exists fs',
+          add_ptrs_to_frame_stack fs1 ptrs fs' /\
+            add_ptr_to_frame_stack fs' ptr fs2
+      end.
+  Proof.
+    induction ptrs; cbn; auto.
+  Qed.
+
   (*** Heap operations *)
   Record empty_heap (h : Heap) : Prop :=
     {

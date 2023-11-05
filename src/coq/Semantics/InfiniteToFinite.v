@@ -181,16 +181,192 @@ Module InfiniteToFinite.
     apply dvi.
   Defined.
 
-  (* SAZ: These seem like the basic inversion properties - but things are too opaque? *)
-  Lemma fin_to_inf_convert_dvalue_inversion :
-    forall {dv_inf dv_fin},
-      DVC1.dvalue_convert_strict dv_inf = NoOom dv_fin ->
-      fin_to_inf_dvalue dv_fin = dv_inf.
+  Lemma fin_to_inf_dvalue_refine_strict' :
+    forall d_inf d_fin,
+      DVC1.dvalue_refine_strict d_inf d_fin ->
+      d_inf = fin_to_inf_dvalue d_fin.
   Proof.
-    intros dv_inf dv_fin H.
+    intros d_inf d_fin H.
+    rewrite DVC1.dvalue_refine_strict_equation in H.
     unfold fin_to_inf_dvalue.
-  Admitted.
+    break_match; cbn in *.
+    destruct p.
+    clear Heqs.
 
+    revert d_fin H x e e0.
+    induction d_inf; intros d_fin H' x' e e0; try rename H into H''; rename H' into H;
+      try solve
+        [ rewrite DVC1.dvalue_convert_strict_equation in H;
+          cbn in *; inv H;
+          rewrite DVC2.dvalue_convert_strict_equation in e;
+          cbn in *; inv e;
+          auto
+        ].
+    - rewrite DVC1.dvalue_convert_strict_equation in H.
+      cbn in *.
+      break_match_hyp; inv H.
+      rewrite DVC2.dvalue_convert_strict_equation in e.
+      cbn in *.
+      break_match_hyp; inv e.
+      rewrite DVC1.dvalue_convert_strict_equation in e0.
+      cbn in *.
+      break_match_hyp; inv e0.
+
+      pose proof InfToFinAddrConvert.addr_convert_injective a a1 a0 Heqo Heqo1.
+      subst.
+      auto.
+    - rewrite DVC1.dvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      rewrite DVC2.dvalue_convert_strict_equation in e.
+      cbn in *; inv e.
+      rewrite DVC1.dvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+
+      pose proof (IP64Bit.from_Z_injective _ _ _ Heqo Heqo0).
+      apply LLVMParamsBigIntptr.IP.to_Z_inj in H.
+      subst.
+      reflexivity.
+    - rewrite DVC1.dvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      rewrite DVC2.dvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      rewrite DVC1.dvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction fields; intros l Heqo l0 Heqo1 H'' Heqo0.
+      + cbn in *. inv Heqo.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_InT_unfold in Heqo.
+        cbn in *.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHfields _ eq_refl l Heqo1).
+        forward IHfields; eauto.
+        forward IHfields; eauto.
+        inv IHfields.
+        reflexivity.
+    - rewrite DVC1.dvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      rewrite DVC2.dvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      rewrite DVC1.dvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction fields; intros l Heqo l0 Heqo1 H'' Heqo0.
+      + cbn in *. inv Heqo.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_InT_unfold in Heqo.
+        cbn in *.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHfields _ eq_refl l Heqo1).
+        forward IHfields; eauto.
+        forward IHfields; eauto.
+        inv IHfields.
+        reflexivity.
+    - rewrite DVC1.dvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      rewrite DVC2.dvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      rewrite DVC1.dvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction elts; intros l Heqo l0 Heqo1 H'' Heqo0.
+      + cbn in *. inv Heqo.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_InT_unfold in Heqo.
+        cbn in *.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHelts _ eq_refl l Heqo1).
+        forward IHelts; eauto.
+        forward IHelts; eauto.
+        inv IHelts.
+        reflexivity.
+    - rewrite DVC1.dvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      rewrite DVC2.dvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      rewrite DVC1.dvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction elts; intros l Heqo l0 Heqo1 H'' Heqo0.
+      + cbn in *. inv Heqo.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_InT_unfold in Heqo.
+        cbn in *.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHelts _ eq_refl l Heqo1).
+        forward IHelts; eauto.
+        forward IHelts; eauto.
+        inv IHelts.
+        reflexivity.
+  Qed.
 
   (* TODO: Should we move this? *)
   Definition fin_to_inf_uvalue (uv : LLVMParams64BitIntptr.Events.DV.uvalue) : LLVMParamsBigIntptr.Events.DV.uvalue.
@@ -210,16 +386,425 @@ Module InfiniteToFinite.
     reflexivity.
   Qed.
 
-  (* SAZ: These seem like the basic inversion properties - but things are too opaque? *)
-  Lemma fin_to_inf_convert_uvalue_inversion :
-    forall {uv_inf uv_fin},
-      DVC1.uvalue_convert_strict uv_inf = NoOom uv_fin ->
-      fin_to_inf_uvalue uv_fin = uv_inf.
+  Lemma fin_to_inf_uvalue_refine_strict' :
+    forall d_inf d_fin,
+      DVC1.uvalue_refine_strict d_inf d_fin ->
+      d_inf = fin_to_inf_uvalue d_fin.
   Proof.
-    intros uv_inf uv_fin H.
+    intros d_inf d_fin H.
+    rewrite DVC1.uvalue_refine_strict_equation in H.
     unfold fin_to_inf_uvalue.
-  Admitted.
+    break_match; cbn in *.
+    destruct p.
+    clear Heqs.
 
+    revert d_fin H x e e0.
+    induction d_inf; intros d_fin H' x' e e0; try rename H into H''; rename H' into H;
+      try solve
+        [ rewrite DVC1.uvalue_convert_strict_equation in H;
+          cbn in *; inv H;
+          rewrite DVC2.uvalue_convert_strict_equation in e;
+          cbn in *; inv e;
+          auto
+        ].
+    - rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *.
+      break_match_hyp; inv H.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *.
+      break_match_hyp; inv e.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *.
+      break_match_hyp; inv e0.
+
+      pose proof InfToFinAddrConvert.addr_convert_injective a a1 a0 Heqo Heqo1.
+      subst.
+      auto.
+    - rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *; inv e.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+
+      pose proof (IP64Bit.from_Z_injective _ _ _ Heqo Heqo0).
+      apply LLVMParamsBigIntptr.IP.to_Z_inj in H.
+      subst.
+      reflexivity.
+    - rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction fields; intros l Heqo l0 Heqo1 H'' Heqo0.
+      + cbn in *. inv Heqo.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_InT_unfold in Heqo.
+        cbn in *.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHfields _ eq_refl l Heqo1).
+        forward IHfields; eauto.
+        forward IHfields; eauto.
+        inv IHfields.
+        reflexivity.
+    - rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction fields; intros l Heqo l0 Heqo1 H'' Heqo0.
+      + cbn in *. inv Heqo.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_InT_unfold in Heqo.
+        cbn in *.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHfields _ eq_refl l Heqo1).
+        forward IHfields; eauto.
+        forward IHfields; eauto.
+        inv IHfields.
+        reflexivity.
+    - rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction elts; intros l Heqo l0 Heqo1 H'' Heqo0.
+      + cbn in *. inv Heqo.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_InT_unfold in Heqo.
+        cbn in *.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHelts _ eq_refl l Heqo1).
+        forward IHelts; eauto.
+        forward IHelts; eauto.
+        inv IHelts.
+        reflexivity.
+    - rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction elts; intros l Heqo l0 Heqo1 H'' Heqo0.
+      + cbn in *. inv Heqo.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_InT_unfold in Heqo.
+        cbn in *.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHelts _ eq_refl l Heqo1).
+        forward IHelts; eauto.
+        forward IHelts; eauto.
+        inv IHelts.
+        reflexivity.
+    - (* IBinop *)
+      rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv H1.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv H0.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+      cbn in *; break_match_hyp; inv H0.
+
+      erewrite IHd_inf1; eauto.
+      erewrite IHd_inf2; eauto.
+    - (* ICmp *)
+      rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv H1.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv H0.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+      cbn in *; break_match_hyp; inv H0.
+
+      erewrite IHd_inf1; eauto.
+      erewrite IHd_inf2; eauto.
+    - (* FBinop *)
+      rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv H1.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv H0.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+      cbn in *; break_match_hyp; inv H0.
+
+      erewrite IHd_inf1; eauto.
+      erewrite IHd_inf2; eauto.
+    - (* FCmp *)
+      rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv H1.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv H0.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+      cbn in *; break_match_hyp; inv H0.
+
+      erewrite IHd_inf1; eauto.
+      erewrite IHd_inf2; eauto.
+    - (* Conversion *)
+      rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+
+      erewrite IHd_inf; eauto.
+    - (* GEP *)
+      rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv H1.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv H0.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+      cbn in *; break_match_hyp; inv H0.
+
+      revert l Heqo l0 u0 Heqo1 H'' Heqo0 Heqo2 Heqo4 Heqo3.
+      induction idxs; intros l Heqo l0 u0 Heqo1 H'' Heqo0 Heqo2 Heqo4 Heqo3.
+      + cbn in *. inv Heqo0.
+        cbn in *. inv Heqo2.
+        erewrite IHd_inf; eauto.
+      + rewrite map_monad_InT_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo2.
+        cbn in *.
+        break_match_hyp; inv Heqo2.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo4.
+        cbn in *.
+        break_match_hyp; inv Heqo4.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl)_ Heqo5 _ Heqo6 Heqo7); subst.
+
+        specialize (IHidxs l1 Heqo l _ Heqo1).
+        repeat (forward IHidxs; eauto).
+        inv IHidxs.
+        reflexivity.
+    - (* ExtractElement *)
+      rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv H1.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv H0.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+      cbn in *; break_match_hyp; inv H0.
+
+      erewrite IHd_inf1; eauto.
+      erewrite IHd_inf2; eauto.
+    - (* InsertElement *)
+      rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv H1.
+      cbn in *; break_match_hyp; inv H0.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv H0.
+      cbn in *; break_match_hyp; inv H1.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+      cbn in *; break_match_hyp; inv H0.
+      cbn in *; break_match_hyp; inv H1.
+
+      erewrite IHd_inf1; eauto.
+      erewrite IHd_inf2; eauto.
+      erewrite IHd_inf3; eauto.
+    - (* ShuffleVector *)
+      rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv H1.
+      cbn in *; break_match_hyp; inv H0.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv H0.
+      cbn in *; break_match_hyp; inv H1.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+      cbn in *; break_match_hyp; inv H0.
+      cbn in *; break_match_hyp; inv H1.
+
+      erewrite IHd_inf1; eauto.
+      erewrite IHd_inf2; eauto.
+      erewrite IHd_inf3; eauto.
+    - (* ExtractValue *)
+      rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+
+      erewrite IHd_inf; eauto.
+    - (* InsertValue *)
+      rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv H1.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv H0.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+      cbn in *; break_match_hyp; inv H0.
+
+      erewrite IHd_inf1; eauto.
+      erewrite IHd_inf2; eauto.
+    - (* Select *)
+      rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv H1.
+      cbn in *; break_match_hyp; inv H0.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv H0.
+      cbn in *; break_match_hyp; inv H1.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+      cbn in *; break_match_hyp; inv H0.
+      cbn in *; break_match_hyp; inv H1.
+
+      erewrite IHd_inf1; eauto.
+      erewrite IHd_inf2; eauto.
+      erewrite IHd_inf3; eauto.
+    - (* ExtractByte *)
+      rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv H1.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv H0.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+      cbn in *; break_match_hyp; inv H0.
+
+      erewrite IHd_inf1; eauto.
+      erewrite IHd_inf2; eauto.
+    - (* ConcatBytes *)
+      rewrite DVC1.uvalue_convert_strict_equation in H.
+      cbn in *; break_match_hyp; inv H.
+      rewrite DVC2.uvalue_convert_strict_equation in e.
+      cbn in *; break_match_hyp; inv e.
+      rewrite DVC1.uvalue_convert_strict_equation in e0.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0 Heqo.
+      induction uvs; intros l Heqo l0 Heqo1 H'' Heqo0 Heqo2.
+      + cbn in *. inv Heqo2.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_InT_unfold in Heqo2.
+        cbn in *.
+        break_match_hyp; inv Heqo2.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_InT_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo3 _ Heqo4 Heqo5); subst.
+
+        specialize (IHuvs l1 eq_refl l Heqo1).
+        repeat (forward IHuvs; eauto).
+        inv IHuvs.
+        reflexivity.
+  Qed.
 
   (* Could not put with the other conversions, need to know what memory structures like MemState are *)
   Definition convert_SByte (sb1 : MemoryBigIntptr.MP.BYTE_IMPL.SByte) : OOM (Memory64BitIntptr.MP.BYTE_IMPL.SByte).
@@ -247,8 +832,8 @@ Module InfiniteToFinite.
     cbn in H.
     destruct (DVC1.uvalue_convert_strict idx) eqn: EQ3; [|inversion H].
     inversion H.
-    apply fin_to_inf_convert_uvalue_inversion in EQ2.
-    apply fin_to_inf_convert_uvalue_inversion in EQ3.
+    apply fin_to_inf_uvalue_refine_strict' in EQ2.
+    apply fin_to_inf_uvalue_refine_strict' in EQ3.
     rewrite EQ2.
     rewrite EQ3.
     reflexivity.
@@ -9107,426 +9692,6 @@ cofix CIH
         eauto.
   Qed.
 
-  Lemma fin_to_inf_uvalue_refine_strict' :
-    forall d_inf d_fin,
-      DVC1.uvalue_refine_strict d_inf d_fin ->
-      d_inf = fin_to_inf_uvalue d_fin.
-  Proof.
-    intros d_inf d_fin H.
-    rewrite DVC1.uvalue_refine_strict_equation in H.
-    unfold fin_to_inf_uvalue.
-    break_match; cbn in *.
-    destruct p.
-    clear Heqs.
-
-    revert d_fin H x e e0.
-    induction d_inf; intros d_fin H' x' e e0; try rename H into H''; rename H' into H;
-      try solve
-        [ rewrite DVC1.uvalue_convert_strict_equation in H;
-          cbn in *; inv H;
-          rewrite DVC2.uvalue_convert_strict_equation in e;
-          cbn in *; inv e;
-          auto
-        ].
-    - rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *.
-      break_match_hyp; inv H.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *.
-      break_match_hyp; inv e.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *.
-      break_match_hyp; inv e0.
-
-      pose proof InfToFinAddrConvert.addr_convert_injective a a1 a0 Heqo Heqo1.
-      subst.
-      auto.
-    - rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *; inv e.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-
-      pose proof (IP64Bit.from_Z_injective _ _ _ Heqo Heqo0).
-      apply LLVMParamsBigIntptr.IP.to_Z_inj in H.
-      subst.
-      reflexivity.
-    - rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-
-      revert l Heqo l0 Heqo1 H'' Heqo0.
-      induction fields; intros l Heqo l0 Heqo1 H'' Heqo0.
-      + cbn in *. inv Heqo.
-        cbn in *. inv Heqo0.
-        reflexivity.
-      + rewrite map_monad_InT_unfold in Heqo.
-        cbn in *.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo1.
-        cbn in *.
-        break_match_hyp; inv Heqo1.
-        break_match_hyp; inv H0.
-
-        (* Show that a = u0 *)
-        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
-
-        specialize (IHfields _ eq_refl l Heqo1).
-        forward IHfields; eauto.
-        forward IHfields; eauto.
-        inv IHfields.
-        reflexivity.
-    - rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-
-      revert l Heqo l0 Heqo1 H'' Heqo0.
-      induction fields; intros l Heqo l0 Heqo1 H'' Heqo0.
-      + cbn in *. inv Heqo.
-        cbn in *. inv Heqo0.
-        reflexivity.
-      + rewrite map_monad_InT_unfold in Heqo.
-        cbn in *.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo1.
-        cbn in *.
-        break_match_hyp; inv Heqo1.
-        break_match_hyp; inv H0.
-
-        (* Show that a = u0 *)
-        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
-
-        specialize (IHfields _ eq_refl l Heqo1).
-        forward IHfields; eauto.
-        forward IHfields; eauto.
-        inv IHfields.
-        reflexivity.
-    - rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-
-      revert l Heqo l0 Heqo1 H'' Heqo0.
-      induction elts; intros l Heqo l0 Heqo1 H'' Heqo0.
-      + cbn in *. inv Heqo.
-        cbn in *. inv Heqo0.
-        reflexivity.
-      + rewrite map_monad_InT_unfold in Heqo.
-        cbn in *.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo1.
-        cbn in *.
-        break_match_hyp; inv Heqo1.
-        break_match_hyp; inv H0.
-
-        (* Show that a = u0 *)
-        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
-
-        specialize (IHelts _ eq_refl l Heqo1).
-        forward IHelts; eauto.
-        forward IHelts; eauto.
-        inv IHelts.
-        reflexivity.
-    - rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-
-      revert l Heqo l0 Heqo1 H'' Heqo0.
-      induction elts; intros l Heqo l0 Heqo1 H'' Heqo0.
-      + cbn in *. inv Heqo.
-        cbn in *. inv Heqo0.
-        reflexivity.
-      + rewrite map_monad_InT_unfold in Heqo.
-        cbn in *.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo1.
-        cbn in *.
-        break_match_hyp; inv Heqo1.
-        break_match_hyp; inv H0.
-
-        (* Show that a = u0 *)
-        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
-
-        specialize (IHelts _ eq_refl l Heqo1).
-        forward IHelts; eauto.
-        forward IHelts; eauto.
-        inv IHelts.
-        reflexivity.
-    - (* IBinop *)
-      rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      cbn in *; break_match_hyp; inv H1.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      cbn in *; break_match_hyp; inv H0.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-      cbn in *; break_match_hyp; inv H0.
-
-      erewrite IHd_inf1; eauto.
-      erewrite IHd_inf2; eauto.
-    - (* ICmp *)
-      rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      cbn in *; break_match_hyp; inv H1.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      cbn in *; break_match_hyp; inv H0.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-      cbn in *; break_match_hyp; inv H0.
-
-      erewrite IHd_inf1; eauto.
-      erewrite IHd_inf2; eauto.
-    - (* FBinop *)
-      rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      cbn in *; break_match_hyp; inv H1.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      cbn in *; break_match_hyp; inv H0.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-      cbn in *; break_match_hyp; inv H0.
-
-      erewrite IHd_inf1; eauto.
-      erewrite IHd_inf2; eauto.
-    - (* FCmp *)
-      rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      cbn in *; break_match_hyp; inv H1.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      cbn in *; break_match_hyp; inv H0.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-      cbn in *; break_match_hyp; inv H0.
-
-      erewrite IHd_inf1; eauto.
-      erewrite IHd_inf2; eauto.
-    - (* Conversion *)
-      rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-
-      erewrite IHd_inf; eauto.
-    - (* GEP *)
-      rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      cbn in *; break_match_hyp; inv H1.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      cbn in *; break_match_hyp; inv H0.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-      cbn in *; break_match_hyp; inv H0.
-
-      revert l Heqo l0 u0 Heqo1 H'' Heqo0 Heqo2 Heqo4 Heqo3.
-      induction idxs; intros l Heqo l0 u0 Heqo1 H'' Heqo0 Heqo2 Heqo4 Heqo3.
-      + cbn in *. inv Heqo0.
-        cbn in *. inv Heqo2.
-        erewrite IHd_inf; eauto.
-      + rewrite map_monad_InT_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo2.
-        cbn in *.
-        break_match_hyp; inv Heqo2.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo4.
-        cbn in *.
-        break_match_hyp; inv Heqo4.
-        break_match_hyp; inv H0.
-
-        (* Show that a = u0 *)
-        pose proof (H'' a (or_introl eq_refl)_ Heqo5 _ Heqo6 Heqo7); subst.
-
-        specialize (IHidxs l1 Heqo l _ Heqo1).
-        repeat (forward IHidxs; eauto).
-        inv IHidxs.
-        reflexivity.
-    - (* ExtractElement *)
-      rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      cbn in *; break_match_hyp; inv H1.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      cbn in *; break_match_hyp; inv H0.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-      cbn in *; break_match_hyp; inv H0.
-
-      erewrite IHd_inf1; eauto.
-      erewrite IHd_inf2; eauto.
-    - (* InsertElement *)
-      rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      cbn in *; break_match_hyp; inv H1.
-      cbn in *; break_match_hyp; inv H0.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      cbn in *; break_match_hyp; inv H0.
-      cbn in *; break_match_hyp; inv H1.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-      cbn in *; break_match_hyp; inv H0.
-      cbn in *; break_match_hyp; inv H1.
-
-      erewrite IHd_inf1; eauto.
-      erewrite IHd_inf2; eauto.
-      erewrite IHd_inf3; eauto.
-    - (* ShuffleVector *)
-      rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      cbn in *; break_match_hyp; inv H1.
-      cbn in *; break_match_hyp; inv H0.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      cbn in *; break_match_hyp; inv H0.
-      cbn in *; break_match_hyp; inv H1.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-      cbn in *; break_match_hyp; inv H0.
-      cbn in *; break_match_hyp; inv H1.
-
-      erewrite IHd_inf1; eauto.
-      erewrite IHd_inf2; eauto.
-      erewrite IHd_inf3; eauto.
-    - (* ExtractValue *)
-      rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-
-      erewrite IHd_inf; eauto.
-    - (* InsertValue *)
-      rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      cbn in *; break_match_hyp; inv H1.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      cbn in *; break_match_hyp; inv H0.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-      cbn in *; break_match_hyp; inv H0.
-
-      erewrite IHd_inf1; eauto.
-      erewrite IHd_inf2; eauto.
-    - (* Select *)
-      rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      cbn in *; break_match_hyp; inv H1.
-      cbn in *; break_match_hyp; inv H0.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      cbn in *; break_match_hyp; inv H0.
-      cbn in *; break_match_hyp; inv H1.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-      cbn in *; break_match_hyp; inv H0.
-      cbn in *; break_match_hyp; inv H1.
-
-      erewrite IHd_inf1; eauto.
-      erewrite IHd_inf2; eauto.
-      erewrite IHd_inf3; eauto.
-    - (* ExtractByte *)
-      rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      cbn in *; break_match_hyp; inv H1.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      cbn in *; break_match_hyp; inv H0.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-      cbn in *; break_match_hyp; inv H0.
-
-      erewrite IHd_inf1; eauto.
-      erewrite IHd_inf2; eauto.
-    - (* ConcatBytes *)
-      rewrite DVC1.uvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      rewrite DVC2.uvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      rewrite DVC1.uvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-
-      revert l Heqo l0 Heqo1 H'' Heqo0 Heqo.
-      induction uvs; intros l Heqo l0 Heqo1 H'' Heqo0 Heqo2.
-      + cbn in *. inv Heqo2.
-        cbn in *. inv Heqo0.
-        reflexivity.
-      + rewrite map_monad_InT_unfold in Heqo2.
-        cbn in *.
-        break_match_hyp; inv Heqo2.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo1.
-        cbn in *.
-        break_match_hyp; inv Heqo1.
-        break_match_hyp; inv H0.
-
-        (* Show that a = u0 *)
-        pose proof (H'' a (or_introl eq_refl) _ Heqo3 _ Heqo4 Heqo5); subst.
-
-        specialize (IHuvs l1 eq_refl l Heqo1).
-        repeat (forward IHuvs; eauto).
-        inv IHuvs.
-        reflexivity.
-  Qed.
-
   Lemma IntMap_find_NoOom_elements :
     forall {X Y} (m : IntMaps.IM.t X) (f : (IntMaps.IM.key * X) -> OOM (IntMaps.IM.key * Y)) m_elts (n : Z) (y : Y),
       map_monad f (IntMaps.IM.elements (elt:=X) m) = NoOom m_elts ->
@@ -11972,193 +12137,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     rewrite find_filter_dom_false; eauto.
 
     eapply addr_oom_not_in_bounds; eauto.
-  Qed.
-
-  Lemma fin_to_inf_dvalue_refine_strict' :
-    forall d_inf d_fin,
-      DVC1.dvalue_refine_strict d_inf d_fin ->
-      d_inf = fin_to_inf_dvalue d_fin.
-  Proof.
-    intros d_inf d_fin H.
-    rewrite DVC1.dvalue_refine_strict_equation in H.
-    unfold fin_to_inf_dvalue.
-    break_match; cbn in *.
-    destruct p.
-    clear Heqs.
-
-    revert d_fin H x e e0.
-    induction d_inf; intros d_fin H' x' e e0; try rename H into H''; rename H' into H;
-      try solve
-        [ rewrite DVC1.dvalue_convert_strict_equation in H;
-          cbn in *; inv H;
-          rewrite DVC2.dvalue_convert_strict_equation in e;
-          cbn in *; inv e;
-          auto
-        ].
-    - rewrite DVC1.dvalue_convert_strict_equation in H.
-      cbn in *.
-      break_match_hyp; inv H.
-      rewrite DVC2.dvalue_convert_strict_equation in e.
-      cbn in *.
-      break_match_hyp; inv e.
-      rewrite DVC1.dvalue_convert_strict_equation in e0.
-      cbn in *.
-      break_match_hyp; inv e0.
-
-      pose proof InfToFinAddrConvert.addr_convert_injective a a1 a0 Heqo Heqo1.
-      subst.
-      auto.
-    - rewrite DVC1.dvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      rewrite DVC2.dvalue_convert_strict_equation in e.
-      cbn in *; inv e.
-      rewrite DVC1.dvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-
-      pose proof (IP64Bit.from_Z_injective _ _ _ Heqo Heqo0).
-      apply LLVMParamsBigIntptr.IP.to_Z_inj in H.
-      subst.
-      reflexivity.
-    - rewrite DVC1.dvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      rewrite DVC2.dvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      rewrite DVC1.dvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-
-      revert l Heqo l0 Heqo1 H'' Heqo0.
-      induction fields; intros l Heqo l0 Heqo1 H'' Heqo0.
-      + cbn in *. inv Heqo.
-        cbn in *. inv Heqo0.
-        reflexivity.
-      + rewrite map_monad_InT_unfold in Heqo.
-        cbn in *.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo1.
-        cbn in *.
-        break_match_hyp; inv Heqo1.
-        break_match_hyp; inv H0.
-
-        (* Show that a = u0 *)
-        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
-
-        specialize (IHfields _ eq_refl l Heqo1).
-        forward IHfields; eauto.
-        forward IHfields; eauto.
-        inv IHfields.
-        reflexivity.
-    - rewrite DVC1.dvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      rewrite DVC2.dvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      rewrite DVC1.dvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-
-      revert l Heqo l0 Heqo1 H'' Heqo0.
-      induction fields; intros l Heqo l0 Heqo1 H'' Heqo0.
-      + cbn in *. inv Heqo.
-        cbn in *. inv Heqo0.
-        reflexivity.
-      + rewrite map_monad_InT_unfold in Heqo.
-        cbn in *.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo1.
-        cbn in *.
-        break_match_hyp; inv Heqo1.
-        break_match_hyp; inv H0.
-
-        (* Show that a = u0 *)
-        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
-
-        specialize (IHfields _ eq_refl l Heqo1).
-        forward IHfields; eauto.
-        forward IHfields; eauto.
-        inv IHfields.
-        reflexivity.
-    - rewrite DVC1.dvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      rewrite DVC2.dvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      rewrite DVC1.dvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-
-      revert l Heqo l0 Heqo1 H'' Heqo0.
-      induction elts; intros l Heqo l0 Heqo1 H'' Heqo0.
-      + cbn in *. inv Heqo.
-        cbn in *. inv Heqo0.
-        reflexivity.
-      + rewrite map_monad_InT_unfold in Heqo.
-        cbn in *.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo1.
-        cbn in *.
-        break_match_hyp; inv Heqo1.
-        break_match_hyp; inv H0.
-
-        (* Show that a = u0 *)
-        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
-
-        specialize (IHelts _ eq_refl l Heqo1).
-        forward IHelts; eauto.
-        forward IHelts; eauto.
-        inv IHelts.
-        reflexivity.
-    - rewrite DVC1.dvalue_convert_strict_equation in H.
-      cbn in *; break_match_hyp; inv H.
-      rewrite DVC2.dvalue_convert_strict_equation in e.
-      cbn in *; break_match_hyp; inv e.
-      rewrite DVC1.dvalue_convert_strict_equation in e0.
-      cbn in *; break_match_hyp; inv e0.
-
-      revert l Heqo l0 Heqo1 H'' Heqo0.
-      induction elts; intros l Heqo l0 Heqo1 H'' Heqo0.
-      + cbn in *. inv Heqo.
-        cbn in *. inv Heqo0.
-        reflexivity.
-      + rewrite map_monad_InT_unfold in Heqo.
-        cbn in *.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_InT_unfold in Heqo1.
-        cbn in *.
-        break_match_hyp; inv Heqo1.
-        break_match_hyp; inv H0.
-
-        (* Show that a = u0 *)
-        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
-
-        specialize (IHelts _ eq_refl l Heqo1).
-        forward IHelts; eauto.
-        forward IHelts; eauto.
-        inv IHelts.
-        reflexivity.
   Qed.
 
   Lemma MemState_in_bounds_memory_in_bounds :
@@ -17293,6 +17271,7 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       apply F2_b_F3_old; auto.
   Qed.
 
+  (* TODO: Move this, make available for fin / inf *)
   Lemma add_ptr_to_frame_stack_commutative :
     forall a b fs1 fs2 fs2' fs3,
       MemoryBigIntptr.MMEP.MemSpec.add_ptr_to_frame_stack fs1 a fs2 ->
@@ -17468,24 +17447,15 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
           MemoryBigIntptr.MMEP.MemSpec.add_ptrs_to_frame_stack fs' addrs fs2.
   Proof.
     intros fs1 fs2 a addrs ADD_PTRS.
+    cbn in ADD_PTRS.
+
     generalize dependent a.
     generalize dependent fs1.
     generalize dependent fs2.
     generalize dependent addrs.
     induction addrs; intros fs2 fs1 ptr ADD_PTRS.
-    - cbn in *.
-      destruct ADD_PTRS as (fs'&ADD_PTRS&ADD_PTR).
-      exists fs2.
-      split; [|reflexivity].
-      rewrite ADD_PTRS.
-      auto.
-    - cbn in ADD_PTRS.
-      destruct ADD_PTRS as (fs_addrs_a & ADD_PTRS & ADD_PTR).
-      destruct ADD_PTRS as (fs_addrs & ADD_PTRS & ADD_PTR').
-
-      pose proof add_ptr_to_frame_stack_commutative _ _ _ _ _ _ .
-
-      cbn in IHaddrs.
+    - destruct fs1.
+      + cbn in *.
   Abort.
 
    (* SAZ: try this eventually *)
@@ -17502,84 +17472,133 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     red in EXTEND.
     red.
 
-    intros fs1 fs2 MSFSP ADD_PTRS.
-    eapply MemState_refine_prop_frame_stack_preserved in MSFSP; eauto.
-    apply memory_stack_frame_stack_prop_lift_inv in MSFSP.
-    destruct MSFSP as (?&?&?&?&?); subst.
-    rename x into ms_fin_start'.
+    (* induction addrs_inf; intros fs1 fs2 MSFSP ADD_PTRS. *)
+    (* - cbn in *. *)
+    (*   destruct ms_fin_start. destruct ms_memory_stack. *)
+    (*   destruct ms_inf_start. destruct ms_memory_stack. *)
+    (*   cbn in *. *)
+    (*   unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop, Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *. *)
+    (*   cbn in *. *)
+    (*   rewrite <- ADD_PTRS. *)
+    (*   inv ADDRS. *)
+    (*   cbn in *. *)
 
-    destruct ms_fin_start. destruct ms_memory_stack.
-    destruct ms_inf_start. destruct ms_memory_stack.
-    cbn in *.
-    unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop, Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *.
-    cbn in *.
+    (*   rewrite <- MSFSP. *)
+    (*   apply MSR2. *)
+
+    (*   destruct ms_fin_final. destruct ms_memory_stack. *)
+    (*   unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop, Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *. *)
+    (*   cbn in *. *)
+
+    (*   rewrite MSFSP. *)
+    (*   apply frame_stack_eqv_lift. *)
+    (*   eapply EXTEND. *)
+    (*   reflexivity. *)
+    (*   reflexivity. *)
+
+    (* - cbn in *. *)
+    (*   red. *)
+    (*   rewrite <- ADD_PTRS. *)
+    (*   eapply MemState_refine_prop_frame_stack_preserved in MSFSP; eauto. *)
+    (*   eapply MemState_refine_prop_frame_stack_preserved; eauto. *)
+    (*   apply memory_stack_frame_stack_prop_lift_inv in MSFSP. *)
+    (*   destruct MSFSP as (?&?&?&?&?); subst. *)
+    (*   red in H1. *)
+    (*   destruct ms_fin_start. destruct ms_memory_stack. *)
+    (*   destruct ms_inf_start. destruct ms_memory_stack. *)
+    (*   destruct x. *)
+    (*   cbn in *. *)
+
+    (*   assert (FinMem.MMEP.MMSP.frame_stack_eqv memory_stack_frame_stack1 memory_stack_frame_stack). *)
+    (*   { admit. *)
+    (*   } *)
+
+    (*   unfold Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *. *)
+    (*   cbn in *. *)
+
+    (*   specialize (EXTEND x0 x0). *)
+    (*   unfold Memory *)
+    (*   red in MSFSP. *)
+    (*   apply MSFSP. *)
+
+
+
+    (* apply memory_stack_frame_stack_prop_lift_inv in MSFSP. *)
+    (* destruct MSFSP as (?&?&?&?&?); subst. *)
+    (* rename x into ms_fin_start'. *)
+
+    (* destruct ms_fin_start. destruct ms_memory_stack. *)
+    (* destruct ms_inf_start. destruct ms_memory_stack. *)
+    (* cbn in *. *)
+    (* unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop, Memory64BitIntptr.MMEP.MMSP.memory_stack_frame_stack_prop in *. *)
+    (* cbn in *. *)
 
     
 
-    destruct ms_fin_start'; cbn in *.
-    setoid_rewrite <- H1 in ADD_PTRS.
-    inversion H.
+    (* destruct ms_fin_start'; cbn in *. *)
+    (* setoid_rewrite <- H1 in ADD_PTRS. *)
+    (* inversion H. *)
 
-    generalize dependent addrs_fin.
-    generalize dependent fs2.
-    generalize dependent fs1.
-    induction addrs_inf; intros fs1 MSFSP fs2 ADD_PTRS addrs_fin ADDRS EXTEND.
-    - cbn in *.
-      rewrite <- ADD_PTRS.
-      inv ADDRS.
-      cbn in *.
+    (* generalize dependent addrs_fin. *)
+    (* generalize dependent fs2. *)
+    (* generalize dependent fs1. *)
+    (* induction addrs_inf; intros fs1 MSFSP fs2 ADD_PTRS addrs_fin ADDRS EXTEND. *)
+    (* - cbn in *. *)
+    (*   rewrite <- ADD_PTRS. *)
+    (*   inv ADDRS. *)
+    (*   cbn in *. *)
 
-      rewrite <- MSFSP.
-      apply MSR2.
+    (*   rewrite <- MSFSP. *)
+    (*   apply MSR2. *)
 
-      destruct ms_fin_final. destruct ms_memory_stack.
-      cbn in *.
+    (*   destruct ms_fin_final. destruct ms_memory_stack. *)
+    (*   cbn in *. *)
 
-      apply frame_stack_eqv_lift.
-      eapply EXTEND.
-      reflexivity.
-      reflexivity.
-    - cbn in ADD_PTRS.
-      destruct ADD_PTRS as (fs'&ADD_PTRS&ADD_PTR).
+    (*   apply frame_stack_eqv_lift. *)
+    (*   eapply EXTEND. *)
+    (*   reflexivity. *)
+    (*   reflexivity. *)
+    (* - cbn in ADD_PTRS. *)
+    (*   destruct ADD_PTRS as (fs'&ADD_PTRS&ADD_PTR). *)
 
-      inv ADDRS.
-      rename l' into addrs_fin.
+    (*   inv ADDRS. *)
+    (*   rename l' into addrs_fin. *)
 
-      clear MSR1.
-      specialize (MSR2 (InfMem.MMEP.MMSP.memory_stack_frame_stack
-                          (InfMem.MMEP.MMSP.MemState_get_memory ms_inf_final))).
-      destruct MSR2 as [MSR2 _].
-      forward MSR2. reflexivity.
+    (*   clear MSR1. *)
+    (*   specialize (MSR2 (InfMem.MMEP.MMSP.memory_stack_frame_stack *)
+    (*                       (InfMem.MMEP.MMSP.MemState_get_memory ms_inf_final))). *)
+    (*   destruct MSR2 as [MSR2 _]. *)
+    (*   forward MSR2. reflexivity. *)
 
-      specialize (IHaddrs_inf _ MSFSP _ ADD_PTRS _ H3).
-      forward IHaddrs_inf.
-      admit.
+    (*   specialize (IHaddrs_inf _ MSFSP _ ADD_PTRS _ H3). *)
+    (*   forward IHaddrs_inf. *)
+    (*   admit. *)
 
-      rewrite IHaddrs_inf.
-      specialize (MSR1 memory_stack_frame_stack0).
-      destruct MSR1 as [MSR1 _].
-      forward MSR1. reflexivity.
+    (*   rewrite IHaddrs_inf. *)
+    (*   specialize (MSR1 memory_stack_frame_stack0). *)
+    (*   destruct MSR1 as [MSR1 _]. *)
+    (*   forward MSR1. reflexivity. *)
 
       
         
-      epose proof (EXTEND memory_stack_frame_stack).
+    (*   epose proof (EXTEND memory_stack_frame_stack). *)
 
-      epose proof (IHaddrs_inf _ _ _ _ _ H3).
-      forward H.
-      { intros fs0 fs3 H0 H2.
-        setoid_rewrite <- H2.
-      }
+    (*   epose proof (IHaddrs_inf _ _ _ _ _ H3). *)
+    (*   forward H. *)
+    (*   { intros fs0 fs3 H0 H2. *)
+    (*     setoid_rewrite <- H2. *)
+    (*   } *)
 
 
-      eapply IHaddrs_inf.
-      3: eauto.
-      eauto.
+    (*   eapply IHaddrs_inf. *)
+    (*   3: eauto. *)
+    (*   eauto. *)
 
-      all: eauto.
-      admit.
-      admit.
-      admit.
-  Qed.
+    (*   all: eauto. *)
+    (*   admit. *)
+    (*   admit. *)
+    (*   admit. *)
+  Admitted.
 
   (* TODO: DELETE *)
   (* TODO: Not currently true, but will be once heap_preserved is modified *)
@@ -20182,7 +20201,6 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
     reflexivity.
   Qed.
 
-
   Lemma re_sid_ubytes_helper_fin_inf :
     forall {ixbytes_fin ixbytes_inf ms_fin_start ms_fin_final ms_inf_start init_map_fin init_map_inf byte_map_fin},
       MemState_refine_prop ms_inf_start ms_fin_start ->
@@ -20268,6 +20286,9 @@ intros addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin MSR ADDR_CONV BYTE_REF 
       with (init_map_inf:=NMaps.NM.empty MemoryBigIntptr.MP.BYTE_IMPL.SByte)
            (ixbytes_inf:=zip (Nseq 0 (Datatypes.length bytes_inf)) bytes_inf)
       in H; eauto.
+    2: {
+      admit.
+    }
 
     destruct H as (?&?&?&?&?).
 
