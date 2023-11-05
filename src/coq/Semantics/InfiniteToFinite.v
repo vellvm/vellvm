@@ -9031,6 +9031,10 @@ cofix CIH
     intros a1 sz1 a2 sz2 a1' a2' REF1 REF2.
     unfold MemoryBigIntptr.MMEP.MemSpec.OVER_H.no_overlap.
     unfold Memory64BitIntptr.MMEP.MemSpec.OVER_H.no_overlap.
+    unfold MemoryBigIntptr.MMEP.MemSpec.OVER.overlaps.
+    unfold Memory64BitIntptr.MMEP.MemSpec.OVER.overlaps.
+    apply InfToFinAddrConvert.addr_convert_ptoi in REF1, REF2.
+    lia.
   Qed.
 
   Lemma fin_inf_intptr_seq :
