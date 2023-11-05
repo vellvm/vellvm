@@ -7501,7 +7501,7 @@ cofix CIH
       apply fin_to_inf_dvalue_refine_strict.
   Qed.
 
-  Lemma covert_Frame_lift :
+  Lemma convert_Frame_lift :
     forall f,
     exists f',
       convert_Frame (lift_Frame f) = NoOom f' /\
@@ -7521,13 +7521,54 @@ cofix CIH
       reflexivity.
   Qed.
 
+  (* TODO: Move this to where it can be used for fin / inf *)
+  #[global] Instance frame_stack_eqv_Singleton_Proper :
+    Proper (FinMem.MMEP.MMSP.frame_eqv ==> FinMem.MMEP.MMSP.frame_stack_eqv) FinMemMMSP.Singleton.
+  Proof.
+    intros fs' fs FS.
+    split; intros NTH.
+    - cbn in *.
+      break_match_hyp; auto.
+      rewrite <- FS; auto.
+    - cbn in *.
+      break_match_hyp; auto.
+      rewrite FS; auto.
+  Qed.
+
+  (* TODO: Move this to where it can be used for fin / inf *)
+  #[global] Instance frame_stack_eqv_Snoc_Proper :
+    Proper (FinMem.MMEP.MMSP.frame_stack_eqv ==> FinMem.MMEP.MMSP.frame_eqv ==> FinMem.MMEP.MMSP.frame_stack_eqv) FinMemMMSP.Snoc.
+  Proof.
+    unfold Proper, respectful.
+    intros x y H x0 y0 H0.
+    split.
+    - intros H1.
+      rewrite <- H, <- H0; auto.
+    - intros H1.
+      rewrite H, H0; auto.
+  Qed.
+
   Lemma convert_FrameStack_lift :
     forall fs,
     exists fs',
       convert_FrameStack (lift_FrameStack fs) = NoOom fs' /\
         FinMem.MMEP.MMSP.frame_stack_eqv fs fs'.
   Proof.
-    
+    induction fs.
+    - cbn.
+      pose proof (convert_Frame_lift f) as (f'&CONV&EQV).
+      rewrite CONV.
+      eexists; split; eauto.
+      rewrite EQV.
+      reflexivity.
+    - destruct IHfs as (fs' & CONV & EQV).
+      pose proof (convert_Frame_lift f) as (f'&CONVf&EQVf).
+      cbn.
+      rewrite CONVf.
+      setoid_rewrite CONV.
+      eexists; split; eauto.
+      rewrite EQVf, EQV.
+      reflexivity.
   Qed.
 
   Lemma convert_memory_lift :
