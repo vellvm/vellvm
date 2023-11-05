@@ -187,6 +187,22 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         left; destruct a; reflexivity.
     Qed.
 
+    Lemma In_InA :
+      forall mem ix e,
+        In (ix, e) (IM.elements (elt:=mem_byte) mem) ->
+        SetoidList.InA (IM.eq_key_elt (elt:=mem_byte)) (ix, e) (IM.elements (elt:=mem_byte) mem).
+    Proof.
+      intros mem.
+      induction (IM.elements (elt:=mem_byte) mem);
+        intros ix e INS.
+
+      - cbn in INS; contradiction.
+      - apply SetoidList.InA_cons.
+        destruct INS as [INS | INS]; firstorder.
+        left; subst; eauto.
+        repeat red; eauto.
+    Qed.
+
     Lemma read_byte_raw_next_memory_key :
       forall (mem : memory) ix,
         ix >= next_key mem ->

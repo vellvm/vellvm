@@ -994,19 +994,6 @@ Module InfiniteToFinite.
     let mem' := IntMaps.IP.filter_dom in_bounds mem in
     IntMaps.IM.map lift_mem_byte mem'.
 
-  Lemma IntMaps_map_list_map_Equal :
-    forall {A B} (f : A -> B) l,
-      IntMaps.IM.Equal (IntMaps.IM.map f (IntMaps.IP.of_list l)) (IntMaps.IP.of_list (List.map (fun '(i, x) => (i, f x)) l)).
-  Proof.
-  Admitted.
-
-  Lemma IntMaps_filter_dom_list_filter_Equal :
-    forall {A : Type} (f : IntMaps.IM.key -> bool) (l : list (IntMaps.IM.key * A)),
-      IntMaps.IM.Equal (IntMaps.IP.filter_dom f (IntMaps.IP.of_list l))
-        (IntMaps.IP.of_list (filter (fun '(i, x) => f i) l)).
-  Proof.
-  Admitted.
-
   Lemma Forall2_cons_inversion :
     forall {A B} f (x:A) (y:B) xs ys,
       Forall2 f (x::xs) (y::ys) -> f x y /\ Forall2 f xs ys.
@@ -1246,6 +1233,20 @@ Module InfiniteToFinite.
         auto.
   Qed.
 
+  Lemma IntMaps_map_list_map_Equal :
+    forall {A B} (f : A -> B) l,
+      IntMaps.IM.Equal (IntMaps.IM.map f (IntMaps.IP.of_list l)) (IntMaps.IP.of_list (List.map (fun '(i, x) => (i, f x)) l)).
+  Proof.
+    (* Only seem to need these for lift_memory_convert_inversion, which currently is unused *)
+  Admitted.
+
+  Lemma IntMaps_filter_dom_list_filter_Equal :
+    forall {A : Type} (f : IntMaps.IM.key -> bool) (l : list (IntMaps.IM.key * A)),
+      IntMaps.IM.Equal (IntMaps.IP.filter_dom f (IntMaps.IP.of_list l))
+        (IntMaps.IP.of_list (filter (fun '(i, x) => f i) l)).
+  Proof.
+    (* Only seem to need these for lift_memory_convert_inversion, which currently is unused *)
+  Admitted.
 
   Lemma lift_memory_convert_memory_inversion :
     forall {mem_inf mem_fin},
@@ -1512,24 +1513,111 @@ Module InfiniteToFinite.
   Definition MemState_in_bounds (ms_fin:FinMem.MMEP.MMSP.MemState) :=
     Heap_in_bounds ms_fin /\ memory_in_bounds ms_fin.
 
-  (* TODO: Move this *)
-  Lemma lift_MemState_convert_MemState_inverse :
-    forall {ms_inf ms_fin},
-      convert_MemState ms_inf = NoOom ms_fin ->
-      lift_MemState ms_fin = ms_inf.
+  Lemma lift_mem_byte_convert_mem_byte_inverse :
+    forall {mb_fin},
+      convert_mem_byte (lift_mem_byte mb_fin) = NoOom mb_fin.
   Proof.
     intros.
-    unfold lift_MemState.
-    destruct ms_fin. cbn in *.
-    destruct ms_inf.
-    cbn in *.
-  Admitted.
+    unfold convert_mem_byte.
+    destruct mb_fin.
+    cbn.
+    rewrite sbyte_refine_lifted.
+    reflexivity.
+  Qed.
+  
+Lemma lift_memory_convert_mem_byte :
+    forall {ms k m},
+      In (k, m) (IntMaps.IM.elements (elt:=InfMemMMSP.mem_byte) (lift_memory ms)) ->
+      is_true (in_bounds k) /\
+        exists m', convert_mem_byte m = NoOom m'.
+  Proof.
+    intros ms k m ELEM.
+    apply MemoryBigIntptr.MMEP.MMSP.In_InA in ELEM.
+    apply IntMaps.IM.elements_2 in ELEM.
+    unfold lift_memory in ELEM.
+    eapply filter_dom_map_eq in ELEM.
+    apply IntMaps.IP.F.find_mapsto_iff in ELEM.
+    apply find_filter_dom_true in ELEM.
+    destruct ELEM as (FIND & IN_BOUNDS).
+    rewrite IntMaps.IP.F.map_o in FIND.
+    unfold option_map in FIND.
+    break_match_hyp_inv.
+    split; eauto.
+    rewrite lift_mem_byte_convert_mem_byte_inverse.
+    exists m0; auto.    
+  Qed.
+
+  Lemma convert_memory_inv :
+    forall ms,
+      exists ms',
+        convert_memory (lift_memory ms) = NoOom ms'.
+  Proof.
+    intros ms.
+    Opaque lift_memory.
+    cbn.
+    Transparent lift_memory.
+    break_inner_match_goal.
+    2: {
+      apply map_monad_OOM_fail in Heqo.
+      destruct Heqo as (?&?&?).
+      destruct x.
+
+      pose proof lift_memory_convert_mem_byte H
+        as (IN_BOUNDS & (m' & CONV)).
+      rewrite CONV in H0.
+      unfold LLVMParams64BitIntptr.ITOP.int_to_ptr in *.
+      pose proof in_bounds_Z k.
+      break_inner_match_hyp; try discriminate.
+      rewrite IN_BOUNDS in H1.
+      lia.
+    }
+
+    eexists; eauto.
+  Qed.
+
+  Lemma MemState_fin_to_inf_to_fin_exists :
+    forall ms,
+    exists ms',
+      convert_MemState (lift_MemState ms) = NoOom ms'.
+  Proof.
+    intros ms.
+    destruct ms as [[ms fss hs] msprovs].
+
+    Opaque convert_memory.
+    Opaque convert_FrameStack.
+    Opaque convert_Heap.
+    cbn.
+    repeat break_inner_match_goal.
+    2-4: exfalso.
+    4: {
+      pose proof convert_memory_inv ms.
+      destruct H.
+      rewrite Heqo in H.
+      discriminate.
+    }
+  Abort.
 
   (* TODO: Move this *)
   Lemma MemState_fin_to_inf_to_fin :
-    forall ms,
-      exists ms', convert_MemState (lift_MemState ms) = NoOom ms' /\ Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms ms'.
+    forall ms ms',
+      convert_MemState (lift_MemState ms) = NoOom ms' ->
+      Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms ms'.
   Proof.
+    intros ms ms' CONV.
+    destruct ms as [[ms fss hs] msprovs].
+    destruct ms' as [[ms' fss' hs'] msprovs'].
+
+    Opaque convert_memory.
+    Opaque convert_FrameStack.
+    Opaque convert_Heap.
+    cbn in *.
+    repeat break_match_hyp_inv.
+
+    split; [|split; [|split; [|split; [|split; [|split; [|split]]]]]].
+    - red; reflexivity.
+    - red.
+      split.
+      red.
   Admitted.
 
   (* TODO: Need a MemState_refine_prop that takes all of the predicates
@@ -1539,23 +1627,6 @@ Module InfiniteToFinite.
   Definition MemState_refine_prop ms_inf ms_fin :=
     let ms_fin_lifted := lift_MemState ms_fin in
     InfMem.MMEP.MemSpec.MemState_eqv ms_inf ms_fin_lifted.
-
-  (* TODO: move this *)
-  (*
-  Lemma MemState_refine_MemState_refine_prop :
-    forall ms_inf ms_fin,
-      MemState_refine ms_inf ms_fin ->
-      MemState_refine_prop ms_inf ms_fin.
-  Proof.
-    intros ms_inf ms_fin MSR.
-    red.
-    red in MSR.
-    erewrite lift_MemState_convert_MemState_inverse; eauto.
-    split; [|split; [|split; [|split; [|split; [|split]]]]]; try (red; reflexivity).
-
-    split; split; [red; reflexivity|].
-  Qed.
-   *)
 
   Definition sbytes_refine bytes_inf bytes_fin : Prop :=
     Forall2 sbyte_refine bytes_inf bytes_fin.
@@ -7430,18 +7501,21 @@ cofix CIH
     forall fs,
       convert_FrameStack (lift_FrameStack fs) = NoOom fs.
   Proof.
+    (* Probably not true up to equality *)
   Admitted.
 
   Lemma convert_memory_lift :
     forall m,
       convert_memory (lift_memory m) = NoOom m.
   Proof.
+    (* Probably not true up to equality *)
   Admitted.
 
   Lemma convert_Heap_lift :
     forall h,
       convert_Heap (lift_Heap h) = NoOom h.
   Proof.
+    (* Probably not true up to equality *)
   Admitted.
 
   Lemma convert_memory_stack_lift :
@@ -8950,11 +9024,14 @@ cofix CIH
 
   Lemma fin_inf_no_overlap :
     forall a1 sz1 a2 sz2 a1' a2',
-      InfToFinAddrConvert.addr_convert a1' = NoOom a1 ->
-      InfToFinAddrConvert.addr_convert a2' = NoOom a2 ->
+      addr_refine a1' a1 ->
+      addr_refine a2' a2 ->
       Memory64BitIntptr.MMEP.MemSpec.OVER_H.no_overlap a1 sz1 a2 sz2 = MemoryBigIntptr.MMEP.MemSpec.OVER_H.no_overlap a1' sz1 a2' sz2.
   Proof.
-  Admitted.
+    intros a1 sz1 a2 sz2 a1' a2' REF1 REF2.
+    unfold MemoryBigIntptr.MMEP.MemSpec.OVER_H.no_overlap.
+    unfold Memory64BitIntptr.MMEP.MemSpec.OVER_H.no_overlap.
+  Qed.
 
   Lemma fin_inf_intptr_seq :
     forall start len ips,
