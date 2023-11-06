@@ -105,11 +105,11 @@ Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
   (*** Primitives on memory *)
 
   (** Reads *)
-  Parameter read_byte_MemPropT : addr -> MemPropT memory_stack SByte.
+  Parameter read_byte_prop_memory : addr -> memory_stack -> SByte -> Prop.
 
   (** Allocations *)
-  (* Returns true if a byte is allocated with a given AllocationId? *)
-  Parameter addr_allocated_prop : addr -> AllocationId -> MemPropT memory_stack bool.
+  (* Holds if a byte is allocated with a given AllocationId *)
+  Parameter addr_allocated_prop_memory : addr -> AllocationId -> memory_stack -> Prop.
 
   (** Frame stacks *)
   (* Check if an address is allocated in a frame *)
@@ -2975,20 +2975,10 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   Import MemHelpers.
 
   Definition read_byte_prop (ms : MemState) (ptr : addr) (byte : SByte) : Prop
-    := read_byte_MemPropT ptr (MemState_get_memory ms) (ret ((MemState_get_memory ms), byte)).
-
-  Definition lift_memory_MemPropT {X} (m : MemPropT memory_stack X) : MemPropT MemState X :=
-    fun ms res =>
-      m (MemState_get_memory ms) (fmap (fun '(ms, x) => (MemState_get_memory ms, x)) res) /\
-        (* Provenance should be preserved as memory operation shouldn't touch rest of MemState *)
-        forall ms' x, res = ret (ms', x) -> MemState_get_provenance ms = MemState_get_provenance ms'.
-
-  Definition byte_allocated_MemPropT (ptr : addr) (aid : AllocationId) : MemPropT MemState unit :=
-    b <- lift_memory_MemPropT (addr_allocated_prop ptr aid);;
-    MemPropT_assert (b = true).
+    := read_byte_prop_memory ptr (MemState_get_memory ms) byte.
 
   Definition byte_allocated (ms : MemState) (ptr : addr) (aid : AllocationId) : Prop
-    := byte_allocated_MemPropT ptr aid ms (ret (ms, tt)).
+    := addr_allocated_prop_memory ptr aid (MemState_get_memory ms).
 
   Definition byte_not_allocated (ms : MemState) (ptr : addr) : Prop
     := forall (aid : AllocationId), ~ byte_allocated ms ptr aid.
@@ -3094,19 +3084,17 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   Definition heap_preserved (m1 m2 : MemState) : Prop
     := heap_preserved_memory (MemState_get_memory m1) (MemState_get_memory m2).
 
-  Definition addr_allocated_preserved (m1 m2 : memory_stack) : Prop
-    := forall addr aid res1 res2,
-      (fmap snd res1 : err_ub_oom bool) = fmap snd res2 ->
-      addr_allocated_prop addr aid m1 res1 <-> addr_allocated_prop addr aid m2 res2.
+  Definition addr_allocated_prop_memory_preserved (m1 m2 : memory_stack) : Prop
+    := forall addr aid,
+      addr_allocated_prop_memory addr aid m1 <-> addr_allocated_prop_memory addr aid m2.
 
-  Definition read_byte_MemPropT_preserved (m1 m2 : memory_stack) : Prop
-    := forall ptr res1 res2,
-      fmap snd res1 = fmap snd res2 ->
-      read_byte_MemPropT ptr m1 res1 <-> read_byte_MemPropT ptr m2 res2.
+  Definition read_byte_prop_memory_preserved (m1 m2 : memory_stack) : Prop
+    := forall ptr byte,
+      read_byte_prop_memory ptr m1 byte <-> read_byte_prop_memory ptr m2 byte.
 
   Record memory_stack_eqv (m1 m2 : memory_stack) : Prop :=
-    { memory_stack_eqv_preserves_addr_allocated : addr_allocated_preserved m1 m2;
-      memory_stack_eqv_preserves_read_byte_MemPropT : read_byte_MemPropT_preserved m1 m2;
+    { memory_stack_eqv_preserves_addr_allocated : addr_allocated_prop_memory_preserved m1 m2;
+      memory_stack_eqv_preserves_read_byte_MemPropT : read_byte_prop_memory_preserved m1 m2;
       memory_stack_eqv_frame_stack_preserved_memory : frame_stack_preserved_memory m1 m2;
       memory_stack_eqv_heap_preserved_memory : heap_preserved_memory m1 m2;
     }.
@@ -3135,41 +3123,15 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     intros ptr.
     split; intros RBA;
       red; red in RBA;
-      destruct RBA as (aid&ALLOC&ACCESS);
-      repeat red in ALLOC;
-      destruct ALLOC as (?&?&?&?);
-      cbn in H0;
-      destruct H0; subst.
+      destruct RBA as (aid&ALLOC&ACCESS).
     - exists aid.
       split; auto.
-      repeat red.
-      exists ms2. exists true.
-      split; cbn; auto.
-      red; red in H.
-      destruct H as (?&?).
-      split.
-      + cbn in *.
-        red in memory_stack_eqv_preserves_addr_allocated0.
-        specialize (memory_stack_eqv_preserves_addr_allocated0 ptr aid (success_unERR_UB_OOM (MemState_get_memory ms1, true)) (success_unERR_UB_OOM (MemState_get_memory ms2, true))).
-        eapply memory_stack_eqv_preserves_addr_allocated0; eauto.
-      + intros ms' x H1.
-        inv H1.
-        reflexivity.
+      red; red in ALLOC.
+      apply memory_stack_eqv_preserves_addr_allocated0; auto.
     - exists aid.
       split; auto.
-      repeat red.
-      exists ms1. exists true.
-      split; cbn; auto.
-      red; red in H.
-      destruct H as (?&?).
-      split.
-      + cbn in *.
-        red in memory_stack_eqv_preserves_addr_allocated0.
-        specialize (memory_stack_eqv_preserves_addr_allocated0 ptr aid (success_unERR_UB_OOM (MemState_get_memory ms1, true)) (success_unERR_UB_OOM (MemState_get_memory ms2, true))).
-        eapply memory_stack_eqv_preserves_addr_allocated0; eauto.
-      + intros ms' x H1.
-        inv H1.
-        reflexivity.
+      red; red in ALLOC.
+      apply memory_stack_eqv_preserves_addr_allocated0; auto.
   Qed.
 
   #[global] Hint Resolve MemState_eqv'_read_byte_allowed_all_preserved : MemEqv.
@@ -3186,13 +3148,9 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     split; intros RBP;
       red; red in RBP.
     - red in memory_stack_eqv_preserves_read_byte_MemPropT0.
-      eapply memory_stack_eqv_preserves_read_byte_MemPropT0.
-      2: eauto.
-      eauto.
+      eapply memory_stack_eqv_preserves_read_byte_MemPropT0; eauto.
     - red in memory_stack_eqv_preserves_read_byte_MemPropT0.
-      eapply memory_stack_eqv_preserves_read_byte_MemPropT0.
-      2: eauto.
-      eauto.
+      eapply memory_stack_eqv_preserves_read_byte_MemPropT0; eauto.
   Qed.
 
   #[global] Hint Resolve MemState_eqv'_read_byte_prop_all_preserved : MemEqv.
@@ -3243,33 +3201,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     split; intros ALLOC;
       repeat red in ALLOC;
       repeat red;
-      destruct ALLOC as (?&?&?&?);
-      cbn in H0;
-      destruct H0; subst.
-    - exists ms2. exists true.
-      split; cbn; auto.
-      red; red in H.
-      destruct H as (?&?); subst.
-      split.
-      + cbn in *.
-        red in memory_stack_eqv_preserves_addr_allocated0.
-        specialize (memory_stack_eqv_preserves_addr_allocated0 ptr aid (success_unERR_UB_OOM (MemState_get_memory ms1, true)) (success_unERR_UB_OOM (MemState_get_memory ms2, true))).
-        eapply memory_stack_eqv_preserves_addr_allocated0; eauto.
-      + intros ms' x H1.
-        inv H1.
-        reflexivity.
-    - exists ms1. exists true.
-      split; cbn; auto.
-      red; red in H.
-      destruct H as (?&?); subst.
-      split.
-      + cbn in *.
-        red in memory_stack_eqv_preserves_addr_allocated0.
-        specialize (memory_stack_eqv_preserves_addr_allocated0 ptr aid (success_unERR_UB_OOM (MemState_get_memory ms1, true)) (success_unERR_UB_OOM (MemState_get_memory ms2, true))).
-        eapply memory_stack_eqv_preserves_addr_allocated0; eauto.
-      + intros ms' x H1.
-        inv H1.
-        reflexivity.
+      eapply memory_stack_eqv_preserves_addr_allocated0; eauto.
   Qed.
 
   #[global] Hint Resolve MemState_eqv'_allocations_preserved : MemEqv.
@@ -4128,8 +4060,24 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     reflexivity.
   Qed.
 
+  #[global] Instance frame_stack_preserved_memory_Reflexive :
+    Reflexive frame_stack_preserved_memory.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
   #[global] Instance frame_stack_preserved_Reflexive :
     Reflexive frame_stack_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance heap_preserved_memory_Reflexive :
+    Reflexive heap_preserved_memory.
   Proof.
     red; intros ms.
     red.
@@ -4142,6 +4090,37 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     red; intros ms.
     red.
     reflexivity.
+  Qed.
+
+  #[global] Instance addr_allocated_preserved_Reflexive : Reflexive addr_allocated_prop_memory_preserved.
+  Proof.
+    repeat red.
+    intros x addr0 aid.
+    split; intros ALLOC; auto.
+  Qed.
+
+  #[global] Instance read_byte_prop_memory_preserved_Reflexive : Reflexive read_byte_prop_memory_preserved.
+  Proof.
+    repeat red.
+    intros x addr0 aid.
+    split; intros ALLOC; auto.
+  Qed.
+
+  #[global] Instance memory_stack_Reflexive : Reflexive memory_stack_eqv.
+  Proof.
+    red.
+    intros x.
+    split; try reflexivity.
+  Qed.
+
+  #[global] Instance MemState_eqv'_Reflexive : Reflexive MemState_eqv'.
+  Proof.
+    red.
+    intros ms.
+    red.
+    split; [|reflexivity].
+      
+    repeat (split; [reflexivity|]); reflexivity.
   Qed.
 
   #[global] Instance MemState_eqv_Reflexive : Reflexive MemState_eqv.
@@ -4723,9 +4702,6 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
              (@within MemM _ err_ub_oom (ExtraState * MemState)%type (ExtraState * MemState)%type WEM X exec (st, ms) e (st', ms')) /\
                (e {{ms}} ∈ {{ms'}} spec) /\ ((exists x, e = ret x) -> (@MemMonad_valid_state ExtraState MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ms' st'))).
 
-  Definition exec_correct_memory {MemM Eff ExtraState} `{MM: MemMonad ExtraState MemM (itree Eff)} {X} (pre : MemState -> ExtraState -> Prop) (exec : MemM X) (spec : MemPropT memory_stack X) : Prop :=
-    exec_correct pre exec (lift_memory_MemPropT spec).
-
   Require Import Error.
   Require Import MonadReturnsLaws.
 
@@ -5208,17 +5184,11 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         byte_allocated ms' ptr aid.
     Proof.
       intros ms ms' ptr aid ALLOC EQ.
-      unfold byte_allocated, byte_allocated_MemPropT in *.
+      unfold byte_allocated.
       cbn in *.
-      unfold lift_memory_MemPropT in *.
-      cbn in *.
-      destruct ALLOC as [sab [ab [[ALLOC PROV] [EQ1 EQ2]]]].
-      subst.
-      repeat eexists.
+      red in ALLOC.
       rewrite <- EQ.
       auto.
-      intros ms'0 x EQ'; inv EQ'.
-      reflexivity.
     Qed.
 
     (* TODO: move this? *)
