@@ -689,6 +689,31 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     cbn in *; intros ptr; split; firstorder.
   Qed.
 
+  #[global] Instance frame_stack_eqv_Singleton_Proper :
+    Proper (FinMem.MMEP.MMSP.frame_eqv ==> FinMem.MMEP.MMSP.frame_stack_eqv) FinMemMMSP.Singleton.
+  Proof.
+    intros fs' fs FS.
+    split; intros NTH.
+    - cbn in *.
+      break_match_hyp; auto.
+      rewrite <- FS; auto.
+    - cbn in *.
+      break_match_hyp; auto.
+      rewrite FS; auto.
+  Qed.
+
+  #[global] Instance frame_stack_eqv_Snoc_Proper :
+    Proper (FinMem.MMEP.MMSP.frame_stack_eqv ==> FinMem.MMEP.MMSP.frame_eqv ==> FinMem.MMEP.MMSP.frame_stack_eqv) FinMemMMSP.Snoc.
+  Proof.
+    unfold Proper, respectful.
+    intros x y H x0 y0 H0.
+    split.
+    - intros H1.
+      rewrite <- H, <- H0; auto.
+    - intros H1.
+      rewrite H, H0; auto.
+  Qed.
+
   Lemma MemState_get_put_memory :
     forall ms mem,
       MemState_get_memory (MemState_put_memory mem ms) = mem.
@@ -697,6 +722,18 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     destruct ms.
     cbn.
     reflexivity.
+  Qed.
+
+  Lemma memory_stack_memory_mem_state_memory :
+    forall m,
+      memory_stack_memory (MemState_get_memory m) = mem_state_memory m.
+  Proof.
+    intros m.
+    destruct m.
+    cbn.
+    destruct ms_memory_stack.
+    cbn.
+    auto.
   Qed.
 
   #[global] Instance MemState_memory_MemStateMem : MemStateMem MemState memory_stack :=

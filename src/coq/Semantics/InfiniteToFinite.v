@@ -7521,33 +7521,6 @@ cofix CIH
       reflexivity.
   Qed.
 
-  (* TODO: Move this to where it can be used for fin / inf *)
-  #[global] Instance frame_stack_eqv_Singleton_Proper :
-    Proper (FinMem.MMEP.MMSP.frame_eqv ==> FinMem.MMEP.MMSP.frame_stack_eqv) FinMemMMSP.Singleton.
-  Proof.
-    intros fs' fs FS.
-    split; intros NTH.
-    - cbn in *.
-      break_match_hyp; auto.
-      rewrite <- FS; auto.
-    - cbn in *.
-      break_match_hyp; auto.
-      rewrite FS; auto.
-  Qed.
-
-  (* TODO: Move this to where it can be used for fin / inf *)
-  #[global] Instance frame_stack_eqv_Snoc_Proper :
-    Proper (FinMem.MMEP.MMSP.frame_stack_eqv ==> FinMem.MMEP.MMSP.frame_eqv ==> FinMem.MMEP.MMSP.frame_stack_eqv) FinMemMMSP.Snoc.
-  Proof.
-    unfold Proper, respectful.
-    intros x y H x0 y0 H0.
-    split.
-    - intros H1.
-      rewrite <- H, <- H0; auto.
-    - intros H1.
-      rewrite H, H0; auto.
-  Qed.
-
   Lemma convert_FrameStack_lift :
     forall fs,
     exists fs',
@@ -7592,7 +7565,9 @@ cofix CIH
     induction ms.
     cbn.
     setoid_rewrite convert_memory_lift.
-    setoid_rewrite convert_FrameStack_lift.
+    pose proof convert_FrameStack_lift memory_stack_frame_stack
+      as (fs'&CONVfs&EQVfs).
+    rewrite CONVfs.
     setoid_rewrite convert_Heap_lift.
     reflexivity.
   Qed.
@@ -7608,7 +7583,6 @@ cofix CIH
     rewrite convert_memory_stack_lift.
     auto.
   Qed.
-
 
   Lemma lift_MemState_refine_prop :
     forall ms,
@@ -9856,32 +9830,6 @@ cofix CIH
     }
     all: auto.
     apply IntMaps.IM.elements_3w.
-  Qed.
-
-  (* TODO: Move this somewhere it can apply to fin / inf *)
-  Lemma memory_stack_memory_mem_state_memory :
-    forall m,
-      InfMem.MMEP.MMSP.memory_stack_memory (InfMem.MMEP.MMSP.MemState_get_memory m) = MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory m.
-  Proof.
-    intros m.
-    destruct m.
-    cbn.
-    destruct ms_memory_stack.
-    cbn.
-    auto.
-  Qed.
-
-  (* TODO: Move this somewhere it can apply to fin / inf *)
-  Lemma memory_stack_memory_mem_state_memory_fin :
-    forall m,
-      FinMem.MMEP.MMSP.memory_stack_memory (FinMem.MMEP.MMSP.MemState_get_memory m) = FinMemMMSP.mem_state_memory m.
-  Proof.
-    intros m.
-    destruct m.
-    cbn.
-    destruct ms_memory_stack.
-    cbn.
-    auto.
   Qed.
 
   Lemma read_byte_raw_lifted :

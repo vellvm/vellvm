@@ -3074,9 +3074,12 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     := ~ used_store_id_prop ms new_sid.
 
   (** Frame stack *)
-  Definition frame_stack_preserved (m1 m2 : MemState) : Prop
+  Definition frame_stack_preserved_memory (m1 m2 : memory_stack) : Prop
     := forall fs,
-      memory_stack_frame_stack_prop (MemState_get_memory m1) fs <-> memory_stack_frame_stack_prop (MemState_get_memory m2) fs.
+      memory_stack_frame_stack_prop m1 fs <-> memory_stack_frame_stack_prop m2 fs.
+
+  Definition frame_stack_preserved (m1 m2 : MemState) : Prop
+    := frame_stack_preserved_memory (MemState_get_memory m1) (MemState_get_memory m2).
 
   (* Definition Heap_in_bounds (ms_fin:FinMem.MMEP.MMSP.MemState) : Prop := *)
   (*   let h := Memory64BitIntptr.MMEP.MMSP.mem_state_heap ms_fin in *)
@@ -3084,9 +3087,33 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   
   (** Heap *)
   (* SAZ: Add Heap_in_bounds *)
-  Definition heap_preserved (m1 m2 : MemState) : Prop
+  Definition heap_preserved_memory (m1 m2 : memory_stack) : Prop
     := forall h,
-      memory_stack_heap_prop (MemState_get_memory m1) h <-> memory_stack_heap_prop (MemState_get_memory m2) h.
+        memory_stack_heap_prop m1 h <-> memory_stack_heap_prop m2 h.
+
+  Definition heap_preserved (m1 m2 : MemState) : Prop
+    := heap_preserved_memory (MemState_get_memory m1) (MemState_get_memory m2).
+
+  Definition addr_allocated_preserved (m1 m2 : memory_stack) : Prop
+    := forall addr aid res1 res2,
+      (fmap snd res1 : err_ub_oom bool) = fmap snd res2 ->
+      addr_allocated_prop addr aid m1 res1 <-> addr_allocated_prop addr aid m2 res2.
+
+  Definition read_byte_MemPropT_preserved (m1 m2 : memory_stack) : Prop
+    := forall ptr res1 res2,
+      fmap snd res1 = fmap snd res2 ->
+      read_byte_MemPropT ptr m1 res1 <-> read_byte_MemPropT ptr m2 res2.
+
+  Record memory_stack_eqv (m1 m2 : memory_stack) : Prop :=
+    { memory_stack_eqv_preserves_addr_allocated : addr_allocated_preserved m1 m2;
+      memory_stack_eqv_preserves_read_byte_MemPropT : read_byte_MemPropT_preserved m1 m2;
+      memory_stack_eqv_frame_stack_preserved_memory : frame_stack_preserved_memory m1 m2;
+      memory_stack_eqv_heap_preserved_memory : heap_preserved_memory m1 m2;
+    }.
+
+  Definition MemState_eqv' (ms1 ms2 : MemState) : Prop :=
+    memory_stack_eqv (MemState_get_memory ms1) (MemState_get_memory ms2) /\
+      preserve_allocation_ids ms1 ms2.
 
   Definition MemState_eqv (ms1 ms2 : MemState) : Prop :=
     preserve_allocation_ids ms1 ms2 /\
@@ -3096,6 +3123,190 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       allocations_preserved ms1 ms2 /\
       frame_stack_preserved ms1 ms2 /\
       heap_preserved ms1 ms2.
+
+  Lemma MemState_eqv'_read_byte_allowed_all_preserved :
+    forall ms1 ms2,
+      memory_stack_eqv (MemState_get_memory ms1) (MemState_get_memory ms2) ->
+      read_byte_allowed_all_preserved ms1 ms2.
+  Proof.
+    intros ms1 ms2 H.
+    destruct H.
+    red.
+    intros ptr.
+    split; intros RBA;
+      red; red in RBA;
+      destruct RBA as (aid&ALLOC&ACCESS);
+      repeat red in ALLOC;
+      destruct ALLOC as (?&?&?&?);
+      cbn in H0;
+      destruct H0; subst.
+    - exists aid.
+      split; auto.
+      repeat red.
+      exists ms2. exists true.
+      split; cbn; auto.
+      red; red in H.
+      destruct H as (?&?).
+      split.
+      + cbn in *.
+        red in memory_stack_eqv_preserves_addr_allocated0.
+        specialize (memory_stack_eqv_preserves_addr_allocated0 ptr aid (success_unERR_UB_OOM (MemState_get_memory ms1, true)) (success_unERR_UB_OOM (MemState_get_memory ms2, true))).
+        eapply memory_stack_eqv_preserves_addr_allocated0; eauto.
+      + intros ms' x H1.
+        inv H1.
+        reflexivity.
+    - exists aid.
+      split; auto.
+      repeat red.
+      exists ms1. exists true.
+      split; cbn; auto.
+      red; red in H.
+      destruct H as (?&?).
+      split.
+      + cbn in *.
+        red in memory_stack_eqv_preserves_addr_allocated0.
+        specialize (memory_stack_eqv_preserves_addr_allocated0 ptr aid (success_unERR_UB_OOM (MemState_get_memory ms1, true)) (success_unERR_UB_OOM (MemState_get_memory ms2, true))).
+        eapply memory_stack_eqv_preserves_addr_allocated0; eauto.
+      + intros ms' x H1.
+        inv H1.
+        reflexivity.
+  Qed.
+
+  #[global] Hint Resolve MemState_eqv'_read_byte_allowed_all_preserved : MemEqv.
+
+  Lemma MemState_eqv'_read_byte_prop_all_preserved :
+    forall ms1 ms2,
+      memory_stack_eqv (MemState_get_memory ms1) (MemState_get_memory ms2) ->
+      read_byte_prop_all_preserved ms1 ms2.
+  Proof.
+    intros ms1 ms2 H.
+    destruct H.
+    red.
+    intros ptr byte.
+    split; intros RBP;
+      red; red in RBP.
+    - red in memory_stack_eqv_preserves_read_byte_MemPropT0.
+      eapply memory_stack_eqv_preserves_read_byte_MemPropT0.
+      2: eauto.
+      eauto.
+    - red in memory_stack_eqv_preserves_read_byte_MemPropT0.
+      eapply memory_stack_eqv_preserves_read_byte_MemPropT0.
+      2: eauto.
+      eauto.
+  Qed.
+
+  #[global] Hint Resolve MemState_eqv'_read_byte_prop_all_preserved : MemEqv.
+
+  Lemma MemState_eqv'_read_byte_preserved :
+    forall ms1 ms2,
+      memory_stack_eqv (MemState_get_memory ms1) (MemState_get_memory ms2) ->
+      read_byte_preserved ms1 ms2.
+  Proof.
+    intros ms1 ms2 H.
+    red.
+    split; eauto with MemEqv.
+  Qed.
+
+  #[global] Hint Resolve MemState_eqv'_read_byte_preserved : MemEqv.
+
+  Lemma MemState_eqv'_write_byte_allowed_all_preserved :
+    forall ms1 ms2,
+      memory_stack_eqv (MemState_get_memory ms1) (MemState_get_memory ms2) ->
+      write_byte_allowed_all_preserved ms1 ms2.
+  Proof.
+    intros ms1 ms2 H.
+    eapply MemState_eqv'_read_byte_allowed_all_preserved; eauto.
+  Qed.
+
+  #[global] Hint Resolve MemState_eqv'_write_byte_allowed_all_preserved : MemEqv.
+
+  Lemma MemState_eqv'_free_byte_allowed_all_preserved :
+    forall ms1 ms2,
+      memory_stack_eqv (MemState_get_memory ms1) (MemState_get_memory ms2) ->
+      free_byte_allowed_all_preserved ms1 ms2.
+  Proof.
+    intros ms1 ms2 H.
+    eapply MemState_eqv'_read_byte_allowed_all_preserved; eauto.
+  Qed.
+
+  #[global] Hint Resolve MemState_eqv'_free_byte_allowed_all_preserved : MemEqv.
+
+  Lemma MemState_eqv'_allocations_preserved :
+    forall ms1 ms2,
+      memory_stack_eqv (MemState_get_memory ms1) (MemState_get_memory ms2) ->
+      allocations_preserved ms1 ms2.
+  Proof.
+    intros ms1 ms2 H.
+    destruct H.
+    red.
+    intros ptr aid.
+    split; intros ALLOC;
+      repeat red in ALLOC;
+      repeat red;
+      destruct ALLOC as (?&?&?&?);
+      cbn in H0;
+      destruct H0; subst.
+    - exists ms2. exists true.
+      split; cbn; auto.
+      red; red in H.
+      destruct H as (?&?); subst.
+      split.
+      + cbn in *.
+        red in memory_stack_eqv_preserves_addr_allocated0.
+        specialize (memory_stack_eqv_preserves_addr_allocated0 ptr aid (success_unERR_UB_OOM (MemState_get_memory ms1, true)) (success_unERR_UB_OOM (MemState_get_memory ms2, true))).
+        eapply memory_stack_eqv_preserves_addr_allocated0; eauto.
+      + intros ms' x H1.
+        inv H1.
+        reflexivity.
+    - exists ms1. exists true.
+      split; cbn; auto.
+      red; red in H.
+      destruct H as (?&?); subst.
+      split.
+      + cbn in *.
+        red in memory_stack_eqv_preserves_addr_allocated0.
+        specialize (memory_stack_eqv_preserves_addr_allocated0 ptr aid (success_unERR_UB_OOM (MemState_get_memory ms1, true)) (success_unERR_UB_OOM (MemState_get_memory ms2, true))).
+        eapply memory_stack_eqv_preserves_addr_allocated0; eauto.
+      + intros ms' x H1.
+        inv H1.
+        reflexivity.
+  Qed.
+
+  #[global] Hint Resolve MemState_eqv'_allocations_preserved : MemEqv.
+
+  Lemma MemState_eqv'_frame_stack_preserved :
+    forall ms1 ms2,
+      memory_stack_eqv (MemState_get_memory ms1) (MemState_get_memory ms2) ->
+      frame_stack_preserved ms1 ms2.
+  Proof.
+    intros ms1 ms2 H.
+    destruct H.
+    red; eauto.
+  Qed.
+
+  #[global] Hint Resolve MemState_eqv'_frame_stack_preserved : MemEqv.
+
+  Lemma MemState_eqv'_heap_preserved :
+    forall ms1 ms2,
+      memory_stack_eqv (MemState_get_memory ms1) (MemState_get_memory ms2) ->
+      heap_preserved ms1 ms2.
+  Proof.
+    intros ms1 ms2 H.
+    destruct H.
+    red; eauto.
+  Qed.
+
+  #[global] Hint Resolve MemState_eqv'_heap_preserved : MemEqv.
+
+  Lemma MemState_eqv'_MemState_eqv :
+    forall ms1 ms2,
+      MemState_eqv' ms1 ms2 ->
+      MemState_eqv ms1 ms2.
+  Proof.
+    intros ms1 ms2 EQV.
+    destruct EQV.
+    split; [|split; [|split; [|split; [|split; [|split]]]]]; eauto with MemEqv.
+  Qed.
 
   (*** Provenance operations *)
   #[global] Instance MemPropT_MonadProvenance : MonadProvenance Provenance (MemPropT MemState).
