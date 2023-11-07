@@ -1913,26 +1913,18 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       add_ptrs_to_heap ptrs.
 
     Definition allocate_bytes_with_pr `{MemMonad ExtraState MemM (itree Eff)}
-      (dt : dtyp) (num_elements : N) (init_bytes : list SByte) (pr : Provenance)
+      (init_bytes : list SByte) (pr : Provenance)
       : MemM addr
       := let len := length init_bytes in
          '(ptr, ptrs) <- get_free_block len pr;;
-         match dtyp_eq_dec dt DTYPE_Void with
-         | left _ => raise_ub "Allocation of type void"
-         | _ =>
-             match N.eq_dec (sizeof_dtyp dt * num_elements) (N.of_nat len) with
-             | right _ => raise_ub "Sizeof dtyp doesn't match number of bytes for initialization in allocation."
-             | _ =>
-                 let aid := provenance_to_allocation_id pr in
-                 add_block_to_stack aid ptr ptrs init_bytes;;
-                 ret ptr
-             end
-         end.
+         let aid := provenance_to_allocation_id pr in
+         add_block_to_stack aid ptr ptrs init_bytes;;
+         ret ptr.
 
     Definition allocate_bytes `{MemMonad ExtraState MemM (itree Eff)}
-      (dt : dtyp) (num_elements : N) (init_bytes : list SByte) : MemM addr :=
+      (init_bytes : list SByte) : MemM addr :=
       pr <- fresh_provenance;;
-      allocate_bytes_with_pr dt num_elements init_bytes pr.
+      allocate_bytes_with_pr init_bytes pr.
 
     (** Heap allocation *)
     Definition malloc_bytes_with_pr `{MemMonad ExtraState MemM (itree Eff)} (init_bytes : list SByte) (pr : Provenance) : MemM addr :=
@@ -3145,23 +3137,21 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         unfold lift_spec_to_MemPropT.
         exists ms. exists (""%string).
         cbn.
-        intros byte.
+        intros ALLOWED.
+        repeat red in ALLOWED.
+        destruct ALLOWED as (?&?&?).
+        repeat red in H1.
         unfold mem_state_memory in *.
-        intros READ'.
-        destruct READ'.
-        break_access_hyps.
-        repeat red in ALLOC.
-        rewrite READ in ALLOC.
-        apply proj_sumbool_true in ALLOC; subst.
-        rewrite ACCESS in ALLOWED.
+        rewrite READ in H1.
+        apply proj_sumbool_true in H1; subst.
+        rewrite ACCESS in H2.
         discriminate.
       - (* UB from accessing unallocated memory *)
         left.
         exists ms. exists (""%string).
         cbn.
-        intros byte CONTRA.
+        intros CONTRA.
         unfold mem_state_memory in *.
-        destruct CONTRA.
         break_access_hyps.
         repeat red in ALLOC.
         rewrite READ in ALLOC.
@@ -3222,18 +3212,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         admit.
       - (* UB from provenance mismatch *)
         left.
-        unfold write_byte_spec_MemPropT.
-        unfold lift_spec_to_MemPropT.
         exists ms. exists (""%string).
         cbn.
-        intros m2.
+        intros CONTRA.
         unfold mem_state_memory in *.
-        intros WRITE'.
-        destruct WRITE'.
         break_access_hyps.
-
         repeat red in ALLOC.
         rewrite READ in ALLOC.
+        auto.
         apply proj_sumbool_true in ALLOC; subst.
         rewrite ACCESS in ALLOWED.
         discriminate.
@@ -3241,9 +3227,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         left.
         exists ms. exists (""%string).
         cbn.
-        intros m2 CONTRA.
+        intros CONTRA.
         unfold mem_state_memory in *.
-        destruct CONTRA.
         break_access_hyps.
         repeat red in ALLOC.
         rewrite READ in ALLOC.
@@ -4437,10 +4422,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* TODO: solve_allocate_bytes_post_conditions *)
     (* TODO: move, generalize *)
     Lemma find_free_allocate_bytes_post_conditions :
-      forall (ms_init ms_found_free ms_final : MemState) dt num_elements init_bytes pr ptr ptrs
+      forall (ms_init ms_found_free ms_final : MemState) init_bytes pr ptr ptrs
         memory_stack_memory0 memory_stack_frame_stack0 memory_stack_heap0 ms_provenance0
-        (SIZE : (sizeof_dtyp dt * num_elements)%N = N.of_nat (length init_bytes))
-        (NVOID : dt <> DTYPE_Void)
         (EQ : ms_found_free = {| ms_memory_stack :=
                                   {|
                                     memory_stack_memory := memory_stack_memory0;
@@ -4463,10 +4446,10 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                    ms_provenance := ms_provenance0
                  |})
         (FIND_FREE : ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr),
-        allocate_bytes_post_conditions ms_found_free dt num_elements init_bytes pr ms_final ptr ptrs.
+        allocate_bytes_post_conditions ms_found_free init_bytes pr ms_final ptr ptrs.
     Proof.
-      intros ms_init ms_found_free ms_final dt num_elements init_bytes pr ptr ptrs memory_stack_memory0
-        memory_stack_frame_stack0 memory_stack_heap0 ms_provenance0 SIZE EQ EQF FIND_FREE.
+      intros ms_init ms_found_free ms_final init_bytes pr ptr ptrs memory_stack_memory0
+        memory_stack_frame_stack0 memory_stack_heap0 ms_provenance0 EQ EQF FIND_FREE.
       subst.
       split.
       + solve_used_provenance_prop.
@@ -4505,20 +4488,16 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         rewrite EQFS at 1.
         eapply add_all_to_frame_correct; auto.
       + solve_heap_preserved.
-      + auto.
-      + auto.
     Qed.
 
     (* TODO: move *)
     Lemma find_free_allocate_bytes_post_conditions_exists :
-      forall (ms_init ms_found_free : MemState) dt num_elements init_bytes pr ptr ptrs
-        (SIZE : (sizeof_dtyp dt * num_elements)%N = N.of_nat (length init_bytes))
-        (NVOID : dt <> DTYPE_Void)
+      forall (ms_init ms_found_free : MemState) init_bytes pr ptr ptrs
         (FIND_FREE : ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr),
       exists ms_final,
-        allocate_bytes_post_conditions ms_found_free dt num_elements init_bytes pr ms_final ptr ptrs.
+        allocate_bytes_post_conditions ms_found_free init_bytes pr ms_final ptr ptrs.
     Proof.
-      intros ms_init ms_found_free dt init_bytes pr ptr ptrs SIZE FIND_FREE.
+      intros ms_init ms_found_free init_bytes pr ptr ptrs FIND_FREE.
       destruct ms_found_free.
       destruct ms_memory_stack0.
       eexists.
@@ -4527,28 +4506,16 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     (* TODO: Pull out lemmas and clean up + fix admits *)
     Lemma add_block_to_stack_correct :
-      forall dt num_elements pr ms_init ptr ptrs init_bytes
-        (SIZE : (sizeof_dtyp dt * num_elements)%N = N.of_nat (length init_bytes)),
+      forall pr ms_init ptr ptrs init_bytes,
         exec_correct
           (fun ms_k _ => ret (ptr, ptrs) {{ms_init}} ∈ {{ms_k}} find_free_block (Datatypes.length init_bytes) pr)
           (_ <- add_block_to_stack (provenance_to_allocation_id pr) ptr ptrs init_bytes;; ret ptr)
-          (_ <- allocate_bytes_post_conditions_MemPropT dt num_elements init_bytes pr ptr ptrs;; ret ptr).
+          (_ <- allocate_bytes_post_conditions_MemPropT init_bytes pr ptr ptrs;; ret ptr).
     Proof.
-      intros dt num_elements pr ms_init ptr ptrs init_bytes SIZE.
+      intros pr ms_init ptr ptrs init_bytes.
       unfold exec_correct.
       intros ms st VALID PRE.
 
-      (* Need to destruct ahead of time so we know if UB happens *)
-      pose proof (dtyp_eq_dec dt DTYPE_Void) as [VOID | NVOID].
-      { (* UB because void type allocated to stack *)
-        left.
-        cbn.
-        exists ms_init.
-        exists ""%string.
-        tauto.
-      }
-
-      (* No UB because type allocated isn't void *)
       right.
       unfold add_block_to_stack, add_block, add_ptrs_to_frame.
 
@@ -4772,46 +4739,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Admitted.
 
     Lemma allocate_bytes_with_pr_correct :
-      forall dt num_elements init_bytes pr pre, exec_correct pre (allocate_bytes_with_pr dt num_elements init_bytes pr) (allocate_bytes_with_pr_spec_MemPropT dt num_elements init_bytes pr).
+      forall init_bytes pr pre, exec_correct pre (allocate_bytes_with_pr init_bytes pr) (allocate_bytes_with_pr_spec_MemPropT init_bytes pr).
     Proof.
       Opaque exec_correct.
-      intros dt num_elements init_bytes pr pre.
+      intros init_bytes pr pre.
 
       unfold allocate_bytes_with_pr, allocate_bytes_with_pr_spec_MemPropT.
       apply exec_correct_bind; eauto with EXEC_CORRECT.
       intros [ptr ptrs] ms' ms_find_free st'' st_find_free GET_FREE.
-
-      (* Need to destruct ahead of time so we know if UB happens *)
-      pose proof (dtyp_eq_dec dt DTYPE_Void) as [VOID | NVOID].
-
-      { (* UB because dt is void *)
-        break_match; try contradiction.
-
-        unfold allocate_bytes_post_conditions_MemPropT.
-        (* Can probably clean this up into a lemma *)
-        Transparent exec_correct.
-        left.
-        Opaque exec_correct.
-        cbn.
-        exists ms.
-        exists ""%string. auto.
-      }
-
-      (* dt is non-void, allocation may succeed *)
-      break_match; try contradiction.
-
-      (* UB if size of dtyp and number of bytes being initialized differs *)
-      break_match.
-      2: { (* Size of bytes mismatch *)
-        unfold allocate_bytes_post_conditions_MemPropT.
-        (* Can probably clean this up into a lemma *)
-        Transparent exec_correct.
-        left.
-        Opaque exec_correct.
-        cbn.
-        exists ms.
-        exists ""%string. auto.
-      }
 
       eapply exec_correct_weaken_pre with (weak_pre := fun ms st => find_free_block (Datatypes.length init_bytes) pr ms' (ret (ms, (ptr, ptrs)))); [tauto|].
       eapply add_block_to_stack_correct; eauto.
@@ -5985,7 +5920,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         left.
         exists ms. exists ""%string.
         cbn.
-        intros m2 FREE.
+        intros FREE.
         inv FREE.
         unfold root_in_memstate_heap in *.
         specialize (free_was_root0 h).
@@ -6002,7 +5937,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         left.
         exists ms. exists ""%string.
         cbn.
-        intros m2 FREE.
+        intros FREE.
         inv FREE.
         destruct free_was_allocated0 as (aid & ALLOC).
         unfold byte_allocated, addr_allocated_prop_memory in ALLOC.
@@ -6019,7 +5954,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         left.
         exists ms. exists ""%string.
         cbn.
-        intros m2 FREE.
+        intros FREE.
         inv FREE.
         contradiction.
       }
@@ -6047,7 +5982,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
       split.
       { (* Proof of free_spec *)
-        split.
+        split; split.
         - (* free_was_root *)
           red.
           intros h0 HEAP.

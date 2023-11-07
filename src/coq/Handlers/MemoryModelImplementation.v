@@ -428,21 +428,19 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Admitted.
 
   Lemma allocate_bytes_post_conditions_can_always_be_satisfied :
-    forall (ms_init : MemState) dt num_elements bytes pr
-      (BYTES_SIZE : (sizeof_dtyp dt * num_elements)%N = N.of_nat (length bytes))
-      (NON_VOID : dt <> DTYPE_Void),
+    forall (ms_init : MemState) bytes pr,
     exists ms_final ptr ptrs,
       (ret (ptr, ptrs) {{ms_init}} ∈ {{ms_init}} find_free_block (length bytes) pr) /\
-      allocate_bytes_post_conditions ms_init dt num_elements bytes pr ms_final ptr ptrs.
+      allocate_bytes_post_conditions ms_init bytes pr ms_final ptr ptrs.
   Proof.
-    intros ms_init dt num_elements bytes pr BYTES_SIZE NON_VOID.
+    intros ms_init bytes pr.
 
     Opaque find_free_block.
     (* Memory state pre allocation *)
     destruct ms_init as [mstack mprov] eqn:MSINIT.
     destruct mstack as [mem fs h] eqn:MSTACK.
 
-    pose proof (allocate_bytes_with_pr_correct dt num_elements bytes pr (fun _ _ => True) (Eff := Eff) (MemM:=MemStateFreshT (itree Eff))) as ALLOC.
+    pose proof (allocate_bytes_with_pr_correct bytes pr (fun _ _ => True) (Eff := Eff) (MemM:=MemStateFreshT (itree Eff))) as ALLOC.
     red in ALLOC.
     specialize (ALLOC ms_init 0%N).
     forward ALLOC.
@@ -460,7 +458,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     { (* UB *)
       cbn in UB.
       destruct UB as [ub_ms [ub_msg [CONTRA | REST]]]; try contradiction.
-      destruct REST as [ms'' [[ptr' ptrs'] [[MEQ FREE] [[VOID_UB | SIZE_UB] | REST]]]];
+      destruct REST as [ms'' [[ptr' ptrs'] [[MEQ FREE] [[] | REST]]]];
         firstorder.
     }
 
@@ -562,8 +560,6 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
       repeat setoid_rewrite bind_ret_l in ALLOC_EXEC.
       cbn in ALLOC_EXEC.
       repeat setoid_rewrite bind_ret_l in ALLOC_EXEC.
-      break_match_hyp; [contradiction|].
-      break_match_hyp; [|contradiction].
       repeat rewrite bind_ret_l in ALLOC_EXEC.
       cbn in ALLOC_EXEC.
       repeat rewrite bind_ret_l in ALLOC_EXEC.

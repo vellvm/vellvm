@@ -3305,8 +3305,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     lift_spec_to_MemPropT
       (fun m1 byte m2 =>
          m1 = m2 /\ read_byte_spec m1 ptr byte)
-      (fun m1 =>
-         forall byte, ~ read_byte_spec m1 ptr byte).
+      (fun m1 => ~ read_byte_allowed m1 ptr).
 
   (*** Framestack operations *)
   Definition empty_frame (f : Frame) : Prop :=
@@ -3541,8 +3540,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     lift_spec_to_MemPropT
       (fun m1 _ m2 =>
          write_byte_spec m1 ptr byte m2)
-      (fun m1 =>
-         forall m2, ~ write_byte_spec m1 ptr byte m2).
+      (fun m1 => ~ write_byte_allowed m1 ptr).
 
   (*** Allocation utilities *)
   Record block_is_free (m1 : MemState) (len : nat) (pr : Provenance) (ptr : addr) (ptrs : list addr) : Prop :=
@@ -3641,7 +3639,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   (*** Allocating bytes on the stack *)
   (* Post conditions for actually reserving bytes in memory and allocating them in the current stack frame *)
   Record allocate_bytes_post_conditions
-    (m1 : MemState) (t : dtyp) (num_elements : N) (init_bytes : list SByte)
+    (m1 : MemState) (init_bytes : list SByte)
     (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr)
     : Prop :=
     { allocate_bytes_provenances_preserved :
@@ -3666,17 +3664,10 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       (* Heap preserved *)
       allocate_bytes_heap_preserved :
       heap_preserved m1 m2;
-
-      (* Type is valid *)
-      allocate_bytes_typ :
-      t <> DTYPE_Void;
-
-      allocate_bytes_typ_size :
-      (sizeof_dtyp t * num_elements = N.of_nat (length init_bytes))%N;
     }.
 
   Definition allocate_bytes_post_conditions_MemPropT
-    (t : dtyp) (num_elements : N) (init_bytes : list SByte)
+    (init_bytes : list SByte)
     (prov : Provenance) (ptr : addr) (ptrs : list addr)
     : MemPropT MemState (addr * list addr)
     := fun m1 res =>
@@ -3684,25 +3675,25 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
          | inl (OOM_message x) =>
              False
          | inr (inl (UB_message x)) =>
-             t = DTYPE_Void \/ (sizeof_dtyp t * num_elements <> N.of_nat (length init_bytes))%N
+             False
          | inr (inr (inl (ERR_message x))) =>
              False
          | inr (inr (inr (m2, (ptr', ptrs')))) =>
-             allocate_bytes_post_conditions m1 t num_elements init_bytes prov m2 ptr ptrs /\ ptr = ptr' /\ ptrs = ptrs'
+             allocate_bytes_post_conditions m1 init_bytes prov m2 ptr ptrs /\ ptr = ptr' /\ ptrs = ptrs'
          end.
 
   Definition allocate_bytes_with_pr_spec_MemPropT
-    (t : dtyp) (num_elements : N) (init_bytes : list SByte) (prov : Provenance)
+    (init_bytes : list SByte) (prov : Provenance)
     : MemPropT MemState addr
     := '(ptr, ptrs) <- find_free_block (length init_bytes) prov;;
-       allocate_bytes_post_conditions_MemPropT t num_elements init_bytes prov ptr ptrs;;
+       allocate_bytes_post_conditions_MemPropT init_bytes prov ptr ptrs;;
        ret ptr.
 
   Definition allocate_bytes_spec_MemPropT
-    (t : dtyp) (num_elements : N) (init_bytes : list SByte)
+    (init_bytes : list SByte)
     : MemPropT MemState addr
     := prov <- fresh_provenance;;
-       allocate_bytes_with_pr_spec_MemPropT t num_elements init_bytes prov.
+       allocate_bytes_with_pr_spec_MemPropT init_bytes prov.
 
   (*** Allocating bytes in the heap *)
   Record malloc_bytes_post_conditions (m1 : MemState) (init_bytes : list SByte) (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
@@ -3788,7 +3779,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         root_in_heap_prop h1 root' <-> root_in_heap_prop h2 root';
     }.
 
-  Record free_spec (m1 : MemState) (root : addr) (m2 : MemState) : Prop :=
+  Record free_preconditions (m1 : MemState) (root : addr) : Prop :=
     { (* ptr being freed was a root *)
       free_was_root :
       root_in_memstate_heap m1 root;
@@ -3809,8 +3800,10 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
          implementation with size 0 allocations / frees *)
       (* free_root_allowed :
          free_byte_allowed m1 root; *)
-
-      (* all bytes in block are freed. *)
+    }.    
+  
+  Record free_spec (m1 : MemState) (root : addr) (m2 : MemState) : Prop :=
+    { (* all bytes in block are freed. *)
       free_bytes_freed :
       forall ptr,
         ptr_in_memstate_heap m1 root ptr ->
@@ -3842,9 +3835,8 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   Definition free_spec_MemPropT (root : addr) : MemPropT MemState unit :=
     lift_spec_to_MemPropT
       (fun m1 _ m2 =>
-         free_spec m1 root m2)
-      (fun m1 =>
-         forall m2, ~ free_spec m1 root m2).
+         free_preconditions m1 root /\ free_spec m1 root m2)
+      (fun m1 => ~ free_preconditions m1 root).
 
   (*** Aggregate things *)
 
@@ -3876,10 +3868,11 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   (** Allocating dtyps *)
   (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
   Definition allocate_dtyp_spec (dt : dtyp) (num_elements : N) : MemPropT MemState addr :=
+    MemPropT_assert_pre (dt <> DTYPE_Void);;
     sid <- fresh_sid;;
     element_bytes <- repeatMN num_elements (lift_OOM (generate_undef_bytes dt sid));;
     let bytes := concat element_bytes in
-    allocate_bytes_spec_MemPropT dt num_elements bytes.
+    allocate_bytes_spec_MemPropT bytes.
 
   (** memcpy spec *)
   Definition memcpy_spec (src dst : addr) (len : Z) (align : N) (volatile : bool) : MemPropT MemState unit :=
@@ -5414,7 +5407,7 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
 
     (** Stack allocations *)
     Parameter allocate_bytes_with_pr :
-      forall `{MemMonad ExtraState MemM (itree Eff)}, dtyp -> N -> list SByte -> Provenance -> MemM addr.
+      forall `{MemMonad ExtraState MemM (itree Eff)}, list SByte -> Provenance -> MemM addr.
 
     (** Frame stacks *)
     Parameter mempush : forall `{MemMonad ExtraState MemM (itree Eff)}, MemM unit.
@@ -5437,10 +5430,10 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
       forall ptr byte pre, exec_correct pre (write_byte ptr byte) (write_byte_spec_MemPropT ptr byte).
 
     Parameter allocate_bytes_with_pr_correct :
-      forall dt num_elements init_bytes pr pre,
+      forall init_bytes pr pre,
         exec_correct pre
-          (allocate_bytes_with_pr dt num_elements init_bytes pr)
-          (allocate_bytes_with_pr_spec_MemPropT dt num_elements init_bytes pr).
+          (allocate_bytes_with_pr init_bytes pr)
+          (allocate_bytes_with_pr_spec_MemPropT init_bytes pr).
 
     (** Correctness of frame stack operations *)
     Parameter mempush_correct :
@@ -5549,19 +5542,22 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
 
     (** Allocating dtyps *)
     Definition allocate_bytes `{MemMonad ExtraState MemM (itree Eff)}
-      (dt : dtyp) (num_elements : N) (init_bytes : list SByte)
+      (init_bytes : list SByte)
       : MemM addr
       := pr <- fresh_provenance;;
-         allocate_bytes_with_pr dt num_elements init_bytes pr.
+         allocate_bytes_with_pr init_bytes pr.
 
     (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
     Definition allocate_dtyp `{MemMonad ExtraState MemM (itree Eff)}
       (dt : dtyp) (num_elements : N)
       : MemM addr
-      := sid <- fresh_sid;;
-         element_bytes <- repeatMN num_elements (lift_OOM (generate_undef_bytes dt sid));;
-         let bytes := concat element_bytes in
-         allocate_bytes dt num_elements bytes.
+      :=
+      if dtyp_eqb dt DTYPE_Void
+      then raise_ub "allocating void type"
+      else sid <- fresh_sid;;
+           element_bytes <- repeatMN num_elements (lift_OOM (generate_undef_bytes dt sid));;
+           let bytes := concat element_bytes in
+           allocate_bytes bytes.
 
     (** Malloc *)
     Definition malloc_bytes `{MemMonad ExtraState MemM (itree Eff)} (init_bytes : list SByte) : MemM addr :=
@@ -6082,10 +6078,10 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Qed.
 
     Lemma allocate_bytes_correct :
-      forall dt num_elements bytes pre,
+      forall bytes pre,
         exec_correct pre
-          (allocate_bytes dt num_elements bytes)
-          (allocate_bytes_spec_MemPropT dt num_elements bytes).
+          (allocate_bytes bytes)
+          (allocate_bytes_spec_MemPropT bytes).
     Proof.
       intros dt num_elements pr pre.
       apply exec_correct_bind.
@@ -6115,11 +6111,78 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         apply exec_correct_ret.
     Qed.
 
+    Lemma exec_correct_clear_assertion :
+      forall {A} (pre : MemState -> ExtraState -> Prop) (m_exec : MemM A) (m_spec : MemPropT MemState A) (assertion : Prop),
+        exec_correct pre m_exec m_spec ->
+        assertion ->
+        exec_correct pre m_exec (MemPropT_assert_pre assertion;; m_spec).
+    Proof.
+      intros A pre m_exec m_spec assertion EXEC ASSERTION.
+      repeat red.
+      intros ms st H H0.
+      repeat red in EXEC.
+      specialize (EXEC _ _ H H0).
+      destruct EXEC as [UB | EXEC].
+      - left.
+        destruct UB as (?&?&?).
+        exists x, x0.
+        cbn.
+        right.
+        exists ms, tt.
+        split; eauto.
+      - destruct EXEC as (?&?&?&?&?&?).
+        right.
+        exists x, x0, x1.
+        split; eauto.
+        split; eauto.
+        destruct_err_ub_oom x; subst; cbn in *.
+        + right.
+          exists ms, tt.
+          split; eauto.
+        + right.
+          exists ms, tt.
+          split; eauto.
+        + right.
+          exists ms, tt.
+          split; eauto.
+        + exists ms, tt.
+          split; eauto.
+    Qed.
+
+    Hint Resolve exec_correct_clear_assertion : EXEC_CORRECT.
+
     Lemma allocate_dtyp_correct :
       forall dt num_elements pre,
         exec_correct pre (allocate_dtyp dt num_elements) (allocate_dtyp_spec dt num_elements).
     Proof.
       intros dt num_elements pre.
+      destruct (dtyp_eqb dt DTYPE_Void) eqn:DT.
+      { (* UB because of attempting to allocate a void type... *)
+        unfold allocate_dtyp.
+        rewrite DT.
+        apply dtyp_eqb_eq in DT; subst.
+        unfold allocate_dtyp_spec.
+        repeat red.
+        intros ms st H H0.
+        left.
+        exists ms.
+        exists ""%string.
+        left.
+        cbn.
+        eauto.
+      }
+
+      assert (dt <> DTYPE_Void) as NVOID.
+      { intros CONTRA.
+        subst.
+        rewrite dtyp_eqb_refl in DT.
+        discriminate.
+      }
+
+      apply exec_correct_clear_assertion; auto.
+      unfold allocate_dtyp.
+      rewrite DT.
+
       apply exec_correct_bind.
       apply exec_correct_fresh_sid.
       intros * RUN1.
@@ -6290,29 +6353,27 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
 
   Lemma allocate_bytes_spec_MemPropT_no_ub :
     forall (ms_init : MemState)
-      dt num_elements bytes
-      (BYTES_SIZE : (sizeof_dtyp dt * num_elements)%N = N.of_nat (length bytes))
-      (NON_VOID : dt <> DTYPE_Void)
+      bytes
       (ub_msg : string),
-      ~ allocate_bytes_spec_MemPropT dt num_elements bytes ms_init (raise_ub ub_msg).
+      ~ allocate_bytes_spec_MemPropT bytes ms_init (raise_ub ub_msg).
   Proof.
-    intros ms_init dt num_elements bytes BYTES_SIZE NON_VOID ub_msg CONTRA.
+    intros ms_init bytes ub_msg CONTRA.
 
     unfold allocate_bytes_spec_MemPropT in CONTRA.
     cbn in CONTRA.
     destruct CONTRA as [[] | [ms' [pr' [FRESH [[] | CONTRA]]]]].
     destruct CONTRA as [ms'' [[ptr ptrs] [[EQ BLOCKFREE] CONTRA]]]; subst.
-    destruct CONTRA as [[CONTRA | CONTRA] | CONTRA]; try contradiction.
+    destruct CONTRA as [CONTRA | CONTRA]; try contradiction.
     destruct CONTRA as [ms''' [[ptr' ptrs'] [POST CONTRA]]]; contradiction.
   Qed.
 
   Lemma allocate_bytes_spec_MemPropT_no_err :
     forall (ms_init : MemState)
-      dt num_elements bytes
+      bytes
       (err_msg : string),
-      ~ allocate_bytes_spec_MemPropT dt num_elements bytes ms_init (raise_error err_msg).
+      ~ allocate_bytes_spec_MemPropT bytes ms_init (raise_error err_msg).
   Proof.
-    intros ms_init dt num_elements bytes err_msg CONTRA.
+    intros ms_init bytes err_msg CONTRA.
 
     unfold allocate_bytes_spec_MemPropT in CONTRA.
     cbn in CONTRA.
@@ -6323,17 +6384,15 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
 
   Lemma allocate_bytes_spec_MemPropT_inv :
     forall (ms_init : MemState)
-      dt num_elements bytes
-      (BYTES_SIZE : (sizeof_dtyp dt * num_elements)%N = N.of_nat (length bytes))
-      (NON_VOID : dt <> DTYPE_Void)
+      bytes
       (res : err_ub_oom (MemState * LP.ADDR.addr))
-      (ALLOC : allocate_bytes_spec_MemPropT dt num_elements bytes ms_init res),
+      (ALLOC : allocate_bytes_spec_MemPropT bytes ms_init res),
       (exists ms_final ptr,
           res = ret (ms_final, ptr)) \/
         (exists oom_msg,
             res = raise_oom oom_msg).
   Proof.
-    intros ms_init dt num_elements bytes BYTES_SIZE NON_VOID res ALLOC.
+    intros ms_init bytes res ALLOC.
     unfold allocate_bytes_spec_MemPropT in ALLOC.
     destruct res as [[[[[[[oom_res] | [[ub_res] | [[err_res] | res']]]]]]]] eqn:Hres;
       cbn in *; try contradiction.
@@ -6341,7 +6400,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       right. eexists; reflexivity.
     - (* UB *)
       destruct ALLOC as [[] | [ms' [pr' [FRESH [[] | ALLOC]]]]].
-      destruct ALLOC as [ms'' [[ptr ptrs] [[MEQ BLOCKFREE] [[UB | UB] | ALLOC]]]];
+      destruct ALLOC as [ms'' [[ptr ptrs] [[MEQ BLOCKFREE] [UB | ALLOC]]]];
         try contradiction; subst.
 
       destruct ALLOC as [ms''' [[ptr' ptrs'] ALLOC]].
@@ -6401,7 +6460,10 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     - (* OOM *)
       right. eexists; reflexivity.
     - (* UB *)
-      destruct ALLOC as [[] | [ms' [sid [FRESH [GEN | ALLOC]]]]].
+      destruct ALLOC as [UB | ALLOC]; try contradiction.
+      destruct ALLOC as [ms' [[] [[MS NVOID] [UB | ALLOC]]]]; try contradiction.
+      symmetry in MS; subst.
+      destruct ALLOC as [ms' [sid [FRESH [GEN | ALLOC]]]].
       { induction num_elements using N.peano_rect; [cbn in *; contradiction|].
         rewrite repeatMN_succ in GEN.
         destruct (generate_undef_bytes dt sid); cbn in *.
@@ -6444,8 +6506,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         cbn in *.
         destruct ALLOC as [[] | [ms''' [pr [FRESH_PR [[] | ALLOC]]]]].
         destruct ALLOC as [ms'''' [[ptr ptrs] ALLOC]].
-        destruct ALLOC as [[MEQ BLOCK_FREE] [[UB | UB] | [_ [_ [_ []]]]]];
-          [contradiction | lia].
+        destruct ALLOC as [[MEQ BLOCK_FREE] [UB | [_ [_ [_ []]]]]]; contradiction.
       }
 
       { induction num_elements using N.peano_rect.
@@ -6457,15 +6518,17 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           cbn in *.
           destruct ALLOC as [[] | [ms'' [pr [FRESH_PR [[] | ALLOC]]]]].
           destruct ALLOC as [ms''' [[ptr ptrs] ALLOC]].
-          destruct ALLOC as [[MEQ BLOCK_FREE] [[UB | UB] | [_ [_ [_ []]]]]];
-            [contradiction | lia].
+          destruct ALLOC as [[MEQ BLOCK_FREE] [UB | [_ [_ [_ []]]]]]; contradiction.
           Opaque allocate_bytes_spec_MemPropT.
         + rewrite repeatMN_succ in GEN.
           cbn in GEN.
           destruct GEN as [ms''' [a [[] _]]].
       }
     - (* Error *)
-      destruct ALLOC as [[] | [ms' [sid [FRESH [GEN | ALLOC]]]]].
+      destruct ALLOC as [UB | ALLOC]; try contradiction.
+      destruct ALLOC as [ms' [[] [[MS NVOID] [UB | ALLOC]]]]; try contradiction.
+      symmetry in MS; subst.
+      destruct ALLOC as [ms' [sid [FRESH [GEN | ALLOC]]]].
       { induction num_elements using N.peano_rect; [cbn in *; contradiction|].
         rewrite repeatMN_succ in GEN.
         destruct (generate_undef_bytes dt sid); cbn in *.
@@ -6664,12 +6727,10 @@ Module Type MemoryModelInfiniteSpec (LP : LLVMParamsBig) (MP : MemoryParams LP) 
       ret (ptr, ptrs) {{ms}} ∈ {{ms}} find_free_block len pr.
 
   Parameter allocate_bytes_post_conditions_can_always_be_satisfied :
-    forall (ms_init : MemState) dt num_elements bytes pr
-      (BYTES_SIZE : (sizeof_dtyp dt * num_elements)%N = N.of_nat (length bytes))
-      (NON_VOID : dt <> DTYPE_Void),
+    forall (ms_init : MemState) bytes pr,
     exists ms_final ptr ptrs,
       (ret (ptr, ptrs) {{ms_init}} ∈ {{ms_init}} find_free_block (length bytes) pr) /\
-      allocate_bytes_post_conditions ms_init dt num_elements bytes pr ms_final ptr ptrs.
+      allocate_bytes_post_conditions ms_init bytes pr ms_final ptr ptrs.
 
 End MemoryModelInfiniteSpec.
 
@@ -6696,16 +6757,14 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
 
   Lemma allocate_bytes_with_pr_spec_MemPropT_can_always_succeed :
     forall (ms_init : MemState)
-      dt num_elements bytes pr
-      (BYTES_SIZE : (sizeof_dtyp dt * num_elements)%N = N.of_nat (length bytes))
-      (NON_VOID : dt <> DTYPE_Void),
+      bytes pr,
     exists ms_final ptr,
-      ret ptr {{ms_init}} ∈ {{ms_final}} allocate_bytes_with_pr_spec_MemPropT dt num_elements bytes pr.
+      ret ptr {{ms_init}} ∈ {{ms_final}} allocate_bytes_with_pr_spec_MemPropT bytes pr.
   Proof.
-    intros ms_init dt num_elements bytes pr BYTES_SIZE NON_VOID.
+    intros ms_init bytes pr.
     unfold allocate_bytes_spec_MemPropT.
 
-    pose proof allocate_bytes_post_conditions_can_always_be_satisfied ms_init dt num_elements bytes pr BYTES_SIZE NON_VOID as (ms_final & ptr & ptrs & (_ & BLOCK_FREE) & ALLOC).
+    pose proof allocate_bytes_post_conditions_can_always_be_satisfied ms_init bytes pr as (ms_final & ptr & ptrs & (_ & BLOCK_FREE) & ALLOC).
 
     exists ms_final. exists ptr.
     cbn.
@@ -6721,18 +6780,16 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
 
   Lemma allocate_bytes_spec_MemPropT_can_always_succeed :
     forall (ms_init ms_fresh_pr : MemState)
-      dt num_elements bytes
+      bytes
       (pr : Provenance)
-      (FRESH_PR : (fresh_provenance ms_init (ret (ms_fresh_pr, pr))))
-      (BYTES_SIZE : (sizeof_dtyp dt * num_elements)%N = N.of_nat (length bytes))
-      (NON_VOID : dt <> DTYPE_Void),
+      (FRESH_PR : (fresh_provenance ms_init (ret (ms_fresh_pr, pr)))),
     exists ms_final ptr,
-      ret ptr {{ms_init}} ∈ {{ms_final}} allocate_bytes_spec_MemPropT dt num_elements bytes.
+      ret ptr {{ms_init}} ∈ {{ms_final}} allocate_bytes_spec_MemPropT bytes.
   Proof.
-    intros ms_init ms_fresh_pr dt num_elements bytes pr FRESH_PR BYTES_SIZE NON_VOID.
+    intros ms_init ms_fresh_pr bytes pr FRESH_PR.
     unfold allocate_bytes_spec_MemPropT.
 
-    pose proof allocate_bytes_with_pr_spec_MemPropT_can_always_succeed ms_fresh_pr dt num_elements bytes pr BYTES_SIZE NON_VOID as (ms_final & ptr & ALLOC).
+    pose proof allocate_bytes_with_pr_spec_MemPropT_can_always_succeed ms_fresh_pr bytes pr as (ms_final & ptr & ALLOC).
 
     exists ms_final. exists ptr.
     exists ms_fresh_pr. exists pr.
@@ -6888,10 +6945,16 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
     assert ((sizeof_dtyp dt * num_elements)%N = N.of_nat (Datatypes.length (concat bytes))) as SIZE by lia.
 
     pose proof allocate_bytes_spec_MemPropT_can_always_succeed
-         ms_fresh_sid ms_fresh_pr dt num_elements (concat bytes) pr FRESH_PR SIZE NON_VOID
+         ms_fresh_sid ms_fresh_pr (concat bytes) pr FRESH_PR
       as (ms_final & ptr & ALLOC_SUCCESS).
 
     exists ms_final, ptr.
+    repeat red.
+    exists ms_init, tt.
+    split.
+    { cbn.
+      split; eauto.
+    }
     exists ms_fresh_sid, sid; split; auto.
 
     rewrite UNDEF_BYTES.
