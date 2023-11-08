@@ -8276,7 +8276,7 @@ cofix CIH
 
   #[global] Hint Resolve MemPropT_fin_inf_repeatMN : FinInf.
 
-  Lemma get_inf_tree_rutt :
+  Lemma get_inf_tree_orutt :
     forall t,
       orutt (OOM:=OOME) L3_refine_strict L3_res_refine_strict
         (MemState_refine_prop
@@ -30801,7 +30801,7 @@ cofix CIH
         forward IHREL; auto.
     }
 
-    apply get_inf_tree_rutt.
+    apply get_inf_tree_orutt.
   Admitted.
 
   (* Extra stuff from the proof of the above lemma that needs to get cleaned up... But there's some other stuff in here that I need to not accidentally delete *)
@@ -33846,55 +33846,71 @@ cofix CIH
                                    (MemPropT.store_id * (FinLLVM.Local.local_env * FinLLVM.Stack.lstack * (FinLLVM.Global.global_env * FinLP.Events.DV.dvalue)))))
     : Prop :=
     forall t', t2 t' ->
-               exists t, t1 t /\
-                           orutt
-                             L4_refine_strict
-                             L4_res_refine_strict
-                             (MemState_refine_prop × (eq × (local_refine_strict × stack_refine_strict × (global_refine_strict × DVC1.dvalue_refine_strict))))
-                             t t' (OOM:=OOME).
+          (exists t, t1 t /\
+                  orutt
+                    L4_refine_strict
+                    L4_res_refine_strict
+                    (MemState_refine_prop × (eq × (local_refine_strict × stack_refine_strict × (global_refine_strict × DVC1.dvalue_refine_strict))))
+                    t t' (OOM:=OOME)) \/
+            (exists ub, t1 ub /\ ContainsUB.contains_UB ub).
 
   Definition model_E1E2_L5_orutt_strict p1 p2 :=
     L5_E1E2_orutt_strict
       (TopLevelBigIntptr.model_oom_L5 TLR_INF.R.refine_res2 TLR_INF.R.refine_res3 p1)
       (TopLevel64BitIntptr.model_oom_L5 TLR_FIN.R.refine_res2 TLR_FIN.R.refine_res3 p2).
 
+  Lemma orutt_L4_contains_UB :
+    forall (t_inf_ub : itree InfLP.Events.L4 TopLevelBigIntptr.res_L6) (t_fin_ub : itree E2 res_L6),
+      orutt (OOM:=OOME) L4_refine_strict L4_res_refine_strict (MemState_refine_prop × (eq × (local_refine_strict × stack_refine_strict × (global_refine_strict × DVC1.dvalue_refine_strict)))) t_inf_ub t_fin_ub ->
+      ContainsUB.contains_UB t_fin_ub ->
+      ContainsUB.contains_UB t_inf_ub.
+  Proof.
+    intros t_inf_ub t_fin_ub EQV UB.
+    induction UB.
+    - (* CrawlTau *)
+      eapply IHUB.
+      rewrite H in EQV.
+      rewrite tau_eutt in EQV.
+      eauto.
+    - (* CrawlVis *)
+      admit.
+    - admit.
+  Admitted.
+
   Lemma model_E1E2_45_orutt_strict :
     forall t_inf t_fin,
       L4_E1E2_orutt_strict t_inf t_fin ->
       L5_E1E2_orutt_strict (model_UB t_inf) (model_UB t_fin).
   Proof.
-  (*   intros t_inf_set t_fin_set REL. *)
-  (*   (* t_inf_set and t_fin_set are both sets of itrees. *)
+    intros t_inf_set t_fin_set REL.
+    (* t_inf_set and t_fin_set are both sets of itrees. *)
+    red in REL.
+    red.
+    intros t_fin_L5 UB_FIN.
+    red in UB_FIN.
+    destruct UB_FIN.
+    { (* No UB *)
+      specialize (REL t_fin_L5 H).
+      destruct REL as (t_inf_L5 & T_INF & REL).
 
-  (*      REL is a relation between these sets, stating that for any tree *)
-  (*      in the finite set there is one in the infinite set that is *)
-  (*      orutt this tree at L3. *)
-  (*    *) *)
+      left.
+      exists t_inf_L5.
+      split; eauto.
+      red; eauto.
+    }
 
-  (*   red in REL. *)
-  (*   red. *)
-  (*   intros t_fin_L4 UNDEF_FIN. *)
+    (* UB *)
+    destruct H as (t_fin_ub & T_FIN_UB & UB).
+    specialize (REL t_fin_ub T_FIN_UB).
+    destruct REL as (t_inf_ub & T_INF & REL).
 
-  (*   (* Given t_fin_L4 ∈ t_fin_set, I should be able to find an *)
-  (*      appropriate t_inf_4 such that t_inf_L4 ∈ t_inf_set... Such that *)
-  (*      orutt t_inf_L4 t_fin_L4... *)
-  (*    *) *)
-  (*   exists (get_inf_tree_L4 t_fin_L4). *)
-  (*   split. *)
-  (*   2: apply get_inf_tree_L4_orutt. *)
+    right.
+    exists t_inf_ub.
+    split; eauto.
+    red; eauto.
 
-  (*   red. *)
-  (*   red in UNDEF_FIN. *)
-  (*   destruct UNDEF_FIN as (t_fin_L3 & T_FIN & UNDEF_FIN). *)
-
-  (*   specialize (REL t_fin_L3 T_FIN). *)
-  (*   destruct REL as (t_inf_L3 & T_INF & REL). *)
-
-  (*   exists t_inf_L3. *)
-  (*   split; auto. *)
-  (*   eapply model_undef_h_fin_inf; eauto. *)
-  (* Qed. *)
-  Admitted.
+    eapply orutt_L4_contains_UB; eauto.
+  Qed.
 
   Lemma model_E1E2_L5_orutt_strict_sound
     (p : list
