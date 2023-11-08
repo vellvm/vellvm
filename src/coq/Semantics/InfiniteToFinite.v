@@ -30841,7 +30841,8 @@ cofix CIH
   Definition L4_E1E2_orutt_strict
     (t1 : PropT InfLP.Events.L4 (InfMemMMSP.MemState *
                                    (MemPropT.store_id * (InfLLVM.Local.local_env * InfLLVM.Stack.lstack * (InfLLVM.Global.global_env * InfLP.Events.DV.dvalue)))))
-    t2
+    (t2 : PropT FinLP.Events.L4 (FinMemMMSP.MemState *
+                                   (MemPropT.store_id * (FinLLVM.Local.local_env * FinLLVM.Stack.lstack * (FinLLVM.Global.global_env * FinLP.Events.DV.dvalue)))))
     : Prop :=
     forall t', t2 t' ->
                exists t, t1 t /\
@@ -33841,7 +33842,8 @@ cofix CIH
   Definition L5_E1E2_orutt_strict
     (t1 : PropT InfLP.Events.L5 (InfMemMMSP.MemState *
                                    (MemPropT.store_id * (InfLLVM.Local.local_env * InfLLVM.Stack.lstack * (InfLLVM.Global.global_env * InfLP.Events.DV.dvalue)))))
-    t2
+    (t2 : PropT FinLP.Events.L5 (FinMemMMSP.MemState *
+                                   (MemPropT.store_id * (FinLLVM.Local.local_env * FinLLVM.Stack.lstack * (FinLLVM.Global.global_env * FinLP.Events.DV.dvalue)))))
     : Prop :=
     forall t', t2 t' ->
                exists t, t1 t /\
@@ -33855,6 +33857,54 @@ cofix CIH
     L5_E1E2_orutt_strict
       (TopLevelBigIntptr.model_oom_L5 TLR_INF.R.refine_res2 TLR_INF.R.refine_res3 p1)
       (TopLevel64BitIntptr.model_oom_L5 TLR_FIN.R.refine_res2 TLR_FIN.R.refine_res3 p2).
+
+  Lemma model_E1E2_45_orutt_strict :
+    forall t_inf t_fin,
+      L4_E1E2_orutt_strict t_inf t_fin ->
+      L5_E1E2_orutt_strict (model_UB t_inf) (model_UB t_fin).
+  Proof.
+  (*   intros t_inf_set t_fin_set REL. *)
+  (*   (* t_inf_set and t_fin_set are both sets of itrees. *)
+
+  (*      REL is a relation between these sets, stating that for any tree *)
+  (*      in the finite set there is one in the infinite set that is *)
+  (*      orutt this tree at L3. *)
+  (*    *) *)
+
+  (*   red in REL. *)
+  (*   red. *)
+  (*   intros t_fin_L4 UNDEF_FIN. *)
+
+  (*   (* Given t_fin_L4 ∈ t_fin_set, I should be able to find an *)
+  (*      appropriate t_inf_4 such that t_inf_L4 ∈ t_inf_set... Such that *)
+  (*      orutt t_inf_L4 t_fin_L4... *)
+  (*    *) *)
+  (*   exists (get_inf_tree_L4 t_fin_L4). *)
+  (*   split. *)
+  (*   2: apply get_inf_tree_L4_orutt. *)
+
+  (*   red. *)
+  (*   red in UNDEF_FIN. *)
+  (*   destruct UNDEF_FIN as (t_fin_L3 & T_FIN & UNDEF_FIN). *)
+
+  (*   specialize (REL t_fin_L3 T_FIN). *)
+  (*   destruct REL as (t_inf_L3 & T_INF & REL). *)
+
+  (*   exists t_inf_L3. *)
+  (*   split; auto. *)
+  (*   eapply model_undef_h_fin_inf; eauto. *)
+  (* Qed. *)
+  Admitted.
+
+  Lemma model_E1E2_L5_orutt_strict_sound
+    (p : list
+           (LLVMAst.toplevel_entity
+              LLVMAst.typ
+              (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))) :
+    model_E1E2_L5_orutt_strict p p.
+  Proof.
+    apply model_E1E2_45_orutt_strict; apply model_E1E2_L4_orutt_strict_sound.
+  Qed.
 
   Definition L6_E1E2_orutt_strict
     (t1 : PropT InfLP.Events.L6 (InfMemMMSP.MemState *
@@ -33874,444 +33924,52 @@ cofix CIH
       (TopLevelBigIntptr.model_oom_L6 TLR_INF.R.refine_res2 TLR_INF.R.refine_res3 TLR_INF.R.refine_res3 p1)
       (TopLevel64BitIntptr.model_oom_L6 TLR_FIN.R.refine_res2 TLR_FIN.R.refine_res3 TLR_FIN.R.refine_res3 p2).
 
-
-  (* If
-
-    - ti2 is a refinement of ti1 tf2 refines ti2 tf1 refines tf2 at
-    - finite level
-
-    Not sure that this is true.
-
-    If ti1 -i> ti2
-
-    and ti2 -if> tf2
-
-    And tf2 -f> tf1...
-
-    Does it really follow that ti1 -if> tf1?
-
-    In theory I can refine ti1 to ti2, and to tf1 through
-    tf2... BUT... Does this mean I can refine ti1 directly to tf1?
-
-    In theory ti2 has fewer behaviours than ti1, and so if I can
-    refine it to tf2, then I can also refine ti1 to tf2.
-   *)
-  Lemma refine_E1E2_L6_strict_compose_inf_to_fin :
-    forall tx ty tz,
-      TLR_INF.R.refine_L6 tx ty ->
-      refine_E1E2_L6_strict ty tz ->
-      refine_E1E2_L6_strict tx tz.
+  Lemma model_E1E2_56_orutt_strict :
+    forall t_inf t_fin,
+      L5_E1E2_orutt_strict t_inf t_fin ->
+      L6_E1E2_orutt_strict (refine_OOM TLR_INF.R.refine_res3 t_inf) (refine_OOM TLR_FIN.R.refine_res3 t_fin).
   Proof.
-    intros tx ty tz XY_INF YZ_FIN.
+  (*   intros t_inf_set t_fin_set REL. *)
+  (*   (* t_inf_set and t_fin_set are both sets of itrees. *)
 
-    unfold refine_E1E2_L6_strict in *.
-    unfold TLR_INF.R.refine_L6 in *.
-    unfold TLR_FIN.R.refine_L6 in *.
+  (*      REL is a relation between these sets, stating that for any tree *)
+  (*      in the finite set there is one in the infinite set that is *)
+  (*      orutt this tree at L3. *)
+  (*    *) *)
 
-    intros rz TZ.
-    specialize (YZ_FIN rz TZ).
-    destruct YZ_FIN as (ry_fin & TY_FIN & YZ).
-
-    unfold L6_convert_PropT_strict in TY_FIN.
-    destruct TY_FIN as (ry_inf & TY_INF & ry_fin_inf).
-
-    specialize (XY_INF ry_inf TY_INF).
-    destruct XY_INF as (rx_inf & TX_INF & XY_INF).
-
-    set (rx_fin := L4_convert_tree_strict' res_L6_convert_strict_unsafe rx_inf).
-    exists rx_fin.
-    split.
-    - unfold L6_convert_PropT_strict, L4_convert_PropT_strict.
-      exists rx_inf; split; auto.
-      subst rx_fin.
-      reflexivity.
-    - rewrite <- YZ.
-      rewrite <- ry_fin_inf.
-      subst rx_fin.
-
-      (* There's probably a more general lemma hiding here *)
-      unfold L4_convert_tree_strict'.
-
-      Unset Universe Checking.
-      eapply refine_OOM_h_bind with (RR1:=TopLevelRefinementsBigIntptr.R.refine_res3).
-      { intros r1 r2 H.
-        unfold TLR_INF.R.refine_res3, TLR_INF.R.refine_res2, TLR_INF.R.refine_res1 in H.
-        destruct r1 as [r1a [r1sid [[r1b1 r1b2] [r1c dv1]]]].
-        destruct r2 as [r2a [r2sid [[r2b1 r2b2] [r2c dv2]]]].
-        cbn.
-
-        inversion H; subst.
-        inversion snd_rel; subst.
-        inversion snd_rel0; subst.
-        inversion snd_rel1; subst.
-        cbn in *; subst; reflexivity.
-      }
-      { apply refine_OOM_h_L6_convert_tree_strict; auto.
-      }
-  Qed.
-
-  Lemma refine_E1E2_L6_strict_compose_fin_to_inf :
-    forall tx ty tz,
-      refine_E1E2_L6_strict tx ty ->
-      TLR_FIN.R.refine_L6 ty tz ->
-      refine_E1E2_L6_strict tx tz.
-  Proof.
-    intros tx ty tz XY_INF_TO_FIN YZ_FIN.
-
-    unfold refine_E1E2_L6_strict in *.
-    unfold TLR_INF.R.refine_L6 in *.
-    unfold TLR_FIN.R.refine_L6 in *.
-
-    intros rz TZ.
-    specialize (YZ_FIN rz TZ).
-    destruct YZ_FIN as (ry_fin & TY_FIN & YZ).
-
-    specialize (XY_INF_TO_FIN ry_fin TY_FIN).
-    destruct XY_INF_TO_FIN as (rx_fin & TX_FIN & refine_inf_fin_x).
-
-    exists rx_fin.
-    split; auto.
-    rewrite refine_inf_fin_x; auto.
-  Qed.
-
-  Theorem refine_E1E2_L6_transitive :
-    forall ti1 ti2 tf1 tf2,
-      TLR_INF.R.refine_L6 ti1 ti2 ->
-      refine_E1E2_L6_strict ti2 tf1 ->
-      TLR_FIN.R.refine_L6 tf1 tf2 ->
-      refine_E1E2_L6_strict ti1 tf2.
-  Proof.
-    intros ti1 ti2 tf1 tf2 RINF RITOF RFIN.
-
-    eapply refine_E1E2_L6_strict_compose_fin_to_inf; eauto.
-    eapply refine_E1E2_L6_strict_compose_inf_to_fin; eauto.
-  Qed.
-
-  (** Safe conversion lemmas *)
-  (* TODO: These used the Fin to Inf LangRefine that no longer exists
-     because we added safe conversion modules... See if I still need
-     these *)
-  (* Lemma infinite_to_finite_dvalue_convert_safe : *)
-  (*   forall dv_i, *)
-  (*   exists dv_f, *)
-  (*     EC1.DVC.dvalue_convert_strict dv_i = NoOom dv_f /\ *)
-  (*       EC2.DVC.dvalue_convert_strict dv_f = NoOom dv_i. *)
-  (* Proof. *)
-  (*   intros dv_i. *)
-
-  (*   rewrite EC1.DVC.dvalue_convert_equation. *)
-  (*   destruct dv_i. *)
-  (*   - (* Addresses *) *)
-
-  (*   setoid_rewrite EC2.DVC.dvalue_convert_equation. *)
-
-  (*   (* TODO: Ugh, everything is opaque. Fix and prove. *) *)
-  (* Admitted. *)
-
-  (* Lemma L0_convert_safe : *)
-  (*   forall t, *)
-  (*     InfFinTC.L0_convert_tree' EC1.DVC.dvalue_convert *)
-  (*       (FinInfTC.L0_convert_tree' EC2.DVC.dvalue_convert t) ≈ t. *)
-  (* Proof. *)
-  (*   intros t. *)
-  (*   unfold InfFinTC.L0_convert_tree', InfFinTC.L0_convert_tree. *)
-  (*   unfold FinInfTC.L0_convert_tree', FinInfTC.L0_convert_tree. *)
-  (*   cbn. *)
-  (*   setoid_rewrite interp_bind. *)
-  (*   rewrite bind_bind. *)
-  (*   rewrite interp_interp. *)
-
-
-  (*   cbn. *)
+  (*   red in REL. *)
   (*   red. *)
-  (* Admitted. *)
+  (*   intros t_fin_L4 UNDEF_FIN. *)
 
-  (** Refinement lemmas *)
-  Lemma refine_E1E2_L0_strict_interp_intrinsics :
-    forall t1 t2,
-      refine_E1E2_L0_strict t1 t2 ->
-      refine_E1E2_L0_strict (InfLLVM.Intrinsics.interp_intrinsics t1) (FinLLVM.Intrinsics.interp_intrinsics t2).
-  Proof.
-    intros t1 t2 RL0.
-    red in RL0.
-    destruct RL0 as [t1' [OOM_T1 RL0]].
-    red in RL0.
-    red.
-    (* exists (FinInfTC.L0_convert_tree_strict' EC2.DVC.dvalue_convert (FinLLVM.Intrinsics.interp_intrinsics t2)). *)
-    (* split. *)
-    (* - assert ((FinInfTC.L0_convert_tree' EC2.DVC.dvalue_convert (FinLLVM.Intrinsics.interp_intrinsics t2)) ≈  (FinInfTC.L0_convert_tree' EC2.DVC.dvalue_convert (LLVM.Intrinsics.interp_intrinsics (InfFinTC.L0_convert_tree' EC1.DVC.dvalue_convert t1')))) as EQT2. *)
-    (*   { eapply @FinInfTC.L0_convert_tree'_eutt_proper with (RA:=eq). *)
-    (*     intros u1 u2 H; subst. *)
-    (*     reflexivity. *)
+  (*   (* Given t_fin_L4 ∈ t_fin_set, I should be able to find an *)
+  (*      appropriate t_inf_4 such that t_inf_L4 ∈ t_inf_set... Such that *)
+  (*      orutt t_inf_L4 t_fin_L4... *)
+  (*    *) *)
+  (*   exists (get_inf_tree_L4 t_fin_L4). *)
+  (*   split. *)
+  (*   2: apply get_inf_tree_L4_orutt. *)
 
-    (*     rewrite RL0. *)
-    (*     reflexivity. *)
-    (*   } *)
+  (*   red. *)
+  (*   red in UNDEF_FIN. *)
+  (*   destruct UNDEF_FIN as (t_fin_L3 & T_FIN & UNDEF_FIN). *)
 
-    (*   rewrite EQT2. *)
+  (*   specialize (REL t_fin_L3 T_FIN). *)
+  (*   destruct REL as (t_inf_L3 & T_INF & REL). *)
 
-    (*   eapply refine_OOM_h_transitive with (y:=(InfLLVM.Intrinsics.interp_intrinsics t1')); try typeclasses eauto. *)
-    (*   (* May hold... OOM_T1 *) *)
-    (*   admit. *)
-
-    (*   red. *)
-    (*   red. *)
-  (*   (* This might actually be provable by walking through t1'? *)
-
-   (*      The conversions may cause early OOM, but otherwise preserves *)
-   (*      the event structure. *)
-   (*    *) *)
-    (*   admit. *)
-    (* - red. *)
-  (*   (* This can't hold unless I know converting from E2 -> E1 -> E2 *)
-   (*      is "safe" and doesn't cause any OOM. *)
-
-   (*      This should be the case for the particular Inf / Fin case we *)
-   (*      care about, though. *)
-   (*    *) *)
-    (*   rewrite L0_convert_safe. *)
-    (*   reflexivity. *)
+  (*   exists t_inf_L3. *)
+  (*   split; auto. *)
+  (*   eapply model_undef_h_fin_inf; eauto. *)
+  (* Qed. *)
   Admitted.
 
-  Lemma refine_E1E2_interp_global_strict :
-    forall t1 t2 g1 g2,
-      refine_E1E2_L0_strict t1 t2 ->
-      global_refine_strict g1 g2 ->
-      refine_E1E2_L1_strict (interp_global t1 g1) (interp_global t2 g2).
+  Lemma model_E1E2_L6_orutt_strict_sound
+    (p : list
+           (LLVMAst.toplevel_entity
+              LLVMAst.typ
+              (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))) :
+    model_E1E2_L6_orutt_strict p p.
   Proof.
-    intros t1 t2 g1 g2 RL0 GENVS.
-    red in RL0.
-    destruct RL0 as [t1' [OOM_T1 RL0]].
-    red.
-
-    (* Perhaps I need a lemma about L1_convert_tree and interp_global here? *)
-  Admitted.
-
-  Lemma refine_E1E2_interp_local_stack_strict :
-    forall t1 t2 ls1 ls2,
-      refine_E1E2_L1_strict t1 t2 ->
-      local_stack_refine_strict ls1 ls2 ->
-      refine_E1E2_L2_strict (interp_local_stack t1 ls1) (interp_local_stack t2 ls2).
-  Proof.
-  Admitted.
-
-  (* Most of these are aliases of the above, but some levels of the interpreter interpret more than one event *)
-  Lemma refine_E1E2_01_strict :
-    forall t1 t2 g1 g2,
-      refine_E1E2_L0_strict t1 t2 ->
-      global_refine_strict g1 g2 ->
-      refine_E1E2_L1_strict (interp_global (InfLLVM.Intrinsics.interp_intrinsics t1) g1) (interp_global (FinLLVM.Intrinsics.interp_intrinsics t2) g2).
-  Proof.
-    intros t1 t2 g1 g2 RL0 GENVS.
-    red in RL0.
-    apply refine_E1E2_interp_global_strict; auto.
-    apply refine_E1E2_L0_strict_interp_intrinsics; auto.
-  Qed.
-
-  Lemma refine_E1E2_12_strict :
-    forall t1 t2 l1 l2,
-      refine_E1E2_L1_strict t1 t2 ->
-      local_stack_refine_strict l1 l2 ->
-      refine_E1E2_L2_strict (interp_local_stack t1 l1) (interp_local_stack t2 l2).
-  Proof.
-    intros t1 t2 g1 g2 RL1 GENVS.
-    red in RL1.
-    apply refine_E1E2_interp_local_stack_strict; auto.
-  Qed.
-
-  Import InterpMemoryProp.
-  Lemma refine_E1E2_23_strict :
-    forall t1 t2 sid m1 m2,
-      refine_E1E2_L2_strict t1 t2 ->
-      MemState_refine m1 m2 ->
-      refine_E1E2_L3_strict (InfMemInterp.interp_memory_prop eq t1 sid m1) (FinMemInterp.interp_memory_prop eq t2 sid m2).
-  Proof.
-    intros t1 t2 sid m1 m2 RL2.
-
-  (*
-    h1 and h2 are handlers
-
-    (* h2 refines h1 *)
-    (forall e,
-    refine_E1E2_L3 (h1 e) (h2 e)) ->
-    forall u : itree,
-    refine_E1E2_L3 (interp_prop h1 u) (interp_prop h2 u)
-
-    Need something a bit more general like rutt.
-
-    (forall e1 e2,
-    refine_events e1 e2 ->
-    refine_E1E2_L3 (h1 e1) (h2 e2)) ->
-    forall u1 u2 : itree,
-    rutt refine_events refine_dvalue eq u1 u2 ->
-    refine_E1E2_L3 (interp_prop h1 u1) (interp_prop h2 u2)
-
-
-    (forall e1 e2,
-    refine_events e1 e2 ->
-    refine_E1E2_L4 (h1 e1) (h2 e2)) ->
-    forall u1 u2 : itree,
-    refine_E1E2_L3 u1 u2 ->
-    refine_E1E2_L4 (interp_prop h1 u1) (interp_prop h2 u2)
-
-   *)
-
-    (* I'll probably need something about MemMonad_valid_state eventually... *)
-  Admitted.
-
-  Lemma refine_E1E2_34_strict :
-    forall t1 t2,
-      refine_E1E2_L3_strict t1 t2 ->
-      refine_E1E2_L4_strict (InfLLVM.Pick.model_undef eq t1) (FinLLVM.Pick.model_undef eq t2).
-  Proof.
-    intros t1 t2 RL3.
-    red.
-  Admitted.
-
-  Lemma refine_E1E2_45_strict :
-    forall t1 t2,
-      refine_E1E2_L4_strict t1 t2 ->
-      refine_E1E2_L5_strict (model_UB t1) (model_UB t2).
-  Proof.
-    intros t1 t2 RL4.
-    red.
-  Admitted.
-
-  Lemma refine_E1E2_56_strict :
-    forall t1 t2,
-      refine_E1E2_L5_strict t1 t2 ->
-      refine_E1E2_L6_strict (refine_OOM eq t1) (refine_OOM eq t2).
-  Proof.
-    intros t1 t2 RL4.
-    red.
-  Admitted.
-
-
-  From Vellvm Require Import Tactics.
-
-  From ITree Require Import
-    ITree
-    Basics.Monad
-    Events.StateFacts
-    Eq.Eqit.
-
-  Import TranslateFacts.
-  Import TopLevelBigIntptr.
-  Import TopLevel64BitIntptr.
-  Import InterpreterStackBigIntptr.
-  Import TopLevelRefinements64BitIntptr.
-
-  Ltac force_rewrite H :=
-    let HB := fresh "HB" in
-    pose proof @H as HB; eapply bisimulation_is_eq in HB; rewrite HB; clear HB.
-
-  Tactic Notation "force_rewrite" constr(H) "in" hyp(H') :=
-    let HB := fresh "HB" in
-    pose proof @H as HB; eapply bisimulation_is_eq in HB; rewrite HB in H'; clear HB.
-
-
-  (* TODO: this is going to be a big one *)
-  Theorem model_E1E2_L0_sound :
-    forall (p : LLVM_syntax),
-      model_E1E2_L0 p p.
-  Proof.
-    intros p.
-    unfold model_E1E2_L0.
-    red.
-    unfold refine_L0.
-    unfold L0_convert_tree_strict'.
-    unfold L0_convert_tree_strict.
-
-    (* exists (FinInfTC.L0_convert_tree_strict' EC2.DVC.dvalue_convert *)
-    (*      (denote_vellvm (DynamicTypes.DTYPE_I 32) "main" main_args *)
-    (*         (TypToDtyp.convert_types (CFG.mcfg_of_tle p)))). *)
-
-    (* split. *)
-    (* - (* src' may have additional OOM *) *)
-    (*   (* I think this pretty much has to be by induction over the syntax? *) *)
-    (*   admit. *)
-    (* - (* src' when converted agrees with target *) *)
-    (*   (* Target may just be OOM for all we know *) *)
-    (*   red. *)
-    (*   setoid_rewrite L0_convert_safe. *)
-    (*   reflexivity. *)
-  Admitted.
-
-  Theorem model_E1E2_L1_sound :
-    forall (p : LLVM_syntax),
-      model_E1E2_L1 p p.
-  Proof.
-    intros p.
-    red.
-
-    (* Maybe I need some lemmas akin to these:
-
-    Lemma refine_34 : forall t1 t2,
-        refine_L3 t1 t2 -> refine_L4 (model_undef refine_res3 t1) (model_undef refine_res3 t2).
-
-    But for crossing the infinite / finite boundary...
-
-     *)
-    unfold model_oom_L1.
-    unfold model_gen_oom_L1.
-    unfold interp_mcfg1.
-
-    apply refine_E1E2_01_strict.
-    { (* Still need to deal with interp_intrinsics... *)
-      apply model_E1E2_L0_sound.
-    }
-
-    apply global_refine_strict_empty.
-  Qed.
-
-  Theorem model_E1E2_L2_sound :
-    forall (p : LLVM_syntax),
-      model_E1E2_L2 p p.
-  Proof.
-    intros p.
-    red.
-    apply refine_E1E2_12_strict; [| apply local_stack_refine_strict_empty].
-    apply model_E1E2_L1_sound.
-  Qed.
-
-  Theorem model_E1E2_L3_sound :
-    forall (p : LLVM_syntax),
-      model_E1E2_L3 p p.
-  Proof.
-    intros p.
-    red.
-    apply refine_E1E2_23_strict; [| apply MemState_refine_initial].
-    apply model_E1E2_L2_sound.
-  Qed.
-
-  Theorem model_E1E2_L4_sound :
-    forall (p : LLVM_syntax),
-      model_E1E2_L4 p p.
-  Proof.
-    intros p.
-    red.
-    apply refine_E1E2_34_strict.
-    apply model_E1E2_L3_sound.
-  Qed.
-
-  Theorem model_E1E2_L5_sound :
-    forall (p : LLVM_syntax),
-      model_E1E2_L5 p p.
-  Proof.
-    intros p.
-    red.
-    apply refine_E1E2_45_strict.
-    apply model_E1E2_L4_sound.
-  Qed.
-
-  Theorem model_E1E2_L6_sound :
-    forall (p : LLVM_syntax),
-      model_E1E2_L6 p p.
-  Proof.
-    intros p.
-    red.
-    apply refine_E1E2_56_strict.
-    apply model_E1E2_L5_sound.
+    apply model_E1E2_56_orutt_strict; apply model_E1E2_L5_orutt_strict_sound.
   Qed.
 
 End InfiniteToFinite.
