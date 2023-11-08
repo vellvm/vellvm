@@ -14474,10 +14474,8 @@ cofix CIH
     intros addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf msg MSR BYTE_REF ADDR_REF WRITE.
 
     cbn in *.
-    intros byte CONTRA.
-    eapply inf_fin_write_byte_spec_exists in CONTRA; eauto.
-    destruct CONTRA as (ms_fin_final & WRITE' & ADDR_REF' & MSR').
-    eapply WRITE; eauto.
+    intros CONTRA.
+    eapply inf_fin_write_byte_allowed in CONTRA; eauto.
   Qed.
 
   #[global] Hint Resolve fin_inf_write_byte_spec_MemPropT_ub : FinInf.
@@ -14935,7 +14933,7 @@ cofix CIH
       destruct m_fin_final. destruct ms_memory_stack.
       cbn in *; subst.
       rewrite lift_FrameStack_snoc in MSR'.
-      red in MSR'; cbn in MSR'.
+      repeat red in MSR'; cbn in MSR'.
       unfold InfMem.MMEP.MMSP.memory_stack_frame_stack_prop at 2 in MSR'.
       unfold InfMem.MMEP.MMSP.memory_stack_frame_stack in MSR'.
 
@@ -15137,7 +15135,7 @@ cofix CIH
     specialize (MSR fss_inf).
     specialize (PTR fss_inf).
     destruct MSR as [MSR _].
-    forward MSR; [reflexivity|].
+    forward MSR; [red; cbn; reflexivity|].
     forward PTR; [reflexivity|].
 
     destruct fss_inf.
@@ -15162,10 +15160,12 @@ cofix CIH
       destruct MSR as (?&?&?&?&?).
       inv H0.
       destruct fss_fin; inv H.
+      red in H1; cbn in H1.
       rewrite <- H1 in PTR.
 
       eapply fin_inf_ptr_in_frame_prop in PTR; eauto.
       2: {
+        rewrite lift_FrameStack_singleton.
         reflexivity.
       }
 
@@ -15205,6 +15205,7 @@ cofix CIH
 
       eapply fin_inf_ptr_in_frame_prop in PTR; eauto.
       2: {
+        rewrite lift_FrameStack_snoc.
         reflexivity.
       }
 
@@ -15241,7 +15242,7 @@ cofix CIH
     specialize (MSR fss_inf).
     specialize (PTR fss_fin).
     destruct MSR as [MSR _].
-    forward MSR; [reflexivity|].
+    forward MSR; [red; cbn; reflexivity|].
     forward PTR; [red; cbn; reflexivity|].
 
     destruct fss_fin.
@@ -15534,12 +15535,12 @@ cofix CIH
 
       specialize (MSR2 memory_stack_frame_stack1).
       destruct MSR2 as [MSR2 _].
-      forward MSR2; [reflexivity|].
-      rewrite <- MSR2.
+      forward MSR2; [red; cbn; reflexivity|].
+      red in MSR2. rewrite <- MSR2.
 
       specialize (MSR1 (InfMem.MMEP.MMSP.Snoc memory_stack_frame_stack0 f0)).
       destruct MSR1 as [MSR1 _].
-      forward MSR1; [reflexivity|].
+      forward MSR1; [red; cbn; reflexivity|].
 
       destruct memory_stack_frame_stack.
       {
@@ -15678,8 +15679,8 @@ cofix CIH
       rewrite lift_FrameStack_snoc in MSR1.
       specialize (MSR1 (InfMemMMSP.Snoc (lift_FrameStack memory_stack_frame_stack) (lift_Frame f0))).
       destruct MSR1 as [_ MSR1].
-      forward MSR1; [reflexivity|].
-      setoid_rewrite MSR1 in POP_FRAME.
+      forward MSR1; [red; cbn; reflexivity|].
+      red in MSR1; setoid_rewrite MSR1 in POP_FRAME.
 
       eapply POP_FRAME. reflexivity.
       red.
@@ -15739,58 +15740,8 @@ cofix CIH
         destruct Heqo0 as (bad_addr&IN_BLOCK&BAD_CONV).
 
         (* IN_FIN should be a contradiction because lift_Heap should filter out bad elements *)
-
-        Set Nested Proofs Allowed.
-        (* TODO: Move this *)
-        Lemma ptr_in_heap_prop_intmap_elements_inf :
-          forall {h root root_ptr block addr},
-            LLVMParamsBigIntptr.PTOI.ptr_to_int root_ptr = root ->
-            In (root, block) (IntMaps.IM.elements (elt:=InfMemMMSP.Block) h) ->
-            In addr block ->
-            InfMemMMSP.ptr_in_heap_prop h root_ptr addr.
-        Proof.
-          intros h root root_ptr block addr PTOI ELEMS BLOCK.
-          red.
-          eapply SetoidList.In_InA in ELEMS.
-          eapply IntMaps.IP.F.elements_mapsto_iff in ELEMS.
-          2: typeclasses eauto.
-          eapply IntMaps.IP.F.find_mapsto_iff in ELEMS.
-          rewrite PTOI, ELEMS.
-          apply in_map; auto.
-        Qed.
-
-        (* TODO: Move this *)
-        Lemma ptr_in_heap_prop_intmap_elements_fin :
-          forall {h root root_ptr block addr},
-            LLVMParams64BitIntptr.PTOI.ptr_to_int root_ptr = root ->
-            In (root, block) (IntMaps.IM.elements (elt:=FinMemMMSP.Block) h) ->
-            In addr block ->
-            FinMemMMSP.ptr_in_heap_prop h root_ptr addr.
-        Proof.
-          intros h root root_ptr block addr PTOI ELEMS BLOCK.
-          red.
-          eapply SetoidList.In_InA in ELEMS.
-          eapply IntMaps.IP.F.elements_mapsto_iff in ELEMS.
-          2: typeclasses eauto.
-          eapply IntMaps.IP.F.find_mapsto_iff in ELEMS.
-          rewrite PTOI, ELEMS.
-          apply in_map; auto.
-        Qed.
-
-        (* TODO: Move this *)
-        Lemma every_int_has_big_ptr :
-          forall z,
-          exists addr, LLVMParamsBigIntptr.PTOI.ptr_to_int addr = z.
-        Proof.
-          intros z.
-          pose proof (InfITOP_BIG.int_to_ptr_safe z InfPROV.nil_prov).
-          break_match_hyp_inv.
-          exists a.
-          erewrite InterpreterStackBigIntptr.LP.ITOP.ptr_to_int_int_to_ptr; eauto.
-        Qed.
-
-        destruct (MSR hs_inf) as [EQV _]; forward EQV; [reflexivity|].
-        destruct (mempop_heap_preserved hs_inf) as [EQV2 _]; forward EQV2; [reflexivity|].
+        destruct (MSR hs_inf) as [EQV _]; forward EQV; [red; cbn; reflexivity|].
+        destruct (mempop_heap_preserved hs_inf) as [EQV2 _]; forward EQV2; [red; cbn; reflexivity|].
 
         pose proof every_int_has_big_ptr root as (root_ptr&ROOT_PTR).
         pose proof ptr_in_heap_prop_intmap_elements_inf ROOT_PTR H IN_BLOCK as IN_HEAP.
@@ -15830,7 +15781,8 @@ cofix CIH
         forward POP_FRAME; [red; reflexivity|].
 
         destruct (MSR (InfMem.MMEP.MMSP.Snoc fss_inf f_inf)) as [MSR' _];
-          forward MSR'; [reflexivity|].
+          forward MSR'; [red; cbn; reflexivity|].
+        red in MSR'.
         rewrite <- POP_FRAME in MSR'.
 
         apply InfMemMMSP.frame_stack_inv in MSR' as [MSR' | MSR'].
@@ -15846,45 +15798,6 @@ cofix CIH
         destruct fss_fin; [inv H|].
         rewrite lift_FrameStack_snoc in H.
         symmetry in H; inv H.
-
-        (* TODO: Move this *)
-        Lemma lift_FrameStack_singleton :
-          forall f,
-            lift_FrameStack (FinMem.MMEP.MMSP.Singleton f) = InfMem.MMEP.MMSP.Singleton (lift_Frame f).
-        Proof.
-          Transparent lift_FrameStack.
-          intros f.
-          cbn.
-          reflexivity.
-          Opaque lift_FrameStack.
-        Qed.
-
-        (* TODO: Move this *)
-        Lemma fin_ptr_to_inf_round_trip :
-          forall ptr_fin i,
-            LLVMParamsBigIntptr.PTOI.ptr_to_int (fin_to_inf_addr ptr_fin) = i ->
-            forall pr,
-            exists ptr_fin', FinITOP.int_to_ptr i pr = NoOom ptr_fin'.
-        Proof.
-          intros ptr_fin i H pr.
-          unfold fin_to_inf_addr in *.
-          break_match_hyp.
-          cbn in *.
-          subst.
-          clear Heqs.
-          destruct ptr_fin.
-          eapply @int_to_ptr_succeeds_regardless_of_provenance with (pr1:=p) (ptr:=(i, p)).
-          cbn in *.
-          inv e.
-          unfold FinITOP.int_to_ptr.
-          cbn.
-          break_match_goal.
-          pose proof (Int64.unsigned_range i).
-          lia.
-          rewrite Int64.repr_unsigned.
-          reflexivity.
-        Qed.
-
 
         clear POP_FRAME MSR.
         generalize dependent fss_inf.
@@ -16007,254 +15920,22 @@ cofix CIH
             apply BYTES_FREED in CONTRA.
             red in CONTRA.
             eapply (CONTRA aid).
-
-            (* TODO: Move this *)
-            Definition big_int_to_ptr (addr : Z) (pr : InfPROV.Prov) : InfAddr.addr.
-              pose proof InfITOP_BIG.int_to_ptr_safe addr pr.
-              break_match_hyp_inv.
-              apply a.
-            Defined.
-
-            Lemma ptr_to_int_of_big_int_to_ptr :
-              forall addr pr,
-                LLVMParamsBigIntptr.PTOI.ptr_to_int (big_int_to_ptr addr pr) = addr.
-            Proof.
-              intros addr pr.
-              cbn.
-              break_match.
-              cbn in *; auto.
-            Qed.
-
-            Lemma fin_to_inf_addr_big_int_to_ptr :
-              forall addr a pr,
-                LLVMParams64BitIntptr.ITOP.int_to_ptr addr pr = NoOom a ->
-                fin_to_inf_addr a = big_int_to_ptr addr pr.
-            Proof.
-              intros addr a pr PTR.
-              cbn.
-              break_match.
-              unfold fin_to_inf_addr.
-              break_match.
-              clear Heqs.
-              unfold FinToInfAddrConvert.addr_convert in e.
-              break_match_hyp; subst.
-              cbn in e.
-              inv e.
-              unfold LLVMParams64BitIntptr.ITOP.int_to_ptr in PTR.
-              break_match_hyp_inv.
-              rewrite Int64.unsigned_repr; auto.
-              unfold Int64.max_unsigned.
-              lia.
-            Qed.
-
             Opaque big_int_to_ptr.
-
-            (* TODO: Move this *)
-            Lemma In_memory_is_allocated_inf :
-              forall addr byte ptr aid mem ms pr,
-                In (addr, (byte, aid)) (IntMaps.IM.elements (elt:=InfMemMMSP.mem_byte) mem) ->
-                MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory ms = mem ->
-                ptr = big_int_to_ptr addr pr ->
-                MemoryBigIntptr.MMEP.MemSpec.byte_allocated ms ptr aid.
-            Proof.
-              intros addr ptr byte aid mem ms pr ELEMS MEM PTR.
-              cbn.
-              do 2 eexists; split; eauto.
-              cbn.
-              red.
-              split.
-              2: {
-                intros ms' x H.
-                inv H.
-                reflexivity.
-              }
-
-              cbn.
-              exists (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms).
-              exists (MemoryBigIntptr.MMEP.MMSP.MemState_get_memory ms).
-              split; auto.
-
-              Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
-              unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
-              Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
-
-              subst.
-              rewrite ptr_to_int_of_big_int_to_ptr.
-              rewrite memory_stack_memory_mem_state_memory.
-
-              eapply SetoidList.In_InA in ELEMS.
-              eapply IntMaps.IP.F.elements_mapsto_iff in ELEMS.
-              2: typeclasses eauto.
-              eapply IntMaps.IP.F.find_mapsto_iff in ELEMS.
-              rewrite ELEMS.
-
-              split; auto.
-              apply InfPROV.aid_eq_dec_refl.
-            Qed.
-
             eapply In_memory_is_allocated_inf; eauto.
             eapply fin_to_inf_addr_big_int_to_ptr; eauto.
           }
 
           destruct NON_FRAME_BYTES_READ as [_ NON_FRAME_BYTES_READ].
           forward NON_FRAME_BYTES_READ.
-
-          (* TODO: Move this *)
-          Lemma In_memory_read_byte_inf :
-            forall addr ptr byte aid mem ms,
-              In (addr, (byte, aid)) (IntMaps.IM.elements (elt:=InfMemMMSP.mem_byte) mem) ->
-              LLVMParams64BitIntptr.ITOP.int_to_ptr addr (FinPROV.allocation_id_to_prov aid) = NoOom ptr ->
-              MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory ms = mem ->
-              MemoryBigIntptr.MMEP.MemSpec.read_byte_spec ms (fin_to_inf_addr ptr) byte.
-          Proof.
-            intros addr ptr byte aid mem ms ELEMS PTR MEM.
-            split.
-            { red.
-              exists aid.
-              split.
-              - eapply In_memory_is_allocated_inf; eauto.
-                eapply fin_to_inf_addr_big_int_to_ptr; eauto.
-              - eapply fin_inf_access_allowed.
-                + apply addr_convert_fin_to_inf_addr.
-                + erewrite ITOP.int_to_ptr_provenance; eauto.
-                  apply FinLP.PROV.access_allowed_refl.
-            }
-
-            cbn.
-            do 2 eexists; split; eauto.
-            cbn.
-
-            Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
-            unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
-            Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
-
-            rewrite fin_to_inf_addr_ptr_to_int.
-            erewrite FinLP.ITOP.ptr_to_int_int_to_ptr; eauto.
-            rewrite memory_stack_memory_mem_state_memory.
-            rewrite MEM.
-
-            eapply SetoidList.In_InA in ELEMS.
-            eapply IntMaps.IP.F.elements_mapsto_iff in ELEMS.
-            2: typeclasses eauto.
-            eapply IntMaps.IP.F.find_mapsto_iff in ELEMS.
-            rewrite ELEMS.
-
-            cbn.
-
-            assert (LLVMParamsBigIntptr.PROV.access_allowed
-                      (LLVMParamsBigIntptr.PROV.address_provenance (fin_to_inf_addr ptr)) aid = true) as ACCESS.
-            { eapply fin_inf_access_allowed.
-              - apply addr_convert_fin_to_inf_addr.
-              - erewrite ITOP.int_to_ptr_provenance; eauto.
-                apply FinLP.PROV.access_allowed_refl.
-            }
-            rewrite ACCESS.
-
-            split; auto.
-          Qed.
-
           eapply In_memory_read_byte_inf; eauto.
-
-          (* TODO: Move this *)
-          Lemma MemState_refine_prop_read_byte_preserved :
-            forall {ms_inf ms_fin},
-              MemState_refine_prop ms_inf ms_fin ->
-              InfMem.MMEP.MemSpec.read_byte_preserved ms_inf (lift_MemState ms_fin).
-          Proof.
-            intros ms_inf ms_fin MSR.
-            do 2 red in MSR.
-            tauto.
-          Qed.
-
-          (* TODO: Move this, should be in MemoryModel.v with read_byte_preserved *)
-          Definition read_byte_spec_preserved m1 m2 :=
-            forall ptr byte, MemoryBigIntptr.MMEP.MemSpec.read_byte_spec m1 ptr byte <-> MemoryBigIntptr.MMEP.MemSpec.read_byte_spec m2 ptr byte.
-
-          Lemma read_byte_preserved_read_byte_spec_preserved :
-            forall m1 m2,
-              InfMem.MMEP.MemSpec.read_byte_preserved m1 m2 ->
-              read_byte_spec_preserved m1 m2.
-          Proof.
-            intros m1 m2.
-            intros PRES.
-            { destruct PRES as [ALLOWED_PRES PROP_PRES].
-              red.
-              intros ptr byte.
-              split; intros [ALLOWED PROP].
-              - split.
-                + apply ALLOWED_PRES; auto.
-                + apply PROP_PRES; auto.
-              - split.
-                + apply ALLOWED_PRES; auto.
-                + apply PROP_PRES; auto.
-            }
-          Qed.
-
-          Lemma MemState_refine_prop_read_byte_spec_preserved :
-            forall {ms_inf : InfMem.MMEP.MMSP.MemState} {ms_fin : FinMem.MMEP.MMSP.MemState},
-              MemState_refine_prop ms_inf ms_fin ->
-              read_byte_spec_preserved ms_inf (lift_MemState ms_fin).
-          Proof.
-            intros ms_inf ms_fin MSR.
-            apply read_byte_preserved_read_byte_spec_preserved.
-            apply MemState_refine_prop_read_byte_preserved; auto.
-          Qed.
 
           pose NON_FRAME_BYTES_READ as READ.
           apply (MemState_refine_prop_read_byte_spec_preserved MSR) in READ.
 
           (* Using READ I want to be able to conclude that byte is a lifted SByte... *)
-          (* TODO: Move this *)
-          Lemma read_byte_spec_lifted_memory_lifted_sbyte :
-            forall {ms ptr byte},
-              MemoryBigIntptr.MMEP.MemSpec.read_byte_spec (lift_MemState ms) ptr byte ->
-              exists fin_byte, byte = lift_SByte fin_byte.
-          Proof.
-            intros ms ptr byte READ.
-            destruct READ as [ALLOWED READ].
-
-            red in ALLOWED.
-            destruct ALLOWED as (aid&ALLOC&ALLOWED).
-            pose proof ALLOC as READ_RAW.
-            apply inf_byte_allocated_read_byte_raw in READ_RAW.
-            destruct READ_RAW as (byte'&READ_RAW).
-
-            cbn in READ.
-            destruct READ as (?&?&(?&?)&READ).
-            subst.
-            rewrite READ_RAW in READ.
-            cbn in READ.
-            rewrite ALLOWED in READ.
-
-            destruct READ; subst.
-            clear H.
-
-            destruct ms as [[ms fss hs] msprovs].
-            cbn in READ_RAW.
-            eapply read_byte_raw_lifted in READ_RAW.
-            destruct READ_RAW as (fin_byte&READ_RAW&IN_BOUNDS&BYTE_REF).
-            exists fin_byte.
-            unfold sbyte_refine in BYTE_REF.
-            symmetry.
-            apply lift_SByte_convert_SByte_inverse; auto.
-          Qed.
-
           apply read_byte_spec_lifted_memory_lifted_sbyte in READ.
           destruct READ as (fin_byte & LIFT_BYTE).
           subst.
-
-          (* TODO: Move this *)
-          Lemma convert_SByte_lift_SByte :
-            forall byte,
-              convert_SByte (lift_SByte byte) = NoOom byte.
-          Proof.
-            intros byte.
-            unfold lift_SByte.
-            destruct byte.
-            cbn.
-            repeat rewrite convert_fin_to_inf_uvalue_succeeds.
-            reflexivity.
-          Qed.
 
           rewrite convert_SByte_lift_SByte in CONV_BYTE.
           inv CONV_BYTE.
@@ -16279,39 +15960,6 @@ cofix CIH
              in bounds for ms_inf, it should be in bounds for ms_inf'
              as well.
            *)
-
-          Lemma MemState_refine_prop_in_bounds :
-            forall ms_inf mem_inf ms_fin addr byte aid,
-              MemState_refine_prop ms_inf ms_fin ->
-              MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory ms_inf = mem_inf ->
-              In (addr, (byte, aid)) (IntMaps.IM.elements (elt:=InfMemMMSP.mem_byte) mem_inf) ->
-              in_bounds addr = true.
-          Proof.
-            intros ms_inf mem_inf ms_fin addr byte aid MSR MEM IN.
-            apply MemState_refine_prop_allocations_preserved in MSR.
-            red in MSR.
-            remember (big_int_to_ptr addr (MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov aid)) as a.
-
-            specialize (MSR a aid).
-            destruct MSR as (ALLOC_INF_FIN&ALLOC_FIN_INF).
-
-            pose proof In_memory_is_allocated_inf _ _ a _ _ ms_inf (MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov aid) IN.
-            forward H; auto.
-            forward H; auto.
-
-            apply ALLOC_INF_FIN in H.
-            eapply inf_fin_byte_allocated_exists in H.
-            2: apply lift_MemState_refine_prop.
-            destruct H as (addr_fin&ADDR_CONV&ALLOC_FIN).
-
-            apply in_bounds_exists_addr'.
-            exists addr_fin.
-            erewrite fin_inf_ptoi.
-            2: apply ADDR_CONV.
-            subst.
-            apply ptr_to_int_of_big_int_to_ptr.
-          Qed.
-
           assert (exists byte, In (addr, (byte, aid)) (IntMaps.IM.elements (elt:=InfMemMMSP.mem_byte) ms_inf)) as MEM_ELEMS'.
           { (* Should hold because pop only removes things... *)
             remember (big_int_to_ptr addr (MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov aid)) as a.
@@ -16346,56 +15994,6 @@ cofix CIH
 
             eapply NON_FRAME_BYTES_PRESERVED in NIN_FRAME.
             apply NIN_FRAME in H.
-
-            (* TODO: Move this *)
-            Lemma byte_allocate_In_memory_inf :
-              forall {ms mem ptr addr aid pr},
-                MemoryBigIntptr.MMEP.MemSpec.byte_allocated ms ptr aid ->
-                MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory ms = mem ->
-                ptr = big_int_to_ptr addr pr ->
-                exists byte, In (addr, (byte, aid)) (IntMaps.IM.elements (elt:=InfMemMMSP.mem_byte) mem).
-            Proof.
-              intros ms mem ptr addr0 aid pr ALLOC MEM PTR.
-
-              repeat red in ALLOC.
-              destruct ALLOC as (sab & a & ALLOC & ASSERT).
-              cbn in ASSERT.
-              inv ASSERT.
-
-              repeat red in ALLOC.
-              destruct ALLOC as (ALLOC & PROV).
-              repeat red in ALLOC.
-              destruct ALLOC as (sab & a & MEMSTATE & ALLOC).
-
-              cbn in MEMSTATE.
-              inv MEMSTATE.
-
-              Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
-              unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw in ALLOC.
-              Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
-
-              rewrite ptr_to_int_of_big_int_to_ptr in ALLOC.
-              break_match_hyp.
-              2: {
-                cbn in ALLOC.
-                inv ALLOC.
-                discriminate.
-              }
-
-              destruct m.
-              exists s.
-
-              cbn in ALLOC.
-              inv ALLOC.
-
-              destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid a); cbn in H0; inv H0.
-
-              apply IntMaps.IP.F.find_mapsto_iff in Heqo.
-              apply InfMemMMSP.InA_In.
-              apply IntMaps.IM.elements_1.
-              rewrite <- memory_stack_memory_mem_state_memory.
-              auto.
-            Qed.
 
             epose proof byte_allocate_In_memory_inf H as IN.
             forward IN; cbn; auto.
@@ -16510,7 +16108,7 @@ cofix CIH
       symmetry in SNOC; inv SNOC.
 
       specialize (MSR fss_inf).
-      destruct MSR as [MSR _]; forward MSR; [reflexivity|].
+      destruct MSR as [MSR _]; forward MSR; [red; cbn; reflexivity|].
 
       apply InfMemMMSP.frame_stack_inv in MSR as [MSR | MSR].
       2: { (* Singleton is contradiction *)
@@ -16533,7 +16131,7 @@ cofix CIH
 
       rewrite <- POP, <- FS_EQV.
       eapply frame_stack_eqv_lift_inf_fin.
-      rewrite MSR_FINAL, H1.
+      red in MSR_FINAL; rewrite MSR_FINAL, H1.
       reflexivity.
     - (* mempop_invariants *)
       clear - MSR MSR_FINAL INVARIANTS.
@@ -17966,17 +17564,17 @@ cofix CIH
   (* Qed. *)
 
   Lemma allocate_bytes_post_conditions_fin_inf :
-    forall {ms_fin_start ms_fin_final ms_inf_start t num_elements bytes_fin addr_fin addrs_fin bytes_inf pr},
+    forall {ms_fin_start ms_fin_final ms_inf_start bytes_fin addr_fin addrs_fin bytes_inf pr},
       MemState_refine_prop ms_inf_start ms_fin_start ->
       (Forall2 sbyte_refine) bytes_inf bytes_fin ->
-      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_post_conditions ms_fin_start t num_elements bytes_fin pr ms_fin_final addr_fin addrs_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_post_conditions ms_fin_start bytes_fin pr ms_fin_final addr_fin addrs_fin ->
       exists addr_inf addrs_inf ms_inf_final,
-        MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_post_conditions ms_inf_start t num_elements bytes_inf pr ms_inf_final addr_inf addrs_inf /\
+        MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_post_conditions ms_inf_start bytes_inf pr ms_inf_final addr_inf addrs_inf /\
           addr_refine addr_inf addr_fin /\
           Forall2 addr_refine addrs_inf addrs_fin /\
           MemState_refine_prop ms_inf_final ms_fin_final.
   Proof.
-    intros ms_fin_start ms_fin_final ms_inf_start t num_elements bytes_fin addr_fin addrs_fin bytes_inf pr MSR BYTES ALLOC.
+    intros ms_fin_start ms_fin_final ms_inf_start bytes_fin addr_fin addrs_fin bytes_inf pr MSR BYTES ALLOC.
     destruct ALLOC.
 
     exists (fin_to_inf_addr addr_fin).
@@ -18022,22 +17620,20 @@ cofix CIH
       apply lift_MemState_refine_prop; auto.
     - eapply fin_inf_heap_preserved; eauto.
       apply lift_MemState_refine_prop; auto.
-    - apply Util.Forall2_length in BYTES.
-      lia.
   Qed.
 
   Lemma allocate_bytes_post_conditions_MemPropT_fin_inf :
-    forall {ms_fin_start ms_fin_final ms_inf_start t num_elements bytes_fin addr_fin addrs_fin res_fin bytes_inf pr},
+    forall {ms_fin_start ms_fin_final ms_inf_start bytes_fin addr_fin addrs_fin res_fin bytes_inf pr},
       MemState_refine_prop ms_inf_start ms_fin_start ->
       (Forall2 sbyte_refine) bytes_inf bytes_fin ->
-      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_post_conditions_MemPropT t num_elements bytes_fin
+      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_post_conditions_MemPropT bytes_fin
         pr addr_fin addrs_fin ms_fin_start (ret (ms_fin_final, res_fin)) ->
       exists res_inf ms_inf_final,
-        MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_post_conditions_MemPropT t num_elements bytes_inf pr (fst res_inf) (snd res_inf) ms_inf_start (ret (ms_inf_final, res_inf)) /\
+        MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_post_conditions_MemPropT bytes_inf pr (fst res_inf) (snd res_inf) ms_inf_start (ret (ms_inf_final, res_inf)) /\
           (addr_refine × (Forall2 addr_refine)) res_inf res_fin /\
           MemState_refine_prop ms_inf_final ms_fin_final.
   Proof.
-    intros ms_fin_start ms_fin_final ms_inf_start t num_elements bytes_fin addr_fin addrs_fin res_fin bytes_inf pr MSR BYTES ALLOC.
+    intros ms_fin_start ms_fin_final ms_inf_start bytes_fin addr_fin addrs_fin res_fin bytes_inf pr MSR BYTES ALLOC.
     repeat red in ALLOC.
     destruct res_fin.
     destruct ALLOC.
@@ -18054,17 +17650,17 @@ cofix CIH
 
   (* This version assures the structure of res... *)
   Lemma allocate_bytes_post_conditions_MemPropT_fin_inf' :
-    forall {ms_fin_start ms_fin_final ms_inf_start t num_elements bytes_fin addr_fin addrs_fin bytes_inf pr},
+    forall {ms_fin_start ms_fin_final ms_inf_start bytes_fin addr_fin addrs_fin bytes_inf pr},
       MemState_refine_prop ms_inf_start ms_fin_start ->
       (Forall2 sbyte_refine) bytes_inf bytes_fin ->
-      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_post_conditions_MemPropT t num_elements bytes_fin
+      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_post_conditions_MemPropT bytes_fin
         pr addr_fin addrs_fin ms_fin_start (ret (ms_fin_final, (addr_fin, addrs_fin))) ->
       exists addr_inf addrs_inf ms_inf_final,
-        MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_post_conditions_MemPropT t num_elements bytes_inf pr addr_inf addrs_inf ms_inf_start (ret (ms_inf_final, (addr_inf, addrs_inf))) /\
+        MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_post_conditions_MemPropT bytes_inf pr addr_inf addrs_inf ms_inf_start (ret (ms_inf_final, (addr_inf, addrs_inf))) /\
           (addr_refine × (Forall2 addr_refine)) (addr_inf, addrs_inf) (addr_fin, addrs_fin) /\
           MemState_refine_prop ms_inf_final ms_fin_final.
   Proof.
-    intros ms_fin_start ms_fin_final ms_inf_start t num_elements bytes_fin addr_fin addrs_fin bytes_inf pr MSR BYTES ALLOC.
+    intros ms_fin_start ms_fin_final ms_inf_start bytes_fin addr_fin addrs_fin bytes_inf pr MSR BYTES ALLOC.
     repeat red in ALLOC.
     destruct ALLOC.
     destruct H0; subst.
@@ -18077,16 +17673,16 @@ cofix CIH
   Qed.
 
   Lemma allocate_bytes_with_pr_spec_MemPropT_fin_inf :
-    forall {ms_fin_start ms_fin_final ms_inf_start t num_elements bytes_fin addr_fin bytes_inf pr},
+    forall {ms_fin_start ms_fin_final ms_inf_start bytes_fin addr_fin bytes_inf pr},
       MemState_refine_prop ms_inf_start ms_fin_start ->
       (Forall2 sbyte_refine) bytes_inf bytes_fin ->
-      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_with_pr_spec_MemPropT t num_elements bytes_fin pr ms_fin_start (ret (ms_fin_final, addr_fin)) ->
+      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_with_pr_spec_MemPropT bytes_fin pr ms_fin_start (ret (ms_fin_final, addr_fin)) ->
       exists addr_inf ms_inf_final,
-        MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_with_pr_spec_MemPropT t num_elements bytes_inf pr ms_inf_start (ret (ms_inf_final, addr_inf)) /\
+        MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_with_pr_spec_MemPropT bytes_inf pr ms_inf_start (ret (ms_inf_final, addr_inf)) /\
           addr_refine addr_inf addr_fin /\
           MemState_refine_prop ms_inf_final ms_fin_final.
   Proof.
-    intros ms_fin_start ms_fin_final ms_inf_start t num_elements bytes_fin addr_fin bytes_inf pr MSR BYTES ALLOC.
+    intros ms_fin_start ms_fin_final ms_inf_start bytes_fin addr_fin bytes_inf pr MSR BYTES ALLOC.
     (* assert (Heap_in_bounds ms_fin_start) as HIB. *)
     (* { apply MSR. } *)
     unfold MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_with_pr_spec_MemPropT.
@@ -18156,18 +17752,18 @@ cofix CIH
   Qed.
 
   Lemma allocate_bytes_spec_MemPropT_fin_inf :
-    forall {ms_fin_start ms_fin_final ms_inf_start t num_elements bytes_fin addr_fin bytes_inf},
+    forall {ms_fin_start ms_fin_final ms_inf_start bytes_fin addr_fin bytes_inf},
       MemState_refine_prop ms_inf_start ms_fin_start ->
       (Forall2 sbyte_refine) bytes_inf bytes_fin ->
-      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_spec_MemPropT t num_elements
+      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_spec_MemPropT
         bytes_fin ms_fin_start (ret (ms_fin_final, addr_fin)) ->
       exists addr_inf ms_inf_final,
-        MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_spec_MemPropT t num_elements
+        MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_spec_MemPropT
           bytes_inf ms_inf_start (ret (ms_inf_final, addr_inf)) /\
           addr_refine addr_inf addr_fin /\
           MemState_refine_prop ms_inf_final ms_fin_final.
   Proof.
-    intros ms_fin_start ms_fin_final ms_inf_start t num_elements bytes_fin addr_fin bytes_inf MSR BYTES_REF ALLOCA_FIN.
+    intros ms_fin_start ms_fin_final ms_inf_start bytes_fin addr_fin bytes_inf MSR BYTES_REF ALLOCA_FIN.
 
     eapply MemPropT_fin_inf_bind.
     4: apply ALLOCA_FIN.
@@ -18184,28 +17780,25 @@ cofix CIH
   Qed.
 
   Lemma allocate_bytes_post_conditions_MemPropT_fin_inf_ub :
-    forall t num_elements bytes_inf bytes_fin pr ptr_fin ptrs_fin ptr_inf ptrs_inf msg ms_fin ms_inf,
+    forall bytes_inf bytes_fin pr ptr_fin ptrs_fin ptr_inf ptrs_inf msg ms_fin ms_inf,
       MemState_refine_prop ms_inf ms_fin ->
       sbytes_refine bytes_inf bytes_fin ->
-      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_post_conditions_MemPropT t num_elements bytes_fin pr ptr_fin ptrs_fin ms_fin (raise_ub msg) ->
-      MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_post_conditions_MemPropT t num_elements bytes_inf pr ptr_inf ptrs_inf ms_inf (raise_ub msg).
+      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_post_conditions_MemPropT bytes_fin pr ptr_fin ptrs_fin ms_fin (raise_ub msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_post_conditions_MemPropT bytes_inf pr ptr_inf ptrs_inf ms_inf (raise_ub msg).
   Proof.
-    intros t num_elements bytes_inf bytes_fin pr ptr_fin ptrs_fin ptr_inf ptrs_inf msg ms_fin ms_inf MSR BYTES_REF ALLOC.
-    cbn in *.
-    destruct ALLOC as [ALLOC | ALLOC]; auto.
-    right.
-    erewrite sbytes_refine_length; eauto.
+    intros bytes_inf bytes_fin pr ptr_fin ptrs_fin ptr_inf ptrs_inf msg ms_fin ms_inf MSR BYTES_REF ALLOC.
+    cbn in *; auto.
   Qed.
 
   #[global] Hint Resolve allocate_bytes_post_conditions_MemPropT_fin_inf_ub : FinInf.
   Lemma allocate_bytes_with_pr_spec_MemPropT_fin_inf_ub :
-    forall bytes_fin bytes_inf ms_inf ms_fin t num_elements pr msg,
+    forall bytes_fin bytes_inf ms_inf ms_fin pr msg,
       sbytes_refine bytes_inf bytes_fin ->
       MemState_refine_prop ms_inf ms_fin ->
-      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_with_pr_spec_MemPropT t num_elements bytes_fin pr ms_fin (raise_ub msg) ->
-      MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_with_pr_spec_MemPropT t num_elements bytes_inf pr ms_inf (raise_ub msg).
+      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_with_pr_spec_MemPropT bytes_fin pr ms_fin (raise_ub msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_with_pr_spec_MemPropT bytes_inf pr ms_inf (raise_ub msg).
   Proof.
-    intros bytes_fin bytes_inf ms_inf ms_fin t num_elements pr msg BYTES_REF MSR ALLOC.
+    intros bytes_fin bytes_inf ms_inf ms_fin pr msg BYTES_REF MSR ALLOC.
     red; red in ALLOC.
 
     eapply MemPropT_fin_inf_bind_ub.
@@ -18269,13 +17862,13 @@ cofix CIH
   #[global] Hint Resolve allocate_bytes_with_pr_spec_MemPropT_fin_inf_ub : FinInf.
 
   Lemma allocate_bytes_spec_MemPropT_fin_inf_ub :
-    forall bytes_fin bytes_inf ms_inf ms_fin t num_elements msg,
+    forall bytes_fin bytes_inf ms_inf ms_fin msg,
       sbytes_refine bytes_inf bytes_fin ->
       MemState_refine_prop ms_inf ms_fin ->
-      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_spec_MemPropT t num_elements bytes_fin ms_fin (raise_ub msg) ->
-      MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_spec_MemPropT t num_elements bytes_inf ms_inf (raise_ub msg).
+      Memory64BitIntptr.MMEP.MemSpec.allocate_bytes_spec_MemPropT bytes_fin ms_fin (raise_ub msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.allocate_bytes_spec_MemPropT bytes_inf ms_inf (raise_ub msg).
   Proof.
-    intros bytes_fin bytes_inf ms_inf ms_fin t num_elements msg BYTES_REF MSR ALLOC.
+    intros bytes_fin bytes_inf ms_inf ms_fin msg BYTES_REF MSR ALLOC.
     red in ALLOC; red.
 
     eapply MemPropT_fin_inf_bind_ub.
@@ -18302,8 +17895,23 @@ cofix CIH
   Proof.
     intros t num_elements ms_fin_start ms_fin_final ms_inf_start addr_fin MSR ALLOCA.
 
-    eapply MemPropT_fin_inf_bind.
+    eapply MemPropT_fin_inf_bind with (A_REF:=eq).
     4: apply ALLOCA.
+    all: eauto.
+
+    { (* MA: Assert *)
+      intros [] ms_fin_ma ASSERT.
+      repeat red in ASSERT.
+      destruct ASSERT; subst.
+      exists tt.
+      exists ms_inf_start.
+      split; cbn; auto.
+    }
+
+    intros ms_inf_assert ms_fin_assert ms_fin_assert' [] [] b_fin_assert _ MSR_ASSERT ASSERT POST_ASSERT.
+
+    eapply MemPropT_fin_inf_bind.
+    4: apply POST_ASSERT.
     all: eauto.
 
     { (* MA: fresh_sid *)
@@ -18371,11 +17979,23 @@ cofix CIH
     red in ALLOC.
     red.
 
-    eapply MemPropT_fin_inf_bind_ub.
+    eapply MemPropT_fin_inf_bind_ub with (A_REF:=eq).
     5: apply ALLOC.
-    all: eauto with FinInf.
+    all: eauto.
 
-    { intros a_fin ms_fin_ma FRESH.
+    { (* MA: Assert *)
+      intros [] ms_fin_ma ASSERT.
+      repeat red in ASSERT.
+      destruct ASSERT; subst.
+      exists tt.
+      exists ms_inf.
+      split; cbn; auto.
+    }
+
+    intros ms_inf_assert ms_fin_assert [] [] msg_assert _ MSR_ASSERT ASSERT.
+
+    eapply MemPropT_fin_inf_bind_ub; eauto.
+    { intros a_fin ms_fin_ma H.
       eapply fresh_sid_fin_inf; eauto.
     }
 
@@ -18609,7 +18229,7 @@ cofix CIH
     intros h H.
     specialize (MSR memory_stack_heap).
     destruct MSR as [MSR _].
-    forward MSR; [reflexivity|].
+    forward MSR; [red; reflexivity|].
     rewrite <- MSR in H.
     rewrite <- H.
 
@@ -18658,7 +18278,7 @@ cofix CIH
 
     specialize (MSR memory_stack_heap).
     destruct MSR as [MSR _].
-    forward MSR; [reflexivity|].
+    forward MSR; [red; reflexivity|].
     rewrite <- MSR in IN_HEAP.
 
     pose proof ptr_in_heap_prop_lift_inv IN_HEAP as (root_fin'&ptr_fin'&ROOT_FIN_REF&PTR_FIN_REF&IN_HEAP_FIN).
@@ -18689,7 +18309,7 @@ cofix CIH
 
     specialize (MSR memory_stack_heap).
     destruct MSR as [MSR _].
-    forward MSR; [reflexivity|].
+    forward MSR; [red; reflexivity|].
 
     specialize (IN_HEAP (lift_Heap memory_stack_heap0)).
     forward IN_HEAP; [symmetry; auto|].
@@ -19593,13 +19213,14 @@ cofix CIH
     forall {ms_fin_start ms_fin_final ms_inf_start ptr_fin ptr_inf},
       MemState_refine_prop ms_inf_start ms_fin_start ->
       addr_refine ptr_inf ptr_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.free_preconditions ms_fin_start ptr_fin ->
       Memory64BitIntptr.MMEP.MemSpec.free_spec ms_fin_start ptr_fin ms_fin_final ->
       exists (ms_inf_final : MemoryBigIntptr.MMEP.MMSP.MemState),
         MemoryBigIntptr.MMEP.MemSpec.free_spec ms_inf_start ptr_inf ms_inf_final /\
           MemState_refine_prop ms_inf_final ms_fin_final.
   Proof.
-    intros ms_fin_start ms_fin_final ms_inf_start ptr_fin ptr_inf MSR PTR_REF FREE.
-    destruct FREE.
+    intros ms_fin_start ms_fin_final ms_inf_start ptr_fin ptr_inf MSR PTR_REF FREE_PRE FREE.
+    destruct FREE, FREE_PRE.
 
     exists (lift_MemState ms_fin_final).
 
@@ -19607,30 +19228,6 @@ cofix CIH
     2: apply lift_MemState_refine_prop.
 
     split.
-    - eapply root_in_memstate_heap_fin_inf; eauto.
-    - destruct free_was_allocated.
-      eapply fin_inf_byte_allocated in H; eauto.
-    - intros ptr H.
-      { destruct (InfToFinAddrConvert.addr_convert ptr) eqn:CONV.
-        { (* ptr in finite range *)
-          eapply ptr_in_memstate_heap_inf_fin in H; eauto.
-          apply free_block_allocated in H.
-          destruct H.
-          eapply fin_inf_byte_allocated in H; eauto.
-        }
-
-        { (* Big pointer, shouldn't be allocated. *)
-          exfalso.
-          eapply ptr_in_memstate_heap_inf_fin_exists in H; eauto.
-          destruct H as (?&?&?).
-          apply free_block_allocated in H0.
-          destruct H0 as (?&?).
-          epose proof fin_inf_byte_allocated_exists _ _ _ _ MSR H0 as (?&?&?).
-          red in H.
-          rewrite CONV in H.
-          discriminate.
-        }
-      }
     - intros ptr H.
       { destruct (InfToFinAddrConvert.addr_convert ptr) eqn:CONV.
         { (* ptr in finite range *)
@@ -19758,6 +19355,43 @@ cofix CIH
         apply lift_MemState_refine_prop; auto.
   Qed.
 
+  Lemma handle_free_preconditions_fin_inf :
+    forall {ms_fin_start ms_inf_start ptr_fin ptr_inf},
+      MemState_refine_prop ms_inf_start ms_fin_start ->
+      addr_refine ptr_inf ptr_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.free_preconditions ms_fin_start ptr_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.free_preconditions ms_inf_start ptr_inf.
+  Proof.
+    intros ms_fin_start ms_inf_start ptr_fin ptr_inf MSR PTR_REF FREE_PRE.
+    destruct FREE_PRE.
+
+    split.
+    - eapply root_in_memstate_heap_fin_inf; eauto.
+    - destruct free_was_allocated.
+      eapply fin_inf_byte_allocated in H; eauto.
+    - intros ptr H.
+      { destruct (InfToFinAddrConvert.addr_convert ptr) eqn:CONV.
+        { (* ptr in finite range *)
+          eapply ptr_in_memstate_heap_inf_fin in H; eauto.
+          apply free_block_allocated in H.
+          destruct H.
+          eapply fin_inf_byte_allocated in H; eauto.
+        }
+
+        { (* Big pointer, shouldn't be allocated. *)
+          exfalso.
+          eapply ptr_in_memstate_heap_inf_fin_exists in H; eauto.
+          destruct H as (?&?&?).
+          apply free_block_allocated in H0.
+          destruct H0 as (?&?).
+          epose proof fin_inf_byte_allocated_exists _ _ _ _ MSR H0 as (?&?&?).
+          red in H.
+          rewrite CONV in H.
+          discriminate.
+        }
+      }
+  Qed.
+
   Lemma handle_free_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start res_fin args_fin args_inf},
       MemState_refine_prop ms_inf_start ms_fin_start ->
@@ -19781,12 +19415,16 @@ cofix CIH
     apply dvalue_refine_strict_addr_r_inv in ADDR as (ptr_inf&PTR&PTR_REF);
       subst.
     cbn in *.
+    destruct HANDLE as [FREE_PRE HANDLE].
 
-    epose proof handle_free_spec_fin_inf MSR PTR_REF HANDLE.
+    epose proof handle_free_spec_fin_inf MSR PTR_REF FREE_PRE HANDLE.
     destruct res_fin.
     exists tt.
     destruct H as (ms_inf_final&?&?).
     exists ms_inf_final; auto.
+    split; eauto.
+    split; eauto.
+    eapply handle_free_preconditions_fin_inf; eauto.
   Qed.
 
   (* TODO: Lemma about lifting intrinsic handlers *)
