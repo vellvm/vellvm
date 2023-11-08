@@ -1647,7 +1647,7 @@ Lemma lift_memory_convert_mem_byte :
                            orutt
                              L3_refine_strict
                              L3_res_refine_strict
-                             (MemState_refine × (eq × (local_refine_strict × stack_refine_strict × (global_refine_strict × DVC1.dvalue_refine_strict))))
+                             (MemState_refine_prop × (eq × (local_refine_strict × stack_refine_strict × (global_refine_strict × DVC1.dvalue_refine_strict))))
                              t t' (OOM:=OOME).
 
   Definition model_E1E2_L3_orutt_strict p1 p2 :=
@@ -23411,6 +23411,12 @@ cofix CIH
   Proof.
     intros t num_elements ms msg HANDLE.
     repeat red in HANDLE.
+    destruct HANDLE as [ASSERT | HANDLE].
+    { cbn in ASSERT; auto. }
+    destruct HANDLE as (?&[]&ASSERT&HANDLE).
+    cbn in ASSERT.
+    destruct ASSERT; subst.
+    rename H0 into ASSERT.
     destruct HANDLE as [FRESH | HANDLE].
     - cbn in FRESH; auto.
     - destruct HANDLE as (?&?&?&?).
@@ -23423,7 +23429,7 @@ cofix CIH
         clear H.
         generalize dependent x.
         generalize dependent x0.
-        induction num_elements using N.peano_ind; intros x0 x H0.
+        induction num_elements using N.peano_ind; intros x0 H0 x.
         * cbn in H0; auto.
         * rewrite repeatN_succ in H0.
           rewrite map_monad_unfold in H0.
@@ -23523,7 +23529,7 @@ cofix CIH
         red.
         unfold Memory64BitIntptr.MMEP.MMSP.memory_stack_heap_prop. cbn.
         unfold Memory64BitIntptr.MMEP.MMSP.memory_stack_heap.
-        reflexivity.
+        red. reflexivity.
   Qed.
 
   Lemma fin_inf_malloc_bytes_with_pr_spec_MemPropT_ub :
@@ -23581,6 +23587,43 @@ cofix CIH
 
   #[global] Hint Resolve fin_inf_malloc_bytes_spec_MemPropT_ub : FinInf.
 
+  (* TODO: Move. Should apply to fin / inf *)
+  Lemma ptr_in_heap_prop_dec :
+    forall h root ptr,
+      {MemoryBigIntptr.MMEP.MMSP.ptr_in_heap_prop h root ptr} + {~ MemoryBigIntptr.MMEP.MMSP.ptr_in_heap_prop h root ptr}.
+  Proof.
+    intros h root ptr.
+    unfold MemoryBigIntptr.MMEP.MMSP.ptr_in_heap_prop.
+    destruct (IntMaps.IM.find (elt:=MemoryBigIntptr.MMEP.MMSP.Block) (LLVMParamsBigIntptr.PTOI.ptr_to_int root) h) eqn:FIND; eauto.
+    eapply in_dec.
+    eapply Z.eq_dec.
+  Qed.
+
+  (* TODO: move this *)
+  Lemma inf_fin_free_preconditions :
+    forall {ms_inf_start : InfMem.MMEP.MMSP.MemState}
+      {ms_fin_start : FinMem.MMEP.MMSP.MemState}
+      {ptr_fin : FinAddr.addr} {ptr_inf : InfAddr.addr},
+      MemState_refine_prop ms_inf_start ms_fin_start ->
+      addr_refine ptr_inf ptr_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.free_preconditions ms_inf_start ptr_inf ->
+      Memory64BitIntptr.MMEP.MemSpec.free_preconditions ms_fin_start ptr_fin.
+  Proof.
+    intros ms_inf_start ms_fin_start ptr_fin ptr_inf MSR ADDR_REF FREE_SPEC.
+    destruct FREE_SPEC.
+    split.
+    - eapply root_in_memstate_heap_inf_fin; eauto.
+    - destruct free_was_allocated.
+      eapply inf_fin_byte_allocated in H; eauto.
+    - intros ptr H.
+      eapply @ptr_in_memstate_heap_fin_inf with (ptr_inf:=fin_to_inf_addr ptr) in H; eauto.
+      2: apply addr_refine_fin_to_inf_addr.
+      eapply free_block_allocated in H.
+      destruct H.
+      eapply inf_fin_byte_allocated in H; eauto.
+      apply addr_refine_fin_to_inf_addr.
+  Qed.
+
   (* TODO: Prove this / move this *)
   Lemma inf_fin_free_spec :
     forall {ms_inf_start : InfMem.MMEP.MMSP.MemState}
@@ -23588,12 +23631,13 @@ cofix CIH
       {ptr_fin : FinAddr.addr} {ptr_inf : InfAddr.addr},
       MemState_refine_prop ms_inf_start ms_fin_start ->
       addr_refine ptr_inf ptr_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.free_preconditions ms_inf_start ptr_inf ->
       MemoryBigIntptr.MMEP.MemSpec.free_spec ms_inf_start ptr_inf ms_inf_final ->
       exists ms_fin_final : Memory64BitIntptr.MMEP.MMSP.MemState,
         Memory64BitIntptr.MMEP.MemSpec.free_spec ms_fin_start ptr_fin ms_fin_final /\
           MemState_refine_prop ms_inf_final ms_fin_final.
   Proof.
-    intros ms_inf_start ms_inf_final ms_fin_start ptr_fin ptr_inf MSR ADDR_REF FREE_SPEC.
+    intros ms_inf_start ms_inf_final ms_fin_start ptr_fin ptr_inf MSR ADDR_REF FREE_PRE FREE_SPEC.
     destruct FREE_SPEC.
 
     (* How do I get an appropriate MemState for this?
@@ -23709,7 +23753,7 @@ cofix CIH
 
           apply free_block_disjoint_preserved in IN_HEAP.
           specialize (MSR hs_inf).
-          destruct MSR as [MSR _]; forward MSR; [reflexivity|].
+          destruct MSR as [MSR _]; forward MSR; [red; reflexivity|].
           rewrite <- MSR in IN_HEAP.
           eapply ptr_in_heap_prop_lift_inv in IN_HEAP.
           destruct IN_HEAP as (?&?&?&CONV&?).
@@ -23732,11 +23776,11 @@ cofix CIH
         cbn in *.
 
         specialize (MSR fss_inf).
-        destruct MSR as [MSR _]; forward MSR; [reflexivity|].
+        destruct MSR as [MSR _]; forward MSR; [red; reflexivity|].
 
         specialize (free_frame_stack_preserved fss_inf).
-        destruct free_frame_stack_preserved as [FSP _]; forward FSP; [reflexivity|].
-        rewrite <- MSR in FSP.
+        destruct free_frame_stack_preserved as [FSP _]; forward FSP; [red; reflexivity|].
+        red in FSP, MSR. rewrite <- MSR in FSP.
 
         symmetry in FSP.
         generalize dependent fss_inf.
@@ -23793,7 +23837,9 @@ cofix CIH
           subst.
 
           rewrite lift_FrameStack_snoc in SNOC.
+          cbn in SNOC.
           inv SNOC.
+          cbn in SNOC'; subst.
 
           rewrite convert_FrameStack_Snoc_equation in Heqo.
           cbn in Heqo.
@@ -23857,19 +23903,7 @@ cofix CIH
                       InfMemMMSP.ms_provenance := msprovs_inf'
                     |} (k, PROV.nil_prov) a).
           { cbn.
-            do 2 eexists.
-            cbn.
-            repeat split; auto.
-            2: {
-              intros ms' x H.
-              cbn in *.
-              inv H.
-              cbn.
-              reflexivity.
-            }
-            cbn.
-            do 2 eexists.
-            split; eauto.
+            repeat red.
             cbn.
             Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
             unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
@@ -23879,21 +23913,8 @@ cofix CIH
             2: typeclasses eauto.
             eapply IntMaps.IP.F.find_mapsto_iff in IN_BLOCK.
             rewrite IN_BLOCK.
-            split; auto.
-            apply InfPROV.aid_eq_dec_refl.
+            symmetry; apply InfPROV.aid_eq_dec_refl.
           }
-
-          (* TODO: Move. Should apply to fin / inf *)
-          Lemma ptr_in_heap_prop_dec :
-            forall h root ptr,
-              {MemoryBigIntptr.MMEP.MMSP.ptr_in_heap_prop h root ptr} + {~ MemoryBigIntptr.MMEP.MMSP.ptr_in_heap_prop h root ptr}.
-          Proof.
-            intros h root ptr.
-            unfold MemoryBigIntptr.MMEP.MMSP.ptr_in_heap_prop.
-            destruct (IntMaps.IM.find (elt:=MemoryBigIntptr.MMEP.MMSP.Block) (LLVMParamsBigIntptr.PTOI.ptr_to_int root) h) eqn:FIND; eauto.
-            eapply in_dec.
-            eapply Z.eq_dec.
-          Qed.
 
           (* Need to know if k is in the freed block or not *)
           pose proof (ptr_in_heap_prop_dec hs_inf ptr_inf (k, PROV.nil_prov)) as [IN_HEAP | NIN_HEAP].
@@ -23934,27 +23955,11 @@ cofix CIH
           rename Heqo into CONTRA.
           move CONTRA before ALLOC.
 
-          red in ALLOC.
-          apply MemPropT_bind_ret_inv in ALLOC.
-          destruct ALLOC as (?&?&ALLOC&ASSERT).
+          repeat red in ALLOC.
           cbn in ALLOC.
-          red in ALLOC.
-          cbn in ALLOC.
-          destruct ALLOC as (?&?).
-          destruct H0 as (?&?&?&?).
-          destruct H0; subst.
-          destruct ASSERT; subst.
-          cbn in H2.
-          break_match_hyp.
-          2: {
-            destruct H2.
-            inv H2.
-          }
+          break_match_hyp; auto.
 
           destruct m.
-          destruct H2.
-          inv H0.
-
           Transparent MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
           unfold MemoryBigIntptr.MMEP.MMSP.read_byte_raw in Heqo.
           Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
@@ -23988,24 +23993,6 @@ cofix CIH
     }
 
     split.
-    - (* free_was_root *)
-      eapply root_in_memstate_heap_inf_fin; eauto.
-    - (* free_was_allocated *)
-      destruct free_was_allocated.
-      exists x.
-      eapply inf_fin_byte_allocated; eauto.
-    - (* free_block_allocated *)
-      intros ptr PTR.
-      pose proof PTR as PTR_INF.
-      eapply ptr_in_memstate_heap_fin_inf in PTR_INF; eauto.
-      2: {
-        apply addr_refine_fin_to_inf_addr.
-      }
-      apply free_block_allocated in PTR_INF.
-      destruct PTR_INF as (aid&BYTE_ALLOCATED).
-      exists aid.
-      eapply inf_fin_byte_allocated; eauto.
-      apply addr_refine_fin_to_inf_addr.
     - (* free_bytes_freed *)
       intros ptr PTR.
       pose proof PTR as PTR_INF.
@@ -25940,16 +25927,9 @@ cofix CIH
                         left.
 
                         cbn.
-                        intros m2 CONTRA.
+                        intros CONTRA.
 
-                        eapply inf_fin_free_spec in CONTRA.
-                        destruct CONTRA as (?&?&?).
-
-                        cbn in HANDLER.
-                        eapply HANDLER.
-                        eapply H.
-
-                        all: eauto.
+                        eapply inf_fin_free_preconditions in CONTRA; eauto.
                         apply lift_MemState_refine_prop.
                       }
 
@@ -26248,9 +26228,8 @@ cofix CIH
 
                     { epose proof mem_push_spec_fin_inf (lift_MemState_refine_prop m1) (lift_MemState_refine_prop ms_push) PUSH_HANDLER as PUSH_INF.
 
-                      pose proof MemState_fin_to_inf_to_fin ms_push as (ms_push'&MS_PUSH_CONV&MS_PUSH_EQV).
-                      apply MemState_eqv_lift_MemState in MS_PUSH_EQV.
-                      rewrite MS_PUSH_EQV in PUSH_INF.
+                      pose proof MemState_fin_to_inf_to_fin_exists ms_push.
+                      destruct H as (ms_push'&MS_PUSH_CONV&MS_PUSH_EQV).
 
                       eapply Interp_Memory_PropT_Vis with
                         (k2:=(fun '(ms_inf, (sid', _)) =>
@@ -26271,8 +26250,6 @@ cofix CIH
                         exists tt.
                         split; try reflexivity.
                         cbn; auto.
-                        rewrite MS_PUSH_EQV.
-                        auto.
                       }
 
                       2: {
@@ -26488,7 +26465,8 @@ cofix CIH
                     }
 
                     rewrite bind_ret_l in VIS_HANDLED.
-                    pose proof MemState_fin_to_inf_to_fin ms_pop as (ms_pop'&MS_POP_CONV&MS_POP_EQV).
+                    pose proof MemState_fin_to_inf_to_fin_exists ms_pop.
+                    destruct H as (ms_pop'&MS_POP_CONV&MS_POP_EQV).
 
                     { eapply Interp_Memory_PropT_Vis with
                         (k2:=(fun '(ms_inf, (sid', _)) =>
@@ -28977,16 +28955,9 @@ cofix CIH
                 left.
 
                 cbn.
-                intros m2 CONTRA.
+                intros CONTRA.
 
-                eapply inf_fin_free_spec in CONTRA.
-                destruct CONTRA as (?&?&?).
-
-                cbn in HANDLER.
-                eapply HANDLER.
-                eapply H.
-
-                all: eauto.
+                eapply inf_fin_free_preconditions in CONTRA; eauto.
                 apply lift_MemState_refine_prop.
               }
 
@@ -29289,8 +29260,7 @@ cofix CIH
 
             { epose proof mem_push_spec_fin_inf (lift_MemState_refine_prop m1) (lift_MemState_refine_prop ms_push) PUSH_HANDLER as PUSH_INF.
 
-              pose proof MemState_fin_to_inf_to_fin ms_push as (ms_push'&MS_PUSH_CONV&MS_PUSH_EQV).
-              apply MemState_eqv_lift_MemState in MS_PUSH_EQV.
+              pose proof MemState_fin_to_inf_to_fin_exists ms_push as (ms_push'&MS_PUSH_CONV&MS_PUSH_EQV).
               pstep; red; cbn.
 
               eapply Interp_Memory_PropT_Vis with
@@ -30878,7 +30848,7 @@ cofix CIH
                            orutt
                              L4_refine_strict
                              L4_res_refine_strict
-                             (MemState_refine × (eq × (local_refine_strict × stack_refine_strict × (global_refine_strict × DVC1.dvalue_refine_strict))))
+                             (MemState_refine_prop × (eq × (local_refine_strict × stack_refine_strict × (global_refine_strict × DVC1.dvalue_refine_strict))))
                              t t' (OOM:=OOME).
 
   Definition model_E1E2_L4_orutt_strict p1 p2 :=
@@ -32734,10 +32704,10 @@ cofix CIH
       admit.
   Admitted.
 
-  Lemma get_inf_tree_L4_rutt :
+  Lemma get_inf_tree_L4_orutt :
     forall t,
       orutt (OOM:=OOME) L4_refine_strict L4_res_refine_strict
-        (MemState_refine
+        (MemState_refine_prop
            × (eq
                 × (local_refine_strict × stack_refine_strict
                      × (global_refine_strict × DVC1.dvalue_refine_strict)))) (get_inf_tree_L4 t) t.
@@ -32757,8 +32727,9 @@ cofix CIH
       destruct r0.
       repeat destruct p.
       destruct p0.
+      constructor.
+      apply lift_MemState_refine_prop.
       repeat constructor; cbn.
-      + apply lift_MemState_refine.
       + apply lift_local_env_refine_strict.
       + apply lift_stack_refine_strict.
       + apply lift_global_env_refine_strict.
@@ -33355,7 +33326,7 @@ cofix CIH
       (t_inf : itree InfLP.Events.L3 TopLevelBigIntptr.res_L6)
       (t_fin' : itree L4 (FinMem.MMEP.MMSP.MemState * (MemPropT.store_id * (local_env * @stack (list (LLVMAst.raw_id * uvalue)) * res_L1))))
       (REL: orutt (OOM:=OOME) L3_refine_strict L3_res_refine_strict
-              (MemState_refine
+              (MemState_refine_prop
                  × (eq
                       × (local_refine_strict × stack_refine_strict
                            × (global_refine_strict × DVC1.dvalue_refine_strict)))) t_inf t_fin)
@@ -33841,7 +33812,7 @@ cofix CIH
      *)
     exists (get_inf_tree_L4 t_fin_L4).
     split.
-    2: apply get_inf_tree_L4_rutt.
+    2: apply get_inf_tree_L4_orutt.
 
     red.
     red in UNDEF_FIN.
@@ -33877,7 +33848,7 @@ cofix CIH
                            orutt
                              L4_refine_strict
                              L4_res_refine_strict
-                             (MemState_refine × (eq × (local_refine_strict × stack_refine_strict × (global_refine_strict × DVC1.dvalue_refine_strict))))
+                             (MemState_refine_prop × (eq × (local_refine_strict × stack_refine_strict × (global_refine_strict × DVC1.dvalue_refine_strict))))
                              t t' (OOM:=OOME).
 
   Definition model_E1E2_L5_orutt_strict p1 p2 :=
@@ -33895,7 +33866,7 @@ cofix CIH
                            orutt
                              L4_refine_strict
                              L4_res_refine_strict
-                             (MemState_refine × (eq × (local_refine_strict × stack_refine_strict × (global_refine_strict × DVC1.dvalue_refine_strict))))
+                             (MemState_refine_prop × (eq × (local_refine_strict × stack_refine_strict × (global_refine_strict × DVC1.dvalue_refine_strict))))
                              t t' (OOM:=OOME).
 
   Definition model_E1E2_L6_orutt_strict p1 p2 :=
