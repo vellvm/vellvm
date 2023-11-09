@@ -19849,6 +19849,34 @@ cofix CIH
     eapply handle_free_preconditions_fin_inf; eauto.
   Qed.
 
+  Lemma handle_free_fin_inf_error :
+    forall {ms_fin_start ms_inf_start msg_fin args_fin args_inf},
+      MemState_refine_prop ms_inf_start ms_fin_start ->
+      Forall2 DVC1.dvalue_refine_strict args_inf args_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.handle_free_prop args_fin ms_fin_start (raise_error msg_fin) ->
+      exists msg_inf,
+        MemoryBigIntptr.MMEP.MemSpec.handle_free_prop args_inf ms_inf_start (raise_error msg_inf).
+  Proof.
+    intros ms_fin_start ms_inf_start msg_fin args_fin args_inf MSR ARGS HANDLE.
+
+    repeat (destruct ARGS;
+            try solve [cbn in *; eauto];
+            match goal with
+            | H: DVCInfFin.dvalue_refine_strict ?x _ |- _ =>
+                destruct x;
+                rewrite
+                  DVCInfFin.dvalue_refine_strict_equation,
+                  DVCInfFin.dvalue_convert_strict_equation in H;
+                inv H;
+                try solve [cbn in *; eauto]
+            end).
+    all: repeat break_match_hyp_inv.
+    all: destruct ARGS; [|cbn in *; eauto].
+    eauto.
+    Unshelve.
+    exact (""%string).
+  Qed.
+
   (* TODO: Lemma about lifting intrinsic handlers *)
   (* TODO: Move this *)
   Lemma handle_intrinsic_fin_inf :
@@ -24922,6 +24950,398 @@ cofix CIH
       auto.
   Qed.
 
+  (* TODO: Move this *)
+  Lemma handle_memcpy_fin_inf_error :
+    forall {args args0 ms_fin ms_inf msg_fin},
+      MemState_refine_prop ms_inf ms_fin ->
+      Forall2 DVCInfFin.dvalue_refine_strict args0 args ->
+      Memory64BitIntptr.MMEP.MemSpec.handle_memcpy_prop args ms_fin (raise_error msg_fin) ->
+      exists msg_inf,
+        MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop args0 ms_inf (raise_error msg_inf).
+  Proof.
+    intros args args0 ms_fin ms_inf msg_fin MSR ARGS HANDLER.
+
+    repeat (destruct ARGS;
+            try solve [cbn in *; eauto];
+            match goal with
+            | H: DVCInfFin.dvalue_refine_strict ?x _ |- _ =>
+                destruct x;
+                rewrite
+                  DVCInfFin.dvalue_refine_strict_equation,
+                  DVCInfFin.dvalue_convert_strict_equation in H;
+                inv H;
+                try solve [cbn in *; eauto]
+            end).
+    all: repeat break_match_hyp_inv.
+    all: destruct ARGS; [|cbn in *; eauto].
+
+    { (* 32 bit memcpy *)
+      unfold MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop.
+      unfold MemoryBigIntptr.MMEP.MemSpec.memcpy_spec.
+      do 2 red in HANDLER.
+      break_match_hyp; try contradiction.
+      break_match_hyp; try contradiction.
+      unfold LLVMParams64BitIntptr.Events.DV.unsigned in Heqb, Heqb0.
+      cbn in Heqb, Heqb0.
+      unfold LLVMParamsBigIntptr.Events.DV.unsigned.
+      unfold LLVMParamsBigIntptr.Events.DV.VInt32.
+      rewrite Heqb.
+      erewrite <- fin_inf_no_overlap; eauto.
+      repeat erewrite <- fin_inf_ptoi; eauto.
+      rewrite Heqb0.
+
+      destruct HANDLER.
+      { exists msg_fin.
+        left.
+        eapply fin_inf_read_bytes_spec_err; eauto.
+      }
+
+      destruct H as (?&?&?&?).
+      exists msg_fin.
+      right.
+
+      eapply fin_inf_read_bytes_spec in H; eauto.
+      destruct H as (?&?&?&?&?).
+      exists x5, x4.
+      split; eauto.
+      eapply fin_inf_write_bytes_spec_error; eauto.
+    }
+
+    { (* 64 bit memcpy *)
+      unfold MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop.
+      unfold MemoryBigIntptr.MMEP.MemSpec.memcpy_spec.
+      do 2 red in HANDLER.
+      break_match_hyp; try contradiction.
+      break_match_hyp; try contradiction.
+      unfold LLVMParams64BitIntptr.Events.DV.unsigned in Heqb, Heqb0.
+      cbn in Heqb, Heqb0.
+      unfold LLVMParamsBigIntptr.Events.DV.unsigned.
+      unfold LLVMParamsBigIntptr.Events.DV.VInt64.
+      rewrite Heqb.
+      erewrite <- fin_inf_no_overlap; eauto.
+      repeat erewrite <- fin_inf_ptoi; eauto.
+      rewrite Heqb0.
+
+      destruct HANDLER.
+      { exists msg_fin.
+        left.
+        eapply fin_inf_read_bytes_spec_err; eauto.
+      }
+
+      destruct H as (?&?&?&?).
+      exists msg_fin.
+      right.
+
+      eapply fin_inf_read_bytes_spec in H; eauto.
+      destruct H as (?&?&?&?&?).
+      exists x5, x4.
+      split; eauto.
+      eapply fin_inf_write_bytes_spec_error; eauto.
+    }
+
+    { (* intptr memcpy *)
+      unfold MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop.
+      unfold MemoryBigIntptr.MMEP.MemSpec.memcpy_spec.
+      do 2 red in HANDLER.
+      break_match_hyp; try contradiction.
+      break_match_hyp; try contradiction.
+      unfold LLVMParams64BitIntptr.Events.DV.unsigned in Heqb, Heqb0.
+      cbn in Heqb, Heqb0.
+      assert (LLVMParams64BitIntptr.IP.to_Z i0 = LLVMParamsBigIntptr.IP.to_Z x) as X.
+      { unfold LLVMParams64BitIntptr.IP.to_Z, LLVMParamsBigIntptr.IP.to_Z.
+        unfold InterpreterStackBigIntptr.LP.IP.to_Z in *.
+        erewrite IP.from_Z_to_Z; eauto.
+      }
+      rewrite <- X; clear X.
+      rewrite Heqb.
+      erewrite <- fin_inf_no_overlap; eauto.
+      repeat erewrite <- fin_inf_ptoi; eauto.
+      rewrite Heqb0.
+
+      destruct HANDLER.
+      { exists msg_fin.
+        left.
+        eapply fin_inf_read_bytes_spec_err; eauto.
+      }
+
+      destruct H as (?&?&?&?).
+      exists msg_fin.
+      right.
+
+      eapply fin_inf_read_bytes_spec in H; eauto.
+      destruct H as (?&?&?&?&?).
+      exists x5, x4.
+      split; eauto.
+      eapply fin_inf_write_bytes_spec_error; eauto.
+    }
+  Qed.
+
+  Lemma handle_malloc_fin_inf_error :
+    forall {args args0 ms_fin ms_inf msg_fin},
+      MemState_refine_prop ms_inf ms_fin ->
+      Forall2 DVCInfFin.dvalue_refine_strict args0 args ->
+      Memory64BitIntptr.MMEP.MemSpec.handle_malloc_prop args ms_fin (raise_error msg_fin) ->
+      exists msg_inf,
+        MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop args0 ms_inf (raise_error msg_inf).
+  Proof.
+    intros args args0 ms_fin ms_inf msg_fin MSR ARGS HANDLER.
+
+    repeat (destruct ARGS;
+            try solve [cbn in *; eauto];
+            match goal with
+            | H: DVCInfFin.dvalue_refine_strict ?x _ |- _ =>
+                destruct x;
+                rewrite
+                  DVCInfFin.dvalue_refine_strict_equation,
+                  DVCInfFin.dvalue_convert_strict_equation in H;
+                inv H;
+                try solve [cbn in *; eauto]
+            end).
+    all: repeat break_match_hyp_inv.
+    all: destruct ARGS; [|cbn in *; eauto].
+
+    { (* i1 *)
+      unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
+      red in HANDLER.
+      eapply MemPropT_bind_raise_error_inv in HANDLER.
+      destruct HANDLER as [[] | HANDLER].
+      destruct HANDLER as (?&?&?&?).
+      destruct H0.
+      { red in H0.
+        break_match_hyp; cbn in H0; contradiction.
+      }
+      destruct H0 as (?&?&?&?).
+      exists msg_fin.
+      right.
+      eapply fresh_sid_fin_inf in H; eauto.
+      destruct H as (?&?&?&?&?); subst.
+      do 2 eexists; split; eauto.
+
+      red in H0.
+      break_match_hyp_inv.
+      eapply generate_num_undef_bytes_fin_inf in Heqo.
+      destruct Heqo as (?&?&?).
+      right.
+      do 2 eexists.
+      split.
+      red.
+      cbn in H0.
+      cbn; rewrite H0.
+      split; reflexivity.
+
+      eapply fin_inf_malloc_bytes_spec_MemPropT_error; eauto.
+    }
+
+    { (* i8 *)
+      unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
+      red in HANDLER.
+      eapply MemPropT_bind_raise_error_inv in HANDLER.
+      destruct HANDLER as [[] | HANDLER].
+      destruct HANDLER as (?&?&?&?).
+      destruct H0.
+      { red in H0.
+        break_match_hyp; cbn in H0; contradiction.
+      }
+      destruct H0 as (?&?&?&?).
+      exists msg_fin.
+      right.
+      eapply fresh_sid_fin_inf in H; eauto.
+      destruct H as (?&?&?&?&?); subst.
+      do 2 eexists; split; eauto.
+
+      red in H0.
+      break_match_hyp_inv.
+      eapply generate_num_undef_bytes_fin_inf in Heqo.
+      destruct Heqo as (?&?&?).
+      right.
+      do 2 eexists.
+      split.
+      red.
+      cbn in H0.
+      cbn; rewrite H0.
+      split; reflexivity.
+
+      eapply fin_inf_malloc_bytes_spec_MemPropT_error; eauto.
+    }
+
+    { (* i32 *)
+      unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
+      red in HANDLER.
+      eapply MemPropT_bind_raise_error_inv in HANDLER.
+      destruct HANDLER as [[] | HANDLER].
+      destruct HANDLER as (?&?&?&?).
+      destruct H0.
+      { red in H0.
+        break_match_hyp; cbn in H0; contradiction.
+      }
+      destruct H0 as (?&?&?&?).
+      exists msg_fin.
+      right.
+      eapply fresh_sid_fin_inf in H; eauto.
+      destruct H as (?&?&?&?&?); subst.
+      do 2 eexists; split; eauto.
+
+      red in H0.
+      break_match_hyp_inv.
+      eapply generate_num_undef_bytes_fin_inf in Heqo.
+      destruct Heqo as (?&?&?).
+      right.
+      do 2 eexists.
+      split.
+      red.
+      cbn in H0.
+      cbn; rewrite H0.
+      split; reflexivity.
+
+      eapply fin_inf_malloc_bytes_spec_MemPropT_error; eauto.
+    }
+
+    { (* i64 *)
+      unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
+      red in HANDLER.
+      eapply MemPropT_bind_raise_error_inv in HANDLER.
+      destruct HANDLER as [[] | HANDLER].
+      destruct HANDLER as (?&?&?&?).
+      destruct H0.
+      { red in H0.
+        break_match_hyp; cbn in H0; contradiction.
+      }
+      destruct H0 as (?&?&?&?).
+      exists msg_fin.
+      right.
+      eapply fresh_sid_fin_inf in H; eauto.
+      destruct H as (?&?&?&?&?); subst.
+      do 2 eexists; split; eauto.
+
+      red in H0.
+      break_match_hyp_inv.
+      eapply generate_num_undef_bytes_fin_inf in Heqo.
+      destruct Heqo as (?&?&?).
+      right.
+      do 2 eexists.
+      split.
+      red.
+      cbn in H0.
+      cbn; rewrite H0.
+      split; reflexivity.
+
+      eapply fin_inf_malloc_bytes_spec_MemPropT_error; eauto.
+    }
+
+    { (* iptr *)
+      unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
+      red in HANDLER.
+      eapply MemPropT_bind_raise_error_inv in HANDLER.
+      destruct HANDLER as [[] | HANDLER].
+      destruct HANDLER as (?&?&?&?).
+      destruct H0.
+      { red in H0.
+        break_match_hyp; cbn in H0; contradiction.
+      }
+      destruct H0 as (?&?&?&?).
+      exists msg_fin.
+      right.
+      eapply fresh_sid_fin_inf in H; eauto.
+      destruct H as (?&?&?&?&?); subst.
+      do 2 eexists; split; eauto.
+
+      red in H0.
+      break_match_hyp_inv.
+      eapply generate_num_undef_bytes_fin_inf in Heqo0.
+      destruct Heqo0 as (?&?&?).
+      right.
+      do 2 eexists.
+      split.
+
+      unfold LLVMParamsBigIntptr.IP.to_unsigned.
+      rewrite <- LLVMParamsBigIntptr.IP.to_Z_to_unsigned.
+      unfold LLVMParams64BitIntptr.IP.to_unsigned in H0.
+      rewrite <- LLVMParams64BitIntptr.IP.to_Z_to_unsigned in H0.
+
+
+      assert (LLVMParams64BitIntptr.IP.to_Z i = LLVMParamsBigIntptr.IP.to_Z x) as X.
+      { unfold LLVMParams64BitIntptr.IP.to_Z, LLVMParamsBigIntptr.IP.to_Z.
+        unfold InterpreterStackBigIntptr.LP.IP.to_Z in *.
+        erewrite IP.from_Z_to_Z; eauto.
+      }
+      rewrite <- X; clear X.
+
+      red.
+      cbn in H0.
+      cbn; rewrite H0.
+      split; reflexivity.
+
+      eapply fin_inf_malloc_bytes_spec_MemPropT_error; eauto.
+    }
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma handle_intrinsic_fin_inf_error :
+    forall {t f args args0 ms_fin ms_inf msg_fin}
+      (ARGS: Forall2 DVCInfFin.dvalue_refine_strict args0 args),
+      MemState_refine_prop ms_inf ms_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.handle_intrinsic_prop
+        LLVMParams64BitIntptr.Events.DV.dvalue
+        (LLVMParams64BitIntptr.Events.Intrinsic t f args) ms_fin (raise_error msg_fin) ->
+      exists msg_inf,
+        MemoryBigIntptr.MMEP.MemSpec.handle_intrinsic_prop DVCInfFin.DV1.dvalue
+          (InterpreterStackBigIntptr.LP.Events.Intrinsic t f args0) ms_inf
+          (raise_error msg_inf).
+  Proof.
+    intros t f args args0 ms_fin ms_inf msg_fin ARGS MSR INTRINSIC.
+
+    red in INTRINSIC.
+    unfold MemoryBigIntptr.MMEP.MemSpec.handle_intrinsic_prop.
+    break_match.
+    { (* Memcpy *)
+      destruct INTRINSIC.
+      2: {
+        cbn in H.
+        destruct H as (?&?&?&?).
+        contradiction.
+      }
+      eapply handle_memcpy_fin_inf_error in H; eauto.
+      destruct H.
+      exists x.
+      left.
+      auto.
+    }
+
+    break_match.
+    { (* Malloc *)
+      destruct INTRINSIC.
+      2: {
+        cbn in H.
+        destruct H as (?&?&?&?).
+        contradiction.
+      }
+
+      eapply handle_malloc_fin_inf_error in H; eauto.
+      destruct H.
+      exists x.
+      left; auto.
+    }
+
+    break_match.
+    { (* Free *)
+      destruct INTRINSIC.
+      2: {
+        cbn in H.
+        destruct H as (?&?&?&?).
+        contradiction.
+      }
+
+      eapply handle_free_fin_inf_error in H; eauto.
+      destruct H.
+      exists x.
+      left; auto.
+    }
+
+    eauto.
+    Unshelve.
+    exact ""%string.
+  Qed.
+
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
       L2_E1E2_orutt_strict t_inf t_fin ->
@@ -26511,444 +26931,10 @@ cofix CIH
                       rewrite bind_trigger.
                       reflexivity.
 
-                      (* TODO: Move this *)
-                      Lemma handle_memcpy_fin_inf_error :
-                        forall {args args0 ms_fin ms_inf msg_fin},
-                          MemState_refine_prop ms_inf ms_fin ->
-                          Forall2 DVCInfFin.dvalue_refine_strict args0 args ->
-                          Memory64BitIntptr.MMEP.MemSpec.handle_memcpy_prop args ms_fin (raise_error msg_fin) ->
-                          exists msg_inf,
-                            MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop args0 ms_inf (raise_error msg_inf).
-                      Proof.
-                        intros args args0 ms_fin ms_inf msg_fin MSR ARGS HANDLER.
-
-                        repeat (destruct ARGS;
-                                try solve [cbn in *; eauto];
-                                match goal with
-                                | H: DVCInfFin.dvalue_refine_strict ?x _ |- _ =>
-                                    destruct x;
-                                    rewrite
-                                      DVCInfFin.dvalue_refine_strict_equation,
-                                      DVCInfFin.dvalue_convert_strict_equation in H;
-                                    inv H;
-                                    try solve [cbn in *; eauto]
-                                end).
-                        all: repeat break_match_hyp_inv.
-                        all: destruct ARGS; [|cbn in *; eauto].
-
-                        { (* 32 bit memcpy *)
-                          unfold MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop.
-                          unfold MemoryBigIntptr.MMEP.MemSpec.memcpy_spec.
-                          do 2 red in HANDLER.
-                          break_match_hyp; try contradiction.
-                          break_match_hyp; try contradiction.
-                          unfold LLVMParams64BitIntptr.Events.DV.unsigned in Heqb, Heqb0.
-                          cbn in Heqb, Heqb0.
-                          unfold LLVMParamsBigIntptr.Events.DV.unsigned.
-                          unfold LLVMParamsBigIntptr.Events.DV.VInt32.
-                          rewrite Heqb.
-                          erewrite <- fin_inf_no_overlap; eauto.
-                          repeat erewrite <- fin_inf_ptoi; eauto.
-                          rewrite Heqb0.
-
-                          destruct HANDLER.
-                          { exists msg_fin.
-                            left.
-                            eapply fin_inf_read_bytes_spec_err; eauto.
-                          }
-
-                          destruct H as (?&?&?&?).
-                          exists msg_fin.
-                          right.
-
-                          eapply fin_inf_read_bytes_spec in H; eauto.
-                          destruct H as (?&?&?&?&?).
-                          exists x5, x4.
-                          split; eauto.
-                          eapply fin_inf_write_bytes_spec_error; eauto.
-                        }
-
-                        { (* 64 bit memcpy *)
-                          unfold MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop.
-                          unfold MemoryBigIntptr.MMEP.MemSpec.memcpy_spec.
-                          do 2 red in HANDLER.
-                          break_match_hyp; try contradiction.
-                          break_match_hyp; try contradiction.
-                          unfold LLVMParams64BitIntptr.Events.DV.unsigned in Heqb, Heqb0.
-                          cbn in Heqb, Heqb0.
-                          unfold LLVMParamsBigIntptr.Events.DV.unsigned.
-                          unfold LLVMParamsBigIntptr.Events.DV.VInt64.
-                          rewrite Heqb.
-                          erewrite <- fin_inf_no_overlap; eauto.
-                          repeat erewrite <- fin_inf_ptoi; eauto.
-                          rewrite Heqb0.
-
-                          destruct HANDLER.
-                          { exists msg_fin.
-                            left.
-                            eapply fin_inf_read_bytes_spec_err; eauto.
-                          }
-
-                          destruct H as (?&?&?&?).
-                          exists msg_fin.
-                          right.
-
-                          eapply fin_inf_read_bytes_spec in H; eauto.
-                          destruct H as (?&?&?&?&?).
-                          exists x5, x4.
-                          split; eauto.
-                          eapply fin_inf_write_bytes_spec_error; eauto.
-                        }
-
-                        { (* intptr memcpy *)
-                          unfold MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop.
-                          unfold MemoryBigIntptr.MMEP.MemSpec.memcpy_spec.
-                          do 2 red in HANDLER.
-                          break_match_hyp; try contradiction.
-                          break_match_hyp; try contradiction.
-                          unfold LLVMParams64BitIntptr.Events.DV.unsigned in Heqb, Heqb0.
-                          cbn in Heqb, Heqb0.
-                          assert (LLVMParams64BitIntptr.IP.to_Z i0 = LLVMParamsBigIntptr.IP.to_Z x) as X.
-                          { unfold LLVMParams64BitIntptr.IP.to_Z, LLVMParamsBigIntptr.IP.to_Z.
-                            unfold InterpreterStackBigIntptr.LP.IP.to_Z in *.
-                            erewrite IP.from_Z_to_Z; eauto.
-                          }
-                          rewrite <- X; clear X.
-                          rewrite Heqb.
-                          erewrite <- fin_inf_no_overlap; eauto.
-                          repeat erewrite <- fin_inf_ptoi; eauto.
-                          rewrite Heqb0.
-
-                          destruct HANDLER.
-                          { exists msg_fin.
-                            left.
-                            eapply fin_inf_read_bytes_spec_err; eauto.
-                          }
-
-                          destruct H as (?&?&?&?).
-                          exists msg_fin.
-                          right.
-
-                          eapply fin_inf_read_bytes_spec in H; eauto.
-                          destruct H as (?&?&?&?&?).
-                          exists x5, x4.
-                          split; eauto.
-                          eapply fin_inf_write_bytes_spec_error; eauto.
-                        }
-                      Qed.
-
-                      Lemma handle_malloc_fin_inf_error :
-                        forall {args args0 ms_fin ms_inf msg_fin},
-                          MemState_refine_prop ms_inf ms_fin ->
-                          Forall2 DVCInfFin.dvalue_refine_strict args0 args ->
-                          Memory64BitIntptr.MMEP.MemSpec.handle_malloc_prop args ms_fin (raise_error msg_fin) ->
-                          exists msg_inf,
-                            MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop args0 ms_inf (raise_error msg_inf).
-                      Proof.
-                        intros args args0 ms_fin ms_inf msg_fin MSR ARGS HANDLER.
-
-                        repeat (destruct ARGS;
-                                try solve [cbn in *; eauto];
-                                match goal with
-                                | H: DVCInfFin.dvalue_refine_strict ?x _ |- _ =>
-                                    destruct x;
-                                    rewrite
-                                      DVCInfFin.dvalue_refine_strict_equation,
-                                      DVCInfFin.dvalue_convert_strict_equation in H;
-                                    inv H;
-                                    try solve [cbn in *; eauto]
-                                end).
-                        all: repeat break_match_hyp_inv.
-                        all: destruct ARGS; [|cbn in *; eauto].
-
-                        { (* i1 *)
-                          unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
-                          red in HANDLER.
-                          eapply MemPropT_bind_raise_error_inv in HANDLER.
-                          destruct HANDLER as [[] | HANDLER].
-                          destruct HANDLER as (?&?&?&?).
-                          destruct H0.
-                          { red in H0.
-                            break_match_hyp; cbn in H0; contradiction.
-                          }
-                          destruct H0 as (?&?&?&?).
-                          exists msg_fin.
-                          right.
-                          eapply fresh_sid_fin_inf in H; eauto.
-                          destruct H as (?&?&?&?&?); subst.
-                          do 2 eexists; split; eauto.
-
-                          red in H0.
-                          break_match_hyp_inv.
-                          eapply generate_num_undef_bytes_fin_inf in Heqo.
-                          destruct Heqo as (?&?&?).
-                          right.
-                          do 2 eexists.
-                          split.
-                          red.
-                          cbn in H0.
-                          cbn; rewrite H0.
-                          split; reflexivity.
-
-                          eapply fin_inf_malloc_bytes_spec_MemPropT_error; eauto.
-                        }
-
-                        { (* i8 *)
-                          unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
-                          red in HANDLER.
-                          eapply MemPropT_bind_raise_error_inv in HANDLER.
-                          destruct HANDLER as [[] | HANDLER].
-                          destruct HANDLER as (?&?&?&?).
-                          destruct H0.
-                          { red in H0.
-                            break_match_hyp; cbn in H0; contradiction.
-                          }
-                          destruct H0 as (?&?&?&?).
-                          exists msg_fin.
-                          right.
-                          eapply fresh_sid_fin_inf in H; eauto.
-                          destruct H as (?&?&?&?&?); subst.
-                          do 2 eexists; split; eauto.
-
-                          red in H0.
-                          break_match_hyp_inv.
-                          eapply generate_num_undef_bytes_fin_inf in Heqo.
-                          destruct Heqo as (?&?&?).
-                          right.
-                          do 2 eexists.
-                          split.
-                          red.
-                          cbn in H0.
-                          cbn; rewrite H0.
-                          split; reflexivity.
-
-                          eapply fin_inf_malloc_bytes_spec_MemPropT_error; eauto.
-                        }
-
-                        { (* i32 *)
-                          unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
-                          red in HANDLER.
-                          eapply MemPropT_bind_raise_error_inv in HANDLER.
-                          destruct HANDLER as [[] | HANDLER].
-                          destruct HANDLER as (?&?&?&?).
-                          destruct H0.
-                          { red in H0.
-                            break_match_hyp; cbn in H0; contradiction.
-                          }
-                          destruct H0 as (?&?&?&?).
-                          exists msg_fin.
-                          right.
-                          eapply fresh_sid_fin_inf in H; eauto.
-                          destruct H as (?&?&?&?&?); subst.
-                          do 2 eexists; split; eauto.
-
-                          red in H0.
-                          break_match_hyp_inv.
-                          eapply generate_num_undef_bytes_fin_inf in Heqo.
-                          destruct Heqo as (?&?&?).
-                          right.
-                          do 2 eexists.
-                          split.
-                          red.
-                          cbn in H0.
-                          cbn; rewrite H0.
-                          split; reflexivity.
-
-                          eapply fin_inf_malloc_bytes_spec_MemPropT_error; eauto.
-                        }
-
-                        { (* i64 *)
-                          unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
-                          red in HANDLER.
-                          eapply MemPropT_bind_raise_error_inv in HANDLER.
-                          destruct HANDLER as [[] | HANDLER].
-                          destruct HANDLER as (?&?&?&?).
-                          destruct H0.
-                          { red in H0.
-                            break_match_hyp; cbn in H0; contradiction.
-                          }
-                          destruct H0 as (?&?&?&?).
-                          exists msg_fin.
-                          right.
-                          eapply fresh_sid_fin_inf in H; eauto.
-                          destruct H as (?&?&?&?&?); subst.
-                          do 2 eexists; split; eauto.
-
-                          red in H0.
-                          break_match_hyp_inv.
-                          eapply generate_num_undef_bytes_fin_inf in Heqo.
-                          destruct Heqo as (?&?&?).
-                          right.
-                          do 2 eexists.
-                          split.
-                          red.
-                          cbn in H0.
-                          cbn; rewrite H0.
-                          split; reflexivity.
-
-                          eapply fin_inf_malloc_bytes_spec_MemPropT_error; eauto.
-                        }
-
-                        { (* iptr *)
-                          unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
-                          red in HANDLER.
-                          eapply MemPropT_bind_raise_error_inv in HANDLER.
-                          destruct HANDLER as [[] | HANDLER].
-                          destruct HANDLER as (?&?&?&?).
-                          destruct H0.
-                          { red in H0.
-                            break_match_hyp; cbn in H0; contradiction.
-                          }
-                          destruct H0 as (?&?&?&?).
-                          exists msg_fin.
-                          right.
-                          eapply fresh_sid_fin_inf in H; eauto.
-                          destruct H as (?&?&?&?&?); subst.
-                          do 2 eexists; split; eauto.
-
-                          red in H0.
-                          break_match_hyp_inv.
-                          eapply generate_num_undef_bytes_fin_inf in Heqo0.
-                          destruct Heqo0 as (?&?&?).
-                          right.
-                          do 2 eexists.
-                          split.
-
-                          unfold LLVMParamsBigIntptr.IP.to_unsigned.
-                          rewrite <- LLVMParamsBigIntptr.IP.to_Z_to_unsigned.
-                          unfold LLVMParams64BitIntptr.IP.to_unsigned in H0.
-                          rewrite <- LLVMParams64BitIntptr.IP.to_Z_to_unsigned in H0.
-
-
-                          assert (LLVMParams64BitIntptr.IP.to_Z i = LLVMParamsBigIntptr.IP.to_Z x) as X.
-                          { unfold LLVMParams64BitIntptr.IP.to_Z, LLVMParamsBigIntptr.IP.to_Z.
-                            unfold InterpreterStackBigIntptr.LP.IP.to_Z in *.
-                            erewrite IP.from_Z_to_Z; eauto.
-                          }
-                          rewrite <- X; clear X.
-
-                          red.
-                          cbn in H0.
-                          cbn; rewrite H0.
-                          split; reflexivity.
-
-                          eapply fin_inf_malloc_bytes_spec_MemPropT_error; eauto.
-                        }
-                      Qed.
-
-                      (* TODO: Move this *)
-                      Lemma handle_intrinsic_fin_inf_error :
-                        forall {t f args args0 ms_fin ms_inf msg_fin}
-                          (ARGS: Forall2 DVCInfFin.dvalue_refine_strict args0 args),
-                          MemState_refine_prop ms_inf ms_fin ->
-                          Memory64BitIntptr.MMEP.MemSpec.handle_intrinsic_prop
-                            LLVMParams64BitIntptr.Events.DV.dvalue
-                            (LLVMParams64BitIntptr.Events.Intrinsic t f args) ms_fin (raise_error msg_fin) ->
-                          exists msg_inf,
-                            MemoryBigIntptr.MMEP.MemSpec.handle_intrinsic_prop DVCInfFin.DV1.dvalue
-                              (InterpreterStackBigIntptr.LP.Events.Intrinsic t f args0) ms_inf
-                              (raise_error msg_inf).
-                      Proof.
-                        intros t f args args0 ms_fin ms_inf msg_fin ARGS MSR INTRINSIC.
-
-                        red in INTRINSIC.
-                        unfold MemoryBigIntptr.MMEP.MemSpec.handle_intrinsic_prop.
-                        break_match.
-                        { (* Memcpy *)
-                          destruct INTRINSIC.
-                          2: {
-                            cbn in H.
-                            destruct H as (?&?&?&?).
-                            contradiction.
-                          }
-                          eapply handle_memcpy_fin_inf_error in H; eauto.
-                          destruct H.
-                          exists x.
-                          left.
-                          auto.
-                        }
-
-                        break_match.
-                        { (* Malloc *)
-                          destruct INTRINSIC.
-                          2: {
-                            cbn in H.
-                            destruct H as (?&?&?&?).
-                            contradiction.
-                          }
-
-                          eapply handle_malloc_fin_inf_error in H; eauto.
-                          destruct H.
-                          exists x.
-                          left; auto.
-                        }
-
-                          eapply MemPropT_fin_inf_bind.
-                          4: apply INTRINSIC.
-                          all: eauto.
-
-                          { (* MA: handle_malloc_prop *)
-                            intros a_fin ms_fin_ma HANDLE_MALLOC.
-                            eapply handle_malloc_fin_inf; eauto.
-                          }
-
-                          intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin H H0 H1 H2.
-                          cbn in H, H2.
-                          destruct H2; subst.
-                          do 2 eexists; cbn; split; auto.
-                          split; auto.
-                          rewrite DVC1.dvalue_refine_strict_equation, DVC1.dvalue_convert_strict_equation.
-                          cbn.
-                          rewrite H.
-                          auto.
-                        }
-
-                        break_match.
-                        { (* Free *)
-                          eapply MemPropT_fin_inf_bind.
-                          4: apply INTRINSIC.
-                          all: eauto.
-
-                          { (* MA: handle_free_prop *)
-                            intros a_fin ms_fin_ma HANDLE_FREE.
-                            eapply handle_free_fin_inf; eauto.
-                          }
-
-                          intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin H H0 H1 H2.
-                          cbn in H, H2.
-                          destruct H2; subst.
-                          do 2 eexists; cbn; split; auto.
-                          split; auto.
-                          rewrite DVC1.dvalue_refine_strict_equation, DVC1.dvalue_convert_strict_equation.
-                          cbn.
-                          auto.
-                        }
-
-                        (* Unknown intrinsic *)
-                        cbn in *; auto.
-                        contradiction.
-                      Qed.
-
                       destruct HANDLER.
                       eapply handle_intrinsic_fin_inf_error.
                       2: apply lift_MemState_refine_prop.
                       all: eauto.
-                      
-                      (* This seems related to HANDLER... *)
-                      (* TODO: Prove this. Maybe separate into a
-                      separate lemma, running into massive problems
-                      with Coq slowness... May need to restart emacs
-                      or something? *)
-                      destruct HANDLER as [msg_spec HANDLER].
-                      cbn in HANDLER.
-                      break_match_hyp.
-                      destruct HANDLER as [HANDLER | (?&?&?&[])].
-                      exists msg_spec.
-                      cbn.
-                      rewrite Heqb.
-                      left.
-                      admit.
-                      admit.
                     }
 
                     { (* Handler raises OOM *)
