@@ -7752,6 +7752,22 @@ cofix CIH
     auto.
   Qed.
 
+  (* TODO: Move this... *)
+  Lemma MemPropT_bind_raise_error_inv :
+    forall {S A B}
+      (ma : MemPropT S A)
+      (mab : A -> MemPropT S B)
+      {s1 msg}
+      (M :
+        (a <- ma;;
+         mab a) s1 (raise_error msg)),
+      (ma s1 (raise_error msg) \/
+         exists s' a, ma s1 (ret (s', a)) /\ mab a s' (raise_error msg)).
+  Proof.
+    intros S A B ma mab s1 msg M.
+    auto.
+  Qed.
+
   (* This might be a good idea, should make the proofs more modular... *)
   (* TODO: Move this *)
   Lemma MemPropT_fin_inf_bind :
@@ -8025,6 +8041,65 @@ cofix CIH
 
   #[global] Hint Resolve MemPropT_fin_inf_bind_ub : FinInf.
 
+  Lemma MemPropT_fin_inf_bind_error :
+    forall {ms_inf_start : MemoryBigIntptr.MMEP.MMSP.MemState}
+      {ms_fin_start ms_fin_final : Memory64BitIntptr.MMEP.MMSP.MemState}
+      {A_FIN A_INF B_FIN B_INF}
+      (ma_fin : MemPropT Memory64BitIntptr.MMEP.MMSP.MemState A_FIN)
+      {ma_inf : MemPropT MemoryBigIntptr.MMEP.MMSP.MemState A_INF}
+      {mab_fin : A_FIN -> MemPropT Memory64BitIntptr.MMEP.MMSP.MemState B_FIN}
+      {mab_inf : A_INF -> MemPropT MemoryBigIntptr.MMEP.MMSP.MemState B_INF}
+      {msg : string}
+
+      (A_REF : A_INF -> A_FIN -> Prop)
+
+      (MEM_REF_START : MemState_refine_prop ms_inf_start ms_fin_start)
+
+      (* Not sure about quantification *)
+      (MA: forall a_fin ms_fin_ma,
+          ma_fin ms_fin_start (ret (ms_fin_ma, a_fin)) ->
+          exists a_inf ms_inf_ma,
+            ma_inf ms_inf_start (ret (ms_inf_ma, a_inf)) /\
+              A_REF a_inf a_fin /\
+              MemState_refine_prop ms_inf_ma ms_fin_ma)
+
+      (MA_ERROR: forall msg,
+          ma_fin ms_fin_start (raise_error msg) ->
+          ma_inf ms_inf_start (raise_error msg))
+
+      (* Not sure about quantification *)
+      (* ma >>= k *)
+      (K: forall ms_inf ms_fin a_fin a_inf msg,
+          A_REF a_inf a_fin ->
+          MemState_refine_prop ms_inf ms_fin ->
+          ma_inf ms_inf_start (ret (ms_inf, a_inf)) ->
+          mab_fin a_fin ms_fin (raise_error msg) ->
+          mab_inf a_inf ms_inf (raise_error msg))
+
+      (FIN: (a <- ma_fin;;
+             mab_fin a) ms_fin_start (raise_error msg)),
+
+      (a <- ma_inf;;
+       mab_inf a) ms_inf_start (raise_error msg).
+  Proof.
+    intros ms_inf_start ms_fin_start ms_fin_final A_FIN A_INF B_FIN B_INF ma_fin ma_inf mab_fin mab_inf msg A_REF MEM_REF_START MA MA_ERROR K FIN.
+
+    repeat red in FIN.
+    destruct FIN as [UB | (sab&a&FIN&FIN_AB)].
+    { (* UB in ma_fin *)
+      left.
+      auto.
+    }
+
+    apply MA in FIN as (a_inf&ms_inf''&INF&A&MSR).
+    eapply K in FIN_AB; eauto.
+
+    right.
+    eauto.
+  Qed.
+
+  #[global] Hint Resolve MemPropT_fin_inf_bind_error : FinInf.
+
   Lemma MemPropT_fin_inf_map_monad_ub :
     forall {A_INF A_FIN B_INF B_FIN}
       {l_inf : list A_INF} {l_fin : list A_FIN}
@@ -8087,6 +8162,69 @@ cofix CIH
   Qed.
 
   #[global] Hint Resolve MemPropT_fin_inf_map_monad_ub : FinInf.
+
+  Lemma MemPropT_fin_inf_map_monad_error :
+    forall {A_INF A_FIN B_INF B_FIN}
+      {l_inf : list A_INF} {l_fin : list A_FIN}
+      {f_fin : A_FIN -> MemPropT Memory64BitIntptr.MMEP.MMSP.MemState B_FIN} {f_inf : A_INF -> MemPropT MemoryBigIntptr.MMEP.MMSP.MemState B_INF}
+      {ms_fin_start ms_fin_final : Memory64BitIntptr.MMEP.MMSP.MemState}
+      {ms_inf_start : MemoryBigIntptr.MMEP.MMSP.MemState}
+      {msg : string}
+
+      (A_REF : A_INF -> A_FIN -> Prop)
+      (B_REF : B_INF -> B_FIN -> Prop)
+
+      (MEM_REF_START : MemState_refine_prop ms_inf_start ms_fin_start)
+
+      (F : forall a_fin a_inf b_fin ms_fin ms_inf ms_fin_ma,
+          MemState_refine_prop ms_inf ms_fin ->
+          A_REF a_inf a_fin ->
+          f_fin a_fin ms_fin (ret (ms_fin_ma, b_fin)) ->
+          exists b_inf ms_inf_ma,
+            f_inf a_inf ms_inf (ret (ms_inf_ma, b_inf)) /\
+              B_REF b_inf b_fin /\
+              MemState_refine_prop ms_inf_ma ms_fin_ma)
+
+      (F_ERROR : forall a_fin a_inf ms_fin ms_inf msg,
+          MemState_refine_prop ms_inf ms_fin ->
+          A_REF a_inf a_fin ->
+          f_fin a_fin ms_fin (raise_error msg) ->
+          f_inf a_inf ms_inf (raise_error msg))
+
+      (AS : Forall2 A_REF l_inf l_fin)
+      (FIN : map_monad f_fin l_fin ms_fin_start (raise_error msg)),
+
+      map_monad f_inf l_inf ms_inf_start (raise_error msg).
+  Proof.
+    intros A_INF A_FIN B_INF B_FIN l_inf l_fin f_fin f_inf ms_fin_start ms_fin_final ms_inf_start msg A_REF B_REF MEM_REF_START F F_ERROR AS FIN.
+
+    generalize dependent msg.
+    generalize dependent ms_fin_start.
+    generalize dependent ms_inf_start.
+    induction AS; intros ms_inf_start ms_fin_start MEM_REF_START msg FIN.
+    - cbn in *; auto.
+    - rewrite map_monad_unfold in FIN.
+      apply MemPropT_bind_raise_error_inv in FIN as [UB | (ms_fin' & b_fin & F_Y & FIN)].
+      { (* UB in first component *)
+        left; eauto.
+      }
+
+      apply MemPropT_bind_raise_error_inv in FIN as [UB | (ms_fin_final' & b_fin_rest & MAP_FIN & RET_FIN)].
+      2: {
+        cbn in RET_FIN.
+        contradiction.
+      }
+
+      (* UB in rest *)
+      right.
+      pose proof (F _ _ _ _ _ _ MEM_REF_START H F_Y) as (b_inf & ms_inf' & F_X & B & MSR).
+      specialize (IHAS ms_inf' ms_fin' MSR msg UB).
+      exists ms_inf'. exists b_inf.
+      split; eauto.
+      left; auto.
+  Qed.
+
+  #[global] Hint Resolve MemPropT_fin_inf_map_monad_error : FinInf.
 
   Lemma MemPropT_fin_inf_map_monad_In_ub :
     forall {A_INF A_FIN B_INF B_FIN}
@@ -8160,6 +8298,79 @@ cofix CIH
   Qed.
 
   #[global] Hint Resolve MemPropT_fin_inf_map_monad_In_ub : FinInf.
+
+  Lemma MemPropT_fin_inf_map_monad_In_error :
+    forall {A_INF A_FIN B_INF B_FIN}
+      {l_inf : list A_INF} {l_fin : list A_FIN}
+      {f_fin : forall x, In x l_fin -> MemPropT Memory64BitIntptr.MMEP.MMSP.MemState B_FIN}
+      {f_inf : forall x, In x l_inf -> MemPropT MemoryBigIntptr.MMEP.MMSP.MemState B_INF}
+      {ms_fin_start ms_fin_final : Memory64BitIntptr.MMEP.MMSP.MemState}
+      {ms_inf_start : MemoryBigIntptr.MMEP.MMSP.MemState}
+      {msg : string}
+
+      (A_REF : A_INF -> A_FIN -> Prop)
+      (B_REF : B_INF -> B_FIN -> Prop)
+
+      (MEM_REF_START : MemState_refine_prop ms_inf_start ms_fin_start)
+
+      (F : forall a_fin a_inf b_fin ms_fin ms_inf ms_fin_ma (HIN_FIN : In a_fin l_fin) (HIN_INF : In a_inf l_inf),
+          MemState_refine_prop ms_inf ms_fin ->
+          A_REF a_inf a_fin ->
+          f_fin a_fin HIN_FIN ms_fin (ret (ms_fin_ma, b_fin)) ->
+          exists b_inf ms_inf_ma,
+            f_inf a_inf HIN_INF ms_inf (ret (ms_inf_ma, b_inf)) /\
+              B_REF b_inf b_fin /\
+              MemState_refine_prop ms_inf_ma ms_fin_ma)
+
+      (F_ERROR : forall a_fin a_inf ms_fin ms_inf (HIN_FIN : In a_fin l_fin) (HIN_INF : In a_inf l_inf) msg,
+          MemState_refine_prop ms_inf ms_fin ->
+          A_REF a_inf a_fin ->
+          f_fin a_fin HIN_FIN ms_fin (raise_error msg) ->
+          f_inf a_inf HIN_INF ms_inf (raise_error msg))
+
+      (AS : Forall2 A_REF l_inf l_fin)
+      (FIN : map_monad_In l_fin f_fin ms_fin_start (raise_error msg)),
+      map_monad_In l_inf f_inf ms_inf_start (raise_error msg).
+  Proof.
+    intros A_INF A_FIN B_INF B_FIN l_inf l_fin f_fin f_inf ms_fin_start ms_fin_final ms_inf_start msg A_REF B_REF
+      MEM_REF_START F F_ERROR AS FIN.
+
+    generalize dependent msg.
+    generalize dependent ms_fin_start.
+    generalize dependent ms_inf_start.
+    induction AS; intros msg ms_inf_start ms_fin_start MEM_REF_START FIN.
+    - cbn in FIN; cbn; auto.
+    - rewrite map_monad_In_unfold in FIN.
+      rewrite map_monad_In_unfold.
+
+      eapply MemPropT_fin_inf_bind_error.
+      5: apply FIN.
+      all: eauto with FinInf.
+
+      intros ms_inf ms_fin a_fin a_inf msg0 REF MSR F_INF MAP.
+      eapply MemPropT_fin_inf_bind_error.
+      5: apply MAP.
+      all: eauto with FinInf.
+
+      { intros a_fin0 ms_fin_ma H0.
+        eapply MemPropT_fin_inf_map_monad_In.
+        3: apply AS.
+        all: eauto with FinInf.
+
+        intros a_fin1 a_inf0 b_fin ms_fin0 ms_inf0 ms_fin_ma0 HIN_FIN HIN_INF H1 H2 H3.
+        eapply F; eauto.
+        apply H3.
+      }
+
+      intros msg1 HMAP.
+      specialize (IHAS (fun (x : A_FIN) (HIn : In x l') => f_fin x (or_intror HIn)) (fun (x0 : A_INF) (HIn : In x0 l) => f_inf x0 (or_intror HIn))).
+      repeat (forward IHAS; eauto).
+
+      Unshelve.
+      all: eauto.
+  Qed.
+
+  #[global] Hint Resolve MemPropT_fin_inf_map_monad_In_error : FinInf.
 
   Lemma MemPropT_fin_inf_repeatMN :
     forall {A_INF A_FIN}
@@ -8274,7 +8485,62 @@ cofix CIH
       all: eauto.
   Qed.
 
-  #[global] Hint Resolve MemPropT_fin_inf_repeatMN : FinInf.
+  #[global] Hint Resolve MemPropT_fin_inf_repeatMN_ub : FinInf.
+
+  Lemma MemPropT_fin_inf_repeatMN_error :
+    forall {A_INF A_FIN}
+      {m_fin : MemPropT Memory64BitIntptr.MMEP.MMSP.MemState A_FIN}
+      {m_inf : MemPropT MemoryBigIntptr.MMEP.MMSP.MemState A_INF}
+      {ms_fin_start ms_fin_final : Memory64BitIntptr.MMEP.MMSP.MemState}
+      {ms_inf_start : MemoryBigIntptr.MMEP.MMSP.MemState}
+      {num_elements}
+      {msg : string}
+
+      (A_REF : A_INF -> A_FIN -> Prop)
+
+      (MEM_REF_START : MemState_refine_prop ms_inf_start ms_fin_start)
+
+      (M : forall res_fin ms_fin ms_inf ms_fin_ma,
+          MemState_refine_prop ms_inf ms_fin ->
+          m_fin ms_fin (ret (ms_fin_ma, res_fin)) ->
+          exists res_inf ms_inf_ma,
+            m_inf ms_inf (ret (ms_inf_ma, res_inf)) /\
+              A_REF res_inf res_fin /\
+              MemState_refine_prop ms_inf_ma ms_fin_ma)
+
+      (M_ERROR : forall ms_fin ms_inf msg,
+          MemState_refine_prop ms_inf ms_fin ->
+          m_fin ms_fin (raise_error msg) ->
+          m_inf ms_inf (raise_error msg))
+
+      (FIN : repeatMN num_elements m_fin ms_fin_start (raise_error msg)),
+      repeatMN num_elements m_inf ms_inf_start (raise_error msg).
+  Proof.
+    intros A_INF A_FIN m_fin m_inf ms_fin_start ms_fin_final ms_inf_start num_elements msg A_REF MEM_REF_START M M_ERROR FIN.
+
+    generalize dependent msg.
+    generalize dependent ms_fin_start.
+    generalize dependent ms_inf_start.
+    induction num_elements using N.peano_ind; intros ms_inf_start ms_fin_start MEM_REF_START msg FIN.
+    - cbn in *; auto.
+    - rewrite repeatMN_succ.
+      rewrite repeatMN_succ in FIN.
+
+      eapply MemPropT_fin_inf_bind_error.
+      5: apply FIN.
+      all: eauto with FinInf.
+
+      intros ms_inf ms_fin a_fin a_inf msg0 H H0 H1 H2.
+      eapply MemPropT_fin_inf_bind_error.
+      5: apply H2.
+      all: eauto with FinInf.
+
+      Unshelve.
+      all: eauto.
+  Qed.
+
+  #[global] Hint Resolve MemPropT_fin_inf_repeatMN_error : FinInf.
+
 
   Lemma get_inf_tree_orutt :
     forall t,
@@ -14209,6 +14475,19 @@ cofix CIH
 
   #[global] Hint Resolve fin_inf_get_consecutive_ptrs_ub : FinInf.
 
+  (* TODO: Move this *)
+  Lemma fin_inf_get_consecutive_ptrs_error :
+    forall a_fin a_inf ms_fin ms_inf n_fin n_inf msg_fin msg_inf,
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs (M:=(MemPropT Memory64BitIntptr.MMEP.MMSP.MemState)) a_fin n_fin ms_fin (raise_error msg_fin) ->
+      MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs (M:=(MemPropT MemoryBigIntptr.MMEP.MMSP.MemState)) a_inf n_inf ms_inf (raise_error msg_inf).
+  Proof.
+    intros a_fin a_inf ms_fin ms_inf n_fin n_inf msg_fin msg_inf H.
+    eapply get_consecutive_ptrs_never_fails in H.
+    contradiction.
+  Qed.
+
+  #[global] Hint Resolve fin_inf_get_consecutive_ptrs_error : FinInf.
+
   Lemma fin_inf_read_byte_spec_MemPropT_ub :
     forall (addr_fin : LLVMParams64BitIntptr.ADDR.addr) (addr_inf : LLVMParamsBigIntptr.ADDR.addr)
       (ms_fin : FinMem.MMEP.MMSP.MemState) (ms_inf : InfMem.MMEP.MMSP.MemState)
@@ -14480,6 +14759,25 @@ cofix CIH
 
   #[global] Hint Resolve fin_inf_write_byte_spec_MemPropT_ub : FinInf.
 
+  Lemma fin_inf_write_byte_spec_MemPropT_error :
+    forall (addr_fin : LLVMParams64BitIntptr.ADDR.addr) (addr_inf : LLVMParamsBigIntptr.ADDR.addr)
+      (ms_fin : FinMem.MMEP.MMSP.MemState) (ms_inf : InfMem.MMEP.MMSP.MemState)
+      byte_fin byte_inf
+      (msg : string),
+      MemState_refine_prop ms_inf ms_fin ->
+      sbyte_refine byte_inf byte_fin ->
+      addr_refine addr_inf addr_fin ->
+      (fun ptr : LLVMParams64BitIntptr.ADDR.addr =>
+         Memory64BitIntptr.MMEP.MemSpec.write_byte_spec_MemPropT ptr byte_fin) addr_fin ms_fin
+        (raise_error msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.write_byte_spec_MemPropT addr_inf byte_inf ms_inf (raise_error msg).
+  Proof.
+    intros addr_fin addr_inf ms_fin ms_inf byte_fin byte_inf msg MSR BYTE_REF ADDR_REF WRITE.
+    cbn in *; auto.
+  Qed.
+
+  #[global] Hint Resolve fin_inf_write_byte_spec_MemPropT_error : FinInf.
+
   (* TODO: Move this *)
   (* TODO: Can we make msg_fin / msg_inf work? *)
   Lemma fin_inf_read_bytes_spec_ub' :
@@ -14522,6 +14820,47 @@ cofix CIH
     all: eauto.
   Qed.
 
+  Lemma fin_inf_read_bytes_spec_err :
+    forall (a_fin : FinAddr.addr) (a_inf : InfAddr.addr) (n : nat)
+      (ms_fin : FinMem.MMEP.MMSP.MemState) (ms_inf : InfMem.MMEP.MMSP.MemState)
+      msg,
+      InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
+      MemState_refine_prop ms_inf ms_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.read_bytes_spec a_fin n ms_fin
+        (raise_error msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.read_bytes_spec a_inf n ms_inf
+        (raise_error msg).
+  Proof.
+    intros a_fin a_inf n ms_fin ms_inf msg CONV MSR READ.
+    red; red in READ.
+    eapply MemPropT_fin_inf_bind_error.
+    5: apply READ.
+    all: eauto with FinInf.
+
+    2: {
+      intros ms_inf0 ms_fin0 ptrs_fin ptrs_inf msg' PTRS MSR' GCP READ'.
+      eapply MemPropT_fin_inf_map_monad_error.
+      5: apply READ'.
+      all: eauto with FinInf.
+      intros a_fin0 a_inf0 b_fin ms_fin1 ms_inf1 ms_fin_ma H H0 H1.
+      eapply fin_inf_read_byte_spec_MemPropT; eauto.
+      apply H0.
+      apply H1.
+    }
+
+    intros a_fin0 ms_fin_ma GCP.
+    eapply fin_inf_get_consecutive_ptrs_success_exists in GCP; eauto.
+    destruct GCP as (addrs_inf & ms_inf' & GCP & ADDRS & MSR').
+    exists addrs_inf. exists ms_inf'.
+    split; auto.
+    split; eauto.
+
+    eapply Forall2_flip; eauto.
+
+    Unshelve.
+    all: eauto.
+  Qed.
+
   (* TODO: Move this to memory model so it applies for both infinite / finite *)
   (* TODO: Somewhat unclear if we should allow the messages to be distinct... *)
   (** If reading bytes at the source causes UB, then the memcpy contains UB *)
@@ -14536,7 +14875,6 @@ cofix CIH
     break_match; [|cbn; auto].
     left; auto.
   Qed.
-
 
   Lemma fin_inf_write_bytes_spec_ub :
     forall a_fin a_inf ms_fin ms_inf bytes_inf bytes_fin msg,
@@ -14623,6 +14961,90 @@ cofix CIH
     all: exact ms_fin.
   Qed.
 
+  Lemma fin_inf_write_bytes_spec_error :
+    forall a_fin a_inf ms_fin ms_inf bytes_inf bytes_fin msg,
+      InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin ->
+      MemState_refine_prop ms_inf ms_fin ->
+      sbytes_refine bytes_inf bytes_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.write_bytes_spec a_fin bytes_fin ms_fin (raise_error msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.write_bytes_spec a_inf bytes_inf ms_inf (raise_error msg).
+  Proof.
+    intros a_fin a_inf ms_fin ms_inf bytes_inf bytes_fin msg ADDR_CONV MEM_REF1 BYTES_REF WRITE_SPEC.
+
+    (* TODO: Make these opaque earlier *)
+    Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+    Opaque MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs.
+
+    red; red in WRITE_SPEC.
+
+    eapply MemPropT_fin_inf_bind_error.
+    5: apply WRITE_SPEC.
+    all: eauto with FinInf.
+
+    { (* MA *)
+      intros a_fin0 ms_fin_ma H.
+      eapply fin_inf_get_consecutive_ptrs_success_exists; eauto.
+      erewrite sbytes_refine_length; eauto.
+      apply H.
+    }
+
+    intros ms_inf0 ms_fin0 a_fin0 a_inf0 msg0 ADDRS MSR GCP WRITES.
+
+    eapply MemPropT_fin_inf_bind_error with
+      (A_REF := Forall2 eq).
+    5: apply WRITES.
+    all: eauto with FinInf.
+
+    { (* MA *)
+      intros a_fin1 ms_fin_ma MAP.
+      eapply MemPropT_fin_inf_map_monad with
+        (A_REF := (fun '(a_inf, byte_inf) '(a_fin, byte_fin) =>
+                     InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin /\
+                       sbyte_refine byte_inf byte_fin)).
+      4: apply MAP.
+      all: eauto.
+
+      { intros a_fin2 a_inf1 b_fin0 ms_fin1 ms_inf1 ms_fin_ma0 MSR' A_REF WRITE.
+        destruct a_fin2, a_inf1.
+        destruct A_REF.
+        eapply fin_inf_write_byte_spec_MemPropT; eauto.
+      }
+
+      cbn in ADDRS.
+
+      apply Forall2_zip; eauto.
+      apply Forall2_flip in ADDRS.
+      apply ADDRS.
+    }
+
+    intros msg1 MAP.
+    eapply MemPropT_fin_inf_map_monad_error with
+      (A_REF := (fun '(a_inf, byte_inf) '(a_fin, byte_fin) =>
+                   InfToFinAddrConvert.addr_convert a_inf = NoOom a_fin /\
+                     sbyte_refine byte_inf byte_fin)).
+    5: apply MAP.
+    all: eauto with FinInf.
+
+    2: {
+      intros a_fin1 a_inf1 ms_fin1 ms_inf1 msg2 H H0 H1.
+      destruct a_inf1, a_fin1.
+      destruct H0.
+      eapply fin_inf_write_byte_spec_MemPropT_error; eauto.
+    }
+
+    2: {
+      eapply Forall2_zip; eauto.
+      eapply Forall2_flip; eauto.
+    }
+
+    intros a_fin1 a_inf1 b_fin ms_fin1 ms_inf1 ms_fin_ma H H0 H1.
+    destruct a_inf1, a_fin1.
+    destruct H0.
+    eapply fin_inf_write_byte_spec_MemPropT; eauto.
+
+    Unshelve.
+    all: exact ms_fin.
+  Qed.
 
   (* TODO: Move this to somewhere it can
      be instantiated for all memory model
@@ -23563,6 +23985,37 @@ cofix CIH
 
   #[global] Hint Resolve fin_inf_malloc_bytes_with_pr_spec_MemPropT_ub : FinInf.
 
+  Lemma fin_inf_malloc_bytes_with_pr_spec_MemPropT_error :
+    forall bytes_fin bytes_inf sid ms_fin ms_fin' ms_inf ms_inf' msg,
+      MemState_refine_prop ms_inf ms_fin ->
+      MemState_refine_prop ms_inf' ms_fin' ->
+      sbytes_refine bytes_inf bytes_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.malloc_bytes_with_pr_spec_MemPropT bytes_fin sid ms_fin' (raise_error msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.malloc_bytes_with_pr_spec_MemPropT bytes_inf sid ms_inf' (raise_error msg).
+  Proof.
+    intros bytes_fin bytes_inf sid ms_fin ms_fin' ms_inf ms_inf' msg MSR1 MSR2 BYTES_REF MALLOC.
+    red; red in MALLOC.
+
+    eapply MemPropT_fin_inf_bind_error.
+    5: apply MALLOC.
+    all: eauto with FinInf.
+
+    { intros a_fin ms_fin_ma H.
+      eapply find_free_block_fin_inf; eauto.
+      erewrite sbytes_refine_length; eauto.
+    }
+
+    intros ms_inf0 ms_fin0 a_fin a_inf msg0 REF MSR FIND_FREE MALLOC'.
+    cbn in *.
+    break_match_hyp.
+    destruct MALLOC' as [[] | (?&?&?&[])].
+
+    Unshelve.
+    apply ms_fin.
+  Qed.
+
+  #[global] Hint Resolve fin_inf_malloc_bytes_with_pr_spec_MemPropT_error : FinInf.
+
   Lemma fin_inf_malloc_bytes_spec_MemPropT_ub :
     forall bytes_fin bytes_inf ms_fin ms_inf msg,
       MemState_refine_prop ms_inf ms_fin ->
@@ -23586,6 +24039,30 @@ cofix CIH
   Qed.
 
   #[global] Hint Resolve fin_inf_malloc_bytes_spec_MemPropT_ub : FinInf.
+
+  Lemma fin_inf_malloc_bytes_spec_MemPropT_error :
+    forall bytes_fin bytes_inf ms_fin ms_inf msg,
+      MemState_refine_prop ms_inf ms_fin ->
+      sbytes_refine bytes_inf bytes_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.malloc_bytes_spec_MemPropT bytes_fin ms_fin (raise_error msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.malloc_bytes_spec_MemPropT bytes_inf ms_inf (raise_error msg).
+  Proof.
+    intros bytes_fin bytes_inf ms_fin ms_inf msg MSR BYTES MALLOC.
+    red; red in MALLOC.
+
+    eapply MemPropT_fin_inf_bind_error.
+    5: apply MALLOC.
+    all: eauto with FinInf.
+
+    intros ms_inf0 ms_fin0 sid a_inf msg0 EQ MSR' FRESH_PR MALLOC'.
+    cbn in EQ; subst.
+    eapply fin_inf_malloc_bytes_with_pr_spec_MemPropT_error in MALLOC'; eauto.
+
+    Unshelve.
+    eauto.
+  Qed.
+
+  #[global] Hint Resolve fin_inf_malloc_bytes_spec_MemPropT_error : FinInf.
 
   (* TODO: Move. Should apply to fin / inf *)
   Lemma ptr_in_heap_prop_dec :
@@ -25986,6 +26463,7 @@ cofix CIH
                         inv CONTRA.
                       }
 
+                      clear KS.
                       eapply Interp_Memory_PropT_Vis with (ta:=
                                                              vis (Throw (print_msg err_msg))
                                                                (fun x : void =>
@@ -26033,6 +26511,429 @@ cofix CIH
                       rewrite bind_trigger.
                       reflexivity.
 
+                      (* TODO: Move this *)
+                      Lemma handle_memcpy_fin_inf_error :
+                        forall {args args0 ms_fin ms_inf msg_fin},
+                          MemState_refine_prop ms_inf ms_fin ->
+                          Forall2 DVCInfFin.dvalue_refine_strict args0 args ->
+                          Memory64BitIntptr.MMEP.MemSpec.handle_memcpy_prop args ms_fin (raise_error msg_fin) ->
+                          exists msg_inf,
+                            MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop args0 ms_inf (raise_error msg_inf).
+                      Proof.
+                        intros args args0 ms_fin ms_inf msg_fin MSR ARGS HANDLER.
+
+                        repeat (destruct ARGS;
+                                try solve [cbn in *; eauto];
+                                match goal with
+                                | H: DVCInfFin.dvalue_refine_strict ?x _ |- _ =>
+                                    destruct x;
+                                    rewrite
+                                      DVCInfFin.dvalue_refine_strict_equation,
+                                      DVCInfFin.dvalue_convert_strict_equation in H;
+                                    inv H;
+                                    try solve [cbn in *; eauto]
+                                end).
+                        all: repeat break_match_hyp_inv.
+                        all: destruct ARGS; [|cbn in *; eauto].
+
+                        { (* 32 bit memcpy *)
+                          unfold MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop.
+                          unfold MemoryBigIntptr.MMEP.MemSpec.memcpy_spec.
+                          do 2 red in HANDLER.
+                          break_match_hyp; try contradiction.
+                          break_match_hyp; try contradiction.
+                          unfold LLVMParams64BitIntptr.Events.DV.unsigned in Heqb, Heqb0.
+                          cbn in Heqb, Heqb0.
+                          unfold LLVMParamsBigIntptr.Events.DV.unsigned.
+                          unfold LLVMParamsBigIntptr.Events.DV.VInt32.
+                          rewrite Heqb.
+                          erewrite <- fin_inf_no_overlap; eauto.
+                          repeat erewrite <- fin_inf_ptoi; eauto.
+                          rewrite Heqb0.
+
+                          destruct HANDLER.
+                          { exists msg_fin.
+                            left.
+                            eapply fin_inf_read_bytes_spec_err; eauto.
+                          }
+
+                          destruct H as (?&?&?&?).
+                          exists msg_fin.
+                          right.
+
+                          eapply fin_inf_read_bytes_spec in H; eauto.
+                          destruct H as (?&?&?&?&?).
+                          exists x5, x4.
+                          split; eauto.
+                          eapply fin_inf_write_bytes_spec_error; eauto.
+                        }
+
+                        { (* 64 bit memcpy *)
+                          unfold MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop.
+                          unfold MemoryBigIntptr.MMEP.MemSpec.memcpy_spec.
+                          do 2 red in HANDLER.
+                          break_match_hyp; try contradiction.
+                          break_match_hyp; try contradiction.
+                          unfold LLVMParams64BitIntptr.Events.DV.unsigned in Heqb, Heqb0.
+                          cbn in Heqb, Heqb0.
+                          unfold LLVMParamsBigIntptr.Events.DV.unsigned.
+                          unfold LLVMParamsBigIntptr.Events.DV.VInt64.
+                          rewrite Heqb.
+                          erewrite <- fin_inf_no_overlap; eauto.
+                          repeat erewrite <- fin_inf_ptoi; eauto.
+                          rewrite Heqb0.
+
+                          destruct HANDLER.
+                          { exists msg_fin.
+                            left.
+                            eapply fin_inf_read_bytes_spec_err; eauto.
+                          }
+
+                          destruct H as (?&?&?&?).
+                          exists msg_fin.
+                          right.
+
+                          eapply fin_inf_read_bytes_spec in H; eauto.
+                          destruct H as (?&?&?&?&?).
+                          exists x5, x4.
+                          split; eauto.
+                          eapply fin_inf_write_bytes_spec_error; eauto.
+                        }
+
+                        { (* intptr memcpy *)
+                          unfold MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop.
+                          unfold MemoryBigIntptr.MMEP.MemSpec.memcpy_spec.
+                          do 2 red in HANDLER.
+                          break_match_hyp; try contradiction.
+                          break_match_hyp; try contradiction.
+                          unfold LLVMParams64BitIntptr.Events.DV.unsigned in Heqb, Heqb0.
+                          cbn in Heqb, Heqb0.
+                          assert (LLVMParams64BitIntptr.IP.to_Z i0 = LLVMParamsBigIntptr.IP.to_Z x) as X.
+                          { unfold LLVMParams64BitIntptr.IP.to_Z, LLVMParamsBigIntptr.IP.to_Z.
+                            unfold InterpreterStackBigIntptr.LP.IP.to_Z in *.
+                            erewrite IP.from_Z_to_Z; eauto.
+                          }
+                          rewrite <- X; clear X.
+                          rewrite Heqb.
+                          erewrite <- fin_inf_no_overlap; eauto.
+                          repeat erewrite <- fin_inf_ptoi; eauto.
+                          rewrite Heqb0.
+
+                          destruct HANDLER.
+                          { exists msg_fin.
+                            left.
+                            eapply fin_inf_read_bytes_spec_err; eauto.
+                          }
+
+                          destruct H as (?&?&?&?).
+                          exists msg_fin.
+                          right.
+
+                          eapply fin_inf_read_bytes_spec in H; eauto.
+                          destruct H as (?&?&?&?&?).
+                          exists x5, x4.
+                          split; eauto.
+                          eapply fin_inf_write_bytes_spec_error; eauto.
+                        }
+                      Qed.
+
+                      Lemma handle_malloc_fin_inf_error :
+                        forall {args args0 ms_fin ms_inf msg_fin},
+                          MemState_refine_prop ms_inf ms_fin ->
+                          Forall2 DVCInfFin.dvalue_refine_strict args0 args ->
+                          Memory64BitIntptr.MMEP.MemSpec.handle_malloc_prop args ms_fin (raise_error msg_fin) ->
+                          exists msg_inf,
+                            MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop args0 ms_inf (raise_error msg_inf).
+                      Proof.
+                        intros args args0 ms_fin ms_inf msg_fin MSR ARGS HANDLER.
+
+                        repeat (destruct ARGS;
+                                try solve [cbn in *; eauto];
+                                match goal with
+                                | H: DVCInfFin.dvalue_refine_strict ?x _ |- _ =>
+                                    destruct x;
+                                    rewrite
+                                      DVCInfFin.dvalue_refine_strict_equation,
+                                      DVCInfFin.dvalue_convert_strict_equation in H;
+                                    inv H;
+                                    try solve [cbn in *; eauto]
+                                end).
+                        all: repeat break_match_hyp_inv.
+                        all: destruct ARGS; [|cbn in *; eauto].
+
+                        { (* i1 *)
+                          unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
+                          red in HANDLER.
+                          eapply MemPropT_bind_raise_error_inv in HANDLER.
+                          destruct HANDLER as [[] | HANDLER].
+                          destruct HANDLER as (?&?&?&?).
+                          destruct H0.
+                          { red in H0.
+                            break_match_hyp; cbn in H0; contradiction.
+                          }
+                          destruct H0 as (?&?&?&?).
+                          exists msg_fin.
+                          right.
+                          eapply fresh_sid_fin_inf in H; eauto.
+                          destruct H as (?&?&?&?&?); subst.
+                          do 2 eexists; split; eauto.
+
+                          red in H0.
+                          break_match_hyp_inv.
+                          eapply generate_num_undef_bytes_fin_inf in Heqo.
+                          destruct Heqo as (?&?&?).
+                          right.
+                          do 2 eexists.
+                          split.
+                          red.
+                          cbn in H0.
+                          cbn; rewrite H0.
+                          split; reflexivity.
+
+                          eapply fin_inf_malloc_bytes_spec_MemPropT_error; eauto.
+                        }
+
+                        { (* i8 *)
+                          unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
+                          red in HANDLER.
+                          eapply MemPropT_bind_raise_error_inv in HANDLER.
+                          destruct HANDLER as [[] | HANDLER].
+                          destruct HANDLER as (?&?&?&?).
+                          destruct H0.
+                          { red in H0.
+                            break_match_hyp; cbn in H0; contradiction.
+                          }
+                          destruct H0 as (?&?&?&?).
+                          exists msg_fin.
+                          right.
+                          eapply fresh_sid_fin_inf in H; eauto.
+                          destruct H as (?&?&?&?&?); subst.
+                          do 2 eexists; split; eauto.
+
+                          red in H0.
+                          break_match_hyp_inv.
+                          eapply generate_num_undef_bytes_fin_inf in Heqo.
+                          destruct Heqo as (?&?&?).
+                          right.
+                          do 2 eexists.
+                          split.
+                          red.
+                          cbn in H0.
+                          cbn; rewrite H0.
+                          split; reflexivity.
+
+                          eapply fin_inf_malloc_bytes_spec_MemPropT_error; eauto.
+                        }
+
+                        { (* i32 *)
+                          unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
+                          red in HANDLER.
+                          eapply MemPropT_bind_raise_error_inv in HANDLER.
+                          destruct HANDLER as [[] | HANDLER].
+                          destruct HANDLER as (?&?&?&?).
+                          destruct H0.
+                          { red in H0.
+                            break_match_hyp; cbn in H0; contradiction.
+                          }
+                          destruct H0 as (?&?&?&?).
+                          exists msg_fin.
+                          right.
+                          eapply fresh_sid_fin_inf in H; eauto.
+                          destruct H as (?&?&?&?&?); subst.
+                          do 2 eexists; split; eauto.
+
+                          red in H0.
+                          break_match_hyp_inv.
+                          eapply generate_num_undef_bytes_fin_inf in Heqo.
+                          destruct Heqo as (?&?&?).
+                          right.
+                          do 2 eexists.
+                          split.
+                          red.
+                          cbn in H0.
+                          cbn; rewrite H0.
+                          split; reflexivity.
+
+                          eapply fin_inf_malloc_bytes_spec_MemPropT_error; eauto.
+                        }
+
+                        { (* i64 *)
+                          unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
+                          red in HANDLER.
+                          eapply MemPropT_bind_raise_error_inv in HANDLER.
+                          destruct HANDLER as [[] | HANDLER].
+                          destruct HANDLER as (?&?&?&?).
+                          destruct H0.
+                          { red in H0.
+                            break_match_hyp; cbn in H0; contradiction.
+                          }
+                          destruct H0 as (?&?&?&?).
+                          exists msg_fin.
+                          right.
+                          eapply fresh_sid_fin_inf in H; eauto.
+                          destruct H as (?&?&?&?&?); subst.
+                          do 2 eexists; split; eauto.
+
+                          red in H0.
+                          break_match_hyp_inv.
+                          eapply generate_num_undef_bytes_fin_inf in Heqo.
+                          destruct Heqo as (?&?&?).
+                          right.
+                          do 2 eexists.
+                          split.
+                          red.
+                          cbn in H0.
+                          cbn; rewrite H0.
+                          split; reflexivity.
+
+                          eapply fin_inf_malloc_bytes_spec_MemPropT_error; eauto.
+                        }
+
+                        { (* iptr *)
+                          unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
+                          red in HANDLER.
+                          eapply MemPropT_bind_raise_error_inv in HANDLER.
+                          destruct HANDLER as [[] | HANDLER].
+                          destruct HANDLER as (?&?&?&?).
+                          destruct H0.
+                          { red in H0.
+                            break_match_hyp; cbn in H0; contradiction.
+                          }
+                          destruct H0 as (?&?&?&?).
+                          exists msg_fin.
+                          right.
+                          eapply fresh_sid_fin_inf in H; eauto.
+                          destruct H as (?&?&?&?&?); subst.
+                          do 2 eexists; split; eauto.
+
+                          red in H0.
+                          break_match_hyp_inv.
+                          eapply generate_num_undef_bytes_fin_inf in Heqo0.
+                          destruct Heqo0 as (?&?&?).
+                          right.
+                          do 2 eexists.
+                          split.
+
+                          unfold LLVMParamsBigIntptr.IP.to_unsigned.
+                          rewrite <- LLVMParamsBigIntptr.IP.to_Z_to_unsigned.
+                          unfold LLVMParams64BitIntptr.IP.to_unsigned in H0.
+                          rewrite <- LLVMParams64BitIntptr.IP.to_Z_to_unsigned in H0.
+
+
+                          assert (LLVMParams64BitIntptr.IP.to_Z i = LLVMParamsBigIntptr.IP.to_Z x) as X.
+                          { unfold LLVMParams64BitIntptr.IP.to_Z, LLVMParamsBigIntptr.IP.to_Z.
+                            unfold InterpreterStackBigIntptr.LP.IP.to_Z in *.
+                            erewrite IP.from_Z_to_Z; eauto.
+                          }
+                          rewrite <- X; clear X.
+
+                          red.
+                          cbn in H0.
+                          cbn; rewrite H0.
+                          split; reflexivity.
+
+                          eapply fin_inf_malloc_bytes_spec_MemPropT_error; eauto.
+                        }
+                      Qed.
+
+                      (* TODO: Move this *)
+                      Lemma handle_intrinsic_fin_inf_error :
+                        forall {t f args args0 ms_fin ms_inf msg_fin}
+                          (ARGS: Forall2 DVCInfFin.dvalue_refine_strict args0 args),
+                          MemState_refine_prop ms_inf ms_fin ->
+                          Memory64BitIntptr.MMEP.MemSpec.handle_intrinsic_prop
+                            LLVMParams64BitIntptr.Events.DV.dvalue
+                            (LLVMParams64BitIntptr.Events.Intrinsic t f args) ms_fin (raise_error msg_fin) ->
+                          exists msg_inf,
+                            MemoryBigIntptr.MMEP.MemSpec.handle_intrinsic_prop DVCInfFin.DV1.dvalue
+                              (InterpreterStackBigIntptr.LP.Events.Intrinsic t f args0) ms_inf
+                              (raise_error msg_inf).
+                      Proof.
+                        intros t f args args0 ms_fin ms_inf msg_fin ARGS MSR INTRINSIC.
+
+                        red in INTRINSIC.
+                        unfold MemoryBigIntptr.MMEP.MemSpec.handle_intrinsic_prop.
+                        break_match.
+                        { (* Memcpy *)
+                          destruct INTRINSIC.
+                          2: {
+                            cbn in H.
+                            destruct H as (?&?&?&?).
+                            contradiction.
+                          }
+                          eapply handle_memcpy_fin_inf_error in H; eauto.
+                          destruct H.
+                          exists x.
+                          left.
+                          auto.
+                        }
+
+                        break_match.
+                        { (* Malloc *)
+                          destruct INTRINSIC.
+                          2: {
+                            cbn in H.
+                            destruct H as (?&?&?&?).
+                            contradiction.
+                          }
+
+                          eapply handle_malloc_fin_inf_error in H; eauto.
+                          destruct H.
+                          exists x.
+                          left; auto.
+                        }
+
+                          eapply MemPropT_fin_inf_bind.
+                          4: apply INTRINSIC.
+                          all: eauto.
+
+                          { (* MA: handle_malloc_prop *)
+                            intros a_fin ms_fin_ma HANDLE_MALLOC.
+                            eapply handle_malloc_fin_inf; eauto.
+                          }
+
+                          intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin H H0 H1 H2.
+                          cbn in H, H2.
+                          destruct H2; subst.
+                          do 2 eexists; cbn; split; auto.
+                          split; auto.
+                          rewrite DVC1.dvalue_refine_strict_equation, DVC1.dvalue_convert_strict_equation.
+                          cbn.
+                          rewrite H.
+                          auto.
+                        }
+
+                        break_match.
+                        { (* Free *)
+                          eapply MemPropT_fin_inf_bind.
+                          4: apply INTRINSIC.
+                          all: eauto.
+
+                          { (* MA: handle_free_prop *)
+                            intros a_fin ms_fin_ma HANDLE_FREE.
+                            eapply handle_free_fin_inf; eauto.
+                          }
+
+                          intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin H H0 H1 H2.
+                          cbn in H, H2.
+                          destruct H2; subst.
+                          do 2 eexists; cbn; split; auto.
+                          split; auto.
+                          rewrite DVC1.dvalue_refine_strict_equation, DVC1.dvalue_convert_strict_equation.
+                          cbn.
+                          auto.
+                        }
+
+                        (* Unknown intrinsic *)
+                        cbn in *; auto.
+                        contradiction.
+                      Qed.
+
+                      destruct HANDLER.
+                      eapply handle_intrinsic_fin_inf_error.
+                      2: apply lift_MemState_refine_prop.
+                      all: eauto.
+                      
                       (* This seems related to HANDLER... *)
                       (* TODO: Prove this. Maybe separate into a
                       separate lemma, running into massive problems
@@ -33938,12 +34839,124 @@ cofix CIH
 
   Definition model_E1E2_L6_orutt_strict p1 p2 :=
     L6_E1E2_orutt_strict
-      (TopLevelBigIntptr.model_oom_L6 TLR_INF.R.refine_res2 TLR_INF.R.refine_res3 TLR_INF.R.refine_res3 p1)
-      (TopLevel64BitIntptr.model_oom_L6 TLR_FIN.R.refine_res2 TLR_FIN.R.refine_res3 TLR_FIN.R.refine_res3 p2).
+      (TopLevelBigIntptr.model_oom_L6 TLR_INF.R.refine_res2 TLR_INF.R.refine_res3 eq p1)
+      (TopLevel64BitIntptr.model_oom_L6 TLR_FIN.R.refine_res2 TLR_FIN.R.refine_res3 eq p2).
+
+Section interp_prop_oom_extra.
+
+  Context {E F OOM : Type -> Type} `{OOME: OOM -< E} `{OOMF: OOM -< F}.
+  Context (h : E ~> PropT F).
+  Context {R1 R2 : Type} (RR : R1 -> R2 -> Prop).
+
+  Lemma interp_prop_oom_l_ret_inv_r:
+    forall r2 (t : itree E _),
+      interp_prop_oom_l (F := F) (OOME:=OOME) h RR t (ret r2) ->
+      (exists r1 , RR r1 r2 /\ t ≈ ret r1) \/ (exists {A} (e : OOM A) k, t ≈ vis e k).
+  Proof.
+    intros r2 t INTERP.
+    punfold INTERP.
+    red in INTERP.
+    setoid_rewrite itree_eta with (t:=t).
+    remember (observe (ret r2)); remember (observe t).
+    clear Heqi0.
+    induction INTERP; subst; pclearbot; intros.
+    - left.
+      exists r1.
+      cbn in Heqi.
+      inv Heqi.
+      split; auto.
+      cbn.
+      reflexivity.
+    - inv Heqi.
+    - cbn in INTERP.
+      inv INTERP.
+      + apply simpobs in H0.
+        left.
+        exists r1; split; auto.
+        rewrite H0.
+        rewrite tau_eutt.
+        reflexivity.
+      + specialize (IHINTERP eq_refl).
+        destruct IHINTERP as [[r1 [RRr1r2 EQ]] | IHOOM].
+        2: {
+          right.
+          setoid_rewrite (itree_eta t1).
+          setoid_rewrite tau_eutt.
+          auto.
+        }
+        left.
+        exists r1; split; auto.
+        rewrite <- itree_eta in EQ.
+        rewrite EQ.
+        rewrite tau_eutt.
+        reflexivity.
+      + setoid_rewrite tau_eutt.
+        specialize (IHINTERP eq_refl).
+        destruct IHINTERP as [[r1 [RRr1r2 EQ]] | IHOOM].
+        2: {
+          right.
+          setoid_rewrite (itree_eta t1).
+          auto.
+        }
+        left.
+        exists r1; split; auto.
+        rewrite <- itree_eta in EQ.
+        rewrite EQ.
+        reflexivity.
+      + setoid_rewrite tau_eutt.
+        specialize (IHINTERP eq_refl).
+        destruct IHINTERP as [[r1 [RRr1r2 EQ]] | IHOOM].
+        2: {
+          right.
+          setoid_rewrite (itree_eta t1).
+          auto.
+        }
+        left.
+        exists r1; split; auto.
+        rewrite <- itree_eta in EQ.
+        rewrite EQ.
+        reflexivity.
+      + setoid_rewrite tau_eutt.
+        specialize (IHINTERP eq_refl).
+        destruct IHINTERP as [[r1 [RRr1r2 EQ]] | IHOOM].
+        2: {
+          right.
+          setoid_rewrite (itree_eta t1).
+          auto.
+        }
+        left.
+        exists r1; split; auto.
+        rewrite <- itree_eta in EQ.
+        rewrite EQ.
+        reflexivity.
+    - inv Heqi.
+    - right.
+      exists A, e, k1.
+      rewrite <- itree_eta.
+      rewrite HT1.
+      reflexivity.
+    - inv Heqi.
+      rewrite itree_eta in HT1; rewrite H0 in HT1; apply eqit_inv in HT1; contradiction.
+    - Print Assumptions model_E1E2_23_orutt_strict.
+    - inv Heqi.
+      rewrite itree_eta in H0.
+      rewrite H2 in H0; apply eqit_inv in H0.
+      cbn in *.
+      break_match_hyp; try contradiction; subst.
+    - rewrite itree_eta in H0.
+
+discriminate.
+    - inv Heqi.
+  Qed.
 
   Lemma refine_OOM_h_orutt :
-    forall t t1 t2,
-      refine_OOM_h TLR_FIN.R.refine_res3 t1 t2 ->
+    forall
+      (t : itree InterpreterStackBigIntptr.LP.Events.L4
+             (InfMem.MMEP.MMSP.MemState *
+                (MemPropT.store_id *
+                   (InterpreterStackBigIntptr.LLVM.Local.local_env * stack * TopLevelBigIntptr.res_L1))))
+      (t1 t2 : itree L4 (MMEP.MMSP.MemState * (MemPropT.store_id * (local_env * stack * res_L1)))),
+      refine_OOM_h eq t1 t2 ->
       orutt (OOM:=OOME) L4_refine_strict L4_res_refine_strict
         (MemState_refine_prop
            × (eq
@@ -33955,12 +34968,51 @@ cofix CIH
                 × (local_refine_strict × stack_refine_strict
                      × (global_refine_strict × DVC1.dvalue_refine_strict)))) t t2.
   Proof.
-  Admitted.
+    setoid_rewrite itree_eta.
+    pcofix CIH; intros t t1 t2 REF EQV.
+    genobs t ot.
+    genobs t1 ot1.
+    genobs t2 ot2.
+    clear t t1 t2 Heqot Heqot1 Heqot2.
+
+    punfold EQV; red in EQV.
+    cbn in *.
+    dependent induction EQV.
+    - do 2 red in REF.
+
+
+      eapply interp_prop_oom_ret_inv in REF.
+
+    
+    punfold REF; red in REF.
+    cbn in *.
+
+    dependent induction REF.
+    - eapply orutt_inv_Ret_r in EQV.
+      destruct EQV as (?&?&?).
+
+      eapply paco2_mon_bot; eauto.
+      eapply orutt_cong_eutt.
+      2: {
+        rewrite H.
+        reflexivity.
+      }
+
+      pstep; red; cbn.
+      red in REL; subst.
+      constructor; auto.
+    - (* Tau Tau, coinductive *)
+      pclearbot.
+      pstep; red; cbn.
+      constructor.
+      apply orutt_inv_Tau_r in EQV.
+      admit.
+  Qed.
 
   Lemma model_E1E2_56_orutt_strict :
     forall t_inf t_fin,
       L5_E1E2_orutt_strict t_inf t_fin ->
-      L6_E1E2_orutt_strict (refine_OOM TLR_INF.R.refine_res3 t_inf) (refine_OOM TLR_FIN.R.refine_res3 t_fin).
+      L6_E1E2_orutt_strict (refine_OOM eq t_inf) (refine_OOM eq t_fin).
   Proof.
     intros t_inf_set t_fin_set REL.
     (* t_inf_set and t_fin_set are both sets of itrees. *)
@@ -34007,4 +35059,7 @@ cofix CIH
     apply model_E1E2_56_orutt_strict; apply model_E1E2_L5_orutt_strict_sound.
   Qed.
 
+
+  (* Bogus for safety... *)
+  euoauaohuhaoseu
 End InfiniteToFinite.
