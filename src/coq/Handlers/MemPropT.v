@@ -337,8 +337,14 @@ Proof.
   intros A ub_msg.
     intros ms res.
     destruct res as [[[[[[[oom_res] | [[ub_res] | [[err_res] | [ms' a]]]]]]]]] eqn:Hres.
-    (* Allow everything because UB *)
-    all: exact True.
+    + (* OOM *)
+      exact False. (* Must UB *)
+    + (* UB *)
+      exact True. (* Any UB message is good *)
+    + (* Error *)
+      exact False. (* Must UB *)
+    + (* Success *)
+      exact False. (* Must UB *)
 Defined.
 
 Definition within_err_ub_oom_MemPropT {MemState} {A} (m : MemPropT MemState A) (pre : MemState) (e : err_ub_oom A) (post : MemState) : Prop :=
@@ -509,35 +515,19 @@ Proof.
   tauto.
 Defined.
 
-Definition MemPropT_assert {MemState X} (assertion : Prop) : MemPropT MemState X
+Definition MemPropT_assert_pre {MemState} (assertion : Prop) : MemPropT MemState unit
   := fun ms ms'x =>
        match ms'x with
        | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent ms'x)))) =>
            match ms'x with
            | inl (OOM_message x) =>
-               assertion
+               False
            | inr (inl (UB_message x)) =>
-               assertion
+               ~ assertion
            | inr (inr (inl (ERR_message x))) =>
-               assertion
+               False
            | inr (inr (inr (ms',x))) =>
                ms = ms' /\ assertion
-           end
-       end.
-
-Definition MemPropT_assert_post {MemState X} (Post : X -> Prop) : MemPropT MemState X
-  := fun ms ms'x =>
-       match ms'x with
-       | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent ms'x)))) =>
-           match ms'x with
-           | inl (OOM_message x) =>
-               True
-           | inr (inl (UB_message x)) =>
-               True
-           | inr (inr (inl (ERR_message x))) =>
-               True
-           | inr (inr (inr (ms',x))) =>
-               ms = ms' /\ Post x
            end
        end.
 

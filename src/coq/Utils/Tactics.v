@@ -332,5 +332,3 @@ Ltac subst_cont :=
   | h: visible_cont _ |- _ =>
     destruct h; subst
   end.
-
-

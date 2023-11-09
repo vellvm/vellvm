@@ -22,6 +22,10 @@ Require Import List.
 
 Import ListNotations.
 
+(* TODO: Probably should try to remove these... *)
+Unset Universe Checking.
+Unset Auto Template Polymorphism.
+
 From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Generators QC.Utils Handlers.Handlers.
 Require Import Integers.
 

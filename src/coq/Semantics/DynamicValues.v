@@ -2565,11 +2565,19 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_Float f1, DVALUE_Float f2   => float_op fop f1 f2
     | DVALUE_Double d1, DVALUE_Double d2 => double_op fop d1 d2
     | DVALUE_Poison t, _                 => ret (DVALUE_Poison t)
-    | _, DVALUE_Poison t                 =>
+    | DVALUE_Float _, DVALUE_Poison t
+    | DVALUE_Double _, DVALUE_Poison t
+      =>
         if fop_is_div fop
         then raise_ub "Division by poison."
         else ret (DVALUE_Poison t)
-    | _, _                               => raise_error ("ill_typed-fop: " ++ (to_string fop) ++ " " ++ (to_string v1) ++ " " ++ (to_string v2))
+    | _, _                               =>
+        raise_error ("ill_typed-fop: " ++
+                       (to_string fop) ++
+                       " " ++
+                       (to_string v1) ++
+                       " " ++
+                       (to_string v2))
     end.
   
   Definition not_nan32 (f:ll_float) : bool :=

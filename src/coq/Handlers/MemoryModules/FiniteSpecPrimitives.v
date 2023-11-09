@@ -187,6 +187,22 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         left; destruct a; reflexivity.
     Qed.
 
+    Lemma In_InA :
+      forall mem ix e,
+        In (ix, e) (IM.elements (elt:=mem_byte) mem) ->
+        SetoidList.InA (IM.eq_key_elt (elt:=mem_byte)) (ix, e) (IM.elements (elt:=mem_byte) mem).
+    Proof.
+      intros mem.
+      induction (IM.elements (elt:=mem_byte) mem);
+        intros ix e INS.
+
+      - cbn in INS; contradiction.
+      - apply SetoidList.InA_cons.
+        destruct INS as [INS | INS]; firstorder.
+        left; subst; eauto.
+        repeat red; eauto.
+    Qed.
+
     Lemma read_byte_raw_next_memory_key :
       forall (mem : memory) ix,
         ix >= next_key mem ->
@@ -279,28 +295,26 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Definition mem_state_heap (ms : MemState) : Heap
     := memory_stack_heap ms.(ms_memory_stack).
 
-  Definition read_byte_MemPropT (ptr : addr) : MemPropT memory_stack SByte :=
+  Definition read_byte_prop_memory (ptr : addr) (mem_stack : memory_stack) (byte : SByte) : Prop :=
     let addr := ptr_to_int ptr in
     let pr := address_provenance ptr in
-    mem_stack <- get_mem_state;;
     let mem := memory_stack_memory mem_stack in
     match read_byte_raw mem addr with
-    | None => raise_ub "Reading from unallocated memory."
-    | Some byte =>
-        let aid := snd byte in
+    | None => False
+    | Some mbyte =>
+        let aid := snd mbyte in
         if access_allowed pr aid
-        then ret (fst byte)
+        then byte = fst mbyte
         else
-          raise_ub
-            ("Read from memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ show_prov pr ++ ", memory allocation id: " ++ Show.show (show_allocation_id aid) ++ " memory: " ++ Show.show (map (fun '(key, (_, aid)) => (key, show_allocation_id aid)) (IM.elements mem)))
+          False
     end.
 
-  Definition addr_allocated_prop (ptr : addr) (aid : AllocationId) : MemPropT memory_stack bool :=
-    mem <- get_mem_state;;
-    match read_byte_raw (memory_stack_memory mem) (ptr_to_int ptr) with
-    | None => ret false
+  Definition addr_allocated_prop_memory (ptr : addr) (aid : AllocationId) (mem_stack : memory_stack) : Prop :=
+    let mem := memory_stack_memory mem_stack in
+    match read_byte_raw mem (ptr_to_int ptr) with
+    | None => False
     | Some (byte, aid') =>
-        ret (proj_sumbool (aid_eq_dec aid aid'))
+        aid_eq_dec aid aid'
     end.
 
   Definition ptr_in_frame_prop (f : Frame) (ptr : addr) : Prop :=
@@ -673,6 +687,91 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     cbn in *; intros ptr; split; firstorder.
   Qed.
 
+  (* TODO: move this *)
+  #[global] Instance ptr_in_frame_prop_int_Proper :
+    Proper (frame_eqv ==> (fun a b => ptr_to_int a = ptr_to_int b) ==> iff) ptr_in_frame_prop.
+  Proof.
+    unfold Proper, respectful.
+    intros x y XY a b AB.
+    unfold frame_eqv in *.
+    unfold ptr_in_frame_prop in *.
+    rewrite AB; auto.
+  Qed.
+
+  #[global] Instance ptr_in_frame_prop_Proper :
+    Proper (frame_eqv ==> eq ==> iff) ptr_in_frame_prop.
+  Proof.
+    unfold Proper, respectful.
+    intros x y XY a b AB; subst.
+    unfold frame_eqv in *.
+    auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma FSNth_frame_eqv :
+    forall n fs f1 f2,
+      frame_eqv f1 f2 ->
+      FSNth_eqv fs n f1 ->
+      FSNth_eqv fs n f2.
+  Proof.
+    induction n;
+      intros fs f1 f2 EQV NTHEQV.
+    - destruct fs; cbn in *;
+        rewrite NTHEQV; auto.
+    - destruct fs; cbn in *; eauto.
+  Qed.
+
+  (* TODO: Move this *)
+  #[global] Instance FSNth_eqv_Proper :
+    Proper (frame_stack_eqv ==> eq ==> frame_eqv ==> iff) FSNth_eqv.
+  Proof.
+    unfold Proper, respectful.
+    intros x y H' x0 y0 H0 x1 y1 H1; subst.
+    split; intros NTH.
+    - red in H'.
+      apply H'.
+      eapply FSNth_frame_eqv; eauto.
+    - red in H'.
+      apply H'.
+      eapply FSNth_frame_eqv; eauto.
+      symmetry; auto.
+  Qed.
+
+  #[global] Instance frame_stack_eqv_Singleton_Proper :
+    Proper (frame_eqv ==> frame_stack_eqv) Singleton.
+  Proof.
+    intros fs' fs FS.
+    split; intros NTH.
+    - cbn in *.
+      break_match_hyp; auto.
+      rewrite <- FS; auto.
+    - cbn in *.
+      break_match_hyp; auto.
+      rewrite FS; auto.
+  Qed.
+
+  #[global] Instance frame_stack_eqv_Snoc_Proper :
+    Proper (frame_stack_eqv ==> frame_eqv ==> frame_stack_eqv) Snoc.
+  Proof.
+    unfold Proper, respectful.
+    intros x y H x0 y0 H0.
+    split.
+    - intros H1.
+      revert x0 y0 x y f H1 H H0.
+      induction n; intros x0 y0 x y f H1 H H0; cbn in *.
+      + rewrite <- H0; auto.
+      + destruct n.
+        * rewrite <- H; auto.
+        * rewrite <- H; eauto.
+    - intros H1.
+      revert x0 y0 x y f H1 H H0.
+      induction n; intros x0 y0 x y f H1 H H0; cbn in *.
+      + rewrite H0; auto.
+      + destruct n.
+        * rewrite H; auto.
+        * rewrite H; eauto.
+  Qed.
+
   Lemma MemState_get_put_memory :
     forall ms mem,
       MemState_get_memory (MemState_put_memory mem ms) = mem.
@@ -681,6 +780,18 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     destruct ms.
     cbn.
     reflexivity.
+  Qed.
+
+  Lemma memory_stack_memory_mem_state_memory :
+    forall m,
+      memory_stack_memory (MemState_get_memory m) = mem_state_memory m.
+  Proof.
+    intros m.
+    destruct m.
+    cbn.
+    destruct ms_memory_stack0.
+    cbn.
+    auto.
   Qed.
 
   #[global] Instance MemState_memory_MemStateMem : MemStateMem MemState memory_stack :=

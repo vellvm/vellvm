@@ -56,7 +56,7 @@ Import InterpFacts.
 Import MonadNotation.
 Import ListNotations.
 
-Module Type AddrConvert (ADDR1 : ADDRESS) (ADDR2 : ADDRESS).
+Module Type AddrConvert (ADDR1 : ADDRESS) (PTOI1 : PTOI ADDR1) (ADDR2 : ADDRESS) (PTOI2 : PTOI ADDR2).
   Parameter addr_convert : ADDR1.addr -> OOM ADDR2.addr.
   Parameter addr_convert_null :
     addr_convert ADDR1.null = NoOom ADDR2.null.
@@ -66,9 +66,14 @@ Module Type AddrConvert (ADDR1 : ADDRESS) (ADDR2 : ADDRESS).
       addr_convert a = NoOom c ->
       addr_convert b = NoOom c ->
       a = b.
+
+  Parameter addr_convert_ptoi :
+    forall a b,
+      addr_convert a = NoOom b ->
+      PTOI1.ptr_to_int a = PTOI2.ptr_to_int b.
 End AddrConvert.
 
-Module InfToFinAddrConvert : AddrConvert InfAddr FinAddr
+Module InfToFinAddrConvert : AddrConvert InfAddr InfPTOI FinAddr FinPTOI
 with Definition addr_convert :=
   fun a =>
     match a with
@@ -129,10 +134,22 @@ Proof.
   subst.
   reflexivity.
 Qed.
+
+Lemma addr_convert_ptoi :
+  forall a b,
+    addr_convert a = NoOom b ->
+    InfPTOI.ptr_to_int a = FinPTOI.ptr_to_int b.
+Proof.
+  intros a b CONV.
+  unfold addr_convert in *.
+  destruct a, b.
+  cbn in *.
+  erewrite FinITOP.ptr_to_int_int_to_ptr; eauto.
+Qed.
     
 End InfToFinAddrConvert.
 
-Module FinToInfAddrConvert : AddrConvert FinAddr InfAddr
+Module FinToInfAddrConvert : AddrConvert FinAddr FinPTOI InfAddr InfPTOI
 with Definition addr_convert :=
   fun a =>
     match a with
@@ -172,9 +189,24 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma addr_convert_ptoi :
+  forall a b,
+    addr_convert a = NoOom b ->
+    FinPTOI.ptr_to_int a = InfPTOI.ptr_to_int b.
+Proof.
+  intros a b CONV.
+  unfold addr_convert in *.
+  destruct a, b.
+  cbn in *.
+  inv CONV.
+  unfold FinPTOI.ptr_to_int.
+  cbn.
+  reflexivity.
+Qed.
+
 End FinToInfAddrConvert.
 
-Module Type AddrConvertSafe (ADDR1 : ADDRESS) (ADDR2 : ADDRESS) (AC1 : AddrConvert ADDR1 ADDR2) (AC2 : AddrConvert ADDR2 ADDR1).
+Module Type AddrConvertSafe (ADDR1 : ADDRESS) (PTOI1 : PTOI ADDR1) (ADDR2 : ADDRESS) (PTOI2 : PTOI ADDR2) (AC1 : AddrConvert ADDR1 PTOI1 ADDR2 PTOI2 ) (AC2 : AddrConvert ADDR2 PTOI2 ADDR1 PTOI1).
   (* ADDR1 is "contained within" ADDR2 *)
 
   Parameter addr_convert_succeeds :
@@ -200,7 +232,7 @@ Module Type IPConvertSafe (IP1 : INTPTR) (IP2 : INTPTR).
       IP1.from_Z (IP2.to_Z i2) = NoOom i1.
 End IPConvertSafe.
 
-Module FinToInfAddrConvertSafe : AddrConvertSafe FinAddr InfAddr FinToInfAddrConvert InfToFinAddrConvert.
+Module FinToInfAddrConvertSafe : AddrConvertSafe FinAddr FinPTOI InfAddr InfPTOI FinToInfAddrConvert InfToFinAddrConvert.
   Lemma addr_convert_succeeds :
     forall a1,
     {a2 & FinToInfAddrConvert.addr_convert a1 = NoOom a2}.

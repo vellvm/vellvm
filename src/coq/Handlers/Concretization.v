@@ -11,7 +11,7 @@ From Vellvm Require Import
      Utils.NMaps
      Utils.Monads
      Utils.MonadReturnsLaws
-     Utils.RefineProp
+     Utils.ErrUbOomProp
      Syntax.LLVMAst
      Syntax.DynamicTypes
      Syntax.DataLayout
@@ -419,6 +419,62 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                        ("concretize_uvalueM: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++
                                                                                                                                   uvalue_constructor_string u))
         end.
+
+      Parameter eval_select_equation :
+        forall (M : Type -> Type) {HM : Monad M} (undef_handler : dtyp -> M dvalue)
+          (ERR_M : Type -> Type) {HM_ERR : Monad ERR_M} {ERR : RAISE_ERROR ERR_M} {UB : RAISE_UB ERR_M}
+          {OOM : RAISE_OOM ERR_M} (lift_ue : forall A : Type, ERR_M A -> M A)
+          (cnd : dvalue) (v1 v2 : uvalue),
+          eval_select M undef_handler ERR_M lift_ue cnd v1 v2 =
+            match cnd with
+            | DVALUE_Poison t =>
+                (* TODO: Should be the type of the result of the select... *)
+                ret (DVALUE_Poison t)
+            | DVALUE_I1 i =>
+                if (Int1.unsigned i =? 1)%Z
+                then concretize_uvalueM M undef_handler ERR_M lift_ue v1
+                else concretize_uvalueM M undef_handler ERR_M lift_ue v2
+            | DVALUE_Vector conds =>
+                let fix loop conds xs ys : M (list dvalue) :=
+                  match conds, xs, ys with
+                  | [], [], [] => ret []
+                  | (c::conds), (x::xs), (y::ys) =>
+                      selected <- match c with
+                                 | DVALUE_Poison t =>
+                                     (* TODO: Should be the type of the result of the select... *)
+                                     ret (DVALUE_Poison t)
+                                 | DVALUE_I1 i =>
+                                     if (Int1.unsigned i =? 1)%Z
+                                     then ret x
+                                     else ret y
+                                 | _ =>
+                                     lift_ue dvalue
+                                       (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1.")
+                                 end;;
+                      rest <- loop conds xs ys;;
+                      ret (selected :: rest)
+                  | _, _, _ =>
+                      lift_ue (list dvalue) (raise_error "concretize_uvalueM: ill-typed vector select, length mismatch.")
+                  end in
+                (* TODO: lazily concretize these vectors to avoid
+                   evaluating elements that aren't chosen? *)
+                dv1 <- concretize_uvalueM M undef_handler ERR_M lift_ue v1;;
+                dv2 <- concretize_uvalueM M undef_handler ERR_M lift_ue v2;;
+                match dv1, dv2 with
+                | DVALUE_Poison t, _ =>
+                    (* TODO: Should we make sure t is a vector type...? *)
+                    ret (DVALUE_Poison t)
+                | DVALUE_Vector _, DVALUE_Poison t =>
+                    (* TODO: Should we make sure t is a vector type...? *)
+                    ret (DVALUE_Poison t)
+                | DVALUE_Vector xs, DVALUE_Vector ys =>
+                    selected <- loop conds xs ys;;
+                    ret (DVALUE_Vector selected)
+                | _, _ =>
+                    lift_ue dvalue (raise_error "concretize_uvalueM: ill-typed vector select, non-vector arguments")
+                end
+            | _ => lift_ue dvalue (raise_error "concretize_uvalueM: ill-typed select.")
+            end.
 End ConcretizationBase.
 
 Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (SER : ConcretizationBase LP MP Byte) <: ConcretizationBase LP MP Byte.
@@ -431,11 +487,11 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
              (uv : uvalue) : M dvalue
     := concretize_uvalueM M (fun dt => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) M (fun _ x => x) uv.
 
-  Definition concretize_u (uv : uvalue) : RefineProp dvalue.
+  Definition concretize_u (uv : uvalue) : ErrUbOomProp dvalue.
     refine (concretize_uvalueM _ (fun dt => _) err_ub_oom (fun _ x => _) uv).
 
     (* Undef handler *)
-    { unfold RefineProp.
+    { unfold ErrUbOomProp.
       refine (fun edv => match unERR_UB_OOM edv with
                       | mkEitherT (mkEitherT (mkEitherT (mkIdent (inr (inr (inr dv)))))) =>
                           (* As long as the dvalue has the same type, it's a refinement *)
@@ -445,36 +501,17 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
     }
 
     (* lift_ue *)
-    { unfold RefineProp.
+    { unfold ErrUbOomProp.
       intros ue.
-
-      (* Is x or ue the thing that should be the refinement? *)
-      (* I think ue is the refinement *)
-      destruct x as [[[[[[[oom_x] | [[ub_x] | [[err_x] | x]]]]]]]].
-      - (* OOM *)
-        (* OOM only refines OOM *)
-        destruct ue as [[[[[[[oom_ue] | [[ub_ue] | [[err_ue] | ue]]]]]]]].
-        + exact True.
-        + exact False.
-        + exact False.
-        + exact False.
-      - (* UB *)
-        exact True.
-      - (* ERR *)
-        exact True.
-      - destruct ue as [[[[[[[oom_ue] | [[ub_ue] | [[err_ue] | ue]]]]]]]].
-        + exact True. (* OOM refines everything *)
-        + exact False.
-        + exact False.
-        + exact (x = ue).
+      exact (x=ue).
     }
   Defined.
 
-  Definition concretize_u_succeeds (uv : uvalue) : RefineProp dvalue.
+  Definition concretize_u_succeeds (uv : uvalue) : ErrUbOomProp dvalue.
     refine (concretize_uvalueM _ (fun dt => _) err_ub_oom (fun _ x => _) uv).
 
     (* Undef handler *)
-    { unfold RefineProp.
+    { unfold ErrUbOomProp.
       refine (fun edv => match unERR_UB_OOM edv with
                       | mkEitherT (mkEitherT (mkEitherT (mkIdent (inr (inr (inr dv)))))) =>
                           (* As long as the dvalue has the same type, it's a refinement *)
@@ -484,7 +521,7 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
     }
 
     (* lift_ue *)
-    { unfold RefineProp.
+    { unfold ErrUbOomProp.
       intros ue.
 
       exact (~MFails x /\ ~MFails ue).
@@ -543,7 +580,7 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
 
     unfold bind.
     cbn.
-    unfold bind_RefineProp.
+    unfold bind_ErrUbOomProp.
 
     eexists.
     exists (fun x => match unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM e2)))) with
@@ -553,15 +590,13 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
              | inr (inr (inr x0)) => eval_iop iop x x0
              end).
     split; eauto.
-    split.
+    split; eauto.
 
     { (* Monad.eq1 mb (x <- ma;; k' x) *)
       unfold bind.
       cbn.
       destruct e1 as [[[[[[[oom_e1] | [[ub_e1] | [[err_e1] | e1]]]]]]]]; cbn; try reflexivity.
       destruct e2 as [[[[[[[oom_e2] | [[ub_e2] | [[err_e2] | e2]]]]]]]]; cbn; try reflexivity.
-
-      destruct (eval_iop iop e1 e2) as [[[[[[[oom_eval_iopiope1e2] | [[ub_eval_iopiope1e2] | [[err_eval_iopiope1e2] | eval_iopiope1e2]]]]]]]]; reflexivity.
     }
 
     right.
@@ -1539,60 +1574,44 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
              if (Int1.unsigned i =? 1)%Z
              then concretize_uvalueM v1
              else concretize_uvalueM v2
-         | DVALUE_Vector [] =>
-             (* Make sure parameters are also empty vectors *)
-             dv1 <- concretize_uvalueM v1;;
-             dv2 <- concretize_uvalueM v2;;
-             match dv1, dv2 with
-             | DVALUE_Poison t, _ =>
-                 ret (DVALUE_Poison t)
-             | _, DVALUE_Poison t =>
-                 ret (DVALUE_Poison t)
-             | DVALUE_Vector [], DVALUE_Vector [] =>
-                 ret (DVALUE_Vector [])
-             | _, _=>
-                 lift_ue (raise_error "concretize_uvalueM: ill-typed vector select.")
-             end
-         | DVALUE_Vector (c :: conds) =>
+         | DVALUE_Vector conds =>
+             let fix loop conds xs ys : M (list dvalue) :=
+               match conds, xs, ys with
+               | [], [], [] => ret []
+               | (c::conds), (x::xs), (y::ys) =>
+                   selected <- match c with
+                              | DVALUE_Poison t =>
+                                  (* TODO: Should be the type of the result of the select... *)
+                                  ret (DVALUE_Poison t)
+                              | DVALUE_I1 i =>
+                                  if (Int1.unsigned i =? 1)%Z
+                                  then ret x
+                                  else ret y
+                              | _ =>
+                                  lift_ue
+                                    (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1.")
+                              end;;
+                   rest <- loop conds xs ys;;
+                   ret (selected :: rest)
+               | _, _, _ =>
+                   lift_ue (raise_error "concretize_uvalueM: ill-typed vector select, length mismatch.")
+               end in
              (* TODO: lazily concretize these vectors to avoid
                    evaluating elements that aren't chosen? *)
              dv1 <- concretize_uvalueM v1;;
              dv2 <- concretize_uvalueM v2;;
-
              match dv1, dv2 with
              | DVALUE_Poison t, _ =>
+                 (* TODO: Should we make sure t is a vector type...? *)
                  ret (DVALUE_Poison t)
-             | _, DVALUE_Poison t =>
+             | DVALUE_Vector _, DVALUE_Poison t =>
+                 (* TODO: Should we make sure t is a vector type...? *)
                  ret (DVALUE_Poison t)
-             | DVALUE_Vector (x :: xs), DVALUE_Vector (y :: ys) =>
-                 selected <- match c with
-                            | DVALUE_Poison t =>
-                                (* TODO: Should be the type of the result of the select... *)
-                                (* This may never happen anyway, a
-                                      vector containing poison should
-                                      just concretize to poison? *)
-                                ret (DVALUE_Poison t)
-                            | DVALUE_I1 i =>
-                                if (Int1.unsigned i =? 1)%Z
-                                then ret x
-                                else ret y
-                            | _ =>
-                                lift_ue
-                                  (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1.")
-                            end;;
-                 let conds_rest  := DVALUE_Vector conds in
-                 let xs_rest     := dvalue_to_uvalue (DVALUE_Vector xs) in
-                 let ys_rest     := dvalue_to_uvalue (DVALUE_Vector ys) in
-                 rest <- eval_select conds_rest xs_rest ys_rest;;
-                 match rest with
-                 | DVALUE_Poison t => ret (DVALUE_Poison t)
-                 | DVALUE_Vector rs =>
-                     ret (DVALUE_Vector (selected :: rs))
-                 | _ =>
-                     lift_ue (raise_error "concretize_uvalueM: ill-typed vector select, did not concretize to vector.")
-                 end
+             | DVALUE_Vector xs, DVALUE_Vector ys =>
+                 selected <- loop conds xs ys;;
+                 ret (DVALUE_Vector selected)
              | _, _ =>
-                 lift_ue (raise_error "concretize_uvalueM: ill-typed vector select, cons case.")
+                 lift_ue (raise_error "concretize_uvalueM: ill-typed vector select, non-vector arguments")
              end
          | _ => lift_ue (raise_error "concretize_uvalueM: ill-typed select.")
          end.
@@ -1726,6 +1745,64 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
         intros u.
         unfold concretize_uvalueM at 1.
         destruct u; try reflexivity.
+      Qed.
+
+      Lemma eval_select_equation :
+        forall cnd v1 v2,
+          eval_select cnd v1 v2 =
+            match cnd with
+            | DVALUE_Poison t =>
+                (* TODO: Should be the type of the result of the select... *)
+                ret (DVALUE_Poison t)
+            | DVALUE_I1 i =>
+                if (Int1.unsigned i =? 1)%Z
+                then concretize_uvalueM v1
+                else concretize_uvalueM v2
+            | DVALUE_Vector conds =>
+                let fix loop conds xs ys : M (list dvalue) :=
+                  match conds, xs, ys with
+                  | [], [], [] => ret []
+                  | (c::conds), (x::xs), (y::ys) =>
+                      selected <- match c with
+                                 | DVALUE_Poison t =>
+                                     (* TODO: Should be the type of the result of the select... *)
+                                     ret (DVALUE_Poison t)
+                                 | DVALUE_I1 i =>
+                                     if (Int1.unsigned i =? 1)%Z
+                                     then ret x
+                                     else ret y
+                                 | _ =>
+                                     lift_ue
+                                       (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1.")
+                                 end;;
+                      rest <- loop conds xs ys;;
+                      ret (selected :: rest)
+                  | _, _, _ =>
+                      lift_ue (raise_error "concretize_uvalueM: ill-typed vector select, length mismatch.")
+                  end in
+                (* TODO: lazily concretize these vectors to avoid
+                   evaluating elements that aren't chosen? *)
+                dv1 <- concretize_uvalueM v1;;
+                dv2 <- concretize_uvalueM v2;;
+                match dv1, dv2 with
+                | DVALUE_Poison t, _ =>
+                    (* TODO: Should we make sure t is a vector type...? *)
+                    ret (DVALUE_Poison t)
+                | DVALUE_Vector _, DVALUE_Poison t =>
+                    (* TODO: Should we make sure t is a vector type...? *)
+                    ret (DVALUE_Poison t)
+                | DVALUE_Vector xs, DVALUE_Vector ys =>
+                    selected <- loop conds xs ys;;
+                    ret (DVALUE_Vector selected)
+                | _, _ =>
+                    lift_ue (raise_error "concretize_uvalueM: ill-typed vector select, non-vector arguments")
+                end
+            | _ => lift_ue (raise_error "concretize_uvalueM: ill-typed select.")
+            end.
+      Proof.
+        intros cnd v1 v2.
+        unfold eval_select at 1.
+        destruct cnd; try reflexivity.
       Qed.
 
     End Concretize.

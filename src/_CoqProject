@@ -90,6 +90,8 @@
 ./coq/Syntax/TypeUtil.v
 ./coq/Theory.v
 ./coq/Theory/ContainsUB.v
+./coq/Theory/ContainsUBExtra.v
+./coq/Theory/ContainsUBOriginal.v
 ./coq/Theory/DenotationTheory.v
 ./coq/Theory/ExpLemmas.v
 ./coq/Theory/InstrLemmas.v
@@ -137,6 +139,8 @@
 ./coq/Utils/PropT.v
 ./coq/Utils/Raise.v
 ./coq/Utils/RefineProp.v
+./coq/Utils/ErrUbOomProp.v
+./coq/Utils/VellvmRelations.v
 ./coq/Utils/RuttPropsExtra.v
 ./coq/Utils/StateMonads.v
 ./coq/Utils/TFor.v

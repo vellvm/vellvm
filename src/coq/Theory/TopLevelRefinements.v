@@ -1,35 +1,36 @@
 (* begin hide *)
 From ITree Require Import
-     ITree
-     ITreeFacts
-     Basics.HeterogeneousRelations
-     Events.State
-     Events.StateFacts
-     InterpFacts
-     KTreeFacts
-     Eq.Eqit.
+  ITree
+  ITreeFacts
+  Basics.HeterogeneousRelations
+  Events.State
+  Events.StateFacts
+  InterpFacts
+  KTreeFacts
+  Eq.Eqit.
 
 From Vellvm Require Import
-     Utilities
-     Syntax
-     Semantics
-     Theory.Refinement
-     Theory.InterpreterMCFG
-     Theory.InterpreterCFG
-     Utils.InterpMemoryProp.
+  Utilities
+  Utils.VellvmRelations
+  Syntax
+  Semantics
+  Theory.Refinement
+  Theory.InterpreterMCFG
+  Theory.InterpreterCFG
+  Utils.InterpMemoryProp
+  Utils.InterpPropOOM.
 
 From ExtLib Require Import
-     Structures.Functor.
+  Structures.Functor.
 
 From Coq Require Import
-     RelationClasses
-     Strings.String
-     Logic
-     Morphisms
-     Relations
-     List
-     ZArith.
-
+  RelationClasses
+  Strings.String
+  Logic
+  Morphisms
+  Relations
+  List
+  ZArith.
 
 Require Import Paco.paco.
 
@@ -186,7 +187,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         specialize (REF _ T2).
         destruct REF as [t_pre1 [T1 EUTT]].
         exists t_pre1; split; auto.
-        eapply interp_prop_Proper_eq in MODEL; try typeclasses eauto; eauto.
+        eapply interp_prop_oom_Proper_eq in MODEL; try typeclasses eauto; eauto.
       - reflexivity.
     Qed.
 
@@ -526,7 +527,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       unfold model_undef.
       unfold exec_undef.
       exists x; split; auto.
-      apply interp_prop_correct_exec; try reflexivity; auto.
+      apply interp_prop_oom_correct_exec; try reflexivity; auto.
       repeat intro.
       unfold case_, Case_sum1, case_sum1.
       destruct e as [ | [ | ]]; eauto.

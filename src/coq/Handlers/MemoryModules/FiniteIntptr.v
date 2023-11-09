@@ -56,6 +56,16 @@ Definition to_Z := fun (x : Z) => x.
     inversion FROM; auto.
   Qed.
 
+  Lemma from_Z_injective :
+    forall (z1 z2 : Z) (i : intptr),
+      from_Z z1 = NoOom i ->
+      from_Z z2 = NoOom i ->
+      z1 = z2.
+  Proof.
+    intros z1 z2 i Z1 Z2.
+    inversion Z1; inversion Z2; subst; auto.
+  Qed.
+
   Lemma to_Z_from_Z :
     forall (i : intptr),
       from_Z (to_Z i) = NoOom i.
@@ -225,6 +235,23 @@ Module IP64Bit : MemoryAddress.INTPTR.
     unfold to_Z.
     apply Integers.Int64.signed_repr.
     lia.
+  Qed.
+
+  Lemma from_Z_injective :
+    forall (z1 z2 : Z) (i : intptr),
+      from_Z z1 = NoOom i ->
+      from_Z z2 = NoOom i ->
+      z1 = z2.
+  Proof.
+    intros z1 z2 i Z1 Z2.
+    unfold from_Z in *.
+    break_match_hyp; inversion Z2.
+    break_match_hyp; inversion Z1.
+    pose proof Integers.Int64.signed_repr z1.
+    pose proof Integers.Int64.signed_repr z2.
+    forward H; try lia.
+    forward H2; try lia.
+    congruence.
   Qed.
 
   Lemma to_Z_from_Z :

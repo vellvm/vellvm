@@ -12,14 +12,18 @@ From Vellvm Require Import
      Utils.ITreeMap
      Utils.Raise
      Utils.Tactics
+     Utils.VellvmRelations
      Theory.DenotationTheory
      Theory.InterpreterMCFG
+     Theory.ContainsUBExtra
      Handlers.MemoryModelImplementation.
 
 From ITree Require Import
      ITree
      Eq
      Basics.
+
+Import HeterogeneousRelations.
 
 From Coq Require Import
      ZArith
@@ -156,7 +160,14 @@ Module Infinite.
                 (vis (ThrowOOM (print_msg oom_msg)) (fun x : void => match x return (itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) R) with
                                                          end))).
 
-    hinduction Hmodel before CIH; cbn; intros; inv Heqi; eauto; [solve [cbn in *; eapply EqTauL; auto] |]; try discriminate.
+    hinduction Hmodel before CIH; cbn; intros; inv Heqi; eauto; [solve [cbn in *; eapply EqTauL; auto] | | |]; try discriminate.
+    { destruct e, u.
+      pinversion HT1; subst_existT.
+      - unfold print_msg.
+        constructor.
+        intros [].
+      - inv CHECK0.
+    }
 
     dependent destruction H3.
     do 20 red in H.
@@ -179,36 +190,34 @@ Module Infinite.
     forall {E F : Type -> Type}
       `{FAIL : FailureE -< E +' F}
       `{UB : UBE -< E +' F}
-      `{OOM : OOME -< E +' F}
+      `{OOM : OOME -< F}
       {X} (x : X)
       (RR : relation X) `{REF : Reflexive X RR},
       model_undef_h RR (ret x) (ret x).
   Proof.
     intros E F FAIL UB OOM X x RR REF.
     unfold model_undef_h.
-    apply interp_prop_ret_pure; auto.
+    apply interp_prop_oom_ret_pure; auto.
   Qed.
 
   Lemma model_undef_h_ret_inv :
     forall {E F : Type -> Type}
       `{FAIL : FailureE -< E +' F}
       `{UB : UBE -< E +' F}
-      `{OOM : OOME -< E +' F}
+      `{OOMF : OOME -< F}
       {X} (x : X) (t : itree (E +' F) X),
       model_undef_h eq (ret x) t ->
-      t ≈ Ret x.
+      t ≈ Ret x \/ (exists (A : Type) (e : OOME A) (k : A -> itree (E +' F) X), t ≈ vis e k).
   Proof.
     intros E F FAIL UB OOM X x t UNDEF.
     unfold model_undef_h in *.
-    eapply interp_prop_ret_inv in UNDEF.
-    destruct UNDEF as [r2 [EQ T']].
-    subst.
-    auto.
+    eapply interp_prop_oom_ret_inv in UNDEF.
+    destruct UNDEF as [[r2 [EQ T']] | OOM_CASE]; subst; eauto.
   Qed.
 
   Lemma interp_mcfg4_ret :
     forall R g l sid m (r : R),
-      ℑs4 eq eq (ret r) g l sid m (Ret5 g l sid m r).
+      ℑs4 eq (MemoryBigIntptr.MMEP.MemSpec.MemState_eqv × eq) (ret r) g l sid m (Ret5 g l sid m r).
   Proof.
     intros.
     unfold interp_mcfg4, model_undef.
@@ -223,6 +232,7 @@ Module Infinite.
     pstep; econstructor; eauto.
     2 : eapply model_undef_h_ret_pure; eauto.
     cbn. reflexivity.
+    typeclasses eauto.
   Qed.
 
   Lemma interp_mcfg4_ret_inv :
@@ -243,9 +253,11 @@ Module Infinite.
     destruct H as [(?&?&?) | (A&e&k&?)].
     { destruct x1 as (?&?&?).
       rewrite H1 in H0.
-      apply interp_prop_ret_inv in H0.
-      destruct H0 as (?&?&?). subst.
-      cbn. left. exists m0, s. rewrite H2. reflexivity.
+      apply interp_prop_oom_ret_inv in H0.
+      destruct H0 as [(?&?&?) | OOM_CASE]; subst; eauto.
+      cbn. left. exists m0, s. rewrite H2.
+      cbn.
+      reflexivity.
     }
 
     right.
@@ -261,7 +273,12 @@ Module Infinite.
     dependent induction H0.
     - setoid_rewrite tau_eutt.
       setoid_rewrite itree_eta.
-      eapply IHinterp_PropTF; eauto.
+      eapply IHinterp_prop_oomTF; eauto.
+    - cbn.
+      setoid_rewrite <- itree_eta.
+      setoid_rewrite HT1.
+      exists A0. exists e0. exists k2.
+      reflexivity.
     - red in H; cbn in H; red in H.
       setoid_rewrite bind_ret_r in H.
       rewrite H in H0.
@@ -562,14 +579,8 @@ Module Infinite.
           red.
           pstep; red; cbn.
           change (VisF (subevent void (ThrowOOM u)) k) with (observe (Vis (subevent void (ThrowOOM u)) k)).
-          econstructor.
-          * intros [] _.
-          * cbn. red.
-            setoid_rewrite bind_ret_r.
-            reflexivity.
-          * setoid_rewrite bind_trigger.
-            unfold print_msg. destruct u.
-            reflexivity.
+          econstructor; eauto.
+          reflexivity.
       - reflexivity.
     }
 
@@ -597,7 +608,7 @@ Module Infinite.
     rewrite alloc_tree_simpl.
 
     apply L3_trace_MemoryE.
-    eapply (interp_memory_prop_vis _ _ _ _ _ (Ret _) (fun _ => Ret _))
+    eapply (interp_memory_prop_vis _ _ _ _ _ _ (Ret _) _ (fun _ => Ret _))
       ; [ setoid_rewrite bind_ret_l; reflexivity |..].
 
     { cbn. unfold my_handle_memory_prop.
@@ -605,7 +616,7 @@ Module Infinite.
       right; right; right.
       exists sid, ms_final, (DVALUE_Addr addr).
       Unshelve.
-      5 : exact (ms_final, (sid, DVALUE_Addr addr)).
+      7 : exact (ms_final, (sid, DVALUE_Addr addr)).
       split; [ red; reflexivity |].
       6 : exact m. cbn in *.
       exists ms_final, addr. tauto.
@@ -691,14 +702,8 @@ Module Infinite.
           red.
           pstep; red; cbn.
           change (VisF (subevent void (ThrowOOM u)) k) with (observe (Vis (subevent void (ThrowOOM u)) k)).
-          econstructor.
-          * intros [] _.
-          * cbn. red.
-            setoid_rewrite bind_ret_r.
-            reflexivity.
-          * setoid_rewrite bind_trigger.
-            unfold print_msg. destruct u.
-            reflexivity.
+          econstructor; eauto.
+          reflexivity.
       - reflexivity.
     }
 
@@ -726,7 +731,7 @@ Module Infinite.
     rewrite ptoi_tree_simpl.
 
     apply L3_trace_MemoryE.
-    eapply (interp_memory_prop_vis _ _ _ _ _ (Ret _) (fun _ => Ret _))
+    eapply (interp_memory_prop_vis _ _ _ _ _ _ (Ret _) _ (fun _ => Ret _))
       ; [ setoid_rewrite bind_ret_l; reflexivity |..].
 
     { cbn. unfold my_handle_memory_prop.
@@ -734,7 +739,7 @@ Module Infinite.
       right; right; right.
       exists sid, ms_final, (DVALUE_Addr addr).
       Unshelve.
-      5 : exact (ms_final, (sid, DVALUE_Addr addr)).
+      7 : exact (ms_final, (sid, DVALUE_Addr addr)).
       split; [ red; reflexivity |].
       6 : exact m. cbn in *.
       exists ms_final, addr. tauto.
@@ -762,29 +767,32 @@ Module Infinite.
   Lemma interp_memory_prop_vis_inv:
     forall E R X
       (e : (E +' LLVMParamsBigIntptr.Events.IntrinsicE +' LLVMParamsBigIntptr.Events.MemoryE +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X)
-      k sid m x,
-      interp_memory_prop (E:=E) (R2 := R) eq (Vis e k) sid m x ->
+      k sid m t,
+      interp_memory_prop (E:=E) (R2 := R) eq (Vis e k) sid m t ->
       ((exists ta k2 s1 s2 ,
-        x ≈ x <- ta;; k2 x /\
-          interp_memory_prop_h e s1 s2 ta /\
-          (forall (a : X) (b : MMEP.MMSP.MemState * (store_id * X)),
-            @Returns (E +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X a (trigger e) ->
-            @Returns (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) (MMEP.MMSP.MemState * (store_id * X)) b ta ->
-            a = snd (snd b) ->
-            interp_memory_prop (E := E) eq (k a) sid m (k2 b))) \/
-        (exists A (e : OOME A) k, x ≈ vis e k)%type).
+           eutt (MMEP.MemSpec.MemState_eqv × eq) t (a <- ta;; k2 a) /\
+             interp_memory_prop_h e s1 s2 ta /\
+             (forall (a : X) (b : MMEP.MMSP.MemState * (store_id * X)),
+                 @Returns (E +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X a (trigger e) ->
+                 @Returns (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) (MMEP.MMSP.MemState * (store_id * X)) b ta ->
+                 a = snd (snd b) ->
+                 interp_memory_prop (E := E) eq (k a) sid m (k2 b))) \/
+         (exists ta s1 s2, interp_memory_prop_h e s1 s2 ta /\ contains_UB_Extra ta)%type \/
+         (exists A (e : OOME A) k, t ≈ (vis e k)%type)).
   Proof.
     intros.
     punfold H.
     red in H. cbn in H.
-    setoid_rewrite (itree_eta x).
+    setoid_rewrite (itree_eta t).
     remember (VisF e k).
-    genobs x ox.
-    clear x Heqox.
+    genobs t ot.
+    clear t Heqot.
     hinduction H before sid; intros; inv Heqi; eauto.
     - specialize (IHinterp_memory_PropTF m eq_refl).
-      destruct IHinterp_memory_PropTF as [(?&?&?&?&?&?&?) | (?&?&?&?)].
-      2: {
+      destruct IHinterp_memory_PropTF as [(?&?&?&?&?&?&?) | [(?&?&?&?) | (?&?&?&?)]].
+      3: {
+        (* OOM *)
+        right.
         right.
         setoid_rewrite tau_eutt.
         rewrite <- itree_eta in H1.
@@ -793,27 +801,44 @@ Module Infinite.
         reflexivity.
       }
 
+      2: {
+        (* UB *)
+        right. left.
+        exists x. exists x0. exists x1.
+        auto.        
+      }
+
       left.
       eexists _,_,_,_; split; eauto. rewrite tau_eutt.
       rewrite <- itree_eta in H1. eauto.
     - setoid_rewrite <- itree_eta.
       setoid_rewrite HT1.
-      right.
+      right. right.
       exists A. exists e0. exists k0.
       reflexivity.
-    - dependent destruction H3.
+    - dependent destruction H1.
+      red in KS; cbn in KS.
+      destruct KS as [KS_UB | KS].
+      { (* Interpretation of e contains UB *)
+        right; left.
+        exists ta. exists s1. exists s2.
+        auto.
+      }
+
+      (* Interpretation of e does not contain UB *)
       left.
       eexists _,_,_,_; split; eauto.
       + rewrite <- itree_eta; eauto.
+
       + split; eauto.
         intros. do 3 red.
-        specialize (HK a b H1 H2 H3). pclearbot; auto.
+        specialize (HK a b H H0 H1). pclearbot; auto.
   Qed.
 
   Lemma refine_OOM_h_model_undef_h_raise_OOM:
     forall R t1 oom_msg (k1 : R -> _) t3,
       refine_OOM_h (E := L4) refine_res3 t1 (raiseOOM oom_msg) ->
-      model_undef_h eq (x <- Error.raise_oom oom_msg;; k1 x) t3 ->
+      model_undef_h (prod_rel MemoryBigIntptr.MMEP.MemSpec.MemState_eqv eq) (x <- Error.raise_oom oom_msg;; k1 x) t3 ->
       refine_OOM_h (E := L4) refine_res3 t1 t3.
   Proof.
     intros. punfold H. red in H.
@@ -839,7 +864,9 @@ Module Infinite.
             end)).
     hinduction H0 before i0; intros; inv Heqi.
     - pstep; constructor; eauto.
-      specialize (IHinterp_PropTF eq_refl H eq_refl). punfold IHinterp_PropTF.
+      specialize (IHinterp_prop_oomTF eq_refl H eq_refl). punfold IHinterp_prop_oomTF.
+    - inv CHECK.
+    - pstep; red; cbn; eauto.
     - dependent destruction H4.
       cbn in H. red in H.
       rewrite H in H0.
@@ -854,26 +881,39 @@ Module Infinite.
   Lemma refine_OOM_h_model_undef_h_raise_ret:
     forall t1 t3 r,
       refine_OOM_h (E := L4) refine_res3 t1 (ret r) ->
-      model_undef_h eq (ret r) t3 ->
+      model_undef_h (prod_rel MemoryBigIntptr.MMEP.MemSpec.MemState_eqv eq) (ret r) t3 ->
       refine_OOM_h (E := L4) refine_res3 t1 t3.
   Proof.
     intros.
-    eapply interp_prop_ret_inv in H0.
-    destruct H0 as (?&?&?).
+    eapply interp_prop_oom_ret_inv in H0.
+    rewrite H.
+    destruct H0 as [(?&?&?) | OOM_CASE].
+    2: {
+      red.
+      red.
+      destruct OOM_CASE as (?&?&?&?).
+      rewrite H0.
+      pstep; red; cbn.
+      observe_vis.
+      eapply Interp_Prop_OomT_Vis_OOM_L; eauto.
+      reflexivity.
+    }
+
     subst. rewrite H1.
     red in H.
-    red in H.
-    eapply interp_prop_oom_l_ret_inv in H.
-    destruct H as (?&?&?).
-    subst. rewrite H0.
-    pstep; constructor; eauto.
+    inv H0.
+    destruct r, x.
+    cbn in *; subst.
+    pstep; constructor; auto.
+    red.
+    repeat constructor; cbn; auto.
   Qed.
 
   (* Add allocation in infinite language *)
   Example add_alloc :
     forall genv lenv stack sid m,
-      refine_L6 (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m)
-                (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ alloc_tree) genv (lenv, stack) sid m).
+      refine_L6 (interp_mcfg4 eq (prod_rel MemoryBigIntptr.MMEP.MemSpec.MemState_eqv eq) (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m)
+                (interp_mcfg4 eq (prod_rel MemoryBigIntptr.MMEP.MemSpec.MemState_eqv eq) (interp_instr_E_to_L0 _ alloc_tree) genv (lenv, stack) sid m).
   Proof.
     intros genv lenv stack sid m.
     unfold refine_L6.
@@ -884,9 +924,10 @@ Module Infinite.
     rewrite alloc_tree_simpl in H.
     apply L3_trace_MemoryE in H.
 
+    (* Given `H`, what can `x` be? *)
     apply interp_memory_prop_vis_inv in H.
-    destruct H as [(alloc_t&k1&s1&ms1&EQ1&SPEC1&HK) | (A&e&k&EUTT)].
-    2: {
+    destruct H as [(alloc_t&k1&s1&ms1&EQ1&SPEC1&HK) | [(ta&s1&s2&INTERP&UB) | (A&e&k&EUTT)]].
+    3: { (* OOM *)
       exists t'.
       split.
       - unfold interp_mcfg4.
@@ -932,7 +973,18 @@ Module Infinite.
           { setoid_rewrite (itree_eta t').
             setoid_rewrite <- x.
             setoid_rewrite tau_eutt.
-            eapply IHinterp_PropTF; eauto.
+            eapply IHinterp_prop_oomTF; eauto.
+          }
+
+          { setoid_rewrite (itree_eta t').
+            setoid_rewrite <- x.
+            rewrite HT1.
+            cbn.
+            destruct e.
+            pstep; red; cbn.
+            observe_vis_r.
+            eapply Interp_Prop_OomT_Vis_OOM_R; eauto.
+            reflexivity.
           }
 
           cbn in H.
@@ -969,7 +1021,7 @@ Module Infinite.
                      (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME
                         (UBE +' DebugE +' FailureE) (@ReSum_id (Type -> Type) IFun Id_IFun OOME)) void
                      (ThrowOOM u))) (fun x1 : void => k2 x1))).
-          eapply Interp_PropT_Vis.
+          eapply Interp_Prop_OomT_Vis.
           * intros [] _.
           * cbn. red.
             setoid_rewrite bind_ret_r.
@@ -979,7 +1031,53 @@ Module Infinite.
             reflexivity.
       - reflexivity.
     }
-    rewrite EQ1 in H0. clear x EQ1.
+
+    2: { (* UB *)
+      exfalso.
+
+      pose proof allocate_dtyp_spec_inv s2 (DTYPE_I 64) as ALLOCINV.
+      assert (abs : DTYPE_I 64 <> DTYPE_Void) by (intros abs; inv abs).
+      specialize (ALLOCINV 1%N abs); eauto; clear abs.
+
+      repeat red in INTERP.
+      destruct INTERP as [ALLOC_UB | [ALLOC_ERR | [ALLOC_OOM | ALLOC_SUC]]].
+      { (* UB *)
+        destruct ALLOC_UB as [ub_msg [ALLOC_UB | [sab [a [ALLOC_UB []]]]]].
+        specialize (ALLOCINV _ ALLOC_UB).
+        destruct ALLOCINV as [[ms_final [ptr ALLOC_INV]] | [oom_msg ALLOC_INV]];
+          inv ALLOC_INV.
+      }
+      { (* ERR *)
+        destruct ALLOC_ERR as [err_msg [MAP [spec_msg [ALLOC_ERR | [sab [a [ALLOC_ERR []]]]]]]].
+        apply ALLOCINV in ALLOC_ERR.
+        destruct ALLOC_ERR as [[ms_final [ptr ALLOC_ERR]] | [oom_msg ALLOC_ERR]];
+          inv ALLOC_ERR.
+      }
+      { (* OOM *)
+        destruct ALLOC_OOM as [err_msg [MAP [spec_msg [ALLOC_OOM | [sab [a [ALLOC_OOM []]]]]]]].
+        apply ALLOCINV in ALLOC_OOM. clear ALLOCINV.
+        destruct ALLOC_OOM as [[ms_final [ptr ALLOC_OOM]] | [oom_msg ALLOC_OOM]];
+          inv ALLOC_OOM.
+
+        rewrite MAP in UB.
+        cbn in UB.
+
+        eapply contains_UB_Extra_raiseOOM in UB; eauto.
+        intros X e1 e2.
+        repeat unfold resum, ReSum_id, id_, Id_IFun, ReSum_inr, ReSum_inl, inr_, inl_, cat, Cat_IFun, Inr_sum1, Inl_sum1.
+        intros CONTRA; discriminate.
+      }
+
+      destruct ALLOC_SUC as (?&?&?&?&?).
+      rewrite H in UB.
+      eapply ret_not_contains_UB_Extra in UB; eauto.
+      reflexivity.
+    }
+
+    (* Why can't this just be a rewrite? *)
+    eapply interp_prop_oom_Proper_eq in H0; try typeclasses eauto; eauto.
+    2: symmetry; apply EQ1.
+    clear x EQ1.
 
     pose proof allocate_dtyp_spec_inv ms1 (DTYPE_I 64) as ALLOCINV.
     assert (abs : DTYPE_I 64 <> DTYPE_Void) by (intros abs; inv abs).
@@ -1005,7 +1103,7 @@ Module Infinite.
       rewrite MAP in H0.
       exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
       split; cycle 1.
-      { clear -H0.
+      { clear - H0.
         eapply refine_OOM_h_model_undef_h_raise_OOM; eauto.
         eapply refine_oom_h_raise_oom; typeclasses eauto. }
       { unfold interp_instr_E_to_L0. unfold ret_tree. cbn.
@@ -1055,7 +1153,18 @@ Module Infinite.
         setoid_rewrite <- x.
         eapply interp_prop_oom_Proper_eq; try typeclasses eauto; auto.
         rewrite tau_eutt; reflexivity.
-        eapply IHinterp_PropTF; eauto.
+        eapply IHinterp_prop_oomTF; eauto.
+      }
+
+      { setoid_rewrite (itree_eta t').
+        setoid_rewrite <- x.
+        rewrite HT1.
+        cbn.
+        destruct e.
+        pstep; red; cbn.
+        observe_vis.
+        eapply Interp_Prop_OomT_Vis_OOM_L; eauto.
+        reflexivity.
       }
 
       cbn in H2.
@@ -1240,7 +1349,7 @@ Module Finite.
   Lemma refine_OOM_h_model_undef_h_raise_OOM:
     forall R t1 oom_msg (k1 : R -> _) t3,
       refine_OOM_h (E := L4) refine_res3 t1 (raiseOOM oom_msg) ->
-      model_undef_h eq (x <- Error.raise_oom oom_msg;; k1 x) t3 ->
+      model_undef_h (prod_rel Memory64BitIntptr.MMEP.MemSpec.MemState_eqv eq) (x <- Error.raise_oom oom_msg;; k1 x) t3 ->
       refine_OOM_h (E := L4) refine_res3 t1 t3.
   Proof.
     intros. punfold H. red in H.
@@ -1266,7 +1375,9 @@ Module Finite.
             end)).
     hinduction H0 before i0; intros; inv Heqi.
     - pstep; constructor; eauto.
-      specialize (IHinterp_PropTF eq_refl H eq_refl). punfold IHinterp_PropTF.
+      specialize (IHinterp_prop_oomTF eq_refl H eq_refl). punfold IHinterp_prop_oomTF.
+    - inv CHECK.
+    - pstep; red; cbn; eauto.      
     - dependent destruction H4.
       cbn in H. red in H.
       rewrite H in H0.
@@ -1281,19 +1392,32 @@ Module Finite.
   Lemma refine_OOM_h_model_undef_h_raise_ret:
     forall t1 t3 r,
       refine_OOM_h (E := L4) refine_res3 t1 (ret r) ->
-      model_undef_h eq (ret r) t3 ->
+      model_undef_h (prod_rel Memory64BitIntptr.MMEP.MemSpec.MemState_eqv eq) (ret r) t3 ->
       refine_OOM_h (E := L4) refine_res3 t1 t3.
   Proof.
     intros.
-    eapply interp_prop_ret_inv in H0.
-    destruct H0 as (?&?&?).
+    eapply interp_prop_oom_ret_inv in H0.
+    rewrite H.
+    destruct H0 as [(?&?&?) | OOM_CASE].
+    2: {
+      red.
+      red.
+      destruct OOM_CASE as (?&?&?&?).
+      rewrite H0.
+      pstep; red; cbn.
+      observe_vis.
+      eapply Interp_Prop_OomT_Vis_OOM_L; eauto.
+      reflexivity.
+    }
+
     subst. rewrite H1.
     red in H.
-    red in H.
-    eapply interp_prop_oom_l_ret_inv in H.
-    destruct H as (?&?&?).
-    subst. rewrite H0.
-    pstep; constructor; eauto.
+    inv H0.
+    destruct r, x.
+    cbn in *; subst.
+    pstep; constructor; auto.
+    red.
+    repeat constructor; cbn; auto.
   Qed.
 
   (* Few remarks about [L3_trace] used in [interp_mcfg4] *)
@@ -1381,29 +1505,32 @@ Module Finite.
   Lemma interp_memory_prop_vis_inv:
     forall E R X
       (e : (E +' LLVMParams64BitIntptr.Events.IntrinsicE +' LLVMParams64BitIntptr.Events.MemoryE +' LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X)
-      k sid m x,
-      interp_memory_prop (E:=E) (R2 := R) eq (Vis e k) sid m x ->
+      k sid m t,
+      interp_memory_prop (E:=E) (R2 := R) eq (Vis e k) sid m t ->
       ((exists ta k2 s1 s2 ,
-        x ≈ x <- ta;; k2 x /\
-          interp_memory_prop_h e s1 s2 ta /\
-          (forall (a : X) (b : MMEP.MMSP.MemState * (store_id * X)),
-            @Returns (E +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X a (trigger e) ->
-            @Returns (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) (MMEP.MMSP.MemState * (store_id * X)) b ta ->
-            a = snd (snd b) ->
-            interp_memory_prop (E := E) eq (k a) sid m (k2 b))) \/
-        (exists A (e : OOME A) k, x ≈ vis e k)%type).
+           eutt (MMEP.MemSpec.MemState_eqv × eq) t (a <- ta;; k2 a) /\
+             interp_memory_prop_h e s1 s2 ta /\
+             (forall (a : X) (b : MMEP.MMSP.MemState * (store_id * X)),
+                 @Returns (E +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X a (trigger e) ->
+                 @Returns (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) (MMEP.MMSP.MemState * (store_id * X)) b ta ->
+                 a = snd (snd b) ->
+                 interp_memory_prop (E := E) eq (k a) sid m (k2 b))) \/
+         (exists ta s1 s2, interp_memory_prop_h e s1 s2 ta /\ contains_UB_Extra ta)%type \/
+         (exists A (e : OOME A) k, t ≈ (vis e k)%type)).
   Proof.
     intros.
     punfold H.
     red in H. cbn in H.
-    setoid_rewrite (itree_eta x).
+    setoid_rewrite (itree_eta t).
     remember (VisF e k).
-    genobs x ox.
-    clear x Heqox.
+    genobs t ot.
+    clear t Heqot.
     hinduction H before sid; intros; inv Heqi; eauto.
     - specialize (IHinterp_memory_PropTF m eq_refl).
-      destruct IHinterp_memory_PropTF as [(?&?&?&?&?&?&?) | (?&?&?&?)].
-      2: {
+      destruct IHinterp_memory_PropTF as [(?&?&?&?&?&?&?) | [(?&?&?&?) | (?&?&?&?)]].
+      3: {
+        (* OOM *)
+        right.
         right.
         setoid_rewrite tau_eutt.
         rewrite <- itree_eta in H1.
@@ -1412,57 +1539,72 @@ Module Finite.
         reflexivity.
       }
 
+      2: {
+        (* UB *)
+        right. left.
+        exists x. exists x0. exists x1.
+        auto.        
+      }
+
       left.
       eexists _,_,_,_; split; eauto. rewrite tau_eutt.
       rewrite <- itree_eta in H1. eauto.
     - setoid_rewrite <- itree_eta.
       setoid_rewrite HT1.
-      right.
+      right. right.
       exists A. exists e0. exists k0.
       reflexivity.
-    - dependent destruction H3.
+    - dependent destruction H1.
+      red in KS; cbn in KS.
+      destruct KS as [KS_UB | KS].
+      { (* Interpretation of e contains UB *)
+        right; left.
+        exists ta. exists s1. exists s2.
+        auto.
+      }
+
+      (* Interpretation of e does not contain UB *)
       left.
       eexists _,_,_,_; split; eauto.
       + rewrite <- itree_eta; eauto.
+
       + split; eauto.
         intros. do 3 red.
-        specialize (HK a b H1 H2 H3). pclearbot; auto.
+        specialize (HK a b H H0 H1). pclearbot; auto.
   Qed.
 
   Lemma model_undef_h_ret_pure :
     forall {E F : Type -> Type}
       `{FAIL : FailureE -< E +' F}
       `{UB : UBE -< E +' F}
-      `{OOM : OOME -< E +' F}
+      `{OOM : OOME -< F}
       {X} (x : X)
       (RR : relation X) `{REF : Reflexive X RR},
       model_undef_h RR (ret x) (ret x).
   Proof.
     intros E F FAIL UB OOM X x RR REF.
     unfold model_undef_h.
-    apply interp_prop_ret_pure; auto.
+    apply interp_prop_oom_ret_pure; auto.
   Qed.
 
   Lemma model_undef_h_ret_inv :
     forall {E F : Type -> Type}
       `{FAIL : FailureE -< E +' F}
       `{UB : UBE -< E +' F}
-      `{OOM : OOME -< E +' F}
+      `{OOMF : OOME -< F}
       {X} (x : X) (t : itree (E +' F) X),
       model_undef_h eq (ret x) t ->
-      t ≈ Ret x.
+      t ≈ Ret x \/ (exists (A : Type) (e : OOME A) (k : A -> itree (E +' F) X), t ≈ vis e k).
   Proof.
     intros E F FAIL UB OOM X x t UNDEF.
     unfold model_undef_h in *.
-    eapply interp_prop_ret_inv in UNDEF.
-    destruct UNDEF as [r2 [EQ T']].
-    subst.
-    auto.
+    eapply interp_prop_oom_ret_inv in UNDEF.
+    destruct UNDEF as [[r2 [EQ T']] | OOM_CASE]; subst; eauto.
   Qed.
 
   Lemma interp_mcfg4_ret :
     forall R g l sid m (r : R),
-      ℑs4 eq eq (ret r) g l sid m (Ret5 g l sid m r).
+      ℑs4 eq (Memory64BitIntptr.MMEP.MemSpec.MemState_eqv × eq) (ret r) g l sid m (Ret5 g l sid m r).
   Proof.
     intros.
     unfold interp_mcfg4, model_undef.
@@ -1477,6 +1619,7 @@ Module Finite.
     pstep; econstructor; eauto.
     2 : eapply model_undef_h_ret_pure; eauto.
     cbn. reflexivity.
+    typeclasses eauto.
   Qed.
 
   Lemma interp_mcfg4_ret_inv :
@@ -1497,9 +1640,11 @@ Module Finite.
     destruct H as [(?&?&?) | (A&e&k&?)].
     { destruct x1 as (?&?&?).
       rewrite H1 in H0.
-      apply interp_prop_ret_inv in H0.
-      destruct H0 as (?&?&?). subst.
-      cbn. left. exists m0, s. rewrite H2. reflexivity.
+      apply interp_prop_oom_ret_inv in H0.
+      destruct H0 as [(?&?&?) | OOM_CASE]; subst; eauto.
+      cbn. left. exists m0, s. rewrite H2.
+      cbn.
+      reflexivity.
     }
 
     right.
@@ -1515,7 +1660,12 @@ Module Finite.
     dependent induction H0.
     - setoid_rewrite tau_eutt.
       setoid_rewrite itree_eta.
-      eapply IHinterp_PropTF; eauto.
+      eapply IHinterp_prop_oomTF; eauto.
+    - cbn.
+      setoid_rewrite <- itree_eta.
+      setoid_rewrite HT1.
+      exists A0. exists e0. exists k2.
+      reflexivity.
     - red in H; cbn in H; red in H.
       setoid_rewrite bind_ret_r in H.
       rewrite H in H0.
@@ -1537,8 +1687,8 @@ Module Finite.
   (* Add allocation in the finite language *)
   Example add_alloc :
     forall genv lenv stack sid m,
-      refine_L6 (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m)
-                (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ alloc_tree) genv (lenv, stack) sid m).
+      refine_L6 (interp_mcfg4 eq (prod_rel Memory64BitIntptr.MMEP.MemSpec.MemState_eqv eq) (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m)
+                (interp_mcfg4 eq (prod_rel Memory64BitIntptr.MMEP.MemSpec.MemState_eqv eq) (interp_instr_E_to_L0 _ alloc_tree) genv (lenv, stack) sid m).
   Proof.
     intros genv lenv stack sid m.
     unfold refine_L6.
@@ -1549,9 +1699,10 @@ Module Finite.
     rewrite alloc_tree_simpl in H.
     apply L3_trace_MemoryE in H.
 
+    (* Given `H`, what can `x` be? *)
     apply interp_memory_prop_vis_inv in H.
-    destruct H as [(alloc_t&k1&s1&ms1&EQ1&SPEC1&HK) | (A&e&k&EUTT)].
-    2: {
+    destruct H as [(alloc_t&k1&s1&ms1&EQ1&SPEC1&HK) | [(ta&s1&s2&INTERP&UB) | (A&e&k&EUTT)]].
+    3: { (* OOM *)
       exists t'.
       split.
       - unfold interp_mcfg4.
@@ -1597,7 +1748,18 @@ Module Finite.
           { setoid_rewrite (itree_eta t').
             setoid_rewrite <- x.
             setoid_rewrite tau_eutt.
-            eapply IHinterp_PropTF; eauto.
+            eapply IHinterp_prop_oomTF; eauto.
+          }
+
+          { setoid_rewrite (itree_eta t').
+            setoid_rewrite <- x.
+            rewrite HT1.
+            cbn.
+            destruct e.
+            pstep; red; cbn.
+            observe_vis_r.
+            eapply Interp_Prop_OomT_Vis_OOM_R; eauto.
+            reflexivity.
           }
 
           cbn in H.
@@ -1634,7 +1796,7 @@ Module Finite.
                      (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME
                         (UBE +' DebugE +' FailureE) (@ReSum_id (Type -> Type) IFun Id_IFun OOME)) void
                      (ThrowOOM u))) (fun x1 : void => k2 x1))).
-          eapply Interp_PropT_Vis.
+          eapply Interp_Prop_OomT_Vis.
           * intros [] _.
           * cbn. red.
             setoid_rewrite bind_ret_r.
@@ -1644,7 +1806,53 @@ Module Finite.
             reflexivity.
       - reflexivity.
     }
-    rewrite EQ1 in H0. clear x EQ1.
+
+    2: { (* UB *)
+      exfalso.
+
+      pose proof allocate_dtyp_spec_inv s2 (DTYPE_I 64) as ALLOCINV.
+      assert (abs : DTYPE_I 64 <> DTYPE_Void) by (intros abs; inv abs).
+      specialize (ALLOCINV 1%N abs); eauto; clear abs.
+
+      repeat red in INTERP.
+      destruct INTERP as [ALLOC_UB | [ALLOC_ERR | [ALLOC_OOM | ALLOC_SUC]]].
+      { (* UB *)
+        destruct ALLOC_UB as [ub_msg [ALLOC_UB | [sab [a [ALLOC_UB []]]]]].
+        specialize (ALLOCINV _ ALLOC_UB).
+        destruct ALLOCINV as [[ms_final [ptr ALLOC_INV]] | [oom_msg ALLOC_INV]];
+          inv ALLOC_INV.
+      }
+      { (* ERR *)
+        destruct ALLOC_ERR as [err_msg [MAP [spec_msg [ALLOC_ERR | [sab [a [ALLOC_ERR []]]]]]]].
+        apply ALLOCINV in ALLOC_ERR.
+        destruct ALLOC_ERR as [[ms_final [ptr ALLOC_ERR]] | [oom_msg ALLOC_ERR]];
+          inv ALLOC_ERR.
+      }
+      { (* OOM *)
+        destruct ALLOC_OOM as [err_msg [MAP [spec_msg [ALLOC_OOM | [sab [a [ALLOC_OOM []]]]]]]].
+        apply ALLOCINV in ALLOC_OOM. clear ALLOCINV.
+        destruct ALLOC_OOM as [[ms_final [ptr ALLOC_OOM]] | [oom_msg ALLOC_OOM]];
+          inv ALLOC_OOM.
+
+        rewrite MAP in UB.
+        cbn in UB.
+
+        eapply contains_UB_Extra_raiseOOM in UB; eauto.
+        intros X e1 e2.
+        repeat unfold resum, ReSum_id, id_, Id_IFun, ReSum_inr, ReSum_inl, inr_, inl_, cat, Cat_IFun, Inr_sum1, Inl_sum1.
+        intros CONTRA; discriminate.
+      }
+
+      destruct ALLOC_SUC as (?&?&?&?&?).
+      rewrite H in UB.
+      eapply ret_not_contains_UB_Extra in UB; eauto.
+      reflexivity.
+    }
+
+    (* Why can't this just be a rewrite? *)
+    eapply interp_prop_oom_Proper_eq in H0; try typeclasses eauto; eauto.
+    2: symmetry; apply EQ1.
+    clear x EQ1.
 
     pose proof allocate_dtyp_spec_inv ms1 (DTYPE_I 64) as ALLOCINV.
     assert (abs : DTYPE_I 64 <> DTYPE_Void) by (intros abs; inv abs).
@@ -1670,7 +1878,7 @@ Module Finite.
       rewrite MAP in H0.
       exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
       split; cycle 1.
-      { clear -H0.
+      { clear - H0.
         eapply refine_OOM_h_model_undef_h_raise_OOM; eauto.
         eapply refine_oom_h_raise_oom; typeclasses eauto. }
       { unfold interp_instr_E_to_L0. unfold ret_tree. cbn.
@@ -1689,10 +1897,11 @@ Module Finite.
     assert (alloca_returns:
              forall x, Returns
                     (E := ExternalCallE +'
-                          LLVMParams64BitIntptr.Events.IntrinsicE +'
-                          LLVMParams64BitIntptr.Events.MemoryE +'
-                          LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
-                    x (trigger (Alloca (DTYPE_I 64) 1 None))).
+                        LLVMParams64BitIntptr.Events.IntrinsicE +'
+                        LLVMParams64BitIntptr.Events.MemoryE +'
+                        LLVMParams64BitIntptr.Events.PickUvalueE +'
+                        OOME +' UBE +' DebugE +' FailureE)
+                                   x (trigger (Alloca (DTYPE_I 64) 1 None))).
     { intros. unfold trigger.
       eapply ReturnsVis; [ reflexivity | ].
       Unshelve. eapply ReturnsRet. reflexivity. }
@@ -1719,7 +1928,18 @@ Module Finite.
         setoid_rewrite <- x.
         eapply interp_prop_oom_Proper_eq; try typeclasses eauto; auto.
         rewrite tau_eutt; reflexivity.
-        eapply IHinterp_PropTF; eauto.
+        eapply IHinterp_prop_oomTF; eauto.
+      }
+
+      { setoid_rewrite (itree_eta t').
+        setoid_rewrite <- x.
+        rewrite HT1.
+        cbn.
+        destruct e.
+        pstep; red; cbn.
+        observe_vis.
+        eapply Interp_Prop_OomT_Vis_OOM_L; eauto.
+        reflexivity.
       }
 
       cbn in H2.

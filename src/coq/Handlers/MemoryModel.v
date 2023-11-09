@@ -98,11 +98,11 @@ Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
   (*** Primitives on memory *)
 
   (** Reads *)
-  Parameter read_byte_MemPropT : addr -> MemPropT memory_stack SByte.
+  Parameter read_byte_prop_memory : addr -> memory_stack -> SByte -> Prop.
 
   (** Allocations *)
-  (* Returns true if a byte is allocated with a given AllocationId? *)
-  Parameter addr_allocated_prop : addr -> AllocationId -> MemPropT memory_stack bool.
+  (* Holds if a byte is allocated with a given AllocationId *)
+  Parameter addr_allocated_prop_memory : addr -> AllocationId -> memory_stack -> Prop.
 
   (** Frame stacks *)
   (* Check if an address is allocated in a frame *)
@@ -676,6 +676,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   Proof.
     intros M HM EQM Pre Post B MB WM EQV WRET MLAWS OOM ERR RBMOOM RBMERR RWOOM RWERR ptr len ptrs CONSEC.
     unfold get_consecutive_ptrs in CONSEC.
+    Opaque handle_gep_addr.
     cbn in *.
     destruct (intptr_seq 0 len) eqn:SEQ.
     - (* No OOM *)
@@ -2687,20 +2688,10 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   Import MemHelpers.
 
   Definition read_byte_prop (ms : MemState) (ptr : addr) (byte : SByte) : Prop
-    := read_byte_MemPropT ptr (MemState_get_memory ms) (ret ((MemState_get_memory ms), byte)).
-
-  Definition lift_memory_MemPropT {X} (m : MemPropT memory_stack X) : MemPropT MemState X :=
-    fun ms res =>
-      m (MemState_get_memory ms) (fmap (fun '(ms, x) => (MemState_get_memory ms, x)) res) /\
-        (* Provenance should be preserved as memory operation shouldn't touch rest of MemState *)
-        forall ms' x, res = ret (ms', x) -> MemState_get_provenance ms = MemState_get_provenance ms'.
-
-  Definition byte_allocated_MemPropT (ptr : addr) (aid : AllocationId) : MemPropT MemState unit :=
-    b <- lift_memory_MemPropT (addr_allocated_prop ptr aid);;
-    MemPropT_assert (b = true).
+    := read_byte_prop_memory ptr (MemState_get_memory ms) byte.
 
   Definition byte_allocated (ms : MemState) (ptr : addr) (aid : AllocationId) : Prop
-    := byte_allocated_MemPropT ptr aid ms (ret (ms, tt)).
+    := addr_allocated_prop_memory ptr aid (MemState_get_memory ms).
 
   Definition byte_not_allocated (ms : MemState) (ptr : addr) : Prop
     := forall (aid : AllocationId), ~ byte_allocated ms ptr aid.
@@ -2786,9 +2777,12 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     := ~ used_store_id_prop ms new_sid.
 
   (** Frame stack *)
-  Definition frame_stack_preserved (m1 m2 : MemState) : Prop
+  Definition frame_stack_preserved_memory (m1 m2 : memory_stack) : Prop
     := forall fs,
-      memory_stack_frame_stack_prop (MemState_get_memory m1) fs <-> memory_stack_frame_stack_prop (MemState_get_memory m2) fs.
+      memory_stack_frame_stack_prop m1 fs <-> memory_stack_frame_stack_prop m2 fs.
+
+  Definition frame_stack_preserved (m1 m2 : MemState) : Prop
+    := frame_stack_preserved_memory (MemState_get_memory m1) (MemState_get_memory m2).
 
   (* Definition Heap_in_bounds (ms_fin:FinMem.MMEP.MMSP.MemState) : Prop := *)
   (*   let h := Memory64BitIntptr.MMEP.MMSP.mem_state_heap ms_fin in *)
@@ -2796,9 +2790,31 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   
   (** Heap *)
   (* SAZ: Add Heap_in_bounds *)
-  Definition heap_preserved (m1 m2 : MemState) : Prop
+  Definition heap_preserved_memory (m1 m2 : memory_stack) : Prop
     := forall h,
-      memory_stack_heap_prop (MemState_get_memory m1) h <-> memory_stack_heap_prop (MemState_get_memory m2) h.
+        memory_stack_heap_prop m1 h <-> memory_stack_heap_prop m2 h.
+
+  Definition heap_preserved (m1 m2 : MemState) : Prop
+    := heap_preserved_memory (MemState_get_memory m1) (MemState_get_memory m2).
+
+  Definition addr_allocated_prop_memory_preserved (m1 m2 : memory_stack) : Prop
+    := forall addr aid,
+      addr_allocated_prop_memory addr aid m1 <-> addr_allocated_prop_memory addr aid m2.
+
+  Definition read_byte_prop_memory_preserved (m1 m2 : memory_stack) : Prop
+    := forall ptr byte,
+      read_byte_prop_memory ptr m1 byte <-> read_byte_prop_memory ptr m2 byte.
+
+  Record memory_stack_eqv (m1 m2 : memory_stack) : Prop :=
+    { memory_stack_eqv_preserves_addr_allocated : addr_allocated_prop_memory_preserved m1 m2;
+      memory_stack_eqv_preserves_read_byte_MemPropT : read_byte_prop_memory_preserved m1 m2;
+      memory_stack_eqv_frame_stack_preserved_memory : frame_stack_preserved_memory m1 m2;
+      memory_stack_eqv_heap_preserved_memory : heap_preserved_memory m1 m2;
+    }.
+
+  Definition MemState_eqv' (ms1 ms2 : MemState) : Prop :=
+    memory_stack_eqv (MemState_get_memory ms1) (MemState_get_memory ms2) /\
+      preserve_allocation_ids ms1 ms2.
 
   Definition MemState_eqv (ms1 ms2 : MemState) : Prop :=
     preserve_allocation_ids ms1 ms2 /\
@@ -2808,6 +2824,134 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       allocations_preserved ms1 ms2 /\
       frame_stack_preserved ms1 ms2 /\
       heap_preserved ms1 ms2.
+
+  Lemma MemState_eqv'_read_byte_allowed_all_preserved :
+    forall ms1 ms2,
+      memory_stack_eqv (MemState_get_memory ms1) (MemState_get_memory ms2) ->
+      read_byte_allowed_all_preserved ms1 ms2.
+  Proof.
+    intros ms1 ms2 H.
+    destruct H.
+    red.
+    intros ptr.
+    split; intros RBA;
+      red; red in RBA;
+      destruct RBA as (aid&ALLOC&ACCESS).
+    - exists aid.
+      split; auto.
+      red; red in ALLOC.
+      apply memory_stack_eqv_preserves_addr_allocated0; auto.
+    - exists aid.
+      split; auto.
+      red; red in ALLOC.
+      apply memory_stack_eqv_preserves_addr_allocated0; auto.
+  Qed.
+
+  #[global] Hint Resolve MemState_eqv'_read_byte_allowed_all_preserved : MemEqv.
+
+  Lemma MemState_eqv'_read_byte_prop_all_preserved :
+    forall ms1 ms2,
+      memory_stack_eqv (MemState_get_memory ms1) (MemState_get_memory ms2) ->
+      read_byte_prop_all_preserved ms1 ms2.
+  Proof.
+    intros ms1 ms2 H.
+    destruct H.
+    red.
+    intros ptr byte.
+    split; intros RBP;
+      red; red in RBP.
+    - red in memory_stack_eqv_preserves_read_byte_MemPropT0.
+      eapply memory_stack_eqv_preserves_read_byte_MemPropT0; eauto.
+    - red in memory_stack_eqv_preserves_read_byte_MemPropT0.
+      eapply memory_stack_eqv_preserves_read_byte_MemPropT0; eauto.
+  Qed.
+
+  #[global] Hint Resolve MemState_eqv'_read_byte_prop_all_preserved : MemEqv.
+
+  Lemma MemState_eqv'_read_byte_preserved :
+    forall ms1 ms2,
+      memory_stack_eqv (MemState_get_memory ms1) (MemState_get_memory ms2) ->
+      read_byte_preserved ms1 ms2.
+  Proof.
+    intros ms1 ms2 H.
+    red.
+    split; eauto with MemEqv.
+  Qed.
+
+  #[global] Hint Resolve MemState_eqv'_read_byte_preserved : MemEqv.
+
+  Lemma MemState_eqv'_write_byte_allowed_all_preserved :
+    forall ms1 ms2,
+      memory_stack_eqv (MemState_get_memory ms1) (MemState_get_memory ms2) ->
+      write_byte_allowed_all_preserved ms1 ms2.
+  Proof.
+    intros ms1 ms2 H.
+    eapply MemState_eqv'_read_byte_allowed_all_preserved; eauto.
+  Qed.
+
+  #[global] Hint Resolve MemState_eqv'_write_byte_allowed_all_preserved : MemEqv.
+
+  Lemma MemState_eqv'_free_byte_allowed_all_preserved :
+    forall ms1 ms2,
+      memory_stack_eqv (MemState_get_memory ms1) (MemState_get_memory ms2) ->
+      free_byte_allowed_all_preserved ms1 ms2.
+  Proof.
+    intros ms1 ms2 H.
+    eapply MemState_eqv'_read_byte_allowed_all_preserved; eauto.
+  Qed.
+
+  #[global] Hint Resolve MemState_eqv'_free_byte_allowed_all_preserved : MemEqv.
+
+  Lemma MemState_eqv'_allocations_preserved :
+    forall ms1 ms2,
+      memory_stack_eqv (MemState_get_memory ms1) (MemState_get_memory ms2) ->
+      allocations_preserved ms1 ms2.
+  Proof.
+    intros ms1 ms2 H.
+    destruct H.
+    red.
+    intros ptr aid.
+    split; intros ALLOC;
+      repeat red in ALLOC;
+      repeat red;
+      eapply memory_stack_eqv_preserves_addr_allocated0; eauto.
+  Qed.
+
+  #[global] Hint Resolve MemState_eqv'_allocations_preserved : MemEqv.
+
+  Lemma MemState_eqv'_frame_stack_preserved :
+    forall ms1 ms2,
+      memory_stack_eqv (MemState_get_memory ms1) (MemState_get_memory ms2) ->
+      frame_stack_preserved ms1 ms2.
+  Proof.
+    intros ms1 ms2 H.
+    destruct H.
+    red; eauto.
+  Qed.
+
+  #[global] Hint Resolve MemState_eqv'_frame_stack_preserved : MemEqv.
+
+  Lemma MemState_eqv'_heap_preserved :
+    forall ms1 ms2,
+      memory_stack_eqv (MemState_get_memory ms1) (MemState_get_memory ms2) ->
+      heap_preserved ms1 ms2.
+  Proof.
+    intros ms1 ms2 H.
+    destruct H.
+    red; eauto.
+  Qed.
+
+  #[global] Hint Resolve MemState_eqv'_heap_preserved : MemEqv.
+
+  Lemma MemState_eqv'_MemState_eqv :
+    forall ms1 ms2,
+      MemState_eqv' ms1 ms2 ->
+      MemState_eqv ms1 ms2.
+  Proof.
+    intros ms1 ms2 EQV.
+    destruct EQV.
+    split; [|split; [|split; [|split; [|split; [|split]]]]]; eauto with MemEqv.
+  Qed.
 
   (*** Provenance operations *)
   #[global] Instance MemPropT_MonadProvenance : MonadProvenance Provenance (MemPropT MemState).
@@ -2874,8 +3018,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     lift_spec_to_MemPropT
       (fun m1 byte m2 =>
          m1 = m2 /\ read_byte_spec m1 ptr byte)
-      (fun m1 =>
-         forall byte, ~ read_byte_spec m1 ptr byte).
+      (fun m1 => ~ read_byte_allowed m1 ptr).
 
   (*** Framestack operations *)
   Definition empty_frame (f : Frame) : Prop :=
@@ -2933,8 +3076,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     lift_spec_to_MemPropT
       (fun m1 _ m2 =>
          mempush_spec m1 m2)
-      (fun m1 =>
-         forall m2, ~ mempush_spec m1 m2).
+      (fun m1 => False).
 
   (** mempop *)
   Record mempop_operation_invariants (m1 : MemState) (m2 : MemState) :=
@@ -2985,7 +3127,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       | inl (OOM_message x) =>
           True
       | inr (inl (UB_message x)) =>
-          ~ cannot_pop m1 /\ forall m2, ~ mempop_spec m1 m2
+          False
       | inr (inr (inl (ERR_message x))) =>
           (* Not being able to pop is an error, shouldn't happen *)
           cannot_pop m1
@@ -3009,6 +3151,19 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
           add_ptrs_to_frame_stack fs1 ptrs fs' /\
             add_ptr_to_frame_stack fs' ptr fs2
     end.
+
+  Lemma add_ptrs_to_frame_stack_equation (fs1 : FrameStack) (ptrs : list addr) (fs2 : FrameStack) :
+    add_ptrs_to_frame_stack fs1 ptrs fs2 =
+      match ptrs with
+      | nil => frame_stack_eqv fs1 fs2
+      | (ptr :: ptrs) =>
+          exists fs',
+          add_ptrs_to_frame_stack fs1 ptrs fs' /\
+            add_ptr_to_frame_stack fs' ptr fs2
+      end.
+  Proof.
+    induction ptrs; cbn; auto.
+  Qed.
 
   (*** Heap operations *)
   Record empty_heap (h : Heap) : Prop :=
@@ -3098,8 +3253,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     lift_spec_to_MemPropT
       (fun m1 _ m2 =>
          write_byte_spec m1 ptr byte m2)
-      (fun m1 =>
-         forall m2, ~ write_byte_spec m1 ptr byte m2).
+      (fun m1 => ~ write_byte_allowed m1 ptr).
 
   (*** Allocation utilities *)
   Record block_is_free (m1 : MemState) (len : nat) (pr : Provenance) (ptr : addr) (ptrs : list addr) : Prop :=
@@ -3198,7 +3352,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   (*** Allocating bytes on the stack *)
   (* Post conditions for actually reserving bytes in memory and allocating them in the current stack frame *)
   Record allocate_bytes_post_conditions
-    (m1 : MemState) (t : dtyp) (num_elements : N) (init_bytes : list SByte)
+    (m1 : MemState) (init_bytes : list SByte)
     (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr)
     : Prop :=
     { allocate_bytes_provenances_preserved :
@@ -3223,17 +3377,10 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       (* Heap preserved *)
       allocate_bytes_heap_preserved :
       heap_preserved m1 m2;
-
-      (* Type is valid *)
-      allocate_bytes_typ :
-      t <> DTYPE_Void;
-
-      allocate_bytes_typ_size :
-      (sizeof_dtyp t * num_elements = N.of_nat (length init_bytes))%N;
     }.
 
   Definition allocate_bytes_post_conditions_MemPropT
-    (t : dtyp) (num_elements : N) (init_bytes : list SByte)
+    (init_bytes : list SByte)
     (prov : Provenance) (ptr : addr) (ptrs : list addr)
     : MemPropT MemState (addr * list addr)
     := fun m1 res =>
@@ -3241,25 +3388,25 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
          | inl (OOM_message x) =>
              False
          | inr (inl (UB_message x)) =>
-             t = DTYPE_Void \/ (sizeof_dtyp t * num_elements <> N.of_nat (length init_bytes))%N
+             False
          | inr (inr (inl (ERR_message x))) =>
              False
          | inr (inr (inr (m2, (ptr', ptrs')))) =>
-             allocate_bytes_post_conditions m1 t num_elements init_bytes prov m2 ptr ptrs /\ ptr = ptr' /\ ptrs = ptrs'
+             allocate_bytes_post_conditions m1 init_bytes prov m2 ptr ptrs /\ ptr = ptr' /\ ptrs = ptrs'
          end.
 
   Definition allocate_bytes_with_pr_spec_MemPropT
-    (t : dtyp) (num_elements : N) (init_bytes : list SByte) (prov : Provenance)
+    (init_bytes : list SByte) (prov : Provenance)
     : MemPropT MemState addr
     := '(ptr, ptrs) <- find_free_block (length init_bytes) prov;;
-       allocate_bytes_post_conditions_MemPropT t num_elements init_bytes prov ptr ptrs;;
+       allocate_bytes_post_conditions_MemPropT init_bytes prov ptr ptrs;;
        ret ptr.
 
   Definition allocate_bytes_spec_MemPropT
-    (t : dtyp) (num_elements : N) (init_bytes : list SByte)
+    (init_bytes : list SByte)
     : MemPropT MemState addr
     := prov <- fresh_provenance;;
-       allocate_bytes_with_pr_spec_MemPropT t num_elements init_bytes prov.
+       allocate_bytes_with_pr_spec_MemPropT init_bytes prov.
 
   (*** Allocating bytes in the heap *)
   Record malloc_bytes_post_conditions (m1 : MemState) (init_bytes : list SByte) (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
@@ -3345,7 +3492,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         root_in_heap_prop h1 root' <-> root_in_heap_prop h2 root';
     }.
 
-  Record free_spec (m1 : MemState) (root : addr) (m2 : MemState) : Prop :=
+  Record free_preconditions (m1 : MemState) (root : addr) : Prop :=
     { (* ptr being freed was a root *)
       free_was_root :
       root_in_memstate_heap m1 root;
@@ -3366,8 +3513,10 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
          implementation with size 0 allocations / frees *)
       (* free_root_allowed :
          free_byte_allowed m1 root; *)
-
-      (* all bytes in block are freed. *)
+    }.    
+  
+  Record free_spec (m1 : MemState) (root : addr) (m2 : MemState) : Prop :=
+    { (* all bytes in block are freed. *)
       free_bytes_freed :
       forall ptr,
         ptr_in_memstate_heap m1 root ptr ->
@@ -3399,9 +3548,8 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   Definition free_spec_MemPropT (root : addr) : MemPropT MemState unit :=
     lift_spec_to_MemPropT
       (fun m1 _ m2 =>
-         free_spec m1 root m2)
-      (fun m1 =>
-         forall m2, ~ free_spec m1 root m2).
+         free_preconditions m1 root /\ free_spec m1 root m2)
+      (fun m1 => ~ free_preconditions m1 root).
 
   (*** Aggregate things *)
 
@@ -3433,10 +3581,11 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   (** Allocating dtyps *)
   (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
   Definition allocate_dtyp_spec (dt : dtyp) (num_elements : N) : MemPropT MemState addr :=
+    MemPropT_assert_pre (dt <> DTYPE_Void);;
     sid <- fresh_sid;;
     element_bytes <- repeatMN num_elements (lift_OOM (generate_undef_bytes dt sid));;
     let bytes := concat element_bytes in
-    allocate_bytes_spec_MemPropT dt num_elements bytes.
+    allocate_bytes_spec_MemPropT bytes.
 
   (** memcpy spec *)
   Definition memcpy_spec (src dst : addr) (len : Z) (align : N) (volatile : bool) : MemPropT MemState unit :=
@@ -3558,6 +3707,377 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
            end.
 
   End Handlers.
+
+  (* TODO: Should these be here, or in another module? *)
+  (* Useful helper lemmas and relations... *)
+  #[global] Instance preserve_allocation_ids_Reflexive :
+    Reflexive preserve_allocation_ids.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance read_byte_allowed_all_preserved_Reflexive :
+    Reflexive read_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance read_byte_prop_all_preserved_Reflexive :
+    Reflexive read_byte_prop_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance read_byte_preserved_Reflexive :
+    Reflexive read_byte_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    split; reflexivity.
+  Qed.
+
+  #[global] Instance write_byte_allowed_all_preserved_Reflexive :
+    Reflexive write_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance free_byte_allowed_all_preserved_Reflexive :
+    Reflexive free_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance allocations_preserved_Reflexive :
+    Reflexive allocations_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance frame_stack_preserved_memory_Reflexive :
+    Reflexive frame_stack_preserved_memory.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance frame_stack_preserved_Reflexive :
+    Reflexive frame_stack_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance heap_preserved_memory_Reflexive :
+    Reflexive heap_preserved_memory.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance heap_preserved_Reflexive :
+    Reflexive heap_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance addr_allocated_preserved_Reflexive : Reflexive addr_allocated_prop_memory_preserved.
+  Proof.
+    repeat red.
+    intros x addr0 aid.
+    split; intros ALLOC; auto.
+  Qed.
+
+  #[global] Instance read_byte_prop_memory_preserved_Reflexive : Reflexive read_byte_prop_memory_preserved.
+  Proof.
+    repeat red.
+    intros x addr0 aid.
+    split; intros ALLOC; auto.
+  Qed.
+
+  #[global] Instance memory_stack_Reflexive : Reflexive memory_stack_eqv.
+  Proof.
+    red.
+    intros x.
+    split; try reflexivity.
+  Qed.
+
+  #[global] Instance MemState_eqv'_Reflexive : Reflexive MemState_eqv'.
+  Proof.
+    red.
+    intros ms.
+    red.
+    split; [|reflexivity].
+      
+    repeat (split; [reflexivity|]); reflexivity.
+  Qed.
+
+  #[global] Instance MemState_eqv_Reflexive : Reflexive MemState_eqv.
+  Proof.
+    red.
+    intros ms.
+    repeat (split; [reflexivity|]); reflexivity.
+  Qed.
+
+  Lemma fresh_sid_MemState_eqv :
+    forall ms ms' sid,
+      fresh_sid ms (ret (ms', sid)) ->
+      MemState_eqv ms ms'.
+  Proof.
+    intros ms ms' sid H.
+    destruct H.
+    split; [|split; [|split; [|split; [|split; [|split]]]]];
+      tauto.
+  Qed.
+
+  #[global] Instance preserve_allocation_ids_Transitive :
+    Transitive preserve_allocation_ids.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 p.
+    split; intros USED.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  #[global] Instance read_byte_allowed_all_preserved_Transitive :
+    Transitive read_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 ptr.
+    split; intros READ.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  #[global] Instance read_byte_prop_all_preserved_Transitive :
+    Transitive read_byte_prop_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 ptr byte.
+    split; intros READ.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  #[global] Instance read_byte_preserved_Transitive :
+    Transitive read_byte_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0.
+    destruct H, H0.
+    split.
+    - eapply read_byte_allowed_all_preserved_Transitive; eauto.
+    - eapply read_byte_prop_all_preserved_Transitive; eauto.
+  Qed.
+
+  #[global] Instance write_byte_allowed_all_preserved_Transitive :
+    Transitive write_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 ptr.
+    split; intros WRITE.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  #[global] Instance free_byte_allowed_all_preserved_Transitive :
+    Transitive free_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 ptr.
+    split; intros FREE.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  #[global] Instance allocations_preserved_Transitive :
+    Transitive allocations_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 ptr aid.
+    split; intros BYTE.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  #[global] Instance frame_stack_preserved_Transitive :
+    Transitive frame_stack_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 fs.
+    split; intros FSP.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  #[global] Instance heap_preserved_Transitive :
+    Transitive heap_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y z H H0 h.
+    split; intros HEAP.
+    - apply H0, H; auto.
+    - apply H, H0; auto.
+  Qed.
+
+  #[global] Instance MemState_eqv_Transitive : Transitive MemState_eqv.
+  Proof.
+    red.
+    intros x y z H H0.
+    destruct H as (?&?&?&?&?&?&?).
+    destruct H0 as (?&?&?&?&?&?&?).
+    split; [|split; [|split; [|split; [|split; [|split]]]]].
+    - eapply preserve_allocation_ids_Transitive; eauto.
+    - eapply read_byte_preserved_Transitive; eauto.
+    - eapply write_byte_allowed_all_preserved_Transitive; eauto.
+    - eapply free_byte_allowed_all_preserved_Transitive; eauto.
+    - eapply allocations_preserved_Transitive; eauto.
+    - eapply frame_stack_preserved_Transitive; eauto.
+    - eapply heap_preserved_Transitive; eauto.
+  Qed.
+
+  #[global] Instance preserve_allocation_ids_Symmetric :
+    Symmetric preserve_allocation_ids.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H p.
+    split; intros USED.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  #[global] Instance read_byte_allowed_all_preserved_Symmetric :
+    Symmetric read_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H ptr.
+    split; intros READ.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  #[global] Instance read_byte_prop_all_preserved_Symmetric :
+    Symmetric read_byte_prop_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H ptr byte.
+    split; intros READ.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  #[global] Instance read_byte_preserved_Symmetric :
+    Symmetric read_byte_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H.
+    destruct H.
+    split.
+    - eapply read_byte_allowed_all_preserved_Symmetric; eauto.
+    - eapply read_byte_prop_all_preserved_Symmetric; eauto.
+  Qed.
+
+  #[global] Instance write_byte_allowed_all_preserved_Symmetric :
+    Symmetric write_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H ptr.
+    split; intros WRITE.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  #[global] Instance free_byte_allowed_all_preserved_Symmetric :
+    Symmetric free_byte_allowed_all_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H ptr.
+    split; intros FREE.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  #[global] Instance allocations_preserved_Symmetric :
+    Symmetric allocations_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H ptr aid.
+    split; intros BYTE.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  #[global] Instance frame_stack_preserved_Symmetric :
+    Symmetric frame_stack_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H fs.
+    split; intros FSP.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  #[global] Instance heap_preserved_Symmetric :
+    Symmetric heap_preserved.
+  Proof.
+    red; intros ms.
+    red.
+    intros y H h.
+    split; intros HEAP.
+    - apply H; auto.
+    - apply H; auto.
+  Qed.
+
+  #[global] Instance MemState_eqv_Symmetric : Symmetric MemState_eqv.
+  Proof.
+    red.
+    intros x y H.
+    destruct H as (?&?&?&?&?&?&?).
+    split; [|split; [|split; [|split; [|split; [|split]]]]].
+    - eapply preserve_allocation_ids_Symmetric; eauto.
+    - eapply read_byte_preserved_Symmetric; eauto.
+    - eapply write_byte_allowed_all_preserved_Symmetric; eauto.
+    - eapply free_byte_allowed_all_preserved_Symmetric; eauto.
+    - eapply allocations_preserved_Symmetric; eauto.
+    - eapply frame_stack_preserved_Symmetric; eauto.
+    - eapply heap_preserved_Symmetric; eauto.
+  Qed.
+
 End MemoryModelSpec.
 
 Module MakeMemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) <: MemoryModelSpec LP MP MMSP.
@@ -3887,9 +4407,6 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
              let WEM := (Within_err_ub_oom_MemM (EQI:=(@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) (EQV:=(@MemMonad_eq1_runm_equiv _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM))) in
              (@within MemM _ err_ub_oom (ExtraState * MemState)%type (ExtraState * MemState)%type WEM X exec (st, ms) e (st', ms')) /\
                (e {{ms}} ∈ {{ms'}} spec) /\ ((exists x, e = ret x) -> (@MemMonad_valid_state ExtraState MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ms' st'))).
-
-  Definition exec_correct_memory {MemM Eff ExtraState} `{MM: MemMonad ExtraState MemM (itree Eff)} {X} (pre : MemState -> ExtraState -> Prop) (exec : MemM X) (spec : MemPropT memory_stack X) : Prop :=
-    exec_correct pre exec (lift_memory_MemPropT spec).
 
   Require Import Error.
   Require Import MonadReturnsLaws.
@@ -4373,17 +4890,11 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         byte_allocated ms' ptr aid.
     Proof.
       intros ms ms' ptr aid ALLOC EQ.
-      unfold byte_allocated, byte_allocated_MemPropT in *.
+      unfold byte_allocated.
       cbn in *.
-      unfold lift_memory_MemPropT in *.
-      cbn in *.
-      destruct ALLOC as [sab [ab [[ALLOC PROV] [EQ1 EQ2]]]].
-      subst.
-      repeat eexists.
+      red in ALLOC.
       rewrite <- EQ.
       auto.
-      intros ms'0 x EQ'; inv EQ'.
-      reflexivity.
     Qed.
 
     (* TODO: move this? *)
@@ -4609,7 +5120,7 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
 
     (** Stack allocations *)
     Parameter allocate_bytes_with_pr :
-      forall `{MemMonad ExtraState MemM (itree Eff)}, dtyp -> N -> list SByte -> Provenance -> MemM addr.
+      forall `{MemMonad ExtraState MemM (itree Eff)}, list SByte -> Provenance -> MemM addr.
 
     (** Frame stacks *)
     Parameter mempush : forall `{MemMonad ExtraState MemM (itree Eff)}, MemM unit.
@@ -4632,10 +5143,10 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
       forall ptr byte pre, exec_correct pre (write_byte ptr byte) (write_byte_spec_MemPropT ptr byte).
 
     Parameter allocate_bytes_with_pr_correct :
-      forall dt num_elements init_bytes pr pre,
+      forall init_bytes pr pre,
         exec_correct pre
-          (allocate_bytes_with_pr dt num_elements init_bytes pr)
-          (allocate_bytes_with_pr_spec_MemPropT dt num_elements init_bytes pr).
+          (allocate_bytes_with_pr init_bytes pr)
+          (allocate_bytes_with_pr_spec_MemPropT init_bytes pr).
 
     (** Correctness of frame stack operations *)
     Parameter mempush_correct :
@@ -4671,7 +5182,7 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
 
         initial_memory_read_ub :
         forall ptr byte,
-          read_byte_prop initial_memory_state ptr byte
+          ~ read_byte_prop initial_memory_state ptr byte
       }.
 
     Record initial_frame_prop : Prop :=
@@ -4744,19 +5255,22 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
 
     (** Allocating dtyps *)
     Definition allocate_bytes `{MemMonad ExtraState MemM (itree Eff)}
-      (dt : dtyp) (num_elements : N) (init_bytes : list SByte)
+      (init_bytes : list SByte)
       : MemM addr
       := pr <- fresh_provenance;;
-         allocate_bytes_with_pr dt num_elements init_bytes pr.
+         allocate_bytes_with_pr init_bytes pr.
 
     (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
     Definition allocate_dtyp `{MemMonad ExtraState MemM (itree Eff)}
       (dt : dtyp) (num_elements : N)
       : MemM addr
-      := sid <- fresh_sid;;
-         element_bytes <- repeatMN num_elements (lift_OOM (generate_undef_bytes dt sid));;
-         let bytes := concat element_bytes in
-         allocate_bytes dt num_elements bytes.
+      :=
+      if dtyp_eqb dt DTYPE_Void
+      then raise_ub "allocating void type"
+      else sid <- fresh_sid;;
+           element_bytes <- repeatMN num_elements (lift_OOM (generate_undef_bytes dt sid));;
+           let bytes := concat element_bytes in
+           allocate_bytes bytes.
 
     (** Malloc *)
     Definition malloc_bytes `{MemMonad ExtraState MemM (itree Eff)} (init_bytes : list SByte) : MemM addr :=
@@ -5172,10 +5686,10 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Qed.
 
     Lemma allocate_bytes_correct :
-      forall dt num_elements bytes pre,
+      forall bytes pre,
         exec_correct pre
-          (allocate_bytes dt num_elements bytes)
-          (allocate_bytes_spec_MemPropT dt num_elements bytes).
+          (allocate_bytes bytes)
+          (allocate_bytes_spec_MemPropT bytes).
     Proof.
       intros dt num_elements pr pre.
       apply exec_correct_bind.
@@ -5205,11 +5719,78 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         apply exec_correct_ret.
     Qed.
 
+    Lemma exec_correct_clear_assertion :
+      forall {A} (pre : MemState -> ExtraState -> Prop) (m_exec : MemM A) (m_spec : MemPropT MemState A) (assertion : Prop),
+        exec_correct pre m_exec m_spec ->
+        assertion ->
+        exec_correct pre m_exec (MemPropT_assert_pre assertion;; m_spec).
+    Proof.
+      intros A pre m_exec m_spec assertion EXEC ASSERTION.
+      repeat red.
+      intros ms st H H0.
+      repeat red in EXEC.
+      specialize (EXEC _ _ H H0).
+      destruct EXEC as [UB | EXEC].
+      - left.
+        destruct UB as (?&?&?).
+        exists x, x0.
+        cbn.
+        right.
+        exists ms, tt.
+        split; eauto.
+      - destruct EXEC as (?&?&?&?&?&?).
+        right.
+        exists x, x0, x1.
+        split; eauto.
+        split; eauto.
+        destruct_err_ub_oom x; subst; cbn in *.
+        + right.
+          exists ms, tt.
+          split; eauto.
+        + right.
+          exists ms, tt.
+          split; eauto.
+        + right.
+          exists ms, tt.
+          split; eauto.
+        + exists ms, tt.
+          split; eauto.
+    Qed.
+
+    Hint Resolve exec_correct_clear_assertion : EXEC_CORRECT.
+
     Lemma allocate_dtyp_correct :
       forall dt num_elements pre,
         exec_correct pre (allocate_dtyp dt num_elements) (allocate_dtyp_spec dt num_elements).
     Proof.
       intros dt num_elements pre.
+      destruct (dtyp_eqb dt DTYPE_Void) eqn:DT.
+      { (* UB because of attempting to allocate a void type... *)
+        unfold allocate_dtyp.
+        rewrite DT.
+        apply dtyp_eqb_eq in DT; subst.
+        unfold allocate_dtyp_spec.
+        repeat red.
+        intros ms st H H0.
+        left.
+        exists ms.
+        exists ""%string.
+        left.
+        cbn.
+        eauto.
+      }
+
+      assert (dt <> DTYPE_Void) as NVOID.
+      { intros CONTRA.
+        subst.
+        rewrite dtyp_eqb_refl in DT.
+        discriminate.
+      }
+
+      apply exec_correct_clear_assertion; auto.
+      unfold allocate_dtyp.
+      rewrite DT.
+
       apply exec_correct_bind.
       apply exec_correct_fresh_sid.
       intros * RUN1.
@@ -5380,29 +5961,27 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
 
   Lemma allocate_bytes_spec_MemPropT_no_ub :
     forall (ms_init : MemState)
-      dt num_elements bytes
-      (BYTES_SIZE : (sizeof_dtyp dt * num_elements)%N = N.of_nat (length bytes))
-      (NON_VOID : dt <> DTYPE_Void)
+      bytes
       (ub_msg : string),
-      ~ allocate_bytes_spec_MemPropT dt num_elements bytes ms_init (raise_ub ub_msg).
+      ~ allocate_bytes_spec_MemPropT bytes ms_init (raise_ub ub_msg).
   Proof.
-    intros ms_init dt num_elements bytes BYTES_SIZE NON_VOID ub_msg CONTRA.
+    intros ms_init bytes ub_msg CONTRA.
 
     unfold allocate_bytes_spec_MemPropT in CONTRA.
     cbn in CONTRA.
     destruct CONTRA as [[] | [ms' [pr' [FRESH [[] | CONTRA]]]]].
     destruct CONTRA as [ms'' [[ptr ptrs] [[EQ BLOCKFREE] CONTRA]]]; subst.
-    destruct CONTRA as [[CONTRA | CONTRA] | CONTRA]; try contradiction.
+    destruct CONTRA as [CONTRA | CONTRA]; try contradiction.
     destruct CONTRA as [ms''' [[ptr' ptrs'] [POST CONTRA]]]; contradiction.
   Qed.
 
   Lemma allocate_bytes_spec_MemPropT_no_err :
     forall (ms_init : MemState)
-      dt num_elements bytes
+      bytes
       (err_msg : string),
-      ~ allocate_bytes_spec_MemPropT dt num_elements bytes ms_init (raise_error err_msg).
+      ~ allocate_bytes_spec_MemPropT bytes ms_init (raise_error err_msg).
   Proof.
-    intros ms_init dt num_elements bytes err_msg CONTRA.
+    intros ms_init bytes err_msg CONTRA.
 
     unfold allocate_bytes_spec_MemPropT in CONTRA.
     cbn in CONTRA.
@@ -5413,17 +5992,15 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
 
   Lemma allocate_bytes_spec_MemPropT_inv :
     forall (ms_init : MemState)
-      dt num_elements bytes
-      (BYTES_SIZE : (sizeof_dtyp dt * num_elements)%N = N.of_nat (length bytes))
-      (NON_VOID : dt <> DTYPE_Void)
+      bytes
       (res : err_ub_oom (MemState * LP.ADDR.addr))
-      (ALLOC : allocate_bytes_spec_MemPropT dt num_elements bytes ms_init res),
+      (ALLOC : allocate_bytes_spec_MemPropT bytes ms_init res),
       (exists ms_final ptr,
           res = ret (ms_final, ptr)) \/
         (exists oom_msg,
             res = raise_oom oom_msg).
   Proof.
-    intros ms_init dt num_elements bytes BYTES_SIZE NON_VOID res ALLOC.
+    intros ms_init bytes res ALLOC.
     unfold allocate_bytes_spec_MemPropT in ALLOC.
     destruct res as [[[[[[[oom_res] | [[ub_res] | [[err_res] | res']]]]]]]] eqn:Hres;
       cbn in *; try contradiction.
@@ -5431,7 +6008,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       right. eexists; reflexivity.
     - (* UB *)
       destruct ALLOC as [[] | [ms' [pr' [FRESH [[] | ALLOC]]]]].
-      destruct ALLOC as [ms'' [[ptr ptrs] [[MEQ BLOCKFREE] [[UB | UB] | ALLOC]]]];
+      destruct ALLOC as [ms'' [[ptr ptrs] [[MEQ BLOCKFREE] [UB | ALLOC]]]];
         try contradiction; subst.
 
       destruct ALLOC as [ms''' [[ptr' ptrs'] ALLOC]].
@@ -5491,7 +6068,10 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     - (* OOM *)
       right. eexists; reflexivity.
     - (* UB *)
-      destruct ALLOC as [[] | [ms' [sid [FRESH [GEN | ALLOC]]]]].
+      destruct ALLOC as [UB | ALLOC]; try contradiction.
+      destruct ALLOC as [ms' [[] [[MS NVOID] [UB | ALLOC]]]]; try contradiction.
+      symmetry in MS; subst.
+      destruct ALLOC as [ms' [sid [FRESH [GEN | ALLOC]]]].
       { induction num_elements using N.peano_rect; [cbn in *; contradiction|].
         rewrite repeatMN_succ in GEN.
         destruct (generate_undef_bytes dt sid); cbn in *.
@@ -5534,8 +6114,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         cbn in *.
         destruct ALLOC as [[] | [ms''' [pr [FRESH_PR [[] | ALLOC]]]]].
         destruct ALLOC as [ms'''' [[ptr ptrs] ALLOC]].
-        destruct ALLOC as [[MEQ BLOCK_FREE] [[UB | UB] | [_ [_ [_ []]]]]];
-          [contradiction | lia].
+        destruct ALLOC as [[MEQ BLOCK_FREE] [UB | [_ [_ [_ []]]]]]; contradiction.
       }
 
       { induction num_elements using N.peano_rect.
@@ -5547,15 +6126,17 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           cbn in *.
           destruct ALLOC as [[] | [ms'' [pr [FRESH_PR [[] | ALLOC]]]]].
           destruct ALLOC as [ms''' [[ptr ptrs] ALLOC]].
-          destruct ALLOC as [[MEQ BLOCK_FREE] [[UB | UB] | [_ [_ [_ []]]]]];
-            [contradiction | lia].
+          destruct ALLOC as [[MEQ BLOCK_FREE] [UB | [_ [_ [_ []]]]]]; contradiction.
           Opaque allocate_bytes_spec_MemPropT.
         + rewrite repeatMN_succ in GEN.
           cbn in GEN.
           destruct GEN as [ms''' [a [[] _]]].
       }
     - (* Error *)
-      destruct ALLOC as [[] | [ms' [sid [FRESH [GEN | ALLOC]]]]].
+      destruct ALLOC as [UB | ALLOC]; try contradiction.
+      destruct ALLOC as [ms' [[] [[MS NVOID] [UB | ALLOC]]]]; try contradiction.
+      symmetry in MS; subst.
+      destruct ALLOC as [ms' [sid [FRESH [GEN | ALLOC]]]].
       { induction num_elements using N.peano_rect; [cbn in *; contradiction|].
         rewrite repeatMN_succ in GEN.
         destruct (generate_undef_bytes dt sid); cbn in *.
@@ -5677,6 +6258,8 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
   Proof.
     intros M HM EQM EQV EQRET OOM ERR LAWS ptr len.
 
+    Opaque handle_gep_addr.
+
     unfold get_consecutive_ptrs.
     pose proof big_intptr_seq_succeeds 0 len as (ips & SEQ).
     rewrite SEQ.
@@ -5752,12 +6335,10 @@ Module Type MemoryModelInfiniteSpec (LP : LLVMParamsBig) (MP : MemoryParams LP) 
       ret (ptr, ptrs) {{ms}} ∈ {{ms}} find_free_block len pr.
 
   Parameter allocate_bytes_post_conditions_can_always_be_satisfied :
-    forall (ms_init : MemState) dt num_elements bytes pr
-      (BYTES_SIZE : (sizeof_dtyp dt * num_elements)%N = N.of_nat (length bytes))
-      (NON_VOID : dt <> DTYPE_Void),
+    forall (ms_init : MemState) bytes pr,
     exists ms_final ptr ptrs,
       (ret (ptr, ptrs) {{ms_init}} ∈ {{ms_init}} find_free_block (length bytes) pr) /\
-      allocate_bytes_post_conditions ms_init dt num_elements bytes pr ms_final ptr ptrs.
+      allocate_bytes_post_conditions ms_init bytes pr ms_final ptr ptrs.
 
 End MemoryModelInfiniteSpec.
 
@@ -5784,16 +6365,14 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
 
   Lemma allocate_bytes_with_pr_spec_MemPropT_can_always_succeed :
     forall (ms_init : MemState)
-      dt num_elements bytes pr
-      (BYTES_SIZE : (sizeof_dtyp dt * num_elements)%N = N.of_nat (length bytes))
-      (NON_VOID : dt <> DTYPE_Void),
+      bytes pr,
     exists ms_final ptr,
-      ret ptr {{ms_init}} ∈ {{ms_final}} allocate_bytes_with_pr_spec_MemPropT dt num_elements bytes pr.
+      ret ptr {{ms_init}} ∈ {{ms_final}} allocate_bytes_with_pr_spec_MemPropT bytes pr.
   Proof.
-    intros ms_init dt num_elements bytes pr BYTES_SIZE NON_VOID.
+    intros ms_init bytes pr.
     unfold allocate_bytes_spec_MemPropT.
 
-    pose proof allocate_bytes_post_conditions_can_always_be_satisfied ms_init dt num_elements bytes pr BYTES_SIZE NON_VOID as (ms_final & ptr & ptrs & (_ & BLOCK_FREE) & ALLOC).
+    pose proof allocate_bytes_post_conditions_can_always_be_satisfied ms_init bytes pr as (ms_final & ptr & ptrs & (_ & BLOCK_FREE) & ALLOC).
 
     exists ms_final. exists ptr.
     cbn.
@@ -5809,18 +6388,16 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
 
   Lemma allocate_bytes_spec_MemPropT_can_always_succeed :
     forall (ms_init ms_fresh_pr : MemState)
-      dt num_elements bytes
+      bytes
       (pr : Provenance)
-      (FRESH_PR : (fresh_provenance ms_init (ret (ms_fresh_pr, pr))))
-      (BYTES_SIZE : (sizeof_dtyp dt * num_elements)%N = N.of_nat (length bytes))
-      (NON_VOID : dt <> DTYPE_Void),
+      (FRESH_PR : (fresh_provenance ms_init (ret (ms_fresh_pr, pr)))),
     exists ms_final ptr,
-      ret ptr {{ms_init}} ∈ {{ms_final}} allocate_bytes_spec_MemPropT dt num_elements bytes.
+      ret ptr {{ms_init}} ∈ {{ms_final}} allocate_bytes_spec_MemPropT bytes.
   Proof.
-    intros ms_init ms_fresh_pr dt num_elements bytes pr FRESH_PR BYTES_SIZE NON_VOID.
+    intros ms_init ms_fresh_pr bytes pr FRESH_PR.
     unfold allocate_bytes_spec_MemPropT.
 
-    pose proof allocate_bytes_with_pr_spec_MemPropT_can_always_succeed ms_fresh_pr dt num_elements bytes pr BYTES_SIZE NON_VOID as (ms_final & ptr & ALLOC).
+    pose proof allocate_bytes_with_pr_spec_MemPropT_can_always_succeed ms_fresh_pr bytes pr as (ms_final & ptr & ALLOC).
 
     exists ms_final. exists ptr.
     exists ms_fresh_pr. exists pr.
@@ -5975,10 +6552,16 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
     assert ((sizeof_dtyp dt * num_elements)%N = N.of_nat (Datatypes.length (concat bytes))) as SIZE by lia.
 
     pose proof allocate_bytes_spec_MemPropT_can_always_succeed
-         ms_fresh_sid ms_fresh_pr dt num_elements (concat bytes) pr FRESH_PR SIZE NON_VOID
+         ms_fresh_sid ms_fresh_pr (concat bytes) pr FRESH_PR
       as (ms_final & ptr & ALLOC_SUCCESS).
 
     exists ms_final, ptr.
+    repeat red.
+    exists ms_init, tt.
+    split.
+    { cbn.
+      split; eauto.
+    }
     exists ms_fresh_sid, sid; split; auto.
 
     rewrite UNDEF_BYTES.

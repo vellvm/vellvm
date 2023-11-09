@@ -35,6 +35,9 @@ From Vellvm Require Import
   Semantics.ConcretizationParams
   Handlers.Concretization.
 
+From Vellvm.Utils Require Import
+  InterpPropOOM.
+
 From ExtLib Require Import
   Data.Monads.EitherMonad
   Data.Monads.IdentityMonad
@@ -94,7 +97,6 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
 
     Arguments lift_err_ub_oom_post_ret {_ _ _ _ _ _} _ _ _.
 
-
     Inductive PickUvalue_handler {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E} : PickUvalueE ~> PropT E :=
     | PickUV_UB  : forall Pre uv t,
         ~Pre -> PickUvalue_handler (pick Pre uv) t
@@ -113,10 +115,10 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
       Definition F_trigger_prop : F ~> PropT (E +' F) :=
         fun R e => fun t => t ≈ r <- trigger e ;; ret r.
 
-      Definition model_undef_h `{FAIL: FailureE -< E +' F} `{UB: UBE -< E +' F} `{OOM_OUT : OOME -< E +' F} {R1 R2} (RR : R1 -> R2 -> Prop) :=
-        interp_prop (case_ E_trigger_prop (case_ PickUvalue_handler F_trigger_prop)) RR.
+      Definition model_undef_h `{FAIL: FailureE -< E +' F} `{UB: UBE -< E +' F} `{OOM_OUT : OOME -< F} {R1 R2} (RR : R1 -> R2 -> Prop) :=
+        interp_prop_oom_r (OOM:=OOME) (case_ E_trigger_prop (case_ PickUvalue_handler F_trigger_prop)) RR.
 
-      Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F}
+      Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< F}
         {T} (RR : T -> T -> Prop) (ts : PropT (E +' PickUvalueE +' F) T) : PropT (E +' F) T:=
         fun t_picked => exists t_pre, ts t_pre /\ model_undef_h RR t_pre t_picked.
     End PARAMS_MODEL.

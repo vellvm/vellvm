@@ -58,7 +58,7 @@ Import InterpFacts.
 Import MonadNotation.
 Import ListNotations.
 
-Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (AC2 : AddrConvert LP2.ADDR LP1.ADDR) (E1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (E2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF) (DVC : DVConvert LP1 LP2 AC E1 E2) (DVCrev : DVConvert LP2 LP1 AC2 E2 E1).
+Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP1.PTOI LP2.ADDR LP2.PTOI) (AC2 : AddrConvert LP2.ADDR LP2.PTOI LP1.ADDR LP1.PTOI) (E1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (E2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF) (DVC : DVConvert LP1 LP2 AC E1 E2) (DVCrev : DVConvert LP2 LP1 AC2 E2 E1).
   Import DVC.
 
   Definition L0_convert_helper
@@ -568,7 +568,7 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
   Definition L6_convert_strict : Handler E1.L6 E2.L6 := L6_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict DVCrev.uvalue_convert_strict.
 End EventConvert.
 
-Module EventConvertMake (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (AC2 : AddrConvert LP2.ADDR LP1.ADDR) (E1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (E2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF) (DVC : DVConvert LP1 LP2 AC E1 E2) (DVCrev : DVConvert LP2 LP1 AC2 E2 E1) : EventConvert LP1 LP2 AC AC2 E1 E2 DVC DVCrev.
+Module EventConvertMake (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP1.PTOI LP2.ADDR LP2.PTOI) (AC2 : AddrConvert LP2.ADDR LP2.PTOI LP1.ADDR LP1.PTOI) (E1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (E2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF) (DVC : DVConvert LP1 LP2 AC E1 E2) (DVCrev : DVConvert LP2 LP1 AC2 E2 E1) : EventConvert LP1 LP2 AC AC2 E1 E2 DVC DVCrev.
   Include EventConvert LP1 LP2 AC AC2 E1 E2 DVC DVCrev.
 End EventConvertMake.
 
@@ -577,8 +577,8 @@ Module ECInfFin := EventConvertMake InterpreterStackBigIntptr.LP InterpreterStac
 
 Module EventConvertSafe
   (LP1 : LLVMParams) (LP2 : LLVMParams)
-  (AC1 : AddrConvert LP1.ADDR LP2.ADDR) (AC2 : AddrConvert LP2.ADDR LP1.ADDR)
-  (ACSafe : AddrConvertSafe LP1.ADDR LP2.ADDR AC1 AC2)
+  (AC1 : AddrConvert LP1.ADDR LP1.PTOI LP2.ADDR LP2.PTOI) (AC2 : AddrConvert LP2.ADDR LP2.PTOI LP1.ADDR LP1.PTOI)
+  (ACSafe : AddrConvertSafe LP1.ADDR LP1.PTOI LP2.ADDR LP2.PTOI AC1 AC2)
   (IPSafe : IPConvertSafe LP1.IP LP2.IP)
   (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF)
   (DVC : DVConvert LP1 LP2 AC1 Events1 Events2) (DVCrev : DVConvert LP2 LP1 AC2 Events2 Events1) (EC : EventConvert LP1 LP2 AC1 AC2 Events1 Events2 DVC DVCrev).
