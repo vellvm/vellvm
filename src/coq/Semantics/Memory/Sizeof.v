@@ -6,7 +6,7 @@ From Vellvm Require Import
      DynamicTypes.
 
 
-Module Type Sizeof.
+Module Type SIZEOF.
   (** ** Size of a dynamic type in bits *)
   Parameter bit_sizeof_dtyp : dtyp -> N.
 
@@ -38,11 +38,11 @@ Module Type Sizeof.
 
   Parameter sizeof_dtyp_i8 :
     sizeof_dtyp (DTYPE_I 8) = 1%N.
-End Sizeof.
+End SIZEOF.
 
 (* Derived functions / constants on Sizeof. *)
-Module Sizeof_helpers(SIZEOF:Sizeof).
-  Import SIZEOF.
+Module Sizeof_helpers(Sizeof:SIZEOF).
+  Import Sizeof.
 
   Definition ptr_size : N := sizeof_dtyp DTYPE_Pointer.
 End Sizeof_helpers.

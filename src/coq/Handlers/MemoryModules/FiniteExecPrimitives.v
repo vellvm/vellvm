@@ -68,27 +68,27 @@ Open Scope monad_scope.
 
 #[local] Open Scope Z_scope.
 
-Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) <: MemoryModelExecPrimitives LP MP.
-  Module MMSP := FiniteMemoryModelSpecPrimitives LP MP.
-  Module MemSpec := MakeMemoryModelSpec LP MP MMSP.
-  Module MemExecM := MakeMemoryExecMonad LP MP MMSP MemSpec.
-  Import MemExecM.
-
+(* SAZ:
+  TODO - rename this to MemoryModelExecPrimitives because it is shared
+  between both the Finite and Infinite versions.
+*)
+Module FiniteMemoryModelExecPrimitives (LP : PARAMS) <: MMEP LP.
+  Include FiniteMemoryModelSpecPrimitives LP.
+  Include _ADD_SERIALIZE LP.
+  Include MemoryModelSpec LP.
+  Include MemoryExecMonad LP.
+  Include MemoryHelpers LP.
+  
   Import LP.
-  Import LP.ADDR.
-  Import LP.SIZEOF.
-  Import LP.PROV.
-  Import LP.PTOI.
-  Import LP.ITOP.
-  Import MMSP.
-  Import MMSP.MemByte.
-  Import MemSpec.
-  Import MemHelpers.
-  Import MP.
+  Import Addr.
+  Import Sizeof.
+  Import IP.
+  Import DV.
+  Import ByteImpl.
   Import GEP.
 
   (* Convenient to make these opaque so they don't get unfolded *)
-  Section MemoryPrimatives.
+  Section MemoryPrimitives.
     Context {MemM : Type -> Type}.
     Context {Eff : Type -> Type}.
     (* Context `{Monad MemM}. *)
@@ -1899,7 +1899,10 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
            MemState_put_memory (add_all_to_frame mem ptrs) ms);;
       ret tt.
 
-    Definition add_ptrs_to_heap `{MemMonad ExtraState MemM (itree Eff)} (ptrs : list addr) : MemM unit :=
+    (* MODULE CLEANUP - [add_ptrs_to_heap] is already defined in [MemoryModel]
+       renamed by adding _exec
+     *)
+    Definition add_ptrs_to_heap_exec `{MemMonad ExtraState MemM (itree Eff)} (ptrs : list addr) : MemM unit :=
       modify_mem_state
         (fun ms =>
            let mem := MemState_get_memory ms in
@@ -1915,7 +1918,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* Should we make sure ptr (the root) is added even if ptrs is empty? *)
     Definition add_block_to_heap `{MemMonad ExtraState MemM (itree Eff)} (aid : AllocationId) (ptr : addr) (ptrs : list addr) (init_bytes : list SByte) : MemM unit :=
       add_block aid ptr ptrs init_bytes;;
-      add_ptrs_to_heap ptrs.
+      add_ptrs_to_heap_exec ptrs.
 
     Definition allocate_bytes_with_pr `{MemMonad ExtraState MemM (itree Eff)}
       (dt : dtyp) (num_elements : N) (init_bytes : list SByte) (pr : Provenance)
@@ -2156,7 +2159,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Import Monad.
 
-  End MemoryPrimatives.
+  End MemoryPrimitives.
 
     Import Monad.
 
@@ -3097,7 +3100,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Ltac solve_write_byte_spec :=
       split; [solve_write_byte_allowed | solve_set_byte_memory | solve_write_byte_operation_invariants].
 
-    Section MemoryPrimatives.
+    Section MemoryPrimitives.
       Context {MemM : Type -> Type}.
       Context {Eff : Type -> Type}.
       (* Context `{Monad MemM}. *)
@@ -3542,7 +3545,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
         destruct
           (map_monad
-             (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix])
+             (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
              NOOM_seq) eqn:HMAPM.
         + cbn.
           rewrite MemMonad_run_bind.
@@ -3950,7 +3953,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       exists ms2. exists l.
       split; auto.
 
-      destruct (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) eqn:HMAPM; cbn in *.
+      destruct (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix]) l) eqn:HMAPM; cbn in *.
       destruct MAPM as [_ [_ [[] _]]].
       destruct MAPM as [sab [a [[EQSAB EQA] SEQUENCE]]]; subst.
       exists ms2. exists l0.
@@ -3971,7 +3974,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       destruct CONSEC as [ms' [ixs [SEQ MAPM]]].
       destruct (intptr_seq 0 len) eqn:HSEQ; cbn in SEQ; inv SEQ.
       cbn.
-      destruct (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) eqn:HMAPM; cbn in *.
+      destruct (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix]) l) eqn:HMAPM; cbn in *.
       destruct MAPM as [_ [_ [[] _]]].
       destruct MAPM as [sab [a [[EQSAB EQA] SEQUENCE]]]; subst.
       destruct (Monads.sequence l0) eqn:HSEQUENCE;
@@ -3990,7 +3993,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       destruct CONSEC as [ms' [ixs [SEQ MAPM]]].
       destruct (intptr_seq 0 len) eqn:HSEQ; cbn in SEQ; inv SEQ.
       destruct (map_monad
-                  (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) eqn:HMAPM.
+                  (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix]) l) eqn:HMAPM.
       destruct MAPM as [_ [_ [[] _]]].
       destruct MAPM as [sab [a [[EQSAB EQA] SEQUENCE]]]; subst.
       destruct (Monads.sequence l0) eqn:HSEQUENCE.
@@ -4995,7 +4998,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           }
         }
 
-        unfold MemSpec.add_ptrs_to_heap in PTRS_ADDED.
+        unfold add_ptrs_to_heap in PTRS_ADDED.
         destruct ptrs as [|p ptrs]; auto.
         assert (p = ptr).
         { eapply @get_consecutive_ptrs_cons with (M:=MemPropT MemState) (B:=err_ub_oom);
@@ -5019,7 +5022,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
       (* No UB because type allocated isn't void *)
       right.
-      unfold add_block_to_heap, add_block, add_ptrs_to_heap.
+      unfold add_block_to_heap, add_block, add_ptrs_to_heap_exec.
 
       destruct ms.
       destruct ms_memory_stack0.
@@ -6807,6 +6810,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         solve_read_byte_prop.
     Qed.
 
-    End MemoryPrimatives.
+    End MemoryPrimitives.
 
 End FiniteMemoryModelExecPrimitives.

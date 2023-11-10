@@ -34,6 +34,9 @@ From ExtLib Require Import
 From Vellvm.Utils Require Import
      PropT InterpMemoryProp.
 
+From Vellvm Require Import
+  DynamicTypes.
+
 Require Import Paco.paco.
 
 Import Basics.Basics.Monads.
@@ -57,20 +60,20 @@ Ltac raise_abs :=
   end.
 
 
-Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MM : MemoryModelSpec LP MP MMSP) (MemExecM : MemoryExecMonad LP MP MMSP MM).
-  Import MM.
-  Import MMSP.
-  Import MemExecM.
-  Import LP.Events.
-  Import LP.PROV.
+Module Type MemorySpecInterpreter (LP : PARAMS) (M : MMEF LP).
+  Import M.
+  Import LP.
+  Import DV.
+  Import IP.
+  Import Addr.
 
   Section Interpreters.
 
     Context {E : Type -> Type}.
 
-    Notation F := (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE).
+    Notation F := (PickUvalueE uvalue dvalue +' OOME +' UBE +' DebugE +' FailureE).
 
-    Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
+    Notation Effin := (E +' IntrinsicE dtyp dvalue +' MemoryE dtyp uvalue dvalue +' F).
     Notation Effout := (E +' F).
 
     Definition MemStateT M := stateT MemState M.
@@ -365,7 +368,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
 
     (* TODO: get rid of this silly hack. *)
     Definition my_handle_memory_prop' :
-      forall T : Type, MemoryE T -> MemStateT (PropT Effout) T.
+      forall T : Type, MemoryE dtyp uvalue dvalue T -> MemStateT (PropT Effout) T.
     Proof.
       intros T MemE.
       eapply MemPropT_lift_PropT.
@@ -373,7 +376,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Defined.
 
     Definition my_handle_intrinsic_prop' :
-      forall T : Type, IntrinsicE T -> MemStateT (PropT Effout) T.
+      forall T : Type, IntrinsicE dtyp dvalue T -> MemStateT (PropT Effout) T.
     Proof.
       intros T IntE.
       eapply MemPropT_lift_PropT.
@@ -381,7 +384,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Defined.
 
     Definition my_handle_memory_prop :
-      forall T : Type, MemoryE T -> MemStateFreshT (PropT Effout) T.
+      forall T : Type, MemoryE dtyp uvalue dvalue T -> MemStateFreshT (PropT Effout) T.
     Proof.
       intros T MemE.
       eapply MemPropT_lift_PropT_fresh.
@@ -389,7 +392,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Defined.
 
     Definition my_handle_intrinsic_prop :
-      forall T : Type, IntrinsicE T -> MemStateFreshT (PropT Effout) T.
+      forall T : Type, IntrinsicE dtyp dvalue T -> MemStateFreshT (PropT Effout) T.
     Proof.
       intros T IntE.
       eapply MemPropT_lift_PropT_fresh.
@@ -407,31 +410,27 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
   End Interpreters.
 End MemorySpecInterpreter.
 
-Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP) (MM : MemoryModelExec LP MP MMEP) (SPEC_INTERP : MemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec MMEP.MemExecM).
-  Import MM.
-  Import MMEP.
-  Import MMEP.MMSP.
+Module Type MemoryExecInterpreter (LP : PARAMS) (M : MMME LP) (SPEC_INTERP : MemorySpecInterpreter LP M).
+  Import M.
   Import LP.
-  Import LP.Events.
-  Import LP.PROV.
-
+  Import DV.
+  Import IP.
+  Import Addr.
+  Import ByteImpl.
+  
   (** Specification of the memory model *)
   Import SPEC_INTERP.
-  Import MMSP.
-  Import MMSP.MemByte.
-  Import MemSpec.
-  Import MemExecM.
 
-  Module MemTheory := MemoryModelTheory LP MP MMEP MM.
+  Module MemTheory := MemoryModelTheory LP M.
   Import MemTheory.
 
   Section Interpreters.
 
     Context {E : Type -> Type}.
-    Notation E := ExternalCallE.
-    Notation F := (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE).
+    Notation E := (ExternalCallE dtyp uvalue dvalue).
+    Notation F := (PickUvalueE uvalue dvalue +' OOME +' UBE +' DebugE +' FailureE).
 
-    Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
+    Notation Effin := (E +' IntrinsicE dtyp dvalue +' MemoryE dtyp uvalue dvalue +' F).
     Notation Effout := (E +' F).
 
     (* TODO: Why do I have to duplicate this >_<? *)
@@ -629,10 +628,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       fun R e sid m => r <- trigger e;; ret (m, (sid, r)).
 
     (* TODO: get rid of this silly hack. *)
-    Definition my_handle_memory : MemoryE ~> MemStateFreshT (itree Effout) :=
+    Definition my_handle_memory : MemoryE dtyp uvalue dvalue ~> MemStateFreshT (itree Effout) :=
       @handle_memory (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
-    Definition my_handle_intrinsic : IntrinsicE ~> MemStateFreshT (itree Effout) :=
+    Definition my_handle_intrinsic : IntrinsicE dtyp dvalue ~> MemStateFreshT (itree Effout) :=
       @handle_intrinsic (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
     Definition interp_memory_h : Effin ~> MemStateFreshT (itree Effout)
@@ -953,10 +952,11 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
   End Interpreters.
 End MemoryExecInterpreter.
 
-Module MakeMemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MS : MemoryModelSpec LP MP MMSP) (MemExecM : MemoryExecMonad LP MP MMSP MS) <: MemorySpecInterpreter LP MP MMSP MS MemExecM.
-  Include MemorySpecInterpreter LP MP MMSP MS MemExecM.
+(* SAZ: MODULE CLEANUP TODO - thes seem very awkward, remove them? *)
+Module MakeMemorySpecInterpreter (LP : PARAMS) (M : MMEF LP) <: MemorySpecInterpreter LP M.
+  Include MemorySpecInterpreter LP M.
 End MakeMemorySpecInterpreter.
 
-Module MakeMemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP) (ME : MemoryModelExec LP MP MMEP) (SPEC_INTERP : MemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec MMEP.MemExecM) <: MemoryExecInterpreter LP MP MMEP ME SPEC_INTERP.
-  Include MemoryExecInterpreter LP MP MMEP ME SPEC_INTERP.
+Module MakeMemoryExecInterpreter (LP : PARAMS) (M : MMME LP) (SPEC_INTERP : MemorySpecInterpreter LP M) <: MemoryExecInterpreter LP M SPEC_INTERP.
+  Include MemoryExecInterpreter LP M SPEC_INTERP.
 End MakeMemoryExecInterpreter.

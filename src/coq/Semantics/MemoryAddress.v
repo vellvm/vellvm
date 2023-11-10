@@ -37,74 +37,27 @@ Module Type ADDRESS.
 
   (* Coq's logical equality on the pointer data type *)
   Parameter eq_dec : forall (a b : addr), {a = b} + {a <> b}.
+
+  (* SAZ: MODULE CLEANUP - this can't possibly be very useful: delete? *)
   Parameter different_addrs : forall (a : addr), exists (b : addr), a <> b.
 
   (* Debug *)
   Parameter show_addr : addr -> string.
 End ADDRESS.
 
-Module Type INTPTR.
-  Parameter intptr : Set.
-  Parameter zero : intptr.
 
-  Parameter VMemInt_intptr : VMemInt intptr.
+(* SAZ: Design note? I'm experimenting with naming functors / sig_funs with "underscore" [_] names
+   to indicate that they're intended to "extend" existing signatures / modules.
 
-  Parameter eq_dec : forall (a b : intptr), {a = b} + {a <> b}.
-  Parameter eqb : forall (a b : intptr), bool.
-
-  Parameter to_Z : forall (a : intptr), Z.
-  Parameter to_unsigned : forall (a : intptr), Z.
-  Parameter from_Z : Z -> OOM intptr.
-
-  Parameter from_Z_to_Z :
-    forall (z : Z) (i : intptr),
-      from_Z z = NoOom i ->
-      to_Z i = z.
-
-  Parameter to_Z_from_Z :
-    forall (i : intptr),
-      from_Z (to_Z i) = NoOom i.
-
-  Parameter from_Z_0 :
-    from_Z 0 = NoOom zero.
-
-  Parameter to_Z_0 :
-    to_Z zero = 0%Z.
-
-  Parameter to_Z_inj :
-    forall x y,
-      to_Z x = to_Z y ->
-      x = y.
-
-  Parameter VMemInt_intptr_dtyp :
-    @mdtyp_of_int intptr VMemInt_intptr = DTYPE_IPTR.
-
-  Parameter VMemInt_intptr_mrepr_from_Z :
-    forall x,
-      @mrepr intptr VMemInt_intptr x = from_Z x.
-
-  Parameter to_Z_to_unsigned :
-    forall x,
-      to_Z x = to_unsigned x.
-End INTPTR.
-
-Module Type INTPTR_BIG (IP : INTPTR).
-  Import IP.
-
-  Parameter from_Z_safe :
-    forall z,
-      match from_Z z with
-      | NoOom _ => True
-      | Oom _ => False
-      end.
-End INTPTR_BIG.
-
-(* TODO: move this? *)
-Module Type PTOI(Addr:MemoryAddress.ADDRESS).
-  Import Addr.
+   For example: [_PTOI] adds the [ptr_to_int] function to an [ADDRESS] module.
+*)
+(* SAZ: CLEANUP - rename PTOI to ATOI and [ptr_to_int] to [addr_to_int] *)
+Module Type _PTOI (Import Addr:ADDRESS).
   Parameter ptr_to_int : addr -> Z.
-End PTOI.
+End _PTOI.
 
+(* SAZ: We define the combined signature like so: *)
+Module Type ADDRESS_PTOI := ADDRESS <+ _PTOI.
 
 (* TODO: Should provenance just be a typeclass? *)
 (* Monad class *)
@@ -115,7 +68,7 @@ Class MonadProvenance (Provenance : Type) (M : Type -> Type) : Type :=
 (* TODO: move this?
    TODO: Have I crammed too much into this?
  *)
-Module Type PROVENANCE(Addr:MemoryAddress.ADDRESS).
+Module Type _PROVENANCE (Import Addr:ADDRESS).
   (* Types *)
   (* Morally:
 
@@ -224,9 +177,11 @@ Module Type PROVENANCE(Addr:MemoryAddress.ADDRESS).
        provenance_lt_trans
        provenance_lt_next_provenance
        provenance_lt_nrefl : PROVENANCE_LT.
-End PROVENANCE.
+End _PROVENANCE.
 
+Module Type ADDRESS_PROVENANCE := ADDRESS_PTOI <+ _PROVENANCE.
 
+(*
 (* Derived functions on provenances. *)
 Module PROV_FUNCS(Addr:MemoryAddress.ADDRESS)(PROV:PROVENANCE(Addr)).
   Import PROV.
@@ -248,12 +203,10 @@ Module PROV_FUNCS(Addr:MemoryAddress.ADDRESS)(PROV:PROVENANCE(Addr)).
     auto.
   Qed.
 End PROV_FUNCS.
+*)
 
 (* TODO: move this? *)
-Module Type ITOP (Addr:MemoryAddress.ADDRESS) (PROV:PROVENANCE(Addr)) (PTOI:PTOI(Addr)).
-  Import PROV.
-  Import PTOI.
-  Import Addr.
+Module Type _ITOP (Import Addr:ADDRESS_PROVENANCE).
 
   Parameter int_to_ptr : Z -> Prov -> OOM addr.
   Parameter int_to_ptr_provenance :
@@ -277,15 +230,19 @@ Module Type ITOP (Addr:MemoryAddress.ADDRESS) (PROV:PROVENANCE(Addr)) (PTOI:PTOI
     forall (x : Z) (p : Prov) (a : addr),
       int_to_ptr x p = ret a ->
       ptr_to_int a = x.
-End ITOP.
+End _ITOP.
 
-Module Type ITOP_BIG (Addr:MemoryAddress.ADDRESS) (PROV:PROVENANCE(Addr)) (PTOI:PTOI(Addr)) (ITOP : ITOP Addr PROV PTOI).
-  Import ITOP.
+Module Type ADDRESS_ITOP := ADDRESS_PROVENANCE <+ _ITOP.
 
+Module Type _ITOP_BIG (Import Addr:ADDRESS_ITOP).
   Parameter int_to_ptr_safe :
     forall z pr,
       match int_to_ptr z pr with
       | NoOom _ => True
       | Oom _ => False
       end.
-End ITOP_BIG.
+End _ITOP_BIG.
+
+Module Type ADDRESS_ITOP_BIG := ADDRESS_ITOP <+ _ITOP_BIG.
+
+

@@ -7,6 +7,7 @@ From ExtLib Require Import
 From Vellvm Require Import
      DynamicTypes
      LLVMEvents
+     Semantics.LLVMParams
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
      Utils.Error
@@ -15,15 +16,12 @@ From Vellvm Require Import
 Import ListNotations.
 Import MonadNotation.
 
-Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITOP : ITOP Addr PROV PTOI) (IP:INTPTR) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)).
-  Import LLVMEvents.
-  Import DV.
-  Import PROV.
+Module Type GEPM (LLVMParams : LLVM_PARAMS).
+  Import LLVMParams.
   Import Addr.
-  Import PTOI.
-  Import ITOP.
   Import IP.
-  Import SIZEOF.
+  Import Sizeof.
+  Import DV.
 
   (* TODO: should this be here? *)
   Parameter handle_gep_h : dtyp -> Z -> list dvalue -> err Z.
@@ -67,14 +65,12 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
     end.
 End GEPM.
 
-Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERACTIONS(ADDR)(IP)(SIZE)) (PTOI : PTOI ADDR) (PROV : PROVENANCE ADDR) (ITOP : ITOP ADDR PROV PTOI) <: GEPM(ADDR)(PTOI)(PROV)(ITOP)(IP)(SIZE)(Events).
-  Import ADDR.
-  Import Events.
+Module Make (LLVMParams : LLVM_PARAMS) <: GEPM(LLVMParams).
+  Import LLVMParams.
+  Import Addr.
+  Import IP.
+  Import Sizeof.
   Import DV.
-  Import SIZE.
-  Import PTOI.
-  Import ITOP.
-  Import PROV.
 
   (** ** Get Element Pointer
       Retrieve the address of a subelement of an indexable (i.e. aggregate) [dtyp] [t] (i.e. vector, array, struct, packed struct).

@@ -7,7 +7,7 @@ From Vellvm Require Import
      Semantics.DynamicValues
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
-     Semantics.LLVMEvents
+     Semantics.LLVMParams
      Utils.Monads
      Utils.OptionUtil
      Utils.ListUtil
@@ -15,16 +15,16 @@ From Vellvm Require Import
      Utils.MonadReturnsLaws
      Utils.MapMonadExtra.
 
+Import Utils.Monads.
 Import Basics.Basics.Monads.
 
 Import ListNotations.
 Import MonadNotation.
 
-Module Type ByteImpl(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)).
-  Import LLVMEvents.
+Module SByteM (LLVMParams: LLVM_PARAMS).
+  Import LLVMParams.
   Import DV.
-
-  Parameter SByte : Set.
+  Import Sizeof.
 
   (* Get a specific byte of a uvalue of a given type.
 
@@ -35,51 +35,120 @@ Module Type ByteImpl(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents: LLVM_IN
      - The index of the byte (as a uvalue).
      - The store id for the byte we are creating.
    *)
-  Parameter uvalue_sbyte : uvalue -> dtyp -> N -> store_id -> SByte.
+  Inductive SByte :=
+  | uvalue_sbyte (uv : uvalue) (dt : dtyp) (idx : N) (sid : store_id).
 
+  Definition sbyte_sid (byte : SByte) : store_id :=
+    match byte with
+    | uvalue_sbyte uv dt idx sid => sid
+    end.
+  
   (* Turn an SByte into a UVALUE_ExtractByte value *)
-  Parameter sbyte_to_extractbyte : SByte -> uvalue.
+  Definition sbyte_to_extractbyte (s : SByte) : uvalue :=
+    match s with
+    | uvalue_sbyte uv dt idx sid => UVALUE_ExtractByte uv dt idx sid
+    end.
 
-  Parameter sbyte_to_extractbyte_inv  :
+  Lemma sbyte_to_extractbyte_inv  :
     forall (b : SByte),
     exists uv dt idx sid,
       sbyte_to_extractbyte b = UVALUE_ExtractByte uv dt idx sid.
+  Proof.
+    intros.
+    destruct b.
+    do 4 eexists. simpl. reflexivity.
+  Qed.
 
-  Parameter sbyte_to_extractbyte_of_uvalue_sbyte :
+  Lemma sbyte_to_extractbyte_of_uvalue_sbyte :
     forall uv dt idx sid,
       sbyte_to_extractbyte (uvalue_sbyte uv dt idx sid) =  UVALUE_ExtractByte uv dt idx sid.
-End ByteImpl.
+  Proof.
+    intros. reflexivity.
+  Qed.
 
-Module Type ByteModule(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF))(Byte:ByteImpl(Addr)(IP)(SIZEOF)(LLVMEvents)).
-  Export Byte.
-  Import LLVMEvents.
-  Import DV.
-  Import SIZEOF.
+  Definition extractbyte_to_sbyte (u : uvalue) : option SByte :=
+    match u with
+    | UVALUE_ExtractByte uv dt idx sid => Some (uvalue_sbyte uv dt idx sid)
+    | _ => None
+    end.
 
-  Fixpoint all_bytes_from_uvalue_helper (idx' : N) (sid' : store_id) (parent : uvalue) (bytes : list SByte) : option uvalue
-    := match bytes with
-       | [] => Some parent
-       | sbyte::bytes =>
-         match sbyte_to_extractbyte sbyte with
-         | UVALUE_ExtractByte uv dt idx sid =>
-           guard_opt (N.eqb idx idx');;
-           guard_opt (RelDec.rel_dec uv parent);;
-           guard_opt (N.eqb sid sid');;
-           all_bytes_from_uvalue_helper (N.succ idx') sid' parent bytes
-         | _ => None
-         end
-       end.
+  Lemma extractbyte_to_sbyte_inv :
+    forall u sb,
+      extractbyte_to_sbyte u = Some sb ->
+      sbyte_to_extractbyte sb = u.
+  Proof.
+    intros.
+    destruct u; inversion H.
+    reflexivity.
+  Qed.
 
+  Lemma extractbyte_to_sbyte_inv' :
+    forall u,
+      extractbyte_to_sbyte u = None ->
+      ~ exists sb, sbyte_to_extractbyte sb = u.
+  Proof.
+    intros.
+    intro C.
+    destruct C as [sb HEQ].
+    subst.
+    destruct sb.
+    inversion H.
+  Qed.
+  
+(* End ByteImpl. *)
+
+(* Module Byte(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)). *)
+(*   Module Byte := ByteImpl(Addr)(IP)(SIZEOF)(LLVMEvents). *)
+(*   Export Byte. *)
+(*   Import LLVMEvents. *)
+(*   Import DV. *)
+
+
+  (* SAZ: Do we also need to check all of the embedded dtyps ?*)
+  Definition all_bytes_parent_sid (parent : uvalue) (dt:dtyp) (sid : store_id) (bytes : list SByte) : bool :=
+    List.forallb
+      (fun '(uvalue_sbyte uv dt' _ sid') =>
+         N.eqb sid sid' && (dtyp_eqb dt dt') && 
+           (RelDec.rel_dec parent uv))%bool bytes.
+
+  Fixpoint all_bytes_in_order_from idx (bytes : list SByte) : bool :=
+    match bytes with
+    | [] => true
+    | sbyte::bytes =>
+        match sbyte with
+        | uvalue_sbyte _ _ idx' _ =>
+            (N.eqb idx idx') && all_bytes_in_order_from (N.succ idx) bytes
+        end
+    end.
+
+  Fixpoint zero_size_uvalue (t : dtyp) : option uvalue :=
+    match t with
+    | DTYPE_Void => Some UVALUE_None
+    | DTYPE_Array sz dt =>
+        if N.eqb sz 0 then Some (UVALUE_Array []) else
+          v <- zero_size_uvalue dt ;;
+          Some (UVALUE_Array (repeat v (N.to_nat sz)))
+    | DTYPE_Struct dts =>
+        uvs <- map_monad zero_size_uvalue dts ;;
+        Some (UVALUE_Struct uvs)
+    | DTYPE_Packed_struct dts =>
+        uvs <- map_monad zero_size_uvalue dts ;;
+        Some (UVALUE_Packed_struct uvs)
+    | DTYPE_Vector sz dt =>
+        if N.eqb sz 0 then Some (UVALUE_Array []) else
+        None  (* internal vector types are all non-zero size *)
+    | _ => None
+    end.
+  
   Definition all_bytes_from_uvalue (t : dtyp) (bytes : list SByte) : option uvalue
     := match bytes with
-       | nil => None
+       | nil =>  (* Only "zero size" uvalues can serialize to nil *)
+           zero_size_uvalue t
        | cons sbyte xs =>
-         match sbyte_to_extractbyte sbyte with
-         | UVALUE_ExtractByte uv dt idx sid =>
-           guard_opt (dtyp_eqb t dt);;
-           guard_opt (Coqlib.proj_sumbool (@uvalue_has_dtyp_dec uv dt));;
-           all_bytes_from_uvalue_helper 0 sid uv bytes
-         | _ => None
+         match sbyte with
+         | uvalue_sbyte uv dt idx sid =>
+             if ((all_bytes_parent_sid uv dt sid bytes) && (all_bytes_in_order_from 0%N bytes))%bool then
+               Some uv else None
          end
        end.
 
@@ -88,28 +157,12 @@ Module Type ByteModule(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_I
          (fun n => uvalue_sbyte uv dt n sid)
          (Nseq 0 (N.to_nat (sizeof_dtyp dt))).
 
-  Fixpoint all_extract_bytes_from_uvalue_helper (idx' : N) (sid' : store_id) (dt' : dtyp) (parent : uvalue) (bytes : list uvalue) : option uvalue
-    := match bytes with
-       | [] => Some parent
-       | (UVALUE_ExtractByte uv dt idx sid)::bytes =>
-         guard_opt (N.eqb idx idx');;
-         guard_opt (RelDec.rel_dec uv parent);;
-         guard_opt (N.eqb sid sid');;
-         guard_opt (dtyp_eqb dt dt');;
-         all_extract_bytes_from_uvalue_helper (N.succ idx') sid' dt' parent bytes
-       | _ => None
-       end.
-
   (* Check that store ids, uvalues, and types match up, as well as
        that the extract byte indices are in the right order *)
   Definition all_extract_bytes_from_uvalue (t : dtyp) (bytes : list uvalue) : option uvalue
-    := match bytes with
-       | nil => None
-       | (UVALUE_ExtractByte uv dt idx sid)::xs =>
-           guard_opt (dtyp_eqb t dt);;
-           all_extract_bytes_from_uvalue_helper 0 sid dt uv bytes
-       | _ => None
-       end.
+    :=
+    sbs <- map_monad extractbyte_to_sbyte bytes ;;
+    all_bytes_from_uvalue t sbs.
 
   Definition from_ubytes (bytes : list SByte) (dt : dtyp) : uvalue
     :=
@@ -129,13 +182,5 @@ Module Type ByteModule(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_I
     apply Nnat.N2Nat.id.
   Qed.
 
-  Definition sbyte_sid (byte : SByte) : err store_id :=
-    match sbyte_to_extractbyte byte with
-    | UVALUE_ExtractByte uv dt idx sid => inr sid
-    | _ => inl "Invalid sbyte, did not convert to extractbyte."%string
-    end.
-End ByteModule.
+End SByteM.
 
-Module Byte (Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF))(Byte:ByteImpl(Addr)(IP)(SIZEOF)(LLVMEvents)) : ByteModule Addr IP SIZEOF LLVMEvents Byte.
-  Include (ByteModule Addr IP SIZEOF LLVMEvents Byte).
-End Byte.

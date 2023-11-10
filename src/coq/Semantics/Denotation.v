@@ -33,8 +33,9 @@ From Vellvm Require Import
      Semantics.LLVMParams
      Semantics.MemoryParams
      Semantics.Memory.MemBytes
-     Semantics.ConcretizationParams
-     Utils.ListUtil.
+     Utils.ListUtil
+     Handlers.MemoryModel
+     Handlers.Concretization.
 
 Require Import Ceres.Ceres.
 
@@ -103,13 +104,11 @@ Open Scope N_scope.
     itrees in the second phase.
  *)
 
-Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (CP : ConcretizationParams LP MP Byte).
+Module Denotation (LP : PARAMS) (CP : MMC LP).
   Import CP.
-  Import CONC.
-  Import MP.
   Import LP.
-  Import Events.
-
+  Import DV.
+  
   Definition dv_zero_initializer (t:dtyp) : err dvalue :=
     default_dvalue_of_dtyp t.
 
@@ -119,7 +118,23 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       Note: global maps contain [dvalue]s, while local maps contain [uvalue]s.
       We perform the conversion here.
    *)
-  Definition lookup_id (i:ident) : itree lookup_E uvalue :=
+  (* SAZ: MODULE CLEANUP -
+     Making the events polymorphic caused typeclass resolution to fail for
+     these.  TODO - figure out how to do better?
+   *)
+  #[global] Instance GL : GlobalE raw_id dvalue -< lookup_E uvalue dvalue.
+  Proof.
+    unfold lookup_E.
+    typeclasses eauto.
+  Defined.
+
+  #[global] Instance LL : LocalE raw_id uvalue -< lookup_E uvalue dvalue.
+  Proof.
+    unfold lookup_E.
+    typeclasses eauto.
+  Qed.
+  
+  Definition lookup_id (i:ident) : itree (lookup_E uvalue dvalue) uvalue :=
     match i with
     | ID_Global x => dv <- trigger (GlobalRead x);; ret (dvalue_to_uvalue dv)
     | ID_Local x  => trigger (LocalRead x)
@@ -176,15 +191,81 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
      Expressions are denoted as itrees that return a [uvalue].
    *)
 
+  (* SAZ: MODULE CLEANUP TODO - figure out why the polymorphism makes this uninferrable. *)
+  #[global] Instance Lookup_E_in_expE : (lookup_E uvalue dvalue) -< (exp_E dtyp uvalue dvalue).
+  Proof.
+    unfold exp_E.
+    unfold lookup_E.
+    typeclasses eauto.
+  Defined.
+
+  #[global] Instance Failure_in_expE : FailureE -< (exp_E dtyp uvalue dvalue).
+  Proof.
+    unfold exp_E.
+    typeclasses eauto.
+  Defined.
+
+  #[global] Instance UBE_in_expE : UBE -< (exp_E dtyp uvalue dvalue).
+  Proof.
+    unfold exp_E.
+    typeclasses eauto.
+  Defined.
+
+  #[global] Instance OOME_in_expE : OOME -< (exp_E dtyp uvalue dvalue).
+  Proof.
+    unfold exp_E.
+    typeclasses eauto.
+  Defined.
+
+
+  #[global] Instance PICKE_in_expE : (@PickE uvalue dvalue (fun _ _ => True)) -< (exp_E dtyp uvalue dvalue).
+  Proof.
+    unfold exp_E.
+    unfold PickUvalueE.
+    typeclasses eauto.
+  Defined.
+
+  #[global] Instance MemoryE_in_exp_E : (MemoryE dtyp uvalue dvalue) -< (exp_E dtyp uvalue dvalue).
+  Proof.
+    unfold exp_E.
+    typeclasses eauto.
+  Defined.
+  
+  #[global] Instance exp_E_in_instr_E {E} {H : E -< (exp_E dtyp uvalue dvalue)} : E -< (instr_E dtyp uvalue dvalue).
+  Proof.
+    unfold instr_E.
+    typeclasses eauto.
+  Defined.
+
+  #[global] Instance CallE_in_instr_E : (CallE dtyp uvalue) -< (instr_E dtyp uvalue dvalue).
+  Proof.
+    unfold instr_E.
+    typeclasses eauto.
+  Defined.
+
+  #[global] Instance IntrinsicE_in_instr_E : (IntrinsicE dtyp dvalue) -< (instr_E dtyp uvalue dvalue).
+  Proof.
+    unfold instr_E.
+    typeclasses eauto.
+  Defined.
+
+  #[global] Instance LocalE_in_instr_E : (LocalE raw_id uvalue) -< (instr_E dtyp uvalue dvalue).
+  Proof.
+    unfold instr_E.
+    unfold exp_E.
+    typeclasses eauto.
+  Defined.
+
+  
   Fixpoint denote_exp
-           (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E uvalue :=
+           (top:option dtyp) (o:exp dtyp) {struct o} : itree (exp_E dtyp uvalue dvalue) uvalue :=
     let eval_texp '(dt,ex) := denote_exp (Some dt) ex
     in
     match o with
 
     (* The translation injects the [lookup_E] interface used by [lookup_id] to the ambient one *)
     | EXP_Ident i =>
-      translate LU_to_exp (lookup_id i)
+      translate (@LU_to_exp dtyp uvalue dvalue) (lookup_id i)
 
     | EXP_Integer x =>
       match top with
@@ -222,7 +303,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       | false => ret (UVALUE_I1 zero)
       end
 
-    | EXP_Null => ret (UVALUE_Addr ADDR.null)
+    | EXP_Null => ret (UVALUE_Addr Addr.null)
 
     | EXP_Zero_initializer =>
       match top with
@@ -338,18 +419,18 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
   Arguments denote_exp _ : simpl nomatch.
 
-  Definition denote_op (o:exp dtyp) : itree exp_E uvalue :=
+  Definition denote_op (o:exp dtyp) : itree (exp_E dtyp uvalue dvalue) uvalue :=
     denote_exp None o.
   Arguments denote_op _ : simpl nomatch.
 
   (* An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
-    (i: (instr_id * instr dtyp)): itree instr_E unit :=
+    (i: (instr_id * instr dtyp)): itree (instr_E dtyp uvalue dvalue) unit :=
     match i with
     (* Pure operations *)
 
     | (IId id, INSTR_Op op) =>
-        uv <- translate exp_to_instr (denote_op op) ;;
+        uv <- translate (@exp_to_instr dtyp uvalue dvalue) (denote_op op) ;;
         trigger (LocalWrite id uv)
 
     (* Allocation *)
@@ -375,14 +456,14 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
             dv <- trigger (Alloca dt 1 align);;
             trigger (LocalWrite id (dvalue_to_uvalue dv))
         | Some (t, num_exp) =>
-            un <- translate exp_to_instr (denote_exp (Some t) num_exp);;
+            un <- translate (@exp_to_instr dtyp uvalue dvalue) (denote_exp (Some t) num_exp);;
             n <- pickUnique un;;
             dv <- trigger (Alloca dt (Z.to_N (dvalue_int_unsigned n)) align);;
             trigger (LocalWrite id (dvalue_to_uvalue dv))
         end
     (* Load *)
     | (IId id, INSTR_Load dt (du,ptr) _) =>
-      ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
+      ua <- translate (@exp_to_instr dtyp uvalue dvalue) (denote_exp (Some du) ptr) ;;
       (* Load addresses must be unique *)
       da <- pickUnique ua;;
       uv <- trigger (Load dt da);;
@@ -390,8 +471,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
     (* Store *)
     | (IVoid _, INSTR_Store (dt, val) (du, ptr) _) =>
-      uv <- translate exp_to_instr (denote_exp (Some dt) val) ;;
-      ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
+      uv <- translate (@exp_to_instr dtyp uvalue dvalue) (denote_exp (Some dt) val) ;;
+      ua <- translate (@exp_to_instr dtyp uvalue dvalue)  (denote_exp (Some du) ptr) ;;
       (* Store addresses must be unique *)
       da <- pickUnique ua ;;
       match da with
@@ -403,14 +484,14 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
     (* Call *)
     | (pt, INSTR_Call (dt, f) args _) =>
-      uvs <- map_monad (fun '(t, op) => (translate exp_to_instr (denote_exp (Some t) op))) (List.map fst args) ;;
+      uvs <- map_monad (fun '(t, op) => (translate (@exp_to_instr dtyp uvalue dvalue) (denote_exp (Some t) op))) (List.map fst args) ;;
       returned_value <-
       match intrinsic_exp f with
       | Some s =>
         dvs <- map_monad (fun uv => pickUnique uv) uvs ;;
         fmap dvalue_to_uvalue (trigger (Intrinsic dt s dvs))
       | None =>
-        fv <- translate exp_to_instr (denote_exp None f) ;;
+        fv <- translate (@exp_to_instr dtyp uvalue dvalue) (denote_exp None f) ;;
         trigger (Call dt fv uvs)
       end
       ;;
@@ -454,7 +535,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
   (* A [terminator] either returns from a function call, producing a [dvalue],
          or jumps to a new [block_id]. *)
-  Definition denote_terminator (t: terminator dtyp): itree exp_E (block_id + uvalue) :=
+  Definition denote_terminator (t: terminator dtyp): itree (exp_E dtyp uvalue dvalue) (block_id + uvalue) :=
     match t with
 
     | TERM_Ret (dt, op) =>
@@ -502,10 +583,10 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     end.
 
   (* Denoting a list of instruction simply binds the trees together *)
-  Definition denote_code (c: code dtyp): itree instr_E unit :=
+  Definition denote_code (c: code dtyp): itree (instr_E dtyp uvalue dvalue) unit :=
     map_monad_ denote_instr c.
 
-  Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp) : itree exp_E (local_id * uvalue) :=
+  Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp) : itree (exp_E dtyp uvalue dvalue) (local_id * uvalue) :=
     let '(id, Phi dt args) := id_p in
     match assoc bid_from args with
     | Some op =>
@@ -514,19 +595,19 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | None => raise ("jump: phi node doesn't include block ")
     end.
 
-  Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp)): itree instr_E unit :=
+  Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp)): itree (instr_E dtyp uvalue dvalue) unit :=
     dvs <- map_monad
-             (fun x => translate exp_to_instr (denote_phi bid_from x))
+             (fun x => translate (@exp_to_instr dtyp uvalue dvalue) (denote_phi bid_from x))
              phis;;
     map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
     ret tt.
 
   (* A block ends with a terminator, it either jumps to another block,
          or returns a dynamic value *)
-  Definition denote_block (b: block dtyp) (bid_from : block_id) : itree instr_E (block_id + uvalue) :=
+  Definition denote_block (b: block dtyp) (bid_from : block_id) : itree (instr_E dtyp uvalue dvalue) (block_id + uvalue) :=
     denote_phis bid_from (blk_phis b);;
     denote_code (blk_code b);;
-    translate exp_to_instr (denote_terminator (blk_term b)).
+    translate (@exp_to_instr dtyp uvalue dvalue) (denote_terminator (blk_term b)).
 
   (* Our denotation currently contains two kinds of indirections: jumps to labels, internal to
          a cfg, and calls to functions, that jump from a cfg to another.
@@ -542,7 +623,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
          If it ever returns a dynamic value, we exit the loop by returning the [dvalue].
    *)
   Definition denote_ocfg (bks: ocfg dtyp)
-    : (block_id * block_id) -> itree instr_E ((block_id * block_id) + uvalue) :=
+    : (block_id * block_id) -> itree (instr_E dtyp uvalue dvalue) ((block_id * block_id) + uvalue) :=
     iter (C := ktree _) (bif := sum)
          (fun '((bid_from,bid_src) : block_id * block_id) =>
             match find_block bks bid_src with
@@ -555,7 +636,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
               end
             end).
 
-  Definition denote_cfg (f: cfg dtyp) : itree instr_E uvalue :=
+  Definition denote_cfg (f: cfg dtyp) : itree (instr_E dtyp uvalue dvalue) uvalue :=
     r <- denote_ocfg (blks f) (init f,init f) ;;
     match r with
     | inl bid => raise ("Can't find block in denote_cfg " ++ to_string (snd bid))
@@ -565,18 +646,36 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
   (* The denotation of an itree function is a coq function that takes
          a list of uvalues and returns the appropriate semantics. *)
   Definition function_denotation : Type :=
-    list uvalue -> itree L0' uvalue.
+    list uvalue -> itree (L0' dtyp uvalue dvalue) uvalue.
 
+  #[global] Instance MemoryE_in_L0' : (MemoryE dtyp uvalue dvalue) -< (L0' dtyp uvalue dvalue).
+  Proof.
+    unfold L0'.
+    typeclasses eauto.
+  Qed.
+
+  #[global] Instance FailureE_in_L0' : (FailureE) -< (L0' dtyp uvalue dvalue).
+  Proof.
+    unfold L0'.
+    typeclasses eauto.
+  Qed.
+
+  #[global] Instance StackE_in_L0' : (StackE local_id uvalue) -< (L0' dtyp uvalue dvalue).
+  Proof.
+    unfold L0'.
+    typeclasses eauto.
+  Qed.
+  
   Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation :=
     fun (args : list uvalue) =>
       (* We match the arguments variables to the inputs *)
       bs <- lift_err ret (combine_lists_err (df_args df) args) ;;
       (* generate the corresponding writes to the local stack frame *)
-      trigger MemPush ;;
+      trigger (@MemPush dtyp uvalue dvalue);;
       trigger (StackPush bs) ;;
-      rv <- translate instr_to_L0' (denote_cfg (df_instrs df)) ;;
+      rv <- translate (@instr_to_L0' dtyp uvalue dvalue) (denote_cfg (df_instrs df)) ;;
       trigger StackPop ;;
-      trigger MemPop ;;
+      trigger (@MemPop dtyp uvalue dvalue);;
       ret rv.
 
   (* We now turn to the second knot to be tied: a top-level itree program is a set
@@ -595,10 +694,23 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
   Definition lookup_defn {B} := @assoc dvalue B _.
 
+  #[global] Instance PICKE_in_L0' : (@PickE uvalue dvalue (fun _ _ => True)) -< (L0' dtyp uvalue dvalue).
+  Proof.
+    unfold L0'.
+    unfold PickUvalueE.
+    typeclasses eauto.
+  Defined.
+
+  #[global] Instance ExternalCallE_in_L0' : (@ExternalCallE dtyp uvalue dvalue) -< (L0' dtyp uvalue dvalue).
+  Proof.
+    unfold L0'.
+    typeclasses eauto.
+  Defined.
+    
   Definition denote_mcfg
              (fundefs:list (dvalue * function_denotation)) (dt : dtyp)
-             (f_value : uvalue) (args : list uvalue) : itree L0 uvalue :=
-    @mrec CallE (ExternalCallE +' _)
+             (f_value : uvalue) (args : list uvalue) : itree (L0 dtyp uvalue dvalue) uvalue :=
+    @mrec (CallE dtyp uvalue) (ExternalCallE dtyp uvalue dvalue +' _)
           (fun T call =>
              match call with
              | Call dt fv args =>

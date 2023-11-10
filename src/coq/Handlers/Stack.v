@@ -23,7 +23,11 @@ From Vellvm Require Import
      Semantics.Memory.Sizeof
      Semantics.DynamicValues
      Semantics.LLVMEvents
+     Semantics.LLVMParams
      Handlers.Local.
+
+From ExtLib Require Import
+     Data.Map.FMapAList.
 
 Require Import Ceres.Ceres.
 
@@ -152,16 +156,12 @@ Section StackMap.
 
 End StackMap.
 
-From ExtLib Require Import
-     Data.Map.FMapAList.
-
-
 (* Undecided about the status of this over-generalization of these events over domains of keys and values.
    The interface needs to be specialized anyway in [LLVMEvents].
    We want to have access to the specialized type both in [InterpreterMCFG] and [InterpreterCFG] so we cannot delay
    it until [TopLevel] either.
    We are hence exposing the specialization here, but it is slightly awkward.
  *)
-Module Make (A : ADDRESS)(IP : INTPTR)(SIZEOF : Sizeof)(LLVMEvents : LLVM_INTERACTIONS(A)(IP)(SIZEOF)).
-  Definition lstack := @stack (list (raw_id * LLVMEvents.DV.uvalue)).
+Module Make (LLVMParams : LLVM_PARAMS).
+  Definition lstack := @stack (list (raw_id * LLVMParams.DV.uvalue)).
 End Make.

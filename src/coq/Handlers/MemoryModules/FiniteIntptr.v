@@ -31,10 +31,8 @@ Open Scope monad_scope.
 
 #[local] Open Scope Z_scope.
 
-Module BigIP : MemoryAddress.INTPTR with
-Definition intptr := Z with
-Definition from_Z := (fun (x : Z) => ret x : OOM Z) with
-Definition to_Z := fun (x : Z) => x.
+Module BigIP <: IntPtr.INTPTR_BIG.
+  
   Definition intptr := Z.
   Definition zero := 0%Z.
 
@@ -110,6 +108,7 @@ Definition to_Z := fun (x : Z) => x.
     | Cge => Z.geb x y
     end.
 
+  #[global]
   Instance VMemInt_intptr : VMemInt intptr
     :=
     { mequ  := mequ_Z;
@@ -180,11 +179,6 @@ Definition to_Z := fun (x : Z) => x.
     reflexivity.
   Qed.
 
-End BigIP.
-
-Module BigIP_BIG : MemoryAddress.INTPTR_BIG BigIP.
-  Import BigIP.
-
   Lemma from_Z_safe :
     forall z,
       match from_Z z with
@@ -196,9 +190,9 @@ Module BigIP_BIG : MemoryAddress.INTPTR_BIG BigIP.
     unfold from_Z.
     reflexivity.
   Qed.
-End BigIP_BIG.
+End BigIP.
 
-Module IP64Bit : MemoryAddress.INTPTR.
+Module IP64Bit <: IntPtr.INTPTR.
   Definition intptr := int64.
   Definition zero := Int64.zero.
 
@@ -272,6 +266,7 @@ Module IP64Bit : MemoryAddress.INTPTR.
       rewrite (proof_irrelevance _ intrange intrange0); auto.
   Admitted. (* This is probably awful because of lia? *)
 
+  #[global]
   Instance VMemInt_intptr : VMemInt intptr
     :=
     { (* Comparisons *)

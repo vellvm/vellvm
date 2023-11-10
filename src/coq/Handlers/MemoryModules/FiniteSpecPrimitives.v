@@ -27,8 +27,17 @@ From Vellvm.Semantics Require Import
 From Vellvm.Utils Require Import
      Error
      IntMaps
+     Util
+     NMaps
      Tactics
-     Inhabited.
+     Raise
+     Monads
+     MapMonadExtra
+     MonadReturnsLaws
+     MonadEq1Laws
+     MonadExcLaws
+     Inhabited
+     ListUtil.
 
 From Vellvm.Handlers Require Import
      MemPropT
@@ -38,32 +47,34 @@ From Vellvm.Handlers Require Import
 From Vellvm.Handlers.MemoryModules Require Import
      FiniteAddresses.
 
+From Vellvm.Syntax Require Import
+     DataLayout
+     DynamicTypes.
+
 From ExtLib Require Import
-     Structures.Monads.
+     Structures.Monads
+     Structures.Functor.
 
 Import ListNotations.
 
+Import Basics.Basics.Monads.
 Import MonadNotation.
+
+Require Import MonadReturnsLaws.
+  Import Monad.
+
 Open Scope monad_scope.
 
 #[local] Open Scope Z_scope.
 
-Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) <: MemoryModelSpecPrimitives LP MP.
+Module FiniteMemoryModelSpecPrimitives (LP : PARAMS) <: MemoryModelSpecPrimitives LP.
   Import LP.
-  Import LP.Events.
-  Import LP.ADDR.
-  Import LP.SIZEOF.
-  Import LP.PROV.
-  Import PTOI.
-  Import ITOP.
-  Import MP.
+  Import DV.
+  Import Addr.
+  Import Sizeof.
+  Import IP.
   Import GEP.
-
-  Import MemBytes.
-  Module MemByte := Byte LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL.
-  Import MemByte.
-  Import LP.SIZEOF.
-
+  Import LP.ByteImpl.
 
   Section Datatype_Definition.
 
@@ -469,11 +480,14 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         (pr', mkMemState mem_stack pr')
     end.
 
+  (* MODULE CLEANUP: there is already a definition in MemoryModel *)
+  (*
   Definition used_store_id_prop (ms : MemState) (sid : store_id) : Prop :=
     exists ptr byte aid,
       let mem := mem_state_memory ms in
       read_byte_raw mem ptr = Some (byte, aid) /\
-        sbyte_sid byte = inr sid.
+        sbyte_sid byte = sid.
+  *)
 
   Lemma mem_state_fresh_provenance_fresh :
     forall (ms ms' : MemState) (pr : Provenance),
@@ -693,4 +707,31 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     { inhabitant := initial_memory_state
     }.
 
+  (* Aggregate operations *)
+  Definition intptr_seq (start : Z) (len : nat) : OOM (list intptr)
+    := map_monad (from_Z) (Zseq start len).
+
+  Definition get_consecutive_ptrs {M} `{Monad M} `{RAISE_OOM M} `{RAISE_ERROR M} (ptr : addr) (len : nat) : M (list addr) :=
+    ixs <- lift_OOM (intptr_seq 0 len);;
+    addrs <- lift_err_RAISE_ERROR
+              (map_monad
+                 (fun ix => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
+                 ixs (m:=err));;
+    lift_OOM (Monads.sequence addrs).
+
+  Definition generate_num_undef_bytes_h (start_ix : N) (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
+    N.recursion
+      (fun (x : N) => ret [])
+      (fun n mf x =>
+         rest_bytes <- mf (N.succ x);;
+         let byte := uvalue_sbyte (UVALUE_Undef dt) dt x sid in
+         ret (byte :: rest_bytes))
+      num start_ix.
+
+  Definition generate_num_undef_bytes (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
+    generate_num_undef_bytes_h 0 num dt sid.
+
+  Definition generate_undef_bytes (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
+    generate_num_undef_bytes (sizeof_dtyp dt) dt sid.
+  
 End FiniteMemoryModelSpecPrimitives.

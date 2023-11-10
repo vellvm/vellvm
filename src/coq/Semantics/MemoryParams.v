@@ -3,14 +3,22 @@ From Vellvm Require Import
      Semantics.GepM
      Semantics.Memory.MemBytes.
 
-Module Type MemoryParams (LP : LLVMParams).
-  Declare Module GEP : GEPM LP.ADDR LP.PTOI LP.PROV LP.ITOP LP.IP LP.SIZEOF LP.Events.
-  Declare Module BYTE_IMPL : ByteImpl LP.ADDR LP.IP LP.SIZEOF LP.Events.
-End MemoryParams.
+Module Type _MEMORY_PARAMS (LLVMParams : LLVM_PARAMS).
+  Declare Module GEP : GEPM LLVMParams.
+  Module ByteImpl := SByteM LLVMParams.  
+End _MEMORY_PARAMS.
 
-Module Make (LP' : LLVMParams) (GEP' : GEPM LP'.ADDR LP'.PTOI LP'.PROV LP'.ITOP LP'.IP LP'.SIZEOF LP'.Events) (BYTE_IMPL' : ByteImpl LP'.ADDR LP'.IP LP'.SIZEOF LP'.Events) : MemoryParams LP'
-with Module GEP := GEP'
-with Module BYTE_IMPL := BYTE_IMPL'.
-  Module GEP := GEP'.
-  Module BYTE_IMPL := BYTE_IMPL'.
+Module Type PARAMS := LLVM_PARAMS <+ _MEMORY_PARAMS.
+Module Type PARAMS_BIG := LLVM_PARAMS_BIG <+ _MEMORY_PARAMS.
+
+Module Make (LLVMParams : LLVM_PARAMS) <: PARAMS.
+  Include LLVMParams.
+  Module GEP := GepM.Make LLVMParams.
+  Module ByteImpl := SByteM LLVMParams.
 End Make.
+
+Module MakeBig (LLVMParams : LLVM_PARAMS_BIG) <: PARAMS_BIG.
+  Include LLVMParams.
+  Module GEP := GepM.Make LLVMParams.
+  Module ByteImpl := SByteM LLVMParams.
+End MakeBig.

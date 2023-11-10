@@ -20,6 +20,8 @@ From ExtLib Require Import
 From Vellvm Require Import
      Utils.Util
      Syntax.LLVMAst
+     Syntax.DynamicTypes
+     Semantics.LLVMParams
      Semantics.LLVMEvents
      Semantics.Memory.Sizeof
      Semantics.IntrinsicsDefinitions.
@@ -66,11 +68,11 @@ Set Contextual Implicit.
    exception.  Unknown Calls (either to other intrinsics or external calls) are
    passed through unchanged.
 *)
-Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLVMIO: LLVM_INTERACTIONS(A)(IP)(SIZEOF)).
+Module Make (LLVMParams : LLVM_PARAMS).
 
-  Module IS := IntrinsicsDefinitions.Make(A)(IP)(SIZEOF)(LLVMIO).
+  Module IS := IntrinsicsDefinitions.Make(LLVMParams).
   Include IS.
-  Import LLVMIO.
+  Import LLVMParams.
   Import DV.
 
 
@@ -85,10 +87,10 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
                                   end
                                ) defined_intrinsics.
 
-  Definition handle_intrinsics {E} `{FailureE -< E} `{IntrinsicE -< E} : IntrinsicE ~> itree E :=
+  Definition handle_intrinsics {E} `{FailureE -< E} `{IntrinsicE dtyp dvalue -< E} : (IntrinsicE dtyp dvalue) ~> itree E :=
     (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
-    fun X (e : IntrinsicE X) =>
-      match e in IntrinsicE Y return X = Y -> itree E Y with
+    fun X (e : IntrinsicE dtyp dvalue X) =>
+      match e in IntrinsicE _ _ Y return X = Y -> itree E Y with
       | (Intrinsic _ fname args) =>
           match assoc fname defs_assoc with
           | Some f => fun pf =>
@@ -103,7 +105,7 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
   Section PARAMS.
     Variable (E F : Type -> Type).
     Context `{FailureE -< F}.
-    Notation Eff := (E +' IntrinsicE +' F).
+    Notation Eff := (E +' IntrinsicE dtyp dvalue +' F).
 
     Definition E_trigger : Handler E Eff := fun _ e => trigger e.
     Definition F_trigger : Handler F Eff := fun _ e => trigger e.

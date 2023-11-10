@@ -56,18 +56,16 @@ Proof.
   eapply Monad_stateT; typeclasses eauto.
 Defined.
 
-Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL).
-  Import MP.
+Module Type CONCRETIZATION_BASE (LP : PARAMS) (MMSP : MemoryModelSpecPrimitives_SERIALIZE LP).
+  
   Import LP.
-  Import PTOI.
-  Import ITOP.
-  Import PROV.
   Import GEP.
-  Import SIZEOF.
-  Import Events.
-
-  Module MemHelpers := MemoryHelpers LP MP Byte.
-  Import MemHelpers.
+  Import DV.
+  Import ByteImpl.
+  Import Sizeof.
+  Import IP.
+  Import Addr.
+  Import MMSP.
 
   Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} icmp v1 v2 : M dvalue :=
     match v1, v2 with
@@ -419,13 +417,12 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                        ("concretize_uvalueM: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++
                                                                                                                                   uvalue_constructor_string u))
         end.
-End ConcretizationBase.
+End CONCRETIZATION_BASE.
 
-Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (SER : ConcretizationBase LP MP Byte) <: ConcretizationBase LP MP Byte.
-  Include SER.
-  Import MP.
+Module Type _CONCRETIZATION (LP : PARAMS) (MMSP : MemoryModelSpecPrimitives_SERIALIZE LP) (SER : CONCRETIZATION_BASE LP MMSP).
   Import LP.
-  Import Events.
+  Import SER.
+  Import DV.
 
   Definition concretize_uvalue {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M}
              (uv : uvalue) : M dvalue
@@ -494,7 +491,7 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
   Definition concretize (uv: uvalue) (dv : dvalue) := concretize_u uv (ret dv).
 
   (* TODO: should the post condition be concretize uv dv ? *)
-  Definition pick_uvalue (Pre : Prop) (uv : uvalue) : PickUvalueE {dv : dvalue | True}
+  Definition pick_uvalue (Pre : Prop) (uv : uvalue) : PickUvalueE uvalue dvalue {dv : dvalue | True}
     := pick Pre uv.
 
   (* Concretization encounters UB / Failure.
@@ -586,25 +583,26 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
     destruct (eval_iop iop dv1 dv2) as [[[[[[[oom_eval_iopiopdv1dv2] | [[ub_eval_iopiopdv1dv2] | [[err_eval_iopiopdv1dv2] | eval_iopiopdv1dv2]]]]]]]]; reflexivity.
   Qed.
 
-End Concretization.
+End _CONCRETIZATION.
 
-Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) <: ConcretizationBase LP MP Byte.
-  Import MP.
+Module Type CONCRETIZATION (LP : PARAMS) (MMSP : MemoryModelSpecPrimitives_SERIALIZE LP) :=
+  (CONCRETIZATION_BASE LP MMSP) <+ (_CONCRETIZATION LP MMSP).
+
+Module Type MMC (LP : PARAMS) := (MMME LP) <+ (CONCRETIZATION LP).
+Module Type MMIC (LP : PARAMS_BIG) := (MMIE LP) <+ (CONCRETIZATION LP).
+
+Module Make (LP : PARAMS) (MMSP : MemoryModelSpecPrimitives_SERIALIZE LP) <: CONCRETIZATION LP MMSP.
   Import LP.
-  Import Events.
-  Import SIZEOF.
-  Import PTOI.
-  Import PROV.
-  Import ITOP.
   Import DV.
   Import GEP.
+  Import ByteImpl.
+  Import Sizeof.
+  Import IP.
+  Import Addr.
+  Import MMSP.
+  
   Open Scope list.
-
-  Export Byte.
-
-  Module MemHelpers := MemoryHelpers LP MP Byte.
-  Import MemHelpers.
-
+  
   Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} icmp v1 v2 : M dvalue :=
     match v1, v2 with
     | DVALUE_I1 i1, DVALUE_I1 i2
@@ -826,7 +824,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
   (* Variable datalayout : DataLayout. *)
   Definition ptr_size : nat := 8.
 
-  Definition addr := ADDR.addr.
+  Definition addr := Addr.addr.
 
   Definition endianess : Endianess
     := ENDIAN_LITTLE.
@@ -1735,8 +1733,8 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
   End Concretize.
 
   Set Guard Checking.
-End MakeBase.
 
-Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (SER : ConcretizationBase LP MP Byte) : Concretization LP MP Byte SER.
-  Include Concretization LP MP Byte SER.
+  Include _CONCRETIZATION LP MMSP. 
 End Make.
+
+

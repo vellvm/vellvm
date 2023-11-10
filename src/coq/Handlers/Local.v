@@ -162,7 +162,7 @@ End Locals.
 
 From Vellvm Require Import
      LLVMAst
-     MemoryAddress.
+     LLVMParams.
 
 (* YZ TODO : Undecided about the status of this over-generalization of these events over domains of keys and values.
    The interface needs to be specialized anyway in [LLVMEvents].
@@ -170,6 +170,6 @@ From Vellvm Require Import
    it until [TopLevel] either.
    So exposing the specialization here, but it is awkward.
  *)
-Module Make (A : ADDRESS)(IP : INTPTR)(SIZEOF : Sizeof)(LLVMEvents : LLVM_INTERACTIONS(A)(IP)(SIZEOF)).
-  Definition local_env := FMapAList.alist raw_id LLVMEvents.DV.uvalue.
+Module Make (LLVMParams : LLVM_PARAMS).
+  Definition local_env := FMapAList.alist raw_id LLVMParams.DV.uvalue.
 End Make.

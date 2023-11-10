@@ -62,7 +62,7 @@ endif
 endif
 
 .PHONY: all $(KNOWNFILES)
-all: quickchick vellvm
+all: vellvm
 
 .PHONY: coq
 coq: real-all

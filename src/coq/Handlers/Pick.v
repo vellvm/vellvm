@@ -32,7 +32,7 @@ From Vellvm Require Import
   Semantics.LLVMParams
   Semantics.MemoryParams
   Semantics.Memory.MemBytes
-  Semantics.ConcretizationParams
+  Handlers.MemoryModel
   Handlers.Concretization.
 
 From ExtLib Require Import
@@ -51,12 +51,10 @@ Import MonadNotation.
   - The propositional one capture in [Prop] all possible values
   - The executable one interprets [undef] as 0 at the type
  *)
-Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (CP : ConcretizationParams LP MP Byte).
-  Import CP.
-  Import CONC.
-  Import MP.
+Module Make (LP : PARAMS) (C : MMC LP).
+  Import C.
   Import LP.
-  Import Events.
+  Import DV.
 
   Section PickPropositional.
 
@@ -95,7 +93,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
     Arguments lift_err_ub_oom_post_ret {_ _ _ _ _ _} _ _ _.
 
 
-    Inductive PickUvalue_handler {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E} : PickUvalueE ~> PropT E :=
+    Inductive PickUvalue_handler {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E} : (PickUvalueE uvalue dvalue) ~> PropT E :=
     | PickUV_UB  : forall Pre uv t,
         ~Pre -> PickUvalue_handler (pick Pre uv) t
     | PickUV_Ret : forall Pre uv (res : err_ub_oom dvalue)
@@ -117,7 +115,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
         interp_prop (case_ E_trigger_prop (case_ PickUvalue_handler F_trigger_prop)) RR.
 
       Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F}
-        {T} (RR : T -> T -> Prop) (ts : PropT (E +' PickUvalueE +' F) T) : PropT (E +' F) T:=
+        {T} (RR : T -> T -> Prop) (ts : PropT (E +' (PickUvalueE uvalue dvalue) +' F) T) : PropT (E +' F) T:=
         fun t_picked => exists t_pre, ts t_pre /\ model_undef_h RR t_pre t_picked.
     End PARAMS_MODEL.
 
@@ -201,7 +199,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
       (* Qed. *)
     Admitted.
 
-    Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} : PickUvalueE ~> itree E :=
+    Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} : (PickUvalueE uvalue dvalue) ~> itree E :=
       fun T p =>
         match p with
         | pick Pre u => 

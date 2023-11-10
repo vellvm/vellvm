@@ -15,7 +15,7 @@ From Vellvm.Semantics Require Import
      Memory.MemBytes
      Memory.Sizeof.
 
-Module FinSizeof : Sizeof.
+Module FinSizeof <: SIZEOF.
   (* TODO: make parameter? *)
   Definition ptr_size : nat := 8.
 
@@ -118,39 +118,3 @@ Module FinSizeof : Sizeof.
     reflexivity.
   Qed.
 End FinSizeof.
-
-Inductive UByte (uvalue : Type) :=
-| mkUByte (uv : uvalue) (dt : dtyp) (idx : N) (sid : store_id) : UByte uvalue.
-
-Module FinByte (ADDR : MemoryAddress.ADDRESS) (IP : MemoryAddress.INTPTR) (SIZEOF : Sizeof) (LLVMEvents:LLVM_INTERACTIONS(ADDR)(IP)(SIZEOF)) : ByteImpl(ADDR)(IP)(SIZEOF)(LLVMEvents)
-with  Definition SByte := UByte LLVMEvents.DV.uvalue
-with  Definition uvalue_sbyte := mkUByte LLVMEvents.DV.uvalue.
-  Import LLVMEvents.
-  Import DV.
-
-  Definition SByte := UByte uvalue.
-
-  Definition uvalue_sbyte := mkUByte uvalue.
-
-  Definition sbyte_to_extractbyte (byte : SByte) : uvalue
-    := match byte with
-       | mkUByte uv dt idx sid => UVALUE_ExtractByte uv dt idx sid
-       end.
-
-  Lemma sbyte_to_extractbyte_inv :
-    forall (b : SByte),
-    exists uv dt idx sid,
-      sbyte_to_extractbyte b = UVALUE_ExtractByte uv dt idx sid.
-  Proof.
-    intros b. destruct b.
-    cbn; eauto.
-  Qed.
-
-  Lemma sbyte_to_extractbyte_of_uvalue_sbyte :
-    forall uv dt idx sid,
-      sbyte_to_extractbyte (uvalue_sbyte uv dt idx sid) =  UVALUE_ExtractByte uv dt idx sid.
-  Proof.
-    auto.
-  Qed.
-
-End FinByte.

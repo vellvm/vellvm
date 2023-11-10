@@ -1,59 +1,106 @@
 From Vellvm Require Import
      Semantics.Memory.MemBytes
      Semantics.LLVMParams
+     Semantics.MemoryParams
      Semantics.GepM
      Semantics.Denotation
-
+     Semantics.ConcretizationParams
+     
      Handlers.Global
      Handlers.Stack
      Handlers.Intrinsics
      Handlers.Pick
      Handlers.MemoryModel
-     Handlers.MemoryInterpreters.
+     Handlers.MemoryInterpreters
+     Handlers.Concretization.
 
-  Module Type Memory (LP: LLVMParams).
-    Import LP.
+  Module Type Memory (MP: PARAMS) (MMSP : MemoryModelSpecPrimitives MP) <: MMC MP.
+      Include  MMSP.
+      Include (_ADD_SERIALIZE MP).
+      Include (MemoryModelSpec MP).
+      Include (MemoryExecMonad MP).
+      Include (MemoryModelExecPrimitives MP).
+      Include (MemoryModelExec MP).
+      Include (Concretization.Make MP).
 
-    Declare Module GEP  : GEPM ADDR PTOI PROV ITOP IP SIZEOF Events.
-    Declare Module Byte : ByteImpl ADDR IP SIZEOF Events.
-
-    Module MP := MemoryParams.Make LP GEP Byte.
-
-    Declare Module MMEP : MemoryModelExecPrimitives LP MP.
-    Module MEM_MODEL := MakeMemoryModelExec LP MP MMEP.
-    Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec MMEP.MemExecM.
-    Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL MEM_SPEC_INTERP.
+    Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter MP.
+    Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter MP.
 
     (* Concretization *)
-    Module ByteM := MemBytes.Byte ADDR IP SIZEOF LP.Events MP.BYTE_IMPL.
-    Module CP := ConcretizationParams.Make LP MP ByteM.
-
-    Export GEP Byte MP MEM_MODEL CP.
+    Export MP.IP MP.ByteImpl MP.GEP.
   End Memory.
 
-  Module Type Lang (LP: LLVMParams).
-    Export LP.
+  (* SAZ This is actually not needed, should be MMIC over in MemoryModelImplemention.v *)
+  Module Type MemoryBig (MP: PARAMS_BIG) (MMSP : MemoryModelSpecPrimitives MP) <: MMC MP.
+      Include  MMSP.
+      Include (_ADD_SERIALIZE MP).
+      Include (MemoryModelSpec MP).
+      Include (MemoryExecMonad MP).
+      Include (MemoryModelExecPrimitives MP).
+      Include (MemoryModelExec MP).
+      Include (Concretization.Make MP).
 
+    Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter MP.
+    Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter MP.
+
+    (* Concretization *)
+    Export MP.IP MP.ByteImpl MP.GEP.
+  End MemoryBig.
+
+  Module Type LANG (MP : PARAMS) (M : MemoryModelSpecPrimitives MP).
+    Include MP.
+    
     (* Handlers *)
-    Module Global     := Global.Make ADDR IP SIZEOF LP.Events.
-    Module Local      := Local.Make ADDR IP SIZEOF LP.Events.
-    Module Stack      := Stack.Make ADDR IP SIZEOF LP.Events.
-    Module Intrinsics := Intrinsics.Make ADDR IP SIZEOF LP.Events.
+    Module Global     := Global.Make MP.
+    Module Local      := Local.Make MP.
+    Module Stack      := Stack.Make MP.
+    Module Intrinsics := Intrinsics.Make MP.
+  End LANG.
+    
+  
 
+  Module Lang (MP: PARAMS) (M : MemoryModelSpecPrimitives MP) <: LANG MP M.
+    Include MP.
+    
+    (* Handlers *)
+    Module Global     := Global.Make MP.
+    Module Local      := Local.Make MP.
+    Module Stack      := Stack.Make MP.
+    Module Intrinsics := Intrinsics.Make MP.
     (* Memory *)
-    Declare Module MEM : Memory LP.
-    Export MEM.
+    Include Memory MP M.
 
     (* Pick handler (depends on memory / concretization) *)
-    Module Pick := Pick.Make LP MP ByteM CP.
+    Include Pick.Make MP.
 
     (* Denotation *)
-    Module D := Denotation LP MP ByteM CP.
+    Include Denotation MP.
 
-    Export Events Events.DV Global Local Stack Pick Intrinsics
-           CP.CONC D.
+    Export DV Global Local Stack Pick Intrinsics.
   End Lang.
 
-  Module Make (LP : LLVMParams) (MEM' : Memory LP) <: Lang LP with Module MEM := MEM'.
-    Include Lang LP with Module MEM := MEM'.
-  End Make.
+  Module LangBig (MP: PARAMS_BIG) (M : MemoryModelSpecPrimitives MP).
+    Include MP.
+    
+    (* Handlers *)
+    Module Global     := Global.Make MP.
+    Module Local      := Local.Make MP.
+    Module Stack      := Stack.Make MP.
+    Module Intrinsics := Intrinsics.Make MP.
+    (* Memory *)
+    Include Memory MP M.
+
+    (* Pick handler (depends on memory / concretization) *)
+    Include Pick.Make MP.
+
+    (* Denotation *)
+    Include Denotation MP.
+
+    Export DV Global Local Stack Pick Intrinsics.
+  End LangBig.
+
+  (*
+  Module Make (MP : PARAMS) (MMSP : MemoryModelSpecPrimitives MP) (MEM' : Memory MP MMSP) <: Lang MP MMSP.
+    Include Lang MP MMSP with Module MEM := MEM'.
+End Make.
+*)

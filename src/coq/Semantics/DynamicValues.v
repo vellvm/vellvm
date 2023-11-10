@@ -33,6 +33,7 @@ From Vellvm Require Import
      Utilities
      Syntax
      Semantics.MemoryAddress
+     Semantics.IntPtr
      Semantics.Memory.Sizeof
      Semantics.VellvmIntegers
      Utils.MapMonadExtra
@@ -179,9 +180,9 @@ Definition ll_double := Floats.float.
 
 
 (* Sizeof is needed for for ConcatBytes case *)
-Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.MemoryAddress.INTPTR)(SIZEOF:Sizeof).
+Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.IntPtr.INTPTR)(Sizeof:SIZEOF).
 
-  Import SIZEOF.
+  Import Sizeof.
   Import IP.
 
   (* The set of dynamic values manipulated by an LLVM program. *)
@@ -3412,6 +3413,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       uvalue_has_dtyp y dt ->
       uvalue_has_dtyp (UVALUE_IBinop op x y) dt
 
+  (* TODO: Add the IBinop_vector_typ / FBinop_vector_typ cases *)
+                      
   | UVALUE_ICmp_typ :
       forall x y op sz,
         ((IX_supported sz /\ uvalue_has_dtyp x (DTYPE_I sz) /\ uvalue_has_dtyp y (DTYPE_I sz))

@@ -20,13 +20,11 @@ From ExtLib Require Import
 From Vellvm Require Import
      Utilities
      Syntax
-     Semantics.LLVMEvents
+     Semantics.LLVMParams
      Semantics.Memory.Sizeof
      Numeric.Coqlib
      Numeric.Integers
      Numeric.Floats.
-
-
 
 From Flocq.IEEE754 Require Import
      Binary
@@ -165,10 +163,10 @@ Definition defined_intrinsics_decls :=
    any other effects.
 
 *)
-Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLVMIO: LLVM_INTERACTIONS(A)(IP)(SIZEOF)).
+Module Make (LLVMParams : LLVM_PARAMS).
   Open Scope string_scope.
 
-  Import LLVMIO.
+  Import LLVMParams.
   Import DV.
 
   (* Each (pure) intrinsic is defined by a function of the following type.

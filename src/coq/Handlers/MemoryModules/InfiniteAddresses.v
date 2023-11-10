@@ -8,6 +8,8 @@ From Vellvm Require Import
 
 From Vellvm.Semantics Require Import
   MemoryAddress
+  Overlaps
+  (* SAZ MODULE CLEANUP: Rename [FiniteProvenance] into just [Provenance] - delete it? *)
   Memory.FiniteProvenance.
 
 From QuickChick Require Import Show.
@@ -30,9 +32,8 @@ Definition wildcard_prov : Prov := None.
 Definition nil_prov : Prov := Some [].
 
 (* TODO: If Prov is an NSet, I get a universe inconsistency here... *)
-Module InfAddr : MemoryAddress.ADDRESS
-with Definition addr := (Iptr * Prov) % type
-with Definition null := (0, nil_prov)%Z.
+Module InfAddr <: ADDRESS_OVERLAPS_BIG.
+
   Definition addr := (Iptr * Prov) % type.
   Definition null : addr := (0, nil_prov)%Z.
 
@@ -64,23 +65,8 @@ with Definition null := (0, nil_prov)%Z.
   Qed.
 
   Definition show_addr (a : addr) := Show.show a.
-End InfAddr.
 
-Module InfPTOI : PTOI(InfAddr)
-with Definition ptr_to_int := fun (ptr : InfAddr.addr) => fst ptr.
   Definition ptr_to_int (ptr : InfAddr.addr) := fst ptr.
-End InfPTOI.
-
-Module InfPROV : PROVENANCE(InfAddr)
-with Definition Prov := Prov
-with Definition address_provenance
-    := fun (a : InfAddr.addr) => snd a
-with Definition Provenance := Provenance
-with Definition AllocationId := AllocationId
-with Definition wildcard_prov := wildcard_prov
-with Definition nil_prov := nil_prov
-with Definition initial_provenance := 0%N
-with Definition provenance_to_prov := fun (pr : Provenance) => Some [pr].
 
   Definition Provenance := Provenance.
   Definition AllocationId := AllocationId.
@@ -286,22 +272,13 @@ with Definition provenance_to_prov := fun (pr : Provenance) => Some [pr].
   Definition show_prov (pr : Prov) := Show.show pr.
   Definition show_provenance (pr : Provenance) := Show.show pr.
   Definition show_allocation_id (aid : AllocationId) := Show.show aid.
-End InfPROV.
 
-Module InfITOP : ITOP InfAddr InfPROV InfPTOI
-with Definition int_to_ptr := fun (i : Z) (pr : Prov) => @ret OOM _ _ (i, pr).
-
-  Import InfAddr.
-  Import InfPROV.
-  Import InfPTOI.
-
-  Definition int_to_ptr (i : Z) (pr : Prov) : OOM addr
-    := ret (i, pr).
+  Definition int_to_ptr := fun (i : Z) (pr : Prov) => @ret OOM _ _ (i, pr).
 
   Lemma int_to_ptr_provenance :
     forall (x : Z) (p : Prov) (a : addr),
       int_to_ptr x p = ret a ->
-      InfPROV.address_provenance a = p.
+      address_provenance a = p.
   Proof.
     intros x p a IP.
     cbn in IP; inv IP.
@@ -341,10 +318,6 @@ with Definition int_to_ptr := fun (i : Z) (pr : Prov) => @ret OOM _ _ (i, pr).
     inv IP.
     reflexivity.
   Qed.
-End InfITOP.
-
-Module InfITOP_BIG : MemoryAddress.ITOP_BIG InfAddr InfPROV InfPTOI InfITOP.
-  Import InfITOP.
 
   Lemma int_to_ptr_safe :
     forall z pr,
@@ -358,4 +331,13 @@ Module InfITOP_BIG : MemoryAddress.ITOP_BIG InfAddr InfPROV InfPTOI InfITOP.
     cbn.
     auto.
   Qed.
-End InfITOP_BIG.
+
+  Local Open Scope Z_scope.
+  Definition overlaps (a1 : addr) (sz1 : Z) (a2 : addr) (sz2 : Z) : bool :=
+    let a1_start := ptr_to_int a1 in
+    let a1_end   := ptr_to_int a1 + sz1 in
+    let a2_start := ptr_to_int a2 in
+    let a2_end   := ptr_to_int a2 + sz2 in
+    (a1_start <=? (a2_end - 1)) && (a2_start <=? (a1_end - 1)).
+
+End InfAddr.

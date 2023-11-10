@@ -8,6 +8,7 @@ From Vellvm Require Import
 
 From Vellvm.Semantics Require Import
   MemoryAddress
+  Overlaps
   Memory.FiniteProvenance
   DynamicValues.
 
@@ -31,9 +32,8 @@ Definition wildcard_prov : Prov := None.
 Definition nil_prov : Prov := Some [].
 
 (* TODO: If Prov is an NSet, I get a universe inconsistency here... *)
-Module FinAddr : MemoryAddress.ADDRESS
-with Definition addr := (Iptr * Prov) % type
-with Definition null := (Int64.zero, nil_prov)%Z.
+Module FinAddr <: ADDRESS_OVERLAPS.
+
   Definition addr := (Iptr * Prov) % type.
   Definition null : addr := (Int64.zero, nil_prov)%Z.
 
@@ -70,23 +70,7 @@ with Definition null := (Int64.zero, nil_prov)%Z.
     | (i, p) =>
         Show.show (Int64.unsigned i, p)
     end.
-End FinAddr.
-
-Module FinPTOI : PTOI(FinAddr)
-with Definition ptr_to_int := fun (ptr : FinAddr.addr) => Int64.unsigned (fst ptr).
   Definition ptr_to_int := fun (ptr : FinAddr.addr) => Int64.unsigned (fst ptr).
-End FinPTOI.
-
-Module FinPROV : PROVENANCE(FinAddr)
-with Definition Prov := Prov
-with Definition address_provenance
-    := fun (a : FinAddr.addr) => snd a
-with Definition Provenance := Provenance
-with Definition AllocationId := AllocationId
-with Definition wildcard_prov := wildcard_prov
-with Definition nil_prov := nil_prov
-with Definition initial_provenance := 0%N
-with Definition provenance_to_prov := fun (pr : Provenance) => Some [pr].
 
   Definition Provenance := Provenance.
   Definition AllocationId := AllocationId.
@@ -292,28 +276,17 @@ with Definition provenance_to_prov := fun (pr : Provenance) => Some [pr].
   Definition show_prov (pr : Prov) := Show.show pr.
   Definition show_provenance (pr : Provenance) := Show.show pr.
   Definition show_allocation_id (aid : AllocationId) := Show.show aid.
-End FinPROV.
 
-Module FinITOP : ITOP(FinAddr)(FinPROV)(FinPTOI)
-with Definition int_to_ptr :=
+  Definition int_to_ptr :=
   fun (i : Z) (pr : Prov) =>
     if (i <? 0)%Z || (i >=? Int64.modulus)%Z
     then Oom ("FinITOP.int_to_ptr: out of range (" ++ show i ++ ").")
     else NoOom (Int64.repr i, pr).
 
-  Import FinAddr.
-  Import FinPROV.
-  Import FinPTOI.
-
-  Definition int_to_ptr (i : Z) (pr : Prov) : OOM addr
-    := if (i <? 0)%Z || (i >=? Int64.modulus)%Z
-       then Oom ("FinITOP.int_to_ptr: out of range (" ++ show i ++ ").")
-       else NoOom (Int64.repr i, pr).
-
   Lemma int_to_ptr_provenance :
     forall (x : Z) (p : Prov) (a : addr),
       int_to_ptr x p = ret a ->
-      FinPROV.address_provenance a = p.
+      address_provenance a = p.
   Proof.
     intros x p a IP.
     unfold int_to_ptr in *.
@@ -370,4 +343,13 @@ with Definition int_to_ptr :=
     unfold Int64.max_unsigned.
     lia.
   Qed.
-End FinITOP.
+
+  Local Open Scope Z_scope.
+  Definition overlaps (a1 : addr) (sz1 : Z) (a2 : addr) (sz2 : Z) : bool :=
+    let a1_start := ptr_to_int a1 in
+    let a1_end   := ptr_to_int a1 + sz1 in
+    let a2_start := ptr_to_int a2 in
+    let a2_end   := ptr_to_int a2 + sz2 in
+    (a1_start <=? (a2_end - 1)) && (a2_start <=? (a1_end - 1)).
+
+End FinAddr.

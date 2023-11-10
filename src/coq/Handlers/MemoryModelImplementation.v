@@ -13,7 +13,8 @@ From Vellvm.Semantics Require Import
      Memory.MemBytes
      Memory.ErrSID
      GepM
-     VellvmIntegers.
+     VellvmIntegers
+     ConcretizationParams.
 
 From Vellvm Require Import
      Numeric.Coqlib
@@ -21,7 +22,8 @@ From Vellvm Require Import
 
 From Vellvm.Handlers Require Import
      MemPropT
-     MemoryInterpreters.
+     MemoryInterpreters
+     Concretization.
 
 From Vellvm.Utils Require Import
      Util
@@ -42,7 +44,9 @@ From ITree Require Import
 From ExtLib Require Import
      Structures.Monads
      Structures.Functor
-     Data.Monads.StateMonad.
+     Data.Monads.StateMonad
+     Core.RelDec
+     Programming.Eqv.
 
 From Coq Require Import
      ZArith
@@ -73,6 +77,13 @@ From Vellvm.Handlers.MemoryModules Require Import
   FiniteExecPrimitives
   Within.
 
+From Vellvm Require Import
+            Semantics.IntPtr
+            Semantics.MemoryAddress
+            Semantics.Memory.Overlaps
+            Semantics.Memory.Sizeof.
+
+
 #[local] Open Scope Z_scope.
 
 (** * Memory Model
@@ -84,6 +95,7 @@ From Vellvm.Handlers.MemoryModules Require Import
     an address and an offset.
 *)
 
+(* SAZ TODO CLEANUP: Move `is_supported` to the LLVMParams file? It seems sensible to put it there. *)
 (* Specifying the currently supported dynamic types.
        This is mostly to rule out:
 
@@ -118,43 +130,14 @@ Module IP64Bit := FiniteIntptr.IP64Bit.
 Module BigIP := FiniteIntptr.BigIP.
 Module FinSizeof := FiniteSizeof.FinSizeof.
 
-Module MakeFiniteMemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
-  Module FMSP := FiniteMemoryModelSpecPrimitives LP MP.
-  Module FMS := MakeMemoryModelSpec LP MP FMSP.
+Module LLVMParams64BitIntptr := LLVMParams.Make FinAddr IP64Bit FinSizeof.
+Module LLVMParamsBigIntptr := LLVMParams.MakeParamsBig InfAddr BigIP FinSizeof.
+Module FinMP := MemoryParams.Make LLVMParams64BitIntptr.
+Module BigMP := MemoryParams.MakeBig LLVMParamsBigIntptr.
+Module FinSpec := FiniteSpecPrimitives.FiniteMemoryModelSpecPrimitives FinMP.
+Module BigSpec := FiniteSpecPrimitives.FiniteMemoryModelSpecPrimitives BigMP.
 
-  Export FMSP FMS.
-End MakeFiniteMemoryModelSpec.
-
-Module MakeFiniteMemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP).
-  Module FMEP := FiniteMemoryModelExecPrimitives LP MP.
-  Module FME := MakeMemoryModelExec LP MP FMEP.
-End MakeFiniteMemoryModelExec.
-
-Module MakeFiniteMemory (LP : LLVMParams) <: Memory LP.
-  Import LP.
-
-  Module GEP := GepM.Make ADDR IP SIZEOF Events PTOI PROV ITOP.
-  Module Byte := FinByte ADDR IP SIZEOF Events.
-
-  Module MP := MemoryParams.Make LP GEP Byte.
-
-  Module MMEP := FiniteMemoryModelExecPrimitives LP MP.
-  Module MEM_MODEL := MakeMemoryModelExec LP MP MMEP.
-  Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec MMEP.MemExecM.
-  Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL MEM_SPEC_INTERP.
-
-  (* Concretization *)
-  Module ByteM := MemBytes.Byte ADDR IP SIZEOF LP.Events MP.BYTE_IMPL.
-  Module CP := ConcretizationParams.Make LP MP ByteM.
-
-  Export GEP Byte MP MEM_MODEL CP.
-End MakeFiniteMemory.
-
-Module LLVMParamsBigIntptr := LLVMParams.MakeBig InfAddr BigIP FinSizeof InfPTOI InfPROV InfITOP BigIP_BIG InfITOP_BIG.
-Module LLVMParams64BitIntptr := LLVMParams.Make FinAddr IP64Bit FinSizeof FinPTOI FinPROV FinITOP.
-
-Module MemoryBigIntptr := MakeFiniteMemory LLVMParamsBigIntptr.
-Module Memory64BitIntptr := MakeFiniteMemory LLVMParams64BitIntptr.
+Module Memory64BitIntptr := Lang FinMP FinSpec.
 
 From Coq Require Import Program.Equality.
 
@@ -168,54 +151,26 @@ Tactic Notation "raise_abs:" hyp(H) :=
   | [ H : existT _ _ _ = existT _ _ _ |- _] => dependent destruction H
   end; try inv H.
 
-Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntptr MemoryBigIntptr.MP MemoryBigIntptr.MMEP.MMSP MemoryBigIntptr.MMEP.MemSpec.
-  (* Intptrs are "big" *)
-  Module LP := LLVMParamsBigIntptr.
-  Module MP := MemoryBigIntptr.MP.
+Module MemoryBigIntptrInfiniteSpec (LP : PARAMS_BIG) <: MMIC LP.
+  Include (FiniteExecPrimitives.FiniteMemoryModelExecPrimitives LP).
+  Include (Concretization.Make LP).
+  Include (MemoryModelExec LP).
+End MemoryBigIntptrInfiniteSpec.  
 
-  Module MMSP := MemoryBigIntptr.MMEP.MMSP.
-  Module MMS := MemoryBigIntptr.MMEP.MemSpec.
-  Module MME := MemoryBigIntptr.MEM_MODEL.
 
-  Import LP.Events.
-  Import LP.ITOP.
-  Import LP.PTOI.
-  Import LP.IP_BIG.
-  Import LP.I2P_BIG.
-  Import LP.IP.
-  Import LP.ADDR.
-  Import LP.PROV.
-  Import LP.SIZEOF.
 
-  Import MMSP.
-  Import MMS.
-  Import MemHelpers.
+  
 
-  Import Monad.
-  Import MapMonadExtra.
-  Import MP.GEP.
 
-  Module MSIH := MemStateInfiniteHelpers LP MP MMSP MMS.
-  Import MSIH.
 
-  Import MemoryBigIntptr.
-  Import MMEP.
-  Import MP.BYTE_IMPL.
-  Import MemExecM.
-
-  Module MemTheory  := MemoryModelTheory LP MP MMEP MME.
-  Import MemTheory.
-
-  Module SpecInterp := MakeMemorySpecInterpreter LP MP MMSP MMS MemExecM.
-  Module ExecInterp := MakeMemoryExecInterpreter LP MP MMEP MME SpecInterp.
-  Import SpecInterp.
-  Import ExecInterp.
+  
+  Include (MakeMemoryExecInterpreter LP).
 
   Context {E : Type -> Type}.
   Notation Eff := (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE).
 
   Import Eq.
-  Import MMSP.
+
 
   (* TODO: Move out of infinite stuff *)
   Lemma find_free_block_never_ub :
@@ -238,9 +193,16 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     auto.
   Qed.
 
-  Import MemSpec.MemHelpers.
-  Import LLVMParamsBigIntptr.
-  Import PROV.
+  Import LP.
+  Import DV.
+  Import IP.
+  Import Addr.
+  Import Sizeof.
+  Import ByteImpl.
+
+  Import Monad.
+  Import MapMonadExtra.
+  Import GEP.
 
   Lemma find_free_block_can_always_succeed :
     forall ms (len : nat) (pr : Provenance),

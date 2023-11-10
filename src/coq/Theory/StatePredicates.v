@@ -1,7 +1,8 @@
 (* begin hide *)
 From Vellvm Require Import
-     Semantics.LLVMParams
-     Semantics.Lang.
+  Semantics.MemoryParams
+  Handlers.MemoryModel
+  Semantics.Lang.
 (* end hide *)
 
 (** * Utilities to build predicates and relations over VIR's state *)
@@ -17,12 +18,11 @@ Definition conj_rel {T} (R1 R2: rel T) : rel T :=
 
 Infix "×" := conj_rel (at level 30, right associativity).
 
-Module CFG_LEVEL (LP : LLVMParams) (LLVM : Lang LP).
-  Import LP.
-  Import LLVM.
-  Import MEM.
-  Import MEM.MMEP.
-  Import MEM.MMEP.MMSP.
+Module CFG_LEVEL (MP: PARAMS) (MMSP : MemoryModelSpecPrimitives MP) (L : LANG MP MMSP).
+  Import MP.
+  Import MMSP.
+  Import L.Local.
+  Import L.Global.
 
   Definition state_cfg : Type := MemState * (local_env * global_env).
 

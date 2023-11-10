@@ -4,9 +4,7 @@ Require Import Vellvm.Semantics.MemoryAddress.
 Require Import Vellvm.Semantics.Memory.Sizeof.
 From Vellvm Require Import DynamicTypes.
 
-Module Type Overlaps (Addr:MemoryAddress.ADDRESS).
-  Import Addr.
-
+Module Type _OVERLAPS (Import Addr:MemoryAddress.ADDRESS).
   (** Do two memory regions overlap each other?
 
         - *a1* and *a2* are addresses to the start of each region.
@@ -17,12 +15,13 @@ Module Type Overlaps (Addr:MemoryAddress.ADDRESS).
 
   Parameter overlaps :
     forall (a1 : addr) (sz1 : Z) (a2 : addr) (sz2 : Z), bool.
-End Overlaps.
+End _OVERLAPS.
 
-Module OverlapHelpers (Addr : MemoryAddress.ADDRESS) (Size : Sizeof) (Over : Overlaps Addr).
-  Import Addr.
-  Import Over.
-  Import Size.
+Module Type ADDRESS_OVERLAPS := ADDRESS_ITOP <+ _OVERLAPS.
+Module Type ADDRESS_OVERLAPS_BIG := ADDRESS_ITOP_BIG <+ _OVERLAPS.
+
+(* SAZ: MODULE CLEANUP TODO: rename this? *)
+Module OverlapHelpers (Import Addr : ADDRESS_OVERLAPS) (Import Sizeof : SIZEOF).
 
   (** Checks if two regions of memory overlap each other. The types
    *τ1* and *τ2* are used to determine the size of the two memory
@@ -42,18 +41,3 @@ Module OverlapHelpers (Addr : MemoryAddress.ADDRESS) (Size : Sizeof) (Over : Ove
     : bool := negb (overlaps_dtyp a1 τ1 a2 τ2).
 End OverlapHelpers.
 
-(* Define overlapping of memory addresses when PTOI is defined. *)
-Module PTOIOverlaps (Addr:MemoryAddress.ADDRESS) (PTOI:PTOI(Addr)) (Size:Sizeof).
-  Import Addr.
-  Import PTOI.
-  Import Size.
-
-  Local Open Scope Z.
-
-  Definition overlaps (a1 : addr) (sz1 : Z) (a2 : addr) (sz2 : Z) : bool :=
-    let a1_start := ptr_to_int a1 in
-    let a1_end   := ptr_to_int a1 + sz1 in
-    let a2_start := ptr_to_int a2 in
-    let a2_end   := ptr_to_int a2 + sz2 in
-    (a1_start <=? (a2_end - 1)) && (a2_start <=? (a1_end - 1)).
-End PTOIOverlaps.
