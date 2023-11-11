@@ -34782,15 +34782,174 @@ cofix CIH
       ContainsUB.contains_UB t_inf_ub.
   Proof.
     intros t_inf_ub t_fin_ub EQV UB.
-    induction UB.
+    revert t_inf_ub EQV.
+    induction UB; intros t_inf_ub EQV.
     - (* CrawlTau *)
       eapply IHUB.
       rewrite H in EQV.
       rewrite tau_eutt in EQV.
       eauto.
     - (* CrawlVis *)
-      admit.
-    - admit.
+      rewrite H in EQV.
+      punfold EQV; red in EQV; cbn in EQV.
+      dependent induction EQV.
+      + rewrite itree_eta_.
+        setoid_rewrite <- x.
+
+        (* Need to figure out what event we're working with to know
+        what A and Y are... *)
+        destruct e1.
+        { (* ExternalCallE *)
+          destruct e0.
+          repeat red in H2.
+          break_match_hyp; try contradiction.
+          destruct e0.
+          destruct H2 as (?&?&?).
+
+          specialize (H0 (fin_to_inf_dvalue x0) x0).
+          forward H0.
+          cbn.
+          repeat split; eauto.
+          apply fin_to_inf_dvalue_refine_strict.
+          
+          eapply ContainsUB.CrawlVis with (k:=k1).
+          change 
+            (@inl1 InterpreterStackBigIntptr.LP.Events.ExternalCallE (OOME +' UBE +' DebugE +' FailureE)
+               InterpreterStackBigIntptr.LP.Events.DV.dvalue
+               (InterpreterStackBigIntptr.LP.Events.ExternalCall t f args))
+            with
+            (@subevent InterpreterStackBigIntptr.LP.Events.L4 InterpreterStackBigIntptr.LP.Events.L4
+             (@ReSum_id (forall _ : Type, Type) IFun Id_IFun InterpreterStackBigIntptr.LP.Events.L4)
+             InterpreterStackBigIntptr.LP.Events.DV.dvalue (inl1 (InterpreterStackBigIntptr.LP.Events.ExternalCall t f args))).
+          reflexivity.
+
+          eapply IHUB.
+          pclearbot; eauto.
+        }
+
+        destruct s.
+        { (* OOM *)
+          destruct o.
+          cbn in H2.
+          break_match_hyp; try contradiction.
+          destruct s; try contradiction.
+          destruct o.
+          destruct x0.
+        }
+
+        destruct s.
+        { (* UBE *)
+          destruct u.
+          cbn in H2.
+          break_match_hyp; try contradiction.
+          repeat (destruct s; try contradiction).
+          destruct u0.
+          destruct x0.
+        }
+
+        destruct s.
+        { (* DebugE *)
+          destruct d.
+          cbn in H2.
+          break_match_hyp; try contradiction.
+          repeat (destruct s; try contradiction).
+          destruct d; subst.
+          specialize (H0 tt tt).
+          forward H0; cbn; auto.
+
+          eapply ContainsUB.CrawlVis with (k:=k1).
+          change 
+            (@inr1 InterpreterStackBigIntptr.LP.Events.ExternalCallE (OOME +' UBE +' DebugE +' FailureE) unit
+               (@inr1 OOME (UBE +' DebugE +' FailureE) unit
+                  (@inr1 UBE (DebugE +' FailureE) unit (@inl1 DebugE FailureE unit (Debug u0)))))
+            with
+            (@subevent InterpreterStackBigIntptr.LP.Events.L4 InterpreterStackBigIntptr.LP.Events.L4
+             (@ReSum_id (forall _ : Type, Type) IFun Id_IFun InterpreterStackBigIntptr.LP.Events.L4)
+             unit
+             (inr1 (inr1 (inr1 (inl1 (Debug u0)))))).
+          reflexivity.
+
+          destruct x0.
+          eapply IHUB.
+          pclearbot; eauto.
+        }
+
+        { (* FailureE *)
+          destruct f.
+          cbn in H2.
+          repeat break_match_hyp; try contradiction.
+        }
+      + destruct e0.
+        destruct x0.
+      + rewrite itree_eta.
+        setoid_rewrite <- x.
+        rewrite tau_eutt.
+        eapply IHEQV; eauto.
+    - (* FindUB *)
+      rewrite H in EQV.
+      punfold EQV; red in EQV; cbn in EQV.
+      dependent induction EQV.
+      + destruct e1 as [e1 | [e1 | [e1 | e1]]];
+          cbn in H2.
+        * destruct e1.
+          break_match_hyp; try contradiction.
+          clear - e.
+          (* Is there a better way? *)
+          inv e.
+          remember (E2.DV.DVALUE_None).
+          clear Heqd.
+          rewrite H0 in d.
+          destruct d.
+        * repeat break_match_hyp; try contradiction.
+          subst.
+          exfalso.
+          eapply H1.
+          reflexivity.
+        * repeat break_match_hyp; try contradiction.
+          subst.
+          destruct e1.
+
+          eapply ContainsUB.FindUB.
+          rewrite itree_eta.
+          setoid_rewrite <- x.
+          rewrite subevent_subevent.
+
+          change 
+            (@inr1 InterpreterStackBigIntptr.LP.Events.ExternalCallE (OOME +' UBE +' DebugE +' FailureE)
+               void
+               (@inr1 OOME (UBE +' DebugE +' FailureE) void (@inl1 UBE (DebugE +' FailureE) void (ThrowUB u0))))
+            with
+            (@subevent UBE InfLP.Events.L4
+               (fun (x0 : Type) (f : UBE x0) =>
+                  @ReSum_id (forall _ : Type, Type) IFun Id_IFun InfLP.Events.L4 x0
+                    (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 UBE
+                       (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) InfLP.Events.ExternalCallE
+                       (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 UBE
+                          (sum1 UBE (sum1 DebugE FailureE)) OOME
+                          (@ReSum_inl (forall _ : Type, Type) IFun sum1 Cat_IFun Inl_sum1 UBE UBE
+                             (sum1 DebugE FailureE) (@ReSum_id (forall _ : Type, Type) IFun Id_IFun UBE)))
+                       x0 f)) Empty_set (ThrowUB u0)).
+          reflexivity.
+        * repeat break_match_hyp; try contradiction.
+          -- subst.
+             clear - d0.
+             inv d0.
+             rewrite H in H0.
+             destruct H0.
+          -- subst.
+             dependent destruction f0; subst.
+             destruct u0, s.
+             cbn in *.
+             rewrite <- Heqs1 in H.
+             rewrite subevent_subevent in Heqs1.
+             rewrite itree_eta.
+             admit.
+      + dependent destruction e.
+        admit.
+      + rewrite itree_eta.
+        setoid_rewrite <- x.
+        rewrite tau_eutt.
+        eapply IHEQV; eauto.
   Admitted.
 
   Lemma model_E1E2_45_orutt_strict :
