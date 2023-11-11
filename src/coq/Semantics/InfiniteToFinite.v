@@ -34892,19 +34892,8 @@ cofix CIH
       + destruct e1 as [e1 | [e1 | [e1 | e1]]];
           cbn in H2.
         * destruct e1.
-          break_match_hyp; try contradiction.
-          clear - e.
-          (* Is there a better way? *)
-          inv e.
-          remember (E2.DV.DVALUE_None).
-          clear Heqd.
-          rewrite H0 in d.
-          destruct d.
+          try contradiction.
         * repeat break_match_hyp; try contradiction.
-          subst.
-          exfalso.
-          eapply H1.
-          reflexivity.
         * repeat break_match_hyp; try contradiction.
           subst.
           destruct e1.
@@ -34917,7 +34906,7 @@ cofix CIH
           change 
             (@inr1 InterpreterStackBigIntptr.LP.Events.ExternalCallE (OOME +' UBE +' DebugE +' FailureE)
                void
-               (@inr1 OOME (UBE +' DebugE +' FailureE) void (@inl1 UBE (DebugE +' FailureE) void (ThrowUB u0))))
+               (@inr1 OOME (UBE +' DebugE +' FailureE) void (@inl1 UBE (DebugE +' FailureE) void (ThrowUB u))))
             with
             (@subevent UBE InfLP.Events.L4
                (fun (x0 : Type) (f : UBE x0) =>
@@ -34928,29 +34917,14 @@ cofix CIH
                           (sum1 UBE (sum1 DebugE FailureE)) OOME
                           (@ReSum_inl (forall _ : Type, Type) IFun sum1 Cat_IFun Inl_sum1 UBE UBE
                              (sum1 DebugE FailureE) (@ReSum_id (forall _ : Type, Type) IFun Id_IFun UBE)))
-                       x0 f)) Empty_set (ThrowUB u0)).
+                       x0 f)) Empty_set (ThrowUB u)).
           reflexivity.
         * repeat break_match_hyp; try contradiction.
-          -- subst.
-             clear - d0.
-             inv d0.
-             rewrite H in H0.
-             destruct H0.
-          -- subst.
-             dependent destruction f0; subst.
-             destruct u0, s.
-             cbn in *.
-             rewrite <- Heqs1 in H.
-             rewrite subevent_subevent in Heqs1.
-             rewrite itree_eta.
-             admit.
-      + dependent destruction e.
-        admit.
       + rewrite itree_eta.
         setoid_rewrite <- x.
         rewrite tau_eutt.
         eapply IHEQV; eauto.
-  Admitted.
+  Qed.
 
   Lemma model_E1E2_45_orutt_strict :
     forall t_inf t_fin,

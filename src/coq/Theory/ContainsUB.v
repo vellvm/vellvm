@@ -36,11 +36,12 @@ Ltac inv_observes :=
 
 Section contains_UB.
   Context {Eff : Type -> Type}.
+  Context `{Eff_UBE : UBE -< Eff}.
 
   Inductive contains_UB {R} : itree Eff R -> Prop :=
   | CrawlTau  : forall t1 t2, t2 ≅ Tau t1 -> contains_UB t1 -> contains_UB t2
   | CrawlVis : forall Y (e : Eff Y) x k t2, t2 ≅ (vis e k) -> contains_UB (k x) -> contains_UB t2
-  | FindUB    : forall `{Eff_UBE : UBE -< Eff} s k t2, t2 ≅ (vis (@subevent UBE Eff Eff_UBE void (ThrowUB s)) k) -> contains_UB t2.
+  | FindUB    : forall s k t2, t2 ≅ (vis (@subevent UBE Eff Eff_UBE void (ThrowUB s)) k) -> contains_UB t2.
 
   #[global] Instance proper_eutt_contains_UB {R} {RR : relation R} : Proper (@eqit Eff _ _ RR true true ==> iff) contains_UB.
   Proof.
@@ -111,18 +112,20 @@ Section contains_UB.
         2: symmetry; eauto.
         2: reflexivity.
 
+        rewrite subevent_subevent in EQ.
+        clear H.
         punfold EQ; red in EQ; cbn in EQ.
-        dependent induction EQ; subst.
+        
+        rewrite EqAxiom.itree_eta_.
+        genobs y oy. clear y Heqoy.
+        remember (VisF (subevent void (ThrowUB s)) k) as t.
+        induction EQ; inv Heqt; subst_existT.
         + eapply FindUB.
-          rewrite itree_eta.
-          rewrite <- x.
+          rewrite subevent_subevent.          
           reflexivity.
         + eapply CrawlTau.
-
-          rewrite itree_eta.
-          rewrite <- x.
           reflexivity.
-
+          rewrite EqAxiom.itree_eta_.
           eapply IHEQ; eauto.
     }
 
@@ -187,27 +190,27 @@ Section contains_UB.
             inversion H; inversion CHECK0.
         }
       - intros y EQ.
-        punfold H; red in H.
-        dependent induction H.
-        punfold EQ; red in EQ.
+        eapply eutt_cong_eutt in EQ.
+        3: rewrite H; reflexivity.
+        all: try reflexivity.
 
-        genobs t2 ot2. genobs y oy. clear t2 Heqot2.
-        revert y Heqoy.
+        clear H.
+        punfold EQ; red in EQ; cbn in EQ.
 
-        induction EQ; try solve [inv x]; intros.
-        + subst. inv x.
-          dependent destruction H1.
-          eapply FindUB.
+        rewrite EqAxiom.itree_eta_.
+        genobs y oy. clear y Heqoy.
+
+        rewrite subevent_subevent in EQ.
+        remember (VisF (subevent void (ThrowUB s)) k) as t.
+        induction EQ; try inv Heqt; subst_existT.
+        + eapply FindUB.
           pfold; red.
-          rewrite <- Heqoy.
-          cbn.
+          rewrite subevent_subevent.
           econstructor; intros [].
         + subst.
           eapply CrawlTau with (t1:=t1).
-          pfold; red; rewrite <- Heqoy; cbn.
-          constructor. left.
-          apply Reflexive_eqit. typeclasses eauto.
-
+          reflexivity.
+          rewrite EqAxiom.itree_eta_.
           eapply IHEQ; eauto.
     }
 
@@ -255,6 +258,7 @@ End contains_UB.
 
 Section contains_UB_lemmas.
   Context {Eff : Type -> Type}.
+  Context `{Eff_UBE : UBE -< Eff}.
 
   Lemma ret_not_contains_UB {R} {RR : relation R} :
     forall (t : itree Eff R) rv, eqit RR true true t (ret rv) -> ~ contains_UB t.
@@ -277,6 +281,7 @@ Section bind_lemmas.
     }.
 
   Context `{EffInv : SubeventInversion Eff}.
+  Context `{Eff_UBE : UBE -< Eff}.
 
   Lemma bind_contains_UB :
     forall {R T} (t : itree Eff R) (k : R -> itree Eff T),
@@ -403,6 +408,7 @@ End interp_lemmas.
 Section refine_OOM_h_lemmas.
   Context {Eff : Type -> Type}.
   Context `{OOMEff : OOME -< Eff}.
+  Context `{Eff_UBE : UBE -< Eff}.
 
   Hint Resolve interp_PropT__mono : paco.
 
