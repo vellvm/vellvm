@@ -690,21 +690,21 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                 intros [].
                 Unshelve.
                 all : eauto.
-  Admitted.
+  Abort.
 
   Lemma refine_OOM_h_L1_convert_tree_strict :
     forall {T} x_inf y_inf (RR : relation T),
       refine_OOM_h RR x_inf y_inf ->
       refine_OOM_h RR (L1_convert_tree_strict x_inf) (L1_convert_tree_strict y_inf).
   Proof.
-  Admitted.
+  Abort.
 
   Lemma refine_OOM_h_L2_convert_tree_strict :
     forall {T} x_inf y_inf (RR : relation T),
       refine_OOM_h RR x_inf y_inf ->
       refine_OOM_h RR (L2_convert_tree_strict x_inf) (L2_convert_tree_strict y_inf).
   Proof.
-  Admitted.
+  Abort.
 
   Lemma refine_OOM_h_L3_convert_tree_strict :
     forall {T} x_inf y_inf (RR : relation T),
@@ -1088,7 +1088,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     (*             Unshelve. *)
     (*             all : eauto. *)
     (*             all : inv x.     *)
-  Admitted.
+  Abort.
 
   Opaque FinPROV.initial_provenance.
   Opaque InfPROV.initial_provenance.
@@ -1390,7 +1390,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                 Unshelve.
                 all : eauto.
                 all : inv x.
-  Admitted.
+  Abort.
 
   Lemma refine_OOM_h_L5_convert_tree_strict :
     forall {T} x_inf y_inf (RR : relation T),
@@ -1398,8 +1398,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       refine_OOM_h RR (L5_convert_tree_strict x_inf) (L5_convert_tree_strict y_inf).
   Proof.
     intros T.
-    apply refine_OOM_h_L4_convert_tree_strict.
-  Qed.
+    (* apply refine_OOM_h_L4_convert_tree_strict. *)
+  Abort.
 
   Lemma refine_OOM_h_L6_convert_tree_strict :
     forall {T} x_inf y_inf (RR : relation T),
@@ -1407,8 +1407,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       refine_OOM_h RR (L6_convert_tree_strict x_inf) (L6_convert_tree_strict y_inf).
   Proof.
     intros T.
-    apply refine_OOM_h_L5_convert_tree_strict.
-  Qed.
+    (* apply refine_OOM_h_L5_convert_tree_strict. *)
+  Abort.
 
   (** Model *)
   Import DynamicTypes TypToDtyp CFG.
@@ -8221,6 +8221,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       (* TODO: Annoying intptr differences... *)
       (* NOTE: different implicit arguments *)
       rewrite eval_int_icmp_fin_inf in e; inv e.
+      pose proof IS1.LP.IP.to_Z_from_Z i.
+      pose proof IS1.LP.IP.from_Z_injective _ _ _ Heqo H.
+      rewrite H0 in Heqo.
       admit.
     }
 
@@ -14013,12 +14016,22 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         destruct OOMSPEC as [o' [k OOMEQ]].
         rewrite <- x.
         cbn.
-        (* TODO: figure out how to do this rewrite *)
-        (* setoid_rewrite OOMEQ. *)
-        (* rewrite bind_vis. *)
-        (* gstep; red; cbn. *)
-        (* constructor. *)
-        admit.
+
+        eapply gpaco2_final.
+        apply orutt_monot.
+        right.
+
+        eapply paco2_mon_bot; eauto.
+        eapply orutt_cong_eutt2.
+        2: {
+          rewrite OOMEQ.
+          rewrite bind_vis.
+          cbn.
+          reflexivity.
+        }
+
+        pstep; red; cbn.
+        constructor.
       - (* TauL *)
         cbn in *.
         rewrite <- x.
@@ -14033,7 +14046,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         rewrite tau_euttge.
         rewrite <- StateFacts.unfold_interp_state.
         eapply IHEQ; eauto.
-    Admitted.
+    Qed.
 
     Lemma orutt_interp_global_h :
       forall A B e1 e2 genv1 genv2,
