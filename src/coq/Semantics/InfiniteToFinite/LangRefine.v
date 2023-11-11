@@ -14296,7 +14296,28 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           IS1.LLVM.Intrinsics.llvm_fabs_f32 args1 = inl s ->
           IS2.LLVM.Intrinsics.llvm_fabs_f32 args2 = inl s.
       Proof.
-      Admitted.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+      Qed.
 
       Lemma llvm_fabs_f32_agrees_success :
         forall args1 args2 d1,
@@ -14306,7 +14327,36 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             IS2.LLVM.Intrinsics.llvm_fabs_f32 args2 = inr d2 /\
               dvalue_refine_strict d1 d2.
       Proof.
-      Admitted.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        inv EXEC.
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H.
+        inv H.
+        eexists.
+        split; eauto.
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation.
+        reflexivity.
+      Qed.
 
       Lemma llvm_fabs_f64_agrees_fail :
         forall args1 args2 s,
@@ -14314,7 +14364,28 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           IS1.LLVM.Intrinsics.llvm_fabs_f64 args1 = inl s ->
           IS2.LLVM.Intrinsics.llvm_fabs_f64 args2 = inl s.
       Proof.
-      Admitted.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+      Qed.
 
       Lemma llvm_fabs_f64_agrees_success :
         forall args1 args2 d1,
@@ -14324,7 +14395,36 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             IS2.LLVM.Intrinsics.llvm_fabs_f64 args2 = inr d2 /\
               dvalue_refine_strict d1 d2.
       Proof.
-      Admitted.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        inv EXEC.
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H.
+        inv H.
+        eexists.
+        split; eauto.
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation.
+        reflexivity.
+      Qed.
 
       Lemma llvm_maxnum_f32_agrees_fail :
         forall args1 args2 s,
@@ -14332,7 +14432,40 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           IS1.LLVM.Intrinsics.llvm_maxnum_f32 args1 = inl s ->
           IS2.LLVM.Intrinsics.llvm_maxnum_f32 args2 = inl s.
       Proof.
-      Admitted.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H; inv H.
+
+        destruct ARGS; cbn in *; destruct x0;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H0;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H0;
+              try congruence
+            ].
+      Qed.
 
       Lemma llvm_maxnum_f32_agrees_success :
         forall args1 args2 d1,
@@ -14342,7 +14475,48 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             IS2.LLVM.Intrinsics.llvm_maxnum_f32 args2 = inr d2 /\
               dvalue_refine_strict d1 d2.
       Proof.
-      Admitted.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H; inv H.
+
+        destruct ARGS; cbn in *; destruct x0;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H0;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H0;
+              try congruence
+            ].
+
+        inv EXEC.
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H0.
+        inv H0.
+        eexists.
+        split; eauto.
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation.
+        reflexivity.        
+      Qed.
 
       Lemma llvm_maxnum_f64_agrees_fail :
         forall args1 args2 s,
@@ -14350,7 +14524,40 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           IS1.LLVM.Intrinsics.llvm_maxnum_f64 args1 = inl s ->
           IS2.LLVM.Intrinsics.llvm_maxnum_f64 args2 = inl s.
       Proof.
-      Admitted.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H; inv H.
+
+        destruct ARGS; cbn in *; destruct x0;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H0;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H0;
+              try congruence
+            ].
+      Qed.
 
       Lemma llvm_maxnum_f64_agrees_success :
         forall args1 args2 d1,
@@ -14360,7 +14567,48 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             IS2.LLVM.Intrinsics.llvm_maxnum_f64 args2 = inr d2 /\
               dvalue_refine_strict d1 d2.
       Proof.
-      Admitted.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H; inv H.
+
+        destruct ARGS; cbn in *; destruct x0;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H0;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H0;
+              try congruence
+            ].
+
+        inv EXEC.
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H0.
+        inv H0.
+        eexists.
+        split; eauto.
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation.
+        reflexivity.        
+      Qed.
 
       Lemma llvm_minimum_f32_agrees_fail :
         forall args1 args2 s,
@@ -14368,7 +14616,40 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           IS1.LLVM.Intrinsics.llvm_minimum_f32 args1 = inl s ->
           IS2.LLVM.Intrinsics.llvm_minimum_f32 args2 = inl s.
       Proof.
-      Admitted.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H; inv H.
+
+        destruct ARGS; cbn in *; destruct x0;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H0;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H0;
+              try congruence
+            ].
+      Qed.
 
       Lemma llvm_minimum_f32_agrees_success :
         forall args1 args2 d1,
@@ -14378,7 +14659,48 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             IS2.LLVM.Intrinsics.llvm_minimum_f32 args2 = inr d2 /\
               dvalue_refine_strict d1 d2.
       Proof.
-      Admitted.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H; inv H.
+
+        destruct ARGS; cbn in *; destruct x0;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H0;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H0;
+              try congruence
+            ].
+
+        inv EXEC.
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H0.
+        inv H0.
+        eexists.
+        split; eauto.
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation.
+        reflexivity.        
+      Qed.
 
       Lemma llvm_minimum_f64_agrees_fail :
         forall args1 args2 s,
@@ -14386,7 +14708,40 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           IS1.LLVM.Intrinsics.llvm_minimum_f64 args1 = inl s ->
           IS2.LLVM.Intrinsics.llvm_minimum_f64 args2 = inl s.
       Proof.
-      Admitted.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H; inv H.
+
+        destruct ARGS; cbn in *; destruct x0;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H0;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H0;
+              try congruence
+            ].
+      Qed.
 
       Lemma llvm_minimum_f64_agrees_success :
         forall args1 args2 d1,
@@ -14396,9 +14751,48 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             IS2.LLVM.Intrinsics.llvm_minimum_f64 args2 = inr d2 /\
               dvalue_refine_strict d1 d2.
       Proof.
-      Admitted.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
 
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
 
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H; inv H.
+
+        destruct ARGS; cbn in *; destruct x0;
+          try
+            solve
+            [ rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H0;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H0;
+              try congruence
+            ].
+
+        inv EXEC.
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation in H0.
+        inv H0.
+        eexists.
+        split; eauto.
+        rewrite dvalue_refine_strict_equation, dvalue_convert_strict_equation.
+        reflexivity.        
+      Qed.
 
       all:
         try solve
