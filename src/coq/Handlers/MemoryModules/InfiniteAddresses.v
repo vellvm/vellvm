@@ -71,7 +71,7 @@ with Definition ptr_to_int := fun (ptr : InfAddr.addr) => fst ptr.
   Definition ptr_to_int (ptr : InfAddr.addr) := fst ptr.
 End InfPTOI.
 
-Module InfPROV : PROVENANCE(InfAddr)
+Module InfPROV <: PROVENANCE(InfAddr)
 with Definition Prov := Prov
 with Definition address_provenance
     := fun (a : InfAddr.addr) => snd a
@@ -290,6 +290,35 @@ with Definition access_allowed := fun (pr : Prov) (aid : AllocationId)
     intros pr.
     unfold next_provenance.
     lia.
+  Qed.
+
+  Lemma access_allowed_aid_neq :
+    forall aid1 aid2,
+      aid1 <> aid2 ->
+      access_allowed
+        (allocation_id_to_prov (Some aid1)) (Some aid2) = false.
+  Proof.
+    intros aid1 aid2 NEQ.
+    unfold access_allowed.
+    unfold allocation_id_to_prov.
+    cbn.
+    rewrite orb_false_r.
+    eapply N.eqb_neq.
+    eauto.
+  Qed.
+
+  Lemma access_allowed_aid_eq :
+    forall aid1 aid2,
+      access_allowed
+        (allocation_id_to_prov (Some aid1)) (Some aid2) = true ->
+      aid1 = aid2.
+  Proof.
+    intros aid1 aid2 ACCESS.
+    unfold access_allowed, allocation_id_to_prov in *.
+    cbn in ACCESS.
+    rewrite orb_false_r in ACCESS.
+    eapply N.eqb_eq in ACCESS.
+    auto.
   Qed.
 
   (* Debug *)

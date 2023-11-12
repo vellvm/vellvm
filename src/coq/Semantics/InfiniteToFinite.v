@@ -10280,22 +10280,6 @@ cofix CIH
     Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
   Qed.
 
-  Lemma access_allowed_aid_neq :
-    forall aid1 aid2,
-      aid1 <> aid2 ->
-      LLVMParamsBigIntptr.PROV.access_allowed
-      (MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov (Some aid1)) (Some aid2) = false.
-  Proof.
-  Admitted.
-
-  Lemma access_allowed_aid_eq :
-    forall aid1 aid2,
-      LLVMParamsBigIntptr.PROV.access_allowed
-        (MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov (Some aid1)) (Some aid2) = true ->
-      aid1 = aid2.
-  Proof.
-  Admitted.
-
   Lemma access_allowed_wildcard_prov :
     forall aid,
       LLVMParamsBigIntptr.PROV.access_allowed wildcard_prov aid = true.
@@ -10334,8 +10318,7 @@ cofix CIH
       symmetry.
       apply MemoryBigIntptrInfiniteSpec.LP.PROV.aid_eq_dec_refl.
       unfold LLVMParamsBigIntptr.PROV.access_allowed.
-      cbn.
-      break_match_goal; auto.
+      cbn; auto.
     }
 
     apply RBA in H.
@@ -10346,8 +10329,9 @@ cofix CIH
     rewrite R2 in ALLOC.
 
     destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid' (Some p)); try discriminate; subst.
-    rewrite access_allowed_aid_neq in ALLOWED; [| lia].
-    discriminate.
+    rewrite Bool.orb_false_r in ALLOWED.
+    eapply N.eqb_eq in ALLOWED.
+    lia.
   Qed.
 
   Lemma read_byte_allowed_all_preserved_preserves_aids:
@@ -10404,7 +10388,9 @@ cofix CIH
     rewrite R2 in ALLOC.
 
     destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid' (Some p0)); try discriminate; subst.
-    apply access_allowed_aid_eq in ALLOWED; subst; auto.
+    rewrite Bool.orb_false_r in ALLOWED.
+    eapply N.eqb_eq in ALLOWED.
+    subst; auto.
   Qed.
 
   Lemma fin_inf_read_byte_raw :
@@ -10441,8 +10427,9 @@ cofix CIH
       cbn in READ_RAW; cbn.
       erewrite read_byte_raw_lifted_fin_inf; eauto.
       cbn.
-      rewrite MemoryBigIntptrInfiniteSpec.LP.PROV.access_allowed_refl.
-      split; auto.
+      break_inner_match_goal; cbn; eauto.
+      rewrite N.eqb_refl.
+      cbn; auto.
     }
 
     pose proof RBP_INF as RBP_FIN.
@@ -10651,6 +10638,7 @@ cofix CIH
     auto.
   Qed.
 
+  Opaque MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov.
   Lemma inf_read_byte_preserved_read_byte_raw :
     forall ms1 ms2 addr,
       MemoryBigIntptr.MMEP.MemSpec.read_byte_preserved ms1 ms2 ->
@@ -17178,12 +17166,6 @@ cofix CIH
       eauto.
       apply block_is_free_consecutive.
     - erewrite inf_fin_addr_convert_provenance; eauto.
-      rewrite MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov_provenance_to_allocation_id.
-      rewrite PROV.allocation_id_to_prov_provenance_to_allocation_id in block_is_free_ptr_provenance.
-      unfold MemoryBigIntptrInfiniteSpec.LP.PROV.provenance_to_prov.
-      unfold PROV.provenance_to_prov in *.
-      rewrite <- block_is_free_ptr_provenance.
-      reflexivity.
     - intros ptr H.
       apply In_Nth in H. destruct H.
       eapply Util.Forall2_Nth_left in ADDRS_CONV; eauto.
@@ -17194,12 +17176,6 @@ cofix CIH
       specialize (block_is_free_ptrs_provenance _ H2).
 
       erewrite inf_fin_addr_convert_provenance; eauto.
-      rewrite MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov_provenance_to_allocation_id.
-      rewrite PROV.allocation_id_to_prov_provenance_to_allocation_id in block_is_free_ptrs_provenance.
-      unfold MemoryBigIntptrInfiniteSpec.LP.PROV.provenance_to_prov.
-      unfold PROV.provenance_to_prov in *.
-      rewrite <- block_is_free_ptrs_provenance.
-      reflexivity.
     - intros ptr H.
       apply In_Nth in H. destruct H.
       eapply Util.Forall2_Nth_left in ADDRS_CONV; eauto.
