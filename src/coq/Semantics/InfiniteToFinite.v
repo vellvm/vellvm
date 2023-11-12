@@ -23960,6 +23960,54 @@ cofix CIH
     reflexivity.
   Qed.
 
+  (* TODO: Move to where the other frame stack lemmas are *)
+  Lemma cannot_pop_inf_fin :
+    forall {ms_fin ms_inf},
+      MemState_refine_prop ms_inf ms_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.cannot_pop ms_inf ->
+      Memory64BitIntptr.MMEP.MemSpec.cannot_pop ms_fin.
+  Proof.
+    intros ms_fin ms_inf MSR NPOP.
+    red.
+    red in NPOP.
+    intros fs1 fs2 MSFP POP.
+    red in POP.
+    break_match_hyp; auto.
+
+    (* Finite memory had frame to pop *)
+    destruct ms_fin as [[ms_fin fss_fin hs_fin] msprovs_fin].
+    cbn in *.
+    specialize (NPOP (lift_FrameStack fss_fin) (lift_FrameStack fs2)).
+    eapply NPOP.
+    { eapply MemState_refine_prop_frame_stack_preserved; eauto.
+      red.
+      cbn in *.
+      reflexivity.
+    }
+
+    red.
+    red in MSFP.
+    cbn in MSFP.
+    destruct fss_fin; subst.
+    - cbn; apply FinMem.MMEP.MMSP.frame_stack_eqv_sing_snoc_inv in MSFP; auto.
+    - rewrite lift_FrameStack_snoc.
+      apply FinMemMMSP.frame_stack_inv in MSFP.
+      destruct MSFP as [MSFP | CONTRA].
+      2: {
+        destruct CONTRA as (?&?&?&?).
+        inv H.
+      }
+
+      destruct MSFP as (?&?&?&?&?&?&?&?).
+      inv H.
+      inv H0.
+      apply frame_stack_eqv_lift.
+      rewrite H1.
+      rewrite POP.
+      reflexivity.
+  Qed.
+
+
   (* TODO: Move into memory model. Likely near MEM_EXEC_INTERP.MemTheory.allocate_bytes_spec_MemPropT_no_err *)
   Lemma allocate_dtyp_spec_no_error :
     forall t num_elements ms msg,
@@ -24709,7 +24757,7 @@ cofix CIH
       split.
       + eapply inf_fin_preserve_allocation_ids; eauto.
       + eapply inf_fin_frame_stack_preserved; eauto.
-  Admitted.
+  Abort.
 
   Import Tactics.
   #[global] Instance interp_memory_prop_eutt_S1S2_Proper_impl_ :
@@ -25448,6 +25496,32 @@ cofix CIH
     exact ""%string.
   Qed.
 
+  (* TODO: Move this *)
+  Lemma contains_UB_Extra_raise_error :
+    forall {E F G J} `{O : FailureE -< E +' F +' G +' UBE +' J} {X} msg,
+      (forall X e1 e2, O X e1 <> inr1 (inr1 (inr1 (inl1 e2)))) ->
+      ~ contains_UB_Extra (@raise_error _ _ X msg).
+  Proof.
+    intros E F G J O X msg NUBE CONTRA.
+    dependent destruction CONTRA.
+    - pinversion H; subst; inv CHECK.
+    - pinversion H; do 2 subst_existT.
+      cbn in *.
+      inv x.
+    - pinversion H; do 2 subst_existT.
+      cbn in *.
+      inv x.
+    - pinversion H; do 2 subst_existT.
+      cbn in *.
+      subst.
+      rewrite subevent_subevent in H4.
+      unfold subevent in *.
+      repeat unfold resum, ReSum_id, id_, Id_IFun, ReSum_inr, ReSum_inl, inr_, inl_, cat, Cat_IFun, Inr_sum1, Inl_sum1 in H4.
+      apply NUBE in H4.
+      auto.
+  Qed.
+
+  Print Assumptions model_E1E2_L0_orutt_strict_sound.
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
       L2_E1E2_orutt_strict t_inf t_fin ->
@@ -26949,32 +27023,6 @@ cofix CIH
 
                       destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
                       { rewrite TA in VIS_HANDLED.
-
-                        (* TODO: Move this *)
-                        Lemma contains_UB_Extra_raise_error :
-                          forall {E F G J} `{O : FailureE -< E +' F +' G +' UBE +' J} {X} msg,
-                            (forall X e1 e2, O X e1 <> inr1 (inr1 (inr1 (inl1 e2)))) ->
-                            ~ contains_UB_Extra (@raise_error _ _ X msg).
-                        Proof.
-                          intros E F G J O X msg NUBE CONTRA.
-                          dependent destruction CONTRA.
-                          - pinversion H; subst; inv CHECK.
-                          - pinversion H; do 2 subst_existT.
-                            cbn in *.
-                            inv x.
-                          - pinversion H; do 2 subst_existT.
-                            cbn in *.
-                            inv x.
-                          - pinversion H; do 2 subst_existT.
-                            cbn in *.
-                            subst.
-                            rewrite subevent_subevent in H4.
-                            unfold subevent in *.
-                            repeat unfold resum, ReSum_id, id_, Id_IFun, ReSum_inr, ReSum_inl, inr_, inl_, cat, Cat_IFun, Inr_sum1, Inl_sum1 in H4.
-                            apply NUBE in H4.
-                            auto.
-                        Qed.
-
                         exfalso.
                         eapply contains_UB_Extra_raise_error.
                         2: {
@@ -27308,53 +27356,6 @@ cofix CIH
                     { (* Handler raises UB *)
                       cbn in UB.
                       destruct UB as [msg []].
-
-                      (* TODO: Move to where the other frame stack lemmas are *)
-                      Lemma cannot_pop_inf_fin :
-                        forall {ms_fin ms_inf},
-                          MemState_refine_prop ms_inf ms_fin ->
-                          MemoryBigIntptr.MMEP.MemSpec.cannot_pop ms_inf ->
-                          Memory64BitIntptr.MMEP.MemSpec.cannot_pop ms_fin.
-                      Proof.
-                        intros ms_fin ms_inf MSR NPOP.
-                        red.
-                        red in NPOP.
-                        intros fs1 fs2 MSFP POP.
-                        red in POP.
-                        break_match_hyp; auto.
-
-                        (* Finite memory had frame to pop *)
-                        destruct ms_fin as [[ms_fin fss_fin hs_fin] msprovs_fin].
-                        cbn in *.
-                        specialize (NPOP (lift_FrameStack fss_fin) (lift_FrameStack fs2)).
-                        eapply NPOP.
-                        { eapply MemState_refine_prop_frame_stack_preserved; eauto.
-                          red.
-                          cbn in *.
-                          reflexivity.
-                        }
-
-                        red.
-                        red in MSFP.
-                        cbn in MSFP.
-                        destruct fss_fin; subst.
-                        - cbn; apply FinMem.MMEP.MMSP.frame_stack_eqv_sing_snoc_inv in MSFP; auto.
-                        - rewrite lift_FrameStack_snoc.
-                          apply FinMemMMSP.frame_stack_inv in MSFP.
-                          destruct MSFP as [MSFP | CONTRA].
-                          2: {
-                            destruct CONTRA as (?&?&?&?).
-                            inv H.
-                          }
-
-                          destruct MSFP as (?&?&?&?&?&?&?&?).
-                          inv H.
-                          inv H0.
-                          apply frame_stack_eqv_lift.
-                          rewrite H1.
-                          rewrite POP.
-                          reflexivity.
-                      Qed.
                     }
 
                     { (* Handler raises error *)
