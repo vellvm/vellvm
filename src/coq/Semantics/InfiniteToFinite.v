@@ -10280,27 +10280,132 @@ cofix CIH
     Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
   Qed.
 
+  Lemma access_allowed_aid_neq :
+    forall aid1 aid2,
+      aid1 <> aid2 ->
+      LLVMParamsBigIntptr.PROV.access_allowed
+      (MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov (Some aid1)) (Some aid2) = false.
+  Proof.
+  Admitted.
+
   Lemma access_allowed_aid_eq :
     forall aid1 aid2,
       LLVMParamsBigIntptr.PROV.access_allowed
-      (MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov aid1) aid2 = true ->
+        (MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov (Some aid1)) (Some aid2) = true ->
       aid1 = aid2.
   Proof.
-    (* TODO: need to show that aid = aid'...
-
-       This should be true, but need a lemma about access_allowed and
-       allocation_id_to_prov to do this...
-
-       In this case there should only be one provenance in the Prov
-       argument to access_allowed, so aid' must = aid.
-     *)
   Admitted.
 
   Lemma access_allowed_wildcard_prov :
     forall aid,
       LLVMParamsBigIntptr.PROV.access_allowed wildcard_prov aid = true.
   Proof.
-  Admitted.
+    intros aid.
+    unfold LLVMParamsBigIntptr.PROV.access_allowed.
+    cbn; auto.
+  Qed.
+
+  Lemma read_byte_allowed_all_preserved_preserves_aids_wildcard:
+    forall ms1 ms2 ptr byte1 byte2 aid,
+      InfMem.MMEP.MemSpec.read_byte_allowed_all_preserved ms1 ms2 ->
+      MemoryBigIntptr.MMEP.MMSP.read_byte_raw
+        (MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory ms1)
+        ptr = Some (byte1, None) ->
+      MemoryBigIntptr.MMEP.MMSP.read_byte_raw
+        (MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory ms2)
+        ptr = Some (byte2, aid) ->
+      aid = None.
+  Proof.
+    intros ms1 ms2 addr byte1 byte2 aid RBA R1 R2.
+    unfold MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory in *.
+
+    repeat red in RBA.
+    destruct (InfPROV.aid_eq_dec aid None); auto.
+    destruct aid; try contradiction.
+    
+    remember (addr, MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov (Some (N.succ p))) as ptr.
+    assert (InfMem.MMEP.MemSpec.read_byte_allowed ms1 ptr).
+    { red.
+      exists None.
+      split; subst.
+      repeat red.
+      cbn.
+      rewrite R1.
+      symmetry.
+      apply MemoryBigIntptrInfiniteSpec.LP.PROV.aid_eq_dec_refl.
+      unfold LLVMParamsBigIntptr.PROV.access_allowed.
+      cbn.
+      break_match_goal; auto.
+    }
+
+    apply RBA in H.
+    repeat red in H.
+    destruct H as (aid' & ALLOC & ALLOWED).
+    repeat red in ALLOC.
+    subst; cbn in *.
+    rewrite R2 in ALLOC.
+
+    destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid' (Some p)); try discriminate; subst.
+    rewrite access_allowed_aid_neq in ALLOWED; [| lia].
+    discriminate.
+  Qed.
+
+  Lemma read_byte_allowed_all_preserved_preserves_aids:
+    forall ms1 ms2 ptr byte1 byte2 aid1 aid2,
+      InfMem.MMEP.MemSpec.read_byte_allowed_all_preserved ms1 ms2 ->
+      MemoryBigIntptr.MMEP.MMSP.read_byte_raw
+        (MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory ms1)
+        ptr = Some (byte1, aid1) ->
+      MemoryBigIntptr.MMEP.MMSP.read_byte_raw
+        (MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory ms2)
+        ptr = Some (byte2, aid2) ->
+      aid1 = aid2.
+  Proof.
+    intros ms1 ms2 addr byte1 byte2 aid1 aid2 RBA R1 R2.
+    unfold MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory in *.
+
+    destruct aid1.
+    2: {
+      symmetry.
+      eapply read_byte_allowed_all_preserved_preserves_aids_wildcard; eauto.
+    }
+
+    destruct aid2.
+    2: {
+      symmetry in RBA.
+      eapply read_byte_allowed_all_preserved_preserves_aids_wildcard; eauto.
+    }
+
+    remember (p + p0 + 1) as p1.
+    assert (p1 <> p) as PNEQ by lia.
+    assert (p1 <> p0) as PNEQ0 by lia.
+    clear Heqp1.
+
+    remember (addr, MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov (Some p)) as ptr1.
+    remember (addr, MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov (Some p0)) as ptr2.
+
+    assert (InfMem.MMEP.MemSpec.read_byte_allowed ms1 ptr1).
+    { red.
+      exists (Some p).
+      split; subst.
+      repeat red.
+      cbn.
+      rewrite R1.
+      symmetry.
+      apply MemoryBigIntptrInfiniteSpec.LP.PROV.aid_eq_dec_refl.
+      apply MemoryBigIntptrInfiniteSpec.LP.PROV.access_allowed_refl.
+    }
+
+    apply RBA in H.
+    repeat red in H.
+    destruct H as (aid' & ALLOC & ALLOWED).
+    repeat red in ALLOC.
+    subst; cbn in *.
+    rewrite R2 in ALLOC.
+
+    destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid' (Some p0)); try discriminate; subst.
+    apply access_allowed_aid_eq in ALLOWED; subst; auto.
+  Qed.
 
   Lemma fin_inf_read_byte_raw :
     forall {m_inf m_fin ptr byte_fin aid},
@@ -10319,6 +10424,7 @@ cofix CIH
     destruct H0.
     clear H1 H.
     destruct H0 as [ALLOWED RBP].
+    pose proof ALLOWED as ALLOWED'.
     unfold InfMem.MMEP.MemSpec.read_byte_prop_all_preserved in RBP.
     remember (addr, MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov aid) as ptr_inf.
     specialize (RBP ptr_inf (lift_SByte byte_fin)).
@@ -10364,26 +10470,21 @@ cofix CIH
     repeat red in RBP_FIN.
     break_match_hyp; try contradiction.
 
+    unfold MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory in *.
+    subst; cbn.
+    setoid_rewrite Heqo.
+
     destruct m.
     cbn in *.
-
-    destruct ALLOWED_FIN as (aid'&ALLOCATED&ACCESS).
-    repeat red in ALLOCATED.
-    rewrite Heqo in ALLOCATED.
-    destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid' a); try discriminate; subst.
-    rewrite ACCESS in RBP_FIN.
-    subst.
-
-    cbn in Heqo.
-    unfold MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory.
-    rewrite Heqo.
+    break_match_hyp; try contradiction; subst.
 
     assert (a = aid).
-    { symmetry; apply access_allowed_aid_eq; eauto.
+    { eapply read_byte_allowed_all_preserved_preserves_aids; eauto.
+      destruct m_fin, ms_memory_stack.
+      cbn.
+      eapply read_byte_raw_lifted_fin_inf; eauto.
     }
-
-    subst.
-    auto.
+    subst; auto.
   Qed.
 
   (* TODO: Move this into lemmas about primitives *)
@@ -10483,8 +10584,7 @@ cofix CIH
         rewrite CONTRA.
         symmetry.
         apply MemoryBigIntptrInfiniteSpec.LP.PROV.aid_eq_dec_refl.
-      - subst; cbn.
-        apply access_allowed_wildcard_prov.
+      - subst; cbn; auto.
     }
 
     destruct (MemoryBigIntptr.MMEP.MMSP.read_byte_raw (MemoryBigIntptr.MMEP.MMSP.mem_state_memory m_inf) addr).
@@ -10543,8 +10643,7 @@ cofix CIH
         eapply read_byte_raw_lifted_fin_inf in CONTRA; eauto.
         rewrite CONTRA.
         symmetry; apply MemoryBigIntptrInfiniteSpec.LP.PROV.aid_eq_dec_refl.
-      - subst; cbn.
-        apply access_allowed_wildcard_prov.
+      - subst; cbn; auto.
     }
 
     destruct (Memory64BitIntptr.MMEP.MMSP.read_byte_raw (Memory64BitIntptr.MMEP.MMSP.mem_state_memory m_fin) addr).
@@ -10562,6 +10661,7 @@ cofix CIH
     destruct (MemoryBigIntptr.MMEP.MMSP.read_byte_raw (InfMem.MMEP.MMSP.mem_state_memory ms1) addr) eqn:READ.
     - destruct m.
       remember (addr, MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov a) as ptr_inf.
+      pose proof RBP as ALLOWED'.
       specialize (RBP ptr_inf).
       specialize (ALLOWED ptr_inf).
 
@@ -10607,8 +10707,10 @@ cofix CIH
       destruct m; cbn in *.
       inv MS2_READ.
       rewrite H1 in H; subst.
-      apply access_allowed_aid_eq in H1; subst.
-      auto.
+      assert (a = x).
+      { eapply read_byte_allowed_all_preserved_preserves_aids; eauto.
+      }
+      subst; auto.
     - remember (addr, wildcard_prov) as ptr_inf.
       specialize (RBP ptr_inf).
       clear ALLOWED.
@@ -10637,8 +10739,7 @@ cofix CIH
           unfold MemoryBigIntptr.MMEP.MMSP.mem_state_memory in *.
           rewrite CONTRA.
           symmetry; apply MemoryBigIntptrInfiniteSpec.LP.PROV.aid_eq_dec_refl.
-        - subst; cbn.
-          apply access_allowed_wildcard_prov.
+        - subst; cbn; auto.
       }
 
       destruct (MemoryBigIntptr.MMEP.MMSP.read_byte_raw (MemoryBigIntptr.MMEP.MMSP.mem_state_memory ms2) addr).

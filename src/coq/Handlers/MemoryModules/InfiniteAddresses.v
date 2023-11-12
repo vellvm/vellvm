@@ -80,7 +80,17 @@ with Definition AllocationId := AllocationId
 with Definition wildcard_prov := wildcard_prov
 with Definition nil_prov := nil_prov
 with Definition initial_provenance := 0%N
-with Definition provenance_to_prov := fun (pr : Provenance) => Some [pr].
+with Definition provenance_to_prov := fun (pr : Provenance) => Some [pr]
+with Definition access_allowed := fun (pr : Prov) (aid : AllocationId)
+    => match pr with
+       | None => true (* Wildcard can access anything. *)
+       | Some prset =>
+         match aid with
+         | None => true (* Wildcard, can be accessed by anything. *)
+         | Some aid =>
+           existsb (N.eqb aid) prset
+         end
+       end.
 
   Definition Provenance := Provenance.
   Definition AllocationId := AllocationId.

@@ -15038,6 +15038,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             hinduction vs1 before vs2; intros vs2 REF.
             (* TODO: Ugh, equivalent alists may not be in the same
                order *)
+            - admit.
+            - admit.
           Admitted.
 
           apply alist_refine_strict_fold_right_add; auto.
