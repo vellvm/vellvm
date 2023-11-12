@@ -33694,9 +33694,55 @@ cofix CIH
       unfold _get_inf_tree.
       rewrite HTFIN.
       destruct e.
-      admit.
-      admit.
-  Admitted.
+      { (* ExternalCallE *)
+        destruct e.
+        cbn.
+        pstep; red; cbn.
+        constructor.
+        intros v; red.
+        left; eapply paco2_mon_bot; eauto.
+        (* Why won't reflexivity work? *)
+        eapply paco2_eqit_b1b2_RR_refl; eauto.
+      }
+
+      destruct s.
+      { (* OOM *)
+        destruct o.
+        cbn.
+        pstep; red; cbn.
+        constructor.
+        intros [].
+      }
+
+      destruct s.
+      { (* UBE *)
+        destruct u.
+        cbn.
+        pstep; red; cbn.
+        constructor.
+        intros [].
+      }
+
+      destruct s.
+      { (* DebugE *)
+        destruct d.
+        cbn.
+        pstep; red; cbn.
+        constructor.
+        intros []; red.
+        left; eapply paco2_mon_bot; eauto.
+        (* Why won't reflexivity work? *)
+        eapply paco2_eqit_b1b2_RR_refl; eauto.
+      }
+
+      { (* FailureE *)
+        destruct f.
+        cbn.
+        pstep; red; cbn.
+        constructor.
+        intros [].
+      }
+  Qed.
 
   Lemma get_inf_tree_L4_orutt :
     forall t,
