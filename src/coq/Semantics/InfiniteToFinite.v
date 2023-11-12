@@ -30028,10 +30028,10 @@ cofix CIH
               rewrite bind_trigger.
               reflexivity.
 
-
-              (* This seems related to HANDLER... *)
-              (* TODO: proof should be same (or similar) to above *)
-              admit.
+              destruct HANDLER.
+              eapply handle_intrinsic_fin_inf_error.
+              2: apply lift_MemState_refine_prop.
+              all: eauto.
             }
 
             { (* Handler raises OOM *)
