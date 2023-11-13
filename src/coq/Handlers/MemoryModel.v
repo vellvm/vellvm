@@ -2569,7 +2569,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           match fields with
           | [] => ret ([], bytes)
           | t::ts => 
-              '(bs1, bs2) <- split_n (N.to_nat (sizeof_dtyp dt)) bytes ;;
+              '(bs1, bs2) <- split_n (N.to_nat (sizeof_dtyp t)) bytes ;;
               u <- deserialize_sbytes bs1 t ;;
               '(us, rest) <- go bs2 ts ;;
               ret (u::us, rest)
