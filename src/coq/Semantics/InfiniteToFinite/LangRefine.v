@@ -6541,21 +6541,18 @@ Qed.
     induction dv_fin;
       try solve
         [eexists;
-         rewrite DVCrev.dvalue_convert_strict_equation;
          cbn; eauto
         ].
     - pose proof (ACS.addr_convert_succeeds a) as (a_inf & CONV).
       exists (DVCrev.DV2.DVALUE_Addr a_inf).
-      rewrite DVCrev.dvalue_convert_strict_equation;
-        rewrite CONV; cbn; eauto.
+      cbn.
+      rewrite CONV; cbn; eauto.
     - pose proof (IPS.intptr_convert_succeeds x) as (x_inf & CONV).
       eexists.
-      rewrite DVCrev.dvalue_convert_strict_equation.
       cbn.
       rewrite CONV; cbn; eauto.
     - induction fields.
       + exists (DVCrev.DV2.DVALUE_Struct []).
-        rewrite DVCrev.dvalue_convert_strict_equation.
         cbn.
         reflexivity.
       + forward IHfields.
@@ -6565,7 +6562,6 @@ Qed.
         }
 
         destruct IHfields.
-        rewrite DVCrev.dvalue_convert_strict_equation in e.
         cbn in e.
         break_match_hyp_inv.
 
@@ -6574,15 +6570,12 @@ Qed.
         destruct X0 as (a'&A).
         exists (DVCrev.DV2.DVALUE_Struct (a' :: l)).
 
-        rewrite DVCrev.dvalue_convert_strict_equation.
-        rewrite map_monad_InT_unfold.
         cbn.
         rewrite A.
         rewrite Heqo.
         reflexivity.
     - induction fields.
       + exists (DVCrev.DV2.DVALUE_Packed_struct []).
-        rewrite DVCrev.dvalue_convert_strict_equation.
         cbn.
         reflexivity.
       + forward IHfields.
@@ -6592,7 +6585,6 @@ Qed.
         }
 
         destruct IHfields.
-        rewrite DVCrev.dvalue_convert_strict_equation in e.
         cbn in e.
         break_match_hyp_inv.
 
@@ -6601,15 +6593,12 @@ Qed.
         destruct X0 as (a'&A).
         exists (DVCrev.DV2.DVALUE_Packed_struct (a' :: l)).
 
-        rewrite DVCrev.dvalue_convert_strict_equation.
-        rewrite map_monad_InT_unfold.
         cbn.
         rewrite A.
         rewrite Heqo.
         reflexivity.
     - induction elts.
       + exists (DVCrev.DV2.DVALUE_Array []).
-        rewrite DVCrev.dvalue_convert_strict_equation.
         cbn.
         reflexivity.
       + forward IHelts.
@@ -6619,7 +6608,6 @@ Qed.
         }
 
         destruct IHelts.
-        rewrite DVCrev.dvalue_convert_strict_equation in e.
         cbn in e.
         break_match_hyp_inv.
 
@@ -6628,15 +6616,12 @@ Qed.
         destruct X0 as (a'&A).
         exists (DVCrev.DV2.DVALUE_Array (a' :: l)).
 
-        rewrite DVCrev.dvalue_convert_strict_equation.
-        rewrite map_monad_InT_unfold.
         cbn.
         rewrite A.
         rewrite Heqo.
         reflexivity.
     - induction elts.
       + exists (DVCrev.DV2.DVALUE_Vector []).
-        rewrite DVCrev.dvalue_convert_strict_equation.
         cbn.
         reflexivity.
       + forward IHelts.
@@ -6646,7 +6631,6 @@ Qed.
         }
 
         destruct IHelts.
-        rewrite DVCrev.dvalue_convert_strict_equation in e.
         cbn in e.
         break_match_hyp_inv.
 
@@ -6655,8 +6639,6 @@ Qed.
         destruct X0 as (a'&A).
         exists (DVCrev.DV2.DVALUE_Vector (a' :: l)).
 
-        rewrite DVCrev.dvalue_convert_strict_equation.
-        rewrite map_monad_InT_unfold.
         cbn.
         rewrite A.
         rewrite Heqo.
@@ -6710,11 +6692,9 @@ Qed.
       res = (IS1.LP.Events.DV.DVALUE_Struct (map lift_dvalue_fin_inf fields_fin)).
   Proof.
     intros fields_fin res CONV.
-    rewrite DVCrev.dvalue_convert_strict_equation in CONV.
     cbn in CONV.
     break_match_hyp_inv.
-    apply map_monad_InT_oom_forall2 in Heqo.
-    apply Forall2_Forall2_HInT in Heqo.
+    apply map_monad_oom_Forall2 in Heqo.
     induction Heqo.
     - cbn. reflexivity.
     - rewrite map_cons.
@@ -6731,11 +6711,9 @@ Qed.
       res = (IS1.LP.Events.DV.DVALUE_Packed_struct (map lift_dvalue_fin_inf fields_fin)).
   Proof.
     intros fields_fin res CONV.
-    rewrite DVCrev.dvalue_convert_strict_equation in CONV.
     cbn in CONV.
     break_match_hyp_inv.
-    apply map_monad_InT_oom_forall2 in Heqo.
-    apply Forall2_Forall2_HInT in Heqo.
+    apply map_monad_oom_Forall2 in Heqo.
     induction Heqo.
     - cbn. reflexivity.
     - rewrite map_cons.
@@ -6752,11 +6730,9 @@ Qed.
       res = (IS1.LP.Events.DV.DVALUE_Array (map lift_dvalue_fin_inf fields_fin)).
   Proof.
     intros fields_fin res CONV.
-    rewrite DVCrev.dvalue_convert_strict_equation in CONV.
     cbn in CONV.
     break_match_hyp_inv.
-    apply map_monad_InT_oom_forall2 in Heqo.
-    apply Forall2_Forall2_HInT in Heqo.
+    apply map_monad_oom_Forall2 in Heqo.
     induction Heqo.
     - cbn. reflexivity.
     - rewrite map_cons.
@@ -6773,11 +6749,9 @@ Qed.
       res = (IS1.LP.Events.DV.DVALUE_Vector (map lift_dvalue_fin_inf fields_fin)).
   Proof.
     intros fields_fin res CONV.
-    rewrite DVCrev.dvalue_convert_strict_equation in CONV.
     cbn in CONV.
     break_match_hyp_inv.
-    apply map_monad_InT_oom_forall2 in Heqo.
-    apply Forall2_Forall2_HInT in Heqo.
+    apply map_monad_oom_Forall2 in Heqo.
     induction Heqo.
     - cbn. reflexivity.
     - rewrite map_cons.
@@ -6909,39 +6883,39 @@ Qed.
       try solve
         [ cbn in *;
           repeat break_match_hyp_inv; cbn in *;
-          rewrite DVCrev.dvalue_convert_strict_equation in CONV; inv CONV;
+          inv CONV;
           cbn in *; reflexivity
         ].
 
     { cbn in *.
       break_match_hyp_inv.
-      rewrite DVCrev.dvalue_convert_strict_equation in CONV; inv CONV; cbn; auto.
+      cbn in CONV; inv CONV; cbn; auto.
       break_match_hyp_inv.
-      rewrite DVCrev.dvalue_convert_strict_equation in CONV; inv CONV; cbn; auto.
+      cbn in CONV; inv CONV; cbn; auto.
       destruct nsw.
       2: {
         cbn in H1; inv H1; cbn.
-        rewrite DVCrev.dvalue_convert_strict_equation in CONV;
+        cbn in CONV;
           inv CONV; cbn; auto.
       }
 
       break_match_hyp;
         cbn in H1; inv H1; cbn;
-        rewrite DVCrev.dvalue_convert_strict_equation in CONV;
+        cbn in CONV;
         inv CONV; cbn; auto.
     }
 
     all: try solve
            [ cbn in *;
              repeat break_match_hyp_inv; cbn in *;
-             rewrite DVCrev.dvalue_convert_strict_equation in CONV; inv CONV;
+             cbn in CONV; inv CONV;
              cbn in *; reflexivity
            ].
 
     all: try solve
            [ cbn in *;
              repeat break_match_hyp_inv; cbn in *; inv EVAL;
-             rewrite DVCrev.dvalue_convert_strict_equation in CONV; inv CONV;
+             cbn in CONV; inv CONV;
              cbn in *; reflexivity
            ].
   Qed.
@@ -6968,39 +6942,39 @@ Qed.
       try solve
         [ cbn in *;
           repeat break_match_hyp_inv; cbn in *;
-          rewrite DVCrev.dvalue_convert_strict_equation in CONV; inv CONV;
+          cbn in CONV; inv CONV;
           cbn in *; reflexivity
         ].
 
     { cbn in *.
       break_match_hyp_inv.
-      rewrite DVCrev.dvalue_convert_strict_equation in CONV; inv CONV; cbn; auto.
+      cbn in CONV; inv CONV; cbn; auto.
       break_match_hyp_inv.
-      rewrite DVCrev.dvalue_convert_strict_equation in CONV; inv CONV; cbn; auto.
+      cbn in CONV; inv CONV; cbn; auto.
       destruct nsw.
       2: {
         cbn in H1; inv H1; cbn.
-        rewrite DVCrev.dvalue_convert_strict_equation in CONV;
+        cbn in CONV;
           inv CONV; cbn; auto.
       }
 
       break_match_hyp;
         cbn in H1; inv H1; cbn;
-        rewrite DVCrev.dvalue_convert_strict_equation in CONV;
+        cbn in CONV;
         inv CONV; cbn; auto.
     }
 
     all: try solve
            [ cbn in *;
              repeat break_match_hyp_inv; cbn in *;
-             rewrite DVCrev.dvalue_convert_strict_equation in CONV; inv CONV;
+             cbn in CONV; inv CONV;
              cbn in *; reflexivity
            ].
 
     all: try solve
            [ cbn in *;
              repeat break_match_hyp_inv; cbn in *; inv EVAL;
-             rewrite DVCrev.dvalue_convert_strict_equation in CONV; inv CONV;
+             cbn in CONV; inv CONV;
              cbn in *; reflexivity
            ].
   Qed.
@@ -7027,39 +7001,39 @@ Qed.
       try solve
         [ cbn in *;
           repeat break_match_hyp_inv; cbn in *;
-          rewrite DVCrev.dvalue_convert_strict_equation in CONV; inv CONV;
+          cbn in CONV; inv CONV;
           cbn in *; reflexivity
         ].
 
     { cbn in *.
       break_match_hyp_inv.
-      rewrite DVCrev.dvalue_convert_strict_equation in CONV; inv CONV; cbn; auto.
+      cbn in CONV; inv CONV; cbn; auto.
       break_match_hyp_inv.
-      rewrite DVCrev.dvalue_convert_strict_equation in CONV; inv CONV; cbn; auto.
+      cbn in CONV; inv CONV; cbn; auto.
       destruct nsw.
       2: {
         cbn in H1; inv H1; cbn.
-        rewrite DVCrev.dvalue_convert_strict_equation in CONV;
+        cbn in CONV;
           inv CONV; cbn; auto.
       }
 
       break_match_hyp;
         cbn in H1; inv H1; cbn;
-        rewrite DVCrev.dvalue_convert_strict_equation in CONV;
+        cbn in CONV;
         inv CONV; cbn; auto.
     }
 
     all: try solve
            [ cbn in *;
              repeat break_match_hyp_inv; cbn in *;
-             rewrite DVCrev.dvalue_convert_strict_equation in CONV; inv CONV;
+             cbn in CONV; inv CONV;
              cbn in *; reflexivity
            ].
 
     all: try solve
            [ cbn in *;
              repeat break_match_hyp_inv; cbn in *; inv EVAL;
-             rewrite DVCrev.dvalue_convert_strict_equation in CONV; inv CONV;
+             cbn in CONV; inv CONV;
              cbn in *; reflexivity
            ].
   Qed.
@@ -7085,11 +7059,11 @@ Qed.
       try solve
         [ cbn in *;
           repeat break_match_hyp_inv; cbn in *;
-          rewrite DVCrev.dvalue_convert_strict_equation in CONV; inv CONV;
+          cbn in CONV; inv CONV;
           cbn in *; reflexivity
         | cbn in *;
           repeat break_match_hyp_inv; cbn in *; inv EVAL;
-          rewrite DVCrev.dvalue_convert_strict_equation in CONV; inv CONV;
+          cbn in CONV; inv CONV;
           cbn in *; reflexivity
         ].
   Qed.
@@ -7143,7 +7117,7 @@ Qed.
       unfold lift_dvalue_fin_inf.
       break_match_goal; clear Heqs.
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e, e0.
+      cbn in e, e0.
       cbn in *.
       inv e0.
       break_match_hyp_inv.
@@ -7160,7 +7134,7 @@ Qed.
         break_match_goal; clear Heqs.
         break_match_goal; clear Heqs.
         break_match_goal; clear Heqs.
-        rewrite DVCrev.dvalue_convert_strict_equation in e, e0.
+        cbn in e, e0.
         cbn in *.
         inv e.
         inv e0.
@@ -7172,7 +7146,7 @@ Qed.
         unfold lift_dvalue_fin_inf.
         break_match_goal; clear Heqs.
         break_match_goal; clear Heqs.
-        rewrite DVCrev.dvalue_convert_strict_equation in e, e0.
+        cbn in e, e0.
         cbn in *.
         inv e.
         inv e0.
@@ -7191,7 +7165,7 @@ Qed.
         break_match_goal; clear Heqs.
         break_match_goal; clear Heqs.
         break_match_goal; clear Heqs.
-        rewrite DVCrev.dvalue_convert_strict_equation in e, e0.
+        cbn in e, e0.
         cbn in *.
         inv e.
         inv e0.
@@ -7203,7 +7177,7 @@ Qed.
         unfold lift_dvalue_fin_inf.
         break_match_goal; clear Heqs.
         break_match_goal; clear Heqs.
-        rewrite DVCrev.dvalue_convert_strict_equation in e, e0.
+        cbn in e, e0.
         cbn in *.
         inv e.
         inv e0.
@@ -7222,7 +7196,7 @@ Qed.
         break_match_goal; clear Heqs.
         break_match_goal; clear Heqs.
         break_match_goal; clear Heqs.
-        rewrite DVCrev.dvalue_convert_strict_equation in e, e0.
+        cbn in e, e0.
         cbn in *.
         inv e.
         inv e0.
@@ -7234,7 +7208,7 @@ Qed.
         unfold lift_dvalue_fin_inf.
         break_match_goal; clear Heqs.
         break_match_goal; clear Heqs.
-        rewrite DVCrev.dvalue_convert_strict_equation in e, e0.
+        cbn in e, e0.
         cbn in *.
         inv e.
         inv e0.
@@ -7253,7 +7227,7 @@ Qed.
         break_match_goal; clear Heqs.
         break_match_goal; clear Heqs.
         break_match_goal; clear Heqs.
-        rewrite DVCrev.dvalue_convert_strict_equation in e, e0.
+        cbn in e, e0.
         cbn in *.
         inv e.
         inv e0.
@@ -7265,7 +7239,7 @@ Qed.
         unfold lift_dvalue_fin_inf.
         break_match_goal; clear Heqs.
         break_match_goal; clear Heqs.
-        rewrite DVCrev.dvalue_convert_strict_equation in e, e0.
+        cbn in e, e0.
         cbn in *.
         inv e.
         inv e0.
@@ -7284,7 +7258,7 @@ Qed.
         break_match_goal; clear Heqs.
         break_match_goal; clear Heqs.
         break_match_goal; clear Heqs.
-        rewrite DVCrev.dvalue_convert_strict_equation in e, e0.
+        cbn in e, e0.
         cbn in *.
         inv e.
         inv e0.
@@ -7299,7 +7273,7 @@ Qed.
         unfold lift_dvalue_fin_inf.
         break_match_goal; clear Heqs.
         break_match_goal; clear Heqs.
-        rewrite DVCrev.dvalue_convert_strict_equation in e, e0.
+        cbn in e, e0.
         cbn in *.
         inv e.
         inv e0.
@@ -7322,7 +7296,7 @@ Qed.
       unfold lift_dvalue_fin_inf.
       break_match_goal; clear Heqs.
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e, e0.
+      cbn in e, e0.
       cbn in *.
       inv e.
       inv e0.
@@ -7343,7 +7317,7 @@ Qed.
       unfold lift_dvalue_fin_inf.
       break_match_goal; clear Heqs.
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e, e0.
+      cbn in e, e0.
       cbn in *.
       inv e.
       inv e0.
@@ -7361,7 +7335,7 @@ Qed.
       unfold lift_dvalue_fin_inf.
       break_match_goal; clear Heqs.
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *.
       inv e.
       cbn.
@@ -7373,12 +7347,12 @@ Qed.
       unfold lift_dvalue_fin_inf.
       break_match_goal; clear Heqs.
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *.
       inv e.
       cbn.
       break_match_hyp_inv.
-      rewrite DVCrev.dvalue_convert_strict_equation in e0.
+      cbn in e0.
       cbn in *.
       inv e0.
 
@@ -7391,7 +7365,7 @@ Qed.
 
       break_match_goal.
       clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *.
       inv e.
       reflexivity.
@@ -7402,11 +7376,11 @@ Qed.
       unfold lift_dvalue_fin_inf.
       break_match_goal; clear Heqs.
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *.
       inv e.
       break_match_hyp_inv.
-      rewrite DVCrev.dvalue_convert_strict_equation in e0.
+      cbn in e0.
       cbn in *.
       inv e0.
 
@@ -7419,7 +7393,7 @@ Qed.
 
       break_match_goal.
       clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *.
       inv e.
       reflexivity.
@@ -7433,10 +7407,10 @@ Qed.
       unfold lift_dvalue_fin_inf.
       break_match_goal; clear Heqs.
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *.
       break_match_hyp_inv.
-      rewrite DVCrev.dvalue_convert_strict_equation in e0.
+      cbn in e0.
       cbn in *.
       inv e0.
 
@@ -7455,10 +7429,10 @@ Qed.
       unfold lift_dvalue_fin_inf.
       break_match_goal; clear Heqs.
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *.
       break_match_hyp_inv.
-      rewrite DVCrev.dvalue_convert_strict_equation in e0.
+      cbn in e0.
       cbn in *.
       inv e0.
 
@@ -7477,10 +7451,10 @@ Qed.
       unfold lift_dvalue_fin_inf.
       break_match_goal; clear Heqs.
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *.
       break_match_hyp_inv.
-      rewrite DVCrev.dvalue_convert_strict_equation in e0.
+      cbn in e0.
       cbn in *.
       inv e0.
 
@@ -7502,15 +7476,13 @@ Qed.
         unfold lift_dvalue_fin_inf.
         break_match_goal; clear Heqs.
         break_match_goal; clear Heqs.
-        rewrite DVCrev.dvalue_convert_strict_equation in e.
+        cbn in e.
         cbn in *.
         break_match_hyp_inv.
-        rewrite DVCrev.dvalue_convert_strict_equation in e0.
-        cbn in e0.
         break_match_hyp_inv.
 
         break_match_goal; clear Heqs.
-        rewrite DVCrev.dvalue_convert_strict_equation in e.
+        cbn in e.
         cbn in *.
         break_match_hyp_inv.
 
@@ -7524,10 +7496,10 @@ Qed.
       unfold lift_dvalue_fin_inf.
       break_match_goal; clear Heqs.
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *.
       break_match_hyp_inv.
-      rewrite DVCrev.dvalue_convert_strict_equation in e0.
+      cbn in e0.
       cbn in *.
       inv e0.
 
@@ -7550,7 +7522,7 @@ Qed.
     destruct icmp;
       try solve
         [ break_match_goal;
-          rewrite DVCrev.dvalue_convert_strict_equation; auto
+          cbn; auto
         ].
   Qed.
 
@@ -7577,11 +7549,11 @@ Qed.
           [ unfold lift_dvalue_fin_inf;
 
             break_match_goal; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e;
+            cbn in e;
             cbn in *; inv e;
 
             break_match_goal; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e;
+            cbn in e;
             cbn in *; inv e;
 
             break_match_goal; clear Heqs;
@@ -7592,11 +7564,11 @@ Qed.
           | unfold lift_dvalue_fin_inf;
 
             break_match_goal; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e;
+            cbn in e;
             cbn in *; inv e;
 
             break_match_goal; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e;
+            cbn in e;
             cbn in *; inv e;
 
             cbn;
@@ -7611,12 +7583,12 @@ Qed.
       unfold lift_dvalue_fin_inf.
 
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *.
       break_match_hyp_inv.
 
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *.
       break_match_hyp_inv.
 
@@ -7635,12 +7607,12 @@ Qed.
       unfold lift_dvalue_fin_inf.
 
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *.
       break_match_hyp_inv.
 
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *.
       break_match_hyp_inv.
 
@@ -7658,11 +7630,11 @@ Qed.
         unfold lift_dvalue_fin_inf;
 
         break_match_goal; clear Heqs;
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e;
         cbn in *; inv e;
 
         break_match_goal; clear Heqs;
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e;
         cbn in *; inv e;
 
         cbn;
@@ -7678,7 +7650,7 @@ Qed.
   Proof.
     intros fop a b res_fin res_inf EVAL REF.
     destruct fop; cbn in *; inv EVAL;
-      rewrite DVCrev.dvalue_convert_strict_equation in REF;
+      cbn in REF;
       inv REF; reflexivity.
   Qed.
 
@@ -7690,7 +7662,7 @@ Qed.
   Proof.
     intros fop a b res_fin res_inf EVAL REF.
     destruct fop; cbn in *; inv EVAL;
-      rewrite DVCrev.dvalue_convert_strict_equation in REF;
+      cbn in REF;
       inv REF; reflexivity.
   Qed.
 
@@ -7720,7 +7692,7 @@ Qed.
         unfold lift_dvalue_fin_inf.
         break_match_goal; clear Heqs.
         break_match_goal; clear Heqs.
-        rewrite DVCrev.dvalue_convert_strict_equation in e, e0.
+        cbn in e, e0.
         inv e; inv e0.
         cbn.
 
@@ -7734,7 +7706,7 @@ Qed.
       unfold lift_dvalue_fin_inf.
       break_match_goal; clear Heqs.
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e, e0.
+      cbn in e, e0.
       inv e; inv e0.
       cbn.
       break_match_goal; clear Heqs.
@@ -7748,7 +7720,7 @@ Qed.
         unfold lift_dvalue_fin_inf.
         break_match_goal; clear Heqs.
         break_match_goal; clear Heqs.
-        rewrite DVCrev.dvalue_convert_strict_equation in e, e0.
+        cbn in e, e0.
         inv e; inv e0.
         cbn.
 
@@ -7762,7 +7734,7 @@ Qed.
       unfold lift_dvalue_fin_inf.
       break_match_goal; clear Heqs.
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e, e0.
+      cbn in e, e0.
       inv e; inv e0.
       cbn.
       break_match_goal; clear Heqs.
@@ -7773,7 +7745,7 @@ Qed.
       unfold lift_dvalue_fin_inf.
 
       break_match_goal; clear Heqs;
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e;
         cbn in *; inv e.
       cbn. reflexivity.
     }
@@ -7787,7 +7759,7 @@ Qed.
   Proof.
     intros fcmp a b res_fin res_inf EVAL REF.
     destruct fcmp; cbn in *; subst;
-      rewrite DVCrev.dvalue_convert_strict_equation in REF;
+      cbn in REF;
       inv REF; auto;
       solve
         [ unfold double_cmp, IS1.LP.Events.DV.double_cmp in *;
@@ -7804,7 +7776,7 @@ Qed.
   Proof.
     intros fcmp a b res_fin res_inf EVAL REF.
     destruct fcmp; cbn in *; subst;
-      rewrite DVCrev.dvalue_convert_strict_equation in REF;
+      cbn in REF;
       inv REF; auto;
       solve
         [ unfold float_cmp, IS1.LP.Events.DV.float_cmp in *;
@@ -7848,11 +7820,11 @@ Qed.
           [ unfold lift_dvalue_fin_inf;
 
             break_match_goal; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e;
+            cbn in e;
             cbn in *; inv e;
 
             break_match_goal; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e;
+            cbn in e;
             cbn in *; inv e;
 
             break_match_goal; clear Heqs;
@@ -7863,11 +7835,11 @@ Qed.
           | unfold lift_dvalue_fin_inf;
 
             break_match_goal; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e;
+            cbn in e;
             cbn in *; inv e;
 
             break_match_goal; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e;
+            cbn in e;
             cbn in *; inv e;
 
             cbn;
@@ -7882,11 +7854,11 @@ Qed.
       unfold lift_dvalue_fin_inf.
 
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *; inv e.
 
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *; inv e.
 
       break_match_goal; clear Heqs.
@@ -7895,11 +7867,11 @@ Qed.
       erewrite double_cmp_fin_inf; eauto.
       unfold lift_dvalue_fin_inf.
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *; inv e.
 
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *; inv e.
       reflexivity.
     }
@@ -7909,11 +7881,11 @@ Qed.
       unfold lift_dvalue_fin_inf.
 
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *; inv e.
 
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *; inv e.
 
       break_match_goal; clear Heqs.
@@ -7922,11 +7894,11 @@ Qed.
       erewrite float_cmp_fin_inf; eauto.
       unfold lift_dvalue_fin_inf.
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *; inv e.
 
       break_match_goal; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in *; inv e.
       reflexivity.
     }
@@ -7936,11 +7908,11 @@ Qed.
         unfold lift_dvalue_fin_inf;
 
         break_match_goal; clear Heqs;
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e;
         cbn in *; inv e;
 
         break_match_goal; clear Heqs;
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e;
         cbn in *; inv e;
 
         cbn;
@@ -7969,11 +7941,11 @@ Qed.
         break_match_goal;
         break_match_hyp;
         clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e;
         cbn in e; inv e; try discriminate;
 
         try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e;
              cbn in e; inv e; reflexivity).
     }
 
@@ -7983,11 +7955,11 @@ Qed.
         break_match_goal;
         break_match_hyp;
         clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e;
         cbn in e; inv e; try discriminate;
 
         try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e;
              cbn in e; inv e; reflexivity).
     }
 
@@ -7997,11 +7969,11 @@ Qed.
         break_match_goal;
         break_match_hyp;
         clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e;
         cbn in e; inv e; try discriminate;
 
         try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e;
              cbn in e; inv e; reflexivity).
     }
 
@@ -8021,11 +7993,11 @@ Qed.
         break_match_goal;
         break_match_hyp;
         clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e;
         cbn in e; inv e; try discriminate;
 
         try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e;
              cbn in e; inv e; reflexivity).
     }
 
@@ -8035,11 +8007,11 @@ Qed.
         break_match_goal;
         break_match_hyp;
         clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e;
         cbn in e; inv e; try discriminate;
 
         try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e;
              cbn in e; inv e; reflexivity).
     }
 
@@ -8061,11 +8033,11 @@ Qed.
         break_match_goal;
         break_match_hyp;
         clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e;
         cbn in e; inv e; try discriminate;
 
         try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e;
              cbn in e; inv e; reflexivity).
     }
 
@@ -8075,11 +8047,11 @@ Qed.
         break_match_goal;
         break_match_hyp;
         clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e;
         cbn in e; inv e; try discriminate;
 
         try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e;
              cbn in e; inv e; reflexivity).
     }
 
@@ -8124,11 +8096,11 @@ Qed.
         break_match_goal;
         break_match_hyp;
         clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e;
         cbn in e; inv e; try discriminate;
 
         try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e;
              cbn in e; inv e; reflexivity).
     }
 
@@ -8138,11 +8110,11 @@ Qed.
         break_match_goal;
         break_match_hyp;
         clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e;
         cbn in e; inv e; try discriminate;
 
         try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e;
              cbn in e; inv e; reflexivity).
     }
 
@@ -8152,11 +8124,11 @@ Qed.
         break_match_goal;
         break_match_hyp;
         clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e;
         cbn in e; inv e; try discriminate;
 
         try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e;
              cbn in e; inv e; reflexivity).
     }
 
@@ -8176,11 +8148,11 @@ Qed.
         break_match_goal;
         break_match_hyp;
         clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e;
         cbn in e; inv e; try discriminate;
 
         try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e;
              cbn in e; inv e; reflexivity).
     }
 
@@ -8190,11 +8162,11 @@ Qed.
         break_match_goal;
         break_match_hyp;
         clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e;
         cbn in e; inv e; try discriminate;
 
         try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e;
              cbn in e; inv e; reflexivity).
     }
 
@@ -8221,11 +8193,11 @@ Qed.
         break_match_goal;
         break_match_hyp;
         clear Heqs; 
-        rewrite DVCrev.dvalue_convert_strict_equation in e;
+        cbn in e;
         cbn in e; inv e; try discriminate;
 
         try (inv H0; auto; break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e;
              cbn in e; inv e; reflexivity).
     }
 
@@ -8254,26 +8226,25 @@ Qed.
     - cbn.
       unfold lift_dvalue_fin_inf.
       break_match_goal; clear Heqs;
-        rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; subst; inv e.
+        cbn in e; cbn in e; subst; inv e.
       auto.
     - unfold lift_dvalue_fin_inf in *.
       break_match_goal; clear Heqs;
-        rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; subst; inv e.
+        cbn in e; cbn in e; subst; inv e.
       break_match_hyp_inv.
       break_match_hyp_inv.
       break_match_hyp_inv.
+      rewrite map_cons.
 
       break_match_hyp_inv; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; subst; inv e.
+      cbn in e; cbn in e; subst; inv e.
 
       break_match_hyp_inv.
-      setoid_rewrite Heqo1 in Heqo.
-      rewrite map_cons.
-      inv Heqo.
-
       break_match_goal; clear Heqs.
       rewrite Heqo0 in e.
       inv e.
+
+      inv Heqo.
       auto.
   Qed.
 
@@ -8286,26 +8257,25 @@ Qed.
     - cbn.
       unfold lift_dvalue_fin_inf.
       break_match_goal; clear Heqs;
-        rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; subst; inv e.
+        cbn in e; cbn in e; subst; inv e.
       auto.
     - unfold lift_dvalue_fin_inf in *.
       break_match_goal; clear Heqs;
-        rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; subst; inv e.
+        cbn in e; cbn in e; subst; inv e.
       break_match_hyp_inv.
       break_match_hyp_inv.
       break_match_hyp_inv.
+      rewrite map_cons.
 
       break_match_hyp_inv; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; subst; inv e.
+      cbn in e; cbn in e; subst; inv e.
 
       break_match_hyp_inv.
-      setoid_rewrite Heqo1 in Heqo.
-      rewrite map_cons.
-      inv Heqo.
-
       break_match_goal; clear Heqs.
       rewrite Heqo0 in e.
       inv e.
+
+      inv Heqo.
       auto.
   Qed.
 
@@ -8317,7 +8287,7 @@ Qed.
     intros x.
     unfold lift_dvalue_fin_inf.
     break_match_goal; clear Heqs;
-      rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; subst; inv e.
+      cbn in e; cbn in e; subst; inv e.
     auto.
   Qed.
 
@@ -8329,7 +8299,7 @@ Qed.
     intros x.
     unfold lift_dvalue_fin_inf.
     break_match_goal; clear Heqs;
-      rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; subst; inv e.
+      cbn in e; cbn in e; subst; inv e.
     auto.
   Qed.
 
@@ -8341,7 +8311,7 @@ Qed.
     intros x.
     unfold lift_dvalue_fin_inf.
     break_match_goal; clear Heqs;
-      rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; subst; inv e.
+      cbn in e; cbn in e; subst; inv e.
     auto.
   Qed.
 
@@ -8353,7 +8323,7 @@ Qed.
     intros x.
     unfold lift_dvalue_fin_inf.
     break_match_goal; clear Heqs;
-      rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; subst; inv e.
+      cbn in e; cbn in e; subst; inv e.
     auto.
   Qed.
 
@@ -8371,7 +8341,7 @@ Qed.
     intros x.
     unfold lift_dvalue_fin_inf.
     break_match_goal; clear Heqs;
-      rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; subst; inv e.
+      cbn in e; cbn in e; subst; inv e.
 
     pose proof intptr_convert_succeeds x.
     destruct H.
@@ -8392,7 +8362,7 @@ Qed.
     intros x.
     unfold lift_dvalue_fin_inf.
     break_match_goal; clear Heqs;
-      rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; subst; inv e.
+      cbn in e; cbn in e; subst; inv e.
     auto.
   Qed.
 
@@ -8556,17 +8526,17 @@ Qed.
 
             break_match_goal;
             break_match_hyp; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e; inv H0;
+            cbn in e; cbn in e; inv e; inv H0;
 
             break_match_goal;
             break_match_hyp; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e; inv H0;
+            cbn in e; cbn in e; inv e; inv H0;
 
             cbn;
             rewrite Heqz;
 
             break_match_goal; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e;
+            cbn in e; cbn in e; inv e;
 
             auto.
         - cbn in H0.
@@ -8577,12 +8547,12 @@ Qed.
 
             break_match_goal;
               break_match_hyp; clear Heqs;
-              rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e;
+              cbn in e; cbn in e; inv e;
               break_match_hyp_inv.
 
             break_match_goal;
               break_match_hyp; clear Heqs;
-              rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e; inv H0.
+              cbn in e; cbn in e; inv e; inv H0.
 
             destruct (dvalue_convert_strict_fin_inf_succeeds res).
             rewrite e in Heqo.
@@ -8596,12 +8566,12 @@ Qed.
 
             break_match_goal;
               break_match_hyp; clear Heqs;
-              rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e;
+              cbn in e; cbn in e; inv e;
               break_match_hyp_inv.
 
             break_match_goal;
               break_match_hyp; clear Heqs;
-              rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e; inv H0.
+              cbn in e; cbn in e; inv e; inv H0.
 
             destruct (dvalue_convert_strict_fin_inf_succeeds res).
             break_match_hyp_inv.
@@ -8629,32 +8599,32 @@ Qed.
             break_match_hyp_inv.
             { move Heqd0 after H0.
               break_match_hyp_inv; clear Heqs;
-                rewrite DVCrev.dvalue_convert_strict_equation in e0; cbn in e0; inv e0.
+                cbn in e0; cbn in e0; inv e0.
               break_match_hyp_inv.
 
               break_match_hyp_inv.
               { move Heqd0 after H3.
                 break_match_hyp_inv; clear Heqs;
-                  rewrite DVCrev.dvalue_convert_strict_equation in e0; cbn in e0; inv e0.
+                  cbn in e0; cbn in e0; inv e0.
 
                 destruct (dvalue_convert_strict_fin_inf_succeeds res).
                 rewrite e in e0; inv e0.
                 rewrite X1 in H3.
 
                 cbn in H3.
-                setoid_rewrite Heqo in Heqo1; inv Heqo1.
+                setoid_rewrite Heqo in Heqo1; inv Heqo1; inv Heqo.
                 destruct p; cbn in *; eauto.
               }
 
               { move Heqd0 after H3.
                 break_match_hyp_inv; clear Heqs;
-                  rewrite DVCrev.dvalue_convert_strict_equation in e0; cbn in e0; inv e0.
+                  cbn in e0; cbn in e0; inv e0.
               }
             }
 
             { move Heqd0 after H0;
                 break_match_hyp_inv; clear Heqs;
-                rewrite DVCrev.dvalue_convert_strict_equation in e0; cbn in e0;
+                cbn in e0; cbn in e0;
                 break_match_hyp_inv.
             }
       }
@@ -8668,17 +8638,17 @@ Qed.
 
             break_match_goal;
             break_match_hyp; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e; inv H0;
+            cbn in e; cbn in e; inv e; inv H0;
 
             break_match_goal;
             break_match_hyp; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e; inv H0;
+            cbn in e; cbn in e; inv e; inv H0;
 
             cbn;
             rewrite Heqz;
 
             break_match_goal; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e;
+            cbn in e; cbn in e; inv e;
 
             auto.
         - cbn in H0.
@@ -8689,12 +8659,12 @@ Qed.
 
             break_match_goal;
               break_match_hyp; clear Heqs;
-              rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e;
+              cbn in e; cbn in e; inv e;
               break_match_hyp_inv.
 
             break_match_goal;
               break_match_hyp; clear Heqs;
-              rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e; inv H0.
+              cbn in e; cbn in e; inv e; inv H0.
 
             destruct (dvalue_convert_strict_fin_inf_succeeds res).
             rewrite e in Heqo.
@@ -8708,12 +8678,12 @@ Qed.
 
             break_match_goal;
               break_match_hyp; clear Heqs;
-              rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e;
+              cbn in e; cbn in e; inv e;
               break_match_hyp_inv.
 
             break_match_goal;
               break_match_hyp; clear Heqs;
-              rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e; inv H0.
+              cbn in e; cbn in e; inv e; inv H0.
 
             destruct (dvalue_convert_strict_fin_inf_succeeds res).
             break_match_hyp_inv.
@@ -8741,32 +8711,32 @@ Qed.
             break_match_hyp_inv.
             { move Heqd0 after H0.
               break_match_hyp_inv; clear Heqs;
-                rewrite DVCrev.dvalue_convert_strict_equation in e0; cbn in e0; inv e0.
+                cbn in e0; cbn in e0; inv e0.
               break_match_hyp_inv.
 
               break_match_hyp_inv.
               { move Heqd0 after H3.
                 break_match_hyp_inv; clear Heqs;
-                  rewrite DVCrev.dvalue_convert_strict_equation in e0; cbn in e0; inv e0.
+                  cbn in e0; cbn in e0; inv e0.
               }
 
               { move Heqd0 after H3.
                 break_match_hyp_inv; clear Heqs;
-                  rewrite DVCrev.dvalue_convert_strict_equation in e0; cbn in e0; inv e0.
+                  cbn in e0; cbn in e0; inv e0.
 
                 destruct (dvalue_convert_strict_fin_inf_succeeds res).
                 rewrite e in e0; inv e0.
                 rewrite X1 in H3.
 
                 cbn in H3.
-                setoid_rewrite Heqo in Heqo1; inv Heqo1.
+                setoid_rewrite Heqo in Heqo1; inv Heqo1; inv Heqo.
                 destruct p; cbn in *; eauto.
               }
             }
 
             { move Heqd0 after H0;
                 break_match_hyp_inv; clear Heqs;
-                rewrite DVCrev.dvalue_convert_strict_equation in e0; cbn in e0;
+                cbn in e0; cbn in e0;
                 break_match_hyp_inv.
             }
       }
@@ -8783,17 +8753,17 @@ Qed.
 
             break_match_goal;
             break_match_hyp; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e; inv H0;
+            cbn in e; cbn in e; inv e; inv H0;
 
             break_match_goal;
             break_match_hyp; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e; inv H0;
+            cbn in e; cbn in e; inv e; inv H0;
 
             cbn;
             rewrite Heqz;
 
             break_match_goal; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e;
+            cbn in e; cbn in e; inv e;
 
             auto.
         - cbn in H0.
@@ -8804,12 +8774,12 @@ Qed.
 
             break_match_goal;
               break_match_hyp; clear Heqs;
-              rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e;
+              cbn in e; cbn in e; inv e;
               break_match_hyp_inv.
 
             break_match_goal;
               break_match_hyp; clear Heqs;
-              rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e; inv H0.
+              cbn in e; cbn in e; inv e; inv H0.
 
             destruct (dvalue_convert_strict_fin_inf_succeeds res).
             rewrite e in Heqo.
@@ -8823,12 +8793,12 @@ Qed.
 
             break_match_goal;
               break_match_hyp; clear Heqs;
-              rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e;
+              cbn in e; cbn in e; inv e;
               break_match_hyp_inv.
 
             break_match_goal;
               break_match_hyp; clear Heqs;
-              rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e; inv H0.
+              cbn in e; cbn in e; inv e; inv H0.
 
             destruct (dvalue_convert_strict_fin_inf_succeeds res).
             break_match_hyp_inv.
@@ -8856,32 +8826,32 @@ Qed.
             break_match_hyp_inv.
             { move Heqd0 after H0;
                 break_match_hyp_inv; clear Heqs;
-                rewrite DVCrev.dvalue_convert_strict_equation in e0; cbn in e0;
+                cbn in e0; cbn in e0;
                 break_match_hyp_inv.
             }
 
             { move Heqd0 after H0.
               break_match_hyp_inv; clear Heqs;
-                rewrite DVCrev.dvalue_convert_strict_equation in e0; cbn in e0; inv e0.
+                cbn in e0; cbn in e0; inv e0.
               break_match_hyp_inv.
 
               break_match_hyp_inv.
               { move Heqd0 after H3.
                 break_match_hyp_inv; clear Heqs;
-                  rewrite DVCrev.dvalue_convert_strict_equation in e0; cbn in e0; inv e0.
+                  cbn in e0; cbn in e0; inv e0.
 
                 destruct (dvalue_convert_strict_fin_inf_succeeds res).
                 rewrite e in e0; inv e0.
                 rewrite X1 in H3.
 
                 cbn in H3.
-                setoid_rewrite Heqo in Heqo1; inv Heqo1.
+                setoid_rewrite Heqo in Heqo1; inv Heqo1; inv Heqo.
                 destruct p; cbn in *; eauto.
               }
 
               { move Heqd0 after H3.
                 break_match_hyp_inv; clear Heqs;
-                  rewrite DVCrev.dvalue_convert_strict_equation in e0; cbn in e0; inv e0.
+                  cbn in e0; cbn in e0; inv e0.
               }
             }
       }
@@ -8895,17 +8865,17 @@ Qed.
 
             break_match_goal;
             break_match_hyp; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e; inv H0;
+            cbn in e; cbn in e; inv e; inv H0;
 
             break_match_goal;
             break_match_hyp; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e; inv H0;
+            cbn in e; cbn in e; inv e; inv H0;
 
             cbn;
             rewrite Heqz;
 
             break_match_goal; clear Heqs;
-            rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e;
+            cbn in e; cbn in e; inv e;
 
             auto.
         - cbn in H0.
@@ -8916,12 +8886,12 @@ Qed.
 
             break_match_goal;
               break_match_hyp; clear Heqs;
-              rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e;
+              cbn in e; cbn in e; inv e;
               break_match_hyp_inv.
 
             break_match_goal;
               break_match_hyp; clear Heqs;
-              rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e; inv H0.
+              cbn in e; cbn in e; inv e; inv H0.
 
             destruct (dvalue_convert_strict_fin_inf_succeeds res).
             rewrite e in Heqo.
@@ -8935,12 +8905,12 @@ Qed.
 
             break_match_goal;
               break_match_hyp; clear Heqs;
-              rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e;
+              cbn in e; cbn in e; inv e;
               break_match_hyp_inv.
 
             break_match_goal;
               break_match_hyp; clear Heqs;
-              rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e; inv H0.
+              cbn in e; cbn in e; inv e; inv H0.
 
             destruct (dvalue_convert_strict_fin_inf_succeeds res).
             break_match_hyp_inv.
@@ -8968,31 +8938,31 @@ Qed.
             break_match_hyp_inv.
             { move Heqd0 after H0;
                 break_match_hyp_inv; clear Heqs;
-                rewrite DVCrev.dvalue_convert_strict_equation in e0; cbn in e0;
+                cbn in e0; cbn in e0;
                 break_match_hyp_inv.
             }
 
             { move Heqd0 after H0.
               break_match_hyp_inv; clear Heqs;
-                rewrite DVCrev.dvalue_convert_strict_equation in e0; cbn in e0; inv e0.
+                cbn in e0; cbn in e0; inv e0.
               break_match_hyp_inv.
 
               break_match_hyp_inv.
               { move Heqd0 after H3.
                 break_match_hyp_inv; clear Heqs;
-                  rewrite DVCrev.dvalue_convert_strict_equation in e0; cbn in e0; inv e0.
+                  cbn in e0; cbn in e0; inv e0.
               }
 
               { move Heqd0 after H3.
                 break_match_hyp_inv; clear Heqs;
-                  rewrite DVCrev.dvalue_convert_strict_equation in e0; cbn in e0; inv e0.
+                  cbn in e0; cbn in e0; inv e0.
 
                 destruct (dvalue_convert_strict_fin_inf_succeeds res).
                 rewrite e in e0; inv e0.
                 rewrite X1 in H3.
 
                 cbn in H3.
-                setoid_rewrite Heqo in Heqo1; inv Heqo1.
+                setoid_rewrite Heqo in Heqo1; inv Heqo1; inv Heqo.
                 destruct p; cbn in *; eauto.
               }
             }
@@ -9233,20 +9203,19 @@ Qed.
     - cbn.
       unfold lift_dvalue_fin_inf.
       break_match_goal; clear Heqs;
-        rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; subst; inv e.
+        cbn in e; cbn in e; subst; inv e.
       auto.
     - unfold lift_dvalue_fin_inf in *.
       break_match_goal; clear Heqs;
-        rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; subst; inv e.
+        cbn in e; cbn in e; subst; inv e.
       break_match_hyp_inv.
       break_match_hyp_inv.
       break_match_hyp_inv.
 
       break_match_hyp_inv; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; subst; inv e.
+      cbn in e; cbn in e; subst; inv e.
 
       break_match_hyp_inv.
-      setoid_rewrite Heqo1 in Heqo.
       rewrite map_cons.
       inv Heqo.
 
@@ -9265,20 +9234,19 @@ Qed.
     - cbn.
       unfold lift_dvalue_fin_inf.
       break_match_goal; clear Heqs;
-        rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; subst; inv e.
+        cbn in e; cbn in e; subst; inv e.
       auto.
     - unfold lift_dvalue_fin_inf in *.
       break_match_goal; clear Heqs;
-        rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; subst; inv e.
+        cbn in e; cbn in e; subst; inv e.
       break_match_hyp_inv.
       break_match_hyp_inv.
       break_match_hyp_inv.
 
       break_match_hyp_inv; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; subst; inv e.
+      cbn in e; cbn in e; subst; inv e.
 
       break_match_hyp_inv.
-      setoid_rewrite Heqo1 in Heqo.
       rewrite map_cons.
       inv Heqo.
 
@@ -9298,10 +9266,10 @@ Qed.
     break_match_hyp;
       try solve
         [ unfold lift_dvalue_fin_inf; break_match_goal; break_match_hyp_inv; clear Heqs;
-          rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e;
+          cbn in e; cbn in e; inv e;
           cbn; auto
         | unfold lift_dvalue_fin_inf; break_match_goal; break_match_hyp_inv; clear Heqs;
-          rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; break_match_hyp_inv;
+          cbn in e; cbn in e; break_match_hyp_inv;
           cbn; auto
         ].
     
@@ -9412,10 +9380,10 @@ Qed.
     destruct str;
       try solve
         [ unfold lift_dvalue_fin_inf; break_match_goal; clear Heqs;
-          rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e;
+          cbn in e; cbn in e; inv e;
           cbn; auto
         | unfold lift_dvalue_fin_inf; break_match_goal; clear Heqs;
-          rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; break_match_hyp_inv;
+          cbn in e; cbn in e; break_match_hyp_inv;
           cbn; auto
         ].
 
@@ -9583,7 +9551,7 @@ Qed.
     destruct a; subst.
     unfold lift_dvalue_fin_inf; break_match_goal; cbn; auto;
     break_match_hyp; clear Heqs;
-    subst; rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; break_match_hyp_inv.
+    subst; cbn in e; cbn in e; break_match_hyp_inv.
 
     { (* i1 *)
       rewrite_lift_dvalue_fin_inf.
@@ -9594,10 +9562,10 @@ Qed.
       try solve
         [ unfold lift_dvalue_fin_inf; break_match_goal; cbn; auto;
           break_match_hyp; clear Heqs;
-          subst; rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; inv e
+          subst; cbn in e; cbn in e; inv e
         | unfold lift_dvalue_fin_inf; break_match_goal; cbn; auto;
           break_match_hyp; clear Heqs;
-          subst; rewrite DVCrev.dvalue_convert_strict_equation in e; cbn in e; break_match_hyp_inv
+          subst; cbn in e; cbn in e; break_match_hyp_inv
         ].
 
     { (* Poison *)
@@ -9803,7 +9771,7 @@ Qed.
     destruct cond.
     { unfold lift_dvalue_fin_inf at 1.
       break_match_goal; clear Heqs;
-      rewrite DVCrev.dvalue_convert_strict_equation in e;
+      cbn in e;
       cbn in e; break_match_hyp_inv;
         cbn in *; subst; cbn in *; auto; inv EVAL.
     }
@@ -9965,17 +9933,17 @@ Qed.
     all: try solve
            [ unfold lift_dvalue_fin_inf at 1;
              break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e;
              cbn in e; inv e;
              cbn in *; subst; cbn in *; inv EVAL; auto
            | unfold lift_dvalue_fin_inf at 1;
              break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e;
              cbn in e; inv e;
              cbn in *; subst; cbn in *; reflexivity
            | unfold lift_dvalue_fin_inf at 1;
              break_match_goal; clear Heqs;
-             rewrite DVCrev.dvalue_convert_strict_equation in e;
+             cbn in e;
              cbn in e; break_match_hyp_inv;
              cbn in *; subst; cbn in *; auto; inv EVAL
            ].
@@ -9997,7 +9965,7 @@ Qed.
     induction uv_inf; intros uv_fin REF;
       try solve
         [ red; intros dv_fin CONC_FIN;
-          rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF;
+          red in REF;
           cbn in REF; inv REF;
 
           rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN;
@@ -10011,13 +9979,13 @@ Qed.
           cbn;
           unfold lift_dvalue_fin_inf;
           break_match_goal; clear Heqs;
-          rewrite DVCrev.dvalue_convert_strict_equation in e;
+          cbn in e;
           cbn in e; inv e;
           reflexivity
         ].
     - (* Addresses *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
       rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
@@ -10032,7 +10000,7 @@ Qed.
       unfold lift_dvalue_fin_inf.
       break_match_goal.
       clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in e.
       break_match_hyp_inv.
       pose proof (addr_convert_safe _ _ Heqo0).
@@ -10040,31 +10008,25 @@ Qed.
       reflexivity.
     - (* IPTR *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
+      inv REF.
       break_match_hyp_inv.
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite CONCBASE.concretize_uvalueM_equation in CONC_FIN.
-      cbn in CONC_FIN; inv CONC_FIN.
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
-      red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-      cbn.
-      unfold lift_dvalue_fin_inf.
+      cbn in *.
+      inv CONC_FIN.
+      rewrite lift_dvalue_fin_inf_iptr.
+      pose proof IP.to_Z_from_Z i.
+      pose proof IP.from_Z_injective _ _ _ Heqo H.
+      unfold intptr_fin_inf.
       break_match_goal.
       clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
-      cbn in e.
-      break_match_hyp_inv.
-      pose proof (intptr_convert_safe _ _ Heqo0).
-      pose proof IP.from_Z_injective _ _ _ Heqo H.
-      apply IS1.LP.IP.to_Z_inj in H0; subst.
-      reflexivity.
+      rewrite <- H0 in e.
+      rewrite IS1.LP.IP.to_Z_from_Z in e.
+      inv e; eauto.
     - (* Undef *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF; inv REF.
 
       rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
@@ -10078,15 +10040,14 @@ Qed.
       cbn.
 
       eapply dvalue_has_dtyp_lift_dvalue_fin_inf; eauto.
-
     - (* Struct *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
 
       unfold uvalue_concretize_fin_inf_inclusion in H.
-      apply map_monad_InT_oom_forall2 in Heqo.
+      apply map_monad_oom_Forall2 in Heqo.
 
       rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
@@ -10117,12 +10078,10 @@ Qed.
         - rewrite map_length.
 
           apply map_monad_ErrUbOomProp_length in MAP.
-          apply Forall2_Forall2_HInT in Heqo.
           apply Util.Forall2_length in Heqo.
           congruence.
         - intros i a b NTH_fields NTH_res.
 
-          apply Forall2_Forall2_HInT in Heqo.
           epose proof Util.Forall2_Nth_left NTH_fields Heqo as (x&NTHl&CONV).
 
           apply Util.Nth_In in NTH_fields.
@@ -10155,12 +10114,12 @@ Qed.
       reflexivity.
     - (* Packed structs *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
 
       unfold uvalue_concretize_fin_inf_inclusion in H.
-      apply map_monad_InT_oom_forall2 in Heqo.
+      apply map_monad_oom_Forall2 in Heqo.
 
       rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
@@ -10191,12 +10150,10 @@ Qed.
         - rewrite map_length.
 
           apply map_monad_ErrUbOomProp_length in MAP.
-          apply Forall2_Forall2_HInT in Heqo.
           apply Util.Forall2_length in Heqo.
           congruence.
         - intros i a b NTH_fields NTH_res.
 
-          apply Forall2_Forall2_HInT in Heqo.
           epose proof Util.Forall2_Nth_left NTH_fields Heqo as (x&NTHl&CONV).
 
           apply Util.Nth_In in NTH_fields.
@@ -10229,12 +10186,12 @@ Qed.
       reflexivity.
     - (* Array *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
 
       unfold uvalue_concretize_fin_inf_inclusion in H.
-      apply map_monad_InT_oom_forall2 in Heqo.
+      apply map_monad_oom_Forall2 in Heqo.
 
       rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
@@ -10265,12 +10222,10 @@ Qed.
         - rewrite map_length.
 
           apply map_monad_ErrUbOomProp_length in MAP.
-          apply Forall2_Forall2_HInT in Heqo.
           apply Util.Forall2_length in Heqo.
           congruence.
         - intros i a b NTH_fields NTH_res.
 
-          apply Forall2_Forall2_HInT in Heqo.
           epose proof Util.Forall2_Nth_left NTH_fields Heqo as (x&NTHl&CONV).
 
           apply Util.Nth_In in NTH_fields.
@@ -10303,12 +10258,12 @@ Qed.
       reflexivity.
     - (* Vector *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
 
       unfold uvalue_concretize_fin_inf_inclusion in H.
-      apply map_monad_InT_oom_forall2 in Heqo.
+      apply map_monad_oom_Forall2 in Heqo.
 
       rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
@@ -10339,12 +10294,10 @@ Qed.
         - rewrite map_length.
 
           apply map_monad_ErrUbOomProp_length in MAP.
-          apply Forall2_Forall2_HInT in Heqo.
           apply Util.Forall2_length in Heqo.
           congruence.
         - intros i a b NTH_fields NTH_res.
 
-          apply Forall2_Forall2_HInT in Heqo.
           epose proof Util.Forall2_Nth_left NTH_fields Heqo as (x&NTHl&CONV).
 
           apply Util.Nth_In in NTH_fields.
@@ -10377,7 +10330,7 @@ Qed.
       reflexivity.
     - (* IBinop *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
       break_match_hyp_inv.
@@ -10441,7 +10394,7 @@ Qed.
       eapply eval_iop_fin_inf; eauto.
     - (* ICmp *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
       break_match_hyp_inv.
@@ -10505,7 +10458,7 @@ Qed.
       eapply eval_icmp_fin_inf; eauto.
     - (* FBinop *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
       break_match_hyp_inv.
@@ -10569,7 +10522,7 @@ Qed.
       eapply eval_fop_fin_inf; eauto.
     - (* fcmp *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
       break_match_hyp_inv.
@@ -10633,7 +10586,7 @@ Qed.
       eapply eval_fcmp_fin_inf; eauto.
     - (* Conversion *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
 
@@ -10690,7 +10643,7 @@ Qed.
       }
     - (* GetElementPtr *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
       break_match_hyp_inv.
@@ -10745,8 +10698,7 @@ Qed.
       cbn.
       split; eauto.
       { clear - H H1 Heqo0.
-        apply map_monad_InT_oom_forall2 in Heqo0.
-        apply Forall2_Forall2_HInT in Heqo0.
+        apply map_monad_oom_Forall2 in Heqo0.
         generalize dependent x3.
         induction Heqo0; intros x3 H1.
         - cbn in *; inv H1; cbn; auto.
@@ -10809,7 +10761,7 @@ Qed.
       intros a1 ?; subst.
       unfold lift_dvalue_fin_inf at 1.
       break_inner_match_goal; clear Heqs0.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in e.
       rewrite AA' in e.
       inv e.
@@ -10821,14 +10773,14 @@ Qed.
 
       unfold lift_dvalue_fin_inf.
       break_match_goal; clear Heqs0.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in e.
       rewrite A0A0' in e.
       inv e.
       reflexivity.
     - (* ExtractElement *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
       break_match_hyp_inv.
@@ -10909,7 +10861,7 @@ Qed.
       eapply index_into_vec_dv_fin_inf; eauto.
     - (* InsertElement *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
       break_match_hyp_inv.
@@ -10991,7 +10943,7 @@ Qed.
       eapply insert_into_vec_dv_fin_inf; eauto.
     - (* ShuffleVector *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
       break_match_hyp_inv.
@@ -11009,7 +10961,7 @@ Qed.
       inv CONC_FIN.
     - (* ExtractValue *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
 
@@ -11036,7 +10988,7 @@ Qed.
       exists (fun dv_inf => (fmap lift_dvalue_fin_inf (x0 x1))).
       cbn; rewrite <- Heqx0x1; cbn.
       split.
-      eapply IHuv_inf; eauto. apply Heqo.
+      eapply IHuv_inf; eauto.
       split; eauto.
 
       right.
@@ -11044,7 +10996,7 @@ Qed.
       auto.
     - (* InsertValue *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
       break_match_hyp_inv.
@@ -11104,7 +11056,7 @@ Qed.
       reflexivity.
     - (* Select *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
       break_match_hyp_inv.
@@ -11146,16 +11098,24 @@ Qed.
       auto.
     - (* ExtractByte *)
       red; intros dv_fin CONC_FIN.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
-      break_match_hyp_inv.
-
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
+      cbn in *.
       inv CONC_FIN.
     - (* ConcatBytes *)
+      cbn in *.
+      unfold uvalue_concretize_fin_inf_inclusion in *.
+      intros dv_fin H0.
+
+      red in REF.
+      cbn in REF.
+      break_match_hyp_inv.
+
+      rewrite IS1.MEM.CP.CONC.concretize_equation;
+        red; rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation;
+        cbn; repeat red.
+
       admit.
   Admitted.
 
@@ -11176,7 +11136,7 @@ Qed.
     - unfold lift_dvalue_fin_inf in *.
       break_match_hyp; clear Heqs.
       break_match_hyp_inv; clear Heqs.
-      rewrite DVCrev.dvalue_convert_strict_equation in e.
+      cbn in e.
       cbn in e.
       break_match_hyp_inv.
       (* TODO: Need to move dvalue_convert_strict_addr_inv *)
@@ -11206,7 +11166,7 @@ Qed.
       try
         solve
         [ left;
-          rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF;
+          red in REF;
           cbn in REF; inv REF;
 
           rewrite IS1.LLVM.MEM.CP.CONC.concretize_equation in CONC;
@@ -11225,7 +11185,7 @@ Qed.
 
     { (* Addr *)
       left.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
 
@@ -11245,7 +11205,7 @@ Qed.
 
     { (* Iptr *)
       left.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
 
@@ -11265,7 +11225,7 @@ Qed.
 
     { (* Undef *)
       pose proof REF as REF'.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF; inv REF.
 
       rewrite IS1.LLVM.MEM.CP.CONC.concretize_equation in CONC.
@@ -11306,7 +11266,7 @@ Qed.
 
     { (* UVALUE_Struct *)
       left.
-      rewrite uvalue_refine_strict_equation, uvalue_convert_strict_equation in REF.
+      red in REF.
       cbn in REF.
       break_match_hyp_inv.
 
@@ -11324,8 +11284,7 @@ Qed.
       cbn in H4.
       inv H4.
 
-      apply map_monad_InT_oom_forall2 in Heqo.
-      apply Forall2_Forall2_HInT in Heqo.
+      apply map_monad_oom_Forall2 in Heqo.
       induction Heqo.
       - cbn in H0. inv H0.
         eexists.
