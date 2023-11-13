@@ -495,7 +495,7 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
       refine (fun edv => match unERR_UB_OOM edv with
                       | mkEitherT (mkEitherT (mkEitherT (mkIdent (inr (inr (inr dv)))))) =>
                           (* As long as the dvalue has the same type, it's a refinement *)
-                          dvalue_has_dtyp dv dt
+                          dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
                       | _ => False
                       end).
     }
@@ -515,7 +515,7 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
       refine (fun edv => match unERR_UB_OOM edv with
                       | mkEitherT (mkEitherT (mkEitherT (mkIdent (inr (inr (inr dv)))))) =>
                           (* As long as the dvalue has the same type, it's a refinement *)
-                          dvalue_has_dtyp dv dt
+                          dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
                       | _ => False
                       end).
     }
@@ -555,9 +555,10 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
 
   Lemma Concretize_Undef : forall dt dv,
       dvalue_has_dtyp dv dt ->
+      dv <> DVALUE_Poison dt ->
       concretize (UVALUE_Undef dt) dv.
   Proof.
-    intros dt dv H.
+    intros dt dv DVT H.
     rewrite concretize_equation.
     unfold concretize_u.
     rewrite concretize_uvalueM_equation.

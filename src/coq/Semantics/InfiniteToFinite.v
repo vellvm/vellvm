@@ -10214,27 +10214,118 @@ cofix CIH
     Opaque MemoryBigIntptr.MMEP.MMSP.read_byte_raw.
   Qed.
 
-  Lemma access_allowed_aid_eq :
-    forall aid1 aid2,
-      LLVMParamsBigIntptr.PROV.access_allowed
-      (MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov aid1) aid2 = true ->
-      aid1 = aid2.
-  Proof.
-    (* TODO: need to show that aid = aid'...
-
-       This should be true, but need a lemma about access_allowed and
-       allocation_id_to_prov to do this...
-
-       In this case there should only be one provenance in the Prov
-       argument to access_allowed, so aid' must = aid.
-     *)
-  Admitted.
-
   Lemma access_allowed_wildcard_prov :
     forall aid,
       LLVMParamsBigIntptr.PROV.access_allowed wildcard_prov aid = true.
   Proof.
-  Admitted.
+    intros aid.
+    unfold LLVMParamsBigIntptr.PROV.access_allowed.
+    cbn; auto.
+  Qed.
+
+  Lemma read_byte_allowed_all_preserved_preserves_aids_wildcard:
+    forall ms1 ms2 ptr byte1 byte2 aid,
+      InfMem.MMEP.MemSpec.read_byte_allowed_all_preserved ms1 ms2 ->
+      MemoryBigIntptr.MMEP.MMSP.read_byte_raw
+        (MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory ms1)
+        ptr = Some (byte1, None) ->
+      MemoryBigIntptr.MMEP.MMSP.read_byte_raw
+        (MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory ms2)
+        ptr = Some (byte2, aid) ->
+      aid = None.
+  Proof.
+    intros ms1 ms2 addr byte1 byte2 aid RBA R1 R2.
+    unfold MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory in *.
+
+    repeat red in RBA.
+    destruct (InfPROV.aid_eq_dec aid None); auto.
+    destruct aid; try contradiction.
+    
+    remember (addr, MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov (Some (N.succ p))) as ptr.
+    assert (InfMem.MMEP.MemSpec.read_byte_allowed ms1 ptr).
+    { red.
+      exists None.
+      split; subst.
+      repeat red.
+      cbn.
+      rewrite R1.
+      symmetry.
+      apply MemoryBigIntptrInfiniteSpec.LP.PROV.aid_eq_dec_refl.
+      unfold LLVMParamsBigIntptr.PROV.access_allowed.
+      cbn; auto.
+    }
+
+    apply RBA in H.
+    repeat red in H.
+    destruct H as (aid' & ALLOC & ALLOWED).
+    repeat red in ALLOC.
+    subst; cbn in *.
+    rewrite R2 in ALLOC.
+
+    destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid' (Some p)); try discriminate; subst.
+    rewrite Bool.orb_false_r in ALLOWED.
+    eapply N.eqb_eq in ALLOWED.
+    lia.
+  Qed.
+
+  Lemma read_byte_allowed_all_preserved_preserves_aids:
+    forall ms1 ms2 ptr byte1 byte2 aid1 aid2,
+      InfMem.MMEP.MemSpec.read_byte_allowed_all_preserved ms1 ms2 ->
+      MemoryBigIntptr.MMEP.MMSP.read_byte_raw
+        (MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory ms1)
+        ptr = Some (byte1, aid1) ->
+      MemoryBigIntptr.MMEP.MMSP.read_byte_raw
+        (MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory ms2)
+        ptr = Some (byte2, aid2) ->
+      aid1 = aid2.
+  Proof.
+    intros ms1 ms2 addr byte1 byte2 aid1 aid2 RBA R1 R2.
+    unfold MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory in *.
+
+    destruct aid1.
+    2: {
+      symmetry.
+      eapply read_byte_allowed_all_preserved_preserves_aids_wildcard; eauto.
+    }
+
+    destruct aid2.
+    2: {
+      symmetry in RBA.
+      eapply read_byte_allowed_all_preserved_preserves_aids_wildcard; eauto.
+    }
+
+    remember (p + p0 + 1) as p1.
+    assert (p1 <> p) as PNEQ by lia.
+    assert (p1 <> p0) as PNEQ0 by lia.
+    clear Heqp1.
+
+    remember (addr, MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov (Some p)) as ptr1.
+    remember (addr, MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov (Some p0)) as ptr2.
+
+    assert (InfMem.MMEP.MemSpec.read_byte_allowed ms1 ptr1).
+    { red.
+      exists (Some p).
+      split; subst.
+      repeat red.
+      cbn.
+      rewrite R1.
+      symmetry.
+      apply MemoryBigIntptrInfiniteSpec.LP.PROV.aid_eq_dec_refl.
+      apply MemoryBigIntptrInfiniteSpec.LP.PROV.access_allowed_refl.
+    }
+
+    apply RBA in H.
+    repeat red in H.
+    destruct H as (aid' & ALLOC & ALLOWED).
+    repeat red in ALLOC.
+    subst; cbn in *.
+    rewrite R2 in ALLOC.
+
+    destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid' (Some p0)); try discriminate; subst.
+    rewrite Bool.orb_false_r in ALLOWED.
+    eapply N.eqb_eq in ALLOWED.
+    subst; auto.
+  Qed.
 
   Lemma fin_inf_read_byte_raw :
     forall {m_inf m_fin ptr byte_fin aid},
@@ -10253,6 +10344,7 @@ cofix CIH
     destruct H0.
     clear H1 H.
     destruct H0 as [ALLOWED RBP].
+    pose proof ALLOWED as ALLOWED'.
     unfold InfMem.MMEP.MemSpec.read_byte_prop_all_preserved in RBP.
     remember (addr, MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov aid) as ptr_inf.
     specialize (RBP ptr_inf (lift_SByte byte_fin)).
@@ -10269,8 +10361,9 @@ cofix CIH
       cbn in READ_RAW; cbn.
       erewrite read_byte_raw_lifted_fin_inf; eauto.
       cbn.
-      rewrite MemoryBigIntptrInfiniteSpec.LP.PROV.access_allowed_refl.
-      split; auto.
+      break_inner_match_goal; cbn; eauto.
+      rewrite N.eqb_refl.
+      cbn; auto.
     }
 
     pose proof RBP_INF as RBP_FIN.
@@ -10298,26 +10391,21 @@ cofix CIH
     repeat red in RBP_FIN.
     break_match_hyp; try contradiction.
 
+    unfold MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory in *.
+    subst; cbn.
+    setoid_rewrite Heqo.
+
     destruct m.
     cbn in *.
-
-    destruct ALLOWED_FIN as (aid'&ALLOCATED&ACCESS).
-    repeat red in ALLOCATED.
-    rewrite Heqo in ALLOCATED.
-    destruct (LLVMParamsBigIntptr.PROV.aid_eq_dec aid' a); try discriminate; subst.
-    rewrite ACCESS in RBP_FIN.
-    subst.
-
-    cbn in Heqo.
-    unfold MemoryBigIntptrInfiniteSpec.MMSP.mem_state_memory.
-    rewrite Heqo.
+    break_match_hyp; try contradiction; subst.
 
     assert (a = aid).
-    { symmetry; apply access_allowed_aid_eq; eauto.
+    { eapply read_byte_allowed_all_preserved_preserves_aids; eauto.
+      destruct m_fin, ms_memory_stack.
+      cbn.
+      eapply read_byte_raw_lifted_fin_inf; eauto.
     }
-
-    subst.
-    auto.
+    subst; auto.
   Qed.
 
   (* TODO: Move this into lemmas about primitives *)
@@ -10417,8 +10505,7 @@ cofix CIH
         rewrite CONTRA.
         symmetry.
         apply MemoryBigIntptrInfiniteSpec.LP.PROV.aid_eq_dec_refl.
-      - subst; cbn.
-        apply access_allowed_wildcard_prov.
+      - subst; cbn; auto.
     }
 
     destruct (MemoryBigIntptr.MMEP.MMSP.read_byte_raw (MemoryBigIntptr.MMEP.MMSP.mem_state_memory m_inf) addr).
@@ -10477,8 +10564,7 @@ cofix CIH
         eapply read_byte_raw_lifted_fin_inf in CONTRA; eauto.
         rewrite CONTRA.
         symmetry; apply MemoryBigIntptrInfiniteSpec.LP.PROV.aid_eq_dec_refl.
-      - subst; cbn.
-        apply access_allowed_wildcard_prov.
+      - subst; cbn; auto.
     }
 
     destruct (Memory64BitIntptr.MMEP.MMSP.read_byte_raw (Memory64BitIntptr.MMEP.MMSP.mem_state_memory m_fin) addr).
@@ -10486,6 +10572,7 @@ cofix CIH
     auto.
   Qed.
 
+  Opaque MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov.
   Lemma inf_read_byte_preserved_read_byte_raw :
     forall ms1 ms2 addr,
       MemoryBigIntptr.MMEP.MemSpec.read_byte_preserved ms1 ms2 ->
@@ -10496,6 +10583,7 @@ cofix CIH
     destruct (MemoryBigIntptr.MMEP.MMSP.read_byte_raw (InfMem.MMEP.MMSP.mem_state_memory ms1) addr) eqn:READ.
     - destruct m.
       remember (addr, MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov a) as ptr_inf.
+      pose proof RBP as ALLOWED'.
       specialize (RBP ptr_inf).
       specialize (ALLOWED ptr_inf).
 
@@ -10541,8 +10629,10 @@ cofix CIH
       destruct m; cbn in *.
       inv MS2_READ.
       rewrite H1 in H; subst.
-      apply access_allowed_aid_eq in H1; subst.
-      auto.
+      assert (a = x).
+      { eapply read_byte_allowed_all_preserved_preserves_aids; eauto.
+      }
+      subst; auto.
     - remember (addr, wildcard_prov) as ptr_inf.
       specialize (RBP ptr_inf).
       clear ALLOWED.
@@ -10571,8 +10661,7 @@ cofix CIH
           unfold MemoryBigIntptr.MMEP.MMSP.mem_state_memory in *.
           rewrite CONTRA.
           symmetry; apply MemoryBigIntptrInfiniteSpec.LP.PROV.aid_eq_dec_refl.
-        - subst; cbn.
-          apply access_allowed_wildcard_prov.
+        - subst; cbn; auto.
       }
 
       destruct (MemoryBigIntptr.MMEP.MMSP.read_byte_raw (MemoryBigIntptr.MMEP.MMSP.mem_state_memory ms2) addr).
@@ -11088,8 +11177,8 @@ cofix CIH
   Proof.
     intros uv1 uv2 FININF.
     unfold fin_to_inf_uvalue in *.
-    destruct (uvalue_convert_strict_safe uv1) as (?&?&?).
-    destruct (uvalue_convert_strict_safe uv2) as (?&?&?).
+    break_match_hyp; clear Heqs; destruct p.
+    break_match_hyp; clear Heqs; destruct p.
     subst.
     rewrite e0 in e2. inv e2.
     auto.
@@ -16959,12 +17048,6 @@ cofix CIH
       eauto.
       apply block_is_free_consecutive.
     - erewrite inf_fin_addr_convert_provenance; eauto.
-      rewrite MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov_provenance_to_allocation_id.
-      rewrite PROV.allocation_id_to_prov_provenance_to_allocation_id in block_is_free_ptr_provenance.
-      unfold MemoryBigIntptrInfiniteSpec.LP.PROV.provenance_to_prov.
-      unfold PROV.provenance_to_prov in *.
-      rewrite <- block_is_free_ptr_provenance.
-      reflexivity.
     - intros ptr H.
       apply In_Nth in H. destruct H.
       eapply Util.Forall2_Nth_left in ADDRS_CONV; eauto.
@@ -16975,12 +17058,6 @@ cofix CIH
       specialize (block_is_free_ptrs_provenance _ H2).
 
       erewrite inf_fin_addr_convert_provenance; eauto.
-      rewrite MemoryBigIntptrInfiniteSpec.LP.PROV.allocation_id_to_prov_provenance_to_allocation_id.
-      rewrite PROV.allocation_id_to_prov_provenance_to_allocation_id in block_is_free_ptrs_provenance.
-      unfold MemoryBigIntptrInfiniteSpec.LP.PROV.provenance_to_prov.
-      unfold PROV.provenance_to_prov in *.
-      rewrite <- block_is_free_ptrs_provenance.
-      reflexivity.
     - intros ptr H.
       apply In_Nth in H. destruct H.
       eapply Util.Forall2_Nth_left in ADDRS_CONV; eauto.
@@ -22647,9 +22724,38 @@ cofix CIH
     forall {ms_fin_start ms_inf_start uv_fin uv_inf t msg},
       MemState_refine_prop ms_inf_start ms_fin_start ->
       DVC1.uvalue_refine_strict uv_inf uv_fin ->
-      DVC1.DV1.uvalue_has_dtyp uv_inf t ->
       Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv_fin t ms_fin_start (raise_ub msg) -> False.
   Proof.
+    intros ms_fin_start ms_inf_start uv_fin uv_inf t msg H H0 H1.
+    rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes_equation in H1.
+    (* induction uv_fin.
+    all: try solve
+        [ cbn in H1; contradiction
+        | destruct H1; try contradiction;
+          destruct H1 as (?&?&?&?);
+          red in H2;
+          break_match_hyp_inv
+        ].
+
+    - induction t;
+        try solve
+          [ cbn in H1; contradiction
+          | destruct H1; try contradiction;
+            destruct H1 as (?&?&?&?);
+            red in H2;
+            break_match_hyp_inv
+          ].
+     *)
+  Admitted.
+
+  Lemma serialize_sbytes_fin_inf_error :
+    forall {ms_fin_start ms_inf_start uv_fin uv_inf t msg},
+      MemState_refine_prop ms_inf_start ms_fin_start ->
+      DVC1.uvalue_refine_strict uv_inf uv_fin ->
+      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv_fin t ms_fin_start (raise_error msg) ->
+      MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) uv_inf t ms_inf_start (raise_error msg).
+  Proof.
+    intros ms_fin_start ms_inf_start uv_fin uv_inf t msg H H0 H1.
   Admitted.
 
   Lemma handle_store_fin_inf :
@@ -22784,7 +22890,26 @@ cofix CIH
   Qed.
 
   (* TODO: Move this *)
-  (*
+  Lemma all_bytes_from_uvalue_has_dtyp :
+    forall {bytes t uv},
+      MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue t bytes = Some uv ->
+      E1.DV.uvalue_has_dtyp uv t.
+  Proof.
+    induction bytes. intros t uv ALL.
+    - cbn in ALL. discriminate.
+    - intros t uv H.
+      unfold MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue in H.
+      repeat break_match_hyp_inv.
+      unfold OptionUtil.guard_opt in *.
+      repeat break_match_hyp_inv.
+      assert (u3_1 = u1).
+      apply RelDec.rel_dec_correct; auto.
+      subst.
+      apply dtyp_eqb_eq in Heqb3; subst.
+      apply N.eqb_eq in Heqb; subst.
+  Admitted.
+
+  (* TODO: Move this *)
   Lemma from_ubytes_dtyp :
     forall {bytes t uv},
       MemoryBigIntptr.MMEP.MMSP.MemByte.from_ubytes bytes t = uv ->
@@ -22809,26 +22934,6 @@ cofix CIH
              across all of the ExtractByte values, but it doesn't care
              about `uv` at all.
        *)
-      (* TODO: Move this *)
-      Lemma all_bytes_from_uvalue_has_dtyp :
-        forall {bytes t uv},
-          MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue t bytes = Some uv ->
-          E1.DV.uvalue_has_dtyp uv t.
-      Proof.
-        induction bytes. intros t uv ALL.
-        - cbn in ALL. discriminate.
-        - intros t uv H.
-          unfold MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue in H.
-          repeat break_match_hyp_inv.
-          unfold OptionUtil.guard_opt in *.
-          repeat break_match_hyp_inv.
-          assert (u3_1 = u1).
-          apply RelDec.rel_dec_correct; auto.
-          subst.
-          apply dtyp_eqb_eq in Heqb3; subst.
-          apply N.eqb_eq in Heqb; subst.
-      Admitted.
-
       eapply all_bytes_from_uvalue_has_dtyp; eauto.
     - constructor; auto.
       admit.
@@ -23791,6 +23896,54 @@ cofix CIH
     reflexivity.
   Qed.
 
+  (* TODO: Move to where the other frame stack lemmas are *)
+  Lemma cannot_pop_inf_fin :
+    forall {ms_fin ms_inf},
+      MemState_refine_prop ms_inf ms_fin ->
+      MemoryBigIntptr.MMEP.MemSpec.cannot_pop ms_inf ->
+      Memory64BitIntptr.MMEP.MemSpec.cannot_pop ms_fin.
+  Proof.
+    intros ms_fin ms_inf MSR NPOP.
+    red.
+    red in NPOP.
+    intros fs1 fs2 MSFP POP.
+    red in POP.
+    break_match_hyp; auto.
+
+    (* Finite memory had frame to pop *)
+    destruct ms_fin as [[ms_fin fss_fin hs_fin] msprovs_fin].
+    cbn in *.
+    specialize (NPOP (lift_FrameStack fss_fin) (lift_FrameStack fs2)).
+    eapply NPOP.
+    { eapply MemState_refine_prop_frame_stack_preserved; eauto.
+      red.
+      cbn in *.
+      reflexivity.
+    }
+
+    red.
+    red in MSFP.
+    cbn in MSFP.
+    destruct fss_fin; subst.
+    - cbn; apply FinMem.MMEP.MMSP.frame_stack_eqv_sing_snoc_inv in MSFP; auto.
+    - rewrite lift_FrameStack_snoc.
+      apply FinMemMMSP.frame_stack_inv in MSFP.
+      destruct MSFP as [MSFP | CONTRA].
+      2: {
+        destruct CONTRA as (?&?&?&?).
+        inv H.
+      }
+
+      destruct MSFP as (?&?&?&?&?&?&?&?).
+      inv H.
+      inv H0.
+      apply frame_stack_eqv_lift.
+      rewrite H1.
+      rewrite POP.
+      reflexivity.
+  Qed.
+
+
   (* TODO: Move into memory model. Likely near MEM_EXEC_INTERP.MemTheory.allocate_bytes_spec_MemPropT_no_err *)
   Lemma allocate_dtyp_spec_no_error :
     forall t num_elements ms msg,
@@ -24540,7 +24693,7 @@ cofix CIH
       split.
       + eapply inf_fin_preserve_allocation_ids; eauto.
       + eapply inf_fin_frame_stack_preserved; eauto.
-  Admitted.
+  Abort.
 
   Import Tactics.
   #[global] Instance interp_memory_prop_eutt_S1S2_Proper_impl_ :
@@ -25279,6 +25432,32 @@ cofix CIH
     exact ""%string.
   Qed.
 
+  (* TODO: Move this *)
+  Lemma contains_UB_Extra_raise_error :
+    forall {E F G J} `{O : FailureE -< E +' F +' G +' UBE +' J} {X} msg,
+      (forall X e1 e2, O X e1 <> inr1 (inr1 (inr1 (inl1 e2)))) ->
+      ~ contains_UB_Extra (@raise_error _ _ X msg).
+  Proof.
+    intros E F G J O X msg NUBE CONTRA.
+    dependent destruction CONTRA.
+    - pinversion H; subst; inv CHECK.
+    - pinversion H; do 2 subst_existT.
+      cbn in *.
+      inv x.
+    - pinversion H; do 2 subst_existT.
+      cbn in *.
+      inv x.
+    - pinversion H; do 2 subst_existT.
+      cbn in *.
+      subst.
+      rewrite subevent_subevent in H4.
+      unfold subevent in *.
+      repeat unfold resum, ReSum_id, id_, Id_IFun, ReSum_inr, ReSum_inl, inr_, inl_, cat, Cat_IFun, Inr_sum1, Inl_sum1 in H4.
+      apply NUBE in H4.
+      auto.
+  Qed.
+
+  Print Assumptions model_E1E2_L0_orutt_strict_sound.
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
       L2_E1E2_orutt_strict t_inf t_fin ->
@@ -26780,32 +26959,6 @@ cofix CIH
 
                       destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
                       { rewrite TA in VIS_HANDLED.
-
-                        (* TODO: Move this *)
-                        Lemma contains_UB_Extra_raise_error :
-                          forall {E F G J} `{O : FailureE -< E +' F +' G +' UBE +' J} {X} msg,
-                            (forall X e1 e2, O X e1 <> inr1 (inr1 (inr1 (inl1 e2)))) ->
-                            ~ contains_UB_Extra (@raise_error _ _ X msg).
-                        Proof.
-                          intros E F G J O X msg NUBE CONTRA.
-                          dependent destruction CONTRA.
-                          - pinversion H; subst; inv CHECK.
-                          - pinversion H; do 2 subst_existT.
-                            cbn in *.
-                            inv x.
-                          - pinversion H; do 2 subst_existT.
-                            cbn in *.
-                            inv x.
-                          - pinversion H; do 2 subst_existT.
-                            cbn in *.
-                            subst.
-                            rewrite subevent_subevent in H4.
-                            unfold subevent in *.
-                            repeat unfold resum, ReSum_id, id_, Id_IFun, ReSum_inr, ReSum_inl, inr_, inl_, cat, Cat_IFun, Inr_sum1, Inl_sum1 in H4.
-                            apply NUBE in H4.
-                            auto.
-                        Qed.
-
                         exfalso.
                         eapply contains_UB_Extra_raise_error.
                         2: {
@@ -27139,53 +27292,6 @@ cofix CIH
                     { (* Handler raises UB *)
                       cbn in UB.
                       destruct UB as [msg []].
-
-                      (* TODO: Move to where the other frame stack lemmas are *)
-                      Lemma cannot_pop_inf_fin :
-                        forall {ms_fin ms_inf},
-                          MemState_refine_prop ms_inf ms_fin ->
-                          MemoryBigIntptr.MMEP.MemSpec.cannot_pop ms_inf ->
-                          Memory64BitIntptr.MMEP.MemSpec.cannot_pop ms_fin.
-                      Proof.
-                        intros ms_fin ms_inf MSR NPOP.
-                        red.
-                        red in NPOP.
-                        intros fs1 fs2 MSFP POP.
-                        red in POP.
-                        break_match_hyp; auto.
-
-                        (* Finite memory had frame to pop *)
-                        destruct ms_fin as [[ms_fin fss_fin hs_fin] msprovs_fin].
-                        cbn in *.
-                        specialize (NPOP (lift_FrameStack fss_fin) (lift_FrameStack fs2)).
-                        eapply NPOP.
-                        { eapply MemState_refine_prop_frame_stack_preserved; eauto.
-                          red.
-                          cbn in *.
-                          reflexivity.
-                        }
-
-                        red.
-                        red in MSFP.
-                        cbn in MSFP.
-                        destruct fss_fin; subst.
-                        - cbn; apply FinMem.MMEP.MMSP.frame_stack_eqv_sing_snoc_inv in MSFP; auto.
-                        - rewrite lift_FrameStack_snoc.
-                          apply FinMemMMSP.frame_stack_inv in MSFP.
-                          destruct MSFP as [MSFP | CONTRA].
-                          2: {
-                            destruct CONTRA as (?&?&?&?).
-                            inv H.
-                          }
-
-                          destruct MSFP as (?&?&?&?&?&?&?&?).
-                          inv H.
-                          inv H0.
-                          apply frame_stack_eqv_lift.
-                          rewrite H1.
-                          rewrite POP.
-                          reflexivity.
-                      Qed.
                     }
 
                     { (* Handler raises error *)
@@ -29859,10 +29965,10 @@ cofix CIH
               rewrite bind_trigger.
               reflexivity.
 
-
-              (* This seems related to HANDLER... *)
-              (* TODO: proof should be same (or similar) to above *)
-              admit.
+              destruct HANDLER.
+              eapply handle_intrinsic_fin_inf_error.
+              2: apply lift_MemState_refine_prop.
+              all: eauto.
             }
 
             { (* Handler raises OOM *)
@@ -33525,9 +33631,55 @@ cofix CIH
       unfold _get_inf_tree.
       rewrite HTFIN.
       destruct e.
-      admit.
-      admit.
-  Admitted.
+      { (* ExternalCallE *)
+        destruct e.
+        cbn.
+        pstep; red; cbn.
+        constructor.
+        intros v; red.
+        left; eapply paco2_mon_bot; eauto.
+        (* Why won't reflexivity work? *)
+        eapply paco2_eqit_b1b2_RR_refl; eauto.
+      }
+
+      destruct s.
+      { (* OOM *)
+        destruct o.
+        cbn.
+        pstep; red; cbn.
+        constructor.
+        intros [].
+      }
+
+      destruct s.
+      { (* UBE *)
+        destruct u.
+        cbn.
+        pstep; red; cbn.
+        constructor.
+        intros [].
+      }
+
+      destruct s.
+      { (* DebugE *)
+        destruct d.
+        cbn.
+        pstep; red; cbn.
+        constructor.
+        intros []; red.
+        left; eapply paco2_mon_bot; eauto.
+        (* Why won't reflexivity work? *)
+        eapply paco2_eqit_b1b2_RR_refl; eauto.
+      }
+
+      { (* FailureE *)
+        destruct f.
+        cbn.
+        pstep; red; cbn.
+        constructor.
+        intros [].
+      }
+  Qed.
 
   Lemma get_inf_tree_L4_orutt :
     forall t,
@@ -34690,16 +34842,149 @@ cofix CIH
       ContainsUB.contains_UB t_inf_ub.
   Proof.
     intros t_inf_ub t_fin_ub EQV UB.
-    induction UB.
+    revert t_inf_ub EQV.
+    induction UB; intros t_inf_ub EQV.
     - (* CrawlTau *)
       eapply IHUB.
       rewrite H in EQV.
       rewrite tau_eutt in EQV.
       eauto.
     - (* CrawlVis *)
-      admit.
-    - admit.
-  Admitted.
+      rewrite H in EQV.
+      punfold EQV; red in EQV; cbn in EQV.
+      dependent induction EQV.
+      + rewrite itree_eta_.
+        setoid_rewrite <- x.
+
+        (* Need to figure out what event we're working with to know
+        what A and Y are... *)
+        destruct e1.
+        { (* ExternalCallE *)
+          destruct e0.
+          repeat red in H2.
+          break_match_hyp; try contradiction.
+          destruct e0.
+          destruct H2 as (?&?&?).
+
+          specialize (H0 (fin_to_inf_dvalue x0) x0).
+          forward H0.
+          cbn.
+          repeat split; eauto.
+          apply fin_to_inf_dvalue_refine_strict.
+          
+          eapply ContainsUB.CrawlVis with (k:=k1).
+          change 
+            (@inl1 InterpreterStackBigIntptr.LP.Events.ExternalCallE (OOME +' UBE +' DebugE +' FailureE)
+               InterpreterStackBigIntptr.LP.Events.DV.dvalue
+               (InterpreterStackBigIntptr.LP.Events.ExternalCall t f args))
+            with
+            (@subevent InterpreterStackBigIntptr.LP.Events.L4 InterpreterStackBigIntptr.LP.Events.L4
+             (@ReSum_id (forall _ : Type, Type) IFun Id_IFun InterpreterStackBigIntptr.LP.Events.L4)
+             InterpreterStackBigIntptr.LP.Events.DV.dvalue (inl1 (InterpreterStackBigIntptr.LP.Events.ExternalCall t f args))).
+          reflexivity.
+
+          eapply IHUB.
+          pclearbot; eauto.
+        }
+
+        destruct s.
+        { (* OOM *)
+          destruct o.
+          cbn in H2.
+          break_match_hyp; try contradiction.
+          destruct s; try contradiction.
+          destruct o.
+          destruct x0.
+        }
+
+        destruct s.
+        { (* UBE *)
+          destruct u.
+          cbn in H2.
+          break_match_hyp; try contradiction.
+          repeat (destruct s; try contradiction).
+          destruct u0.
+          destruct x0.
+        }
+
+        destruct s.
+        { (* DebugE *)
+          destruct d.
+          cbn in H2.
+          break_match_hyp; try contradiction.
+          repeat (destruct s; try contradiction).
+          destruct d; subst.
+          specialize (H0 tt tt).
+          forward H0; cbn; auto.
+
+          eapply ContainsUB.CrawlVis with (k:=k1).
+          change 
+            (@inr1 InterpreterStackBigIntptr.LP.Events.ExternalCallE (OOME +' UBE +' DebugE +' FailureE) unit
+               (@inr1 OOME (UBE +' DebugE +' FailureE) unit
+                  (@inr1 UBE (DebugE +' FailureE) unit (@inl1 DebugE FailureE unit (Debug u0)))))
+            with
+            (@subevent InterpreterStackBigIntptr.LP.Events.L4 InterpreterStackBigIntptr.LP.Events.L4
+             (@ReSum_id (forall _ : Type, Type) IFun Id_IFun InterpreterStackBigIntptr.LP.Events.L4)
+             unit
+             (inr1 (inr1 (inr1 (inl1 (Debug u0)))))).
+          reflexivity.
+
+          destruct x0.
+          eapply IHUB.
+          pclearbot; eauto.
+        }
+
+        { (* FailureE *)
+          destruct f.
+          cbn in H2.
+          repeat break_match_hyp; try contradiction.
+        }
+      + destruct e0.
+        destruct x0.
+      + rewrite itree_eta.
+        setoid_rewrite <- x.
+        rewrite tau_eutt.
+        eapply IHEQV; eauto.
+    - (* FindUB *)
+      rewrite H in EQV.
+      punfold EQV; red in EQV; cbn in EQV.
+      dependent induction EQV.
+      + destruct e1 as [e1 | [e1 | [e1 | e1]]];
+          cbn in H2.
+        * destruct e1.
+          try contradiction.
+        * repeat break_match_hyp; try contradiction.
+        * repeat break_match_hyp; try contradiction.
+          subst.
+          destruct e1.
+
+          eapply ContainsUB.FindUB.
+          rewrite itree_eta.
+          setoid_rewrite <- x.
+          rewrite subevent_subevent.
+
+          change 
+            (@inr1 InterpreterStackBigIntptr.LP.Events.ExternalCallE (OOME +' UBE +' DebugE +' FailureE)
+               void
+               (@inr1 OOME (UBE +' DebugE +' FailureE) void (@inl1 UBE (DebugE +' FailureE) void (ThrowUB u))))
+            with
+            (@subevent UBE InfLP.Events.L4
+               (fun (x0 : Type) (f : UBE x0) =>
+                  @ReSum_id (forall _ : Type, Type) IFun Id_IFun InfLP.Events.L4 x0
+                    (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 UBE
+                       (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) InfLP.Events.ExternalCallE
+                       (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 UBE
+                          (sum1 UBE (sum1 DebugE FailureE)) OOME
+                          (@ReSum_inl (forall _ : Type, Type) IFun sum1 Cat_IFun Inl_sum1 UBE UBE
+                             (sum1 DebugE FailureE) (@ReSum_id (forall _ : Type, Type) IFun Id_IFun UBE)))
+                       x0 f)) Empty_set (ThrowUB u)).
+          reflexivity.
+        * repeat break_match_hyp; try contradiction.
+      + rewrite itree_eta.
+        setoid_rewrite <- x.
+        rewrite tau_eutt.
+        eapply IHEQV; eauto.
+  Qed.
 
   Lemma model_E1E2_45_orutt_strict :
     forall t_inf t_fin,
@@ -34765,113 +35050,6 @@ cofix CIH
       (TopLevelBigIntptr.model_oom_L6 TLR_INF.R.refine_res2 TLR_INF.R.refine_res3 eq p1)
       (TopLevel64BitIntptr.model_oom_L6 TLR_FIN.R.refine_res2 TLR_FIN.R.refine_res3 eq p2).
 
-Section interp_prop_oom_extra.
-
-  Context {E F OOM : Type -> Type} `{OOME: OOM -< E} `{OOMF: OOM -< F}.
-  Context (h : E ~> PropT F).
-  Context {R1 R2 : Type} (RR : R1 -> R2 -> Prop).
-
-  Lemma interp_prop_oom_l_ret_inv_r:
-    forall r2 (t : itree E _),
-      interp_prop_oom_l (F := F) (OOME:=OOME) h RR t (ret r2) ->
-      (exists r1 , RR r1 r2 /\ t ≈ ret r1) \/ (exists {A} (e : OOM A) k, t ≈ vis e k).
-  Proof.
-    intros r2 t INTERP.
-    punfold INTERP.
-    red in INTERP.
-    setoid_rewrite itree_eta with (t:=t).
-    remember (observe (ret r2)); remember (observe t).
-    clear Heqi0.
-    induction INTERP; subst; pclearbot; intros.
-    - left.
-      exists r1.
-      cbn in Heqi.
-      inv Heqi.
-      split; auto.
-      cbn.
-      reflexivity.
-    - inv Heqi.
-    - cbn in INTERP.
-      inv INTERP.
-      + apply simpobs in H0.
-        left.
-        exists r1; split; auto.
-        rewrite H0.
-        rewrite tau_eutt.
-        reflexivity.
-      + specialize (IHINTERP eq_refl).
-        destruct IHINTERP as [[r1 [RRr1r2 EQ]] | IHOOM].
-        2: {
-          right.
-          setoid_rewrite (itree_eta t1).
-          setoid_rewrite tau_eutt.
-          auto.
-        }
-        left.
-        exists r1; split; auto.
-        rewrite <- itree_eta in EQ.
-        rewrite EQ.
-        rewrite tau_eutt.
-        reflexivity.
-      + setoid_rewrite tau_eutt.
-        specialize (IHINTERP eq_refl).
-        destruct IHINTERP as [[r1 [RRr1r2 EQ]] | IHOOM].
-        2: {
-          right.
-          setoid_rewrite (itree_eta t1).
-          auto.
-        }
-        left.
-        exists r1; split; auto.
-        rewrite <- itree_eta in EQ.
-        rewrite EQ.
-        reflexivity.
-      + setoid_rewrite tau_eutt.
-        specialize (IHINTERP eq_refl).
-        destruct IHINTERP as [[r1 [RRr1r2 EQ]] | IHOOM].
-        2: {
-          right.
-          setoid_rewrite (itree_eta t1).
-          auto.
-        }
-        left.
-        exists r1; split; auto.
-        rewrite <- itree_eta in EQ.
-        rewrite EQ.
-        reflexivity.
-      + setoid_rewrite tau_eutt.
-        specialize (IHINTERP eq_refl).
-        destruct IHINTERP as [[r1 [RRr1r2 EQ]] | IHOOM].
-        2: {
-          right.
-          setoid_rewrite (itree_eta t1).
-          auto.
-        }
-        left.
-        exists r1; split; auto.
-        rewrite <- itree_eta in EQ.
-        rewrite EQ.
-        reflexivity.
-    - inv Heqi.
-    - right.
-      exists A, e, k1.
-      rewrite <- itree_eta.
-      rewrite HT1.
-      reflexivity.
-    - inv Heqi.
-      rewrite itree_eta in HT1; rewrite H0 in HT1; apply eqit_inv in HT1; contradiction.
-    - Print Assumptions model_E1E2_23_orutt_strict.
-    - inv Heqi.
-      rewrite itree_eta in H0.
-      rewrite H2 in H0; apply eqit_inv in H0.
-      cbn in *.
-      break_match_hyp; try contradiction; subst.
-    - rewrite itree_eta in H0.
-
-discriminate.
-    - inv Heqi.
-  Qed.
-
   Lemma refine_OOM_h_orutt :
     forall
       (t : itree InterpreterStackBigIntptr.LP.Events.L4
@@ -34891,45 +35069,307 @@ discriminate.
                 × (local_refine_strict × stack_refine_strict
                      × (global_refine_strict × DVC1.dvalue_refine_strict)))) t t2.
   Proof.
-    setoid_rewrite itree_eta.
-    pcofix CIH; intros t t1 t2 REF EQV.
-    genobs t ot.
+    pcofix CIH.
+    intros t t1 t2 REF EQV.
+
+    rewrite (itree_eta_ t1) in REF, EQV.
+    rewrite (itree_eta_ t2) in REF.
+    rewrite (itree_eta_ t2).
+    rewrite (itree_eta_ t).
+    rewrite (itree_eta_ t) in EQV.
+
     genobs t1 ot1.
     genobs t2 ot2.
-    clear t t1 t2 Heqot Heqot1 Heqot2.
-
-    punfold EQV; red in EQV.
-    cbn in *.
-    dependent induction EQV.
-    - do 2 red in REF.
-
-
-      eapply interp_prop_oom_ret_inv in REF.
-
+    genobs t ot.
     
-    punfold REF; red in REF.
-    cbn in *.
+    clear t t1 t2 Heqot1 Heqot2 Heqot.
+    punfold EQV.
+    red in EQV.
+    cbn in EQV.
 
-    dependent induction REF.
-    - eapply orutt_inv_Ret_r in EQV.
-      destruct EQV as (?&?&?).
+    dependent induction EQV.
+    - (* EqRet *)
+      punfold REF.
+      red in REF.
+      cbn in REF.
+      pstep; red; cbn.
 
-      eapply paco2_mon_bot; eauto.
-      eapply orutt_cong_eutt.
-      2: {
-        rewrite H.
-        reflexivity.
+      dependent induction REF; subst.
+      + red in REL; subst.
+        constructor.
+        auto.
+      + constructor.
+        eauto.
+      + pinversion HT1.
+        2: inv CHECK0.
+        subst_existT.
+        constructor.
+      + exfalso.
+        rewrite (itree_eta_ t2) in H0.
+        rewrite x in H0.
+        red in H.
+        rewrite H in H0.
+        clear - H0.
+
+        setoid_rewrite bind_trigger in H0.
+        apply eutt_ret_vis_abs in H0; auto.
+    - (* EqTau *)
+      assert (DEC: (exists m3, ot2 = TauF m3) \/ (forall m3, ot2 <> TauF m3)).
+      { destruct ot2; eauto; right; red; intros; inv H0. }
+
+      destruct DEC as [EQ | EQ].
+      { destruct EQ; subst.
+        pstep; red; cbn.
+        constructor.
+        right.
+        eapply CIH.
+        apply InterpPropOOM.interp_prop_oom_inv_tau in REF.
+        apply REF.
+        pclearbot.
+        eauto.
       }
 
-      pstep; red; cbn.
-      red in REL; subst.
-      constructor; auto.
-    - (* Tau Tau, coinductive *)
       pclearbot.
+
+      apply InterpPropOOM.interp_prop_oom_inv_tau_r in REF.
+      punfold REF.
+      red in REF.
+      cbn in REF.
+
+      rewrite (itree_eta_ m2) in H.
+      genobs m2 om2.
+      clear m2 Heqom2.
+
+      dependent induction REF; subst.
+      + (* Ret *) 
+        red in REL; cbn in REL; subst.
+        eapply paco2_mon_bot; eauto.
+        eapply orutt_add_Tau_l.
+        eauto.
+      + (* Tau Tau *)
+        exfalso; eapply EQ.
+        reflexivity.
+      + (* TauL *)
+        exfalso; eapply EQ.
+        reflexivity.
+      + (* TauR *)
+        eapply IHREF; eauto.
+        eapply orutt_inv_Tau_r in H.
+        rewrite <- itree_eta_.
+        eapply H.
+      + (* Vis_OOM_L *)
+        pinversion HT1; try inv CHECK0.
+        subst_existT.
+        pstep; red; cbn.
+        constructor.
+      + (* Vis_OOM_R *)
+        inv CHECK.
+      + (* Vis *)
+        assert (DEC: (exists o : OOME A, e = subevent A o) \/ forall o : OOME A, e <> subevent A o).
+        { clear - e.
+          destruct e;
+            try solve [right; intros o CONTRA;
+                       inv CONTRA].
+          destruct s;
+            try solve [right; intros o CONTRA;
+                       inv CONTRA].
+
+          left.
+          exists o.
+          reflexivity.
+        }
+
+        destruct DEC as [OOM | NOOM].
+        { destruct OOM.
+          subst.
+          pstep; red; cbn.
+          constructor.
+        }
+
+        red in H.
+        rewrite H in H0.
+        rewrite (itree_eta_ t2) in H0.
+        setoid_rewrite bind_trigger in H0.
+        setoid_rewrite H in HK.
+
+        eapply orutt_Proper_R3 with (x:=L4_refine_strict) in H1.
+        6: symmetry; apply H0.
+        all: try reflexivity.
+
+        eapply orutt_inv_Vis_r in H1.
+        destruct H1 as [VIS | OOM].
+        2: {
+          destruct OOM.
+          destruct e; inv H1.
+          change
+            (@inr1 ExternalCallE (OOME +' UBE +' DebugE +' FailureE) A
+               (@resum (Type -> Type) IFun OOME (OOME +' UBE +' DebugE +' FailureE)
+                  (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME
+                     (UBE +' DebugE +' FailureE) (@ReSum_id (Type -> Type) IFun Id_IFun OOME)) A x))
+ with
+            (@subevent OOME L4
+         (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME
+            (OOME +' UBE +' DebugE +' FailureE) ExternalCallE
+            (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME
+               (UBE +' DebugE +' FailureE) (@ReSum_id (Type -> Type) IFun Id_IFun OOME))) A x).
+
+          pstep; red; cbn.
+          constructor.
+        }
+
+        destruct VIS as (?&?&?&?&?&?).
+
+        pstep; red; cbn.
+        constructor.
+        punfold H1; red in H1; cbn in H1.
+        genobs m1 om1.
+        clear m1 Heqom1.
+        dependent induction H1.
+        2: {
+          constructor.
+          eapply IHeqitF; eauto.
+        }
+
+        constructor; eauto.
+
+        intros a b H4.
+        right.
+        eapply CIH.
+        specialize (HK b).
+        forward HK.
+        eapply ReturnsVis.
+        unfold trigger.
+        reflexivity.
+        constructor.
+        reflexivity.
+        pclearbot.
+        apply HK.
+
+        specialize (REL a).
+        red in REL.
+        pclearbot.
+
+        eapply orutt_Proper_R3.
+        4: apply REL.
+        all: try reflexivity.
+
+        eauto.
+    - (* EqVis *)
+      punfold REF; red in REF; cbn in REF.
+      dependent induction REF.
+      + (* Tau *)
+        forward IHREF; auto.
+        specialize (IHREF B _ _ eq_refl).
+        specialize (IHREF A e1 k1 H H0 H1).
+        rewrite (itree_eta_ t1).
+        genobs t1 ot1.
+        clear t1 Heqot1.
+
+        pstep; red; cbn.
+        punfold IHREF. red in IHREF; cbn in IHREF.
+        clear REF.
+        dependent induction IHREF.
+        * constructor.
+          constructor; eauto.
+        * constructor.
+          eapply OOMRutt.EqVisOOM.
+        * constructor; eauto.
+          cbn.
+          rewrite (itree_eta_ t2).
+          eapply IHIHREF; eauto.
+      + (* OOM *)
+        pinversion HT1; subst_existT.
+        * pstep; red; cbn.
+          apply OOMRutt.EqVisOOM.
+        * inv CHECK0.
+      + (* Not OOM *)
+        red in H.
+        rewrite H in H0.
+        rewrite (itree_eta_ t2) in H0.
+        rewrite x in H0.
+        setoid_rewrite bind_trigger in H0.
+        pinversion H0; repeat subst_existT.
+
+        pstep; red; cbn.
+        constructor; eauto.
+
+        intros a b H4.
+        right.
+        eapply CIH.
+        specialize (HK b).
+        forward HK.
+        eapply ReturnsVis.
+        rewrite H.
+        unfold trigger.
+        reflexivity.
+        constructor.
+        reflexivity.
+        pclearbot.
+        apply HK.
+
+        repeat red in H0.
+        inv H0; subst_existT.
+        specialize (REL0 b); red in REL0.
+        pclearbot.
+
+        eapply orutt_Proper_R3.
+        5: symmetry; apply REL0.
+        all: try reflexivity.
+
+        specialize (H2 _ _ H4).
+        pclearbot; eauto.
+    - (* EqVisOOM *)
+      punfold REF; red in REF; cbn in REF.
+      dependent induction REF.
+      + (* Tau *)
+        forward IHREF; auto.
+        specialize (IHREF _ _ _ eq_refl t0).
+        rewrite (itree_eta_ t1).
+        genobs t1 ot1.
+        clear t1 Heqot1.
+
+        pstep; red; cbn.
+        constructor.
+        punfold IHREF. 
+      + (* OOM *)
+        pinversion HT1; subst_existT.
+        * pstep; red; cbn.
+          apply OOMRutt.EqVisOOM.
+        * inv CHECK0.
+      + (* Not OOM *)
+        red in H.
+        rewrite H in H0.
+        rewrite (itree_eta_ t2) in H0.
+        rewrite x in H0.
+        setoid_rewrite bind_trigger in H0.
+        pinversion H0; repeat subst_existT.
+        pstep; red; cbn.
+        destruct e0; inv H6.
+        change
+          (@inr1 ExternalCallE (OOME +' UBE +' DebugE +' FailureE) A0
+             (@resum (Type -> Type) IFun OOME (OOME +' UBE +' DebugE +' FailureE)
+                (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME
+                   (UBE +' DebugE +' FailureE) (@ReSum_id (Type -> Type) IFun Id_IFun OOME)) A0 e))
+          with
+          (@subevent OOME L4
+             (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME
+                (OOME +' UBE +' DebugE +' FailureE) ExternalCallE
+                (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME
+                   (UBE +' DebugE +' FailureE) (@ReSum_id (Type -> Type) IFun Id_IFun OOME))) A0 e).
+
+        apply OOMRutt.EqVisOOM.
+    - (* EqTauL *)
+      specialize (IHEQV REF).
+      punfold IHEQV. red in IHEQV. cbn in IHEQV.
+      rewrite (itree_eta_ t1).
+      genobs t1 ot1; clear t1 Heqot1.
       pstep; red; cbn.
-      constructor.
-      apply orutt_inv_Tau_r in EQV.
-      admit.
+      constructor; cbn; eauto.
+    - (* EqTauR *)
+      apply InterpPropOOM.interp_prop_oom_inv_tau_r in REF.
+      rewrite (itree_eta_ t2) in REF.
+      specialize (IHEQV REF).
+      auto.
   Qed.
 
   Lemma model_E1E2_56_orutt_strict :
