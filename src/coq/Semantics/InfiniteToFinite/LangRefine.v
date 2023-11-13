@@ -8595,14 +8595,10 @@ Qed.
       destruct unERR_UB_OOM.
       do 3 destruct unEitherT.
       destruct unIdent;
-        inv Heqs.
-      unfold StateMonad.evalStateT.
-
-      (* Need to improve this lemma... *)
-      pose proof runStateT_succeeds_serialize_sbytes_fin_inf _ _ _ Heqe as (res_inf&SERIALIZE).
-      rewrite SERIALIZE.
-      Opaque IS1.LLVM.MEM.CP.CONC.MemHelpers.deserialize_sbytes.
-      cbn.
+        inv Heqs;
+        unfold StateMonad.evalStateT;
+        cbn.
+      admit.
       admit.
     }
 

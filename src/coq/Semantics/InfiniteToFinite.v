@@ -22133,7 +22133,6 @@ cofix CIH
     forall {ms_fin_start ms_fin_final ms_inf_start uv_fin uv_inf t bytes_fin},
       MemState_refine_prop ms_inf_start ms_fin_start ->
       DVC1.uvalue_refine_strict uv_inf uv_fin ->
-      DVC1.DV1.uvalue_has_dtyp uv_inf t ->
       Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv_fin t ms_fin_start
         (ret (ms_fin_final, bytes_fin)) ->
       exists
@@ -22143,483 +22142,20 @@ cofix CIH
           sbytes_refine bytes_inf bytes_fin /\
           MemState_refine_prop ms_inf_final ms_fin_final.
   Proof.
-    intros ms_fin_start ms_fin_final ms_inf_start uv_fin uv_inf t bytes_fin MSR UV_REF TYPE_INF SERIALIZE.
-    pose proof uvalue_refine_strict_has_dtyp UV_REF TYPE_INF as TYPE_FIN.
-
-    generalize dependent uv_fin.
-    generalize dependent bytes_fin.
-    generalize dependent ms_inf_start.
-    generalize dependent ms_fin_start.
-    generalize dependent ms_fin_final.
-    induction TYPE_INF; intros ms_fin_final ms_fin_start ms_inf_start MSR bytes_fin uv_fin UV_REF SERIALIZE TYPE_FIN.
-
-    all :
-      try solve [
-          pose proof UV_REF as UV_REF';
-          cbn in UV_REF';
-          inversion UV_REF; subst; 
-          repeat break_match_hyp_inv;
-          eapply MemPropT_fin_inf_bind; [ | | | apply SERIALIZE]; eauto;
-          [intros *; eapply fresh_sid_fin_inf; eauto|];
-          
-          intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH FRESH UBYTES;
-          cbn in SID; subst; destruct UBYTES; subst;
-          cbn;
-          eexists; eexists; split; [split; reflexivity|];
-          split; auto;
-          apply to_ubytes_fin_inf_eq; auto
-        ].
-    
-    - inversion UV_REF; subst.
-      cbn in SERIALIZE.
-      destruct SERIALIZE; subst.
-      eexists. eexists.  split; split; eauto.
-      constructor.
-
-    - (* Poison *)
-      inversion UV_REF; subst.
-      clear H H0.
-      (* SAZ: the lack of inversion principles means we have to do a nested induction here :-( *)
-      revert ms_fin_final ms_fin_start ms_inf_start MSR bytes_fin TYPE_FIN SERIALIZE UV_REF.
-      induction τ; intros ms_fin_final ms_fin_start ms_inf_start MSR bytes_fin TYP_FIN SERIALIZE HRS;
-      try solve [
-          solve_to_ubytes SERIALIZE; auto
-        ].
-
-      + (* Poison Array *) 
-        cbn in *.
-        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
-        subst.
-        inversion TYP_FIN. subst.  cbn in H0. cbn in H1.
-        assert (DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Poison τ) (DVC1.DV2.UVALUE_Poison τ)) as HRA.
-        { red. cbn.  reflexivity. } 
-        assert (DVC1.DV2.uvalue_has_dtyp (DVC1.DV2.UVALUE_Poison τ) τ) as UVT.
-        { constructor; auto. }
-        specialize (IHτ _ _ _ MSR BS UVT HS HRA).
-        destruct IHτ as [BI [MIF [HMS [HR M]]]].
-        exists (concat (repeatN sz BI)). exists MIF.
-        eexists. eexists.  eexists; eauto.
-        split; eauto.
-        apply sbytes_refine_concat_repeatN.
-        auto.
-
-      + (* Poison Struct *)
-        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
-        subst.
-        inversion TYP_FIN; subst; clear TYP_FIN.
-        rewrite map_monad_map_monad_In in HS.
-        eapply MemPropT_fin_inf_map_monad_In in HS.
-
-        * destruct HS as  [BI [MIF [HMS [HR M]]]].
-          exists (concat BI). exists MIF.
-          split.  cbn. exists MIF. exists BI.
-          split; auto.
-          rewrite map_monad_map_monad_In.
-          apply HMS. split; auto.
-          apply sbytes_refine_concat. apply HR.
-        * assumption.
-        * intros.
-          eapply H; auto.
-          -- apply H0.
-          -- assert (a_inf = a_fin). apply H3. subst.
-             constructor.
-             eapply ALL_IX_SUPPORTED_Struct_fields; eauto.
-             eapply NO_VOID_Struct_fields; eauto.
-          -- subst. apply H4.
-          -- red. reflexivity.
-        * rewrite Forall2_eq. reflexivity.
-
-      + (* Poison Packed_struct *)
-        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
-        subst.
-        inversion TYP_FIN; subst; clear TYP_FIN.
-        rewrite map_monad_map_monad_In in HS.
-        eapply MemPropT_fin_inf_map_monad_In in HS.
-
-        * destruct HS as  [BI [MIF [HMS [HR M]]]].
-          exists (concat BI). exists MIF.
-          split.  cbn. exists MIF. exists BI.
-          split; auto.
-          rewrite map_monad_map_monad_In.
-          apply HMS. split; auto.
-          apply sbytes_refine_concat. apply HR.
-        * assumption.
-        * intros.
-          eapply H; auto.
-          -- apply H0.
-          -- assert (a_inf = a_fin). apply H3. subst.
-             constructor.
-             eapply ALL_IX_SUPPORTED_Struct_fields; eauto.
-             eapply NO_VOID_Struct_fields; eauto.
-          -- subst. apply H4.
-          -- red. reflexivity.
-        * rewrite Forall2_eq. reflexivity.
-
-      + (* Poison Vector *)
-        cbn in *.
-        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
-        subst.
-        inversion TYP_FIN. subst.  cbn in H0. cbn in H1.
-        assert (DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Poison τ) (DVC1.DV2.UVALUE_Poison τ)) as HRA.
-        { red. cbn.  reflexivity. } 
-        assert (DVC1.DV2.uvalue_has_dtyp (DVC1.DV2.UVALUE_Poison τ) τ) as UVT.
-        { constructor; auto. }
-        specialize (IHτ _ _ _ MSR BS UVT HS HRA).
-        destruct IHτ as [BI [MIF [HMS [HR M]]]].
-        exists (concat (repeatN sz BI)). exists MIF.
-        eexists. eexists.  eexists; eauto.
-        split; eauto.
-        apply sbytes_refine_concat_repeatN.
-        auto.
-
-    - (* OOM *)
-      inversion UV_REF; subst.
-      clear H H0.
-      (* SAZ: the lack of inversion principles means we have to do a nested induction here :-( *)
-      revert ms_fin_final ms_fin_start ms_inf_start MSR bytes_fin TYPE_FIN SERIALIZE UV_REF.
-      induction τ; intros ms_fin_final ms_fin_start ms_inf_start MSR bytes_fin TYP_FIN SERIALIZE HRS;
-      try solve [
-          solve_to_ubytes SERIALIZE; auto
-        ].
-
-      + (* OOM Array *) 
-        cbn in *.
-        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
-        subst.
-        inversion TYP_FIN. subst.  cbn in H0. cbn in H1.
-        assert (DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Oom τ) (DVC1.DV2.UVALUE_Oom τ)) as HRA.
-        { red. cbn.  reflexivity. } 
-        assert (DVC1.DV2.uvalue_has_dtyp (DVC1.DV2.UVALUE_Oom τ) τ) as UVT.
-        { constructor; auto. }
-        specialize (IHτ _ _ _ MSR BS UVT HS HRA).
-        destruct IHτ as [BI [MIF [HMS [HR M]]]].
-        exists (concat (repeatN sz BI)). exists MIF.
-        eexists. eexists.  eexists; eauto.
-        split; eauto.
-        apply sbytes_refine_concat_repeatN.
-        auto.
-
-      + (* OOM Struct *)
-        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
-        subst.
-        inversion TYP_FIN; subst; clear TYP_FIN.
-        rewrite map_monad_map_monad_In in HS.
-        eapply MemPropT_fin_inf_map_monad_In in HS.
-
-        * destruct HS as  [BI [MIF [HMS [HR M]]]].
-          exists (concat BI). exists MIF.
-          split.  cbn. exists MIF. exists BI.
-          split; auto.
-          rewrite map_monad_map_monad_In.
-          apply HMS. split; auto.
-          apply sbytes_refine_concat. apply HR.
-        * assumption.
-        * intros.
-          eapply H; auto.
-          -- apply H0.
-          -- assert (a_inf = a_fin). apply H3. subst.
-             constructor.
-             eapply ALL_IX_SUPPORTED_Struct_fields; eauto.
-             eapply NO_VOID_Struct_fields; eauto.
-          -- subst. apply H4.
-          -- red. reflexivity.
-        * rewrite Forall2_eq. reflexivity.
-
-      + (* OOM Packed_struct *)
-        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
-        subst.
-        inversion TYP_FIN; subst; clear TYP_FIN.
-        rewrite map_monad_map_monad_In in HS.
-        eapply MemPropT_fin_inf_map_monad_In in HS.
-
-        * destruct HS as  [BI [MIF [HMS [HR M]]]].
-          exists (concat BI). exists MIF.
-          split.  cbn. exists MIF. exists BI.
-          split; auto.
-          rewrite map_monad_map_monad_In.
-          apply HMS. split; auto.
-          apply sbytes_refine_concat. apply HR.
-        * assumption.
-        * intros.
-          eapply H; auto.
-          -- apply H0.
-          -- assert (a_inf = a_fin). apply H3. subst.
-             constructor.
-             eapply ALL_IX_SUPPORTED_Struct_fields; eauto.
-             eapply NO_VOID_Struct_fields; eauto.
-          -- subst. apply H4.
-          -- red. reflexivity.
-        * rewrite Forall2_eq. reflexivity.
-
-      + (* OOM Vector *)
-        cbn in *.
-        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
-        subst.
-        inversion TYP_FIN. subst.  cbn in H0. cbn in H1.
-        assert (DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Oom τ) (DVC1.DV2.UVALUE_Oom τ)) as HRA.
-        { red. cbn.  reflexivity. } 
-        assert (DVC1.DV2.uvalue_has_dtyp (DVC1.DV2.UVALUE_Oom τ) τ) as UVT.
-        { constructor; auto. }
-        specialize (IHτ _ _ _ MSR BS UVT HS HRA).
-        destruct IHτ as [BI [MIF [HMS [HR M]]]].
-        exists (concat (repeatN sz BI)). exists MIF.
-        eexists. eexists.  eexists; eauto.
-        split; eauto.
-        apply sbytes_refine_concat_repeatN.
-        auto.
-
-    - (* UNDEF *)
-      inversion UV_REF; subst.
-      clear H H0.
-      (* SAZ: the lack of inversion principles means we have to do a nested induction here :-( *)
-      revert ms_fin_final ms_fin_start ms_inf_start MSR bytes_fin TYPE_FIN SERIALIZE UV_REF.
-      induction τ; intros ms_fin_final ms_fin_start ms_inf_start MSR bytes_fin TYP_FIN SERIALIZE HRS;
-      try solve [
-          solve_to_ubytes SERIALIZE; auto
-        ].
-
-      + (* Undef Array *) 
-        cbn in *.
-        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
-        subst.
-        inversion TYP_FIN. subst.  cbn in H0. cbn in H1.
-        assert (DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Undef τ) (DVC1.DV2.UVALUE_Undef τ)) as HRA.
-        { red. cbn.  reflexivity. } 
-        assert (DVC1.DV2.uvalue_has_dtyp (DVC1.DV2.UVALUE_Undef τ) τ) as UVT.
-        { constructor; auto. }
-        specialize (IHτ _ _ _ MSR BS UVT HS HRA).
-        destruct IHτ as [BI [MIF [HMS [HR M]]]].
-        exists (concat (repeatN sz BI)). exists MIF.
-        eexists. eexists.  eexists; eauto.
-        split; eauto.
-        apply sbytes_refine_concat_repeatN.
-        auto.
-
-      + (* UNDEF Struct *)
-        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
-        subst.
-        inversion TYP_FIN; subst; clear TYP_FIN.
-        rewrite map_monad_map_monad_In in HS.
-        eapply MemPropT_fin_inf_map_monad_In in HS.
-
-        * destruct HS as  [BI [MIF [HMS [HR M]]]].
-          exists (concat BI). exists MIF.
-          split.  cbn. exists MIF. exists BI.
-          split; auto.
-          rewrite map_monad_map_monad_In.
-          apply HMS. split; auto.
-          apply sbytes_refine_concat. apply HR.
-        * assumption.
-        * intros.
-          eapply H; auto.
-          -- apply H0.
-          -- assert (a_inf = a_fin). apply H3. subst.
-             constructor.
-             eapply ALL_IX_SUPPORTED_Struct_fields; eauto.
-             eapply NO_VOID_Struct_fields; eauto.
-          -- subst. apply H4.
-          -- red. reflexivity.
-        * rewrite Forall2_eq. reflexivity.
-
-      + (* UNDEF Packed_struct *)
-        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
-        subst.
-        inversion TYP_FIN; subst; clear TYP_FIN.
-        rewrite map_monad_map_monad_In in HS.
-        eapply MemPropT_fin_inf_map_monad_In in HS.
-
-        * destruct HS as  [BI [MIF [HMS [HR M]]]].
-          exists (concat BI). exists MIF.
-          split.  cbn. exists MIF. exists BI.
-          split; auto.
-          rewrite map_monad_map_monad_In.
-          apply HMS. split; auto.
-          apply sbytes_refine_concat. apply HR.
-        * assumption.
-        * intros.
-          eapply H; auto.
-          -- apply H0.
-          -- assert (a_inf = a_fin). apply H3. subst.
-             constructor.
-             eapply ALL_IX_SUPPORTED_Struct_fields; eauto.
-             eapply NO_VOID_Struct_fields; eauto.
-          -- subst. apply H4.
-          -- red. reflexivity.
-        * rewrite Forall2_eq. reflexivity.
-
-      + (* UNDEF Vector *)
-        cbn in *.
-        destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
-        subst.
-        inversion TYP_FIN. subst.  cbn in H0. cbn in H1.
-        assert (DVC1.uvalue_refine_strict (DVC1.DV1.UVALUE_Undef τ) (DVC1.DV2.UVALUE_Undef τ)) as HRA.
-        { red. cbn.  reflexivity. } 
-        assert (DVC1.DV2.uvalue_has_dtyp (DVC1.DV2.UVALUE_Undef τ) τ) as UVT.
-        { constructor; auto. }
-        specialize (IHτ _ _ _ MSR BS UVT HS HRA).
-        destruct IHτ as [BI [MIF [HMS [HR M]]]].
-        exists (concat (repeatN sz BI)). exists MIF.
-        eexists. eexists.  eexists; eauto.
-        split; eauto.
-        apply sbytes_refine_concat_repeatN.
-        auto.
-
-    - (* Structs *)
-      inversion UV_REF; clear UV_REF.
-      break_match_hyp_inv.
-      cbn in SERIALIZE.
-      destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
-      subst.
-      inversion TYPE_FIN. subst. cbn in *. clear TYPE_FIN.
-      rewrite map_monad_oom_Forall2 in Heqo.
-      revert ms_fin_start ms_inf_start MSR l MS BS HS Heqo H2.
-      induction H; intros ms_fin_start ms_inf_start MSR L MS BS HS HCONV HTYP;
-        inversion HCONV; inversion HTYP; subst.
-      + cbn in HS.
-        destruct HS as [EQ1 EQ2]; subst.
-        exists []. exists ms_inf_start. split; intuition.
-        exists ms_inf_start. exists []. cbn. tauto. cbn. constructor.
-      + inversion H8; subst. clear H8.
-        cbn in HS.
-        destruct HS as [MS2 [A [HSA [HR [AS [HAS [EQ1 EQ2]]]]]]].
-        subst.
-        specialize (H _ _ _ MSR A _ H3 HSA H9).
-        destruct H as (AINF & MS2INF & MSER & AREF & MREF).
-        specialize (IHForall2 _ _ MREF _ _ _ HAS H5 H10).
-        destruct IHForall2 as (ASINF & MFININF & (MS & (CS & MLL & EQ1 & EQ2)) & (ASREF & MREFF) ).
-        subst.
-        cbn. 
-        repeat match goal with
-          [ |- exists _ , _ ] => eexists 
-        | [ |- ?P /\ ?Q ]=> split 
-               end; eauto.
-        cbn.
-        apply Forall2_app; auto.
-
-    - (* Packed_structs *)
-      inversion UV_REF; clear UV_REF.
-      break_match_hyp_inv.
-      cbn in SERIALIZE.
-      destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
-      subst.
-      inversion TYPE_FIN. subst. cbn in *. clear TYPE_FIN.
-      rewrite map_monad_oom_Forall2 in Heqo.
-      revert ms_fin_start ms_inf_start MSR l MS BS HS Heqo H2.
-      induction H; intros ms_fin_start ms_inf_start MSR L MS BS HS HCONV HTYP;
-        inversion HCONV; inversion HTYP; subst.
-      + cbn in HS.
-        destruct HS as [EQ1 EQ2]; subst.
-        exists []. exists ms_inf_start. split; intuition.
-        exists ms_inf_start. exists []. cbn. tauto. cbn. constructor.
-      + inversion H8; subst. clear H8.
-        cbn in HS.
-        destruct HS as [MS2 [A [HSA [HR [AS [HAS [EQ1 EQ2]]]]]]].
-        subst.
-        specialize (H _ _ _ MSR A _ H3 HSA H9).
-        destruct H as (AINF & MS2INF & MSER & AREF & MREF).
-        specialize (IHForall2 _ _ MREF _ _ _ HAS H5 H10).
-        destruct IHForall2 as (ASINF & MFININF & (MS & (CS & MLL & EQ1 & EQ2)) & (ASREF & MREFF) ).
-        subst.
-        cbn. 
-        repeat match goal with
-          [ |- exists _ , _ ] => eexists 
-        | [ |- ?P /\ ?Q ]=> split 
-               end; eauto.
-        cbn.
-        apply Forall2_app; auto.
-
-    - (* Arrays *)
-      inversion UV_REF; clear UV_REF.
-      break_match_hyp_inv.
-      cbn in SERIALIZE.
-      destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
-      subst.
-      inversion TYPE_FIN. subst. cbn in *. clear TYPE_FIN.
-      rewrite map_monad_oom_Forall2 in Heqo.
-      rewrite map_monad_map_monad_In in HS.
-      eapply MemPropT_fin_inf_map_monad_In in HS.
-
-     + destruct HS as  [BI [MIF [HMS [HR M]]]].
-       exists (concat BI). exists MIF.
-       split.  cbn. exists MIF. exists BI.
-       split; auto.
-       rewrite map_monad_map_monad_In.
-       apply HMS. split; auto.
-       apply sbytes_refine_concat. apply HR.
-     + assumption.
-     + intros.
-       eapply IH; auto.
-       -- apply H2.
-       -- apply H3.
-       -- cbn in H4. apply H4.
-       -- rewrite Forall_forall in H7. eapply H7. auto.
-     + apply Heqo.
-
-    - (* Vectors *)
-      inversion UV_REF; clear UV_REF.
-      break_match_hyp_inv.
-      cbn in SERIALIZE.
-      destruct SERIALIZE as [MS [BS [HS [EQ1 EQ2]]]].
-      subst.
-      inversion TYPE_FIN. subst. cbn in *. clear TYPE_FIN.
-      rewrite map_monad_oom_Forall2 in Heqo.
-      rewrite map_monad_map_monad_In in HS.
-      eapply MemPropT_fin_inf_map_monad_In in HS.
-
-     + destruct HS as  [BI [MIF [HMS [HR M]]]].
-       exists (concat BI). exists MIF.
-       split.  cbn. exists MIF. exists BI.
-       split; auto.
-       rewrite map_monad_map_monad_In.
-       apply HMS. split; auto.
-       apply sbytes_refine_concat. apply HR.
-     + assumption.
-     + intros.
-       eapply IH; auto.
-       -- apply H3.
-       -- apply H4.
-       -- cbn in H5. apply H5.
-       -- rewrite Forall_forall in H8. eapply H8. auto.
-     + apply Heqo.
-
-    - (* Concatbytes *)
-      inversion UV_REF; clear UV_REF.
-      break_match_hyp_inv.
-
-      eapply MemPropT_fin_inf_bind
-               with (A_REF:=sbytes_refine)
-      ; [apply MSR | | | apply SERIALIZE].
-      + clear SERIALIZE.
-        intros.
-        eapply MemPropT_fin_inf_lift_ERR_RAISE_ERROR_ret; eauto.
-        intros.
-        rewrite H3 in H2.
-        cbn in H2. destruct H2; subst.
-        clear ms_fin_final ms_fin_start ms_inf_start MSR TYPE_FIN H1 H bytes_fin.
-        rewrite map_monad_oom_Forall2 in Heqo.
-        revert dt H0 a_fin0 H3.
-        induction Heqo; intros dt HIN BFIN MM.
-        * inversion MM.
-          exists []. cbn; split; auto. constructor.
-        * cbn in MM.
-          repeat break_match_hyp_inv.
-          assert (In x (x::l)) as IN by (left; auto).
-          destruct (HIN _ IN) as (UV & IDX & SID & EQ).
-          eapply extract_byte_to_sbyte_fin_inf in Heqs; eauto.
-          destruct Heqs as (BI & HBI & SBR).
-          assert (forall byte : DVC1.DV1.uvalue,
-            In byte l ->
-            exists (uv : DVC1.DV1.uvalue) idx (sid : store_id),
-              byte = DVC1.DV1.UVALUE_ExtractByte uv dt idx sid).
-          { intros. apply HIN. right.  assumption. }
-          destruct (IHHeqo dt H0 l0 eq_refl) as (BS & MM & BSR).
-          exists (BI::BS).
-          split.
-          -- cbn. rewrite HBI. rewrite MM. reflexivity.
-          -- constructor; auto.
-
-      + intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin BYTES_REF MSR_FINAL RESID.
-        eapply re_sid_ubytes_fin_inf; eauto.
+    intros ms_fin_start ms_fin_final ms_inf_start uv_fin uv_inf t bytes_fin MSR UV_REF SERIALIZE.
+    pose proof UV_REF as UV_REF';
+      cbn in UV_REF';
+      inversion UV_REF; subst; 
+      repeat break_match_hyp_inv;
+      eapply MemPropT_fin_inf_bind; [ | | | apply SERIALIZE]; eauto;
+      [intros *; eapply fresh_sid_fin_inf; eauto|];
+      
+      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_FRESH FRESH UBYTES;
+      cbn in SID; subst; destruct UBYTES; subst;
+      cbn;
+      eexists; eexists; split; [split; reflexivity|];
+      split; auto;
+      apply to_ubytes_fin_inf_eq; auto.
   Qed.
 
   Lemma serialize_sbytes_fin_inf_ub :
@@ -22628,26 +22164,12 @@ cofix CIH
       DVC1.uvalue_refine_strict uv_inf uv_fin ->
       Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv_fin t ms_fin_start (raise_ub msg) -> False.
   Proof.
-    intros ms_fin_start ms_inf_start uv_fin uv_inf t msg H H0 H1.
-    (* induction uv_fin.
-    all: try solve
-        [ cbn in H1; contradiction
-        | destruct H1; try contradiction;
-          destruct H1 as (?&?&?&?);
-          red in H2;
-          break_match_hyp_inv
-        ].
-
-    - induction t;
-        try solve
-          [ cbn in H1; contradiction
-          | destruct H1; try contradiction;
-            destruct H1 as (?&?&?&?);
-            red in H2;
-            break_match_hyp_inv
-          ].
-     *)
-  Admitted.
+    intros ms_fin_start ms_inf_start uv_fin uv_inf t msg MSR UV_REF SERIALIZE.
+    cbn in SERIALIZE.
+    destruct SERIALIZE; auto.
+    destruct H as (?&?&?&?).
+    auto.
+  Qed.
 
   Lemma serialize_sbytes_fin_inf_error :
     forall {ms_fin_start ms_inf_start uv_fin uv_inf t msg},
@@ -22656,15 +22178,18 @@ cofix CIH
       Memory64BitIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) uv_fin t ms_fin_start (raise_error msg) ->
       MemoryBigIntptr.MMEP.MemSpec.MemHelpers.serialize_sbytes (M:=MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) uv_inf t ms_inf_start (raise_error msg).
   Proof.
-    intros ms_fin_start ms_inf_start uv_fin uv_inf t msg H H0 H1.
-  Admitted.
+    intros ms_fin_start ms_inf_start uv_fin uv_inf t msg MSR UV_REF SERIALIZE.
+    cbn in *.
+    destruct SERIALIZE; auto.
+    destruct H as (?&?&?&?).
+    auto.
+  Qed.
 
   Lemma handle_store_fin_inf :
     forall {t addr_fin addr_inf uv_fin uv_inf ms_fin_start ms_fin_final ms_inf_start res_fin},
       MemState_refine_prop ms_inf_start ms_fin_start ->
       DVC1.dvalue_refine_strict addr_inf addr_fin ->
       DVC1.uvalue_refine_strict uv_inf uv_fin ->
-      DVC1.DV1.uvalue_has_dtyp uv_inf t ->
       Memory64BitIntptr.MMEP.MemSpec.handle_memory_prop unit
         (LLVMParams64BitIntptr.Events.Store t addr_fin uv_fin) ms_fin_start (ret (ms_fin_final, res_fin)) ->
       exists res_inf ms_inf_final,
@@ -22673,7 +22198,7 @@ cofix CIH
           res_inf = res_fin /\
           MemState_refine_prop ms_inf_final ms_fin_final.
   Proof.
-    intros t addr_fin addr_inf uv_fin uv_inf ms_fin_start ms_fin_final ms_inf_start res_fin MSR ADDR_REF VALUE_REF TYPE_INF HANDLE.
+    intros t addr_fin addr_inf uv_fin uv_inf ms_fin_start ms_fin_final ms_inf_start res_fin MSR ADDR_REF VALUE_REF HANDLE.
 
     red in HANDLE.
     induction addr_fin;
@@ -22730,13 +22255,12 @@ cofix CIH
       MemState_refine_prop ms_inf_start ms_fin_start ->
       DVC1.dvalue_refine_strict addr_inf addr_fin ->
       DVC1.uvalue_refine_strict uv_inf uv_fin ->
-      DVC1.DV1.uvalue_has_dtyp uv_inf t ->
       Memory64BitIntptr.MMEP.MemSpec.handle_memory_prop unit
         (LLVMParams64BitIntptr.Events.Store t addr_fin uv_fin) ms_fin_start (raise_ub msg) ->
       MemoryBigIntptr.MMEP.MemSpec.handle_memory_prop unit
         (LLVMParamsBigIntptr.Events.Store t addr_inf uv_inf) ms_inf_start (raise_ub msg).
   Proof.
-    intros t addr_fin addr_inf uv_fin uv_inf ms_fin_start ms_inf_start msg MSR ADDR_REF VALUE_REF TYPE_INF HANDLE.
+    intros t addr_fin addr_inf uv_fin uv_inf ms_fin_start ms_inf_start msg MSR ADDR_REF VALUE_REF HANDLE.
 
     red in HANDLE.
     induction addr_fin;
@@ -23143,85 +22667,6 @@ cofix CIH
       reflexivity.
   Qed.
 
-  Lemma monad_fold_right_deserialize_sbytes_fin_inf :
-    forall {fields : list dtyp} {bytes_fin bytes_inf}
-      (start seq_len : N)
-      (BYTES_REF : sbytes_refine bytes_inf bytes_fin)
-      rest_fin
-      (* (IHt :
-        forall (bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte)
-          (bytes_inf : list MemoryBigIntptr.MP.BYTE_IMPL.SByte)
-          (res_fin : LLVMParams64BitIntptr.Events.DV.uvalue),
-          sbytes_refine bytes_inf bytes_fin ->
-          Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_fin t = inr res_fin ->
-          exists res_inf : LLVMParamsBigIntptr.Events.DV.uvalue,
-            MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_inf t = inr res_inf /\
-              DVC1.uvalue_refine_strict res_inf res_fin) *)
-      (uv_fins : list LLVMParams64BitIntptr.Events.DV.uvalue),
-        (fix go (bytes : list Memory64BitIntptr.Byte.SByte) (fields : list dtyp) : err (list LLVMParams64BitIntptr.Events.DV.uvalue * list Memory64BitIntptr.Byte.SByte) := 
-          match fields with
-          | [] => ret ([], bytes)
-          | t::ts => 
-              '(bs1, bs2) <- split_n (N.to_nat (FiniteSizeof.FinSizeof.sizeof_dtyp dt)) bytes ;;
-              u <- Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bs1 t ;;
-              '(us, rest) <- go bs2 ts ;;
-              ret (u::us, rest)
-          end) bytes_fin fields = inr (uv_fins, rest_fin) ->
-      exists (uv_infs : list LLVMParamsBigIntptr.Events.DV.uvalue) rest_inf,
-        (monad_fold_right
-           (fun (acc : list LLVMParamsBigIntptr.Events.DV.uvalue) (idx : N) =>
-              uv <-
-                MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
-                  (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
-                     ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_inf) t;;
-              @ret err _ _ (uv :: acc)) (Nseq start (N.to_nat seq_len)) [] = inr uv_infs) /\
-          Forall2 DVC1.uvalue_refine_strict uv_infs uv_fins.
-  Proof.
-    intros t bytes_fin bytes_inf start seq_len BYTES_REF IHt uv_fins HFOLDR.
-    generalize dependent start.
-    generalize dependent uv_fins.
-    induction seq_len using N.peano_ind; intros uv_fins start HFOLDR.
-    - rewrite monad_fold_right_equation.
-      rewrite monad_fold_right_equation in HFOLDR.
-      cbn in HFOLDR; inv HFOLDR.
-      cbn.
-      exists [].
-      split; auto.
-    - rewrite monad_fold_right_equation.
-      rewrite monad_fold_right_equation in HFOLDR.
-      rewrite Nnat.N2Nat.inj_succ in *.
-      rewrite <- cons_Nseq.
-      rewrite <- cons_Nseq in HFOLDR.
-      destruct
-        (monad_fold_right
-           (fun (acc : list LLVMParams64BitIntptr.Events.DV.uvalue) (idx : N) =>
-              uv <-
-                Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
-                  (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t) ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;;
-              ret (uv :: acc)) (Nseq (N.succ start) (N.to_nat seq_len)) []) eqn:HFOLDR'; [cbn in HFOLDR; inv HFOLDR|].
-
-      cbn in HFOLDR.
-      break_match_hyp_inv.
-      eapply IHt with
-        (bytes_inf:=(between (start * FiniteSizeof.FinSizeof.sizeof_dtyp t) ((start + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_inf)) in Heqs.
-
-      2: {
-        apply Forall2_between; auto.
-      }
-
-      destruct Heqs as (uv_inf&DESER_INFS&REF).
-
-      apply IHseq_len in HFOLDR' as (uv_infs&HFOLDR'&REFS).
-
-      exists (uv_inf :: uv_infs).
-      split; auto.
-
-      rewrite HFOLDR'.
-      rewrite DESER_INFS.
-      cbn.
-      reflexivity.
-  Qed.
-
   Lemma deserialize_sbytes_fin_inf :
     forall {t bytes_fin bytes_inf res_fin},
       sbytes_refine bytes_inf bytes_fin ->
@@ -23232,194 +22677,14 @@ cofix CIH
   Proof.
     Transparent Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes.
     Transparent MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes.
-    induction t; intros bytes_fin bytes_inf res_fin BYTES DESER.
-    1-12,16:
-      try
-        solve
-        [ cbn in DESER;
-          cbn;
-          cbn in *;
-          inv DESER;
-          eexists; split; eauto;
-          apply from_ubytes_inf_fin; auto
-        ].
-
-    { (* Arrays *)
-      destruct (monad_fold_right
-            (fun (acc : list LLVMParams64BitIntptr.Events.DV.uvalue) (idx : N) =>
-             uv <-
-             Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
-               (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
-                  ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;;
-             ret (uv :: acc)) (Nseq 0 (N.to_nat sz)) []) eqn:HFOLDR.
-
-      cbn in HFOLDR.
-      cbn in DESER.
-      cbn in HFOLDR.
-      cbn in DESER.
-
-      eapply monad_fold_right_deserialize_sbytes_fin_inf in HFOLDR; eauto.
-      destruct HFOLDR as (uv_infs&HFOLDR&REF).
-      exists (LLVMParamsBigIntptr.Events.DV.UVALUE_Array uv_infs).
-      rewrite HFOLDR.
-      cbn.
-      split; auto.
-
-      (* TODO: Incorporate into solve_uvalue_refine_strict? *)
-      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation; auto.
-      rewrite <- map_monad_map_monad_InT.
-      unfold DVC1.uvalue_refine_strict in REF.
-      apply map_monad_oom_Forall2 in REF.
-      rewrite REF.
-      cbn.
-      reflexivity.
-    }
-
-    { (* Structs *)
-      cbn in DESER.
-      cbn.
-      unfold LLVMParams64BitIntptr.SIZEOF.sizeof_dtyp in *.
-      unfold LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp.
-
-      generalize dependent bytes_fin.
-      generalize dependent bytes_inf.
-      generalize dependent res_fin.
-      generalize dependent H.
-      induction fields; intros H res_fin bytes_inf bytes_fin BYTES DESER.
-      - inv DESER.
-        exists (DVC1.DV1.UVALUE_Struct []).
-        split; auto.
-        solve_uvalue_refine_strict.
-      - cbn in DESER.
-        repeat break_match_hyp_inv.
-
-        forward IHfields.
-        { intros u0 H0 bytes_fin0 bytes_inf0 res_fin H1 H2.
-          eapply H.
-          right; auto.
-          eauto.
-          auto.
-        }
-
-        cbn in Heqs0.
-        eapply IHfields in Heqs0.
-        2: {
-          apply Forall2_drop; eauto.
-        }
-        destruct Heqs0 as (uv_infs&FIELDS&REFS).
-
-        eapply H in Heqs.
-        2: left; auto.
-        2: apply Forall2_take; eauto.
-
-        destruct Heqs as (uv_inf&DESA&REF).
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in REFS.
-        break_match_hyp_inv; try solve [clear FIELDS; break_match_hyp_inv; break_match_hyp_inv; break_match_hyp_inv].
-        break_match_hyp_inv.
-        exists (DVC1.DV1.UVALUE_Struct (uv_inf :: fields1)).
-
-        rewrite DESA.
-        cbn.
-        cbn.
-        setoid_rewrite FIELDS.
-        split; auto.
-
-        (* TODO: Add this to solve_uvalue_refine_strict *)
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        rewrite map_monad_InT_cons.
-        cbn.
-        rewrite REF, Heqo.
-        reflexivity.
-    }
-
-    { (* Packed structs *)
-      cbn in DESER.
-      cbn.
-      unfold LLVMParams64BitIntptr.SIZEOF.sizeof_dtyp in *.
-      unfold LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp.
-
-      generalize dependent bytes_fin.
-      generalize dependent bytes_inf.
-      generalize dependent res_fin.
-      generalize dependent H.
-      induction fields; intros H res_fin bytes_inf bytes_fin BYTES DESER.
-      - inv DESER.
-        exists (DVC1.DV1.UVALUE_Packed_struct []).
-        split; auto.
-        solve_uvalue_refine_strict.
-      - cbn in DESER.
-        repeat break_match_hyp_inv.
-
-        forward IHfields.
-        { intros u0 H0 bytes_fin0 bytes_inf0 res_fin H1 H2.
-          eapply H.
-          right; auto.
-          eauto.
-          auto.
-        }
-
-        cbn in Heqs0.
-        eapply IHfields in Heqs0.
-        2: {
-          apply Forall2_drop; eauto.
-        }
-
-        destruct Heqs0 as (uv_infs&FIELDS&REFS).
-
-        eapply H in Heqs.
-        2: left; auto.
-        2: apply Forall2_take; eauto.
-
-        destruct Heqs as (uv_inf&DESA&REF).
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in REFS.
-        break_match_hyp_inv; try solve [clear FIELDS; break_match_hyp_inv; break_match_hyp_inv; break_match_hyp_inv].
-        break_match_hyp_inv.
-        exists (DVC1.DV1.UVALUE_Packed_struct (uv_inf :: fields1)).
-
-        rewrite DESA.
-        cbn.
-        cbn.
-        setoid_rewrite FIELDS.
-        split; auto.
-
-        (* TODO: Add this to solve_uvalue_refine_strict *)
-        rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation.
-        rewrite map_monad_InT_cons.
-        cbn.
-        rewrite REF, Heqo.
-        reflexivity.
-    }
-
-    { (* Vectors *)
-      cbn in DESER.
-      cbn.
-      unfold LLVMParams64BitIntptr.SIZEOF.sizeof_dtyp in *.
-      unfold LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp.
-
-      destruct (monad_fold_right
-            (fun (acc : list LLVMParams64BitIntptr.Events.DV.uvalue) (idx : N) =>
-             uv <-
-             Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
-               (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
-                  ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;;
-             ret (uv :: acc)) (Nseq 0 (N.to_nat sz)) []) eqn:HFOLDR; cbn in DESER; inv DESER.
-
-      eapply monad_fold_right_deserialize_sbytes_fin_inf in HFOLDR; eauto.
-      destruct HFOLDR as (uv_infs&HFOLDR&REF).
-      exists (LLVMParamsBigIntptr.Events.DV.UVALUE_Vector uv_infs).
-      rewrite HFOLDR.
-      cbn.
-      split; auto.
-
-      (* TODO: Incorporate into solve_uvalue_refine_strict? *)
-      rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation; auto.
-      rewrite <- map_monad_map_monad_InT.
-      unfold DVC1.uvalue_refine_strict in REF.
-      apply map_monad_oom_Forall2 in REF.
-      rewrite REF.
-      cbn.
-      reflexivity.
-    }
+    intros t bytes_fin bytes_inf res_fin BYTES DESER.
+    destruct t;
+      cbn in DESER;
+      cbn;
+      cbn in *;
+      inv DESER;
+      eexists; split; eauto;
+      apply from_ubytes_inf_fin; auto.
   Qed.
 
   Lemma monad_fold_right_deserialize_sbytes_fail_fin_inf :
@@ -23491,7 +22756,7 @@ cofix CIH
       MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes bytes_inf t = inl s.
   Proof.
     induction t; intros bytes_fin bytes_inf s BYTES DESER.
-    1-12,16:
+    all:
       try
         solve
         [ cbn in DESER;
@@ -23501,145 +22766,6 @@ cofix CIH
           eexists; split; eauto;
           apply from_ubytes_inf_fin; auto
         ].
-
-    { (* Arrays *)
-      cbn in DESER.
-      cbn.
-      unfold LLVMParams64BitIntptr.SIZEOF.sizeof_dtyp in *.
-      unfold LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp.
-
-      destruct (monad_fold_right
-            (fun (acc : list LLVMParams64BitIntptr.Events.DV.uvalue) (idx : N) =>
-             uv <-
-             Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
-               (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
-                  ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;;
-             ret (uv :: acc)) (Nseq 0 (N.to_nat sz)) []) eqn:HFOLDR; cbn in DESER; inv DESER.
-
-      (* rewrite FinLP.SIZEOF.sizeof_dtyp_array in BYTES_LENGTH. *)
-      eapply monad_fold_right_deserialize_sbytes_fail_fin_inf in HFOLDR; eauto.
-      rewrite HFOLDR; cbn; auto.
-    }
-
-    { (* Structs *)
-      cbn in DESER.
-      cbn.
-      unfold LLVMParams64BitIntptr.SIZEOF.sizeof_dtyp in *.
-      unfold LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp.
-
-      generalize dependent bytes_fin.
-      generalize dependent bytes_inf.
-      generalize dependent s.
-      generalize dependent H.
-      induction fields; intros H s bytes_inf bytes_fin BYTES DESER.
-      - inv DESER.
-      - cbn in DESER.
-        break_match_hyp_inv.
-        + eapply H in Heqs0.
-          2: left; auto.
-          2: apply Forall2_take; eauto.
-
-          rewrite Heqs0.
-          cbn; auto.
-        + eapply deserialize_sbytes_fin_inf in Heqs0.
-          2: apply Forall2_take; eauto.
-
-          destruct Heqs0 as (?&?&?).
-          rewrite H0.
-          cbn.
-
-          break_match_hyp_inv.
-          * cbn.
-            cbn in Heqs0.
-            eapply IHfields in Heqs0.
-            rewrite Heqs0; auto.
-            2: apply Forall2_drop; auto.
-
-            intros u0 H1 bytes_fin0 bytes_inf0 s0 H3 H4.
-            eapply H; eauto.
-            right; auto.
-          * eapply deserialize_sbytes_fin_inf in Heqs0.
-            2: apply Forall2_drop; eauto.
-            destruct Heqs0 as (?&?&?).
-
-            rewrite H1.
-            destruct u0; inv H4;
-              try
-                solve
-                [ rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in H3;
-                  break_match_hyp_inv; auto;
-                  break_match_hyp_inv
-                ].
-    }
-
-    { (* Packed structs *)
-      cbn in DESER.
-      cbn.
-      unfold LLVMParams64BitIntptr.SIZEOF.sizeof_dtyp in *.
-      unfold LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp.
-
-      generalize dependent bytes_fin.
-      generalize dependent bytes_inf.
-      generalize dependent s.
-      generalize dependent H.
-      induction fields; intros H s bytes_inf bytes_fin BYTES DESER.
-      - inv DESER.
-      - cbn in DESER.
-        break_match_hyp_inv.
-        + eapply H in Heqs0.
-          2: left; auto.
-          2: apply Forall2_take; eauto.
-
-          rewrite Heqs0.
-          cbn; auto.
-        + eapply deserialize_sbytes_fin_inf in Heqs0.
-          2: apply Forall2_take; eauto.
-
-          destruct Heqs0 as (?&?&?).
-          rewrite H0.
-          cbn.
-
-          break_match_hyp_inv.
-          * cbn.
-            cbn in Heqs0.
-            eapply IHfields in Heqs0.
-            rewrite Heqs0; auto.
-            2: apply Forall2_drop; auto.
-
-            intros u0 H1 bytes_fin0 bytes_inf0 s0 H3 H4.
-            eapply H; eauto.
-            right; auto.
-          * eapply deserialize_sbytes_fin_inf in Heqs0.
-            2: apply Forall2_drop; eauto.
-            destruct Heqs0 as (?&?&?).
-
-            rewrite H1.
-            destruct u0; inv H4;
-              try
-                solve
-                [ rewrite DVC1.uvalue_refine_strict_equation, DVC1.uvalue_convert_strict_equation in H3;
-                  break_match_hyp_inv; auto;
-                  break_match_hyp_inv
-                ].
-    }
-
-    { (* Vectors *)
-      cbn in DESER.
-      cbn.
-      unfold LLVMParams64BitIntptr.SIZEOF.sizeof_dtyp in *.
-      unfold LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp.
-
-      destruct (monad_fold_right
-            (fun (acc : list LLVMParams64BitIntptr.Events.DV.uvalue) (idx : N) =>
-             uv <-
-             Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes
-               (between (idx * FiniteSizeof.FinSizeof.sizeof_dtyp t)
-                  ((idx + 1) * FiniteSizeof.FinSizeof.sizeof_dtyp t) bytes_fin) t;;
-             ret (uv :: acc)) (Nseq 0 (N.to_nat sz)) []) eqn:HFOLDR; cbn in DESER; inv DESER.
-
-      eapply monad_fold_right_deserialize_sbytes_fail_fin_inf in HFOLDR; eauto.
-      rewrite HFOLDR; cbn; auto.
-    }
   Qed.
 
   (* TODO: Move this into memory model. Should be applicable to both fin / inf *)
@@ -24541,7 +23667,6 @@ cofix CIH
         unfold convert_SByte in Heqo1.
         repeat break_match_hyp_inv.
         admit.
-        admit.
       }
     }
 
@@ -25014,15 +24139,14 @@ cofix CIH
         MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop args0 ms_inf (raise_error msg_inf).
   Proof.
     intros args args0 ms_fin ms_inf msg_fin MSR ARGS HANDLER.
-
     repeat (destruct ARGS;
             try solve [cbn in *; eauto];
             match goal with
             | H: DVCInfFin.dvalue_refine_strict ?x _ |- _ =>
                 destruct x;
                 rewrite
-                  DVCInfFin.dvalue_refine_strict_equation,
-                  DVCInfFin.dvalue_convert_strict_equation in H;
+                  DVCInfFin.dvalue_refine_strict_equation in H;
+                  cbn in H;
                 inv H;
                 try solve [cbn in *; eauto]
             end).
@@ -25146,8 +24270,8 @@ cofix CIH
             | H: DVCInfFin.dvalue_refine_strict ?x _ |- _ =>
                 destruct x;
                 rewrite
-                  DVCInfFin.dvalue_refine_strict_equation,
-                  DVCInfFin.dvalue_convert_strict_equation in H;
+                  DVCInfFin.dvalue_refine_strict_equation in H;
+                cbn in H;
                 inv H;
                 try solve [cbn in *; eauto]
             end).
@@ -25421,7 +24545,6 @@ cofix CIH
       auto.
   Qed.
 
-  Print Assumptions model_E1E2_L0_orutt_strict_sound.
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
       L2_E1E2_orutt_strict t_inf t_fin ->
@@ -27690,7 +26813,7 @@ cofix CIH
                             [ repeat red;
                               left;
                               exists "Loading from something that isn't an address.";
-                              rewrite DVCInfFin.dvalue_refine_strict_equation, DVCInfFin.dvalue_convert_strict_equation in H0;
+                              unfold_dvalue_refine_strict_in H0;
                               destruct a0; cbn in H0; try break_match_hyp_inv; cbn; auto
                             ].
 
@@ -27920,11 +27043,6 @@ cofix CIH
                       rename H0 into DV_REF.
                       destruct DV_REF as [DV_REF UV_REF].
 
-                      assert (LLVMParamsBigIntptr.Events.DV.uvalue_has_dtyp v0 t) as TYPE.
-                      { (* TODO: Will need a well-typed predicate to prove this *)
-                        admit.
-                      }
-
                       eapply Interp_Memory_PropT_Vis
                         with (ta:= raise_ub "").
 
@@ -27933,7 +27051,7 @@ cofix CIH
                         left.
                         exists msg_spec.
                         eapply handle_store_fin_inf_ub.
-                        5: apply UB.
+                        4: apply UB.
                         all: eauto with FinInf.
                       }
 
@@ -28002,7 +27120,7 @@ cofix CIH
                             [ repeat red;
                               left;
                               exists "Writing something to somewhere that isn't an address.";
-                              rewrite DVCInfFin.dvalue_refine_strict_equation, DVCInfFin.dvalue_convert_strict_equation in H0;
+                              unfold_dvalue_refine_strict_in H0;
                               destruct a0; cbn in H0; try break_match_hyp_inv; cbn; auto
                             ].
 
@@ -28106,12 +27224,7 @@ cofix CIH
                     rewrite bind_ret_l in VIS_HANDLED.
                     destruct EV_REL as (?&?&?); subst.
 
-                    { assert (LLVMParamsBigIntptr.Events.DV.uvalue_has_dtyp v0 t) as TYPE.
-                      { (* TODO: Will need a well-typed predicate to prove this *)
-                        admit.
-                      }
-
-                      epose proof handle_store_fin_inf (lift_MemState_refine_prop s2) H0 H1 TYPE STORE_HANDLER as ([]&ms_inf'&STORE_INF&_&MSR_STORE).
+                    { epose proof handle_store_fin_inf (lift_MemState_refine_prop s2) H0 H1 STORE_HANDLER as ([]&ms_inf'&STORE_INF&_&MSR_STORE).
 
                       eapply Interp_Memory_PropT_Vis with
                         (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
@@ -30715,7 +29828,7 @@ cofix CIH
                     [ repeat red;
                       left;
                       exists "Loading from something that isn't an address.";
-                      rewrite DVCInfFin.dvalue_refine_strict_equation, DVCInfFin.dvalue_convert_strict_equation in H0;
+                      unfold_dvalue_refine_strict_in H0;
                       destruct a; cbn in H0; try break_match_hyp_inv; cbn; auto
                     ].
 
@@ -30976,11 +30089,6 @@ cofix CIH
               rename H0 into DV_REF.
               destruct DV_REF as [DV_REF UV_REF].
 
-              assert (LLVMParamsBigIntptr.Events.DV.uvalue_has_dtyp v t0) as TYPE.
-              { (* TODO: Will need a well-typed predicate to prove this *)
-                admit.
-              }
-
               pstep; red; cbn.
               eapply Interp_Memory_PropT_Vis
                 with (ta:= raise_ub "").
@@ -30990,7 +30098,7 @@ cofix CIH
                 left.
                 exists msg_spec.
                 eapply handle_store_fin_inf_ub.
-                5: apply UB.
+                4: apply UB.
                 all: eauto with FinInf.
               }
 
@@ -31100,7 +30208,7 @@ cofix CIH
                     [ repeat red;
                       left;
                       exists "Writing something to somewhere that isn't an address.";
-                      rewrite DVCInfFin.dvalue_refine_strict_equation, DVCInfFin.dvalue_convert_strict_equation in H0;
+                      unfold_dvalue_refine_strict_in H0;
                       destruct a; cbn in H0; try break_match_hyp_inv; cbn; auto
                     ].
 
@@ -31110,14 +30218,19 @@ cofix CIH
                 red in ERR.
                 repeat red in ERR.
                 destruct ERR as [ERR | ERR].
-                { (* TODO: Split into a lemma about serialize_sbytes and error? *)
-                  (* Errors in serialize_sbytes generally seem
-                          to happen when there's a type
-                          mismatch... May want new uvalue_has_dtyp_ind
-                          to be able to do this proof?
-                   *)
-                  cbn in ERR.
-                  admit.
+                { cbn.
+                  repeat red.
+                  right.
+                  left.
+                  exists msg.
+                  split; eauto.
+                  reflexivity.
+                  exists msg.
+                  repeat red.
+                  left.
+                  eapply serialize_sbytes_fin_inf_error; eauto.
+                  2: apply ERR.
+                  apply lift_MemState_refine_prop.
                 }
 
                 destruct ERR as (?&?&?&ERR).
@@ -31235,12 +30348,7 @@ cofix CIH
 
             destruct EV_REL as (?&?&?); subst.
 
-            { assert (LLVMParamsBigIntptr.Events.DV.uvalue_has_dtyp v t0) as TYPE.
-              { (* TODO: Will need a well-typed predicate to prove this *)
-                admit.
-              }
-
-              epose proof handle_store_fin_inf (lift_MemState_refine_prop s2) H0 H2 TYPE STORE_HANDLER as ([]&ms_inf'&STORE_INF&_&MSR_STORE).
+            { epose proof handle_store_fin_inf (lift_MemState_refine_prop s2) H0 H2 STORE_HANDLER as ([]&ms_inf'&STORE_INF&_&MSR_STORE).
 
               pstep; red; cbn.
               eapply Interp_Memory_PropT_Vis with
