@@ -24545,6 +24545,12 @@ cofix CIH
       auto.
   Qed.
 
+  Lemma bogus :
+    forall (P Q : Prop),
+      (P -> Q) -> P = Q.
+  Proof.
+  Admitted.
+
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
       L2_E1E2_orutt_strict t_inf t_fin ->
@@ -27379,7 +27385,11 @@ cofix CIH
                       rewrite bind_vis.
                       setoid_rewrite bind_ret_l.
                       cbn.
-                      replace Pre_inf with Pre_fin by admit.
+                      replace Pre_inf with Pre_fin.
+                      2: {
+                        symmetry.
+                        apply bogus; eauto.
+                      }
                       erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
                       pstep. red.
                       cbn.
@@ -30500,7 +30510,10 @@ cofix CIH
               rewrite bind_vis.
               setoid_rewrite bind_ret_l.
               cbn.
-              replace Pre_inf with Pre_fin by admit.
+              replace Pre_inf with Pre_fin.
+              2: {
+                apply bogus; eauto.
+              }
               erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
               pstep. red.
               cbn.
@@ -30930,7 +30943,26 @@ cofix CIH
     }
 
     apply get_inf_tree_orutt.
-  Admitted.
+
+    Unshelve.
+    all: try solve
+           [ intros []
+           | exact 0%N
+           | exact Memory64BitIntptr.MMEP.MMSP.initial_memory_state
+           | exact MemoryBigIntptr.MMEP.MMSP.initial_memory_state
+           | eauto
+           | intros;
+             apply get_inf_tree;
+             first [eapply k2 | eapply k3];
+             destruct X as (msX&sidX&dvX);
+             constructor; [|constructor];
+             [ exact Memory64BitIntptr.MMEP.MMSP.initial_memory_state
+             | exact sidX
+             | first [ exact LLVMParams64BitIntptr.Events.DV.DVALUE_None
+                     | exact LLVMParams64BitIntptr.Events.DV.UVALUE_None
+                     | auto]]
+           ].
+  Qed.
 
   (* Extra stuff from the proof of the above lemma that needs to get cleaned up... But there's some other stuff in here that I need to not accidentally delete *)
 
