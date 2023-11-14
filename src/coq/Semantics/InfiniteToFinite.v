@@ -10983,10 +10983,8 @@ cofix CIH
     pose proof ITOP.int_to_ptr_provenance _ _ _ ADDR_CONV. subst.
     unfold LLVMParams64BitIntptr.PROV.access_allowed in *.
     unfold LLVMParamsBigIntptr.PROV.access_allowed in *.
-
-    (* TODO: Need to expose access_allowed *)
-    admit.
-  Admitted.
+    reflexivity.
+  Qed.
 
   Lemma inf_fin_access_allowed :
     forall addr_fin addr_inf aid res,
@@ -11002,10 +11000,8 @@ cofix CIH
     pose proof ITOP.int_to_ptr_provenance _ _ _ ADDR_CONV. subst.
     unfold LLVMParams64BitIntptr.PROV.access_allowed in *.
     unfold LLVMParamsBigIntptr.PROV.access_allowed in *.
-
-    (* TODO: Need to expose access_allowed *)
-    admit.
-  Admitted.
+    reflexivity.
+  Qed.
 
   Lemma fin_inf_read_byte_allowed :
     forall addr_fin addr_inf ms_fin ms_inf,
@@ -30964,6 +30960,7 @@ cofix CIH
            ].
   Qed.
 
+  Print Assumptions model_E1E2_23_orutt_strict.
   (* Extra stuff from the proof of the above lemma that needs to get cleaned up... But there's some other stuff in here that I need to not accidentally delete *)
 
   (* TODO: Move this *)
