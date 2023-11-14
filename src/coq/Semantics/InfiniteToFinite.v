@@ -27130,14 +27130,19 @@ cofix CIH
                         red in ERR.
                         repeat red in ERR.
                         destruct ERR as [ERR | ERR].
-                        { (* TODO: Split into a lemma about serialize_sbytes and error? *)
-                          (* Errors in serialize_sbytes generally seem
-                          to happen when there's a type
-                          mismatch... May want new uvalue_has_dtyp_ind
-                          to be able to do this proof?
-                           *)
-                          cbn in ERR.
-                          admit.
+                        { cbn.
+                          repeat red.
+                          right.
+                          left.
+                          exists msg.
+                          split; eauto.
+                          reflexivity.
+                          exists msg.
+                          repeat red.
+                          left.
+                          eapply serialize_sbytes_fin_inf_error; eauto.
+                          2: apply ERR.
+                          apply lift_MemState_refine_prop.
                         }
 
                         destruct ERR as (?&?&?&ERR).
@@ -27340,135 +27345,127 @@ cofix CIH
                     rename Pre into Pre_inf.
                     rename Pre0 into Pre_fin.
 
-                    (* eapply Interp_Memory_PropT_Vis *)
-                    (*   with (k2:= *)
-                    (*           fun (x : {_ : InterpreterStackBigIntptr.LP.Events.DV.dvalue | True}) => *)
-                    (*             (let (x4, p) := x in *)
-                    (*              get_inf_tree *)
-                    (*                match DVCInfFin.dvalue_convert_strict x4 with *)
-                    (*                | NoOom a => k5 (exist (fun _ : dvalue => True) a p) *)
-                    (*                | Oom s => raiseOOM s *)
-                    (*                end)). *)
+                    cbn.
+                    match goal with
+                    | |- 
+                        interp_memory_PropTF _ _ _ _ _ _ _
+                          (VisF ?e ?k) =>
+                        change (VisF e k) with (observe (Vis e k))
+                    end.
 
-                    (* 2: { *)
-                    (*   cbn. *)
-                    (*   red. *)
-                    (*   reflexivity. *)
-                    (* } *)
-                    (* 2: { *)
-                    (*   rewrite get_inf_tree_equation. *)
-                    (*   cbn. *)
-                    (*   rewrite bind_bind. *)
-                    (*   rewrite bind_trigger. *)
-                    (*   setoid_rewrite bind_ret_l. *)
-                    (*   erewrite <- fin_to_inf_uvalue_refine_strict'; eauto. *)
-                    (*   assert (Pre_inf = Pre_fin). *)
-                    (*   { admit. (* TODO: Not provable? *) *)
-                    (*   } *)
-                    (*   subst. *)
+                    eapply Interp_Memory_PropT_Vis with
+                        (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                                match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                                | NoOom dv_fin => get_inf_tree (k2 (s2, (s1, exist _ dv_fin I)))
+                                | Oom s => raiseOOM s
+                                end)
+                        )
+                      (s1:=s1)
+                      (s2:=lift_MemState s2).
 
-                    (*   cbn. *)
-                    (*   pstep. red. cbn. *)
-                    (*   eapply EqVis. *)
-                    (*   intros v. *)
+                    2: {
+                      cbn.
+                      red.
+                      cbn.
+                      rewrite bind_trigger.
+                      reflexivity.
+                    }
 
-                    (*   with (k2:= *)
-                    (*           fun (v : {_ : InterpreterStackBigIntptr.LP.Events.DV.dvalue | True}) => *)
-                    (*           (let (x4, p) := v in *)
-                    (*            get_inf_tree *)
-                    (*              match DVCInfFin.dvalue_convert_strict x4 with *)
-                    (*              | NoOom a => k5 (exist (fun _ : dvalue => True) a p) *)
-                    (*              | Oom s => raiseOOM s *)
-                    (*              end)). *)
+                    2: {
+                      rewrite resum_to_subevent.
+                      repeat setoid_rewrite subevent_subevent.
+                      right.
+                      cbn.
+                      rewrite bind_vis.
+                      setoid_rewrite bind_ret_l.
+                      cbn.
+                      replace Pre_inf with Pre_fin by admit.
+                      erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+                      pstep. red.
+                      cbn.
+                      constructor.
+                      intros v.
+                      red.
+                      left.
+                      destruct v.
+                      cbn.
+                      break_match_goal.
+                      2: {
+                        (* OOM *)
+                        rewrite get_inf_tree_equation.
+                        cbn.
+                        unfold raiseOOM, print_msg.
+                        eapply paco2_eqit_RR_refl.
+                        typeclasses eauto.
+                      }
 
+                      move REL0 after Heqo.
+                      specialize (REL0 (exist (fun _ : dvalue => True) d t)).
+                      red in REL0.
+                      pclearbot.
+                      rewrite REL0.
+                      destruct t.
 
-                    (*   red. left. *)
-                    (*   destruct v. *)
+                      eapply paco2_eqit_RR_refl; typeclasses eauto.
+                    }
 
-                    (* } *)
-                    (*   { intros a b H H1 H2. *)
-                    (*     destruct b. destruct p. *)
-                    (*     cbn in *; subst. *)
-                    (*     right. *)
+                    intros a b H H0 H1.
+                    destruct a.
+                    destruct b as (?&?&?&?).
+                    destruct t, t0.
 
-                    (*     left. *)
+                    cbn.
+                    break_match_goal.
+                    2: {
+                      left.
+                      pstep; red; cbn.
+                      observe_vis.
+                      eapply Interp_Memory_PropT_Vis_OOM.
+                      reflexivity.
+                    }
 
-                    (*   } *)
+                    right.
+                    rewrite (itree_eta_ (k0 _)).
+                    rewrite (itree_eta_ (k2 _)).
 
-                    (*     with *)
-                    (*     (k2:=(fun '(ms_inf, (sid', uv_inf)) => *)
-                    (*             get_inf_tree (k2 (s2, (s1, x))))). *)
+                    eapply CIH.
+                    2: {
+                      repeat red.
+                      repeat rewrite <- itree_eta.
+                      specialize (HK (exist _ d I)
+                                    (s2, (s1, exist _ d I))).
+                      forward HK; cbn; auto.
+                      { eapply ReturnsVis.
+                        unfold ITree.trigger.
+                        cbn.
+                        reflexivity.
+                        cbn.
+                        constructor; reflexivity.
+                      }
+                      forward HK.
+                      { rewrite HSPEC.
+                        eapply ReturnsVis.
+                        reflexivity.
+                        constructor; reflexivity.
+                      }
 
-                    (*   eapply Interp_Memory_PropT_Vis. *)
-                    (*   3: { *)
-                    (*     rewrite get_inf_tree_equation. *)
-                    (*     cbn. *)
-                    (*   } *)
-                    (* - specialize (EQ t1); contradiction. *)
+                      forward HK; cbn; auto.
+                      pclearbot.
+                      apply HK.
+                    }
 
+                    repeat rewrite <- itree_eta.
+                    specialize (REL (exist (fun _ : InterpreterStackBigIntptr.LP.Events.DV.dvalue => True) x1 I)).
+                    red in REL.
+                    pclearbot.
+                    rewrite REL.
 
-
-
-                    (*           get_inf_tree (k2 (s2, (s2, r))))). *)
-                    (* eapply Interp_Memory_PropT_Vis with *)
-                    (*   (ta:=trigger (E1.pick Pre0 (fin_to_inf_uvalue x0))). *)
-                    (* 3: { *)
-                    (*   rewrite VIS_HANDLED. *)
-                    (*   rewrite get_inf_tree_equation. *)
-                    (*   red. *)
-                    (*   cbn. *)
-
-                    (* } *)
-
-                    (* destruct t2; pinversion VIS_HANDLED; subst_existT. *)
-                    (* { exfalso; eapply EQ; eauto. } *)
-                    (* subst_existT. *)
-
-                    (* eapply Interp_Memory_PropT_Vis. *)
-                    (* 3: { *)
-                    (*   rewrite get_inf_tree_equation. *)
-                    (*   cbn. *)
-
-                    (* } *)
-                    (* - intros a b H H1 H2. *)
-                    (*   left. *)
-                    (*   setoid_rewrite REL. *)
-                    (*   apply REL. *)
-
-                    (* rewrite get_inf_tree_equation. *)
-                    (* cbn. *)
-                    (* pfold. red. *)
-                    (* cbn. *)
-
-                    (* eapply Interp_Memory_PropT_Vis with *)
-                    (*   (k2:=(fun res : {_ : InfLP.Events.DV.dvalue | True} => *)
-                    (*           let (x4, p) := res in *)
-                    (*           get_inf_tree *)
-                    (*             match DVCInfFin.dvalue_convert_strict x4 with *)
-                    (*             | NoOom a => k (exist (fun _ : dvalue => True) a p) *)
-                    (*             | Oom s => raiseOOM s *)
-                    (*             end)). *)
-
-
-
-                    (*   (k2:=(fun '(ms_inf, (sid', dv_inf)) => *)
-                    (*           get_inf_tree (k2 (ms_store, (st', tt))))) *)
-                    (*   (s1:=s1) *)
-                    (*   (s2:=lift_MemState s2). *)
-
-                    (* constructor. *)
-
-                    (* cbn *)
-
-                    (* epose proof (@itree_eta _ _ t2). *)
-
-                    (* punfold VIS_HANDLED. *)
-                    (* cbn in VIS_HANDLED. *)
-                    (* red in VIS_HANDLED. *)
-                    (* dependent induction VIS_HANDLED. *)
-                    (* - admit. *)
-                    (* - specialize (EQ *)
-                    admit.
+                    eapply K_RUTT.
+                    split; eauto.
+                    split; eauto.
+                    cbn in H1.
+                    inv H1.
+                    auto.
                   }
 
                   { (* OOM *)
@@ -30433,7 +30430,6 @@ cofix CIH
             cbn in HANDLER.
             rewrite HANDLER in VIS_HANDLED.
             rewrite bind_vis in VIS_HANDLED.
-            setoid_rewrite bind_ret_l in VIS_HANDLED.
             destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
             { exfalso.
               clear - VIS_HANDLED.
@@ -30455,7 +30451,137 @@ cofix CIH
                 inversion H5.
             }
 
-            admit.
+            pstep; red; cbn.
+            punfold VIS_HANDLED; red in VIS_HANDLED; cbn in VIS_HANDLED.
+            genobs t2 ot2.
+            clear t2 Heqot2.
+            dependent induction VIS_HANDLED.
+            2: {
+              cbn.
+              constructor; eauto.
+            }
+
+            cbn.
+            rename Pre into Pre_inf.
+            rename Pre0 into Pre_fin.
+            subst.
+
+            cbn.
+            match goal with
+            | |- 
+                interp_memory_PropTF _ _ _ _ _ _ _
+                  (VisF ?e ?k) =>
+                change (VisF e k) with (observe (Vis e k))
+            end.
+
+            eapply Interp_Memory_PropT_Vis with
+              (k2:=(fun '(ms_inf, (sid', dv_inf)) =>
+                      match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                      | NoOom dv_fin => get_inf_tree (k3 (s2, (s1, exist _ dv_fin I)))
+                      | Oom s => raiseOOM s
+                      end)
+              )
+              (s1:=s1)
+              (s2:=lift_MemState s2).
+
+            2: {
+              cbn.
+              red.
+              cbn.
+              rewrite bind_trigger.
+              reflexivity.
+            }
+
+            2: {
+              rewrite resum_to_subevent.
+              repeat setoid_rewrite subevent_subevent.
+              right.
+              cbn.
+              rewrite bind_vis.
+              setoid_rewrite bind_ret_l.
+              cbn.
+              replace Pre_inf with Pre_fin by admit.
+              erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+              pstep. red.
+              cbn.
+              constructor.
+              intros v.
+              red.
+              left.
+              destruct v.
+              cbn.
+              break_match_goal.
+              2: {
+                (* OOM *)
+                rewrite get_inf_tree_equation.
+                cbn.
+                unfold raiseOOM, print_msg.
+                eapply paco2_eqit_RR_refl.
+                typeclasses eauto.
+              }
+
+              destruct t.
+              specialize (REL (exist (fun _ : dvalue => True) d I)).
+              red in REL. pclearbot.
+              rewrite REL.
+              rewrite bind_ret_l.
+              eapply paco2_eqit_RR_refl; typeclasses eauto.
+            }
+
+            intros a b H H0 H2.
+            destruct a.
+            destruct b as (?&?&?&?).
+            destruct t, t0.
+
+            cbn.
+            break_match_goal.
+            2: {
+              left.
+              pstep; red; cbn.
+              observe_vis.
+              eapply Interp_Memory_PropT_Vis_OOM.
+              reflexivity.
+            }
+
+            right.
+            rewrite (itree_eta_ (k0 _)).
+            rewrite (itree_eta_ (k3 _)).
+            eapply CIH.
+            2: {
+              repeat red.
+              repeat rewrite <- itree_eta.
+              specialize (HK (exist _ d I)
+                            (s2, (s1, exist _ d I))).
+              forward HK; cbn; auto.
+              { eapply ReturnsVis.
+                unfold ITree.trigger.
+                cbn.
+                reflexivity.
+                cbn.
+                constructor; reflexivity.
+              }
+              forward HK.
+              { rewrite HANDLER.
+                eapply ReturnsVis.
+                reflexivity.
+                constructor; reflexivity.
+              }
+
+              forward HK; cbn; auto.
+              pclearbot.
+              apply HK.
+            }
+
+            repeat rewrite <- itree_eta.
+            specialize (REL0 (exist (fun _ : InterpreterStackBigIntptr.LP.Events.DV.dvalue => True) x1 I)
+                          (exist (fun _ : DVCInfFin.DV2.dvalue => True) d I)).
+            cbn in REL0.
+            forward REL0.
+            split; eauto.
+            split; eauto.
+            cbn in H2; inv H2; auto.
+            pclearbot.
+            auto.
           }
 
           { (* OOM *)
