@@ -17147,12 +17147,14 @@ cofix CIH
     tauto.
   Qed.
 
-  (* TODO: move this... Need to expose provenance_to_allocation_id to prove this *)
+  (* TODO: move this... *)
   Lemma provenance_to_allocation_id_fin_inf :
     forall pr,
       FinPROV.provenance_to_allocation_id pr = InfPROV.provenance_to_allocation_id pr.
   Proof.
-  Admitted.
+    intros pr.
+    reflexivity.
+  Qed.
 
   Lemma extend_allocations_fin_inf :
     forall {ms_inf_start ms_fin_start ms_inf_final ms_fin_final addrs_fin addrs_inf pr},
