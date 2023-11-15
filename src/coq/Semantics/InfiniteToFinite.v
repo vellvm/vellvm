@@ -23188,50 +23188,52 @@ cofix CIH
     repeat break_match_hyp_inv.
   Admitted.
 
-  Lemma all_bytes_from_uvalue_fin_inf_helper_Some :
+  Lemma all_bytes_from_uvalue_fin_inf_helper_None :
     forall {bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte}
       {bytes_inf : list MemoryBigIntptr.MP.BYTE_IMPL.SByte}
-      {parent_fin parent_inf idx sid uv_fin}
+      {parent_fin parent_inf idx sid}
       (BYTES : sbytes_refine bytes_inf bytes_fin),
       DVC1.uvalue_refine_strict parent_inf parent_fin ->
-      Memory64BitIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper idx sid parent_fin bytes_fin = Some uv_fin ->
-      MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper idx sid parent_inf bytes_inf = Some parent_inf.
+      Memory64BitIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper idx sid parent_fin bytes_fin = None ->
+      MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper idx sid parent_inf bytes_inf = None.
   Proof.
-    intros bytes_fin bytes_inf parent_fin parent_inf idx sid uv_fin BYTES REF ALL.
-    revert parent_fin parent_inf idx sid uv_fin REF ALL.
-    induction BYTES; intros parent_fin parent_inf idx sid uv_fin REF ALL.
+    intros bytes_fin bytes_inf parent_fin parent_inf idx sid BYTES REF ALL.
+    revert parent_fin parent_inf idx sid REF ALL.
+    induction BYTES; intros parent_fin parent_inf idx sid REF ALL.
     - cbn in *; inv ALL.
-      split; eauto.
-    - cbn in ALL.
-      repeat break_match_hyp_inv.
-      destruct u0, u1, u2.
-      eapply IHBYTES in H2; eauto.
-      Transparent MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper.
-      cbn.
+    - Transparent MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper.
+      Transparent Memory64BitIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper.
+      cbn in ALL.
       destruct x.
       red in H.
       unfold convert_SByte in H.
       cbn in H.
+      move H after ALL.
       break_match_hyp_inv.
-      rewrite FinLLVM.MEM.Byte.sbyte_to_extractbyte_of_uvalue_sbyte in Hequ.
-      inv Hequ.
+      rewrite FinLLVM.MEM.Byte.sbyte_to_extractbyte_of_uvalue_sbyte in ALL.
+      cbn.
       rewrite InfLLVM.MEM.Byte.sbyte_to_extractbyte_of_uvalue_sbyte.
-      rewrite Heqo.
       unfold OptionUtil.guard_opt in *.
-      repeat break_match_hyp_inv.
-      pose proof RelDec.rel_dec_correct u parent_fin.
-      apply H in Heqb0; subst.
-      break_inner_match_goal.
-      * eauto.
-      * red in REF.
+      repeat break_match_hyp_inv; auto.
+      + break_inner_match_goal; auto.
+        pose proof RelDec.rel_dec_correct u parent_fin.
+        apply H in Heqb0; subst.
+        pose proof RelDec.rel_dec_correct uv parent_inf.
+        apply H1 in Heqb2; subst.
+        eauto.
+      + break_inner_match_goal; auto.
+      + break_inner_match_goal; auto.
+        break_inner_match_goal; auto.
+        pose proof RelDec.rel_dec_correct uv parent_inf.
+        apply H in Heqb1; subst.
         pose proof DVC1.uvalue_refine_strict_R2_injective.
         red in H0.
-        specialize (H0 _ _ _ _ Heqo2 REF).
+        specialize (H0 _ _ _ _ Heqo REF).
         destruct H0.
-        forward H1; auto.
+        forward H0; auto.
         subst.
-        rewrite Util.eq_dec_eq in Heqb0.
-        inv Heqb0.        
+        rewrite Util.eq_dec_eq in Heqb.
+        inv Heqb.
   Qed.
 
   Lemma all_bytes_from_uvalue_fin_inf_None :
@@ -23243,26 +23245,35 @@ cofix CIH
         MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue dt bytes_inf = None.
   Proof.
     intros.
-    destruct bytes_fin.
-    - inversion BYTES. subst.
-      cbn.  reflexivity.
-    - cbn in H.
-      unfold MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue.
-      inversion BYTES; subst; auto.
-      break_match_goal; auto.
-      unfold OptionUtil.guard_opt.
-      break_match_goal; auto.
-      cbn.
-      break_match_goal; auto.
+    destruct BYTES; cbn in *; auto.
+    destruct x.
+    red in H0.
+    unfold convert_SByte in H0.
+    cbn in H0.
+    move H0 after H.
+    break_match_hyp_inv.
+
+    rewrite Memory64BitIntptr.Byte.sbyte_to_extractbyte_of_uvalue_sbyte in H.
+    rewrite MemoryBigIntptr.Byte.sbyte_to_extractbyte_of_uvalue_sbyte.
+
+    unfold OptionUtil.guard_opt in *.
+    rewrite Util.eq_dec_eq.
+    rewrite Util.eq_dec_eq in H.
+    rewrite N.eqb_refl.
+    rewrite N.eqb_refl in H.
+    repeat break_match_hyp_inv; cbn in *; eauto; try lia.
+
+    - break_inner_match_goal; eauto.
+      eapply all_bytes_from_uvalue_fin_inf_helper_None; eauto.
+    - break_inner_match_goal; eauto.
+    - break_inner_match_goal; eauto.
+      exfalso.
+      unfold Coqlib.proj_sumbool in Heqb, Heqb1.
       break_match_hyp_inv.
-      destruct (sbyte_to_extract_byte_inversion1 H3 Hequ) as [ui1 [ui2 EQ]].
-      rewrite EQ in H.
-      rewrite Heqb in H.
-      cbn in H.
       break_match_hyp_inv.
-      unfold OptionUtil.guard_opt in *.
-      break_match_hyp_inv.
-  Admitted.
+      apply n.
+      eapply uvalue_refine_strict_has_dtyp; eauto.
+  Qed.
 
   Lemma from_ubytes_inf_fin :
     forall {bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte}
