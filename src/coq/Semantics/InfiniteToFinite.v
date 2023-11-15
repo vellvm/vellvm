@@ -22999,35 +22999,64 @@ cofix CIH
         (Memory64BitIntptr.MMEP.MMSP.MemByte.from_ubytes bytes_fin dt).
   Proof.
     intros bytes_fin bytes_inf dt BYTES.
-    unfold DVC1.uvalue_refine_strict.
-    
 
     assert (length bytes_inf = length bytes_fin) as BYTE_LENGTH.
     { eapply sbytes_refine_length; eauto.
     }
 
     unfold MemoryBigIntptr.MMEP.MMSP.MemByte.from_ubytes.
-
     unfold Memory64BitIntptr.MMEP.MMSP.MemByte.from_ubytes.
-    break_match_goal.
-    - rewrite BYTE_LENGTH in Heqb. rewrite Heqb.
-      destruct (Memory64BitIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue dt bytes_fin) eqn:Heqo.
-      + destruct (all_bytes_from_uvalue_fin_inf_Some BYTES Heqo) as [uv_inf [HEQ HR]].
-        rewrite HEQ. apply HR.
-      + erewrite all_bytes_from_uvalue_fin_inf_None; eauto.
-        cbn.
-        break_match_goal.
-        2: {
-          apply map_monad_OOM_fail in Heqo0.
-          destruct Heqo0 as (?&?&?).
-          admit. (* sbyte_refine... *)
-        }
+    rewrite <- BYTE_LENGTH.
 
-        rewrite map_monad_map_oom in Heqo0.
-        admit.
-    - cbn.
-      admit.
-  Admitted.
+    break_match_goal.
+    2: {
+      clear Heqb BYTE_LENGTH.
+      induction BYTES.
+      - cbn.
+        unfold DVC1.uvalue_refine_strict;
+          cbn; reflexivity.
+      - unfold DVC1.uvalue_refine_strict in *.
+        cbn.
+        destruct x.
+        rewrite MemoryBigIntptr.Byte.sbyte_to_extractbyte_of_uvalue_sbyte.
+        cbn.
+        red in H.
+        unfold convert_SByte in *.
+        cbn in H.
+        break_match_hyp_inv.
+        cbn in *.
+        break_match_hyp_inv.
+        rewrite Memory64BitIntptr.Byte.sbyte_to_extractbyte_of_uvalue_sbyte.
+        reflexivity.
+    }
+
+    { destruct (Memory64BitIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue dt bytes_fin) eqn:ALL.
+      - eapply all_bytes_from_uvalue_fin_inf_Some in ALL; eauto.
+        destruct ALL as (?&?&?).
+        rewrite H; auto.
+      - eapply all_bytes_from_uvalue_fin_inf_None in ALL; eauto.
+        rewrite ALL.
+
+        clear Heqb BYTE_LENGTH ALL.
+        induction BYTES.
+        + cbn.
+          unfold DVC1.uvalue_refine_strict;
+            cbn; reflexivity.
+        + unfold DVC1.uvalue_refine_strict in *.
+          cbn.
+          destruct x.
+          rewrite MemoryBigIntptr.Byte.sbyte_to_extractbyte_of_uvalue_sbyte.
+          cbn.
+          red in H.
+          unfold convert_SByte in *.
+          cbn in H.
+          break_match_hyp_inv.
+          cbn in *.
+          break_match_hyp_inv.
+          rewrite Memory64BitIntptr.Byte.sbyte_to_extractbyte_of_uvalue_sbyte.
+          reflexivity.
+    }
+  Qed.
 
   #[global] Opaque Memory64BitIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes.
   #[global] Opaque MemoryBigIntptr.MMEP.MemSpec.MemHelpers.deserialize_sbytes.
