@@ -14034,8 +14034,16 @@ cofix CIH
     - red; red in UP.
       destruct ms_fin.
       cbn in *.
-      (* TODO: need to expose provenance_lt / next_provenance definitions *)
-  Admitted.
+      unfold LLVMParams64BitIntptr.PROV.provenance_lt,
+        LLVMParamsBigIntptr.PROV.provenance_lt in *.
+      auto.
+    - red; red in UP.
+      destruct ms_fin.
+      cbn in *.
+      unfold LLVMParams64BitIntptr.PROV.provenance_lt,
+        LLVMParamsBigIntptr.PROV.provenance_lt in *.
+      auto.
+  Qed.
 
   Lemma inf_fin_used_provenance_prop :
     forall ms_inf ms_fin p,
