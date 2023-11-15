@@ -2044,16 +2044,26 @@ Lemma lift_memory_convert_mem_byte :
     cbn in *.
     repeat break_match_hyp_inv.
 
-    split; [|split; [|split; [|split; [|split; [|split; [|split]]]]]].
-    - red; reflexivity.
-    - red.
-      split.
-      red.
+    eapply MMEP.MemSpec.MemState_eqv'_MemState_eqv.
+    split; eauto; [|red; reflexivity].
+    { pose proof convert_memory_inv ms as (ms''&?).
+      pose proof convert_FrameStack_lift fss as (fss''&?&?).
+      pose proof convert_Heap_lift hs as (hs''&?&?).
 
-      Transparent convert_memory.
-      Transparent convert_FrameStack.
-      Transparent convert_Heap.
-  Admitted.
+      rewrite H in Heqo0; inv Heqo0.
+      rewrite H0 in Heqo; inv Heqo.
+      rewrite H2 in Heqo1; inv Heqo1.
+
+      eapply build_up_memory_stack_eqv; eauto.
+      epose proof lift_memory_convert_memory_inversion H.
+      symmetry.
+      eauto.
+    }
+    
+    Transparent convert_memory.
+    Transparent convert_FrameStack.
+    Transparent convert_Heap.
+  Qed.
 
   (* TODO: Need a MemState_refine_prop that takes all of the predicates
       like write_byte_all_preserved and bundles them in one place
