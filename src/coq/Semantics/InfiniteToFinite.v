@@ -22849,25 +22849,50 @@ cofix CIH
   Qed.
 
   (* TODO: Move this *)
+  Lemma all_bytes_from_uvalue_helper_has_dtyp :
+    forall {bytes idx sid parent t uv},
+      E1.DV.uvalue_has_dtyp parent t ->
+      MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper idx sid parent bytes = Some uv ->
+      E1.DV.uvalue_has_dtyp uv t.
+  Proof.
+    induction bytes; intros idx sid parent t uv TYP ALL.
+    - cbn in *.
+      inv ALL; auto.
+    - cbn in ALL.
+      repeat break_match_hyp_inv.
+      destruct u0, u1, u2.
+      destruct a.
+      rewrite MemoryBigIntptr.Byte.sbyte_to_extractbyte_of_uvalue_sbyte in Hequ.
+      inv Hequ.
+      eauto.
+  Qed.
+
+  (* TODO: Move this *)
   Lemma all_bytes_from_uvalue_has_dtyp :
     forall {bytes t uv},
       MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue t bytes = Some uv ->
       E1.DV.uvalue_has_dtyp uv t.
   Proof.
-    (* TODO: Is this true? *)
-    induction bytes. intros t uv ALL.
-    - cbn in ALL. discriminate.
-    - intros t uv H.
-      unfold MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue in H.
-      repeat break_match_hyp_inv.
-      unfold OptionUtil.guard_opt in *.
-      repeat break_match_hyp_inv.
-      assert (u2 = u).
-      apply RelDec.rel_dec_correct; auto.
-      subst.
-      apply dtyp_eqb_eq in Heqb3; subst.
-      apply N.eqb_eq in Heqb; subst.
-  Admitted.
+    intros bytes t uv ALL.
+    unfold MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue in ALL.
+    destruct bytes; try discriminate.
+
+    destruct s.
+    rewrite MemoryBigIntptr.Byte.sbyte_to_extractbyte_of_uvalue_sbyte in ALL.
+    Opaque MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper.
+    cbn in ALL.
+    break_match_hyp_inv.
+    break_match_hyp_inv.
+    eapply all_bytes_from_uvalue_helper_has_dtyp; eauto.
+    destruct (dtyp_eqb t dt) eqn:HDTYP;
+      cbn in Heqo; inv Heqo.
+    destruct (Coqlib.proj_sumbool LLVMParamsBigIntptr.Events.DV.uvalue_has_dtyp_dec) eqn:HUVT;
+      cbn in Heqo0; inv Heqo0.
+    unfold Coqlib.proj_sumbool in HUVT.
+    break_match_hyp_inv.
+    apply dtyp_eqb_eq in HDTYP; subst.
+    auto.
+  Qed.
 
   (* TODO: Move this *)
   Lemma from_ubytes_dtyp :
