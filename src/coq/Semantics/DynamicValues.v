@@ -3528,7 +3528,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | UVALUE_ConcatBytes_typ :
     forall bytes dt,
       ALL_IX_SUPPORTED dt ->
-      (forall byte, In byte bytes -> exists uv idx sid, byte = UVALUE_ExtractByte uv dt idx sid) ->
+      (forall byte, In byte bytes -> exists uv t idx sid, byte = UVALUE_ExtractByte uv t idx sid) ->
       N.of_nat (length bytes) = sizeof_dtyp dt ->
       uvalue_has_dtyp (UVALUE_ConcatBytes bytes dt) dt.
 
@@ -3683,7 +3683,7 @@ Hint Constructors uvalue_has_dtyp : uvalue.
     Hypothesis IH_UVALUE_ConcatBytes :
       forall bytes dt,
         ALL_IX_SUPPORTED dt ->        
-        (forall byte, In byte bytes -> exists uv idx sid, byte = UVALUE_ExtractByte uv dt idx sid) ->
+        (forall byte, In byte bytes -> exists uv t idx sid, byte = UVALUE_ExtractByte uv t idx sid) ->
         N.of_nat (length bytes) = sizeof_dtyp dt ->
         P (UVALUE_ConcatBytes bytes dt) dt.
 
@@ -4116,8 +4116,8 @@ Hint Constructors uvalue_has_dtyp : uvalue.
             if N.eq_dec (N.of_nat (length bytes)) (sizeof_dtyp dt) then
               forallb (fun byte =>
                          match byte with
-                         | UVALUE_ExtractByte _ dt' _ _ =>
-                             if dtyp_eq_dec dt dt' then true else false 
+                         | UVALUE_ExtractByte _ _ _ _ =>
+                             true
                          | _ => false
                          end) bytes
             else false 
@@ -4264,7 +4264,7 @@ Hint Constructors uvalue_has_dtyp : uvalue.
       rewrite forallb_forall in H1.
       specialize (H1 _ HIN).
       repeat break_match_hyp_inv.
-      do 3 eexists. reflexivity.
+      do 4 eexists. reflexivity.
       Unshelve. 
       all : constructor.
   Qed.
@@ -4311,9 +4311,8 @@ Hint Constructors uvalue_has_dtyp : uvalue.
       rewrite forallb_forall.
       intros.
       specialize (H0 x H2).
-      destruct H0 as [uv [idx [sid EQ]]].
-      subst.
-      break_match_goal; auto.
+      destruct H0 as [uv [t [idx [sid EQ]]]]. 
+      subst; reflexivity.
   Qed.
       
         

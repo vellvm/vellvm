@@ -21051,19 +21051,18 @@ cofix CIH
         rewrite map_monad_oom_Forall2 in Heqo.      
         apply Forall2_flip in Heqo.
         destruct (Forall2_In _ _ _ _ H2 Heqo) as [x [HIN HX]].
-        destruct (H0 _ HIN) as [y [u [sid HY]]].
+        destruct (H0 _ HIN) as [u [t [idx [sid HY]]]].
         subst.
         cbn in HX.
         repeat break_match_hyp_inv.
-        eexists. eexists. eexists.  reflexivity.
+        do 4 eexists.
+        reflexivity.
       + apply map_monad_oom_length in Heqo.
         rewrite <- Heqo.
         rewrite <- H1.
         reflexivity.
         Unshelve.
-        eauto.
-        eauto.
-        eauto.
+        all: eauto.
   Qed.        
 
   (* TODO: move this to where filter_sid_matches is defined *)
@@ -22873,37 +22872,29 @@ cofix CIH
   (* TODO: Move this *)
   Lemma from_ubytes_dtyp :
     forall {bytes t uv},
+      ALL_IX_SUPPORTED t ->
       MemoryBigIntptr.MMEP.MMSP.MemByte.from_ubytes bytes t = uv ->
       N.of_nat (Datatypes.length bytes) = LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp t ->
       E1.DV.uvalue_has_dtyp uv t.
   Proof.
-    intros bytes t uv UBYTES SIZE.
+    intros bytes t uv SUPPORTED UBYTES SIZE.
     unfold MemoryBigIntptr.MMEP.MMSP.MemByte.from_ubytes in *.
     rewrite SIZE in UBYTES.
     rewrite N.eqb_refl in UBYTES.
     break_match_hyp; subst.
-    - (* Not sure what happens if `uv` doesn't have the same type as `t`...
-
-             Technically I could construct a bunch of
-             `(UVALUE_ExtractByte uv dt idx sid)` values where `uv`
-             does not have type `dt`...
-
-             This `all_bytes_from_uvalue` function will just pull out
-             the uvalue as is... Is that a problem?
-
-             all_bytes_from_uvalue will make sure that `dt` agrees
-             across all of the ExtractByte values, but it doesn't care
-             about `uv` at all.
-       *)
-      eapply all_bytes_from_uvalue_has_dtyp; eauto.
+    - eapply all_bytes_from_uvalue_has_dtyp; eauto.
     - constructor; auto.
-      admit.
-      + intros byte MAP.
-        apply in_map_iff in MAP.
-        destruct MAP as (raw_byte & EXTRACT & IN).
+      + intros byte IN.
+        apply in_map_iff in IN.
+        destruct IN as (x&BYTE&IN).
+        destruct x.
+        rewrite MemoryBigIntptr.Byte.sbyte_to_extractbyte_of_uvalue_sbyte in BYTE.
         subst.
-        induction bytes.
-  Admitted.
+        exists uv, dt, idx, sid.
+        reflexivity.
+      + rewrite map_length.
+        auto.
+  Qed.
 
   Lemma all_bytes_from_uvalue_fin_inf_Some :
     forall {bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte}
@@ -31007,8 +30998,8 @@ cofix CIH
             }
 
             cbn.
-            rename Pre into Pre_inf.
-            rename Pre0 into Pre_fin.
+            rename Pre0 into Pre_inf.
+            rename Pre into Pre_fin.
             subst.
 
             cbn.
@@ -31045,7 +31036,7 @@ cofix CIH
               rewrite bind_vis.
               setoid_rewrite bind_ret_l.
               cbn.
-              replace Pre_inf with Pre_fin.
+              replace Pre_fin with Pre_inf.
               2: {
                 apply bogus; eauto.
               }
@@ -35188,6 +35179,7 @@ cofix CIH
     apply model_E1E2_56_orutt_strict; apply model_E1E2_L5_orutt_strict_sound.
   Qed.
 
+  Print Assumptions model_E1E2_L6_orutt_strict_sound.
 
   (* Bogus for safety... *)
   euoauaohuhaoseu
