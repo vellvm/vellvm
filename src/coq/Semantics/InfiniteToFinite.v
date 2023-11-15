@@ -13239,21 +13239,6 @@ cofix CIH
       auto.
   Qed.
 
-  (* SAZ: Do these next *)
-  (* TODO: Move this *)
-  Lemma memory_stack_frame_stack_prop_lift_inv :
-    forall ms_inf fs_inf,
-      InfMem.MMEP.MMSP.memory_stack_frame_stack_prop ms_inf fs_inf ->
-      exists ms_fin fs_fin,
-        ms_inf = lift_memory_stack ms_fin /\
-          fs_inf = lift_FrameStack fs_fin /\
-          FinMem.MMEP.MMSP.memory_stack_frame_stack_prop ms_fin fs_fin.
-  Proof.
-    intros ms_inf fs_inf FSP.
-    red in FSP.
-  Admitted.
-
-  (* SAZ: Do these next *)
   (* TODO: Move this *)
   Lemma frame_stack_preserved_lift_MemState :
     forall ms_fin ms_fin',
@@ -13265,18 +13250,23 @@ cofix CIH
     destruct ms_fin, ms_fin'; cbn in *.
     intros fs.
     split; intros MSFSP.
-    - red.
-      apply memory_stack_frame_stack_prop_lift_inv in MSFSP.
-      destruct MSFSP as (?&?&?&?&?); subst.
-      apply memory_stack_frame_stack_prop_lift in H1.
-      rewrite <- H in H1.
-      apply memory_stack_frame_stack_prop_lift.
-      apply FSP.
-      apply memory_stack_frame_stack_prop_lift_inv in H1.
-      auto.
-      admit.
-    - admit.
-  Admitted.
+    - red; red in MSFSP.
+      red in FSP.
+      rewrite <- MSFSP.
+      destruct ms_memory_stack, ms_memory_stack0; cbn in *.
+      apply frame_stack_eqv_lift.
+      eapply FSP.
+      red; cbn.
+      reflexivity.
+    - red; red in MSFSP.
+      red in FSP.
+      rewrite <- MSFSP.
+      destruct ms_memory_stack, ms_memory_stack0; cbn in *.
+      apply frame_stack_eqv_lift.
+      eapply FSP.
+      red; cbn.
+      reflexivity.
+  Qed.
 
   (* Lemma fin_inf_root_in_heap_prop_lift : *)
   (*   forall h root, *)
