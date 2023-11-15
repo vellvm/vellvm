@@ -23095,6 +23095,26 @@ cofix CIH
         inv Heqb0.        
   Qed.
 
+  Lemma all_bytes_from_uvalue_fin_helper_Some_same_uv :
+    forall {bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte}
+      {bytes_inf : list MemoryBigIntptr.MP.BYTE_IMPL.SByte}
+      {parent_fin parent_inf idx sid uv_fin}
+      (BYTES : sbytes_refine bytes_inf bytes_fin),
+      DVC1.uvalue_refine_strict parent_inf parent_fin ->
+      Memory64BitIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper idx sid parent_fin bytes_fin = Some uv_fin ->
+      parent_fin = uv_fin.
+  Proof.
+    intros bytes_fin bytes_inf parent_fin parent_inf idx sid uv_fin BYTES REF ALL.
+    revert parent_fin parent_inf idx sid uv_fin REF ALL.
+    induction BYTES; intros parent_fin parent_inf idx sid uv_fin REF ALL.
+    - cbn in *; inv ALL.
+      split; eauto.
+    - cbn in ALL.
+      repeat break_match_hyp_inv.
+      destruct u0, u1, u2.
+      eapply IHBYTES in H2; eauto.
+  Qed.
+
   Lemma all_bytes_from_uvalue_fin_inf_Some :
     forall {bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte}
       {bytes_inf : list MemoryBigIntptr.MP.BYTE_IMPL.SByte}
@@ -23122,9 +23142,9 @@ cofix CIH
     rewrite MemoryBigIntptr.Byte.sbyte_to_extractbyte_of_uvalue_sbyte.
     rewrite Heqo.
 
+    pose proof all_bytes_from_uvalue_fin_helper_Some_same_uv BYTES Heqo4 H1; subst.
     eapply all_bytes_from_uvalue_fin_inf_helper_Some in H1; eauto.
-    destruct H1 as (?&?&?).
-    exists x.
+    exists uv.
     split; eauto.
 
     destruct (Coqlib.proj_sumbool LLVMParamsBigIntptr.Events.DV.uvalue_has_dtyp_dec) eqn:HUVT;
@@ -23133,7 +23153,7 @@ cofix CIH
       break_match_hyp_inv.
     2: {
       exfalso.
-      unfold OptionUtil.guard_opt in H2.
+      unfold OptionUtil.guard_opt in H0.
       break_match_hyp_inv.
       unfold Coqlib.proj_sumbool in Heqb.
       break_match_hyp_inv.
@@ -23143,11 +23163,10 @@ cofix CIH
     cbn.
     Transparent MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper.
     unfold MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper.
-    rewrite MemoryBigIntptr.Byte.sbyte_to_extractbyte_of_uvalue_sbyte.
     rewrite Heqo1, Heqo3.
     rewrite Util.eq_dec_eq.
     cbn.
-    eapply H.
+    eapply H1.
   Qed.
 
   Opaque MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper.
@@ -23168,7 +23187,53 @@ cofix CIH
     inversion BYTES.
     repeat break_match_hyp_inv.
   Admitted.
-  
+
+  Lemma all_bytes_from_uvalue_fin_inf_helper_Some :
+    forall {bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte}
+      {bytes_inf : list MemoryBigIntptr.MP.BYTE_IMPL.SByte}
+      {parent_fin parent_inf idx sid uv_fin}
+      (BYTES : sbytes_refine bytes_inf bytes_fin),
+      DVC1.uvalue_refine_strict parent_inf parent_fin ->
+      Memory64BitIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper idx sid parent_fin bytes_fin = Some uv_fin ->
+      MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper idx sid parent_inf bytes_inf = Some parent_inf.
+  Proof.
+    intros bytes_fin bytes_inf parent_fin parent_inf idx sid uv_fin BYTES REF ALL.
+    revert parent_fin parent_inf idx sid uv_fin REF ALL.
+    induction BYTES; intros parent_fin parent_inf idx sid uv_fin REF ALL.
+    - cbn in *; inv ALL.
+      split; eauto.
+    - cbn in ALL.
+      repeat break_match_hyp_inv.
+      destruct u0, u1, u2.
+      eapply IHBYTES in H2; eauto.
+      Transparent MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper.
+      cbn.
+      destruct x.
+      red in H.
+      unfold convert_SByte in H.
+      cbn in H.
+      break_match_hyp_inv.
+      rewrite FinLLVM.MEM.Byte.sbyte_to_extractbyte_of_uvalue_sbyte in Hequ.
+      inv Hequ.
+      rewrite InfLLVM.MEM.Byte.sbyte_to_extractbyte_of_uvalue_sbyte.
+      rewrite Heqo.
+      unfold OptionUtil.guard_opt in *.
+      repeat break_match_hyp_inv.
+      pose proof RelDec.rel_dec_correct u parent_fin.
+      apply H in Heqb0; subst.
+      break_inner_match_goal.
+      * eauto.
+      * red in REF.
+        pose proof DVC1.uvalue_refine_strict_R2_injective.
+        red in H0.
+        specialize (H0 _ _ _ _ Heqo2 REF).
+        destruct H0.
+        forward H1; auto.
+        subst.
+        rewrite Util.eq_dec_eq in Heqb0.
+        inv Heqb0.        
+  Qed.
+
   Lemma all_bytes_from_uvalue_fin_inf_None :
     forall {bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte}
       {bytes_inf : list MemoryBigIntptr.MP.BYTE_IMPL.SByte}
