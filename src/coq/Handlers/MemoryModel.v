@@ -3194,7 +3194,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     {
       old_heap_lu : forall ptr',
         disjoint_ptr_byte ptr ptr' ->
-        forall root, ptr_in_heap_prop h1 root ptr' <-> ptr_in_heap_prop h2 root ptr';
+        ptr_in_heap_prop h1 root ptr' <-> ptr_in_heap_prop h2 root ptr';
 
       old_heap_lu_different_root : forall root',
         disjoint_ptr_byte root root' ->

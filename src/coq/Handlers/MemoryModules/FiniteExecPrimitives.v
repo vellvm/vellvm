@@ -689,7 +689,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         (* unfold FSNth_eqv in *. *)
         destruct ADD as [OLD NEW].
         split.
-        + intros ptr'0 DISJOINT root.
+        + intros ptr'0 DISJOINT.
           rewrite <- RS.
           rewrite <- XY.
           auto.
@@ -707,7 +707,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           auto.
       - destruct ADD as [OLD NEW].
         split.
-        + intros ptr'0 DISJOINT root.
+        + intros ptr'0 DISJOINT.
           rewrite RS.
           rewrite XY.
           auto.
@@ -863,7 +863,15 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       - left.
         split; auto.
         specialize (old_heap_lu0 _ DISJOINT).
-        apply old_heap_lu0; auto.
+        pose proof disjoint_ptr_byte_dec root root' as [DISJOINT' | NDISJOINT'].
+        + eapply old_heap_lu_different_root0; eauto.
+        + apply Classical_Prop.NNPP in NDISJOINT'.
+          red.
+          rewrite <- NDISJOINT'.
+          apply old_heap_lu0.
+          red.
+          rewrite NDISJOINT'.
+          apply F'.
       - unfold disjoint_ptr_byte in NDISJOINT.
         assert (ptr_to_int ptr = ptr_to_int ptr') as EQ by lia.
         right.
@@ -1096,7 +1104,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           * pose proof disjoint_ptr_byte_dec root root0 as [DISJOINT | NDISJOINT].
             -- eapply old_heap_lu_different_root1; eauto.
             -- pose proof disjoint_ptr_byte_dec ptr ptr0 as [DISJOINT' | NDISJOINT'].
-               ++ eapply old_heap_lu1; eauto.
+               ++ apply Classical_Prop.NNPP in NDISJOINT.
+                  red. rewrite <- NDISJOINT.
+                  red in new_heap_lu1.
+                  eapply old_heap_lu1; eauto.
+                  red. rewrite NDISJOINT.
+                  apply IN.
                ++ unfold disjoint_ptr_byte in NDISJOINT'.
                   assert (ptr_to_int ptr = ptr_to_int ptr0) as EQ by lia.
 
@@ -1110,7 +1123,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           * pose proof disjoint_ptr_byte_dec root root0 as [DISJOINT | NDISJOINT].
             -- eapply old_heap_lu_different_root1; eauto.
             -- pose proof disjoint_ptr_byte_dec ptr ptr0 as [DISJOINT' | NDISJOINT'].
-               ++ eapply old_heap_lu1; eauto.
+               ++ apply Classical_Prop.NNPP in NDISJOINT.
+                  red. rewrite <- NDISJOINT.
+                  red in new_heap_lu1.
+                  eapply old_heap_lu1; eauto.
+                  red. rewrite NDISJOINT.
+                  apply IN1.
                ++ unfold disjoint_ptr_byte in NDISJOINT'.
                   assert (ptr_to_int ptr = ptr_to_int ptr0) as EQ by lia.
 
@@ -1133,7 +1151,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           * pose proof disjoint_ptr_byte_dec root root0 as [DISJOINT | NDISJOINT].
             -- eapply old_heap_lu_different_root0; eauto.
             -- pose proof disjoint_ptr_byte_dec ptr ptr0 as [DISJOINT' | NDISJOINT'].
-               ++ eapply old_heap_lu0; eauto.
+               ++ apply Classical_Prop.NNPP in NDISJOINT.
+                  red. rewrite <- NDISJOINT.
+                  red in new_heap_lu0.
+                  eapply old_heap_lu0; eauto.
+                  red. rewrite NDISJOINT.
+                  apply IN.
                ++ unfold disjoint_ptr_byte in NDISJOINT'.
                   assert (ptr_to_int ptr = ptr_to_int ptr0) as EQ by lia.
 
@@ -1147,7 +1170,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           * pose proof disjoint_ptr_byte_dec root root0 as [DISJOINT | NDISJOINT].
             -- eapply old_heap_lu_different_root0; eauto.
             -- pose proof disjoint_ptr_byte_dec ptr ptr0 as [DISJOINT' | NDISJOINT'].
-               ++ eapply old_heap_lu0; eauto.
+               ++ apply Classical_Prop.NNPP in NDISJOINT.
+                  red. rewrite <- NDISJOINT.
+                  red in new_heap_lu0.
+                  eapply old_heap_lu0; eauto.
+                  red. rewrite NDISJOINT.
+                  apply IN1.
                ++ unfold disjoint_ptr_byte in NDISJOINT'.
                   assert (ptr_to_int ptr = ptr_to_int ptr0) as EQ by lia.
 
@@ -1717,7 +1745,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       intros root ptr ms ms' ADD.
       split.
       - (* Old *)
-        intros ptr' DISJOINT root'.
+        intros ptr' DISJOINT.
         destruct ms as [mem fs h].
         unfold add_to_heap in *.
         unfold ptr_in_heap_prop in *.
@@ -1727,31 +1755,17 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
         split; intros IN.
         + unfold add_with.
-          destruct (Z.eq_dec (ptr_to_int root') (ptr_to_int root)) as [EQR | NEQR].
           * unfold Block in *.
             unfold Iptr in *.
-            rewrite EQR in *.
             break_inner_match.
             -- rewrite IP.F.add_eq_o; firstorder.
             -- contradiction.
-          * unfold Block in *.
-            unfold Iptr in *.
-            break_inner_match.
-            -- rewrite IP.F.add_neq_o; firstorder.
-            -- rewrite IP.F.add_neq_o; firstorder.
         + unfold add_with in *.
-          destruct (Z.eq_dec (ptr_to_int root') (ptr_to_int root)) as [EQR | NEQR].
-          * unfold Block in *.
-            unfold Iptr in *.
-            rewrite EQR in *.
-            break_inner_match_hyp.
-            -- rewrite IP.F.add_eq_o in IN; firstorder.
-            -- rewrite IP.F.add_eq_o in IN; firstorder.
           * unfold Block in *.
             unfold Iptr in *.
             break_inner_match_hyp.
-            -- rewrite IP.F.add_neq_o in IN; firstorder.
-            -- rewrite IP.F.add_neq_o in IN; firstorder.
+            -- rewrite IP.F.add_eq_o in IN; firstorder.
+            -- rewrite IP.F.add_eq_o in IN; firstorder.
       - (* Disjoint roots *)
         intros root' H0 ptr'.
         inv ADD.
