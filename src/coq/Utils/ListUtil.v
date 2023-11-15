@@ -70,7 +70,21 @@ Lemma Nth_map_iff :
   forall {X Y} (f : X -> Y) xs i y,
     Util.Nth (map f xs) i y <-> (exists x, f x = y /\ Util.Nth xs i x).
 Proof.
-Admitted.
+  intros X Y f xs.
+  induction xs; intros i y.
+  - cbn.
+    split; intros H.
+    + destruct i; cbn in *; discriminate.
+    + destruct H as (x&FXY&H).
+      destruct i; cbn in *; discriminate.
+  - cbn.
+    split; intros H.
+    + destruct i; cbn in *; inv H; eauto.
+      eapply IHxs; eauto.
+    + destruct H as (x&FXY&H).
+      destruct i; cbn in *; inv H; eauto.
+      eapply IHxs; eauto.
+Qed.
 
 Lemma map_inj :
   forall {X Y} (f : X -> Y) xs1 xs2,
