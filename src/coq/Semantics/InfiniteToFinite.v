@@ -1535,6 +1535,442 @@ Lemma lift_memory_convert_mem_byte :
     eexists; eauto.
   Qed.
 
+  Lemma fin_to_inf_dvalue_refine_strict :
+    forall d,
+      DVC1.dvalue_refine_strict (fin_to_inf_dvalue d) d.
+  Proof.
+    intros d.
+    rewrite DVC1.dvalue_refine_strict_equation.
+    unfold fin_to_inf_dvalue.
+    break_match; cbn in *.
+    destruct p.
+    auto.
+  Qed.
+
+  Lemma fin_to_inf_uvalue_refine_strict :
+    forall u,
+      DVC1.uvalue_refine_strict (fin_to_inf_uvalue u) u.
+  Proof.
+    intros u.
+    rewrite DVC1.uvalue_refine_strict_equation.
+    unfold fin_to_inf_uvalue.
+    break_match; cbn in *.
+    destruct p.
+    auto.
+  Qed.
+
+  Import AListFacts.
+
+  Definition lift_local_env (lenv : InterpreterStack64BitIntptr.LLVM.Local.local_env) : InterpreterStackBigIntptr.LLVM.Local.local_env.
+    refine (map _ lenv).
+
+    refine (fun '(ix, uv) =>
+              let uv' := fin_to_inf_uvalue uv in
+              (ix, uv')).
+  Defined.
+
+  Definition lift_global_env (genv : InterpreterStack64BitIntptr.LLVM.Global.global_env) : InterpreterStackBigIntptr.LLVM.Global.global_env.
+    refine (map _ genv).
+
+    refine (fun '(ix, dv) =>
+              let dv' := fin_to_inf_dvalue dv in
+              (ix, dv')).
+  Defined.
+
+  Definition lift_stack (stack : InterpreterStack64BitIntptr.LLVM.Stack.lstack) : InterpreterStackBigIntptr.LLVM.Stack.lstack.
+    induction stack.
+    - exact [].
+    - exact (lift_local_env a :: IHstack).
+  Defined.
+
+  Lemma lift_local_env_refine_strict :
+    forall l,
+      local_refine_strict (lift_local_env l) l.
+  Proof.
+    induction l.
+    - cbn.
+      apply alist_refine_empty.
+    - destruct a.
+      apply alist_refine_cons; cbn; auto.
+      apply fin_to_inf_uvalue_refine_strict.
+  Qed.
+
+  Lemma lift_stack_refine_strict :
+    forall s,
+      stack_refine_strict (lift_stack s) s.
+  Proof.
+    induction s.
+    - cbn.
+      apply stack_refine_strict_empty.
+    - apply stack_refine_strict_add; auto.
+      apply lift_local_env_refine_strict.
+  Qed.
+
+  Lemma lift_global_env_refine_strict :
+    forall g,
+      global_refine_strict (lift_global_env g) g.
+  Proof.
+    induction g.
+    - cbn.
+      apply alist_refine_empty.
+    - destruct a.
+      apply alist_refine_cons; cbn; auto.
+      apply fin_to_inf_dvalue_refine_strict.
+  Qed.
+
+  Lemma convert_Frame_lift :
+    forall f,
+    exists f',
+      convert_Frame (lift_Frame f) = NoOom f' /\
+        FinMem.MMEP.MMSP.frame_eqv f f'.
+  Proof.
+    intros f.
+    induction f.
+    - cbn.
+      eexists; split; eauto.
+      reflexivity.
+    - cbn.
+      destruct IHf as (f'&CONV&EQV).
+      rewrite addr_convert_fin_to_inf_addr.
+      setoid_rewrite CONV.
+      eexists; split; eauto.
+      rewrite EQV.
+      reflexivity.
+  Qed.
+
+  Lemma convert_FrameStack_lift :
+    forall fs,
+    exists fs',
+      convert_FrameStack (lift_FrameStack fs) = NoOom fs' /\
+        FinMem.MMEP.MMSP.frame_stack_eqv fs fs'.
+  Proof.
+    induction fs.
+    - cbn.
+      pose proof (convert_Frame_lift f) as (f'&CONV&EQV).
+      rewrite CONV.
+      eexists; split; eauto.
+      rewrite EQV.
+      reflexivity.
+    - destruct IHfs as (fs' & CONV & EQV).
+      pose proof (convert_Frame_lift f) as (f'&CONVf&EQVf).
+      cbn.
+      rewrite CONVf.
+      setoid_rewrite CONV.
+      eexists; split; eauto.
+      rewrite EQVf, EQV.
+      reflexivity.
+  Qed.
+
+  Lemma convert_Block_lift :
+    forall b,
+      convert_Block (lift_Block b) = NoOom b.
+  Proof.
+    unfold lift_Block.
+    unfold convert_Block.
+    intros b.
+    apply map_monad_oom_Forall2.
+    induction b.
+    - cbn.
+      constructor.
+    - cbn.
+      constructor; auto.
+      apply addr_convert_fin_to_inf_addr.
+  Qed.
+
+  Lemma IntMaps_MapsTo_not_Empty :
+    forall elt k e m,
+      IntMaps.IM.MapsTo k e m ->
+      ~ IntMaps.IM.Empty (elt:=elt) m.
+  Proof.
+    intros elt k e m MAPS.
+    intros CONTRA.
+    eapply CONTRA.
+    eapply MAPS.
+  Qed.
+
+  Lemma IntMaps_empty_map :
+    forall {elt elt'} m f,
+      IntMaps.IM.Empty (elt:=elt') (IntMaps.IM.map f m) ->
+      IntMaps.IM.Empty (elt:=elt) m.
+  Proof.
+    intros elt elt'.
+    induction m using IntMaps.IP.map_induction;
+      intros f EMPTY; eauto.
+
+    intros k e' CONTRA.
+    eapply EMPTY.
+    apply IntMaps.IP.F.find_mapsto_iff.
+    rewrite (@IntMaps.IP.F.map_o elt elt' m2 x f).
+    specialize (H0 x).
+    rewrite IntMaps.IP.F.add_eq_o in H0; auto.
+    rewrite H0.
+    reflexivity.
+  Qed.
+
+  Lemma convert_Heap_lift :
+    forall h,
+    exists h',
+      convert_Heap (lift_Heap h) = NoOom h' /\
+        FinMemMMSP.heap_eqv h h'.
+  Proof.
+    intros h.
+
+    Opaque convert_Block.
+    Opaque lift_Block.
+    Opaque IntMaps.IM.elements.
+    unfold convert_Heap.
+    cbn.
+    break_match_goal.
+    2: {
+      exfalso.
+      apply map_monad_OOM_fail in Heqo.
+      destruct Heqo as (?&?&?).
+      break_match_hyp.
+      break_match_hyp_inv.
+      eapply SetoidList.In_InA in H; eauto.
+      eapply IntMaps.IP.F.elements_mapsto_iff in H.
+      2: apply IntMaps.IP.eqke_equiv.
+
+      unfold lift_Heap in H.
+      apply IntMaps.IP.F.map_mapsto_iff in H.
+      destruct H as (?&?&?).
+      subst.
+      rewrite convert_Block_lift in Heqo.
+      discriminate.
+    }
+
+    eexists.
+    split; eauto.
+    apply map_monad_oom_Forall2 in Heqo.
+    dependent induction Heqo.
+    - split.
+      + symmetry in x.
+        unfold lift_Heap in x.
+        apply IntMaps.IP.elements_Empty in x.
+        apply IntMaps_empty_map in x.
+        intros root; split; intros ROOT.
+        * exfalso.
+          red in ROOT.
+          apply IntMaps.member_lookup in ROOT.
+          destruct ROOT.
+          apply IntMaps.IP.F.find_mapsto_iff in H.
+          eapply x.
+          apply MapsTo_filter_dom_true.
+          split; [|eapply H].
+          eapply in_bounds_ptr_to_int_fin.
+        * exfalso.
+          red in ROOT.
+          cbn in ROOT.
+          discriminate.
+      + symmetry in x.
+        unfold lift_Heap in x.
+        apply IntMaps.IP.elements_Empty in x.
+        apply IntMaps_empty_map in x.
+        intros root; split; intros ROOT.
+        * exfalso.
+          red in ROOT.
+          break_match_hyp; auto.
+          apply IntMaps.IP.F.find_mapsto_iff in Heqo.
+          eapply x.
+          apply MapsTo_filter_dom_true.
+          split; [|eapply Heqo].
+          eapply in_bounds_ptr_to_int_fin.
+        * exfalso.
+          red in ROOT.
+          cbn in ROOT; auto.
+    - destruct x0.
+      break_match_hyp_inv.
+
+    Transparent convert_Block.
+    Transparent lift_Block.
+    Transparent IntMaps.IM.elements.
+  Admitted.
+
+  Lemma convert_memory_stack_lift :
+    forall ms,
+    exists ms',
+      convert_memory_stack (lift_memory_stack ms) = NoOom ms' /\
+        MMEP.MemSpec.memory_stack_eqv ms ms'.
+  Proof.
+    induction ms.
+
+    Opaque convert_memory lift_memory.
+    Opaque convert_Heap lift_Heap.
+    Opaque convert_FrameStack lift_FrameStack.
+
+    cbn.
+    pose proof convert_memory_inv memory_stack_memory.
+    destruct H.
+
+    pose proof convert_FrameStack_lift memory_stack_frame_stack
+      as (fs'&CONVfs&EQVfs).
+    rewrite CONVfs.
+
+    pose proof convert_Heap_lift memory_stack_heap as
+      (h'&CONVh&EQVh).
+    rewrite CONVh.
+
+    eexists; split; try rewrite H; eauto.
+    admit.
+
+    Transparent convert_memory lift_memory.
+    Transparent convert_Heap lift_Heap.
+    Transparent convert_FrameStack lift_FrameStack.
+  Admitted.
+
+  Lemma fin_to_inf_uvalue_injective :
+    forall uv1 uv2,
+      fin_to_inf_uvalue uv1 = fin_to_inf_uvalue uv2 ->
+      uv1 = uv2.
+  Proof.
+    intros uv1 uv2 FININF.
+    unfold fin_to_inf_uvalue in *.
+    break_match_hyp; clear Heqs; destruct p.
+    break_match_hyp; clear Heqs; destruct p.
+    subst.
+    rewrite e0 in e2. inv e2.
+    auto.
+  Qed.
+
+  Lemma lift_SByte_injective :
+    forall b1 b2,
+      lift_SByte b1 = lift_SByte b2 ->
+      b1 = b2.
+  Proof.
+    intros b1 b2 H.
+    destruct b1, b2.
+    cbn in *.
+    inv H.
+    apply fin_to_inf_uvalue_injective in H1.
+    subst.
+    auto.
+  Qed.
+
+  Lemma equal_memory_read_byte_raw :
+    forall m m' addr,
+      IntMaps.IM.Equal (lift_memory m) (lift_memory m') ->
+      is_true (in_bounds addr) ->
+      Memory64BitIntptr.MMEP.MMSP.read_byte_raw m addr =
+        Memory64BitIntptr.MMEP.MMSP.read_byte_raw m' addr.
+  Proof.
+    intros m m' addr0 EQ IN_BOUNDS.
+    Transparent Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
+    unfold Memory64BitIntptr.MMEP.MMSP.read_byte_raw.
+    red in EQ.
+    unfold lift_memory in *.
+    specialize (EQ addr0).
+    repeat rewrite IntMaps.IP.F.map_o in EQ.
+    unfold option_map in EQ.
+    repeat break_match_hyp_inv.
+    - apply find_filter_dom_true in Heqo, Heqo0.
+      destruct Heqo, Heqo0; subst.
+      rewrite H, H2.
+      unfold lift_mem_byte in H1.
+      destruct m0, m1.
+      inv H1.
+      apply lift_SByte_injective in H5; subst; auto.
+    - destruct (IntMaps.IM.find (elt:=FinMemMMSP.mem_byte) addr0 m) eqn:M.
+      { pose proof (conj M IN_BOUNDS).
+        apply find_filter_dom_true in H.
+        rewrite H in Heqo.
+        discriminate.
+      }
+
+      destruct (IntMaps.IM.find (elt:=FinMemMMSP.mem_byte) addr0 m') eqn:M'.
+      { pose proof (conj M' IN_BOUNDS).
+        apply find_filter_dom_true in H.
+        rewrite H in Heqo0.
+        discriminate.
+      }
+
+      auto.      
+  Qed.
+    
+  Lemma build_up_memory_stack_eqv :
+    forall fs fs' h h' m m',
+      FinMem.MMEP.MMSP.frame_stack_eqv fs fs' ->
+      FinMemMMSP.heap_eqv h h' ->
+      IntMaps.IM.Equal (lift_memory m) (lift_memory m') ->
+      Memory64BitIntptr.MMEP.MemSpec.memory_stack_eqv
+        {|
+          FinMemMMSP.memory_stack_memory := m;
+          FinMemMMSP.memory_stack_frame_stack := fs;
+          FinMemMMSP.memory_stack_heap := h
+        |}
+        {|
+          FinMemMMSP.memory_stack_memory := m';
+          FinMemMMSP.memory_stack_frame_stack := fs';
+          FinMemMMSP.memory_stack_heap := h'
+        |}.
+  Proof.
+    intros fs fs' h h' m m' FS_EQV H_EQV M_EQV.
+    split.
+    - red.
+      intros addr0 aid.
+      split; intros ALLOC.
+      + red; red in ALLOC.
+        cbn in *.
+        assert (Memory64BitIntptr.MMEP.MMSP.read_byte_raw m (LLVMParams64BitIntptr.PTOI.ptr_to_int addr0) = Memory64BitIntptr.MMEP.MMSP.read_byte_raw m' (LLVMParams64BitIntptr.PTOI.ptr_to_int addr0)).
+        { eapply equal_memory_read_byte_raw; eauto.
+          apply in_bounds_ptr_to_int_fin.
+        }
+
+        rewrite <- H.
+        auto.
+      + red; red in ALLOC.
+        cbn in *.
+        assert (Memory64BitIntptr.MMEP.MMSP.read_byte_raw m (LLVMParams64BitIntptr.PTOI.ptr_to_int addr0) = Memory64BitIntptr.MMEP.MMSP.read_byte_raw m' (LLVMParams64BitIntptr.PTOI.ptr_to_int addr0)).
+        { eapply equal_memory_read_byte_raw; eauto.
+          apply in_bounds_ptr_to_int_fin.
+        }
+
+        rewrite H.
+        auto.
+    - red.
+      intros addr0 aid.
+      split; intros ALLOC.
+      + red; red in ALLOC.
+        cbn in *.
+        assert (Memory64BitIntptr.MMEP.MMSP.read_byte_raw m (LLVMParams64BitIntptr.PTOI.ptr_to_int addr0) = Memory64BitIntptr.MMEP.MMSP.read_byte_raw m' (LLVMParams64BitIntptr.PTOI.ptr_to_int addr0)).
+        { eapply equal_memory_read_byte_raw; eauto.
+          apply in_bounds_ptr_to_int_fin.
+        }
+
+        rewrite <- H.
+        auto.
+      + red; red in ALLOC.
+        cbn in *.
+        assert (Memory64BitIntptr.MMEP.MMSP.read_byte_raw m (LLVMParams64BitIntptr.PTOI.ptr_to_int addr0) = Memory64BitIntptr.MMEP.MMSP.read_byte_raw m' (LLVMParams64BitIntptr.PTOI.ptr_to_int addr0)).
+        { eapply equal_memory_read_byte_raw; eauto.
+          apply in_bounds_ptr_to_int_fin.
+        }
+
+        rewrite H.
+        auto.
+    - red.
+      intros fs0.
+      split; intros MSFSP.
+      + red; red in MSFSP.
+        cbn in *.
+        rewrite <- FS_EQV.
+        auto.
+      + red; red in MSFSP.
+        cbn in *.
+        rewrite FS_EQV.
+        auto.
+    - red.
+      intros h0.
+      split; intros MSHP.
+      + red; red in MSHP.
+        cbn in *.
+        rewrite <- H_EQV.
+        auto.
+      + red; red in MSHP.
+        cbn in *.
+        rewrite H_EQV.
+        auto.
+  Qed.
+
   Lemma MemState_fin_to_inf_to_fin_exists :
     forall ms,
     exists ms',
@@ -1556,7 +1992,41 @@ Lemma lift_memory_convert_mem_byte :
       rewrite Heqo in H.
       discriminate.
     }
-  Admitted.
+    3: {
+      pose proof convert_FrameStack_lift fss.
+      destruct H as (?&?&?).
+      rewrite H in Heqo0.
+      discriminate.
+    }
+    2: {
+      pose proof convert_Heap_lift hs.
+      destruct H as (?&?&?).
+      rewrite H in Heqo1.
+      discriminate.
+    }
+
+    eexists.
+    split; eauto.
+
+    pose proof convert_memory_inv ms as (ms'&?).
+    pose proof convert_FrameStack_lift fss as (fss'&?&?).
+    pose proof convert_Heap_lift hs as (hs'&?&?).
+
+    rewrite H in Heqo; inv Heqo.
+    rewrite H0 in Heqo0; inv Heqo0.
+    rewrite H2 in Heqo1; inv Heqo1.
+
+    eapply Memory64BitIntptr.MMEP.MemSpec.MemState_eqv'_MemState_eqv.
+    red.
+    cbn.
+    split; cbn; [|red; reflexivity].
+
+    epose proof lift_memory_convert_memory_inversion H.
+
+    eapply build_up_memory_stack_eqv; eauto.
+    symmetry.
+    eauto.        
+  Qed.
 
   (* TODO: Move this *)
   Lemma MemState_fin_to_inf_to_fin :
@@ -1614,28 +2084,6 @@ Lemma lift_memory_convert_mem_byte :
     L3_E1E2_orutt_strict
       (TopLevelBigIntptr.model_oom_L3 TLR_INF.R.refine_res2 p1)
       (TopLevel64BitIntptr.model_oom_L3 TLR_FIN.R.refine_res2 p2).
-
-  Definition lift_local_env (lenv : InterpreterStack64BitIntptr.LLVM.Local.local_env) : InterpreterStackBigIntptr.LLVM.Local.local_env.
-    refine (map _ lenv).
-
-    refine (fun '(ix, uv) =>
-              let uv' := fin_to_inf_uvalue uv in
-              (ix, uv')).
-  Defined.
-
-  Definition lift_global_env (genv : InterpreterStack64BitIntptr.LLVM.Global.global_env) : InterpreterStackBigIntptr.LLVM.Global.global_env.
-    refine (map _ genv).
-
-    refine (fun '(ix, dv) =>
-              let dv' := fin_to_inf_dvalue dv in
-              (ix, dv')).
-  Defined.
-
-  Definition lift_stack (stack : InterpreterStack64BitIntptr.LLVM.Stack.lstack) : InterpreterStackBigIntptr.LLVM.Stack.lstack.
-    induction stack.
-    - exact [].
-    - exact (lift_local_env a :: IHstack).
-  Defined.
 
   #[global] Instance mempush_spec_MemState_eqv_Proper :
     Proper (MemoryBigIntptr.MMEP.MemSpec.MemState_eqv ==> MemoryBigIntptr.MMEP.MemSpec.MemState_eqv ==> iff) MemoryBigIntptr.MMEP.MemSpec.mempush_spec.
@@ -7389,274 +7837,6 @@ cofix CIH
       }
   Qed.
 
-  Lemma fin_to_inf_dvalue_refine_strict :
-    forall d,
-      DVC1.dvalue_refine_strict (fin_to_inf_dvalue d) d.
-  Proof.
-    intros d.
-    rewrite DVC1.dvalue_refine_strict_equation.
-    unfold fin_to_inf_dvalue.
-    break_match; cbn in *.
-    destruct p.
-    auto.
-  Qed.
-
-  Lemma fin_to_inf_uvalue_refine_strict :
-    forall u,
-      DVC1.uvalue_refine_strict (fin_to_inf_uvalue u) u.
-  Proof.
-    intros u.
-    rewrite DVC1.uvalue_refine_strict_equation.
-    unfold fin_to_inf_uvalue.
-    break_match; cbn in *.
-    destruct p.
-    auto.
-  Qed.
-
-  Import AListFacts.
-
-  Lemma lift_local_env_refine_strict :
-    forall l,
-      local_refine_strict (lift_local_env l) l.
-  Proof.
-    induction l.
-    - cbn.
-      apply alist_refine_empty.
-    - destruct a.
-      apply alist_refine_cons; cbn; auto.
-      apply fin_to_inf_uvalue_refine_strict.
-  Qed.
-
-  Lemma lift_stack_refine_strict :
-    forall s,
-      stack_refine_strict (lift_stack s) s.
-  Proof.
-    induction s.
-    - cbn.
-      apply stack_refine_strict_empty.
-    - apply stack_refine_strict_add; auto.
-      apply lift_local_env_refine_strict.
-  Qed.
-
-  Lemma lift_global_env_refine_strict :
-    forall g,
-      global_refine_strict (lift_global_env g) g.
-  Proof.
-    induction g.
-    - cbn.
-      apply alist_refine_empty.
-    - destruct a.
-      apply alist_refine_cons; cbn; auto.
-      apply fin_to_inf_dvalue_refine_strict.
-  Qed.
-
-  Lemma convert_Frame_lift :
-    forall f,
-    exists f',
-      convert_Frame (lift_Frame f) = NoOom f' /\
-        FinMem.MMEP.MMSP.frame_eqv f f'.
-  Proof.
-    intros f.
-    induction f.
-    - cbn.
-      eexists; split; eauto.
-      reflexivity.
-    - cbn.
-      destruct IHf as (f'&CONV&EQV).
-      rewrite addr_convert_fin_to_inf_addr.
-      setoid_rewrite CONV.
-      eexists; split; eauto.
-      rewrite EQV.
-      reflexivity.
-  Qed.
-
-  Lemma convert_FrameStack_lift :
-    forall fs,
-    exists fs',
-      convert_FrameStack (lift_FrameStack fs) = NoOom fs' /\
-        FinMem.MMEP.MMSP.frame_stack_eqv fs fs'.
-  Proof.
-    induction fs.
-    - cbn.
-      pose proof (convert_Frame_lift f) as (f'&CONV&EQV).
-      rewrite CONV.
-      eexists; split; eauto.
-      rewrite EQV.
-      reflexivity.
-    - destruct IHfs as (fs' & CONV & EQV).
-      pose proof (convert_Frame_lift f) as (f'&CONVf&EQVf).
-      cbn.
-      rewrite CONVf.
-      setoid_rewrite CONV.
-      eexists; split; eauto.
-      rewrite EQVf, EQV.
-      reflexivity.
-  Qed.
-
-  Lemma convert_memory_lift :
-    forall m,
-      convert_memory (lift_memory m) = NoOom m.
-  Proof.
-    (* Probably not true up to equality *)
-  Admitted.
-
-  Lemma convert_Block_lift :
-    forall b,
-      convert_Block (lift_Block b) = NoOom b.
-  Proof.
-    unfold lift_Block.
-    unfold convert_Block.
-    intros b.
-    apply map_monad_oom_Forall2.
-    induction b.
-    - cbn.
-      constructor.
-    - cbn.
-      constructor; auto.
-      apply addr_convert_fin_to_inf_addr.
-  Qed.
-
-  Lemma IntMaps_MapsTo_not_Empty :
-    forall elt k e m,
-      IntMaps.IM.MapsTo k e m ->
-      ~ IntMaps.IM.Empty (elt:=elt) m.
-  Proof.
-    intros elt k e m MAPS.
-    intros CONTRA.
-    eapply CONTRA.
-    eapply MAPS.
-  Qed.
-
-  Lemma IntMaps_empty_map :
-    forall {elt elt'} m f,
-      IntMaps.IM.Empty (elt:=elt') (IntMaps.IM.map f m) ->
-      IntMaps.IM.Empty (elt:=elt) m.
-  Proof.
-    intros elt elt'.
-    induction m using IntMaps.IP.map_induction;
-      intros f EMPTY; eauto.
-
-    intros k e' CONTRA.
-    eapply EMPTY.
-    apply IntMaps.IP.F.find_mapsto_iff.
-    rewrite (@IntMaps.IP.F.map_o elt elt' m2 x f).
-    specialize (H0 x).
-    rewrite IntMaps.IP.F.add_eq_o in H0; auto.
-    rewrite H0.
-    reflexivity.
-  Qed.
-
-  Lemma convert_Heap_lift :
-    forall h,
-    exists h',
-      convert_Heap (lift_Heap h) = NoOom h' /\
-        FinMemMMSP.heap_eqv h h'.
-  Proof.
-    intros h.
-
-    Opaque convert_Block.
-    Opaque lift_Block.
-    Opaque IntMaps.IM.elements.
-    unfold convert_Heap.
-    cbn.
-    break_match_goal.
-    2: {
-      exfalso.
-      apply map_monad_OOM_fail in Heqo.
-      destruct Heqo as (?&?&?).
-      break_match_hyp.
-      break_match_hyp_inv.
-      eapply SetoidList.In_InA in H; eauto.
-      eapply IntMaps.IP.F.elements_mapsto_iff in H.
-      2: apply IntMaps.IP.eqke_equiv.
-
-      unfold lift_Heap in H.
-      apply IntMaps.IP.F.map_mapsto_iff in H.
-      destruct H as (?&?&?).
-      subst.
-      rewrite convert_Block_lift in Heqo.
-      discriminate.
-    }
-
-    eexists.
-    split; eauto.
-    apply map_monad_oom_Forall2 in Heqo.
-    dependent induction Heqo.
-    - split.
-      + symmetry in x.
-        unfold lift_Heap in x.
-        apply IntMaps.IP.elements_Empty in x.
-        apply IntMaps_empty_map in x.
-        intros root; split; intros ROOT.
-        * exfalso.
-          red in ROOT.
-          apply IntMaps.member_lookup in ROOT.
-          destruct ROOT.
-          apply IntMaps.IP.F.find_mapsto_iff in H.
-          eapply x.
-          apply MapsTo_filter_dom_true.
-          split; [|eapply H].
-          eapply in_bounds_ptr_to_int_fin.
-        * exfalso.
-          red in ROOT.
-          cbn in ROOT.
-          discriminate.
-      + symmetry in x.
-        unfold lift_Heap in x.
-        apply IntMaps.IP.elements_Empty in x.
-        apply IntMaps_empty_map in x.
-        intros root; split; intros ROOT.
-        * exfalso.
-          red in ROOT.
-          break_match_hyp; auto.
-          apply IntMaps.IP.F.find_mapsto_iff in Heqo.
-          eapply x.
-          apply MapsTo_filter_dom_true.
-          split; [|eapply Heqo].
-          eapply in_bounds_ptr_to_int_fin.
-        * exfalso.
-          red in ROOT.
-          cbn in ROOT; auto.
-    - destruct x0.
-      break_match_hyp_inv.
-
-    Transparent convert_Block.
-    Transparent lift_Block.
-    Transparent IntMaps.IM.elements.
-  Admitted.
-
-  Lemma convert_memory_stack_lift :
-    forall ms,
-    exists ms',
-      convert_memory_stack (lift_memory_stack ms) = NoOom ms' /\
-        MMEP.MemSpec.memory_stack_eqv ms ms'.
-  Proof.
-    induction ms.
-
-    Opaque convert_memory lift_memory.
-    Opaque convert_Heap lift_Heap.
-    Opaque convert_FrameStack lift_FrameStack.
-
-    cbn.
-    
-    setoid_rewrite convert_memory_lift.
-    pose proof convert_FrameStack_lift memory_stack_frame_stack
-      as (fs'&CONVfs&EQVfs).
-    rewrite CONVfs.
-
-    pose proof convert_Heap_lift memory_stack_heap as
-      (h'&CONVh&EQVh).
-    rewrite CONVh.
-
-    eexists; split; eauto.
-    split; red; cbn.
-    admit.
-
-    Transparent convert_memory lift_memory.
-    Transparent convert_Heap lift_Heap.
-    Transparent convert_FrameStack lift_FrameStack.
-  Admitted.
-
   Lemma lift_MemState_refine_prop :
     forall ms,
       MemState_refine_prop (lift_MemState ms) ms.
@@ -11164,34 +11344,6 @@ cofix CIH
     rewrite Heqb.
     unfold sbyte_refine in BYTE_REF.
     apply lift_SByte_convert_SByte_inverse in BYTE_REF; eauto.
-  Qed.
-
-  Lemma fin_to_inf_uvalue_injective :
-    forall uv1 uv2,
-      fin_to_inf_uvalue uv1 = fin_to_inf_uvalue uv2 ->
-      uv1 = uv2.
-  Proof.
-    intros uv1 uv2 FININF.
-    unfold fin_to_inf_uvalue in *.
-    break_match_hyp; clear Heqs; destruct p.
-    break_match_hyp; clear Heqs; destruct p.
-    subst.
-    rewrite e0 in e2. inv e2.
-    auto.
-  Qed.
-
-  Lemma lift_SByte_injective :
-    forall b1 b2,
-      lift_SByte b1 = lift_SByte b2 ->
-      b1 = b2.
-  Proof.
-    intros b1 b2 H.
-    destruct b1, b2.
-    cbn in *.
-    inv H.
-    apply fin_to_inf_uvalue_injective in H1.
-    subst.
-    auto.
   Qed.
 
   Lemma inf_fin_read_byte_prop_memory :
