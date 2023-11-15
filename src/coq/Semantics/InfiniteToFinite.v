@@ -19047,6 +19047,346 @@ cofix CIH
     eapply ptr_in_memstate_heap_inf_fin in PTR; eauto.
   Qed.
 
+  Lemma add_ptr_to_heap_lift_Heap :
+    forall {root_inf ptr_inf root_fin ptr_fin h_fin_start h2},
+      MemoryBigIntptr.MMEP.MemSpec.add_ptr_to_heap (lift_Heap h_fin_start) root_inf ptr_inf h2 ->
+      addr_refine root_inf root_fin ->
+      addr_refine ptr_inf ptr_fin ->
+      exists h2_fin,
+        Memory64BitIntptr.MMEP.MemSpec.add_ptr_to_heap h_fin_start root_fin ptr_fin h2_fin /\
+          MemoryBigIntptr.MMEP.MMSP.heap_eqv (lift_Heap h2_fin) h2.
+  Proof.
+    intros root_inf ptr_inf root_fin ptr_fin h_fin_start h2 ADD_PTR REF1 REF2.
+    exists (IntMaps.add_with (FinPTOI.ptr_to_int root_fin) ptr_fin ret cons h_fin_start).
+    split.
+    { split.
+      - intros ptr' DISJOINT root.
+        red in DISJOINT.
+        pose proof (Memory64BitIntptr.MMEP.disjoint_ptr_byte_dec root_fin root) as [NEQ_ROOT | EQ_ROOT].
+        2: { split; intros IN_HEAP; red in IN_HEAP.
+             + break_match_hyp; try contradiction.
+               red; cbn.
+               unfold IntMaps.add_with.
+               apply Classical_Prop.NNPP in EQ_ROOT.
+               rewrite EQ_ROOT in *.
+               break_inner_match_goal; rewrite IntMaps.IP.F.add_eq_o; eauto.
+               2: {
+                 setoid_rewrite Heqo in Heqo0.
+                 discriminate.
+               }
+               setoid_rewrite Heqo in Heqo0.
+               inv Heqo0.
+               cbn.
+               right; auto.
+             + break_match_hyp; try contradiction.
+               red; cbn.
+               unfold IntMaps.add_with in *.
+               apply Classical_Prop.NNPP in EQ_ROOT.
+               rewrite EQ_ROOT in *.
+               break_match_hyp; rewrite IntMaps.IP.F.add_eq_o in Heqo; eauto; inv Heqo.
+               2: {
+                 break_match_goal.
+                 setoid_rewrite Heqo0 in Heqo.
+                 discriminate.
+
+                 cbn in IN_HEAP.
+                 destruct IN_HEAP as [IN_HEAP | []].
+                 contradiction.
+               }
+
+               break_match_goal.
+               * setoid_rewrite Heqo0 in Heqo; inv Heqo.
+                 cbn in IN_HEAP.
+                 destruct IN_HEAP; auto; contradiction.
+               * setoid_rewrite Heqo0 in Heqo; inv Heqo.
+        }
+
+        { split; intros IN_HEAP; red in IN_HEAP.
+          + break_match_hyp; try contradiction.
+            red; cbn.
+            unfold IntMaps.add_with.
+            break_inner_match_goal; rewrite IntMaps.IP.F.add_neq_o; eauto.
+            2: {
+              break_match_goal;
+              setoid_rewrite Heqo in Heqo1; inv Heqo1.
+              auto.
+            }
+
+            break_match_goal;
+              setoid_rewrite Heqo in Heqo1; inv Heqo1.
+            auto.
+          + break_match_hyp; try contradiction.
+            red; cbn.
+            unfold IntMaps.add_with in *.
+            break_match_hyp; rewrite IntMaps.IP.F.add_neq_o in Heqo; eauto; inv Heqo.
+            2: {
+              break_match_goal;
+              setoid_rewrite Heqo in H0; inv H0.
+              auto.
+            }
+
+            break_match_goal;
+              setoid_rewrite Heqo in H0; inv H0.
+            auto.
+        }
+      - intros root' H ptr'.
+        split; intros IN_HEAP; red in IN_HEAP.
+        + break_match_hyp; try contradiction.
+          red; cbn.
+          unfold IntMaps.add_with.
+          break_inner_match_goal; rewrite IntMaps.IP.F.add_neq_o; eauto.
+          2: {
+            break_match_goal;
+            setoid_rewrite Heqo in Heqo1; inv Heqo1.
+            auto.
+          }
+
+          break_match_goal;
+            setoid_rewrite Heqo in Heqo1; inv Heqo1.
+          auto.
+        + break_match_hyp; try contradiction.
+          red; cbn.
+          unfold IntMaps.add_with in *.
+          break_match_hyp; rewrite IntMaps.IP.F.add_neq_o in Heqo; eauto; inv Heqo.
+          2: {
+            break_match_goal;
+            setoid_rewrite Heqo in H1; inv H1.
+            auto.
+          }
+
+          break_match_goal;
+            setoid_rewrite Heqo in H1; inv H1.
+          auto.
+      - intros root' H.
+        split; intros IN_HEAP; red in IN_HEAP;
+          eapply IntMaps.member_lookup in IN_HEAP;
+          destruct IN_HEAP as (b&IN_HEAP).
+        + eapply IntMaps.lookup_member with (v:=b).
+          unfold IntMaps.add_with.
+          break_inner_match_goal; rewrite IntMaps.IP.F.add_neq_o; eauto.
+        + eapply IntMaps.lookup_member with (v:=b).
+          unfold IntMaps.add_with in *.
+          break_match_hyp; rewrite IntMaps.IP.F.add_neq_o in IN_HEAP; eauto; inv Heqo.
+      - red.
+        unfold IntMaps.add_with.
+        break_inner_match_goal; rewrite IntMaps.IP.F.add_eq_o; eauto;
+          cbn; auto.
+      - red.
+        unfold IntMaps.add_with.
+        break_inner_match_goal;
+          eapply IntMaps.lookup_member;
+          rewrite IntMaps.IP.F.add_eq_o;
+          cbn; auto.
+    }
+
+    (* Heap equivalence *)
+    split.
+    - intros root.
+      pose proof (MemoryBigIntptr.MMEP.disjoint_ptr_byte_dec root_inf root) as [NEQ_ROOT | EQ_ROOT].
+      { split; intros IN_HEAP.
+        eapply IntMaps.member_lookup in IN_HEAP;
+          destruct IN_HEAP as (b&IN_HEAP).
+        - destruct ADD_PTR.
+          specialize (old_heap_roots _ NEQ_ROOT).
+          destruct old_heap_roots.
+
+          eapply H.
+
+          unfold IntMaps.add_with in *.
+          break_match_hyp.
+          + unfold lift_Heap in *.
+            rewrite IntMaps.IP.F.map_o in IN_HEAP.
+            unfold option_map in *.
+            break_match_hyp_inv.
+            apply find_filter_dom_true in Heqo0.
+            destruct Heqo0.
+            rewrite IntMaps.IP.F.add_neq_o in H1; eauto.
+            2: {
+              intros CONTRA.
+              apply NEQ_ROOT.
+              erewrite fin_inf_ptoi in CONTRA; eauto.
+            }
+
+            red.
+            eapply IntMaps.lookup_member with (v:=lift_Block b0).
+            rewrite IntMaps.IP.F.map_o.
+            unfold option_map.
+            pose proof (conj H1 H2).
+            eapply find_filter_dom_true in H3.
+            rewrite H3.
+            reflexivity.
+          + unfold lift_Heap in *.
+            rewrite IntMaps.IP.F.map_o in IN_HEAP.
+            unfold option_map in *.
+            break_match_hyp_inv.
+            apply find_filter_dom_true in Heqo0.
+            destruct Heqo0.
+            rewrite IntMaps.IP.F.add_neq_o in H1; eauto.
+            2: {
+              intros CONTRA.
+              apply NEQ_ROOT.
+              erewrite fin_inf_ptoi in CONTRA; eauto.
+            }
+
+            red.
+            eapply IntMaps.lookup_member with (v:=lift_Block b0).
+            rewrite IntMaps.IP.F.map_o.
+            unfold option_map.
+            pose proof (conj H1 H2).
+            eapply find_filter_dom_true in H3.
+            rewrite H3.
+            reflexivity.
+        - destruct ADD_PTR.
+          specialize (old_heap_roots _ NEQ_ROOT).
+          destruct old_heap_roots.
+          specialize (H0 IN_HEAP).
+          eapply IntMaps.member_lookup in H0.
+          destruct H0 as (b&ROOT).
+
+          unfold lift_Heap in *.
+          rewrite IntMaps.IP.F.map_o in ROOT.
+          unfold option_map in *.
+          break_match_hyp_inv.
+          apply find_filter_dom_true in Heqo.
+          destruct Heqo.
+
+          unfold IntMaps.add_with in *.
+          break_match_goal.
+          + red.
+
+            destruct (IntMaps.IM.find (elt:=FinMemMMSP.Block) (LLVMParamsBigIntptr.PTOI.ptr_to_int root)
+                        (IntMaps.add (FinPTOI.ptr_to_int root_fin) (ptr_fin :: l) h_fin_start)) eqn:HFIND.
+            2:{ exfalso.
+                rewrite IntMaps.IP.F.add_neq_o in HFIND; eauto.
+                2: {
+                  intros CONTRA.
+                  apply NEQ_ROOT.
+                  erewrite fin_inf_ptoi in CONTRA; eauto.
+                }
+                setoid_rewrite HFIND in H0.
+                discriminate.
+            }
+
+            pose proof (conj HFIND H1).
+            apply find_filter_dom_true in H2.
+            
+            eapply IntMaps.lookup_member.
+            unfold lift_Heap.
+            rewrite IntMaps.IP.F.map_o.
+            unfold option_map in *.
+            rewrite H2.
+            reflexivity.
+          + red.
+            destruct (IntMaps.IM.find (elt:=FinMemMMSP.Block) (LLVMParamsBigIntptr.PTOI.ptr_to_int root)
+                        (IntMaps.add (FinPTOI.ptr_to_int root_fin) (ret ptr_fin) h_fin_start)) eqn:HFIND.
+            2:{ exfalso.
+                rewrite IntMaps.IP.F.add_neq_o in HFIND; eauto.
+                2: {
+                  intros CONTRA.
+                  apply NEQ_ROOT.
+                  erewrite fin_inf_ptoi in CONTRA; eauto.
+                }
+                setoid_rewrite HFIND in H0.
+                discriminate.
+            }
+
+            pose proof (conj HFIND H1).
+            apply find_filter_dom_true in H2.
+            
+            eapply IntMaps.lookup_member.
+            unfold lift_Heap.
+            rewrite IntMaps.IP.F.map_o.
+            unfold option_map in *.
+            rewrite H2.
+            reflexivity.
+      }
+
+      { apply Classical_Prop.NNPP in EQ_ROOT.
+        split; intros IN_HEAP.
+        - destruct ADD_PTR.
+          red; red in new_heap_root.
+          rewrite <- EQ_ROOT.
+          auto.
+        - red.
+          erewrite <- fin_inf_ptoi in EQ_ROOT; eauto.
+          rewrite EQ_ROOT.
+          unfold IntMaps.add_with.
+          break_match_goal.
+          + unfold lift_Heap.
+            eapply IntMaps.lookup_member.
+            rewrite IntMaps.IP.F.map_o.
+            unfold option_map.
+            pose proof @IntMaps.IP.F.add_eq_o
+              _ h_fin_start (LLVMParamsBigIntptr.PTOI.ptr_to_int root) _ (ptr_fin :: l) eq_refl.
+            pose proof in_bounds_exists_addr' (LLVMParamsBigIntptr.PTOI.ptr_to_int root).
+            destruct H0.
+            forward H1.
+            exists root_fin.
+            auto.
+
+            pose proof (conj H H1).
+            apply find_filter_dom_true in H2.
+            setoid_rewrite H2.
+            reflexivity.
+          + unfold lift_Heap.
+            eapply IntMaps.lookup_member.
+            rewrite IntMaps.IP.F.map_o.
+            unfold option_map.
+            pose proof @IntMaps.IP.F.add_eq_o
+              _ h_fin_start (LLVMParamsBigIntptr.PTOI.ptr_to_int root) _ (ret ptr_fin) eq_refl.
+            pose proof in_bounds_exists_addr' (LLVMParamsBigIntptr.PTOI.ptr_to_int root).
+            destruct H0.
+            forward H1.
+            exists root_fin.
+            auto.
+
+            pose proof (conj H H1).
+            apply find_filter_dom_true in H2.
+            setoid_rewrite H2.
+            reflexivity.
+      }
+    - intros root ptr.
+      pose proof (MemoryBigIntptr.MMEP.disjoint_ptr_byte_dec root_inf root) as [NEQ_ROOT | EQ_ROOT].
+      { destruct ADD_PTR.
+        specialize (old_heap_lu_different_root _ NEQ_ROOT).
+
+        split; intros IN_HEAP;
+          red; red in IN_HEAP;
+          break_match_hyp; try contradiction.
+
+        admit.
+        admit.
+      }
+
+      admit.
+  Admitted.
+
+  Lemma add_ptrs_to_heap'_lift_Heap :
+    forall {root_inf ptrs_inf root_fin ptrs_fin h_fin_start h2},
+      MemoryBigIntptr.MMEP.MemSpec.add_ptrs_to_heap' (lift_Heap h_fin_start) root_inf ptrs_inf h2 ->
+      addr_refine root_inf root_fin ->
+      Forall2 addr_refine ptrs_inf ptrs_fin ->
+      exists h2_fin,
+        Memory64BitIntptr.MMEP.MemSpec.add_ptrs_to_heap' h_fin_start root_fin ptrs_fin h2_fin /\
+          MemoryBigIntptr.MMEP.MMSP.heap_eqv (lift_Heap h2_fin) h2.
+  Proof.
+    intros root_inf ptrs_inf root_fin ptrs_fin h_fin_start h2 ADD_PTRS ROOT ADDRS.
+    generalize dependent h2.
+    induction ADDRS; intros h2 ADD_PTRS.
+    - cbn in *.
+      exists h_fin_start; split; cbn; eauto.
+      reflexivity.
+    - cbn in ADD_PTRS.
+      destruct ADD_PTRS as (h' & ADD_PTRS & ADD_PTR).
+      apply IHADDRS in ADD_PTRS.
+      destruct ADD_PTRS as (h'_fin & ADD_PTRS & EQV).
+      rewrite <- EQV in ADD_PTR.
+      eapply add_ptr_to_heap_lift_Heap in ADD_PTR; eauto.
+      destruct ADD_PTR as (h2_fin & ADD_PTR & EQV').
+      exists h2_fin.
+      split; cbn; eauto.
+  Qed.
+
   (* SAZ: Look at this one too *)
   Lemma extend_heap_fin_inf :
     forall {ms_inf_start ms_fin_start ms_inf_final ms_fin_final addrs_fin addrs_inf},
@@ -19056,7 +19396,8 @@ cofix CIH
       Memory64BitIntptr.MMEP.MemSpec.extend_heap ms_fin_start addrs_fin ms_fin_final ->
       MemoryBigIntptr.MMEP.MemSpec.extend_heap ms_inf_start addrs_inf ms_inf_final.
   Proof.
-    intros ms_inf_start ms_fin_start ms_inf_final ms_fin_final addrs_fin addrs_inf MSR1 MSR2 ADDRS EXTEND.
+    intros ms_inf_start ms_fin_start ms_inf_final ms_fin_final
+      addrs_fin addrs_inf MSR1 MSR2 ADDRS EXTEND.
     red in EXTEND.
     red.
 
@@ -19081,26 +19422,40 @@ cofix CIH
     red in MSFSP.
     unfold InfMem.MMEP.MMSP.memory_stack_heap_prop, Memory64BitIntptr.MMEP.MMSP.memory_stack_heap_prop in *.
     cbn in *.
+    unfold InfMem.MMEP.MemSpec.heap_preserved_memory,
+      InfMem.MMEP.MMSP.memory_stack_heap_prop in *.
+    cbn in *.
 
-    (* I think I need to be able to go from Inf.heap_eqv on lifted
-       heaps to Fin.heap_eqv on non-lifted heaps in order to be able
-       to use EXTEND...
+    rewrite <- MSFSP in ADD_PTRS.
+    clear h1 MSFSP.
+    red in ADD_PTRS.
+    destruct ADDRS.
+    - specialize (EXTEND h_fin_start h_fin_start).
+      forward EXTEND; [reflexivity|].
+      forward EXTEND; [cbn; reflexivity|].
+      cbn in ADD_PTRS.
+      apply Heap_eqv_lift in EXTEND.
+      rewrite <- ADD_PTRS.
+      setoid_rewrite <- EXTEND.
+      symmetry.
+      apply MSR2.
+      reflexivity.
+    - cbn in *.
+      destruct ADD_PTRS as (h' & ADD_PTRS & ADD_PTR).
+      (* A lemma about add_ptr_to_heap would probably help *)
 
-       This may not hold right now because root_in_heap_prop only
-       cares about
-     *)
-    apply MSR1 in MSFSP.
-  Admitted.
+      eapply MSR2.
+      eapply add_ptrs_to_heap'_lift_Heap in ADD_PTRS; eauto.
+      destruct ADD_PTRS as (h'_fin & ADD_PTRS & EQV).
+      rewrite <- EQV in ADD_PTR.
+      eapply add_ptr_to_heap_lift_Heap in ADD_PTR; eauto.
+      destruct ADD_PTR as (h2_fin & ADD_PTR & EQV').
+      rewrite <- EQV'.
 
-  (* TODO: DELETE *)
-  (* TODO: Not currently true, but will be once heap_preserved is modified *)
-  (* Lemma extend_heap_heap_in_bounds : *)
-  (*   forall {ms_fin_start ms_fin_final ptrs_fin}, *)
-  (*     Heap_in_bounds ms_fin_start -> *)
-  (*     Memory64BitIntptr.MMEP.MemSpec.extend_heap ms_fin_start ptrs_fin ms_fin_final -> *)
-  (*     Heap_in_bounds ms_fin_final. *)
-  (* Proof. *)
-  (* Admitted. *)
+      eapply Heap_eqv_lift.
+      eapply EXTEND; eauto.
+      reflexivity.
+  Qed.      
 
   Lemma malloc_bytes_post_conditions_fin_inf :
     forall {ms_fin_start ms_fin_final ms_inf_start bytes_fin addr_fin addrs_fin bytes_inf pr},
