@@ -21063,7 +21063,135 @@ cofix CIH
         reflexivity.
         Unshelve.
         all: eauto.
-  Qed.        
+  Qed.
+
+  Lemma uvalue_refine_strict_has_dtyp_fin_inf :
+    forall {uv_inf uv_fin t},
+      DVC1.uvalue_refine_strict uv_inf uv_fin ->
+      DVC1.DV2.uvalue_has_dtyp uv_fin t ->
+      DVC1.DV1.uvalue_has_dtyp uv_inf t.
+  Proof.
+    intros uv_inf uv_fin t UV_REF TYP.
+    unfold DVC1.uvalue_refine_strict in UV_REF.
+    generalize dependent uv_inf.
+
+    induction TYP; intros uv_fin UV_REF; inversion UV_REF; clear UV_REF;
+      try solve [
+          destruct uv_fin; cbn in H0;
+          repeat break_match_hyp_inv;
+          try discriminate;
+          try constructor; auto
+        | destruct uv_fin; cbn in H2;
+          repeat break_match_hyp_inv;
+          try inv H2;
+          try discriminate;
+          try constructor; auto
+        | destruct uv_fin; cbn in H1;
+          repeat break_match_hyp_inv;
+          try inv H1;
+          try discriminate;
+          try constructor; auto;      
+          rewrite map_monad_oom_Forall2 in Heqo;
+          revert fields0 Heqo;
+          induction H; intros fields HL; inversion HL; subst; constructor; eauto
+        | destruct uv_fin; cbn in H1;
+          repeat break_match_hyp_inv;
+          try inv H1;
+          econstructor; eauto
+        ].
+
+    - (* Arrays *)
+      destruct uv_fin; cbn in H3;
+        repeat break_match_hyp_inv;
+        try inv H3.
+      constructor; auto.
+      + rewrite map_monad_oom_Forall2 in Heqo.
+        revert sz H1.
+        induction Heqo; constructor.
+        * eapply IH; eauto. left.  reflexivity. 
+        * eapply IHHeqo; intros; eauto.
+          -- eapply IH; eauto. right.  assumption.
+          -- cbn in H2. rewrite Nnat.Nat2N.id. reflexivity.
+      + apply map_monad_oom_length in Heqo.
+        lia.
+    - (* Vectors *)
+      destruct uv_fin; cbn in H4;
+        repeat break_match_hyp_inv;
+        try inv H4.
+      constructor; auto.
+      + rewrite map_monad_oom_Forall2 in Heqo.
+        revert sz H1.
+        induction Heqo; constructor.
+        * eapply IH; eauto. left.  reflexivity. 
+        * eapply IHHeqo; intros; eauto.
+          -- eapply IH; eauto. right.  assumption.
+          -- cbn in H2. rewrite Nnat.Nat2N.id. reflexivity.
+      + apply map_monad_oom_length in Heqo.
+        lia.
+    - destruct uv_fin; cbn in H1;
+        repeat break_match_hyp_inv;
+        try inv H1.
+      destruct H.
+      + destruct H as (?&?&?).
+        econstructor; eauto.
+        left; split; eauto.
+      + destruct H.
+        * destruct H.
+          econstructor; eauto.
+          right; left; split; eauto.
+        * destruct H.
+          econstructor; eauto.
+          right; right; split; eauto.
+    - destruct uv_fin; cbn in H1;
+        repeat break_match_hyp_inv;
+        try inv H1.
+      destruct H.
+      + destruct H as (?&?&?).
+        econstructor; eauto.
+        left; split; eauto.
+      + destruct H.
+        * destruct H.
+          econstructor; eauto.
+          right; left; split; eauto.
+        * destruct H.
+          econstructor; eauto.
+          right; right; split; eauto.
+    - destruct uv_fin; cbn in H2;
+        repeat break_match_hyp_inv;
+        try inv H2.
+      destruct H0.
+      + econstructor; eauto.
+        destruct H0.
+        left; eauto.
+      + econstructor; eauto.
+    - destruct uv_fin; cbn in H2;
+        repeat break_match_hyp_inv;
+        try inv H2.
+      destruct H0.
+      + econstructor; eauto.
+        destruct H0.
+        left; eauto.
+      + econstructor; eauto.
+    - destruct uv_fin; cbn in H3;
+        repeat break_match_hyp_inv;
+        try inv H3.
+      constructor; auto.
+      + intros.
+        rewrite map_monad_oom_Forall2 in Heqo.
+        destruct (Forall2_In _ _ _ _ H2 Heqo) as [x [HIN HX]].
+        destruct (H0 _ HIN) as [u [t [idx [sid HY]]]].
+        subst.
+        destruct byte; inv HX;
+        repeat break_match_hyp_inv.
+        do 4 eexists.
+        reflexivity.
+      + apply map_monad_oom_length in Heqo.
+        rewrite Heqo.
+        rewrite <- H1.
+        reflexivity.
+        Unshelve.
+        all: eauto.
+  Qed.
 
   (* TODO: move this to where filter_sid_matches is defined *)
   Lemma filter_sid_matches_length_r_le :
@@ -22921,6 +23049,19 @@ cofix CIH
         auto.
   Qed.
 
+  Lemma all_bytes_from_uvalue_fin_inf_helper_Some :
+    forall {bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte}
+      {bytes_inf : list MemoryBigIntptr.MP.BYTE_IMPL.SByte}
+      {parent_fin parent_inf idx sid uv_fin}
+      (BYTES : sbytes_refine bytes_inf bytes_fin),
+      DVC1.uvalue_refine_strict parent_inf parent_fin ->
+      Memory64BitIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper idx sid parent_fin bytes_fin = Some uv_fin ->
+      exists uv_inf,
+        MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper idx sid parent_inf bytes_inf = Some uv_inf /\
+          DVC1.uvalue_refine_strict uv_inf uv_fin.
+  Proof.
+  Admitted.
+
   Lemma all_bytes_from_uvalue_fin_inf_Some :
     forall {bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte}
       {bytes_inf : list MemoryBigIntptr.MP.BYTE_IMPL.SByte}
@@ -22931,15 +23072,50 @@ cofix CIH
         MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue dt bytes_inf = Some uv_inf /\
           DVC1.uvalue_refine_strict uv_inf uv_fin.
   Proof.
-    intros.
-    destruct bytes_fin.
-    - inversion H.
-    - cbn in H.
-      repeat break_match_hyp_inv.
-      unfold OptionUtil.guard_opt in *.
-      repeat break_match_hyp_inv.
-      inversion BYTES; subst.
-  Admitted.
+    intros bytes_fin bytes_inf dt uv_fin BYTES ALL.
+    unfold Memory64BitIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue in ALL.
+    destruct BYTES; try discriminate.
+    repeat break_match_hyp_inv.
+    destruct u0, u1, u3, u4, u5.
+    cbn.
+    destruct x.
+    red in H.
+    unfold convert_SByte in H.
+    cbn in *.
+    break_match_hyp_inv.
+    rewrite Memory64BitIntptr.Byte.sbyte_to_extractbyte_of_uvalue_sbyte in Hequ2;
+      inv Hequ2;
+      inv Hequ.
+    rewrite MemoryBigIntptr.Byte.sbyte_to_extractbyte_of_uvalue_sbyte.
+    rewrite Heqo.
+
+    eapply all_bytes_from_uvalue_fin_inf_helper_Some in H1; eauto.
+    destruct H1 as (?&?&?).
+    exists x.
+    split; eauto.
+
+    destruct (Coqlib.proj_sumbool LLVMParamsBigIntptr.Events.DV.uvalue_has_dtyp_dec) eqn:HUVT;
+      cbn in Heqo0; inv Heqo0;
+      unfold Coqlib.proj_sumbool in HUVT;
+      break_match_hyp_inv.
+    2: {
+      exfalso.
+      unfold OptionUtil.guard_opt in H2.
+      break_match_hyp_inv.
+      unfold Coqlib.proj_sumbool in Heqb.
+      break_match_hyp_inv.
+      eapply n.
+      eapply uvalue_refine_strict_has_dtyp_fin_inf; eauto.
+    }
+    cbn.
+    Transparent MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper.
+    unfold MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper.
+    rewrite MemoryBigIntptr.Byte.sbyte_to_extractbyte_of_uvalue_sbyte.
+    rewrite Heqo1, Heqo3.
+    rewrite Util.eq_dec_eq.
+    cbn.
+    eapply H.
+  Qed.
 
   Opaque MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper.
   Opaque Memory64BitIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper.
