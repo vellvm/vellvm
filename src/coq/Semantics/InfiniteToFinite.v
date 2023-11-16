@@ -1155,20 +1155,134 @@ Module InfiniteToFinite.
         auto.
   Qed.
 
+  Lemma IntMaps_map_empty_Equal :
+    forall {A B} (f : A -> B),
+      IntMaps.IM.Equal (IntMaps.IM.map f (IntMaps.IM.empty A)) (IntMaps.IM.empty B).
+  Proof.
+    intros A B f.
+    red.
+    intros y.
+    cbn; auto.
+  Qed.
+
+  Lemma IntMaps_map_id_Equal :
+    forall {A} (m : IntMaps.IntMap A),
+      IntMaps.IM.Equal (IntMaps.IM.map id m) m.
+  Proof.
+    intros A B f.
+    destruct (IntMaps.IM.find (elt:=A) f B) eqn:FIND.
+    - apply IntMaps.IP.F.find_mapsto_iff.
+      apply IntMaps.IP.F.find_mapsto_iff in FIND.
+      apply IntMaps.IP.F.map_mapsto_iff.
+      exists a.
+      split; cbn; eauto.
+    - eapply IntMaps_find_None.
+      intros e CONTRA.
+      apply IntMaps_find_None with (e:=e) in FIND.
+      apply FIND.
+      apply IntMaps.IP.F.map_mapsto_iff in CONTRA.
+      destruct CONTRA as (a & H & CONTRA); subst; auto.
+  Qed.
+
+  Lemma IntMaps_map_compose_Equal :
+    forall {A B C} (f : A -> B) (g : B -> C) (m : IntMaps.IntMap A),
+      IntMaps.IM.Equal (IntMaps.IM.map (fun a => g (f a)) m) (IntMaps.IM.map g (IntMaps.IM.map f m)).
+  Proof.
+    intros A B C f g m.
+    red.
+    intros y.
+    destruct (IntMaps.IM.find (elt:=C) y (IntMaps.IM.map g (IntMaps.IM.map f m))) eqn:FIND.
+    - apply IntMaps.IP.F.find_mapsto_iff.
+      apply IntMaps.IP.F.find_mapsto_iff in FIND.
+      apply IntMaps.IP.F.map_mapsto_iff in FIND.
+      destruct FIND as (?&?&FIND).
+      apply IntMaps.IP.F.map_mapsto_iff in FIND.
+      destruct FIND as (?&?&?).
+      subst.
+      apply IntMaps.IP.F.map_mapsto_iff.
+      exists x0.
+      split; cbn; eauto.
+    - eapply IntMaps_find_None.
+      intros e CONTRA.
+      apply IntMaps_find_None with (e:=e) in FIND.
+      apply FIND.
+      apply IntMaps.IP.F.map_mapsto_iff in CONTRA.
+      destruct CONTRA as (a & H & CONTRA); subst; auto.
+      apply IntMaps.IP.F.map_mapsto_iff.
+      exists (f a).
+      split; eauto.
+      apply IntMaps.IP.F.map_mapsto_iff.
+      exists a.
+      split; eauto.
+  Qed.
+
+  Lemma IntMaps_map_add_Equal :
+    forall {A B} (f : A -> B) (m : IntMaps.IntMap A) k a,
+      IntMaps.IM.Equal (IntMaps.IM.map f (IntMaps.IM.add k a m))
+        (IntMaps.IM.add k (f a) (IntMaps.IM.map f m)).
+  Proof.
+    intros A B f m k a.
+    red.
+    intros y.
+    destruct (IntMaps.IM.find (elt:=B) y (IntMaps.IM.add k (f a) (IntMaps.IM.map f m))) eqn:FIND.
+    - pose proof (Z.eq_dec y k) as [EQ | NEQ]; subst.
+      + rewrite IntMaps.IP.F.add_eq_o in FIND; eauto.
+        inv FIND.
+        apply IntMaps.IP.F.find_mapsto_iff.
+        apply IntMaps.IP.F.map_mapsto_iff.
+        exists a.
+        split; eauto.
+        apply IntMaps.IP.F.add_mapsto_iff;
+          eauto.
+      + rewrite IntMaps.IP.F.add_neq_o in FIND; eauto.
+        apply IntMaps.IP.F.find_mapsto_iff in FIND.
+        eapply IntMaps.IP.F.map_mapsto_iff in FIND.
+        destruct FIND as (?&?&?); subst.
+
+        apply IntMaps.IP.F.find_mapsto_iff.
+        apply IntMaps.IP.F.map_mapsto_iff.
+        exists x.
+        split; eauto.
+        apply IntMaps.IP.F.add_mapsto_iff;
+          eauto.
+    - pose proof (Z.eq_dec y k) as [EQ | NEQ]; subst.
+      + rewrite IntMaps.IP.F.add_eq_o in FIND; eauto.
+        discriminate.
+      + rewrite IntMaps.IP.F.add_neq_o in FIND; eauto.
+        eapply IntMaps_find_None.
+        intros e CONTRA.
+        apply IntMaps_find_None with (e:=e) in FIND.
+        apply FIND.
+        apply IntMaps.IP.F.map_mapsto_iff in CONTRA.
+        destruct CONTRA as (a' & H & CONTRA); subst; auto.        
+        apply IntMaps.IP.F.map_mapsto_iff.
+        exists a'.
+        split; eauto.
+        apply IntMaps.IP.F.add_neq_mapsto_iff in CONTRA; eauto.
+  Qed.
+
   Lemma IntMaps_map_list_map_Equal :
     forall {A B} (f : A -> B) l,
       IntMaps.IM.Equal (IntMaps.IM.map f (IntMaps.IP.of_list l)) (IntMaps.IP.of_list (List.map (fun '(i, x) => (i, f x)) l)).
   Proof.
-    (* Only seem to need these for lift_memory_convert_inversion, which currently is unused *)
-  Admitted.
+    intros A B f l.
+    induction l.
+    - cbn.
+      apply IntMaps_map_empty_Equal.
+    - cbn.
+      unfold IntMaps.IP.uncurry in *.
+      destruct a.
+      cbn in *.
+      rewrite <- IHl.
+      eapply IntMaps_map_add_Equal.
+  Qed.
 
   Lemma IntMaps_filter_dom_list_filter_Equal :
     forall {A : Type} (f : IntMaps.IM.key -> bool) (l : list (IntMaps.IM.key * A)),
       IntMaps.IM.Equal (IntMaps.IP.filter_dom f (IntMaps.IP.of_list l))
         (IntMaps.IP.of_list (filter (fun '(i, x) => f i) l)).
   Proof.
-    (* Only seem to need these for lift_memory_convert_inversion, which currently is unused *)
-  Admitted.
+  Qed.
 
   Lemma lift_memory_convert_memory_inversion :
     forall {mem_inf mem_fin},
