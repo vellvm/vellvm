@@ -1277,11 +1277,103 @@ Module InfiniteToFinite.
       eapply IntMaps_map_add_Equal.
   Qed.
 
+  Lemma IntMaps_filter_dom_add_true_Equal :
+    forall {A} f k (a : A) m,
+      f k = true ->
+      IntMaps.IM.Equal
+        (IntMaps.IP.filter_dom f (IntMaps.IM.add k a m))
+        (IntMaps.IM.add k a (IntMaps.IP.filter_dom f m)).
+  Proof.
+    intros A f k a m F.
+    red.
+    intros y.
+    destruct (IntMaps.IM.find (elt:=A) y (IntMaps.IM.add k a (IntMaps.IP.filter_dom f m))) eqn:FIND.
+    - pose proof (Z.eq_dec y k) as [EQ | NEQ]; subst.
+      + rewrite IntMaps.IP.F.add_eq_o in FIND; eauto.
+        inv FIND.
+        apply find_filter_dom_true.
+        split; eauto.
+        rewrite IntMaps.IP.F.add_eq_o; eauto.
+      + rewrite IntMaps.IP.F.add_neq_o in FIND; eauto.
+        apply find_filter_dom_true in FIND.
+        destruct FIND.
+        apply find_filter_dom_true.
+        split; eauto.
+        rewrite IntMaps.IP.F.add_neq_o; eauto.
+    - pose proof (Z.eq_dec y k) as [EQ | NEQ]; subst.
+      + rewrite IntMaps.IP.F.add_eq_o in FIND; eauto.
+        discriminate.
+      + rewrite IntMaps.IP.F.add_neq_o in FIND; eauto.
+        destruct (IntMaps.IM.find (elt:=A) y m) eqn:FIND'.
+        * destruct (f y) eqn:FY.
+          { pose proof conj FIND' FY.
+            apply find_filter_dom_true in H.
+            rewrite FIND in H.
+            discriminate.
+          }
+
+          eapply find_filter_dom_false; eauto.
+        * eapply find_filter_dom_None.
+          rewrite IntMaps.IP.F.add_neq_o; eauto.
+  Qed.
+
+  Lemma IntMaps_filter_dom_add_false_Equal :
+    forall {A} f k (a : A) m,
+      f k = false ->
+      IntMaps.IM.Equal
+        (IntMaps.IP.filter_dom f (IntMaps.IM.add k a m))
+        (IntMaps.IP.filter_dom f m).
+  Proof.
+    intros A f k a m F.
+    intros y.
+    destruct (IntMaps.IM.find (elt:=A) y (IntMaps.IP.filter_dom f m)) eqn:FIND.
+    - apply find_filter_dom_true in FIND.
+      destruct FIND.
+
+      pose proof (Z.eq_dec y k) as [EQ | NEQ]; subst.
+      + rewrite F in H0; inv H0.
+      + apply find_filter_dom_true.
+        rewrite IntMaps.IP.F.add_neq_o; eauto.
+    - pose proof (Z.eq_dec y k) as [EQ | NEQ]; subst.
+      + eapply find_filter_dom_false; eauto.
+      + destruct (IntMaps.IM.find (elt:=A) y m) eqn:FIND'.
+        * destruct (f y) eqn:FY.
+          { pose proof conj FIND' FY.
+            apply find_filter_dom_true in H.
+            rewrite FIND in H.
+            discriminate.
+          }
+          eapply find_filter_dom_false; eauto.
+        * eapply find_filter_dom_None.
+          rewrite IntMaps.IP.F.add_neq_o; eauto.
+  Qed.
+
   Lemma IntMaps_filter_dom_list_filter_Equal :
     forall {A : Type} (f : IntMaps.IM.key -> bool) (l : list (IntMaps.IM.key * A)),
       IntMaps.IM.Equal (IntMaps.IP.filter_dom f (IntMaps.IP.of_list l))
         (IntMaps.IP.of_list (filter (fun '(i, x) => f i) l)).
   Proof.
+    intros A f l.
+    induction l.
+    - cbn.
+      reflexivity.
+    - Opaque IntMaps.IM.Equal.
+      Opaque IntMaps.IP.filter_dom.
+      destruct a; cbn.
+      break_match_goal.
+      + cbn.
+        unfold IntMaps.IP.uncurry in *.
+        cbn.
+        rewrite IntMaps_filter_dom_add_true_Equal; eauto.
+        rewrite IHl.
+        reflexivity.
+      + cbn.
+        unfold IntMaps.IP.uncurry in *.
+        cbn.
+        rewrite IntMaps_filter_dom_add_false_Equal; eauto.
+
+        Transparent IntMaps.IM.Equal.
+        Transparent IntMaps.IP.filter_dom.
   Qed.
 
   Lemma lift_memory_convert_memory_inversion :
