@@ -2781,11 +2781,478 @@ Lemma lift_memory_convert_mem_byte :
   Proof.
   Admitted.
 
+  Lemma lift_MemState_refine_prop :
+    forall ms,
+      MemState_refine_prop (lift_MemState ms) ms.
+  Proof.
+    intros ms.
+    red.
+    destruct ms.
+    cbn.
+    repeat split; intros; cbn in * ; try reflexivity; try intuition;
+      try red in H; try (rewrite <- H; auto); try (rewrite H; auto).
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma MemState_refine_prop_heap_preserved :
+    forall ms_inf ms_fin,
+      MemState_refine_prop ms_inf ms_fin ->
+      InfMem.MMEP.MemSpec.heap_preserved ms_inf (lift_MemState ms_fin).
+  Proof.
+    intros ms_inf ms_fin MSR.
+    do 2 red in MSR.
+    tauto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma MemState_refine_prop_frame_stack_preserved :
+    forall ms_inf ms_fin,
+      MemState_refine_prop ms_inf ms_fin ->
+      InfMem.MMEP.MemSpec.frame_stack_preserved ms_inf (lift_MemState ms_fin).
+  Proof.
+    intros ms_inf ms_fin MSR.
+    do 2 red in MSR.
+    tauto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma MemState_refine_prop_allocations_preserved :
+    forall {ms_inf ms_fin},
+      MemState_refine_prop ms_inf ms_fin ->
+      InfMem.MMEP.MemSpec.allocations_preserved ms_inf (lift_MemState ms_fin).
+  Proof.
+    intros ms_inf ms_fin MSR.
+    do 2 red in MSR.
+    tauto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma MemState_refine_prop_read_byte_preserved :
+    forall {ms_inf ms_fin},
+      MemState_refine_prop ms_inf ms_fin ->
+      InfMem.MMEP.MemSpec.read_byte_preserved ms_inf (lift_MemState ms_fin).
+  Proof.
+    intros ms_inf ms_fin MSR.
+    do 2 red in MSR.
+    tauto.
+  Qed.
+
+  (* TODO: Move this, should be in MemoryModel.v with read_byte_preserved *)
+  Definition read_byte_spec_preserved m1 m2 :=
+    forall ptr byte, MemoryBigIntptr.MMEP.MemSpec.read_byte_spec m1 ptr byte <-> MemoryBigIntptr.MMEP.MemSpec.read_byte_spec m2 ptr byte.
+
+  Lemma read_byte_preserved_read_byte_spec_preserved :
+    forall m1 m2,
+      InfMem.MMEP.MemSpec.read_byte_preserved m1 m2 ->
+      read_byte_spec_preserved m1 m2.
+  Proof.
+    intros m1 m2.
+    intros PRES.
+    { destruct PRES as [ALLOWED_PRES PROP_PRES].
+      red.
+      intros ptr byte.
+      split; intros [ALLOWED PROP].
+      - split.
+        + apply ALLOWED_PRES; auto.
+        + apply PROP_PRES; auto.
+      - split.
+        + apply ALLOWED_PRES; auto.
+        + apply PROP_PRES; auto.
+    }
+  Qed.
+
+  Lemma MemState_refine_prop_read_byte_spec_preserved :
+    forall {ms_inf : InfMem.MMEP.MMSP.MemState} {ms_fin : FinMem.MMEP.MMSP.MemState},
+      MemState_refine_prop ms_inf ms_fin ->
+      read_byte_spec_preserved ms_inf (lift_MemState ms_fin).
+  Proof.
+    intros ms_inf ms_fin MSR.
+    apply read_byte_preserved_read_byte_spec_preserved.
+    apply MemState_refine_prop_read_byte_preserved; auto.
+  Qed.
+
+  (* TODO: Move this to MMSP or something *)
+  Lemma frame_eqv_empty_l :
+    forall f,
+      Memory64BitIntptr.MMEP.MMSP.frame_eqv [] f ->
+      f = [].
+  Proof.
+    intros f EQV.
+    destruct f; auto.
+    red in  EQV.
+    specialize (EQV a).
+    destruct EQV.
+    forward H0; cbn; auto.
+    red in H0.
+    cbn in H0.
+    contradiction.
+  Qed.
+
+  (* TODO: Move this to MMSP or something *)
+  Lemma frame_eqv_empty_r :
+    forall f,
+      Memory64BitIntptr.MMEP.MMSP.frame_eqv f [] ->
+      f = [].
+  Proof.
+    intros f EQV.
+    symmetry in EQV.
+    apply frame_eqv_empty_l.
+    auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma fin_to_inf_addr_conv_inf :
+    forall ptr_inf ptr_fin,
+      InfToFinAddrConvert.addr_convert ptr_inf = NoOom ptr_fin ->
+      fin_to_inf_addr ptr_fin = ptr_inf.
+  Proof.
+    intros ptr_inf ptr_fin CONV.
+    unfold fin_to_inf_addr.
+    break_match_goal.
+    clear Heqs.
+    apply FinToInfAddrConvertSafe.addr_convert_safe in e.
+    eapply InfToFinAddrConvert.addr_convert_injective; eauto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma ptr_in_frame_prop_lift_inv :
+    forall f ptr_inf,
+      InfMem.MMEP.MMSP.ptr_in_frame_prop (lift_Frame f) ptr_inf ->
+      exists ptr_fin,
+        InfToFinAddrConvert.addr_convert ptr_inf = NoOom ptr_fin /\
+          FinMem.MMEP.MMSP.ptr_in_frame_prop f ptr_fin.
+  Proof.
+    intros f ptr IN.
+    red in IN.
+    unfold lift_Frame in IN.
+    rewrite List.map_map in IN.
+    apply in_map_iff in IN.
+    destruct IN as (?&?&?).
+    rewrite fin_to_inf_addr_ptr_to_int in H.
+    pose proof ITOP.int_to_ptr_ptr_to_int_exists x (InfPROV.address_provenance ptr).
+    destruct H1 as (?&?&?&?).
+    exists x0.
+    split.
+    - destruct ptr.
+      cbn in *; subst; auto.
+    - red.
+      apply in_map_iff.
+      exists x.
+      split; auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma ptr_in_frame_prop_lift :
+    forall f ptr,
+      FinMem.MMEP.MMSP.ptr_in_frame_prop f ptr ->
+      InfMem.MMEP.MMSP.ptr_in_frame_prop (lift_Frame f) (fin_to_inf_addr ptr).
+  Proof.
+    intros f ptr IN.
+    red in *.
+    unfold lift_Frame.
+    rewrite List.map_map.
+    rewrite fin_to_inf_addr_ptr_to_int.
+    replace (fun x : FinAddr.addr => LLVMParamsBigIntptr.PTOI.ptr_to_int (fin_to_inf_addr x)) with
+      (fun x : FinAddr.addr => LLVMParams64BitIntptr.PTOI.ptr_to_int x).
+    apply IN.
+
+    apply Axioms.functional_extensionality.
+    intros x.
+    rewrite fin_to_inf_addr_ptr_to_int.
+    auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma frame_eqv_lift :
+    forall f1 f2,
+      FinMem.MMEP.MMSP.frame_eqv f1 f2 ->
+      InfMem.MMEP.MMSP.frame_eqv (lift_Frame f1) (lift_Frame f2).
+  Proof.
+    intros f1 f2 EQV.
+    red in EQV; red.
+
+    intros ptr.
+    split; intros IN.
+    - apply ptr_in_frame_prop_lift_inv in IN.
+      destruct IN as (ptr_fin & CONV & IN).
+      apply EQV in IN.
+      apply ptr_in_frame_prop_lift in IN.
+      erewrite fin_to_inf_addr_conv_inf in IN; eauto.
+    - apply ptr_in_frame_prop_lift_inv in IN.
+      destruct IN as (ptr_fin & CONV & IN).
+      apply EQV in IN.
+      apply ptr_in_frame_prop_lift in IN.
+      erewrite fin_to_inf_addr_conv_inf in IN; eauto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma addr_refine_fin_to_inf_addr :
+    forall addr_fin,
+      addr_refine (fin_to_inf_addr addr_fin) addr_fin.
+  Proof.
+    intros addr_fin.
+    red. unfold fin_to_inf_addr.
+    break_match_goal.
+    clear Heqs.
+    apply FinToInfAddrConvertSafe.addr_convert_safe in e.
+    auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma frame_eqv_lift_inv :
+    forall f1 f2,
+      InfMem.MMEP.MMSP.frame_eqv (lift_Frame f1) (lift_Frame f2) ->
+      FinMem.MMEP.MMSP.frame_eqv f1 f2.
+  Proof.
+    intros f1 f2 EQV.
+    red in EQV; red.
+
+    intros ptr.
+    split; intros IN.
+    - apply ptr_in_frame_prop_lift in IN.
+      apply EQV in IN.
+      apply ptr_in_frame_prop_lift_inv in IN.
+      destruct IN as (ptr_fin & CONV & IN).
+      pose proof addr_convert_fin_to_inf_addr ptr as CONV'.
+      rewrite CONV in CONV'.
+      inv CONV'.
+      auto.
+    - apply ptr_in_frame_prop_lift in IN.
+      apply EQV in IN.
+      apply ptr_in_frame_prop_lift_inv in IN.
+      destruct IN as (ptr_fin & CONV & IN).
+      pose proof addr_convert_fin_to_inf_addr ptr as CONV'.
+      rewrite CONV in CONV'.
+      inv CONV'.
+      auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma FSNth_eqv_lift :
+    forall n fs f,
+      FinMem.MMEP.MMSP.FSNth_eqv fs n f ->
+      InfMem.MMEP.MMSP.FSNth_eqv (lift_FrameStack fs) n (lift_Frame f).
+  Proof.
+    induction n; intros fs f NTHEQV.
+    - destruct fs; cbn in *;
+        apply frame_eqv_lift; auto.
+    - destruct fs; cbn in *; auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma lift_FrameStack_snoc :
+    forall fs f,
+      lift_FrameStack (FinMemMMSP.Snoc fs f) = InfMemMMSP.Snoc (lift_FrameStack fs) (lift_Frame f).
+  Proof.
+    induction fs; intros f_fin; cbn; auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma FSNth_eqv_lift_inv :
+    forall n fs f,
+      InfMem.MMEP.MMSP.FSNth_eqv (lift_FrameStack fs) n f ->
+      exists f_fin,
+        InfMem.MMEP.MMSP.frame_eqv (lift_Frame f_fin) f /\
+          FinMem.MMEP.MMSP.FSNth_eqv fs n f_fin.
+  Proof.
+    induction n; intros fs f NTHEQV.
+    - destruct fs; cbn in *; exists f0;
+        split; auto; reflexivity.
+    - destruct fs.
+      cbn in *; contradiction.
+
+      rewrite lift_FrameStack_snoc in NTHEQV.
+      cbn in *.
+      eauto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma frame_stack_eqv_lift :
+    forall fs1 fs2,
+      FinMem.MMEP.MMSP.frame_stack_eqv fs1 fs2 ->
+      InfMem.MMEP.MMSP.frame_stack_eqv (lift_FrameStack fs1) (lift_FrameStack fs2).
+  Proof.
+    intros fs1 fs2 EQV.
+    red in *.
+    intros f n.
+    split; intros FSE.
+    - apply FSNth_eqv_lift_inv in FSE.
+      destruct FSE as (f_fin & F & FSE).
+
+      rewrite <- F.
+      apply FSNth_eqv_lift.
+      apply EQV.
+      auto.
+    - apply FSNth_eqv_lift_inv in FSE.
+      destruct FSE as (f_fin & F & FSE).
+
+      rewrite <- F.
+      apply FSNth_eqv_lift.
+      apply EQV.
+      auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma frame_stack_eqv_lift_inf_fin :
+    forall fs1 fs2,
+      InfMem.MMEP.MMSP.frame_stack_eqv (lift_FrameStack fs1) (lift_FrameStack fs2) ->
+      FinMem.MMEP.MMSP.frame_stack_eqv fs1 fs2.
+  Proof.
+    intros fs1 fs2 EQV.
+    red in *.
+    intros f n.
+    split; intros FSE.
+    - apply FSNth_eqv_lift in FSE.
+      apply EQV in FSE.
+      apply FSNth_eqv_lift_inv in FSE.
+      destruct FSE as (f_fin & F & FSE).
+      apply frame_eqv_lift_inv in F.
+      rewrite <- F.
+      auto.
+    - apply FSNth_eqv_lift in FSE.
+      apply EQV in FSE.
+      apply FSNth_eqv_lift_inv in FSE.
+      destruct FSE as (f_fin & F & FSE).
+      apply frame_eqv_lift_inv in F.
+      rewrite <- F.
+      auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma memory_stack_frame_stack_prop_lift :
+    forall ms_fin fs_fin,
+      FinMem.MMEP.MMSP.memory_stack_frame_stack_prop ms_fin fs_fin ->
+      InfMem.MMEP.MMSP.memory_stack_frame_stack_prop (lift_memory_stack ms_fin) (lift_FrameStack fs_fin).
+  Proof.
+    intros ms_fin fs_fin FSP.
+    red in FSP; red.
+    destruct ms_fin.
+    cbn in *.
+    apply frame_stack_eqv_lift.
+    auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma frame_stack_preserved_lift_MemState :
+    forall ms_fin ms_fin',
+      FinMem.MMEP.MemSpec.frame_stack_preserved ms_fin ms_fin' ->
+      InfMem.MMEP.MemSpec.frame_stack_preserved (lift_MemState ms_fin) (lift_MemState ms_fin').
+  Proof.
+    intros ms_fin ms_fin' FSP.
+    red in FSP; red.
+    destruct ms_fin, ms_fin'; cbn in *.
+    intros fs.
+    split; intros MSFSP.
+    - red; red in MSFSP.
+      red in FSP.
+      rewrite <- MSFSP.
+      destruct ms_memory_stack, ms_memory_stack0; cbn in *.
+      apply frame_stack_eqv_lift.
+      eapply FSP.
+      red; cbn.
+      reflexivity.
+    - red; red in MSFSP.
+      red in FSP.
+      rewrite <- MSFSP.
+      destruct ms_memory_stack, ms_memory_stack0; cbn in *.
+      apply frame_stack_eqv_lift.
+      eapply FSP.
+      red; cbn.
+      reflexivity.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma heap_preserved_lift_MemState :
+    forall ms_fin ms_fin',
+      FinMem.MMEP.MemSpec.heap_preserved ms_fin ms_fin' ->
+      InfMem.MMEP.MemSpec.heap_preserved (lift_MemState ms_fin) (lift_MemState ms_fin').
+  Proof.
+    intros ms_fin ms_fin' HP.
+    red in HP.
+    red.
+    destruct ms_fin, ms_fin'; cbn in *.
+    intros h.
+    split; intros MSFSP.
+    - destruct ms_memory_stack, ms_memory_stack0.
+      unfold InfMem.MMEP.MMSP.memory_stack_heap_prop in *.
+      unfold FinMem.MMEP.MMSP.memory_stack_heap_prop in *.
+      cbn in *.
+      rewrite <- MSFSP.
+      eapply Heap_eqv_lift.
+      eapply HP.
+      red. cbn.
+      reflexivity.
+    - destruct ms_memory_stack, ms_memory_stack0.
+      unfold InfMem.MMEP.MMSP.memory_stack_heap_prop in *.
+      unfold FinMem.MMEP.MMSP.memory_stack_heap_prop in *.
+      cbn in *.
+      rewrite <- MSFSP.
+      eapply Heap_eqv_lift.
+      eapply HP.
+      red; cbn.
+      reflexivity.
+  Qed.
+
+  Lemma heap_preserved_lift_MemState' :
+    forall ms_fin ms_fin',
+      InfMem.MMEP.MemSpec.heap_preserved (lift_MemState ms_fin) (lift_MemState ms_fin') ->
+      FinMem.MMEP.MemSpec.heap_preserved ms_fin ms_fin'.
+  Proof.
+    intros ms_fin ms_fin' HP.
+    red in HP.
+    red.
+    destruct ms_fin, ms_fin'; cbn in *.
+    intros h.
+    split; intros MSFSP.
+    - destruct ms_memory_stack, ms_memory_stack0.
+      unfold InfMem.MMEP.MMSP.memory_stack_heap_prop in *.
+      unfold FinMem.MMEP.MMSP.memory_stack_heap_prop in *.
+      cbn in *.
+      rewrite <- MSFSP.
+      eapply Heap_eqv_lift'.
+      eapply HP.
+      red; cbn.
+      reflexivity.
+    - destruct ms_memory_stack, ms_memory_stack0.
+      unfold InfMem.MMEP.MMSP.memory_stack_heap_prop in *.
+      unfold FinMem.MMEP.MMSP.memory_stack_heap_prop in *.
+      cbn in *.
+      rewrite <- MSFSP.
+      eapply Heap_eqv_lift'.
+      eapply HP.
+      red; cbn.
+      reflexivity.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma convert_MemState_MemState_refine_prop :
+    forall ms_inf ms_fin,
+      convert_MemState ms_inf = NoOom ms_fin ->
+      MemState_refine_prop ms_inf ms_fin.
+  Proof.
+    intros ms_inf ms_fin CONV.
+  Admitted.
+
   Lemma MemState_eqv_lift_MemState :
     forall ms1 ms2,
       Memory64BitIntptr.MMEP.MemSpec.MemState_eqv ms1 ms2 ->
       MemoryBigIntptr.MMEP.MemSpec.MemState_eqv (lift_MemState ms1) (lift_MemState ms2).
   Proof.
+    intros ms1 ms2 EQV.
+    pose proof EQV as H.
+    destruct ms1 as [[ms1 fss1 hs1] msprovs1].
+    destruct ms2 as [[ms2 fss2 hs2] msprovs2].
+    destruct H as (?&?&?&?&?&?&?).
+    cbn in *.
+
+    split; [|split; [|split; [|split; [| split; [| split]]]]].
+    - apply H.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
   Admitted.
 
   Unset Implicit Arguments.
@@ -8079,271 +8546,6 @@ cofix CIH
          e k
    end.
 
-  (* TODO: Move this *)
-  Lemma ptr_in_frame_prop_lift :
-    forall f ptr,
-      FinMem.MMEP.MMSP.ptr_in_frame_prop f ptr ->
-      InfMem.MMEP.MMSP.ptr_in_frame_prop (lift_Frame f) (fin_to_inf_addr ptr).
-  Proof.
-    intros f ptr IN.
-    red in *.
-    unfold lift_Frame.
-    rewrite List.map_map.
-    rewrite fin_to_inf_addr_ptr_to_int.
-    replace (fun x : FinAddr.addr => LLVMParamsBigIntptr.PTOI.ptr_to_int (fin_to_inf_addr x)) with
-      (fun x : FinAddr.addr => LLVMParams64BitIntptr.PTOI.ptr_to_int x).
-    apply IN.
-
-    apply Axioms.functional_extensionality.
-    intros x.
-    rewrite fin_to_inf_addr_ptr_to_int.
-    auto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma ptr_in_frame_prop_lift_inv :
-    forall f ptr_inf,
-      InfMem.MMEP.MMSP.ptr_in_frame_prop (lift_Frame f) ptr_inf ->
-      exists ptr_fin,
-        InfToFinAddrConvert.addr_convert ptr_inf = NoOom ptr_fin /\
-          FinMem.MMEP.MMSP.ptr_in_frame_prop f ptr_fin.
-  Proof.
-    intros f ptr IN.
-    red in IN.
-    unfold lift_Frame in IN.
-    rewrite List.map_map in IN.
-    apply in_map_iff in IN.
-    destruct IN as (?&?&?).
-    rewrite fin_to_inf_addr_ptr_to_int in H.
-    pose proof ITOP.int_to_ptr_ptr_to_int_exists x (InfPROV.address_provenance ptr).
-    destruct H1 as (?&?&?&?).
-    exists x0.
-    split.
-    - destruct ptr.
-      cbn in *; subst; auto.
-    - red.
-      apply in_map_iff.
-      exists x.
-      split; auto.
-  Qed.
-
-
-  (* TODO: Move this to MMSP or something *)
-  Lemma frame_eqv_empty_l :
-    forall f,
-      Memory64BitIntptr.MMEP.MMSP.frame_eqv [] f ->
-      f = [].
-  Proof.
-    intros f EQV.
-    destruct f; auto.
-    red in  EQV.
-    specialize (EQV a).
-    destruct EQV.
-    forward H0; cbn; auto.
-    red in H0.
-    cbn in H0.
-    contradiction.
-  Qed.
-
-  (* TODO: Move this to MMSP or something *)
-  Lemma frame_eqv_empty_r :
-    forall f,
-      Memory64BitIntptr.MMEP.MMSP.frame_eqv f [] ->
-      f = [].
-  Proof.
-    intros f EQV.
-    symmetry in EQV.
-    apply frame_eqv_empty_l.
-    auto.
-  Qed.
-
-
-  (* TODO: Move this *)
-  Lemma fin_to_inf_addr_conv_inf :
-    forall ptr_inf ptr_fin,
-      InfToFinAddrConvert.addr_convert ptr_inf = NoOom ptr_fin ->
-      fin_to_inf_addr ptr_fin = ptr_inf.
-  Proof.
-    intros ptr_inf ptr_fin CONV.
-    unfold fin_to_inf_addr.
-    break_match_goal.
-    clear Heqs.
-    apply FinToInfAddrConvertSafe.addr_convert_safe in e.
-    eapply InfToFinAddrConvert.addr_convert_injective; eauto.
-  Qed.
-
-
-  (* (* TODO: Move this *) *)
-  (* Lemma frame_stack_eqv_lift_inv : *)
-  (*   forall fs1 fs2, *)
-  (*     InfMem.MMEP.MMSP.frame_stack_eqv fs1 fs2 -> *)
-  (*     exists fs1_fin fs2_fin, *)
-  (*       fs1 = lift_FrameStack fs1_fin /\ *)
-  (*         fs2 = lift_FrameStack fs2_fin /\ *)
-  (*         FinMem.MMEP.MMSP.frame_stack_eqv fs1_fin fs2_fin. *)
-  (* Proof. *)
-  (*   unfold InfMem.MMEP.MMSP.frame_stack_eqv. *)
-  (*   induction fs1. *)
-  (*   - destruct fs2; intros. *)
-  (*     + specialize (H f). *)
-  (* Admitted. *)
-
-  (* TODO: Move this *)
-  Lemma frame_eqv_lift :
-    forall f1 f2,
-      FinMem.MMEP.MMSP.frame_eqv f1 f2 ->
-      InfMem.MMEP.MMSP.frame_eqv (lift_Frame f1) (lift_Frame f2).
-  Proof.
-    intros f1 f2 EQV.
-    red in EQV; red.
-
-    intros ptr.
-    split; intros IN.
-    - apply ptr_in_frame_prop_lift_inv in IN.
-      destruct IN as (ptr_fin & CONV & IN).
-      apply EQV in IN.
-      apply ptr_in_frame_prop_lift in IN.
-      erewrite fin_to_inf_addr_conv_inf in IN; eauto.
-    - apply ptr_in_frame_prop_lift_inv in IN.
-      destruct IN as (ptr_fin & CONV & IN).
-      apply EQV in IN.
-      apply ptr_in_frame_prop_lift in IN.
-      erewrite fin_to_inf_addr_conv_inf in IN; eauto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma addr_refine_fin_to_inf_addr :
-    forall addr_fin,
-      addr_refine (fin_to_inf_addr addr_fin) addr_fin.
-  Proof.
-    intros addr_fin.
-    red. unfold fin_to_inf_addr.
-    break_match_goal.
-    clear Heqs.
-    apply FinToInfAddrConvertSafe.addr_convert_safe in e.
-    auto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma frame_eqv_lift_inv :
-    forall f1 f2,
-      InfMem.MMEP.MMSP.frame_eqv (lift_Frame f1) (lift_Frame f2) ->
-      FinMem.MMEP.MMSP.frame_eqv f1 f2.
-  Proof.
-    intros f1 f2 EQV.
-    red in EQV; red.
-
-    intros ptr.
-    split; intros IN.
-    - apply ptr_in_frame_prop_lift in IN.
-      apply EQV in IN.
-      apply ptr_in_frame_prop_lift_inv in IN.
-      destruct IN as (ptr_fin & CONV & IN).
-      pose proof addr_convert_fin_to_inf_addr ptr as CONV'.
-      rewrite CONV in CONV'.
-      inv CONV'.
-      auto.
-    - apply ptr_in_frame_prop_lift in IN.
-      apply EQV in IN.
-      apply ptr_in_frame_prop_lift_inv in IN.
-      destruct IN as (ptr_fin & CONV & IN).
-      pose proof addr_convert_fin_to_inf_addr ptr as CONV'.
-      rewrite CONV in CONV'.
-      inv CONV'.
-      auto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma FSNth_eqv_lift :
-    forall n fs f,
-      FinMem.MMEP.MMSP.FSNth_eqv fs n f ->
-      InfMem.MMEP.MMSP.FSNth_eqv (lift_FrameStack fs) n (lift_Frame f).
-  Proof.
-    induction n; intros fs f NTHEQV.
-    - destruct fs; cbn in *;
-        apply frame_eqv_lift; auto.
-    - destruct fs; cbn in *; auto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma lift_FrameStack_snoc :
-    forall fs f,
-      lift_FrameStack (FinMemMMSP.Snoc fs f) = InfMemMMSP.Snoc (lift_FrameStack fs) (lift_Frame f).
-  Proof.
-    induction fs; intros f_fin; cbn; auto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma FSNth_eqv_lift_inv :
-    forall n fs f,
-      InfMem.MMEP.MMSP.FSNth_eqv (lift_FrameStack fs) n f ->
-      exists f_fin,
-        InfMem.MMEP.MMSP.frame_eqv (lift_Frame f_fin) f /\
-          FinMem.MMEP.MMSP.FSNth_eqv fs n f_fin.
-  Proof.
-    induction n; intros fs f NTHEQV.
-    - destruct fs; cbn in *; exists f0;
-        split; auto; reflexivity.
-    - destruct fs.
-      cbn in *; contradiction.
-
-      rewrite lift_FrameStack_snoc in NTHEQV.
-      cbn in *.
-      eauto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma frame_stack_eqv_lift :
-    forall fs1 fs2,
-      FinMem.MMEP.MMSP.frame_stack_eqv fs1 fs2 ->
-      InfMem.MMEP.MMSP.frame_stack_eqv (lift_FrameStack fs1) (lift_FrameStack fs2).
-  Proof.
-    intros fs1 fs2 EQV.
-    red in *.
-    intros f n.
-    split; intros FSE.
-    - apply FSNth_eqv_lift_inv in FSE.
-      destruct FSE as (f_fin & F & FSE).
-
-      rewrite <- F.
-      apply FSNth_eqv_lift.
-      apply EQV.
-      auto.
-    - apply FSNth_eqv_lift_inv in FSE.
-      destruct FSE as (f_fin & F & FSE).
-
-      rewrite <- F.
-      apply FSNth_eqv_lift.
-      apply EQV.
-      auto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma frame_stack_eqv_lift_inf_fin :
-    forall fs1 fs2,
-      InfMem.MMEP.MMSP.frame_stack_eqv (lift_FrameStack fs1) (lift_FrameStack fs2) ->
-      FinMem.MMEP.MMSP.frame_stack_eqv fs1 fs2.
-  Proof.
-    intros fs1 fs2 EQV.
-    red in *.
-    intros f n.
-    split; intros FSE.
-    - apply FSNth_eqv_lift in FSE.
-      apply EQV in FSE.
-      apply FSNth_eqv_lift_inv in FSE.
-      destruct FSE as (f_fin & F & FSE).
-      apply frame_eqv_lift_inv in F.
-      rewrite <- F.
-      auto.
-    - apply FSNth_eqv_lift in FSE.
-      apply EQV in FSE.
-      apply FSNth_eqv_lift_inv in FSE.
-      destruct FSE as (f_fin & F & FSE).
-      apply frame_eqv_lift_inv in F.
-      rewrite <- F.
-      auto.
-  Qed.
-
   (* TODO: Move this, possibly to itrees library? *)
   Lemma paco2_eqit_RR_refl : forall E R RR `{REFL: Reflexive _ RR} r (t : itree E R), paco2 (eqit_ RR true true id) r t t.
   Proof.
@@ -8460,18 +8662,6 @@ cofix CIH
         constructor.
         intros [].
       }
-  Qed.
-
-  Lemma lift_MemState_refine_prop :
-    forall ms,
-      MemState_refine_prop (lift_MemState ms) ms.
-  Proof.
-    intros ms.
-    red.
-    destruct ms.
-    cbn.
-    repeat split; intros; cbn in * ; try reflexivity; try intuition;
-      try red in H; try (rewrite <- H; auto); try (rewrite H; auto).
   Qed.
 
   (* TODO: Move this... *)
@@ -12762,39 +12952,6 @@ cofix CIH
     }
   Qed.
 
-  (* TODO: Move this *)
-  Lemma MemState_refine_prop_heap_preserved :
-    forall ms_inf ms_fin,
-      MemState_refine_prop ms_inf ms_fin ->
-      InfMem.MMEP.MemSpec.heap_preserved ms_inf (lift_MemState ms_fin).
-  Proof.
-    intros ms_inf ms_fin MSR.
-    do 2 red in MSR.
-    tauto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma MemState_refine_prop_frame_stack_preserved :
-    forall ms_inf ms_fin,
-      MemState_refine_prop ms_inf ms_fin ->
-      InfMem.MMEP.MemSpec.frame_stack_preserved ms_inf (lift_MemState ms_fin).
-  Proof.
-    intros ms_inf ms_fin MSR.
-    do 2 red in MSR.
-    tauto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma MemState_refine_prop_allocations_preserved :
-    forall {ms_inf ms_fin},
-      MemState_refine_prop ms_inf ms_fin ->
-      InfMem.MMEP.MemSpec.allocations_preserved ms_inf (lift_MemState ms_fin).
-  Proof.
-    intros ms_inf ms_fin MSR.
-    do 2 red in MSR.
-    tauto.
-  Qed.
-
   Lemma convert_FrameStack_OOM :
     forall fs1 fs2 s1,
       InfMem.MMEP.MMSP.frame_stack_eqv fs1 fs2 ->
@@ -12985,51 +13142,6 @@ cofix CIH
   Qed.
 
   (* TODO: Move this *)
-  Lemma MemState_refine_prop_read_byte_preserved :
-    forall {ms_inf ms_fin},
-      MemState_refine_prop ms_inf ms_fin ->
-      InfMem.MMEP.MemSpec.read_byte_preserved ms_inf (lift_MemState ms_fin).
-  Proof.
-    intros ms_inf ms_fin MSR.
-    do 2 red in MSR.
-    tauto.
-  Qed.
-
-  (* TODO: Move this, should be in MemoryModel.v with read_byte_preserved *)
-  Definition read_byte_spec_preserved m1 m2 :=
-    forall ptr byte, MemoryBigIntptr.MMEP.MemSpec.read_byte_spec m1 ptr byte <-> MemoryBigIntptr.MMEP.MemSpec.read_byte_spec m2 ptr byte.
-
-  Lemma read_byte_preserved_read_byte_spec_preserved :
-    forall m1 m2,
-      InfMem.MMEP.MemSpec.read_byte_preserved m1 m2 ->
-      read_byte_spec_preserved m1 m2.
-  Proof.
-    intros m1 m2.
-    intros PRES.
-    { destruct PRES as [ALLOWED_PRES PROP_PRES].
-      red.
-      intros ptr byte.
-      split; intros [ALLOWED PROP].
-      - split.
-        + apply ALLOWED_PRES; auto.
-        + apply PROP_PRES; auto.
-      - split.
-        + apply ALLOWED_PRES; auto.
-        + apply PROP_PRES; auto.
-    }
-  Qed.
-
-  Lemma MemState_refine_prop_read_byte_spec_preserved :
-    forall {ms_inf : InfMem.MMEP.MMSP.MemState} {ms_fin : FinMem.MMEP.MMSP.MemState},
-      MemState_refine_prop ms_inf ms_fin ->
-      read_byte_spec_preserved ms_inf (lift_MemState ms_fin).
-  Proof.
-    intros ms_inf ms_fin MSR.
-    apply read_byte_preserved_read_byte_spec_preserved.
-    apply MemState_refine_prop_read_byte_preserved; auto.
-  Qed.
-
-  (* TODO: Move this *)
   Lemma read_byte_spec_lifted_memory_lifted_sbyte :
     forall {ms ptr byte},
       MemoryBigIntptr.MMEP.MemSpec.read_byte_spec (lift_MemState ms) ptr byte ->
@@ -13134,15 +13246,6 @@ cofix CIH
     apply IntMaps.IM.elements_1.
     eapply Heqo.
   Qed.
-
-  (* TODO: Move this *)
-  Lemma convert_MemState_MemState_refine_prop :
-    forall ms_inf ms_fin,
-      convert_MemState ms_inf = NoOom ms_fin ->
-      MemState_refine_prop ms_inf ms_fin.
-  Proof.
-    intros ms_inf ms_fin CONV.
-  Admitted.
 
   Lemma addr_oom_not_in_bounds :
     forall ptr oom_msg,
@@ -13594,151 +13697,6 @@ cofix CIH
     apply MapsTo_filter_dom_true in HX.
   Qed.
   *)
-
-  (* TODO: Move this *)
-  Lemma memory_stack_frame_stack_prop_lift :
-    forall ms_fin fs_fin,
-      FinMem.MMEP.MMSP.memory_stack_frame_stack_prop ms_fin fs_fin ->
-      InfMem.MMEP.MMSP.memory_stack_frame_stack_prop (lift_memory_stack ms_fin) (lift_FrameStack fs_fin).
-  Proof.
-    intros ms_fin fs_fin FSP.
-    red in FSP; red.
-    destruct ms_fin.
-    cbn in *.
-    apply frame_stack_eqv_lift.
-    auto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma frame_stack_preserved_lift_MemState :
-    forall ms_fin ms_fin',
-      FinMem.MMEP.MemSpec.frame_stack_preserved ms_fin ms_fin' ->
-      InfMem.MMEP.MemSpec.frame_stack_preserved (lift_MemState ms_fin) (lift_MemState ms_fin').
-  Proof.
-    intros ms_fin ms_fin' FSP.
-    red in FSP; red.
-    destruct ms_fin, ms_fin'; cbn in *.
-    intros fs.
-    split; intros MSFSP.
-    - red; red in MSFSP.
-      red in FSP.
-      rewrite <- MSFSP.
-      destruct ms_memory_stack, ms_memory_stack0; cbn in *.
-      apply frame_stack_eqv_lift.
-      eapply FSP.
-      red; cbn.
-      reflexivity.
-    - red; red in MSFSP.
-      red in FSP.
-      rewrite <- MSFSP.
-      destruct ms_memory_stack, ms_memory_stack0; cbn in *.
-      apply frame_stack_eqv_lift.
-      eapply FSP.
-      red; cbn.
-      reflexivity.
-  Qed.
-
-  (* Lemma fin_inf_root_in_heap_prop_lift : *)
-  (*   forall h root, *)
-  (*     (exists fin_root, (fin_to_inf_addr fin_root) = root /\ FinMem.MMEP.MMSP.root_in_heap_prop h fin_root) <-> *)
-  (*       InfMem.MMEP.MMSP.root_in_heap_prop (lift_Heap h) root. *)
-  (* Proof. *)
-  (*   intros h root. *)
-  (*   unfold FinMem.MMEP.MMSP.root_in_heap_prop. *)
-  (*   unfold InfMem.MMEP.MMSP.root_in_heap_prop. *)
-  (*   split; intros. *)
-  (*   - destruct H as [fin_root [HEQ H]]. *)
-  (*     rewrite member_lift_Heap. *)
-  (*     rewrite <- HEQ. *)
-  (*     rewrite fin_to_inf_addr_ptr_to_int. *)
-  (*     assumption. *)
-  (*   - apply member_lift_Heap in H. *)
-  (*     unfold FinMem.MMEP.MMSP.Heap in *. *)
-
-  (*     apply (IntMap_member_map_keys_eq id) in H. *)
-  (*     destruct root. *)
-  (*     unfold LLVMParamsBigIntptr.PTOI.ptr_to_int in *. *)
-  (*     cbn in H. *)
-  (*     unfold FinAddr.addr. *)
-  (*     unfold FiniteAddresses.Iptr. unfold Iptr in i. *)
-  (* Admitted. *)
-
-  (* Lemma memory_stack_heap_prop_lift : *)
-  (*   forall ms_fin h_fin, *)
-  (*     FinMem.MMEP.MMSP.memory_stack_heap_prop ms_fin h_fin -> *)
-  (*     InfMem.MMEP.MMSP.memory_stack_heap_prop (lift_memory_stack ms_fin) (lift_Heap h_fin). *)
-  (* Proof. *)
-  (*   intros ms_fin h_fin MSH. *)
-  (*   red in MSH; red. *)
-  (*   destruct ms_fin. *)
-  (*   cbn in *. *)
-  (* Admitted. *)
-
-
-  (* TODO: Move this *)
-  Lemma heap_preserved_lift_MemState :
-    forall ms_fin ms_fin',
-      FinMem.MMEP.MemSpec.heap_preserved ms_fin ms_fin' ->
-      InfMem.MMEP.MemSpec.heap_preserved (lift_MemState ms_fin) (lift_MemState ms_fin').
-  Proof.
-    intros ms_fin ms_fin' HP.
-    red in HP.
-    red.
-    destruct ms_fin, ms_fin'; cbn in *.
-    intros h.
-    split; intros MSFSP.
-    - destruct ms_memory_stack, ms_memory_stack0.
-      unfold InfMem.MMEP.MMSP.memory_stack_heap_prop in *.
-      unfold FinMem.MMEP.MMSP.memory_stack_heap_prop in *.
-      cbn in *.
-      rewrite <- MSFSP.
-      eapply Heap_eqv_lift.
-      eapply HP.
-      red. cbn.
-      reflexivity.
-    - destruct ms_memory_stack, ms_memory_stack0.
-      unfold InfMem.MMEP.MMSP.memory_stack_heap_prop in *.
-      unfold FinMem.MMEP.MMSP.memory_stack_heap_prop in *.
-      cbn in *.
-      rewrite <- MSFSP.
-      eapply Heap_eqv_lift.
-      eapply HP.
-      red; cbn.
-      reflexivity.
-  Qed.
-
-  Lemma heap_preserved_lift_MemState' :
-    forall ms_fin ms_fin',
-      InfMem.MMEP.MemSpec.heap_preserved (lift_MemState ms_fin) (lift_MemState ms_fin') ->
-      FinMem.MMEP.MemSpec.heap_preserved ms_fin ms_fin'.
-  Proof.
-    intros ms_fin ms_fin' HP.
-    red in HP.
-    red.
-    destruct ms_fin, ms_fin'; cbn in *.
-    intros h.
-    split; intros MSFSP.
-    - destruct ms_memory_stack, ms_memory_stack0.
-      unfold InfMem.MMEP.MMSP.memory_stack_heap_prop in *.
-      unfold FinMem.MMEP.MMSP.memory_stack_heap_prop in *.
-      cbn in *.
-      rewrite <- MSFSP.
-      eapply Heap_eqv_lift'.
-      eapply HP.
-      red; cbn.
-      reflexivity.
-    - destruct ms_memory_stack, ms_memory_stack0.
-      unfold InfMem.MMEP.MMSP.memory_stack_heap_prop in *.
-      unfold FinMem.MMEP.MMSP.memory_stack_heap_prop in *.
-      cbn in *.
-      rewrite <- MSFSP.
-      eapply Heap_eqv_lift'.
-      eapply HP.
-      red; cbn.
-      reflexivity.
-  Qed.
-
-
 
   Lemma convert_Frame_cons :
     forall ptr f,
@@ -14867,6 +14825,10 @@ cofix CIH
           addr_refine ptr_inf ptr_fin /\
           MemState_refine_prop ms_inf_final ms_fin_final.
   Proof.
+    Transparent convert_Block.
+    Transparent lift_Block.
+    Transparent IntMaps.IM.elements.
+
     intros ms_inf_start ms_inf_final ms_fin_start ptr_inf ptr_fin byte_inf byte_fin MSR BYTES ADDR_REF WRITE.
     destruct WRITE.
 
@@ -24890,7 +24852,7 @@ cofix CIH
 
           (* TODO: Need to know ms_fin only has in bounds addresses *)
           (* I should be able to get this from MSR? *)
-          pose proof convert_memory_lift ms_fin as CONV_MEM.
+          pose proof convert_memory_inv ms_fin as (ms_fin'&CONV_MEM).
 
           admit.
         }
