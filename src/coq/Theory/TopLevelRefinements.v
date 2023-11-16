@@ -376,28 +376,72 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       repeat red; intros.
       split; intros.
       - inversion H4.
-        + dependent destruction H5.
+        + (* PickUV_UniqueUB *)
+          dependent destruction H5.
           apply inj_pair2 in H8.
           subst.
-          apply PickUV_UB. assumption.
-        + dependent destruction H5.
+          apply PickUV_UniqueUB. assumption.
+        + (* PickUV_UniqueRet *)
+          dependent destruction H5.
+          apply inj_pair2 in H6.
+          apply inj_pair2 in H10.
+          subst.
+          eapply PickUV_UniqueRet.
+          assumption.
+          rewrite <- H3. apply H11.
+        + (* PickUV_NonPoisonUB *)
+          dependent destruction H5.
+          apply inj_pair2 in H8.
+          subst.
+          apply PickUV_NonPoisonUB. assumption.
+        + (* PickUV_NonPoisonRet *)
+          dependent destruction H5.
+          apply inj_pair2 in H6.
+          apply inj_pair2 in H10.
+          subst.
+          eapply PickUV_NonPoisonRet.
+          assumption.
+          rewrite <- H3. apply H11.
+        + (* PickUV_Ret *)
+          dependent destruction H5.
           apply inj_pair2 in H8.
           apply inj_pair2 in H10.
           subst.
           eapply PickUV_Ret.
-          apply Conc.
           rewrite <- H3. apply H7.
       - inversion H4.
-        + dependent destruction H5.
+        + (* PickUV_UniqueUB *)
+          dependent destruction H5.
           apply inj_pair2 in H8.
           subst.
-          apply PickUV_UB. assumption.
-        + dependent destruction H5.
+          apply PickUV_UniqueUB. assumption.
+        + (* PickUV_UniqueRet *)
+          dependent destruction H5.
+          apply inj_pair2 in H6.
+          apply inj_pair2 in H10.
+          subst.
+          eapply PickUV_UniqueRet.
+          assumption.
+          rewrite H3. apply H11.
+        + (* PickUV_NonPoisonUB *)
+          dependent destruction H5.
+          apply inj_pair2 in H8.
+          subst.
+          apply PickUV_NonPoisonUB. assumption.
+        + (* PickUV_NonPoisonRet *)
+          dependent destruction H5.
+          apply inj_pair2 in H6.
+          apply inj_pair2 in H10.
+          subst.
+          eapply PickUV_NonPoisonRet.
+          assumption.
+          rewrite H3. apply H11.
+        + (* PickUV_Ret *)
+          dependent destruction H5.
           apply inj_pair2 in H8.
           apply inj_pair2 in H10.
           subst.
           eapply PickUV_Ret.
-          apply Conc.
           rewrite H3. apply H7.
     Qed.
 
@@ -484,35 +528,101 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Proof.
       unfold handler_correct.
       intros * EQ.
-      destruct e as [Pre u].
-      rewrite EQ.
-      apply PickUV_Ret with (res := concretize_uvalue u).
-      - apply concretize_u_concretize_uvalue.
-      - unfold ITree.map.
+      destruct e as [uv | uv | uv];
+        rewrite EQ.
+      - destruct (Classical_Prop.classic (unique_prop uv)).
+        + eapply PickUV_UniqueRet with (res := concretize_uvalue uv); eauto.
+          { cbn.
+            unfold ITree.map.
+            unfold lift_err_ub_oom_post_ret, lift_err_ub_oom_post.
+            destruct ((concretize_uvalue uv) : err_ub_oom_T _ _) eqn: HU.
+            repeat break_match.
+            + unfold raiseOOM.
+              apply eutt_clo_bind with (UU:=fun _ _ => True).
+              setoid_rewrite concretize_uvalue_err_ub_oom_to_itree.
+              rewrite HU. unfold raiseOOM.
+              rewrite bind_trigger. unfold trigger.
+              apply eqit_Vis. intros [].
+              intros ? [].
+            + unfold raiseUB.
+              apply eutt_clo_bind with (UU:=fun _ _ => True).
+              setoid_rewrite concretize_uvalue_err_ub_oom_to_itree.
+              rewrite HU.
+              unfold raiseUB. rewrite bind_trigger. unfold trigger.
+              apply eqit_Vis. intros [].
+              intros ? [].
+            + unfold raise.
+              apply eutt_clo_bind with (UU:=fun _ _ => True).
+              setoid_rewrite concretize_uvalue_err_ub_oom_to_itree.
+              rewrite HU. unfold raise.
+              rewrite bind_trigger. unfold trigger.
+              apply eqit_Vis. intros [].
+              intros ? [].
+            + cbn. unfold ITree.map.
+              setoid_rewrite concretize_uvalue_err_ub_oom_to_itree.
+              rewrite HU. setoid_rewrite bind_ret_l. reflexivity.
+          }
+        + eapply PickUV_UniqueUB; eauto.
+      - destruct (Classical_Prop.classic (forall dt : dtyp, ~ concretize uv (DVALUE_Poison dt))).
+        + eapply PickUV_NonPoisonRet with (res := concretize_uvalue uv); eauto.
+          { cbn.
+            unfold ITree.map.
+            unfold lift_err_ub_oom_post_ret, lift_err_ub_oom_post.
+            destruct ((concretize_uvalue uv) : err_ub_oom_T _ _) eqn: HU.
+            repeat break_match.
+            + unfold raiseOOM.
+              apply eutt_clo_bind with (UU:=fun _ _ => True).
+              setoid_rewrite concretize_uvalue_err_ub_oom_to_itree.
+              rewrite HU. unfold raiseOOM.
+              rewrite bind_trigger. unfold trigger.
+              apply eqit_Vis. intros [].
+              intros ? [].
+            + unfold raiseUB.
+              apply eutt_clo_bind with (UU:=fun _ _ => True).
+              setoid_rewrite concretize_uvalue_err_ub_oom_to_itree.
+              rewrite HU.
+              unfold raiseUB. rewrite bind_trigger. unfold trigger.
+              apply eqit_Vis. intros [].
+              intros ? [].
+            + unfold raise.
+              apply eutt_clo_bind with (UU:=fun _ _ => True).
+              setoid_rewrite concretize_uvalue_err_ub_oom_to_itree.
+              rewrite HU. unfold raise.
+              rewrite bind_trigger. unfold trigger.
+              apply eqit_Vis. intros [].
+              intros ? [].
+            + cbn. unfold ITree.map.
+              setoid_rewrite concretize_uvalue_err_ub_oom_to_itree.
+              rewrite HU. setoid_rewrite bind_ret_l. reflexivity.
+          }
+        + eapply PickUV_NonPoisonUB; eauto.
+      - eapply PickUV_Ret with (res := concretize_uvalue uv); eauto.
+        cbn.
+        unfold ITree.map.
         unfold lift_err_ub_oom_post_ret, lift_err_ub_oom_post.
-        destruct ((concretize_uvalue u) : err_ub_oom_T _ _) eqn: HU.
+        destruct ((concretize_uvalue uv) : err_ub_oom_T _ _) eqn: HU.
         repeat break_match.
         + unfold raiseOOM.
           apply eutt_clo_bind with (UU:=fun _ _ => True).
           setoid_rewrite concretize_uvalue_err_ub_oom_to_itree.
           rewrite HU. unfold raiseOOM.
           rewrite bind_trigger. unfold trigger.
-          apply eqit_Vis. intros. inversion u0.
-          intros; inv u2.
+          apply eqit_Vis. intros [].
+          intros ? [].
         + unfold raiseUB.
           apply eutt_clo_bind with (UU:=fun _ _ => True).
           setoid_rewrite concretize_uvalue_err_ub_oom_to_itree.
           rewrite HU.
           unfold raiseUB. rewrite bind_trigger. unfold trigger.
-          apply eqit_Vis. intros. inversion u1. intros.
-          inversion u2.
+          apply eqit_Vis. intros [].
+          intros ? [].
         + unfold raise.
           apply eutt_clo_bind with (UU:=fun _ _ => True).
           setoid_rewrite concretize_uvalue_err_ub_oom_to_itree.
           rewrite HU. unfold raise.
           rewrite bind_trigger. unfold trigger.
-          apply eqit_Vis. intros. inversion u0.
-          intros. inversion u2.
+          apply eqit_Vis. intros [].
+          intros ? [].
         + cbn. unfold ITree.map.
           setoid_rewrite concretize_uvalue_err_ub_oom_to_itree.
           rewrite HU. setoid_rewrite bind_ret_l. reflexivity.

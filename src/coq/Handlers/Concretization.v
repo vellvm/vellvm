@@ -531,8 +531,12 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
   Definition concretize (uv: uvalue) (dv : dvalue) := concretize_u uv (ret dv).
 
   (* TODO: should the post condition be concretize uv dv ? *)
-  Definition pick_uvalue (Pre : Prop) (uv : uvalue) : PickUvalueE {dv : dvalue | True}
-    := pick Pre uv.
+  Definition pick_uvalue (uv : uvalue) : PickUvalueE {dv : dvalue | True}
+    := pick uv.
+
+  (* TODO: should the post condition be concretize uv dv ? *)
+  Definition pick_unique_uvalue (uv : uvalue) : PickUvalueE {dv : dvalue | True}
+    := pickUnique uv.
 
   (* Concretization encounters UB / Failure.
 

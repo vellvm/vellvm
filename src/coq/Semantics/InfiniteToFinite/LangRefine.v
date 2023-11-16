@@ -1672,9 +1672,24 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
       inversion e1.
-      destruct e2 eqn:HE2.
-      apply ((Pre -> Pre0) /\
-               uvalue_refine_strict x x0).
+      - (* pickUnique *)
+        subst.
+        destruct e2.
+        + apply (uvalue_refine_strict x x0).
+        + exact False.
+        + exact False.
+      - (* pickNonPoison *)
+        subst.
+        destruct e2.
+        + exact False.
+        + apply (uvalue_refine_strict x x0).
+        + exact False.
+      - (* pick *)
+        subst.
+        destruct e2.
+        + exact False.
+        + exact False.
+        + apply (uvalue_refine_strict x x0).
     }
 
     (* OOME *)
@@ -1799,9 +1814,24 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
       inversion e1.
-      destruct e2 eqn:HE2.
-      apply ((Pre -> Pre0) /\
-               uvalue_refine_strict x x0).
+      - (* pickUnique *)
+        subst.
+        destruct e2.
+        + apply (uvalue_refine_strict x x0).
+        + exact False.
+        + exact False.
+      - (* pickNonPoison *)
+        subst.
+        destruct e2.
+        + exact False.
+        + apply (uvalue_refine_strict x x0).
+        + exact False.
+      - (* pick *)
+        subst.
+        destruct e2.
+        + exact False.
+        + exact False.
+        + apply (uvalue_refine_strict x x0).
     }
 
     (* OOME *)
@@ -1897,9 +1927,24 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
       inversion e1.
-      destruct e2 eqn:HE2.
-      apply ((Pre -> Pre0) /\
-               uvalue_refine_strict x x0).
+      - (* pickUnique *)
+        subst.
+        destruct e2.
+        + apply (uvalue_refine_strict x x0).
+        + exact False.
+        + exact False.
+      - (* pickNonPoison *)
+        subst.
+        destruct e2.
+        + exact False.
+        + apply (uvalue_refine_strict x x0).
+        + exact False.
+      - (* pick *)
+        subst.
+        destruct e2.
+        + exact False.
+        + exact False.
+        + apply (uvalue_refine_strict x x0).
     }
 
     (* OOME *)
@@ -1953,9 +1998,24 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
       inversion e1.
-      destruct e2 eqn:HE2.
-      apply ((Pre -> Pre0) /\
-               uvalue_refine_strict x x0).
+      - (* pickUnique *)
+        subst.
+        destruct e2.
+        + apply (uvalue_refine_strict x x0).
+        + exact False.
+        + exact False.
+      - (* pickNonPoison *)
+        subst.
+        destruct e2.
+        + exact False.
+        + apply (uvalue_refine_strict x x0).
+        + exact False.
+      - (* pick *)
+        subst.
+        destruct e2.
+        + exact False.
+        + exact False.
+        + apply (uvalue_refine_strict x x0).
     }
 
     (* OOME *)
@@ -2448,13 +2508,31 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
-      inversion e1; subst.
-      destruct e2 eqn:HE2.
-      destruct res1 as [r1 P1].
-      destruct res2 as [r2 P2].
-      apply ((Pre -> Pre0) /\
-               uvalue_refine_strict x x0 /\
-               dvalue_refine_strict r1 r2).
+      inversion e1.
+      - (* pickUnique *)
+        subst.
+        destruct e2.
+        + destruct res1 as [r1 P1].
+          destruct res2 as [r2 P2].
+          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
+        + exact False.
+        + exact False.
+      - (* pickNonPoison *)
+        subst.
+        destruct e2.
+        + exact False.
+        + destruct res1 as [r1 P1].
+          destruct res2 as [r2 P2].
+          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
+        + exact False.
+      - (* pick *)
+        subst.
+        destruct e2.
+        + exact False.
+        + exact False.
+        + destruct res1 as [r1 P1].
+          destruct res2 as [r2 P2].
+          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
     }
 
     (* OOME *)
@@ -2589,13 +2667,31 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
-      inversion e1; subst.
-      destruct e2 eqn:HE2.
-      destruct res1 as [r1 P1].
-      destruct res2 as [r2 P2].
-      apply ((Pre -> Pre0) /\
-               uvalue_refine_strict x x0 /\
-               dvalue_refine_strict r1 r2).
+      inversion e1.
+      - (* pickUnique *)
+        subst.
+        destruct e2.
+        + destruct res1 as [r1 P1].
+          destruct res2 as [r2 P2].
+          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
+        + exact False.
+        + exact False.
+      - (* pickNonPoison *)
+        subst.
+        destruct e2.
+        + exact False.
+        + destruct res1 as [r1 P1].
+          destruct res2 as [r2 P2].
+          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
+        + exact False.
+      - (* pick *)
+        subst.
+        destruct e2.
+        + exact False.
+        + exact False.
+        + destruct res1 as [r1 P1].
+          destruct res2 as [r2 P2].
+          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
     }
 
     (* OOME *)
@@ -2699,13 +2795,31 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
-      inversion e1; subst.
-      destruct e2 eqn:HE2.
-      destruct res1 as [r1 P1].
-      destruct res2 as [r2 P2].
-      apply ((Pre -> Pre0) /\
-               uvalue_refine_strict x x0 /\
-               dvalue_refine_strict r1 r2).
+      inversion e1.
+      - (* pickUnique *)
+        subst.
+        destruct e2.
+        + destruct res1 as [r1 P1].
+          destruct res2 as [r2 P2].
+          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
+        + exact False.
+        + exact False.
+      - (* pickNonPoison *)
+        subst.
+        destruct e2.
+        + exact False.
+        + destruct res1 as [r1 P1].
+          destruct res2 as [r2 P2].
+          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
+        + exact False.
+      - (* pick *)
+        subst.
+        destruct e2.
+        + exact False.
+        + exact False.
+        + destruct res1 as [r1 P1].
+          destruct res2 as [r2 P2].
+          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
     }
 
     (* OOME *)
@@ -2762,13 +2876,31 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
-      inversion e1; subst.
-      destruct e2 eqn:HE2.
-      destruct res1 as [r1 P1].
-      destruct res2 as [r2 P2].
-      apply ((Pre <-> Pre0) /\
-               uvalue_refine_strict x x0 /\
-               dvalue_refine_strict r1 r2).
+      inversion e1.
+      - (* pickUnique *)
+        subst.
+        destruct e2.
+        + destruct res1 as [r1 P1].
+          destruct res2 as [r2 P2].
+          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
+        + exact False.
+        + exact False.
+      - (* pickNonPoison *)
+        subst.
+        destruct e2.
+        + exact False.
+        + destruct res1 as [r1 P1].
+          destruct res2 as [r2 P2].
+          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
+        + exact False.
+      - (* pick *)
+        subst.
+        destruct e2.
+        + exact False.
+        + exact False.
+        + destruct res1 as [r1 P1].
+          destruct res2 as [r2 P2].
+          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
     }
 
     (* OOME *)
@@ -3118,9 +3250,24 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
       inversion e1.
-      destruct e2 eqn:HE2.
-      apply ((Pre -> Pre0) /\
-               uvalue_refine_strict x x0).
+      - (* pickUnique *)
+        subst.
+        destruct e2.
+        + apply (uvalue_refine_strict x x0).
+        + exact False.
+        + exact False.
+      - (* pickNonPoison *)
+        subst.
+        destruct e2.
+        + exact False.
+        + apply (uvalue_refine_strict x x0).
+        + exact False.
+      - (* pick *)
+        subst.
+        destruct e2.
+        + exact False.
+        + exact False.
+        + apply (uvalue_refine_strict x x0).
     }
 
     (* OOME *)
@@ -3350,13 +3497,31 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
-      inversion e1; subst.
-      destruct e2 eqn:HE2.
-      destruct res1 as [r1 P1].
-      destruct res2 as [r2 P2].
-      apply ((Pre -> Pre0) /\
-               uvalue_refine_strict x x0 /\
-            dvalue_refine_strict r1 r2).
+      inversion e1.
+      - (* pickUnique *)
+        subst.
+        destruct e2.
+        + destruct res1 as [r1 P1].
+          destruct res2 as [r2 P2].
+          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
+        + exact False.
+        + exact False.
+      - (* pickNonPoison *)
+        subst.
+        destruct e2.
+        + exact False.
+        + destruct res1 as [r1 P1].
+          destruct res2 as [r2 P2].
+          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
+        + exact False.
+      - (* pick *)
+        subst.
+        destruct e2.
+        + exact False.
+        + exact False.
+        + destruct res1 as [r1 P1].
+          destruct res2 as [r2 P2].
+          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
     }
 
     (* OOME *)
@@ -3845,8 +4010,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           2,3: (cbn in H;
                 (repeat break_match_hyp; try contradiction)).
 
-          { destruct p, p0; cbn in *; auto.
-            destruct a, b.
+          { destruct p, p0; cbn in *; auto;
+            destruct a, b;
             tauto.
           }
 
@@ -4932,13 +5097,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Ltac solve_pick_uvalue_orutt :=
     apply orutt_trigger; cbn;
-    [ split;
-      [ tauto
-      | cbn;
-        unfold uvalue_refine_strict; cbn;
-        repeat rewrite_uvalue_convert_strict; auto
-      ]
-    | intros [t1] [t2] [_ [REF1 REF2]];
+    [ cbn;
+      unfold uvalue_refine_strict; cbn;
+      repeat rewrite_uvalue_convert_strict; auto
+    | intros [t1] [t2] [REF1 REF2];
       cbn; auto
     | intros o CONTRA;
       inv CONTRA
@@ -5045,14 +5207,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             apply orutt_Ret; auto
           ]
         ].
-
     - (* Poison *)
       inv HRS; cbn.
       eapply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)); eauto.
       { (* pick_uvalue *)
         apply orutt_trigger; cbn.
-        split; [tauto | unfold uvalue_refine_strict; cbn; reflexivity].
-        intros [t1] [t2] [_ [REF1 REF2]].
+        unfold uvalue_refine_strict; cbn; reflexivity.
+        intros [t1] [t2] [REF1 REF2].
         cbn; auto.
         intros o CONTRA.
         inv CONTRA.
@@ -5068,8 +5229,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       eapply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)); eauto.
       { (* pick_uvalue *)
         apply orutt_trigger; cbn.
-        split; [tauto | unfold uvalue_refine_strict; cbn; reflexivity].
-        intros [t1] [t2] [_ [REF1 REF2]].
+        unfold uvalue_refine_strict; cbn; reflexivity.
+        intros [t1] [t2] [REF1 REF2].
         cbn; auto.
         intros o CONTRA.
         inv CONTRA.
@@ -5131,9 +5292,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         * apply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
           { (* Pick uvalue *)
             apply orutt_trigger; cbn.
-            -- split; [tauto | ].
-               unfold uvalue_refine_strict. cbn.
-
+            -- unfold uvalue_refine_strict; cbn. 
                break_match_goal.
                ++ rewrite map_monad_oom_Forall2 in Heqo0.
                   clear Heqb Heqb0.
@@ -5149,7 +5308,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                    destruct Heqo0 as [dv [HI HS]].
                    destruct (Forall2_In _ _ _ _ HI Heqo) as [dv' [_ C]].
                    rewrite HS in C. inversion C.
-            -- intros [t1] [t2] [_ [REF1 REF2]].
+            -- intros [t1] [t2] [REF1 REF2].
                cbn; auto.
             --  intros o.
                 intro C.
@@ -5211,8 +5370,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         * apply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
           { (* Pick uvalue *)
             apply orutt_trigger; cbn.
-            -- split; [tauto | ].
-               unfold uvalue_refine_strict. cbn.
+            -- unfold uvalue_refine_strict. cbn.
 
                break_match_goal.
                ++ rewrite map_monad_oom_Forall2 in Heqo0.
@@ -5229,7 +5387,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                    destruct Heqo0 as [dv [HI HS]].
                    destruct (Forall2_In _ _ _ _ HI Heqo) as [dv' [_ C]].
                    rewrite HS in C. inversion C.
-            -- intros [t1] [t2] [_ [REF1 REF2]].
+            -- intros [t1] [t2] [REF1 REF2].
                cbn; auto.
             --  intros o.
                 intro C.
@@ -5291,8 +5449,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         * apply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
           { (* Pick uvalue *)
             apply orutt_trigger; cbn.
-            -- split; [tauto | ].
-               unfold uvalue_refine_strict. cbn.
+            -- unfold uvalue_refine_strict. cbn.
 
                break_match_goal.
                ++ rewrite map_monad_oom_Forall2 in Heqo0.
@@ -5309,7 +5466,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                    destruct Heqo0 as [dv [HI HS]].
                    destruct (Forall2_In _ _ _ _ HI Heqo) as [dv' [_ C]].
                    rewrite HS in C. inversion C.
-            -- intros [t1] [t2] [_ [REF1 REF2]].
+            -- intros [t1] [t2] [REF1 REF2].
                cbn; auto.
             --  intros o.
                 intro C.
@@ -5371,8 +5528,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         * apply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
           { (* Pick uvalue *)
             apply orutt_trigger; cbn.
-            -- split; [tauto | ].
-               unfold uvalue_refine_strict. cbn.
+            -- unfold uvalue_refine_strict. cbn.
 
                break_match_goal.
                ++ rewrite map_monad_oom_Forall2 in Heqo0.
@@ -5389,7 +5545,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                    destruct Heqo0 as [dv [HI HS]].
                    destruct (Forall2_In _ _ _ _ HI Heqo) as [dv' [_ C]].
                    rewrite HS in C. inversion C.
-            -- intros [t1] [t2] [_ [REF1 REF2]].
+            -- intros [t1] [t2] [REF1 REF2].
                cbn; auto.
             --  intros o.
                 intro C.
@@ -5407,11 +5563,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       eapply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
       {
         apply orutt_trigger; cbn;
-          [ split;
-            [ tauto
+          [ first [ tauto
             | idtac
             ]
-          | intros [t1] [t2] [_ [REF1 REF2]];
+          | intros [t1] [t2] [REF1 REF2];
             cbn; auto
           | intros o CONTRA;
             inv CONTRA
@@ -5434,12 +5589,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       eapply orutt_bind with (RR:=fun dv1 dv2 => dvalue_refine_strict (proj1_sig dv1) (proj1_sig dv2)).
       { (* Pick uvalue *)
         apply orutt_trigger; cbn.
-        split; [tauto | ].
         { unfold uvalue_refine_strict. cbn.
           rewrite Heqo.
           reflexivity.
         }
-        intros [t1] [t2] [_ [REF1 REF2]].
+        intros [t1] [t2] [REF1 REF2].
         cbn; auto.
         intros o CONTRA.
         inv CONTRA.
@@ -11914,13 +12068,13 @@ Qed.
   Lemma uvalue_refine_strict_unique_prop :
     forall uv_inf uv_fin,
       uvalue_refine_strict uv_inf uv_fin ->
-      IS1.LLVM.D.unique_prop uv_inf ->
+      IS1.LLVM.Pick.unique_prop uv_inf ->
       unique_prop uv_fin.
   Proof.
     intros uv_inf uv_fin REF UNIQUE_INF.
 
     unfold unique_prop.
-    unfold IS1.LLVM.D.unique_prop in UNIQUE_INF.
+    unfold IS1.LLVM.Pick.unique_prop in UNIQUE_INF.
     destruct UNIQUE_INF as [[dv_inf [CONC UNIQUE_INF]] | NO_CONC].
     2: {
       right.
@@ -13207,9 +13361,7 @@ Qed.
     apply orutt_Vis.
 
     { constructor.
-      cbn.
-      split; auto.
-      - apply uvalue_refine_strict_unique_prop; auto.
+      cbn; auto.
     }
 
     intros t1 t2 H.
@@ -13245,8 +13397,7 @@ Qed.
     repeat rewrite bind_trigger.
     apply orutt_Vis.
 
-    { constructor; auto.
-      apply uvalue_refine_strict_unique_prop; auto.
+    { cbn; auto.
     }
 
     intros t1 t2 H.
@@ -13280,9 +13431,7 @@ Qed.
     repeat rewrite bind_trigger.
     apply orutt_Vis.
 
-    { constructor; auto.
-      apply uvalue_refine_strict_unique_prop; auto.
-    }
+    { cbn; auto. }
 
     intros t1 t2 H.
     apply orutt_Ret.
@@ -14255,10 +14404,7 @@ Qed.
     eapply orutt_bind with (RR:=fun x y => dvalue_refine_strict (proj1_sig x) (proj1_sig y)).
     { (* Pick *)
       apply orutt_trigger.
-      { cbn.
-        split; auto.
-        (* TODO: this lemma may not even be true *)
-        apply uvalue_refine_strict_concretize_poison; auto.
+      { cbn; auto.
       }
 
       intros t1 t2 H0.
@@ -14756,6 +14902,33 @@ Qed.
         intros r1 r2 H.
         apply orutt_Ret; tauto.
       }
+    - cbn in REF;
+        destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF).
+      + (* PickUnique *)
+        cbn.
+        eapply orutt_bind with (RR:=fun x y => dvalue_refine_strict (proj1_sig x) (proj1_sig y)).
+        apply orutt_trigger; cbn; eauto.
+        intros [t1] [t2] H; tauto.
+        intros o CONTRA; inv CONTRA.
+        intros [r1] [r2] H.
+        apply orutt_Ret; tauto.
+      + (* PickNonPoison *)
+        cbn.
+        eapply orutt_bind with (RR:=fun x y => dvalue_refine_strict (proj1_sig x) (proj1_sig y)).
+        apply orutt_trigger; cbn; eauto.
+        intros [t1] [t2] H; tauto.
+        intros o CONTRA; inv CONTRA.
+        intros [r1] [r2] H.
+        apply orutt_Ret; tauto.
+      + (* Pick *)
+        cbn.
+        eapply orutt_bind with (RR:=fun x y => dvalue_refine_strict (proj1_sig x) (proj1_sig y)).
+        apply orutt_trigger; cbn; eauto.
+        intros [t1] [t2] H; tauto.
+        intros o CONTRA; inv CONTRA.
+        intros [r1] [r2] H.
+        apply orutt_Ret; tauto.
     - cbn in REF;
         destruct e2; try inv REF;
         repeat (break_match_hyp; try inv REF).

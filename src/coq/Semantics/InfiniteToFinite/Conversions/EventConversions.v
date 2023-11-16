@@ -167,13 +167,30 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
       inversion e0.
-      subst.
-      refine (x' <- lift_OOM (uvalue_convert x);;
-              dv <- trigger (E2.pick Pre x');;
-              _).
-      destruct dv as [res _].
-      apply (res' <- lift_OOM (rev_dvalue_convert res);;
-             ret (exist (fun x => True) res' I)).
+      - (* pickUnique *)
+        subst.
+        refine (x' <- lift_OOM (uvalue_convert x);;
+                dv <- trigger (E2.pickUnique x');;
+                _).
+        destruct dv as [res _].
+        apply (res' <- lift_OOM (rev_dvalue_convert res);;
+               ret (exist (fun x => True) res' I)).
+      - (* pickNonPoison *)
+        subst.
+        refine (x' <- lift_OOM (uvalue_convert x);;
+                dv <- trigger (E2.pickNonPoison x');;
+                _).
+        destruct dv as [res _].
+        apply (res' <- lift_OOM (rev_dvalue_convert res);;
+               ret (exist (fun x => True) res' I)).
+      - (* pick *)
+        subst.
+        refine (x' <- lift_OOM (uvalue_convert x);;
+                dv <- trigger (E2.pick x');;
+                _).
+        destruct dv as [res _].
+        apply (res' <- lift_OOM (rev_dvalue_convert res);;
+               ret (exist (fun x => True) res' I)).
     }
 
     (* OOME *)
@@ -291,13 +308,30 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
       inversion e0.
-      subst.
-      refine (x' <- lift_OOM (uvalue_convert x);;
-              dv <- trigger (E2.pick Pre x');;
-              _).
-      destruct dv as [res _].
-      apply (res' <- lift_OOM (rev_dvalue_convert res);;
-             ret (exist (fun x => True) res' I)).
+      - (* pickUnique *)
+        subst.
+        refine (x' <- lift_OOM (uvalue_convert x);;
+                dv <- trigger (E2.pickUnique x');;
+                _).
+        destruct dv as [res _].
+        apply (res' <- lift_OOM (rev_dvalue_convert res);;
+               ret (exist (fun x => True) res' I)).
+      - (* pickNonPoison *)
+        subst.
+        refine (x' <- lift_OOM (uvalue_convert x);;
+                dv <- trigger (E2.pickNonPoison x');;
+                _).
+        destruct dv as [res _].
+        apply (res' <- lift_OOM (rev_dvalue_convert res);;
+               ret (exist (fun x => True) res' I)).
+      - (* pick *)
+        subst.
+        refine (x' <- lift_OOM (uvalue_convert x);;
+                dv <- trigger (E2.pick x');;
+                _).
+        destruct dv as [res _].
+        apply (res' <- lift_OOM (rev_dvalue_convert res);;
+               ret (exist (fun x => True) res' I)).
     }
 
     (* OOME *)
@@ -387,13 +421,30 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
       inversion e0.
-      subst.
-      refine (x' <- lift_OOM (uvalue_convert x);;
-              dv <- trigger (E2.pick Pre x');;
-              _).
-      destruct dv as [res _].
-      apply (res' <- lift_OOM (rev_dvalue_convert res);;
-             ret (exist (fun x => True) res' I)).
+      - (* pickUnique *)
+        subst.
+        refine (x' <- lift_OOM (uvalue_convert x);;
+                dv <- trigger (E2.pickUnique x');;
+                _).
+        destruct dv as [res _].
+        apply (res' <- lift_OOM (rev_dvalue_convert res);;
+               ret (exist (fun x => True) res' I)).
+      - (* pickNonPoison *)
+        subst.
+        refine (x' <- lift_OOM (uvalue_convert x);;
+                dv <- trigger (E2.pickNonPoison x');;
+                _).
+        destruct dv as [res _].
+        apply (res' <- lift_OOM (rev_dvalue_convert res);;
+               ret (exist (fun x => True) res' I)).
+      - (* pick *)
+        subst.
+        refine (x' <- lift_OOM (uvalue_convert x);;
+                dv <- trigger (E2.pick x');;
+                _).
+        destruct dv as [res _].
+        apply (res' <- lift_OOM (rev_dvalue_convert res);;
+               ret (exist (fun x => True) res' I)).
     }
 
     (* OOME *)
@@ -453,13 +504,30 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
       inversion e0.
-      subst.
-      refine (x' <- lift_OOM (uvalue_convert x);;
-              dv <- trigger (E2.pick Pre x');;
-              _).
-      destruct dv as [res _].
-      apply (res' <- lift_OOM (rev_dvalue_convert res);;
-             ret (exist (fun x => True) res' I)).
+      - (* pickUnique *)
+        subst.
+        refine (x' <- lift_OOM (uvalue_convert x);;
+                dv <- trigger (E2.pickUnique x');;
+                _).
+        destruct dv as [res _].
+        apply (res' <- lift_OOM (rev_dvalue_convert res);;
+               ret (exist (fun x => True) res' I)).
+      - (* pickNonPoison *)
+        subst.
+        refine (x' <- lift_OOM (uvalue_convert x);;
+                dv <- trigger (E2.pickNonPoison x');;
+                _).
+        destruct dv as [res _].
+        apply (res' <- lift_OOM (rev_dvalue_convert res);;
+               ret (exist (fun x => True) res' I)).
+      - (* pick *)
+        subst.
+        refine (x' <- lift_OOM (uvalue_convert x);;
+                dv <- trigger (E2.pick x');;
+                _).
+        destruct dv as [res _].
+        apply (res' <- lift_OOM (rev_dvalue_convert res);;
+               ret (exist (fun x => True) res' I)).
     }
 
     (* OOME *)

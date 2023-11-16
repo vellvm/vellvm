@@ -42,10 +42,10 @@ Module InstrLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (** Helper lemmas that should probably be moved *)
   (* TODO: Move this *)
   Lemma interp_cfg2_concretize_or_pick_concrete :
-    forall (uv : uvalue) (dv : dvalue) P g l,
+    forall (uv : uvalue) (dv : dvalue) g l,
       is_concrete uv = true ->
       uvalue_to_dvalue uv = inr dv ->
-      ℑ2 (concretize_or_pick uv P) g l ≈ Ret2 g l dv.
+      ℑ2 (concretize_or_pick uv) g l ≈ Ret2 g l dv.
   Proof.
     intros * CONC CONV.
     unfold concretize_or_pick.
@@ -59,11 +59,11 @@ Module InstrLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   (* TODO: Move this *)
   Lemma interp_cfg3_concretize_or_pick_concrete_exists :
-    forall (uv : uvalue) P g l,
+    forall (uv : uvalue) g l,
       is_concrete uv = true ->
-      exists dv, uvalue_to_dvalue uv = inr dv /\ ℑ2 (concretize_or_pick uv P) g l ≈ Ret2 g l dv.
+      exists dv, uvalue_to_dvalue uv = inr dv /\ ℑ2 (concretize_or_pick uv) g l ≈ Ret2 g l dv.
   Proof.
-    intros uv P g ρ CONC.
+    intros uv g ρ CONC.
     pose proof is_concrete_uvalue_to_dvalue uv CONC as (dv & CONV).
     exists dv.
     split; auto.
@@ -72,11 +72,11 @@ Module InstrLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   (* TODO; Move this *)
   Lemma interp_cfg2_concretize_or_pick_not_concrete :
-    forall (uv : uvalue) (dv : dvalue) P g l,
+    forall (uv : uvalue) (dv : dvalue) g l,
       is_concrete uv = false ->
-      ℑ2 (concretize_or_pick uv P) g l ≈ 'dv <- trigger (pick_uvalue P uv) ;; Ret2 g l (proj1_sig dv).
+      ℑ2 (concretize_or_pick uv) g l ≈ 'dv <- trigger (pick_uvalue uv) ;; Ret2 g l (proj1_sig dv).
   Proof.
-    intros uv dv P g ρ NCONC.
+    intros uv dv g ρ NCONC.
     unfold concretize_or_pick.
     rewrite NCONC.
     setoid_rewrite interp_cfg2_pick_proj1_sig.

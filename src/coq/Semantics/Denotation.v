@@ -142,26 +142,23 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
   (* A trivially concrete [uvalue] does not need to go through a pick event to get concretize.
      This function therefore either trigger [pick], or perform a direct cast.
      The value of this "optimization" is debatable. *)
-  Definition concretize_or_pick {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) (P : Prop) : itree E dvalue :=
+  Definition concretize_or_pick {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue :=
     if is_concrete uv
     then lift_err ret (uvalue_to_dvalue uv)
-    else dv <- trigger (pick_uvalue P uv);; ret (proj1_sig dv).
+    else dv <- trigger (pick_uvalue uv);; ret (proj1_sig dv).
 
   (* Pick a possibly poison value, treating poison as nondeterminism.
      This is used for freeze. *)
   Definition pick_your_poison {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue :=
     match uv with
-    | UVALUE_Poison dt => concretize_or_pick (UVALUE_Undef dt) True
-    | _             => concretize_or_pick uv True
+    | UVALUE_Poison dt => concretize_or_pick (UVALUE_Undef dt)
+    | _             => concretize_or_pick uv
     end.
 
-  (* Unique or the concretization fails *)
-  Definition unique_prop (uv : uvalue) : Prop
-    := (exists x, concretize uv x /\ forall dv, concretize uv dv -> dv = x) \/
-         (forall dv, ~ concretize uv dv).
-
   Definition pickUnique {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue
-    := concretize_or_pick uv (unique_prop uv).
+    :=     if is_concrete uv
+    then lift_err ret (uvalue_to_dvalue uv)
+    else dv <- trigger (pick_unique_uvalue uv);; ret (proj1_sig dv).
 
   (** ** Denotation of expressions
       [denote_exp top o] is the main entry point for evaluating itree expressions.
@@ -468,7 +465,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
     | TERM_Br (dt,op) br1 br2 =>
       uv <- denote_exp (Some dt) op ;;
-      dv <- concretize_or_pick uv True ;;
+      dv <- concretize_or_pick uv;;
       match dv with
       | DVALUE_I1 comparison_bit =>
         if equ comparison_bit one then
@@ -604,7 +601,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
           (fun T call =>
              match call with
              | Call dt fv args =>
-               dfv <- concretize_or_pick fv True ;;
+               dfv <- concretize_or_pick fv;;
                match (lookup_defn dfv fundefs) with
                | Some f_den => (* If the call is internal *)
                  f_den args

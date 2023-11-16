@@ -233,8 +233,8 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     apply eutt_eq_bind; intros [].
   Qed.
 
-  Lemma interp_cfg2_pick : forall u P l g,
-      ℑ2 (trigger (pick_uvalue P u)) g l ≈ v <- trigger (pick_uvalue P u);; Ret2 g l v.
+  Lemma interp_cfg2_pick : forall u l g,
+      ℑ2 (trigger (pick_uvalue u)) g l ≈ v <- trigger (pick_uvalue u);; Ret2 g l v.
   Proof.
     intros.
     unfold interp_cfg2.
@@ -244,8 +244,8 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     reflexivity.
   Qed.
 
-  Lemma interp_cfg2_pick_proj1_sig : forall u P l g,
-      ℑ2 (dv <- trigger (pick_uvalue P u);; ret (proj1_sig dv)) g l ≈ dv <- trigger (pick_uvalue P u);; Ret2 g l (proj1_sig dv).
+  Lemma interp_cfg2_pick_proj1_sig : forall u l g,
+      ℑ2 (dv <- trigger (pick_uvalue u);; ret (proj1_sig dv)) g l ≈ dv <- trigger (pick_uvalue u);; Ret2 g l (proj1_sig dv).
   Proof.
     intros.
     unfold interp_cfg2.

@@ -190,7 +190,9 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
    if it is not satisfied, the only possible execution is to raise _UB_.
    *)
   Variant PickE {X Y} {Post : X -> Y -> Prop} : Type -> Type :=
-    | pick (Pre : Prop) (x : X) : PickE ({y : Y | Post x y}).
+    | pickUnique (x : X) : PickE ({y : Y | Post x y})
+    | pickNonPoison (x : X) : PickE ({y : Y | Post x y})
+    | pick (x : X) : PickE ({y : Y | Post x y}).
 
   Definition PickUvalueE := @PickE uvalue dvalue (fun _ _ => True).
 
