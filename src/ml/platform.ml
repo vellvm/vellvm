@@ -187,8 +187,18 @@ let result_dir_configure () : unit =
   | Unix_error (e, fstr, pstr) ->
       failwith (Printf.sprintf "%s : %s : %s" (error_message e) fstr pstr)
 
+let dir_configure (path : string) () : unit =
+  try mkdir path 0o755 with
+  | Unix_error (EEXIST, _, _) ->
+      (* Directory already exists, clear results*)
+      print_endline "Result directory already exists" ;
+      ()
+  | Unix_error (e, fstr, pstr) ->
+      failwith (Printf.sprintf "%s : %s : %s" (error_message e) fstr pstr)
 (* let configure () = if os <> "Unix" then failwith "Windows not supported"
    else let _ = if !linux then ( verb "platform = linux\n" ; clang_flags :=
    "" ) else verb "platform = OS X\n" in try ignore (stat !output_path) with
    Unix_error (ENOENT, _, _) -> verb @@ Printf.sprintf "creating output
    directory: %s\n" !output_path ; mkdir !output_path 0o755 *)
+
+let append_loc : string -> string -> string = Printf.sprintf "%s/%s"

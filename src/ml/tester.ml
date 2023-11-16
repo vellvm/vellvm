@@ -225,7 +225,56 @@ let print_result (rs : result_sum) () : unit =
   in
   IO.write_file !result_output_file_name output_str
 
-let output_asts (_ : result_sum) () : unit = ()
+module StringMap = Map.Make (String)
+
+let output_asts (rs : result_sum) () : unit =
+  let ast_map =
+    Result.filter_map
+      (fun k _ ->
+        match k with STOk _ | STNOk _ | STErr _ -> true | _ -> false )
+      rs
+  in
+  let (ast_bindings : (test_result * value) list) =
+    (* test_result * (string * test_outcome list) list*)
+    Result.bindings ast_map
+  in
+  let update_policy (l : test_result * test_outcome)
+      (o : (test_result * test_outcome) list option) :
+      (test_result * test_outcome) list option =
+    match o with None -> Some [l] | Some l2 -> Some (l :: l2)
+  in
+  let write_policy (file_case : string * (test_result * test_outcome) list) :
+      unit =
+    let filename, r_o_list = file_case in
+    let folder_loc =
+      Platform.append_loc !Platform.result_dir_path filename
+    in
+    let correct_folder_loc = Platform.append_loc folder_loc "correct" in
+    let incorrect_folder_loc = Platform.append_loc folder_loc "incorrect" in
+    Platform.dir_configure folder_loc () ;
+    ()
+  in
+  let str_map =
+    List.fold_right
+      (fun x acc ->
+        let res, va = x in
+        List.fold_right
+          (fun y accy ->
+            match y with
+            | TEST_SUM (filename, t_o) ->
+                StringMap.update filename (update_policy (res, t_o)) accy )
+          va acc )
+      ast_bindings StringMap.empty
+  in
+  let file_bindings = StringMap.bindings str_map in
+  List.fold_right
+    (fun x acc -> write_policy x)
+    file_bindings (* Print each file to its folder *)
+    (*1. Group files by their name and then by output *)
+    (*Steps: 0. For each file, create correct or error *)
+    (* 2. For each file, if their output is good, output to correct folder If
+       their output is bad, output to bad folder *)
+    ()
 
 let test_dir dir =
   Printf.printf "===> TESTING ASSERTIONS WITH STATISTICS: %s\n" dir ;

@@ -176,6 +176,8 @@ let string_of_key_value_pair (with_ast : bool) (rs : ResultMap.key * value) :
 
 let bindings = ResultMap.bindings
 
+let filter_map = ResultMap.filter
+
 let get_stats (rs : result_sum) =
   let res : (ResultMap.key * value) list = ResultMap.bindings rs in
   List.map
