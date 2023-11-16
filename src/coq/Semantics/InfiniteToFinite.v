@@ -1402,12 +1402,201 @@ Module InfiniteToFinite.
     let h' := IntMaps.IP.filter_dom in_bounds h in
     IntMaps.IM.map lift_Block h'.
 
-  Lemma lift_Heap_convert_Heap_inverse :
-    forall {h_inf h_fin},
+  Lemma convert_Heap_find_block :
+    forall {h_inf h_fin k b},
       convert_Heap h_inf = NoOom h_fin ->
-      lift_Heap h_fin = h_inf.
+      IntMaps.IM.find k h_inf = Some b ->
+      exists b',
+        IntMaps.IM.find k h_fin = Some b' /\
+          convert_Block b = NoOom b'.
   Proof.
-  Abort.
+    intros h_inf h_fin k b H H0.
+  Admitted.
+
+  Lemma fin_inf_ptoi :
+    forall a a',
+      InfToFinAddrConvert.addr_convert a' = NoOom a ->
+      LLVMParams64BitIntptr.PTOI.ptr_to_int a = LLVMParamsBigIntptr.PTOI.ptr_to_int a'.
+  Proof.
+    intros a a' H.
+    unfold InfToFinAddrConvert.addr_convert in H.
+    destruct a'.
+    apply ITOP.ptr_to_int_int_to_ptr in H.
+    rewrite H.
+    unfold LLVMParamsBigIntptr.PTOI.ptr_to_int.
+    reflexivity.
+  Qed.
+
+  Lemma fin_inf_from_Z :
+    forall ip_f z,
+      LLVMParams64BitIntptr.IP.from_Z z = NoOom ip_f ->
+      exists ip_i,
+        LLVMParamsBigIntptr.IP.from_Z z = NoOom ip_i.
+  Proof.
+    intros ip_f z H.
+
+    unfold LLVMParams64BitIntptr.IP.from_Z in H.
+    pose proof (IP.from_Z_to_Z z ip_f H).
+    exists z.
+    unfold LLVMParamsBigIntptr.IP.from_Z.
+    cbn.
+    reflexivity.
+  Qed.
+
+  (* TODO: Move this and use it in picky intptr reasoning admits *)
+  Lemma fin_inf_from_Z_to_Z :
+    forall z x y,
+      LLVMParamsBigIntptr.IP.from_Z z = NoOom x ->
+      LLVMParams64BitIntptr.IP.from_Z z = NoOom y ->
+      LLVMParams64BitIntptr.IP.to_Z y = LLVMParamsBigIntptr.IP.to_Z x.
+  Proof.
+    intros z x y ZX ZY.
+    pose proof BigIP.from_Z_to_Z z x ZX.
+    pose proof IP.from_Z_to_Z z y ZY.
+    rewrite H, H0.
+    auto.
+  Qed.
+
+    (* TODO: Move this *)
+  Lemma fin_to_inf_addr_ptr_to_int :
+    forall ptr,
+      LLVMParamsBigIntptr.PTOI.ptr_to_int (fin_to_inf_addr ptr) = LLVMParams64BitIntptr.PTOI.ptr_to_int ptr.
+  Proof.
+    intros ptr.
+    destruct ptr.
+    unfold fin_to_inf_addr.
+    break_match_goal.
+    erewrite fin_inf_ptoi; eauto.
+    apply FinToInfAddrConvertSafe.addr_convert_safe; auto.
+  Qed.
+
+  Lemma fin_ptr_to_int_in_bounds:
+    forall (ptr : FinAddr.addr),
+          in_bounds (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr) = true.
+  Proof.
+    intros.
+    destruct ptr.
+    unfold LLVMParams64BitIntptr.PTOI.ptr_to_int. cbn.
+    eapply in_bounds_exists_addr.
+    exists (i,p); auto.
+  Qed.
+
+  Lemma find_ptr_to_int_lift_Heap :
+    forall h ptr,
+      IntMaps.IM.find (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr) (lift_Heap h) =
+        option_map lift_Block (IntMaps.IM.find (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr) h).
+  Proof.
+    intros.
+    unfold lift_Heap.
+
+    unfold option_map.
+    break_match.
+    - apply IntMaps.IP.F.find_mapsto_iff in Heqo.
+      apply IntMaps.IP.F.find_mapsto_iff.
+      apply IntMaps.IP.F.map_mapsto_iff.
+      exists b. split; auto.
+      apply MapsTo_filter_dom_true.
+      split.
+      apply fin_ptr_to_int_in_bounds.
+      assumption.
+    - rewrite IntMaps.IP.F.map_o.
+      apply (find_filter_dom_None in_bounds) in Heqo.
+      rewrite Heqo.
+      reflexivity.
+  Qed.
+
+  Lemma convert_Block_lift :
+    forall b,
+      convert_Block (lift_Block b) = NoOom b.
+  Proof.
+    unfold lift_Block.
+    unfold convert_Block.
+    intros b.
+    apply map_monad_oom_Forall2.
+    induction b.
+    - cbn.
+      constructor.
+    - cbn.
+      constructor; auto.
+      apply addr_convert_fin_to_inf_addr.
+  Qed.
+
+  Lemma IntMaps_MapsTo_not_Empty :
+    forall elt k e m,
+      IntMaps.IM.MapsTo k e m ->
+      ~ IntMaps.IM.Empty (elt:=elt) m.
+  Proof.
+    intros elt k e m MAPS.
+    intros CONTRA.
+    eapply CONTRA.
+    eapply MAPS.
+  Qed.
+
+  Lemma IntMaps_empty_map :
+    forall {elt elt'} m f,
+      IntMaps.IM.Empty (elt:=elt') (IntMaps.IM.map f m) ->
+      IntMaps.IM.Empty (elt:=elt) m.
+  Proof.
+    intros elt elt'.
+    induction m using IntMaps.IP.map_induction;
+      intros f EMPTY; eauto.
+
+    intros k e' CONTRA.
+    eapply EMPTY.
+    apply IntMaps.IP.F.find_mapsto_iff.
+    rewrite (@IntMaps.IP.F.map_o elt elt' m2 x f).
+    specialize (H0 x).
+    rewrite IntMaps.IP.F.add_eq_o in H0; auto.
+    rewrite H0.
+    reflexivity.
+  Qed.
+
+  Lemma In_MapsTo_exists :
+    forall {A} x (m : IntMaps.IntMap A),
+      IntMaps.IM.In x m <->
+        exists v, IntMaps.IM.MapsTo x v m.
+  Proof.
+    intros.
+    split; intros.
+    - rewrite IntMaps.IP.F.mem_in_iff in H.
+      assert (IntMaps.member x m = true).
+      unfold IntMaps.member. assumption.
+      apply IntMaps.member_lookup in H0.
+      destruct H0 as [v HV].
+      exists v. unfold IntMaps.lookup in HV.
+      apply IntMaps.IM.find_2 in HV.
+      assumption.
+    - destruct H as [v HV].
+      rewrite IntMaps.IP.F.mem_in_iff.
+      apply IntMaps.IM.find_1 in HV.
+      eapply IntMaps.lookup_member.
+      apply HV.
+  Qed.
+
+  Lemma root_in_heap_prop_lift :
+    forall h root,
+      FinMem.MMEP.MMSP.root_in_heap_prop h root ->
+      InfMem.MMEP.MMSP.root_in_heap_prop (lift_Heap h) (fin_to_inf_addr root).
+  Proof.
+    intros h root H.
+    unfold FinMem.MMEP.MMSP.root_in_heap_prop in H.
+    unfold InfMem.MMEP.MMSP.root_in_heap_prop.
+    rewrite fin_to_inf_addr_ptr_to_int.
+    unfold lift_Heap.
+    unfold IntMaps.member in *.
+    apply IntMaps.IP.F.mem_in_iff.
+    apply IntMaps.IP.F.mem_in_iff in H.
+    apply In_MapsTo_exists.
+    rewrite In_MapsTo_exists in H.
+    destruct H as [b HM].
+    exists (lift_Block b).
+    rewrite filter_dom_map_eq.
+    apply MapsTo_filter_dom_true.
+    split.
+    - apply fin_ptr_to_int_in_bounds.
+    - apply IntMaps.IM.map_1.
+      assumption.
+  Qed.
 
   Definition convert_memory_stack (ms1 : InfMemMMSP.memory_stack) : OOM (FinMemMMSP.memory_stack).
     destruct ms1 as [mem fs h].
@@ -1661,50 +1850,338 @@ Lemma lift_memory_convert_mem_byte :
       reflexivity.
   Qed.
 
-  Lemma convert_Block_lift :
-    forall b,
-      convert_Block (lift_Block b) = NoOom b.
+  Lemma MapsTo_filter_dom_subset_strong :
+    forall {A} x v f (m : IntMaps.IntMap A),
+    IntMaps.IM.MapsTo x v (IntMaps.IP.filter_dom f m) ->
+    IntMaps.IM.MapsTo x v m /\ f x = true.
   Proof.
-    unfold lift_Block.
-    unfold convert_Block.
-    intros b.
-    apply map_monad_oom_Forall2.
-    induction b.
-    - cbn.
-      constructor.
-    - cbn.
-      constructor; auto.
-      apply addr_convert_fin_to_inf_addr.
+    intros.
+    apply IntMaps.IP.filter_iff in H; auto.
+    repeat red; intros; subst; auto.
   Qed.
 
-  Lemma IntMaps_MapsTo_not_Empty :
-    forall elt k e m,
-      IntMaps.IM.MapsTo k e m ->
-      ~ IntMaps.IM.Empty (elt:=elt) m.
+  Require Import ITree.Eq.EuttExtras.
+
+  Lemma paco2_eq_itree_refl : forall E R r (t : itree E R), paco2 (eqit_ eq false false id) r t t.
   Proof.
-    intros elt k e m MAPS.
-    intros CONTRA.
-    eapply CONTRA.
-    eapply MAPS.
+    intros. eapply paco2_mon with (r := bot2); intuition.
+    enough (t ≅ t); auto. reflexivity.
   Qed.
 
-  Lemma IntMaps_empty_map :
-    forall {elt elt'} m f,
-      IntMaps.IM.Empty (elt:=elt') (IntMaps.IM.map f m) ->
-      IntMaps.IM.Empty (elt:=elt) m.
-  Proof.
-    intros elt elt'.
-    induction m using IntMaps.IP.map_induction;
-      intros f EMPTY; eauto.
 
-    intros k e' CONTRA.
-    eapply EMPTY.
-    apply IntMaps.IP.F.find_mapsto_iff.
-    rewrite (@IntMaps.IP.F.map_o elt elt' m2 x f).
-    specialize (H0 x).
-    rewrite IntMaps.IP.F.add_eq_o in H0; auto.
-    rewrite H0.
+  (* (* TODO: Move this *) *)
+  (* Definition heap_refine (h1 : InfMemMMSP.Heap) (h2 : FinMemMMSP.Heap) : Prop *)
+  (*   := MemoryBigIntptr.MMEP.MemSpec.heap_preserved h1 (lift_Heap h2). *)
+
+  (* TODO: Move this *)
+  (* TODO: This may not be true... The roots are just keys in the map *)
+  (*    for the heap, so nothing is forcing them to be in bounds for *)
+  (*    finite memory... May be able to use MemState_refine_prop's *)
+  (*    heap_preserved component to ensure this, though? *)
+  (*  *)
+  (* TODO: Will need the heap in bounds predicate *)
+  Lemma root_in_heap_prop_lift_inv :
+    forall {h root_inf},
+      InfMem.MMEP.MMSP.root_in_heap_prop (lift_Heap h) root_inf ->
+      exists root_fin,
+        InfToFinAddrConvert.addr_convert root_inf = NoOom root_fin /\
+        FinMem.MMEP.MMSP.root_in_heap_prop h root_fin.
+  Proof.
+    intros h root_inf IN.
+    red in IN.
+    apply IntMaps.member_lookup in IN.
+    destruct IN as [v HV].
+    unfold IntMaps.lookup in HV.
+    unfold InfMem.MMEP.MMSP.Block in HV.
+    unfold InfMemMMSP.Block in *.
+    unfold lift_Heap in HV.
+    apply IntMaps.IP.F.find_mapsto_iff in HV.
+    apply filter_dom_map_eq in HV.
+    apply MapsTo_filter_dom_subset_strong in HV.
+    destruct HV as [HV IN].
+    destruct root_inf.
+    cbn in *.
+    apply (in_bounds_exists_addr i p) in IN.
+    destruct IN as [root_fin [HF EQ]].
+    exists root_fin.
+    split.
+    - destruct root_fin. cbn in *.
+      subst.
+      apply LLVMParams64BitIntptr.ITOP.int_to_ptr_ptr_to_int. auto.
+    - unfold FinMem.MMEP.MMSP.root_in_heap_prop.
+      unfold IntMaps.member.
+      apply IntMaps.IP.F.mem_in_iff.
+      rewrite HF.
+      apply IntMaps.IP.F.map_mapsto_iff in HV.
+      destruct HV as [b [_ HIN]].
+      apply In_MapsTo_exists.
+      exists b.
+      assumption.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma ptr_in_heap_prop_intmap_elements_inf :
+    forall {h root root_ptr block addr},
+      LLVMParamsBigIntptr.PTOI.ptr_to_int root_ptr = root ->
+      In (root, block) (IntMaps.IM.elements (elt:=InfMemMMSP.Block) h) ->
+      In addr block ->
+      InfMemMMSP.ptr_in_heap_prop h root_ptr addr.
+  Proof.
+    intros h root root_ptr block addr PTOI ELEMS BLOCK.
+    red.
+    eapply SetoidList.In_InA in ELEMS.
+    eapply IntMaps.IP.F.elements_mapsto_iff in ELEMS.
+    2: typeclasses eauto.
+    eapply IntMaps.IP.F.find_mapsto_iff in ELEMS.
+    rewrite PTOI, ELEMS.
+    apply in_map; auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma ptr_in_heap_prop_intmap_elements_fin :
+    forall {h root root_ptr block addr},
+      LLVMParams64BitIntptr.PTOI.ptr_to_int root_ptr = root ->
+      In (root, block) (IntMaps.IM.elements (elt:=FinMemMMSP.Block) h) ->
+      In addr block ->
+      FinMemMMSP.ptr_in_heap_prop h root_ptr addr.
+  Proof.
+    intros h root root_ptr block addr PTOI ELEMS BLOCK.
+    red.
+    eapply SetoidList.In_InA in ELEMS.
+    eapply IntMaps.IP.F.elements_mapsto_iff in ELEMS.
+    2: typeclasses eauto.
+    eapply IntMaps.IP.F.find_mapsto_iff in ELEMS.
+    rewrite PTOI, ELEMS.
+    apply in_map; auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma every_int_has_big_ptr :
+    forall z,
+    exists addr, LLVMParamsBigIntptr.PTOI.ptr_to_int addr = z.
+  Proof.
+    intros z.
+    pose proof (InfITOP_BIG.int_to_ptr_safe z InfPROV.nil_prov).
+    break_match_hyp_inv.
+    exists a.
+    erewrite InterpreterStackBigIntptr.LP.ITOP.ptr_to_int_int_to_ptr; eauto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma ptr_in_heap_prop_lift_inv' :
+    forall {h root_inf root_fin ptr_inf},
+      InfMem.MMEP.MMSP.ptr_in_heap_prop (lift_Heap h) root_inf ptr_inf ->
+      InfToFinAddrConvert.addr_convert root_inf = NoOom root_fin ->
+      exists ptr_fin,
+        InfToFinAddrConvert.addr_convert ptr_inf = NoOom ptr_fin /\
+          FinMem.MMEP.MMSP.ptr_in_heap_prop h root_fin ptr_fin.
+  Proof.
+    intros h root_inf root_fin ptr_inf IN CONV.
+    red in IN.
+    unfold lift_Heap, lift_Block in IN.
+    unfold FinMem.MMEP.MMSP.ptr_in_heap_prop.
+
+    rewrite IntMaps.IP.F.map_o in IN.
+    break_match_hyp; try contradiction.
+    apply Util.option_map_some_inv in Heqo as (?&?&?).
+
+    erewrite fin_inf_ptoi; eauto.
+    apply find_filter_dom_true in H.
+    destruct H as [H HB].
+    rewrite H.
+
+    generalize dependent b.
+    clear H.
+    induction x; intros b H0 IN.
+    - cbn in *.
+      inv H0.
+      cbn in *.
+      contradiction.
+    - cbn in *.
+      inv H0.
+      destruct IN as [IN | IN].
+      + destruct a.
+        destruct ptr_inf.
+        exists (i, p0).
+        split; auto.
+        {
+          rewrite fin_to_inf_addr_ptr_to_int in IN.
+          cbn in IN.
+          unfold LLVMParams64BitIntptr.PTOI.ptr_to_int in IN.
+          cbn in IN; subst.
+
+          cbn.
+          unfold FinITOP.int_to_ptr.
+          break_match.
+          {
+            pose proof Integers.Int64.unsigned_range i.
+            lia.
+          }
+
+          rewrite Int64.repr_unsigned.
+          auto.
+        }
+      + rewrite List.map_map in IN.
+        apply in_map_iff in IN.
+        pose proof IN as IN'.
+        destruct IN as (?&?&?).
+
+        specialize (IHx _ eq_refl).
+        forward IHx.
+        { rewrite List.map_map.
+          apply in_map_iff.
+          auto.
+        }
+
+        destruct IHx as (?&?&?).
+        exists x1.
+        split; auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma ptr_in_heap_prop_lift :
+    forall h root ptr,
+      FinMem.MMEP.MMSP.ptr_in_heap_prop h root ptr ->
+      InfMem.MMEP.MMSP.ptr_in_heap_prop (lift_Heap h) (fin_to_inf_addr root) (fin_to_inf_addr ptr).
+  Proof.
+    intros h root ptr IN.
+    red in *.
+    rewrite fin_to_inf_addr_ptr_to_int.
+    rewrite find_ptr_to_int_lift_Heap.
+
+    destruct (IntMaps.IM.find (elt:=FinMem.MMEP.MMSP.Block) (LLVMParams64BitIntptr.PTOI.ptr_to_int root) h) eqn: EQ; simpl in *.
+    - unfold lift_Block.
+      apply in_map_iff in IN.
+      destruct IN as [addr [EQ' HI]].
+      apply in_map_iff.
+      exists (fin_to_inf_addr addr).
+      split.
+      rewrite fin_to_inf_addr_ptr_to_int.
+      rewrite fin_to_inf_addr_ptr_to_int.
+      assumption.
+      apply in_map.
+      assumption.
+    - contradiction.
+  Qed.
+
+  Lemma ptr_in_heap_prop_addr_convert:
+    forall {h root_inf ptr_inf},
+      InfMem.MMEP.MMSP.ptr_in_heap_prop (lift_Heap h) root_inf ptr_inf ->
+      exists root_fin,
+      InfToFinAddrConvert.addr_convert root_inf = NoOom root_fin.
+  Proof.
+    intros h root_inf ptr_inf IN.
+    red in IN.
+    unfold lift_Heap, lift_Block in IN.
+    break_match_hyp; try contradiction.
+    apply IntMaps.IP.F.find_mapsto_iff in Heqo.
+    apply IntMaps.IP.F.map_mapsto_iff in Heqo.
+    destruct Heqo as [b_fin [EQ HB]].
+    apply MapsTo_filter_dom_true in HB.
+    destruct HB as [IB HB].
+    apply (in_bounds_exists_addr _ (snd root_inf)) in IB.
+    destruct IB as [root_fin [EQR HS]].
+    exists root_fin.
+    rewrite <- fin_to_inf_addr_ptr_to_int in EQR.
+    destruct root_inf.
+    cbn in *. subst.
+    destruct root_fin. cbn.
+    erewrite <- fin_inf_ptoi.
+    rewrite ITOP.int_to_ptr_ptr_to_int. reflexivity.
+    auto.
+    rewrite addr_convert_fin_to_inf_addr.
     reflexivity.
+  Qed.
+
+  Lemma ptr_in_heap_prop_lift_inv :
+    forall {h root_inf ptr_inf},
+      InfMem.MMEP.MMSP.ptr_in_heap_prop (lift_Heap h) root_inf ptr_inf ->
+      exists root_fin, exists ptr_fin,
+        InfToFinAddrConvert.addr_convert root_inf = NoOom root_fin /\
+        InfToFinAddrConvert.addr_convert ptr_inf = NoOom ptr_fin /\
+          FinMem.MMEP.MMSP.ptr_in_heap_prop h root_fin ptr_fin.
+  Proof.
+    intros h root_inf ptr_inf H.
+    specialize (ptr_in_heap_prop_addr_convert H) as H1.
+    destruct H1 as [root_fin HC].
+    exists root_fin.
+    specialize  (ptr_in_heap_prop_lift_inv' H HC) as HX.
+    destruct HX as [ptr_fin [HP HH]].
+    exists ptr_fin; eauto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma Heap_eqv_lift :
+    forall h1 h2,
+      FinMem.MMEP.MMSP.heap_eqv h1 h2 ->
+      InfMem.MMEP.MMSP.heap_eqv (lift_Heap h1) (lift_Heap h2).
+  Proof.
+    intros h1 h2 H.
+    inversion H.
+    constructor; intros; split; intros.
+    - apply root_in_heap_prop_lift_inv in H0.
+      destruct H0 as [root_fin [HEQ HF]].
+      apply heap_roots_eqv in HF.
+      eapply root_in_heap_prop_lift in HF.
+      erewrite lift_addr_Convert_addr_inverse in HF; eauto.
+    - apply root_in_heap_prop_lift_inv in H0.
+      destruct H0 as [root_fin [HEQ HF]].
+      apply heap_roots_eqv in HF.
+      eapply root_in_heap_prop_lift in HF.
+      erewrite lift_addr_Convert_addr_inverse in HF; eauto.
+    - specialize (ptr_in_heap_prop_lift_inv H0) as HL.
+      destruct HL as [root_fin [ptr_fin [HR [HP HIN]]]].
+      apply heap_ptrs_eqv in HIN.
+      apply ptr_in_heap_prop_lift in HIN.
+
+      rewrite (lift_addr_Convert_addr_inverse HR) in HIN.
+      rewrite (lift_addr_Convert_addr_inverse HP) in HIN.
+      assumption.
+    - specialize (ptr_in_heap_prop_lift_inv H0) as HL.
+      destruct HL as [root_fin [ptr_fin [HR [HP HIN]]]].
+      apply heap_ptrs_eqv in HIN.
+      apply ptr_in_heap_prop_lift in HIN.
+
+      rewrite (lift_addr_Convert_addr_inverse HR) in HIN.
+      rewrite (lift_addr_Convert_addr_inverse HP) in HIN.
+      assumption.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma Heap_eqv_lift' :
+    forall h1 h2,
+      InfMem.MMEP.MMSP.heap_eqv (lift_Heap h1) (lift_Heap h2) ->
+      FinMem.MMEP.MMSP.heap_eqv h1 h2.
+  Proof.
+    intros h1 h2 H.
+    inversion H.
+    constructor; intros; split; intros.
+    - apply root_in_heap_prop_lift in H0.
+      apply heap_roots_eqv in H0.
+      apply root_in_heap_prop_lift_inv in H0.
+      destruct H0 as [root_fin [HEQ HF]].
+      rewrite addr_convert_fin_to_inf_addr in HEQ; inv HEQ.
+      auto.
+    - apply root_in_heap_prop_lift in H0.
+      apply heap_roots_eqv in H0.
+      apply root_in_heap_prop_lift_inv in H0.
+      destruct H0 as [root_fin [HEQ HF]].
+      rewrite addr_convert_fin_to_inf_addr in HEQ; inv HEQ.
+      auto.
+    - specialize (ptr_in_heap_prop_lift _ _ _ H0) as HL.
+      apply heap_ptrs_eqv in HL.
+      apply ptr_in_heap_prop_lift_inv in HL.
+      destruct HL as [root_fin [ptr_fin [HR [HP HIN]]]].
+      rewrite addr_convert_fin_to_inf_addr in HR, HP.
+      inv HR; inv HP.
+      auto.
+    - specialize (ptr_in_heap_prop_lift _ _ _ H0) as HL.
+      apply heap_ptrs_eqv in HL.
+      apply ptr_in_heap_prop_lift_inv in HL.
+      destruct HL as [root_fin [ptr_fin [HR [HP HIN]]]].
+      rewrite addr_convert_fin_to_inf_addr in HR, HP.
+      inv HR; inv HP.
+      auto.
   Qed.
 
   Lemma convert_Heap_lift :
@@ -1739,52 +2216,254 @@ Lemma lift_memory_convert_mem_byte :
       discriminate.
     }
 
-    eexists.
-    split; eauto.
-    apply map_monad_oom_Forall2 in Heqo.
-    dependent induction Heqo.
-    - split.
-      + symmetry in x.
-        unfold lift_Heap in x.
-        apply IntMaps.IP.elements_Empty in x.
-        apply IntMaps_empty_map in x.
-        intros root; split; intros ROOT.
-        * exfalso.
-          red in ROOT.
-          apply IntMaps.member_lookup in ROOT.
-          destruct ROOT.
-          apply IntMaps.IP.F.find_mapsto_iff in H.
-          eapply x.
-          apply MapsTo_filter_dom_true.
-          split; [|eapply H].
-          eapply in_bounds_ptr_to_int_fin.
-        * exfalso.
-          red in ROOT.
-          cbn in ROOT.
-          discriminate.
-      + symmetry in x.
-        unfold lift_Heap in x.
-        apply IntMaps.IP.elements_Empty in x.
-        apply IntMaps_empty_map in x.
-        intros root; split; intros ROOT.
-        * exfalso.
-          red in ROOT.
-          break_match_hyp; auto.
-          apply IntMaps.IP.F.find_mapsto_iff in Heqo.
-          eapply x.
-          apply MapsTo_filter_dom_true.
-          split; [|eapply Heqo].
-          eapply in_bounds_ptr_to_int_fin.
-        * exfalso.
-          red in ROOT.
-          cbn in ROOT; auto.
-    - destruct x0.
+    remember (IntMaps.IM.elements (elt:=InfMemMMSP.Block) (lift_Heap h)) as h_inf.
+    eexists; split; eauto.
+    split; intros; split; intros IN;
+      red; red in IN.
+    - eapply IntMaps.member_lookup in IN as (b & IN).
+      eapply map_monad_oom_Forall2 in Heqo.
+      subst.
+      unfold lift_Heap in *.
+      apply IntMaps.IP.F.find_mapsto_iff in IN.
+      pose proof IN as MAP.
+      eapply IntMaps.IM.map_1 with (f:=lift_Block) in MAP.
+      pose proof in_bounds_ptr_to_int_fin root as IN_BOUNDS.
+      pose proof (conj IN_BOUNDS MAP).
+      apply MapsTo_filter_dom_true in H.
+      rewrite <- filter_dom_map_eq in H.
+      rename H into FILTER.
+
+      eapply IntMaps.lookup_member with (v:=b).
+      apply IntMaps.IP.F.find_mapsto_iff.
+      eapply IntMaps.IP.of_list_1.
+      { pose proof @IntMaps.IM.elements_3w InfMemMMSP.Block (IntMaps.IM.map lift_Block (IntMaps.IP.filter_dom in_bounds h)).
+        remember (IntMaps.IM.elements (elt:=InfMemMMSP.Block) (IntMaps.IM.map lift_Block (IntMaps.IP.filter_dom in_bounds h))) as elems.
+        clear Heqelems.
+        induction Heqo.
+        - constructor.
+        - inv H.
+          constructor; eauto.
+          intros CONTRA.
+          destruct x.
+          break_match_hyp_inv.
+          eapply SetoidList.InA_alt in CONTRA; try typeclasses eauto.
+          destruct CONTRA as (?&?&?).
+          repeat red in H.
+          cbn in H. destruct x; cbn in H; subst.
+          eapply Forall2_In_exists2 in Heqo; eauto.
+          destruct Heqo.
+          destruct H.
+          destruct x.
+          break_match_hyp_inv.
+          forward IHHeqo; eauto.
+          eapply H3.
+          eapply SetoidList.In_InA with (eqA:=(IntMaps.IM.eq_key (elt:=InfMemMMSP.Block))) in H; try typeclasses eauto.
+          eapply SetoidList.InA_eqA; eauto.
+          repeat red; eauto.
+      }
+
+      eapply SetoidList.InA_alt.
+      eapply Forall2_In with (a:=((LLVMParams64BitIntptr.PTOI.ptr_to_int root), lift_Block b)) in Heqo; eauto.
+      2: {
+        apply IntMaps.IM.elements_1 in FILTER.
+        eapply SetoidList.InA_alt in FILTER.
+        destruct FILTER as (?&?&?).
+        repeat red in H.
+        destruct H, x; cbn in *; subst.
+        eauto.
+      }
+
+      destruct Heqo as (?&?&?).
+      rewrite convert_Block_lift in H0; inv H0.
+      exists (LLVMParams64BitIntptr.PTOI.ptr_to_int root, b).
+      split; eauto.
+      repeat red.
+      split; cbn; eauto.
+    - eapply IntMaps.member_lookup in IN as (b & IN).
+      eapply map_monad_oom_Forall2 in Heqo.
+      subst.
+      unfold lift_Heap in *.
+      apply IntMaps.IP.F.find_mapsto_iff in IN.
+      eapply IntMaps.IP.of_list_1 in IN.
+      2: {
+        clear H IN.
+        pose proof @IntMaps.IM.elements_3w InfMemMMSP.Block (IntMaps.IM.map lift_Block (IntMaps.IP.filter_dom in_bounds h)).
+        remember (IntMaps.IM.elements (elt:=InfMemMMSP.Block) (IntMaps.IM.map lift_Block (IntMaps.IP.filter_dom in_bounds h))) as elems.
+        clear Heqelems.
+        induction Heqo.
+        - constructor.
+        - inv H.
+          constructor; eauto.
+          intros CONTRA.
+          destruct x.
+          break_match_hyp_inv.
+          eapply SetoidList.InA_alt in CONTRA; try typeclasses eauto.
+          destruct CONTRA as (?&?&?).
+          repeat red in H.
+          cbn in H. destruct x; cbn in H; subst.
+          eapply Forall2_In_exists2 in Heqo; eauto.
+          destruct Heqo.
+          destruct H.
+          destruct x.
+          break_match_hyp_inv.
+          forward IHHeqo; eauto.
+          eapply H3.
+          eapply SetoidList.In_InA with (eqA:=(IntMaps.IM.eq_key (elt:=InfMemMMSP.Block))) in H; try typeclasses eauto.
+          eapply SetoidList.InA_eqA; eauto.
+          repeat red; eauto.
+      }
+
+      eapply SetoidList.InA_alt in IN.
+      destruct IN as (? & ? & IN).
+      eapply Forall2_In_exists2 in Heqo; eauto.
+      destruct Heqo as (?&?&?).
+      destruct x0.
       break_match_hyp_inv.
 
-    Transparent convert_Block.
-    Transparent lift_Block.
-    Transparent IntMaps.IM.elements.
-  Admitted.
+      eapply IntMaps.lookup_member with (v:=b1).      
+      eapply SetoidList.In_InA with (eqA:=(IntMaps.IM.eq_key_elt (elt:=InfMemMMSP.Block))) in H0;
+        try typeclasses eauto.
+
+      eapply IntMaps.IM.elements_2 in H0.
+      rewrite filter_dom_map_eq in H0.
+      eapply MapsTo_filter_dom_true in H0.
+      destruct H0.
+      eapply IntMaps.IP.F.map_mapsto_iff in H1.
+      destruct H1 as (?&?&?).
+      subst.
+      rewrite convert_Block_lift in Heqo;
+        inv Heqo.
+
+      repeat red in H.
+      destruct H; cbn in *; subst.
+      eapply IntMaps.IM.find_1; eauto.
+    - break_match_hyp; try contradiction.
+      eapply map_monad_oom_Forall2 in Heqo.
+      subst.
+      unfold lift_Heap in *.
+      apply IntMaps.IP.F.find_mapsto_iff in Heqo0.
+      pose proof Heqo0 as MAP.
+      eapply IntMaps.IM.map_1 with (f:=lift_Block) in MAP.
+      pose proof in_bounds_ptr_to_int_fin root as IN_BOUNDS.
+      pose proof (conj IN_BOUNDS MAP).
+      apply MapsTo_filter_dom_true in H.
+      rewrite <- filter_dom_map_eq in H.
+      rename H into FILTER.
+
+      replace (IntMaps.IM.find (elt:=FinMemMMSP.Block) (LLVMParams64BitIntptr.PTOI.ptr_to_int root)
+                 (IntMaps.IP.of_list l)) with (Some b); eauto.
+      symmetry.
+
+      apply IntMaps.IP.F.find_mapsto_iff.
+      eapply IntMaps.IP.of_list_1.
+      { pose proof @IntMaps.IM.elements_3w InfMemMMSP.Block (IntMaps.IM.map lift_Block (IntMaps.IP.filter_dom in_bounds h)).
+        remember (IntMaps.IM.elements (elt:=InfMemMMSP.Block) (IntMaps.IM.map lift_Block (IntMaps.IP.filter_dom in_bounds h))) as elems.
+        clear Heqelems.
+        induction Heqo.
+        - constructor.
+        - inv H.
+          constructor; eauto.
+          intros CONTRA.
+          destruct x.
+          break_match_hyp_inv.
+          eapply SetoidList.InA_alt in CONTRA; try typeclasses eauto.
+          destruct CONTRA as (?&?&?).
+          repeat red in H.
+          cbn in H. destruct x; cbn in H; subst.
+          eapply Forall2_In_exists2 in Heqo; eauto.
+          destruct Heqo.
+          destruct H.
+          destruct x.
+          break_match_hyp_inv.
+          forward IHHeqo; eauto.
+          eapply H3.
+          eapply SetoidList.In_InA with (eqA:=(IntMaps.IM.eq_key (elt:=InfMemMMSP.Block))) in H; try typeclasses eauto.
+          eapply SetoidList.InA_eqA; eauto.
+          repeat red; eauto.
+      }
+
+      eapply SetoidList.InA_alt.
+      eapply Forall2_In with (a:=((LLVMParams64BitIntptr.PTOI.ptr_to_int root), lift_Block b)) in Heqo; eauto.
+      2: {
+        apply IntMaps.IM.elements_1 in FILTER.
+        eapply SetoidList.InA_alt in FILTER.
+        destruct FILTER as (?&?&?).
+        repeat red in H.
+        destruct H, x; cbn in *; subst.
+        eauto.
+      }
+
+      destruct Heqo as (?&?&?).
+      rewrite convert_Block_lift in H0; inv H0.
+      exists (LLVMParams64BitIntptr.PTOI.ptr_to_int root, b).
+      split; eauto.
+      repeat red.
+      split; cbn; eauto.
+    - break_match_hyp; try contradiction.
+      eapply map_monad_oom_Forall2 in Heqo.
+      subst.
+      unfold lift_Heap in *.
+      apply IntMaps.IP.F.find_mapsto_iff in Heqo0.
+      eapply IntMaps.IP.of_list_1 in Heqo0.
+      2: {
+        clear H IN.
+        pose proof @IntMaps.IM.elements_3w InfMemMMSP.Block (IntMaps.IM.map lift_Block (IntMaps.IP.filter_dom in_bounds h)).
+        remember (IntMaps.IM.elements (elt:=InfMemMMSP.Block) (IntMaps.IM.map lift_Block (IntMaps.IP.filter_dom in_bounds h))) as elems.
+        clear Heqelems Heqo0.
+        induction Heqo.
+        - constructor.
+        - destruct x; break_match_hyp_inv.
+          inv H.
+          constructor; eauto.
+          intros CONTRA.
+          eapply SetoidList.InA_alt in CONTRA; try typeclasses eauto.
+          destruct CONTRA as (?&?&?).
+          repeat red in H.
+          cbn in H. destruct x; cbn in H; subst.
+          eapply Forall2_In_exists2 in Heqo; eauto.
+          destruct Heqo.
+          destruct H.
+          destruct x.
+          break_match_hyp_inv.
+          forward IHHeqo; eauto.
+          eapply H2.
+          eapply SetoidList.In_InA with (eqA:=(IntMaps.IM.eq_key (elt:=InfMemMMSP.Block))) in H; try typeclasses eauto.
+          eapply SetoidList.InA_eqA; eauto.
+          repeat red; eauto.
+      }
+
+      replace (IntMaps.IM.find (elt:=FinMemMMSP.Block) (LLVMParams64BitIntptr.PTOI.ptr_to_int root) h)
+        with (Some b); eauto.
+      symmetry.
+
+      eapply SetoidList.InA_alt in Heqo0.
+      destruct Heqo0 as (?&?&?).
+      destruct x.
+      repeat red in H.
+      destruct H; cbn in *; subst.
+
+      eapply Forall2_In_exists2 in Heqo; eauto.
+      destruct Heqo as (?&?&?).
+      destruct x.
+      break_match_hyp_inv.
+
+      eapply SetoidList.In_InA with (eqA:=(IntMaps.IM.eq_key_elt (elt:=InfMemMMSP.Block))) in H;
+        try typeclasses eauto.
+      eapply IntMaps.IM.elements_2 in H.
+
+      eapply filter_dom_map_eq in H.
+      eapply MapsTo_filter_dom_true in H.
+      destruct H.
+      eapply IntMaps.IP.F.map_mapsto_iff in H1.
+      destruct H1 as (?&?&?).
+      subst.
+      rewrite convert_Block_lift in Heqo;
+        inv Heqo.
+
+      repeat red in H.
+      destruct H; cbn in *; subst.
+      eapply IntMaps.IM.find_1; eauto.
+  Qed.
 
   Lemma convert_memory_stack_lift :
     forall ms,
@@ -2064,6 +2743,8 @@ Lemma lift_memory_convert_mem_byte :
     Transparent convert_FrameStack.
     Transparent convert_Heap.
   Qed.
+
+  Print Assumptions MemState_fin_to_inf_to_fin.
 
   (* TODO: Need a MemState_refine_prop that takes all of the predicates
       like write_byte_all_preserved and bundles them in one place
@@ -7398,72 +8079,6 @@ cofix CIH
          e k
    end.
 
-  Require Import ITree.Eq.EuttExtras.
-
-  Lemma paco2_eq_itree_refl : forall E R r (t : itree E R), paco2 (eqit_ eq false false id) r t t.
-  Proof.
-    intros. eapply paco2_mon with (r := bot2); intuition.
-    enough (t ≅ t); auto. reflexivity.
-  Qed.
-
-
-  Lemma fin_inf_ptoi :
-    forall a a',
-      InfToFinAddrConvert.addr_convert a' = NoOom a ->
-      LLVMParams64BitIntptr.PTOI.ptr_to_int a = LLVMParamsBigIntptr.PTOI.ptr_to_int a'.
-  Proof.
-    intros a a' H.
-    unfold InfToFinAddrConvert.addr_convert in H.
-    destruct a'.
-    apply ITOP.ptr_to_int_int_to_ptr in H.
-    rewrite H.
-    unfold LLVMParamsBigIntptr.PTOI.ptr_to_int.
-    reflexivity.
-  Qed.
-
-  Lemma fin_inf_from_Z :
-    forall ip_f z,
-      LLVMParams64BitIntptr.IP.from_Z z = NoOom ip_f ->
-      exists ip_i,
-        LLVMParamsBigIntptr.IP.from_Z z = NoOom ip_i.
-  Proof.
-    intros ip_f z H.
-
-    unfold LLVMParams64BitIntptr.IP.from_Z in H.
-    pose proof (IP.from_Z_to_Z z ip_f H).
-    exists z.
-    unfold LLVMParamsBigIntptr.IP.from_Z.
-    cbn.
-    reflexivity.
-  Qed.
-
-  (* TODO: Move this and use it in picky intptr reasoning admits *)
-  Lemma fin_inf_from_Z_to_Z :
-    forall z x y,
-      LLVMParamsBigIntptr.IP.from_Z z = NoOom x ->
-      LLVMParams64BitIntptr.IP.from_Z z = NoOom y ->
-      LLVMParams64BitIntptr.IP.to_Z y = LLVMParamsBigIntptr.IP.to_Z x.
-  Proof.
-    intros z x y ZX ZY.
-    pose proof BigIP.from_Z_to_Z z x ZX.
-    pose proof IP.from_Z_to_Z z y ZY.
-    rewrite H, H0.
-    auto.
-  Qed.
-
-    (* TODO: Move this *)
-  Lemma fin_to_inf_addr_ptr_to_int :
-    forall ptr,
-      LLVMParamsBigIntptr.PTOI.ptr_to_int (fin_to_inf_addr ptr) = LLVMParams64BitIntptr.PTOI.ptr_to_int ptr.
-  Proof.
-    intros ptr.
-    destruct ptr.
-    unfold fin_to_inf_addr.
-    break_match_goal.
-    erewrite fin_inf_ptoi; eauto.
-    apply FinToInfAddrConvertSafe.addr_convert_safe; auto.
-  Qed.
-
   (* TODO: Move this *)
   Lemma ptr_in_frame_prop_lift :
     forall f ptr,
@@ -12159,232 +12774,6 @@ cofix CIH
   Qed.
 
   (* TODO: Move this *)
-  Lemma ptr_in_heap_prop_intmap_elements_inf :
-    forall {h root root_ptr block addr},
-      LLVMParamsBigIntptr.PTOI.ptr_to_int root_ptr = root ->
-      In (root, block) (IntMaps.IM.elements (elt:=InfMemMMSP.Block) h) ->
-      In addr block ->
-      InfMemMMSP.ptr_in_heap_prop h root_ptr addr.
-  Proof.
-    intros h root root_ptr block addr PTOI ELEMS BLOCK.
-    red.
-    eapply SetoidList.In_InA in ELEMS.
-    eapply IntMaps.IP.F.elements_mapsto_iff in ELEMS.
-    2: typeclasses eauto.
-    eapply IntMaps.IP.F.find_mapsto_iff in ELEMS.
-    rewrite PTOI, ELEMS.
-    apply in_map; auto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma ptr_in_heap_prop_intmap_elements_fin :
-    forall {h root root_ptr block addr},
-      LLVMParams64BitIntptr.PTOI.ptr_to_int root_ptr = root ->
-      In (root, block) (IntMaps.IM.elements (elt:=FinMemMMSP.Block) h) ->
-      In addr block ->
-      FinMemMMSP.ptr_in_heap_prop h root_ptr addr.
-  Proof.
-    intros h root root_ptr block addr PTOI ELEMS BLOCK.
-    red.
-    eapply SetoidList.In_InA in ELEMS.
-    eapply IntMaps.IP.F.elements_mapsto_iff in ELEMS.
-    2: typeclasses eauto.
-    eapply IntMaps.IP.F.find_mapsto_iff in ELEMS.
-    rewrite PTOI, ELEMS.
-    apply in_map; auto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma every_int_has_big_ptr :
-    forall z,
-    exists addr, LLVMParamsBigIntptr.PTOI.ptr_to_int addr = z.
-  Proof.
-    intros z.
-    pose proof (InfITOP_BIG.int_to_ptr_safe z InfPROV.nil_prov).
-    break_match_hyp_inv.
-    exists a.
-    erewrite InterpreterStackBigIntptr.LP.ITOP.ptr_to_int_int_to_ptr; eauto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma ptr_in_heap_prop_lift_inv' :
-    forall {h root_inf root_fin ptr_inf},
-      InfMem.MMEP.MMSP.ptr_in_heap_prop (lift_Heap h) root_inf ptr_inf ->
-      InfToFinAddrConvert.addr_convert root_inf = NoOom root_fin ->
-      exists ptr_fin,
-        InfToFinAddrConvert.addr_convert ptr_inf = NoOom ptr_fin /\
-          FinMem.MMEP.MMSP.ptr_in_heap_prop h root_fin ptr_fin.
-  Proof.
-    intros h root_inf root_fin ptr_inf IN CONV.
-    red in IN.
-    unfold lift_Heap, lift_Block in IN.
-    unfold FinMem.MMEP.MMSP.ptr_in_heap_prop.
-
-    rewrite IntMaps.IP.F.map_o in IN.
-    break_match_hyp; try contradiction.
-    apply Util.option_map_some_inv in Heqo as (?&?&?).
-
-    erewrite fin_inf_ptoi; eauto.
-    apply find_filter_dom_true in H.
-    destruct H as [H HB].
-    rewrite H.
-
-    generalize dependent b.
-    clear H.
-    induction x; intros b H0 IN.
-    - cbn in *.
-      inv H0.
-      cbn in *.
-      contradiction.
-    - cbn in *.
-      inv H0.
-      destruct IN as [IN | IN].
-      + destruct a.
-        destruct ptr_inf.
-        exists (i, p0).
-        split; auto.
-        {
-          rewrite fin_to_inf_addr_ptr_to_int in IN.
-          cbn in IN.
-          unfold LLVMParams64BitIntptr.PTOI.ptr_to_int in IN.
-          cbn in IN; subst.
-
-          cbn.
-          unfold FinITOP.int_to_ptr.
-          break_match.
-          {
-            pose proof Integers.Int64.unsigned_range i.
-            lia.
-          }
-
-          rewrite Int64.repr_unsigned.
-          auto.
-        }
-      + rewrite List.map_map in IN.
-        apply in_map_iff in IN.
-        pose proof IN as IN'.
-        destruct IN as (?&?&?).
-
-        specialize (IHx _ eq_refl).
-        forward IHx.
-        { rewrite List.map_map.
-          apply in_map_iff.
-          auto.
-        }
-
-        destruct IHx as (?&?&?).
-        exists x1.
-        split; auto.
-  Qed.
-
-  Lemma fin_ptr_to_int_in_bounds:
-    forall (ptr : FinAddr.addr),
-          in_bounds (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr) = true.
-  Proof.
-    intros.
-    destruct ptr.
-    unfold LLVMParams64BitIntptr.PTOI.ptr_to_int. cbn.
-    eapply in_bounds_exists_addr.
-    exists (i,p); auto.
-  Qed.
-
-  Lemma find_ptr_to_int_lift_Heap :
-    forall h ptr,
-      IntMaps.IM.find (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr) (lift_Heap h) =
-        option_map lift_Block (IntMaps.IM.find (LLVMParams64BitIntptr.PTOI.ptr_to_int ptr) h).
-  Proof.
-    intros.
-    unfold lift_Heap.
-
-    unfold option_map.
-    break_match.
-    - apply IntMaps.IP.F.find_mapsto_iff in Heqo.
-      apply IntMaps.IP.F.find_mapsto_iff.
-      apply IntMaps.IP.F.map_mapsto_iff.
-      exists b. split; auto.
-      apply MapsTo_filter_dom_true.
-      split.
-      apply fin_ptr_to_int_in_bounds.
-      assumption.
-    - rewrite IntMaps.IP.F.map_o.
-      apply (find_filter_dom_None in_bounds) in Heqo.
-      rewrite Heqo.
-      reflexivity.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma ptr_in_heap_prop_lift :
-    forall h root ptr,
-      FinMem.MMEP.MMSP.ptr_in_heap_prop h root ptr ->
-      InfMem.MMEP.MMSP.ptr_in_heap_prop (lift_Heap h) (fin_to_inf_addr root) (fin_to_inf_addr ptr).
-  Proof.
-    intros h root ptr IN.
-    red in *.
-    rewrite fin_to_inf_addr_ptr_to_int.
-    rewrite find_ptr_to_int_lift_Heap.
-
-    destruct (IntMaps.IM.find (elt:=FinMem.MMEP.MMSP.Block) (LLVMParams64BitIntptr.PTOI.ptr_to_int root) h) eqn: EQ; simpl in *.
-    - unfold lift_Block.
-      apply in_map_iff in IN.
-      destruct IN as [addr [EQ' HI]].
-      apply in_map_iff.
-      exists (fin_to_inf_addr addr).
-      split.
-      rewrite fin_to_inf_addr_ptr_to_int.
-      rewrite fin_to_inf_addr_ptr_to_int.
-      assumption.
-      apply in_map.
-      assumption.
-    - contradiction.
-  Qed.
-
-  Lemma ptr_in_heap_prop_addr_convert:
-    forall {h root_inf ptr_inf},
-      InfMem.MMEP.MMSP.ptr_in_heap_prop (lift_Heap h) root_inf ptr_inf ->
-      exists root_fin,
-      InfToFinAddrConvert.addr_convert root_inf = NoOom root_fin.
-  Proof.
-    intros h root_inf ptr_inf IN.
-    red in IN.
-    unfold lift_Heap, lift_Block in IN.
-    break_match_hyp; try contradiction.
-    apply IntMaps.IP.F.find_mapsto_iff in Heqo.
-    apply IntMaps.IP.F.map_mapsto_iff in Heqo.
-    destruct Heqo as [b_fin [EQ HB]].
-    apply MapsTo_filter_dom_true in HB.
-    destruct HB as [IB HB].
-    apply (in_bounds_exists_addr _ (snd root_inf)) in IB.
-    destruct IB as [root_fin [EQR HS]].
-    exists root_fin.
-    rewrite <- fin_to_inf_addr_ptr_to_int in EQR.
-    destruct root_inf.
-    cbn in *. subst.
-    destruct root_fin. cbn.
-    erewrite <- fin_inf_ptoi.
-    rewrite ITOP.int_to_ptr_ptr_to_int. reflexivity.
-    auto.
-    rewrite addr_convert_fin_to_inf_addr.
-    reflexivity.
-  Qed.
-
-  Lemma ptr_in_heap_prop_lift_inv :
-    forall {h root_inf ptr_inf},
-      InfMem.MMEP.MMSP.ptr_in_heap_prop (lift_Heap h) root_inf ptr_inf ->
-      exists root_fin, exists ptr_fin,
-        InfToFinAddrConvert.addr_convert root_inf = NoOom root_fin /\
-        InfToFinAddrConvert.addr_convert ptr_inf = NoOom ptr_fin /\
-          FinMem.MMEP.MMSP.ptr_in_heap_prop h root_fin ptr_fin.
-  Proof.
-    intros h root_inf ptr_inf H.
-    specialize (ptr_in_heap_prop_addr_convert H) as H1.
-    destruct H1 as [root_fin HC].
-    exists root_fin.
-    specialize  (ptr_in_heap_prop_lift_inv' H HC) as HX.
-    destruct HX as [ptr_fin [HP HH]].
-    exists ptr_fin; eauto.
-  Qed.
-
-  (* TODO: Move this *)
   Lemma MemState_refine_prop_frame_stack_preserved :
     forall ms_inf ms_fin,
       MemState_refine_prop ms_inf ms_fin ->
@@ -13206,113 +13595,6 @@ cofix CIH
   Qed.
   *)
 
-  Lemma MapsTo_filter_dom_subset_strong :
-    forall {A} x v f (m : IntMaps.IntMap A),
-    IntMaps.IM.MapsTo x v (IntMaps.IP.filter_dom f m) ->
-    IntMaps.IM.MapsTo x v m /\ f x = true.
-  Proof.
-    intros.
-    apply IntMaps.IP.filter_iff in H; auto.
-    repeat red; intros; subst; auto.
-  Qed.
-
-  Lemma In_MapsTo_exists :
-    forall {A} x (m : IntMaps.IntMap A),
-      IntMaps.IM.In x m <->
-        exists v, IntMaps.IM.MapsTo x v m.
-  Proof.
-    intros.
-    split; intros.
-    - rewrite IntMaps.IP.F.mem_in_iff in H.
-      assert (IntMaps.member x m = true).
-      unfold IntMaps.member. assumption.
-      apply IntMaps.member_lookup in H0.
-      destruct H0 as [v HV].
-      exists v. unfold IntMaps.lookup in HV.
-      apply IntMaps.IM.find_2 in HV.
-      assumption.
-    - destruct H as [v HV].
-      rewrite IntMaps.IP.F.mem_in_iff.
-      apply IntMaps.IM.find_1 in HV.
-      eapply IntMaps.lookup_member.
-      apply HV.
-  Qed.
-
-  Lemma root_in_heap_prop_lift :
-    forall h root,
-      FinMem.MMEP.MMSP.root_in_heap_prop h root ->
-      InfMem.MMEP.MMSP.root_in_heap_prop (lift_Heap h) (fin_to_inf_addr root).
-  Proof.
-    intros h root H.
-    unfold FinMem.MMEP.MMSP.root_in_heap_prop in H.
-    unfold InfMem.MMEP.MMSP.root_in_heap_prop.
-    rewrite fin_to_inf_addr_ptr_to_int.
-    unfold lift_Heap.
-    unfold IntMaps.member in *.
-    apply IntMaps.IP.F.mem_in_iff.
-    apply IntMaps.IP.F.mem_in_iff in H.
-    apply In_MapsTo_exists.
-    rewrite In_MapsTo_exists in H.
-    destruct H as [b HM].
-    exists (lift_Block b).
-    rewrite filter_dom_map_eq.
-    apply MapsTo_filter_dom_true.
-    split.
-    - apply fin_ptr_to_int_in_bounds.
-    - apply IntMaps.IM.map_1.
-      assumption.
-  Qed.
-
-  (* (* TODO: Move this *) *)
-  (* Definition heap_refine (h1 : InfMemMMSP.Heap) (h2 : FinMemMMSP.Heap) : Prop *)
-  (*   := MemoryBigIntptr.MMEP.MemSpec.heap_preserved h1 (lift_Heap h2). *)
-
-  (* TODO: Move this *)
-  (* TODO: This may not be true... The roots are just keys in the map *)
-  (*    for the heap, so nothing is forcing them to be in bounds for *)
-  (*    finite memory... May be able to use MemState_refine_prop's *)
-  (*    heap_preserved component to ensure this, though? *)
-  (*  *)
-  (* TODO: Will need the heap in bounds predicate *)
-  Lemma root_in_heap_prop_lift_inv :
-    forall {h root_inf},
-      InfMem.MMEP.MMSP.root_in_heap_prop (lift_Heap h) root_inf ->
-      exists root_fin,
-        InfToFinAddrConvert.addr_convert root_inf = NoOom root_fin /\
-        FinMem.MMEP.MMSP.root_in_heap_prop h root_fin.
-  Proof.
-    intros h root_inf IN.
-    red in IN.
-    apply IntMaps.member_lookup in IN.
-    destruct IN as [v HV].
-    unfold IntMaps.lookup in HV.
-    unfold InfMem.MMEP.MMSP.Block in HV.
-    unfold InfMemMMSP.Block in *.
-    unfold lift_Heap in HV.
-    apply IntMaps.IP.F.find_mapsto_iff in HV.
-    apply filter_dom_map_eq in HV.
-    apply MapsTo_filter_dom_subset_strong in HV.
-    destruct HV as [HV IN].
-    destruct root_inf.
-    cbn in *.
-    apply (in_bounds_exists_addr i p) in IN.
-    destruct IN as [root_fin [HF EQ]].
-    exists root_fin.
-    split.
-    - destruct root_fin. cbn in *.
-      subst.
-      apply LLVMParams64BitIntptr.ITOP.int_to_ptr_ptr_to_int. auto.
-    - unfold FinMem.MMEP.MMSP.root_in_heap_prop.
-      unfold IntMaps.member.
-      apply IntMaps.IP.F.mem_in_iff.
-      rewrite HF.
-      apply IntMaps.IP.F.map_mapsto_iff in HV.
-      destruct HV as [b [_ HIN]].
-      apply In_MapsTo_exists.
-      exists b.
-      assumption.
-  Qed.
-
   (* TODO: Move this *)
   Lemma memory_stack_frame_stack_prop_lift :
     forall ms_fin fs_fin,
@@ -13325,80 +13607,6 @@ cofix CIH
     cbn in *.
     apply frame_stack_eqv_lift.
     auto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma Heap_eqv_lift :
-    forall h1 h2,
-      FinMem.MMEP.MMSP.heap_eqv h1 h2 ->
-      InfMem.MMEP.MMSP.heap_eqv (lift_Heap h1) (lift_Heap h2).
-  Proof.
-    intros h1 h2 H.
-    inversion H.
-    constructor; intros; split; intros.
-    - apply root_in_heap_prop_lift_inv in H0.
-      destruct H0 as [root_fin [HEQ HF]].
-      apply heap_roots_eqv in HF.
-      eapply root_in_heap_prop_lift in HF.
-      erewrite lift_addr_Convert_addr_inverse in HF; eauto.
-    - apply root_in_heap_prop_lift_inv in H0.
-      destruct H0 as [root_fin [HEQ HF]].
-      apply heap_roots_eqv in HF.
-      eapply root_in_heap_prop_lift in HF.
-      erewrite lift_addr_Convert_addr_inverse in HF; eauto.
-    - specialize (ptr_in_heap_prop_lift_inv H0) as HL.
-      destruct HL as [root_fin [ptr_fin [HR [HP HIN]]]].
-      apply heap_ptrs_eqv in HIN.
-      apply ptr_in_heap_prop_lift in HIN.
-
-      rewrite (lift_addr_Convert_addr_inverse HR) in HIN.
-      rewrite (lift_addr_Convert_addr_inverse HP) in HIN.
-      assumption.
-    - specialize (ptr_in_heap_prop_lift_inv H0) as HL.
-      destruct HL as [root_fin [ptr_fin [HR [HP HIN]]]].
-      apply heap_ptrs_eqv in HIN.
-      apply ptr_in_heap_prop_lift in HIN.
-
-      rewrite (lift_addr_Convert_addr_inverse HR) in HIN.
-      rewrite (lift_addr_Convert_addr_inverse HP) in HIN.
-      assumption.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma Heap_eqv_lift' :
-    forall h1 h2,
-      InfMem.MMEP.MMSP.heap_eqv (lift_Heap h1) (lift_Heap h2) ->
-      FinMem.MMEP.MMSP.heap_eqv h1 h2.
-  Proof.
-    intros h1 h2 H.
-    inversion H.
-    constructor; intros; split; intros.
-    - apply root_in_heap_prop_lift in H0.
-      apply heap_roots_eqv in H0.
-      apply root_in_heap_prop_lift_inv in H0.
-      destruct H0 as [root_fin [HEQ HF]].
-      rewrite addr_convert_fin_to_inf_addr in HEQ; inv HEQ.
-      auto.
-    - apply root_in_heap_prop_lift in H0.
-      apply heap_roots_eqv in H0.
-      apply root_in_heap_prop_lift_inv in H0.
-      destruct H0 as [root_fin [HEQ HF]].
-      rewrite addr_convert_fin_to_inf_addr in HEQ; inv HEQ.
-      auto.
-    - specialize (ptr_in_heap_prop_lift _ _ _ H0) as HL.
-      apply heap_ptrs_eqv in HL.
-      apply ptr_in_heap_prop_lift_inv in HL.
-      destruct HL as [root_fin [ptr_fin [HR [HP HIN]]]].
-      rewrite addr_convert_fin_to_inf_addr in HR, HP.
-      inv HR; inv HP.
-      auto.
-    - specialize (ptr_in_heap_prop_lift _ _ _ H0) as HL.
-      apply heap_ptrs_eqv in HL.
-      apply ptr_in_heap_prop_lift_inv in HL.
-      destruct HL as [root_fin [ptr_fin [HR [HP HIN]]]].
-      rewrite addr_convert_fin_to_inf_addr in HR, HP.
-      inv HR; inv HP.
-      auto.
   Qed.
 
   (* TODO: Move this *)
