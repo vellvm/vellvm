@@ -252,6 +252,46 @@ let output_asts (rs : result_sum) () : unit =
     let correct_folder_loc = Platform.append_loc folder_loc "correct" in
     let incorrect_folder_loc = Platform.append_loc folder_loc "incorrect" in
     Platform.dir_configure folder_loc () ;
+    Platform.dir_configure correct_folder_loc () ;
+    Platform.dir_configure incorrect_folder_loc () ;
+    let count = (0, 0) in
+    let write_res_to_file (correct_folder_loc : string)
+        (incorrect_folder_loc : string) (filename : string)
+        (x : test_result * test_outcome) (acc : int * int) : int * int =
+      let correct_count, incorrect_count = acc in
+      let _, o = x in
+      let test_name = IO.get_test_name filename in
+      match o with
+      | AST_ERR_MSG (ast, _) ->
+          let file_loc =
+            Printf.sprintf "%s/%s%d.ll" incorrect_folder_loc test_name
+              incorrect_count
+          in
+          IO.output_file file_loc ast ;
+          (correct_count, incorrect_count + 1)
+      | AST_TEST_ERR (ast, _) ->
+          let file_loc =
+            Printf.sprintf "%s/%s%d.ll" incorrect_folder_loc test_name
+              incorrect_count
+          in
+          IO.output_file file_loc ast ;
+          (correct_count, incorrect_count + 1)
+      | AST_CORRECT ast ->
+          let file_loc =
+            Printf.sprintf "%s/%s%d.ll" correct_folder_loc test_name
+              correct_count
+          in
+          IO.output_file file_loc ast ;
+          (correct_count + 1, incorrect_count)
+      | _ -> acc
+    in
+    let _ =
+      List.fold_right
+        (fun x acc ->
+          write_res_to_file correct_folder_loc incorrect_folder_loc filename
+            x acc )
+        r_o_list count
+    in
     ()
   in
   let str_map =
@@ -268,7 +308,7 @@ let output_asts (rs : result_sum) () : unit =
   in
   let file_bindings = StringMap.bindings str_map in
   List.fold_right
-    (fun x acc -> write_policy x)
+    (fun x _ -> write_policy x)
     file_bindings (* Print each file to its folder *)
     (*1. Group files by their name and then by output *)
     (*Steps: 0. For each file, create correct or error *)
