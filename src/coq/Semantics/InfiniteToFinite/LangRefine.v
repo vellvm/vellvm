@@ -13749,6 +13749,49 @@ Qed.
     }
   Qed.
 
+  Lemma dvalue_refine_strict_preserves_dvalue_is_poison :
+    forall x y,
+      dvalue_refine_strict x y ->
+      DV1.dvalue_is_poison x = DV2.dvalue_is_poison y.
+  Proof.
+    intros x y H.
+    destruct x;
+      unfold dvalue_refine_strict in *; cbn in *; try break_match_hyp; inv H; cbn; auto.
+  Qed.
+
+  Lemma concretize_or_pick_exp_E_orutt_strict :
+    forall uv1 uv2,
+      uvalue_refine_strict uv1 uv2 ->
+      orutt exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
+        (IS1.LLVM.D.concretize_or_pick uv1) (concretize_or_pick uv2)
+        (OOM:=OOME).
+  Proof.
+    intros uv1 uv2 REF.
+    unfold IS1.LLVM.D.pickUnique, IS1.LLVM.D.concretize_or_pick.
+    unfold pickUnique, concretize_or_pick.
+    cbn.
+    break_match;
+      eapply uvalue_refine_strict_preserves_is_concrete with (uvc:=uv2) in Heqb; eauto;
+      rewrite Heqb.
+
+    apply lift_err_uvalue_to_dvalue_orutt_strict_exp_E; eauto.
+
+    repeat rewrite bind_trigger.
+    apply orutt_Vis.
+
+    { cbn; auto. }
+
+    intros t1 t2 H.
+    apply orutt_Ret.
+    destruct t1 as [dv1 []].
+    destruct t2 as [dv2 []].
+    cbn in *.
+    inv H; subst_existT; cbn in *.
+    tauto.
+
+    intros o CONTRA; inv CONTRA.
+  Qed.
+
   Lemma denote_terminator_orutt_strict :
     forall term,
       orutt exp_E_refine_strict exp_E_res_refine_strict (sum_rel eq uvalue_refine_strict) (IS1.LLVM.D.denote_terminator term)
@@ -13771,8 +13814,7 @@ Qed.
 
       intros r1 r2 H.
       eapply orutt_bind with (RR:=dvalue_refine_strict).
-      (* TODO: need something about concretize_or_pick *)
-      admit.
+      apply concretize_or_pick_exp_E_orutt_strict; eauto.
 
       intros r0 r3 H0.
       break_match; unfold dvalue_refine_strict in *; cbn in *; try break_match_hyp; inv H0;
@@ -13793,16 +13835,6 @@ Qed.
       apply pickUnique_exp_E_orutt_strict; auto.
 
       intros r0 r3 H0.
-      Set Nested Proofs Allowed.
-      Lemma dvalue_refine_strict_preserves_dvalue_is_poison :
-        forall x y,
-          dvalue_refine_strict x y ->
-          DV1.dvalue_is_poison x = DV2.dvalue_is_poison y.
-      Proof.
-        intros x y H.
-        destruct x;
-        unfold dvalue_refine_strict in *; cbn in *; try break_match_hyp; inv H; cbn; auto.
-      Qed.
 
       pose proof dvalue_refine_strict_preserves_dvalue_is_poison _ _ H0.
       rewrite H1.
@@ -13825,14 +13857,52 @@ Qed.
         constructor; auto.
       }
 
-      intros r4 r5 H2.
-      (* TODO: switch??? *)
-      admit.
+      (* TODO: Factor out this switch lemma *)
+      { intros r4 r5 H2.
+        induction H2.
+        - cbn.
+          apply orutt_Ret; auto.
+        - cbn.
+          destruct x, y.
+          destruct r0;
+            cbn in H1; inv H1;
+            red in H0; cbn in H0;
+            try break_match_hyp_inv; try inv H0;
+            cbn; try solve_orutt_raise.
+          + destruct H2; cbn in *; subst.
+            destruct d0; red in fst_rel;
+              cbn in fst_rel;
+              try break_match_hyp_inv; try inv fst_rel;
+              cbn; try solve_orutt_raise.
+            break_match_goal; cbn; eauto.
+            apply orutt_Ret; auto.
+          + destruct H2; cbn in *; subst.
+            destruct d0; red in fst_rel;
+              cbn in fst_rel;
+              try break_match_hyp_inv; try inv fst_rel;
+              cbn; try solve_orutt_raise.
+            break_match_goal; cbn; eauto.
+            apply orutt_Ret; auto.
+          + destruct H2; cbn in *; subst.
+            destruct d0; red in fst_rel;
+              cbn in fst_rel;
+              try break_match_hyp_inv; try inv fst_rel;
+              cbn; try solve_orutt_raise.
+            break_match_goal; cbn; eauto.
+            apply orutt_Ret; auto.
+          + destruct H2; cbn in *; subst.
+            destruct d0; red in fst_rel;
+              cbn in fst_rel;
+              try break_match_hyp_inv; try inv fst_rel;
+              cbn; try solve_orutt_raise.
+            break_match_goal; cbn; eauto.
+            apply orutt_Ret; auto.
+      }
     - solve_orutt_raise.
     - solve_orutt_raise.
     - solve_orutt_raise.
     - solve_orutt_raiseUB.
-  Admitted.
+  Qed.
 
   Lemma denote_block_orutt_strict :
     forall block bid,
