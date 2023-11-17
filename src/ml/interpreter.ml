@@ -102,20 +102,20 @@ let rec step (m : ('a coq_L4, MMEP.MMSP.coq_MemState * (MemPropT.store_id * ((lo
 
   (* The OOME effect *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 msg), _k) ->
-     Error (OutOfMemory (Camlcoq.camlstring_of_coqstring msg))
+     Error (OutOfMemory "")
 
   (* UBE event *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 msg)), _k) ->
-     Error (UndefinedBehavior(Camlcoq.camlstring_of_coqstring msg))
+     Error (UndefinedBehavior "")
 
   (* The DebugE effect *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 msg))), k) ->
-     (debug (Camlcoq.camlstring_of_coqstring msg);
+     (debug "";
       step (k (Obj.magic DV.DVALUE_None)))
 
   (* The FailureE effect is a failure *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 msg))), _) ->
-     Error (Failed (Camlcoq.camlstring_of_coqstring msg))
+     Error (Failed "")
 
   (* The only visible effects from LLVMIO that should propagate to the interpreter are:
      - Call to external functions
