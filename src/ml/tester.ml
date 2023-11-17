@@ -246,39 +246,44 @@ let output_asts (rs : result_sum) () : unit =
   let write_policy (file_case : string * (test_result * test_outcome) list) :
       unit =
     let filename, r_o_list = file_case in
+    let test_folder_path_list, test_file_name = IO.unzip_filename filename in
     let folder_loc =
-      Platform.append_loc !Platform.result_dir_path filename
+      String.concat "/"
+        (List.append
+           (!Platform.result_dir_path :: test_folder_path_list)
+           [test_file_name] )
     in
     let correct_folder_loc = Platform.append_loc folder_loc "correct" in
     let incorrect_folder_loc = Platform.append_loc folder_loc "incorrect" in
-    Platform.dir_configure folder_loc () ;
+    Platform.rec_dir_configure !Platform.result_dir_path
+      (List.append test_folder_path_list [test_file_name])
+      () ;
     Platform.dir_configure correct_folder_loc () ;
     Platform.dir_configure incorrect_folder_loc () ;
     let count = (0, 0) in
     let write_res_to_file (correct_folder_loc : string)
-        (incorrect_folder_loc : string) (filename : string)
+        (incorrect_folder_loc : string) (test_file_name : string)
         (x : test_result * test_outcome) (acc : int * int) : int * int =
       let correct_count, incorrect_count = acc in
       let _, o = x in
-      let test_name = IO.get_test_name filename in
       match o with
       | AST_ERR_MSG (ast, _) ->
           let file_loc =
-            Printf.sprintf "%s/%s%d.ll" incorrect_folder_loc test_name
+            Printf.sprintf "%s/%s%d.ll" incorrect_folder_loc test_file_name
               incorrect_count
           in
           IO.output_file file_loc ast ;
           (correct_count, incorrect_count + 1)
       | AST_TEST_ERR (ast, _) ->
           let file_loc =
-            Printf.sprintf "%s/%s%d.ll" incorrect_folder_loc test_name
+            Printf.sprintf "%s/%s%d.ll" incorrect_folder_loc test_file_name
               incorrect_count
           in
           IO.output_file file_loc ast ;
           (correct_count, incorrect_count + 1)
       | AST_CORRECT ast ->
           let file_loc =
-            Printf.sprintf "%s/%s%d.ll" correct_folder_loc test_name
+            Printf.sprintf "%s/%s%d.ll" correct_folder_loc test_file_name
               correct_count
           in
           IO.output_file file_loc ast ;
@@ -288,8 +293,8 @@ let output_asts (rs : result_sum) () : unit =
     let _ =
       List.fold_right
         (fun x acc ->
-          write_res_to_file correct_folder_loc incorrect_folder_loc filename
-            x acc )
+          write_res_to_file correct_folder_loc incorrect_folder_loc
+            test_file_name x acc )
         r_o_list count
     in
     ()

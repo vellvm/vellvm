@@ -50,3 +50,16 @@ let ll_files_of_dir path : string list =
 
 let get_test_name (filename : string) =
   String.sub filename 0 (String.length filename - 3)
+
+(* getting rid of the header ".." and "tests". Then split the file name into
+   foldername and filename*)
+let unzip_filename (filename : string) : string list * string =
+  ( List.filter
+      (fun x -> not (List.mem x [".."; "tests"; ""]))
+      (String.split_on_char '/' (Filename.dirname filename))
+  , get_test_name (Filename.basename filename) )
+(* let rec concat_until_last (l : string list) (result : string * string) :
+   string * string = match l with | str2 :: [] -> (fst result, str2) | str1
+   :: xs -> concat_until_last xs (fst result ^ "/" ^ str1, snd result) | _ ->
+   result in concat_until_last (List.filter (Fun.flip List.mem ["..";
+   "tests"]) (String.split_on_char '/' filename) ) ("", "") *)

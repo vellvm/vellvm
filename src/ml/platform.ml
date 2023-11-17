@@ -201,4 +201,13 @@ let dir_configure (path : string) () : unit =
    Unix_error (ENOENT, _, _) -> verb @@ Printf.sprintf "creating output
    directory: %s\n" !output_path ; mkdir !output_path 0o755 *)
 
+(* Configure directory. Assume that base is already created *)
+let rec rec_dir_configure (base : string) (l : string list) () : unit =
+  match l with
+  | [] -> ()
+  | x :: xs ->
+      let subpath = String.concat "/" [base; x] in
+      dir_configure subpath () ;
+      rec_dir_configure subpath xs ()
+
 let append_loc : string -> string -> string = Printf.sprintf "%s/%s"
