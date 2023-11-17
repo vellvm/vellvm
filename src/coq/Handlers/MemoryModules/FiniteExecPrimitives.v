@@ -6404,6 +6404,64 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         discriminate.
     Qed.
 
+    (* TODO: Move this earlier? *)
+    Lemma read_byte_allowed_byte_not_allocated :
+        forall ms ptr,
+          byte_not_allocated ms ptr ->
+          ~ read_byte_allowed ms ptr.
+    Proof.
+      intros ms ptr NALLOC.
+      intros CONTRA.
+      red in CONTRA, NALLOC.
+      destruct CONTRA as (?&?&?).
+      eapply NALLOC; eauto.
+    Qed.
+
+    (* TODO: Move this earlier? *)
+    Lemma read_byte_prop_byte_not_allocated :
+        forall ms ptr byte,
+          byte_not_allocated ms ptr ->
+          ~ read_byte_prop ms ptr byte.
+    Proof.
+      intros ms ptr byte NALLOC.
+      intros CONTRA.
+      red in CONTRA, NALLOC.
+      red in CONTRA.
+      break_match_hyp; try contradiction.
+      break_match_hyp_inv.
+      destruct m.
+      eapply NALLOC; eauto.
+      repeat red.
+      rewrite Heqo.
+      symmetry; apply aid_eq_dec_refl.      
+    Qed.
+
+    (* TODO: Move this earlier? *)
+    Lemma write_byte_allowed_byte_not_allocated :
+        forall ms ptr,
+          byte_not_allocated ms ptr ->
+          ~ write_byte_allowed ms ptr.
+    Proof.
+      intros ms ptr NALLOC.
+      intros CONTRA.
+      red in CONTRA, NALLOC.
+      destruct CONTRA as (?&?&?).
+      eapply NALLOC; eauto.
+    Qed.
+
+    (* TODO: Move this earlier? *)
+    Lemma free_byte_allowed_byte_not_allocated :
+        forall ms ptr,
+          byte_not_allocated ms ptr ->
+          ~ free_byte_allowed ms ptr.
+    Proof.
+      intros ms ptr NALLOC.
+      intros CONTRA.
+      red in CONTRA, NALLOC.
+      destruct CONTRA as (?&?&?).
+      eapply NALLOC; eauto.
+    Qed.
+
     End MemoryPrimatives.
 
 End FiniteMemoryModelExecPrimitives.

@@ -2999,6 +2999,121 @@ Lemma lift_memory_convert_mem_byte :
       try red in H; try (rewrite <- H; auto); try (rewrite H; auto).
   Qed.
 
+  Lemma MemState_refine_prop_initial :
+    MemState_refine_prop InfMemMMSP.initial_memory_state FinMemMMSP.initial_memory_state.
+  Proof.
+    red. red.
+    split; [| split; [| split; [| split; [| split; [| split]]]]].
+    - red.
+      intros p.
+      split; intros USED;
+        cbn in *;
+        red; red in USED;
+        cbn in *; auto.
+    - red.
+      split.
+      + red.
+        intros ptr; split; intros READ.
+        * pose proof MemoryBigIntptr.MMEP.initial_memory_no_allocations MemoryBigIntptr.MMEP.initial_memory_state_correct ptr.
+          pose proof InfMem.MMEP.read_byte_allowed_byte_not_allocated _ _ H.
+          contradiction.
+        * pose proof MemoryBigIntptr.MMEP.initial_memory_no_allocations MemoryBigIntptr.MMEP.initial_memory_state_correct ptr.
+          pose proof InfMem.MMEP.read_byte_allowed_byte_not_allocated _ _ H.
+          contradiction.
+      + red.
+        intros ptr; split; intros READ;
+          eapply MemoryBigIntptr.MMEP.initial_memory_read_ub in READ; try contradiction.
+    - red.
+      intros ptr; split; intros WRITE.
+      * pose proof MemoryBigIntptr.MMEP.initial_memory_no_allocations MemoryBigIntptr.MMEP.initial_memory_state_correct ptr.
+        pose proof InfMem.MMEP.write_byte_allowed_byte_not_allocated _ _ H.
+        contradiction.
+      * pose proof MemoryBigIntptr.MMEP.initial_memory_no_allocations MemoryBigIntptr.MMEP.initial_memory_state_correct ptr.
+        pose proof InfMem.MMEP.write_byte_allowed_byte_not_allocated _ _ H.
+        contradiction.
+    - red.
+      intros ptr; split; intros FREE.
+      * pose proof MemoryBigIntptr.MMEP.initial_memory_no_allocations MemoryBigIntptr.MMEP.initial_memory_state_correct ptr.
+        pose proof InfMem.MMEP.free_byte_allowed_byte_not_allocated _ _ H.
+        contradiction.
+      * pose proof MemoryBigIntptr.MMEP.initial_memory_no_allocations MemoryBigIntptr.MMEP.initial_memory_state_correct ptr.
+        pose proof InfMem.MMEP.free_byte_allowed_byte_not_allocated _ _ H.
+        contradiction.
+    - red.
+      intros ptr aid; split; intros ALLOC;
+        eapply MemoryBigIntptr.MMEP.initial_memory_no_allocations in ALLOC; contradiction.
+    - cbn; red; cbn; red.
+      intros fs; split; intros MSFSP.
+      + red; cbn.
+        unfold InfMemMMSP.empty_memory_stack, InfMemMMSP.frame_empty in *.
+        red in MSFSP.
+        cbn in *.
+        auto.
+      + red; cbn.
+        unfold InfMemMMSP.empty_memory_stack, InfMemMMSP.frame_empty in *.
+        red in MSFSP.
+        cbn in *.
+        auto.
+    - cbn; red; cbn; red.
+      intros H; split; intros HP.
+      + red; cbn.
+        unfold InfMemMMSP.empty_memory_stack, InfMemMMSP.heap_empty, FinMemMMSP.heap_empty in *.
+        red in HP.
+        cbn in *.
+        unfold lift_Heap.
+        cbn.
+        rewrite <- HP.
+        cbn.
+        constructor.
+        { intros root; split; intros ROOT.
+          - red; red in ROOT.
+            setoid_rewrite IntMaps_map_empty_Equal in ROOT.
+            eauto.
+          - red; red in ROOT.
+            setoid_rewrite IntMaps_map_empty_Equal.
+            eauto.
+        }
+        { intros root ptr; split; intros PTR.
+          - red; red in PTR.
+            break_match_hyp; try contradiction.
+            setoid_rewrite IntMaps_map_empty_Equal in Heqo.
+            break_match_goal;
+              setoid_rewrite Heqo0 in Heqo; inv Heqo; eauto.
+          - red; red in PTR.
+            break_match_hyp; try contradiction.
+            break_match_goal;
+              setoid_rewrite Heqo0 in Heqo; inv Heqo; eauto.
+        }
+      + red; cbn.
+        unfold InfMemMMSP.empty_memory_stack, InfMemMMSP.heap_empty, FinMemMMSP.heap_empty in *.
+        red in HP.
+        cbn in *.
+        unfold lift_Heap.
+        cbn.
+        rewrite <- HP.
+        cbn.
+        constructor.
+        { intros root; split; intros ROOT.
+          - red; red in ROOT.
+            setoid_rewrite IntMaps_map_empty_Equal.
+            eauto.
+          - red; red in ROOT.
+            setoid_rewrite IntMaps_map_empty_Equal in ROOT.
+            eauto.
+        }
+        { intros root ptr; split; intros PTR.
+          - red; red in PTR.
+            break_match_hyp; try contradiction.
+            break_match_goal;
+              setoid_rewrite Heqo0 in Heqo; inv Heqo; eauto.
+          - red; red in PTR.
+            break_match_hyp; try contradiction.
+            setoid_rewrite IntMaps_map_empty_Equal in Heqo.
+            break_match_goal;
+              setoid_rewrite Heqo0 in Heqo; inv Heqo; eauto.
+        }
+  Qed.
+
   (* TODO: Move this *)
   Lemma MemState_refine_prop_heap_preserved :
     forall ms_inf ms_fin,
@@ -29611,25 +29726,6 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
 
   Print Assumptions model_E1E2_23_orutt_strict.
   (* Extra stuff from the proof of the above lemma that needs to get cleaned up... But there's some other stuff in here that I need to not accidentally delete *)
-
-  (* TODO: Move this *)
-  Lemma MemState_refine_prop_initial :
-    MemState_refine_prop InfMemMMSP.initial_memory_state FinMemMMSP.initial_memory_state.
-  Proof.
-    red. red.
-    split; [| split; [| split; [| split; [| split; [| split]]]]].
-    - red.
-      intros p.
-      split; intros USED;
-        red; red in USED; cbn in *;
-        auto.
-    - red.
-      split.
-      + (* Read byte allowed *)
-        red.
-        intros ptr.
-        split; intros ALLOWED.
-  Admitted.
 
   Lemma model_E1E2_L3_orutt_strict_sound
     (p : list
