@@ -15824,6 +15824,35 @@ Qed.
           (*     ((k0, v0) :: FMapAList.alist_remove k0 (fold_right (fun '(id, v1) (m : FMapAList.alist K V2) => (id, v1) :: FMapAList.alist_remove id m) [] vs2)) *)
 
           (* TODO: look at frame stack equivalence *)
+          Lemma alist_refine_strict_fold_right_add_self :
+            forall {K V}
+              `{RD_K : @RelDec.RelDec K (@eq K)}
+              `{RD_K_CORRECT : @RelDec.RelDec_Correct _ eq RD_K}
+              (vs : FMapAList.alist K V),
+              alist_refine eq vs (fold_right (fun '(id, v) => FMapAList.alist_add id v) [] vs).
+          Proof.
+            induction vs.
+            - cbn; red; cbn.
+              auto.
+            - cbn; red; cbn.
+              red in IHvs.
+              intros k.
+              unfold OptionUtil.option_rel2 in *.
+              destruct a.
+              break_inner_match_goal.
+              + assert (k = k0).
+                apply RelDec.rel_dec_correct; eauto.
+
+                subst.
+                rewrite alist_find_add_eq; auto.
+              + rewrite alist_find_neq; eauto.
+                apply IHvs.
+                intros CONTRA.
+                subst.
+                rewrite Util.eq_dec_eq in Heqb.
+                discriminate.
+          Qed.
+
           Lemma alist_refine_strict_fold_right_add :
             forall {K V1 V2}
               `{RD_K : @RelDec.RelDec K (@eq K)}
@@ -15833,13 +15862,33 @@ Qed.
               alist_refine R (fold_right (fun '(id, v) => FMapAList.alist_add id v) [] vs1) (fold_right (fun '(id, v) => FMapAList.alist_add id v) [] vs2).
           Proof.
             intros K V1 V2 RD_K RD_K_CORRECT R vs1 vs2 REF.
-            unfold FMapAList.alist_add.
-            hinduction vs1 before vs2; intros vs2 REF.
-            (* TODO: Ugh, equivalent alists may not be in the same
-               order *)
-            - admit.
-            - admit.
-          Admitted.
+            pose proof alist_refine_strict_fold_right_add_self vs1.
+            red.
+            red in H.
+            unfold OptionUtil.option_rel2 in *.
+            intros k.
+            specialize (H k).
+            break_match_hyp; try contradiction.
+            - break_match_hyp; try contradiction; subst.
+              pose proof alist_refine_strict_fold_right_add_self vs2.
+              red in H.
+              unfold OptionUtil.option_rel2 in *.
+              specialize (H k).
+              specialize (REF k).
+              unfold OptionUtil.option_rel2 in *.
+              rewrite Heqo in REF; auto.
+              break_match_hyp; try contradiction.
+              break_match_hyp; subst; auto.
+            - specialize (REF k).
+              unfold OptionUtil.option_rel2 in *.
+              rewrite Heqo in REF; auto.
+              break_match_hyp; try contradiction; subst.
+              pose proof alist_refine_strict_fold_right_add_self vs2.
+              red in H0.
+              unfold OptionUtil.option_rel2 in *.
+              specialize (H0 k).
+              break_match_hyp; try contradiction; auto.
+          Qed.
 
           apply alist_refine_strict_fold_right_add; auto.
         }
