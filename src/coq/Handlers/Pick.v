@@ -97,19 +97,26 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
 
     Inductive PickUvalue_handler  {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E} : PickUvalueE ~> PropT E :=
     | PickUV_UniqueUB : forall x t,
-        ~ (unique_prop x) -> PickUvalue_handler (@pickUnique _ _ (fun _ _ => True) x) t
-    | PickUV_UniqueRet : forall x (res : err_ub_oom dvalue) (t : itree E {y : dvalue | True}),
+        ~ (unique_prop x) ->
+        PickUvalue_handler (@pickUnique _ _ (fun _ _ => True) x) t
+    | PickUV_UniqueRet :
+      forall x (res : err_ub_oom dvalue) (t : itree E {y : dvalue | True})
+        (Conc : concretize_u x res),
         unique_prop x ->
         t ≈ lift_err_ub_oom_post_ret id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) ->
         PickUvalue_handler (@pickUnique _ _ (fun _ _ => True) x) t
     | PickUV_NonPoisonUB : forall x t,
         ~ (forall dt, ~concretize x (DVALUE_Poison dt)) ->
         PickUvalue_handler (@pickNonPoison _ _ (fun _ _ => True) x) t
-    | PickUV_NonPoisonRet : forall x (res : err_ub_oom dvalue) (t : itree E {y : dvalue | True}),
+    | PickUV_NonPoisonRet :
+      forall x (res : err_ub_oom dvalue) (t : itree E {y : dvalue | True})
+        (Conc : concretize_u x res),
         (forall dt, ~concretize x (DVALUE_Poison dt)) ->
         t ≈ lift_err_ub_oom_post_ret id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) ->
         PickUvalue_handler (@pickNonPoison _ _ (fun _ _ => True) x) t                           
-    | PickUV_Ret : forall x (res : err_ub_oom dvalue) (t : itree E {y : dvalue | True}),
+    | PickUV_Ret :
+      forall x (res : err_ub_oom dvalue) (t : itree E {y : dvalue | True})
+        (Conc : concretize_u x res),
         t ≈ lift_err_ub_oom_post_ret id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) ->
         PickUvalue_handler (@pick _ _ (fun _ _ => True) x) t.
 

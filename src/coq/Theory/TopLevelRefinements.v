@@ -378,70 +378,74 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       - inversion H4.
         + (* PickUV_UniqueUB *)
           dependent destruction H5.
-          apply inj_pair2 in H8.
+          apply inj_pair2 in H6, H10.
           subst.
           apply PickUV_UniqueUB. assumption.
+          destruct H11.
+          eexists; rewrite <- H3; eauto.
         + (* PickUV_UniqueRet *)
           dependent destruction H5.
           apply inj_pair2 in H6.
           apply inj_pair2 in H10.
           subst.
-          eapply PickUV_UniqueRet.
-          assumption.
+          eapply PickUV_UniqueRet; eauto.
           rewrite <- H3. apply H11.
         + (* PickUV_NonPoisonUB *)
           dependent destruction H5.
-          apply inj_pair2 in H8.
+          apply inj_pair2 in H6, H10.
           subst.
           apply PickUV_NonPoisonUB. assumption.
+          destruct H11.
+          eexists; rewrite <- H3; eauto.
         + (* PickUV_NonPoisonRet *)
           dependent destruction H5.
           apply inj_pair2 in H6.
           apply inj_pair2 in H10.
           subst.
-          eapply PickUV_NonPoisonRet.
-          assumption.
+          eapply PickUV_NonPoisonRet; eauto.
           rewrite <- H3. apply H11.
         + (* PickUV_Ret *)
           dependent destruction H5.
           apply inj_pair2 in H8.
           apply inj_pair2 in H10.
           subst.
-          eapply PickUV_Ret.
+          eapply PickUV_Ret; eauto.
           rewrite <- H3. apply H7.
       - inversion H4.
         + (* PickUV_UniqueUB *)
           dependent destruction H5.
-          apply inj_pair2 in H8.
+          apply inj_pair2 in H6, H10.
           subst.
           apply PickUV_UniqueUB. assumption.
+          destruct H11.
+          eexists; rewrite H3; eauto.
         + (* PickUV_UniqueRet *)
           dependent destruction H5.
           apply inj_pair2 in H6.
           apply inj_pair2 in H10.
           subst.
-          eapply PickUV_UniqueRet.
-          assumption.
+          eapply PickUV_UniqueRet; eauto.
           rewrite H3. apply H11.
         + (* PickUV_NonPoisonUB *)
           dependent destruction H5.
-          apply inj_pair2 in H8.
+          apply inj_pair2 in H6, H10.
           subst.
           apply PickUV_NonPoisonUB. assumption.
+          destruct H11.
+          eexists; rewrite H3; eauto.
         + (* PickUV_NonPoisonRet *)
           dependent destruction H5.
           apply inj_pair2 in H6.
           apply inj_pair2 in H10.
           subst.
-          eapply PickUV_NonPoisonRet.
-          assumption.
+          eapply PickUV_NonPoisonRet; eauto.
           rewrite H3. apply H11.
         + (* PickUV_Ret *)
           dependent destruction H5.
           apply inj_pair2 in H8.
           apply inj_pair2 in H10.
           subst.
-          eapply PickUV_Ret.
+          eapply PickUV_Ret; eauto.
           rewrite H3. apply H7.
     Qed.
 
@@ -532,6 +536,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         rewrite EQ.
       - destruct (Classical_Prop.classic (unique_prop uv)).
         + eapply PickUV_UniqueRet with (res := concretize_uvalue uv); eauto.
+          apply concretize_u_concretize_uvalue.
+
           { cbn.
             unfold ITree.map.
             unfold lift_err_ub_oom_post_ret, lift_err_ub_oom_post.
@@ -563,8 +569,13 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
               rewrite HU. setoid_rewrite bind_ret_l. reflexivity.
           }
         + eapply PickUV_UniqueUB; eauto.
+          eexists.
+          cbn.
+          red.
       - destruct (Classical_Prop.classic (forall dt : dtyp, ~ concretize uv (DVALUE_Poison dt))).
         + eapply PickUV_NonPoisonRet with (res := concretize_uvalue uv); eauto.
+          eapply concretize_u_concretize_uvalue.
+
           { cbn.
             unfold ITree.map.
             unfold lift_err_ub_oom_post_ret, lift_err_ub_oom_post.
@@ -597,6 +608,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
           }
         + eapply PickUV_NonPoisonUB; eauto.
       - eapply PickUV_Ret with (res := concretize_uvalue uv); eauto.
+        eapply concretize_u_concretize_uvalue.
+
         cbn.
         unfold ITree.map.
         unfold lift_err_ub_oom_post_ret, lift_err_ub_oom_post.
