@@ -2750,7 +2750,6 @@ Section InstrGenerators.
     (* annotate_debug ("--Generate: Global: @" ++ show name ++ " " ++ show t);; *)
     opt_exp <- fmap Some (hide_ctx (gen_exp_size 0 t FULL_CTX));;
     add_to_global_ctx (ID_Global name, TYPE_Pointer t);;
-    ctx <- get_ctx;;
     let ann_linkage : list (annotation typ) :=
       match opt_exp with
       | None => [ANN_linkage (LINKAGE_External)]
